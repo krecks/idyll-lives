@@ -8,9 +8,12 @@ use std::path::Path;
 use regex::Regex;
 
 use super::body;
-use super::contract::{HAIR_STYLES, VISEMES, channels, garments, hair_parts, required_parts};
+use super::contract::{
+    HAIR_STYLES, IDENTITY, VISEMES, channels, garments, hair_parts, required_parts,
+};
 use super::hair::{EAR_MIN, Ears};
 use super::head::head_frame;
+use super::identity;
 use super::json::JValue;
 use super::np::{degrees, linspace_open, radians};
 use super::rig::{
@@ -72,7 +75,11 @@ fn ts_list(src: &str, name: &str) -> Vec<String> {
     }
 }
 
+/// No identity channel moves anything further than this at 1 (m): a face of its own, not another head.
+const IDENTITY_REACH: f64 = 0.006;
+
 struct Runtime {
+    faces: Vec<String>,
     units: Vec<String>,
     moods: BTreeSet<String>,
     visemes: Vec<String>,
@@ -126,7 +133,12 @@ fn runtime_names() -> Runtime {
         &read(&web.join("game/household.ts")),
         "export const HAIR_STYLES",
     );
+    let faces = ts_list(
+        &read(&web.join("game/household.ts")),
+        "export const FACE_CHANNELS",
+    );
     Runtime {
+        faces,
         units,
         moods,
         visemes,
@@ -161,6 +173,27 @@ fn u16s(buf: &[u8], at: usize, n: usize) -> Vec<u16> {
         .chunks(2)
         .map(|c| u16::from_le_bytes(c.try_into().unwrap()))
         .collect()
+}
+
+/// A part's morph of channel `c` (m per vertex), if it has one.
+fn morph_of(buf: &[u8], part: &JValue, c: usize, scale: f64) -> Option<Vec<V3>> {
+    let m = part.get("morph")?;
+    let r: Vec<usize> = m.at("ranges").arr().iter().map(JValue::usize).collect();
+    if r[c + 1] == r[c] {
+        return None;
+    }
+    let verts = u16s(buf, m.at("morphVerts").usize(), m.at("count").usize());
+    let slots = u16s(buf, m.at("morphSlots").usize(), r[c + 1]);
+    let dp = i16s(buf, m.at("morphPositions").usize(), r[c + 1] * 4);
+    let mut out = vec![V3::zeros(); part.at("vertices").usize()];
+    for e in r[c]..r[c + 1] {
+        out[verts[slots[e] as usize] as usize] = v3(
+            dp[4 * e] as f64 / scale,
+            dp[4 * e + 1] as f64 / scale,
+            dp[4 * e + 2] as f64 / scale,
+        );
+    }
+    Some(out)
 }
 
 /// Python's `repr` of a list of strings.
@@ -247,9 +280,32 @@ pub fn check(out: &Path) -> bool {
     if rt.hair != HAIR_STYLES {
         fail("hairstyles differ from household.ts".into());
     }
+    // The identity channels: the last of the channels, the creator's (household.ts) in its order.
+    let (first, count) = match rig.at("morphs").get("identity") {
+        Some(i) => (i.at("first").usize(), i.at("count").usize()),
+        None => (ch.len(), 0),
+    };
+    if first + count != ch.len()
+        || ch[first.min(ch.len())..] != IDENTITY
+        || ch[..first.min(ch.len())]
+            .iter()
+            .any(|c| c.starts_with("id."))
+    {
+        fail("the identity channels are not the last channels".into());
+    }
+    if rt
+        .faces
+        .iter()
+        .map(|c| format!("id.{c}"))
+        .collect::<Vec<_>>()
+        != IDENTITY
+    {
+        fail("identity channels differ from household.ts FACE_CHANNELS".into());
+    }
 
     let mut moved: BTreeSet<String> = BTreeSet::new();
     let shell = shell_re(false);
+    let mscale = rig.at("morphs").at("scale").f64();
     let stage_scale = rig.at("stageScale").f64();
     let tone_scale = rig.at("toneScale").f64();
     for (fam, body) in rig.at("bodies").obj() {
@@ -547,6 +603,26 @@ pub fn check(out: &Path) -> bool {
                 .map(|&i| i as usize)
                 .collect();
             let ears = Ears::new(&hs.ears, &bpos, &bidx, &ear);
+            // The head as a face of its own deforms it (identity.rs): each identity channel at its two
+            // ends, as far as this stage takes it (`faceScale`), and the box of what it moves.
+            let Some(scale) = info.unwrap_or(body).get("faceScale").map(JValue::f64) else {
+                fail(format!("{fam}.{stage}: no faceScale"));
+                continue;
+            };
+            let own: Vec<_> = identity::channels(fam)
+                .iter()
+                .flat_map(|c| [-1.0, 1.0].map(|end| (c, end * scale)))
+                .filter_map(|(c, k)| {
+                    let moved = hs.moved(&skin.head_tri_ix, &c.samples.0, &c.samples.1, k);
+                    let at = c.samples.0.iter().zip(&hs.samples);
+                    let (lo, hi) = at.filter(|(d, _)| d.norm() > 0.0).fold(
+                        (V3::repeat(f64::INFINITY), V3::repeat(f64::NEG_INFINITY)),
+                        |(lo, hi), (_, p)| (lo.inf(p), hi.sup(p)),
+                    );
+                    let pad = V3::repeat(0.015);
+                    (lo.x <= hi.x).then_some((c.name, k, moved, lo - pad, hi + pad))
+                })
+                .collect();
             for (name, e) in parts.obj() {
                 if !name.starts_with("hair.") {
                     continue;
@@ -557,6 +633,32 @@ pub fn check(out: &Path) -> bool {
                     fail(format!(
                         "{fam}.{stage}:{name} comes within 2 mm of the head ({:.1} mm)",
                         gap * 1000.0
+                    ));
+                }
+                // Hair as far off a face of its own (the beard moves with the skin: its own morphs).
+                let mut worst = (0.002, "", 0.0);
+                for (c, k, moved, lo, hi) in &own {
+                    let d = morph_of(
+                        &buf,
+                        e,
+                        ch.iter().position(|x| x == c).expect("channel"),
+                        mscale,
+                    );
+                    let gap = (0..pos.len())
+                        .map(|v| pos[v] + d.as_ref().map_or(V3::zeros(), |d| d[v] * *k))
+                        .filter(|p| (0..3).all(|a| lo[a] <= p[a] && p[a] <= hi[a]))
+                        .map(|p| moved.sdf(p))
+                        .fold(f64::INFINITY, f64::min);
+                    if gap < worst.0 {
+                        worst = (gap, c, *k);
+                    }
+                }
+                if !worst.1.is_empty() {
+                    fail(format!(
+                        "{fam}.{stage}:{name} comes within 2 mm of the head with {} at {:+.2} ({:.1} mm)",
+                        worst.1,
+                        worst.2,
+                        worst.0 * 1000.0
                     ));
                 }
                 let into: Vec<f64> = pos
@@ -581,21 +683,37 @@ pub fn check(out: &Path) -> bool {
                 }
             }
         }
-        // Face morphs: small, finite shapes (no channel moves anything further than 4 cm).
-        let mscale = rig.at("morphs").at("scale").f64();
+        // Face morphs: small, finite shapes (no channel moves anything further than 4 cm, no identity
+        // channel further than `IDENTITY_REACH`, and none of those the low-detail parts).
         for (name, e) in parts.obj() {
             if let Some(m) = e.get("morph") {
-                let total = m.at("ranges").arr().last().unwrap();
-                let dp = i16s(&buf, m.at("morphPositions").usize(), total.usize() * 4);
-                let mx = dp
-                    .chunks(4)
-                    .flat_map(|c| c[..3].iter().map(|&v| (v as f64 / mscale).abs()))
-                    .fold(0.0, f64::max);
+                let r: Vec<usize> = m.at("ranges").arr().iter().map(JValue::usize).collect();
+                let dp = i16s(&buf, m.at("morphPositions").usize(), r[ch.len()] * 4);
+                let reach = |from: usize, to: usize| {
+                    dp[4 * r[from]..4 * r[to]]
+                        .chunks(4)
+                        .flat_map(|c| c[..3].iter().map(|&v| (v as f64 / mscale).abs()))
+                        .fold(0.0, f64::max)
+                };
+                let mx = reach(0, ch.len());
                 if mx > 0.04 {
                     fail(format!(
                         "{fam}:{name} has a morph moving {:.1} cm",
                         mx * 100.0
                     ));
+                }
+                for k in first.min(ch.len())..ch.len() {
+                    if reach(k, k + 1) > IDENTITY_REACH {
+                        fail(format!(
+                            "{fam}:{name}: {} moves {:.1} mm (at most {:.0})",
+                            ch[k],
+                            reach(k, k + 1) * 1000.0,
+                            IDENTITY_REACH * 1000.0
+                        ));
+                    }
+                    if name.starts_with("lod.") && r[k + 1] > r[k] {
+                        fail(format!("{fam}:{name} has the identity channel {}", ch[k]));
+                    }
                 }
             }
         }

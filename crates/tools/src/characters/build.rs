@@ -5,7 +5,8 @@
 //! Per family and life stage it asks the head interface (head.rs) where the face is, then builds
 //! the body (body.rs), the face (face.rs: eyes, lids, lashes, brows, mouth and the morph channels),
 //! the hair (hair.rs) and the clothes (clothes.rs), merges the face's skin pieces into the body,
-//! bakes the base stage's ambient occlusion into tone.w (ao.rs; the stages share it), and writes
+//! bakes the base stage's ambient occlusion into tone.w (ao.rs; the stages share it), adds the
+//! identity channels (identity.rs: a face per resident) to the base stage's morphs, and writes
 //! the base stage (young adult) whole and the other stages as deltas. Then the checks
 //! run. Everything is deterministic (seeded).
 
@@ -18,14 +19,15 @@ use serde::Serialize;
 use super::ao;
 use super::body::{Meta, body_fields_and_tone, build_body};
 use super::clothes::{Cut, Cuts, build_clothes, garment_cuts};
-use super::contract::channels;
+use super::contract::{IDENTITY, channels};
 use super::face::{Deltas, FaceOut, build_face, follow_mouth};
 use super::hair::build_hair;
 use super::head::{HeadFrame, head_frame};
+use super::identity;
 use super::json::{OMap, to_string_py};
 use super::kdtree::KdTree;
 use super::meshops::OnMesh;
-use super::np::py_round;
+use super::np::{py_round, smoothstep};
 use super::rig::{
     BASE_STAGE, BONES, CLIP_BONES, FACE_BONES, FAMILIES, NB, STAGES, head, leg_lengths, parents,
     skeleton, source_pelvis,
@@ -137,6 +139,13 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
     }
 }
 
+/// Hair this near the skin (m) takes all of an identity channel's shape there, and hair further off than
+/// the second none of it (`build_family`; the beard all of it).
+const HAIR_FOLLOWS: (f64, f64) = (0.006, 0.03);
+/// Where a hair vertex lies on the skin (its nearest triangle's corners and their weights) and how much
+/// of the skin's shape it takes.
+type OnSkin = ([usize; 3], [f64; 3], f64);
+
 /// A lid's normal at a point: the face's it lies on, the skin as it would be without the eye sockets
 /// (`skin`; `nor`: the body's normals, which are the skin's so), at its nearest point, not
 /// the eyeball's the lid is made round. The lids reach over the sockets out to the face (face.rs), where
@@ -206,6 +215,8 @@ struct SkeletonJson {
     seat_drop: f64,
     eye_y: f64,
     grip: Vec<f64>,
+    /// How far this stage's face takes a resident's identity (identity.rs `face_scale`).
+    face_scale: f64,
 }
 
 fn skeleton_json(family: &str, stage: &str, meta: &Meta) -> SkeletonJson {
@@ -218,6 +229,7 @@ fn skeleton_json(family: &str, stage: &str, meta: &Meta) -> SkeletonJson {
         seat_drop: py_round(meta.seat_drop, 4),
         eye_y: py_round(meta.eye_y, 4),
         grip: meta.grip.iter().map(|&v| py_round(v, 4)).collect(),
+        face_scale: py_round(identity::face_scale(family, stage), 4),
     }
 }
 
@@ -354,6 +366,70 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
         let d = follow_mouth(part(&mut base.parts, "hair.beard"), follow, &head);
         morphs.push(("hair.beard".into(), d));
     }
+    // A face of its own (identity.rs): each channel's shape on the skin with the lids and lips after it,
+    // on the face's parts, and on the hair that lies on the face (the beard, a lock on a cheek), which
+    // takes the skin's shape where it lies (`HAIR_FOLLOWS`). Not the low-detail body.
+    let on_face: Vec<(&str, Vec<OnSkin>)> = base
+        .parts
+        .iter()
+        .filter(|e| e.0.starts_with("hair."))
+        .map(|(name, m)| {
+            let at = m.pos.iter().map(|&q| {
+                let (t, w) = base.skin.at(q);
+                let near = (0..3).fold(V3::zeros(), |a, j| a + base.unsocketed[t[j]] * w[j]);
+                let k = if name == "hair.beard" {
+                    1.0
+                } else {
+                    1.0 - smoothstep(HAIR_FOLLOWS.0, HAIR_FOLLOWS.1, (near - q).norm())
+                };
+                (t, w, k)
+            });
+            (name.as_str(), at.collect())
+        })
+        .collect();
+    for ch in identity::channels(family).iter() {
+        let mut shapes: Vec<(&str, Vec<V3>, Vec<V3>)> = Vec::new();
+        for (name, dp, dn) in &ch.parts {
+            if *name == "body" {
+                let join = |a: &[V3], b: &[V3]| [a, b].concat();
+                shapes.push((name, join(&ch.skin.0, dp), join(&ch.skin.1, dn)));
+            } else {
+                shapes.push((name, dp.clone(), dn.clone()));
+            }
+        }
+        for (name, at) in &on_face {
+            let d = &ch.skin.0;
+            let dp: Vec<V3> = at
+                .iter()
+                .map(|(t, w, k)| (d[t[0]] * w[0] + d[t[1]] * w[1] + d[t[2]] * w[2]) * *k)
+                .map(|v| {
+                    if v.abs().max() < identity::TRIM.0 {
+                        V3::zeros()
+                    } else {
+                        v
+                    }
+                })
+                .collect();
+            let none = vec![V3::zeros(); dp.len()];
+            shapes.push((name, dp, none));
+        }
+        for (name, dp, dn) in shapes {
+            assert_eq!(dp.len(), get(&base.parts, name).pos.len(), "{name}");
+            if !dp.iter().any(|v| v.abs().max() > 0.0) {
+                continue;
+            }
+            match morphs.iter_mut().find(|e| e.0 == name) {
+                Some(e) => {
+                    e.1.insert(ch.name, (dp, dn));
+                }
+                None => {
+                    let mut d = Deltas::new();
+                    d.insert(ch.name, (dp, dn));
+                    morphs.push((name.to_string(), d));
+                }
+            }
+        }
+    }
     let ch = channels();
     for (name, d) in &morphs {
         let m = part(&mut base.parts, name);
@@ -411,6 +487,17 @@ struct Morphs {
     scale: f64,
     #[serde(rename = "normalScale")]
     normal_scale: f64,
+    identity: IdentityJson,
+}
+
+/// The identity channels (identity.rs): the first of them among the channels, how many, and per body
+/// the eyeballs a channel moves (at 1: the right eye's centre x, y, z in metres, the left's x mirrored,
+/// and how much larger they are, of 1), which the runtime moves by their bones.
+#[derive(Serialize)]
+struct IdentityJson {
+    first: usize,
+    count: usize,
+    eyes: OMap<OMap<Vec<f64>>>,
 }
 
 #[derive(Serialize)]
@@ -445,6 +532,16 @@ pub fn build(out: &Path) -> io::Result<()> {
     for &family in &FAMILIES {
         bodies.insert(family, build_family(family, out)?);
     }
+    let mut eyes = OMap::new();
+    for &family in &FAMILIES {
+        let mut moved = OMap::new();
+        for ch in identity::channels(family).iter() {
+            if ch.eye.iter().any(|v| v.abs() > 1e-9) {
+                moved.insert(ch.name, r4(&ch.eye));
+            }
+        }
+        eyes.insert(family, moved);
+    }
     let (thigh, shin) = leg_lengths();
     let sp = source_pelvis();
     let rig = Rig {
@@ -469,6 +566,11 @@ pub fn build(out: &Path) -> io::Result<()> {
             channels: channels(),
             scale: MORPH_SCALE,
             normal_scale: NORMAL_SCALE,
+            identity: IdentityJson {
+                first: channels().len() - IDENTITY.len(),
+                count: IDENTITY.len(),
+                eyes,
+            },
         },
         bodies,
     };

@@ -119,6 +119,14 @@ const PAGES = {
   'characters-game': { path: '/characters.html', query: 'manual&camera=game&labels=0', webgl: true },
   'characters-near': { path: '/characters.html', query: 'manual&camera=near&labels=0', webgl: true },
   'characters-faces': { path: '/characters.html', query: 'manual&face=moods&family=female&cols=6&closeup=1&labels=0', webgl: true },
+  // The faces of their own (the identity channels): the shared face, then each channel at -1 and at +1, four channels
+  // a line, and a line of random faces (`--extra only=jawWidth,chinLength&per=2&radius=1.6`: a few of them, larger).
+  'characters-identity': { path: '/characters.html', query: 'manual&faces=all&family=male&closeup=1&t=0', webgl: true },
+  'characters-identity-female': { path: '/characters.html', query: 'manual&faces=all&family=female&closeup=1&t=0', webgl: true },
+  // Random faces alone, eight men and eight women (`--extra family=male`: one family, larger).
+  'characters-identity-random': { path: '/characters.html', query: 'manual&faces=random&closeup=1&t=0&cols=4', webgl: true },
+  // The sliders' corners: every channel at -1, at +1, and at one end or the other (the furthest a face goes).
+  'characters-identity-ends': { path: '/characters.html', query: 'manual&faces=ends&closeup=1&t=0&cols=5', webgl: true },
   poses: { path: '/poses.html', query: 'manual&labels=0', webgl: true, prepare: () => window.__poses.advance(2) },
   previews: { path: '/previews.html', query: '', webgl: true },
   'poses-close': { path: '/poses.html', query: 'manual&only=sofa,sleep,cook,bath,piano,hug&cols=3&labels=0', webgl: true, prepare: () => window.__poses.advance(2) },

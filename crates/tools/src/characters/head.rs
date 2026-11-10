@@ -25,9 +25,11 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use super::body::Surface;
 use super::cage::{Cage, Tags, Weights};
+use super::identity::Identity;
 use super::kdtree::KdTree;
-use super::np::{PI, clip, linspace_open, mean, median, radians, sign};
+use super::np::{PI, clip, linspace_open, mean, median, radians, sign, smoothstep};
 use super::rig::{ADULT, BABY_HH, Proportions, b, joints, maturity, proportions};
 use super::{Cache, V3, key, v3};
 
@@ -187,6 +189,119 @@ const NOSE: [(usize, f64, [f64; 3]); 10] = [
     (BASE, 7.0, [0.1, 0.0, 0.25]),
 ];
 
+/// A face of its own (identity.rs `Identity`, each of its numbers -1..1): what one of them at 1 adds to the
+/// shared head, fractions of hh. The jaw's width (the cheeks-and-jaw ellipsoid's x radius, below
+/// `JAW_HEIGHT.0` above the chin and no more of it from `JAW_HEIGHT.1` up: the face at the eyes stays as
+/// wide), the chin's length (its centre lower) and width (its x radius), the lower face's length (the
+/// chin's centre lower, the muzzle's by a share, the cheeks' lower half taller by one; `FACE_ROWS`: how
+/// much lower the rows from the mouth to the nose's tip then lie, of their elevation; `MOUTH_DROP`: the
+/// mouth), the brow ridge (the
+/// brow row's offset), the eyes further apart (each from the middle) and larger (of their radius), the
+/// mouth wider (of its width).
+const JAW_WIDTH: f64 = 0.027;
+const JAW_HEIGHT: (f64, f64) = (0.2, 0.4);
+const CHIN_LENGTH: f64 = 0.024;
+const CHIN_WIDTH: f64 = 0.026;
+const FACE_LENGTH: f64 = 0.022;
+const FACE_ROWS: f64 = 0.085;
+const MOUTH_DROP: f64 = 0.017;
+const BROW_RIDGE: f64 = 0.014;
+const EYE_SPACING: f64 = 0.01;
+const EYE_SIZE: f64 = 0.07;
+const MOUTH_WIDTH: f64 = 0.15;
+/// What stands out of the smooth head either side on a face of its own: an ellipsoid joined to it (blended
+/// over `BUMP_BLEND`), the left one mirrored: where on the head (the ray from its middle through this
+/// point), its radii, and how far it stands out of the head there at 1 (`Bump::fit` places it so, whatever
+/// the family's head). The jaw's corners (a square jaw), the cheekbones, the cheeks' flesh beside the
+/// mouth. The shared head has none of them, and the runtime's negative weights take the shape away from it
+/// (the channel is a difference, identity.rs).
+struct Bump {
+    aim: V3,
+    radii: V3,
+    out: f64,
+}
+const JAW_SQUARE: Bump = Bump {
+    aim: v3(0.27, 0.14, 0.05),
+    radii: v3(0.08, 0.1, 0.12),
+    out: 0.015,
+};
+const CHEEKBONES: Bump = Bump {
+    aim: v3(0.29, 0.385, 0.2),
+    radii: v3(0.09, 0.07, 0.11),
+    out: 0.013,
+};
+const CHEEK_FULLNESS: Bump = Bump {
+    aim: v3(0.23, 0.25, 0.25),
+    radii: v3(0.12, 0.11, 0.125),
+    out: 0.015,
+};
+const BUMP_BLEND: f64 = 0.09;
+
+impl Bump {
+    /// The ellipsoid's centre (the right one's) on the head `f`, so the head with it stands `out * w`
+    /// further out than `f` along the ray through `aim`.
+    fn fit(&self, f: &impl Fn(V3) -> f64, w: f64) -> V3 {
+        let o = v3(0.0, MIDDLE.0, MIDDLE.1);
+        let d = (self.aim - o).normalize();
+        let skin = cast(f, o, d);
+        // (The ellipsoid's reach along the ray.)
+        let reach = 1.0 / d.component_div(&self.radii).norm();
+        let stands = |t: f64| {
+            let c = skin + d * (t - reach);
+            let g = |p: V3| smin(f(p), ellipsoid_sd(p, c, self.radii), BUMP_BLEND);
+            (cast(&g, o, d) - skin).norm()
+        };
+        let (mut lo, mut hi) = (-reach, reach);
+        for _ in 0..40 {
+            let mid = (lo + hi) / 2.0;
+            if stands(mid) < self.out * w {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        skin + d * (lo - reach)
+    }
+}
+/// The nose of a face of its own: what `NOSE`'s offsets take on, entry by entry (the same units), longer
+/// (its tip further out and lower), wider (its wings), its bridge higher.
+const NOSE_LENGTH: [[f64; 3]; 10] = [
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.06],
+    [0.0, 0.0, 0.0],
+    [0.0, -0.16, 0.22],
+    [0.0, -0.1, 0.06],
+    [0.0, 0.0, 0.0],
+    [0.0, -0.12, 0.1],
+    [0.0, -0.08, 0.04],
+];
+const NOSE_WIDTH: [[f64; 3]; 10] = [
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.04, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.15, 0.0, 0.0],
+    [0.06, 0.0, 0.02],
+    [0.0, 0.0, 0.0],
+    [0.15, 0.0, 0.0],
+];
+const NOSE_BRIDGE: [[f64; 3]; 10] = [
+    [0.0, 0.0, 0.12],
+    [0.0, 0.0, 0.2],
+    [0.0, 0.0, 0.04],
+    [0.0, 0.0, 0.14],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+];
+
 /// 0 for adult heads (`rig::ADULT`'s share of the height), 1 for babies (`rig::BABY_HH`).
 pub fn youth(stage_hh: f64) -> f64 {
     clip((stage_hh - ADULT.hh) / (BABY_HH - ADULT.hh), 0.0, 1.0)
@@ -197,13 +312,27 @@ pub fn youth(stage_hh: f64) -> f64 {
 /// game's closest camera, the iris is 4 px, and the sphere a little over life size is what keeps the
 /// sclera from closing the iris into a dot. A grown woman's a little larger (a twentieth), which reads
 /// as hers at a distance more than any other feature of the face.
-fn eye_radius(family: &str, stage: &str, pr: &Proportions) -> f64 {
+fn eye_radius(family: &str, stage: &str, pr: &Proportions, id: &Identity) -> f64 {
     let f = if family == "female" {
         1.0 + 0.05 * maturity(stage)
     } else {
         1.0
     };
-    (0.056 + 0.018 * youth(pr.hh)) * pr.hh * pr.h * f
+    (0.056 + 0.018 * youth(pr.hh)) * pr.hh * pr.h * f * (1.0 + EYE_SIZE * id.eye_size)
+}
+
+/// The eyeballs' centres (left at -x, then right; m): the eye bones' joints, set apart as the resident's
+/// own face has them (`Identity::eye_spacing`).
+fn eye_centres(family: &str, stage: &str, id: &Identity) -> [V3; 2] {
+    let pr = proportions(family, stage);
+    let j = joints(family, stage);
+    [j[b("eye_l")], j[b("eye_r")]].map(|e| {
+        e + v3(
+            sign(e.x) * EYE_SPACING * id.eye_spacing * pr.hh * pr.h,
+            0.0,
+            0.0,
+        )
+    })
 }
 
 /// Approximate signed distance to an ellipsoid (exact on its surface).
@@ -222,7 +351,7 @@ pub fn smin(a: f64, b: f64, k: f64) -> f64 {
 
 /// The smooth head (no features) as a signed distance function of points in hh units (origin: the
 /// chin's height and the Head joint's z).
-pub fn head_shape(family: &str, stage: &str) -> impl Fn(V3) -> f64 {
+pub fn head_shape(family: &str, stage: &str, id: &Identity) -> impl Fn(V3) -> f64 {
     let pr = proportions(family, stage);
     let yg = youth(pr.hh);
     let s = shapes(family);
@@ -244,11 +373,43 @@ pub fn head_shape(family: &str, stage: &str) -> impl Fn(V3) -> f64 {
     if stage == "elder" {
         kr += v3(0.008, 0.0, 0.0);
     }
+    // The resident's own face (identity.rs; all of it nothing on the shared head): the jaw's width, the
+    // chin's length and width, and the lower face's length (the cheeks, the muzzle and the chin lower).
+    let jaw = v3(JAW_WIDTH * id.jaw_width, 0.0, 0.0);
+    nc += v3(0.0, -CHIN_LENGTH * id.chin_length, 0.0);
+    nr += v3(CHIN_WIDTH * id.chin_width, 0.0, 0.0);
+    let long = v3(0.0, 0.6 * FACE_LENGTH * id.face_length, 0.0);
+    mc += v3(0.0, -0.7 * FACE_LENGTH * id.face_length, 0.0);
+    nc += v3(0.0, -FACE_LENGTH * id.face_length, 0.0);
     let bl = s.blend;
-    move |p: V3| {
+    let smooth = move |p: V3| {
+        // (The jaw's width below the eyes; a longer face's cheeks reach lower from their middle down.)
+        let kr = kr
+            + jaw * (1.0 - smoothstep(JAW_HEIGHT.0, JAW_HEIGHT.1, p.y))
+            + if p.y < kc.y { long } else { V3::zeros() };
         let d = smin(ellipsoid_sd(p, cc, cr), ellipsoid_sd(p, kc, kr), bl);
         let d = smin(d, ellipsoid_sd(p, mc, mr), 0.08);
         smin(d, ellipsoid_sd(p, nc, nr), 0.09)
+    };
+    // And what stands out of it, either side: the jaw's corners, the cheekbones, the cheeks' flesh.
+    let bumps: Vec<(V3, V3)> = [
+        (JAW_SQUARE, id.jaw_square),
+        (CHEEKBONES, id.cheekbones),
+        (CHEEK_FULLNESS, id.cheek_fullness),
+    ]
+    .into_iter()
+    .filter(|(_, w)| *w > 0.0)
+    .flat_map(|(bump, w)| {
+        let c = bump.fit(&smooth, w);
+        [-1.0, 1.0].map(|sx| (v3(sx * c.x, c.y, c.z), bump.radii))
+    })
+    .collect();
+    move |p: V3| {
+        let mut d = smooth(p);
+        for &(c, r) in &bumps {
+            d = smin(d, ellipsoid_sd(p, c, r), BUMP_BLEND);
+        }
+        d
     }
 }
 
@@ -272,11 +433,10 @@ fn cast(f: &impl Fn(V3) -> f64, o: V3, d: V3) -> V3 {
 /// at its corners, and on down behind the eyeball (`SLOT`), so the eye shows between the lids right into
 /// their corners. The lids cover all of it (face.rs: they reach out to the face round it), and the skin
 /// is shaded and its shade baked as it is without it (body.rs, build.rs).
-pub fn sockets(family: &str, stage: &str, lod: bool) -> impl Fn(V3) -> V3 {
+pub fn sockets(family: &str, stage: &str, lod: bool, id: &Identity) -> impl Fn(V3) -> V3 {
     let pr = proportions(family, stage);
-    let j = joints(family, stage);
-    let r = eye_radius(family, stage, &pr);
-    let eyes = [j[b("eye_l")], j[b("eye_r")]];
+    let r = eye_radius(family, stage, &pr, id);
+    let eyes = eye_centres(family, stage, id);
     let [over, side, r0, cv, ch, c4] = SOCKET;
     move |p: V3| {
         let mut z = p.z;
@@ -309,11 +469,11 @@ pub fn sockets(family: &str, stage: &str, lod: bool) -> impl Fn(V3) -> V3 {
 
 /// Where the ray from the head's middle through a point (model space, metres) leaves the smooth head
 /// (`head_shape`): what body.rs fits the drawn head to between the cage's vertices.
-pub fn onto_head(family: &str, stage: &str) -> impl Fn(V3) -> V3 {
+pub fn onto_head(family: &str, stage: &str, id: &Identity) -> impl Fn(V3) -> V3 {
     let pr = proportions(family, stage);
     let hh = pr.hh * pr.h;
     let origin = v3(0.0, pr.h - hh, 0.0);
-    let f = head_shape(family, stage);
+    let f = head_shape(family, stage, id);
     let o = v3(0.0, MIDDLE.0, MIDDLE.1);
     move |p: V3| cast(&f, o, ((p - origin) / hh - o).normalize()) * hh + origin
 }
@@ -433,7 +593,7 @@ fn grid_faces(ids: &[Vec<Option<usize>>], coarse: bool) -> Vec<Vec<usize>> {
 }
 
 /// Offsets of the grid's vertices: the nose, the philtrum and the brow (see the module docs), metres.
-fn features(family: &str, stage: &str) -> Vec<Vec<V3>> {
+fn features(family: &str, stage: &str, id: &Identity) -> Vec<Vec<V3>> {
     let pr = proportions(family, stage);
     let hh = pr.hh * pr.h;
     let yg = youth(pr.hh);
@@ -441,7 +601,14 @@ fn features(family: &str, stage: &str) -> Vec<Vec<V3>> {
     let z = v3(0.0, 0.0, 1.0);
     let young = 1.0 - 0.55 * yg;
     let n = nose(family, stage) * young * hh * (if stage == "elder" { 1.1 } else { 1.0 });
-    for (r, deg, [ox, oy, oz]) in NOSE {
+    for (k, (r, deg, [ox, oy, oz])) in NOSE.into_iter().enumerate() {
+        // (The resident's own nose: longer, wider, its bridge higher.)
+        let own = |t: &[[f64; 3]; 10], w: f64| v3(t[k][0], t[k][1], t[k][2]) * w;
+        let o = v3(ox, oy, oz)
+            + own(&NOSE_LENGTH, id.nose_length)
+            + own(&NOSE_WIDTH, id.nose_width)
+            + own(&NOSE_BRIDGE, id.nose_bridge);
+        let (ox, oy, oz) = (o.x, o.y, o.z);
         for sx in if deg == 0.0 {
             vec![1.0]
         } else {
@@ -461,7 +628,7 @@ fn features(family: &str, stage: &str) -> Vec<Vec<V3>> {
     ] {
         dd[LIP][col_of(deg)] += z * k * n;
     }
-    let bw = brow(family, stage) * (1.0 - 0.6 * yg) * hh;
+    let bw = (brow(family, stage) * (1.0 - 0.6 * yg) + BROW_RIDGE * id.brow_ridge) * hh;
     for deg in [14.0, 28.0, 40.0, 50.0] {
         for sx in [1.0, -1.0] {
             dd[BROW][col_of(sx * deg)] += z * bw;
@@ -472,20 +639,27 @@ fn features(family: &str, stage: &str) -> Vec<Vec<V3>> {
 }
 
 /// Adds the head to `cage`; returns its jaw ring (12 ids, the ring's columns in order) for the neck.
-pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
+pub fn head_cage(cage: &mut Cage, family: &str, stage: &str, id: &Identity) -> Vec<usize> {
     let pr = proportions(family, stage);
     let h = pr.h;
     let hh = pr.hh * h;
     let chin = h - hh;
     let yg = youth(pr.hh);
-    let f = head_shape(family, stage);
+    let f = head_shape(family, stage, id);
     let o = v3(0.0, MIDDLE.0, MIDDLE.1);
     let w: Weights = vec![("Head", 1.0)];
     let origin = v3(0.0, chin, 0.0);
     // The smooth head at every row and column.
     let grid: Vec<Vec<V3>> = ROWS
         .iter()
-        .map(|&(ef, eb, _)| {
+        .enumerate()
+        .map(|(r, &(ef, eb, _))| {
+            // (A longer face: the rows from the mouth to the nose's tip lie lower on it.)
+            let ef = if (MOUTH..=TIP).contains(&r) {
+                ef * (1.0 + FACE_ROWS * id.face_length)
+            } else {
+                ef
+            };
             COLS.iter()
                 .map(|&(deg, _, _)| {
                     let th = radians(deg);
@@ -500,7 +674,7 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str) -> Vec<usize> {
         .map(|r| (0..COLS.len()).map(|c| at(r, c)).collect())
         .collect();
     let mut ids: Vec<Vec<Option<usize>>> = vec![vec![None; COLS.len()]; ROWS.len()];
-    let dd = features(family, stage);
+    let dd = features(family, stage, id);
     for r in 0..ROWS.len() {
         for c in 0..COLS.len() {
             if !exists[r][c] {
@@ -703,6 +877,33 @@ impl HeadFrame {
         (-(d / FOLD_WIDTH).powi(2)).exp() * front
     }
 
+    /// This head with its samples moved (`tri`: body.rs `Surface::head_tri_ix` of its body; `dpos`, `dnor`:
+    /// per vertex sample, times `k`), the triangles' centre samples following: the head a face of its own
+    /// deforms it into (identity.rs), for `sdf`. Everything else of the frame stays the shared head's.
+    pub fn moved(&self, tri: &[[usize; 3]], dpos: &[V3], dnor: &[V3], k: f64) -> HeadFrame {
+        let nv = self.samples.len() - tri.len();
+        assert_eq!(dpos.len(), nv, "identity: the samples differ");
+        let mut samples: Vec<V3> = (0..nv).map(|i| self.samples[i] + dpos[i] * k).collect();
+        let mut normals: Vec<V3> = (0..nv)
+            .map(|i| (self.normals[i] + dnor[i] * k).normalize())
+            .collect();
+        for t in tri {
+            samples.push((samples[t[0]] + samples[t[1]] + samples[t[2]]) / 3.0);
+            normals.push((normals[t[0]] + normals[t[1]] + normals[t[2]]).normalize());
+        }
+        HeadFrame {
+            family: self.family.clone(),
+            stage: self.stage.clone(),
+            hairline: self.hairline.clone(),
+            tree: KdTree::new(&samples),
+            samples,
+            normals,
+            tris: self.tris.clone(),
+            bare: self.bare.clone(),
+            ..*self
+        }
+    }
+
     /// Scalp weight (0..1) of a point: 1 well above the hairline, 0 on the face and neck.
     ///
     /// The ramp is a tenth of the head's height wide (2.6 cm on an adult), so the shade fades out over
@@ -765,18 +966,28 @@ static HEADS: Cache<(String, String), HeadFrame> = Cache::new();
 
 /// The head of `family` at life stage `stage` (see `HeadFrame`).
 pub fn head_frame(family: &str, stage: &str) -> Arc<HeadFrame> {
-    HEADS.get(key(family, stage), || make_head_frame(family, stage))
+    HEADS.get(key(family, stage), || {
+        make_head_frame(
+            family,
+            stage,
+            &Identity::NONE,
+            &super::body::surface(family, stage),
+        )
+    })
 }
 
-fn make_head_frame(family: &str, stage: &str) -> HeadFrame {
+/// The head of a face of its own (`id`; identity.rs), on that face's body (`body::surface_of`). Not kept.
+pub fn head_frame_of(family: &str, stage: &str, id: &Identity, srf: &Surface) -> HeadFrame {
+    make_head_frame(family, stage, id, srf)
+}
+
+fn make_head_frame(family: &str, stage: &str, id: &Identity, srf: &Surface) -> HeadFrame {
     // The head is drawn as part of the body.
-    let srf = super::body::surface(family, stage);
     let pr = proportions(family, stage);
-    let j = joints(family, stage);
     let (hgt, hh) = (pr.h, pr.hh * pr.h);
     let chin_y = hgt - hh;
-    let eyes = [j[b("eye_l")], j[b("eye_r")]];
-    let eye_r = eye_radius(family, stage, &pr);
+    let eyes = eye_centres(family, stage, id);
+    let eye_r = eye_radius(family, stage, &pr, id);
     // The cranium's ellipsoid: round the head above the ears (ears and face excluded).
     let cran = &srf.cranium;
     let zmin = cran.iter().map(|p| p.z).fold(f64::INFINITY, f64::min);
@@ -812,7 +1023,7 @@ fn make_head_frame(family: &str, stage: &str) -> HeadFrame {
         iris_r: eye_r * 0.6,
         pupil_r: eye_r * 0.22,
         mouth: V3::zeros(),
-        mouth_w: 0.2 * hh,
+        mouth_w: 0.2 * hh * (1.0 + MOUTH_WIDTH * id.mouth_width),
         brows: [[V3::zeros(); 2]; 2],
         hairline: Vec::new(),
         chin: V3::zeros(),
@@ -834,7 +1045,7 @@ fn make_head_frame(family: &str, stage: &str) -> HeadFrame {
         })
         .collect();
     h.face_z = mean(&rim);
-    let my = chin_y + 0.2 * hh;
+    let my = chin_y + (0.2 - MOUTH_DROP * id.face_length) * hh;
     h.mouth = v3(0.0, my, h.surface_z(0.0, my));
     // The brows over the eyes, by the eye (eye radii from its centre): from over the inner corner to a
     // little past the outer one, on the brow bone rather than round the temple (they were 1.9 cm past

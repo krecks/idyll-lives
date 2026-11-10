@@ -12,6 +12,12 @@
  *   every mood (and the friendly resting face, a half and a full blink) / viseme; `?body=stand|walk` every
  *   emotion's body language (`bodyLanguage.ts`, through the snapshot's emotion, no stage directions), standing or
  *   walking towards the camera at 1.3 m/s (`?moods=sad,happy`: only those);
+ * - `?faces=all` the faces of their own (`Appearance.face`, the set's identity channels): a line per four channels
+ *   (`?per=2`: two), the shared face and then each channel at -1 and at +1, and a line of eight random faces
+ *   (`?only=jawWidth,noseLength`: only those channels; `?faces=random`: only the random faces; `?faces=ends`: every
+ *   channel at -1, every channel at +1, and eight faces with each channel at one of its ends, the sliders' corners);
+ *   every other sheet draws the shared face. `?hairStyle=bob`
+ *   and `?beard=1` change the look of every resident on the page;
  * - `?clip=walk&t=0.4` the clip held at t seconds (default: idle, playing), `?view=side|back`,
  *   `?closeup=1` frames the heads, `?build=1.2`, `?cols=8`, `?gap=0.9`, `?labels=0`, `?hairColor=%23C89B5A`;
  * - `?alpha=…&beta=…&radius=…` the camera (`?y=1.2`: the height it looks at in a close-up); `__bench.advance(s)` steps time when `?manual`;
@@ -29,7 +35,8 @@ import type { FrameState } from '../core/bridge';
 import type { SimInfo } from '../core/protocol';
 import { Pose, simFields, tickRates, type SnapshotLayout } from '../core/snapshot';
 import type { Appearance, HairStyle } from '../game/household';
-import { HAIR_STYLES } from '../game/household';
+import { FACE_CHANNELS, HAIR_STYLES, randomFace } from '../game/household';
+import { mulberry32 } from '../game/noise';
 import { Characters, EXPRESSIONS, FRIENDLY, MAX_CHARACTERS, type StageDirection } from '../render/pc/characters';
 import { GARMENTS } from '../render/shared/characters/outfit';
 import { DEFAULT_ORBIT, LENS, RADIUS_LIMITS } from '../render/shared/lens';
@@ -62,6 +69,8 @@ const base = (gender: string): Appearance => ({
   bottom: gender === 'female' ? 'bottom.skirt' : 'bottom.trousers',
   shoes: 'shoes.sneakers',
   bottomColor: '#33415C',
+  // The shared face (a look without one gets a face from its id): a sheet compares one thing at a time.
+  face: {},
 });
 
 // One row per family per sheet.
@@ -69,8 +78,13 @@ const rows: Cell[][] = [];
 const stageParam = params.get('stage');
 const lifeStage = stageParam && stageParam !== 'all' ? stageParam : undefined;
 const build = params.get('build') ? Number(params.get('build')) : undefined;
-const common = (): Partial<Appearance> => ({ ...(lifeStage ? { stage: lifeStage } : {}), ...(build ? { build } : {}) });
-const sheets = ['hair', 'tops', 'skins', 'builds', 'face', 'body'].filter((k) => params.has(k));
+const common = (): Partial<Appearance> => ({
+  ...(lifeStage ? { stage: lifeStage } : {}),
+  ...(build ? { build } : {}),
+  ...(params.get('hairStyle') ? { hairStyle: params.get('hairStyle') as HairStyle } : {}),
+  ...(params.has('beard') ? { beard: true } : {}),
+});
+const sheets = ['hair', 'tops', 'skins', 'builds', 'face', 'faces', 'body'].filter((k) => params.has(k));
 /** `?body=`: the emotions shown (every one the faces know), and whether they walk. */
 const body = params.get('body');
 const EMOTIONS = Object.keys(EXPRESSIONS);
@@ -101,6 +115,21 @@ for (const g of families) {
       }),
     );
   }
+  if (params.has('faces')) {
+    const kind = params.get('faces');
+    const only = kind === 'random' || kind === 'ends' ? [] : params.get('only')?.split(',');
+    const channels = FACE_CHANNELS.filter((c) => !only || only.includes(c));
+    const per = Number(params.get('per')) || 4;
+    for (let k = 0; k < channels.length; k += per) {
+      const ends = channels.slice(k, k + per).flatMap((c) => [-1, 1].map((v) => ({ label: `${c} ${v < 0 ? '-1' : '+1'}`, gender: g, look: { ...common(), face: { [c]: v } } })));
+      rows.push([{ label: 'shared', gender: g, look: common() }, ...ends]);
+    }
+    if (kind === 'ends') {
+      const ends = (label: string, end: (c: string) => number): Cell => ({ label, gender: g, look: { ...common(), face: Object.fromEntries(FACE_CHANNELS.map((c) => [c, end(c)])) } });
+      const coin = mulberry32(104729 + g.length);
+      rows.push([ends('all -1', () => -1), ends('all +1', () => 1), ...Array.from({ length: 8 }, (_, n) => ends(`ends ${n + 1}`, () => (coin() < 0.5 ? -1 : 1)))]);
+    } else if (!only?.length) rows.push(Array.from({ length: 8 }, (_, n) => ({ label: `random ${n + 1}`, gender: g, look: { ...common(), face: randomFace(mulberry32(7919 * (n + 1) + g.length)) } })));
+  }
   if (params.has('skins')) rows.push(SKINS.map((s) => ({ label: s, gender: g, look: { ...common(), skin: s } })));
   if (params.has('builds')) rows.push([0.85, 1, 1.2].map((b) => ({ label: `build ${b}`, gender: g, look: { ...common(), build: b } })));
   if (params.get('face') === 'moods') {
@@ -122,10 +151,13 @@ for (const g of families) {
 const cells = rows.flatMap((row, r) => row.map((c, k) => ({ ...c, r, k })));
 if (cells.length > MAX_CHARACTERS) throw new Error(`bench: ${cells.length} residents (max ${MAX_CHARACTERS})`);
 const closeup = params.get('closeup') === '1';
+// The faces' sheet in close-up: many lines of heads, packed (a head a cell) and seen through a long lens, so the
+// lines nearer the camera are hardly larger; each face's label on its neck.
+const packed = closeup && params.has('faces');
 const cols = Number(params.get('cols')) || Math.max(...rows.map((r) => r.length));
-const gap = Number(params.get('gap')) || (closeup ? 0.36 : 0.9);
+const gap = Number(params.get('gap')) || (packed ? 0.32 : closeup ? 0.36 : 0.9);
 // Close-ups stack the lines on raised floors (one head height apart), each lower one nearer the camera.
-const rowGap = closeup ? 0.36 : 2.1;
+const rowGap = packed ? 0.32 : closeup ? 0.36 : 2.1;
 // Wrap long rows.
 const placed = cells.map((c, i) => {
   const k = c.k % cols;
@@ -137,7 +169,7 @@ const lines = Math.max(...placed.map((p) => p.line)) + 1;
 const width = cols * gap + 4;
 const depth = lines * rowGap + 4;
 
-const faceY = 1.5 + (lines - 1) * rowGap * 0.5;
+const faceY = (packed ? (families[0] === 'female' ? 1.5 : 1.6) : 1.5) + (lines - 1) * rowGap * 0.5;
 /** `?camera=game|near`: the game's own camera, as a game opens or zoomed all the way in. */
 const gameCamera = params.get('camera') === 'game' ? DEFAULT_ORBIT.radius : params.get('camera') === 'near' ? RADIUS_LIMITS[0] : 0;
 const stage = await createStage({
@@ -147,8 +179,8 @@ const stage = await createStage({
   environment: 1,
   alpha: Number(params.get('alpha') ?? Math.PI / 2),
   beta: Number(params.get('beta') ?? (gameCamera ? DEFAULT_ORBIT.beta : closeup ? Math.PI / 2 : 1.3)),
-  radius: Number(params.get('radius')) || gameCamera || (closeup ? Math.max(cols * gap * 1.5, lines * rowGap * 2.6) : Math.max(width * 0.75, lines * rowGap * 1.3, 3)),
-  ...(gameCamera ? { fov: LENS.fov } : {}),
+  radius: Number(params.get('radius')) || gameCamera || (packed ? Math.max(cols * gap * 2.05, (lines * rowGap + 0.3) * 3.6) : closeup ? Math.max(cols * gap * 1.5, lines * rowGap * 2.6) : Math.max(width * 0.75, lines * rowGap * 1.3, 3)),
+  ...(gameCamera ? { fov: LENS.fov } : packed ? { fov: 0.3 } : {}),
   near: 0.02,
   wheelPrecision: 60,
 });
@@ -235,7 +267,7 @@ if (params.get('labels') !== '0') {
     const el = document.createElement('span');
     el.textContent = p.label;
     labels.append(el);
-    spots.push({ at: [p.x, closeup ? liftOf(p.line) + 1.32 : -0.02, zOf(p.line) + 0.25], el });
+    spots.push({ at: [p.x, closeup ? liftOf(p.line) + (packed ? (p.gender === 'female' ? 1.4 : 1.49) : 1.32) : -0.02, zOf(p.line) + 0.25], el });
   }
 }
 

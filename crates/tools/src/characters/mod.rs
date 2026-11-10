@@ -4,6 +4,7 @@
 //! docs/characters-format.md): per family and life stage the head interface (head.rs) says where
 //! the face is, then the body (body.rs), the face (face.rs), the hair (hair.rs) and the clothes
 //! (clothes.rs) are made, and write.rs writes the base stage whole and the other stages as deltas.
+//! identity.rs makes the identity channels (a face per resident) as differences of two builds.
 //! check.rs holds a set to the contract; diff.rs compares two sets. Everything is deterministic.
 //!
 //! The port keeps the Python's structure, one module per file, and its arithmetic order where
@@ -25,6 +26,7 @@ pub mod face;
 pub mod garments;
 pub mod hair;
 pub mod head;
+pub mod identity;
 pub mod json;
 pub mod kdtree;
 pub mod measure;

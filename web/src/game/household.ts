@@ -39,6 +39,75 @@ export const HAIR_LABELS: Record<HairStyle, string> = {
 };
 export type HairStyle = (typeof HAIR_STYLES)[number];
 
+/**
+ * A face of one's own: what a resident's face has more (to 1) or less (to -1) of than its family's shared
+ * face. The character set's identity channels (`id.<name>` morphs; crates/tools/src/characters/contract.rs
+ * `IDENTITY`, which `cargo characters check` holds to this list), in its order.
+ */
+export const FACE_CHANNELS = [
+  'jawWidth',
+  'jawSquare',
+  'chinLength',
+  'chinWidth',
+  'cheekbones',
+  'cheekFullness',
+  'noseLength',
+  'noseWidth',
+  'noseBridge',
+  'browRidge',
+  'eyeSpacing',
+  'eyeTilt',
+  'eyeSize',
+  'mouthWidth',
+  'lipFullness',
+  'faceLength',
+] as const;
+export type FaceChannel = (typeof FACE_CHANNELS)[number];
+/** The creator's sliders, grouped as it shows them: a channel, its name and what its two ends are. */
+export const FACE_GROUPS: readonly { name: string; channels: readonly { id: FaceChannel; label: string; low: string; high: string }[] }[] = [
+  {
+    name: 'Jaw & chin',
+    channels: [
+      { id: 'faceLength', label: 'Face', low: 'Short', high: 'Long' },
+      { id: 'jawWidth', label: 'Jaw', low: 'Narrow', high: 'Wide' },
+      { id: 'jawSquare', label: 'Jaw line', low: 'Soft', high: 'Square' },
+      { id: 'chinLength', label: 'Chin', low: 'Short', high: 'Long' },
+      { id: 'chinWidth', label: 'Chin width', low: 'Pointed', high: 'Broad' },
+    ],
+  },
+  {
+    name: 'Cheeks',
+    channels: [
+      { id: 'cheekbones', label: 'Cheekbones', low: 'Flat', high: 'High' },
+      { id: 'cheekFullness', label: 'Cheeks', low: 'Hollow', high: 'Full' },
+    ],
+  },
+  {
+    name: 'Nose',
+    channels: [
+      { id: 'noseLength', label: 'Nose', low: 'Short', high: 'Long' },
+      { id: 'noseWidth', label: 'Nose width', low: 'Narrow', high: 'Wide' },
+      { id: 'noseBridge', label: 'Bridge', low: 'Low', high: 'High' },
+    ],
+  },
+  {
+    name: 'Eyes',
+    channels: [
+      { id: 'eyeSize', label: 'Eyes', low: 'Small', high: 'Large' },
+      { id: 'eyeSpacing', label: 'Spacing', low: 'Close', high: 'Wide' },
+      { id: 'eyeTilt', label: 'Tilt', low: 'Down', high: 'Up' },
+      { id: 'browRidge', label: 'Brow', low: 'Soft', high: 'Heavy' },
+    ],
+  },
+  {
+    name: 'Mouth',
+    channels: [
+      { id: 'mouthWidth', label: 'Mouth', low: 'Narrow', high: 'Wide' },
+      { id: 'lipFullness', label: 'Lips', low: 'Thin', high: 'Full' },
+    ],
+  },
+];
+
 /** Opaque to the simulation; read by the renderer and UI. */
 export interface Appearance {
   /** Outfit (top) colour. */
@@ -76,7 +145,42 @@ export interface Appearance {
   stageStoop?: number;
   /** A voice chosen in the creator (`voice/voices.ts`); missing: the voice made from the id. */
   voice?: VoiceChoice;
+  /**
+   * The face of their own (`FACE_CHANNELS`: channel -> -1..1, 0 or missing: as the shared face has it).
+   * Missing in older saves: the renderer then makes one from the Sim's id (`faceFromId`).
+   */
+  face?: Record<string, number>;
 }
+
+/**
+ * A face drawn from `rand`: each channel about the shared face's (roughly normal, most within +-0.6,
+ * none past 1), so most faces are near it and differ in a few things.
+ */
+export function randomFace(rand: () => number = Math.random): Record<string, number> {
+  const face: Record<string, number> = {};
+  for (const c of FACE_CHANNELS) face[c] = faceValue((rand() + rand() + rand() - 1.5) * FACE_SPREAD);
+  return face;
+}
+/** The spread of `randomFace` (its sum of three is +-1.5, 0.5 standard deviations wide): 0.36 standard deviations of a channel. */
+const FACE_SPREAD = 0.72;
+/** How far a child's face is from the blend of its parents' (`lookFromSeed`), of `FACE_SPREAD`. */
+const FACE_OWN = 0.5;
+const faceValue = (v: number): number => Math.round(Math.max(-1, Math.min(1, v)) * 100) / 100;
+
+/** The face of a resident whose look has none (older saves): always the same for an id, and nobody else's. */
+export function faceFromId(id: number): Record<string, number> {
+  let face = facesById.get(id);
+  if (!face) {
+    face = randomFace(mulberry32(Math.imul(id + 1, 0x9e3779b1) ^ FACE_SEED));
+    facesById.set(id, face);
+  }
+  return face;
+}
+const facesById = new Map<number, Record<string, number>>();
+/** A seed from a text (FNV-1a). */
+const textSeed = (text: string): number => [...text].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 0x01000193) >>> 0, 0x811c9dc5);
+/** The seed stream of faces (`lookFromSeed`, `faceFromId`): their own, so looks made from a seed before faces existed stay as they were. */
+const FACE_SEED = 0x2f6b3a95;
 
 /** `hex` mixed `amount` of the way towards silver. */
 export function greyed(hex: string, amount: number): string {
@@ -237,6 +341,11 @@ export function ensureOutfit(sim: SimDraft): void {
   if (!sim.appearance.top) Object.assign(sim.appearance, pickOutfit(sim.gender));
 }
 
+/** Drafts made before faces could be shaped get a random one (kept from then on), so the creator's sliders show the face that is drawn. */
+export function ensureFace(sim: SimDraft): void {
+  sim.appearance.face ??= randomFace();
+}
+
 /**
  * The draft's own voice, made on first use with a seed of its own (not a random choice: random
  * residents keep the generated voice, like the neighbours).
@@ -294,9 +403,12 @@ export function randomSim(content: Content, assets: AssetRegistry, taken: readon
 
 /**
  * A random look for `gender` (the creator's dice, or seeded for the same look every time). The
- * build comes from `buildRand`, so seeded looks made before builds existed stay the same.
+ * build comes from `buildRand`, so seeded looks made before builds existed stay the same. The face
+ * comes from a stream of its own: `faceRand`, or one seeded by the rest of the look, so it takes
+ * nothing from the look's dice, and a town made from a seed (whose every draw moves the next) is the
+ * town it was before faces existed, with faces.
  */
-export function randomLook(assets: AssetRegistry, gender: string, rand: () => number = Math.random, buildRand: () => number = rand): Appearance {
+export function randomLook(assets: AssetRegistry, gender: string, rand: () => number = Math.random, buildRand: () => number = rand, faceRand?: () => number): Appearance {
   const appearance: Appearance = {
     body: pick(palette(assets, 'palette.outfit'), rand),
     skin: pick(palette(assets, 'palette.skin'), rand),
@@ -308,18 +420,29 @@ export function randomLook(assets: AssetRegistry, gender: string, rand: () => nu
     ...pickOutfit(gender, rand),
     build: Math.round((0.92 + buildRand() * 0.16) * 100) / 100,
   };
+  appearance.face = randomFace(faceRand ?? mulberry32(textSeed(`${gender}${JSON.stringify(appearance)}`) ^ FACE_SEED));
   lookGenders.set(appearance, gender);
   return appearance;
 }
 
 /**
  * The look of a resident the simulation made up (a newcomer, a baby): `{seed}` expanded, always
- * the same. A child of `parents` takes skin from one and hair colour from the other.
+ * the same. A child of `parents` takes skin from one and hair colour from the other, and its face is
+ * somewhere between theirs, channel by channel, with a little of its own.
  */
 export function lookFromSeed(assets: AssetRegistry, gender: string, seed: number, parents: readonly Appearance[] = []): Appearance {
   const rand = mulberry32(seed);
-  const look = randomLook(assets, gender, rand, mulberry32(seed ^ 0x5bd1e995));
+  const faceRand = mulberry32(seed ^ FACE_SEED);
+  const look = randomLook(assets, gender, rand, mulberry32(seed ^ 0x5bd1e995), faceRand);
   if (parents.length) {
+    const own = look.face!;
+    const face: Record<string, number> = {};
+    for (const c of FACE_CHANNELS) {
+      // (A parent from an older save has no face here: the shared one stands in.)
+      const [a, b] = [parents[0], parents[parents.length - 1]].map((p) => p.face?.[c] ?? 0);
+      face[c] = faceValue(a + (b - a) * faceRand() + own[c] * FACE_OWN);
+    }
+    look.face = face;
     const first = Math.floor(rand() * parents.length);
     const skinFrom = parents[first];
     const hairFrom = parents[(first + 1) % parents.length];

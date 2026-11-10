@@ -78,7 +78,8 @@ import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './se
 import { BATH_WEAR, BEDS, BENCH_HIP, BENCH_KNEE, BLANKET_BEDS, BLANKET_MEET, BUNKS, type Bed, CLIP_HEIGHT, CURLED_BEDS, DEFAULT_BED, DEFAULT_SEAT, FEET_UP, FOOTSTOOLS, LEGS_OUT_DROP, LIE_CENTRE, LIE_ENTRY, type LegFit, NO_FEET_UP, ON_FLOOR, PEDAL, type PlacedObject, QUILT_COLOUR, QUILT_PART, REST_BACK, RISING, SEATS, SIDE_BEDS, SIDE_IN, SIT_CLIPS, SIT_FLEX, SIT_FROM, SLING, type Seat, type SeatFit, TUCK, floorSit, seatOf, slingTop } from './seats';
 import { AIM, Anim, EMBRACE, KISS_FIT, REFUSED, gesturesOf } from './socials';
 import { BLANKET_WIDTH, quiltGeometry, quiltTint } from './blanket';
-import { APPEARANCE_TEXELS, BONE_FLOATS, BONE_TEXELS, MORPH_TEXELS } from './layout';
+import { APPEARANCE_TEXELS, BONE_FLOATS, BONE_TEXELS, EXPRESSION_TEXELS, MORPH_TEXELS } from './layout';
+import { faceOf, writeIdentity } from './identity';
 import type { TemplateCache } from '../templateCache';
 import { WALL_HEIGHT } from '../walls';
 import { MOST_CADENCE, MOUNT_SECONDS, MOUNTS, type Mount, mountNodes } from './vehicles';
@@ -797,7 +798,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         warmth: 1,
         relaxArms: 0,
         skirt: false,
-        faceState: new Float32Array(set.morphs?.channels.length ?? 0),
+        faceState: new Float32Array(set.morphs?.expressions ?? 0),
+        eyes: new Float32Array(4),
         faceL: 1 + (hash(s.id * 7 + 3) - 0.5) * 0.2,
         faceR: 1 + (hash(s.id * 7 + 5) - 0.5) * 0.2,
         speech: null,
@@ -809,6 +811,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const fit = outfitFit(set, base);
       rig.outfits = Object.fromEntries(WEARS.map((wear) => [wear, outfitFor(outfitId, s.gender, s.appearance, body, wear, fit, s.outfit)])) as Record<Wear, OutfitParams>;
       this.wear(rig, s.id, rig.outfits.day);
+      this.writeFace(rig, s.id, faceOf(s.appearance, outfitId));
     }
     for (const p of this.meshes.values()) this.enablePart(p, false);
     for (const p of this.shadowMeshes.values()) this.enablePart(p, false);
@@ -921,10 +924,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         yaw: k,
         seed: hash(id),
         face: { ...NEUTRAL },
-        faceState: new Float32Array(set.morphs?.channels.length ?? 0),
+        faceState: new Float32Array(set.morphs?.expressions ?? 0),
+        eyes: new Float32Array(4),
         speech: null,
       };
       this.sims[id] = rig;
+      this.writeFace(rig, id, faceOf(undefined, id));
       const look = { body: '#5F86C9', skin: '#C08A64', hair: '#2B2320', hairStyle: 'short' as const, height: 1, top: 'top.tee', bottom: 'bottom.trousers', shoes: 'shoes.sneakers' };
       writeOutfit(outfitFor(id, body.name, look, body), this.data, this.row(id) + set.bones.length * BONE_FLOATS);
     }
@@ -976,6 +981,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       pl.scale = rig.scale;
       pl.head = rig.head;
       pl.build = rig.build;
+      pl.eyes = rig.eyes;
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp, true);
       this.visible[i] = 1;
     });
@@ -2109,6 +2115,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       pl.scale = rig.scale;
       pl.head = rig.head;
       pl.build = rig.build;
+      pl.eyes = rig.eyes;
       this.posedAt[i * 2] = pl.x;
       this.posedAt[i * 2 + 1] = pl.z;
       // Sitting or lying on a seat that moves (a rocking chair, a swing): along with it.
@@ -4222,6 +4229,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   private row(i: number): number {
     return i * this.width * 4;
+  }
+
+  /**
+   * Gives Sim `i` its own face (`identity.ts`): its identity texels, after the expression's, and what the face moves
+   * of its eyeballs (`rig.eyes`, for `skin`). Once, when the Sim is built: nothing rewrites those texels until the
+   * next build.
+   */
+  private writeFace(rig: SimRig, i: number, face: Record<string, number>): void {
+    const set = this.set!;
+    if (!set.morphs) return;
+    writeIdentity(set.morphs, rig.body, face, this.data, this.row(i) + set.bones.length * BONE_FLOATS + (APPEARANCE_TEXELS + EXPRESSION_TEXELS) * 4, rig.eyes);
   }
 
   /**

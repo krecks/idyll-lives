@@ -21,7 +21,8 @@
  *   the first 64 rows; the rows past them (the town's servers in a full town) always draw.
  * - Before skinning (`getLocalPosition`, `vsLocal`): the face morphs (`GAME_SIM_MORPH`: the set's
  *   morph texture `game_simMorphs`, its block per vertex in `game_simMorph`, the row's (channel,
- *   weight) pairs), position and normal (`normalCoreVS`'s `getLocalNormal` wrapped,
+ *   weight) pairs: the expression's, then the resident's own face, whose weights are signed and
+ *   written once, `layout.ts`), position and normal (`normalCoreVS`'s `getLocalNormal` wrapped,
  *   `RESIDENT_NORMAL`); on shells (`GAME_SIM_CLOTH`) the seated corrective (tone.xyz, as far as
  *   appearance texel 4 b says).
  * - `game_simLayout`: x the first appearance texel (bones · `BONE_TEXELS`), y the morph texture's width, z the

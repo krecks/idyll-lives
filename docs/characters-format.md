@@ -64,7 +64,7 @@ The build is deterministic (seeded noise only): the same code gives the same byt
 | `sourcePelvis`, `sourceRestQ` | the reference pelvis; identity rotations (`NB * 4`) |
 | `reference` | `{ body, thigh, shin }`: the clips' reference body and leg lengths |
 | `fieldScale`, `toneScale`, `stageScale` | int16 per unit for fields and tone, per metre for stage deltas (4000, 4000, 5000) |
-| `morphs` | `{ channels, scale: 30000, normalScale: 63 }` |
+| `morphs` | `{ channels, scale: 30000, normalScale: 63, identity: { first, count, eyes } }`: `identity` says which of the channels are the identity channels (the last `count`, from `first`) and, per body, the eyeballs a channel moves at weight 1 (`eyes.<family>.<channel>`: the right eye's centre x, y, z in metres, the left's x mirrored, and how much larger both are, of 1). See Morph channels |
 | `anims`, `clips` | optional baked clips; absent: the runtime bakes `clips/` at load |
 | `bodies.<family>` | `male`, `female` (below) |
 
@@ -79,12 +79,13 @@ A body entry:
 | `pelvisScale` | pelvis height / the reference pelvis height (scales clip pelvis motion) |
 | `seatDrop` | seated, the pelvis joint's height above the seat surface (m) |
 | `eyeY` | the eye centres' height (m) |
+| `faceScale` | how far this body's face takes a resident's identity (1 on the base stage; see Morph channels) |
 | `grip` | see above (optional) |
 | `skinRef` | `[1, 1, 1]` |
 | `garments` | id -> cut, every id of the family in the creator's order (see Clothes) |
 | `bodyChunks` | `{ "body": [] }` (clothes are painted, skin is never hidden) |
 | `parts` | part name -> byte offsets in `mesh` |
-| `stages` | other life stages: `{ mesh, height, restT, inverseBind, pelvisScale, seatDrop, eyeY, grip, parts }` |
+| `stages` | other life stages: `{ mesh, height, restT, inverseBind, pelvisScale, seatDrop, eyeY, grip, faceScale, parts }` |
 
 No textures: `textures`, `cloth`, `hairTextures`, `hairCards` are gone, and so are UVs.
 
@@ -124,7 +125,7 @@ Every body has:
 | `lashes`, `brows` | lashes on the upper lid rims; brows | Head | `lash` (dark), `brow` (hair colour x 0.45), opaque |
 | `teeth`, `tongue` | teeth; the mouth plate (dark, tone.y = 1) and tongue | Head | `mouth` |
 | `hair.<style>` | every hairstyle but `none` (`short crop layered tousled sideSwept afro bob long ponytail braid bun`) | Head, blending to neck_01 / spine_03 below the jaw | `hair` |
-| `hair.beard` | facial hair (male only; hidden for baby, child, teen) | Head; follows the mouth's morphs | `hair` |
+| `hair.beard` | facial hair (male only; hidden for baby, child, teen) | Head; follows the mouth's morphs and the face's identity | `hair` |
 | `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, the server's apron (the front from the waist to above the knees), every shoe (below) | from the body | `cloth` (flat colour) |
 | `lod.<shell>` | a low-detail copy of every shell | | `cloth` |
 
@@ -396,7 +397,25 @@ Garment ids per family (outfit.ts):
 | 7 | eye colour | 1 if the resident wears hair (the scalp takes the hair colour) |
 | 8 | r, g = how loose the top and the bottom are (0..1: how far the painted cloth stands off the skin, `EASE`); b = 1 if the bottom has a shell round the hips (a skirt) | 0 |
 
-Then 12 texels of face morph (channel, weight) pairs. Disabled cuts are -10 (+10 for "below" cuts).
+Then 20 texels of face morph (channel, weight) pairs, two a texel, a weight of 0 unused (`layout.ts`):
+
+| Texels | What | Written |
+|---|---|---|
+| 12 (`EXPRESSION_TEXELS`) | the expression: the 24 strongest of the expression channels (`face.ts` `FaceMixer`); a first channel of -1 means no morphs at all on this face this frame (too small on screen, `parts.ts` `MORPH_PX`) | every frame the face is posed |
+| 8 (`IDENTITY_TEXELS`) | the resident's own face: the 16 identity channels at the look's weights, signed, times the body's `faceScale` (`identity.ts` `writeIdentity`) | once, when the resident is built |
+
+A row is 33 x 3 + 9 + 20 = 128 texels (it was 120). Disabled cuts are -10 (+10 for "below" cuts).
+
+`appearance.face` is the resident's own face: identity channel name (without `id.`) -> -1..1, 0 or
+missing as the shared face has it (household.ts `FACE_CHANNELS`, `FACE_GROUPS` for the creator's
+sliders). `randomLook` draws one from a stream of its own (about normal, 0.36 wide, so most values are
+within 0.6 and a face differs from the shared one in a few things), seeded by the rest of the look,
+so it takes nothing from the look's dice and a town made from a seed is the town it was, with faces;
+a child made by the
+simulation (`lookFromSeed`) is somewhere between its parents channel by channel, with a little of its
+own. A look without one (an older save) gets a face from the resident's id (`faceFromId`), so nobody
+shares a face. Portraits are cached by the appearance, and by the id for a look without a face
+(`portraits.ts` `lookKey`).
 
 `appearance.build` (0.85 slim .. 1.2 broad; missing = 1) widens bones across their axis in
 `skin()`: `K = W * (I + (g - 1)(I - a a^T)) * IBM`, the torso by g, the neck by half and the limbs
@@ -409,9 +428,64 @@ by 60% of it. The simulation keeps the appearance opaque, so old saves are unaff
 - visemes: `sil PP FF TH DD kk CH SS nn RR aa E I O U`;
 - units: `browDownLeft browDownRight browInnerUp browOuterUpLeft browOuterUpRight cheekSquintLeft cheekSquintRight eyeBlinkLeft eyeBlinkRight eyeLookDownLeft eyeLookDownRight eyeLookUpLeft eyeLookUpRight eyeSquintLeft eyeSquintRight eyeWideLeft eyeWideRight jawForward jawOpen mouthClose mouthDimpleLeft mouthDimpleRight mouthFrownLeft mouthFrownRight mouthFunnel mouthLeft mouthLowerDownLeft mouthLowerDownRight mouthPressLeft mouthPressRight mouthPucker mouthRollLower mouthRollUpper mouthShrugLower mouthShrugUpper mouthSmileLeft mouthSmileRight mouthStretchLeft mouthStretchRight mouthUpperUpLeft mouthUpperUpRight noseSneerLeft noseSneerRight`.
 
-`Left` is the resident's left (-x). Units are authored at ARKit strength. The head itself never
-deforms: channels move the lids, lashes, brows, lips, mouth plate, teeth, tongue and beard. Morphs
-are built at the base stage and shared by the other stages.
+`Left` is the resident's left (-x). Units are authored at ARKit strength. An expression never
+deforms the head: these channels move the lids, lashes, brows, lips, mouth plate, teeth, tongue and
+beard. Morphs are built at the base stage and shared by the other stages.
+
+### Identity channels (a face per resident)
+
+After the 58 expression channels come 16 identity channels (`contract.rs` `IDENTITY`,
+`morphs.identity`), which give a resident a face of its own. The runtime sets them once per resident
+from `appearance.face` (above); a weight runs from -1 to 1 and 0 is the family's shared face.
+
+| Channel | At +1 (at -1 the opposite) | Moves at most (mm: man, woman) |
+|---|---|---|
+| `id.jawWidth` | the jaw wider below the eyes | 4.5, 3.3 a side |
+| `id.jawSquare` | the jaw's corners stand out (square; -1 soft) | 3.7, 3.3 |
+| `id.chinLength` | the chin longer | 4.7, 3.2 |
+| `id.chinWidth` | the chin broader (-1 pointed) | 3.8, 2.0 |
+| `id.cheekbones` | the cheekbones stand out | 3.0, 2.7 |
+| `id.cheekFullness` | fuller cheeks beside the mouth (-1 hollow) | 3.3, 3.2 |
+| `id.noseLength` | the nose's tip further out and lower | 4.0, 2.4 |
+| `id.noseWidth` | the nose's wings wider | 2.4, 1.4 a side |
+| `id.noseBridge` | the bridge higher between the eyes | 2.9, 1.8 |
+| `id.browRidge` | a heavier brow ridge (the brows go with it) | 2.3, 2.1 |
+| `id.eyeSpacing` | the eyes further apart | 2.4, 2.3 an eye |
+| `id.eyeTilt` | the eyes' outer corners higher (7 degrees) | 2.1 (lids) |
+| `id.eyeSize` | larger eyes, opened wider (7 % of the eyeball, the brows higher over them) | 2.7 (brows) |
+| `id.mouthWidth` | a wider mouth (15 %) | 3.6, 3.4 a corner |
+| `id.lipFullness` | fuller lips (34 % taller) | 1.9, 2.5 |
+| `id.faceLength` | a longer lower face: the chin, the mouth and the nose's tip lower | 4.8, 4.2 |
+
+(`cargo characters faces` prints the table as built.)
+
+A channel is a difference (`identity.rs`): the base stage's head, lids, lashes, brows, lips, mouth
+plate and teeth built with one of the generator's numbers at +1 (`head.rs`, `face.rs`: an
+`Identity`), minus the same built at -1, halved, vertex by vertex. Everything on the face is made
+from the head's frame, so it follows the skin by construction; the beard and any hair that lies on
+the face (a long style's locks on the cheeks; within 6 mm of the skin all of it, none past 3 cm)
+take the skin's shape where they lie. The three that add a shape to the head (`jawSquare`,
+`cheekbones`, `cheekFullness`: an ellipsoid joined to the smooth head, placed so it stands that far
+out of either family's) are the head with it minus the shared head. The cranium above the hairline,
+the ears, the back of the head and the neck stay as they are (`identity.rs` `Mask`), so hairlines
+and hairstyles fit every face. Under the lids, the skin in an eye's socket goes with the eyeball
+rather than by the difference of two sockets.
+
+The eyeballs turn on bones, so the two channels that move or size them (`eyeSpacing`, `eyeSize`)
+say so in `morphs.identity.eyes`, and `pose.ts` `skin` moves the eye bones' joints and scales them
+(`Placement.eyes`, summed over the resident's weights once, with the texels).
+
+Identity channels are on `body` (the skin with its lids and lips), `lashes`, `brows`, `teeth`,
+`tongue`, `hair.beard` and the hair that touches the face; not on `lod.body` or the shadow copies,
+and they are skipped with the expression when the face is small on screen. The shapes are metres on
+the base stage's head, so a body's `faceScale` scales a resident's weights: the stage's head height
+over the base stage's, times 0.6 on a baby and 0.8 on a child, whose faces are round and unformed
+(a man's: 0.42 baby, 0.69 child, 0.94 teen, about 1 from then on; a woman's 0.45, 0.70, 0.95).
+
+`cargo characters check` holds the channels to the creator's list (`FACE_CHANNELS`), no identity
+channel to more than 6 mm and none to a low-detail part, and every hairstyle 2 mm clear of the head
+at each channel's two ends, at every life stage (the head's samples moved as the channel moves the
+skin, `HeadFrame::moved`).
 
 ## Clips
 
@@ -645,6 +719,7 @@ rider, the seesaw), which they settle onto as before rather than walk through.
 | the contract | `rig.rs`, `head.rs` (the head interface), `contract.rs`, `write.rs`, `build.rs`, `check.rs`, `check_clips.ts`, `clips/dsl.ts`, this page |
 | body and clothes | `body.rs`, `cage.rs`, `subdiv.rs`, `clothes.rs`, `garments.rs`, `meshops.rs` |
 | face and hair | `face.rs`, `hair.rs`, `prims.rs`; the eye, hair and brow branches of `render/pc/shaders/character.ts`; `characters/face.ts` |
+| a face per resident | `identity.rs` (the channels as differences, the mask), the amounts in `head.rs` and `face.rs`; `characters/identity.ts` (the row's identity texels, the eyes), `game/household.ts` (`Appearance.face`, `randomFace`, `FACE_GROUPS`) |
 | clips | `clips/*` (with `clips/ik.ts`) |
 | the runtime | `render/shared/characters/residents.ts` (activities, seats, beds, carrying, faces; its tables in `actions.ts`, `seats.ts`, `socials.ts`, `expressions.ts`, `parts.ts`; drawn through `view.ts` by `pc/characters.ts`), `shared/characters/{data,pose,outfit,blanket}.ts`, `pc/characterMaterial.ts` and `pc/shaders/character.ts` (the shading), `pc/poseTexture.ts`; the creator in `ui/screens/CreateHousehold.svelte` and `render/preview` |
 
@@ -654,6 +729,9 @@ See also `tools/characters/README.md`.
 
 - `/characters.html`: a grid of residents. `?family=male|female`, `?stage=<id>|all` (default: every
   stage), `?hair=all` (or `?hair=long,beard`: only those), `?tops=all`, `?skins=all`, `?builds=all`, `?face=moods|visemes`,
+  `?faces=all` (each identity channel at -1 and +1 beside the shared face, and eight random faces; `?only=jawWidth,noseLength`,
+  `?per=2` channels a line, `?faces=random`, `?faces=ends` for the sliders' corners; `?hairStyle=bob`, `?beard=1`; the
+  `characters-identity*` pages of `tools/bench/render.mjs`),
   `?clip=<name>&t=<s>`, `?view=side|back`, `?closeup=1` (`?y=`: the height it looks at), `?build=1.2`, `?cols=`, `?manual`
   (`__bench.advance(s)`); sets `window.__ready`.
 - `/poses.html`: residents at real furniture, seats and beds, cooking, carrying, socials.

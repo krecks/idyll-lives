@@ -4,6 +4,7 @@
 //!     cargo characters check [dir]    # the set against the contract
 //!     cargo characters diff <a> <b>   # the largest differences between two sets (`-v`: per part)
 //!     cargo characters ratios         # every body's proportions as the generator builds them, beside a real adult's
+//!     cargo characters faces          # every identity channel: how far it moves the skin, the face's parts and the eyes
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -59,9 +60,13 @@ fn main() -> ExitCode {
             measure::print();
             ExitCode::SUCCESS
         }
+        Some("faces") => {
+            measure::print_faces();
+            ExitCode::SUCCESS
+        }
         _ => {
             eprintln!(
-                "usage: cargo characters build [out] | check [dir] | diff [-v] <a> <b> | ratios"
+                "usage: cargo characters build [out] | check [dir] | diff [-v] <a> <b> | ratios | faces"
             );
             ExitCode::from(2)
         }

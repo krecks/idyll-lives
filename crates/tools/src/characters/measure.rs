@@ -73,3 +73,36 @@ pub fn print() {
     }
     line("a real adult", REAL);
 }
+
+/// `cargo characters faces`: every identity channel (identity.rs) as the generator builds it, per family:
+/// how far it moves the skin and each of the face's parts at most (mm, at 1), how many of the skin's
+/// vertices it moves, and the eyeballs (mm, and their size in per cent).
+pub fn print_faces() {
+    for family in FAMILIES {
+        println!(
+            "{family:<22} {:>6} {:>6} {:>6} {:>6} {:>6} {:>6} {:>6} {:>6}  eyes",
+            "skin", "verts", "lids", "lips", "lashes", "brows", "tongue", "teeth"
+        );
+        for ch in super::identity::channels(family).iter() {
+            let mm = |d: &[super::V3]| d.iter().map(|v| v.norm()).fold(0.0, f64::max) * 1000.0;
+            let moved = ch.skin.0.iter().filter(|v| v.norm() > 0.0).count();
+            let part = |name: &str| mm(&ch.parts.iter().find(|p| p.0 == name).expect("part").1);
+            println!(
+                "  {:<20} {:>6.2} {:>6} {:>6.2} {:>6.2} {:>6.2} {:>6.2} {:>6.2} {:>6.2}  {:.2} {:.2} {:.2} mm, {:+.1} %",
+                ch.name,
+                mm(&ch.skin.0),
+                moved,
+                mm(&ch.parts[0].1[..ch.lids]),
+                mm(&ch.parts[0].1[ch.lids..]),
+                part("lashes"),
+                part("brows"),
+                part("tongue"),
+                part("teeth"),
+                ch.eye[0] * 1000.0,
+                ch.eye[1] * 1000.0,
+                ch.eye[2] * 1000.0,
+                ch.eye[3] * 100.0
+            );
+        }
+    }
+}

@@ -208,6 +208,11 @@ export interface Placement {
   head?: number;
   /** Build (slim 0.85 .. broad 1.2): girth across the torso's and limbs' bones (see `girth`). */
   build?: number;
+  /**
+   * The eyeballs of the resident's own face (`identity.ts`): the right eye bone's joint moved by x, y, z (m, in
+   * the head's frame; the left's x mirrored) and both eyes larger by the fourth (of 1). None: as the body has them.
+   */
+  eyes?: Float32Array | null;
 }
 
 /** Share of the build's girth per bone: the torso takes it all, the neck half, the limbs 60%. */
@@ -277,6 +282,9 @@ export function skin(
   const py = place.qy;
   const pz = place.qz;
   const pw = place.qw;
+  const eyes = place.eyes ?? null;
+  const eyeL = eyes ? (set.bone.eye_l ?? -1) : -1;
+  const eyeR = eyes ? (set.bone.eye_r ?? -1) : -1;
 
   for (let b = 0; b < NB; b++) {
     const o = b * 4;
@@ -302,6 +310,11 @@ export function skin(
       tx += (srcPelvis[0] - sp[0]) * ps;
       ty += (srcPelvis[1] - sp[1]) * ps;
       tz += (srcPelvis[2] - sp[2]) * ps;
+    } else if (eyes && (b === eyeL || b === eyeR)) {
+      // The resident's own eyes: set apart (or however its face moves them), in the head's frame.
+      tx += b === eyeR ? eyes[0] : -eyes[0];
+      ty += eyes[1];
+      tz += eyes[2];
     }
     const p = parents[b];
     // Parent world (placement for the root).
@@ -365,7 +378,8 @@ export function skin(
   for (let b = 0; b < NB; b++) {
     const o = b * 4;
     const big = hs !== 1 && set.inHead[b] === 1;
-    const sb = big ? s * hs : s;
+    // (Its own face's eyes larger or smaller, about their centres.)
+    const sb = (big ? s * hs : s) * (eyes && (b === eyeL || b === eyeR) ? 1 + eyes[3] : 1);
     const x = wq[o];
     const y = wq[o + 1];
     const z = wq[o + 2];

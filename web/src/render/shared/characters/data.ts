@@ -49,9 +49,17 @@ export interface MeshPart {
  * move the part (-1: none); then per such channel and slot two texels: position delta, normal delta.
  */
 export interface MorphSet {
-  /** Channel names: the 15 visemes (voice engine order), then ARKit face units. */
+  /** Channel names: the 15 visemes (voice engine order), then ARKit face units, then the identity channels (`id.<name>`). */
   channels: string[];
   channel: Record<string, number>;
+  /** How many of them are the expression's (the first; the identity channels follow, `identity.ts`). */
+  expressions: number;
+  /**
+   * The eyeballs an identity channel moves, per base body: 4 numbers a channel (from `expressions` on) at
+   * weight 1, the right eye's centre x, y, z (m; the left's x mirrored) and how much larger the eyes are
+   * (of 1). The eyes turn on bones, so `pose.ts` `skin` moves those.
+   */
+  eyes: Record<string, Float32Array>;
   headerTexels: number;
   width: number;
   height: number;
@@ -74,6 +82,8 @@ export interface BodyData {
   seatDrop: number | null;
   /** Height of the eyes' centres (m, bind pose). */
   eyeY: number | null;
+  /** How far this body's face takes a resident's identity (smaller, rounder heads less; 1 on the base bodies). */
+  faceScale: number;
   /** Left palm centre relative to the wrist (m, bind pose; the right mirrors x). */
   grip: [number, number, number] | null;
   restT: Float32Array;
@@ -110,6 +120,7 @@ export interface StageJson {
   pelvisScale: number;
   seatDrop?: number;
   eyeY?: number;
+  faceScale?: number;
   grip?: [number, number, number];
   parts: Record<string, { positions: number; normals: number }>;
   skinRef?: [number, number, number];
@@ -189,7 +200,7 @@ interface RigJson {
   anims?: string;
   stageScale?: number;
   toneScale?: number;
-  morphs?: { channels: string[]; scale: number; normalScale: number };
+  morphs?: { channels: string[]; scale: number; normalScale: number; identity?: { first: number; count: number; eyes?: Record<string, Record<string, number[]>> } };
   clips?: Record<
     string,
     {
@@ -213,6 +224,7 @@ interface RigJson {
       pelvisScale: number;
       seatDrop?: number;
       eyeY?: number;
+      faceScale?: number;
       grip?: [number, number, number];
       skinRef?: [number, number, number];
       garments?: Record<string, GarmentCut>;
@@ -376,6 +388,7 @@ async function load(url: string): Promise<CharacterSet> {
       headAbove: b.height - jointY(b.inverseBind, rig.head),
       seatDrop: b.seatDrop ?? null,
       eyeY: b.eyeY ?? null,
+      faceScale: b.faceScale ?? 1,
       grip: b.grip ?? null,
       restT: Float32Array.from(b.restT),
       restQ: restRotations(b.restQ, NB),
@@ -418,7 +431,14 @@ async function load(url: string): Promise<CharacterSet> {
     }
     const channel: Record<string, number> = {};
     channels.forEach((c, i) => (channel[c] = i));
-    morphs = { channels, channel, headerTexels, width: MORPH_WIDTH, height, data };
+    const identity = rig.morphs!.identity;
+    const expressions = identity?.first ?? C;
+    const eyes: Record<string, Float32Array> = {};
+    for (const [body, moved] of Object.entries(identity?.eyes ?? {})) {
+      eyes[body] = new Float32Array((C - expressions) * 4);
+      for (const [name, v] of Object.entries(moved)) if (channel[name] >= expressions) eyes[body].set(v, (channel[name] - expressions) * 4);
+    }
+    morphs = { channels, channel, expressions, eyes, headerTexels, width: MORPH_WIDTH, height, data };
   }
 
   const bone: Record<string, number> = {};
@@ -537,6 +557,7 @@ export function loadStage(set: CharacterSet, base: BodyData, stage: string): Pro
         headAbove: info.height - jointY(info.inverseBind, set.head),
         seatDrop: info.seatDrop ?? null,
         eyeY: info.eyeY ?? null,
+        faceScale: info.faceScale ?? 1,
         grip: info.grip ?? null,
         restT: Float32Array.from(info.restT),
         restQ: restRotations(info.restQ, set.bones.length),

@@ -53,9 +53,36 @@ pub const UNITS: [&str; 43] = [
     "noseSneerRight",
 ];
 
-/// The visemes, then the units.
-pub fn channels() -> Vec<&'static str> {
+/// A face of one's own (identity.rs, household.ts `FACE_CHANNELS`): what a resident's face has more or
+/// less of than its family's shared one, each -1..1. Morph channels after the expressions', which the
+/// runtime sets once per resident.
+pub const IDENTITY: [&str; 16] = [
+    "id.jawWidth",
+    "id.jawSquare",
+    "id.chinLength",
+    "id.chinWidth",
+    "id.cheekbones",
+    "id.cheekFullness",
+    "id.noseLength",
+    "id.noseWidth",
+    "id.noseBridge",
+    "id.browRidge",
+    "id.eyeSpacing",
+    "id.eyeTilt",
+    "id.eyeSize",
+    "id.mouthWidth",
+    "id.lipFullness",
+    "id.faceLength",
+];
+
+/// The expressions: the visemes, then the units.
+pub fn expressions() -> Vec<&'static str> {
     VISEMES.iter().chain(UNITS.iter()).copied().collect()
+}
+
+/// Every morph channel: the expressions, then the identity channels.
+pub fn channels() -> Vec<&'static str> {
+    expressions().into_iter().chain(IDENTITY).collect()
 }
 
 /// Hairstyles (household.ts HAIR_STYLES): each but `none` is a part `hair.<style>`; `hair.beard`

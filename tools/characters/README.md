@@ -16,10 +16,11 @@ The format, the conventions and the clip list are in [docs/characters-format.md]
 From the repo root:
 
 ```
-cargo characters build [out]     # about 6 s; writes the set, then checks it
+cargo characters build [out]     # about a minute; writes the set, then checks it
 cargo characters check [set dir] # the set against the contract only
 cargo characters diff <a> <b>    # two sets against each other, within the quantisation
 cargo characters ratios          # every body's proportions as the generator builds them, beside a real adult's
+cargo characters faces           # every identity channel: how far it moves the skin, the face's parts and the eyes (mm)
 bun tools/characters/check_clips.ts [rig.json] [--body male|female|all] [--stage <stage>[,…]|all] [--update-baseline] [--reach]
 cd web && bun run check:clips    # check_clips on both bodies at every life stage, as CI runs it
 ```
@@ -29,8 +30,8 @@ cd web && bun run check:clips    # check_clips on both bodies at every life stag
   clean); commit them together with the generator change when they do change.
 - `cargo characters check` fails on any contract violation: bone names and order, rest frames,
   vertex and triangle budgets, weights, winding, stage topology, morph channels, garment ids and
-  cuts, stage heights, the seat drop, eyes in their sockets and uncovered, hair clear of the head,
-  bounded morphs.
+  cuts, stage heights, the seat drop, eyes in their sockets and uncovered, hair clear of the head
+  (and of every face of its own: each identity channel at its two ends), bounded morphs.
 - `check_clips.ts` fails on NaNs, seams in loops, sliding feet, lengths more than 15% off the
   runtime's, seated clips that leave the seat or feet off the floor, and a crooked `lie`, on the
   bodies (`--body`, default `male`) and life stages (`--stage`, default `youngAdult,baby`) asked
@@ -48,6 +49,8 @@ The generator's `.rs` files are in `crates/tools/src/characters/`.
 | the body's shape, skin weights, fields and tone | `body.rs`, `cage.rs`, `subdiv.rs` |
 | the head, the face's place | `head.rs` (the head interface the face and hair build on) |
 | eyes, lids, brows, lips, teeth, tongue, the expression and viseme shapes | `face.rs` |
+| a face per resident: the identity channels (how they are made, where they are kept off) | `identity.rs`; how much each adds, in `head.rs` (`JAW_WIDTH` ... `Bump`, `NOSE_LENGTH` ...) and `face.rs` (`LIP_FULLNESS`, `EYE_TILT`, `EYE_OPEN`); the names in `contract.rs` (`IDENTITY`) and `web/src/game/household.ts` (`FACE_CHANNELS`, `FACE_GROUPS`) |
+| how a resident's face is drawn and its eyes moved | `web/src/render/shared/characters/identity.ts`, `pose.ts` (`Placement.eyes`) |
 | hairstyles and the beard | `hair.rs`, built from `prims.rs` |
 | garment cuts and shells | `clothes.rs`, `garments.rs` |
 | clips | `clips/*.ts` (`dsl.ts` for the format, `ik.ts` for arm and leg placement) |
@@ -63,6 +66,7 @@ then open:
 
 - `/characters.html`: a grid of residents to check bodies, faces, hair, clothes and skins.
   `?stage=all`, `?hair=all`, `?tops=all`, `?skins=all`, `?builds=all`, `?face=moods|visemes`,
+  `?faces=all&closeup=1` (every identity channel at -1 and +1, and random faces),
   `?clip=walk&t=0.4`, `?view=side|back`, `?closeup=1`, `?family=female`.
 - `/poses.html`: residents doing things at real furniture (gardening, beds, seats, eating, desks,
   instruments, cooking, carrying, exercise, conversations). `?only=sleep,chop`, `?seats=sofa,toilet`,

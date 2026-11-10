@@ -34,6 +34,7 @@ use nalgebra::{DMatrix, DVector, Dyn, LU};
 
 use super::cage::{Cage, Per, RingTags, Tags, Weights, se, turn, unit};
 use super::head::{HeadFrame, head_cage, onto_head, sockets, youth};
+use super::identity::Identity;
 use super::kdtree::KdTree;
 use super::meshops::smooth_normals;
 use super::np::{clip, lstsq, mean, mean_rows, radians, sign, smoothstep, unique};
@@ -158,6 +159,11 @@ fn ring_pts(c: V3, u: V3, v: V3, a: f64, bf: f64, bb: f64, ang: &[f64], p: f64) 
 
 /// The control cage (targets on the designed surface) of `family` at `stage`, and its joints.
 pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
+    body_cage_of(family, stage, &Identity::NONE)
+}
+
+/// The cage with a face of its own (`id`; identity.rs): the head's part of it differs.
+fn body_cage_of(family: &str, stage: &str, id: &Identity) -> (Cage, [V3; NB]) {
     let pr = proportions(family, stage);
     let p = joints(family, stage);
     let pj = |n: &str| p[b(n)];
@@ -471,7 +477,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
     let nw: Weights = vec![("neck_01", 0.55), ("Head", 0.45)];
     let nh_id = c.ring(&nh, Per::All(&nw), "neck", None, RingTags::default());
     c.band(&n0, &nh_id, &[]);
-    let jaw = head_cage(&mut c, family, stage);
+    let jaw = head_cage(&mut c, family, stage, id);
     c.join(&nh_id, &jaw, &[0, 2, 4, 5, 6, 7, 8, 10]);
 
     // Arms and hands.
@@ -1115,6 +1121,11 @@ pub struct Surface {
     pub ears: [[V3; 2]; 2],
     pub head_samples: Vec<V3>,
     pub head_normals: Vec<V3>,
+    /// Per sample, the head's (and the ears') share of it: 1 on the head, falling to 0 down the neck.
+    pub head_share: Vec<f64>,
+    /// The samples' triangles: each one's corners among the first samples (the vertices; a centre sample
+    /// follows per triangle, in this order).
+    pub head_tri_ix: Vec<[usize; 3]>,
     pub head_tris: Vec<[V3; 3]>,
     /// The same triangles without the eye sockets (where the closed lids lie, face.rs).
     pub bare_tris: Vec<[V3; 3]>,
@@ -1125,19 +1136,29 @@ static SURFACES: Cache<(String, String), Surface> = Cache::new();
 
 /// The body of `family` at `stage` (cached).
 pub fn surface(family: &str, stage: &str) -> Arc<Surface> {
-    SURFACES.get(key(family, stage), || make_surface(family, stage))
+    SURFACES.get(key(family, stage), || {
+        make_surface(family, stage, &Identity::NONE)
+    })
 }
 
-fn make_surface(family: &str, stage: &str) -> Surface {
+/// The body with a face of its own (`id`; identity.rs): the same topology, another head. Not kept.
+pub fn surface_of(family: &str, stage: &str, id: &Identity) -> Surface {
+    make_surface(family, stage, id)
+}
+
+fn make_surface(family: &str, stage: &str, id: &Identity) -> Surface {
     let topo = topology();
-    let (cage, p) = body_cage(family, stage);
+    let (cage, p) = body_cage_of(family, stage, id);
     let arr = cage.arrays();
     assert_eq!(arr.t.len(), topo.n);
     // The smooth shape is interpolated at the cage's vertices and snapped onto between them; features
     // are offsets on the fitted cage, the eye sockets carved after (`snapped`).
     let base = topo.solve(&arr.t);
     let ctrl: Vec<V3> = base.iter().zip(&arr.d).map(|(c, d)| c + d).collect();
-    let (onto, holes) = (onto_head(family, stage), sockets(family, stage, false));
+    let (onto, holes) = (
+        onto_head(family, stage, id),
+        sockets(family, stage, false, id),
+    );
     let s = &topo.s;
     let pos = topo.snapped(false, &base, &ctrl, &onto, &holes);
     let region: Vec<[f64; NR]> = cage
@@ -1153,7 +1174,7 @@ fn make_surface(family: &str, stage: &str) -> Surface {
         .a
         .apply(&ctrl)
         .into_iter()
-        .map(sockets(family, stage, true))
+        .map(sockets(family, stage, true, id))
         .collect();
     let tags = TagArrays::of(&arr.tags);
     let dense1 = rigid_fingertips(s.m.apply_n(&arr.dense), &pos, &p);
@@ -1212,11 +1233,18 @@ fn make_surface(family: &str, stage: &str) -> Surface {
     // Samples: the vertices and the triangles' centres (about 4 mm apart on an adult head).
     let mut head_samples: Vec<V3> = used.iter().map(|&i| fpos[i]).collect();
     let mut head_normals: Vec<V3> = used.iter().map(|&i| nor2[i]).collect();
+    let share = |i: usize| freg[i][ri_head] + freg[i][ri_ear];
+    let mut head_share: Vec<f64> = used.iter().map(|&i| share(i)).collect();
     for t in &tri {
         let cn = nor2[t[0]] + nor2[t[1]] + nor2[t[2]];
         head_normals.push(cn / cn.norm());
         head_samples.push((fpos[t[0]] + fpos[t[1]] + fpos[t[2]]) / 3.0);
+        head_share.push((share(t[0]) + share(t[1]) + share(t[2])) / 3.0);
     }
+    let head_tri_ix = tri
+        .iter()
+        .map(|t| t.map(|i| used.binary_search(&i).expect("sample")))
+        .collect();
     let head_tris = tri
         .iter()
         .map(|t| [fpos[t[0]], fpos[t[1]], fpos[t[2]]])
@@ -1252,6 +1280,8 @@ fn make_surface(family: &str, stage: &str) -> Surface {
         ears,
         head_samples,
         head_normals,
+        head_share,
+        head_tri_ix,
         head_tris,
         bare_tris,
         cranium,
