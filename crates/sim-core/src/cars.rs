@@ -6176,6 +6176,19 @@ pub(crate) fn in_the_way(cars: &[Car], body: Body, from: [f32; 2], to: [f32; 2])
     })
 }
 
+/// Whether resident `id` (with `body`, at `pos`) holds up a car driving by: it waits for them
+/// (`Car::on_foot`), or they stand in the way of one waiting for those in its way (`in_the_way`'s
+/// `holds_up`). They're to go on out of its way, not stand there: at a crosswalk closed to them
+/// (`traffic::kerb_stop`) the two waited for each other for good.
+pub(crate) fn holding_up(cars: &[Car], id: u32, body: Body, pos: [f32; 2]) -> bool {
+    cars.iter().any(|car| {
+        car.shown.is_some_and(|(at, yaw, on, _)| {
+            on && (car.on_foot.contains(&id)
+                || car.waited > 0 && in_way_of(at, yaw, car.len, car.wid, body, pos))
+        })
+    })
+}
+
 /// Someone has waited a while for a car (at `at`, facing `yaw`) to pass, standing in its way: a
 /// step aside (across the way it drives, away from it), where there's ground to stand on and it
 /// isn't into another's way (`clear`). None: nowhere to go.

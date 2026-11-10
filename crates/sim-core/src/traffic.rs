@@ -471,8 +471,8 @@ impl Signal {
 }
 
 /// An arm of a lit junction (`Signal`): the way out along it (a unit vector), and its signal head:
-/// the pole on the kerb to the right of the way in, a little out past the box, and which way it
-/// faces (as a resident's yaw: towards those coming in). Its phase (`Signal::phases`), its road
+/// the pole on the kerb to the right of the way in, at its stop line (a roundabout's, a little out
+/// past the box), and which way it faces (as a resident's yaw: towards those coming in). Its phase (`Signal::phases`), its road
 /// (`Graph::roads` index) and how far its kerbs are from the middle of it (m); its crosswalk, from
 /// `walk_from` to `walk_to` m out from the junction's middle (from the corner, where the kerb's
 /// return round from the next arm ends, `KERB_RETURN`, or the box's edge, whichever is further
@@ -533,8 +533,8 @@ const AMBER: u64 = crate::secs(2.0);
 const ALL_RED: u64 = crate::secs(4.0);
 /// A route this near a lit junction's middle goes through its lights (m, `gate`).
 const GATE_REACH: f32 = BOX_MOST + 2.0;
-/// How far out past its arm's box a signal pole stands, and in from the kerb on the pavement (or
-/// the road's edge) (m).
+/// How far out past its arm's box a roundabout's signal pole stands (another's stands at the stop
+/// line), and how far in from the kerb on the pavement (or the road's edge) any stands (m).
 const POLE_OUT: f32 = 1.0;
 const POLE_KERB: f32 = 0.4;
 /// Two arms of a junction whose ways out are further apart than 150° (the cosine) are across from
@@ -558,8 +558,8 @@ const WALK_CLEAR_LEAST: f32 = 3.0;
 type ArmRoad = (u32, f32, f32, f32, f32);
 
 /// The lights of the junction at node `n` of `g` (`Signal`): its arms for cars, each with its pole
-/// on the kerb to the right of the way in, just out past the box (`boxes`), its phase, crosswalk
-/// and stop line (`SignalArm`). `ring`: per road of `g`, whether it's a roundabout's. None: fewer
+/// on the kerb to the right of the way in, at its stop line, its phase and its crosswalk
+/// (`SignalArm`). `ring`: per road of `g`, whether it's a roundabout's. None: fewer
 /// than `SIGNAL_ARMS` arms.
 pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
     let p = g.nodes[n];
@@ -1451,7 +1451,7 @@ impl Traffic {
                 });
                 continue;
             };
-            // (At the lights, not its arm's green: it waits at the stop line, and holds nobody up.)
+            // (At the lights, not its phase's green: it waits at the stop line, holding nobody up.)
             if !self.green(next[0].gate) {
                 waits.push((i, Vec::new()));
                 fifo.push((i, Vec::new()));
@@ -1745,7 +1745,7 @@ pub fn waits_on(w: &World, key: u64) -> Vec<u64> {
     out
 }
 
-/// Whether vehicle `key` waits at a red light (its ask through lights not on its arm's green): it
+/// Whether vehicle `key` waits at a red light (its ask through lights not on its phase's green): it
 /// isn't held up for good, the light changes (for checks).
 pub fn at_red(w: &World, key: u64) -> bool {
     w.traffic.asks.iter().any(|a| {
@@ -1871,10 +1871,12 @@ fn walk_open(signals: &[Signal], lights: &[Light], s: usize) -> bool {
 
 /// Where someone on foot (or on a bike) stepping from `from` to `to` stops at a lit junction's
 /// crosswalks (`Signal::crossing`: its box too, between the kerbs, and its arms out to the far side
-/// of their crosswalks) while they're closed to them, out of its walk phase: the junction, and how
-/// far along the step they come (0 to 1), at the kerb. None: on (out of reach of any, its walk
-/// phase, or in it already: on across, out of it). One crossing a road away from the junctions
-/// goes as ever.
+/// of their crosswalks) while they're closed to them, out of its walk phase: the junction (of those
+/// whose crosswalks are there, the nearest), and how far along the step they come (0 to 1), at the
+/// kerb. None: on (out of reach of any; one whose crosswalks are there in its walk phase; or on a
+/// junction's crosswalks already, on across, out of it and over any next to it: two junctions a
+/// few metres apart, their walks apart, kept someone waiting on one for the other's). One crossing
+/// a road away from the junctions goes as ever.
 pub(crate) fn kerb_stop(
     travel: &crate::travel::Travel,
     lights: &[Light],
@@ -1894,34 +1896,52 @@ pub(crate) fn kerb_stop(
         cell(from[1].min(to[1]), c.rows),
         cell(from[1].max(to[1]), c.rows),
     );
-    let signals = &travel.signals;
-    let n = (dist(from, to) / KERB_STEP).ceil().max(1.0) as usize;
-    let mut stop: Option<(u16, f32)> = None;
+    // (The junctions near the step, once each.)
+    let mut near: [u16; 8] = [0; 8];
+    let mut count = 0;
     for z in z0..=z1 {
         for x in x0..=x1 {
             for &s in &c.cells[z * c.cols + x] {
-                let sig = &signals[usize::from(s)];
-                if walk_open(signals, lights, usize::from(s)) || sig.crossing(from) {
-                    continue;
-                }
-                for k in 1..=n {
-                    let f = k as f32 / n as f32;
-                    if stop.is_some_and(|(_, at)| f > at) {
-                        break;
-                    }
-                    let p = [
-                        from[0] + (to[0] - from[0]) * f,
-                        from[1] + (to[1] - from[1]) * f,
-                    ];
-                    if sig.crossing(p) {
-                        stop = Some((s, (k - 1) as f32 / n as f32));
-                        break;
-                    }
+                if !near[..count].contains(&s) && count < near.len() {
+                    near[count] = s;
+                    count += 1;
                 }
             }
         }
     }
-    stop
+    let signals = &travel.signals;
+    let near = &near[..count];
+    if near.is_empty() || near.iter().any(|&s| signals[usize::from(s)].crossing(from)) {
+        return None;
+    }
+    let n = (dist(from, to) / KERB_STEP).ceil().max(1.0) as usize;
+    for k in 1..=n {
+        let f = k as f32 / n as f32;
+        let p = [
+            from[0] + (to[0] - from[0]) * f,
+            from[1] + (to[1] - from[1]) * f,
+        ];
+        let mut here = near
+            .iter()
+            .copied()
+            .filter(|&s| signals[usize::from(s)].crossing(p))
+            .peekable();
+        if here.peek().is_none() {
+            continue;
+        }
+        let mut stop: Option<(u16, f32)> = None;
+        for s in here {
+            if walk_open(signals, lights, usize::from(s)) {
+                return None;
+            }
+            let d = dist(p, signals[usize::from(s)].at);
+            if stop.is_none_or(|(_, e)| d < e) {
+                stop = Some((s, d));
+            }
+        }
+        return stop.map(|(s, _)| (s, (k - 1) as f32 / n as f32));
+    }
+    None
 }
 
 /// The tick's claims, before the cars go on (`Traffic::begin`).
