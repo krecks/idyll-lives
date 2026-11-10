@@ -2509,8 +2509,13 @@ impl World {
             .map(|(_, speed, min)| (speed, min)),
         };
         let door = p.arrival_point();
-        let taxi =
-            crate::taxi::leisure_eta(&self.travel, &self.exits, &self.content, sim, pos, door);
+        let taxi = self
+            .taxis
+            .takes(sim)
+            .then(|| {
+                crate::taxi::leisure_eta(&self.travel, &self.exits, &self.content, sim, pos, door)
+            })
+            .flatten();
         let (_, eta) = leisure_way(
             &self.travel,
             &self.content,
@@ -7285,15 +7290,21 @@ fn pick_autonomous(
                 * crate::planner::visit_factor(content, sim, soon);
             // (The way there timed only for a visit worth making.)
             if score > MIN_AUTONOMY_SCORE {
-                let taxi = crate::taxi::leisure_eta_via(
-                    ctx.travel,
-                    ctx.exits,
-                    content,
-                    sim,
-                    pos,
-                    (Some(plot), door),
-                    &mut on,
-                );
+                let taxi = ctx
+                    .taxis
+                    .takes(sim)
+                    .then(|| {
+                        crate::taxi::leisure_eta_via(
+                            ctx.travel,
+                            ctx.exits,
+                            content,
+                            sim,
+                            pos,
+                            (Some(plot), door),
+                            &mut on,
+                        )
+                    })
+                    .flatten();
                 let (_, eta) = leisure_way(
                     ctx.travel,
                     content,
@@ -7331,15 +7342,21 @@ fn pick_autonomous(
                 continue;
             }
             // By the way they'd go (`leisure_way`).
-            let taxi = crate::taxi::leisure_eta_via(
-                ctx.travel,
-                ctx.exits,
-                content,
-                sim,
-                pos,
-                (Some(p.id), door),
-                &mut on,
-            );
+            let taxi = ctx
+                .taxis
+                .takes(sim)
+                .then(|| {
+                    crate::taxi::leisure_eta_via(
+                        ctx.travel,
+                        ctx.exits,
+                        content,
+                        sim,
+                        pos,
+                        (Some(p.id), door),
+                        &mut on,
+                    )
+                })
+                .flatten();
             let (_, eta) = leisure_way(
                 ctx.travel,
                 content,
@@ -10449,11 +10466,11 @@ fn outing_fits_now(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], plot: u32) 
         .or(sim.bound_for_bike)
         .and_then(|b| objects.get(b as usize))
         .and_then(|b| content.objects[b.def].vehicle)
-        .map(|v| (v.speed, 0.0))
+        .map(|v| (v.pace, 0.0))
         .or_else(|| {
             leisure_ride(sim, ctx, objects, plot)
                 .and_then(|b| content.objects[objects[b as usize].def].vehicle)
-                .map(|v| (v.speed, 0.0))
+                .map(|v| (v.pace, 0.0))
         });
     let goer = Goer {
         drives: false,
@@ -10497,6 +10514,7 @@ fn taxi_from_home(sim: &Sim, ctx: &Ctx, plot: u32) -> bool {
         && !car_home
         && Some(plot) != home
         && !ctx.taxis.no_taxi(sim.id, plot)
+        && ctx.taxis.takes(sim)
         && crate::taxi::leisure_eta(
             ctx.travel,
             ctx.exits,
@@ -10550,7 +10568,7 @@ fn outing_leave_by(
         .and_then(|(at, b)| {
             Some((
                 at,
-                content.objects[objects.get(b as usize)?.def].vehicle?.speed,
+                content.objects[objects.get(b as usize)?.def].vehicle?.pace,
             ))
         });
     let foot = crate::travel::Mode::Foot;

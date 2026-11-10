@@ -1,18 +1,20 @@
-// The sim's two clocks on the web side: real seconds (`ticksPerSecond`) and game minutes (`ticksPerMinute`), both from
-// the snapshot layout, and what keeps to sim-core's own (`lib.rs`, `clock.rs`) without a layout to hand. `bun test`.
+// The sim's clocks on the web side: real seconds (`ticksPerSecond`), game minutes (`ticksPerMinute`) and the traffic's
+// (`driveScale`), all from the snapshot layout, and what keeps to sim-core's own (`lib.rs`, `clock.rs`) without a
+// layout to hand. `bun test`.
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { clockGain, maxAlpha } from '../src/core/bridge';
 import { gameMinutesPerSecond, minutesPerTick, readLayout, tickRates } from '../src/core/snapshot';
 import { PLAYBACK_RATE, QUIET_SPEED } from '../src/render/shared/gameSpeed';
-import { constant, TICKS_PER_MINUTE, TICKS_PER_SECOND } from './snapshotLayout';
+import { constant, DRIVE_SCALE, TICKS_PER_MINUTE, TICKS_PER_SECOND } from './snapshotLayout';
 
 const CLOCK_RS = readFileSync(join(import.meta.dir, '../../crates/sim-core/src/clock.rs'), 'utf8');
 
 describe('tick rates', () => {
   test("before a game, the rates are sim-core's (`lib.rs`)", () => {
-    expect(tickRates).toEqual({ ticksPerSecond: TICKS_PER_SECOND, ticksPerMinute: TICKS_PER_MINUTE });
+    expect(tickRates).toEqual({ ticksPerSecond: TICKS_PER_SECOND, ticksPerMinute: TICKS_PER_MINUTE, driveScale: DRIVE_SCALE });
+    expect(DRIVE_SCALE).toBeGreaterThanOrEqual(1);
   });
 
   test("the playback rate is the ticks a step runs at each speed (`clock::TICKS_PER_STEP`), quiet hours sim-core's", () => {
@@ -25,6 +27,9 @@ describe('tick rates', () => {
   test('a layout without `ticksPerMinute` (an older sim) has a game minute a real second', () => {
     expect(readLayout('{"ticksPerSecond": 20}').ticksPerMinute).toBe(20);
     expect(readLayout('{"ticksPerSecond": 60, "ticksPerMinute": 75}').ticksPerMinute).toBe(75);
+    // (Nor `driveScale`: vehicles went at real time.)
+    expect(readLayout('{"ticksPerSecond": 20}').driveScale).toBe(1);
+    expect(readLayout('{"ticksPerSecond": 60, "ticksPerMinute": 75, "driveScale": 4}').driveScale).toBe(4);
     expect(minutesPerTick({ ticksPerMinute: 20 })).toBe(1 / 20);
     expect(gameMinutesPerSecond({ ticksPerSecond: 20, ticksPerMinute: 20 })).toBe(1);
     expect(gameMinutesPerSecond({ ticksPerSecond: 60, ticksPerMinute: 75 })).toBeCloseTo(0.8, 12);

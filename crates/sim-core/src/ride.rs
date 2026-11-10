@@ -120,15 +120,15 @@ fn fits(
     let v = content.objects[obj.def].vehicle?;
     let at = spot(content, obj);
     let far = to.is_none_or(|to| (to[0] - at[0]).hypot(to[1] - at[1]) >= v.min_ride);
-    (!obj.broken() && stage_in(v.stages, stage) && far).then_some(v.speed)
+    (!obj.broken() && stage_in(v.stages, stage) && far).then_some(v.pace)
 }
 
-/// How many times as fast as walking `sim` goes now: their bike's `speed` while they ride it.
+/// How many times as fast as walking `sim` goes now: their bike's `Vehicle::pace` while they ride it.
 pub(crate) fn speed(content: &Content, sim: &Sim, objects: &[ObjectInstance]) -> f32 {
     sim.riding
         .and_then(|o| objects.get(o as usize))
         .and_then(|o| content.objects[o.def].vehicle)
-        .map_or(1.0, |v| v.speed)
+        .map_or(1.0, |v| v.pace)
 }
 
 /// `sim` sets off for `bike`: it's theirs until they're back.

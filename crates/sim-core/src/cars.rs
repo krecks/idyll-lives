@@ -97,7 +97,7 @@ use crate::travel::{Mode, RoadPoint, Travel};
 use crate::world::{
     Household, Phase, Plot, Sim, SimBrief, Task, TaskKind, World, nearest_exit, wrap_angle,
 };
-use crate::{TICKS_PER_SECOND, secs};
+use crate::{DRIVE_TICKS_PER_SECOND, drive_secs, drive_ticks, secs};
 
 /// Most cars in a town (the snapshot's rows).
 pub const MAX_CARS: usize = 128;
@@ -132,7 +132,7 @@ pub(crate) const BODY: f32 = 0.25;
 /// Someone waiting for a car to pass for this long steps aside out of its way (ticks of real
 /// time, `make_way`), this far a tick (m: 1.2 m a second).
 pub(crate) const MAKE_WAY_TICKS: u32 = secs(1.5) as u32;
-pub(crate) const STEP_ASIDE: f32 = (1.2 / TICKS_PER_SECOND as f64) as f32;
+pub(crate) const STEP_ASIDE: f32 = (1.2 / crate::TICKS_PER_SECOND as f64) as f32;
 /// Someone walking within about 30° of a car's way (the sine of the angle between) walks along
 /// it, not across it out of it (`go_on`).
 const ALONG: f32 = 0.5;
@@ -175,9 +175,9 @@ pub(crate) const GAP: f32 = 0.15;
 /// theirs, `too_near` their bodies as they are, which on a bend come nearer.
 pub(crate) const PASSING: f32 = 0.1;
 pub(crate) const PULL_MARGIN: f32 = 0.3;
-/// How far a car pulls over (or back) a tick (m: 1.2 m a second), and for one coming the other
-/// way how far ahead of its front (m, from the other's front: `pull_want`).
-pub(crate) const PULL_RATE: f32 = (1.2 / TICKS_PER_SECOND as f64) as f32;
+/// How far a car pulls over (or back) a tick (m: 1.2 m a second of drive time), and for one coming
+/// the other way how far ahead of its front (m, from the other's front: `pull_want`).
+pub(crate) const PULL_RATE: f32 = (1.2 / DRIVE_TICKS_PER_SECOND as f64) as f32;
 pub(crate) const PULL_AHEAD: f32 = 16.0;
 /// How near the furniture (or a country road's edge) a car pulled over comes (m), and how far
 /// right of its lane it pulls over at most (m).
@@ -187,10 +187,11 @@ const PULL_MOST: f32 = 0.7;
 const TURN: f32 = 2.4;
 /// How far past the town's exit a car drives before it's gone (m).
 pub(crate) const OVERSHOOT: f32 = 12.0;
-/// Top speeds (m per second at 1×): along the street, and in the driveway, turning or backing up.
+/// Top speeds (m per second of drive time, `crate::DRIVE_SCALE`): along the street, and in the
+/// driveway, turning or backing up.
 pub(crate) const FAST: f32 = 6.0;
 const SLOW: f32 = 1.8;
-/// Speeding up and slowing down (m/s²).
+/// Speeding up and slowing down (m/s², drive time).
 const ACCEL: f32 = 2.2;
 /// The route's sampling step (m).
 const STEP: f32 = 0.25;
@@ -337,18 +338,19 @@ pub(crate) const SEEN_MARGIN: f32 = 32.0;
 const SEEN_SLACK: f32 = 12.0;
 
 /// One out of sight comes under the rules once it's this near coming into sight along its way
-/// (ticks: the next, then each second up to 4 s, some 20 m at speed), clear of those in sight
-/// (`sight`).
+/// (ticks: the next, then each second of drive time up to 4 s, some 20 m at a town's speed),
+/// clear of those in sight (`sight`).
 const COMING_IN: [f32; 5] = [
     1.0,
-    secs(1.0) as f32,
-    secs(2.0) as f32,
-    secs(3.0) as f32,
-    secs(4.0) as f32,
+    drive_ticks(1.0),
+    drive_ticks(2.0),
+    drive_ticks(3.0),
+    drive_ticks(4.0),
 ];
-/// How far apart (ticks: half a second) a car's way into sight is looked along (`sight`: its
-/// claims reaching into sight, and `METER`'s queue).
-const SIGHT_STEP: f32 = secs(0.5) as f32;
+/// How far apart (ticks: half a second of drive time, 3 m at a town's speed; slowed for a
+/// junction, less than 2 m) a car's way into sight is looked along (`sight`: its claims reaching
+/// into sight, and `METER`'s queue).
+const SIGHT_STEP: f32 = drive_ticks(0.5);
 
 /// Coming into sight (`sight`), a car out of it waits outside while one in sight standing still
 /// (`METER_STILL`, or a taxi at its stop) is on its way in up to the first junction it takes
@@ -362,16 +364,16 @@ struct Meter {
     gap: f32,
 }
 const METER: Meter = Meter {
-    ahead: secs(6.0) as f32,
-    most: secs(75.0) as f32,
+    ahead: drive_ticks(6.0),
+    most: drive_ticks(75.0),
     gap: 1.0,
 };
-/// How long one in sight on its way has stood still for its queue to count as full (ticks of real
+/// How long one in sight on its way has stood still for its queue to count as full (ticks of drive
 /// time).
-const METER_STILL: u64 = secs(1.0);
-/// How long one waits outside for room at most (ticks of real time, `METER`): then it comes in all
-/// the same.
-const METER_MOST: u64 = secs(5.0);
+const METER_STILL: u64 = drive_secs(1.0);
+/// How long one waits outside for room at most (ticks of drive time, `METER`): then it comes in
+/// all the same.
+const METER_MOST: u64 = drive_secs(5.0);
 
 /// Two cars this near (m) touch: one the camera comes to touching one in sight is put clear
 /// (`sight`), and one in sight touching one out of it isn't drawn (`hidden`). (Those under the
@@ -1175,6 +1177,45 @@ pub(crate) fn top_speed(
     }
 }
 
+/// How many ticks a car takes along the roads from the road nearest `from` to the road nearest
+/// `to` with them to itself (every light green, nobody in its way): in its lane, its corners
+/// rounded, slowing for junctions and bends as `Route::on_roads` lays a drive out, from standing
+/// to standing. None: no road near either, or no way between by road. (A world's drive across,
+/// timed: the tests.)
+pub fn empty_drive_ticks(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<f32> {
+    use crate::travel::dist;
+    let g = &travel.graph;
+    let a = *g.near(from, ROAD_REACH, 1, Mode::Car).first()?;
+    let b = *g.near(to, ROAD_REACH, 1, Mode::Car).first()?;
+    let path = g.path(a, b, Mode::Car, travel.country_speed)?;
+    if path.pts.len() < 2 {
+        return None;
+    }
+    let centre: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
+    let offs: Vec<f32> = path.pts.iter().map(|p| lane_on(p.1, p.2)).collect();
+    let lane = round_corners(&crate::travel::thin_with(
+        &offset_right_by(&centre, &offs),
+        ROUTE_STEP,
+        ROUTE_TOLERANCE,
+    ));
+    let junctions: Vec<[f32; 2]> = g.junctions().collect();
+    let mut legs = Legs::default();
+    for p in lane {
+        let (_, width, kind) = *path
+            .pts
+            .iter()
+            .min_by(|x, y| dist(x.0, p).total_cmp(&dist(y.0, p)))?;
+        let top = top_speed(p, kind, travel, &junctions);
+        legs.push_lane(
+            p,
+            top,
+            pull_room(width, kind, 2.0 * CAR_HALF),
+            lane_on(width, kind),
+        );
+    }
+    Some(legs.timed(true, true).ticks())
+}
+
 /// A drive, sampled every `STEP` metres: where the car's middle is, which way it faces, and when
 /// it gets there (ticks from the start).
 #[derive(Debug, Clone, Default)]
@@ -1677,7 +1718,7 @@ impl Route {
             for i in i0..had.points.len() {
                 let (q, _, t, rev) = had.points[i];
                 let top = had.points.get(i + 1).map_or(SLOW, |n| {
-                    let dt = (n.2 - t).max(1e-3) / TICKS_PER_SECOND as f32;
+                    let dt = (n.2 - t).max(1e-3) / DRIVE_TICKS_PER_SECOND;
                     (dist(q, n.0) / dt).max(0.3)
                 });
                 legs.pts.push((q, rev, top));
@@ -2625,7 +2666,8 @@ impl Legs {
         for i in (0..n - 1).rev() {
             v[i] = v[i].min((v[i + 1] * v[i + 1] + 2.0 * ACCEL * ds[i]).sqrt());
         }
-        let per_second = TICKS_PER_SECOND as f32;
+        // (Ticks of drive time: `crate::DRIVE_SCALE` times as fast as real time.)
+        let per_second = DRIVE_TICKS_PER_SECOND;
         // Facing along each step: the way it goes, turned round while it backs; along a step of
         // none (where it changes between backing and driving on), as along the one before.
         let mut facing: Vec<f32> = Vec::with_capacity(n - 1);
@@ -3328,7 +3370,10 @@ fn drive_on(w: &mut World, c: usize) {
     }
     // (Backed up out of its way, it stays there while that one still waits for it, or while it
     // still waits its turn after it, or that one is still by it (held up there by others now and
-    // then, on foot too): not on into its way again.)
+    // then, on foot too): not on into its way again. Not one that could back up no further
+    // (`Car::jam`'s third, the other backs instead): it goes on as soon as the other gives it
+    // room, else both stood back for each other for good, the other coming up again to wait on
+    // it, Tide Sands.)
     let asking = !w.traffic.waits_for(key).is_empty();
     let by = w.cars[c].backed_for.is_some_and(|k| {
         let me = &w.cars[c];
@@ -3340,7 +3385,7 @@ fn drive_on(w: &mut World, c: usize) {
                 crate::travel::dist(m.0, s.0) < (me.len + o.len) / 2.0 + 2.0 * AHEAD
             })
     });
-    if (jammed || asking || by) && jam.1 > 0 && !w.cars[c].outside() {
+    if (jammed || asking || by) && jam.1 > 0 && !jam.2 && !w.cars[c].outside() {
         return;
     }
     // (Whom it waited for last tick: pulled over for that one, it doesn't pull back in into its
@@ -3447,7 +3492,7 @@ fn drive_on(w: &mut World, c: usize) {
     // Not into what's left of a claim another holds. (Pulling over to pass one in it only as far
     // as it will on its way: not into a junction's box just ahead, `pull_want`.)
     let (body_now, body_next) = (now.body(), me.body());
-    let pass = ([1.0, secs(0.5) as f32, secs(1.0) as f32]
+    let pass = ([1.0, drive_ticks(0.5), drive_ticks(1.0)]
         .into_iter()
         .map(|k| route_pass(car, t + k))
         .fold(f32::INFINITY, f32::min)
@@ -3627,10 +3672,10 @@ pub(crate) fn stand_taxi(w: &mut World, c: usize) {
     pull_over(w, c, &others, false, None);
 }
 
-/// How long a car and one in its way wait for each other before it backs up (ticks of real time,
+/// How long a car and one in its way wait for each other before it backs up (ticks of drive time,
 /// `back_off`), and how far back it goes at most (ticks along its route, a tick back each tick).
-const JAM_TICKS: u32 = secs(5.0) as u32;
-const JAM_BACK: u32 = secs(3.0) as u32;
+const JAM_TICKS: u32 = drive_secs(5.0) as u32;
+const JAM_BACK: u32 = drive_secs(3.0) as u32;
 
 /// Whether car `k` (its `Driving::first`) waited for car `me` last tick, so that car `me`, waiting
 /// for it, should back up (`back_off`): of two cars, the one not holding a claim (holding one,
@@ -3908,7 +3953,7 @@ fn pull_want(w: &World, c: usize, moving: bool, after: &dyn Fn(u64) -> bool) -> 
     // (On the move, back in its lane before its room runs out; standing, as far as it has room
     // where it stands.)
     let room = if moving {
-        [0.0, 1.0, secs(0.5) as f32, secs(1.0) as f32]
+        [0.0, 1.0, drive_ticks(0.5), drive_ticks(1.0)]
             .into_iter()
             .map(|k| route.room_at(t + k))
             .fold(f32::INFINITY, f32::min)
@@ -4343,23 +4388,23 @@ pub(crate) fn track_stall(w: &mut World) {
         }
         let on_way = going && car.sight == Sight::Seen;
         // (Well back along its way: a new way, begun afresh.)
-        let restarted = car.progress < car.stall.0 - secs(10.0) as f32;
+        let restarted = car.progress < car.stall.0 - drive_ticks(10.0);
         if !on_way || car.progress > car.stall.0 + 1e-3 || restarted {
             car.stall = (car.progress, tick);
         }
     }
 }
 
-/// How far ahead along its way (ticks of real time) a car in sight is looked along for a work taxi
+/// How far ahead along its way (ticks of drive time) a car in sight is looked along for a work taxi
 /// standing at the kerb in its lane, or alongside one the other way (`pass_stands`); one further
 /// off than `PASS_FAR` (m: well past where a car gets in `PASS_LOOK` at any speed) isn't.
-const PASS_LOOK: f32 = secs(45.0) as f32;
+const PASS_LOOK: f32 = drive_ticks(45.0);
 const PASS_FAR: f32 = 900.0;
-/// How far apart (ticks: a tenth of a second) a way past a standing taxi is looked along
-/// (`leg_past`, `span_by`), and how far on from where it comes up against it its middle is looked
-/// for alongside the taxi's (ticks: 4 s).
-const PASS_STEP: f32 = secs(0.1) as f32;
-const PASS_ALONGSIDE: usize = secs(4.0) as usize;
+/// How far apart (ticks: a tenth of a second of drive time) a way past a standing taxi is looked
+/// along (`leg_past`, `span_by`), and how far on from where it comes up against it its middle is
+/// looked for alongside the taxi's (ticks: 4 s of drive time).
+const PASS_STEP: f32 = drive_ticks(0.1);
+const PASS_ALONGSIDE: usize = drive_secs(4.0) as usize;
 /// Passing a work taxi standing at the kerb in its lane (`PassBy`): how far clear of it its body
 /// keeps alongside (m), how far behind it and past it (m) it's out of its lane all the way, and
 /// how far it eases out before and back in after (m; out, `PASS_EASE_LEAST` at least, right
@@ -4370,8 +4415,8 @@ const PASS_EASE: f32 = 8.0;
 const PASS_EASE_LEAST: f32 = 3.0;
 /// How long a car waits for its way round a work taxi standing in its lane, or behind one with
 /// no way round it, before it turns round as one held up by a car parked in its way (ticks,
-/// `unjam`; real time).
-const PASS_WAIT: u64 = secs(3.0);
+/// `unjam`; drive time).
+const PASS_WAIT: u64 = drive_secs(3.0);
 
 /// How much of its way out round a standing taxi a car is at `t` ticks along (`PassBy`: 0 in its
 /// lane, 1 out alongside it), easing out and back in.
@@ -4909,7 +4954,8 @@ fn turn_round_by(w: &mut World, c: usize, d: Detour) -> bool {
     let car = &mut cars[c];
     car.avoided.retain(|a| a.1 > tick);
     let old = car.route.take();
-    let twice = car.detour.is_some();
+    let had = car.detour;
+    let twice = had.is_some();
     let passing = car.pass_by.take();
     car.detour = Some(d);
     let mut halts: Option<Box<dyn Fn(f32) -> f32>> = None;
@@ -4999,7 +5045,10 @@ fn turn_round_by(w: &mut World, c: usize, d: Detour) -> bool {
         .is_none_or(|(h, r)| *h != home || r.ticks() <= 1.0)
         || !clear
     {
-        car.detour = None;
+        // (As it was: on the way it had, turned round before or not. Not left on the way it
+        // turned round to with no turn round, as on its way: backing up along it, it waited on
+        // the one it backed into for good, Tide Sands.)
+        car.detour = had;
         car.route = old;
         car.pass_by = passing;
         return false;
@@ -5128,7 +5177,7 @@ fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static str> {
         .map_or(1.0, |m| m.1.max(1.0));
     let boxes = &w.travel.graph.boxes;
     // (The stretch it was held up on: where it is, or on along its way.)
-    let (mut ahead, step) = (t, secs(0.2) as f32);
+    let (mut ahead, step) = (t, drive_ticks(0.2));
     while ahead + step < route.ticks() && crate::travel::dist(route.at(ahead).0, body(t).at) <= 6.0
     {
         ahead += step;
@@ -5314,12 +5363,12 @@ fn mouth_behind(
 const UNJAM_WHY: [&str; 4] = ["turning round", "no room", "no junction behind", "no way"];
 
 /// Longest a car turned round with no other way waits out of the way for those it was held up
-/// with to go on (ticks of real time, `unjam`).
-const LET_BY_MOST: u64 = secs(15.0);
+/// with to go on (ticks of drive time, `unjam`).
+const LET_BY_MOST: u64 = drive_secs(15.0);
 
-/// How long a car keeps off a stretch it turned round from, turning round again (ticks of real
+/// How long a car keeps off a stretch it turned round from, turning round again (ticks of drive
 /// time, `unjam`).
-const AVOID_FOR: u64 = secs(30.0);
+const AVOID_FOR: u64 = drive_secs(30.0);
 
 /// How far the others keep off the ground a car turning round backs up over, past `GAP` (m,
 /// `drive_on`).
@@ -5334,12 +5383,12 @@ const PASS_ROOM: f32 = 0.6;
 const TURN_ROOM: f32 = 60.0;
 /// How far on past a junction's box a car backs up to turn round there (m).
 const TURN_PAST: f32 = 3.0;
-/// Held up this long (ticks of real time), in sight, a car turns round (`unjam`): well before a
+/// Held up this long (ticks of drive time), in sight, a car turns round (`unjam`): well before a
 /// check counts it held up for good (10 game minutes).
-const UNJAM_TICKS: u64 = secs(4.0);
-/// Cars none of which could turn round are tried again this much later (ticks of real time,
+const UNJAM_TICKS: u64 = drive_secs(4.0);
+/// Cars none of which could turn round are tried again this much later (ticks of drive time,
 /// `unjam`).
-const UNJAM_AGAIN: u64 = secs(2.0);
+const UNJAM_AGAIN: u64 = drive_secs(2.0);
 
 /// Whether car `c` on a trip, its driver no longer at the wheel, is in the picture, or where it
 /// parks out or at home is (`in_picture`): it drives on there, not to be seen to jump there.
@@ -5364,9 +5413,9 @@ fn in_picture(w: &World, p: [f32; 2]) -> bool {
 /// the ground in front of it well clear of what's drawn.
 const UNSEEN: f32 = 8.0;
 
-/// Standing still this long (ticks of real time), with all it waits for, out of the picture, a car
-/// is put on (`unstick`).
-const STUCK_UNSEEN: u64 = secs(3.0);
+/// Standing still this long (ticks of drive time), with all it waits for, out of the picture, a
+/// car is put on (`unstick`).
+const STUCK_UNSEEN: u64 = drive_secs(3.0);
 
 /// The bay a car `len` long turns round in at driveway mouth `m` (`Detour::mouth`): just inside
 /// the driveway, off the road, facing out (as if parked there nose out). None: no road there, or
@@ -5384,9 +5433,9 @@ fn mouth_turn(m: &MouthTurn, travel: &Travel, len: f32) -> Option<Bay> {
 /// length).
 const MOUTH_IN: f32 = 0.5;
 
-/// Furthest (ticks along its way: 15 s) a car the camera came to on top of another is put to come
-/// into sight clear of it (`moved_clear`, a tick at a time).
-const MOVED_MOST: u32 = secs(15.0) as u32;
+/// Furthest (ticks along its way: 15 s of drive time) a car the camera came to on top of another
+/// is put to come into sight clear of it (`moved_clear`, a tick at a time).
+const MOVED_MOST: u32 = drive_secs(15.0) as u32;
 
 /// Which of `cars` aren't drawn (`snapshot::car`): those out of sight (`Sight`: none is drawn
 /// driving through the others), and any on top of one of those or touching it (`TOUCH`: at the
@@ -5474,7 +5523,7 @@ pub(crate) fn movers(
         // (On the move, as far as it will pull over on its way: not into a junction's box or a
         // narrow span just ahead, as `drive_on` sees it. Standing, waiting at a box's edge, as far
         // as it can where it stands: those coming out of the box pass it there.)
-        const AHEAD_TOO: [f32; 3] = [0.0, secs(0.5) as f32, secs(1.0) as f32];
+        const AHEAD_TOO: [f32; 3] = [0.0, drive_ticks(0.5), drive_ticks(1.0)];
         let ahead_too: &[f32] = if moved { &AHEAD_TOO } else { &[0.0] };
         let pass = (ahead_too
             .iter()
@@ -8441,6 +8490,70 @@ mod tests {
         )
     }
 
+    /// On the traffic's clock a car on a country road goes about a metre a tick
+    /// (`crate::DRIVE_SCALE`): one driven straight through the smallest junction's box at that
+    /// speed, never slowing for it, still has its route sampled finer than the box, and asks for
+    /// the box's claim before its body is in it, whichever tick it gets there.
+    #[test]
+    fn a_car_at_country_speed_cannot_skip_a_junction_box() {
+        let speed = crate::travel::COUNTRY_SPEED;
+        assert!(
+            speed / crate::DRIVE_TICKS_PER_SECOND > 1.0,
+            "a metre a tick or more"
+        );
+        // (Along x through a box at x = 100, the smallest: `traffic::boxes`' 6 m.)
+        let (centre, r) = ([100.0, 0.0], 6.0);
+        let mut legs = Legs::default();
+        for k in 0..=50 {
+            legs.push_lane([k as f32 * 4.0, 0.0], speed, 0.0, LANE);
+        }
+        let route = legs.timed(false, false);
+        let (len, wid) = (4.4, 1.8);
+        // The way sampled no further apart than `SAMPLE` and a little: finer than the box.
+        let trace = crate::traffic::trace(|t| route.at(t), route.ticks());
+        let most = trace
+            .windows(2)
+            .map(|w| crate::travel::dist(w[0].1, w[1].1))
+            .fold(0.0f32, f32::max);
+        assert!(
+            most < crate::traffic::SAMPLE + 0.5 && most < r,
+            "{most} m between samples"
+        );
+        assert!(SIGHT_STEP / crate::DRIVE_TICKS_PER_SECOND * JUNCTION_SPEED < r);
+        let pass = vec![0.0; trace.len()];
+        let claims = crate::traffic::claims(&trace, &pass, len, wid, &[(centre, r)], &[]);
+        assert_eq!(claims.len(), 1, "the box's claim");
+        let c = &claims[0];
+        // (Whether its body `t` ticks along touches the box.)
+        let touches = |t: f32| {
+            let (p, yaw, _) = route.at(t);
+            let (dx, dz) = (centre[0] - p[0], centre[1] - p[1]);
+            let along = dx * yaw.sin() + dz * yaw.cos();
+            let across = dx * yaw.cos() - dz * yaw.sin();
+            let off =
+                ((along.abs() - len / 2.0).max(0.0)).hypot((across.abs() - wid / 2.0).max(0.0));
+            off <= r
+        };
+        // Each tick it goes on from `t` to `t + 1` (`drive_on`, `Traffic::may_go`): into the box
+        // only asking for its claim first.
+        let mut asked = false;
+        let mut t = 0.0;
+        while t < route.ticks() {
+            let asks = t + 1.0 > c.from && t < c.to;
+            asked |= asks;
+            assert!(
+                !touches(t + 1.0) || touches(t) || asks,
+                "at {t} it drives into the box ({:?}) unasked",
+                route.at(t + 1.0).0
+            );
+            if touches(t + 1.0) {
+                assert!(asked, "in the box at {} before asking", t + 1.0);
+            }
+            t += 1.0;
+        }
+        assert!(asked);
+    }
+
     #[test]
     fn pulls_out_and_drives_to_the_nearer_end() {
         // Street along x at z = 20, exits at both ends; the car faces the street.
@@ -8454,8 +8567,8 @@ mod tests {
         assert!((r.points[0].0[0] - 70.0).abs() < 1e-3);
         assert!(r.points[0].1.abs() < 0.2);
         assert!((r.points.last().unwrap().1 - std::f32::consts::FRAC_PI_2).abs() < 0.1);
-        // Takes a while, but not forever.
-        let secs = r.ticks() / TICKS_PER_SECOND as f32;
+        // Takes a while, but not forever (seconds of drive time).
+        let secs = r.ticks() / DRIVE_TICKS_PER_SECOND;
         assert!(secs > 5.0 && secs < 40.0, "{secs} s");
         // The pose follows the route.
         c.state = CarState::Leaving;

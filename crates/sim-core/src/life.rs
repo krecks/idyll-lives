@@ -319,7 +319,7 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
         };
         let speed = bike
             .and_then(|o| w.content.objects[w.objects.get(o as usize)?.def].vehicle)
-            .map_or(1.0, |v| v.speed);
+            .map_or(1.0, |v| v.pace);
         let walk = sim.walk_per_minute(&w.content) * speed;
         // (From over the ground: a commute timed from bed upstairs had them setting off for
         // work in the middle of the night.)
@@ -373,10 +373,10 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
     planned
 }
 
-/// The longest ride out of town on a bike or e-scooter (game minutes: a bike's 4.5 m a real second
-/// is about 5.6 m a game minute, so some 500 m of street; a big world's far roads out took over
-/// three hours): longer, the way is ridden in the work taxi or walked (`refresh_commute`), and
-/// nobody rides two hours in town.
+/// The longest ride out of town on a bike or e-scooter (game minutes: a bike's 4.5 m a second, on
+/// the traffic's clock (`crate::DRIVE_SCALE`), is about 22 m a game minute, so some 2 km of
+/// street, across a big world): longer, the way is ridden in the work taxi or walked
+/// (`refresh_commute`), and nobody rides two hours in town.
 const BIKE_MOST: f32 = 90.0;
 
 /// Minutes added to the walk from the front door for getting out of the house to it, and a
@@ -2232,13 +2232,14 @@ mod tests {
         );
     }
 
-    /// Friends are visited only where the walk isn't one of hours: the one next door, not the
-    /// one at the far end of a long street (`world::visit_fits`).
+    /// Friends are visited only where the way isn't one of hours: the one next door, not the
+    /// one at the far end of a long street (`world::visit_fits`), most of a kilometre off (a third
+    /// of that, the taxi takes them: `taxi::leisure_eta`, on the traffic's clock).
     #[test]
     fn friends_hours_away_are_not_visited_on_a_whim() {
-        for (east, visited) in [(20, true), (300, false)] {
+        for (east, visited) in [(20, true), (900, false)] {
             let town = TOWN
-                .replace(r#""width":40"#, r#""width":340"#)
+                .replace(r#""width":40"#, &format!(r#""width":{}"#, east + 40))
                 .replace(
                     r#""x":20,"z":0,"w":20"#,
                     &format!(r#""x":{east},"z":0,"w":20"#),

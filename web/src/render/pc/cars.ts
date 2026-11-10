@@ -46,7 +46,10 @@ const CAR_SEAT: Seat = { h: 0.3, fwd: 0 };
 
 /** How far the front wheels steer at most (rad), and how quickly they follow the way the car turns (per second). */
 const STEER = { max: 0.5, rate: 8 };
-/** How far the body tilts at most as it speeds up or slows down (rad, nose up speeding up), per m/s² of it, and how quickly it settles (per second). */
+/**
+ * How far the body tilts at most as it speeds up or slows down (rad, nose up speeding up), per m/s² of it (of drive
+ * time, as the sim's `ACCEL`: the same at any game speed), and how quickly it settles (per second).
+ */
 const PITCH_MAX = 0.03;
 const PITCH_PER_ACCEL = 0.006;
 const PITCH_RATE = 5;
@@ -149,6 +152,8 @@ export class Cars extends Vehicles {
     const rate = PLAYBACK_RATE[curr[layout.header.speed] | 0] ?? 1;
     const real = Math.min(0.1, Math.max(0, (frame.now - this.lastNow) / 1000));
     const dt = real * rate;
+    // (Seconds of drive time a real second: the cars go on the traffic's clock.)
+    const drive = rate * layout.driveScale;
     this.lastNow = frame.now;
     this.moved = false;
     if (layout.carBase === undefined || layout.carStride === undefined || !f) return;
@@ -166,8 +171,8 @@ export class Cars extends Vehicles {
         const o = layout.carBase + car.row * layout.carStride;
         changed = at.x !== last.x || at.z !== last.z || at.yaw !== last.yaw;
         // (Paused, nothing goes on settling.)
-        if (changed) this.roll(car, real);
-        else if (rate > 0) changed = this.settle(car, real);
+        if (changed) this.roll(car, real, drive);
+        else if (rate > 0) changed = this.settle(car, real, drive);
         [last.x, last.z, last.yaw] = [at.x, at.z, at.yaw];
         const open = doorsAt === undefined ? 0 : curr[o + doorsAt];
         let ajar = false;
@@ -278,31 +283,34 @@ export class Cars extends Vehicles {
     }
   }
 
-  /** A car moved since last frame (`real` seconds): its wheels turn by the way it went, the front ones steer by how it turned, the body tilts by how its speed changed. */
-  private roll(car: Drawn, real: number): void {
-    const along = rollWheels(car, car.at, car.last, car.shape.wheelR, car.shape.wheelBase, STEER, real);
+  /**
+   * A car moved since last frame (`real` seconds, `drive` seconds of drive time each): its wheels turn by the way it
+   * went, the front ones steer by how it turned, the body tilts by how its speed changed.
+   */
+  private roll(car: Drawn, real: number, drive: number): void {
+    const along = rollWheels(car, car.at, car.last, car.shape.wheelR, car.shape.wheelBase, STEER, real, drive);
     if (along === null) car.speed = 0;
-    else if (real > 0) this.tilt(car, along / real, real);
+    else if (real > 0 && drive > 0) this.tilt(car, along / (real * drive), real, drive);
   }
 
   /** A car standing still this frame: its tilt settles, its wheels straighten once parked. Whether either changed. */
-  private settle(car: Drawn, real: number): boolean {
+  private settle(car: Drawn, real: number, drive: number): boolean {
     let changed = false;
     if (car.at.shown === 1 && car.steer !== 0) {
       car.steer = Math.abs(car.steer) < 0.01 ? 0 : car.steer * Math.exp(-real * STEER.rate);
       changed = true;
     }
-    if (car.speed !== 0 || car.pitch !== 0) changed = this.tilt(car, 0, real) || changed;
+    if (car.speed !== 0 || car.pitch !== 0) changed = this.tilt(car, 0, real, drive) || changed;
     return changed;
   }
 
-  /** The body's tilt for its speed now (`speed`, m/s): nose up speeding up, down slowing down. Whether it changed. */
-  private tilt(car: Drawn, speed: number, real: number): boolean {
-    if (real <= 0) return false;
+  /** The body's tilt for its speed now (`speed`, m a second of drive time): nose up speeding up, down slowing down. Whether it changed. */
+  private tilt(car: Drawn, speed: number, real: number, drive: number): boolean {
+    if (real <= 0 || drive <= 0) return false;
     const was = car.speed;
     car.speed += (speed - car.speed) * (1 - Math.exp(-real * SPEED_RATE));
     if (Math.abs(car.speed) < 0.01 && speed === 0) car.speed = 0;
-    const accel = (Math.abs(car.speed) - Math.abs(was)) / real;
+    const accel = (Math.abs(car.speed) - Math.abs(was)) / (real * drive);
     const goal = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, accel * PITCH_PER_ACCEL));
     const pitch = car.pitch;
     car.pitch += (goal - car.pitch) * (1 - Math.exp(-real * PITCH_RATE));

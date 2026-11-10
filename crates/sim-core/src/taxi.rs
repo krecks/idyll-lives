@@ -1164,7 +1164,7 @@ fn route_via(
 
 /// The way in at `at` (a point of `World::exits`): how many cars wait out of sight to come in by
 /// it (`Car::waits_to_come_in_at`), and stand still on their way near it (`QUEUE_NEAR`, a second
-/// or more): a queue into its first junction.
+/// of drive time or more): a queue into its first junction.
 fn queued(w: &World, at: [f32; 2]) -> usize {
     let outside = w.cars.iter().filter(|c| c.waits_to_come_in_at(at)).count();
     let held = w
@@ -1173,7 +1173,7 @@ fn queued(w: &World, at: [f32; 2]) -> usize {
         .zip(&w.taxis.still)
         .filter(|(_, s)| {
             s.0.is_some_and(|p| crate::travel::dist(p, at) < QUEUE_NEAR)
-                && w.tick >= s.1 + crate::secs(1.0)
+                && w.tick >= s.1 + crate::drive_secs(1.0)
         })
         .count();
     outside + held
@@ -1595,9 +1595,9 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
 
 /// How near one going by a taxi ready to go on may be, besides `cars::PASSING` (m, either side),
 /// for it to wait till they're past, and how long it waits so at most since it stood (ticks of
-/// real time).
+/// drive time).
 const PASS_BY: f32 = 0.3;
-const PASS_BY_MOST: u64 = crate::secs(3.0);
+const PASS_BY_MOST: u64 = crate::drive_secs(3.0);
 
 /// Resident `i`, booked on a taxi, isn't riding it: unbooked, and on their way to work or school
 /// their own way (from the kerb, or wherever they've got to); planned once more for the same start
@@ -2095,6 +2095,18 @@ impl World {
 }
 
 impl Taxis {
+    /// Whether `LEISURE_FLEET` taxis are out on visits and outings now: no more are sent there.
+    pub(crate) fn fleet_out(&self) -> bool {
+        self.runs.iter().filter(|r| r.place.is_some()).count() >= LEISURE_FLEET
+    }
+
+    /// Whether a taxi would take `sim` out to a visit or an outing now (`book_leisure`): not one
+    /// booked on a taxi already (to work, say: they'd walk it, hours across a big world, the
+    /// way timed by the taxi), nor with the fleet out (`fleet_out`).
+    pub(crate) fn takes(&self, sim: &crate::world::Sim) -> bool {
+        sim.taxi.is_none() && !self.fleet_out()
+    }
+
     /// Whether `sim` was just turned down for a taxi to `plot` (`turned_down`): they walk.
     pub(crate) fn no_taxi(&self, sim: u32, plot: u32) -> bool {
         self.no_leisure.iter().any(|&(s, p)| s == sim && p == plot)
@@ -2143,10 +2155,12 @@ const TURNING: f32 = 2.4;
 const TURN_OVER: f32 = 0.3;
 const SWERVE: f32 = 2.0;
 const TURN_SPEED: f32 = crate::cars::JUNCTION_SPEED;
-/// What turning round costs the way it's weighed (s), on top of the drive, and standing for a
-/// rider on the far side of the road from their house (s: they cross it).
+/// What turning round costs the way it's weighed (s of drive time, as the drive's own:
+/// `travel::Graph::path`), on top of the drive, and standing for a rider on the far side of the
+/// road from their house (s: they cross it).
 const TURN_COST: f32 = 6.0;
-/// What turning round in a side street costs, the way it's weighed (s: slowly in and backing out).
+/// What turning round in a side street costs, the way it's weighed (s of drive time: slowly in and
+/// backing out).
 const SIDE_COST: f32 = 12.0;
 const FAR_SIDE: f32 = 8.0;
 /// Runs coming into town by the same way are planned this far apart at least (ticks, `time_run`),
@@ -2162,7 +2176,8 @@ const QUEUE_TRIES: usize = 3;
 /// The most a way round a hold-up may take over the straight way (ticks, `way_for`): about as
 /// long as a run waits one out (`JAM_WAIT`).
 const DETOUR_MOST: u64 = JAM_WAIT;
-/// A stretch through a place cars are held up now (`jammed`) as a run's way is weighed (s): driven
+/// A stretch through a place cars are held up now (`jammed`) as a run's way is weighed (s of drive
+/// time): driven
 /// only with no other way round, a way round no longer than `DETOUR_MOST` over the straight way
 /// (else that, `way_for`: a run came two hours late to its riders round a car stood still half an
 /// hour on its way).
@@ -3189,19 +3204,20 @@ fn u_turn(
 }
 
 /// How long two cars or more by a junction's box stand still on their way before it counts as
-/// jammed (ticks of real time, `jammed`), how far round its box they're by it (m), and how long a
+/// jammed (ticks of drive time, `jammed`), how far round its box they're by it (m), and how long a
 /// taxi due into town through one waits at the edge of town for it to clear at most (ticks of
-/// real time, as the cars clear it, `run_on`: a run to work, half its spare time at most).
-const JAM_STILL: u64 = crate::secs(5.0);
+/// drive time, as the cars clear it, `run_on`: a run to work, half its spare time at most).
+const JAM_STILL: u64 = crate::drive_secs(5.0);
 /// How long one car on its way stands still before the place counts as held up on its own (ticks
-/// of real time).
-const LONE_STILL: u64 = crate::secs(30.0);
+/// of drive time).
+const LONE_STILL: u64 = crate::drive_secs(30.0);
 const JAM_NEAR: f32 = 8.0;
-const JAM_WAIT: u64 = crate::secs(30.0);
+const JAM_WAIT: u64 = crate::drive_secs(30.0);
 /// A taxi stands clear of another's stand when it's there within this long of it, either way (ticks,
 /// `stand_window`): as each is timed, give or take its stand, a hold-up on its way and a wait at
-/// the edge of town (`JAM_WAIT`).
-const STAND_NEAR: u64 = JAM_WAIT;
+/// the edge of town (`JAM_WAIT`). Real time, not drive time: the stand is its riders' (getting
+/// in, `DWELL`, and coming out to it), which don't speed up with the traffic.
+const STAND_NEAR: u64 = crate::secs(30.0);
 /// A run whose stand another taxi has when it'd be there comes as much later as clears it, by
 /// `STAND_NEAR` at a time, this much at most (ticks, `stands_and_way`).
 const STAND_LATER: u64 = 3 * 60 * TICKS_PER_MINUTE;
@@ -3309,6 +3325,13 @@ const LEISURE_WINDOW: u64 = 30 * TICKS_PER_MINUTE;
 /// A taxi back from a place comes this long after its rider's visit ends (ticks: a goodbye and
 /// out to the kerb).
 const BACK_SLACK: u64 = 8 * TICKS_PER_MINUTE;
+/// The most taxis on visits and outings at once, planned or under way, there or back, the town's
+/// taxi firm's (`Taxis::fleet_out`): with that many out, someone setting off goes another way, or
+/// somewhere nearer (one home from a place is never refused). On the
+/// traffic's clock (`crate::DRIVE_SCALE`) a taxi beats any walk out of reach, and with no such
+/// limit a big world's evening had some 20 out at once and 150 runs a day where 5 to 20 ran
+/// before, jammed solid round a junction in view (seed base 16: Sand Quay, Eaglescar).
+const LEISURE_FLEET: usize = 6;
 
 /// About how many minutes a taxi would take `sim` from `from` to `plot` on a visit or an outing
 /// (`world::leisure_way`, after the household's car and a bike of theirs, before walking), a way
@@ -3453,8 +3476,10 @@ fn seat_leisure(
                 }
         })
         .collect();
-    // (Each it could ride along on, else one of its own: the first that can be timed.)
-    for join in joins.into_iter().map(Some).chain([None]) {
+    // (Each it could ride along on, else one of its own: the first that can be timed. Not one
+    // of its own out with the fleet out, `LEISURE_FLEET`.)
+    let own = back || !w.taxis.fleet_out();
+    for join in joins.into_iter().map(Some).chain(own.then_some(None)) {
         let mut run = match join {
             Some(k) => w.taxis.runs[k].clone(),
             None => Run {
@@ -4235,5 +4260,28 @@ mod kerb_tests {
         warm_kerbs(&mut w);
         let warm = stop_for(&w, 0).expect("a stand");
         assert_eq!((warm.road, warm.s), (fresh.road, fresh.s));
+    }
+
+    /// No more than `LEISURE_FLEET` taxis go out on visits and outings at once, there and back
+    /// counted alike; the work taxi's runs don't count.
+    #[test]
+    fn the_leisure_taxis_out_at_once_are_a_fleet_of_six() {
+        let run = |id: u32, place: Option<u32>, home: bool| -> Run {
+            serde_json::from_value(serde_json::json!({
+                "id": id, "home": home, "place": place, "group": [0, 0], "enter": 100,
+                "stops": [], "progress": 0.0}))
+            .unwrap()
+        };
+        let mut taxis = Taxis::default();
+        for k in 0..10 {
+            taxis.runs.push(run(k, None, false));
+        }
+        assert!(!taxis.fleet_out(), "work runs aren't the fleet");
+        for k in 0..LEISURE_FLEET as u32 - 1 {
+            taxis.runs.push(run(10 + k, Some(3), k % 2 == 0));
+        }
+        assert!(!taxis.fleet_out());
+        taxis.runs.push(run(20, Some(4), true));
+        assert!(taxis.fleet_out(), "{LEISURE_FLEET} out, there or back");
     }
 }
