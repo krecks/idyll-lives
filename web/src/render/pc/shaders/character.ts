@@ -108,6 +108,15 @@ const HEM_TOP = `max(max(simHem((simA.w - simF.x) * 0.55, ${BAND.cuff}), simHem(
 const HEM_BOTTOM = `max(simHem(simT4.w - simF.y, ${BAND.waistband}), simHem(simF.y - c5, ${BAND.hem})) * simPlain`;
 /** A shoe's laces: across the instep between the eyelets, under the collar. */
 const LACE = `(1.0 - smoothstep(0.009 - lW, 0.009 + lW, abs(simF.w))) * (1.0 - smoothstep(0.06, 0.065, simF.x)) * smoothstep(0.01, 0.014, simF.x) * mix(smoothstep(0.28 - lAA, 0.28 + lAA, abs(fract(lBar) - 0.5)), 0.44, smoothstep(0.25, 0.5, lAA))`;
+/**
+ * Hair's highlight from the lights (`RESIDENT_HAIR_SPECULAR`, Kajiya-Kay: the strands run down the head, and a
+ * strand shines where it lies across the half vector): its strength (of a plastic's highlight), how narrow the
+ * band is, and how far a lock's middle shifts it along the strands (the band breaks up lock by lock). The band
+ * painted for a light overhead (`HAIR_BAND`) stays at `HAIR_SKY`, as the sky's share: hair in the shade, or in a
+ * room by day, keeps a soft sheen.
+ */
+const HAIR_SHINE = { gain: '5.0', power: '40.0', shift: '0.35' };
+const HAIR_SKY = '0.4';
 /** The hair's highlight band: sharp along the strands up close, broad where they blur. */
 const HAIR_BAND = `mix(pow(hS, 6.0), 0.35 * hS * hS, smoothstep(0.08, 0.25, fwidth(hTH))) * smoothstep(0.0, 0.35, dot(normalW, hHalf)) * mix(0.6, 1.2, hClump)`;
 /**
@@ -210,6 +219,35 @@ fn getLightDiffuse(worldNormal: vec3f, viewDir: vec3f, lightDirNorm: vec3f) -> f
 	#else
 		return lambert;
 	#endif
+}
+`,
+};
+
+/**
+ * The hair's `lightSpecularBlinnPS` (per material; the game's materials shine by Blinn): a light's highlight on hair, a band across the strands
+ * (`HAIR_SHINE`) where it would put a spot on a helmet.
+ */
+export const RESIDENT_HAIR_SPECULAR: Record<Language, string> = {
+  glsl: `
+float getLightSpecular(vec3 h, vec3 reflDir, vec3 worldNormal, vec3 viewDir, vec3 lightDirNorm, float gloss, mat3 tbn) {
+	vec3 strand = normalize(vec3(0.0, 1.0001, 0.0) - worldNormal * worldNormal.y);
+	#if defined(GAME_RESIDENT) && !defined(SHADOW_PASS)
+		strand = normalize(strand + worldNormal * (${HAIR_SHINE.shift} * (vSimTone.z - 0.5)));
+	#endif
+	float across = dot(strand, h);
+	float lit = smoothstep(-0.1, 0.4, dot(worldNormal, -lightDirNorm));
+	return ${HAIR_SHINE.gain} * pow(sqrt(max(1.0 - across * across, 0.0)), ${HAIR_SHINE.power}) * lit;
+}
+`,
+  wgsl: `
+fn getLightSpecular(h: vec3f, reflDir: vec3f, worldNormal: vec3f, viewDir: vec3f, lightDirNorm: vec3f, gloss: f32, tbn: mat3x3f) -> f32 {
+	var strand = normalize(vec3f(0.0, 1.0001, 0.0) - worldNormal * worldNormal.y);
+	#if defined(GAME_RESIDENT) && !defined(SHADOW_PASS)
+		strand = normalize(strand + worldNormal * (${HAIR_SHINE.shift} * (vSimTone.z - 0.5)));
+	#endif
+	let across = dot(strand, h);
+	let lit = smoothstep(-0.1, 0.4, dot(worldNormal, -lightDirNorm));
+	return ${HAIR_SHINE.gain} * pow(sqrt(max(1.0 - across * across, 0.0)), ${HAIR_SHINE.power}) * lit;
 }
 `,
 };
@@ -614,7 +652,7 @@ const PS_GLSL = {
 			float hS = 1.0 - hTH * hTH;
 			float hBand = ${HAIR_BAND};
 			vec3 hCol = mix(hc * (1.0 + 0.45 * (hClump - 0.5)), hTint, 0.28 * hDark * hClump);
-			hCol = mix(hCol, hTint, hBand * mix(0.3, 0.75, hDark));
+			hCol = mix(hCol, hTint, ${HAIR_SKY} * hBand * mix(0.3, 0.75, hDark));
 			return hCol * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * ${ao(AO_GAIN)};
 		#elif defined(GAME_SIM_BROW)
 			return simTexel(3).rgb * 0.45;
@@ -778,7 +816,7 @@ const PS_WGSL = {
 			let hS = 1.0 - hTH * hTH;
 			let hBand = ${HAIR_BAND};
 			var hCol = mix(hc * (1.0 + 0.45 * (hClump - 0.5)), hTint, 0.28 * hDark * hClump);
-			hCol = mix(hCol, hTint, hBand * mix(0.3, 0.75, hDark));
+			hCol = mix(hCol, hTint, ${HAIR_SKY} * hBand * mix(0.3, 0.75, hDark));
 			return hCol * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * ${ao(AO_GAIN)};
 		#elif defined(GAME_SIM_BROW)
 			return simTexel(3).rgb * 0.45;
