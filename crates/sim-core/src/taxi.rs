@@ -1418,6 +1418,22 @@ fn give_up(w: &mut World, k: usize, c: usize) -> bool {
 /// a longer one waits at work for another run home.
 const SHORT_WALK: f32 = 30.0;
 
+/// Per car (`World::cars`), how far along its route it may be put on (`cars::moved_clear`): a work
+/// taxi on a run, to its next stop at most (put on past it, it would stand where it's come to, as
+/// it is: mid-turn, off its lane); any other car, as far as it likes.
+pub(crate) fn stops_ahead(w: &World) -> Vec<f32> {
+    let mut out = vec![f32::INFINITY; w.cars.len()];
+    for run in &w.taxis.runs {
+        if let Some(c) = run.car.map(|c| c as usize)
+            && let Some(&at) = run.at.get(run.next as usize)
+            && let Some(o) = out.get_mut(c)
+        {
+            *o = at;
+        }
+    }
+    out
+}
+
 /// Run `k`'s taxi (car `c`) stands at its stop `next` (a halt: housemates' one): those there get
 /// in (called to its door, a seat each: `door_for`), or out, each by a door of their own; one not
 /// out yet within `taxi.waitMinutes`, or on their way but not at its door within `COMING_WAIT` at

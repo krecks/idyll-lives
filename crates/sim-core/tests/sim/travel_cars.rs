@@ -1338,6 +1338,98 @@ fn someone_on_foot_at_a_lit_crosswalk_waits_at_the_kerb_for_the_walk_then_crosse
 }
 
 #[test]
+fn someone_on_foot_crossing_a_country_roads_arm_at_a_lit_t_is_not_held_for_the_walk() {
+    use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
+    // A big world's street along x (z = 200), its ways out east and west, and a country road
+    // meeting it from the north at (200, 200): a lit T. The street's arms have crosswalks, the
+    // country road's none (no sidewalks to cross between, as the renderer draws it: no zebra, no
+    // pedestrians' head). Someone crossing the country road just by the junction crosses as they
+    // would anywhere else, not held for a walk phase, which nobody asks for.
+    let road = |a: [f32; 2], b: [f32; 2], kind: &str, ends: &str| {
+        format!(
+            r#"{{"points":[{}],"width":7,"kind":"{kind}","ends":{ends},"area":0}}"#,
+            line_pts(a, b)
+        )
+    };
+    let roads = format!(
+        "[{},{},{}]",
+        road([0.5, 200.0], [200.0, 200.0], "street", r#"["out","join"]"#),
+        road(
+            [200.0, 200.0],
+            [399.5, 200.0],
+            "street",
+            r#"["join","out"]"#
+        ),
+        road(
+            [200.0, 120.0],
+            [200.0, 200.0],
+            "country",
+            r#"["dead","join"]"#
+        )
+    );
+    let exits = r#"[{"x":0.5,"z":200,"kind":"road"},{"x":399.5,"z":200,"kind":"road"}]"#;
+    let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
+        "areas":[{"name":"T","kind":"hamlet","x":130,"z":130,"w":140,"d":140}]"#;
+    let home = House {
+        plot: [142.0, 178.0, 16.0, 18.0],
+        inner: [150.0, 190.5],
+        front: 1.0,
+        along_x: false,
+        road: 0,
+        s: 149.5,
+    };
+    let mut w = town_of(CONTENT, more, 400, 400, &roads, exits, &[home]);
+    common::run_to(&mut w, 2, 7.0);
+    assert_eq!(w.travel.signals.len(), 1, "the T is lit");
+    let sig = w.travel.signals[0].clone();
+    let country = sig
+        .arms
+        .iter()
+        .find(|a| a.way[1] < -0.9)
+        .expect("the country road's arm");
+    assert!(!country.crosswalk, "no crosswalk across the country road");
+    assert!(
+        sig.arms
+            .iter()
+            .filter(|a| a.way[1] > -0.9)
+            .all(|a| a.crosswalk),
+        "the street's arms have theirs"
+    );
+    // (Across the country road 8 m up it from the junction's middle: by its arm, inside its stop
+    // line, where a street's crosswalk would be.)
+    let z = sig.at[1] - (country.walk_from + country.walk_to) / 2.0;
+    let (from, to) = (
+        [sig.at[0] - country.kerb - 0.7, z],
+        [sig.at[0] + country.kerb + 0.7, z],
+    );
+    assert!(!sig.crossing(from) && !sig.crossing([sig.at[0], z]) && !sig.crossing(to));
+    w.sims[0].pos = from;
+    walk_to(&mut w, 0, to);
+    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    let start = w.tick;
+    let mut across = None;
+    while w.tick < start + common::secs(60.0) {
+        w.tick_once();
+        snapshot::write(&w, &mut buf);
+        for k in 0..sig.arms.len() {
+            assert_ne!(
+                buf[LIGHT_BASE + k * LIGHT_STRIDE + light::STATE],
+                light::WALK,
+                "a walk phase nobody waits for"
+            );
+        }
+        let p = w.sims[0].pos;
+        if (p[0] - to[0]).hypot(p[1] - to[1]) < 0.3 {
+            across = Some(w.tick - start);
+            break;
+        }
+    }
+    // (8.4 m at a walk: some 6 s, not the cars' turn, amber and all red first.)
+    let across = across.expect("never across");
+    assert!(across < common::secs(9.0), "across after {across} ticks");
+}
+
+#[test]
 fn no_car_drives_past_a_stop_line_on_red_or_the_walk_and_on_red_each_waits_at_it() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
     // The busy crossroads, its cars coming and going all the time, and someone walking to and fro

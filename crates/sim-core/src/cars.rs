@@ -4108,6 +4108,8 @@ pub(crate) fn sight(w: &mut World) {
             dx.hypot(dz) <= reach
         })
     };
+    // (How far on along its way each may be put, `moved_clear`.)
+    let stops = crate::taxi::stops_ahead(w);
     // (Those in sight first, which stay or go; then those out of it, coming in clear of them as
     // they are now.)
     let order: Vec<usize> = (0..w.cars.len())
@@ -4115,6 +4117,7 @@ pub(crate) fn sight(w: &mut World) {
         .chain((0..w.cars.len()).filter(|&c| w.cars[c].sight != Sight::Seen))
         .collect();
     for c in order {
+        let most = stops[c];
         if !matches!(w.cars[c].state, CarState::Leaving | CarState::Arriving) {
             w.cars[c].sight = Sight::Seen;
             continue;
@@ -4209,7 +4212,7 @@ pub(crate) fn sight(w: &mut World) {
                     match cars[c]
                         .route
                         .as_ref()
-                        .and_then(|(_, r)| moved_clear(r, t, half, &[-1.0, 1.0], &clear))
+                        .and_then(|(_, r)| moved_clear(r, t, half, &[-1.0, 1.0], most, &clear))
                     {
                         Some(to) => {
                             moved = Some(to);
@@ -4311,12 +4314,15 @@ pub(crate) fn sight(w: &mut World) {
 /// How far along `route` (ticks) a car `half` its length and width, `t` along it, is put to come
 /// into sight clear of those in sight (`clear`, now and a tick on), the camera come to it on top of
 /// one of them (`sight`): the nearest such place back along its way, else on along it, up to
-/// `MOVED_MOST` either way, out of its claims (part way through one, it would cut in). None: none.
+/// `MOVED_MOST` either way, out of its claims (part way through one, it would cut in), and no further on than `most` (a
+/// work taxi's next stop, `taxi::stops_ahead`: put on past it, it stood there mid-turn). None:
+/// none.
 fn moved_clear(
     route: &Route,
     t: f32,
     half: [f32; 2],
     ways: &[f32],
+    most: f32,
     clear: &dyn Fn(&Rect) -> bool,
 ) -> Option<f32> {
     let ticks = route.ticks();
@@ -4327,7 +4333,7 @@ fn moved_clear(
     };
     (1..=MOVED_MOST)
         .flat_map(|d| ways.iter().map(move |k| t + k * d as f32))
-        .filter(|&s| s >= 1.0 && s + 1.0 < ticks)
+        .filter(|&s| s >= 1.0 && s + 1.0 < ticks && s <= most)
         .find(|&s| !claiming(s) && clear(&body(s)) && clear(&body(s + 1.0)))
 }
 
@@ -4379,6 +4385,7 @@ fn unstick(w: &mut World) {
             out.push(c);
         }
     }
+    let stops = crate::taxi::stops_ahead(w);
     for c in out {
         let body = |o: &Car| {
             o.shown.map(|s| Rect {
@@ -4406,7 +4413,7 @@ fn unstick(w: &mut World) {
         let Some(to) = car
             .route
             .as_ref()
-            .and_then(|(_, r)| moved_clear(r, car.progress, half, &[1.0], &clear))
+            .and_then(|(_, r)| moved_clear(r, car.progress, half, &[1.0], stops[c], &clear))
         else {
             continue;
         };

@@ -125,8 +125,10 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   traffic): a step into them stops at the kerb (`traffic::kerb_stop`, a 16 m grid of the junctions, `Travel::crossings`), and their wait
   is what brings the walk round; someone already on them goes on across (over a junction next to
   it too), and so does someone a car waits for (`cars::holding_up`: the two waited for each other
-  for good at a corner). Crossing a road away
-  from the junctions is as before. A roundabout's junctions (a road with `island`) keep an arm a
+  for good at a corner). Only an arm into a street or a lane has a crosswalk
+  (`SignalArm::crosswalk`, the renderer's rule for its zebra and pedestrians' head): a country
+  road's arm is crossed as a road anywhere else, and where only country roads meet there is no walk
+  phase. Crossing a road away from the junctions is as before. A roundabout's junctions (a road with `island`) keep an arm a
   phase, the pole just past the box, cars waiting at the box's edge, no crosswalks and no walk.
   A T where a road ends at another's kerb has its node on that road's middle line (`Graph::build`),
   so its box, lights and slow zone are in the middle of the road.
