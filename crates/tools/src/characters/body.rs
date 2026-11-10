@@ -686,6 +686,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             .collect();
         let w01 = one(nm("fingers_01"));
         let w02 = one(nm("fingers_02"));
+        let (d0, u0) = (d, u);
         for fi in 0..4 {
             let side = |k: isize| {
                 if k < 0 {
@@ -731,7 +732,18 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                 })
                 .collect()
             };
-            let pivot = jwr + d * pivot_d + u * pivot_u + z * (zf + spread * (pivot_d - lpm));
+            let straight = jwr + d * pivot_d + u * pivot_u + z * (zf + spread * (pivot_d - lpm));
+            // A hand at rest curls more towards the little finger: each finger turned a little further in at
+            // its knuckle (`knuckle`, rad, the pinky to the index) and at its middle joint (`rho`). Four fingers
+            // curled alike are one flat slab, a mitten; the bones turn them all together from here, so the
+            // step from finger to finger stays in every pose.
+            let knuckle: f64 = [0.2, 0.13, 0.07, 0.0][fi];
+            let (d, u) = (
+                d * knuckle.cos() - u * knuckle.sin(),
+                u * knuckle.cos() + d * knuckle.sin(),
+            );
+            let at = jwr + d0 * lpm + u0 * pivot_u + z * (zf + spread * (pivot_d - lpm));
+            let pivot = at + d * (straight - at).dot(&d0) + u * (straight - at).dot(&u0);
             let a = hex(
                 pivot - d * (0.04 * lpm),
                 d,
@@ -742,7 +754,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             );
             let ra = c.ring(&a, Per::All(&w01), "hand", None, arm1());
             c.band(&loop_f, &ra, &[]);
-            let rho: f64 = 0.2;
+            let rho: f64 = [0.42, 0.34, 0.27, 0.2][fi];
             let (ad, au) = (d * rho.cos() - u * rho.sin(), u * rho.cos() + d * rho.sin());
             let b = hex(
                 pivot + ad * (tip * lpm) + z * (spread * tip * lpm),
