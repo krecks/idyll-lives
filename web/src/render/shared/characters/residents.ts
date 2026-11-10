@@ -132,6 +132,11 @@ function stationSide(rig: SimRig, station: PlacedObject): number {
  */
 const FAR_EVERY = [2, 4] as const;
 const FAR_LAG = 0.25;
+/**
+ * How long after coming into the sim's full-detail area (`setDetailArea`) a resident is first drawn (real ms): the
+ * camera's new area reaches the sim's worker, and its next tick catches them up on the ticks they owe, a few frames.
+ */
+export const REVEAL_MS = 250;
 
 /** How fast a rise cut short (`SimRig.riseK`) finishes its step off the seat (per second: a quarter of a second, less
  * when the action runs fast). */
@@ -332,6 +337,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private readonly glideFrom = new Float64Array(MAX_CHARACTERS * 4);
   private readonly glideTo = new Float64Array(MAX_CHARACTERS * 4).fill(NaN);
   private readonly glideK = new Float64Array(MAX_CHARACTERS).fill(1);
+  /**
+   * Where the sim moves residents every tick (`setDetailArea`: a big world's chunks streamed in; null: everywhere). Out of
+   * it they take a turn now and then and catch up in one go (sim-core `lod.rs`): a rider would stand, then jump tens of metres.
+   */
+  private detail: ((x: number, z: number) => boolean) | null = null;
+  /** Per row, when one just come into the full-detail area may be drawn (`REVEAL_MS`; NaN: not waiting). */
+  private readonly revealAt = new Float64Array(MAX_CHARACTERS).fill(NaN);
   /**
    * Per row, the thing they ride (a bike, an e-scooter: the snapshot's `ride`, `vehicles.ts`) as drawn: its stable id
    * (-1: none), how far on it they are (`mountOn`: 0 at its place, 1 riding; `MOUNT_SECONDS` each way), and how far
@@ -1785,7 +1797,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.spots[i * 2] = away ? NaN : tx;
       this.spots[i * 2 + 1] = tz;
       this.storeys[i] = th;
-      const show = !!rig && !away && inView(tx, tz) && storeyShown(Math.floor(th + 0.01), storey);
+      let show = !!rig && !away && inView(tx, tz) && storeyShown(Math.floor(th + 0.01), storey) && (!this.detail || this.detail(tx, tz));
+      // (Just come into the full-detail area: a moment later, once the sim has caught them up.)
+      if (!show) this.revealAt[i] = NaN;
+      else if (this.detail && !this.visible[i]) {
+        if (Number.isNaN(this.revealAt[i])) this.revealAt[i] = now + REVEAL_MS;
+        show = now >= this.revealAt[i];
+      }
       if (!rig || !show) {
         if (this.visible[i]) {
           this.data.fill(0, this.row(i), this.row(i) + NB * BONE_FLOATS);
@@ -3202,6 +3220,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    */
   setCarRide(ride: CarRide | null): void {
     this.carRide = ride;
+  }
+
+  /**
+   * Where the sim moves residents every tick (a big world's chunks streamed in, as sent it: sim-core `lod::full_detail`),
+   * or null (everywhere). Only those in it are drawn, and one come into it only `REVEAL_MS` later: the sim catches a
+   * resident up on the ticks they owe there in one go (a rider out of it for three game minutes jumped 92 m), so they
+   * appear where they are rather than where they were.
+   */
+  setDetailArea(test: ((x: number, z: number) => boolean) | null): void {
+    this.detail = test;
   }
 
   /** Where residents sitting or lying on an object are carried by its moving seat (`ObjectMotion.ride`). */

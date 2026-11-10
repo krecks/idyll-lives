@@ -85,6 +85,8 @@ interface Drawn {
   last: { x: number; z: number; yaw: number; shown: number };
   /** Where the newest snapshot has it, and whether it drives in either snapshot: those riding in it sit in that frame (`ride`). */
   snap: { x: number; z: number; yaw: number; driving: boolean };
+  /** Where it was drawn the frame before (`update`): its shadow in the sun's map was cast from there. */
+  castFrom: { x: number; z: number };
   /** How far open each door is (0..1), which way each opens (+1 or -1), and whether any is open at all. */
   open: number[];
   sides: number[];
@@ -163,6 +165,8 @@ export class Cars extends Vehicles {
     for (let i = 0; i < this.cars.length; i++) {
       const car = this.cars[i];
       const { at, last } = car;
+      // (Where it was drawn last frame, its shadow in the sun's map with it: `castFrom`.)
+      [car.castFrom.x, car.castFrom.z] = [last.x, last.z];
       // (Into town or out of it, parked or off driving: drawn another way, `restate`.)
       const shown = at.shown !== last.shown;
       last.shown = at.shown;
@@ -188,7 +192,7 @@ export class Cars extends Vehicles {
       }
       if (changed && car.drawn) {
         this.stirred.push(car);
-        if (this.shadows && this.inShadows(at.x, at.z)) this.moved = true;
+        if (this.castsMoved(car)) this.moved = true;
       }
       if (changed || shown) this.restate(car);
     }
@@ -327,12 +331,21 @@ export class Cars extends Vehicles {
       const parked = (car.drawn && !car.owned) || (drawn && !owned) ? this.parkedFor(car) : null;
       if (parked) parked.dirty = true;
       if (drawn !== car.drawn) this.around = true;
-      if (this.shadows && this.inShadows(car.at.x, car.at.z)) this.moved = true;
+      if (this.castsMoved(car)) this.moved = true;
       car.drawn = drawn;
       car.owned = owned;
     }
     if (owned) this.placeOwn(car);
     else if (car.own?.entity.enabled) car.own.entity.enabled = false;
+  }
+
+  /**
+   * Whether a car that moved, came or went changes the sun's map: where it is now casts into it, or where it was
+   * (`castFrom`: its shadow is left there otherwise, as one at the fastest speed goes tens of metres in a frame, from
+   * in the map to out of it).
+   */
+  private castsMoved(car: Drawn): boolean {
+    return this.shadows && (this.inShadows(car.at.x, car.at.z) || this.inShadows(car.castFrom.x, car.castFrom.z));
   }
 
   /** Every car `restate`d (what's hidden or near changed), and the draws written again where that changed. */
@@ -484,6 +497,7 @@ function drawnCar(row: number, taxi: boolean, body: number, paint: number, x: nu
     at: { x, z, yaw, shown: 0 },
     last: { x, z, yaw, shown: 0 },
     snap: { x, z, yaw, driving: false },
+    castFrom: { x, z },
     open: new Array<number>(DOORS).fill(0),
     sides: Array.from({ length: DOORS }, (_, d) => carDoor(shape, d).side),
     ajar: false,

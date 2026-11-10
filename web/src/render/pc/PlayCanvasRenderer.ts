@@ -187,6 +187,8 @@ const NOON_SKY_LUMA = skyLuma(lightingAt(13 * 60, LOOK, createLighting()));
 
 /** Residents this far (m) outside the viewed lot are still drawn (walking up to it). */
 const SIM_VIEW_MARGIN = 2;
+/** Residents are drawn this far out past the sim's full-detail area (`reportWatch`; m: the sim keeps 5 m round it in full). */
+const DETAIL_MARGIN = 4;
 /** Residents further than this (m) from the camera's target, off the viewed lot, have no contact shadow. */
 const FAR_SHADOW = 40;
 /** `?residents=lot`: residents drawn only on the viewed lot, as before life on every lot. */
@@ -1106,7 +1108,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The roaming square's middle (8 m steps) and half side (8 m steps), as last set. */
   private readonly roamSquare = new Float64Array(3);
 
-  /** The sim's full-detail area: the chunks streamed in, as a tile rectangle on the ground (`onWatch`). */
+  /**
+   * The sim's full-detail area: the chunks streamed in, as a tile rectangle on the ground (`onWatch`); the residents
+   * drawn only in it (`Residents.setDetailArea`).
+   */
   private reportWatch(): void {
     const world = this.builtWorld;
     if (!world || !this.watchListener || !this.roam.chunks.size) return;
@@ -1119,7 +1124,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       z1 = Math.max(z1, (cz + 1) * CHUNK);
     }
     const d = groundDepth(world);
-    this.watchListener([Math.max(0, x0), Math.max(0, z0), Math.min(world.width, x1), Math.min(d, z1)]);
+    const rect: [number, number, number, number] = [Math.max(0, x0), Math.max(0, z0), Math.min(world.width, x1), Math.min(d, z1)];
+    this.watchListener(rect);
+    // Residents are drawn only where the sim now moves them every tick (out of it they catch up in jumps), a
+    // little in from its edge (the sim's own margin is `lod::VIEW_MARGIN`, 5 m out).
+    const [a, b, c, e] = [rect[0] - DETAIL_MARGIN, rect[1] - DETAIL_MARGIN, rect[2] + DETAIL_MARGIN, rect[3] + DETAIL_MARGIN];
+    this.characters.setDetailArea((x, z) => x >= a && z >= b && x <= c && z <= e);
   }
 
   /** The street builds the chunks streamed in (between world builds; a world build builds them itself). */
