@@ -19,7 +19,7 @@ use serde::Serialize;
 use super::ao;
 use super::body::{Meta, body_fields_and_tone, build_body};
 use super::clothes::{Cut, Cuts, build_clothes, garment_cuts};
-use super::contract::{IDENTITY, channels};
+use super::contract::{IDENTITY, channels, is_wisps, wisps_part};
 use super::face::{Deltas, FaceOut, build_face, follow_mouth};
 use super::hair::build_hair;
 use super::head::{HeadFrame, head_frame};
@@ -164,11 +164,17 @@ fn lid_shading<'a>(skin: &'a OnMesh, nor: &'a [V3]) -> impl Fn(V3) -> V3 + 'a {
 /// themselves; the hair and beard by the body, the eyes and themselves. On the face (the skin, the first
 /// `spread.0` of the body, where `spread.1` says) each vertex's shade is spread over its triangles
 /// (`ao::occlusion_spread`). The lids then take the shade of the skin they lie on (`build_family`).
+/// The hair's wisps take the shade of the hair they grow from (a wisp's vertices come in twos, its
+/// root, where a vertex of the hair is, then its end: hair.rs `wisps`), so an edge and its wisps are
+/// one colour.
 fn bake_ao(parts: &mut [(String, Mesh)], spread: (usize, &dyn Fn(V3) -> bool)) {
     let (body, lod) = (get(parts, "body").clone(), get(parts, "lod.body").clone());
     let face = ["eyes", "teeth", "tongue"].map(|n| get(parts, n).clone());
     let [eyes, teeth, tongue] = &face;
     for (name, m) in parts.iter_mut() {
+        if is_wisps(name) {
+            continue;
+        }
         let around: Vec<&Mesh> = if name == "body" || name == "lod.body" {
             vec![teeth, tongue]
         } else if name.starts_with("lod.") {
@@ -201,6 +207,20 @@ fn bake_ao(parts: &mut [(String, Mesh)], spread: (usize, &dyn Fn(V3) -> bool)) {
         let face = |i: usize| name == "body" && i < spread.0 && (spread.1)(m.pos[i]);
         let occ = ao::smooth(m, &occ, passes, &face);
         ao::bake(m, occ);
+    }
+    let hair: Vec<String> = parts.iter().map(|e| e.0.clone()).collect();
+    for name in hair.iter().filter(|n| is_wisps(n)) {
+        let solid = get(parts, name.strip_suffix(".wisps").expect("a wisps part"));
+        let near = KdTree::new(&solid.pos);
+        let shade: Vec<f64> = get(parts, name)
+            .pos
+            .chunks(2)
+            .map(|q| solid.tone[near.query(&q[0], 1)[0].1][3])
+            .collect();
+        for (t, w) in part(parts, name).tone.chunks_mut(2).zip(shade) {
+            t[0][3] = w;
+            t[1][3] = w;
+        }
     }
 }
 
@@ -361,13 +381,17 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
             }
         }
     }
-    if base.parts.iter().any(|e| e.0 == "hair.beard") {
-        let follow = base.face.follow.as_ref().expect("lip lines");
-        let d = follow_mouth(part(&mut base.parts, "hair.beard"), follow, &head);
-        morphs.push(("hair.beard".into(), d));
+    // (The beard's wisps as the beard: a wisp's root is a vertex of the beard's, and moves as it does.)
+    for name in ["hair.beard".to_string(), wisps_part("hair.beard")] {
+        if base.parts.iter().any(|e| e.0 == name) {
+            let follow = base.face.follow.as_ref().expect("lip lines");
+            let d = follow_mouth(part(&mut base.parts, &name), follow, &head);
+            morphs.push((name, d));
+        }
     }
     // A face of its own (identity.rs): each channel's shape on the skin with the lids and lips after it,
-    // on the face's parts, and on the hair that lies on the face (the beard, a lock on a cheek), which
+    // on the face's parts, and on the hair that lies on the face (the beard, a lock on a cheek, and the
+    // wisps of either, by the same rule: a wisp's root moves as the vertex it grows from), which
     // takes the skin's shape where it lies (`HAIR_FOLLOWS`). Not the low-detail body.
     let on_face: Vec<(&str, Vec<OnSkin>)> = base
         .parts
@@ -377,7 +401,7 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
             let at = m.pos.iter().map(|&q| {
                 let (t, w) = base.skin.at(q);
                 let near = (0..3).fold(V3::zeros(), |a, j| a + base.unsocketed[t[j]] * w[j]);
-                let k = if name == "hair.beard" {
+                let k = if name.starts_with("hair.beard") {
                     1.0
                 } else {
                     1.0 - smoothstep(HAIR_FOLLOWS.0, HAIR_FOLLOWS.1, (near - q).norm())

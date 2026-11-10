@@ -17,9 +17,9 @@
  *   / ring / blanket instance matrices), never meshes.
  * - Clothes are painted on the body by its shader (each garment's cut over the body's fields);
  *   shells (`top.*`, `bottom.*`, `shoes.*` parts) are added only where the silhouette needs them.
- * - Small face parts (teeth, tongue, lashes, brows) are drawn only on faces big enough on screen to
- *   show them, and faces too small to show expressions skip their morphs (`faceDetail`); only the
- *   instance lists change per frame.
+ * - Small face parts (teeth, tongue, lashes, brows) and the hair's wisps (its soft edges) are drawn
+ *   only on faces big enough on screen to show them, and faces too small to show expressions skip
+ *   their morphs (`faceDetail`); only the instance lists change per frame.
  * - Far from the camera a Sim switches to the low-detail body and shells (`lod.*` parts; with a gap
  *   between switching down and up), and every Sim casts its sun shadow from shadow-only copies of
  *   those (`shadowMeshes`, on the shadow-only layer; none where Sims cast no shadows, `castsShadows`).
@@ -71,7 +71,7 @@ import { cradled, cuddlePose, onPad, writeCradle } from './cuddles';
 import { lyingPose, measureLegs, measureSit, outfitFit, type PoseKit } from './measure';
 import { type Hands, palmAt, placeFrame, placeHand, placeProp } from './props';
 import { rimOf } from './clips/shot';
-import { DETAIL_PX, FACE_PARTS, LOD_FAR_PX, LOD_HEIGHT_PX, LOD_NEAR_PX, MORPH_PX, POSE_FAR_PX, POSE_NEAR_PX, type PartMesh, Range, YOUNG_STAGES, shellBit, skinChunks } from './parts';
+import { FACE_PARTS, LOD_FAR_PX, LOD_HEIGHT_PX, LOD_NEAR_PX, MORPH_PX, POSE_FAR_PX, POSE_NEAR_PX, type PartMesh, Range, YOUNG_STAGES, detailOf, shellBit, skinChunks, wispsOf } from './parts';
 import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, sampleClip, skin } from './pose';
 import { BABBLE, compose, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clamp, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, hash, lerp, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
 import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './seatFit';
@@ -570,7 +570,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // The low-detail body and clothes' shadow copies; sets without them cast from the full meshes.
     for (const p of this.shadowMeshes.values()) if (p.enabled) out.push(p.mesh);
     if (out.length) return out;
-    for (const [key, p] of this.meshes) if (p.enabled && !/:(eyes|brows|lashes|teeth|tongue|shoes\.)/.test(key)) out.push(p.mesh);
+    for (const [key, p] of this.meshes) if (p.enabled && !/:(eyes|brows|lashes|teeth|tongue|shoes\.)|\.wisps$/.test(key)) out.push(p.mesh);
     return out;
   }
 
@@ -629,8 +629,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // (Pyjamas are the same garments, so the same chunks show at night.)
       for (const part of skinChunks(body, day.parts)) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
       for (const part of FACE_PARTS) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
-      if (body.parts.has(hairKey)) push(`${body.name}:${hairKey}`, s);
-      if (s.appearance?.beard && !YOUNG_STAGES.has(body.stage) && body.parts.has('hair.beard')) push(`${body.name}:hair.beard`, s);
+      // The hair and the beard, each with its wisps (its soft edges, drawn only close up: `detailOf`).
+      const hair = [hairKey, ...(s.appearance?.beard && !YOUNG_STAGES.has(body.stage) ? ['hair.beard'] : [])];
+      for (const part of hair.flatMap((h) => [h, wispsOf(h)])) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
       for (const part of day.parts) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
       // The low-detail body and clothes (drawn instead when the Sim is far from the camera).
       for (const part of ['lod.body', ...day.parts.map((p) => `lod.${p}`)]) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
@@ -4586,7 +4587,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (!body.parts.has(part)) return null;
     const mesh = this.view.createPart(body, part, shadow);
     const range = shadow ? Range.Always : part.startsWith('lod.') ? Range.Far : part === 'body' || /^(body|top|bottom|shoes)\./.test(part) ? Range.Near : Range.Always;
-    const pm: PartMesh<M> = { mesh, enabled: true, settings: new Float32Array(0), count: 0, all: new Float32Array(0), detail: shadow ? 0 : (DETAIL_PX[part] ?? 0), range, shell: shellBit(part) };
+    const pm: PartMesh<M> = { mesh, enabled: true, settings: new Float32Array(0), count: 0, all: new Float32Array(0), detail: shadow ? 0 : detailOf(part), range, shell: shellBit(part) };
     meshes.set(key, pm);
     if (!shadow) this.parts.set(mesh, pm);
     return pm;
@@ -4625,8 +4626,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /**
    * How big each Sim's face is on screen (`facePx`: px per 5 cm), and the rows each part draws: only
    * those drawn now (not those hidden, away or out of view: every part, shadow-only copies too, or
-   * they're skinned all the same, to nothing), the small face parts (teeth, tongue, lashes, brows)
-   * only on the faces big enough to show them, the low-detail body or the full one by distance, and
+   * they're skinned all the same, to nothing), the small face parts (teeth, tongue, lashes, brows) and the
+   * hair's wisps only on the faces big enough to show them, the low-detail body or the full one by distance, and
    * not the shells clothes leave out. Parts drawn whatever the distance are written again only when
    * who is drawn changes.
    */

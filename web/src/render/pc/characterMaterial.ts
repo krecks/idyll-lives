@@ -27,7 +27,7 @@ import * as pc from './engine';
 import type { InstanceStream } from './instancing';
 import { GAME_FRONT_FACE, MaterialLibrary } from './materials';
 import { BLANKET } from './shaders/blanket';
-import { RESIDENT, RESIDENT_DIFFUSE, RESIDENT_HAIR_SPECULAR, RESIDENT_INSTANCING, RESIDENT_NORMAL } from './shaders/character';
+import { RESIDENT, RESIDENT_DIFFUSE, RESIDENT_HAIR_SPECULAR, RESIDENT_INSTANCING, RESIDENT_NORMAL, RESIDENT_WISP_OPACITY, WISP } from './shaders/character';
 import { engineChunk, gameChunks, installGameChunks, registerShaderFeature, replaceOnce, type Language } from './shaders/chunks';
 import { BLANKET_WIDTH, COVER, SHEET } from '../shared/characters/blanket';
 import type { MeshPart, MorphSet } from '../shared/characters/data';
@@ -251,7 +251,7 @@ export function characterMaterial(app: pc.AppBase, part: string, options: Charac
   mat.metalness = 0;
   // Roughness, as PlayCanvas's inverted gloss.
   mat.glossInvert = true;
-  const rough: Record<CharacterSurface, number> = { body: 0.55, cloth: 0.85, hair: 0.5, brow: 0.6, lash: 0.6, mouth: 0.5, eye: 0.25 };
+  const rough: Record<CharacterSurface, number> = { body: 0.55, cloth: 0.85, hair: 0.5, wisp: 0.5, brow: 0.6, lash: 0.6, mouth: 0.5, eye: 0.25 };
   mat.gloss = rough[kind];
   // (The albedo colours, linear.)
   const albedo = part === 'teeth' ? [1, 0.96, 0.9] : part === 'tongue' ? [0.85, 0.8, 0.8] : kind === 'lash' ? [0.16, 0.12, 0.1] : [1, 1, 1];
@@ -260,6 +260,19 @@ export function characterMaterial(app: pc.AppBase, part: string, options: Charac
     // Open hems and collars, hair cards and lashes show their insides.
     mat.cull = pc.CULLFACE_NONE;
     mat.twoSidedLighting = true;
+  }
+  if (kind === 'wisp') {
+    // The hair's wisps: seen from both sides, lit by the normals of the hair they grow from whichever way
+    // a quad of theirs faces. Their strands' cover (`RESIDENT_WISP_OPACITY`) cuts them out (the alpha test:
+    // nothing drawn, no depth written, under `WISP.cut`), blends their edges over what is behind them and
+    // is the multisampling's coverage where the target has samples, for edges as smooth as the solid
+    // hair's. The blend's alpha (`BLEND_NORMAL`: the alphas added up) is what keeps a transparent
+    // canvas (the creator's stage, the portraits) covered where they lie over the hair or the skin: the
+    // coverage alone writes its alpha in their place, and the page shows through.
+    mat.cull = pc.CULLFACE_NONE;
+    mat.alphaTest = WISP.cut;
+    mat.alphaToCoverage = true;
+    mat.blendType = pc.BLEND_NORMAL;
   }
   if (kind === 'mouth') {
     // Warm, soft and hardly lit by the sky (the mouth hides most of it): the environment's light at 0.35.
@@ -285,11 +298,14 @@ export function characterMaterial(app: pc.AppBase, part: string, options: Charac
     // (Skin's light wraps round the terminator: `RESIDENT_DIFFUSE`.)
     if (kind === 'body' && !shadow) chunks.set('lightDiffuseLambertPS', RESIDENT_DIFFUSE[lang]);
     // (Hair's highlight is a band across the strands: `RESIDENT_HAIR_SPECULAR`.)
-    if (kind === 'hair' && !shadow) chunks.set('lightSpecularBlinnPS', RESIDENT_HAIR_SPECULAR[lang]);
+    if ((kind === 'hair' || kind === 'wisp') && !shadow) chunks.set('lightSpecularBlinnPS', RESIDENT_HAIR_SPECULAR[lang]);
+    if (kind === 'wisp') chunks.set('opacityPS', RESIDENT_WISP_OPACITY[lang]);
     chunks.set('normalCoreVS', residentNormalCore(device, lang));
   }
   mat.setDefine('GAME_RESIDENT', '');
   mat.setDefine(`GAME_SIM_${kind.toUpperCase()}`, '');
+  // (The wisps are hair: its colour and its light.)
+  if (kind === 'wisp') mat.setDefine('GAME_SIM_HAIR', '');
   if (morph) mat.setDefine('GAME_SIM_MORPH', '');
   // The shadow-only copies are drawn in along their normals in the shadow pass (`character.ts` `CASTER_INSET`).
   if (shadow) {

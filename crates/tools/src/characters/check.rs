@@ -9,7 +9,7 @@ use regex::Regex;
 
 use super::body;
 use super::contract::{
-    HAIR_STYLES, IDENTITY, VISEMES, channels, garments, hair_parts, required_parts,
+    HAIR_STYLES, IDENTITY, VISEMES, channels, garments, hair_parts, is_wisps, required_parts,
 };
 use super::hair::{EAR_MIN, Ears};
 use super::head::head_frame;
@@ -35,11 +35,16 @@ fn budget(name: &str) -> Option<usize> {
     match name {
         "body" => Some(6000),
         "lod.body" => Some(1400),
+        _ if is_wisps(name) => Some(WISPS_BUDGET),
         _ if name.starts_with("hair.") => Some(7400),
         _ if shell_re(true).is_match(name) => Some(1500),
         _ => None,
     }
 }
+
+/// A style's wisps: thin quads past its edges, drawn only close up (the afro's fins come nearest,
+/// about 400).
+const WISPS_BUDGET: usize = 600;
 
 fn shell_re(lod: bool) -> Regex {
     Regex::new(if lod {
@@ -436,7 +441,9 @@ pub fn check(out: &Path) -> bool {
             } else {
                 0.0
             };
-            if frac > 0.05 {
+            // (Not the hair's wisps: drawn from both sides and shaded by the normals of the hair they grow
+            // from, whichever way a quad of theirs faces; a fin stands square to them.)
+            if frac > 0.05 && !is_wisps(name) {
                 fail(format!(
                     "{fam}:{name}: {} of the faces wind the wrong way (front faces are clockwise)",
                     pct(frac)

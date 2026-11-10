@@ -86,7 +86,8 @@ pub fn channels() -> Vec<&'static str> {
 }
 
 /// Hairstyles (household.ts HAIR_STYLES): each but `none` is a part `hair.<style>`; `hair.beard`
-/// is the facial hair of the families that have it.
+/// is the facial hair of the families that have it. Each has its soft edges in a part of their own
+/// (`wisps_part`).
 pub const HAIR_STYLES: [&str; 12] = [
     "short",
     "crop",
@@ -155,6 +156,16 @@ pub fn required_parts() -> Vec<String> {
         .collect()
 }
 
+/// The part of a hair part's wisps (parts.ts `wispsOf`): `hair.<style>.wisps`.
+pub fn wisps_part(hair: &str) -> String {
+    format!("{hair}.wisps")
+}
+
+/// Whether a part is a hair part's wisps.
+pub fn is_wisps(part: &str) -> bool {
+    part.starts_with("hair.") && part.ends_with(".wisps")
+}
+
 pub fn hair_parts(family: &str) -> Vec<String> {
     let mut out: Vec<String> = HAIR_STYLES
         .iter()
@@ -164,5 +175,7 @@ pub fn hair_parts(family: &str) -> Vec<String> {
     if BEARD_FAMILIES.contains(&family) {
         out.push("hair.beard".into());
     }
-    out
+    out.iter()
+        .flat_map(|p| [p.clone(), wisps_part(p)])
+        .collect()
 }
