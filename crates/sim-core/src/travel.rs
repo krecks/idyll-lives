@@ -440,6 +440,12 @@ pub struct RoadPath {
 /// last two (as `Graph::path` has them). None for one of fewer than two points.
 pub type PathEnds = Option<([[f32; 2]; 2], [[f32; 2]; 2])>;
 
+/// Junctions this near (m), with a stretch of road for cars between them, are one (`Graph::
+/// merge_junctions`): each within the other's box (`traffic::boxes`, 6 m round its middle at
+/// least) and a little more. Two side roads meeting a road a few metres apart either side are a
+/// crossroads: as two junctions, each one's lights stood in the middle of the other.
+const MERGE: f32 = 8.0;
+
 /// Two roads' middle lines this near (m) away from their ends meet there (`crossings`): two cars
 /// in their lanes on them would touch.
 const CROSS_NEAR: f32 = 2.0;
@@ -728,6 +734,7 @@ impl Graph {
                 prev = Some((s, n));
             }
         }
+        g.merge_junctions();
         g.index();
         g.boxes = crate::traffic::boxes(&g);
         g
@@ -829,6 +836,140 @@ impl Graph {
     /// The point on the road at `p`.
     pub fn point(&self, p: RoadPoint) -> [f32; 2] {
         self.roads[p.road as usize].at(p.s)
+    }
+
+    /// Junctions of roads for cars closer than `MERGE` along a stretch between them made one
+    /// (`build`): two side roads meeting a road a metre or a few apart, either side of it, are a
+    /// crossroads, not two T's, each with its lights in the middle of the other. The node goes
+    /// to their middle with every arm of them; the stretches between them go, the road's
+    /// stretches either side meeting half way between (its geometry as it was). Not on a
+    /// roundabout's ring (a road whose ends are one node: its entries stay apart).
+    fn merge_junctions(&mut self) {
+        let n = self.nodes.len();
+        let car = |g: &Graph, e: &Edge| g.roads[e.road as usize].drivable();
+        let ring = |g: &Graph, r: u32| {
+            let pts = &g.roads[r as usize].pts;
+            dist(pts[0], pts[pts.len() - 1]) < 0.5
+        };
+        let junction = |g: &Graph, v: usize| {
+            g.adj[v]
+                .iter()
+                .filter(|&&e| car(g, &g.edges[e as usize]))
+                .count()
+                >= 3
+                && g.adj[v].iter().all(|&e| !ring(g, g.edges[e as usize].road))
+        };
+        fn find(parent: &mut [usize], mut i: usize) -> usize {
+            while parent[i] != i {
+                parent[i] = parent[parent[i]];
+                i = parent[i];
+            }
+            i
+        }
+        // (A short stretch from a junction back to itself: two roads' ends joined there, each
+        // meeting the road a little apart.)
+        let looped = |g: &Graph, e: &Edge| {
+            e.a == e.b
+                && car(g, e)
+                && e.len() < MERGE
+                && !ring(g, e.road)
+                && junction(g, e.a as usize)
+        };
+        let mut parent: Vec<usize> = (0..n).collect();
+        let mut merged = self.edges.iter().any(|e| looped(self, e));
+        for e in &self.edges {
+            let (a, b) = (e.a as usize, e.b as usize);
+            if a != b
+                && car(self, e)
+                && e.len() < MERGE
+                && dist(self.nodes[a], self.nodes[b]) < MERGE
+                && junction(self, a)
+                && junction(self, b)
+            {
+                let (ra, rb) = (find(&mut parent, a), find(&mut parent, b));
+                if ra != rb {
+                    parent[ra.max(rb)] = ra.min(rb);
+                    merged = true;
+                }
+            }
+        }
+        if !merged {
+            return;
+        }
+        // (Each group in the middle of its members.)
+        let mut sum: Vec<([f32; 2], u32)> = vec![([0.0, 0.0], 0); n];
+        for v in 0..n {
+            let r = find(&mut parent, v);
+            sum[r].0[0] += self.nodes[v][0];
+            sum[r].0[1] += self.nodes[v][1];
+            sum[r].1 += 1;
+        }
+        for v in 0..n {
+            if parent[v] == v && sum[v].1 > 1 {
+                let k = sum[v].1 as f32;
+                self.nodes[v] = [sum[v].0[0] / k, sum[v].0[1] / k];
+            }
+        }
+        // (The stretches inside a group go; along each road, the ones either side of a run of
+        // them meet half way across it.)
+        let inside: Vec<bool> = (0..self.edges.len())
+            .map(|k| {
+                let e = self.edges[k];
+                looped(self, &e)
+                    || e.a != e.b
+                        && find(&mut parent, e.a as usize) == find(&mut parent, e.b as usize)
+            })
+            .collect();
+        for list in &self.road_edges {
+            let mut k = 0;
+            while k < list.len() {
+                if !inside[list[k] as usize] {
+                    k += 1;
+                    continue;
+                }
+                let first = k;
+                while k < list.len() && inside[list[k] as usize] {
+                    k += 1;
+                }
+                let (from, to) = (
+                    self.edges[list[first] as usize].s0,
+                    self.edges[list[k - 1] as usize].s1,
+                );
+                let before = first.checked_sub(1).map(|j| list[j] as usize);
+                let after = list.get(k).map(|&j| j as usize);
+                match (before, after) {
+                    (Some(p), Some(q)) => {
+                        let m = (from + to) / 2.0;
+                        self.edges[p].s1 = m;
+                        self.edges[q].s0 = m;
+                    }
+                    (Some(p), None) => self.edges[p].s1 = to,
+                    (None, Some(q)) => self.edges[q].s0 = from,
+                    (None, None) => {}
+                }
+            }
+        }
+        let edges: Vec<Edge> = self
+            .edges
+            .iter()
+            .zip(&inside)
+            .filter(|(_, inside)| !**inside)
+            .map(|(e, _)| Edge {
+                a: find(&mut parent, e.a as usize) as u32,
+                b: find(&mut parent, e.b as usize) as u32,
+                ..*e
+            })
+            .collect();
+        self.edges = edges;
+        self.adj = vec![Vec::new(); n];
+        self.road_edges = vec![Vec::new(); self.roads.len()];
+        for (k, e) in self.edges.iter().enumerate() {
+            self.adj[e.a as usize].push(k as u32);
+            if e.a != e.b {
+                self.adj[e.b as usize].push(k as u32);
+            }
+            self.road_edges[e.road as usize].push(k as u32);
+        }
     }
 
     fn index(&mut self) {
@@ -1569,6 +1710,61 @@ mod tests {
     fn line(a: [f32; 2], b: [f32; 2]) -> Vec<[f32; 2]> {
         let n = dist(a, b).ceil() as usize;
         (0..=n).map(|i| lerp(a, b, i as f32 / n as f32)).collect()
+    }
+
+    #[test]
+    fn two_side_roads_meeting_a_road_a_metre_apart_are_one_crossroads() {
+        // A 7 m street along x; a lane off it north at x = 50 and another south at x = 51.1, each
+        // beginning at the street's kerb: two T's 1.1 m apart were two junctions, each with its
+        // lights in the middle of the other. One crossroads, its node half way between on the
+        // street's middle line, four arms, two phases; the street's stretches either side of it
+        // meet there, with nothing left out of the street.
+        let g = Graph::build(&[
+            road(&line([0.0, 10.0], [100.0, 10.0]), 7.0, RoadKind::Street),
+            road(&line([50.0, 12.15], [50.0, 60.0]), 6.0, RoadKind::Lane),
+            road(&line([51.1, 7.85], [51.1, -40.0]), 6.0, RoadKind::Lane),
+            // (Farther apart, 12 m, two T's as before.)
+            road(&line([80.0, 12.15], [80.0, 60.0]), 6.0, RoadKind::Lane),
+            road(&line([92.0, 7.85], [92.0, -40.0]), 6.0, RoadKind::Lane),
+        ]);
+        let junctions: Vec<usize> = (0..g.nodes.len()).filter(|&n| g.degree(n) >= 3).collect();
+        assert_eq!(junctions.len(), 3, "{:?}", g.nodes);
+        let cross = junctions
+            .iter()
+            .copied()
+            .find(|&n| g.degree(n) == 4)
+            .expect("a crossroads");
+        assert!(
+            dist(g.nodes[cross], [50.55, 10.0]) < 0.01,
+            "{:?}",
+            g.nodes[cross]
+        );
+        let sig = crate::traffic::signal_at(&g, cross, &[]).expect("lit");
+        assert_eq!((sig.arms.len(), sig.phases), (4, 2));
+        // (The street's stretches, end to end along it: none missing, none overlapping.)
+        let street: Vec<&Edge> = g.road_edges[0]
+            .iter()
+            .map(|&e| &g.edges[e as usize])
+            .collect();
+        assert_eq!(street.first().unwrap().s0, 0.0);
+        assert!((street.last().unwrap().s1 - 100.0).abs() < 1e-3);
+        for w in street.windows(2) {
+            assert_eq!(w[0].s1, w[1].s0);
+            assert_eq!(w[0].b, w[1].a);
+        }
+        for (k, e) in g.edges.iter().enumerate() {
+            assert!(g.adj[e.a as usize].contains(&(k as u32)));
+            assert!(g.adj[e.b as usize].contains(&(k as u32)));
+        }
+        // (From one lane to the other across the street, through the crossroads.)
+        let (a, b) = (
+            g.near([50.0, 40.0], 5.0, 1, Mode::Car)[0],
+            g.near([51.1, -20.0], 5.0, 1, Mode::Car)[0],
+        );
+        let path = g
+            .path(a, b, Mode::Car, COUNTRY_SPEED)
+            .expect("a way across");
+        assert!(path.len < 62.0, "{}", path.len);
     }
 
     #[test]
