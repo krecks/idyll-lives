@@ -306,12 +306,22 @@ fields) decides where it covers:
 - bottom: `y < waist`, `y > leg`, `x < -0.5` (not on the arms);
 - shoes: `y < shoe`, the sock's top (under the shoe's shell, and the sock in its collar's opening).
 
-A top with `over: true` (its hem is below the waistband: shirt, jacket, suit) is painted over the
-bottom; otherwise the bottom wins. Shoes win over both. Edges are anti-aliased; painted cloth is
+A top with `over: true` (its hem is below the waistband: the tee, the v-neck, the polo and the long top worn
+out, the shirt, the jacket, the suit) is painted over the bottom; otherwise (the tank top, the blouse, tucked
+in) the bottom wins. Shoes win over both. Edges are anti-aliased; painted cloth is
 rougher than skin. Shoes have a `colour` (sRGB hex). Skirts set `skirt: true` and their `leg` cut
 paints the thighs (the shell hangs over them). Babies don't wear skirts (the shell can't follow
 their drawn-up, spread legs): a baby whose outfit has one wears `bottom.shorts` in the top's colour,
 a romper (outfit.ts).
+
+Painted cloth stands off the skin (character.ts `EASE`, the body's vertex shader): each covered vertex is
+drawn out along its normal, as far as the garment is loose (appearance texel 8; outfit.ts `EASE_OF`), so
+a tee hangs from the chest past the waist (4 mm of cloth, up to 2 cm more below the chest), a trouser leg
+falls nearly straight from the knee over the shoe (up to 2.6 cm at the ankle) and a cuff or a hem stands a
+step off the arm, with a shade under it (`EDGE_SHADE`). The amounts are metres on the base body by the
+fields' heights, scaled to the life stage (the vertex's height over its field's). What clings (swimwear,
+the towel) and what lies under a shell (the shirt in a jacket, a skirt's painted thighs) has none; under a
+skirt's shell the top lies flat from the waistband down (texel 8 b). No triangle, byte or draw is added.
 
 Each painted cut edge is drawn as fabric (material.ts `simHem`, `BAND`): a turned band along it, a
 little darker (lighter on dark cloth), with a thin stitch line in it. The band is 2.2 cm at a cuff,
@@ -384,6 +394,7 @@ Garment ids per family (outfit.ts):
 | 5 | skin reference (1) | bottom: leg cut |
 | 6 | shoe colour | shoes: the sock's top |
 | 7 | eye colour | 1 if the resident wears hair (the scalp takes the hair colour) |
+| 8 | r, g = how loose the top and the bottom are (0..1: how far the painted cloth stands off the skin, `EASE`); b = 1 if the bottom has a shell round the hips (a skirt) | 0 |
 
 Then 12 texels of face morph (channel, weight) pairs. Disabled cuts are -10 (+10 for "below" cuts).
 

@@ -16,6 +16,9 @@
  *   5: skin reference colour rgb (the skin is tinted relative to it; 1), bottom: leg cut
  *   6: shoe colour rgb, shoes: top height
  *   7: eye colour rgb, 1 if the Sim wears hair (the scalp takes the hair colour)
+ *   8: r, g = how loose the top and the bottom are (0..1: how far the cloth stands off the skin it is painted on,
+ *      the character shader's `EASE`; 0 for what clings or lies under a shell), b = 1 if the bottom has a shell
+ *      round the hips (a skirt: the top lies flat under it)
  * Disabled cuts are -10 (or +10 for "below" cuts) so their predicate always / never holds.
  * Then `MORPH_TEXELS` texels of (channel, weight, channel, weight); weight 0 = unused.
  */
@@ -29,7 +32,7 @@ export const BONE_TEXELS = 3;
 export const BONE_FLOATS = BONE_TEXELS * 4;
 
 /** Appearance texels per resident, after its bone matrices. */
-export const APPEARANCE_TEXELS = 8;
+export const APPEARANCE_TEXELS = 9;
 
 /**
  * The shirts of texel 4 r (`n`; their colours: the character shader's `SHIRTS`): what shows in an open jacket's V, white,

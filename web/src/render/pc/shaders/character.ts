@@ -110,6 +110,47 @@ const HEM_BOTTOM = `max(simHem(simT4.w - simF.y, ${BAND.waistband}), simHem(simF
 const LACE = `(1.0 - smoothstep(0.009 - lW, 0.009 + lW, abs(simF.w))) * (1.0 - smoothstep(0.06, 0.065, simF.x)) * smoothstep(0.01, 0.014, simF.x) * mix(smoothstep(0.28 - lAA, 0.28 + lAA, abs(fract(lBar) - 0.5)), 0.44, smoothstep(0.25, 0.5, lAA))`;
 /** The hair's highlight band: sharp along the strands up close, broad where they blur. */
 const HAIR_BAND = `mix(pow(hS, 6.0), 0.35 * hS * hS, smoothstep(0.08, 0.25, fwidth(hTH))) * smoothstep(0.0, 0.35, dot(normalW, hHalf)) * mix(0.6, 1.2, hClump)`;
+/**
+ * Cloth stands off the body it is painted on (the vertex shader, `GAME_SIM_BODY`): the covered skin is drawn out
+ * along its normal, as far as the resident's garments are loose (appearance texel 8: the top's and the bottom's,
+ * 0 for what clings or lies under a shell), so a tee hangs from the chest past the waist, a trouser leg falls
+ * nearly straight from the knee over the shoe, and a cuff or a hem stands a step off the skin. Metres on the base
+ * body by its fields' heights, scaled to the life stage: `thick` everywhere, `hang` more from `chest` down to
+ * `waist` (the top), `seat` more below the hips and `leg` more from `knee` down to `ankle` (the bottom), `sleeve`
+ * on the arms; within `neck` m of the neckline it thins out, under the collars' shells.
+ */
+const EASE = { thick: '0.004', hang: '0.016', chest: '1.30', waist: '1.12', sleeve: '0.007', neck: '0.06', hips: '0.88', thigh: '0.6', seat: '0.006', knee: '0.5', ankle: '0.12', leg: '0.016' };
+/** How dark the skin (or the cloth under it) is just under a loose garment's edge (the step's shade), and how far (m). */
+const EDGE_SHADE = '0.3';
+const EDGE_REACH = '0.018';
+/** The ease's code for a language's vertex shader: `f` the fields, `tx(k)` appearance texel k. */
+function easeCode(lang: Language): string {
+  const w = lang === 'wgsl';
+  const let_ = (name: string, type: string) => (w ? `let ${name}` : `${type} ${name}`);
+  const tx = (k: number) => (w ? `textureLoad(game_simPoses, vec2i(simOff + ${k}, simRow), 0)` : `texelFetch(game_simPoses, ivec2(simOff + ${k}, simRow), 0)`);
+  const add = (v: string) => (w ? `localPos = localPos + ${v};` : `localPos += ${v};`);
+  return `
+		#if defined(GAME_SIM_BODY) && !defined(SHADOW_PASS)
+		{
+			${let_('simEase', 'vec4')} = ${tx(8)};
+			if (simEase.x + simEase.y > 0.0) {
+				${let_('simF', 'vec4')} = game_simField;
+				${let_('simT4', 'vec4')} = ${tx(4)};
+				${let_('simNeck', 'float')} = min(simF.z - ${tx(2)}.w, simF.w - ${tx(3)}.w);
+				${let_('simTopIn', 'float')} = min(min((${tx(0)}.w - simF.x) * 0.55, simF.y - ${tx(1)}.w), simNeck);
+				${let_('simBottomIn', 'float')} = min(min(simT4.w - simF.y, simF.y - ${tx(5)}.w), (-0.5 - simF.x) * 0.55);
+				${let_('simArm', 'float')} = clamp(simF.x + 1.0, 0.0, 1.0);
+				${let_('simHang', 'float')} = 1.0 - smoothstep(${EASE.waist}, ${EASE.chest}, simF.y);
+				${let_('simTopEase', 'float')} = mix(${EASE.thick} + ${EASE.hang} * simHang, ${EASE.sleeve}, simArm) * (0.25 + 0.75 * smoothstep(0.0, ${EASE.neck}, simNeck)) * smoothstep(-0.004, 0.004, simTopIn) * simEase.x * (1.0 - simEase.z * (1.0 - smoothstep(simT4.w, simT4.w + 0.04, simF.y)));
+				${let_('simBottomEase', 'float')} = (${EASE.thick} + ${EASE.seat} * (1.0 - smoothstep(${EASE.thigh}, ${EASE.hips}, simF.y)) + ${EASE.leg} * (1.0 - smoothstep(${EASE.ankle}, ${EASE.knee}, simF.y))) * smoothstep(-0.004, 0.004, simBottomIn) * simEase.y;
+				// (The life stage's size: the vertex's height over its height on the base body, the fields'.)
+				${let_('simSize', 'float')} = clamp(localPos.y / max(simF.y, 0.05), 0.3, 1.2);
+				${add('normalize(vertex_normal) * (max(simTopEase, simBottomEase) * simSize)')}
+			}
+		}
+		#endif`;
+}
+
 /** The first morph pair texel, after the appearance texels. */
 const PAIRS = APPEARANCE_TEXELS;
 
@@ -243,6 +284,10 @@ const VS_GLSL = {
 	varying vec4 vSimField;
 	varying vec4 vSimTone;
 	vec3 gameSimMorphN = vec3(0.0);
+	#if defined(GAME_SIM_BODY) && !defined(SHADOW_PASS)
+		// (The cloth's ease reads the normal in getLocalPosition, before normalCoreVS declares it: RESIDENT_NORMAL leaves it out there.)
+		attribute vec3 vertex_normal;
+	#endif
 	// Bone b's skinning matrix's three rows (a texel each, layout.ts BONE_TEXELS), weighted by w, added to r0..r2.
 	void gameSimBone(int b, int row, float w, inout vec4 r0, inout vec4 r1, inout vec4 r2) {
 		int o = b * ${BONE_TEXELS};
@@ -312,6 +357,7 @@ const VS_GLSL = {
 				}
 			}
 		#endif
+${easeCode('glsl')}
 		#ifdef GAME_SIM_CLOTH
 			// Seated: the shell's corrective (its tone) as far as the thighs are turned forward (texel 4 b).
 			localPos += game_simTone.xyz * texelFetch(game_simPoses, ivec2(simOff + 4, simRow), 0).z;
@@ -415,6 +461,7 @@ const VS_WGSL = {
 				}
 			}
 		#endif
+${easeCode('wgsl')}
 		#ifdef GAME_SIM_CLOTH
 			// Seated: the shell's corrective (its tone) as far as the thighs are turned forward (texel 4 b).
 			localPos = localPos + game_simTone.xyz * textureLoad(game_simPoses, vec2i(simOff + 4, simRow), 0).z;
@@ -530,7 +577,12 @@ const PS_GLSL = {
 			vec3 topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);
 			vec3 topUnder = mix(mix(skin, cTop, simTop), cBottom, simBottom);
 			gameSimOcc = ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
-			return mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe) * gameSimOcc;
+			// The shade under a loose garment's edge (EASE: it stands a step off what is under it).
+			vec2 simEase = simTexel(8).xy;
+			float simUnderTop = (1.0 - smoothstep(0.0, ${EDGE_REACH}, -gTop)) * (1.0 - simTop) * (simT4.x > 0.5 ? 1.0 : 1.0 - simBottom) * simEase.x;
+			float simUnderBottom = (1.0 - smoothstep(0.0, ${EDGE_REACH}, -gBottom)) * (1.0 - simBottom) * (1.0 - simTop) * simEase.y;
+			float simEdge = 1.0 - ${EDGE_SHADE} * max(simUnderTop, simUnderBottom) * (1.0 - simShoe);
+			return mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe) * gameSimOcc * simEdge;
 		#elif defined(GAME_SIM_CLOTH)
 			// Shells: the flat top / bottom / shoe colour (fields.z = category); soles darker; a skirt's or a
 			// jacket's hem (fields.x: the distance from it; a collar's is out of reach).
@@ -697,7 +749,11 @@ const PS_WGSL = {
 			let topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);
 			let topUnder = mix(mix(skin, cTop, simTop), cBottom, simBottom);
 			gameSimOcc = ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
-			return mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe) * gameSimOcc;
+			let simEase = simTexel(8).xy;
+			let simUnderTop = (1.0 - smoothstep(0.0, ${EDGE_REACH}, -gTop)) * (1.0 - simTop) * select(1.0 - simBottom, 1.0, simT4.x > 0.5) * simEase.x;
+			let simUnderBottom = (1.0 - smoothstep(0.0, ${EDGE_REACH}, -gBottom)) * (1.0 - simBottom) * (1.0 - simTop) * simEase.y;
+			let simEdge = 1.0 - ${EDGE_SHADE} * max(simUnderTop, simUnderBottom) * (1.0 - simShoe);
+			return mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe) * gameSimOcc * simEdge;
 		#elif defined(GAME_SIM_CLOTH)
 			let simHemShell = simHem(simF.x, ${BAND.hem}) * select(0.0, 1.0, abs(simF.y - 3.0) < 0.5 || simF.z < 0.5);
 			let c = simFabric(select(select(simTexel(6).rgb, simTexel(2).rgb, simF.z < 1.5), simTexel(1).rgb, simF.z < 0.5), simHemShell);

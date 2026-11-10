@@ -309,7 +309,11 @@ export function characterMaterial(app: pc.AppBase, part: string, options: Charac
 function residentNormalCore(device: pc.GraphicsDevice, lang: Language): string {
   const { anchor, code } = RESIDENT_NORMAL[lang];
   const engine = engineChunk(device, lang, 'normalCoreVS');
-  return `${replaceOnce(engine, 'normalCoreVS', anchor, anchor.replace('getLocalNormal(', 'getLocalNormalEngine('))}\n${code}`;
+  const wrapped = `${replaceOnce(engine, 'normalCoreVS', anchor, anchor.replace('getLocalNormal(', 'getLocalNormalEngine('))}\n${code}`;
+  // (GLSL: the body declares the normal itself, before `getLocalPosition` reads it for the cloth's ease, `character.ts` `EASE`.)
+  if (lang !== 'glsl') return wrapped;
+  const decl = 'attribute vec3 vertex_normal;';
+  return replaceOnce(wrapped, 'normalCoreVS', decl, `#if defined(GAME_SIM_BODY) && !defined(SHADOW_PASS)\n#else\n${decl}\n#endif`);
 }
 
 /**
