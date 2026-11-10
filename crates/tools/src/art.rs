@@ -8,6 +8,7 @@
 //!   cargo art garden_decor --preview --sheet   and <id>.sheet.png: four sides, the baked shading, the clips along
 //!   cargo art kitchen --no-pack        export without writing the pack
 //!   cargo art --centres                write centres.json from every family (gamekit/centres.py, no build)
+//!   cargo art --leafcards              render the trees' leaf-card atlas (leafcards.py: textures/leafcards/albedo.png)
 //!
 //! A family is a script in tools/art/blender/families/ (those starting with `_` are templates). Blender
 //! comes from $BLENDER, the macOS app, or PATH; the models are made with Blender 5.2 LTS. After exporting
@@ -17,6 +18,9 @@
 //! of every family, as a build writes it for the models it builds: Blender imports the family scripts
 //! without building anything. Run it after changing a Model's `centre` without a rebuild (the gate then
 //! says which files are off it), or after adding or removing models.
+//!
+//! `--leafcards` renders the one atlas every tree's leaf cards are cut from (the `leafcards` finish), from
+//! leaves the script generates: run it after changing the script; the trees needn't be rebuilt for it.
 
 use crate::checkglb::{self, Paths};
 use std::path::Path;
@@ -185,6 +189,18 @@ pub fn main(argv: &[String]) -> i32 {
             Err(err) => return exit(err),
         };
         return if echo(&run(&exe, &format!("{here}/gamekit/centres.py"), &[])) {
+            0
+        } else {
+            1
+        };
+    }
+    if has("--leafcards") {
+        // The trees' leaf-card atlas, rendered from generated leaves (no family, no gate).
+        let exe = match blender() {
+            Ok(exe) => exe,
+            Err(err) => return exit(err),
+        };
+        return if echo(&run(&exe, &format!("{here}/leafcards.py"), &[])) {
             0
         } else {
             1

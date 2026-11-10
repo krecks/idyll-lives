@@ -104,6 +104,13 @@ export interface MaterialEntry {
   projection?: 'uv' | 'xz';
   /** Opacity below 1 makes the surface see-through (glass). Default 1. */
   alpha?: number;
+  /**
+   * The texture's alpha cuts the surface out where it is under this (a tree's leaf cards): an alpha
+   * test, never blended, softened by alpha to coverage where the picture is multisampled; drawn from
+   * both sides and lit by the mesh's normals on either (a card's are its crown's). The texture is an
+   * atlas on the mesh's own UVs (`uvScale` 1).
+   */
+  cutout?: number;
 }
 
 export interface IconEntry {

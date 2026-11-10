@@ -391,6 +391,20 @@ fn surf(color: &'static str, tex: &str, uv: f64, kw: &[(&'static str, J)]) -> J 
     J::Obj(e)
 }
 
+/// A cut-out finish: one albedo on the mesh's own UVs, its alpha cutting the surface out where it is under
+/// `cutout` (the trees' leaf cards; the atlas is rendered by `cargo art --leafcards`, not synthesised here).
+fn cut(color: &'static str, tex: &str, cutout: f64, kw: &[(&'static str, J)]) -> J {
+    let mut e = vec![
+        ("type", J::Str("material")),
+        ("color", J::Str(color)),
+        ("texture", J::Owned(format!("textures/{tex}/albedo.png"))),
+        ("uvScale", J::Float(1.0)),
+        ("cutout", J::Float(cutout)),
+    ];
+    e.extend(kw.iter().cloned());
+    J::Obj(e)
+}
+
 fn plain(color: &'static str, kw: &[(&'static str, J)]) -> J {
     let mut e = vec![("type", J::Str("material")), ("color", J::Str(color))];
     e.extend(kw.iter().cloned());
@@ -515,6 +529,15 @@ pub fn materials() -> J {
                 "#FFFFFF",
                 "foliage",
                 0.8,
+                &[("roughness", f(0.9)), ("metallic", i(0))],
+            ),
+        ),
+        (
+            "material.finish.leafcards",
+            cut(
+                "#FFFFFF",
+                "leafcards",
+                0.5,
                 &[("roughness", f(0.9)), ("metallic", i(0))],
             ),
         ),
@@ -693,7 +716,8 @@ mod tests {
         assert_eq!(py_fsum(std::iter::repeat_n(0.1, 10)), 1.0);
     }
 
-    /// `tests/fixtures/tex/materials.json` is what materials.py wrote (but for the sky's URL, since `cargo envconv`'s `.pcenv`).
+    /// `tests/fixtures/tex/materials.json` is what materials.py wrote (but for the sky's URL, since `cargo envconv`'s `.pcenv`,
+    /// and the trees' leaf cards' finish, added since).
     #[test]
     fn materials_bytes() {
         assert_eq!(

@@ -135,6 +135,15 @@
     "roughness": 0.9,
     "metallic": 0
   },
+  "material.finish.leafcards": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/leafcards/albedo.png",
+    "uvScale": 1.0,
+    "cutout": 0.5,
+    "roughness": 0.9,
+    "metallic": 0
+  },
   "material.finish.glass": {
     "type": "material",
     "color": "#DCE6E8",

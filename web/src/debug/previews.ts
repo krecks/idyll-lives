@@ -6,7 +6,7 @@
  * of the build.
  *
  * The residents are made from seeds (`lookFromSeed`, the same look every time); the objects are
- * the first `?count=12` objects of the shop in id order. `?renderer=webgl` draws with
+ * the first `?count=12` objects of the shop in id order, or those `?ids=tree,garden.apple` names. `?renderer=webgl` draws with
  * WebGL2. Sets `window.__ready` once every picture has loaded. `?debug` exposes the residents'
  * previews as `__previews` (`render/preview/index.ts`): the household creator's stage can be
  * attached from a script (`__previews.stage(host)`) and its studio inspected (`__previews.live`).
@@ -30,10 +30,11 @@ const looks = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => {
   return { gender, appearance: lookFromSeed(assets, gender, seed * 7919) };
 });
 const count = Number(params.get('count') ?? 12);
+const ids = params.get('ids')?.split(',');
 const objects = content.shop
-  .filter((o) => assets.has(o.model, 'model'))
+  .filter((o) => assets.has(o.model, 'model') && (!ids || ids.includes(o.id)))
   .toSorted((a, b) => (a.id < b.id ? -1 : 1))
-  .slice(0, count);
+  .slice(0, ids ? ids.length : count);
 
 const sims = createSimPreviews({ assets, emotions: content.emotions.map((e) => e.id), backend: () => backend });
 const items = createItemPreviews(assets);

@@ -955,6 +955,8 @@ export const WIND = {
 export const WIND_KIND: Record<string, [number, number, number, number]> = {
   'material.finish.bark': [WIND.bend, 0, 0, 0],
   'material.finish.foliage': [WIND.bend, 0.012, 3.1, 1.5],
+  // (A tree's leaf cards, as the leaves they are.)
+  'material.finish.leafcards': [WIND.bend, 0.012, 3.1, 1.5],
 };
 
 /**

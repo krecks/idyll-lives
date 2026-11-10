@@ -134,7 +134,7 @@ const NEEDED: { file: string; text: string; who: string }[] = [
   // render/pc/nature.ts: the plants' wind and tint, and the shadow-only layer (layers.ts).
   ...both('common/vert/transformInstancing.js', 'attribute vec4 instance_line4;', 'attribute instance_line4: vec4f;', 'nature.ts: the wind reads the instance\'s matrix (`instance_line1..4`) in the vertex position hook'),
   ...both('lit/vert/litMain.js', 'vVertexColor = gammaCorrectInput(vertex_color);', 'output.vVertexColor = gammaCorrectInputVec4(vertex_color);', 'nature.ts: the foliage\'s tint on the converted vertex colour, at the end of the vertex shader'),
-  { file: 'scene/shader-pass.js', text: 'this.defines.set(`${this.name.toUpperCase()}_PASS`, "");', who: 'nature.ts, cutaway.ts: SHADOW_PASS set in both stages of the shadow pass' },
+  { file: 'scene/shader-pass.js', text: 'this.defines.set(`${this.name.toUpperCase()}_PASS`, "");', who: 'nature.ts, cutaway.ts: SHADOW_PASS set in both stages of the shadow pass (shaders/cutout.ts: FORWARD_PASS, likewise)' },
   // render/pc/characterMaterial.ts, shaders/character.ts: residents skinned from the pose texture in the instancing transform.
   ...both('common/vert/transformCore.js', '#include "transformInstancingVS"', '#include "transformInstancingVS"', 'shaders/character.ts: an instanced draw\'s model matrix from transformInstancingVS (the residents\' skin)'),
   ...both('common/vert/transformInstancing.js', 'mat4 getModelMatrix() {', 'fn getModelMatrix() -> mat4x4f {', 'shaders/character.ts: RESIDENT_INSTANCING replaces transformInstancingVS'),
@@ -145,6 +145,10 @@ const NEEDED: { file: string; text: string; who: string }[] = [
   ...both('lit/vert/normal.js', 'return normalize(dNormalMatrix * localNormal);', 'return normalize(dNormalMatrix * localNormal);', 'shaders/chunks.ts: an instance\'s normal corrected for uneven scale (INSTANCE_NORMAL)'),
   ...both('lit/vert/normal.js', 'dNormalMatrix = getNormalMatrix(dModelMatrix);', 'dNormalMatrix = getNormalMatrix(dModelMatrix);', 'shaders/chunks.ts INSTANCE_NORMAL: dNormalMatrix is the model matrix\'s 3 × 3 for instanced draws (normalCore.js)'),
   ...both('standard/frag/emissive.js','void getEmission() {', 'fn getEmission() {', 'shaders/chunks.ts: the emission wrap (the eyes\' catchlight)'),
+  // render/pc/shaders/cutout.ts: a cut-out finish's opacity (a tree's leaf cards).
+  ...both('standard/frag/opacity.js', 'void getOpacity() {', 'fn getOpacity() {', 'shaders/chunks.ts: the opacity wrap (cut-out finishes)'),
+  ...both('standard/frag/opacity.js', 'dAlpha *= texture2DBias({STD_OPACITY_TEXTURE_NAME}, {STD_OPACITY_TEXTURE_UV}, {STD_TEXTURE_BIAS}).{STD_OPACITY_TEXTURE_CHANNEL};', 'dAlpha = dAlpha * textureSampleBias({STD_OPACITY_TEXTURE_NAME}, {STD_OPACITY_TEXTURE_NAME}Sampler, {STD_OPACITY_TEXTURE_UV}, {STD_TEXTURE_BIAS}).{STD_OPACITY_TEXTURE_CHANNEL};', 'shaders/cutout.ts: the opacity map\'s name and UV, under STD_OPACITY_TEXTURE'),
+  ...both('lit/frag/viewDir.js', 'dViewDirW = normalize(view_position - vPositionW);', 'dViewDirW = normalize(uniform.view_position - vPositionW);', 'shaders/cutout.ts: the eye and the fragment in the world, for a leaf\'s distance from the eye'),
   { file: 'scene/shader-lib/programs/lit-shader.js', text: 'if (this.chunks.get("transformInstancingVS") === languageChunks.get("transformInstancingVS")) {', who: 'characterMaterial.ts: with transformInstancingVS replaced, instance_line1..4 are the material\'s to map (setAttribute)' },
   { file: 'platform/graphics/webgpu/webgpu-shader-processor-wgsl.js', text: 'type = WebgpuShaderProcessorWGSL.floatAttributeToInt(type, isSignedType);', who: 'characterMaterial.ts: byte bone indices read as vec4f in WGSL' },
   { file: 'platform/graphics/webgpu/webgpu-shader-processor-wgsl.js', text: 'case "uff":', who: 'shaders/character.ts: the RGBA32F pose texture declared texture_2d<uff>' },

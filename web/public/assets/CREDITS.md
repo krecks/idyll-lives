@@ -49,7 +49,8 @@ The trees (`models/trees/oak.glb`, `maple.glb`, `birch.glb`, `cherry.glb`, `appl
 `magnolia.glb`, `willow.glb`, `pine.glb`, `spruce.glb`, `cypress.glb`, `lemonTree.glb`, each with its far version,
 override pack `packs/trees/manifest.json`) are built in Blender by `tools/art/blender/families/trees.py` on `gamekit`
 and exported as `.glb` (glTF, original, CC0). They stand on the lots and in the woods, whose far trees draw the far
-versions. An apple or a lemon shrinks away while it is picked, the Japanese maple's stray sprigs while it is shaped. The pine, spruce, Japanese maple, willow, cypress, maple and magnolia were rebuilt for the authenticity review
+versions. The broadleaves' crowns are leaf cards cut from one atlas (`textures/leafcards/albedo.png`, generated: below);
+their far versions and the conifers wear the tiling foliage. An apple or a lemon shrinks away while it is picked, the Japanese maple's stray sprigs while it is shaped. The pine, spruce, Japanese maple, willow, cypress, maple and magnolia were rebuilt for the authenticity review
 (G-38, 2026-10-21): crowns over head height, the willow's streamers, a slim cypress, a maple of its own and the
 magnolia's goblets; with them the bonsai's stand, the rose bush, azalea, meadow and strawberries (`plants.py`) and
 the garden boulders (`garden_decor.py`), all original and CC0.
@@ -500,6 +501,7 @@ override pack
 |---|---|---|
 | `textures/sky/clouds.png` | Cloud band of the sky | `cargo tex clouds` (procedural noise, `crates/tools/src/tex.rs`) |
 | `textures/<set>/albedo.jpg`, `normal.jpg`, `arm.jpg`; `street/sidewalk/*.jpg` | All 20 surface sets (`bark` … `wood_oak`, `sidewalk`) | `cargo tex synth` (procedural height fields, `crates/tools/src/tex/synth.rs`) |
+| `textures/leafcards/albedo.png` | The trees' leaf cards: three cut-out clusters of leaves and a dense wall of them | `cargo art --leafcards` (rendered in Blender from leaves generated in code, `tools/art/blender/leafcards.py`) |
 | `icons/rotate.svg`, `wall.svg`, `door.svg`, `eraser.svg`, `eyedropper.svg`, `environment.svg`, `fence.svg`, `gate.svg`, `garage.svg`, `roof.svg`, `upgrade.svg`, `focused.svg`, `inspired.svg`, `energized.svg`, `relaxed.svg` | UI and emotion icons | Hand-written SVG in the style of the existing set |
 
 ## Characters (`characters/`)

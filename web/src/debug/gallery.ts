@@ -20,6 +20,7 @@
  * `?renderer=webgl` draws with WebGL2 (default WebGPU). `?still`: nothing moves once the residents
  * have settled, the wind dropped (pictures that compare pixel for pixel; `tools/bench/render.mjs --pages`).
  * `?ground=0` leaves the lawn out (the models alone, e.g. to compare diag views).
+ * `?far` draws each model's far version where it has one (a tree's lumps beside `?far`-less leaf cards: do they match?).
  * `?camera=game` is the game's Live camera as a game starts (radius 24, beta 0.86, its longer lens),
  * from the game's angle onto a model facing that camera, aimed at the floor under the first model,
  * or the one `?at=<key or index>` names; `__gallery.aim(n)` aims it at model n. `alpha`, `beta`,
@@ -85,7 +86,7 @@ if (keys.length === 0) console.warn(`[gallery] no models match ${filter ? `'${fi
 
 const cols = Number(params.get('cols')) || Math.max(1, Math.ceil(Math.sqrt(keys.length)));
 const rows = Math.ceil(keys.length / cols);
-const templates = await Promise.all(keys.map((key) => buildModel(app, key, assets.get(key, 'model'), [1, 1])));
+const templates = await Promise.all(keys.map((key) => buildModel(app, key, assets.get(key, 'model'), [1, 1], { far: params.has('far') })));
 const outlines = templates.map((t) => t.outline ?? { minX: -0.5, maxX: 0.5, minZ: -0.5, maxZ: 0.5 });
 // Spots the widest model's size apart, plus a metre (small things close together), plus the residents beside each.
 const widest = Math.max(...outlines.map((o) => Math.max(o.maxX - o.minX, o.maxZ - o.minZ)));

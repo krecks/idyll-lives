@@ -212,9 +212,11 @@ class Family:
             if model.accept:
                 entry['accept'] = model.accept
             if model.far:
-                far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), self.make_far(model, objs),
-                                 ground=model.ground)
+                far_objs = self.make_far(model, objs)
+                far = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.far.glb'), far_objs, ground=model.ground)
                 entry['far'] = f'../../models/{self.name}/{model.id}.far.glb'
+                # The far version's own materials too (a tree's lumps on `foliage`, its cards on `leafcards`).
+                entry['materials'] = dict(sorted({**self.palette.finishes(materials_used(far_objs)), **entry['materials']}.items()))
                 print(f'[gamekit] built its far version -> {os.path.relpath(far, ASSETS)}')
             entries[self.key(model)] = entry
             centres[self.key(model)] = model.centre

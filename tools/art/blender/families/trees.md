@@ -4,9 +4,10 @@
 `packs/trees/manifest.json`: the oak (`model.tree`), maple, silver birch, cherry blossom, apple, Japanese maple,
 magnolia and weeping willow (`model.tree.*`), the pine, blue spruce and Italian cypress (`model.pine`, `model.spruce`,
 `model.cypress`) and the potted lemon tree (`model.garden.lemonTree`). Built 2026-10-14; they sat in Validate › Trees until checked in play.
-Rebuilt with real skeletons 2026-10-22 (the oak first, by hand, then the rest in its way). The leafy lumps and small
-helpers (`lump`, `tube`, `pot`, `cupped`, `sprigs`, `far_of`) come from `plants.py`; the tree builders are in
-`trees.py` (plants.py is shared, so they stay out of it).
+Rebuilt with real skeletons 2026-10-22 (the oak first, by hand, then the rest in its way); the broadleaves' crowns
+drawn as leaf cards 2026-11-10 (below). The leaf masses and small helpers (`leaves`, `clad`, `lump`, `tube`, `pot`,
+`cupped`, `sprigs`, `far_of`) come from `plants.py`; the tree builders are in `trees.py` (plants.py is shared, so they
+stay out of it).
 
 ## How a tree is made
 
@@ -16,8 +17,8 @@ helpers (`lump`, `tube`, `pot`, `cupped`, `sprigs`, `far_of`) come from `plants.
   by bearing onto a few limbs; each limb runs from the trunk to part way to its tips' middle, bowed up and wandering
   (`_bend`), and forks into a curving bough to each tip; tips over the middle go on a leader. At each tip a leaf
   mass (`_mass`): a clump on the tip and two round it, a little below and out, lighter towards the top, with gaps
-  between the masses where the limbs show; a few dark lumps close the crown's heart (`_hearts`). The oak is built
-  the same way by hand. Its own shape per tree: the birch's slender white limbs up the stem and hanging masses,
+  between the masses where the limbs show; a few dark ones close the crown's heart (`_hearts`). Each clump is drawn
+  as leaf cards (below). The oak is built the same way by hand. Its own shape per tree: the birch's slender white limbs up the stem and hanging masses,
   the cherry's wide low limbs under flat blossom clouds, the apple's crooked trunk and gnarled limbs, the Japanese
   maple's six S-curved stems under flat layered clouds, the magnolia's upswept stems, the willow's five limbs
   rising and arching over with masses along their crests and curtains (`streamer`) hanging from them.
@@ -27,7 +28,8 @@ helpers (`lump`, `tube`, `pot`, `cupped`, `sprigs`, `far_of`) come from `plants.
   lowest tiers' bare boughs show from below. The cypress is a lofted flame of foliage covered in upright sprays.
 - **Fruit and blooms** sit on the leaves as built: apples and lemons where lines in from round the crown meet the
   leaves (`_hang`, a ray cast), the magnolia's goblets where lines out of each mass's tip clump leave it.
-- **Finishes:** leaves on `foliage`, trunks and limbs on `bark` (the nature shader sways and tints both), the
+- **Finishes:** the broadleaves' leaves on `leafcards` (their far versions', the conifers' and the Japanese
+  maple's stray sprigs on `foliage`), trunks and limbs on `bark` (the nature shader sways and tints all three), the
   birch's white bark and fruit plain.
 - **Trunk on the origin:** crowns are built round the trunk, so `settle` moves a lopsided crown's bounds only by a
   few centimetres.
@@ -58,32 +60,75 @@ helpers (`lump`, `tube`, `pot`, `cupped`, `sprigs`, `far_of`) come from `plants.
   `model.tree.fruit` in the base manifest), so the boughs face the tile in front at these heights; the house builder's
   garden trees and the woods keep their own turn and size.
 
+## Leaf cards (2026-11-10)
+
+A review found the crowns the least real thing on screen: lumpy balls with a leaf pattern tiled over them. A
+broadleaf's leaf masses are now cut-out cards over dark cores (`plants.py` `leaves`, `clad`, `Cards`):
+
+- **The atlas.** One texture for every tree, `textures/leafcards/albedo.png` (512², `cargo art --leafcards`,
+  `../leafcards.py`): three clusters of leaves on twigs, rendered from generated leaves and cut out by their alpha,
+  and a dense, opaque wall of leaves for the cores. Pale, as the tiling foliage is: a card's colour tints it.
+- **A build** makes its masses as ever (`leaves`: the same lumps from the same random numbers) and keeps them out of
+  the model (`join_still`) for what is found on them by casting rays: the perches, the apples and lemons (`_hang`),
+  the magnolia's goblets. `clad` then draws each mass as 15 cards, 1 to 1.4 of its radius across, in its own shade
+  (`CARD_OF`: a leaf colour's cards), and the lumps go. Under each mass's three clumps, and under each heart, one
+  dark core (48 triangles, its UVs in the atlas's dense tile).
+- **A card** lies as a spray of leaves does: its plane turned from straight out of its mass more than half way to
+  straight up (`CARD_UP`), then up to 20° off that at random, so the game's camera, which looks down on a tree,
+  never sees it edge-on on the crown's near side or at its outline. None faces the crown's middle or hangs
+  underneath. Its normals are its mass's hull's, a quarter its own (`CARD_OWN`), so the crown shades as a volume and
+  the sprays still differ. Its shading is written as it is laid (open on top and outside, darker inside and under:
+  `gamekit/shade.py` keeps it and leaves the cards out of the occlusion it casts).
+- **The tree keeps its size.** A card is drawn in until its corners are within 1.1 of its mass's ellipsoid
+  (`CARD_REACH`: as far as the lump's noise reached) and inside the box of all the lumps; one card lies level on
+  each lump's highest point, so every mass keeps its height, and the card nearest each side of the box is moved out
+  to it (`Cards.fill`, a few centimetres). So the model's box is the lumps' to the millimetre, `G.settle` centres it
+  where it centred them, and the perches (found on the lumps before the cards are made) are the same points:
+  the pack's `perches` didn't change, nor the sizes in the table below. (Short of that, a crown 20 cm lower left the
+  birch's top perch outside its box, which the gate fails, and a box 3 cm narrower moved every perch by as much,
+  which the recorded day of birds, `web/tests/birds.test.ts`, notices.) The lowest point farther than 0.85 m from
+  the trunk is as high or higher on all but the Japanese maple, 6 cm lower at 2.29 m ("Walking past them", below).
+- **The willow.** Its crown is cards as the others'; each strand of its curtain is upright cards down its ribbon's
+  line (`strand`, `Cards.hang`: one every half metre, overlapping, turned a little off the next, the clusters drawn
+  long as hanging leaves), cut out, so whoever sits by the trunk shows through the leaves as well as between the
+  strands. The ribbons are built as ever and stand in until then (`stand_in`): the curtain keeps their box.
+- **Blossom and fruit.** The cherry's and the magnolia's cards are their pinks (the same clusters, tinted), their
+  green clumps green cards; the apples, lemons and goblets sit where they sat, on the lumps' surface, just outside
+  the cards.
+- **Cost.** The same triangles as the lumps within 2 % (the willow fewer) and the same draw calls (bark, leaves;
+  the cores are on the cards' finish). The nine files are 24 % larger, 2.31 MB from 1.86 (four corners a card,
+  none shared).
+- **In the game** the finish is alpha-tested and drawn from both sides (objects.md, "Leaf cards").
+
 ## Far versions and the woods
 
 Each tree has a far version (`far_of`): the same build at low detail, every random number drawn in the same order:
 no boughs, one lump a mass spanning its clumps (so the crown keeps its size), the trunk and limbs on fewer sides, the
-conifers' sprays on three-point paths with a wedge profile, the willow's outer curtain only, half the magnolia's
-blooms. It keeps the tree's size within 5 % at 16–30 % of its triangles, and its foot where the model's is. The far woods (`nature.ts` `forests`) used to draw the `*.far` old part keys whatever the model; they
+conifers' sprays on three-point paths with a wedge profile, the willow's outer curtain only (wedge ribbons, as its
+curtain was), half the magnolia's blooms. A far version keeps the lumps, on `foliage`: no cards. Its lumps' colours
+are the leaf shades; the cards' are those shades toned (`CARD_TONE`), so a tree and its far version match where the
+near woods meet the far and where Low draws the street's far versions. It keeps the tree's size within 5 % at 16–30 % of its triangles, and its foot where the model's is. The far woods (`nature.ts` `forests`) used to draw the `*.far` old part keys whatever the model; they
 now draw a file's own far version, so the woods match the town, and those keys are gone (2026-10-18, with the
 primitive parts). The town overview draws them too.
 
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|
-| `model.tree` | 5.27 × 7.35 × 5.04 m | 4,410 | 740 | 2 |
-| `model.tree.maple` | 5.09 × 7.15 × 5.38 m | 4,376 | 832 | 2 |
-| `model.tree.birch` | 3.35 × 8.27 × 3.52 m | 4,316 | 692 | 3 |
-| `model.tree.blossom` | 5.09 × 5.37 × 5.25 m | 3,880 | 734 | 2 |
-| `model.tree.fruit` | 4.29 × 4.11 × 4.64 m | 4,484 | 1,250 | 4 |
-| `model.tree.japaneseMaple` | 3.75 × 4.10 × 3.90 m | 3,786 | 692 | 3 |
-| `model.tree.magnolia` | 4.20 × 5.25 × 3.83 m | 4,346 | 936 | 3 |
-| `model.tree.willow` | 5.06 × 5.80 × 4.96 m | 4,196 | 1,214 | 2 |
+| `model.tree` | 5.27 × 7.35 × 5.04 m | 4,428 | 740 | 2 |
+| `model.tree.maple` | 5.09 × 7.15 × 5.38 m | 4,448 | 832 | 2 |
+| `model.tree.birch` | 3.35 × 8.27 × 3.52 m | 4,310 | 692 | 3 |
+| `model.tree.blossom` | 5.09 × 5.37 × 5.25 m | 3,830 | 734 | 2 |
+| `model.tree.fruit` | 4.29 × 4.11 × 4.64 m | 4,488 | 1,250 | 4 |
+| `model.tree.japaneseMaple` | 3.75 × 4.10 × 3.90 m | 3,732 | 692 | 3 |
+| `model.tree.magnolia` | 4.20 × 5.25 × 3.83 m | 4,296 | 936 | 3 |
+| `model.tree.willow` | 5.06 × 5.80 × 4.96 m | 3,506 | 1,214 | 2 |
 | `model.pine` | 5.94 × 9.21 × 6.17 m | 3,828 | 892 | 2 |
 | `model.spruce` | 5.23 × 10.50 × 5.40 m | 4,174 | 1,048 | 2 |
 | `model.cypress` | 1.03 × 7.95 × 1.05 m | 2,464 | 468 | 2 |
-| `model.garden.lemonTree` | 1.25 × 2.00 × 1.27 m | 4,024 | 1,216 | 4 |
+| `model.garden.lemonTree` | 1.25 × 2.00 × 1.27 m | 4,042 | 1,216 | 4 |
 
 Each at most 4,500 triangles (trees stand by the thousand in the woods). `check-glb`: 12 models, 0 failed; its
-warnings are the apple's and the lemon tree's 4 draw calls (as before). The sizes were held to the
+warnings are the apple's and the lemon tree's 4 draw calls (as before). (The broadleaves as leaf cards, 2026-11-10:
+the lumps' triangles within 2 %, the willow 690 fewer, its ribbons now cards; the same draw calls.) The sizes were held to the
 old parts' bounds as they were built (those bounds counted each turned blob's or cone's whole box: the
 spruce's read 7.8 m for cones 5.4 m across); the oak's and maple's crowns were drawn in a little to match (`spread`
 0.75 to 0.71 and 0.78 to 0.74, 2026-10-15). Khronos validator: 0 errors, 0 warnings on all 24 files.
@@ -98,6 +143,8 @@ inside 0.85 m at about 1.4-1.6 m, inside the reach of someone shaping it from th
 lowest leaves; its low boughs end within 0.85 m, the sprigs at their tips to about 0.95 m), cherry 2.87, oak 3.31, maple 3.42, birch 4.01. The root buttresses reach
 0.4-0.75 m out, a few centimetres high. The willow's curtains come down to
 0.45 m by design (sitting inside the curtain is the willow), thin streamers with gaps, not solid wedges.
+As leaf cards (2026-11-10), by the same measure: Japanese maple 2.29 m, magnolia 2.53, cherry 2.92, oak 3.31, maple
+3.54, birch 4.21; the apple's leaves 1.85 at a metre out (1.72); the willow's curtain to 0.47, as it was.
 
 - **Pine:** its lowest tier's foot at 2.35 m (was 1.4); its sprays' tips droop to about 2.5 m.
 - **Blue spruce:** limbed up, its skirt from 2.2 m (was 0.35), 5.0 m across (was 5.4), on a 3 m trunk.
@@ -105,7 +152,9 @@ lowest leaves; its low boughs end within 0.85 m, the sprigs at their tips to abo
   tiers at 2.7, 3.25 and 3.65 m (were 2.0, 2.7, 3.2).
 - **Weeping willow:** the 26 solid cones and 8 inner ones are `streamer`s, thin leafy ribbons out of the crown's edge
   and straight down to 0.45-0.8 m (the outer row) and 0.9-1.5 m (the inner): 68 lenses of four points a row (4,944
-  triangles), since 2026-10-22 60 wedges of three points a row, five rows (4,196 in all, under the trees' 4,500).
+  triangles), since 2026-10-22 60 wedges of three points a row, five rows (4,196 in all, under the trees' 4,500);
+  since 2026-11-10 each strand upright leaf cards down the wedge's line (3,506 in all; its far version keeps the
+  wedges).
 - **Italian cypress:** a pencil about a metre across (was 2.1), the same 7.95 m.
 - **Maple:** not the oak's crown again: a Norway maple's dense, even dome (since 2026-10-22 eighteen leaf masses on
   six steep limbs round a dark heart), in a cooler, deeper green, on a straight trunk with a leader.

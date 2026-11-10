@@ -22,9 +22,9 @@
  *   blankets add their snippets here, or a `transformInstancingVS` of their own.
  * - `psDecl`, `psStart`: `litUserDeclarationPS`, `litUserMainStartPS` (which runs in every pass,
  *   the shadow pass included).
- * - `albedo`, `metalness`, `gloss`, `reflDir`, `emissive`: after `getAlbedo`, `getMetalness`,
- *   `getGlossiness`, `getReflDir`, `getEmission` (`diffusePS`, `metalnessPS`, `glossPS`,
- *   `reflDirPS`, `emissivePS`).
+ * - `albedo`, `opacity`, `metalness`, `gloss`, `reflDir`, `emissive`: after `getAlbedo`, `getOpacity`,
+ *   `getMetalness`, `getGlossiness`, `getReflDir`, `getEmission` (`diffusePS`, `opacityPS`,
+ *   `metalnessPS`, `glossPS`, `reflDirPS`, `emissivePS`).
  * - `combine`: `combineColor` (`combinePS`): the engine's is `combineColorEngine`.
  * - `end`: replaces `endPS` (the colour, fog, tone mapping and gamma) where its defines say so.
  * - `fogPS`: the game's haze in its materials (`fog.ts`); `reflectionEnvPS`, `reflectionEnvHQPS`:
@@ -47,6 +47,7 @@
 
 import * as pc from '../engine';
 import { CUTAWAY } from './cutaway';
+import { CUTOUT } from './cutout';
 import { DIAG_VIEW } from './diagView';
 import { gameNormalMap } from './bump';
 import { gameFresnel, gameReflection } from './envBrdf';
@@ -86,6 +87,7 @@ export interface FeatureCode {
   psDecl?: string;
   psStart?: string;
   albedo?: string;
+  opacity?: string;
   metalness?: string;
   gloss?: string;
   reflDir?: string;
@@ -132,7 +134,7 @@ fn gamePos(p: vec3f) -> vec3f { return vec3f(p.x, p.y, -p.z); }
   },
 };
 
-const features: ShaderFeature[] = [COMMON, VERTEX_TWEAKS, PATTERN, ROOM_LIGHTS, CUTAWAY, UNDERGROUND, PLAIN_FINISH, SOFT_LOOK, DIAG_VIEW].sort((a, b) => a.priority - b.priority);
+const features: ShaderFeature[] = [COMMON, VERTEX_TWEAKS, PATTERN, CUTOUT, ROOM_LIGHTS, CUTAWAY, UNDERGROUND, PLAIN_FINISH, SOFT_LOOK, DIAG_VIEW].sort((a, b) => a.priority - b.priority);
 
 /**
  * Adds a feature (wind, blankets). Before the first material is made: the chunks
@@ -149,6 +151,11 @@ const WRAPS = {
     slot: 'albedo',
     glsl: { decl: 'void getAlbedo() {', head: 'void getAlbedo() {\n\tgetAlbedoEngine();' },
     wgsl: { decl: 'fn getAlbedo() {', head: 'fn getAlbedo() {\n\tgetAlbedoEngine();' },
+  },
+  opacityPS: {
+    slot: 'opacity',
+    glsl: { decl: 'void getOpacity() {', head: 'void getOpacity() {\n\tgetOpacityEngine();' },
+    wgsl: { decl: 'fn getOpacity() {', head: 'fn getOpacity() {\n\tgetOpacityEngine();' },
   },
   metalnessPS: {
     slot: 'metalness',

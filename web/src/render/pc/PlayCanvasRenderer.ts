@@ -679,6 +679,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // and the night grade (`post.ts`; the diag views and `?diag=linear` without them).
     this.post = new PostProcessing(this.app, cam, gamePostOptions(this.quality.msaaSamples, this.diag, diagViewActive, this.quality.leanTargets, this.quality.contactShading));
     this.post.setLook(gameLook(LOOK));
+    // Leaf cards soften their edges with the picture's samples (none on Low, nor without the post-processing).
+    this.lib.setCutoutCoverage(this.post.samples > 1);
 
     this.sun = new pc.Entity('sun');
     this.sun.addComponent('light', {

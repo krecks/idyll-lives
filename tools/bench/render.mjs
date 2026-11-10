@@ -103,6 +103,8 @@ const PAGES = {
   // A few things close up, without labels: the furniture's finishes and the trees' foliage (the sheets to judge a look by).
   'gallery-furniture': { path: '/gallery.html', query: 'keys=model.sofa,model.armchair,model.fridge,model.bedDouble,model.bathtub,model.bookcaseTall&cols=3&labels=0&still', webgl: true },
   'gallery-trees': { path: '/gallery.html', query: 'keys=model.tree,model.tree.maple,model.tree.birch,model.pine,model.bush,model.hedge&cols=3&labels=0&still', webgl: true },
+  // The broadleaved trees, whose crowns are leaf cards (`--extra 'camera=game&at=model.tree.birch'`: one from the game's camera; `--extra far`: their far versions).
+  'gallery-broadleaves': { path: '/gallery.html', query: 'keys=model.tree,model.tree.maple,model.tree.birch,model.tree.blossom,model.tree.fruit,model.tree.japaneseMaple,model.tree.magnolia,model.tree.willow,model.garden.lemonTree&cols=3&labels=0&still', webgl: true },
   clips: { path: '/clips.html', query: 'keys=model.fridge,model.sofa,model.wardrobe,model.shower&t=0.6', webgl: true },
   characters: { path: '/characters.html', query: 'manual', webgl: true },
   // The residents' sheets (`characters.ts`): from the side, the heads close up, every skin, hairstyle, garment and
