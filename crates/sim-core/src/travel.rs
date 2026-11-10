@@ -44,7 +44,7 @@ const THIN_TOLERANCE: f32 = 0.3;
 const DETOUR: f32 = 1.25;
 /// Cars: top speeds by kind of road (m a second of drive time, `crate::DRIVE_SCALE` times that a
 /// real second at 1×); country roads come from content (`cars.countrySpeed`).
-pub const TOWN_SPEED: f32 = 6.0;
+pub const TOWN_SPEED: f32 = 9.0;
 pub const COUNTRY_SPEED: f32 = 16.0;
 /// Game minutes in a minute of `Travel::eta` by car: a car's speeds are drive time (m a second of
 /// it), so the eta's minutes are a drive's seconds of drive time over 60, each `DRIVE_SCALE` times

@@ -379,9 +379,14 @@ fn two_cars_coming_in_by_the_same_way_at_the_same_tick_come_in_one_after_the_oth
 
 #[test]
 fn two_cars_meeting_on_a_7_m_street_pass_each_other_in_their_lanes() {
-    // One drives off west from its house; the other comes in from the west to its home.
+    // One drives off west from its house; the other comes in from the west to its home, a few
+    // seconds of drive time later (they meet short of its driveway: turning in, it waits for one
+    // coming the other way).
     let mut w = street(7.0, &[(90.0, true), (60.0, false)]);
     set_off(&mut w, 0);
+    for _ in 0..common::drive_secs(4.0) {
+        w.tick_once();
+    }
     come_home(&mut w, 1);
     let mut met = false;
     let mut stood = vec![0u64; 2];
@@ -1593,9 +1598,10 @@ fn cars_holding_each_other_up_out_of_sight_go_on_at_once() {
 #[test]
 fn a_car_coming_into_sight_never_overlaps_one_there() {
     // Two cars coming home by the same way at the same tick, the way in out of sight: there they
-    // drive in on top of each other (out of sight nobody waits for anyone).
+    // drive in on top of each other (out of sight nobody waits for anyone). (The seen area from
+    // x 58: they come under the rules some 4 s of drive time short of it, 36 m at a town's speed.)
     let mut w = street(7.0, &[(80.0, true), (90.0, true)]);
-    let watch = [70, 0, 200, 60];
+    let watch = [90, 0, 200, 60];
     w.set_watch(Some(watch));
     come_home(&mut w, 0);
     come_home(&mut w, 1);

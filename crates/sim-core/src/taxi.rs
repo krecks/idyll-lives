@@ -2785,7 +2785,7 @@ fn lay_route(
     net: &Net,
     legs: &[Vec<Piece>],
 ) -> Option<(crate::cars::Route, Vec<f32>)> {
-    use crate::cars::{Legs, kerb_of, lane_on, pull_room, top_speed};
+    use crate::cars::{Legs, kerb_of, lane_on, pull_room};
     use crate::travel::{RoadKind, dist};
     let g = &travel.graph;
     let junctions: Vec<[f32; 2]> = g.junctions().collect();
@@ -2952,8 +2952,11 @@ fn lay_route(
                 let (turn, at) = bay.entry(d);
                 Some((bay, d, turn, at))
             });
+            let tops =
+                crate::cars::lane_tops(&lane, travel, &junctions, |k| along[nearest(lane[k])].1);
             let mut on = false;
             for (i, &p) in lane.iter().enumerate() {
+                let top = tops[i];
                 if !on
                     && let Some((bay, d, at, taken, _)) = &leaving
                     && bay.near(p, *at, *taken, *d)
@@ -2977,12 +2980,7 @@ fn lay_route(
                 on = true;
                 let i = nearest(p);
                 let (w, kind) = along[i];
-                out.push_lane(
-                    p,
-                    top_speed(p, kind, travel, &junctions),
-                    pull_room(w, kind, TAXI_WID),
-                    offs[i],
-                );
+                out.push_lane(p, top, pull_room(w, kind, TAXI_WID), offs[i]);
             }
             // (The claim of the stand before, closed once there's way on to close it at.)
             if let Some(s) = stood.take() {

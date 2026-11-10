@@ -661,7 +661,9 @@ fn one_coming_the_other_way_waits_its_turn_short_of_a_taxi_standing_at_the_kerb(
         while w.tick < start + secs(300.0) && !(home && gone) {
             w.tick_once();
             no_overlaps(&w);
-            if !sent && w.tick >= start + drive_secs(15.0) + drive_secs(1.25) * k {
+            // (Its set-off timed for a town's speed of 9 m/s: the two come up to the taxi
+            // about together, one ahead of the other by turns.)
+            if !sent && w.tick >= start + drive_secs(5.0) + drive_secs(0.85) * k {
                 drive(&mut w, f, 1, false);
                 sent = true;
             }
@@ -826,9 +828,11 @@ fn a_game_saved_with_a_car_part_way_round_a_standing_taxi_loads_with_it_where_it
         l.tick_once();
         no_overlaps(&l);
         let Some(s) = l.cars[c].shown else { break };
+        // (A tick's way at a town's speed, 0.6 m, and a little.)
+        let tick = sim_core::travel::TOWN_SPEED / sim_core::DRIVE_TICKS_PER_SECOND;
         let (from, limit) = match was {
-            None => (at, 0.5),
-            Some(p) => (p, 0.6),
+            None => (at, tick + 0.1),
+            Some(p) => (p, tick + 0.15),
         };
         let step = (s.0[0] - from[0]).hypot(s.0[1] - from[1]);
         assert!(
@@ -1901,7 +1905,7 @@ fn one_booked_on_a_taxi_while_out_at_another_house_isnt_called_home_hours_early(
 #[test]
 fn a_cyclist_out_on_a_visit_when_work_calls_doesnt_ride_out_on_the_bike_their_way_isnt_by() {
     // C's way out along a street of over 2 km (`town_long`) is by the work taxi (by bike, well
-    // over `BIKE_MOST`). Sent on a visit along the street just before leaving for the taxi (five
+    // over `BIKE_MOST`). Sent on a visit along the street just before leaving for the taxi (seven
     // minutes), C sets off on the bike; leaving time comes on the way: the ride cut short, off to
     // the kerb for the taxi. (On, they rode hours out of town on it, Hollyshaw and Stationgate.)
     let mut far = house(20, &[&worker("C")]);
@@ -1924,7 +1928,7 @@ fn a_cyclist_out_on_a_visit_when_work_calls_doesnt_ride_out_on_the_bike_their_wa
             break l;
         }
     };
-    while w.tick + mins(5.0) < leave {
+    while w.tick + mins(7.0) < leave {
         w.tick_once();
     }
     let _ = w.apply(sim_core::Command::Visit { sim: 0, plot: 1 });

@@ -187,12 +187,12 @@ const PULL_MOST: f32 = 0.7;
 const TURN: f32 = 2.4;
 /// How far past the town's exit a car drives before it's gone (m).
 pub(crate) const OVERSHOOT: f32 = 12.0;
-/// Top speeds (m per second of drive time, `crate::DRIVE_SCALE`): along the street, and in the
-/// driveway, turning or backing up.
-pub(crate) const FAST: f32 = 6.0;
+/// Top speeds (m per second of drive time, `crate::DRIVE_SCALE`): along the street
+/// (`travel::TOWN_SPEED`, 32 km/h), and in the driveway, turning or backing up.
+pub(crate) const FAST: f32 = crate::travel::TOWN_SPEED;
 const SLOW: f32 = 1.8;
-/// Speeding up and slowing down (m/s², drive time).
-const ACCEL: f32 = 2.2;
+/// Speeding up and slowing down (m/s², drive time: from standing to `FAST` in 3 s).
+const ACCEL: f32 = 3.0;
 /// The route's sampling step (m).
 const STEP: f32 = 0.25;
 /// From the side of the car to where someone gets in (m).
@@ -204,11 +204,15 @@ const CALL_REACH: f32 = 15.0;
 /// Clearance from the inner end of a driveway to the car (m), as the town parks them.
 const PARK_GAP: f32 = 0.45;
 /// On the town's roads (`Route::on_roads`): how far from the road a driveway or exit may be (m),
-/// how slow cars take junctions (m/s) within how far of them (m), and the longest straight step
+/// how slow cars turn through junctions (m/s) within how far of them (m; straight through one, at
+/// their speed: `lane_tops`), and the longest straight step
 /// between a route's points and how far a step may stray from the lane (m).
 pub(crate) const ROAD_REACH: f32 = 30.0;
 pub(crate) const JUNCTION_SPEED: f32 = 3.5;
 pub(crate) const JUNCTION_REACH: f32 = 8.0;
+/// A way turning through a junction by more than this (radians, between the way it comes in and
+/// the way it goes out) takes it at `JUNCTION_SPEED` (`lane_tops`); straighter, at its speed.
+const TURN_AT: f32 = 0.35;
 pub(crate) const ROUTE_STEP: f32 = 4.0;
 pub(crate) const ROUTE_TOLERANCE: f32 = 0.08;
 /// A lane's corners rounded (`round_corners`): where it turns sharper than `SHARP` (radians) at a
@@ -228,9 +232,10 @@ const ARC_STEP: f32 = 0.1;
 /// How much longer than it's off a corner's line a lead into its curve (or out of it) from a point
 /// a little off it is (`round_corners`): the step turns no more than about `ARC_STEP`.
 const LEAD: f32 = 10.0;
-/// The most a car's way pulls it sideways turning (m/s², `Legs::timed`): round a junction's
-/// corner it slows to about 3 m/s.
-const SIDEWAYS: f32 = 4.0;
+/// The most a car's way pulls it sideways turning (m/s² of drive time, `Legs::timed`): round a
+/// junction's corner it slows to about 4 to 5 m/s, a country road's bend to 14 (4 before the
+/// junctions were lit: the lights and the stop lines do the stopping now).
+const SIDEWAYS: f32 = 6.5;
 /// A driveway meeting its road further from square than this (the cosine of its angle to the
 /// road's side) comes alongside it rather than onto it: its car stays parked (`Car::no_way`).
 const OBLIQUE: f32 = 0.5;
@@ -347,10 +352,10 @@ const COMING_IN: [f32; 5] = [
     drive_ticks(3.0),
     drive_ticks(4.0),
 ];
-/// How far apart (ticks: half a second of drive time, 3 m at a town's speed; slowed for a
-/// junction, less than 2 m) a car's way into sight is looked along (`sight`: its claims reaching
-/// into sight, and `METER`'s queue).
-const SIGHT_STEP: f32 = drive_ticks(0.5);
+/// How far apart (ticks: a quarter of a second of drive time, 1.5 m at a town's speed, 4 m on a
+/// country road straight through a junction: less than the smallest box) a car's way into sight
+/// is looked along (`sight`: its claims reaching into sight, and `METER`'s queue).
+const SIGHT_STEP: f32 = drive_ticks(0.25);
 
 /// Coming into sight (`sight`), a car out of it waits outside while one in sight standing still
 /// (`METER_STILL`, or a taxi at its stop) is on its way in up to the first junction it takes
@@ -1154,27 +1159,66 @@ pub(crate) fn extend_past(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
     ]
 }
 
-/// The top speed on the roads at `p`, on a road of `kind` (m/s): `FAST` in the hamlets,
-/// `Travel::country_speed` on country roads, `JUNCTION_SPEED` near any of `junctions`.
-pub(crate) fn top_speed(
-    p: [f32; 2],
-    kind: crate::travel::RoadKind,
+/// The top speed at each of `lane`'s points (m/s of drive time; `kind_at` the kind of road at
+/// each): `FAST` in the hamlets, `Travel::country_speed` on country roads, and `JUNCTION_SPEED`
+/// through a junction (within `JUNCTION_REACH` of it, `junctions`) where the way turns there by
+/// more than `TURN_AT`. Straight through one it keeps its speed (its bends limit it,
+/// `Legs::timed`'s `SIDEWAYS`; the lights and the stop lines stop it, `traffic.rs`).
+pub(crate) fn lane_tops(
+    lane: &[[f32; 2]],
     travel: &Travel,
     junctions: &[[f32; 2]],
-) -> f32 {
-    let fast = if kind == crate::travel::RoadKind::Country {
-        travel.country_speed
-    } else {
-        FAST
+    kind_at: impl Fn(usize) -> crate::travel::RoadKind,
+) -> Vec<f32> {
+    use crate::travel::dist;
+    let n = lane.len();
+    let mut tops: Vec<f32> = (0..n)
+        .map(|i| {
+            if kind_at(i) == crate::travel::RoadKind::Country {
+                travel.country_speed
+            } else {
+                FAST
+            }
+        })
+        .collect();
+    let heading = |a: usize, b: usize| {
+        let (p, q) = (lane[a], lane[b]);
+        (q[0] - p[0]).atan2(q[1] - p[1])
     };
-    if junctions
-        .iter()
-        .any(|&j| crate::travel::dist(j, p) < JUNCTION_REACH)
-    {
-        fast.min(JUNCTION_SPEED)
-    } else {
-        fast
+    for &j in junctions {
+        // (Each pass by it: the points within reach, one run after another.)
+        let mut i = 0;
+        while i < n {
+            if dist(lane[i], j) >= JUNCTION_REACH {
+                i += 1;
+                continue;
+            }
+            let i0 = i;
+            while i + 1 < n && dist(lane[i + 1], j) < JUNCTION_REACH {
+                i += 1;
+            }
+            let i1 = i;
+            i += 1;
+            // (The way it comes in and the way it goes out, from the points just outside.)
+            let (a0, b0) = if i0 > 0 {
+                (i0 - 1, i0)
+            } else {
+                (0, 1.min(n - 1))
+            };
+            let (a1, b1) = if i1 + 1 < n {
+                (i1, i1 + 1)
+            } else {
+                (i1.saturating_sub(1), i1)
+            };
+            let turned = crate::world::wrap_angle(heading(a1, b1) - heading(a0, b0)).abs();
+            if turned > TURN_AT || a0 == b0 || a1 == b1 {
+                for t in &mut tops[i0..=i1] {
+                    *t = t.min(JUNCTION_SPEED);
+                }
+            }
+        }
     }
+    tops
 }
 
 /// How many ticks a car takes along the roads from the road nearest `from` to the road nearest
@@ -1199,13 +1243,19 @@ pub fn empty_drive_ticks(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Optio
         ROUTE_TOLERANCE,
     ));
     let junctions: Vec<[f32; 2]> = g.junctions().collect();
-    let mut legs = Legs::default();
-    for p in lane {
-        let (_, width, kind) = *path
-            .pts
+    let road_at = |p: [f32; 2]| {
+        path.pts
             .iter()
-            .min_by(|x, y| dist(x.0, p).total_cmp(&dist(y.0, p)))?;
-        let top = top_speed(p, kind, travel, &junctions);
+            .min_by(|x, y| dist(x.0, p).total_cmp(&dist(y.0, p)))
+            .map(|x| (x.1, x.2))
+    };
+    let tops = lane_tops(&lane, travel, &junctions, |i| {
+        road_at(lane[i]).map_or(crate::travel::RoadKind::Street, |r| r.1)
+    });
+    let mut legs = Legs::default();
+    for (i, &p) in lane.iter().enumerate() {
+        let (width, kind) = road_at(p)?;
+        let top = tops[i];
         legs.push_lane(
             p,
             top,
@@ -1569,7 +1619,7 @@ impl Route {
                 .min_by(|x, y| dist(x.0, p).total_cmp(&dist(y.0, p)))
                 .map_or((7.0, RoadKind::Street), |x| (x.1, x.2))
         };
-        let top = |p: [f32; 2]| top_speed(p, road_at(p).1, travel, &junctions);
+        let tops = lane_tops(&lane, travel, &junctions, |i| road_at(lane[i]).1);
         // A trip's parking bay off the road (`parking_bay`), turned into nose first and backed
         // out of as a driveway is, and which way along the road it goes there (from the lane's
         // nearer end); a spot on the road itself is pulled into and out of straight.
@@ -1647,7 +1697,7 @@ impl Route {
             let (width, kind) = road_at(p);
             legs.push_lane(
                 p,
-                top(p),
+                tops[i],
                 pull_room(width, kind, car.wid),
                 lane_on(width, kind),
             );
@@ -1835,7 +1885,7 @@ impl Route {
                 .min_by(|x, y| dist(x.0, q).total_cmp(&dist(y.0, q)))
                 .map_or((7.0, RoadKind::Street), |x| (x.1, x.2))
         };
-        let top = |q: [f32; 2]| top_speed(q, road_at(q).1, travel, &junctions);
+        let tops = lane_tops(&lane, travel, &junctions, |i| road_at(lane[i]).1);
         // Off the lane at the end: into its driveway, coming from the side the way comes in
         // from; or into its trip's parking bay.
         let into = if home {
@@ -1889,7 +1939,7 @@ impl Route {
             let (width, kind) = road_at(q);
             legs.push_lane(
                 q,
-                top(q),
+                tops[i],
                 pull_room(width, kind, car.wid),
                 lane_on(width, kind),
             );
@@ -8532,7 +8582,7 @@ mod tests {
             most < crate::traffic::SAMPLE + 0.5 && most < r,
             "{most} m between samples"
         );
-        assert!(SIGHT_STEP / crate::DRIVE_TICKS_PER_SECOND * JUNCTION_SPEED < r);
+        assert!(SIGHT_STEP / crate::DRIVE_TICKS_PER_SECOND * speed < r);
         let pass = vec![0.0; trace.len()];
         let claims = crate::traffic::claims(&trace, &pass, len, wid, &[(centre, r)], &[]);
         assert_eq!(claims.len(), 1, "the box's claim");

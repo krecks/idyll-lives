@@ -222,8 +222,8 @@ fn an_open_world_saved_by_0_7_0_plays_on() {
 }
 
 /// Two hamlets saved by the build before the traffic's own clock (eaeb02eb, version 36: cars timed
-/// in real seconds) with three cars on their way out of town load with each where it was, the same
-/// place along its way a quarter of the ticks on (`DRIVE_SCALE`), and drive on.
+/// in real seconds) with three cars on their way out of town load with each on its way near where
+/// it was, a quarter of the ticks on (`DRIVE_SCALE`; the town's speed went up since), and drive on.
 #[test]
 fn cars_on_their_way_in_a_v36_save_load_where_they_were() {
     let path =
@@ -248,8 +248,10 @@ fn cars_on_their_way_in_a_v36_save_load_where_they_were() {
             .clone()
             .pose_on(&w.exits, Some(&w.travel))
             .unwrap_or_else(|| panic!("car {i} is on its way"));
+        // (On the same way, near where it was: the same ticks along it, a quarter as many, but
+        // the town's speed and the cars' acceleration went up since, so a few metres on.)
         assert!(
-            (p[0] - at[0]).hypot(p[1] - at[1]) < 1e-3 && (y - yaw).abs() < 1e-4 && moving,
+            (p[0] - at[0]).hypot(p[1] - at[1]) < 5.0 && (y - yaw).abs() < 1e-4 && moving,
             "car {i} at {p:?} facing {y}, not {at:?} facing {yaw}"
         );
     }
