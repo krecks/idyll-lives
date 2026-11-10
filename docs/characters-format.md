@@ -254,11 +254,14 @@ hairline and chin as before.
 ## Tone (4 per vertex)
 
 x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = shade drawn by hand (the
-upper lids' crease, the teeth's sides, deep in the hair; the mouth plate is
+upper lids' crease, the nostrils: the nose's underside either side of its middle, the teeth's sides,
+deep in the hair; the mouth plate is
 1), and on the lips its opposite sign: negative, how much of the lip's colour they take (up to 0.9,
 less at the mouth's corners and towards the line between them, which the occlusion bakes: the
 shader tints the skin red-rose by it and takes the gloss off, `character.ts` `LIP_MIX`), z = hair
-clump bands (0..1: light in a lock's middle, dark in the parting between two) and on the
+clump bands (0..1: light in a lock's middle, dark in the parting between two), on the teeth their
+count from the middle one (a tooth's width a unit: the shader draws a dark line at every whole
+number, `character.ts` `TOOTH_GAP`) and on the
 body the face's age folds (0..1: a soft line from beside
 each nose wing down past the mouth's corner, `HeadFrame::fold`, each vertex's the mean over its
 triangles weighted by its barycentric weight, as the triangles can show it; the shader darkens the

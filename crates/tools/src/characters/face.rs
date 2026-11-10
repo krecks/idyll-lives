@@ -181,6 +181,9 @@ fn bow(s: f64) -> f64 {
     (-((s.abs() - 0.3) / 0.2).powi(2)).exp()
 }
 
+/// A tooth's width (m): what the lines between the teeth are spaced by (the shader's, tone.z).
+const TOOTH: f64 = 0.0075;
+
 fn teeth_s() -> Vec<f64> {
     linspace(-0.62, 0.62, 9)
 }
@@ -1120,6 +1123,8 @@ fn tone(name: &str, pos: &[V3], idx: &[usize], face: &Face) -> Vec<[f64; 4]> {
             let s = (pos[i].x - face.h.mouth[0]).abs() / face.hw;
             let c = clip(s / 0.62, 0.0, 1.0);
             t[i][1] = 0.05 + 0.5 * (c * c);
+            // (The teeth counted from the middle: the shader draws a line at every whole number.)
+            t[i][2] = (pos[i].x - face.h.mouth[0]) / TOOTH;
         }
     }
     t

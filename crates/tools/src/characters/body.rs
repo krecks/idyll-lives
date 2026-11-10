@@ -1579,6 +1579,12 @@ fn folds(pos: &[V3], idx: &[usize], head: &HeadFrame) -> Vec<f64> {
         .collect()
 }
 
+/// The nostrils' shade on the nose's underside (`body_fields_and_tone`): from where beside the nose's
+/// middle it begins, where it is full and where it ends (|x|, of hh), how far above the mouth and below
+/// the eyes the nose's underside is looked for (of hh), and how dark (tone.y).
+const NOSTRIL: (f64, f64, f64, f64) = (0.006, 0.026, 0.044, 0.03);
+const NOSTRIL_SHADE: f64 = 0.6;
+
 /// Clothes fields and tone of the (base stage) body or its LOD; the face's pieces after the skin.
 pub fn body_fields_and_tone(
     family: &str,
@@ -1613,6 +1619,24 @@ pub fn body_fields_and_tone(
             ]
         })
         .collect();
+    // The nostrils (y: the shader darkens the skin by it): the nose's underside, either side of its
+    // middle. Shade, not shape: the cage has one face there.
+    if !lod {
+        let (lo, hi) = (
+            head.mouth.y + NOSTRIL.3 * head.hh,
+            head.eyes[0].y - NOSTRIL.3 * head.hh,
+        );
+        for i in 0..k {
+            let (q, nr) = (pos[i], s.nor[i]);
+            if region[i][ri_head] < 0.5 || q.z < head.face_z || !(lo..hi).contains(&q.y) {
+                continue;
+            }
+            let x = q.x.abs() / head.hh;
+            let beside =
+                smoothstep(NOSTRIL.0, NOSTRIL.1, x) * (1.0 - smoothstep(NOSTRIL.1, NOSTRIL.2, x));
+            tone[i][1] = NOSTRIL_SHADE * beside * smoothstep(0.3, 0.7, -nr.y);
+        }
+    }
     if n > k {
         // The face's pieces (lids, lips) inside the body: head fields; the nearest skin's tone.
         let extra = &mesh.pos[k..];

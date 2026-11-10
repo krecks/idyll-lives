@@ -212,9 +212,9 @@ const NOSE: [(usize, f64, [f64; 3]); 10] = [
     (UNDER, 7.0, [0.0, 0.0, 0.08]),
     (TIP, 0.0, [0.0, 0.0, 1.6]),
     (TIP, 7.0, [0.08, -0.04, 0.4]),
-    (TIP, 14.0, [0.0, 0.0, 0.06]),
+    (TIP, 14.0, [0.05, -0.06, 0.14]),
     (BASE, 0.0, [0.0, 0.0, 0.2]),
-    (BASE, 7.0, [0.1, 0.0, 0.25]),
+    (BASE, 7.0, [0.16, 0.1, 0.02]),
 ];
 
 /// A face of its own (identity.rs `Identity`, each of its numbers -1..1): what one of them at 1 adds to the

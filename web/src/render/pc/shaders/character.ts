@@ -103,6 +103,8 @@ const SKIN_SPECULAR = '0.55';
 const SCLERA = '0.8, 0.775, 0.75';
 const LID_SHADE = '0.45';
 const EYE_ROUND = '0.3';
+/** The line between two teeth (the `mouth` kind, tone.z): its half-width, of a tooth's, and how dark it is. */
+const TOOTH_GAP = { half: '0.05', dark: '0.55' };
 /** The occlusion's darkening, at `gain` per unit of tone.w. */
 const ao = (gain: string): string => `(1.0 - ${AO_DARK} * clamp(${gain} * simT.w, 0.0, 1.0))`;
 /** The painted cuts' bands on the body (`simHem`): the top's edges and the bottom's. */
@@ -687,8 +689,14 @@ const PS_GLSL = {
 			return mix(mix(vec3(${SCLERA}), irisColour, iris), vec3(0.02), pupil) * simLid * simRound;
 		#elif defined(GAME_SIM_MOUTH)
 			// Inside the mouth: the tongue red (tone.x), shaded (tone.y); the mouth plate (tone.y = 1) dark red.
+			// The teeth (neither): a dark line between one and the next (tone.z counts them from the middle
+			// one), evened out where a tooth is too small on screen to show it.
 			float shade = clamp(simT.y, 0.0, 1.0);
-			vec3 c = mix(albedo, vec3(0.6, 0.17, 0.17), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.6 * shade);
+			float tooth = (1.0 - clamp(simT.x, 0.0, 1.0)) * (1.0 - smoothstep(0.6, 0.7, shade));
+			float tW = fwidth(simT.z);
+			float tGap = 1.0 - smoothstep(${TOOTH_GAP.half} - tW, ${TOOTH_GAP.half} + tW, abs(fract(simT.z + 0.5) - 0.5));
+			tGap = mix(tGap, 2.0 * ${TOOTH_GAP.half}, smoothstep(0.2, 0.45, tW));
+			vec3 c = mix(albedo, vec3(0.6, 0.17, 0.17), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.6 * shade) * (1.0 - ${TOOTH_GAP.dark} * tooth * tGap);
 			return mix(c, vec3(0.09, 0.018, 0.022), smoothstep(0.7, 1.0, shade));
 		#else
 			return albedo;
@@ -847,7 +855,11 @@ const PS_WGSL = {
 			return mix(mix(vec3f(${SCLERA}), irisColour, iris), vec3f(0.02), pupil) * simLid * simRound;
 		#elif defined(GAME_SIM_MOUTH)
 			let shade = clamp(simT.y, 0.0, 1.0);
-			let c = mix(albedo, vec3f(0.6, 0.17, 0.17), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.6 * shade);
+			let tooth = (1.0 - clamp(simT.x, 0.0, 1.0)) * (1.0 - smoothstep(0.6, 0.7, shade));
+			let tW = fwidth(simT.z);
+			var tGap = 1.0 - smoothstep(${TOOTH_GAP.half} - tW, ${TOOTH_GAP.half} + tW, abs(fract(simT.z + 0.5) - 0.5));
+			tGap = mix(tGap, 2.0 * ${TOOTH_GAP.half}, smoothstep(0.2, 0.45, tW));
+			let c = mix(albedo, vec3f(0.6, 0.17, 0.17), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.6 * shade) * (1.0 - ${TOOTH_GAP.dark} * tooth * tGap);
 			return mix(c, vec3f(0.09, 0.018, 0.022), smoothstep(0.7, 1.0, shade));
 		#else
 			return albedo;
