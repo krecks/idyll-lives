@@ -14,7 +14,7 @@
  * - `res=1` the full resolution (or 0.5–1); `res=auto` (default) what the game picks.
  * - `secs=20` measured after `warmup=5`; `cap=0` frames per second at most (0: every frame shown).
  * - `hud=0` hides the interface; `gpu=0` doesn't time the GPU; `label=…` is kept with the result.
- * - `diag=noshadows,noaa,nonature,nolamps,nomirrors,noglass,nonight,freeze`: features
+ * - `diag=noshadows,noaa,nonature,nolamps,nomirrors,noglass,nonight,noao,freeze`: features
  *   left out (to measure what each costs; `nowoods`, `nofarwoods`, `noflowers` and `nograss` leave out
  *   one part of the nature); `freeze` stops time for screenshots (`at=<s>` along the path);
  *   `shaders` logs every shader and pipeline made (the warm-up should leave none for play).

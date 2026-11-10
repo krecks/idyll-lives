@@ -14,10 +14,12 @@
  *   and encoded for the screen by then, so a byte a channel holds it as the canvas will; only what
  *   the contrast pushed past white is clamped a pass sooner). Half the bytes of two half-float
  *   targets, read and written every frame.
+ * - Contact shading on Medium and High (`QualitySettings.contactShading`, `CONTACT`): the scene's depth
+ *   drawn once before the scene, an occlusion pass at half size from it, read by the lit shaders.
  * - `?diag=albedo|normals` and `?diag=linear` leave the image processing and the grade out (the
  *   colour itself, encoded for the screen); without them only Low's FXAA is left, so Medium and High
  *   draw straight onto the canvas there. `?diag=noaa`: no multisampling, no FXAA; `?diag=nonight`:
- *   no grade.
+ *   no grade; `?diag=noao`: no contact shading.
  *
  * The drawing size is the canvas's (`shared/resolution.ts`, `applyResolution`), all passes at full
  * size. Live changes (the exposure each lighting step, the night's amount, the look) are uniform
@@ -47,7 +49,16 @@ export interface PostOptions {
   night: boolean;
   /** Low's lean targets: the scene in 11/11/10-bit float where it can be, the FXAA's input in 8 bits (`QualitySettings.leanTargets`). */
   lean?: boolean;
+  /** Contact shading (`QualitySettings.contactShading`; `CONTACT`). */
+  contact?: boolean;
 }
+
+/**
+ * Contact shading: PlayCanvas's screen-space ambient occlusion, applied in the lighting (the lit shaders
+ * read it; `shaders/softLook.ts` gives it to the sky's fill and a share of the lights). `radius` (m): how
+ * far a thing shades what is beside it; `scale`: its size, of the picture's.
+ */
+const CONTACT = { radius: 0.8, intensity: 3, power: 2, samples: 16, minAngle: 25, scale: 0.5 };
 
 /** What the image processing does (`shared/imageProcessing.ts`, ACES always). */
 export interface PostLook {
@@ -57,8 +68,79 @@ export interface PostLook {
   curves: ColorCurveSettings;
 }
 
+/** Whether the scene's depth is being drawn for the contact shading (`withoutContact`'s materials are left out of it). */
+const depthPass = { drawing: false };
+
+let contactPassesDone = false;
+
+/**
+ * PlayCanvas's passes as the contact shading needs them (once per page; the frame makes its passes again
+ * whenever its options change, so their classes are changed, not one frame's):
+ * - the depth pass (`RenderPassPrepass`) says while it draws, so `withoutContact`'s materials stay out of it;
+ * - the occlusion's picture (`RenderPassSsao`'s targets) is read between its texels: it is half the scene's
+ *   size, and its nearest texel showed as blocks on a plain wall.
+ */
+function contactPasses(): void {
+  if (contactPassesDone) return;
+  contactPassesDone = true;
+  // SAFETY: PlayCanvas 2.23's `RenderPassPrepass.execute` draws the depth; `RenderPassSsao.createRenderTarget`
+  // makes its two targets (the occlusion and the blur's). `check:chunks` checks both are there.
+  const depth = pc.RenderPassPrepass.prototype as unknown as { execute(): void };
+  const execute = depth.execute;
+  depth.execute = function (this: unknown) {
+    depthPass.drawing = true;
+    try {
+      execute.call(this);
+    } finally {
+      depthPass.drawing = false;
+    }
+  };
+  const occlusion = pc.RenderPassSsao.prototype as unknown as { createRenderTarget(name: string): pc.RenderTarget };
+  const create = occlusion.createRenderTarget;
+  occlusion.createRenderTarget = function (this: unknown, name: string) {
+    const target = create.call(this, name);
+    target.colorBuffer.minFilter = pc.FILTER_LINEAR;
+    target.colorBuffer.magFilter = pc.FILTER_LINEAR;
+    return target;
+  };
+}
+
+/**
+ * `material` left out of the contact shading, where things would only shade themselves as noise or far too
+ * small to see (the lawn's blades and the ground under them, the plants): its shaders are built as for a
+ * camera without it, and it isn't drawn into the scene's depth the shading is made from (about half that
+ * pass's triangles in the village are plants).
+ */
+export function withoutContact(material: pc.StandardMaterial): void {
+  // SAFETY: PlayCanvas 2.23's options builder sets `litOptions.ssao` from the camera and `useAo` from the
+  // material's own occlusion or that; `onUpdateShader` runs after it, before the shader's key is made.
+  type Options = { aoMap?: unknown; aoVertexColor?: unknown; litOptions: { ssao: boolean; useAo: boolean } };
+  const m = material as unknown as { onUpdateShader?: (options: Options) => Options };
+  const own = m.onUpdateShader;
+  m.onUpdateShader = (options) => {
+    const o = own ? own(options) : options;
+    o.litOptions.ssao = false;
+    o.litOptions.useAo = Boolean(o.aoMap || o.aoVertexColor);
+    return o;
+  };
+  // SAFETY: PlayCanvas 2.23's depth pass (`RenderPassPrepass.execute`, `contactPasses`) draws the meshes whose
+  // material writes depth (`material.depthWrite`, an accessor on `Material`): while it draws, this one says it doesn't.
+  const write = Object.getOwnPropertyDescriptor(pc.Material.prototype, 'depthWrite');
+  if (!write?.get || !write.set) return;
+  const { get, set } = write;
+  Object.defineProperty(material, 'depthWrite', {
+    configurable: true,
+    get(this: pc.Material): boolean {
+      return !depthPass.drawing && (get.call(this) as boolean);
+    },
+    set(this: pc.Material, value: boolean) {
+      set.call(this, value);
+    },
+  });
+}
+
 /** The game's options for `quality` and the bench's `?diag=` flags (`lean`: `QualitySettings.leanTargets`). */
-export function gamePostOptions(samples: number, diag: ReadonlySet<string>, colourItself: boolean, lean = false): PostOptions {
+export function gamePostOptions(samples: number, diag: ReadonlySet<string>, colourItself: boolean, lean = false, contact = false): PostOptions {
   const aa = !diag.has('noaa');
   const imageProcessing = !colourItself && !diag.has('linear');
   return {
@@ -68,6 +150,7 @@ export function gamePostOptions(samples: number, diag: ReadonlySet<string>, colo
     imageProcessing,
     night: imageProcessing && !diag.has('nonight'),
     lean,
+    contact: contact && imageProcessing && !diag.has('noao'),
   };
 }
 
@@ -237,6 +320,12 @@ export class PostProcessing {
     frame.rendering.samples = Math.max(1, this.options.samples);
     frame.rendering.toneMapping = pc.TONEMAP_NONE;
     frame.rendering.sharpness = 0;
+    if (this.options.contact) {
+      contactPasses();
+      frame.ssao.type = pc.SSAOTYPE_LIGHTING;
+      frame.ssao.blurEnabled = true;
+      Object.assign(frame.ssao, CONTACT);
+    }
     frame.update();
     return frame;
   }

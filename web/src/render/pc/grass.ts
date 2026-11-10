@@ -12,6 +12,7 @@
  */
 
 import * as pc from './engine';
+import { withoutContact } from './post';
 import { Instances, type InstanceStream } from './instancing';
 import { GAME_FRONT_FACE, MaterialLibrary } from './materials';
 import { registerShaderFeature } from './shaders/chunks';
@@ -64,6 +65,8 @@ export function grassGround(device: pc.GraphicsDevice, material: pc.StandardMate
     noGrass.set(device, (none = { colour: blank('noGrass', pc.PIXELFORMAT_RGBA8, 4), town: blank('noTownGrass', pc.PIXELFORMAT_R8, 1) }));
   }
   material.setDefine('GAME_GRASS_GROUND', '');
+  // No contact shading under the blades (`post.ts`): they would shade the ground in blotches.
+  withoutContact(material);
   material.setParameter('game_grassGust', gustTexture(device));
   material.setParameter('game_grassColour', none.colour);
   material.setParameter('game_grassTown', none.town);
@@ -184,6 +187,8 @@ export class Grass {
     mat.setAttribute('game_grassSlope', GRASS_SLOPE.semantic);
     MaterialLibrary.for(app).adopt(mat);
     mat.setDefine('GAME_GRASS', '');
+    // No contact shading on the blades (`post.ts`): among themselves they would shade as noise.
+    withoutContact(mat);
     mat.setParameter('game_grassArea', this.area);
     mat.setParameter('game_grassEye', this.eye);
     mat.setParameter('game_grassDensity', quality.density);

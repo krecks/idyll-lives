@@ -21,6 +21,7 @@
  */
 
 import * as pc from './engine';
+import { withoutContact } from './post';
 import { Grass, grassGround, type GrassPusher } from './grass';
 import { disposeTiles, type GroundTile } from './groundTiles';
 import { Instances } from './instancing';
@@ -764,6 +765,8 @@ export function installNature(app: pc.AppBase): void {
     if (!kind) return;
     material.setDefine('GAME_WIND', '');
     if (key !== 'material.finish.bark') material.setDefine('GAME_WIND_TINT', '');
+    // No contact shading among leaves and twigs, and none of them in the depth it is made from (`post.ts`).
+    withoutContact(material);
     material.setParameter('game_windKind', new Float32Array(kind));
     material.setParameter('game_windFlutter', 1);
   });

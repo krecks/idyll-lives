@@ -185,6 +185,14 @@ const NEEDED: { file: string; text: string; who: string }[] = [
   { file: 'platform/graphics/vertex-format.js', text: 'this.renderingHash = stringIds.get(this.renderingHashString);', who: 'shaderKeys.ts: the vertex format\'s hash set in _evaluateHash (wrapped)' },
   { file: 'platform/graphics/webgpu/webgpu-vertex-buffer-layout.js', text: 'offset: interleaved ? element.offset : 0,', who: 'shaderKeys.ts: a non-interleaved format\'s pipeline layout doesn\'t depend on its offsets' },
   { file: 'platform/graphics/webgpu/webgpu-render-pipeline.js', text: 'lookupHashes[5] = vertexFormat0?.renderingHash ?? 0;', who: 'shaderKeys.ts: WebGPU\'s pipelines cached by the vertex format\'s hash' },
+  // render/pc/post.ts: contact shading (PlayCanvas's occlusion in the lighting, its depth pass without the plants).
+  { file: 'extras/render-passes/render-pass-prepass.js', text: 'if (meshInstance.material?.depthWrite) {', who: 'post.ts withoutContact: the depth pass draws the meshes whose material writes depth' },
+  { file: 'extras/render-passes/frame-pass-camera-frame.js', text: 'this.prePass = new RenderPassPrepass(', who: 'post.ts contactPasses: the frame\'s depth pass is a RenderPassPrepass (its execute is wrapped)' },
+  { file: 'extras/render-passes/render-pass-ssao.js', text: 'createRenderTarget(name) {', who: 'post.ts contactPasses: the occlusion pass makes its targets in createRenderTarget (wrapped: read between texels)' },
+  { file: 'scene/materials/standard-material-options-builder.js', text: 'options.litOptions.ssao = cameraShaderParams?.ssaoEnabled;', who: 'post.ts withoutContact: the camera\'s occlusion goes into a material\'s options here, before onUpdateShader' },
+  { file: 'scene/materials/standard-material-options-builder.js', text: 'options.litOptions.useAo = options.aoMap || options.aoVertexColor || options.litOptions.ssao;', who: 'post.ts withoutContact: useAo is the material\'s own occlusion or the camera\'s' },
+  { file: 'scene/shader-lib/glsl/chunks/lit/frag/pass-forward/litForwardDeclaration.js', text: 'uniform sampler2D ssaoTexture;', who: 'chunks.ts backend patch: the occlusion\'s texture under LIT_SSAO (GLSL)' },
+  { file: 'scene/shader-lib/wgsl/chunks/lit/frag/pass-forward/litForwardDeclaration.js', text: 'uniform ssaoTextureSizeInv: vec2f;', who: 'chunks.ts backend patch: the occlusion\'s texture size under LIT_SSAO (WGSL)' },
 ];
 
 let failed = 0;

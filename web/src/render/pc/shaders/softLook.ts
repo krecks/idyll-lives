@@ -51,6 +51,14 @@ export const BASE = {
 	#endif`,
 };
 
+/**
+ * Contact shading (`post.ts` `CONTACT`, the lit shaders' `LIT_SSAO`): the sky's light is shaded by it in
+ * full (PlayCanvas's ambient by the engine, the hemispheric fill in `chunks.ts`'s patch), the lamps' and
+ * the sun's by this share of it: a lamp casts no shadow here, so without it a lamplit room has none
+ * where a thing stands on the floor or against the wall.
+ */
+export const CONTACT_DIRECT = '0.5';
+
 export const SOFT_LOOK: ShaderFeature = {
   name: 'softLook',
   priority: 300,
@@ -61,6 +69,8 @@ export const SOFT_LOOK: ShaderFeature = {
 	uniform vec3 game_hemiGround;
 	uniform vec3 game_hemiDir;
 	vec3 gameAmbient = vec3(0.0);
+	// Contact shading's share of the light left where things meet (1: none; \`chunks.ts\`'s patch reads it).
+	float gameContact = 1.0;
 	// The soft look's saturation (a surface may set its own before the light is combined: the residents' skin).
 	float gameSaturation = 1.15;
 	vec3 gameHemi(vec3 n) {
@@ -77,9 +87,12 @@ export const SOFT_LOOK: ShaderFeature = {
 	${RESIDENT_LIGHT.glsl}
 	// The AO map occludes the light falling on a surface as well as the sky's (an ARM map's red,
 	// with no ambient texture), as the look was tuned; PlayCanvas occludes only the sky's.
+	// (With contact shading the engine has put it into \`litArgs_ao\`: the map's share alone here, the
+	// contact's after it, on every surface alike.)
 	#ifdef STD_AO
-		dDiffuseLight *= litArgs_ao;
+		dDiffuseLight *= litArgs_ao / max(gameContact, 0.001);
 	#endif
+	dDiffuseLight *= mix(1.0, gameContact, ${CONTACT_DIRECT});
 	// The lights' highlights at the look's strength: PlayCanvas's light is the look's / π (its Lambert
 	// has no 1 / π, \`lightUnits.ts\` \`SUN_UNITS\`), but its GGX keeps the 1 / π (\`SPECULAR_UNITS\`).
 	#ifdef LIT_SPECULAR
@@ -128,6 +141,7 @@ export const SOFT_LOOK: ShaderFeature = {
 	uniform game_hemiGround: vec3f;
 	uniform game_hemiDir: vec3f;
 	var<private> gameAmbient: vec3f = vec3f(0.0);
+	var<private> gameContact: f32 = 1.0;
 	var<private> gameSaturation: f32 = 1.15;
 	fn gameHemi(n: vec3f) -> vec3f {
 		var c = mix(uniform.game_hemiGround, uniform.game_hemiSky, dot(n, uniform.game_hemiDir) * 0.5 + 0.5);
@@ -143,8 +157,9 @@ export const SOFT_LOOK: ShaderFeature = {
 	${RESIDENT_LIGHT.wgsl}
 	// See the GLSL: the AO map occludes the direct light too.
 	#ifdef STD_AO
-		dDiffuseLight = dDiffuseLight * litArgs_ao;
+		dDiffuseLight = dDiffuseLight * (litArgs_ao / max(gameContact, 0.001));
 	#endif
+	dDiffuseLight = dDiffuseLight * mix(1.0, gameContact, ${CONTACT_DIRECT});
 	// The lights' highlights at the look's strength (see the GLSL).
 	#ifdef LIT_SPECULAR
 		dSpecularLight = dSpecularLight * ${SPECULAR_UNITS};

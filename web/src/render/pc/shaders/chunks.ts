@@ -51,7 +51,7 @@ import { DIAG_VIEW } from './diagView';
 import { gameNormalMap } from './bump';
 import { gameFresnel, gameReflection } from './envBrdf';
 import { gameFog } from './fog';
-import { SOFT_LOOK } from './softLook';
+import { CONTACT_DIRECT, SOFT_LOOK } from './softLook';
 import { ROOM_LIGHT_CODE, ROOM_LIGHTS } from './roomLights';
 import { PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
 import { UNDERGROUND } from './underground';
@@ -359,11 +359,17 @@ const UV0_WGSL = `
 const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
   glsl: {
     // The ambient PlayCanvas added (the sky's harmonics, occluded) is kept apart, and the sky's
-    // hemispheric fill comes in as direct light, as a hemispheric light's does.
+    // hemispheric fill comes in as direct light, as a hemispheric light's does. With contact shading
+    // (`LIT_SSAO`, `post.ts`) the fill is shaded by it in full (`softLook.ts` `combine` shades all the
+    // direct light by `CONTACT_DIRECT` of it: the fill here by the rest).
     backend: `
 	#if defined(GAME_LOOK) && defined(LIT_NEEDS_NORMAL)
 		gameAmbient = dDiffuseLight;
 		dDiffuseLight = gameHemi(litArgs_worldNormal);
+		#ifdef LIT_SSAO
+			gameContact = texture2DLod(ssaoTexture, gl_FragCoord.xy * ssaoTextureSizeInv, 0.0).r;
+			dDiffuseLight *= gameContact / mix(1.0, gameContact, ${CONTACT_DIRECT});
+		#endif
 	#endif
 `,
     sun: `
@@ -378,6 +384,10 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 	#if defined(GAME_LOOK) && defined(LIT_NEEDS_NORMAL)
 		gameAmbient = dDiffuseLight;
 		dDiffuseLight = gameHemi(litArgs_worldNormal);
+		#ifdef LIT_SSAO
+			gameContact = textureSampleLevel(ssaoTexture, ssaoTextureSampler, pcPosition.xy * uniform.ssaoTextureSizeInv, 0.0).r;
+			dDiffuseLight = dDiffuseLight * (gameContact / mix(1.0, gameContact, ${CONTACT_DIRECT}));
+		#endif
 	#endif
 `,
     sun: `
