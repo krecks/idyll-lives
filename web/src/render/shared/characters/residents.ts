@@ -133,8 +133,9 @@ function stationSide(rig: SimRig, station: PlacedObject): number {
 const FAR_EVERY = [2, 4] as const;
 const FAR_LAG = 0.25;
 /**
- * How long after coming into the sim's full-detail area (`setDetailArea`) a resident is first drawn (real ms): the
- * camera's new area reaches the sim's worker, and its next tick catches them up on the ticks they owe, a few frames.
+ * How long a resident the sim is catching up is hidden (real ms, `setDetailArea`): come into its full-detail area
+ * (the camera's new area reaches the sim's worker, and its next tick catches them up on the ticks they owe, a few
+ * frames), or seen to jump further than they could have gone (a catch-up out of it, or after a pause).
  */
 export const REVEAL_MS = 250;
 
@@ -342,7 +343,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    * it they take a turn now and then and catch up in one go (sim-core `lod.rs`): a rider would stand, then jump tens of metres.
    */
   private detail: ((x: number, z: number) => boolean) | null = null;
-  /** Per row, when one just come into the full-detail area may be drawn (`REVEAL_MS`; NaN: not waiting). */
+  /** Per row, whether they were in the full-detail area last frame. */
+  private readonly inArea = new Uint8Array(MAX_CHARACTERS);
+  /** Per row, till when one being caught up is hidden (`REVEAL_MS`; NaN: not hidden). */
   private readonly revealAt = new Float64Array(MAX_CHARACTERS).fill(NaN);
   /**
    * Per row, the thing they ride (a bike, an e-scooter: the snapshot's `ride`, `vehicles.ts`) as drawn: its stable id
@@ -1767,7 +1770,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         // (Riding: its `speed` times walking, on the traffic's clock, `driveScale` times that a step.)
         const speed = Math.max(1, mount?.ride?.speed ?? 1);
         const far = mount?.ride ? Math.max(SNAP_DISTANCE * speed, stride * speed * layout.driveScale) : reach;
-        if (Math.hypot(cx - prev[o + k.x], cz - pz) < far) {
+        const step = Math.hypot(cx - prev[o + k.x], cz - pz);
+        // (Further than they could have gone: caught up, hidden a moment and drawn where they are, not jumping.)
+        if (step >= far && this.detail && this.visible[i]) this.revealAt[i] = now + REVEAL_MS;
+        if (step < far) {
           tx = prev[o + k.x] + (cx - prev[o + k.x]) * alpha;
           tz = pz + (cz - pz) * alpha;
           if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;
@@ -1783,7 +1789,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
           else [from[g], from[g + 1], from[g + 2], from[g + 3]] = [to[g], to[g + 1], to[g + 2], to[g + 3]];
           if (Math.abs(cx - from[g]) + Math.abs(cz - from[g + 1]) < SNAP_DISTANCE) {
             this.glideK[i] = Math.min(1, (alpha * frame.steps) / layout.ticksPerSecond / GLIDE_SECONDS);
-          } else this.glideK[i] = 1;
+          } else {
+            this.glideK[i] = 1;
+            // (Moved far at once: caught up, as a walker who jumped above.)
+            if (this.detail && this.visible[i] && Number.isFinite(to[g])) this.revealAt[i] = now + REVEAL_MS;
+          }
         }
         const at = this.glideK[i];
         if (at < 1) [tx, tz, th, tyaw] = [lerp(from[g], cx, at), lerp(from[g + 1], cz, at), lerp(from[g + 2], ch, at), lerpAngle(from[g + 3], tyaw, at)];
@@ -1797,12 +1807,21 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.spots[i * 2] = away ? NaN : tx;
       this.spots[i * 2 + 1] = tz;
       this.storeys[i] = th;
-      let show = !!rig && !away && inView(tx, tz) && storeyShown(Math.floor(th + 0.01), storey) && (!this.detail || this.detail(tx, tz));
-      // (Just come into the full-detail area: a moment later, once the sim has caught them up.)
-      if (!show) this.revealAt[i] = NaN;
-      else if (this.detail && !this.visible[i]) {
-        if (Number.isNaN(this.revealAt[i])) this.revealAt[i] = now + REVEAL_MS;
-        show = now >= this.revealAt[i];
+      // Come into the full-detail area (as it's first set too: out of it till then): the sim catches them up in a few
+      // frames, hidden meanwhile (not where they were, then jumping); drawn as ever out of it.
+      if (this.detail) {
+        const inside = this.detail(cx, cz) ? 1 : 0;
+        if (inside && !this.inArea[i]) this.revealAt[i] = now + REVEAL_MS;
+        this.inArea[i] = inside;
+      }
+      // (Hidden till now: shown again as they are, not held again for being out of the area.)
+      const released = now >= this.revealAt[i];
+      if (released) this.revealAt[i] = NaN;
+      let show = !!rig && !away && inView(tx, tz) && storeyShown(Math.floor(th + 0.01), storey) && !(now < this.revealAt[i]);
+      // (Come into view out of it: the camera jumped there, the area follows it this frame and catches them up after.)
+      if (show && this.detail && !this.visible[i] && !this.inArea[i] && !released) {
+        this.revealAt[i] = now + REVEAL_MS;
+        show = false;
       }
       if (!rig || !show) {
         if (this.visible[i]) {
@@ -3224,9 +3243,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   /**
    * Where the sim moves residents every tick (a big world's chunks streamed in, as sent it: sim-core `lod::full_detail`),
-   * or null (everywhere). Only those in it are drawn, and one come into it only `REVEAL_MS` later: the sim catches a
-   * resident up on the ticks they owe there in one go (a rider out of it for three game minutes jumped 92 m), so they
-   * appear where they are rather than where they were.
+   * or null (everywhere). Out of it the sim moves a resident only now and then and catches them up in one go when it
+   * reaches them (a rider out of it for three game minutes jumped 92 m in a frame as the camera came to them). Everyone
+   * is drawn as ever, but one come into it, come into view out of it (the camera jumped to them: the area follows it
+   * after the residents are drawn), or seen to go further in a step than they could (a catch-up out of it, or after a
+   * pause: paused, the sim catches nobody up) is hidden for `REVEAL_MS` and then drawn where they are: no jump, no slide.
    */
   setDetailArea(test: ((x: number, z: number) => boolean) | null): void {
     this.detail = test;

@@ -187,8 +187,8 @@ const NOON_SKY_LUMA = skyLuma(lightingAt(13 * 60, LOOK, createLighting()));
 
 /** Residents this far (m) outside the viewed lot are still drawn (walking up to it). */
 const SIM_VIEW_MARGIN = 2;
-/** Residents are drawn this far out past the sim's full-detail area (`reportWatch`; m: the sim keeps 5 m round it in full). */
-const DETAIL_MARGIN = 4;
+/** How far round the watch rectangle the sim keeps residents in full detail (m: sim-core `lod::VIEW_MARGIN`; `reportWatch`). */
+const DETAIL_MARGIN = 5;
 /** Residents further than this (m) from the camera's target, off the viewed lot, have no contact shadow. */
 const FAR_SHADOW = 40;
 /** `?residents=lot`: residents drawn only on the viewed lot, as before life on every lot. */
@@ -1110,7 +1110,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /**
    * The sim's full-detail area: the chunks streamed in, as a tile rectangle on the ground (`onWatch`); the residents
-   * drawn only in it (`Residents.setDetailArea`).
+   * told it (`Residents.setDetailArea`: one it reaches is caught up by the sim, hidden a moment meanwhile).
    */
   private reportWatch(): void {
     const world = this.builtWorld;
@@ -1126,8 +1126,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const d = groundDepth(world);
     const rect: [number, number, number, number] = [Math.max(0, x0), Math.max(0, z0), Math.min(world.width, x1), Math.min(d, z1)];
     this.watchListener(rect);
-    // Residents are drawn only where the sim now moves them every tick (out of it they catch up in jumps), a
-    // little in from its edge (the sim's own margin is `lod::VIEW_MARGIN`, 5 m out).
+    // (Out of it the sim moves residents only now and then: one it reaches catches up in a jump, hidden meanwhile.)
     const [a, b, c, e] = [rect[0] - DETAIL_MARGIN, rect[1] - DETAIL_MARGIN, rect[2] + DETAIL_MARGIN, rect[3] + DETAIL_MARGIN];
     this.characters.setDetailArea((x, z) => x >= a && z >= b && x <= c && z <= e);
   }

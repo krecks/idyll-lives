@@ -1,8 +1,8 @@
-// A rider coming into the sim's full-detail area (`Residents.setDetailArea`: a big world's chunks streamed in round
-// the camera; sim-core `lod.rs`): out of it the sim moves a resident only now and then and catches them up in one go
-// when it reaches them (a bike's rider out of it three game minutes jumped 92 m in one frame, the camera on them). They
-// aren't drawn out of it, and come into view only `REVEAL_MS` after it reaches them, where they are, riding on
-// smoothly from there. `bun test`.
+// A rider the sim catches up (`Residents.setDetailArea`: a big world's chunks streamed in round the camera; sim-core
+// `lod.rs`): out of that area the sim moves a resident only now and then and catches them up in one go when it reaches
+// them (a bike's rider out of it three game minutes jumped 92 m in one frame, the camera on them). They're drawn out of
+// it as ever; as it reaches them, or as they're seen to go further in a step than they could (a catch-up out of it,
+// after a pause), they're hidden for `REVEAL_MS` and then drawn where they are, riding on smoothly. `bun test`.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { TICK_RATES, TICKS_PER_SECOND } from './snapshotLayout';
@@ -106,27 +106,24 @@ describe('a rider coming into the full-detail area', async () => {
   const k = layout.sim as Record<(typeof FIELDS)[number], number>;
 
   /**
-   * The script: riding along +x at `SPEED` m/s from `START` the whole time. Out of the sim's full-detail area (as a
-   * big world's chunks out of the camera's stream) they take a turn now and then (sim-core `lod.rs`): the snapshot
-   * keeps them where they were (`STALE`) until the area comes to them (`ARRIVE`: the camera there) and the sim's next
-   * tick catches them up on what they owe in one go (`CATCH`), 90 m on, then on along at full detail.
+   * The script: riding along +x at `SPEED` m/s. Out of the sim's full-detail area (as a big world's chunks out of the
+   * camera's stream) they take a turn now and then (sim-core `lod.rs`): the snapshot keeps them where they were
+   * (`STALE`) until the sim's tick catches them up on what they owe in one go (`CATCH` s of game time in: 90 m on),
+   * then on along at full detail. Game time `g` stands still while paused.
    */
   const TICKS = TICKS_PER_SECOND;
   const SPEED = 18;
-  const START = 40;
-  const ARRIVE = 1;
+  const STALE = 40;
   const CATCH = 1.08;
   const END = 2.5;
-  const STALE = START;
-  const truth = (t: number) => START + 90 + SPEED * (t - CATCH);
+  const truth = (g: number) => STALE + 90 + SPEED * (g - CATCH);
 
-  function write(snap: Float32Array, n: number): void {
-    const t = n / TICKS;
+  function write(snap: Float32Array, g: number, paused: boolean): void {
     const o = layout.headerLen;
-    snap[layout.header.speed] = 1;
+    snap[layout.header.speed] = paused ? 0 : 1;
     snap[layout.header.simCount] = 1;
     snap[o + k.id] = 0;
-    snap[o + k.x] = t < CATCH ? STALE : truth(t);
+    snap[o + k.x] = g < CATCH ? STALE : truth(g);
     snap[o + k.z] = 20.5;
     snap[o + k.yaw] = Math.PI / 2;
     snap[o + k.pose] = Pose.Stand;
@@ -140,8 +137,12 @@ describe('a rider coming into the full-detail area', async () => {
     snap[o + k.ride] = ID;
   }
 
-  /** Every frame at 60 a second (`detail`: the area set at `ARRIVE`, none before; null: no area at all): where the rider is drawn, and when (NaN: not drawn). */
-  async function run(detail: boolean): Promise<{ t: number; x: number }[]> {
+  /**
+   * Every frame at 60 a second for `END` s (or `end`): where the rider is drawn (NaN: not drawn). `area(t)`: whether
+   * the full-detail area reaches them at time `t` (null: no area at all, as before); `resume`: paused till then;
+   * `seen(t)`: whether they're in view.
+   */
+  async function run(area: ((t: number) => boolean) | null, resume = 0, end = END, seen: (t: number) => boolean = () => true): Promise<{ t: number; x: number; g: number }[]> {
     const realNow = performance.now;
     let now = 0;
     performance.now = () => now;
@@ -156,27 +157,34 @@ describe('a rider coming into the full-detail area', async () => {
       const frame: FrameState = { prev, curr, alpha: 0, steps: 1, layout, now: 0 };
       const shadows = new Float32Array(MAX_CHARACTERS * 16);
       let tick = 0;
-      write(prev, 0);
-      write(curr, 0);
-      // The camera's stream far off at first (the area doesn't reach them), there from `ARRIVE`.
-      if (detail) characters.setDetailArea(() => false);
-      const out: { t: number; x: number }[] = [];
+      write(prev, 0, resume > 0);
+      write(curr, 0, resume > 0);
+      const out: { t: number; x: number; g: number }[] = [];
       const FPS = 60;
-      for (let n = 0; n < END * FPS; n++) {
+      let inside: boolean | null = null;
+      for (let n = 0; n < end * FPS; n++) {
         const t = n / FPS;
-        const due = Math.floor(t * TICKS);
+        const paused = t < resume;
+        const g = Math.max(0, t - resume);
+        const due = Math.floor(g * TICKS);
         while (tick < due) {
           tick++;
           prev.set(curr);
-          write(curr, tick);
+          write(curr, tick / TICKS, false);
         }
-        if (detail && n === ARRIVE * FPS) characters.setDetailArea(() => true);
-        frame.alpha = Math.min(1, t * TICKS - tick);
+        if (paused) write(curr, g, true);
+        // (The camera's stream: its area as it is now, set again as it changes.)
+        if (area && area(t) !== inside) {
+          inside = area(t);
+          const now = inside;
+          characters.setDetailArea(() => now);
+        }
+        frame.alpha = paused ? 1 : Math.min(1, g * TICKS - tick);
         now = t * 1000;
         frame.now = now;
         await new Promise((resolve) => setTimeout(resolve, 0));
-        characters.update(frame, () => true, shadows);
-        out.push({ t, x: visible[0] ? rig.x : NaN });
+        characters.update(frame, () => seen(t), shadows);
+        out.push({ t, x: visible[0] ? rig.x : NaN, g });
       }
       return out;
     } finally {
@@ -184,27 +192,69 @@ describe('a rider coming into the full-detail area', async () => {
     }
   }
 
-  test('appears where they are, a moment after the area comes to them, and rides on smoothly', async () => {
-    const frames = await run(true);
-    const drawn = frames.filter((f) => !Number.isNaN(f.x));
-    // Not drawn out of the area, nor in it before `REVEAL_MS` (the sim's catching up meanwhile).
-    expect(drawn.length).toBeGreaterThan(0);
-    expect(drawn[0].t).toBeGreaterThanOrEqual(ARRIVE + REVEAL_MS / 1000 - 1e-9);
-    expect(drawn[0].t).toBeLessThan(ARRIVE + REVEAL_MS / 1000 + 0.05);
-    // Never where the snapshot had them before (`STALE`): first drawn where they are, within a step.
-    expect(drawn.every((f) => f.x > STALE + 80)).toBe(true);
-    expect(Math.abs(drawn[0].x - truth(drawn[0].t))).toBeLessThan(SPEED / TICKS + 0.05);
-    // Then along smoothly: no frame further than riding goes in one (with a tick's slack), no slide.
+  /** The longest step between frames drawn one after the other. */
+  const worstStep = (frames: { x: number }[]) => {
     let worst = 0;
-    for (let i = 1; i < drawn.length; i++) worst = Math.max(worst, Math.abs(drawn[i].x - drawn[i - 1].x));
-    expect(worst).toBeLessThan((SPEED * 2) / 60);
+    for (let i = 1; i < frames.length; i++) if (!Number.isNaN(frames[i].x) && !Number.isNaN(frames[i - 1].x)) worst = Math.max(worst, Math.abs(frames[i].x - frames[i - 1].x));
+    return worst;
+  };
+  const R = REVEAL_MS / 1000;
+  /** Drawn where the snapshot has them (within a step of riding), never between there and somewhere else. */
+  const inPlace = (f: { x: number; g: number }) => Math.abs(f.x - (f.g < CATCH ? STALE : truth(f.g))) < SPEED / TICKS + 0.05 || Math.abs(f.x - STALE) < 0.05;
+
+  test('drawn where they were out of the area; hidden as it reaches them, then drawn where they are, riding on smoothly', async () => {
+    const ARRIVE = 1;
+    const frames = await run((t) => t >= ARRIVE);
+    // Out of it, as ever: drawn (where the sim has them), once they've been in view a moment (come into view out of
+    // it, a resident may be about to be caught up).
+    expect(frames.filter((f) => f.t < R - 1e-9).every((f) => Number.isNaN(f.x))).toBe(true);
+    expect(frames.filter((f) => f.t >= R + 1e-9 && f.t < ARRIVE).every((f) => Math.abs(f.x - STALE) < 0.05)).toBe(true);
+    // Not drawn from the moment it reaches them (the sim's catching up meanwhile) for `REVEAL_MS`.
+    expect(frames.filter((f) => f.t >= ARRIVE && f.t < ARRIVE + R - 1e-9).every((f) => Number.isNaN(f.x))).toBe(true);
+    const after = frames.filter((f) => f.t >= ARRIVE + R + 1e-9);
+    expect(after.every((f) => !Number.isNaN(f.x) && f.x > STALE + 80)).toBe(true);
+    expect(after.every(inPlace)).toBe(true);
+    expect(worstStep(after)).toBeLessThan((SPEED * 2) / 60);
   }, 30_000);
 
-  test('(with no area, as before: drawn where the snapshot was, then a jump when the sim catches them up)', async () => {
-    const frames = await run(false);
-    let worst = 0;
-    for (let i = 1; i < frames.length; i++) worst = Math.max(worst, Math.abs(frames[i].x - frames[i - 1].x));
+  test('the camera jumping to them (in view a frame before the area follows it): never drawn where they were', async () => {
+    const ARRIVE = 1;
+    const frames = await run((t) => t >= ARRIVE + 1 / 60, 0, END, (t) => t >= ARRIVE);
+    const drawn = frames.filter((f) => !Number.isNaN(f.x));
+    expect(drawn.length).toBeGreaterThan(0);
+    expect(drawn[0].t).toBeGreaterThanOrEqual(ARRIVE + R - 1e-9);
+    expect(drawn.every((f) => f.x > STALE + 80 && inPlace(f))).toBe(true);
+    expect(worstStep(drawn)).toBeLessThan((SPEED * 2) / 60);
+  }, 30_000);
+
+  test('caught up out of the area (seen to go further than they could): hidden a moment, then where they are', async () => {
+    const frames = await run(() => false);
+    const jump = frames.findIndex((f) => f.g >= CATCH);
+    expect(frames.slice(0, jump).filter((f) => f.t >= R + 1e-9).every((f) => Math.abs(f.x - STALE) < 0.05)).toBe(true);
+    const hidden = frames.filter((f) => f.t >= frames[jump].t && f.t < frames[jump].t + R - 1e-9);
+    expect(hidden.every((f) => Number.isNaN(f.x))).toBe(true);
+    const after = frames.filter((f) => f.t >= frames[jump].t + R + 1e-9);
+    expect(after.length).toBeGreaterThan(0);
+    expect(after.every((f) => !Number.isNaN(f.x) && inPlace(f))).toBe(true);
+    expect(worstStep(frames)).toBeLessThan((SPEED * 2) / 60);
+  }, 30_000);
+
+  test('paused as the area reaches them: drawn where the sim has them, then where it catches them up on resuming, never sliding', async () => {
+    const ARRIVE = 0.5;
+    const RESUME = 1.5;
+    const frames = await run((t) => t >= ARRIVE, RESUME, RESUME + CATCH + 1);
+    // Hidden as it reaches them, then shown where they are (paused: the sim can't catch anyone up).
+    expect(frames.filter((f) => f.t >= ARRIVE && f.t < ARRIVE + R - 1e-9).every((f) => Number.isNaN(f.x))).toBe(true);
+    expect(frames.filter((f) => f.t >= ARRIVE + R + 1e-9 && f.t < RESUME).every((f) => Math.abs(f.x - STALE) < 0.05)).toBe(true);
+    // On resuming, caught up: hidden a moment, then where they are; never a frame between.
+    expect(frames.every((f) => Number.isNaN(f.x) || inPlace(f))).toBe(true);
+    expect(frames.filter((f) => f.g >= CATCH + R + 0.02).every((f) => !Number.isNaN(f.x))).toBe(true);
+    expect(worstStep(frames)).toBeLessThan((SPEED * 2) / 60);
+  }, 30_000);
+
+  test('(with no area, as before: a jump when the sim catches them up)', async () => {
+    const frames = await run(null);
     expect(frames[0].x).toBeCloseTo(STALE, 3);
-    expect(worst).toBeGreaterThan(80);
+    expect(worstStep(frames)).toBeGreaterThan(80);
   }, 30_000);
 });
