@@ -113,9 +113,11 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   crosswalks (`traffic::settle`: its zone out to their far side), so nobody drives onto one without
   room to clear it beyond ("don't block the box"). Where a car can't wait between two lit
   junctions (the second's stop line before it's out of the first's box), the way through both is
-  one group, asked for at the first's stop line on both greens (`Claim::gate2`), the second's
-  green fresh (younger than its share of `CYCLE`) and held on for it till it's past that one's
-  stop line (`GREEN_HELD` 10 s past its share at most). Each
+  one group, asked for at the first's stop line on both greens (`Claim::gate2`): the second's
+  green is held on for those waiting through it and those granted till they're past its stop
+  line, `CYCLE` at most from when the hold began (the first's turn comes round meanwhile, so the
+  two never stay out of step), and one is granted only with `GREEN_HELD` 10 s of the hold still
+  to come. Each
   arm has a crosswalk from its corner (where the kerb's `KERB_RETURN` 3 m return round from the
   next arm ends, or the box's edge, whichever is further out) `CROSSWALK` 3 m wide, and a stop
   line `STOP_GAP` 0.5 m past it, no further out than half way to the next junction: a car's claim

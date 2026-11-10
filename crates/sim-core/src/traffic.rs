@@ -575,8 +575,11 @@ const MIN_GREEN: u64 = crate::drive_secs(5.0);
 /// lasts no longer than its share of it (`change_lights`).
 const CYCLE: u64 = crate::drive_secs(50.0);
 const AMBER: u64 = crate::drive_secs(2.0);
-/// A phase's green kept on past its share of `CYCLE` this long at most for one on its way to it,
-/// granted through a lit junction just before it (`Claim::gate2`).
+/// Through two lit junctions too near to wait between (`Claim::gate2`): the second's green is
+/// kept on for those waiting at the first's stop line or granted through both, from when one
+/// first is, for `CYCLE` at most (the first's turn comes round for them meanwhile); one is
+/// granted through only with `GREEN_HELD` of that still to come (its way to the second's stop
+/// line).
 const GREEN_HELD: u64 = crate::drive_secs(10.0);
 const ALL_RED: u64 = crate::drive_secs(4.0);
 /// A route this near a lit junction's middle goes through its lights (m, `gate`), and its arm is
@@ -1100,8 +1103,10 @@ pub struct Traffic {
     /// Per lit junction, the phases anyone waits at and comes through (`change_lights`'s own,
     /// kept so it isn't made anew every tick).
     lit_phases: Vec<[u64; 3]>,
-    /// Per lit junction, whether its green is young enough to be held for one granted through it
-    /// from a lit junction just before (`GREEN_HELD`, `Traffic::green_through`).
+    /// Per lit junction, since when its green is held for those through it from a lit junction
+    /// just before (`Claim::gate2`, `GREEN_HELD`), and whether one may still be granted through
+    /// it (`Traffic::green_through`).
+    held: Vec<Option<u64>>,
     fresh: Vec<bool>,
     /// The lit junctions someone on foot waits at a crosswalk of (`Signal` indices, this tick:
     /// `kerb_stop`, `traffic::begin`), for their walk phase.
@@ -1414,6 +1419,7 @@ impl Traffic {
         // phase; and those on foot, at its walk phase's bit.)
         let bit = |phase: u8| 1u64.checked_shl(u32::from(phase)).unwrap_or(0);
         self.fresh.resize(signals.len(), true);
+        self.held.resize(signals.len(), None);
         let mut phases = std::mem::take(&mut self.lit_phases);
         phases.clear();
         phases.resize(signals.len(), [0, 0, 0]);
@@ -1426,6 +1432,12 @@ impl Traffic {
                         m[0] |= bit(phase);
                     }
                 }
+                // (Waiting through two: the second's green held for it, the first's to come.)
+                if let Some((s, phase)) = first.1.gate2
+                    && let Some(m) = phases.get_mut(usize::from(s))
+                {
+                    m[2] |= bit(phase);
+                }
             }
         }
         for h in &self.holds {
@@ -1436,7 +1448,7 @@ impl Traffic {
                 m[1] |= bit(phase);
             }
             // (Through two lights, granted on both greens: the second's on till it's past its
-            // stop line, `GREEN_HELD` past its share at most.)
+            // stop line.)
             if h.at < h.claim.stop2
                 && let Some((s, phase)) = h.claim.gate2
                 && let Some(m) = phases.get_mut(usize::from(s))
@@ -1484,9 +1496,12 @@ impl Traffic {
                 Stage::Green => {
                     let held = phases[i][2] & bit(l.phase) != 0;
                     let busy = waits(l.phase) || coming(l.phase) || held;
-                    let most = if held { most + GREEN_HELD } else { most };
+                    // (Held, on till `CYCLE` from when it first was.)
+                    let kept = held && self.held[i].is_none_or(|t| tick < t + CYCLE);
                     match next(l.phase) {
-                        Some(_) if on >= most || on >= MIN_GREEN && !busy => stage(Stage::Amber),
+                        Some(_) if !kept && on >= most || on >= MIN_GREEN && !busy => {
+                            stage(Stage::Amber)
+                        }
                         _ => l,
                     }
                 }
@@ -1502,7 +1517,25 @@ impl Traffic {
                 _ => l,
             };
             let now = self.lights[i];
-            self.fresh[i] = now.stage == Stage::Green && tick.saturating_sub(now.since) < most;
+            let held = now.stage == Stage::Green && phases[i][2] & bit(now.phase) != 0;
+            // (A new hold as its green begins, or its last one over and it's still on: nobody
+            // waiting at another phase.)
+            self.held[i] = if held {
+                Some(
+                    self.held[i]
+                        .filter(|&t| now.since < tick && tick < t + CYCLE)
+                        .unwrap_or(tick),
+                )
+            } else {
+                None
+            };
+            // (Granted through only with its green on a while yet: young, or held long enough
+            // still; resting, nobody waiting elsewhere, it stays on till someone is, and then held.)
+            self.fresh[i] = now.stage == Stage::Green
+                && match self.held[i] {
+                    Some(t) => tick + GREEN_HELD < t + CYCLE,
+                    None => true,
+                };
         }
         self.lit_phases = phases;
     }

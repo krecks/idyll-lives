@@ -1309,7 +1309,7 @@ fn in_junction(sig: &sim_core::traffic::Signal, p: [f32; 2]) -> Option<(usize, f
 }
 
 #[test]
-fn someone_on_foot_crossing_by_a_lit_junction_crosses_on_its_zebras_on_the_walk_never_through_the_box() {
+fn someone_on_foot_crosses_a_lit_junction_on_its_zebras_on_the_walk_never_through_the_box() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
     // The crossroads: someone on the pavement at its north-east corner walks to the south-west
     // one. Not straight across the box (as at Canalside, 2-3 m from the middle, on the walk and
@@ -1338,7 +1338,11 @@ fn someone_on_foot_crossing_by_a_lit_junction_crosses_on_its_zebras_on_the_walk_
             // (Onto it only on the walk.)
             if !was_in {
                 let head = buf[LIGHT_BASE + k * LIGHT_STRIDE + light::STATE];
-                assert_eq!(head, light::WALK, "onto arm {k}'s zebra off the walk at {p:?}");
+                assert_eq!(
+                    head,
+                    light::WALK,
+                    "onto arm {k}'s zebra off the walk at {p:?}"
+                );
             }
             on_zebras.insert(k);
         }
@@ -1617,6 +1621,8 @@ fn between_two_lit_junctions_too_near_to_wait_between_nobody_stands_on_a_crosswa
     let mut green_at: Vec<Vec<u64>> = vec![vec![0; sigs.len()]; w.cars.len()];
     let (mut crossed, mut through_both) = (0, 0);
     let mut seen_between = vec![false; w.cars.len()];
+    // (Per car, since when it waits at a red light: never for good, the two lights out of step.)
+    let mut red_since: Vec<Option<u64>> = vec![None; w.cars.len()];
     let end = w.tick + common::drive_secs(2400.0);
     while w.tick < end {
         keep_driving(&mut w);
@@ -1652,6 +1658,15 @@ fn between_two_lit_junctions_too_near_to_wait_between_nobody_stands_on_a_crosswa
             );
             if (p[1] - 211.5).abs() < 3.0 {
                 seen_between[c] = true;
+            }
+            if sim_core::traffic::at_red(&w, sim_core::cars::car_key(c)) {
+                let since = *red_since[c].get_or_insert(w.tick);
+                assert!(
+                    w.tick < since + common::drive_secs(150.0),
+                    "car {c} at a red light at {p:?} since tick {since}"
+                );
+            } else {
+                red_since[c] = None;
             }
             for (i, s) in sigs.iter().enumerate() {
                 let d = [nose[0] - s.at[0], nose[1] - s.at[1]];
