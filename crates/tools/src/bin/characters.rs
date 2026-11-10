@@ -3,11 +3,12 @@
 //!     cargo characters build [out]    # writes the set (default web/public/assets/characters), then checks it
 //!     cargo characters check [dir]    # the set against the contract
 //!     cargo characters diff <a> <b>   # the largest differences between two sets (`-v`: per part)
+//!     cargo characters ratios         # every body's proportions as the generator builds them, beside a real adult's
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use ll_tools::characters::{build, check, default_out, diff};
+use ll_tools::characters::{build, check, default_out, diff, measure};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -54,8 +55,14 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Some("ratios") => {
+            measure::print();
+            ExitCode::SUCCESS
+        }
         _ => {
-            eprintln!("usage: cargo characters build [out] | check [dir] | diff [-v] <a> <b>");
+            eprintln!(
+                "usage: cargo characters build [out] | check [dir] | diff [-v] <a> <b> | ratios"
+            );
             ExitCode::from(2)
         }
     }

@@ -10,7 +10,7 @@
 
 import { clip, cycle, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { breathe, bump, hangArms, stand, TAU } from './idle';
-import { armIK, axisAngle, footIK, lerpV, mul, sub, toEuler, world, wrist } from './ik';
+import { armIK, axisAngle, footIK, lerpV, mul, onBody, sub, toEuler, world, wrist } from './ik';
 
 /** Pelvis offset when seated (reference skeleton), and the left foot's offset from its rest place. */
 export const SEAT_MOVE: Vec = [0, -0.348, -0.19];
@@ -286,7 +286,8 @@ export function eatPose(t: number, at: Vec, head: Vec, lean: number): PoseSpec {
   return {
     ...body,
     ...armIK('l', [-0.1, 1.02, 0.26], body, { palm: true, pole: [-0.4, -1, -0.3], pronate: -40, hand: wrist('l', 0, 0) }),
-    ...armIK('r', at, body, { palm: true, pole: [0.5, -1, 0.1], pronate: -30, hand: wrist('r', 20, 10) }),
+    // (Up to the mouth and down to the plate before the chest: places on the body, `onBody`.)
+    ...armIK('r', onBody(at), body, { palm: true, pole: [0.5, -1, 0.1], pronate: -30, hand: wrist('r', 20, 10) }),
   };
 }
 

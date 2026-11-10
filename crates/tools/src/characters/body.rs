@@ -875,12 +875,14 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             c.band(&prev, &cur, &[]);
             prev = cur;
         }
-        // The foot: rings turning from the ankle to point forward, flat underneath, a round toe.
+        // The foot: rings turning from the ankle to point forward, flat underneath, the toes past the
+        // ball's joint and a round tip. A real foot's length and breadth (0.15 and 0.055 of the height;
+        // it ended at the ball, a seventh shorter and a fifth wider: a clog, and the shoes with it).
         let jb = pj(nm("ball"));
         let fl = jb[2] - ja[2];
-        let fw = 0.33 * fl * (if female { 0.94 } else { 1.0 });
+        let fw = 0.285 * fl * (if female { 0.94 } else { 1.0 });
         let fx = ja[0];
-        let feet: [(V3, f64, f64, f64, f64, Weights); 2] = [
+        let feet: [(V3, f64, f64, f64, f64, Weights); 3] = [
             (
                 v3(fx, 0.5 * ja[1], ja[2] - 0.02 * fl),
                 45.0,
@@ -897,6 +899,15 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                 0.30 * fl,
                 vec![(nm("ball"), 0.5), (nm("foot"), 0.5)],
             ),
+            // (The toes: lower and a little narrower.)
+            (
+                v3(fx, 0.3 * ja[1], jb[2] + 0.1 * fl),
+                90.0,
+                fw * 0.9,
+                0.2 * fl,
+                0.22 * fl,
+                one(nm("ball")),
+            ),
         ];
         for (cc, al, a, bt, bb, w) in &feet {
             let al = radians(*al);
@@ -910,7 +921,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             prev = cur;
         }
         let tip = c.add(
-            v3(fx, 0.4 * ja[1], jb[2] + 0.04 * fl),
+            v3(fx, 0.26 * ja[1], jb[2] + 0.27 * fl),
             one(nm("ball")),
             "foot",
             None,

@@ -1175,7 +1175,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const baby = shown.grip === 'aim' ? rig.cuddleBaby : -1;
     if (baby >= 0 && this.headJoints[baby * 3 + 1] !== 0) {
       for (let k = 0; k < 3; k++) this.aimAt[k] = this.headJoints[baby * 3 + k];
-      this.aimAt[1] += 0.03 * (this.sims[baby]?.scale ?? 1);
+      this.aimAt[1] += 0.026 * (this.sims[baby]?.scale ?? 1);
       h.aim = this.aimAt;
     } else h.aim = undefined;
     placeHand(m, i, shown, h);

@@ -187,8 +187,8 @@ export class StageController implements SimStage {
     bodyH = Math.max(bodyH, 1.05 / aspect);
     const bodyY = bodyLo - BOTTOM_UI * bodyH + bodyH / 2;
     // Face: chin to crown, centred a little above the middle.
-    const faceH = Math.max(0.56, 0.36 / aspect);
-    const faceY = top - 0.2 - faceH * 0.06;
+    const faceH = Math.max(0.5, 0.32 / aspect);
+    const faceY = top - 0.176 - faceH * 0.06;
     const z = this.zoom * this.zoom * (3 - 2 * this.zoom);
     const h = Math.exp(Math.log(bodyH) + (Math.log(faceH) - Math.log(bodyH)) * z);
     const y = bodyY + (faceY - bodyY) * z;

@@ -27,6 +27,7 @@ pub mod hair;
 pub mod head;
 pub mod json;
 pub mod kdtree;
+pub mod measure;
 pub mod meshops;
 pub mod np;
 pub mod prims;

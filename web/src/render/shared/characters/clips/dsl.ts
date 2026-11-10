@@ -193,10 +193,38 @@ export interface Reference {
   shin: number;
   /** The left palm centre from the wrist (rest frame; the right mirrors x). */
   grip: Vec;
+  /**
+   * The reference's upper body beside the one the clips' numbers were written on (`WRITTEN`): its back's
+   * length (pelvis to neck) and its head's size (the eyes above the head joint), as shares of that one's
+   * (clips/ik.ts `onBody` and `pointOn` on the head).
+   */
+  torso: number;
+  head: number;
 }
+
+/**
+ * The body the clips' numbers were written on (m; the reference skeleton as it was with a head of 1/6.5 of its
+ * height): the pelvis joint, the neck joint above it, and the eyes above the head joint. A hand's place given
+ * on that body (at its chin, before its chest) is moved to the same place on the reference's (`onBody`).
+ */
+export const WRITTEN = { pelvis: 0.947, torso: 0.4772, eyes: 0.1035 } as const;
 
 /** Rest joints of the reference skeleton while baking (for `legIK`). */
 let ref: Reference | null = null;
+
+/**
+ * What `bake` tells of each limb an IK solve placed (`report`, for tools/characters/check_clips.ts): the clip, the
+ * limb (`arm_l`, `leg_r`), and how far its target was from the limb's root as a share of the limb's length. Over
+ * 1 the limb is straight and its end short of the target; under `fold` (the two bones' difference in length,
+ * the same share) it is folded shut and its end past it.
+ */
+export type ReachReport = (clip: string, limb: string, reach: number, fold: number) => void;
+let report: ReachReport | null = null;
+let baking = '';
+/** An IK solve's reach (clips/ik.ts `twoBone`, `legIK`): `want` m to the target, on bones `l1` and `l2` long. */
+export function reached(limb: string, want: number, l1: number, l2: number): void {
+  report?.(baking, limb, want / (l1 + l2), Math.abs(l1 - l2) / (l1 + l2));
+}
 
 /** The reference skeleton; only while clips bake (for IK helpers such as clips/ik.ts). */
 export function reference(): Reference {
@@ -218,6 +246,7 @@ export function legIK(side: 'l' | 'r', ankle: Vec, move: Vec = [0, 0, 0]): PoseS
   const dy = foot[1] + ankle[1] - (hip[1] + move[1]);
   const dz = foot[2] + ankle[2] - (hip[2] + move[2]);
   const { thigh: L1, shin: L2 } = ref;
+  reached(`leg_${side}`, Math.hypot(dx, dy, dz), L1, L2);
   const D = Math.min(Math.hypot(dx, dy, dz), (L1 + L2) * 0.9995);
   const knee = Math.PI - Math.acos(clamp((L1 * L1 + L2 * L2 - D * D) / (2 * L1 * L2), -1, 1));
   const lift = Math.acos(clamp((L1 * L1 + D * D - L2 * L2) / (2 * L1 * D), -1, 1));
@@ -259,8 +288,8 @@ function referenceJoints(set: CharacterSet): (name: string) => Vec {
   };
 }
 
-/** Bakes clip definitions into the runtime's clips for `set`. */
-export function bake(defs: readonly ClipDef[], set: CharacterSet): Map<string, Clip> {
+/** Bakes clip definitions into the runtime's clips for `set`; `reach` hears of every limb an IK solve placed. */
+export function bake(defs: readonly ClipDef[], set: CharacterSet, reach: ReachReport | null = null): Map<string, Clip> {
   const joint = referenceJoints(set);
   const len = (a: string, b: string) => {
     const p = joint(a);
@@ -274,12 +303,19 @@ export function bake(defs: readonly ClipDef[], set: CharacterSet): Map<string, C
     thigh: set.reference?.thigh ?? len('thigh_l', 'calf_l'),
     shin: set.reference?.shin ?? len('calf_l', 'foot_l'),
     grip: body.grip ?? [-0.02, -0.055, 0],
+    torso: (joint('neck_01')[1] - joint('pelvis')[1]) / WRITTEN.torso,
+    head: (joint('eye_l')[1] - joint('Head')[1]) / WRITTEN.eyes,
   };
   const out = new Map<string, Clip>();
+  report = reach;
   try {
-    for (const def of defs) out.set(def.name, bakeOne(def, set));
+    for (const def of defs) {
+      baking = def.name;
+      out.set(def.name, bakeOne(def, set));
+    }
   } finally {
     ref = null;
+    report = null;
   }
   return out;
 }

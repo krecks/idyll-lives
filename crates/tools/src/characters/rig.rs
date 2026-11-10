@@ -190,14 +190,20 @@ pub struct Proportions {
     pub belly: f64,
 }
 
-/// Adult layout (fractions of H; left side, the right mirrors x).
+/// A baby's head (chin to crown, fraction of H): a quarter of its length, as a real baby's.
+pub const BABY_HH: f64 = 1.0 / 4.0;
+
+/// Adult layout (fractions of H; left side, the right mirrors x). The head is a real adult's, 1/7.4 of
+/// the height (it was 1/6.5, the toy look), and the upper arm with it (0.186 of the height, shoulder
+/// to elbow; it was 0.165): the shoulders stand higher under a smaller head, and the longer arm
+/// leaves the elbows and wrists where they were.
 pub const ADULT: Proportions = Proportions {
     h: 0.0,
-    hh: 1.0 / 6.5,
+    hh: 1.0 / 7.4,
     hip: 0.50,
     shoulder: 0.13,
     hip_w: 0.054,
-    upper: 0.165,
+    upper: 0.186,
     lower: 0.145,
     girth: 1.0,
     waist: 1.0,
@@ -226,11 +232,11 @@ pub fn proportions(family: &str, stage: &str) -> Proportions {
     match (stage, female) {
         ("baby", _) => Proportions {
             h: 0.67,
-            hh: 1.0 / 3.4,
+            hh: BABY_HH,
             hip: 0.38,
             shoulder: 0.12,
             hip_w: 0.075,
-            upper: 0.12,
+            upper: 0.14,
             lower: 0.105,
             girth: 1.35,
             belly: 0.03,
@@ -238,44 +244,44 @@ pub fn proportions(family: &str, stage: &str) -> Proportions {
         },
         ("child", false) => Proportions {
             h: 1.13,
-            hh: 1.0 / 4.6,
+            hh: 1.0 / 5.5,
             hip: 0.45,
             shoulder: 0.11,
             hip_w: 0.06,
-            upper: 0.15,
+            upper: 0.172,
             lower: 0.13,
             girth: 1.1,
             ..a
         },
         ("child", true) => Proportions {
             h: 1.09,
-            hh: 1.0 / 4.6,
+            hh: 1.0 / 5.5,
             hip: 0.45,
             shoulder: 0.11,
             hip_w: 0.062,
-            upper: 0.15,
+            upper: 0.172,
             lower: 0.13,
             girth: 1.1,
             ..a
         },
         ("teen", false) => Proportions {
             h: 1.51,
-            hh: 1.0 / 6.0,
+            hh: 1.0 / 6.75,
             hip: 0.50,
             shoulder: 0.12,
             hip_w: 0.054,
-            upper: 0.162,
+            upper: 0.182,
             lower: 0.142,
             girth: 0.95,
             ..a
         },
         ("teen", true) => Proportions {
             h: 1.44,
-            hh: 1.0 / 6.0,
+            hh: 1.0 / 6.75,
             hip: 0.50,
             shoulder: 0.105,
             hip_w: 0.058,
-            upper: 0.162,
+            upper: 0.182,
             lower: 0.142,
             girth: 0.95,
             ..a
@@ -310,7 +316,7 @@ pub fn proportions(family: &str, stage: &str) -> Proportions {
         },
         ("elder", false) => Proportions {
             h: 1.74,
-            hh: 1.0 / 6.4,
+            hh: 1.0 / 7.3,
             hip: 0.49,
             shoulder: MAN_SHOULDER * 0.95,
             waist: 1.12,
@@ -320,7 +326,7 @@ pub fn proportions(family: &str, stage: &str) -> Proportions {
         },
         ("elder", true) => Proportions {
             h: 1.64,
-            hh: 1.0 / 6.4,
+            hh: 1.0 / 7.3,
             hip: 0.49,
             shoulder: 0.115 * 0.95,
             hip_w: 0.058,
@@ -333,6 +339,10 @@ pub fn proportions(family: &str, stage: &str) -> Proportions {
     }
 }
 
+/// An eye's centre out from the middle of the face (head heights): the pupils 72 mm apart on a grown
+/// man (a real pair is 63 mm apart; it was 0.17, 93 mm, with the larger eyes of the toy look).
+const EYE_X: f64 = 0.15;
+
 /// Joint positions per bone (m), model space at rest (identity rotations).
 pub fn joints(family: &str, stage: &str) -> [V3; NB] {
     let p = proportions(family, stage);
@@ -340,7 +350,8 @@ pub fn joints(family: &str, stage: &str) -> [V3; NB] {
     let mut j = [V3::zeros(); NB];
     let mut set = |n: &str, v: V3| j[b(n)] = v;
     let chin = 1.0 - hh;
-    let neck = chin - (if hh < 0.2 { 0.27 } else { 0.12 }) * hh;
+    // (Babies and children, whose heads are over 1/6 of the height, have the short neck.)
+    let neck = chin - (if hh < 1.0 / 6.0 { 0.27 } else { 0.12 }) * hh;
     let hip = p.hip;
     let pelvis = hip + 0.035 * (hip / 0.5);
     set("root", v3(0.0, 0.0, 0.0));
@@ -362,7 +373,7 @@ pub fn joints(family: &str, stage: &str) -> [V3; NB] {
         let up = v3(-p.shoulder, sh_y, -0.005);
         let el = up + d * p.upper;
         let wr = el + d * p.lower;
-        // Hands and feet are 1.15x real ones (the toy look), and relatively bigger on small people.
+        // Hands and feet are relatively bigger on small people.
         let hs = (p.upper / ADULT.upper).powf(0.5);
         let k1 = wr + d * (0.055 * hs);
         // The fingers' middle joint, 0.42 palm lengths past the knuckle (a real proximal finger
@@ -397,7 +408,7 @@ pub fn joints(family: &str, stage: &str) -> [V3; NB] {
     for (s, sx) in [("l", 1.0), ("r", -1.0)] {
         set(
             &format!("eye_{s}"),
-            v3(-0.17 * hh * sx, chin + 0.44 * hh, eye_z * hh),
+            v3(-EYE_X * hh * sx, chin + 0.44 * hh, eye_z * hh),
         );
     }
     j.map(|v| v * h)

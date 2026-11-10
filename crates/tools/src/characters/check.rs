@@ -13,7 +13,9 @@ use super::hair::{EAR_MIN, Ears};
 use super::head::head_frame;
 use super::json::JValue;
 use super::np::{degrees, linspace_open, radians};
-use super::rig::{BASE_STAGE, BONES, CLIP_BONES, RUNTIME_BONES, STAGES, target_height};
+use super::rig::{
+    BASE_STAGE, BONES, CLIP_BONES, RUNTIME_BONES, STAGES, proportions, target_height,
+};
 use super::{V3, repo_root, v3};
 
 /// lod.body: the cage at its limit (~0.9k) plus the eyelids (~0.2k).
@@ -411,6 +413,20 @@ pub fn check(out: &Path) -> bool {
                     "{fam}.{stage}: height {} is more than 3% off {}",
                     super::np::py_repr(height),
                     super::np::py_repr(target)
+                ));
+            }
+            // A real body's heads in its height (docs/review/reference.md: about 4 on a baby, 5-6 on a
+            // child, 6.5-7 on a teen, 7-7.5 on the grown).
+            let heads = 1.0 / proportions(fam, stage).hh;
+            let (lo, hi) = match stage {
+                "baby" => (3.8, 4.3),
+                "child" => (5.0, 6.0),
+                "teen" => (6.5, 7.0),
+                _ => (7.0, 7.5),
+            };
+            if !(lo..=hi).contains(&heads) {
+                fail(format!(
+                    "{fam}.{stage}: {heads:.2} heads tall, a real one is {lo} to {hi}"
                 ));
             }
             let drop = info.at("seatDrop").f64() / height;

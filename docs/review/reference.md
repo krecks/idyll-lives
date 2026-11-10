@@ -61,18 +61,19 @@ standard, 3rd to 97th percentile (`whoLength`). The game's stage ages are `base.
 
 | Stage | Ages | Real height (m) | Median, girl / boy (m) | Rig height, f / m (m) | Real head-to-height | Rig head-to-height (`rig.rs`) |
 |---|---|---|---|---|---|---|
-| `resident.baby` | 0–2 | 0.45–0.94 | birth 0.49 / 0.50; 1 y 0.74 / 0.76; 2 y 0.86 / 0.88 | 0.675 / 0.663 (about 6–9 months) | about 1:4 | 1:3.4 |
-| `resident.child` | 2–12 | 0.83–1.70 | 6 y 1.19 / 1.18; 12 y 1.54 / 1.54 | 1.094 / 1.128 (about 5 years) | 1:5 at 2–5, 1:6 at 5–7 | 1:4.6 |
-| `resident.teen` | 13–17 | 1.45–1.88 | 13 y 1.58 / 1.64; 17 y 1.62 / 1.75 | 1.442 / 1.512 | about 1:7 from 14–15 | 1:6.0 |
-| `resident.youngAdult` | 18–29 | 1.50–1.88 | 1.63 / 1.76 | 1.67 / 1.77 | 1:7–7.5 | 1:6.5 |
-| `resident.adult` | 30–59 | 1.50–1.89 | 1.63 / 1.77 | 1.672 / 1.755 | 1:7–7.5 | 1:6.5 |
-| `resident.elder` | 60+ | 1.45–1.85 | 60–69: 1.61 / 1.74; 80+: 1.56 / – | 1.661 / 1.742 | 1:7–7.5, a little shorter, often a stoop | 1:6.4 |
+| `resident.baby` | 0–2 | 0.45–0.94 | birth 0.49 / 0.50; 1 y 0.74 / 0.76; 2 y 0.86 / 0.88 | 0.675 / 0.663 (about 6–9 months) | about 1:4 | 1:4.0 |
+| `resident.child` | 2–12 | 0.83–1.70 | 6 y 1.19 / 1.18; 12 y 1.54 / 1.54 | 1.094 / 1.128 (about 5 years) | 1:5 at 2–5, 1:6 at 5–7 | 1:5.5 |
+| `resident.teen` | 13–17 | 1.45–1.88 | 13 y 1.58 / 1.64; 17 y 1.62 / 1.75 | 1.442 / 1.512 | about 1:7 from 14–15 | 1:6.75 |
+| `resident.youngAdult` | 18–29 | 1.50–1.88 | 1.63 / 1.76 | 1.67 / 1.77 | 1:7–7.5 | 1:7.4 |
+| `resident.adult` | 30–59 | 1.50–1.89 | 1.63 / 1.77 | 1.672 / 1.755 | 1:7–7.5 | 1:7.4 |
+| `resident.elder` | 60+ | 1.45–1.85 | 60–69: 1.61 / 1.74; 80+: 1.56 / – | 1.661 / 1.742 | 1:7–7.5, a little shorter, often a stoop | 1:7.3 |
 
 - Head-to-height ratios are the classic figures for art students (`dunlop`: about 4 heads at birth, 6 at 5 years,
   7½ for adults) and match the rubric's M14 (baby about 1:4, child 1:5–6, teen 1:6.5–7, adult 1:7–7.5). Art
   canons often use 8 heads for an idealised adult.
-- The rig's heads are bigger than real at every stage (the toy look). That is a style choice; changes to `rig.rs`
-  are filed only and decided at triage (owner decision 5).
+- The rig's heads are real ones since 2026-11-10 (the owner's decision: they were 1:3.4, 1:4.6, 1:6.0, 1:6.5 and
+  1:6.4, the toy look), with the upper arm and the feet a real adult's too. `cargo characters ratios` prints every
+  body's proportions as built, beside a real adult's.
 - The girl teen at 1.442 m is just under the real 5th percentile at 13 (1.450 m). Every other stage sits inside
   its range.
 - Sleep needs per stage are in the `resident.*` kinds' `minutes` (`aasm`, `nsf`): babies 11–16 h a day with naps,

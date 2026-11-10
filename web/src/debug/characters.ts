@@ -15,6 +15,8 @@
  * - `?clip=walk&t=0.4` the clip held at t seconds (default: idle, playing), `?view=side|back`,
  *   `?closeup=1` frames the heads, `?build=1.2`, `?cols=8`, `?gap=0.9`, `?labels=0`, `?hairColor=%23C89B5A`;
  * - `?alpha=…&beta=…&radius=…` the camera (`?y=1.2`: the height it looks at in a close-up); `__bench.advance(s)` steps time when `?manual`;
+ * - `?camera=game` looks from where the game's Live camera starts (24 m, its tilt and its longer lens) and
+ *   `?camera=near` from as close as it comes (6 m): the residents at the sizes players see them;
  * - `?renderer=webgl` draws with WebGL2 (default WebGPU); `?ground=0` leaves the floor out (the
  *   residents alone, e.g. to compare diag views);
  * - The residents are shaded in the game's soft look (`softLook.ts`); `?look=classic` (dev only)
@@ -30,6 +32,7 @@ import type { Appearance, HairStyle } from '../game/household';
 import { HAIR_STYLES } from '../game/household';
 import { Characters, EXPRESSIONS, FRIENDLY, MAX_CHARACTERS, type StageDirection } from '../render/pc/characters';
 import { GARMENTS } from '../render/shared/characters/outfit';
+import { DEFAULT_ORBIT, LENS, RADIUS_LIMITS } from '../render/shared/lens';
 import { WALL_HEIGHT } from '../render/shared/walls';
 import { VISEMES } from '../voice/visemes';
 
@@ -135,14 +138,17 @@ const width = cols * gap + 4;
 const depth = lines * rowGap + 4;
 
 const faceY = 1.5 + (lines - 1) * rowGap * 0.5;
+/** `?camera=game|near`: the game's own camera, as a game opens or zoomed all the way in. */
+const gameCamera = params.get('camera') === 'game' ? DEFAULT_ORBIT.radius : params.get('camera') === 'near' ? RADIUS_LIMITS[0] : 0;
 const stage = await createStage({
   sky: 0.7,
   sun: [-0.35, -1, -0.6],
   sunIntensity: 3,
   environment: 1,
   alpha: Number(params.get('alpha') ?? Math.PI / 2),
-  beta: Number(params.get('beta') ?? (closeup ? Math.PI / 2 : 1.3)),
-  radius: Number(params.get('radius')) || (closeup ? Math.max(cols * gap * 1.5, lines * rowGap * 2.6) : Math.max(width * 0.75, lines * rowGap * 1.3, 3)),
+  beta: Number(params.get('beta') ?? (gameCamera ? DEFAULT_ORBIT.beta : closeup ? Math.PI / 2 : 1.3)),
+  radius: Number(params.get('radius')) || gameCamera || (closeup ? Math.max(cols * gap * 1.5, lines * rowGap * 2.6) : Math.max(width * 0.75, lines * rowGap * 1.3, 3)),
+  ...(gameCamera ? { fov: LENS.fov } : {}),
   near: 0.02,
   wheelPrecision: 60,
 });

@@ -28,7 +28,7 @@ use std::sync::Arc;
 use super::cage::{Cage, Tags, Weights};
 use super::kdtree::KdTree;
 use super::np::{PI, clip, linspace_open, mean, median, radians, sign};
-use super::rig::{Proportions, b, joints, maturity, proportions};
+use super::rig::{ADULT, BABY_HH, Proportions, b, joints, maturity, proportions};
 use super::{Cache, V3, key, v3};
 
 /// Rows from the jaw up: elevation (degrees) of the ray from the head's middle (`MIDDLE`) at the
@@ -187,23 +187,23 @@ const NOSE: [(usize, f64, [f64; 3]); 10] = [
     (BASE, 7.0, [0.1, 0.0, 0.25]),
 ];
 
-/// 0 for adult heads (1 / 6.5 of the height), 1 for babies (1 / 3.4).
+/// 0 for adult heads (`rig::ADULT`'s share of the height), 1 for babies (`rig::BABY_HH`).
 pub fn youth(stage_hh: f64) -> f64 {
-    clip((stage_hh - 1.0 / 6.5) / (1.0 / 3.4 - 1.0 / 6.5), 0.0, 1.0)
+    clip((stage_hh - ADULT.hh) / (BABY_HH - ADULT.hh), 0.0, 1.0)
 }
 
-/// An eyeball's radius (m): the sockets are carved round it. A young adult's is 34 mm across where a
-/// real one is 24, and small children's a little larger still: at 6 m, the game's closest camera, the
-/// iris is 5 px, and the larger sphere is what keeps the sclera from closing the iris into a dot. Past
-/// that it stops reading as an eye and starts reading as a bead. A grown woman's a little larger (a
-/// twentieth), which reads as hers at a distance more than any other feature of the face.
+/// An eyeball's radius (m): the sockets are carved round it. A young adult's is 27 mm across where a
+/// real one is 24 (it was 34, the toy look), and small children's a little larger still: at 6 m, the
+/// game's closest camera, the iris is 4 px, and the sphere a little over life size is what keeps the
+/// sclera from closing the iris into a dot. A grown woman's a little larger (a twentieth), which reads
+/// as hers at a distance more than any other feature of the face.
 fn eye_radius(family: &str, stage: &str, pr: &Proportions) -> f64 {
     let f = if family == "female" {
         1.0 + 0.05 * maturity(stage)
     } else {
         1.0
     };
-    (0.062 + 0.018 * youth(pr.hh)) * pr.hh * pr.h * f
+    (0.056 + 0.018 * youth(pr.hh)) * pr.hh * pr.h * f
 }
 
 /// Approximate signed distance to an ellipsoid (exact on its surface).
@@ -809,7 +809,7 @@ fn make_head_frame(family: &str, stage: &str) -> HeadFrame {
         face_z: 0.0,
         eyes,
         eye_r,
-        iris_r: eye_r * 0.55,
+        iris_r: eye_r * 0.6,
         pupil_r: eye_r * 0.22,
         mouth: V3::zeros(),
         mouth_w: 0.2 * hh,

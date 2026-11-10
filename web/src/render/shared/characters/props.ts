@@ -203,9 +203,9 @@ export function placeHand(m: Float32Array, i: number, p: HandProp, h: Hands): vo
       const my = (P[1] + P[4]) / 2;
       const mz = (P[2] + P[5]) / 2;
       unitInto(F, 0, P[0] - P[3], P[1] - P[4], P[2] - P[5]);
-      let nx = h.head[0] + fx * 0.08 * h.scale - mx;
+      let nx = h.head[0] + fx * 0.07 * h.scale - mx;
       let ny = h.head[1] - my;
-      let nz = h.head[2] + fz * 0.08 * h.scale - mz;
+      let nz = h.head[2] + fz * 0.07 * h.scale - mz;
       const d = nx * F[0] + ny * F[1] + nz * F[2];
       nx -= d * F[0];
       ny -= d * F[1];
@@ -229,7 +229,7 @@ export function placeHand(m: Float32Array, i: number, p: HandProp, h: Hands): vo
     case 'bite': {
       // From the palm to the mouth (a little ahead of and under the head joint), its face up, moved `at` along itself.
       const s = h.scale;
-      unitInto(F, 6, h.head[0] + fx * 0.1 * s - P[b], h.head[1] - 0.03 * s - P[b + 1], h.head[2] + fz * 0.1 * s - P[b + 2]);
+      unitInto(F, 6, h.head[0] + fx * 0.088 * s - P[b], h.head[1] - 0.026 * s - P[b + 1], h.head[2] + fz * 0.088 * s - P[b + 2]);
       const d = fz * F[6] - fx * F[8];
       unitInto(F, 0, fz - d * F[6], -d * F[7], -fx - d * F[8]);
       F[3] = F[7] * F[2] - F[8] * F[1];

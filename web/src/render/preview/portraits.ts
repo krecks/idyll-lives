@@ -38,8 +38,8 @@ const ANGLE = 0.28;
  * Framing for a Sim whose head top is at `REF_TOP` (m): half the height in view and how far below
  * the crown its centre is. Both scale with the Sim, so height doesn't change the picture.
  */
-const FRAME_HALF = 0.25;
-const FRAME_DROP = 0.2;
+const FRAME_HALF = 0.22;
+const FRAME_DROP = 0.176;
 const REF_TOP = 1.78;
 
 /** A friendly portrait face. */
