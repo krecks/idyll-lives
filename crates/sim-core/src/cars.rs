@@ -236,6 +236,11 @@ const LEAD: f32 = 10.0;
 /// junction's corner it slows to about 4 to 5 m/s, a country road's bend to 14 (4 before the
 /// junctions were lit: the lights and the stop lines do the stopping now).
 const SIDEWAYS: f32 = 6.5;
+/// A step of a route shorter than this says nothing of the way a car faces along it (m,
+/// `Legs::timed`): it faces as along the step before. (Where a taxi stands at the kerb, the way on
+/// began 2 to 8 mm from it and mostly across the lane, and it stood 25 to 37 degrees across its
+/// lane: King'ston, Pebble Quay.)
+const FACING_STEP: f32 = 0.02;
 /// A driveway meeting its road further from square than this (the cosine of its angle to the
 /// road's side) comes alongside it rather than onto it: its car stays parked (`Car::no_way`).
 const OBLIQUE: f32 = 0.5;
@@ -2719,11 +2724,12 @@ impl Legs {
         // (Ticks of drive time: `crate::DRIVE_SCALE` times as fast as real time.)
         let per_second = DRIVE_TICKS_PER_SECOND;
         // Facing along each step: the way it goes, turned round while it backs; along a step of
-        // none (where it changes between backing and driving on), as along the one before.
+        // none (where it changes between backing and driving on) or next to none (`FACING_STEP`),
+        // as along the one before.
         let mut facing: Vec<f32> = Vec::with_capacity(n - 1);
         for i in 0..n - 1 {
             let (a, b) = (pts[i].0, pts[i + 1].0);
-            let f = if ds[i] > 1e-4 || i == 0 {
+            let f = if ds[i] > FACING_STEP || i == 0 {
                 let way = (b[0] - a[0]).atan2(b[1] - a[1]);
                 if pts[i + 1].1 {
                     wrap_angle(way + std::f32::consts::PI)
@@ -8892,6 +8898,34 @@ mod tests {
             round.iter().all(|p| p[0] <= 12.0 + 1e-3 && p[1] >= -1e-3),
             "{round:?}"
         );
+    }
+
+    #[test]
+    fn a_car_faces_along_its_lane_where_the_next_step_is_a_hair_across_it() {
+        // (King'ston and Pebble Quay: where a taxi stood at the kerb, the way on began 2 to 8 mm
+        // from it, mostly across the lane, and it stood 25 to 37 degrees across its lane.) Along
+        // +z, standing at z = 8, the next point 5 mm across: it faces along the lane there.
+        let mut legs = Legs::default();
+        for p in [
+            [0.0, 0.0],
+            [0.0, 4.0],
+            [0.0, 8.0],
+            [0.005, 8.001],
+            [0.0, 12.0],
+            [0.0, 16.0],
+        ] {
+            legs.push_lane(p, FAST, 0.0, LANE);
+        }
+        let route = legs.timed(true, true);
+        for i in 1..route.points.len() - 1 {
+            let yaw = route.points[i].1;
+            assert!(
+                yaw.abs().to_degrees() < 4.0,
+                "{}° across its lane at {:?}",
+                yaw.to_degrees(),
+                route.points[i].0
+            );
+        }
     }
 
     #[test]
