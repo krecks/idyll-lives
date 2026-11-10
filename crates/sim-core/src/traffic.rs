@@ -531,7 +531,9 @@ const MIN_GREEN: u64 = crate::secs(5.0);
 const CYCLE: u64 = crate::secs(50.0);
 const AMBER: u64 = crate::secs(2.0);
 const ALL_RED: u64 = crate::secs(4.0);
-/// A route this near a lit junction's middle goes through its lights (m, `gate`).
+/// A route this near a lit junction's middle goes through its lights (m, `gate`), and its arm is
+/// the one it's on where it first comes this near (`GATE_REACH`).
+const GATE_THROUGH: f32 = BOX_LEAST + 1.0;
 const GATE_REACH: f32 = BOX_MOST + 2.0;
 /// How far out past its arm's box a roundabout's signal pole stands (another's stands at the stop
 /// line), and how far in from the kerb on the pavement (or the road's edge) any stands (m).
@@ -709,15 +711,16 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
 }
 
 /// The lights `claims`' groups go through (`Claim::gate`), and the phase of the arm each comes in
-/// by: of `signals`, the first along its way whose middle a group comes by (within `BOX_LEAST`:
-/// through its box), else the nearest it comes within `GATE_REACH` of (not the first in the list:
-/// two lit junctions close together). A group through lights begins where a body `len` long coming
+/// by: of `signals`, the first along its way whose middle a group comes by (within `GATE_THROUGH`:
+/// through its box; not the first in the list it comes within `GATE_REACH` of, two lit junctions
+/// close together; nor one it only comes near, out of a driveway by a junction, which kept a car
+/// coming out of one waiting for the junction's green in the way of those turning in). A group through lights begins where a body `len` long coming
 /// in along `trace` has its nose at its arm's stop line (`SignalArm::stop`; but a roundabout's, at
 /// the box's edge as ever): it waits there on red, short of the crosswalk.
 pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal], trace: &Trace, len: f32) {
-    // (A lit junction near a group: whether it goes by its middle and how near, when it first
-    // comes within reach of it, which, and where it was then.)
-    type Near = ((bool, f32, f32), usize, [f32; 2]);
+    // (A lit junction a group goes through: when it first comes within reach of it and how near
+    // it comes, which, and where it was then.)
+    type Near = ((f32, f32), usize, [f32; 2]);
     let mut k = 0;
     while k < claims.len() {
         let g = claims[k].group;
@@ -761,8 +764,10 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal], trace: &Trace, len:
                     }
                 }
             }
-            let Some((t, at)) = first else { continue };
-            let key = (near >= BOX_LEAST, t, near);
+            let Some((t, at)) = first.filter(|_| near < GATE_THROUGH) else {
+                continue;
+            };
+            let key = (t, near);
             if best.as_ref().is_none_or(|(k0, ..)| key < *k0) {
                 best = Some((key, i, at));
             }
