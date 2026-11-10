@@ -4788,17 +4788,62 @@ fn span_by(route: &Route, t: f32, len: f32, taxi: &Rect) -> Option<(f32, f32)> {
     Some((first?, last?))
 }
 
+/// The cars held up round car `c` (`unjam`): it and those it waits for (`waits`), however far
+/// round, each held up (`kind`: `Some(false)`) or a car parked in its way (`Some(true)`, not one of
+/// them); with whether they're held up by each other alone, and whether one is by a car parked.
+/// Not by each other alone: someone on foot among those waited for (they step aside first), one
+/// on its way or out of sight (`kind`: None), or one at a red light (`red`) waiting for nothing
+/// else (it goes on the green). One there that a car's in the way of waits for it on the green too
+/// (`Traffic::begin`): with the others on another phase, one of them would always be at a red
+/// light, and they'd stand there for good.
+fn held_round(
+    c: usize,
+    waits: impl Fn(u64) -> Vec<u64>,
+    red: impl Fn(u64) -> bool,
+    kind: impl Fn(usize) -> Option<bool>,
+) -> (Vec<usize>, bool, bool) {
+    let mut ring = vec![c];
+    let mut todo = vec![car_first(c)];
+    let mut ok = true;
+    let mut parked = false;
+    while let Some(k) = todo.pop() {
+        let by = waits(k);
+        if by.is_empty() && red(k) {
+            ok = false;
+        }
+        for o in by {
+            if o < 1 << 63 {
+                ok = false;
+                continue;
+            }
+            let o = (o & !(1 << 63)) as usize;
+            if ring.contains(&o) {
+                continue;
+            }
+            match kind(o) {
+                Some(true) => parked = true,
+                Some(false) => {
+                    ring.push(o);
+                    todo.push(car_first(o));
+                }
+                None => ok = false,
+            }
+        }
+    }
+    (ring, ok, parked)
+}
+
 /// Cars in sight held up by each other (`traffic::waits_on`, round in a ring or on to one that
-/// waits for nothing), or by a car parked in the way, none of them on `UNJAM` (`UNJAM_TICKS`), none at a red light and nobody
-/// on foot among them (they step aside first, `go_on`): the one of them with the most clear room
-/// behind it does as a driver would (`Detour`). It backs up along the way it came, round the turn
-/// it took, till it's out of the last junction it came through, and goes on from there another
-/// way, round the stretch it was held up on (`Route::detour`). Of those with as much room: one
-/// with nobody riding with it first, then one on a trip before one on its way to or from work,
-/// then one with riders, a work taxi last, and only once its stops are behind it (they're along
-/// its way). None can (no junction behind it within the
-/// room it has, or no other way): counted with why (`Traffic::unjam_impossible`), tried again
-/// `UNJAM_AGAIN` later.
+/// waits for nothing), or by a car parked in the way, none of them on `UNJAM` (`UNJAM_TICKS`),
+/// none at a red light waiting for nothing else (one a car's in the way of there waits for it on
+/// the green too) and nobody on foot among them (they step aside first, `go_on`): the one of them
+/// with the most clear room behind it does as a driver would (`Detour`). It backs up along the way
+/// it came, round the turn it took, till it's out of the last junction it came through, and goes
+/// on from there another way, round the stretch it was held up on (`Route::detour`). Of those with
+/// as much room: one with nobody riding with it first, then one on a trip before one on its way to
+/// or from work, then one with riders, a work taxi last, and only once its stops are behind it
+/// (they're along its way). None can (no junction behind it within the room it has, or no other
+/// way): counted with why (`Traffic::unjam_impossible`), tried again `UNJAM_AGAIN` later.
 pub(crate) fn unjam(w: &mut World) {
     let tick = w.tick;
     let held = |c: &Car| {
@@ -4848,40 +4893,21 @@ pub(crate) fn unjam(w: &mut World) {
         if taken[c] || !held(&w.cars[c]) {
             continue;
         }
-        let mut ring = vec![c];
-        let mut todo = vec![car_first(c)];
-        let mut ok = true;
-        // (Held up by a car parked in its way, standing for good as far as anyone knows.)
-        let mut parked = false;
-        while let Some(k) = todo.pop() {
-            if crate::traffic::at_red(w, k) {
-                ok = false;
-            }
-            for o in crate::traffic::waits_on(w, k) {
-                // (Someone on foot among them: they step aside first.)
-                if o < 1 << 63 {
-                    ok = false;
-                    continue;
-                }
-                let o = (o & !(1 << 63)) as usize;
-                if ring.contains(&o) {
-                    continue;
-                }
+        let (ring, ok, parked) = held_round(
+            c,
+            |k| crate::traffic::waits_on(w, k),
+            |k| crate::traffic::at_red(w, k),
+            |o| {
                 if w.cars
                     .get(o)
                     .is_some_and(|x| x.state == CarState::Parked && !x.taxi)
                 {
-                    parked = true;
-                    continue;
+                    Some(true)
+                } else {
+                    w.cars.get(o).is_some_and(held).then_some(false)
                 }
-                if w.cars.get(o).is_none_or(|x| !held(x)) {
-                    ok = false;
-                    continue;
-                }
-                ring.push(o);
-                todo.push(car_first(o));
-            }
-        }
+            },
+        );
         for &o in &ring {
             taken[o] = true;
         }
@@ -8438,6 +8464,37 @@ mod tests {
         );
         let w = World::from_json(CONTENT, &town, 1).unwrap();
         assert_eq!(w.travel.by_a_mouth, [true, true, false]);
+    }
+
+    #[test]
+    fn a_ring_with_one_at_a_red_light_someone_is_in_the_way_of_is_held_up() {
+        // (Willowshore, seed base 22: a taxi at a red light with another's body in its way through
+        // the junction, it in the way of one at the green on the other phase, that one in front
+        // of the other's. Whatever the light, one of them was at a red one, so the ring was never
+        // turned round: 16 cars stood in view for good.) Three cars round in a ring, one at a red
+        // light: it waits for one in its way too, so they're held up by each other; waiting for
+        // the light alone, it goes on the green, and they aren't.
+        let (a, b, c) = (car_first(0), car_first(1), car_first(2));
+        let ring = |a_waits: Vec<u64>| {
+            move |k: u64| {
+                if k == a {
+                    a_waits.clone()
+                } else if k == b {
+                    vec![c]
+                } else {
+                    vec![a]
+                }
+            }
+        };
+        let red = |k: u64| k == a;
+        let held = |_: usize| Some(false);
+        let (cars, ok, parked) = held_round(1, ring(vec![b]), red, held);
+        assert_eq!(cars, [1, 2, 0]);
+        assert!(ok && !parked, "held up by each other");
+        let (_, ok, _) = held_round(1, ring(vec![]), red, held);
+        assert!(!ok, "it waits for the light alone");
+        let (_, ok, _) = held_round(1, ring(vec![b]), red, |o| (o != 2).then_some(false));
+        assert!(!ok, "one of them on its way");
     }
 
     #[test]
