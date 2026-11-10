@@ -22,6 +22,7 @@
 import { settings } from '../../../settings/settings.svelte';
 import type { Shading } from '../../types';
 import type { ShaderFeature } from './chunks';
+import { RESIDENT_LIGHT } from './character';
 import { SPECULAR_UNITS } from '../lightUnits';
 
 const LUM = { glsl: 'vec3(0.2126, 0.7152, 0.0722)', wgsl: 'vec3f(0.2126, 0.7152, 0.0722)' };
@@ -60,6 +61,8 @@ export const SOFT_LOOK: ShaderFeature = {
 	uniform vec3 game_hemiGround;
 	uniform vec3 game_hemiDir;
 	vec3 gameAmbient = vec3(0.0);
+	// The soft look's saturation (a surface may set its own before the light is combined: the residents' skin).
+	float gameSaturation = 1.15;
 	vec3 gameHemi(vec3 n) {
 		vec3 c = mix(game_hemiGround, game_hemiSky, dot(n, game_hemiDir) * 0.5 + 0.5);
 		#ifdef GAME_UNDERGROUND
@@ -71,6 +74,7 @@ export const SOFT_LOOK: ShaderFeature = {
 #endif`,
     combine: `
 #ifdef GAME_LOOK
+	${RESIDENT_LIGHT.glsl}
 	// The AO map occludes the light falling on a surface as well as the sky's (an ARM map's red,
 	// with no ambient texture), as the look was tuned; PlayCanvas occludes only the sky's.
 	#ifdef STD_AO
@@ -108,7 +112,7 @@ export const SOFT_LOOK: ShaderFeature = {
 		vec3 soft = ambient * 0.6 + base * shade * lightCol * clamp(lightAmt * 0.42, 0.0, 1.0);
 		float fres = pow(1.0 - max(dot(litArgs_worldNormal, dViewDirW), 0.0), 3.0);
 		soft *= 1.0 + 0.35 * fres;
-		soft = mix(vec3(dot(soft, ${LUM.glsl})), soft, 1.15);
+		soft = mix(vec3(dot(soft, ${LUM.glsl})), soft, gameSaturation);
 		return max(soft, vec3(0.0));
 	#else
 		return pbr;
@@ -124,6 +128,7 @@ export const SOFT_LOOK: ShaderFeature = {
 	uniform game_hemiGround: vec3f;
 	uniform game_hemiDir: vec3f;
 	var<private> gameAmbient: vec3f = vec3f(0.0);
+	var<private> gameSaturation: f32 = 1.15;
 	fn gameHemi(n: vec3f) -> vec3f {
 		var c = mix(uniform.game_hemiGround, uniform.game_hemiSky, dot(n, uniform.game_hemiDir) * 0.5 + 0.5);
 		#ifdef GAME_UNDERGROUND
@@ -135,6 +140,7 @@ export const SOFT_LOOK: ShaderFeature = {
 #endif`,
     combine: `
 #ifdef GAME_LOOK
+	${RESIDENT_LIGHT.wgsl}
 	// See the GLSL: the AO map occludes the direct light too.
 	#ifdef STD_AO
 		dDiffuseLight = dDiffuseLight * litArgs_ao;
@@ -168,7 +174,7 @@ export const SOFT_LOOK: ShaderFeature = {
 		var soft = ambient * 0.6 + base * shade * lightCol * clamp(lightAmt * 0.42, 0.0, 1.0);
 		let fres = pow(1.0 - max(dot(litArgs_worldNormal, dViewDirW), 0.0), 3.0);
 		soft = soft * (1.0 + 0.35 * fres);
-		soft = mix(vec3f(dot(soft, ${LUM.wgsl})), soft, 1.15);
+		soft = mix(vec3f(dot(soft, ${LUM.wgsl})), soft, gameSaturation);
 		return max(soft, vec3f(0.0));
 	#else
 		return pbr;

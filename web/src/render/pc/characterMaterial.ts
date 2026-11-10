@@ -27,7 +27,7 @@ import * as pc from './engine';
 import type { InstanceStream } from './instancing';
 import { GAME_FRONT_FACE, MaterialLibrary } from './materials';
 import { BLANKET } from './shaders/blanket';
-import { RESIDENT, RESIDENT_INSTANCING, RESIDENT_NORMAL } from './shaders/character';
+import { RESIDENT, RESIDENT_DIFFUSE, RESIDENT_INSTANCING, RESIDENT_NORMAL } from './shaders/character';
 import { engineChunk, gameChunks, installGameChunks, registerShaderFeature, replaceOnce, type Language } from './shaders/chunks';
 import { BLANKET_WIDTH, COVER, SHEET } from '../shared/characters/blanket';
 import type { MeshPart, MorphSet } from '../shared/characters/data';
@@ -282,6 +282,8 @@ export function characterMaterial(app: pc.AppBase, part: string, options: Charac
   for (const lang of ['glsl', 'wgsl'] as const) {
     const chunks = mat.getShaderChunks(lang === 'glsl' ? pc.SHADERLANGUAGE_GLSL : pc.SHADERLANGUAGE_WGSL);
     chunks.set('transformInstancingVS', RESIDENT_INSTANCING[lang]);
+    // (Skin's light wraps round the terminator: `RESIDENT_DIFFUSE`.)
+    if (kind === 'body' && !shadow) chunks.set('lightDiffuseLambertPS', RESIDENT_DIFFUSE[lang]);
     chunks.set('normalCoreVS', residentNormalCore(device, lang));
   }
   mat.setDefine('GAME_RESIDENT', '');

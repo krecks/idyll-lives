@@ -78,8 +78,29 @@ const FOLD = '0.3';
  * stripes (acne) wherever the map's texels were small: the creator, a close camera, the pages.
  */
 const CASTER_INSET = '0.012';
-/** The eye's catchlight (linear, emissive). */
+/**
+ * The eye's catchlight (linear, emissive): the light's reflection, so as bright as the light on the eye
+ * (`RESIDENT_LIGHT`; at its full strength whatever the light, it glowed at night).
+ */
 const CATCHLIGHT = '0.85';
+/**
+ * Skin lets light through: the light of a lamp or the sun comes round the terminator (`SKIN_WRAP`: how far past
+ * it, as a share of the way round; `RESIDENT_DIFFUSE`), and what came through is red (`SKIN_SCATTER`, its
+ * colour; `RESIDENT_LIGHT`). Its highlight is a weak one (`SKIN_SPECULAR` of a plastic's), weaker in a crease.
+ * The soft look's extra saturation (`softLook.ts` `gameSaturation`) is left off skin (`SKIN_SATURATION`): on a
+ * tone already warm it turned every face orange.
+ */
+const SKIN_SATURATION = '0.88';
+const SKIN_WRAP = '0.3';
+const SKIN_SCATTER = '1.0, 0.52, 0.4';
+const SKIN_SPECULAR = '0.55';
+/**
+ * The white of the eye (linear; a real one is far from white, and in the lids' shade), how far the upper lid
+ * shades the top of the eye and how far the ball darkens towards its corners as it turns away.
+ */
+const SCLERA = '0.8, 0.775, 0.75';
+const LID_SHADE = '0.45';
+const EYE_ROUND = '0.3';
 /** The occlusion's darkening, at `gain` per unit of tone.w. */
 const ao = (gain: string): string => `(1.0 - ${AO_DARK} * clamp(${gain} * simT.w, 0.0, 1.0))`;
 /** The painted cuts' bands on the body (`simHem`): the top's edges and the bottom's. */
@@ -112,6 +133,80 @@ fn getModelMatrix() -> mat4x4f {
 	return uniform.matrix_model * mat4x4f(instance_line1, instance_line2, instance_line3, instance_line4) * gameSimSkin() * gameSimShown();
 }
 `,
+};
+
+/**
+ * The body's `lightDiffuseLambertPS` (per material): a light's diffuse share on the skin wrapped round the
+ * terminator (`SKIN_WRAP`), Lambert's on painted clothes; what it added is kept for `RESIDENT_LIGHT`. The lights'
+ * shadows still fall on it, so the skin only softens where the body turns from the light.
+ */
+export const RESIDENT_DIFFUSE: Record<Language, string> = {
+  glsl: `
+float getLightDiffuse(vec3 worldNormal, vec3 viewDir, vec3 lightDirNorm) {
+	float nl = dot(worldNormal, -lightDirNorm);
+	float lambert = max(nl, 0.0);
+	#if defined(GAME_RESIDENT) && !defined(SHADOW_PASS)
+		float skin = 1.0 - gameSimCloth;
+		float wrapped = mix(lambert, max((nl + ${SKIN_WRAP}) / (1.0 + ${SKIN_WRAP}), 0.0), skin);
+		gameSimWrapped += wrapped;
+		gameSimWrap += wrapped - lambert;
+		return wrapped;
+	#else
+		return lambert;
+	#endif
+}
+`,
+  wgsl: `
+fn getLightDiffuse(worldNormal: vec3f, viewDir: vec3f, lightDirNorm: vec3f) -> f32 {
+	let nl = dot(worldNormal, -lightDirNorm);
+	let lambert = max(nl, 0.0);
+	#if defined(GAME_RESIDENT) && !defined(SHADOW_PASS)
+		let skin = 1.0 - gameSimCloth;
+		let wrapped = mix(lambert, max((nl + ${SKIN_WRAP}) / (1.0 + ${SKIN_WRAP}), 0.0), skin);
+		gameSimWrapped = gameSimWrapped + wrapped;
+		gameSimWrap = gameSimWrap + wrapped - lambert;
+		return wrapped;
+	#else
+		return lambert;
+	#endif
+}
+`,
+};
+
+/**
+ * The residents' part of the look's `combineColor` (`softLook.ts`, before it splits the light from the
+ * environment, so in both looks): the skin's light that came round the terminator turned red and its highlight
+ * weakened, and the eye's catchlight as bright as the light on the eye.
+ */
+export const RESIDENT_LIGHT: Record<Language, string> = {
+  glsl: `
+#if defined(GAME_RESIDENT) && !defined(SHADOW_PASS)
+	#ifdef GAME_SIM_BODY
+		float simSkin = 1.0 - gameSimCloth;
+		gameSaturation = mix(gameSaturation, ${SKIN_SATURATION}, simSkin);
+		dDiffuseLight *= mix(vec3(1.0), vec3(${SKIN_SCATTER}), simSkin * gameSimWrap / max(gameSimWrapped, 1e-4));
+		#ifdef LIT_SPECULAR
+			dSpecularLight *= mix(1.0, ${SKIN_SPECULAR} * gameSimOcc, simSkin);
+		#endif
+	#endif
+	#ifdef GAME_SIM_EYE
+		litArgs_emission *= clamp(dot(dDiffuseLight + gameAmbient, vec3(0.2126, 0.7152, 0.0722)), 0.05, 1.0);
+	#endif
+#endif`,
+  wgsl: `
+#if defined(GAME_RESIDENT) && !defined(SHADOW_PASS)
+	#ifdef GAME_SIM_BODY
+		let simSkin = 1.0 - gameSimCloth;
+		gameSaturation = mix(gameSaturation, ${SKIN_SATURATION}, simSkin);
+		dDiffuseLight = dDiffuseLight * mix(vec3f(1.0), vec3f(${SKIN_SCATTER}), simSkin * gameSimWrap / max(gameSimWrapped, 1e-4));
+		#ifdef LIT_SPECULAR
+			dSpecularLight = dSpecularLight * mix(1.0, ${SKIN_SPECULAR} * gameSimOcc, simSkin);
+		#endif
+	#endif
+	#ifdef GAME_SIM_EYE
+		litArgs_emission = litArgs_emission * clamp(dot(dDiffuseLight + gameAmbient, vec3f(0.2126, 0.7152, 0.0722)), 0.05, 1.0);
+	#endif
+#endif`,
 };
 
 /** `normalCoreVS`'s `getLocalNormal`, wrapped (the face morphs' normal deltas, `gameSimMorphN`). */
@@ -354,6 +449,11 @@ const PS_GLSL = {
 	float gameSimCloth = 0.0;
 	float gameSimLip = 0.0;
 	float gameSimCatch = 0.0;
+	// The baked occlusion's shade (the skin's highlight goes with it), and the lights' diffuse on the skin: all
+	// of it, and how much of it came round the terminator (RESIDENT_DIFFUSE).
+	float gameSimOcc = 1.0;
+	float gameSimWrapped = 0.0;
+	float gameSimWrap = 0.0;
 	// Appearance texel k of the resident's row.
 	vec4 simTexel(int k) { return texelFetch(game_simPoses, ivec2(int(game_simLayout.x + 0.5) + k, int(vSimRow + 0.5)), 0); }
 	#if defined(GAME_SIM_BODY) || defined(GAME_SIM_CLOTH)
@@ -429,7 +529,8 @@ const PS_GLSL = {
 			cShoe = simFabric(cShoe, simHemShoe);
 			vec3 topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);
 			vec3 topUnder = mix(mix(skin, cTop, simTop), cBottom, simBottom);
-			return mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe) * ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
+			gameSimOcc = ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
+			return mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe) * gameSimOcc;
 		#elif defined(GAME_SIM_CLOTH)
 			// Shells: the flat top / bottom / shoe colour (fields.z = category); soles darker; a skirt's or a
 			// jacket's hem (fields.x: the distance from it; a collar's is out of reach).
@@ -480,7 +581,11 @@ const PS_GLSL = {
 			float pupil = 1.0 - smoothstep(simF.w - simAA, simF.w + simAA, simR);
 			float ring = smoothstep(simF.z * 0.62, simF.z, simR);
 			vec3 irisColour = eyeColour * (1.0 - 0.55 * ring) * (0.85 + 0.3 * smoothstep(simF.w, simF.z * 0.7, simR));
-			return mix(mix(vec3(0.93, 0.91, 0.88), irisColour, iris), vec3(0.02), pupil);
+			// The upper lid's shade over the top of the eye, and the ball darker towards its corners: a white left
+			// flat reads as a sticker on the face.
+			float simLid = 1.0 - ${LID_SHADE} * smoothstep(0.1 * simF.z, 1.5 * simF.z, simF.y);
+			float simRound = 1.0 - ${EYE_ROUND} * smoothstep(1.2 * simF.z, 2.6 * simF.z, simR);
+			return mix(mix(vec3(${SCLERA}), irisColour, iris), vec3(0.02), pupil) * simLid * simRound;
 		#elif defined(GAME_SIM_MOUTH)
 			// Inside the mouth: the tongue red (tone.x), shaded (tone.y); the mouth plate (tone.y = 1) dark red.
 			float shade = clamp(simT.y, 0.0, 1.0);
@@ -527,6 +632,9 @@ const PS_WGSL = {
 	var<private> gameSimCloth: f32 = 0.0;
 	var<private> gameSimLip: f32 = 0.0;
 	var<private> gameSimCatch: f32 = 0.0;
+	var<private> gameSimOcc: f32 = 1.0;
+	var<private> gameSimWrapped: f32 = 0.0;
+	var<private> gameSimWrap: f32 = 0.0;
 	fn simTexel(k: i32) -> vec4f { return textureLoad(game_simPoses, vec2i(i32(uniform.game_simLayout.x + 0.5) + k, i32(vSimRow + 0.5)), 0); }
 	#if defined(GAME_SIM_BODY) || defined(GAME_SIM_CLOTH)
 		// See the GLSL: a turned band and its stitch line along a cut edge.
@@ -588,7 +696,8 @@ const PS_WGSL = {
 			cShoe = simFabric(cShoe, simHemShoe);
 			let topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);
 			let topUnder = mix(mix(skin, cTop, simTop), cBottom, simBottom);
-			return mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe) * ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
+			gameSimOcc = ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
+			return mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe) * gameSimOcc;
 		#elif defined(GAME_SIM_CLOTH)
 			let simHemShell = simHem(simF.x, ${BAND.hem}) * select(0.0, 1.0, abs(simF.y - 3.0) < 0.5 || simF.z < 0.5);
 			let c = simFabric(select(select(simTexel(6).rgb, simTexel(2).rgb, simF.z < 1.5), simTexel(1).rgb, simF.z < 0.5), simHemShell);
@@ -630,7 +739,9 @@ const PS_WGSL = {
 			let pupil = 1.0 - smoothstep(simF.w - simAA, simF.w + simAA, simR);
 			let ring = smoothstep(simF.z * 0.62, simF.z, simR);
 			let irisColour = eyeColour * (1.0 - 0.55 * ring) * (0.85 + 0.3 * smoothstep(simF.w, simF.z * 0.7, simR));
-			return mix(mix(vec3f(0.93, 0.91, 0.88), irisColour, iris), vec3f(0.02), pupil);
+			let simLid = 1.0 - ${LID_SHADE} * smoothstep(0.1 * simF.z, 1.5 * simF.z, simF.y);
+			let simRound = 1.0 - ${EYE_ROUND} * smoothstep(1.2 * simF.z, 2.6 * simF.z, simR);
+			return mix(mix(vec3f(${SCLERA}), irisColour, iris), vec3f(0.02), pupil) * simLid * simRound;
 		#elif defined(GAME_SIM_MOUTH)
 			let shade = clamp(simT.y, 0.0, 1.0);
 			let c = mix(albedo, vec3f(0.6, 0.17, 0.17), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.6 * shade);

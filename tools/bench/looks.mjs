@@ -28,7 +28,7 @@ const flag = (name, fallback) => {
   return i >= 0 && args[i + 1] !== undefined && !args[i + 1].startsWith('--') ? args[i + 1] : fallback;
 };
 
-const DEFAULT_PAGES = 'characters,characters-side,characters-heads,characters-close,characters-hands,characters-feet,characters-skins,characters-hair,characters-tops,characters-builds,characters-game,characters-near,characters-faces,poses,poses-close,previews,gallery-objects,gallery-nature';
+const DEFAULT_PAGES = 'characters,characters-side,characters-heads,characters-close,characters-hands,characters-feet,characters-skins,characters-hair,characters-tops,characters-builds,characters-game,characters-near,characters-faces,poses,poses-close,previews,gallery-objects,gallery-furniture,gallery-trees,gallery-nature';
 const LABEL = 44;
 
 /** Tiles the pictures `a` and `b` share, `a`'s on the left, under their names; returns how many. */
