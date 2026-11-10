@@ -8,8 +8,11 @@
  * moved (a new world) or only the lamps changed.
  */
 
+import type { WorldStructure } from '../../core/protocol';
 import type { SnapshotLayout } from '../../core/snapshot';
 import { Geo, type V3 } from './geometry';
+import { hasSidewalks } from './junctions';
+import { townRoads } from './roads';
 
 /** The lamp a head shows: its lens, top to bottom (`SIGNAL_LAMPS`). */
 export const RED = 0;
@@ -42,6 +45,8 @@ export class SignalRows {
   readonly lamp: Uint8Array;
   /** Each head's pedestrians' lamp: 1 walk, 0 don't walk (`walkOf`). */
   readonly walk: Uint8Array;
+  /** Each head's row in the snapshot (`WorldStructure.junctions` arms' `light`: rows not shown are left out). */
+  readonly row: Uint16Array;
   private readonly change: SignalChange = { placed: false, lit: false };
 
   constructor(readonly most = MOST_SIGNALS) {
@@ -50,6 +55,7 @@ export class SignalRows {
     this.yaw = new Float32Array(most);
     this.lamp = new Uint8Array(most);
     this.walk = new Uint8Array(most);
+    this.row = new Uint16Array(most);
   }
 
   /**
@@ -84,6 +90,8 @@ export class SignalRows {
       this.yaw[n] = yaw;
       this.lamp[n] = lamp;
       this.walk[n] = walk;
+      if (this.row[n] !== k) change.placed = true;
+      this.row[n] = k;
       n++;
     }
     if (n !== this.count) change.placed = true;
@@ -97,6 +105,27 @@ export class SignalRows {
   clear(): void {
     this.count = 0;
   }
+}
+
+/**
+ * Per snapshot row (`SnapshotLayout.light`), whether its head's arm has a crosswalk, so its pole
+ * gets the pedestrians' head: an arm into a street or a lane, as its zebra is drawn (`roads.ts`
+ * `junctionMarks`), not a country road's (no sidewalks to cross between) nor a roundabout's (no walk
+ * phase). Null: the structure doesn't say which arm a row is (one from before `junctions`): every
+ * head has it.
+ */
+export function crosswalkRows(world: WorldStructure): Uint8Array | null {
+  const list = world.junctions;
+  if (!list) return null;
+  const roads = townRoads(world);
+  let rows = 0;
+  for (const j of list) for (const a of j.arms) if (a.light !== null) rows = Math.max(rows, a.light + 1);
+  const out = new Uint8Array(rows);
+  for (const j of list) {
+    if (j.roundabout) continue;
+    for (const a of j.arms) if (a.light !== null && hasSidewalks(roads[a.road])) out[a.light] = 1;
+  }
+  return out;
 }
 
 /** A row's `state` values (`SnapshotLayout.light.states`). */

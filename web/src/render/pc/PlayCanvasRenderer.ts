@@ -1217,6 +1217,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // thing, hundreds of MB of buffers; Low's merged object shadows alone 260 MB, which lost the
     // WebGPU device): with no lot given, the focus stays the lot built, else the one nearest the camera.
     if (!view && world.meta?.world?.size === 'big') view = this.view ?? this.nearestLot(world);
+    // (Which traffic lights' poles get a pedestrians' head: those by a crosswalk.)
+    this.signals.setWorld(world);
     if (this.rebuildNext) this.rebuildNext = false;
     else if (this.patchable(world, view)) {
       this.patchWorld(world);

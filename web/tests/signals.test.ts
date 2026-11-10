@@ -8,8 +8,9 @@
  */
 
 import { describe, expect, test } from 'bun:test';
+import type { RoadPlan, WorldStructure } from '../src/core/protocol';
 import type { SnapshotLayout } from '../src/core/snapshot';
-import { AMBER, GREEN, lampOf, pedestrianHead, RED, SignalRows, walkOf } from '../src/render/shared/signals';
+import { AMBER, crosswalkRows, GREEN, lampOf, pedestrianHead, RED, SignalRows, walkOf } from '../src/render/shared/signals';
 import { BASES, constant, layout, LAYOUT, SNAPSHOT_RS } from './snapshotLayout';
 
 /** The light rows' part of the layout, as sim-core's `layout_json` writes it (worked out from snapshot.rs: `snapshotLayout.ts`). */
@@ -157,5 +158,37 @@ describe('signal-head rows', () => {
     few.read(snap, layout);
     expect(few.count).toBeLessThanOrEqual(8);
     expect(few.count).toBe(4);
+  });
+
+  test("reads each head's row, so its pole is known by the structure's junctions", () => {
+    const rows = new SignalRows();
+    rows.read(snapshot([JUNCTION[0], { ...JUNCTION[1], shown: 0 }, JUNCTION[2]]), layout);
+    expect([...rows.row.subarray(0, 2)]).toEqual([0, 2]);
+  });
+});
+
+describe("the pedestrians' heads", () => {
+  /** A road of `kind` (a street: 7 m with its sidewalks; a country road, no sidewalks). */
+  const road = (kind: RoadPlan['kind']): RoadPlan => ({ points: [[0, 0], [50, 0]], width: 7, kind, ends: ['join', 'join'] }) as RoadPlan;
+  const arm = (road: number, light: number | null) => ({ road, dir: [1, 0] as [number, number], width: 4.3, walkFrom: 6, walkTo: 9, stop: 9.5, light });
+  const world = (junctions: WorldStructure['junctions']) =>
+    ({ width: 100, depth: 100, meta: { roads: [road('street'), road('lane'), road('country'), road('street')] }, junctions }) as unknown as WorldStructure;
+
+  test("hang only on poles by a crosswalk: a street's or a lane's arm, not a country road's nor a roundabout's", () => {
+    const rows = crosswalkRows(
+      world([
+        // A T where a country road meets a street: its heads in rows 0..2.
+        { x: 10, z: 10, arms: [arm(0, 0), arm(2, 1), arm(0, 2)] },
+        // A crossroads of a lane and a street, its rows 3..6.
+        { x: 60, z: 10, arms: [arm(1, 3), arm(3, 4), arm(1, 5), arm(3, 6)] },
+        // A roundabout's junction: lit an arm at a time, no walk phase.
+        { x: 90, z: 90, roundabout: true, arms: [arm(0, 7), arm(3, 8), arm(1, 9)] },
+      ]),
+    );
+    expect(rows && [...rows]).toEqual([1, 0, 1, 1, 1, 1, 1, 0, 0, 0]);
+  });
+
+  test('hang on every pole for a structure that says nothing of its junctions', () => {
+    expect(crosswalkRows(world(undefined))).toBeNull();
   });
 });
