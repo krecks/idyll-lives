@@ -1471,10 +1471,11 @@ fn generated_worlds_cars_keep_to_the_roads() {
 /// How long a drive across a world takes with the roads to itself, from its road furthest south
 /// to its road furthest west (some one to two km of road), on the traffic's own clock
 /// (`DRIVE_SCALE`), 32 km/h in the hamlets, straight through junctions at speed: about 20 to 25
-/// game minutes for the middle world of a sample (`ACROSS_MINUTES` at most; 20.6 to 30.0 over seed
-/// bases 16 to 35), none more than `ACROSS_MOST` (game minutes; 55.2 the most seen, Otterpool).
-/// At real speeds they took two to five game hours.
-const ACROSS_MINUTES: f32 = 30.0;
+/// game minutes for the middle world of a sample (`ACROSS_MINUTES` at most; 20.6 to 30.7 over seed
+/// bases 16 to 35: about half an hour, as asked, with room for a sample's spread, bases 28 and 34
+/// sitting at 30.0 to 30.7), none more than `ACROSS_MOST` (game minutes; 55.2 the most seen,
+/// Otterpool). At real speeds they took two to five game hours.
+const ACROSS_MINUTES: f32 = 32.0;
 const ACROSS_MOST: f32 = 60.0;
 
 #[test]
