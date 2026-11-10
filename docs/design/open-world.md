@@ -120,7 +120,10 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   its green for one waiting at the other's red, two in step kept two cars crossing each other's
   way at red for hours (Hollyglade). A hold lasts `CYCLE` at most from when it began, and the
   second's green is held for those granted till they're past its stop line; one is granted only
-  with `GREEN_HELD` 10 s of the hold still to come. Each
+  with `GREEN_HELD` 10 s of the hold still to come. A light whose stop
+  line a car is past already (in its box, asking again for the rest of its way through after a
+  taxi's stand there) neither holds it nor is called by it (`Claim::lights`): it waited in the box
+  at red for good while the light was held for one waiting for the box to clear. Each
   arm has a crosswalk from its corner (where the kerb's `KERB_RETURN` 3 m return round from the
   next arm ends, or the box's edge, whichever is further out) `CROSSWALK` 3 m wide, and a stop
   line `STOP_GAP` 0.5 m past it, no further out than half way to the next junction: a car's claim

@@ -105,6 +105,9 @@ pub(crate) struct Sample {
     pub pass: f32,
 }
 
+/// A lit junction (`Travel::signals`) and the phase of the arm a way comes in by (`Claim::gate`).
+pub(crate) type Gate = (u16, u8);
+
 /// A stretch of a route a vehicle holds before driving into it (`from`, ticks along it) till it's
 /// out of its last zone (`to`), sampled on past that over its room on the far side.
 #[derive(Debug, Clone, Default)]
@@ -162,6 +165,20 @@ impl Claim {
             stop2: f32::NEG_INFINITY,
             stop_at: f32::NEG_INFINITY,
         }
+    }
+
+    /// The lights its group goes through (`gate`, `gate2`) that one `at` ticks along its route
+    /// still comes to: not one whose stop line it's past already, in the box (`stop_at`,
+    /// `stop2`). (A taxi stood for its rider in a lit junction's box, out past the crosswalk,
+    /// letting go of its group but the part it stood in, `Traffic::stand`: asking for the rest
+    /// again, it waited in the box for that light's green, held up those waiting for the box to
+    /// clear at the others' greens, Elderbrook.)
+    pub(crate) fn lights(&self, at: f32) -> (Option<Gate>, Option<Gate>) {
+        let past = |line: f32| line.is_finite() && at > line + 1e-3;
+        (
+            self.gate.filter(|_| !past(self.stop_at)),
+            self.gate2.filter(|_| !past(self.stop2)),
+        )
     }
 
     /// What's left of it for one `t` ticks along its route: the samples from there on (from the
@@ -1111,6 +1128,9 @@ struct Ask {
     /// Long asked (`OLD_ASK`), whom it waits for, however far round (as the tick began, those only
     /// coming into its way left out): none of them keeps clear of it (`blocked`).
     reach: Vec<u64>,
+    /// How far along its route its vehicle is (ticks, as the tick began or as it asked): past a
+    /// stop line of its group's lights already, that light is behind it (`Claim::lights`).
+    at: f32,
 }
 
 /// How far short of what's left of another's claim one waits (m, `Traffic::blocked`).
@@ -1279,7 +1299,10 @@ impl Traffic {
                 continue;
             }
             match self.asks.iter_mut().find(|a| a.key == key) {
-                Some(a) if a.parts.first().is_some_and(|p| p.0 == tag) => a.seen = tick,
+                Some(a) if a.parts.first().is_some_and(|p| p.0 == tag) => {
+                    a.seen = tick;
+                    a.at = t;
+                }
                 found => {
                     let ask = Ask {
                         tick,
@@ -1296,6 +1319,7 @@ impl Traffic {
                         coming: Vec::new(),
                         bodies_only: false,
                         reach: Vec::new(),
+                        at: t,
                     };
                     match found {
                         Some(a) => *a = ask,
@@ -1441,15 +1465,13 @@ impl Traffic {
             .map(|a| a.key)
     }
 
-    /// Whether a group through the lights `gate` (`Claim::gate`) may be asked for now: its arm's
-    /// phase's green (none: no lights).
-    /// Whether a group through claim `c`'s lights may be asked for now: green at each of them
-    /// (`Claim::gate`, `Claim::gate2`).
-    pub(crate) fn green_through(&self, c: &Claim) -> bool {
-        self.green(c.gate)
-            && self.green(c.gate2)
-            && c.gate2
-                .is_none_or(|(s, _)| self.fresh.get(usize::from(s)).copied().unwrap_or(true))
+    /// Whether a group through claim `c`'s lights may be asked for now by one `at` ticks along its
+    /// route: green at each of them it still comes to (`Claim::lights`; none: no lights).
+    pub(crate) fn green_through(&self, c: &Claim, at: f32) -> bool {
+        let (gate, gate2) = c.lights(at);
+        self.green(gate)
+            && self.green(gate2)
+            && gate2.is_none_or(|(s, _)| self.fresh.get(usize::from(s)).copied().unwrap_or(true))
     }
 
     pub(crate) fn green(&self, gate: Option<(u16, u8)>) -> bool {
@@ -1495,7 +1517,8 @@ impl Traffic {
             if a.seen + 1 >= tick
                 && let Some(first) = a.parts.first()
             {
-                for (s, phase) in [first.1.gate, first.1.gate2].into_iter().flatten() {
+                let (gate, gate2) = first.1.lights(a.at);
+                for (s, phase) in [gate, gate2].into_iter().flatten() {
                     if let Some(m) = phases.get_mut(usize::from(s)) {
                         m[0] |= bit(phase);
                     }
@@ -1505,7 +1528,7 @@ impl Traffic {
                 // wanted there, next. Each holding the other's green for one waiting at its own
                 // red, two lights in step kept two cars crossing each other's way at red for
                 // hours: Hollyglade.)
-                if let (Some(a), Some(b)) = (first.1.gate, first.1.gate2) {
+                if let (Some(a), Some(b)) = (gate, gate2) {
                     let (lead, follow) = if a.0 <= b.0 { (a, b) } else { (b, a) };
                     if self.green(Some(lead)) {
                         if let Some(m) = phases.get_mut(usize::from(lead.0)) {
@@ -1685,6 +1708,11 @@ impl Traffic {
             (a.seen + 1 >= tick || going || at.is_some_and(short))
                 && at.is_some_and(|t| a.parts.first().is_some_and(|p| t <= p.1.from + 1e-3))
         });
+        for a in &mut self.asks {
+            if let Some(t) = place(a.key, a.route) {
+                a.at = t;
+            }
+        }
         self.asks.sort_by_key(|a| (a.tick, a.key));
         self.change_lights(tick, signals);
         // Who waited for whom as the tick began: those on the road, for one in their way; the
@@ -1732,7 +1760,7 @@ impl Traffic {
             // bodies in its way, it names (`by`), as on its green: one standing in its way waiting
             // in turn for it at another phase's red is a ring the waits see, rule 3's and
             // `cars::unjam`'s, not two standing for good by turns, Highholm.)
-            let red = !self.green_through(next[0]);
+            let red = !self.green_through(next[0], a.at);
             let me = self
                 .mover(a.key)
                 .map_or((first.rect, first.way), |m| (m.rect, m.way));
@@ -2040,7 +2068,7 @@ pub fn at_red(w: &World, key: u64) -> bool {
             && a.seen + 1 >= w.traffic.tick
             && a.parts
                 .first()
-                .is_some_and(|p| !w.traffic.green_through(&p.1))
+                .is_some_and(|p| !w.traffic.green_through(&p.1, a.at))
     })
 }
 
@@ -2860,6 +2888,42 @@ mod tests {
             went_x.is_some_and(|t| t < 2 * CYCLE) && went_y.is_some_and(|t| t < 2 * CYCLE),
             "through both lights: {went_x:?}, {went_y:?}"
         );
+    }
+
+    #[test]
+    fn one_past_its_stop_line_asking_again_in_the_box_goes_on_at_red() {
+        // (Elderbrook's: a taxi stood for its rider in a lit junction's box, letting go of all of
+        // its group but the part it stood in; asking for the rest again it waited in the box for
+        // its arm's green, while the light was held on the other phase for one waiting for the
+        // box to clear of it.) Its stop line behind it, that light is too: it goes on, and it
+        // calls no green.
+        let k = 1 << 63 | 7;
+        let mut c = claim(&[[0.0, -2.0], [0.0, 2.0], [0.0, 6.0], [0.0, 10.0]]);
+        c.gate = Some((0, 0));
+        c.stop_at = 4.0;
+        let sig = lit(
+            [0.0, 0.0],
+            &[[0.0, -1.0], [0.0, 1.0], [1.0, 0.0]],
+            &[0, 0, 1],
+        );
+        assert_eq!(c.lights(4.0), (Some((0, 0)), None), "at its stop line");
+        assert_eq!(c.lights(9.5), (None, None), "past it");
+        let mut traffic = Traffic {
+            lights: vec![Light {
+                phase: 1,
+                stage: Stage::Green,
+                since: 0,
+            }],
+            ..Default::default()
+        };
+        let movers = || vec![standing(k, [0.0, -2.5], 0.0)];
+        let places = [(k, 0, 9.5)];
+        for tick in 1..4 {
+            traffic.may_go(tick, k, 0, std::slice::from_ref(&c), 9.5, 10.5);
+            traffic.begin(tick + 1, movers(), &places, std::slice::from_ref(&sig));
+        }
+        assert!(traffic.holding(k), "it waited in the box at red");
+        assert_eq!(traffic.lights[0].phase, 1, "it called its own green");
     }
 
     #[test]
