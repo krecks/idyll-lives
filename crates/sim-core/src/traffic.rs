@@ -433,8 +433,9 @@ pub struct Signal {
     /// On a roundabout's ring (a road of it has an island: `meta.roads[].island`).
     pub roundabout: bool,
     /// How long its walk phase's clearance lasts, once those on foot may no longer step out
-    /// (`WALK_OPEN`): its widest arm crossed at `WALK_PACE` (ticks of real time: people don't
-    /// hurry for the cars' clock). 0: no walk phase (a roundabout's).
+    /// (`WALK_OPEN`): its widest arm with a crosswalk crossed at `WALK_PACE` (ticks of real time:
+    /// people don't hurry for the cars' clock). 0: no walk phase (a roundabout's, or one with no
+    /// crosswalk: country roads meeting).
     pub walk_clear: u64,
 }
 
@@ -450,11 +451,12 @@ impl Signal {
     }
 
     /// Whether `p` is in its crosswalks or its box, between the kerbs (`kerb_stop`): out along
-    /// an arm no further than its crosswalk's far side. None of a roundabout's.
+    /// an arm with a crosswalk (`SignalArm::crosswalk`) no further than its far side. None of a
+    /// roundabout's; a country road's arm is crossed as anywhere else.
     pub fn crossing(&self, p: [f32; 2]) -> bool {
         let d = [p[0] - self.at[0], p[1] - self.at[1]];
         self.walk_clear > 0
-            && self.arms.iter().any(|a| {
+            && self.arms.iter().filter(|a| a.crosswalk).any(|a| {
                 let along = d[0] * a.way[0] + d[1] * a.way[1];
                 let across = (d[0] * a.way[1] - d[1] * a.way[0]).abs();
                 (0.0..=a.walk_to).contains(&along) && across <= a.kerb
@@ -465,6 +467,7 @@ impl Signal {
     fn crossing_reach(&self) -> f32 {
         self.arms
             .iter()
+            .filter(|a| a.crosswalk)
             .map(|a| a.walk_to.hypot(a.kerb))
             .fold(0.0, f32::max)
     }
@@ -477,7 +480,9 @@ impl Signal {
 /// `walk_from` to `walk_to` m out from the junction's middle (from the corner, where the kerb's
 /// return round from the next arm ends, `KERB_RETURN`, or the box's edge, whichever is further
 /// out: `CROSSWALK` wide), and its stop line `stop` m out (`STOP_GAP` past the crosswalk), where
-/// cars stop on red with their noses.
+/// cars stop on red with their noses. Whether it has a crosswalk at all (`crosswalk`): a street's
+/// or a lane's (one with sidewalks, as the renderer draws its zebra and the pedestrians' head), not
+/// a country road's nor a roundabout's; those on foot wait for the walk phase only at those.
 #[derive(Debug, Clone, Copy)]
 pub struct SignalArm {
     pub way: [f32; 2],
@@ -489,6 +494,7 @@ pub struct SignalArm {
     pub walk_from: f32,
     pub walk_to: f32,
     pub stop: f32,
+    pub crosswalk: bool,
 }
 
 /// How far a lit junction's lights are through a phase's turn (`Light`): its green, its amber,
@@ -691,12 +697,22 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
                 walk_from,
                 walk_to,
                 stop,
+                crosswalk: !roundabout
+                    && matches!(
+                        r.kind,
+                        crate::travel::RoadKind::Street | crate::travel::RoadKind::Lane
+                    ),
             }
         })
         .collect();
-    // (Its widest arm crossed at an old person's pace, once they may no longer step out.)
-    let widest = arms.iter().map(|a| 2.0 * a.kerb).fold(0.0, f32::max);
-    let walk_clear = if roundabout {
+    // (Its widest crosswalk crossed at an old person's pace, once they may no longer step out;
+    // none, no walk phase.)
+    let widest = arms
+        .iter()
+        .filter(|a| a.crosswalk)
+        .map(|a| 2.0 * a.kerb)
+        .fold(0.0, f32::max);
+    let walk_clear = if widest <= 0.0 {
         0
     } else {
         crate::secs((widest / WALK_PACE).max(WALK_CLEAR_LEAST))
@@ -2044,6 +2060,7 @@ mod tests {
                     walk_from: 6.0,
                     walk_to: 9.0,
                     stop: 9.5,
+                    crosswalk: true,
                 })
                 .collect(),
             phases: phases.iter().max().map_or(0, |p| p + 1),
