@@ -1401,6 +1401,10 @@ pub struct Travel {
     /// The tiles the town file's `terrain` masks (water, rock): blocked under everything, so a
     /// tile freed of what stood on it stays blocked (`World::set_travel`). Sorted tile indices.
     pub base_blocked: Vec<usize>,
+    /// The lit junctions' boxes and their carriageways out past their stop lines but for the
+    /// crosswalks (`traffic::settle`, `traffic::KEEP_OFF`): blocked to those on foot, who cross on
+    /// the zebras. Sorted tile indices; not saved.
+    pub(crate) junction_tiles: Vec<usize>,
     /// The junctions with traffic lights (`traffic::Signal`, `traffic::settle`). Not saved: worked
     /// out again on load.
     pub signals: Vec<crate::traffic::Signal>,
@@ -1430,6 +1434,7 @@ impl Travel {
             graph,
             country_speed: COUNTRY_SPEED,
             base_blocked: Vec::new(),
+            junction_tiles: Vec::new(),
             by_a_mouth: Vec::new(),
             signals: Vec::new(),
             crossings: Default::default(),
@@ -1468,9 +1473,10 @@ impl Travel {
         }
     }
 
-    /// Whether tile `i` (`Lot::tile_index`) is blocked by the land itself (`base_blocked`).
+    /// Whether tile `i` (`Lot::tile_index`) is blocked by the land itself (`base_blocked`), or is
+    /// a lit junction's off-limits to those on foot (`junction_tiles`).
     pub fn ground_blocked(&self, i: usize) -> bool {
-        self.base_blocked.binary_search(&i).is_ok()
+        self.base_blocked.binary_search(&i).is_ok() || self.junction_tiles.binary_search(&i).is_ok()
     }
 
     /// The area a point is in, if any.

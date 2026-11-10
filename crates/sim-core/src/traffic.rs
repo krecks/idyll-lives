@@ -462,17 +462,44 @@ impl Signal {
         self.phases + u8::from(self.walk_clear > 0)
     }
 
-    /// Whether `p` is in its crosswalks or its box, between the kerbs (`kerb_stop`): out along
-    /// an arm with a crosswalk (`SignalArm::crosswalk`) no further than its far side. None of a
-    /// roundabout's; a country road's arm is crossed as anywhere else.
+    /// Whether `p` is on one of its crosswalks (`kerb_stop`): an arm's with one
+    /// (`SignalArm::crosswalk`), from `walk_from` to `walk_to` out, in its carriageway (`KERB_IN`
+    /// in from the kerb: one walking along the pavement by it isn't on it). Its box and the
+    /// carriageway either side of the crosswalks nobody on foot walks on at all
+    /// (`Travel::junction_tiles`). None of a roundabout's; a country road's arm is crossed as
+    /// anywhere else, out past the box.
     pub fn crossing(&self, p: [f32; 2]) -> bool {
         let d = [p[0] - self.at[0], p[1] - self.at[1]];
         self.walk_clear > 0
             && self.arms.iter().filter(|a| a.crosswalk).any(|a| {
                 let along = d[0] * a.way[0] + d[1] * a.way[1];
                 let across = (d[0] * a.way[1] - d[1] * a.way[0]).abs();
-                (0.0..=a.walk_to).contains(&along) && across <= a.kerb
+                (a.walk_from..=a.walk_to).contains(&along) && across <= a.kerb - KERB_IN
             })
+    }
+
+    /// Whether `p` is where those on foot never walk (`Travel::junction_tiles`): its box, between
+    /// the kerbs out to the crosswalks (out past the box on an arm without one), and on an arm with
+    /// one, from its far side out to `KEEP_OFF` past the stop line; not on a crosswalk itself.
+    /// (Not a roundabout's.)
+    fn off_limits(&self, p: [f32; 2]) -> bool {
+        if self.roundabout {
+            return false;
+        }
+        let d = [p[0] - self.at[0], p[1] - self.at[1]];
+        let mut off = false;
+        for a in &self.arms {
+            let along = d[0] * a.way[0] + d[1] * a.way[1];
+            let across = (d[0] * a.way[1] - d[1] * a.way[0]).abs();
+            if across > a.kerb || along < -0.01 {
+                continue;
+            }
+            if a.crosswalk && (a.walk_from..=a.walk_to).contains(&along) {
+                return false;
+            }
+            off |= along < a.walk_from || a.crosswalk && along <= a.stop + KEEP_OFF;
+        }
+        off
     }
 
     /// How far from its middle its crosswalks reach at most (m).
@@ -569,6 +596,11 @@ const OPPOSITE: f32 = -0.866;
 pub const KERB_RETURN: f32 = 3.0;
 pub const CROSSWALK: f32 = 3.0;
 pub const STOP_GAP: f32 = 0.5;
+/// How far out past an arm's stop line its carriageway is off-limits to those on foot (m,
+/// `Signal::off_limits`): they cross on the zebra, not just past it; and how far in from the kerb
+/// one on the crosswalk is in the road (m, `Signal::crossing`).
+pub const KEEP_OFF: f32 = 3.0;
+const KERB_IN: f32 = 0.25;
 /// The walk phase (`Signal::walk_phase`): how long those on foot may step out (ticks of real time,
 /// as people walk), and the pace its clearance gives the slowest to get across the widest arm
 /// (m a second; `Signal::walk_clear`), `WALK_CLEAR_LEAST` at least (s).
@@ -1896,6 +1928,64 @@ pub fn on_its_way(w: &World, key: u64) -> Option<f32> {
     .then_some(car.progress)
 }
 
+/// The tiles the lit junctions keep those on foot off (`Signal::off_limits`, `Travel::
+/// junction_tiles`), as `signals` have them: blocked, those freed since the last time given back,
+/// and walkers finding their way again round where that changed.
+fn keep_off(w: &mut World, signals: &[Signal]) {
+    let mut tiles: Vec<usize> = Vec::new();
+    let mut rects: Vec<[i32; 4]> = Vec::new();
+    for sig in signals.iter().filter(|s| !s.roundabout) {
+        let r = sig
+            .arms
+            .iter()
+            .map(|a| (a.stop + KEEP_OFF).hypot(a.kerb))
+            .fold(0.0, f32::max)
+            .ceil();
+        let (x0, z0) = (
+            (sig.at[0] - r).floor() as i32,
+            (sig.at[1] - r).floor() as i32,
+        );
+        let (x1, z1) = ((sig.at[0] + r).ceil() as i32, (sig.at[1] + r).ceil() as i32);
+        let mut any = false;
+        for z in z0..z1 {
+            for x in x0..x1 {
+                if w.lot.in_bounds(x, z) && sig.off_limits([x as f32 + 0.5, z as f32 + 0.5]) {
+                    tiles.push(w.lot.tile_index(x, z));
+                    any = true;
+                }
+            }
+        }
+        if any {
+            rects.push([x0, z0, x1, z1]);
+        }
+    }
+    tiles.sort_unstable();
+    tiles.dedup();
+    let old = std::mem::replace(&mut w.travel.junction_tiles, tiles);
+    if old == w.travel.junction_tiles {
+        return;
+    }
+    for &i in &old {
+        if w.travel.junction_tiles.binary_search(&i).is_err()
+            && let Some(b) = w.blocked.get_mut(i)
+        {
+            *b = w.travel.base_blocked.binary_search(&i).is_ok();
+        }
+    }
+    for &i in &w.travel.junction_tiles {
+        if let Some(b) = w.blocked.get_mut(i) {
+            *b = true;
+        }
+    }
+    for &i in &old {
+        let (x, z) = w.lot.tile_xz(i);
+        rects.push([x, z, x + 1, z + 1]);
+    }
+    for r in rects {
+        w.nav_changed_in(r);
+    }
+}
+
 /// Per road of `g`, whether it's a roundabout's ring: the town file's road (`meta.roads`) has an
 /// island in the middle.
 fn rings(g: &Graph, meta: &serde_json::Value) -> Vec<bool> {
@@ -1928,6 +2018,7 @@ pub(crate) fn settle(w: &mut World) {
         crate::snapshot::MAX_LIGHTS
     );
     w.travel.crossings = Crossings::new(&signals);
+    keep_off(w, &signals);
     // (Each lit junction's box taken out to the far side of its crosswalks: nobody goes onto one
     // without room to clear it beyond, and a way between two lit junctions too near each other
     // for a body to stand between them is one group, through both lights: `gate`.)

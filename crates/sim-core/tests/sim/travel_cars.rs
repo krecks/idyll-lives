@@ -1295,6 +1295,106 @@ fn walk_to(w: &mut World, i: u32, to: [f32; 2]) {
     .unwrap();
 }
 
+/// Where `p` is in the carriageway near the crossroads' junction (`crossroads`): out along which
+/// arm, if any (between its kerbs, out to `KEEP_OFF` past its stop line), and how far.
+fn in_junction(sig: &sim_core::traffic::Signal, p: [f32; 2]) -> Option<(usize, f32)> {
+    let d = [p[0] - sig.at[0], p[1] - sig.at[1]];
+    (0..sig.arms.len()).find_map(|k| {
+        let a = sig.arms[k];
+        let along = d[0] * a.way[0] + d[1] * a.way[1];
+        let across = (d[0] * a.way[1] - d[1] * a.way[0]).abs();
+        (across <= a.kerb - 0.3 && (0.0..a.stop + sim_core::traffic::KEEP_OFF).contains(&along))
+            .then_some((k, along))
+    })
+}
+
+#[test]
+fn someone_on_foot_crossing_by_a_lit_junction_crosses_on_its_zebras_on_the_walk_never_through_the_box() {
+    use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
+    // The crossroads: someone on the pavement at its north-east corner walks to the south-west
+    // one. Not straight across the box (as at Canalside, 2-3 m from the middle, on the walk and
+    // off it): over two of its zebras, each on the walk, and nowhere else in the carriageway near
+    // the junction, out past its stop lines.
+    let mut w = crossroads(&[crossroads_house(150.0, true)]);
+    common::run_to(&mut w, 2, 7.0);
+    let sig = w.travel.signals[0].clone();
+    let corner = |x: f32, z: f32| [sig.at[0] + x * 3.0, sig.at[1] + z * 3.0];
+    let (from, to) = (corner(1.0, -1.0), corner(-1.0, 1.0));
+    w.sims[0].pos = from;
+    walk_to(&mut w, 0, to);
+    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    let (mut on_zebras, mut across) = (std::collections::BTreeSet::new(), false);
+    let mut was_in = false;
+    for _ in 0..common::secs(240.0) {
+        w.tick_once();
+        snapshot::write(&w, &mut buf);
+        let p = w.sims[0].pos;
+        if let Some((k, along)) = in_junction(&sig, p) {
+            let a = sig.arms[k];
+            assert!(
+                (a.walk_from - 0.3..=a.walk_to + 0.3).contains(&along),
+                "in the road off the zebras at {p:?}: arm {k}, {along:.2} m out"
+            );
+            // (Onto it only on the walk.)
+            if !was_in {
+                let head = buf[LIGHT_BASE + k * LIGHT_STRIDE + light::STATE];
+                assert_eq!(head, light::WALK, "onto arm {k}'s zebra off the walk at {p:?}");
+            }
+            on_zebras.insert(k);
+        }
+        was_in = in_junction(&sig, p).is_some();
+        if (p[0] - to[0]).hypot(p[1] - to[1]) < 0.4 {
+            across = true;
+            break;
+        }
+    }
+    assert!(across, "never across: at {:?}", w.sims[0].pos);
+    assert_eq!(on_zebras.len(), 2, "over two zebras: {on_zebras:?}");
+}
+
+#[test]
+fn someone_on_foot_walking_past_a_lit_crosswalk_on_the_pavement_isnt_held() {
+    use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
+    // The crossroads: someone on the pavement of its north arm, west of it, beside its crosswalk,
+    // walks round the corner along the pavement to the west arm's: they cross no road, and go on
+    // without waiting for a walk (at Canalside they stood by a crosswalk till the walk, then went
+    // on along the pavement).
+    let mut w = crossroads(&[crossroads_house(150.0, true)]);
+    common::run_to(&mut w, 2, 7.0);
+    let sig = w.travel.signals[0].clone();
+    let north = sig.arms.iter().find(|a| a.way[1] < -0.5).unwrap();
+    let side = north.kerb + 0.75;
+    let (from, to) = (
+        [sig.at[0] - side, sig.at[1] - north.walk_to - 2.0],
+        [sig.at[0] - north.walk_to - 2.0, sig.at[1] - side],
+    );
+    w.sims[0].pos = from;
+    walk_to(&mut w, 0, to);
+    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    let start = w.tick;
+    let mut there = None;
+    while w.tick < start + common::secs(30.0) {
+        w.tick_once();
+        snapshot::write(&w, &mut buf);
+        for k in 0..sig.arms.len() {
+            assert_ne!(
+                buf[LIGHT_BASE + k * LIGHT_STRIDE + light::STATE],
+                light::WALK,
+                "a walk phase for one only walking by"
+            );
+        }
+        let p = w.sims[0].pos;
+        assert!(in_junction(&sig, p).is_none(), "in the road at {p:?}");
+        if (p[0] - to[0]).hypot(p[1] - to[1]) < 0.4 {
+            there = Some(w.tick - start);
+            break;
+        }
+    }
+    // (Some 17 m round the corner at a walk: a dozen seconds.)
+    let there = there.expect("never round the corner");
+    assert!(there < common::secs(16.0), "round after {there} ticks");
+}
+
 #[test]
 fn someone_on_foot_at_a_lit_crosswalk_waits_at_the_kerb_for_the_walk_then_crosses() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
