@@ -3370,7 +3370,10 @@ fn drive_on(w: &mut World, c: usize) {
     }
     // (Backed up out of its way, it stays there while that one still waits for it, or while it
     // still waits its turn after it, or that one is still by it (held up there by others now and
-    // then, on foot too): not on into its way again.)
+    // then, on foot too): not on into its way again. Not one that could back up no further
+    // (`Car::jam`'s third, the other backs instead): it goes on as soon as the other gives it
+    // room, else both stood back for each other for good, the other coming up again to wait on
+    // it, Tide Sands.)
     let asking = !w.traffic.waits_for(key).is_empty();
     let by = w.cars[c].backed_for.is_some_and(|k| {
         let me = &w.cars[c];
@@ -3382,7 +3385,7 @@ fn drive_on(w: &mut World, c: usize) {
                 crate::travel::dist(m.0, s.0) < (me.len + o.len) / 2.0 + 2.0 * AHEAD
             })
     });
-    if (jammed || asking || by) && jam.1 > 0 && !w.cars[c].outside() {
+    if (jammed || asking || by) && jam.1 > 0 && !jam.2 && !w.cars[c].outside() {
         return;
     }
     // (Whom it waited for last tick: pulled over for that one, it doesn't pull back in into its
@@ -4951,7 +4954,8 @@ fn turn_round_by(w: &mut World, c: usize, d: Detour) -> bool {
     let car = &mut cars[c];
     car.avoided.retain(|a| a.1 > tick);
     let old = car.route.take();
-    let twice = car.detour.is_some();
+    let had = car.detour;
+    let twice = had.is_some();
     let passing = car.pass_by.take();
     car.detour = Some(d);
     let mut halts: Option<Box<dyn Fn(f32) -> f32>> = None;
@@ -5041,7 +5045,10 @@ fn turn_round_by(w: &mut World, c: usize, d: Detour) -> bool {
         .is_none_or(|(h, r)| *h != home || r.ticks() <= 1.0)
         || !clear
     {
-        car.detour = None;
+        // (As it was: on the way it had, turned round before or not. Not left on the way it
+        // turned round to with no turn round, as on its way: backing up along it, it waited on
+        // the one it backed into for good, Tide Sands.)
+        car.detour = had;
         car.route = old;
         car.pass_by = passing;
         return false;
