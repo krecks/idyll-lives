@@ -469,11 +469,9 @@ impl Signal {
     /// (`Travel::junction_tiles`). None of a roundabout's; a country road's arm is crossed as
     /// anywhere else, out past the box.
     pub fn crossing(&self, p: [f32; 2]) -> bool {
-        let d = [p[0] - self.at[0], p[1] - self.at[1]];
         self.walk_clear > 0
             && self.arms.iter().filter(|a| a.crosswalk).any(|a| {
-                let along = d[0] * a.way[0] + d[1] * a.way[1];
-                let across = (d[0] * a.way[1] - d[1] * a.way[0]).abs();
+                let (along, across) = a.out(self.at, p);
                 (a.walk_from..=a.walk_to).contains(&along) && across <= a.kerb - KERB_IN
             })
     }
@@ -486,18 +484,17 @@ impl Signal {
         if self.roundabout {
             return false;
         }
-        let d = [p[0] - self.at[0], p[1] - self.at[1]];
         let mut off = false;
         for a in &self.arms {
-            let along = d[0] * a.way[0] + d[1] * a.way[1];
-            let across = (d[0] * a.way[1] - d[1] * a.way[0]).abs();
-            if across > a.kerb || along < -0.01 {
-                continue;
+            let (along, across) = a.out(self.at, p);
+            if across <= a.kerb && along >= a.walk_from {
+                if a.crosswalk && along <= a.walk_to {
+                    return false;
+                }
+                off |= a.crosswalk && along <= a.stop + KEEP_OFF;
             }
-            if a.crosswalk && (a.walk_from..=a.walk_to).contains(&along) {
-                return false;
-            }
-            off |= along < a.walk_from || a.crosswalk && along <= a.stop + KEEP_OFF;
+            let (along, across) = a.inside(self.at, p);
+            off |= across <= a.kerb && (-0.01..a.walk_from).contains(&along);
         }
         off
     }
@@ -507,7 +504,7 @@ impl Signal {
         self.arms
             .iter()
             .filter(|a| a.crosswalk)
-            .map(|a| a.walk_to.hypot(a.kerb))
+            .map(|a| a.walk_to.max(dist(self.at, a.span[0]) + CROSSWALK) + a.kerb)
             .fold(0.0, f32::max)
     }
 }
@@ -522,6 +519,12 @@ impl Signal {
 /// cars stop on red with their noses. Whether it has a crosswalk at all (`crosswalk`): a street's
 /// or a lane's (one with sidewalks, as the renderer draws its zebra and the pedestrians' head), not
 /// a country road's nor a roundabout's; those on foot wait for the walk phase only at those.
+/// Where its road's middle is at its crosswalk and out to `KEEP_OFF` past its stop line (`span`:
+/// at `walk_from` and at `stop + KEEP_OFF` out along the road, round its bend): its crosswalk and
+/// the carriageway either side of it are measured across from that (`SignalArm::out`), not from
+/// `way`, which a road bending away from the junction's middle, or a junction's middle off its
+/// road (two junctions merged), leaves metres off by then: the strip kept off by the stop line
+/// took in a house's gate on the pavement, and shut it in.
 #[derive(Debug, Clone, Copy)]
 pub struct SignalArm {
     pub way: [f32; 2],
@@ -534,6 +537,41 @@ pub struct SignalArm {
     pub walk_to: f32,
     pub stop: f32,
     pub crosswalk: bool,
+    pub span: [[f32; 2]; 2],
+}
+
+impl SignalArm {
+    /// Where `p` is by its crosswalk (`span`): how far out (m from the junction's middle, as
+    /// `walk_from`, `stop`) and how far from its road's middle. A span too short to have a way
+    /// (its road ends there): along `way` from `at`, the junction's middle.
+    fn out(&self, at: [f32; 2], p: [f32; 2]) -> (f32, f32) {
+        let [a, b] = self.span;
+        let l = dist(a, b);
+        let (o, w, from) = if l > 0.1 {
+            (a, [(b[0] - a[0]) / l, (b[1] - a[1]) / l], self.walk_from)
+        } else {
+            (at, self.way, 0.0)
+        };
+        let d = [p[0] - o[0], p[1] - o[1]];
+        (
+            from + d[0] * w[0] + d[1] * w[1],
+            (d[0] * w[1] - d[1] * w[0]).abs(),
+        )
+    }
+
+    /// Where `p` is along its box (from `at`, the junction's middle, out to where its crosswalk
+    /// begins, `span`'s first): how far out, and how far from that line.
+    fn inside(&self, at: [f32; 2], p: [f32; 2]) -> (f32, f32) {
+        let a = self.span[0];
+        let l = dist(at, a);
+        let w = if l > 0.1 {
+            [(a[0] - at[0]) / l, (a[1] - at[1]) / l]
+        } else {
+            self.way
+        };
+        let d = [p[0] - at[0], p[1] - at[1]];
+        (d[0] * w[0] + d[1] * w[1], (d[0] * w[1] - d[1] * w[0]).abs())
+    }
 }
 
 /// How far a lit junction's lights are through a phase's turn (`Light`): its green, its amber,
@@ -603,6 +641,9 @@ pub const STOP_GAP: f32 = 0.5;
 /// `Signal::off_limits`): they cross on the zebra, not just past it; and how far in from the kerb
 /// one on the crosswalk is in the road (m, `Signal::crossing`).
 pub const KEEP_OFF: f32 = 3.0;
+/// How far round a lit junction's tiles kept off (tiles) the ground is looked over for any they
+/// would cut off (`left_open`).
+const KEEP_OFF_ROOM: i32 = 4;
 const KERB_IN: f32 = 0.25;
 /// The walk phase (`Signal::walk_phase`): how long those on foot may step out (ticks of real time,
 /// as people walk), and the pace its clearance gives the slowest to get across the widest arm
@@ -729,9 +770,11 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
             // pavement, `POLE_KERB` in from the kerb; on a country road, as far out on the verge.
             // A road ending at another's kerb, a T's arm, measured from the junction's middle.)
             let r = &g.roads[road as usize];
-            let out = if roundabout { edge + POLE_OUT } else { stop };
             let short = dist(p, r.at(s));
-            let at = (s + k * (out - short).max(0.0)).clamp(s0, s1);
+            let on = |out: f32| (s + k * (out - short).max(0.0)).clamp(s0, s1);
+            let span = [r.at(on(walk_from)), r.at(on(stop + KEEP_OFF))];
+            let out = if roundabout { edge + POLE_OUT } else { stop };
+            let at = on(out);
             let t = r.tangent(at);
             let out = [t[0] * k, t[1] * k];
             let right = [out[1], -out[0]];
@@ -747,6 +790,7 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
                 walk_from,
                 walk_to,
                 stop,
+                span,
                 crosswalk: !roundabout
                     && matches!(
                         r.kind,
@@ -1963,15 +2007,25 @@ pub fn on_its_way(w: &World, key: u64) -> Option<f32> {
 
 /// The tiles the lit junctions keep those on foot off (`Signal::off_limits`, `Travel::
 /// junction_tiles`), as `signals` have them: blocked, those freed since the last time given back,
-/// and walkers finding their way again round where that changed.
+/// and walkers finding their way again round where that changed. Never ground cut off: a way
+/// over them left open from any they'd shut in (`left_open`).
 fn keep_off(w: &mut World, signals: &[Signal]) {
     let mut tiles: Vec<usize> = Vec::new();
     let mut rects: Vec<[i32; 4]> = Vec::new();
+    let mut taken = std::collections::HashSet::new();
+    let gates: Vec<(i32, i32)> = w
+        .plots
+        .iter()
+        .map(|p| {
+            let a = p.arrival_point();
+            (a[0].floor() as i32, a[1].floor() as i32)
+        })
+        .collect();
     for sig in signals.iter().filter(|s| !s.roundabout) {
         let r = sig
             .arms
             .iter()
-            .map(|a| (a.stop + KEEP_OFF).hypot(a.kerb))
+            .map(|a| (a.stop + KEEP_OFF).max(dist(sig.at, a.span[1])) + a.kerb)
             .fold(0.0, f32::max)
             .ceil();
         let (x0, z0) = (
@@ -1979,18 +2033,23 @@ fn keep_off(w: &mut World, signals: &[Signal]) {
             (sig.at[1] - r).floor() as i32,
         );
         let (x1, z1) = ((sig.at[0] + r).ceil() as i32, (sig.at[1] + r).ceil() as i32);
-        let mut any = false;
+        let mut mine = Vec::new();
         for z in z0..z1 {
             for x in x0..x1 {
                 if w.lot.in_bounds(x, z) && sig.off_limits([x as f32 + 0.5, z as f32 + 0.5]) {
-                    tiles.push(w.lot.tile_index(x, z));
-                    any = true;
+                    mine.push(w.lot.tile_index(x, z));
                 }
             }
         }
-        if any {
-            rects.push([x0, z0, x1, z1]);
+        if mine.is_empty() {
+            continue;
         }
+        mine.sort_unstable();
+        let open = left_open(w, [x0, z0, x1, z1], &mine, &taken, &gates);
+        mine.retain(|i| open.binary_search(i).is_err());
+        taken.extend(mine.iter().copied());
+        tiles.extend(mine);
+        rects.push([x0, z0, x1, z1]);
     }
     tiles.sort_unstable();
     tiles.dedup();
@@ -2017,6 +2076,172 @@ fn keep_off(w: &mut World, signals: &[Signal]) {
     for r in rects {
         w.nav_changed_in(r);
     }
+}
+
+/// Of `mine` (a lit junction's tiles to keep those on foot off, sorted, within `rect`), those left
+/// open so that it cuts no ground off. Of the ground in `rect` and `KEEP_OFF_ROOM` round it,
+/// walked as ever (`NavGrid` on the ground, but for the tiles the junctions keep them off: those
+/// looked at before it, `taken`, and not the ones they kept them off till now): a
+/// piece of it once `mine` are kept off that was joined to the edge's ground and no longer is (a
+/// pocket of pavement walled round but for its side onto the road by the stop line, a gate
+/// opening onto it) gets the shortest way over `mine` back to it; a place's gate on one of them
+/// (`gates`), the same from there.
+fn left_open(
+    w: &World,
+    rect: [i32; 4],
+    mine: &[usize],
+    taken: &std::collections::HashSet<usize>,
+    gates: &[(i32, i32)],
+) -> Vec<usize> {
+    let [x0, z0, x1, z1] = rect;
+    let (x0, z0) = ((x0 - KEEP_OFF_ROOM).max(0), (z0 - KEEP_OFF_ROOM).max(0));
+    let (x1, z1) = (
+        (x1 + KEEP_OFF_ROOM).min(w.lot.width as i32),
+        (z1 + KEEP_OFF_ROOM).min(w.lot.depth as i32),
+    );
+    if x1 <= x0 || z1 <= z0 {
+        return Vec::new();
+    }
+    let (cols, rows) = ((x1 - x0) as usize, (z1 - z0) as usize);
+    let blocked = w.blocked();
+    let lot = &w.lot;
+    let xz = |k: usize| (x0 + (k % cols) as i32, z0 + (k / cols) as i32);
+    let tile = |k: usize| {
+        let (x, z) = xz(k);
+        lot.tile_index(x, z)
+    };
+    // (As `NavGrid::tile_free` has it on the ground, but for the junctions' tiles.)
+    let wall: Vec<bool> = (0..cols * rows)
+        .map(|k| {
+            let (x, z) = xz(k);
+            let i = lot.tile_index(x, z);
+            !lot.allocated(x, z)
+                || lot.diag_blocks(x, z)
+                || taken.contains(&i)
+                || if w.travel.junction_tiles.binary_search(&i).is_ok() {
+                    w.travel.base_blocked.binary_search(&i).is_ok()
+                } else {
+                    blocked.get(i).copied().unwrap_or(true)
+                }
+        })
+        .collect();
+    let kept: Vec<bool> = (0..cols * rows)
+        .map(|k| mine.binary_search(&tile(k)).is_ok())
+        .collect();
+    let next = |k: usize| {
+        let (x, z) = (k % cols, k / cols);
+        let (ax, az) = xz(k);
+        [
+            (x > 0).then(|| k - 1),
+            (x + 1 < cols).then(|| k + 1),
+            (z > 0).then(|| k - cols),
+            (z + 1 < rows).then(|| k + cols),
+        ]
+        .into_iter()
+        .flatten()
+        .filter(move |&m| {
+            let (bx, bz) = xz(m);
+            lot.edge_walkable(ax, az, bx, bz)
+        })
+    };
+    // (Each tile's piece of ground, numbered from 1; 0 shut.)
+    let pieces = |shut: &dyn Fn(usize) -> bool| {
+        let mut piece = vec![0u32; cols * rows];
+        let mut n = 0;
+        let mut todo = Vec::new();
+        for start in 0..piece.len() {
+            if piece[start] != 0 || shut(start) {
+                continue;
+            }
+            n += 1;
+            piece[start] = n;
+            todo.push(start);
+            while let Some(k) = todo.pop() {
+                for m in next(k) {
+                    if piece[m] == 0 && !shut(m) {
+                        piece[m] = n;
+                        todo.push(m);
+                    }
+                }
+            }
+        }
+        (piece, n as usize)
+    };
+    let (before, nb) = pieces(&|k| wall[k]);
+    let (after, na) = pieces(&|k| wall[k] || kept[k]);
+    let edge = |k: usize| {
+        let (x, z) = (k % cols, k / cols);
+        x == 0 || z == 0 || x + 1 == cols || z + 1 == rows
+    };
+    // (Of each piece before, the pieces after on the edge, and those that aren't.)
+    let mut out = vec![false; na + 1];
+    let mut joined = vec![false; nb + 1];
+    for k in 0..cols * rows {
+        if edge(k) && after[k] != 0 {
+            out[after[k] as usize] = true;
+            joined[before[k] as usize] = true;
+        }
+    }
+    let mut cut: Vec<usize> = (0..cols * rows)
+        .filter(|&k| after[k] != 0 && !out[after[k] as usize] && joined[before[k] as usize])
+        .collect();
+    // (A gate on the junction's tiles: a piece of its own.)
+    cut.extend(gates.iter().filter_map(|&(x, z)| {
+        ((x0..x1).contains(&x) && (z0..z1).contains(&z))
+            .then(|| (z - z0) as usize * cols + (x - x0) as usize)
+            .filter(|&k| kept[k])
+    }));
+    let mut open = Vec::new();
+    let mut from = vec![usize::MAX; cols * rows];
+    while let Some(&start) = cut.first() {
+        // (The piece, all of it, and the shortest way over the junction's tiles to the edge's
+        // ground.)
+        let piece = after[start];
+        let seeds: Vec<usize> = if piece == 0 {
+            vec![start]
+        } else {
+            cut.iter().copied().filter(|&k| after[k] == piece).collect()
+        };
+        cut.retain(|k| !seeds.contains(k));
+        from.iter_mut().for_each(|f| *f = usize::MAX);
+        let mut todo = std::collections::VecDeque::new();
+        for &k in &seeds {
+            from[k] = k;
+            todo.push_back(k);
+        }
+        let mut found = None;
+        while let Some(k) = todo.pop_front() {
+            if after[k] != 0 && out[after[k] as usize] {
+                found = Some(k);
+                break;
+            }
+            for m in next(k) {
+                if from[m] == usize::MAX && !wall[m] && (kept[m] || after[m] != 0) {
+                    from[m] = k;
+                    todo.push_back(m);
+                }
+            }
+        }
+        let Some(mut k) = found else { continue };
+        while from[k] != k {
+            if kept[k] {
+                open.push(tile(k));
+            }
+            k = from[k];
+        }
+        if kept[k] {
+            open.push(tile(k));
+        }
+        // (Joined now: the piece is the edge's.)
+        for &k in &seeds {
+            if after[k] != 0 {
+                out[after[k] as usize] = true;
+            }
+        }
+    }
+    open.sort_unstable();
+    open.dedup();
+    open
 }
 
 /// Per road of `g`, whether it's a roundabout's ring: the town file's road (`meta.roads`) has an
@@ -2313,12 +2538,41 @@ mod tests {
                     walk_to: 9.0,
                     stop: 9.5,
                     crosswalk: true,
+                    span: [
+                        [at[0] + way[0] * 6.0, at[1] + way[1] * 6.0],
+                        [
+                            at[0] + way[0] * (9.5 + KEEP_OFF),
+                            at[1] + way[1] * (9.5 + KEEP_OFF),
+                        ],
+                    ],
                 })
                 .collect(),
             phases: phases.iter().max().map_or(0, |p| p + 1),
             roundabout: false,
             walk_clear: crate::secs(4.3),
         }
+    }
+
+    #[test]
+    fn a_crosswalk_and_the_road_kept_off_by_it_follow_its_road_not_the_way_out_from_the_middle() {
+        // A junction's east arm, its road leaving the middle 20° off the way it goes on (a road
+        // bending away, a middle merged off it): its crosswalk and the road kept off by its stop
+        // line are where its road is, not along the way out from the middle (by then metres off
+        // it, over the pavement, where it shut a house's gate in).
+        let mut sig = lit(
+            [0.0, 0.0],
+            &[[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0]],
+            &[0, 1, 0],
+        );
+        let (s, c) = 20f32.to_radians().sin_cos();
+        sig.arms[0].way = [c, s];
+        sig.arms[0].span = [[6.0, 0.0], [9.5 + KEEP_OFF, 0.0]];
+        let kerb = sig.arms[0].kerb;
+        assert!(sig.crossing([7.5, -1.0]), "on its zebra");
+        assert!(!sig.crossing([7.5, kerb + 0.5]), "on the pavement by it");
+        assert!(sig.off_limits([11.0, 0.0]), "on the road by the stop line");
+        assert!(!sig.off_limits([11.0, kerb + 1.0]), "on the pavement by it");
+        assert!(sig.off_limits([2.0, 0.0]), "in the box");
     }
 
     #[test]

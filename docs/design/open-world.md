@@ -131,7 +131,14 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   lit junction on its zebras only: its box, and each arm's carriageway out past its stop line by
   `KEEP_OFF` 3 m but for the zebra (an arm without one, out to the box's edge), are blocked to
   them for good (`Signal::off_limits`, `Travel::junction_tiles`, in `ground_blocked`), so their
-  way goes over a zebra or crosses the road further off. Out of the walk phase a zebra is closed
+  way goes over a zebra or crosses the road further off. The zebra and the road by the stop line
+  are measured from the arm's own road there (`SignalArm::span`, its middle at the crosswalk and
+  `KEEP_OFF` past the stop line), not along the arm's way out from the junction's middle: a road
+  bending away, or a junction's middle merged off it, left that metres off over the pavement,
+  where it shut a house's gate in. Nor do they ever cut ground off: a pocket of pavement walled
+  round but for its side onto that road, or a gate on it, gets the shortest way over them back
+  to the ground round it left open (`traffic::left_open`, looked at within `KEEP_OFF_ROOM` 4 m
+  round each junction). Out of the walk phase a zebra is closed
   to them (a bike or an e-scooter rides on with the traffic): a step onto it, into the
   carriageway (`KERB_IN` 0.25 m in from the kerb; one walking past on the pavement isn't held),
   stops at the kerb (`traffic::kerb_stop`, a 16 m grid of the junctions, `Travel::crossings`), and

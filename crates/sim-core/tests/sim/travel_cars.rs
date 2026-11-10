@@ -1000,6 +1000,12 @@ const CONTENT: &str = r#"{
 /// A big world's crossroads at (200, 200), its ways out east and west, dead ends north and south,
 /// and `houses` along those (`crossroads_house`).
 fn crossroads(houses: &[House]) -> World {
+    crossroads_walled(houses, "[]")
+}
+
+/// The crossroads (`crossroads`) with `walls` (the town file's: `[x0, z0, x1, z1]` along the
+/// tiles' edges).
+fn crossroads_walled(houses: &[House], walls: &str) -> World {
     let arm = |a: [f32; 2], b: [f32; 2], ends: &str| {
         format!(
             r#"{{"points":[{}],"width":7,"kind":"street","ends":{ends},"area":0}}"#,
@@ -1014,9 +1020,11 @@ fn crossroads(houses: &[House]) -> World {
         arm([200.0, 200.0], [200.0, 280.0], r#"["join","dead"]"#)
     );
     let exits = r#"[{"x":0.5,"z":200,"kind":"road"},{"x":399.5,"z":200,"kind":"road"}]"#;
-    let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
-        "areas":[{"name":"Crossroads","kind":"hamlet","x":130,"z":130,"w":140,"d":140}]"#;
-    town_of(CONTENT, more, 400, 400, &roads, exits, houses)
+    let more = format!(
+        r#","size":"big","walls":{walls},"doors":[],"windows":[],"relationships":[],
+        "areas":[{{"name":"Crossroads","kind":"hamlet","x":130,"z":130,"w":140,"d":140}}]"#
+    );
+    town_of(CONTENT, &more, 400, 400, &roads, exits, houses)
 }
 
 /// A house by the crossroads' north arm (`z` below 200, west of it) or south arm (east of it),
@@ -1354,6 +1362,44 @@ fn someone_on_foot_crosses_a_lit_junction_on_its_zebras_on_the_walk_never_throug
     }
     assert!(across, "never across: at {:?}", w.sims[0].pos);
     assert_eq!(on_zebras.len(), 2, "over two zebras: {on_zebras:?}");
+}
+
+#[test]
+fn a_lit_junction_keeps_those_on_foot_off_its_box_but_never_cuts_ground_off() {
+    // The crossroads, and a pocket of the pavement by its north arm, walled round but for its side
+    // onto the road kept off by the stop line: kept off it, nobody could get in or out of the
+    // pocket (a gate there, Foundry Quarter's 9 Foundry Terrace was cut off). A way out of it is
+    // left open, over the road to the pavement beyond; the box is kept off as ever.
+    let w = crossroads(&[]);
+    let sig = &w.travel.signals[0];
+    let arm = sig.arms[crossroads_arm(&w, [0.0, -1.0])];
+    let middle = w.lot.tile_index(200, 200);
+    assert!(w.blocked()[middle], "the box walked through");
+    // (The pocket: west of the arm's kerb, between where its crosswalk ends and the stop line's
+    // strip does, open onto the road.)
+    let kerb = (200.0 - arm.kerb).ceil() as i32;
+    let (z0, z1) = (
+        (200.0 - arm.stop - sim_core::traffic::KEEP_OFF + 0.5).ceil() as i32,
+        (200.0 - arm.walk_to - 0.5).floor() as i32,
+    );
+    assert!(z1 > z0, "no room for a pocket: {z0}..{z1}");
+    let x0 = kerb - 3;
+    let walls = format!("[[{x0},{z0},{kerb},{z0}],[{x0},{z1},{kerb},{z1}],[{x0},{z0},{x0},{z1}]]");
+    let w = crossroads_walled(&[], &walls);
+    assert!(
+        (z0..z1).all(|z| !w.travel.signals[0].crossing([kerb as f32 + 0.5, z as f32 + 0.5])),
+        "the pocket's road is the stop line's, not the crosswalk's"
+    );
+    assert!(w.blocked()[middle], "the box walked through");
+    let nav = sim_core::path::NavGrid {
+        lot: &w.lot,
+        blocked: w.blocked(),
+        stairs: w.stair_map(),
+    };
+    assert!(
+        nav.find_path((x0, z0), (150, 150)).is_some(),
+        "the pocket cut off"
+    );
 }
 
 #[test]
