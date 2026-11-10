@@ -1429,6 +1429,168 @@ fn someone_on_foot_crossing_a_country_roads_arm_at_a_lit_t_is_not_held_for_the_w
     assert!(across < common::secs(9.0), "across after {across} ticks");
 }
 
+/// A big world's street along z (x = 200, a dead end south at z = 100, the way out north), a lane
+/// off it east at z = 200 and another west at z = 223: two lit T's 23 m apart, as Canalside's on
+/// Foundry Street. Houses up the east lane (`cars` of them) and the west one.
+fn two_ts(east: usize, west: usize) -> World {
+    let road = |a: [f32; 2], b: [f32; 2], kind: &str, ends: &str| {
+        format!(
+            r#"{{"points":[{}],"width":7,"kind":"{kind}","ends":{ends},"area":0}}"#,
+            line_pts(a, b)
+        )
+    };
+    let roads = format!(
+        "[{},{},{}]",
+        road(
+            [200.0, 100.0],
+            [200.0, 399.5],
+            "street",
+            r#"["dead","out"]"#
+        ),
+        road(
+            [202.15, 200.0],
+            [300.0, 200.0],
+            "lane",
+            r#"["join","dead"]"#
+        ),
+        road(
+            [197.85, 223.0],
+            [100.0, 223.0],
+            "lane",
+            r#"["join","dead"]"#
+        )
+    );
+    let exits = r#"[{"x":200,"z":399.5,"kind":"road"}]"#;
+    let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
+        "areas":[{"name":"Two Ts","kind":"hamlet","x":90,"z":90,"w":220,"d":220}]"#;
+    let mut houses = Vec::new();
+    for k in 0..east {
+        let x = 236.0 + 20.0 * k as f32;
+        houses.push(House {
+            plot: [x - 8.0, 176.0, 16.0, 18.0],
+            inner: [x, 188.5],
+            front: 1.0,
+            along_x: false,
+            road: 1,
+            s: x - 202.15,
+        });
+    }
+    for k in 0..west {
+        let x = 164.0 - 20.0 * k as f32;
+        houses.push(House {
+            plot: [x - 8.0, 229.0, 16.0, 18.0],
+            inner: [x, 234.5],
+            front: -1.0,
+            along_x: false,
+            road: 2,
+            s: 197.85 - x,
+        });
+    }
+    town_of(CONTENT, more, 400, 400, &roads, exits, &houses)
+}
+
+#[test]
+fn between_two_lit_junctions_too_near_to_wait_between_nobody_stands_on_a_crosswalk_or_runs_a_red() {
+    use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
+    // Cars from the east lane go out north through both T's, and come home back through both; those
+    // of the west lane through the north one. Between the two (23 m, the crosswalks 9 m out from
+    // each) a car has no room to wait clear of both: it waits at the first's stop line till it can
+    // go through both, on both their greens. Nobody stands on a crosswalk (a taxi waited at the
+    // second's stop line on the first's crosswalk for minutes), nor drives past a stop line on red.
+    let mut w = two_ts(4, 3);
+    common::run_to(&mut w, 2, 7.0);
+    let sigs = w.travel.signals.clone();
+    assert_eq!(sigs.len(), 2, "two lit T's");
+    let rows: Vec<usize> = sigs
+        .iter()
+        .scan(0, |n, s| {
+            let r = *n;
+            *n += s.arms.len();
+            Some(r)
+        })
+        .collect();
+    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    // (Per car: where it stood and since when; per car and junction, its nose out along the arm it
+    // comes in by, and the last tick that arm was green.)
+    let mut still: Vec<([f32; 2], u64)> = vec![([0.0; 2], 0); w.cars.len()];
+    let mut was: Vec<Vec<Option<(usize, f32)>>> = vec![vec![None; sigs.len()]; w.cars.len()];
+    let mut green_at: Vec<Vec<u64>> = vec![vec![0; sigs.len()]; w.cars.len()];
+    let (mut crossed, mut through_both) = (0, 0);
+    let mut seen_between = vec![false; w.cars.len()];
+    let end = w.tick + common::drive_secs(2400.0);
+    while w.tick < end {
+        keep_driving(&mut w);
+        w.tick_once();
+        snapshot::write(&w, &mut buf);
+        for c in 0..w.cars.len() {
+            let Some((p, yaw, _, _)) = w.cars[c].shown else {
+                continue;
+            };
+            let half = w.cars[c].len / 2.0;
+            let (nose, tail) = (
+                [p[0] + yaw.sin() * half, p[1] + yaw.cos() * half],
+                [p[0] - yaw.sin() * half, p[1] - yaw.cos() * half],
+            );
+            // (Standing on a crosswalk, any part of it from nose to tail: not for long.)
+            if (still[c].0[0] - p[0]).hypot(still[c].0[1] - p[1]) > 0.05 {
+                still[c] = (p, w.tick);
+            }
+            let on_crosswalk = sigs.iter().any(|s| {
+                s.arms.iter().filter(|a| a.crosswalk).any(|a| {
+                    [nose, p, tail].iter().any(|q| {
+                        let d = [q[0] - s.at[0], q[1] - s.at[1]];
+                        let along = d[0] * a.way[0] + d[1] * a.way[1];
+                        let across = (d[0] * a.way[1] - d[1] * a.way[0]).abs();
+                        (a.walk_from..=a.walk_to).contains(&along) && across <= a.kerb
+                    })
+                })
+            });
+            assert!(
+                !on_crosswalk || w.tick < still[c].1 + common::drive_secs(3.0),
+                "car {c} stood on a crosswalk at {p:?} since tick {}",
+                still[c].1
+            );
+            if (p[1] - 211.5).abs() < 3.0 {
+                seen_between[c] = true;
+            }
+            for (i, s) in sigs.iter().enumerate() {
+                let d = [nose[0] - s.at[0], nose[1] - s.at[1]];
+                let on = (0..s.arms.len()).find_map(|k| {
+                    let a = s.arms[k];
+                    let along = d[0] * a.way[0] + d[1] * a.way[1];
+                    let across = (d[0] * a.way[1] - d[1] * a.way[0]).abs();
+                    let inward = yaw.sin() * a.way[0] + yaw.cos() * a.way[1] < -0.7;
+                    (inward && across <= a.kerb && (0.0..30.0).contains(&along))
+                        .then_some((k, along))
+                });
+                if let Some((k, along)) = on {
+                    let head = buf[LIGHT_BASE + (rows[i] + k) * LIGHT_STRIDE + light::STATE];
+                    if head == light::GREEN {
+                        green_at[c][i] = w.tick;
+                    }
+                    let stop = s.arms[k].stop;
+                    if let Some((j, before)) = was[c][i]
+                        && j == k
+                        && before >= stop - 0.05
+                        && along < stop - 0.05
+                    {
+                        crossed += 1;
+                        assert!(
+                            head != light::RED && head != light::WALK
+                                || w.tick < green_at[c][i] + common::drive_secs(6.0),
+                            "car {c} past junction {i}'s stop line on red at {nose:?}"
+                        );
+                    }
+                }
+                was[c][i] = on;
+            }
+        }
+    }
+    through_both += seen_between.iter().filter(|&&b| b).count();
+    assert!(crossed >= 20, "{crossed} stop lines crossed");
+    assert!(through_both >= 3, "{through_both} cars between the two");
+}
+
 #[test]
 fn no_car_drives_past_a_stop_line_on_red_or_the_walk_and_on_red_each_waits_at_it() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};

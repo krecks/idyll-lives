@@ -119,6 +119,15 @@ pub(crate) struct Claim {
     /// The traffic lights its group goes through, and the phase of the arm it comes in by
     /// (`Travel::signals`, `gate`): it's asked for only on that phase's green.
     pub gate: Option<(u16, u8)>,
+    /// The next lit junction its group goes through, too near the first for a body to stand
+    /// between them (each box taken out to its crosswalks: `settle`), and the phase of the arm it
+    /// comes in by there: asked for only on both greens (`Traffic::green_through`). (Through one
+    /// only, one went on past the second's red; or waited at the second's stop line on the first's
+    /// crosswalk.)
+    pub gate2: Option<(u16, u8)>,
+    /// Through two lights (`gate2`): where it comes to the second's stop line (ticks along the
+    /// route), its green kept on for it till it's past (`change_lights`).
+    pub stop2: f32,
     /// Through lights, where its group begins (ticks along the route: the nose at the stop line,
     /// `gate`): granted, but no further on than that once the light's no longer green, its holder
     /// lets it go and waits for the next green (`Traffic::begin`).
@@ -149,6 +158,8 @@ impl Claim {
             samples,
             bounds: b,
             gate: None,
+            gate2: None,
+            stop2: f32::NEG_INFINITY,
             stop_at: f32::NEG_INFINITY,
         }
     }
@@ -537,6 +548,9 @@ const MIN_GREEN: u64 = crate::drive_secs(5.0);
 /// lasts no longer than its share of it (`change_lights`).
 const CYCLE: u64 = crate::drive_secs(50.0);
 const AMBER: u64 = crate::drive_secs(2.0);
+/// A phase's green kept on past its share of `CYCLE` this long at most for one on its way to it,
+/// granted through a lit junction just before it (`Claim::gate2`).
+const GREEN_HELD: u64 = crate::drive_secs(10.0);
 const ALL_RED: u64 = crate::drive_secs(4.0);
 /// A route this near a lit junction's middle goes through its lights (m, `gate`), and its arm is
 /// the one it's on where it first comes this near (`GATE_REACH`).
@@ -738,6 +752,8 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal], trace: &Trace, len:
     // (A lit junction a group goes through: when it first comes within reach of it and how near
     // it comes, which, and where it was then.)
     type Near = ((f32, f32), usize, [f32; 2]);
+    // (The group before, through lights: its first part, and where it begins.)
+    let mut before: Option<(usize, f32)> = None;
     let mut k = 0;
     while k < claims.len() {
         let g = claims[k].group;
@@ -760,7 +776,7 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal], trace: &Trace, len:
         );
         // (Each lit junction near it: whether it goes through its box, when it first comes within
         // reach of it and where, and how near it comes.)
-        let mut best: Option<Near> = None;
+        let mut through: Vec<Near> = Vec::new();
         for (i, sig) in signals.iter().enumerate() {
             let p = sig.at;
             if p[0] < b[0] - GATE_REACH
@@ -784,12 +800,10 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal], trace: &Trace, len:
             let Some((t, at)) = first.filter(|_| near < GATE_THROUGH) else {
                 continue;
             };
-            let key = (t, near);
-            if best.as_ref().is_none_or(|(k0, ..)| key < *k0) {
-                best = Some((key, i, at));
-            }
+            through.push(((t, near), i, at));
         }
-        let gate = best.map(|(_, i, at)| {
+        through.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap_or(std::cmp::Ordering::Equal));
+        let arm_of = |&(_, i, at): &Near| {
             let sig = &signals[i];
             let d = [at[0] - sig.at[0], at[1] - sig.at[1]];
             let arm = (0..sig.arms.len())
@@ -799,9 +813,23 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal], trace: &Trace, len:
                 })
                 .unwrap_or(0);
             (i, arm)
+        };
+        let gate = through.first().map(arm_of);
+        let gate2 = through.get(1).map(arm_of);
+        // (Through a second, where its nose comes to that one's stop line.)
+        let stop2 = gate2.and_then(|(i, arm)| {
+            let (at, out) = (signals[i].at, signals[i].arms[arm].stop + len / 2.0);
+            claims[k..end]
+                .iter()
+                .flat_map(|c| &c.samples)
+                .filter(|s| dist(s.rect.at, at) <= out)
+                .map(|s| s.t)
+                .reduce(f32::min)
         });
         for c in &mut claims[k..end] {
             c.gate = gate.map(|(i, arm)| (i as u16, signals[i].arms[arm].phase));
+            c.gate2 = gate2.map(|(i, arm)| (i as u16, signals[i].arms[arm].phase));
+            c.stop2 = stop2.unwrap_or(f32::NEG_INFINITY);
         }
         if let Some((i, arm)) = gate
             && !signals[i].roundabout
@@ -822,12 +850,18 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal], trace: &Trace, len:
                 let inward = s * a.way[0] + c * a.way[1] < -0.5;
                 (along, !back && inward && across <= a.kerb + 1.0)
             };
-            let mut j = trace
+            let start = trace
                 .partition_point(|s| s.0 < claims[k].from)
                 .min(trace.len() - 1);
-            while j > 0 && trace[j - 1].0 >= least {
+            let mut j = start;
+            let mut short = false;
+            while j > 0 {
                 let (along, on) = nose(j);
                 if !on || along >= a.stop {
+                    break;
+                }
+                if trace[j - 1].0 < least {
+                    short = true;
                     break;
                 }
                 j -= 1;
@@ -841,11 +875,44 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal], trace: &Trace, len:
             {
                 from += (trace[j + 1].0 - from) * (at - a.stop) / (at - next);
             }
-            let from = claims[k].from.min(from);
+            // (Its body first touching the box out past the line, taken out to the crosswalks, a
+            // step before its nose is at the line: at the line all the same.)
+            let from = if j == start {
+                from
+            } else {
+                claims[k].from.min(from)
+            };
+            let short = short || from < least;
+            // (Its stop line before it's out of the group before through lights: no room to wait
+            // between the two. One group with that one, asked for on both greens, from its stop
+            // line: out of the one, it went on past the other's stop line on red.)
+            if let Some((first, at)) =
+                before.filter(|&(first, _)| short && claims[first].gate.is_some())
+            {
+                let (group, gate) = (claims[first].group, claims[first].gate);
+                let this = claims[k].gate;
+                for c in &mut claims[first..k] {
+                    c.gate2 = c.gate2.or(this);
+                    c.stop2 = from;
+                }
+                for c in &mut claims[k..end] {
+                    c.group = group;
+                    c.gate = gate;
+                    c.gate2 = this;
+                    c.stop_at = at;
+                    c.stop2 = from;
+                }
+                k = end;
+                continue;
+            }
+
             claims[k].from = from;
             for c in &mut claims[k..end] {
                 c.stop_at = from;
             }
+            before = Some((k, from));
+        } else {
+            before = None;
         }
         k = end;
     }
@@ -1000,7 +1067,10 @@ pub struct Traffic {
     pub(crate) passing: Vec<(u64, u64)>,
     /// Per lit junction, the phases anyone waits at and comes through (`change_lights`'s own,
     /// kept so it isn't made anew every tick).
-    lit_phases: Vec<[u64; 2]>,
+    lit_phases: Vec<[u64; 3]>,
+    /// Per lit junction, whether its green is young enough to be held for one granted through it
+    /// from a lit junction just before (`GREEN_HELD`, `Traffic::green_through`).
+    fresh: Vec<bool>,
     /// The lit junctions someone on foot waits at a crosswalk of (`Signal` indices, this tick:
     /// `kerb_stop`, `traffic::begin`), for their walk phase.
     pub(crate) walkers: Vec<u16>,
@@ -1268,6 +1338,15 @@ impl Traffic {
 
     /// Whether a group through the lights `gate` (`Claim::gate`) may be asked for now: its arm's
     /// phase's green (none: no lights).
+    /// Whether a group through claim `c`'s lights may be asked for now: green at each of them
+    /// (`Claim::gate`, `Claim::gate2`).
+    pub(crate) fn green_through(&self, c: &Claim) -> bool {
+        self.green(c.gate)
+            && self.green(c.gate2)
+            && c.gate2
+                .is_none_or(|(s, _)| self.fresh.get(usize::from(s)).copied().unwrap_or(true))
+    }
+
     pub(crate) fn green(&self, gate: Option<(u16, u8)>) -> bool {
         gate.is_none_or(|(s, phase)| {
             self.lights
@@ -1302,15 +1381,19 @@ impl Traffic {
         // one pass over the asks and the holds for every junction, not one per junction and
         // phase; and those on foot, at its walk phase's bit.)
         let bit = |phase: u8| 1u64.checked_shl(u32::from(phase)).unwrap_or(0);
+        self.fresh.resize(signals.len(), true);
         let mut phases = std::mem::take(&mut self.lit_phases);
         phases.clear();
-        phases.resize(signals.len(), [0, 0]);
+        phases.resize(signals.len(), [0, 0, 0]);
         for a in &self.asks {
             if a.seen + 1 >= tick
-                && let Some((s, phase)) = a.parts.first().and_then(|p| p.1.gate)
-                && let Some(m) = phases.get_mut(usize::from(s))
+                && let Some(first) = a.parts.first()
             {
-                m[0] |= bit(phase);
+                for (s, phase) in [first.1.gate, first.1.gate2].into_iter().flatten() {
+                    if let Some(m) = phases.get_mut(usize::from(s)) {
+                        m[0] |= bit(phase);
+                    }
+                }
             }
         }
         for h in &self.holds {
@@ -1319,6 +1402,14 @@ impl Traffic {
                 && let Some(m) = phases.get_mut(usize::from(s))
             {
                 m[1] |= bit(phase);
+            }
+            // (Through two lights, granted on both greens: the second's on till it's past its
+            // stop line, `GREEN_HELD` past its share at most.)
+            if h.at < h.claim.stop2
+                && let Some((s, phase)) = h.claim.gate2
+                && let Some(m) = phases.get_mut(usize::from(s))
+            {
+                m[2] |= bit(phase);
             }
         }
         for &s in &self.walkers {
@@ -1359,7 +1450,9 @@ impl Traffic {
                     }
                 }
                 Stage::Green => {
-                    let busy = waits(l.phase) || coming(l.phase);
+                    let held = phases[i][2] & bit(l.phase) != 0;
+                    let busy = waits(l.phase) || coming(l.phase) || held;
+                    let most = if held { most + GREEN_HELD } else { most };
                     match next(l.phase) {
                         Some(_) if on >= most || on >= MIN_GREEN && !busy => stage(Stage::Amber),
                         _ => l,
@@ -1376,6 +1469,8 @@ impl Traffic {
                 },
                 _ => l,
             };
+            let now = self.lights[i];
+            self.fresh[i] = now.stage == Stage::Green && tick.saturating_sub(now.since) < most;
         }
         self.lit_phases = phases;
     }
@@ -1417,8 +1512,9 @@ impl Traffic {
                     .is_none_or(|l| l.stage == Stage::Green && l.phase == phase)
             })
         };
-        self.holds
-            .retain(|h| h.at > h.claim.stop_at + 1e-3 || green(h.claim.gate));
+        self.holds.retain(|h| {
+            h.at > h.claim.stop_at + 1e-3 || green(h.claim.gate) && green(h.claim.gate2)
+        });
         let holds = &self.holds;
         self.asks.retain(|a| {
             let going = holds
@@ -1478,7 +1574,7 @@ impl Traffic {
             // bodies in its way, it names (`by`), as on its green: one standing in its way waiting
             // in turn for it at another phase's red is a ring the waits see, rule 3's and
             // `cars::unjam`'s, not two standing for good by turns, Highholm.)
-            let red = !self.green(next[0].gate);
+            let red = !self.green_through(next[0]);
             let me = self
                 .mover(a.key)
                 .map_or((first.rect, first.way), |m| (m.rect, m.way));
@@ -1784,7 +1880,9 @@ pub fn at_red(w: &World, key: u64) -> bool {
     w.traffic.asks.iter().any(|a| {
         a.key == key
             && a.seen + 1 >= w.traffic.tick
-            && !w.traffic.green(a.parts.first().and_then(|p| p.1.gate))
+            && a.parts
+                .first()
+                .is_some_and(|p| !w.traffic.green_through(&p.1))
     })
 }
 
@@ -1830,6 +1928,24 @@ pub(crate) fn settle(w: &mut World) {
         crate::snapshot::MAX_LIGHTS
     );
     w.travel.crossings = Crossings::new(&signals);
+    // (Each lit junction's box taken out to the far side of its crosswalks: nobody goes onto one
+    // without room to clear it beyond, and a way between two lit junctions too near each other
+    // for a body to stand between them is one group, through both lights: `gate`.)
+    let mut zones = boxes(&w.travel.graph);
+    for sig in &signals {
+        for a in sig.arms.iter().filter(|a| a.crosswalk) {
+            let mut d = BOX_LEAST;
+            while d < a.walk_to {
+                d = (d + ARM_STEP).min(a.walk_to);
+                let q = [
+                    sig.at[0] + a.way[0] * (d - ARM_REACH),
+                    sig.at[1] + a.way[1] * (d - ARM_REACH),
+                ];
+                zones.push((q, ARM_REACH));
+            }
+        }
+    }
+    w.travel.graph.boxes = zones;
     w.travel.signals = signals;
     // (Green on the first phase before the first tick changes them: `change_lights`.)
     w.traffic
