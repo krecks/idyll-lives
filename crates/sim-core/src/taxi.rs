@@ -2095,6 +2095,11 @@ impl World {
 }
 
 impl Taxis {
+    /// Whether `LEISURE_FLEET` taxis are out on visits and outings now: no more are sent there.
+    pub(crate) fn fleet_out(&self) -> bool {
+        self.runs.iter().filter(|r| r.place.is_some()).count() >= LEISURE_FLEET
+    }
+
     /// Whether `sim` was just turned down for a taxi to `plot` (`turned_down`): they walk.
     pub(crate) fn no_taxi(&self, sim: u32, plot: u32) -> bool {
         self.no_leisure.iter().any(|&(s, p)| s == sim && p == plot)
@@ -3313,6 +3318,13 @@ const LEISURE_WINDOW: u64 = 30 * TICKS_PER_MINUTE;
 /// A taxi back from a place comes this long after its rider's visit ends (ticks: a goodbye and
 /// out to the kerb).
 const BACK_SLACK: u64 = 8 * TICKS_PER_MINUTE;
+/// The most taxis on visits and outings at once, planned or under way, there or back, the town's
+/// taxi firm's (`Taxis::fleet_out`): with that many out, someone setting off goes another way, or
+/// somewhere nearer (one home from a place is never refused). On the
+/// traffic's clock (`crate::DRIVE_SCALE`) a taxi beats any walk out of reach, and with no such
+/// limit a big world's evening had some 20 out at once and 150 runs a day where 5 to 20 ran
+/// before, jammed solid round a junction in view (seed base 16: Sand Quay, Eaglescar).
+const LEISURE_FLEET: usize = 6;
 
 /// About how many minutes a taxi would take `sim` from `from` to `plot` on a visit or an outing
 /// (`world::leisure_way`, after the household's car and a bike of theirs, before walking), a way
@@ -3457,8 +3469,10 @@ fn seat_leisure(
                 }
         })
         .collect();
-    // (Each it could ride along on, else one of its own: the first that can be timed.)
-    for join in joins.into_iter().map(Some).chain([None]) {
+    // (Each it could ride along on, else one of its own: the first that can be timed. Not one
+    // of its own out with the fleet out, `LEISURE_FLEET`.)
+    let own = back || !w.taxis.fleet_out();
+    for join in joins.into_iter().map(Some).chain(own.then_some(None)) {
         let mut run = match join {
             Some(k) => w.taxis.runs[k].clone(),
             None => Run {
@@ -4239,5 +4253,28 @@ mod kerb_tests {
         warm_kerbs(&mut w);
         let warm = stop_for(&w, 0).expect("a stand");
         assert_eq!((warm.road, warm.s), (fresh.road, fresh.s));
+    }
+
+    /// No more than `LEISURE_FLEET` taxis go out on visits and outings at once, there and back
+    /// counted alike; the work taxi's runs don't count.
+    #[test]
+    fn the_leisure_taxis_out_at_once_are_a_fleet_of_six() {
+        let run = |id: u32, place: Option<u32>, home: bool| -> Run {
+            serde_json::from_value(serde_json::json!({
+                "id": id, "home": home, "place": place, "group": [0, 0], "enter": 100,
+                "stops": [], "progress": 0.0}))
+            .unwrap()
+        };
+        let mut taxis = Taxis::default();
+        for k in 0..10 {
+            taxis.runs.push(run(k, None, false));
+        }
+        assert!(!taxis.fleet_out(), "work runs aren't the fleet");
+        for k in 0..LEISURE_FLEET as u32 - 1 {
+            taxis.runs.push(run(10 + k, Some(3), k % 2 == 0));
+        }
+        assert!(!taxis.fleet_out());
+        taxis.runs.push(run(20, Some(4), true));
+        assert!(taxis.fleet_out(), "{LEISURE_FLEET} out, there or back");
     }
 }
