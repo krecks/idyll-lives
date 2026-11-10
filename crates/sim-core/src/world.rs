@@ -2509,7 +2509,9 @@ impl World {
             .map(|(_, speed, min)| (speed, min)),
         };
         let door = p.arrival_point();
-        let taxi = (!self.taxis.fleet_out())
+        let taxi = self
+            .taxis
+            .takes(sim)
             .then(|| {
                 crate::taxi::leisure_eta(&self.travel, &self.exits, &self.content, sim, pos, door)
             })
@@ -7288,7 +7290,9 @@ fn pick_autonomous(
                 * crate::planner::visit_factor(content, sim, soon);
             // (The way there timed only for a visit worth making.)
             if score > MIN_AUTONOMY_SCORE {
-                let taxi = (!ctx.taxis.fleet_out())
+                let taxi = ctx
+                    .taxis
+                    .takes(sim)
                     .then(|| {
                         crate::taxi::leisure_eta_via(
                             ctx.travel,
@@ -7338,7 +7342,9 @@ fn pick_autonomous(
                 continue;
             }
             // By the way they'd go (`leisure_way`).
-            let taxi = (!ctx.taxis.fleet_out())
+            let taxi = ctx
+                .taxis
+                .takes(sim)
                 .then(|| {
                     crate::taxi::leisure_eta_via(
                         ctx.travel,
@@ -10508,7 +10514,7 @@ fn taxi_from_home(sim: &Sim, ctx: &Ctx, plot: u32) -> bool {
         && !car_home
         && Some(plot) != home
         && !ctx.taxis.no_taxi(sim.id, plot)
-        && !ctx.taxis.fleet_out()
+        && ctx.taxis.takes(sim)
         && crate::taxi::leisure_eta(
             ctx.travel,
             ctx.exits,

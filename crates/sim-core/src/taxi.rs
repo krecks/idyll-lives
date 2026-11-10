@@ -2100,6 +2100,13 @@ impl Taxis {
         self.runs.iter().filter(|r| r.place.is_some()).count() >= LEISURE_FLEET
     }
 
+    /// Whether a taxi would take `sim` out to a visit or an outing now (`book_leisure`): not one
+    /// booked on a taxi already (to work, say: they'd walk it, hours across a big world, the
+    /// way timed by the taxi), nor with the fleet out (`fleet_out`).
+    pub(crate) fn takes(&self, sim: &crate::world::Sim) -> bool {
+        sim.taxi.is_none() && !self.fleet_out()
+    }
+
     /// Whether `sim` was just turned down for a taxi to `plot` (`turned_down`): they walk.
     pub(crate) fn no_taxi(&self, sim: u32, plot: u32) -> bool {
         self.no_leisure.iter().any(|&(s, p)| s == sim && p == plot)

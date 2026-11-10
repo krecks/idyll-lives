@@ -1494,6 +1494,10 @@ fn generated_worlds_are_driven_across_in_about_half_an_hour() {
         let (Some(south), Some(west)) = (south, west) else {
             return Err(format!("{label}: no roads"));
         };
+        // (The road furthest south furthest west too: no way across to time.)
+        if south == west {
+            return Ok(None);
+        }
         let Some(ticks) = sim_core::cars::empty_drive_ticks(&w.travel, south, west) else {
             return Err(format!(
                 "{label}: no way by road from {south:?} to {west:?}"
@@ -1506,7 +1510,7 @@ fn generated_worlds_are_driven_across_in_about_half_an_hour() {
                 "{label}: the drive from {south:?} to {west:?} takes {minutes:.1} game minutes, more than {ACROSS_MOST}"
             ));
         }
-        Ok(minutes)
+        Ok(Some(minutes))
     });
     let mut failures: Vec<String> = results
         .iter()
@@ -1514,7 +1518,7 @@ fn generated_worlds_are_driven_across_in_about_half_an_hour() {
         .collect();
     let mut minutes: Vec<f32> = results
         .iter()
-        .filter_map(|r| r.as_ref().ok().copied())
+        .filter_map(|r| r.as_ref().ok().copied().flatten())
         .collect();
     minutes.sort_by(f32::total_cmp);
     if let Some(&middle) = minutes.get(minutes.len() / 2) {
