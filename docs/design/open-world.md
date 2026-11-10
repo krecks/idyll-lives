@@ -101,6 +101,44 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   onto the pavement and pass. Cars take turns where their ways cross or meet (junctions' boxes,
   where two roads cross or touch between their ends too, driveway and bay mouths, a 6 m lane's
   tight bend): one queue of claims, granted in the order asked (`sim-core/src/traffic.rs`).
+- Traffic lights (`traffic::Signal`, `traffic::settle`, worked out again on load): every junction
+  where `SIGNAL_ARMS` (3) roads for cars or more meet is lit. Its arms make phases: two more than
+  150° apart share one, an arm with none across from it has its own (a crossroads two, a T two:
+  the road through, then the side road; `SignalArm::phase`). One phase is green at a time,
+  actuated as the arms were (`MIN_GREEN` 5 s, its share of `CYCLE` 50 s, `AMBER` 2 s, `ALL_RED`
+  4 s); a turn across those coming the other way on the same green is left to the claims. Only a
+  car's way through a junction's box (within `GATE_THROUGH` 7 m of its middle) goes by its lights,
+  on the phase of the arm it comes in by, of the first junction it goes through (`traffic::gate`;
+  not one it only comes near, out of a driveway by it). Each
+  arm has a crosswalk from its corner (where the kerb's `KERB_RETURN` 3 m return round from the
+  next arm ends, or the box's edge, whichever is further out) `CROSSWALK` 3 m wide, and a stop
+  line `STOP_GAP` 0.5 m past it, no further out than half way to the next junction: a car's claim
+  through the lights begins with its nose at the stop line, so it waits there on red, and one
+  granted but still short of the line when the light stops being green lets the grant go
+  (`Claim::stop_at`). The pole stands at the stop line on the kerb right of those coming in. A
+  walk phase follows the cars' (`Signal::walk_phase`): brought round only by someone on foot
+  waiting at the junction's crosswalks, every arm red, the crosswalks open for `WALK_OPEN` 5 s,
+  then its clearance (the widest arm at `WALK_PACE` 1 m/s, 3 s at least), then `ALL_RED`; walk
+  timing stays on the real clock (people don't hurry for the cars' clock). Out of it a lit
+  junction's crosswalks and box between the kerbs (out to each crosswalk's far side,
+  `Signal::crossing`) are closed to those on foot (a bike or an e-scooter rides on with the
+  traffic): a step into them stops at the kerb (`traffic::kerb_stop`, a 16 m grid of the junctions, `Travel::crossings`), and their wait
+  is what brings the walk round; someone already on them goes on across (over a junction next to
+  it too), and so does someone a car waits for (`cars::holding_up`: the two waited for each other
+  for good at a corner). Crossing a road away
+  from the junctions is as before. A roundabout's junctions (a road with `island`) keep an arm a
+  phase, the pole just past the box, cars waiting at the box's edge, no crosswalks and no walk.
+  A T where a road ends at another's kerb has its node on that road's middle line (`Graph::build`),
+  so its box, lights and slow zone are in the middle of the road.
+- The structure's `junctions` (`JunctionInfo`, `web/src/core/protocol.ts`): every lit junction in
+  the snapshot's signal head rows' order, `{x, z, roundabout?, arms: {road, dir, width, walkFrom,
+  walkTo, stop, light}[]}` (the arm's `meta.roads` index, its unit way out, the carriageway kerb to
+  kerb, its crosswalk and stop line in m out from the middle, its head's snapshot row or null);
+  `lightPoles` stays for the kerbside furniture. The snapshot's light rows are as before; every
+  head of a junction shows `STATE` 3 (walk) while its walk phase lets people step out, red in its
+  clearance. `snapshot::MAX_LIGHTS` is 512, a row for every head (the generated worlds have up to
+  367 heads at 121 junctions, over seed bases 0 and 16–35; 256 left some unlit); past it a debug
+  build fails, the generated-world check too.
 - `garages[].rot?: 0 | 1 | 2 | 3` — a garage the player built (Build mode's Garage tool,
   `Command::BuildGarage`): the way its door faces, as a thing's facing (0 towards +z, 1 +x,
   2 -z, 3 -x). Absent: towards the street, as the town places garages. The same field is in the

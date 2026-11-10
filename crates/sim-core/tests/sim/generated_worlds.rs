@@ -182,6 +182,18 @@ fn generated_worlds_are_livable() {
         if w.exits.is_empty() {
             failures.push(format!("{label}: no way out of town"));
         }
+        // Every junction's lights with a row in the snapshot for each of its heads: none undrawn.
+        let heads: usize = w.travel.signals.iter().map(|s| s.arms.len()).sum();
+        println!(
+            "  {label}: {} lit junctions, {heads} signal heads",
+            w.travel.signals.len()
+        );
+        if heads > sim_core::snapshot::MAX_LIGHTS {
+            failures.push(format!(
+                "{label}: {heads} signal heads, past the snapshot's {} rows",
+                sim_core::snapshot::MAX_LIGHTS
+            ));
+        }
         // The town's roads one network as the sim joins them.
         let networks = Graph::from_town(&w.travel.file, &world["town"]["meta"]).networks();
         if networks != 1 {

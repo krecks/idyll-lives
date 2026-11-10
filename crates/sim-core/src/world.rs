@@ -1135,6 +1135,9 @@ pub struct Sim {
     pub(crate) car_door: u8,
     /// Ticks they've waited for a car driving by to pass (`cars::in_the_way`). Not saved.
     pub(crate) car_wait: u32,
+    /// The lit junction whose crosswalk they wait at the kerb of for its walk phase, and the tick
+    /// they last did (`traffic::kerb_stop`). Not saved.
+    pub(crate) kerb_wait: Option<(u16, u64)>,
     /// The work shift (or school day) they're away for starts at this tick: until then they're on
     /// their way (`life::at_work`). Not saved (after a load, it's under way).
     pub(crate) shift_from: u64,
@@ -1999,6 +2002,8 @@ pub(crate) struct Ctx<'a> {
     pub travel: &'a crate::travel::Travel,
     /// Households' cars and the work taxis (`World::cars`).
     pub cars: &'a [crate::cars::Car],
+    /// The lit junctions' lights (`Traffic::lights`): their crosswalks open on the walk phase.
+    pub lights: &'a [crate::traffic::Light],
     /// The work taxis' runs (`World::taxis`).
     pub taxis: &'a crate::taxi::Taxis,
     pub autonomy: bool,
@@ -2463,6 +2468,7 @@ impl World {
             exits: &self.exits,
             travel: &self.travel,
             cars: &self.cars,
+            lights: &self.traffic.lights,
             taxis: &self.taxis,
             autonomy: self.autonomy,
             room_score: &self.room_score,
@@ -3102,6 +3108,7 @@ impl World {
             car_seat: 0,
             car_door: 0,
             car_wait: 0,
+            kerb_wait: None,
             shift_from: 0,
             alone_until: 0,
             household: spawn.household,
@@ -4534,6 +4541,7 @@ impl World {
                 exits,
                 travel,
                 cars,
+                traffic,
                 taxis,
                 room_score,
                 dirt,
@@ -4569,6 +4577,7 @@ impl World {
                 exits,
                 travel,
                 cars,
+                lights: &traffic.lights,
                 taxis,
                 autonomy: *autonomy,
                 hour,
@@ -8674,6 +8683,28 @@ fn progress(
                 if dist > 1e-4 {
                     sim.yaw = dx.atan2(dz);
                 }
+                // At a lit junction's crosswalk, closed to them: on foot, they wait at the kerb for
+                // its walk phase, which their waiting brings round (`traffic::kerb_stop`). Not in
+                // the way of a car waiting for them, though: on, out of its way (a taxi turning the
+                // corner and someone waiting there at the kerb waited for each other for good).
+                // On a bike or an e-scooter they ride on with the traffic (stopped at every
+                // junction along the road, riders were hours on their way out of town).
+                let go = budget.min(dist);
+                let ahead = [
+                    sim.pos[0] + dx / dist.max(1e-4) * go,
+                    sim.pos[1] + dz / dist.max(1e-4) * go,
+                ];
+                if sim.riding.is_none()
+                    && let Some((s, f)) =
+                        crate::traffic::kerb_stop(ctx.travel, ctx.lights, sim.pos, ahead)
+                    && !crate::cars::holding_up(ctx.cars, sim.id, body, sim.pos)
+                {
+                    sim.pos[0] += (ahead[0] - sim.pos[0]) * f;
+                    sim.pos[1] += (ahead[1] - sim.pos[1]) * f;
+                    sim.kerb_wait = Some((s, ctx.tick));
+                    break;
+                }
+                sim.kerb_wait = None;
                 if dist <= budget {
                     sim.pos = wp;
                     budget -= dist;

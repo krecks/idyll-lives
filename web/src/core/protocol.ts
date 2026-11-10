@@ -631,6 +631,44 @@ export interface WorldStructure {
    * head rows' order): the kerbside furniture keeps clear of them. Absent: none.
    */
   lightPoles?: [number, number, number][];
+  /**
+   * Every junction where three or more roads for cars meet (sim-core `traffic::Signal`, in the
+   * snapshot's signal head rows' order), for its pad and markings. Absent: none.
+   */
+  junctions?: JunctionInfo[];
+}
+
+/**
+ * A junction (`WorldStructure.junctions`, sim-core `traffic::Signal`): its node's middle (m), and
+ * its arms. `roundabout`: a node on a roundabout's ring (the renderer leaves out its pad and
+ * markings; its lights work as before, an arm at a time).
+ */
+export interface JunctionInfo {
+  x: number;
+  z: number;
+  roundabout?: true;
+  arms: JunctionArmInfo[];
+}
+
+/**
+ * A junction's arm (sim-core `traffic::SignalArm`). Distances are m out from the junction's middle
+ * along `dir`: the crosswalk from `walkFrom` (the corner, where the kerb's return round from the
+ * next arm ends, about `traffic::KERB_RETURN` = 3 m in radius, or the box's edge) to `walkTo`
+ * (`traffic::CROSSWALK` = 3 m on), and the stop line at `stop` (`traffic::STOP_GAP` = 0.5 m past
+ * it): cars on red stop with their noses there.
+ */
+export interface JunctionArmInfo {
+  /** The arm's road (`meta.roads` index). */
+  road: number;
+  /** The way out along the arm from the middle (a unit vector: x, z). */
+  dir: [number, number];
+  /** The road's carriageway, kerb to kerb (m). */
+  width: number;
+  walkFrom: number;
+  walkTo: number;
+  stop: number;
+  /** Its signal head's row in the snapshot (`SnapshotLayout.light`); null: not lit. */
+  light: number | null;
 }
 
 /**

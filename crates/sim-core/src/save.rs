@@ -87,9 +87,10 @@
 //! back at the front door after a load). Still 35: a file written while the town had buses (its
 //! bus stops among its exits, `openWorld.stops`) loads without them: the stops are no ways out,
 //! dropped from the exits as it loads, and nothing of the buses was ever saved. Still 35: the
-//! traffic lights (`traffic::Signal`, worked out again on load) are saved where they'd got to (`lights`: each lit junction's arm, its stage, the tick it began),
-//! left out where there are none; absent (an older file, or another number of lit junctions),
-//! they start over at their first arm's green.
+//! traffic lights (`traffic::Signal`, worked out again on load) are saved where they'd got to (`lights`: each lit junction's phase, its
+//! stage, the tick it began; `arm` before phases), left out where there are none; absent (an
+//! older file, another number of lit junctions, or a phase one hasn't), they start over at their
+//! first phase's green.
 //! Still 35: a resident late for the shift they're at says so (`job.late`, left out when on
 //! time; an older file's are on time).
 //! Still 35: the story may tell of a host bringing a guest something (`served`, the item in `n`,
@@ -217,11 +218,13 @@ pub struct SaveFile {
     pub taxis: crate::taxi::Taxis,
 }
 
-/// A lit junction's lights (`traffic::Light`): whose turn it is (its arm), how far through it
-/// (0 green, 1 amber, 2 all red), and the tick that began.
+/// A lit junction's lights (`traffic::Light`): whose turn it is (its phase, or its walk phase;
+/// `arm` in files before phases, an arm's index: loaded as a phase if there's one, else they start
+/// over), how far through it (0 green, 1 amber, 2 all red), and the tick that began.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct LightSave {
-    pub arm: u8,
+    #[serde(alias = "arm")]
+    pub phase: u8,
     pub stage: u8,
     pub since: u64,
 }
@@ -1104,7 +1107,7 @@ impl World {
                 .lights
                 .iter()
                 .map(|l| LightSave {
-                    arm: l.arm,
+                    phase: l.phase,
                     stage: match l.stage {
                         crate::traffic::Stage::Green => 0,
                         crate::traffic::Stage::Amber => 1,
@@ -1741,13 +1744,19 @@ impl World {
         crate::cars::load(&mut world, &cars, &save.drives, &save.garages);
         // (The junctions lit are worked out again from the roads: `traffic::settle`.)
         crate::traffic::settle(&mut world);
-        // (The lights where they'd got to, for the same lit junctions.)
-        if save.lights.len() == world.travel.signals.len() {
+        // (The lights where they'd got to, for the same lit junctions: each a turn it has.)
+        if save.lights.len() == world.travel.signals.len()
+            && save
+                .lights
+                .iter()
+                .zip(&world.travel.signals)
+                .all(|(l, s)| l.phase < s.turns())
+        {
             world.traffic.lights = save
                 .lights
                 .iter()
                 .map(|l| crate::traffic::Light {
-                    arm: l.arm,
+                    phase: l.phase,
                     stage: match l.stage {
                         1 => crate::traffic::Stage::Amber,
                         2 => crate::traffic::Stage::Clear,
