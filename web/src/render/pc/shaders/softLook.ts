@@ -23,6 +23,7 @@ import { settings } from '../../../settings/settings.svelte';
 import type { Shading } from '../../types';
 import type { ShaderFeature } from './chunks';
 import { RESIDENT_LIGHT } from './character';
+import { ROOM } from './envBrdf';
 import { SPECULAR_UNITS } from '../lightUnits';
 
 const LUM = { glsl: 'vec3(0.2126, 0.7152, 0.0722)', wgsl: 'vec3f(0.2126, 0.7152, 0.0722)' };
@@ -71,6 +72,8 @@ export const SOFT_LOOK: ShaderFeature = {
 	vec3 gameAmbient = vec3(0.0);
 	// Contact shading's share of the light left where things meet (1: none; \`chunks.ts\`'s patch reads it).
 	float gameContact = 1.0;
+	// Whether the reflection is the room's (\`envBrdf.ts\` \`ROOM\`): a unit of it until \`combineColor\`.
+	bool gameRoomRefl = false;
 	// The soft look's saturation (a surface may set its own before the light is combined: the residents' skin).
 	float gameSaturation = 1.15;
 	vec3 gameHemi(vec3 n) {
@@ -105,8 +108,12 @@ export const SOFT_LOOK: ShaderFeature = {
 		if (gameGrey) { gameAmbient = vec3(dot(gameAmbient, ${LUM.glsl})); }
 		gameAmbient *= gameUnder.z;
 		#ifdef LIT_REFLECTIONS
-			dReflection.rgb *= gameUnder.z;
+			if (!gameRoomRefl) { dReflection.rgb *= gameUnder.z; }
 		#endif
+	#endif
+	// A room's reflection (\`envBrdf.ts\` \`ROOM\`): as bright as the light that reaches this fragment.
+	#ifdef LIT_REFLECTIONS
+		if (gameRoomRefl) { dReflection.rgb *= (dDiffuseLight + gameAmbient) * ${ROOM.wall}; }
 	#endif
 	dDiffuseLight += gameAmbient;
 	vec3 pbr = combineColorEngine(gameAlbedo, sheenSpecularity, clearcoatSpecularity);
@@ -142,6 +149,7 @@ export const SOFT_LOOK: ShaderFeature = {
 	uniform game_hemiDir: vec3f;
 	var<private> gameAmbient: vec3f = vec3f(0.0);
 	var<private> gameContact: f32 = 1.0;
+	var<private> gameRoomRefl: bool = false;
 	var<private> gameSaturation: f32 = 1.15;
 	fn gameHemi(n: vec3f) -> vec3f {
 		var c = mix(uniform.game_hemiGround, uniform.game_hemiSky, dot(n, uniform.game_hemiDir) * 0.5 + 0.5);
@@ -170,8 +178,11 @@ export const SOFT_LOOK: ShaderFeature = {
 		if (gameGrey) { gameAmbient = vec3f(dot(gameAmbient, ${LUM.wgsl})); }
 		gameAmbient = gameAmbient * gameUnder.z;
 		#ifdef LIT_REFLECTIONS
-			dReflection = vec4f(dReflection.rgb * gameUnder.z, dReflection.a);
+			if (!gameRoomRefl) { dReflection = vec4f(dReflection.rgb * gameUnder.z, dReflection.a); }
 		#endif
+	#endif
+	#ifdef LIT_REFLECTIONS
+		if (gameRoomRefl) { dReflection = vec4f(dReflection.rgb * (dDiffuseLight + gameAmbient) * ${ROOM.wall}, dReflection.a); }
 	#endif
 	dDiffuseLight = dDiffuseLight + gameAmbient;
 	let pbr = combineColorEngine(gameAlbedo, sheenSpecularity, clearcoatSpecularity);

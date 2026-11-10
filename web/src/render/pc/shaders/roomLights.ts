@@ -39,7 +39,7 @@
 import type { Language, ShaderFeature } from './chunks';
 
 /** How far out along its normal a fragment is classed (m): off a wall's face, into the room it faces. */
-const OUT = '0.1';
+export const OUT = '0.1';
 
 /** `-log2(1/100)`: the physical spot falloff, a hundredth of the light at the cone's edge. */
 const CONE_EDGE = '6.64385618977';

@@ -24,6 +24,18 @@
  */
 
 import type { Language } from './chunks';
+import { OUT } from './roomLights';
+
+/**
+ * What a glossy thing reflects in a room of the lot in view (`roomLights.ts`: its fragments know their
+ * room): not the open sky, which shone on every fridge and bathtub as on a car in a field, but the room
+ * itself, as a soft picture of it: its walls and ceiling as bright as the light that reaches the thing
+ * (the sun through the windows, the lamps, the sky's fill: `softLook.ts` `combineColor`) times `wall`
+ * (what the walls give back of it), the floor `floor` of that, turning from one to the other over
+ * `turn` of the reflected direction's height. Rooms the mask doesn't know (other houses, storeys not
+ * shown) and everything outdoors reflect the sky as before.
+ */
+export const ROOM = { wall: '0.7', floor: '0.45', turn: '0.5' };
 
 /** The lines replaced and wrapped (also in `tools/render/check_chunks.ts`). */
 export const ENV_BRDF_ANCHORS = {
@@ -62,7 +74,14 @@ void addReflection(vec3 reflDir, float gloss) {
 		float gameSlant = pow(1.0 - saturate(dot(dViewDirW, litArgs_worldNormal)), 5.0);
 		vec3 gameLagarde = gameF0 + (max(vec3(gloss), gameF0) - gameF0) * gameSlant;
 		vec3 gameSchlick = gameF0 + (vec3(1.0) - gameF0) * gameSlant;
-		dReflection.rgb = gameBefore + (dReflection.rgb - gameBefore) * gameLagarde / gameSchlick;
+		vec3 gameAdded = dReflection.rgb - gameBefore;
+		// In a room (\`ROOM\`): the room's picture, not the sky's, a unit of it; \`combineColor\` gives it the room's light.
+		if (gameRoomHere < 0.0) gameRoomHere = gameRoomOf(vPositionW + litArgs_worldNormal * ${OUT});
+		if (gameRoomHere > 1.5) {
+			gameRoomRefl = true;
+			gameAdded = vec3(mix(${ROOM.floor}, 1.0, smoothstep(-${ROOM.turn}, ${ROOM.turn}, reflDir.y)));
+		}
+		dReflection.rgb = gameBefore + gameAdded * gameLagarde / gameSchlick;
 	#else
 		addReflectionEngine(reflDir, gloss);
 	#endif
@@ -77,7 +96,13 @@ fn addReflection(reflDir: vec3f, gloss: f32) {
 		let gameSlant = pow(1.0 - saturate(dot(dViewDirW, litArgs_worldNormal)), 5.0);
 		let gameLagarde = gameF0 + (max(vec3f(gloss), gameF0) - gameF0) * gameSlant;
 		let gameSchlick = gameF0 + (vec3f(1.0) - gameF0) * gameSlant;
-		dReflection = vec4f(gameBefore + (dReflection.rgb - gameBefore) * gameLagarde / gameSchlick, dReflection.a);
+		var gameAdded = dReflection.rgb - gameBefore;
+		if (gameRoomHere < 0.0) { gameRoomHere = gameRoomOf(vPositionW + litArgs_worldNormal * ${OUT}); }
+		if (gameRoomHere > 1.5) {
+			gameRoomRefl = true;
+			gameAdded = vec3f(mix(${ROOM.floor}, 1.0, smoothstep(-${ROOM.turn}, ${ROOM.turn}, reflDir.y)));
+		}
+		dReflection = vec4f(gameBefore + gameAdded * gameLagarde / gameSchlick, dReflection.a);
 	#else
 		addReflectionEngine(reflDir, gloss);
 	#endif
