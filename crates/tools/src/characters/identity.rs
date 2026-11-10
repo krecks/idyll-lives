@@ -171,6 +171,8 @@ pub struct Channel {
     pub name: &'static str,
     /// The body's skin (`body`'s first vertices, body.rs `Surface::pos`).
     pub skin: (Vec<V3>, Vec<V3>),
+    /// SPIKE (`hd.body`): the same on the level-2 skin (`Surface::fine_pos`).
+    pub skin_hd: (Vec<V3>, Vec<V3>),
     /// The face's parts (face.rs `PARTS`; `body`: the lids and lips, after the skin).
     pub parts: Vec<(&'static str, Vec<V3>, Vec<V3>)>,
     /// The right eyeball: how far its centre moves (m; the left's x mirrored) and how much larger it is (of 1).
@@ -273,30 +275,58 @@ fn channel(family: &str, name: &'static str, base: &Built, mask: &Mask) -> Chann
     let (lo, k) = if one_sided { (base, 1.0) } else { (&low, 0.5) };
     let b = &base.srf;
     let (ri_head, ri_ear) = (body::region("head"), body::region("ear"));
-    let w: Vec<f64> = (0..b.pos.len())
-        .map(|v| mask.skin(b.pos[v], b.region[v][ri_head] + b.region[v][ri_ear]))
-        .collect();
     let e = (hi.head.eyes[1] - lo.head.eyes[1]) * k;
     let size = (hi.head.eye_r - lo.head.eye_r) * k / base.head.eye_r;
     let eye_moves = e.norm() > 1e-9 || size.abs() > 1e-9;
-    let mut skin: (Vec<V3>, Vec<V3>) = (
-        (0..b.pos.len())
-            .map(|v| {
-                let d = (hi.srf.pos[v] - lo.srf.pos[v]) * k;
-                let carved = smoothstep(SOCKET.0, SOCKET.1, b.unsocketed[v].z - b.pos[v].z);
-                if !eye_moves || carved == 0.0 {
-                    return d * w[v];
-                }
-                let c = base.head.eyes[usize::from(b.pos[v].x > 0.0)];
-                let with_eye = V3::new(e.x * c.x.signum(), e.y, e.z) + (b.pos[v] - c) * size;
-                (d + (with_eye - d) * carved) * w[v]
-            })
-            .collect(),
-        (0..b.pos.len())
-            .map(|v| (hi.srf.nor[v] - lo.srf.nor[v]) * (k * w[v]))
-            .collect(),
+    // (SPIKE: the same shape on level 1's vertices and on level 2's, `hd.body`.)
+    let shape = |pos: &[V3],
+                 bare: &[V3],
+                 region: &[[f64; body::NR]],
+                 hp: &[V3],
+                 lp: &[V3],
+                 hn: &[V3],
+                 ln: &[V3]| {
+        let w: Vec<f64> = (0..pos.len())
+            .map(|v| mask.skin(pos[v], region[v][ri_head] + region[v][ri_ear]))
+            .collect();
+        let mut skin: (Vec<V3>, Vec<V3>) = (
+            (0..pos.len())
+                .map(|v| {
+                    let d = (hp[v] - lp[v]) * k;
+                    let carved = smoothstep(SOCKET.0, SOCKET.1, bare[v].z - pos[v].z);
+                    if !eye_moves || carved == 0.0 {
+                        return d * w[v];
+                    }
+                    let c = base.head.eyes[usize::from(pos[v].x > 0.0)];
+                    let with_eye = V3::new(e.x * c.x.signum(), e.y, e.z) + (pos[v] - c) * size;
+                    (d + (with_eye - d) * carved) * w[v]
+                })
+                .collect(),
+            (0..pos.len())
+                .map(|v| (hn[v] - ln[v]) * (k * w[v]))
+                .collect(),
+        );
+        trim(&mut skin);
+        skin
+    };
+    let skin = shape(
+        &b.pos,
+        &b.unsocketed,
+        &b.region,
+        &hi.srf.pos,
+        &lo.srf.pos,
+        &hi.srf.nor,
+        &lo.srf.nor,
     );
-    trim(&mut skin);
+    let skin_hd = shape(
+        &b.fine_pos,
+        &b.fine_bare,
+        &b.fine_region,
+        &hi.srf.fine_pos,
+        &lo.srf.fine_pos,
+        &hi.srf.fine_nor,
+        &lo.srf.fine_nor,
+    );
     let parts = base
         .parts
         .iter()
@@ -339,6 +369,7 @@ fn channel(family: &str, name: &'static str, base: &Built, mask: &Mask) -> Chann
     Channel {
         name,
         skin,
+        skin_hd,
         parts,
         eye: [e.x, e.y, e.z, size],
         samples,
