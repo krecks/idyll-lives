@@ -8666,17 +8666,20 @@ fn progress(
                 if dist > 1e-4 {
                     sim.yaw = dx.atan2(dz);
                 }
-                // At a lit junction's crosswalk, closed to them: they wait at the kerb for its
-                // walk phase, which their waiting brings round (`traffic::kerb_stop`). Not in the
-                // way of a car waiting for them, though: on, out of its way (a taxi turning the
+                // At a lit junction's crosswalk, closed to them: on foot, they wait at the kerb for
+                // its walk phase, which their waiting brings round (`traffic::kerb_stop`). Not in
+                // the way of a car waiting for them, though: on, out of its way (a taxi turning the
                 // corner and someone waiting there at the kerb waited for each other for good).
+                // On a bike or an e-scooter they ride on with the traffic (stopped at every
+                // junction along the road, riders were hours on their way out of town).
                 let go = budget.min(dist);
                 let ahead = [
                     sim.pos[0] + dx / dist.max(1e-4) * go,
                     sim.pos[1] + dz / dist.max(1e-4) * go,
                 ];
-                if let Some((s, f)) =
-                    crate::traffic::kerb_stop(ctx.travel, ctx.lights, sim.pos, ahead)
+                if sim.riding.is_none()
+                    && let Some((s, f)) =
+                        crate::traffic::kerb_stop(ctx.travel, ctx.lights, sim.pos, ahead)
                     && !crate::cars::holding_up(ctx.cars, sim.id, body, sim.pos)
                 {
                     sim.pos[0] += (ahead[0] - sim.pos[0]) * f;

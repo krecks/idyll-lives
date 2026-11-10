@@ -118,8 +118,8 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   then its clearance (the widest arm at `WALK_PACE` 1 m/s, 3 s at least), then `ALL_RED`; walk
   timing stays on the real clock (people don't hurry for the cars' clock). Out of it a lit
   junction's crosswalks and box between the kerbs (out to each crosswalk's far side,
-  `Signal::crossing`) are closed to those on foot and on bikes: a step into them stops at the
-  kerb (`traffic::kerb_stop`, a 16 m grid of the junctions, `Travel::crossings`), and their wait
+  `Signal::crossing`) are closed to those on foot (a bike or an e-scooter rides on with the
+  traffic): a step into them stops at the kerb (`traffic::kerb_stop`, a 16 m grid of the junctions, `Travel::crossings`), and their wait
   is what brings the walk round; someone already on them goes on across (over a junction next to
   it too), and so does someone a car waits for (`cars::holding_up`: the two waited for each other
   for good at a corner). Crossing a road away

@@ -1869,9 +1869,9 @@ fn walk_open(signals: &[Signal], lights: &[Light], s: usize) -> bool {
     })
 }
 
-/// Where someone on foot (or on a bike) stepping from `from` to `to` stops at a lit junction's
-/// crosswalks (`Signal::crossing`: its box too, between the kerbs, and its arms out to the far side
-/// of their crosswalks) while they're closed to them, out of its walk phase: the junction (of those
+/// Where someone on foot (riding, they go on with the traffic) stepping from `from` to `to` stops
+/// at a lit junction's crosswalks (`Signal::crossing`: its box too, between the kerbs, and its arms
+/// out to the far side of their crosswalks) while they're closed to them, out of its walk phase: the junction (of those
 /// whose crosswalks are there, the nearest), and how far along the step they come (0 to 1), at the
 /// kerb. None: on (out of reach of any; one whose crosswalks are there in its walk phase; or on a
 /// junction's crosswalks already, on across, out of it and over any next to it: two junctions a
