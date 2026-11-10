@@ -146,7 +146,9 @@ at real speeds (`generated_worlds`' drive across). Its etas follow (`travel::DRI
 walking (the city bike 3, the kids' bike 2.2, the e-scooter 4) on the same clock, so four times
 that (`content::Vehicle::pace`, `ride.rs`), along the same way as the walk, and the way to work is
 timed by the ride (`ride::commute_bike`). Walking, getting in and out of a car, its doors and the
-taxi's stands for its riders stay real time, and schedules game time.
+taxi's stands for its riders stay real time, and schedules game time. With the taxi that quick,
+visits and outings out of walking reach go by it far more often: six leisure taxis at a time, there
+and back (`taxi::LEISURE_FLEET`), keep a big world's evening from jamming.
 
 - Areas are 170 m or more apart (best ~230 m from the nearest, every quarter of the world with
   one or with homes out in the country); trips between them are by car. The household setting off with
