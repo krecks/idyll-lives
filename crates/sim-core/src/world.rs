@@ -8655,7 +8655,7 @@ fn progress(
                     sim.pos[0] + dx / dist.max(1e-4) * step,
                     sim.pos[1] + dz / dist.max(1e-4) * step,
                 ];
-                let passing = crate::cars::in_the_way(ctx.cars, body, sim.pos, to)
+                let passing = crate::cars::in_the_way(ctx.cars, sim.id, body, sim.pos, to)
                     .and_then(|c| ctx.cars[c].shown.map(|(at, yaw, ..)| (at, yaw)));
                 if let Some((at, yaw)) = passing {
                     sim.car_wait = sim.car_wait.saturating_add(ticks);

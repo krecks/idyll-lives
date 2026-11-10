@@ -3241,6 +3241,12 @@ const STILL_REACH: f32 = 3.0;
 /// Since when each car on its way has stood still (`Taxis::still`).
 fn note_still(w: &mut World) {
     let tick = w.tick;
+    let red: Vec<bool> = (0..w.cars.len())
+        .map(|c| {
+            w.traffic.waiting(crate::cars::car_first(c))
+                && crate::traffic::at_red(w, crate::cars::car_first(c))
+        })
+        .collect();
     let still = &mut w.taxis.still;
     still.resize(w.cars.len(), (None, tick));
     for (c, car) in w.cars.iter().enumerate() {
@@ -3250,11 +3256,13 @@ fn note_still(w: &mut World) {
                 crate::cars::CarState::Leaving | crate::cars::CarState::Arriving
             )
         });
-        // (Inching on or backing up a little, as one held up does, is standing still.)
+        // (Inching on or backing up a little, as one held up does, is standing still; waiting at
+        // a red light isn't, it changes: a taxi given up there let its riders out in the road,
+        // and waited for them standing in its way for good, Wheat Acres.)
         let moved = match (at, still[c].0) {
             (Some(p), Some(q)) => crate::travel::dist(p, q) > STILL_REACH,
             _ => true,
-        };
+        } || red[c];
         if moved {
             still[c] = (at, tick);
         }
