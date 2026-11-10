@@ -106,7 +106,10 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   150° apart share one, an arm with none across from it has its own (a crossroads two, a T two:
   the road through, then the side road; `SignalArm::phase`). One phase is green at a time,
   actuated as the arms were (`MIN_GREEN` 5 s, its share of `CYCLE` 50 s, `AMBER` 2 s, `ALL_RED`
-  4 s); a turn across those coming the other way on the same green is left to the claims. Each
+  4 s); a turn across those coming the other way on the same green is left to the claims. Only a
+  car's way through a junction's box (within `GATE_THROUGH` 7 m of its middle) goes by its lights,
+  on the phase of the arm it comes in by, of the first junction it goes through (`traffic::gate`;
+  not one it only comes near, out of a driveway by it). Each
   arm has a crosswalk from its corner (where the kerb's `KERB_RETURN` 3 m return round from the
   next arm ends, or the box's edge, whichever is further out) `CROSSWALK` 3 m wide, and a stop
   line `STOP_GAP` 0.5 m past it, no further out than half way to the next junction: a car's claim
@@ -134,7 +137,8 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   `lightPoles` stays for the kerbside furniture. The snapshot's light rows are as before; every
   head of a junction shows `STATE` 3 (walk) while its walk phase lets people step out, red in its
   clearance. `snapshot::MAX_LIGHTS` is 512, a row for every head (the generated worlds have up to
-  about 350); past it a debug build fails, the generated-world check too.
+  367 heads at 121 junctions, over seed bases 0 and 16–35; 256 left some unlit); past it a debug
+  build fails, the generated-world check too.
 - `garages[].rot?: 0 | 1 | 2 | 3` — a garage the player built (Build mode's Garage tool,
   `Command::BuildGarage`): the way its door faces, as a thing's facing (0 towards +z, 1 +x,
   2 -z, 3 -x). Absent: towards the street, as the town places garages. The same field is in the
