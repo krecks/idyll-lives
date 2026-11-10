@@ -2,6 +2,10 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **Junctions with real traffic lights:** every junction where three roads or more meet is lit (in the biggest towns only the first few hundred lights were), and the arms across from each other go green together: a crossroads in two turns, a T in two (the road through, then the side road), a car turning across the way of those coming the other way waiting for them to pass. Each arm has a crosswalk at the corner and a stop line just short of it, where cars wait on red, the light's pole beside it on the kerb; a car let through just as the light changes but held up before the line stops after all. Someone on foot crossing at a junction waits at the kerb for the walk, which their waiting brings round: every arm red, a few seconds to step out and time to get across, then the cars again. The lights where a lane begins at a road's kerb stand round the middle of the road, not off towards the lane. The roundabouts work as before.
+
 ## 0.7.0 — 2026-11-09
 
 **Play it in your browser:** https://krecks.github.io/idyll-lives/
