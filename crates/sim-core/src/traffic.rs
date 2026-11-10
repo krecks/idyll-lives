@@ -1473,12 +1473,12 @@ impl Traffic {
                 });
                 continue;
             };
-            // (At the lights, not its phase's green: it waits at the stop line, holding nobody up.)
-            if !self.green(next[0].gate) {
-                waits.push((i, Vec::new()));
-                fifo.push((i, Vec::new()));
-                continue;
-            }
+            // (At the lights, not its phase's green: it waits at the stop line, holding nobody up
+            // and granted nothing; but who it would wait for on its green, the parts held and the
+            // bodies in its way, it names (`by`), as on its green: one standing in its way waiting
+            // in turn for it at another phase's red is a ring the waits see, rule 3's and
+            // `cars::unjam`'s, not two standing for good by turns, Highholm.)
+            let red = !self.green(next[0].gate);
             let me = self
                 .mover(a.key)
                 .map_or((first.rect, first.way), |m| (m.rect, m.way));
@@ -1556,11 +1556,15 @@ impl Traffic {
             };
             fifo.push((
                 i,
-                pending
-                    .iter()
-                    .filter(conflicting)
-                    .map(|(j, _)| self.asks[*j].key)
-                    .collect(),
+                if red {
+                    Vec::new()
+                } else {
+                    pending
+                        .iter()
+                        .filter(conflicting)
+                        .map(|(j, _)| self.asks[*j].key)
+                        .collect()
+                },
             ));
             // (Whose bodies those it waits for wait for, it doesn't wait for: it'd wait for itself.)
             let after: Vec<u64> = pending
@@ -1612,10 +1616,17 @@ impl Traffic {
                     bodies.push(m.key);
                 }
             }
-            let free = by_holds.is_empty() && !earlier && bodies.is_empty();
-            let bodies_only = by_holds.is_empty() && !earlier;
+            let holds_none = by_holds.is_empty();
             let mut by = by_holds;
             by.extend(bodies);
+            if red {
+                self.asks[i].coming = coming;
+                self.asks[i].bodies_only = false;
+                waits.push((i, by));
+                continue;
+            }
+            let free = by.is_empty() && !earlier;
+            let bodies_only = holds_none && !earlier;
             if free {
                 // (Held from now: the asks after it this tick see it held.)
                 let key = self.asks[i].key;
@@ -2182,6 +2193,59 @@ mod tests {
             traffic.holding(third),
             "the third goes first: waits {:?}",
             traffic.waits_for(third)
+        );
+    }
+
+    #[test]
+    fn two_at_the_lights_each_in_the_others_way_wait_for_each_other_on_red_and_green() {
+        // (Highholm's: a car and a taxi at their stop lines on two phases of a lit junction, each
+        // standing in the other's way through it. On its green each waited for the other's body;
+        // the other, at its red, named nobody: no ring for the waits to see, and they stood by
+        // turns for good.) At red too each names whom it would wait for: the ring is seen.
+        let (a, b) = (1 << 63 | 5, 1 << 63 | 22);
+        let mut c_a = claim(&[
+            [-6.0, 0.0],
+            [-2.0, 0.0],
+            [2.0, 0.0],
+            [6.0, 0.0],
+            [10.0, 0.0],
+        ]);
+        let mut c_b = claim(&[
+            [6.0, 0.0],
+            [2.0, 0.0],
+            [-2.0, 0.0],
+            [-6.0, 0.0],
+            [-10.0, 0.0],
+        ]);
+        c_a.gate = Some((0, 0));
+        c_b.gate = Some((0, 1));
+        let sig = lit(
+            [0.0, 0.0],
+            &[[-1.0, 0.0], [1.0, 0.0], [0.0, 1.0]],
+            &[0, 1, 1],
+        );
+        let movers = || {
+            vec![
+                standing(a, [-9.0, 0.0], std::f32::consts::FRAC_PI_2),
+                standing(b, [9.0, 0.0], -std::f32::consts::FRAC_PI_2),
+            ]
+        };
+        let places = [(a, 0, 9.5), (b, 0, 9.5)];
+        let mut traffic = Traffic::default();
+        let mut both = false;
+        for tick in 1..CYCLE * 3 {
+            traffic.may_go(tick, a, 0, std::slice::from_ref(&c_a), 9.5, 10.5);
+            traffic.may_go(tick, b, 0, std::slice::from_ref(&c_b), 9.5, 10.5);
+            traffic.begin(tick + 1, movers(), &places, std::slice::from_ref(&sig));
+            assert!(
+                !traffic.holding(a) && !traffic.holding(b),
+                "one went into the other"
+            );
+            both |= traffic.waits_for(a).contains(&b) && traffic.waits_for(b).contains(&a);
+        }
+        assert!(
+            both,
+            "they never both waited for each other: a ring nobody sees"
         );
     }
 

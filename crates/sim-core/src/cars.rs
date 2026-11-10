@@ -4977,6 +4977,13 @@ pub(crate) fn unjam(w: &mut World) {
         let (Some(_), Some((_, r))) = (car.detour, car.route.as_ref()) else {
             continue;
         };
+        // (Backed up as far as it goes, driving on from the next tick: no ground left to back
+        // over, only where it stands, which the others keep out of anyway (`guard`). Kept as
+        // its, one backing up out of its way waited for it there for good while it waited for
+        // that one, Oakview.)
+        if !r.at(car.progress + 1.0).2 {
+            continue;
+        }
         let half = [car.len / 2.0, car.wid / 2.0];
         let mut t = car.progress;
         let mut path = Vec::new();
