@@ -89,7 +89,7 @@ const EAR: (f64, f64) = (92.0, 122.0);
 /// The rows the ear's opening runs between (the upper lip's and the brow's: both run all round).
 const EAR_ROWS: (usize, usize) = (LIP, BROW);
 /// The ear (fractions of hh): half its breadth and half its height, and its middle above the opening's.
-const EAR_SIZE: (f64, f64, f64) = (0.078, 0.145, -0.04);
+const EAR_SIZE: (f64, f64, f64) = (0.078, 0.145, -0.03);
 /// How far its top lies behind its bottom (of its half breadth, per half height).
 const EAR_LEAN: f64 = 0.2;
 /// The ear's rim, eight points in order: the lobe's front, the lobe, the back low and high, the top's back

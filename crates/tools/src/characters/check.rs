@@ -590,7 +590,15 @@ pub fn check(out: &Path) -> bool {
                     })
                     .collect()
             };
-            // The ears: the body's faces where its skin (the first vertices, as body.rs made them) is ear.
+            // The ears: sound (no corner of a triangle shaded as facing away from it: the skin folded
+            // over itself where the ear leaves the head).
+            let turned = super::measure::ear(fam, stage)[6];
+            if turned > 0.0 {
+                fail(format!(
+                    "{fam}.{stage}: the ear's skin is folded over itself ({turned:.0} corners shaded as facing away)"
+                ));
+            }
+            // The body's faces where its skin (the first vertices, as body.rs made them) is ear.
             let skin = body::surface(fam, stage);
             let ri = body::region("ear");
             let bpos = at("body");

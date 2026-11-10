@@ -206,7 +206,7 @@ behind it (it has a thickness), inside it the fold round the hollow and the holl
 the head's side; a real ear's size (about 62 mm high and 32 wide on an adult, from the brow to the
 nose's base, 15 mm off the head at its back) and solid behind. `cargo characters ratios` prints each
 body's ear, and how many of its triangles' corners are shaded as facing away from the triangle (none:
-the skin is nowhere folded over itself). Between the grid's vertices the drawn head is snapped onto the
+the skin is nowhere folded over itself; `check` fails on one). Between the grid's vertices the drawn head is snapped onto the
 smooth one (the cage's limit alone dents it by up to 4 mm there, where the grid's spacing is uneven
 and its partial lines end: patches on the cheeks; by the ears, where the fit also slides the points
 along the head, they are placed from the cage's own points instead), and the eye sockets are carved into every point
