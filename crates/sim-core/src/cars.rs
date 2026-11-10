@@ -6309,7 +6309,13 @@ pub(crate) fn getting(sim: &mut Sim, car: &Car, t: u32, inward: bool) {
 
 /// The car driving by that a step from `from` to `to` with `body` would walk into (stepping out
 /// of its way is fine).
-pub(crate) fn in_the_way(cars: &[Car], body: Body, from: [f32; 2], to: [f32; 2]) -> Option<usize> {
+pub(crate) fn in_the_way(
+    cars: &[Car],
+    id: u32,
+    body: Body,
+    from: [f32; 2],
+    to: [f32; 2],
+) -> Option<usize> {
     // (Already in the way of one waiting for those in its way: they go on out of it, where
     // they're going, as it waits; those not yet in it wait for it, so it gets its gap.)
     let holds_up = |car: &Car| {
@@ -6328,6 +6334,12 @@ pub(crate) fn in_the_way(cars: &[Car], body: Body, from: [f32; 2], to: [f32; 2])
         };
         if holds_up(car) {
             return false;
+        }
+        // (One it waits for by name (`Car::on_foot`) doesn't wait for it to come on, nor for where
+        // it backs up to: only never into its body. Behind one backing out of a bay, a cyclist
+        // waited for it as it waited for them, for good, Swanmere.)
+        if car.on_foot.contains(&id) {
+            return walks_into(at, yaw, car.len, car.wid, 0.0, body, from, to);
         }
         let ahead = if out && !car.moved { 0.0 } else { AHEAD };
         walks_into(at, yaw, car.len, car.wid, ahead, body, from, to)
@@ -8379,17 +8391,17 @@ mod tests {
         let cars = [c];
         let on_foot = Body::WALKER;
         assert_eq!(
-            in_the_way(&cars, on_foot, [12.0, 10.0], [11.0, 10.0]),
+            in_the_way(&cars, u32::MAX, on_foot, [12.0, 10.0], [11.0, 10.0]),
             Some(0),
             "into its side"
         );
         assert_eq!(
-            in_the_way(&cars, on_foot, [10.8, 10.0], [11.5, 10.0]),
+            in_the_way(&cars, u32::MAX, on_foot, [10.8, 10.0], [11.5, 10.0]),
             None,
             "out of its way"
         );
         assert_eq!(
-            in_the_way(&cars, on_foot, [14.0, 10.0], [13.5, 10.0]),
+            in_the_way(&cars, u32::MAX, on_foot, [14.0, 10.0], [13.5, 10.0]),
             None,
             "well clear"
         );
@@ -8401,24 +8413,24 @@ mod tests {
             yaw: 0.0,
         };
         assert_eq!(
-            in_the_way(&cars, on_foot, [12.4, 10.0], [12.0, 10.0]),
+            in_the_way(&cars, u32::MAX, on_foot, [12.4, 10.0], [12.0, 10.0]),
             None,
             "on foot, still clear"
         );
         assert_eq!(
-            in_the_way(&cars, bike, [12.4, 10.0], [12.0, 10.0]),
+            in_the_way(&cars, u32::MAX, bike, [12.4, 10.0], [12.0, 10.0]),
             Some(0),
             "but not on a bike"
         );
         // Nor into the ground just in front of it (it faces +z, its front at z = 12.2): stopped
         // there, they'd hold it up. Out of there is fine.
         assert_eq!(
-            in_the_way(&cars, on_foot, [10.0, 15.5], [10.0, 14.0]),
+            in_the_way(&cars, u32::MAX, on_foot, [10.0, 15.5], [10.0, 14.0]),
             Some(0),
             "in front of it"
         );
         assert_eq!(
-            in_the_way(&cars, on_foot, [10.0, 13.5], [10.0, 14.0]),
+            in_the_way(&cars, u32::MAX, on_foot, [10.0, 13.5], [10.0, 14.0]),
             None,
             "out from in front of it"
         );
@@ -8439,10 +8451,14 @@ mod tests {
         // coming on (it waits its turn), they don't wait for it.
         let (from, to) = ([10.6, 13.0], [11.8, 13.0]);
         let cars = [waiting.clone(), standing.clone()];
-        assert_eq!(in_the_way(&cars, on_foot, from, to), None, "past its nose");
+        assert_eq!(
+            in_the_way(&cars, u32::MAX, on_foot, from, to),
+            None,
+            "past its nose"
+        );
         // Never into its body.
         assert_eq!(
-            in_the_way(&cars, on_foot, [13.0, 13.0], [13.6, 13.0]),
+            in_the_way(&cars, u32::MAX, on_foot, [13.0, 13.0], [13.6, 13.0]),
             Some(1),
             "into it"
         );
@@ -8451,16 +8467,44 @@ mod tests {
         let mut moving = standing.clone();
         moving.moved = true;
         assert_eq!(
-            in_the_way(&[waiting.clone(), moving], on_foot, from, to),
+            in_the_way(&[waiting.clone(), moving], u32::MAX, on_foot, from, to),
             Some(1),
             "it's coming on"
         );
         let mut clear = waiting;
         clear.waited = 0;
         assert_eq!(
-            in_the_way(&[clear, standing], on_foot, from, to),
+            in_the_way(&[clear, standing], u32::MAX, on_foot, from, to),
             Some(1),
             "holding nobody up"
+        );
+    }
+
+    #[test]
+    fn one_a_car_backing_up_waits_for_goes_on_out_of_its_way() {
+        // (Swanmere's: a car backing out of a bay by a lit junction, facing +z and backing towards
+        // -z, waited for a cyclist behind it, who waited for it in turn: for good.) Waited for by
+        // name, they go on, but never into its body; anyone else waits for it as ever.
+        let mut backing = car([10.0, 10.0], 0.0, 20.0);
+        backing.shown = Some(([10.0, 10.0], 0.0, true, 0));
+        backing.next = Some(([10.0, 9.3], 0.0));
+        backing.on_foot = vec![7];
+        let (from, to) = ([9.0, 7.0], [9.6, 7.0]);
+        let cars = [backing];
+        assert_eq!(
+            in_the_way(&cars, 8, Body::WALKER, from, to),
+            Some(0),
+            "another waits for it"
+        );
+        assert_eq!(
+            in_the_way(&cars, 7, Body::WALKER, from, to),
+            None,
+            "the one it waits for"
+        );
+        assert_eq!(
+            in_the_way(&cars, 7, Body::WALKER, [9.0, 7.95], [9.6, 8.0]),
+            Some(0),
+            "into its body"
         );
     }
 
