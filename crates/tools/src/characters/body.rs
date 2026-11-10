@@ -965,6 +965,10 @@ pub struct Topology {
     /// Per level-1 and level-2 point, how far it is snapped onto the smooth head (`snapped`).
     snap1: Vec<f64>,
     snap2: Vec<f64>,
+    /// Per level-1 and level-2 point, how much it is by an ear (`snapped`: placed from the cage's own
+    /// points, not the fitted ones).
+    ear1: Vec<f64>,
+    ear2: Vec<f64>,
     pub lod_tris: Vec<[usize; 3]>,
     /// A second level, only to sample the head densely (head_frame).
     pub s2: Subdivision,
@@ -996,18 +1000,17 @@ impl Topology {
         let l2 = limit_matrix(&s2.quads, s2.m.rows);
         let fine = l2.matmul(&s2.m).matmul(&s.m);
         let fine_m = s2.m.matmul(&s.m);
-        // Snapped: points of the head's cage alone, fading out where the neck's share comes in (none
-        // where an ear's does).
+        // Snapped: points of the head's cage alone, fading out where the neck's share comes in. The
+        // ears' too: their cage lies on the smooth head and the ear is its offset (head.rs), and the
+        // fit rings most beside them (the ear's rings are millimetres apart, the head's columns
+        // centimetres), by up to 3 cm at the fitted cage's vertices and 1 cm between them.
         let share = |m: &Csr| -> Vec<f64> {
             m.data
                 .iter()
                 .map(|row| {
-                    if row.iter().any(|&(c, _)| cage.region[c] == "ear") {
-                        return 0.0;
-                    }
                     let head: f64 = row
                         .iter()
-                        .filter(|&&(c, _)| cage.region[c] == "head")
+                        .filter(|&&(c, _)| matches!(cage.region[c], "head" | "ear"))
                         .map(|&(_, v)| v)
                         .sum();
                     smoothstep(0.8, 1.0, head)
@@ -1015,6 +1018,20 @@ impl Topology {
                 .collect()
         };
         let (snap1, snap2) = (share(&body), share(&fine));
+        let by_ear = |m: &Csr| -> Vec<f64> {
+            m.data
+                .iter()
+                .map(|row| {
+                    let ear: f64 = row
+                        .iter()
+                        .filter(|&&(c, _)| cage.region[c] == "ear")
+                        .map(|&(_, v)| v)
+                        .sum();
+                    smoothstep(0.0, 0.1, ear)
+                })
+                .collect()
+        };
+        let (ear1, ear2) = (by_ear(&body), by_ear(&fine));
         let lod_tris = polygon_triangles(&lod_faces);
         Topology {
             faces,
@@ -1025,6 +1042,8 @@ impl Topology {
             lu,
             snap1,
             snap2,
+            ear1,
+            ear2,
             lod_tris,
             s2,
             fine,
@@ -1051,24 +1070,40 @@ impl Topology {
     /// between them the face grid's uneven spacing and the ends of its partial lines (3-valent vertices,
     /// pentagons) dent it by up to 4 mm and turn its normals by up to 17 degrees, which showed as patches
     /// on the cheeks; snapped, the head is the smooth one plus the features.
+    ///
+    /// By the ears the fit also slides the points along the head (the ear's rings are millimetres apart,
+    /// the columns beside them centimetres: up to 1 cm between the fitted vertices), which folded the
+    /// skin over itself where the ear leaves it. There the smooth part is the cage's own points
+    /// (`targets`, what the fit was given) subdivided, not the fitted ones, moved onto the smooth head,
+    /// and the features are what `ctrl` adds to `base`.
     fn snapped(
         &self,
         fine: bool,
+        targets: &[V3],
         base: &[V3],
         ctrl: &[V3],
         onto: &impl Fn(V3) -> V3,
         sockets: &impl Fn(V3) -> V3,
     ) -> Vec<V3> {
-        let (m, w) = if fine {
-            (&self.fine, &self.snap2)
+        let (m, w, sub, ear) = if fine {
+            (&self.fine, &self.snap2, &self.fine_m, &self.ear2)
         } else {
-            (&self.body, &self.snap1)
+            (&self.body, &self.snap1, &self.s.m, &self.ear1)
         };
+        let plain = sub.apply(targets);
         m.apply(base)
             .iter()
             .zip(m.apply(ctrl))
             .zip(w)
-            .map(|((b, p), &w)| sockets(if w > 0.0 { p + (onto(*b) - b) * w } else { p }))
+            .enumerate()
+            .map(|(i, ((b, p), &w))| {
+                let fitted = if w > 0.0 { p + (onto(*b) - b) * w } else { p };
+                sockets(if ear[i] > 0.0 {
+                    fitted + (onto(plain[i]) + (p - b) - fitted) * ear[i]
+                } else {
+                    fitted
+                })
+            })
             .collect()
     }
 }
@@ -1160,7 +1195,7 @@ fn make_surface(family: &str, stage: &str, id: &Identity) -> Surface {
         sockets(family, stage, false, id),
     );
     let s = &topo.s;
-    let pos = topo.snapped(false, &base, &ctrl, &onto, &holes);
+    let pos = topo.snapped(false, &arr.t, &base, &ctrl, &onto, &holes);
     let region: Vec<[f64; NR]> = cage
         .region
         .iter()
@@ -1181,11 +1216,11 @@ fn make_surface(family: &str, stage: &str, id: &Identity) -> Surface {
     let tags1 = tags.subdivided(&s.m);
     let region1 = s.m.apply_n(&region);
     // Head and neck, densely, without the ears (for the head interface's sdf and surface_z).
-    let fpos = topo.snapped(true, &base, &ctrl, &onto, &holes);
+    let fpos = topo.snapped(true, &arr.t, &base, &ctrl, &onto, &holes);
     // Normals from the finer (level-2) limit surface: smooth shading on the coarse level 1 (whose
     // vertices are the first of level 2's), as it is without the eye sockets: the lids cover them
     // (face.rs), and the skin round a lid is shaded as the face it carries on.
-    let bare = topo.snapped(true, &base, &ctrl, &onto, &|p| p);
+    let bare = topo.snapped(true, &arr.t, &base, &ctrl, &onto, &|p| p);
     let bare_nor = smooth_normals(&bare, &triangles(&topo.s2.quads, &bare).concat());
     let nor = bare_nor[..pos.len()].to_vec();
     let lod_nor = bare_nor[..topo.n].to_vec();
@@ -1216,7 +1251,7 @@ fn make_surface(family: &str, stage: &str, id: &Identity) -> Surface {
         .zip(&cage.region)
         .map(|((c, d), r)| if *r == "ear" { c - d } else { c - d * 0.0 })
         .collect();
-    let fpos = topo.snapped(true, &base, &flat_ctrl, &onto, &holes);
+    let fpos = topo.snapped(true, &arr.t, &base, &flat_ctrl, &onto, &holes);
     let hmask: Vec<bool> = freg
         .iter()
         .map(|r| (r[ri_head] + r[ri_ear]) + r[ri_neck] > 0.5)
@@ -1249,7 +1284,7 @@ fn make_surface(family: &str, stage: &str, id: &Identity) -> Surface {
         .iter()
         .map(|t| [fpos[t[0]], fpos[t[1]], fpos[t[2]]])
         .collect();
-    let fbare = topo.snapped(true, &base, &flat_ctrl, &onto, &|p| p);
+    let fbare = topo.snapped(true, &arr.t, &base, &flat_ctrl, &onto, &|p| p);
     let bare_tris = tri
         .iter()
         .map(|t| [fbare[t[0]], fbare[t[1]], fbare[t[2]]])

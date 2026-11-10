@@ -19,7 +19,7 @@ From the repo root:
 cargo characters build [out]     # about a minute; writes the set, then checks it
 cargo characters check [set dir] # the set against the contract only
 cargo characters diff <a> <b>    # two sets against each other, within the quantisation
-cargo characters ratios          # every body's proportions as the generator builds them, beside a real adult's
+cargo characters ratios          # every body's proportions and its ear as the generator builds them, beside a real adult's
 cargo characters faces           # every identity channel: how far it moves the skin, the face's parts and the eyes (mm)
 bun tools/characters/check_clips.ts [rig.json] [--body male|female|all] [--stage <stage>[,…]|all] [--update-baseline] [--reach]
 cd web && bun run check:clips    # check_clips on both bodies at every life stage, as CI runs it

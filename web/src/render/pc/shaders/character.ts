@@ -87,7 +87,8 @@ const CATCHLIGHT = '0.85';
 /**
  * Skin lets light through: the light of a lamp or the sun comes round the terminator (`SKIN_WRAP`: how far past
  * it, as a share of the way round; `RESIDENT_DIFFUSE`), and what came through is red (`SKIN_SCATTER`, its
- * colour; `RESIDENT_LIGHT`). Its highlight is a weak one (`SKIN_SPECULAR` of a plastic's), weaker in a crease.
+ * colour; `RESIDENT_LIGHT`). Its highlight is a weak one (`SKIN_SPECULAR` of a plastic's), weaker in a crease,
+ * where it reflects less of the sky too.
  * The soft look's extra saturation (`softLook.ts` `gameSaturation`) is left off skin (`SKIN_SATURATION`): on a
  * tone already warm it turned every face orange.
  */
@@ -268,6 +269,10 @@ export const RESIDENT_LIGHT: Record<Language, string> = {
 		#ifdef LIT_SPECULAR
 			dSpecularLight *= mix(1.0, ${SKIN_SPECULAR} * gameSimOcc, simSkin);
 		#endif
+		// (A crease reflects no sky either: the ear's folds, the nose's wings.)
+		#ifdef LIT_REFLECTIONS
+			dReflection.rgb *= mix(1.0, gameSimOcc, simSkin);
+		#endif
 	#endif
 	#ifdef GAME_SIM_EYE
 		litArgs_emission *= clamp(dot(dDiffuseLight + gameAmbient, vec3(0.2126, 0.7152, 0.0722)), 0.05, 1.0);
@@ -281,6 +286,9 @@ export const RESIDENT_LIGHT: Record<Language, string> = {
 		dDiffuseLight = dDiffuseLight * mix(vec3f(1.0), vec3f(${SKIN_SCATTER}), simSkin * gameSimWrap / max(gameSimWrapped, 1e-4));
 		#ifdef LIT_SPECULAR
 			dSpecularLight = dSpecularLight * mix(1.0, ${SKIN_SPECULAR} * gameSimOcc, simSkin);
+		#endif
+		#ifdef LIT_REFLECTIONS
+			dReflection = vec4f(dReflection.rgb * mix(1.0, gameSimOcc, simSkin), dReflection.a);
 		#endif
 	#endif
 	#ifdef GAME_SIM_EYE

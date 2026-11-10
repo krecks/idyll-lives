@@ -1269,10 +1269,7 @@ fn tuft(
         .iter()
         .map(|&s| thick * interp(s, &[0.0, 0.3, 1.0], &[0.8, 1.0, 0.3]))
         .collect();
-    let rz: Vec<f64> = s
-        .iter()
-        .map(|&s| wide * interp(s, &[0.0, 0.25, 0.7, 1.0], &[0.7, 1.0, 0.6, 0.08]))
-        .collect();
+    let rz: Vec<f64> = s.iter().map(|&s| wide * tuft_breadth(s)).collect();
     let m = loft(&pts, &rx, &rz, 6, sc.surface(a, phi).1, caps(1));
     let k = 0.3 + 0.4 * jitter(0, seed);
     let z =
@@ -1281,6 +1278,25 @@ fn tuft(
             .collect();
     let y = m.t.iter().map(|&t| 0.2 * (1.0 - t).max(0.0)).collect();
     comp(m.pos, m.idx, None, Some(z), Some(y), None)
+}
+
+/// A tuft's breadth along its length (s: 0 its root, 1 its tip), of `wide`.
+fn tuft_breadth(s: f64) -> f64 {
+    interp(s, &[0.0, 0.25, 0.7, 1.0], &[0.7, 1.0, 0.6, 0.08])
+}
+
+/// Whether a tuft (as `tuft` lays it) stays off the ears' ovals by its breadth.
+fn tuft_clears(sc: &Scalp, a: f64, phi: f64, len: f64, turn: f64, wide: f64) -> bool {
+    let st = phi.sin().max(0.3);
+    linspace(0.0, 1.0, 11).iter().all(|&s| {
+        let (ta, tp) = (
+            a + turn.sin() * len * s / st,
+            (phi + turn.cos() * len * s).max(0.05),
+        );
+        sc.oval(ta).is_none_or(|o| {
+            (o.rho(ta, tp) - 1.0) * o.r[0].min(o.r[1]) >= wide * tuft_breadth(s) + EAR_CLEAR
+        })
+    })
 }
 
 /// A bent capsule (lofted along a smooth curve through `points`); `hang` (a, b): it follows the
@@ -1534,6 +1550,14 @@ pub fn build_hair(
         let turn = rng.uniform(-0.65, 0.65);
         let lift = rng.uniform(0.015, 0.04) * hh;
         let wide = rng.uniform(0.055, 0.075) * hh;
+        // A lock that would lie on an ear is cut shorter until it ends above it (or left out, if it
+        // grows from beside one).
+        let Some(len) = (0..8)
+            .map(|cut| len * 0.85f64.powi(cut))
+            .find(|&len| tuft_clears(&sc, a, phi, len, turn, wide))
+        else {
+            continue;
+        };
         tou.push(tuft(
             &sc,
             a,

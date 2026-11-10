@@ -199,9 +199,17 @@ The points lie on a smooth head (a soft union of a cranium, cheeks-and-jaw, a mu
 ellipsoid: the face from the nose down stands up rather than sloping back to the chin); the features
 are offsets on them: the nose (a bridge from between the eyes to a round tip over the nose's base,
 its wings beside the tip and the base), the upper lip rounded forward with a groove down its middle
-(the philtrum), the brow, the ears. Between the grid's vertices the drawn head is snapped onto the
+(the philtrum), the brow, the ears. An ear leaves the head through an opening as high as itself
+(columns 92 to 122 degrees, from the upper lip's row to the brow's), so it grows straight out of the
+head and nothing of it lies folded over the skin beside it: a rim of eight points with a back edge
+behind it (it has a thickness), inside it the fold round the hollow and the hollow's floor, laid along
+the head's side; a real ear's size (about 62 mm high and 32 wide on an adult, from the brow to the
+nose's base, 15 mm off the head at its back) and solid behind. `cargo characters ratios` prints each
+body's ear, and how many of its triangles' corners are shaded as facing away from the triangle (none:
+the skin is nowhere folded over itself). Between the grid's vertices the drawn head is snapped onto the
 smooth one (the cage's limit alone dents it by up to 4 mm there, where the grid's spacing is uneven
-and its partial lines end: patches on the cheeks), and the eye sockets are carved into every point
+and its partial lines end: patches on the cheeks; by the ears, where the fit also slides the points
+along the head, they are placed from the cage's own points instead), and the eye sockets are carved into every point
 of it (`sockets`): round each eye a shallow hollow (the eyes' fronts are about level with the face
 round them) that the eyeball stands out of, deepest at the eye's corners and going on down behind the
 eyeball under the lids; the LOD has one vertex in each, set back. The lids cover the sockets, so the
