@@ -113,11 +113,14 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   crosswalks (`traffic::settle`: its zone out to their far side), so nobody drives onto one without
   room to clear it beyond ("don't block the box"). Where a car can't wait between two lit
   junctions (the second's stop line before it's out of the first's box), the way through both is
-  one group, asked for at the first's stop line on both greens (`Claim::gate2`): the second's
-  green is held on for those waiting through it and those granted till they're past its stop
-  line, `CYCLE` at most from when the hold began (the first's turn comes round meanwhile, so the
-  two never stay out of step), and one is granted only with `GREEN_HELD` 10 s of the hold still
-  to come. Each
+  one group, asked for at the first's stop line on both greens (`Claim::gate2`). Of the two, the
+  one listed first leads and the other follows: the leader on its green for one waiting through
+  both holds it, and the follower's phase that one needs is wanted there (it keeps that green,
+  ends another after `MIN_GREEN`, and turns to it next, but not twice running). Each light holding
+  its green for one waiting at the other's red, two in step kept two cars crossing each other's
+  way at red for hours (Hollyglade). A hold lasts `CYCLE` at most from when it began, and the
+  second's green is held for those granted till they're past its stop line; one is granted only
+  with `GREEN_HELD` 10 s of the hold still to come. Each
   arm has a crosswalk from its corner (where the kerb's `KERB_RETURN` 3 m return round from the
   next arm ends, or the box's edge, whichever is further out) `CROSSWALK` 3 m wide, and a stop
   line `STOP_GAP` 0.5 m past it, no further out than half way to the next junction: a car's claim
@@ -133,9 +136,12 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   them for good (`Signal::off_limits`, `Travel::junction_tiles`, in `ground_blocked`), so their
   way goes over a zebra or crosses the road further off. The zebra and the road by the stop line
   are measured from the arm's own road there (`SignalArm::span`, its middle at the crosswalk and
-  `KEEP_OFF` past the stop line), not along the arm's way out from the junction's middle: a road
+  `KEEP_OFF` past the stop line, where that goes out within 30° of the arm's way and about as far
+  out; else along the way), not along the arm's way out from the junction's middle: a road
   bending away, or a junction's middle merged off it, left that metres off over the pavement,
-  where it shut a house's gate in. Nor do they ever cut ground off: a pocket of pavement walled
+  where it shut a house's gate in. And a tile is kept off only on a carriageway: within its kerb
+  of one of the junction's roads' middle lines (a box along a way off its road took in a garden's
+  planter). Nor do they ever cut ground off: a pocket of pavement walled
   round but for its side onto that road, or a gate on it, gets the shortest way over them back
   to the ground round it left open (`traffic::left_open`, looked at within `KEEP_OFF_ROOM` 4 m
   round each junction). Out of the walk phase a zebra is closed

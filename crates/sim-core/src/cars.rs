@@ -7124,7 +7124,7 @@ const MOUTH_CLEAR: f32 = 7.0;
 const DRIVE_CLEAR: f32 = 2.5;
 
 /// How far `p` is from the segment `a`..`b` (m).
-fn to_segment(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
+pub(crate) fn to_segment(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
     let ab = [b[0] - a[0], b[1] - a[1]];
     let t =
         ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / (ab[0] * ab[0] + ab[1] * ab[1]).max(1e-6);

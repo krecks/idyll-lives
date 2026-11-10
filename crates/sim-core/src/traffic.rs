@@ -645,6 +645,11 @@ pub const KEEP_OFF: f32 = 3.0;
 /// would cut off (`left_open`).
 const KEEP_OFF_ROOM: i32 = 4;
 const KERB_IN: f32 = 0.25;
+/// An arm's crosswalk is measured along its own road (`SignalArm::span`) where that goes out within
+/// 30° of its way (the cosine), its crosswalk this near as far out as the arm's (m); else along
+/// `way`.
+const SPAN_ALONG: f32 = 0.866;
+const SPAN_OFF: f32 = 2.0;
 /// The walk phase (`Signal::walk_phase`): how long those on foot may step out (ticks of real time,
 /// as people walk), and the pace its clearance gives the slowest to get across the widest arm
 /// (m a second; `Signal::walk_clear`), `WALK_CLEAR_LEAST` at least (s).
@@ -771,8 +776,27 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
             // A road ending at another's kerb, a T's arm, measured from the junction's middle.)
             let r = &g.roads[road as usize];
             let short = dist(p, r.at(s));
-            let on = |out: f32| (s + k * (out - short).max(0.0)).clamp(s0, s1);
-            let span = [r.at(on(walk_from)), r.at(on(stop + KEEP_OFF))];
+            let raw = |out: f32| s + k * (out - short).max(0.0);
+            let on = |out: f32| raw(out).clamp(s0, s1);
+            // (Along its own road where that goes out the arm's way, about as far out; else out
+            // along `way` as ever: past the end of its stretch, or from a junction's middle merged
+            // off it, the box went off towards a garden's chair, Frostridge.)
+            let straight =
+                [walk_from, stop + KEEP_OFF].map(|o| [p[0] + way[0] * o, p[1] + way[1] * o]);
+            let along = [r.at(on(walk_from)), r.at(on(stop + KEEP_OFF))];
+            let l = dist(along[0], along[1]);
+            let span = if [walk_from, stop + KEEP_OFF]
+                .iter()
+                .all(|&o| (s0..=s1).contains(&raw(o)))
+                && l > 0.1
+                && ((along[1][0] - along[0][0]) * way[0] + (along[1][1] - along[0][1]) * way[1]) / l
+                    > SPAN_ALONG
+                && (dist(p, along[0]) - walk_from).abs() < SPAN_OFF
+            {
+                along
+            } else {
+                straight
+            };
             let out = if roundabout { edge + POLE_OUT } else { stop };
             let at = on(out);
             let t = r.tangent(at);
@@ -1146,7 +1170,7 @@ pub struct Traffic {
     pub(crate) passing: Vec<(u64, u64)>,
     /// Per lit junction, the phases anyone waits at and comes through (`change_lights`'s own,
     /// kept so it isn't made anew every tick).
-    lit_phases: Vec<[u64; 3]>,
+    lit_phases: Vec<[u64; 4]>,
     /// Per lit junction, since when its green is held for those through it from a lit junction
     /// just before (`Claim::gate2`, `GREEN_HELD`), and whether one may still be granted through
     /// it (`Traffic::green_through`).
@@ -1466,7 +1490,7 @@ impl Traffic {
         self.held.resize(signals.len(), None);
         let mut phases = std::mem::take(&mut self.lit_phases);
         phases.clear();
-        phases.resize(signals.len(), [0, 0, 0]);
+        phases.resize(signals.len(), [0, 0, 0, 0]);
         for a in &self.asks {
             if a.seen + 1 >= tick
                 && let Some(first) = a.parts.first()
@@ -1476,11 +1500,21 @@ impl Traffic {
                         m[0] |= bit(phase);
                     }
                 }
-                // (Waiting through two: the second's green held for it, the first's to come.)
-                if let Some((s, phase)) = first.1.gate2
-                    && let Some(m) = phases.get_mut(usize::from(s))
-                {
-                    m[2] |= bit(phase);
+                // (Waiting through two: the one of the two listed first leads, the other follows.
+                // The leader on its green for it, that's held, and the other's phase it needs is
+                // wanted there, next. Each holding the other's green for one waiting at its own
+                // red, two lights in step kept two cars crossing each other's way at red for
+                // hours: Hollyglade.)
+                if let (Some(a), Some(b)) = (first.1.gate, first.1.gate2) {
+                    let (lead, follow) = if a.0 <= b.0 { (a, b) } else { (b, a) };
+                    if self.green(Some(lead)) {
+                        if let Some(m) = phases.get_mut(usize::from(lead.0)) {
+                            m[2] |= bit(lead.1);
+                        }
+                        if let Some(m) = phases.get_mut(usize::from(follow.0)) {
+                            m[3] |= bit(follow.1);
+                        }
+                    }
                 }
             }
         }
@@ -1539,11 +1573,18 @@ impl Traffic {
                 }
                 Stage::Green => {
                     let held = phases[i][2] & bit(l.phase) != 0;
+                    let wanted = phases[i][3];
                     let busy = waits(l.phase) || coming(l.phase) || held;
-                    // (Held, on till `CYCLE` from when it first was.)
-                    let kept = held && self.held[i].is_none_or(|t| tick < t + CYCLE);
+                    // (Held, on till `CYCLE` from when it first was; or wanted, by a lit junction
+                    // next to it on its green for one through both, on while that is, `CYCLE` at
+                    // most: one at its red, in the way of one through both, waited for good,
+                    // Wheat Bottom.)
+                    let kept = held && self.held[i].is_none_or(|t| tick < t + CYCLE)
+                        || wanted & bit(l.phase) != 0 && on < CYCLE;
+                    // (Another phase wanted: on to it as soon as may be.)
+                    let follow = wanted != 0 && !kept && on >= MIN_GREEN;
                     match next(l.phase) {
-                        Some(_) if !kept && on >= most || on >= MIN_GREEN && !busy => {
+                        Some(_) if !kept && on >= most || on >= MIN_GREEN && !busy || follow => {
                             stage(Stage::Amber)
                         }
                         _ => l,
@@ -1552,9 +1593,17 @@ impl Traffic {
                 Stage::Amber if on >= if walk { sig.walk_clear } else { AMBER } => {
                     stage(Stage::Clear)
                 }
-                // (After the walk phase, nobody waiting: the cars' next phase, to rest on.)
+                // (After the walk phase, nobody waiting: the cars' next phase, to rest on. One
+                // wanted by a lit junction next to it, first; not again straight after its own
+                // turn: those at the others' reds waited for good, one stopped in the box among
+                // them, Wheat Bottom.)
                 Stage::Clear if on >= ALL_RED => Light {
-                    phase: next(l.phase).unwrap_or(if walk { 0 } else { l.phase }),
+                    phase: (1..=n)
+                        .map(|k| (l.phase + k) % n)
+                        .find(|&x| phases[i][3] & bit(x) != 0 && x != l.phase)
+                        .filter(|_| phases[i][3] & bit(l.phase) == 0)
+                        .or_else(|| next(l.phase))
+                        .unwrap_or(if walk { 0 } else { l.phase }),
                     stage: Stage::Green,
                     since: tick,
                 },
@@ -2034,9 +2083,30 @@ fn keep_off(w: &mut World, signals: &[Signal]) {
         );
         let (x1, z1) = ((sig.at[0] + r).ceil() as i32, (sig.at[1] + r).ceil() as i32);
         let mut mine = Vec::new();
+        // (Its arms' roads' middle lines near it: a tile kept off is on one's carriageway, within
+        // its kerb of it, whatever the arms' straight ways out say. Out along a way off its road,
+        // the box took in a garden's planter, Applestead.)
+        let g = &w.travel.graph;
+        let lines: Vec<([f32; 2], [f32; 2], f32)> = sig
+            .arms
+            .iter()
+            .flat_map(|a| {
+                let pts = &g.roads[a.road as usize].pts;
+                pts.windows(2)
+                    .filter(|q| dist(q[0], sig.at).min(dist(q[1], sig.at)) <= r + 2.0)
+                    .map(|q| (q[0], q[1], a.kerb))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        let on_road = |q: [f32; 2]| {
+            lines
+                .iter()
+                .any(|&(a, b, kerb)| crate::cars::to_segment(q, a, b) <= kerb)
+        };
         for z in z0..z1 {
             for x in x0..x1 {
-                if w.lot.in_bounds(x, z) && sig.off_limits([x as f32 + 0.5, z as f32 + 0.5]) {
+                let q = [x as f32 + 0.5, z as f32 + 0.5];
+                if w.lot.in_bounds(x, z) && sig.off_limits(q) && on_road(q) {
                     mine.push(w.lot.tile_index(x, z));
                 }
             }
@@ -2740,6 +2810,55 @@ mod tests {
         assert!(
             both,
             "they never both waited for each other: a ring nobody sees"
+        );
+    }
+
+    #[test]
+    fn two_through_two_close_lit_junctions_each_way_both_get_their_greens() {
+        // (Hollyglade's: two lit junctions too near to wait between. One waits at the first's red
+        // to go through it on phase 1 and the second on phase 0; another the other way round.
+        // Each light held its phase 0 for the one waiting through it from the other, and the two
+        // went round in step for good: neither ever had both its greens.) One of the two leads,
+        // the other follows it: each gets through on both its greens.
+        let (x, y) = (1 << 63 | 3, 1 << 63 | 29);
+        let mut c_x = claim(&[[-6.0, 50.0], [-2.0, 50.0], [2.0, 50.0], [6.0, 50.0]]);
+        let mut c_y = claim(&[[-6.0, -50.0], [-2.0, -50.0], [2.0, -50.0], [6.0, -50.0]]);
+        c_x.gate = Some((0, 1));
+        c_x.gate2 = Some((1, 0));
+        c_y.gate = Some((1, 1));
+        c_y.gate2 = Some((0, 0));
+        let ways = [[-1.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        let sigs = [
+            lit([0.0, 0.0], &ways, &[0, 0, 1]),
+            lit([20.0, 0.0], &ways, &[0, 0, 1]),
+        ];
+        let movers = || {
+            vec![
+                standing(x, [-9.0, 50.0], std::f32::consts::FRAC_PI_2),
+                standing(y, [-9.0, -50.0], std::f32::consts::FRAC_PI_2),
+            ]
+        };
+        let places = [(x, 0, 9.5), (y, 0, 9.5)];
+        let mut traffic = Traffic::default();
+        let (mut went_x, mut went_y) = (None, None);
+        for tick in 1..CYCLE * 6 {
+            if went_x.is_none() {
+                traffic.may_go(tick, x, 0, std::slice::from_ref(&c_x), 9.5, 10.5);
+            }
+            if went_y.is_none() {
+                traffic.may_go(tick, y, 0, std::slice::from_ref(&c_y), 9.5, 10.5);
+            }
+            traffic.begin(tick + 1, movers(), &places, &sigs);
+            if went_x.is_none() && traffic.holding(x) {
+                went_x = Some(tick);
+            }
+            if went_y.is_none() && traffic.holding(y) {
+                went_y = Some(tick);
+            }
+        }
+        assert!(
+            went_x.is_some_and(|t| t < 2 * CYCLE) && went_y.is_some_and(|t| t < 2 * CYCLE),
+            "through both lights: {went_x:?}, {went_y:?}"
         );
     }
 
