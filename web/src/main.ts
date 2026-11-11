@@ -12,7 +12,10 @@ import './voice/service.svelte';
 import './talk';
 import { startModelsAfter } from './ml/schedule.svelte';
 import { app } from './ui/app.svelte';
+import { watchForDevLog } from './debug/devlogWatch.svelte';
 
+// The dev play log (dev server only, `debug/devlog.ts`).
+watchForDevLog();
 // No browser right-click menu over the game, except in text fields.
 suppressContextMenu();
 mount(App, { target: document.getElementById('app')! });

@@ -9,6 +9,7 @@ node_modules
 /debug-reports
 /debug-states
 /bench-results
+/dev-logs
 /web/.assets
 __pycache__
 /tools/art/blender/previews
