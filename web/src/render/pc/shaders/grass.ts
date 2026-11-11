@@ -56,8 +56,34 @@ const BLADE = { short: 0.09, long: 0.26, thin: 0.016, wide: 0.027, lean: [0.12, 
  * `saturation`), and the ground under the blades near the eye (`under`) and past them (`far`),
  * so the lawn averages the same near and far. Over `blend` (shares of the reach) the ground goes
  * from `under` to `far` and the blades from their shade to the ground's `far` colour, together.
+ *
+ * `sky`: how far a blade's normal is bent to the sky, near the eye and far off (a blade is lit as
+ * turned to the eye; bent nearly all the way, every blade takes the lawn's own light and none stands
+ * out bright or dark). `yellow`: the tip's yellow tint (1: the whole of it); `vary`: a blade's own
+ * lightness, either way; `gust`: how much lighter a gust makes the tips (the ground's lightening
+ * follows it).
+ *
+ * `grade`: the lawn's colour itself, for the blades and the ground alike wherever the land is lawn
+ * (a worn patch keeps its earth): its saturation and value, and the most red its green may carry
+ * (`maxRG`, red / green in linear light; 0: as much as it has), which keeps a meadow from reading yellow.
+ *
+ * The values are the calm lawn chosen from pictures side by side (2026-11-11, `tools/bench/play.mjs
+ * --sheet lawn`): the lawn is most of a play picture, and with dark roots under light yellow tips (0.55
+ * to 1.35, every blade 10 % its own way) it read as bright noise beside the flat walls and furniture.
  */
-const LAWN = tuned('lawn', { root: 0.55, tip: 1.35, saturation: 0.85, under: 0.55, far: 0.8, blend: [0.45, 0.85] as const } as const);
+const LAWN = tuned('lawn', {
+  root: 0.7,
+  tip: 1.15,
+  saturation: 0.85,
+  under: 0.68,
+  far: 0.8,
+  blend: [0.45, 0.85],
+  sky: [0.85, 0.95],
+  yellow: 0.4,
+  vary: 0.04,
+  gust: 0.08,
+  grade: { saturation: 0.88, value: 0.95, maxRG: 0.8 },
+});
 
 function grassCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
   const { wgsl, v2, v3, v4, u, decl: d } = codeFor(lang);
@@ -71,6 +97,17 @@ function grassCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
   const { patch, perPatch, near } = GRASS;
   const { span, span2, weight2, speed, calm, strong } = GRASS.gust;
   const [gc, gs] = GUST_ROTATION;
+  /** `c` (linear rgb, assignable) as the lawn's grade has it, by the share `w`; `tmp` names the working value. */
+  const grade = (c: string, w: string, tmp: string) => {
+    const g = LAWN.grade;
+    if (g.saturation === 1 && g.value === 1 && g.maxRG <= 0) return '';
+    return `{
+			${d(tmp, v3, true)} = ${c};
+			${g.maxRG > 0 ? `${tmp}.x = min(${tmp}.x, ${tmp}.y * ${f(g.maxRG)});` : ''}
+			${tmp} = mix(${v3}(dot(${tmp}, ${v3}(0.2126, 0.7152, 0.0722))), ${tmp}, ${f(g.saturation)}) * ${f(g.value)};
+			${c} = mix(${c}, ${tmp}, ${w});
+		}`;
+  };
   /** The gust at `p` (game xz, carried back along the wind), as `gustAt`. */
   const gust = (p: string) => `smoothstep(${f(calm)}, ${f(strong)}, (${tex('game_grassGust', `${p} / ${f(span)}`)}.r + ${tex('game_grassGust', `${v2}(${p}.x * ${f(gc)} - ${p}.y * ${f(gs)}, ${p}.x * ${f(gs)} + ${p}.y * ${f(gc)}) / ${f(span2)}`)}.r * ${f(weight2)}) / ${f(1 + weight2)})`;
 
@@ -208,12 +245,13 @@ ${windDecl}
 		if (dot(gN, gEye - (gO + gAt)) < 0.0) { gN = -gN; }
 		gN = normalize(gN + gAcross * (gSide * 0.45));
 		// (vsNormal normalizes it.)
-		gameGrassN = mix(gN, ${v3}(0.0, 1.0, 0.0), 0.3 + 0.45 * smoothstep(8.0, 50.0, gD));
+		gameGrassN = mix(gN, ${v3}(0.0, 1.0, 0.0), ${f(LAWN.sky[0])} + ${f(LAWN.sky[1] - LAWN.sky[0])} * smoothstep(8.0, 50.0, gD));
 		// Its colour: the ground's, dark at the root, paler and yellower at the tip, lighter in a gust.
-		${d('gLin', v3)} = pow(gField.rgb, ${v3}(2.2)) * ${f(GRASS.groundAlbedo)};
+		${d('gLin', v3, true)} = pow(gField.rgb, ${v3}(2.2)) * ${f(GRASS.groundAlbedo)};
+		${grade('gLin', 'smoothstep(0.15, 0.7, gCov)', 'gGrade')}
 		${d('gBase', v3)} = mix(${v3}(dot(gLin, ${v3}(0.2126, 0.7152, 0.0722))), gLin, ${f(LAWN.saturation)});
-		${d('gTint', v3)} = mix(${v3}(1.0), ${v3}(1.1, 1.06, 0.8), gT * gT * 0.5) * (0.9 + 0.2 * gR.z);
-		${d('gNearC', v3)} = gBase * gTint * mix(${f(LAWN.root)}, ${f(LAWN.tip)}, pow(gT, 0.8)) * (1.0 + gGust * gT * 0.2);
+		${d('gTint', v3)} = mix(${v3}(1.0), ${v3}(1.1, 1.06, 0.8), gT * gT * ${f(0.5 * LAWN.yellow)}) * (${f(1 - LAWN.vary)} + ${f(2 * LAWN.vary)} * gR.z);
+		${d('gNearC', v3)} = gBase * gTint * mix(${f(LAWN.root)}, ${f(LAWN.tip)}, pow(gT, 0.8)) * (1.0 + gGust * gT * ${f(LAWN.gust)});
 		// Far off, a blade is a pixel or two: it takes the lawn's plain colour, as the ground under it does over
 		// the same distances, or its light tip would twinkle against the shade (as GAME_GRASS_GROUND blends the ground).
 		${d('gFar', 'float')} = smoothstep(gReach * ${f(LAWN.blend[0])}, gReach * ${f(LAWN.blend[1])}, gD);
@@ -294,7 +332,8 @@ ${windDecl}
 			// The lawn's own colour, as dark as the blades and the shade between them average, and darker
 			// under the blades near the eye (the shade between them), blending out towards the grass's reach.
 			${d('ggNear', 'float')} = 1.0 - smoothstep(${u('game_grassEye')}.w * ${f(LAWN.blend[0])}, ${u('game_grassEye')}.w * ${f(LAWN.blend[1])}, length(ggQ - ${u('game_grassEye')}.xyz));
-			dAlbedo = dAlbedo * (1.0 - ggLawn * ${f(1 - LAWN.far)} - ggCov * ggNear * ${f(LAWN.far - LAWN.under)}) * (1.0 + (ggGust - ${f(calm)}) * 0.13 * ggLawn);
+			${grade('dAlbedo', 'ggLawn', 'ggGrade')}
+			dAlbedo = dAlbedo * (1.0 - ggLawn * ${f(1 - LAWN.far)} - ggCov * ggNear * ${f(LAWN.far - LAWN.under)}) * (1.0 + (ggGust - ${f(calm)}) * ${f(0.65 * LAWN.gust)} * ggLawn);
 		}
 	}
 #endif`;
