@@ -1,11 +1,16 @@
 # Look
 
 *Design notes for how Idyll Lives looks. Inspired by classic life-simulation games, described
-here on our own terms. Status: 0.3.1. This is the Medium graphics preset, everyone's default; Low
+here on our own terms. Status: 0.7.0 and what has landed since. This is the Medium graphics preset, everyone's default; Low
 and High change a few things (softer or sharper shadows, fewer lamps, half the lawn, no shadows
 from the woods, the street or the residents and the street's far models on Low, two mirrors
-reflecting every frame on High), listed in
+reflecting every frame and the miniature focus on High), listed in
 [graphics.md](graphics.md).*
+
+Changes to the look are judged at the camera a game is played from (24 m from the lot, and the street
+and town views), from pictures of the same scene side by side, and the owner chooses
+(`tools/bench/play.mjs`, [tools/bench/README.md](../../tools/bench/README.md)): at that distance a pixel is
+16 mm, so what decides the picture is the lawn, the light and the colour, not what is small.
 
 The world is drawn in physically based shading (**Classic**, the default since 2026-11-10, the owner's
 decision: the residents and the models should look real, and skin, grass and wood keep their own colours
@@ -32,7 +37,10 @@ lit surface in the soft shading below (Settings, Performance, Shading).
 - **Warm lamps against cool nights.** At night a moonlight grade turns dark tones blue-grey
   (grass alone would otherwise read dark green) while lamps and lit windows stay warm.
 - **Readable at a glance.** The dollhouse view has to show who is where and what they are doing,
-  so clarity beats extra effects. There is no bloom or tilt-shift blur.
+  so clarity beats extra effects. There is no bloom (tried on 2026-11-11: at night's exposure only a
+  threshold low enough to bloom the whole day picked out the lamps, and then faintly). The miniature
+  focus, below, softens only the picture's far and near edges, and stays out wherever every tile is
+  looked at.
 - **Real surfaces by default, painted ones by choice.** Classic lights a surface as light falls on it.
   With Soft, light falls off widely and gently, shade takes the sky's tint instead of going black, and a
   quiet rim keeps silhouettes readable: closer to a hand-painted illustration than a photograph, without
@@ -43,9 +51,10 @@ lit surface in the soft shading below (Settings, Performance, Shading).
 | Aspect | Choice |
 |---|---|
 | Light | Saturated warm sun on an arc, lowered (`sunHeight` 0.8) for long, dramatic shadows. A low peach sunrise, a golden (not red) late afternoon, an orange sunset only as the sun touches the horizon, then a blue dusk with lamps coming on. |
-| Nights | A blue moon fill with a strong night grade (0.85), so nights are clearly blue but not murky; warm lamps (`#FFC27A`) and glowing windows. |
-| Grading | ACES tone mapping, contrast 1.1, saturation +14. Split toning: warm highlights (hue 38) and cool shadows (hue 222). |
-| Effects | A light vignette and soft distance haze. |
+| Nights | A blue moon (0.8) and sky fill (0.65) with a strong night grade (0.85), so nights are clearly blue but not murky, and a garden is dim, not near black; warm lamps (`#FFC27A`) and glowing windows. |
+| Grading | ACES tone mapping, contrast 1.1, saturation +14. Split toning: warm highlights (hue 38) and cool shadows (hue 222), faint (a filter of 2 and 3 %; stronger, and a cooler sky fill by day, were tried on 2026-11-11 and hardly differed). |
+| Effects | A light vignette (weight 0.8: the corners keep about three quarters of their light) and soft distance haze. |
+| Miniature focus | The picture's far and near edges out of focus, as in a photograph of a model, so the eye rests on the home in the middle (`render/shared/tilt.ts`, drawn in the compose). What stays sharp is a band of the ground by its distance from the eye (0.85 to 1.16 of the camera's distance from what it looks at), so it follows the camera's tilt: the rows 0.34 to 0.72 of the picture at the camera a game opens with. The blur grows to 8 px (of a picture 1080 high) at the picture's edge. It fades out as the camera comes closer than 18 m (gone at 9 m), and stays out in Build mode, in the basement and in the menus' town. On with High by default, and anyone's to turn on or off (Settings, Performance, Miniature focus). |
 | Shadows | Soft, filtered shadows from one sun shadow map over a fixed area round the lot. Its size comes with the graphics preset: 2048 on Medium (the default), 1024 on Low, 4096 on High. |
 
 ## Shading
@@ -81,7 +90,7 @@ server `?look=soft|classic` overrides the setting.
 | Contact shading | On Medium and High, things shade what they stand on or against: a soft dark edge where a wardrobe meets the floor, behind a sofa at the wall, under a counter's overhang (`contactShading` in [graphics.md](graphics.md)). It reaches 30 cm from where things touch, and shades the sky's light fully and the lamps' and the sun's by a third, so a lamplit room, whose lamps cast no shadows, still has depth without dark corners. Not on the lawn or the plants. |
 | Reflections indoors | A glossy thing in a room of the lot in view (a tap, a shower's frame, a glazed tile, a polished floor) reflects the room, not the open sky: a soft picture of it, its walls and ceiling as bright as the light that reaches the thing (the sun through the windows, the lamps, the sky's fill) and its floor darker (`ROOM` in `shaders/envBrdf.ts`). So chrome is bright in a lit room and dark in a dark one, by day and by night, where it used to shine with the sky like a car in a field. Other houses' rooms, storeys not shown and everything outdoors reflect the sky. |
 | Sunlight indoors | The sun comes in through windows and doorways only: walls cast in every wall mode under a shadow-only ceiling. A room without windows is dark by day, as a basement is, and its lamps light it day and night. |
-| Garden | A bright yellow-green lawn, foundation shrubs, lot trees, clouds and a sun glow in the sky. The broadleaved trees' crowns are sprays of leaves, cut-out cards from one atlas over dark cores (objects.md, "Leaf cards"): alpha-tested, never blended, their edges softened by the multisampling on Medium and High and cut clean on Low; far off, in the far woods and on Low's street, they are the leafy lumps they were, toned to match. |
+| Garden | A calm green lawn (its blades close to the ground's own tone from root to tip, a little less saturated and less yellow than the world's lawn colours as stored: it is most of a play picture, and read as bright noise beside flat walls and furniture until 2026-11-11), foundation shrubs, lot trees, clouds and a sun glow in the sky. The broadleaved trees' crowns are sprays of leaves, cut-out cards from one atlas over dark cores (objects.md, "Leaf cards"): alpha-tested, never blended, their edges softened by the multisampling on Medium and High and cut clean on Low; far off, in the far woods and on Low's street, they are the leafy lumps they were, toned to match. |
 | Selection marker | A small marker over the selected resident. Its colour follows their mood through a five-step palette (`marker` in `look.ts`). |
 | Residents | Made in code (`cargo characters`): smooth bodies in a real adult's proportions (the head 1/7.4 of the height, a baby's a quarter; the eyes a little over life size, so they still read at the game's distance) from a cage of rounded cross-sections, subdivided once, with a low-detail copy for far residents and shadows. Women and men are separate bodies; each life stage, from a baby to an elder, has its own proportions, and a build slider makes anyone slimmer or broader. Everyone has a face of their own: sixteen sliders in the creator (the jaw's width and line, the chin, the cheekbones and cheeks, the nose's length, width and bridge, the brow, the eyes' size, spacing and tilt, the mouth's width, the lips, the face's length), a few millimetres each either way from the family's shared face, drawn at random for whoever the game makes up and blended from the parents for a child; the lids, brows, lips and beard follow the skin, and the skull under the hair stays, so every hairstyle fits every face. An expression never deforms the head: eyelids, brows, lips, teeth, tongue and the beard are small shapes moved by morphs (ARKit face units for moods, one whole-face recipe per emotion adapted from TalkingHead's expressions; idle micro-expressions; blinks and lids following the gaze; visemes for lip sync). Eyes are drawn by the shader (iris in the resident's eye colour, pupil, catchlight) and turn on bones. Faces have a nose shaped by the head's cage, full lips with a cupid's bow, a lid crease and tapered brows, and soft folds that come with age. Hands have five fingers with a knuckle and a middle joint, curling together into a fist. Eleven hairstyles, bald and a beard, built in locks (grooved caps with a whorl and a parting, thick curtains with curled, uneven hems, tufts, puffs, a plaited braid), in the hair colour with clump bands and a soft sheen that shows on dark hair; long hair and tails follow the neck and shoulders. Clothes are painted on the body by its shader (tops, bottoms and socks in the creator's colours, with soft edges, turned hems, cuffs, a waistband, a neck rib and stitch lines; a shirt of its own in an open jacket) and stand off it as cloth does: a tee worn out hangs from the chest over the waistband, a trouser leg falls straight from the knee over the shoe, a cuff stands a step off the arm. Shells only where the silhouette needs them (jackets and suits with banded edges, collars, skirts, shoes: an upper with a collar and laces on a sole that stands out round it). Skin takes the creator's tone, warmed as real skin reflects, deep tones keeping enough value for their features to read. Creases are baked into every part as the furniture's are (ambient occlusion: armpits, neck, inside a jacket, between fingers, deep in the hair), deepening with age. Clips are made in code (`characters/clips`) with arm and leg IK: residents stand relaxed with the weight drifting from leg to leg, walk with planted feet and a hip sway (more in women), sit back onto seats, lie under a blanket, and carry dishes on their palms. See `tools/characters/README.md`. |
 

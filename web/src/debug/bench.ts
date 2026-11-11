@@ -18,7 +18,8 @@
  * - `res=1` the full resolution (or 0.5–1); `res=auto` (default) what the game picks.
  * - `secs=20` measured after `warmup=5`; `cap=0` frames per second at most (0: every frame shown).
  * - `hud=0` hides the interface; `gpu=0` doesn't time the GPU; `label=…` is kept with the result.
- * - `diag=noshadows,noaa,nonature,nolamps,nomirrors,noglass,nonight,noao,freeze`: features
+ * - `tilt=1|0`: the miniature focus on or off whatever the preset has (the player's setting).
+ * - `diag=noshadows,noaa,nonature,nolamps,nomirrors,noglass,nonight,noao,notilt,freeze`: features
  *   left out (to measure what each costs; `nowoods`, `nofarwoods`, `noflowers` and `nograss` leave out
  *   one part of the nature); `freeze` stops time for screenshots (`at=<s>` along the path);
  *   `shaders` logs every shader and pipeline made (the warm-up should leave none for play).
@@ -177,6 +178,7 @@ export function prepareBench(): void {
   // (The renderer takes `?quality=` itself; the setting too, for what shows it.)
   if (b.quality) settings.graphics = b.quality;
   if (b.res !== 'auto') settings.resolution = b.res;
+  if (b.tilt !== null) settings.tiltShift = b.tilt ? 'on' : 'off';
   Object.assign(settings, { directorDelay: 0, autosaveMinutes: 0, fpsCap: b.cap, autoSlow: false, voices: false, showFps: false, reducedMotion: false });
   const css: string[] = [];
   if (!b.hud) css.push(HUD_HIDDEN);

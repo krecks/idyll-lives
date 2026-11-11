@@ -51,6 +51,8 @@ export interface PostOptions {
   lean?: boolean;
   /** Contact shading (`QualitySettings.contactShading`; `CONTACT`). */
   contact?: boolean;
+  /** The miniature focus in the compose (`shared/tilt.ts`; its amount by `tilt`, none until set). */
+  tilt?: boolean;
 }
 
 /**
@@ -144,6 +146,7 @@ export function withoutContact(material: pc.StandardMaterial): void {
 
 /** The game's options for `quality` and the bench's `?diag=` flags (`lean`: `QualitySettings.leanTargets`). */
 export function gamePostOptions(samples: number, diag: ReadonlySet<string>, colourItself: boolean, lean = false, contact = false): PostOptions {
+  // (The miniature focus is in every preset's compose: whether it shows is the player's setting, live.)
   const aa = !diag.has('noaa');
   const imageProcessing = !colourItself && !diag.has('linear');
   return {
@@ -154,6 +157,7 @@ export function gamePostOptions(samples: number, diag: ReadonlySet<string>, colo
     night: imageProcessing && !diag.has('nonight'),
     lean,
     contact: contact && imageProcessing && !diag.has('noao'),
+    tilt: imageProcessing && !diag.has('notilt'),
   };
 }
 
@@ -252,11 +256,12 @@ export class PostProcessing {
   private fxaa: FxaaPass | null = null;
   private fxaaTarget: pc.RenderTarget | null = null;
   private readonly device: pc.GraphicsDevice;
-  private readonly ids: Record<'exposure' | 'contrast' | 'vignette1' | 'vignette2' | 'neutral' | 'positive' | 'negative' | 'night' | 'nightTint', pc.ScopeId>;
+  private readonly ids: Record<'exposure' | 'contrast' | 'vignette1' | 'vignette2' | 'neutral' | 'positive' | 'negative' | 'night' | 'nightTint' | 'tilt', pc.ScopeId>;
   private readonly vignette1 = new Float32Array(4);
   private readonly vignette2 = new Float32Array(4);
   private readonly curves = { neutral: new Float32Array(4), positive: new Float32Array(4), negative: new Float32Array(4) };
   private readonly tint = new Float32Array(NIGHT_TINT);
+  private readonly tiltNow = new Float32Array([0.25, 0.75, 0, 0]);
   private look: PostLook = PLAIN_LOOK;
   private exposureNow = 1;
   private nightNow = 0;
@@ -279,7 +284,9 @@ export class PostProcessing {
       negative: scope.resolve('gameCurveNegative'),
       night: scope.resolve('gameNightAmount'),
       nightTint: scope.resolve('gameNightTint'),
+      tilt: scope.resolve('gameTilt'),
     };
+    this.ids.tilt.setValue(this.tiltNow);
     const chained = options.imageProcessing || options.fxaa;
     this.sceneLinear = chained;
     if (!chained) {
@@ -292,7 +299,7 @@ export class PostProcessing {
     // The compose's chunks (one set per device: the game has one camera with a chain).
     for (const lang of ['glsl', 'wgsl'] as const) {
       const chunks = pc.ShaderChunks.get(device, lang === 'glsl' ? pc.SHADERLANGUAGE_GLSL : pc.SHADERLANGUAGE_WGSL);
-      const code = composeChunks(lang, { imageProcessing: options.imageProcessing, night: options.night && !options.fxaa, toFxaa: options.fxaa });
+      const code = composeChunks(lang, { imageProcessing: options.imageProcessing, tilt: !!options.tilt, night: options.night && !options.fxaa, toFxaa: options.fxaa });
       chunks.set('composeDeclarationsPS', code.declarations);
       chunks.set('composeMainEndPS', code.mainEnd);
     }
@@ -385,6 +392,17 @@ export class PostProcessing {
 
   get night(): number {
     return this.nightNow;
+  }
+
+  /**
+   * The miniature focus (`shared/tilt.ts`): the rows between which the picture is sharp (0 its top, 1 its bottom)
+   * and the blur's radius at the picture's edges, in pixels of a picture 1080 high (0: none). Live: a uniform.
+   */
+  tilt(top: number, bottom: number, px: number): void {
+    this.tiltNow[0] = top;
+    this.tiltNow[1] = bottom;
+    this.tiltNow[2] = this.options.tilt ? px : 0;
+    this.ids.tilt.setValue(this.tiltNow);
   }
 
   /** Contrast, vignette and colour curves (live: uniforms only). */

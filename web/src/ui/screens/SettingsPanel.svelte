@@ -59,7 +59,7 @@
 
   /** Each page, and the settings "Reset this page" puts back. */
   const pages = [
-    { id: 'performance', label: 'Performance', icon: 'icon.ui.perf', keys: ['graphics', 'shading', 'resolution', 'fpsCap', 'renderer'] },
+    { id: 'performance', label: 'Performance', icon: 'icon.ui.perf', keys: ['graphics', 'shading', 'tiltShift', 'resolution', 'fpsCap', 'renderer'] },
     { id: 'gameplay', label: 'Gameplay', icon: 'icon.ui.live', keys: ['autonomy', 'autosaveMinutes'] },
     { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours', 'pauseOnBlur'] },
     { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'clock24h', 'reducedMotion', 'showFps'] },
@@ -314,6 +314,21 @@
             options={[
               { value: 'classic', label: 'Classic' },
               { value: 'soft', label: 'Soft' },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Miniature focus"
+          hint="The far and near edges of the picture go soft, as in a photograph of a model. Auto: on with High graphics."
+          details="Only a band across the middle of the picture stays sharp, so the eye rests on the home in view. It follows the camera's tilt, fades out as you zoom in, and is off while you build and in the basement. It costs a little of the graphics card's time, which is why Auto leaves it to High."
+        >
+          <Segmented
+            label="Miniature focus"
+            bind:value={settings.tiltShift}
+            options={[
+              { value: 'auto', label: 'Auto' },
+              { value: 'on', label: 'On' },
+              { value: 'off', label: 'Off' },
             ]}
           />
         </SettingRow>

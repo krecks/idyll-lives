@@ -360,7 +360,7 @@ function sceneCanvas(): HTMLCanvasElement {
 }
 
 function liveOptions(s: Settings) {
-  return { resolution: s.resolution, cameraSensitivity: s.cameraSensitivity, fpsCap: s.fpsCap, shading: s.shading, reducedMotion: s.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches };
+  return { resolution: s.resolution, cameraSensitivity: s.cameraSensitivity, fpsCap: s.fpsCap, shading: s.shading, tiltShift: s.tiltShift, reducedMotion: s.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches };
 }
 
 /** Reduce motion: the setting (as applied to the page) or the system's. */

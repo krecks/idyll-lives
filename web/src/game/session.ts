@@ -708,6 +708,8 @@ async function openSession(
       game.socialMenu = null;
       // Build and Create pause the game (and close Live's panels); back in Live the speed returns.
       speed.hold('build', mode !== 'live');
+      // (And every tile is looked at: the whole picture in focus.)
+      renderer.setSharp(mode !== 'live');
       if (mode !== 'live') {
         game.townOpen = false;
         game.jobBoardOpen = false;
