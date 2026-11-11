@@ -1363,9 +1363,10 @@
         {
           "id": "sleep",
           "label": "Sleep on the sofa",
-          "anim": "nap",
+          "anim": "sleep",
           "minutes": 480,
-          "pose": "sit",
+          "pose": "lie",
+          "whole": true,
           "effects": {
             "energy": 0.7,
             "comfort": 0.05
@@ -1424,9 +1425,10 @@
         {
           "id": "sleep",
           "label": "Sleep on the sofa",
-          "anim": "nap",
+          "anim": "sleep",
           "minutes": 480,
-          "pose": "sit",
+          "pose": "lie",
+          "whole": true,
           "effects": {
             "energy": 0.7,
             "comfort": 0.05
@@ -1487,9 +1489,10 @@
         {
           "id": "sleep",
           "label": "Sleep on the sofa",
-          "anim": "nap",
+          "anim": "sleep",
           "minutes": 480,
-          "pose": "sit",
+          "pose": "lie",
+          "whole": true,
           "effects": {
             "energy": 0.7,
             "comfort": 0.05

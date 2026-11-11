@@ -6518,7 +6518,9 @@ pub(crate) fn upper_barred(content: &Content, obj: &ObjectInstance, sim: u32, ag
 
 /// Whether one of `usable` is a bed free for `sim` tonight: working, a place on it free for them
 /// (or theirs) and not kept for a couple (`privacy::kept_for_couple`), for their age, and not one
-/// they couldn't get to a moment ago; a spare one (`Interaction::spare`: the sofa) only if `spare`.
+/// they couldn't get to a moment ago; a spare one (`Interaction::spare`: the sofa) only if `spare`,
+/// and then one somebody only sits on for now (watching TV on the sofa) counts as free: they'll get
+/// up, nobody sleeps there.
 fn has_bed(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32], spare: bool) -> bool {
     let content = ctx.content;
     usable.iter().map(|&o| &objects[o as usize]).any(|o| {
@@ -6530,7 +6532,10 @@ fn has_bed(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32], spa
                 inter.tags & content.day_rhythm.sleep_tags != 0
                     && (spare || !inter.spare)
                     && !inter.baby
-                    && o.can_use_for(sim.id, def, i)
+                    && (o.can_use_for(sim.id, def, i)
+                        || (inter.spare
+                            && o.users()
+                                .all(|u| ctx.briefs.get(u as usize).is_none_or(|b| !b.lying))))
                     && unfit(content, sim.age, inter).is_none()
                     && !upper_barred(content, o, sim.id, sim.age)
             })

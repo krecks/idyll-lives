@@ -71,14 +71,21 @@ fn sleeping_in(w: &World, sim: usize) -> Option<u32> {
 }
 
 /// `HOUSE` (or `town`) at half past nine on day 1, the family in the living room (a day without
-/// free will) and fed and rested but for energy: the son worn out (off to bed at once), his parents
+/// free will, fed and rested) and fed and rested but for energy: the son worn out (off to bed at once), his parents
 /// tired (to bed at bedtime).
 fn evening(town: &str) -> World {
     let mut w = World::from_json(&common::content(), town, 3).unwrap();
     w.autonomy = false;
+    let (n, energy) = (w.content.needs.len(), need(&w, "energy"));
+    // (Fed and rested every hour: nobody falls asleep on the floor in the day.)
+    for hour in 9..=21 {
+        common::run_to(&mut w, 1, (hour as f32).min(21.5));
+        for s in &mut w.sims {
+            s.needs[..n].fill(1.0);
+        }
+    }
     common::run_to(&mut w, 1, 21.5);
     w.autonomy = true;
-    let (n, energy) = (w.content.needs.len(), need(&w, "energy"));
     for (i, s) in w.sims.iter_mut().enumerate() {
         s.needs[..n].fill(1.0);
         s.needs[energy] = if i == 2 { 0.1 } else { 0.45 };
@@ -117,16 +124,49 @@ fn the_parents_share_their_bed_and_their_grown_son_sleeps_on_the_sofa() {
     );
     let sofa = &w.content.objects[w.objects[SOFA as usize].def];
     assert!(
-        sofa.interactions.iter().any(|i| i.spare && i.id == "sleep"),
-        "a night on the sofa is a spare bed's"
+        sofa.interactions.iter().any(|i| {
+            i.spare && i.id == "sleep" && i.whole && i.pose == sim_core::content::Pose::Lie
+        }),
+        "a night on the sofa is a spare bed's, lain along the whole of it"
     );
 }
 
 #[test]
+fn a_sofa_somebody_sits_on_is_still_the_son_s_for_the_night() {
+    // His father watching TV on the sofa (sat on, it isn't free to lie along): the son waits for it
+    // rather than take his parents' bed (he took it, and his father, kept out of the room, fell asleep
+    // on the landing).
+    let mut w = evening(HOUSE);
+    let energy = need(&w, "energy");
+    w.sims[0].needs[energy] = 0.9;
+    let relax = common::interaction(&w, SOFA, "relax");
+    w.apply(sim_core::Command::Use {
+        sim: 0,
+        object: SOFA,
+        interaction: relax,
+    })
+    .unwrap();
+    let mut sat = false;
+    let mut his = None;
+    while w.tick < clock::tick_at(2, 1.0 * 60.0).unwrap() {
+        w.tick_once();
+        sat |= w.objects[SOFA as usize].users().any(|u| u == 0);
+        assert_ne!(sleeping_in(&w, 2), Some(BED), "Ravi in his parents' bed");
+        his = his.or(sleeping_in(&w, 2));
+    }
+    assert!(sat, "his father sat on the sofa");
+    assert_eq!(his, Some(SOFA), "Ravi on the sofa once it's free");
+}
+
+#[test]
 fn with_nowhere_else_the_son_sleeps_in_the_bed_rather_than_on_the_floor() {
-    // No sofa: the parents' bed is all there is for him (they aren't in it yet).
+    // No sofa: the parents' bed is all there is for him (they aren't tired yet).
     let town = HOUSE.replace(r#"{"def":"sofa","x":3,"z":2},"#, "");
     let mut w = evening(&town);
+    let energy = need(&w, "energy");
+    for s in &mut w.sims[..2] {
+        s.needs[energy] = 0.9;
+    }
     let bed = BED - 1;
     let mut his = None;
     while w.tick < clock::tick_at(2, 1.0 * 60.0).unwrap() {

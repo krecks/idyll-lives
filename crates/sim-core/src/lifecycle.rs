@@ -246,7 +246,8 @@ fn sleepers(w: &World, h: usize) -> Vec<usize> {
 /// and each bunk of a bed for two apart, and the couple's beds (a double bed: somewhere to try
 /// for a baby, `privacy::couples_bed`), whose other half is only a partner's. Each place is for
 /// the life stages its bed is for (content `stages`: the race car bed is a child's). A spare bed
-/// lain in (`Interaction::spare`: the sofa bed pulled out) is a place; a night on the sofa isn't.
+/// opened out for the night (`Interaction::spare` and `leaves` open: the sofa bed pulled out) is a
+/// place; a night on the sofa isn't.
 struct Beds {
     /// A place each, and the stages that may sleep there: a bed, a bunk, or a couple's bed slept
     /// in alone.
@@ -304,8 +305,8 @@ impl Beds {
 }
 
 /// The stages a bed of kind `def` is for (its night's sleep, content `stages`); None: no bed (no
-/// night's sleep, or only a baby's; a spare bed's only if `spare` and it's lain in, the sofa bed
-/// pulled out, not a night sitting up on the sofa).
+/// night's sleep, or only a baby's; a spare bed's only if `spare` and it opens out into a bed for
+/// the night, the sofa bed pulled out, not a night curled up on the sofa).
 fn bed_stages(
     content: &crate::content::Content,
     def: &crate::content::ObjectDef,
@@ -315,9 +316,7 @@ fn bed_stages(
     def.interactions
         .iter()
         .filter(|it| {
-            it.tags & sleep != 0
-                && !it.baby
-                && (!it.spare || (spare && it.pose == crate::content::Pose::Lie))
+            it.tags & sleep != 0 && !it.baby && (!it.spare || (spare && it.leaves == Some(true)))
         })
         .map(|it| it.stages)
         .reduce(|a, b| a | b)
