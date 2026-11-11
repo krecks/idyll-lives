@@ -4,7 +4,8 @@
 //!
 //! Per family and life stage it asks the head interface (head.rs) where the face is, then builds
 //! the body (body.rs), the face (face.rs: eyes, lids, lashes, brows, mouth and the morph channels),
-//! the hair (hair.rs) and the clothes (clothes.rs), merges the face's skin pieces into the body,
+//! the hair (hair.rs) and the clothes (clothes.rs), merges the face's skin pieces and the ears (ear.rs)
+//! into the body,
 //! bakes the base stage's ambient occlusion into tone.w (ao.rs; the stages share it), adds the
 //! identity channels (identity.rs: a face per resident) to the base stage's morphs, and writes
 //! the base stage (young adult) whole and the other stages as deltas. Then the checks
@@ -20,6 +21,7 @@ use super::ao;
 use super::body::{Meta, body_fields_and_tone, build_body};
 use super::clothes::{Cut, Cuts, build_clothes, garment_cuts};
 use super::contract::{IDENTITY, channels, is_wisps, wisps_part};
+use super::ear::{Ears, ears};
 use super::face::{Deltas, FaceOut, build_face, follow_mouth};
 use super::hair::build_hair;
 use super::head::{HeadFrame, head_frame};
@@ -45,6 +47,8 @@ struct Assembled {
     p: [V3; NB],
     head: Arc<HeadFrame>,
     face: FaceOut,
+    /// The ears: the last pieces of `body` and `hd.body` (whole) and of `lod.body` (plain).
+    ears: Arc<Ears>,
     n_skin: usize,
     n_lod: usize,
     cuts: Cuts,
@@ -101,11 +105,16 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
         idx: m.idx.clone(),
         ..Mesh::default()
     };
+    // The ears come last, the left then the right (ear.rs): the face's channels pass them by.
+    let ears = ears(family, stage);
     let mut body_list: Vec<Mesh> = vec![strip(&bd.body)];
     body_list.extend(extras.iter().map(strip));
-    // The low-detail body has the eyelids too (they come first among the face's skin pieces).
+    body_list.extend(ears.full.iter().map(|e| strip(&e.mesh)));
+    // The low-detail body has the eyelids too (they come first among the face's skin pieces), and
+    // plain ears.
     let mut lod_list: Vec<Mesh> = vec![strip(&bd.lod)];
     lod_list.extend(extras.iter().filter(|m| m.skin_tone).map(strip));
+    lod_list.extend(ears.lod.iter().map(|e| strip(&e.mesh)));
     let mut parts = vec![
         (
             "body".to_string(),
@@ -133,11 +142,12 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
         None => garment_cuts(family, &p),
     };
     parts.extend(build_clothes(family, stage, &cuts));
-    // SPIKE (`hd.body`): the level-2 skin with the same lids and lips after it, the lids shaded by the
-    // level-2 skin they lie on. Last, so every other part stays where it was in the binaries.
+    // SPIKE (`hd.body`): the level-2 skin with the same lids, lips and ears after it, the lids shaded by
+    // the level-2 skin they lie on. Last, so every other part stays where it was in the binaries.
     let n_hd = bd.hd.pos.len();
     let mut hd_list: Vec<Mesh> = vec![strip(&bd.hd)];
     hd_list.extend(extras.iter().map(strip));
+    hd_list.extend(ears.full.iter().map(|e| strip(&e.mesh)));
     let mut hd = merge(&hd_list.iter().collect::<Vec<_>>());
     let hd_skin = OnMesh::new(&bd.hd_unsocketed, &hd.idx, n_hd);
     let hd_lids: Vec<V3> = {
@@ -155,6 +165,7 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
         p,
         head,
         face: f,
+        ears,
         n_skin,
         n_lod,
         cuts,
@@ -186,7 +197,7 @@ fn lid_shading<'a>(skin: &'a OnMesh, nor: &'a [V3]) -> impl Fn(V3) -> V3 + 'a {
 }
 
 /// Ambient occlusion into every toned part's tone.w (ao.rs), at rest: the bodies by themselves (the
-/// lids and lips are in them) and the mouth (not the eyes: the lower lids would take a dark crescent
+/// lids, the lips and the ears are in them) and the mouth (not the eyes: the lower lids would take a dark crescent
 /// from the eyeball); the shells by the body (the low-detail ones by the low-detail body) and
 /// themselves; the hair and beard by the body, the eyes and themselves. On the face (the skin, the first
 /// `spread.0` of the body, where `spread.1` says) each vertex's shade is spread over its triangles
@@ -619,6 +630,34 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
             }
             k += n;
         }
+        // The ears, after them: their own blush and the shade in their bowl (baked with the body; as much
+        // of it as `Ear::shade` says), and where they run into the head (`Ear::seam`) the tone of the skin
+        // there, so the join shows no line.
+        let set = if name == "lod.body" {
+            &base.ears.lod
+        } else {
+            &base.ears.full
+        };
+        for ear in set {
+            for (i, q) in ear.mesh.pos.iter().enumerate() {
+                let skin: [f64; 4] = if name == "lod.body" {
+                    m.tone[near.nearest(q)]
+                } else {
+                    let (t, w) = on_skin.at(*q);
+                    std::array::from_fn(|c| (0..3).map(|j| m.tone[t[j]][c] * w[j]).sum())
+                };
+                let (own, w) = (ear.mesh.tone[i], ear.seam[i]);
+                let shade = m.tone[k + i][3] * ear.shade[i];
+                m.tone[k + i] = [
+                    own[0] + (skin[0] - own[0]) * w,
+                    own[1],
+                    0.0,
+                    shade + (skin[3] - shade) * w,
+                ];
+            }
+            k += ear.mesh.pos.len();
+        }
+        assert_eq!(k, m.pos.len(), "{name}: pieces");
     }
     // Face morphs: the face's own parts, the body's lids (after its skin), the beard.
     let mut morphs: Vec<(String, Deltas)> = base.face.morphs.clone();
@@ -683,7 +722,8 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
             morphs.push((name, d));
         }
     }
-    // A face of its own (identity.rs): each channel's shape on the skin with the lids and lips after it,
+    // A face of its own (identity.rs): each channel's shape on the skin with the lids and lips after it (and
+    // the ears, which it leaves alone),
     // on the face's parts, and on the hair that lies on the face (the beard, a lock on a cheek, and the
     // wisps of either, by the same rule: a wisp's root moves as the vertex it grows from), which
     // takes the skin's shape where it lies (`HAIR_FOLLOWS`). Not the low-detail body.
@@ -709,9 +749,14 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
         let mut shapes: Vec<(&str, Vec<V3>, Vec<V3>)> = Vec::new();
         for (name, dp, dn) in &ch.parts {
             if *name == "body" {
-                let join = |a: &[V3], b: &[V3]| [a, b].concat();
+                // (The ears, the body's last vertices, stay as they are.)
+                let join = |a: &[V3], b: &[V3]| {
+                    let mut v = [a, b].concat();
+                    v.resize(v.len() + 2 * super::ear::VERTS, V3::zeros());
+                    v
+                };
                 shapes.push((name, join(&ch.skin.0, dp), join(&ch.skin.1, dn)));
-                // SPIKE: the channel on the level-2 skin, the same lids and lips after it.
+                // SPIKE: the channel on the level-2 skin, the same lids, lips and ears after it.
                 shapes.push((HD, join(&ch.skin_hd.0, dp), join(&ch.skin_hd.1, dn)));
             } else {
                 shapes.push((name, dp.clone(), dn.clone()));

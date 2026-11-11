@@ -274,7 +274,7 @@ fn channel(family: &str, name: &'static str, base: &Built, mask: &Mask) -> Chann
     let one_sided = low.srf.pos == base.srf.pos && low.parts == base.parts;
     let (lo, k) = if one_sided { (base, 1.0) } else { (&low, 0.5) };
     let b = &base.srf;
-    let (ri_head, ri_ear) = (body::region("head"), body::region("ear"));
+    let ri_head = body::region("head");
     let e = (hi.head.eyes[1] - lo.head.eyes[1]) * k;
     let size = (hi.head.eye_r - lo.head.eye_r) * k / base.head.eye_r;
     let eye_moves = e.norm() > 1e-9 || size.abs() > 1e-9;
@@ -287,7 +287,7 @@ fn channel(family: &str, name: &'static str, base: &Built, mask: &Mask) -> Chann
                  hn: &[V3],
                  ln: &[V3]| {
         let w: Vec<f64> = (0..pos.len())
-            .map(|v| mask.skin(pos[v], region[v][ri_head] + region[v][ri_ear]))
+            .map(|v| mask.skin(pos[v], region[v][ri_head]))
             .collect();
         let mut skin: (Vec<V3>, Vec<V3>) = (
             (0..pos.len())

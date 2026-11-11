@@ -26,20 +26,22 @@
 //!
 //! Skinning: Head, blending below the jaw to neck_01 and spine_03 by height (tails and braids
 //! along their length), so hair that falls past the jaw follows the shoulders when the head turns.
-//! Nothing comes within 2.6 mm of the head, or 3 mm of the ears (`Ears`: the body's ear faces, which the
-//! head's `sdf` leaves out): caps go round them in an arc (the afro's stands off them and closes
+//! Nothing comes within 2.6 mm of the head, or 3 mm of the ears (`Ears`: the ear pieces' faces, ear.rs,
+//! which the head's `sdf` leaves out): caps go round them in an arc (the afro's stands off them and closes
 //! under itself above them), curtains go out over them, the beard stops in front.
 
+use std::sync::Arc;
+
 use super::contract::{BEARD_FAMILIES, HAIR_STYLES, wisps_part};
-use super::head::HeadFrame;
+use super::head::{HeadFrame, head_frame};
 use super::meshops::{nearest_point, ray_hit, smooth_normals};
 use super::np::{
     PI, Periodic, TAU, clip, interp, linspace, linspace_open, mean_rows, pairwise_sum, py_mod,
     radians, smoothstep,
 };
 use super::prims::{caps, ellipsoid, grid, loft, noise3, orient, rings_mesh, spline, torus};
-use super::rig::{NB, b};
-use super::{Mesh, V3, v3};
+use super::rig::{BASE_STAGE, NB, b};
+use super::{Cache, Mesh, V3, v3};
 use crate::pcg64::Pcg64;
 
 /// Nearest the hair comes to the skull (m); the check wants more than 2 mm.
@@ -436,8 +438,8 @@ const RIM_ROUND: f64 = 0.011;
 const EAR_CLEAR: f64 = 0.003;
 pub const EAR_MIN: f64 = 0.0015;
 
-/// The ears as drawn (the body's faces where it is ear; the head's `sdf` leaves them out), to keep
-/// hair off them: how far a point is into one.
+/// The ears as drawn (ear.rs: pieces set into the head, which the head's `sdf` knows nothing of), to
+/// keep hair off them: how far a point is into one.
 pub struct Ears {
     ears: Vec<Ear>,
 }
@@ -447,52 +449,33 @@ struct Ear {
     side: f64,
     lo: V3,
     hi: V3,
-    /// The ear's own faces, and every face in the box (a ray out to the side crosses these an odd
-    /// number of times from inside the ear).
+    /// The ear's own faces, and the same closed over its foot in the head (a ray out to the side
+    /// crosses these an odd number of times from inside the ear).
     own: Vec<[V3; 3]>,
-    near: Vec<[V3; 3]>,
+    closed: Vec<[V3; 3]>,
 }
 
 impl Ears {
-    /// From the body's positions and faces and each vertex's share of ear (region weight), round the
-    /// head interface's `ears` boxes.
-    pub fn new(boxes: &[[V3; 2]; 2], pos: &[V3], idx: &[usize], ear: &[f64]) -> Self {
+    /// From each ear's faces and the faces closing its foot (left, right: `ear::Ears::faces`), round
+    /// the head interface's `ears` boxes.
+    pub fn new(boxes: &[[V3; 2]; 2], faces: [[Vec<[V3; 3]>; 2]; 2]) -> Self {
         let ears = boxes
             .iter()
-            .map(|[c, e]| {
-                let (lo, hi) = (c - e - V3::repeat(0.02), c + e + V3::repeat(0.02));
-                let inb = |p: &V3| (0..3).all(|k| lo[k] <= p[k] && p[k] <= hi[k]);
-                let (mut own, mut near) = (Vec::new(), Vec::new());
-                for t in idx.chunks(3) {
-                    if !t.iter().any(|&i| inb(&pos[i])) {
-                        continue;
-                    }
-                    let tri = [pos[t[0]], pos[t[1]], pos[t[2]]];
-                    near.push(tri);
-                    if t.iter().map(|&i| ear[i]).sum::<f64>() > 0.9
-                        && t.iter().all(|&i| pos[i].x * c.x > 0.0)
-                    {
-                        own.push(tri);
-                    }
-                }
-                Ear {
-                    side: c.x.signum(),
-                    lo,
-                    hi,
-                    own,
-                    near,
-                }
+            .zip(faces)
+            .map(|([c, e], [own, cap])| Ear {
+                side: c.x.signum(),
+                lo: c - e - V3::repeat(0.02),
+                hi: c + e + V3::repeat(0.02),
+                closed: [own.as_slice(), cap.as_slice()].concat(),
+                own,
             })
             .collect();
         Ears { ears }
     }
 
-    /// The ears of a family at a stage (its body as built).
+    /// The ears of a family at a stage (as built).
     pub fn of(family: &str, stage: &str, h: &HeadFrame) -> Self {
-        let s = super::body::surface(family, stage);
-        let r = super::body::region("ear");
-        let ear: Vec<f64> = s.region.iter().map(|w| w[r]).collect();
-        Ears::new(&h.ears, &s.pos, &super::body::tris(family), &ear)
+        Ears::new(&h.ears, super::ear::ears(family, stage).faces(None))
     }
 
     /// How far a point is into an ear (m; < 0: that far out of the nearest), and the way out of it;
@@ -505,7 +488,7 @@ impl Ears {
             }
             let ray = v3(e.side, 0.0123, 0.0071).normalize();
             let inside = e
-                .near
+                .closed
                 .iter()
                 .filter(|t| ray_hit(p, ray, t).is_some())
                 .count()
@@ -1484,6 +1467,52 @@ fn tuft_clears(sc: &Scalp, a: f64, phi: f64, len: f64, turn: f64, wide: f64) -> 
     })
 }
 
+/// The tousled style's locks as its seed lays them: each one's azimuth, how far down to the hairline it
+/// grows (of the hairline's polar angle), its length, its turn, and its lift and breadth (of hh).
+fn tousled_locks() -> Vec<[f64; 6]> {
+    let mut rng = Pcg64::new(11);
+    (0..22)
+        .map(|k| {
+            // Spread over the head on a spiral (each about as much of it), nudged.
+            let a = py_mod(
+                k as f64 * PI * (3.0 - 5f64.sqrt()) + rng.uniform(-0.2, 0.2) + PI,
+                TAU,
+            ) - PI;
+            let down = 0.82 * ((k as f64 + 0.5) / 22.0).sqrt() + rng.uniform(-0.05, 0.05);
+            let len = rng.uniform(0.4, 0.65);
+            let turn = rng.uniform(-0.65, 0.65);
+            let lift = rng.uniform(0.015, 0.04);
+            let wide = rng.uniform(0.055, 0.075);
+            [a, down, len, turn, lift, wide]
+        })
+        .collect()
+}
+
+/// A tousled lock's length on a head: one that would lie on an ear is cut shorter until it ends above it
+/// (`tuft_clears`); none, if it grows from beside one.
+fn tousled_cut(sc: &Scalp, hh: f64, lock: [f64; 6]) -> Option<f64> {
+    let [a, down, len, turn, _, wide] = lock;
+    let phi = sc.hairline(a) * down;
+    (0..8)
+        .map(|cut| len * 0.85f64.powi(cut))
+        .find(|&len| tuft_clears(sc, a, phi, len, turn, wide * hh))
+}
+
+static TOUSLED: Cache<String, Vec<bool>> = Cache::new();
+
+/// Which of the tousled locks a family has: those that clear the ears on its base stage. Every stage has
+/// the same ones (the style is one topology, and the ears' ovals differ a little from stage to stage).
+fn tousled_kept(family: &str) -> Arc<Vec<bool>> {
+    TOUSLED.get(family.to_string(), || {
+        let h = head_frame(family, BASE_STAGE);
+        let sc = Scalp::new(&h, true).round(&Ears::of(family, BASE_STAGE, &h));
+        tousled_locks()
+            .into_iter()
+            .map(|lock| tousled_cut(&sc, h.hh, lock).is_some())
+            .collect()
+    })
+}
+
 /// A bent capsule (lofted along a smooth curve through `points`); `hang` (a, b): it follows the
 /// body more and more from a to b along its length (a tail).
 #[allow(clippy::too_many_arguments)]
@@ -1765,7 +1794,6 @@ pub fn build_hair(
 
     // Tousled: a cap and seeded locks pointing every which way, their tips lifting, a few over the
     // forehead.
-    let mut rng = Pcg64::new(11);
     let tb = thick(0.034 * hh, 0.028 * hh, 0.026 * hh, Some(0.016 * hh));
     let lumpy =
         |a: f64, u: f64| tb(a, u) * (1.0 + 0.35 * noise3(v3(a.cos(), 2.0 * u, a.sin()), 5, 2.5));
@@ -1785,35 +1813,25 @@ pub fn build_hair(
             wisps: Some(&rim_wisps),
         },
     )];
-    for k in 0..22 {
-        // Spread over the head on a spiral (each about as much of it), nudged.
-        let a = py_mod(
-            k as f64 * PI * (3.0 - 5f64.sqrt()) + rng.uniform(-0.2, 0.2) + PI,
-            TAU,
-        ) - PI;
-        let phi =
-            sc.hairline(a) * (0.82 * ((k as f64 + 0.5) / 22.0).sqrt() + rng.uniform(-0.05, 0.05));
-        let len = rng.uniform(0.4, 0.65);
-        let turn = rng.uniform(-0.65, 0.65);
-        let lift = rng.uniform(0.015, 0.04) * hh;
-        let wide = rng.uniform(0.055, 0.075) * hh;
-        // A lock that would lie on an ear is cut shorter until it ends above it (or left out, if it
-        // grows from beside one).
-        let Some(len) = (0..8)
-            .map(|cut| len * 0.85f64.powi(cut))
-            .find(|&len| tuft_clears(&sc, a, phi, len, turn, wide))
-        else {
+    let kept = tousled_kept(family);
+    for (k, lock) in tousled_locks().into_iter().enumerate() {
+        if !kept[k] {
             continue;
-        };
+        }
+        let [a, down, len, turn, lift, wide] = lock;
+        let phi = sc.hairline(a) * down;
+        // (Where it clears the ears on the base stage but at no length here: as short as it is cut, and
+        // `clear` keeps it off them.)
+        let len = tousled_cut(&sc, hh, lock).unwrap_or(len * 0.85f64.powi(7));
         tou.push(tuft(
             &sc,
             a,
             phi,
             len,
             turn,
-            lift,
+            lift * hh,
             0.03 * hh,
-            wide,
+            wide * hh,
             0.028 * hh,
             k as f64,
         ));

@@ -21,7 +21,8 @@ use super::rig::{
 };
 use super::{V3, repo_root, v3};
 
-/// lod.body: the cage at its limit (~0.9k) plus the eyelids (~0.2k).
+/// body: the skin (~4.8k), the lids and lips (~0.5k) and the ears (324 each, ear.rs).
+/// lod.body: the cage at its limit (~0.9k) plus the eyelids (~0.2k) and plain ears (24 each).
 ///
 /// hair: the styles are built at `hair::DETAIL` (1.5) times their layout's rows, each lock on 6
 /// columns rather than 4 (`hair::LOCK`), so the
@@ -597,27 +598,19 @@ pub fn check(out: &Path) -> bool {
                     })
                     .collect()
             };
-            // The ears: sound (no corner of a triangle shaded as facing away from it: the skin folded
-            // over itself where the ear leaves the head).
+            // The ears: sound (no corner of a triangle that shows shaded as facing away from it).
             let turned = super::measure::ear(fam, stage)[6];
             if turned > 0.0 {
                 fail(format!(
-                    "{fam}.{stage}: the ear's skin is folded over itself ({turned:.0} corners shaded as facing away)"
+                    "{fam}.{stage}: an ear is shaded inside out ({turned:.0} corners shaded as facing away)"
                 ));
             }
-            // The body's faces where its skin (the first vertices, as body.rs made them) is ear.
+            // The ears as the set has them: the body's last vertices (ear.rs), the generator's faces.
             let skin = body::surface(fam, stage);
-            let ri = body::region("ear");
-            let bpos = at("body");
-            let ear: Vec<f64> = (0..bpos.len())
-                .map(|v| skin.region.get(v).map_or(0.0, |w| w[ri]))
-                .collect();
-            let be = parts.at("body");
-            let bidx: Vec<usize> = u16s(&buf, be.at("index").usize(), be.at("indices").usize())
-                .iter()
-                .map(|&i| i as usize)
-                .collect();
-            let ears = Ears::new(&hs.ears, &bpos, &bidx, &ear);
+            let ears = Ears::new(
+                &hs.ears,
+                super::ear::ears(fam, stage).faces(Some(&at("body"))),
+            );
             // The head as a face of its own deforms it (identity.rs): each identity channel at its two
             // ends, as far as this stage takes it (`faceScale`), and the box of what it moves.
             let Some(scale) = info.unwrap_or(body).get("faceScale").map(JValue::f64) else {
@@ -704,6 +697,16 @@ pub fn check(out: &Path) -> bool {
             if let Some(m) = e.get("morph") {
                 let r: Vec<usize> = m.at("ranges").arr().iter().map(JValue::usize).collect();
                 let dp = i16s(&buf, m.at("morphPositions").usize(), r[ch.len()] * 4);
+                // No channel moves an ear (the last vertices of the bodies that have the whole ones).
+                let n = e.at("vertices").usize();
+                let moved = u16s(&buf, m.at("morphVerts").usize(), m.at("count").usize());
+                if matches!(name.as_str(), "body" | "hd.body")
+                    && moved
+                        .iter()
+                        .any(|&v| v as usize >= n - 2 * super::ear::VERTS)
+                {
+                    fail(format!("{fam}:{name} has a channel that moves an ear"));
+                }
                 let reach = |from: usize, to: usize| {
                     dp[4 * r[from]..4 * r[to]]
                         .chunks(4)

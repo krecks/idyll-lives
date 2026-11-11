@@ -119,8 +119,8 @@ Every body has:
 
 | Part | What | Skinning | Material |
 |---|---|---|---|
-| `body` | the skin, with the eyelids and lips (from the face) | body bones; lids and lips Head | `body`: skin colour, painted clothes |
-| `lod.body` | the low-detail body (far residents, every shadow), with the eyelids (they blink) | body bones; lids Head | `body` |
+| `body` | the skin, with the eyelids and lips (from the face) and the ears | body bones; lids, lips and ears Head | `body`: skin colour, painted clothes |
+| `lod.body` | the low-detail body (far residents, every shadow), with the eyelids (they blink) and plain ears | body bones; lids and ears Head | `body` |
 | `eyes` | two eyeballs | `eye_l`, `eye_r` | `eye` (procedural iris) |
 | `lashes`, `brows` | lashes on the upper lid rims; brows | Head | `lash` (dark), `brow` (hair colour x 0.45), opaque |
 | `teeth`, `tongue` | teeth; the mouth plate (dark, tone.y = 1) and tongue | Head | `mouth` |
@@ -162,7 +162,7 @@ short ones for 52 columns and 18 rows:
   the braid, three strands plaited (each a loft), a tie and a tuft; buns, twisted, with a band.
 - the beard is a shell over the jaw in locks, their tips below the chin, thinning to the skin at
   its lower edge; the sideburns stop in front of the ears.
-- no hair comes within 2 mm of the head (`sdf`) or 1.5 mm of an ear (the body's ear faces), and no
+- no hair comes within 2 mm of the head (`sdf`) or 1.5 mm of an ear (the ear pieces' faces), and no
   edge passes through an ear, at every life stage at rest (`check`).
 
 Solid hair ends in hard edges. Past them go wisps (`hair.rs` `Strip`, `wisps`; a part of their own
@@ -219,8 +219,9 @@ default camera (no draw call), all of them zoomed in.
 
 The body (`body.rs`) is a control cage of superellipse rings (`cage.rs`; the head's cage
 in `head.rs`) fitted so its limit surface passes through the ring points and subdivided once
-(`subdiv.rs`): `body` is about 5.2k triangles of skin plus the face's lids and lips (budget
-6k), `lod.body` the cage at its limit plus the lids (budget 1.4k; the fingers are on it too). Skin
+(`subdiv.rs`): `body` is about 4.8k triangles of skin plus the face's lids and lips and the ears (5.9k
+in all, budget 6k), `lod.body` the cage at its limit plus the lids and plain ears (budget 1.4k; the
+fingers are on it too). Skin
 weights are set per ring and subdivide with the positions. Every stage of a family has the same cage.
 
 A hand is a palm with the ball of the thumb on it, a knuckle ring, four fingers and a thumb. A
@@ -246,17 +247,9 @@ The points lie on a smooth head (a soft union of a cranium, cheeks-and-jaw, a mu
 ellipsoid: the face from the nose down stands up rather than sloping back to the chin); the features
 are offsets on them: the nose (a bridge from between the eyes to a round tip over the nose's base,
 its wings beside the tip and the base), the upper lip rounded forward with a groove down its middle
-(the philtrum), the brow, the ears. An ear leaves the head through an opening as high as itself
-(columns 92 to 122 degrees, from the upper lip's row to the brow's), so it grows straight out of the
-head and nothing of it lies folded over the skin beside it: a rim of eight points with a back edge
-behind it (it has a thickness), inside it the fold round the hollow and the hollow's floor, laid along
-the head's side; a real ear's size (about 62 mm high and 32 wide on an adult, from the brow to the
-nose's base, 15 mm off the head at its back) and solid behind. `cargo characters ratios` prints each
-body's ear, and how many of its triangles' corners are shaded as facing away from the triangle (none:
-the skin is nowhere folded over itself; `check` fails on one). Between the grid's vertices the drawn head is snapped onto the
+(the philtrum), the brow. Between the grid's vertices the drawn head is snapped onto the
 smooth one (the cage's limit alone dents it by up to 4 mm there, where the grid's spacing is uneven
-and its partial lines end: patches on the cheeks; by the ears, where the fit also slides the points
-along the head, they are placed from the cage's own points instead), and the eye sockets are carved into every point
+and its partial lines end: patches on the cheeks), and the eye sockets are carved into every point
 of it (`sockets`): round each eye a shallow hollow (the eyes' fronts are about level with the face
 round them) that the eyeball stands out of, deepest at the eye's corners and going on down behind the
 eyeball under the lids; the LOD has one vertex in each, set back. The lids cover the sockets, so the
@@ -273,6 +266,29 @@ the upper with a cupid's bow over the philtrum; brows thickest at the inner end,
 its outer one, on the brow bone (not round the temple); a man's lower, straighter and heavier, a
 woman's higher, thinner and arched further out, its tail dropping.
 
+The ears are not the cage's (`ear.rs`): each is a piece of its own set into the side of the smooth
+head, as the lids and lips are set on the face, and comes after them in `body` (the left one, then the
+right: 169 vertices and 324 triangles each; `lod.body` has a plain flap of 24 triangles a side). An ear
+is laid out on a sheet hinged on the head along the ear's front edge and turned out towards the back
+until its back edge stands 13.5 mm off the head (on a grown man: 20 to 25 degrees from the head's side),
+leaning back a little at the top; a real ear's size and place (about 62 mm high and 34 wide on a man,
+58 and 31 on a woman, from the brow to the nose's base; by the head's height at the other stages, a
+baby's a tenth smaller). The mesh is a polar grid round the bowl's middle: the bowl's floor (the
+concha, 2 mm over the skin), its rim (the antihelix behind and above it, the tragus in front), the
+groove inside the helix (the scapha), the helix's crest, the ear's edge between two rings close to it
+(the edge's turn is in two narrow bands, so no broad one is shaded as turning away from the eye, which
+the sky's reflection draws as a white line), then round to the back: under the helix, under the bowl's
+rim (the ear is a shell 3 or 4 mm thick, standing free of the head behind the bowl), and a foot ring 2
+mm inside the head, so nothing is stitched to the skin. The lobe has no rolled rim, and the front edge
+runs into the cheek. An ear's normals are its own triangles' (weighted by their angle at the vertex,
+and leant until no corner faces away from its triangle; the edge is the front's and the back's, so it
+shades round), turned to the head's where the ear enters the head (the foot, the front edge), where it
+also takes the skin's tone: the join shows no crease and no line. It is built from the stage's smooth
+head with the shared face (the identity channels leave the ears and the skin by them alone), is
+skinned to `Head`, and no channel moves it (`check`). `cargo characters ratios` prints each body's ear
+(what of it stands out of the head), and how many of its triangles' corners are shaded as facing away
+from the triangle (none; `check` fails on one).
+
 Grown faces and bodies differ by family more than the shared shapes do, as far as the stage is grown
 (`rig::maturity`: none for babies and children, 0.6 for teens): a man's jaw wider and squarer, his
 chin broad, his nose larger, his brow ridge heavier, his neck and arms thicker, his chest and
@@ -284,7 +300,7 @@ young adult's; the stages' own waists widen it with age), with a gentle
 bust (`head.rs` `grown`, `nose`, `brow`; `body.rs` `Shape::m`).
 
 The head interface (`head_frame(family, stage)`, `head.rs`): `sdf` is a smooth signed distance
-to the head and neck as drawn (the ears left out; about 1 mm near the surface), `surface_z` the
+to the head and neck as drawn (the ears, pieces set into it, left out; about 1 mm near the surface), `surface_z` the
 front surface's z; `ears` boxes round the ears (hair goes round or over them); `centre` / `radii` a
 loose ellipsoid round the skull (with a margin; fit close things to `sdf`); eyes, mouth, brows,
 hairline and chin as before.
@@ -293,7 +309,7 @@ hairline and chin as before.
 
 | Part | x | y | z | w |
 |---|---|---|---|---|
-| body | sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, > 1 hand) | height (m, base body) | crew neckline (m, > 0 covered: distance from the neck's axis plus depth below a curve round the neck's base); head: -1 - scalp weight | scoop neckline (women: round and low in front; men: a V); head: -1 - scalp weight |
+| body | sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, > 1 hand) | height (m, base body) | crew neckline (m, > 0 covered: distance from the neck's axis plus depth below a curve round the neck's base); head: -1 - scalp weight (the ears: -1) | scoop neckline (women: round and low in front; men: a V); head: -1 - scalp weight (the ears: -1) |
 | shells | hem distance (m; a shoe's from its collar, negative on its lining) | flag: 1 sole, 2 waistband, 3 skirt or apron (a hem band), 4 light midsole, 5 polished | category: 0 top, 1 bottom, 2 shoes | shoes: across the instep (m from its middle; over 1 off its front), else 0 |
 | eyes | offset from the iris centre on the eye's front (m), x | y | iris radius (m) | pupil radius (m) |
 | hair | 0.1 (unused) | | | |
@@ -319,8 +335,12 @@ whichever way the head faces), w = the baked ambient occlusion
 (below). A wisp's two vertices take the tone of the hair vertex it grows from, w included (in
 `build.rs`, after the bake). On `body` the eyelids take the tone of the face they lie on (as it is without the socket, at
 their nearest point), w included (the upper lid keeps its crease), and its normals there, in every
-shape of the face (build.rs `lid_shading`); on `lod.body` the mean tone of the skin round them. Every
-stage uses the base stage's tone.
+shape of the face (build.rs `lid_shading`); on `lod.body` the mean tone of the skin round them. The
+ears have a blush of their own (most on the lobe), a shade in the bowl's middle for the canal (y) and
+part of their baked occlusion (0.7 of it on the front, 0.4 on the back, which faces the head a
+centimetre off and would be as dark as the inside of a mouth: an ear is thin and lit through); where
+an ear runs into the head (its foot, its front edge) it takes the tone of the skin there instead, so
+the join shows no line. Every stage uses the base stage's tone.
 
 w is how much of the sky a vertex does not see at rest, 0 (open) to 1 (enclosed), in 32 steps
 (`ao.rs`, after the furniture's `gamekit/shade.py`): 96 rays per vertex (48 on the hair, whose shade is
@@ -338,7 +358,7 @@ all on the hair): a vertex takes half its own and half its neighbours' mean, the
 left alone, so a crease that lands on two of a ring's eight vertices reads as a crease and not as a
 blotch. What occludes what:
 
-- `body`: itself (its lids and lips included) and the teeth and tongue, not the eyes;
+- `body`: itself (its lids, lips and ears included) and the teeth and tongue, not the eyes;
 - `lod.body`: the same, its own bake;
 - shells: themselves and `body`; their `lod.` copies themselves and `lod.body`;
 - `hair.*`, `hair.beard`: themselves, `body` and the eyes (one body serves every style and outfit,
@@ -536,7 +556,7 @@ The eyeballs turn on bones, so the two channels that move or size them (`eyeSpac
 say so in `morphs.identity.eyes`, and `pose.ts` `skin` moves the eye bones' joints and scales them
 (`Placement.eyes`, summed over the resident's weights once, with the texels).
 
-Identity channels are on `body` (the skin with its lids and lips), `lashes`, `brows`, `teeth`,
+Identity channels are on `body` (the skin with its lids and lips; not its ears), `lashes`, `brows`, `teeth`,
 `tongue`, `hair.beard` and the hair that touches the face, with their wisps; not on `lod.body` or the shadow copies,
 and they are skipped with the expression when the face is small on screen. The shapes are metres on
 the base stage's head, so a body's `faceScale` scales a resident's weights: the stage's head height

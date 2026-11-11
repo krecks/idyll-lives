@@ -10,16 +10,18 @@
 //! hexagon where a line ends on its side): columns beside the nose's middle (7 degrees) and at the
 //! eyes' outer corners (40), rows at the mouth, at the nose's base, under the eyes and over them.
 //! Its vertices lie where rays from the head's middle leave a smooth head (`head_shape`: a soft union
-//! of a cranium, cheeks-and-jaw, a muzzle and a chin ellipsoid, rounder on small children); an ear
-//! grows out of each side (a rim, the fold round its hollow and the hollow's floor), and the features are offsets on the grid's vertices (`features`): the
-//! nose (bridge, tip, wings and base), the upper lip and philtrum and a soft brow. body.rs draws the
+//! of a cranium, cheeks-and-jaw, a muzzle and a chin ellipsoid, rounder on small children), and the
+//! features are offsets on the grid's vertices (`features`): the nose (bridge, tip, wings and base),
+//! the upper lip and philtrum and a soft brow. The ears are not the cage's: each is a piece of its
+//! own set into the head's side (ear.rs). body.rs draws the
 //! smooth head between the grid's vertices too (`onto_head`) and carves the eye sockets into every
 //! point of it (`sockets`): round each eyeball a shallow hollow its front stands out of, the lids over
 //! it. There is no mouth hole: the lips and the mouth plate sit on the face. The LOD keeps the 8 x 12
 //! grid (cage.rs `lod_faces`).
 //!
-//! `HeadFrame::sdf` and `surface_z` are measured on the real (subdivided) head and neck without
-//! the ears, so the face features and the hair sit on what is drawn; `ears` bound the ears.
+//! `HeadFrame::sdf` and `surface_z` are measured on the real (subdivided) head and neck (the ears
+//! are pieces on it, ear.rs), so the face features and the hair sit on what is drawn; `ears` bound
+//! the ears.
 //! `centre` / `radii` are a loose ellipsoid round the skull for code that wants a simple one.
 
 use std::collections::BTreeMap;
@@ -83,38 +85,7 @@ const COLS: [(f64, usize, usize); 16] = [
     (-14.0, JAW, TOP),
     (-7.0, MOUTH, LID),
 ];
-/// The ear leaves through the face between the columns at 92 and 122 degrees (and their mirrors), between
-/// `EAR_ROWS`.
-const EAR: (f64, f64) = (92.0, 122.0);
-/// The rows the ear's opening runs between (the upper lip's and the brow's: both run all round).
-const EAR_ROWS: (usize, usize) = (LIP, BROW);
-/// The ear (fractions of hh): half its breadth and half its height, and its middle above the opening's.
-const EAR_SIZE: (f64, f64, f64) = (0.078, 0.145, -0.03);
-/// How far its top lies behind its bottom (of its half breadth, per half height).
-const EAR_LEAN: f64 = 0.2;
-/// The ear's rim, eight points in order: the lobe's front, the lobe, the back low and high, the top's back
-/// and front, the front high and low (where it joins the cheek): front (+) to back, bottom to top
-/// (-1..1), how far off the head (of hh).
-const EAR_RIM: [(f64, f64, f64); 8] = [
-    (0.4, -0.85, 0.034),
-    (-0.25, -1.0, 0.042),
-    (-0.8, -0.45, 0.068),
-    (-1.0, 0.35, 0.082),
-    (-0.65, 0.92, 0.072),
-    (0.25, 1.0, 0.042),
-    (0.7, 0.45, 0.034),
-    (0.75, -0.25, 0.032),
-];
-/// The hollow's middle on the ear (as `EAR_RIM`'s first two), the fold round it (how far from the hollow's
-/// middle towards the rim, how much nearer the head than the rim, of hh) and the hollow's floor (as far
-/// towards the rim, as far off the head).
-const EAR_HOLLOW: (f64, f64) = (0.1, 0.05);
-/// The rim's back edge: as far from the hollow's middle as the rim (of 1), nearer the head than it by this
-/// (of hh) and no nearer than this.
-const EAR_BACK: (f64, f64, f64) = (0.93, 0.02, 0.012);
-const EAR_FOLD: (f64, f64) = (0.7, 0.028);
-const EAR_FLOOR: (f64, f64) = (0.3, 0.014);
-/// (height above the chin, z), fractions of hh.
+/// The head's middle, where the grid's rays start: (height above the chin, z), fractions of hh.
 const MIDDLE: (f64, f64) = (0.40, 0.0);
 /// The eye sockets (`sockets`), eye radii: a hollow behind the eyeball, `SOCKET[0]` in front of the eye's
 /// middle above and below it (where the lids cover it) and `SOCKET[1]` beside it (the eye's corners), a
@@ -442,7 +413,7 @@ pub fn head_shape(family: &str, stage: &str, id: &Identity) -> impl Fn(V3) -> f6
 }
 
 /// Where a ray from inside (o) along unit direction d leaves the shape f (bisection).
-fn cast(f: &impl Fn(V3) -> f64, o: V3, d: V3) -> V3 {
+pub fn cast(f: &impl Fn(V3) -> f64, o: V3, d: V3) -> V3 {
     let (mut lo, mut hi) = (0.0, 1.2);
     for _ in 0..40 {
         let mid = (lo + hi) / 2.0;
@@ -538,7 +509,7 @@ fn col_of(deg: f64) -> usize {
     COLS.iter().position(|c| c.0 == deg).expect("column")
 }
 
-/// The faces of the grid's cells (row r to r + 1, column c to c + 1), the ears' openings left out:
+/// The faces of the grid's cells (row r to r + 1, column c to c + 1):
 /// cells not parted by a row or column that runs between them make one face, a rectangle of cells
 /// whose corners (and the vertices along its sides, where a line ends on it) are its corners.
 /// `coarse`: only the lines that run all round (the LOD's grid).
@@ -578,7 +549,6 @@ fn grid_faces(ids: &[Vec<Option<usize>>], coarse: bool) -> Vec<Vec<usize>> {
             }
         }
     }
-    let ears = [EAR, (-EAR.1, -EAR.0)].map(|(a, _)| col_of(a));
     let mut groups: BTreeMap<usize, Vec<(usize, usize)>> = BTreeMap::new();
     for r in 0..nr {
         for c in 0..nc {
@@ -600,9 +570,6 @@ fn grid_faces(ids: &[Vec<Option<usize>>], coarse: bool) -> Vec<Vec<usize>> {
             (r1 - r0) * (c1 - c0),
             "head cage: a face that is not a rectangle of cells"
         );
-        if ears.contains(&c0) && r0 >= EAR_ROWS.0 && r1 <= EAR_ROWS.1 {
-            continue;
-        }
         assert!(
             [(r0, c0), (r0, c1), (r1, c0), (r1, c1)]
                 .iter()
@@ -744,91 +711,6 @@ pub fn head_cage(cage: &mut Cage, family: &str, stage: &str, id: &Identity) -> V
             .map(|c| ids[r][c].expect("ring"))
             .collect()
     };
-    let id = |r: usize, deg: f64| ids[r][col_of(deg)].expect("vertex");
-    // Ears: from the face left open between columns 92 and 122 (and -122 .. -92), from the upper lip's
-    // row to the brow's: the ear's whole height, so it grows straight out of the head and nothing of it
-    // lies folded over the skin beside it (a fold that tight turns the skin over itself at this density,
-    // and its shading with it). The smooth head goes on under it (the skull the hair fits over); the ear
-    // is the offset, along the head's side: a rim of eight (`EAR_RIM`) with a back edge behind it
-    // (`EAR_BACK`: the ear has a thickness, so no face of it turns straight from its front to its back),
-    // inside it the fold round the hollow and the hollow's floor (`EAR_FOLD`, `EAR_FLOOR`). The LOD has
-    // the back edge alone, closed flat.
-    for (c0, c1) in [EAR, (-EAR.1, -EAR.0)] {
-        let (r0, r1) = EAR_ROWS;
-        let lp = [
-            id(r0, c0),
-            id(r0, c1),
-            id(TIP, c1),
-            id(EYE, c1),
-            id(r1, c1),
-            id(r1, c0),
-            id(EYE, c0),
-            id(TIP, c0),
-        ];
-        let p: Vec<V3> = lp.iter().map(|&i| cage.p[i]).collect();
-        let m = super::np::mean_rows(&p);
-        let sx = sign(m[0]);
-        let out = v3(sx, 0.0, 0.0);
-        // The rim's points in the loop's direction from its first corner (it runs the other way round
-        // on the left).
-        let order: [usize; 8] = if sx > 0.0 {
-            [0, 1, 2, 3, 4, 5, 6, 7]
-        } else {
-            [1, 0, 7, 6, 5, 4, 3, 2]
-        };
-        let size = 1.0 - 0.1 * yg;
-        let (half_w, half_h) = (EAR_SIZE.0 * hh * size, EAR_SIZE.1 * hh * size);
-        let middle = v3(m.x, m.y + EAR_SIZE.2 * hh, m.z);
-        // The smooth head's side at a height and a depth (its x), so the ear lies along the head.
-        let side = |y: f64, z: f64| {
-            let from = v3(0.0, (y - chin) / hh, z / hh);
-            cast(&f, from, out).x * hh
-        };
-        // A point of the ear: front to back and bottom to top of it (-1..1), and how far off the head (of hh).
-        let at = |zf: f64, v: f64, off: f64| {
-            let (y, z) = (
-                middle.y + v * half_h,
-                middle.z + (zf - EAR_LEAN * v) * half_w,
-            );
-            v3(side(y, z) + sx * off * hh * (1.0 + 0.3 * yg), y, z)
-        };
-        let mut rings: [Vec<usize>; 4] = Default::default();
-        for (ring, ids) in rings.iter_mut().enumerate() {
-            // (On the head under the ear: the rim's back and front, and the two rings inside it.)
-            let flat = [0.8, 0.6, 0.4, 0.2][ring];
-            for (i, k) in order.into_iter().enumerate() {
-                let (zf, v, off) = EAR_RIM[k];
-                let b = m + (p[i] - m) * flat;
-                let bpt = v3(side(b.y, b.z), b.y, b.z);
-                // (A ring nearer the hollow's middle than the rim, that far off the head.)
-                let inside = |share: f64, off: f64| {
-                    let c = EAR_HOLLOW;
-                    at(c.0 + (zf - c.0) * share, c.1 + (v - c.1) * share, off)
-                };
-                let q = match ring {
-                    0 => inside(EAR_BACK.0, (off - EAR_BACK.1).max(EAR_BACK.2)),
-                    1 => at(zf, v, off),
-                    2 => inside(EAR_FOLD.0, (off - EAR_FOLD.1).max(EAR_FLOOR.1)),
-                    _ => inside(EAR_FLOOR.0, EAR_FLOOR.1),
-                };
-                let tags = Tags {
-                    blush: if ring < 2 { 0.35 } else { 0.2 },
-                    ..Default::default()
-                };
-                ids.push(cage.add(bpt, w.clone(), "ear", Some(q - bpt), tags));
-            }
-        }
-        let [back, e, fold, floor] = rings;
-        cage.band(&lp, &back, &[]);
-        for (a, b) in [(&back, &e), (&e, &fold), (&fold, &floor)] {
-            for i in 0..8 {
-                let j = (i + 1) % 8;
-                cage.fine_face(&[a[i], a[j], b[j], b[i]]);
-            }
-        }
-        cage.fine_face(&floor);
-        cage.lod_face(&back);
-    }
     // Crown: a 2 x 4 patch over the top row (right edge columns 14..122, left edge -14..-122), its
     // middle line on the head's top.
     let top = ring(TOP);
@@ -882,8 +764,9 @@ pub struct HeadFrame {
     /// Hairline: a closed loop of points on the skull (front, temples, behind the ears, nape).
     pub hairline: Vec<V3>,
     pub chin: V3,
-    /// Ears (left, right): centre and half extents (x, y, z) of a box round each. They stand off
-    /// the skull and are not part of `sdf` / `surface_z`; hair should go round or over them.
+    /// Ears (left, right): centre and half extents (x, y, z) of a box round each (ear.rs: pieces set
+    /// into the head). They stand off the skull and are not part of `sdf` / `surface_z`; hair should go
+    /// round or over them.
     pub ears: [[V3; 2]; 2],
     /// The real head and neck surface (dense samples, their normals, and its triangles).
     pub samples: Vec<V3>,
@@ -1101,7 +984,7 @@ fn make_head_frame(family: &str, stage: &str, id: &Identity, srf: &Surface) -> H
         brows: [[V3::zeros(); 2]; 2],
         hairline: Vec::new(),
         chin: V3::zeros(),
-        ears: srf.ears,
+        ears: super::ear::ears(family, stage).boxes(),
         samples,
         normals: srf.head_normals.clone(),
         tris: srf.head_tris.clone(),

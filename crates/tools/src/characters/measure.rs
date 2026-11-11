@@ -1,8 +1,9 @@
 //! `cargo characters ratios`: the proportions of every body as built, and its ear, beside a real adult's,
-//! to tune `rig.rs`, the hands and feet and the ears (head.rs) by (docs/review/residents.md, M-residents-01). Reads the generator,
+//! to tune `rig.rs`, the hands and feet and the ears (ear.rs) by (docs/review/residents.md, M-residents-01). Reads the generator,
 //! not a built set, so it shows a change before the build.
 
 use super::body::{self, region};
+use super::ear::ears;
 use super::head::head_frame;
 use super::rig::{FAMILIES, STAGES, b, proportions};
 use super::v3;
@@ -99,41 +100,34 @@ pub fn print() {
     );
 }
 
-/// One body's right ear as drawn: how high and how wide (front to back) it is and how far it stands off
-/// the head beside it (mm), its top, its bottom and the eyes above the chin (shares of the head's height),
-/// and how many corners of its triangles are shaded as facing away from the triangle (the skin folded
-/// over itself there: none, on an ear that is sound).
+/// One body's right ear as drawn (ear.rs; what of it stands out of the head): how high and how wide (front
+/// to back) it is and how far it stands off the head beside it (mm), its top, its bottom and the eyes above
+/// the chin (shares of the head's height), and how many corners of its triangles are shaded as facing away
+/// from the triangle (none, on an ear that is sound; triangles wholly in the head, which never show, aside).
 pub fn ear(family: &str, stage: &str) -> [f64; 7] {
     let h = head_frame(family, stage);
-    let s = body::surface(family, stage);
-    let r = region("ear");
-    let own: Vec<_> = s
-        .pos
-        .iter()
-        .zip(&s.region)
-        .filter(|(v, w)| v.x > 0.0 && w[r] > 0.5)
-        .map(|(v, _)| *v)
-        .collect();
+    let ears = ears(family, stage);
+    let m = &ears.full[1].mesh;
+    let off: Vec<f64> = m.pos.iter().map(|&v| h.sdf(v)).collect();
     let span = |k: usize| {
-        own.iter()
-            .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), v| {
+        m.pos
+            .iter()
+            .zip(&off)
+            .filter(|(_, d)| **d > 0.0)
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), (v, _)| {
                 (lo.min(v[k]), hi.max(v[k]))
             })
     };
     let (y, z) = (span(1), span(2));
     let mut turned = 0;
-    for t in body::tris(family).chunks(3) {
-        if !t.iter().any(|&i| s.region[i][r] > 0.05 && s.pos[i].x > 0.0) {
+    for t in m.idx.chunks(3) {
+        if t.iter().all(|&i| off[i] < 0.0) {
             continue;
         }
-        let face = (s.pos[t[1]] - s.pos[t[0]]).cross(&(s.pos[t[2]] - s.pos[t[0]]));
-        turned += t.iter().filter(|&&i| s.nor[i].dot(&face) < 0.0).count();
+        let face = (m.pos[t[1]] - m.pos[t[0]]).cross(&(m.pos[t[2]] - m.pos[t[0]]));
+        turned += t.iter().filter(|&&i| m.nor[i].dot(&face) < 0.0).count();
     }
-    // (The head beside the ear: its skin without the ears.)
-    let out = own
-        .iter()
-        .map(|&v| h.sdf(v))
-        .fold(f64::NEG_INFINITY, f64::max);
+    let out = off.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     [
         (y.1 - y.0) * 1000.0,
         (z.1 - z.0) * 1000.0,
