@@ -45,9 +45,9 @@ export const LAWN_MAP = tuned('ground', {
   roughPatch: 1.3,
   stripes: 0.12,
   stripeWidth: 1,
-  wall: 0,
-  shade: 0,
-  fence: 0,
+  wall: 0.8,
+  shade: 0.3,
+  fence: 0.5,
   lush: 0.8,
   fenceRough: 0.6,
   door: 0,
@@ -58,7 +58,7 @@ export const LAWN_MAP = tuned('ground', {
   bed: 0,
   trunk: 0,
   ring: 1,
-  crown: 0,
+  crown: 0.6,
 });
 
 /** Things that wear or cover the lawn, by their kind's id: bare earth under them (a share of `LAWN_MAP`'s), and whether a tree. */
