@@ -11,12 +11,13 @@
  *     one build in the variants of `play-variants.json`'s group, each a `?tune=` (dev server only, `web/src/render/tune.ts`),
  *     on the group's poses, and a sheet per pose with the variants side by side under their names (`<out>/sheets`).
  *     `--low` adds low/webgl; `--with` is a tune every variant starts from; `--poses a,b` instead of the group's.
+ *     A variant whose folder already holds pictures is not shot again (a variant added to a sheet); `--again` shoots all.
  *
  * Needs what `render.mjs` needs (the wasm packages, Playwright).
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tile } from './sheet.mjs';
@@ -35,6 +36,9 @@ const out = flag('out', join(ROOT, 'bench-results', `play-${group ?? 'set'}-${st
 const COMBOS = [['medium', 'webgpu'], ...(group && !args.includes('--low') ? [] : [['low', 'webgl']])];
 const shots = (dir, poses, extra) => COMBOS.map(([preset, backend]) => ['--shots', dir, '--poses', poses, '--presets', preset, '--backends', backend, '--port', port, ...(extra ? ['--extra', extra] : [])]);
 
+/** A variant's folder: its name without what a path can't hold. */
+const dirOf = (name) => join(out, name.replace(/[^\w.-]+/g, '-').replace(/^-|-$/g, ''));
+
 let jobs;
 let variants = [];
 if (group) {
@@ -46,7 +50,8 @@ if (group) {
   }
   const base = flag('with', '');
   variants = Object.entries(g.variants);
-  jobs = variants.flatMap(([name, tune]) => shots(join(out, name), flag('poses', g.poses.join(',')), [base, tune].filter(Boolean).join(';') && `tune=${[base, tune].filter(Boolean).join(';')}`));
+  const shot = (name) => !args.includes('--again') && existsSync(dirOf(name)) && readdirSync(dirOf(name)).some((f) => f.endsWith('.png'));
+  jobs = variants.filter(([name]) => !shot(name)).flatMap(([name, tune]) => shots(dirOf(name), flag('poses', g.poses.join(',')), [base, tune].filter(Boolean).join(';') && `tune=${[base, tune].filter(Boolean).join(';')}`));
 } else {
   jobs = shots(out, flag('poses', 'play'), '');
 }
@@ -55,7 +60,7 @@ const file = join(out, 'jobs.json');
 writeFileSync(file, JSON.stringify(jobs, null, 1));
 const run = spawnSync('bun', [join(ROOT, 'tools/bench/render.mjs'), '--jobs', file], { stdio: 'inherit' });
 if (group) {
-  const n = await tile(variants.map(([name]) => join(out, name)), variants.map(([name]) => name), join(out, 'sheets'));
+  const n = await tile(variants.map(([name]) => dirOf(name)), variants.map(([name]) => name), join(out, 'sheets'));
   console.log(`${n} sheets in ${join(out, 'sheets')}`);
 }
 process.exit(run.status ?? 1);

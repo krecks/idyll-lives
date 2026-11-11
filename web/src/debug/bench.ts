@@ -28,6 +28,7 @@
  */
 
 import { host } from '../game/host';
+import { whenStreamSettled } from '../assets/stream';
 import { deleteSave } from '../persistence/saves';
 import type { FrameCounts, Renderer, RenderPassInfo } from '../render/types';
 import { settings, unsavedSettings } from '../settings/settings.svelte';
@@ -98,6 +99,8 @@ function roamPose(t: number, b: { x0: number; z0: number; x1: number; z1: number
 const START_ALPHA = -Math.PI * 0.62;
 /** Longest wait for the game to start (loading, shaders). */
 const START_LIMIT_MS = 120_000;
+/** Longest wait, before a picture, for the town's files to arrive and for what they hold to be built. */
+const SETTLE_LIMIT_MS = 60_000;
 
 interface Stats {
   avg: number;
@@ -291,6 +294,13 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
 
   try {
     await sleep(b.warmup * 1000);
+    // A picture waits for the town's files and for what is built from them (a measurement keeps its timing).
+    if (frozen) {
+      await Promise.race([whenStreamSettled(), sleep(SETTLE_LIMIT_MS)]);
+      const until = performance.now() + SETTLE_LIMIT_MS;
+      while (renderer.benchInfo().building && performance.now() < until) await sleep(250);
+      await renderer.framesRendered(3);
+    }
     if (b.cam === 'town') await showTown(renderer, (b.hour ?? 13) * 60);
     window.__benchReady = true;
     // The measured stretch.
