@@ -88,8 +88,13 @@ export { PLAYBACK_RATE, QUIET_SPEED } from '../gameSpeed';
 
 /** The key suffix of a body's quilt draped over it curled up (`blankets`). */
 const CURL = ':curl';
-/** How far (m) a curled-up sleeper's quilt reaches past the feet (`quiltGeometry`). */
-const CURL_PAST = 0.06;
+/**
+ * A curled-up sleeper's quilt (`quiltGeometry`), a throw over them on a sofa: how far (m) it reaches past the feet,
+ * how far its sides hang down (just over the seat cushion's front edge, not to the floor), and how far past the
+ * neck its top edge is, towards the head (the shoulders and the arm over them under it, the head out), lying over
+ * the shoulder rather than tucked down.
+ */
+const CURL_QUILT = { past: 0.06, drop: 0.14, neck: -0.06 };
 export { MAX_CHARACTERS } from './rig';
 export { EXPRESSIONS, FRIENDLY, STANCE, type StageDirection } from './expressions';
 export type { Face } from './face';
@@ -4534,9 +4539,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /** A body's quilt (`blankets`), draped over its lying pose (`curl`: its curled-up one), every row's instance hidden. */
-  private addQuilt(body: BodyData, lying: { positions: Float32Array; chestZ: number; feetZ: number }, curl = ''): void {
-    // (Curled up, on a sofa: ending just past the knees and feet, inside its arm, not stretched to the bed's end.)
-    const geometry = quiltGeometry(lying.positions, lying.chestZ, lying.feetZ, curl ? CURL_PAST : undefined);
+  private addQuilt(body: BodyData, lying: { positions: Float32Array; chestZ: number; feetZ: number; neckZ: number }, curl = ''): void {
+    // (Curled up, on a sofa: up to the neck, ending just past the knees and feet, inside its arm, not stretched to the
+    // bed's end, and hanging just over the seat's front edge: `CURL_QUILT`.)
+    const geometry = curl
+      ? quiltGeometry(lying.positions, lying.neckZ + CURL_QUILT.neck, lying.feetZ, CURL_QUILT.past, CURL_QUILT.drop, false)
+      : quiltGeometry(lying.positions, lying.chestZ, lying.feetZ);
     const matrices = new Float32Array(MAX_CHARACTERS * 16);
     const ext = new Float32Array(MAX_CHARACTERS * 2);
     const tint = new Float32Array(MAX_CHARACTERS * 3);

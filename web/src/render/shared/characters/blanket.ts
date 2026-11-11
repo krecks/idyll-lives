@@ -38,9 +38,11 @@ export interface QuiltGeometry {
 /**
  * Builds the quilt from lying-pose vertex positions (x, y above the mattress, z; scale 1).
  * `chestZ` is where the top edge goes (just below the armpits), `feetZ` the tips of the toes; `past`, how far
- * (m) the quilt reaches past them (a curled-up sleeper's on a sofa: short of its arm).
+ * (m) the quilt reaches past them, and `drop`, how far its sides and foot end hang down past the top (a
+ * curled-up sleeper's throw on a sofa: short of its arm, and just over the seat cushion's front edge); `tucked`, its
+ * top edge tucked down to the mattress (a bed's), else lying over the body there (a throw pulled up to the neck).
  */
-export function quiltGeometry(lying: Float32Array, chestZ: number, feetZ: number, past = STRETCH): QuiltGeometry {
+export function quiltGeometry(lying: Float32Array, chestZ: number, feetZ: number, past = STRETCH, drop = DROP, tucked = true): QuiltGeometry {
   const topZ = chestZ;
   const toeZ = feetZ + 0.03;
   const footZ = feetZ + past;
@@ -142,10 +144,10 @@ export function quiltGeometry(lying: Float32Array, chestZ: number, feetZ: number
       const gi = c - 2;
       const gj = r - 1;
       let y = hAt(gi, gj);
-      const sideDrop = c === 0 || c === W - 1 ? DROP : c === 1 || c === W - 2 ? 0.05 : 0;
-      const footDrop = r === D - 1 ? DROP : r === D - 2 ? 0.05 : 0;
+      const sideDrop = c === 0 || c === W - 1 ? drop : c === 1 || c === W - 2 ? 0.05 : 0;
+      const footDrop = r === D - 1 ? drop : r === D - 2 ? 0.05 : 0;
       y -= Math.max(sideDrop, footDrop);
-      if (r === 0) y = 0.012; // thick top edge, tucked to the mattress
+      if (r === 0) y = tucked ? 0.012 : y * 0.35; // thick top edge, tucked to the mattress (or sagging over the shoulder)
       const k = r * W + c;
       pos[k * 3] = xs[c];
       pos[k * 3 + 1] = y;
