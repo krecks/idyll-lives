@@ -96,6 +96,22 @@ export const SOFT_LOOK: ShaderFeature = {
 		dDiffuseLight *= litArgs_ao / max(gameContact, 0.001);
 	#endif
 	dDiffuseLight *= mix(1.0, gameContact, ${CONTACT_DIRECT});
+	// Contact shading is for the light that falls on a surface. The engine dims the highlights and the
+	// reflections by it too (its occlusion, where a material's dims them): they get theirs back, or a tap
+	// or a towel rail a hand from the wall, which is all reflection, goes black.
+	#ifdef LIT_SSAO
+		#if LIT_OCCLUDE_SPECULAR == AO
+			#ifndef LIT_OCCLUDE_SPECULAR_FLOAT
+				float gameUncontact = 1.0 / max(gameContact, 0.05);
+				#ifdef LIT_SPECULAR
+					dSpecularLight *= gameUncontact;
+				#endif
+				#ifdef LIT_REFLECTIONS
+					dReflection.rgb *= gameUncontact;
+				#endif
+			#endif
+		#endif
+	#endif
 	// The lights' highlights at the look's strength: PlayCanvas's light is the look's / π (its Lambert
 	// has no 1 / π, \`lightUnits.ts\` \`SUN_UNITS\`), but its GGX keeps the 1 / π (\`SPECULAR_UNITS\`).
 	#ifdef LIT_SPECULAR
@@ -168,6 +184,19 @@ export const SOFT_LOOK: ShaderFeature = {
 		dDiffuseLight = dDiffuseLight * (litArgs_ao / max(gameContact, 0.001));
 	#endif
 	dDiffuseLight = dDiffuseLight * mix(1.0, gameContact, ${CONTACT_DIRECT});
+	#ifdef LIT_SSAO
+		#if LIT_OCCLUDE_SPECULAR == AO
+			#ifndef LIT_OCCLUDE_SPECULAR_FLOAT
+				let gameUncontact = 1.0 / max(gameContact, 0.05);
+				#ifdef LIT_SPECULAR
+					dSpecularLight = dSpecularLight * gameUncontact;
+				#endif
+				#ifdef LIT_REFLECTIONS
+					dReflection = vec4f(dReflection.rgb * gameUncontact, dReflection.a);
+				#endif
+			#endif
+		#endif
+	#endif
 	// The lights' highlights at the look's strength (see the GLSL).
 	#ifdef LIT_SPECULAR
 		dSpecularLight = dSpecularLight * ${SPECULAR_UNITS};
