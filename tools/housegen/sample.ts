@@ -4,8 +4,9 @@
  * (`cargo test -p sim-core --test sim generated_houses:: -- --ignored`, reading HOUSES).
  *
  * Each house is furnished for one of a few households in turn (empty, a couple, two friends, a
- * family) and checked here against them all: the same layout for each, beds enough, no toys
- * without children, no bathroom off the room the front door opens into, the front door into a
+ * family, a couple and a teenager) and checked here against them all: the same layout for each,
+ * beds enough, no toys without children nor any no child there may use, a child's bed every
+ * child there may sleep in, no bathroom off the room the front door opens into, the front door into a
  * shared room, no way through a bathroom, a laundry or a bedroom, and a lot cut to fit the house
  * (the garden sizes in turn) that it covers no more and no less of than `COVER` says. Each house
  * is priced as the game prices a home (`price.ts`, furnished for nobody): the prices by house
@@ -49,7 +50,8 @@ const households: [string, Residents | undefined][] = [
   ['empty', undefined],
   ['couple', { couples: 1, adults: 0, children: 0, babies: 0 }],
   ['friends', { couples: 0, adults: 2, children: 0, babies: 0 }],
-  ['family', { couples: 1, adults: 0, children: 2, babies: 0 }],
+  ['family', { couples: 1, adults: 0, children: 2, babies: 0, stages: ['child', 'child'] }],
+  ['teenager', { couples: 1, adults: 0, children: 1, babies: 0, stages: ['teen'] }],
 ];
 const problems: string[] = [];
 const kidsOnly = cfg.residents?.kidsOnly;
@@ -68,6 +70,15 @@ function check(h: HouseTemplate, who: Residents | undefined): string[] {
   const all = [...h.objects, ...(h.upper?.objects ?? []), ...(h.basement?.objects ?? [])];
   const kids = !!who && who.children + who.babies > 0;
   if (!kids && all.some((o) => forKids(o.def))) out.push(`things for children: ${[...new Set(all.filter((o) => forKids(o.def)).map((o) => o.def))].join(', ')}`);
+  // Nothing for children no child here may use (the race car bed and the toy box for a teenager).
+  const stages = who?.stages ?? [];
+  const fits = (def: string, stage: string) => info(def)?.usedBy?.includes(stage) ?? true;
+  const unfit = (def: string) => forKids(def) && !who?.babies && stages.length > 0 && !stages.some((s) => fits(def, s));
+  if (all.some((o) => unfit(o.def))) out.push(`things for children nobody here may use: ${[...new Set(all.filter((o) => unfit(o.def)).map((o) => o.def))].join(', ')}`);
+  // A child's bed is for every child here.
+  const childBeds = all.filter((o) => isBed(o.def) && (cfg.residents?.beds.child ?? []).includes(o.def));
+  const tooSmall = childBeds.filter((o) => stages.some((s) => !fits(o.def, s)));
+  if (tooSmall.length) out.push(`a child's bed a child here may not sleep in: ${[...new Set(tooSmall.map((o) => o.def))].join(', ')}`);
   if (who) {
     const beds = all.filter((o) => isBed(o.def));
     const doubles = beds.filter((o) => (byId.get(o.def)?.slots ?? 1) >= 2).length;
