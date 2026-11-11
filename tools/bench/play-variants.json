@@ -1,4 +1,18 @@
 {
+  "ground": {
+    "poses": [
+      "day-home-13",
+      "day-east-16",
+      "day-north-16",
+      "street-day"
+    ],
+    "variants": {
+      "one green (before 2026-11-11 evening)": "ground.stripes:0;ground.patchTone:0,0;ground.dry:0;ground.wall:0;ground.shade:0;ground.fence:0;ground.fenceRough:0;ground.door:0;ground.gate:0;ground.path:0;ground.play:0;ground.seat:0;ground.bed:0;ground.trunk:0;ground.crown:0;lawn.under:0.68;lawn.root:0.7;lawn.tip:1.15;lawn.soften:0;lawn.mown:0;lawn.rough:1,1,1;flowers.dense:0;flowers.single:0.06",
+      "calm at a pixel, lots mown": "ground.stripes:0;ground.patchTone:0,0;ground.dry:0;ground.wall:0;ground.shade:0;ground.fence:0;ground.fenceRough:0;ground.door:0;ground.gate:0;ground.path:0;ground.play:0;ground.seat:0;ground.bed:0;ground.trunk:0;ground.crown:0",
+      "and patches": "ground.stripes:0;ground.wall:0;ground.shade:0;ground.fence:0;ground.door:0;ground.gate:0;ground.path:0;ground.play:0;ground.seat:0;ground.bed:0;ground.trunk:0;ground.crown:0",
+      "and stripes, a dark foot, worn earth (as it is)": ""
+    }
+  },
   "lawn": {
     "poses": [
       "play-day",

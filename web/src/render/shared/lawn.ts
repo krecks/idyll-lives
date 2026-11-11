@@ -29,7 +29,7 @@ import { tuned } from '../tune';
  * neither to full either way).
  *
  * `patch`, `patchTone`: the tone patches' two sizes (m across) and strengths; `drySpan`, `dry`: the dry
- * patches' size and strength. `roughPatch`: how much stronger both are on rough land. `stripes`: a mown
+ * patches' size and strength, and `dryTone` how much lighter a dry patch is (darker a lush one). `roughPatch`: how much stronger both are on rough land. `stripes`: a mown
  * lot's stripes, `stripeWidth` tiles wide each. `wall`, `shade`, `fence`: the darker foot of a wall, more
  * on its shaded side (and half of it a tile further out), and of a fence or hedge; `lush`: how much lusher
  * the grass is there, as a share of how much darker. `fenceRough`: how rough the grass at a fence's foot.
@@ -39,9 +39,10 @@ import { tuned } from '../tune';
  */
 export const LAWN_MAP = tuned('ground', {
   patch: [10, 3.7],
-  patchTone: [0.6, 0.3],
+  patchTone: [0.35, 0.3],
   drySpan: 13,
-  dry: 0.75,
+  dry: 0.9,
+  dryTone: 0.25,
   roughPatch: 1.3,
   stripes: 0.12,
   stripeWidth: 1,
@@ -105,6 +106,8 @@ function baseMap(world: WorldStructure, tw: number, td: number): Uint8Array {
       const [bx, bz] = [px * 0.469 + pz * 0.883, -px * 0.883 + pz * 0.469];
       let tone = ((valueNoise(ax / a, az / a, seed + 401) - 0.5) * 2 * M.patchTone[0] + (valueNoise(bx / b + 7.3, bz / b - 2.1, seed + 402) - 0.5) * 2 * M.patchTone[1]) * more;
       const dry = (valueNoise(bx / M.drySpan - 3.7, az / M.drySpan + 9.2, seed + 403) - 0.5) * 2 * M.dry * more;
+      // (Dry grass is paler: a patch then reads as grass of another kind, not as a shadow on it.)
+      tone += dry * M.dryTone;
       const way = stripes[on];
       if (way) tone += (Math.floor((way === 1 ? z : x) / stripeWidth) % 2 ? 1 : -1) * M.stripes;
       base[o + TONE] = edge ? 128 : signed(tone);

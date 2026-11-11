@@ -101,7 +101,7 @@ const LAWN = tuned('lawn', {
   gust: 0.08,
   grade: { saturation: 0.88, value: 0.95, maxRG: 0.8 },
   tone: 0.5,
-  dryTint: [0.16, 0.03, -0.1],
+  dryTint: [0.22, 0.05, -0.13],
   rough: [0.78, 0.88, 0.68],
   mown: 1,
   earth: [0.2, 0.14, 0.075],
@@ -414,8 +414,8 @@ ${windDecl}
 			#else
 				${d('ggSpeck', 'float')} = 1.0;
 			#endif
-			${grade('dAlbedo', 'ggLawn', 'ggGrade')}
 			${mapped('dAlbedo', 'ggMap', 'ggLand')}
+			${grade('dAlbedo', 'ggLawn', 'ggGrade')}
 			dAlbedo = dAlbedo * (1.0 - ggLawn * ${f(1 - LAWN.far)} - ggCov * (1.0 - ggEarth) * ggNear * ${f(LAWN.far - LAWN.under)}) * (1.0 + (ggGust - ${f(calm)}) * ${f(0.65 * LAWN.gust)} * ggLawn);
 			// Bare earth where the lawn is worn away.
 			dAlbedo = mix(dAlbedo, ${list(LAWN.earth)} * ggSpeck, ggEarth);
