@@ -14,6 +14,7 @@ import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
 import { fbm, hash, mulberry32, smoothstep, valueNoise } from '../../game/noise';
+import { tuned } from '../tune';
 import { shareAt, ZoneField } from './zones';
 
 /**
@@ -797,7 +798,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         const n = rand() < 0.5 ? 2 : 1;
         for (let k = 0; k < n * TUFT_DRAWS; k++) rand();
         // (A big world's water is on its tiles: no flowers in it.)
-        if (rand() < 0.06 && !(this.zones && this.waterEdge(x + 0.5, z + 0.5) > -BEACH * 0.6)) {
+        // In drifts a few metres across, as daisies and clover grow, with a single one here and there between them.
+        const drift = smoothstep(FLOWER_DRIFTS.from, FLOWER_DRIFTS.full, valueNoise(x / FLOWER_DRIFTS.span, z / FLOWER_DRIFTS.span, this.seed + 421));
+        if (rand() < FLOWER_DRIFTS.single + FLOWER_DRIFTS.dense * drift && !(this.zones && this.waterEdge(x + 0.5, z + 0.5) > -BEACH * 0.6)) {
           flowers.push(scatter(x, z, rand, 0.8 + rand() * 0.5));
           flowerTiles.push(i);
         }
@@ -833,6 +836,13 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
 // ---- Garden dressing ------------------------------------------------------------------
 
 export type Decor = [number, number, number, number][];
+
+/**
+ * The lawn's flowers in drifts: the noise they follow (`span` m a cell), its values where a drift begins and is
+ * full, the share of tiles with a flower in a full drift and between drifts. A little fewer in all than when
+ * six tiles in a hundred had one, wherever they were (the noise is over `from` on about a third of the land).
+ */
+const FLOWER_DRIFTS = tuned('flowers', { span: 6, from: 0.6, full: 0.76, dense: 0.22, single: 0.006 });
 
 /** Clear distances for lot trees (trunk to edge, metres). */
 const TREE_CLEAR = { street: 3.0, path: 1.3, house: 2.2, object: 1.0 };
