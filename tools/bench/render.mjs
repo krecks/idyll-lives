@@ -26,7 +26,8 @@
  *     --extra 'k=v&k=v'        more URL flags for every run
  *     --out <dir>              default <repo>/bench-results/<time>/
  *   --shots <dir>              fixed poses, paused (`diag=freeze`, `hud=0`): one PNG per preset × backend × pose
- *     --poses orbit-day-0,…    which (`POSES`; `play`: the play set, the pictures a change to the look is judged by)
+ *     --poses orbit-day-0,…    which (`POSES`; `play`: the play set, the pictures a change to the look is judged by;
+ *                              `day`: the day set, the play camera over three homes at three hours of the day)
  *     --pages [gallery,…]      with --shots: the dev pages instead (`PAGES`: the gallery, clips, residents and
  *                              poses benches, each held still), one PNG per page × backend × diag
  *   --compare <dirA> <dirB>    pixel differences between two shot folders (and `--out` for the difference images)
@@ -104,11 +105,26 @@ const POSES = {
   'street-day': 'cam=street&hour=13&walls=up',
   'street-night': 'cam=street&hour=21&walls=up',
   'town-day': 'cam=town&hour=16.5',
+  // The day set (`--poses day`): the play camera by day over three homes of the scene, in the morning, at midday
+  // and in the late afternoon. `home` is the home lot (`day-home-13` is `play-day`, `day-back-13` is `play-day-b`:
+  // the same lot from its other side, the street in view); `east` a fuller house with shrubs at its foot, a hedge
+  // and trees; `north` a fenced lot with its drive, the street and a neighbour's house whole.
+  'day-home-9': 'cam=orbit&hour=9.5&at=0&beta=0.86',
+  'day-home-13': 'cam=orbit&hour=13&at=0&beta=0.86',
+  'day-home-16': 'cam=orbit&hour=16.5&at=0&beta=0.86',
+  'day-back-13': 'cam=orbit&hour=13&at=20&beta=0.86',
+  'day-east-9': 'cam=orbit&hour=9.5&at=0&beta=0.86&tx=34',
+  'day-east-13': 'cam=orbit&hour=13&at=0&beta=0.86&tx=34',
+  'day-east-16': 'cam=orbit&hour=16.5&at=0&beta=0.86&tx=34',
+  'day-north-13': 'cam=orbit&hour=13&at=0&beta=0.86&tz=-34',
+  'day-north-16': 'cam=orbit&hour=16.5&at=0&beta=0.86&tz=-34',
 };
 /** `--poses play`: the pictures a change to the look is judged by. */
 const PLAY = ['play-day', 'play-day-b', 'play-dusk', 'play-night', 'up-day', 'up-dusk', 'up-night', 'wide-day-0', 'wide-night-45', 'street-day', 'street-night', 'town-day'];
+/** `--poses day`: the play camera by day, where a change to the daytime look has to show. */
+const DAY = ['day-home-9', 'day-home-13', 'day-home-16', 'day-back-13', 'day-east-9', 'day-east-13', 'day-east-16', 'day-north-13', 'day-north-16', 'up-day'];
 /** Poses outside the default list. */
-const NAMED_ONLY = /^(mirror|play|up|street|town)-/;
+const NAMED_ONLY = /^(mirror|play|up|street|town|day)-/;
 
 /**
  * Dev pages for `--shots --pages`: each held still (no wind, clips at a set time, residents' time
@@ -460,7 +476,7 @@ function table(o, results) {
 
 async function shots(o) {
   const { backends, presets, diags, warmup, out } = o;
-  const poses = o.list('poses', Object.keys(POSES).filter((p) => !NAMED_ONLY.test(p)).join(',')).flatMap((p) => (p === 'play' ? PLAY : [p]));
+  const poses = o.list('poses', Object.keys(POSES).filter((p) => !NAMED_ONLY.test(p)).join(',')).flatMap((p) => (p === 'play' ? PLAY : p === 'day' ? DAY : [p]));
   for (const backend of backends) {
     for (const preset of presets) {
       for (const pose of poses) {
