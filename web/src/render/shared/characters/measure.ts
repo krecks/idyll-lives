@@ -27,10 +27,10 @@ export function outfitFit(set: CharacterSet, base: BodyData): OutfitFit {
 
 /**
  * The lying pose of a body (scale 1, slot frame: x across, y above the mattress, z towards the
- * feet), skinned on the CPU once for the blanket: the `lie` clip sleeping Sims play. Also returns
- * the chest line and the toes' z.
+ * feet), skinned on the CPU once for the blanket: the `lie` clip sleeping Sims play (or `clip`: `lieCurl`,
+ * curled up on a sofa). Also returns the chest line and the toes' z.
  */
-export function lyingPose(kit: PoseKit, body: BodyData): {
+export function lyingPose(kit: PoseKit, body: BodyData, clip = 'lie'): {
   positions: Float32Array;
   chestZ: number;
   feetZ: number;
@@ -40,7 +40,7 @@ export function lyingPose(kit: PoseKit, body: BodyData): {
   const NB = set.bones.length;
   const mats = new Float32Array(NB * 16);
   const head = new Float32Array(3);
-  sampleClip(set, set.clips.get('lie') ?? set.clips.get('idle')!, 0, kit.qA, kit.pA);
+  sampleClip(set, set.clips.get(clip) ?? set.clips.get('lie') ?? set.clips.get('idle')!, 0, kit.qA, kit.pA);
   resetAdditive(kit.add);
   const sp = Math.sin(-Math.PI / 4);
   const cp = Math.cos(-Math.PI / 4);

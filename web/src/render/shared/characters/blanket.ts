@@ -37,12 +37,13 @@ export interface QuiltGeometry {
 
 /**
  * Builds the quilt from lying-pose vertex positions (x, y above the mattress, z; scale 1).
- * `chestZ` is where the top edge goes (just below the armpits), `feetZ` the tips of the toes.
+ * `chestZ` is where the top edge goes (just below the armpits), `feetZ` the tips of the toes; `past`, how far
+ * (m) the quilt reaches past them (a curled-up sleeper's on a sofa: short of its arm).
  */
-export function quiltGeometry(lying: Float32Array, chestZ: number, feetZ: number): QuiltGeometry {
+export function quiltGeometry(lying: Float32Array, chestZ: number, feetZ: number, past = STRETCH): QuiltGeometry {
   const topZ = chestZ;
   const toeZ = feetZ + 0.03;
-  const footZ = feetZ + STRETCH;
+  const footZ = feetZ + past;
   const half = BLANKET_WIDTH / 2;
   const nx = Math.round(BLANKET_WIDTH / CELL) + 1;
   const nz = Math.round((footZ - topZ) / CELL) + 1;

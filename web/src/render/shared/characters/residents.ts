@@ -85,6 +85,11 @@ import { MOST_CADENCE, MOUNT_SECONDS, MOUNTS, type Mount, mountNodes } from './v
 import type { ResidentProp, ResidentView } from './view';
 
 export { PLAYBACK_RATE, QUIET_SPEED } from '../gameSpeed';
+
+/** The key suffix of a body's quilt draped over it curled up (`blankets`). */
+const CURL = ':curl';
+/** How far (m) a curled-up sleeper's quilt reaches past the feet (`quiltGeometry`). */
+const CURL_PAST = 0.06;
 export { MAX_CHARACTERS } from './rig';
 export { EXPRESSIONS, FRIENDLY, STANCE, type StageDirection } from './expressions';
 export type { Face } from './face';
@@ -295,13 +300,14 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** Scratch for `writeHeld`: a frame's axes and origin (x, y, z each). */
   private readonly frame3 = new Float32Array(12);
   /**
-   * Blankets: one quilt mesh per body (the base bodies', and each life stage's body as it loads, `addQuilt`);
-   * the covered Sims wearing that body packed afresh each frame into its drawn `matrices` (a matrix each) and
-   * `ext` (two numbers each), `drawn` of them (`writeBlanket`).
+   * Blankets: one quilt mesh per body (the base bodies', and each life stage's body as it loads, `addQuilt`),
+   * and one more draped over it curled up (`<body>:curl`, for a sofa slept on, `CURLED_BEDS`); the covered Sims
+   * wearing that body packed afresh each frame into its drawn `matrices` (a matrix each) and `ext` (two numbers
+   * each), `drawn` of them (`writeBlanket`).
    */
   private readonly blankets = new Map<
     string,
-    { quilt: Q; footZ: number; topZ: number; matrices: Float32Array; ext: Float32Array; tint: Float32Array; drawn: number; shown: number; base: boolean }
+    { quilt: Q; footZ: number; topZ: number; matrices: Float32Array; ext: Float32Array; tint: Float32Array; drawn: number; shown: number; base: boolean; body: string }
   >();
   /** The quilts' shared material is made (`ResidentView.quiltMaterial`), for the life stages' quilts made later. */
   private quilted = false;
@@ -524,7 +530,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const toeZ = Math.max(...lying.map((l) => l.feetZ)) + 0.03;
     this.view.quiltMaterial(toeZ, toeZ + 0.29);
     this.quilted = true;
-    for (const l of lying) this.addQuilt(l.body, l);
+    for (const l of lying) {
+      this.addQuilt(l.body, l);
+      this.addQuilt(l.body, lyingPose(this.kit, l.body, 'lieCurl'), CURL);
+    }
     this.view.createRing(this.ringMatrix);
     if (new URLSearchParams(location.search).has('debug')) {
       Object.assign(window, { __characters: this, __stance: STANCE, __friendly: FRIENDLY });
@@ -614,7 +623,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
           if (b && !this.sitPelvis.has(b.name)) this.measureBody(b);
           // Its own quilt, draped over its own lying pose: a child's feet stand up higher for its size than a
           // grown-up's quilt made smaller covers (their shoes showed through it halfway down the bed).
-          if (b && !this.blankets.has(b.name) && this.quilted) this.addQuilt(b, lyingPose(this.kit, b));
+          if (b && !this.blankets.has(b.name) && this.quilted) {
+            this.addQuilt(b, lyingPose(this.kit, b));
+            this.addQuilt(b, lyingPose(this.kit, b, 'lieCurl'), CURL);
+          }
         }
       }),
     );
@@ -876,13 +888,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const beds = world.objects.some((o) => BLANKET_BEDS.has(o.def));
     const bodies = new Set(this.sims.map((r) => r?.body.name));
     const rows = this.sims.length;
-    for (const [name, b] of this.blankets) {
+    for (const b of this.blankets.values()) {
       // `update` compacts the covered rows (a town of six must not draw 64 quilts' worth of triangles).
       // (With none, not drawn at all, rather than once as it is, at the origin.)
       b.shown = 0;
       this.view.quiltRows(b.quilt, 0, false);
       // (A life stage's quilt only where someone has that body: no draw call for nobody.)
-      this.view.quiltEnabled(b.quilt, rows > 0 && beds && (b.base || bodies.has(name)));
+      this.view.quiltEnabled(b.quilt, rows > 0 && beds && (b.base || bodies.has(b.body)));
     }
     this.view.uploadPoses();
     this.uploaded.set(this.data);
@@ -4448,9 +4460,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    * every resident in the town (and not the buffer's capacity).
    */
   private writeBlanket(rig: SimRig, i: number, pose: number, dt: number, fresh: boolean): void {
-    // Its body's own quilt (a life stage's, draped over its own pose), else its family's base body's.
-    const own = this.blankets.get(rig.body.name);
-    const blanket = own ?? this.blankets.get(rig.body.family);
+    // Its body's own quilt (a life stage's, draped over its own pose), else its family's base body's; curled up
+    // (on a sofa, `CURLED_BEDS`), the one draped over that.
+    const curl = rig.cur.key === 'lieCurl' ? CURL : '';
+    const own = this.blankets.get(rig.body.name + curl);
+    const blanket = own ?? this.blankets.get(rig.body.family + curl);
     if (!blanket) return;
     const bed = rig.bed;
     // Only once the body lies flat (the crossfade from sitting on the edge done): pulled up while the legs
@@ -4483,7 +4497,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // A body smaller than the one the quilt was made for (a child's with no quilt of its own yet): the quilt
     // shrunk to it along the body and in height, from its feet, so its head is out (the width stays the bed's).
     const zs = own ? s : s * rig.size;
-    const z0 = lieCentre(rig) - LIE_CENTRE * zs;
+    // (Moved along the bed with the body: `Bed.fwd`, and back to its middle on one lain on across.)
+    const z0 = lieCentre(rig) - LIE_CENTRE * zs + rig.bedFwd;
     // The quilt past the toes reaches the bed's foot end (local units, at the Sim's scale); tucked in, as close
     // as just past the toes.
     blanket.ext[d * 2] = clamp((foot - z0) / zs - blanket.footZ, tuck ? -0.3 : -0.22, 1.2);
@@ -4512,19 +4527,21 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const r = (bed.rot * Math.PI) / 2;
     const right = tuck ? tuck[1] : 0;
     m[o + 12] = x - fz * side + fx * z0 + Math.cos(r) * right;
-    m[o + 13] = rig.bedH + lift;
+    // (On its storey: a bed upstairs is the storey's floor up, `floorY`, as its sleeper is.)
+    m[o + 13] = rig.floorY + rig.bedH + lift;
     m[o + 14] = z + fx * side + fz * z0 - Math.sin(r) * right;
     m[o + 15] = 1;
   }
 
-  /** A body's quilt (`blankets`), draped over its lying pose, every row's instance hidden. */
-  private addQuilt(body: BodyData, lying: { positions: Float32Array; chestZ: number; feetZ: number }): void {
-    const geometry = quiltGeometry(lying.positions, lying.chestZ, lying.feetZ);
+  /** A body's quilt (`blankets`), draped over its lying pose (`curl`: its curled-up one), every row's instance hidden. */
+  private addQuilt(body: BodyData, lying: { positions: Float32Array; chestZ: number; feetZ: number }, curl = ''): void {
+    // (Curled up, on a sofa: ending just past the knees and feet, inside its arm, not stretched to the bed's end.)
+    const geometry = quiltGeometry(lying.positions, lying.chestZ, lying.feetZ, curl ? CURL_PAST : undefined);
     const matrices = new Float32Array(MAX_CHARACTERS * 16);
     const ext = new Float32Array(MAX_CHARACTERS * 2);
     const tint = new Float32Array(MAX_CHARACTERS * 3);
-    const quilt = this.view.createQuilt(`simBlanket:${body.name}`, geometry, matrices, ext, tint);
-    this.blankets.set(body.name, { quilt, footZ: geometry.footZ, topZ: geometry.topZ, matrices, ext, tint, drawn: 0, shown: 0, base: body.name === body.family });
+    const quilt = this.view.createQuilt(`simBlanket:${body.name}${curl}`, geometry, matrices, ext, tint);
+    this.blankets.set(body.name + curl, { quilt, footZ: geometry.footZ, topZ: geometry.topZ, matrices, ext, tint, drawn: 0, shown: 0, base: body.name === body.family, body: body.name });
   }
 
   /**

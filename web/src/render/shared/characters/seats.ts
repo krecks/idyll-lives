@@ -128,8 +128,14 @@ export const REST_BACK = 0.09;
  */
 export const FEET_UP = { heel: 0.14, edge: 0.03, ankle: 0.075, side: 0.3, reach: 0.995, near: 0.6, slide: 0.18, slouch: 1.4 };
 export const NO_FEET_UP = new Set(['music', 'meditate', 'toilet', 'bath', 'wash']);
-/** Beds whose sleepers get a blanket (pack hammocks, sofas and nap pods don't). */
-export const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'bedDouble', 'bedQueenUpholstered', 'bedCanopy', 'kidsBed', 'kidsBedCar', 'wallBed', 'bedDaybed']);
+/**
+ * The sofas slept on for the night by whoever has no bed (content `Sleep on the sofa`, `spare`): lain along the
+ * seat (`BEDS` `across`), the head at one arm, under a blanket tucked in between the back and the front and ending
+ * inside the arm (`tuck`, `foot`); curled up on a two-seater (`CURLED_BEDS`), at full length on a three-seater.
+ */
+export const SOFA_NIGHTS = ['sofa', 'loveseat', 'sofaDesign', 'sofaThree', 'sofaThreeSeat'];
+/** Beds whose sleepers get a blanket (pack hammocks and nap pods don't): the beds, and the sofas slept on for the night (content `spare`), a blanket pulled over them. */
+export const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'bedDouble', 'bedQueenUpholstered', 'bedCanopy', 'kidsBed', 'kidsBedCar', 'wallBed', 'bedDaybed', ...SOFA_NIGHTS]);
 /**
  * The part of a bed whose colour its sleepers' quilts take (`PlacedObject.quilt`): the one the player
  * paints as its "Bedding", else this (the futon's own quilt, a throw).
@@ -175,8 +181,8 @@ export function slingTop(sling: NonNullable<Bed['sling']>, d: number): number {
 export const LIE_ENTRY = 0.55;
 /** Getting into bed from its side (`sideIn`): how far in from its edge the hips sit down (body scale 1). */
 export const SIDE_IN = 0.2;
-/** Beds too short to lie on flat (a window seat's 1.3 m between its pillows): dozed on curled up on the side (`lieCurl`, clips/self.ts). */
-export const CURLED_BEDS = new Set(['gloomy.windowSeat']);
+/** Beds too short to lie on flat (a window seat's 1.3 m between its pillows, a two-seater sofa's 1.5 to 1.66 m between its arms): dozed or slept on curled up on the side (`lieCurl`, clips/self.ts). */
+export const CURLED_BEDS = new Set(['gloomy.windowSeat', 'sofa', 'loveseat', 'sofaDesign']);
 /** Beds lain on at full length on the side rather than the back (a daybed, a sofa by day: `lieSide`, clips/self.ts). */
 export const SIDE_BEDS = new Set(['bedDaybed']);
 /**
