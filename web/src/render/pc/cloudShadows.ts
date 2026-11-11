@@ -25,9 +25,9 @@ export const CLOUDS = tuned('clouds', {
   span: 380,
   cells: 12,
   cover: [0.55, 0.68],
-  strength: 0.7,
+  strength: 0.5,
   speed: 1.3,
-  at: [70, 20],
+  at: [85, 20],
 });
 
 /** Texels a side of the map. */

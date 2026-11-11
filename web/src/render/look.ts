@@ -84,9 +84,12 @@ export const LOOK: Look = tuned('look', {
     // Sunrise: a low peach sun, lavender ambient.
     { hour: 6.4, sun: 1.4, sunColor: '#FFB27A', sky: 0.22, skyColor: '#A6AAD8', groundColor: '#3E3C40', env: 0.36, clear: '#E2C0A8', zenith: '#4E6CB0', exposure: 1.16, lamps: 0.3 },
     { hour: 7.5, sun: 3.0, sunColor: '#FFDAB0', sky: 0.12, skyColor: '#B4C4E6', groundColor: '#5B5A48', env: 0.64, clear: '#DCDCD8', zenith: '#5C8ED6', exposure: 1.03, lamps: 0 },
-    { hour: 9.5, sun: 3.5, sunColor: '#FFEAD0', sky: 0.09, skyColor: '#B0C8EA', groundColor: '#5E6B3C', env: 0.78, clear: '#C8DAEE', zenith: '#4A84D0', exposure: 1.0, lamps: 0 },
-    { hour: 13, sun: 3.9, sunColor: '#FFF0D8', sky: 0.08, skyColor: '#A9C4E4', groundColor: '#5E6B3C', env: 0.82, clear: '#C9DDF0', zenith: '#3F7BCB', exposure: 0.95, lamps: 0 },
-    { hour: 16.5, sun: 3.5, sunColor: '#FFE4BE', sky: 0.09, skyColor: '#B8C6E6', groundColor: '#5E6340', env: 0.76, clear: '#D2DAE6', zenith: '#5486CC', exposure: 1.0, lamps: 0 },
+    // By day the sun is warm and strong and the sky's light less and bluer than the sky's picture gives it, so
+    // what the sun reaches and what only the sky reaches differ in colour, not only in how light they are
+    // (2026-11-12; the exposure a little up, so the picture is as light as it was).
+    { hour: 9.5, sun: 4.0, sunColor: '#FFDCA8', sky: 0.22, skyColor: '#7FA8FF', groundColor: '#5E6B3C', env: 0.62, clear: '#C8DAEE', zenith: '#4A84D0', exposure: 1.07, lamps: 0 },
+    { hour: 13, sun: 4.5, sunColor: '#FFE4BC', sky: 0.22, skyColor: '#7FA8FF', groundColor: '#5E6B3C', env: 0.66, clear: '#C9DDF0', zenith: '#3F7BCB', exposure: 1.0, lamps: 0 },
+    { hour: 16.5, sun: 4.0, sunColor: '#FFD294', sky: 0.22, skyColor: '#7FA8FF', groundColor: '#5E6340', env: 0.61, clear: '#D2DAE6', zenith: '#5486CC', exposure: 1.07, lamps: 0 },
     // Golden hour: golden (not red) low sun with long shadows; cool, neutral ambient.
     { hour: 18, sun: 3.3, sunColor: '#FFBF7A', sky: 0.12, skyColor: '#A4B4DE', groundColor: '#545A46', env: 0.64, clear: '#E2D4C2', zenith: '#5A80C4', exposure: 1.03, lamps: 0.05 },
     // Sunset: the sun deepens to orange only as it touches the horizon.

@@ -110,5 +110,36 @@
       "fewer, at 150 100": "clouds.cover:0.55,0.68;clouds.at:150,100",
       "fewer, at 240 180": "clouds.cover:0.55,0.68;clouds.at:240,180"
     }
+  },
+  "sunshade": {
+    "poses": [
+      "day-home-13",
+      "day-east-16",
+      "day-home-9",
+      "up-day"
+    ],
+    "variants": {
+      "now": "",
+      "K1 less sky, more and warmer sun, a blue fill": "key.9.5.env:0.56;key.9.5.sun:3.9;key.9.5.sky:0.3;key.9.5.skyColor:7FA8FF;key.9.5.sunColor:FFE2B8;key.13.env:0.59;key.13.sun:4.35;key.13.sky:0.3;key.13.skyColor:7FA8FF;key.13.sunColor:FFEACA;key.16.5.env:0.55;key.16.5.sun:3.9;key.16.5.sky:0.3;key.16.5.skyColor:7FA8FF;key.16.5.sunColor:FFD9A4",
+      "K2 more of the same": "key.9.5.env:0.48;key.9.5.sun:4.1;key.9.5.sky:0.38;key.9.5.skyColor:6F9CFF;key.9.5.sunColor:FFE2B8;key.13.env:0.51;key.13.sun:4.6;key.13.sky:0.38;key.13.skyColor:6F9CFF;key.13.sunColor:FFEACA;key.16.5.env:0.47;key.16.5.sun:4.1;key.16.5.sky:0.38;key.16.5.skyColor:6F9CFF;key.16.5.sunColor:FFD9A4",
+      "K3 K1 with more contrast and colour": "key.9.5.env:0.56;key.9.5.sun:3.9;key.9.5.sky:0.3;key.9.5.skyColor:7FA8FF;key.9.5.sunColor:FFE2B8;key.13.env:0.59;key.13.sun:4.35;key.13.sky:0.3;key.13.skyColor:7FA8FF;key.13.sunColor:FFEACA;key.16.5.env:0.55;key.16.5.sun:3.9;key.16.5.sky:0.3;key.16.5.skyColor:7FA8FF;key.16.5.sunColor:FFD9A4;look.contrast:1.16;look.saturation:18",
+      "K4 K1 as bright as now": "key.9.5.env:0.56;key.9.5.sun:3.9;key.9.5.sky:0.3;key.9.5.skyColor:7FA8FF;key.9.5.sunColor:FFE2B8;key.9.5.exposure:1.07;key.13.env:0.59;key.13.sun:4.35;key.13.sky:0.3;key.13.skyColor:7FA8FF;key.13.sunColor:FFEACA;key.13.exposure:1.02;key.16.5.env:0.55;key.16.5.sun:3.9;key.16.5.sky:0.3;key.16.5.skyColor:7FA8FF;key.16.5.sunColor:FFD9A4;key.16.5.exposure:1.07",
+      "K5 a warmer sun first, a little less sky": "key.9.5.env:0.62;key.9.5.sun:3.85;key.9.5.sky:0.22;key.9.5.skyColor:7FA8FF;key.9.5.sunColor:FFDFB0;key.9.5.exposure:1.03;key.13.env:0.66;key.13.sun:4.3;key.13.sky:0.22;key.13.skyColor:7FA8FF;key.13.sunColor:FFE8C4;key.13.exposure:0.98;key.16.5.env:0.61;key.16.5.sun:3.85;key.16.5.sky:0.22;key.16.5.skyColor:7FA8FF;key.16.5.sunColor:FFD69C;key.16.5.exposure:1.03",
+      "K6 warmer and stronger still": "key.9.5.env:0.62;key.9.5.sun:4.0;key.9.5.sky:0.22;key.9.5.skyColor:7FA8FF;key.9.5.sunColor:FFDCA8;key.9.5.exposure:1.02;key.13.env:0.66;key.13.sun:4.5;key.13.sky:0.22;key.13.skyColor:7FA8FF;key.13.sunColor:FFE4BC;key.13.exposure:0.97;key.16.5.env:0.61;key.16.5.sun:4.0;key.16.5.sky:0.22;key.16.5.skyColor:7FA8FF;key.16.5.sunColor:FFD294;key.16.5.exposure:1.02"
+    }
+  },
+  "clouds2": {
+    "poses": [
+      "day-home-16",
+      "day-back-13",
+      "day-east-13",
+      "day-north-16"
+    ],
+    "variants": {
+      "at 85 20": "clouds.at:85,20",
+      "at 55 20": "clouds.at:55,20",
+      "at 70 35": "clouds.at:70,35",
+      "at 70 5": "clouds.at:70,5"
+    }
   }
 }
