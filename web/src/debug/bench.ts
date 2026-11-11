@@ -162,8 +162,8 @@ declare global {
   }
 }
 
-/** The game's interface hidden (`hud=0`): the top bar and the household strip, what's over the world, the toasts. */
-const HUD_HIDDEN = '.hud-root, .world-overlay, .toast-layer { display: none !important; }';
+/** The game's interface hidden (`hud=0`): the top bar and the household strip, what's over the world, the toasts, the pill of what streams in. */
+const HUD_HIDDEN = '.hud-root, .world-overlay, .toast-layer, .stream { display: none !important; }';
 
 /** `hud=0` on a page that isn't the benchmark's (`?state=…&debug&hud=0`: pictures of the world for checks): the interface hidden. */
 export function hideHud(): void {
