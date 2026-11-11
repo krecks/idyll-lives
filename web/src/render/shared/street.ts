@@ -19,9 +19,12 @@
  *   (`lawnMask`). The menus' town (`pc/overview.ts`) draws every lot's things itself.
  * - Nothing on the viewed lot: the player builds there (the mailbox stands on the sidewalk). In
  *   the menus' town the player's lot (`WorldMeta.home`) gets its house as a shell dressed as the
- *   game builds it (no porch, chimney or garden dressing), and nothing else. Its garage, if the
- *   town gave it one (`WorldStructure.garages`), stands on it in the game too, drawn apart
- *   (`StreetPlan.lot`): it goes with the lot's ground while its basement is in view.
+ *   game draws it (its porch, no chimney or garden dressing), and nothing else. Its garage, if the
+ *   town gave it one (`WorldStructure.garages`), and its house's porch (over the front door the
+ *   garden path meets, as on every silhouette: `porchDoors`) stand on it in the game too, drawn
+ *   apart (`StreetPlan.lot`): they go with the lot's ground while its basement is in view, the
+ *   porch with its wall in the cutaway. A house looks the same from the street as in the game:
+ *   the lot's look on every storey, the roof the player chose.
  * - Fences: the world's (`shownFences`: the ones a town puts up round its gardens and fields,
  *   `game/gardenFences.ts`, the player's, and in an older town the ones it would have put up) on
  *   other lots, in their styles (`shared/fences.ts`), merged into each chunk's meshes, hedges with
@@ -368,7 +371,7 @@ export interface StreetSource {
 export interface StreetPlan {
   /** The neighbours' houses (`HousePlanner.silhouettes`). */
   silhouettes: SilhouettePlan;
-  /** Their wall boxes and garages, for what stands round them (x0, z0, x1, z1). */
+  /** Their wall boxes and garages, for what stands round them (x0, z0, x1, z1); the viewed lot's too (`dressingOnly`: its garage and porch). */
   specs: SilhouetteSpec[];
   /** Sidewalks and kerbs (the sidewalk surface, vertex-coloured). */
   walk: Geo;
@@ -381,11 +384,13 @@ export interface StreetPlan {
   /** Soft contact shadows (black, by vertex alpha). */
   shadows: Geo;
   /**
-   * The viewed lot's own (the game's): its garage and the garage's coach lamp (its cap, glass and
-   * pool of light), apart from the street's meshes so they hide with the lot's ground while its
-   * basement is in view. Null when it has no garage.
+   * The viewed lot's own (the game's): its garage and porch (`SilhouetteSpec.dressingOnly`) and
+   * their lamps (caps, glass and pools of light), apart from the street's meshes so they hide with
+   * the lot's ground while its basement is in view. The porch's lamps apart again (`porch`, with
+   * the cutaway's look bits that drop the porch's wall): they go with that wall. Null when it has
+   * no house and no garage.
    */
-  lot: { silhouettes: SilhouettePlan; props: Geo; glow: Geo; pools: Geo } | null;
+  lot: { silhouettes: SilhouettePlan; props: Geo; glow: Geo; pools: Geo; porch: { look: number; props: Geo; glow: Geo; pools: Geo } | null } | null;
   /** Instanced models in the order they're drawn: the foliage first, then props and things; `cast`: they cast shadows. */
   batches: [key: string, items: Inst[], cast: boolean][];
   /** Other lots' things: their footprints and the boxes they're drawn as without their files, by model key. */
@@ -528,7 +533,7 @@ const mix = (h: number, v: number) => Math.imul(h ^ (v | 0), 16777619);
 
 /**
  * The whole town's street, laid out once, view-independent, and planned per 64 m chunk for a focus
- * lot (`chunk`): the focus lot's house and garden are the game's own (only its garage here, apart in
+ * lot (`chunk`): the focus lot's house and garden are the game's own (only its garage and porch here, apart in
  * `lot`), and its fences the game's too (the world's fences round it are the same whichever lot is
  * the focus). Each part of the street (a plot, a road side's kerb, a chunk's fences) is planned on its own and kept, planned again only when what it
  * stands among changes (a thing moved near it, the focus next to it), so a focus change or an edit
@@ -1055,28 +1060,32 @@ export class TownStreet {
     let spec: SilhouetteSpec | null = null;
     let lot: StreetPlan['lot'] = null;
 
-    // ---- its house (the player's in the menus' town a shell; the viewed lot's only its garage) ----
+    // ---- its house (the player's in the menus' town a shell; the viewed lot's only its garage and porch) ----
     // (A garage the player built on their lot before any house: it stands there alone.)
     const lone = home && game && !L.house ? (this.garages.get(L.info.id) ?? null) : null;
     if ((kind === 'house' || kind === 'shop' || home) && (L.house || lone)) {
       const g = kind === 'shop' ? null : world.garages ? (this.garages.get(L.info.id) ?? null) : home ? null : this.legacyGarage(L, focus);
-      if (!(home && game && !g)) {
-        const [x0, z0, x1, z1] = L.info.house ?? [lone!.x0, lone!.z0, lone!.x1, lone!.z1];
-        const front: [number, number] = L.turned ? [-L.front, 0] : [0, L.front];
-        spec = { x0, z0, x1, z1, lot: L.info, home, garageOnly: home && game, front, door: L.door, garage: g, roof: L.plot.roof, storeys: L.plot.storeys, lived: kind === 'house' && this.options.lived };
-        // The openings on and round its walls, in the town's order (upstairs ones found on the ground's rows).
-        const openings = this.openingGrid
-          .near({ x: x0, z: z0, w: x1 - x0, d: z1 - z0 }, 2)
-          .sort((a, b) => a.i - b.i)
-          .map((e) => e.o);
-        const plan = this.planner.silhouettes([spec], openings, world);
-        if (spec.garageOnly) {
-          lot = { silhouettes: plan, props: new Geo(), glow: new Geo(), pools: new Geo() };
-          lamps(plan.lamps, new Painter(lot.props), new Painter(lot.glow), lot.pools);
-        } else {
-          silhouettes = plan;
-          lamps(plan.lamps, parts.props, parts.glow, parts.pools);
+      const [x0, z0, x1, z1] = L.info.house ?? [lone!.x0, lone!.z0, lone!.x1, lone!.z1];
+      const front: [number, number] = L.turned ? [-L.front, 0] : [0, L.front];
+      spec = { x0, z0, x1, z1, lot: L.info, home, dressingOnly: home && game, front, door: L.door, garage: g, roof: L.plot.roof, storeys: L.plot.storeys, lived: kind === 'house' && this.options.lived };
+      // The openings on and round its walls, in the town's order (upstairs ones found on the ground's rows).
+      const openings = this.openingGrid
+        .near({ x: x0, z: z0, w: x1 - x0, d: z1 - z0 }, 2)
+        .sort((a, b) => a.i - b.i)
+        .map((e) => e.o);
+      const plan = this.planner.silhouettes([spec], openings, world);
+      if (spec.dressingOnly) {
+        lot = { silhouettes: plan, props: new Geo(), glow: new Geo(), pools: new Geo(), porch: null };
+        // (The porch's lamps go with its wall in the cutaway: drawn apart, `pc/street.ts` `cutLot`.)
+        const porch = plan.lamps.filter((l) => l[5]);
+        if (porch.length) {
+          lot.porch = { look: porch[0][5]!, props: new Geo(), glow: new Geo(), pools: new Geo() };
+          lamps(porch, new Painter(lot.porch.props), new Painter(lot.porch.glow), lot.porch.pools);
         }
+        lamps(plan.lamps.filter((l) => !l[5]), new Painter(lot.props), new Painter(lot.glow), lot.pools);
+      } else {
+        silhouettes = plan;
+        lamps(plan.lamps, parts.props, parts.glow, parts.pools);
       }
     }
 

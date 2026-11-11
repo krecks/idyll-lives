@@ -1983,6 +1983,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (bits === this.cutLook) return;
     this.cutLook = bits;
     this.placing.cutWallItems(bits, this.shownWallMode === 'down'); // (things on the walls go with them, but the one in hand.)
+    this.street.cutLot(bits, this.shownWallMode === 'down'); // (and the porch's lamps.)
     this.lib.wallCut.look.set(bits & 1 ? 1 : 0, bits & 2 ? 1 : 0, bits & 4 ? 1 : 0, bits & 8 ? 1 : 0);
   }
 

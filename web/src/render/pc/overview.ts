@@ -2,7 +2,7 @@
  * The town overview behind the menus (main menu, new-game steps) on PlayCanvas: the whole
  * neighbourhood at once, drawn with the game's own builders so it looks like the game. Every house
  * is a dressed shell (`HouseBuilder.silhouetteMeshes` through `Street`: porches, chimneys, garages,
- * cars, fences, flower beds; the player's house, `WorldMeta.home`, dressed as the game builds it),
+ * cars, fences, flower beds; the player's house, `WorldMeta.home`, dressed as the game draws it: its porch and garage, no chimney),
  * with its models' far versions, plus the road, garden paths and fields and every outdoor object
  * (garden and park trees, benches, flower beds). No interiors, no residents.
  *

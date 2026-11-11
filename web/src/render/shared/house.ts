@@ -397,12 +397,15 @@ export interface SilhouetteSpec {
   z0: number;
   x1: number;
   z1: number;
-  /** Origin of the house's lot: its look (siding, roof, accent) is chosen from it, as for the game's house. */
+  /** Origin of the house's lot: its look (siding, roof, accent) is chosen from it, as for the game's house (every storey of it). */
   lot: { x: number; z: number };
-  /** The player's house, dressed as the game builds it (no porch or chimney; its garage). */
+  /** The player's house in the menus' town, dressed as the game draws it (its porch and garage; no chimney). */
   home?: boolean;
-  /** Only its garage: the game draws the house itself (the viewed lot's). */
-  garageOnly?: boolean;
+  /**
+   * Only what the game doesn't draw of it (the viewed lot's): its garage and its porch, the porch
+   * going with its wall in the cutaway (`porchDoors`); the game draws the house itself.
+   */
+  dressingOnly?: boolean;
   /** The street side: the outward normal (x, z) of the wall that faces the street ([0, 1]: the wall at z1, [-1, 0]: the wall at x0...). */
   front: [number, number];
   /** Centre of the front door along the front wall (x, or z on a wall along z), where the garden path meets the house, if known. */
@@ -422,8 +425,46 @@ export interface SilhouettePlan {
   parts: HousePart[];
   /** The window glass of each lived-in house (not in `parts`): drawn lit or dark (`neighbourPanes`). */
   homes: { spec: SilhouetteSpec; panes: Geo }[];
-  /** Porch and garage lamps: x, y, z and the wall's outward normal (nx, nz). */
-  lamps: [number, number, number, number, number][];
+  /**
+   * Porch and garage lamps: x, y, z and the wall's outward normal (nx, nz); a lamp on the viewed
+   * lot's porch also the cutaway's look bits (`LOOK`) that drop its wall, to hide it with it.
+   */
+  lamps: [number, number, number, number, number, number?][];
+}
+
+/** A front door a silhouette's porch stands over (`porchDoors`): its wall's axis, the wall's outer face, its outward normal and the door's middle along it. */
+export interface PorchDoor {
+  axis: 'h' | 'v';
+  plane: number;
+  n: V3;
+  mid: number;
+}
+
+/**
+ * Where a house's porches stand: over each door on its ground storey in the front wall of its box
+ * (`SilhouetteSpec.front`) that the garden path meets (`door`, its middle within 0.6 m). The same
+ * for a neighbour's silhouette and the viewed lot's house (`dressingOnly`): a door moved off the
+ * path, out of the front wall or taken out has none. `layout`: as for `silhouettes`.
+ */
+export function porchDoors(b: SilhouetteSpec, openings: readonly Opening[], layout: StoreyLayout | null = null): PorchDoor[] {
+  const out: PorchDoor[] = [];
+  if (b.door === null) return out;
+  const [fx, fz] = b.front;
+  const axis = fz ? 'h' : 'v';
+  const line = fz ? (fz > 0 ? b.z1 : b.z0) : fx > 0 ? b.x1 : b.x0;
+  const [a0, a1] = fz ? [b.x0, b.x1] : [b.z0, b.z1];
+  for (const o of openings) {
+    if (o.kind !== 'door' || o.axis !== axis || (layout && storeyOfRow(layout, o.z) !== 0)) continue;
+    const [at, a] = axis === 'h' ? [o.z, o.x] : [o.x, o.z];
+    if (at !== line || a < a0 || a >= a1 || Math.abs(a + 0.5 - b.door) >= 0.6) continue;
+    out.push({ axis, plane: line + (fz || fx) * T, n: [fx, 0, fz], mid: a + 0.5 });
+  }
+  return out;
+}
+
+/** The cutaway's look bits (`LOOK`) that drop a wall facing `n` outwards: the camera looking at it from outside. */
+function lookAt(n: V3): number {
+  return n[0] > 0 ? LOOK.NegX : n[0] < 0 ? LOOK.PosX : n[2] > 0 ? LOOK.NegZ : LOOK.PosZ;
 }
 
 /** Wall edges of the lot: `h` edges run along x at a grid line z, `v` edges along z. */
@@ -504,6 +545,11 @@ export interface HouseScheme {
   shutters: boolean;
   seedX: number;
   seedZ: number;
+}
+
+/** The origin of the lot a storey's view (`HousePlanner.build`'s, on that storey's rows) is of: on the ground's rows. */
+export function lotOrigin(world: StoreyLayout, view: { x: number; z: number }): { x: number; z: number } {
+  return { x: view.x, z: view.z - storeyRow(world, storeyOfRow(world, view.z)) };
 }
 
 export function houseScheme(x: number, z: number): HouseScheme {
@@ -712,8 +758,12 @@ export class HousePlanner {
         }
       }
     }
-    const viewed = view ? world.plots?.find((p) => p.x === view.x && p.z === view.z) : undefined;
-    const scheme = this.schemeWith(houseScheme(view?.x ?? 0, view?.z ?? 0), viewed?.roof);
+    // The lot's look (and the roof the player chose for it) on every storey: a storey's view lies on
+    // its own rows (`storeyRow`), so it is taken from the lot's origin on the ground's, as the
+    // street's silhouette of this house takes it (`silhouettes`, `farHouse`).
+    const lot = view && lotOrigin(world, view);
+    const viewed = lot ? world.plots?.find((p) => p.x === lot.x && p.z === lot.z) : undefined;
+    const scheme = this.schemeWith(houseScheme(lot?.x ?? 0, lot?.z ?? 0), viewed?.roof);
     // Open-plan rooms that mix kinds get the living-room look (wood floor).
     const kindOf = (r: number): RoomKind => {
       const defs = roomDefs.get(r);
@@ -1667,9 +1717,11 @@ export class HousePlanner {
   /**
    * Neighbouring houses as dressed boxes: the house's own doors and windows where they lie on
    * the box outline (framed, with muntins, curtains and shutters), corner boards, a porch with a
-   * gabled canopy over the front door, a chimney on some roofs, and a garage at the end of the
-   * driveway (the player's house in the menus' town gets none of those, as in the game). Each
-   * house's look comes from its lot's origin, as the game's house does. Returns the meshes (one per material for the whole street), the ones that cast
+   * gabled canopy over the front door (`porchDoors`), a chimney on some roofs, and a garage at the
+   * end of the driveway (the player's house in the menus' town gets no chimney, as in the game; the
+   * viewed lot's house only its garage and porch, `dressingOnly`). Each house's look comes from its
+   * lot's origin (and the roof the player chose), as the game's house does on every storey
+   * (`build`). Returns the meshes (one per material for the whole street), the ones that cast
    * shadows, and the porch / garage lamps for the street's night lighting.
    */
   /** `layout`: where each storey's rows of the lot are (openings upstairs are on theirs; see `storeyRow`). */
@@ -1726,8 +1778,13 @@ export class HousePlanner {
     for (const b of houses) {
       const s = this.schemeWith(houseScheme(b.lot.x, b.lot.z), b.roof);
       const walls = s.brick ? brick : siding;
-      if (b.garageOnly) {
+      // The porch over its front door; on the viewed lot's house it goes with its wall in the cutaway.
+      const porches = () => {
+        for (const d of porchDoors(b, openings, layout)) this.porch(d, s, walls, roof, trim, lamps, b.dressingOnly ? lookAt(d.n) : 0);
+      };
+      if (b.dressingOnly) {
         if (b.garage) garage(b, b.garage, s, walls);
+        porches();
         continue;
       }
       const panes = b.lived ? new Geo() : glass;
@@ -1796,10 +1853,9 @@ export class HousePlanner {
           board(a + 0.5 + 0.04, a + 1 - T - 0.1, 0.15, 0.95, 0.04);
           trim.color('#C8A64A').box(...span(o.axis, plane, n, a + 1 - T - 0.16, a + 1 - T - 0.1, 1.0, 1.06, 0.07));
           trim.color(TRIM);
-          const front = !b.home && b.door !== null && Math.abs(a + 0.5 - b.door) < 0.6 && n[0] === b.front[0] && n[2] === b.front[1];
-          if (front) this.porch(o.axis, plane, n, a + 0.5, s, walls, roof, trim, lamps);
         }
       }
+      porches();
       roof.color(s.roof);
       addRoofShaped({ x0: b.x0, z0: b.z0, x1: b.x1, z1: b.z1 }, s, roof, trim, walls, tall);
       if (hash(b.x0, b.z0, 8) < 0.6 && s.shape !== 'flat' && !b.roof && !b.home) this.chimney(b, s, brick, stone, tall);
@@ -1827,14 +1883,24 @@ export class HousePlanner {
     return { geo, name: lit ? 'silhouetteWindowsLit' : 'silhouetteWindowsDark', surface: { kind: 'neighbourGlass', lit }, cut: true, cast: false, roof: false, shadowOnly: false, glass: false };
   }
 
-  /** Landing, posts and a small gabled canopy over a front door; a lamp beside the door. */
-  private porch(axis: 'h' | 'v', plane: number, n: V3, mid: number, s: HouseScheme, walls: Geo, roof: Geo, trim: Geo, lamps: SilhouettePlan['lamps']): void {
+  /**
+   * Landing, posts and a small gabled canopy over a front door (`d`); a lamp beside the door. The
+   * canopy's ridge meets the wall at right angles and its gable end stands just inside the wall,
+   * so nothing of it shows indoors. `look` (the viewed lot's porch): the cutaway's look bits that
+   * drop the door's wall: the posts drop with it and the canopy and the lamp go (the landing stays).
+   */
+  private porch(d: PorchDoor, s: HouseScheme, walls: Geo, roof: Geo, trim: Geo, lamps: SilhouettePlan['lamps'], look = 0): void {
+    const { axis, plane, n, mid } = d;
     // Laid out along the wall (u) and out from it (v: z on a wall along x, x on one along z).
     const out = axis === 'h' ? n[2] : n[0];
     const box = (u0: number, y0: number, v0: number, u1: number, y1: number, v1: number, skip?: string) => {
       const [va, vb] = [Math.min(v0, v1), Math.max(v0, v1)];
       if (axis === 'h') trim.box(u0, y0, va, u1, y1, vb, skip);
       else trim.box(va, y0, u0, vb, y1, u1, skip);
+    };
+    /** What follows goes with the wall in the cutaway (`kind`), on the viewed lot; else it stays. */
+    const cut = (kind: number) => {
+      for (const g of [trim, roof, walls]) g.cutting(look ? kind : Cut.Keep, look || LOOK.All, look || LOOK.All);
     };
     const depth = 1.3;
     const half = 0.95;
@@ -1846,21 +1912,27 @@ export class HousePlanner {
     box(mid - half + 0.15, 0, z1, mid + half - 0.15, 0.025, z1 + out * 0.3, 'ny');
     const top = 2.34;
     trim.color(TRIM);
+    cut(Cut.Clamp);
     for (const x of [mid - half + 0.08, mid + half - 0.08]) {
       const zc = z1 - out * 0.08;
       box(x - 0.055, 0.05, zc - 0.055, x + 0.055, top, zc + 0.055);
       box(x - 0.08, 0.05, zc - 0.08, x + 0.08, 0.22, zc + 0.08);
     }
-    // The canopy runs into the wall so its ridge meets the house at right angles.
+    // The canopy from the posts back to the wall, its ridge out from it (the gable end a centimetre in).
+    cut(Cut.Hide);
+    walls.color(s.wall);
     roof.color(s.roof);
-    const [ca, cb] = [Math.min(z1, z0 - out * 0.9) + T, Math.max(z1, z0 - out * 0.9) - T];
+    const [ca, cb] = [Math.min(z1, z0 - out * 0.01) + T, Math.max(z1, z0 - out * 0.01) - T];
     const canopy = axis === 'h' ? { x0: mid - half + T, z0: ca, x1: mid + half - T, z1: cb } : { x0: ca, z0: mid - half + T, x1: cb, z1: mid + half - T };
-    addRoof(canopy, false, roof, trim, walls, top, 0.12);
+    addRoof(canopy, false, roof, trim, walls, top, 0.12, PITCH, axis === 'v');
     // The lamp on the side towards larger u (larger x on a wall along x, larger z on one along z).
-    lamps.push(axis === 'h' ? [mid + 0.72, 1.75, plane + out * 0.08, 0, out] : [plane + out * 0.08, 1.75, mid + 0.72, out, 0]);
+    const lamp: SilhouettePlan['lamps'][number] = axis === 'h' ? [mid + 0.72, 1.75, plane + out * 0.08, 0, out] : [plane + out * 0.08, 1.75, mid + 0.72, out, 0];
+    if (look) lamp[5] = look;
+    lamps.push(lamp);
     trim.color('#2E2E30');
     box(mid + 0.66, 1.62, plane, mid + 0.78, 1.66, plane + out * 0.05);
     trim.color(TRIM);
+    for (const g of [trim, roof, walls]) g.cutting(Cut.Keep);
   }
 
   /** A brick chimney through one roof slope near a gable end, with a stone cap, on a roof whose eaves are `base` high. */
@@ -2327,7 +2399,7 @@ function addFlatRoof(rect: { x0: number; z0: number; x1: number; z1: number }, r
 /**
  * Pitched roof over a rectangle of wall centre lines. The underside passes through the outer
  * top edge of the walls, so the eaves rest on them and overhang by `OVERHANG`; gable ends are
- * closed with wall cladding. The ridge runs along the longer side.
+ * closed with wall cladding. The ridge runs along the longer side (or as `ridgeAlongX` says).
  */
 export function addRoof(
   rect: { x0: number; z0: number; x1: number; z1: number },
@@ -2338,8 +2410,9 @@ export function addRoof(
   base = WALL_HEIGHT,
   overhang = OVERHANG,
   pitch = PITCH,
+  ridgeAlongX = rect.x1 - rect.x0 >= rect.z1 - rect.z0,
 ): void {
-  const alongX = rect.x1 - rect.x0 >= rect.z1 - rect.z0;
+  const alongX = ridgeAlongX;
   // Local frame: a = along the ridge, b = across. `P` maps back to world space.
   const A0 = (alongX ? rect.x0 : rect.z0) - T;
   const A1 = (alongX ? rect.x1 : rect.z1) + T;
