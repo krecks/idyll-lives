@@ -46,6 +46,12 @@ M = G.Palette(
     saddle=('#3A3530', 'satin'),
     # the city bike, the kids' bike and the e-scooter (with the rack's tyre, rim and saddle): all plain, one draw
     city=('#2F5D50', 'gloss'),           # the city bike's frame, carrier and chain guard
+    mtb=('#D9822B', 'gloss'),            # the mountain bike's frame
+    road=('#C8433A', 'gloss'),           # the road bike's frame
+    cargo=('#3E6F8E', 'gloss'),          # the cargo bike's frame and box
+    ebike=('#4C5866', 'gloss'),          # the e-bike's frame
+    battery=('#30343A', 'satin'),        # the e-bike's battery
+    motor=('#8E9499', 'metal'),          # its motor, the mountain bike's fork crown and disc brakes
     basket_dark=('#A8885C', 'satin'),    # the basket's woven band (the basket: `basket`, the washing line's wicker)
     lamp=('#F4F1E6', 'gloss'),           # a lamp's glass
     reflector=('#C8302A', 'gloss'),      # a red back light
@@ -364,6 +370,7 @@ class Bike:
         self.rear, self.front, self.z = REAR, FRONT, BZ     # the axles
         self.spokes, self.segments = 16, (32, 10)           # spokes a wheel; the tyre's points round (full, far)
         self.rim_segments, self.tyre_minor = 32, 6
+        self.knobs = 0                                      # knobbly tyre lugs round the tread (a mountain bike's)
         self.bb, self.sc, self.ht, self.hb = (-0.1, 0.27), (-0.24, 0.66), (0.3, 0.68), (0.34, 0.56)
         self.crown = None                                   # the fork's crown (default `hb`)
         self.head = ((0.345, 0.55), (0.295, 0.7))           # the head tube's ends
@@ -410,6 +417,14 @@ def _wheel(x, z, S=RACK_BIKE):
     y = R
     G.torus(_name('tyre'), R - t, t, at=F.at(x, y, z), material=M.tyre, rot=(90, 0, 0),
             major_segments=low(*S.segments), minor_segments=low(S.tyre_minor, 3))
+    if S.knobs and not G.is_low():                          # lugs across the tread, in two staggered rows
+        for i in range(S.knobs):
+            a = 360 * (i + 0.5) / S.knobs
+            c, s = G.cosd(a), G.sind(a)
+            for side in (-1, 1):
+                dz = side * 0.012 * k
+                _rod(_name('knob'), (x + (R - 0.008 * k) * c, y + (R - 0.008 * k) * s, z + dz),
+                     (x + (R + 0.014 * k) * c, y + (R + 0.014 * k) * s, z + dz), 0.008 * k, M.tyre, verts=4)
     if not G.is_low():
         rim = R - 2 * t - 0.003 * k
         G.torus(_name('rim'), rim, 0.009 * k, at=F.at(x, y, z), material=M.rim, rot=(90, 0, 0),
@@ -480,7 +495,8 @@ def _bike(S=RACK_BIKE):
         _bent('bars', [(x, h, BZ + dz) for x, h, dz in S.bars], 0.011 * k, M.rim, bend=S.bend, verts=low(8, 5))
         for a, b in S.grips:
             _rod(_name('grip'), (a[0], a[1], BZ + a[2]), (b[0], b[1], BZ + b[2]), S.grip_r, M.saddle, verts=low(8, 5))
-        F.cyl('bell', 0.02 * k, 0.015 * k, (S.bell[0], S.bell[1], BZ + S.bell[2]), M.rim, verts=8)
+        if S.bell:
+            F.cyl('bell', 0.02 * k, 0.015 * k, (S.bell[0], S.bell[1], BZ + S.bell[2]), M.rim, verts=8)
         F.cyl('cog', S.cog, 0.008 * k, (S.rear, R, BZ + rdz), M.rim, rot=(90, 0, 0), verts=low(10, 5))
     with G.new_parts() as cranks:
         # chain ring, cranks and pedals on the drive side (the front), the chain to the back cog
@@ -587,6 +603,81 @@ KID = Bike(
     grip_r=0.016, bell=(0.153, 0.627, 0.06),
     ring=0.05, ring_dz=0.035, cog=0.026, chain_drop=0.52, crank=(0.105, 0.0), crank_dz=0.062, pedal_dz=0.036,
     pedal=(0.06, 0.018, 0.05), pedal_segments=1, drive=-1, kickstand=False, colour='kid', guard_colour='kid_trim', guard_k=0.95)
+
+# The other bikes: a mountain bike, a road bike, a long cargo bike and an e-bike. Each is built along x like the city
+# bike; the cargo bike is centred after building (its long front box puts its bounds ahead of the rider).
+MTB = Bike(
+    r=0.345, k=1.08, tyre=0.034, rear=-0.56, front=0.56, spokes=28, segments=(32, 10), rim_segments=28, tyre_minor=5,
+    bb=(-0.08, 0.30), sc=(-0.23, 0.64), hb=(0.37, 0.70), ht=(0.33, 0.82), crown=(0.39, 0.66),
+    head=((0.39, 0.65), (0.31, 0.84)), fork_mid=(0.49, 0.44), tubes=(0.022, 0.019, 0.024),
+    stay_dz=0.045, guards=(), post=(-0.31, 0.83), saddle=(-0.40, 0.835),
+    saddle_rows=((0.0, 0.03, 0.018), (0.03, 0.07, 0.03), (0.08, 0.065, 0.03), (0.14, 0.03, 0.026),
+                 (0.2, 0.012, 0.018), (0.225, 0.006, 0.01)),
+    stem=((0.31, 0.84), (0.36, 0.95)),
+    # flat: straight out from the stem to the grips, barely swept
+    bars=[(0.34, 0.955, -0.30), (0.36, 0.96, -0.18), (0.37, 0.962, -0.06), (0.37, 0.962, 0.06),
+          (0.36, 0.96, 0.18), (0.34, 0.955, 0.30)],
+    bend=0.015,
+    grips=[((0.36, 0.96, -0.17), (0.34, 0.955, -0.30)), ((0.36, 0.96, 0.17), (0.34, 0.955, 0.30))],
+    grip_r=0.017, bell=(0.35, 0.975, 0.11),
+    ring=0.078, ring_dz=0.05, cog=0.04, chain_drop=0.48, crank=(0.17, 0.0), crank_dz=0.08, pedal_dz=0.05,
+    pedal=(0.09, 0.022, 0.07), drive=-1, kickstand=False, colour='mtb', knobs=18)
+
+ROAD = Bike(
+    r=0.345, k=1.06, tyre=0.016, rear=-0.56, front=0.56, spokes=20, segments=(40, 12), rim_segments=36, tyre_minor=4,
+    bb=(-0.06, 0.30), sc=(-0.23, 0.66), hb=(0.38, 0.71), ht=(0.33, 0.84), crown=(0.39, 0.68),
+    head=((0.39, 0.67), (0.31, 0.86)), fork_mid=(0.48, 0.44), tubes=(0.016, 0.014, 0.018),
+    stay_dz=0.038, guards=(), post=(-0.32, 0.86), saddle=(-0.41, 0.865),
+    saddle_rows=((0.0, 0.026, 0.015), (0.03, 0.06, 0.026), (0.08, 0.055, 0.026), (0.14, 0.025, 0.022),
+                 (0.2, 0.01, 0.015), (0.22, 0.005, 0.008)),
+    stem=((0.31, 0.86), (0.41, 0.93)),
+    # drops: out to the hoods, over the top, then down and back to the ends
+    bars=[(0.31, 0.80, -0.20), (0.37, 0.86, -0.20), (0.41, 0.93, -0.16), (0.42, 0.95, -0.08),
+          (0.42, 0.95, 0.08), (0.41, 0.93, 0.16), (0.37, 0.86, 0.20), (0.31, 0.80, 0.20)],
+    bend=0.04,
+    grips=[((0.32, 0.81, -0.20), (0.29, 0.79, -0.21)), ((0.32, 0.81, 0.20), (0.29, 0.79, 0.21))],
+    grip_r=0.014, bell=None,
+    ring=0.085, ring_dz=0.05, cog=0.032, chain_drop=0.50, crank=(0.17, 0.0), crank_dz=0.075, pedal_dz=0.045,
+    pedal=(0.085, 0.02, 0.06), drive=-1, kickstand=False, colour='road')
+
+CARGO = Bike(
+    r=0.30, k=1.05, tyre=0.03, rear=-0.72, front=1.35, spokes=28, segments=(32, 10), rim_segments=28, tyre_minor=5,
+    bb=(-0.28, 0.30), sc=(-0.42, 0.64), hb=(0.40, 0.64), ht=(0.35, 0.80), crown=(0.41, 0.62),
+    head=((0.40, 0.62), (0.33, 0.82)), fork_mid=(0.90, 0.40), tubes=(0.022, 0.019, 0.024),
+    # a step-through, so the rider can get on round the box
+    step=([(0.35, 0.80), (0.18, 0.60), (-0.12, 0.46), (-0.33, 0.44)],
+          [(0.40, 0.64), (0.22, 0.46), (0.0, 0.33), (-0.28, 0.30)]),
+    stay_dz=0.05, guards=((20, 140), (30, 170)),
+    post=(-0.50, 0.82), saddle=(-0.58, 0.825),
+    saddle_rows=((0.0, 0.045, 0.022), (0.035, 0.11, 0.038), (0.09, 0.105, 0.038), (0.155, 0.05, 0.032),
+                 (0.22, 0.022, 0.024), (0.255, 0.012, 0.013)),
+    stem=((0.33, 0.82), (0.30, 0.98)),
+    bars=[(0.16, 0.97, -0.31), (0.23, 0.975, -0.235), (0.31, 0.98, -0.15), (0.30, 0.98, -0.04),
+          (0.30, 0.98, 0.04), (0.31, 0.98, 0.15), (0.23, 0.975, 0.235), (0.16, 0.97, 0.31)],
+    bend=0.06,
+    grips=[((0.23, 0.975, -0.234), (0.16, 0.97, -0.31)), ((0.23, 0.975, 0.234), (0.16, 0.97, 0.31))],
+    grip_r=0.018, bell=(0.31, 0.995, 0.11),
+    ring=0.08, ring_dz=0.055, cog=0.042, chain_drop=0.50, crank=(0.17, 0.0), crank_dz=0.085, pedal_dz=0.05,
+    pedal=(0.095, 0.022, 0.075), drive=-1, kickstand=False, colour='cargo')
+
+EBIKE = Bike(
+    r=0.335, k=1.08, tyre=0.032, rear=-0.57, front=0.57, spokes=28, segments=(36, 12), rim_segments=32, tyre_minor=5,
+    bb=(-0.07, 0.29), sc=(-0.21, 0.62), hb=(0.37, 0.72), ht=(0.34, 0.81), crown=(0.39, 0.68),
+    head=((0.39, 0.67), (0.31, 0.86)), fork_mid=(0.47, 0.46), tubes=(0.021, 0.018, 0.023),
+    step=([(0.34, 0.81), (0.22, 0.61), (0.04, 0.48), (-0.14, 0.45)],
+          [(0.37, 0.72), (0.26, 0.51), (0.09, 0.35), (-0.07, 0.29)]),
+    stay_dz=0.042, guards=((15, 125), (35, 172)),
+    post=(-0.30, 0.83), saddle=(-0.38, 0.835),
+    saddle_rows=((0.0, 0.038, 0.021), (0.032, 0.098, 0.036), (0.086, 0.092, 0.036), (0.15, 0.044, 0.031),
+                 (0.215, 0.019, 0.023), (0.248, 0.01, 0.012)),
+    stem=((0.31, 0.86), (0.31, 1.0)),
+    bars=[(0.20, 0.985, -0.30), (0.27, 0.99, -0.22), (0.33, 0.995, -0.12), (0.32, 0.995, -0.03),
+          (0.32, 0.995, 0.03), (0.33, 0.995, 0.12), (0.27, 0.99, 0.22), (0.20, 0.985, 0.30)],
+    bend=0.05,
+    grips=[((0.27, 0.99, -0.22), (0.20, 0.985, -0.30)), ((0.27, 0.99, 0.22), (0.20, 0.985, 0.30))],
+    grip_r=0.018, bell=(0.33, 1.005, 0.10),
+    ring=0.082, ring_dz=0.05, cog=0.04, chain_drop=0.48, crank=(0.17, 0.0), crank_dz=0.08, pedal_dz=0.05,
+    pedal=(0.09, 0.022, 0.07), drive=-1, kickstand=False, colour='ebike')
 
 
 def _bb_shell(S, width):
@@ -714,7 +805,78 @@ def _kid_extras(S):
         F.cyl(_name('stabiliser_axle'), 0.007, 0.04, (sx, sr, sz), M.rim, rot=(90, 0, 0), verts=low(6, 4))
 
 
-def _ride(name, S, extras, stand=None, pivot=None):
+def _mtb_extras(S):
+    """The mountain bike's own things: a suspension fork's crown and stanchions, and a disc brake at each wheel."""
+    z = S.z
+    cx, cy = S.crown
+    F.box('fork_crown', 0.19, 0.05, 0.11, (cx, cy, z), M.motor, bevel=low(0.008, 0), bevel_segments=1)
+    for s in (-1, 1):
+        dz = s * 0.055
+        _rod('stanchion', (cx, cy - 0.01, z + dz), (S.fork_mid[0] - 0.02, S.fork_mid[1] + 0.02, z + dz), 0.017,
+             M.rim, verts=low(8, 4))
+        _rod('fork_lower', (S.fork_mid[0] - 0.01, S.fork_mid[1] + 0.01, z + dz), (S.front, S.r, z + dz), 0.026,
+             M.tyre, verts=low(8, 4))
+    for x in (S.front, S.rear):
+        F.cyl('disc', 0.085, 0.004, (x, S.r, z + 0.052 * S.drive), M.rim, rot=(90, 0, 0), verts=low(16, 8))
+        F.box('caliper', 0.035, 0.09, 0.03, (x + 0.02, S.r + 0.06, z + 0.052 * S.drive), M.motor,
+              bevel=low(0.005, 0), bevel_segments=1)
+
+
+def _road_extras(S):
+    """The road bike's own things: a bottle on the down tube, a brake caliper at each wheel."""
+    z = S.z
+    _bb_shell(S, 0.07)
+    _board('bottle', (0.19, 0.49, z), (0.12, 0.37, z), 0.055, 0.055, M.lamp, face=(0, 1, 0),
+           bevel=low(0.012, 0))
+    F.cyl('bottle_cap', 0.018, 0.02, (0.115, 0.365, z), M.rim, rot=(0, 90, 0), verts=low(8, 4))
+    F.box('front_brake', 0.03, 0.06, 0.05, (S.crown[0] + 0.02, S.crown[1] - 0.02, z), M.motor,
+          bevel=low(0.004, 0), bevel_segments=1)
+    F.box('rear_brake', 0.03, 0.06, 0.05, (-0.45, 0.48, z), M.motor, bevel=low(0.004, 0), bevel_segments=1)
+
+
+def _cargo_extras(S):
+    """The cargo bike's own things: the long box between the rider and the front wheel, with a padded bench, a
+    wooden floor and rails, a lamp on its front and a red light at the back."""
+    z = S.z
+    _bb_shell(S, 0.08)
+    x0, x1, y0, y1, hz = 0.42, 1.00, 0.30, 0.66, 0.30     # the box's ends (x), its floor and top rail (y), its half depth (z)
+    F.box('box_floor', x1 - x0, 0.025, 2 * hz, ((x0 + x1) / 2, y0, z), M.box_wood,
+          bevel=low(0.006, 0), bevel_segments=1)
+    for s in (-1, 1):
+        F.box('box_side', x1 - x0, y1 - y0, 0.03, ((x0 + x1) / 2, (y0 + y1) / 2, z + s * (hz - 0.015)), S.body,
+              bevel=low(0.008, 0), bevel_segments=1)
+        _rod('box_rail', (x0, y1, z + s * hz), (x1, y1, z + s * hz), 0.012, M.box_wood, verts=6)
+    F.box('box_front', 0.03, y1 - y0, 2 * hz, (x1, (y0 + y1) / 2, z), S.body, bevel=low(0.008, 0), bevel_segments=1)
+    F.box('box_back', 0.03, y1 - y0, 2 * hz, (x0, (y0 + y1) / 2, z), S.body, bevel=low(0.008, 0), bevel_segments=1)
+    F.box('box_pad', x1 - x0 - 0.09, 0.05, 2 * hz - 0.09, ((x0 + x1) / 2, y0 + 0.05, z), M.saddle,
+          bevel=low(0.012, 0), bevel_segments=1)
+    F.cyl('lamp', 0.028, 0.045, (x1 + 0.02, 0.56, z), M.rim, rot=(0, 90, 0), verts=low(12, 6))
+    F.cyl('lamp_glass', 0.024, 0.006, (x1 + 0.044, 0.56, z), M.lamp, rot=(0, 90, 0), verts=low(12, 6))
+    F.box('rear_light', 0.02, 0.03, 0.06, (-0.62, 0.70, z), M.reflector, bevel=low(0.004, 0), bevel_segments=1)
+
+
+def _ebike_extras(S):
+    """The e-bike's own things: the battery in the down tube, the motor at the bottom bracket, a display on the
+    bars, built-in lights, and a carrier over the back wheel."""
+    z = S.z
+    _bb_shell(S, 0.08)
+    F.cyl('motor', 0.06, 0.10, (S.bb[0], S.bb[1], z), M.motor, rot=(90, 0, 0), verts=low(14, 7))
+    _board('battery', (0.26, 0.55, z), (0.02, 0.37, z), 0.13, 0.085, M.battery, face=(0, 1, 0),
+           bevel=low(0.01, 0))
+    F.box('display', 0.085, 0.03, 0.05, (0.33, 1.005, z), M.screen, bevel=low(0.006, 0), bevel_segments=1)
+    F.box('head_light', 0.06, 0.04, 0.06, (S.crown[0] + 0.03, S.crown[1] + 0.02, z), M.lamp,
+          bevel=low(0.008, 0), bevel_segments=1)
+    F.box('tail_light', 0.02, 0.03, 0.06, (-0.56, 0.73, z), M.reflector, bevel=low(0.004, 0), bevel_segments=1)
+    ch = 0.76
+    for s in (-1, 1):
+        dz = s * 0.07
+        _rod('rack_rail', (-0.34, ch, z + dz), (-0.72, ch, z + dz), 0.007, M.rim, verts=low(6, 4))
+        _rod('rack_stay', (-0.68, ch, z + dz), (-0.56, S.r + 0.01, z + s * 0.05), 0.006, M.rim, verts=low(6, 4))
+    for x in (-0.40, -0.56, -0.70):
+        _rod('rack_bar', (x, ch, z - 0.07), (x, ch, z + 0.07), 0.005, M.rim, verts=low(6, 4))
+
+
+def _ride(name, S, extras, stand=None, pivot=None, centre=False):
     """A bike `S` in its nodes (the note above): `extras` and `stand` (its pivot at game (x, height) `pivot`) build what
     this one has of its own."""
     with G.new_parts() as rear:
@@ -728,18 +890,34 @@ def _ride(name, S, extras, stand=None, pivot=None):
         if stand:
             stand(S)
     if G.is_low():                                         # from afar: parked, all one still part
-        return G.settle([G.join_all(name)], centre=False)
+        return G.settle([G.join_all(name)], centre=centre)
     G.join(frame + more, 'frame', origin=(0, 0, 0))
     G.join(front, 'wheel_front', origin=F.at(S.front, S.r, S.z))
     G.join(rear, 'wheel_rear', origin=F.at(S.rear, S.r, S.z))
     G.join(cranks + cranks_more, 'cranks', origin=F.at(S.bb[0], S.bb[1], S.z))
     if kick:
         G.join(kick, 'stand', origin=F.at(*pivot, S.z))
-    return G.settle(centre=False)
+    return G.settle(centre=centre)
 
 
 def bicycle():
     return _ride('bicycle', CITY, _city_extras, _city_stand, CITY_STAND)
+
+
+def mountainBike():
+    return _ride('mountainBike', MTB, _mtb_extras)
+
+
+def roadBike():
+    return _ride('roadBike', ROAD, _road_extras)
+
+
+def cargoBike():
+    return _ride('cargoBike', CARGO, _cargo_extras, centre=True)
+
+
+def eBike():
+    return _ride('eBike', EBIKE, _ebike_extras)
 
 
 def bicycleChild():
@@ -1650,6 +1828,14 @@ FAMILY = G.Family(
              paint=[('rack', 'Rack'), ('bike', 'Bike')]),
      G.Model('bicycle', bicycle, size=(1.839, 1.008, 0.645), centre=(-0.0046, 0), key='model.bicycle', far=G.far_of(bicycle),
              paint=[('city', 'Frame')]),
+     G.Model('mountainBike', mountainBike, size=(1.832, 0.998, 0.605), tolerance=0.02, key='model.mountainBike',
+             far=G.far_of(mountainBike), paint=[('mtb', 'Frame')]),
+     G.Model('roadBike', roadBike, size=(1.810, 0.961, 0.447), tolerance=0.02, key='model.roadBike',
+             far=G.far_of(roadBike), paint=[('road', 'Frame')]),
+     G.Model('cargoBike', cargoBike, size=(2.727, 1.003, 0.644), tolerance=0.02, key='model.cargoBike',
+             far=G.far_of(cargoBike), paint=[('cargo', 'Frame')]),
+     G.Model('eBike', eBike, size=(1.879, 1.020, 0.624), centre=(-0.0046, 0), tolerance=0.02, key='model.eBike',
+             far=G.far_of(eBike), paint=[('ebike', 'Frame')]),
      G.Model('bicycleChild', bicycleChild, size=(0.949, 0.679, 0.573), centre=(-0.0062, 0), key='model.bicycleChild',
              far=G.far_of(bicycleChild), paint=[('kid', 'Frame')]),
      G.Model('eScooter', eScooter, size=(0.952, 1.067, 0.596), centre=(-0.0009, 0), key='model.eScooter', far=G.far_of(eScooter),

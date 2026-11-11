@@ -35,6 +35,8 @@ export interface BuildLook {
   window: number;
   /** Fence style (fences and gates). */
   fence: number;
+  /** Which staircase the Stairs tool builds (an index into the shop's stairs). */
+  stair: number;
 }
 
 /** An object being placed in Build mode: a new purchase, or an owned object being moved. */
@@ -157,7 +159,7 @@ class GameState {
   buildTab = $state<BuildTab>('furnish');
   buildTool = $state<BuildTool>('wall');
   /** The looks Build mode's tools use (kept between visits). */
-  buildLook = $state<BuildLook>({ cover: 0, floor: 1, form: 0, door: 0, window: 0, fence: 0 });
+  buildLook = $state<BuildLook>({ cover: 0, floor: 1, form: 0, door: 0, window: 0, fence: 0, stair: 0 });
   /** Paint tool: wall faces under the preview, and whether Shift (a whole room) is held. */
   paintFaces = $state(0);
   /** Floor tool: tiles under the preview. */

@@ -59,6 +59,9 @@
   const floorSwatch = (c: FloorCoveringDef) => `--c:${multiply(FLOOR_BASE[c.finish], c.color)}`;
 
   const look = $derived(game.buildLook);
+  /** The staircases the Stairs tool builds, and the one picked. */
+  const stairDefs = content.staircases();
+  const stairDef = $derived(stairDefs[look.stair] ?? stairDefs[0]);
   const coverLabel = $derived(look.cover ? (coverings[look.cover - 1]?.label ?? '') : 'House default');
   const coverPrice = $derived(look.cover ? (coverings[look.cover - 1]?.price ?? 0) : 0);
   const floorLabel = $derived(look.floor ? (floors[look.floor - 1]?.label ?? '') : 'Room default');
@@ -261,6 +264,32 @@
       {/each}
     </div>
     <span class="chosen"><b>{roof ? `${roofs[roof[0]]?.label ?? ''} · ${roofColors[roof[1]]?.label ?? ''}` : 'The house’s own roof'}</b><small> · free</small></span>
+  </div>
+{:else if tool === 'stairs' && stairDefs.length}
+  <div class="row">
+    <div class="swatches" role="radiogroup" aria-label="Staircase">
+      {#each stairDefs as d, i (d.id)}
+        <button
+          role="radio"
+          aria-checked={look.stair === i}
+          class="swatch"
+          class:active={look.stair === i}
+          style="--c:#EDE7DC"
+          title="{d.name}{d.price ? ` · ${money(d.price)}` : ' · free'}"
+          onclick={() => (play('tab'), services.controls.pickStair(i))}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            {#if d.stair === 'spiral'}
+              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.3" />
+              <path d="M12 12V4M12 12l7 2M12 12l-6 4" fill="none" stroke="currentColor" stroke-width="1.3" />
+            {:else}
+              <path d="M3 20h5v-5h5v-5h5V5" fill="none" stroke="currentColor" stroke-width="1.7" />
+            {/if}
+          </svg>
+        </button>
+      {/each}
+    </div>
+    <span class="chosen"><b>{stairDef?.name ?? ''}</b><small class="tabular"> · {stairDef?.price ? money(stairDef.price) : 'Free'}</small></span>
   </div>
 {:else if tool === 'garage'}
   <div class="row">

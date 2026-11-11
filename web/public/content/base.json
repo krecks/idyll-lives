@@ -3634,6 +3634,27 @@
       "interactions": [],
       "price": 900,
       "category": "living"
+    },
+    {
+      "id": "stairsOpen",
+      "name": "Open-tread staircase",
+      "model": "model.stairsOpen",
+      "footprint": [1, 4],
+      "stairs": true,
+      "interactions": [],
+      "price": 1400,
+      "category": "living"
+    },
+    {
+      "id": "stairsSpiral",
+      "name": "Spiral staircase",
+      "model": "model.stairsSpiral",
+      "footprint": [2, 2],
+      "stairs": true,
+      "stair": "spiral",
+      "interactions": [],
+      "price": 1800,
+      "category": "living"
     }
   ],
   "skills": [

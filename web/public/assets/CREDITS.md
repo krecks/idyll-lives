@@ -95,6 +95,10 @@ rest are still.
 The staircase (`models/living/stairs.glb`, same pack) is built the same way (glTF, original, CC0): still, its steps
 where the house's are.
 
+The two staircases the player buys (`models/living/stairsOpen.glb`, `stairsSpiral.glb`, same pack) are built the
+same way (glTF, original, CC0): still, the open-tread flight where `stairs` climbs, the spiral winding round its
+newel over the 2 × 2 tiles the residents walk.
+
 The bathroom sinks (`models/bathroom/sink.glb`, `sinkPedestal.glb`, `vanityDouble.glb`, `sinkVessel.glb`,
 `sinkConsole.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
 `tools/art/blender/families/bathroom.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each has a
@@ -263,12 +267,13 @@ grill were rebuilt to real sizes (2026-10-21).
 The play and yard things (`models/yard/sandbox.glb`, `bikeRack.glb`, `raisedBed.glb`, `shedSmall.glb`,
 `greenhouse.glb`, `compostBin.glb`, `rainBarrel.glb`, `clothesline.glb`, `firewoodStack.glb`, and the rides residents
 ride to work or school, `bicycle.glb` (a step-through city bike with a basket), `bicycleChild.glb` (a kids' bike on
-stabilisers) and `eScooter.glb` (an electric scooter), each with its `.far.glb`, override pack
-`packs/yard/manifest.json`) are built in Blender by `tools/art/blender/families/yard.py`
-on `gamekit` and exported as `.glb` (glTF, original, CC0). A sand castle grows in the sandpit, the bike lifts and
-turns its back wheel, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open, the
-compost bin's lid lifts and the washing goes out on the line a line at a time; the rides' wheels, cranks and stands
-are parts the game moves.
+stabilisers), `eScooter.glb` (an electric scooter), `mountainBike.glb` (knobbly tyres and a suspension fork),
+`roadBike.glb` (drop bars and thin tyres), `cargoBike.glb` (a long box up front) and `eBike.glb` (a battery in the
+frame and a motor at the pedals), each with its `.far.glb`, override pack `packs/yard/manifest.json`) are built in
+Blender by `tools/art/blender/families/yard.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). A sand
+castle grows in the sandpit, the bike lifts and turns its back wheel, the raised bed's crop grows and is picked, the
+shed's and the greenhouse's doors open, the compost bin's lid lifts and the washing goes out on the line a line at a
+time; the rides' wheels, cranks and stands are parts the game moves.
 
 The grills and the fire pit (`models/outdoor/grill.glb`, `grillStation.glb`, `firePit.glb`, same pack and family)
 are built the same way (glTF, original, CC0). The grill's lid and the station's hood swing up while residents cook,

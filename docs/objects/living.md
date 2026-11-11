@@ -175,13 +175,15 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
   cabinet" (`bench-results/check-parts/parts-displayCabinet-{openDoor,shutDoor}-01.png`).
 - Known, not changed: standing free, the ladder shelf leans on nothing (it is made to lean on a wall).
 
-## L6. Stairs (1)
+## L6. Stairs (3)
 
 - **Family:** `tools/art/blender/families/living.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `stairs` Staircase | 1x4 · floor | — | living / — | Treads, Railing | Static | Static: 14 steps of 0.2 × 4/14 m, oak treads on white risers between closed strings, an iron railing each side. Placed by build mode and housegen, not the buy catalog. |
+| `stairsOpen` Open-tread staircase | 1x4 · floor | — | living / — | Treads, Railing | Static | Static: 14 oak boards of 0.2 × 4/14 m on two slim steel plates, no risers, a thin steel handrail on a post at the foot and every third step. Placed by build mode's Stairs tool, not the buy catalog. |
+| `stairsSpiral` Spiral staircase | 2x2 · floor | — | living / — | Treads, Railing | Static | Static: 14 oak wedge treads winding 315° round a dark steel newel, a slim iron handrail on the treads' outer ends, a baluster each; walked anticlockwise from the front-left tile, off to the left of the back-left. Placed by build mode's Stairs tool, not the buy catalog. |
 
 **In play** (signed off 2026-10-16):
 - Bought in all four facings and coloured (treads, railing; by day and night, WebGPU and Low WebGL).

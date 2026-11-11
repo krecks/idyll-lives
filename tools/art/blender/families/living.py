@@ -51,6 +51,7 @@ M = G.Palette(
     treads=('#B98B5E', 'wood'),
     risers=('#EFEBE3', 'satin'),
     railing=('#3C3A38', 'metal'),
+    spine=('#2B2D30', 'metal'),          # the spiral's newel: dark steel, not a colour part
     # the sofa bed
     upholstery=('#6F7F8C', 'fabric'),   # its body: arms, back and base; the main part the player colours
     cushion=('#7A8A97', 'fabric'),      # the seat and back cushions
@@ -1113,6 +1114,119 @@ def stairs():
     G.settle(centre=False)
 
 
+# L6, the two staircases the player buys (`stairsSpiral`, `stairsOpen`). The spiral winds round a newel at the
+# middle of its 2 × 2 tiles: sim-core walks the four tiles anticlockwise from the front-left (`spiral_steps`),
+# one tile a step, and steps off left of the back-left tile, so the treads wind 315° from the front-left tile to
+# due left, where the top tread's outer edge faces -x. The walking line 0.71 m from the newel, at the tiles'
+# corners, rises 0.7 m a tile: the four tile centres are 0.35, 1.05, 1.75 and 2.45 m up, and the top tread meets
+# the floor above at 2.8 m.
+SPIRAL_TREADS = 14
+SPIRAL_FIRST, SPIRAL_TOP = 0.35, 2.8
+SPIRAL_TURN = 315.0                     # from the front-left tile (135°) to due left (-180°)
+SPIRAL_R0, SPIRAL_R1 = 0.045, 0.92      # round the newel, inside the 2 × 2 footprint
+SPIRAL_TREAD = 0.045
+SPIRAL_RAIL = 0.92                      # the handrail's middle above a tread
+
+
+def _wedge(r0, r1, a0, a1, segments=6):
+    """A tread's outline (game x, depth) between two radii, `a0`..`a1` in degrees round the newel."""
+    angles = [a0 + (a1 - a0) * i / segments for i in range(segments + 1)]
+    inner = [(r0 * math.cos(math.radians(a)), r0 * math.sin(math.radians(a))) for a in angles]
+    outer = [(r1 * math.cos(math.radians(a)), r1 * math.sin(math.radians(a))) for a in reversed(angles)]
+    return inner + outer
+
+
+def stairs_spiral():
+    """A spiral stair: 14 oak wedge treads round a dark steel newel, winding anticlockwise from the front-left
+    tile to due left, where the way off is; a slim black handrail on the treads' outer ends, a baluster each."""
+    step = SPIRAL_TURN / (SPIRAL_TREADS - 1)
+    rise = (SPIRAL_TOP - SPIRAL_FIRST) / (SPIRAL_TREADS - 1)
+    half = step / 2 + 1.2               # a little overlap, so no gap shows between the boards
+    for k in range(SPIRAL_TREADS):
+        a = 135.0 - k * step
+        y = SPIRAL_FIRST + k * rise
+        F.extrude(f'tread{k}', _wedge(SPIRAL_R0, SPIRAL_R1, a - half, a + half), SPIRAL_TREAD,
+                  (0, y - SPIRAL_TREAD / 2, 0), M.treads, plane='top', bevel=0.005, bevel_segments=1)
+    # the newel: a dark steel spine from the floor to the floor above, on a plate, with a cap
+    F.cyl('newel_plate', 0.105, 0.03, (0, 0.015, 0), M.spine, verts=20, bevel=0.006)
+    F.cyl('newel', 0.048, 2.85, (0, 1.425, 0), M.spine, verts=16, bevel=0.004)
+    F.cyl('newel_cap', 0.062, 0.02, (0, 2.86, 0), M.spine, verts=16, bevel=0.006)
+
+    def rail_y(deg):
+        return SPIRAL_FIRST + (135.0 - deg) / 90.0 * 0.7 + SPIRAL_RAIL
+
+    # the handrail: a slim tube winding with the treads, on a baluster at each tread's outer end
+    rail = []
+    for i in range(SPIRAL_TREADS * 3 + 1):
+        a = 141.0 - i * (SPIRAL_TURN + 12.0) / (SPIRAL_TREADS * 3)
+        rail.append((0.875 * math.cos(math.radians(a)), rail_y(a), 0.875 * math.sin(math.radians(a))))
+    F.sweep('handrail', rail, 0.013, M.railing, verts=8, resolution=2)
+    for k in range(SPIRAL_TREADS):
+        a = math.radians(135.0 - k * step)
+        x, z = 0.862 * math.cos(a), 0.862 * math.sin(a)
+        y = SPIRAL_FIRST + k * rise
+        F.sweep(f'baluster{k}', [(x, y - 0.005, z), (x, rail_y(135.0 - k * step) - 0.012, z)], 0.008, M.railing, verts=6)
+    G.join_all('stairsSpiral')
+    G.settle(centre=False)
+
+
+# The open-tread flight: the same 14 steps, rise and run as `stairs`, but oak boards on two slim steel plates
+# with no risers, and a thin steel handrail on posts: at a glance, not the closed white staircase.
+OPEN_TREAD = 0.045
+OPEN_STRING = 0.02                   # the plate's thickness across
+OPEN_STRING_X = 0.395                # its middle: the plates' outer faces at ±0.405
+OPEN_STRING_D = 0.17                 # how deep the plate hangs under the boards
+OPEN_RAIL = 0.95                     # the handrail's middle above the treads
+
+
+def _open_string(name, x, material):
+    """A slim plate along the flight, its top edge under the boards and cut level at both ends."""
+    slope = RISE / RUN
+
+    def top(z):
+        return slope * (2 - z) - OPEN_TREAD
+
+    z_foot = 2 - (OPEN_TREAD + OPEN_STRING_D) / slope   # where the underside meets the floor
+    outline = [(z_foot, 0.0), (z_foot, top(z_foot)), (-2.0, top(-2.0)), (-2.0, top(-2.0) - OPEN_STRING_D)]
+    n = len(outline)
+    verts = [F.at(x - OPEN_STRING / 2, y, z) for z, y in outline] + \
+            [F.at(x + OPEN_STRING / 2, y, z) for z, y in outline]
+    faces = [tuple(range(n)), tuple(range(2 * n - 1, n - 1, -1))] + \
+            [(i, (i + 1) % n, n + (i + 1) % n, n + i) for i in range(n)]
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(verts, [], faces)
+    mesh.validate()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    obj.data.materials.append(material)
+    G.shapes._recalc_normals(obj)
+    return obj
+
+
+def stairs_open():
+    """An open-tread flight: 14 oak boards on two slim steel plates, no risers, a thin steel handrail on a post
+    at the foot and every third step."""
+    for i in range(1, STEPS + 1):
+        front, back = 2 - (i - 1) * RUN, 2 - i * RUN
+        y = i * RISE
+        over = NOSING if i > 1 else 0.0
+        F.box(f'tread{i}', 0.80, OPEN_TREAD, RUN + over, (0, y - OPEN_TREAD / 2, (front + over + back) / 2),
+              M.treads, bevel=0.005, bevel_segments=1)
+    def rail_y(z):
+        return RISE / RUN * (2 - z) + OPEN_RAIL
+
+    for s in (-1, 1):
+        x = s * OPEN_STRING_X
+        _open_string(f'string{s}', x, M.black_metal)
+        F.sweep(f'handrail{s}', [(x, rail_y(1.95), 1.95), (x, rail_y(-1.95), -1.95)], 0.014, M.railing, verts=8)
+        for k, i in enumerate((0, 3, 6, 9, 12, 14)):
+            z = 1.94 if i == 0 else 2 - (i - 0.5) * RUN
+            y0 = 0.0 if i == 0 else i * RISE
+            F.sweep(f'post{s}{k}', [(x, y0, z), (x, rail_y(z), z)], 0.010, M.railing, verts=6)
+    G.join_all('stairsOpen')
+    G.settle(centre=False)
+
+
 # L3, the coffee and side tables: still, but for the coffee table's drawer (`drawer_open`, a magazine in it,
 # for the magazine use). Their tops stay at the content `surface` heights (the old `TOPS`).
 def _legs4(xs, zs, h, t, mat, y0=0.0):
@@ -1822,6 +1936,10 @@ FAMILY = G.Family(
                     ('pillow_rose', 'Pillow'), ('pillow_cream', 'Second pillow')]),
      # L6: the staircase (placed by build mode's Stairs tool and the house generator)
      G.Model('stairs', stairs, key='model.stairs', size=(0.855, 3.68, 4.0), paint=[('treads', 'Treads'), ('railing', 'Railing')]),
+     G.Model('stairsOpen', stairs_open, key='model.stairsOpen', size=(0.82, 3.73, 4.0),
+             paint=[('treads', 'Treads'), ('railing', 'Railing')]),
+     G.Model('stairsSpiral', stairs_spiral, key='model.stairsSpiral', size=(1.84, 3.78, 1.84),
+             paint=[('treads', 'Treads'), ('railing', 'Railing')]),
      # L1: the sofas and sectionals, their seat cushions sinking while sat or dozed on
      G.Model('sofa', sofa_classic, key='model.sofa', size=(1.88, 0.935, 0.817), centre=(0, -0.0215),
              motions={'uses': {'relax': 'sink_in'}},

@@ -1332,9 +1332,11 @@ export class BuildBuyInput {
     return true;
   }
 
-  /** The staircase the Stairs tool builds. */
+  /** The staircase the Stairs tool builds: the one picked beside the tool (`buildLook.stair`), else the
+   *  first. */
   stairsDef(): ObjectDef | undefined {
-    return this.content.shop.find((d) => d.stairs);
+    const all = this.content.staircases();
+    return all[game.buildLook.stair] ?? all[0];
   }
 
   /**

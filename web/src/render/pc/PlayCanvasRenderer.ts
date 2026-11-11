@@ -1589,17 +1589,23 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const holes = new Set<number>();
     const landings = new Set<number>();
     for (const o of world.objects) {
-      if (!this.deps.content.object(o.def)?.stairs) continue;
+      const def = this.deps.content.object(o.def);
+      if (!def?.stairs) continue;
       const lift = up(this.storeyOf(o.z));
       for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) holes.add((z + lift) * W + x);
-      // The tile past the top step, on the storey above (as sim-core `storeys::stair_of`).
-      const [lx, lz] = [
-        [o.x + Math.floor((o.w - 1) / 2), o.z - 1],
-        [o.x - 1, o.z + Math.floor((o.d - 1) / 2)],
-        [o.x + Math.floor((o.w - 1) / 2), o.z + o.d],
-        [o.x + o.w, o.z + Math.floor((o.d - 1) / 2)],
-      ][o.rot % 4];
-      landings.add((lz + lift) * W + lx);
+      // The tile past the top step, on the storey above (as sim-core `storeys::stair_of`). A
+      // spiral winds round its square footprint and steps off its back left corner, to the left.
+      const far = o.w - 1;
+      const off: [number, number] =
+        def.stair === 'spiral'
+          ? ([[-1, 0], [0, far + 1], [far + 1, far], [far, -1]] as [number, number][])[o.rot % 4]!
+          : ([
+              [Math.floor((o.w - 1) / 2), -1],
+              [-1, Math.floor((o.d - 1) / 2)],
+              [Math.floor((o.w - 1) / 2), o.d],
+              [o.w, Math.floor((o.d - 1) / 2)],
+            ] as [number, number][])[o.rot % 4]!;
+      landings.add((o.z + off[1] + lift) * W + o.x + off[0]);
     }
     // The ground first (its garden dressing is the lot's), then upstairs, then the basement.
     const order = [...Array.from({ length: count }, (_, k) => k), ...(lowest < 0 ? [-1] : [])];

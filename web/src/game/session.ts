@@ -895,6 +895,15 @@ async function openSession(
       const stairs = tool === 'stairs' ? buildBuy.stairsDef() : undefined;
       if (stairs) game.placing = { def: stairs.id, rot: 0, turn: 0, objectId: null };
     },
+    pickStair(index) {
+      game.buildLook = { ...game.buildLook, stair: index };
+      const stairs = buildBuy.stairsDef();
+      // A new staircase in hand swaps for the one picked, keeping the way it is turned (one being
+      // moved stays what it is).
+      if (!stairs || !game.placing || game.placing.objectId != null) return;
+      game.placing = { ...game.placing, def: stairs.id };
+      buildBuy.rehover();
+    },
     build(edits) {
       bridge.send({ type: 'build', household: game.home, edits });
     },

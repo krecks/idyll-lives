@@ -9,6 +9,7 @@ use std::ops::RangeInclusive;
 use serde::Deserialize;
 
 use crate::Error;
+use crate::path::StairShape;
 use crate::social::{
     self, BondPreset, EmotionDef, EmotionRaw, FeelingDef, FeelingRaw, Indices, SocialDef,
     SocialRaw, SocialRules, SocialRulesRaw,
@@ -444,6 +445,9 @@ pub struct ObjectDef {
     /// A flight of stairs up to the storey above (one tile wide, climbed from the front; see
     /// `path::Stair`). Residents walk on it instead of around it.
     pub stairs: bool,
+    /// The stair's shape (content `stairShape`; only for stairs): a straight flight (the default)
+    /// or a spiral winding round its square footprint.
+    pub stair: StairShape,
     /// Turns freely (decor, plants): besides its four facings it can stand at any angle
     /// (`ObjectInstance::turn`). The angle is only for looks; the footprint stays on tiles.
     pub turns: bool,
@@ -2649,6 +2653,9 @@ struct ObjectRaw {
     private: bool,
     #[serde(default)]
     stairs: bool,
+    /// See `ObjectDef::stair`: "spiral", else a straight flight.
+    #[serde(default)]
+    stair: Option<String>,
     /// Buy catalog category (decides free rotation, see `objectRules.freeRotation`).
     #[serde(default)]
     category: Option<String>,
@@ -4008,6 +4015,37 @@ impl Content {
                     obj.id
                 )));
             }
+            // A spiral winds round a square footprint; a flight is a straight column of tiles. Only a
+            // stair has a shape.
+            let stair_shape = match obj.stair.as_deref() {
+                None => StairShape::Flight,
+                Some(shape) => {
+                    if !obj.stairs {
+                        return Err(Error::new(format!(
+                            "object '{}': `stair` is a stair's",
+                            obj.id
+                        )));
+                    }
+                    match shape {
+                        // A step is a corner of the square, so its two tiles square is the only size
+                        // whose steps touch.
+                        "spiral" if obj.footprint != [2, 2] => {
+                            return Err(Error::new(format!(
+                                "object '{}': a spiral winds round a footprint of two by two tiles",
+                                obj.id
+                            )));
+                        }
+                        "spiral" => StairShape::Spiral,
+                        "flight" => StairShape::Flight,
+                        other => {
+                            return Err(Error::new(format!(
+                                "object '{}': unknown `stair` '{other}' (flight or spiral)",
+                                obj.id
+                            )));
+                        }
+                    }
+                }
+            };
             if !obj.places.is_empty() {
                 let half = obj.footprint.map(|f| f as f32 / 2.0 + PLACE_REACH);
                 if obj.places.len() != obj.slots as usize
@@ -4083,6 +4121,7 @@ impl Content {
                 crown: obj.crown.max(0.0),
                 private: obj.private,
                 stairs: obj.stairs,
+                stair: stair_shape,
                 turns,
                 decor: obj
                     .decor
