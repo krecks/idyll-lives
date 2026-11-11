@@ -60,6 +60,21 @@ export function devlogSlowFrame(ms: number, data: Record<string, unknown>): void
   devlog('slowFrame', { ms: Math.round(ms), ...data });
 }
 
+let pausedUntil = 0;
+
+/**
+ * Whether the gap before this frame may hold a pause on purpose: a menu over the game or a hidden tab
+ * (nothing is drawn then), opened or closed within the last second. Such gaps aren't stalls.
+ */
+export function devlogPaused(): boolean {
+  return performance.now() < pausedUntil;
+}
+
+/** A menu opened or closed, or the tab hidden or shown: the next frame's gap isn't a stall (`devlogPaused`). */
+export function devlogPause(): void {
+  pausedUntil = performance.now() + 1000;
+}
+
 /** A new sample period: stalls count again. */
 export function devlogNextSample(): void {
   slowFrames = 0;
@@ -104,7 +119,10 @@ export function startDevLog(context: Record<string, unknown> = {}): void {
     ...context,
   });
   watchLog((e) => devlog('log', { level: e.level, text: e.text }));
-  document.addEventListener('visibilitychange', () => devlog('visibility', { hidden: document.hidden }));
+  document.addEventListener('visibilitychange', () => {
+    devlogPause();
+    devlog('visibility', { hidden: document.hidden });
+  });
   let resizeTimer = 0;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);

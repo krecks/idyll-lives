@@ -21,7 +21,7 @@ import { within } from '../core/async';
 import { plainState } from '../debug/snapshot.svelte';
 import { liveSims } from '../debug/sims';
 import { threadStats } from '../debug/threads';
-import { DEVLOG, devlog, devlogNextSample, devlogSlowFrame, renderSample, SAMPLE_MS, SLOW_FRAME_MS } from '../debug/devlog';
+import { DEVLOG, devlog, devlogNextSample, devlogPaused, devlogSlowFrame, renderSample, SAMPLE_MS, SLOW_FRAME_MS } from '../debug/devlog';
 import { createSimPreviews } from '../render/preview';
 import { createItemPreviews } from '../render/preview/items';
 import type { CameraPose, Renderer, WallMode } from '../render/types';
@@ -222,7 +222,7 @@ async function openSession(
   warm: boolean,
 ): Promise<GameSession> {
   const params = new URLSearchParams(location.search);
-  devlog('session', { event: 'opening', kind: request.kind, ...(request.kind === 'load' ? { saveId: request.saveId } : { slot: request.slot, town: request.town.name, mode: request.mode ?? 'living' }) });
+  devlog('session', { event: 'opening', request: request.kind, ...(request.kind === 'load' ? { saveId: request.saveId } : { slot: request.slot, town: request.town.name, mode: request.mode ?? 'living' }) });
   // Every loading step names the work in the perf report (a long task or a dropped frame then says which).
   const report = progress;
   progress = (label, value) => {
@@ -1799,7 +1799,8 @@ async function openSession(
   renderer.run((now) => {
     if (failFrames) throw new Error('a frame failed on purpose (__crash)');
     if (DEVLOG) {
-      if (lastFrameAt && now - lastFrameAt >= SLOW_FRAME_MS && !document.hidden) devlogSlowFrame(now - lastFrameAt, { day: game.day, minute: game.minute, speed: game.speed, screen: app.screen });
+      // (Not across a menu over the game or a hidden tab: the game draws nothing then on purpose.)
+      if (lastFrameAt && now - lastFrameAt >= SLOW_FRAME_MS && !document.hidden && !devlogPaused()) devlogSlowFrame(now - lastFrameAt, { day: game.day, minute: game.minute, speed: game.speed, screen: app.screen });
       lastFrameAt = now;
     }
     bridge.sync(now);

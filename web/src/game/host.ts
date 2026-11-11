@@ -14,7 +14,7 @@ import type { Renderer, RenderFailure } from '../render/types';
 import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app, type Progress } from '../ui/app.svelte';
 import { perfTime, perfTimeAsync } from '../debug/perf';
-import { DEVLOG, devlog, renderSample, SAMPLE_MS } from '../debug/devlog';
+import { DEVLOG, devlog, devlogPause, renderSample, SAMPLE_MS } from '../debug/devlog';
 import { game, toast } from '../ui/state.svelte';
 import { basicReport, within } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
@@ -313,6 +313,8 @@ class GameHost {
   cover(on: boolean): void {
     if (on === this.covered) return;
     this.covered = on;
+    // (The dev play log: the gap this makes between frames isn't a stall.)
+    devlogPause();
     void this.renderer?.then((r) => r.hold(on)).catch(() => {});
   }
 

@@ -5,7 +5,7 @@
 
 import { settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
-import { changes, DEVLOG, devlog, startDevLog } from './devlog';
+import { changes, DEVLOG, devlog, devlogPause, startDevLog } from './devlog';
 import { gpuInfo } from './report';
 
 /** Starts the dev play log with the settings it starts on, and watches the screen and the settings. */
@@ -17,6 +17,7 @@ export function watchForDevLog(): void {
   $effect.root(() => {
     $effect(() => {
       devlog('screen', { screen: app.screen, overlay: app.overlay });
+      devlogPause();
     });
     $effect(() => {
       const now = $state.snapshot(settings) as Record<string, unknown>;
