@@ -26,6 +26,7 @@
  *     --extra 'k=v&k=v'        more URL flags for every run
  *     --out <dir>              default <repo>/bench-results/<time>/
  *   --shots <dir>              fixed poses, paused (`diag=freeze`, `hud=0`): one PNG per preset × backend × pose
+ *     --poses orbit-day-0,…    which (`POSES`; `play`: the play set, the pictures a change to the look is judged by)
  *     --pages [gallery,…]      with --shots: the dev pages instead (`PAGES`: the gallery, clips, residents and
  *                              poses benches, each held still), one PNG per page × backend × diag
  *   --compare <dirA> <dirB>    pixel differences between two shot folders (and `--out` for the difference images)
@@ -90,7 +91,24 @@ const POSES = {
   'mirror-day-0': 'cam=mirror&hour=13&at=0',
   'mirror-day-15': 'cam=mirror&hour=13&at=15',
   'mirror-night-0': 'cam=mirror&hour=21&at=0',
+  // The play set (`--poses play`): the home lot as a game opens on it (24 m, beta 0.86) with the sun behind the
+  // camera and ahead of it, at dusk and by night; the same with the walls up (the house whole, roof on); the lot
+  // from across its street; and the menus' town from the main menu's angle.
+  'play-day': 'cam=orbit&hour=13&at=0&beta=0.86',
+  'play-day-b': 'cam=orbit&hour=13&at=20&beta=0.86',
+  'play-dusk': 'cam=orbit&hour=19&at=0&beta=0.86',
+  'play-night': 'cam=orbit&hour=21&at=0&beta=0.86',
+  'up-day': 'cam=orbit&hour=13&at=0&beta=0.86&walls=up',
+  'up-dusk': 'cam=orbit&hour=19&at=0&beta=0.86&walls=up',
+  'up-night': 'cam=orbit&hour=21&at=0&beta=0.86&walls=up',
+  'street-day': 'cam=street&hour=13&walls=up',
+  'street-night': 'cam=street&hour=21&walls=up',
+  'town-day': 'cam=town&hour=16.5',
 };
+/** `--poses play`: the pictures a change to the look is judged by. */
+const PLAY = ['play-day', 'play-day-b', 'play-dusk', 'play-night', 'up-day', 'up-dusk', 'up-night', 'wide-day-0', 'wide-night-45', 'street-day', 'street-night', 'town-day'];
+/** Poses outside the default list. */
+const NAMED_ONLY = /^(mirror|play|up|street|town)-/;
 
 /**
  * Dev pages for `--shots --pages`: each held still (no wind, clips at a set time, residents' time
@@ -435,7 +453,7 @@ function table(o, results) {
 
 async function shots(o) {
   const { backends, presets, diags, warmup, out } = o;
-  const poses = o.list('poses', Object.keys(POSES).filter((p) => !p.startsWith('mirror')).join(','));
+  const poses = o.list('poses', Object.keys(POSES).filter((p) => !NAMED_ONLY.test(p)).join(',')).flatMap((p) => (p === 'play' ? PLAY : [p]));
   for (const backend of backends) {
     for (const preset of presets) {
       for (const pose of poses) {

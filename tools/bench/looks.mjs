@@ -16,10 +16,10 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tile } from './sheet.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const args = process.argv.slice(2);
@@ -29,32 +29,6 @@ const flag = (name, fallback) => {
 };
 
 const DEFAULT_PAGES = 'characters,characters-side,characters-heads,characters-close,characters-hands,characters-feet,characters-skins,characters-hair,characters-tops,characters-builds,characters-game,characters-near,characters-faces,poses,poses-close,previews,gallery-objects,gallery-furniture,gallery-trees,gallery-nature';
-const LABEL = 44;
-
-/** Tiles the pictures `a` and `b` share, `a`'s on the left, under their names; returns how many. */
-async function pair(a, b, names, out) {
-  const sharp = (await import(createRequire(join(ROOT, 'web/package.json')).resolve('sharp'))).default;
-  mkdirSync(out, { recursive: true });
-  const inB = new Set(readdirSync(b));
-  const shared = readdirSync(a).filter((f) => f.endsWith('.png') && inB.has(f)).sort();
-  for (const name of shared) {
-    const [x, y] = [sharp(join(a, name)), sharp(join(b, name))];
-    const [mx, my] = await Promise.all([x.metadata(), y.metadata()]);
-    const width = mx.width + my.width;
-    const height = Math.max(mx.height, my.height) + LABEL;
-    const text = (label, at) => `<text x="${at}" y="${LABEL - 13}" font-family="Helvetica, Arial, sans-serif" font-size="26" fill="#fff" text-anchor="middle">${label}</text>`;
-    const labels = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${LABEL}"><rect width="100%" height="100%" fill="#1b1d21"/>${text(names[0], mx.width / 2)}${text(names[1], mx.width + my.width / 2)}</svg>`);
-    await sharp({ create: { width, height, channels: 3, background: '#1b1d21' } })
-      .composite([
-        { input: labels, left: 0, top: 0 },
-        { input: await x.toBuffer(), left: 0, top: LABEL },
-        { input: await y.toBuffer(), left: mx.width, top: LABEL },
-      ])
-      .png()
-      .toFile(join(out, name));
-  }
-  return shared.length;
-}
 
 if (args.includes('--pair')) {
   const i = args.indexOf('--pair');
@@ -64,7 +38,7 @@ if (args.includes('--pair')) {
     console.error('usage: looks.mjs --pair <dirA> <dirB> [--names before,after] --out <dir>');
     process.exit(2);
   }
-  const n = await pair(a, b, flag('names', 'before,after').split(','), out);
+  const n = await tile([a, b], flag('names', 'before,after').split(','), out);
   console.log(`${n} pairs in ${out}`);
   process.exit(0);
 }
@@ -87,6 +61,6 @@ const jobs = LOOKS.flatMap((look) => {
 const file = join(out, 'jobs.json');
 writeFileSync(file, JSON.stringify(jobs, null, 1));
 const run = spawnSync('bun', [join(ROOT, 'tools/bench/render.mjs'), '--jobs', file], { stdio: 'inherit' });
-const n = await pair(join(out, LOOKS[0]), join(out, LOOKS[1]), LOOKS, join(out, 'pairs'));
+const n = await tile([join(out, LOOKS[0]), join(out, LOOKS[1])], LOOKS, join(out, 'pairs'));
 console.log(`${n} pairs in ${join(out, 'pairs')}`);
 process.exit(run.status ?? 1);

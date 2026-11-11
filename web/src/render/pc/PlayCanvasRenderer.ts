@@ -2777,6 +2777,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return target.name;
   };
 
+  benchWorld(): WorldStructure | null {
+    return this.lastWorld;
+  }
+
   /**
    * What the benchmark reports of the renderer (`debug/bench.ts`), its fields meaning what they mean
    * in the bench's results up to 0.3.2, so runs compare (see `gpuTiming.ts` for the measures):

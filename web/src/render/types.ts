@@ -506,6 +506,8 @@ export interface Renderer {
   gpuPasses(reset?: boolean): { name: string; ms: number; frames: number }[];
   /** Benchmark: the passes a frame draws, the GPU and what the scene holds (counts that show two runs drew the same). */
   benchInfo(): Record<string, unknown> & { passes: RenderPassInfo[] };
+  /** Benchmark: the world last drawn (its town shown as the menus' for `cam=town`), or null. */
+  benchWorld(): WorldStructure | null;
   configure(options: LiveRenderOptions): void;
   /** Small JPEG data URL of the current view, or null if capture isn't possible. */
   captureThumbnail(width: number, height: number): Promise<string | null>;
