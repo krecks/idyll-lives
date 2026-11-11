@@ -53,6 +53,8 @@ export class StageController implements SimStage {
     private readonly studio: Studio,
     host: HTMLElement,
     private readonly release: () => void,
+    /** The resident is drawn with the close-up body: they fill the view here, and the body's outline shows its edges. */
+    private readonly closeUp = true,
   ) {
     const canvas = studio.canvas;
     canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab';
@@ -79,7 +81,7 @@ export class StageController implements SimStage {
   show(look: SimLook): void {
     if (this.detached) return;
     this.look = { gender: look.gender, appearance: JSON.parse(JSON.stringify(look.appearance)), id: look.id };
-    this.studio.setRow(ROW, { look: this.look, x: 0, z: 0, yaw: this.yaw });
+    this.studio.setRow(ROW, { look: this.look, x: 0, z: 0, yaw: this.yaw, closeUp: this.closeUp });
   }
 
   react(reaction: StageReaction): void {

@@ -57,10 +57,11 @@ class Previews implements SimPreviews {
       return null;
     }
     this.stageCtl?.detach();
-    const ctl = new StageController(studio, host, () => {
+    const release = () => {
       if (this.stageCtl === ctl) this.stageCtl = null;
       this.idleCheck();
-    });
+    };
+    const ctl: StageController = new StageController(studio, host, release, this.deps.closeUp !== false);
     this.stageCtl = ctl;
     this.loop(studio);
     return ctl;

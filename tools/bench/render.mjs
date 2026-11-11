@@ -138,6 +138,10 @@ const PAGES = {
   'characters-builds': { path: '/characters.html', query: 'manual&builds=all&labels=0', webgl: true },
   'characters-game': { path: '/characters.html', query: 'manual&camera=game&labels=0', webgl: true },
   'characters-near': { path: '/characters.html', query: 'manual&camera=near&labels=0', webgl: true },
+  // One resident as the household creator's face view frames them (half a metre of face down the picture), bald, to
+  // judge the head's outline: `--extra hd=1` draws the close-up body the creator's stage draws, without it the body.
+  'characters-creator': { path: '/characters.html', query: 'manual&family=male&stage=youngAdult&closeup=1&labels=0&fov=0.46&radius=1.07&skin=%23F3D6C2&hairStyle=none&t=0', webgl: true },
+  'characters-creator-female': { path: '/characters.html', query: 'manual&family=female&stage=youngAdult&closeup=1&labels=0&fov=0.46&radius=1.07&skin=%23F3D6C2&hairStyle=none&t=0', webgl: true },
   'characters-faces': { path: '/characters.html', query: 'manual&face=moods&family=female&cols=6&closeup=1&labels=0', webgl: true },
   // The faces of their own (the identity channels): the shared face, then each channel at -1 and at +1, four channels
   // a line, and a line of random faces (`--extra only=jawWidth,chinLength&per=2&radius=1.6`: a few of them, larger).
@@ -149,6 +153,9 @@ const PAGES = {
   'characters-identity-ends': { path: '/characters.html', query: 'manual&faces=ends&closeup=1&t=0&cols=5', webgl: true },
   poses: { path: '/poses.html', query: 'manual&labels=0', webgl: true, prepare: () => window.__poses.advance(2) },
   previews: { path: '/previews.html', query: '', webgl: true },
+  // The household creator's stage itself, at its face view (`--extra hd=0`: with the body, where it draws the close-up body).
+  'previews-stage': { path: '/previews.html', query: 'stage=male&zoom=1&bald', webgl: true },
+  'previews-stage-female': { path: '/previews.html', query: 'stage=female&zoom=1&bald', webgl: true },
   'poses-close': { path: '/poses.html', query: 'manual&only=sofa,sleep,cook,bath,piano,hug&cols=3&labels=0', webgl: true, prepare: () => window.__poses.advance(2) },
 };
 

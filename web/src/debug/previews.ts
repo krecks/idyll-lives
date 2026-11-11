@@ -7,7 +7,9 @@
  *
  * The residents are made from seeds (`lookFromSeed`, the same look every time); the objects are
  * the first `?count=12` objects of the shop in id order, or those `?ids=tree,garden.apple` names. `?renderer=webgl` draws with
- * WebGL2. Sets `window.__ready` once every picture has loaded. `?debug` exposes the residents'
+ * WebGL2. Sets `window.__ready` once every picture has loaded. `?stage=male|female` shows the household creator's
+ * stage alone instead, over the whole page, with the first of those residents on it (`?zoom=1`: its face view;
+ * `?bald`; `?hd=0`: drawn with the body, where the stage draws the close-up body). `?debug` exposes the residents'
  * previews as `__previews` (`render/preview/index.ts`): the household creator's stage can be
  * attached from a script (`__previews.stage(host)`) and its studio inspected (`__previews.live`).
  * Both preview apps are PlayCanvas apps of their own (`pc/device.ts` `createSideApp`).
@@ -36,8 +38,23 @@ const objects = content.shop
   .toSorted((a, b) => (a.id < b.id ? -1 : 1))
   .slice(0, ids ? ids.length : count);
 
-const sims = createSimPreviews({ assets, emotions: content.emotions.map((e) => e.id), backend: () => backend });
+const sims = createSimPreviews({ assets, emotions: content.emotions.map((e) => e.id), backend: () => backend, closeUp: params.get('hd') !== '0' });
 const items = createItemPreviews(assets);
+
+const staged = params.get('stage');
+if (staged) {
+  const gender = staged === 'female' ? 'female' : 'male';
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;inset:0;background:#9cc3e6';
+  document.body.append(host);
+  const stage = await sims.stage(host);
+  if (!stage) throw new Error('The stage is unavailable');
+  stage.show({ gender, appearance: { ...lookFromSeed(assets, gender, 7919), ...(params.has('bald') ? { hairStyle: 'none' as const } : {}) } });
+  stage.zoomTo(Number(params.get('zoom') ?? 0));
+  // (The framing eases in, and the close-up body comes a moment after the body.)
+  await new Promise((resolve) => setTimeout(resolve, 4000));
+  Object.assign(window, { __ready: true });
+}
 
 /** A row of pictures under a heading; each resolves to an `<img>` once loaded (or a gap). */
 function row(title: string, pictures: Promise<{ url: string | null; label: string }>[]): Promise<void>[] {
@@ -59,7 +76,7 @@ function row(title: string, pictures: Promise<{ url: string | null; label: strin
   });
 }
 
-await Promise.all([
+if (!staged) await Promise.all([
   ...row(
     'Portraits',
     looks.map(async (look, i) => ({ url: await sims.portrait(look), label: `${look.gender} ${i + 1}` })),
