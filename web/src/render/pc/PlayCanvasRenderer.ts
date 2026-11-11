@@ -74,6 +74,7 @@ import { GameCameraRig, keepUp } from '../shared/cameraRig';
 import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS } from '../shared/lens';
 import { TILT, tiltRows, tiltShare } from '../shared/tilt';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
+import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
 import { PLAYBACK_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
@@ -650,6 +651,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sizeWatch.observe(canvas);
     const forceWebGL = this.deps.backend === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
     this.device = await createDevice(canvas, forceWebGL);
+    // (Before the first material is made: Low's shaders are built without the clouds' shadows.)
+    if (!this.quality.cloudShadows) withoutCloudShadows(this.device);
     steadyShaderKeys();
     // Before anything compiles: every shader and pipeline is counted (`?diag=shaders` logs them).
     this.shaderWatch = new ShaderWatch(this.device, this.diag.has('shaders'));

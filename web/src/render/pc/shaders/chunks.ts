@@ -45,8 +45,9 @@
  * Vertex snippets work on the local position, which is game space already.
  */
 
+import { benchDiag } from '../../../debug/benchFlags';
 import * as pc from '../engine';
-import { noCloudShadows } from '../cloudShadows';
+import { cloudShadowsOn, noCloudShadows } from '../cloudShadows';
 import { CLOUD_CODE } from './clouds';
 import { CUTAWAY } from './cutaway';
 import { CUTOUT } from './cutout';
@@ -428,8 +429,9 @@ export function patchEngineChunks(device: pc.GraphicsDevice): void {
     if (!light.includes(PATCHED)) {
       const anchor = ANCHORS[lang].lightFunctionLightPS;
       // The sun kept out of basements; a forward lamp kept in its room (`roomLights.ts`).
-      // And the sun dimmed under a cloud's shadow (`clouds.ts`).
-      chunks.set('lightFunctionLightPS', `${PATCHED}\n${CLOUD_CODE[lang].decl}${replaceOnce(light, 'lightFunctionLightPS', anchor, `${anchor}${ENGINE_PATCHES[lang].sun}${CLOUD_CODE[lang].sun}${ROOM_LIGHT_CODE[lang].forward}`)}`);
+      // And the sun dimmed under a cloud's shadow (`clouds.ts`), where the preset has them (`?diag=noclouds` leaves it out, to measure it).
+      const clouds = benchDiag().has('noclouds') || !cloudShadowsOn(device) ? { decl: '', sun: '' } : CLOUD_CODE[lang];
+      chunks.set('lightFunctionLightPS', `${PATCHED}\n${clouds.decl}${replaceOnce(light, 'lightFunctionLightPS', anchor, `${anchor}${ENGINE_PATCHES[lang].sun}${clouds.sun}${ROOM_LIGHT_CODE[lang].forward}`)}`);
     }
     // The lamps kept in their rooms, and out of the meshes they don't light (`roomLights.ts`).
     const clustered = engineChunk(device, lang, 'clusteredLightPS');

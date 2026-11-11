@@ -48,6 +48,17 @@ export function cloudCover(size = SIZE): Uint8Array {
 }
 
 const blanks = new WeakMap<pc.GraphicsDevice, pc.Texture>();
+const without = new WeakSet<pc.GraphicsDevice>();
+
+/** `device`'s shaders are built without cloud shadows (a preset that has none, `QualitySettings.cloudShadows`): before its first material is made. */
+export function withoutCloudShadows(device: pc.GraphicsDevice): void {
+  without.add(device);
+}
+
+/** Whether `device`'s shaders read the clouds (`shaders/chunks.ts`'s patch). */
+export function cloudShadowsOn(device: pc.GraphicsDevice): boolean {
+  return !without.has(device);
+}
 
 /** No clouds on `device` until a renderer has some (before its first shader is built: `patchEngineChunks`). */
 export function noCloudShadows(device: pc.GraphicsDevice): void {
