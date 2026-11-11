@@ -486,6 +486,7 @@ impl World {
             lot,
             blocked: &self.blocked,
             stairs: &self.stairs,
+            kept_off: &self.travel.junction_tiles,
         };
         let p = &self.plots[plot as usize];
         let inside = |x: i32, z: i32| {

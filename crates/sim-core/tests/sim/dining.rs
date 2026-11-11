@@ -71,6 +71,7 @@ fn nav(w: &World) -> NavGrid<'_> {
         lot: &w.lot,
         blocked: w.blocked(),
         stairs: w.stair_map(),
+        kept_off: &[],
     }
 }
 

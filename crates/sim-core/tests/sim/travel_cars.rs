@@ -1365,6 +1365,69 @@ fn someone_on_foot_crosses_a_lit_junction_on_its_zebras_on_the_walk_never_throug
 }
 
 #[test]
+fn someone_on_foot_left_in_a_lit_junctions_box_gets_out_with_nothing_to_do_or_on_their_way() {
+    // Canalside: Mila, saved in a T's box (1.7 m into it), stood there for a day with nothing to
+    // do, every way out kept off to her, a taxi and two cars waiting round her. Kept off is only
+    // stepping onto it: someone in the crossroads' box with nothing to do (nobody choosing for
+    // themselves) walks off the road to the pavement; told to walk somewhere, they go, off the
+    // box the nearest way.
+    let mut w = crossroads(&[crossroads_house(150.0, true)]);
+    common::run_to(&mut w, 2, 7.0);
+    w.autonomy = false;
+    let sig = w.travel.signals[0].clone();
+    let at = [sig.at[0] + 1.3, sig.at[1] + 1.7];
+    let tile = |p: [f32; 2]| w.lot.tile_index(p[0].floor() as i32, p[1].floor() as i32);
+    assert!(w.blocked()[tile(at)], "the box isn't kept off");
+    let place = |w: &mut World| {
+        for _ in 0..8 {
+            if w.apply(sim_core::Command::Cancel { sim: 0, index: 0 })
+                .is_err()
+            {
+                break;
+            }
+        }
+        w.sims[0].pos = at;
+    };
+    place(&mut w);
+    let start = w.tick;
+    let mut out = None;
+    while w.tick < start + common::secs(30.0) {
+        w.tick_once();
+        let p = w.sims[0].pos;
+        if !w.travel.on_carriageway(p, 0.0) {
+            out = Some(w.tick - start);
+            break;
+        }
+    }
+    let p = w.sims[0].pos;
+    let out = out.unwrap_or_else(|| panic!("still in the road at {p:?}"));
+    // (A couple of metres: a few seconds.)
+    assert!(out < common::secs(8.0), "out after {out} ticks");
+    for _ in 0..common::secs(5.0) {
+        w.tick_once();
+    }
+    let p = w.sims[0].pos;
+    assert!(
+        !w.travel.on_carriageway(p, 0.0) && in_junction(&sig, p).is_none(),
+        "back in the road at {p:?}"
+    );
+    // On their way somewhere from in the box: off it, and there.
+    place(&mut w);
+    let to = [sig.at[0] - 20.0, sig.at[1] - 6.0];
+    walk_to(&mut w, 0, to);
+    let mut there = false;
+    for _ in 0..common::secs(60.0) {
+        w.tick_once();
+        let p = w.sims[0].pos;
+        if (p[0] - to[0]).hypot(p[1] - to[1]) < 0.4 {
+            there = true;
+            break;
+        }
+    }
+    assert!(there, "never there: at {:?}", w.sims[0].pos);
+}
+
+#[test]
 fn a_lit_junction_keeps_those_on_foot_off_its_box_but_never_cuts_ground_off() {
     // The crossroads, and a pocket of the pavement by its north arm, walled round but for its side
     // onto the road kept off by the stop line: kept off it, nobody could get in or out of the
@@ -1395,6 +1458,7 @@ fn a_lit_junction_keeps_those_on_foot_off_its_box_but_never_cuts_ground_off() {
         lot: &w.lot,
         blocked: w.blocked(),
         stairs: w.stair_map(),
+        kept_off: &[],
     };
     assert!(
         nav.find_path((x0, z0), (150, 150)).is_some(),

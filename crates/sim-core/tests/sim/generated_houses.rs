@@ -189,6 +189,7 @@ fn generated_houses_are_livable() {
             lot: &w.lot,
             blocked: w.blocked(),
             stairs: w.stair_map(),
+            kept_off: &[],
         };
         let start = (entry[0].floor() as i32, entry[1].floor() as i32);
         let mut seated = 0;

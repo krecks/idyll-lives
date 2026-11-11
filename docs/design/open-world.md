@@ -142,7 +142,12 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   lit junction on its zebras only: its box, and each arm's carriageway out past its stop line by
   `KEEP_OFF` 3 m but for the zebra (an arm without one, out to the box's edge), are blocked to
   them for good (`Signal::off_limits`, `Travel::junction_tiles`, in `ground_blocked`), so their
-  way goes over a zebra or crosses the road further off. The zebra and the road by the stop line
+  way goes over a zebra or crosses the road further off. Kept off is only stepping onto them:
+  one standing on them (set down there, or there before they were kept off) gets off them the
+  nearest way, over them (`NavGrid::kept_off`, `NavGrid::way_out`), and anyone standing in a
+  road's carriageway with nothing to do walks off it to the nearest ground off it
+  (`world::off_the_road`): Canalside's Mila, saved in a T's box, stood there for a day, every
+  way out shut to her, a taxi and two cars held up round her. The zebra and the road by the stop line
   are measured from the arm's own road there (`SignalArm::span`, its middle at the crosswalk and
   `KEEP_OFF` past the stop line, where that goes out within 30° of the arm's way and about as far
   out; else along the way), not along the arm's way out from the junction's middle: a road
