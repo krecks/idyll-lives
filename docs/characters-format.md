@@ -54,11 +54,11 @@ The build is deterministic (seeded noise only): the same code gives the same byt
 - The reference skeleton for the clips is the male young adult: `sourcePelvis` is its pelvis rest
   position, and `reference` gives its body name and its thigh and shin lengths (for leg IK).
 
-## rig.json (version 4)
+## rig.json (version 5)
 
 | Key | Meaning |
 |---|---|
-| `version` | 4 |
+| `version` | 5 |
 | `bones`, `parents`, `clipBones`, `head`, `face.bones` | the skeleton above (parents come before children) |
 | `fps` | 30 (clip baking) |
 | `sourcePelvis`, `sourceRestQ` | the reference pelvis; identity rotations (`NB * 4`) |
@@ -85,7 +85,8 @@ A body entry:
 | `garments` | id -> cut, every id of the family in the creator's order (see Clothes) |
 | `bodyChunks` | `{ "body": [] }` (clothes are painted, skin is never hidden) |
 | `parts` | part name -> byte offsets in `mesh` |
-| `stages` | other life stages: `{ mesh, height, restT, inverseBind, pelvisScale, seatDrop, eyeY, grip, faceScale, parts }` |
+| `hd` | the close-up body, in a file of its own: `{ mesh: "<family>.hd.bin", parts: { "hd.body": … } }`, laid out as `mesh` and `parts` are (see Close-up body) |
+| `stages` | other life stages: `{ mesh, height, restT, inverseBind, pelvisScale, seatDrop, eyeY, grip, faceScale, parts, hd }` (`hd`: `{ mesh: "<family>.<stage>.hd.bin", parts: { "hd.body": … } }`, the close-up body's deltas) |
 
 No textures: `textures`, `cloth`, `hairTextures`, `hairCards` are gone, and so are UVs.
 
@@ -108,10 +109,9 @@ No textures: `textures`, `cloth`, `hairTextures`, `hairCards` are gone, and so a
 `normals` i8 x4 (/ 127). Every part has the same vertices at every stage; fields, tone, weights,
 indices and morphs come from the base.
 
-The runtime interleaves field, morph slot and tone into one vertex buffer (`simField` 0,
-`simMorph` 4, `simTone` 8; stride 12 floats; parts no morph moves get slot -1), so a draw uses 7
-vertex buffers (position, normal, joints, weights, that one, the instance matrices and settings)
-of WebGPU's 8.
+The runtime interleaves a part's position, normal, joints, weights, field, morph slot and tone into
+one vertex buffer of 80 bytes a vertex (`residentMesh` in `pc/characterMaterial.ts`; parts no morph
+moves get slot -1); the instance matrices and settings are the draw's other buffers.
 
 ## Parts
 
@@ -131,6 +131,25 @@ Every body has:
 | `lod.<shell>` | a low-detail copy of every shell | | `cloth` |
 
 `hair.none` has no part: a bald resident's scalp keeps the skin colour (appearance texel 7 w = 0).
+
+### Close-up body
+
+`hd.body` is the body one subdivision finer (level 2 where `body` is level 1: its skin in four times the
+triangles, 20,200 with the same lids, lips and ears after it), with fields, tone, occlusion and morphs
+of its own, worked out at its own vertices. It is drawn in place of `body` only where one resident fills
+the view: the creator's stage, where `body`'s outline shows its edges as corners of 8 to 20 degrees
+(3 to 4 px at the face view). In play it shows nothing, even at the closest zoom (6 m), and a portrait
+(160 px over 0.44 m, shown at 26 to 60 px) would move its outline by less than half a pixel, so
+neither uses it.
+
+It is stored, not made at load: its skin is snapped to the body's surface and its sockets carved at
+its own vertices, as its fields, tone and morphs are worked out there, at every stage and for every
+identity channel, and a subdivision step at load reproduces none of that. So that play never
+downloads it, it lives in files of its own: `<family>.hd.bin` (the part) and `<family>.<stage>.hd.bin`
+(its deltas), 1.29 MB gzipped over the 3.85 MB play fetches in all. The creator fetches a family's
+(about 330 KB gzipped) with the first resident of that family on its stage, and a stage's (46 to 74 KB)
+with the first of that stage; until they arrive, and if they fail to, the stage draws `body`
+(`loadCloseUp` in `characters/data.ts`).
 
 Hair (`hair.rs`, up to 7.4k triangles a style, one draw) is closed shapes in locks, so it breaks
 its outline and shades in clumps. Every style's layout is a shape, and it is cut at `DETAIL` (1.5)
@@ -814,7 +833,10 @@ See also `tools/characters/README.md`.
   `?per=2` channels a line, `?faces=random`, `?faces=ends` for the sliders' corners; `?hairStyle=bob`, `?beard=1`; the
   `characters-identity*` pages of `tools/bench/render.mjs`),
   `?clip=<name>&t=<s>`, `?view=side|back`, `?closeup=1` (`?y=`: the height it looks at), `?build=1.2`, `?cols=`, `?manual`
-  (`__bench.advance(s)`); sets `window.__ready`.
+  (`__bench.advance(s)`); `?hd=1` draws everyone with the close-up body (the `characters-creator` pages of
+  `tools/bench/render.mjs` frame one resident as the creator's face view does, to shoot both); sets `window.__ready`.
+- `/previews.html?stage=male|female&zoom=1`: the household creator's stage itself (`?hd=0`: with the body, where it
+  draws the close-up body; the `previews-stage` pages).
 - `/poses.html`: residents at real furniture, seats and beds, cooking, carrying, socials.
   `?only=<labels>` picks stations, `?seats=sofa,toilet` seats a man and a woman on each object,
   `?clip=<name>` plays one clip on everyone, `?clip=<name>&strip=8` shows it held at 8 times on a

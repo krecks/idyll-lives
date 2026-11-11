@@ -1132,7 +1132,7 @@ pub struct Surface {
     /// The same triangles without the eye sockets (where the closed lids lie, face.rs).
     pub bare_tris: Vec<[V3; 3]>,
     pub cranium: Vec<V3>,
-    /// SPIKE (`hd.body`, the close-up detail level): the whole body at level 2. Positions (snapped,
+    /// The close-up body (`hd.body`): the whole body at level 2. Positions (snapped,
     /// sockets carved), the same without the sockets, their smooth normals,
     /// and the weights, tags and regions subdivided to level 2 (`Topology::fine_m`).
     pub fine_pos: Vec<V3>,
@@ -1193,7 +1193,7 @@ fn make_surface(family: &str, stage: &str, id: &Identity) -> Surface {
     let region1 = s.m.apply_n(&region);
     // Head and neck, densely (for the head interface's sdf and surface_z).
     let fpos = topo.snapped(true, &base, &ctrl, &onto, &holes);
-    // SPIKE (`hd.body`): level 2 as a mesh of its own.
+    // The close-up body (`hd.body`): level 2 as a mesh of its own.
     let fine_dense = rigid_fingertips(topo.fine_m.apply_n(&arr.dense), &fpos, &p);
     let fine_tags = tags.subdivided(&topo.fine_m);
     // Normals from the finer (level-2) limit surface: smooth shading on the coarse level 1 (whose
@@ -1280,7 +1280,7 @@ fn make_surface(family: &str, stage: &str, id: &Identity) -> Surface {
 
 static TRIS_HD: Cache<String, Vec<usize>> = Cache::new();
 
-/// SPIKE (`hd.body`): level-2 triangles, split as `tris` splits level 1's.
+/// The close-up body's triangles (level 2), split as `tris` splits level 1's.
 pub fn tris_hd(family: &str) -> Arc<Vec<usize>> {
     TRIS_HD.get(family.to_string(), || {
         triangles(&topology().s2.quads, &surface(family, BASE_STAGE).fine_pos).concat()
@@ -1311,7 +1311,7 @@ pub struct Body {
     pub joints: [V3; NB],
     /// `body`'s positions without the eye sockets (`Surface::unsocketed`; its normals are so already).
     pub unsocketed: Vec<V3>,
-    /// SPIKE: the body at level 2 (`hd.body`'s skin) and its positions without the eye sockets.
+    /// The body at level 2 (the close-up body's skin, `hd.body`) and its positions without the eye sockets.
     pub hd: Mesh,
     pub hd_unsocketed: Vec<V3>,
 }
@@ -1562,24 +1562,30 @@ fn folds(pos: &[V3], idx: &[usize], head: &HeadFrame) -> Vec<f64> {
 const NOSTRIL: (f64, f64, f64, f64) = (0.006, 0.026, 0.044, 0.03);
 const NOSTRIL_SHADE: f64 = 0.6;
 
-/// Clothes fields and tone of the (base stage) body or its LOD; the face's pieces and the ears after the skin.
+/// Which of a body's three meshes: the low-detail one, the body, or the close-up body (`hd.body`).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Detail {
+    Lod,
+    Body,
+    CloseUp,
+}
+
+/// Clothes fields and tone of the (base stage) body at `detail`, worked out at that mesh's own vertices;
+/// the face's pieces and the ears after the skin.
 pub fn body_fields_and_tone(
     family: &str,
+    detail: Detail,
     mesh: &Mesh,
     p: &[V3; NB],
     head: &HeadFrame,
 ) -> (Vec<[f64; 4]>, Vec<[f64; 4]>) {
     let s = surface(family, BASE_STAGE);
     let n = mesh.pos.len();
-    let lod = n < s.pos.len();
-    // SPIKE (`hd.body`): the level-2 body's are worked out at its own vertices.
-    let hd = n >= s.fine_pos.len();
-    let (pos, tags, region, nor) = if lod {
-        (&s.lod_pos, &s.lod_tags, &s.lod_region, &s.lod_nor)
-    } else if hd {
-        (&s.fine_pos, &s.fine_tags, &s.fine_region, &s.fine_nor)
-    } else {
-        (&s.pos, &s.tags, &s.region, &s.nor)
+    let lod = detail == Detail::Lod;
+    let (pos, tags, region, nor) = match detail {
+        Detail::Lod => (&s.lod_pos, &s.lod_tags, &s.lod_region, &s.lod_nor),
+        Detail::Body => (&s.pos, &s.tags, &s.region, &s.nor),
+        Detail::CloseUp => (&s.fine_pos, &s.fine_tags, &s.fine_region, &s.fine_nor),
     };
     let k = pos.len();
     let mut f = fields_of(family, pos, &tags.arm, region, p, head);

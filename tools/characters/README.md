@@ -4,7 +4,8 @@ The residents are made in code. Nothing here downloads anything.
 
 - `cargo characters` (Rust, in `crates/tools/src/characters`, no Python): the bodies, faces, hair,
   beards and clothes of both families at every life stage. `cargo characters build` writes
-  `web/public/assets/characters` (`rig.json` and the `.bin` files) and then checks it.
+  `web/public/assets/characters` (`rig.json` and the `.bin` files; the `.hd.bin` files are the close-up body,
+  which only the household creator's stage fetches) and then checks it.
 - `web/src/render/shared/characters/clips/`: the animation clips, in TypeScript, baked when the game
   loads the character set (no clip file is shipped).
 - `check_clips.ts`: checks those clips against the built rig.
@@ -29,7 +30,8 @@ cd web && bun run check:clips    # check_clips on both bodies at every life stag
   art, the files in `web/public/assets/characters` come out byte-identical (`git status` stays
   clean); commit them together with the generator change when they do change.
 - `cargo characters check` fails on any contract violation: bone names and order, rest frames,
-  vertex and triangle budgets, weights, winding, stage topology, morph channels, garment ids and
+  vertex and triangle budgets, weights, winding, stage topology, the close-up body in files of its own
+  at every stage, morph channels, garment ids and
   cuts, stage heights, the seat drop, eyes in their sockets and uncovered, hair clear of the head
   (and of every face of its own: each identity channel at its two ends), bounded morphs.
 - `check_clips.ts` fails on NaNs, seams in loops, sliding feet, lengths more than 15% off the

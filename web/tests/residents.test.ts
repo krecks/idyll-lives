@@ -126,6 +126,7 @@ describe('residents', async () => {
       poses = data;
       width = w;
     },
+    setMorphs: () => {},
     uploadPoses: () => void log.push(`poses ${hash(poses, 0, RECORDED_ROWS * width * 4)}`),
     uploadPoseRows: (from, count) => void log.push(`rows ${from} ${count} ${hash(poses, from * width * 4, (from + count) * width * 4)}`),
     createPart(body, part, shadow) {

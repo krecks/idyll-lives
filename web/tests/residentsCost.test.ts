@@ -58,6 +58,7 @@ describe('residents not drawn', async () => {
   const lens = { height: 720, fov: 0.8 };
   const view: View = {
     init: () => {},
+    setMorphs: () => {},
     uploadPoses: () => {},
     uploadPoseRows: () => {},
     createPart(body, part, shadow) {

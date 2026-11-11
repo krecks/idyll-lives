@@ -25,8 +25,8 @@
  *   `?camera=near` from as close as it comes (6 m): the residents at the sizes players see them;
  * - `?renderer=webgl` draws with WebGL2 (default WebGPU); `?ground=0` leaves the floor out (the
  *   residents alone, e.g. to compare diag views);
- * - SPIKE: `?hd=1` draws the close-up detail level (`hd.body`, the whole body at subdivision level 2) in place of
- *   `body` on every resident at every size (`shared/characters/data.ts` `HD_SPIKE`), to shoot the same view both ways;
+ * - `?hd=1` draws the close-up body (`hd.body`, the whole body one subdivision finer, which only the creator's stage
+ *   draws) in place of `body` on every resident at every size, to shoot the same view both ways;
  *   `?skin=%23F3D6C2` gives every resident that skin and `?fov=0.46` sets the lens (with `radius=1.07`: the household
  *   creator's face view, half a metre of face down the picture);
  * - The residents are shaded in the game's soft look (`softLook.ts`); `?look=classic` (dev only)
@@ -87,7 +87,7 @@ const common = (): Partial<Appearance> => ({
   ...(build ? { build } : {}),
   ...(params.get('hairStyle') ? { hairStyle: params.get('hairStyle') as HairStyle } : {}),
   ...(params.has('beard') ? { beard: true } : {}),
-  // (SPIKE: `?skin=%23F3D6C2`, one skin for every resident on the page.)
+  // (`?skin=%23F3D6C2`: one skin for every resident on the page.)
   ...(params.get('skin') ? { skin: params.get('skin')! } : {}),
 });
 const sheets = ['hair', 'tops', 'skins', 'builds', 'face', 'faces', 'body'].filter((k) => params.has(k));
@@ -97,7 +97,8 @@ const EMOTIONS = Object.keys(EXPRESSIONS);
 /** `?moods=sad,happy`: only those (with the neutral one first). */
 const shown = params.get('moods')?.split(',') ?? EMOTIONS;
 if (!sheets.length || stageParam === 'all') {
-  for (const g of families) rows.push(STAGES.map((s) => ({ label: `${g} ${s}`, gender: g, look: { stage: s, ...(build ? { build } : {}) } })));
+  // (`?stage=<id>` alone: that stage only, with what the page's flags give everyone.)
+  for (const g of families) rows.push((lifeStage ? [lifeStage] : STAGES).map((s) => ({ label: `${g} ${s}`, gender: g, look: { ...common(), stage: s } })));
 }
 for (const g of families) {
   if (params.has('hair')) {
@@ -186,7 +187,7 @@ const stage = await createStage({
   alpha: Number(params.get('alpha') ?? Math.PI / 2),
   beta: Number(params.get('beta') ?? (gameCamera ? DEFAULT_ORBIT.beta : closeup ? Math.PI / 2 : 1.3)),
   radius: Number(params.get('radius')) || gameCamera || (packed ? Math.max(cols * gap * 2.05, (lines * rowGap + 0.3) * 3.6) : closeup ? Math.max(cols * gap * 1.5, lines * rowGap * 2.6) : Math.max(width * 0.75, lines * rowGap * 1.3, 3)),
-  // (SPIKE: `?fov=0.46`, the lens; the household creator's with `radius=1.07` is its face view.)
+  // (`?fov=0.46`: the lens; the household creator's with `radius=1.07` is its face view.)
   ...(params.get('fov') ? { fov: Number(params.get('fov')) } : gameCamera ? { fov: LENS.fov } : packed ? { fov: 0.3 } : {}),
   near: 0.02,
   wheelPrecision: 60,
@@ -197,7 +198,9 @@ stage.lawn(width, depth, '#8E9A7A');
 
 const zOf = (line: number) => (closeup ? line * 0.3 : -(line - (lines - 1) / 2) * rowGap);
 const liftOf = (line: number) => (closeup ? (lines - 1 - line) * rowGap : 0);
-const sims: SimInfo[] = placed.map((p) => ({
+/** `?hd=1`: everyone drawn with the close-up body. */
+const closeUpBody = params.get('hd') === '1';
+const sims: (SimInfo & { closeUp?: boolean })[] = placed.map((p) => ({
   id: p.i,
   name: p.label,
   household: 0,
@@ -206,9 +209,11 @@ const sims: SimInfo[] = placed.map((p) => ({
   appearance: { ...base(p.gender), ...p.look } as Appearance,
   traits: [],
   perks: [],
+  ...(closeUpBody ? { closeUp: true } : {}),
 }));
 const characters = new Characters(app, stage.root, assets, lib);
 if (!(await characters.init())) throw new Error('characters unavailable');
+if (closeUpBody) await Promise.all(sims.map((s) => characters.closeUp(s.gender, s.appearance?.stage)));
 await characters.build({ sims, objects: [] });
 
 const clipName = params.get('clip');

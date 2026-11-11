@@ -60,7 +60,7 @@ import { LOW_TOP, SIT_LOW } from './clips/low';
 import { RIDE_BIKE, RIDE_BIKE_CHILD, RIDE_SCOOTER } from './clips/rides';
 import { FLOOR_SITS } from './clips/seated';
 import { HANDED } from './clips/serve';
-import { type BodyData, type CharacterSet, type Clip, loadCharacterSet, loadStage } from './data';
+import { CLOSE_UP, type BodyData, type CharacterSet, type Clip, type MorphSet, loadCharacterSet, loadCloseUp, loadStage } from './data';
 import { BEARING_FLOATS, bearing } from './bodyLanguage';
 import { gaitFor } from './gait';
 import { TURN_FADE, isTurn, turnClipIn, turnDone, turnOnSpot, turnYaw } from './turns';
@@ -162,6 +162,8 @@ function samplePlayer(set: CharacterSet, p: Player, q: Float32Array, t: Float32A
 
 export class Characters<M extends object, Q, P extends ResidentProp> {
   private set: CharacterSet | null = null;
+  /** The morphs the view's texture was last made from, when not the set's own (`closeUp`). */
+  private morphsShown: MorphSet | null = null;
   private failed = false;
   private data!: Float32Array;
   /** The pose texture as last uploaded, and which rows were drawn then (see `upload`). */
@@ -526,6 +528,33 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     return (this.assets.has(key, 'character') ? this.assets.get(key, 'character')!.part : undefined) ?? `hair.${style}`;
   }
 
+  /**
+   * Fetches the close-up body for residents of `gender` at life stage `stage` (the base body's without one), once,
+   * and gives the view the morphs with its own among them. Resolves to whether it is there: a resident built
+   * with `closeUp: true` then draws it in the body's place (`build`), and until then, or without it, the body.
+   * Only for a view where a resident fills the picture (the creator's stage): play never asks, so never fetches it.
+   */
+  async closeUp(gender: string, stage?: string): Promise<boolean> {
+    if (!(await this.init())) return false;
+    const set = this.set!;
+    const base = this.baseBody(gender);
+    const ok = await loadCloseUp(set, base, stage ?? base.stage);
+    if (ok && set.closeUpMorphs && set.closeUpMorphs !== (this.morphsShown ?? set.morphs)) {
+      this.morphsShown = set.closeUpMorphs;
+      this.view.setMorphs(set.closeUpMorphs);
+    }
+    return ok;
+  }
+
+  /** Whether the close-up body for `gender` at `stage` has loaded (`closeUp`). */
+  hasCloseUp(gender: string, stage?: string): boolean {
+    const set = this.set;
+    if (!set) return false;
+    const base = this.baseBody(gender);
+    const body = stage && stage !== base.stage ? set.bodies.get(`${base.name}.${stage}`) : base;
+    return !!body?.parts.has(CLOSE_UP);
+  }
+
   /** The base body (young adult) for a gender. */
   private baseBody(gender: string): BodyData {
     const set = this.set!;
@@ -627,7 +656,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const outfitId = (s as SimInfo & { outfitId?: number }).outfitId ?? s.id;
       const day = outfitFor(outfitId, s.gender, s.appearance, body, 'day', undefined, s.outfit);
       // (Pyjamas are the same garments, so the same chunks show at night.)
-      for (const part of skinChunks(body, day.parts)) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
+      // (The close-up body in the body's place for a resident that fills the view, once it has loaded: `closeUp`.)
+      const fine = !!(s as SimInfo & { closeUp?: boolean }).closeUp && body.parts.has(CLOSE_UP);
+      for (const chunk of skinChunks(body, day.parts)) {
+        const part = fine && chunk === 'body' ? CLOSE_UP : chunk;
+        if (body.parts.has(part)) push(`${body.name}:${part}`, s);
+      }
       for (const part of FACE_PARTS) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
       // The hair and the beard, each with its wisps (its soft edges, drawn only close up: `detailOf`).
       const hair = [hairKey, ...(s.appearance?.beard && !YOUNG_STAGES.has(body.stage) ? ['hair.beard'] : [])];
@@ -4586,7 +4620,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (cached) return cached;
     if (!body.parts.has(part)) return null;
     const mesh = this.view.createPart(body, part, shadow);
-    const range = shadow ? Range.Always : part.startsWith('lod.') ? Range.Far : part === 'body' || /^(body|top|bottom|shoes)\./.test(part) ? Range.Near : Range.Always;
+    const range = shadow ? Range.Always : part.startsWith('lod.') ? Range.Far : part === 'body' || part === CLOSE_UP || /^(body|top|bottom|shoes)\./.test(part) ? Range.Near : Range.Always;
     const pm: PartMesh<M> = { mesh, enabled: true, settings: new Float32Array(0), count: 0, all: new Float32Array(0), detail: shadow ? 0 : detailOf(part), range, shell: shellBit(part) };
     meshes.set(key, pm);
     if (!shadow) this.parts.set(mesh, pm);

@@ -146,6 +146,11 @@ pub fn garments(family: &str) -> &'static [&'static str] {
 }
 
 /// Parts every body has (the face parts are characters.ts FACE_PARTS).
+/// The close-up body: the whole body one subdivision finer than `body` (level 2 for its level 1), with the
+/// same lids, lips and ears after its skin. Drawn only where one resident fills the view (the creator's
+/// stage), where `body`'s outline shows its edges; in play nothing of it is visible.
+pub const HD: &str = "hd.body";
+
 pub const FACE_PARTS: [&str; 5] = ["eyes", "brows", "lashes", "teeth", "tongue"];
 
 pub fn required_parts() -> Vec<String> {

@@ -171,7 +171,7 @@ pub struct Channel {
     pub name: &'static str,
     /// The body's skin (`body`'s first vertices, body.rs `Surface::pos`).
     pub skin: (Vec<V3>, Vec<V3>),
-    /// SPIKE (`hd.body`): the same on the level-2 skin (`Surface::fine_pos`).
+    /// The same on the close-up body's skin (`hd.body`: level 2, `Surface::fine_pos`).
     pub skin_hd: (Vec<V3>, Vec<V3>),
     /// The face's parts (face.rs `PARTS`; `body`: the lids and lips, after the skin).
     pub parts: Vec<(&'static str, Vec<V3>, Vec<V3>)>,
@@ -278,7 +278,7 @@ fn channel(family: &str, name: &'static str, base: &Built, mask: &Mask) -> Chann
     let e = (hi.head.eyes[1] - lo.head.eyes[1]) * k;
     let size = (hi.head.eye_r - lo.head.eye_r) * k / base.head.eye_r;
     let eye_moves = e.norm() > 1e-9 || size.abs() > 1e-9;
-    // (SPIKE: the same shape on level 1's vertices and on level 2's, `hd.body`.)
+    // (The same shape on level 1's vertices and on level 2's, the close-up body's.)
     let shape = |pos: &[V3],
                  bare: &[V3],
                  region: &[[f64; body::NR]],

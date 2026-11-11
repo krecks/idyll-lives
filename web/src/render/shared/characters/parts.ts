@@ -5,7 +5,7 @@
  */
 
 import type { PartColors } from '../../../core/protocol';
-import type { BodyData } from './data';
+import { CLOSE_UP, type BodyData } from './data';
 import { SHELL_BITS } from './outfit';
 
 /** Life stages without facial hair. */
@@ -59,7 +59,7 @@ export type CharacterSurface = 'body' | 'cloth' | 'hair' | 'wisp' | 'brow' | 'la
 
 /** The surface part `part` is drawn with. */
 export function surfaceOf(part: string): CharacterSurface {
-  return part === 'body' || part === 'lod.body' || part.startsWith('body.')
+  return part === 'body' || part === 'lod.body' || part === CLOSE_UP || part.startsWith('body.')
     ? 'body'
     : part === 'eyes'
       ? 'eye'

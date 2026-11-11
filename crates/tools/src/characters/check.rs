@@ -9,7 +9,7 @@ use regex::Regex;
 
 use super::body;
 use super::contract::{
-    HAIR_STYLES, IDENTITY, VISEMES, channels, garments, hair_parts, is_wisps, required_parts,
+    HAIR_STYLES, HD, IDENTITY, VISEMES, channels, garments, hair_parts, is_wisps, required_parts,
 };
 use super::hair::{EAR_MIN, Ears};
 use super::head::head_frame;
@@ -36,6 +36,8 @@ fn budget(name: &str) -> Option<usize> {
     match name {
         "body" => Some(6000),
         "lod.body" => Some(1400),
+        // The close-up body: `body`'s skin split in four, its lids, lips and ears as they are (20,200).
+        HD => Some(20_400),
         _ if is_wisps(name) => Some(WISPS_BUDGET),
         _ if name.starts_with("hair.") => Some(7400),
         _ if shell_re(true).is_match(name) => Some(1500),
@@ -226,8 +228,8 @@ pub fn check(out: &Path) -> bool {
     let mut fail = |m: String| errors.push(m);
 
     // Skeleton.
-    if rig.get("version").map(JValue::f64) != Some(4.0) {
-        fail("rig.json is not version 4".into());
+    if rig.get("version").map(JValue::f64) != Some(5.0) {
+        fail("rig.json is not version 5".into());
     }
     let bones = rig.at("bones").strs();
     if bones != BONES {
@@ -366,15 +368,53 @@ pub fn check(out: &Path) -> bool {
         if !chunks_ok {
             fail(format!("{fam}: bodyChunks must be {{body: []}}"));
         }
-        for (name, e) in parts.obj() {
+        // The close-up body: in files of its own (play never fetches it), that one part, laid out as the
+        // body's parts are and held to the same checks; its lids, lips and ears are `body`'s, where they are.
+        if pkeys.iter().any(|p| p.starts_with("hd.")) {
+            fail(format!(
+                "{fam}: the close-up body is among the parts play fetches"
+            ));
+        }
+        let hd = body.get("hd");
+        let hbuf = hd.map(|h| std::fs::read(out.join(h.at("mesh").str())).expect("close-up mesh"));
+        if hd.map(|h| h.at("parts").keys()) != Some(vec![HD]) {
+            fail(format!("{fam}: no close-up body (hd: {HD})"));
+        }
+        let all: Vec<(&String, &JValue, &[u8])> = parts
+            .obj()
+            .iter()
+            .map(|(name, e)| (name, e, &buf[..]))
+            .chain(hd.iter().flat_map(|h| {
+                let hbuf = hbuf.as_deref().expect("close-up mesh");
+                h.at("parts")
+                    .obj()
+                    .iter()
+                    .map(move |(name, e)| (name, e, hbuf))
+            }))
+            .collect();
+        if let (Some(h), Some(b)) = (hd.and_then(|h| h.at("parts").get(HD)), parts.get("body")) {
+            let hbuf = hbuf.as_deref().expect("close-up mesh");
+            let (nh, nb) = (h.at("vertices").usize(), b.at("vertices").usize());
+            let tail = nb - body::surface(fam, BASE_STAGE).pos.len();
+            let (ph, pb) = (
+                f32s(hbuf, h.at("positions").usize(), nh * 3),
+                f32s(&buf, b.at("positions").usize(), nb * 3),
+            );
+            if nh < tail || ph[(nh - tail) * 3..] != pb[(nb - tail) * 3..] {
+                fail(format!(
+                    "{fam}:{HD}: its lids, lips and ears are not `body`'s"
+                ));
+            }
+        }
+        for &(name, e, buf) in &all {
             let n = e.at("vertices").usize();
             let tris = e.at("indices").usize() / 3;
             if n >= 65536 {
                 fail(format!("{fam}:{name} has {n} vertices"));
             }
-            let pos = f32s(&buf, e.at("positions").usize(), n * 3);
+            let pos = f32s(buf, e.at("positions").usize(), n * 3);
             let w = &buf[e.at("weights").usize()..e.at("weights").usize() + n * 4];
-            let idx = u16s(&buf, e.at("index").usize(), tris * 3);
+            let idx = u16s(buf, e.at("index").usize(), tris * 3);
             if pos.iter().any(|v| !v.is_finite()) {
                 fail(format!("{fam}:{name} has NaN positions"));
             }
@@ -387,7 +427,7 @@ pub fn check(out: &Path) -> bool {
                 fail(format!("{fam}:{name} index out of range"));
             }
             // The baked occlusion (tone.w) is a share of the sky: 0..1 on every part.
-            let tone = i16s(&buf, e.at("tone").usize(), n * 4);
+            let tone = i16s(buf, e.at("tone").usize(), n * 4);
             if tone
                 .chunks(4)
                 .any(|t| !(0.0..=1.0).contains(&(t[3] as f64 / tone_scale)))
@@ -401,7 +441,7 @@ pub fn check(out: &Path) -> bool {
             }
             // The game's front faces are clockwise in its left-handed space (kept under PlayCanvas's
             // mirrored root): cross(b - a, c - a) points against the normals.
-            let nrm = i16s(&buf, e.at("normals").usize(), n * 4);
+            let nrm = i16s(buf, e.at("normals").usize(), n * 4);
             let pt = |i: u16| -> [f32; 3] {
                 [
                     pos[3 * i as usize],
@@ -518,6 +558,21 @@ pub fn check(out: &Path) -> bool {
                         "{fam}.{stage}:{name} topology differs from the base"
                     ));
                 }
+            }
+            // The stage's close-up body: its deltas, in a file of their own.
+            let ok = match (info.get("hd"), hd.and_then(|h| h.at("parts").get(HD))) {
+                (Some(sh), Some(base)) if sh.at("parts").keys() == vec![HD] => {
+                    let e = sh.at("parts").at(HD);
+                    let end = e.at("positions").usize() + base.at("vertices").usize() * 8;
+                    let len = std::fs::metadata(out.join(sh.at("mesh").str())).map(|m| m.len());
+                    len.is_ok_and(|len| end as u64 <= len)
+                }
+                _ => false,
+            };
+            if !ok {
+                fail(format!(
+                    "{fam}.{stage}: no close-up body, or not the base's topology"
+                ));
             }
         }
         // Eyes in their sockets (base stage).
@@ -693,14 +748,14 @@ pub fn check(out: &Path) -> bool {
         }
         // Face morphs: small, finite shapes (no channel moves anything further than 4 cm, no identity
         // channel further than `IDENTITY_REACH`, and none of those the low-detail parts).
-        for (name, e) in parts.obj() {
+        for &(name, e, buf) in &all {
             if let Some(m) = e.get("morph") {
                 let r: Vec<usize> = m.at("ranges").arr().iter().map(JValue::usize).collect();
-                let dp = i16s(&buf, m.at("morphPositions").usize(), r[ch.len()] * 4);
+                let dp = i16s(buf, m.at("morphPositions").usize(), r[ch.len()] * 4);
                 // No channel moves an ear (the last vertices of the bodies that have the whole ones).
                 let n = e.at("vertices").usize();
-                let moved = u16s(&buf, m.at("morphVerts").usize(), m.at("count").usize());
-                if matches!(name.as_str(), "body" | "hd.body")
+                let moved = u16s(buf, m.at("morphVerts").usize(), m.at("count").usize());
+                if matches!(name.as_str(), "body" | HD)
                     && moved
                         .iter()
                         .any(|&v| v as usize >= n - 2 * super::ear::VERTS)
