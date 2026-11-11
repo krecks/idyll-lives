@@ -2710,6 +2710,22 @@
             "rest",
             "nap"
           ]
+        },
+        {
+          "id": "sleep",
+          "label": "Sleep on the sofa",
+          "anim": "nap",
+          "minutes": 480,
+          "pose": "sit",
+          "effects": {
+            "energy": 0.7,
+            "comfort": 0.05
+          },
+          "tags": [
+            "rest",
+            "sleep"
+          ],
+          "spare": true
         }
       ],
       "price": 500,

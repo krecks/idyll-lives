@@ -6516,18 +6516,19 @@ pub(crate) fn upper_barred(content: &Content, obj: &ObjectInstance, sim: u32, ag
         && obj.users[0].is_some_and(|u| u != sim)
 }
 
-/// Whether one of `usable` is a bed free for `sim` tonight that isn't a spare one
-/// (`Interaction::spare`): working, a place on it free for them (or theirs), for their age, and
-/// not one they couldn't get to a moment ago.
-fn has_bed(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32]) -> bool {
+/// Whether one of `usable` is a bed free for `sim` tonight: working, a place on it free for them
+/// (or theirs) and not kept for a couple (`privacy::kept_for_couple`), for their age, and not one
+/// they couldn't get to a moment ago; a spare one (`Interaction::spare`: the sofa) only if `spare`.
+fn has_bed(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32], spare: bool) -> bool {
     let content = ctx.content;
     usable.iter().map(|&o| &objects[o as usize]).any(|o| {
         let def = &content.objects[o.def];
         !o.broken()
             && !sim.couldnt_reach(o.id, ctx.tick)
+            && !crate::privacy::kept_for_couple(ctx, objects, sim, o)
             && def.interactions.iter().enumerate().any(|(i, inter)| {
                 inter.tags & content.day_rhythm.sleep_tags != 0
-                    && !inter.spare
+                    && (spare || !inter.spare)
                     && !inter.baby
                     && o.can_use_for(sim.id, def, i)
                     && unfit(content, sim.age, inter).is_none()
@@ -6756,8 +6757,12 @@ fn pick_autonomous(
     let minding = crate::life::minding_baby(sim, ctx);
     let own = ctx.households[sim.household as usize].plot;
     let stranded = short & !fillable & content.autonomy.urgent;
-    // A spare bed's night (a sofa bed's) only for someone with no other bed free.
-    let bedded = has_bed(sim, ctx, objects, usable);
+    // A spare bed's night (a sofa bed's, the sofa's) only for someone with no other bed free; a
+    // couple's bed kept for the couple only for someone with nowhere else at all.
+    let bedded = has_bed(sim, ctx, objects, usable, false);
+    let elsewhere = std::cell::OnceCell::new();
+    let elsewhere =
+        || *elsewhere.get_or_init(|| bedded || has_bed(sim, ctx, objects, usable, true));
     for obj in usable
         .iter()
         .map(|&o| &objects[o as usize])
@@ -6838,6 +6843,9 @@ fn pick_autonomous(
             // (Nor one that takes the whole thing while someone else is on it.)
             if inter.baby
                 || (inter.spare && bedded)
+                || (inter.tags & rhythm.sleep_tags != 0
+                    && crate::privacy::kept_for_couple(ctx, objects, sim, obj)
+                    && elsewhere())
                 || unfit(content, sim.age, inter).is_some()
                 || upper_barred(content, obj, sim.id, sim.age)
                 || (inter.needs_table && !at_table)
@@ -9245,7 +9253,9 @@ fn use_object(
         // Planned activities go on for their time even once the needs they fill are full.
         // Whatever they chose themselves (not a routine, nor for one of them) stops for a need
         // about to run out that home has something for, if it would before the end (off to the
-        // toilet halfway through a film, not off the toilet for a bite to eat).
+        // toilet halfway through a film, not off the toilet for a bite to eat: a use that `lasts`
+        // isn't left for another need, or worn out with the bladder low they'd be up from it
+        // for bed and from bed for it, round and round, until they fell asleep on the floor).
         let planned = crate::planner::planned_now(content, sim, inter);
         let chosen = sim
             .current
@@ -9260,7 +9270,9 @@ fn use_object(
         let drained = emptying
             || (urgent && planned)
             || (chosen && heading_home)
-            || (chosen && breaks_off(sim, content, pressing, fills, left, inter, low));
+            || (chosen
+                && !inter.lasts
+                && breaks_off(sim, content, pressing, fills, left, inter, low));
         let routine = sim.current.as_ref().is_some_and(|a| a.task.routine);
         // Practising a skill they still want to (as when choosing: at home or in a public place)
         // goes on for its time too, until practice gets boring; stopping it as soon as the needs

@@ -155,7 +155,7 @@ fn generated_houses_are_livable() {
                 .find(|o| is(&w.content.objects[o.def]))
                 .map(|o| w.lot.room_at(o.x, o.z))
         };
-        let bed = room_of(&|d| d.interactions.iter().any(|i| i.id == "sleep"));
+        let bed = room_of(&|d| d.interactions.iter().any(|i| i.id == "sleep" && !i.spare));
         let (fridge, toilet) = (
             room_of(&|d| d.id == "fridge"),
             room_of(&|d| d.id == "toilet"),
