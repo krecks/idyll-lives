@@ -46,6 +46,8 @@
  */
 
 import * as pc from '../engine';
+import { noCloudShadows } from '../cloudShadows';
+import { CLOUD_CODE } from './clouds';
 import { CUTAWAY } from './cutaway';
 import { CUTOUT } from './cutout';
 import { DIAG_VIEW } from './diagView';
@@ -413,6 +415,8 @@ const patchedDevices = new WeakSet<pc.GraphicsDevice>();
 export function patchEngineChunks(device: pc.GraphicsDevice): void {
   if (patchedDevices.has(device)) return;
   patchedDevices.add(device);
+  // (No clouds until a renderer has some: the patch below reads their uniforms.)
+  noCloudShadows(device);
   for (const lang of ['glsl', 'wgsl'] as const) {
     const chunks = pc.ShaderChunks.get(device, lang === 'glsl' ? pc.SHADERLANGUAGE_GLSL : pc.SHADERLANGUAGE_WGSL);
     const backend = engineChunk(device, lang, 'litForwardBackendPS');
@@ -424,7 +428,8 @@ export function patchEngineChunks(device: pc.GraphicsDevice): void {
     if (!light.includes(PATCHED)) {
       const anchor = ANCHORS[lang].lightFunctionLightPS;
       // The sun kept out of basements; a forward lamp kept in its room (`roomLights.ts`).
-      chunks.set('lightFunctionLightPS', `${PATCHED}\n${replaceOnce(light, 'lightFunctionLightPS', anchor, `${anchor}${ENGINE_PATCHES[lang].sun}${ROOM_LIGHT_CODE[lang].forward}`)}`);
+      // And the sun dimmed under a cloud's shadow (`clouds.ts`).
+      chunks.set('lightFunctionLightPS', `${PATCHED}\n${CLOUD_CODE[lang].decl}${replaceOnce(light, 'lightFunctionLightPS', anchor, `${anchor}${ENGINE_PATCHES[lang].sun}${CLOUD_CODE[lang].sun}${ROOM_LIGHT_CODE[lang].forward}`)}`);
     }
     // The lamps kept in their rooms, and out of the meshes they don't light (`roomLights.ts`).
     const clustered = engineChunk(device, lang, 'clusteredLightPS');

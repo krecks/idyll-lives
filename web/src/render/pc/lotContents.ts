@@ -31,6 +31,8 @@ import { MaterialLibrary } from './materials';
 import { ATLAS_TILE_SEMANTIC, installGameChunks } from './shaders/chunks';
 import { buildModel, disposeTemplate, glowByInstance, type MirrorSurface, type ModelTemplate } from './models';
 import type { GrassPusher } from './grass';
+import { CloudShadows } from './cloudShadows';
+import { smoothstep } from '../../game/noise';
 import { installNature, Landscape, NATURE_DIAGS, setWind, Sky, windStill, type RoadBuilder } from './nature';
 import { ObjectMotion, writeInstance, type MovingObject, type PopTarget } from './objectMotion';
 import { ObjectShadows, type ShadowSource } from './objectShadows';
@@ -166,6 +168,8 @@ export interface GlowLight {
 
 export class LotContents {
   readonly sky: Sky;
+  /** The clouds' shadows on the land (`cloudShadows.ts`). */
+  private readonly cloudShadows: CloudShadows;
   readonly items: ItemLayer;
   private readonly lib: MaterialLibrary;
   private readonly motion = new ObjectMotion();
@@ -243,6 +247,7 @@ export class LotContents {
     this.objectShadows = quality.mergedObjectShadows ? new ObjectShadows(app.graphicsDevice, root, this.shadowLayer.id) : null;
     const clouds = deps.assets.has('image.clouds', 'image') ? deps.assets.get('image.clouds', 'image')!.url : undefined;
     this.sky = new Sky(app, root, SKY_RADIUS, clouds);
+    this.cloudShadows = new CloudShadows(app);
     this.items = new ItemLayer(app, root, deps.assets, deps.content);
     this.templates = new TemplateCache(app);
     this.motion.setAmbientRange(quality.ambientRange);
@@ -444,6 +449,9 @@ export class LotContents {
    */
   applyLighting(l: Lighting): void {
     this.sky.update(l);
+    // Cloud shadows while the sun is well up: none at night, nor in the low sun of early morning and of the
+    // evening, whose long shadows and gold are the picture then (all of them from about 9 to 17 h).
+    this.cloudShadows.light((1 - l.night) * smoothstep(0.25, 0.6, l.sunUp));
     this.motion.setLamps(l.lamps);
     const level = Math.min(1, Math.max(0, (l.lamps - 0.35) / 0.5));
     if (level !== this.glowLight.level) this.applyGlow({ ...this.glowLight, level });
@@ -456,10 +464,12 @@ export class LotContents {
   }
 
   /** Each frame, game or overview, once the camera is placed: the sky round it, the clouds' drift (`dt` ms), the grass in view. */
-  frame(dt: number): void {
+  frame(dt: number, held = false): void {
     const eye = toGame(this.camera.getPosition(), this.eye);
     this.sky.follow(eye.x, eye.y, eye.z);
     if (!this.reducedMotion) this.sky.drift(dt);
+    // (The clouds' shadows hold still with Reduce motion, and in the menus' town, whose picture is held while nothing in it moves.)
+    if (!this.reducedMotion && !held) this.cloudShadows.drift(dt);
     const camera = this.camera.camera;
     if (!camera) return;
     const { world, town } = this.natureIn;
@@ -1272,6 +1282,7 @@ export class LotContents {
     this.templates.clear();
     this.items.dispose();
     this.sky.destroy();
+    this.cloudShadows.destroy();
     this.objectShadows?.destroy();
     this.shadowMaterial.opacityMap?.destroy();
     this.shadowMaterial.destroy();

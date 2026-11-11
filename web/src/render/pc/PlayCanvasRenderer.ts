@@ -935,7 +935,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.applyCamera();
       this.applyTilt(dt);
       this.pushGrass(dt);
-      this.lot.frame(dt); // (the sky round the camera, the grass in view.)
+      this.lot.frame(dt, this.townMode); // (the sky round the camera, the clouds' shadows, the grass in view.)
       if (!this.townMode) this.updateCutaway();
       // (The marker faces the camera as it is now, after this frame's input.)
       this.placeMarker();
