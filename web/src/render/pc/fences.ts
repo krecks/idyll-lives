@@ -25,10 +25,17 @@ export interface Fences {
 
 /**
  * Builds the mesh of all fences and gates under `parent` (null when there are none). Hedges are the
- * garden's (`fenceHedges`), but for `hedgeBoxes` (Build mode's previews: plain boxes).
+ * garden's (`fenceHedges`), but for `hedgeBoxes` (Build mode's previews: plain boxes). `wallAt`: no post
+ * where a fence meets a wall (`writeFences`).
  */
-export function buildFences(app: pc.AppBase, parent: pc.Entity, fences: readonly FenceEdge[], styles: readonly FenceStyleDef[], { hedgeBoxes = false } = {}): Fences | null {
-  const plan = planFences(fences, styles, { hedgeBoxes });
+export function buildFences(
+  app: pc.AppBase,
+  parent: pc.Entity,
+  fences: readonly FenceEdge[],
+  styles: readonly FenceStyleDef[],
+  { hedgeBoxes = false, wallAt }: { hedgeBoxes?: boolean; wallAt?: (x: number, z: number) => boolean } = {},
+): Fences | null {
+  const plan = planFences(fences, styles, { hedgeBoxes, wallAt });
   if (!plan) return null;
   const data = plan.geo.meshData({ colors: true });
   const mesh = meshFrom(app.graphicsDevice, data, plan.gates.length > 0);

@@ -29,7 +29,7 @@ import { GameCamera } from './camera';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { createApp, createDevice, destroyApp } from './device';
 import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
-import { fenceHedges } from '../shared/fences';
+import { fenceHedges, wallCorners } from '../shared/fences';
 import { shownFences } from '../shared/shownFences';
 import { gardenPool, GardenPools } from './gardenPools';
 import { HoverTile, ResizeHandles } from './handles';
@@ -1441,8 +1441,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       await this.pace();
       // The viewed lot's fences stand on the ground (hidden with it while the basement is in view, its
       // hedges with the garden's shrubs: `lotHedges`); other lots' are the street's, but for their gates, which swing.
+      const walls = wallCorners(world.walls);
+      const wallAt = (x: number, z: number) => walls.has(`${x}:${z}`);
       for (const [list, storey] of [[lotFences, 0], [shown.filter((f) => !onLot(f) && f.kind === 'gate'), undefined]] as const) {
-        const fences = buildFences(this.app, this.root, list, this.deps.content.fenceStyles);
+        const fences = buildFences(this.app, this.root, list, this.deps.content.fenceStyles, { wallAt });
         if (!fences) continue;
         this.lotEntities.push({ entity: fences.entity, storey });
         for (const leaf of fences.gates) this.gates.push({ fences, leaf, open: 0, towards: 1 });

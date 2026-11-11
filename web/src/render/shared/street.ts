@@ -50,7 +50,7 @@ import { chunkAt, chunkCoords, chunkId, distanceToRect, hashNumbers, hashString,
 import type { HousePlanner, SilhouettePlan, SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
-import { writeFences } from './fences';
+import { wallCorners, writeFences } from './fences';
 import { shownFences } from './shownFences';
 import { centroid } from '../../game/roads';
 import { Kerb, KERB, roadIndex, roadMeshes, SIDEWALK, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
@@ -580,6 +580,9 @@ export class TownStreet {
   private fencesByChunk = new Map<number, FenceEdge[]>();
   /** Which chunk draws the post on each grid corner (`x:z`): the first fence's there (in the world's order). */
   private postOwner = new Map<string, number>();
+  /** The grid corners walls end or turn at (`wallCorners`), and the walls they're from: a fence meeting a wall there has no post. */
+  private wallCornerSet = new Set<string>();
+  private wallsOf: unknown = null;
   private readonly fenceUnits = new Map<number, { hash: number; out: Parts }>();
 
   /** The street's own: sidewalks, the road's surface, fountains, the menus' parked cars (by chunk). */
@@ -779,6 +782,13 @@ export class TownStreet {
       }
       this.fencesByChunk = by;
       this.postOwner = owner;
+      this.version++;
+    }
+    // Walls built or taken down: the fences meeting them are drawn again (with or without their posts there).
+    if (world.walls !== this.wallsOf) {
+      this.wallsOf = world.walls;
+      this.wallCornerSet = wallCorners(world.walls);
+      this.fenceUnits.clear();
       this.version++;
     }
     // (Rooms decide which things are outdoors: another rooms array, keys worked out again.)
@@ -1421,7 +1431,8 @@ export class TownStreet {
     if (cached && cached.hash === h) return { key: `e${id}:${h}`, out: cached.out };
     const parts = new Parts(this.options.has);
     const postHere = (x: number, z: number) => this.postOwner.get(`${x}:${z}`) === id;
-    writeFences(parts.props, list, this.options.fenceStyles ?? [], { gates: null, hedges: parts.plants.hedge, postsFrom: round, postHere });
+    const wallAt = (x: number, z: number) => this.wallCornerSet.has(`${x}:${z}`);
+    writeFences(parts.props, list, this.options.fenceStyles ?? [], { gates: null, hedges: parts.plants.hedge, postsFrom: round, postHere, wallAt });
     this.fenceUnits.set(id, { hash: h, out: parts });
     return { key: `e${id}:${h}`, out: parts };
   }
