@@ -173,7 +173,7 @@ export interface QualitySettings {
    */
   leanTargets: boolean;
   /**
-   * Contact shading (`pc/post.ts`): the sky's light, and half the lamps' and the sun's, is shaded where
+   * Contact shading (`pc/post.ts`): the sky's light, and a third of the lamps' and the sun's, is shaded where
    * things meet (a sofa against the wall, a chair's legs on the floor, a pot on the sill), from the
    * scene's depth (PlayCanvas's screen-space ambient occlusion at half the picture's size, applied in
    * the lighting). It draws the scene's depth once more before the scene (a depth-only pass over every

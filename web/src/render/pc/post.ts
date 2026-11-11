@@ -56,9 +56,10 @@ export interface PostOptions {
 /**
  * Contact shading: PlayCanvas's screen-space ambient occlusion, applied in the lighting (the lit shaders
  * read it; `shaders/softLook.ts` gives it to the sky's fill and a share of the lights). `radius` (m): how
- * far a thing shades what is beside it; `scale`: its size, of the picture's.
+ * far a thing shades what is beside it (short: at 0.8 m a room's corners darkened in bands and a bookcase
+ * had a halo on the wall behind it, darkest in an unlit room); `scale`: its size, of the picture's.
  */
-const CONTACT = { radius: 0.8, intensity: 3, power: 2, samples: 16, minAngle: 25, scale: 0.5 };
+const CONTACT = { radius: 0.3, intensity: 4, power: 1.5, samples: 16, minAngle: 25, scale: 0.5 };
 
 /** What the image processing does (`shared/imageProcessing.ts`, ACES always). */
 export interface PostLook {

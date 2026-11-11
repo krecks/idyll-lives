@@ -58,7 +58,7 @@ export const BASE = {
  * the sun's by this share of it: a lamp casts no shadow here, so without it a lamplit room has none
  * where a thing stands on the floor or against the wall.
  */
-export const CONTACT_DIRECT = '0.5';
+export const CONTACT_DIRECT = '0.35';
 
 export const SOFT_LOOK: ShaderFeature = {
   name: 'softLook',
