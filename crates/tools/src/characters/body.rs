@@ -45,6 +45,10 @@ use super::subdiv::{
 };
 use super::{Cache, Dense, M3, Mesh, V3, key, v3};
 
+/// How far in front of the neck's joint the neck's upper ring (under the jaw) has its middle, of the
+/// neck's radius: with it behind the joint the nape stood behind the skull's base, a wedge down the back
+/// of the head that the hair's nape tips landed on.
+const NAPE: f64 = 0.15;
 const SPINE: [&str; 4] = ["pelvis", "spine_01", "spine_02", "spine_03"];
 pub const REGIONS: [&str; 8] = ["torso", "arm", "hand", "leg", "foot", "neck", "head", "ear"];
 pub const NR: usize = REGIONS.len();
@@ -140,7 +144,7 @@ fn shape(family: &str, stage: &str) -> Shape {
             * g
             * (1.0 + 0.08 * yg),
         r_a: (if female { 0.029 } else { 0.033 } + grown(-0.0015, 0.002)) * h * g,
-        r_n: (if female { 0.031 } else { 0.035 } + grown(-0.0025, 0.0025)) * h * g.powf(0.5),
+        r_n: (if female { 0.031 } else { 0.035 } + grown(-0.0025, 0.0)) * h * g.powf(0.5),
         waist: pr.waist,
         belly: pr.belly * h,
     }
@@ -460,8 +464,10 @@ fn body_cage_of(family: &str, stage: &str, id: &Identity) -> (Cage, [V3; NB]) {
     let chin = h - pr_head;
     let y_n = chin - 0.01 * h + 0.005 * h * yg;
     let psi: Vec<f64> = (0..8).map(|i| radians(i as f64 * 45.0)).collect();
+    // (Its middle a little in front of the neck's joint: the nape lies under the skull's base, in front
+    // of the back of the head, not behind it.)
     let mut nh = ring_pts(
-        v3(0.0, y_n, zn - 0.2 * r_n),
+        v3(0.0, y_n, zn + NAPE * r_n),
         x,
         z,
         r_n,
