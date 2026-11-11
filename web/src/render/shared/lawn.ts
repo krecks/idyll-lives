@@ -49,7 +49,7 @@ export const LAWN_MAP = tuned('ground', {
   shade: 0,
   fence: 0,
   lush: 0.8,
-  fenceRough: 0,
+  fenceRough: 0.6,
   door: 0,
   gate: 0,
   path: 0,
