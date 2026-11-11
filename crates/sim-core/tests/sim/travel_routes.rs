@@ -153,6 +153,7 @@ fn short_trips_are_found_over_the_tiles_as_before() {
         lot: &w.lot,
         blocked: w.blocked(),
         stairs: w.stair_map(),
+        kept_off: &[],
     };
     // The same as A* would give (the way they set off may have been cut short by a step).
     let path = nav.find_path(tile, goal).expect("a way");

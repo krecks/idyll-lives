@@ -1479,6 +1479,18 @@ impl Travel {
         self.base_blocked.binary_search(&i).is_ok() || self.junction_tiles.binary_search(&i).is_ok()
     }
 
+    /// Whether `p` is in a road's carriageway, between the kerbs of one for cars (a country
+    /// road's, its edges), `margin` m in from them at least.
+    pub fn on_carriageway(&self, p: [f32; 2], margin: f32) -> bool {
+        self.graph
+            .near(p, CARRIAGEWAY_LOOK, 4, Mode::Car)
+            .iter()
+            .any(|rp| {
+                let road = &self.graph.roads[rp.road as usize];
+                rp.off <= crate::cars::kerb_of(road.width, road.kind) - margin
+            })
+    }
+
     /// The area a point is in, if any.
     pub fn area_at(&self, p: [f32; 2]) -> Option<u32> {
         self.file
@@ -1594,6 +1606,10 @@ pub struct WalkPlan {
 /// Half a metre in from its edge, 2.5 m out at most: on a 6 m lane, a bike's handlebars clear a
 /// car going by (`cars::BESIDE`). Beside a country road there's open ground: half a metre out on
 /// the verge.
+/// How far round a point the roads are looked over for one whose carriageway it's in (m,
+/// `Travel::on_carriageway`): more than half the widest road's.
+const CARRIAGEWAY_LOOK: f32 = 8.0;
+
 pub(crate) fn side_offset(width: f32, kind: RoadKind) -> f32 {
     match kind {
         RoadKind::Trail => 0.0,

@@ -2864,6 +2864,7 @@ impl World {
             lot: &self.lot,
             blocked: &self.blocked,
             stairs: &self.stairs,
+            kept_off: &self.travel.junction_tiles,
         }
     }
 
@@ -3823,6 +3824,7 @@ impl World {
                 lot: &self.lot,
                 blocked: &self.blocked,
                 stairs: &self.stairs,
+                kept_off: &self.travel.junction_tiles,
             };
             self.object_index.links =
                 crate::surface::Links::new(&self.content, &self.objects, &nav);
@@ -3888,6 +3890,7 @@ impl World {
             lot: &self.lot,
             blocked: &self.blocked,
             stairs: &self.stairs,
+            kept_off: &self.travel.junction_tiles,
         };
         self.reach.refresh(&nav);
         self.reach_version = self.nav_version;
@@ -4563,6 +4566,7 @@ impl World {
                     lot,
                     blocked,
                     stairs,
+                    kept_off: &travel.junction_tiles,
                 },
                 reach,
                 nav_version: *nav_version,
@@ -6251,7 +6255,15 @@ fn step_sim(
                 }
                 return;
             }
-            if free_will && sim.idle_ticks >= AUTONOMY_DELAY_TICKS {
+            // Standing in the road with nothing to do (set down there, or a talk there over):
+            // off it first, to the pavement (free will or not).
+            if sim.idle_ticks >= AUTONOMY_DELAY_TICKS
+                && let Some(task) = off_the_road(sim, ctx)
+            {
+                sim.idle_ticks = 0;
+                start_task(sim, task, ctx, objects, items);
+            }
+            if sim.current.is_none() && free_will && sim.idle_ticks >= AUTONOMY_DELAY_TICKS {
                 let since = sim.idle_ticks - AUTONOMY_DELAY_TICKS;
                 sim.idle_ticks = 0;
                 if let Some(task) = pick_autonomous(sim, ctx, objects, items, rng, None) {
@@ -6277,6 +6289,63 @@ fn step_sim(
 
     progress(sim, ctx, objects, items, rng, ticks);
 }
+
+/// Someone on foot standing in a road's carriageway (`Travel::on_carriageway`, a lit junction's
+/// box: `NavGrid::kept_off`): a walk to the nearest ground off it they can get to, the pavement
+/// (by the nearest way, over tiles kept off too: `NavGrid::way_out`). None: not in the road, in a
+/// car or on their way to one, or nowhere off it within `OFF_ROAD_MOST` tiles. (Canalside's Mila,
+/// saved in a T's box, stood there a day, a taxi and two cars waiting round her.)
+fn off_the_road(sim: &Sim, ctx: &Ctx) -> Option<Task> {
+    let travel = ctx.travel;
+    let nav = &ctx.nav;
+    if travel.graph.is_empty()
+        || sim.bound_for_car.is_some()
+        || sim.taxi.is_some()
+        || sim.riding.is_some()
+    {
+        return None;
+    }
+    let road = |(x, z): (i32, i32)| {
+        nav.kept_off_at(x, z) || travel.on_carriageway([x as f32 + 0.5, z as f32 + 0.5], 0.0)
+    };
+    let start = sim.tile();
+    if !nav.kept_off_at(start.0, start.1) && !travel.on_carriageway(sim.pos, OFF_ROAD_IN) {
+        return None;
+    }
+    // (Nearest first, over what they may step onto, or kept off but for stepping onto: they're
+    // on it already.)
+    let mut seen = std::collections::HashSet::from([start]);
+    let mut todo = std::collections::VecDeque::from([start]);
+    while let Some((x, z)) = todo.pop_front() {
+        for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let t = (x + dx, z + dz);
+            if seen.len() > OFF_ROAD_MOST || !seen.insert(t) {
+                continue;
+            }
+            let free = nav.can_step(x, z, t.0, t.1);
+            if !free && !(nav.kept_off_at(t.0, t.1) && nav.lot.edge_walkable(x, z, t.0, t.1)) {
+                continue;
+            }
+            if free && !road(t) && ctx.reach.reaches(nav, start, t) {
+                return Some(Task {
+                    kind: TaskKind::MoveTo {
+                        x: t.0 as f32 + 0.5,
+                        z: t.1 as f32 + 0.5,
+                    },
+                    directed: false,
+                    routine: false,
+                });
+            }
+            todo.push_back(t);
+        }
+    }
+    None
+}
+
+/// How far in from its kerbs someone stands in a road for `off_the_road` to walk them off it (m),
+/// and how many tiles round it looks for ground off it at most.
+const OFF_ROAD_IN: f32 = 0.3;
+const OFF_ROAD_MOST: usize = 1024;
 
 /// What a Sim may use on a plot: everything at home or in public places; as a guest,
 /// anything that isn't private (bed, bathroom...); nothing on other people's lots.

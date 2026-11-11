@@ -104,7 +104,10 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
 - Traffic lights (`traffic::Signal`, `traffic::settle`, worked out again on load): every junction
   where `SIGNAL_ARMS` (3) roads for cars or more meet is lit. Its arms make phases: two more than
   150° apart share one, an arm with none across from it has its own (a crossroads two, a T two:
-  the road through, then the side road; `SignalArm::phase`). One phase is green at a time,
+  the road through, then the side road; `SignalArm::phase`); of those, one road's two arms through
+  it first, then two of a kind, each the most nearly opposite first (`phases_of`: a country road
+  16° off a street, straighter on than the street's own way, took the street's arm's place, and
+  the street's two arms were never green together, Canalside's j35). One phase is green at a time,
   actuated as the arms were (`MIN_GREEN` 5 s, its share of `CYCLE` 50 s, `AMBER` 2 s, `ALL_RED`
   4 s); a turn across those coming the other way on the same green is left to the claims. Only a
   car's way through a junction's box (within `GATE_THROUGH` 7 m of its middle) goes by its lights,
@@ -134,7 +137,13 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   line `STOP_GAP` 0.5 m past it, no further out than half way to the next junction: a car's claim
   through the lights begins with its nose at the stop line, so it waits there on red, and one
   granted but still short of the line when the light stops being green lets the grant go
-  (`Claim::stop_at`). The pole stands at the stop line on the kerb right of those coming in. A
+  (`Claim::stop_at`). The pole stands at the stop line on the kerb right of those coming in; where
+  that's on another road's carriageway, further out along the kerb (onto the island between it
+  and a road leaving at a slant), else back towards the crosswalk, else on the left (`signal_at`:
+  `POLE_CLEAR` off every road's carriageway). Two lit junctions so near that an arm's crosswalk
+  and stop line, and the other's back along it, can't both be out of the other's box are one
+  junction there: the stretch between them has no crosswalk (`walk_from` = `walk_to`: no zebra,
+  no pedestrians' head) and its stop lines are half way. A
   walk phase follows the cars' (`Signal::walk_phase`): brought round only by someone on foot
   waiting at the junction's crosswalks, every arm red, the crosswalks open for `WALK_OPEN` 5 s,
   then its clearance (the widest arm at `WALK_PACE` 1 m/s, 3 s at least), then `ALL_RED`; walk
@@ -142,7 +151,12 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   lit junction on its zebras only: its box, and each arm's carriageway out past its stop line by
   `KEEP_OFF` 3 m but for the zebra (an arm without one, out to the box's edge), are blocked to
   them for good (`Signal::off_limits`, `Travel::junction_tiles`, in `ground_blocked`), so their
-  way goes over a zebra or crosses the road further off. The zebra and the road by the stop line
+  way goes over a zebra or crosses the road further off. Kept off is only stepping onto them:
+  one standing on them (set down there, or there before they were kept off) gets off them the
+  nearest way, over them (`NavGrid::kept_off`, `NavGrid::way_out`), and anyone standing in a
+  road's carriageway with nothing to do walks off it to the nearest ground off it
+  (`world::off_the_road`): Canalside's Mila, saved in a T's box, stood there for a day, every
+  way out shut to her, a taxi and two cars held up round her. The zebra and the road by the stop line
   are measured from the arm's own road there (`SignalArm::span`, its middle at the crosswalk and
   `KEEP_OFF` past the stop line, where that goes out within 30° of the arm's way and about as far
   out; else along the way), not along the arm's way out from the junction's middle: a road

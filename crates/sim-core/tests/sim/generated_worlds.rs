@@ -207,6 +207,7 @@ fn generated_worlds_are_livable() {
                 lot: &w.lot,
                 blocked: w.blocked(),
                 stairs: w.stair_map(),
+                kept_off: &[],
             };
             let mut walks = Walks::new(&nav);
             let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
@@ -1165,6 +1166,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
                 lot: &w.lot,
                 blocked: w.blocked(),
                 stairs: w.stair_map(),
+                kept_off: &[],
             };
             let shut = car.door(&nav, 0).is_none();
             if shut && fenced_in(&w, car) {

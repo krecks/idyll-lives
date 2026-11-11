@@ -1365,6 +1365,69 @@ fn someone_on_foot_crosses_a_lit_junction_on_its_zebras_on_the_walk_never_throug
 }
 
 #[test]
+fn someone_on_foot_left_in_a_lit_junctions_box_gets_out_with_nothing_to_do_or_on_their_way() {
+    // Canalside: Mila, saved in a T's box (1.7 m into it), stood there for a day with nothing to
+    // do, every way out kept off to her, a taxi and two cars waiting round her. Kept off is only
+    // stepping onto it: someone in the crossroads' box with nothing to do (nobody choosing for
+    // themselves) walks off the road to the pavement; told to walk somewhere, they go, off the
+    // box the nearest way.
+    let mut w = crossroads(&[crossroads_house(150.0, true)]);
+    common::run_to(&mut w, 2, 7.0);
+    w.autonomy = false;
+    let sig = w.travel.signals[0].clone();
+    let at = [sig.at[0] + 1.3, sig.at[1] + 1.7];
+    let tile = |p: [f32; 2]| w.lot.tile_index(p[0].floor() as i32, p[1].floor() as i32);
+    assert!(w.blocked()[tile(at)], "the box isn't kept off");
+    let place = |w: &mut World| {
+        for _ in 0..8 {
+            if w.apply(sim_core::Command::Cancel { sim: 0, index: 0 })
+                .is_err()
+            {
+                break;
+            }
+        }
+        w.sims[0].pos = at;
+    };
+    place(&mut w);
+    let start = w.tick;
+    let mut out = None;
+    while w.tick < start + common::secs(30.0) {
+        w.tick_once();
+        let p = w.sims[0].pos;
+        if !w.travel.on_carriageway(p, 0.0) {
+            out = Some(w.tick - start);
+            break;
+        }
+    }
+    let p = w.sims[0].pos;
+    let out = out.unwrap_or_else(|| panic!("still in the road at {p:?}"));
+    // (A couple of metres: a few seconds.)
+    assert!(out < common::secs(8.0), "out after {out} ticks");
+    for _ in 0..common::secs(5.0) {
+        w.tick_once();
+    }
+    let p = w.sims[0].pos;
+    assert!(
+        !w.travel.on_carriageway(p, 0.0) && in_junction(&sig, p).is_none(),
+        "back in the road at {p:?}"
+    );
+    // On their way somewhere from in the box: off it, and there.
+    place(&mut w);
+    let to = [sig.at[0] - 20.0, sig.at[1] - 6.0];
+    walk_to(&mut w, 0, to);
+    let mut there = false;
+    for _ in 0..common::secs(60.0) {
+        w.tick_once();
+        let p = w.sims[0].pos;
+        if (p[0] - to[0]).hypot(p[1] - to[1]) < 0.4 {
+            there = true;
+            break;
+        }
+    }
+    assert!(there, "never there: at {:?}", w.sims[0].pos);
+}
+
+#[test]
 fn a_lit_junction_keeps_those_on_foot_off_its_box_but_never_cuts_ground_off() {
     // The crossroads, and a pocket of the pavement by its north arm, walled round but for its side
     // onto the road kept off by the stop line: kept off it, nobody could get in or out of the
@@ -1395,6 +1458,7 @@ fn a_lit_junction_keeps_those_on_foot_off_its_box_but_never_cuts_ground_off() {
         lot: &w.lot,
         blocked: w.blocked(),
         stairs: w.stair_map(),
+        kept_off: &[],
     };
     assert!(
         nav.find_path((x0, z0), (150, 150)).is_some(),
@@ -2260,4 +2324,93 @@ fn a_car_held_up_with_no_room_behind_it_to_turn_round_is_counted_and_never_backs
         w.traffic.unjam_impossible.values().sum::<u64>() >= 1,
         "the ring wasn't counted"
     );
+}
+
+#[test]
+fn a_knot_of_a_country_road_leaving_a_street_at_a_slant_by_another_junction_is_lit_as_one() {
+    // Canalside's knot (j35, j77): a street along x, its two halves meeting at (200, 200), a
+    // country road leaving it there 16° off the street east, and a lane meeting it from the
+    // south 18 m on. The street's two arms through the first junction are green together, though
+    // the country road is as nearly across from its west arm; no signal pole stands on any road's
+    // asphalt (the street's east arm's stood on the country road's); and between the two lit
+    // junctions, too near for a crosswalk and stop line out of the other's box, there's none:
+    // the two are one junction there, its stop line half way.
+    let road = |pts: String, kind: &str, ends: &str| {
+        format!(r#"{{"points":[{pts}],"width":7,"kind":"{kind}","ends":{ends},"area":0}}"#)
+    };
+    let slant = 16f32.to_radians();
+    let roads = format!(
+        "[{},{},{},{}]",
+        road(
+            line_pts([0.5, 200.0], [200.0, 200.0]),
+            "street",
+            r#"["out","join"]"#
+        ),
+        road(
+            line_pts([200.0, 200.0], [399.5, 200.0]),
+            "street",
+            r#"["join","out"]"#
+        ),
+        road(
+            line_pts(
+                [200.0, 200.0],
+                [200.0 + 150.0 * slant.cos(), 200.0 - 150.0 * slant.sin()]
+            ),
+            "country",
+            r#"["join","dead"]"#
+        ),
+        road(
+            line_pts([218.0, 200.0], [218.0, 300.0]),
+            "lane",
+            r#"["join","dead"]"#
+        )
+    );
+    let exits = r#"[{"x":0.5,"z":200,"kind":"road"},{"x":399.5,"z":200,"kind":"road"}]"#;
+    let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
+        "areas":[{"name":"Knot","kind":"hamlet","x":120,"z":120,"w":160,"d":160}]"#;
+    let w = town_of(CONTENT, more, 400, 400, &roads, exits, &[]);
+    let sigs = &w.travel.signals;
+    assert_eq!(sigs.len(), 2, "two lit junctions");
+    let (fork, tee) = if sigs[0].at[0] < sigs[1].at[0] {
+        (&sigs[0], &sigs[1])
+    } else {
+        (&sigs[1], &sigs[0])
+    };
+    let arm = |s: &sim_core::traffic::Signal, way: [f32; 2]| {
+        *s.arms
+            .iter()
+            .max_by(|a, b| {
+                (a.way[0] * way[0] + a.way[1] * way[1])
+                    .total_cmp(&(b.way[0] * way[0] + b.way[1] * way[1]))
+            })
+            .unwrap()
+    };
+    let (west, east) = (arm(fork, [-1.0, 0.0]), arm(fork, [1.0, 0.0]));
+    assert_eq!(west.phase, east.phase, "the street's two arms apart");
+    let country = arm(fork, [slant.cos(), -slant.sin()]);
+    assert_ne!(
+        country.phase, west.phase,
+        "the country road with the street"
+    );
+    for (i, s) in sigs.iter().enumerate() {
+        for (k, a) in s.arms.iter().enumerate() {
+            assert!(
+                !w.travel.on_carriageway(a.pole, -0.1),
+                "junction {i} arm {k}'s pole on a road at {:?}",
+                a.pole
+            );
+        }
+    }
+    // (Half the street's 18 m between them.)
+    let back = arm(tee, [-1.0, 0.0]);
+    for a in [east, back] {
+        assert!(!a.crosswalk, "a crosswalk between the two");
+        assert!(
+            (a.stop - 9.0).abs() < 0.5,
+            "the stop line {} m out, not half way",
+            a.stop
+        );
+    }
+    // (The other arms keep theirs.)
+    assert!(west.crosswalk && arm(tee, [1.0, 0.0]).crosswalk);
 }

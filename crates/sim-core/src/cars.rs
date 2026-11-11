@@ -3661,6 +3661,7 @@ fn drive_on(w: &mut World, c: usize) {
         lot,
         blocked,
         stairs,
+        kept_off: &[],
     };
     let mut progress = t;
     let held_up = go_on(

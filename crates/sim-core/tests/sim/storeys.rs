@@ -270,6 +270,7 @@ fn a_neighbour_climbs_the_stairs_at_lower_detail() {
             lot: &w.lot,
             blocked: w.blocked(),
             stairs: w.stair_map(),
+            kept_off: &[],
         }
         .tile_free(x, z)
     };
