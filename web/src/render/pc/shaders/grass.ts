@@ -43,6 +43,7 @@
 
 import { codeFor, float as f, type ShaderFeature } from './chunks';
 import { GRASS, GRASS_PUSHERS, GUST_ROTATION } from '../../shared/grass';
+import { tuned } from '../../tune';
 
 /**
  * Blade shape: heights (m) of short and long grass, root widths (m), the share of the height a tip
@@ -56,7 +57,7 @@ const BLADE = { short: 0.09, long: 0.26, thin: 0.016, wide: 0.027, lean: [0.12, 
  * so the lawn averages the same near and far. Over `blend` (shares of the reach) the ground goes
  * from `under` to `far` and the blades from their shade to the ground's `far` colour, together.
  */
-const LAWN = { root: 0.55, tip: 1.35, saturation: 0.85, under: 0.55, far: 0.8, blend: [0.45, 0.85] as const } as const;
+const LAWN = tuned('lawn', { root: 0.55, tip: 1.35, saturation: 0.85, under: 0.55, far: 0.8, blend: [0.45, 0.85] as const } as const);
 
 function grassCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
   const { wgsl, v2, v3, v4, u, decl: d } = codeFor(lang);

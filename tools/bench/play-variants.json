@@ -1,0 +1,11 @@
+{
+  "vignette": {
+    "poses": ["play-day", "play-night", "wide-day-0", "town-day"],
+    "variants": {
+      "1.2 (now)": "",
+      "0.8": "look.vignette:0.8",
+      "0.5": "look.vignette:0.5",
+      "none": "look.vignette:0"
+    }
+  }
+}

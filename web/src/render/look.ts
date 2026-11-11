@@ -4,6 +4,8 @@
  * data; the renderer applies it.
  */
 
+import { tuned } from './tune';
+
 /** One time-of-day keyframe. Colours are sRGB hex; intensities are PBR units. */
 export interface LightKey {
   hour: number;
@@ -64,17 +66,17 @@ export interface Look {
 // so shadows read blue, greens stay green and only sunlit faces turn golden. The sun's intensity
 // also fades to zero around sunrise/sunset in `lightingAt`, so the switch between sun and moon
 // direction never pops.
-const NIGHT = {
+const NIGHT = tuned('night', {
   sun: 0.6, sunColor: '#7088F2', sky: 0.5, skyColor: '#3A52C4', groundColor: '#1A2050', env: 0.05,
   clear: '#1E2C58', zenith: '#081232', exposure: 1.7, lamps: 1,
-};
+});
 
 /**
  * Stylised realism: warm saturated sun with long golden-hour shadows, bluish ambient fill, soft
- * haze, blue moonlit nights with warm lamps.
+ * haze, blue moonlit nights with warm lamps. (On the dev server `?tune=` replaces values: `tune.ts`.)
  */
-export const LOOK: Look = {
-  keys: [
+export const LOOK: Look = tuned('look', {
+  keys: ([
     { hour: 0, ...NIGHT },
     { hour: 4.8, ...NIGHT },
     // Blue hour before dawn: the moon fades, the sky brightens to a deep blue.
@@ -93,7 +95,7 @@ export const LOOK: Look = {
     { hour: 20, sun: 0.3, sunColor: '#E8A08C', sky: 0.42, skyColor: '#5464C0', groundColor: '#22284A', env: 0.14, clear: '#6E70A0', zenith: '#26326E', exposure: 1.3, lamps: 0.85 },
     { hour: 21, ...NIGHT },
     { hour: 24, ...NIGHT },
-  ],
+  ] satisfies LightKey[]).map((k) => tuned(`key.${k.hour}`, k)),
   sunHeight: 0.8,
   contrast: 1.1,
   exposure: 1.05,
@@ -108,4 +110,4 @@ export const LOOK: Look = {
   marker: ['#FFAE1F', '#FFC23D', '#FFDE94', '#7F95FF', '#F2604F'],
   windowGlow: '#FFC27A',
   lampColor: '#FFC27A',
-};
+});
