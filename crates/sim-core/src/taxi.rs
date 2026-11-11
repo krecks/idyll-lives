@@ -1393,18 +1393,35 @@ fn give_up(w: &mut World, k: usize, c: usize) -> bool {
     }
     // (Out of it at the kerb side, on ground they can walk on, not where its middle is: let out
     // inside its body, with the way home not found from there, they stood in its way as it
-    // turned round, and it waited for them for good, Wheat Acres.)
+    // turned round, and it waited for them for good, Wheat Acres. Nor, both sides of it kept
+    // off where it stands, the carriageway in a lit junction's box, set down there after all:
+    // further out (its sides first, then its ends), the nearest ground they can walk on clear of
+    // every car, Willowby. None so near: it doesn't give up yet.)
     let out = {
         let car = &w.cars[c];
         let (p, yaw) = car.shown.map_or((car.spot, car.yaw), |s| (s.0, s.1));
         let (sn, cs) = yaw.sin_cos();
         let nav = w.nav();
-        let k = car.wid / 2.0 + 0.5;
-        [[-cs, sn], [cs, -sn]]
-            .into_iter()
-            .map(|d| [p[0] + d[0] * k, p[1] + d[1] * k])
-            .find(|q| nav.tile_free(q[0].floor() as i32, q[1].floor() as i32))
-            .unwrap_or(at)
+        let them = crate::cars::vehicles(&w.cars, None);
+        let (side, end) = (car.wid / 2.0 + 0.5, car.len / 2.0 + 0.5);
+        (0..LET_OUT_STEPS)
+            .map(|n| n as f32 * LET_OUT_STEP)
+            .flat_map(|n| {
+                [
+                    ([-cs, sn], side),
+                    ([cs, -sn], side),
+                    ([-sn, -cs], end),
+                    ([sn, cs], end),
+                ]
+                .map(|(d, k)| [p[0] + d[0] * (k + n), p[1] + d[1] * (k + n)])
+            })
+            .find(|&q| {
+                nav.tile_free(q[0].floor() as i32, q[1].floor() as i32)
+                    && crate::cars::clear(&them, crate::cars::Body::WALKER, q)
+            })
+    };
+    let Some(out) = out.or((!(home || leisure) || aboard.is_empty()).then_some(at)) else {
+        return false;
     };
     if home || leisure {
         for (s, i, plot) in aboard {
@@ -1432,6 +1449,11 @@ fn give_up(w: &mut World, k: usize, c: usize) -> bool {
 /// A walk home this long at most (minutes) from where a taxi gave its way up (`give_up`) is walked;
 /// a longer one waits at work for another run home.
 const SHORT_WALK: f32 = 30.0;
+
+/// Those aboard a taxi giving its way up (`give_up`) are set down beside it, out from its sides or
+/// ends a step (m) at a time, this many steps at most, on ground they can walk on clear of every car.
+const LET_OUT_STEP: f32 = 0.5;
+const LET_OUT_STEPS: usize = 20;
 
 /// Per car (`World::cars`), how far along its route it may be put on (`cars::moved_clear`): a work
 /// taxi on a run, to its next stop at most (put on past it, it would stand where it's come to, as
