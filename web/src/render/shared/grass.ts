@@ -21,6 +21,7 @@
 import { groundDepth, type WorldStructure } from '../../core/protocol';
 import type { RGB } from './environment';
 import { lawnMap } from './lawn';
+import { groundShade } from './groundShade';
 import { bareTiles, fbm, lawnMask, smoothstep, splitHalf, WIND } from './nature';
 
 /** Blades a patch at full density (`GRASS.perPatch`), and the draws: each a step of √2 sparser (`GRASS.lods`). */
@@ -99,6 +100,8 @@ export interface GrassField {
   townW: number;
   townD: number;
   town: Uint8Array;
+  /** The ground's shade round what stands on it (`shared/groundShade.ts`): a byte a texel, as the town mask's. */
+  shade: Uint8Array;
   /** The lawn's map (`shared/lawn.ts`): RGBA bytes, a texel a tile over the town's ground (`townW / GRASS.townTexels` across). */
   lawn: Uint8Array;
   /** Patches across and deep from (x0, z0), and per patch: 1 where any grass grows. */
@@ -157,7 +160,7 @@ export async function grassField(world: WorldStructure, land: GrassLand, pace?: 
       ground[k + 2] = sz;
     }
   }
-  const field: GrassField = { x0, z0, margin: m, w, d, colour, townW: 0, townD: 0, town: new Uint8Array(0), lawn: new Uint8Array(0), pw, pd, patches: new Uint8Array(pw * pd), ground };
+  const field: GrassField = { x0, z0, margin: m, w, d, colour, townW: 0, townD: 0, town: new Uint8Array(0), shade: new Uint8Array(0), lawn: new Uint8Array(0), pw, pd, patches: new Uint8Array(pw * pd), ground };
   townGrass(field, world);
   return field;
 }
@@ -186,6 +189,8 @@ export function townGrass(field: GrassField, world: WorldStructure): void {
   const bare = bareTiles(world, mask);
   // What the grass is like, tile by tile (its tone, worn earth, mown or rough): again whatever changed.
   field.lawn = lawnMap(world, bare, field.lawn);
+  // The shade on the ground round what stands on it.
+  field.shade = groundShade(world, n, field.shade);
   const walls = wallSegments(world, tw, td);
   // Only the tiles whose lawn could have changed since the last time (furniture, rooms, walls: a lot
   // shown or edited), the whole town the first time: a big world's mask is millions of texels.

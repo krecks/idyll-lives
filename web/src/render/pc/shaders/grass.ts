@@ -78,7 +78,8 @@ const BLADE = { short: 0.09, long: 0.26, mown: 0.085, thin: 0.016, wide: 0.027, 
  * the ground takes where the map says so, over `earthEdge` of its values, `earthRagged` of them the
  * raggedness of its edge. `soften`: how much of the ground
  * texture's own light and dark speckle is taken out under the lawn (it shows between the blades, and is
- * most of what changes from one frame to the next as the camera moves).
+ * most of what changes from one frame to the next as the camera moves). `shade`: how much of the ground's
+ * shade round what stands on it (the town mask's second channel, `shared/groundShade.ts`) the lawn takes.
  *
  * The values are the calm lawn chosen from pictures side by side (2026-11-11, `tools/bench/play.mjs
  * --sheet lawn`): the lawn is most of a play picture, and with dark roots under light yellow tips (0.55
@@ -108,6 +109,7 @@ const LAWN = tuned('lawn', {
   earthEdge: [0.15, 0.7],
   earthRagged: 0.5,
   soften: 0.6,
+  shade: 1,
 });
 
 function grassCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
@@ -254,8 +256,12 @@ ${windDecl}
 		${d('gTu', v2)} = gW / ${u('game_grassTownSize')}.xy;
 		// What the lawn is like here (the lawn's map; past the town, the land as it is, rough).
 		${d('gMap', v4, true)} = ${v4}(0.5, 0.5, 0.0, 1.0);
+		// The shade round what stands on the ground here (the mask's second channel, \`shared/groundShade.ts\`).
+		${d('gShade', 'float', true)} = 0.0;
 		if (${inTown('gTu')}) {
-			gCov = min(gCov, ${tex('game_grassTown', 'gTu')}.r);
+			${d('gTown', v4)} = ${tex('game_grassTown', 'gTu')};
+			gCov = min(gCov, gTown.r);
+			gShade = gTown.g;
 			${lawnUv('gW', 'gM')}
 			gMap = ${tex('game_grassLawn', 'gMUv')};
 		}
@@ -309,6 +315,7 @@ ${windDecl}
 		// Its colour: the ground's, dark at the root, paler and yellower at the tip, lighter in a gust.
 		${d('gLin', v3, true)} = pow(gField.rgb, ${v3}(2.2)) * ${f(GRASS.groundAlbedo)};
 		${mapped('gLin', 'gMap', '1.0')}
+		gLin = gLin * (1.0 - gShade * ${f(LAWN.shade)});
 		${grade('gLin', 'smoothstep(0.15, 0.7, gCov)', 'gGrade')}
 		${d('gBase', v3)} = mix(${v3}(dot(gLin, ${v3}(0.2126, 0.7152, 0.0722))), gLin, ${f(LAWN.saturation)});
 		${d('gTint', v3)} = mix(${v3}(1.0), ${v3}(1.1, 1.06, 0.8), gT * gT * ${f(0.5 * LAWN.yellow)}) * (${f(1 - LAWN.vary)} + ${f(2 * LAWN.vary)} * gR.z);
@@ -385,13 +392,16 @@ ${windDecl}
 		ggLawn = ggLawn * (1.0 - smoothstep(${u('game_grassTownSize')}.z, ${u('game_grassTownSize')}.w, length(ggOut)));
 		// (The lawn as the land has it, whatever stands on it: the map's tone and its earth go on under a bench.)
 		${d('ggLand', 'float')} = ggLawn;
+		${d('ggShade', 'float', true)} = 0.0;
 		// In town, as much as the blades grow there (none by a wall, under furniture or on a patio: no shade of theirs).
 		if (ggCov + ggLawn > 0.0 && ${u('game_grassTownSize')}.x > 0.0) {
 			${d('ggTu', v2)} = ggQ.xz / ${u('game_grassTownSize')}.xy;
 			if (${inTown('ggTu')}) {
-				${d('ggMask', 'float')} = ${tex('game_grassTown', 'ggTu')}.r;
+				${d('ggTown', v4)} = ${tex('game_grassTown', 'ggTu')};
+				${d('ggMask', 'float')} = ggTown.r;
 				ggCov = min(ggCov, ggMask);
 				ggLawn = min(ggLawn, ggMask);
+				ggShade = ggTown.g;
 			}
 		}
 		// (Only where the land has lawn: roads, fields and the rest of the landscape skip the gusts.)
@@ -420,6 +430,8 @@ ${windDecl}
 			// Bare earth where the lawn is worn away.
 			dAlbedo = mix(dAlbedo, ${list(LAWN.earth)} * ggSpeck, ggEarth);
 		}
+		// The shade round what stands on the ground (walls, fences, things, trunks), as the blades have it.
+		dAlbedo = dAlbedo * (1.0 - ggShade * ${f(LAWN.shade)});
 	}
 #endif`;
 

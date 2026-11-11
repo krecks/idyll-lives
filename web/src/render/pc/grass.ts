@@ -64,7 +64,7 @@ export function grassGround(device: pc.GraphicsDevice, material: pc.StandardMate
   if (!none) {
     const blank = (name: string, format: number, bytes: ArrayLike<number>) => new pc.Texture(device, { name, width: 1, height: 1, format, mipmaps: false, levels: [Uint8Array.from(bytes)] });
     // (No lawn's map: the land as it is, rough.)
-    noGrass.set(device, (none = { colour: blank('noGrass', pc.PIXELFORMAT_RGBA8, [0, 0, 0, 0]), town: blank('noTownGrass', pc.PIXELFORMAT_R8, [0]), lawn: blank('noLawn', pc.PIXELFORMAT_RGBA8, [128, 128, 0, 255]) }));
+    noGrass.set(device, (none = { colour: blank('noGrass', pc.PIXELFORMAT_RGBA8, [0, 0, 0, 0]), town: blank('noTownGrass', pc.PIXELFORMAT_RG8, [0, 0]), lawn: blank('noLawn', pc.PIXELFORMAT_RGBA8, [128, 128, 0, 255]) }));
   }
   material.setDefine('GAME_GRASS_GROUND', '');
   // No contact shading under the blades (`post.ts`): they would shade the ground in blotches.
@@ -210,10 +210,21 @@ export class Grass {
     this.counts = this.draws.map(() => 0);
   }
 
-  /** The town's mask as a texture (one byte a texel). */
+  /** The town's mask as a texture, two bytes a texel: where the lawn grows, and the ground's shade (`shared/groundShade.ts`). */
   private townTexture(): pc.Texture {
     const f = this.field;
-    return new pc.Texture(this.app.graphicsDevice, { name: 'grassTown', width: Math.max(1, f.townW), height: Math.max(1, f.townD), format: pc.PIXELFORMAT_R8, mipmaps: false, minFilter: pc.FILTER_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [f.town.length ? f.town : new Uint8Array(1)] });
+    return new pc.Texture(this.app.graphicsDevice, { name: 'grassTown', width: Math.max(1, f.townW), height: Math.max(1, f.townD), format: pc.PIXELFORMAT_RG8, mipmaps: false, minFilter: pc.FILTER_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [this.townTexels(new Uint8Array(Math.max(1, f.townW * f.townD) * 2))] });
+  }
+
+  /** The mask and the shade, texel by texel, into `out` (the texture's bytes). */
+  private townTexels(out: Uint8Array): Uint8Array {
+    const { town, shade } = this.field;
+    const shaded = shade.length === town.length;
+    for (let i = 0, o = 0; i < town.length; i++, o += 2) {
+      out[o] = town[i];
+      out[o + 1] = shaded ? shade[i] : 0;
+    }
+    return out;
   }
 
   /** The lawn's map as a texture (a texel a tile; with mips: the ground reads it far off). */
@@ -263,8 +274,7 @@ export class Grass {
       this.lawn.destroy();
       this.lawn = this.lawnTexture();
     } else {
-      const data = this.town.lock() as Uint8Array;
-      data.set(this.field.town);
+      this.townTexels(this.town.lock() as Uint8Array);
       this.town.unlock();
       const lawn = this.lawn.lock() as Uint8Array;
       lawn.set(this.field.lawn);

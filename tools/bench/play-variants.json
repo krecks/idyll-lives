@@ -68,5 +68,47 @@
       "N1 moon 0.8, fill 0.65": "night.sun:0.8;night.sky:0.65",
       "N2 moon 0.9, fill 0.8": "night.sun:0.9;night.sky:0.8;night.env:0.08"
     }
+  },
+  "light": {
+    "poses": [
+      "day-home-13",
+      "day-east-16",
+      "day-home-9",
+      "up-day"
+    ],
+    "variants": {
+      "now": "",
+      "L1 less of the sky, more sun": "key.9.5.env:0.56;key.9.5.sun:3.9;key.13.env:0.59;key.13.sun:4.35;key.16.5.env:0.55;key.16.5.sun:3.9",
+      "L2 and a blue fill": "key.9.5.env:0.56;key.9.5.sun:3.9;key.9.5.sky:0.3;key.9.5.skyColor:7FA8FF;key.13.env:0.59;key.13.sun:4.35;key.13.sky:0.3;key.13.skyColor:7FA8FF;key.16.5.env:0.55;key.16.5.sun:3.9;key.16.5.sky:0.3;key.16.5.skyColor:7FA8FF",
+      "L3 and a warmer sun": "key.9.5.env:0.56;key.9.5.sun:3.9;key.9.5.sky:0.3;key.9.5.skyColor:7FA8FF;key.9.5.sunColor:FFE2B8;key.13.env:0.59;key.13.sun:4.35;key.13.sky:0.3;key.13.skyColor:7FA8FF;key.13.sunColor:FFEACA;key.16.5.env:0.55;key.16.5.sun:3.9;key.16.5.sky:0.3;key.16.5.skyColor:7FA8FF;key.16.5.sunColor:FFD9A4"
+    }
+  },
+  "light2": {
+    "poses": [
+      "day-home-13",
+      "day-east-16",
+      "day-north-16",
+      "wide-day-0"
+    ],
+    "variants": {
+      "now": "clouds.strength:0;lawn.shade:0",
+      "A clouds .75, shade wall .6 1.6": "clouds.strength:0.75;clouds.cover:0.46,0.62;shade.wall:0.6,1.6;shade.fence:0.5,0.8;shade.thing:0.6,0.7;shade.trunk:0.6,1.4",
+      "B smaller clouds, shade wall .7 2": "clouds.strength:0.75;clouds.cover:0.5,0.62;clouds.cells:16;shade.wall:0.7,2;shade.fence:0.55,1;shade.thing:0.7,0.9;shade.trunk:0.65,1.6;shade.falloff:1.2",
+      "C more of the sky clouded .6, shade even": "clouds.strength:0.6;clouds.cover:0.42,0.6;shade.wall:0.6,1.6;shade.fence:0.5,0.8;shade.thing:0.6,0.7;shade.trunk:0.6,1.4;shade.falloff:1"
+    }
+  },
+  "clouds": {
+    "poses": [
+      "day-home-13",
+      "day-east-13",
+      "day-north-13",
+      "day-back-13"
+    ],
+    "variants": {
+      "fewer, at 0 0": "clouds.cover:0.55,0.68",
+      "fewer, at 70 20": "clouds.cover:0.55,0.68;clouds.at:70,20",
+      "fewer, at 150 100": "clouds.cover:0.55,0.68;clouds.at:150,100",
+      "fewer, at 240 180": "clouds.cover:0.55,0.68;clouds.at:240,180"
+    }
   }
 }
