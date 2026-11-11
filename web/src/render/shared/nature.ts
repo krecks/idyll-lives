@@ -989,7 +989,7 @@ export function windDirection(yaw: number, sx: number, sz: number, out: { x: num
   out.z = -along * s + across * c;
 }
 
-/** What the lawn grows round (`lawnMask`, `bareTiles`, the grass's walls): rooms, things, walls, diagonals, floors, paths and fields. */
+/** What the lawn grows round (`lawnMask`, `bareTiles`, the grass's walls, the lawn's map): rooms, things, walls, diagonals, floors, fences, doors, plots, paths and fields. */
 export interface LawnInputs {
   width: number;
   rooms: ArrayLike<number>;
@@ -1007,9 +1007,16 @@ export function lawnInputs(world: WorldStructure): LawnInputs {
     rooms: world.rooms,
     things,
     defs: world.objects.map((o) => o.def).join(),
-    edges: JSON.stringify([world.walls.length, world.diagonals, world.floors, world.walls.map((e) => `${e.axis}${e.x},${e.z}`).join()]),
+    edges: JSON.stringify([world.walls.length, world.diagonals, world.floors, world.walls.map((e) => `${e.axis}${e.x},${e.z}`).join(), lawnEdges(world)]),
     meta: [world.meta?.paths, world.meta?.streets, world.meta?.roads, world.meta?.world?.fields],
   };
+}
+
+/** What the lawn's map reads besides (`shared/lawn.ts`): the fences and gates, the doors and the plots. */
+function lawnEdges(world: WorldStructure): string {
+  const fences = (world.fences ?? []).map((e) => `${e.axis}${e.x},${e.z}${e.kind === 'gate' ? 'g' : ''}`).join();
+  const doors = world.openings.filter((o) => o.kind === 'door').map((o) => `${o.axis}${o.x},${o.z}`).join();
+  return `${fences}|${doors}|${world.plots.map((p) => `${p.x},${p.z},${p.w},${p.d}`).join()}`;
 }
 
 export function sameLawnInputs(a: LawnInputs, b: LawnInputs): boolean {

@@ -5,7 +5,7 @@
  * and a worker has no such flag in its address.
  *
  * The groups: `look` (`LOOK`'s own fields), `key.<hour>` (one time-of-day keyframe) and `night` (the night's,
- * all four) in `render/look.ts`; `lawn` in `pc/shaders/grass.ts`.
+ * all four) in `render/look.ts`; `lawn` in `pc/shaders/grass.ts`; `ground` (the lawn's map) in `shared/lawn.ts`.
  */
 
 /** `a.b:1;c.d:x` as path → value, both as written. */

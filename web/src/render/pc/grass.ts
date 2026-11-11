@@ -8,7 +8,8 @@
  * copy each, its matrix moving it to its corner on the ground, its `GRASS_SLOPE` the ground's tilt
  * under it. Its own material (the textures and the eye are this town's): both faces, lit alike,
  * casting no shadow, receiving the sun's. The textures: the field's colour (and grassiness), the
- * town's mask (`refresh`, when the lot changes) and the gusts' noise.
+ * town's mask and the lawn's map (`shared/lawn.ts`: its tone, worn earth, mown or rough; both again on
+ * `refresh`, when the lot changes) and the gusts' noise.
  */
 
 import * as pc from './engine';
@@ -50,7 +51,7 @@ function gustTexture(device: pc.GraphicsDevice): pc.Texture {
 }
 
 const grounds = new WeakSet<pc.Material>();
-const noGrass = new WeakMap<pc.GraphicsDevice, { colour: pc.Texture; town: pc.Texture }>();
+const noGrass = new WeakMap<pc.GraphicsDevice, { colour: pc.Texture; town: pc.Texture; lawn: pc.Texture }>();
 
 /**
  * The ground's gusts (`GAME_GRASS_GROUND`) on `material` (the terrain's, shared by every town's):
@@ -61,8 +62,9 @@ export function grassGround(device: pc.GraphicsDevice, material: pc.StandardMate
   grounds.add(material);
   let none = noGrass.get(device);
   if (!none) {
-    const blank = (name: string, format: number, bytes: number) => new pc.Texture(device, { name, width: 1, height: 1, format, mipmaps: false, levels: [new Uint8Array(bytes)] });
-    noGrass.set(device, (none = { colour: blank('noGrass', pc.PIXELFORMAT_RGBA8, 4), town: blank('noTownGrass', pc.PIXELFORMAT_R8, 1) }));
+    const blank = (name: string, format: number, bytes: ArrayLike<number>) => new pc.Texture(device, { name, width: 1, height: 1, format, mipmaps: false, levels: [Uint8Array.from(bytes)] });
+    // (No lawn's map: the land as it is, rough.)
+    noGrass.set(device, (none = { colour: blank('noGrass', pc.PIXELFORMAT_RGBA8, [0, 0, 0, 0]), town: blank('noTownGrass', pc.PIXELFORMAT_R8, [0]), lawn: blank('noLawn', pc.PIXELFORMAT_RGBA8, [128, 128, 0, 255]) }));
   }
   material.setDefine('GAME_GRASS_GROUND', '');
   // No contact shading under the blades (`post.ts`): they would shade the ground in blotches.
@@ -70,6 +72,7 @@ export function grassGround(device: pc.GraphicsDevice, material: pc.StandardMate
   material.setParameter('game_grassGust', gustTexture(device));
   material.setParameter('game_grassColour', none.colour);
   material.setParameter('game_grassTown', none.town);
+  material.setParameter('game_grassLawn', none.lawn);
   material.setParameter('game_grassArea', new Float32Array([0, 0, 1, 1]));
   material.setParameter('game_grassEye', new Float32Array(4));
   // (No town: its mask isn't read, nor the lawn's tone drawn.)
@@ -135,6 +138,7 @@ export class Grass {
   private readonly material: pc.StandardMaterial;
   private readonly colour: pc.Texture;
   private town: pc.Texture;
+  private lawn: pc.Texture;
   /** The residents pushing it (`setPushers`: x, z, strength each). */
   private readonly push = new Float32Array(GRASS_PUSHERS * 4);
   /**
@@ -169,6 +173,7 @@ export class Grass {
     // (With mips, trilinear: the ground reads it far off, `shaders/grass.ts`; the blades read its first level.)
     this.colour = new pc.Texture(device, { name: 'grassColour', width: field.w, height: field.d, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [field.colour] });
     this.town = this.townTexture();
+    this.lawn = this.lawnTexture();
     this.area = new Float32Array([field.x0, field.z0, 1 / field.w, 1 / field.d]);
     this.townSize[2] = field.margin;
     this.townSize[3] = field.margin + GRASS.toneFade;
@@ -211,7 +216,15 @@ export class Grass {
     return new pc.Texture(this.app.graphicsDevice, { name: 'grassTown', width: Math.max(1, f.townW), height: Math.max(1, f.townD), format: pc.PIXELFORMAT_R8, mipmaps: false, minFilter: pc.FILTER_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [f.town.length ? f.town : new Uint8Array(1)] });
   }
 
-  /** The town's mask and its size on the material. */
+  /** The lawn's map as a texture (a texel a tile; with mips: the ground reads it far off). */
+  private lawnTexture(): pc.Texture {
+    const f = this.field;
+    const n = GRASS.townTexels;
+    const [w, d] = [Math.max(1, f.townW / n), Math.max(1, f.townD / n)];
+    return new pc.Texture(this.app.graphicsDevice, { name: 'grassLawn', width: w, height: d, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [f.lawn.length === w * d * 4 ? f.lawn : Uint8Array.from([128, 128, 0, 255])] });
+  }
+
+  /** The town's mask, the lawn's map and the town's size on the material. */
   private setTown(): void {
     const f = this.field;
     const n = GRASS.townTexels;
@@ -219,6 +232,7 @@ export class Grass {
     this.townSize[1] = f.townD / n;
     for (const on of [this.material, ...this.grounds]) {
       on?.setParameter('game_grassTown', this.town);
+      on?.setParameter('game_grassLawn', this.lawn);
       on?.setParameter('game_grassTownSize', this.townSize);
     }
   }
@@ -246,10 +260,15 @@ export class Grass {
     if (this.field.townW !== this.town.width || this.field.townD !== this.town.height || !this.field.town.length) {
       this.town.destroy();
       this.town = this.townTexture();
+      this.lawn.destroy();
+      this.lawn = this.lawnTexture();
     } else {
       const data = this.town.lock() as Uint8Array;
       data.set(this.field.town);
       this.town.unlock();
+      const lawn = this.lawn.lock() as Uint8Array;
+      lawn.set(this.field.lawn);
+      this.lawn.unlock();
     }
     this.setTown();
     this.stale = true;
@@ -354,5 +373,6 @@ export class Grass {
     this.material.destroy();
     this.colour.destroy();
     this.town.destroy();
+    this.lawn.destroy();
   }
 }
