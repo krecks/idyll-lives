@@ -1391,6 +1391,21 @@ fn give_up(w: &mut World, k: usize, c: usize) -> bool {
             .collect();
         w.taxis.missed.retain(|m| !waiting.contains(&m.0));
     }
+    // (Out of it at the kerb side, on ground they can walk on, not where its middle is: let out
+    // inside its body, with the way home not found from there, they stood in its way as it
+    // turned round, and it waited for them for good, Wheat Acres.)
+    let out = {
+        let car = &w.cars[c];
+        let (p, yaw) = car.shown.map_or((car.spot, car.yaw), |s| (s.0, s.1));
+        let (sn, cs) = yaw.sin_cos();
+        let nav = w.nav();
+        let k = car.wid / 2.0 + 0.5;
+        [[-cs, sn], [cs, -sn]]
+            .into_iter()
+            .map(|d| [p[0] + d[0] * k, p[1] + d[1] * k])
+            .find(|q| nav.tile_free(q[0].floor() as i32, q[1].floor() as i32))
+            .unwrap_or(at)
+    };
     if home || leisure {
         for (s, i, plot) in aboard {
             let short = walk_home(w, i, plot) <= SHORT_WALK;
@@ -1407,7 +1422,7 @@ fn give_up(w: &mut World, k: usize, c: usize) -> bool {
             sim.away_until = None;
             sim.current = None;
             sim.pose = crate::content::Pose::Stand;
-            sim.pos = at;
+            sim.pos = out;
             crate::cars::walk_home(w, i, None);
         }
     }
