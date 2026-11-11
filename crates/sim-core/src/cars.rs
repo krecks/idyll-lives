@@ -3628,17 +3628,30 @@ fn drive_on(w: &mut World, c: usize) {
     // Nor into the ground one turning round still backs up over (`unjam`): it has the way; but
     // for one waiting for this one (its body in that one's way), which goes on by, never nearer
     // than `GAP` (each kept off the other, one backing up and one it had turned round for or
-    // turning round itself stood there for good: Elm Park, Willowbrook).
+    // turning round itself stood there for good: Elm Park, Willowbrook). Even so not nearer the
+    // ground past where that one stands now, still to back over: going on by is past its front,
+    // not cutting in behind its tail (a taxi came by one backing round a junction's turn, cut in
+    // behind it into its turn and stood there, each waiting for the other for good, Willowby).
+    // Nor, going the way it backs, on past it (`overtakes`): crept along beside the ground it backs
+    // over, a car came out ahead of it into its way.
     if let Some(k) = traffic.turning.iter().find_map(|(k, path)| {
+        let on = if waiting.contains(k) {
+            path.iter()
+                .position(|r| path[0].overlap(r) <= 0.0)
+                .unwrap_or(path.len())
+        } else {
+            0
+        };
         (*k != key
-            && !waiting.contains(k)
-            && path.iter().any(|r| {
-                crate::travel::dist(r.at, body_next.at) < r.half[0] + body_next.half[0] + 1.0 && {
-                    // (Kept `TURN_KEEP` off it, so the one backing up comes by clear.)
-                    let after = body_next.gap(r);
-                    after < GAP + TURN_KEEP && after < body_now.gap(r) - 1e-3
-                }
-            }))
+            && (overtakes(path[0], &body_now, &body_next, me.heading())
+                || path[on..].iter().any(|r| {
+                    crate::travel::dist(r.at, body_next.at) < r.half[0] + body_next.half[0] + 1.0
+                        && {
+                            // (Kept `TURN_KEEP` off it, so the one backing up comes by clear.)
+                            let after = body_next.gap(r);
+                            after < GAP + TURN_KEEP && after < body_now.gap(r) - 1e-3
+                        }
+                })))
         .then_some(*k)
     }) {
         car.waits_for = Some(k);
@@ -3917,6 +3930,24 @@ fn guard<'a>(now: &Rect, next: &Rect, them: impl Iterator<Item = &'a Driving>) -
     them.into_iter()
         .find(|o| near(o.at, o.len) && closes_in(now, next, &o.body()))
         .map(|o| o.first)
+}
+
+/// Whether a car going `heading`, its move from body `now` to `next`, goes on past one turning
+/// round as it backs (`turning`, where it is now, `Traffic::turning`): going the way that one
+/// backs, beside it or behind it (within a lane or so either side), its front further past that
+/// one's nose and nearer than `GAP` behind it or beyond. (Ahead of it already, it's on its way out
+/// of the way: `drive_on`'s keep off the ground still backed over.)
+fn overtakes(turning: Rect, now: &Rect, next: &Rect, heading: [f32; 2]) -> bool {
+    let back = [-turning.yaw.sin(), -turning.yaw.cos()];
+    let rel = |r: &Rect| sub2(r.at, turning.at);
+    let (d_now, d_next) = (rel(now), rel(next));
+    let front = |d: [f32; 2], r: &Rect| dot2(d, back) + r.half[0];
+    let nose = -turning.half[0] - GAP;
+    dot2(heading, back) > 0.5
+        && cross2(back, d_next).abs() < turning.half[1] + next.half[1] + 2.0 * LANE
+        && dot2(d_now, back) < 0.0
+        && front(d_next, next) > nose
+        && front(d_next, next) > front(d_now, now) + 1e-3
 }
 
 /// Whether a car's move from body `now` to `next` brings it nearer `o` than `GAP`, and nearer than
