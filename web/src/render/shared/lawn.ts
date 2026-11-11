@@ -43,7 +43,7 @@ export const LAWN_MAP = tuned('ground', {
   drySpan: 13,
   dry: 0.75,
   roughPatch: 1.3,
-  stripes: 0,
+  stripes: 0.12,
   stripeWidth: 1,
   wall: 0,
   shade: 0,
