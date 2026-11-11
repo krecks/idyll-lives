@@ -241,6 +241,11 @@ const SIDEWAYS: f32 = 6.5;
 /// began 2 to 8 mm from it and mostly across the lane, and it stood 25 to 37 degrees across its
 /// lane: King'ston, Pebble Quay.)
 const FACING_STEP: f32 = 0.02;
+/// A car turned round joins its new way's lane at the first point it drives on to within this of
+/// the way it faces (the cosine of the angle, `Route::detour`), of those nearer than `JOIN_NEAR`
+/// (m): one further off it drives to however it lies.
+const JOIN_COS: f32 = 0.7;
+const JOIN_NEAR: f32 = 2.5;
 /// A driveway meeting its road further from square than this (the cosine of its angle to the
 /// road's side) comes alongside it rather than onto it: its car stays parked (`Car::no_way`).
 const OBLIQUE: f32 = 0.5;
@@ -1932,9 +1937,21 @@ impl Route {
             let w = way(i);
             (w[0] * b.t[0] + w[1] * b.t[1]) * d > 0.7
         };
+        // (Onto the lane at its first point ahead of where it turned round, the way it faces
+        // there, not across to one right beside it or behind it: a car doesn't step sideways,
+        // and facing along such a step it swung its tail half across the road as it drove on,
+        // into the way of one coming the other way on a stretch too narrow for more, both held up
+        // for good, Eaglescar. One further off it drives to as it would.)
         let from = legs.last().unwrap_or(lane[0]);
-        legs.line(from, lane[0], false, JUNCTION_SPEED);
-        for (i, &q) in lane.iter().enumerate() {
+        let facing = [yaw.sin(), yaw.cos()];
+        let join = (0..lane.len() - 1)
+            .find(|&i| {
+                let off = dist(from, lane[i]);
+                off >= JOIN_NEAR || dot2(sub2(lane[i], from), facing) >= JOIN_COS * off
+            })
+            .unwrap_or(lane.len() - 1);
+        legs.line(from, lane[join], false, JUNCTION_SPEED);
+        for (i, &q) in lane.iter().enumerate().skip(join) {
             if let Some((b, d, (turn, at))) = &into
                 && b.near(q, *at, turn.taken, *d)
                 && along(b, i, -*d)
@@ -3611,17 +3628,30 @@ fn drive_on(w: &mut World, c: usize) {
     // Nor into the ground one turning round still backs up over (`unjam`): it has the way; but
     // for one waiting for this one (its body in that one's way), which goes on by, never nearer
     // than `GAP` (each kept off the other, one backing up and one it had turned round for or
-    // turning round itself stood there for good: Elm Park, Willowbrook).
+    // turning round itself stood there for good: Elm Park, Willowbrook). Even so not nearer the
+    // ground past where that one stands now, still to back over: going on by is past its front,
+    // not cutting in behind its tail (a taxi came by one backing round a junction's turn, cut in
+    // behind it into its turn and stood there, each waiting for the other for good, Willowby).
+    // Nor, going the way it backs, on past it (`overtakes`): crept along beside the ground it backs
+    // over, a car came out ahead of it into its way.
     if let Some(k) = traffic.turning.iter().find_map(|(k, path)| {
+        let on = if waiting.contains(k) {
+            path.iter()
+                .position(|r| path[0].overlap(r) <= 0.0)
+                .unwrap_or(path.len())
+        } else {
+            0
+        };
         (*k != key
-            && !waiting.contains(k)
-            && path.iter().any(|r| {
-                crate::travel::dist(r.at, body_next.at) < r.half[0] + body_next.half[0] + 1.0 && {
-                    // (Kept `TURN_KEEP` off it, so the one backing up comes by clear.)
-                    let after = body_next.gap(r);
-                    after < GAP + TURN_KEEP && after < body_now.gap(r) - 1e-3
-                }
-            }))
+            && (overtakes(path[0], &body_now, &body_next, me.heading())
+                || path[on..].iter().any(|r| {
+                    crate::travel::dist(r.at, body_next.at) < r.half[0] + body_next.half[0] + 1.0
+                        && {
+                            // (Kept `TURN_KEEP` off it, so the one backing up comes by clear.)
+                            let after = body_next.gap(r);
+                            after < GAP + TURN_KEEP && after < body_now.gap(r) - 1e-3
+                        }
+                })))
         .then_some(*k)
     }) {
         car.waits_for = Some(k);
@@ -3900,6 +3930,24 @@ fn guard<'a>(now: &Rect, next: &Rect, them: impl Iterator<Item = &'a Driving>) -
     them.into_iter()
         .find(|o| near(o.at, o.len) && closes_in(now, next, &o.body()))
         .map(|o| o.first)
+}
+
+/// Whether a car going `heading`, its move from body `now` to `next`, goes on past one turning
+/// round as it backs (`turning`, where it is now, `Traffic::turning`): going the way that one
+/// backs, beside it or behind it (within a lane or so either side), its front further past that
+/// one's nose and nearer than `GAP` behind it or beyond. (Ahead of it already, it's on its way out
+/// of the way: `drive_on`'s keep off the ground still backed over.)
+fn overtakes(turning: Rect, now: &Rect, next: &Rect, heading: [f32; 2]) -> bool {
+    let back = [-turning.yaw.sin(), -turning.yaw.cos()];
+    let rel = |r: &Rect| sub2(r.at, turning.at);
+    let (d_now, d_next) = (rel(now), rel(next));
+    let front = |d: [f32; 2], r: &Rect| dot2(d, back) + r.half[0];
+    let nose = -turning.half[0] - GAP;
+    dot2(heading, back) > 0.5
+        && cross2(back, d_next).abs() < turning.half[1] + next.half[1] + 2.0 * LANE
+        && dot2(d_now, back) < 0.0
+        && front(d_next, next) > nose
+        && front(d_next, next) > front(d_now, now) + 1e-3
 }
 
 /// Whether a car's move from body `now` to `next` brings it nearer `o` than `GAP`, and nearer than
@@ -8752,6 +8800,66 @@ mod tests {
             t += 1.0;
         }
         assert!(asked);
+    }
+
+    /// (Eaglescar, world 231441 of seed base 16: a car turned round where the way it came ran a
+    /// little off the lane it turned round to; it stepped sideways onto that lane and, facing along
+    /// the step, swung its tail half across a road too narrow for more as it drove on, into one
+    /// coming the other way: both held up for good.) A car that came east along a street on its
+    /// middle line backs up and drives on east: onto its lane ahead of where it stands, facing
+    /// the way it goes all along.
+    #[test]
+    fn a_car_turned_round_off_its_lane_drives_on_facing_the_way_it_goes() {
+        let road: Vec<String> = (0..=99).map(|x| format!("[{x}.5,30]")).collect();
+        let town = format!(
+            r#"{{"width":100,"depth":60,
+            "exits":[{{"x":0.5,"z":30,"kind":"road"}},{{"x":99.5,"z":30,"kind":"road"}}],
+            "roads":[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}}],
+            "plots":[],"households":[],"objects":[],"sims":[],"cars":[]}}"#,
+            road.join(",")
+        );
+        let w = World::from_json(CONTENT, &town, 1).unwrap();
+        let c = car([50.0, 10.0], 0.0, 30.0);
+        let mut legs = Legs::default();
+        for k in 0..=20 {
+            legs.push_lane([20.0 + k as f32 * 2.0, 30.0], 5.0, 0.0, LANE);
+        }
+        let had = legs.timed(true, true);
+        let at = |x: f32| had.points.iter().find(|p| p.0[0] >= x).unwrap().2;
+        let rp = w.travel.graph.near([40.0, 30.0], ROAD_REACH, 1, Mode::Car)[0];
+        let d = Detour {
+            home: false,
+            from: at(50.0),
+            back: at(36.0),
+            avoid: rp.edge,
+            same: false,
+            mouth: None,
+        };
+        let r = c
+            .detoured(&w.exits, &w.travel, false, &d, &had)
+            .expect("a way on");
+        let on = r.points.iter().position(|p| !p.3).expect("it drives on");
+        assert!(
+            r.points[on..].iter().all(|p| !p.3),
+            "backs up, then drives on"
+        );
+        // (At each point it drives on from, it faces the way it goes, as near as a step's curve.)
+        let mut lane = 0.0f32;
+        for k in r.points[on..].windows(2) {
+            let (a, b) = (k[0], k[1]);
+            lane = lane.max((b.0[1] - 30.0).abs());
+            if crate::travel::dist(a.0, b.0) < 0.05 {
+                continue;
+            }
+            let way = (b.0[0] - a.0[0]).atan2(b.0[1] - a.0[1]);
+            assert!(
+                wrap_angle(a.1 - way).abs() < 0.2,
+                "at {:?} it faces {} going {way}",
+                a.0,
+                a.1
+            );
+        }
+        assert!(lane > 0.5, "it comes to its lane ({lane} m off the middle)");
     }
 
     #[test]
