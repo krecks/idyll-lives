@@ -4,7 +4,7 @@
  */
 
 import { isGraphicsPreset, QUALITY, type GraphicsPreset, type RenderQuality } from '../render/quality';
-import { MIN_SCALE, type Resolution } from '../render/shared/resolution';
+import { DEFAULT_RESOLUTION, isResolution, type Resolution } from '../render/shared/resolution';
 import type { Shading } from '../render/types';
 
 export interface Settings {
@@ -15,7 +15,7 @@ export interface Settings {
    * shading; or `classic`, the PBR shading it replaced. Applies live.
    */
   shading: Shading;
-  /** `auto`: the screen's own resolution up to about 1920×1080 pixels; or a share of it along each side, 0.5..1 (`render/shared/resolution.ts`). */
+  /** Lines of pixels drawn: 720p, 1080p, 1440p or 2160p, at most the screen's own (`render/shared/resolution.ts`). */
   resolution: Resolution;
   /** Frames per second at most (saves power and heat; 60 unless chosen); 0: no cap. */
   fpsCap: number;
@@ -86,7 +86,7 @@ const STORAGE_KEY = 'open-sims-wasm.settings';
 export const DEFAULT_SETTINGS: Settings = {
   graphics: 'medium',
   shading: 'soft',
-  resolution: 'auto',
+  resolution: DEFAULT_RESOLUTION,
   fpsCap: 60,
   renderer: 'auto',
   autonomy: true,
@@ -207,11 +207,8 @@ function sanitize(s: Record<string, unknown>): Settings {
   out.masterVolume = clampNumber(s.masterVolume, 0, 1, DEFAULT_SETTINGS.masterVolume);
   out.graphics = isGraphicsPreset(s.graphics) ? s.graphics : DEFAULT_SETTINGS.graphics;
   out.shading = oneOf(s.shading, ['soft', 'classic'] as const, DEFAULT_SETTINGS.shading);
-  const resolution = s.resolution;
-  out.resolution =
-    resolution === 'auto' || (typeof resolution === 'number' && resolution >= MIN_SCALE && resolution <= 1)
-      ? resolution
-      : DEFAULT_SETTINGS.resolution;
+  // (`auto` and the 50–100 % shares of before 0.7.1 start again on 1080p.)
+  out.resolution = isResolution(s.resolution) ? s.resolution : DEFAULT_SETTINGS.resolution;
   out.renderer = oneOf(s.renderer, ['auto', 'webgl'] as const, DEFAULT_SETTINGS.renderer);
   out.directorPace = oneOf(s.directorPace, ['calm', 'lively'] as const, DEFAULT_SETTINGS.directorPace);
   out.directControl = oneOf(s.directControl, ['inspect', 'always'] as const, DEFAULT_SETTINGS.directControl);

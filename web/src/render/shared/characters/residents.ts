@@ -213,6 +213,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private carRide: CarRide | null = null;
   /** Scratch for `carRide`. */
   private readonly rideAt = { x: 0, z: 0, yaw: 0 };
+  /** Height of the land at (x, z) (`setGround`: a big world's hills between its hamlets), or null: flat at 0. */
+  private ground: ((x: number, z: number) => number) | null = null;
   /** Scratch for `riding`: the placement as a matrix, then moved by the ride. */
   private readonly rideM = new Float32Array(16);
   /** The lanes others have taken on what `freeLane` looks at (scratch). */
@@ -1852,7 +1854,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         rig.lag += frameDt;
         const moved = curr[o + k.moving] > 0 || riding;
         const dx = moved ? tx - rig.x : 0;
-        const dy = moved ? th * WALL_HEIGHT - rig.floorY : 0;
+        const dy = moved ? this.floorAt(th, tx, tz) - rig.floorY : 0;
         const dz = moved ? tz - rig.z : 0;
         if (frameDt > 0) rig.speed += (Math.min(Math.hypot(dx, dz) / frameDt, 20) - rig.speed) * (1 - Math.exp(-frameDt * 10));
         if (dx || dy || dz) this.carryPose(rig, i, dx, dy, dz, shadows);
@@ -1862,7 +1864,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const dt = Math.min(FAR_LAG, frameDt + rig.lag);
       rig.lag = 0;
       const dir = (rig.dir = this.directions[i] ?? null);
-      rig.floorY = th * WALL_HEIGHT;
+      rig.floorY = this.floorAt(th, tx, tz);
       const pose = curr[o + k.pose];
       const moving = curr[o + k.moving] > 0;
       // Calling someone over (sim-core's `call`): a wave, looking at them.
@@ -3239,6 +3241,21 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    */
   setCarRide(ride: CarRide | null): void {
     this.carRide = ride;
+  }
+
+  /**
+   * The land under the residents (the landscape's `heightAt`): out on a big world's hills between its hamlets they
+   * stand, walk and ride on it, with what they hold or ride, not sunk into it or floating over a hollow. What's built
+   * (lots, streets and the apron round them) is flat at 0, so in and round the houses nothing changes. Null: flat.
+   */
+  setGround(ground: ((x: number, z: number) => number) | null): void {
+    this.ground = ground;
+  }
+
+  /** The floor Sim at (x, z) stands on, on storey `th` (fractions on the stairs): the storey's height over the land there. */
+  private floorAt(th: number, x: number, z: number): number {
+    const land = this.ground ? this.ground(x, z) : 0;
+    return th * WALL_HEIGHT + (Number.isFinite(land) ? land : 0);
   }
 
   /**

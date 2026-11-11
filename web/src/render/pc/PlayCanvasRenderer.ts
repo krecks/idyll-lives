@@ -87,7 +87,7 @@ import { ModelRefresh } from '../shared/modelRefresh';
 import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
-import { PIXEL_BUDGET, renderScale, watchPixelRatio } from '../shared/resolution';
+import { DEFAULT_RESOLUTION, renderScale, watchPixelRatio } from '../shared/resolution';
 import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
@@ -353,7 +353,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly townRig = new OverviewCamera(this.townPose);
 
   private readonly pacer = new FramePacer();
-  private options: LiveRenderOptions = { resolution: 'auto', cameraSensitivity: 1, fpsCap: 0 };
+  private options: LiveRenderOptions = { resolution: DEFAULT_RESOLUTION, cameraSensitivity: 1, fpsCap: 0 };
   private active = false;
   private covered = false;
   private coveredFrames = 0;
@@ -741,6 +741,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.signals = new Signals(this.app, this.root, this.deps.assets, { shadows: this.quality.streetShadows, lod: this.quality.streetLod });
     this.characters.setShadowTest(inMap);
     this.characters.setCarRide((frame, x, z, yaw, aboard, out) => this.cars.ride(frame, x, z, yaw, aboard, out));
+    // (Out on the hills between hamlets, on the land, not sunk into it: `Characters.setGround`.)
+    this.characters.setGround((x, z) => this.lot.landscape?.heightAt(x, z) ?? 0);
     this.decorTemplates = new TemplateCache(this.app);
     this.storeyLayer = new pc.Entity('storeyLayer');
     this.root.addChild(this.storeyLayer);
@@ -2725,7 +2727,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const dpr = window.devicePixelRatio || 1;
     const w = this.cssSize.width * dpr;
     const h = this.cssSize.height * dpr;
-    const scale = (this.renderScaleNow = renderScale(w, h, this.options.resolution, PIXEL_BUDGET * this.quality.pixelBudget));
+    const scale = (this.renderScaleNow = renderScale(h, this.options.resolution));
     this.app.setCanvasResolution(pc.RESOLUTION_FIXED, Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)));
   }
 

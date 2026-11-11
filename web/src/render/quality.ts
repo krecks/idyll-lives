@@ -160,12 +160,6 @@ export interface QualitySettings {
    */
   openWorld: OpenWorldQuality;
   /**
-   * The share of `shared/resolution.ts`'s `PIXEL_BUDGET` the `auto` resolution draws at most (1: a
-   * 1920×1080 screen at 100 %). Low's 0.5625 is 75 % along each side there, as a share of the
-   * fill-rate: the picture a little softer, the scene, its FXAA and its compose about 44 % fewer pixels.
-   */
-  pixelBudget: number;
-  /**
    * Low's leaner picture chain (`pc/post.ts`): the scene in an 11/11/10-bit float target where the GPU
    * can draw into one (RGBA16F otherwise), and the FXAA's input 8 bits a channel, the image-processed
    * colour clamped there. Half the bytes of the two half-float full-size targets. Medium and High
@@ -204,9 +198,9 @@ export interface RenderQuality extends QualitySettings {
 const OPEN_WORLD: OpenWorldQuality = { stream: 1, farCull: 650, woodsFar: 560, woodsCell: 256, flowersFar: 170, tiles: [200, 460], far: 2600 };
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, grass: { radius: 45, density: 0.5, nearest: 1 }, woodsCell: 100, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, holdStillFrames: true, ambientRange: 0, birds: { count: 6, range: 18 }, residentRadius: 90, openWorld: { stream: 0.7, farCull: 450, woodsFar: 400, woodsCell: 128, flowersFar: 120, tiles: [150, 350], far: 1800 }, pixelBudget: 0.5625, leanTargets: true },
-  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 60, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 40, birds: { count: 24, range: 35 }, residentRadius: 140, openWorld: OPEN_WORLD, pixelBudget: 1, leanTargets: false },
-  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 90, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 }, residentRadius: 200, openWorld: OPEN_WORLD, pixelBudget: 1, leanTargets: false },
+  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, grass: { radius: 45, density: 0.5, nearest: 1 }, woodsCell: 100, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, holdStillFrames: true, ambientRange: 0, birds: { count: 6, range: 18 }, residentRadius: 90, openWorld: { stream: 0.7, farCull: 450, woodsFar: 400, woodsCell: 128, flowersFar: 120, tiles: [150, 350], far: 1800 }, leanTargets: true },
+  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 60, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 40, birds: { count: 24, range: 35 }, residentRadius: 140, openWorld: OPEN_WORLD, leanTargets: false },
+  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 90, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 }, residentRadius: 200, openWorld: OPEN_WORLD, leanTargets: false },
 };
 
 export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];

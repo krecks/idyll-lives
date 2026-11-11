@@ -1,8 +1,8 @@
 # Graphics settings and performance
 
-*Status: 0.3.1 (its review changed the lamps: each lights only its own room). Three presets (Low, Medium, High), Auto resolution and the paced frame rate cap are in. 0.3.0 cut Low's draws and triangles hard (below); it still hasn't been measured on Intel hardware. On the Intel laptops below, Medium's target is 30 fps; scaled from Mac measurements, 0.2.0's Medium is estimated at about 10–21 fps there by day (8–13 at night), so it probably falls short until someone measures it on a real laptop. Low is best effort. The release review has the findings behind this page ([release-0.2.0-review.md](../release-0.2.0-review.md), §2.5.1 and §3.5). After 0.3.2 the game moved from Babylon.js 9.30 to PlayCanvas 2.23 ([The renderer](#the-renderer)): the presets and their knobs are the same, and the measurements on this page up to 0.3.2 were taken on the Babylon renderer; the port's are in [performance.md](performance.md#the-playcanvas-port).*
+*Status: 0.3.1 (its review changed the lamps: each lights only its own room). Three presets (Low, Medium, High), the resolution setting and the paced frame rate cap are in. 0.3.0 cut Low's draws and triangles hard (below); it still hasn't been measured on Intel hardware. On the Intel laptops below, Medium's target is 30 fps; scaled from Mac measurements, 0.2.0's Medium is estimated at about 10–21 fps there by day (8–13 at night), so it probably falls short until someone measures it on a real laptop. Low is best effort. The release review has the findings behind this page ([release-0.2.0-review.md](../release-0.2.0-review.md), §2.5.1 and §3.5). After 0.3.2 the game moved from Babylon.js 9.30 to PlayCanvas 2.23 ([The renderer](#the-renderer)): the presets and their knobs are the same, and the measurements on this page up to 0.3.2 were taken on the Babylon renderer; the port's are in [performance.md](performance.md#the-playcanvas-port).*
 
-Code: `web/src/render/pc/` (the renderer, `PlayCanvasRenderer.ts`), `web/src/render/quality.ts` (the presets), `web/src/render/shared/resolution.ts` (Auto resolution), `web/src/render/shared/pacing.ts` (the FramePacer), `web/src/settings/settings.svelte.ts` (settings and their migration), `web/src/debug/bench.ts` and `benchFlags.ts` (the benchmark), `tools/bench/` (its runner).
+Code: `web/src/render/pc/` (the renderer, `PlayCanvasRenderer.ts`), `web/src/render/quality.ts` (the presets), `web/src/render/shared/resolution.ts` (the resolution), `web/src/render/shared/pacing.ts` (the FramePacer), `web/src/settings/settings.svelte.ts` (settings and their migration), `web/src/debug/bench.ts` and `benchFlags.ts` (the benchmark), `tools/bench/` (its runner).
 
 ## The presets
 
@@ -36,7 +36,7 @@ Costs are what leaving the feature out saved on Medium, on the Babylon renderer:
 The same on every preset:
 - **No canvas MSAA.** Only the last full-screen pass draws to the canvas, so its 4× MSAA smoothed nothing: 66 MB of memory traffic a frame at 1080p, about 3 ms on an Intel HD 620 by P1's model (P1-06). The scene is multisampled in its own half-float target instead (`msaaSamples`, `render/pc/post.ts`).
 - **The sun's shadow map is depth only** (PlayCanvas's `SHADOW_PCF3_32F`; on Babylon it was an R16F colour target, not the RGBA16F that nothing read, P1-05).
-- **Auto resolution** with a budget of 1920×1080 (below).
+- **Resolution** as 720p, 1080p, 1440p or 2160p (below).
 - **The FramePacer** for the frame rate cap (below).
 - **The menus' town** is drawn at the player's frame rate cap, as the game is: standing still it is held (`holdStillFrames`, above), so it costs nothing then; it had a 30 fps cap of its own until 0.5.0, which saved nothing while held and made the camera judder whenever it moved (four refreshes a frame on a 120 Hz screen).
 - **The camera's near plane** moves out with its distance, to a fiftieth of it (0.3 m up to 15 m out, 1.9 m at the game's farthest, about 6 m from the town overview's 300 m): with it at 0.3 m from that far, the depth buffer couldn't tell the roads, 1.2 cm over the ground, from the ground, and the ground showed through them in green patches.
@@ -60,27 +60,25 @@ There is no hardware target (the owner, 2026-10-15): no frame-rate goal for part
 
 ## Resolution
 
-Settings › Performance › Resolution: Auto (the default) or Custom.
+Settings › Performance › Resolution: 720p, 1080p (the default), 1440p or 2160p (`render/shared/resolution.ts`). Auto and the 50–100 % slider were removed after 0.7.0: Auto drew a Retina or 4K screen at about 1920×1080 pixels and, with the step-down tried on top of it, looked blurry and flickered as the canvas was resized.
 
-- **Auto** draws every pixel of the screen up to a budget of 1920×1080 (2,073,600 pixels). A screen with more device pixels is drawn at `sqrt(budget / pixels)` of its resolution along each side, and the browser scales the picture up. The interface is still drawn at the screen's own resolution, so text stays sharp.
-- **Custom** draws 50–100 % of the screen's own resolution along each side, whatever the screen.
+- **Lines drawn:** the setting is how many lines of pixels the game draws, the width following the window's shape: the canvas's device-pixel height × `min(1, lines / height)` along each side, and the browser scales the picture up to the canvas. Never more than the canvas has: a window shorter than the setting is drawn at its own size. The interface is still drawn at the screen's own resolution, so text stays sharp.
 - **Rounding:** the drawn size is CSS size × device pixel ratio × scale, cut down to whole pixels.
 - **When it's applied:** on start, on a settings change, when the window resizes, and when the device pixel ratio changes. Browser zoom and moving the window to a screen with another density change the ratio, which doesn't always resize the window, so a `matchMedia` resolution query watches it. PlayCanvas's own pixel-ratio scaling is off (`maxPixelRatio` 1); it would apply the ratio a second time.
-- **There is no step-down:** Auto doesn't lower the resolution when the game runs slowly.
+- **No step-down:** the resolution never changes on its own while the game runs.
+- **Settings from before:** `auto` or a share saved by 0.7.0 starts on 1080p.
 
-Examples with Auto:
+Examples:
 
-| Screen (CSS size × device pixel ratio) | Device pixels | Drawn | Share along each side |
+| Window (CSS size × device pixel ratio) | Device pixels | 1080p draws | 1440p draws |
 |---|---|---|---|
-| 1366×768 × 1 | 1366×768 | 1366×768 | 100 % |
-| 1920×1080 × 1 | 1920×1080 | 1920×1080 | 100 % |
-| 2560×1440 × 1 | 2560×1440 | 1920×1080 | 75 % |
-| 2560×1600 × 1 | 2560×1600 | 1821×1138 | 71 % |
-| 1512×982 × 2 (a MacBook window, measured by G1) | 3024×1964 | 1786×1160 | 59 % |
-| 1920×1080 × 2 | 3840×2160 | 1920×1080 | 50 % |
-| 3840×2160 × 1 | 3840×2160 | 1920×1080 | 50 % |
+| 1366×768 × 1 | 1366×768 | 1366×768 (100 %) | 1366×768 (100 %) |
+| 1920×1080 × 1 | 1920×1080 | 1920×1080 (100 %) | 1920×1080 (100 %) |
+| 2560×1440 × 1 | 2560×1440 | 1920×1080 (75 %) | 2560×1440 (100 %) |
+| 1512×982 × 2 (a MacBook window) | 3024×1964 | 1663×1080 (55 %) | 2217×1440 (73 %) |
+| 3840×2160 × 1 | 3840×2160 | 1920×1080 (50 %) | 2560×1440 (67 %) |
 
-The F3 overlay shows the drawn size and the share ("Resolution 1786×1160 · 59 %").
+The F3 overlay shows the drawn size and the share ("Resolution 1663×1080 · 55 %").
 
 ## The frame rate cap
 

@@ -1,31 +1,31 @@
 /**
- * The render resolution (Settings › Performance › Resolution). `auto` draws every pixel of the
- * screen up to a budget of about 1920×1080: a 1080p screen is drawn at 100 %, a Retina or 4K one at
- * about 2.07 million pixels, which the browser scales up (the picture stays sharp: the scene is
- * smoothed and the interface is drawn at the screen's own resolution). A number draws that share of
- * the screen's resolution along each side (0.5..1), whatever the screen. Low's `auto` has a smaller
- * budget (`QualitySettings.pixelBudget`: three quarters of 1080p along each side).
+ * The render resolution (Settings › Performance › Resolution): how many lines of pixels the game draws,
+ * 720p, 1080p (the default), 1440p or 2160p, the width following the window's shape. Never more than the
+ * screen has: on a 1080p screen 1440p and 2160p draw its own 1080 lines, and a window smaller than the
+ * setting is drawn at its own size. Fewer lines than the screen has are scaled up by the browser; the
+ * interface is drawn at the screen's own resolution either way.
  *
  * `renderScale` is pure (no DOM, no engine), so it can be checked on its own.
  */
 
-/** `auto`, or a share of native resolution along each side (`MIN_SCALE`..1). */
-export type Resolution = 'auto' | number;
+/** The resolutions offered: lines of pixels drawn. */
+export const RESOLUTIONS = [720, 1080, 1440, 2160] as const;
+export type Resolution = (typeof RESOLUTIONS)[number];
+/** The resolution a new player starts with. */
+export const DEFAULT_RESOLUTION: Resolution = 1080;
 
-/** Pixels `auto` draws at most: 1920×1080. */
-export const PIXEL_BUDGET = 1920 * 1080;
-/** The lowest share the resolution setting offers. */
-export const MIN_SCALE = 0.5;
+export function isResolution(value: unknown): value is Resolution {
+  return RESOLUTIONS.includes(value as Resolution);
+}
 
 /**
- * The share of native resolution along each side to draw at, for a canvas of `width`×`height` device
- * pixels. `budget`: the pixels `auto` draws at most (the preset's share of `PIXEL_BUDGET`,
- * `QualitySettings.pixelBudget`: Low's 0.5625, 75 % along each side of a 1080p screen).
+ * The share of the canvas's device pixels to draw along each side, for a canvas `height` device pixels
+ * tall: the setting's lines, at most every line the canvas has (1).
  */
-export function renderScale(width: number, height: number, resolution: Resolution, budget = PIXEL_BUDGET): number {
-  if (resolution !== 'auto') return Number.isFinite(resolution) ? Math.min(1, Math.max(MIN_SCALE, resolution)) : 1;
-  const pixels = width * height;
-  return pixels > budget ? Math.sqrt(budget / pixels) : 1;
+export function renderScale(height: number, resolution: Resolution): number {
+  if (!(height > 0)) return 1;
+  const lines = isResolution(resolution) ? resolution : DEFAULT_RESOLUTION;
+  return Math.min(1, lines / height);
 }
 
 /**

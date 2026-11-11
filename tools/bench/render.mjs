@@ -18,7 +18,7 @@
  *                              camera swinging before it or held)
  *     --throttle 1,3           CPU slow-down factors (CDP Emulation.setCPUThrottlingRate)
  *     --diags none,noshadows   one run each ('+' joins several: noshadows+noaa)
- *     --res 1                  render scale: 1, 0.5–1, or auto
+ *     --res 1                  resolution: 1 (every line the window has), 720, 1080, 1440, 2160, or auto
  *     --secs 20 --warmup 5 --runs 1
  *     --throughput             no vsync and no frame-rate limit: frames as fast as they can be made
  *     --hud 0|1                the game's interface during the run (default 0: measure the renderer;
@@ -386,7 +386,7 @@ function table(o, results) {
   }
   const f = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : '–');
   const rows = [
-    `Scene \`${scene}\`, 1920×1080 at DPR 1, render scale ${res}, ${throughput ? 'no vsync (throughput)' : 'vsync'}, ${secs} s after ${warmup} s warm-up, median of ${runs} run(s).`,
+    `Scene \`${scene}\`, 1920×1080 at DPR 1, resolution ${res}, ${throughput ? 'no vsync (throughput)' : 'vsync'}, ${secs} s after ${warmup} s warm-up, median of ${runs} run(s).`,
     '',
     '| preset | backend | scenario | diag | CPU× | fps | frame p50 / p95 / p99 ms | CPU ms (update + draw) | GPU ms avg / p95 | draws (shadow / mirror) | triangles M (shadow / mirror) | passes · M px×samples · targets MB | residents ms | lighting /s | reflections /s | long tasks | fingerprint |',
     '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
