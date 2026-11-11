@@ -126,6 +126,7 @@ Every body has:
 | `teeth`, `tongue` | teeth; the mouth plate (dark, tone.y = 1) and tongue | Head | `mouth` |
 | `hair.<style>` | every hairstyle but `none` (`short crop layered tousled sideSwept afro bob long ponytail braid bun`) | Head, blending to neck_01 / spine_03 below the jaw | `hair` |
 | `hair.beard` | facial hair (male only; hidden for baby, child, teen) | Head; follows the mouth's morphs and the face's identity | `hair` |
+| `hair.<style>.wisps`, `hair.beard.wisps` | the soft edges of each: thin quads past its rims, hems and tips (below), drawn only close up | their hair's, vertex for vertex | `wisp`: the hair's colour and light, cut out in strands |
 | `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, the server's apron (the front from the waist to above the knees), every shoe (below) | from the body | `cloth` (flat colour) |
 | `lod.<shell>` | a low-detail copy of every shell | | `cloth` |
 
@@ -164,11 +165,57 @@ short ones for 52 columns and 18 rows:
 - no hair comes within 2 mm of the head (`sdf`) or 1.5 mm of an ear (the body's ear faces), and no
   edge passes through an ear, at every life stage at rest (`check`).
 
+Solid hair ends in hard edges. Past them go wisps (`hair.rs` `Strip`, `wisps`; a part of their own
+per style, at most 600 triangles, 150 to 470 as built): rows of quads, each growing from two
+neighbouring vertices of the solid hair (the same positions, normals, weights and tone, so a row
+starts exactly on the hair and is shaded as it is; a wisp's two vertices are its root, then its
+end) out to where the wisps end, kept clear of the head and the ears as the hair is. The shader
+draws strands on them and cuts the rest away (below). Where:
+
+- a cap's rim, on over the skin the way its columns come down to it (walked along the head's
+  field, which knows the neck): 9 mm over the forehead, 13 mm at the temples, 16 mm at the nape
+  (0.04, 0.055 and 0.07 head heights), shorter towards an ear and none round it; six tenths of that
+  on hair drawn back tight (ponytail, braid, buns); only in front of the curtains where a style has
+  them (layered, long); none on the bob, whose fringe and curtain cover its rim;
+- the hem of every curtain and fringe: from the outer face's last row down in front of the hem's
+  lip, as one that far (fields.w), and on below it, turned in half as far as the hem is (0.05 to
+  0.08 head heights; the bob's fringe 0.035);
+- a lofted lock's tip: a brush from its last ring but one (two on the thicker locks) on past its
+  end, drawn in to 0.45 of that ring's breadth; over the outer face only on the flat locks that lie
+  on the head (the long style's face locks, the tousled tufts), all round on the others (the
+  side-swept locks, the ponytail's tail, the braid's tuft);
+- the afro, whose outline is no edge: tufts all over it, laid like shingles (a row round the shell
+  from every third ring, on every third column, each on down over two rings and lifting 0.06 head
+  heights off it), their strands loose curls, so its outline is strands' ends from every side;
+- the beard: below its lower edge and up each cheek from its upper one.
+
+Left solid: the buns and their bands, the ponytail's band, the braid's strands and tie (tight hair,
+whose outline is smooth), the sides of the curtains and fringes (they lie on the cheeks and the
+temples), the beard's edge under the nose, round the lips and at the sideburns.
+
 The shader (`hair` branch of `characters/material.ts`) takes the hair colour with the clump bands
 (tone.z), and on dark hair lifts the clumps and a sheen band round the crown (where the strands, taken
 straight down the head from the normal, lie square to the half-way vector between the view and a light
 from above) towards a lighter tint; both even out under a pixel or two. The material has no PBR sheen
 (linked to the albedo it took the colour down to 8 %).
+
+The wisps are that hair, cut out (`character.ts` `WISP`, `RESIDENT_WISP_OPACITY`): along the edge
+(fields.x) strands stand in cells, 500 a metre, in three layers, each sparser than the last and set
+off from it; a strand is a random share of the quad long (fields.y past fields.w), longer and shorter
+in tufts along the edge, as wide as its cell at its root, where the row is one with the solid hair,
+parting from its neighbours and thinning to its tip, leaning a little on the way (a loose one,
+fields.z = 1: waving, and broken along its length). No texture: the strands are drawn from the
+fields, and where they are a pixel wide or less they blur into their mean cover. The cover is the
+material's opacity: under 0.1 nothing is drawn (the alpha test), over it the wisp blends over what
+is behind it and, where the target is multisampled (Medium, High, the creator, the portraits),
+covers that share of the pixel's samples (alpha to coverage), so a strand's edge is as smooth as a
+solid one's; on Low the blend alone smooths it. The blend adds the alphas up, which keeps a
+transparent canvas (the creator's stage, the portraits) covered under them. The wisps are drawn
+after everything solid, from both sides (their faces' winding is free: the one part `check` does
+not hold to it), cast no shadow, write depth, and are lit by the normals of the hair they grow
+from, turned to the viewer where a quad stands across the view. Drawn only where a face is 4 px
+per 5 cm or more (`parts.ts` `WISPS_PX`; thinned out by the shader below 7): not at the game's
+default camera (no draw call), all of them zoomed in.
 
 The body (`body.rs`) is a control cage of superellipse rings (`cage.rs`; the head's cage
 in `head.rs`) fitted so its limit surface passes through the ring points and subdivided once
@@ -250,6 +297,7 @@ hairline and chin as before.
 | shells | hem distance (m; a shoe's from its collar, negative on its lining) | flag: 1 sole, 2 waistband, 3 skirt or apron (a hem band), 4 light midsole, 5 polished | category: 0 top, 1 bottom, 2 shoes | shoes: across the instep (m from its middle; over 1 off its front), else 0 |
 | eyes | offset from the iris centre on the eye's front (m), x | y | iris radius (m) | pupil radius (m) |
 | hair | 0.1 (unused) | | | |
+| wisps | along the edge (m, from a start of the row's own) | 0 at the root (on the hair) .. 1 where the quad ends | how loose the strands are: 0 combed, 1 curls | the share of y over which the strands are still one (solid: a hem's lip) |
 
 ## Tone (4 per vertex)
 
@@ -268,7 +316,8 @@ triangles weighted by its barycentric weight, as the triangles can show it; the 
 skin by `0.3 z age`, appearance texel 4 g, so young adults show none; on the lips instead, how far
 the lip turns down at rest, 0..1, which the shader shades by `LIP_SHADE`: baked, so it is the lip's shape
 whichever way the head faces), w = the baked ambient occlusion
-(below). On `body` the eyelids take the tone of the face they lie on (as it is without the socket, at
+(below). A wisp's two vertices take the tone of the hair vertex it grows from, w included (in
+`build.rs`, after the bake). On `body` the eyelids take the tone of the face they lie on (as it is without the socket, at
 their nearest point), w included (the upper lid keeps its crease), and its normals there, in every
 shape of the face (build.rs `lid_shading`); on `lod.body` the mean tone of the skin round them. Every
 stage uses the base stage's tone.
@@ -441,7 +490,7 @@ by 60% of it. The simulation keeps the appearance opaque, so old saves are unaff
 
 `Left` is the resident's left (-x). Units are authored at ARKit strength. An expression never
 deforms the head: these channels move the lids, lashes, brows, lips, mouth plate, teeth, tongue and
-beard. Morphs are built at the base stage and shared by the other stages.
+beard (with its wisps). Morphs are built at the base stage and shared by the other stages.
 
 ### Identity channels (a face per resident)
 
@@ -475,7 +524,8 @@ plate and teeth built with one of the generator's numbers at +1 (`head.rs`, `fac
 `Identity`), minus the same built at -1, halved, vertex by vertex. Everything on the face is made
 from the head's frame, so it follows the skin by construction; the beard and any hair that lies on
 the face (a long style's locks on the cheeks; within 6 mm of the skin all of it, none past 3 cm)
-take the skin's shape where they lie. The three that add a shape to the head (`jawSquare`,
+take the skin's shape where they lie, and the wisps by the same rule (a wisp's root is where a
+vertex of its hair is, and moves as it does; its end follows the skin under it). The three that add a shape to the head (`jawSquare`,
 `cheekbones`, `cheekFullness`: an ellipsoid joined to the smooth head, placed so it stands that far
 out of either family's) are the head with it minus the shared head. The cranium above the hairline,
 the ears, the back of the head and the neck stay as they are (`identity.rs` `Mask`), so hairlines
@@ -487,14 +537,14 @@ say so in `morphs.identity.eyes`, and `pose.ts` `skin` moves the eye bones' join
 (`Placement.eyes`, summed over the resident's weights once, with the texels).
 
 Identity channels are on `body` (the skin with its lids and lips), `lashes`, `brows`, `teeth`,
-`tongue`, `hair.beard` and the hair that touches the face; not on `lod.body` or the shadow copies,
+`tongue`, `hair.beard` and the hair that touches the face, with their wisps; not on `lod.body` or the shadow copies,
 and they are skipped with the expression when the face is small on screen. The shapes are metres on
 the base stage's head, so a body's `faceScale` scales a resident's weights: the stage's head height
 over the base stage's, times 0.6 on a baby and 0.8 on a child, whose faces are round and unformed
 (a man's: 0.42 baby, 0.69 child, 0.94 teen, about 1 from then on; a woman's 0.45, 0.70, 0.95).
 
 `cargo characters check` holds the channels to the creator's list (`FACE_CHANNELS`), no identity
-channel to more than 6 mm and none to a low-detail part, and every hairstyle 2 mm clear of the head
+channel to more than 6 mm and none to a low-detail part, and every hairstyle (its wisps too) 2 mm clear of the head
 at each channel's two ends, at every life stage (the head's samples moved as the channel moves the
 skin, `HeadFrame::moved`).
 

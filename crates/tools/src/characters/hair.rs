@@ -2,7 +2,8 @@
 //!
 //! - `build_hair(family, stage, head, joints)`: `hair.<style>` for every style but `none`, and
 //!   `hair.beard` where the family has it; each pos, nor, idx (CCW out), dense, fields, tone (y:
-//!   shade deep in the hair, z: clump bands 0..1; w: the occlusion, baked later in build.rs).
+//!   shade deep in the hair, z: clump bands 0..1; w: the occlusion, baked later in build.rs). After
+//!   each, its soft edges: `hair.<style>.wisps` (`Strip`, `wisps`).
 //!
 //! Every style starts from a skull cap: the scalp inside the hair's edge (the head interface's
 //! hairline, smoothed round and brought a little lower over the forehead and temples, going round
@@ -17,13 +18,19 @@
 //! lip with a hole round the lips, in locks; its morphs copy the lips' (face::follow_mouth). Each
 //! style has one fixed layout, so the same calls give the same topology at every life stage.
 //!
+//! The solid hair ends in hard edges (a cap's rim, a hem, a lock's tip, a shell's outline). Past
+//! them go wisps: thin quads growing from the edge's own vertices (`Strip`), in a part of their
+//! own that is drawn only close up, on which the shader draws strands and cuts the gaps between them
+//! away (fields: x = metres along the edge, y = 0 at the root .. 1 at the tip, z = how loose the
+//! strands are, w = how far along they stay one; `character.ts` `RESIDENT_WISP_OPACITY`).
+//!
 //! Skinning: Head, blending below the jaw to neck_01 and spine_03 by height (tails and braids
 //! along their length), so hair that falls past the jaw follows the shoulders when the head turns.
 //! Nothing comes within 2.6 mm of the head, or 3 mm of the ears (`Ears`: the body's ear faces, which the
 //! head's `sdf` leaves out): caps go round them in an arc (the afro's stands off them and closes
 //! under itself above them), curtains go out over them, the beard stops in front.
 
-use super::contract::{BEARD_FAMILIES, HAIR_STYLES};
+use super::contract::{BEARD_FAMILIES, HAIR_STYLES, wisps_part};
 use super::head::HeadFrame;
 use super::meshops::{nearest_point, ray_hit, smooth_normals};
 use super::np::{
@@ -561,7 +568,8 @@ fn grad(h: &HeadFrame, p: V3, e: f64) -> V3 {
 }
 
 /// A component of a style: faces, how far each vertex follows the body rather than the head
-/// (`f`, -1: by height, see `finish`), clump bands (`z`) and shade (`y`).
+/// (`f`, -1: by height, see `finish`), clump bands (`z`) and shade (`y`); and the wisps past its
+/// edges.
 #[derive(Clone, Default)]
 pub struct Comp {
     pos: Vec<V3>,
@@ -569,6 +577,89 @@ pub struct Comp {
     f: Vec<f64>,
     z: Vec<f64>,
     y: Vec<f64>,
+    wisps: Vec<Strip>,
+}
+
+/// A soft edge: a row of quads growing from an edge of a component (or, where it has none, from a
+/// row of its surface: `shingles`), each from two of its vertices next to each other out to where
+/// their wisps end (`wisps`). The vertices are the solid hair's own, so the strip starts exactly on
+/// it, and takes their shade, normals and skin.
+#[derive(Clone)]
+struct Strip {
+    /// The edge's vertices (of the component), in order.
+    at: Vec<usize>,
+    /// Where each one's wisp ends, from the vertex (m).
+    by: Vec<V3>,
+    /// The edge is a ring: the last vertex's quad goes on to the first.
+    closed: bool,
+    /// How loose the strands are (fields.z): 0 combed, lying side by side; 1 a curl's, crossing and
+    /// broken along their length.
+    loose: f64,
+    /// The share of each quad's length, from its root, over which the strands are still one (fields.w):
+    /// solid hair, as over a hem's lip, which the wisps hang down in front of.
+    rooted: Vec<f64>,
+}
+
+/// Maximal runs of `show` round a ring of columns as strips (`by(k)`: column k's wisp); the whole
+/// ring, a closed one.
+fn rim_strips(show: &[bool], by: &dyn Fn(usize) -> V3) -> Vec<Strip> {
+    let n = show.len();
+    let strip = |at: Vec<usize>, closed: bool| Strip {
+        by: at.iter().map(|&k| by(k)).collect(),
+        rooted: vec![0.0; at.len()],
+        at,
+        closed,
+        loose: 0.0,
+    };
+    let Some(start) = show.iter().position(|&s| !s) else {
+        return vec![strip((0..n).collect(), true)];
+    };
+    let (mut out, mut run) = (Vec::new(), Vec::new());
+    for o in 1..=n {
+        let k = (start + o) % n;
+        if show[k] {
+            run.push(k);
+        } else if run.len() > 1 {
+            out.push(strip(std::mem::take(&mut run), false));
+        } else {
+            run.clear();
+        }
+    }
+    out
+}
+
+/// A lock's tip in wisps: a brush from one of a loft's rings (`segs` points each; the ring `back`
+/// rings before its last) on past its end by `past` (m), drawn in to `taper` of that ring's breadth.
+/// `span`: over the lock's outer face only, that many points either side of the ring's first (a flat
+/// lock lying on the head has no other side to show); without, all round the ring, a sleeve (a
+/// tail's end).
+fn brush(
+    pos: &[V3],
+    segs: usize,
+    back: usize,
+    past: f64,
+    taper: f64,
+    span: Option<usize>,
+) -> Strip {
+    let rings = pos.len() / segs;
+    let ring = |r: usize| &pos[r * segs..(r + 1) * segs];
+    let (root, end) = (rings - 1 - back, mean_rows(ring(rings - 1)));
+    let c = mean_rows(ring(root));
+    let axis = (end - c) / (end - c).norm().max(1e-9);
+    let of: Vec<usize> = match span {
+        Some(n) => (0..=2 * n).map(|q| (q + segs - n) % segs).collect(),
+        None => (0..segs).collect(),
+    };
+    Strip {
+        by: of
+            .iter()
+            .map(|&q| end + axis * past + (ring(root)[q] - c) * taper - ring(root)[q])
+            .collect(),
+        rooted: vec![0.0; of.len()],
+        at: of.iter().map(|q| root * segs + q).collect(),
+        closed: span.is_none(),
+        loose: 0.0,
+    }
 }
 
 /// A component with faces turned to point along `out` (if given).
@@ -591,6 +682,7 @@ fn comp(
         y: y.unwrap_or_else(|| vec![0.0; n]),
         pos,
         idx,
+        wisps: Vec::new(),
     }
 }
 
@@ -658,6 +750,10 @@ struct Cap<'a> {
     bands: Option<Field<'a>>,
     /// How it meets the ears.
     ears: Meet,
+    /// Wisps past the rim, on over the skin: their length (m) by azimuth (0: none there, where other
+    /// hair covers the rim); none round an ear. Only on a cap whose rim goes round the ears
+    /// (`Meet::Round`).
+    wisps: Option<&'a dyn Fn(f64) -> f64>,
 }
 
 /// How a cap meets the ears: `Round(n)`, its rim goes round each in an arc, with n more columns there;
@@ -674,6 +770,23 @@ const EAR_SPAN: [f64; 2] = [57.0 * PI / 180.0, 153.0 * PI / 180.0];
 /// How far round from the front azimuth a is (rad, 0..pi).
 fn round(a: f64) -> f64 {
     (py_mod(a + PI, TAU) - PI).abs()
+}
+
+/// The point `len` (m) from `p` over the head's skin, setting out along `dir`: walked in steps, each
+/// along the skin and back to `p`'s distance off it (clear of it at the least; the head's field
+/// knows the neck too, which a direction from the head's centre does not reach).
+fn over_skin(h: &HeadFrame, p: V3, dir: V3, len: f64) -> V3 {
+    let off = h.sdf(p).max(CLEAR + 0.0008);
+    let steps = 4;
+    let (mut q, mut d) = (p, dir);
+    for _ in 0..steps {
+        let g = grad(h, q, 1e-3);
+        d -= g * d.dot(&g);
+        d /= d.norm().max(1e-9);
+        q += d * (len / steps as f64);
+        q += grad(h, q, 1e-3) * (off - h.sdf(q));
+    }
+    q
 }
 
 /// The skull cap: rows from the crown down to the hairline, pushed out by the thickness, tapering to
@@ -844,6 +957,21 @@ fn cap(sc: &Scalp, mut c: Cap) -> Comp {
         }
         p.push(ring);
     }
+    // Wisps past the rim: on over the skin from each of its points, the way its column comes down to
+    // it, shorter towards an ear.
+    let strips = match c.wisps {
+        Some(wl) if c.ears != Meet::Over => {
+            let show: Vec<bool> = a.iter().map(|&ak| wl(ak) > 0.0).collect();
+            rim_strips(&show, &|k| {
+                let (ra, rp) = node[0][k];
+                let near = sc
+                    .oval(ra)
+                    .map_or(1.0, |o| smoothstep(1.2, 1.7, o.rho(ra, rp)));
+                over_skin(h, p[0][k], p[0][k] - p[1][k], wl(a[k]) * near) - p[0][k]
+            })
+        }
+        _ => Vec::new(),
+    };
     if c.ears == Meet::Over {
         // Under the rim, up and in to the skin (so no scalp shows under it); over an ear, up and out of its
         // oval (out past the ear on the way).
@@ -878,7 +1006,10 @@ fn cap(sc: &Scalp, mut c: Cap) -> Comp {
     z.push(0.5);
     y.push(0.0);
     let out = pos.iter().map(|q| q - h.centre).collect();
-    comp(pos, idx, Some(out), Some(z), Some(y), None)
+    Comp {
+        wisps: strips,
+        ..comp(pos, idx, Some(out), Some(z), Some(y), None)
+    }
 }
 
 /// Unit normals of a grid of points (rows, cols), turned to point along `out(p)`.
@@ -918,11 +1049,22 @@ fn section(c: &[V3], n: &[V3], s: &[V3], h: &[f64], k: f64) -> Vec<(V3, V3, f64)
     out
 }
 
+/// How far under a slab's last row its hem closes, of its half thickness there.
+const HEM_DROP: f64 = 0.9;
+
 /// A sheet of hair with a thickness, from its middle surface (rows from the top to the hem, columns
 /// across), the normals out from the head and the half thickness: every row a closed section with
 /// rounded edges, and under the last a rounded hem, curled in by `curl` (a share of the thickness).
-/// Clump bands per column.
-fn slab(mid: &[Vec<V3>], nrm: &[Vec<V3>], half: &[Vec<f64>], curl: f64, bands: &[f64]) -> Comp {
+/// Clump bands per column. Wisps hang `wisp` (m) below the hem: from the outer face's last row, down
+/// in front of the hem's lip (as one to its lowest line) and on, turned in half as far as it is.
+fn slab(
+    mid: &[Vec<V3>],
+    nrm: &[Vec<V3>],
+    half: &[Vec<f64>],
+    curl: f64,
+    bands: &[f64],
+    wisp: f64,
+) -> Comp {
     let (rows, cols) = (mid.len(), mid[0].len());
     let unit = |v: V3| v / v.norm().max(1e-12);
     let across = |q: &[V3]| -> Vec<V3> {
@@ -945,7 +1087,7 @@ fn slab(mid: &[Vec<V3>], nrm: &[Vec<V3>], half: &[Vec<f64>], curl: f64, bands: &
     }
     let l = rows - 1;
     let s = across(&mid[l]);
-    for (kd, kn, shade) in [(0.55, 0.75, None), (0.9, 0.0, Some(0.2))] {
+    for (kd, kn, shade) in [(0.55, 0.75, None), (HEM_DROP, 0.0, Some(0.2))] {
         let c: Vec<V3> = (0..cols)
             .map(|j| {
                 mid[l][j] + (unit(mid[l][j] - mid[l - 1][j]) - nrm[l][j] * curl) * (half[l][j] * kd)
@@ -963,7 +1105,25 @@ fn slab(mid: &[Vec<V3>], nrm: &[Vec<V3>], half: &[Vec<f64>], curl: f64, bands: &
         _ => 0,
     };
     let z = (0..pos.len()).map(|v| bands[col(v)]).collect();
-    comp(pos, idx, Some(outs), Some(z), Some(y), None)
+    // (The hem's lowest line is `HEM_DROP` of the half thickness under the last row.)
+    let hem = Strip {
+        at: (l * k..l * k + cols).collect(),
+        by: (0..cols)
+            .map(|j| {
+                unit(unit(mid[l][j] - mid[l - 1][j]) - nrm[l][j] * (0.5 * curl))
+                    * (HEM_DROP * half[l][j] + wisp)
+            })
+            .collect(),
+        closed: false,
+        loose: 0.0,
+        rooted: (0..cols)
+            .map(|j| HEM_DROP * half[l][j] / (HEM_DROP * half[l][j] + wisp))
+            .collect(),
+    };
+    Comp {
+        wisps: if wisp > 0.0 { vec![hem] } else { Vec::new() },
+        ..comp(pos, idx, Some(outs), Some(z), Some(y), None)
+    }
 }
 
 /// Clump bands across a sheet's columns (whole locks at its edges): light in the locks' middles,
@@ -1021,6 +1181,8 @@ struct Curtain<'a> {
     back: Option<&'a dyn Fn(f64) -> f64>,
     wave: f64,
     seed: i64,
+    /// Wisps this long (m) hang from the hem.
+    wisp: f64,
 }
 
 /// Hair hanging round the head in locks between azimuths a0..a1, from height top(a) down to
@@ -1102,7 +1264,17 @@ fn curtain(sc: &Scalp, mut c: Curtain) -> Comp {
                 .collect()
         })
         .collect();
-    slab(&mid, &nrm, &half, c.curl, &lock_bands(cols, seed))
+    let mut out = slab(&mid, &nrm, &half, c.curl, &lock_bands(cols, seed), c.wisp);
+    // The wisps' ends no nearer the back than the hair itself.
+    if let Some(bk) = c.back {
+        for s in &mut out.wisps {
+            for (&i, by) in s.at.iter().zip(&mut s.by) {
+                let tip = out.pos[i] + *by;
+                by[2] = tip[2].min(bk(tip[1])) - out.pos[i][2];
+            }
+        }
+    }
+    out
 }
 
 /// A fringe's shape (see `fringe`).
@@ -1122,6 +1294,8 @@ struct Fringe<'a> {
     sharp: f64,
     flare: f64,
     seed: f64,
+    /// Wisps this long (m) hang from the hem.
+    wisp: f64,
 }
 
 /// Hair falling over the forehead in locks, on the face as drawn (`face`: a Scalp that isn't held
@@ -1162,7 +1336,7 @@ fn fringe(face: &Scalp, mut c: Fringe) -> Comp {
         nrm.push(nr);
         half.push(hr);
     }
-    slab(&mid, &nrm, &half, 0.3, &lock_bands(cols, c.seed))
+    slab(&mid, &nrm, &half, 0.3, &lock_bands(cols, c.seed), c.wisp)
 }
 
 /// The polar angle (below `from`) at which the surface at azimuth a comes down to height y.
@@ -1227,15 +1401,22 @@ fn face_lock(
             )
         })
         .collect();
-    comp(
-        m.pos,
-        m.idx,
-        None,
-        Some(z),
-        Some(vec![0.1; m.t.len()]),
-        None,
-    )
+    let tip = brush(&m.pos, 6, 2, 0.5 * wide, TIP_TAPER, Some(1));
+    Comp {
+        wisps: vec![tip],
+        ..comp(
+            m.pos,
+            m.idx,
+            None,
+            Some(z),
+            Some(vec![0.1; m.t.len()]),
+            None,
+        )
+    }
 }
+
+/// How far a lock's tip wisps are drawn in from the ring they leave it at (`brush`).
+const TIP_TAPER: f64 = 0.45;
 
 /// A lock lying on the scalp from (a, phi), `len` (rad of arc) long, turned `turn` from straight
 /// down the head and lifting off it by `lift` (m) at its tip: a flattened tube `wide` across and
@@ -1277,7 +1458,11 @@ fn tuft(
             .map(|&t| clip(k + 0.3 * (1.0 - t), 0.0, 1.0))
             .collect();
     let y = m.t.iter().map(|&t| 0.2 * (1.0 - t).max(0.0)).collect();
-    comp(m.pos, m.idx, None, Some(z), Some(y), None)
+    let tip = brush(&m.pos, 6, 2, 0.4 * wide, TIP_TAPER, Some(1));
+    Comp {
+        wisps: vec![tip],
+        ..comp(m.pos, m.idx, None, Some(z), Some(y), None)
+    }
 }
 
 /// A tuft's breadth along its length (s: 0 its root, 1 its tip), of `wide`.
@@ -1321,7 +1506,11 @@ fn lobe(
         })
         .collect();
     let follow = hang.map(|(a, b)| m.t.iter().map(|&t| smoothstep(a, b, t)).collect());
-    comp(m.pos, m.idx, None, Some(z), Some(vec![y; n]), follow)
+    let tip = brush(&m.pos, segs, 3, 2.5 * ry[ry.len() - 1], TIP_TAPER, None);
+    Comp {
+        wisps: vec![tip],
+        ..comp(m.pos, m.idx, None, Some(z), Some(vec![y; n]), follow)
+    }
 }
 
 /// A loft's rings (`segs` points each, laid one after the other) in `grooves` locks round it: each
@@ -1346,6 +1535,43 @@ fn grooved(
         }
     }
     z
+}
+
+/// Wisps over a shell of rings of `cols` points (a cap that stands off the head: its outline is no
+/// edge to grow wisps from), laid like shingles: from every `every`th ring a row round the shell (on
+/// every third column), each quad on down over the rings under it, a ring short of the next row's
+/// roots, and lifting off the shell by `lift` (m) on the way: tufts standing half up, so the shell's
+/// outline, whichever way it is seen, is strands' ends. Their strands are loose curls. (The rings
+/// come lowest first; `first`: the lowest one the wisps come down to.)
+fn shingles(
+    pos: &[V3],
+    centre: V3,
+    cols: usize,
+    first: usize,
+    every: usize,
+    lift: f64,
+) -> Vec<Strip> {
+    let rings = pos.len() / cols;
+    let reach = every - 1;
+    (first + reach..rings)
+        .step_by(every)
+        .map(|r| {
+            let at: Vec<usize> = (0..cols).step_by(3).map(|k| r * cols + k).collect();
+            Strip {
+                by: at
+                    .iter()
+                    .map(|&i| {
+                        let to = pos[i - reach * cols];
+                        to + (to - centre).normalize() * lift - pos[i]
+                    })
+                    .collect(),
+                rooted: vec![0.0; at.len()],
+                at,
+                closed: true,
+                loose: 1.0,
+            }
+        })
+        .collect()
 }
 
 /// A torus as a component (`_tor`).
@@ -1399,6 +1625,22 @@ pub fn build_hair(
             s + (bk - s) * smoothstep(0.2, -0.8, ca) * smoothstep(0.1, 0.8, u)
         }
     }
+    // Wisps past a cap's rim (m, by azimuth): short over the forehead, longer at the temples and longest
+    // at the nape; where curtains hang from the sides round the back, only in front of them; shorter
+    // on hair drawn back tight.
+    let rim_wisps = move |a: f64| {
+        hh * (0.04
+            + 0.015 * smoothstep(deg(40.0), deg(75.0), round(a))
+            + 0.015 * smoothstep(deg(110.0), deg(140.0), round(a)))
+    };
+    let front_wisps = move |a: f64| {
+        if round(a) < deg(60.0) {
+            rim_wisps(a)
+        } else {
+            0.0
+        }
+    };
+    let slick_wisps = move |a: f64| 0.6 * rim_wisps(a);
     // Short locks past the hairline at the temples and the nape (none over the forehead or the ears).
     let nape_tips = move |a: f64| {
         deg(4.5)
@@ -1434,6 +1676,7 @@ pub fn build_hair(
                 part: Some((deg(20.0), 0.3)),
                 bands: None,
                 ears: Meet::Round(17),
+                wisps: Some(&rim_wisps),
             },
         )],
     ));
@@ -1464,6 +1707,7 @@ pub fn build_hair(
                 part: None,
                 bands: None,
                 ears: Meet::Round(17),
+                wisps: Some(&rim_wisps),
             },
         )],
     ));
@@ -1482,6 +1726,7 @@ pub fn build_hair(
             part: None,
             bands: None,
             ears: Meet::Round(14),
+            wisps: Some(&front_wisps),
         },
     )];
     for (k, (yt, yb, off, fl)) in [
@@ -1512,6 +1757,7 @@ pub fn build_hair(
                 back: None,
                 wave: 0.0,
                 seed: k as i64,
+                wisp: 0.06 * hh,
             },
         ));
     }
@@ -1536,6 +1782,7 @@ pub fn build_hair(
             part: None,
             bands: None,
             ears: Meet::Round(10),
+            wisps: Some(&rim_wisps),
         },
     )];
     for k in 0..22 {
@@ -1587,6 +1834,7 @@ pub fn build_hair(
             part: Some((deg(45.0), 0.35)),
             bands: None,
             ears: Meet::Round(15),
+            wisps: Some(&rim_wisps),
         },
     )];
     let fa = [0.75, 0.35, 0.0, -0.4, -0.75, -1.05];
@@ -1674,24 +1922,25 @@ pub fn build_hair(
             * (0.3 + 0.7 * smoothstep(1.0, 0.55, u))
     };
     let puff_bands = |a: f64, u: f64| 0.15 + 0.75 * puff(dir(a, u));
-    styles.push((
-        "afro",
-        vec![cap(
-            &sc,
-            Cap {
-                thick: &rounded,
-                rows: 18,
-                cols: 52,
-                limit: None,
-                edge: CLEAR + 0.004 * hh,
-                ridge: 0.0,
-                tips: None,
-                part: None,
-                bands: Some(&puff_bands),
-                ears: Meet::Over,
-            },
-        )],
-    ));
+    let mut afro = cap(
+        &sc,
+        Cap {
+            thick: &rounded,
+            rows: 18,
+            cols: 52,
+            limit: None,
+            edge: CLEAR + 0.004 * hh,
+            ridge: 0.0,
+            tips: None,
+            part: None,
+            bands: Some(&puff_bands),
+            ears: Meet::Over,
+            wisps: None,
+        },
+    );
+    // (Under the afro's rim are the three rings of its hem.)
+    afro.wisps = shingles(&afro.pos, h.centre, dense_cols(52), 3, 3, 0.06 * hh);
+    styles.push(("afro", vec![afro]));
 
     // Bob: a shell to the jaw in blunt locks with a curled-in hem, and a straight fringe.
     let mut bob = vec![cap(
@@ -1707,6 +1956,7 @@ pub fn build_hair(
             part: None,
             bands: None,
             ears: Meet::Round(14),
+            wisps: None,
         },
     )];
     let (bt, bb) = (chin + 0.72 * hh, chin + 0.06 * hh);
@@ -1728,6 +1978,7 @@ pub fn build_hair(
             back: None,
             wave: 0.0,
             seed: 0,
+            wisp: 0.05 * hh,
         },
     ));
     let under = |a: f64| sc.hairline(a) * 0.8;
@@ -1750,6 +2001,7 @@ pub fn build_hair(
             sharp: 1.5,
             flare: 0.15,
             seed: 2.0,
+            wisp: 0.035 * hh,
         },
     ));
     styles.push(("bob", bob));
@@ -1769,6 +2021,7 @@ pub fn build_hair(
             part: Some((0.0, 0.3)),
             bands: None,
             ears: Meet::Round(14),
+            wisps: Some(&front_wisps),
         },
     )];
     let shoulder = p[b("clavicle_l")].y;
@@ -1800,6 +2053,7 @@ pub fn build_hair(
             back: Some(&long_back),
             wave: 0.004 * hh,
             seed: 0,
+            wisp: 0.08 * hh,
         },
     ));
     for s in [-1.0, 1.0] {
@@ -1851,6 +2105,7 @@ pub fn build_hair(
             part: None,
             bands: None,
             ears: Meet::Round(14),
+            wisps: Some(&slick_wisps),
         },
     )];
     let tie = sc.point(PI, deg(95.0), 0.03 * hh);
@@ -1885,7 +2140,11 @@ pub fn build_hair(
     let mut m = loft(&tp, &ry, &rz, 12, v3(1.0, 0.0, 0.0), caps(2));
     let z = grooved(&mut m, 12, 4.0, 0.16, 2.5);
     let f = m.t.iter().map(|&t| smoothstep(0.1, 0.9, t)).collect();
-    pt.push(comp(m.pos, m.idx, None, Some(z), None, Some(f)));
+    let tip = brush(&m.pos, 12, 3, 0.07 * hh, TIP_TAPER, None);
+    pt.push(Comp {
+        wisps: vec![tip],
+        ..comp(m.pos, m.idx, None, Some(z), None, Some(f))
+    });
     styles.push(("ponytail", pt));
 
     // Braid: a cap and three strands plaited down the back, tied off with a tuft below the tie.
@@ -1902,6 +2161,7 @@ pub fn build_hair(
             part: None,
             bands: Some(&b15),
             ears: Meet::Round(14),
+            wisps: Some(&slick_wisps),
         },
     )];
     let start = sc.point(PI, deg(120.0), 0.03 * hh);
@@ -1964,14 +2224,18 @@ pub fn build_hair(
         .collect();
     let mut m = loft(&tp, &r, &r, 8, v3(0.0, 0.0, -1.0), caps(1));
     let z = grooved(&mut m, 8, 3.0, 0.2, 1.0);
-    br.push(comp(
-        m.pos,
-        m.idx,
-        None,
-        Some(z),
-        None,
-        Some(vec![1.0; m.t.len()]),
-    ));
+    let tip = brush(&m.pos, 8, 2, 0.05 * hh, TIP_TAPER, None);
+    br.push(Comp {
+        wisps: vec![tip],
+        ..comp(
+            m.pos,
+            m.idx,
+            None,
+            Some(z),
+            None,
+            Some(vec![1.0; m.t.len()]),
+        )
+    });
     styles.push(("braid", br));
 
     // Buns: a cap and two buns high on each side, twisted, each with a band round its foot.
@@ -1988,6 +2252,7 @@ pub fn build_hair(
             part: Some((0.0, 0.3)),
             bands: Some(&b15),
             ears: Meet::Round(14),
+            wisps: Some(&slick_wisps),
         },
     )];
     for s in [-1.0, 1.0] {
@@ -2024,17 +2289,18 @@ pub fn build_hair(
     let mut names: Vec<&str> = styles.iter().map(|s| s.0).collect();
     names.push("none");
     assert!(HAIR_STYLES.iter().all(|s| names.contains(s)) && names.len() == HAIR_STYLES.len());
-    let mut out: Vec<(String, Mesh)> = styles
-        .into_iter()
-        .map(|(name, comps)| (format!("hair.{name}"), finish(&comps, h, &ears, p, false)))
-        .collect();
     if BEARD_FAMILIES.contains(&family) {
-        out.push((
-            "hair.beard".into(),
-            finish(&[beard(&skin)], h, &ears, p, true),
-        ));
+        styles.push(("beard", vec![beard(&skin)]));
     }
-    out
+    styles
+        .into_iter()
+        .flat_map(|(name, comps)| {
+            let part = format!("hair.{name}");
+            let solid = finish(&comps, h, &ears, p, name == "beard");
+            let soft = (wisps_part(&part), wisps(&comps, &solid, h, &ears));
+            [(part, solid), soft]
+        })
+        .collect()
 }
 
 /// A shell over the jaw, chin and upper lip with a hole round the lips (cells inside it collapse
@@ -2137,28 +2403,53 @@ fn beard(sc: &Scalp) -> Comp {
     }
     let (pos, idx) = grid(&pg, false);
     let out = pos.iter().map(|q| q - h.centre).collect();
-    comp(pos, idx, Some(out), Some(z), Some(y), None)
+    // Wisps: below its lower edge (none at the sideburns' ends, by the ears), and up each cheek from
+    // its upper edge (not under the nose or up the sideburns), each on along the shell from its edge.
+    let on = |r: usize, from: usize, j: usize| (pg[r][j] - pg[from][j]).normalize();
+    let lower = Strip {
+        at: (0..cols).map(|j| (rows - 1) * cols + j).collect(),
+        by: (0..cols)
+            .map(|j| {
+                on(rows - 1, rows - 2, j)
+                    * (0.035 * hh * smoothstep(radians(94.0), radians(70.0), a[j].abs()))
+            })
+            .collect(),
+        closed: false,
+        loose: 0.0,
+        rooted: vec![0.0; cols],
+    };
+    let cheek = |side: f64| {
+        let at: Vec<usize> = (0..cols)
+            .filter(|&j| (radians(30.0)..radians(75.0)).contains(&(a[j] * side)))
+            .collect();
+        Strip {
+            by: at.iter().map(|&j| on(0, 1, j) * (0.02 * hh)).collect(),
+            rooted: vec![0.0; at.len()],
+            at,
+            closed: false,
+            loose: 0.0,
+        }
+    };
+    Comp {
+        wisps: vec![lower, cheek(-1.0), cheek(1.0)],
+        ..comp(pos, idx, Some(out), Some(z), Some(y), None)
+    }
 }
 
-/// The components merged, pushed clear of the head, skinned, with fields and tone.
-fn finish(comps: &[Comp], h: &HeadFrame, ears: &Ears, p: &[V3; NB], head_only: bool) -> Mesh {
-    let mut pos = Vec::new();
-    let (mut idx, mut zz, mut yy, mut ff) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
-    for c in comps {
-        let n = pos.len();
-        idx.extend(c.idx.iter().map(|&i| i + n));
-        pos.extend(&c.pos);
-        zz.extend(&c.z);
-        yy.extend(&c.y);
-        ff.extend(&c.f);
+/// A point within EAR_CLEAR of an ear pushed off it.
+fn off_ears(q: &mut V3, ears: &Ears) {
+    if let Some((d, out)) = ears.depth(*q)
+        && d > -EAR_CLEAR
+    {
+        *q += out * (EAR_CLEAR + 0.0002 + d);
     }
+}
+
+/// Points pushed clear of the ears and the head.
+fn clear(pos: &mut [V3], h: &HeadFrame, ears: &Ears) {
     // The shapes go round or over the ears; whatever still comes within EAR_CLEAR of one is pushed off it.
-    for q in &mut pos {
-        if let Some((d, out)) = ears.depth(*q)
-            && d > -EAR_CLEAR
-        {
-            *q += out * (EAR_CLEAR + 0.0002 + d);
-        }
+    for q in pos.iter_mut() {
+        off_ears(q, ears);
     }
     // Nothing closer than CLEAR to the head: push such vertices out along the field's gradient
     // (measured a little round each point, so the clearance holds after the positions are rounded
@@ -2182,6 +2473,76 @@ fn finish(comps: &[Comp], h: &HeadFrame, ears: &Ears, p: &[V3; NB], head_only: b
         }
         near = d.iter().map(|e| e.0).collect();
     }
+}
+
+/// Where a style's strips start along the edge (fields.x, m), strip by strip: apart, so no two of
+/// them draw the same strands.
+const STRIP_STARTS: f64 = 2.0;
+
+/// A style's wisps (its components' `Strip`s) as a part, from its solid hair as finished (`solid`:
+/// the components' vertices in their order): per edge vertex one at the root, the solid hair's own
+/// vertex again, and one where its wisp ends (kept clear of the ears and the head as the hair is),
+/// in that order, both with its normal, skin and tone (the occlusion follows in build.rs). Fields: x =
+/// metres along the edge, y = 0 at the root and 1 at the end, z = how loose the strands are, w = how
+/// far along they stay one.
+fn wisps(comps: &[Comp], solid: &Mesh, h: &HeadFrame, ears: &Ears) -> Mesh {
+    let mut m = Mesh::default();
+    let mut first = 0;
+    let mut strips = 0;
+    for c in comps {
+        for s in &c.wisps {
+            let base = m.pos.len();
+            let n = s.at.len() + usize::from(s.closed);
+            let mut u = STRIP_STARTS * jitter(strips, 7.0);
+            strips += 1;
+            for k in 0..n {
+                let j = k % s.at.len();
+                let i = first + s.at[j];
+                if k > 0 {
+                    u += (solid.pos[i] - solid.pos[first + s.at[k - 1]]).norm();
+                }
+                let mut end = solid.pos[i] + s.by[j];
+                off_ears(&mut end, ears);
+                // (Off the head by its field's own way out, whatever `clear` would take: wisps reach down
+                // the neck, where the way out is not from the head's centre.)
+                for _ in 0..8 {
+                    let d = near_sdf(h, end);
+                    if d >= CLEAR {
+                        break;
+                    }
+                    end += grad(h, end, 1e-3) * (CLEAR + 0.0004 - d);
+                }
+                for (v, p) in [(0.0, solid.pos[i]), (1.0, end)] {
+                    m.pos.push(p);
+                    m.nor.push(solid.nor[i]);
+                    m.dense.push(solid.dense[i]);
+                    m.fields.push([u, v, s.loose, s.rooted[j]]);
+                    m.tone.push(solid.tone[i]);
+                }
+                if k > 0 {
+                    let (a, b) = (base + 2 * (k - 1), base + 2 * k);
+                    m.idx.extend([a, b, b + 1, a, b + 1, a + 1]);
+                }
+            }
+        }
+        first += c.pos.len();
+    }
+    m
+}
+
+/// The components merged, pushed clear of the head, skinned, with fields and tone.
+fn finish(comps: &[Comp], h: &HeadFrame, ears: &Ears, p: &[V3; NB], head_only: bool) -> Mesh {
+    let mut pos = Vec::new();
+    let (mut idx, mut zz, mut yy, mut ff) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    for c in comps {
+        let n = pos.len();
+        idx.extend(c.idx.iter().map(|&i| i + n));
+        pos.extend(&c.pos);
+        zz.extend(&c.z);
+        yy.extend(&c.y);
+        ff.extend(&c.f);
+    }
+    clear(&mut pos, h, ears);
     let n = pos.len();
     let nor = smooth_normals(&pos, &idx);
     let mut dense = vec![[0.0; NB]; n];
