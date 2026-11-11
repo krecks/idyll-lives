@@ -83,12 +83,16 @@ const BLADE = { short: 0.09, long: 0.26, mown: 0.085, thin: 0.016, wide: 0.027, 
  * The values are the calm lawn chosen from pictures side by side (2026-11-11, `tools/bench/play.mjs
  * --sheet lawn`): the lawn is most of a play picture, and with dark roots under light yellow tips (0.55
  * to 1.35, every blade 10 % its own way) it read as bright noise beside the flat walls and furniture.
+ * The same day the ground under the blades came up to nearly their tone (`under` 0.68 to 0.76, the tip
+ * down from 1.15 to 1.02) and lost most of its speckle (`soften`): measured from pictures a quarter of a
+ * pixel apart, what changed from one to the next was the light blades against the darker ground between
+ * them and that speckle, not a blade's own gradient or its light (`bench-results/jump/ground/notes.md`).
  */
 const LAWN = tuned('lawn', {
-  root: 0.7,
-  tip: 1.15,
+  root: 0.72,
+  tip: 1.02,
   saturation: 0.85,
-  under: 0.68,
+  under: 0.76,
   far: 0.8,
   blend: [0.45, 0.85],
   sky: [0.85, 0.95],
@@ -103,7 +107,7 @@ const LAWN = tuned('lawn', {
   earth: [0.2, 0.14, 0.075],
   earthEdge: [0.15, 0.7],
   earthRagged: 0.5,
-  soften: 0,
+  soften: 0.6,
 });
 
 function grassCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
