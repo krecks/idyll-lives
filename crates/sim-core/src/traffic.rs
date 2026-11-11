@@ -645,6 +645,13 @@ const GATE_REACH: f32 = BOX_MOST + 2.0;
 /// line), and how far in from the kerb on the pavement (or the road's edge) any stands (m).
 const POLE_OUT: f32 = 1.0;
 const POLE_KERB: f32 = 0.4;
+/// A pole stands this far off every road's carriageway at least (m, `signal_at`), looked for along
+/// its kerb `POLE_STEP` m at a time, `POLE_STEPS` each way at most, over the roads `POLE_LOOK` m
+/// round it.
+const POLE_CLEAR: f32 = 0.15;
+const POLE_STEP: f32 = 0.5;
+const POLE_STEPS: usize = 24;
+const POLE_LOOK: f32 = 10.0;
 /// Two arms of a junction whose ways out are further apart than 150° (the cosine) are across from
 /// each other: green together (`SignalArm::phase`).
 const OPPOSITE: f32 = -0.866;
@@ -678,16 +685,15 @@ const WALK_CLEAR_LEAST: f32 = 3.0;
 /// and the stretch of it between its ends' nodes.
 type ArmRoad = (u32, f32, f32, f32, f32);
 
-/// The lights of the junction at node `n` of `g` (`Signal`): its arms for cars, each with its pole
-/// on the kerb to the right of the way in, at its stop line, its phase and its crosswalk
-/// (`SignalArm`). `ring`: per road of `g`, whether it's a roundabout's. None: fewer
-/// than `SIGNAL_ARMS` arms.
-pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
+/// A junction's arm for cars as `signal_at` finds it: its way out, how far from its middle its kerb
+/// is, its road from the node (`ArmRoad`), the node at the far end of its stretch, and the
+/// stretch's length.
+type ArmAt = ([f32; 2], f32, ArmRoad, usize, f32);
+
+/// The arms for cars of node `n` of `g` (`ArmAt`), round the way they go (by their angle).
+fn arms_at(g: &Graph, n: usize) -> Vec<ArmAt> {
     let p = g.nodes[n];
-    // (Each arm's way out, how far from its middle its kerb is, its road from the node: which,
-    // where along it and which way; and how far out along it the junction may reach: half way to
-    // the next junction, else its stretch's length.)
-    let mut arms: Vec<([f32; 2], f32, ArmRoad, f32)> = Vec::new();
+    let mut arms: Vec<ArmAt> = Vec::new();
     for e in g.edges.iter() {
         let road = &g.roads[e.road as usize];
         if !road.drivable() {
@@ -700,93 +706,186 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
             let q = road.at((s + k * ARM_LOOK.min(e.len())).clamp(e.s0, e.s1));
             let l = dist(p, q);
             if l > 0.1 {
-                let room = if g.degree(far as usize) >= SIGNAL_ARMS {
-                    e.len() / 2.0
-                } else {
-                    e.len()
-                };
                 arms.push((
                     [(q[0] - p[0]) / l, (q[1] - p[1]) / l],
                     crate::cars::kerb_of(road.width, road.kind),
                     (e.road, s, k, e.s0, e.s1),
-                    room,
+                    far as usize,
+                    e.len(),
                 ));
             }
         }
     }
-    if arms.len() < SIGNAL_ARMS {
-        return None;
-    }
-    let roundabout = arms
-        .iter()
-        .any(|a| ring.get(a.2.0 as usize).copied().unwrap_or(false));
-    // (Arms by the way they go round, for the lights' turns.)
     arms.sort_by(|a, b| a.0[0].atan2(a.0[1]).total_cmp(&b.0[0].atan2(b.0[1])));
+    arms
+}
+
+/// How far out along each of `arms` (`arms_at`) a lit junction's box reaches with its corners: as
+/// far as two bodies in their lanes on it and another are `ARMS_APART` apart (`BOX_LEAST` to
+/// `BOX_MOST`), or where the kerb's return round from the next arm ends (`R / tan(θ / 2)` past
+/// where the two kerbs would meet; none with an arm across), whichever is further, `BOX_MOST` at
+/// most: where its crosswalk begins (`SignalArm::walk_from`) with room for it.
+fn box_edges(arms: &[ArmAt]) -> Vec<(f32, f32)> {
     let dot = |a: [f32; 2], b: [f32; 2]| a[0] * b[0] + a[1] * b[1];
-    // (Phases in that order round: an arm, and the one furthest round from it past `OPPOSITE`
-    // not yet in one; on a roundabout, an arm each.)
-    let mut phase = vec![u8::MAX; arms.len()];
+    (0..arms.len())
+        .map(|i| {
+            let (wa, ka) = (arms[i].0, arms[i].1);
+            let mut edge = BOX_LEAST;
+            let mut corner = 0.0f32;
+            for (j, b) in arms.iter().enumerate() {
+                if j == i {
+                    continue;
+                }
+                let cos = dot(wa, b.0).clamp(-1.0, 1.0);
+                let sin = (1.0 - cos * cos).max(0.0).sqrt();
+                if cos > 0.0 {
+                    edge = edge.max(ARMS_APART / sin.max(1e-3));
+                }
+                if cos >= OPPOSITE {
+                    let sin = sin.max(1e-3);
+                    corner = corner.max((b.1 + ka * cos) / sin + KERB_RETURN * (1.0 + cos) / sin);
+                }
+            }
+            let edge = edge.min(BOX_MOST);
+            (edge, edge.max(corner).min(BOX_MOST))
+        })
+        .collect()
+}
+
+/// Of a junction's `arms` (`arms_at`, round in order) on roads of `g`, which share a phase: of
+/// two arms more than `OPPOSITE` apart, those of one road through it first, then two of one kind
+/// (two streets), then the rest, each the two most nearly opposite first, of those left. So a
+/// street's two arms through a junction go together, though a road leaving it at a slant is
+/// further round from one of them (Canalside's j35: a country road 16° off the street and
+/// straighter on than the street's own way, took the street's arm's place in its phase, and the
+/// street's two arms were never green together). Each arm the phase it's in, numbered round in
+/// order (on a roundabout, an arm each), and how many.
+fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<u8>, u8) {
+    let dot = |a: [f32; 2], b: [f32; 2]| a[0] * b[0] + a[1] * b[1];
+    let n = arms.len();
+    let mut partner: Vec<Option<usize>> = vec![None; n];
+    if !roundabout {
+        let kind = |i: usize| g.roads[arms[i].2.0 as usize].kind;
+        let rank = |i: usize, j: usize| {
+            if arms[i].2.0 == arms[j].2.0 {
+                0
+            } else if kind(i) == kind(j) {
+                1
+            } else {
+                2
+            }
+        };
+        let mut pairs: Vec<(u8, f32, usize, usize)> = (0..n)
+            .flat_map(|i| (i + 1..n).map(move |j| (i, j)))
+            .map(|(i, j)| (rank(i, j), dot(arms[i].0, arms[j].0), i, j))
+            .filter(|&(_, d, ..)| d < OPPOSITE)
+            .collect();
+        pairs.sort_by(|a, b| {
+            a.0.cmp(&b.0)
+                .then(a.1.total_cmp(&b.1))
+                .then((a.2, a.3).cmp(&(b.2, b.3)))
+        });
+        for (.., i, j) in pairs {
+            if partner[i].is_none() && partner[j].is_none() {
+                partner[i] = Some(j);
+                partner[j] = Some(i);
+            }
+        }
+    }
+    let mut phase = vec![u8::MAX; n];
     let mut phases = 0u8;
-    for i in 0..arms.len() {
+    for i in 0..n {
         if phase[i] != u8::MAX {
             continue;
         }
         phase[i] = phases;
-        let across = (i + 1..arms.len())
-            .filter(|&j| phase[j] == u8::MAX && dot(arms[i].0, arms[j].0) < OPPOSITE)
-            .min_by(|&a, &b| dot(arms[i].0, arms[a].0).total_cmp(&dot(arms[i].0, arms[b].0)));
-        if let Some(j) = across.filter(|_| !roundabout) {
+        if let Some(j) = partner[i] {
             phase[j] = phases;
         }
         phases += 1;
     }
-    let reach = |a: [f32; 2]| {
+    (phase, phases)
+}
+
+/// Whether `p` is on a road's carriageway in `g` (within its kerb of its middle line and `margin`
+/// more): no signal pole stands there (`signal_at`).
+fn on_carriageway(g: &Graph, p: [f32; 2], margin: f32) -> bool {
+    g.near(p, POLE_LOOK, 6, crate::travel::Mode::Car)
+        .iter()
+        .any(|rp| {
+            let r = &g.roads[rp.road as usize];
+            rp.off < crate::cars::kerb_of(r.width, r.kind) + margin
+        })
+}
+
+/// The lights of the junction at node `n` of `g` (`Signal`): its arms for cars, each with its pole
+/// on the kerb to the right of the way in, at its stop line, its phase and its crosswalk
+/// (`SignalArm`). `ring`: per road of `g`, whether it's a roundabout's. None: fewer
+/// than `SIGNAL_ARMS` arms.
+pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
+    let p = g.nodes[n];
+    let arms = arms_at(g, n);
+    if arms.len() < SIGNAL_ARMS {
+        return None;
+    }
+    let on_ring = |arms: &[ArmAt]| {
         arms.iter()
-            .filter(|b| b.0 != a)
-            .map(|b| {
-                let cos = dot(a, b.0);
-                let sin = (1.0 - cos * cos).max(0.0).sqrt();
-                if cos > 0.0 {
-                    ARMS_APART / sin.max(1e-3)
-                } else {
-                    0.0
-                }
-            })
-            .fold(BOX_LEAST, f32::max)
-            .min(BOX_MOST)
+            .any(|a| ring.get(a.2.0 as usize).copied().unwrap_or(false))
     };
-    // (Where an arm's kerb turns round into the next's ends, out along it: where the two kerbs
-    // would meet, and on round the return's radius, `R / tan(θ / 2)`; none with an arm across.)
-    let corner = |a: usize| {
-        let (wa, ka) = (arms[a].0, arms[a].1);
-        arms.iter()
-            .enumerate()
-            .filter(|&(b, _)| b != a)
-            .map(|(_, &(wb, kb, ..))| {
-                let cos = dot(wa, wb).clamp(-1.0, 1.0);
-                if cos < OPPOSITE {
-                    return 0.0;
-                }
-                let sin = (1.0 - cos * cos).sqrt().max(1e-3);
-                (kb + ka * cos) / sin + KERB_RETURN * (1.0 + cos) / sin
-            })
-            .fold(0.0, f32::max)
-    };
+    let roundabout = on_ring(&arms);
+    let (phase, phases) = phases_of(g, &arms, roundabout);
+    let edges = box_edges(&arms);
+    // (Per arm, how far out along it the junction may reach: half way to the next junction, else
+    // its stretch's length. And whether that next junction is lit too and so near that this arm's
+    // crosswalk and stop line, and that one's back along it, can't both be out of the other's box
+    // (`joined`): the two are one junction there, the stretch between them its box, no crosswalk
+    // on it and the stop line half way. At Canalside's knot, j35's crosswalk and stop line stood
+    // in j77's box, j77's in j35's.)
+    let room: Vec<(f32, bool)> = arms
+        .iter()
+        .enumerate()
+        .map(|(i, &(_, _, (road, _, k, s0, s1), far, len))| {
+            if g.degree(far) < SIGNAL_ARMS {
+                return (len, false);
+            }
+            let there = arms_at(g, far);
+            let far_s = if k > 0.0 { s1 } else { s0 };
+            let back = there
+                .iter()
+                .position(|b| b.2.0 == road && (b.2.1 - far_s).abs() < 1e-3 && b.2.2 == -k);
+            let joined = !roundabout
+                && far != n
+                && there.len() >= SIGNAL_ARMS
+                && !on_ring(&there)
+                && back.is_some_and(|b| {
+                    edges[i].1 + box_edges(&there)[b].1 + CROSSWALK + STOP_GAP > len
+                });
+            (len / 2.0, joined)
+        })
+        .collect();
     let arms: Vec<SignalArm> = arms
         .iter()
         .enumerate()
-        .map(|(i, &(way, kerb, (road, s, k, s0, s1), room))| {
+        .map(|(i, &(way, kerb, (road, s, k, s0, s1), ..))| {
             // (The crosswalk from the corner or the box's edge, the stop line past it; no further
-            // out than the junction may reach along it, the box's edge at least.)
-            let edge = reach(way);
-            let walk_from = edge.max(corner(i)).min(BOX_MOST);
+            // out than the junction may reach along it, the box's edge at least. Joined to the
+            // next lit junction (`room`): no crosswalk, the stop line half way.)
+            let (edge, walk_from) = edges[i];
+            let (room, joined) = room[i];
             let mut walk_to = walk_from + CROSSWALK;
             let mut stop = walk_to + STOP_GAP;
-            if stop > room {
+            if joined {
+                stop = room;
+                walk_to = room;
+            } else if stop > room {
                 stop = room.max(edge).min(stop);
                 walk_to = walk_to.min(stop - STOP_GAP);
             }
-            let walk_from = walk_from.min(walk_to - CROSSWALK).max(0.0);
+            let walk_from = if joined {
+                room
+            } else {
+                walk_from.min(walk_to - CROSSWALK).max(0.0)
+            };
             // (Along its own road, round its bend: at the stop line (a roundabout's, out past the
             // box), and the way out there; coming in, its right is the way out's left. On the
             // pavement, `POLE_KERB` in from the kerb; on a country road, as far out on the verge.
@@ -814,16 +913,36 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
             } else {
                 straight
             };
-            let out = if roundabout { edge + POLE_OUT } else { stop };
-            let at = on(out);
-            let t = r.tangent(at);
-            let out = [t[0] * k, t[1] * k];
-            let right = [out[1], -out[0]];
-            let m = r.at(at);
-            let side = kerb + POLE_KERB;
+            // (Its pole: on its right at the stop line; where that's on another road's
+            // carriageway, further out along its kerb (onto the island between it and a road
+            // leaving at a slant), else back towards the junction as far as its crosswalk, else
+            // on its left. Canalside's j35: a country road 16° off the street, the street arm's
+            // head stood on its asphalt.)
+            let base = if roundabout { edge + POLE_OUT } else { stop };
+            let pole_at = |out: f32, side: f32| {
+                let at = on(out);
+                let t = r.tangent(at);
+                let o = [t[0] * k, t[1] * k];
+                let right = [o[1] * side, -o[0] * side];
+                let m = r.at(at);
+                let d = kerb + POLE_KERB;
+                ([m[0] + right[0] * d, m[1] + right[1] * d], o)
+            };
+            let (pole, out) = [1.0f32, -1.0]
+                .into_iter()
+                .flat_map(|side| {
+                    let outward = (0..=POLE_STEPS).map(move |j| base + POLE_STEP * j as f32);
+                    let inward = (1..=POLE_STEPS)
+                        .map(move |j| base - POLE_STEP * j as f32)
+                        .take_while(move |&o| o >= walk_from.min(base));
+                    outward.chain(inward).map(move |o| (o, side))
+                })
+                .map(|(o, side)| pole_at(o, side))
+                .find(|&(q, _)| !on_carriageway(g, q, POLE_CLEAR))
+                .unwrap_or_else(|| pole_at(base, 1.0));
             SignalArm {
                 way,
-                pole: [m[0] + right[0] * side, m[1] + right[1] * side],
+                pole,
                 yaw: out[0].atan2(out[1]),
                 phase: phase[i],
                 road,
@@ -833,6 +952,7 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
                 stop,
                 span,
                 crosswalk: !roundabout
+                    && !joined
                     && matches!(
                         r.kind,
                         crate::travel::RoadKind::Street | crate::travel::RoadKind::Lane

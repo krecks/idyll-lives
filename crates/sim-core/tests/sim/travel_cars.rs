@@ -2325,3 +2325,92 @@ fn a_car_held_up_with_no_room_behind_it_to_turn_round_is_counted_and_never_backs
         "the ring wasn't counted"
     );
 }
+
+#[test]
+fn a_knot_of_a_country_road_leaving_a_street_at_a_slant_by_another_junction_is_lit_as_one() {
+    // Canalside's knot (j35, j77): a street along x, its two halves meeting at (200, 200), a
+    // country road leaving it there 16° off the street east, and a lane meeting it from the
+    // south 18 m on. The street's two arms through the first junction are green together, though
+    // the country road is as nearly across from its west arm; no signal pole stands on any road's
+    // asphalt (the street's east arm's stood on the country road's); and between the two lit
+    // junctions, too near for a crosswalk and stop line out of the other's box, there's none:
+    // the two are one junction there, its stop line half way.
+    let road = |pts: String, kind: &str, ends: &str| {
+        format!(r#"{{"points":[{pts}],"width":7,"kind":"{kind}","ends":{ends},"area":0}}"#)
+    };
+    let slant = 16f32.to_radians();
+    let roads = format!(
+        "[{},{},{},{}]",
+        road(
+            line_pts([0.5, 200.0], [200.0, 200.0]),
+            "street",
+            r#"["out","join"]"#
+        ),
+        road(
+            line_pts([200.0, 200.0], [399.5, 200.0]),
+            "street",
+            r#"["join","out"]"#
+        ),
+        road(
+            line_pts(
+                [200.0, 200.0],
+                [200.0 + 150.0 * slant.cos(), 200.0 - 150.0 * slant.sin()]
+            ),
+            "country",
+            r#"["join","dead"]"#
+        ),
+        road(
+            line_pts([218.0, 200.0], [218.0, 300.0]),
+            "lane",
+            r#"["join","dead"]"#
+        )
+    );
+    let exits = r#"[{"x":0.5,"z":200,"kind":"road"},{"x":399.5,"z":200,"kind":"road"}]"#;
+    let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
+        "areas":[{"name":"Knot","kind":"hamlet","x":120,"z":120,"w":160,"d":160}]"#;
+    let w = town_of(CONTENT, more, 400, 400, &roads, exits, &[]);
+    let sigs = &w.travel.signals;
+    assert_eq!(sigs.len(), 2, "two lit junctions");
+    let (fork, tee) = if sigs[0].at[0] < sigs[1].at[0] {
+        (&sigs[0], &sigs[1])
+    } else {
+        (&sigs[1], &sigs[0])
+    };
+    let arm = |s: &sim_core::traffic::Signal, way: [f32; 2]| {
+        *s.arms
+            .iter()
+            .max_by(|a, b| {
+                (a.way[0] * way[0] + a.way[1] * way[1])
+                    .total_cmp(&(b.way[0] * way[0] + b.way[1] * way[1]))
+            })
+            .unwrap()
+    };
+    let (west, east) = (arm(fork, [-1.0, 0.0]), arm(fork, [1.0, 0.0]));
+    assert_eq!(west.phase, east.phase, "the street's two arms apart");
+    let country = arm(fork, [slant.cos(), -slant.sin()]);
+    assert_ne!(
+        country.phase, west.phase,
+        "the country road with the street"
+    );
+    for (i, s) in sigs.iter().enumerate() {
+        for (k, a) in s.arms.iter().enumerate() {
+            assert!(
+                !w.travel.on_carriageway(a.pole, -0.1),
+                "junction {i} arm {k}'s pole on a road at {:?}",
+                a.pole
+            );
+        }
+    }
+    // (Half the street's 18 m between them.)
+    let back = arm(tee, [-1.0, 0.0]);
+    for a in [east, back] {
+        assert!(!a.crosswalk, "a crosswalk between the two");
+        assert!(
+            (a.stop - 9.0).abs() < 0.5,
+            "the stop line {} m out, not half way",
+            a.stop
+        );
+    }
+    // (The other arms keep theirs.)
+    assert!(west.crosswalk && arm(tee, [1.0, 0.0]).crosswalk);
+}
