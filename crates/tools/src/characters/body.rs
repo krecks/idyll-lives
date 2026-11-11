@@ -1165,6 +1165,15 @@ pub struct Surface {
     /// The same triangles without the eye sockets (where the closed lids lie, face.rs).
     pub bare_tris: Vec<[V3; 3]>,
     pub cranium: Vec<V3>,
+    /// SPIKE (`hd.body`, the close-up detail level): the whole body at level 2. Positions (snapped,
+    /// sockets carved, the ears' features on), the same without the sockets, their smooth normals,
+    /// and the weights, tags and regions subdivided to level 2 (`Topology::fine_m`).
+    pub fine_pos: Vec<V3>,
+    pub fine_bare: Vec<V3>,
+    pub fine_nor: Vec<V3>,
+    pub fine_dense: Vec<Dense>,
+    pub fine_tags: TagArrays,
+    pub fine_region: Vec<[f64; NR]>,
 }
 
 static SURFACES: Cache<(String, String), Surface> = Cache::new();
@@ -1217,6 +1226,10 @@ fn make_surface(family: &str, stage: &str, id: &Identity) -> Surface {
     let region1 = s.m.apply_n(&region);
     // Head and neck, densely, without the ears (for the head interface's sdf and surface_z).
     let fpos = topo.snapped(true, &arr.t, &base, &ctrl, &onto, &holes);
+    // SPIKE (`hd.body`): level 2 as a mesh of its own.
+    let fine_pos = fpos.clone();
+    let fine_dense = rigid_fingertips(topo.fine_m.apply_n(&arr.dense), &fine_pos, &p);
+    let fine_tags = tags.subdivided(&topo.fine_m);
     // Normals from the finer (level-2) limit surface: smooth shading on the coarse level 1 (whose
     // vertices are the first of level 2's), as it is without the eye sockets: the lids cover them
     // (face.rs), and the skin round a lid is shaded as the face it carries on.
@@ -1320,7 +1333,22 @@ fn make_surface(family: &str, stage: &str, id: &Identity) -> Surface {
         head_tris,
         bare_tris,
         cranium,
+        fine_pos,
+        fine_bare: bare,
+        fine_nor: bare_nor,
+        fine_dense,
+        fine_tags,
+        fine_region: freg,
     }
+}
+
+static TRIS_HD: Cache<String, Vec<usize>> = Cache::new();
+
+/// SPIKE (`hd.body`): level-2 triangles, split as `tris` splits level 1's.
+pub fn tris_hd(family: &str) -> Arc<Vec<usize>> {
+    TRIS_HD.get(family.to_string(), || {
+        triangles(&topology().s2.quads, &surface(family, BASE_STAGE).fine_pos).concat()
+    })
 }
 
 static TRIS: Cache<String, Vec<usize>> = Cache::new();
@@ -1347,6 +1375,9 @@ pub struct Body {
     pub joints: [V3; NB],
     /// `body`'s positions without the eye sockets (`Surface::unsocketed`; its normals are so already).
     pub unsocketed: Vec<V3>,
+    /// SPIKE: the body at level 2 (`hd.body`'s skin) and its positions without the eye sockets.
+    pub hd: Mesh,
+    pub hd_unsocketed: Vec<V3>,
 }
 
 /// The body of `family` at `stage` (and its low-detail copy); see the module docs.
@@ -1374,12 +1405,22 @@ pub fn build_body(family: &str, stage: &str) -> Body {
         eye_y: s.p[b("eye_l")].y,
         grip: grip(family, stage),
     };
+    let hd = Mesh {
+        pos: s.fine_pos.clone(),
+        idx: tris_hd(family).to_vec(),
+        dense: s.fine_dense.clone(),
+        arm: s.fine_tags.arm.clone(),
+        nor: s.fine_nor.clone(),
+        ..Mesh::default()
+    };
     Body {
         body,
         lod,
         meta,
         joints: s.p,
         unsocketed: s.unsocketed.clone(),
+        hd,
+        hd_unsocketed: s.fine_bare.clone(),
     }
 }
 
@@ -1595,10 +1636,14 @@ pub fn body_fields_and_tone(
     let s = surface(family, BASE_STAGE);
     let n = mesh.pos.len();
     let lod = n < s.pos.len();
-    let (pos, tags, region) = if lod {
-        (&s.lod_pos, &s.lod_tags, &s.lod_region)
+    // SPIKE (`hd.body`): the level-2 body's are worked out at its own vertices.
+    let hd = n >= s.fine_pos.len();
+    let (pos, tags, region, nor) = if lod {
+        (&s.lod_pos, &s.lod_tags, &s.lod_region, &s.lod_nor)
+    } else if hd {
+        (&s.fine_pos, &s.fine_tags, &s.fine_region, &s.fine_nor)
     } else {
-        (&s.pos, &s.tags, &s.region)
+        (&s.pos, &s.tags, &s.region, &s.nor)
     };
     let k = pos.len();
     let mut f = fields_of(family, pos, &tags.arm, region, p, head);
@@ -1627,7 +1672,7 @@ pub fn body_fields_and_tone(
             head.eyes[0].y - NOSTRIL.3 * head.hh,
         );
         for i in 0..k {
-            let (q, nr) = (pos[i], s.nor[i]);
+            let (q, nr) = (pos[i], nor[i]);
             if region[i][ri_head] < 0.5 || q.z < head.face_z || !(lo..hi).contains(&q.y) {
                 continue;
             }

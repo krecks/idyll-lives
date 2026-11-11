@@ -265,6 +265,14 @@ interface PartMorph {
 
 const MORPH_WIDTH = 2048;
 
+/**
+ * SPIKE (the close-up detail level): `?hd=1` in the page's URL draws `hd.body` (the whole body subdivided a
+ * second time, level 2, which the generator writes after every other part) in place of `body`, for every
+ * resident at every size. Without it the part is dropped at load, so nothing else sees it.
+ */
+const HD_SPIKE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('hd') === '1';
+const HD_PART = 'hd.body';
+
 /** Height of bone `b`'s joint in the bind pose, from its inverse bind matrix (column-major, rigid). */
 function jointY(inverseBind: ArrayLike<number>, b: number): number {
   const m = b * 16;
@@ -355,7 +363,10 @@ async function load(url: string): Promise<CharacterSet> {
   Object.entries(rig.bodies).forEach(([name, b], i) => {
     const buf = meshBufs[i];
     const parts = new Map<string, MeshPart>();
-    for (const [partName, p] of Object.entries(b.parts)) {
+    const table = { ...b.parts };
+    if (HD_SPIKE && table[HD_PART]) table.body = table[HD_PART];
+    delete table[HD_PART];
+    for (const [partName, p] of Object.entries(table)) {
       const n = p.vertices;
       const part = readPart(buf, p, fieldScale, toneScale);
       const m = p.morph;
@@ -439,6 +450,7 @@ async function load(url: string): Promise<CharacterSet> {
       for (const [name, v] of Object.entries(moved)) if (channel[name] >= expressions) eyes[body].set(v, (channel[name] - expressions) * 4);
     }
     morphs = { channels, channel, expressions, eyes, headerTexels, width: MORPH_WIDTH, height, data };
+    if (HD_SPIKE) console.info(`[spike] hd.body drawn as body; morph texture ${MORPH_WIDTH} x ${height} (${texels} texels used)`);
   }
 
   const bone: Record<string, number> = {};
@@ -546,7 +558,8 @@ export function loadStage(set: CharacterSet, base: BodyData, stage: string): Pro
     p = fetchBinary(set.file(info.mesh)).then((buf) => {
       const parts = new Map<string, MeshPart>();
       for (const [partName, part] of base.parts) {
-        const e = info.parts[partName];
+        // (SPIKE: with `?hd=1` the body is the level-2 one, and so are its stage deltas.)
+        const e = info.parts[HD_SPIKE && partName === 'body' && info.parts[HD_PART] ? HD_PART : partName];
         if (e) parts.set(partName, stagePart(set, part, buf, e));
       }
       const body: BodyData = {

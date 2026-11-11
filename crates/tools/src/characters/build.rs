@@ -52,7 +52,15 @@ struct Assembled {
     /// them (`lid_shading`, the lids' tone).
     unsocketed: Vec<V3>,
     skin: OnMesh,
+    /// SPIKE (`hd.body`, the body at level 2 with the lids and lips after it; the last part): how many of
+    /// its vertices are the skin's, the skin without its eye sockets and its triangles on that.
+    n_hd: usize,
+    hd_unsocketed: Vec<V3>,
+    hd_skin: OnMesh,
 }
+
+/// SPIKE: the close-up detail level's part (the whole body at level 2).
+const HD: &str = "hd.body";
 
 fn part<'a>(parts: &'a mut [(String, Mesh)], name: &str) -> &'a mut Mesh {
     &mut parts
@@ -125,6 +133,22 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
         None => garment_cuts(family, &p),
     };
     parts.extend(build_clothes(family, stage, &cuts));
+    // SPIKE (`hd.body`): the level-2 skin with the same lids and lips after it, the lids shaded by the
+    // level-2 skin they lie on. Last, so every other part stays where it was in the binaries.
+    let n_hd = bd.hd.pos.len();
+    let mut hd_list: Vec<Mesh> = vec![strip(&bd.hd)];
+    hd_list.extend(extras.iter().map(strip));
+    let mut hd = merge(&hd_list.iter().collect::<Vec<_>>());
+    let hd_skin = OnMesh::new(&bd.hd_unsocketed, &hd.idx, n_hd);
+    let hd_lids: Vec<V3> = {
+        let shade = lid_shading(&hd_skin, &hd.nor);
+        hd.pos[n_hd..n_hd + n_lids]
+            .iter()
+            .map(|&q| shade(q))
+            .collect()
+    };
+    hd.nor[n_hd..n_hd + n_lids].copy_from_slice(&hd_lids);
+    parts.push((HD.to_string(), hd));
     Assembled {
         parts,
         meta: bd.meta,
@@ -136,6 +160,9 @@ fn assemble(family: &str, stage: &str, cuts: Option<&Cuts>) -> Assembled {
         cuts,
         unsocketed: bd.unsocketed,
         skin,
+        n_hd,
+        hd_unsocketed: bd.hd_unsocketed,
+        hd_skin,
     }
 }
 
@@ -167,7 +194,7 @@ fn lid_shading<'a>(skin: &'a OnMesh, nor: &'a [V3]) -> impl Fn(V3) -> V3 + 'a {
 /// The hair's wisps take the shade of the hair they grow from (a wisp's vertices come in twos, its
 /// root, where a vertex of the hair is, then its end: hair.rs `wisps`), so an edge and its wisps are
 /// one colour.
-fn bake_ao(parts: &mut [(String, Mesh)], spread: (usize, &dyn Fn(V3) -> bool)) {
+fn bake_ao(parts: &mut [(String, Mesh)], spread: (usize, &dyn Fn(V3) -> bool), n_hd: usize) {
     let (body, lod) = (get(parts, "body").clone(), get(parts, "lod.body").clone());
     let face = ["eyes", "teeth", "tongue"].map(|n| get(parts, n).clone());
     let [eyes, teeth, tongue] = &face;
@@ -175,7 +202,10 @@ fn bake_ao(parts: &mut [(String, Mesh)], spread: (usize, &dyn Fn(V3) -> bool)) {
         if is_wisps(name) {
             continue;
         }
-        let around: Vec<&Mesh> = if name == "body" || name == "lod.body" {
+        // (SPIKE: `hd.body` is baked as `body` is, over its own skin.)
+        let full = name == "body" || name == HD;
+        let n_spread = if name == HD { n_hd } else { spread.0 };
+        let around: Vec<&Mesh> = if full || name == "lod.body" {
             vec![teeth, tongue]
         } else if name.starts_with("lod.") {
             vec![&lod]
@@ -189,22 +219,22 @@ fn bake_ao(parts: &mut [(String, Mesh)], spread: (usize, &dyn Fn(V3) -> bool)) {
         } else {
             continue;
         };
-        let (reach, passes, samples) = if name == "body" || name == "lod.body" {
+        let (reach, passes, samples) = if full || name == "lod.body" {
             (ao::REACH_BODY, 2, ao::SAMPLES)
         } else if name.starts_with("hair.") {
             (ao::REACH, 0, ao::SAMPLES_HAIR)
         } else {
             (ao::REACH_SHELL, 2, ao::SAMPLES)
         };
-        let occ = if name == "body" {
-            ao::occlusion_spread(m, &around, reach, samples, spread.0, spread.1)
+        let occ = if full {
+            ao::occlusion_spread(m, &around, reach, samples, n_spread, spread.1)
         } else {
             ao::occlusion(m, &around, reach, samples)
         };
         // The face's creases are narrower than the triangles, and `occlusion_spread` has them; the rest
         // of the skin and the shells are relaxed over the mesh instead, so a ring's two or three dark
         // vertices read as a crease rather than as a blotch (`ao::smooth`).
-        let face = |i: usize| name == "body" && i < spread.0 && (spread.1)(m.pos[i]);
+        let face = |i: usize| full && i < n_spread && (spread.1)(m.pos[i]);
         let occ = ao::smooth(m, &occ, passes, &face);
         ao::bake(m, occ);
     }
@@ -275,11 +305,256 @@ struct BodyEntry {
     stages: OMap<StageEntry>,
 }
 
+/// SPIKE: level-2 values guessed from level 1's by the plainest stencils (a level-1 vertex keeps its own,
+/// an edge's new vertex takes the mean of its two ends, a face's the mean of its four corners).
+fn spike_stencil(v1: &[V3]) -> Vec<V3> {
+    let topo = super::body::topology();
+    let mut out = v1.to_vec();
+    out.extend(topo.s2.edges.iter().map(|&(a, b)| (v1[a] + v1[b]) / 2.0));
+    out.extend(
+        topo.s
+            .quads
+            .iter()
+            .map(|q| (v1[q[0]] + v1[q[1]] + v1[q[2]] + v1[q[3]]) / 4.0),
+    );
+    out
+}
+
+/// SPIKE: the largest and the root-mean-square difference of two lists, over the vertices `keep` picks.
+fn spike_err(a: &[V3], b: &[V3], keep: &dyn Fn(usize) -> bool) -> (f64, f64) {
+    let (mut mx, mut sq, mut n) = (0.0f64, 0.0, 0usize);
+    for i in (0..a.len()).filter(|&i| keep(i)) {
+        let d = (a[i] - b[i]).norm();
+        mx = mx.max(d);
+        sq += d * d;
+        n += 1;
+    }
+    (mx, (sq / n.max(1) as f64).sqrt())
+}
+
+/// SPIKE: where the two lists differ most: the vertex, what it is (a level-1 vertex, an edge's or a face's
+/// new one), its head / ear / neck shares, where it is and how deep its eye socket is carved there (mm).
+fn spike_worst(family: &str, a: &[V3], b: &[V3]) -> String {
+    let s = super::body::surface(family, BASE_STAGE);
+    let topo = super::body::topology();
+    let i = (0..a.len())
+        .max_by(|&i, &j| (a[i] - b[i]).norm().total_cmp(&(a[j] - b[j]).norm()))
+        .unwrap_or(0);
+    let n1 = s.pos.len();
+    let kind = if i < n1 {
+        "level-1 vertex"
+    } else if i < n1 + topo.s2.edges.len() {
+        "edge vertex"
+    } else {
+        "face vertex"
+    };
+    let r = &s.fine_region[i];
+    let p = s.fine_pos[i];
+    format!(
+        "worst at {kind} {i}: head {:.2} ear {:.2} neck {:.2}, at ({:.3}, {:.3}, {:.3}), socket {:.1} mm deep",
+        r[super::body::region("head")],
+        r[super::body::region("ear")],
+        r[super::body::region("neck")],
+        p.x,
+        p.y,
+        p.z,
+        (s.fine_bare[i].z - p.z) * 1e3
+    )
+}
+
+/// SPIKE: with `HD_SPIKE_DUMP=<dir>`, what a download would hold if level 2 were made at load time from
+/// level 1 by the plain stencils and only the rest shipped: per new vertex (an edge's or a face's) how far
+/// the real one is from the stencils' (int16 x 3 at `STAGE_SCALE`), for gzip to size.
+fn spike_dump(name: &str, derived: &[V3], real: &[V3], n1: usize) {
+    let Ok(dir) = std::env::var("HD_SPIKE_DUMP") else {
+        return;
+    };
+    let bytes: Vec<u8> = (n1..real.len())
+        .flat_map(|i| {
+            let d = real[i] - derived[i];
+            [d.x, d.y, d.z].map(|v| (v * STAGE_SCALE).round().clamp(-32767.0, 32767.0) as i16)
+        })
+        .flat_map(i16::to_le_bytes)
+        .collect();
+    std::fs::write(Path::new(&dir).join(format!("{name}.resid.bin")), bytes).expect("dump");
+}
+
+/// SPIKE: what the close-up level is made of and how well its morphs and stages could be derived at
+/// load time from level 1's (printed by the build; nothing reads it).
+fn spike_report(family: &str, base: &Assembled) {
+    let s = super::body::surface(family, BASE_STAGE);
+    let topo = super::body::topology();
+    let (rh, re, rn) = (
+        super::body::region("head"),
+        super::body::region("ear"),
+        super::body::region("neck"),
+    );
+    let share =
+        |r: &[f64; super::body::NR], neck: bool| r[rh] + r[re] + if neck { r[rn] } else { 0.0 };
+    let count = |reg: &[[f64; super::body::NR]], idx: &[usize], n: usize, neck: bool| {
+        let v = reg.iter().filter(|r| share(r, neck) > 0.5).count();
+        let t = idx
+            .chunks(3)
+            .filter(|t| t.iter().all(|&i| i < n && share(&reg[i], neck) > 0.5))
+            .count();
+        (v, t)
+    };
+    let (b1, b2) = (get(&base.parts, "body"), get(&base.parts, HD));
+    let (n1, n2) = (base.n_skin, base.n_hd);
+    println!(
+        "SPIKE {family}: cage {} vertices; level 1 skin {n1} v, {} t; level 2 skin {n2} v, {} t; lids and lips {} v, {} t",
+        topo.n,
+        b1.idx
+            .chunks(3)
+            .filter(|t| t.iter().all(|&i| i < n1))
+            .count(),
+        b2.idx
+            .chunks(3)
+            .filter(|t| t.iter().all(|&i| i < n2))
+            .count(),
+        b1.pos.len() - n1,
+        b1.idx
+            .chunks(3)
+            .filter(|t| t.iter().all(|&i| i >= n1))
+            .count(),
+    );
+    for neck in [true, false] {
+        let (v1, t1) = count(&s.region, &b1.idx, n1, neck);
+        let (v2, t2) = count(&s.fine_region, &b2.idx, n2, neck);
+        println!(
+            "SPIKE {family}: head + ears{}: level 1 {v1} v, {t1} t; level 2 {v2} v, {t2} t",
+            if neck { " + neck" } else { "" }
+        );
+    }
+    // Level 2's first vertices against level 1's (they should be the same points).
+    let same = spike_err(&s.pos, &s.fine_pos[..n1], &|_| true);
+    let same_off_ears = spike_err(&s.pos, &s.fine_pos[..n1], &|i| s.fine_region[i][re] < 0.01);
+    println!(
+        "SPIKE {family}: level 2's first vertices are off level 1's by at most {:.4} mm ({:.4} mm away from the ears); {}",
+        same.0 * 1e3,
+        same_off_ears.0 * 1e3,
+        spike_worst(family, &s.pos, &s.fine_pos[..n1])
+    );
+    spike_dump(
+        &format!("{family}.base"),
+        &spike_stencil(&s.pos),
+        &s.fine_pos,
+        n1,
+    );
+    // Positions made at load time instead: one Catmull-Clark step of level 1's points (they are limit
+    // points already, so the step rounds the surface off a little), against the real level 2.
+    let cc = topo.s2.m.apply(&s.pos);
+    let headish = |i: usize| share(&s.fine_region[i], true) > 0.5;
+    let ear = |i: usize| s.fine_region[i][re] > 0.5;
+    for (what, keep) in [
+        ("whole body", &(|_| true) as &dyn Fn(usize) -> bool),
+        ("head + ears + neck", &headish),
+        ("ears", &ear),
+    ] {
+        let e = spike_err(&cc, &s.fine_pos, keep);
+        let l = spike_err(&spike_stencil(&s.pos), &s.fine_pos, keep);
+        println!(
+            "SPIKE {family}: level 2 from level 1 at load, {what}: Catmull-Clark step max {:.3} mm rms {:.3} mm; plain means max {:.3} mm rms {:.3} mm",
+            e.0 * 1e3,
+            e.1 * 1e3,
+            l.0 * 1e3,
+            l.1 * 1e3
+        );
+    }
+    // Identity channels on level 2 derived from level 1's deltas by the plain stencils, against the real ones.
+    let (mut worst_p, mut worst_n, mut worst_cc) = ((0.0f64, 0.0f64), (0.0f64, 0.0f64), 0.0f64);
+    for ch in identity::channels(family).iter() {
+        let reach = ch.skin_hd.0.iter().map(|d| d.norm()).fold(0.0, f64::max);
+        let p = spike_err(&spike_stencil(&ch.skin.0), &ch.skin_hd.0, &|_| true);
+        let n = spike_err(&spike_stencil(&ch.skin.1), &ch.skin_hd.1, &|_| true);
+        let c = spike_err(&topo.s2.m.apply(&ch.skin.0), &ch.skin_hd.0, &|_| true);
+        let moved = |d: &[V3]| d.iter().filter(|v| v.abs().max() > 1e-5).count();
+        println!(
+            "SPIKE {family} {}: reach {:.2} mm, moves {} of level 1 and {} of level 2; derived positions off by max {:.3} mm rms {:.4} mm (Catmull-Clark step: max {:.3} mm); derived normals off by max {:.3} rms {:.4} (of 1)",
+            ch.name,
+            reach * 1e3,
+            moved(&ch.skin.0),
+            moved(&ch.skin_hd.0),
+            p.0 * 1e3,
+            p.1 * 1e3,
+            c.0 * 1e3,
+            n.0,
+            n.1
+        );
+        if p.0 > 2e-4 {
+            println!(
+                "SPIKE {family} {}: {}",
+                ch.name,
+                spike_worst(family, &spike_stencil(&ch.skin.0), &ch.skin_hd.0)
+            );
+        }
+        worst_p = (worst_p.0.max(p.0), worst_p.1.max(p.1));
+        worst_n = (worst_n.0.max(n.0), worst_n.1.max(n.1));
+        worst_cc = worst_cc.max(c.0);
+    }
+    println!(
+        "SPIKE {family}: identity derived at load, worst channel: positions max {:.3} mm rms {:.4} mm (Catmull-Clark step max {:.3} mm); normals max {:.3} rms {:.4}",
+        worst_p.0 * 1e3,
+        worst_p.1 * 1e3,
+        worst_cc * 1e3,
+        worst_n.0,
+        worst_n.1
+    );
+}
+
+/// SPIKE: a life stage's level 2 derived at load time (the base's level 2 plus the stage's level-1
+/// deltas spread by the plain stencils), against the real one.
+fn spike_stage(family: &str, stage: &str, base: &Assembled, st: &Assembled) {
+    let s = super::body::surface(family, BASE_STAGE);
+    let (rh, re, rn) = (
+        super::body::region("head"),
+        super::body::region("ear"),
+        super::body::region("neck"),
+    );
+    let headish =
+        |i: usize| s.fine_region[i][rh] + s.fine_region[i][re] + s.fine_region[i][rn] > 0.5;
+    let (n1, n2) = (base.n_skin, base.n_hd);
+    let (b1, b2) = (get(&base.parts, "body"), get(&base.parts, HD));
+    let (s1, s2) = (get(&st.parts, "body"), get(&st.parts, HD));
+    let d1: Vec<V3> = (0..n1).map(|i| s1.pos[i] - b1.pos[i]).collect();
+    let derived: Vec<V3> = spike_stencil(&d1)
+        .iter()
+        .zip(&b2.pos[..n2])
+        .map(|(d, p)| p + d)
+        .collect();
+    let all = spike_err(&derived, &s2.pos[..n2], &|_| true);
+    let hd = spike_err(&derived, &s2.pos[..n2], &headish);
+    println!(
+        "SPIKE {family} {stage}: {}",
+        spike_worst(family, &derived, &s2.pos[..n2])
+    );
+    // (The other way to make a stage at load: the stage's own level 1 through the stencils, the rest shipped.)
+    spike_dump(
+        &format!("{family}.{stage}"),
+        &spike_stencil(&s1.pos[..n1]),
+        &s2.pos[..n2],
+        n1,
+    );
+    spike_dump(
+        &format!("{family}.{stage}.fromdelta"),
+        &derived,
+        &s2.pos[..n2],
+        n1,
+    );
+    println!(
+        "SPIKE {family} {stage}: level 2 derived from level 1's stage deltas: whole body max {:.3} mm rms {:.3} mm; head + ears + neck max {:.3} mm rms {:.3} mm",
+        all.0 * 1e3,
+        all.1 * 1e3,
+        hd.0 * 1e3,
+        hd.1 * 1e3
+    );
+}
+
 fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
     let mut base = assemble(family, BASE_STAGE, None);
     let head = base.head.clone();
     // Fields and tone (base stage only; the stages share them).
-    for name in ["body", "lod.body"] {
+    for name in ["body", "lod.body", HD] {
         let (f, t) = body_fields_and_tone(family, part(&mut base.parts, name), &base.p, &head);
         let m = part(&mut base.parts, name);
         m.fields = f;
@@ -289,14 +564,27 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
     // over them (face.rs), so the skin round a lid and the lid take the shade the face has there.
     let socketed = part(&mut base.parts, "body").pos[..base.n_skin].to_vec();
     part(&mut base.parts, "body").pos[..base.n_skin].copy_from_slice(&base.unsocketed);
+    let hd_socketed = part(&mut base.parts, HD).pos[..base.n_hd].to_vec();
+    part(&mut base.parts, HD).pos[..base.n_hd].copy_from_slice(&base.hd_unsocketed);
     bake_ao(
         &mut base.parts,
         (base.n_skin, &|p: V3| p.y > head.chin_y - 0.1 * head.hh),
+        base.n_hd,
     );
     part(&mut base.parts, "body").pos[..base.n_skin].copy_from_slice(&socketed);
+    part(&mut base.parts, HD).pos[..base.n_hd].copy_from_slice(&hd_socketed);
     // The face's skin pieces: the lids take the tone of the face they lie on (its shade too; the low-detail
     // body's the mean of the skin round them), the upper lid's crease its own; the lips keep theirs.
-    for (name, k0) in [("body", base.n_skin), ("lod.body", base.n_lod)] {
+    for (name, k0) in [
+        ("body", base.n_skin),
+        ("lod.body", base.n_lod),
+        (HD, base.n_hd),
+    ] {
+        let on_skin = if name == HD {
+            &base.hd_skin
+        } else {
+            &base.skin
+        };
         let m = part(&mut base.parts, name);
         let near = KdTree::new(&m.pos[..k0]);
         let mut k = k0;
@@ -306,10 +594,10 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
             }
             let n = piece.pos.len();
             for (i, q) in piece.pos.iter().enumerate() {
-                m.tone[k + i] = if piece.skin_tone && name == "body" {
+                m.tone[k + i] = if piece.skin_tone && name != "lod.body" {
                     // (The face's tone at the lid's nearest point, as the face is without the socket; the
                     // upper lid's crease its own.)
-                    let (t, w) = base.skin.at(*q);
+                    let (t, w) = on_skin.at(*q);
                     let at = |c: usize| (0..3).map(|j| m.tone[t[j]][c] * w[j]).sum::<f64>();
                     [at(0), piece.tone[i][1], at(2), at(3)]
                 } else if piece.skin_tone {
@@ -348,12 +636,18 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
             .filter(|m| m.skin_tone)
             .map(|m| m.pos.len())
             .sum();
-        let body = get(&base.parts, "body");
-        let shade = lid_shading(&base.skin, &body.nor);
         for (name, k, count) in [
             ("body", base.n_skin, None),
             ("lod.body", base.n_lod, Some(n_lids)),
+            (HD, base.n_hd, None),
         ] {
+            // (SPIKE: `hd.body`'s lids and lips move as `body`'s do, shaded by its own skin.)
+            let (body, on_skin) = if name == HD {
+                (get(&base.parts, HD), &base.hd_skin)
+            } else {
+                (get(&base.parts, "body"), &base.skin)
+            };
+            let shade = lid_shading(on_skin, &body.nor);
             let n = get(&base.parts, name).pos.len();
             let mut d = Deltas::new();
             for (c, (dp, dn)) in &face_d {
@@ -417,6 +711,8 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
             if *name == "body" {
                 let join = |a: &[V3], b: &[V3]| [a, b].concat();
                 shapes.push((name, join(&ch.skin.0, dp), join(&ch.skin.1, dn)));
+                // SPIKE: the channel on the level-2 skin, the same lids and lips after it.
+                shapes.push((HD, join(&ch.skin_hd.0, dp), join(&ch.skin_hd.1, dn)));
             } else {
                 shapes.push((name, dp.clone(), dn.clone()));
             }
@@ -461,6 +757,7 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
             m.morph = Some(pm);
         }
     }
+    spike_report(family, &base);
     let table = write_parts(&out.join(format!("{family}.bin")), &base.parts)?;
     let mut stages = OMap::new();
     for &stage in &STAGES {
@@ -474,6 +771,7 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
         b.sort_unstable();
         assert_eq!(a, b, "{family} {stage}: parts differ");
         let mesh = format!("{family}.{stage}.bin");
+        spike_stage(family, stage, &base, &st);
         let t = write_stage(&out.join(&mesh), &base.parts, &st.parts)?;
         stages.insert(
             stage,
