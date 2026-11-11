@@ -67,7 +67,7 @@ export interface Look {
 // also fades to zero around sunrise/sunset in `lightingAt`, so the switch between sun and moon
 // direction never pops.
 const NIGHT = tuned('night', {
-  sun: 0.6, sunColor: '#7088F2', sky: 0.5, skyColor: '#3A52C4', groundColor: '#1A2050', env: 0.05,
+  sun: 0.8, sunColor: '#7088F2', sky: 0.65, skyColor: '#3A52C4', groundColor: '#1A2050', env: 0.05,
   clear: '#1E2C58', zenith: '#081232', exposure: 1.7, lamps: 1,
 });
 
@@ -105,7 +105,7 @@ export const LOOK: Look = tuned('look', {
   shadowsHue: 222,
   shadowsDensity: 26,
   nightGrade: 0.85,
-  vignette: 1.2,
+  vignette: 0.8,
   fog: 0.0032,
   marker: ['#FFAE1F', '#FFC23D', '#FFDE94', '#7F95FF', '#F2604F'],
   windowGlow: '#FFC27A',

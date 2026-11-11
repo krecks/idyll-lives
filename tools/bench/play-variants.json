@@ -1,11 +1,58 @@
 {
-  "vignette": {
-    "poses": ["play-day", "play-night", "wide-day-0", "town-day"],
+  "lawn": {
+    "poses": [
+      "play-day",
+      "play-day-b",
+      "wide-day-0",
+      "town-day"
+    ],
     "variants": {
-      "1.2 (now)": "",
+      "before 2026-11-11": "lawn.sky:0.3,0.75;lawn.root:0.55;lawn.tip:1.35;lawn.under:0.55;lawn.vary:0.1;lawn.yellow:1;lawn.gust:0.2;lawn.grade.saturation:1;lawn.grade.value:1;lawn.grade.maxRG:0",
+      "steady": "lawn.sky:0.85,0.95;lawn.root:0.55;lawn.tip:1.35;lawn.under:0.55;lawn.vary:0.1;lawn.yellow:1;lawn.gust:0.2;lawn.grade.saturation:1;lawn.grade.value:1;lawn.grade.maxRG:0",
+      "calm": "lawn.sky:0.85,0.95;lawn.root:0.7;lawn.tip:1.15;lawn.under:0.68;lawn.vary:0.04;lawn.yellow:0.4;lawn.gust:0.08;lawn.grade.saturation:1;lawn.grade.value:1;lawn.grade.maxRG:0",
+      "calm, a little deeper": "lawn.sky:0.85,0.95;lawn.root:0.7;lawn.tip:1.15;lawn.under:0.68;lawn.vary:0.04;lawn.yellow:0.4;lawn.gust:0.08;lawn.grade.saturation:0.88;lawn.grade.value:0.95;lawn.grade.maxRG:0.8",
+      "calm, deeper": "lawn.sky:0.85,0.95;lawn.root:0.7;lawn.tip:1.15;lawn.under:0.68;lawn.vary:0.04;lawn.yellow:0.4;lawn.gust:0.08;lawn.grade.saturation:0.75;lawn.grade.value:0.9;lawn.grade.maxRG:0.72"
+    }
+  },
+  "shade": {
+    "poses": [
+      "play-day",
+      "play-day-b",
+      "up-day",
+      "street-day"
+    ],
+    "variants": {
+      "now": "",
+      "G1 a cooler, stronger sky fill": "key.7.5.sky:0.2;key.7.5.skyColor:8FB4EE;key.7.5.env:0.544;key.9.5.sky:0.2;key.9.5.skyColor:8FB4EE;key.9.5.env:0.663;key.13.sky:0.2;key.13.skyColor:8FB4EE;key.13.env:0.697;key.16.5.sky:0.2;key.16.5.skyColor:8FB4EE;key.16.5.env:0.646",
+      "G2 split toning": "look.shadowsDensity:55;look.highlightsDensity:40",
+      "G3 half of each, less saturation": "key.7.5.sky:0.14;key.7.5.skyColor:9CBCEA;key.7.5.env:0.595;key.9.5.sky:0.14;key.9.5.skyColor:9CBCEA;key.9.5.env:0.725;key.13.sky:0.14;key.13.skyColor:9CBCEA;key.13.env:0.763;key.16.5.sky:0.14;key.16.5.skyColor:9CBCEA;key.16.5.env:0.707;look.shadowsDensity:40;look.saturation:8"
+    }
+  },
+  "vignette": {
+    "poses": [
+      "play-day",
+      "play-night",
+      "wide-day-0",
+      "town-day"
+    ],
+    "variants": {
+      "1.2 (before 2026-11-11)": "look.vignette:1.2",
       "0.8": "look.vignette:0.8",
       "0.5": "look.vignette:0.5",
       "none": "look.vignette:0"
+    }
+  },
+  "moon": {
+    "poses": [
+      "play-night",
+      "up-night",
+      "wide-night-45",
+      "street-night"
+    ],
+    "variants": {
+      "moon 0.6, fill 0.5 (before 2026-11-11)": "night.sun:0.6;night.sky:0.5",
+      "N1 moon 0.8, fill 0.65": "night.sun:0.8;night.sky:0.65",
+      "N2 moon 0.9, fill 0.8": "night.sun:0.9;night.sky:0.8;night.env:0.08"
     }
   }
 }
