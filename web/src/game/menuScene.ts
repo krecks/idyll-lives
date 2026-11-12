@@ -58,6 +58,8 @@ class MenuScene {
   private glideEnd = 0;
   /** Tags of lots outside this screen area stay at its edge (pointing the way). */
   private bounds: Frame | null = null;
+  /** The part of the world the shot frames (metres): lots well outside it have no tag. */
+  private framed: TownShot['focus'] | null = null;
   /** Weak so a disposed renderer isn't pinned here after a graphics-preset change. */
   private renderer: WeakRef<Renderer> | null = null;
   private get live(): Renderer | undefined {
@@ -138,11 +140,14 @@ class MenuScene {
     if (!world || !renderer || !this.wanted) return;
     const { shot, duration } = this.wanted;
     this.bounds = shot.kind === 'overview' || shot.kind === 'lot' ? shot.frame : null;
+    const townShot = this.townShot(shot, world, duration);
+    // What the camera frames is the town as far as the tags go (see `positionLabels`); before the key
+    // check, since a new world of the same size and shot can leave the key unchanged.
+    this.framed = shot.kind === 'overview' || shot.kind === 'lot' ? townShot.focus : null;
     const key = `${JSON.stringify(shot)}|${world.width}x${groundDepth(world)}|${window.innerWidth}x${window.innerHeight}`;
     if (key === this.shotKey) return;
     const first = this.shotKey === '';
     this.shotKey = key;
-    const townShot = this.townShot(shot, world, duration);
     renderer.setTownShot(townShot, first);
     this.glideEnd = performance.now() + (first ? 0 : (townShot.duration ?? 0) * 1000);
   }
@@ -276,7 +281,9 @@ class MenuScene {
    * Per overview frame: lays out the pinned tags in screen space. Each tag wants to sit above its
    * lot, inside the stage; in priority order (selected and hovered lots first, then nearer lots,
    * i.e. lower on screen) each takes the free spot nearest to that, next to the tags already
-   * placed and clear of the UI over the town. Writes transforms only for tags that moved.
+   * placed and clear of the UI over the town. Writes transforms only for tags that moved. A lot
+   * whose tag has no room above it (or that is well outside the town in view) gets none: clamped,
+   * such tags floated over empty ground and stacked up in the haze under the header.
    */
   private readonly positionLabels = () => {
     const r = this.live;
@@ -290,12 +297,24 @@ class MenuScene {
       if (o.width && o.height) blocks.push({ l: o.left - 6, t: o.top - 6, r: o.right + 6, b: o.bottom + 6 });
     }
     const placed: Label[] = [];
-    // A lot whose anchor is off the stage (a big world's far places, beside or behind the view) has no
-    // tag: clamped to the edge, they stacked up there in a column. One just past the edge still shows,
-    // pulled in.
-    const off = (x: number, y: number) => x < area.left - OFF_STAGE || x > area.right + OFF_STAGE || y < area.top - OFF_STAGE || y > area.bottom + OFF_STAGE;
+    // A low camera still projects a hamlet over the horizon onto the stage, over empty ground: a lot
+    // well outside the town the shot frames has no tag.
+    const f = this.framed;
+    const onTown = (plot: number) => {
+      if (!f) return true;
+      const p = this.world?.plots[plot];
+      if (!p) return false;
+      const x = p.x + p.w / 2;
+      const z = p.z + p.d / 2;
+      return x >= f.x - REACH && x <= f.x + f.w + REACH && z >= f.z - REACH && z <= f.z + f.d + REACH;
+    };
+    // The tag's box has to fit above its lot inside the stage. The selected and hovered lots' tags
+    // are still shown when it doesn't (pulled in, and moved out from under the header): they win.
+    const room = (x: number, y: number, h: number) => x >= area.left && x <= area.right && y - h >= area.top && y <= area.bottom;
+    const wins = (plot: number) => plot === this.focusPlots[0] || plot === this.focusPlots[1];
     for (const [plot, label] of this.labels) {
-      const visible = label.y > -100 && r.project(label.x, label.y, label.z, this.out) && !off(this.out.x, this.out.y);
+      const visible =
+        label.y > -100 && r.project(label.x, label.y, label.z, this.out) && onTown(plot) && (wins(plot) || room(this.out.x, this.out.y, label.h + STEM));
       if (visible !== label.shown) {
         label.shown = visible;
         this.showLabel(label);
@@ -375,8 +394,8 @@ class MenuScene {
 
 /** Height of a tag's stem below its body (see TownStage). */
 const STEM = 10;
-/** How far (CSS px) past the stage's edge a lot's anchor may be and still have its tag (pulled in to the edge). */
-const OFF_STAGE = 24;
+/** How far (m) outside the town a shot frames a lot may be and still have its tag (a lot or two around it). */
+const REACH = 60;
 
 interface Box {
   l: number;
