@@ -50,6 +50,8 @@ export const LOT_CLEAR = 1;
 /** At least this many backdrop buildings in a main town, in a hamlet. */
 export const MAIN_LEAST = 60;
 export const HAMLET_LEAST = 8;
+/** A main town's centre is built over at least this many times as densely as the rest of its box (`centreDensity`). */
+const DENSEST = 1.15;
 /** A backdrop building's side runs within this (radians) of the way the road nearest it runs, or square to it. */
 export const FACING = (15 * Math.PI) / 180;
 /** How far a building in a block's middle may stand from the nearest road's edge (m): the main town's, a hamlet's. */
@@ -305,6 +307,52 @@ export function reserveCentre(centre: Centre, ground: Ground): Uint8Array {
   return out;
 }
 
+/**
+ * How built over a main town's centre is against the rest of its box: of each one's open land
+ * (`taken`: the tiles that are a road, a lot, a green or water, one per tile over `W` × `D`), the
+ * share under a backdrop building (`polys`) whose tiles' middles are in it. `per`: each
+ * building's tiles counted towards the rest of the box (to take it away again: `layBackdrop`).
+ * tools/worlds/sample.ts checks the centre is the denser.
+ */
+export function centreDensity(W: number, D: number, taken: Uint8Array, box: Rect, centre: readonly Pt[], polys: readonly (readonly Pt[])[]): { centre: number; rest: number; open: [number, number]; built: [number, number]; per: number[] } {
+  const inC = new Uint8Array(W * D);
+  fillPoly(centre, W, D, (i) => (inC[i] = 1));
+  const open: [number, number] = [0, 0];
+  for (let z = Math.max(0, box.z); z < Math.min(D, box.z + box.d); z++) for (let x = Math.max(0, box.x); x < Math.min(W, box.x + box.w); x++) if (!taken[z * W + x]) open[inC[z * W + x] ? 0 : 1]++;
+  const built: [number, number] = [0, 0];
+  const seen = new Uint8Array(W * D);
+  const per = polys.map((poly) => {
+    let rest = 0;
+    fillPoly(poly, W, D, (i) => {
+      const [x, z] = [i % W, Math.floor(i / W)];
+      if (seen[i] || taken[i] || x < box.x || z < box.z || x >= box.x + box.w || z >= box.z + box.d) return;
+      seen[i] = 1;
+      built[inC[i] ? 0 : 1]++;
+      if (!inC[i]) rest++;
+    });
+    return rest;
+  });
+  return { centre: built[0] / Math.max(1, open[0]), rest: built[1] / Math.max(1, open[1]), open, built, per };
+}
+
+/** Calls `fn` with the index of every tile (of `W` × `D`) whose middle is inside `poly`. */
+export function fillPoly(poly: readonly Pt[], W: number, D: number, fn: (i: number) => void): void {
+  const zs = poly.map((p) => p[1]);
+  // (A row at a time: where the outline crosses the row's middle, inside between each pair, as `inside` says.)
+  for (let z = Math.max(0, Math.floor(Math.min(...zs))); z < Math.min(D, Math.ceil(Math.max(...zs))); z++) {
+    const zc = z + 0.5;
+    const cuts: number[] = [];
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [[xi, zi], [xj, zj]] = [poly[i], poly[j]];
+      if (zi > zc !== zj > zc) cuts.push(((xj - xi) * (zc - zi)) / (zj - zi) + xi);
+    }
+    cuts.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < cuts.length; k += 2) {
+      for (let x = Math.max(0, Math.ceil(cuts[k] - 0.5)); x < Math.min(W, Math.ceil(cuts[k + 1] - 0.5)); x++) fn(z * W + x);
+    }
+  }
+}
+
 /** What a backdrop building is, and how big a kind of it is: along the road (m), deep (m), storeys, roofs. */
 interface Kind {
   use: BackdropUse;
@@ -444,6 +492,9 @@ export interface BackdropInput {
   centres: readonly Centre[];
   /** The centres' land kept for the backdrop (`reserveCentre`), if any. */
   reserved?: Uint8Array;
+  /** The greens and the water (one per tile), for how built over the centre is (`centreDensity`). */
+  greens: readonly Pt[][];
+  water: Uint8Array;
   /** How much of a main town's land is built over, 0..1 (a dense town's most). */
   density: number;
   rand: Rand;
@@ -451,7 +502,7 @@ export interface BackdropInput {
 
 /** The backdrop and the places of a big world: see the top of this file. */
 export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[]; places: TownPlace[] } {
-  const { content, W, D, roads, areas, slots, rectOf, ground, centres, reserved, density, rand } = input;
+  const { content, W, D, roads, areas, slots, rectOf, ground, centres, reserved, greens, water, density, rand } = input;
   const index = new RoadIndex(roads);
   const ways = roads.map((r) => r.kind !== 'trail');
   // What a building may not stand on (a tile each): what the ground takes (roads, greens, water,
@@ -478,6 +529,18 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
   const buckets = new Map<number, number[]>();
   const CELL = 24;
   const key = (cx: number, cz: number) => cx * 4096 + cz;
+  /** Files building `at` under the cells its footprint's box covers. */
+  const bucket = (poly: readonly Pt[], at: number) => {
+    const xs = poly.map((p) => p[0]);
+    const zs = poly.map((p) => p[1]);
+    for (let cz = Math.floor(Math.min(...zs) / CELL); cz <= Math.floor(Math.max(...zs) / CELL); cz++) {
+      for (let cx = Math.floor(Math.min(...xs) / CELL); cx <= Math.floor(Math.max(...xs) / CELL); cx++) {
+        const list = buckets.get(key(cx, cz));
+        if (list) list.push(at);
+        else buckets.set(key(cx, cz), [at]);
+      }
+    }
+  };
   /** Whether a footprint may go down (see the top of this file). */
   const fits = (poly: Pt[]): boolean => {
     const bad = tilesOf(poly, 0, (x, z) => x < EDGE || z < EDGE || x >= W - EDGE || z >= D - EDGE || blocked[z * W + x] === 1);
@@ -545,15 +608,7 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
     };
     const at = built.push(b) - 1;
     doors.push(add(c, n, -0.5));
-    const xs = poly.map((p) => p[0]);
-    const zs = poly.map((p) => p[1]);
-    for (let cz = Math.floor(Math.min(...zs) / CELL); cz <= Math.floor(Math.max(...zs) / CELL); cz++) {
-      for (let cx = Math.floor(Math.min(...xs) / CELL); cx <= Math.floor(Math.max(...xs) / CELL); cx++) {
-        const list = buckets.get(key(cx, cz));
-        if (list) list.push(at);
-        else buckets.set(key(cx, cz), [at]);
-      }
-    }
+    bucket(poly, at);
     return at;
   };
   /** Where a building's front goes from road `r` at `s` on `side`, set back `back` m from its sidewalk's edge: the middle of its front, the way along, the way back from the road. */
@@ -684,6 +739,48 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
   for (let a = 1; a < areas.length; a++) infill(a, 0.25, 16);
   // (Short of the least: filled in more closely.)
   for (let a = 0; a < areas.length; a++) for (let k = 0; k < 3 && countIn(a) < (a === 0 ? MAIN_LEAST : HAMLET_LEAST); k++) infill(a, 1, 9 - k * 2);
+
+  // ---- the centre the densest: houses and such taken away round it till it is --------------------
+  // (Its square and what the centres' public places leave open count as open land: in a town whose
+  // centre is mostly those, the rest is thinned.)
+  for (const c of centres) {
+    const box = areas[c.area].rect;
+    // (The roads' tiles as the ground has them, a little wider than the check's: `DENSEST` spares it.)
+    const taken = ground.roadTiles().slice();
+    for (const s of slots) {
+      const r = rectOf(s);
+      for (let z = Math.max(0, r.z); z < Math.min(D, r.z + r.d); z++) for (let x = Math.max(0, r.x); x < Math.min(W, r.x + r.w); x++) taken[z * W + x] = 1;
+    }
+    for (const g of greens) fillPoly(g, W, D, (i) => (taken[i] = 1));
+    for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
+    const d = centreDensity(W, D, taken, box, c.poly, built.map((b) => b.poly));
+    let rest = d.built[1];
+    // (Those not a place, outside the centre, in its box: the furthest from the centre first.)
+    const mid = centroidOf(c.poly);
+    const spare = built
+      .map((b, i) => ({ i, far: dist(centroidOf(b.poly), mid) }))
+      .filter(({ i }) => d.per[i] > 0 && built[i].area === c.area && !PLACE_KINDS.includes(built[i].use as TownPlace['kind']) && !centreAt(centroidOf(built[i].poly)))
+      .sort((x, y) => y.far - x.far);
+    const drop = new Set<number>();
+    const want = d.centre / DENSEST;
+    for (const { i } of spare) {
+      if (rest / Math.max(1, d.open[1]) < want || built.length - drop.size <= 0 || countIn(c.area) - drop.size <= MAIN_LEAST) break;
+      drop.add(i);
+      rest -= d.per[i];
+    }
+    if (drop.size) {
+      const keep = built.filter((_, i) => !drop.has(i));
+      const doorsKept = doors.filter((_, i) => !drop.has(i));
+      built.length = 0;
+      built.push(...keep);
+      doors.length = 0;
+      doors.push(...doorsKept);
+      civic.forEach((k) => (k.at -= [...drop].filter((j) => j < k.at).length));
+      // (The buckets anew, by the buildings' new indices.)
+      buckets.clear();
+      built.forEach((b, at) => bucket(b.poly, at));
+    }
+  }
 
   // ---- by every farmstead: a farm building and a barn or two, behind it or beside ------------------
   const farmNames: string[] = [];

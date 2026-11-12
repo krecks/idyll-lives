@@ -60,7 +60,7 @@ const { homePrice } = await import('../../web/src/game/price.ts');
 const { savingsOf } = await import('../../web/src/game/wealth.ts');
 const { COURT, lengths, nearest, pointAt, roadMask, sharpestTurn, sideBySide } = await import('../../web/src/game/roads.ts');
 const { mulberry32 } = await import('../../web/src/game/noise.ts');
-const { facesRoad, HAMLET_LEAST, LOT_CLEAR, MAIN_LEAST, overlaps, signedArea2 } = await import('../../web/src/game/backdrop.ts');
+const { centreDensity, facesRoad, fillPoly, HAMLET_LEAST, LOT_CLEAR, MAIN_LEAST, overlaps, signedArea2 } = await import('../../web/src/game/backdrop.ts');
 const { RoadIndex, inside } = await import('../../web/src/game/roads.ts');
 
 type Rect = { x: number; z: number; w: number; d: number };
@@ -389,31 +389,11 @@ function livingProblems(town: TownFile, careers: readonly string[]): string[] {
   else if (areas[0]) {
     const box = areas[0];
     const taken = roadMask(roads.filter((r) => r.kind !== 'trail'), town.width, town.depth, 0);
-    const fill = (poly: readonly Pt[], value: number, into: Uint8Array) => {
-      const xs = poly.map((p) => p[0]);
-      const zs = poly.map((p) => p[1]);
-      for (let z = Math.max(0, Math.floor(Math.min(...zs))); z < Math.min(town.depth, Math.ceil(Math.max(...zs))); z++) {
-        for (let x = Math.max(0, Math.floor(Math.min(...xs))); x < Math.min(town.width, Math.ceil(Math.max(...xs))); x++) if (inside(poly as Pt[], x + 0.5, z + 0.5)) into[z * town.width + x] = value;
-      }
-    };
-    for (const p of town.plots) fill(corners(p), 1, taken);
+    for (const p of town.plots) fillPoly(corners(p), town.width, town.depth, (i) => (taken[i] = 1));
     // (Nor the water: a lakeside town's high street runs along its shore.)
     if (water) for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
-    for (const g of town.meta.greens ?? []) fill(g, 1, taken);
-    const built = new Uint8Array(town.width * town.depth);
-    for (const b of backdrop) fill(b.poly, 1, built);
-    // [open, built] in the centre, then in the rest of the box.
-    const counts = [0, 0, 0, 0];
-    for (let z = Math.max(0, box.z); z < Math.min(town.depth, box.z + box.d); z++) {
-      for (let x = Math.max(0, box.x); x < Math.min(town.width, box.x + box.w); x++) {
-        const i = z * town.width + x;
-        if (taken[i]) continue;
-        const k = inside(centre.poly, x + 0.5, z + 0.5) ? 0 : 2;
-        counts[k]++;
-        counts[k + 1] += built[i];
-      }
-    }
-    const [inC, inRest] = [counts[1] / Math.max(1, counts[0]), counts[3] / Math.max(1, counts[2])];
+    for (const g of town.meta.greens ?? []) fillPoly(g, town.width, town.depth, (i) => (taken[i] = 1));
+    const { centre: inC, rest: inRest } = centreDensity(town.width, town.depth, taken, box, centre.poly, backdrop.map((b) => b.poly));
     if (inC <= inRest) out.push(`the centre's open land is ${(inC * 100).toFixed(0)}% built over, the rest of the main town's ${(inRest * 100).toFixed(0)}% (the centre the densest)`);
   }
   // Places: every public lot one, named once, open within the day, careers that are.

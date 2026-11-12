@@ -1736,6 +1736,8 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     ground,
     centres: centre ? [centre] : [],
     reserved,
+    greens: allGreens,
+    water: waterMask,
     density: ch.density,
     rand: dense,
   });
