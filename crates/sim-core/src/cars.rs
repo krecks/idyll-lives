@@ -2467,6 +2467,16 @@ fn sharp_corners(lane: &[[f32; 2]]) -> (Vec<[f32; 2]>, Vec<bool>) {
         let din = unit2(lane[i - 1], lane[i]);
         let dout = unit2(lane[j], lane[j + 1]);
         let theta = turned(din, dout);
+        // (Its way in a step back against the way it came, where the way goes a little past a
+        // road's end and back: as it is. Rounded from that step, the curve began on the far side
+        // of the corner, and the road before it, ahead of the curve's start that way, was taken
+        // out with it: a taxi drove 130 m straight across the grass, Applewold.)
+        if i >= 2 && dot2(unit2(lane[i - 2], lane[i - 1]), din) < 0.0 {
+            out.extend_from_slice(&lane[i..=j]);
+            fixed.resize(out.len(), false);
+            i = j + 1;
+            continue;
+        }
         let mut keep = |out: &mut Vec<[f32; 2]>| {
             out.extend_from_slice(&lane[i..=j]);
             fixed.resize(out.len(), false);
@@ -2524,7 +2534,12 @@ fn sharp_corners(lane: &[[f32; 2]]) -> (Vec<[f32; 2]>, Vec<bool>) {
         }
         let from = [c[0] - din[0] * into, c[1] - din[1] * into];
         let to = [c[0] + dout[0] * outof, c[1] + dout[1] * outof];
-        while out.len() > locked && dot2(sub2(*out.last().expect("one"), from), din) > -0.01 {
+        // (Only those about the corner, never the road before it.)
+        let reach = into + 3.0 * CORNER_SPAN;
+        while out.len() > locked
+            && dot2(sub2(*out.last().expect("one"), from), din) > -0.01
+            && dist(*out.last().expect("one"), c) <= reach
+        {
             out.pop();
             fixed.pop();
         }
@@ -8075,6 +8090,92 @@ fn park_out(w: &mut World, c: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A lane that goes a step past a road's end and back before it turns off (where one road's end
+    /// meets another) keeps the points it came up by: rounding the corner takes out only those
+    /// about it. (A work taxi's lane in Applewold, seed base 19: its corner's way in was the step
+    /// back, and the 130 m of road before it went, the taxi driving straight across the grass.)
+    #[test]
+    fn a_corner_after_a_step_back_keeps_the_road_before_it() {
+        let lane: Vec<[f32; 2]> = vec![
+            [497.8137, 250.62184],
+            [497.54294, 253.87134],
+            [497.3321, 257.02386],
+            [497.16132, 260.057],
+            [496.99088, 263.9974],
+            [496.8605, 267.95804],
+            [496.76022, 271.9087],
+            [496.70004, 275.87933],
+            [496.67, 279.84],
+            [496.68005, 283.81058],
+            [496.73013, 287.7659],
+            [496.81033, 291.7365],
+            [496.92065, 295.70712],
+            [497.07108, 299.6677],
+            [497.26132, 303.62296],
+            [497.48193, 307.5835],
+            [497.74265, 311.53442],
+            [498.03302, 315.4797],
+            [498.36392, 319.42072],
+            [498.73563, 323.38858],
+            [499.08685, 326.48978],
+            [499.4788, 329.6956],
+            [499.92017, 332.97583],
+            [500.40112, 336.3224],
+            [500.92294, 339.71445],
+            [501.46356, 343.12817],
+            [502.02515, 346.5478],
+            [502.60544, 349.93933],
+            [503.1968, 353.297],
+            [503.7874, 356.59033],
+            [504.37732, 359.80997],
+            [504.94775, 362.9223],
+            [505.50842, 365.92575],
+            [506.22787, 369.70285],
+            [506.879, 373.18875],
+            [507.59717, 377.03912],
+            [508.2756, 380.8303],
+            [508.36566, 381.36075],
+            [510.51163, 381.43753],
+            [509.77502, 378.2679],
+            [507.91922, 377.908],
+            [504.92474, 379.23447],
+            [501.34598, 380.8985],
+            [499.398, 381.86713],
+            [497.2816, 381.88196],
+            [498.27985, 382.7819],
+            [498.2299, 379.45593],
+            [498.17975, 376.0669],
+            [498.09973, 372.6471],
+            [498.01965, 369.19263],
+            [497.91953, 365.71832],
+            [497.8094, 362.2338],
+            [497.6894, 358.7538],
+            [497.55923, 355.2793],
+            [497.4192, 351.8189],
+            [497.279, 348.38397],
+            [497.12897, 344.98358],
+            [496.97894, 341.62277],
+            [496.82867, 338.31708],
+            [496.66885, 335.0712],
+            [496.50854, 331.89508],
+            [496.35873, 328.79837],
+            [496.1586, 324.8062],
+            [495.9585, 320.98364],
+            [495.76865, 317.3664],
+            [495.59875, 313.96884],
+            [495.39883, 310.06036],
+            [495.2389, 306.5716],
+            [495.08926, 303.00076],
+            [495.0692, 302.46964],
+        ];
+        let out = round_corners(&lane);
+        let gap = out
+            .windows(2)
+            .map(|w| crate::travel::dist(w[0], w[1]))
+            .fold(0.0f32, f32::max);
+        assert!(gap < 8.0, "a step of {gap} m");
+    }
 
     /// A body standing on the outside of a bend to the left reaches past the lane by the chord's
     /// sagitta (len² / 8R); on a straight, or on the inside of a bend to the right, by none.
