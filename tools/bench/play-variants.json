@@ -154,5 +154,19 @@
       "mid 8D877E": "house.cap:8D877E",
       "dark 5E5A56": "house.cap:5E5A56"
     }
+  },
+  "rooms": {
+    "poses": [
+      "day-home-13",
+      "day-east-16",
+      "day-north-13"
+    ],
+    "variants": {
+      "flat (before)": "house.floorWall:0;house.floorMid:1;house.floorWear:0;house.floorVary:0;house.wallFoot:0;house.wallCorner:0;house.wallVary:0",
+      "floors toned": "house.wallFoot:0;house.wallCorner:0;house.wallVary:0",
+      "walls toned": "house.floorWall:0;house.floorMid:1;house.floorWear:0;house.floorVary:0",
+      "both (as it is)": "",
+      "both, stronger": "house.floorWall:0.42;house.floorMid:0.85;house.wallFoot:0.32;house.wallCorner:0.3;house.wallVary:0.07;house.floorVary:0.08"
+    }
   }
 }

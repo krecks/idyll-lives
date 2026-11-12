@@ -37,6 +37,7 @@ import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
 import { roadIndex, townRoads } from './roads';
 import { tuned } from '../tune';
+import { smoothstep, valueNoise } from '../../game/noise';
 import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
 import { WALL_HALF, WALL_HEIGHT } from './walls';
 
@@ -207,7 +208,43 @@ const TRIM = '#F7F5F0';
  * cut wall shows of itself from the play camera: the wall's own section, a mid tone, where the trim's
  * off-white made every room's outline the brightest thing in the picture.
  */
-export const HOUSE_LOOK = tuned('house', { cap: '#8D877E' });
+export const HOUSE_LOOK = tuned('house', {
+  cap: '#8D877E',
+  /**
+   * A floor's tone over its room, by vertex (no texture, no read): `floorWall` darker at the foot of a wall
+   * (of the light it reflects), fading over `floorReach` m; `floorMid` the tone out in the room; lighter again,
+   * up to the covering's own colour, by `floorWear` within `floorWearReach` m of a door, where feet wear it
+   * pale; and `floorVary` lighter and darker in patches a few metres across.
+   */
+  floorWall: 0.38,
+  floorReach: 1.6,
+  floorMid: 0.87,
+  floorWear: 1,
+  floorWearReach: 1.7,
+  floorVary: 0.07,
+  /**
+   * A wall face's tone, by vertex: `wallFoot` darker at the floor, fading over `wallFootReach` m up it;
+   * `wallCorner` darker into a room's corner, over `wallCornerReach` m along it; `wallVary` in patches.
+   */
+  wallFoot: 0,
+  wallFootReach: 1.3,
+  wallCorner: 0,
+  wallCornerReach: 0.9,
+  wallVary: 0,
+});
+
+/** A tone (a share of the light reflected, linear) as the vertex colour's multiplier (sRGB). */
+function toneTint(lin: number): V3 {
+  const v = Math.pow(Math.min(1, Math.max(0, lin)), 1 / 2.2);
+  return [v, v, v];
+}
+
+/** The distance from `(px, pz)` to the segment `a`..`b`. */
+function segmentDistance(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+  const [dx, dz] = [bx - ax, bz - az];
+  const t = Math.min(1, Math.max(0, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz || 1)));
+  return Math.hypot(px - ax - dx * t, pz - az - dz * t);
+}
 const ROOM_WALLS: Record<RoomKind, string[]> = {
   living: ['#EFE3D3', '#E6DECF', '#EAE2D8', '#DCE3E6'],
   bedroom: ['#D8E2D0', '#DCD6E6', '#E6D4C8', '#D2DDE8'],
@@ -825,12 +862,46 @@ export class HousePlanner {
     };
 
     /**
+     * An indoor wall face's tone at height `y`, `corner` m along it from the room's nearest corner, at
+     * `(wx, wz)`: darker at the floor and into a corner, as less light reaches it there, and a little
+     * lighter and darker in patches, so a wall isn't one flat tone from end to end (`HOUSE_LOOK`).
+     */
+    const wallTone = (y: number, corner: number, wx: number, wz: number): V3 => {
+      const L = HOUSE_LOOK;
+      const foot = 1 - smoothstep(0, L.wallFootReach, y);
+      const into = 1 - smoothstep(0, L.wallCornerReach, corner);
+      const vary = (valueNoise(wx / 2.3 + y / 1.9, wz / 2.3 - y / 1.9, 613) - 0.5) * 2 * L.wallVary;
+      return toneTint((1 - L.wallFoot * foot) * (1 - L.wallCorner * into) * (1 - L.wallVary + vary));
+    };
+    /**
+     * A wall face `a0`..`a1` along, `y0`..`y1` high, toned by `tone` at its vertices: in rows up the wall
+     * (and two columns where a corner is near), so the tone runs smoothly over it.
+     */
+    const tonedFace = (g: Geo, P: (a: number, y: number) => V3, a0: number, a1: number, y0: number, y1: number, n: V3, tone: (a: number, y: number) => V3, split: boolean, uv?: (p: V3) => [number, number]) => {
+      const ys = [y0, ...[WALL_STUB, 0.8, 1.4].filter((y) => y > y0 + 0.01 && y < y1 - 0.01), y1];
+      const as = split && a1 - a0 > 0.3 ? [a0, (a0 + a1) / 2, a1] : [a0, a1];
+      for (let j = 0; j + 1 < ys.length; j++) {
+        for (let i = 0; i + 1 < as.length; i++) {
+          const c: [number, number][] = [[as[i], ys[j]], [as[i + 1], ys[j]], [as[i + 1], ys[j + 1]], [as[i], ys[j + 1]]];
+          const pts = c.map(([a, y]) => P(a, y));
+          g.poly(pts, n, uv && pts.map(uv), undefined, c.map(([a, y]) => tone(a, y)));
+        }
+      }
+    };
+
+    /**
      * One wall face (a rectangle on the plane of a wall side) from `a0` to `a1` along the
      * wall, `y0` to `y1` high. `n` is the outward normal; `r` the room that face looks into;
      * `key` names it in `surfaces`.
      */
     const face = (axis: 'h' | 'v', plane: number, a0: number, a1: number, y0: number, y1: number, n: V3, r: number, cover = 0, key?: string) => {
       const P = (a: number, y: number): V3 => (axis === 'h' ? [a, y, plane] : [plane, y, a]);
+      // The room's corners along this face: the nodes either end of its tile where a wall meets it on the room's side.
+      const k0 = Math.floor((a0 + a1) / 2 + 1e-6);
+      const meets = (k: number) => (axis === 'h' ? edges.get('v', k, Math.round(n[2] < 0 ? plane + T - 1 : plane - T)) : edges.get('h', Math.round(n[0] < 0 ? plane + T - 1 : plane - T), k)) !== undefined;
+      const corners = [k0, k0 + 1].filter(meets);
+      const tone = (a: number, y: number) => wallTone(y, corners.length ? Math.min(...corners.map((k) => Math.abs(a - k))) : 9, axis === 'h' ? a : plane, axis === 'h' ? plane : a);
+      const wall = (g: Geo, ya: number, yb: number) => tonedFace(g, P, a0, a1, ya, yb, n, tone, corners.length > 0);
       const own = coverGeo(cover);
       const mark = (y0: number, y1: number) => {
         const S = (a: number, y: number): V3 => (axis === 'h' ? [a, y, plane + n[2] * PROUD] : [plane + n[0] * PROUD, y, a]);
@@ -862,14 +933,14 @@ export class HousePlanner {
         return;
       }
       mark(y0, y1);
-      if (own) own.poly([P(a0, y0), P(a1, y0), P(a1, y1), P(a0, y1)], n);
+      if (own) wall(own, y0, y1);
       else {
         const tint = roomWall(r);
         const bath = kinds.get(r) === 'bath';
         // Bathrooms are tiled up to 1.25 m (only the part of this face below that).
         const split = bath ? Math.min(Math.max(1.25, y0), y1) : y0;
-        if (split > y0) wainscot.color('#F4F4F2').poly([P(a0, y0), P(a1, y0), P(a1, split), P(a0, split)], n);
-        if (y1 > split) int.color(tint).poly([P(a0, split), P(a1, split), P(a1, y1), P(a0, y1)], n);
+        if (split > y0) wall(wainscot.color('#F4F4F2'), y0, split);
+        if (y1 > split) wall(int.color(tint), split, y1);
       }
       if (y0 < 0.01) {
         trim.box(...span(axis, plane, n, a0, a1, 0, 0.1, 0.014));
@@ -1163,13 +1234,16 @@ export class HousePlanner {
         return;
       }
       mark(y0, y1);
-      if (own) f.face(own, a0, a1, y0, y1, dOff, sign);
+      // (Toned as a straight wall's face is, but for the corners.)
+      const wall = (g: Geo, ya: number, yb: number) =>
+        tonedFace(g, (a, y) => f.at(a, y, dOff), a0, a1, ya, yb, f.normal(sign), (a, y) => wallTone(y, 9, f.at(a, 0, dOff)[0], f.at(a, 0, dOff)[2]), false, (p) => [f.u(p), p[1]]);
+      if (own) wall(own, y0, y1);
       else {
         const tint = roomWall(r);
         const bath = kinds.get(r) === 'bath';
         const split = bath ? Math.min(Math.max(1.25, y0), y1) : y0;
-        if (split > y0) f.face(wainscot.color('#F4F4F2'), a0, a1, y0, split, dOff, sign);
-        if (y1 > split) f.face(int.color(tint), a0, a1, split, y1, dOff, sign);
+        if (split > y0) wall(wainscot.color('#F4F4F2'), y0, split);
+        if (y1 > split) wall(int.color(tint), split, y1);
       }
       if (y0 < 0.01) {
         f.box(trim, a0, a1, 0, 0.1, ...out(0.014), sign > 0 ? 'nd' : 'pd');
@@ -1370,6 +1444,42 @@ export class HousePlanner {
     const laid = new Map<number, number>();
     for (const [x, z, c] of world.floors ?? []) laid.set(z * W + x, c);
     const FINISH = { wood, whitewash, tile, carpet, stone: stoneFloor };
+    /**
+     * A floor's tone at a point (`HOUSE_LOOK`): darker at the foot of the walls, where less light reaches
+     * it and nobody walks, lighter out in the room, palest in and before a doorway, where feet wear it, and
+     * a little lighter and darker in patches a few metres across. (Kept per point: tiles share corners.)
+     */
+    const floorTones = new Map<number, V3>();
+    const floorTone = (px: number, pz: number): V3 => {
+      const key = Math.round(pz * 2) * (W * 2 + 3) + Math.round(px * 2);
+      let tone = floorTones.get(key);
+      if (tone) return tone;
+      const L = HOUSE_LOOK;
+      let [wall, door] = [9, 9];
+      const [tx, tz] = [Math.floor(px), Math.floor(pz)];
+      for (let ez = tz - 2; ez <= tz + 3; ez++) {
+        for (let ex = tx - 2; ex <= tx + 3; ex++) {
+          const [h, v, dg] = [edges.get('h', ex, ez), edges.get('v', ex, ez), diagonal(ex, ez)];
+          if (h === 'door') door = Math.min(door, segmentDistance(px, pz, ex + 0.2, ez, ex + 0.8, ez));
+          else if (h) wall = Math.min(wall, segmentDistance(px, pz, ex, ez, ex + 1, ez));
+          if (v === 'door') door = Math.min(door, segmentDistance(px, pz, ex, ez + 0.2, ex, ez + 0.8));
+          else if (v) wall = Math.min(wall, segmentDistance(px, pz, ex, ez, ex, ez + 1));
+          if (dg) {
+            const [a, b] = diagonalEnds(dg.axis, dg.x, dg.z);
+            const far = segmentDistance(px, pz, a[0], a[1], b[0], b[1]);
+            if (dg.kind === 'door') door = Math.min(door, far);
+            else wall = Math.min(wall, far);
+          }
+        }
+      }
+      const worn = (1 - smoothstep(0.2, L.floorWearReach, door)) * L.floorWear;
+      const foot = (1 - smoothstep(0, L.floorReach, wall)) * (1 - worn);
+      const vary = (valueNoise(px / 2.6, pz / 2.6, 577) - 0.5) * 2 * L.floorVary;
+      const mid = L.floorMid + (1 - L.floorMid) * worn;
+      tone = toneTint(mid * (1 - L.floorWall * foot) * (1 + vary * (1 - worn)));
+      floorTones.set(key, tone);
+      return tone;
+    };
     for (let z = bounds.z; z < bounds.z + bounds.d; z++) {
       for (let x = bounds.x; x < bounds.x + bounds.w; x++) {
         const r = room(x, z);
@@ -1386,10 +1496,8 @@ export class HousePlanner {
           // A triangle per indoor half of a split tile.
           for (const h of [0, 1] as const) {
             if (d.rooms[h] === 0) continue;
-            floorOf(d.rooms[h]).poly(
-              halfTriangle(d.axis, h).map(([fx, fz]) => [x + fx, 0.01, z + fz] as V3),
-              [0, 1, 0],
-            );
+            const tri = halfTriangle(d.axis, h).map(([fx, fz]) => [x + fx, 0.01, z + fz] as V3);
+            floorOf(d.rooms[h]).poly(tri, [0, 1, 0], undefined, undefined, tri.map((p) => floorTone(p[0], p[2])));
             surface(surfaces.floors, `${x}:${z}`).poly(
               halfTriangle(d.axis, h).map(([fx, fz]) => [x + fx, 0.01 + PROUD, z + fz] as V3),
               [0, 1, 0],
@@ -1397,7 +1505,12 @@ export class HousePlanner {
           }
           continue;
         }
-        floorOf(r).poly([[x, 0.01, z], [x + 1, 0.01, z], [x + 1, 0.01, z + 1], [x, 0.01, z + 1]], [0, 1, 0]);
+        // Four quads a tile, so the tone runs smoothly from the walls out into the room.
+        const g = floorOf(r);
+        for (const [hx, hz] of [[0, 0], [0.5, 0], [0, 0.5], [0.5, 0.5]]) {
+          const q: V3[] = [[x + hx, 0.01, z + hz], [x + hx + 0.5, 0.01, z + hz], [x + hx + 0.5, 0.01, z + hz + 0.5], [x + hx, 0.01, z + hz + 0.5]];
+          g.poly(q, [0, 1, 0], undefined, undefined, q.map((p) => floorTone(p[0], p[2])));
+        }
         const y = 0.01 + PROUD;
         surface(surfaces.floors, `${x}:${z}`).poly([[x, y, z], [x + 1, y, z], [x + 1, y, z + 1], [x, y, z + 1]], [0, 1, 0]);
       }
