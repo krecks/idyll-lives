@@ -944,7 +944,7 @@ export function decorPlants(decor: readonly [string, Decor][]): PlantPlacement[]
  * Splits the house builder's garden dressing (`model.tree` lot trees, `model.bush` foundation
  * shrubs; items are [x, z, scale, yaw]) into species. Lot trees mix oaks, maples, blossom, fruit,
  * birch, magnolia and Japanese maple, with fallen petals under the two in blossom; each house gets either a clipped hedge along its walls or a
- * mixed border of shrubs, hydrangeas, roses, lavender and clipped balls. Deterministic per position.
+ * mixed border of shrubs, hydrangeas, roses, lavender, clipped balls and beds of lupins and marigolds. Deterministic per position.
  */
 export function natureDecor(key: string, items: Decor, world?: WorldStructure, view?: { x: number; z: number; w: number; d: number } | null): [string, Decor][] {
   const out = new Map<string, Decor>();
@@ -976,9 +976,10 @@ export function natureDecor(key: string, items: Decor, world?: WorldStructure, v
         const alongX = Math.abs(x - Math.floor(x) - 0.5) < 0.05;
         put('model.hedge', [x, z, 0.95 + (s - 0.55) * 0.2, alongX ? 0 : Math.PI / 2]);
       } else {
-        // A mixed border: green shrubs with hydrangeas, roses, lavender and clipped balls among them.
+        // A mixed border: green shrubs with hydrangeas, roses, lavender and clipped balls among them, and a bed of
+        // lupins or marigolds here and there (the plain green shrub was three in ten of it, and most of what showed).
         const kind =
-          h < 0.3 ? 'model.bush' : h < 0.45 ? 'model.bush.flowering' : h < 0.55 ? 'model.bush.small' : h < 0.67 ? 'model.garden.hydrangea' : h < 0.78 ? 'model.garden.rosebush' : h < 0.89 ? 'model.garden.lavender' : 'model.garden.boxwood';
+          h < 0.18 ? 'model.bush' : h < 0.31 ? 'model.bush.flowering' : h < 0.4 ? 'model.bush.small' : h < 0.52 ? 'model.garden.hydrangea' : h < 0.63 ? 'model.garden.rosebush' : h < 0.73 ? 'model.garden.lavender' : h < 0.81 ? 'model.garden.boxwood' : h < 0.91 ? 'model.garden.lupins' : 'model.garden.marigolds';
         put(kind, [x, z, s * (kind.startsWith('model.garden') ? 1.25 : 1.1), item[3]]);
       }
     }
