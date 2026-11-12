@@ -10,9 +10,8 @@
 //! Timing depends on the machine, so it is opt-in and prints its numbers:
 //! `cargo test --release -p sim-core --test big_world -- --ignored --nocapture`
 //! with `SIZE=1024` (default 256), `RESIDENTS=160` (default: as many as a town holds) and
-//! `HOURS=6` (game hours to run, default 4) in the environment. The world is a `big` town with
-//! roads and areas; `OPEN=0` makes it one without them (a cosy town, as the first
-//! baseline was measured on).
+//! `HOURS=6` (game hours to run, default 4) in the environment. The world is a town with roads and
+//! areas; `OPEN=0` makes it one without them (as the first baseline was measured on).
 
 #[path = "sim/common/mod.rs"]
 mod common;

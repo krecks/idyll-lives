@@ -155,7 +155,7 @@ fn generated_houses_are_livable() {
                 .find(|o| is(&w.content.objects[o.def]))
                 .map(|o| w.lot.room_at(o.x, o.z))
         };
-        let bed = room_of(&|d| d.interactions.iter().any(|i| i.id == "sleep"));
+        let bed = room_of(&|d| d.interactions.iter().any(|i| i.id == "sleep" && !i.spare));
         let (fridge, toilet) = (
             room_of(&|d| d.id == "fridge"),
             room_of(&|d| d.id == "toilet"),
@@ -189,6 +189,7 @@ fn generated_houses_are_livable() {
             lot: &w.lot,
             blocked: w.blocked(),
             stairs: w.stair_map(),
+            kept_off: &[],
         };
         let start = (entry[0].floor() as i32, entry[1].floor() as i32);
         let mut seated = 0;

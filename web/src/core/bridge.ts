@@ -172,6 +172,7 @@ export class SimBridge {
     this.maxAlpha = maxAlpha(this.stepMs);
     tickRates.ticksPerSecond = layout.ticksPerSecond;
     tickRates.ticksPerMinute = layout.ticksPerMinute;
+    tickRates.driveScale = layout.driveScale;
     this.reader = shared ? new SharedSnapshotReader(shared, layout.capacity) : null;
     this.prev2 = new Float32Array(layout.capacity);
     this.prev = new Float32Array(layout.capacity);

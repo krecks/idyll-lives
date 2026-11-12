@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::clock;
+use crate::content::StageMask;
 use crate::social::{self, EventKind, Kin};
 use crate::world::{GoneWhy, Household, World};
 
@@ -68,7 +69,7 @@ pub(crate) fn update(w: &mut World) {
     }
     // (None: nobody ages, so nobody reaches the retirement age or dies of old age.)
     let days_per_year = w.lifespan.days_per_year(w.content.life.days_per_year);
-    let mut out_of_cribs = Vec::new();
+    let mut grew = Vec::new();
     let mut reached_retirement = Vec::new();
     for i in 0..w.sims.len() {
         let Some(days_per_year) = days_per_year else {
@@ -128,15 +129,16 @@ pub(crate) fn update(w: &mut World) {
             for o in &mut w.objects {
                 o.release(i as u32);
             }
-            out_of_cribs.push(i);
         }
+        grew.push(i);
         w.refresh_base_mods(i);
         w.structure_version = w.structure_version.wrapping_add(1);
         w.events
             .push_detail(w.tick, EventKind::GrewOlder, i, Some(stage as i64), None);
     }
-    for i in out_of_cribs {
-        bed_for_child(w, i);
+    // (Out of the crib, or into a stage their bed isn't for.)
+    for i in grew {
+        bed_for(w, i);
     }
     for i in 0..w.sims.len() {
         if w.sims[i].here() {
@@ -242,32 +244,88 @@ fn sleepers(w: &World, h: usize) -> Vec<usize> {
 /// Bed places in the home on `plot`, broken ones too (whoever lives there fixes them; a house
 /// whose only bed broke while empty would otherwise never be lived in again): one for each bed
 /// and each bunk of a bed for two apart, and the couple's beds (a double bed: somewhere to try
-/// for a baby, `privacy::couples_bed`), whose other half is only a partner's.
-#[derive(Clone, Copy)]
+/// for a baby, `privacy::couples_bed`), whose other half is only a partner's. Each place is for
+/// the life stages its bed is for (content `stages`: the race car bed is a child's). A spare bed
+/// opened out for the night (`Interaction::spare` and `leaves` open: the sofa bed pulled out) is a
+/// place; a night on the sofa isn't.
 struct Beds {
-    /// A place for anyone: a bed, a bunk, or a couple's bed slept in alone.
-    places: usize,
-    /// Couple's beds, each a place more for a couple.
-    couples: usize,
+    /// A place each, and the stages that may sleep there: a bed, a bunk, or a couple's bed slept
+    /// in alone.
+    places: Vec<StageMask>,
+    /// Couple's beds' other halves, each a place more for a couple.
+    couples: Vec<StageMask>,
 }
 
 impl Beds {
-    /// Places for `pairs` couples and everyone else on their own.
-    fn for_pairs(self, pairs: usize) -> usize {
-        self.places + self.couples.min(pairs)
+    /// Which of the sleepers of life stages `stages` have no place here (indices into it), with
+    /// `pairs` couples among them: each takes a place their stage may sleep in, those with the
+    /// fewest to choose from first and the place for the fewest stages first; then a couple's
+    /// bed's other half for each couple.
+    fn unplaced(&self, stages: &[usize], pairs: usize) -> Vec<usize> {
+        let fits = |mask: StageMask, s: usize| crate::content::stage_in(mask, s);
+        let mut places = self.places.clone();
+        places.sort_by_key(|m| m.count_ones());
+        let mut order: Vec<usize> = (0..stages.len()).collect();
+        order.sort_by_key(|&k| places.iter().filter(|&&m| fits(m, stages[k])).count());
+        let mut taken = vec![false; places.len()];
+        let mut out = Vec::new();
+        for k in order {
+            match (0..places.len()).find(|&p| !taken[p] && fits(places[p], stages[k])) {
+                Some(p) => taken[p] = true,
+                None => out.push(k),
+            }
+        }
+        let mut halves = self.couples.clone();
+        let mut pairs = pairs;
+        out.retain(|&k| {
+            let half = halves.iter().position(|&m| fits(m, stages[k]));
+            match half.filter(|_| pairs > 0) {
+                Some(h) => {
+                    halves.swap_remove(h);
+                    pairs -= 1;
+                    false
+                }
+                None => true,
+            }
+        });
+        out.sort_unstable();
+        out
     }
 
-    /// The most who could sleep here: couples in every couple's bed.
-    fn most(self) -> usize {
-        self.places + self.couples
+    /// How many of `stages` have a place here, with `pairs` couples among them.
+    fn placed(&self, stages: &[usize], pairs: usize) -> usize {
+        stages.len() - self.unplaced(stages, pairs).len()
+    }
+
+    /// The most of life stage `stage` who could sleep here: couples in every couple's bed.
+    fn most(&self, stage: usize) -> usize {
+        let fits = |m: &&StageMask| crate::content::stage_in(**m, stage);
+        self.places.iter().filter(fits).count() + self.couples.iter().filter(fits).count()
     }
 }
 
+/// The stages a bed of kind `def` is for (its night's sleep, content `stages`); None: no bed (no
+/// night's sleep, or only a baby's; a spare bed's only if `spare` and it opens out into a bed for
+/// the night, the sofa bed pulled out, not a night curled up on the sofa).
+fn bed_stages(
+    content: &crate::content::Content,
+    def: &crate::content::ObjectDef,
+    spare: bool,
+) -> Option<StageMask> {
+    let sleep = content.day_rhythm.sleep_tags;
+    def.interactions
+        .iter()
+        .filter(|it| {
+            it.tags & sleep != 0 && !it.baby && (!it.spare || (spare && it.leaves == Some(true)))
+        })
+        .map(|it| it.stages)
+        .reduce(|a, b| a | b)
+}
+
 fn beds(w: &World, plot: u32) -> Beds {
-    let sleep = w.content.day_rhythm.sleep_tags;
     let mut beds = Beds {
-        places: 0,
-        couples: 0,
+        places: Vec::new(),
+        couples: Vec::new(),
     };
     for (o, _) in w
         .objects
@@ -276,17 +334,36 @@ fn beds(w: &World, plot: u32) -> Beds {
         .filter(|(_, p)| **p == Some(plot))
     {
         let def = &w.content.objects[o.def];
-        if !def.interactions.iter().any(|it| it.tags & sleep != 0) {
+        let Some(stages) = bed_stages(&w.content, def, true) else {
             continue;
-        }
+        };
         if crate::privacy::couples_bed(def) {
-            beds.places += 1;
-            beds.couples += usize::from(def.slots) - 1;
+            beds.places.push(stages);
+            beds.couples
+                .extend(std::iter::repeat_n(stages, usize::from(def.slots) - 1));
         } else {
-            beds.places += usize::from(def.slots);
+            beds.places
+                .extend(std::iter::repeat_n(stages, usize::from(def.slots)));
         }
     }
     beds
+}
+
+/// The life stage of `sims`, each.
+fn stages_of(w: &World, sims: &[usize]) -> Vec<usize> {
+    sims.iter()
+        .map(|&i| w.content.life.stage(w.sims[i].age))
+        .collect()
+}
+
+/// The first grown-up life stage (whoever moves in is one).
+fn grown_stage(w: &World) -> usize {
+    w.content
+        .life
+        .stages
+        .iter()
+        .position(|s| s.adult)
+        .unwrap_or(0)
 }
 
 /// Couples among `sims` (both of them in it).
@@ -307,8 +384,13 @@ fn has_room_for_partner(w: &World, h: usize) -> bool {
         return false;
     };
     let members = members(w, h);
-    let n = members.len() + 1;
-    n <= w.content.rules.max_household && beds(w, plot).for_pairs(pairs(w, &members) + 1) >= n
+    let sleepers = sleepers(w, h);
+    let mut stages = stages_of(w, &sleepers);
+    stages.push(grown_stage(w));
+    members.len() < w.content.rules.max_household
+        && beds(w, plot)
+            .unplaced(&stages, pairs(w, &sleepers) + 1)
+            .is_empty()
 }
 
 /// Whether a resident's household lets them move on their own (the player can say no). Being
@@ -334,7 +416,7 @@ fn vacant_plot(w: &World, n: usize) -> Option<u32> {
                 .enumerate()
                 .any(|(h, hh)| hh.plot == Some(p.id) && (hh.player || !members(w, h).is_empty()))
         })
-        .find(|p| beds(w, p.id).for_pairs(n / 2) >= n)
+        .find(|p| beds(w, p.id).placed(&vec![grown_stage(w); n], n / 2) >= n)
         .map(|p| p.id)
 }
 
@@ -494,7 +576,7 @@ fn moving(w: &mut World, rules: &crate::content::MovingRules) {
 fn newcomers(w: &mut World, rules: &crate::content::NewcomerRules) {
     for p in 0..w.plots.len() as u32 {
         if w.plots[p as usize].public
-            || beds(w, p).most() == 0
+            || beds(w, p).most(grown_stage(w)) == 0
             || w.households
                 .iter()
                 .enumerate()
@@ -520,15 +602,18 @@ fn pick<'a, T>(rng: &mut crate::rng::Rng, list: &'a [T]) -> Option<&'a T> {
 pub fn arrive(w: &mut World, plot: u32) -> bool {
     let content = &w.content;
     let beds = beds(w, plot);
-    let most = beds.most().min(content.rules.max_household).max(1);
+    let grown = grown_stage(w);
+    let most = beds.most(grown).min(content.rules.max_household).max(1);
     let here = w.sims.iter().filter(|s| s.here()).count();
-    let cap = w.population_cap();
+    let cap = crate::world::MAX_SIMS;
     if here >= cap || content.genders.is_empty() {
         return false;
     }
     let size = (1 + (w.rng.next_u32() as usize) % most).min(cap - here);
     let couple = size >= 2 && w.rng.next_f32() < 0.6;
-    let size = size.min(beds.for_pairs(usize::from(couple))).max(1);
+    let size = size
+        .min(beds.placed(&vec![grown; size], usize::from(couple)))
+        .max(1);
     // Everyone who moves in is grown up (the first stages are a baby's and a child's).
     let adult = content
         .life
@@ -735,10 +820,12 @@ pub(crate) fn cribs_for_babies(w: &mut World, h: usize) {
     }
 }
 
-/// The player's household starts in a home with fewer bed places than people past the crib:
-/// tell them once, for each resident without a bed (on the game's first step, so it's news to the
-/// view, not the story so far). The simulation's fallback is unchanged: they share a bed (only a partner, in a couple's bed) or sleep
-/// on the floor until the player buys one.
+/// The player's household starts in a home with fewer bed places than people past the crib (a
+/// bed their age may sleep in: the race car bed is no teenager's): tell them once, for each
+/// resident without a bed (on the game's first step, so it's news to the view, not the story so
+/// far). The simulation's fallback is unchanged: they sleep on the sofa (`Interaction::spare`),
+/// share a bed (only a partner, in a couple's bed, or a child with a parent whose partner is out)
+/// or sleep on the floor until the player buys one.
 pub(crate) fn notify_missing_beds(w: &mut World, h: usize) {
     let sleep = w.content.day_rhythm.sleep_tags;
     if sleep == 0 || !w.households[h].player {
@@ -748,47 +835,76 @@ pub(crate) fn notify_missing_beds(w: &mut World, h: usize) {
         return;
     };
     let sleepers = sleepers(w, h);
-    for &i in sleepers
-        .iter()
-        .skip(beds(w, plot).for_pairs(pairs(w, &sleepers)))
-    {
+    let stages = stages_of(w, &sleepers);
+    for k in beds(w, plot).unplaced(&stages, pairs(w, &sleepers)) {
+        let i = sleepers[k];
         w.events.push(w.tick, EventKind::NoBed, i, i, None);
     }
 }
 
-/// Child `i` is out of the crib (or came to live here past it) and needs a bed: with fewer bed
-/// places at home than people past the crib, a household the player doesn't play buys one (the
-/// cheapest, at the first good free spot, like `cribs_for_babies`) if that leaves a week's rent
-/// and bills, like the planner's purchases; the player's is told (`EventKind::NoBed`) and buys
-/// its own.
-pub(crate) fn bed_for_child(w: &mut World, i: usize) {
+/// Resident `i` is out of the crib, came to live here past it, or grew into a life stage (their
+/// bed may not be for it: the race car bed is a child's): with fewer bed places at home than
+/// people past the crib (`Beds::unplaced`), a household the player doesn't play buys one: the
+/// cheapest bed for the stage of whoever has none and every stage after it, at the first good free spot, like `cribs_for_babies`, if
+/// that leaves a week's rent and bills, like the planner's purchases; a bed nobody at home may
+/// sleep in any more is sold, to make room for it where it stood. The player's household is told,
+/// if it's `i` who has none (`EventKind::NoBed`), and buys its own.
+pub(crate) fn bed_for(w: &mut World, i: usize) {
     let h = w.sims[i].household as usize;
     let sleep = w.content.day_rhythm.sleep_tags;
     let Some(plot) = w.households[h].plot.filter(|_| sleep != 0) else {
         return;
     };
-    let sleepers = sleepers(w, h);
-    if beds(w, plot).for_pairs(pairs(w, &sleepers)) >= sleepers.len() {
+    // (Them last: of those with as many places to choose from, they're the one without.)
+    let mut sleepers = sleepers(w, h);
+    sleepers.retain(|&j| j != i);
+    sleepers.push(i);
+    let stages = stages_of(w, &sleepers);
+    let short = beds(w, plot).unplaced(&stages, pairs(w, &sleepers));
+    let Some(&k) = short.last() else {
         return;
-    }
+    };
+    let who = sleepers[k];
     if w.households[h].player {
-        w.events.push(w.tick, EventKind::NoBed, i, i, None);
+        if who == i {
+            w.events.push(w.tick, EventKind::NoBed, i, i, None);
+        }
         return;
     }
+    let stage = w.content.life.stage(w.sims[who].age);
+    let later =
+        (stage..w.content.life.stages.len().max(stage + 1)).fold(0, |m: StageMask, s| m | 1 << s);
     let bed = (0..w.content.objects.len())
         .filter(|&d| {
-            w.content.objects[d]
-                .interactions
-                .iter()
-                .any(|it| it.tags & sleep != 0 && !it.baby && !it.spare)
+            bed_stages(&w.content, &w.content.objects[d], false).is_some_and(|m| m & later == later)
         })
         .filter_map(|d| w.content.objects[d].price.map(|p| (p, d)))
         .min();
     let reserve = crate::life::weekly_costs(w, h).map_or(0, |(rent, bills)| rent + bills);
-    if let Some((price, bed)) = bed
-        && w.households[h].funds - w.build_price(price) >= reserve
-        && w.deliver(h as u32, bed).is_some()
-    {
+    let Some((price, bed)) = bed else {
+        return;
+    };
+    if w.households[h].funds - w.build_price(price) < reserve {
+        return;
+    }
+    // Beds at home nobody of the household may sleep in now (outgrown: whoever lies in one
+    // tonight gets up, and goes to bed again in the new one).
+    let outgrown: Vec<u32> = w
+        .objects
+        .iter()
+        .zip(&w.object_plot)
+        .filter(|(_, p)| **p == Some(plot))
+        .filter(|(o, _)| {
+            bed_stages(&w.content, &w.content.objects[o.def], false)
+                .is_some_and(|m| !stages.iter().any(|&s| crate::content::stage_in(m, s)))
+        })
+        .map(|(o, _)| o.id)
+        .collect();
+    // (Highest id first: selling one moves the ids after it.)
+    for &o in outgrown.iter().rev() {
+        let _ = w.sell(h as u32, o);
+    }
+    if w.deliver(h as u32, bed).is_some() {
         w.pay(h, price);
     }
 }
@@ -825,7 +941,7 @@ pub(crate) fn conceive(w: &mut World, a: usize, b: usize) {
 /// Room in household `h` for one more (and in the town).
 pub(crate) fn room_for_one(w: &World, h: usize) -> bool {
     members(w, h).len() < w.content.rules.max_household
-        && w.sims.iter().filter(|s| s.here()).count() < w.population_cap()
+        && w.sims.iter().filter(|s| s.here()).count() < crate::world::MAX_SIMS
 }
 
 /// At midnight: babies who are due are born (returned).
@@ -906,7 +1022,7 @@ pub fn adopt(w: &mut World, household: u32, child: bool) -> Result<u32, crate::E
         parents.get(1).copied(),
     );
     if !w.content.life.baby(age) {
-        bed_for_child(w, id);
+        bed_for(w, id);
     }
     Ok(id as u32)
 }

@@ -399,8 +399,8 @@ export interface RoadPlan {
 /** `street` (default) · `lane` · `country` (between areas) · `trail` (2 m, on foot only). */
 export type RoadKind = 'street' | 'lane' | 'country' | 'trail';
 
-/** How big a world is (docs/design/open-world.md); towns without one are `cosy`. */
-export type WorldSize = 'cosy' | 'normal' | 'big';
+/** How big a world is: every world is a Big one (cosy and normal were dropped in 0.7.1; a save that still says so reads as `big`). */
+export type WorldSize = 'big';
 
 /** Run-length mask over the ground grid, row-major from tile (0, 0): `[run, value(0|1), run, value, ...]`. */
 export type Rle = number[];
@@ -471,7 +471,7 @@ export interface WorldMeta {
 /** The world a town stands in (`game/world.ts`): its kind, its land, and farm fields in town. */
 export interface WorldLook {
   kind: string;
-  /** How big the world is (missing: `cosy`). */
+  /** How big the world is (always `big` now). */
   size?: WorldSize;
   landscape: LandscapeParams;
   /** Tilled fields on farm lots (town tiles): drawn as soil, fenced in. */
@@ -631,7 +631,48 @@ export interface WorldStructure {
    * head rows' order): the kerbside furniture keeps clear of them. Absent: none.
    */
   lightPoles?: [number, number, number][];
+  /**
+   * Every junction where three or more roads for cars meet (sim-core `traffic::Signal`, in the
+   * snapshot's signal head rows' order), for its pad and markings. Absent: none.
+   */
+  junctions?: JunctionInfo[];
 }
+
+/**
+ * A junction (`WorldStructure.junctions`, sim-core `traffic::Signal`): its node's middle (m), and
+ * its arms. `roundabout`: a node on a roundabout's ring (the renderer leaves out its pad and
+ * markings; its lights work as before, an arm at a time).
+ */
+export interface JunctionInfo {
+  x: number;
+  z: number;
+  roundabout?: true;
+  arms: JunctionArmInfo[];
+}
+
+/**
+ * A junction's arm (sim-core `traffic::SignalArm`). Distances are m out from the junction's middle
+ * along `dir`: the crosswalk from `walkFrom` (the corner, where the kerb's return round from the
+ * next arm ends, about `traffic::KERB_RETURN` = 3 m in radius, or the box's edge) to `walkTo`
+ * (`traffic::CROSSWALK` = 3 m on), and the stop line at `stop` (`traffic::STOP_GAP` = 0.5 m past
+ * it): cars on red stop with their noses there.
+ */
+export interface JunctionArmInfo {
+  /** The arm's road (`meta.roads` index). */
+  road: number;
+  /** The way out along the arm from the middle (a unit vector: x, z). */
+  dir: [number, number];
+  /** The road's carriageway, kerb to kerb (m). */
+  width: number;
+  walkFrom: number;
+  walkTo: number;
+  stop: number;
+  /** Its signal head's row in the snapshot (`SnapshotLayout.light`); null: not lit. */
+  light: number | null;
+}
+
+/** A junction, as the renderer's pads and markings take it (`render/shared/junctions.ts`). */
+export type Junction = JunctionInfo;
 
 /**
  * A lane cars pull over on (`WorldStructure.pullOverStreets`): the town's road (`meta.roads`

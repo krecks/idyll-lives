@@ -18,8 +18,18 @@ import { blob, Painter } from '../shared/street';
 
 /** Vehicles further than this from the camera's target aren't drawn (m): past the fog, a dot at most. */
 const FAR = 650;
-/** Further than this in a frame (m), a vehicle was put there (a load, back into town), not driven: its wheels don't turn for it. */
+/**
+ * Further than this in a frame (m), a vehicle was put there (a load, back into town), not driven: its wheels don't
+ * turn for it. At least `JUMP`; at speed, as far as `FASTEST` m a second of drive time goes in the frame (the layout's
+ * `driveScale` times the game speed's playback rate, `jumpOver`).
+ */
 const JUMP = 10;
+const FASTEST = 30;
+
+/** `JUMP` for a frame `real` seconds long, `drive` seconds of drive time a real second (`driveScale` × playback rate). */
+export function jumpOver(real: number, drive: number): number {
+  return Math.max(JUMP, FASTEST * drive * real);
+}
 /** Height of the body and wheels over the ground (as the street's `paintCar`). */
 export const LIFT = 0.015;
 
@@ -52,14 +62,14 @@ export interface Steering {
 }
 
 /**
- * A vehicle moved from `last` to `at` in `real` seconds: its wheels turn by the way it went, the
- * front ones steer by how it turned. The way it went along itself (m), or null when it was put
- * there (further than `JUMP`).
+ * A vehicle moved from `last` to `at` in `real` seconds (`drive` seconds of drive time each: `jumpOver`): its wheels
+ * turn by the way it went, the front ones steer by how it turned. The way it went along itself (m), or null when it
+ * was put there (further than `jumpOver`).
  */
-export function rollWheels(v: Rolling, at: Spot, last: Pick<Spot, 'x' | 'z' | 'yaw'>, wheelR: number, wheelBase: number, steer: Steering, real: number): number | null {
+export function rollWheels(v: Rolling, at: Spot, last: Pick<Spot, 'x' | 'z' | 'yaw'>, wheelR: number, wheelBase: number, steer: Steering, real: number, drive = 1): number | null {
   const dx = at.x - last.x;
   const dz = at.z - last.z;
-  if (Math.hypot(dx, dz) > JUMP) return null;
+  if (Math.hypot(dx, dz) > jumpOver(real, drive)) return null;
   const along = dx * Math.sin(at.yaw) + dz * Math.cos(at.yaw);
   v.spin = (v.spin + along / wheelR) % (Math.PI * 2);
   // Turning by `turn` over `along` metres: a circle the front wheels steer round (a bicycle's, the wheelbase long).

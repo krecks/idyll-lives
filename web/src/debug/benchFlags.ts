@@ -10,6 +10,8 @@
  * without tone mapping, exposure or grading: the light compared without the image processing.
  */
 
+import { isResolution, type Resolution } from '../render/shared/resolution';
+
 export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still' | 'roam';
 
 export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders'] as const;
@@ -27,8 +29,8 @@ export interface BenchFlags {
   /** `?hour=`: the lighting held at that hour (the renderer reads it itself); null: the game's clock. */
   hour: number | null;
   cam: BenchCamera;
-  /** Render scale: 0.5..1, or `auto` (the player's resolution setting). */
-  res: number | 'auto';
+  /** Resolution (`render/shared/resolution.ts`): 720, 1080, 1440 or 2160, or `auto` (the player's setting); `1`, the old full scale, is 2160 (every line the window has). */
+  res: Resolution | 'auto';
   /** Seconds measured, after `warmup` seconds of the same camera path. */
   secs: number;
   warmup: number;
@@ -79,7 +81,7 @@ function parse(): BenchFlags | null {
     quality: quality === 'low' || quality === 'medium' || quality === 'high' ? quality : null,
     hour: params.has('hour') && Number.isFinite(Number(params.get('hour'))) ? Number(params.get('hour')) : null,
     cam: camera,
-    res: res === 'auto' || res === null ? 'auto' : num('res', 1, 0.5, 1),
+    res: res === 'auto' || res === null ? 'auto' : res === '1' ? 2160 : isResolution(Number(res)) ? (Number(res) as Resolution) : 'auto',
     secs: num('secs', 20, 0, 600),
     warmup: num('warmup', 5, 0, 120),
     cap: num('cap', 0, 0, 1000),

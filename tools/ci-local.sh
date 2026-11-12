@@ -51,12 +51,11 @@ step() {
       # step's own.)
       trap "rm -rf '$out'" EXIT
       "${bun_ci[@]}" tools/housegen/sample.ts "$out/houses.json"
-      # Cosy and Normal worlds three per kind, Big ones (up to 1024 m) one per kind in a file of their own.
+      # Worlds three per kind (every one Big), the same seed base making the same worlds.
       local base=${SEED_BASE:-0}
       echo "Sample worlds of seed base $base."
-      "${bun_ci[@]}" tools/worlds/sample.ts "$out/worlds.json" 3 --sizes cosy,normal,big --big-per-kind 1 --big-out "$out/worlds-big.json" --seed-base "$base"
-      if ! HOUSES="$out/houses.json" WORLDS="$out/worlds.json" cargo test -p sim-core --locked --test sim -- --ignored generated_houses:: generated_worlds:: ||
-        ! WORLDS="$out/worlds-big.json" cargo test -p sim-core --locked --test sim -- --ignored generated_worlds::; then
+      "${bun_ci[@]}" tools/worlds/sample.ts "$out/worlds.json" 3 --seed-base "$base"
+      if ! HOUSES="$out/houses.json" WORLDS="$out/worlds.json" cargo test -p sim-core --locked --test sim -- --ignored generated_houses:: generated_worlds::; then
         echo "The generated-world checks failed on seed base $base (again: SEED_BASE=$base tools/ci-local.sh generated)." >&2
         exit 1
       fi

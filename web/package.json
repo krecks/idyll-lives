@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint src",
-    "test": "bun test --isolate tests",
+    "test": "bun test --parallel tests",
     "test:sim": "cd .. && cargo test -p sim-core",
     "voice": "bun run voice:wasm && cd .. && cargo fetch-voice",
     "voice:wasm": "cd .. && cargo build -p voice-wasm --target wasm32-unknown-unknown --release --locked && wasm-bindgen target/wasm32-unknown-unknown/release/voice_wasm.wasm --target web --out-dir web/src/voice/wasm-pkg",
@@ -41,16 +41,16 @@
     "@tsconfig/svelte": "^5.0.8",
     "binaryen": "132.0.0",
     "bun-types": "^1.4.4",
-    "eslint": "^10.13.0",
-    "eslint-plugin-svelte": "^3.23.1",
+    "eslint": "^10.14.0",
+    "eslint-plugin-svelte": "^3.24.1",
     "ktx2-encoder": "0.6.0",
     "sharp": "^0.35.5",
     "svelte": "^5.57.3",
-    "svelte-check": "^4.7.7",
-    "svelte-eslint-parser": "^1.10.0",
+    "svelte-check": "^4.7.8",
+    "svelte-eslint-parser": "^1.10.1",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.1",
-    "vite": "^8.3.5"
+    "typescript-eslint": "^8.72.2",
+    "vite": "^8.3.7"
   },
   "packageManager": "bun@1.4.4"
 }

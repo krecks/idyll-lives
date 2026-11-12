@@ -246,7 +246,8 @@ pub fn shift_today(
     Some((leave, start, start + ticks(level.hours * 60.0)))
 }
 
-fn ticks(minutes: f32) -> u64 {
+/// Game minutes as ticks (rounded down).
+pub(crate) fn ticks(minutes: f32) -> u64 {
     (minutes * crate::TICKS_PER_MINUTE as f32) as u64
 }
 
@@ -302,7 +303,6 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
     // the walk from there looks.
     let sim = &w.sims[i];
     if let Some(c) = sim.commute
-        && w.travel.open
         && !heading_out(sim)
         && let Some(&exit) = w.exits.get(c.exit)
     {
@@ -319,7 +319,7 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
         };
         let speed = bike
             .and_then(|o| w.content.objects[w.objects.get(o as usize)?.def].vehicle)
-            .map_or(1.0, |v| v.speed);
+            .map_or(1.0, |v| v.pace);
         let walk = sim.walk_per_minute(&w.content) * speed;
         // (From over the ground: a commute timed from bed upstairs had them setting off for
         // work in the middle of the night.)
@@ -373,10 +373,10 @@ fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 
     planned
 }
 
-/// The longest ride out of town on a bike or e-scooter (game minutes: a bike's 4.5 m a real second
-/// is about 5.6 m a game minute, so some 500 m of street; a big world's far roads out took over
-/// three hours): longer, the way is ridden in the work taxi or walked (`refresh_commute`), and
-/// nobody rides two hours in town.
+/// The longest ride out of town on a bike or e-scooter (game minutes: a bike's 4.5 m a second, on
+/// the traffic's clock (`crate::DRIVE_SCALE`), is about 22 m a game minute, so some 2 km of
+/// street, across a big world): longer, the way is ridden in the work taxi or walked
+/// (`refresh_commute`), and nobody rides two hours in town.
 const BIKE_MOST: f32 = 90.0;
 
 /// Minutes added to the walk from the front door for getting out of the house to it, and a
@@ -409,7 +409,7 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
     let commutes = sim.job.is_some()
         || w.content.life.school.is_some()
             && w.content.life.stage_at(sim.age).is_some_and(|s| s.school);
-    if !w.travel.open || w.exits.is_empty() || !commutes {
+    if w.exits.is_empty() || !commutes {
         w.sims[i].commute = None;
         return;
     }
@@ -729,10 +729,9 @@ fn schedule_school(w: &mut World, i: usize, day: u32) {
     // kerb (`taxi::leave_at`).
     let leave = match crate::cars::lead_ticks(w, i, start) {
         0 => leave,
-        // (In an open-world town, by the drive's time, not the walk's: a way out on foot of hours
-        // had drivers off in the night.)
-        lead if w.travel.open => start.saturating_sub(lead),
-        lead => leave.min(start.saturating_sub(lead)),
+        // (By the drive's time, not the walk's: a way out on foot of hours had drivers off in the
+        // night.)
+        lead => start.saturating_sub(lead),
     };
     let by_taxi = crate::taxi::leave_at(w, i);
     let leave = by_taxi.unwrap_or(leave);
@@ -780,10 +779,9 @@ fn schedule_work(w: &mut World, i: usize, day: u32) {
     // kerb (`taxi::leave_at`).
     let leave = match crate::cars::lead_ticks(w, i, start) {
         0 => leave,
-        // (In an open-world town, by the drive's time, not the walk's: a way out on foot of hours
-        // had drivers off in the night.)
-        lead if w.travel.open => start.saturating_sub(lead),
-        lead => leave.min(start.saturating_sub(lead)),
+        // (By the drive's time, not the walk's: a way out on foot of hours had drivers off in the
+        // night.)
+        lead => start.saturating_sub(lead),
     };
     let by_taxi = crate::taxi::leave_at(w, i);
     let leave = by_taxi.unwrap_or(leave);
@@ -1152,15 +1150,10 @@ pub(crate) fn start_taxi_shift(w: &mut World, i: usize, rest: u64) {
     start_shift(w, i, rest);
 }
 
-/// What's left of the way to work once they're off (`start_shift`), as their way was timed: in
-/// an open-world town the part off the map (`cars::off_map_ticks`) and, before it, `out` (the
-/// drive out of town). A cosy town's way is all before work starts, as ever.
+/// What's left of the way to work once they're off (`start_shift`), as their way was timed: the
+/// part off the map (`cars::off_map_ticks`) and, before it, `out` (the drive out of town).
 fn still_to_go(w: &World, out: u64) -> u64 {
-    if w.travel.open {
-        out + crate::cars::off_map_ticks(w)
-    } else {
-        0
-    }
+    out + crate::cars::off_map_ticks(w)
 }
 
 fn apply_transition(w: &mut World, i: usize, transition: Transition) {
@@ -2239,13 +2232,14 @@ mod tests {
         );
     }
 
-    /// Friends are visited only where the walk isn't one of hours: the one next door, not the
-    /// one at the far end of a long street (`world::visit_fits`).
+    /// Friends are visited only where the way isn't one of hours: the one next door, not the
+    /// one at the far end of a long street (`world::visit_fits`), most of a kilometre off (a third
+    /// of that, the taxi takes them: `taxi::leisure_eta`, on the traffic's clock).
     #[test]
     fn friends_hours_away_are_not_visited_on_a_whim() {
-        for (east, visited) in [(20, true), (300, false)] {
+        for (east, visited) in [(20, true), (900, false)] {
             let town = TOWN
-                .replace(r#""width":40"#, r#""width":340"#)
+                .replace(r#""width":40"#, &format!(r#""width":{}"#, east + 40))
                 .replace(
                     r#""x":20,"z":0,"w":20"#,
                     &format!(r#""x":{east},"z":0,"w":20"#),

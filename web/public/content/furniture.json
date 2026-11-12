@@ -1359,6 +1359,23 @@
             "rest",
             "nap"
           ]
+        },
+        {
+          "id": "sleep",
+          "label": "Sleep on the sofa",
+          "anim": "sleep",
+          "minutes": 480,
+          "pose": "lie",
+          "whole": true,
+          "effects": {
+            "energy": 0.7,
+            "comfort": 0.05
+          },
+          "tags": [
+            "rest",
+            "sleep"
+          ],
+          "spare": true
         }
       ]
     },
@@ -1404,6 +1421,23 @@
             "rest",
             "nap"
           ]
+        },
+        {
+          "id": "sleep",
+          "label": "Sleep on the sofa",
+          "anim": "sleep",
+          "minutes": 480,
+          "pose": "lie",
+          "whole": true,
+          "effects": {
+            "energy": 0.7,
+            "comfort": 0.05
+          },
+          "tags": [
+            "rest",
+            "sleep"
+          ],
+          "spare": true
         }
       ]
     },
@@ -1451,6 +1485,23 @@
             "rest",
             "nap"
           ]
+        },
+        {
+          "id": "sleep",
+          "label": "Sleep on the sofa",
+          "anim": "sleep",
+          "minutes": 480,
+          "pose": "lie",
+          "whole": true,
+          "effects": {
+            "energy": 0.7,
+            "comfort": 0.05
+          },
+          "tags": [
+            "rest",
+            "sleep"
+          ],
+          "spare": true
         }
       ]
     },

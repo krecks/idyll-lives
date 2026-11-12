@@ -144,6 +144,7 @@ fn every_public_place_loads_on_either_side_of_the_street() {
                 lot: &world.lot,
                 blocked: world.blocked(),
                 stairs: world.stair_map(),
+                kept_off: &[],
             };
             let start = (entry[0].floor() as i32, entry[1].floor() as i32);
             assert!(

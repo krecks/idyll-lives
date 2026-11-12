@@ -184,6 +184,7 @@ fn a_basement_room_is_a_room_even_under_the_garden() {
         lot: &w.lot,
         blocked: w.blocked(),
         stairs: w.stair_map(),
+        kept_off: &[],
     };
     assert!(!nav.tile_free(12, 4 + DOWN) && nav.tile_free(6, 6 + DOWN));
 }
@@ -256,6 +257,7 @@ fn stairs_down_start_inside_the_house() {
         lot: &w.lot,
         blocked: w.blocked(),
         stairs: w.stair_map(),
+        kept_off: &[],
     };
     assert!(
         !nav.tile_free(9, 4) && nav.tile_free(9, 2),

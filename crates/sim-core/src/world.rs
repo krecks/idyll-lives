@@ -20,9 +20,6 @@ use serde::{Deserialize, Serialize};
 /// The most residents a town holds (a town file may start with this many; saves, slots, the
 /// snapshot's layout).
 pub const MAX_SIMS: usize = 160;
-/// The most a town grows to by births and newcomers (`World::population_cap`), but for a big
-/// world: as many as towns always had.
-pub const TOWN_SIMS: usize = 64;
 
 /// A set of residents by slot (`MAX_SIMS` of them, a bit each).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -1138,6 +1135,9 @@ pub struct Sim {
     pub(crate) car_door: u8,
     /// Ticks they've waited for a car driving by to pass (`cars::in_the_way`). Not saved.
     pub(crate) car_wait: u32,
+    /// The lit junction whose crosswalk they wait at the kerb of for its walk phase, and the tick
+    /// they last did (`traffic::kerb_stop`). Not saved.
+    pub(crate) kerb_wait: Option<(u16, u64)>,
     /// The work shift (or school day) they're away for starts at this tick: until then they're on
     /// their way (`life::at_work`). Not saved (after a load, it's under way).
     pub(crate) shift_from: u64,
@@ -2002,6 +2002,8 @@ pub(crate) struct Ctx<'a> {
     pub travel: &'a crate::travel::Travel,
     /// Households' cars and the work taxis (`World::cars`).
     pub cars: &'a [crate::cars::Car],
+    /// The lit junctions' lights (`Traffic::lights`): their crosswalks open on the walk phase.
+    pub lights: &'a [crate::traffic::Light],
     /// The work taxis' runs (`World::taxis`).
     pub taxis: &'a crate::taxi::Taxis,
     pub autonomy: bool,
@@ -2466,6 +2468,7 @@ impl World {
             exits: &self.exits,
             travel: &self.travel,
             cars: &self.cars,
+            lights: &self.traffic.lights,
             taxis: &self.taxis,
             autonomy: self.autonomy,
             room_score: &self.room_score,
@@ -2512,8 +2515,13 @@ impl World {
             .map(|(_, speed, min)| (speed, min)),
         };
         let door = p.arrival_point();
-        let taxi =
-            crate::taxi::leisure_eta(&self.travel, &self.exits, &self.content, sim, pos, door);
+        let taxi = self
+            .taxis
+            .takes(sim)
+            .then(|| {
+                crate::taxi::leisure_eta(&self.travel, &self.exits, &self.content, sim, pos, door)
+            })
+            .flatten();
         let (_, eta) = leisure_way(
             &self.travel,
             &self.content,
@@ -2856,6 +2864,7 @@ impl World {
             lot: &self.lot,
             blocked: &self.blocked,
             stairs: &self.stairs,
+            kept_off: &self.travel.junction_tiles,
         }
     }
 
@@ -3100,6 +3109,7 @@ impl World {
             car_seat: 0,
             car_door: 0,
             car_wait: 0,
+            kerb_wait: None,
             shift_from: 0,
             alone_until: 0,
             household: spawn.household,
@@ -3308,7 +3318,7 @@ impl World {
                 "at most {most} residents per household"
             )));
         }
-        let cap = self.population_cap();
+        let cap = MAX_SIMS;
         if self.sims.iter().filter(|s| s.here()).count() + sims.len() > cap {
             return Err(Error::new(format!("at most {cap} residents in this town")));
         }
@@ -3792,32 +3802,29 @@ impl World {
     /// Rebuilds the objects-by-plot index if objects were added, removed or changed since.
     pub(crate) fn refresh_index(&mut self) {
         if self.object_index.version != self.objects_version {
-            self.object_index = if self.travel.open {
-                let centres: Vec<[f32; 2]> = self
-                    .objects
-                    .iter()
-                    .map(|o| o.centre(&self.content))
-                    .collect();
-                let ground = if self.stairs.depth > 0 {
-                    self.stairs.depth as usize
-                } else {
-                    self.lot.depth
-                };
-                let size = [self.lot.width as f32, ground as f32];
-                ObjectIndex::open(
-                    &self.object_plot,
-                    &self.plots,
-                    &centres,
-                    size,
-                    self.objects_version,
-                )
+            let centres: Vec<[f32; 2]> = self
+                .objects
+                .iter()
+                .map(|o| o.centre(&self.content))
+                .collect();
+            let ground = if self.stairs.depth > 0 {
+                self.stairs.depth as usize
             } else {
-                ObjectIndex::new(&self.object_plot, &self.plots, self.objects_version)
+                self.lot.depth
             };
+            let size = [self.lot.width as f32, ground as f32];
+            self.object_index = ObjectIndex::open(
+                &self.object_plot,
+                &self.plots,
+                &centres,
+                size,
+                self.objects_version,
+            );
             let nav = NavGrid {
                 lot: &self.lot,
                 blocked: &self.blocked,
                 stairs: &self.stairs,
+                kept_off: &self.travel.junction_tiles,
             };
             self.object_index.links =
                 crate::surface::Links::new(&self.content, &self.objects, &nav);
@@ -3837,17 +3844,10 @@ impl World {
         }
     }
 
-    /// Whether this tick's searches so far have expanded more than `search_budget` tiles in an
-    /// open-world town: what can wait for the next tick does (residents' turns, the day's
-    /// commutes worked out again).
+    /// Whether this tick's searches so far have expanded more than `search_budget` tiles: what can
+    /// wait for the next tick does (residents' turns, the day's commutes worked out again).
     pub(crate) fn over_search_budget(&self) -> bool {
-        self.travel.open && crate::path::nodes_searched() - self.search_mark > self.search_budget
-    }
-
-    /// The most residents this town grows to by births and newcomers: `MAX_SIMS` in a big
-    /// world, else `TOWN_SIMS` (cosy and normal towns, and towns and saves without a size).
-    pub fn population_cap(&self) -> usize {
-        self.travel.population_cap()
+        crate::path::nodes_searched() - self.search_mark > self.search_budget
     }
 
     /// The navigation version: bumped whenever something walkers can or can't step through
@@ -3890,6 +3890,7 @@ impl World {
             lot: &self.lot,
             blocked: &self.blocked,
             stairs: &self.stairs,
+            kept_off: &self.travel.junction_tiles,
         };
         self.reach.refresh(&nav);
         self.reach_version = self.nav_version;
@@ -4509,20 +4510,16 @@ impl World {
         crate::privacy::refresh(self);
         crate::lod::plan(self);
         // Those who go first when the tick's searches run over budget: the player's household
-        // and whoever is watched (open-world towns only; see `SEARCH_BUDGET`).
-        let first: Vec<bool> = if self.travel.open {
-            (0..self.sims.len())
-                .map(|i| {
-                    self.full_detail(i)
-                        || self
-                            .households
-                            .get(self.sims[i].household as usize)
-                            .is_some_and(|h| h.player)
-                })
-                .collect()
-        } else {
-            Vec::new()
-        };
+        // and whoever is watched (see `SEARCH_BUDGET`).
+        let first: Vec<bool> = (0..self.sims.len())
+            .map(|i| {
+                self.full_detail(i)
+                    || self
+                        .households
+                        .get(self.sims[i].household as usize)
+                        .is_some_and(|h| h.player)
+            })
+            .collect();
         let (search_mark, budget) = (self.search_mark, self.search_budget);
         let hour = crate::clock::hour(tick);
         let mut work = std::mem::take(&mut self.work);
@@ -4547,6 +4544,7 @@ impl World {
                 exits,
                 travel,
                 cars,
+                traffic,
                 taxis,
                 room_score,
                 dirt,
@@ -4568,6 +4566,7 @@ impl World {
                     lot,
                     blocked,
                     stairs,
+                    kept_off: &travel.junction_tiles,
                 },
                 reach,
                 nav_version: *nav_version,
@@ -4582,6 +4581,7 @@ impl World {
                 exits,
                 travel,
                 cars,
+                lights: &traffic.lights,
                 taxis,
                 autonomy: *autonomy,
                 hour,
@@ -6255,7 +6255,15 @@ fn step_sim(
                 }
                 return;
             }
-            if free_will && sim.idle_ticks >= AUTONOMY_DELAY_TICKS {
+            // Standing in the road with nothing to do (set down there, or a talk there over):
+            // off it first, to the pavement (free will or not).
+            if sim.idle_ticks >= AUTONOMY_DELAY_TICKS
+                && let Some(task) = off_the_road(sim, ctx)
+            {
+                sim.idle_ticks = 0;
+                start_task(sim, task, ctx, objects, items);
+            }
+            if sim.current.is_none() && free_will && sim.idle_ticks >= AUTONOMY_DELAY_TICKS {
                 let since = sim.idle_ticks - AUTONOMY_DELAY_TICKS;
                 sim.idle_ticks = 0;
                 if let Some(task) = pick_autonomous(sim, ctx, objects, items, rng, None) {
@@ -6281,6 +6289,63 @@ fn step_sim(
 
     progress(sim, ctx, objects, items, rng, ticks);
 }
+
+/// Someone on foot standing in a road's carriageway (`Travel::on_carriageway`, a lit junction's
+/// box: `NavGrid::kept_off`): a walk to the nearest ground off it they can get to, the pavement
+/// (by the nearest way, over tiles kept off too: `NavGrid::way_out`). None: not in the road, in a
+/// car or on their way to one, or nowhere off it within `OFF_ROAD_MOST` tiles. (Canalside's Mila,
+/// saved in a T's box, stood there a day, a taxi and two cars waiting round her.)
+fn off_the_road(sim: &Sim, ctx: &Ctx) -> Option<Task> {
+    let travel = ctx.travel;
+    let nav = &ctx.nav;
+    if travel.graph.is_empty()
+        || sim.bound_for_car.is_some()
+        || sim.taxi.is_some()
+        || sim.riding.is_some()
+    {
+        return None;
+    }
+    let road = |(x, z): (i32, i32)| {
+        nav.kept_off_at(x, z) || travel.on_carriageway([x as f32 + 0.5, z as f32 + 0.5], 0.0)
+    };
+    let start = sim.tile();
+    if !nav.kept_off_at(start.0, start.1) && !travel.on_carriageway(sim.pos, OFF_ROAD_IN) {
+        return None;
+    }
+    // (Nearest first, over what they may step onto, or kept off but for stepping onto: they're
+    // on it already.)
+    let mut seen = std::collections::HashSet::from([start]);
+    let mut todo = std::collections::VecDeque::from([start]);
+    while let Some((x, z)) = todo.pop_front() {
+        for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let t = (x + dx, z + dz);
+            if seen.len() > OFF_ROAD_MOST || !seen.insert(t) {
+                continue;
+            }
+            let free = nav.can_step(x, z, t.0, t.1);
+            if !free && !(nav.kept_off_at(t.0, t.1) && nav.lot.edge_walkable(x, z, t.0, t.1)) {
+                continue;
+            }
+            if free && !road(t) && ctx.reach.reaches(nav, start, t) {
+                return Some(Task {
+                    kind: TaskKind::MoveTo {
+                        x: t.0 as f32 + 0.5,
+                        z: t.1 as f32 + 0.5,
+                    },
+                    directed: false,
+                    routine: false,
+                });
+            }
+            todo.push_back(t);
+        }
+    }
+    None
+}
+
+/// How far in from its kerbs someone stands in a road for `off_the_road` to walk them off it (m),
+/// and how many tiles round it looks for ground off it at most.
+const OFF_ROAD_IN: f32 = 0.3;
+const OFF_ROAD_MOST: usize = 1024;
 
 /// What a Sim may use on a plot: everything at home or in public places; as a guest,
 /// anything that isn't private (bed, bathroom...); nothing on other people's lots.
@@ -6451,20 +6516,26 @@ pub(crate) fn upper_barred(content: &Content, obj: &ObjectInstance, sim: u32, ag
         && obj.users[0].is_some_and(|u| u != sim)
 }
 
-/// Whether one of `usable` is a bed free for `sim` tonight that isn't a spare one
-/// (`Interaction::spare`): working, a place on it free for them (or theirs), for their age, and
-/// not one they couldn't get to a moment ago.
-fn has_bed(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32]) -> bool {
+/// Whether one of `usable` is a bed free for `sim` tonight: working, a place on it free for them
+/// (or theirs) and not kept for a couple (`privacy::kept_for_couple`), for their age, and not one
+/// they couldn't get to a moment ago; a spare one (`Interaction::spare`: the sofa) only if `spare`,
+/// and then one somebody only sits on for now (watching TV on the sofa) counts as free: they'll get
+/// up, nobody sleeps there.
+fn has_bed(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], usable: &[u32], spare: bool) -> bool {
     let content = ctx.content;
     usable.iter().map(|&o| &objects[o as usize]).any(|o| {
         let def = &content.objects[o.def];
         !o.broken()
             && !sim.couldnt_reach(o.id, ctx.tick)
+            && !crate::privacy::kept_for_couple(ctx, objects, sim, o)
             && def.interactions.iter().enumerate().any(|(i, inter)| {
                 inter.tags & content.day_rhythm.sleep_tags != 0
-                    && !inter.spare
+                    && (spare || !inter.spare)
                     && !inter.baby
-                    && o.can_use_for(sim.id, def, i)
+                    && (o.can_use_for(sim.id, def, i)
+                        || (inter.spare
+                            && o.users()
+                                .all(|u| ctx.briefs.get(u as usize).is_none_or(|b| !b.lying))))
                     && unfit(content, sim.age, inter).is_none()
                     && !upper_barred(content, o, sim.id, sim.age)
             })
@@ -6691,8 +6762,12 @@ fn pick_autonomous(
     let minding = crate::life::minding_baby(sim, ctx);
     let own = ctx.households[sim.household as usize].plot;
     let stranded = short & !fillable & content.autonomy.urgent;
-    // A spare bed's night (a sofa bed's) only for someone with no other bed free.
-    let bedded = has_bed(sim, ctx, objects, usable);
+    // A spare bed's night (a sofa bed's, the sofa's) only for someone with no other bed free; a
+    // couple's bed kept for the couple only for someone with nowhere else at all.
+    let bedded = has_bed(sim, ctx, objects, usable, false);
+    let elsewhere = std::cell::OnceCell::new();
+    let elsewhere =
+        || *elsewhere.get_or_init(|| bedded || has_bed(sim, ctx, objects, usable, true));
     for obj in usable
         .iter()
         .map(|&o| &objects[o as usize])
@@ -6773,6 +6848,9 @@ fn pick_autonomous(
             // (Nor one that takes the whole thing while someone else is on it.)
             if inter.baby
                 || (inter.spare && bedded)
+                || (inter.tags & rhythm.sleep_tags != 0
+                    && crate::privacy::kept_for_couple(ctx, objects, sim, obj)
+                    && elsewhere())
                 || unfit(content, sim.age, inter).is_some()
                 || upper_barred(content, obj, sim.id, sim.age)
                 || (inter.needs_table && !at_table)
@@ -7303,15 +7381,21 @@ fn pick_autonomous(
                 * crate::planner::visit_factor(content, sim, soon);
             // (The way there timed only for a visit worth making.)
             if score > MIN_AUTONOMY_SCORE {
-                let taxi = crate::taxi::leisure_eta_via(
-                    ctx.travel,
-                    ctx.exits,
-                    content,
-                    sim,
-                    pos,
-                    (Some(plot), door),
-                    &mut on,
-                );
+                let taxi = ctx
+                    .taxis
+                    .takes(sim)
+                    .then(|| {
+                        crate::taxi::leisure_eta_via(
+                            ctx.travel,
+                            ctx.exits,
+                            content,
+                            sim,
+                            pos,
+                            (Some(plot), door),
+                            &mut on,
+                        )
+                    })
+                    .flatten();
                 let (_, eta) = leisure_way(
                     ctx.travel,
                     content,
@@ -7338,52 +7422,56 @@ fn pick_autonomous(
             }
         }
 
-        // An outing: in an open-world town, a public place out of reach, for the best it has,
-        // the less the longer the way (`OUTING_K`): only one the way to takes `outingMinutes` at
-        // most, with time for there and back and an hour there before work or school and before
-        // `outingHomeBy` (`outing_fits`).
-        if ctx.travel.open {
-            let reach = content.autonomy.reach;
-            for p in ctx.plots.iter().filter(|p| p.public) {
-                let door = p.arrival_point();
-                if (door[0] - pos[0]).hypot(door[1] - pos[1]) <= reach {
-                    continue;
-                }
-                // By the way they'd go (`leisure_way`).
-                let taxi = crate::taxi::leisure_eta_via(
-                    ctx.travel,
-                    ctx.exits,
-                    content,
-                    sim,
-                    pos,
-                    (Some(p.id), door),
-                    &mut on,
-                );
-                let (_, eta) = leisure_way(
-                    ctx.travel,
-                    content,
-                    pos,
-                    walk_per_minute,
-                    p.id,
-                    door,
-                    goer,
-                    taxi,
-                    &mut on,
-                );
-                if !outing_fits(content, eta, ctx.hour, free) {
-                    continue;
-                }
-                // The best the place has for each need, as one day out; not with a need that
-                // would be low by the time they could leave, that it has nothing for (`lasts`).
-                let best = place_serves(ctx, objects, sim, p.id, false);
-                if !lasts(content, sim, &best, eta + visits.least_minutes) {
-                    continue;
-                }
-                let score = ai::score_felt(needs, &felt, &best, 0.0) * feel(visits.tags)
-                    / (1.0 + OUTING_K * eta);
-                if score > MIN_AUTONOMY_SCORE {
-                    candidates.push((score, Choice::Outing(p.id)));
-                }
+        // An outing: a public place out of reach, for the best it has, the less the longer the
+        // way (`OUTING_K`): only one the way to takes `outingMinutes` at most, with time for there
+        // and back and an hour there before work or school and before `outingHomeBy`
+        // (`outing_fits`).
+        let reach = content.autonomy.reach;
+        for p in ctx.plots.iter().filter(|p| p.public) {
+            let door = p.arrival_point();
+            if (door[0] - pos[0]).hypot(door[1] - pos[1]) <= reach {
+                continue;
+            }
+            // By the way they'd go (`leisure_way`).
+            let taxi = ctx
+                .taxis
+                .takes(sim)
+                .then(|| {
+                    crate::taxi::leisure_eta_via(
+                        ctx.travel,
+                        ctx.exits,
+                        content,
+                        sim,
+                        pos,
+                        (Some(p.id), door),
+                        &mut on,
+                    )
+                })
+                .flatten();
+            let (_, eta) = leisure_way(
+                ctx.travel,
+                content,
+                pos,
+                walk_per_minute,
+                p.id,
+                door,
+                goer,
+                taxi,
+                &mut on,
+            );
+            if !outing_fits(content, eta, ctx.hour, free) {
+                continue;
+            }
+            // The best the place has for each need, as one day out; not with a need that
+            // would be low by the time they could leave, that it has nothing for (`lasts`).
+            let best = place_serves(ctx, objects, sim, p.id, false);
+            if !lasts(content, sim, &best, eta + visits.least_minutes) {
+                continue;
+            }
+            let score = ai::score_felt(needs, &felt, &best, 0.0) * feel(visits.tags)
+                / (1.0 + OUTING_K * eta);
+            if score > MIN_AUTONOMY_SCORE {
+                candidates.push((score, Choice::Outing(p.id)));
             }
         }
     }
@@ -7870,7 +7958,7 @@ fn start_task(
                 // (In an open-world town, a bike only where the way was timed by one: a ride of
                 // `life::BIKE_MOST` at most; not before it's been timed, nor where it was timed on
                 // foot or by car.)
-                let no_bike = no_bike_out(ctx, sim);
+                let no_bike = no_bike_out(sim);
                 if riding && no_bike {
                     // On a bike of theirs from a visit or an outing where the way out isn't by
                     // one (a ride of over `life::BIKE_MOST`, or none timed): the ride cut short,
@@ -8004,9 +8092,9 @@ fn start_task(
                 .then(|| crate::life::knock_spot(nav, p))
                 .flatten();
             let mut door = p.arrival_point();
-            // A public place without an entry (open-world towns): the open ground nearest its
-            // middle, not whatever stands there.
-            if ctx.travel.open && p.public && p.entry.is_none() {
+            // A public place without an entry: the open ground nearest its middle, not whatever
+            // stands there.
+            if p.public && p.entry.is_none() {
                 door = open_ground_near(nav, p, door).unwrap_or(door);
             }
             match knock {
@@ -8649,7 +8737,7 @@ fn progress(
                     sim.pos[0] + dx / dist.max(1e-4) * step,
                     sim.pos[1] + dz / dist.max(1e-4) * step,
                 ];
-                let passing = crate::cars::in_the_way(ctx.cars, body, sim.pos, to)
+                let passing = crate::cars::in_the_way(ctx.cars, sim.id, body, sim.pos, to)
                     .and_then(|c| ctx.cars[c].shown.map(|(at, yaw, ..)| (at, yaw)));
                 if let Some((at, yaw)) = passing {
                     sim.car_wait = sim.car_wait.saturating_add(ticks);
@@ -8677,6 +8765,28 @@ fn progress(
                 if dist > 1e-4 {
                     sim.yaw = dx.atan2(dz);
                 }
+                // At a lit junction's crosswalk, closed to them: on foot, they wait at the kerb for
+                // its walk phase, which their waiting brings round (`traffic::kerb_stop`). Not in
+                // the way of a car waiting for them, though: on, out of its way (a taxi turning the
+                // corner and someone waiting there at the kerb waited for each other for good).
+                // On a bike or an e-scooter they ride on with the traffic (stopped at every
+                // junction along the road, riders were hours on their way out of town).
+                let go = budget.min(dist);
+                let ahead = [
+                    sim.pos[0] + dx / dist.max(1e-4) * go,
+                    sim.pos[1] + dz / dist.max(1e-4) * go,
+                ];
+                if sim.riding.is_none()
+                    && let Some((s, f)) =
+                        crate::traffic::kerb_stop(ctx.travel, ctx.lights, sim.pos, ahead)
+                    && !crate::cars::holding_up(ctx.cars, sim.id, body, sim.pos)
+                {
+                    sim.pos[0] += (ahead[0] - sim.pos[0]) * f;
+                    sim.pos[1] += (ahead[1] - sim.pos[1]) * f;
+                    sim.kerb_wait = Some((s, ctx.tick));
+                    break;
+                }
+                sim.kerb_wait = None;
                 if dist <= budget {
                     sim.pos = wp;
                     budget -= dist;
@@ -9148,7 +9258,9 @@ fn use_object(
         // Planned activities go on for their time even once the needs they fill are full.
         // Whatever they chose themselves (not a routine, nor for one of them) stops for a need
         // about to run out that home has something for, if it would before the end (off to the
-        // toilet halfway through a film, not off the toilet for a bite to eat).
+        // toilet halfway through a film, not off the toilet for a bite to eat: a use that `lasts`
+        // isn't left for another need, or worn out with the bladder low they'd be up from it
+        // for bed and from bed for it, round and round, until they fell asleep on the floor).
         let planned = crate::planner::planned_now(content, sim, inter);
         let chosen = sim
             .current
@@ -9163,7 +9275,9 @@ fn use_object(
         let drained = emptying
             || (urgent && planned)
             || (chosen && heading_home)
-            || (chosen && breaks_off(sim, content, pressing, fills, left, inter, low));
+            || (chosen
+                && !inter.lasts
+                && breaks_off(sim, content, pressing, fills, left, inter, low));
         let routine = sim.current.as_ref().is_some_and(|a| a.task.routine);
         // Practising a skill they still want to (as when choosing: at home or in a public place)
         // goes on for its time too, until practice gets boring; stopping it as soon as the needs
@@ -9375,8 +9489,8 @@ fn arrive(
                 directed,
             });
         }
-        // At a car that went without them (open-world towns): on foot after all.
-        TaskKind::Visit { .. } if sim.bound_for_car.is_some() && ctx.travel.open => {
+        // At a car that went without them: on foot after all.
+        TaskKind::Visit { .. } if sim.bound_for_car.is_some() => {
             sim.bound_for_car = None;
             if let Some(a) = sim.current.take() {
                 sim.queue.push_front(a.task);
@@ -9491,8 +9605,8 @@ fn arrive(
                 sim.queue.push_front(a.task);
             }
         }
-        // At a car that went without them (open-world towns): home on foot after all.
-        TaskKind::GoHome if sim.bound_for_car.is_some() && ctx.travel.open => {
+        // At a car that went without them: home on foot after all.
+        TaskKind::GoHome if sim.bound_for_car.is_some() => {
             sim.bound_for_car = None;
             if let Some(a) = sim.current.take() {
                 sim.queue.push_front(a.task);
@@ -10364,7 +10478,7 @@ pub(crate) fn leisure_way(
         distance > content.autonomy.reach && goer.drives && crate::cars::parks_near(travel, door);
     let bike = goer
         .bike
-        .filter(|&(_, min)| travel.open && distance >= min)
+        .filter(|&(_, min)| distance >= min)
         .map(|(speed, _)| speed);
     let (way, mode, pace) = match (car, bike, taxi) {
         (true, ..) => (Way::Car, crate::travel::Mode::Car, walk),
@@ -10452,8 +10566,7 @@ fn outing_fits_now(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], plot: u32) 
     let door = p.arrival_point();
     // (Booked on a taxi there already: it's the taxi's to time, `taxi::book_leisure`.)
     let visit = TaskKind::Visit { plot };
-    if !ctx.travel.open
-        || crate::taxi::kerb_for(ctx, sim, &visit).is_some()
+    if crate::taxi::kerb_for(ctx, sim, &visit).is_some()
         || crate::taxi::door_for(ctx, sim, &visit).is_some()
         || !p.public
         || !at_home
@@ -10470,11 +10583,11 @@ fn outing_fits_now(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], plot: u32) 
         .or(sim.bound_for_bike)
         .and_then(|b| objects.get(b as usize))
         .and_then(|b| content.objects[b.def].vehicle)
-        .map(|v| (v.speed, 0.0))
+        .map(|v| (v.pace, 0.0))
         .or_else(|| {
             leisure_ride(sim, ctx, objects, plot)
                 .and_then(|b| content.objects[objects[b as usize].def].vehicle)
-                .map(|v| (v.speed, 0.0))
+                .map(|v| (v.pace, 0.0))
         });
     let goer = Goer {
         drives: false,
@@ -10518,6 +10631,7 @@ fn taxi_from_home(sim: &Sim, ctx: &Ctx, plot: u32) -> bool {
         && !car_home
         && Some(plot) != home
         && !ctx.taxis.no_taxi(sim.id, plot)
+        && ctx.taxis.takes(sim)
         && crate::taxi::leisure_eta(
             ctx.travel,
             ctx.exits,
@@ -10534,9 +10648,6 @@ fn taxi_from_home(sim: &Sim, ctx: &Ctx, plot: u32) -> bool {
 /// for a ride of its `minRide` or more from where they are. None: they walk (or drive).
 fn leisure_ride(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], plot: u32) -> Option<u32> {
     let content = ctx.content;
-    if !ctx.travel.open {
-        return None;
-    }
     let door = ctx.plots.get(plot as usize)?.arrival_point();
     let (bike, _, min) =
         crate::ride::leisure_bike(content, ctx.index, ctx.briefs, ctx.households, objects, sim)?;
@@ -10557,7 +10668,7 @@ fn outing_leave_by(
     pos: [f32; 2],
 ) -> Option<u64> {
     let content = ctx.content;
-    if !ctx.travel.open || !ctx.plots.get(plot as usize)?.public {
+    if !ctx.plots.get(plot as usize)?.public {
         return None;
     }
     let home = ctx.households.get(sim.household as usize)?.plot?;
@@ -10574,7 +10685,7 @@ fn outing_leave_by(
         .and_then(|(at, b)| {
             Some((
                 at,
-                content.objects[objects.get(b as usize)?.def].vehicle?.speed,
+                content.objects[objects.get(b as usize)?.def].vehicle?.pace,
             ))
         });
     let foot = crate::travel::Mode::Foot;
@@ -10622,19 +10733,15 @@ pub(crate) fn trip_minutes(eta: f32, car: bool) -> f32 {
     }
 }
 
-/// Whether `sim`'s way out to work or school isn't by bike (in an open-world town, a bike only
-/// where the way was timed by one: a ride of `life::BIKE_MOST` at most; not before it's been
-/// timed, nor where it was timed on foot or by car).
-fn no_bike_out(ctx: &Ctx, sim: &Sim) -> bool {
-    ctx.travel.open && sim.commute.is_none_or(|c| c.long_ride || c.bike.is_none())
+/// Whether `sim`'s way out to work or school isn't by bike (a bike only where the way was timed
+/// by one: a ride of `life::BIKE_MOST` at most; not before it's been timed, nor where it was
+/// timed on foot or by car).
+fn no_bike_out(sim: &Sim) -> bool {
+    sim.commute.is_none_or(|c| c.long_ride || c.bike.is_none())
 }
 
-/// The way out of town `sim` takes on foot: the nearest by straight line, or in an open-world
-/// town the quickest (`travel::Travel::eta`).
+/// The way out of town `sim` takes on foot: the quickest (`travel::Travel::eta`).
 pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
-    if !ctx.travel.open {
-        return nearest_exit(ctx.exits, sim.pos).map(|i| ctx.exits[i]);
-    }
     // From home, the way their commute was timed by (on foot).
     let home = ctx
         .households
@@ -10763,7 +10870,7 @@ fn could_conceive(ctx: &Ctx, a: usize, b: usize) -> bool {
         && y.household == x.household
         && ctx.households[h].expecting.is_none()
         && members < ctx.content.rules.max_household
-        && ctx.briefs.iter().filter(|s| s.here).count() < ctx.travel.population_cap()
+        && ctx.briefs.iter().filter(|s| s.here).count() < MAX_SIMS
 }
 
 /// The colours a player gives an object's parts, 0xRRGGBB by the name of the model's material

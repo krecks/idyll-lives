@@ -17,8 +17,8 @@
  * of it. `setChunks` limits what is drawn to the chunks round the camera (null: all of them). The
  * models are kept (hidden) between builds in the street's own template cache. The neighbours'
  * window glass glows at night only while someone is up in there (`setUp`), redrawn at most once a
- * second, group by group. The streetlights' pools of light are drawn only at night. The focus lot's garage hangs apart (`lotRoot`), hidden with the lot's
- * ground while its basement is in view (`showLot`).
+ * second, group by group. The streetlights' pools of light are drawn only at night. The focus lot's garage and porch hang apart (`lotRoot`), hidden with the lot's
+ * ground while its basement is in view (`showLot`); the porch's lamps go with its wall in the cutaway (`cutLot`).
  */
 
 import * as pc from './engine';
@@ -174,9 +174,12 @@ export class Street {
   /** Whether every chunk of the town has been planned (the first build while streaming does it). */
   private prepared = false;
   private readonly groups = new Map<number, Group>();
-  /** The focus lot's own (its garage), as built, and from which chunk key. */
+  /** The focus lot's own (its garage and porch), as built, and from which chunk key. */
   private lotMeshes: pc.Entity[] = [];
   private lotKey = '';
+  /** The focus lot's porch lamps (under `lotRoot`) and the cutaway's look bits that drop their wall; the cutaway as last given (`cutLot`). */
+  private lotPorch: { entity: pc.Entity; look: number } | null = null;
+  private lotCut = { bits: 0, down: false };
   /** Instanced models by key (foliage, props, public places' things), kept hidden between builds. */
   private readonly templates: TemplateCache<ModelTemplate>;
   private readonly placed = new Map<string, Placed>();
@@ -366,7 +369,7 @@ export class Street {
       if (stale()) return;
       dirty.delete(g);
     }
-    // The focus lot's garage (apart: it goes with the lot's ground).
+    // The focus lot's garage and porch (apart: they go with the lot's ground).
     const focusChunk = town.focusChunk(focus);
     const lotPlan = focusChunk !== null ? this.chunks.get(focusChunk) : undefined;
     const lotKey = lotPlan ? `${focus}|${lotPlan.key}` : '';
@@ -374,9 +377,10 @@ export class Street {
       this.lotKey = lotKey;
       for (const e of this.lotMeshes) e.destroy();
       this.lotMeshes = [];
+      this.lotPorch = null;
       const lot = lotPlan?.plan.lot;
       if (lot) {
-        const parent = this.lotRoot;
+        let parent = this.lotRoot;
         for (const part of lot.silhouettes.parts) {
           const m = this.house.drawData(part, part.geo.meshData({ colors: true, cut: part.cut }), parent);
           if (!m) continue;
@@ -393,6 +397,18 @@ export class Street {
         add(lot.props, 'streetLotProps', this.lib.plainFinish(), { cast: true });
         add(lot.glow, 'streetLotLamps', this.glowMat, { colors: false });
         add(lot.pools, 'streetLotPools', this.poolMat, { colors: false, receiveShadows: false, alphaIndex: 5 });
+        if (lot.porch) {
+          const entity = new pc.Entity('streetLotPorch');
+          this.lotRoot.addChild(entity);
+          parent = entity;
+          add(lot.porch.props, 'streetLotPorchProps', this.lib.plainFinish(), { cast: true });
+          add(lot.porch.glow, 'streetLotPorchLamps', this.glowMat, { colors: false });
+          add(lot.porch.pools, 'streetLotPools', this.poolMat, { colors: false, receiveShadows: false, alphaIndex: 5 });
+          // (After its meshes: they go first.)
+          this.lotMeshes.push(entity);
+          this.lotPorch = { entity, look: lot.porch.look };
+          this.cutLot(this.lotCut.bits, this.lotCut.down);
+        }
         this.showPools(this.lotMeshes);
       }
     }
@@ -492,9 +508,18 @@ export class Street {
     return { chunks: this.chunks.size, groups: this.groups.size, far: [...this.farGroups.values()].filter((g) => g.entity?.enabled).length, streamed: this.wanted !== null };
   }
 
-  /** Shows or hides the viewed lot's own (its garage): it stands on the lot's ground, hidden while its basement is in view. */
+  /** Shows or hides the viewed lot's own (its garage and porch): it stands on the lot's ground, hidden while its basement is in view. */
   showLot(on: boolean): void {
     this.lotRoot.enabled = on;
+  }
+
+  /**
+   * The cutaway (the look bits it drops walls for, `LOOK`; or all walls `down`): the viewed lot's
+   * porch lamps go with their wall, as the porch's canopy does in the vertex shader.
+   */
+  cutLot(bits: number, down: boolean): void {
+    this.lotCut = { bits, down };
+    if (this.lotPorch) this.lotPorch.entity.enabled = !down && !(bits & this.lotPorch.look);
   }
 
   /** Neighbours' houses: their wall boxes (x0, z0, x1, z1 on the ground's grid lines). */
@@ -636,7 +661,7 @@ export class Street {
     out.set('streetLightPools', { material: () => this.poolMat, colors: false, cast: false, receive: false, alphaIndex: 5 });
     out.set('streetShadows', { material: () => this.lib.contactShadow(false), colors: true, cast: false, receive: true });
     // The ground layers as the lot draws its own: double-sided, in the house's lamps' light.
-    for (const g of plan.ground) out.set(g.name, { material: () => this.lib.surface(g.material, { doubleSided: true }), colors: false, cast: false, receive: true, lit: true });
+    for (const g of plan.ground) out.set(g.name, { material: () => (g.paint ? this.lib.roadPaint() : this.lib.surface(g.material, { doubleSided: true })), colors: !!g.paint, cast: false, receive: true, lit: true });
     return out;
   }
 
@@ -729,6 +754,7 @@ export class Street {
     this.farData.clear();
     for (const e of this.lotMeshes) e.destroy();
     this.lotMeshes = [];
+    this.lotPorch = null;
     this.lotKey = '';
     this.homes = [];
     this.boxes = [];
@@ -912,7 +938,7 @@ function chunkData(plan: ChunkPlan): Map<string, MeshData> {
   put('streetLamps', plan.glow, false);
   put('streetLightPools', plan.pools, false);
   put('streetShadows', plan.shadows, true);
-  for (const g of plan.ground) put(g.name, g.geo, false);
+  for (const g of plan.ground) put(g.name, g.geo, !!g.paint);
   return out;
 }
 

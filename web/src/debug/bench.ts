@@ -11,7 +11,7 @@
  *   Build mode, paused), `dusk` (orbit at speed 5 from the scene's 18:00, the light changing every frame),
  *   `mirror` (the home lot's first mirror from 4.4 m, from over its room with the walls up, the camera
  *   swinging round the glass every 20 s), `mirror-still` (the same, held still in the swing's middle).
- * - `res=1` the full resolution (or 0.5–1); `res=auto` (default) what the game picks.
+ * - `res=1080` that resolution (720, 1080, 1440, 2160; `res=1` every line the window has); `res=auto` (default) the player's setting.
  * - `secs=20` measured after `warmup=5`; `cap=0` frames per second at most (0: every frame shown).
  * - `hud=0` hides the interface; `gpu=0` doesn't time the GPU; `label=…` is kept with the result.
  * - `diag=noshadows,noaa,nonature,nolamps,nomirrors,noglass,nonight,freeze`: features

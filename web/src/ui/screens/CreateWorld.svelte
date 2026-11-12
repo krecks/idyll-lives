@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { menuScene } from '../../game/menuScene';
-  import { loadTemplates, neighbourCap, type NeighbourhoodDraft, type Templates } from '../../game/town';
+  import { loadTemplates, NEIGHBOUR_CAP, type NeighbourhoodDraft, type Templates } from '../../game/town';
   import { keepHouses, Superseded, townJob } from '../../game/townJobs';
-  import { WORLD_KINDS, WORLDS, worldName, type WorldKind, type WorldSize } from '../../game/world';
+  import { WORLD_KINDS, WORLDS, worldName, type WorldKind } from '../../game/world';
   import { app } from '../app.svelte';
   import { toast } from '../state.svelte';
   import { lifespanHint } from '../format';
@@ -16,15 +16,6 @@
   let templates = $state.raw<Templates | null>(null);
   let world = $state.raw<NeighbourhoodDraft | null>(app.world);
   let kind = $state<WorldKind>(app.world?.world?.kind ?? 'medium');
-  /** How big a world (docs/design/open-world.md). */
-  let size = $state<WorldSize>(app.world?.world?.size ?? 'cosy');
-  const sizeOptions = [
-    { value: 'cosy' as const, label: 'Cosy' },
-    { value: 'normal' as const, label: 'Normal' },
-    { value: 'big' as const, label: 'Big (preview)' },
-  ];
-  /** Big worlds are a preview in 0.7.0: traffic can still jam at a busy junction (finished in 0.7.1). */
-  const previewHint = 'Preview: at rush hour, traffic can still jam at a busy junction near the camera. Looking elsewhere clears it.';
   let name = $state(app.world?.name ?? '');
   /** The name was typed or rolled here (kept when the world is made again). */
   let named = $state(false);
@@ -36,8 +27,8 @@
   const places = $derived(world ? world.slots.filter((s) => s.kind !== 'house').length : 0);
   const roadCount = $derived(world ? world.roads.length : 0);
   const hamlets = $derived(world?.open ? world.open.areas.length - 1 : 0);
-  /** The chosen size in a line: homes, land, how many residents it holds. */
-  const sizeHint = $derived(world ? `${homes} homes${hamlets ? ` in a town and ${hamlets} hamlets` : ''} · ${world.width} × ${world.depth} m · up to ${neighbourCap(size)} neighbours` : '');
+  /** The world in a line: homes, land, how many residents it holds. */
+  const sizeHint = $derived(world ? `${homes} homes${hamlets ? ` in a town and ${hamlets} hamlets` : ''} · ${world.width} × ${world.depth} m · up to ${NEIGHBOUR_CAP} neighbours` : '');
 
   // Public places and farms have their names on them; plain houses are left untagged (the town reads better).
   const labels = $derived<LotLabel[]>(
@@ -58,7 +49,7 @@
     making = true;
     const typed = named && name.trim() ? name.trim() : undefined;
     try {
-      const made = await townJob(content, { kind: 'world', world: kind, seed: (Math.random() * 2 ** 31) >>> 0, name: typed, size }, control.signal);
+      const made = await townJob(content, { kind: 'world', world: kind, seed: (Math.random() * 2 ** 31) >>> 0, name: typed }, control.signal);
       if (job !== control) return;
       // Its houses and preview come with it: the menu draws it without making them again.
       keepHouses(made);
@@ -79,13 +70,6 @@
   }
   $effect(() => () => job?.abort());
 
-  function resize(s: WorldSize) {
-    // (While a world is being made, the size asked for, not the one shown.)
-    if (s === (making ? size : (world?.world?.size ?? 'cosy')) && world) return;
-    size = s;
-    void make();
-  }
-
   function choose(k: WorldKind) {
     if (k === kind && world) return;
     kind = k;
@@ -101,7 +85,7 @@
     if (!world) return;
     const chosen = { ...world, name: name.trim() || world.name };
     // The same world as before (back and forth): its neighbours stay.
-    const same = app.town && app.town.seed === chosen.seed && app.town.world?.kind === chosen.world?.kind && app.town.world?.size === chosen.world?.size;
+    const same = app.town && app.town.seed === chosen.seed && app.town.world?.kind === chosen.world?.kind;
     app.town = same && app.town ? { ...app.town, name: chosen.name } : null;
     app.world = chosen;
     app.screen = 'neighbourhood';
@@ -199,10 +183,8 @@
             <span class="hint">{app.mode === 'creative' ? 'Building is free. No rent or bills at home.' : 'Your residents earn the money to build with.'}</span>
           </div>
           <div class="control">
-            <span class="eyebrow">Size</span>
-            <Segmented label="Size" value={size} options={sizeOptions} onchange={resize} />
+            <span class="eyebrow">World</span>
             <span class="hint">{sizeHint}</span>
-            {#if size === 'big'}<span class="hint">{previewHint}</span>{/if}
           </div>
           <div class="control">
             <span class="eyebrow">Lifespan</span>

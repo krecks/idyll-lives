@@ -279,6 +279,10 @@ pub struct NavGrid<'a> {
     pub lot: &'a Lot,
     pub blocked: &'a [bool],
     pub stairs: &'a StairMap,
+    /// Of the blocked tiles, those blocked only to anyone stepping onto them (sorted tile
+    /// indices; `Travel::junction_tiles`, a lit junction's box and carriageway): one standing on
+    /// one is walked off them by the nearest way (`way_out`), never left there. Empty: none.
+    pub kept_off: &'a [usize],
 }
 
 impl NavGrid<'_> {
@@ -293,6 +297,69 @@ impl NavGrid<'_> {
             && (self.stairs.depth == 0
                 || z < self.stairs.depth
                 || self.lot.room_at(x, z) != OUTDOORS)
+    }
+
+    /// Whether `(x, z)` is one of the tiles blocked only to those stepping onto them (`kept_off`).
+    pub fn kept_off_at(&self, x: i32, z: i32) -> bool {
+        !self.kept_off.is_empty()
+            && self.lot.in_bounds(x, z)
+            && self
+                .kept_off
+                .binary_search(&self.lot.tile_index(x, z))
+                .is_ok()
+    }
+
+    /// From `start`, on a tile kept off (`kept_off`), the nearest way off them: a step at a time
+    /// (no diagonals) over them, to the first tile anyone may stand on; `start` first. None: not
+    /// on one, or no way off within `WAY_OUT_MOST` tiles. Kept off is only stepping onto them:
+    /// one already on them (set down there, or there when they were first kept off: Canalside's
+    /// Mila, saved in a junction's box, stood there for a day, every way out shut to her, and a
+    /// T's cars round her) always gets off.
+    pub fn way_out(&self, start: (i32, i32)) -> Option<Vec<(i32, i32)>> {
+        if !self.kept_off_at(start.0, start.1) {
+            return None;
+        }
+        let lot = self.lot;
+        let mut came: std::collections::HashMap<(i32, i32), (i32, i32)> =
+            std::collections::HashMap::new();
+        let mut todo = std::collections::VecDeque::from([start]);
+        came.insert(start, start);
+        while let Some((x, z)) = todo.pop_front() {
+            for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let (nx, nz) = (x + dx, z + dz);
+                if came.contains_key(&(nx, nz))
+                    || !lot.in_bounds(nx, nz)
+                    || !lot.edge_walkable(x, z, nx, nz)
+                {
+                    continue;
+                }
+                let free = self.can_step(x, z, nx, nz);
+                if !free
+                    && !(self.kept_off_at(nx, nz)
+                        && lot.allocated(nx, nz)
+                        && !lot.diag_blocks(nx, nz))
+                {
+                    continue;
+                }
+                came.insert((nx, nz), (x, z));
+                if free {
+                    let mut way = vec![(nx, nz)];
+                    let mut at = (x, z);
+                    while at != start {
+                        way.push(at);
+                        at = came[&at];
+                    }
+                    way.push(start);
+                    way.reverse();
+                    return Some(way);
+                }
+                if came.len() > WAY_OUT_MOST {
+                    return None;
+                }
+                todo.push_back((nx, nz));
+            }
+        }
+        None
     }
 
     /// Whether a single step from `a` to the neighbouring tile `b` is allowed.
@@ -372,6 +439,14 @@ impl NavGrid<'_> {
         }
         if start == goal {
             return Some(vec![start]);
+        }
+        // (On tiles kept off: off them the nearest way first, then on from there.)
+        if !self.tile_free(start.0, start.1)
+            && let Some(mut way) = self.way_out(start)
+        {
+            let off = way.pop()?;
+            way.extend(self.find_path_with(off, goal, grounds)?);
+            return Some(way);
         }
         match self.search(start, goal, grounds, NODE_CAP, None) {
             Search::Found(path) => return Some(path),
@@ -1003,6 +1078,11 @@ impl Reach {
         let Some(to) = self.of(nav.lot, b) else {
             return true;
         };
+        // (On tiles kept off: from where the way off them comes off.)
+        let a = nav
+            .way_out(a)
+            .and_then(|way| way.last().copied())
+            .unwrap_or(a);
         match self.of(nav.lot, a) {
             Some(from) => from == to,
             None if nav.lot.in_bounds(a.0, a.1) => nav
@@ -1171,6 +1251,9 @@ enum Search {
 
 /// The most tiles a search tries before it looks for a corridor (`NavGrid::find_path_with`).
 pub const NODE_CAP: u64 = 30_000;
+/// How many tiles kept off (`NavGrid::kept_off`) the way off them looks over at most: a lit
+/// junction's box and carriageway are a few hundred.
+const WAY_OUT_MOST: usize = 4096;
 /// The most a search kept to a corridor tries.
 const CORRIDOR_CAP: u64 = 4 * NODE_CAP;
 
@@ -1314,6 +1397,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let reach = Reach::build(&nav);
         assert_eq!(reach.regions(), 2, "the room is sealed off");
@@ -1327,6 +1411,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         assert!(reach.reaches(&nav, (2, 2), (3, 3)));
         assert!(!reach.reaches(&nav, (2, 2), (8, 8)));
@@ -1340,6 +1425,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let reach = Reach::build(&nav);
         assert_eq!(reach.regions(), 1);
@@ -1355,6 +1441,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let path = nav.find_path((2, 2), (7, 2)).expect("path exists");
         assert!(
@@ -1374,6 +1461,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let path = nav.find_path((2, 2), (7, 2)).unwrap();
         let smooth = nav.smooth(&path);
@@ -1425,6 +1513,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         assert!(!nav.tile_free(4, 2), "nobody stands on a diagonal wall");
         // Orthogonal steps into the wall tile are refused from both halves.
@@ -1457,6 +1546,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         // From the lower-right side (below the wall) to the upper-left side.
         let path = nav.find_path((6, 1), (2, 4)).expect("path around the end");
@@ -1479,6 +1569,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         assert!(nav.tile_free(5, 3), "a doorway can be walked");
         let path = nav.find_path((6, 2), (4, 4)).expect("through the door");
@@ -1511,6 +1602,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         assert!(nav.can_step(1, 0, 2, 1), "along the corridor");
         assert!(nav.can_step(2, 1, 3, 2));
@@ -1529,6 +1621,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         assert!(nav.find_path((0, 0), (3, 3)).is_none());
     }
@@ -1562,6 +1655,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         // Without plots to mind, straight across the middle garden.
         let direct = nav.find_path((5, 8), (25, 8)).unwrap();
@@ -1613,6 +1707,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         // From their own garden to the neighbours' (both open to them: they're going there), the
         // two side by side: out at the front, along the street and in at the neighbours' front.
@@ -1664,6 +1759,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let grounds = Grounds {
             tile_plot: &tile_plot,
@@ -1707,6 +1803,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         take_search_stats();
         let before = nodes_searched();
@@ -1767,11 +1864,13 @@ mod tests {
             lot: &small,
             blocked: &bs,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let up = NavGrid {
             lot: &tall,
             blocked: &bt,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let first = flat.find_path((2, 2), (7, 2)).unwrap();
         assert!(

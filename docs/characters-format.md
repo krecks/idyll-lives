@@ -599,6 +599,14 @@ Why some entries are as they are:
   `lieSide` clip): turned a quarter about its length, its back to the back rail (a sofa by day is lounged on, not
   lain flat on the back).
 - `sofaBed`: the head on the seat, the rest on the mattress pulled out in front (`bed_out`, `fwd`).
+- The sofas slept on for the night (`sofa`, `loveseat`, `sofaDesign`, `sofaThree`, `sofaThreeSeat`: `SOFA_NIGHTS`, content
+  "Sleep on the sofa"): lain on along the seat cushions at their height (`across`), moved towards one arm (`fwd`,
+  along the sofa) so the head is by it and clear of it; curled up on the side on the two-seaters, 1.5 to 1.66 m between
+  their arms (`CURLED_BEDS`, the `lieCurl` clip, a quilt of its own draped over that pose: a throw
+  pulled up over the shoulder and the arm on it to the neck, the head out, ending just past the feet and hanging only a
+  little over the seat cushion's front edge, `CURL_QUILT`), at full length on the back on the three-seaters (2.5 m). The blanket is 0.9 m across (`tuck`), the seat's depth
+  and over its front edge, clear of the back cushions, and its foot end stops 0.3 m short of the footprint's end, inside
+  the arm (`foot`).
 - `gloomy.windowSeat`, `kind.hearthSettee` (2 wide): dozed on along the cushion, head to its left, whichever slot
   (the nap takes both, content `whole`).
 - `bunks.bedBunk`: the lower and the upper mattress tops, `[lower, upper]` (content `bunk`).

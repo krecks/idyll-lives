@@ -6,7 +6,7 @@
  */
 
 import type { Content } from '../content/content';
-import type { WorldStructure, WorldSize } from '../core/protocol';
+import type { WorldStructure } from '../core/protocol';
 import type { HouseholdDraft } from './household';
 import { assembleTown, generatedHouses, generateWorld, loadTemplates, primeHouses, type AssembleOptions, type HouseTemplate, type NeighbourhoodDraft, type Templates } from './town';
 import { previewWorld } from './townPreview';
@@ -16,7 +16,7 @@ import { mulberry32 } from './noise';
 
 export type TownJob =
   /** A new world (`generateWorld`), with the menu's preview of it (`previewWorld`). */
-  | { kind: 'world'; world: WorldKind; seed: number; name?: string; size: WorldSize }
+  | { kind: 'world'; world: WorldKind; seed: number; name?: string }
   /** The simulation's town file (`assembleTown`); `random`: the seed for its dice (neighbours' bonds). */
   | { kind: 'assemble'; town: NeighbourhoodDraft; player: HouseholdDraft; slot: number; options: AssembleOptions; random: number };
 
@@ -34,7 +34,7 @@ export type FromTownWorker = WorkerAnswer<TownResult>;
  */
 export function runTownJob(content: Content, t: Templates, job: TownJob): TownResult {
   if (job.kind === 'world') {
-    const draft = generateWorld(content, t, job.world, job.seed, job.name, job.size);
+    const draft = generateWorld(content, t, job.world, job.seed, job.name);
     const preview = previewWorld(content, t, draft, null);
     return { kind: 'world', draft, preview, houses: generatedHouses(t, draft.slots.map((s) => s.template)) };
   }

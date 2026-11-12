@@ -387,7 +387,7 @@ export function randomHousehold(
   return { name: pick(names.length ? names : content.names.last), members, bonds };
 }
 
-/** Who sleeps where in a household's home (`Residents`): partners share a bed, everyone else has one of their own (babies a crib). */
+/** Who sleeps where in a household's home (`Residents`): partners share a bed, everyone else has one of their own (babies a crib), a child's for their life stage. */
 export function residentsOf(content: Content, h: HouseholdDraft): Residents {
   const paired = new Set<string>();
   let couples = 0;
@@ -398,12 +398,17 @@ export function residentsOf(content: Content, h: HouseholdDraft): Residents {
     paired.add(b.a).add(b.b);
     couples++;
   }
-  const r: Residents = { couples, adults: 0, children: 0, babies: 0 };
+  const stages: string[] = [];
+  const r: Residents = { couples, adults: 0, children: 0, babies: 0, stages };
   for (const m of h.members) {
     if (paired.has(m.uid)) continue;
+    const stage = content.stageOf(m.age);
     if (content.isAdult(m.age)) r.adults++;
-    else if (content.stageOf(m.age)?.baby) r.babies++;
-    else r.children++;
+    else if (stage?.baby) r.babies++;
+    else {
+      r.children++;
+      if (stage) stages.push(stage.id);
+    }
   }
   return r;
 }

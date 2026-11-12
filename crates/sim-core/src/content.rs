@@ -568,8 +568,9 @@ pub enum VehicleKind {
 #[derive(Debug, Clone, Copy)]
 pub struct Vehicle {
     pub kind: VehicleKind,
-    /// How many times as fast as walking.
-    pub speed: f32,
+    /// How many times as fast as walking it goes: its content `speed` (times walking), on the
+    /// traffic's clock (`crate::DRIVE_SCALE` times that), as a car goes on its roads.
+    pub pace: f32,
     /// Life stages that ride it.
     pub stages: StageMask,
     /// Ways shorter than this many metres are walked.
@@ -1837,7 +1838,8 @@ pub struct Content {
 /// How cars drive (content `cars`).
 #[derive(Debug, Clone)]
 pub struct CarRules {
-    /// Top speed on country roads (m/s at 1×; `countrySpeed`, default 16).
+    /// Top speed on country roads (m a second of drive time, `crate::DRIVE_SCALE`; `countrySpeed`,
+    /// default 16).
     pub country_speed: f32,
 }
 
@@ -2731,6 +2733,8 @@ struct ObjectRaw {
 #[serde(rename_all = "camelCase")]
 struct VehicleRaw {
     kind: VehicleKind,
+    /// Times walking (1 to 10), as a person on it would go at real time: it goes
+    /// `crate::DRIVE_SCALE` times that, on the traffic's clock (`Vehicle::pace`).
     speed: f32,
     stages: Option<Vec<String>>,
     #[serde(default = "default_min_ride")]
@@ -3979,7 +3983,7 @@ impl Content {
                     }
                     Some(Vehicle {
                         kind: v.kind,
-                        speed: v.speed,
+                        pace: v.speed * crate::DRIVE_SCALE,
                         stages: stages_of(&v.stages, &format!("object '{}' vehicle", obj.id))?
                             .unwrap_or(every_stage),
                         min_ride: v.min_ride,

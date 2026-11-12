@@ -21,6 +21,7 @@ import { within } from '../core/async';
 import { plainState } from '../debug/snapshot.svelte';
 import { liveSims } from '../debug/sims';
 import { threadStats } from '../debug/threads';
+import { DEVLOG, devlog, devlogNextSample, devlogPaused, devlogSlowFrame, renderSample, SAMPLE_MS, SLOW_FRAME_MS } from '../debug/devlog';
 import { createSimPreviews } from '../render/preview';
 import { createItemPreviews } from '../render/preview/items';
 import type { CameraPose, Renderer, WallMode } from '../render/types';
@@ -221,6 +222,7 @@ async function openSession(
   warm: boolean,
 ): Promise<GameSession> {
   const params = new URLSearchParams(location.search);
+  devlog('session', { event: 'opening', request: request.kind, ...(request.kind === 'load' ? { saveId: request.saveId } : { slot: request.slot, town: request.town.name, mode: request.mode ?? 'living' }) });
   // Every loading step names the work in the perf report (a long task or a dropped frame then says which).
   const report = progress;
   progress = (label, value) => {
@@ -1767,10 +1769,40 @@ async function openSession(
     game.threads = threadStats(game.stats, bridge.threadStats, voices.stats());
   }, STATS_INTERVAL_MS);
 
+  // The dev play log (`debug/devlog.ts`): what the game is doing every few seconds, the size drawn when it
+  // changes, and stalls between frames.
+  let lastFrameAt = 0;
+  const devlogTimer = DEVLOG
+    ? setInterval(() => {
+        const s = renderer.stats();
+        const t = threadStats(s, bridge.threadStats, voices.stats());
+        devlog('sample', {
+          screen: app.screen,
+          day: game.day,
+          minute: game.minute,
+          speed: game.speed,
+          mode: game.mode,
+          paused: game.pauseMenu,
+          render: renderSample(s, liveSettings.resolution),
+          main: { busy: +t.main.busy.toFixed(3), longTasks: t.main.longTasks, longestTaskMs: Math.round(t.main.longestTaskMs), heapMB: t.main.heapBytes === null ? null : Math.round(t.main.heapBytes / 2 ** 20) },
+          sim: t.sim
+            ? { stepsPerS: Math.round(t.sim.stepsPerSecond), targetPerS: Math.round(t.sim.targetPerSecond), stepMs: +t.sim.stepMs.toFixed(3), stepMaxMs: +t.sim.stepMaxMs.toFixed(2), busy: +t.sim.busy.toFixed(3), wasmMB: Math.round(t.sim.memoryBytes / 2 ** 20) }
+            : null,
+          residents: game.sims.length,
+        });
+        devlogNextSample();
+      }, SAMPLE_MS)
+    : 0;
+
   /** This frame's interpolation state (for what is placed over the view once the camera has moved). */
   let shown: FrameState | null = null;
   renderer.run((now) => {
     if (failFrames) throw new Error('a frame failed on purpose (__crash)');
+    if (DEVLOG) {
+      // (Not across a menu over the game or a hidden tab: the game draws nothing then on purpose.)
+      if (lastFrameAt && now - lastFrameAt >= SLOW_FRAME_MS && !document.hidden && !devlogPaused()) devlogSlowFrame(now - lastFrameAt, { day: game.day, minute: game.minute, speed: game.speed, screen: app.screen });
+      lastFrameAt = now;
+    }
     bridge.sync(now);
     const frame = (shown = bridge.frame(now));
     renderer.update(frame);
@@ -1830,6 +1862,7 @@ async function openSession(
     reveal() {
       if (revealed) return;
       revealed = true;
+      devlog('session', { event: 'revealed', day: game.day, minute: game.minute, residents: game.sims.length });
       // Prepared, then the simulation stopped before the game was shown.
       if (stoppedWith !== null) app.crashed({ kind: 'sim', detail: stoppedWith });
       // Nothing to lose yet: leaving the page in the first minute doesn't autosave.
@@ -1925,6 +1958,8 @@ async function openSession(
       releaseInference();
       ideas.clear();
       clearInterval(statsTimer);
+      clearInterval(devlogTimer);
+      devlog('session', { event: 'closed', day: game.day, minute: game.minute });
       clearInterval(autosaveTimer);
       clearTimeout(prefetchTimer);
       services.items.holdAhead(false);

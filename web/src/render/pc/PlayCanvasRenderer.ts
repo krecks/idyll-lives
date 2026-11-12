@@ -29,7 +29,7 @@ import { GameCamera } from './camera';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { createApp, createDevice, destroyApp } from './device';
 import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
-import { fenceHedges } from '../shared/fences';
+import { fenceHedges, wallCorners } from '../shared/fences';
 import { shownFences } from '../shared/shownFences';
 import { gardenPool, GardenPools } from './gardenPools';
 import { HoverTile, ResizeHandles } from './handles';
@@ -87,7 +87,7 @@ import { ModelRefresh } from '../shared/modelRefresh';
 import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
-import { PIXEL_BUDGET, renderScale, watchPixelRatio } from '../shared/resolution';
+import { DEFAULT_RESOLUTION, renderScale, watchPixelRatio } from '../shared/resolution';
 import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
@@ -187,6 +187,8 @@ const NOON_SKY_LUMA = skyLuma(lightingAt(13 * 60, LOOK, createLighting()));
 
 /** Residents this far (m) outside the viewed lot are still drawn (walking up to it). */
 const SIM_VIEW_MARGIN = 2;
+/** How far round the watch rectangle the sim keeps residents in full detail (m: sim-core `lod::VIEW_MARGIN`; `reportWatch`). */
+const DETAIL_MARGIN = 5;
 /** Residents further than this (m) from the camera's target, off the viewed lot, have no contact shadow. */
 const FAR_SHADOW = 40;
 /** `?residents=lot`: residents drawn only on the viewed lot, as before life on every lot. */
@@ -351,7 +353,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly townRig = new OverviewCamera(this.townPose);
 
   private readonly pacer = new FramePacer();
-  private options: LiveRenderOptions = { resolution: 'auto', cameraSensitivity: 1, fpsCap: 0 };
+  private options: LiveRenderOptions = { resolution: DEFAULT_RESOLUTION, cameraSensitivity: 1, fpsCap: 0 };
   private active = false;
   private covered = false;
   private coveredFrames = 0;
@@ -739,6 +741,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.signals = new Signals(this.app, this.root, this.deps.assets, { shadows: this.quality.streetShadows, lod: this.quality.streetLod });
     this.characters.setShadowTest(inMap);
     this.characters.setCarRide((frame, x, z, yaw, aboard, out) => this.cars.ride(frame, x, z, yaw, aboard, out));
+    // (Out on the hills between hamlets, on the land, not sunk into it: `Characters.setGround`.)
+    this.characters.setGround((x, z) => this.lot.landscape?.heightAt(x, z) ?? 0);
     this.decorTemplates = new TemplateCache(this.app);
     this.storeyLayer = new pc.Entity('storeyLayer');
     this.root.addChild(this.storeyLayer);
@@ -1106,7 +1110,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The roaming square's middle (8 m steps) and half side (8 m steps), as last set. */
   private readonly roamSquare = new Float64Array(3);
 
-  /** The sim's full-detail area: the chunks streamed in, as a tile rectangle on the ground (`onWatch`). */
+  /**
+   * The sim's full-detail area: the chunks streamed in, as a tile rectangle on the ground (`onWatch`); the residents
+   * told it (`Residents.setDetailArea`: one it reaches is caught up by the sim, hidden a moment meanwhile).
+   */
   private reportWatch(): void {
     const world = this.builtWorld;
     if (!world || !this.watchListener || !this.roam.chunks.size) return;
@@ -1119,7 +1126,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       z1 = Math.max(z1, (cz + 1) * CHUNK);
     }
     const d = groundDepth(world);
-    this.watchListener([Math.max(0, x0), Math.max(0, z0), Math.min(world.width, x1), Math.min(d, z1)]);
+    const rect: [number, number, number, number] = [Math.max(0, x0), Math.max(0, z0), Math.min(world.width, x1), Math.min(d, z1)];
+    this.watchListener(rect);
+    // (Out of it the sim moves residents only now and then: one it reaches catches up in a jump, hidden meanwhile.)
+    const [a, b, c, e] = [rect[0] - DETAIL_MARGIN, rect[1] - DETAIL_MARGIN, rect[2] + DETAIL_MARGIN, rect[3] + DETAIL_MARGIN];
+    this.characters.setDetailArea((x, z) => x >= a && z >= b && x <= c && z <= e);
   }
 
   /** The street builds the chunks streamed in (between world builds; a world build builds them itself). */
@@ -1217,6 +1228,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // thing, hundreds of MB of buffers; Low's merged object shadows alone 260 MB, which lost the
     // WebGPU device): with no lot given, the focus stays the lot built, else the one nearest the camera.
     if (!view && world.meta?.world?.size === 'big') view = this.view ?? this.nearestLot(world);
+    // (Which traffic lights' poles get a pedestrians' head: those by a crosswalk.)
+    this.signals.setWorld(world);
     if (this.rebuildNext) this.rebuildNext = false;
     else if (this.patchable(world, view)) {
       this.patchWorld(world);
@@ -1428,8 +1441,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       await this.pace();
       // The viewed lot's fences stand on the ground (hidden with it while the basement is in view, its
       // hedges with the garden's shrubs: `lotHedges`); other lots' are the street's, but for their gates, which swing.
+      const walls = wallCorners(world.walls);
+      const wallAt = (x: number, z: number) => walls.has(`${x}:${z}`);
       for (const [list, storey] of [[lotFences, 0], [shown.filter((f) => !onLot(f) && f.kind === 'gate'), undefined]] as const) {
-        const fences = buildFences(this.app, this.root, list, this.deps.content.fenceStyles);
+        const fences = buildFences(this.app, this.root, list, this.deps.content.fenceStyles, { wallAt });
         if (!fences) continue;
         this.lotEntities.push({ entity: fences.entity, storey });
         for (const leaf of fences.gates) this.gates.push({ fences, leaf, open: 0, towards: 1 });
@@ -1968,6 +1983,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (bits === this.cutLook) return;
     this.cutLook = bits;
     this.placing.cutWallItems(bits, this.shownWallMode === 'down'); // (things on the walls go with them, but the one in hand.)
+    this.street.cutLot(bits, this.shownWallMode === 'down'); // (and the porch's lamps.)
     this.lib.wallCut.look.set(bits & 1 ? 1 : 0, bits & 2 ? 1 : 0, bits & 4 ? 1 : 0, bits & 8 ? 1 : 0);
   }
 
@@ -2714,7 +2730,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const dpr = window.devicePixelRatio || 1;
     const w = this.cssSize.width * dpr;
     const h = this.cssSize.height * dpr;
-    const scale = (this.renderScaleNow = renderScale(w, h, this.options.resolution, PIXEL_BUDGET * this.quality.pixelBudget));
+    const scale = (this.renderScaleNow = renderScale(h, this.options.resolution));
     this.app.setCanvasResolution(pc.RESOLUTION_FIXED, Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)));
   }
 

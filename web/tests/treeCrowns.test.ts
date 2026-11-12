@@ -44,25 +44,23 @@ describe('tree crowns', async () => {
   test("no town tree's crown grows into a house", () => {
     let trees = 0;
     for (const kind of ['small', 'medium', 'dense', 'farm', 'seaside', 'mountain', 'lakeside', 'forest'] as const) {
-      for (const size of ['cosy', 'normal'] as const) {
-        for (const seed of [11, 4242, 90210]) {
-          const town = generateWorld(content, t, kind, seed, undefined, size);
-          const layout = layoutTown(content, t, town, null);
-          const edges = new Map<string, string>();
-          for (const [x0, z0, x1, z1] of layout.walls) {
-            if (Math.max(z0, z1) > town.depth) continue;
-            if (z0 === z1) for (let x = Math.min(x0, x1); x < Math.max(x0, x1); x++) edges.set(`h:${x}:${z0}`, 'wall');
-            else for (let z = Math.min(z0, z1); z < Math.max(z0, z1); z++) edges.set(`v:${x0}:${z}`, 'wall');
-          }
-          for (const o of layout.objects) {
-            const def = content.object(o.def);
-            const crown = def?.crown ?? 0;
-            if (crown <= 0 || o.z >= town.depth) continue;
-            trees++;
-            const [fw, fd] = def?.footprint ?? [1, 1];
-            const [w, d] = (o.rot ?? 0) % 2 ? [fd, fw] : [fw, fd];
-            expect(crownClear({ edges }, o.x + w / 2, o.z + d / 2, crown), `${kind} ${size} ${seed}: ${o.def} at ${o.x}, ${o.z}`).toBe(true);
-          }
+      for (const seed of [11, 4242, 90210]) {
+        const town = generateWorld(content, t, kind, seed);
+        const layout = layoutTown(content, t, town, null);
+        const edges = new Map<string, string>();
+        for (const [x0, z0, x1, z1] of layout.walls) {
+          if (Math.max(z0, z1) > town.depth) continue;
+          if (z0 === z1) for (let x = Math.min(x0, x1); x < Math.max(x0, x1); x++) edges.set(`h:${x}:${z0}`, 'wall');
+          else for (let z = Math.min(z0, z1); z < Math.max(z0, z1); z++) edges.set(`v:${x0}:${z}`, 'wall');
+        }
+        for (const o of layout.objects) {
+          const def = content.object(o.def);
+          const crown = def?.crown ?? 0;
+          if (crown <= 0 || o.z >= town.depth) continue;
+          trees++;
+          const [fw, fd] = def?.footprint ?? [1, 1];
+          const [w, d] = (o.rot ?? 0) % 2 ? [fd, fw] : [fw, fd];
+          expect(crownClear({ edges }, o.x + w / 2, o.z + d / 2, crown), `${kind} ${seed}: ${o.def} at ${o.x}, ${o.z}`).toBe(true);
         }
       }
     }

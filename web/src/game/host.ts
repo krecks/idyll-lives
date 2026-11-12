@@ -14,6 +14,7 @@ import type { Renderer, RenderFailure } from '../render/types';
 import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app, type Progress } from '../ui/app.svelte';
 import { perfTime, perfTimeAsync } from '../debug/perf';
+import { DEVLOG, devlog, devlogPause, renderSample, SAMPLE_MS } from '../debug/devlog';
 import { game, toast } from '../ui/state.svelte';
 import { basicReport, within } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
@@ -84,6 +85,17 @@ class GameHost {
   private covered = false;
 
   constructor() {
+    // The dev play log (`debug/devlog.ts`): while only the menus use the renderer, what it draws every few
+    // seconds (a game's own samples say the rest).
+    if (DEVLOG) {
+      setInterval(() => {
+        if (this.current?.live || !this.renderer) return;
+        void this.renderer.then(
+          (r) => !this.current?.live && devlog('menuSample', { screen: app.screen, townShown: r.townShown, render: renderSample(r.stats(), liveSettings.resolution) }),
+          () => {},
+        );
+      }, SAMPLE_MS);
+    }
     this.root = document.createElement('div');
     this.root.className = 'game-host';
     this.canvas = sceneCanvas();
@@ -301,6 +313,8 @@ class GameHost {
   cover(on: boolean): void {
     if (on === this.covered) return;
     this.covered = on;
+    // (The dev play log: the gap this makes between frames isn't a stall.)
+    devlogPause();
     void this.renderer?.then((r) => r.hold(on)).catch(() => {});
   }
 
@@ -331,6 +345,7 @@ class GameHost {
       // reset, "Graphics were reset") offers to save and reload.
       renderer.onFailure = this.onRendererFailure;
       await renderer.init(this.canvas);
+      devlog('renderer', { backend: renderer.stats().backend, preset: renderer.stats().preset, webGpuFailed: webGpuFailed() });
       renderer.hold(this.covered);
       if (webGpuFailed() && settings.renderer !== 'webgl' && !this.toldFallback) {
         this.toldFallback = true;

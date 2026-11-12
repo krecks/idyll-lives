@@ -118,10 +118,16 @@ bed is the partner's (Mummy and Daddy share a bed, and sometimes a child does fo
 bunk bed is a bed for each. Whoever minds a crib in there goes in to the baby, a lodger too; being
 sent to a bed doesn't make anyone else one of them. Walking through a bedroom to a room beyond is
 allowed. Newcomers are never strangers (a single, a couple, perhaps with a grown child, or
-siblings), and bed places count a couple's bed as one unless a couple sleeps in it. The bathroom
+siblings), and bed places count a couple's bed as one unless a couple sleeps in it, and a bed only
+for the ages it's for (the race car bed is no teenager's place). The bathroom
 is never claimed: nobody has a place in it, so it shuts for whomever is in there. Residents don't
 have beds of their own yet: before anyone lies down, a free bed in the room is a place for any of
-the household. Code: `privacy.rs` (`Shut::claimants`, `World::claimants_cache`),
+the household, but a couple's bed is kept for the couple while they need it (the other half while
+one of them lies in it and the other is home; empty, while there are no more couple's beds free
+than couples without one). Anyone else, a grown son with no bed of his own say, sleeps on the
+sofa (a spare bed's night, `spare`) and takes the parents' bed only with nowhere else at all:
+the son who took it first left his father kept out of the room, asleep on the landing (F8 report
+2026-11-11). Code: `privacy.rs` (`Shut::claimants`, `World::claimants_cache`),
 `lifecycle.rs` (`Beds`).
 
 ## Opinions and wishes
