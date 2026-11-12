@@ -232,6 +232,12 @@ export const HOUSE_LOOK = tuned('house', {
   wallCorner: 0.28,
   wallCornerReach: 0.9,
   wallVary: 0.06,
+  /**
+   * The cap shingles of a roof's ridge and hips against its slopes (the colour's multiplier, sRGB). A little
+   * darker only: they stand proud of the slopes, which shades them by day. A fifth darker (0.8), by night and
+   * at dusk, when the slopes either side are one tone, a hip's cap was a hard dark stripe across the roof.
+   */
+  roofCap: 0.95,
 });
 
 /**
@@ -2562,12 +2568,12 @@ export function addRoof(
     plane([[ea1, ye, eb0], [ea1, ye, eb1], [ra1, yr, bc]], [[eb0, 0], [eb1, 0], [bc, vr]], sideA1);
     trim.poly([P(ea0, ye, eb0), P(ea0, ye, eb1), P(ea0, ye + th, eb1), P(ea0, ye + th, eb0)], sideA0);
     trim.poly([P(ea1, ye, eb0), P(ea1, ye + th, eb0), P(ea1, ye + th, eb1), P(ea1, ye, eb1)], sideA1);
-    // Hip caps: a course of cap shingles up each hip, a fifth darker as the ridge's is, standing a little
-    // proud of the two slopes it covers the joint of (a hip was a bare seam between two tones).
+    // Hip caps: a course of cap shingles up each hip, a little darker as the ridge's is (`HOUSE_LOOK.roofCap`),
+    // standing a little proud of the two slopes it covers the joint of (a hip was a bare seam between two tones).
     const [r, g, b] = [roof.r, roof.g, roof.b];
-    roof.r *= 0.8;
-    roof.g *= 0.8;
-    roof.b *= 0.8;
+    roof.r *= HOUSE_LOOK.roofCap;
+    roof.g *= HOUSE_LOOK.roofCap;
+    roof.b *= HOUSE_LOOK.roofCap;
     const len = Math.hypot(pitch, 1);
     type L3 = [number, number, number];
     const cross = (u: L3, v: L3): L3 => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
@@ -2611,9 +2617,9 @@ export function addRoof(
     const r = roof.r;
     const g = roof.g;
     const b = roof.b;
-    roof.r *= 0.8;
-    roof.g *= 0.8;
-    roof.b *= 0.8;
+    roof.r *= HOUSE_LOOK.roofCap;
+    roof.g *= HOUSE_LOOK.roofCap;
+    roof.b *= HOUSE_LOOK.roofCap;
     roof.box(Math.min(c0[0], c1[0]), c0[1] - 0.02, Math.min(c0[2], c1[2]), Math.max(c0[0], c1[0]), c1[1], Math.max(c0[2], c1[2]), 'ny');
     roof.r = r;
     roof.g = g;
