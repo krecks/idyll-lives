@@ -39,9 +39,21 @@ group. The keys are unchanged.
   outline through the star's face as dark lines). Its origin is its middle, as the old part's: 1,344 triangles
   where the old part took 1,936 (and its outline as many again).
 
+- **Patches** (`model.flowers.daisies`, `.buttercups`, `.violets`, 2026-11-12): where the lawn's flowers gather on a
+  mown plot (`lawns`, `FLOWER_PATCHES`), by the thousand, so they are light: five or six heads on a disc half a
+  metre across, each the top of a flower only (a fan of petals and a flat eye laid on it, `_head`: under 3
+  triangles a petal) on a sliver of a stem (2), no leaves. Every face's normal is bent to the sky, as the blades'
+  are: a head is 4 to 7 px from the play camera, and shaded by its own slope half of it drew dark. No shading from
+  the ground (`ground=False`), which had every head, all within 10 cm of it, dark. A first version with `flower`'s
+  closed heads and tube stems (228 triangles a patch of daisies) cost 0.23 ms of GPU a frame on Medium over the
+  village; these, on the plots only, 0.07 ms and 0.09 M triangles (M3 Pro, the orbit by day, medians of 3).
+
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|
 | flowers | 0.14 × 0.27 × 0.17 | 266 (was 156) | 64 (was 58) | 1 |
+| daisies | 0.58 × 0.10 × 0.46 | 126 | 48 | 1 |
+| buttercups | 0.55 × 0.13 × 0.45 | 75 | 35 | 1 |
+| violets | 0.50 × 0.09 × 0.39 | 90 | 42 | 1 |
 | rock | 1.13 × 0.55 × 0.83 | 1,654 (was 492) | 56 (unchanged) | 1 |
 | marker | 0.23 × 0.34 × 0.06 | 1,344 | — | 1 |
 

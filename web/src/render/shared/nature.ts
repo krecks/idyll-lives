@@ -824,12 +824,43 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       flowers.push(placed(scale, scale, scale, yaw, px, this.heightAt(x, z), pz));
       flowerTiles.push(-1);
     }
+    // Where they gather, patches of one kind of small flower, so a drift reads as one from the game's camera: daisies
+    // in most, buttercups or violets in others, more of them towards a drift's middle. (Draws of their own: the
+    // flowers above stand where they always have.)
+    const patchRand = mulberry32(this.seed ^ 0x5d21f);
+    const patches = FLOWER_PATCHES.kinds.map((kind) => ({ kind, matrices: [] as Float32Array[], tiles: [] as number[] }));
+    // (On the plots' mown lawns: the rough grass between them is over their heads.)
+    const mown = new Uint8Array(paved.length);
+    for (const p of world.plots ?? []) {
+      for (let z = Math.max(0, p.z); z < Math.min(groundDepth(world), p.z + p.d); z++) mown.fill(1, z * world.width + Math.max(0, p.x), z * world.width + Math.min(world.width, p.x + p.w));
+    }
+    for (let z = 0; z < groundDepth(world); z++) {
+      if (z % 8 === 0) await pace?.();
+      for (let x = 0; x < world.width; x++) {
+        const i = z * world.width + x;
+        if (paved[i] || !mown[i]) continue;
+        const drift = smoothstep(FLOWER_PATCHES.from, FLOWER_PATCHES.full, valueNoise(x / FLOWER_DRIFTS.span, z / FLOWER_DRIFTS.span, this.seed + 421));
+        if (drift <= 0 || (this.zones && this.waterEdge(x + 0.5, z + 0.5) > -BEACH * 0.6)) continue;
+        const which = valueNoise(x / FLOWER_PATCHES.kindSpan, z / FLOWER_PATCHES.kindSpan, this.seed + 433);
+        const into = patches[which < FLOWER_PATCHES.split[0] ? 0 : which < FLOWER_PATCHES.split[1] ? 1 : 2];
+        const n = Math.floor(drift * FLOWER_PATCHES.dense + patchRand());
+        for (let k = 0; k < n; k++) {
+          into.matrices.push(scatter(x, z, patchRand, 0.85 + patchRand() * 0.5));
+          into.tiles.push(i);
+        }
+      }
+    }
     // A lighter lawn keeps every so many of them, the same ones each time (the placement above is unchanged).
     const d = this.lawnDensity;
     const thin = <T>(list: T[]) => (d >= 1 ? list : list.filter((_, k) => Math.floor((k + 1) * d) > Math.floor(k * d)));
     // (Flowers are sparse: too few triangles for groups to pay; but a big world's are a kilometre of them, in squares.)
     const cell = this.built ? (x: number, z: number) => `${Math.floor(x / BIG_FLOWERS_CELL)}:${Math.floor(z / BIG_FLOWERS_CELL)}` : undefined;
-    return [{ key: 'model.flowers', matrices: thin(flowers), tiles: thin(flowerTiles), ...(cell ? { cell } : {}) }];
+    // (The patches in squares the camera leaves out when out of view, in a town too.)
+    const patchCell = cell ?? ((x: number, z: number) => `${Math.floor(x / FLOWER_PATCHES.cell)}:${Math.floor(z / FLOWER_PATCHES.cell)}`);
+    return [
+      { key: 'model.flowers', matrices: thin(flowers), tiles: thin(flowerTiles), ...(cell ? { cell } : {}) },
+      ...patches.filter((p) => p.matrices.length).map((p) => ({ key: p.kind, matrices: thin(p.matrices), tiles: thin(p.tiles), cell: patchCell })),
+    ];
   }
 }
 
@@ -843,6 +874,21 @@ export type Decor = [number, number, number, number][];
  * six tiles in a hundred had one, wherever they were (the noise is over `from` on about a third of the land).
  */
 const FLOWER_DRIFTS = tuned('flowers', { span: 6, from: 0.6, full: 0.76, dense: 0.22, single: 0.006 });
+
+/**
+ * The patches of small flowers where the lawn's flowers gather (`lawns`): the drifts' noise from where there are
+ * any to where there are `dense` of them a tile; their models, and the values of a wider noise (`kindSpan` m a
+ * cell) that part the first kind's drifts from the second's and the third's; `cell`: the squares (m) they are drawn in.
+ */
+const FLOWER_PATCHES = tuned('patches', {
+  from: 0.6,
+  full: 0.8,
+  dense: 2.2,
+  kinds: ['model.flowers.daisies', 'model.flowers.buttercups', 'model.flowers.violets'],
+  kindSpan: 17,
+  split: [0.52, 0.64],
+  cell: 32,
+});
 
 /** Clear distances for lot trees (trunk to edge, metres). */
 const TREE_CLEAR = { street: 3.0, path: 1.3, house: 2.2, object: 1.0 };

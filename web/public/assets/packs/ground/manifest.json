@@ -62,6 +62,54 @@
         }
       },
       "sink": 0.17
+    },
+    "model.flowers.daisies": {
+      "type": "model",
+      "url": "../../models/ground/daisies.glb",
+      "materials": {
+        "eye": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "petal_white": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/ground/daisies.far.glb"
+    },
+    "model.flowers.buttercups": {
+      "type": "model",
+      "url": "../../models/ground/buttercups.glb",
+      "materials": {
+        "eye_orange": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "petal_yellow": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/ground/buttercups.far.glb"
+    },
+    "model.flowers.violets": {
+      "type": "model",
+      "url": "../../models/ground/violets.glb",
+      "materials": {
+        "eye_pale": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "petal_violet": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "far": "../../models/ground/violets.far.glb"
     }
   }
 }

@@ -6,7 +6,7 @@
  *
  * The groups: `look` (`LOOK`'s own fields), `key.<hour>` (one time-of-day keyframe) and `night` (the night's,
  * all four) in `render/look.ts`; `lawn` in `pc/shaders/grass.ts`; `ground` (the lawn's map) in `shared/lawn.ts`;
- * `flowers` (the lawn's flowers' drifts) in `shared/nature.ts`; `shade` (the ground's shade round what stands on it) in
+ * `flowers` (the lawn's flowers' drifts) and `patches` (the patches of small flowers in them) in `shared/nature.ts`; `shade` (the ground's shade round what stands on it) in
  * `shared/groundShade.ts`; `clouds` (the clouds' shadows) in `pc/cloudShadows.ts`; `leaves` (the plants' leaves from
  * above and from plant to plant) in `pc/nature.ts`.
  */

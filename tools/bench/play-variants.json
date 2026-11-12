@@ -154,5 +154,18 @@
       "lit from above, gently": "leaves.top:1.25,1.22,1.05;leaves.under:0.8;leaves.warm:1.07,1.02,0.84;leaves.cool:0.9,0.98,1.04;leaves.value:0.92,1.06",
       "lit from above, more variety (as it is)": ""
     }
+  },
+  "patches": {
+    "poses": [
+      "day-home-13",
+      "day-east-13",
+      "day-north-16",
+      "day-back-13"
+    ],
+    "variants": {
+      "single flowers (before 2026-11-12)": "patches.dense:0",
+      "thinner": "patches.dense:1.2",
+      "patches of daisies, buttercups and violets (as it is)": ""
+    }
   }
 }

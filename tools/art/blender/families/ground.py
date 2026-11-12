@@ -254,6 +254,84 @@ def flowers():
     return G.settle([G.join_all('flowers')])
 
 
+# ---- the lawn's drifts -----------------------------------------------------------------------------------------
+
+def _drift(name, seed, petals, eye, heads, spread, radius, heights, shape):
+    """A patch of one kind of lawn flower, as daisies stand in a lawn: `heads` small heads on short stems (their
+    `heights` over the ground, from and to: at the tips of a mown lawn's blades) scattered over a disc `spread`
+    across, none on another, each tilted its own way a little. No leaves: they are down among the grass. The game
+    stands patches by the hundred where the lawn's flowers gather (render/shared/nature.ts `lawns`), so it is light:
+    a head under 3 triangles a petal (`_head`), a stem 2; a far version's heads a fan each."""
+    rng = random.Random(seed)
+    spots = []
+    for i in range(heads):                                            # spread evenly (a sunflower's spiral), then nudged
+        a, r = i * 2.39996 + rng.uniform(-0.5, 0.5), spread / 2 * math.sqrt((i + rng.uniform(0.3, 0.9)) / heads)
+        spots.append((r * math.cos(a), r * math.sin(a)))
+    for i, (x, y) in enumerate(spots):
+        h = rng.uniform(*heights)
+        lean = (rng.uniform(-0.012, 0.012), rng.uniform(-0.012, 0.012))
+        top = Vector((x + lean[0], y + lean[1], h))
+        base = Vector((x, y, 0))
+        # (The stem a sliver seen from either side: 2 triangles.)
+        a = rng.uniform(0, math.tau)
+        across = Vector((math.cos(a), math.sin(a), 0)) * 0.005
+        sliver = [base + across, base - across, top]
+        _mesh(f'{name}_stem{i}', sliver + sliver, [(0, 1, 2), (5, 4, 3)], M.leaf, smooth=False, sky=SKY, recalc=False)
+        _head(f'{name}_head{i}', top, radius * rng.uniform(0.85, 1.15), rng.uniform(3, 12), rng.uniform(0, 360),
+              petals, eye, **shape)
+    return G.settle([G.join_all(name)])
+
+
+def _head(name, at, radius, tilt, yaw, petals, eye, n=5, notch=0.8, cup=0.0, disc=0.32, dome=0.011):
+    """A lawn flower's head, as `flower` shapes one, for looking down on, by the thousand: its top only (the lawn is
+    under it), the petals one fan from its middle, the eye a flat polygon laid on them, and every face lit as the
+    sky sees it (`SKY`), so its petals are one light colour whichever way they lean: shaded each by its own slope,
+    half of a head 4 px across drew dark. 3n - 2 triangles; n in a far version (no eye, no notches)."""
+    full = low(True, False)
+    turn = Matrix.Rotation(math.radians(yaw), 4, 'Z') @ Matrix.Rotation(math.radians(tilt), 4, 'Y')
+    place = Matrix.Translation(at) @ turn
+    if full:
+        rim = [Vector(((radius if i % 2 == 0 else radius * notch) * math.cos(math.tau * i / (2 * n)),
+                       (radius if i % 2 == 0 else radius * notch) * math.sin(math.tau * i / (2 * n)),
+                       (0.004 + cup) if i % 2 == 0 else cup * 0.6)) for i in range(2 * n)]
+        middle = Vector((0, 0, cup * 0.3))
+        top = [Vector((radius * disc * math.cos(math.tau * (i + 0.5) / n), radius * disc * math.sin(math.tau * (i + 0.5) / n),
+                       dome * 0.6 + cup * 0.3)) for i in range(n)]
+        verts = rim + [middle] + top
+        C, E = 2 * n, 2 * n + 1
+        faces = [(C, i, (i + 1) % (2 * n)) for i in range(2 * n)] + [(E, E + i, E + i + 1) for i in range(1, n - 1)]
+        colours = [0] * (2 * n) + [1] * (n - 2)
+    else:
+        rim = [Vector((radius * 0.9 * math.cos(math.tau * i / n), radius * 0.9 * math.sin(math.tau * i / n), 0.004 + cup)) for i in range(n)]
+        verts = rim + [Vector((0, 0, 0.006 + cup * 0.5))]
+        faces = [(n, i, (i + 1) % n) for i in range(n)]
+        colours = [0] * n
+    obj = _mesh(name, [place @ v for v in verts], faces, petals, smooth=False, sky=SKY, recalc=False)
+    if full:
+        obj.data.materials.append(eye)
+        for p, c in zip(obj.data.polygons, colours):
+            p.material_index = c
+    return obj
+
+
+def daisies():
+    """A patch of lawn daisies: white rays round a yellow eye."""
+    return _drift('daisies', 7, M.petal_white, M.eye, 6, 0.66, 0.043, (0.055, 0.1),
+                  dict(n=low(7, 6), notch=0.66, disc=0.36, dome=0.009))
+
+
+def buttercups():
+    """A patch of creeping buttercups: five glossy yellow petals, cupped."""
+    return _drift('buttercups', 11, M.petal_yellow, M.eye_orange, 5, 0.6, 0.037, (0.07, 0.12),
+                  dict(n=5, notch=0.84, cup=0.007, disc=0.26))
+
+
+def violets():
+    """A patch of low violet flowers (a selfheal's or a speedwell's blue-violet), a pale eye in each."""
+    return _drift('violets', 19, M.petal_violet, M.eye_pale, 6, 0.54, 0.034, (0.045, 0.085),
+                  dict(n=5, notch=0.86, disc=0.24, dome=0.006))
+
+
 # ---- the rock --------------------------------------------------------------------------------------------------
 
 ROCK_CENTRE = (0.085, 0.01)   # game (x, depth): the old part's middle
@@ -489,6 +567,9 @@ def marker():
 FAMILY = G.Family(
     'ground', M,
     [G.Model('flowers', flowers, size=(0.143, 0.274, 0.165), key='model.flowers', far=far_of(flowers)),
+     G.Model('daisies', daisies, size=(0.578, 0.102, 0.455), key='model.flowers.daisies', far=far_of(daisies), code=True, ground=False),
+     G.Model('buttercups', buttercups, size=(0.552, 0.133, 0.445), key='model.flowers.buttercups', far=far_of(buttercups), code=True, ground=False),
+     G.Model('violets', violets, size=(0.501, 0.091, 0.385), key='model.flowers.violets', far=far_of(violets), code=True, ground=False),
      G.Model('rock', rock, size=(1.137, 0.55, 0.829), key='model.rock', centre=ROCK_CENTRE, floor=False, far=far_of(rock),
              tolerance=0.05, sink=-GROUND),
      G.Model('marker', marker, size=(0.23, 0.34, 0.064), key='model.marker', floor=False, sink=0.17)],
