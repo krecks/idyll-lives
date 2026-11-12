@@ -39,6 +39,8 @@ type Rand = () => number;
 /** How long a main town's high street is (m, at most), and how far its centre reaches either side of its middle line. */
 const HIGH_STREET = 180;
 const BAND = 32;
+/** The bands a centre's outline is tried at, widest first (`outline`): a narrower one where the wider crosses itself, or isn't the densest. */
+const BANDS = [BAND, 24, 18, 12];
 /** A main town's square (m along its street, m deep), the larger first. */
 const SQUARES: readonly [number, number][] = [
   [26, 18],
@@ -67,6 +69,9 @@ export interface Centre {
   road: number;
   s0: number;
   s1: number;
+  /** How far the outline reaches either side of the street (m), and the square along it (`outline`). */
+  band: number;
+  at?: { s: number; w: number; d: number; side: 1 | -1; front: number };
 }
 
 const add = (a: Pt, b: Pt, k = 1): Pt => [a[0] + b[0] * k, a[1] + b[1] * k];
@@ -221,23 +226,41 @@ function selfCrossing(poly: readonly Pt[]): boolean {
  * square. Null: no street long enough.
  */
 export function chooseCentre(roads: readonly RoadPlan[], areaRoads: readonly number[], middle: Pt, ground: Ground, area = 0): Centre | null {
-  let best: { road: number; s: number; side: 1 | -1; score: number } | null = null;
+  // Stretches of the area's streets and lanes round its middle: the one nearest it, straight
+  // enough for its outline not to cross itself, with the most land nothing takes yet (no green,
+  // no water, no other road) to build on.
+  let best: { road: number; s0: number; s1: number; side: 1 | -1; score: number } | null = null;
   for (const r of areaRoads) {
     const road = roads[r];
     if (road.kind === 'country' || road.kind === 'trail') continue;
-    const at = nearest(road.points, middle[0], middle[1]);
-    const score = at.dist + (road.kind === 'lane' ? 40 : 0);
-    if (!best || score < best.score) best = { road: r, s: at.s, side: at.side, score };
+    const ls = lengths(road.points);
+    const L = ls[ls.length - 1];
+    const half = Math.min(HIGH_STREET / 2, L / 2 - 6);
+    if (half < 20) continue;
+    const near = nearest(road.points, middle[0], middle[1], ls);
+    for (const shift of [0, -50, 50, -100, 100]) {
+      const mid = Math.max(6 + half, Math.min(L - 6 - half, near.s + shift));
+      const { p } = pointAt(road.points, mid, ls);
+      const probe: Centre = { area, poly: [], square: null, road: r, s0: mid - half, s1: mid + half, band: BAND };
+      // (The widest band whose outline doesn't cross itself: round a tight bend, a narrower one.)
+      const band = BANDS.find((b) => !selfCrossing(outline(roads, probe, b)));
+      if (band === undefined) continue;
+      const poly = outline(roads, probe, band);
+      let [free, all] = [0, 0];
+      fillPoly(poly, ground.w, ground.d, (i) => {
+        all++;
+        if (!ground.takenAt((i % ground.w) + 0.5, Math.floor(i / ground.w) + 0.5)) free++;
+      });
+      const score = dist(p, middle) + (road.kind === 'lane' ? 40 : 0) + (1 - free / Math.max(1, all)) * 200 + (BAND - band) * 3;
+      if (!best || score < best.score) best = { road: r, s0: mid - half, s1: mid + half, side: near.side, score };
+    }
   }
   if (!best) return null;
   const road = roads[best.road];
   const pts = road.points;
   const ls = lengths(pts);
-  const L = ls[ls.length - 1];
-  const half = Math.min(HIGH_STREET / 2, L / 2 - 6);
-  if (half < 20) return null;
-  const mid = Math.max(6 + half, Math.min(L - 6 - half, best.s));
-  const [s0, s1] = [mid - half, mid + half];
+  const { s0, s1 } = best;
+  const mid = (s0 + s1) / 2;
   const hw = road.width / 2;
   const front = hw + 1.5;
   // The square: the largest that fits, nearest the middle, on the middle's side first.
@@ -268,24 +291,33 @@ export function chooseCentre(roads: readonly RoadPlan[], areaRoads: readonly num
       if (inside(sq, x + 0.5, z + 0.5)) ground.take({ x, z, w: 1, d: 1 });
     });
   }
-  // The outline: the band along the high street, out round the square.
-  for (const band of [BAND, 18, 12]) {
-    const left: Pt[] = [];
-    const right: Pt[] = [];
-    const steps = Math.ceil((s1 - s0) / 4);
-    for (let k = 0; k <= steps; k++) {
-      const s = s0 + ((s1 - s0) * k) / steps;
-      const { p, t } = pointAt(pts, s, ls);
-      const n = leftOf(t);
-      const round = square && Math.abs(s - square.s) <= square.w / 2 + 2 ? Math.max(band, front + square.d + 4) : band;
-      left.push(add(p, n, square?.side === 1 ? round : band));
-      right.push(add(p, n, -(square?.side === -1 ? round : band)));
-    }
-    let poly = [...left, ...right.reverse()].map(([x, z]): Pt => [r2(x), r2(z)]);
-    if (signedArea2(poly) > 0) poly = poly.reverse();
-    if (!selfCrossing(poly) || band === 12) return { area, poly, square: square?.poly.map(([x, z]): Pt => [r2(x), r2(z)]) ?? null, road: best.road, s0, s1 };
+  const centre: Centre = { area, poly: [], square: square?.poly.map(([x, z]): Pt => [r2(x), r2(z)]) ?? null, road: best.road, s0, s1, band: BAND, ...(square ? { at: { s: square.s, w: square.w, d: square.d, side: square.side, front } } : {}) };
+  for (const band of BANDS) {
+    centre.poly = outline(roads, centre, band);
+    centre.band = band;
+    if (!selfCrossing(centre.poly)) break;
   }
-  return null;
+  return centre;
+}
+
+/** A centre's outline `band` m either side of its high street, out round its square: counter-clockwise seen from above. */
+function outline(roads: readonly RoadPlan[], c: Centre, band: number): Pt[] {
+  const pts = roads[c.road].points;
+  const ls = lengths(pts);
+  const { s0, s1, at } = c;
+  const left: Pt[] = [];
+  const right: Pt[] = [];
+  const steps = Math.ceil((s1 - s0) / 4);
+  for (let k = 0; k <= steps; k++) {
+    const s = s0 + ((s1 - s0) * k) / steps;
+    const { p, t } = pointAt(pts, s, ls);
+    const n = leftOf(t);
+    const round = at && Math.abs(s - at.s) <= at.w / 2 + 2 ? Math.max(band, at.front + at.d + 4) : band;
+    left.push(add(p, n, at?.side === 1 ? round : band));
+    right.push(add(p, n, -(at?.side === -1 ? round : band)));
+  }
+  const poly = [...left, ...right.reverse()].map(([x, z]): Pt => [r2(x), r2(z)]);
+  return signedArea2(poly) > 0 ? poly.reverse() : poly;
 }
 
 /**
@@ -476,7 +508,8 @@ interface Namer {
   last(): string;
   street(): string;
   inn(): string;
-  unique(name: string): string;
+  /** A name `draw` gives that no place has yet. */
+  unique(draw: () => string): string;
 }
 
 export interface BackdropInput {
@@ -753,7 +786,16 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
     }
     for (const g of greens) fillPoly(g, W, D, (i) => (taken[i] = 1));
     for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
-    const d = centreDensity(W, D, taken, box, c.poly, built.map((b) => b.poly));
+    let d = centreDensity(W, D, taken, box, c.poly, built.map((b) => b.poly));
+    // (Not the densest: the outline narrowed to the street, where the land round it is the emptier.)
+    for (const band of BANDS.filter((b) => b < c.band)) {
+      if (d.centre >= d.rest * DENSEST) break;
+      const poly = outline(roads, c, band);
+      if (selfCrossing(poly)) continue;
+      const n = centreDensity(W, D, taken, box, poly, built.map((b) => b.poly));
+      if (n.centre / Math.max(1e-6, n.rest) <= d.centre / Math.max(1e-6, d.rest)) continue;
+      [c.poly, c.band, d] = [poly, band, n];
+    }
     let rest = d.built[1];
     // (Those not a place, outside the centre, in its box: the furthest from the centre first.)
     const mid = centroidOf(c.poly);
@@ -828,7 +870,10 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
       // (A street's own word: "Mill" of "Mill Lane, Ashby".)
       street: () => (streets.length ? pick(rand, streets).split(',')[0].replace(/ (Street|Road|Lane|Way|Avenue|Row|Close|Drive|Hill|Walk|Crescent|Place|Gardens|Terrace|Parade|Square|Rise|Green|End|Mews|Court)$/, '') : areas[a].name),
       inn: () => `The ${pick(rand, INN_A)} ${pick(rand, INN_B)}`,
-      unique: (name: string) => {
+      unique: (draw: () => string) => {
+        // (Drawn again a few times before it gets a number.)
+        let name = draw();
+        for (let k = 0; k < 8 && taken.has(name); k++) name = draw();
         let out = name;
         for (let k = 2; taken.has(out); k++) out = `${name} ${k}`;
         taken.add(out);
@@ -870,7 +915,7 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
     if (!PLACE_KINDS.includes(kind)) return;
     const c = civicAt.get(i);
     const n = namer(b.area);
-    const name = n.unique(c ? c.name(n) : (farmNames[i] ?? placeName(kind, n)));
+    const name = n.unique(() => (c ? c.name(n) : (farmNames[i] ?? placeName(kind, n))));
     const work = c ? c.work : (KIND_WORK[kind] ?? []);
     // (Its tag at its door: the middle of its front, on the street side.)
     b.place = places.length;
