@@ -152,366 +152,354 @@ fn flood(nav: &NavGrid, start: Walk, round: Rect) -> std::collections::HashSet<u
     seen
 }
 
-#[test]
-#[ignore]
-fn generated_worlds_are_livable() {
-    let path = std::env::var("WORLDS")
-        .expect("set WORLDS to a file made by `bun tools/worlds/sample.ts worlds.json`");
-    let worlds: Vec<serde_json::Value> =
-        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-    let content = common::content();
-    let items: Vec<(usize, &serde_json::Value)> = worlds.iter().enumerate().collect();
-    // Each world's problems, and (a town with bikes at homes without a car) whether someone rode
-    // one.
-    let checked: Vec<(Vec<String>, Option<bool>)> = each_world(&items, |&(i, world)| {
-        let mut failures = Vec::new();
-        let label = format!("{} {} ({})", world["kind"], world["seed"], world["name"]);
-        let mut w = match World::from_json(&content, &world["town"].to_string(), i as u32 + 1) {
-            Ok(w) => w,
-            Err(e) => {
-                failures.push(format!("{label}: {e}"));
-                return (failures, None);
-            }
+/// The town as it loads, before the cars test's two days (`generated_worlds_cars_keep_to_the_roads`):
+/// no more residents than a town holds, a way out of town, a snapshot row for every signal head, the
+/// roads one network, every lot reached from every way into town, no garden shut off by the town's
+/// fences, everything residents use reached (outdoors, in the houses and their basements); the
+/// basement rooms counted.
+fn livable_at_start(
+    w: &World,
+    world: &serde_json::Value,
+    label: &str,
+    failures: &mut Vec<String>,
+) -> usize {
+    if w.sims.len() > MAX_SIMS {
+        failures.push(format!(
+            "{label}: {} residents, more than {MAX_SIMS}",
+            w.sims.len()
+        ));
+    }
+    if w.exits.is_empty() {
+        failures.push(format!("{label}: no way out of town"));
+    }
+    // Every junction's lights with a row in the snapshot for each of its heads: none undrawn.
+    let heads: usize = w.travel.signals.iter().map(|s| s.arms.len()).sum();
+    println!(
+        "  {label}: {} lit junctions, {heads} signal heads",
+        w.travel.signals.len()
+    );
+    if heads > sim_core::snapshot::MAX_LIGHTS {
+        failures.push(format!(
+            "{label}: {heads} signal heads, past the snapshot's {} rows",
+            sim_core::snapshot::MAX_LIGHTS
+        ));
+    }
+    // The town's roads one network as the sim joins them.
+    let networks = Graph::from_town(&w.travel.file, &world["town"]["meta"]).networks();
+    if networks != 1 {
+        failures.push(format!(
+            "{label}: the roads make {networks} networks, not one"
+        ));
+    }
+    let mut cellars = 0;
+    {
+        let nav = NavGrid {
+            lot: &w.lot,
+            blocked: w.blocked(),
+            stairs: w.stair_map(),
+            kept_off: &[],
         };
-        if w.sims.len() > MAX_SIMS {
-            failures.push(format!(
-                "{label}: {} residents, more than {MAX_SIMS}",
-                w.sims.len()
-            ));
-        }
-        if w.exits.is_empty() {
-            failures.push(format!("{label}: no way out of town"));
-        }
-        // Every junction's lights with a row in the snapshot for each of its heads: none undrawn.
-        let heads: usize = w.travel.signals.iter().map(|s| s.arms.len()).sum();
-        println!(
-            "  {label}: {} lit junctions, {heads} signal heads",
-            w.travel.signals.len()
-        );
-        if heads > sim_core::snapshot::MAX_LIGHTS {
-            failures.push(format!(
-                "{label}: {heads} signal heads, past the snapshot's {} rows",
-                sim_core::snapshot::MAX_LIGHTS
-            ));
-        }
-        // The town's roads one network as the sim joins them.
-        let networks = Graph::from_town(&w.travel.file, &world["town"]["meta"]).networks();
-        if networks != 1 {
-            failures.push(format!(
-                "{label}: the roads make {networks} networks, not one"
-            ));
-        }
-        let mut cellars = 0;
-        {
-            let nav = NavGrid {
-                lot: &w.lot,
-                blocked: w.blocked(),
-                stairs: w.stair_map(),
-                kept_off: &[],
-            };
-            let mut walks = Walks::new(&nav);
-            let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
-            let exits: Vec<_> = w.exits.iter().map(|&e| tile(e)).collect();
-            // Every lot from every way into town.
-            for plot in &w.plots {
-                let entry = tile(plot.arrival_point());
-                for &exit in &exits {
-                    if !walks.reaches(exit, entry) {
-                        failures.push(format!(
-                            "{label}: {} can't be reached from {exit:?}",
-                            plot.name
-                        ));
-                    }
+        let mut walks = Walks::new(&nav);
+        let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
+        let exits: Vec<_> = w.exits.iter().map(|&e| tile(e)).collect();
+        // Every lot from every way into town.
+        for plot in &w.plots {
+            let entry = tile(plot.arrival_point());
+            for &exit in &exits {
+                if !walks.reaches(exit, entry) {
+                    failures.push(format!(
+                        "{label}: {} can't be reached from {exit:?}",
+                        plot.name
+                    ));
                 }
             }
-            // No garden shut off by the town's fences: every tile of the ground walked to from the
-            // way into town with the fences gone is walked to with them standing.
-            let reach = |through_fences: bool| {
-                let (wd, dd) = (w.lot.width as i32, w.storey_depth());
-                let mut seen = vec![false; (wd * dd) as usize];
-                let (sx, sz) = exits[0];
-                let mut stack = vec![(sx, sz)];
-                while let Some((x, z)) = stack.pop() {
-                    if x < 0 || z < 0 || x >= wd || z >= dd || seen[(z * wd + x) as usize] {
+        }
+        // No garden shut off by the town's fences: every tile of the ground walked to from the
+        // way into town with the fences gone is walked to with them standing.
+        let reach = |through_fences: bool| {
+            let (wd, dd) = (w.lot.width as i32, w.storey_depth());
+            let mut seen = vec![false; (wd * dd) as usize];
+            let (sx, sz) = exits[0];
+            let mut stack = vec![(sx, sz)];
+            while let Some((x, z)) = stack.pop() {
+                if x < 0 || z < 0 || x >= wd || z >= dd || seen[(z * wd + x) as usize] {
+                    continue;
+                }
+                seen[(z * wd + x) as usize] = true;
+                for (nx, nz) in [(x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1)] {
+                    if nx < 0 || nz < 0 || nx >= wd || nz >= dd || !nav.tile_free(nx, nz) {
                         continue;
                     }
-                    seen[(z * wd + x) as usize] = true;
-                    for (nx, nz) in [(x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1)] {
-                        if nx < 0 || nz < 0 || nx >= wd || nz >= dd || !nav.tile_free(nx, nz) {
-                            continue;
-                        }
-                        let edge = if nx != x {
-                            w.lot.v_edge(x.max(nx) as usize, z as usize)
-                        } else {
-                            w.lot.h_edge(x as usize, z.max(nz) as usize)
-                        };
-                        if !edge.blocks() || (through_fences && edge == Edge::Fence) {
-                            stack.push((nx, nz));
-                        }
+                    let edge = if nx != x {
+                        w.lot.v_edge(x.max(nx) as usize, z as usize)
+                    } else {
+                        w.lot.h_edge(x as usize, z.max(nz) as usize)
+                    };
+                    if !edge.blocks() || (through_fences && edge == Edge::Fence) {
+                        stack.push((nx, nz));
                     }
                 }
-                seen
-            };
-            let (fenced, open) = (reach(false), reach(true));
-            let mut shut = std::collections::BTreeMap::<&str, (usize, (i32, i32))>::new();
-            for (i, (&f, &o)) in fenced.iter().zip(&open).enumerate() {
-                let (x, z) = (i as i32 % w.lot.width as i32, i as i32 / w.lot.width as i32);
-                if o && !f && w.lot.room_at(x, z) == OUTDOORS {
-                    let name = w
-                        .plot_at(x, z)
-                        .map_or("the street", |p| &w.plots[p as usize].name);
-                    shut.entry(name).or_insert((0, (x, z))).0 += 1;
-                }
             }
-            for (name, (n, at)) in shut {
+            seen
+        };
+        let (fenced, open) = (reach(false), reach(true));
+        let mut shut = std::collections::BTreeMap::<&str, (usize, (i32, i32))>::new();
+        for (i, (&f, &o)) in fenced.iter().zip(&open).enumerate() {
+            let (x, z) = (i as i32 % w.lot.width as i32, i as i32 / w.lot.width as i32);
+            if o && !f && w.lot.room_at(x, z) == OUTDOORS {
+                let name = w
+                    .plot_at(x, z)
+                    .map_or("the street", |p| &w.plots[p as usize].name);
+                shut.entry(name).or_insert((0, (x, z))).0 += 1;
+            }
+        }
+        for (name, (n, at)) in shut {
+            failures.push(format!(
+                "{label}: {n} tiles of {name} shut off by fences (one at {at:?})"
+            ));
+        }
+        // Everything outdoors that residents use.
+        let start = exits[0];
+        for o in &w.objects {
+            let def = &w.content.objects[o.def];
+            if def.interactions.is_empty() || w.lot.room_at(o.x, o.z) != OUTDOORS {
+                continue;
+            }
+            if !surface::use_tiles(&w.content, &w.objects, &nav, o)
+                .into_iter()
+                .any(|t| walks.reaches(start, t))
+            {
                 failures.push(format!(
-                    "{label}: {n} tiles of {name} shut off by fences (one at {at:?})"
+                    "{label}: can't reach the {} at {},{}",
+                    def.id, o.x, o.z
                 ));
             }
-            // Everything outdoors that residents use.
-            let start = exits[0];
-            for o in &w.objects {
-                let def = &w.content.objects[o.def];
-                if def.interactions.is_empty() || w.lot.room_at(o.x, o.z) != OUTDOORS {
+        }
+        // Every room in the basements, from the front door of its house; and everything residents
+        // use in the houses (upstairs, downstairs and in the basement), on lots facing either way.
+        let door = |x: i32, z: i32| {
+            w.plot_at(x, z)
+                .map(|p| (p, tile(w.plots[p as usize].arrival_point())))
+        };
+        let down = w.storey_row(-1);
+        let mut seen = std::collections::HashSet::new();
+        for z in down..down + w.storey_depth() {
+            for x in 0..w.lot.width as i32 {
+                let room = w.lot.room_at(x, z);
+                if room == OUTDOORS || !nav.tile_free(x, z) || !seen.insert(room) {
                     continue;
                 }
-                if !surface::use_tiles(&w.content, &w.objects, &nav, o)
-                    .into_iter()
-                    .any(|t| walks.reaches(start, t))
-                {
-                    failures.push(format!(
-                        "{label}: can't reach the {} at {},{}",
-                        def.id, o.x, o.z
-                    ));
-                }
-            }
-            // Every room in the basements, from the front door of its house; and everything residents
-            // use in the houses (upstairs, downstairs and in the basement), on lots facing either way.
-            let door = |x: i32, z: i32| {
-                w.plot_at(x, z)
-                    .map(|p| (p, tile(w.plots[p as usize].arrival_point())))
-            };
-            let down = w.storey_row(-1);
-            let mut seen = std::collections::HashSet::new();
-            for z in down..down + w.storey_depth() {
-                for x in 0..w.lot.width as i32 {
-                    let room = w.lot.room_at(x, z);
-                    if room == OUTDOORS || !nav.tile_free(x, z) || !seen.insert(room) {
-                        continue;
-                    }
-                    let Some((plot, from)) = door(x, z) else {
-                        continue;
-                    };
-                    cellars += 1;
-                    let walked = (z..down + w.storey_depth())
-                        .flat_map(|tz| (0..w.lot.width as i32).map(move |tx| (tx, tz)));
-                    if !walked
-                        .filter(|&(tx, tz)| w.lot.room_at(tx, tz) == room && nav.tile_free(tx, tz))
-                        .take(8)
-                        .any(|t| walks.reaches_in(from, t, &w.plots[plot as usize]))
-                    {
-                        failures.push(format!(
-                            "{label}: can't get into the basement room at {x},{z}"
-                        ));
-                    }
-                }
-            }
-            for o in w.objects.iter().filter(|o| {
-                !w.content.objects[o.def].interactions.is_empty()
-                    && w.lot.room_at(o.x, o.z) != OUTDOORS
-            }) {
-                let Some((plot, from)) = door(o.x, o.z) else {
+                let Some((plot, from)) = door(x, z) else {
                     continue;
                 };
-                if !surface::use_tiles(&w.content, &w.objects, &nav, o)
-                    .into_iter()
+                cellars += 1;
+                let walked = (z..down + w.storey_depth())
+                    .flat_map(|tz| (0..w.lot.width as i32).map(move |tx| (tx, tz)));
+                if !walked
+                    .filter(|&(tx, tz)| w.lot.room_at(tx, tz) == room && nav.tile_free(tx, tz))
+                    .take(8)
                     .any(|t| walks.reaches_in(from, t, &w.plots[plot as usize]))
                 {
-                    let at = match w.storey_of(o.z) {
-                        -1 => "in the basement",
-                        0 => "downstairs",
-                        _ => "upstairs",
-                    };
                     failures.push(format!(
-                        "{label}: can't reach the {} {at} at {},{}",
-                        w.content.objects[o.def].id, o.x, o.z
+                        "{label}: can't get into the basement room at {x},{z}"
                     ));
                 }
             }
         }
-        common::check(&w);
-        // Half a day of everyone's free will. Those with a bike of their own ride it to work or
-        // school (`ride.rs`), and out on a visit or an outing: someone does, and nobody is on one
-        // in town for longer than a ride takes (stuck on it), one way (a ride out to a café and
-        // straight back home is two).
+        for o in w.objects.iter().filter(|o| {
+            !w.content.objects[o.def].interactions.is_empty() && w.lot.room_at(o.x, o.z) != OUTDOORS
+        }) {
+            let Some((plot, from)) = door(o.x, o.z) else {
+                continue;
+            };
+            if !surface::use_tiles(&w.content, &w.objects, &nav, o)
+                .into_iter()
+                .any(|t| walks.reaches_in(from, t, &w.plots[plot as usize]))
+            {
+                let at = match w.storey_of(o.z) {
+                    -1 => "in the basement",
+                    0 => "downstairs",
+                    _ => "upstairs",
+                };
+                failures.push(format!(
+                    "{label}: can't reach the {} {at} at {},{}",
+                    w.content.objects[o.def].id, o.x, o.z
+                ));
+            }
+        }
+    }
+    common::check(w);
+    cellars
+}
+
+/// The first half day of the cars test's two (`generated_worlds_cars_keep_to_the_roads`), everyone's
+/// free will: those with a bike of their own ride it to work or school (`ride.rs`), and out on a visit
+/// or an outing: in a town with bikes at homes without a car someone does, and nobody is on one in
+/// town for longer than a ride takes (stuck on it), one way (a ride out to a café and straight back
+/// home is two); nobody goes home from a visit before `visits.leastMinutes` there but for a reason;
+/// no two cars stand or drive on top of each other where one is drawn (`check_cars`).
+struct HalfDay {
+    bikes: usize,
+    carless_bikes: usize,
+    rode: std::collections::BTreeSet<usize>,
+    on_since: Vec<Option<(u64, u8)>>,
+    /// Who's at a visit or an outing, since when, where.
+    there: Vec<Option<(u64, u32)>>,
+    short: std::collections::BTreeSet<String>,
+    least: u64,
+    stuck: std::collections::BTreeSet<String>,
+    on_road: std::collections::BTreeSet<String>,
+    stacked: Stacked,
+}
+
+/// How long `HalfDay` watches (ticks).
+const HALF_DAY: u64 = 12 * TICKS_PER_HOUR;
+
+impl HalfDay {
+    fn new(w: &World) -> Self {
         // (A household with a car at home drives: those without one ride.)
         let carless = |plot: u32| {
             w.households.iter().enumerate().any(|(h, hh)| {
                 hh.plot == Some(plot) && !w.cars.iter().any(|c| c.household == h as u32)
             })
         };
-        let bikes = w
-            .objects
-            .iter()
-            .filter(|o| w.content.objects[o.def].vehicle.is_some())
-            .count();
-        let carless_bikes = w
-            .objects
-            .iter()
-            .filter(|o| {
-                w.content.objects[o.def].vehicle.is_some()
-                    && w.plot_at(o.x, o.z).is_some_and(carless)
-            })
-            .count();
-        let mut rode = std::collections::BTreeSet::new();
-        let mut on_since = vec![None::<(u64, u8)>; w.sims.len()];
-        // (Who's at a visit or an outing, since when, where: `visits.leastMinutes` there at least,
-        // unless a need is about to run out, it's late or they're off to work.)
-        let mut there: Vec<Option<(u64, u32)>> = vec![None; w.sims.len()];
-        let mut short = std::collections::BTreeSet::new();
-        let least = common::mins(w.content.visits.least_minutes);
-        let mut stuck = std::collections::BTreeSet::new();
-        let mut failures_on_road = std::collections::BTreeSet::new();
-        let mut in_view = std::collections::BTreeSet::new();
-        let mut stacked: Stacked = Default::default();
-        // (The world looked at as its game starts: `common::watch_home`.)
-        let watch = common::watch_home(&mut w);
-        let mut standing: Standing = Default::default();
-        for hour in 0..12 {
-            for t in 0..TICKS_PER_HOUR {
-                w.tick_once();
-                check_cars(&w, watch, &mut stacked, &mut failures_on_road);
-                check_stuck(&w, &mut standing, &mut failures_on_road, &mut in_view);
-                if t % 10 != 0 {
-                    continue;
-                }
-                for (k, sim) in w.sims.iter().enumerate() {
-                    let on = sim.riding.is_some() && sim.away_until.is_none();
-                    if sim.riding.is_some() {
-                        rode.insert(k);
-                    }
-                    // (Which way: out, home, to work.)
-                    let leg = match sim.current().map(|a| a.task.kind) {
-                        Some(TaskKind::Visit { .. }) => 1,
-                        Some(TaskKind::GoHome) => 2,
-                        Some(TaskKind::Work) => 3,
-                        _ => 0,
-                    };
-                    if let Some(at) = there.get_mut(k) {
-                        // (Over once they're off home, or gone home.)
-                        let home = sim
-                            .current()
-                            .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
-                        let now = sim
-                            .visiting
-                            .filter(|v| v.arrived > 0 && !home)
-                            .map(|v| (v.arrived, v.plot));
-                        if let Some((t0, plot)) = *at
-                            && now.is_none_or(|n| n.0 != t0)
-                        {
-                            let content = &w.content;
-                            let critical =
-                                content.needs.iter().zip(&sim.needs).any(|(d, &n)| {
-                                    !d.room && n < content.autonomy.urgent_below + 0.02
-                                });
-                            let hour = sim_core::clock::hour(w.tick);
-                            let work = sim
-                                .current()
-                                .is_some_and(|a| matches!(a.task.kind, TaskKind::Work));
-                            // (Come in someone else's car: they go when its driver does.)
-                            let passenger = w.cars.iter().any(|c| {
-                                c.trip.is_some_and(|t| t.driver != sim.id)
-                                    && c.riders.contains(&sim.id)
-                            });
-                            // (Brought others in their car: they go when one of them must, a
-                            // need about to run out, say: `cars::call_party_home`.)
-                            let party = w.cars.iter().any(|c| {
-                                c.trip.is_some_and(|t| t.driver == sim.id)
-                                    && c.riders.iter().any(|&r| {
-                                        w.sims.get(r as usize).is_some_and(|o| {
-                                            o.current().is_some_and(|a| {
-                                                matches!(a.task.kind, TaskKind::GoHome)
-                                            })
-                                        })
-                                    })
-                            });
-                            if w.tick < t0 + least
-                                && !critical
-                                && !work
-                                && !passenger
-                                && !party
-                                && (6.0..22.0).contains(&hour)
-                                && sim.here()
-                            {
-                                short.insert(format!(
-                                    "{} went home from plot {plot} {} min after getting there",
-                                    sim.name,
-                                    (w.tick - t0) / common::TICKS_PER_MINUTE
-                                ));
-                            }
-                        }
-                        *at = now;
-                    }
-                    let since = on_since.get_mut(k);
-                    let Some(since) = since else { continue };
-                    match (on, *since) {
-                        (true, None) => *since = Some((w.tick, leg)),
-                        (true, Some((_, was))) if was != leg => *since = Some((w.tick, leg)),
-                        (true, Some((t0, _))) if w.tick - t0 > RIDE_HOURS * TICKS_PER_HOUR => {
-                            stuck.insert(sim.name.clone());
-                        }
-                        (false, _) => *since = None,
-                        _ => {}
-                    }
-                }
+        let vehicles = || {
+            w.objects
+                .iter()
+                .filter(|o| w.content.objects[o.def].vehicle.is_some())
+        };
+        HalfDay {
+            bikes: vehicles().count(),
+            carless_bikes: vehicles()
+                .filter(|o| w.plot_at(o.x, o.z).is_some_and(carless))
+                .count(),
+            rode: Default::default(),
+            on_since: vec![None; w.sims.len()],
+            there: vec![None; w.sims.len()],
+            short: Default::default(),
+            least: common::mins(w.content.visits.least_minutes),
+            stuck: Default::default(),
+            on_road: Default::default(),
+            stacked: Default::default(),
+        }
+    }
+
+    /// Tick `t` of the hour just played (`watch`: the world looked at, `common::watch_home`): the
+    /// cars every tick, who rides and who's out every tenth.
+    fn tick(&mut self, w: &World, watch: [i32; 4], t: u64) {
+        check_cars(w, watch, &mut self.stacked, &mut self.on_road);
+        if !t.is_multiple_of(10) {
+            return;
+        }
+        for (k, sim) in w.sims.iter().enumerate() {
+            let on = sim.riding.is_some() && sim.away_until.is_none();
+            if sim.riding.is_some() {
+                self.rode.insert(k);
             }
-            if hour % 3 == 2 {
-                common::check(&w);
+            // (Which way: out, home, to work.)
+            let leg = match sim.current().map(|a| a.task.kind) {
+                Some(TaskKind::Visit { .. }) => 1,
+                Some(TaskKind::GoHome) => 2,
+                Some(TaskKind::Work) => 3,
+                _ => 0,
+            };
+            if let Some(at) = self.there.get_mut(k) {
+                // (Over once they're off home, or gone home.)
+                let home = sim
+                    .current()
+                    .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
+                let now = sim
+                    .visiting
+                    .filter(|v| v.arrived > 0 && !home)
+                    .map(|v| (v.arrived, v.plot));
+                if let Some((t0, plot)) = *at
+                    && now.is_none_or(|n| n.0 != t0)
+                {
+                    let content = &w.content;
+                    let critical = content
+                        .needs
+                        .iter()
+                        .zip(&sim.needs)
+                        .any(|(d, &n)| !d.room && n < content.autonomy.urgent_below + 0.02);
+                    let hour = sim_core::clock::hour(w.tick);
+                    let work = sim
+                        .current()
+                        .is_some_and(|a| matches!(a.task.kind, TaskKind::Work));
+                    // (Come in someone else's car: they go when its driver does.)
+                    let passenger = w.cars.iter().any(|c| {
+                        c.trip.is_some_and(|t| t.driver != sim.id) && c.riders.contains(&sim.id)
+                    });
+                    // (Brought others in their car: they go when one of them must, a
+                    // need about to run out, say: `cars::call_party_home`.)
+                    let party = w.cars.iter().any(|c| {
+                        c.trip.is_some_and(|t| t.driver == sim.id)
+                            && c.riders.iter().any(|&r| {
+                                w.sims.get(r as usize).is_some_and(|o| {
+                                    o.current()
+                                        .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome))
+                                })
+                            })
+                    });
+                    if w.tick < t0 + self.least
+                        && !critical
+                        && !work
+                        && !passenger
+                        && !party
+                        && (6.0..22.0).contains(&hour)
+                        && sim.here()
+                    {
+                        self.short.insert(format!(
+                            "{} went home from plot {plot} {} min after getting there",
+                            sim.name,
+                            (w.tick - t0) / common::TICKS_PER_MINUTE
+                        ));
+                    }
+                }
+                *at = now;
+            }
+            let since = self.on_since.get_mut(k);
+            let Some(since) = since else { continue };
+            match (on, *since) {
+                (true, None) => *since = Some((w.tick, leg)),
+                (true, Some((_, was))) if was != leg => *since = Some((w.tick, leg)),
+                (true, Some((t0, _))) if w.tick - t0 > RIDE_HOURS * TICKS_PER_HOUR => {
+                    self.stuck.insert(sim.name.clone());
+                }
+                (false, _) => *since = None,
+                _ => {}
             }
         }
-        for name in &stuck {
+    }
+
+    /// Its failures into `failures`, a line about the town, and (a town with bikes at homes without
+    /// a car) whether someone rode one.
+    fn finish(
+        self,
+        w: &World,
+        label: &str,
+        cellars: usize,
+        failures: &mut Vec<String>,
+    ) -> Option<bool> {
+        for name in &self.stuck {
             failures.push(format!(
                 "{label}: {name} on a bike in town for over {RIDE_HOURS} hours"
             ));
         }
-        for s in &short {
+        for s in &self.short {
             failures.push(format!("{label}: {s}"));
         }
-        failures.extend(
-            failures_on_road
-                .into_iter()
-                .map(|f| format!("{label}: {f}")),
-        );
-        print_in_view(&label, &in_view);
-        let ridden = (carless_bikes > 0).then_some(!rode.is_empty());
+        failures.extend(self.on_road.into_iter().map(|f| format!("{label}: {f}")));
         eprintln!(
-            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements, {bikes} bikes, {} rode",
+            "  {label}: {}×{}, {} residents, {} things, {cellars} rooms in basements, {} bikes, {} rode",
             w.lot.width,
             w.lot.depth,
             w.sims.len(),
             w.objects.len(),
-            rode.len(),
+            self.bikes,
+            self.rode.len(),
         );
-        (failures, ridden)
-    });
-    let mut failures: Vec<String> = checked.iter().flat_map(|(f, _)| f.clone()).collect();
-    // (Half a day may be the weekend, or a household's work may start after it: most of the towns.)
-    let towns = checked.iter().filter(|(_, r)| r.is_some()).count();
-    let ridden = checked.iter().filter(|(_, r)| *r == Some(true)).count();
-    if ridden * 2 < towns {
-        failures.push(format!(
-            "someone rode a bike to work or school in {ridden} of {towns} towns with bikes at homes without a car"
-        ));
+        (self.carless_bikes > 0).then_some(!self.rode.is_empty())
     }
-    eprintln!(
-        "{} worlds checked, {} problems",
-        worlds.len(),
-        failures.len()
-    );
-    for f in failures.iter().take(30) {
-        eprintln!("  {f}");
-    }
-    assert!(failures.is_empty());
 }
 
 /// How late the work taxi's riders may be at work on average (game minutes).
@@ -1102,6 +1090,10 @@ impl Slips {
     }
 }
 
+/// Generated worlds as they load (`livable_at_start`) and their first half day (`HalfDay`): the
+/// livable towns' checks, run here over the same play as the cars' (they were a test of their own,
+/// which made and played every world a second time).
+///
 /// The households' cars of generated worlds (`town.ts` writes them where the street drew them,
 /// with the road each driveway meets): every one loads parked on its driveway on its lot, nothing
 /// built over it, and few stay parked for want of a way onto the road (`NO_WAY`, a driveway that
@@ -1139,9 +1131,11 @@ fn generated_worlds_cars_keep_to_the_roads() {
             Ok(w) => w,
             Err(e) => {
                 failures.push(format!("{label}: {e}"));
-                return (tally, failures);
+                return (tally, failures, None);
             }
         };
+        // The town as it loads (`livable_at_start`); its first half day is `HalfDay`'s too.
+        let cellars = livable_at_start(&w, world, &label, &mut failures);
         let filed = world["town"]["cars"].as_array().map_or(0, Vec::len);
         tally[1] += w.cars.len();
         if w.cars.len() != filed {
@@ -1218,11 +1212,21 @@ fn generated_worlds_cars_keep_to_the_roads() {
         let mut taxis: Taxis = Default::default();
         // (The world looked at as its game starts: `common::watch_home`.)
         let view = common::watch_home(&mut w);
+        let mut half = HalfDay::new(&w);
+        let start = w.tick;
         let mut taxi_faults = std::collections::BTreeSet::new();
         let slip = std::env::var("SLIP").ok();
         let mut slips = Slips::default();
         while w.tick < end {
             w.tick_once();
+            // (The first half day: `HalfDay`'s checks, and the whole town checked every three hours.)
+            let k = w.tick - start;
+            if k <= HALF_DAY {
+                half.tick(&w, view, (k - 1) % TICKS_PER_HOUR);
+                if k.is_multiple_of(3 * TICKS_PER_HOUR) {
+                    common::check(&w);
+                }
+            }
             watch.sample(&w);
             check_stuck(&w, &mut standing, &mut stood, &mut stood_in_view);
             held_in_view.resize(w.cars.len(), (0, 0, f32::NAN));
@@ -1422,11 +1426,22 @@ fn generated_worlds_cars_keep_to_the_roads() {
             watch.stuck.len(),
             started.elapsed().as_secs_f32()
         );
-        (tally, failures)
+        let ridden = half.finish(&w, &label, cellars, &mut failures);
+        (tally, failures, ridden)
     });
     let mut failures = Vec::new();
+    // In a town with bikes at homes without a car, someone rode one to work or school in its first
+    // half day in half the towns at least (half a day may be the weekend, or a household's work may
+    // start after it).
+    let towns = results.iter().filter(|(_, _, r)| r.is_some()).count();
+    let ridden = results.iter().filter(|(_, _, r)| *r == Some(true)).count();
+    if ridden * 2 < towns {
+        failures.push(format!(
+            "someone rode a bike to work or school in {ridden} of {towns} towns with bikes at homes without a car"
+        ));
+    }
     let mut sum = [0usize; 7];
-    for (tally, mut found) in results {
+    for (tally, mut found, _) in results {
         for (s, t) in sum.iter_mut().zip(tally) {
             *s += t;
         }
