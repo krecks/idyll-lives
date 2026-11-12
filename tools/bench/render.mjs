@@ -15,7 +15,9 @@
  *     --scenarios orbit-day,orbit-night,dusk,build,wide   (also roam: a loop over the town at 12 m/s, the
  *                              street streaming and the focus lot changing as it goes; mirror-day, mirror-night, mirror-still:
  *                              the home lot's mirror in view from inside its room, the walls up, the
- *                              camera swinging before it or held)
+ *                              camera swinging before it or held; town-zoom: the zoom out from the home to the
+ *                              whole town, 900 m, and back in, 60 s, in a Big world: `--scene bigworld` and
+ *                              `--secs 60` unless given)
  *     --throttle 1,3           CPU slow-down factors (CDP Emulation.setCPUThrottlingRate)
  *     --diags none,noshadows   one run each ('+' joins several: noshadows+noaa)
  *     --res 1                  resolution: 1 (every line the window has), 720, 1080, 1440, 2160, or auto
@@ -27,7 +29,9 @@
  *     --out <dir>              default <repo>/bench-results/<time>/
  *   --shots <dir>              fixed poses, paused (`diag=freeze`, `hud=0`): one PNG per preset × backend × pose
  *     --poses orbit-day-0,…    which (`POSES`; `play`: the play set, the pictures a change to the look is judged by;
- *                              `day`: the day set, the play camera over three homes at three hours of the day)
+ *                              `day`: the day set, the play camera over three homes at three hours of the day;
+ *                              `town`: the town view, over the main town's centre and over the home from 150, 400
+ *                              and 900 m at midday, at dusk and by night, in a Big world: `--scene bigworld` unless given)
  *     --pages [gallery,…]      with --shots: the dev pages instead (`PAGES`: the gallery, clips, residents and
  *                              poses benches, each held still), one PNG per page × backend × diag
  *   --compare <dirA> <dirB>    pixel differences between two shot folders (and `--out` for the difference images)
@@ -75,7 +79,12 @@ const SCENARIOS = {
   'mirror-day': 'cam=mirror&hour=13',
   'mirror-night': 'cam=mirror&hour=21',
   'mirror-still': 'cam=mirror-still&hour=13',
+  // The town view's zoom (docs/design/living-town.md): from the home at the game's opening distance out to 900 m and
+  // back in, once in 60 s, in a Big world (`SCENARIO_DEFAULTS`).
+  'town-zoom': 'cam=zoom&hour=13',
 };
+/** What a scenario runs with unless the command line says otherwise: its scene and the seconds measured. */
+const SCENARIO_DEFAULTS = { 'town-zoom': { scene: 'bigworld', secs: 60 } };
 /** Screenshot poses: along the paths (seconds), by day and by night. */
 const POSES = {
   'orbit-day-0': 'cam=orbit&hour=13&at=0',
@@ -119,6 +128,21 @@ const POSES = {
   'day-north-13': 'cam=orbit&hour=13&at=0&beta=0.86&tz=-34',
   'day-north-16': 'cam=orbit&hour=16.5&at=0&beta=0.86&tz=-34',
 };
+/**
+ * The town set (`--poses town`, docs/design/living-town.md): the town view held over the main town's centre and over
+ * the home, from 150 m (just into the town view), 400 m (the full town view) and 900 m (as far out as it goes), at
+ * midday, at dusk and by night. In a Big world (`--scene bigworld` unless another is given).
+ */
+const TOWN_HOURS = { day: 13, dusk: 19.5, night: 23 };
+const TOWN = [];
+for (const over of ['centre', 'home']) {
+  for (const radius of [150, 400, 900]) {
+    for (const [name, hour] of Object.entries(TOWN_HOURS)) {
+      POSES[`town-${over}-${radius}-${name}`] = `cam=over&over=${over}&radius=${radius}&hour=${hour}`;
+      TOWN.push(`town-${over}-${radius}-${name}`);
+    }
+  }
+}
 /** `--poses play`: the pictures a change to the look is judged by. */
 const PLAY = ['play-day', 'play-day-b', 'play-dusk', 'play-night', 'up-day', 'up-dusk', 'up-night', 'wide-day-0', 'wide-night-45', 'street-day', 'street-night', 'town-day'];
 /** `--poses day`: the play camera by day, where a change to the daytime look has to show. */
@@ -357,8 +381,8 @@ async function open(o, query, throttle, key, timeoutMs, path = '/') {
   return { page, done };
 }
 
-const queryOf = (o, preset, backend, more) =>
-  [`bench=${o.scene}`, `quality=${preset}`, backend === 'webgl' ? 'renderer=webgl' : '', `res=${o.res}`, more, o.extra].filter(Boolean).join('&');
+const queryOf = (o, preset, backend, more, scene = o.scene) =>
+  [`bench=${scene}`, `quality=${preset}`, backend === 'webgl' ? 'renderer=webgl' : '', `res=${o.res}`, more, o.extra].filter(Boolean).join('&');
 
 /** One job: a comparison, shots, page shots or a measured matrix. */
 async function run(o) {
@@ -411,12 +435,16 @@ async function matrix(o) {
             for (const diag of diags) {
               const d = diag === 'none' ? '' : diag.replaceAll('+', ',');
               const label = [preset, backend, scenario, `cpu${throttle}`, diag, throughput ? 'fast' : 'vsync'].join('-');
-              const query = queryOf(o, preset, backend, [SCENARIOS[scenario] ?? scenario, d && `diag=${d}`, `secs=${secs}`, `warmup=${warmup}`, `hud=${hud}`, `label=${label}`].filter(Boolean).join('&'));
+              // (A scenario's own scene and length, unless the command line gives them.)
+              const own = SCENARIO_DEFAULTS[scenario] ?? {};
+              const runSecs = o.args.includes('--secs') ? secs : (own.secs ?? secs);
+              const scene = o.args.includes('--scene') ? o.scene : (own.scene ?? o.scene);
+              const query = queryOf(o, preset, backend, [SCENARIOS[scenario] ?? scenario, d && `diag=${d}`, `secs=${runSecs}`, `warmup=${warmup}`, `hud=${hud}`, `label=${label}`].filter(Boolean).join('&'), scene);
               n++;
               process.stdout.write(`[${n}/${total}] ${label} … `);
               let result;
               try {
-                const { page, done } = await open(o, query, throttle, '__benchResult', (warmup + secs) * 1000 + 240_000);
+                const { page, done } = await open(o, query, throttle, '__benchResult', (warmup + runSecs) * 1000 + 240_000);
                 result = await page.evaluate(() => window.__benchResult);
                 await done();
               } catch (err) {
@@ -452,8 +480,10 @@ function table(o, results) {
     cells.get(key).push(r);
   }
   const f = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : '–');
+  // (Scenarios that ran with a scene and a length of their own: `SCENARIO_DEFAULTS`.)
+  const own = [...new Set(results.filter((r) => r.ok && (r.scene !== scene || Math.round(r.secs) !== secs)).map((r) => ` ${r.cell.scenario}: scene \`${r.scene}\`, ${Math.round(r.secs)} s.`))].join('');
   const rows = [
-    `Scene \`${scene}\`, 1920×1080 at DPR 1, resolution ${res}, ${throughput ? 'no vsync (throughput)' : 'vsync'}, ${secs} s after ${warmup} s warm-up, median of ${runs} run(s).`,
+    `Scene \`${scene}\`, 1920×1080 at DPR 1, resolution ${res}, ${throughput ? 'no vsync (throughput)' : 'vsync'}, ${secs} s after ${warmup} s warm-up, median of ${runs} run(s).${own}`,
     '',
     '| preset | backend | scenario | diag | CPU× | fps | frame p50 / p95 / p99 ms | CPU ms (update + draw) | GPU ms avg / p95 | draws (shadow / mirror) | triangles M (shadow / mirror) | passes · M px×samples · targets MB | residents ms | lighting /s | reflections /s | long tasks | fingerprint |',
     '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
@@ -476,7 +506,7 @@ function table(o, results) {
 
 async function shots(o) {
   const { backends, presets, diags, warmup, out } = o;
-  const poses = o.list('poses', Object.keys(POSES).filter((p) => !NAMED_ONLY.test(p)).join(',')).flatMap((p) => (p === 'play' ? PLAY : p === 'day' ? DAY : [p]));
+  const poses = o.list('poses', Object.keys(POSES).filter((p) => !NAMED_ONLY.test(p)).join(',')).flatMap((p) => (p === 'play' ? PLAY : p === 'day' ? DAY : p === 'town' ? TOWN : [p]));
   for (const backend of backends) {
     for (const preset of presets) {
       for (const pose of poses) {
@@ -485,7 +515,9 @@ async function shots(o) {
           const name = `${preset}-${backend}-${pose}${diag === 'none' ? '' : `-${diag}`}.png`;
           process.stdout.write(`${name} … `);
           try {
-            const { page, done } = await open(o, queryOf(o, preset, backend, `${POSES[pose]}&diag=${d}&hud=0&secs=0&warmup=${warmup}`), 1, '__benchReady', warmup * 1000 + 240_000);
+            // (The town set is a Big world's, unless the command line gives a scene.)
+            const scene = TOWN.includes(pose) && !o.args.includes('--scene') ? 'bigworld' : o.scene;
+            const { page, done } = await open(o, queryOf(o, preset, backend, `${POSES[pose]}&diag=${d}&hud=0&secs=0&warmup=${warmup}`, scene), 1, '__benchReady', warmup * 1000 + 240_000);
             // Two more frames, then the picture.
             await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
             await page.screenshot({ path: join(out, name) });

@@ -132,6 +132,20 @@ export interface OrbitLimits {
   beta: readonly [number, number];
 }
 
+/**
+ * How the orbit changes with its distance (not the original's: the town view, `townCamera.ts`), each for a camera
+ * `radius` m out. An orbit without one is the same at any distance.
+ */
+export interface OrbitShape {
+  /** The tilt's limits there, into `out`; `limits`: the orbit's own. */
+  beta(radius: number, limits: readonly [number, number], out: [number, number]): void;
+  /** How far (m) the pan bounds are drawn in from each edge (never past their middle). */
+  inset(radius: number): number;
+  /** How much faster the wheel zooms, and the zoom keys. */
+  wheel(radius: number): number;
+  keyZoom(radius: number): number;
+}
+
 /** The orbit camera's pose and controls. */
 export class OrbitControls {
   alpha: number;
@@ -170,6 +184,8 @@ export class OrbitControls {
   panRadius: number | null = null;
   /** The ground rectangle the target stays in (`checkLimits`; null: anywhere). */
   panBounds: { x0: number; z0: number; x1: number; z1: number } | null = null;
+  /** How the limits and the zoom change with the camera's distance (`OrbitShape`; null: the same at any). */
+  shape: OrbitShape | null = null;
   /** The keys: radians a frame (at 60 fps), and their panning and zooming sensibilities. */
   keyAngularSpeed = 0.01;
   keyPanningSensibility = 50;
@@ -183,6 +199,18 @@ export class OrbitControls {
   inertialPanningY = 0;
 
   private readonly movement = new Movement();
+  /**
+   * With a `shape`: the tilt and the target as the camera has them of its own (the player's drag, a glide, a pose
+   * set), and as the shape's limits held them last. Far out the limits hold them back; coming in, they give them
+   * back: zooming out of a home and in again ends where it began.
+   */
+  private ownBeta = 0;
+  private heldBeta = NaN;
+  private readonly ownTarget = { x: 0, z: 0 };
+  private readonly heldTarget = { x: NaN, z: NaN };
+  private readonly betaAt: [number, number] = [0, 0];
+  /** Whether the player has panned or zoomed since `takeMoved` last asked. */
+  private moved = false;
   /** The pose the last frame was drawn with (`pan`). */
   private viewAlpha = 0;
   private viewBeta = 0;
@@ -229,6 +257,13 @@ export class OrbitControls {
     if (value === 0) this.movement.resetZoom();
   }
 
+  /** Whether the player has panned or zoomed (not turned) since this was last asked: a flight under way ends on it. */
+  takeMoved(): boolean {
+    const moved = this.moved;
+    this.moved = false;
+    return moved;
+  }
+
   /** Stops what is left of the player's last turn, zoom and pan (as zeroing the original's inertial offsets does). */
   stopInertia(): void {
     this.inertialAlphaOffset = this.inertialBetaOffset = this.inertialRadiusOffset = 0;
@@ -266,6 +301,7 @@ export class OrbitControls {
           m.activeInput = true;
           m.panAccumulated.x += -dx * scale;
           m.panAccumulated.y += dy * scale;
+          this.moved = true;
         }
       } else if (d.interaction === 'rotate') {
         m.activeInput = true;
@@ -354,11 +390,14 @@ export class OrbitControls {
     this.checkLimits();
   }
 
-  /** Keeps beta and the radius within the limits (a radius held at one stops zooming, as the original's `_checkLimits`). */
+  /**
+   * Keeps beta and the radius within the limits (a radius held at one stops zooming, as the original's `_checkLimits`),
+   * and the target within its bounds. With a `shape`, the tilt's limits and the bounds are those for the radius, and
+   * a tilt or target they hold back is kept (`ownBeta`, `ownTarget`) and comes back as they let go.
+   */
   checkLimits(): void {
     const { beta, radius } = this.limits;
-    if (this.beta < beta[0]) this.beta = beta[0];
-    if (this.beta > beta[1]) this.beta = beta[1];
+    // (The radius first: with a shape, the tilt's limits come from it.)
     if (this.radius < radius[0]) {
       this.radius = radius[0];
       this.inertialRadiusOffset = 0;
@@ -367,16 +406,58 @@ export class OrbitControls {
       this.radius = radius[1];
       this.inertialRadiusOffset = 0;
     }
+    const shape = this.shape;
+    let lo = beta[0];
+    let hi = beta[1];
+    if (shape) {
+      // (Not where the limits left it: moved since. That is the camera's own tilt now.)
+      if (this.beta !== this.heldBeta) this.ownBeta = this.beta;
+      shape.beta(this.radius, beta, this.betaAt);
+      lo = this.betaAt[0];
+      hi = this.betaAt[1];
+      this.beta = this.ownBeta;
+    }
+    if (this.beta < lo) this.beta = lo;
+    if (this.beta > hi) this.beta = hi;
+    // (Without a shape nothing is held: one set later starts from the tilt and the target there are then.)
+    this.heldBeta = shape ? this.beta : NaN;
     const b = this.panBounds;
     if (b) {
       const t = this.target;
-      const x = Math.min(b.x1, Math.max(b.x0, t.x));
-      const z = Math.min(b.z1, Math.max(b.z0, t.z));
+      let x0 = b.x0;
+      let z0 = b.z0;
+      let x1 = b.x1;
+      let z1 = b.z1;
+      let x = t.x;
+      let z = t.z;
+      if (shape) {
+        const own = this.ownTarget;
+        const held = this.heldTarget;
+        if (t.x !== held.x || t.z !== held.z) {
+          own.x = t.x;
+          own.z = t.z;
+        }
+        x = own.x;
+        z = own.z;
+        const inset = shape.inset(this.radius);
+        if (inset > 0) {
+          const mx = (b.x0 + b.x1) / 2;
+          const mz = (b.z0 + b.z1) / 2;
+          x0 = Math.min(b.x0 + inset, mx);
+          z0 = Math.min(b.z0 + inset, mz);
+          x1 = Math.max(b.x1 - inset, mx);
+          z1 = Math.max(b.z1 - inset, mz);
+        }
+      }
+      x = Math.min(x1, Math.max(x0, x));
+      z = Math.min(z1, Math.max(z0, z));
       // At the edge: what is left of a pan that way stops.
       if (x !== t.x || z !== t.z) this.inertialPanningX = this.inertialPanningY = 0;
       t.x = x;
       t.z = z;
     }
+    this.heldTarget.x = shape && b ? this.target.x : NaN;
+    this.heldTarget.z = shape && b ? this.target.z : NaN;
   }
 
   private rotateAndZoom(alpha: number, beta: number, radius: number): void {
@@ -440,12 +521,16 @@ export class OrbitControls {
     } else {
       delta = wheelDelta / (this.wheelPrecision * 40);
     }
-    if (delta) this.movement.zoomAccumulated += delta;
+    if (delta) {
+      this.movement.zoomAccumulated += delta;
+      this.moved = true;
+    }
   }
 
   /** A wheel event's zoom (the original's `_computeDeltaFromMouseWheelLegacyEvent`): a share of the radius, a little less going in than out. */
   private wheelZoom(wheelDelta: number, radius: number): number {
-    const d = wheelDelta * 0.01 * this.wheelDeltaPercentage * radius;
+    // (With a shape: its share more of the radius, far out.)
+    const d = wheelDelta * 0.01 * this.wheelDeltaPercentage * radius * (this.shape ? this.shape.wheel(radius) : 1);
     return wheelDelta > 0 ? d / (1 + this.wheelDeltaPercentage) : d * (1 + this.wheelDeltaPercentage);
   }
 
@@ -479,13 +564,15 @@ export class OrbitControls {
       if (key === 220) continue;
       const interaction = keyInteraction(key, this.ctrlKey, this.altKey);
       if (interaction === 'pan') {
+        this.moved = true;
         panSpeed = Math.max(panSpeed, 1 / (this.keyPanningSensibility / scale));
         if (KEY.left.includes(key)) px -= 1;
         else if (KEY.right.includes(key)) px += 1;
         else if (KEY.up.includes(key)) py += 1;
         else if (KEY.down.includes(key)) py -= 1;
       } else if (interaction === 'zoom') {
-        const speed = 1 / (this.keyZoomingSensibility / scale);
+        this.moved = true;
+        const speed = (1 / (this.keyZoomingSensibility / scale)) * (this.shape ? this.shape.keyZoom(this.radius) : 1);
         if (KEY.up.includes(key) || KEY.zoomIn.includes(key)) m.zoomAccumulated += speed;
         else if (KEY.down.includes(key) || KEY.zoomOut.includes(key)) m.zoomAccumulated -= speed;
       } else {

@@ -442,6 +442,14 @@ export interface Renderer {
   /** Flies the camera to a world point, smoothly (the town map's "look here"; `shared/focus.ts` `Flight`). */
   flyTo(x: number, z: number): void;
   /**
+   * Glides the camera to a town point (a town tag's click, `townView.goTo`; the same `Flight`, which from the town
+   * view comes down by a share of its height a second). `radius`: the distance it ends at (without one: near
+   * enough to see who is there, `townArrival`). `follow`: the resident (snapshot index) it lands on: the glide
+   * goes where they go meanwhile. `done` runs once it is there; not when the player's own pan or zoom, or another
+   * flight, ended it first.
+   */
+  glideTo(x: number, z: number, radius?: number, follow?: number, done?: () => void): void;
+  /**
    * The lot the roaming camera has settled on (a plot index), to be shown in full: the listener says
    * whether it takes it (it shows it with `setWorld` of its view, the camera left where it is), or
    * keeps its own (build mode). Not called while the camera follows someone or the director films.
