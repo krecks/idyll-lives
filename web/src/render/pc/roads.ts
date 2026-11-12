@@ -11,7 +11,7 @@ import { GAME_FRONT_FACE, MaterialLibrary } from './materials';
 import { drawMesh, meshFrom } from './meshes';
 import { LIFT, STEP, STRAIGHT, type CountryRoads, type Point } from '../shared/countryRoads';
 import { Geo, type V3 } from '../shared/geometry';
-import { asphaltVary, carriageway, tint } from '../shared/paving';
+import { asphaltVary, carriageway, tint, STREET_LOOK } from '../shared/paving';
 
 /** The road surfaces, their centre lines and the welcome signs of `roads`, under `parent`. */
 export function drawRoads(app: pc.AppBase, roads: CountryRoads, parent: pc.Entity): pc.Entity[] {
@@ -26,12 +26,12 @@ export function drawRoads(app: pc.AppBase, roads: CountryRoads, parent: pc.Entit
    * A stretch of asphalt worn as the town's streets are (`shared/paving.ts`): strips across it, pale where
    * wheels run, darker between them and at its edges. `at`: the point `t` along it, `off` m from its middle.
    */
-  const worn = (at: (t: number, off: number) => V3, half: number) => {
+  const worn = (at: (t: number, off: number) => V3, half: number, even = false) => {
     const band = carriageway(half);
     const offs = [-half, ...band.at.filter((o) => Math.abs(o) < half - 0.05), half];
     const tone = (t: number, off: number): V3 => {
       const [x, , z] = at(t, off);
-      return tint(band.tone(off) * asphaltVary(x, z));
+      return tint((even ? STREET_LOOK.junction : band.tone(off)) * asphaltVary(x, z));
     };
     for (let o = 0; o + 1 < offs.length; o++) {
       const c: [number, number][] = [[0, offs[o + 1]], [1, offs[o + 1]], [1, offs[o]], [0, offs[o]]];
@@ -42,7 +42,9 @@ export function drawRoads(app: pc.AppBase, roads: CountryRoads, parent: pc.Entit
   for (const r of roads.links) {
     const y = 0.012;
     const rows = Math.max(1, Math.round(r.d / 4));
-    for (let k = 0; k < rows; k++) worn((t, off) => [r.x + r.w / 2 + off, y, r.z + ((k + t) / rows) * r.d], r.w / 2);
+    // (One even tone, as the streets have where they meet (`STREET_LOOK.junction`): a link lies over the street it
+    // joins, and worn its own way it lay there like a slab.)
+    for (let k = 0; k < rows; k++) worn((t, off) => [r.x + r.w / 2 + off, y, r.z + ((k + t) / rows) * r.d], r.w / 2, true);
     const xc = r.x + r.w / 2;
     for (let z = r.z + 1; z + 2.4 < r.z + r.d - 1; z += 5) quad(lines, [[xc - 0.06, y + 0.005, z], [xc + 0.06, y + 0.005, z], [xc + 0.06, y + 0.005, z + 2.4], [xc - 0.06, y + 0.005, z + 2.4]]);
   }
