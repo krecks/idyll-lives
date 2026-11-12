@@ -12,7 +12,7 @@
 
 export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still' | 'roam' | 'street' | 'town';
 
-export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'noao', 'notilt', 'noclouds', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders'] as const;
+export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'noao', 'noclouds', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders'] as const;
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
 
 export interface BenchFlags {
@@ -45,8 +45,6 @@ export interface BenchFlags {
   hold: boolean;
   /** The orbit's radius and angle from vertical instead of its path's (`radius=`, `beta=`), and its target moved by (`tx=`, `tz=`, m): a close look at the lawn. */
   orbit: { radius: number | null; beta: number | null; tx: number; tz: number };
-  /** `tilt=1|0`: the miniature focus on or off whatever the preset (the player's setting, `render/shared/tilt.ts`); null: as the preset has it. */
-  tilt: boolean | null;
   /** `walls=up|cutaway|down`: the walls held that way (`up` from the game's distance shows the house whole, roof on); null: the game's own. */
   walls: 'up' | 'cutaway' | 'down' | null;
   diag: ReadonlySet<BenchDiag>;
@@ -95,7 +93,6 @@ function parse(): BenchFlags | null {
     at: num('at', 0, 0, 3600),
     hold: params.get('hold') === '1',
     orbit: { radius: params.has('radius') ? num('radius', 24, 2, 200) : null, beta: params.has('beta') ? num('beta', 0.9, 0.1, 1.5) : null, tx: num('tx', 0, -200, 200), tz: num('tz', 0, -200, 200) },
-    tilt: params.get('tilt') === '1' ? true : params.get('tilt') === '0' ? false : null,
     walls: walls === 'up' || walls === 'cutaway' || walls === 'down' ? walls : null,
     diag,
     label: params.get('label') ?? '',

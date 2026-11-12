@@ -73,7 +73,6 @@ import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
 import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS } from '../shared/lens';
-import { TILT, tiltRows, tiltShare } from '../shared/tilt';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
 import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
@@ -356,9 +355,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   private readonly pacer = new FramePacer();
   private options: LiveRenderOptions = { resolution: 'auto', cameraSensitivity: 1, fpsCap: 0 };
-  /** The miniature focus (`shared/tilt.ts`): asked to stay out (`setSharp`: Build mode), and how much of it shows now (0..1, eased). */
-  private sharp = false;
-  private tiltAmount = 0;
   private active = false;
   private covered = false;
   private coveredFrames = 0;
@@ -938,7 +934,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       }
       this.sunShadows.frame();
       this.applyCamera();
-      this.applyTilt(dt);
       this.pushGrass(dt);
       this.lot.frame(dt, this.townMode); // (the sky round the camera, the clouds' shadows, the grass in view.)
       if (!this.townMode) this.updateCutaway();
@@ -3005,28 +3000,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   // (placing things, `placing.ts`.)
   setPlacementGhost(ghost: PlacementGhost | null): void {
     this.placing.setPlacementGhost(ghost);
-  }
-
-  setSharp(on: boolean): void {
-    this.sharp = on;
-  }
-
-  /**
-   * The miniature focus for this frame (`shared/tilt.ts`, drawn by the compose): the band the camera's tilt
-   * gives, the blur eased in and out over a third of a second. Out in Build mode (`setSharp`), in the menus'
-   * town (a picture to read lot by lot), in the basement (looked into from above its walls) and zoomed in.
-   */
-  private applyTilt(dt: number): void {
-    const post = this.post;
-    if (!post) return;
-    const setting = this.options.tiltShift ?? 'auto';
-    const wanted = setting === 'on' || (setting === 'auto' && this.quality.tiltShift);
-    const goal = wanted && !this.sharp && !this.townMode && this.storey >= 0 ? 1 : 0;
-    // (A frozen picture, `?diag=freeze`, has no time to ease in.)
-    this.tiltAmount = dt > 0 ? goal + (this.tiltAmount - goal) * Math.exp(-dt / 110) : goal;
-    if (Math.abs(this.tiltAmount - goal) < 0.002) this.tiltAmount = goal;
-    const [top, bottom] = tiltRows(this.orbit.beta, LENS.fov);
-    post.tilt(top, bottom, TILT.px * this.tiltAmount * tiltShare(this.orbit.radius));
   }
 
   setHeldObject(id: number | null, moved = false): void {

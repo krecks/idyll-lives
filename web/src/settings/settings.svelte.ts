@@ -5,7 +5,7 @@
 
 import { isGraphicsPreset, QUALITY, type GraphicsPreset, type RenderQuality } from '../render/quality';
 import { MIN_SCALE, type Resolution } from '../render/shared/resolution';
-import type { Shading, TiltShift } from '../render/types';
+import type { Shading } from '../render/types';
 
 export interface Settings {
   /** The graphics preset (`render/quality.ts`): Medium unless chosen. */
@@ -16,11 +16,6 @@ export interface Settings {
    * was the default before. Applies live.
    */
   shading: Shading;
-  /**
-   * The miniature focus (`render/shared/tilt.ts`): the far and near edges of the picture out of focus, as in a
-   * photograph of a model. `auto`: as the graphics preset has it (on with High). Applies live.
-   */
-  tiltShift: TiltShift;
   /** `auto`: the screen's own resolution up to about 1920×1080 pixels; or a share of it along each side, 0.5..1 (`render/shared/resolution.ts`). */
   resolution: Resolution;
   /** Frames per second at most (saves power and heat; 60 unless chosen); 0: no cap. */
@@ -92,7 +87,6 @@ const STORAGE_KEY = 'open-sims-wasm.settings';
 export const DEFAULT_SETTINGS: Settings = {
   graphics: 'medium',
   shading: 'classic',
-  tiltShift: 'auto',
   resolution: 'auto',
   fpsCap: 60,
   renderer: 'auto',
@@ -219,7 +213,6 @@ function sanitize(s: Record<string, unknown>): Settings {
   out.masterVolume = clampNumber(s.masterVolume, 0, 1, DEFAULT_SETTINGS.masterVolume);
   out.graphics = isGraphicsPreset(s.graphics) ? s.graphics : DEFAULT_SETTINGS.graphics;
   out.shading = oneOf(s.shading, ['soft', 'classic'] as const, DEFAULT_SETTINGS.shading);
-  out.tiltShift = oneOf(s.tiltShift, ['auto', 'on', 'off'] as const, DEFAULT_SETTINGS.tiltShift);
   const resolution = s.resolution;
   out.resolution =
     resolution === 'auto' || (typeof resolution === 'number' && resolution >= MIN_SCALE && resolution <= 1)

@@ -161,14 +161,7 @@ export interface LiveRenderOptions {
    * `classic`, the PBR shading it replaced. Absent: leave the scene's shading as it is.
    */
   shading?: Shading;
-  /**
-   * The miniature focus (`shared/tilt.ts`: the picture's far and near edges out of focus): `on`, `off`, or `auto`,
-   * as the graphics preset has it (`QualitySettings.tiltShift`). Absent: `auto`.
-   */
-  tiltShift?: TiltShift;
 }
-
-export type TiltShift = 'auto' | 'on' | 'off';
 
 /** Translucent preview of an object being placed in buy mode. */
 /** Buy-mode feedback played in the world (see `render/shared/buildFx.ts`). */
@@ -493,8 +486,6 @@ export interface Renderer {
   setGaragePreview(garage: GaragePreview | null): void;
   /** Build mode's room-score overlay: a film over each tile in its colour (`rgb` 0..1); empty hides it. */
   setRoomOverlay(tiles: readonly RoomOverlayTile[]): void;
-  /** The whole picture in focus whatever the setting (Build mode, where every tile is looked at): the miniature focus eases out, and back in. */
-  setSharp(on: boolean): void;
   /** Build/buy mode: subtle tile grid over a tile rectangle (null hides it). */
   setBuildGrid(rect: ViewRect | null): void;
   /** Build tools: whether a left-drag turns the camera (off while a wall is being drawn). */

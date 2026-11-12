@@ -4,7 +4,7 @@
 here on our own terms. Status: 0.7.0 and what has landed since. This is the Medium graphics preset, everyone's default; Low
 and High change a few things (softer or sharper shadows, fewer lamps, half the lawn, no cloud shadows, no shadows
 from the woods, the street or the residents and the street's far models on Low, two mirrors
-reflecting every frame and the miniature focus on High), listed in
+reflecting every frame on High), listed in
 [graphics.md](graphics.md).*
 
 Changes to the look are judged at the camera a game is played from (24 m from the lot, and the street
@@ -38,9 +38,9 @@ lit surface in the soft shading below (Settings, Performance, Shading).
   (grass alone would otherwise read dark green) while lamps and lit windows stay warm.
 - **Readable at a glance.** The dollhouse view has to show who is where and what they are doing,
   so clarity beats extra effects. There is no bloom (tried on 2026-11-11: at night's exposure only a
-  threshold low enough to bloom the whole day picked out the lamps, and then faintly). The miniature
-  focus, below, softens only the picture's far and near edges, and stays out wherever every tile is
-  looked at.
+  threshold low enough to bloom the whole day picked out the lamps, and then faintly) and no blur of
+  the picture's far and near edges (a miniature focus, tried on 2026-11-11 and taken out the next day:
+  the owner read it as a haze over the picture).
 - **Real surfaces by default, painted ones by choice.** Classic lights a surface as light falls on it.
   With Soft, light falls off widely and gently, shade takes the sky's tint instead of going black, and a
   quiet rim keeps silhouettes readable: closer to a hand-painted illustration than a photograph, without
@@ -55,7 +55,6 @@ lit surface in the soft shading below (Settings, Performance, Shading).
 | Nights | A blue moon (0.8) and sky fill (0.65) with a strong night grade (0.85), so nights are clearly blue but not murky, and a garden is dim, not near black; warm lamps (`#FFC27A`) and glowing windows. |
 | Grading | ACES tone mapping, contrast 1.1, saturation +14. Split toning: warm highlights (hue 38) and cool shadows (hue 222), faint (a filter of 2 and 3 %; stronger, and a cooler sky fill by day, were tried on 2026-11-11 and hardly differed). |
 | Effects | A light vignette (weight 0.8: the corners keep about three quarters of their light) and soft distance haze. |
-| Miniature focus | The picture's far and near edges out of focus, as in a photograph of a model, so the eye rests on the home in the middle (`render/shared/tilt.ts`, drawn in the compose). What stays sharp is a band of the ground by its distance from the eye (0.85 to 1.16 of the camera's distance from what it looks at), so it follows the camera's tilt: the rows 0.34 to 0.72 of the picture at the camera a game opens with. The blur grows to 8 px (of a picture 1080 high) at the picture's edge. It fades out as the camera comes closer than 18 m (gone at 9 m), and stays out in Build mode, in the basement and in the menus' town. On with High by default, and anyone's to turn on or off (Settings, Performance, Miniature focus). |
 | Cloud shadows | By day soft patches of shade drift over the land with the wind (1.3 m/s), 30 to 60 m across, most of the land in the sun between them, so the light is not the same from one edge of the picture to the other and the sunlit parts read as sunlit (`render/pc/cloudShadows.ts`). Under one only the sun is dimmed (by half in its middle); the sky's light stays, so a cloud's shade is cooler than the sun beside it. They are a small tiling map every lit surface reads where it stands (`shaders/clouds.ts`): no draw and no pass. None at night or in the low sun of early morning and evening (all of them from about 9 to 17 h), whose long shadows are the picture then. They hold still with Reduce motion, as the birds do, and in the menus' town, whose picture is held. Not on Low (`cloudShadows` in [graphics.md](graphics.md)). |
 | Shadows | Soft, filtered shadows from one sun shadow map over a fixed area round the lot. Its size comes with the graphics preset: 2048 on Medium (the default), 1024 on Low, 4096 on High. |
 

@@ -19,9 +19,6 @@
  *   `TONEMAP_NONE`, its vignette and LUT off), with the night grade after it (`nightGrade.ts`). The
  *   compose then encodes for its target (`gammaCorrectOutput`, the same `pow(x, 1 / 2.2)`), so the
  *   chunk hands it the display colour decoded the same way.
- * - `TILT_FOCUS`: the miniature focus (`shared/tilt.ts`), first in that chunk, on the scene's linear colour: outside
- *   the rows `gameTilt` gives (x, y: the band's top and bottom row; z: the blur's radius at the picture's edge, in
- *   pixels of a picture 1080 high, 0: none), twelve taps round the pixel, spread evenly over a disc.
  * - `FXAA`: FXAA 3.11 (quality preset 12), verbatim from the original, on the image-processed
  *   colour, with the night grade at its end where it runs (the order: image processing, FXAA,
  *   grade).
@@ -158,50 +155,9 @@ fn gameSrgbDecode(c: vec3f) -> vec3f {
 `,
 };
 
-/** The miniature focus's taps: a disc filled evenly by the golden angle. */
-const TILT_TAPS = Array.from({ length: 12 }, (_, i) => {
-  const r = Math.sqrt((i + 0.5) / 12);
-  const a = i * 2.399963;
-  return [r * Math.cos(a), r * Math.sin(a)] as const;
-});
-
-/** The miniature focus in the compose: its uniform, and its code (which reads the compose's `uv`, `scene` and `result`). */
-const TILT_FOCUS: Record<Language, { declarations: string; code: string }> = (() => {
-  const of = (lang: Language) => {
-    const wgsl = lang === 'wgsl';
-    const [v2, v3] = wgsl ? ['vec2f', 'vec3f'] : ['vec2', 'vec3'];
-    const tilt = wgsl ? 'uniform.gameTilt' : 'gameTilt';
-    const res = wgsl ? 'uniform.sceneTextureInvRes' : 'sceneTextureInvRes';
-    // (The scene's texture has its first row at the picture's top with WebGPU and at its bottom with WebGL2.)
-    const row = wgsl ? 'uv.y' : '(1.0 - uv.y)';
-    const tap = (o: readonly [number, number]) => {
-      const at = `uv + ${v2}(${o[0].toFixed(5)}, ${o[1].toFixed(5)}) * tiltR`;
-      return wgsl ? `textureSampleLevel(sceneTexture, sceneTextureSampler, ${at}, 0.0).rgb` : `textureLod(sceneTexture, ${at}, 0.0).rgb`;
-    };
-    return {
-      declarations: wgsl ? '\nuniform gameTilt: vec4f;\n' : '\nuniform vec4 gameTilt;\n',
-      code: `
-	{
-		// The blur's radius here, in pixels of a picture 1080 high: none inside the band, all of it at the picture's edge.
-		${wgsl ? 'let' : 'float'} tiltPx = max(1.0 - smoothstep(0.0, ${tilt}.x, ${row}), smoothstep(${tilt}.y, 1.0, ${row})) * ${tilt}.z;
-		if (tiltPx > 0.05) {
-			${wgsl ? 'let' : 'vec2'} tiltR = ${res} * (tiltPx / (1080.0 * ${res}.y));
-			${wgsl ? 'var' : 'vec3'} tiltSum = ${v3}(0.0);
-${TILT_TAPS.map((o) => `\t\t\ttiltSum += ${tap(o)};`).join('\n')}
-			// (What the compose added to the scene's colour before this stays as it is.)
-			result = result - scene.rgb + (tiltSum + scene.rgb) / 13.0;
-		}
-	}`,
-    };
-  };
-  return { glsl: of('glsl'), wgsl: of('wgsl') };
-})();
-
 export interface ComposeOptions {
   /** The image processing (off: the diag views and `?diag=linear`, which show the colour itself). */
   imageProcessing: boolean;
-  /** The miniature focus before it (`TILT_FOCUS`; off with `?diag=notilt`). Its amount is a uniform: none costs a compare a pixel. */
-  tilt: boolean;
   /** The night grade at the end (off where the FXAA pass has it, and with `?diag=nonight`). */
   night: boolean;
   /** The compose draws for the FXAA pass: the colour unclamped above 1 (as a half-float input). */
@@ -211,13 +167,13 @@ export interface ComposeOptions {
 /** The compose pass's chunks for `options` (`composeDeclarationsPS`, `composeMainEndPS`; empty: the compose as PlayCanvas has it). */
 export function composeChunks(lang: Language, options: ComposeOptions): { declarations: string; mainEnd: string } {
   if (!options.imageProcessing) return { declarations: '', mainEnd: '' };
-  const declarations = `${IMAGE_PROCESSING[lang]}${options.night ? NIGHT_GRADE[lang] : ''}${SRGB_DECODE[lang]}${options.tilt ? TILT_FOCUS[lang].declarations : ''}`;
+  const declarations = `${IMAGE_PROCESSING[lang]}${options.night ? NIGHT_GRADE[lang] : ''}${SRGB_DECODE[lang]}`;
   const v3 = lang === 'glsl' ? 'vec3' : 'vec3f';
   // (The FXAA reads the image-processed colour as from a half-float texture, unclamped above 1; the
   // grade reads it clamped, as from an 8-bit one; the canvas clamps. Negative values, which the
   // compose's encoding can't take, are left out for the FXAA too.)
   const range = options.toFxaa ? `max(result, ${v3}(0.0))` : `clamp(result, ${v3}(0.0), ${v3}(1.0))`;
-  const mainEnd = `${options.tilt ? TILT_FOCUS[lang].code : ''}
+  const mainEnd = `
 	result = gameImageProcessing(result, uv);
 	result = ${range};
 	${options.night ? 'result = gameNightGrade(result);' : ''}
