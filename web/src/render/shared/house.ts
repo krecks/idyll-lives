@@ -214,29 +214,34 @@ export const HOUSE_LOOK = tuned('house', {
    * A floor's tone over its room, by vertex (no texture, no read): `floorWall` darker at the foot of a wall
    * (of the light it reflects), fading over `floorReach` m; `floorMid` the tone out in the room; lighter again,
    * up to the covering's own colour, by `floorWear` within `floorWearReach` m of a door, where feet wear it
-   * pale; and `floorVary` lighter and darker in patches a few metres across.
+   * pale; `floorVary` lighter and darker in patches a few metres across; and `floorWarm` warmer the darker it is.
    */
-  floorWall: 0.38,
+  floorWall: 0.34,
   floorReach: 1.6,
-  floorMid: 0.87,
+  floorMid: 0.95,
   floorWear: 1,
   floorWearReach: 1.7,
   floorVary: 0.07,
+  floorWarm: 0.2,
   /**
    * A wall face's tone, by vertex: `wallFoot` darker at the floor, fading over `wallFootReach` m up it;
    * `wallCorner` darker into a room's corner, over `wallCornerReach` m along it; `wallVary` in patches.
    */
-  wallFoot: 0.3,
+  wallFoot: 0.24,
   wallFootReach: 1.3,
   wallCorner: 0.28,
   wallCornerReach: 0.9,
   wallVary: 0.06,
 });
 
-/** A tone (a share of the light reflected, linear) as the vertex colour's multiplier (sRGB). */
-function toneTint(lin: number): V3 {
-  const v = Math.pow(Math.min(1, Math.max(0, lin)), 1 / 2.2);
-  return [v, v, v];
+/**
+ * A tone (a share of the light reflected, linear) as the vertex colour's multiplier (sRGB). `warm`: the
+ * darker it is the warmer (`HOUSE_LOOK.floorWarm`), as a floor's shade at a wall is lit by the floor beside it.
+ */
+function toneTint(lin: number, warm = 0): V3 {
+  const l = Math.min(1, Math.max(0, lin));
+  const v = (k: number) => Math.pow(l, k / 2.2);
+  return [v(1 - warm), v(1), v(1 + warm * 1.3)];
 }
 
 /** The distance from `(px, pz)` to the segment `a`..`b`. */
@@ -1476,7 +1481,7 @@ export class HousePlanner {
       const foot = (1 - smoothstep(0, L.floorReach, wall)) * (1 - worn);
       const vary = (valueNoise(px / 2.6, pz / 2.6, 577) - 0.5) * 2 * L.floorVary;
       const mid = L.floorMid + (1 - L.floorMid) * worn;
-      tone = toneTint(mid * (1 - L.floorWall * foot) * (1 + vary * (1 - worn)));
+      tone = toneTint(mid * (1 - L.floorWall * foot) * (1 + vary * (1 - worn)), L.floorWarm);
       floorTones.set(key, tone);
       return tone;
     };
