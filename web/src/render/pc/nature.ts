@@ -44,7 +44,7 @@ import type { BenchDiag } from '../../debug/benchFlags';
 import { tuned } from '../tune';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
-export { decorPlants, natureDecor, type PlantPlacement } from '../shared/nature';
+export { BORDER, decorPlants, natureDecor, type PlantPlacement } from '../shared/nature';
 
 /** What the landscape draws: entities under the world root, switched off until their owner shows them. */
 export interface NatureResult {

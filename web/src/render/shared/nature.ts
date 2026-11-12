@@ -947,6 +947,13 @@ export function decorPlants(decor: readonly [string, Decor][]): PlantPlacement[]
 }
 
 /**
+ * A border's beds of lupins and marigolds stand on their model's mound of soil (its `bed` part, which a player's own
+ * bed has in the colour they choose). In the model's brown (`#6A4C38`) the mounds were salmon discs in the midday
+ * sun, a plant saucer's colour more than soil's; `soil` is darker and less red, near the lawn's own bare earth.
+ */
+export const BORDER = tuned('border', { soil: '#3C2C1E' });
+
+/**
  * Splits the house builder's garden dressing (`model.tree` lot trees, `model.bush` foundation
  * shrubs; items are [x, z, scale, yaw]) into species. Lot trees mix oaks, maples, blossom, fruit,
  * birch, magnolia and Japanese maple, with fallen petals under the two in blossom; each house gets either a clipped hedge along its walls or a

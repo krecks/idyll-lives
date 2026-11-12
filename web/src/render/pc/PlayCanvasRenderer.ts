@@ -48,7 +48,7 @@ import { buildModel, fileImported, importAhead, modelFilesSettled, onModelFileAr
 import { GameBirds } from './birds';
 import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming';
 import { steadyShaderKeys } from './shaderKeys';
-import { natureDecor, windStill } from './nature';
+import { BORDER, natureDecor, windStill } from './nature';
 import { PETALS } from '../shared/nature';
 import { TownOverview, townLayer } from './overview';
 import { Placing } from './placing';
@@ -89,7 +89,7 @@ import { CHUNK, chunkCoords, distanceToRect, RectGrid } from '../shared/chunks';
 import { ModelRefresh } from '../shared/modelRefresh';
 import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
-import { standInOf } from '../shared/modelEntry';
+import { painted, standInOf } from '../shared/modelEntry';
 import { PIXEL_BUDGET, renderScale, watchPixelRatio } from '../shared/resolution';
 import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
@@ -1679,7 +1679,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private async placeDecor(key: string, items: [number, number, number, number][]): Promise<void> {
     if (!items.length) return;
     const lot = this.lotKey;
-    const template = await this.decorTemplates.get(`deco:${key}`, () => buildModel(this.app, key, this.deps.assets.get(key, 'model'), [1, 1]));
+    const template = await this.decorTemplates.get(`deco:${key}`, () => buildModel(this.app, key, painted(this.deps.assets.get(key, 'model'), { bed: BORDER.soil }), [1, 1]));
     if (this.disposed || lot !== this.lotKey) return;
     let placed = this.decor.get(key);
     if (placed && placed.template !== template) {
