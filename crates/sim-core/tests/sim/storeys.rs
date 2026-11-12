@@ -11,6 +11,7 @@ fn content(storeys: u8) -> String {
     "needs":[{{"id":"comfort","label":"Comfort","decayPerHour":0.01}}],
     "objects":[
       {{"id":"stairs","name":"Stairs","price":400,"footprint":[1,4],"stairs":true,"interactions":[]}},
+      {{"id":"stairsSpiral","name":"Spiral","price":900,"footprint":[2,2],"stairs":true,"stair":"spiral","interactions":[]}},
       {{"id":"chair","name":"Chair","price":50,"interactions":[{{"id":"sit","label":"Sit","minutes":60,"pose":"sit","effects":{{"comfort":0.5}}}}]}}],
     "economy":{{"startingFunds":20000}},
     "build":{{"wall":10,"door":50,"window":40,"remove":0,"storeys":{storeys}}}}}"#
@@ -157,6 +158,93 @@ fn residents_climb_the_stairs_to_use_things_upstairs() {
 }
 
 #[test]
+fn a_spiral_winds_up_a_square_of_tiles_and_comes_up_a_side_of_it() {
+    let mut w = world(2);
+    build(&mut w, room(3, 2, 8, 8, true)).unwrap();
+    build(&mut w, room(3, 2 + UP, 8, 8, false)).unwrap();
+    let spiral = buy(&mut w, "stairsSpiral", 5, 5, 0).unwrap();
+    let s = w.stair_map().stairs[0];
+    assert!(s.open, "a spiral is walked onto from any side");
+    assert_eq!(
+        s.tiles(),
+        &[(5, 6), (6, 6), (6, 5), (5, 5)],
+        "front left, round to the back left"
+    );
+    assert_eq!(s.landing, (4, 5 + UP), "off to the left, one storey up");
+    // The stairwell above its square is open (nothing stands there), and the way off the top is
+    // a free tile on the floor above.
+    assert!(buy(&mut w, "chair", 5, 5 + UP, 0).is_err());
+    // Something in the way off the top is refused, naming the way off.
+    let mut blocked = world(2);
+    build(&mut blocked, room(3, 2, 8, 8, true)).unwrap();
+    build(&mut blocked, room(3, 2 + UP, 8, 8, false)).unwrap();
+    buy(&mut blocked, "chair", 4, 5 + UP, 0).unwrap();
+    let err = buy(&mut blocked, "stairsSpiral", 5, 5, 0).unwrap_err();
+    assert!(err.to_string().contains("clear way off"), "{err}");
+    // Up the spiral to a chair in the room above: climbed in steps, and stood at the top.
+    let chair = buy(&mut w, "chair", 4, 3 + UP, 0).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: chair,
+        interaction: 0,
+    })
+    .unwrap();
+    let mut climbing = false;
+    let mut turned = false;
+    let mut last = w.sims[0].tile();
+    for _ in 0..sim_core::mins(300.0) {
+        w.tick_once();
+        let h = height(&w, 0);
+        climbing |= h > 0.2 && h < 0.8;
+        let tile = w.sims[0].tile();
+        // A step onto another step of the spiral that goes sideways as well: round the square, not
+        // straight up it.
+        if s.step(tile.0, tile.1).is_some() && s.step(last.0, last.1).is_some() {
+            turned |= tile.1 != last.1;
+        }
+        last = tile;
+        if w.sims[0].pose == sim_core::content::Pose::Sit {
+            break;
+        }
+    }
+    assert!(climbing, "went up step by step");
+    assert!(turned, "walked round the square, not straight across it");
+    assert_eq!(w.sims[0].pose, sim_core::content::Pose::Sit);
+    assert_eq!(w.storey_of(w.sims[0].tile().1), 1);
+    assert_eq!(height(&w, 0), 1.0);
+    // And back down it: the chair downstairs brings them to the ground again.
+    let below = buy(&mut w, "chair", 4, 3, 0).unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: below,
+        interaction: 0,
+    })
+    .unwrap();
+    for _ in 0..sim_core::mins(300.0) {
+        w.tick_once();
+        if w.storey_of(w.sims[0].tile().1) == 0 && w.sims[0].pose == sim_core::content::Pose::Sit {
+            break;
+        }
+    }
+    assert_eq!(w.storey_of(w.sims[0].tile().1), 0, "came down the spiral");
+    assert_eq!(height(&w, 0), 0.0);
+    assert!(w.index_of(spiral).is_some());
+    // Turned a quarter, the spiral keeps to its square and steps off the corner its turn brings
+    // round (the renderer works out the same tile for the floor's opening).
+    let mut turned_world = world(2);
+    build(&mut turned_world, room(3, 2, 8, 8, true)).unwrap();
+    build(&mut turned_world, room(3, 2 + UP, 8, 8, false)).unwrap();
+    buy(&mut turned_world, "stairsSpiral", 5, 5, 1).unwrap();
+    let t = turned_world.stair_map().stairs[0];
+    assert!(
+        t.tiles()
+            .iter()
+            .all(|&(x, z)| (5..7).contains(&x) && (5..7).contains(&z))
+    );
+    assert_eq!(t.landing, (5, 7 + UP), "off the front, one storey up");
+}
+
+#[test]
 fn saves_keep_the_storeys_and_older_saves_grow_them() {
     let mut w = house();
     buy(&mut w, "chair", 5, 3 + UP, 0).unwrap();
@@ -203,7 +291,7 @@ fn a_two_storey_house_goes_through_a_blueprint() {
     assert!(
         w.objects
             .iter()
-            .any(|o| o.def == 1 && o.x >= 22 && w.storey_of(o.z) == 1),
+            .any(|o| w.content.objects[o.def].id == "chair" && o.x >= 22 && w.storey_of(o.z) == 1),
         "with its chair"
     );
     assert_eq!(w.stair_map().stairs.len(), 2);

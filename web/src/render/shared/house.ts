@@ -14,6 +14,8 @@
  * the half they are on. Where diagonals meet other walls, the corner post is a mitred outline
  * (`slanted.ts`). Houses with diagonal sides get a hip roof following their outline when it is
  * convex; otherwise the usual rectangles cover the split tiles whole (a deeper eave there).
+ * Where the storey above leaves an L, a U or a ring of roof and no diagonal wall is in view, it is
+ * roofed as one area (hips, ridges and valleys meeting) rather than a rectangle at a time.
  * Every wall vertex carries cutaway data (`geometry.ts`); the vertex shader lowers walls
  * between the camera and the rooms behind them, so the cutaway costs no CPU.
  *
@@ -1483,65 +1485,66 @@ export class HousePlanner {
     const viewDiagonals = (world.diagonals ?? []).some((d) => inView(d.x, d.z) && (d.rooms[0] !== 0 || d.rooms[1] !== 0));
     const roofing = !storey.preview && Number.isFinite(minX);
     if (roofing && !viewDiagonals) {
-      // No roof where a room upstairs stands on this one.
-      const roofed = (x: number, z: number) => (storey.covered?.(x, z) ? 0 : room(x, z));
-      for (const rect of indoorRects(roofed, minX, minZ, maxX, maxZ)) {
-        addRoofShaped(rect, scheme, roof, roofTrim, gables);
+      // No roof where a room upstairs stands on this one. One roof per connected area: a plain
+      // rectangle gets the usual one, a ring round a storey above or an L one over the whole of
+      // it (see `addRoofArea`).
+      const roofed = (x: number, z: number) => !storey.covered?.(x, z) && room(x, z) !== 0;
+      for (const tiles of indoorAreas(roofed, W, minX, minZ, maxX, maxZ)) {
+        // A sliver of a tile or three doesn't get a roof of its own (see `indoorRects`).
+        if (tiles.length < 4) continue;
+        const inArea = new Set(tiles);
+        let bx0 = maxX;
+        let bx1 = minX;
+        let bz0 = maxZ;
+        let bz1 = minZ;
+        for (const i of tiles) {
+          const x = i % W;
+          const z = (i - x) / W;
+          bx0 = Math.min(bx0, x);
+          bx1 = Math.max(bx1, x + 1);
+          bz0 = Math.min(bz0, z);
+          bz1 = Math.max(bz1, z + 1);
+        }
+        if ((bx1 - bx0) * (bz1 - bz0) === tiles.length) {
+          addRoofShaped({ x0: bx0, z0: bz0, x1: bx1, z1: bz1 }, scheme, roof, roofTrim, gables);
+          continue;
+        }
+        const inside = (x: number, z: number) => inArea.has(z * W + x);
+        addRoofArea(inside, bx0, bz0, bx1, bz1, scheme, roof, roofTrim, WALL_HEIGHT, scheme.shape === 'flat' ? 0.12 : OVERHANG);
       }
     } else if (roofing) {
       // With diagonal walls: per connected indoor area. A convex outline (a diamond, a box with
       // cut corners) gets a hip roof that follows it; any other shape gets the usual rectangles
       // over its tiles, split tiles included whole (their outdoor half under a deeper eave).
-      const seen = new Set<number>();
-      for (let z = minZ; z < maxZ; z++) {
-        for (let x = minX; x < maxX; x++) {
-          const start = z * W + x;
-          if (room(x, z) === 0 || !inView(x, z) || seen.has(start)) continue;
-          const tiles: number[] = [];
-          const queue = [start];
-          seen.add(start);
-          while (queue.length) {
-            const i = queue.pop()!;
-            tiles.push(i);
-            const tx = i % W;
-            const tz = Math.floor(i / W);
-            for (const [nx, nz] of [[tx + 1, tz], [tx - 1, tz], [tx, tz + 1], [tx, tz - 1]]) {
-              const n = nz * W + nx;
-              if (nx >= minX && nz >= minZ && nx < maxX && nz < maxZ && room(nx, nz) !== 0 && inView(nx, nz) && !seen.has(n)) {
-                seen.add(n);
-                queue.push(n);
-              }
-            }
-          }
-          const inArea = new Set(tiles);
-          const corners: P2[] = [];
-          let indoorArea = 0;
-          let split = false;
-          for (const i of tiles) {
-            const tx = i % W;
-            const tz = Math.floor(i / W);
-            const d = diagonal(tx, tz);
-            if (!d) {
-              indoorArea += 1;
-              corners.push([tx, tz], [tx + 1, tz], [tx + 1, tz + 1], [tx, tz + 1]);
-              continue;
-            }
-            split = true;
-            for (const h of [0, 1] as const) {
-              if (d.rooms[h] === 0) continue;
-              indoorArea += 0.5;
-              for (const [fx, fz] of halfTriangle(d.axis, h)) corners.push([tx + fx, tz + fz]);
-            }
-          }
-          const hull = convexHull(corners);
-          if (split && indoorArea >= 2 && Math.abs(area(hull) - indoorArea) < 1e-3) {
-            addHipPolygon(hull, roof, roofTrim, H, T, scheme.shape === 'flat' ? 0.12 : OVERHANG, scheme.pitch, ROOF_THICKNESS);
+      for (const tiles of indoorAreas((x, z) => room(x, z) !== 0 && inView(x, z), W, minX, minZ, maxX, maxZ)) {
+        const corners: P2[] = [];
+        let indoorArea = 0;
+        let split = false;
+        for (const i of tiles) {
+          const tx = i % W;
+          const tz = Math.floor(i / W);
+          const d = diagonal(tx, tz);
+          if (!d) {
+            indoorArea += 1;
+            corners.push([tx, tz], [tx + 1, tz], [tx + 1, tz + 1], [tx, tz + 1]);
             continue;
           }
-          // Here every leftover gets its own small roof too, so no part of the room stays open.
-          const indoor = (tx: number, tz: number) => (inArea.has(tz * W + tx) ? 1 : 0);
-          for (const rect of indoorRects(indoor, minX, minZ, maxX, maxZ, 1)) addRoofShaped(rect, scheme, roof, roofTrim, gables);
+          split = true;
+          for (const h of [0, 1] as const) {
+            if (d.rooms[h] === 0) continue;
+            indoorArea += 0.5;
+            for (const [fx, fz] of halfTriangle(d.axis, h)) corners.push([tx + fx, tz + fz]);
+          }
         }
+        const hull = convexHull(corners);
+        if (split && indoorArea >= 2 && Math.abs(area(hull) - indoorArea) < 1e-3) {
+          addHipPolygon(hull, roof, roofTrim, H, T, scheme.shape === 'flat' ? 0.12 : OVERHANG, scheme.pitch, ROOF_THICKNESS);
+          continue;
+        }
+        // Here every leftover gets its own small roof too, so no part of the room stays open.
+        const inArea = new Set(tiles);
+        const indoor = (tx: number, tz: number) => (inArea.has(tz * W + tx) ? 1 : 0);
+        for (const rect of indoorRects(indoor, minX, minZ, maxX, maxZ, 1)) addRoofShaped(rect, scheme, roof, roofTrim, gables);
       }
     }
 
@@ -2347,6 +2350,35 @@ function turnAbout(from: P2, to: P2, turn: number): [number, number] {
 }
 
 /**
+ * The connected areas of a bounding box, each as the list of its tiles (`z * w + x`): the four
+ * sides of a tile join it to its neighbours, so a diagonal step doesn't.
+ */
+function indoorAreas(ok: (x: number, z: number) => boolean, w: number, x0: number, z0: number, x1: number, z1: number): number[][] {
+  const seen = new Set<number>();
+  const areas: number[][] = [];
+  for (let z = z0; z < z1; z++) {
+    for (let x = x0; x < x1; x++) {
+      if (!ok(x, z) || seen.has(z * w + x)) continue;
+      const tiles = [z * w + x];
+      seen.add(tiles[0]);
+      for (let i = 0; i < tiles.length; i++) {
+        const tx = tiles[i] % w;
+        const tz = (tiles[i] - tx) / w;
+        for (const [nx, nz] of [[tx + 1, tz], [tx - 1, tz], [tx, tz + 1], [tx, tz - 1]]) {
+          const n = nz * w + nx;
+          if (nx >= x0 && nz >= z0 && nx < x1 && nz < z1 && ok(nx, nz) && !seen.has(n)) {
+            seen.add(n);
+            tiles.push(n);
+          }
+        }
+      }
+      areas.push(tiles);
+    }
+  }
+  return areas;
+}
+
+/**
  * Covers the indoor tiles of a bounding box with a few rectangles (greedy, row-major). Leftovers
  * smaller than `minArea` tiles (e.g. a single-tile porch notch) don't get their own roof.
  */
@@ -2490,4 +2522,144 @@ export function addRoof(
   }
   void up;
   void down;
+}
+
+/** An edge of a roofed area: an eave, over the outdoors or over a storey below. */
+interface RoofEdge {
+  /** Its two corners, on the tile grid (wall centre lines). */
+  a: P2;
+  b: P2;
+  /** Outward normal. */
+  nx: number;
+  nz: number;
+}
+
+/**
+ * One hip roof over a roofed area that isn't a single rectangle: an L, a U, or the ring round a
+ * storey that stands on this one. Every side of it is an eave, and the underside height is the
+ * nearest eave's plus `pitch` × the distance to it, so the facets meet in hips, ridges and
+ * valleys instead of butting together as separate roofs at every corner. An area is hipped even
+ * where the style is a gable: it has no end to put a gable on.
+ */
+function addRoofArea(
+  inArea: (x: number, z: number) => boolean,
+  x0: number,
+  z0: number,
+  x1: number,
+  z1: number,
+  s: RoofShape,
+  roof: Geo,
+  trim: Geo,
+  base = WALL_HEIGHT,
+  overhang = OVERHANG,
+): void {
+  const pitch = Math.max(s.pitch, 1e-3);
+  const th = ROOF_THICKNESS;
+  const slope = Math.sqrt(1 + pitch * pitch);
+  const ye = base - overhang * pitch; // underside height at the eaves
+  const d = T + overhang; // how far the eave line stands out from the area's edge
+  // Every side of a roofed tile that doesn't face another roofed tile is an eave.
+  const edges: RoofEdge[] = [];
+  for (let z = z0; z < z1; z++) {
+    for (let x = x0; x < x1; x++) {
+      if (!inArea(x, z)) continue;
+      if (!inArea(x, z - 1)) edges.push({ a: [x, z], b: [x + 1, z], nx: 0, nz: -1 });
+      if (!inArea(x + 1, z)) edges.push({ a: [x + 1, z], b: [x + 1, z + 1], nx: 1, nz: 0 });
+      if (!inArea(x, z + 1)) edges.push({ a: [x, z + 1], b: [x + 1, z + 1], nx: 0, nz: 1 });
+      if (!inArea(x - 1, z)) edges.push({ a: [x, z], b: [x, z + 1], nx: -1, nz: 0 });
+    }
+  }
+  if (!edges.length) return;
+  // Each eave's line, `d` out from the area's edge; `away` from it is how high the roof is there.
+  const lines = edges.map((e) => {
+    const [ax, az] = [e.a[0] + e.nx * d, e.a[1] + e.nz * d];
+    return { nx: e.nx, nz: e.nz, c: e.nx * ax + e.nz * az, ex: e.b[0] - e.a[0], ez: e.b[1] - e.a[1], len: Math.hypot(e.b[0] - e.a[0], e.b[1] - e.a[1]) };
+  });
+  /** How far (x, z) is in from eave `i`'s line. */
+  const away = (i: number, x: number, z: number) => {
+    const l = lines[i];
+    return l.c - l.nx * x - l.nz * z;
+  };
+  /** A point of eave `i`'s plane, `th` over its underside, and its shingle UV (u along the eave, v up-slope). */
+  const onPlane = (i: number, x: number, z: number): [V3, [number, number]] => {
+    const l = lines[i];
+    const a = away(i, x, z);
+    return [[x, ye + pitch * a + th, z], [(x * l.ex + z * l.ez) / l.len, a * slope]];
+  };
+  /** The same faces, `th` down: soffits and the underside of the roof. */
+  const down = (pts: V3[]): V3[] => pts.map((p) => [p[0], p[1] - th, p[2]] as V3);
+  const tri = (pts: V3[], uvs: [number, number][]) => {
+    const n = facing(pts[0], pts[1], pts[2], [0, 1, 0]);
+    roof.poly(pts, n, uvs);
+    trim.poly(down(pts), [-n[0], -n[1], -n[2]]);
+  };
+  /** `poly` cut to where `a x + b z + c` is not above nought: a convex polygon stays convex. */
+  const cut = (poly: P2[], a: number, b: number, c: number): P2[] => {
+    const out: P2[] = [];
+    for (let k = 0; k < poly.length; k++) {
+      const [p, q] = [poly[k], poly[(k + 1) % poly.length]];
+      const [fp, fq] = [a * p[0] + b * p[1] + c, a * q[0] + b * q[1] + c];
+      const [pIn, qIn] = [fp <= 0, fq <= 0];
+      if (pIn) out.push(p);
+      if (pIn !== qIn) out.push([p[0] + ((q[0] - p[0]) * fp) / (fp - fq), p[1] + ((q[1] - p[1]) * fp) / (fp - fq)]);
+    }
+    return out;
+  };
+  // The roof: every eave's plane over the tiles where it is the lowest of them, a tile at a time.
+  // Where two of them cross is a hip, a ridge or a valley, so every facet is flat, as a roof's are.
+  const square: P2[] = [[0, 0], [1, 0], [1, 1], [0, 1]];
+  // The eaves are square to the walls, so a plane that is lowest anywhere in a tile is lowest at
+  // its corners, the middles of its sides, or its middle: those nine find every plane to try.
+  const probes: P2[] = [...square, [0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5], [0.5, 0.5]];
+  for (let z = z0; z < z1; z++) {
+    for (let x = x0; x < x1; x++) {
+      if (!inArea(x, z)) continue;
+      const lowest = new Set(probes.map(([dx, dz]) => {
+        let k = 0;
+        for (let i = 1; i < lines.length; i++) if (away(i, x + dx, z + dz) < away(k, x + dx, z + dz)) k = i;
+        return k;
+      }));
+      for (const i of lowest) {
+        let poly = square.map(([dx, dz]) => [x + dx, z + dz] as P2);
+        for (let j = 0; j < lines.length && poly.length; j++) {
+          // eave i's plane under eave j's: (nx_j - nx_i) x + (nz_j - nz_i) z + c_i - c_j <= 0.
+          if (j !== i) poly = cut(poly, lines[j].nx - lines[i].nx, lines[j].nz - lines[i].nz, lines[i].c - lines[j].c);
+        }
+        let area = 0;
+        for (let k = 0; k < poly.length; k++) area += poly[k][0] * poly[(k + 1) % poly.length][1] - poly[(k + 1) % poly.length][0] * poly[k][1];
+        if (poly.length < 3 || Math.abs(area) < 1e-6) continue;
+        const v = poly.map(([px, pz]) => onPlane(i, px, pz));
+        for (let k = 1; k < v.length - 1; k++) tri([v[0][0], v[k][0], v[k + 1][0]], [v[0][1], v[k][1], v[k + 1][1]]);
+      }
+    }
+  }
+  // The eaves: boards from the roof's edge out to the eave line, their soffits, and fascias. A
+  // corner's eave point stands `d` out along the normals of the eaves meeting there; they are
+  // square to each other, so their sum mitres the corner (and a straight run's two are one).
+  const out = new Map<string, [number, number][]>();
+  for (const e of edges) {
+    for (const p of [e.a, e.b]) {
+      const key = `${p[0]},${p[1]}`;
+      const normals = out.get(key) ?? [];
+      if (!normals.some(([nx, nz]) => nx === e.nx && nz === e.nz)) normals.push([e.nx, e.nz]);
+      out.set(key, normals);
+    }
+  }
+  const corner = (p: P2): V3 => {
+    let [nx, nz] = [0, 0];
+    for (const [ax, az] of out.get(`${p[0]},${p[1]}`) ?? []) {
+      nx += ax;
+      nz += az;
+    }
+    return [p[0] + nx * d, ye, p[1] + nz * d];
+  };
+  for (const [i, e] of edges.entries()) {
+    const oa = corner(e.a);
+    const ob = corner(e.b);
+    const top = [onPlane(i, e.a[0], e.a[1])[0], onPlane(i, e.b[0], e.b[1])[0], [ob[0], ob[1] + th, ob[2]], [oa[0], oa[1] + th, oa[2]]] as V3[];
+    const n = facing(top[0], top[1], top[2], [e.nx, 0, e.nz]);
+    roof.poly(top, n);
+    trim.poly(down(top), [-n[0], -n[1], -n[2]]);
+    trim.poly([oa, ob, [ob[0], ob[1] + th, ob[2]], [oa[0], oa[1] + th, oa[2]]], [e.nx, 0, e.nz]);
+  }
 }

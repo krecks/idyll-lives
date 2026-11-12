@@ -243,7 +243,7 @@ fn stairs_down_start_inside_the_house() {
     let stairs = buy(&mut w, "stairs", 9, 3 + DOWN, 0).unwrap();
     let s = w.stair_map().stairs[0];
     assert_eq!(
-        (s.bottom, s.top(), s.landing),
+        (s.bottom(), s.top(), s.landing),
         ((9, 6 + DOWN), (9, 3 + DOWN), (9, 2)),
         "up to the ground floor"
     );

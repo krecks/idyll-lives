@@ -567,6 +567,139 @@
         }
       ],
       "far": "../../models/yard/eScooter.far.glb"
+    },
+    "model.mountainBike": {
+      "type": "model",
+      "url": "../../models/yard/mountainBike.glb",
+      "materials": {
+        "motor": {
+          "finish": "material.finish.metal"
+        },
+        "mtb": {
+          "finish": "material.finish.gloss"
+        },
+        "rim": {
+          "finish": "material.finish.chrome"
+        },
+        "saddle": {
+          "finish": "material.finish.satin"
+        },
+        "tyre": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "mtb",
+          "label": "Frame"
+        }
+      ],
+      "far": "../../models/yard/mountainBike.far.glb"
+    },
+    "model.roadBike": {
+      "type": "model",
+      "url": "../../models/yard/roadBike.glb",
+      "materials": {
+        "lamp": {
+          "finish": "material.finish.gloss"
+        },
+        "motor": {
+          "finish": "material.finish.metal"
+        },
+        "rim": {
+          "finish": "material.finish.chrome"
+        },
+        "road": {
+          "finish": "material.finish.gloss"
+        },
+        "saddle": {
+          "finish": "material.finish.satin"
+        },
+        "tyre": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "road",
+          "label": "Frame"
+        }
+      ],
+      "far": "../../models/yard/roadBike.far.glb"
+    },
+    "model.cargoBike": {
+      "type": "model",
+      "url": "../../models/yard/cargoBike.glb",
+      "materials": {
+        "box_wood": {
+          "finish": "material.finish.satin"
+        },
+        "cargo": {
+          "finish": "material.finish.gloss"
+        },
+        "lamp": {
+          "finish": "material.finish.gloss"
+        },
+        "reflector": {
+          "finish": "material.finish.gloss"
+        },
+        "rim": {
+          "finish": "material.finish.chrome"
+        },
+        "saddle": {
+          "finish": "material.finish.satin"
+        },
+        "tyre": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "cargo",
+          "label": "Frame"
+        }
+      ],
+      "far": "../../models/yard/cargoBike.far.glb"
+    },
+    "model.eBike": {
+      "type": "model",
+      "url": "../../models/yard/eBike.glb",
+      "materials": {
+        "battery": {
+          "finish": "material.finish.satin"
+        },
+        "ebike": {
+          "finish": "material.finish.gloss"
+        },
+        "lamp": {
+          "finish": "material.finish.gloss"
+        },
+        "motor": {
+          "finish": "material.finish.metal"
+        },
+        "reflector": {
+          "finish": "material.finish.gloss"
+        },
+        "rim": {
+          "finish": "material.finish.chrome"
+        },
+        "saddle": {
+          "finish": "material.finish.satin"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "tyre": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "ebike",
+          "label": "Frame"
+        }
+      ],
+      "far": "../../models/yard/eBike.far.glb"
     }
   }
 }

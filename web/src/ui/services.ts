@@ -108,6 +108,8 @@ export interface GameControls {
   buildBlueprint(id: string): void;
   /** Build mode: pick a tool (walls, rooms, doors, windows, remove...); switches to Build mode's Build tab. */
   setBuildTool(tool: BuildTool): void;
+  /** Build mode's Stairs tool: which staircase it builds (an index into the shop's stairs), swapping the one in hand. */
+  pickStair(index: number): void;
   build(edits: EdgeEdit[]): void;
   /** Build mode: cover wall faces (paint, wallpaper, brick...). */
   paint(faces: FacePaint[]): void;

@@ -5499,6 +5499,206 @@
       ]
     },
     {
+      "id": "mountainBike",
+      "name": "Mountain bike",
+      "model": "model.mountainBike",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 380,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "rides",
+      "outdoors": true,
+      "vehicle": {
+        "kind": "bike",
+        "speed": 2.8,
+        "stages": [
+          "teen",
+          "youngAdult",
+          "adult",
+          "elder"
+        ],
+        "minRide": 60,
+        "reach": [
+          1.2,
+          0.6,
+          0.32
+        ]
+      },
+      "description": "A mountain bike with knobbly tyres, a suspension fork and flat bars. It takes rough ground in its stride and is a little slower than the city bike.",
+      "interactions": [
+        {
+          "id": "tuneUp",
+          "label": "Tune up the bike",
+          "anim": "tinker",
+          "sound": "bikeTools",
+          "minutes": 20,
+          "effects": {
+            "fun": 0.06
+          },
+          "tags": [
+            "chores",
+            "outdoors"
+          ],
+          "skills": {
+            "handiness": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "id": "roadBike",
+      "name": "Road bike",
+      "model": "model.roadBike",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 620,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "rides",
+      "outdoors": true,
+      "vehicle": {
+        "kind": "bike",
+        "speed": 4.2,
+        "stages": [
+          "teen",
+          "youngAdult",
+          "adult",
+          "elder"
+        ],
+        "minRide": 60,
+        "reach": [
+          1.15,
+          0.6,
+          0.3
+        ]
+      },
+      "description": "A road bike with drop bars and thin tyres, built for speed. It is the quickest bicycle here, more than four times as fast as walking.",
+      "interactions": [
+        {
+          "id": "tuneUp",
+          "label": "Tune up the bike",
+          "anim": "tinker",
+          "sound": "bikeTools",
+          "minutes": 20,
+          "effects": {
+            "fun": 0.06
+          },
+          "tags": [
+            "chores",
+            "outdoors"
+          ],
+          "skills": {
+            "handiness": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "id": "cargoBike",
+      "name": "Cargo bike",
+      "model": "model.cargoBike",
+      "footprint": [
+        3,
+        1
+      ],
+      "price": 740,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "rides",
+      "outdoors": true,
+      "vehicle": {
+        "kind": "bike",
+        "speed": 2.4,
+        "stages": [
+          "teen",
+          "youngAdult",
+          "adult",
+          "elder"
+        ],
+        "minRide": 60,
+        "reach": [
+          1.75,
+          0.85,
+          0.42
+        ]
+      },
+      "description": "A long cargo bike with a box up front for the shopping or a small passenger. It is heavier than the rest, but it carries what the others cannot.",
+      "interactions": [
+        {
+          "id": "tuneUp",
+          "label": "Tune up the bike",
+          "anim": "tinker",
+          "sound": "bikeTools",
+          "minutes": 20,
+          "effects": {
+            "fun": 0.06
+          },
+          "tags": [
+            "chores",
+            "outdoors"
+          ],
+          "skills": {
+            "handiness": 0.12
+          }
+        }
+      ]
+    },
+    {
+      "id": "eBike",
+      "name": "E-bike",
+      "model": "model.eBike",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 860,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "rides",
+      "outdoors": true,
+      "vehicle": {
+        "kind": "bike",
+        "speed": 3.6,
+        "stages": [
+          "teen",
+          "youngAdult",
+          "adult",
+          "elder"
+        ],
+        "minRide": 60,
+        "reach": [
+          1.2,
+          0.62,
+          0.32
+        ]
+      },
+      "description": "A city bike with a battery in the frame and a motor at the pedals, so hills take no effort. Its lights are built in and it keeps more than three times the pace of walking.",
+      "interactions": [
+        {
+          "id": "tuneUp",
+          "label": "Tune up the bike",
+          "anim": "tinker",
+          "sound": "bikeTools",
+          "minutes": 20,
+          "effects": {
+            "fun": 0.06
+          },
+          "tags": [
+            "chores",
+            "outdoors"
+          ],
+          "skills": {
+            "handiness": 0.12
+          }
+        }
+      ]
+    },
+    {
       "id": "bicycleChild",
       "name": "Kids' bike",
       "model": "model.bicycleChild",
