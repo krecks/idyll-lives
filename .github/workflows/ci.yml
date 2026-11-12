@@ -1,8 +1,13 @@
 # Checks every push to main and every pull request: clippy (the release gate) and the simulation's
-# tests, then the ignored sample tests that need files made first, the residents' clip check, the
+# tests, the ignored sample tests that need files made first, the residents' clip check, the
 # renderer's quick checks (the PlayCanvas internals it relies on, its tests) and the tools' tests.
 # The heavy release work — the wasm builds, models, the other web checks and Pages deploy — stays in
 # pages.yml, run by hand or on a tag.
+#
+# Four jobs side by side, each its own runner and its own Rust cache: the generated worlds alone
+# take 12 to 18 minutes (every one a Big one), so one after another the checks took 25 to 40.
+# `test` waits for the four and passes only when all four did: the name the main branch's ruleset
+# requires.
 name: CI
 
 on:
@@ -17,14 +22,16 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CARGO_TERM_COLOR: always
+
+# Each step's commands are in tools/ci-local.sh (run there with no step, they all go: before a push
+# or a pull request).
 jobs:
-  test:
+  rust:
+    name: Rust checks and simulation tests
     runs-on: ubuntu-26.04
-    # (0.7.0's run took 25 minutes; with every generated world a Big one, 0.8.0's takes 30 to 40
-    # on a slow runner, most of it the generated worlds.)
-    timeout-minutes: 50
-    env:
-      CARGO_TERM_COLOR: always
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -35,8 +42,6 @@ jobs:
           cargo clippy --version
       - uses: Swatinem/rust-cache@v2
 
-      # Each step's commands are in tools/ci-local.sh (run there with no step, they all go: before a
-      # push or a pull request).
       - name: Formatting
         run: tools/ci-local.sh fmt
 
@@ -46,7 +51,20 @@ jobs:
       - name: Simulation tests
         run: tools/ci-local.sh sim
 
-      # Bun runs the sample makers, the clip check (no packages) and the renderer's checks.
+  generated:
+    name: Generated houses and worlds
+    runs-on: ubuntu-26.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install
+          rustc --version
+      - uses: Swatinem/rust-cache@v2
+
+      # Bun runs the sample makers.
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.3
@@ -55,6 +73,18 @@ jobs:
       # instead of passing without checking anything.
       - name: Generated houses and worlds
         run: tools/ci-local.sh generated
+
+  web:
+    name: Clips and renderer tests
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      # Bun runs the clip check (no packages) and the renderer's checks; no Rust here.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
 
       # The residents' clips on both bodies at every life stage; the known failures are in
       # tools/characters/clip-baseline.json, so only a new one fails.
@@ -66,6 +96,19 @@ jobs:
       # tests (web/tests, `bun test`, each file in a fresh global). Neither needs the wasm builds.
       - name: Shader chunks and renderer tests
         run: tools/ci-local.sh web
+
+  tools:
+    name: Tools, object sizes, uses and models
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install
+          rustc --version
+      - uses: Swatinem/rust-cache@v2
 
       # The repo's tools (crates/tools): a fresh character build against the committed set and its
       # checks, the object gate over every shipped model (no Blender), and the content and texture
@@ -90,3 +133,19 @@ jobs:
       # content disagree on. A measure out of range is the review's to weigh; a broken model fails here.
       - name: Models
         run: tools/ci-local.sh models
+
+  # The check the main branch's ruleset requires: all four passed (one skipped or cancelled fails it).
+  test:
+    name: test
+    needs: [rust, generated, web, tools]
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - name: All four passed
+        run: |
+          echo "rust: ${{ needs.rust.result }}, generated: ${{ needs.generated.result }}, web: ${{ needs.web.result }}, tools: ${{ needs.tools.result }}"
+          test "${{ needs.rust.result }}" = success
+          test "${{ needs.generated.result }}" = success
+          test "${{ needs.web.result }}" = success
+          test "${{ needs.tools.result }}" = success
