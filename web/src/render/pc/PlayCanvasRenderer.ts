@@ -1093,7 +1093,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.followShadows();
     this.frameTownView();
     this.street.frame(o.target.x, o.target.z);
-    this.lot.landscape?.frameTiles(o.target.x, o.target.z, this.townBlend, o.radius);
+    this.lot.landscape?.frameTiles(o.target.x, o.target.z, this.diag.has('notownwoods') ? 0 : this.townBlend, o.radius);
     this.roam.pinned = this.followIndex !== null || this.gameRig.active || this.flight.active;
     const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
     const fovH = 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect);
@@ -1144,9 +1144,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.street.setTownView(blend > 0);
     // (The sky's dome as made in the play view; out past the land the town view sees.)
     this.lot.skyReach(blend > 0 ? this.orbit.radius : 0);
-    this.townBuildings.show(Math.min(1, blend / TOWN_FADE));
+    this.townBuildings.show(this.diag.has('notownbuildings') ? 0 : Math.min(1, blend / TOWN_FADE));
     // (The ground tiles' materials asked for only while the map is, or is to be, on them.)
-    if (blend > 0 || this.townGround.active) this.townGround.apply(this.lot.landscape?.groundMaterials() ?? [], blend);
+    const mapped = this.diag.has('notownground') ? 0 : blend;
+    if (mapped > 0 || this.townGround.active) this.townGround.apply(this.lot.landscape?.groundMaterials() ?? [], mapped);
     if (blend <= 0) return;
     const houses = this.street.townHouses();
     const by = this.townLotsBy;
@@ -2720,6 +2721,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /** The menus' town comes on screen: the overview's camera from where the game's is (whose pose the orbit keeps), its layer, its light. */
   private enterTown(): void {
+    this.lot.skyReach(0); // (the sky's dome as made: the town view's may have widened it.)
     this.townMode = true;
     this.shaderWatch.phase = 'town';
     this.birdLife.setTown(true);

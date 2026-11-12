@@ -141,7 +141,7 @@ export class TownGroundMap {
       data[i + 2] = Math.round(data[i + 2] * a);
     }
     this.texture?.destroy();
-    const texture = new pc.Texture(this.device, { name: 'townGroundMap', width: size, height: size, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, anisotropy: 8, levels: [new Uint8Array(data.buffer)] });
+    const texture = new pc.Texture(this.device, { name: 'townGroundMap', width: size, height: size, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [new Uint8Array(data.buffer)] });
     this.texture = texture;
     this.area.set([0, 0, 1 / W, 1 / D]);
   }

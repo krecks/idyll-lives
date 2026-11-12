@@ -207,6 +207,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     // A ground tile's levels not drawn now are no draw's: they go here (the one drawn goes with its entity).
     disposeTiles(this.tiles);
     this.tiles = [];
+    this.groundMats = null;
     this.woodsSquares = [];
     this.flowerSquares = [];
     for (const e of this.others) e.destroy();
@@ -442,9 +443,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   }
 
   /** The ground tiles' materials (the town view lays its colour map over them: `groundTiles.ts` `TownGroundMap`). */
-  groundMaterials(): pc.StandardMaterial[] {
-    return [...new Set(this.tiles.map((t) => t.mi.material as pc.StandardMaterial))];
+  groundMaterials(): readonly pc.StandardMaterial[] {
+    // (Worked out once: the tiles keep their material.)
+    return (this.groundMats ??= [...new Set(this.tiles.map((t) => t.mi.material as pc.StandardMaterial))]);
   }
+  private groundMats: pc.StandardMaterial[] | null = null;
 
   /** Crown clusters gathered from the woods (for the report), 0 without them. */
   get crownCount(): number {
