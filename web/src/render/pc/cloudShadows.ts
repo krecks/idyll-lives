@@ -18,14 +18,15 @@ import { tuned } from '../tune';
 /**
  * `span`: the metres the map covers before it repeats; `cells`: the noise's cells across it (a cloud's shadow
  * is a cell or two wide); `cover`: the noise's values over which a cloud thickens from none to whole (higher:
- * fewer, smaller clouds); `strength`: the share of the sun a cloud's middle takes; `speed`: the drift (m/s);
- * `at`: where the clouds are as a game opens (m, along x and z).
+ * fewer, smaller clouds); `strength`: the share of the sun a cloud's middle takes (a third: at a half, a cloud
+ * standing over a lawn read in a still picture as a dark area of the lawn, not as a cloud's shade); `speed`: the
+ * drift (m/s); `at`: where the clouds are as a game opens (m, along x and z).
  */
 export const CLOUDS = tuned('clouds', {
   span: 380,
   cells: 12,
   cover: [0.55, 0.68],
-  strength: 0.5,
+  strength: 0.35,
   speed: 1.3,
   at: [85, 20],
 });

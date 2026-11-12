@@ -47,8 +47,11 @@ import type { ViewRect } from '../types';
 /** Interior lights without clustered lamps (the preset's `clusteredLamps` off), and with. */
 const ROOM_LIGHTS = 4;
 const CLUSTERED_LIGHTS = 32;
-/** Brightness of a lamp at night (times its content `intensity`), in the look's units. */
-const LAMP_POWER = 7;
+/**
+ * Brightness of a lamp at night (times its content `intensity`), in the look's units. (7 until 2026-11-12: with a
+ * room's floor and walls toned darker at their edges, where the lamps stand, their pools were a step weaker.)
+ */
+const LAMP_POWER = 7.5;
 /** A room without a lamp gets this share of the light it had before lamps gave light. */
 const FILL_POWER = 0.35;
 /**
