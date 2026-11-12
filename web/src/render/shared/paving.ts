@@ -25,6 +25,8 @@ export const STREET_LOOK = tuned('street', {
   pathEdgeTint: [0.8, 1, 0.62],
   pathReach: 0.5,
   pathVary: 0.1,
+  /** A drive: how much darker it is where a car's wheels run. */
+  driveTrack: 0.22,
   /** Asphalt: the tone where wheels run (the rest is under it), between them, on the crown, along the kerb; its patches' depth; a repair's tone and how many of a road's 4 m stretches have one. */
   wheel: 1,
   between: 0.68,
@@ -39,6 +41,10 @@ export const STREET_LOOK = tuned('street', {
   walkVary: 0.07,
   gutterShade: 0.5,
 });
+
+/** Paths at least this wide are drives (`game/town.ts` `DRIVEWAY_MIN_WIDTH`), and half the width of a wheel's track on one (m). */
+const DRIVE = 1.8;
+const TRACK = 0.3;
 
 /** A tone (linear), in a colour (linear multipliers), as a vertex colour's multiplier (sRGB). */
 export function tint(lin: number, colour: readonly number[] = [1, 1, 1]): V3 {
@@ -55,12 +61,13 @@ export function pavedRects(g: Geo, rects: readonly Rect[], all: readonly Rect[],
   const paved = (x: number, z: number) => all.some((r) => x > r.x && x < r.x + r.w && z > r.z && z < r.z + r.d);
   const stations = (from: number, len: number, lo: boolean, hi: boolean): number[] => {
     const out = [0];
-    const edge = [0.15, L.pathReach].filter((e) => e < len / 2 - 0.05);
+    // (A narrow path's middle is as far in as its sides' tone reaches: clean down its middle.)
+    const edge = [0.15, Math.min(L.pathReach, len / 2)].filter((e) => e <= len / 2);
     if (lo) out.push(...edge);
     for (let s = Math.ceil(from + 0.45) - from; s < len - 0.45; s++) if (out.every((o) => Math.abs(o - s) > 0.2)) out.push(s);
     if (hi) out.push(...edge.map((e) => len - e));
     out.push(len);
-    return out.sort((a, b) => a - b);
+    return out.sort((a, b) => a - b).filter((o, i, list) => i === 0 || o - list[i - 1] > 1e-6);
   };
   for (const r of rects) {
     // The sides the lawn is on: a side another path (or a drive) goes on from is none.
@@ -68,13 +75,21 @@ export function pavedRects(g: Geo, rects: readonly Rect[], all: readonly Rect[],
     // (A path's ends meet a door or the pavement: only its long sides; a square's every side.)
     const [alongX, alongZ] = [r.w > r.d * 1.5, r.d > r.w * 1.5];
     const sides = { x0: x0 && !alongX, x1: x1 && !alongX, z0: z0 && !alongZ, z1: z1 && !alongZ };
-    const xs = stations(r.x, r.w, sides.x0, sides.x1);
-    const zs = stations(r.z, r.d, sides.z0, sides.z1);
+    // A drive (a path a car fits on): darker where its wheels run, along it, 0.75 m either side of its middle.
+    const drive = Math.min(r.w, r.d) >= DRIVE;
+    const across = r.d >= r.w ? r.w : r.d;
+    const tracks = drive ? [-0.75, 0.75].map((t) => across / 2 + t) : [];
+    const marks = tracks.flatMap((t) => [t - TRACK, t, t + TRACK]).filter((m) => m > 0.05 && m < across - 0.05);
+    const merge = (list: number[], extra: number[]) => [...list, ...extra.filter((m) => list.every((o) => Math.abs(o - m) > 0.08))].sort((a, b) => a - b);
+    const xs = r.d >= r.w ? merge(stations(r.x, r.w, sides.x0, sides.x1), marks) : stations(r.x, r.w, sides.x0, sides.x1);
+    const zs = r.d >= r.w ? stations(r.z, r.d, sides.z0, sides.z1) : merge(stations(r.z, r.d, sides.z0, sides.z1), marks);
     const tone = (u: number, v: number): V3 => {
       const edge = Math.min(sides.x0 ? u : 9, sides.x1 ? r.w - u : 9, sides.z0 ? v : 9, sides.z1 ? r.d - v : 9);
       const e = 1 - smoothstep(0, L.pathReach, edge);
       const vary = (valueNoise((r.x + u) / 2.1, (r.z + v) / 2.1, 431) - 0.5) * 2 * L.pathVary;
-      const lin = (1 - L.pathVary + vary) * (1 - (1 - L.pathEdge) * e);
+      const c = r.d >= r.w ? u : v;
+      const wheel = Math.max(0, ...tracks.map((t) => 1 - smoothstep(0, TRACK, Math.abs(c - t))));
+      const lin = (1 - L.pathVary + vary) * (1 - (1 - L.pathEdge) * e) * (1 - L.driveTrack * wheel);
       return tint(lin, L.pathEdgeTint.map((c) => 1 + (c - 1) * e));
     };
     for (let j = 0; j + 1 < zs.length; j++) {
