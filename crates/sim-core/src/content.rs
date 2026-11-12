@@ -9,6 +9,7 @@ use std::ops::RangeInclusive;
 use serde::Deserialize;
 
 use crate::Error;
+use crate::path::StairShape;
 use crate::social::{
     self, BondPreset, EmotionDef, EmotionRaw, FeelingDef, FeelingRaw, Indices, SocialDef,
     SocialRaw, SocialRules, SocialRulesRaw,
@@ -444,6 +445,9 @@ pub struct ObjectDef {
     /// A flight of stairs up to the storey above (one tile wide, climbed from the front; see
     /// `path::Stair`). Residents walk on it instead of around it.
     pub stairs: bool,
+    /// The stair's shape (content `stairShape`; only for stairs): a straight flight (the default)
+    /// or a spiral winding round its square footprint.
+    pub stair: StairShape,
     /// Turns freely (decor, plants): besides its four facings it can stand at any angle
     /// (`ObjectInstance::turn`). The angle is only for looks; the footprint stays on tiles.
     pub turns: bool,
@@ -568,8 +572,9 @@ pub enum VehicleKind {
 #[derive(Debug, Clone, Copy)]
 pub struct Vehicle {
     pub kind: VehicleKind,
-    /// How many times as fast as walking.
-    pub speed: f32,
+    /// How many times as fast as walking it goes: its content `speed` (times walking), on the
+    /// traffic's clock (`crate::DRIVE_SCALE` times that), as a car goes on its roads.
+    pub pace: f32,
     /// Life stages that ride it.
     pub stages: StageMask,
     /// Ways shorter than this many metres are walked.
@@ -1837,7 +1842,8 @@ pub struct Content {
 /// How cars drive (content `cars`).
 #[derive(Debug, Clone)]
 pub struct CarRules {
-    /// Top speed on country roads (m/s at 1×; `countrySpeed`, default 16).
+    /// Top speed on country roads (m a second of drive time, `crate::DRIVE_SCALE`; `countrySpeed`,
+    /// default 16).
     pub country_speed: f32,
 }
 
@@ -2647,6 +2653,9 @@ struct ObjectRaw {
     private: bool,
     #[serde(default)]
     stairs: bool,
+    /// See `ObjectDef::stair`: "spiral", else a straight flight.
+    #[serde(default)]
+    stair: Option<String>,
     /// Buy catalog category (decides free rotation, see `objectRules.freeRotation`).
     #[serde(default)]
     category: Option<String>,
@@ -2731,6 +2740,8 @@ struct ObjectRaw {
 #[serde(rename_all = "camelCase")]
 struct VehicleRaw {
     kind: VehicleKind,
+    /// Times walking (1 to 10), as a person on it would go at real time: it goes
+    /// `crate::DRIVE_SCALE` times that, on the traffic's clock (`Vehicle::pace`).
     speed: f32,
     stages: Option<Vec<String>>,
     #[serde(default = "default_min_ride")]
@@ -3979,7 +3990,7 @@ impl Content {
                     }
                     Some(Vehicle {
                         kind: v.kind,
-                        speed: v.speed,
+                        pace: v.speed * crate::DRIVE_SCALE,
                         stages: stages_of(&v.stages, &format!("object '{}' vehicle", obj.id))?
                             .unwrap_or(every_stage),
                         min_ride: v.min_ride,
@@ -4004,6 +4015,37 @@ impl Content {
                     obj.id
                 )));
             }
+            // A spiral winds round a square footprint; a flight is a straight column of tiles. Only a
+            // stair has a shape.
+            let stair_shape = match obj.stair.as_deref() {
+                None => StairShape::Flight,
+                Some(shape) => {
+                    if !obj.stairs {
+                        return Err(Error::new(format!(
+                            "object '{}': `stair` is a stair's",
+                            obj.id
+                        )));
+                    }
+                    match shape {
+                        // A step is a corner of the square, so its two tiles square is the only size
+                        // whose steps touch.
+                        "spiral" if obj.footprint != [2, 2] => {
+                            return Err(Error::new(format!(
+                                "object '{}': a spiral winds round a footprint of two by two tiles",
+                                obj.id
+                            )));
+                        }
+                        "spiral" => StairShape::Spiral,
+                        "flight" => StairShape::Flight,
+                        other => {
+                            return Err(Error::new(format!(
+                                "object '{}': unknown `stair` '{other}' (flight or spiral)",
+                                obj.id
+                            )));
+                        }
+                    }
+                }
+            };
             if !obj.places.is_empty() {
                 let half = obj.footprint.map(|f| f as f32 / 2.0 + PLACE_REACH);
                 if obj.places.len() != obj.slots as usize
@@ -4079,6 +4121,7 @@ impl Content {
                 crown: obj.crown.max(0.0),
                 private: obj.private,
                 stairs: obj.stairs,
+                stair: stair_shape,
                 turns,
                 decor: obj
                     .decor

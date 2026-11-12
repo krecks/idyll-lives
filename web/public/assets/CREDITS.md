@@ -49,7 +49,8 @@ The trees (`models/trees/oak.glb`, `maple.glb`, `birch.glb`, `cherry.glb`, `appl
 `magnolia.glb`, `willow.glb`, `pine.glb`, `spruce.glb`, `cypress.glb`, `lemonTree.glb`, each with its far version,
 override pack `packs/trees/manifest.json`) are built in Blender by `tools/art/blender/families/trees.py` on `gamekit`
 and exported as `.glb` (glTF, original, CC0). They stand on the lots and in the woods, whose far trees draw the far
-versions. An apple or a lemon shrinks away while it is picked, the Japanese maple's stray sprigs while it is shaped. The pine, spruce, Japanese maple, willow, cypress, maple and magnolia were rebuilt for the authenticity review
+versions. The broadleaves' crowns are leaf cards cut from one atlas (`textures/leafcards/albedo.png`, generated: below);
+their far versions and the conifers wear the tiling foliage. An apple or a lemon shrinks away while it is picked, the Japanese maple's stray sprigs while it is shaped. The pine, spruce, Japanese maple, willow, cypress, maple and magnolia were rebuilt for the authenticity review
 (G-38, 2026-10-21): crowns over head height, the willow's streamers, a slim cypress, a maple of its own and the
 magnolia's goblets; with them the bonsai's stand, the rose bush, azalea, meadow and strawberries (`plants.py`) and
 the garden boulders (`garden_decor.py`), all original and CC0.
@@ -94,6 +95,10 @@ rest are still.
 
 The staircase (`models/living/stairs.glb`, same pack) is built the same way (glTF, original, CC0): still, its steps
 where the house's are.
+
+The two staircases the player buys (`models/living/stairsOpen.glb`, `stairsSpiral.glb`, same pack) are built the
+same way (glTF, original, CC0): still, the open-tread flight where `stairs` climbs, the spiral winding round its
+newel over the 2 × 2 tiles the residents walk.
 
 The bathroom sinks (`models/bathroom/sink.glb`, `sinkPedestal.glb`, `vanityDouble.glb`, `sinkVessel.glb`,
 `sinkConsole.glb`, override pack `packs/bathroom/manifest.json`) are built in Blender by
@@ -263,12 +268,13 @@ grill were rebuilt to real sizes (2026-10-21).
 The play and yard things (`models/yard/sandbox.glb`, `bikeRack.glb`, `raisedBed.glb`, `shedSmall.glb`,
 `greenhouse.glb`, `compostBin.glb`, `rainBarrel.glb`, `clothesline.glb`, `firewoodStack.glb`, and the rides residents
 ride to work or school, `bicycle.glb` (a step-through city bike with a basket), `bicycleChild.glb` (a kids' bike on
-stabilisers) and `eScooter.glb` (an electric scooter), each with its `.far.glb`, override pack
-`packs/yard/manifest.json`) are built in Blender by `tools/art/blender/families/yard.py`
-on `gamekit` and exported as `.glb` (glTF, original, CC0). A sand castle grows in the sandpit, the bike lifts and
-turns its back wheel, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open, the
-compost bin's lid lifts and the washing goes out on the line a line at a time; the rides' wheels, cranks and stands
-are parts the game moves.
+stabilisers), `eScooter.glb` (an electric scooter), `mountainBike.glb` (knobbly tyres and a suspension fork),
+`roadBike.glb` (drop bars and thin tyres), `cargoBike.glb` (a long box up front) and `eBike.glb` (a battery in the
+frame and a motor at the pedals), each with its `.far.glb`, override pack `packs/yard/manifest.json`) are built in
+Blender by `tools/art/blender/families/yard.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). A sand
+castle grows in the sandpit, the bike lifts and turns its back wheel, the raised bed's crop grows and is picked, the
+shed's and the greenhouse's doors open, the compost bin's lid lifts and the washing goes out on the line a line at a
+time; the rides' wheels, cranks and stands are parts the game moves.
 
 The grills and the fire pit (`models/outdoor/grill.glb`, `grillStation.glb`, `firePit.glb`, same pack and family)
 are built the same way (glTF, original, CC0). The grill's lid and the station's hood swing up while residents cook,
@@ -465,8 +471,9 @@ Blender by `tools/art/blender/families/garden_things.py` on `gamekit` (the plant
 koi comes up to be fed or watched, a blue tit lands on the feeders while a resident watches, the lamp's panes and the
 festoon bulbs glow at night and the string sways.
 
-The ground cover, the woods' rocks and the selection marker (`models/ground/flowers.glb`, `rock.glb`,
-`marker.glb`, the first two each with a `.far.glb`, override pack `packs/ground/manifest.json`) are built in
+The ground cover, the woods' rocks and the selection marker (`models/ground/flowers.glb`, the lawn's patches
+`daisies.glb`, `buttercups.glb` and `violets.glb`, the fallen `petals.glb`, `rock.glb`,
+`marker.glb`, all but the last each with a `.far.glb`, override pack `packs/ground/manifest.json`) are built in
 Blender by `tools/art/blender/families/ground.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The
 lawn's wildflowers sway in the wind and take a tint per instance (the foliage finish). The lawn's grass is no file:
 it is built on the GPU (`web/src/render/pc/grass.ts`, original code).
@@ -500,6 +507,7 @@ override pack
 |---|---|---|
 | `textures/sky/clouds.png` | Cloud band of the sky | `cargo tex clouds` (procedural noise, `crates/tools/src/tex.rs`) |
 | `textures/<set>/albedo.jpg`, `normal.jpg`, `arm.jpg`; `street/sidewalk/*.jpg` | All 20 surface sets (`bark` … `wood_oak`, `sidewalk`) | `cargo tex synth` (procedural height fields, `crates/tools/src/tex/synth.rs`) |
+| `textures/leafcards/albedo.png` | The trees' leaf cards: three cut-out clusters of leaves and a dense wall of them | `cargo art --leafcards` (rendered in Blender from leaves generated in code, `tools/art/blender/leafcards.py`) |
 | `icons/rotate.svg`, `wall.svg`, `door.svg`, `eraser.svg`, `eyedropper.svg`, `environment.svg`, `fence.svg`, `gate.svg`, `garage.svg`, `roof.svg`, `upgrade.svg`, `focused.svg`, `inspired.svg`, `energized.svg`, `relaxed.svg` | UI and emotion icons | Hand-written SVG in the style of the existing set |
 
 ## Characters (`characters/`)

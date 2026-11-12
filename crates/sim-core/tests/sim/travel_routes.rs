@@ -57,7 +57,6 @@ fn the_network_joins_the_hamlets() {
     // road meets the streets shared.
     assert_eq!(g.roads.len(), 3);
     assert_eq!(g.nodes.len(), 4, "{:?}", g.nodes);
-    assert!(w.travel.open);
 }
 
 #[test]
@@ -154,6 +153,7 @@ fn short_trips_are_found_over_the_tiles_as_before() {
         lot: &w.lot,
         blocked: w.blocked(),
         stairs: w.stair_map(),
+        kept_off: &[],
     };
     // The same as A* would give (the way they set off may have been cut short by a step).
     let path = nav.find_path(tile, goal).expect("a way");

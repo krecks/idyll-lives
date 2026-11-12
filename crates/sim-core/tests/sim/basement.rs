@@ -184,6 +184,7 @@ fn a_basement_room_is_a_room_even_under_the_garden() {
         lot: &w.lot,
         blocked: w.blocked(),
         stairs: w.stair_map(),
+        kept_off: &[],
     };
     assert!(!nav.tile_free(12, 4 + DOWN) && nav.tile_free(6, 6 + DOWN));
 }
@@ -242,7 +243,7 @@ fn stairs_down_start_inside_the_house() {
     let stairs = buy(&mut w, "stairs", 9, 3 + DOWN, 0).unwrap();
     let s = w.stair_map().stairs[0];
     assert_eq!(
-        (s.bottom, s.top(), s.landing),
+        (s.bottom(), s.top(), s.landing),
         ((9, 6 + DOWN), (9, 3 + DOWN), (9, 2)),
         "up to the ground floor"
     );
@@ -256,6 +257,7 @@ fn stairs_down_start_inside_the_house() {
         lot: &w.lot,
         blocked: w.blocked(),
         stairs: w.stair_map(),
+        kept_off: &[],
     };
     assert!(
         !nav.tile_free(9, 4) && nav.tile_free(9, 2),

@@ -1,6 +1,6 @@
 import { defineConfig, searchForWorkspaceRoot, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { appendFile, cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { basename, join, resolve } from 'node:path';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
@@ -52,6 +52,8 @@ const BUILD_ID = process.env.GITHUB_SHA ? COMMIT : `${COMMIT}-${Date.now().toStr
 const REPORTS = fileURLToPath(new URL('../debug-reports', import.meta.url));
 /** Game states written by the simulation's tests (`DUMP_STATES=1 cargo test`): `<repo>/debug-states/<name>.json`. */
 const STATES = fileURLToPath(new URL('../debug-states', import.meta.url));
+/** The dev play logs (src/debug/devlog.ts): `<repo>/dev-logs/<id>.jsonl`, and `latest.txt` naming the newest. */
+const DEV_LOGS = fileURLToPath(new URL('../dev-logs', import.meta.url));
 /** Rendering benchmark results (`?bench=<scene>`, src/debug/bench.ts): `<repo>/bench-results/<name>.json`. */
 const BENCH_RESULTS = fileURLToPath(new URL('../bench-results', import.meta.url));
 
@@ -60,13 +62,32 @@ const BENCH_RESULTS = fileURLToPath(new URL('../bench-results', import.meta.url)
  * POST /__debug/report writes report.json, save.txt and screenshot.jpg into a new folder;
  * GET /__debug/reports/<name>/<file> reads them back (`?debugReport=<name>` loads one);
  * GET /__debug/states/<name> reads a game state the tests wrote (`?state=<name>` loads one);
- * POST /__debug/bench writes a benchmark's result to `bench-results/`.
+ * POST /__debug/bench writes a benchmark's result to `bench-results/`;
+ * POST /__debug/devlog appends the dev play log's lines to `dev-logs/<id>.jsonl`.
  */
 function debugReports(): Plugin {
   return {
     name: 'debug-reports',
     apply: 'serve',
     configureServer(server) {
+      server.middlewares.use('/__debug/devlog', async (req, res) => {
+        if (req.method !== 'POST') return void ((res.statusCode = 405), res.end());
+        try {
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) chunks.push(chunk as Buffer);
+          const { id, lines } = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { id: string; lines: string[] };
+          if (!/^[\w-]+$/.test(id) || !Array.isArray(lines)) return void ((res.statusCode = 400), res.end());
+          await mkdir(DEV_LOGS, { recursive: true });
+          const file = join(DEV_LOGS, `${id}.jsonl`);
+          await appendFile(file, lines.map((l) => `${l}\n`).join(''));
+          await writeFile(join(DEV_LOGS, 'latest.txt'), `${id}\n`);
+          res.statusCode = 204;
+          res.end();
+        } catch (err) {
+          res.statusCode = 500;
+          res.end(String(err));
+        }
+      });
       server.middlewares.use('/__debug/report', async (req, res) => {
         if (req.method !== 'POST') return void ((res.statusCode = 405), res.end());
         try {

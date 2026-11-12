@@ -275,6 +275,9 @@ export interface ObjectDef {
   private?: boolean;
   /** A flight of stairs to the storey above (sim-core `storeys.rs`). */
   stairs?: boolean;
+  /** The stair's shape (`stairs` only): a straight flight (the default) or a spiral winding round
+   *  its 2x2 footprint. */
+  stair?: 'flight' | 'spiral';
   /**
    * Gives light at night (lamps, lanterns): reach in metres, relative brightness, height of the bulb,
    * where the bulb is off the middle (`at`: metres, x and z in the object's own frame, before
@@ -943,6 +946,11 @@ export class Content {
 
   object(id: string): ObjectDef | undefined {
     return this.objects.get(id);
+  }
+
+  /** The staircases (objects with `stairs`), in content order: what the Stairs tool builds. */
+  staircases(): ObjectDef[] {
+    return this.shop.filter((d) => d.stairs);
   }
 
   trait(id: string): TraitDef | undefined {

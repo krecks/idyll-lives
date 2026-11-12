@@ -279,6 +279,60 @@ pub(crate) fn couples_bed(def: &crate::content::ObjectDef) -> bool {
     def.slots > 1 && def.interactions.iter().any(|i| i.conceive)
 }
 
+/// Whether a place at `obj`, a couple's bed in `sim`'s home, is kept for a couple of their
+/// household who aren't `sim` and their partner: its other half while one of a couple lies in it
+/// (or is on their way) and the partner is at home, not out at work; with nobody in it, while
+/// the home has no more couple's beds free than such couples with neither of them in one yet.
+/// Free will leaves it to them while `sim` has somewhere else to sleep (`world::pick_autonomous`):
+/// the parents' bed is theirs, and a child shares it for the night only with the other one out.
+pub(crate) fn kept_for_couple(
+    ctx: &Ctx,
+    objects: &[ObjectInstance],
+    sim: &Sim,
+    obj: &ObjectInstance,
+) -> bool {
+    let def = &ctx.content.objects[obj.def];
+    let Some(home) = ctx.households[sim.household as usize].plot else {
+        return false;
+    };
+    if !couples_bed(def) || ctx.object_plot[obj.id as usize] != Some(home) {
+        return false;
+    }
+    // A housemate of `sim`'s (living here, not `sim`).
+    let housemate = |j: usize| {
+        j as u32 != sim.id
+            && ctx
+                .briefs
+                .get(j)
+                .is_some_and(|b| b.here && b.household == sim.household)
+    };
+    let partner_here = |u: u32| ctx.rels.partner_of(u as usize).filter(|&p| housemate(p));
+    let mut lying = obj.users().filter(|&u| u != sim.id).peekable();
+    if lying.peek().is_some() {
+        return lying.any(|u| partner_here(u).is_some_and(|p| !ctx.briefs[p].away));
+    }
+    if partner_here(sim.id).is_some() {
+        return false;
+    }
+    // Couples of the household (but `sim`'s) with neither in a couple's bed at home, and the
+    // couple's beds free there.
+    let beds: Vec<&ObjectInstance> = ctx
+        .index
+        .on(home)
+        .iter()
+        .map(|&o| &objects[o as usize])
+        .filter(|o| !o.broken() && couples_bed(&ctx.content.objects[o.def]))
+        .collect();
+    let in_one = |j: u32| beds.iter().any(|o| o.slot_of(j).is_some());
+    let couples = (0..ctx.briefs.len())
+        .filter(|&a| housemate(a))
+        .filter(|&a| {
+            partner_here(a as u32).is_some_and(|b| b > a && !in_one(a as u32) && !in_one(b as u32))
+        })
+        .count();
+    couples > 0 && beds.iter().filter(|o| !o.in_use()).count() <= couples
+}
+
 /// The objects that can offer a place in a claimed room (`roomKinds[].claimed`), per claimed
 /// room (`World::claimed_places`): the beds and sofas to lie in, and the cribs and their care.
 /// Broken ones are listed too (skipped while broken, `room_claimants`), so a repair needn't wait

@@ -9,6 +9,24 @@
         "bark": {
           "finish": "material.finish.bark"
         },
+        "card": {
+          "finish": "material.finish.leafcards"
+        },
+        "card2": {
+          "finish": "material.finish.leafcards"
+        },
+        "card3": {
+          "finish": "material.finish.leafcards"
+        },
+        "card4": {
+          "finish": "material.finish.leafcards"
+        },
+        "card5": {
+          "finish": "material.finish.leafcards"
+        },
+        "core": {
+          "finish": "material.finish.leafcards"
+        },
         "leaf": {
           "finish": "material.finish.foliage"
         },
@@ -60,6 +78,24 @@
       "materials": {
         "bark": {
           "finish": "material.finish.bark"
+        },
+        "card": {
+          "finish": "material.finish.leafcards"
+        },
+        "card2": {
+          "finish": "material.finish.leafcards"
+        },
+        "card3": {
+          "finish": "material.finish.leafcards"
+        },
+        "card4": {
+          "finish": "material.finish.leafcards"
+        },
+        "card5": {
+          "finish": "material.finish.leafcards"
+        },
+        "core": {
+          "finish": "material.finish.leafcards"
         },
         "leaf": {
           "finish": "material.finish.foliage"
@@ -119,6 +155,21 @@
         "birch_mark": {
           "finish": "material.finish.matte"
         },
+        "card2": {
+          "finish": "material.finish.leafcards"
+        },
+        "card3": {
+          "finish": "material.finish.leafcards"
+        },
+        "card4": {
+          "finish": "material.finish.leafcards"
+        },
+        "card5": {
+          "finish": "material.finish.leafcards"
+        },
+        "core": {
+          "finish": "material.finish.leafcards"
+        },
         "leaf2": {
           "finish": "material.finish.foliage"
         },
@@ -163,6 +214,30 @@
       "materials": {
         "bark": {
           "finish": "material.finish.bark"
+        },
+        "card": {
+          "finish": "material.finish.leafcards"
+        },
+        "card2": {
+          "finish": "material.finish.leafcards"
+        },
+        "card3": {
+          "finish": "material.finish.leafcards"
+        },
+        "card4": {
+          "finish": "material.finish.leafcards"
+        },
+        "card5": {
+          "finish": "material.finish.leafcards"
+        },
+        "cardg": {
+          "finish": "material.finish.leafcards"
+        },
+        "cardg2": {
+          "finish": "material.finish.leafcards"
+        },
+        "core": {
+          "finish": "material.finish.leafcards"
         },
         "green": {
           "finish": "material.finish.foliage"
@@ -219,6 +294,24 @@
       "materials": {
         "bark": {
           "finish": "material.finish.bark"
+        },
+        "card": {
+          "finish": "material.finish.leafcards"
+        },
+        "card2": {
+          "finish": "material.finish.leafcards"
+        },
+        "card3": {
+          "finish": "material.finish.leafcards"
+        },
+        "card4": {
+          "finish": "material.finish.leafcards"
+        },
+        "card5": {
+          "finish": "material.finish.leafcards"
+        },
+        "core": {
+          "finish": "material.finish.leafcards"
         },
         "fruit": {
           "finish": "material.finish.satin"
@@ -296,6 +389,21 @@
         "bark": {
           "finish": "material.finish.bark"
         },
+        "card2": {
+          "finish": "material.finish.leafcards"
+        },
+        "card3": {
+          "finish": "material.finish.leafcards"
+        },
+        "card4": {
+          "finish": "material.finish.leafcards"
+        },
+        "card5": {
+          "finish": "material.finish.leafcards"
+        },
+        "core": {
+          "finish": "material.finish.leafcards"
+        },
         "leaf": {
           "finish": "material.finish.foliage"
         },
@@ -349,6 +457,30 @@
       "materials": {
         "bark": {
           "finish": "material.finish.bark"
+        },
+        "card": {
+          "finish": "material.finish.leafcards"
+        },
+        "card2": {
+          "finish": "material.finish.leafcards"
+        },
+        "card3": {
+          "finish": "material.finish.leafcards"
+        },
+        "card4": {
+          "finish": "material.finish.leafcards"
+        },
+        "card5": {
+          "finish": "material.finish.leafcards"
+        },
+        "cardg": {
+          "finish": "material.finish.leafcards"
+        },
+        "cardg2": {
+          "finish": "material.finish.leafcards"
+        },
+        "core": {
+          "finish": "material.finish.leafcards"
         },
         "fruit": {
           "finish": "material.finish.satin"
@@ -412,6 +544,21 @@
       "materials": {
         "bark": {
           "finish": "material.finish.bark"
+        },
+        "card2": {
+          "finish": "material.finish.leafcards"
+        },
+        "card3": {
+          "finish": "material.finish.leafcards"
+        },
+        "card4": {
+          "finish": "material.finish.leafcards"
+        },
+        "card5": {
+          "finish": "material.finish.leafcards"
+        },
+        "core": {
+          "finish": "material.finish.leafcards"
         },
         "leaf2": {
           "finish": "material.finish.foliage"
@@ -589,6 +736,21 @@
         },
         "body": {
           "finish": "material.finish.satin"
+        },
+        "card": {
+          "finish": "material.finish.leafcards"
+        },
+        "card2": {
+          "finish": "material.finish.leafcards"
+        },
+        "card3": {
+          "finish": "material.finish.leafcards"
+        },
+        "card4": {
+          "finish": "material.finish.leafcards"
+        },
+        "core": {
+          "finish": "material.finish.leafcards"
         },
         "fruit": {
           "finish": "material.finish.satin"

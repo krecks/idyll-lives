@@ -313,7 +313,7 @@ interface TextureSlot {
   texture: pc.Texture;
   loaded: boolean;
   /** The materials (and their map) waiting for it. */
-  users: { material: pc.StandardMaterial; map: 'diffuseMap' | 'normalMap' | 'aoMap' | 'glossMap' | 'metalnessMap' }[];
+  users: { material: pc.StandardMaterial; map: 'diffuseMap' | 'opacityMap' | 'normalMap' | 'aoMap' | 'glossMap' | 'metalnessMap' }[];
 }
 
 export class MaterialLibrary {
@@ -344,6 +344,9 @@ export class MaterialLibrary {
   anisotropy = 8;
   /** Wall cutaway state read by every `cutaway` material. */
   readonly wallCut = new WallCutState();
+  /** The cut-out finishes made so far (and their copies), each with its entry's `cutout` (`setCutoutCoverage`). */
+  private readonly cutouts = new Map<pc.StandardMaterial, number>();
+  private cutoutCoverage = false;
   /** Told of every material made from a manifest entry, before its first update (`onCreate`). */
   private readonly creators: ((key: string, material: pc.StandardMaterial) => void)[] = [];
   /** The ground dug away over a basement in view (see `digInto`), and the basements and windowless rooms kept dark. */
@@ -493,6 +496,25 @@ export class MaterialLibrary {
   }
 
   /**
+   * Road paint (the junctions' stop lines and crosswalks, `shared/roads.ts`): the plain finish, drawn
+   * over the road it lies a few millimetres above (pulled towards the eye, as the contact shadows
+   * are), however coarse the depth buffer is that far off.
+   */
+  roadPaint(): pc.StandardMaterial {
+    const id = 'finish|roadPaint';
+    let mat = this.cache.get(id);
+    if (!mat) {
+      mat = this.create('material.finish.roadPaint', { type: 'material', color: '#FFFFFF', roughness: 1, metallic: 0 }, { vertexColors: true });
+      mat.setDefine('GAME_PLAIN_FINISH', '');
+      mat.slopeDepthBias = -2;
+      mat.depthBias = -2;
+      mat.update();
+      this.cache.set(id, mat);
+    }
+    return mat;
+  }
+
+  /**
    * `material` for instanced draws with a per-instance colour (`INSTANCE_COLOR_SEMANTIC`, see
    * `instancing.ts`): a copy, kept per material, that multiplies its albedo by the instance's colour
    * (converted from sRGB where the material converts vertex colours).
@@ -507,6 +529,8 @@ export class MaterialLibrary {
       copy.update();
       this.instanced.set(material, copy);
       if (this.lit.has(material)) this.lit.add(copy);
+      const cutout = this.cutouts.get(material);
+      if (cutout !== undefined) this.cutouts.set(copy, cutout);
       this.reuseTextures(material, copy);
     }
     return copy;
@@ -517,7 +541,9 @@ export class MaterialLibrary {
    * water): the library stops keeping and updating it. Its owner destroys it.
    */
   release(material: pc.Material): void {
-    if (material instanceof pc.StandardMaterial) this.lit.delete(material);
+    if (!(material instanceof pc.StandardMaterial)) return;
+    this.lit.delete(material);
+    this.cutouts.delete(material);
   }
 
   /** Adopts a material created elsewhere (the glTF loader's) into the look, the sky's ambient, basements and lamps. */
@@ -568,6 +594,33 @@ export class MaterialLibrary {
     const g = (v: number) => Math.pow(Math.max(0, v), 1 / 2.2);
     material.emissive.set(g(color.r), g(color.g), g(color.b));
     material.update();
+  }
+
+  /**
+   * Whether the picture is multisampled (the preset's `msaaSamples` as the post-processing has them; the
+   * dev pages' canvas): cut-out finishes (`MaterialEntry.cutout`, a tree's leaf cards) then soften their
+   * edges with alpha to coverage and test away only what would cover no sample; without, a plain alpha
+   * test at their `cutout`. (PlayCanvas leaves alpha to coverage out of a pass into a target without
+   * samples: the sun's shadow, a catalog picture.)
+   */
+  setCutoutCoverage(on: boolean): void {
+    if (on === this.cutoutCoverage) return;
+    this.cutoutCoverage = on;
+    for (const [material, cutout] of this.cutouts) {
+      this.cutOut(material, cutout);
+      material.update();
+    }
+  }
+
+  /** Whether `material` is a cut-out finish (a tree's leaf cards): drawn by another shader it would show its whole quads. */
+  isCutout(material: pc.Material): boolean {
+    return material instanceof pc.StandardMaterial && this.cutouts.has(material);
+  }
+
+  /** A cut-out finish's test and coverage as the picture's samples have them (`setCutoutCoverage`). */
+  private cutOut(material: pc.StandardMaterial, cutout: number): void {
+    material.alphaToCoverage = this.cutoutCoverage;
+    material.alphaTest = this.cutoutCoverage ? Math.min(cutout, CUTOUT_COVERAGE_TEST) : cutout;
   }
 
   /** Uploads a material's changed properties. */
@@ -707,6 +760,19 @@ export class MaterialLibrary {
         mat.aoMapOffset = mat.glossMapOffset = mat.metalnessMapOffset = offset;
       }
     }
+    if (textures && entry.cutout !== undefined) {
+      // Cut out by the albedo's alpha (`shaders/cutout.ts`), never blended: thousands of trees stay in
+      // the opaque pass, and the shadow pass discards with it (PlayCanvas's own, by `alphaTest`). Both
+      // sides are drawn, each lit by the mesh's normals as they are (no `twoSidedLighting`: a leaf
+      // card's normals are its crown's, the same seen from behind).
+      this.useTexture(mat, 'opacityMap', textures.texture, true);
+      mat.opacityMapChannel = 'a';
+      mat.opacityMapTiling = tiling;
+      mat.opacityMapOffset = offset;
+      mat.cull = pc.CULLFACE_NONE;
+      this.cutouts.set(mat, entry.cutout);
+      this.cutOut(mat, entry.cutout);
+    }
     // Roughness, as PlayCanvas's inverted gloss; with a packed map the scalars multiply its channels.
     mat.glossInvert = true;
     mat.gloss = entry.roughness ?? (entry.arm ? 1 : 0.8);
@@ -728,6 +794,7 @@ export class MaterialLibrary {
     installGameChunks(mat, this.device);
     if (options.vertexColors) mat.setDefine('GAME_SRGB_COLORS', '');
     if (options.planarUV) mat.setDefine('GAME_PLANAR_UV', '');
+    if (this.cutouts.has(mat)) mat.setDefine('GAME_CUTOUT', '');
     if (options.cutaway) this.cutaway(mat);
     if (options.pattern === 'stripes') mat.setDefine('GAME_PATTERN_STRIPES', '');
     if (options.pattern === 'whitewash') mat.setDefine('GAME_PATTERN_WHITEWASH', '');
@@ -789,6 +856,12 @@ export class MaterialLibrary {
     return made;
   }
 }
+
+/**
+ * A cut-out finish's alpha test where alpha to coverage softens its edge: under an eighth, the alpha
+ * covers none of four samples.
+ */
+const CUTOUT_COVERAGE_TEST = 0.125;
 
 /** 1 × 1 textures standing in while a surface's own load (same kind and format, so the shader stays the same). */
 const standIns = new WeakMap<pc.GraphicsDevice, Map<string, pc.Texture>>();

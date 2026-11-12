@@ -155,7 +155,7 @@ fn generated_houses_are_livable() {
                 .find(|o| is(&w.content.objects[o.def]))
                 .map(|o| w.lot.room_at(o.x, o.z))
         };
-        let bed = room_of(&|d| d.interactions.iter().any(|i| i.id == "sleep"));
+        let bed = room_of(&|d| d.interactions.iter().any(|i| i.id == "sleep" && !i.spare));
         let (fridge, toilet) = (
             room_of(&|d| d.id == "fridge"),
             room_of(&|d| d.id == "toilet"),
@@ -189,6 +189,7 @@ fn generated_houses_are_livable() {
             lot: &w.lot,
             blocked: w.blocked(),
             stairs: w.stair_map(),
+            kept_off: &[],
         };
         let start = (entry[0].floor() as i32, entry[1].floor() as i32);
         let mut seated = 0;
@@ -275,7 +276,7 @@ fn generated_houses_are_livable() {
                 .stair_map()
                 .stairs
                 .iter()
-                .filter(|s| w.storey_of(s.bottom.1) == -1)
+                .filter(|s| w.storey_of(s.bottom().1) == -1)
                 .collect();
             if flights.is_empty() {
                 failures.push(format!("{label}: a basement with no stairs down"));
@@ -285,12 +286,7 @@ fn generated_houses_are_livable() {
                 let (lx, lz) = s.landing;
                 let room = planned(lx, lz);
                 let kind = room.and_then(|r| r["kind"].as_str()).unwrap_or("garden");
-                let well = (0..s.len).map(|i| {
-                    (
-                        s.bottom.0 + s.dir.0 * i,
-                        w.ground_z(s.bottom.1 + s.dir.1 * i),
-                    )
-                });
+                let well = s.tiles().iter().map(|&(bx, bz)| (bx, w.ground_z(bz)));
                 if !["living", "entry", "dining", "kitchen"].contains(&kind) || w.storey_of(lz) != 0
                 {
                     failures.push(format!(

@@ -29,7 +29,7 @@ import { GameCamera } from './camera';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { createApp, createDevice, destroyApp } from './device';
 import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
-import { fenceHedges } from '../shared/fences';
+import { fenceHedges, wallCorners } from '../shared/fences';
 import { shownFences } from '../shared/shownFences';
 import { gardenPool, GardenPools } from './gardenPools';
 import { HoverTile, ResizeHandles } from './handles';
@@ -49,6 +49,7 @@ import { GameBirds } from './birds';
 import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming';
 import { steadyShaderKeys } from './shaderKeys';
 import { natureDecor, windStill } from './nature';
+import { PETALS } from '../shared/nature';
 import { TownOverview, townLayer } from './overview';
 import { Placing } from './placing';
 import { Picker } from './picking';
@@ -73,9 +74,11 @@ import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
 import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS } from '../shared/lens';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
+import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
 import { PLAYBACK_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
+import { pavedRects } from '../shared/paving';
 import { GrassPush } from '../shared/grass';
 import { idleMoment } from '../shared/idle';
 import { coveringSurface, houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
@@ -87,7 +90,7 @@ import { ModelRefresh } from '../shared/modelRefresh';
 import { OverviewCamera } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
-import { PIXEL_BUDGET, renderScale, watchPixelRatio } from '../shared/resolution';
+import { DEFAULT_RESOLUTION, renderScale, watchPixelRatio } from '../shared/resolution';
 import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
@@ -187,6 +190,8 @@ const NOON_SKY_LUMA = skyLuma(lightingAt(13 * 60, LOOK, createLighting()));
 
 /** Residents this far (m) outside the viewed lot are still drawn (walking up to it). */
 const SIM_VIEW_MARGIN = 2;
+/** How far round the watch rectangle the sim keeps residents in full detail (m: sim-core `lod::VIEW_MARGIN`; `reportWatch`). */
+const DETAIL_MARGIN = 5;
 /** Residents further than this (m) from the camera's target, off the viewed lot, have no contact shadow. */
 const FAR_SHADOW = 40;
 /** `?residents=lot`: residents drawn only on the viewed lot, as before life on every lot. */
@@ -351,7 +356,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly townRig = new OverviewCamera(this.townPose);
 
   private readonly pacer = new FramePacer();
-  private options: LiveRenderOptions = { resolution: 'auto', cameraSensitivity: 1, fpsCap: 0 };
+  private options: LiveRenderOptions = { resolution: DEFAULT_RESOLUTION, cameraSensitivity: 1, fpsCap: 0 };
   private active = false;
   private covered = false;
   private coveredFrames = 0;
@@ -646,6 +651,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sizeWatch.observe(canvas);
     const forceWebGL = this.deps.backend === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
     this.device = await createDevice(canvas, forceWebGL);
+    // (Before the first material is made: Low's shaders are built without the clouds' shadows.)
+    if (!this.quality.cloudShadows) withoutCloudShadows(this.device);
     steadyShaderKeys();
     // Before anything compiles: every shader and pipeline is counted (`?diag=shaders` logs them).
     this.shaderWatch = new ShaderWatch(this.device, this.diag.has('shaders'));
@@ -677,8 +684,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     cam.layers = cam.layers.filter((id) => id !== pc.LAYERID_SKYBOX);
     // The picture after the light: multisampling or FXAA, the image processing
     // and the night grade (`post.ts`; the diag views and `?diag=linear` without them).
-    this.post = new PostProcessing(this.app, cam, gamePostOptions(this.quality.msaaSamples, this.diag, diagViewActive, this.quality.leanTargets));
+    this.post = new PostProcessing(this.app, cam, gamePostOptions(this.quality.msaaSamples, this.diag, diagViewActive, this.quality.leanTargets, this.quality.contactShading));
     this.post.setLook(gameLook(LOOK));
+    // Leaf cards soften their edges with the picture's samples (none on Low, nor without the post-processing).
+    this.lib.setCutoutCoverage(this.post.samples > 1);
 
     this.sun = new pc.Entity('sun');
     this.sun.addComponent('light', {
@@ -739,6 +748,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.signals = new Signals(this.app, this.root, this.deps.assets, { shadows: this.quality.streetShadows, lod: this.quality.streetLod });
     this.characters.setShadowTest(inMap);
     this.characters.setCarRide((frame, x, z, yaw, aboard, out) => this.cars.ride(frame, x, z, yaw, aboard, out));
+    // (Out on the hills between hamlets, on the land, not sunk into it: `Characters.setGround`.)
+    this.characters.setGround((x, z) => this.lot.landscape?.heightAt(x, z) ?? 0);
     this.decorTemplates = new TemplateCache(this.app);
     this.storeyLayer = new pc.Entity('storeyLayer');
     this.root.addChild(this.storeyLayer);
@@ -928,7 +939,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.sunShadows.frame();
       this.applyCamera();
       this.pushGrass(dt);
-      this.lot.frame(dt); // (the sky round the camera, the grass in view.)
+      this.lot.frame(dt, this.townMode); // (the sky round the camera, the clouds' shadows, the grass in view.)
       if (!this.townMode) this.updateCutaway();
       // (The marker faces the camera as it is now, after this frame's input.)
       this.placeMarker();
@@ -1106,7 +1117,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The roaming square's middle (8 m steps) and half side (8 m steps), as last set. */
   private readonly roamSquare = new Float64Array(3);
 
-  /** The sim's full-detail area: the chunks streamed in, as a tile rectangle on the ground (`onWatch`). */
+  /**
+   * The sim's full-detail area: the chunks streamed in, as a tile rectangle on the ground (`onWatch`); the residents
+   * told it (`Residents.setDetailArea`: one it reaches is caught up by the sim, hidden a moment meanwhile).
+   */
   private reportWatch(): void {
     const world = this.builtWorld;
     if (!world || !this.watchListener || !this.roam.chunks.size) return;
@@ -1119,7 +1133,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       z1 = Math.max(z1, (cz + 1) * CHUNK);
     }
     const d = groundDepth(world);
-    this.watchListener([Math.max(0, x0), Math.max(0, z0), Math.min(world.width, x1), Math.min(d, z1)]);
+    const rect: [number, number, number, number] = [Math.max(0, x0), Math.max(0, z0), Math.min(world.width, x1), Math.min(d, z1)];
+    this.watchListener(rect);
+    // (Out of it the sim moves residents only now and then: one it reaches catches up in a jump, hidden meanwhile.)
+    const [a, b, c, e] = [rect[0] - DETAIL_MARGIN, rect[1] - DETAIL_MARGIN, rect[2] + DETAIL_MARGIN, rect[3] + DETAIL_MARGIN];
+    this.characters.setDetailArea((x, z) => x >= a && z >= b && x <= c && z <= e);
   }
 
   /** The street builds the chunks streamed in (between world builds; a world build builds them itself). */
@@ -1217,6 +1235,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // thing, hundreds of MB of buffers; Low's merged object shadows alone 260 MB, which lost the
     // WebGPU device): with no lot given, the focus stays the lot built, else the one nearest the camera.
     if (!view && world.meta?.world?.size === 'big') view = this.view ?? this.nearestLot(world);
+    // (Which traffic lights' poles get a pedestrians' head: those by a crosswalk.)
+    this.signals.setWorld(world);
     if (this.rebuildNext) this.rebuildNext = false;
     else if (this.patchable(world, view)) {
       this.patchWorld(world);
@@ -1428,8 +1448,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       await this.pace();
       // The viewed lot's fences stand on the ground (hidden with it while the basement is in view, its
       // hedges with the garden's shrubs: `lotHedges`); other lots' are the street's, but for their gates, which swing.
+      const walls = wallCorners(world.walls);
+      const wallAt = (x: number, z: number) => walls.has(`${x}:${z}`);
       for (const [list, storey] of [[lotFences, 0], [shown.filter((f) => !onLot(f) && f.kind === 'gate'), undefined]] as const) {
-        const fences = buildFences(this.app, this.root, list, this.deps.content.fenceStyles);
+        const fences = buildFences(this.app, this.root, list, this.deps.content.fenceStyles, { wallAt });
         if (!fences) continue;
         this.lotEntities.push({ entity: fences.entity, storey });
         for (const leaf of fences.gates) this.gates.push({ fences, leaf, open: 0, towards: 1 });
@@ -1552,9 +1574,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const list = all?.filter(onLot) ?? [];
       if (!list.length) continue;
       const geo = new Geo();
-      for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-      const mesh = meshFrom(this.device, geo.meshData());
-      if (mesh) this.lotEntities.push({ entity: drawMesh(this.root, name, mesh, this.lotMaterial(material)), storey: 0 });
+      // Paving toned by vertex (darker and mossy at its sides: `shared/paving.ts`), as the street's.
+      const toned = name === 'paths';
+      if (toned) pavedRects(geo, list, all ?? list, y);
+      else for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+      const mesh = meshFrom(this.device, geo.meshData({ colors: toned }));
+      if (mesh) this.lotEntities.push({ entity: drawMesh(this.root, name, mesh, toned ? this.lib.surface(material, { doubleSided: true, vertexColors: true }) : this.lotMaterial(material)), storey: 0 });
     }
   }
 
@@ -1576,17 +1601,23 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const holes = new Set<number>();
     const landings = new Set<number>();
     for (const o of world.objects) {
-      if (!this.deps.content.object(o.def)?.stairs) continue;
+      const def = this.deps.content.object(o.def);
+      if (!def?.stairs) continue;
       const lift = up(this.storeyOf(o.z));
       for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) holes.add((z + lift) * W + x);
-      // The tile past the top step, on the storey above (as sim-core `storeys::stair_of`).
-      const [lx, lz] = [
-        [o.x + Math.floor((o.w - 1) / 2), o.z - 1],
-        [o.x - 1, o.z + Math.floor((o.d - 1) / 2)],
-        [o.x + Math.floor((o.w - 1) / 2), o.z + o.d],
-        [o.x + o.w, o.z + Math.floor((o.d - 1) / 2)],
-      ][o.rot % 4];
-      landings.add((lz + lift) * W + lx);
+      // The tile past the top step, on the storey above (as sim-core `storeys::stair_of`). A
+      // spiral winds round its square footprint and steps off its back left corner, to the left.
+      const far = o.w - 1;
+      const off: [number, number] =
+        def.stair === 'spiral'
+          ? ([[-1, 0], [0, far + 1], [far + 1, far], [far, -1]] as [number, number][])[o.rot % 4]!
+          : ([
+              [Math.floor((o.w - 1) / 2), -1],
+              [-1, Math.floor((o.d - 1) / 2)],
+              [Math.floor((o.w - 1) / 2), o.d],
+              [o.w, Math.floor((o.d - 1) / 2)],
+            ] as [number, number][])[o.rot % 4]!;
+      landings.add((o.z + off[1] + lift) * W + o.x + off[0]);
     }
     // The ground first (its garden dressing is the lot's), then upstairs, then the basement.
     const order = [...Array.from({ length: count }, (_, k) => k), ...(lowest < 0 ? [-1] : [])];
@@ -1679,7 +1710,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!placed) {
       placed = { template, draws: [] };
       for (const m of template.meshes) {
-        const d = new Instances(this.device, this.root, m.mesh, m.material, { name: m.name, castShadows: true, receiveShadows: true });
+        const d = new Instances(this.device, this.root, m.mesh, m.material, { name: m.name, castShadows: key !== PETALS, receiveShadows: true });
         windStill(d.meshInstance, m);
         placed.draws.push(d);
       }
@@ -1968,6 +1999,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (bits === this.cutLook) return;
     this.cutLook = bits;
     this.placing.cutWallItems(bits, this.shownWallMode === 'down'); // (things on the walls go with them, but the one in hand.)
+    this.street.cutLot(bits, this.shownWallMode === 'down'); // (and the porch's lamps.)
     this.lib.wallCut.look.set(bits & 1 ? 1 : 0, bits & 2 ? 1 : 0, bits & 4 ? 1 : 0, bits & 8 ? 1 : 0);
   }
 
@@ -2714,7 +2746,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const dpr = window.devicePixelRatio || 1;
     const w = this.cssSize.width * dpr;
     const h = this.cssSize.height * dpr;
-    const scale = (this.renderScaleNow = renderScale(w, h, this.options.resolution, PIXEL_BUDGET * this.quality.pixelBudget));
+    const scale = (this.renderScaleNow = renderScale(h, this.options.resolution));
     this.app.setCanvasResolution(pc.RESOLUTION_FIXED, Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)));
   }
 
@@ -2774,6 +2806,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (target === post?.fxaa) return 'imageProcessing';
     return target.name;
   };
+
+  benchWorld(): WorldStructure | null {
+    return this.lastWorld;
+  }
 
   /**
    * What the benchmark reports of the renderer (`debug/bench.ts`), its fields meaning what they mean

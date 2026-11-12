@@ -170,15 +170,29 @@ def _floor():
 
 def _textured(m):
     """Gives a material on a textured finish its maps, once: the albedo (times the colour) and the normal map,
-    box-projected in the object's metres times the finish's `uvScale`, as the game's `boxProjectUVs` does."""
+    box-projected in the object's metres times the finish's `uvScale`, as the game's `boxProjectUVs` does. A cut-out
+    finish (a tree's leaf cards): its atlas on the mesh's own UVs, cut out by its alpha, seen from both sides."""
     from .materials import TEXTURES
     finish = m.get('finish')
     if finish not in TEXTURES or m.get('lit') or not m.use_nodes:
         return
     m['lit'] = True
-    albedo, scale = TEXTURES[finish]
+    albedo, scale, cutout = TEXTURES[finish]
     nodes, links = m.node_tree.nodes, m.node_tree.links
     bsdf = nodes['Principled BSDF']
+    if cutout:
+        atlas = nodes.new('ShaderNodeTexImage')
+        atlas.image = bpy.data.images.load(albedo, check_existing=True)
+        tint = nodes.new('ShaderNodeMix')
+        tint.data_type, tint.blend_type = 'RGBA', 'MULTIPLY'
+        tint.inputs['Factor'].default_value = 1.0
+        socket = {s.identifier: s for s in tint.inputs}
+        socket['A_Color'].default_value = bsdf.inputs['Base Color'].default_value
+        links.new(atlas.outputs['Color'], socket['B_Color'])
+        links.new(next(s for s in tint.outputs if s.identifier == 'Result_Color'), bsdf.inputs['Base Color'])
+        links.new(atlas.outputs['Alpha'], bsdf.inputs['Alpha'])
+        m.use_backface_culling = False
+        return
     coords = nodes.new('ShaderNodeTexCoord')
     mapping = nodes.new('ShaderNodeMapping')
     mapping.inputs['Scale'].default_value = (scale, scale, scale)

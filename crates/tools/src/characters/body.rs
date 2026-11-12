@@ -17,7 +17,7 @@
 //! Fields (docs/characters-format.md): x = sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, over
 //! 1 on the hand: the arm's share of a vertex blends from the torso's -1 at the armhole), y = height,
 //! z / w = the crew and scoop (male: V) necklines, metres below a smooth curve round the neck
-//! (positive: covered); on the head -1 - scalp weight. Tone: x = blush (cheeks, nose, ears), z =
+//! (positive: covered); on the head -1 - scalp weight (the ears: -1). Tone: x = blush (cheeks, nose, ears), z =
 //! the face's age folds (`HeadFrame::fold`); the shade in the creases is baked into w afterwards
 //! (ao.rs).
 //!
@@ -25,7 +25,8 @@
 //! (`Cage::lod_faces`), so `lod.body` has the face's extra cage vertices unused. On the head the drawn
 //! surface is snapped onto the smooth head between the cage's vertices (`Topology::snapped`), and the
 //! eye sockets are carved into every point of it (`head::sockets`); the lids cover them, so the skin is
-//! shaded as it is without them.
+//! shaded as it is without them. The ears are pieces set into the head (ear.rs), after the skin in the
+//! `body` part as the lids and lips are; no vertex of the cage is an ear's (the "ear" region is theirs).
 
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
@@ -34,6 +35,7 @@ use nalgebra::{DMatrix, DVector, Dyn, LU};
 
 use super::cage::{Cage, Per, RingTags, Tags, Weights, se, turn, unit};
 use super::head::{HeadFrame, head_cage, onto_head, sockets, youth};
+use super::identity::Identity;
 use super::kdtree::KdTree;
 use super::meshops::smooth_normals;
 use super::np::{clip, lstsq, mean, mean_rows, radians, sign, smoothstep, unique};
@@ -44,6 +46,10 @@ use super::subdiv::{
 };
 use super::{Cache, Dense, M3, Mesh, V3, key, v3};
 
+/// How far in front of the neck's joint the neck's upper ring (under the jaw) has its middle, of the
+/// neck's radius: with it behind the joint the nape stood behind the skull's base, a wedge down the back
+/// of the head that the hair's nape tips landed on.
+const NAPE: f64 = 0.15;
 const SPINE: [&str; 4] = ["pelvis", "spine_01", "spine_02", "spine_03"];
 pub const REGIONS: [&str; 8] = ["torso", "arm", "hand", "leg", "foot", "neck", "head", "ear"];
 pub const NR: usize = REGIONS.len();
@@ -139,7 +145,7 @@ fn shape(family: &str, stage: &str) -> Shape {
             * g
             * (1.0 + 0.08 * yg),
         r_a: (if female { 0.029 } else { 0.033 } + grown(-0.0015, 0.002)) * h * g,
-        r_n: (if female { 0.031 } else { 0.035 } + grown(-0.0025, 0.0025)) * h * g.powf(0.5),
+        r_n: (if female { 0.031 } else { 0.035 } + grown(-0.0025, 0.0)) * h * g.powf(0.5),
         waist: pr.waist,
         belly: pr.belly * h,
     }
@@ -158,6 +164,11 @@ fn ring_pts(c: V3, u: V3, v: V3, a: f64, bf: f64, bb: f64, ang: &[f64], p: f64) 
 
 /// The control cage (targets on the designed surface) of `family` at `stage`, and its joints.
 pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
+    body_cage_of(family, stage, &Identity::NONE)
+}
+
+/// The cage with a face of its own (`id`; identity.rs): the head's part of it differs.
+fn body_cage_of(family: &str, stage: &str, id: &Identity) -> (Cage, [V3; NB]) {
     let pr = proportions(family, stage);
     let p = joints(family, stage);
     let pj = |n: &str| p[b(n)];
@@ -454,8 +465,10 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
     let chin = h - pr_head;
     let y_n = chin - 0.01 * h + 0.005 * h * yg;
     let psi: Vec<f64> = (0..8).map(|i| radians(i as f64 * 45.0)).collect();
+    // (Its middle a little in front of the neck's joint: the nape lies under the skull's base, in front
+    // of the back of the head, not behind it.)
     let mut nh = ring_pts(
-        v3(0.0, y_n, zn - 0.2 * r_n),
+        v3(0.0, y_n, zn + NAPE * r_n),
         x,
         z,
         r_n,
@@ -471,7 +484,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
     let nw: Weights = vec![("neck_01", 0.55), ("Head", 0.45)];
     let nh_id = c.ring(&nh, Per::All(&nw), "neck", None, RingTags::default());
     c.band(&n0, &nh_id, &[]);
-    let jaw = head_cage(&mut c, family, stage);
+    let jaw = head_cage(&mut c, family, stage, id);
     c.join(&nh_id, &jaw, &[0, 2, 4, 5, 6, 7, 8, 10]);
 
     // Arms and hands.
@@ -686,6 +699,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             .collect();
         let w01 = one(nm("fingers_01"));
         let w02 = one(nm("fingers_02"));
+        let (d0, u0) = (d, u);
         for fi in 0..4 {
             let side = |k: isize| {
                 if k < 0 {
@@ -731,7 +745,18 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                 })
                 .collect()
             };
-            let pivot = jwr + d * pivot_d + u * pivot_u + z * (zf + spread * (pivot_d - lpm));
+            let straight = jwr + d * pivot_d + u * pivot_u + z * (zf + spread * (pivot_d - lpm));
+            // A hand at rest curls more towards the little finger: each finger turned a little further in at
+            // its knuckle (`knuckle`, rad, the pinky to the index) and at its middle joint (`rho`). Four fingers
+            // curled alike are one flat slab, a mitten; the bones turn them all together from here, so the
+            // step from finger to finger stays in every pose.
+            let knuckle: f64 = [0.2, 0.13, 0.07, 0.0][fi];
+            let (d, u) = (
+                d * knuckle.cos() - u * knuckle.sin(),
+                u * knuckle.cos() + d * knuckle.sin(),
+            );
+            let at = jwr + d0 * lpm + u0 * pivot_u + z * (zf + spread * (pivot_d - lpm));
+            let pivot = at + d * (straight - at).dot(&d0) + u * (straight - at).dot(&u0);
             let a = hex(
                 pivot - d * (0.04 * lpm),
                 d,
@@ -742,7 +767,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             );
             let ra = c.ring(&a, Per::All(&w01), "hand", None, arm1());
             c.band(&loop_f, &ra, &[]);
-            let rho: f64 = 0.2;
+            let rho: f64 = [0.42, 0.34, 0.27, 0.2][fi];
             let (ad, au) = (d * rho.cos() - u * rho.sin(), u * rho.cos() + d * rho.sin());
             let b = hex(
                 pivot + ad * (tip * lpm) + z * (spread * tip * lpm),
@@ -875,12 +900,14 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             c.band(&prev, &cur, &[]);
             prev = cur;
         }
-        // The foot: rings turning from the ankle to point forward, flat underneath, a round toe.
+        // The foot: rings turning from the ankle to point forward, flat underneath, the toes past the
+        // ball's joint and a round tip. A real foot's length and breadth (0.15 and 0.055 of the height;
+        // it ended at the ball, a seventh shorter and a fifth wider: a clog, and the shoes with it).
         let jb = pj(nm("ball"));
         let fl = jb[2] - ja[2];
-        let fw = 0.33 * fl * (if female { 0.94 } else { 1.0 });
+        let fw = 0.285 * fl * (if female { 0.94 } else { 1.0 });
         let fx = ja[0];
-        let feet: [(V3, f64, f64, f64, f64, Weights); 2] = [
+        let feet: [(V3, f64, f64, f64, f64, Weights); 3] = [
             (
                 v3(fx, 0.5 * ja[1], ja[2] - 0.02 * fl),
                 45.0,
@@ -897,6 +924,15 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
                 0.30 * fl,
                 vec![(nm("ball"), 0.5), (nm("foot"), 0.5)],
             ),
+            // (The toes: lower and a little narrower.)
+            (
+                v3(fx, 0.3 * ja[1], jb[2] + 0.1 * fl),
+                90.0,
+                fw * 0.9,
+                0.2 * fl,
+                0.22 * fl,
+                one(nm("ball")),
+            ),
         ];
         for (cc, al, a, bt, bb, w) in &feet {
             let al = radians(*al);
@@ -910,7 +946,7 @@ pub fn body_cage(family: &str, stage: &str) -> (Cage, [V3; NB]) {
             prev = cur;
         }
         let tip = c.add(
-            v3(fx, 0.4 * ja[1], jb[2] + 0.04 * fl),
+            v3(fx, 0.26 * ja[1], jb[2] + 0.27 * fl),
             one(nm("ball")),
             "foot",
             None,
@@ -967,15 +1003,11 @@ impl Topology {
         let l2 = limit_matrix(&s2.quads, s2.m.rows);
         let fine = l2.matmul(&s2.m).matmul(&s.m);
         let fine_m = s2.m.matmul(&s.m);
-        // Snapped: points of the head's cage alone, fading out where the neck's share comes in (none
-        // where an ear's does).
+        // Snapped: points of the head's cage alone, fading out where the neck's share comes in.
         let share = |m: &Csr| -> Vec<f64> {
             m.data
                 .iter()
                 .map(|row| {
-                    if row.iter().any(|&(c, _)| cage.region[c] == "ear") {
-                        return 0.0;
-                    }
                     let head: f64 = row
                         .iter()
                         .filter(|&&(c, _)| cage.region[c] == "head")
@@ -1089,32 +1121,55 @@ pub struct Surface {
     pub nor: Vec<V3>,
     /// Level 1 as it would be without the eye sockets (`nor` is its normals): what the lids are shaded as.
     pub unsocketed: Vec<V3>,
-    pub ears: [[V3; 2]; 2],
     pub head_samples: Vec<V3>,
     pub head_normals: Vec<V3>,
+    /// Per sample, the head's share of it: 1 on the head, falling to 0 down the neck.
+    pub head_share: Vec<f64>,
+    /// The samples' triangles: each one's corners among the first samples (the vertices; a centre sample
+    /// follows per triangle, in this order).
+    pub head_tri_ix: Vec<[usize; 3]>,
     pub head_tris: Vec<[V3; 3]>,
     /// The same triangles without the eye sockets (where the closed lids lie, face.rs).
     pub bare_tris: Vec<[V3; 3]>,
     pub cranium: Vec<V3>,
+    /// The close-up body (`hd.body`): the whole body at level 2. Positions (snapped,
+    /// sockets carved), the same without the sockets, their smooth normals,
+    /// and the weights, tags and regions subdivided to level 2 (`Topology::fine_m`).
+    pub fine_pos: Vec<V3>,
+    pub fine_bare: Vec<V3>,
+    pub fine_nor: Vec<V3>,
+    pub fine_dense: Vec<Dense>,
+    pub fine_tags: TagArrays,
+    pub fine_region: Vec<[f64; NR]>,
 }
 
 static SURFACES: Cache<(String, String), Surface> = Cache::new();
 
 /// The body of `family` at `stage` (cached).
 pub fn surface(family: &str, stage: &str) -> Arc<Surface> {
-    SURFACES.get(key(family, stage), || make_surface(family, stage))
+    SURFACES.get(key(family, stage), || {
+        make_surface(family, stage, &Identity::NONE)
+    })
 }
 
-fn make_surface(family: &str, stage: &str) -> Surface {
+/// The body with a face of its own (`id`; identity.rs): the same topology, another head. Not kept.
+pub fn surface_of(family: &str, stage: &str, id: &Identity) -> Surface {
+    make_surface(family, stage, id)
+}
+
+fn make_surface(family: &str, stage: &str, id: &Identity) -> Surface {
     let topo = topology();
-    let (cage, p) = body_cage(family, stage);
+    let (cage, p) = body_cage_of(family, stage, id);
     let arr = cage.arrays();
     assert_eq!(arr.t.len(), topo.n);
     // The smooth shape is interpolated at the cage's vertices and snapped onto between them; features
     // are offsets on the fitted cage, the eye sockets carved after (`snapped`).
     let base = topo.solve(&arr.t);
     let ctrl: Vec<V3> = base.iter().zip(&arr.d).map(|(c, d)| c + d).collect();
-    let (onto, holes) = (onto_head(family, stage), sockets(family, stage, false));
+    let (onto, holes) = (
+        onto_head(family, stage, id),
+        sockets(family, stage, false, id),
+    );
     let s = &topo.s;
     let pos = topo.snapped(false, &base, &ctrl, &onto, &holes);
     let region: Vec<[f64; NR]> = cage
@@ -1130,14 +1185,17 @@ fn make_surface(family: &str, stage: &str) -> Surface {
         .a
         .apply(&ctrl)
         .into_iter()
-        .map(sockets(family, stage, true))
+        .map(sockets(family, stage, true, id))
         .collect();
     let tags = TagArrays::of(&arr.tags);
     let dense1 = rigid_fingertips(s.m.apply_n(&arr.dense), &pos, &p);
     let tags1 = tags.subdivided(&s.m);
     let region1 = s.m.apply_n(&region);
-    // Head and neck, densely, without the ears (for the head interface's sdf and surface_z).
+    // Head and neck, densely (for the head interface's sdf and surface_z).
     let fpos = topo.snapped(true, &base, &ctrl, &onto, &holes);
+    // The close-up body (`hd.body`): level 2 as a mesh of its own.
+    let fine_dense = rigid_fingertips(topo.fine_m.apply_n(&arr.dense), &fpos, &p);
+    let fine_tags = tags.subdivided(&topo.fine_m);
     // Normals from the finer (level-2) limit surface: smooth shading on the coarse level 1 (whose
     // vertices are the first of level 2's), as it is without the eye sockets: the lids cover them
     // (face.rs), and the skin round a lid is shaded as the face it carries on.
@@ -1147,36 +1205,8 @@ fn make_surface(family: &str, stage: &str) -> Surface {
     let lod_nor = bare_nor[..topo.n].to_vec();
     let unsocketed = bare[..pos.len()].to_vec();
     let freg = topo.fine_m.apply_n(&region);
-    let (ri_head, ri_ear, ri_neck) = (
-        super::body::region("head"),
-        super::body::region("ear"),
-        super::body::region("neck"),
-    );
-    let mut ears = [[V3::zeros(); 2]; 2];
-    for (e, sx) in [-1.0, 1.0].into_iter().enumerate() {
-        let q: Vec<&V3> = fpos
-            .iter()
-            .zip(&freg)
-            .filter(|(p, r)| r[ri_ear] > 0.3 && sign(p.x) == sx)
-            .map(|(p, _)| p)
-            .collect();
-        let mx = q
-            .iter()
-            .fold(V3::repeat(f64::NEG_INFINITY), |a, p| a.sup(p));
-        let mn = q.iter().fold(V3::repeat(f64::INFINITY), |a, p| a.inf(p));
-        ears[e] = [(mx + mn) / 2.0, (mx - mn) / 2.0];
-    }
-    let flat_ctrl: Vec<V3> = ctrl
-        .iter()
-        .zip(&arr.d)
-        .zip(&cage.region)
-        .map(|((c, d), r)| if *r == "ear" { c - d } else { c - d * 0.0 })
-        .collect();
-    let fpos = topo.snapped(true, &base, &flat_ctrl, &onto, &holes);
-    let hmask: Vec<bool> = freg
-        .iter()
-        .map(|r| (r[ri_head] + r[ri_ear]) + r[ri_neck] > 0.5)
-        .collect();
+    let (ri_head, ri_neck) = (super::body::region("head"), super::body::region("neck"));
+    let hmask: Vec<bool> = freg.iter().map(|r| r[ri_head] + r[ri_neck] > 0.5).collect();
     let q = &topo.s2.quads;
     let qm: Vec<[usize; 4]> = q
         .iter()
@@ -1189,19 +1219,25 @@ fn make_surface(family: &str, stage: &str) -> Surface {
     // Samples: the vertices and the triangles' centres (about 4 mm apart on an adult head).
     let mut head_samples: Vec<V3> = used.iter().map(|&i| fpos[i]).collect();
     let mut head_normals: Vec<V3> = used.iter().map(|&i| nor2[i]).collect();
+    let share = |i: usize| freg[i][ri_head];
+    let mut head_share: Vec<f64> = used.iter().map(|&i| share(i)).collect();
     for t in &tri {
         let cn = nor2[t[0]] + nor2[t[1]] + nor2[t[2]];
         head_normals.push(cn / cn.norm());
         head_samples.push((fpos[t[0]] + fpos[t[1]] + fpos[t[2]]) / 3.0);
+        head_share.push((share(t[0]) + share(t[1]) + share(t[2])) / 3.0);
     }
+    let head_tri_ix = tri
+        .iter()
+        .map(|t| t.map(|i| used.binary_search(&i).expect("sample")))
+        .collect();
     let head_tris = tri
         .iter()
         .map(|t| [fpos[t[0]], fpos[t[1]], fpos[t[2]]])
         .collect();
-    let fbare = topo.snapped(true, &base, &flat_ctrl, &onto, &|p| p);
     let bare_tris = tri
         .iter()
-        .map(|t| [fbare[t[0]], fbare[t[1]], fbare[t[2]]])
+        .map(|t| [bare[t[0]], bare[t[1]], bare[t[2]]])
         .collect();
     let pr = proportions(family, stage);
     let hh = pr.hh * pr.h;
@@ -1226,13 +1262,29 @@ fn make_surface(family: &str, stage: &str) -> Surface {
         region: region1,
         nor,
         unsocketed,
-        ears,
         head_samples,
         head_normals,
+        head_share,
+        head_tri_ix,
         head_tris,
         bare_tris,
         cranium,
+        fine_pos: fpos,
+        fine_bare: bare,
+        fine_nor: bare_nor,
+        fine_dense,
+        fine_tags,
+        fine_region: freg,
     }
+}
+
+static TRIS_HD: Cache<String, Vec<usize>> = Cache::new();
+
+/// The close-up body's triangles (level 2), split as `tris` splits level 1's.
+pub fn tris_hd(family: &str) -> Arc<Vec<usize>> {
+    TRIS_HD.get(family.to_string(), || {
+        triangles(&topology().s2.quads, &surface(family, BASE_STAGE).fine_pos).concat()
+    })
 }
 
 static TRIS: Cache<String, Vec<usize>> = Cache::new();
@@ -1259,6 +1311,9 @@ pub struct Body {
     pub joints: [V3; NB],
     /// `body`'s positions without the eye sockets (`Surface::unsocketed`; its normals are so already).
     pub unsocketed: Vec<V3>,
+    /// The body at level 2 (the close-up body's skin, `hd.body`) and its positions without the eye sockets.
+    pub hd: Mesh,
+    pub hd_unsocketed: Vec<V3>,
 }
 
 /// The body of `family` at `stage` (and its low-detail copy); see the module docs.
@@ -1286,12 +1341,22 @@ pub fn build_body(family: &str, stage: &str) -> Body {
         eye_y: s.p[b("eye_l")].y,
         grip: grip(family, stage),
     };
+    let hd = Mesh {
+        pos: s.fine_pos.clone(),
+        idx: tris_hd(family).to_vec(),
+        dense: s.fine_dense.clone(),
+        arm: s.fine_tags.arm.clone(),
+        nor: s.fine_nor.clone(),
+        ..Mesh::default()
+    };
     Body {
         body,
         lod,
         meta,
         joints: s.p,
         unsocketed: s.unsocketed.clone(),
+        hd,
+        hd_unsocketed: s.fine_bare.clone(),
     }
 }
 
@@ -1491,20 +1556,36 @@ fn folds(pos: &[V3], idx: &[usize], head: &HeadFrame) -> Vec<f64> {
         .collect()
 }
 
-/// Clothes fields and tone of the (base stage) body or its LOD; the face's pieces after the skin.
+/// The nostrils' shade on the nose's underside (`body_fields_and_tone`): from where beside the nose's
+/// middle it begins, where it is full and where it ends (|x|, of hh), how far above the mouth and below
+/// the eyes the nose's underside is looked for (of hh), and how dark (tone.y).
+const NOSTRIL: (f64, f64, f64, f64) = (0.006, 0.026, 0.044, 0.03);
+const NOSTRIL_SHADE: f64 = 0.6;
+
+/// Which of a body's three meshes: the low-detail one, the body, or the close-up body (`hd.body`).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Detail {
+    Lod,
+    Body,
+    CloseUp,
+}
+
+/// Clothes fields and tone of the (base stage) body at `detail`, worked out at that mesh's own vertices;
+/// the face's pieces and the ears after the skin.
 pub fn body_fields_and_tone(
     family: &str,
+    detail: Detail,
     mesh: &Mesh,
     p: &[V3; NB],
     head: &HeadFrame,
 ) -> (Vec<[f64; 4]>, Vec<[f64; 4]>) {
     let s = surface(family, BASE_STAGE);
     let n = mesh.pos.len();
-    let lod = n < s.pos.len();
-    let (pos, tags, region) = if lod {
-        (&s.lod_pos, &s.lod_tags, &s.lod_region)
-    } else {
-        (&s.pos, &s.tags, &s.region)
+    let lod = detail == Detail::Lod;
+    let (pos, tags, region, nor) = match detail {
+        Detail::Lod => (&s.lod_pos, &s.lod_tags, &s.lod_region, &s.lod_nor),
+        Detail::Body => (&s.pos, &s.tags, &s.region, &s.nor),
+        Detail::CloseUp => (&s.fine_pos, &s.fine_tags, &s.fine_region, &s.fine_nor),
     };
     let k = pos.len();
     let mut f = fields_of(family, pos, &tags.arm, region, p, head);
@@ -1525,16 +1606,45 @@ pub fn body_fields_and_tone(
             ]
         })
         .collect();
+    // The nostrils (y: the shader darkens the skin by it): the nose's underside, either side of its
+    // middle. Shade, not shape: the cage has one face there.
+    if !lod {
+        let (lo, hi) = (
+            head.mouth.y + NOSTRIL.3 * head.hh,
+            head.eyes[0].y - NOSTRIL.3 * head.hh,
+        );
+        for i in 0..k {
+            let (q, nr) = (pos[i], nor[i]);
+            if region[i][ri_head] < 0.5 || q.z < head.face_z || !(lo..hi).contains(&q.y) {
+                continue;
+            }
+            let x = q.x.abs() / head.hh;
+            let beside =
+                smoothstep(NOSTRIL.0, NOSTRIL.1, x) * (1.0 - smoothstep(NOSTRIL.1, NOSTRIL.2, x));
+            tone[i][1] = NOSTRIL_SHADE * beside * smoothstep(0.3, 0.7, -nr.y);
+        }
+    }
     if n > k {
-        // The face's pieces (lids, lips) inside the body: head fields; the nearest skin's tone.
+        // The pieces after the skin (the lids and lips, then the ears, which are the last: the low-detail
+        // body's, or the whole ones): head fields (the ears no scalp); the nearest skin's tone.
         let extra = &mesh.pos[k..];
-        let mut onehead = [0.0; NR];
-        onehead[region_ix("head")] = 1.0;
+        let ears = 2 * if lod {
+            super::ear::LOD_VERTS
+        } else {
+            super::ear::VERTS
+        };
+        let one = |name: &str| {
+            let mut v = [0.0; NR];
+            v[region_ix(name)] = 1.0;
+            v
+        };
+        let mut regions = vec![one("head"); n - k - ears];
+        regions.resize(n - k, one("ear"));
         f.extend(fields_of(
             family,
             extra,
             &vec![0.0; n - k],
-            &vec![onehead; n - k],
+            &regions,
             p,
             head,
         ));

@@ -20,7 +20,9 @@
  * basement and gives the woods near the town their shadows.
  */
 
+import { daylightByDefault } from './daylight';
 import * as pc from './engine';
+import { withoutContact } from './post';
 import { Grass, grassGround, type GrassPusher } from './grass';
 import { disposeTiles, type GroundTile } from './groundTiles';
 import { Instances } from './instancing';
@@ -39,6 +41,7 @@ import { computeNormals, sphereData } from '../shared/modelParts';
 import { groupInstances, hideLawn, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
 import type { OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
+import { tuned } from '../tune';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
 export { decorPlants, natureDecor, type PlantPlacement } from '../shared/nature';
@@ -181,7 +184,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.lawn = this.lawn.filter((layer) => !layer.draws.some((d) => going.has(d.entity)));
       stale.forEach(({ again }, i) => {
         if (!again!.tiles) return;
-        const layers = lawnLayers(fresh[i].built, again!.matrices, again!.tiles);
+        const layers = lawnLayers(fresh[i].built, again!.matrices, again!.tiles, again!.clear);
         this.lawn.push(...layers);
         if (this.lawnMask) hideLawn(layers, this.lawnMask, uploadLawn);
       });
@@ -424,11 +427,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /** The lawn's flowers (`lawns`), instanced. */
   private async plantLawns(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>): Promise<void> {
     this.lawn = [];
-    for (const { key, matrices, tiles, cell } of await this.lawns(world, pace)) {
+    for (const { key, matrices, tiles, cell, clear } of await this.lawns(world, pace)) {
       const lod = this.lawnLod;
       const built = await instanced(app, parent, assets, key, matrices, lod, cell, pace);
-      this.batches.push(batch({ key, matrices, lod, cell, tiles }, false, 'flowers', built));
-      this.lawn.push(...lawnLayers(built, matrices, tiles));
+      this.batches.push(batch({ key, matrices, lod, cell, tiles, clear }, false, 'flowers', built));
+      this.lawn.push(...lawnLayers(built, matrices, tiles, clear));
     }
     this.refreshLawn(world);
   }
@@ -566,6 +569,8 @@ interface BatchSource {
   cell?: (x: number, z: number) => string;
   /** The lawn's: each instance's town tile (-1 outside the town), for `refreshLawn`. */
   tiles?: readonly number[];
+  /** The lawn's: they keep a tile clear of what hides the lawn (`LawnLayer.clear`). */
+  clear?: boolean;
 }
 
 /** A batch of plants built from `source`, which it keeps only if it was built without a file (all of them are several MB a landscape). */
@@ -591,11 +596,11 @@ function gather(batches: readonly Batch[]): NatureResult {
 }
 
 /** The lawn layers of a model's tufts or flowers: every instance, in the parts drawn whole; then each group's. */
-function lawnLayers(built: Instanced, matrices: readonly Float32Array[], tiles: readonly number[]): LawnLayer<Instances>[] {
+function lawnLayers(built: Instanced, matrices: readonly Float32Array[], tiles: readonly number[], clear = false): LawnLayer<Instances>[] {
   const layers: LawnLayer<Instances>[] = [];
   for (const { draws, indices } of [{ draws: [...built.shared, ...built.whole], indices: matrices.map((_, k) => k) }, ...built.cells]) {
     if (!draws.length) continue;
-    layers.push(lawnLayer(draws, matrices, tiles, indices));
+    layers.push(lawnLayer(draws, matrices, tiles, indices, clear));
   }
   return layers;
 }
@@ -678,6 +683,33 @@ export function splitsByGroup(m: ModelMesh, copies: number): boolean {
  *
  * No instance stream of its own: it reads only the instance's matrix (`instance_line1..4`).
  */
+/**
+ * The leaves' colour from plant to plant and from their tops to their undersides (sRGB factors on the foliage's
+ * colour, `GAME_WIND_TINT`): `warm` to `cool`, the two ends a plant's hue is drawn between by where it stands, and
+ * `value`, how light it is (from, to); `top` and `under`, what faces the sky and what faces the ground (`facing`:
+ * the normal's height where it is all `under` and all `top`; `petal`: the linear colour from which a part is a
+ * petal, not a leaf, and to which it is all petal, which keeps its colour from plant to plant and under `top`;
+ * `needle`: the blue of a green (linear blue over green) from which it is a conifer's and to which it is all one, which
+ * takes `needles` less of `top`; `night`: what `top` is by night, a grey, `game_daylight` 0: the warm tops were the
+ * one thing the night's grade, which spares what is warm for the lamps' sake, left yellow-green); `petalNight`: how
+ * much of a petal's colour goes to grey by night, for the same reason (a patch of buttercups stayed bright yellow
+ * under the moon). From the play camera a crown, a shrub and a hedge
+ * are seen from above: lit only as the sun fell on them they were one dark green, top and side.
+ */
+const LEAVES = tuned('leaves', {
+  warm: [1.14, 1.04, 0.76],
+  cool: [0.86, 0.98, 1.07],
+  value: [0.86, 1.1],
+  top: [1.42, 1.38, 1.1],
+  under: 0.8,
+  facing: [-0.5, 0.9],
+  petal: [0.3, 0.7],
+  needle: [0.24, 0.36],
+  needles: 0.75,
+  night: 1.2,
+  petalNight: 0.85,
+});
+
 function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
   const { wgsl, v2, v3, u, decl } = codeFor(lang);
   const f = float;
@@ -716,8 +748,19 @@ function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
 			tintInst = instance_line4.xyz;
 		#endif
 		${decl('tintRnd', 'float')} = fract(sin(dot(tintInst.xz, ${v2}(12.9898, 78.233))) * 43758.5453);
-		${decl('tint', 'vec3')} = mix(${v3}(1.07, 1.02, 0.84), ${v3}(0.9, 0.98, 1.04), tintRnd) * (0.92 + 0.14 * fract(tintRnd * 7.31));
+		// (Leaves only: a petal, light already, keeps its colour.)
+		${decl('tintLeaf', 'float')} = 1.0 - smoothstep(${f(LEAVES.petal[0])}, ${f(LEAVES.petal[1])}, max(${color}.r, max(${color}.g, ${color}.b)));
+		${decl('tint', 'vec3', true)} = mix(${v3}(1.0), mix(${v3}(${LEAVES.warm.map(f).join(', ')}), ${v3}(${LEAVES.cool.map(f).join(', ')}), tintRnd) * (${f(LEAVES.value[0])} + ${f(LEAVES.value[1] - LEAVES.value[0])} * fract(tintRnd * 7.31)), tintLeaf);
+		#ifdef NORMALS
+			// Lit from above: what faces the sky lighter and a little warmer, what faces the ground darker.
+			${decl('tintUp', 'float')} = smoothstep(${f(LEAVES.facing[0])}, ${f(LEAVES.facing[1])}, normalize(${wgsl ? 'output.vNormalW' : 'vNormalW'}).y);
+			// (Less on a conifer's blue-green needles, which it turned to mint: by how blue the green is.)
+			${decl('tintNeedle', 'float')} = smoothstep(${f(LEAVES.needle[0])}, ${f(LEAVES.needle[1])}, ${color}.b / max(${color}.g, 0.0001));
+			tint = tint * mix(${v3}(${f(LEAVES.under)}), mix(${v3}(1.0), mix(${v3}(${f(LEAVES.night)}), ${v3}(${LEAVES.top.map(f).join(', ')}), ${u('game_daylight')}), tintLeaf * (1.0 - ${f(LEAVES.needles)} * tintNeedle)), tintUp);
+		#endif
 		${color} = ${wgsl ? 'vec4f' : 'vec4'}(${color}.rgb * pow(tint, ${v3}(2.2)), ${color}.a);
+		// (By night a petal's colour goes most of the way to its grey: the night's grade spares what is warm.)
+		${color} = ${wgsl ? 'vec4f' : 'vec4'}(mix(${color}.rgb, ${v3}(dot(${color}.rgb, ${v3}(0.2126, 0.7152, 0.0722))), (1.0 - tintLeaf) * (1.0 - ${u('game_daylight')}) * ${f(LEAVES.petalNight)}), ${color}.a);
 	}
 #endif`;
   const vsDecl = wgsl
@@ -726,12 +769,14 @@ function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
 	uniform game_wind: vec4f;
 	uniform game_windKind: vec4f;
 	uniform game_windFlutter: f32;
+	uniform game_daylight: f32;
 #endif`
     : `
 #ifdef GAME_WIND
 	uniform vec4 game_wind;
 	uniform vec4 game_windKind;
 	uniform float game_windFlutter;
+	uniform float game_daylight;
 #endif`;
   return { vsDecl, vsLocal: local, vsEnd: end };
 }
@@ -759,11 +804,14 @@ export function installNature(app: pc.AppBase): void {
   if (windStates.has(app)) return;
   const state: WindState = { time: 0, strength: 1 };
   windStates.set(app, state);
+  daylightByDefault(app.graphicsDevice);
   MaterialLibrary.for(app).onCreate((key, material) => {
     const kind = WIND_KIND[key];
     if (!kind) return;
     material.setDefine('GAME_WIND', '');
     if (key !== 'material.finish.bark') material.setDefine('GAME_WIND_TINT', '');
+    // No contact shading among leaves and twigs, and none of them in the depth it is made from (`post.ts`).
+    withoutContact(material);
     material.setParameter('game_windKind', new Float32Array(kind));
     material.setParameter('game_windFlutter', 1);
   });

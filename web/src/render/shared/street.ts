@@ -1,7 +1,7 @@
 /**
  * The neighbourhood around the viewed lot, as a lived-in street: the neighbour houses
- * (`HouseBuilder.silhouettes`, with porches, chimneys and garages), sidewalks with kerbs and
- * a dashed centre line, streetlights that light up at night (with pools of light on the
+ * (`HouseBuilder.silhouettes`, with porches, chimneys and garages), sidewalks with kerbs turning
+ * the junctions' corners, the junctions' stop lines and crosswalks (`roads.ts`), streetlights that light up at night (with pools of light on the
  * ground), mailboxes, hydrants and bins along the kerb, cars parked on neighbours' driveways,
  * the fences and hedges round gardens and fields, and flower beds along their house
  * fronts, with pots by the door and little lights along the garden path; the things standing in
@@ -19,9 +19,12 @@
  *   (`lawnMask`). The menus' town (`pc/overview.ts`) draws every lot's things itself.
  * - Nothing on the viewed lot: the player builds there (the mailbox stands on the sidewalk). In
  *   the menus' town the player's lot (`WorldMeta.home`) gets its house as a shell dressed as the
- *   game builds it (no porch, chimney or garden dressing), and nothing else. Its garage, if the
- *   town gave it one (`WorldStructure.garages`), stands on it in the game too, drawn apart
- *   (`StreetPlan.lot`): it goes with the lot's ground while its basement is in view.
+ *   game draws it (its porch, no chimney or garden dressing), and nothing else. Its garage, if the
+ *   town gave it one (`WorldStructure.garages`), and its house's porch (over the front door the
+ *   garden path meets, as on every silhouette: `porchDoors`) stand on it in the game too, drawn
+ *   apart (`StreetPlan.lot`): they go with the lot's ground while its basement is in view, the
+ *   porch with its wall in the cutaway. A house looks the same from the street as in the game:
+ *   the lot's look on every storey, the roof the player chose.
  * - Fences: the world's (`shownFences`: the ones a town puts up round its gardens and fields,
  *   `game/gardenFences.ts`, the player's, and in an older town the ones it would have put up) on
  *   other lots, in their styles (`shared/fences.ts`), merged into each chunk's meshes, hedges with
@@ -50,10 +53,12 @@ import { chunkAt, chunkCoords, chunkId, distanceToRect, hashNumbers, hashString,
 import type { HousePlanner, SilhouettePlan, SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
-import { writeFences } from './fences';
+import { wallCorners, writeFences } from './fences';
 import { shownFences } from './shownFences';
 import { centroid } from '../../game/roads';
-import { Kerb, KERB, roadIndex, roadMeshes, SIDEWALK, townRoads, WALK_Y, type RoadIndex } from './roads';
+import { pavedRects } from './paving';
+import { Kerb, KERB, roadIndex, roadMeshes, SIDEWALK, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
+import { JunctionCuts, junctionsOf, type JunctionPlan } from './junctions';
 
 /** Vertex-colour alpha for the plain finish, as the material libraries' `encodeFinish`: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. */
 function encodeFinish(roughness: number, metallic: number): number {
@@ -367,7 +372,7 @@ export interface StreetSource {
 export interface StreetPlan {
   /** The neighbours' houses (`HousePlanner.silhouettes`). */
   silhouettes: SilhouettePlan;
-  /** Their wall boxes and garages, for what stands round them (x0, z0, x1, z1). */
+  /** Their wall boxes and garages, for what stands round them (x0, z0, x1, z1); the viewed lot's too (`dressingOnly`: its garage and porch). */
   specs: SilhouetteSpec[];
   /** Sidewalks and kerbs (the sidewalk surface, vertex-coloured). */
   walk: Geo;
@@ -380,11 +385,13 @@ export interface StreetPlan {
   /** Soft contact shadows (black, by vertex alpha). */
   shadows: Geo;
   /**
-   * The viewed lot's own (the game's): its garage and the garage's coach lamp (its cap, glass and
-   * pool of light), apart from the street's meshes so they hide with the lot's ground while its
-   * basement is in view. Null when it has no garage.
+   * The viewed lot's own (the game's): its garage and porch (`SilhouetteSpec.dressingOnly`) and
+   * their lamps (caps, glass and pools of light), apart from the street's meshes so they hide with
+   * the lot's ground while its basement is in view. The porch's lamps apart again (`porch`, with
+   * the cutaway's look bits that drop the porch's wall): they go with that wall. Null when it has
+   * no house and no garage.
    */
-  lot: { silhouettes: SilhouettePlan; props: Geo; glow: Geo; pools: Geo } | null;
+  lot: { silhouettes: SilhouettePlan; props: Geo; glow: Geo; pools: Geo; porch: { look: number; props: Geo; glow: Geo; pools: Geo } | null } | null;
   /** Instanced models in the order they're drawn: the foliage first, then props and things; `cast`: they cast shadows. */
   batches: [key: string, items: Inst[], cast: boolean][];
   /** Other lots' things: their footprints and the boxes they're drawn as without their files, by model key. */
@@ -397,6 +404,10 @@ export interface GroundLayer {
   name: string;
   material: string;
   geo: Geo;
+  /** Road paint (the markings): vertex-coloured in the plain finish, drawn over the road (`MaterialLibrary.roadPaint`; `material` unused). */
+  paint?: boolean;
+  /** Toned by vertex (`paving.ts`: worn asphalt, paving darker at its sides): drawn with its vertex colours. */
+  toned?: boolean;
 }
 
 /** One stream chunk of the street (`shared/chunks.ts`), as planned for a focus lot: what `StreetPlan` holds, for its square. */
@@ -525,7 +536,7 @@ const mix = (h: number, v: number) => Math.imul(h ^ (v | 0), 16777619);
 
 /**
  * The whole town's street, laid out once, view-independent, and planned per 64 m chunk for a focus
- * lot (`chunk`): the focus lot's house and garden are the game's own (only its garage here, apart in
+ * lot (`chunk`): the focus lot's house and garden are the game's own (only its garage and porch here, apart in
  * `lot`), and its fences the game's too (the world's fences round it are the same whichever lot is
  * the focus). Each part of the street (a plot, a road side's kerb, a chunk's fences) is planned on its own and kept, planned again only when what it
  * stands among changes (a thing moved near it, the focus next to it), so a focus change or an edit
@@ -541,6 +552,11 @@ export class TownStreet {
   /** A big world's ways between its areas: country roads (a surface, no sidewalks) and trails (a narrow path). */
   private readonly ways: { country: RoadPlan[]; trail: RoadPlan[] };
   private readonly index: RoadIndex;
+  /** The roads that stop a sidewalk (`roads.ts` `walkStops`): the streets and lanes (`roads`, at the same indexes), then the country roads. */
+  private readonly walkStops: RoadIndex;
+  /** The junctions as drawn (`junctions.ts`), and where their corners stop the sidewalks. */
+  private readonly junctions: JunctionPlan[];
+  private readonly cuts: JunctionCuts;
   private readonly paths: Rect[];
   private readonly fields: Rect[];
   private readonly W: number;
@@ -572,10 +588,13 @@ export class TownStreet {
   private fencesByChunk = new Map<number, FenceEdge[]>();
   /** Which chunk draws the post on each grid corner (`x:z`): the first fence's there (in the world's order). */
   private postOwner = new Map<string, number>();
+  /** The grid corners walls end or turn at (`wallCorners`), and the walls they're from: a fence meeting a wall there has no post. */
+  private wallCornerSet = new Set<string>();
+  private wallsOf: unknown = null;
   private readonly fenceUnits = new Map<number, { hash: number; out: Parts }>();
 
   /** The street's own: sidewalks, the road's surface, fountains, the menus' parked cars (by chunk). */
-  private statics: Map<number, { parts: Parts; road: Geo; trail: Geo }> | null = null;
+  private statics: Map<number, { parts: Parts; road: Geo; trail: Geo; marks: Geo }> | null = null;
   /** Kerbs by road side, and which plots front each. */
   private readonly rows = new Map<string, number[]>();
   /**
@@ -600,6 +619,9 @@ export class TownStreet {
     this.roads = all.filter((r) => r.kind !== 'country' && r.kind !== 'trail');
     this.ways = { country: all.filter((r) => r.kind === 'country'), trail: all.filter((r) => r.kind === 'trail') };
     this.index = roadIndex(this.roads);
+    this.walkStops = roadIndex(walkStops(all));
+    this.junctions = junctionsOf(world, all);
+    this.cuts = JunctionCuts.of(this.junctions);
     this.paths = world.meta?.paths ?? [];
     this.fields = world.meta?.world?.fields ?? [];
     this.W = world.width;
@@ -690,7 +712,7 @@ export class TownStreet {
    * pavement, clear of the other roads, of every lot and of what stands there as the town was laid out.
    */
   private rankSpot(r: number, side: 1 | -1, rowIds: number[]): [number, number] | null {
-    const kerb = new Kerb(this.roads[r], r, side, this.index);
+    const kerb = new Kerb(this.roads[r], r, side, this.walkStops, this.cuts);
     const spans = rowIds.map((i) => {
       const { L, at } = this.fronting[i]!;
       const [a, b] = [kerb.along(...at(L.plot.x)), kerb.along(...at(L.plot.x + L.plot.w))];
@@ -744,6 +766,7 @@ export class TownStreet {
       mode === 'town' ? (world.cars ? keyOf(world.cars, () => JSON.stringify(world.cars)) : '-') : !!world.cars,
       world.pullOverStreets ? keyOf(world.pullOverStreets, () => JSON.stringify(world.pullOverStreets)) : '-',
       world.lightPoles ? keyOf(world.lightPoles, () => JSON.stringify(world.lightPoles)) : '-',
+      world.junctions ? keyOf(world.junctions, () => JSON.stringify(world.junctions)) : '-',
       keyOf(world.plots, () => JSON.stringify(world.plots.map((p) => [p.id, p.x, p.z, p.w, p.d, p.public, p.entry]))),
     ].join('|');
   }
@@ -767,6 +790,13 @@ export class TownStreet {
       }
       this.fencesByChunk = by;
       this.postOwner = owner;
+      this.version++;
+    }
+    // Walls built or taken down: the fences meeting them are drawn again (with or without their posts there).
+    if (world.walls !== this.wallsOf) {
+      this.wallsOf = world.walls;
+      this.wallCornerSet = wallCorners(world.walls);
+      this.fenceUnits.clear();
       this.version++;
     }
     // (Rooms decide which things are outdoors: another rooms array, keys worked out again.)
@@ -1033,28 +1063,32 @@ export class TownStreet {
     let spec: SilhouetteSpec | null = null;
     let lot: StreetPlan['lot'] = null;
 
-    // ---- its house (the player's in the menus' town a shell; the viewed lot's only its garage) ----
+    // ---- its house (the player's in the menus' town a shell; the viewed lot's only its garage and porch) ----
     // (A garage the player built on their lot before any house: it stands there alone.)
     const lone = home && game && !L.house ? (this.garages.get(L.info.id) ?? null) : null;
     if ((kind === 'house' || kind === 'shop' || home) && (L.house || lone)) {
       const g = kind === 'shop' ? null : world.garages ? (this.garages.get(L.info.id) ?? null) : home ? null : this.legacyGarage(L, focus);
-      if (!(home && game && !g)) {
-        const [x0, z0, x1, z1] = L.info.house ?? [lone!.x0, lone!.z0, lone!.x1, lone!.z1];
-        const front: [number, number] = L.turned ? [-L.front, 0] : [0, L.front];
-        spec = { x0, z0, x1, z1, lot: L.info, home, garageOnly: home && game, front, door: L.door, garage: g, roof: L.plot.roof, storeys: L.plot.storeys, lived: kind === 'house' && this.options.lived };
-        // The openings on and round its walls, in the town's order (upstairs ones found on the ground's rows).
-        const openings = this.openingGrid
-          .near({ x: x0, z: z0, w: x1 - x0, d: z1 - z0 }, 2)
-          .sort((a, b) => a.i - b.i)
-          .map((e) => e.o);
-        const plan = this.planner.silhouettes([spec], openings, world);
-        if (spec.garageOnly) {
-          lot = { silhouettes: plan, props: new Geo(), glow: new Geo(), pools: new Geo() };
-          lamps(plan.lamps, new Painter(lot.props), new Painter(lot.glow), lot.pools);
-        } else {
-          silhouettes = plan;
-          lamps(plan.lamps, parts.props, parts.glow, parts.pools);
+      const [x0, z0, x1, z1] = L.info.house ?? [lone!.x0, lone!.z0, lone!.x1, lone!.z1];
+      const front: [number, number] = L.turned ? [-L.front, 0] : [0, L.front];
+      spec = { x0, z0, x1, z1, lot: L.info, home, dressingOnly: home && game, front, door: L.door, garage: g, roof: L.plot.roof, storeys: L.plot.storeys, lived: kind === 'house' && this.options.lived };
+      // The openings on and round its walls, in the town's order (upstairs ones found on the ground's rows).
+      const openings = this.openingGrid
+        .near({ x: x0, z: z0, w: x1 - x0, d: z1 - z0 }, 2)
+        .sort((a, b) => a.i - b.i)
+        .map((e) => e.o);
+      const plan = this.planner.silhouettes([spec], openings, world);
+      if (spec.dressingOnly) {
+        lot = { silhouettes: plan, props: new Geo(), glow: new Geo(), pools: new Geo(), porch: null };
+        // (The porch's lamps go with its wall in the cutaway: drawn apart, `pc/street.ts` `cutLot`.)
+        const porch = plan.lamps.filter((l) => l[5]);
+        if (porch.length) {
+          lot.porch = { look: porch[0][5]!, props: new Geo(), glow: new Geo(), pools: new Geo() };
+          lamps(porch, new Painter(lot.porch.props), new Painter(lot.porch.glow), lot.porch.pools);
         }
+        lamps(plan.lamps.filter((l) => !l[5]), new Painter(lot.props), new Painter(lot.glow), lot.pools);
+      } else {
+        silhouettes = plan;
+        lamps(plan.lamps, parts.props, parts.glow, parts.pools);
       }
     }
 
@@ -1189,7 +1223,7 @@ export class TownStreet {
       return c.parts;
     };
     const free = (r: Rect, m = 0) => this.free(r, m, focus, out.touched, out.cells);
-    const kerb = new Kerb(road, r, side, index);
+    const kerb = new Kerb(road, r, side, this.walkStops, this.cuts);
     const along = (u: [number, number]) => kerb.along(u[0], u[1]);
     // The plots fronting this side, in order along it: their fronts (s0..s1), front doors and driveways.
     const row = rowIds
@@ -1409,28 +1443,33 @@ export class TownStreet {
     if (cached && cached.hash === h) return { key: `e${id}:${h}`, out: cached.out };
     const parts = new Parts(this.options.has);
     const postHere = (x: number, z: number) => this.postOwner.get(`${x}:${z}`) === id;
-    writeFences(parts.props, list, this.options.fenceStyles ?? [], { gates: null, hedges: parts.plants.hedge, postsFrom: round, postHere });
+    const wallAt = (x: number, z: number) => this.wallCornerSet.has(`${x}:${z}`);
+    writeFences(parts.props, list, this.options.fenceStyles ?? [], { gates: null, hedges: parts.plants.hedge, postsFrom: round, postHere, wallAt });
     this.fenceUnits.set(id, { hash: h, out: parts });
     return { key: `e${id}:${h}`, out: parts };
   }
 
   /** Sidewalks and kerbs, the road's surface (the game's), the fountains on roundabouts, the menus' parked cars: by chunk, planned once. */
-  private staticParts(): Map<number, { parts: Parts; road: Geo; trail: Geo }> {
+  private staticParts(): Map<number, { parts: Parts; road: Geo; trail: Geo; marks: Geo }> {
     if (this.statics) return this.statics;
-    const out = new Map<number, { parts: Parts; road: Geo; trail: Geo }>();
+    const out = new Map<number, { parts: Parts; road: Geo; trail: Geo; marks: Geo }>();
     const at = (x: number, z: number) => {
       const id = chunkAt(x, z);
       let c = out.get(id);
-      if (!c) out.set(id, (c = { parts: new Parts(this.options.has), road: new Geo(), trail: new Geo() }));
+      if (!c) out.set(id, (c = { parts: new Parts(this.options.has), road: new Geo(), trail: new Geo(), marks: new Geo() }));
       return c;
     };
-    // Sidewalks, kerbs and the road, each piece in the chunk its middle is in.
+    // Sidewalks, kerbs and the road, the junctions' pads, corners and markings, each piece in the
+    // chunk its middle is in. (The streets' and lanes' sidewalks, stopped by the country roads too.)
     const walk = new RoutedGeo((x, z) => at(x, z).parts.walk);
     const shadows = new RoutedGeo((x, z) => at(x, z).parts.shadows).color('#000000');
-    roadMeshes(this.roads, null, 0, { walk, shadows }, 'sidewalks');
+    roadMeshes(this.walkStops.roads, null, 0, { walk, shadows }, 'sidewalks', this.junctions);
     if (this.options.ground) {
-      roadMeshes([...this.roads, ...this.ways.country], null, 0, { surface: new RoutedGeo((x, z) => at(x, z).road) }, 'surface');
-      roadMeshes(this.ways.trail, null, 0, { surface: new RoutedGeo((x, z) => at(x, z).trail) }, 'surface');
+      // (Worn between the kerbs; a big world's country roads, which have none, from edge to edge.)
+      const all = [...this.roads, ...this.ways.country];
+      const [road, marks] = [new RoutedGeo((x, z) => at(x, z).road), new RoutedGeo((x, z) => at(x, z).marks)];
+      roadMeshes(all, null, 0, { surface: road, marks }, 'surface', this.junctions, (ri) => all[ri].width / 2 - (ri < this.roads.length ? SIDEWALK : 0));
+      roadMeshes(this.ways.trail, null, 0, { surface: new RoutedGeo((x, z) => at(x, z).trail) }, 'surface', []);
     }
     // A fountain in the middle of every roundabout, flowers round it.
     for (const road of this.roads) {
@@ -1512,15 +1551,19 @@ export class TownStreet {
       const onLot = (r: Rect) => !!F && r.x >= F.x && r.z >= F.z && r.x + r.w <= F.x + F.w && r.z + r.d <= F.z + F.d;
       const mine = (r: Rect) => chunkAt(r.x + r.w / 2, r.z + r.d / 2) === id && !onLot(r);
       const road = this.staticParts().get(id)?.road;
-      if (road && !road.empty) ground.push({ name: 'streets', material: 'material.road', geo: road });
+      if (road && !road.empty) ground.push({ name: 'streets', material: 'material.road', geo: road, toned: true });
       const trail = this.staticParts().get(id)?.trail;
       if (trail && !trail.empty) ground.push({ name: 'trails', material: 'material.path', geo: trail });
+      const marks = this.staticParts().get(id)?.marks;
+      if (marks && !marks.empty) ground.push({ name: 'roadMarks', material: 'paint', geo: marks, paint: true });
       for (const [name, all, material, y] of this.groundRects()) {
         const list = all.filter(mine);
         if (!list.length) continue;
         const geo = new Geo();
-        for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-        ground.push({ name, material, geo });
+        const toned = name === 'paths';
+        if (toned) pavedRects(geo, list, all, y);
+        else for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+        ground.push({ name, material, geo, toned });
         keys.push(`${name}:${list.length}:${hashNumbers(list.flatMap((r) => [r.x, r.z, r.w, r.d]))}`);
       }
     }
@@ -1564,7 +1607,7 @@ class RoutedGeo extends Geo {
   constructor(private readonly target: (x: number, z: number) => Geo) {
     super();
   }
-  override poly(points: readonly V3[], n: V3, uvs?: readonly (readonly [number, number])[], alphas?: readonly number[]): this {
+  override poly(points: readonly V3[], n: V3, uvs?: readonly (readonly [number, number])[], alphas?: readonly number[], tints?: readonly V3[]): this {
     let x = 0;
     let z = 0;
     for (const p of points) {
@@ -1579,7 +1622,7 @@ class RoutedGeo extends Geo {
     g.kind = this.kind;
     g.maskA = this.maskA;
     g.maskB = this.maskB;
-    g.poly(points, n, uvs, alphas);
+    g.poly(points, n, uvs, alphas, tints);
     return this;
   }
 }

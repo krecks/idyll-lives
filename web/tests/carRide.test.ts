@@ -44,6 +44,7 @@ describe('riding in a car', async () => {
 
   const view: View = {
     init: () => {},
+    setMorphs: () => {},
     uploadPoses: () => {},
     uploadPoseRows: () => {},
     createPart: () => ({}),

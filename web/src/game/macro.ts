@@ -700,7 +700,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   }
 
   // ---- the main town: its roads first (which side its water is on), then where it goes -------
-  const mainSpec = recipe.sizes.big;
+  const mainSpec = recipe.town;
   const mainShape = ch.main ?? recipe.roads;
   const layout = mainShape(rand, mainSpec.box, mainSpec.scale);
   const mainRoads = settleRoads(joinUp(rand, layout, mainSpec, BIG_COURTS), mainSpec.box);
@@ -1249,12 +1249,20 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     return found.filter((w, i) => found.slice(0, i).every((o) => dist(o.p, w.p) >= SIDE_APART));
   };
   /**
+   * Whether port `q` is no road end any more: another area's street or lane comes up to it (its
+   * middle within half the wider one's width and a metre: the simulation joins them, one street
+   * on through). No country road leaves it: it ran on along that street a few metres off before
+   * turning away, crossing it (Canalside's Queen'ston Lane, by Foundry Street's end).
+   */
+  const continued = (q: Port) =>
+    roads.some((o) => o.area !== undefined && o.area !== q.area && o.kind !== 'trail' && o.kind !== 'country' && nearest(o.points, q.p[0], q.p[1]).dist <= Math.max(o.width, roads[q.road].width) / 2 + 1);
+  /**
    * The way a country road leaves area `a` towards `toward` (or comes into it from there): the
    * port nearest it that faces it (a port with a country road on from it already, off that road),
    * else a T off one of its streets facing it (`sideT`) if that swings round less.
    */
   const waysOut = (a: number, toward: Pt): (Way & { score: number })[] => {
-    const ports = plans[a].ports.map((q) => {
+    const ports = plans[a].ports.filter((q) => !continued(q)).map((q) => {
       const w = via(q, toward);
       return { ...w, score: dist(w.p, toward) + swing(w.p, w.dir, toward) + takenCost(w) };
     });
@@ -1275,6 +1283,8 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   };
   /** Whether `p` lies ahead of way `w`, within `angle` (radians) of straight on. */
   const inFront = (w: Way, p: Pt, angle: number) => w.dir[0] * (p[0] - w.p[0]) + w.dir[1] * (p[1] - w.p[1]) >= dist(p, w.p) * Math.cos(angle);
+  // (Two areas' streets meeting end to end: their ports are a way on already, kept as they are.)
+  for (const q of plans.flatMap((plan) => plan.ports)) if (continued(q)) q.used = true;
   // Prim's tree over the areas, then the shortest edge it left out.
   const inTree = [0];
   const edges: [number, number][] = [];
@@ -1379,7 +1389,10 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     return false;
   });
   for (let tries = 0; made < outs && tries < outs + 12; tries++) {
-    const ports = plans.flatMap((plan) => plan.ports).sort((x, y) => Number(x.used) - Number(y.used));
+    const ports = plans
+      .flatMap((plan) => plan.ports)
+      .filter((q) => !continued(q))
+      .sort((x, y) => Number(x.used) - Number(y.used));
     let best: { q: (typeof ports)[number]; side: number; d: number } | null = null;
     for (const q of ports) {
       for (const [side, d] of [q.p[1], W - q.p[0], D - q.p[1], q.p[0]].entries()) {
@@ -1418,13 +1431,13 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   const edgeOf = (i: number) => [Math.floor(i / gw) === 0, i % gw === gw - 1, Math.floor(i / gw) === gd - 1, i % gw === 0].indexOf(true);
   for (const [k, plan] of plans.entries()) {
     for (const q of plan.ports) {
-      if (q.used) continue;
+      if (q.used || continued(q)) continue;
       /** Country roads' cells out in the country, and which way the road runs there. */
       const country = new Map<number, { road: number; t: Pt }>();
       roads.forEach((r, i) => {
         if (r.kind === 'country') r.points.forEach((p, j) => plain(p) && country.set(land.cell(p[0], p[1]), { road: i, t: tangent(r.points, j) }));
       });
-      const others = plans.flatMap((o, a) => (a === k ? [] : o.ports.filter((x) => !x.used)));
+      const others = plans.flatMap((o, a) => (a === k ? [] : o.ports.filter((x) => !x.used && !continued(x))));
       const portAt = new Map(others.map((x) => [land.cell(x.p[0] + x.dir[0] * CELL, x.p[1] + x.dir[1] * CELL), x]));
       // A country road met square to it (give or take an eighth of a turn), a port head on, the
       // world's edge heading straight out of it; what lies off to the side or behind the port

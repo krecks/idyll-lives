@@ -412,6 +412,7 @@ fn a_child_has_a_snack_at_the_kids_table_and_a_grown_up_never_does() {
         lot: &w.lot,
         blocked: w.blocked(),
         stairs: w.stair_map(),
+        kept_off: &[],
     };
     let links = Links::new(&w.content, &w.objects, &nav);
     let all: Vec<u32> = w.objects.iter().map(|o| o.id).collect();

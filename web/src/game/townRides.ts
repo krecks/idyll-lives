@@ -17,6 +17,9 @@ import type { Door, Placement, Rect, Wall } from './town';
 
 /** What a household rides (content ids). */
 export const RIDES = { bike: 'bicycle', kids: 'bicycleChild', scooter: 'eScooter' } as const;
+/** The bicycles a household may have (content ids), a city bike twice so it stays the common one: a
+ *  household's own bikes need not all be alike, and a town's need not either. */
+export const BIKES = ['bicycle', 'bicycle', 'mountainBike', 'eBike', 'roadBike', 'cargoBike'] as const;
 /** Bicycles a household gets at most. */
 const MOST_BIKES = 3;
 /** The chance a teen or grown-up gets a bicycle, with a car at home and without one. */
@@ -31,13 +34,22 @@ function draw(at: { x: number; z: number }, k: number): number {
   return hash(at.x, at.z, 70 + k);
 }
 
+/** The `k`th bicycle of the household at `at`: one of `BIKES` (leaving out any this content hasn't),
+ *  the same each time the town is laid out. */
+function bikeFor(content: Content, at: { x: number; z: number }, k: number): string {
+  const have = BIKES.filter((def) => content.object(def));
+  return have[Math.floor(draw(at, 40 + k) * have.length)] ?? RIDES.bike;
+}
+
 /** The rides of `household`, living on the plot at `at` (its corner on the town: what decides), with a car at home or not. */
 export function ridesFor(content: Content, household: HouseholdDraft, car: boolean, at: { x: number; z: number }): string[] {
   const stages = household.members.map((m) => content.stageOf(m.age)?.id ?? '');
   const riders = stages.filter((s) => s !== 'baby' && s !== 'child').length;
   const out: string[] = [];
   let k = 0;
-  for (let i = 0; i < riders && out.length < MOST_BIKES; i++) if (draw(at, k++) < (car ? BIKE_CHANCE.car : BIKE_CHANCE.none)) out.push(RIDES.bike);
+  for (let i = 0; i < riders && out.length < MOST_BIKES; i++) {
+    if (draw(at, k++) < (car ? BIKE_CHANCE.car : BIKE_CHANCE.none)) out.push(bikeFor(content, at, i));
+  }
   if (riders > 0 && draw(at, 20) < SCOOTER_CHANCE) out.push(RIDES.scooter);
   for (const m of household.members) if (content.stageOf(m.age)?.id === 'child' && m.age >= KIDS_BIKE_AGE) out.push(RIDES.kids);
   return out.filter((def) => content.object(def));

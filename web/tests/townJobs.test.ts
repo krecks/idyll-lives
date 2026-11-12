@@ -40,20 +40,20 @@ describe('town jobs', async () => {
   const inWorker = (job: TownJob) => structuredClone(runTownJob(content, t, structuredClone(job)));
 
   const worlds = [
-    { kind: 'medium', seed: 7, size: 'cosy' },
-    { kind: 'farm', seed: 3141, size: 'normal' },
-    { kind: 'seaside', seed: 271828, size: 'normal', name: 'Typed In' },
-    { kind: 'forest', seed: 99, size: 'big' },
+    { kind: 'medium', seed: 7 },
+    { kind: 'farm', seed: 3141 },
+    { kind: 'seaside', seed: 271828, name: 'Typed In' },
+    { kind: 'forest', seed: 99 },
   ] as const;
 
   for (const w of worlds) {
     test(
-      `${w.kind} ${w.size} ${w.seed}: the worker's world is the page's`,
+      `${w.kind} ${w.seed}: the worker's world is the page's`,
       () => {
         const name = 'name' in w ? w.name : undefined;
-        const made = inWorker({ kind: 'world', world: w.kind, seed: w.seed, name, size: w.size });
+        const made = inWorker({ kind: 'world', world: w.kind, seed: w.seed, name });
         if (made.kind !== 'world') throw new Error('not a world');
-        const draft = generateWorld(content, t, w.kind, w.seed, name, w.size);
+        const draft = generateWorld(content, t, w.kind, w.seed, name);
         expect(made.draft).toEqual(draft);
         expect(made.preview).toEqual(previewWorld(content, t, draft, null));
         // Every generated house its lots use, as the page makes it.
@@ -66,7 +66,7 @@ describe('town jobs', async () => {
   }
 
   test('the worker\'s town file is the page\'s, its dice from the job\'s seed', () => {
-    const town = populate(content, assets, t, generateWorld(content, t, 'small', 4242, undefined, 'cosy'));
+    const town = populate(content, assets, t, generateWorld(content, t, 'small', 4242));
     const player = randomHousehold(content, assets, 2);
     const job: TownJob = { kind: 'assemble', town, player, slot: vacantSlots(town)[0].index, options: { mode: 'living', lifespan: 'normal' }, random: 12345 };
     const a = inWorker(job);
@@ -77,5 +77,6 @@ describe('town jobs', async () => {
     // (Another seed: other bonds between the neighbours, the same town.)
     if (other.kind !== 'assemble') throw new Error('not a town file');
     expect(JSON.parse(other.lot).plots).toEqual(JSON.parse(a.lot).plots);
-  });
+    // (A whole Big town made, peopled and put together three times: 7 s on CI's runner.)
+  }, 30_000);
 });

@@ -30,8 +30,9 @@ export function constant(name: string, module?: string, src = SNAPSHOT_RS): numb
  */
 export const TICKS_PER_SECOND = constant('TICKS_PER_SECOND', undefined, source('lib.rs'));
 export const TICKS_PER_MINUTE = constant('TICKS_PER_MINUTE', undefined, source('lib.rs'));
-/** A layout's `ticksPerSecond` and `ticksPerMinute`, as the sim's. */
-export const TICK_RATES = { ticksPerSecond: TICKS_PER_SECOND, ticksPerMinute: TICKS_PER_MINUTE };
+export const DRIVE_SCALE = constant('DRIVE_SCALE', undefined, source('lib.rs'));
+/** A layout's `ticksPerSecond`, `ticksPerMinute` and `driveScale`, as the sim's. */
+export const TICK_RATES = { ticksPerSecond: TICKS_PER_SECOND, ticksPerMinute: TICKS_PER_MINUTE, driveScale: DRIVE_SCALE };
 
 /** The bases as snapshot.rs works them out (checked against its source by the tests). */
 export const BASES = {

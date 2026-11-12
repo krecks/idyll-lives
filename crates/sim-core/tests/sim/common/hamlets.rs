@@ -414,8 +414,8 @@ pub fn paste(out: &mut Value, block: &Value, dx: i64, dz: i64) -> Pasted {
 /// the first hamlet. With `open` it's a `big` town: every street a road, the
 /// hamlets of a row joined by country roads that run on to a way out at both edges of the world,
 /// and the rows joined by a country road down the west edge. Without, a town with no open-world
-/// fields (cosy, as the benchmark's first baseline was), a way out at both edges of the world on
-/// every street. Returns the town file and the hamlets' rectangles `[x0, z0, x1, z1)`.
+/// fields (as the benchmark's first baseline was), a way out at both edges of the world on every
+/// street. Returns the town file and the hamlets' rectangles `[x0, z0, x1, z1)`.
 pub fn grid(
     content: &str,
     seed: u64,

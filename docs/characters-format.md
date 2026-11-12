@@ -54,17 +54,17 @@ The build is deterministic (seeded noise only): the same code gives the same byt
 - The reference skeleton for the clips is the male young adult: `sourcePelvis` is its pelvis rest
   position, and `reference` gives its body name and its thigh and shin lengths (for leg IK).
 
-## rig.json (version 4)
+## rig.json (version 5)
 
 | Key | Meaning |
 |---|---|
-| `version` | 4 |
+| `version` | 5 |
 | `bones`, `parents`, `clipBones`, `head`, `face.bones` | the skeleton above (parents come before children) |
 | `fps` | 30 (clip baking) |
 | `sourcePelvis`, `sourceRestQ` | the reference pelvis; identity rotations (`NB * 4`) |
 | `reference` | `{ body, thigh, shin }`: the clips' reference body and leg lengths |
 | `fieldScale`, `toneScale`, `stageScale` | int16 per unit for fields and tone, per metre for stage deltas (4000, 4000, 5000) |
-| `morphs` | `{ channels, scale: 30000, normalScale: 63 }` |
+| `morphs` | `{ channels, scale: 30000, normalScale: 63, identity: { first, count, eyes } }`: `identity` says which of the channels are the identity channels (the last `count`, from `first`) and, per body, the eyeballs a channel moves at weight 1 (`eyes.<family>.<channel>`: the right eye's centre x, y, z in metres, the left's x mirrored, and how much larger both are, of 1). See Morph channels |
 | `anims`, `clips` | optional baked clips; absent: the runtime bakes `clips/` at load |
 | `bodies.<family>` | `male`, `female` (below) |
 
@@ -79,12 +79,14 @@ A body entry:
 | `pelvisScale` | pelvis height / the reference pelvis height (scales clip pelvis motion) |
 | `seatDrop` | seated, the pelvis joint's height above the seat surface (m) |
 | `eyeY` | the eye centres' height (m) |
+| `faceScale` | how far this body's face takes a resident's identity (1 on the base stage; see Morph channels) |
 | `grip` | see above (optional) |
 | `skinRef` | `[1, 1, 1]` |
 | `garments` | id -> cut, every id of the family in the creator's order (see Clothes) |
 | `bodyChunks` | `{ "body": [] }` (clothes are painted, skin is never hidden) |
 | `parts` | part name -> byte offsets in `mesh` |
-| `stages` | other life stages: `{ mesh, height, restT, inverseBind, pelvisScale, seatDrop, eyeY, grip, parts }` |
+| `hd` | the close-up body, in a file of its own: `{ mesh: "<family>.hd.bin", parts: { "hd.body": … } }`, laid out as `mesh` and `parts` are (see Close-up body) |
+| `stages` | other life stages: `{ mesh, height, restT, inverseBind, pelvisScale, seatDrop, eyeY, grip, faceScale, parts, hd }` (`hd`: `{ mesh: "<family>.<stage>.hd.bin", parts: { "hd.body": … } }`, the close-up body's deltas) |
 
 No textures: `textures`, `cloth`, `hairTextures`, `hairCards` are gone, and so are UVs.
 
@@ -107,10 +109,9 @@ No textures: `textures`, `cloth`, `hairTextures`, `hairCards` are gone, and so a
 `normals` i8 x4 (/ 127). Every part has the same vertices at every stage; fields, tone, weights,
 indices and morphs come from the base.
 
-The runtime interleaves field, morph slot and tone into one vertex buffer (`simField` 0,
-`simMorph` 4, `simTone` 8; stride 12 floats; parts no morph moves get slot -1), so a draw uses 7
-vertex buffers (position, normal, joints, weights, that one, the instance matrices and settings)
-of WebGPU's 8.
+The runtime interleaves a part's position, normal, joints, weights, field, morph slot and tone into
+one vertex buffer of 80 bytes a vertex (`residentMesh` in `pc/characterMaterial.ts`; parts no morph
+moves get slot -1); the instance matrices and settings are the draw's other buffers.
 
 ## Parts
 
@@ -118,17 +119,37 @@ Every body has:
 
 | Part | What | Skinning | Material |
 |---|---|---|---|
-| `body` | the skin, with the eyelids and lips (from the face) | body bones; lids and lips Head | `body`: skin colour, painted clothes |
-| `lod.body` | the low-detail body (far residents, every shadow), with the eyelids (they blink) | body bones; lids Head | `body` |
+| `body` | the skin, with the eyelids and lips (from the face) and the ears | body bones; lids, lips and ears Head | `body`: skin colour, painted clothes |
+| `lod.body` | the low-detail body (far residents, every shadow), with the eyelids (they blink) and plain ears | body bones; lids and ears Head | `body` |
 | `eyes` | two eyeballs | `eye_l`, `eye_r` | `eye` (procedural iris) |
 | `lashes`, `brows` | lashes on the upper lid rims; brows | Head | `lash` (dark), `brow` (hair colour x 0.45), opaque |
 | `teeth`, `tongue` | teeth; the mouth plate (dark, tone.y = 1) and tongue | Head | `mouth` |
 | `hair.<style>` | every hairstyle but `none` (`short crop layered tousled sideSwept afro bob long ponytail braid bun`) | Head, blending to neck_01 / spine_03 below the jaw | `hair` |
-| `hair.beard` | facial hair (male only; hidden for baby, child, teen) | Head; follows the mouth's morphs | `hair` |
+| `hair.beard` | facial hair (male only; hidden for baby, child, teen) | Head; follows the mouth's morphs and the face's identity | `hair` |
+| `hair.<style>.wisps`, `hair.beard.wisps` | the soft edges of each: thin quads past its rims, hems and tips (below), drawn only close up | their hair's, vertex for vertex | `wisp`: the hair's colour and light, cut out in strands |
 | `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, the server's apron (the front from the waist to above the knees), every shoe (below) | from the body | `cloth` (flat colour) |
 | `lod.<shell>` | a low-detail copy of every shell | | `cloth` |
 
 `hair.none` has no part: a bald resident's scalp keeps the skin colour (appearance texel 7 w = 0).
+
+### Close-up body
+
+`hd.body` is the body one subdivision finer (level 2 where `body` is level 1: its skin in four times the
+triangles, 20,200 with the same lids, lips and ears after it), with fields, tone, occlusion and morphs
+of its own, worked out at its own vertices. It is drawn in place of `body` only where one resident fills
+the view: the creator's stage, where `body`'s outline shows its edges as corners of 8 to 20 degrees
+(3 to 4 px at the face view). In play it shows nothing, even at the closest zoom (6 m), and a portrait
+(160 px over 0.44 m, shown at 26 to 60 px) would move its outline by less than half a pixel, so
+neither uses it.
+
+It is stored, not made at load: its skin is snapped to the body's surface and its sockets carved at
+its own vertices, as its fields, tone and morphs are worked out there, at every stage and for every
+identity channel, and a subdivision step at load reproduces none of that. So that play never
+downloads it, it lives in files of its own: `<family>.hd.bin` (the part) and `<family>.<stage>.hd.bin`
+(its deltas), 1.29 MB gzipped over the 3.85 MB play fetches in all. The creator fetches a family's
+(about 330 KB gzipped) with the first resident of that family on its stage, and a stage's (46 to 74 KB)
+with the first of that stage; until they arrive, and if they fail to, the stage draws `body`
+(`loadCloseUp` in `characters/data.ts`).
 
 Hair (`hair.rs`, up to 7.4k triangles a style, one draw) is closed shapes in locks, so it breaks
 its outline and shades in clumps. Every style's layout is a shape, and it is cut at `DETAIL` (1.5)
@@ -160,8 +181,36 @@ short ones for 52 columns and 18 rows:
   the braid, three strands plaited (each a loft), a tie and a tuft; buns, twisted, with a band.
 - the beard is a shell over the jaw in locks, their tips below the chin, thinning to the skin at
   its lower edge; the sideburns stop in front of the ears.
-- no hair comes within 2 mm of the head (`sdf`) or 1.5 mm of an ear (the body's ear faces), and no
+- no hair comes within 2 mm of the head (`sdf`) or 1.5 mm of an ear (the ear pieces' faces), and no
   edge passes through an ear, at every life stage at rest (`check`).
+
+Solid hair ends in hard edges. Past them go wisps (`hair.rs` `Strip`, `wisps`; a part of their own
+per style, at most 600 triangles, 150 to 470 as built): rows of quads, each growing from two
+neighbouring vertices of the solid hair (the same positions, normals, weights and tone, so a row
+starts exactly on the hair and is shaded as it is; a wisp's two vertices are its root, then its
+end) out to where the wisps end, kept clear of the head and the ears as the hair is. The shader
+draws strands on them and cuts the rest away (below). Where:
+
+- a cap's rim, on over the skin the way its columns come down to it (walked along the head's
+  field, which knows the neck): 9 mm over the forehead, 13 mm at the temples, 16 mm at the nape
+  (0.04, 0.055 and 0.07 head heights), shorter towards an ear and none round it; six tenths of that
+  on hair drawn back tight (ponytail, braid, buns); only in front of the curtains where a style has
+  them (layered, long); none on the bob, whose fringe and curtain cover its rim;
+- the hem of every curtain and fringe: from the outer face's last row down in front of the hem's
+  lip, as one that far (fields.w), and on below it, turned in half as far as the hem is (0.05 to
+  0.08 head heights; the bob's fringe 0.035);
+- a lofted lock's tip: a brush from its last ring but one (two on the thicker locks) on past its
+  end, drawn in to 0.45 of that ring's breadth; over the outer face only on the flat locks that lie
+  on the head (the long style's face locks, the tousled tufts), all round on the others (the
+  side-swept locks, the ponytail's tail, the braid's tuft);
+- the afro, whose outline is no edge: tufts all over it, laid like shingles (a row round the shell
+  from every third ring, on every third column, each on down over two rings and lifting 0.06 head
+  heights off it), their strands loose curls, so its outline is strands' ends from every side;
+- the beard: below its lower edge and up each cheek from its upper one.
+
+Left solid: the buns and their bands, the ponytail's band, the braid's strands and tie (tight hair,
+whose outline is smooth), the sides of the curtains and fringes (they lie on the cheeks and the
+temples), the beard's edge under the nose, round the lips and at the sideburns.
 
 The shader (`hair` branch of `characters/material.ts`) takes the hair colour with the clump bands
 (tone.z), and on dark hair lifts the clumps and a sheen band round the crown (where the strands, taken
@@ -169,10 +218,29 @@ straight down the head from the normal, lie square to the half-way vector betwee
 from above) towards a lighter tint; both even out under a pixel or two. The material has no PBR sheen
 (linked to the albedo it took the colour down to 8 %).
 
+The wisps are that hair, cut out (`character.ts` `WISP`, `RESIDENT_WISP_OPACITY`): along the edge
+(fields.x) strands stand in cells, 500 a metre, in three layers, each sparser than the last and set
+off from it; a strand is a random share of the quad long (fields.y past fields.w), longer and shorter
+in tufts along the edge, as wide as its cell at its root, where the row is one with the solid hair,
+parting from its neighbours and thinning to its tip, leaning a little on the way (a loose one,
+fields.z = 1: waving, and broken along its length). No texture: the strands are drawn from the
+fields, and where they are a pixel wide or less they blur into their mean cover. The cover is the
+material's opacity: under 0.1 nothing is drawn (the alpha test), over it the wisp blends over what
+is behind it and, where the target is multisampled (Medium, High, the creator, the portraits),
+covers that share of the pixel's samples (alpha to coverage), so a strand's edge is as smooth as a
+solid one's; on Low the blend alone smooths it. The blend adds the alphas up, which keeps a
+transparent canvas (the creator's stage, the portraits) covered under them. The wisps are drawn
+after everything solid, from both sides (their faces' winding is free: the one part `check` does
+not hold to it), cast no shadow, write depth, and are lit by the normals of the hair they grow
+from, turned to the viewer where a quad stands across the view. Drawn only where a face is 4 px
+per 5 cm or more (`parts.ts` `WISPS_PX`; thinned out by the shader below 7): not at the game's
+default camera (no draw call), all of them zoomed in.
+
 The body (`body.rs`) is a control cage of superellipse rings (`cage.rs`; the head's cage
 in `head.rs`) fitted so its limit surface passes through the ring points and subdivided once
-(`subdiv.rs`): `body` is about 5.2k triangles of skin plus the face's lids and lips (budget
-6k), `lod.body` the cage at its limit plus the lids (budget 1.4k; the fingers are on it too). Skin
+(`subdiv.rs`): `body` is about 4.8k triangles of skin plus the face's lids and lips and the ears (5.9k
+in all, budget 6k), `lod.body` the cage at its limit plus the lids and plain ears (budget 1.4k; the
+fingers are on it too). Skin
 weights are set per ring and subdivide with the positions. Every stage of a family has the same cage.
 
 A hand is a palm with the ball of the thumb on it, a knuckle ring, four fingers and a thumb. A
@@ -198,7 +266,7 @@ The points lie on a smooth head (a soft union of a cranium, cheeks-and-jaw, a mu
 ellipsoid: the face from the nose down stands up rather than sloping back to the chin); the features
 are offsets on them: the nose (a bridge from between the eyes to a round tip over the nose's base,
 its wings beside the tip and the base), the upper lip rounded forward with a groove down its middle
-(the philtrum), the brow, the ears. Between the grid's vertices the drawn head is snapped onto the
+(the philtrum), the brow. Between the grid's vertices the drawn head is snapped onto the
 smooth one (the cage's limit alone dents it by up to 4 mm there, where the grid's spacing is uneven
 and its partial lines end: patches on the cheeks), and the eye sockets are carved into every point
 of it (`sockets`): round each eye a shallow hollow (the eyes' fronts are about level with the face
@@ -217,6 +285,29 @@ the upper with a cupid's bow over the philtrum; brows thickest at the inner end,
 its outer one, on the brow bone (not round the temple); a man's lower, straighter and heavier, a
 woman's higher, thinner and arched further out, its tail dropping.
 
+The ears are not the cage's (`ear.rs`): each is a piece of its own set into the side of the smooth
+head, as the lids and lips are set on the face, and comes after them in `body` (the left one, then the
+right: 169 vertices and 324 triangles each; `lod.body` has a plain flap of 24 triangles a side). An ear
+is laid out on a sheet hinged on the head along the ear's front edge and turned out towards the back
+until its back edge stands 13.5 mm off the head (on a grown man: 20 to 25 degrees from the head's side),
+leaning back a little at the top; a real ear's size and place (about 62 mm high and 34 wide on a man,
+58 and 31 on a woman, from the brow to the nose's base; by the head's height at the other stages, a
+baby's a tenth smaller). The mesh is a polar grid round the bowl's middle: the bowl's floor (the
+concha, 2 mm over the skin), its rim (the antihelix behind and above it, the tragus in front), the
+groove inside the helix (the scapha), the helix's crest, the ear's edge between two rings close to it
+(the edge's turn is in two narrow bands, so no broad one is shaded as turning away from the eye, which
+the sky's reflection draws as a white line), then round to the back: under the helix, under the bowl's
+rim (the ear is a shell 3 or 4 mm thick, standing free of the head behind the bowl), and a foot ring 2
+mm inside the head, so nothing is stitched to the skin. The lobe has no rolled rim, and the front edge
+runs into the cheek. An ear's normals are its own triangles' (weighted by their angle at the vertex,
+and leant until no corner faces away from its triangle; the edge is the front's and the back's, so it
+shades round), turned to the head's where the ear enters the head (the foot, the front edge), where it
+also takes the skin's tone: the join shows no crease and no line. It is built from the stage's smooth
+head with the shared face (the identity channels leave the ears and the skin by them alone), is
+skinned to `Head`, and no channel moves it (`check`). `cargo characters ratios` prints each body's ear
+(what of it stands out of the head), and how many of its triangles' corners are shaded as facing away
+from the triangle (none; `check` fails on one).
+
 Grown faces and bodies differ by family more than the shared shapes do, as far as the stage is grown
 (`rig::maturity`: none for babies and children, 0.6 for teens): a man's jaw wider and squarer, his
 chin broad, his nose larger, his brow ridge heavier, his neck and arms thicker, his chest and
@@ -228,7 +319,7 @@ young adult's; the stages' own waists widen it with age), with a gentle
 bust (`head.rs` `grown`, `nose`, `brow`; `body.rs` `Shape::m`).
 
 The head interface (`head_frame(family, stage)`, `head.rs`): `sdf` is a smooth signed distance
-to the head and neck as drawn (the ears left out; about 1 mm near the surface), `surface_z` the
+to the head and neck as drawn (the ears, pieces set into it, left out; about 1 mm near the surface), `surface_z` the
 front surface's z; `ears` boxes round the ears (hair goes round or over them); `centre` / `radii` a
 loose ellipsoid round the skull (with a margin; fit close things to `sdf`); eyes, mouth, brows,
 hairline and chin as before.
@@ -237,29 +328,38 @@ hairline and chin as before.
 
 | Part | x | y | z | w |
 |---|---|---|---|---|
-| body | sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, > 1 hand) | height (m, base body) | crew neckline (m, > 0 covered: distance from the neck's axis plus depth below a curve round the neck's base); head: -1 - scalp weight | scoop neckline (women: round and low in front; men: a V); head: -1 - scalp weight |
+| body | sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, > 1 hand) | height (m, base body) | crew neckline (m, > 0 covered: distance from the neck's axis plus depth below a curve round the neck's base); head: -1 - scalp weight (the ears: -1) | scoop neckline (women: round and low in front; men: a V); head: -1 - scalp weight (the ears: -1) |
 | shells | hem distance (m; a shoe's from its collar, negative on its lining) | flag: 1 sole, 2 waistband, 3 skirt or apron (a hem band), 4 light midsole, 5 polished | category: 0 top, 1 bottom, 2 shoes | shoes: across the instep (m from its middle; over 1 off its front), else 0 |
 | eyes | offset from the iris centre on the eye's front (m), x | y | iris radius (m) | pupil radius (m) |
 | hair | 0.1 (unused) | | | |
+| wisps | along the edge (m, from a start of the row's own) | 0 at the root (on the hair) .. 1 where the quad ends | how loose the strands are: 0 combed, 1 curls | the share of y over which the strands are still one (solid: a hem's lip) |
 
 ## Tone (4 per vertex)
 
 x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = shade drawn by hand (the
-upper lids' crease, the teeth's sides, deep in the hair; the mouth plate is
+upper lids' crease, the nostrils: the nose's underside either side of its middle, the teeth's sides,
+deep in the hair; the mouth plate is
 1), and on the lips its opposite sign: negative, how much of the lip's colour they take (up to 0.9,
 less at the mouth's corners and towards the line between them, which the occlusion bakes: the
 shader tints the skin red-rose by it and takes the gloss off, `character.ts` `LIP_MIX`), z = hair
-clump bands (0..1: light in a lock's middle, dark in the parting between two) and on the
+clump bands (0..1: light in a lock's middle, dark in the parting between two), on the teeth their
+count from the middle one (a tooth's width a unit: the shader draws a dark line at every whole
+number, `character.ts` `TOOTH_GAP`) and on the
 body the face's age folds (0..1: a soft line from beside
 each nose wing down past the mouth's corner, `HeadFrame::fold`, each vertex's the mean over its
 triangles weighted by its barycentric weight, as the triangles can show it; the shader darkens the
 skin by `0.3 z age`, appearance texel 4 g, so young adults show none; on the lips instead, how far
 the lip turns down at rest, 0..1, which the shader shades by `LIP_SHADE`: baked, so it is the lip's shape
 whichever way the head faces), w = the baked ambient occlusion
-(below). On `body` the eyelids take the tone of the face they lie on (as it is without the socket, at
+(below). A wisp's two vertices take the tone of the hair vertex it grows from, w included (in
+`build.rs`, after the bake). On `body` the eyelids take the tone of the face they lie on (as it is without the socket, at
 their nearest point), w included (the upper lid keeps its crease), and its normals there, in every
-shape of the face (build.rs `lid_shading`); on `lod.body` the mean tone of the skin round them. Every
-stage uses the base stage's tone.
+shape of the face (build.rs `lid_shading`); on `lod.body` the mean tone of the skin round them. The
+ears have a blush of their own (most on the lobe), a shade in the bowl's middle for the canal (y) and
+part of their baked occlusion (0.7 of it on the front, 0.4 on the back, which faces the head a
+centimetre off and would be as dark as the inside of a mouth: an ear is thin and lit through); where
+an ear runs into the head (its foot, its front edge) it takes the tone of the skin there instead, so
+the join shows no line. Every stage uses the base stage's tone.
 
 w is how much of the sky a vertex does not see at rest, 0 (open) to 1 (enclosed), in 32 steps
 (`ao.rs`, after the furniture's `gamekit/shade.py`): 96 rays per vertex (48 on the hair, whose shade is
@@ -277,7 +377,7 @@ all on the hair): a vertex takes half its own and half its neighbours' mean, the
 left alone, so a crease that lands on two of a ring's eight vertices reads as a crease and not as a
 blotch. What occludes what:
 
-- `body`: itself (its lids and lips included) and the teeth and tongue, not the eyes;
+- `body`: itself (its lids, lips and ears included) and the teeth and tongue, not the eyes;
 - `lod.body`: the same, its own bake;
 - shells: themselves and `body`; their `lod.` copies themselves and `lod.body`;
 - `hair.*`, `hair.beard`: themselves, `body` and the eyes (one body serves every style and outfit,
@@ -306,12 +406,22 @@ fields) decides where it covers:
 - bottom: `y < waist`, `y > leg`, `x < -0.5` (not on the arms);
 - shoes: `y < shoe`, the sock's top (under the shoe's shell, and the sock in its collar's opening).
 
-A top with `over: true` (its hem is below the waistband: shirt, jacket, suit) is painted over the
-bottom; otherwise the bottom wins. Shoes win over both. Edges are anti-aliased; painted cloth is
+A top with `over: true` (its hem is below the waistband: the tee, the v-neck, the polo and the long top worn
+out, the shirt, the jacket, the suit) is painted over the bottom; otherwise (the tank top, the blouse, tucked
+in) the bottom wins. Shoes win over both. Edges are anti-aliased; painted cloth is
 rougher than skin. Shoes have a `colour` (sRGB hex). Skirts set `skirt: true` and their `leg` cut
 paints the thighs (the shell hangs over them). Babies don't wear skirts (the shell can't follow
 their drawn-up, spread legs): a baby whose outfit has one wears `bottom.shorts` in the top's colour,
 a romper (outfit.ts).
+
+Painted cloth stands off the skin (character.ts `EASE`, the body's vertex shader): each covered vertex is
+drawn out along its normal, as far as the garment is loose (appearance texel 8; outfit.ts `EASE_OF`), so
+a tee hangs from the chest past the waist (4 mm of cloth, up to 2 cm more below the chest), a trouser leg
+falls nearly straight from the knee over the shoe (up to 2.6 cm at the ankle) and a cuff or a hem stands a
+step off the arm, with a shade under it (`EDGE_SHADE`). The amounts are metres on the base body by the
+fields' heights, scaled to the life stage (the vertex's height over its field's). What clings (swimwear,
+the towel) and what lies under a shell (the shirt in a jacket, a skirt's painted thighs) has none; under a
+skirt's shell the top lies flat from the waistband down (texel 8 b). No triangle, byte or draw is added.
 
 Each painted cut edge is drawn as fabric (material.ts `simHem`, `BAND`): a turned band along it, a
 little darker (lighter on dark cloth), with a thin stitch line in it. The band is 2.2 cm at a cuff,
@@ -384,8 +494,27 @@ Garment ids per family (outfit.ts):
 | 5 | skin reference (1) | bottom: leg cut |
 | 6 | shoe colour | shoes: the sock's top |
 | 7 | eye colour | 1 if the resident wears hair (the scalp takes the hair colour) |
+| 8 | r, g = how loose the top and the bottom are (0..1: how far the painted cloth stands off the skin, `EASE`); b = 1 if the bottom has a shell round the hips (a skirt) | 0 |
 
-Then 12 texels of face morph (channel, weight) pairs. Disabled cuts are -10 (+10 for "below" cuts).
+Then 20 texels of face morph (channel, weight) pairs, two a texel, a weight of 0 unused (`layout.ts`):
+
+| Texels | What | Written |
+|---|---|---|
+| 12 (`EXPRESSION_TEXELS`) | the expression: the 24 strongest of the expression channels (`face.ts` `FaceMixer`); a first channel of -1 means no morphs at all on this face this frame (too small on screen, `parts.ts` `MORPH_PX`) | every frame the face is posed |
+| 8 (`IDENTITY_TEXELS`) | the resident's own face: the 16 identity channels at the look's weights, signed, times the body's `faceScale` (`identity.ts` `writeIdentity`) | once, when the resident is built |
+
+A row is 33 x 3 + 9 + 20 = 128 texels (it was 120). Disabled cuts are -10 (+10 for "below" cuts).
+
+`appearance.face` is the resident's own face: identity channel name (without `id.`) -> -1..1, 0 or
+missing as the shared face has it (household.ts `FACE_CHANNELS`, `FACE_GROUPS` for the creator's
+sliders). `randomLook` draws one from a stream of its own (about normal, 0.36 wide, so most values are
+within 0.6 and a face differs from the shared one in a few things), seeded by the rest of the look,
+so it takes nothing from the look's dice and a town made from a seed is the town it was, with faces;
+a child made by the
+simulation (`lookFromSeed`) is somewhere between its parents channel by channel, with a little of its
+own. A look without one (an older save) gets a face from the resident's id (`faceFromId`), so nobody
+shares a face. Portraits are cached by the appearance, and by the id for a look without a face
+(`portraits.ts` `lookKey`).
 
 `appearance.build` (0.85 slim .. 1.2 broad; missing = 1) widens bones across their axis in
 `skin()`: `K = W * (I + (g - 1)(I - a a^T)) * IBM`, the torso by g, the neck by half and the limbs
@@ -398,9 +527,65 @@ by 60% of it. The simulation keeps the appearance opaque, so old saves are unaff
 - visemes: `sil PP FF TH DD kk CH SS nn RR aa E I O U`;
 - units: `browDownLeft browDownRight browInnerUp browOuterUpLeft browOuterUpRight cheekSquintLeft cheekSquintRight eyeBlinkLeft eyeBlinkRight eyeLookDownLeft eyeLookDownRight eyeLookUpLeft eyeLookUpRight eyeSquintLeft eyeSquintRight eyeWideLeft eyeWideRight jawForward jawOpen mouthClose mouthDimpleLeft mouthDimpleRight mouthFrownLeft mouthFrownRight mouthFunnel mouthLeft mouthLowerDownLeft mouthLowerDownRight mouthPressLeft mouthPressRight mouthPucker mouthRollLower mouthRollUpper mouthShrugLower mouthShrugUpper mouthSmileLeft mouthSmileRight mouthStretchLeft mouthStretchRight mouthUpperUpLeft mouthUpperUpRight noseSneerLeft noseSneerRight`.
 
-`Left` is the resident's left (-x). Units are authored at ARKit strength. The head itself never
-deforms: channels move the lids, lashes, brows, lips, mouth plate, teeth, tongue and beard. Morphs
-are built at the base stage and shared by the other stages.
+`Left` is the resident's left (-x). Units are authored at ARKit strength. An expression never
+deforms the head: these channels move the lids, lashes, brows, lips, mouth plate, teeth, tongue and
+beard (with its wisps). Morphs are built at the base stage and shared by the other stages.
+
+### Identity channels (a face per resident)
+
+After the 58 expression channels come 16 identity channels (`contract.rs` `IDENTITY`,
+`morphs.identity`), which give a resident a face of its own. The runtime sets them once per resident
+from `appearance.face` (above); a weight runs from -1 to 1 and 0 is the family's shared face.
+
+| Channel | At +1 (at -1 the opposite) | Moves at most (mm: man, woman) |
+|---|---|---|
+| `id.jawWidth` | the jaw wider below the eyes | 4.5, 3.3 a side |
+| `id.jawSquare` | the jaw's corners stand out (square; -1 soft) | 3.7, 3.3 |
+| `id.chinLength` | the chin longer | 4.7, 3.2 |
+| `id.chinWidth` | the chin broader (-1 pointed) | 3.8, 2.0 |
+| `id.cheekbones` | the cheekbones stand out | 3.0, 2.7 |
+| `id.cheekFullness` | fuller cheeks beside the mouth (-1 hollow) | 3.3, 3.2 |
+| `id.noseLength` | the nose's tip further out and lower | 4.0, 2.4 |
+| `id.noseWidth` | the nose's wings wider | 2.4, 1.4 a side |
+| `id.noseBridge` | the bridge higher between the eyes | 2.9, 1.8 |
+| `id.browRidge` | a heavier brow ridge (the brows go with it) | 2.3, 2.1 |
+| `id.eyeSpacing` | the eyes further apart | 2.4, 2.3 an eye |
+| `id.eyeTilt` | the eyes' outer corners higher (7 degrees) | 2.1 (lids) |
+| `id.eyeSize` | larger eyes, opened wider (7 % of the eyeball, the brows higher over them) | 2.7 (brows) |
+| `id.mouthWidth` | a wider mouth (15 %) | 3.6, 3.4 a corner |
+| `id.lipFullness` | fuller lips (34 % taller) | 1.9, 2.5 |
+| `id.faceLength` | a longer lower face: the chin, the mouth and the nose's tip lower | 4.8, 4.2 |
+
+(`cargo characters faces` prints the table as built.)
+
+A channel is a difference (`identity.rs`): the base stage's head, lids, lashes, brows, lips, mouth
+plate and teeth built with one of the generator's numbers at +1 (`head.rs`, `face.rs`: an
+`Identity`), minus the same built at -1, halved, vertex by vertex. Everything on the face is made
+from the head's frame, so it follows the skin by construction; the beard and any hair that lies on
+the face (a long style's locks on the cheeks; within 6 mm of the skin all of it, none past 3 cm)
+take the skin's shape where they lie, and the wisps by the same rule (a wisp's root is where a
+vertex of its hair is, and moves as it does; its end follows the skin under it). The three that add a shape to the head (`jawSquare`,
+`cheekbones`, `cheekFullness`: an ellipsoid joined to the smooth head, placed so it stands that far
+out of either family's) are the head with it minus the shared head. The cranium above the hairline,
+the ears, the back of the head and the neck stay as they are (`identity.rs` `Mask`), so hairlines
+and hairstyles fit every face. Under the lids, the skin in an eye's socket goes with the eyeball
+rather than by the difference of two sockets.
+
+The eyeballs turn on bones, so the two channels that move or size them (`eyeSpacing`, `eyeSize`)
+say so in `morphs.identity.eyes`, and `pose.ts` `skin` moves the eye bones' joints and scales them
+(`Placement.eyes`, summed over the resident's weights once, with the texels).
+
+Identity channels are on `body` (the skin with its lids and lips; not its ears), `lashes`, `brows`, `teeth`,
+`tongue`, `hair.beard` and the hair that touches the face, with their wisps; not on `lod.body` or the shadow copies,
+and they are skipped with the expression when the face is small on screen. The shapes are metres on
+the base stage's head, so a body's `faceScale` scales a resident's weights: the stage's head height
+over the base stage's, times 0.6 on a baby and 0.8 on a child, whose faces are round and unformed
+(a man's: 0.42 baby, 0.69 child, 0.94 teen, about 1 from then on; a woman's 0.45, 0.70, 0.95).
+
+`cargo characters check` holds the channels to the creator's list (`FACE_CHANNELS`), no identity
+channel to more than 6 mm and none to a low-detail part, and every hairstyle (its wisps too) 2 mm clear of the head
+at each channel's two ends, at every life stage (the head's samples moved as the channel moves the
+skin, `HeadFrame::moved`).
 
 ## Clips
 
@@ -599,6 +784,14 @@ Why some entries are as they are:
   `lieSide` clip): turned a quarter about its length, its back to the back rail (a sofa by day is lounged on, not
   lain flat on the back).
 - `sofaBed`: the head on the seat, the rest on the mattress pulled out in front (`bed_out`, `fwd`).
+- The sofas slept on for the night (`sofa`, `loveseat`, `sofaDesign`, `sofaThree`, `sofaThreeSeat`: `SOFA_NIGHTS`, content
+  "Sleep on the sofa"): lain on along the seat cushions at their height (`across`), moved towards one arm (`fwd`,
+  along the sofa) so the head is by it and clear of it; curled up on the side on the two-seaters, 1.5 to 1.66 m between
+  their arms (`CURLED_BEDS`, the `lieCurl` clip, a quilt of its own draped over that pose: a throw
+  pulled up over the shoulder and the arm on it to the neck, the head out, ending just past the feet and hanging only a
+  little over the seat cushion's front edge, `CURL_QUILT`), at full length on the back on the three-seaters (2.5 m). The blanket is 0.9 m across (`tuck`), the seat's depth
+  and over its front edge, clear of the back cushions, and its foot end stops 0.3 m short of the footprint's end, inside
+  the arm (`foot`).
 - `gloomy.windowSeat`, `kind.hearthSettee` (2 wide): dozed on along the cushion, head to its left, whichever slot
   (the nap takes both, content `whole`).
 - `bunks.bedBunk`: the lower and the upper mattress tops, `[lower, upper]` (content `bunk`).
@@ -634,6 +827,7 @@ rider, the seesaw), which they settle onto as before rather than walk through.
 | the contract | `rig.rs`, `head.rs` (the head interface), `contract.rs`, `write.rs`, `build.rs`, `check.rs`, `check_clips.ts`, `clips/dsl.ts`, this page |
 | body and clothes | `body.rs`, `cage.rs`, `subdiv.rs`, `clothes.rs`, `garments.rs`, `meshops.rs` |
 | face and hair | `face.rs`, `hair.rs`, `prims.rs`; the eye, hair and brow branches of `render/pc/shaders/character.ts`; `characters/face.ts` |
+| a face per resident | `identity.rs` (the channels as differences, the mask), the amounts in `head.rs` and `face.rs`; `characters/identity.ts` (the row's identity texels, the eyes), `game/household.ts` (`Appearance.face`, `randomFace`, `FACE_GROUPS`) |
 | clips | `clips/*` (with `clips/ik.ts`) |
 | the runtime | `render/shared/characters/residents.ts` (activities, seats, beds, carrying, faces; its tables in `actions.ts`, `seats.ts`, `socials.ts`, `expressions.ts`, `parts.ts`; drawn through `view.ts` by `pc/characters.ts`), `shared/characters/{data,pose,outfit,blanket}.ts`, `pc/characterMaterial.ts` and `pc/shaders/character.ts` (the shading), `pc/poseTexture.ts`; the creator in `ui/screens/CreateHousehold.svelte` and `render/preview` |
 
@@ -643,8 +837,14 @@ See also `tools/characters/README.md`.
 
 - `/characters.html`: a grid of residents. `?family=male|female`, `?stage=<id>|all` (default: every
   stage), `?hair=all` (or `?hair=long,beard`: only those), `?tops=all`, `?skins=all`, `?builds=all`, `?face=moods|visemes`,
+  `?faces=all` (each identity channel at -1 and +1 beside the shared face, and eight random faces; `?only=jawWidth,noseLength`,
+  `?per=2` channels a line, `?faces=random`, `?faces=ends` for the sliders' corners; `?hairStyle=bob`, `?beard=1`; the
+  `characters-identity*` pages of `tools/bench/render.mjs`),
   `?clip=<name>&t=<s>`, `?view=side|back`, `?closeup=1` (`?y=`: the height it looks at), `?build=1.2`, `?cols=`, `?manual`
-  (`__bench.advance(s)`); sets `window.__ready`.
+  (`__bench.advance(s)`); `?hd=1` draws everyone with the close-up body (the `characters-creator` pages of
+  `tools/bench/render.mjs` frame one resident as the creator's face view does, to shoot both); sets `window.__ready`.
+- `/previews.html?stage=male|female&zoom=1`: the household creator's stage itself (`?hd=0`: with the body, where it
+  draws the close-up body; the `previews-stage` pages).
 - `/poses.html`: residents at real furniture, seats and beds, cooking, carrying, socials.
   `?only=<labels>` picks stations, `?seats=sofa,toilet` seats a man and a woman on each object,
   `?clip=<name>` plays one clip on everyone, `?clip=<name>&strip=8` shows it held at 8 times on a

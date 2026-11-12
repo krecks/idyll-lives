@@ -61,7 +61,12 @@ delivered to a free spot; with no room for one, they have to wait for the player
 When a baby becomes a child they get out of the crib, beside it. If the home then has fewer bed
 places than people past the crib (also after an adoption), a household the player doesn't play
 buys the cheapest bed at the first free spot, if a week's rent is left after paying; the player's
-household gets a story event instead (`noBed`, once per child).
+household gets a story event instead (`noBed`, once per child). The same when a resident grows
+into a stage their bed isn't for (the race car bed is a child's; bed places count only the beds a
+sleeper's stage may sleep in): the neighbours buy the cheapest bed for that stage and every one
+after it and sell the bed nobody at home may sleep in any more, to make room for it; the player's
+household is told. A generated house is furnished for its children's stages too: a teenager gets
+no race car bed, nor toys only a child may use.
 
 ## School
 

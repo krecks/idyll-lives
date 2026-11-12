@@ -8,9 +8,9 @@
 //! bought, sold or moved, walls built, a game loaded; not a car parking); see
 //! `World::refresh_index`.
 //!
-//! In an open-world town (`travel::Travel::open`) public and off-plot objects aren't copied into
-//! every plot's list: they're kept in `CELL` m cells, and residents look at those within reach
-//! of where they are (`usable_near`, content `autonomy.reach`), still in id order.
+//! Public and off-plot objects aren't copied into every plot's list: they're kept in `CELL` m
+//! cells, and residents look at those within reach of where they are (`usable_near`, content
+//! `autonomy.reach`), still in id order.
 
 use std::borrow::Cow;
 
@@ -26,59 +26,22 @@ pub(crate) struct ObjectIndex {
     /// Per plot, what the people living there may use: their own objects, public places' and
     /// anything off the plots.
     usable: Vec<Vec<u32>>,
-    /// What people with no home may use: public places' and off-plot objects.
-    shared: Vec<u32>,
     /// Seats at tables and the like (`surface::Links`), set by `World::refresh_index`.
     pub links: crate::surface::Links,
     /// The `World::objects_version` it was built for.
     pub version: u32,
-    /// Open-world towns: `shared` by `CELL` m cell (row-major, `cols` a row), each in id order;
+    /// Public and off-plot objects by `CELL` m cell (row-major, `cols` a row), each in id order;
     /// `usable` then holds only each plot's own.
     cells: Vec<Vec<u32>>,
     cols: usize,
-    /// Open-world towns: the ground's depth (m). The storeys above and the basement are stacked
-    /// past it, each as deep: a place there is in the cell of the ground under it (`fold`).
+    /// The ground's depth (m). The storeys above and the basement are stacked past it, each as
+    /// deep: a place there is in the cell of the ground under it (`fold`).
     ground: f32,
-    open: bool,
 }
 
 impl ObjectIndex {
-    pub fn new(object_plot: &[Option<u32>], plots: &[Plot], version: u32) -> Self {
-        let mut index = Self {
-            on: vec![Vec::new(); plots.len()],
-            usable: vec![Vec::new(); plots.len()],
-            shared: Vec::new(),
-            links: Default::default(),
-            version,
-            cells: Vec::new(),
-            cols: 0,
-            ground: 0.0,
-            open: false,
-        };
-        for (id, plot) in object_plot.iter().enumerate() {
-            let id = id as u32;
-            match plot.map(|p| p as usize) {
-                Some(p) if !plots[p].public => {
-                    index.on[p].push(id);
-                    index.usable[p].push(id);
-                }
-                // Public or off the plots: everyone's.
-                p => {
-                    if let Some(p) = p {
-                        index.on[p].push(id);
-                    }
-                    index.shared.push(id);
-                    for usable in &mut index.usable {
-                        usable.push(id);
-                    }
-                }
-            }
-        }
-        index
-    }
-
-    /// For an open-world town: public and off-plot objects by cell (their middles, `centres`, by
-    /// object id), not in every plot's list.
+    /// Public and off-plot objects by cell (their middles, `centres`, by object id), not in every
+    /// plot's list.
     pub fn open(
         object_plot: &[Option<u32>],
         plots: &[Plot],
@@ -89,13 +52,11 @@ impl ObjectIndex {
         let mut index = Self {
             on: vec![Vec::new(); plots.len()],
             usable: vec![Vec::new(); plots.len()],
-            shared: Vec::new(),
             links: Default::default(),
             version,
             cells: Vec::new(),
             cols: (size[0].max(1.0) / CELL).ceil() as usize,
             ground: size[1].max(1.0),
-            open: true,
         };
         let rows = (size[1].max(1.0) / CELL).ceil() as usize;
         index.cells = vec![Vec::new(); index.cols * rows];
@@ -110,7 +71,6 @@ impl ObjectIndex {
                     if let Some(p) = p {
                         index.on[p].push(id);
                     }
-                    index.shared.push(id);
                     let c = centres.get(id as usize).copied().unwrap_or([0.0, 0.0]);
                     let cell = index.cell_of(c, rows);
                     index.cells[cell].push(id);
@@ -136,12 +96,8 @@ impl ObjectIndex {
     }
 
     /// What people living on `home` (or nowhere) may use from `pos`: their own things, and the
-    /// public ones within about `reach` m (the cells it touches; all of them in towns from
-    /// before the open world), in id order.
+    /// public ones within about `reach` m (the cells it touches), in id order.
     pub fn usable_near(&self, home: Option<u32>, pos: [f32; 2], reach: f32) -> Cow<'_, [u32]> {
-        if !self.open {
-            return Cow::Borrowed(self.usable_from(home));
-        }
         let own: &[u32] = home
             .and_then(|p| self.usable.get(p as usize))
             .map_or(&[], Vec::as_slice);
@@ -165,14 +121,6 @@ impl ObjectIndex {
     /// Objects on `plot`.
     pub fn on(&self, plot: u32) -> &[u32] {
         self.on.get(plot as usize).map_or(&[], Vec::as_slice)
-    }
-
-    /// Objects people living on `home` (or nowhere) may use.
-    pub fn usable_from(&self, home: Option<u32>) -> &[u32] {
-        match home.and_then(|p| self.usable.get(p as usize)) {
-            Some(list) => list,
-            None => &self.shared,
-        }
     }
 }
 
@@ -216,18 +164,5 @@ mod tests {
         assert_eq!(&*ix.usable_near(None, [300.0, 330.0], 10.0), [0, 1]);
         assert_eq!(&*ix.usable_near(None, [300.0, 10.0], 10.0), [0, 1]);
         assert!(ix.usable_near(None, [10.0, 330.0], 10.0).is_empty());
-    }
-
-    #[test]
-    fn lists_what_each_household_may_use_in_id_order() {
-        let plots = [plot(0, false), plot(1, true), plot(2, false)];
-        let object_plot = [Some(2), Some(0), None, Some(1), Some(0)];
-        let ix = ObjectIndex::new(&object_plot, &plots, 1);
-        assert_eq!(ix.on(0), [1, 4]);
-        assert_eq!(ix.on(1), [3]);
-        assert_eq!(ix.usable_from(Some(0)), [1, 2, 3, 4]);
-        assert_eq!(ix.usable_from(Some(2)), [0, 2, 3]);
-        assert_eq!(ix.usable_from(None), [2, 3]);
-        assert!(ix.on(7).is_empty());
     }
 }

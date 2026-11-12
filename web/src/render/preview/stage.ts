@@ -53,6 +53,8 @@ export class StageController implements SimStage {
     private readonly studio: Studio,
     host: HTMLElement,
     private readonly release: () => void,
+    /** The resident is drawn with the close-up body: they fill the view here, and the body's outline shows its edges. */
+    private readonly closeUp = true,
   ) {
     const canvas = studio.canvas;
     canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab';
@@ -79,7 +81,7 @@ export class StageController implements SimStage {
   show(look: SimLook): void {
     if (this.detached) return;
     this.look = { gender: look.gender, appearance: JSON.parse(JSON.stringify(look.appearance)), id: look.id };
-    this.studio.setRow(ROW, { look: this.look, x: 0, z: 0, yaw: this.yaw });
+    this.studio.setRow(ROW, { look: this.look, x: 0, z: 0, yaw: this.yaw, closeUp: this.closeUp });
   }
 
   react(reaction: StageReaction): void {
@@ -187,8 +189,8 @@ export class StageController implements SimStage {
     bodyH = Math.max(bodyH, 1.05 / aspect);
     const bodyY = bodyLo - BOTTOM_UI * bodyH + bodyH / 2;
     // Face: chin to crown, centred a little above the middle.
-    const faceH = Math.max(0.56, 0.36 / aspect);
-    const faceY = top - 0.2 - faceH * 0.06;
+    const faceH = Math.max(0.5, 0.32 / aspect);
+    const faceY = top - 0.176 - faceH * 0.06;
     const z = this.zoom * this.zoom * (3 - 2 * this.zoom);
     const h = Math.exp(Math.log(bodyH) + (Math.log(faceH) - Math.log(bodyH)) * z);
     const y = bodyY + (faceY - bodyY) * z;

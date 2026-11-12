@@ -2,7 +2,7 @@
  * The town overview behind the menus (main menu, new-game steps) on PlayCanvas: the whole
  * neighbourhood at once, drawn with the game's own builders so it looks like the game. Every house
  * is a dressed shell (`HouseBuilder.silhouetteMeshes` through `Street`: porches, chimneys, garages,
- * cars, fences, flower beds; the player's house, `WorldMeta.home`, dressed as the game builds it),
+ * cars, fences, flower beds; the player's house, `WorldMeta.home`, dressed as the game draws it: its porch and garage, no chimney),
  * with its models' far versions, plus the road, garden paths and fields and every outdoor object
  * (garden and park trees, benches, flower beds). No interiors, no residents.
  *
@@ -33,7 +33,9 @@ import type { RGB } from '../shared/environment';
 import { Geo, type V3 } from '../shared/geometry';
 import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
 import { placementVariation, standInOf } from '../shared/modelEntry';
-import { roadMeshes, townRoads } from '../shared/roads';
+import { junctionsOf } from '../shared/junctions';
+import { pavedRects } from '../shared/paving';
+import { roadMeshes, SIDEWALK, townRoads } from '../shared/roads';
 import { fieldLayers } from '../shared/street';
 
 /** Height that labels and fits allow for (roofs, chimneys, crowns). */
@@ -290,9 +292,19 @@ export class TownOverview {
   /** Road and garden paths / driveways and fields, one flat mesh each (hidden until the swap). */
   private async buildGround(world: WorldStructure, pace?: () => Promise<void>): Promise<pc.Entity[]> {
     const out: pc.Entity[] = [];
-    const road = meshFrom(this.device, roadMeshes(townRoads(world), null, 0, {}, 'surface').surface.meshData());
+    // (The junctions' pads with the road, their markings in the road paint over it; worn between the kerbs as the
+    // game's street is, `shared/paving.ts`: the same road from near and from afar.)
+    const roads = townRoads(world);
+    const { surface, marks } = roadMeshes(roads, null, 0, { marks: new Geo() }, 'surface', junctionsOf(world, roads), (ri) => roads[ri].width / 2 - SIDEWALK);
+    const road = meshFrom(this.device, surface.meshData({ colors: true }));
     if (road) {
-      const entity = drawMesh(this.root, 'townStreets', road, this.lib.surface('material.road', { doubleSided: true }), { receiveShadows: true, layers: this.layers });
+      const entity = drawMesh(this.root, 'townStreets', road, this.lib.surface('material.road', { doubleSided: true, vertexColors: true }), { receiveShadows: true, layers: this.layers });
+      entity.enabled = false;
+      out.push(entity);
+    }
+    const paint = marks && !marks.empty ? meshFrom(this.device, marks.meshData({ colors: true })) : null;
+    if (paint) {
+      const entity = drawMesh(this.root, 'townMarks', paint, this.lib.roadPaint(), { receiveShadows: true, layers: this.layers });
       entity.enabled = false;
       out.push(entity);
     }
@@ -304,10 +316,13 @@ export class TownOverview {
       if (!rects?.length) continue;
       await pace?.();
       const g = new Geo();
-      for (const r of rects) g.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0]);
-      const mesh = meshFrom(this.device, g.meshData());
+      // (Paving toned as the game's is.)
+      const toned = name === 'townPaths';
+      if (toned) pavedRects(g, rects, rects, y);
+      else for (const r of rects) g.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0]);
+      const mesh = meshFrom(this.device, g.meshData({ colors: toned }));
       if (!mesh) continue;
-      const entity = drawMesh(this.root, name, mesh, this.lib.surface(material, { doubleSided: true }), { receiveShadows: true, layers: this.layers });
+      const entity = drawMesh(this.root, name, mesh, this.lib.surface(material, { doubleSided: true, vertexColors: toned }), { receiveShadows: true, layers: this.layers });
       entity.enabled = false;
       out.push(entity);
     }

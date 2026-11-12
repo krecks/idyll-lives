@@ -56,12 +56,15 @@ pub use error::Error;
 pub use pack::merge_content;
 pub use world::World;
 
-// Two units of time, kept apart:
+// Three units of time, kept apart:
 // - real time, `TICKS_PER_SECOND`: what is seen to move at its own pace whatever the clock does,
-//   such as walking and driving speeds, a car's route position, doors, traffic lights and jams;
+//   such as walking, doors and getting in and out of a car;
+// - drive time, `DRIVE_TICKS_PER_SECOND`: the traffic's own clock, `DRIVE_SCALE` times as fast as
+//   real time: vehicles' speeds (cars, the taxi, bikes and e-scooters), a car's route position,
+//   its look-aheads, claims and jams, and the traffic lights, all in step with each other;
 // - game time, `TICKS_PER_MINUTE`: the clock, needs, schedules and every duration a resident lives
 //   through.
-// `secs` and `mins` turn either into ticks; never count ticks with a bare number.
+// `secs`, `drive_secs` and `mins` turn them into ticks; never count ticks with a bare number.
 
 /// Fixed simulation rate in ticks per real second (at normal speed; 20 before 0.7.0).
 pub const TICKS_PER_SECOND: u32 = 60;
@@ -77,6 +80,26 @@ pub const GAME_MINUTES_PER_SECOND: f32 = TICKS_PER_SECOND as f32 / TICKS_PER_MIN
 pub const fn secs(seconds: f32) -> u64 {
     let t = seconds * TICKS_PER_SECOND as f32;
     if t <= 0.0 { 0 } else { (t + 0.5) as u64 }
+}
+
+/// How many times as fast as real time the traffic's clock runs (drive time): a vehicle's speed of
+/// so many m a second is so many m a second of drive time, `DRIVE_SCALE` times that a real second,
+/// and everything that times how vehicles move and take turns (a route's timing, look-aheads,
+/// claims, jams, the lights) goes by it, so they keep in step. At real speeds against the 48× game
+/// clock a drive across a big world took two game hours; at 4 it takes about half an hour.
+pub const DRIVE_SCALE: f32 = 4.0;
+/// Ticks in a second of drive time (`DRIVE_SCALE`): a car's route is timed in these, each tick of
+/// it a tick of the clock.
+pub const DRIVE_TICKS_PER_SECOND: f32 = TICKS_PER_SECOND as f32 / DRIVE_SCALE;
+
+/// Ticks in `seconds` of drive time (`DRIVE_SCALE`), rounded, at least 0.
+pub const fn drive_secs(seconds: f32) -> u64 {
+    secs(seconds / DRIVE_SCALE)
+}
+
+/// Ticks (not rounded: a place along a car's route, a look along it) in `seconds` of drive time.
+pub const fn drive_ticks(seconds: f32) -> f32 {
+    seconds * DRIVE_TICKS_PER_SECOND
 }
 
 /// Ticks in `minutes` of game time, rounded, at least 0.

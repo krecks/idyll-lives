@@ -283,8 +283,9 @@ export class FaceMixer {
   private readonly pick = new Int32Array(MORPH_PAIRS);
 
   constructor(private readonly set: MorphSet) {
-    this.w = new Float32Array(set.channels.length);
-    this.t = new Float32Array(set.channels.length);
+    // (The expression's channels only: the identity channels after them are the resident's own, `identity.ts`.)
+    this.w = new Float32Array(set.expressions);
+    this.t = new Float32Array(set.expressions);
     const u = {} as Record<Unit, number>;
     for (const name of UNITS) u[name] = set.channel[name] ?? -1;
     this.u = u;
@@ -456,7 +457,7 @@ export class FaceMixer {
   raw(weights: Record<string, number>): void {
     for (const [name, v] of Object.entries(weights)) {
       const c = this.set.channel[name];
-      if (c !== undefined) this.w[c] += v;
+      if (c !== undefined && c < this.w.length) this.w[c] += v;
     }
   }
 

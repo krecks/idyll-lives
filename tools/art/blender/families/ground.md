@@ -39,9 +39,29 @@ group. The keys are unchanged.
   outline through the star's face as dark lines). Its origin is its middle, as the old part's: 1,344 triangles
   where the old part took 1,936 (and its outline as many again).
 
+- **Patches** (`model.flowers.daisies`, `.buttercups`, `.violets`, 2026-11-12): where the lawn's flowers gather on a
+  mown plot (`lawns`, `FLOWER_PATCHES`), by the thousand, so they are light: five or six heads on a disc half a
+  metre across, each the top of a flower only (a fan of petals and a flat eye laid on it, `_head`: under 3
+  triangles a petal), 4 to 9 cm up, at the tips of the blades (the gate's `float`, accepted), with no stem (the
+  blades would hide one; a sliver of a stem drew as a dark mark beside each head from the street) and no leaves.
+  Every face's normal is bent to the sky, as the blades' are: a head is 4 to 7 px from the play camera, and shaded
+  by its own slope half of it drew dark. No shading from the ground (`ground=False`), which had every head, all
+  within 10 cm of it, dark. A first version with `flower`'s closed heads and tube stems (228 triangles a patch of
+  daisies) cost 0.23 ms of GPU a frame on Medium over the village; lighter heads, on the plots only, 0.07 ms and
+  0.09 M triangles (M3 Pro, the orbit by day, medians of 3). Low draws none (`lawnDensity`): every other one, in its
+  far version, was 0.08 ms on WebGL2. The far versions are there for a preset that draws the lawn's far models with
+  its patches.
+- **Petals** (`model.flowers.petals`): fallen under a lot's tree in blossom (`natureDecor`), 340 pale pink rhombi over
+  a disc 5 m across at a tree's scale 1, thickest in the middle, 7 to 10 cm up, each 11 to 15 cm long: larger than
+  life, as the game's flowers are (90 of 7 to 10 cm did not show from the play camera). One or two a lot.
+
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|
 | flowers | 0.14 × 0.27 × 0.17 | 266 (was 156) | 64 (was 58) | 1 |
+| daisies | 0.58 × 0.03 × 0.47 | 114 | 36 | 1 |
+| buttercups | 0.58 × 0.05 × 0.44 | 65 | 25 | 1 |
+| violets | 0.46 × 0.04 × 0.38 | 78 | 30 | 1 |
+| petals | 4.95 × 0.06 × 4.95 | 680 | 170 | 1 |
 | rock | 1.13 × 0.55 × 0.83 | 1,654 (was 492) | 56 (unchanged) | 1 |
 | marker | 0.23 × 0.34 × 0.06 | 1,344 | — | 1 |
 

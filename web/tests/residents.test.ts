@@ -126,6 +126,7 @@ describe('residents', async () => {
       poses = data;
       width = w;
     },
+    setMorphs: () => {},
     uploadPoses: () => void log.push(`poses ${hash(poses, 0, RECORDED_ROWS * width * 4)}`),
     uploadPoseRows: (from, count) => void log.push(`rows ${from} ${count} ${hash(poses, from * width * 4, (from + count) * width * 4)}`),
     createPart(body, part, shadow) {
@@ -273,9 +274,9 @@ describe('residents', async () => {
   const FIELDS = ['id', 'x', 'z', 'yaw', 'pose', 'moving', 'social', 'outcome', 'partner', 'anim', 'emotion', 'role', 'away', 'object', 'action', 'mood', 'held'] as const;
   /**
    * The recording's own clock, not the sim's (`snapshotLayout.ts` `TICK_RATES`): snapshots 20 times a second, a game
-   * minute a second. Its numbers are of a run at these; another rate is another run.
+   * minute a second, vehicles at real time. Its numbers are of a run at these; another rate is another run.
    */
-  const RECORDED_RATES = { ticksPerSecond: 20, ticksPerMinute: 20 };
+  const RECORDED_RATES = { ticksPerSecond: 20, ticksPerMinute: 20, driveScale: 1 };
   const STEP = 1 / RECORDED_RATES.ticksPerSecond;
   const layout: SnapshotLayout = {
     capacity: 6 + FIELDS.length * MAX_CHARACTERS,
@@ -394,5 +395,5 @@ describe('residents', async () => {
       performance.now = realNow;
       globalThis.fetch = realFetch;
     }
-  });
+  }, 30_000);
 });

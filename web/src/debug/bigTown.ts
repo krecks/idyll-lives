@@ -1,6 +1,6 @@
 /**
  * The benchmark's real big world (`?bench=bigworld`, `&big=<kind>`): a Big town of that world kind
- * made in the page as the Create World screen makes one (`generateWorld` with size 'big', then
+ * made in the page as the Create World screen makes one (`generateWorld`, then
  * `populate`), turned into the structure the renderer draws as the menus' preview does
  * (`previewWorld`). The simulation can't hold one yet (towns over 256 m), so the game plays the
  * bench scene's village while the renderer draws this; nothing of it goes in git.
@@ -22,7 +22,7 @@ export async function benchBigWorld(content: Content, assets: AssetRegistry, kin
   return perfTimeAsync('bench: big world', async () => {
     const t = await loadTemplates();
     const k = WORLD_KINDS.find((w) => w === kind) ?? 'small';
-    const draft = populate(content, assets, t, generateWorld(content, t, k, 7, undefined, 'big'));
+    const draft = populate(content, assets, t, generateWorld(content, t, k, 7));
     return previewWorld(content, t, draft);
   });
 }

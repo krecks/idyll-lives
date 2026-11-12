@@ -72,23 +72,25 @@ export class Geo {
     return this;
   }
 
-  private vertex(p: V3, n: V3, u: number, v: number, alpha = this.a): number {
+  private vertex(p: V3, n: V3, u: number, v: number, alpha = this.a, tint?: V3): number {
     this.pos.push(p[0], p[1], p[2]);
     this.nor.push(n[0], n[1], n[2]);
     this.uv.push(u, v);
-    this.col.push(this.r, this.g, this.b, alpha);
+    if (tint) this.col.push(this.r * tint[0], this.g * tint[1], this.b * tint[2], alpha);
+    else this.col.push(this.r, this.g, this.b, alpha);
     this.cut.push(this.maskA, this.kind, this.maskB, 0);
     return this.pos.length / 3 - 1;
   }
 
   /**
    * Convex polygon (3 or 4 points, any order around the perimeter) facing `n`, with explicit
-   * UVs or planar UVs projected along the dominant normal axis. `alphas` sets per-vertex alpha.
+   * UVs or planar UVs projected along the dominant normal axis. `alphas` sets per-vertex alpha;
+   * `tints` multiplies the colour per vertex (sRGB, as the colour is: a floor's tone over a room).
    */
-  poly(points: readonly V3[], n: V3, uvs?: readonly (readonly [number, number])[], alphas?: readonly number[]): this {
+  poly(points: readonly V3[], n: V3, uvs?: readonly (readonly [number, number])[], alphas?: readonly number[], tints?: readonly V3[]): this {
     const ids = points.map((p, i) => {
       const [u, v] = uvs?.[i] ?? planarUV(p, n);
-      return this.vertex(p, n, u, v, alphas?.[i] ?? this.a);
+      return this.vertex(p, n, u, v, alphas?.[i] ?? this.a, tints?.[i]);
     });
     for (let i = 1; i + 1 < ids.length; i++) this.tri(ids[0], ids[i], ids[i + 1], n);
     return this;

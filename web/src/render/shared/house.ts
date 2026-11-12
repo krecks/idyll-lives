@@ -14,6 +14,8 @@
  * the half they are on. Where diagonals meet other walls, the corner post is a mitred outline
  * (`slanted.ts`). Houses with diagonal sides get a hip roof following their outline when it is
  * convex; otherwise the usual rectangles cover the split tiles whole (a deeper eave there).
+ * Where the storey above leaves an L, a U or a ring of roof and no diagonal wall is in view, it is
+ * roofed as one area (hips, ridges and valleys meeting) rather than a rectangle at a time.
  * Every wall vertex carries cutaway data (`geometry.ts`); the vertex shader lowers walls
  * between the camera and the rooms behind them, so the cutaway costs no CPU.
  *
@@ -36,6 +38,8 @@ import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalW
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
 import { roadIndex, townRoads } from './roads';
+import { tuned } from '../tune';
+import { smoothstep, valueNoise } from '../../game/noise';
 import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
 import { WALL_HALF, WALL_HEIGHT } from './walls';
 
@@ -201,6 +205,59 @@ const ACCENT = ['#3E5A4A', '#2F4058', '#7A3B34', '#4A4A4A', '#5B6E86', '#6E5A3E'
 const LOUD = ['#E8457A', '#F2B51D', '#3FA7D6', '#7BC950', '#9B5DE5', '#FF7A3D'];
 const ROOF = ['#5C626A', '#6B4A3A', '#8C4E3C', '#4F5A4C', '#3E4148', '#7A6A5A'];
 const TRIM = '#F7F5F0';
+/**
+ * How the house is toned (`?tune=house.…` on the dev server). `cap`: the top of a wall, which is what a
+ * cut wall shows of itself from the play camera: the wall's own section, a mid tone, where the trim's
+ * off-white made every room's outline the brightest thing in the picture.
+ */
+export const HOUSE_LOOK = tuned('house', {
+  cap: '#8D877E',
+  /**
+   * A floor's tone over its room, by vertex (no texture, no read): `floorWall` darker at the foot of a wall
+   * (of the light it reflects), fading over `floorReach` m; `floorMid` the tone out in the room; lighter again,
+   * up to the covering's own colour, by `floorWear` within `floorWearReach` m of a door, where feet wear it
+   * pale; `floorVary` lighter and darker in patches a few metres across; and `floorWarm` warmer the darker it is.
+   */
+  floorWall: 0.34,
+  floorReach: 1.6,
+  floorMid: 0.95,
+  floorWear: 1,
+  floorWearReach: 1.7,
+  floorVary: 0.07,
+  floorWarm: 0.2,
+  /**
+   * A wall face's tone, by vertex: `wallFoot` darker at the floor, fading over `wallFootReach` m up it;
+   * `wallCorner` darker into a room's corner, over `wallCornerReach` m along it; `wallVary` in patches.
+   */
+  wallFoot: 0.24,
+  wallFootReach: 1.3,
+  wallCorner: 0.28,
+  wallCornerReach: 0.9,
+  wallVary: 0.06,
+  /**
+   * The cap shingles of a roof's ridge and hips against its slopes (the colour's multiplier, sRGB). A little
+   * darker only: they stand proud of the slopes, which shades them by day. A fifth darker (0.8), by night and
+   * at dusk, when the slopes either side are one tone, a hip's cap was a hard dark stripe across the roof.
+   */
+  roofCap: 0.95,
+});
+
+/**
+ * A tone (a share of the light reflected, linear) as the vertex colour's multiplier (sRGB). `warm`: the
+ * darker it is the warmer (`HOUSE_LOOK.floorWarm`), as a floor's shade at a wall is lit by the floor beside it.
+ */
+function toneTint(lin: number, warm = 0): V3 {
+  const l = Math.min(1, Math.max(0, lin));
+  const v = (k: number) => Math.pow(l, k / 2.2);
+  return [v(1 - warm), v(1), v(1 + warm * 1.3)];
+}
+
+/** The distance from `(px, pz)` to the segment `a`..`b`. */
+function segmentDistance(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+  const [dx, dz] = [bx - ax, bz - az];
+  const t = Math.min(1, Math.max(0, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz || 1)));
+  return Math.hypot(px - ax - dx * t, pz - az - dz * t);
+}
 const ROOM_WALLS: Record<RoomKind, string[]> = {
   living: ['#EFE3D3', '#E6DECF', '#EAE2D8', '#DCE3E6'],
   bedroom: ['#D8E2D0', '#DCD6E6', '#E6D4C8', '#D2DDE8'],
@@ -397,12 +454,15 @@ export interface SilhouetteSpec {
   z0: number;
   x1: number;
   z1: number;
-  /** Origin of the house's lot: its look (siding, roof, accent) is chosen from it, as for the game's house. */
+  /** Origin of the house's lot: its look (siding, roof, accent) is chosen from it, as for the game's house (every storey of it). */
   lot: { x: number; z: number };
-  /** The player's house, dressed as the game builds it (no porch or chimney; its garage). */
+  /** The player's house in the menus' town, dressed as the game draws it (its porch and garage; no chimney). */
   home?: boolean;
-  /** Only its garage: the game draws the house itself (the viewed lot's). */
-  garageOnly?: boolean;
+  /**
+   * Only what the game doesn't draw of it (the viewed lot's): its garage and its porch, the porch
+   * going with its wall in the cutaway (`porchDoors`); the game draws the house itself.
+   */
+  dressingOnly?: boolean;
   /** The street side: the outward normal (x, z) of the wall that faces the street ([0, 1]: the wall at z1, [-1, 0]: the wall at x0...). */
   front: [number, number];
   /** Centre of the front door along the front wall (x, or z on a wall along z), where the garden path meets the house, if known. */
@@ -422,8 +482,46 @@ export interface SilhouettePlan {
   parts: HousePart[];
   /** The window glass of each lived-in house (not in `parts`): drawn lit or dark (`neighbourPanes`). */
   homes: { spec: SilhouetteSpec; panes: Geo }[];
-  /** Porch and garage lamps: x, y, z and the wall's outward normal (nx, nz). */
-  lamps: [number, number, number, number, number][];
+  /**
+   * Porch and garage lamps: x, y, z and the wall's outward normal (nx, nz); a lamp on the viewed
+   * lot's porch also the cutaway's look bits (`LOOK`) that drop its wall, to hide it with it.
+   */
+  lamps: [number, number, number, number, number, number?][];
+}
+
+/** A front door a silhouette's porch stands over (`porchDoors`): its wall's axis, the wall's outer face, its outward normal and the door's middle along it. */
+export interface PorchDoor {
+  axis: 'h' | 'v';
+  plane: number;
+  n: V3;
+  mid: number;
+}
+
+/**
+ * Where a house's porches stand: over each door on its ground storey in the front wall of its box
+ * (`SilhouetteSpec.front`) that the garden path meets (`door`, its middle within 0.6 m). The same
+ * for a neighbour's silhouette and the viewed lot's house (`dressingOnly`): a door moved off the
+ * path, out of the front wall or taken out has none. `layout`: as for `silhouettes`.
+ */
+export function porchDoors(b: SilhouetteSpec, openings: readonly Opening[], layout: StoreyLayout | null = null): PorchDoor[] {
+  const out: PorchDoor[] = [];
+  if (b.door === null) return out;
+  const [fx, fz] = b.front;
+  const axis = fz ? 'h' : 'v';
+  const line = fz ? (fz > 0 ? b.z1 : b.z0) : fx > 0 ? b.x1 : b.x0;
+  const [a0, a1] = fz ? [b.x0, b.x1] : [b.z0, b.z1];
+  for (const o of openings) {
+    if (o.kind !== 'door' || o.axis !== axis || (layout && storeyOfRow(layout, o.z) !== 0)) continue;
+    const [at, a] = axis === 'h' ? [o.z, o.x] : [o.x, o.z];
+    if (at !== line || a < a0 || a >= a1 || Math.abs(a + 0.5 - b.door) >= 0.6) continue;
+    out.push({ axis, plane: line + (fz || fx) * T, n: [fx, 0, fz], mid: a + 0.5 });
+  }
+  return out;
+}
+
+/** The cutaway's look bits (`LOOK`) that drop a wall facing `n` outwards: the camera looking at it from outside. */
+function lookAt(n: V3): number {
+  return n[0] > 0 ? LOOK.NegX : n[0] < 0 ? LOOK.PosX : n[2] > 0 ? LOOK.NegZ : LOOK.PosZ;
 }
 
 /** Wall edges of the lot: `h` edges run along x at a grid line z, `v` edges along z. */
@@ -504,6 +602,11 @@ export interface HouseScheme {
   shutters: boolean;
   seedX: number;
   seedZ: number;
+}
+
+/** The origin of the lot a storey's view (`HousePlanner.build`'s, on that storey's rows) is of: on the ground's rows. */
+export function lotOrigin(world: StoreyLayout, view: { x: number; z: number }): { x: number; z: number } {
+  return { x: view.x, z: view.z - storeyRow(world, storeyOfRow(world, view.z)) };
 }
 
 export function houseScheme(x: number, z: number): HouseScheme {
@@ -712,8 +815,12 @@ export class HousePlanner {
         }
       }
     }
-    const viewed = view ? world.plots?.find((p) => p.x === view.x && p.z === view.z) : undefined;
-    const scheme = this.schemeWith(houseScheme(view?.x ?? 0, view?.z ?? 0), viewed?.roof);
+    // The lot's look (and the roof the player chose for it) on every storey: a storey's view lies on
+    // its own rows (`storeyRow`), so it is taken from the lot's origin on the ground's, as the
+    // street's silhouette of this house takes it (`silhouettes`, `farHouse`).
+    const lot = view && lotOrigin(world, view);
+    const viewed = lot ? world.plots?.find((p) => p.x === lot.x && p.z === lot.z) : undefined;
+    const scheme = this.schemeWith(houseScheme(lot?.x ?? 0, lot?.z ?? 0), viewed?.roof);
     // Open-plan rooms that mix kinds get the living-room look (wood floor).
     const kindOf = (r: number): RoomKind => {
       const defs = roomDefs.get(r);
@@ -818,12 +925,46 @@ export class HousePlanner {
     };
 
     /**
+     * An indoor wall face's tone at height `y`, `corner` m along it from the room's nearest corner, at
+     * `(wx, wz)`: darker at the floor and into a corner, as less light reaches it there, and a little
+     * lighter and darker in patches, so a wall isn't one flat tone from end to end (`HOUSE_LOOK`).
+     */
+    const wallTone = (y: number, corner: number, wx: number, wz: number): V3 => {
+      const L = HOUSE_LOOK;
+      const foot = 1 - smoothstep(0, L.wallFootReach, y);
+      const into = 1 - smoothstep(0, L.wallCornerReach, corner);
+      const vary = (valueNoise(wx / 2.3 + y / 1.9, wz / 2.3 - y / 1.9, 613) - 0.5) * 2 * L.wallVary;
+      return toneTint((1 - L.wallFoot * foot) * (1 - L.wallCorner * into) * (1 - L.wallVary + vary));
+    };
+    /**
+     * A wall face `a0`..`a1` along, `y0`..`y1` high, toned by `tone` at its vertices: in rows up the wall
+     * (and two columns where a corner is near), so the tone runs smoothly over it.
+     */
+    const tonedFace = (g: Geo, P: (a: number, y: number) => V3, a0: number, a1: number, y0: number, y1: number, n: V3, tone: (a: number, y: number) => V3, split: boolean, uv?: (p: V3) => [number, number]) => {
+      const ys = [y0, ...[WALL_STUB, 0.8, 1.4].filter((y) => y > y0 + 0.01 && y < y1 - 0.01), y1];
+      const as = split && a1 - a0 > 0.3 ? [a0, (a0 + a1) / 2, a1] : [a0, a1];
+      for (let j = 0; j + 1 < ys.length; j++) {
+        for (let i = 0; i + 1 < as.length; i++) {
+          const c: [number, number][] = [[as[i], ys[j]], [as[i + 1], ys[j]], [as[i + 1], ys[j + 1]], [as[i], ys[j + 1]]];
+          const pts = c.map(([a, y]) => P(a, y));
+          g.poly(pts, n, uv && pts.map(uv), undefined, c.map(([a, y]) => tone(a, y)));
+        }
+      }
+    };
+
+    /**
      * One wall face (a rectangle on the plane of a wall side) from `a0` to `a1` along the
      * wall, `y0` to `y1` high. `n` is the outward normal; `r` the room that face looks into;
      * `key` names it in `surfaces`.
      */
     const face = (axis: 'h' | 'v', plane: number, a0: number, a1: number, y0: number, y1: number, n: V3, r: number, cover = 0, key?: string) => {
       const P = (a: number, y: number): V3 => (axis === 'h' ? [a, y, plane] : [plane, y, a]);
+      // The room's corners along this face: the nodes either end of its tile where a wall meets it on the room's side.
+      const k0 = Math.floor((a0 + a1) / 2 + 1e-6);
+      const meets = (k: number) => (axis === 'h' ? edges.get('v', k, Math.round(n[2] < 0 ? plane + T - 1 : plane - T)) : edges.get('h', Math.round(n[0] < 0 ? plane + T - 1 : plane - T), k)) !== undefined;
+      const corners = [k0, k0 + 1].filter(meets);
+      const tone = (a: number, y: number) => wallTone(y, corners.length ? Math.min(...corners.map((k) => Math.abs(a - k))) : 9, axis === 'h' ? a : plane, axis === 'h' ? plane : a);
+      const wall = (g: Geo, ya: number, yb: number) => tonedFace(g, P, a0, a1, ya, yb, n, tone, corners.length > 0);
       const own = coverGeo(cover);
       const mark = (y0: number, y1: number) => {
         const S = (a: number, y: number): V3 => (axis === 'h' ? [a, y, plane + n[2] * PROUD] : [plane + n[0] * PROUD, y, a]);
@@ -848,27 +989,39 @@ export class HousePlanner {
         if (y1 >= H - 0.01) {
           const k = trim.kind;
           trim.kind = Cut.Hide;
-          trim.box(...span(axis, plane, n, a0, a1, H - 0.2, H, 0.025));
+          // (No higher than the face: a post's face towards a wall it joins stops a hair under that wall's top, and
+          // its frieze, at the wall's full height, lay in the top's own plane and showed through it as light ticks.)
+          trim.box(...span(axis, plane, n, a0, a1, H - 0.2, Math.min(H, y1), 0.025));
           trim.kind = k;
         }
         if (y0 < 0.01) ao.poly([Q(a0, 0.012, 0), Q(a1, 0.012, 0), Q(a1, 0.012, 0.45), Q(a0, 0.012, 0.45)], [0, 1, 0], undefined, [0.32, 0.32, 0, 0]);
         return;
       }
       mark(y0, y1);
-      if (own) own.poly([P(a0, y0), P(a1, y0), P(a1, y1), P(a0, y1)], n);
+      if (own) wall(own, y0, y1);
       else {
         const tint = roomWall(r);
         const bath = kinds.get(r) === 'bath';
         // Bathrooms are tiled up to 1.25 m (only the part of this face below that).
         const split = bath ? Math.min(Math.max(1.25, y0), y1) : y0;
-        if (split > y0) wainscot.color('#F4F4F2').poly([P(a0, y0), P(a1, y0), P(a1, split), P(a0, split)], n);
-        if (y1 > split) int.color(tint).poly([P(a0, split), P(a1, split), P(a1, y1), P(a0, y1)], n);
+        if (split > y0) wall(wainscot.color('#F4F4F2'), y0, split);
+        if (y1 > split) wall(int.color(tint), split, y1);
       }
       if (y0 < 0.01) {
         trim.box(...span(axis, plane, n, a0, a1, 0, 0.1, 0.014));
         const Q = (a: number, d: number): V3 => (axis === 'h' ? [a, 0.013, plane + n[2] * d] : [plane + n[0] * d, 0.013, a]);
         ao.poly([Q(a0, 0.014), Q(a1, 0.014), Q(a1, 0.34), Q(a0, 0.34)], [0, 1, 0], undefined, [0.3, 0.3, 0, 0]);
       }
+    };
+
+    /**
+     * A wall's top, drawn by `draw` in the cut wall's tone (`HOUSE_LOOK.cap`). A half wall's is a ledge,
+     * finished as the trim is.
+     */
+    const capped = (y: number, draw: () => void) => {
+      if (Math.abs(y - HALF_WALL_HEIGHT) > 0.01) trim.color(HOUSE_LOOK.cap);
+      draw();
+      trim.color(TRIM);
     };
 
     /**
@@ -884,11 +1037,11 @@ export class HousePlanner {
       if (axis === 'h') {
         face('h', z - T, a0, a1, y0, y1, [0, 0, -1], roomP(x + 0.5, z - 0.25), c0, `h:${x}:${z}:0`);
         face('h', z + T, a0, a1, y0, y1, [0, 0, 1], roomP(x + 0.5, z + 0.25), c1, `h:${x}:${z}:1`);
-        if (cap) trim.box(a0, y1 - 0.001, z - T, a1, y1, z + T, 'ny nx px nz pz');
+        if (cap) capped(y1, () => trim.box(a0, y1 - 0.001, z - T, a1, y1, z + T, 'ny nx px nz pz'));
       } else {
         face('v', x - T, a0, a1, y0, y1, [-1, 0, 0], roomP(x - 0.25, z + 0.5), c0, `v:${x}:${z}:0`);
         face('v', x + T, a0, a1, y0, y1, [1, 0, 0], roomP(x + 0.25, z + 0.5), c1, `v:${x}:${z}:1`);
-        if (cap) trim.box(x - T, y1 - 0.001, a0, x + T, y1, a1, 'ny nx px nz pz');
+        if (cap) capped(y1, () => trim.box(x - T, y1 - 0.001, a0, x + T, y1, a1, 'ny nx px nz pz'));
       }
     };
 
@@ -914,7 +1067,8 @@ export class HousePlanner {
       if (first) trim.poly([P(g0, sill, -T), P(g0, sill, T), P(g0, head, T), P(g0, head, -T)], na);
       if (last) trim.poly([P(g1, sill, -T), P(g1, head, -T), P(g1, head, T), P(g1, sill, T)], [-na[0], 0, -na[2]]);
       trim.poly([P(g0, head, -T), P(g0, head, T), P(g1, head, T), P(g1, head, -T)], [0, -1, 0]);
-      trim.poly([P(g0, sill, -T), P(g1, sill, -T), P(g1, sill, T), P(g0, sill, T)], [0, 1, 0]);
+      // (A hair over the wall's top below it, which is in the cut wall's tone: gone with the window when the wall is cut.)
+      trim.poly([P(g0, sill + 0.002, -T), P(g1, sill + 0.002, -T), P(g1, sill + 0.002, T), P(g0, sill + 0.002, T)], [0, 1, 0]);
     };
 
     /**
@@ -1023,7 +1177,14 @@ export class HousePlanner {
           const ahead = (into: number) => !!(axis === 'h' ? edges.get('h', x, z + into) : edges.get('v', x + into, z));
           // What a leaf swinging to the side `into` keeps clear of (none: no diagonal in front).
           const slant = (into: number) => obstaclesAt(...tileInFront(axis, x, z, into));
-          const geos = { wood: doorWood, glass, swing, ahead, slant, pocket: (end: -1 | 1) => pocket(axis, x, z, run, end), flip: flipped(axis, x, z, run) };
+          // A wall or a window's wall standing on the door's end node, on the side `side` of the door's wall.
+          const meets = (end: 0 | 1, side: -1 | 1): boolean => {
+            const [cx, cz] = axis === 'h' ? [x + end, side < 0 ? z - 1 : z] : [side < 0 ? x - 1 : x, z + end];
+            const cross = axis === 'h' ? 'v' : 'h';
+            const kind = edges.get(cross, cx, cz);
+            return (kind === 'wall' || kind === 'window') && heightOf(cross, cx, cz) > HALF_WALL_HEIGHT;
+          };
+          const geos = { wood: doorWood, glass, swing, ahead, slant, pocket: (end: -1 | 1) => pocket(axis, x, z, run, end), flip: flipped(axis, x, z, run), meets };
           this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, geos, lookOf(axis, x, z).style, head, run);
         }
       }
@@ -1051,7 +1212,7 @@ export class HousePlanner {
         for (const g of wallGeos) g.cutting(Cut.Clamp, maskH, maskV);
         // As tall as the tallest wall it joins (a run of half walls has half posts).
         const top = Math.max(heightOf('h', x - 1, z), heightOf('h', x, z), heightOf('v', x, z - 1), heightOf('v', x, z));
-        trim.box(x - T, top - 0.001, z - T, x + T, top, z + T, 'ny nx px nz pz');
+        capped(top, () => trim.box(x - T, top - 0.001, z - T, x + T, top, z + T, 'ny nx px nz pz'));
         // Faces towards a door are jambs. Faces towards a wall sit inside it while it stands and
         // close its end when that wall is cut but the post is not.
         // `ra`, `rb`: the rooms of the two quadrants on that side of the corner.
@@ -1145,13 +1306,16 @@ export class HousePlanner {
         return;
       }
       mark(y0, y1);
-      if (own) f.face(own, a0, a1, y0, y1, dOff, sign);
+      // (Toned as a straight wall's face is, but for the corners.)
+      const wall = (g: Geo, ya: number, yb: number) =>
+        tonedFace(g, (a, y) => f.at(a, y, dOff), a0, a1, ya, yb, f.normal(sign), (a, y) => wallTone(y, 9, f.at(a, 0, dOff)[0], f.at(a, 0, dOff)[2]), false, (p) => [f.u(p), p[1]]);
+      if (own) wall(own, y0, y1);
       else {
         const tint = roomWall(r);
         const bath = kinds.get(r) === 'bath';
         const split = bath ? Math.min(Math.max(1.25, y0), y1) : y0;
-        if (split > y0) f.face(wainscot.color('#F4F4F2'), a0, a1, y0, split, dOff, sign);
-        if (y1 > split) f.face(int.color(tint), a0, a1, split, y1, dOff, sign);
+        if (split > y0) wall(wainscot.color('#F4F4F2'), y0, split);
+        if (y1 > split) wall(int.color(tint), split, y1);
       }
       if (y0 < 0.01) {
         f.box(trim, a0, a1, 0, 0.1, ...out(0.014), sign > 0 ? 'nd' : 'pd');
@@ -1164,7 +1328,7 @@ export class HousePlanner {
       for (const g of wallGeos) g.cutting(kind, mask);
       faceG(f, a0, a1, y0, y1, -T, -1, d.rooms[0], d.faces?.[0], `${d.axis}:${d.x}:${d.z}:0`);
       faceG(f, a0, a1, y0, y1, T, 1, d.rooms[1], d.faces?.[1], `${d.axis}:${d.x}:${d.z}:1`);
-      if (cap) trim.poly([f.at(a0, y1, -T), f.at(a1, y1, -T), f.at(a1, y1, T), f.at(a0, y1, T)], [0, 1, 0]);
+      if (cap) capped(y1, () => trim.poly([f.at(a0, y1, -T), f.at(a1, y1, -T), f.at(a1, y1, T), f.at(a0, y1, T)], [0, 1, 0]));
     };
     /** Whether a diagonal run continues as a plain wall past one end (room for a shutter). */
     const plainDiagEnd = (d: DiagonalWall, end: 0 | 1) => {
@@ -1195,6 +1359,7 @@ export class HousePlanner {
         trim.poly([f.at(g0, sill, -T), f.at(g0, sill, T), f.at(g0, head, T), f.at(g0, head, -T)], [f.ux, 0, f.uz]);
         trim.poly([f.at(g1, sill, -T), f.at(g1, head, -T), f.at(g1, head, T), f.at(g1, sill, T)], [-f.ux, 0, -f.uz]);
         trim.poly([f.at(g0, head, -T), f.at(g0, head, T), f.at(g1, head, T), f.at(g1, head, -T)], [0, -1, 0]);
+        trim.poly([f.at(g0, sill + 0.002, -T), f.at(g1, sill + 0.002, -T), f.at(g1, sill + 0.002, T), f.at(g0, sill + 0.002, T)], [0, 1, 0]);
         // Glazing bars between the panes, then per face: a pane, frame, sill and (outside) shutters.
         const recess = 0.03;
         trim.cutting(Cut.Hide, mask).color(TRIM);
@@ -1234,8 +1399,14 @@ export class HousePlanner {
           const plane = sign * T;
           const out = (o: number): [number, number] => (sign > 0 ? [plane, plane + o] : [plane - o, plane]);
           trim.cutting(Cut.Clamp, mask);
-          f.box(trim, o0 - 0.1, o0 + 0.01, 0, DOOR_HEIGHT + 0.1, ...out(0.022));
-          f.box(trim, o1 - 0.01, o1 + 0.1, 0, DOOR_HEIGHT + 0.1, ...out(0.022));
+          // (Their tops, which only a cut shows, in the cut wall's tone: `cutBoard`.)
+          for (const [b0, b1] of [[o0 - 0.1, o0 + 0.01], [o1 - 0.01, o1 + 0.1]]) {
+            const [d0, d1] = out(0.022);
+            const y1 = DOOR_HEIGHT + 0.1;
+            f.box(trim, b0, b1, 0, y1, d0, d1, 'py');
+            trim.color(HOUSE_LOOK.cap).poly([f.at(b0, y1, d0), f.at(b1, y1, d0), f.at(b1, y1, d1), f.at(b0, y1, d1)], [0, 1, 0]);
+            trim.color(TRIM);
+          }
           trim.cutting(Cut.Hide, mask);
           f.box(trim, o0 - 0.1, o1 + 0.1, DOOR_HEIGHT, DOOR_HEIGHT + 0.12, ...out(0.024));
         }
@@ -1312,7 +1483,7 @@ export class HousePlanner {
         for (let k = 0; k < outline.length; k++) {
           const p0 = outline[k];
           const p1 = outline[(k + 1) % outline.length];
-          trim.poly([[x, top, z], [p0[0], top, p0[1]], [p1[0], top, p1[1]]], [0, 1, 0]);
+          capped(top, () => trim.poly([[x, top, z], [p0[0], top, p0[1]], [p1[0], top, p1[1]]], [0, 1, 0]));
           // Frames run along +x (or +z) so textures line up with the walls they continue.
           const flip = p1[0] < p0[0] - 1e-9 || (Math.abs(p1[0] - p0[0]) <= 1e-9 && p1[1] < p0[1]);
           const f = flip ? new WallFrame(p1[0], p1[1], p0[0], p0[1]) : new WallFrame(p0[0], p0[1], p1[0], p1[1]);
@@ -1351,6 +1522,42 @@ export class HousePlanner {
     const laid = new Map<number, number>();
     for (const [x, z, c] of world.floors ?? []) laid.set(z * W + x, c);
     const FINISH = { wood, whitewash, tile, carpet, stone: stoneFloor };
+    /**
+     * A floor's tone at a point (`HOUSE_LOOK`): darker at the foot of the walls, where less light reaches
+     * it and nobody walks, lighter out in the room, palest in and before a doorway, where feet wear it, and
+     * a little lighter and darker in patches a few metres across. (Kept per point: tiles share corners.)
+     */
+    const floorTones = new Map<number, V3>();
+    const floorTone = (px: number, pz: number): V3 => {
+      const key = Math.round(pz * 2) * (W * 2 + 3) + Math.round(px * 2);
+      let tone = floorTones.get(key);
+      if (tone) return tone;
+      const L = HOUSE_LOOK;
+      let [wall, door] = [9, 9];
+      const [tx, tz] = [Math.floor(px), Math.floor(pz)];
+      for (let ez = tz - 2; ez <= tz + 3; ez++) {
+        for (let ex = tx - 2; ex <= tx + 3; ex++) {
+          const [h, v, dg] = [edges.get('h', ex, ez), edges.get('v', ex, ez), diagonal(ex, ez)];
+          if (h === 'door') door = Math.min(door, segmentDistance(px, pz, ex + 0.2, ez, ex + 0.8, ez));
+          else if (h) wall = Math.min(wall, segmentDistance(px, pz, ex, ez, ex + 1, ez));
+          if (v === 'door') door = Math.min(door, segmentDistance(px, pz, ex, ez + 0.2, ex, ez + 0.8));
+          else if (v) wall = Math.min(wall, segmentDistance(px, pz, ex, ez, ex, ez + 1));
+          if (dg) {
+            const [a, b] = diagonalEnds(dg.axis, dg.x, dg.z);
+            const far = segmentDistance(px, pz, a[0], a[1], b[0], b[1]);
+            if (dg.kind === 'door') door = Math.min(door, far);
+            else wall = Math.min(wall, far);
+          }
+        }
+      }
+      const worn = (1 - smoothstep(0.2, L.floorWearReach, door)) * L.floorWear;
+      const foot = (1 - smoothstep(0, L.floorReach, wall)) * (1 - worn);
+      const vary = (valueNoise(px / 2.6, pz / 2.6, 577) - 0.5) * 2 * L.floorVary;
+      const mid = L.floorMid + (1 - L.floorMid) * worn;
+      tone = toneTint(mid * (1 - L.floorWall * foot) * (1 + vary * (1 - worn)), L.floorWarm);
+      floorTones.set(key, tone);
+      return tone;
+    };
     for (let z = bounds.z; z < bounds.z + bounds.d; z++) {
       for (let x = bounds.x; x < bounds.x + bounds.w; x++) {
         const r = room(x, z);
@@ -1367,10 +1574,8 @@ export class HousePlanner {
           // A triangle per indoor half of a split tile.
           for (const h of [0, 1] as const) {
             if (d.rooms[h] === 0) continue;
-            floorOf(d.rooms[h]).poly(
-              halfTriangle(d.axis, h).map(([fx, fz]) => [x + fx, 0.01, z + fz] as V3),
-              [0, 1, 0],
-            );
+            const tri = halfTriangle(d.axis, h).map(([fx, fz]) => [x + fx, 0.01, z + fz] as V3);
+            floorOf(d.rooms[h]).poly(tri, [0, 1, 0], undefined, undefined, tri.map((p) => floorTone(p[0], p[2])));
             surface(surfaces.floors, `${x}:${z}`).poly(
               halfTriangle(d.axis, h).map(([fx, fz]) => [x + fx, 0.01 + PROUD, z + fz] as V3),
               [0, 1, 0],
@@ -1378,7 +1583,12 @@ export class HousePlanner {
           }
           continue;
         }
-        floorOf(r).poly([[x, 0.01, z], [x + 1, 0.01, z], [x + 1, 0.01, z + 1], [x, 0.01, z + 1]], [0, 1, 0]);
+        // Four quads a tile, so the tone runs smoothly from the walls out into the room.
+        const g = floorOf(r);
+        for (const [hx, hz] of [[0, 0], [0.5, 0], [0, 0.5], [0.5, 0.5]]) {
+          const q: V3[] = [[x + hx, 0.01, z + hz], [x + hx + 0.5, 0.01, z + hz], [x + hx + 0.5, 0.01, z + hz + 0.5], [x + hx, 0.01, z + hz + 0.5]];
+          g.poly(q, [0, 1, 0], undefined, undefined, q.map((p) => floorTone(p[0], p[2])));
+        }
         const y = 0.01 + PROUD;
         surface(surfaces.floors, `${x}:${z}`).poly([[x, y, z], [x + 1, y, z], [x + 1, y, z + 1], [x, y, z + 1]], [0, 1, 0]);
       }
@@ -1433,65 +1643,66 @@ export class HousePlanner {
     const viewDiagonals = (world.diagonals ?? []).some((d) => inView(d.x, d.z) && (d.rooms[0] !== 0 || d.rooms[1] !== 0));
     const roofing = !storey.preview && Number.isFinite(minX);
     if (roofing && !viewDiagonals) {
-      // No roof where a room upstairs stands on this one.
-      const roofed = (x: number, z: number) => (storey.covered?.(x, z) ? 0 : room(x, z));
-      for (const rect of indoorRects(roofed, minX, minZ, maxX, maxZ)) {
-        addRoofShaped(rect, scheme, roof, roofTrim, gables);
+      // No roof where a room upstairs stands on this one. One roof per connected area: a plain
+      // rectangle gets the usual one, a ring round a storey above or an L one over the whole of
+      // it (see `addRoofArea`).
+      const roofed = (x: number, z: number) => !storey.covered?.(x, z) && room(x, z) !== 0;
+      for (const tiles of indoorAreas(roofed, W, minX, minZ, maxX, maxZ)) {
+        // A sliver of a tile or three doesn't get a roof of its own (see `indoorRects`).
+        if (tiles.length < 4) continue;
+        const inArea = new Set(tiles);
+        let bx0 = maxX;
+        let bx1 = minX;
+        let bz0 = maxZ;
+        let bz1 = minZ;
+        for (const i of tiles) {
+          const x = i % W;
+          const z = (i - x) / W;
+          bx0 = Math.min(bx0, x);
+          bx1 = Math.max(bx1, x + 1);
+          bz0 = Math.min(bz0, z);
+          bz1 = Math.max(bz1, z + 1);
+        }
+        if ((bx1 - bx0) * (bz1 - bz0) === tiles.length) {
+          addRoofShaped({ x0: bx0, z0: bz0, x1: bx1, z1: bz1 }, scheme, roof, roofTrim, gables);
+          continue;
+        }
+        const inside = (x: number, z: number) => inArea.has(z * W + x);
+        addRoofArea(inside, bx0, bz0, bx1, bz1, scheme, roof, roofTrim, WALL_HEIGHT, scheme.shape === 'flat' ? 0.12 : OVERHANG);
       }
     } else if (roofing) {
       // With diagonal walls: per connected indoor area. A convex outline (a diamond, a box with
       // cut corners) gets a hip roof that follows it; any other shape gets the usual rectangles
       // over its tiles, split tiles included whole (their outdoor half under a deeper eave).
-      const seen = new Set<number>();
-      for (let z = minZ; z < maxZ; z++) {
-        for (let x = minX; x < maxX; x++) {
-          const start = z * W + x;
-          if (room(x, z) === 0 || !inView(x, z) || seen.has(start)) continue;
-          const tiles: number[] = [];
-          const queue = [start];
-          seen.add(start);
-          while (queue.length) {
-            const i = queue.pop()!;
-            tiles.push(i);
-            const tx = i % W;
-            const tz = Math.floor(i / W);
-            for (const [nx, nz] of [[tx + 1, tz], [tx - 1, tz], [tx, tz + 1], [tx, tz - 1]]) {
-              const n = nz * W + nx;
-              if (nx >= minX && nz >= minZ && nx < maxX && nz < maxZ && room(nx, nz) !== 0 && inView(nx, nz) && !seen.has(n)) {
-                seen.add(n);
-                queue.push(n);
-              }
-            }
-          }
-          const inArea = new Set(tiles);
-          const corners: P2[] = [];
-          let indoorArea = 0;
-          let split = false;
-          for (const i of tiles) {
-            const tx = i % W;
-            const tz = Math.floor(i / W);
-            const d = diagonal(tx, tz);
-            if (!d) {
-              indoorArea += 1;
-              corners.push([tx, tz], [tx + 1, tz], [tx + 1, tz + 1], [tx, tz + 1]);
-              continue;
-            }
-            split = true;
-            for (const h of [0, 1] as const) {
-              if (d.rooms[h] === 0) continue;
-              indoorArea += 0.5;
-              for (const [fx, fz] of halfTriangle(d.axis, h)) corners.push([tx + fx, tz + fz]);
-            }
-          }
-          const hull = convexHull(corners);
-          if (split && indoorArea >= 2 && Math.abs(area(hull) - indoorArea) < 1e-3) {
-            addHipPolygon(hull, roof, roofTrim, H, T, scheme.shape === 'flat' ? 0.12 : OVERHANG, scheme.pitch, ROOF_THICKNESS);
+      for (const tiles of indoorAreas((x, z) => room(x, z) !== 0 && inView(x, z), W, minX, minZ, maxX, maxZ)) {
+        const corners: P2[] = [];
+        let indoorArea = 0;
+        let split = false;
+        for (const i of tiles) {
+          const tx = i % W;
+          const tz = Math.floor(i / W);
+          const d = diagonal(tx, tz);
+          if (!d) {
+            indoorArea += 1;
+            corners.push([tx, tz], [tx + 1, tz], [tx + 1, tz + 1], [tx, tz + 1]);
             continue;
           }
-          // Here every leftover gets its own small roof too, so no part of the room stays open.
-          const indoor = (tx: number, tz: number) => (inArea.has(tz * W + tx) ? 1 : 0);
-          for (const rect of indoorRects(indoor, minX, minZ, maxX, maxZ, 1)) addRoofShaped(rect, scheme, roof, roofTrim, gables);
+          split = true;
+          for (const h of [0, 1] as const) {
+            if (d.rooms[h] === 0) continue;
+            indoorArea += 0.5;
+            for (const [fx, fz] of halfTriangle(d.axis, h)) corners.push([tx + fx, tz + fz]);
+          }
         }
+        const hull = convexHull(corners);
+        if (split && indoorArea >= 2 && Math.abs(area(hull) - indoorArea) < 1e-3) {
+          addHipPolygon(hull, roof, roofTrim, H, T, scheme.shape === 'flat' ? 0.12 : OVERHANG, scheme.pitch, ROOF_THICKNESS);
+          continue;
+        }
+        // Here every leftover gets its own small roof too, so no part of the room stays open.
+        const inArea = new Set(tiles);
+        const indoor = (tx: number, tz: number) => (inArea.has(tz * W + tx) ? 1 : 0);
+        for (const rect of indoorRects(indoor, minX, minZ, maxX, maxZ, 1)) addRoofShaped(rect, scheme, roof, roofTrim, gables);
       }
     }
 
@@ -1667,9 +1878,11 @@ export class HousePlanner {
   /**
    * Neighbouring houses as dressed boxes: the house's own doors and windows where they lie on
    * the box outline (framed, with muntins, curtains and shutters), corner boards, a porch with a
-   * gabled canopy over the front door, a chimney on some roofs, and a garage at the end of the
-   * driveway (the player's house in the menus' town gets none of those, as in the game). Each
-   * house's look comes from its lot's origin, as the game's house does. Returns the meshes (one per material for the whole street), the ones that cast
+   * gabled canopy over the front door (`porchDoors`), a chimney on some roofs, and a garage at the
+   * end of the driveway (the player's house in the menus' town gets no chimney, as in the game; the
+   * viewed lot's house only its garage and porch, `dressingOnly`). Each house's look comes from its
+   * lot's origin (and the roof the player chose), as the game's house does on every storey
+   * (`build`). Returns the meshes (one per material for the whole street), the ones that cast
    * shadows, and the porch / garage lamps for the street's night lighting.
    */
   /** `layout`: where each storey's rows of the lot are (openings upstairs are on theirs; see `storeyRow`). */
@@ -1726,8 +1939,13 @@ export class HousePlanner {
     for (const b of houses) {
       const s = this.schemeWith(houseScheme(b.lot.x, b.lot.z), b.roof);
       const walls = s.brick ? brick : siding;
-      if (b.garageOnly) {
+      // The porch over its front door; on the viewed lot's house it goes with its wall in the cutaway.
+      const porches = () => {
+        for (const d of porchDoors(b, openings, layout)) this.porch(d, s, walls, roof, trim, lamps, b.dressingOnly ? lookAt(d.n) : 0);
+      };
+      if (b.dressingOnly) {
         if (b.garage) garage(b, b.garage, s, walls);
+        porches();
         continue;
       }
       const panes = b.lived ? new Geo() : glass;
@@ -1796,10 +2014,9 @@ export class HousePlanner {
           board(a + 0.5 + 0.04, a + 1 - T - 0.1, 0.15, 0.95, 0.04);
           trim.color('#C8A64A').box(...span(o.axis, plane, n, a + 1 - T - 0.16, a + 1 - T - 0.1, 1.0, 1.06, 0.07));
           trim.color(TRIM);
-          const front = !b.home && b.door !== null && Math.abs(a + 0.5 - b.door) < 0.6 && n[0] === b.front[0] && n[2] === b.front[1];
-          if (front) this.porch(o.axis, plane, n, a + 0.5, s, walls, roof, trim, lamps);
         }
       }
+      porches();
       roof.color(s.roof);
       addRoofShaped({ x0: b.x0, z0: b.z0, x1: b.x1, z1: b.z1 }, s, roof, trim, walls, tall);
       if (hash(b.x0, b.z0, 8) < 0.6 && s.shape !== 'flat' && !b.roof && !b.home) this.chimney(b, s, brick, stone, tall);
@@ -1827,14 +2044,24 @@ export class HousePlanner {
     return { geo, name: lit ? 'silhouetteWindowsLit' : 'silhouetteWindowsDark', surface: { kind: 'neighbourGlass', lit }, cut: true, cast: false, roof: false, shadowOnly: false, glass: false };
   }
 
-  /** Landing, posts and a small gabled canopy over a front door; a lamp beside the door. */
-  private porch(axis: 'h' | 'v', plane: number, n: V3, mid: number, s: HouseScheme, walls: Geo, roof: Geo, trim: Geo, lamps: SilhouettePlan['lamps']): void {
+  /**
+   * Landing, posts and a small gabled canopy over a front door (`d`); a lamp beside the door. The
+   * canopy's ridge meets the wall at right angles and its gable end stands just inside the wall,
+   * so nothing of it shows indoors. `look` (the viewed lot's porch): the cutaway's look bits that
+   * drop the door's wall: the posts drop with it and the canopy and the lamp go (the landing stays).
+   */
+  private porch(d: PorchDoor, s: HouseScheme, walls: Geo, roof: Geo, trim: Geo, lamps: SilhouettePlan['lamps'], look = 0): void {
+    const { axis, plane, n, mid } = d;
     // Laid out along the wall (u) and out from it (v: z on a wall along x, x on one along z).
     const out = axis === 'h' ? n[2] : n[0];
     const box = (u0: number, y0: number, v0: number, u1: number, y1: number, v1: number, skip?: string) => {
       const [va, vb] = [Math.min(v0, v1), Math.max(v0, v1)];
       if (axis === 'h') trim.box(u0, y0, va, u1, y1, vb, skip);
       else trim.box(va, y0, u0, vb, y1, u1, skip);
+    };
+    /** What follows goes with the wall in the cutaway (`kind`), on the viewed lot; else it stays. */
+    const cut = (kind: number) => {
+      for (const g of [trim, roof, walls]) g.cutting(look ? kind : Cut.Keep, look || LOOK.All, look || LOOK.All);
     };
     const depth = 1.3;
     const half = 0.95;
@@ -1846,21 +2073,27 @@ export class HousePlanner {
     box(mid - half + 0.15, 0, z1, mid + half - 0.15, 0.025, z1 + out * 0.3, 'ny');
     const top = 2.34;
     trim.color(TRIM);
+    cut(Cut.Clamp);
     for (const x of [mid - half + 0.08, mid + half - 0.08]) {
       const zc = z1 - out * 0.08;
       box(x - 0.055, 0.05, zc - 0.055, x + 0.055, top, zc + 0.055);
       box(x - 0.08, 0.05, zc - 0.08, x + 0.08, 0.22, zc + 0.08);
     }
-    // The canopy runs into the wall so its ridge meets the house at right angles.
+    // The canopy from the posts back to the wall, its ridge out from it (the gable end a centimetre in).
+    cut(Cut.Hide);
+    walls.color(s.wall);
     roof.color(s.roof);
-    const [ca, cb] = [Math.min(z1, z0 - out * 0.9) + T, Math.max(z1, z0 - out * 0.9) - T];
+    const [ca, cb] = [Math.min(z1, z0 - out * 0.01) + T, Math.max(z1, z0 - out * 0.01) - T];
     const canopy = axis === 'h' ? { x0: mid - half + T, z0: ca, x1: mid + half - T, z1: cb } : { x0: ca, z0: mid - half + T, x1: cb, z1: mid + half - T };
-    addRoof(canopy, false, roof, trim, walls, top, 0.12);
+    addRoof(canopy, false, roof, trim, walls, top, 0.12, PITCH, axis === 'v');
     // The lamp on the side towards larger u (larger x on a wall along x, larger z on one along z).
-    lamps.push(axis === 'h' ? [mid + 0.72, 1.75, plane + out * 0.08, 0, out] : [plane + out * 0.08, 1.75, mid + 0.72, out, 0]);
+    const lamp: SilhouettePlan['lamps'][number] = axis === 'h' ? [mid + 0.72, 1.75, plane + out * 0.08, 0, out] : [plane + out * 0.08, 1.75, mid + 0.72, out, 0];
+    if (look) lamp[5] = look;
+    lamps.push(lamp);
     trim.color('#2E2E30');
     box(mid + 0.66, 1.62, plane, mid + 0.78, 1.66, plane + out * 0.05);
     trim.color(TRIM);
+    for (const g of [trim, roof, walls]) g.cutting(Cut.Keep);
   }
 
   /** A brick chimney through one roof slope near a gable end, with a stone cap, on a roof whose eaves are `base` high. */
@@ -1896,22 +2129,28 @@ export class HousePlanner {
       slant?: (into: number) => readonly Obstacle[] | undefined;
       pocket?: (end: -1 | 1) => number | undefined;
       flip?: boolean;
+      /** Whether a full-height wall stands on the door's end node (0 its first, 1 its second) on the side `side` of its wall. */
+      meets?: (end: 0 | 1, side: -1 | 1) => boolean;
     },
     style: number | undefined,
     head = DOOR_HEIGHT,
     run: Run = { start: axis === 'h' ? x : z, len: 1, index: 0 },
   ): void {
     // Casings on both faces: two side boards (clamped to stubs when cut) and a head (hidden). A
-    // double door has its side boards at its two ends only, its head board right across.
+    // double door has its side boards at its two ends only, its head board right across. A side
+    // board lies over its post, 0.1 m back from the jamb; where a wall meets the door's wall there
+    // it would lie inside that wall, and on its cut top once the walls are down (two white ticks on
+    // the grey): there it starts at that wall's face.
     const [first, last] = [run.index === 0, run.index === run.len - 1];
     const base = axis === 'h' ? x : z;
     for (const n of axis === 'h' ? ([[0, 0, -1], [0, 0, 1]] as V3[]) : ([[-1, 0, 0], [1, 0, 0]] as V3[])) {
       const plane = axis === 'h' ? z + n[2] * T : x + n[0] * T;
       const a0 = base + T;
       const a1 = base + 1 - T;
+      const side = (axis === 'h' ? n[2] : n[0]) < 0 ? -1 : 1;
       trim.cutting(Cut.Clamp, mask);
-      if (first) trim.box(...span(axis, plane, n, a0 - 0.1, a0 + 0.01, 0, head + 0.1, 0.022));
-      if (last) trim.box(...span(axis, plane, n, a1 - 0.01, a1 + 0.1, 0, head + 0.1, 0.022));
+      if (first) cutBoard(trim, span(axis, plane, n, a0 - (geos.meets?.(0, side) ? 0 : 0.1), a0 + 0.01, 0, head + 0.1, 0.022));
+      if (last) cutBoard(trim, span(axis, plane, n, a1 - 0.01, a1 + (geos.meets?.(1, side) ? 0 : 0.1), 0, head + 0.1, 0.022));
       trim.cutting(Cut.Hide, mask);
       trim.box(...span(axis, plane, n, first ? a0 - 0.1 : base, last ? a1 + 0.1 : base + 1, head, head + 0.12, 0.024));
     }
@@ -2149,9 +2388,22 @@ export class HousePlanner {
     trim.cutting(Cut.Clamp, LOOK.All, LOOK.All);
     trim.color(TRIM);
     // Board on the face whose normal is along x, and one on the face along z.
-    trim.box(Math.min(xa, xa + sx * d), PLINTH, Math.min(za + sz * 0.001, za - sz * w), Math.max(xa, xa + sx * d), WALL_HEIGHT - 0.2, Math.max(za + sz * 0.001, za - sz * w));
-    trim.box(Math.min(xa + sx * d, xa - sx * w), PLINTH, Math.min(za, za + sz * d), Math.max(xa + sx * d, xa - sx * w), WALL_HEIGHT - 0.2, Math.max(za, za + sz * d));
+    cutBoard(trim, [Math.min(xa, xa + sx * d), PLINTH, Math.min(za + sz * 0.001, za - sz * w), Math.max(xa, xa + sx * d), WALL_HEIGHT - 0.2, Math.max(za + sz * 0.001, za - sz * w)]);
+    cutBoard(trim, [Math.min(xa + sx * d, xa - sx * w), PLINTH, Math.min(za, za + sz * d), Math.max(xa + sx * d, xa - sx * w), WALL_HEIGHT - 0.2, Math.max(za, za + sz * d)]);
   }
+}
+
+/**
+ * A trim board that drops to a stub with its wall (`Cut.Clamp`: a door's side casing, a corner board). Its top
+ * shows only then (standing, the casing's head or the frieze lies on it), so it is in the cut wall's tone
+ * (`HOUSE_LOOK.cap`), as the wall's own top is, not a white dash beside it.
+ */
+function cutBoard(trim: Geo, box: [number, number, number, number, number, number]): void {
+  const [x0, , z0, x1, y1, z1] = box;
+  const { r, g, b, a } = trim;
+  trim.box(...box, 'py');
+  trim.color(HOUSE_LOOK.cap).poly([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [0, 1, 0]);
+  [trim.r, trim.g, trim.b, trim.a] = [r, g, b, a];
 }
 
 /**
@@ -2275,6 +2527,35 @@ function turnAbout(from: P2, to: P2, turn: number): [number, number] {
 }
 
 /**
+ * The connected areas of a bounding box, each as the list of its tiles (`z * w + x`): the four
+ * sides of a tile join it to its neighbours, so a diagonal step doesn't.
+ */
+function indoorAreas(ok: (x: number, z: number) => boolean, w: number, x0: number, z0: number, x1: number, z1: number): number[][] {
+  const seen = new Set<number>();
+  const areas: number[][] = [];
+  for (let z = z0; z < z1; z++) {
+    for (let x = x0; x < x1; x++) {
+      if (!ok(x, z) || seen.has(z * w + x)) continue;
+      const tiles = [z * w + x];
+      seen.add(tiles[0]);
+      for (let i = 0; i < tiles.length; i++) {
+        const tx = tiles[i] % w;
+        const tz = (tiles[i] - tx) / w;
+        for (const [nx, nz] of [[tx + 1, tz], [tx - 1, tz], [tx, tz + 1], [tx, tz - 1]]) {
+          const n = nz * w + nx;
+          if (nx >= x0 && nz >= z0 && nx < x1 && nz < z1 && ok(nx, nz) && !seen.has(n)) {
+            seen.add(n);
+            tiles.push(n);
+          }
+        }
+      }
+      areas.push(tiles);
+    }
+  }
+  return areas;
+}
+
+/**
  * Covers the indoor tiles of a bounding box with a few rectangles (greedy, row-major). Leftovers
  * smaller than `minArea` tiles (e.g. a single-tile porch notch) don't get their own roof.
  */
@@ -2302,6 +2583,9 @@ function indoorRects(room: (x: number, z: number) => number, x0: number, z0: num
   return out;
 }
 
+/** How far a hip's cap shingles reach down each slope from the hip (m). */
+const HIP_CAP = 0.14;
+
 /** A roof of the scheme's shape (gable, hip or flat) over a rectangle of wall centre lines. */
 function addRoofShaped(
   rect: { x0: number; z0: number; x1: number; z1: number },
@@ -2327,7 +2611,7 @@ function addFlatRoof(rect: { x0: number; z0: number; x1: number; z1: number }, r
 /**
  * Pitched roof over a rectangle of wall centre lines. The underside passes through the outer
  * top edge of the walls, so the eaves rest on them and overhang by `OVERHANG`; gable ends are
- * closed with wall cladding. The ridge runs along the longer side.
+ * closed with wall cladding. The ridge runs along the longer side (or as `ridgeAlongX` says).
  */
 export function addRoof(
   rect: { x0: number; z0: number; x1: number; z1: number },
@@ -2338,8 +2622,9 @@ export function addRoof(
   base = WALL_HEIGHT,
   overhang = OVERHANG,
   pitch = PITCH,
+  ridgeAlongX = rect.x1 - rect.x0 >= rect.z1 - rect.z0,
 ): void {
-  const alongX = rect.x1 - rect.x0 >= rect.z1 - rect.z0;
+  const alongX = ridgeAlongX;
   // Local frame: a = along the ridge, b = across. `P` maps back to world space.
   const A0 = (alongX ? rect.x0 : rect.z0) - T;
   const A1 = (alongX ? rect.x1 : rect.z1) + T;
@@ -2390,6 +2675,38 @@ export function addRoof(
     plane([[ea1, ye, eb0], [ea1, ye, eb1], [ra1, yr, bc]], [[eb0, 0], [eb1, 0], [bc, vr]], sideA1);
     trim.poly([P(ea0, ye, eb0), P(ea0, ye, eb1), P(ea0, ye + th, eb1), P(ea0, ye + th, eb0)], sideA0);
     trim.poly([P(ea1, ye, eb0), P(ea1, ye + th, eb0), P(ea1, ye + th, eb1), P(ea1, ye, eb1)], sideA1);
+    // Hip caps: a course of cap shingles up each hip, a little darker as the ridge's is (`HOUSE_LOOK.roofCap`),
+    // standing a little proud of the two slopes it covers the joint of (a hip was a bare seam between two tones).
+    const [r, g, b] = [roof.r, roof.g, roof.b];
+    roof.r *= HOUSE_LOOK.roofCap;
+    roof.g *= HOUSE_LOOK.roofCap;
+    roof.b *= HOUSE_LOOK.roofCap;
+    const len = Math.hypot(pitch, 1);
+    type L3 = [number, number, number];
+    const cross = (u: L3, v: L3): L3 => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    for (const [ca, cb, ra] of [[ea0, eb0, ra0], [ea0, eb1, ra0], [ea1, eb0, ra1], [ea1, eb1, ra1]]) {
+      const E: L3 = [ca, ye + th, cb];
+      const R: L3 = [ra, yr + th, bc];
+      const d: L3 = [R[0] - E[0], R[1] - E[1], R[2] - E[2]];
+      // The two slopes that meet here (local a, y, b): their normals, and the way into each from the hip.
+      const slopes: [L3, L3][] = [
+        [[0, 1 / len, (cb < bc ? -pitch : pitch) / len], [ca < ra ? 1 : -1, 0, 0]],
+        [[(ca < ra ? -pitch : pitch) / len, 1 / len, 0], [0, 0, cb < bc ? 1 : -1]],
+      ];
+      for (const [n, into] of slopes) {
+        let p = cross(n, d);
+        const pl = Math.hypot(...p) || 1;
+        const sign = p[0] * into[0] + p[2] * into[2] < 0 ? -1 : 1;
+        p = [(p[0] / pl) * sign * HIP_CAP, (p[1] / pl) * sign * HIP_CAP, (p[2] / pl) * sign * HIP_CAP];
+        const top = (q: L3): V3 => P(q[0], q[1] + 0.045, q[2]);
+        const foot = (q: L3): V3 => P(q[0] + p[0] + n[0] * 0.006, q[1] + p[1] + n[1] * 0.006, q[2] + p[2] + n[2] * 0.006);
+        const pts = [top(E), top(R), foot(R), foot(E)];
+        roof.poly(pts, facing(pts[0], pts[1], pts[2], [0, 1, 0]));
+      }
+    }
+    roof.r = r;
+    roof.g = g;
+    roof.b = b;
   } else {
     // Rake boards along the sloped edges and closed gable triangles on the wall planes.
     for (const [a, side] of [[ea0, sideA0], [ea1, sideA1]] as const) {
@@ -2407,9 +2724,9 @@ export function addRoof(
     const r = roof.r;
     const g = roof.g;
     const b = roof.b;
-    roof.r *= 0.8;
-    roof.g *= 0.8;
-    roof.b *= 0.8;
+    roof.r *= HOUSE_LOOK.roofCap;
+    roof.g *= HOUSE_LOOK.roofCap;
+    roof.b *= HOUSE_LOOK.roofCap;
     roof.box(Math.min(c0[0], c1[0]), c0[1] - 0.02, Math.min(c0[2], c1[2]), Math.max(c0[0], c1[0]), c1[1], Math.max(c0[2], c1[2]), 'ny');
     roof.r = r;
     roof.g = g;
@@ -2417,4 +2734,144 @@ export function addRoof(
   }
   void up;
   void down;
+}
+
+/** An edge of a roofed area: an eave, over the outdoors or over a storey below. */
+interface RoofEdge {
+  /** Its two corners, on the tile grid (wall centre lines). */
+  a: P2;
+  b: P2;
+  /** Outward normal. */
+  nx: number;
+  nz: number;
+}
+
+/**
+ * One hip roof over a roofed area that isn't a single rectangle: an L, a U, or the ring round a
+ * storey that stands on this one. Every side of it is an eave, and the underside height is the
+ * nearest eave's plus `pitch` × the distance to it, so the facets meet in hips, ridges and
+ * valleys instead of butting together as separate roofs at every corner. An area is hipped even
+ * where the style is a gable: it has no end to put a gable on.
+ */
+function addRoofArea(
+  inArea: (x: number, z: number) => boolean,
+  x0: number,
+  z0: number,
+  x1: number,
+  z1: number,
+  s: RoofShape,
+  roof: Geo,
+  trim: Geo,
+  base = WALL_HEIGHT,
+  overhang = OVERHANG,
+): void {
+  const pitch = Math.max(s.pitch, 1e-3);
+  const th = ROOF_THICKNESS;
+  const slope = Math.sqrt(1 + pitch * pitch);
+  const ye = base - overhang * pitch; // underside height at the eaves
+  const d = T + overhang; // how far the eave line stands out from the area's edge
+  // Every side of a roofed tile that doesn't face another roofed tile is an eave.
+  const edges: RoofEdge[] = [];
+  for (let z = z0; z < z1; z++) {
+    for (let x = x0; x < x1; x++) {
+      if (!inArea(x, z)) continue;
+      if (!inArea(x, z - 1)) edges.push({ a: [x, z], b: [x + 1, z], nx: 0, nz: -1 });
+      if (!inArea(x + 1, z)) edges.push({ a: [x + 1, z], b: [x + 1, z + 1], nx: 1, nz: 0 });
+      if (!inArea(x, z + 1)) edges.push({ a: [x, z + 1], b: [x + 1, z + 1], nx: 0, nz: 1 });
+      if (!inArea(x - 1, z)) edges.push({ a: [x, z], b: [x, z + 1], nx: -1, nz: 0 });
+    }
+  }
+  if (!edges.length) return;
+  // Each eave's line, `d` out from the area's edge; `away` from it is how high the roof is there.
+  const lines = edges.map((e) => {
+    const [ax, az] = [e.a[0] + e.nx * d, e.a[1] + e.nz * d];
+    return { nx: e.nx, nz: e.nz, c: e.nx * ax + e.nz * az, ex: e.b[0] - e.a[0], ez: e.b[1] - e.a[1], len: Math.hypot(e.b[0] - e.a[0], e.b[1] - e.a[1]) };
+  });
+  /** How far (x, z) is in from eave `i`'s line. */
+  const away = (i: number, x: number, z: number) => {
+    const l = lines[i];
+    return l.c - l.nx * x - l.nz * z;
+  };
+  /** A point of eave `i`'s plane, `th` over its underside, and its shingle UV (u along the eave, v up-slope). */
+  const onPlane = (i: number, x: number, z: number): [V3, [number, number]] => {
+    const l = lines[i];
+    const a = away(i, x, z);
+    return [[x, ye + pitch * a + th, z], [(x * l.ex + z * l.ez) / l.len, a * slope]];
+  };
+  /** The same faces, `th` down: soffits and the underside of the roof. */
+  const down = (pts: V3[]): V3[] => pts.map((p) => [p[0], p[1] - th, p[2]] as V3);
+  const tri = (pts: V3[], uvs: [number, number][]) => {
+    const n = facing(pts[0], pts[1], pts[2], [0, 1, 0]);
+    roof.poly(pts, n, uvs);
+    trim.poly(down(pts), [-n[0], -n[1], -n[2]]);
+  };
+  /** `poly` cut to where `a x + b z + c` is not above nought: a convex polygon stays convex. */
+  const cut = (poly: P2[], a: number, b: number, c: number): P2[] => {
+    const out: P2[] = [];
+    for (let k = 0; k < poly.length; k++) {
+      const [p, q] = [poly[k], poly[(k + 1) % poly.length]];
+      const [fp, fq] = [a * p[0] + b * p[1] + c, a * q[0] + b * q[1] + c];
+      const [pIn, qIn] = [fp <= 0, fq <= 0];
+      if (pIn) out.push(p);
+      if (pIn !== qIn) out.push([p[0] + ((q[0] - p[0]) * fp) / (fp - fq), p[1] + ((q[1] - p[1]) * fp) / (fp - fq)]);
+    }
+    return out;
+  };
+  // The roof: every eave's plane over the tiles where it is the lowest of them, a tile at a time.
+  // Where two of them cross is a hip, a ridge or a valley, so every facet is flat, as a roof's are.
+  const square: P2[] = [[0, 0], [1, 0], [1, 1], [0, 1]];
+  // The eaves are square to the walls, so a plane that is lowest anywhere in a tile is lowest at
+  // its corners, the middles of its sides, or its middle: those nine find every plane to try.
+  const probes: P2[] = [...square, [0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5], [0.5, 0.5]];
+  for (let z = z0; z < z1; z++) {
+    for (let x = x0; x < x1; x++) {
+      if (!inArea(x, z)) continue;
+      const lowest = new Set(probes.map(([dx, dz]) => {
+        let k = 0;
+        for (let i = 1; i < lines.length; i++) if (away(i, x + dx, z + dz) < away(k, x + dx, z + dz)) k = i;
+        return k;
+      }));
+      for (const i of lowest) {
+        let poly = square.map(([dx, dz]) => [x + dx, z + dz] as P2);
+        for (let j = 0; j < lines.length && poly.length; j++) {
+          // eave i's plane under eave j's: (nx_j - nx_i) x + (nz_j - nz_i) z + c_i - c_j <= 0.
+          if (j !== i) poly = cut(poly, lines[j].nx - lines[i].nx, lines[j].nz - lines[i].nz, lines[i].c - lines[j].c);
+        }
+        let area = 0;
+        for (let k = 0; k < poly.length; k++) area += poly[k][0] * poly[(k + 1) % poly.length][1] - poly[(k + 1) % poly.length][0] * poly[k][1];
+        if (poly.length < 3 || Math.abs(area) < 1e-6) continue;
+        const v = poly.map(([px, pz]) => onPlane(i, px, pz));
+        for (let k = 1; k < v.length - 1; k++) tri([v[0][0], v[k][0], v[k + 1][0]], [v[0][1], v[k][1], v[k + 1][1]]);
+      }
+    }
+  }
+  // The eaves: boards from the roof's edge out to the eave line, their soffits, and fascias. A
+  // corner's eave point stands `d` out along the normals of the eaves meeting there; they are
+  // square to each other, so their sum mitres the corner (and a straight run's two are one).
+  const out = new Map<string, [number, number][]>();
+  for (const e of edges) {
+    for (const p of [e.a, e.b]) {
+      const key = `${p[0]},${p[1]}`;
+      const normals = out.get(key) ?? [];
+      if (!normals.some(([nx, nz]) => nx === e.nx && nz === e.nz)) normals.push([e.nx, e.nz]);
+      out.set(key, normals);
+    }
+  }
+  const corner = (p: P2): V3 => {
+    let [nx, nz] = [0, 0];
+    for (const [ax, az] of out.get(`${p[0]},${p[1]}`) ?? []) {
+      nx += ax;
+      nz += az;
+    }
+    return [p[0] + nx * d, ye, p[1] + nz * d];
+  };
+  for (const [i, e] of edges.entries()) {
+    const oa = corner(e.a);
+    const ob = corner(e.b);
+    const top = [onPlane(i, e.a[0], e.a[1])[0], onPlane(i, e.b[0], e.b[1])[0], [ob[0], ob[1] + th, ob[2]], [oa[0], oa[1] + th, oa[2]]] as V3[];
+    const n = facing(top[0], top[1], top[2], [e.nx, 0, e.nz]);
+    roof.poly(top, n);
+    trim.poly(down(top), [-n[0], -n[1], -n[2]]);
+    trim.poly([oa, ob, [ob[0], ob[1] + th, ob[2]], [oa[0], oa[1] + th, oa[2]]], [e.nx, 0, e.nz]);
+  }
 }

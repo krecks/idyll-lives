@@ -27,20 +27,21 @@ export function outfitFit(set: CharacterSet, base: BodyData): OutfitFit {
 
 /**
  * The lying pose of a body (scale 1, slot frame: x across, y above the mattress, z towards the
- * feet), skinned on the CPU once for the blanket: the `lie` clip sleeping Sims play. Also returns
- * the chest line and the toes' z.
+ * feet), skinned on the CPU once for the blanket: the `lie` clip sleeping Sims play (or `clip`: `lieCurl`,
+ * curled up on a sofa). Also returns the chest line, the toes' z and the neck's.
  */
-export function lyingPose(kit: PoseKit, body: BodyData): {
+export function lyingPose(kit: PoseKit, body: BodyData, clip = 'lie'): {
   positions: Float32Array;
   chestZ: number;
   feetZ: number;
+  neckZ: number;
 } {
   const set = kit.set;
   const B = set.bone;
   const NB = set.bones.length;
   const mats = new Float32Array(NB * 16);
   const head = new Float32Array(3);
-  sampleClip(set, set.clips.get('lie') ?? set.clips.get('idle')!, 0, kit.qA, kit.pA);
+  sampleClip(set, set.clips.get(clip) ?? set.clips.get('lie') ?? set.clips.get('idle')!, 0, kit.qA, kit.pA);
   resetAdditive(kit.add);
   const sp = Math.sin(-Math.PI / 4);
   const cp = Math.cos(-Math.PI / 4);
@@ -67,6 +68,7 @@ export function lyingPose(kit: PoseKit, body: BodyData): {
     head,
   );
   const chestZ = Math.max(kit.scratch.worldT[B.upperarm_l * 3 + 2], kit.scratch.worldT[B.upperarm_r * 3 + 2]) + 0.07;
+  const neckZ = kit.scratch.worldT[B.neck_01 * 3 + 2];
   resetAdditive(kit.add);
   // The body plus the clothes that stand off it most (skirts, boots).
   const parts = [...Object.keys(body.bodyChunks), 'bottom.skirt', 'shoes.boots'].map((k) => body.parts.get(k)).filter((p): p is NonNullable<typeof p> => !!p);
@@ -98,7 +100,7 @@ export function lyingPose(kit: PoseKit, body: BodyData): {
     }
     base += n;
   }
-  return { positions: out, chestZ, feetZ };
+  return { positions: out, chestZ, feetZ, neckZ };
 }
 
 /** Where each leg is in the clips whose feet are placed (`LEG_CLIPS`), at their start (body space, scale 1). */

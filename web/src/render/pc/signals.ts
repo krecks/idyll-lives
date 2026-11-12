@@ -11,6 +11,11 @@
  * that lens's glow (`BuildOptions.glowApart`) holding the heads showing it: at most three more
  * draws for every light in town, by day as at night, brighter as the lamps come up (`setNight`).
  *
+ * Below the traffic head each near pole of an arm with a crosswalk (`shared/signals.ts`
+ * `crosswalkRows`: a street's or a lane's, not a country road's) has a pedestrians' head facing
+ * across the road (`pedestrianHead`): its housing one instanced draw, its two figures' glows one
+ * each (walk while the junction's walk phase is on, don't walk otherwise): three draws more.
+ *
  * Per frame (`update`) the rows are read into arrays made once and compared; the draws are written
  * again only when a head's lamp changes, the heads change (a new world), or the view does. Nothing
  * is allocated per frame.
@@ -19,13 +24,16 @@
 import * as pc from './engine';
 import { Instances } from './instancing';
 import { MaterialLibrary } from './materials';
+import { meshFrom } from './meshes';
 import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from './models';
 import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry } from '../../assets/types';
 import type { FrameState } from '../../core/bridge';
 import { chunkAt } from '../shared/chunks';
 import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
-import { SIGNAL_LAMPS, SignalRows } from '../shared/signals';
+import type { Geo } from '../shared/geometry';
+import type { WorldStructure } from '../../core/protocol';
+import { crosswalkRows, pedestrianHead, SIGNAL_LAMPS, SignalRows } from '../shared/signals';
 
 /** The model's key in the manifests. */
 export const SIGNAL_MODEL = 'model.trafficLight';
@@ -54,6 +62,8 @@ interface Drawn {
   farBody: Instances[];
   /** Per lamp (`SIGNAL_LAMPS`), its lens's glow (null: the model has none). */
   glows: (Instances | null)[];
+  /** The pedestrians' heads (near poles only): their housings, and their don't-walk and walk figures' glows (null: no glow material). */
+  ped: { housing: Instances; dontWalk: Instances | null; walk: Instances | null; meshes: pc.Mesh[] } | null;
 }
 
 export class Signals {
@@ -75,6 +85,8 @@ export class Signals {
   private eyeZ = NaN;
   /** The view changed since the draws were written (which heads are drawn, and how). */
   private reframed = false;
+  /** Per snapshot row, whether its pole gets the pedestrians' head (`crosswalkRows`; null: every one). */
+  private crosswalks: Uint8Array | null = null;
   /** Whether the poles changed where they cast into the sun's map (the map is to be drawn again). */
   moved = false;
   /** Scratch: a matrix, a turn, each draw's count as it's written. */
@@ -106,6 +118,16 @@ export class Signals {
       return;
     }
     this.write(change.placed);
+  }
+
+  /** The world's junctions: which heads' poles get the pedestrians' head (those of arms with a crosswalk, `crosswalkRows`). */
+  setWorld(world: WorldStructure): void {
+    const c = crosswalkRows(world);
+    const was = this.crosswalks;
+    if (c === was || (c && was && c.length === was.length && c.every((v, k) => v === was[k]))) return;
+    this.crosswalks = c;
+    this.reframed = true;
+    if (this.rows.count > 0) this.due = true;
   }
 
   /** The chunks streamed in (null: the whole town) and the camera's target (x, z): heads outside them, or further than `FAR`, aren't drawn. */
@@ -145,7 +167,7 @@ export class Signals {
   clear(): void {
     this.rows.clear();
     const d = this.drawn;
-    if (d) for (const draw of [...d.body, ...d.farBody, ...d.glows]) if (draw) hide(draw);
+    if (d) for (const draw of [...d.body, ...d.farBody, ...d.glows, ...pedDraws(d)]) if (draw) hide(draw);
     this.due = false;
   }
 
@@ -189,7 +211,7 @@ export class Signals {
         }
         return this.draw(glow.mesh, this.glowMat, false);
       });
-      this.drawn = { near, far, body, farBody, glows };
+      this.drawn = { near, far, body, farBody, glows, ped: this.pedestrians(shadows) };
       this.write(true);
     } finally {
       if (build === this.builds) this.loading = false;
@@ -211,8 +233,17 @@ export class Signals {
       for (const draw of d.farBody) draw.setCount(rows.count);
     }
     for (const draw of d.glows) draw?.setCount(rows.count);
+    const ped = d.ped;
+    if (ped) {
+      if (moved) ped.housing.setCount(rows.count);
+      ped.dontWalk?.setCount(rows.count);
+      ped.walk?.setCount(rows.count);
+    }
     let near = 0;
     let away = 0;
+    let peds = 0;
+    let walking = 0;
+    let waiting = 0;
     lit[0] = lit[1] = lit[2] = 0;
     const looked = !Number.isNaN(this.eyeX);
     for (let k = 0; k < rows.count; k++) {
@@ -227,6 +258,13 @@ export class Signals {
         away++;
       } else {
         if (moved) for (const draw of d.body) draw.setMatrix(near, m);
+        // (A pedestrians' head only where there's a crosswalk to cross.)
+        if (ped && (!this.crosswalks || this.crosswalks[rows.row[k]] === 1)) {
+          if (moved) ped.housing.setMatrix(peds, m);
+          peds++;
+          if (rows.walk[k]) ped.walk?.setMatrix(walking++, m);
+          else ped.dontWalk?.setMatrix(waiting++, m);
+        }
         near++;
       }
       const lamp = rows.lamp[k];
@@ -237,7 +275,10 @@ export class Signals {
     if (moved) {
       for (const draw of d.body) show(draw, near);
       for (const draw of d.farBody) show(draw, away);
+      if (ped) show(ped.housing, peds);
     }
+    if (ped?.walk) show(ped.walk, walking);
+    if (ped?.dontWalk) show(ped.dontWalk, waiting);
     for (let lamp = 0; lamp < d.glows.length; lamp++) {
       const draw = d.glows[lamp];
       if (draw) show(draw, lit[lamp]);
@@ -253,17 +294,44 @@ export class Signals {
     return draw;
   }
 
+  /** The pedestrians' heads' draws: the housing in the plain finish, the figures in the lenses' glow (none without it). */
+  private pedestrians(shadows: boolean): Drawn['ped'] {
+    const head = pedestrianHead();
+    const upload = (g: Geo) => meshFrom(this.app.graphicsDevice, g.meshData({ colors: true }));
+    const housing = upload(head.housing);
+    if (!housing) return null;
+    const meshes = [housing];
+    const glow = (g: Geo, name: string) => {
+      const mesh = this.glowMat && upload(g);
+      if (!mesh) return null;
+      meshes.push(mesh);
+      return this.draw({ name, mesh, material: this.glowMat! }, this.glowMat!, false);
+    };
+    return {
+      housing: this.draw({ name: 'signal|pedestrians', mesh: housing, material: this.lib.plainFinish() }, this.lib.plainFinish(), shadows),
+      dontWalk: glow(head.dontWalk, 'signal|dontWalk'),
+      walk: glow(head.walk, 'signal|walk'),
+      meshes,
+    };
+  }
+
   /** The draws and the templates let go (built again when there are heads to draw). */
   private drop(): void {
     this.builds++;
     this.loading = false;
     const d = this.drawn;
     if (!d) return;
-    for (const draw of [...d.body, ...d.farBody, ...d.glows]) draw?.destroy();
+    for (const draw of [...d.body, ...d.farBody, ...d.glows, ...pedDraws(d)]) draw?.destroy();
+    for (const mesh of d.ped?.meshes ?? []) mesh.destroy();
     disposeTemplate(d.near);
     if (d.far) disposeTemplate(d.far);
     this.drawn = null;
   }
+}
+
+/** The pedestrians' heads' draws. */
+function pedDraws(d: Drawn): (Instances | null)[] {
+  return d.ped ? [d.ped.housing, d.ped.dontWalk, d.ped.walk] : [];
 }
 
 /** A draw of `count` copies (written), drawn while there are any. */

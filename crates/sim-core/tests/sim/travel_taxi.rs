@@ -3,7 +3,7 @@
 //! left; pupils go to school by one; a game saved mid-run goes on.
 
 use crate::common;
-use common::{TICKS_PER_MINUTE, hours, mins, secs};
+use common::{TICKS_PER_MINUTE, drive_secs, hours, mins, secs};
 
 use sim_core::World;
 use sim_core::cars::CarState;
@@ -42,8 +42,8 @@ fn worker(name: &str) -> String {
     )
 }
 
-/// A normal-sized town: a 600 m street of `width` m along x, its way out at the east end, and
-/// `houses` on it.
+/// A town of a 600 m street of `width` m along x, its way out at the east end, and `houses` on
+/// it.
 fn town(width: u32, houses: &[House]) -> World {
     town_on(width, houses, |_| 0.0)
 }
@@ -56,9 +56,42 @@ fn town_on(width: u32, houses: &[House], bend: impl Fn(f32) -> f32) -> World {
 
 /// `town_on`, with more roads (the town file's road JSON) meeting the street.
 fn town_with(width: u32, houses: &[House], bend: impl Fn(f32) -> f32, more: &[String]) -> World {
-    let road: Vec<String> = (0..=599)
-        .map(|x| format!("[{x}.5,{}]", STREET - bend(x as f32 + 0.5)))
+    town_of(false, width, houses, bend, more)
+}
+
+/// `town`, its street going on past 600 m to the east edge of a 1 km world, then 150 m south and
+/// all the way back west, its way out at that end: over 2 km out, a bike's ride of over an hour
+/// and a half (`BIKE_MOST`) on the traffic's clock.
+fn town_long(width: u32, houses: &[House]) -> World {
+    town_of(true, width, houses, |_| 0.0, &[])
+}
+
+/// The street's turn south and back west (`town_long`): how far south (m).
+const LONG_BACK: f32 = 150.0;
+
+/// `town_with`, or (`long`) `town_long`.
+fn town_of(
+    long: bool,
+    width: u32,
+    houses: &[House],
+    bend: impl Fn(f32) -> f32,
+    more: &[String],
+) -> World {
+    let east = if long { 1000 } else { 600 };
+    let mut pts: Vec<[f32; 2]> = (0..east)
+        .map(|x| [x as f32 + 0.5, STREET - bend(x as f32 + 0.5)])
         .collect();
+    if long {
+        let x = east as f32 - 0.5;
+        pts.extend((1..=LONG_BACK as i32).map(|z| [x, STREET + z as f32]));
+        pts.extend(
+            (1..east)
+                .rev()
+                .map(|x| [x as f32 - 0.5, STREET + LONG_BACK]),
+        );
+    }
+    let way_out = *pts.last().expect("a street");
+    let road: Vec<String> = pts.iter().map(|p| format!("[{},{}]", p[0], p[1])).collect();
     let kind = if width < 7 { "lane" } else { "street" };
     let road = format!(
         r#"{{"points":[{}],"width":{width},"kind":"{kind}","ends":["dead","out"]}}"#,
@@ -113,10 +146,13 @@ fn town_with(width: u32, houses: &[House], bend: impl Fn(f32) -> f32, more: &[St
     }
     let more: String = more.iter().map(|r| format!(",{r}")).collect();
     let json = format!(
-        r#"{{"width":600,"depth":80,"size":"normal",
-        "exits":[{{"x":599.5,"z":{STREET},"kind":"road"}}],
+        r#"{{"width":{east},"depth":{},"size":"normal",
+        "exits":[{{"x":{},"z":{},"kind":"road"}}],
         "roads":[{road}{more}],"meta":{{"roads":[{road}{more}]}},
         "plots":[{}],"households":[{}],"objects":[{}],"sims":[{}],"drives":[{}],"cars":[{}]}}"#,
+        if long { 220 } else { 80 },
+        way_out[0],
+        way_out[1],
         plots.join(","),
         households.join(","),
         objects.join(","),
@@ -625,7 +661,9 @@ fn one_coming_the_other_way_waits_its_turn_short_of_a_taxi_standing_at_the_kerb(
         while w.tick < start + secs(300.0) && !(home && gone) {
             w.tick_once();
             no_overlaps(&w);
-            if !sent && w.tick >= start + secs(15.0) + secs(1.25) * k {
+            // (Its set-off timed for a town's speed of 9 m/s: the two come up to the taxi
+            // about together, one ahead of the other by turns.)
+            if !sent && w.tick >= start + drive_secs(5.0) + drive_secs(0.85) * k {
                 drive(&mut w, f, 1, false);
                 sent = true;
             }
@@ -646,11 +684,11 @@ fn one_coming_the_other_way_waits_its_turn_short_of_a_taxi_standing_at_the_kerb(
                 let east = oc
                     .shown
                     .is_some_and(|s| s.0[0] > taxi[0] + len / 2.0 + oc.len / 2.0);
-                if going_by && east && still.1 >= secs(0.5) {
+                if going_by && east && still.1 >= drive_secs(0.5) {
                     stood_out = true;
                 }
             }
-            home |= oc.state == CarState::Parked && w.tick > start + secs(0.5);
+            home |= oc.state == CarState::Parked && w.tick > start + drive_secs(0.5);
             gone |= sent && fc.state == CarState::Away;
         }
         assert!(home && gone, "case {k}: not both through ({home}, {gone})");
@@ -790,9 +828,11 @@ fn a_game_saved_with_a_car_part_way_round_a_standing_taxi_loads_with_it_where_it
         l.tick_once();
         no_overlaps(&l);
         let Some(s) = l.cars[c].shown else { break };
+        // (A tick's way at a town's speed, 0.6 m, and a little.)
+        let tick = sim_core::travel::TOWN_SPEED / sim_core::DRIVE_TICKS_PER_SECOND;
         let (from, limit) = match was {
-            None => (at, 0.5),
-            Some(p) => (p, 0.6),
+            None => (at, tick + 0.1),
+            Some(p) => (p, tick + 0.15),
         };
         let step = (s.0[0] - from[0]).hypot(s.0[1] - from[1]);
         assert!(
@@ -1055,7 +1095,8 @@ fn a_taxi_due_in_through_a_jammed_junction_goes_round_it_or_waits_at_the_edge_of
     // A side street joins the street at x 300, between the way out and A's house, its junction
     // jammed (cars held up in it: `taxi::jammed`). With a way round it (a loop south of the street
     // from x 360 to x 240), the taxi takes that, never into it; with none, it waits at the edge of
-    // town a while rather than drive into it, and comes once it's cleared (15 minutes on).
+    // town a while rather than drive into it, and comes once it's cleared (10 s of drive time on,
+    // well within `taxi::JAM_WAIT`'s 30).
     let road = |pts: Vec<[f32; 2]>, ends: &str| {
         let pts: Vec<String> = pts.iter().map(|p| format!("[{},{}]", p[0], p[1])).collect();
         format!(
@@ -1093,11 +1134,11 @@ fn a_taxi_due_in_through_a_jammed_junction_goes_round_it_or_waits_at_the_edge_of
         while w.tick < end && came(&w) < 2 {
             w.tick_once();
             no_overlaps(&w);
-            // (Cleared a quarter of an hour after the taxi was due in.)
+            // (Cleared 10 s of drive time after the taxi was due in.)
             if !round
                 && let Some(run) = w.taxis.runs.iter().find(|r| !r.home)
                 && run.enter > 0
-                && w.tick >= run.enter + mins(15.0)
+                && w.tick >= run.enter + drive_secs(10.0)
             {
                 w.taxis.jams.clear();
             }
@@ -1122,9 +1163,9 @@ fn a_taxi_due_in_through_a_jammed_junction_goes_round_it_or_waits_at_the_edge_of
             );
         } else {
             assert!(
-                at >= enter + mins(15.0),
-                "({round}) came in at once: {} min",
-                (at - enter) / TICKS_PER_MINUTE
+                at >= enter + drive_secs(10.0),
+                "({round}) came in at once: {} ticks",
+                at - enter
             );
         }
         assert!(came(&w) > 0, "({round}) A never rode");
@@ -1284,7 +1325,8 @@ fn a_guest_leaving_a_visit_early_has_the_taxi_back_brought_forward() {
             house(560, &[r#"{"name":"B","age":40,"traits":["cheerful"]}"#]),
         ],
     );
-    run_to(&mut w, 1, 9.0);
+    // (Off at 11:00: there before noon, gone by two, hours before the visit's end.)
+    run_to(&mut w, 1, 11.0);
     let _ = w.apply(sim_core::Command::Visit { sim: 0, plot: 1 });
     let end = sim_core::clock::tick_at(2, 12.0 * 60.0).unwrap();
     let (mut left, mut until, mut home) = (None, 0, None);
@@ -1325,7 +1367,7 @@ fn a_guest_leaving_a_visit_early_has_the_taxi_back_brought_forward() {
         "A waited {} minutes at the kerb",
         longest / TICKS_PER_MINUTE
     );
-    // (The ride itself, at a car's pace in real time, is an hour and more of game time.)
+    // (The ride itself, on the traffic's clock, is a quarter of an hour of game time.)
     assert!(
         home < until,
         "A was home {} minutes after the visit was to end",
@@ -1335,11 +1377,11 @@ fn a_guest_leaving_a_visit_early_has_the_taxi_back_brought_forward() {
 
 #[test]
 fn a_cyclist_with_a_ride_out_of_over_an_hour_and_a_half_takes_the_taxi() {
-    // C's bike would take well over `BIKE_MOST` out of town from the street's far end: C rides
-    // the work taxi instead.
+    // C's bike would take well over `BIKE_MOST` out of town along a street of over 2 km
+    // (`town_long`): C rides the work taxi instead.
     let mut far = house(20, &[&worker("C")]);
     far.bike = true;
-    let mut w = town(7, &[far]);
+    let mut w = town_long(7, &[far]);
     let mut c = Vec::new();
     let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
     while w.tick < end && !c.iter().any(|x: &(u32, bool)| !x.1) {
@@ -1467,9 +1509,10 @@ fn a_taxi_doesnt_go_hours_round_a_hold_up_it_could_wait_out() {
     let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
     while w.tick < end && came(&w) < 1 {
         w.tick_once();
+        // (Cleared 10 s of drive time after the taxi was due in: within `taxi::JAM_WAIT`.)
         if let Some(run) = w.taxis.runs.iter().find(|r| !r.home)
             && run.enter > 0
-            && w.tick >= run.enter + mins(15.0)
+            && w.tick >= run.enter + drive_secs(10.0)
         {
             w.taxis.jams.clear();
         }
@@ -1861,13 +1904,13 @@ fn one_booked_on_a_taxi_while_out_at_another_house_isnt_called_home_hours_early(
 
 #[test]
 fn a_cyclist_out_on_a_visit_when_work_calls_doesnt_ride_out_on_the_bike_their_way_isnt_by() {
-    // C's way out is by the work taxi (by bike, well over `BIKE_MOST`). Sent on a visit along
-    // the street just before leaving for the taxi, C sets off on the bike; leaving time comes
-    // on the way: the ride cut short, off to the kerb for the taxi. (On, they rode hours out of
-    // town on it, Hollyshaw and Stationgate.)
+    // C's way out along a street of over 2 km (`town_long`) is by the work taxi (by bike, well
+    // over `BIKE_MOST`). Sent on a visit along the street just before leaving for the taxi (seven
+    // minutes), C sets off on the bike; leaving time comes on the way: the ride cut short, off to
+    // the kerb for the taxi. (On, they rode hours out of town on it, Hollyshaw and Stationgate.)
     let mut far = house(20, &[&worker("C")]);
     far.bike = true;
-    let mut w = town(
+    let mut w = town_long(
         7,
         &[
             far,
@@ -1885,7 +1928,7 @@ fn a_cyclist_out_on_a_visit_when_work_calls_doesnt_ride_out_on_the_bike_their_wa
             break l;
         }
     };
-    while w.tick + mins(10.0) < leave {
+    while w.tick + mins(7.0) < leave {
         w.tick_once();
     }
     let _ = w.apply(sim_core::Command::Visit { sim: 0, plot: 1 });
@@ -1947,9 +1990,9 @@ fn a_visit_when_a_bike_commute_starts_is_over_and_the_ride_goes_out_of_town() {
         w.sims[0].commute().is_some_and(|c| c.bike.is_some()),
         "C's way out isn't by bike"
     );
-    // Again, out on a visit then.
+    // Again, out on a visit then (five minutes before: still on the way to it, on the bike).
     let mut w = make();
-    while w.tick + mins(15.0) < off {
+    while w.tick + mins(5.0) < off {
         w.tick_once();
     }
     w.apply(sim_core::Command::Visit { sim: 0, plot: 1 })

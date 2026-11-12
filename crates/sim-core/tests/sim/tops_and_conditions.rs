@@ -180,6 +180,7 @@ fn with_the_front_taken_it_is_used_from_beside_the_top() {
             lot: &w.lot,
             blocked: w.blocked(),
             stairs: w.stair_map(),
+            kept_off: &[],
         },
     );
     assert_eq!(

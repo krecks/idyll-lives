@@ -11,13 +11,16 @@ use sim_core::travel::Mode;
 use sim_core::world::{Phase, Sim, TaskKind};
 use sim_core::{MINUTES_PER_TICK, World, clock};
 
-// Ticks counted in the time they mean: real seconds (`secs`, walking and driving, doors, lights)
-// or game minutes (`mins`, `hours`, `TICKS_PER_DAY`: the clock, needs, schedules, waits).
+// Ticks counted in the time they mean: real seconds (`secs`, walking, doors), seconds of the
+// traffic's clock (`drive_secs`: driving and riding, lights, jams) or game minutes (`mins`,
+// `hours`, `TICKS_PER_DAY`: the clock, needs, schedules, waits).
 // (Not every test binary that includes this module uses them all.)
 #[allow(unused_imports)]
 pub use sim_core::clock::TICKS_PER_DAY;
 #[allow(unused_imports)]
-pub use sim_core::{TICKS_PER_MINUTE, TICKS_PER_SECOND, mins, secs};
+pub use sim_core::{
+    DRIVE_SCALE, DRIVE_TICKS_PER_SECOND, TICKS_PER_MINUTE, TICKS_PER_SECOND, drive_secs, mins, secs,
+};
 
 /// Ticks in `h` game hours.
 pub const fn hours(h: f32) -> u64 {

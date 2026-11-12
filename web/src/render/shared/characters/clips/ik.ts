@@ -6,7 +6,7 @@
  * resident's left at -x) and only while the clips bake (`reference()` in dsl.ts).
  */
 
-import { reference, type BoneKey, type PoseSpec, type Rot, type Vec } from './dsl';
+import { reached, reference, WRITTEN, type BoneKey, type PoseSpec, type Rot, type Vec } from './dsl';
 
 /** A 3x3 rotation, row-major. */
 export type M3 = readonly number[];
@@ -100,10 +100,28 @@ export function world(spec: PoseSpec, bone: string): { r: M3; p: Vec } {
   return { r, p };
 }
 
-/** A point given in a bone's rest frame (an offset from its joint), in the pose (model space). */
+/**
+ * A point given in a bone's rest frame (an offset from its joint), in the pose (model space). One on the head
+ * (the mouth, an ear, the crown) is given on the head the clips were written on and scaled to the reference's.
+ */
 export function pointOn(spec: PoseSpec, bone: string, offset: Vec): Vec {
   const w = world(spec, bone);
-  return addV(w.p, apply(w.r, offset));
+  const k = bone === 'Head' ? reference().head : 1;
+  return addV(w.p, apply(w.r, [offset[0] * k, offset[1] * k, offset[2] * k]));
+}
+
+/**
+ * A place on or before the upper body (model space, standing upright), given on the body the clips' numbers
+ * were written on (`WRITTEN`: its shoulders at 1.39 m, its chin at 1.50 m), on the reference's: as high up its
+ * back, or as high up its head above the neck. For what a hand does to the body itself (a fist by the chin, a
+ * bite, a hand on the heart); a place in the world (a counter, a shelf) stays as it is given.
+ */
+export function onBody(v: Vec): Vec {
+  const ref = reference();
+  const up = v[1] - WRITTEN.pelvis;
+  if (up <= 0) return v;
+  const y = up <= WRITTEN.torso ? up * ref.torso : WRITTEN.torso * ref.torso + (up - WRITTEN.torso) * ref.head;
+  return [v[0], WRITTEN.pelvis + y, v[2]];
 }
 
 /**
@@ -111,9 +129,10 @@ export function pointOn(spec: PoseSpec, bone: string, offset: Vec): Vec {
  * the end at `target`, bending about the hinge `h0` (rest frame of the first bone; a positive turn
  * about it bends the limb), the middle joint towards `pole`.
  */
-function twoBone(root: Vec, target: Vec, l1: number, l2: number, u0: Vec, v0: Vec, h0: Vec, pole: Vec): { r1: M3; bend: number; reach: number } {
+function twoBone(limb: string, root: Vec, target: Vec, l1: number, l2: number, u0: Vec, v0: Vec, h0: Vec, pole: Vec): { r1: M3; bend: number } {
   const d = sub(target, root);
   const want = len(d);
+  reached(limb, want, l1, l2);
   const dist = Math.max(Math.abs(l1 - l2) + 1e-4, Math.min(want, (l1 + l2) * 0.9995));
   const dir = norm(d);
   const a = Math.acos(Math.max(-1, Math.min(1, (l1 * l1 + dist * dist - l2 * l2) / (2 * l1 * dist))));
@@ -133,7 +152,7 @@ function twoBone(root: Vec, target: Vec, l1: number, l2: number, u0: Vec, v0: Ve
   for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) r1.push(f1[0][r] * f0[0][c] + f1[1][r] * f0[1][c] + f1[2][r] * f0[2][c]);
   const v = apply(r1, v0);
   const bend = Math.atan2(dot(cross(v, w), h), dot(v, w)) * R2D;
-  return { r1, bend, reach: want / (l1 + l2) };
+  return { r1, bend };
 }
 
 export interface ArmOptions {
@@ -169,7 +188,7 @@ export function armIK(side: 'l' | 'r', target: Vec, spec: PoseSpec, o: ArmOption
   let goal = target;
   let out: PoseSpec = {};
   for (let pass = 0; pass < (o.palm ? 3 : 1); pass++) {
-    const { r1, bend } = twoBone(root, goal, len(sub(E, S)), len(sub(W, E)), u0, v0, h0, pole);
+    const { r1, bend } = twoBone(`arm_${side}`, root, goal, len(sub(E, S)), len(sub(W, E)), u0, v0, h0, pole);
     const upper = mul(tr(clav.r), r1);
     const lower = mul(axisAngle(h0, bend), axisAngle(v0, twist * 0.6));
     out = { [`upperarm_${side}`]: toEuler(upper), [`lowerarm_${side}`]: toEuler(lower), [`hand_${side}`]: toEuler(handLocal) } as PoseSpec;
@@ -208,7 +227,7 @@ export function footIK(side: 'l' | 'r', ankle: Vec, spec: PoseSpec, o: LegOption
   const A = ref.joint(`foot_${side}`);
   const pelvis = world(spec, 'pelvis');
   const root = addV(world(spec, `thigh_${side}`).p, apply(pelvis.r, [sx * (o.wide ?? 0), 0, 0]));
-  const { r1, bend } = twoBone(root, addV(A, ankle), ref.thigh, ref.shin, norm(sub(K, H)), norm(sub(A, K)), [1, 0, 0], o.pole ?? [0.12 * sx, 0, 1]);
+  const { r1, bend } = twoBone(`leg_${side}`, root, addV(A, ankle), ref.thigh, ref.shin, norm(sub(K, H)), norm(sub(A, K)), [1, 0, 0], o.pole ?? [0.12 * sx, 0, 1]);
   const calf = axisAngle([1, 0, 0], bend);
   const foot = mul(tr(mul(r1, calf)), euler(o.foot ?? [0, 0, 0]));
   return { [`thigh_${side}`]: toEuler(mul(tr(pelvis.r), r1)), [`calf_${side}`]: toEuler(calf), [`foot_${side}`]: toEuler(foot) } as PoseSpec;

@@ -3,13 +3,16 @@
   import {
     bondBetween,
     draftVoice,
+    ensureFace,
     ensureOutfit,
+    FACE_GROUPS,
     HAIR_LABELS,
     HAIR_STYLES,
     householdProblems,
     lookAtAge,
     palette,
     randomAge,
+    randomFace,
     randomFirstName,
     randomHousehold,
     randomSim,
@@ -109,7 +112,10 @@
 
   const neighbourNames = untrack(() => avoidNames);
   const initial = untrack(() => (draft ? structuredClone(draft) : randomHousehold(content, assets, 2, neighbourNames)));
-  for (const m of initial.members) ensureOutfit(m);
+  for (const m of initial.members) {
+    ensureOutfit(m);
+    ensureFace(m);
+  }
   let household = $state<HouseholdDraft>(initial);
   let active = $state(0);
   let stage = $state.raw<SimStage | null>(null);
@@ -175,6 +181,21 @@
     if (sim.appearance[key] === value) return;
     sim.appearance[key] = value;
     stage?.react('admire');
+  }
+
+  // The face of their own: a slider a channel (`FACE_GROUPS`), the dice for all of them, and back to the shared face.
+  const faceChanged = $derived(Object.values(sim.appearance.face ?? {}).some((v) => v !== 0));
+  function setFace(channel: string, value: number) {
+    (sim.appearance.face ??= {})[channel] = value;
+  }
+  function rollFace() {
+    sim.appearance.face = randomFace();
+    stage?.frameFace();
+    stage?.react('admire');
+  }
+  function resetFace() {
+    sim.appearance.face = {};
+    stage?.frameFace();
   }
 
   // Voice: a sample line in the resident's own voice at their age (a baby's as the child they'll be).
@@ -614,6 +635,39 @@
           <div class="field">
             <span class="eyebrow">Eyes</span>
             {@render colors('eyes', 'Eye colour')}
+          </div>
+          <div class="field">
+            <div class="pane-head">
+              <span class="eyebrow">Face</span>
+              <span class="row">
+                <button class="btn" aria-label="Random face" title="Random face" onclick={rollFace}>
+                  <Icon name="icon.ui.dice" size={18} />
+                </button>
+                <button class="btn" aria-label="Even face" title="Back to an even face" disabled={!faceChanged} onclick={resetFace}>
+                  <Icon name="icon.ui.undo" size={18} />
+                </button>
+              </span>
+            </div>
+            {#each FACE_GROUPS as group (group.name)}
+              <span class="face-group">{group.name}</span>
+              <div class="face-grid">
+                {#each group.channels as c (c.id)}
+                  <label class="slider">
+                    <input
+                      type="range"
+                      aria-label={c.label}
+                      min="-1"
+                      max="1"
+                      step="0.05"
+                      bind:value={() => sim.appearance.face?.[c.id] ?? 0, (v) => setFace(c.id, v)}
+                      onpointerdown={() => stage?.frameFace()}
+                    />
+                    <span class="scale"><span>{c.low}</span><b>{c.label}</b><span>{c.high}</span></span>
+                  </label>
+                {/each}
+              </div>
+            {/each}
+            {#if isBaby}<span class="hint small">A baby's face is still round: more of this shows as they grow.</span>{/if}
           </div>
           <div class="field">
             <span class="eyebrow">Hair</span>
@@ -1093,6 +1147,16 @@
     justify-content: space-between;
     color: var(--text-muted);
     font-size: 12px;
+  }
+  .face-group {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .face-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 18px;
   }
   .scale b {
     color: var(--text);

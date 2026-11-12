@@ -1,9 +1,9 @@
-//! How many residents a town grows to (`World::population_cap`): births and newcomers stop at
-//! `TOWN_SIMS` (64, as towns always had) in cosy and normal towns and in towns and saves without
-//! a size; only a big world grows to `MAX_SIMS` (160), which every town can hold.
+//! How many residents a town grows to: births and newcomers stop at
+//! `MAX_SIMS` (160) in every town now (cosy and normal were dropped in 0.8.0), which every town
+//! can hold.
 
 use sim_core::World;
-use sim_core::world::{MAX_SIMS, TOWN_SIMS};
+use sim_core::world::MAX_SIMS;
 
 const CONTENT: &str = r#"{
     "needs":[{"id":"energy","label":"Energy","decayPerHour":0.0}],
@@ -46,28 +46,9 @@ fn moves_in(size: Option<&str>, people: usize) -> bool {
 }
 
 #[test]
-fn cosy_and_normal_towns_grow_to_64_and_big_ones_to_160() {
-    assert_eq!(TOWN_SIMS, 64);
-    for size in [None, Some("cosy"), Some("normal")] {
-        let w = World::from_json(CONTENT, &town(size, 2), 1).unwrap();
-        assert_eq!(w.population_cap(), TOWN_SIMS, "{size:?}");
-        assert!(moves_in(size, TOWN_SIMS - 1), "{size:?}: room for one more");
-        assert!(!moves_in(size, TOWN_SIMS), "{size:?}: full at {TOWN_SIMS}");
+fn every_town_grows_to_160() {
+    for size in [None, Some("cosy"), Some("normal"), Some("big")] {
+        assert!(moves_in(size, MAX_SIMS - 1), "{size:?}: room for one more");
+        assert!(!moves_in(size, MAX_SIMS), "{size:?}: full at {MAX_SIMS}");
     }
-    let w = World::from_json(CONTENT, &town(Some("big"), 2), 1).unwrap();
-    assert_eq!(w.population_cap(), MAX_SIMS);
-    assert!(
-        moves_in(Some("big"), TOWN_SIMS),
-        "a big world has room past 64"
-    );
-    assert!(moves_in(Some("big"), MAX_SIMS - 1));
-    assert!(!moves_in(Some("big"), MAX_SIMS), "full at {MAX_SIMS}");
-}
-
-#[test]
-fn a_town_file_may_start_with_more_than_it_grows_to() {
-    // Capacity is MAX_SIMS everywhere: a cosy town made with 100 loads, it just doesn't grow.
-    let w = World::from_json(CONTENT, &town(None, 100), 1).unwrap();
-    assert_eq!(w.sims.len(), 100);
-    assert!(!moves_in(None, 100));
 }

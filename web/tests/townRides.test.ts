@@ -26,7 +26,7 @@ describe('town rides', async () => {
   const { objectInfos } = await import('../src/game/housegen');
   const { AssetRegistry } = await import('../src/assets/registry');
   const { DRIVEWAY_MIN_WIDTH, generateWorld, layoutTown, populate, useTownContent } = await import('../src/game/town');
-  const { RIDES } = await import('../src/game/townRides');
+  const { BIKES, RIDES } = await import('../src/game/townRides');
   const { frontTile } = await import('../src/game/surfaces');
   type Templates = import('../src/game/town').Templates;
 
@@ -35,8 +35,9 @@ describe('town rides', async () => {
   useTownContent(content);
   const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
-  const rides = new Set<string>(Object.values(RIDES));
-  const towns = (['medium', 'dense', 'farm'] as const).flatMap((kind) => (['cosy', 'normal'] as const).flatMap((size) => [4242, 77].map((seed) => ({ label: `${kind} ${size} ${seed}`, town: populate(content, assets, t, generateWorld(content, t, kind, seed, undefined, size)) }))));
+  const bikeDefs = new Set<string>(BIKES);
+  const rides = new Set<string>([...Object.values(RIDES), ...bikeDefs]);
+  const towns = (['medium', 'dense', 'farm'] as const).flatMap((kind) => [4242, 77].map((seed) => ({ label: `${kind} big ${seed}`, town: populate(content, assets, t, generateWorld(content, t, kind, seed)) })));
   const laid = towns.map(({ label, town }) => ({ label, town, layout: layoutTown(content, t, town, null) }));
   const size = (o: { def: string; rot: number }): [number, number] => {
     const [fw, fd] = content.object(o.def)?.footprint ?? [1, 1];
@@ -52,6 +53,7 @@ describe('town rides', async () => {
     let scooters = 0;
     let kids = 0;
     let kidsBikes = 0;
+    const kinds = new Set<string>();
     for (const { label, town, layout } of laid) {
       for (const { household, slot } of town.households) {
         const plot = layout.plots[slot];
@@ -60,9 +62,10 @@ describe('town rides', async () => {
         if (mine.length) withRides++;
         const stages = household.members.map((m) => content.stageOf(m.age)?.id);
         const n = stages.filter((s) => s && s !== 'baby' && s !== 'child').length;
-        const own = mine.filter((o) => o.def === RIDES.bike).length;
-        expect(own, `${label} plot ${slot}: at most three bicycles, one a rider`).toBeLessThanOrEqual(Math.min(3, n));
-        bikes += own;
+        const own = mine.filter((o) => bikeDefs.has(o.def));
+        expect(own.length, `${label} plot ${slot}: at most three bicycles, one a rider`).toBeLessThanOrEqual(Math.min(3, n));
+        bikes += own.length;
+        for (const o of own) kinds.add(o.def);
         riders += Math.min(3, n);
         scooters += mine.filter((o) => o.def === RIDES.scooter).length;
         kids += household.members.filter((m) => content.stageOf(m.age)?.id === 'child' && m.age >= 4).length;
@@ -72,6 +75,7 @@ describe('town rides', async () => {
     expect(households).toBeGreaterThan(40);
     expect(withRides / households).toBeGreaterThan(0.6);
     expect(bikes / riders).toBeGreaterThan(0.5);
+    expect(kinds.size, `a town's bicycles are not all alike: ${[...kinds].join(', ')}`).toBeGreaterThanOrEqual(3);
     expect(kidsBikes / Math.max(1, kids)).toBeGreaterThan(0.7);
     expect(scooters / households).toBeGreaterThan(0.06);
     expect(scooters / households).toBeLessThan(0.3);

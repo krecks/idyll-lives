@@ -34,7 +34,7 @@ import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry } from '../../assets/types';
 import type { Content } from '../../content/content';
 import type { QuiltGeometry } from '../shared/characters/blanket';
-import type { BodyData, CharacterSet } from '../shared/characters/data';
+import type { BodyData, CharacterSet, MorphSet } from '../shared/characters/data';
 import { Characters as SharedCharacters } from '../shared/characters/residents';
 import { MAX_CHARACTERS } from '../shared/characters/rig';
 import type { ResidentView, RowChange } from '../shared/characters/view';
@@ -80,6 +80,7 @@ export class PlayCanvasResidentView implements ResidentView<PartDraw, QuiltDraw,
   private readonly device: pc.GraphicsDevice;
   private poses: PoseTexture | null = null;
   private morphs: pc.Texture | null = null;
+  private bones = 0;
   private readonly shadowLayer: pc.Layer;
   private readonly parts: PartDraw[] = [];
   /** The part meshes by their draw's mesh instance (`partOf`). */
@@ -110,8 +111,17 @@ export class PlayCanvasResidentView implements ResidentView<PartDraw, QuiltDraw,
   init(set: CharacterSet, data: Float32Array, width: number, rows: number): void {
     this.poses = new PoseTexture(this.device, width, rows, data);
     const m = set.morphs;
+    this.bones = set.bones.length;
     this.morphs = m ? createMorphTexture(this.device, m) : null;
-    setResidentTextures(this.app, { poses: this.poses.texture, bones: set.bones.length, morphs: this.morphs, morphWidth: m?.width ?? 0, morphHeader: m?.headerTexels ?? 0 });
+    setResidentTextures(this.app, { poses: this.poses.texture, bones: this.bones, morphs: this.morphs, morphWidth: m?.width ?? 0, morphHeader: m?.headerTexels ?? 0 });
+  }
+
+  setMorphs(m: MorphSet): void {
+    if (!this.poses) return;
+    const old = this.morphs;
+    this.morphs = createMorphTexture(this.device, m);
+    setResidentTextures(this.app, { poses: this.poses.texture, bones: this.bones, morphs: this.morphs, morphWidth: m.width, morphHeader: m.headerTexels });
+    old?.destroy();
   }
 
   uploadPoses(): void {

@@ -53,13 +53,41 @@ pub const UNITS: [&str; 43] = [
     "noseSneerRight",
 ];
 
-/// The visemes, then the units.
-pub fn channels() -> Vec<&'static str> {
+/// A face of one's own (identity.rs, household.ts `FACE_CHANNELS`): what a resident's face has more or
+/// less of than its family's shared one, each -1..1. Morph channels after the expressions', which the
+/// runtime sets once per resident.
+pub const IDENTITY: [&str; 16] = [
+    "id.jawWidth",
+    "id.jawSquare",
+    "id.chinLength",
+    "id.chinWidth",
+    "id.cheekbones",
+    "id.cheekFullness",
+    "id.noseLength",
+    "id.noseWidth",
+    "id.noseBridge",
+    "id.browRidge",
+    "id.eyeSpacing",
+    "id.eyeTilt",
+    "id.eyeSize",
+    "id.mouthWidth",
+    "id.lipFullness",
+    "id.faceLength",
+];
+
+/// The expressions: the visemes, then the units.
+pub fn expressions() -> Vec<&'static str> {
     VISEMES.iter().chain(UNITS.iter()).copied().collect()
 }
 
+/// Every morph channel: the expressions, then the identity channels.
+pub fn channels() -> Vec<&'static str> {
+    expressions().into_iter().chain(IDENTITY).collect()
+}
+
 /// Hairstyles (household.ts HAIR_STYLES): each but `none` is a part `hair.<style>`; `hair.beard`
-/// is the facial hair of the families that have it.
+/// is the facial hair of the families that have it. Each has its soft edges in a part of their own
+/// (`wisps_part`).
 pub const HAIR_STYLES: [&str; 12] = [
     "short",
     "crop",
@@ -118,6 +146,11 @@ pub fn garments(family: &str) -> &'static [&'static str] {
 }
 
 /// Parts every body has (the face parts are characters.ts FACE_PARTS).
+/// The close-up body: the whole body one subdivision finer than `body` (level 2 for its level 1), with the
+/// same lids, lips and ears after its skin. Drawn only where one resident fills the view (the creator's
+/// stage), where `body`'s outline shows its edges; in play nothing of it is visible.
+pub const HD: &str = "hd.body";
+
 pub const FACE_PARTS: [&str; 5] = ["eyes", "brows", "lashes", "teeth", "tongue"];
 
 pub fn required_parts() -> Vec<String> {
@@ -126,6 +159,16 @@ pub fn required_parts() -> Vec<String> {
         .chain(FACE_PARTS.iter())
         .map(|s| s.to_string())
         .collect()
+}
+
+/// The part of a hair part's wisps (parts.ts `wispsOf`): `hair.<style>.wisps`.
+pub fn wisps_part(hair: &str) -> String {
+    format!("{hair}.wisps")
+}
+
+/// Whether a part is a hair part's wisps.
+pub fn is_wisps(part: &str) -> bool {
+    part.starts_with("hair.") && part.ends_with(".wisps")
 }
 
 pub fn hair_parts(family: &str) -> Vec<String> {
@@ -137,5 +180,7 @@ pub fn hair_parts(family: &str) -> Vec<String> {
     if BEARD_FAMILIES.contains(&family) {
         out.push("hair.beard".into());
     }
-    out
+    out.iter()
+        .flat_map(|p| [p.clone(), wisps_part(p)])
+        .collect()
 }

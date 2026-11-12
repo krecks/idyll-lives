@@ -1,4 +1,4 @@
-//! Writes the character set (rig.json version 4 and its binaries; docs/characters-format.md).
+//! Writes the character set (rig.json version 5 and its binaries; docs/characters-format.md).
 //!
 //! Each part in a family's `<family>.bin`: positions f32x3, normals i16x4 (w unused), joints u8x4,
 //! weights u8x4 (summing to 255), fields i16x4 (x FIELD_SCALE), tone i16x4 (x TONE_SCALE), indices

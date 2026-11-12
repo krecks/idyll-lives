@@ -78,8 +78,9 @@ interface Station {
   alone?: boolean;
   /** A second Sim (a woman) does the same in the object's second slot (two in a double bed). */
   pair?: boolean;
-  /** One Sim a slot of the object (`?seats`, `?beds`), a man, then a woman, and so on. */
+  /** One Sim a slot of the object (`?seats`, `?beds`), a man, then a woman, and so on; one only for a use that takes the whole of it (`whole`: a sofa slept on). */
   seated?: boolean;
+  whole?: boolean;
   /** The object drawn open (a wall bed folded down), and its clips for this use (interaction id or tag) held open. */
   open?: boolean;
   clips?: string[];
@@ -325,7 +326,7 @@ function seatStation(spec: string, lie: boolean): Station {
   // Whether it is open while this goes on: the use's own `leaves` / `when`, or for the plain sit, that of the way it is sat on (or else lain on).
   const way = it ?? uses.find((u) => u.pose === 'sit') ?? uses.find((u) => u.pose === 'lie');
   const open = way?.leaves === 'open' || way?.when === 'open';
-  return { label: spec, def: id, tag, pose, seated: true, open, clips: it || use ? [it?.id ?? use, tag] : undefined };
+  return { label: spec, def: id, tag, pose, seated: true, whole: !!it?.whole, open, clips: it || use ? [it?.id ?? use, tag] : undefined };
 }
 const seats = params.get('seats')?.split(',').filter(Boolean);
 const beds = params.get('beds')?.split(',').filter(Boolean);
@@ -477,7 +478,7 @@ await Promise.all(
         return { frontX: p.x, frontZ: p.z, frontYaw: p.yaw };
       };
       if (s.seated) {
-        for (let k = 0; k < slots; k++) actors.push({ station: n, ...slot(k), object: id, partner: -1, role: 0, ...front(k), inside, female: k % 2 === 1 });
+        for (let k = 0; k < (s.whole ? 1 : slots); k++) actors.push({ station: n, ...slot(k), object: id, partner: -1, role: 0, ...front(k), inside, female: k % 2 === 1 });
       } else if (!s.alone) {
         actors.push({ station: n, ...slot(0), object: id, partner: -1, role: 0, ...front(0), inside });
       }

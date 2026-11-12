@@ -41,6 +41,19 @@ const ROMPER = 'bottom.shorts';
 /** Shoes that go with formal clothes. */
 const FORMAL = new Set(['top.suit', 'bottom.suit', 'bottom.skirt']);
 
+/**
+ * How loose a garment is (0..1, the character shader's `EASE`: how far the cloth painted on the body stands off
+ * it): 1 for what hangs (a tee, a shirt, trousers), less for what fits close, 0 for what clings (swimwear, the
+ * towel) and under a shell that lies on the body (a jacket, a suit, an apron: the shell is the cloth there; a
+ * skirt, whose shell hangs round the painted bottom).
+ */
+const EASE_OF: Record<string, number> = {
+  'top.tee': 1, 'top.vneck': 1, 'top.polo': 1, 'top.long': 1, 'top.shirt': 1, 'top.blouse': 1, 'top.tank': 0.35,
+  'top.jacket': 0, 'top.suit': 0, 'top.apron': 0,
+  'bottom.trousers': 1, 'bottom.suit': 0.9, 'bottom.shorts': 1, 'bottom.capri': 0.6, 'bottom.skirt': 0,
+};
+const easeOf = (part: string): number => EASE_OF[part] ?? 0;
+
 /** Garment choices offered per gender, most common first (`pickOutfit` weights by repetition). */
 export const GARMENTS = { TOPS, BOTTOMS, SHOES: SHOE_PARTS as readonly string[] };
 
@@ -90,6 +103,11 @@ export interface OutfitParams {
   cuts: [number, number, number, number, number, number, number];
   /** The shells not drawn with it (`SHELL_BITS`): the day clothes draw all theirs (0). */
   bare: number;
+  /**
+   * How loose the top and the bottom are (0..1; `EASE_OF`): how far the painted cloth stands off the skin; and 1 if
+   * the bottom has a shell round the hips (a skirt): the top lies flat under it from the waistband down.
+   */
+  ease: [number, number, number];
 }
 
 function hash(n: number): number {
@@ -217,7 +235,7 @@ export function outfitFor(
     // A long top and trousers.
     const t = cut('top.long');
     const b = cut('bottom.trousers');
-    return { ...day, cuts: [t.sleeve ?? c[0], t.hem ?? c[1], t.crew ?? OFF, t.scoop ?? OFF, b.waist ?? c[4], b.leg ?? c[5], OFF], over: 0, bare: ALL_SHELLS };
+    return { ...day, cuts: [t.sleeve ?? c[0], t.hem ?? c[1], t.crew ?? OFF, t.scoop ?? OFF, b.waist ?? c[4], b.leg ?? c[5], OFF], over: 0, bare: ALL_SHELLS, ease: [1, 1, 0] };
   }
   const waist = cut('bottom.trousers').waist ?? 1;
   const f = fit ?? { chest: waist + 0.25, hip: waist - 0.15, knee: waist - 0.5 };
@@ -228,13 +246,13 @@ export function outfitFor(
     const towel = hexToLinear(pick(TOWELS, r(10)), TOWELS[0]);
     // The bottom's cut alone: from under the arms (round the hips) to mid-thigh (above the knees).
     const [top, hem] = male ? [waist + 0.01, f.knee + 0.15 * thigh] : [f.chest, f.knee + 0.6 * thigh];
-    return { ...day, bottom: towel, cuts: [OFF, 10, OFF, OFF, top, hem, OFF], over: 0, plain: 1, bare: ALL_SHELLS };
+    return { ...day, bottom: towel, cuts: [OFF, 10, OFF, OFF, top, hem, OFF], over: 0, plain: 1, bare: ALL_SHELLS, ease: [0, 0, 0] };
   }
   const suit = hexToLinear(pick(SWIMWEAR, r(11)), SWIMWEAR[0]);
   // Trunks; or a swimsuit, the tank top's cut down to the top of the legs.
-  if (male) return { ...day, bottom: suit, cuts: [OFF, 10, OFF, OFF, waist - 0.03, f.knee + 0.65 * thigh, OFF], over: 0, plain: 1, bare: ALL_SHELLS };
+  if (male) return { ...day, bottom: suit, cuts: [OFF, 10, OFF, OFF, waist - 0.03, f.knee + 0.65 * thigh, OFF], over: 0, plain: 1, bare: ALL_SHELLS, ease: [0, 0, 0] };
   const t = cut('top.tank');
-  return { ...day, top: suit, cuts: [t.sleeve ?? -0.62, f.hip - 0.035, t.crew ?? OFF, t.scoop ?? 0, OFF, 10, OFF], over: 0, plain: 1, bare: ALL_SHELLS };
+  return { ...day, top: suit, cuts: [t.sleeve ?? -0.62, f.hip - 0.035, t.crew ?? OFF, t.scoop ?? 0, OFF, 10, OFF], over: 0, plain: 1, bare: ALL_SHELLS, ease: [0, 0, 0] };
 }
 
 /** Day outfit (or its colours as pyjamas, `sleep`). */
@@ -302,6 +320,8 @@ function dayOutfit(id: number, gender: string, appearance: Appearance | null | u
     scalp: appearance?.hairStyle === 'none' ? 0 : 1,
     cuts,
     bare: 0,
+    // (Under an apron's shell the trousers lie closer.)
+    ease: [easeOf(topPart), easeOf(bottomPart) * (topPart === 'top.apron' ? 0.3 : 1), skirt && !romper ? 1 : 0],
   };
 }
 
@@ -317,4 +337,5 @@ export function writeOutfit(o: OutfitParams, row: Float32Array, offset: number):
   row.set([o.skinRef[0], o.skinRef[1], o.skinRef[2], c[5]], offset + 20);
   row.set([o.shoe[0], o.shoe[1], o.shoe[2], c[6]], offset + 24);
   row.set([o.eyes[0], o.eyes[1], o.eyes[2], o.scalp], offset + 28);
+  row.set([o.ease[0], o.ease[1], o.ease[2], 0], offset + 32);
 }

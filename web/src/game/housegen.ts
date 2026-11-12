@@ -19,8 +19,9 @@
  *    things go on tops (counters, tables, shelves), floor lamps and such keep to corners and out
  *    of doorways, every room gets ceiling lights enough for all of it at night, and a few things
  *    (a patio set) go into the garden, by the garden door. The furniture is for whoever lives
- *    there (`Residents`): a couple's bed for two, a bed each for everyone else, toys only where
- *    there are children, and spare bedrooms (and playrooms) as guest rooms, studies and such.
+ *    there (`Residents`): a couple's bed for two, a bed each for everyone else (a child's for
+ *    their age: no race car bed for a teenager), toys only where there are children young enough
+ *    for them, and spare bedrooms (and playrooms) as guest rooms, studies and such.
  *
  * Seeded: the same seed, lot size and config always give the same house (laid out the same for
  * any residents), so a town keeps only `gen:<lot size>:<seed>[:<garden>]` per lot (see `town.ts`).
@@ -62,14 +63,16 @@ export interface HouseGenConfig {
 
 /**
  * Who lives in a house: `couples` (a bed for two), `adults` on their own and `children` (a bed
- * each), `babies` (a crib, which the simulation brings). The layout never depends on it, only
- * the furniture: undefined is an empty house.
+ * each), `babies` (a crib, which the simulation brings); `stages`, the children's life stages
+ * (content `life.stages` ids, one each: their beds and toys are for them; absent: any child's).
+ * The layout never depends on it, only the furniture: undefined is an empty house.
  */
 export interface Residents {
   couples: number;
   adults: number;
   children: number;
   babies: number;
+  stages?: string[];
 }
 
 /** How much garden a house's lot has round it (see `fitLot`). */
@@ -91,7 +94,7 @@ export interface GardenSpec {
 
 /** A key for `residents` (empty: undefined). */
 export function residentsKey(r: Residents | undefined): string {
-  return r ? `${r.couples}.${r.adults}.${r.children}.${r.babies}` : '';
+  return r ? `${r.couples}.${r.adults}.${r.children}.${r.babies}${r.stages?.length ? `.${[...r.stages].sort().join('+')}` : ''}` : '';
 }
 
 /**
@@ -255,6 +258,8 @@ export interface ObjectInfo extends Shape {
   /** Content category and group (`residents.kidsOnly`: things only for a home with children). */
   category?: string;
   group?: string;
+  /** The life stages (content `stages` ids) that may use it, by any of its uses (undefined: anyone): the race car bed and the toy box are a child's. */
+  usedBy?: string[];
   /** How far a tree's crown reaches out from its middle (m, content `crown`): no wall closer (`crownClear`). */
   crown?: number;
 }
@@ -290,10 +295,22 @@ export function objectInfos(content: { object(id: string): ObjectDef | undefined
   return (def) => {
     if (!known.has(def)) {
       const o = content.object(def);
-      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0 || (o.stations ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles, keepClear: cooksOrWashes(o), seated: (o.interactions ?? []).some((i) => i.pose === 'sit' || i.pose === 'lie') });
+      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0 || (o.stations ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles, keepClear: cooksOrWashes(o), seated: (o.interactions ?? []).some((i) => i.pose === 'sit' || i.pose === 'lie'), usedBy: usedBy(o) });
     }
     return known.get(def);
   };
+}
+
+/** The life stages that may use `o` (`ObjectInfo.usedBy`): its uses' `stages`, else the object's; undefined if one is anyone's. */
+function usedBy(o: ObjectDef): string[] | undefined {
+  const each = (o.interactions ?? []).filter((i) => !i.baby).map((i) => i.stages ?? o.stages);
+  if (!each.length) return o.stages;
+  return each.some((s) => !s) ? undefined : [...new Set(each.flatMap((s) => s ?? []))];
+}
+
+/** Whether someone of life stage `stage` may use `o` (`ObjectInfo.usedBy`; no stage: anyone may). */
+function usableAt(o: ObjectInfo | undefined, stage: string | undefined): boolean {
+  return !o?.usedBy || !stage || o.usedBy.includes(stage);
 }
 
 interface Rect {
@@ -1162,13 +1179,20 @@ interface Plan {
  * two, an adult's with any bed, a child's with a child's bed and toys; short of bedrooms,
  * children share one (two beds, else a bunk bed), then adults (two single beds, else a bunk bed); a bedroom
  * nobody sleeps in is a guest room or a room of another kind (a study), as is a playroom in a
- * home without children. An empty house (`residents` undefined) keeps its bedrooms as they are.
+ * home without children. A child's bed is one every child of the home may sleep in at their
+ * stage (`Residents.stages`: the race car bed is a child's, not a teenager's; none such, a single
+ * bed), and the things only for children (`kidsOnly`) are there for a baby (who'll grow into
+ * them) or for a child of a stage that may use them. An empty house (`residents` undefined) keeps
+ * its bedrooms as they are.
  */
 function fitFor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, rooms: Room[], residents: Residents | undefined): Fit {
   const spec = cfg.residents;
   const kids = !!residents && residents.children + residents.babies > 0;
   const only = spec?.kidsOnly;
-  const keep = (o: ObjectInfo) => kids || !only || !(only.categories?.includes(o.category ?? '') || only.groups?.includes(o.group ?? ''));
+  // (No stages given: any child's.)
+  const stages: (string | undefined)[] = residents?.stages?.length ? residents.stages : [undefined];
+  const forKids = (o: ObjectInfo) => !!only && !!(only.categories?.includes(o.category ?? '') || only.groups?.includes(o.group ?? ''));
+  const keep = (o: ObjectInfo) => !forKids(o) || (!!residents && (residents.babies > 0 || (residents.children > 0 && stages.some((s) => usableAt(o, s)))));
   const fit: Fit = { plans: new Map(), keep };
   if (!spec) return fit;
   const bedroom = cfg.rooms.bedroom;
@@ -1199,12 +1223,15 @@ function fitFor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, rooms
   const order: Sleeper[] = ['couple', 'adults', 'children', 'adult', 'child'];
   sleepers.sort((a, b) => order.indexOf(a) - order.indexOf(b));
   const toys = spec.childRoom ?? [];
+  // Beds every child here may sleep in; none such, a single bed.
+  const forChildren = (beds: string[] | undefined) => beds?.filter((d) => stages.every((s) => usableAt(info(d), s)));
+  const childBeds = forChildren(spec.beds.child)?.length ? forChildren(spec.beds.child) : forChildren(spec.beds.single);
   bedrooms.forEach((r, i) => {
     const who = sleepers[i];
     if (who === 'couple') set(r, [withBeds(spec.beds.couple)]);
     else if (who === 'adults') set(r, [withBeds(spec.beds.single, 2), withBeds(spec.beds.bunk)]);
-    else if (who === 'children') set(r, [withBeds(spec.beds.child, 2, toys), withBeds(spec.beds.bunk, 1, toys), withBeds(spec.beds.single, 2)]);
-    else if (who === 'child') set(r, [withBeds(spec.beds.child, 1, toys)]);
+    else if (who === 'children') set(r, [withBeds(childBeds, 2, toys), withBeds(forChildren(spec.beds.bunk), 1, toys), withBeds(forChildren(spec.beds.single), 2)]);
+    else if (who === 'child') set(r, [withBeds(childBeds, 1, toys)]);
     else if (!who) set(r, [spare(true)]);
   });
   return fit;

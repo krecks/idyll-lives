@@ -784,7 +784,9 @@ function roundPose(f: RideFit): (p: number) => PoseSpec {
 export const RIDE_SWING = rideSizes('rideSwing', 0, 2);
 export const SWING_S = 1.6;
 function swingPose(f: RideFit): (p: number) => PoseSpec {
-  const grip = (x: number): Vec => onRide(f, [x, 0.6 * f.s, 0]);
+  // (A hand's length under the shoulders: at their height the arms are folded shut, the hands beside the
+  // shoulders, and the elbows flick over as the rider leans.)
+  const grip = (x: number): Vec => onRide(f, [x, 0.52 * f.s, 0]);
   return (p) => {
     // The swing is back at the loop's quarter, forward at three quarters: the legs out on the way forward.
     const e = 0.5 - 0.5 * Math.cos(TAU * (p - 0.2));

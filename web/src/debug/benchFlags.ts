@@ -10,9 +10,11 @@
  * without tone mapping, exposure or grading: the light compared without the image processing.
  */
 
-export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still' | 'roam';
+import { isResolution, type Resolution } from '../render/shared/resolution';
 
-export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders'] as const;
+export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still' | 'roam' | 'street' | 'town';
+
+export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'noao', 'noclouds', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders'] as const;
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
 
 export interface BenchFlags {
@@ -27,8 +29,8 @@ export interface BenchFlags {
   /** `?hour=`: the lighting held at that hour (the renderer reads it itself); null: the game's clock. */
   hour: number | null;
   cam: BenchCamera;
-  /** Render scale: 0.5..1, or `auto` (the player's resolution setting). */
-  res: number | 'auto';
+  /** Resolution (`render/shared/resolution.ts`): 720, 1080, 1440 or 2160, or `auto` (the player's setting); `1`, the old full scale, is 2160 (every line the window has). */
+  res: Resolution | 'auto';
   /** Seconds measured, after `warmup` seconds of the same camera path. */
   secs: number;
   warmup: number;
@@ -45,6 +47,8 @@ export interface BenchFlags {
   hold: boolean;
   /** The orbit's radius and angle from vertical instead of its path's (`radius=`, `beta=`), and its target moved by (`tx=`, `tz=`, m): a close look at the lawn. */
   orbit: { radius: number | null; beta: number | null; tx: number; tz: number };
+  /** `walls=up|cutaway|down`: the walls held that way (`up` from the game's distance shows the house whole, roof on); null: the game's own. */
+  walls: 'up' | 'cutaway' | 'down' | null;
   diag: ReadonlySet<BenchDiag>;
   /** Free text kept with the result (the runner's matrix cell). */
   label: string;
@@ -70,7 +74,8 @@ function parse(): BenchFlags | null {
   const cam = params.get('cam');
   const diag = benchDiag();
   const res = params.get('res');
-  const camera: BenchCamera = cam === 'wide' || cam === 'build' || cam === 'dusk' || cam === 'mirror' || cam === 'mirror-still' || cam === 'roam' ? cam : 'orbit';
+  const walls = params.get('walls');
+  const camera: BenchCamera = cam === 'wide' || cam === 'build' || cam === 'dusk' || cam === 'mirror' || cam === 'mirror-still' || cam === 'roam' || cam === 'street' || cam === 'town' ? cam : 'orbit';
   const frozen = diag.has('freeze');
   return {
     scene,
@@ -79,7 +84,7 @@ function parse(): BenchFlags | null {
     quality: quality === 'low' || quality === 'medium' || quality === 'high' ? quality : null,
     hour: params.has('hour') && Number.isFinite(Number(params.get('hour'))) ? Number(params.get('hour')) : null,
     cam: camera,
-    res: res === 'auto' || res === null ? 'auto' : num('res', 1, 0.5, 1),
+    res: res === 'auto' || res === null ? 'auto' : res === '1' ? 2160 : isResolution(Number(res)) ? (Number(res) as Resolution) : 'auto',
     secs: num('secs', 20, 0, 600),
     warmup: num('warmup', 5, 0, 120),
     cap: num('cap', 0, 0, 1000),
@@ -90,6 +95,7 @@ function parse(): BenchFlags | null {
     at: num('at', 0, 0, 3600),
     hold: params.get('hold') === '1',
     orbit: { radius: params.has('radius') ? num('radius', 24, 2, 200) : null, beta: params.has('beta') ? num('beta', 0.9, 0.1, 1.5) : null, tx: num('tx', 0, -200, 200), tz: num('tz', 0, -200, 200) },
+    walls: walls === 'up' || walls === 'cutaway' || walls === 'down' ? walls : null,
     diag,
     label: params.get('label') ?? '',
   };

@@ -42,7 +42,7 @@ export function landWorld(world: WorldStructure): WorldStructure {
 }
 
 /** The land part of a grass field: all of it but the town's mask (`townGrass` makes it, and the patches, on the page). */
-export type LandGrass = Omit<GrassField, 'town' | 'townW' | 'townD' | 'patches'>;
+export type LandGrass = Omit<GrassField, 'town' | 'townW' | 'townD' | 'shade' | 'lawn' | 'patches'>;
 
 /**
  * The land as the worker lays it out: `pc/nature.ts`'s `Landscape` without what it draws (the
@@ -69,7 +69,7 @@ export class Land extends LandscapeLayout {
 
 /** A grass field from its land part (the worker's) and the town's mask made here, as `grassField` makes it whole. */
 export function withTownGrass(land: LandGrass, world: WorldStructure): GrassField {
-  const field: GrassField = { ...land, townW: 0, townD: 0, town: new Uint8Array(0), patches: new Uint8Array(land.pw * land.pd) };
+  const field: GrassField = { ...land, townW: 0, townD: 0, town: new Uint8Array(0), shade: new Uint8Array(0), lawn: new Uint8Array(0), patches: new Uint8Array(land.pw * land.pd) };
   townGrass(field, world);
   return field;
 }

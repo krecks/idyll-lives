@@ -312,40 +312,53 @@ pub fn diff(a: &Path, b: &Path) -> Result<Report, String> {
     let read = |dir: &Path, f: &str| {
         std::fs::read(dir.join(f)).map_err(|e| format!("{}: {e}", dir.join(f).display()))
     };
+    // A body's or a stage's own files (`mesh`, `parts`), or its close-up body's (`hd`: laid out the same).
+    let of = |e: &'_ JValue, hd: bool| {
+        if hd {
+            e.get("hd").cloned()
+        } else {
+            Some(e.clone())
+        }
+    };
     for (fam, body_a) in ra.at("bodies").obj() {
         let Some(body_b) = rb.at("bodies").get(fam) else {
             continue;
         };
-        let (ba, bb) = (
-            read(a, body_a.at("mesh").str())?,
-            read(b, body_b.at("mesh").str())?,
-        );
-        for (name, ea) in body_a.at("parts").obj() {
-            let Some(eb) = body_b.at("parts").get(name) else {
+        for hd in [false, true] {
+            let (Some(pa), Some(pb)) = (of(body_a, hd), of(body_b, hd)) else {
                 continue;
             };
-            cmp_part(&mut r, &format!("{fam}:{name}"), ea, eb, &ba, &bb);
-        }
-        for (stage, sa) in body_a.at("stages").obj() {
-            let Some(sb) = body_b.at("stages").get(stage) else {
-                continue;
-            };
-            let (ba, bb) = (read(a, sa.at("mesh").str())?, read(b, sb.at("mesh").str())?);
-            for (name, ea) in sa.at("parts").obj() {
-                let (Some(eb), Some(base)) =
-                    (sb.at("parts").get(name), body_a.at("parts").get(name))
-                else {
+            let (ba, bb) = (read(a, pa.at("mesh").str())?, read(b, pb.at("mesh").str())?);
+            for (name, ea) in pa.at("parts").obj() {
+                let Some(eb) = pb.at("parts").get(name) else {
                     continue;
                 };
-                cmp_stage_part(
-                    &mut r,
-                    &format!("{fam}.{stage}:{name}"),
-                    base.at("vertices").usize(),
-                    ea,
-                    eb,
-                    &ba,
-                    &bb,
-                );
+                cmp_part(&mut r, &format!("{fam}:{name}"), ea, eb, &ba, &bb);
+            }
+            for (stage, sa) in body_a.at("stages").obj() {
+                let Some(sb) = body_b.at("stages").get(stage) else {
+                    continue;
+                };
+                let (Some(sa), Some(sb)) = (of(sa, hd), of(sb, hd)) else {
+                    continue;
+                };
+                let (ba, bb) = (read(a, sa.at("mesh").str())?, read(b, sb.at("mesh").str())?);
+                for (name, ea) in sa.at("parts").obj() {
+                    let (Some(eb), Some(base)) =
+                        (sb.at("parts").get(name), pa.at("parts").get(name))
+                    else {
+                        continue;
+                    };
+                    cmp_stage_part(
+                        &mut r,
+                        &format!("{fam}.{stage}:{name}"),
+                        base.at("vertices").usize(),
+                        ea,
+                        eb,
+                        &ba,
+                        &bb,
+                    );
+                }
             }
         }
     }

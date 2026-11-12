@@ -435,12 +435,14 @@ pub(crate) fn update(w: &mut World) {
         plots,
         tile_plot,
         reach,
+        travel,
         ..
     } = w;
     let nav = NavGrid {
         lot,
         blocked,
         stairs,
+        kept_off: &travel.junction_tiles,
     };
     // (Round other people's gardens, as for any walk.)
     let walk = |sim: &Sim, goal| grounds(tile_plot, plots, households, &nav, sim, goal);

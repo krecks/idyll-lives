@@ -58,7 +58,7 @@ describe('country roads', async () => {
     test(
       `big ${kind} ${seed} (${name}): no country road runs alongside another a few metres off`,
       () => {
-        const town = generateWorld(content, t, kind, seed, undefined, 'big');
+        const town = generateWorld(content, t, kind, seed);
         expect(town.name).toBe(name);
         expect(alongside(town.roads)).toEqual([]);
       },

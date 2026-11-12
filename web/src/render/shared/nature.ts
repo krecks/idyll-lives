@@ -14,6 +14,7 @@ import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
 import { fbm, hash, mulberry32, smoothstep, valueNoise } from '../../game/noise';
+import { tuned } from '../tune';
 import { shareAt, ZoneField } from './zones';
 
 /**
@@ -169,6 +170,8 @@ export interface LawnPlacement {
   tiles: number[];
   /** Which group an instance at (x, z) is drawn in (a big world's: squares the game leaves out past a distance); none: one draw. */
   cell?: (x: number, z: number) => string;
+  /** They keep a tile's distance from what hides the lawn (`LawnLayer.clear`). */
+  clear?: boolean;
 }
 
 /** Lawn flowers as drawn: each instance's original matrix and town tile (-1 outside the town), its matrix as drawn (`shown`) and whether it's hidden. */
@@ -179,6 +182,11 @@ export interface LawnLayer<D> {
   shown: Float32Array;
   tiles: Int32Array;
   hidden: Uint8Array;
+  /**
+   * They are hidden on the tiles next to a hidden one too (a house's walls, a thing in the garden): a patch of
+   * flowers is a tile wide and spills over its tile's edge, onto a doorstep or against a wall's foot.
+   */
+  clear?: boolean;
 }
 
 /** Where the lawn is hidden (`refreshLawn`): per town tile, and the split tiles' diagonals. */
@@ -264,11 +272,24 @@ export function lawnMask(world: WorldStructure): LawnMask {
  * wall, each follows the half it stands in.
  */
 export function hideLawn<D>(layers: readonly LawnLayer<D>[], { width, hidden, splitAxis }: LawnMask, upload: (layer: LawnLayer<D>) => void): void {
+  // (For the layers that keep clear: whether a tile or one of the eight round it is hidden, at all.)
+  let near: Uint8Array | undefined;
+  const nearHidden = (): Uint8Array => {
+    if (near) return near;
+    near = new Uint8Array(hidden.length);
+    const depth = Math.floor(hidden.length / width);
+    for (let i = 0; i < hidden.length; i++) {
+      if (!hidden[i]) continue;
+      const [x, z] = [i % width, Math.floor(i / width)];
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (x + dx >= 0 && x + dx < width && z + dz >= 0 && z + dz < depth) near[(z + dz) * width + x + dx] = 1;
+    }
+    return near;
+  };
   for (const layer of layers) {
     let changed = false;
     for (let k = 0; k < layer.tiles.length; k++) {
       const t = layer.tiles[k];
-      let hide = t >= 0 ? hidden[t] : 0;
+      let hide = t >= 0 ? (layer.clear ? nearHidden()[t] : hidden[t]) : 0;
       if (hide > 1) {
         // The flower's position within its tile decides its half.
         const fx = layer.base[k * 16 + 12] - (t % width);
@@ -291,10 +312,10 @@ export function hideLawn<D>(layers: readonly LawnLayer<D>[], { width, hidden, sp
 }
 
 /** A lawn layer of `indices` into `matrices` (and their tiles), drawn by `draws`. */
-export function lawnLayer<D>(draws: D[], matrices: readonly ArrayLike<number>[], tiles: readonly number[], indices: readonly number[]): LawnLayer<D> {
+export function lawnLayer<D>(draws: D[], matrices: readonly ArrayLike<number>[], tiles: readonly number[], indices: readonly number[], clear = false): LawnLayer<D> {
   const base = new Float32Array(indices.length * 16);
   indices.forEach((k, i) => base.set(matrices[k], i * 16));
-  return { draws, base, shown: new Float32Array(base), tiles: Int32Array.from(indices, (k) => tiles[k]), hidden: new Uint8Array(indices.length) };
+  return { draws, base, shown: new Float32Array(base), tiles: Int32Array.from(indices, (k) => tiles[k]), hidden: new Uint8Array(indices.length), ...(clear ? { clear } : {}) };
 }
 
 /** A model's copies grouped by `group` (each group's indices into `items`, in their order): the woods' and the street's draw groups. */
@@ -333,7 +354,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   private woodsAsked: { at: string; plants: readonly PlantPlacement[] } | null = null;
 
   /**
-   * `lawnDensity`: the share of the lawn's flowers drawn (Low: half); `lawnLod` 1 draws
+   * `lawnDensity`: the share of the lawn's flowers drawn (Low: half, and none of the patches in their drifts); `lawnLod` 1 draws
    * them in their far versions (Low, as the street's models: `QualitySettings.streetLod`); `woodsCell`:
    * the side (m) of the squares the game draws the woods in (0: the `FOREST_SECTORS`;
    * `QualitySettings.woodsCell`); `bigWoodsCell`: a big world's (`OpenWorldQuality.woodsCell`).
@@ -797,7 +818,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         const n = rand() < 0.5 ? 2 : 1;
         for (let k = 0; k < n * TUFT_DRAWS; k++) rand();
         // (A big world's water is on its tiles: no flowers in it.)
-        if (rand() < 0.06 && !(this.zones && this.waterEdge(x + 0.5, z + 0.5) > -BEACH * 0.6)) {
+        // In drifts a few metres across, as daisies and clover grow, with a single one here and there between them.
+        const drift = smoothstep(FLOWER_DRIFTS.from, FLOWER_DRIFTS.full, valueNoise(x / FLOWER_DRIFTS.span, z / FLOWER_DRIFTS.span, this.seed + 421));
+        if (rand() < FLOWER_DRIFTS.single + FLOWER_DRIFTS.dense * drift && !(this.zones && this.waterEdge(x + 0.5, z + 0.5) > -BEACH * 0.6)) {
           flowers.push(scatter(x, z, rand, 0.8 + rand() * 0.5));
           flowerTiles.push(i);
         }
@@ -821,18 +844,88 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       flowers.push(placed(scale, scale, scale, yaw, px, this.heightAt(x, z), pz));
       flowerTiles.push(-1);
     }
+    // Where they gather, patches of one kind of small flower, so a drift reads as one from the game's camera: daisies
+    // in most, buttercups or violets in others, more of them towards a drift's middle. (Draws of their own: the
+    // flowers above stand where they always have.)
+    const patchRand = mulberry32(this.seed ^ 0x5d21f);
+    const patches = FLOWER_PATCHES.kinds.map((kind) => ({ kind, matrices: [] as Float32Array[], tiles: [] as number[] }));
+    // (On the plots' mown lawns: the rough grass between them is over their heads. And a tile clear of paving: a patch
+    // spills over its tile's edge, and stood on a path or a drive.)
+    const pavedNear = unlawned(world, true);
+    const clearOfPaving = (x: number, z: number): boolean => {
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const [nx, nz] = [x + dx, z + dz];
+          if (nx >= 0 && nx < world.width && nz >= 0 && nz < groundDepth(world) && pavedNear[nz * world.width + nx]) return false;
+        }
+      }
+      return true;
+    };
+    const mown = new Uint8Array(paved.length);
+    for (const p of world.plots ?? []) {
+      for (let z = Math.max(0, p.z); z < Math.min(groundDepth(world), p.z + p.d); z++) mown.fill(1, z * world.width + Math.max(0, p.x), z * world.width + Math.min(world.width, p.x + p.w));
+    }
+    // (None on a lighter lawn, Low's: they measured 0.08 ms of GPU a frame there, on WebGL2.)
+    for (let z = 0; z < (this.lawnDensity >= 1 ? groundDepth(world) : 0); z++) {
+      if (z % 8 === 0) await pace?.();
+      for (let x = 0; x < world.width; x++) {
+        const i = z * world.width + x;
+        if (paved[i] || !mown[i] || !clearOfPaving(x, z)) continue;
+        const drift = smoothstep(FLOWER_PATCHES.from, FLOWER_PATCHES.full, valueNoise(x / FLOWER_DRIFTS.span, z / FLOWER_DRIFTS.span, this.seed + 421));
+        if (drift <= 0 || (this.zones && this.waterEdge(x + 0.5, z + 0.5) > -BEACH * 0.6)) continue;
+        const which = valueNoise(x / FLOWER_PATCHES.kindSpan, z / FLOWER_PATCHES.kindSpan, this.seed + 433);
+        const into = patches[which < FLOWER_PATCHES.split[0] ? 0 : which < FLOWER_PATCHES.split[1] ? 1 : 2];
+        const n = Math.floor(drift * FLOWER_PATCHES.dense + patchRand());
+        for (let k = 0; k < n; k++) {
+          into.matrices.push(scatter(x, z, patchRand, 0.85 + patchRand() * 0.5));
+          into.tiles.push(i);
+        }
+      }
+    }
     // A lighter lawn keeps every so many of them, the same ones each time (the placement above is unchanged).
     const d = this.lawnDensity;
     const thin = <T>(list: T[]) => (d >= 1 ? list : list.filter((_, k) => Math.floor((k + 1) * d) > Math.floor(k * d)));
     // (Flowers are sparse: too few triangles for groups to pay; but a big world's are a kilometre of them, in squares.)
     const cell = this.built ? (x: number, z: number) => `${Math.floor(x / BIG_FLOWERS_CELL)}:${Math.floor(z / BIG_FLOWERS_CELL)}` : undefined;
-    return [{ key: 'model.flowers', matrices: thin(flowers), tiles: thin(flowerTiles), ...(cell ? { cell } : {}) }];
+    // (The patches in squares the camera leaves out when out of view, in a town too.)
+    const patchCell = cell ?? ((x: number, z: number) => `${Math.floor(x / FLOWER_PATCHES.cell)}:${Math.floor(z / FLOWER_PATCHES.cell)}`);
+    return [
+      { key: 'model.flowers', matrices: thin(flowers), tiles: thin(flowerTiles), ...(cell ? { cell } : {}) },
+      ...patches.filter((p) => p.matrices.length).map((p) => ({ key: p.kind, matrices: thin(p.matrices), tiles: thin(p.tiles), cell: patchCell, clear: true })),
+    ];
   }
 }
 
 // ---- Garden dressing ------------------------------------------------------------------
 
 export type Decor = [number, number, number, number][];
+
+/**
+ * The lawn's flowers in drifts: the noise they follow (`span` m a cell), its values where a drift begins and is
+ * full, the share of tiles with a flower in a full drift and between drifts. A little fewer in all than when
+ * six tiles in a hundred had one, wherever they were (the noise is over `from` on about a third of the land).
+ */
+const FLOWER_DRIFTS = tuned('flowers', { span: 6, from: 0.6, full: 0.76, dense: 0.22, single: 0.006 });
+
+/**
+ * The patches of small flowers where the lawn's flowers gather (`lawns`): the drifts' noise from where there are
+ * any to where there are `dense` of them a tile; their models, and the values of a wider noise (`kindSpan` m a
+ * cell) that part the first kind's drifts from the second's and the third's; `cell`: the squares (m) they are drawn in.
+ *
+ * A patch or two a garden, at the drifts' cores (`from` 0.74): as first drawn (from 0.6, 2.2 a tile) they were the
+ * busiest thing outside the house and sparkled as the camera moved (a tenth more of a play picture's pixels
+ * changed under a quarter-pixel move; now a fiftieth more), and they stood on paths, at doorsteps and against the
+ * foot of walls: now a tile clear of paving, of the house and of what stands in the garden (`LawnLayer.clear`).
+ */
+const FLOWER_PATCHES = tuned('patches', {
+  from: 0.74,
+  full: 0.92,
+  dense: 1.6,
+  kinds: ['model.flowers.daisies', 'model.flowers.buttercups', 'model.flowers.violets'],
+  kindSpan: 17,
+  split: [0.52, 0.64],
+  cell: 32,
+});
 
 /** Clear distances for lot trees (trunk to edge, metres). */
 const TREE_CLEAR = { street: 3.0, path: 1.3, house: 2.2, object: 1.0 };
@@ -874,16 +967,21 @@ function clearTreeSpot(x: number, z: number, world: WorldStructure, view: { x: n
   return null;
 }
 
-/** The garden dressing (`natureDecor`'s) as placed, for the birds. */
+/** Fallen petals under a lot's tree in blossom (`natureDecor`): no plant (no bird lives in it, and it casts no shadow). */
+export const PETALS = 'model.flowers.petals';
+/** How far they lie, of the model's 2.3 m at a tree's scale 1. */
+const PETALS_SPREAD = 1.05;
+
+/** The garden dressing (`natureDecor`'s) as placed, for the birds: its plants (not the petals fallen from them). */
 export function decorPlants(decor: readonly [string, Decor][]): PlantPlacement[] {
-  return decor.flatMap(([key, items]) => items.map(([x, z, s, yaw]) => ({ key, x, y: 0, z, sx: s, sy: s, sz: s, yaw })));
+  return decor.flatMap(([key, items]) => (key === PETALS ? [] : items.map(([x, z, s, yaw]) => ({ key, x, y: 0, z, sx: s, sy: s, sz: s, yaw }))));
 }
 
 /**
  * Splits the house builder's garden dressing (`model.tree` lot trees, `model.bush` foundation
  * shrubs; items are [x, z, scale, yaw]) into species. Lot trees mix oaks, maples, blossom, fruit,
- * birch, magnolia and Japanese maple; each house gets either a clipped hedge along its walls or a
- * mixed border of shrubs, hydrangeas, roses, lavender and clipped balls. Deterministic per position.
+ * birch, magnolia and Japanese maple, with fallen petals under the two in blossom; each house gets either a clipped hedge along its walls or a
+ * mixed border of shrubs, hydrangeas, roses, lavender, clipped balls and beds of lupins and marigolds. Deterministic per position.
  */
 export function natureDecor(key: string, items: Decor, world?: WorldStructure, view?: { x: number; z: number; w: number; d: number } | null): [string, Decor][] {
   const out = new Map<string, Decor>();
@@ -901,6 +999,8 @@ export function natureDecor(key: string, items: Decor, world?: WorldStructure, v
       const species =
         h < 0.24 ? 'model.tree' : h < 0.4 ? 'model.tree.maple' : h < 0.55 ? 'model.tree.blossom' : h < 0.68 ? 'model.tree.fruit' : h < 0.8 ? 'model.tree.birch' : h < 0.9 ? 'model.tree.magnolia' : 'model.tree.japaneseMaple';
       put(species, [spot[0], spot[1], item[2], item[3]]);
+      // A tree in blossom has shed some of it: petals on the lawn under its crown.
+      if (species === 'model.tree.blossom' || species === 'model.tree.magnolia') put(PETALS, [spot[0], spot[1], item[2] * PETALS_SPREAD, item[3]]);
     }
   } else if (key === 'model.bush' && items.length) {
     // One border style per house (the first shrub's position stands in for the lot).
@@ -913,9 +1013,10 @@ export function natureDecor(key: string, items: Decor, world?: WorldStructure, v
         const alongX = Math.abs(x - Math.floor(x) - 0.5) < 0.05;
         put('model.hedge', [x, z, 0.95 + (s - 0.55) * 0.2, alongX ? 0 : Math.PI / 2]);
       } else {
-        // A mixed border: green shrubs with hydrangeas, roses, lavender and clipped balls among them.
+        // A mixed border: green shrubs with hydrangeas, roses, lavender and clipped balls among them, and a bed of
+        // lupins or marigolds here and there (the plain green shrub was three in ten of it, and most of what showed).
         const kind =
-          h < 0.3 ? 'model.bush' : h < 0.45 ? 'model.bush.flowering' : h < 0.55 ? 'model.bush.small' : h < 0.67 ? 'model.garden.hydrangea' : h < 0.78 ? 'model.garden.rosebush' : h < 0.89 ? 'model.garden.lavender' : 'model.garden.boxwood';
+          h < 0.18 ? 'model.bush' : h < 0.31 ? 'model.bush.flowering' : h < 0.4 ? 'model.bush.small' : h < 0.52 ? 'model.garden.hydrangea' : h < 0.63 ? 'model.garden.rosebush' : h < 0.73 ? 'model.garden.lavender' : h < 0.81 ? 'model.garden.boxwood' : h < 0.91 ? 'model.garden.lupins' : 'model.garden.marigolds';
         put(kind, [x, z, s * (kind.startsWith('model.garden') ? 1.25 : 1.1), item[3]]);
       }
     }
@@ -955,6 +1056,8 @@ export const WIND = {
 export const WIND_KIND: Record<string, [number, number, number, number]> = {
   'material.finish.bark': [WIND.bend, 0, 0, 0],
   'material.finish.foliage': [WIND.bend, 0.012, 3.1, 1.5],
+  // (A tree's leaf cards, as the leaves they are.)
+  'material.finish.leafcards': [WIND.bend, 0.012, 3.1, 1.5],
 };
 
 /**
@@ -987,7 +1090,7 @@ export function windDirection(yaw: number, sx: number, sz: number, out: { x: num
   out.z = -along * s + across * c;
 }
 
-/** What the lawn grows round (`lawnMask`, `bareTiles`, the grass's walls): rooms, things, walls, diagonals, floors, paths and fields. */
+/** What the lawn grows round (`lawnMask`, `bareTiles`, the grass's walls, the lawn's map): rooms, things, walls, diagonals, floors, fences, doors, plots, paths and fields. */
 export interface LawnInputs {
   width: number;
   rooms: ArrayLike<number>;
@@ -1005,9 +1108,16 @@ export function lawnInputs(world: WorldStructure): LawnInputs {
     rooms: world.rooms,
     things,
     defs: world.objects.map((o) => o.def).join(),
-    edges: JSON.stringify([world.walls.length, world.diagonals, world.floors, world.walls.map((e) => `${e.axis}${e.x},${e.z}`).join()]),
+    edges: JSON.stringify([world.walls.length, world.diagonals, world.floors, world.walls.map((e) => `${e.axis}${e.x},${e.z}`).join(), lawnEdges(world)]),
     meta: [world.meta?.paths, world.meta?.streets, world.meta?.roads, world.meta?.world?.fields],
   };
+}
+
+/** What the lawn's map reads besides (`shared/lawn.ts`): the fences and gates, the doors and the plots. */
+function lawnEdges(world: WorldStructure): string {
+  const fences = (world.fences ?? []).map((e) => `${e.axis}${e.x},${e.z}${e.kind === 'gate' ? 'g' : ''}`).join();
+  const doors = world.openings.filter((o) => o.kind === 'door').map((o) => `${o.axis}${o.x},${o.z}`).join();
+  return `${fences}|${doors}|${world.plots.map((p) => `${p.x},${p.z},${p.w},${p.d}`).join()}`;
 }
 
 export function sameLawnInputs(a: LawnInputs, b: LawnInputs): boolean {

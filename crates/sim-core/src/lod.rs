@@ -40,9 +40,9 @@ impl World {
     }
 
     /// What the renderer draws of the town, a tile rectangle `[x0, z0, x1, z1)` on the ground
-    /// storey (a big town's streamed chunks round the camera; None: all of it, as in cosy and
-    /// normal towns, drawn whole). Cars out of it and `cars::SEEN_MARGIN` round it drive through
-    /// each other (`cars::sight`). Not saved: the renderer sends it again.
+    /// storey (the town's streamed chunks round the camera; None: all of it, as in a headless run).
+    /// Cars out of it and `cars::SEEN_MARGIN` round it drive through each other (`cars::sight`).
+    /// Not saved: the renderer sends it again.
     pub fn set_watch(&mut self, region: Option<[i32; 4]>) {
         self.watch = region;
     }
@@ -73,13 +73,10 @@ impl World {
     }
 
     /// Whether resident `i` is farther than `FAR` from the view (they take a turn every
-    /// `FAR_TICKS`). Only in open-world towns (`travel::Travel::open`): a cosy town's residents
-    /// keep the turns they always had.
+    /// `FAR_TICKS`).
     pub fn far_away(&self, i: usize) -> bool {
-        let (Some(s), Some([x0, z0, x1, z1])) = (
-            self.sims.get(i),
-            self.view.filter(|_| self.lod && self.travel.open),
-        ) else {
+        let (Some(s), Some([x0, z0, x1, z1])) = (self.sims.get(i), self.view.filter(|_| self.lod))
+        else {
             return false;
         };
         let [x, z] = s.pos;

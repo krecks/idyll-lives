@@ -61,18 +61,19 @@ standard, 3rd to 97th percentile (`whoLength`). The game's stage ages are `base.
 
 | Stage | Ages | Real height (m) | Median, girl / boy (m) | Rig height, f / m (m) | Real head-to-height | Rig head-to-height (`rig.rs`) |
 |---|---|---|---|---|---|---|
-| `resident.baby` | 0–2 | 0.45–0.94 | birth 0.49 / 0.50; 1 y 0.74 / 0.76; 2 y 0.86 / 0.88 | 0.675 / 0.663 (about 6–9 months) | about 1:4 | 1:3.4 |
-| `resident.child` | 2–12 | 0.83–1.70 | 6 y 1.19 / 1.18; 12 y 1.54 / 1.54 | 1.094 / 1.128 (about 5 years) | 1:5 at 2–5, 1:6 at 5–7 | 1:4.6 |
-| `resident.teen` | 13–17 | 1.45–1.88 | 13 y 1.58 / 1.64; 17 y 1.62 / 1.75 | 1.442 / 1.512 | about 1:7 from 14–15 | 1:6.0 |
-| `resident.youngAdult` | 18–29 | 1.50–1.88 | 1.63 / 1.76 | 1.67 / 1.77 | 1:7–7.5 | 1:6.5 |
-| `resident.adult` | 30–59 | 1.50–1.89 | 1.63 / 1.77 | 1.672 / 1.755 | 1:7–7.5 | 1:6.5 |
-| `resident.elder` | 60+ | 1.45–1.85 | 60–69: 1.61 / 1.74; 80+: 1.56 / – | 1.661 / 1.742 | 1:7–7.5, a little shorter, often a stoop | 1:6.4 |
+| `resident.baby` | 0–2 | 0.45–0.94 | birth 0.49 / 0.50; 1 y 0.74 / 0.76; 2 y 0.86 / 0.88 | 0.675 / 0.663 (about 6–9 months) | about 1:4 | 1:4.0 |
+| `resident.child` | 2–12 | 0.83–1.70 | 6 y 1.19 / 1.18; 12 y 1.54 / 1.54 | 1.094 / 1.128 (about 5 years) | 1:5 at 2–5, 1:6 at 5–7 | 1:5.5 |
+| `resident.teen` | 13–17 | 1.45–1.88 | 13 y 1.58 / 1.64; 17 y 1.62 / 1.75 | 1.442 / 1.512 | about 1:7 from 14–15 | 1:6.75 |
+| `resident.youngAdult` | 18–29 | 1.50–1.88 | 1.63 / 1.76 | 1.67 / 1.77 | 1:7–7.5 | 1:7.4 |
+| `resident.adult` | 30–59 | 1.50–1.89 | 1.63 / 1.77 | 1.672 / 1.755 | 1:7–7.5 | 1:7.4 |
+| `resident.elder` | 60+ | 1.45–1.85 | 60–69: 1.61 / 1.74; 80+: 1.56 / – | 1.661 / 1.742 | 1:7–7.5, a little shorter, often a stoop | 1:7.3 |
 
 - Head-to-height ratios are the classic figures for art students (`dunlop`: about 4 heads at birth, 6 at 5 years,
   7½ for adults) and match the rubric's M14 (baby about 1:4, child 1:5–6, teen 1:6.5–7, adult 1:7–7.5). Art
   canons often use 8 heads for an idealised adult.
-- The rig's heads are bigger than real at every stage (the toy look). That is a style choice; changes to `rig.rs`
-  are filed only and decided at triage (owner decision 5).
+- The rig's heads are real ones since 2026-11-10 (the owner's decision: they were 1:3.4, 1:4.6, 1:6.0, 1:6.5 and
+  1:6.4, the toy look), with the upper arm and the feet a real adult's too. `cargo characters ratios` prints every
+  body's proportions as built, beside a real adult's.
 - The girl teen at 1.442 m is just under the real 5th percentile at 13 (1.450 m). Every other stage sits inside
   its range.
 - Sleep needs per stage are in the `resident.*` kinds' `minutes` (`aasm`, `nsf`): babies 11–16 h a day with naps,
@@ -442,6 +443,10 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `sandpit` | Sandpit | 1–2 × 0.15–0.4 × 1–2 |  | build sandcastles; dig | sandcastle 15–60 | cover 0–110° | neufert | `sandbox` |
 | `bikeRack` | Bike rack with a bicycle | 1.6–2 × 0.9–1.2 × 0.4–0.7 |  | park the bike; tune it up | tuneUp 15–60 |  | neufert | `bikeRack` |
 | `cityBike` | City bike (step-through, 28 in wheels, on its stand) | 1.75–1.95 × 1–1.15 × 0.55–0.7 |  | ride to work or school; tune it up | tuneUp 15–60 |  | neufert, bikeInsightsCity | `bicycle` |
+| `mountainBike` | Mountain bike (27.5 or 29 in wheels, flat bars, suspension fork) | 1.75–1.95 × 0.95–1.15 × 0.7–0.8 |  | ride to work or school; tune it up | tuneUp 15–60 |  | neufert | `mountainBike` |
+| `roadBike` | Road bike (700c wheels, drop bars) | 1.65–1.8 × 0.9–1.05 × 0.38–0.46 |  | ride to work or school; tune it up | tuneUp 15–60 |  | neufert | `roadBike` |
+| `cargoBike` | Cargo bike (front box, long-john) | 2.4–2.75 × 1–1.15 × 0.6–0.7 |  | ride to work or school; tune it up | tuneUp 15–60 |  | neufert | `cargoBike` |
+| `eBike` | E-bike (city or trekking, battery in the frame) | 1.75–1.95 × 1–1.15 × 0.6–0.7 |  | ride to work or school; tune it up | tuneUp 15–60 |  | neufert | `eBike` |
 | `kidsBike` | Kids' bike with stabilisers (14 in wheels) | 0.95–1.05 × 0.56–0.75 × 0.35–0.6 |  | ride to school; tune it up | tuneUp 15–60 |  | argosKids14 | `bicycleChild` |
 | `eScooter` | Electric kick scooter, unfolded | 1.05–1.15 × 1.1–1.2 × 0.43–0.6 |  | ride to work or school |  |  | nbcScooter, ldlcScooter4 | `eScooter` |
 | `planter` | Planter or raised bed (flowers, herbs) | 0.4–1.2 × 0.3–0.9 × 0.3–1 |  | water and tend the plants | water 1–10, tend 10–30 |  | rhsPlants | `planterBox` `flowerbed` `garden.flowerBox` `garden.wheelbarrow` `model.street.flowerTub` `model.street.pot` `garden.geraniums` `garden.herbs` |
@@ -590,7 +595,8 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 |---|---|---|---|---|---|---|---|---|
 | `house.door` | Door leaf in its frame (interior or front door) | 0.76–0.93 × 1.98–2.11 × 0.035–0.055 |  | open and walk through; knock (visitors); shut for privacy |  | door 90–110° | din18101, neufert | `house.door` |
 | `house.window` | Window | 0.5–2.4 × 0.6–2.2 × 0.05–0.2 |  | look out; open for air |  | casement 30–90°, tiltTurn 10–15° | adKWindows, neufert | `house.window` |
-| `house.stairs` | Straight stair, one storey (2.6-3.0 m) | 0.8–1.2 × 2.4–3.1 × 2.8–4.2 |  | go up and down between storeys |  |  | adK, neufert | `stairs` `house.stairs` |
+| `house.stairs` | Straight stair, one storey (2.6-3.0 m) | 0.8–1.2 × 2.4–3.1 × 2.8–4.2 |  | go up and down between storeys |  |  | adK, neufert | `stairs` `house.stairs` `stairsOpen` |
+| `house.spiralStairs` | Spiral stair, one storey (2.6-3.0 m) | 1.2–2 × 2.4–3.1 × 1.2–2 |  | go up and down between storeys |  |  | neufert | `stairsSpiral` |
 | `house.wall` | Wall, one storey | 0.1–30 × 2.4–3.1 × 0.1–0.4 |  | divide rooms; carry pictures, cabinets and lights |  |  | neufert, adKWindows | `house.wall` |
 
 ### Cars

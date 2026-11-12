@@ -82,6 +82,8 @@ export async function createStage(options: StageOptions): Promise<Stage> {
   const assets = await AssetRegistry.load(`${base}assets/manifest.json`, params.getAll('pack'));
   // Finishes (fabric, wood, bark, foliage, ...) come from the manifest's material entries; the plants' sway in the wind.
   const lib = MaterialLibrary.for(app).setAssets(assets);
+  // (The pages' canvas is multisampled: leaf cards soften their edges with it.)
+  lib.setCutoutCoverage(true);
   installNature(app);
   const env = assets.get('environment.sky', 'image');
   // The sky lights the models (its reflections and ambient); it isn't drawn behind them.

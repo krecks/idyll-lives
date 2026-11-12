@@ -1835,6 +1835,56 @@
           "label": "Railing"
         }
       ]
+    },
+    "model.stairsOpen": {
+      "type": "model",
+      "url": "../../models/living/stairsOpen.glb",
+      "materials": {
+        "black_metal": {
+          "finish": "material.finish.metal"
+        },
+        "railing": {
+          "finish": "material.finish.metal"
+        },
+        "treads": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "treads",
+          "label": "Treads"
+        },
+        {
+          "material": "railing",
+          "label": "Railing"
+        }
+      ]
+    },
+    "model.stairsSpiral": {
+      "type": "model",
+      "url": "../../models/living/stairsSpiral.glb",
+      "materials": {
+        "railing": {
+          "finish": "material.finish.metal"
+        },
+        "spine": {
+          "finish": "material.finish.metal"
+        },
+        "treads": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "treads",
+          "label": "Treads"
+        },
+        {
+          "material": "railing",
+          "label": "Railing"
+        }
+      ]
     }
   }
 }

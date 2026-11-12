@@ -12,6 +12,7 @@ mod babies;
 mod balance;
 mod basement;
 mod beds;
+mod bedtime;
 mod behaviour;
 mod big_town;
 mod bigger_homes;

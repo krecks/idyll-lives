@@ -22,9 +22,9 @@
  *   blankets add their snippets here, or a `transformInstancingVS` of their own.
  * - `psDecl`, `psStart`: `litUserDeclarationPS`, `litUserMainStartPS` (which runs in every pass,
  *   the shadow pass included).
- * - `albedo`, `metalness`, `gloss`, `reflDir`, `emissive`: after `getAlbedo`, `getMetalness`,
- *   `getGlossiness`, `getReflDir`, `getEmission` (`diffusePS`, `metalnessPS`, `glossPS`,
- *   `reflDirPS`, `emissivePS`).
+ * - `albedo`, `opacity`, `metalness`, `gloss`, `reflDir`, `emissive`: after `getAlbedo`, `getOpacity`,
+ *   `getMetalness`, `getGlossiness`, `getReflDir`, `getEmission` (`diffusePS`, `opacityPS`,
+ *   `metalnessPS`, `glossPS`, `reflDirPS`, `emissivePS`).
  * - `combine`: `combineColor` (`combinePS`): the engine's is `combineColorEngine`.
  * - `end`: replaces `endPS` (the colour, fog, tone mapping and gamma) where its defines say so.
  * - `fogPS`: the game's haze in its materials (`fog.ts`); `reflectionEnvPS`, `reflectionEnvHQPS`:
@@ -45,13 +45,17 @@
  * Vertex snippets work on the local position, which is game space already.
  */
 
+import { benchDiag } from '../../../debug/benchFlags';
 import * as pc from '../engine';
+import { cloudShadowsOn, noCloudShadows } from '../cloudShadows';
+import { CLOUD_CODE } from './clouds';
 import { CUTAWAY } from './cutaway';
+import { CUTOUT } from './cutout';
 import { DIAG_VIEW } from './diagView';
 import { gameNormalMap } from './bump';
 import { gameFresnel, gameReflection } from './envBrdf';
 import { gameFog } from './fog';
-import { SOFT_LOOK } from './softLook';
+import { CONTACT_DIRECT, SOFT_LOOK } from './softLook';
 import { ROOM_LIGHT_CODE, ROOM_LIGHTS } from './roomLights';
 import { PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
 import { UNDERGROUND } from './underground';
@@ -86,6 +90,7 @@ export interface FeatureCode {
   psDecl?: string;
   psStart?: string;
   albedo?: string;
+  opacity?: string;
   metalness?: string;
   gloss?: string;
   reflDir?: string;
@@ -132,7 +137,7 @@ fn gamePos(p: vec3f) -> vec3f { return vec3f(p.x, p.y, -p.z); }
   },
 };
 
-const features: ShaderFeature[] = [COMMON, VERTEX_TWEAKS, PATTERN, ROOM_LIGHTS, CUTAWAY, UNDERGROUND, PLAIN_FINISH, SOFT_LOOK, DIAG_VIEW].sort((a, b) => a.priority - b.priority);
+const features: ShaderFeature[] = [COMMON, VERTEX_TWEAKS, PATTERN, CUTOUT, ROOM_LIGHTS, CUTAWAY, UNDERGROUND, PLAIN_FINISH, SOFT_LOOK, DIAG_VIEW].sort((a, b) => a.priority - b.priority);
 
 /**
  * Adds a feature (wind, blankets). Before the first material is made: the chunks
@@ -149,6 +154,11 @@ const WRAPS = {
     slot: 'albedo',
     glsl: { decl: 'void getAlbedo() {', head: 'void getAlbedo() {\n\tgetAlbedoEngine();' },
     wgsl: { decl: 'fn getAlbedo() {', head: 'fn getAlbedo() {\n\tgetAlbedoEngine();' },
+  },
+  opacityPS: {
+    slot: 'opacity',
+    glsl: { decl: 'void getOpacity() {', head: 'void getOpacity() {\n\tgetOpacityEngine();' },
+    wgsl: { decl: 'fn getOpacity() {', head: 'fn getOpacity() {\n\tgetOpacityEngine();' },
   },
   metalnessPS: {
     slot: 'metalness',
@@ -359,11 +369,17 @@ const UV0_WGSL = `
 const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
   glsl: {
     // The ambient PlayCanvas added (the sky's harmonics, occluded) is kept apart, and the sky's
-    // hemispheric fill comes in as direct light, as a hemispheric light's does.
+    // hemispheric fill comes in as direct light, as a hemispheric light's does. With contact shading
+    // (`LIT_SSAO`, `post.ts`) the fill is shaded by it in full (`softLook.ts` `combine` shades all the
+    // direct light by `CONTACT_DIRECT` of it: the fill here by the rest).
     backend: `
 	#if defined(GAME_LOOK) && defined(LIT_NEEDS_NORMAL)
 		gameAmbient = dDiffuseLight;
 		dDiffuseLight = gameHemi(litArgs_worldNormal);
+		#ifdef LIT_SSAO
+			gameContact = texture2DLod(ssaoTexture, gl_FragCoord.xy * ssaoTextureSizeInv, 0.0).r;
+			dDiffuseLight *= gameContact / mix(1.0, gameContact, ${CONTACT_DIRECT});
+		#endif
 	#endif
 `,
     sun: `
@@ -378,6 +394,10 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 	#if defined(GAME_LOOK) && defined(LIT_NEEDS_NORMAL)
 		gameAmbient = dDiffuseLight;
 		dDiffuseLight = gameHemi(litArgs_worldNormal);
+		#ifdef LIT_SSAO
+			gameContact = textureSampleLevel(ssaoTexture, ssaoTextureSampler, pcPosition.xy * uniform.ssaoTextureSizeInv, 0.0).r;
+			dDiffuseLight = dDiffuseLight * (gameContact / mix(1.0, gameContact, ${CONTACT_DIRECT}));
+		#endif
 	#endif
 `,
     sun: `
@@ -396,6 +416,8 @@ const patchedDevices = new WeakSet<pc.GraphicsDevice>();
 export function patchEngineChunks(device: pc.GraphicsDevice): void {
   if (patchedDevices.has(device)) return;
   patchedDevices.add(device);
+  // (No clouds until a renderer has some: the patch below reads their uniforms.)
+  noCloudShadows(device);
   for (const lang of ['glsl', 'wgsl'] as const) {
     const chunks = pc.ShaderChunks.get(device, lang === 'glsl' ? pc.SHADERLANGUAGE_GLSL : pc.SHADERLANGUAGE_WGSL);
     const backend = engineChunk(device, lang, 'litForwardBackendPS');
@@ -407,7 +429,9 @@ export function patchEngineChunks(device: pc.GraphicsDevice): void {
     if (!light.includes(PATCHED)) {
       const anchor = ANCHORS[lang].lightFunctionLightPS;
       // The sun kept out of basements; a forward lamp kept in its room (`roomLights.ts`).
-      chunks.set('lightFunctionLightPS', `${PATCHED}\n${replaceOnce(light, 'lightFunctionLightPS', anchor, `${anchor}${ENGINE_PATCHES[lang].sun}${ROOM_LIGHT_CODE[lang].forward}`)}`);
+      // And the sun dimmed under a cloud's shadow (`clouds.ts`), where the preset has them (`?diag=noclouds` leaves it out, to measure it).
+      const clouds = benchDiag().has('noclouds') || !cloudShadowsOn(device) ? { decl: '', sun: '' } : CLOUD_CODE[lang];
+      chunks.set('lightFunctionLightPS', `${PATCHED}\n${clouds.decl}${replaceOnce(light, 'lightFunctionLightPS', anchor, `${anchor}${ENGINE_PATCHES[lang].sun}${clouds.sun}${ROOM_LIGHT_CODE[lang].forward}`)}`);
     }
     // The lamps kept in their rooms, and out of the meshes they don't light (`roomLights.ts`).
     const clustered = engineChunk(device, lang, 'clusteredLightPS');

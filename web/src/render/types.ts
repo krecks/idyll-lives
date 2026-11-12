@@ -8,6 +8,7 @@ import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { ItemPlacement, PartColors, WorldStructure } from '../core/protocol';
 import type { Appearance } from '../game/household';
+import type { Resolution } from './shared/resolution';
 import type { VisemeTrack } from '../voice/visemes';
 
 /**
@@ -149,8 +150,8 @@ export type Shading = 'soft' | 'classic';
 
 /** Settings that can change while a game is running. */
 export interface LiveRenderOptions {
-  /** `auto` (native up to about 1920×1080 pixels) or a share of native resolution along each side, 0.5..1 (`shared/resolution.ts`). */
-  resolution: 'auto' | number;
+  /** Lines of pixels drawn: 720, 1080, 1440 or 2160, at most the screen's own (`shared/resolution.ts`). */
+  resolution: Resolution;
   cameraSensitivity: number;
   /** Frames per second at most; 0: as many as the display shows. */
   fpsCap: number;
@@ -506,6 +507,8 @@ export interface Renderer {
   gpuPasses(reset?: boolean): { name: string; ms: number; frames: number }[];
   /** Benchmark: the passes a frame draws, the GPU and what the scene holds (counts that show two runs drew the same). */
   benchInfo(): Record<string, unknown> & { passes: RenderPassInfo[] };
+  /** Benchmark: the world last drawn (its town shown as the menus' for `cam=town`), or null. */
+  benchWorld(): WorldStructure | null;
   configure(options: LiveRenderOptions): void;
   /** Small JPEG data URL of the current view, or null if capture isn't possible. */
   captureThumbnail(width: number, height: number): Promise<string | null>;

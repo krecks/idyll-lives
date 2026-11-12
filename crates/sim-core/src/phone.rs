@@ -864,11 +864,18 @@ pub(crate) fn update(w: &mut World) {
                 if t.current.as_ref().is_some_and(|a| !a.task.directed) {
                     end_activity(t, content, objects);
                 }
-                t.queue.push_front(Task {
-                    kind: TaskKind::Visit { plot: home },
-                    directed: false,
-                    routine: false,
-                });
+                // (Not as well as a visit there already on its way: they went twice, knocking
+                // again just let in, Mirrorpool.)
+                let there = |k: &TaskKind| matches!(k, TaskKind::Visit { plot } if *plot == home);
+                if !t.queue.iter().any(|q| there(&q.kind))
+                    && !t.current.as_ref().is_some_and(|a| there(&a.task.kind))
+                {
+                    t.queue.push_front(Task {
+                        kind: TaskKind::Visit { plot: home },
+                        directed: false,
+                        routine: false,
+                    });
+                }
                 if ours {
                     events.push(tick, EventKind::Invited, i, c, None);
                 }
@@ -878,11 +885,17 @@ pub(crate) fn update(w: &mut World) {
                 let Some(home) = households[sims[c].household as usize].plot else {
                     continue;
                 };
-                sims[i].queue.push_front(Task {
-                    kind: TaskKind::Visit { plot: home },
-                    directed: h.directed,
-                    routine: false,
-                });
+                let me = &mut sims[i];
+                let there = |k: &TaskKind| matches!(k, TaskKind::Visit { plot } if *plot == home);
+                if !me.queue.iter().any(|q| there(&q.kind))
+                    && !me.current.as_ref().is_some_and(|a| there(&a.task.kind))
+                {
+                    me.queue.push_front(Task {
+                        kind: TaskKind::Visit { plot: home },
+                        directed: h.directed,
+                        routine: false,
+                    });
+                }
             }
         }
     }

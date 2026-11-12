@@ -7,7 +7,7 @@
   import { untrack } from 'svelte';
   import { resetSettings, RESTART_KEYS, settings, type Settings } from '../../settings/settings.svelte';
   import type { GraphicsPreset } from '../../render/quality';
-  import { MIN_SCALE } from '../../render/shared/resolution';
+  import { RESOLUTIONS } from '../../render/shared/resolution';
   import { app } from '../app.svelte';
   import { services } from '../services';
   import { game, toast } from '../state.svelte';
@@ -173,9 +173,6 @@
   }
   const percent = (v: number) => `${Math.round(v * 100)}%`;
 
-  // Resolution: Auto, or a share of the screen's own of the player's choosing (the slider; kept while on Auto).
-  let customResolution = $state(settings.resolution === 'auto' ? 1 : settings.resolution);
-
   // Frame rate cap: a preset, or a number of the player's own (`custom`, -1 in the control).
   const FPS_PRESETS = [30, 60, 120, 0];
   const FPS_MIN = 10;
@@ -305,45 +302,29 @@
         </SettingRow>
         <SettingRow
           title="Shading"
-          hint="Soft: wide, gentle light, closer to a painting. Classic: the shading the game had before."
-          details="Soft draws every lit surface with a wide, soft ramp in the light's own colour, so golden hour stays golden, lamps stay warm and shade takes the sky's tint. Classic is the physically based shading it replaced. Water, the sky and glass that keeps its reflections have their own look either way."
+          hint="Classic: light as it falls, colours as they are. Soft: wide, gentle light, closer to a painting."
+          details="Classic is physically based shading: skin, grass and wood keep their own colours. Soft draws every lit surface with a wide, soft ramp in the light's own colour and more saturation, so golden hour stays golden, lamps stay warm and shade takes the sky's tint. Water, the sky and glass that keeps its reflections have their own look either way."
         >
           <Segmented
             label="Shading"
             bind:value={settings.shading}
             options={[
-              { value: 'soft', label: 'Soft' },
               { value: 'classic', label: 'Classic' },
+              { value: 'soft', label: 'Soft' },
             ]}
           />
         </SettingRow>
         <SettingRow
           title="Resolution"
-          hint={settings.resolution === 'auto' ? (settings.graphics === 'low' ? 'Low draws three quarters of 1920×1080; bigger screens are scaled up.' : 'Full detail up to 1920×1080; bigger screens are scaled up.') : 'Lower is softer, but much faster.'}
-          details="Auto keeps 4K and Retina screens about as fast as a 1080p one. Custom draws that share of the screen's own resolution."
+          hint="Lower is softer, but much faster."
+          details="How many lines of pixels the game draws, never more than the screen has. On a 4K or Retina screen, 1440p or 2160p is sharper and 720p or 1080p runs faster."
         >
           <Segmented
             label="Resolution"
-            value={settings.resolution === 'auto' ? 'auto' : 'custom'}
-            options={[
-              { value: 'auto', label: 'Auto' },
-              { value: 'custom', label: 'Custom' },
-            ]}
-            onchange={(v) => (settings.resolution = v === 'auto' ? 'auto' : customResolution)}
+            value={settings.resolution}
+            options={RESOLUTIONS.map((r) => ({ value: r, label: `${r}p` }))}
+            onchange={(v) => (settings.resolution = v)}
           />
-          {#if settings.resolution !== 'auto'}
-            <input
-              class="slider"
-              type="range"
-              min={MIN_SCALE}
-              max="1"
-              step="0.05"
-              aria-label="Resolution scale"
-              value={settings.resolution}
-              oninput={(e) => (settings.resolution = customResolution = Number(e.currentTarget.value))}
-            />
-            <output>{percent(settings.resolution)}</output>
-          {/if}
         </SettingRow>
         <SettingRow title="Frame rate cap" hint="A cap saves power and keeps laptops cooler." details="No cap draws as often as the display refreshes.">
           <Segmented

@@ -153,7 +153,7 @@ none.
 - Known, not changed: one stepping stone has a small dark nick on its edge (a dent in the boulder shape, a few pixels
   from the game camera).
 
-## OU6. Rides (3)
+## OU6. Rides (7)
 
 What residents ride to work or school (content `vehicle`, sim-core `ride.rs`; since 0.7.0). Furnish lists them under
 Outdoor › Bikes & scooters, and new towns stand them in most gardens (`web/src/game/townRides.ts`).
@@ -165,6 +165,10 @@ Outdoor › Bikes & scooters, and new towns stand them in most gardens (`web/src
 |---|---|---|---|---|---|---|
 | `bicycle` City bike | 2x1 · floor | tuneUp:tinker | outdoor / rides | Frame | Code | No clips: ridden, the renderer turns its wheels and cranks by code and hides its centre stand (`shared/characters/vehicles.ts` `MOUNTS`); parked, it stands on the stand. A step-through with mudguards, a bell, a wicker basket and a carrier. Ridden by teens and up at 3× walking pace. 1 draw, far version. |
 | `bicycleChild` Kids' bike | 1x1 · floor | tuneUp:tinker | outdoor / rides | Frame | Code | As the city bike, with stabilisers (no stand) and streamers on the grips. Ridden by children at 2.2× walking pace. 1 draw, far version. |
+| `mountainBike` Mountain bike | 2x1 · floor | tuneUp:tinker | outdoor / rides | Frame | Code | Knobbly tyres, a suspension fork and flat bars; no guards or basket. Ridden by teens and up at 2.8× walking pace. 1 draw, far version. |
+| `roadBike` Road bike | 2x1 · floor | tuneUp:tinker | outdoor / rides | Frame | Code | Drop bars and thin slick tyres, a slim frame and no basket: the quickest bike. Ridden by teens and up at 4.2× walking pace. 1 draw, far version. |
+| `cargoBike` Cargo bike | 3x1 · floor | tuneUp:tinker | outdoor / rides | Frame | Code | Long and low, with a wooden box up front for shopping or a small passenger, and a step-through so its rider gets on round the box. Ridden by teens and up at 2.4× walking pace. 1 draw, far version. |
+| `eBike` E-bike | 2x1 · floor | tuneUp:tinker | outdoor / rides | Frame | Code | A city bike with a battery in the frame and a motor at the pedals: quicker than the plain city bike without the road bike's crouch. Ridden by teens and up at 3.6× walking pace. 1 draw, far version. |
 | `eScooter` E-scooter | 1x1 · floor | — | outdoor / rides | Body | Code | Its wheels turn by code while ridden and its side stand is hidden; stood on its deck. Ridden by teens and up at 4× walking pace. 0.95 m long, to keep within its tile. 1 draw, far version. |
 
 **Checked:** in the sim tests (`crates/sim-core/tests/sim/travel_bikes.rs`: ridden to work and home again, a third

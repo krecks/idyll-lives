@@ -52,6 +52,7 @@ describe('a bike left out by a place', async () => {
   };
   const view: View = {
     init: () => {},
+    setMorphs: () => {},
     uploadPoses: () => {},
     uploadPoseRows: () => {},
     createPart: () => ({}),

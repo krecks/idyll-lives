@@ -58,14 +58,18 @@ export interface FencePlan {
 
 /**
  * Writes all fences and gates (null when there are none). `hedgeBoxes`: hedges as plain green boxes
- * too (Build mode's previews, which have no hedge model to hand).
+ * too (Build mode's previews, which have no hedge model to hand). `wallAt`: see `writeFences`.
  */
-export function planFences(fences: readonly FenceEdge[], styles: readonly FenceStyleDef[], { hedgeBoxes = false } = {}): FencePlan | null {
+export function planFences(
+  fences: readonly FenceEdge[],
+  styles: readonly FenceStyleDef[],
+  { hedgeBoxes = false, wallAt }: { hedgeBoxes?: boolean; wallAt?: (x: number, z: number) => boolean } = {},
+): FencePlan | null {
   if (!fences.length) return null;
   const p = new Painter(new Geo());
   const gates: GateLeaf[] = [];
   const hedges: Inst[] = [];
-  writeFences(p, fences, styles, { gates, hedges, hedgeBoxes });
+  writeFences(p, fences, styles, { gates, hedges, hedgeBoxes, wallAt });
   return { geo: p.geo, gates, hedges };
 }
 
@@ -74,12 +78,21 @@ export function planFences(fences: readonly FenceEdge[], styles: readonly FenceS
  * collects the leaves (null: they are drawn shut and not kept), `hedges` the hedge model's
  * instances (see `FencePlan.hedges`). Written in parts (the street's chunks): `postsFrom` the fences
  * round them too (a post's style is the tallest there), `postHere` the corners this part draws.
+ * `wallAt`: whether a wall ends or turns at a grid corner (`wallCorners`): a fence or gate meeting a
+ * wall there is fixed to it, with no post of its own standing in the wall.
  */
 export function writeFences(
   p: Painter,
   fences: readonly FenceEdge[],
   styles: readonly FenceStyleDef[],
-  out: { gates: GateLeaf[] | null; hedges: Inst[]; hedgeBoxes?: boolean; postsFrom?: readonly FenceEdge[]; postHere?: (x: number, z: number) => boolean },
+  out: {
+    gates: GateLeaf[] | null;
+    hedges: Inst[];
+    hedgeBoxes?: boolean;
+    postsFrom?: readonly FenceEdge[];
+    postHere?: (x: number, z: number) => boolean;
+    wallAt?: (x: number, z: number) => boolean;
+  },
 ): void {
   const styleOf = (f: FenceEdge) => styles[f.style ?? 0] ?? styles[0] ?? FALLBACK;
   // Posts where fences meet or end: once per grid corner, in the tallest style there.
@@ -94,6 +107,7 @@ export function writeFences(
       else if (f.kind === 'gate') had.gate = true;
     }
   }
+  const gateCorners = gateCornersOf(out.postsFrom ?? fences);
   for (const f of fences) {
     const style = styleOf(f);
     // Local frame: +x along the edge (0..1), +z across it.
@@ -101,8 +115,7 @@ export function writeFences(
     if (f.kind !== 'gate') {
       if (style.kind !== 'hedge') panel(p, style);
       else {
-        const [x, z] = f.axis === 'h' ? [f.x + 0.5, f.z] : [f.x, f.z + 0.5];
-        out.hedges.push(hedgeAt(x, z, f.axis));
+        out.hedges.push(hedgeOf(f, gateCorners));
         if (out.hedgeBoxes) p.paint(style.color, 0.9, 0).box(0, 0, -0.38, 1, height(style), 0.38, 'ny');
       }
       continue;
@@ -129,6 +142,8 @@ export function writeFences(
     if (!ends.has(`${post.x}:${post.z}`)) continue;
     if (out.postHere && !out.postHere(post.x, post.z)) continue;
     if ((post.style.kind === 'stone' || post.style.kind === 'hedge') && !post.gate) continue;
+    // (Against a wall: the wall holds it; a post there would stand in the wall, its faces flickering in the wall's.)
+    if (out.wallAt?.(post.x, post.z)) continue;
     p.at(post.x, post.z, 0);
     postAt(p, post.style.kind === 'hedge' ? HEDGE_GATE : post.style, post.gate);
   }
@@ -136,7 +151,58 @@ export function writeFences(
 
 /** The hedge model's instances for the hedge-style fences among `fences` (not their gates). */
 export function fenceHedges(fences: readonly FenceEdge[], styles: readonly FenceStyleDef[]): Inst[] {
-  return fences.filter((f) => f.kind === 'fence' && (styles[f.style ?? 0] ?? styles[0])?.kind === 'hedge').map((f) => (f.axis === 'h' ? hedgeAt(f.x + 0.5, f.z, 'h') : hedgeAt(f.x, f.z + 0.5, 'v')));
+  const gateCorners = gateCornersOf(fences);
+  return fences.filter((f) => f.kind === 'fence' && (styles[f.style ?? 0] ?? styles[0])?.kind === 'hedge').map((f) => hedgeOf(f, gateCorners));
+}
+
+/** The grid corners a gate hangs at (`x:z`): its posts. */
+function gateCornersOf(fences: readonly FenceEdge[]): Set<string> {
+  const corners = new Set<string>();
+  for (const f of fences) {
+    if (f.kind !== 'gate') continue;
+    corners.add(`${f.x}:${f.z}`);
+    corners.add(f.axis === 'h' ? `${f.x + 1}:${f.z}` : `${f.x}:${f.z + 1}`);
+  }
+  return corners;
+}
+
+/** How far short of a gate's post a hedge beside it stops (m): the post stands clear at the hedge's end. */
+const HEDGE_GATE_GAP = 0.12;
+
+/**
+ * A hedge edge's stretch (`hedgeAt`), but clear of a gate's post at either end (`gateCorners`), so the
+ * post isn't buried in the hedge's rounded end: moved back along its edge, `HEDGE_GATE_GAP` short of
+ * the post, at its size as planted (it overlaps the next stretch a little more; the viewed lot draws a
+ * hedge at one scale every way, so a shorter one would be lower too). Between two gates it is
+ * shortened to fit.
+ */
+function hedgeOf(f: FenceEdge, gateCorners: ReadonlySet<string>): Inst {
+  const [x, z] = f.axis === 'h' ? [f.x + 0.5, f.z] : [f.x, f.z + 0.5];
+  const plain = hedgeAt(x, z, f.axis);
+  const atStart = gateCorners.has(`${f.x}:${f.z}`);
+  const atEnd = gateCorners.has(f.axis === 'h' ? `${f.x + 1}:${f.z}` : `${f.x}:${f.z + 1}`);
+  if (!atStart && !atEnd) return plain;
+  // Along its edge (0 at its start corner, 1 at its end): the stretch as planted spans `-over`..`1 + over`.
+  const length = plain[2] * HEDGE_LENGTH;
+  let [from, scale] = [-(length - 1) / 2, plain[2]];
+  if (atStart && atEnd) {
+    from = HEDGE_GATE_GAP;
+    scale = (1 - 2 * HEDGE_GATE_GAP) / HEDGE_LENGTH;
+  } else if (atStart) from = HEDGE_GATE_GAP;
+  else from = 1 - HEDGE_GATE_GAP - length;
+  const mid = from + (scale * HEDGE_LENGTH) / 2 - 0.5;
+  const [cx, cz] = f.axis === 'h' ? [x + mid, z] : [x, z + mid];
+  return [cx, cz, scale, atStart && atEnd ? scale : plain[3], plain[4]];
+}
+
+/** The grid corners where a wall ends or turns (`x:z`), from the walls' edges: a fence meeting one there needs no post (`writeFences` `wallAt`). */
+export function wallCorners(walls: readonly { axis: 'h' | 'v'; x: number; z: number }[]): Set<string> {
+  const corners = new Set<string>();
+  for (const w of walls) {
+    corners.add(`${w.x}:${w.z}`);
+    corners.add(w.axis === 'h' ? `${w.x + 1}:${w.z}` : `${w.x}:${w.z + 1}`);
+  }
+  return corners;
 }
 
 /**
@@ -249,7 +315,8 @@ function gate(p: Painter, s: FenceStyleDef): void {
   // Diagonal brace from the hinge foot to the latch head.
   const [bx0, by0, bx1, by1] = [x0 + 0.06, y0 + 0.07, x1 - 0.06, y1 - 0.07];
   const w = 0.04;
-  for (const [z, n] of [[t + 0.002, 1], [-t - 0.002, -1]] as const) {
+  // (A centimetre proud of the frame: 2 mm flickered in the rails behind it, a hair too near for the depth buffer.)
+  for (const [z, n] of [[t + 0.01, 1], [-t - 0.01, -1]] as const) {
     p.poly([[bx0, by0, z], [bx0 + w, by0, z], [bx1, by1 - w, z], [bx1, by1, z], [bx1 - w, by1, z], [bx0, by0 + w, z]], [0, 0, n]);
   }
   if (s.kind === 'picket') {

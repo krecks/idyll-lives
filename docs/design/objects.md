@@ -149,7 +149,8 @@ The standard it set, for new models too:
 
 The game's surfaces are a dozen finishes, the `material.finish.*` entries of the base manifest:
 `matte` (roughness 0.75), `satin` (0.42), `gloss` (0.12), `metal`, `chrome`, `skin`, `hair`
-(plain), `fabric`, `wood`, `bark`, `foliage` (textured, tinted by the part's colour) and `glass`
+(plain), `fabric`, `wood`, `bark`, `foliage` (textured, tinted by the part's colour), `leafcards`
+(a tree's leaf cards: an atlas of leaf clusters, cut out by its alpha, tinted too) and `glass`
 (see-through). A model's parts are coloured per part; all the plain finishes of a model merge into
 one mesh, so a model costs one draw call for its plain parts plus one per textured or see-through
 finish it uses. The plain finishes carry their roughness and metalness in the vertex colour's alpha
@@ -252,8 +253,20 @@ room has.
   checks it (still, the same size, at most half the triangles). Give one to what is placed by the
   hundred or seen far off: trees and hedges, street lamps and benches, the farm's buildings.
 - **Plants and trees** (`render/shared/nature.ts`, drawn by `render/pc/nature.ts`) use a reduced build at a distance, for the far
-  woods too: a file's `far` (`families/plants.py`). Its parts on `foliage` and `bark` take the nature
+  woods too: a file's `far` (`families/plants.py`). Its parts on `foliage`, `leafcards` and `bark` take the nature
   shader's wind and tint.
+- **Leaf cards.** A broadleaved tree's crown is cut-out cards over dark cores, not lumpy balls (`families/plants.py`
+  `leaves`, `clad`; `trees.md`): each card a quad with a cluster of leaves from the one atlas they all share
+  (`textures/leafcards/albedo.png`, rendered from generated leaves by `cargo art --leafcards`; three clusters and a
+  dense wall of leaves for the cores), lying as a spray does, turned up and out, so the camera that looks down on the
+  tree never sees it edge-on, with the normals of the leaf mass it stands for, so the crown shades as a volume. The
+  cards stay inside the box of the lumps they replace: the tree keeps its size, its clearances and its perches. The
+  finish is alpha-tested, never blended (`MaterialEntry.cutout`; alpha to coverage on the multisampled presets, a
+  plain test on Low), drawn from both sides, and its shadow is its leaves'; `render/pc/shaders/cutout.ts` keeps the
+  clusters from thinning far off, their edges a pixel wide, and leaves out of the lens (none within 1.2 m of the eye). Same triangles as the lumps, same two draw calls
+  (bark, leaves: the cores are on the cards' finish). The far version keeps the lumps on `foliage`, and the cards'
+  colours are toned to it (`trees.py` `CARD_TONE`), so the near woods match the far. Clipped hedges, topiary, shrubs
+  and conifers are not cards.
 
 ## Moving parts
 
@@ -399,7 +412,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 | Up axis | +Y (`export_yup`) | Blender −Y becomes the game's front, +Z |
 | Modifiers | applied | Bevels and the like are baked in |
 | Selection | the model's mesh objects only | No cameras, lights or helpers in the file |
-| UVs | for parts on textured finishes (wood, fabric, bark, foliage), in metres in each part's own frame (`gamekit/uv.py`); one throughout on the plain parts beside them; none otherwise | The game tiles the finish's texture over them (`uvScale`), so grain runs along a leg and bark up a trunk; without them it projects its own by each vertex's normal, which smeared clumps of leaves |
+| UVs | for parts on textured finishes (wood, fabric, bark, foliage), in metres in each part's own frame (`gamekit/uv.py`); a leaf card's and its core's, their tile of the atlas (`families/plants.py`); one throughout on the plain parts beside them; none otherwise | The game tiles the finish's texture over them (`uvScale`), so grain runs along a leg and bark up a trunk; without them it projects its own by each vertex's normal, which smeared clumps of leaves |
 | Normals | on | Smooth and hard edges as modelled: edges over 40° sharp (round things' sides and lathes' gentle turns smooth), bevels with hardened normals (`gamekit/shapes.py`) |
 | Vertex colours | the baked shading only (`ao` as COLOR_0) | The game multiplies it in; nothing else may colour a vertex |
 | Materials | exported, one-sided | Their names and colours drive the finishes |

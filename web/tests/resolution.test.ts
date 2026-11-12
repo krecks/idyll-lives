@@ -1,27 +1,38 @@
-// The render resolution (`render/shared/resolution.ts`): `auto` draws up to a budget of pixels (the preset's
-// share of 1920×1080), a number that share of the screen along each side.
+// The render resolution (`render/shared/resolution.ts`): 720p, 1080p, 1440p or 2160p lines of pixels,
+// never more than the canvas has.
 import { describe, expect, test } from 'bun:test';
-import { PIXEL_BUDGET, renderScale } from '../src/render/shared/resolution';
-import { QUALITY } from '../src/render/quality';
+import { DEFAULT_RESOLUTION, isResolution, renderScale } from '../src/render/shared/resolution';
 
 describe('the render resolution', () => {
-  test('auto draws a 1080p screen whole and a 4K one at the budget', () => {
-    expect(renderScale(1920, 1080, 'auto')).toBe(1);
-    expect(renderScale(3840, 2160, 'auto')).toBeCloseTo(0.5);
-    expect(renderScale(1280, 720, 'auto')).toBe(1);
+  test('1080p is the default', () => {
+    expect(DEFAULT_RESOLUTION).toBe(1080);
   });
 
-  test("Low's budget is three quarters of 1080p along each side; Medium's and High's the whole", () => {
-    const budget = (p: keyof typeof QUALITY) => PIXEL_BUDGET * QUALITY[p].pixelBudget;
-    expect(renderScale(1920, 1080, 'auto', budget('low'))).toBeCloseTo(0.75);
-    expect(renderScale(3840, 2160, 'auto', budget('low'))).toBeCloseTo(0.375);
-    expect(renderScale(1920, 1080, 'auto', budget('medium'))).toBe(1);
-    expect(renderScale(1920, 1080, 'auto', budget('high'))).toBe(1);
+  test('a canvas taller than the setting is drawn at its lines, scaled up', () => {
+    // A Retina window 1600 device pixels tall.
+    expect(renderScale(1600, 1080)).toBeCloseTo(0.675);
+    expect(renderScale(1600, 720)).toBeCloseTo(0.45);
+    expect(renderScale(1600, 1440)).toBeCloseTo(0.9);
+    // A 4K screen.
+    expect(renderScale(2160, 1080)).toBe(0.5);
+    expect(renderScale(2160, 2160)).toBe(1);
   });
 
-  test('a number is that share, within 0.5..1, whatever the budget', () => {
-    expect(renderScale(1920, 1080, 0.8, PIXEL_BUDGET * 0.5)).toBe(0.8);
-    expect(renderScale(1920, 1080, 0.2)).toBe(0.5);
-    expect(renderScale(1920, 1080, 2)).toBe(1);
+  test('never more than the canvas has', () => {
+    expect(renderScale(1080, 1440)).toBe(1);
+    expect(renderScale(1080, 2160)).toBe(1);
+    expect(renderScale(700, 1080)).toBe(1);
+  });
+
+  test('no canvas yet, or a setting that is none of them, draws as 1080p would', () => {
+    expect(renderScale(0, 1080)).toBe(1);
+    expect(renderScale(2160, 0.8 as never)).toBe(0.5);
+  });
+
+  test('only the four resolutions are settings', () => {
+    expect([720, 1080, 1440, 2160].every(isResolution)).toBe(true);
+    expect(isResolution(1)).toBe(false);
+    expect(isResolution('auto')).toBe(false);
+    expect(isResolution(900)).toBe(false);
   });
 });

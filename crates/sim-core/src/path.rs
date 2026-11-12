@@ -23,33 +23,108 @@ use std::collections::BinaryHeap;
 
 use crate::lot::{CHUNK, Lot, OUTDOORS};
 
-/// One flight of stairs, one tile wide: entered at `bottom` from `foot`, climbed along `dir`
-/// for `len` steps; the top step leads to `landing` on the storey above.
+/// How a stair is shaped (content `stair`, see `ObjectDef::stair`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum StairShape {
+    /// A straight flight, one tile wide: entered from the tile in front of its bottom step.
+    #[default]
+    Flight,
+    /// A spiral in a square footprint: its steps wind round the square, and it is walked onto
+    /// from any side.
+    Spiral,
+}
+
+/// The most steps a stair may have: a four-tile flight's four, or a spiral's four, with room to
+/// spare.
+pub const MAX_STEPS: usize = 8;
+
+/// The way from step `a` to the next, `b`: one tile across (their signs).
+fn along(a: (i32, i32), b: (i32, i32)) -> (i32, i32) {
+    ((b.0 - a.0).signum(), (b.1 - a.1).signum())
+}
+
+/// One stair: the tiles walked, bottom first, and where the top step leads.
+///
+/// A flight is one tile wide and straight (`foot`, the tile in front of the bottom step, is the
+/// only way on); a spiral winds round its square footprint and is walked onto from any side
+/// (`open`). Either way the top step leads to `landing` on the storey above.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Stair {
-    pub foot: (i32, i32),
-    pub bottom: (i32, i32),
-    pub dir: (i32, i32),
+    steps: [(i32, i32); MAX_STEPS],
+    /// How many steps it has (1..=`MAX_STEPS`).
     pub len: i32,
+    pub foot: (i32, i32),
+    /// Walked onto (and off) from any side (a spiral).
+    pub open: bool,
     pub landing: (i32, i32),
 }
 
 impl Stair {
+    /// A stair over `steps` (bottom first, at most `MAX_STEPS` of them: a longer list is cut
+    /// short), entered at `foot` (ignored when `open`), leading to `landing` on the storey
+    /// above.
+    pub fn new(steps: &[(i32, i32)], foot: (i32, i32), open: bool, landing: (i32, i32)) -> Stair {
+        debug_assert!(steps.len() <= MAX_STEPS, "a stair of {} steps", steps.len());
+        let mut tiles = [(0, 0); MAX_STEPS];
+        let n = steps.len().clamp(1, MAX_STEPS);
+        tiles[..n].copy_from_slice(&steps[..n]);
+        Stair {
+            steps: tiles,
+            len: n as i32,
+            foot,
+            open,
+            landing,
+        }
+    }
+
+    /// The step tiles, bottom first.
+    pub fn tiles(&self) -> &[(i32, i32)] {
+        &self.steps[..self.len as usize]
+    }
+
+    /// Step `i`'s tile.
+    pub fn tile(&self, i: i32) -> (i32, i32) {
+        self.steps[i as usize]
+    }
+
+    pub fn bottom(&self) -> (i32, i32) {
+        self.steps[0]
+    }
+
     pub fn top(&self) -> (i32, i32) {
-        (
-            self.bottom.0 + self.dir.0 * (self.len - 1),
-            self.bottom.1 + self.dir.1 * (self.len - 1),
-        )
+        self.steps[self.len as usize - 1]
+    }
+
+    /// The way onto step `i` (from the step below it; step 0: the way it's climbed).
+    pub fn dir(&self, i: i32) -> (i32, i32) {
+        if self.len < 2 {
+            return (0, 0);
+        }
+        let i = i.clamp(1, self.len - 1) as usize;
+        along(self.steps[i - 1], self.steps[i])
+    }
+
+    /// The tile just past the top, where `landing` is above.
+    pub fn out(&self) -> (i32, i32) {
+        Stair::out_of(self.tiles())
+    }
+
+    /// The tile just past the last of `tiles`, the way they climb (nowhere for a one-step
+    /// stair).
+    pub fn out_of(tiles: &[(i32, i32)]) -> (i32, i32) {
+        let Some((&last, before)) = tiles.split_last() else {
+            return (0, 0);
+        };
+        let d = before.last().map_or((0, 0), |&b| along(b, last));
+        (last.0 + d.0, last.1 + d.1)
     }
 
     /// Which step a tile is (0 the bottom one), if it is one.
     pub fn step(&self, x: i32, z: i32) -> Option<i32> {
-        (0..self.len).find(|&i| {
-            (
-                self.bottom.0 + self.dir.0 * i,
-                self.bottom.1 + self.dir.1 * i,
-            ) == (x, z)
-        })
+        self.tiles()
+            .iter()
+            .position(|&t| t == (x, z))
+            .map(|i| i as i32)
     }
 }
 
@@ -145,9 +220,8 @@ impl StairMap {
         let mut steps: Vec<(u64, u32, i32)> = Vec::new();
         let mut links: Vec<(u64, u32, (i32, i32))> = Vec::new();
         for (f, s) in stairs.iter().enumerate() {
-            for i in 0..s.len {
-                let (x, z) = (s.bottom.0 + s.dir.0 * i, s.bottom.1 + s.dir.1 * i);
-                steps.push((tile_key(x, z), f as u32, i));
+            for (i, &(x, z)) in s.tiles().iter().enumerate() {
+                steps.push((tile_key(x, z), f as u32, i as i32));
             }
             let top = s.top();
             links.push((tile_key(top.0, top.1), 2 * f as u32, s.landing));
@@ -279,6 +353,10 @@ pub struct NavGrid<'a> {
     pub lot: &'a Lot,
     pub blocked: &'a [bool],
     pub stairs: &'a StairMap,
+    /// Of the blocked tiles, those blocked only to anyone stepping onto them (sorted tile
+    /// indices; `Travel::junction_tiles`, a lit junction's box and carriageway): one standing on
+    /// one is walked off them by the nearest way (`way_out`), never left there. Empty: none.
+    pub kept_off: &'a [usize],
 }
 
 impl NavGrid<'_> {
@@ -295,6 +373,69 @@ impl NavGrid<'_> {
                 || self.lot.room_at(x, z) != OUTDOORS)
     }
 
+    /// Whether `(x, z)` is one of the tiles blocked only to those stepping onto them (`kept_off`).
+    pub fn kept_off_at(&self, x: i32, z: i32) -> bool {
+        !self.kept_off.is_empty()
+            && self.lot.in_bounds(x, z)
+            && self
+                .kept_off
+                .binary_search(&self.lot.tile_index(x, z))
+                .is_ok()
+    }
+
+    /// From `start`, on a tile kept off (`kept_off`), the nearest way off them: a step at a time
+    /// (no diagonals) over them, to the first tile anyone may stand on; `start` first. None: not
+    /// on one, or no way off within `WAY_OUT_MOST` tiles. Kept off is only stepping onto them:
+    /// one already on them (set down there, or there when they were first kept off: Canalside's
+    /// Mila, saved in a junction's box, stood there for a day, every way out shut to her, and a
+    /// T's cars round her) always gets off.
+    pub fn way_out(&self, start: (i32, i32)) -> Option<Vec<(i32, i32)>> {
+        if !self.kept_off_at(start.0, start.1) {
+            return None;
+        }
+        let lot = self.lot;
+        let mut came: std::collections::HashMap<(i32, i32), (i32, i32)> =
+            std::collections::HashMap::new();
+        let mut todo = std::collections::VecDeque::from([start]);
+        came.insert(start, start);
+        while let Some((x, z)) = todo.pop_front() {
+            for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let (nx, nz) = (x + dx, z + dz);
+                if came.contains_key(&(nx, nz))
+                    || !lot.in_bounds(nx, nz)
+                    || !lot.edge_walkable(x, z, nx, nz)
+                {
+                    continue;
+                }
+                let free = self.can_step(x, z, nx, nz);
+                if !free
+                    && !(self.kept_off_at(nx, nz)
+                        && lot.allocated(nx, nz)
+                        && !lot.diag_blocks(nx, nz))
+                {
+                    continue;
+                }
+                came.insert((nx, nz), (x, z));
+                if free {
+                    let mut way = vec![(nx, nz)];
+                    let mut at = (x, z);
+                    while at != start {
+                        way.push(at);
+                        at = came[&at];
+                    }
+                    way.push(start);
+                    way.reverse();
+                    return Some(way);
+                }
+                if came.len() > WAY_OUT_MOST {
+                    return None;
+                }
+                todo.push_back((nx, nz));
+            }
+        }
+        None
+    }
+
     /// Whether a single step from `a` to the neighbouring tile `b` is allowed.
     pub fn can_step(&self, ax: i32, az: i32, bx: i32, bz: i32) -> bool {
         let (dx, dz) = (bx - ax, bz - az);
@@ -305,21 +446,31 @@ impl NavGrid<'_> {
         if !self.stairs.stairs.is_empty() {
             let from = self.stairs.step(ax, az);
             let to = self.stairs.step(bx, bz);
-            let along = |s: &Stair| (dx, dz) == s.dir || (dx, dz) == (-s.dir.0, -s.dir.1);
             match (from, to) {
                 (None, None) => {}
-                (Some((a, _)), Some((b, _))) => {
-                    if a != b || !along(a) {
+                (Some((a, i)), Some((b, j))) => {
+                    // From one step to the next (or back down one), along the stair: never across
+                    // a spiral's winding from its bottom step to its top, nor onto another stair.
+                    if a != b || (j - i).abs() != 1 {
+                        return false;
+                    }
+                    // `dir` is the way onto a step: up, the way onto the higher one; down, the
+                    // way onto it, walked backwards.
+                    let along = a.dir(i.max(j));
+                    let travel = if j > i { along } else { (-along.0, -along.1) };
+                    if (dx, dz) != travel {
                         return false;
                     }
                 }
                 (Some((s, i)), None) => {
-                    if i != 0 || (bx, bz) != s.foot {
+                    // Off the bottom step: a flight is left the way it's entered (its foot); a
+                    // spiral from any side.
+                    if i != 0 || (!s.open && (bx, bz) != s.foot) {
                         return false;
                     }
                 }
                 (None, Some((s, i))) => {
-                    if i != 0 || (ax, az) != s.foot {
+                    if i != 0 || (!s.open && (ax, az) != s.foot) {
                         return false;
                     }
                 }
@@ -372,6 +523,14 @@ impl NavGrid<'_> {
         }
         if start == goal {
             return Some(vec![start]);
+        }
+        // (On tiles kept off: off them the nearest way first, then on from there.)
+        if !self.tile_free(start.0, start.1)
+            && let Some(mut way) = self.way_out(start)
+        {
+            let off = way.pop()?;
+            way.extend(self.find_path_with(off, goal, grounds)?);
+            return Some(way);
         }
         match self.search(start, goal, grounds, NODE_CAP, None) {
             Search::Found(path) => return Some(path),
@@ -770,11 +929,7 @@ impl Reach {
             .stairs
             .stairs
             .iter()
-            .flat_map(|s| {
-                (0..s.len)
-                    .map(|i| (s.bottom.0 + s.dir.0 * i, s.bottom.1 + s.dir.1 * i))
-                    .chain([s.foot, s.landing])
-            })
+            .flat_map(|s| s.tiles().iter().copied().chain([s.foot, s.landing]))
             .filter(|&(x, z)| lot.in_bounds(x, z))
             .map(|(x, z)| lot.chunk_at(x, z) as u32)
             .collect();
@@ -1003,6 +1158,11 @@ impl Reach {
         let Some(to) = self.of(nav.lot, b) else {
             return true;
         };
+        // (On tiles kept off: from where the way off them comes off.)
+        let a = nav
+            .way_out(a)
+            .and_then(|way| way.last().copied())
+            .unwrap_or(a);
         match self.of(nav.lot, a) {
             Some(from) => from == to,
             None if nav.lot.in_bounds(a.0, a.1) => nav
@@ -1171,6 +1331,9 @@ enum Search {
 
 /// The most tiles a search tries before it looks for a corridor (`NavGrid::find_path_with`).
 pub const NODE_CAP: u64 = 30_000;
+/// How many tiles kept off (`NavGrid::kept_off`) the way off them looks over at most: a lit
+/// junction's box and carriageway are a few hundred.
+const WAY_OUT_MOST: usize = 4096;
 /// The most a search kept to a corridor tries.
 const CORRIDOR_CAP: u64 = 4 * NODE_CAP;
 
@@ -1314,6 +1477,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let reach = Reach::build(&nav);
         assert_eq!(reach.regions(), 2, "the room is sealed off");
@@ -1327,6 +1491,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         assert!(reach.reaches(&nav, (2, 2), (3, 3)));
         assert!(!reach.reaches(&nav, (2, 2), (8, 8)));
@@ -1340,6 +1505,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let reach = Reach::build(&nav);
         assert_eq!(reach.regions(), 1);
@@ -1355,6 +1521,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let path = nav.find_path((2, 2), (7, 2)).expect("path exists");
         assert!(
@@ -1374,6 +1541,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let path = nav.find_path((2, 2), (7, 2)).unwrap();
         let smooth = nav.smooth(&path);
@@ -1425,6 +1593,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         assert!(!nav.tile_free(4, 2), "nobody stands on a diagonal wall");
         // Orthogonal steps into the wall tile are refused from both halves.
@@ -1457,6 +1626,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         // From the lower-right side (below the wall) to the upper-left side.
         let path = nav.find_path((6, 1), (2, 4)).expect("path around the end");
@@ -1479,6 +1649,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         assert!(nav.tile_free(5, 3), "a doorway can be walked");
         let path = nav.find_path((6, 2), (4, 4)).expect("through the door");
@@ -1511,6 +1682,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         assert!(nav.can_step(1, 0, 2, 1), "along the corridor");
         assert!(nav.can_step(2, 1, 3, 2));
@@ -1529,6 +1701,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         assert!(nav.find_path((0, 0), (3, 3)).is_none());
     }
@@ -1562,6 +1735,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         // Without plots to mind, straight across the middle garden.
         let direct = nav.find_path((5, 8), (25, 8)).unwrap();
@@ -1613,6 +1787,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         // From their own garden to the neighbours' (both open to them: they're going there), the
         // two side by side: out at the front, along the street and in at the neighbours' front.
@@ -1664,6 +1839,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let grounds = Grounds {
             tile_plot: &tile_plot,
@@ -1707,6 +1883,7 @@ mod tests {
             lot: &lot,
             blocked: &blocked,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         take_search_stats();
         let before = nodes_searched();
@@ -1735,22 +1912,72 @@ mod tests {
             depth: 10,
             ..Default::default()
         };
-        let flight = |x| Stair {
-            foot: (x, 6),
-            bottom: (x, 5),
-            dir: (0, -1),
-            len: 3,
-            landing: (x, 12),
-        };
+        let flight = |x| Stair::new(&[(x, 5), (x, 4), (x, 3)], (x, 6), false, (x, 12));
         map.set_stairs(vec![flight(2), flight(5)]);
         assert_eq!(
-            map.step(5, 4).map(|(s, i)| (s.bottom, i)),
+            map.step(5, 4).map(|(s, i)| (s.bottom(), i)),
             Some(((5, 5), 1))
         );
         assert_eq!(map.step(5, 2), None);
         assert_eq!(map.link(2, 3), Some((2, 12)));
         assert_eq!(map.link(2, 12), Some((2, 3)));
         assert_eq!(map.link(3, 3), None);
+    }
+
+    #[test]
+    fn a_spiral_is_walked_round_and_onto_from_any_side() {
+        let mut lot = lot_with_wall();
+        lot.grow_depth(20);
+        let blocked = nav_of(&lot);
+        // A spiral in the middle of the ground storey: front left, front right, back right,
+        // back left, leading to the landing one tile left of it on the storey above.
+        let steps = [(3, 5), (4, 5), (4, 4), (3, 4)];
+        let mut map = StairMap {
+            depth: 10,
+            ..Default::default()
+        };
+        map.set_stairs(vec![Stair::new(&steps, (3, 5), true, (2, 14))]);
+        let nav = NavGrid {
+            lot: &lot,
+            blocked: &blocked,
+            stairs: &map,
+            kept_off: &[],
+        };
+        // Onto the bottom step from any side, and round in order.
+        assert!(nav.can_step(2, 5, 3, 5));
+        assert!(nav.can_step(3, 6, 3, 5));
+        assert!(nav.can_step(3, 5, 4, 5));
+        assert!(nav.can_step(4, 5, 4, 4));
+        assert!(nav.can_step(4, 4, 3, 4));
+        // Never across the winding: not from the bottom step to the top one, nor onto a step
+        // out of turn.
+        assert!(!nav.can_step(3, 5, 3, 4));
+        assert!(!nav.can_step(4, 5, 3, 4));
+        // Down again the way it was climbed, and off the bottom step any way.
+        assert!(nav.can_step(4, 5, 3, 5));
+        assert!(nav.can_step(3, 4, 4, 4));
+        // Off the bottom step any way, back down to the ground.
+        assert!(nav.can_step(3, 5, 2, 5));
+        assert!(nav.can_step(3, 5, 3, 6));
+        // The top step leads to the landing on the storey above, and back down.
+        assert_eq!(map.link(3, 4), Some((2, 14)));
+        assert_eq!(map.link(2, 14), Some((3, 4)));
+        // A flight is only entered at its foot.
+        map.set_stairs(vec![Stair::new(
+            &[(3, 5), (3, 4), (3, 3)],
+            (3, 6),
+            false,
+            (3, 12),
+        )]);
+        let nav = NavGrid {
+            lot: &lot,
+            blocked: &blocked,
+            stairs: &map,
+            kept_off: &[],
+        };
+        assert!(nav.can_step(3, 6, 3, 5));
+        assert!(!nav.can_step(2, 5, 3, 5));
+        assert!(!nav.can_step(3, 5, 2, 5));
     }
 
     #[test]
@@ -1767,11 +1994,13 @@ mod tests {
             lot: &small,
             blocked: &bs,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let up = NavGrid {
             lot: &tall,
             blocked: &bt,
             stairs: &NO_STAIRS,
+            kept_off: &[],
         };
         let first = flat.find_path((2, 2), (7, 2)).unwrap();
         assert!(

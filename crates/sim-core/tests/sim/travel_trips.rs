@@ -180,14 +180,15 @@ fn a_visit_to_the_next_hamlet_goes_by_car_and_back() {
 }
 
 #[test]
-fn a_cosy_town_never_drives_to_a_visit() {
-    // The same town without a size: no road network, no trips; they walk.
+fn a_town_with_no_parking_never_drives_to_a_visit() {
+    // The same town without its open-world fields: no parking to drive from or to, so no trips;
+    // they walk (every town is a big one now, cosy and normal were dropped in 0.8.0).
     let (w, _, park) = world(5);
     let content = common::content();
     let mut town: Value = serde_json::from_str(&w.save_json()).unwrap();
-    town["openWorld"]["size"] = Value::Null;
+    town["openWorld"] = Value::Object(Default::default());
     let mut w = World::from_save_json(&content, &town.to_string()).unwrap();
-    assert!(!w.travel.open);
+    assert!(w.travel.file.parking.is_empty());
     let (c, i) = w
         .cars
         .iter()

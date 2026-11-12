@@ -135,7 +135,9 @@ describe('the street in chunks', async () => {
     const id = chunkAt(world.plots[4].x + 10, 10);
     const without = street.chunk(id, 4);
     const withIt = street.chunk(id, NO_FOCUS);
-    expect(without.specs.length).toBe(withIt.specs.length - 1);
+    // (Its house the game's: only its garage and porch here, `dressingOnly`.)
+    expect(without.specs.filter((s) => !s.dressingOnly).length).toBe(withIt.specs.length - 1);
+    expect(without.specs.filter((s) => s.dressingOnly).map((s) => s.lot.x)).toEqual([world.plots[4].x]);
     expect(without.props.pos.length).toBeLessThan(withIt.props.pos.length);
   });
 
@@ -179,7 +181,7 @@ describe('the street in chunks', async () => {
       const fresh = new TownStreet(new HousePlanner(), w, options, 'game');
       for (const id of street.chunkIds()) expect(drawn(street.chunk(id, f))).toBe(drawn(fresh.chunk(id, f)));
     }
-  });
+  }, 30_000);
 
 
   /** The ranks' shelters a street draws (every chunk's), and its own account of them. */

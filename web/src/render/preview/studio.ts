@@ -36,6 +36,8 @@ export interface StudioDeps {
   emotions: readonly string[];
   /** `webgl` forces WebGL2 (as the game's renderer setting does). */
   backend: () => 'auto' | 'webgl';
+  /** The stage's resident drawn with the close-up body (`Row.closeUp`; the default). False: with the body, for a dev page that compares the two. */
+  closeUp?: boolean;
 }
 
 /** A Sim in the studio. `yaw` 0 faces the camera (+z). */
@@ -47,6 +49,12 @@ export interface Row {
   /** Emotion code (content emotion index + 1; 0 = none) and mood 0..1, as the game sends them. */
   emotion?: number;
   mood?: number;
+  /**
+   * Drawn with the close-up body (`hd.body`, fetched when first asked for; until it comes, and without it, with
+   * the body): for a resident who fills the view (the creator's stage), not for the portraits, whose outline it
+   * would move by less than half a pixel.
+   */
+  closeUp?: boolean;
 }
 
 const FIELDS = ['id', 'x', 'z', 'yaw', 'pose', 'moving', 'social', 'outcome', 'partner', 'anim', 'emotion', 'role', 'away', 'object', 'action', 'mood'] as const;
@@ -89,6 +97,8 @@ export class Studio {
   private readonly blob: Instances;
   private readonly decals: { texture: pc.Texture; material: pc.StandardMaterial }[] = [];
   private builtKey = '';
+  /** The close-up bodies asked for (`<gender>.<stage>`), each once. */
+  private readonly closeUps = new Set<string>();
   private building = false;
   private disposed = false;
   private envSettled = false;
@@ -274,15 +284,28 @@ export class Studio {
     this.canvas.remove();
   }
 
+  /** Whether row `r` is drawn with the close-up body now (asked for, and loaded). */
+  private fine(r: Row): boolean {
+    return !!r.closeUp && this.characters.hasCloseUp(r.look.gender, r.look.appearance.stage);
+  }
+
   private structureKey(): string {
-    return JSON.stringify(this.rows.map((r) => (r ? [r.look.gender, r.look.appearance, r.look.id ?? null] : null)));
+    return JSON.stringify(this.rows.map((r) => (r ? [r.look.gender, r.look.appearance, r.look.id ?? null, this.fine(r)] : null)));
   }
 
   private sync(): void {
+    // The close-up bodies asked for and not here yet: fetched once each, the rows built again as they come.
+    for (const r of this.rows) {
+      if (!r?.closeUp || this.fine(r)) continue;
+      const wanted = `${r.look.gender}.${r.look.appearance.stage ?? ''}`;
+      if (this.closeUps.has(wanted)) continue;
+      this.closeUps.add(wanted);
+      void this.characters.closeUp(r.look.gender, r.look.appearance.stage).then((ok) => ok && !this.disposed && this.sync());
+    }
     const key = this.structureKey();
     if (this.building || key === this.builtKey || this.disposed) return;
     this.building = true;
-    const sims = this.rows.flatMap((r, i) => (r ? [simInfo(i, r.look)] : []));
+    const sims = this.rows.flatMap((r, i) => (r ? [simInfo(i, r.look, this.fine(r))] : []));
     void this.characters
       .build({ sims, objects: [] }, 'rows')
       .catch((err: unknown) => console.warn('[preview] build failed', err))
@@ -412,8 +435,9 @@ export class Studio {
 
 const always = () => true;
 
-function simInfo(id: number, look: SimLook): SimInfo & { outfitId: number } {
+function simInfo(id: number, look: SimLook, closeUp: boolean): SimInfo & { outfitId: number; closeUp: boolean } {
   return {
+    closeUp,
     id,
     name: '',
     household: 0,

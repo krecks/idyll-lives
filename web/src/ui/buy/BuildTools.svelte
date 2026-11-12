@@ -24,7 +24,7 @@
       { id: 'fence', label: 'Fence', icon: 'icon.ui.fence', unit: '/m', hint: 'Drag along the grid, then add a gate', note: 'Fences keep a garden outdoors (no floor, no roof); leave a gate so nobody is shut in.' },
       { id: 'gate', label: 'Gate', icon: 'icon.ui.gate', unit: '', hint: 'Click a fence (or open ground) to fit a gate', note: 'Leave a gate so nobody is shut in.' },
       { id: 'garage', label: 'Garage', icon: 'icon.ui.garage', unit: '', hint: 'Click the driveway for one at its end, or anywhere on your lot · R turns it · click your garage to take it down', note: 'A garage for the car, outdoors on the ground. The car parks in front of one at the end of the driveway. One per home; taken down, it sells back like furniture.' },
-      { id: 'stairs', label: 'Stairs', icon: 'icon.ui.stairs', unit: '', hint: 'Click where the stairs start · R turns them · click your stairs to move them', note: 'Build the storey above first. Stairs placed in the basement lead up into a room on the ground floor. Stairs are climbed from the front; nothing can stand on the steps or where they come up.' },
+      { id: 'stairs', label: 'Stairs', icon: 'icon.ui.stairs', unit: '', hint: 'Pick a staircase, click where it starts · R turns it · click your stairs to move them', note: 'Build the storey above first. Stairs placed in the basement lead up into a room on the ground floor. A flight is climbed from the front, a spiral from any side; nothing can stand on the steps or where they come up.' },
       { id: 'roof', label: 'Roof', icon: 'icon.ui.roof', unit: '', hint: 'Pick a shape and a colour: the whole roof changes at once', note: 'The roof covers every room of the house. Changing it is free.' },
     ],
     [
@@ -49,13 +49,16 @@
   const underground = (id: BuildTool) => game.storey < 0 && aboveGround.has(id);
   /** Tools for the ground only (a garage stands on it). */
   const upstairs = (id: BuildTool) => game.storey !== 0 && id === 'garage';
+  /** The staircases the Stairs tool offers, and the one picked (as `LookPicker` shows them). */
+  const stairDefs = $derived(content.staircases());
+  const stairDef = $derived(stairDefs[game.buildLook.stair] ?? stairDefs[0]);
   /** What the tool costs with the look picked (per metre for walls, per face for paint, per tile for floors). */
   const price = (id: BuildTool): string => {
     if (!prices) return '';
     if (id === 'blueprint') return '';
     if (game.creative || id === 'roof' || id === 'move') return 'Free';
     if (id === 'stairs') {
-      const stairs = content.shop.find((d) => d.stairs)?.price ?? 0;
+      const stairs = stairDef?.price ?? 0;
       return stairs ? money(stairs) : 'Free';
     }
     const look = game.buildLook;

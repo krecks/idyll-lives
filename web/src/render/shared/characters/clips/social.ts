@@ -11,9 +11,9 @@
 
 import { cycle, mix, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { bump, hangArms, stand, TAU, type StandOptions } from './idle';
-import { armIK, lerpV, smooth, wrist, type ArmOptions } from './ik';
+import { armIK, lerpV, onBody, smooth, wrist, type ArmOptions } from './ik';
 
-/** A hand placed by IK (`at`: the palm centre), weighted `w` (default 1) against the hanging arm. */
+/** A hand placed by IK (`at`: the palm centre, on the body the numbers were written on: `onBody`), weighted `w` (default 1) against the hanging arm. */
 type Hand = ArmOptions & { at: Vec; w?: number };
 
 /** One side's bones of a pose. */
@@ -27,7 +27,7 @@ function arms(body: PoseSpec, l: Hand, r: Hand, rest: PoseSpec = hangArms(5, 7, 
     const w = hand.w ?? 1;
     const own = side(rest, s);
     if (w <= 0.001) return own;
-    const ik = armIK(s, hand.at, body, { palm: true, pole: [s === 'l' ? -0.4 : 0.4, -1, -0.2], ...hand });
+    const ik = armIK(s, onBody(hand.at), body, { palm: true, pole: [s === 'l' ? -0.4 : 0.4, -1, -0.2], ...hand });
     return w >= 0.999 ? ik : mix(own, ik, w);
   };
   return { ...body, ...one('l', l), ...one('r', r) };

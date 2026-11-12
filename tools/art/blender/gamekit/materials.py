@@ -28,11 +28,12 @@ FINISHES = _finishes()
 
 
 def _textures():
-    """{'fabric': (albedo path, uvScale), ...}: the textured finishes' maps, for the lit previews (`preview.lit`)."""
+    """{'fabric': (albedo path, uvScale, cut out), ...}: the textured finishes' maps, for the lit previews
+    (`preview.lit`); cut out: the albedo's alpha cuts the surface out, on the mesh's own UVs (`leafcards`)."""
     with open(os.path.join(ASSETS, 'manifest.json')) as f:
         entries = json.load(f)['entries']
     prefix = 'material.finish.'
-    return {key[len(prefix):]: (os.path.join(ASSETS, e['texture']), e.get('uvScale', 1.0))
+    return {key[len(prefix):]: (os.path.join(ASSETS, e['texture']), e.get('uvScale', 1.0), 'cutout' in e)
             for key, e in entries.items() if key.startswith(prefix) and e.get('texture')}
 
 
@@ -89,7 +90,7 @@ class Palette:
     A family's colours: `name=(sRGB hex, finish)`. `palette.name` is that Blender material, made on
     first use after each `reset()`; `palette.finishes(names)` is the pack entry's `materials` map.
     The finish is one of the base manifest's `material.finish.*` (matte, satin, gloss, metal, chrome,
-    skin, hair, fabric, wood, bark, foliage, glass). A third says more of it (the pack entry's
+    skin, hair, fabric, wood, bark, foliage, leafcards, glass). A third says more of it (the pack entry's
     material fields):
       mirror glass, the side its face reflects to: `glass=('#DCE6EA', 'gloss', 'front')` (or 'back'),
         on a flat part; gloss, as mirrors always were (only High reflects live);

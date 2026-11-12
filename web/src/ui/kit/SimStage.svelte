@@ -58,6 +58,11 @@
     else queued = reaction;
   }
 
+  /** Frames the face (while its shape is being set). */
+  export function frameFace(): void {
+    stage?.zoomTo(1);
+  }
+
   /** Lip sync while a line plays (null: stops); nothing before the stage is up. */
   export function speak(track: VisemeTrack | null, startTime: number): void {
     stage?.speak(track, startTime);

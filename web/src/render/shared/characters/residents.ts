@@ -17,9 +17,9 @@
  *   / ring / blanket instance matrices), never meshes.
  * - Clothes are painted on the body by its shader (each garment's cut over the body's fields);
  *   shells (`top.*`, `bottom.*`, `shoes.*` parts) are added only where the silhouette needs them.
- * - Small face parts (teeth, tongue, lashes, brows) are drawn only on faces big enough on screen to
- *   show them, and faces too small to show expressions skip their morphs (`faceDetail`); only the
- *   instance lists change per frame.
+ * - Small face parts (teeth, tongue, lashes, brows) and the hair's wisps (its soft edges) are drawn
+ *   only on faces big enough on screen to show them, and faces too small to show expressions skip
+ *   their morphs (`faceDetail`); only the instance lists change per frame.
  * - Far from the camera a Sim switches to the low-detail body and shells (`lod.*` parts; with a gap
  *   between switching down and up), and every Sim casts its sun shadow from shadow-only copies of
  *   those (`shadowMeshes`, on the shadow-only layer; none where Sims cast no shadows, `castsShadows`).
@@ -60,7 +60,7 @@ import { LOW_TOP, SIT_LOW } from './clips/low';
 import { RIDE_BIKE, RIDE_BIKE_CHILD, RIDE_SCOOTER } from './clips/rides';
 import { FLOOR_SITS } from './clips/seated';
 import { HANDED } from './clips/serve';
-import { type BodyData, type CharacterSet, type Clip, loadCharacterSet, loadStage } from './data';
+import { CLOSE_UP, type BodyData, type CharacterSet, type Clip, type MorphSet, loadCharacterSet, loadCloseUp, loadStage } from './data';
 import { BEARING_FLOATS, bearing } from './bodyLanguage';
 import { gaitFor } from './gait';
 import { TURN_FADE, isTurn, turnClipIn, turnDone, turnOnSpot, turnYaw } from './turns';
@@ -71,20 +71,31 @@ import { cradled, cuddlePose, onPad, writeCradle } from './cuddles';
 import { lyingPose, measureLegs, measureSit, outfitFit, type PoseKit } from './measure';
 import { type Hands, palmAt, placeFrame, placeHand, placeProp } from './props';
 import { rimOf } from './clips/shot';
-import { DETAIL_PX, FACE_PARTS, LOD_FAR_PX, LOD_HEIGHT_PX, LOD_NEAR_PX, MORPH_PX, POSE_FAR_PX, POSE_NEAR_PX, type PartMesh, Range, YOUNG_STAGES, shellBit, skinChunks } from './parts';
+import { FACE_PARTS, LOD_FAR_PX, LOD_HEIGHT_PX, LOD_NEAR_PX, MORPH_PX, POSE_FAR_PX, POSE_NEAR_PX, type PartMesh, Range, YOUNG_STAGES, detailOf, shellBit, skinChunks, wispsOf } from './parts';
 import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, sampleClip, skin } from './pose';
 import { BABBLE, compose, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clamp, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, hash, lerp, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
 import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './seatFit';
 import { BATH_WEAR, BEDS, BENCH_HIP, BENCH_KNEE, BLANKET_BEDS, BLANKET_MEET, BUNKS, type Bed, CLIP_HEIGHT, CURLED_BEDS, DEFAULT_BED, DEFAULT_SEAT, FEET_UP, FOOTSTOOLS, LEGS_OUT_DROP, LIE_CENTRE, LIE_ENTRY, type LegFit, NO_FEET_UP, ON_FLOOR, PEDAL, type PlacedObject, QUILT_COLOUR, QUILT_PART, REST_BACK, RISING, SEATS, SIDE_BEDS, SIDE_IN, SIT_CLIPS, SIT_FLEX, SIT_FROM, SLING, type Seat, type SeatFit, TUCK, floorSit, seatOf, slingTop } from './seats';
 import { AIM, Anim, EMBRACE, KISS_FIT, REFUSED, gesturesOf } from './socials';
 import { BLANKET_WIDTH, quiltGeometry, quiltTint } from './blanket';
-import { APPEARANCE_TEXELS, BONE_FLOATS, BONE_TEXELS, MORPH_TEXELS } from './layout';
+import { APPEARANCE_TEXELS, BONE_FLOATS, BONE_TEXELS, EXPRESSION_TEXELS, MORPH_TEXELS } from './layout';
+import { faceOf, writeIdentity } from './identity';
 import type { TemplateCache } from '../templateCache';
 import { WALL_HEIGHT } from '../walls';
 import { MOST_CADENCE, MOUNT_SECONDS, MOUNTS, type Mount, mountNodes } from './vehicles';
 import type { ResidentProp, ResidentView } from './view';
 
 export { PLAYBACK_RATE, QUIET_SPEED } from '../gameSpeed';
+
+/** The key suffix of a body's quilt draped over it curled up (`blankets`). */
+const CURL = ':curl';
+/**
+ * A curled-up sleeper's quilt (`quiltGeometry`), a throw over them on a sofa: how far (m) it reaches past the feet,
+ * how far its sides hang down (just over the seat cushion's front edge, not to the floor), and how far past the
+ * neck its top edge is, towards the head (the shoulders and the arm over them under it, the head out), lying over
+ * the shoulder rather than tucked down.
+ */
+const CURL_QUILT = { past: 0.06, drop: 0.14, neck: -0.06 };
 export { MAX_CHARACTERS } from './rig';
 export { EXPRESSIONS, FRIENDLY, STANCE, type StageDirection } from './expressions';
 export type { Face } from './face';
@@ -132,6 +143,12 @@ function stationSide(rig: SimRig, station: PlacedObject): number {
  */
 const FAR_EVERY = [2, 4] as const;
 const FAR_LAG = 0.25;
+/**
+ * How long a resident the sim is catching up is hidden (real ms, `setDetailArea`): come into its full-detail area
+ * (the camera's new area reaches the sim's worker, and its next tick catches them up on the ticks they owe, a few
+ * frames), or seen to jump further than they could have gone (a catch-up out of it, or after a pause).
+ */
+export const REVEAL_MS = 250;
 
 /** How fast a rise cut short (`SimRig.riseK`) finishes its step off the seat (per second: a quarter of a second, less
  * when the action runs fast). */
@@ -161,6 +178,8 @@ function samplePlayer(set: CharacterSet, p: Player, q: Float32Array, t: Float32A
 
 export class Characters<M extends object, Q, P extends ResidentProp> {
   private set: CharacterSet | null = null;
+  /** The morphs the view's texture was last made from, when not the set's own (`closeUp`). */
+  private morphsShown: MorphSet | null = null;
   private failed = false;
   private data!: Float32Array;
   /** The pose texture as last uploaded, and which rows were drawn then (see `upload`). */
@@ -207,6 +226,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private carRide: CarRide | null = null;
   /** Scratch for `carRide`. */
   private readonly rideAt = { x: 0, z: 0, yaw: 0 };
+  /** Height of the land at (x, z) (`setGround`: a big world's hills between its hamlets), or null: flat at 0. */
+  private ground: ((x: number, z: number) => number) | null = null;
   /** Scratch for `riding`: the placement as a matrix, then moved by the ride. */
   private readonly rideM = new Float32Array(16);
   /** The lanes others have taken on what `freeLane` looks at (scratch). */
@@ -287,13 +308,14 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** Scratch for `writeHeld`: a frame's axes and origin (x, y, z each). */
   private readonly frame3 = new Float32Array(12);
   /**
-   * Blankets: one quilt mesh per body (the base bodies', and each life stage's body as it loads, `addQuilt`);
-   * the covered Sims wearing that body packed afresh each frame into its drawn `matrices` (a matrix each) and
-   * `ext` (two numbers each), `drawn` of them (`writeBlanket`).
+   * Blankets: one quilt mesh per body (the base bodies', and each life stage's body as it loads, `addQuilt`),
+   * and one more draped over it curled up (`<body>:curl`, for a sofa slept on, `CURLED_BEDS`); the covered Sims
+   * wearing that body packed afresh each frame into its drawn `matrices` (a matrix each) and `ext` (two numbers
+   * each), `drawn` of them (`writeBlanket`).
    */
   private readonly blankets = new Map<
     string,
-    { quilt: Q; footZ: number; topZ: number; matrices: Float32Array; ext: Float32Array; tint: Float32Array; drawn: number; shown: number; base: boolean }
+    { quilt: Q; footZ: number; topZ: number; matrices: Float32Array; ext: Float32Array; tint: Float32Array; drawn: number; shown: number; base: boolean; body: string }
   >();
   /** The quilts' shared material is made (`ResidentView.quiltMaterial`), for the life stages' quilts made later. */
   private quilted = false;
@@ -332,6 +354,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private readonly glideFrom = new Float64Array(MAX_CHARACTERS * 4);
   private readonly glideTo = new Float64Array(MAX_CHARACTERS * 4).fill(NaN);
   private readonly glideK = new Float64Array(MAX_CHARACTERS).fill(1);
+  /**
+   * Where the sim moves residents every tick (`setDetailArea`: a big world's chunks streamed in; null: everywhere). Out of
+   * it they take a turn now and then and catch up in one go (sim-core `lod.rs`): a rider would stand, then jump tens of metres.
+   */
+  private detail: ((x: number, z: number) => boolean) | null = null;
+  /** Per row, whether they were in the full-detail area last frame. */
+  private readonly inArea = new Uint8Array(MAX_CHARACTERS);
+  /** Per row, till when one being caught up is hidden (`REVEAL_MS`; NaN: not hidden). */
+  private readonly revealAt = new Float64Array(MAX_CHARACTERS).fill(NaN);
   /**
    * Per row, the thing they ride (a bike, an e-scooter: the snapshot's `ride`, `vehicles.ts`) as drawn: its stable id
    * (-1: none), how far on it they are (`mountOn`: 0 at its place, 1 riding; `MOUNT_SECONDS` each way), and how far
@@ -507,7 +538,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const toeZ = Math.max(...lying.map((l) => l.feetZ)) + 0.03;
     this.view.quiltMaterial(toeZ, toeZ + 0.29);
     this.quilted = true;
-    for (const l of lying) this.addQuilt(l.body, l);
+    for (const l of lying) {
+      this.addQuilt(l.body, l);
+      this.addQuilt(l.body, lyingPose(this.kit, l.body, 'lieCurl'), CURL);
+    }
     this.view.createRing(this.ringMatrix);
     if (new URLSearchParams(location.search).has('debug')) {
       Object.assign(window, { __characters: this, __stance: STANCE, __friendly: FRIENDLY });
@@ -523,6 +557,33 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private hairPart(style = 'short'): string {
     const key = `model.hair.${style}`;
     return (this.assets.has(key, 'character') ? this.assets.get(key, 'character')!.part : undefined) ?? `hair.${style}`;
+  }
+
+  /**
+   * Fetches the close-up body for residents of `gender` at life stage `stage` (the base body's without one), once,
+   * and gives the view the morphs with its own among them. Resolves to whether it is there: a resident built
+   * with `closeUp: true` then draws it in the body's place (`build`), and until then, or without it, the body.
+   * Only for a view where a resident fills the picture (the creator's stage): play never asks, so never fetches it.
+   */
+  async closeUp(gender: string, stage?: string): Promise<boolean> {
+    if (!(await this.init())) return false;
+    const set = this.set!;
+    const base = this.baseBody(gender);
+    const ok = await loadCloseUp(set, base, stage ?? base.stage);
+    if (ok && set.closeUpMorphs && set.closeUpMorphs !== (this.morphsShown ?? set.morphs)) {
+      this.morphsShown = set.closeUpMorphs;
+      this.view.setMorphs(set.closeUpMorphs);
+    }
+    return ok;
+  }
+
+  /** Whether the close-up body for `gender` at `stage` has loaded (`closeUp`). */
+  hasCloseUp(gender: string, stage?: string): boolean {
+    const set = this.set;
+    if (!set) return false;
+    const base = this.baseBody(gender);
+    const body = stage && stage !== base.stage ? set.bodies.get(`${base.name}.${stage}`) : base;
+    return !!body?.parts.has(CLOSE_UP);
   }
 
   /** The base body (young adult) for a gender. */
@@ -569,7 +630,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // The low-detail body and clothes' shadow copies; sets without them cast from the full meshes.
     for (const p of this.shadowMeshes.values()) if (p.enabled) out.push(p.mesh);
     if (out.length) return out;
-    for (const [key, p] of this.meshes) if (p.enabled && !/:(eyes|brows|lashes|teeth|tongue|shoes\.)/.test(key)) out.push(p.mesh);
+    for (const [key, p] of this.meshes) if (p.enabled && !/:(eyes|brows|lashes|teeth|tongue|shoes\.)|\.wisps$/.test(key)) out.push(p.mesh);
     return out;
   }
 
@@ -597,7 +658,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
           if (b && !this.sitPelvis.has(b.name)) this.measureBody(b);
           // Its own quilt, draped over its own lying pose: a child's feet stand up higher for its size than a
           // grown-up's quilt made smaller covers (their shoes showed through it halfway down the bed).
-          if (b && !this.blankets.has(b.name) && this.quilted) this.addQuilt(b, lyingPose(this.kit, b));
+          if (b && !this.blankets.has(b.name) && this.quilted) {
+            this.addQuilt(b, lyingPose(this.kit, b));
+            this.addQuilt(b, lyingPose(this.kit, b, 'lieCurl'), CURL);
+          }
         }
       }),
     );
@@ -626,10 +690,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const outfitId = (s as SimInfo & { outfitId?: number }).outfitId ?? s.id;
       const day = outfitFor(outfitId, s.gender, s.appearance, body, 'day', undefined, s.outfit);
       // (Pyjamas are the same garments, so the same chunks show at night.)
-      for (const part of skinChunks(body, day.parts)) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
+      // (The close-up body in the body's place for a resident that fills the view, once it has loaded: `closeUp`.)
+      const fine = !!(s as SimInfo & { closeUp?: boolean }).closeUp && body.parts.has(CLOSE_UP);
+      for (const chunk of skinChunks(body, day.parts)) {
+        const part = fine && chunk === 'body' ? CLOSE_UP : chunk;
+        if (body.parts.has(part)) push(`${body.name}:${part}`, s);
+      }
       for (const part of FACE_PARTS) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
-      if (body.parts.has(hairKey)) push(`${body.name}:${hairKey}`, s);
-      if (s.appearance?.beard && !YOUNG_STAGES.has(body.stage) && body.parts.has('hair.beard')) push(`${body.name}:hair.beard`, s);
+      // The hair and the beard, each with its wisps (its soft edges, drawn only close up: `detailOf`).
+      const hair = [hairKey, ...(s.appearance?.beard && !YOUNG_STAGES.has(body.stage) ? ['hair.beard'] : [])];
+      for (const part of hair.flatMap((h) => [h, wispsOf(h)])) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
       for (const part of day.parts) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
       // The low-detail body and clothes (drawn instead when the Sim is far from the camera).
       for (const part of ['lod.body', ...day.parts.map((p) => `lod.${p}`)]) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
@@ -797,7 +867,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         warmth: 1,
         relaxArms: 0,
         skirt: false,
-        faceState: new Float32Array(set.morphs?.channels.length ?? 0),
+        faceState: new Float32Array(set.morphs?.expressions ?? 0),
+        eyes: new Float32Array(4),
         faceL: 1 + (hash(s.id * 7 + 3) - 0.5) * 0.2,
         faceR: 1 + (hash(s.id * 7 + 5) - 0.5) * 0.2,
         speech: null,
@@ -809,6 +880,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const fit = outfitFit(set, base);
       rig.outfits = Object.fromEntries(WEARS.map((wear) => [wear, outfitFor(outfitId, s.gender, s.appearance, body, wear, fit, s.outfit)])) as Record<Wear, OutfitParams>;
       this.wear(rig, s.id, rig.outfits.day);
+      this.writeFace(rig, s.id, faceOf(s.appearance, outfitId));
     }
     for (const p of this.meshes.values()) this.enablePart(p, false);
     for (const p of this.shadowMeshes.values()) this.enablePart(p, false);
@@ -859,13 +931,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const beds = world.objects.some((o) => BLANKET_BEDS.has(o.def));
     const bodies = new Set(this.sims.map((r) => r?.body.name));
     const rows = this.sims.length;
-    for (const [name, b] of this.blankets) {
+    for (const b of this.blankets.values()) {
       // `update` compacts the covered rows (a town of six must not draw 64 quilts' worth of triangles).
       // (With none, not drawn at all, rather than once as it is, at the origin.)
       b.shown = 0;
       this.view.quiltRows(b.quilt, 0, false);
       // (A life stage's quilt only where someone has that body: no draw call for nobody.)
-      this.view.quiltEnabled(b.quilt, rows > 0 && beds && (b.base || bodies.has(name)));
+      this.view.quiltEnabled(b.quilt, rows > 0 && beds && (b.base || bodies.has(b.body)));
     }
     this.view.uploadPoses();
     this.uploaded.set(this.data);
@@ -921,10 +993,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         yaw: k,
         seed: hash(id),
         face: { ...NEUTRAL },
-        faceState: new Float32Array(set.morphs?.channels.length ?? 0),
+        faceState: new Float32Array(set.morphs?.expressions ?? 0),
+        eyes: new Float32Array(4),
         speech: null,
       };
       this.sims[id] = rig;
+      this.writeFace(rig, id, faceOf(undefined, id));
       const look = { body: '#5F86C9', skin: '#C08A64', hair: '#2B2320', hairStyle: 'short' as const, height: 1, top: 'top.tee', bottom: 'bottom.trousers', shoes: 'shoes.sneakers' };
       writeOutfit(outfitFor(id, body.name, look, body), this.data, this.row(id) + set.bones.length * BONE_FLOATS);
     }
@@ -976,6 +1050,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       pl.scale = rig.scale;
       pl.head = rig.head;
       pl.build = rig.build;
+      pl.eyes = rig.eyes;
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp, true);
       this.visible[i] = 1;
     });
@@ -1175,7 +1250,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const baby = shown.grip === 'aim' ? rig.cuddleBaby : -1;
     if (baby >= 0 && this.headJoints[baby * 3 + 1] !== 0) {
       for (let k = 0; k < 3; k++) this.aimAt[k] = this.headJoints[baby * 3 + k];
-      this.aimAt[1] += 0.03 * (this.sims[baby]?.scale ?? 1);
+      this.aimAt[1] += 0.026 * (this.sims[baby]?.scale ?? 1);
       h.aim = this.aimAt;
     } else h.aim = undefined;
     placeHand(m, i, shown, h);
@@ -1655,7 +1730,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // `world::WALK_SPEED` a tick, times the fastest walkers' factors and some slack.
     const prevSpeed = prev[layout.header.speed] | 0;
     const prevGameSpeed = layout.header.calm !== undefined && prev[layout.header.calm] > 0 ? Math.max(prevSpeed, QUIET_SPEED) : prevSpeed;
-    const reach = Math.max(SNAP_DISTANCE, (PACE / layout.ticksPerSecond) * WALK_FASTEST * WALK_SLACK * Math.max(playRate, PLAYBACK_RATE[prevGameSpeed] ?? 1) * frame.steps);
+    const stride = (PACE / layout.ticksPerSecond) * WALK_FASTEST * WALK_SLACK * Math.max(playRate, PLAYBACK_RATE[prevGameSpeed] ?? 1) * frame.steps;
+    const reach = Math.max(SNAP_DISTANCE, stride);
     const animRate = this.debugRate ?? Math.min(playRate, 2.5);
     // Paused (the pause button, Buy and Build mode, menus): everyone freezes mid-motion, walk
     // cycles, breathing, blinks and glances included.
@@ -1751,7 +1827,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // at 20 ticks a second, just as it glided over the step); further than `SNAP_DISTANCE`, at once.
       const [from, to, g] = [this.glideFrom, this.glideTo, i * 4];
       if (walking) {
-        if (Math.hypot(cx - prev[o + k.x], cz - pz) < reach * Math.max(1, mount?.ride?.speed ?? 1)) {
+        // (Riding: its `speed` times walking, on the traffic's clock, `driveScale` times that a step.)
+        const speed = Math.max(1, mount?.ride?.speed ?? 1);
+        const far = mount?.ride ? Math.max(SNAP_DISTANCE * speed, stride * speed * layout.driveScale) : reach;
+        const step = Math.hypot(cx - prev[o + k.x], cz - pz);
+        // (Further than they could have gone: caught up, hidden a moment and drawn where they are, not jumping.)
+        if (step >= far && this.detail && this.visible[i]) this.revealAt[i] = now + REVEAL_MS;
+        if (step < far) {
           tx = prev[o + k.x] + (cx - prev[o + k.x]) * alpha;
           tz = pz + (cz - pz) * alpha;
           if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;
@@ -1767,7 +1849,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
           else [from[g], from[g + 1], from[g + 2], from[g + 3]] = [to[g], to[g + 1], to[g + 2], to[g + 3]];
           if (Math.abs(cx - from[g]) + Math.abs(cz - from[g + 1]) < SNAP_DISTANCE) {
             this.glideK[i] = Math.min(1, (alpha * frame.steps) / layout.ticksPerSecond / GLIDE_SECONDS);
-          } else this.glideK[i] = 1;
+          } else {
+            this.glideK[i] = 1;
+            // (Moved far at once: caught up, as a walker who jumped above.)
+            if (this.detail && this.visible[i] && Number.isFinite(to[g])) this.revealAt[i] = now + REVEAL_MS;
+          }
         }
         const at = this.glideK[i];
         if (at < 1) [tx, tz, th, tyaw] = [lerp(from[g], cx, at), lerp(from[g + 1], cz, at), lerp(from[g + 2], ch, at), lerpAngle(from[g + 3], tyaw, at)];
@@ -1781,7 +1867,22 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.spots[i * 2] = away ? NaN : tx;
       this.spots[i * 2 + 1] = tz;
       this.storeys[i] = th;
-      const show = !!rig && !away && inView(tx, tz) && storeyShown(Math.floor(th + 0.01), storey);
+      // Come into the full-detail area (as it's first set too: out of it till then): the sim catches them up in a few
+      // frames, hidden meanwhile (not where they were, then jumping); drawn as ever out of it.
+      if (this.detail) {
+        const inside = this.detail(cx, cz) ? 1 : 0;
+        if (inside && !this.inArea[i]) this.revealAt[i] = now + REVEAL_MS;
+        this.inArea[i] = inside;
+      }
+      // (Hidden till now: shown again as they are, not held again for being out of the area.)
+      const released = now >= this.revealAt[i];
+      if (released) this.revealAt[i] = NaN;
+      let show = !!rig && !away && inView(tx, tz) && storeyShown(Math.floor(th + 0.01), storey) && !(now < this.revealAt[i]);
+      // (Come into view out of it: the camera jumped there, the area follows it this frame and catches them up after.)
+      if (show && this.detail && !this.visible[i] && !this.inArea[i] && !released) {
+        this.revealAt[i] = now + REVEAL_MS;
+        show = false;
+      }
       if (!rig || !show) {
         if (this.visible[i]) {
           this.data.fill(0, this.row(i), this.row(i) + NB * BONE_FLOATS);
@@ -1811,7 +1912,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         rig.lag += frameDt;
         const moved = curr[o + k.moving] > 0 || riding;
         const dx = moved ? tx - rig.x : 0;
-        const dy = moved ? th * WALL_HEIGHT - rig.floorY : 0;
+        const dy = moved ? this.floorAt(th, tx, tz) - rig.floorY : 0;
         const dz = moved ? tz - rig.z : 0;
         if (frameDt > 0) rig.speed += (Math.min(Math.hypot(dx, dz) / frameDt, 20) - rig.speed) * (1 - Math.exp(-frameDt * 10));
         if (dx || dy || dz) this.carryPose(rig, i, dx, dy, dz, shadows);
@@ -1821,7 +1922,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const dt = Math.min(FAR_LAG, frameDt + rig.lag);
       rig.lag = 0;
       const dir = (rig.dir = this.directions[i] ?? null);
-      rig.floorY = th * WALL_HEIGHT;
+      rig.floorY = this.floorAt(th, tx, tz);
       const pose = curr[o + k.pose];
       const moving = curr[o + k.moving] > 0;
       // Calling someone over (sim-core's `call`): a wave, looking at them.
@@ -2109,6 +2210,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       pl.scale = rig.scale;
       pl.head = rig.head;
       pl.build = rig.build;
+      pl.eyes = rig.eyes;
       this.posedAt[i * 2] = pl.x;
       this.posedAt[i * 2 + 1] = pl.z;
       // Sitting or lying on a seat that moves (a rocking chair, a swing): along with it.
@@ -3200,6 +3302,33 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     this.carRide = ride;
   }
 
+  /**
+   * The land under the residents (the landscape's `heightAt`): out on a big world's hills between its hamlets they
+   * stand, walk and ride on it, with what they hold or ride, not sunk into it or floating over a hollow. What's built
+   * (lots, streets and the apron round them) is flat at 0, so in and round the houses nothing changes. Null: flat.
+   */
+  setGround(ground: ((x: number, z: number) => number) | null): void {
+    this.ground = ground;
+  }
+
+  /** The floor Sim at (x, z) stands on, on storey `th` (fractions on the stairs): the storey's height over the land there. */
+  private floorAt(th: number, x: number, z: number): number {
+    const land = this.ground ? this.ground(x, z) : 0;
+    return th * WALL_HEIGHT + (Number.isFinite(land) ? land : 0);
+  }
+
+  /**
+   * Where the sim moves residents every tick (a big world's chunks streamed in, as sent it: sim-core `lod::full_detail`),
+   * or null (everywhere). Out of it the sim moves a resident only now and then and catches them up in one go when it
+   * reaches them (a rider out of it for three game minutes jumped 92 m in a frame as the camera came to them). Everyone
+   * is drawn as ever, but one come into it, come into view out of it (the camera jumped to them: the area follows it
+   * after the residents are drawn), or seen to go further in a step than they could (a catch-up out of it, or after a
+   * pause: paused, the sim catches nobody up) is hidden for `REVEAL_MS` and then drawn where they are: no jump, no slide.
+   */
+  setDetailArea(test: ((x: number, z: number) => boolean) | null): void {
+    this.detail = test;
+  }
+
   /** Where residents sitting or lying on an object are carried by its moving seat (`ObjectMotion.ride`). */
   setRide(rideOf: ((objectId: number) => ArrayLike<number> | null) | null): void {
     this.rideOf = rideOf;
@@ -4225,6 +4354,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /**
+   * Gives Sim `i` its own face (`identity.ts`): its identity texels, after the expression's, and what the face moves
+   * of its eyeballs (`rig.eyes`, for `skin`). Once, when the Sim is built: nothing rewrites those texels until the
+   * next build.
+   */
+  private writeFace(rig: SimRig, i: number, face: Record<string, number>): void {
+    const set = this.set!;
+    if (!set.morphs) return;
+    writeIdentity(set.morphs, rig.body, face, this.data, this.row(i) + set.bones.length * BONE_FLOATS + (APPEARANCE_TEXELS + EXPRESSION_TEXELS) * 4, rig.eyes);
+  }
+
+  /**
    * Uploads the pose texture's rows that changed since the last upload (Sims drawn now, or just
    * hidden), as one band of rows: a few of the 64 most frames, none while the game is paused.
    */
@@ -4378,9 +4518,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    * every resident in the town (and not the buffer's capacity).
    */
   private writeBlanket(rig: SimRig, i: number, pose: number, dt: number, fresh: boolean): void {
-    // Its body's own quilt (a life stage's, draped over its own pose), else its family's base body's.
-    const own = this.blankets.get(rig.body.name);
-    const blanket = own ?? this.blankets.get(rig.body.family);
+    // Its body's own quilt (a life stage's, draped over its own pose), else its family's base body's; curled up
+    // (on a sofa, `CURLED_BEDS`), the one draped over that.
+    const curl = rig.cur.key === 'lieCurl' ? CURL : '';
+    const own = this.blankets.get(rig.body.name + curl);
+    const blanket = own ?? this.blankets.get(rig.body.family + curl);
     if (!blanket) return;
     const bed = rig.bed;
     // Only once the body lies flat (the crossfade from sitting on the edge done): pulled up while the legs
@@ -4413,7 +4555,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // A body smaller than the one the quilt was made for (a child's with no quilt of its own yet): the quilt
     // shrunk to it along the body and in height, from its feet, so its head is out (the width stays the bed's).
     const zs = own ? s : s * rig.size;
-    const z0 = lieCentre(rig) - LIE_CENTRE * zs;
+    // (Moved along the bed with the body: `Bed.fwd`, and back to its middle on one lain on across.)
+    const z0 = lieCentre(rig) - LIE_CENTRE * zs + rig.bedFwd;
     // The quilt past the toes reaches the bed's foot end (local units, at the Sim's scale); tucked in, as close
     // as just past the toes.
     blanket.ext[d * 2] = clamp((foot - z0) / zs - blanket.footZ, tuck ? -0.3 : -0.22, 1.2);
@@ -4442,19 +4585,24 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const r = (bed.rot * Math.PI) / 2;
     const right = tuck ? tuck[1] : 0;
     m[o + 12] = x - fz * side + fx * z0 + Math.cos(r) * right;
-    m[o + 13] = rig.bedH + lift;
+    // (On its storey: a bed upstairs is the storey's floor up, `floorY`, as its sleeper is.)
+    m[o + 13] = rig.floorY + rig.bedH + lift;
     m[o + 14] = z + fx * side + fz * z0 - Math.sin(r) * right;
     m[o + 15] = 1;
   }
 
-  /** A body's quilt (`blankets`), draped over its lying pose, every row's instance hidden. */
-  private addQuilt(body: BodyData, lying: { positions: Float32Array; chestZ: number; feetZ: number }): void {
-    const geometry = quiltGeometry(lying.positions, lying.chestZ, lying.feetZ);
+  /** A body's quilt (`blankets`), draped over its lying pose (`curl`: its curled-up one), every row's instance hidden. */
+  private addQuilt(body: BodyData, lying: { positions: Float32Array; chestZ: number; feetZ: number; neckZ: number }, curl = ''): void {
+    // (Curled up, on a sofa: up to the neck, ending just past the knees and feet, inside its arm, not stretched to the
+    // bed's end, and hanging just over the seat's front edge: `CURL_QUILT`.)
+    const geometry = curl
+      ? quiltGeometry(lying.positions, lying.neckZ + CURL_QUILT.neck, lying.feetZ, CURL_QUILT.past, CURL_QUILT.drop, false)
+      : quiltGeometry(lying.positions, lying.chestZ, lying.feetZ);
     const matrices = new Float32Array(MAX_CHARACTERS * 16);
     const ext = new Float32Array(MAX_CHARACTERS * 2);
     const tint = new Float32Array(MAX_CHARACTERS * 3);
-    const quilt = this.view.createQuilt(`simBlanket:${body.name}`, geometry, matrices, ext, tint);
-    this.blankets.set(body.name, { quilt, footZ: geometry.footZ, topZ: geometry.topZ, matrices, ext, tint, drawn: 0, shown: 0, base: body.name === body.family });
+    const quilt = this.view.createQuilt(`simBlanket:${body.name}${curl}`, geometry, matrices, ext, tint);
+    this.blankets.set(body.name + curl, { quilt, footZ: geometry.footZ, topZ: geometry.topZ, matrices, ext, tint, drawn: 0, shown: 0, base: body.name === body.family, body: body.name });
   }
 
   /**
@@ -4567,8 +4715,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (cached) return cached;
     if (!body.parts.has(part)) return null;
     const mesh = this.view.createPart(body, part, shadow);
-    const range = shadow ? Range.Always : part.startsWith('lod.') ? Range.Far : part === 'body' || /^(body|top|bottom|shoes)\./.test(part) ? Range.Near : Range.Always;
-    const pm: PartMesh<M> = { mesh, enabled: true, settings: new Float32Array(0), count: 0, all: new Float32Array(0), detail: shadow ? 0 : (DETAIL_PX[part] ?? 0), range, shell: shellBit(part) };
+    const range = shadow ? Range.Always : part.startsWith('lod.') ? Range.Far : part === 'body' || part === CLOSE_UP || /^(body|top|bottom|shoes)\./.test(part) ? Range.Near : Range.Always;
+    const pm: PartMesh<M> = { mesh, enabled: true, settings: new Float32Array(0), count: 0, all: new Float32Array(0), detail: shadow ? 0 : detailOf(part), range, shell: shellBit(part) };
     meshes.set(key, pm);
     if (!shadow) this.parts.set(mesh, pm);
     return pm;
@@ -4607,8 +4755,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /**
    * How big each Sim's face is on screen (`facePx`: px per 5 cm), and the rows each part draws: only
    * those drawn now (not those hidden, away or out of view: every part, shadow-only copies too, or
-   * they're skinned all the same, to nothing), the small face parts (teeth, tongue, lashes, brows)
-   * only on the faces big enough to show them, the low-detail body or the full one by distance, and
+   * they're skinned all the same, to nothing), the small face parts (teeth, tongue, lashes, brows) and the
+   * hair's wisps only on the faces big enough to show them, the low-detail body or the full one by distance, and
    * not the shells clothes leave out. Parts drawn whatever the distance are written again only when
    * who is drawn changes.
    */

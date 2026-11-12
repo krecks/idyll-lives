@@ -8,15 +8,21 @@ use std::path::Path;
 use regex::Regex;
 
 use super::body;
-use super::contract::{HAIR_STYLES, VISEMES, channels, garments, hair_parts, required_parts};
+use super::contract::{
+    HAIR_STYLES, HD, IDENTITY, VISEMES, channels, garments, hair_parts, is_wisps, required_parts,
+};
 use super::hair::{EAR_MIN, Ears};
 use super::head::head_frame;
+use super::identity;
 use super::json::JValue;
 use super::np::{degrees, linspace_open, radians};
-use super::rig::{BASE_STAGE, BONES, CLIP_BONES, RUNTIME_BONES, STAGES, target_height};
+use super::rig::{
+    BASE_STAGE, BONES, CLIP_BONES, RUNTIME_BONES, STAGES, proportions, target_height,
+};
 use super::{V3, repo_root, v3};
 
-/// lod.body: the cage at its limit (~0.9k) plus the eyelids (~0.2k).
+/// body: the skin (~4.8k), the lids and lips (~0.5k) and the ears (324 each, ear.rs).
+/// lod.body: the cage at its limit (~0.9k) plus the eyelids (~0.2k) and plain ears (24 each).
 ///
 /// hair: the styles are built at `hair::DETAIL` (1.5) times their layout's rows, each lock on 6
 /// columns rather than 4 (`hair::LOCK`), so the
@@ -30,11 +36,18 @@ fn budget(name: &str) -> Option<usize> {
     match name {
         "body" => Some(6000),
         "lod.body" => Some(1400),
+        // The close-up body: `body`'s skin split in four, its lids, lips and ears as they are (20,200).
+        HD => Some(20_400),
+        _ if is_wisps(name) => Some(WISPS_BUDGET),
         _ if name.starts_with("hair.") => Some(7400),
         _ if shell_re(true).is_match(name) => Some(1500),
         _ => None,
     }
 }
+
+/// A style's wisps: thin quads past its edges, drawn only close up (the afro's fins come nearest,
+/// about 400).
+const WISPS_BUDGET: usize = 600;
 
 fn shell_re(lod: bool) -> Regex {
     Regex::new(if lod {
@@ -70,7 +83,11 @@ fn ts_list(src: &str, name: &str) -> Vec<String> {
     }
 }
 
+/// No identity channel moves anything further than this at 1 (m): a face of its own, not another head.
+const IDENTITY_REACH: f64 = 0.006;
+
 struct Runtime {
+    faces: Vec<String>,
     units: Vec<String>,
     moods: BTreeSet<String>,
     visemes: Vec<String>,
@@ -124,7 +141,12 @@ fn runtime_names() -> Runtime {
         &read(&web.join("game/household.ts")),
         "export const HAIR_STYLES",
     );
+    let faces = ts_list(
+        &read(&web.join("game/household.ts")),
+        "export const FACE_CHANNELS",
+    );
     Runtime {
+        faces,
         units,
         moods,
         visemes,
@@ -161,6 +183,27 @@ fn u16s(buf: &[u8], at: usize, n: usize) -> Vec<u16> {
         .collect()
 }
 
+/// A part's morph of channel `c` (m per vertex), if it has one.
+fn morph_of(buf: &[u8], part: &JValue, c: usize, scale: f64) -> Option<Vec<V3>> {
+    let m = part.get("morph")?;
+    let r: Vec<usize> = m.at("ranges").arr().iter().map(JValue::usize).collect();
+    if r[c + 1] == r[c] {
+        return None;
+    }
+    let verts = u16s(buf, m.at("morphVerts").usize(), m.at("count").usize());
+    let slots = u16s(buf, m.at("morphSlots").usize(), r[c + 1]);
+    let dp = i16s(buf, m.at("morphPositions").usize(), r[c + 1] * 4);
+    let mut out = vec![V3::zeros(); part.at("vertices").usize()];
+    for e in r[c]..r[c + 1] {
+        out[verts[slots[e] as usize] as usize] = v3(
+            dp[4 * e] as f64 / scale,
+            dp[4 * e + 1] as f64 / scale,
+            dp[4 * e + 2] as f64 / scale,
+        );
+    }
+    Some(out)
+}
+
 /// Python's `repr` of a list of strings.
 fn py_list(v: &[&str]) -> String {
     format!(
@@ -185,8 +228,8 @@ pub fn check(out: &Path) -> bool {
     let mut fail = |m: String| errors.push(m);
 
     // Skeleton.
-    if rig.get("version").map(JValue::f64) != Some(4.0) {
-        fail("rig.json is not version 4".into());
+    if rig.get("version").map(JValue::f64) != Some(5.0) {
+        fail("rig.json is not version 5".into());
     }
     let bones = rig.at("bones").strs();
     if bones != BONES {
@@ -245,9 +288,32 @@ pub fn check(out: &Path) -> bool {
     if rt.hair != HAIR_STYLES {
         fail("hairstyles differ from household.ts".into());
     }
+    // The identity channels: the last of the channels, the creator's (household.ts) in its order.
+    let (first, count) = match rig.at("morphs").get("identity") {
+        Some(i) => (i.at("first").usize(), i.at("count").usize()),
+        None => (ch.len(), 0),
+    };
+    if first + count != ch.len()
+        || ch[first.min(ch.len())..] != IDENTITY
+        || ch[..first.min(ch.len())]
+            .iter()
+            .any(|c| c.starts_with("id."))
+    {
+        fail("the identity channels are not the last channels".into());
+    }
+    if rt
+        .faces
+        .iter()
+        .map(|c| format!("id.{c}"))
+        .collect::<Vec<_>>()
+        != IDENTITY
+    {
+        fail("identity channels differ from household.ts FACE_CHANNELS".into());
+    }
 
     let mut moved: BTreeSet<String> = BTreeSet::new();
     let shell = shell_re(false);
+    let mscale = rig.at("morphs").at("scale").f64();
     let stage_scale = rig.at("stageScale").f64();
     let tone_scale = rig.at("toneScale").f64();
     for (fam, body) in rig.at("bodies").obj() {
@@ -302,15 +368,53 @@ pub fn check(out: &Path) -> bool {
         if !chunks_ok {
             fail(format!("{fam}: bodyChunks must be {{body: []}}"));
         }
-        for (name, e) in parts.obj() {
+        // The close-up body: in files of its own (play never fetches it), that one part, laid out as the
+        // body's parts are and held to the same checks; its lids, lips and ears are `body`'s, where they are.
+        if pkeys.iter().any(|p| p.starts_with("hd.")) {
+            fail(format!(
+                "{fam}: the close-up body is among the parts play fetches"
+            ));
+        }
+        let hd = body.get("hd");
+        let hbuf = hd.map(|h| std::fs::read(out.join(h.at("mesh").str())).expect("close-up mesh"));
+        if hd.map(|h| h.at("parts").keys()) != Some(vec![HD]) {
+            fail(format!("{fam}: no close-up body (hd: {HD})"));
+        }
+        let all: Vec<(&String, &JValue, &[u8])> = parts
+            .obj()
+            .iter()
+            .map(|(name, e)| (name, e, &buf[..]))
+            .chain(hd.iter().flat_map(|h| {
+                let hbuf = hbuf.as_deref().expect("close-up mesh");
+                h.at("parts")
+                    .obj()
+                    .iter()
+                    .map(move |(name, e)| (name, e, hbuf))
+            }))
+            .collect();
+        if let (Some(h), Some(b)) = (hd.and_then(|h| h.at("parts").get(HD)), parts.get("body")) {
+            let hbuf = hbuf.as_deref().expect("close-up mesh");
+            let (nh, nb) = (h.at("vertices").usize(), b.at("vertices").usize());
+            let tail = nb - body::surface(fam, BASE_STAGE).pos.len();
+            let (ph, pb) = (
+                f32s(hbuf, h.at("positions").usize(), nh * 3),
+                f32s(&buf, b.at("positions").usize(), nb * 3),
+            );
+            if nh < tail || ph[(nh - tail) * 3..] != pb[(nb - tail) * 3..] {
+                fail(format!(
+                    "{fam}:{HD}: its lids, lips and ears are not `body`'s"
+                ));
+            }
+        }
+        for &(name, e, buf) in &all {
             let n = e.at("vertices").usize();
             let tris = e.at("indices").usize() / 3;
             if n >= 65536 {
                 fail(format!("{fam}:{name} has {n} vertices"));
             }
-            let pos = f32s(&buf, e.at("positions").usize(), n * 3);
+            let pos = f32s(buf, e.at("positions").usize(), n * 3);
             let w = &buf[e.at("weights").usize()..e.at("weights").usize() + n * 4];
-            let idx = u16s(&buf, e.at("index").usize(), tris * 3);
+            let idx = u16s(buf, e.at("index").usize(), tris * 3);
             if pos.iter().any(|v| !v.is_finite()) {
                 fail(format!("{fam}:{name} has NaN positions"));
             }
@@ -323,7 +427,7 @@ pub fn check(out: &Path) -> bool {
                 fail(format!("{fam}:{name} index out of range"));
             }
             // The baked occlusion (tone.w) is a share of the sky: 0..1 on every part.
-            let tone = i16s(&buf, e.at("tone").usize(), n * 4);
+            let tone = i16s(buf, e.at("tone").usize(), n * 4);
             if tone
                 .chunks(4)
                 .any(|t| !(0.0..=1.0).contains(&(t[3] as f64 / tone_scale)))
@@ -337,7 +441,7 @@ pub fn check(out: &Path) -> bool {
             }
             // The game's front faces are clockwise in its left-handed space (kept under PlayCanvas's
             // mirrored root): cross(b - a, c - a) points against the normals.
-            let nrm = i16s(&buf, e.at("normals").usize(), n * 4);
+            let nrm = i16s(buf, e.at("normals").usize(), n * 4);
             let pt = |i: u16| -> [f32; 3] {
                 [
                     pos[3 * i as usize],
@@ -378,7 +482,9 @@ pub fn check(out: &Path) -> bool {
             } else {
                 0.0
             };
-            if frac > 0.05 {
+            // (Not the hair's wisps: drawn from both sides and shaded by the normals of the hair they grow
+            // from, whichever way a quad of theirs faces; a fin stands square to them.)
+            if frac > 0.05 && !is_wisps(name) {
                 fail(format!(
                     "{fam}:{name}: {} of the faces wind the wrong way (front faces are clockwise)",
                     pct(frac)
@@ -413,6 +519,20 @@ pub fn check(out: &Path) -> bool {
                     super::np::py_repr(target)
                 ));
             }
+            // A real body's heads in its height (docs/review/reference.md: about 4 on a baby, 5-6 on a
+            // child, 6.5-7 on a teen, 7-7.5 on the grown).
+            let heads = 1.0 / proportions(fam, stage).hh;
+            let (lo, hi) = match stage {
+                "baby" => (3.8, 4.3),
+                "child" => (5.0, 6.0),
+                "teen" => (6.5, 7.0),
+                _ => (7.0, 7.5),
+            };
+            if !(lo..=hi).contains(&heads) {
+                fail(format!(
+                    "{fam}.{stage}: {heads:.2} heads tall, a real one is {lo} to {hi}"
+                ));
+            }
             let drop = info.at("seatDrop").f64() / height;
             if !(0.04 < drop && drop < 0.12) {
                 fail(format!(
@@ -438,6 +558,21 @@ pub fn check(out: &Path) -> bool {
                         "{fam}.{stage}:{name} topology differs from the base"
                     ));
                 }
+            }
+            // The stage's close-up body: its deltas, in a file of their own.
+            let ok = match (info.get("hd"), hd.and_then(|h| h.at("parts").get(HD))) {
+                (Some(sh), Some(base)) if sh.at("parts").keys() == vec![HD] => {
+                    let e = sh.at("parts").at(HD);
+                    let end = e.at("positions").usize() + base.at("vertices").usize() * 8;
+                    let len = std::fs::metadata(out.join(sh.at("mesh").str())).map(|m| m.len());
+                    len.is_ok_and(|len| end as u64 <= len)
+                }
+                _ => false,
+            };
+            if !ok {
+                fail(format!(
+                    "{fam}.{stage}: no close-up body, or not the base's topology"
+                ));
             }
         }
         // Eyes in their sockets (base stage).
@@ -518,19 +653,39 @@ pub fn check(out: &Path) -> bool {
                     })
                     .collect()
             };
-            // The ears: the body's faces where its skin (the first vertices, as body.rs made them) is ear.
+            // The ears: sound (no corner of a triangle that shows shaded as facing away from it).
+            let turned = super::measure::ear(fam, stage)[6];
+            if turned > 0.0 {
+                fail(format!(
+                    "{fam}.{stage}: an ear is shaded inside out ({turned:.0} corners shaded as facing away)"
+                ));
+            }
+            // The ears as the set has them: the body's last vertices (ear.rs), the generator's faces.
             let skin = body::surface(fam, stage);
-            let ri = body::region("ear");
-            let bpos = at("body");
-            let ear: Vec<f64> = (0..bpos.len())
-                .map(|v| skin.region.get(v).map_or(0.0, |w| w[ri]))
-                .collect();
-            let be = parts.at("body");
-            let bidx: Vec<usize> = u16s(&buf, be.at("index").usize(), be.at("indices").usize())
+            let ears = Ears::new(
+                &hs.ears,
+                super::ear::ears(fam, stage).faces(Some(&at("body"))),
+            );
+            // The head as a face of its own deforms it (identity.rs): each identity channel at its two
+            // ends, as far as this stage takes it (`faceScale`), and the box of what it moves.
+            let Some(scale) = info.unwrap_or(body).get("faceScale").map(JValue::f64) else {
+                fail(format!("{fam}.{stage}: no faceScale"));
+                continue;
+            };
+            let own: Vec<_> = identity::channels(fam)
                 .iter()
-                .map(|&i| i as usize)
+                .flat_map(|c| [-1.0, 1.0].map(|end| (c, end * scale)))
+                .filter_map(|(c, k)| {
+                    let moved = hs.moved(&skin.head_tri_ix, &c.samples.0, &c.samples.1, k);
+                    let at = c.samples.0.iter().zip(&hs.samples);
+                    let (lo, hi) = at.filter(|(d, _)| d.norm() > 0.0).fold(
+                        (V3::repeat(f64::INFINITY), V3::repeat(f64::NEG_INFINITY)),
+                        |(lo, hi), (_, p)| (lo.inf(p), hi.sup(p)),
+                    );
+                    let pad = V3::repeat(0.015);
+                    (lo.x <= hi.x).then_some((c.name, k, moved, lo - pad, hi + pad))
+                })
                 .collect();
-            let ears = Ears::new(&hs.ears, &bpos, &bidx, &ear);
             for (name, e) in parts.obj() {
                 if !name.starts_with("hair.") {
                     continue;
@@ -541,6 +696,32 @@ pub fn check(out: &Path) -> bool {
                     fail(format!(
                         "{fam}.{stage}:{name} comes within 2 mm of the head ({:.1} mm)",
                         gap * 1000.0
+                    ));
+                }
+                // Hair as far off a face of its own (the beard moves with the skin: its own morphs).
+                let mut worst = (0.002, "", 0.0);
+                for (c, k, moved, lo, hi) in &own {
+                    let d = morph_of(
+                        &buf,
+                        e,
+                        ch.iter().position(|x| x == c).expect("channel"),
+                        mscale,
+                    );
+                    let gap = (0..pos.len())
+                        .map(|v| pos[v] + d.as_ref().map_or(V3::zeros(), |d| d[v] * *k))
+                        .filter(|p| (0..3).all(|a| lo[a] <= p[a] && p[a] <= hi[a]))
+                        .map(|p| moved.sdf(p))
+                        .fold(f64::INFINITY, f64::min);
+                    if gap < worst.0 {
+                        worst = (gap, c, *k);
+                    }
+                }
+                if !worst.1.is_empty() {
+                    fail(format!(
+                        "{fam}.{stage}:{name} comes within 2 mm of the head with {} at {:+.2} ({:.1} mm)",
+                        worst.1,
+                        worst.2,
+                        worst.0 * 1000.0
                     ));
                 }
                 let into: Vec<f64> = pos
@@ -565,21 +746,47 @@ pub fn check(out: &Path) -> bool {
                 }
             }
         }
-        // Face morphs: small, finite shapes (no channel moves anything further than 4 cm).
-        let mscale = rig.at("morphs").at("scale").f64();
-        for (name, e) in parts.obj() {
+        // Face morphs: small, finite shapes (no channel moves anything further than 4 cm, no identity
+        // channel further than `IDENTITY_REACH`, and none of those the low-detail parts).
+        for &(name, e, buf) in &all {
             if let Some(m) = e.get("morph") {
-                let total = m.at("ranges").arr().last().unwrap();
-                let dp = i16s(&buf, m.at("morphPositions").usize(), total.usize() * 4);
-                let mx = dp
-                    .chunks(4)
-                    .flat_map(|c| c[..3].iter().map(|&v| (v as f64 / mscale).abs()))
-                    .fold(0.0, f64::max);
+                let r: Vec<usize> = m.at("ranges").arr().iter().map(JValue::usize).collect();
+                let dp = i16s(buf, m.at("morphPositions").usize(), r[ch.len()] * 4);
+                // No channel moves an ear (the last vertices of the bodies that have the whole ones).
+                let n = e.at("vertices").usize();
+                let moved = u16s(buf, m.at("morphVerts").usize(), m.at("count").usize());
+                if matches!(name.as_str(), "body" | HD)
+                    && moved
+                        .iter()
+                        .any(|&v| v as usize >= n - 2 * super::ear::VERTS)
+                {
+                    fail(format!("{fam}:{name} has a channel that moves an ear"));
+                }
+                let reach = |from: usize, to: usize| {
+                    dp[4 * r[from]..4 * r[to]]
+                        .chunks(4)
+                        .flat_map(|c| c[..3].iter().map(|&v| (v as f64 / mscale).abs()))
+                        .fold(0.0, f64::max)
+                };
+                let mx = reach(0, ch.len());
                 if mx > 0.04 {
                     fail(format!(
                         "{fam}:{name} has a morph moving {:.1} cm",
                         mx * 100.0
                     ));
+                }
+                for k in first.min(ch.len())..ch.len() {
+                    if reach(k, k + 1) > IDENTITY_REACH {
+                        fail(format!(
+                            "{fam}:{name}: {} moves {:.1} mm (at most {:.0})",
+                            ch[k],
+                            reach(k, k + 1) * 1000.0,
+                            IDENTITY_REACH * 1000.0
+                        ));
+                    }
+                    if name.starts_with("lod.") && r[k + 1] > r[k] {
+                        fail(format!("{fam}:{name} has the identity channel {}", ch[k]));
+                    }
                 }
             }
         }

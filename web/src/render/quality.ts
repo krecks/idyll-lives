@@ -78,6 +78,8 @@ export interface QualitySettings {
   lightingStep: number;
   /**
    * Share of the lawn's flowers drawn (always the same ones; the placement is otherwise unchanged).
+   * Under 1, none of the patches of daisies, buttercups and violets in their drifts either
+   * (`shared/nature.ts` `lawns`): 0.08 ms of GPU a frame on Low/WebGL2, about 0.07 on Medium/WebGPU.
    */
   lawnDensity: number;
   /**
@@ -160,18 +162,26 @@ export interface QualitySettings {
    */
   openWorld: OpenWorldQuality;
   /**
-   * The share of `shared/resolution.ts`'s `PIXEL_BUDGET` the `auto` resolution draws at most (1: a
-   * 1920×1080 screen at 100 %). Low's 0.5625 is 75 % along each side there, as a share of the
-   * fill-rate: the picture a little softer, the scene, its FXAA and its compose about 44 % fewer pixels.
-   */
-  pixelBudget: number;
-  /**
    * Low's leaner picture chain (`pc/post.ts`): the scene in an 11/11/10-bit float target where the GPU
    * can draw into one (RGBA16F otherwise), and the FXAA's input 8 bits a channel, the image-processed
    * colour clamped there. Half the bytes of the two half-float full-size targets. Medium and High
    * keep the half-float scene (and have no FXAA).
    */
   leanTargets: boolean;
+  /**
+   * Contact shading (`pc/post.ts`): the sky's light, and a third of the lamps' and the sun's, is shaded where
+   * things meet (a sofa against the wall, a chair's legs on the floor, a pot on the sill), from the
+   * scene's depth (PlayCanvas's screen-space ambient occlusion at half the picture's size, applied in
+   * the lighting). It draws the scene's depth once more before the scene (a depth-only pass over every
+   * solid thing), so it is off on Low. `?diag=noao` leaves it out.
+   */
+  contactShading: boolean;
+  /**
+   * Cloud shadows by day (`pc/cloudShadows.ts`): one more texture read wherever the sun's light is worked out.
+   * Medium on WebGPU: within the runs' noise. Low on WebGL2: 2.58 → 2.65 ms of GPU a frame in the village
+   * orbit (M3 Pro, medians of 5, 2026-11-12), so Low has none. `?diag=noclouds` leaves them out.
+   */
+  cloudShadows: boolean;
 }
 
 /** A big world's distances on a preset (`QualitySettings.openWorld`). */
@@ -204,9 +214,9 @@ export interface RenderQuality extends QualitySettings {
 const OPEN_WORLD: OpenWorldQuality = { stream: 1, farCull: 650, woodsFar: 560, woodsCell: 256, flowersFar: 170, tiles: [200, 460], far: 2600 };
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, grass: { radius: 45, density: 0.5, nearest: 1 }, woodsCell: 100, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, holdStillFrames: true, ambientRange: 0, birds: { count: 6, range: 18 }, residentRadius: 90, openWorld: { stream: 0.7, farCull: 450, woodsFar: 400, woodsCell: 128, flowersFar: 120, tiles: [150, 350], far: 1800 }, pixelBudget: 0.5625, leanTargets: true },
-  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 60, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 40, birds: { count: 24, range: 35 }, residentRadius: 140, openWorld: OPEN_WORLD, pixelBudget: 1, leanTargets: false },
-  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 90, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 }, residentRadius: 200, openWorld: OPEN_WORLD, pixelBudget: 1, leanTargets: false },
+  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, grass: { radius: 45, density: 0.5, nearest: 1 }, woodsCell: 100, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, holdStillFrames: true, ambientRange: 0, birds: { count: 6, range: 18 }, residentRadius: 90, openWorld: { stream: 0.7, farCull: 450, woodsFar: 400, woodsCell: 128, flowersFar: 120, tiles: [150, 350], far: 1800 }, leanTargets: true, contactShading: false, cloudShadows: false },
+  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 60, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 40, birds: { count: 24, range: 35 }, residentRadius: 140, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true },
+  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 90, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 }, residentRadius: 200, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true },
 };
 
 export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];

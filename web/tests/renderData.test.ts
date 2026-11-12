@@ -58,17 +58,17 @@ describe('render data worker', async () => {
   }
 
   const worlds = [
-    { kind: 'farm', seed: 5, size: 'cosy' },
-    { kind: 'mountain', seed: 77, size: 'cosy' },
-    { kind: 'seaside', seed: 2024, size: 'normal' },
-    { kind: 'lakeside', seed: 31, size: 'big' },
+    { kind: 'farm', seed: 5 },
+    { kind: 'mountain', seed: 77 },
+    { kind: 'seaside', seed: 2024 },
+    { kind: 'lakeside', seed: 31 },
   ] as const;
 
   for (const w of worlds) {
     test(
-      `${w.kind} ${w.size} ${w.seed}: the worker's grass field and terrain are the page's`,
+      `${w.kind} ${w.seed}: the worker's grass field and terrain are the page's`,
       async () => {
-        const world = previewWorld(content, t, generateWorld(content, t, w.kind, w.seed, undefined, w.size), null);
+        const world = previewWorld(content, t, generateWorld(content, t, w.kind, w.seed), null);
         const page = await pageLand(world);
         // In the worker: the world as it is sent, the answers as they come back.
         const sent = structuredClone(landWorld(world));

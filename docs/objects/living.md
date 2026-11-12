@@ -17,11 +17,11 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
-| `sofa` Sofa | 2x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Frame, Legs, Pillow, Second pillow | Use | `sink_in`: the seat cushions settle 2 cm while sat on (relax, doze; T0 `squash`). Doze off, as the other sofas. |
-| `loveseat` Loveseat | 2x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillow | Use | `sink_in`. |
-| `sofaThree` Three-seat sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillows, Throw | Use | `sink_in`. Three residents at once (`slots: 3`, was 2). |
-| `sofaDesign` Designer sofa | 2x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Frame, Legs | Use | `sink_in`. |
-| `sofaThreeSeat` Three-seater sofa | 3x1 · floor | relax:relax doze:nap | living / seating | Upholstery, Cushions, Legs, Pillow, Second pillow | Use | `sink_in`. |
+| `sofa` Sofa | 2x1 · floor | relax:relax doze:nap sleep:sleep | living / seating | Upholstery, Cushions, Frame, Legs, Pillow, Second pillow | Use | `sink_in`: the seat cushions settle 2 cm while sat on (relax, doze; T0 `squash`). Doze off, as the other sofas. "Sleep on the sofa" (sleep, `spare`, `whole`): a night for whoever has no bed free, curled up on the side (`CURLED_BEDS`, 1.5 to 1.66 m between the arms) under a blanket (`SOFA_NIGHTS`). |
+| `loveseat` Loveseat | 2x1 · floor | relax:relax doze:nap sleep:sleep | living / seating | Upholstery, Cushions, Legs, Pillow | Use | `sink_in`. "Sleep on the sofa" (sleep, `spare`, `whole`): a night for whoever has no bed free, curled up on the side (`CURLED_BEDS`, 1.5 to 1.66 m between the arms) under a blanket (`SOFA_NIGHTS`). |
+| `sofaThree` Three-seat sofa | 3x1 · floor | relax:relax doze:nap sleep:sleep | living / seating | Upholstery, Cushions, Legs, Pillows, Throw | Use | `sink_in`. Three residents at once (`slots: 3`, was 2). "Sleep on the sofa" (sleep, `spare`, `whole`): a night for whoever has no bed free, at full length on the back, the head by one arm, under a blanket (`SOFA_NIGHTS`). |
+| `sofaDesign` Designer sofa | 2x1 · floor | relax:relax doze:nap sleep:sleep | living / seating | Upholstery, Cushions, Frame, Legs | Use | `sink_in`. "Sleep on the sofa" (sleep, `spare`, `whole`): a night for whoever has no bed free, curled up on the side (`CURLED_BEDS`, 1.5 to 1.66 m between the arms) under a blanket (`SOFA_NIGHTS`). |
+| `sofaThreeSeat` Three-seater sofa | 3x1 · floor | relax:relax doze:nap sleep:sleep | living / seating | Upholstery, Cushions, Legs, Pillow, Second pillow | Use | `sink_in`. "Sleep on the sofa" (sleep, `spare`, `whole`): a night for whoever has no bed free, at full length on the back, the head by one arm, under a blanket (`SOFA_NIGHTS`). |
 | `sofaBed` Sofa bed | 2x1 · floor | relax:relax doze:nap sleep:sleep pullOut:fetch foldAway:fetch | living / seating | Upholstery, Cushions, Legs, Bedding, Pillow, Second pillow | Held open | `bed_out`: the mattress pulls out forward from under the seat for doze, "Sleep the night" and "Pull out the bed" and stays out until "Fold the bed away" (relax only while folded; the last one up folds it after a night or a doze); "Sleep the night" is a spare bed's (content `spare`): a night for whoever has no other bed free, and the living room stays a living room (G-61); `beds` height 0.44 and `fwd` 0.6 (head on the seat; `cargo check-glb` measures the mattress pulled out at 0.44); pulling it out and folding it away the resident stands 1 m further back, clear of the mattress (`STAND_BACK`). |
 | `wallBed` Fold-down wall bed | 2x3 · floor | sleep:sleep nap:nap foldDown:fetch foldUp:fetch | living / seating | Cabinet, Bed frame, Mattress, Pillows, Throw, Inside & shelves, Handle | Held open | `bed_down`: the bed turns down 90° on a hinge at the cabinet's foot to fill the footprint in front, for sleep, nap and "Fold down", and stays down while open; "Fold up" closes it. In `BLANKET_BEDS`; `BEDS` height 0.46. |
 | `sectionalMiddle` Sectional: middle seat | 1x1 · floor | relax:relax doze:nap | living / sectionals | Upholstery, Cushions, Legs | Use | `sink_in`. |
@@ -175,13 +175,15 @@ moves while sat on keeps the sitting pose believable. Shelf and table tops are t
   cabinet" (`bench-results/check-parts/parts-displayCabinet-{openDoor,shutDoor}-01.png`).
 - Known, not changed: standing free, the ladder shelf leans on nothing (it is made to lean on a wall).
 
-## L6. Stairs (1)
+## L6. Stairs (3)
 
 - **Family:** `tools/art/blender/families/living.py`
 
 | Item | Size · layer | Uses (id:anim) | Home | Colour parts | Clip | What it shows |
 |---|---|---|---|---|---|---|
 | `stairs` Staircase | 1x4 · floor | — | living / — | Treads, Railing | Static | Static: 14 steps of 0.2 × 4/14 m, oak treads on white risers between closed strings, an iron railing each side. Placed by build mode and housegen, not the buy catalog. |
+| `stairsOpen` Open-tread staircase | 1x4 · floor | — | living / — | Treads, Railing | Static | Static: 14 oak boards of 0.2 × 4/14 m on two slim steel plates, no risers, a thin steel handrail on a post at the foot and every third step. Placed by build mode's Stairs tool, not the buy catalog. |
+| `stairsSpiral` Spiral staircase | 2x2 · floor | — | living / — | Treads, Railing | Static | Static: 14 oak wedge treads winding 315° round a dark steel newel, a slim iron handrail on the treads' outer ends, a baluster each; walked anticlockwise from the front-left tile, off to the left of the back-left. Placed by build mode's Stairs tool, not the buy catalog. |
 
 **In play** (signed off 2026-10-16):
 - Bought in all four facings and coloured (treads, railing; by day and night, WebGPU and Low WebGL).
