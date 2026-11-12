@@ -13,12 +13,18 @@ export interface TownMapSource {
   dots?(): { x: number; z: number; mine: boolean }[];
   /** Where the camera is looking (town tiles). */
   camera?(): [number, number] | null;
+  /** Where resident `id` stands (town tiles, `y` the ground's height there), drawn or simulated; false when away or unknown (the town tags). */
+  spot?(id: number, out: { x: number; y: number; z: number }): boolean;
+  /** The ground's height (m) at a town point (the town tags stand on it). */
+  ground?(x: number, z: number): number;
 }
 
 class TownMapState {
   /** The town's ground (tiles) and its presentation data; null outside a game (the map then works from the plots). */
   world = $state.raw<{ width: number; depth: number; meta: WorldMeta | null } | null>(null);
   source: TownMapSource = {};
+  /** A lot for the map to pick when it opens (a home for sale's tag): the map takes it and clears it. */
+  pick = $state<number | null>(null);
 }
 
 export const townMap = new TownMapState();

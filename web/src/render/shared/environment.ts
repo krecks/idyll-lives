@@ -13,8 +13,9 @@
 
 import type { Look } from '../look';
 
-const SUNRISE = 6;
-const SUNSET = 20;
+/** The hours the sun rises and sets (the light's arc; the top bar's day bar, `ui/town/dayBar.ts`). */
+export const SUNRISE = 6;
+export const SUNSET = 20;
 /** Hours around sunrise/sunset over which the direct light fades out and back in (sun <-> moon). */
 const HANDOVER = 0.4;
 

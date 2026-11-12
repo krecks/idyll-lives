@@ -14,15 +14,20 @@
   import BuildPanel from './BuildPanel.svelte';
   import HomePanel from './HomePanel.svelte';
   import BuyFx from './buy/BuyFx.svelte';
+  import TownTags from './town/TownTags.svelte';
+  import TownSide from './town/TownSide.svelte';
   import { game } from './state.svelte';
   import { settings } from '../settings/settings.svelte';
 
-  /** Live: the household and the world. Build: one dock (Furnish, Build, Home). Create covers the rest (see `Creation`). */
+  /** Live: the household and the world (and zoomed out, the town view's tags and cards: `town/`). Build: one dock (Furnish, Build, Home). Create covers the rest (see `Creation`). */
 </script>
 
 <div class="hud" class:quiet={game.watching && settings.hideHudWhileWatching && !game.hudAwake}>
+  <!-- The town view's tags, under everything else (they live in the town view: docs/design/living-town.md). -->
+  <TownTags />
   <TopBar />
   {#if game.mode === 'live'}
+    <TownSide />
     <PlacePill />
     <HouseholdStrip />
     <SimPanel />

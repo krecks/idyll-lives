@@ -3214,6 +3214,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return true;
   }
 
+  heightAt(x: number, z: number): number {
+    return this.lot.landscape?.heightAt(x, z) ?? 0;
+  }
+
   simHead(index: number, out: { x: number; y: number; z: number }): boolean {
     return index < this.simCount && !!this.characters?.head(index, out);
   }

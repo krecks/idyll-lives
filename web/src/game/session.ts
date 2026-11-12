@@ -1412,6 +1412,12 @@ async function openSession(
       const t = renderer.cameraPose().target;
       return [t[0], t[2]];
     },
+    spot(id, out) {
+      if (!renderer.simSpot(id, out)) return false;
+      out.y = renderer.heightAt(out.x, out.z);
+      return true;
+    },
+    ground: (x, z) => renderer.heightAt(x, z),
   };
   // A town tag's click (docs/design/living-town.md, `townView.goTo`): the camera glides to the place, the player's
   // again on the way (the director lets go, a follow ends). With `select`, the glide lands on that resident, and
