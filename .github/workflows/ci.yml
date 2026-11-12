@@ -86,6 +86,10 @@ jobs:
         with:
           bun-version: 1.4.3
 
+      # Accepted parts held by their sha256 (tools/pins/pins.json): a pinned part changed fails here.
+      - name: Pins
+        run: tools/ci-local.sh pins
+
       # The residents' clips on both bodies at every life stage; the known failures are in
       # tools/characters/clip-baseline.json, so only a new one fails.
       - name: Clip check

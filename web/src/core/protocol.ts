@@ -466,7 +466,70 @@ export interface WorldMeta {
   pads?: Record<number, number>;
   /** The areas (hamlets) as the generator laid them out, for the map and the camera. */
   areas?: TownArea[];
+  // pin:living-town-meta begin
+  /** Living town: buildings nobody lives in that make a town dense (docs/design/living-town.md). */
+  backdrop?: BackdropBuilding[];
+  /** Living town: the places the town tags name (backdrop places and public lots). */
+  places?: TownPlace[];
+  /** Living town: each main town's centre, the square and the high street. */
+  centre?: { area: number; poly: [number, number][] }[];
+  // pin:living-town-meta end
 }
+
+// pin:living-town-types begin
+
+/** What a backdrop building is (docs/design/living-town.md). */
+export type BackdropUse =
+  | 'flats'
+  | 'terrace'
+  | 'house'
+  | 'shop'
+  | 'cafe'
+  | 'restaurant'
+  | 'office'
+  | 'school'
+  | 'church'
+  | 'hall'
+  | 'workshop'
+  | 'farm'
+  | 'barn';
+
+/** A building that makes a town dense without being a lot: drawn only, never simulated. */
+export interface BackdropBuilding {
+  /** Footprint corners, town metres, counter-clockwise, 4 to 8 points (most are rectangles). */
+  poly: [number, number][];
+  /** Ground height of the footprint's lowest corner (m). */
+  y: number;
+  /** Storeys (1 to 6), 3 m each. */
+  storeys: number;
+  roof: 'gable' | 'hip' | 'flat' | 'mansard';
+  /** The ridge's direction for gable and mansard roofs (rad around +y, 0 = along x). */
+  ridge?: number;
+  use: BackdropUse;
+  /** A wall and roof colour pair: an index into the renderer's backdrop palette, taken modulo its length. */
+  look: number;
+  /** A place's building: its index into `WorldMeta.places`. */
+  place?: number;
+  /** The area (`TownArea` index) it stands in. */
+  area: number;
+}
+
+/** Somewhere the town tags name: a backdrop place or a public lot. */
+export interface TownPlace {
+  name: string;
+  kind: 'shop' | 'cafe' | 'restaurant' | 'office' | 'school' | 'church' | 'park' | 'outdoor' | 'workshop' | 'farm';
+  /** Where its tag stands (town metres). */
+  x: number;
+  z: number;
+  /** A public lot: its plot index. Absent: a backdrop place. */
+  plot?: number;
+  /** Opening hours: minutes of the day [open, close) and the days (bit 0 = Monday). Absent: always open. */
+  hours?: { open: number; close: number; days: number };
+  /** Career categories (`JobView.category`) whose workers are shown as working here. */
+  work?: string[];
+  area: number;
+}
+// pin:living-town-types end
 
 /** The world a town stands in (`game/world.ts`): its kind, its land, and farm fields in town. */
 export interface WorldLook {
