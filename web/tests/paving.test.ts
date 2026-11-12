@@ -61,7 +61,7 @@ describe('paving', () => {
     }
   });
 
-  test('a road has the same repairs every time, in about one stretch in seven', () => {
+  test('a road has the same repairs every time, in as many stretches as the look says (none now)', () => {
     let n = 0;
     for (let k = 0; k < 2000; k++) {
       const fix = repair(3, k);
@@ -70,8 +70,8 @@ describe('paving', () => {
       n++;
       expect(Math.abs(fix.across) + fix.wide).toBeLessThanOrEqual(0.92 + 1e-9);
     }
-    expect(n / 2000).toBeGreaterThan(STREET_LOOK.patches * 0.7);
-    expect(n / 2000).toBeLessThan(STREET_LOOK.patches * 1.3);
+    expect(n / 2000).toBeGreaterThanOrEqual(STREET_LOOK.patches * 0.7);
+    expect(n / 2000).toBeLessThanOrEqual(STREET_LOOK.patches * 1.3);
   });
 
   test('a worn road covers what the plain one does, toned between its kerbs', () => {

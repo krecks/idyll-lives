@@ -64,7 +64,7 @@ describe('the ground’s shade', () => {
     const chair = { id: 1, def: 'chairGarden', x: 2, z: 11, w: 1, d: 1, rot: 0 };
     const tree = { id: 2, def: 'garden.maple', x: 13, z: 2, w: 2, d: 2, rot: 0 };
     const map = groundShade(town([chair, tree]), N);
-    expect(at(map, 2.5, 11.5)).toBeGreaterThan(0.5);
+    expect(at(map, 2.5, 11.5)).toBeGreaterThan(GROUND_SHADE.thing[0] * 0.9);
     expect(at(map, 3.1, 11.5)).toBeGreaterThan(0);
     expect(at(map, 2.5 + 0.5 + GROUND_SHADE.thing[1] + 0.2, 11.5)).toBe(0);
     // The tree: its trunk in the middle of its two tiles.

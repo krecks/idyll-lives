@@ -20,21 +20,31 @@ interface Rect {
 
 /** `?tune=street.…` on the dev server. */
 export const STREET_LOOK = tuned('street', {
-  /** Paving: its tone at a side (and the colour it takes there, moss and earth), how far in that fades (m), and its patches' depth. */
-  pathEdge: 0.38,
-  pathEdgeTint: [0.8, 1, 0.62],
-  pathReach: 0.5,
+  /**
+   * Paving: its tone at a side (and the colour it takes there, moss and earth), how far in that fades (m), and its
+   * patches' depth. (Darker and greener, 0.38 of its light and `[0.8, 1, 0.62]` over half a metre, a narrow front
+   * path was olive from side to side and read as dirty, not as worn stone.)
+   */
+  pathEdge: 0.55,
+  pathEdgeTint: [0.9, 1, 0.78],
+  pathReach: 0.35,
   pathVary: 0.1,
   /** A drive: how much darker it is where a car's wheels run. */
   driveTrack: 0.22,
-  /** Asphalt: the tone where wheels run (the rest is under it), between them, on the crown, along the kerb; its patches' depth; a repair's tone and how many of a road's 4 m stretches have one. */
+  /**
+   * Asphalt: the tone where wheels run (the rest is under it), between them, on the crown, along the kerb, and the
+   * one tone it has where roads meet (`junction`); its patches' depth; a repair's tone and how many of a road's
+   * 4 m stretches have one (none: a rectangle of darker asphalt with ruled edges read as a fault in the picture,
+   * not as a repair).
+   */
   wheel: 1,
   between: 0.68,
   crown: 0.8,
   gutter: 0.55,
+  junction: 0.8,
   roadVary: 0.1,
   patch: 0.45,
-  patches: 0.14,
+  patches: 0,
   /** The pavement: its slabs, the kerb and the course at its back (colours), its patches' depth, and the gutter's shade. */
   walk: '#E8E4DA',
   kerb: '#A9A7A2',

@@ -880,11 +880,16 @@ const FLOWER_DRIFTS = tuned('flowers', { span: 6, from: 0.6, full: 0.76, dense: 
  * The patches of small flowers where the lawn's flowers gather (`lawns`): the drifts' noise from where there are
  * any to where there are `dense` of them a tile; their models, and the values of a wider noise (`kindSpan` m a
  * cell) that part the first kind's drifts from the second's and the third's; `cell`: the squares (m) they are drawn in.
+ *
+ * Off (`dense` 0; it was 2.2): as first drawn they were the busiest thing outside the house, sparkled as the
+ * camera moved (a tenth more of a play picture's pixels changed under a quarter-pixel move), stood on paths,
+ * floors and the borders' mulch and under Build mode's grid, and kept their day colours at night. To come
+ * back they want a patch or two a garden, kept to open lawn, and the night's colours.
  */
 const FLOWER_PATCHES = tuned('patches', {
   from: 0.6,
   full: 0.8,
-  dense: 2.2,
+  dense: 0,
   kinds: ['model.flowers.daisies', 'model.flowers.buttercups', 'model.flowers.violets'],
   kindSpan: 17,
   split: [0.52, 0.64],

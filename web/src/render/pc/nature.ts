@@ -20,6 +20,7 @@
  * basement and gives the woods near the town their shadows.
  */
 
+import { daylightByDefault } from './daylight';
 import * as pc from './engine';
 import { withoutContact } from './post';
 import { Grass, grassGround, type GrassPusher } from './grass';
@@ -687,7 +688,8 @@ export function splitsByGroup(m: ModelMesh, copies: number): boolean {
  * the normal's height where it is all `under` and all `top`; `petal`: the linear colour from which a part is a
  * petal, not a leaf, and to which it is all petal, which keeps its colour from plant to plant and under `top`;
  * `needle`: the blue of a green (linear blue over green) from which it is a conifer's and to which it is all one, which
- * takes `needles` less of `top`). From the play camera a crown, a shrub and a hedge
+ * takes `needles` less of `top`; `night`: what `top` is by night, a grey, `game_daylight` 0: the warm tops were the
+ * one thing the night's grade, which spares what is warm for the lamps' sake, left yellow-green). From the play camera a crown, a shrub and a hedge
  * are seen from above: lit only as the sun fell on them they were one dark green, top and side.
  */
 const LEAVES = tuned('leaves', {
@@ -700,6 +702,7 @@ const LEAVES = tuned('leaves', {
   petal: [0.3, 0.7],
   needle: [0.24, 0.36],
   needles: 0.75,
+  night: 1.2,
 });
 
 function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
@@ -748,7 +751,7 @@ function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
 			${decl('tintUp', 'float')} = smoothstep(${f(LEAVES.facing[0])}, ${f(LEAVES.facing[1])}, normalize(${wgsl ? 'output.vNormalW' : 'vNormalW'}).y);
 			// (Less on a conifer's blue-green needles, which it turned to mint: by how blue the green is.)
 			${decl('tintNeedle', 'float')} = smoothstep(${f(LEAVES.needle[0])}, ${f(LEAVES.needle[1])}, ${color}.b / max(${color}.g, 0.0001));
-			tint = tint * mix(${v3}(${f(LEAVES.under)}), mix(${v3}(1.0), ${v3}(${LEAVES.top.map(f).join(', ')}), tintLeaf * (1.0 - ${f(LEAVES.needles)} * tintNeedle)), tintUp);
+			tint = tint * mix(${v3}(${f(LEAVES.under)}), mix(${v3}(1.0), mix(${v3}(${f(LEAVES.night)}), ${v3}(${LEAVES.top.map(f).join(', ')}), ${u('game_daylight')}), tintLeaf * (1.0 - ${f(LEAVES.needles)} * tintNeedle)), tintUp);
 		#endif
 		${color} = ${wgsl ? 'vec4f' : 'vec4'}(${color}.rgb * pow(tint, ${v3}(2.2)), ${color}.a);
 	}
@@ -759,12 +762,14 @@ function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
 	uniform game_wind: vec4f;
 	uniform game_windKind: vec4f;
 	uniform game_windFlutter: f32;
+	uniform game_daylight: f32;
 #endif`
     : `
 #ifdef GAME_WIND
 	uniform vec4 game_wind;
 	uniform vec4 game_windKind;
 	uniform float game_windFlutter;
+	uniform float game_daylight;
 #endif`;
   return { vsDecl, vsLocal: local, vsEnd: end };
 }
@@ -792,6 +797,7 @@ export function installNature(app: pc.AppBase): void {
   if (windStates.has(app)) return;
   const state: WindState = { time: 0, strength: 1 };
   windStates.set(app, state);
+  daylightByDefault(app.graphicsDevice);
   MaterialLibrary.for(app).onCreate((key, material) => {
     const kind = WIND_KIND[key];
     if (!kind) return;

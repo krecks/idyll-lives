@@ -222,6 +222,9 @@ export interface RoadMeshes {
   shadows: Geo;
 }
 
+/** How far from another road a road's wear begins to even out (m). */
+const JUNCTION_FADE = 4.5;
+
 /**
  * The roads' surfaces, sidewalks, kerbs and gutters, only near `clip` (grown by `margin`) when
  * given: the road surface under the sidewalks too, the sidewalks on top (added to `into`'s meshes if given;
@@ -267,11 +270,18 @@ export function roadMeshes(
         const offs = [-half, ...band.at, half].filter((o, k, list) => k === 0 || o - list[k - 1] > 0.05);
         // (A road without kerbs is a country road: longer rows, no repairs.)
         const kerbed = lane < half - 0.01;
-        const rows = Math.max(1, Math.round((b.s - a.s) / (kerbed ? 4 : 8)));
+        // Where another road meets or crosses this one the wear across it fades into one even tone, the same
+        // on both roads: each worn its own way, the one drawn over the other lay on it like a slab, its bands
+        // ending on a ruled line. (Rows of 2 m there, so the fade has vertices to happen between.)
+        const meets = index.onRoad(mx, mz, (b.s - a.s) / 2 + half + JUNCTION_FADE, ri);
+        const rows = Math.max(1, Math.round((b.s - a.s) / (meets ? 2 : kerbed ? 4 : 8)));
         const k0 = Math.round(a.s / 4);
         const toneAt = (t: number, off: number): V3 => {
           const [x, , z] = at(t, off, 0);
-          return tint(band.tone(off) * asphaltVary(x, z));
+          let even = 0;
+          if (meets) even = index.onRoad(x, z, 0, ri) ? 1 : index.onRoad(x, z, JUNCTION_FADE / 3, ri) ? 0.7 : index.onRoad(x, z, (JUNCTION_FADE * 2) / 3, ri) ? 0.4 : index.onRoad(x, z, JUNCTION_FADE, ri) ? 0.15 : 0;
+          const tone = band.tone(off);
+          return tint((tone + (STREET_LOOK.junction - tone) * even) * asphaltVary(x, z));
         };
         for (let k = 0; k < rows; k++) {
           const [t0, t1] = [k / rows, (k + 1) / rows];
@@ -280,7 +290,7 @@ export function roadMeshes(
             surface.poly(c.map(([t, off]) => at(t, off, ROAD_Y)), up, undefined, undefined, c.map(([t, off]) => toneAt(t, off)));
           }
           // A repair: a patch of newer asphalt, a hair over the road.
-          const fix = kerbed ? repair(ri, k0 + k) : null;
+          const fix = kerbed && !meets ? repair(ri, k0 + k) : null;
           if (fix) {
             const [o0, o1] = [(fix.across - fix.wide) * lane, (fix.across + fix.wide) * lane];
             const [u0, u1] = [t0 + (t1 - t0) * fix.from, t0 + (t1 - t0) * Math.min(1, fix.from + fix.long)];
