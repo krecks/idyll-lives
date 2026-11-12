@@ -63,6 +63,10 @@
       <MenuItem label="New game" icon="icon.ui.plus" variant={latest ? 'default' : 'primary'} arrow={!latest} onclick={() => app.newGame()} />
       <MenuItem label="Load game" icon="icon.ui.load" badge={saves.length || undefined} onclick={() => (app.overlay = 'load')} />
       <MenuItem label="Settings" icon="icon.ui.settings" onclick={() => (app.overlay = 'settings')} />
+      {#if import.meta.env.DEV}
+        <!-- The dev server's model inspector (src/debug/inspect.ts): not in the build. -->
+        <MenuItem label="Inspect models" variant="quiet" onclick={() => (location.href = `${import.meta.env.BASE_URL}inspect.html`)} />
+      {/if}
       <MenuItem label="Credits" variant="quiet" onclick={() => (app.overlay = 'credits')} />
     </nav>
 

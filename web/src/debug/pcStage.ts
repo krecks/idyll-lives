@@ -1,5 +1,5 @@
 /**
- * The stage the PlayCanvas dev pages draw on (`gallery.ts`, `clips.ts`, `characters.ts`, `poses.ts`): the device (WebGPU, or
+ * The stage the PlayCanvas dev pages draw on (`gallery.ts`, `clips.ts`, `inspect.ts`, `characters.ts`, `poses.ts`): the device (WebGPU, or
  * WebGL2 with `?renderer=webgl`), an app without its own frame loop, the world root in game space
  * (`pc/space.ts`), the game camera on an orbit (the player's dragging, `shared/orbit.ts`), a noon
  * sun with its shadow over a fixed square, the sky's light, a lawn, and the frame loop. The models'

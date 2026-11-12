@@ -187,7 +187,9 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      `bird={'length', 'wingspan', 'perchHeight', 'pitch'}` (`families/birds.py`, birds.md). The gate checks them all
      against the file.
 5. **Look**: `cargo art <family> --preview`, then open `previews/<family>/<id>.png`. The preview looks at the front
-   three-quarter, so sides facing away (the inside of side shelves) may not show; the game will.
+   three-quarter, so sides facing away (the inside of side shelves) may not show; the game will. Once exported, the
+   inspector (`bun run dev`, `/inspect.html?key=model.<id>`) shows it as the game draws it, from any side, with its
+   footprint, clips and gate report, and rebuilds it each time `cargo art` writes it again.
 6. **Export**: `cargo art <family>`.
 
 ### Wiring a new object into the game
@@ -350,6 +352,9 @@ doesn't do, start your own dev server from your checkout (`cd web && bunx vite -
 never one that's already running) and drive Playwright headless with full Chrome for Testing, at 1 % volume
 (`page.addInitScript(quiet)` from `tools/bench/quiet.mjs`):
 
+- **Inspector.** `/inspect.html?key=model.<id>` shows one model: `&clip=<name>&t=0.4` holds a clip there,
+  `&show=wire,box,foot,radius,axes,scale,far` turns overlays on, `&alpha=…&beta=…&radius=…` move the camera (it
+  frames the model without them). `window.__inspect` has `select(key)`, `set(t)`, `play()` and `solo(name)`.
 - **Gallery.** `/gallery.html?keys=model.<id>&cols=4` shows the models from the front right, as close as
   frames them, at their middle height (so things on a wall are in view). `&alpha=…&beta=…&radius=…` and
   `&target=1.4` (the height looked at; `&target=x,y,z` a point) move the camera. `&scale=adult` (or

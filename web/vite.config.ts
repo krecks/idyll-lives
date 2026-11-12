@@ -4,7 +4,7 @@ import { appendFile, cp, mkdir, readdir, readFile, writeFile } from 'node:fs/pro
 import { fileURLToPath } from 'node:url';
 import { basename, join, resolve } from 'node:path';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 
 // SharedArrayBuffer (zero-copy sim -> render snapshots, threads for the language model on the
 // CPU) requires cross-origin isolation. Where production hosting can't send these two headers
@@ -56,6 +56,56 @@ const STATES = fileURLToPath(new URL('../debug-states', import.meta.url));
 const DEV_LOGS = fileURLToPath(new URL('../dev-logs', import.meta.url));
 /** Rendering benchmark results (`?bench=<scene>`, src/debug/bench.ts): `<repo>/bench-results/<name>.json`. */
 const BENCH_RESULTS = fileURLToPath(new URL('../bench-results', import.meta.url));
+
+/** The repository's root: where cargo runs the art tools. */
+const REPO = fileURLToPath(new URL('..', import.meta.url));
+/** The model files and the manifests, which the inspector (`src/debug/inspect.ts`) is told of when they change. */
+const MODELS = fileURLToPath(new URL('./public/assets/', import.meta.url));
+
+/**
+ * The inspector's dev server side (`/inspect.html`, src/debug/inspect.ts):
+ * - a model file or a manifest written under `public/assets/` (`cargo art <family>`) is announced to the
+ *   page (the `inspect:changed` event, with the paths as the page fetches them: `/assets/…`), a few at a
+ *   time once the writing has stopped for 300 ms, so the model shown is rebuilt from its new file;
+ * - GET /__debug/gate?key=model.<id> runs the glTF gate on that model (`cargo check-glb <key>`, from the
+ *   repository's root) and answers its text and exit code (`{ code, text }`).
+ */
+function modelWatch(): Plugin {
+  return {
+    name: 'model-watch',
+    apply: 'serve',
+    configureServer(server) {
+      let changed = new Set<string>();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const seen = (file: string) => {
+        if (!file.startsWith(MODELS) || !/\.glb$|(^|[\\/])manifest\.json$/.test(file)) return;
+        changed.add(`/assets/${file.slice(MODELS.length).split('\\').join('/')}`);
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          server.ws.send({ type: 'custom', event: 'inspect:changed', data: { files: [...changed] } });
+          changed = new Set();
+        }, 300);
+      };
+      server.watcher.add(MODELS);
+      server.watcher.on('change', seen);
+      server.watcher.on('add', seen);
+
+      server.middlewares.use('/__debug/gate', (req, res) => {
+        const key = new URL(req.url ?? '', 'http://dev').searchParams.get('key') ?? '';
+        if (!/^(model|item|tool)\.[\w.-]+$/.test(key)) return void ((res.statusCode = 400), res.end('say ?key=model.<id>'));
+        const run = spawn('cargo', ['check-glb', key], { cwd: REPO, stdio: ['ignore', 'pipe', 'pipe'] });
+        let text = '';
+        run.stdout.on('data', (chunk: Buffer) => (text += chunk.toString('utf8')));
+        run.stderr.on('data', (chunk: Buffer) => (text += chunk.toString('utf8')));
+        run.on('error', (err) => (text += String(err)));
+        run.on('close', (code) => {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ code, text }));
+        });
+      });
+    },
+  };
+}
 
 /**
  * Dev server endpoints for debug reports (see src/debug/report.ts):
@@ -400,7 +450,7 @@ The game itself is free software under the GNU General Public License v3.0 or la
 }
 
 export default defineConfig({
-  plugins: [svelte(), debugReports(), earlyEnvironment(), optimizedAssets(), minifiedManifests(), dataBundle(), isolationWorker(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
+  plugins: [svelte(), debugReports(), modelWatch(), earlyEnvironment(), optimizedAssets(), minifiedManifests(), dataBundle(), isolationWorker(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
   // The game's version (one number for web and Rust; `cargo release-version <x.y.z>` bumps it).
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   server: { headers: crossOriginIsolation, ...(linkedModules ? { fs: { allow: [searchForWorkspaceRoot(process.cwd()), linkedModules] } } : {}) },
