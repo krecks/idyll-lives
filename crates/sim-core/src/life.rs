@@ -514,6 +514,22 @@ fn walk_commute(
     (minutes, ticks(total))
 }
 
+/// A commute not needed for this long yet can wait for a tick with searches to spare (`update`):
+/// its first use is when the work taxis are planned (`taxi::PLAN_LEAD` before they'd set off on
+/// foot), and nobody's walk out of town is hours long.
+const UNHURRIED_MINUTES: f32 = 6.0 * 60.0;
+
+/// Whether `i`'s work or school doesn't start for `UNHURRIED_MINUTES` yet: neither today's, if
+/// it's still to come or begun no longer than `late_minutes` ago (a game begun after they'd have
+/// set off), nor the next.
+fn unhurried(w: &World, i: usize) -> bool {
+    let late = ticks(w.content.career_rules.late_minutes);
+    let first = start_on(&w.content, &w.sims[i], w.tick)
+        .filter(|&start| start + late > w.tick)
+        .or_else(|| next_start(w, i));
+    first.is_none_or(|start| start > w.tick + ticks(UNHURRIED_MINUTES))
+}
+
 /// When `i`'s work or school next starts: today's, else tomorrow's (if either).
 pub(crate) fn next_start(w: &World, i: usize) -> Option<u64> {
     let at = |tick: u64| start_on(&w.content, &w.sims[i], tick);
@@ -583,9 +599,19 @@ pub(crate) fn update(w: &mut World) {
                 });
             }
         } else {
-            // (Commutes worked out for the first time or after a move: those with one to go by
-            // can wait a tick when the searches are over budget, one a tick at least.)
-            if w.sims[i].commute.is_none() || !w.over_search_budget() || !refreshed {
+            // (Commutes worked out for the first time or after a move, one a tick at least:
+            // those with one to go by can wait a tick when the searches are over budget, and
+            // those without one yet whose work or school is hours off (`unhurried`) wait for a
+            // tick nobody else's is worked out in. The town's hires at the job market's hour
+            // each worked theirs out in the same tick, a search across the town each: 35 of them
+            // in 70 ms, on a fast machine.)
+            let waits = refreshed
+                && if w.sims[i].commute.is_some() {
+                    w.over_search_budget()
+                } else {
+                    unhurried(w, i)
+                };
+            if !waits {
                 let before = w.sims[i].commute;
                 refresh_commute(w, i, day);
                 refreshed |= w.sims[i].commute != before;

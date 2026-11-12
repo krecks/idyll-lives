@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 /// The most residents a town holds (a town file may start with this many; saves, slots, the
 /// snapshot's layout).
-pub const MAX_SIMS: usize = 160;
+pub const MAX_SIMS: usize = 240;
 
 /// A set of residents by slot (`MAX_SIMS` of them, a bit each).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -7024,6 +7024,8 @@ fn pick_autonomous(
     // About to drop (or burst): no time to talk, as a chat would break off at once and leave the
     // other one's activity dropped for nothing (`available_for_social` asks the same of them).
     let pressed = sim.pressed(content);
+    // (Who hears them, worked out once for all of those asked about: `conversation::Earshot`.)
+    let mut earshot = conversation::Earshot::new(&ctx.nav, sim.pos);
     for (j, other) in ctx.briefs.iter().enumerate() {
         if j == me || !other.available || pressed {
             continue;
@@ -7031,7 +7033,7 @@ fn pick_autonomous(
         // Chat with people within earshot (they call out to them); nobody crosses the house or
         // the lot for a chat, and crossing town is a visit.
         let distance = ctx.nav.stairs.distance(other.pos, sim.pos);
-        let heard = conversation::within_earshot(&ctx.nav, sim.pos, other.pos);
+        let heard = earshot.hears(other.pos);
         // Nor out on the street, minding the baby.
         if !heard || (minding && other.plot != own) {
             continue;
@@ -7136,7 +7138,7 @@ fn pick_autonomous(
         }
         // (Only where they can hear them talking.)
         let distance = ctx.nav.stairs.distance(leader.pos, sim.pos);
-        let heard = conversation::within_earshot(&ctx.nav, sim.pos, leader.pos);
+        let heard = earshot.hears(leader.pos);
         if !heard || (minding && leader.plot != own) {
             continue;
         }

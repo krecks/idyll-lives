@@ -619,13 +619,16 @@ export function withLot(town: NeighbourhoodDraft, slot: number, template: string
 }
 
 /**
- * Residents the neighbours number at most (docs/design/open-world.md: the sim holds 160 Sims in
+ * Residents the neighbours number at most (docs/design/open-world.md: the sim holds 240 Sims in
  * a big world; room left for the player's household and babies).
  */
-export const NEIGHBOUR_CAP = 140;
+export const NEIGHBOUR_CAP = 220;
 
-/** Neighbours a big world starts with when nobody asks for a number (docs/design/open-world.md: ~120 residents). */
-const BIG_START = 118;
+/**
+ * Neighbours a big world starts with when nobody asks for a number (docs/design/open-world.md: ~170
+ * residents, where it has the homes for them; the rest of its homes are for sale).
+ */
+const BIG_START = 168;
 
 /** Time spent generating houses (ms), for the sample tool's budgets: the layout's own time is the rest. */
 export const generateStats = { houseMs: 0 };
@@ -908,7 +911,7 @@ const RICH_FOR = 4;
  * and filled dearest first; one no household turns up for stays for sale.
  */
 export function populate(content: Content, assets: AssetRegistry, t: Templates, town: NeighbourhoodDraft, count?: number): NeighbourhoodDraft {
-  // (A big world starts with about 120 residents unless asked for more, up to its cap.)
+  // (A big world starts with about 170 residents unless asked for more, up to its cap.)
   const MAX_NEIGHBOURS = count === undefined ? BIG_START : NEIGHBOUR_CAP;
   const houses = town.slots.filter((s) => s.kind === 'house');
   const wanted = Math.max(0, Math.min(count ?? houses.length - 2, houses.length - 1));

@@ -322,19 +322,37 @@ pub(crate) fn in_sight(nav: &NavGrid, a: [f32; 2], b: [f32; 2]) -> bool {
 /// furniture-free of them: furniture doesn't stop a voice), a doorway counting `DOOR_MUFFLE`
 /// more and a flight of stairs `STOREY_WALK`. Walls, windows and the front door (`shut`) stop
 /// it; garden fences don't.
+///
+/// Asked for many pairs a tick in a full town, so cheaply (`earshot_search`): it stops as soon as
+/// `b` is reached by a way within earshot, with a hasher for small keys and its map and queue kept
+/// from call to call. Asking about many people from one spot, `Earshot` searches once.
 pub(crate) fn within_earshot(nav: &NavGrid, a: [f32; 2], b: [f32; 2]) -> bool {
     if nav.stairs.distance(a, b) > EARSHOT {
         return false;
     }
-    let lot = nav.lot;
     let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
     let (start, goal) = (tile(a), tile(b));
     if start == goal {
         return true;
     }
+    EARSHOT_BEST.with(|best| earshot_search(nav, start, Some(goal), &mut best.borrow_mut()))
+}
+
+/// The search for `within_earshot` and `Earshot` from tile `start`, cheapest first, over the
+/// tiles' edges as a call carries over them, as far as `EARSHOT`: true as soon as it reaches `goal`
+/// (any way within earshot is the answer, the cheapest isn't needed); with no goal, to the end,
+/// leaving in `best` every tile within earshot (the cheapest way to it, tenths of a metre).
+fn earshot_search(
+    nav: &NavGrid,
+    start: (i32, i32),
+    goal: Option<(i32, i32)>,
+    best: &mut EarshotMap,
+) -> bool {
+    let lot = nav.lot;
     // Tenths of a metre, as whole numbers for the queue.
     let tenths = |m: f32| (m * 10.0).round() as u32;
     let (limit, muffle) = (tenths(EARSHOT), tenths(DOOR_MUFFLE));
+    let stairs = tenths(STOREY_WALK);
     let storey = |z: i32| nav.stairs.storey(z);
     // Sound crosses the edge between neighbouring tiles at this extra cost, or not at all.
     let open = |(ax, az): (i32, i32), (bx, bz): (i32, i32)| -> Option<u32> {
@@ -347,51 +365,169 @@ pub(crate) fn within_earshot(nav: &NavGrid, a: [f32; 2], b: [f32; 2]) -> bool {
             _ => Some(0),
         }
     };
-    let mut best = std::collections::HashMap::from([(start, 0u32)]);
-    let mut queue = std::collections::BinaryHeap::from([std::cmp::Reverse((0u32, start))]);
-    while let Some(std::cmp::Reverse((cost, at))) = queue.pop() {
-        if at == goal {
-            return true;
-        }
-        if best.get(&at).is_some_and(|&c| c < cost) {
-            continue;
-        }
-        let mut next: Vec<((i32, i32), u32)> = Vec::with_capacity(9);
-        for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-            let to = (at.0 + dx, at.1 + dz);
-            if let Some(extra) = open(at, to) {
-                next.push((to, 10 + extra));
+    EARSHOT_QUEUE.with(|queue| {
+        let mut queue = queue.borrow_mut();
+        best.clear();
+        queue.clear();
+        best.insert(start, 0u32);
+        queue.push(std::cmp::Reverse((0u32, start)));
+        while let Some(std::cmp::Reverse((cost, at))) = queue.pop() {
+            if best.get(&at).is_some_and(|&c| c < cost) {
+                continue;
+            }
+            // A tile reached by a way within earshot: the goal heard there, or searched on from.
+            let mut reach = |to: (i32, i32), step: u32| {
+                let c = cost + step;
+                if c > limit {
+                    return false;
+                }
+                if Some(to) == goal {
+                    return true;
+                }
+                if best.get(&to).is_none_or(|&b| c < b) {
+                    best.insert(to, c);
+                    queue.push(std::cmp::Reverse((c, to)));
+                }
+                false
+            };
+            for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let to = (at.0 + dx, at.1 + dz);
+                if let Some(extra) = open(at, to)
+                    && reach(to, 10 + extra)
+                {
+                    return true;
+                }
+            }
+            // Diagonally across open floor (both ways round the corner open, no doorway).
+            for (dx, dz) in [(1, 1), (1, -1), (-1, 1), (-1, -1)] {
+                let (side_x, side_z) = ((at.0 + dx, at.1), (at.0, at.1 + dz));
+                let to = (at.0 + dx, at.1 + dz);
+                let clear = open(at, side_x) == Some(0)
+                    && open(side_x, to) == Some(0)
+                    && open(at, side_z) == Some(0)
+                    && open(side_z, to) == Some(0);
+                if clear && reach(to, 14) {
+                    return true;
+                }
+            }
+            // Up or down the stairs.
+            if let Some(to) = nav.stairs.link(at.0, at.1)
+                && reach(to, stairs)
+            {
+                return true;
             }
         }
-        // Diagonally across open floor (both ways round the corner open, no doorway).
-        for (dx, dz) in [(1, 1), (1, -1), (-1, 1), (-1, -1)] {
-            let (side_x, side_z) = ((at.0 + dx, at.1), (at.0, at.1 + dz));
-            let to = (at.0 + dx, at.1 + dz);
-            let clear = [
-                open(at, side_x),
-                open(side_x, to),
-                open(at, side_z),
-                open(side_z, to),
-            ]
-            .iter()
-            .all(|e| *e == Some(0));
-            if clear {
-                next.push((to, 14));
-            }
-        }
-        // Up or down the stairs.
-        if let Some(to) = nav.stairs.link(at.0, at.1) {
-            next.push((to, tenths(STOREY_WALK)));
-        }
-        for (to, step) in next {
-            let c = cost + step;
-            if c <= limit && best.get(&to).is_none_or(|&b| c < b) {
-                best.insert(to, c);
-                queue.push(std::cmp::Reverse((c, to)));
-            }
+        false
+    })
+}
+
+/// Who hears a call from one spot (`within_earshot` from it to each of them, the same answers),
+/// for asking about many: the search from the spot runs once, to everywhere within earshot, at
+/// the first asked about who is near enough as the crow flies, and each after is a look-up.
+/// (Someone choosing what to do asks about everyone available: in a full town, dozens.) The lot
+/// mustn't change while it's in use.
+pub(crate) struct Earshot<'a> {
+    nav: &'a NavGrid<'a>,
+    from: [f32; 2],
+    /// Every tile within earshot of `from`'s (filled at the first need).
+    heard: Option<EarshotMap>,
+}
+
+impl<'a> Earshot<'a> {
+    pub(crate) fn new(nav: &'a NavGrid<'a>, from: [f32; 2]) -> Self {
+        Self {
+            nav,
+            from,
+            heard: None,
         }
     }
-    false
+
+    /// `within_earshot(nav, from, b)`.
+    pub(crate) fn hears(&mut self, b: [f32; 2]) -> bool {
+        let nav = self.nav;
+        if nav.stairs.distance(self.from, b) > EARSHOT {
+            return false;
+        }
+        let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
+        let (start, goal) = (tile(self.from), tile(b));
+        if start == goal {
+            return true;
+        }
+        self.heard
+            .get_or_insert_with(|| {
+                let mut best = EARSHOT_MAPS
+                    .with(|m| m.borrow_mut().pop())
+                    .unwrap_or_default();
+                best.clear();
+                earshot_search(nav, start, None, &mut best);
+                best
+            })
+            .contains_key(&goal)
+    }
+}
+
+impl Drop for Earshot<'_> {
+    fn drop(&mut self) {
+        // (Its map's room kept for the next.)
+        if let Some(map) = self.heard.take() {
+            EARSHOT_MAPS.with(|m| m.borrow_mut().push(map));
+        }
+    }
+}
+
+thread_local! {
+    /// `earshot_search`'s queue and `within_earshot`'s map, kept from one call to the next
+    /// (cleared, their room kept), so a call allocates nothing once the first few have run.
+    static EARSHOT_QUEUE: std::cell::RefCell<EarshotQueue> = std::cell::RefCell::default();
+    static EARSHOT_BEST: std::cell::RefCell<EarshotMap> = std::cell::RefCell::default();
+    /// `Earshot`'s maps, kept for the next one.
+    static EARSHOT_MAPS: std::cell::RefCell<Vec<EarshotMap>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The tiles within earshot found so far, each with the cheapest way to it (tenths of a metre).
+type EarshotMap = std::collections::HashMap<(i32, i32), u32, TileHash>;
+/// The tiles still to search on from, cheapest first.
+type EarshotQueue = std::collections::BinaryHeap<std::cmp::Reverse<(u32, (i32, i32))>>;
+
+/// Hashing for maps keyed by tiles: a multiply and a rotate a word (FxHash's), much cheaper than
+/// the standard SipHash, which guards against keys chosen to collide (none are here).
+pub(crate) type TileHash = std::hash::BuildHasherDefault<TileHasher>;
+
+#[derive(Default, Clone, Copy)]
+pub(crate) struct TileHasher(u64);
+
+impl TileHasher {
+    fn add(&mut self, word: u64) {
+        self.0 = (self.0.rotate_left(5) ^ word).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+}
+
+impl std::hash::Hasher for TileHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.add(u64::from(b));
+        }
+    }
+
+    fn write_i32(&mut self, v: i32) {
+        self.add(u64::from(v as u32));
+    }
+
+    fn write_u32(&mut self, v: u32) {
+        self.add(u64::from(v));
+    }
+
+    fn write_u64(&mut self, v: u64) {
+        self.add(v);
+    }
+
+    fn write_usize(&mut self, v: usize) {
+        self.add(v as u64);
+    }
 }
 
 /// Whether someone at `from` would call out to start `s` with someone at `to`: within earshot,
@@ -2160,5 +2296,141 @@ mod tests {
                 .is_some_and(|c| c.3 < 0.5)
         );
         assert_eq!(outcome_shown(&w, 1), 0.0);
+    }
+
+    /// `within_earshot` as it was before it stopped at the first way within earshot and kept its
+    /// search's room (a cheapest-first search to the end, over a SipHash map): the answers to keep.
+    fn earshot_as_before(nav: &crate::path::NavGrid, a: [f32; 2], b: [f32; 2]) -> bool {
+        use super::{DOOR_MUFFLE, EARSHOT, Edge, STOREY_WALK, shut};
+        if nav.stairs.distance(a, b) > EARSHOT {
+            return false;
+        }
+        let lot = nav.lot;
+        let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
+        let (start, goal) = (tile(a), tile(b));
+        if start == goal {
+            return true;
+        }
+        let tenths = |m: f32| (m * 10.0).round() as u32;
+        let (limit, muffle) = (tenths(EARSHOT), tenths(DOOR_MUFFLE));
+        let storey = |z: i32| nav.stairs.storey(z);
+        let open = |(ax, az): (i32, i32), (bx, bz): (i32, i32)| -> Option<u32> {
+            if !lot.in_bounds(bx, bz) || lot.diag_blocks(bx, bz) || storey(az) != storey(bz) {
+                return None;
+            }
+            match lot.edge_between(ax, az, bx, bz) {
+                _ if shut(lot, (ax, az), (bx, bz)) => None,
+                Edge::Door => Some(muffle),
+                _ => Some(0),
+            }
+        };
+        let mut best = std::collections::HashMap::from([(start, 0u32)]);
+        let mut queue = std::collections::BinaryHeap::from([std::cmp::Reverse((0u32, start))]);
+        while let Some(std::cmp::Reverse((cost, at))) = queue.pop() {
+            if at == goal {
+                return true;
+            }
+            if best.get(&at).is_some_and(|&c| c < cost) {
+                continue;
+            }
+            let mut next: Vec<((i32, i32), u32)> = Vec::with_capacity(9);
+            for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let to = (at.0 + dx, at.1 + dz);
+                if let Some(extra) = open(at, to) {
+                    next.push((to, 10 + extra));
+                }
+            }
+            for (dx, dz) in [(1, 1), (1, -1), (-1, 1), (-1, -1)] {
+                let (side_x, side_z) = ((at.0 + dx, at.1), (at.0, at.1 + dz));
+                let to = (at.0 + dx, at.1 + dz);
+                let clear = [
+                    open(at, side_x),
+                    open(side_x, to),
+                    open(at, side_z),
+                    open(side_z, to),
+                ]
+                .iter()
+                .all(|e| *e == Some(0));
+                if clear {
+                    next.push((to, 14));
+                }
+            }
+            if let Some(to) = nav.stairs.link(at.0, at.1) {
+                next.push((to, tenths(STOREY_WALK)));
+            }
+            for (to, step) in next {
+                let c = cost + step;
+                if c <= limit && best.get(&to).is_none_or(|&b| c < b) {
+                    best.insert(to, c);
+                    queue.push(std::cmp::Reverse((c, to)));
+                }
+            }
+        }
+        false
+    }
+
+    /// The shipped content, merged as the web loads it.
+    fn shipped_content() -> String {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/content");
+        let read = |n: &str| std::fs::read_to_string(dir.join(n)).unwrap();
+        let base = read("base.json");
+        let includes: Vec<String> = serde_json::from_value(
+            serde_json::from_str::<serde_json::Value>(&base).unwrap()["include"].clone(),
+        )
+        .unwrap();
+        let parts: Vec<String> = includes.iter().map(|n| read(n)).collect();
+        let parts: Vec<&str> = parts.iter().map(String::as_str).collect();
+        crate::merge_content(&base, &parts).unwrap()
+    }
+
+    #[test]
+    fn earshot_answers_as_it_did_before_it_was_made_cheap() {
+        // Saved towns with houses of storeys, stairs, doors, windows and gardens: from every
+        // resident, and from spots round them, to spots up to a little past earshot away (both
+        // ways), each answered as the search to the end answered it.
+        let content = shipped_content();
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves");
+        let (mut asked, mut heard) = (0, 0);
+        for name in ["v042_village.json", "v035_normal.json", "live_day5.json"] {
+            let json = std::fs::read_to_string(dir.join(name)).unwrap();
+            let w = World::from_save_json(&content, &json).unwrap();
+            let nav = w.nav();
+            let mut rng = crate::rng::Rng::new(7);
+            for s in &w.sims {
+                for _ in 0..12 {
+                    let a = [
+                        s.pos[0] + rng.range(-6.0, 6.0),
+                        s.pos[1] + rng.range(-6.0, 6.0),
+                    ];
+                    // (One `Earshot` from each spot, asked about every other.)
+                    for from in [a, s.pos] {
+                        let mut earshot = super::Earshot::new(&nav, from);
+                        for _ in 0..10 {
+                            let b = [a[0] + rng.range(-14.0, 14.0), a[1] + rng.range(-14.0, 14.0)];
+                            for (p, q) in [(from, b), (b, from)] {
+                                let want = earshot_as_before(&nav, p, q);
+                                assert_eq!(
+                                    super::within_earshot(&nav, p, q),
+                                    want,
+                                    "{name}: {p:?} to {q:?}"
+                                );
+                                asked += 1;
+                                heard += usize::from(want);
+                            }
+                            assert_eq!(
+                                earshot.hears(b),
+                                earshot_as_before(&nav, from, b),
+                                "{name}: from {from:?} to {b:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        // (Enough of both answers to mean something.)
+        assert!(
+            asked > 3000 && heard > 300 && asked - heard > 300,
+            "{heard} of {asked}"
+        );
     }
 }

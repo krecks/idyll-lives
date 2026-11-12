@@ -28,22 +28,38 @@ ground storey. Row blocks for upper storeys and the basement keep today's stacke
 ## Caps
 
 - Town file: `width`, `depth` ≤ 1024. Saved grid: width ≤ 1024, depth ≤ 1024 × 5.
-- `MAX_SIMS` 160, `MAX_STAFF` 48, `MAX_CARS` 128 (sim-grid). The renderer's `MAX_CHARACTERS`
-  is the snapshot layout's maxSims + maxStaff (208, `render/shared/characters/rig.ts`); the speech
-  bubbles follow the layout's `maxSims`.
-- Neighbours: `NEIGHBOUR_CAP = 140` in every world (a world starts with ~120: `BIG_START`). Kept when Big worlds were filled (2026-11-02, about 2.5
-  times the homes: the rest are for sale). 240 residents were tried: the big-world bench at 1024 m
-  (`SIZE=1024 RESIDENTS=240`, 4 game hours, 4 runs) ticks at 8,000–9,000 a second, p99 0.78–0.84
-  ms, the slowest tick 3.9–4.0 ms, the heap 59 MB (160: 13,000 a second, p99 0.55 ms, 4.3 ms, 58
-  MB), within budget; but a real Big game with ~170 had 16 frames over 33 ms (up to 299 ms) as the
-  town got its jobs at 09:30 against 2 with 118.
+- `MAX_SIMS` 240, `MAX_STAFF` 48, `MAX_CARS` 128 (sim-grid). The renderer's `MAX_CHARACTERS`
+  is the snapshot layout's maxSims + maxStaff (288, `render/shared/characters/rig.ts`; a test holds
+  them together); the speech bubbles follow the layout's `maxSims`.
+- Neighbours: `NEIGHBOUR_CAP = 220` in every world; a world starts with ~170 (`BIG_START`, where it
+  has the homes: the rest are for sale) and grows to `MAX_SIMS`. Raised from 160 / 140 / 118 in the
+  living-town run (2026-11-12), once the two costs that had held them down were gone:
+  - **The 09:30 spike.** A real Big game with ~170 had 16 frames over 33 ms (up to 299 ms) as the
+    town got its jobs at 09:30. The cause: each hire worked out their commute on their next turn
+    (`life::refresh_commute`), never waiting for the search budget, and nearly every commute is an
+    A* over the town's tiles (the walk by road gives up when a waypoint along the road lands on a
+    tile nobody can stand on: `world::road_route`). With the town at full detail they came in one
+    tick: 35 hires, 70-88 ms natively. Now a commute not needed for six hours waits for a tick
+    nobody else's is worked out in (`life::unhurried`): that tick is 22 ms.
+  - **Earshot.** `conversation::within_earshot` searched 12 m of floor to the end for every pair,
+    over a SipHash map; it stops at the first way within earshot now, and someone choosing what to
+    do searches once for everyone they ask about (`conversation::Earshot`). The full-town babies
+    test went from 191 s (at 240) to 4 s.
+  - The work taxis' kerbs (`taxi::kerb_at`): the cheap tests first, 82 ms to 4 ms as a game starts.
+
+  The big-world bench at 1024 m (4 game hours, 3 runs, M3 Pro): the synthetic town
+  (`SIZE=1024 RESIDENTS=240`) 8,000–8,900 ticks a second, p99 0.35–0.49 ms, the slowest tick
+  7.3–8.0 ms, heap 60 MB (160: 15,100–16,400, p99 0.26–0.30 ms, 10–10.7 ms, 60 MB); a real Big
+  town (`WORLDS=`, seaside 104736 filled to the cap, 222 residents) 4,800–5,000 a second, p99
+  3.4–3.6 ms, the slowest tick 41–42 ms (98–134 ms before), heap 76 MB. The slowest ticks left are
+  the work taxis' plans (`taxi::plan_group`, `book_backs`), people done at work and the traffic.
 
 ## Sizes
 
 One size now: `big`. Cosy and normal were dropped in 0.8.0 (Create World has no size option);
 a save or town file that still says `cosy` or `normal` reads as `big`. A world is 896–1024 m: a
 main town (the kind's shape, its streets reaching all of its box) + 5–7 hamlets of 16–24 lots,
-farmsteads and cottages along the country roads, ~120 starting residents, growing to `MAX_SIMS`.
+farmsteads and cottages along the country roads, ~170 starting residents, growing to `MAX_SIMS`.
 Every town has the open world's roads, outings, commutes timed by the walk, cars and taxis; a
 save without the open-world fields takes its network from its meta's roads, or its streets.
 

@@ -9,6 +9,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { SnapshotLayout } from '../src/core/snapshot';
 import { CARS, carRowAt, carRowIsTaxi, paintTaxi, paintTaxiDoor, TAXI_BODY } from '../src/render/shared/cars';
+import { MAX_CHARACTERS } from '../src/render/shared/characters/rig';
 import { Geo } from '../src/render/shared/geometry';
 import { Painter } from '../src/render/shared/street';
 import { BASES, layout, LAYOUT, SNAPSHOT_RS } from './snapshotLayout';
@@ -52,6 +53,10 @@ describe('car rows', () => {
     // (The lights' rows right after the room for every car.)
     expect(LAYOUT.lightBase).toBe(LAYOUT.carBase + LAYOUT.maxCars * LAYOUT.carStride);
     expect(LAYOUT.header.lightCount).toBe(11);
+  });
+
+  test('start after as many residents and servers as the renderer has rows for (`MAX_CHARACTERS`)', () => {
+    expect(LAYOUT.carBase).toBe(LAYOUT.headerLen + MAX_CHARACTERS * LAYOUT.simStride);
   });
 
   test('start a stride apart from the cars’ base', () => {
