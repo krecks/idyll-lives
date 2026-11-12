@@ -12,6 +12,9 @@
 //! with `SIZE=1024` (default 256), `RESIDENTS=160` (default: as many as a town holds) and
 //! `HOURS=6` (game hours to run, default 4) in the environment. The world is a town with roads and
 //! areas; `OPEN=0` makes it one without them (as the first baseline was measured on).
+//! `WORLDS=worlds.json` (a file of `tools/worlds/sample.ts`'s shape) runs a real Big town instead,
+//! the `WORLD`th in it (default 0), as it was made (`SIZE` and `RESIDENTS` don't apply), the view on
+//! the player's home.
 
 #[path = "sim/common/mod.rs"]
 mod common;
@@ -85,7 +88,15 @@ fn big_world_benchmark() {
     let hours = env("HOURS", 4) as u64;
     let open = env("OPEN", 1) != 0;
     let content = common::content();
-    let (town, hamlets) = common::hamlets::grid(&content, 7, size, 6, residents, open);
+    let real = std::env::var("WORLDS").ok().map(|path| {
+        let file = std::fs::read_to_string(&path).expect("the WORLDS file");
+        let worlds: serde_json::Value = serde_json::from_str(&file).expect("WORLDS is JSON");
+        worlds[env("WORLD", 0)]["town"].to_string()
+    });
+    let (town, hamlets) = match &real {
+        Some(town) => (town.clone(), Vec::new()),
+        None => common::hamlets::grid(&content, 7, size, 6, residents, open),
+    };
 
     // Loading: the town file to a world, as a new game does.
     let before = HELD.load(Ordering::Relaxed);
@@ -99,7 +110,9 @@ fn big_world_benchmark() {
     );
     eprintln!(
         "{size}² ({}): {} hamlets, {} plots, {} objects, {} residents, grid {}×{} ({} storeys{})",
-        if open {
+        if real.is_some() {
+            "a real Big town"
+        } else if open {
             "big, with roads"
         } else {
             "no open-world fields"
@@ -126,7 +139,12 @@ fn big_world_benchmark() {
 
     // Ticking: lower detail on, the view on the first hamlet (where the player lives).
     w.lod = true;
-    w.set_view(Some(hamlets[0]));
+    let view = hamlets.first().copied().unwrap_or_else(|| {
+        let home = w.households.iter().find(|h| h.player).and_then(|h| h.plot);
+        let p = &w.plots[home.expect("a player household with a home") as usize];
+        [p.x, p.z, p.x + p.w, p.z + p.d]
+    });
+    w.set_view(Some(view));
     sim_core::path::take_search_stats();
     // The first tick finds the rooms, the walkable regions and the indexes from scratch: part of
     // starting the game, timed on its own.
@@ -149,11 +167,25 @@ fn big_world_benchmark() {
     let searches = sim_core::path::take_search_stats();
     let mut slowest: Vec<(Duration, usize)> = times.iter().copied().zip(0..).collect();
     slowest.sort_unstable_by(|a, b| b.cmp(a));
+    let from = w.tick - ticks;
+    let at = |t: usize| {
+        let m = sim_core::clock::total_minutes(from + t as u64) as u32 % (24 * 60);
+        format!("{:02}:{:02}", m / 60, m % 60)
+    };
+    // `SLOW=<ms>`: every tick slower than that, with its game time.
+    if let Some(slow) = std::env::var("SLOW")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+    {
+        for (t, d) in times.iter().enumerate().filter(|(_, d)| ms(**d) > slow) {
+            eprintln!("slow tick {t} at {}: {:.2} ms", at(t), ms(*d));
+        }
+    }
     eprintln!(
-        "slowest ticks (ms, tick): {:?}",
+        "slowest ticks (ms, tick, time): {:?}",
         slowest[..5.min(slowest.len())]
             .iter()
-            .map(|(d, t)| (format!("{:.2}", ms(*d)), *t))
+            .map(|(d, t)| (format!("{:.2}", ms(*d)), *t, at(*t)))
             .collect::<Vec<_>>()
     );
     times.sort_unstable();
