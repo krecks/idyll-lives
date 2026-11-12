@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The CI `test` job's steps, in one place: .github/workflows/ci.yml runs each as
+# The CI jobs' steps, in one place: .github/workflows/ci.yml's four jobs run each as
 # `tools/ci-local.sh <step>`, and run here with no step they all go, before a push or a pull request,
 # so what goes up arrives green.
 #
