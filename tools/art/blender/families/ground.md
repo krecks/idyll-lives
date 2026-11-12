@@ -48,7 +48,9 @@ group. The keys are unchanged.
   by its own slope half of it drew dark. No shading from the ground (`ground=False`), which had every head, all
   within 10 cm of it, dark. A first version with `flower`'s closed heads and tube stems (228 triangles a patch of
   daisies) cost 0.23 ms of GPU a frame on Medium over the village; lighter heads, on the plots only, 0.07 ms and
-  0.09 M triangles (M3 Pro, the orbit by day, medians of 3).
+  0.09 M triangles (M3 Pro, the orbit by day, medians of 3). Low draws none (`lawnDensity`): every other one, in its
+  far version, was 0.08 ms on WebGL2. The far versions are there for a preset that draws the lawn's far models with
+  its patches.
 - **Petals** (`model.flowers.petals`): fallen under a lot's tree in blossom (`natureDecor`), 340 pale pink rhombi over
   a disc 5 m across at a tree's scale 1, thickest in the middle, 7 to 10 cm up, each 11 to 15 cm long: larger than
   life, as the game's flowers are (90 of 7 to 10 cm did not show from the play camera). One or two a lot.

@@ -334,7 +334,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   private woodsAsked: { at: string; plants: readonly PlantPlacement[] } | null = null;
 
   /**
-   * `lawnDensity`: the share of the lawn's flowers drawn (Low: half); `lawnLod` 1 draws
+   * `lawnDensity`: the share of the lawn's flowers drawn (Low: half, and none of the patches in their drifts); `lawnLod` 1 draws
    * them in their far versions (Low, as the street's models: `QualitySettings.streetLod`); `woodsCell`:
    * the side (m) of the squares the game draws the woods in (0: the `FOREST_SECTORS`;
    * `QualitySettings.woodsCell`); `bigWoodsCell`: a big world's (`OpenWorldQuality.woodsCell`).
@@ -834,7 +834,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     for (const p of world.plots ?? []) {
       for (let z = Math.max(0, p.z); z < Math.min(groundDepth(world), p.z + p.d); z++) mown.fill(1, z * world.width + Math.max(0, p.x), z * world.width + Math.min(world.width, p.x + p.w));
     }
-    for (let z = 0; z < groundDepth(world); z++) {
+    // (None on a lighter lawn, Low's: they measured 0.08 ms of GPU a frame there, on WebGL2.)
+    for (let z = 0; z < (this.lawnDensity >= 1 ? groundDepth(world) : 0); z++) {
       if (z % 8 === 0) await pace?.();
       for (let x = 0; x < world.width; x++) {
         const i = z * world.width + x;
