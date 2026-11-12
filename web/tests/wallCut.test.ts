@@ -10,7 +10,7 @@ import { expect, test } from 'bun:test';
 import type { DiagonalWall, Opening, WallEdge, WorldStructure } from '../src/core/protocol';
 import { Cut } from '../src/render/shared/geometry';
 import { CUTAWAY } from '../src/render/pc/shaders/cutaway';
-import { HOUSE_LOOK, HousePlanner, WALL_HALF, WALL_STUB, type HousePlan } from '../src/render/shared/house';
+import { HOUSE_LOOK, HousePlanner, WALL_HALF, WALL_HEIGHT, WALL_STUB, type HousePlan } from '../src/render/shared/house';
 
 /** Downstairs: a doorway whose first jamb is at the back wall (the wall along row 2). */
 const MEETS = { x: 5, z: 2 };
@@ -133,4 +133,23 @@ test("a door's side board stops at the face of a wall that meets the door's wall
   }
   expect(inside.slice(0, 5)).toEqual([]);
   expect(boards).toBeGreaterThan(0);
+});
+
+test("nothing but a wall's own top lies in the plane of its top: no board inside the wall reaches up into it", () => {
+  // (A post's face towards a wall it joins is inside that wall while it stands. Its frieze board reached the
+  // wall's full height: its top lay in the wall top's own plane, and showed through it as light ticks at every joint.)
+  const T = WALL_HALF;
+  const z0 = 2;
+  const inside: string[] = [];
+  for (const part of storey(0).parts) {
+    if (part.name !== 'trim') continue;
+    const { pos, col } = part.geo;
+    for (let v = 0; v < pos.length / 3; v++) {
+      const [x, y, z] = [pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]];
+      // Along the back wall (the wall on row `z0`), strictly inside its thickness, at its top.
+      if (y < WALL_HEIGHT - 0.0005 || Math.abs(z - z0) > T - 1e-6 || x < 2 + T || x > 8 - T) continue;
+      if (hex(col, v) !== HOUSE_LOOK.cap.toUpperCase()) inside.push(`${hex(col, v)} ${x.toFixed(3)}, ${y.toFixed(3)}, ${z.toFixed(3)}`);
+    }
+  }
+  expect(inside.slice(0, 5)).toEqual([]);
 });

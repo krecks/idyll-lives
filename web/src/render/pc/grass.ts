@@ -79,6 +79,7 @@ export function grassGround(device: pc.GraphicsDevice, material: pc.StandardMate
   material.setParameter('game_grassEye', new Float32Array(4));
   // (No town: its mask isn't read, nor the lawn's tone drawn.)
   material.setParameter('game_grassTownSize', new Float32Array([0, 0, -2, -1]));
+  material.setParameter('game_grassTone', 1);
   material.update();
 }
 
@@ -120,6 +121,13 @@ function patchMesh(device: pc.GraphicsDevice, blades: number, segments: number):
   mesh.aabb = new pc.BoundingBox(new pc.Vec3(p / 2, 0.2, p / 2), new pc.Vec3(p / 2 + 0.4, 0.4, p / 2 + 0.4));
   return mesh;
 }
+
+/**
+ * The share of the lawn map's tone (its patches and the mower's stripes) a thinner lawn shows (a preset's grass
+ * `density` under 1: Low). With half the blades there is less texture over the ground, and the same bands and
+ * patches stood out more than on Medium.
+ */
+const THIN_LAWN_TONE = 0.65;
 
 /** The meshes of `GRASS.lods`, one set per device (shared by every town's grass). */
 const meshSets = new WeakMap<pc.GraphicsDevice, pc.Mesh[]>();
@@ -248,6 +256,7 @@ export class Grass {
       on?.setParameter('game_grassTown', this.town);
       on?.setParameter('game_grassLawn', this.lawn);
       on?.setParameter('game_grassTownSize', this.townSize);
+      on?.setParameter('game_grassTone', this.quality.density < 1 ? THIN_LAWN_TONE : 1);
     }
   }
 

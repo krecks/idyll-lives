@@ -68,7 +68,7 @@ describe('the ground’s shade', () => {
     expect(at(map, 3.1, 11.5)).toBeGreaterThan(0);
     expect(at(map, 2.5 + 0.5 + GROUND_SHADE.thing[1] + 0.2, 11.5)).toBe(0);
     // The tree: its trunk in the middle of its two tiles.
-    expect(at(map, 14, 3)).toBeGreaterThan(0.4);
+    expect(at(map, 14, 3)).toBeGreaterThan(GROUND_SHADE.trunk[0] * 0.9);
     expect(at(map, 14 + GROUND_SHADE.trunkRadius + GROUND_SHADE.trunk[1] + 0.3, 3)).toBe(0);
   });
 

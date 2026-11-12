@@ -20,13 +20,15 @@ import { tuned } from '../tune';
  * How dark and how far, each `[the share of the light taken at the foot, the reach in metres]`: an outside
  * wall's, a fence's or hedge's, a thing's (round its footprint, drawn in by `inset` m a side: few things
  * fill their tiles) and a tree's trunk (round the middle of its footprint, `trunkRadius` m). `falloff`: how
- * fast it fades with the distance (1: evenly; more: most of it close by).
+ * fast it fades with the distance (1: evenly; more: most of it close by). A thing's and a trunk's are light: at
+ * [0.4, 0.6] and [0.6, 1.5], with the soil round a bed or a trunk under them, a crate and a planter stood in a
+ * brown-black smudge heavier than a shadow, and a tree on a grey bare patch.
  */
 export const GROUND_SHADE = tuned('shade', {
   wall: [0.65, 1.8],
   fence: [0.5, 0.9],
-  thing: [0.4, 0.6],
-  trunk: [0.6, 1.5],
+  thing: [0.3, 0.5],
+  trunk: [0.4, 1.3],
   inset: 0.14,
   trunkRadius: 0.2,
   falloff: 1.3,

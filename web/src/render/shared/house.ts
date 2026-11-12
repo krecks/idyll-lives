@@ -937,7 +937,9 @@ export class HousePlanner {
         if (y1 >= H - 0.01) {
           const k = trim.kind;
           trim.kind = Cut.Hide;
-          trim.box(...span(axis, plane, n, a0, a1, H - 0.2, H, 0.025));
+          // (No higher than the face: a post's face towards a wall it joins stops a hair under that wall's top, and
+          // its frieze, at the wall's full height, lay in the top's own plane and showed through it as light ticks.)
+          trim.box(...span(axis, plane, n, a0, a1, H - 0.2, Math.min(H, y1), 0.025));
           trim.kind = k;
         }
         if (y0 < 0.01) ao.poly([Q(a0, 0.012, 0), Q(a1, 0.012, 0), Q(a1, 0.012, 0.45), Q(a0, 0.012, 0.45)], [0, 1, 0], undefined, [0.32, 0.32, 0, 0]);

@@ -30,7 +30,7 @@ import { tuned } from '../tune';
  *
  * `patch`, `patchTone`: the tone patches' two sizes (m across) and strengths; `drySpan`, `dry`: the dry
  * patches' size and strength, and `dryTone` how much lighter a dry patch is (darker a lush one). `roughPatch`: how much stronger both are on rough land. `stripes`: a mown
- * lot's stripes, `stripeWidth` tiles wide each. `wall`, `shade`, `fence`: the darker foot of a wall, more
+ * lot's stripes, `stripeWidth` tiles wide each, coming in over `stripeEdge` tiles from the plot's edge. `wall`, `shade`, `fence`: the darker foot of a wall, more
  * on its shaded side (and half of it a tile further out), and of a fence or hedge; `lush`: how much lusher
  * the grass is there, as a share of how much darker. `fenceRough`: how rough the grass at a fence's foot.
  * `door`, `gate`, `path`: bare earth outside a door, at a gate and past a path's ends; `play`, `seat`,
@@ -54,6 +54,7 @@ export const LAWN_MAP = tuned('ground', {
   roughPatch: 1.3,
   stripes: 0.06,
   stripeWidth: 1,
+  stripeEdge: 3,
   wall: 0.8,
   shade: 0.3,
   fence: 0.5,
@@ -64,9 +65,9 @@ export const LAWN_MAP = tuned('ground', {
   path: 0.6,
   play: 0.8,
   seat: 0.6,
-  bed: 0.9,
-  trunk: 0.9,
-  ring: 0.5,
+  bed: 0.65,
+  trunk: 0.4,
+  ring: 0.45,
   crown: 0.6,
 });
 
@@ -94,6 +95,13 @@ function baseMap(world: WorldStructure, tw: number, td: number): Uint8Array {
   // Which plot a tile is on (0: none), and each plot's stripes: along x (1), along z (2) or none.
   const plot = new Uint16Array(tw * td);
   const stripes = [0];
+  // (The stripes come in over `stripeEdge` tiles from a plot's edge: a plot beside open grass or another plot
+  // began them on a ruled line.)
+  const inFromEdge = (x: number, z: number, k: number): number => {
+    const p = world.plots[k - 1];
+    const t = Math.min(1, (Math.min(x - p.x, p.x + p.w - 1 - x, z - p.z, p.z + p.d - 1 - z) + 0.5) / Math.max(0.5, M.stripeEdge));
+    return t * t * (3 - 2 * t);
+  };
   world.plots.forEach((p, k) => {
     const h = hash(p.x, p.z, seed + 411);
     stripes.push(h < 0.42 ? 1 : h < 0.84 ? 2 : 0);
@@ -117,7 +125,7 @@ function baseMap(world: WorldStructure, tw: number, td: number): Uint8Array {
       // (Dry grass is paler: a patch then reads as grass of another kind, not as a shadow on it.)
       tone += dry * M.dryTone;
       const way = stripes[on];
-      if (way) tone += (Math.floor((way === 1 ? z : x) / stripeWidth) % 2 ? 1 : -1) * M.stripes;
+      if (way) tone += (Math.floor((way === 1 ? z : x) / stripeWidth) % 2 ? 1 : -1) * M.stripes * inFromEdge(x, z, on);
       base[o + TONE] = edge ? 128 : signed(tone);
       base[o + DRY] = edge ? 128 : signed(dry);
       base[o + ROUGH] = on ? 0 : 255;

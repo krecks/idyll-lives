@@ -40,7 +40,7 @@
  * `game_grassEye` (the eye, game space, and in w how far the grass is drawn: the ground blends
  * into the lawn's colour towards it too), `game_grassDensity` (the preset's, `grassShare`), `game_grassArea` (the colour texture's corner and 1 / its
  * size in metres), `game_grassTownSize` (the town's ground in metres, and from how far round it to
- * how far the lawn's tone fades out), `game_daylight` (0 by night to 1 by day, `pc/daylight.ts`), `game_grassPush[16]`.
+ * how far the lawn's tone fades out), `game_grassTone` (the share of the lawn map's tone drawn: less on a thinner lawn, `pc/grass.ts`), `game_daylight` (0 by night to 1 by day, `pc/daylight.ts`), `game_grassPush[16]`.
  * Per copy: `game_grassSlope` (the ground's slope along x and z under its patch).
  */
 
@@ -142,7 +142,7 @@ function grassCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
   const list = (v: readonly number[]) => `${v3}(${v.map(f).join(', ')})`;
   /** `c` (linear rgb, assignable) as the lawn's map `m` (a texel of it) has it: its tone, how dry and how rough, by the share `w`. */
   const mapped = (c: string, m: string, w: string) =>
-    `${c} = ${c} * mix(${v3}(1.0), (1.0 + (${m}.r * 2.0 - 1.0) * ${f(LAWN.tone)} * mix(${f(LAWN.night[0])}, 1.0, ${u('game_daylight')})) * (${v3}(1.0) + (${m}.g * 2.0 - 1.0) * ${list(LAWN.dryTint)}) * mix(${v3}(1.0), ${list(LAWN.rough)}, ${m}.a), ${w});`;
+    `${c} = ${c} * mix(${v3}(1.0), (1.0 + (${m}.r * 2.0 - 1.0) * ${f(LAWN.tone)} * ${u('game_grassTone')} * mix(${f(LAWN.night[0])}, 1.0, ${u('game_daylight')})) * (${v3}(1.0) + (${m}.g * 2.0 - 1.0) * ${list(LAWN.dryTint)}) * mix(${v3}(1.0), ${list(LAWN.rough)}, ${m}.a), ${w});`;
   /**
    * Where the lawn's map is read for `p` (game xz), a texel a tile: level across most of a tile and over to the
    * next in a smooth step about its edge (a smooth step taken twice), so a mown stripe has an edge and nothing
@@ -182,6 +182,7 @@ ${windDecl}
 	uniform game_grassArea: vec4f;
 	uniform game_grassTownSize: vec4f;
 	uniform game_daylight: f32;
+	uniform game_grassTone: f32;
 	uniform game_grassPush: array<vec4f, ${GRASS_PUSHERS}>;
 	var game_grassColour: texture_2d<f32>;
 	var game_grassColourSampler: sampler;
@@ -211,6 +212,7 @@ ${windDecl}
 	uniform vec4 game_grassArea;
 	uniform vec4 game_grassTownSize;
 	uniform float game_daylight;
+	uniform float game_grassTone;
 	uniform vec4 game_grassPush[${GRASS_PUSHERS}];
 	uniform sampler2D game_grassColour;
 	uniform sampler2D game_grassTown;
@@ -353,6 +355,7 @@ ${windDecl}
 	uniform game_grassEye: vec4f;
 	uniform game_grassTownSize: vec4f;
 	uniform game_daylight: f32;
+	uniform game_grassTone: f32;
 	var game_grassColour: texture_2d<f32>;
 	var game_grassColourSampler: sampler;
 	var game_grassTown: texture_2d<f32>;
@@ -372,6 +375,7 @@ ${windDecl}
 	uniform vec4 game_grassEye;
 	uniform vec4 game_grassTownSize;
 	uniform float game_daylight;
+	uniform float game_grassTone;
 	uniform sampler2D game_grassColour;
 	uniform sampler2D game_grassTown;
 	uniform sampler2D game_grassLawn;
