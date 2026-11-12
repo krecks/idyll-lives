@@ -41,7 +41,8 @@ BASE = dict(
     bloom_accent=('#C2367A', 'satin'),
     sand=('#C8B894', 'matte'),
     moss=('#5E7A34', 'matte'),
-    bed=('#6A4C38', 'matte'),           # a flower bed's soil mound: the part the player colours ("Bed")
+    bed=('#3C2C1E', 'matte'),           # a flower bed's soil mound: the part the player colours ("Bed"); dark earth
+                                        # (in a mid brown, #6A4C38, it was a salmon disc in the game's midday sun)
     bloom2=('#F2C12E', 'satin'),
     bloom3=('#EF6F9C', 'satin'),
     bloom4=('#F08A24', 'satin'),
@@ -2445,7 +2446,7 @@ def lobed(lobes, depth=0.35):
 def pumpkins():
     """Pumpkin patch: a patch of soil, vines with curling tendrils, big lobed leaves on long stalks and a yellow flower,
     and three ribbed pumpkins on their stalks, grown from seedlings to ripe."""
-    P = palette(bed='#6A4C38', leaf='#4A7A36', leaf_dark='#5A8A3C', leaf_light='#6A9A44', stem='#7AA84C', bloom='#E8822A',
+    P = palette(leaf='#4A7A36', leaf_dark='#5A8A3C', leaf_light='#6A9A44', stem='#7AA84C', bloom='#E8822A',
                 stalk='#5E6A2E', blossom='#F2C12E')
     rng = random.Random(85)
     G.revolve('bed', [(0, 0), (0.46, 0), (0.42, 0.02), (0.3, 0.035), (0, 0.04)], material=P.bed, segments=low(20, 12),
