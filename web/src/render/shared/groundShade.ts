@@ -25,7 +25,7 @@ import { tuned } from '../tune';
 export const GROUND_SHADE = tuned('shade', {
   wall: [0.65, 1.8],
   fence: [0.5, 0.9],
-  thing: [0.65, 0.8],
+  thing: [0.4, 0.6],
   trunk: [0.6, 1.5],
   inset: 0.14,
   trunkRadius: 0.2,

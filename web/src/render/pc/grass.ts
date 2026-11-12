@@ -57,9 +57,23 @@ const noGrass = new WeakMap<pc.GraphicsDevice, { colour: pc.Texture; town: pc.Te
  * The ground's gusts (`GAME_GRASS_GROUND`) on `material` (the terrain's, shared by every town's):
  * the gusts' noise, and no grass until a town's draw says where it grows (`Grass.onGround`).
  */
+/** Devices whose lawn has been told the time of day (`grassDaylight`): until it is, it is day. */
+const lit = new WeakSet<pc.GraphicsDevice>();
+
+/**
+ * How much of the day it is for the lawn, 0 (night) to 1 (`game_grassDay`, read by the blades and the ground
+ * under them): by night the lawn's map shows less of its tone and of the shade round what stands on it
+ * (`LAWN.night`, `shaders/grass.ts`).
+ */
+export function grassDaylight(device: pc.GraphicsDevice, day: number): void {
+  lit.add(device);
+  device.scope.resolve('game_grassDay').setValue(Math.min(1, Math.max(0, day)));
+}
+
 export function grassGround(device: pc.GraphicsDevice, material: pc.StandardMaterial): void {
   if (grounds.has(material)) return;
   grounds.add(material);
+  if (!lit.has(device)) grassDaylight(device, 1);
   let none = noGrass.get(device);
   if (!none) {
     const blank = (name: string, format: number, bytes: ArrayLike<number>) => new pc.Texture(device, { name, width: 1, height: 1, format, mipmaps: false, levels: [Uint8Array.from(bytes)] });
@@ -192,6 +206,7 @@ export class Grass {
     mat.setAttribute('game_grassSlope', GRASS_SLOPE.semantic);
     MaterialLibrary.for(app).adopt(mat);
     mat.setDefine('GAME_GRASS', '');
+    if (!lit.has(device)) grassDaylight(device, 1);
     // No contact shading on the blades (`post.ts`): among themselves they would shade as noise.
     withoutContact(mat);
     mat.setParameter('game_grassArea', this.area);

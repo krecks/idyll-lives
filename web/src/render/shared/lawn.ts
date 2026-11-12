@@ -36,13 +36,18 @@ import { tuned } from '../tune';
  * `door`, `gate`, `path`: bare earth outside a door, at a gate and past a path's ends; `play`, `seat`,
  * `bed`, `trunk`: under play things, seats, beds and trunks (`THINGS`), and a share of it a tile round
  * them (`RING`, times `ring`). `crown`: the darker grass under a tree.
+ *
+ * A patch differs by its colour (`LAWN.dryTint`) and hardly by its lightness (`patchTone`, `dryTone`): lighter
+ * and darker patches metres across read as stains or as the shade of clouds that never moved, and blurred
+ * the hour the real shadows tell. The ring of soil round a bed is half what its kind says (`ring`): with the
+ * shade round the bed on top of it, a full one read as a scorch mark.
  */
 export const LAWN_MAP = tuned('ground', {
   patch: [10, 3.7],
-  patchTone: [0.35, 0.3],
+  patchTone: [0.08, 0.06],
   drySpan: 13,
   dry: 0.9,
-  dryTone: 0.25,
+  dryTone: 0.05,
   roughPatch: 1.3,
   stripes: 0.12,
   stripeWidth: 1,
@@ -58,7 +63,7 @@ export const LAWN_MAP = tuned('ground', {
   seat: 0.6,
   bed: 0.9,
   trunk: 0.9,
-  ring: 1,
+  ring: 0.5,
   crown: 0.6,
 });
 

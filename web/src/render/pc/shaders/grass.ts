@@ -40,7 +40,7 @@
  * `game_grassEye` (the eye, game space, and in w how far the grass is drawn: the ground blends
  * into the lawn's colour towards it too), `game_grassDensity` (the preset's, `grassShare`), `game_grassArea` (the colour texture's corner and 1 / its
  * size in metres), `game_grassTownSize` (the town's ground in metres, and from how far round it to
- * how far the lawn's tone fades out), `game_grassPush[16]`.
+ * how far the lawn's tone fades out), `game_grassDay` (0 by night to 1 by day, `grassDaylight`), `game_grassPush[16]`.
  * Per copy: `game_grassSlope` (the ground's slope along x and z under its patch).
  */
 
@@ -80,6 +80,9 @@ const BLADE = { short: 0.09, long: 0.26, mown: 0.085, thin: 0.016, wide: 0.027, 
  * texture's own light and dark speckle is taken out under the lawn (it shows between the blades, and is
  * most of what changes from one frame to the next as the camera moves). `shade`: how much of the ground's
  * shade round what stands on it (the town mask's second channel, `shared/groundShade.ts`) the lawn takes.
+ * `night`: the shares of the map's tone and of that shade left by night (`game_grassDay` 0): under the moon
+ * the mower's stripes were the most regular thing on a dark lawn, and the shade under a garden table a
+ * black hole that took a resident's legs with it.
  *
  * The values are the calm lawn chosen from pictures side by side (2026-11-11, `tools/bench/play.mjs
  * --sheet lawn`): the lawn is most of a play picture, and with dark roots under light yellow tips (0.55
@@ -105,11 +108,12 @@ const LAWN = tuned('lawn', {
   dryTint: [0.22, 0.05, -0.13],
   rough: [0.78, 0.88, 0.68],
   mown: 1,
-  earth: [0.2, 0.14, 0.075],
+  earth: [0.17, 0.135, 0.085],
   earthEdge: [0.15, 0.7],
   earthRagged: 0.5,
   soften: 0.6,
   shade: 1,
+  night: [0.4, 0.45],
 });
 
 function grassCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
@@ -138,7 +142,7 @@ function grassCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
   const list = (v: readonly number[]) => `${v3}(${v.map(f).join(', ')})`;
   /** `c` (linear rgb, assignable) as the lawn's map `m` (a texel of it) has it: its tone, how dry and how rough, by the share `w`. */
   const mapped = (c: string, m: string, w: string) =>
-    `${c} = ${c} * mix(${v3}(1.0), (1.0 + (${m}.r * 2.0 - 1.0) * ${f(LAWN.tone)}) * (${v3}(1.0) + (${m}.g * 2.0 - 1.0) * ${list(LAWN.dryTint)}) * mix(${v3}(1.0), ${list(LAWN.rough)}, ${m}.a), ${w});`;
+    `${c} = ${c} * mix(${v3}(1.0), (1.0 + (${m}.r * 2.0 - 1.0) * ${f(LAWN.tone)} * mix(${f(LAWN.night[0])}, 1.0, ${u('game_grassDay')})) * (${v3}(1.0) + (${m}.g * 2.0 - 1.0) * ${list(LAWN.dryTint)}) * mix(${v3}(1.0), ${list(LAWN.rough)}, ${m}.a), ${w});`;
   /**
    * Where the lawn's map is read for `p` (game xz), a texel a tile: level across most of a tile and over to the
    * next in a smooth step about its edge (a smooth step taken twice), so a mown stripe has an edge and nothing
@@ -177,6 +181,7 @@ ${windDecl}
 	uniform game_grassDensity: f32;
 	uniform game_grassArea: vec4f;
 	uniform game_grassTownSize: vec4f;
+	uniform game_grassDay: f32;
 	uniform game_grassPush: array<vec4f, ${GRASS_PUSHERS}>;
 	var game_grassColour: texture_2d<f32>;
 	var game_grassColourSampler: sampler;
@@ -205,6 +210,7 @@ ${windDecl}
 	uniform float game_grassDensity;
 	uniform vec4 game_grassArea;
 	uniform vec4 game_grassTownSize;
+	uniform float game_grassDay;
 	uniform vec4 game_grassPush[${GRASS_PUSHERS}];
 	uniform sampler2D game_grassColour;
 	uniform sampler2D game_grassTown;
@@ -315,7 +321,7 @@ ${windDecl}
 		// Its colour: the ground's, dark at the root, paler and yellower at the tip, lighter in a gust.
 		${d('gLin', v3, true)} = pow(gField.rgb, ${v3}(2.2)) * ${f(GRASS.groundAlbedo)};
 		${mapped('gLin', 'gMap', '1.0')}
-		gLin = gLin * (1.0 - gShade * ${f(LAWN.shade)});
+		gLin = gLin * (1.0 - gShade * ${f(LAWN.shade)} * mix(${f(LAWN.night[1])}, 1.0, ${u('game_grassDay')}));
 		${grade('gLin', 'smoothstep(0.15, 0.7, gCov)', 'gGrade')}
 		${d('gBase', v3)} = mix(${v3}(dot(gLin, ${v3}(0.2126, 0.7152, 0.0722))), gLin, ${f(LAWN.saturation)});
 		${d('gTint', v3)} = mix(${v3}(1.0), ${v3}(1.1, 1.06, 0.8), gT * gT * ${f(0.5 * LAWN.yellow)}) * (${f(1 - LAWN.vary)} + ${f(2 * LAWN.vary)} * gR.z);
@@ -346,6 +352,7 @@ ${windDecl}
 	uniform game_grassArea: vec4f;
 	uniform game_grassEye: vec4f;
 	uniform game_grassTownSize: vec4f;
+	uniform game_grassDay: f32;
 	var game_grassColour: texture_2d<f32>;
 	var game_grassColourSampler: sampler;
 	var game_grassTown: texture_2d<f32>;
@@ -364,6 +371,7 @@ ${windDecl}
 	uniform vec4 game_grassArea;
 	uniform vec4 game_grassEye;
 	uniform vec4 game_grassTownSize;
+	uniform float game_grassDay;
 	uniform sampler2D game_grassColour;
 	uniform sampler2D game_grassTown;
 	uniform sampler2D game_grassLawn;
@@ -431,7 +439,7 @@ ${windDecl}
 			dAlbedo = mix(dAlbedo, ${list(LAWN.earth)} * ggSpeck, ggEarth);
 		}
 		// The shade round what stands on the ground (walls, fences, things, trunks), as the blades have it.
-		dAlbedo = dAlbedo * (1.0 - ggShade * ${f(LAWN.shade)});
+		dAlbedo = dAlbedo * (1.0 - ggShade * ${f(LAWN.shade)} * mix(${f(LAWN.night[1])}, 1.0, ${u('game_grassDay')}));
 	}
 #endif`;
 

@@ -30,7 +30,7 @@ import { shadowOnlyLayer } from './layers';
 import { MaterialLibrary } from './materials';
 import { ATLAS_TILE_SEMANTIC, installGameChunks } from './shaders/chunks';
 import { buildModel, disposeTemplate, glowByInstance, type MirrorSurface, type ModelTemplate } from './models';
-import type { GrassPusher } from './grass';
+import { grassDaylight, type GrassPusher } from './grass';
 import { CloudShadows } from './cloudShadows';
 import { smoothstep } from '../../game/noise';
 import { installNature, Landscape, NATURE_DIAGS, setWind, Sky, windStill, type RoadBuilder } from './nature';
@@ -452,6 +452,8 @@ export class LotContents {
     // Cloud shadows while the sun is well up: none at night, nor in the low sun of early morning and of the
     // evening, whose long shadows and gold are the picture then (all of them from about 9 to 17 h).
     this.cloudShadows?.light((1 - l.night) * smoothstep(0.25, 0.6, l.sunUp));
+    // The lawn's stripes and the shade round what stands on it, fainter as the light goes (`LAWN.night`).
+    grassDaylight(this.app.graphicsDevice, (1 - l.night) * smoothstep(0, 0.3, l.sunUp));
     this.motion.setLamps(l.lamps);
     const level = Math.min(1, Math.max(0, (l.lamps - 0.35) / 0.5));
     if (level !== this.glowLight.level) this.applyGlow({ ...this.glowLight, level });
