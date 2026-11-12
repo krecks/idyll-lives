@@ -29,15 +29,29 @@ fn residents(w: &World) -> u64 {
     hash(&bytes)
 }
 
-/// The structure's hash, but for the lit junctions' and their poles' layout for the renderer
-/// (`junctions`, `lightPoles`): ways out and yaws from the platform's trigonometry, whose last bit
-/// differs between macOS and Linux (CI), so the same build hashed two ways. The game runs on the
-/// WASM's own maths; the layout has its own tests (`traffic`, `web/tests/junctions.test.ts`).
+/// The structure's hash, but for what comes from the platform's trigonometry, whose last bit
+/// differs between macOS and Linux (CI), so the same build hashed two ways: the lit junctions' and
+/// their poles' layout for the renderer (`junctions`, `lightPoles`), and where the cars stand and
+/// which way they face (each car's `x`, `z` and `yaw`; whose car, its body and paint stay in).
+/// The game runs on the WASM's own maths; the layout and the cars have their own tests
+/// (`traffic`, `travel_cars`, `web/tests/junctions.test.ts`).
 fn structure_hash(w: &World) -> u64 {
     let mut v: serde_json::Value = serde_json::from_str(&structure_json(w)).expect("structure");
     if let Some(m) = v.as_object_mut() {
         m.remove("junctions");
         m.remove("lightPoles");
+        for car in m
+            .get_mut("cars")
+            .and_then(|c| c.as_array_mut())
+            .into_iter()
+            .flatten()
+        {
+            if let Some(c) = car.as_object_mut() {
+                for k in ["x", "z", "yaw"] {
+                    c.remove(k);
+                }
+            }
+        }
     }
     hash(v.to_string().as_bytes())
 }
