@@ -178,6 +178,10 @@
     };
   });
 
+  function passWheel(e: WheelEvent) {
+    document.querySelector('canvas.scene')?.dispatchEvent(new WheelEvent('wheel', e));
+  }
+
   /** A click on a tag: the camera glides there; the household's resident is selected, your people and places open a card, a home for sale opens on the town map. */
   function choose(t: TownTag) {
     const a = t.action;
@@ -200,7 +204,8 @@
 </script>
 
 {#if townHud.on && game.mode === 'live'}
-  <div class="tags" bind:this={layer} style:opacity={townHud.fade} aria-label="Town">
+  <!-- (The wheel over a tag zooms the camera as it would over the town: passed on to the canvas.) -->
+  <div class="tags" bind:this={layer} style:opacity={townHud.fade} aria-label="Town" onwheel={passWheel}>
     {#each tags as t (t.key)}
       <div class="pin" class:name={t.kind === 'names'} use:pin={t.key}>
         {#if t.action}

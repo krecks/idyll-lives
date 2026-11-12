@@ -6,6 +6,7 @@
   import { game } from '../state.svelte';
   import { townMap } from '../townMap.svelte';
   import { TAG_ORDER, type TagKind } from './overlap';
+  import { lotInSentence } from '../place';
   import { areaAt } from './places';
   import { eventText, nextEvents, waitText, type TodayMember } from './today';
   import { townHud } from './townHud.svelte';
@@ -60,6 +61,11 @@
     if (!c) return `Not in ${me.name}'s phone`;
     return c.why[call] ?? null;
   });
+  /** Where a visit goes ("the Smiths", "Town Park"): the lot they're on, else their home. */
+  const visitTo = $derived.by(() => {
+    const p = chosen?.plot == null ? null : game.plots[chosen.plot];
+    return p ? lotInSentence(p, game.households) : '';
+  });
   /** Why the buttons are greyed out, in a line. */
   const why = $derived([chosen?.plot != null && visitWhy ? `Visit: ${visitWhy}` : '', callWhy ? `Call: ${callWhy}` : ''].filter(Boolean).join(' · '));
   function visit() {
@@ -83,7 +89,7 @@
         {#if chosen.detail}<p class="muted">{chosen.detail}</p>{/if}
         <div class="actions">
           {#if chosen.plot !== null}
-            <button class="btn small primary" disabled={!!visitWhy} title={visitWhy ?? `${me?.name} goes over`} onclick={visit}>
+            <button class="btn small primary" disabled={!!visitWhy} title={visitWhy ?? `${me?.name} goes to ${visitTo}`} onclick={visit}>
               <Icon name="icon.ui.home" size={14} />{me ? `${me.name}: visit` : 'Visit'}
             </button>
           {/if}
