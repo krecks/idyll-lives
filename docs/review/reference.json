@@ -8042,6 +8042,118 @@
         "bikeInsightsCity"
       ]
     },
+    "mountainBike": {
+      "label": "Mountain bike (27.5 or 29 in wheels, flat bars, suspension fork)",
+      "w": [
+        1.75,
+        1.95
+      ],
+      "h": [
+        0.95,
+        1.15
+      ],
+      "d": [
+        0.7,
+        0.8
+      ],
+      "uses": [
+        "ride to work or school",
+        "tune it up"
+      ],
+      "minutes": {
+        "tuneUp": [
+          15,
+          60
+        ]
+      },
+      "sources": [
+        "neufert"
+      ]
+    },
+    "roadBike": {
+      "label": "Road bike (700c wheels, drop bars)",
+      "w": [
+        1.65,
+        1.8
+      ],
+      "h": [
+        0.9,
+        1.05
+      ],
+      "d": [
+        0.38,
+        0.46
+      ],
+      "uses": [
+        "ride to work or school",
+        "tune it up"
+      ],
+      "minutes": {
+        "tuneUp": [
+          15,
+          60
+        ]
+      },
+      "sources": [
+        "neufert"
+      ]
+    },
+    "cargoBike": {
+      "label": "Cargo bike (front box, long-john)",
+      "w": [
+        2.4,
+        2.75
+      ],
+      "h": [
+        1.0,
+        1.15
+      ],
+      "d": [
+        0.6,
+        0.7
+      ],
+      "uses": [
+        "ride to work or school",
+        "tune it up"
+      ],
+      "minutes": {
+        "tuneUp": [
+          15,
+          60
+        ]
+      },
+      "sources": [
+        "neufert"
+      ]
+    },
+    "eBike": {
+      "label": "E-bike (city or trekking, battery in the frame)",
+      "w": [
+        1.75,
+        1.95
+      ],
+      "h": [
+        1.0,
+        1.15
+      ],
+      "d": [
+        0.6,
+        0.7
+      ],
+      "uses": [
+        "ride to work or school",
+        "tune it up"
+      ],
+      "minutes": {
+        "tuneUp": [
+          15,
+          60
+        ]
+      },
+      "sources": [
+        "neufert"
+      ]
+    },
     "kidsBike": {
       "label": "Kids' bike with stabilisers (14 in wheels)",
       "w": [
@@ -11207,6 +11319,27 @@
         "neufert"
       ]
     },
+    "house.spiralStairs": {
+      "label": "Spiral stair, one storey (2.6-3.0 m)",
+      "w": [
+        1.2,
+        2.0
+      ],
+      "h": [
+        2.4,
+        3.1
+      ],
+      "d": [
+        1.2,
+        2.0
+      ],
+      "uses": [
+        "go up and down between storeys"
+      ],
+      "sources": [
+        "neufert"
+      ]
+    },
     "house.wall": {
       "label": "Wall, one storey",
       "w": [
@@ -12106,7 +12239,13 @@
     "resident.youngAdult": "resident.youngAdult",
     "resident.adult": "resident.adult",
     "resident.elder": "resident.elder",
-    "model.marker": "selectionMarker"
+    "model.marker": "selectionMarker",
+    "stairsOpen": "house.stairs",
+    "stairsSpiral": "house.spiralStairs",
+    "mountainBike": "mountainBike",
+    "roadBike": "roadBike",
+    "cargoBike": "cargoBike",
+    "eBike": "eBike"
   },
   "decor": [
     "wallArt",

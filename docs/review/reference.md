@@ -443,6 +443,10 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 | `sandpit` | Sandpit | 1–2 × 0.15–0.4 × 1–2 |  | build sandcastles; dig | sandcastle 15–60 | cover 0–110° | neufert | `sandbox` |
 | `bikeRack` | Bike rack with a bicycle | 1.6–2 × 0.9–1.2 × 0.4–0.7 |  | park the bike; tune it up | tuneUp 15–60 |  | neufert | `bikeRack` |
 | `cityBike` | City bike (step-through, 28 in wheels, on its stand) | 1.75–1.95 × 1–1.15 × 0.55–0.7 |  | ride to work or school; tune it up | tuneUp 15–60 |  | neufert, bikeInsightsCity | `bicycle` |
+| `mountainBike` | Mountain bike (27.5 or 29 in wheels, flat bars, suspension fork) | 1.75–1.95 × 0.95–1.15 × 0.7–0.8 |  | ride to work or school; tune it up | tuneUp 15–60 |  | neufert | `mountainBike` |
+| `roadBike` | Road bike (700c wheels, drop bars) | 1.65–1.8 × 0.9–1.05 × 0.38–0.46 |  | ride to work or school; tune it up | tuneUp 15–60 |  | neufert | `roadBike` |
+| `cargoBike` | Cargo bike (front box, long-john) | 2.4–2.75 × 1–1.15 × 0.6–0.7 |  | ride to work or school; tune it up | tuneUp 15–60 |  | neufert | `cargoBike` |
+| `eBike` | E-bike (city or trekking, battery in the frame) | 1.75–1.95 × 1–1.15 × 0.6–0.7 |  | ride to work or school; tune it up | tuneUp 15–60 |  | neufert | `eBike` |
 | `kidsBike` | Kids' bike with stabilisers (14 in wheels) | 0.95–1.05 × 0.56–0.75 × 0.35–0.6 |  | ride to school; tune it up | tuneUp 15–60 |  | argosKids14 | `bicycleChild` |
 | `eScooter` | Electric kick scooter, unfolded | 1.05–1.15 × 1.1–1.2 × 0.43–0.6 |  | ride to work or school |  |  | nbcScooter, ldlcScooter4 | `eScooter` |
 | `planter` | Planter or raised bed (flowers, herbs) | 0.4–1.2 × 0.3–0.9 × 0.3–1 |  | water and tend the plants | water 1–10, tend 10–30 |  | rhsPlants | `planterBox` `flowerbed` `garden.flowerBox` `garden.wheelbarrow` `model.street.flowerTub` `model.street.pot` `garden.geraniums` `garden.herbs` |
@@ -591,7 +595,8 @@ not decor: a real one is used, so an object of that kind with no use is a possib
 |---|---|---|---|---|---|---|---|---|
 | `house.door` | Door leaf in its frame (interior or front door) | 0.76–0.93 × 1.98–2.11 × 0.035–0.055 |  | open and walk through; knock (visitors); shut for privacy |  | door 90–110° | din18101, neufert | `house.door` |
 | `house.window` | Window | 0.5–2.4 × 0.6–2.2 × 0.05–0.2 |  | look out; open for air |  | casement 30–90°, tiltTurn 10–15° | adKWindows, neufert | `house.window` |
-| `house.stairs` | Straight stair, one storey (2.6-3.0 m) | 0.8–1.2 × 2.4–3.1 × 2.8–4.2 |  | go up and down between storeys |  |  | adK, neufert | `stairs` `house.stairs` |
+| `house.stairs` | Straight stair, one storey (2.6-3.0 m) | 0.8–1.2 × 2.4–3.1 × 2.8–4.2 |  | go up and down between storeys |  |  | adK, neufert | `stairs` `house.stairs` `stairsOpen` |
+| `house.spiralStairs` | Spiral stair, one storey (2.6-3.0 m) | 1.2–2 × 2.4–3.1 × 1.2–2 |  | go up and down between storeys |  |  | neufert | `stairsSpiral` |
 | `house.wall` | Wall, one storey | 0.1–30 × 2.4–3.1 × 0.1–0.4 |  | divide rooms; carry pictures, cabinets and lights |  |  | neufert, adKWindows | `house.wall` |
 
 ### Cars
