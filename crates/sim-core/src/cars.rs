@@ -1708,7 +1708,7 @@ impl Route {
             legs.push_lane(
                 p,
                 tops[i],
-                pull_room(width, kind, car.wid),
+                (pull_room(width, kind, car.wid) - bend_out(&lane, i, car.len)).max(0.0),
                 lane_on(width, kind),
             );
             // (Out of a driveway, a bay or a spot on the road: its mouth, up to the lane.)
@@ -1962,7 +1962,7 @@ impl Route {
             legs.push_lane(
                 q,
                 tops[i],
-                pull_room(width, kind, car.wid),
+                (pull_room(width, kind, car.wid) - bend_out(&lane, i, car.len)).max(0.0),
                 lane_on(width, kind),
             );
         }
@@ -2281,6 +2281,45 @@ pub(crate) fn pull_room(width: f32, kind: crate::travel::RoadKind, wid: f32) -> 
         _ => width / 2.0 - kerbside(width, kind),
     } - PULL_EDGE;
     (edge - wid / 2.0 - lane_on(width, kind)).clamp(0.0, PULL_MOST)
+}
+
+/// How far past `lane`'s own line at its point `i` the right side of a body `len` m long standing
+/// along it there reaches (m), on the outside of a bend to the left: the sagitta of the chord its
+/// length spans, which `pull_room` (worked out as if the road ran straight) leaves no room for.
+/// None on a straight, or on a bend to the right, its right side on the inside. (A taxi pulled
+/// over its full room at the kerb of a lane bending left stood with a corner over the kerbside
+/// furniture: Primrosebrook.)
+pub(crate) fn bend_out(lane: &[[f32; 2]], i: usize, len: f32) -> f32 {
+    use crate::travel::dist;
+    let Some(&p) = lane.get(i) else {
+        return 0.0;
+    };
+    // The point `len / 2` m along the lane from `i`, back (`step` -1) or on (+1), or its end.
+    let reach = |step: isize| -> [f32; 2] {
+        let (mut at, mut left) = (i as isize, len / 2.0);
+        loop {
+            let next = at + step;
+            if next < 0 || next as usize >= lane.len() {
+                return lane[at as usize];
+            }
+            let (a, b) = (lane[at as usize], lane[next as usize]);
+            let d = dist(a, b);
+            if d >= left {
+                let k = left / d.max(1e-6);
+                return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+            }
+            left -= d;
+            at = next;
+        }
+    };
+    let (a, b) = (reach(-1), reach(1));
+    let d = sub2(b, a);
+    let l = d[0].hypot(d[1]);
+    if l < 1e-3 {
+        return 0.0;
+    }
+    // (Right of the way it runs, as `shifted`: (-z, x).)
+    (dot2(sub2(p, a), [-d[1], d[0]]) / l).max(0.0)
 }
 
 /// `p`, facing `yaw`, `shift` m to its right.
@@ -8036,6 +8075,29 @@ fn park_out(w: &mut World, c: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A body standing on the outside of a bend to the left reaches past the lane by the chord's
+    /// sagitta (len² / 8R); on a straight, or on the inside of a bend to the right, by none.
+    #[test]
+    fn bend_out_is_the_sagitta_on_the_outside_of_a_left_bend() {
+        let (r, len) = (40.0f32, 4.7f32);
+        // An arc round (0, 0) of radius `r`, a point every degree; `turn` +1 bends to the left of
+        // the way it runs (forward (sin, cos), right (-cos, sin): `shifted`).
+        let arc = |turn: f32| -> Vec<[f32; 2]> {
+            (0..=40)
+                .map(|k| {
+                    let a = (k as f32).to_radians();
+                    [-r * a.cos() * turn, r * a.sin()]
+                })
+                .collect()
+        };
+        let want = len * len / (8.0 * r);
+        let left = bend_out(&arc(1.0), 20, len);
+        assert!((left - want).abs() < 0.01, "{left} against {want}");
+        assert_eq!(bend_out(&arc(-1.0), 20, len), 0.0);
+        let straight: Vec<[f32; 2]> = (0..20).map(|k| [0.0, k as f32]).collect();
+        assert!(bend_out(&straight, 10, len) < 1e-5);
+    }
     use crate::clock;
 
     const CONTENT: &str = r#"{

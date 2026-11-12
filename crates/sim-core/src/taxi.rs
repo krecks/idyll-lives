@@ -3031,9 +3031,12 @@ fn lay_route(
                     out.mouths.push((from, Some(out.len().saturating_sub(1))));
                 }
                 on = true;
+                let k = i;
                 let i = nearest(p);
                 let (w, kind) = along[i];
-                out.push_lane(p, top, pull_room(w, kind, TAXI_WID), offs[i]);
+                // (Less on the outside of a bend to the left, where its corners stand out.)
+                let room = pull_room(w, kind, TAXI_WID) - crate::cars::bend_out(&lane, k, TAXI_LEN);
+                out.push_lane(p, top, room.max(0.0), offs[i]);
             }
             // (The claim of the stand before, closed once there's way on to close it at.)
             if let Some(s) = stood.take() {
