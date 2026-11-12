@@ -12,7 +12,10 @@
  *   `mirror` (the home lot's first mirror from 4.4 m, from over its room with the walls up, the camera
  *   swinging round the glass every 20 s), `mirror-still` (the same, held still in the swing's middle),
  *   `street` (the home lot from across its street, low: the house's front, the pavement, the road),
- *   `town` (the menus' town from the menu's own angle, lit for `hour`).
+ *   `town` (the menus' town from the menu's own angle, lit for `hour`),
+ *   `over` (the town view, docs/design/living-town.md: the game's camera held `radius=` m out, 400 by default,
+ *   over the main town's centre or the home, `over=centre|home`), `zoom` (the one zoom from the home at the
+ *   game's opening distance out to 900 m and back in, once in 60 s).
  * - `radius=`, `beta=`, `tx=`, `tz=`: the orbit's distance, angle and target instead of its path's (the game
  *   opens at beta 0.86); `walls=up|cutaway|down`: the walls held that way (up: the house whole, roof on).
  * - `res=1080` that resolution (720, 1080, 1440, 2160; `res=1` every line the window has); `res=auto` (default) the player's setting.
@@ -30,6 +33,8 @@
 import { host } from '../game/host';
 import { whenStreamSettled } from '../assets/stream';
 import { deleteSave } from '../persistence/saves';
+import type { WorldStructure } from '../core/protocol';
+import { DEFAULT_ORBIT, TOWN_FULL, TOWN_MAX } from '../render/shared/lens';
 import type { FrameCounts, Renderer, RenderPassInfo } from '../render/types';
 import { settings, unsavedSettings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
@@ -58,6 +63,36 @@ const MIRROR_PATH = { distance: 4.4, radius: 6, beta: 0.8, turn: -0.4, swing: 0.
 const STREET = { radius: 22, beta: 1.2 };
 /** `cam=town`: the menus' town as the main menu frames it (`menuScene.ts`), over the whole picture. */
 const TOWN = { beta: 1.32, alpha: 0.55, zoom: 1.55 };
+/**
+ * The town view (`cam=over`, `cam=zoom`): the game's own camera, from the angle a game opens at. `settle`: the
+ * seconds it first stays at the opening distance over the place, so the lot there becomes the focus (drawn in full,
+ * as the home is when a player zooms out of it: past `TOWN_FROM` no lot becomes one). `period`: `cam=zoom`'s way
+ * out and back in (s), the distance changing by the same share each second.
+ */
+const TOWN_VIEW = { beta: DEFAULT_ORBIT.beta, settle: 2.5, period: 60 };
+
+/**
+ * Where the town view is held over, in the world drawn: the main town's centre (its square once the world has one,
+ * `meta.centre`; else the middle of its area) and the home. `home`: the player's lot in the world the game plays;
+ * the bench's real big world (`debug/bigTown.ts`) has no household of the player's, so there a lot with a house
+ * three quarters of the way out from the main town's middle stands in for it (the same one every run).
+ */
+function townSpots(world: WorldStructure | null, home: [number, number, number] | null): { centre: [number, number, number]; home: [number, number, number] } {
+  if (!world) return { centre: home ?? [0, 0, 0], home: home ?? [0, 0, 0] };
+  const main = world.meta?.areas?.[0];
+  const square = world.meta?.centre?.find((c) => c.area === 0) ?? world.meta?.centre?.[0];
+  const mid = (pts: [number, number][]): [number, number] => [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
+  const [cx, cz] = square?.poly.length ? mid(square.poly) : main ? [main.x + main.w / 2, main.z + main.d / 2] : [world.width / 2, world.depth / 2];
+  let at = home;
+  if (!at) {
+    const inMain = (p: { x: number; z: number; w: number; d: number }) => !main || (p.x + p.w / 2 >= main.x && p.x + p.w / 2 <= main.x + main.w && p.z + p.d / 2 >= main.z && p.z + p.d / 2 <= main.z + main.d);
+    const away = (p: { x: number; z: number; w: number; d: number }) => Math.hypot(p.x + p.w / 2 - cx, p.z + p.d / 2 - cz);
+    const homes = world.plots.filter((p) => p.house && inMain(p)).sort((a, b) => away(a) - away(b) || a.id - b.id);
+    const p = homes[Math.floor(homes.length * 0.75)];
+    at = p ? [p.x + p.w / 2, 0, p.z + p.d / 2] : [cx, 0, cz];
+  }
+  return { centre: [cx, 0, cz], home: at };
+}
 /**
  * `cam=roam`: the camera's target along a loop over the town at `ROAM.speed` m/s (an ellipse
  * through the home lot, inset from the edge), looking the way it goes from `radius` m up and
@@ -237,6 +272,8 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
   const mirror = b.cam === 'mirror' || b.cam === 'mirror-still' ? mirrorView(renderer.benchInfo().scene as { mirrorSpots?: Spot[] }, plot) : null;
   if (mirror) controls.setWallMode('up');
   else if (b.walls) controls.setWallMode(b.walls);
+  // The town view: over the main town's centre or the home, in the world drawn (the bench's big world has its own).
+  const spots = b.cam === 'over' || b.cam === 'zoom' ? townSpots(renderer.benchWorld(), b.big || !plot ? null : centre) : null;
   // From across the street: the eye past the lot's entry, on the line from the lot's middle through it.
   const street = b.cam === 'street' && plot ? { alpha: plot.entry ? Math.atan2(plot.entry[1] - centre[2], plot.entry[0] - centre[0]) : START_ALPHA, target: (plot.entry ? [plot.entry[0], 0, plot.entry[1]] : centre) as [number, number, number] } : null;
 
@@ -263,6 +300,16 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
         renderer.setCameraPose({ alpha, beta: m.beta, radius: m.radius, target: [g[0] + k * Math.cos(alpha) * s, g[1] + k * Math.cos(m.beta), g[2] + k * Math.sin(alpha) * s] });
       } else if (b.cam === 'roam') {
         renderer.setCameraPose(roamPose(t, bounds));
+      } else if (spots) {
+        const v = TOWN_VIEW;
+        const near = DEFAULT_ORBIT.radius;
+        // (Its first seconds at the opening distance, whatever the clock: the lot there becomes the focus.)
+        const settling = (now - t0) / 1000 < v.settle;
+        // The zoom: out and back in once a period, by the same share each second (a triangle in the radius's logarithm).
+        const out = 1 - Math.abs(1 - (2 * (t % v.period)) / v.period);
+        const radius = settling ? near : b.cam === 'zoom' ? near * Math.pow(TOWN_MAX / near, out) : (b.orbit.radius ?? TOWN_FULL);
+        const at = b.cam === 'zoom' ? spots.home : spots[b.over];
+        renderer.setCameraPose({ alpha: START_ALPHA, beta: b.orbit.beta ?? v.beta, radius, target: [at[0] + b.orbit.tx, at[1], at[2] + b.orbit.tz] });
       } else if (b.cam === 'town') {
         // (The town's own camera: `setTownShot`.)
       } else if (street) {
