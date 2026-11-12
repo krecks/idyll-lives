@@ -141,5 +141,18 @@
       "at 70 35": "clouds.at:70,35",
       "at 70 5": "clouds.at:70,5"
     }
+  },
+  "leaves": {
+    "poses": [
+      "day-home-13",
+      "day-east-13",
+      "day-north-16",
+      "street-day"
+    ],
+    "variants": {
+      "lit by the sun alone (before 2026-11-12)": "leaves.top:1,1,1;leaves.under:1;leaves.warm:1.07,1.02,0.84;leaves.cool:0.9,0.98,1.04;leaves.value:0.92,1.06",
+      "lit from above, gently": "leaves.top:1.25,1.22,1.05;leaves.under:0.8;leaves.warm:1.07,1.02,0.84;leaves.cool:0.9,0.98,1.04;leaves.value:0.92,1.06",
+      "lit from above, more variety (as it is)": ""
+    }
   }
 }

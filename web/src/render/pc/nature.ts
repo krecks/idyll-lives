@@ -40,6 +40,7 @@ import { computeNormals, sphereData } from '../shared/modelParts';
 import { groupInstances, hideLawn, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
 import type { OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
+import { tuned } from '../tune';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
 export { decorPlants, natureDecor, type PlantPlacement } from '../shared/nature';
@@ -679,6 +680,24 @@ export function splitsByGroup(m: ModelMesh, copies: number): boolean {
  *
  * No instance stream of its own: it reads only the instance's matrix (`instance_line1..4`).
  */
+/**
+ * The leaves' colour from plant to plant and from their tops to their undersides (sRGB factors on the foliage's
+ * colour, `GAME_WIND_TINT`): `warm` to `cool`, the two ends a plant's hue is drawn between by where it stands, and
+ * `value`, how light it is (from, to); `top` and `under`, what faces the sky and what faces the ground (`facing`:
+ * the normal's height where it is all `under` and all `top`; `petal`: the linear colour from which a part is a
+ * petal, not a leaf, and to which it is all petal, which `top` leaves as it is). From the play camera a crown, a shrub and a hedge
+ * are seen from above: lit only as the sun fell on them they were one dark green, top and side.
+ */
+const LEAVES = tuned('leaves', {
+  warm: [1.14, 1.04, 0.76],
+  cool: [0.86, 0.98, 1.07],
+  value: [0.86, 1.1],
+  top: [1.42, 1.38, 1.1],
+  under: 0.8,
+  facing: [-0.5, 0.9],
+  petal: [0.3, 0.7],
+});
+
 function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
   const { wgsl, v2, v3, u, decl } = codeFor(lang);
   const f = float;
@@ -717,7 +736,14 @@ function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
 			tintInst = instance_line4.xyz;
 		#endif
 		${decl('tintRnd', 'float')} = fract(sin(dot(tintInst.xz, ${v2}(12.9898, 78.233))) * 43758.5453);
-		${decl('tint', 'vec3')} = mix(${v3}(1.07, 1.02, 0.84), ${v3}(0.9, 0.98, 1.04), tintRnd) * (0.92 + 0.14 * fract(tintRnd * 7.31));
+		${decl('tint', 'vec3', true)} = mix(${v3}(${LEAVES.warm.map(f).join(', ')}), ${v3}(${LEAVES.cool.map(f).join(', ')}), tintRnd) * (${f(LEAVES.value[0])} + ${f(LEAVES.value[1] - LEAVES.value[0])} * fract(tintRnd * 7.31));
+		#ifdef NORMALS
+			// Lit from above: what faces the sky lighter and a little warmer, what faces the ground darker.
+			${decl('tintUp', 'float')} = smoothstep(${f(LEAVES.facing[0])}, ${f(LEAVES.facing[1])}, normalize(${wgsl ? 'output.vNormalW' : 'vNormalW'}).y);
+			// (Leaves only: a petal, light already, would wash out.)
+			${decl('tintLeaf', 'float')} = 1.0 - smoothstep(${f(LEAVES.petal[0])}, ${f(LEAVES.petal[1])}, max(${color}.r, max(${color}.g, ${color}.b)));
+			tint = tint * mix(${v3}(${f(LEAVES.under)}), mix(${v3}(1.0), ${v3}(${LEAVES.top.map(f).join(', ')}), tintLeaf), tintUp);
+		#endif
 		${color} = ${wgsl ? 'vec4f' : 'vec4'}(${color}.rgb * pow(tint, ${v3}(2.2)), ${color}.a);
 	}
 #endif`;
