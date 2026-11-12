@@ -685,7 +685,9 @@ export function splitsByGroup(m: ModelMesh, copies: number): boolean {
  * colour, `GAME_WIND_TINT`): `warm` to `cool`, the two ends a plant's hue is drawn between by where it stands, and
  * `value`, how light it is (from, to); `top` and `under`, what faces the sky and what faces the ground (`facing`:
  * the normal's height where it is all `under` and all `top`; `petal`: the linear colour from which a part is a
- * petal, not a leaf, and to which it is all petal, which keeps its colour from plant to plant and under `top`). From the play camera a crown, a shrub and a hedge
+ * petal, not a leaf, and to which it is all petal, which keeps its colour from plant to plant and under `top`;
+ * `needle`: the blue of a green (linear blue over green) from which it is a conifer's and to which it is all one, which
+ * takes `needles` less of `top`). From the play camera a crown, a shrub and a hedge
  * are seen from above: lit only as the sun fell on them they were one dark green, top and side.
  */
 const LEAVES = tuned('leaves', {
@@ -696,6 +698,8 @@ const LEAVES = tuned('leaves', {
   under: 0.8,
   facing: [-0.5, 0.9],
   petal: [0.3, 0.7],
+  needle: [0.24, 0.36],
+  needles: 0.75,
 });
 
 function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
@@ -742,7 +746,9 @@ function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
 		#ifdef NORMALS
 			// Lit from above: what faces the sky lighter and a little warmer, what faces the ground darker.
 			${decl('tintUp', 'float')} = smoothstep(${f(LEAVES.facing[0])}, ${f(LEAVES.facing[1])}, normalize(${wgsl ? 'output.vNormalW' : 'vNormalW'}).y);
-			tint = tint * mix(${v3}(${f(LEAVES.under)}), mix(${v3}(1.0), ${v3}(${LEAVES.top.map(f).join(', ')}), tintLeaf), tintUp);
+			// (Less on a conifer's blue-green needles, which it turned to mint: by how blue the green is.)
+			${decl('tintNeedle', 'float')} = smoothstep(${f(LEAVES.needle[0])}, ${f(LEAVES.needle[1])}, ${color}.b / max(${color}.g, 0.0001));
+			tint = tint * mix(${v3}(${f(LEAVES.under)}), mix(${v3}(1.0), ${v3}(${LEAVES.top.map(f).join(', ')}), tintLeaf * (1.0 - ${f(LEAVES.needles)} * tintNeedle)), tintUp);
 		#endif
 		${color} = ${wgsl ? 'vec4f' : 'vec4'}(${color}.rgb * pow(tint, ${v3}(2.2)), ${color}.a);
 	}
