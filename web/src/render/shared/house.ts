@@ -226,11 +226,11 @@ export const HOUSE_LOOK = tuned('house', {
    * A wall face's tone, by vertex: `wallFoot` darker at the floor, fading over `wallFootReach` m up it;
    * `wallCorner` darker into a room's corner, over `wallCornerReach` m along it; `wallVary` in patches.
    */
-  wallFoot: 0,
+  wallFoot: 0.3,
   wallFootReach: 1.3,
-  wallCorner: 0,
+  wallCorner: 0.28,
   wallCornerReach: 0.9,
-  wallVary: 0,
+  wallVary: 0.06,
 });
 
 /** A tone (a share of the light reflected, linear) as the vertex colour's multiplier (sRGB). */
