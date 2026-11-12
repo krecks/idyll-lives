@@ -1509,6 +1509,18 @@ export class TownStreet {
   }
   private readonly far = new Map<number, { key: string; geo: Geo }>();
 
+  /**
+   * Every lot's house the far LOD draws (`farChunk`'s, the focus lot's left out), with the chunk it is planned in:
+   * the town view draws them all at once (`pc/townView.ts`), those of the chunks not streamed in.
+   */
+  townHouses(focus: number): { chunk: number; plot: PlotInfo }[] {
+    const out: { chunk: number; plot: PlotInfo }[] = [];
+    for (const [chunk, list] of this.plotsByChunk()) {
+      for (const L of list) if (L.info.house && L.info.id !== focus && (L.base === 'house' || L.base === 'shop')) out.push({ chunk, plot: L.info });
+    }
+    return out;
+  }
+
   /** What chunk `id` is planned from with lot `focus` in view (`ChunkPlan.key`), without planning it. */
   chunkKey(id: number, focus: number): string {
     // (Kept until the world changes what the street stands among: `setWorld` moves `version` on.)
