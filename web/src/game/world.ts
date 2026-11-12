@@ -30,7 +30,7 @@ export interface RoadLayout {
 /**
  * The world's main town: the area its roads are laid out in, how many lots, and how far its lanes
  * reach (docs/design/open-world.md). Every world is a Big one (cosy and normal were dropped in
- * 0.7.1): its main town is the heart of a bigger world (`macro.ts`).
+ * 0.8.0): its main town is the heart of a bigger world (`macro.ts`).
  */
 export interface SizeSpec {
   /** The area its roads are laid out in (m; the town is cut to what it takes, at most 256 m but in a Big world). */

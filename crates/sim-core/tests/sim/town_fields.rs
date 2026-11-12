@@ -2,7 +2,7 @@
 //! (`World::travel`, `travel::OpenWorld`) and saved with the game: size, roads, areas, typed
 //! exits, terrain masks, parking, plots' areas and kinds, driveways' roads. A town without them
 //! takes its meta's roads as the network (every town is open now: cosy and normal were dropped in
-//! 0.7.1).
+//! 0.8.0).
 
 use crate::common;
 

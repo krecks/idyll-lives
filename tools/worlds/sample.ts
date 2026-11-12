@@ -10,7 +10,7 @@
  * how high up they work. Problems are listed (and the exit code is 1).
  *
  * Sizes (docs/design/open-world.md): every world is a Big one now (cosy and normal were dropped
- * in 0.7.1). For every world: the roads (country roads and trails too)
+ * in 0.8.0). For every world: the roads (country roads and trails too)
  * one network as the sim joins them (an end within half the wider road's width and a metre of the
  * other's middle), every way out on it, no more courts (dead ends) than an area keeps, none
  * reaching more than 45 m past the last road it meets, and no country road the layout found no

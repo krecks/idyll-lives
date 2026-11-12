@@ -213,7 +213,7 @@ function sanitize(s: Record<string, unknown>): Settings {
   out.masterVolume = clampNumber(s.masterVolume, 0, 1, DEFAULT_SETTINGS.masterVolume);
   out.graphics = isGraphicsPreset(s.graphics) ? s.graphics : DEFAULT_SETTINGS.graphics;
   out.shading = oneOf(s.shading, ['soft', 'classic'] as const, DEFAULT_SETTINGS.shading);
-  // (`auto` and the 50–100 % shares of before 0.7.1 start again on 1080p.)
+  // (`auto` and the 50–100 % shares of before 0.8.0 start again on 1080p.)
   out.resolution = isResolution(s.resolution) ? s.resolution : DEFAULT_SETTINGS.resolution;
   out.renderer = oneOf(s.renderer, ['auto', 'webgl'] as const, DEFAULT_SETTINGS.renderer);
   out.directorPace = oneOf(s.directorPace, ['calm', 'lively'] as const, DEFAULT_SETTINGS.directorPace);

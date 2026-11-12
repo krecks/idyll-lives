@@ -1,5 +1,5 @@
 //! Generated worlds (web/src/game/world.ts and town.ts: farms, seaside, mountain, lakeside and
-//! forest worlds, every one a big one: cosy and normal were dropped in 0.7.1) checked by the
+//! forest worlds, every one a big one: cosy and normal were dropped in 0.8.0) checked by the
 //! simulation: each loads with no more residents than a town holds, its roads make one network (as
 //! the sim joins them), every lot can be reached from the ends of every street and back,
 //! everything outdoors that residents use (a farm's crops, a park's benches) can be reached, as
@@ -989,7 +989,7 @@ fn check_stuck(
 }
 
 /// Big towns are a preview in 0.7.0 (the owner's decision, 2026-11-07): at rush hour traffic can
-/// still jam at a busy junction near the camera, to be finished in 0.7.1, and its direct
+/// still jam at a busy junction near the camera, to be finished in a later release, and its direct
 /// consequences are known too. In a big world a car held up in the seen area (`cars::Sight::Seen`),
 /// or at its edge waiting to drive in behind one there (`Sight::Wait`), standing too long or still
 /// on its way at three in the morning (having stood two hours at most on that drive but there),
@@ -1111,7 +1111,7 @@ impl Slips {
 /// out at a public spot, or away with someone at work in it; nobody waits for a car for hours
 /// (`CAR_HOURS`; a world's long stretches away or walking are about as many without cars). A
 /// preview in 0.7.0 (the owner's decision, 2026-11-07), a car held up in the seen area is counted,
-/// not a failure: in-view jams are to be finished in 0.7.1 (`BIG_PREVIEW`).
+/// not a failure: in-view jams are to be finished in a later release (`BIG_PREVIEW`).
 #[test]
 #[ignore]
 fn generated_worlds_cars_keep_to_the_roads() {

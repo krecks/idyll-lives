@@ -399,7 +399,7 @@ export interface RoadPlan {
 /** `street` (default) · `lane` · `country` (between areas) · `trail` (2 m, on foot only). */
 export type RoadKind = 'street' | 'lane' | 'country' | 'trail';
 
-/** How big a world is: every world is a Big one (cosy and normal were dropped in 0.7.1; a save that still says so reads as `big`). */
+/** How big a world is: every world is a Big one (cosy and normal were dropped in 0.8.0; a save that still says so reads as `big`). */
 export type WorldSize = 'big';
 
 /** Run-length mask over the ground grid, row-major from tile (0, 0): `[run, value(0|1), run, value, ...]`. */

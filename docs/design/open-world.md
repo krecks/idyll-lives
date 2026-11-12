@@ -6,7 +6,7 @@ across four branches that merge into `feat/open-world` in this order:
 
 1. `feat/open-world-sim-grid` — chunked tile storage, incremental reachability, bounded A*, caps, save v35, wasm views by chunk.
 2. `feat/open-world-sim-travel` — road graph, router, ETA and commutes, cars on roads, nearby choices, outings, countryside content.
-3. `feat/open-world-worldgen` — sizes Cosy/Normal/Big (Cosy and Normal were dropped in 0.7.1: every world is Big now), the Big macro layout, the town file fields below, the pan/zoom town map, sample/map tools.
+3. `feat/open-world-worldgen` — sizes Cosy/Normal/Big (Cosy and Normal were dropped in 0.8.0: every world is Big now), the Big macro layout, the town file fields below, the pan/zoom town map, sample/map tools.
 4. `feat/open-world-render` — view-independent chunked street, roaming camera, residents by distance, chunked terrain/woods/grass, streaming by distance.
 
 This file is the interface between them. Change it only together (through the coordinator).
@@ -40,7 +40,7 @@ ground storey. Row blocks for upper storeys and the basement keep today's stacke
 
 ## Sizes
 
-One size now: `big`. Cosy and normal were dropped in 0.7.1 (Create World has no size option);
+One size now: `big`. Cosy and normal were dropped in 0.8.0 (Create World has no size option);
 a save or town file that still says `cosy` or `normal` reads as `big`. A world is 896–1024 m: a
 main town (the kind's shape, its streets reaching all of its box) + 5–7 hamlets of 16–24 lots,
 farmsteads and cottages along the country roads, ~120 starting residents, growing to `MAX_SIMS`.
@@ -275,4 +275,4 @@ lot, the rest merged into the street's chunks, every gate by the game so it swin
 - New sim tests are separate files under `crates/sim-core/tests/`, written to move into
   `tests/sim/` unchanged once PR #43 lands.
 - Before merging, run every `ci.yml` step locally.
-- Big was behind the dev flag `?big=1` (UI) until all four branches were in; it is the only size since 0.7.1.
+- Big was behind the dev flag `?big=1` (UI) until all four branches were in; it is the only size since 0.8.0.

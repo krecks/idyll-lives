@@ -1,5 +1,5 @@
 //! How many residents a town grows to: births and newcomers stop at
-//! `MAX_SIMS` (160) in every town now (cosy and normal were dropped in 0.7.1), which every town
+//! `MAX_SIMS` (160) in every town now (cosy and normal were dropped in 0.8.0), which every town
 //! can hold.
 
 use sim_core::World;

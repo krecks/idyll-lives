@@ -2,7 +2,7 @@
 //! takes, and the open-world fields of the town file (docs/design/open-world.md).
 //!
 //! **Which towns.** Every town is laid out for the open world now (`size` is always `big`, cosy
-//! and normal were dropped in 0.7.1): it has a network, times commutes by the walk, goes on
+//! and normal were dropped in 0.8.0): it has a network, times commutes by the walk, goes on
 //! outings and keeps public things in cells. A town or save without open-world fields uses its
 //! meta's roads, or the centre lines of its streets, as the network.
 //!
@@ -1426,7 +1426,7 @@ type Door = ([u32; 2], [Option<RoadPoint>; 2]);
 
 impl Travel {
     pub fn new(file: OpenWorld, meta: &serde_json::Value) -> Self {
-        // Every town is one (cosy and normal were dropped in 0.7.1): a town without open-world
+        // Every town is one (cosy and normal were dropped in 0.8.0): a town without open-world
         // fields takes its meta's roads, or its streets, as the network.
         let graph = Graph::from_town(&file, meta);
         Self {

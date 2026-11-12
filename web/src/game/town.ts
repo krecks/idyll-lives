@@ -607,7 +607,7 @@ export const generateStats = { houseMs: 0 };
  * public places round the town's middle, farms out on its edge, the houses from the middle out,
  * each turned to face its road, with a gap or a stretch of meadow between some. The town is cut
  * to the land its lots and roads take. Nobody lives there yet (see `populate`). Every world is a
- * Big one (cosy and normal were dropped in 0.7.1).
+ * Big one (cosy and normal were dropped in 0.8.0).
  */
 export function generateWorld(content: Content, t: Templates, kind: WorldKind, seed = (Math.random() * 2 ** 31) >>> 0, name?: string): NeighbourhoodDraft {
   return generateBigWorld(content, t, kind, seed, name);
