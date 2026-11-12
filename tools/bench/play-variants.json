@@ -141,5 +141,18 @@
       "at 70 35": "clouds.at:70,35",
       "at 70 5": "clouds.at:70,5"
     }
+  },
+  "cap": {
+    "poses": [
+      "day-home-13",
+      "day-east-16",
+      "day-north-13"
+    ],
+    "variants": {
+      "trim white (before)": "house.cap:F7F5F0",
+      "plaster B5AEA4": "house.cap:B5AEA4",
+      "mid 8D877E": "house.cap:8D877E",
+      "dark 5E5A56": "house.cap:5E5A56"
+    }
   }
 }

@@ -36,6 +36,7 @@ import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalW
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
 import { roadIndex, townRoads } from './roads';
+import { tuned } from '../tune';
 import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
 import { WALL_HALF, WALL_HEIGHT } from './walls';
 
@@ -201,6 +202,12 @@ const ACCENT = ['#3E5A4A', '#2F4058', '#7A3B34', '#4A4A4A', '#5B6E86', '#6E5A3E'
 const LOUD = ['#E8457A', '#F2B51D', '#3FA7D6', '#7BC950', '#9B5DE5', '#FF7A3D'];
 const ROOF = ['#5C626A', '#6B4A3A', '#8C4E3C', '#4F5A4C', '#3E4148', '#7A6A5A'];
 const TRIM = '#F7F5F0';
+/**
+ * How the house is toned (`?tune=house.…` on the dev server). `cap`: the top of a wall, which is what a
+ * cut wall shows of itself from the play camera: the wall's own section, a mid tone, where the trim's
+ * off-white made every room's outline the brightest thing in the picture.
+ */
+export const HOUSE_LOOK = tuned('house', { cap: '#8D877E' });
 const ROOM_WALLS: Record<RoomKind, string[]> = {
   living: ['#EFE3D3', '#E6DECF', '#EAE2D8', '#DCE3E6'],
   bedroom: ['#D8E2D0', '#DCD6E6', '#E6D4C8', '#D2DDE8'],
@@ -872,6 +879,16 @@ export class HousePlanner {
     };
 
     /**
+     * A wall's top, drawn by `draw` in the cut wall's tone (`HOUSE_LOOK.cap`). A half wall's is a ledge,
+     * finished as the trim is.
+     */
+    const capped = (y: number, draw: () => void) => {
+      if (Math.abs(y - HALF_WALL_HEIGHT) > 0.01) trim.color(HOUSE_LOOK.cap);
+      draw();
+      trim.color(TRIM);
+    };
+
+    /**
      * Both faces, the cap and the cutaway data of one wall segment, from `s0` to `s1` along
      * the edge (default: the whole edge between the posts). `cap: false` skips the top.
      */
@@ -884,11 +901,11 @@ export class HousePlanner {
       if (axis === 'h') {
         face('h', z - T, a0, a1, y0, y1, [0, 0, -1], roomP(x + 0.5, z - 0.25), c0, `h:${x}:${z}:0`);
         face('h', z + T, a0, a1, y0, y1, [0, 0, 1], roomP(x + 0.5, z + 0.25), c1, `h:${x}:${z}:1`);
-        if (cap) trim.box(a0, y1 - 0.001, z - T, a1, y1, z + T, 'ny nx px nz pz');
+        if (cap) capped(y1, () => trim.box(a0, y1 - 0.001, z - T, a1, y1, z + T, 'ny nx px nz pz'));
       } else {
         face('v', x - T, a0, a1, y0, y1, [-1, 0, 0], roomP(x - 0.25, z + 0.5), c0, `v:${x}:${z}:0`);
         face('v', x + T, a0, a1, y0, y1, [1, 0, 0], roomP(x + 0.25, z + 0.5), c1, `v:${x}:${z}:1`);
-        if (cap) trim.box(x - T, y1 - 0.001, a0, x + T, y1, a1, 'ny nx px nz pz');
+        if (cap) capped(y1, () => trim.box(x - T, y1 - 0.001, a0, x + T, y1, a1, 'ny nx px nz pz'));
       }
     };
 
@@ -914,7 +931,8 @@ export class HousePlanner {
       if (first) trim.poly([P(g0, sill, -T), P(g0, sill, T), P(g0, head, T), P(g0, head, -T)], na);
       if (last) trim.poly([P(g1, sill, -T), P(g1, head, -T), P(g1, head, T), P(g1, sill, T)], [-na[0], 0, -na[2]]);
       trim.poly([P(g0, head, -T), P(g0, head, T), P(g1, head, T), P(g1, head, -T)], [0, -1, 0]);
-      trim.poly([P(g0, sill, -T), P(g1, sill, -T), P(g1, sill, T), P(g0, sill, T)], [0, 1, 0]);
+      // (A hair over the wall's top below it, which is in the cut wall's tone: gone with the window when the wall is cut.)
+      trim.poly([P(g0, sill + 0.002, -T), P(g1, sill + 0.002, -T), P(g1, sill + 0.002, T), P(g0, sill + 0.002, T)], [0, 1, 0]);
     };
 
     /**
@@ -1051,7 +1069,7 @@ export class HousePlanner {
         for (const g of wallGeos) g.cutting(Cut.Clamp, maskH, maskV);
         // As tall as the tallest wall it joins (a run of half walls has half posts).
         const top = Math.max(heightOf('h', x - 1, z), heightOf('h', x, z), heightOf('v', x, z - 1), heightOf('v', x, z));
-        trim.box(x - T, top - 0.001, z - T, x + T, top, z + T, 'ny nx px nz pz');
+        capped(top, () => trim.box(x - T, top - 0.001, z - T, x + T, top, z + T, 'ny nx px nz pz'));
         // Faces towards a door are jambs. Faces towards a wall sit inside it while it stands and
         // close its end when that wall is cut but the post is not.
         // `ra`, `rb`: the rooms of the two quadrants on that side of the corner.
@@ -1164,7 +1182,7 @@ export class HousePlanner {
       for (const g of wallGeos) g.cutting(kind, mask);
       faceG(f, a0, a1, y0, y1, -T, -1, d.rooms[0], d.faces?.[0], `${d.axis}:${d.x}:${d.z}:0`);
       faceG(f, a0, a1, y0, y1, T, 1, d.rooms[1], d.faces?.[1], `${d.axis}:${d.x}:${d.z}:1`);
-      if (cap) trim.poly([f.at(a0, y1, -T), f.at(a1, y1, -T), f.at(a1, y1, T), f.at(a0, y1, T)], [0, 1, 0]);
+      if (cap) capped(y1, () => trim.poly([f.at(a0, y1, -T), f.at(a1, y1, -T), f.at(a1, y1, T), f.at(a0, y1, T)], [0, 1, 0]));
     };
     /** Whether a diagonal run continues as a plain wall past one end (room for a shutter). */
     const plainDiagEnd = (d: DiagonalWall, end: 0 | 1) => {
@@ -1195,6 +1213,7 @@ export class HousePlanner {
         trim.poly([f.at(g0, sill, -T), f.at(g0, sill, T), f.at(g0, head, T), f.at(g0, head, -T)], [f.ux, 0, f.uz]);
         trim.poly([f.at(g1, sill, -T), f.at(g1, head, -T), f.at(g1, head, T), f.at(g1, sill, T)], [-f.ux, 0, -f.uz]);
         trim.poly([f.at(g0, head, -T), f.at(g0, head, T), f.at(g1, head, T), f.at(g1, head, -T)], [0, -1, 0]);
+        trim.poly([f.at(g0, sill + 0.002, -T), f.at(g1, sill + 0.002, -T), f.at(g1, sill + 0.002, T), f.at(g0, sill + 0.002, T)], [0, 1, 0]);
         // Glazing bars between the panes, then per face: a pane, frame, sill and (outside) shutters.
         const recess = 0.03;
         trim.cutting(Cut.Hide, mask).color(TRIM);
@@ -1312,7 +1331,7 @@ export class HousePlanner {
         for (let k = 0; k < outline.length; k++) {
           const p0 = outline[k];
           const p1 = outline[(k + 1) % outline.length];
-          trim.poly([[x, top, z], [p0[0], top, p0[1]], [p1[0], top, p1[1]]], [0, 1, 0]);
+          capped(top, () => trim.poly([[x, top, z], [p0[0], top, p0[1]], [p1[0], top, p1[1]]], [0, 1, 0]));
           // Frames run along +x (or +z) so textures line up with the walls they continue.
           const flip = p1[0] < p0[0] - 1e-9 || (Math.abs(p1[0] - p0[0]) <= 1e-9 && p1[1] < p0[1]);
           const f = flip ? new WallFrame(p1[0], p1[1], p0[0], p0[1]) : new WallFrame(p0[0], p0[1], p1[0], p1[1]);
