@@ -872,7 +872,7 @@ export class Sky {
   private readonly glow = { r: 0, g: 0, b: 0 };
   private spin = 0;
 
-  constructor(app: pc.AppBase, parent: pc.Entity, radius: number, cloudsUrl?: string) {
+  constructor(app: pc.AppBase, parent: pc.Entity, private readonly radius: number, cloudsUrl?: string) {
     const device = app.graphicsDevice;
     const { positions, indices } = sphereData(radius * 2, radius * 2, radius * 2, SKY_SEGMENTS);
     this.dirs = new Float32Array(positions.length);
@@ -958,6 +958,15 @@ export class Sky {
   /** Puts the sky round the camera (game space: its eye), so it never comes nearer. */
   follow(x: number, y: number, z: number): void {
     this.dome.setLocalPosition(x, y, z);
+  }
+
+  /**
+   * The dome's radius (m; the clouds' band with it): it looks the same at any (its colours go by direction, out
+   * of the fog), and hides whatever lies further off, so the town view, which sees further, moves it out.
+   */
+  reach(radius: number): void {
+    const scale = radius / this.radius;
+    if (Math.abs(this.dome.getLocalScale().x - scale) > 1e-4) this.dome.setLocalScale(scale, scale, scale);
   }
 
   /** Slow cloud drift; call per frame with the frame's milliseconds. */

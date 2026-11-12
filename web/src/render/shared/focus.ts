@@ -12,12 +12,15 @@
  * - Focus lot: the plot under the target, else the nearest within `FOCUS_REACH` m; reported once
  *   the camera has settled on it for `SETTLE_MS` (a pan across the town doesn't build every lot it
  *   passes). While `pinned` (build mode, following a resident, the director's shots) the game
- *   chooses the focus itself and none is reported.
+ *   chooses the focus itself and none is reported. Nor from the town view (past `TOWN_FROM`,
+ *   docs/design/living-town.md): from up there a lot is a few pixels, and a pan across the town
+ *   would have one built in full wherever it rests. The focus lot there was stays.
  *
  * Engine-neutral: the renderer feeds it the camera each frame (`update`).
  */
 
 import { CHUNK, chunkCoords, chunkId, distanceToRect } from './chunks';
+import { TOWN_FROM, TOWN_FULL } from './lens';
 
 /** Metres past the stream radius a chunk keeps streaming before it goes. */
 export const HYSTERESIS = 32;
@@ -137,8 +140,8 @@ export class Roam {
 
     const changed = this.stream(cam);
 
-    // The focus: under the target (or nearest), held a moment once the camera slows.
-    if (!this.pinned) {
+    // The focus: under the target (or nearest), held a moment once the camera slows. (Not from the town view.)
+    if (!this.pinned && cam.radius <= TOWN_FROM) {
       const plot = plotAt(cam.x, cam.z, FOCUS_REACH);
       const id = plot?.id ?? null;
       if (id !== this.candidate) {
@@ -205,15 +208,35 @@ export function panBounds(world: { width: number; depth: number; storeyDepth?: n
   return { x0: -m, z0: -m, x1: world.width + m, z1: d + m };
 }
 
+/** The longest a flight from or to the town view takes (s). */
+const FAR_LONGEST = 3.4;
+/**
+ * In a flight from or to the town view, the share of its time the way there takes when the camera comes down, the
+ * zoom when it goes up (the other starts that much later): at a zoom of `FAR_STAGGER_ZOOM` times and more; less the
+ * smaller the zoom, none (both all the time) without one.
+ */
+const FAR_LEAD = 0.7;
+const FAR_STAGGER_ZOOM = 4;
+
+const smooth = (t: number) => t * t * (3 - 2 * t);
+
 /**
  * A smooth flight of the camera's target to a point (the town map's "look here"): eased out and in,
  * longer the further it goes (0.6 s, up to 2.2 s across a big world), rising on the way when far.
+ *
+ * From or to the town view (either end past `TOWN_FROM`: a town tag's click, `townView.goTo`) it is a flight of
+ * its own kind: the distance changes by a share a second, not by metres (down from 600 m to 24 m a metre-wise
+ * glide would spend its last second falling the last 300 m), which takes longer the bigger the zoom (up to
+ * `FAR_LONGEST` s). Coming down, the way there leads and the zoom lands on the place; going up, the zoom leads
+ * and the way follows. A long way from low down rises to a cruising height first (up to `TOWN_FULL`).
  */
 export class Flight {
   private from = { x: 0, z: 0, radius: 0 };
   private to = { x: 0, z: 0, radius: 0 };
   private t = 0;
   private duration = 0;
+  /** From or to the town view. */
+  private far = false;
   active = false;
 
   /** `cut`: Reduce motion is on: the camera is there on the next step, without the flight. */
@@ -221,7 +244,8 @@ export class Flight {
     this.from = { x: fromX, z: fromZ, radius: fromRadius };
     this.to = { x: toX, z: toZ, radius: toRadius };
     const d = Math.hypot(toX - fromX, toZ - fromZ);
-    this.duration = cut ? 0 : Math.min(2.2, 0.6 + d / 400);
+    this.far = Math.max(fromRadius, toRadius) > TOWN_FROM;
+    this.duration = cut ? 0 : this.far ? Math.min(FAR_LONGEST, 0.6 + d / 400 + 0.45 * Math.abs(Math.log(toRadius / fromRadius))) : Math.min(2.2, 0.6 + d / 400);
     this.t = 0;
     this.active = true;
   }
@@ -230,19 +254,47 @@ export class Flight {
     this.active = false;
   }
 
+  /** The flight's end moves (who it flies to walks on): it lands where they are now. */
+  aim(x: number, z: number): void {
+    if (!this.active) return;
+    this.to.x = x;
+    this.to.z = z;
+  }
+
   /** Steps the flight by `dt` s: where the target and radius are now. */
   step(dt: number, out: { x: number; z: number; radius: number }): boolean {
     if (!this.active) return false;
     this.t = this.duration > 0 ? Math.min(1, this.t + dt / this.duration) : 1;
-    const s = this.t * this.t * (3 - 2 * this.t);
+    const s = smooth(this.t);
     const d = Math.hypot(this.to.x - this.from.x, this.to.z - this.from.z);
-    // Up and over a long way: the camera rises by up to a third of the distance, half way.
-    const lift = this.t >= 1 ? 0 : Math.min(60, d / 3) * Math.sin(Math.PI * s);
-    out.x = this.from.x + (this.to.x - this.from.x) * s;
-    out.z = this.from.z + (this.to.z - this.from.z) * s;
-    out.radius = this.from.radius + (this.to.radius - this.from.radius) * s + lift;
+    if (this.far) this.stepFar(s, d, out);
+    else {
+      // Up and over a long way: the camera rises by up to a third of the distance, half way.
+      const lift = this.t >= 1 ? 0 : Math.min(60, d / 3) * Math.sin(Math.PI * s);
+      out.x = this.from.x + (this.to.x - this.from.x) * s;
+      out.z = this.from.z + (this.to.z - this.from.z) * s;
+      out.radius = this.from.radius + (this.to.radius - this.from.radius) * s + lift;
+    }
     if (this.t >= 1) this.active = false;
     return true;
+  }
+
+  /** A flight from or to the town view at `s` (eased time) over `d` m. */
+  private stepFar(s: number, d: number, out: { x: number; z: number; radius: number }): void {
+    const { from, to, t } = this;
+    const ratio = to.radius / from.radius;
+    // The one that leads takes `lead` of the time from the start; the other as long, to the end.
+    const lead = 1 - (1 - FAR_LEAD) * Math.min(1, Math.abs(Math.log(ratio)) / Math.log(FAR_STAGGER_ZOOM));
+    const first = smooth(Math.min(1, t / lead));
+    const second = smooth(Math.max(0, (t - (1 - lead)) / lead));
+    const down = ratio < 1;
+    const way = down ? first : second;
+    const zoom = down ? second : first;
+    // Up to cruising height over a long way, when both ends are lower than that.
+    const lift = t >= 1 ? 0 : Math.max(0, Math.min(TOWN_FULL, d * 0.6) - Math.max(from.radius, to.radius)) * Math.sin(Math.PI * s);
+    out.x = from.x + (to.x - from.x) * way;
+    out.z = from.z + (to.z - from.z) * way;
+    out.radius = t >= 1 ? to.radius : from.radius * Math.pow(ratio, zoom) + lift;
   }
 }
 

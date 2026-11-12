@@ -23,6 +23,10 @@ import { shareAt, ZoneField } from './zones';
  */
 export const RING = 150;
 const WORLD_RING = 260;
+/** How far (m) `world`'s landscape reaches past its land's edge (the layout's own ring, known before one is made). */
+export function landscapeRing(world: { meta?: { world?: unknown } | null }): number {
+  return world.meta?.world ? WORLD_RING : RING;
+}
 /** Flat apron around the town before the hills start. */
 export const APRON = 6;
 /** A big world's distance-from-built grid (m a cell; `distanceToTown`). */
@@ -371,7 +375,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.w = world.width;
     this.d = groundDepth(world);
     this.land = { ...DEFAULT_LANDSCAPE, ...world.meta?.world?.landscape };
-    this.ring = world.meta?.world ? WORLD_RING : RING;
+    this.ring = landscapeRing(world);
     this.built = world.meta?.world?.size === 'big' ? LandscapeLayout.builtField(world, this.w, this.d) : null;
     this.zones = this.built && world.meta?.zones?.length ? new ZoneField(world.meta.zones, this.w, this.d) : null;
     this.orchards = this.zones ? (world.meta?.zones ?? []).filter((z) => z.kind === 'orchard') : [];
