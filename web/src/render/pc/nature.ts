@@ -184,7 +184,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.lawn = this.lawn.filter((layer) => !layer.draws.some((d) => going.has(d.entity)));
       stale.forEach(({ again }, i) => {
         if (!again!.tiles) return;
-        const layers = lawnLayers(fresh[i].built, again!.matrices, again!.tiles);
+        const layers = lawnLayers(fresh[i].built, again!.matrices, again!.tiles, again!.clear);
         this.lawn.push(...layers);
         if (this.lawnMask) hideLawn(layers, this.lawnMask, uploadLawn);
       });
@@ -427,11 +427,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /** The lawn's flowers (`lawns`), instanced. */
   private async plantLawns(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>): Promise<void> {
     this.lawn = [];
-    for (const { key, matrices, tiles, cell } of await this.lawns(world, pace)) {
+    for (const { key, matrices, tiles, cell, clear } of await this.lawns(world, pace)) {
       const lod = this.lawnLod;
       const built = await instanced(app, parent, assets, key, matrices, lod, cell, pace);
-      this.batches.push(batch({ key, matrices, lod, cell, tiles }, false, 'flowers', built));
-      this.lawn.push(...lawnLayers(built, matrices, tiles));
+      this.batches.push(batch({ key, matrices, lod, cell, tiles, clear }, false, 'flowers', built));
+      this.lawn.push(...lawnLayers(built, matrices, tiles, clear));
     }
     this.refreshLawn(world);
   }
@@ -569,6 +569,8 @@ interface BatchSource {
   cell?: (x: number, z: number) => string;
   /** The lawn's: each instance's town tile (-1 outside the town), for `refreshLawn`. */
   tiles?: readonly number[];
+  /** The lawn's: they keep a tile clear of what hides the lawn (`LawnLayer.clear`). */
+  clear?: boolean;
 }
 
 /** A batch of plants built from `source`, which it keeps only if it was built without a file (all of them are several MB a landscape). */
@@ -594,11 +596,11 @@ function gather(batches: readonly Batch[]): NatureResult {
 }
 
 /** The lawn layers of a model's tufts or flowers: every instance, in the parts drawn whole; then each group's. */
-function lawnLayers(built: Instanced, matrices: readonly Float32Array[], tiles: readonly number[]): LawnLayer<Instances>[] {
+function lawnLayers(built: Instanced, matrices: readonly Float32Array[], tiles: readonly number[], clear = false): LawnLayer<Instances>[] {
   const layers: LawnLayer<Instances>[] = [];
   for (const { draws, indices } of [{ draws: [...built.shared, ...built.whole], indices: matrices.map((_, k) => k) }, ...built.cells]) {
     if (!draws.length) continue;
-    layers.push(lawnLayer(draws, matrices, tiles, indices));
+    layers.push(lawnLayer(draws, matrices, tiles, indices, clear));
   }
   return layers;
 }

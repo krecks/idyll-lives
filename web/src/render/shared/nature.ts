@@ -170,6 +170,8 @@ export interface LawnPlacement {
   tiles: number[];
   /** Which group an instance at (x, z) is drawn in (a big world's: squares the game leaves out past a distance); none: one draw. */
   cell?: (x: number, z: number) => string;
+  /** They keep a tile's distance from what hides the lawn (`LawnLayer.clear`). */
+  clear?: boolean;
 }
 
 /** Lawn flowers as drawn: each instance's original matrix and town tile (-1 outside the town), its matrix as drawn (`shown`) and whether it's hidden. */
@@ -180,6 +182,11 @@ export interface LawnLayer<D> {
   shown: Float32Array;
   tiles: Int32Array;
   hidden: Uint8Array;
+  /**
+   * They are hidden on the tiles next to a hidden one too (a house's walls, a thing in the garden): a patch of
+   * flowers is a tile wide and spills over its tile's edge, onto a doorstep or against a wall's foot.
+   */
+  clear?: boolean;
 }
 
 /** Where the lawn is hidden (`refreshLawn`): per town tile, and the split tiles' diagonals. */
@@ -265,11 +272,24 @@ export function lawnMask(world: WorldStructure): LawnMask {
  * wall, each follows the half it stands in.
  */
 export function hideLawn<D>(layers: readonly LawnLayer<D>[], { width, hidden, splitAxis }: LawnMask, upload: (layer: LawnLayer<D>) => void): void {
+  // (For the layers that keep clear: whether a tile or one of the eight round it is hidden, at all.)
+  let near: Uint8Array | undefined;
+  const nearHidden = (): Uint8Array => {
+    if (near) return near;
+    near = new Uint8Array(hidden.length);
+    const depth = Math.floor(hidden.length / width);
+    for (let i = 0; i < hidden.length; i++) {
+      if (!hidden[i]) continue;
+      const [x, z] = [i % width, Math.floor(i / width)];
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (x + dx >= 0 && x + dx < width && z + dz >= 0 && z + dz < depth) near[(z + dz) * width + x + dx] = 1;
+    }
+    return near;
+  };
   for (const layer of layers) {
     let changed = false;
     for (let k = 0; k < layer.tiles.length; k++) {
       const t = layer.tiles[k];
-      let hide = t >= 0 ? hidden[t] : 0;
+      let hide = t >= 0 ? (layer.clear ? nearHidden()[t] : hidden[t]) : 0;
       if (hide > 1) {
         // The flower's position within its tile decides its half.
         const fx = layer.base[k * 16 + 12] - (t % width);
@@ -292,10 +312,10 @@ export function hideLawn<D>(layers: readonly LawnLayer<D>[], { width, hidden, sp
 }
 
 /** A lawn layer of `indices` into `matrices` (and their tiles), drawn by `draws`. */
-export function lawnLayer<D>(draws: D[], matrices: readonly ArrayLike<number>[], tiles: readonly number[], indices: readonly number[]): LawnLayer<D> {
+export function lawnLayer<D>(draws: D[], matrices: readonly ArrayLike<number>[], tiles: readonly number[], indices: readonly number[], clear = false): LawnLayer<D> {
   const base = new Float32Array(indices.length * 16);
   indices.forEach((k, i) => base.set(matrices[k], i * 16));
-  return { draws, base, shown: new Float32Array(base), tiles: Int32Array.from(indices, (k) => tiles[k]), hidden: new Uint8Array(indices.length) };
+  return { draws, base, shown: new Float32Array(base), tiles: Int32Array.from(indices, (k) => tiles[k]), hidden: new Uint8Array(indices.length), ...(clear ? { clear } : {}) };
 }
 
 /** A model's copies grouped by `group` (each group's indices into `items`, in their order): the woods' and the street's draw groups. */
@@ -829,7 +849,18 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     // flowers above stand where they always have.)
     const patchRand = mulberry32(this.seed ^ 0x5d21f);
     const patches = FLOWER_PATCHES.kinds.map((kind) => ({ kind, matrices: [] as Float32Array[], tiles: [] as number[] }));
-    // (On the plots' mown lawns: the rough grass between them is over their heads.)
+    // (On the plots' mown lawns: the rough grass between them is over their heads. And a tile clear of paving: a patch
+    // spills over its tile's edge, and stood on a path or a drive.)
+    const pavedNear = unlawned(world, true);
+    const clearOfPaving = (x: number, z: number): boolean => {
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const [nx, nz] = [x + dx, z + dz];
+          if (nx >= 0 && nx < world.width && nz >= 0 && nz < groundDepth(world) && pavedNear[nz * world.width + nx]) return false;
+        }
+      }
+      return true;
+    };
     const mown = new Uint8Array(paved.length);
     for (const p of world.plots ?? []) {
       for (let z = Math.max(0, p.z); z < Math.min(groundDepth(world), p.z + p.d); z++) mown.fill(1, z * world.width + Math.max(0, p.x), z * world.width + Math.min(world.width, p.x + p.w));
@@ -839,7 +870,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       if (z % 8 === 0) await pace?.();
       for (let x = 0; x < world.width; x++) {
         const i = z * world.width + x;
-        if (paved[i] || !mown[i]) continue;
+        if (paved[i] || !mown[i] || !clearOfPaving(x, z)) continue;
         const drift = smoothstep(FLOWER_PATCHES.from, FLOWER_PATCHES.full, valueNoise(x / FLOWER_DRIFTS.span, z / FLOWER_DRIFTS.span, this.seed + 421));
         if (drift <= 0 || (this.zones && this.waterEdge(x + 0.5, z + 0.5) > -BEACH * 0.6)) continue;
         const which = valueNoise(x / FLOWER_PATCHES.kindSpan, z / FLOWER_PATCHES.kindSpan, this.seed + 433);
@@ -860,7 +891,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const patchCell = cell ?? ((x: number, z: number) => `${Math.floor(x / FLOWER_PATCHES.cell)}:${Math.floor(z / FLOWER_PATCHES.cell)}`);
     return [
       { key: 'model.flowers', matrices: thin(flowers), tiles: thin(flowerTiles), ...(cell ? { cell } : {}) },
-      ...patches.filter((p) => p.matrices.length).map((p) => ({ key: p.kind, matrices: thin(p.matrices), tiles: thin(p.tiles), cell: patchCell })),
+      ...patches.filter((p) => p.matrices.length).map((p) => ({ key: p.kind, matrices: thin(p.matrices), tiles: thin(p.tiles), cell: patchCell, clear: true })),
     ];
   }
 }
@@ -881,15 +912,15 @@ const FLOWER_DRIFTS = tuned('flowers', { span: 6, from: 0.6, full: 0.76, dense: 
  * any to where there are `dense` of them a tile; their models, and the values of a wider noise (`kindSpan` m a
  * cell) that part the first kind's drifts from the second's and the third's; `cell`: the squares (m) they are drawn in.
  *
- * Off (`dense` 0; it was 2.2): as first drawn they were the busiest thing outside the house, sparkled as the
- * camera moved (a tenth more of a play picture's pixels changed under a quarter-pixel move), stood on paths,
- * floors and the borders' mulch and under Build mode's grid, and kept their day colours at night. To come
- * back they want a patch or two a garden, kept to open lawn, and the night's colours.
+ * A patch or two a garden, at the drifts' cores (`from` 0.74): as first drawn (from 0.6, 2.2 a tile) they were the
+ * busiest thing outside the house and sparkled as the camera moved (a tenth more of a play picture's pixels
+ * changed under a quarter-pixel move; now a fiftieth more), and they stood on paths, at doorsteps and against the
+ * foot of walls: now a tile clear of paving, of the house and of what stands in the garden (`LawnLayer.clear`).
  */
 const FLOWER_PATCHES = tuned('patches', {
-  from: 0.6,
-  full: 0.8,
-  dense: 0,
+  from: 0.74,
+  full: 0.92,
+  dense: 1.6,
   kinds: ['model.flowers.daisies', 'model.flowers.buttercups', 'model.flowers.violets'],
   kindSpan: 17,
   split: [0.52, 0.64],
