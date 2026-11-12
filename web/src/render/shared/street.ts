@@ -1432,8 +1432,9 @@ export class TownStreet {
     const shadows = new RoutedGeo((x, z) => at(x, z).parts.shadows).color('#000000');
     roadMeshes(this.roads, null, 0, { walk, shadows }, 'sidewalks');
     if (this.options.ground) {
-      // (The town's streets worn and patched; a big world's country roads plain, as they are from afar.)
-      roadMeshes([...this.roads, ...this.ways.country], null, 0, { surface: new RoutedGeo((x, z) => at(x, z).road) }, 'surface', (ri) => (ri < this.roads.length ? this.roads[ri].width / 2 - SIDEWALK : 0));
+      // (Worn between the kerbs; a big world's country roads, which have none, from edge to edge.)
+      const all = [...this.roads, ...this.ways.country];
+      roadMeshes(all, null, 0, { surface: new RoutedGeo((x, z) => at(x, z).road) }, 'surface', (ri) => all[ri].width / 2 - (ri < this.roads.length ? SIDEWALK : 0));
       roadMeshes(this.ways.trail, null, 0, { surface: new RoutedGeo((x, z) => at(x, z).trail) }, 'surface');
     }
     // A fountain in the middle of every roundabout, flowers round it.

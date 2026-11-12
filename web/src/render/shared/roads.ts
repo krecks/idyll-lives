@@ -233,7 +233,7 @@ export function roadMeshes(
   margin = 0,
   into: Partial<RoadMeshes> = {},
   parts: 'both' | 'surface' | 'sidewalks' = 'both',
-  /** The half width of road `ri`'s carriageway (m) if its asphalt is toned by vertex (worn, patched: `paving.ts`); 0 or none: one plain quad a stretch. */
+  /** The half width of road `ri`'s carriageway (m) if its asphalt is toned by vertex (worn, and patched between kerbs: `paving.ts`); 0 or none: one plain quad a stretch. */
   worn?: (ri: number) => number,
 ): RoadMeshes {
   const [withSurface, withSidewalks] = [parts !== 'sidewalks', parts !== 'surface'];
@@ -265,7 +265,9 @@ export function roadMeshes(
         };
         const band = carriageway(lane);
         const offs = [-half, ...band.at, half].filter((o, k, list) => k === 0 || o - list[k - 1] > 0.05);
-        const rows = Math.max(1, Math.round((b.s - a.s) / 4));
+        // (A road without kerbs is a country road: longer rows, no repairs.)
+        const kerbed = lane < half - 0.01;
+        const rows = Math.max(1, Math.round((b.s - a.s) / (kerbed ? 4 : 8)));
         const k0 = Math.round(a.s / 4);
         const toneAt = (t: number, off: number): V3 => {
           const [x, , z] = at(t, off, 0);
@@ -278,7 +280,7 @@ export function roadMeshes(
             surface.poly(c.map(([t, off]) => at(t, off, ROAD_Y)), up, undefined, undefined, c.map(([t, off]) => toneAt(t, off)));
           }
           // A repair: a patch of newer asphalt, a hair over the road.
-          const fix = repair(ri, k0 + k);
+          const fix = kerbed ? repair(ri, k0 + k) : null;
           if (fix) {
             const [o0, o1] = [(fix.across - fix.wide) * lane, (fix.across + fix.wide) * lane];
             const [u0, u1] = [t0 + (t1 - t0) * fix.from, t0 + (t1 - t0) * Math.min(1, fix.from + fix.long)];
@@ -378,7 +380,9 @@ export function roadMeshes(
       const inLane = (x: number, z: number) => laneIndex.distance(0, x, z) < half;
       for (let k = 0; k < n; k++) {
         const [a0, a1] = [(k / n) * Math.PI * 2, ((k + 1) / n) * Math.PI * 2];
-        if (withSurface) surface.poly([[ex, ROAD_Y, ez], at(a1, r + SIDEWALK, ROAD_Y), at(a0, r + SIDEWALK, ROAD_Y)], up);
+        // (Worn as the lane is: paler in the middle, where cars turn, dark round the kerb.)
+        const turn = withSurface && worn?.(ri) ? [tint(0.85 * asphaltVary(ex, ez)), tint(STREET_LOOK.gutter), tint(STREET_LOOK.gutter)] : undefined;
+        if (withSurface) surface.poly([[ex, ROAD_Y, ez], at(a1, r + SIDEWALK, ROAD_Y), at(a0, r + SIDEWALK, ROAD_Y)], up, undefined, undefined, turn);
         const am = (a0 + a1) / 2;
         if (!withSidewalks || inLane(ex + Math.cos(am) * (r + SIDEWALK / 2), ez + Math.sin(am) * (r + SIDEWALK / 2))) continue;
         const [edge, walkIn, kerb] = [r + SIDEWALK, r + KERB, r];
