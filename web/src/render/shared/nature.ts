@@ -930,15 +930,20 @@ function clearTreeSpot(x: number, z: number, world: WorldStructure, view: { x: n
   return null;
 }
 
-/** The garden dressing (`natureDecor`'s) as placed, for the birds. */
+/** Fallen petals under a lot's tree in blossom (`natureDecor`): no plant (no bird lives in it, and it casts no shadow). */
+export const PETALS = 'model.flowers.petals';
+/** How far they lie, of the model's 2.3 m at a tree's scale 1. */
+const PETALS_SPREAD = 1.05;
+
+/** The garden dressing (`natureDecor`'s) as placed, for the birds: its plants (not the petals fallen from them). */
 export function decorPlants(decor: readonly [string, Decor][]): PlantPlacement[] {
-  return decor.flatMap(([key, items]) => items.map(([x, z, s, yaw]) => ({ key, x, y: 0, z, sx: s, sy: s, sz: s, yaw })));
+  return decor.flatMap(([key, items]) => (key === PETALS ? [] : items.map(([x, z, s, yaw]) => ({ key, x, y: 0, z, sx: s, sy: s, sz: s, yaw }))));
 }
 
 /**
  * Splits the house builder's garden dressing (`model.tree` lot trees, `model.bush` foundation
  * shrubs; items are [x, z, scale, yaw]) into species. Lot trees mix oaks, maples, blossom, fruit,
- * birch, magnolia and Japanese maple; each house gets either a clipped hedge along its walls or a
+ * birch, magnolia and Japanese maple, with fallen petals under the two in blossom; each house gets either a clipped hedge along its walls or a
  * mixed border of shrubs, hydrangeas, roses, lavender and clipped balls. Deterministic per position.
  */
 export function natureDecor(key: string, items: Decor, world?: WorldStructure, view?: { x: number; z: number; w: number; d: number } | null): [string, Decor][] {
@@ -957,6 +962,8 @@ export function natureDecor(key: string, items: Decor, world?: WorldStructure, v
       const species =
         h < 0.24 ? 'model.tree' : h < 0.4 ? 'model.tree.maple' : h < 0.55 ? 'model.tree.blossom' : h < 0.68 ? 'model.tree.fruit' : h < 0.8 ? 'model.tree.birch' : h < 0.9 ? 'model.tree.magnolia' : 'model.tree.japaneseMaple';
       put(species, [spot[0], spot[1], item[2], item[3]]);
+      // A tree in blossom has shed some of it: petals on the lawn under its crown.
+      if (species === 'model.tree.blossom' || species === 'model.tree.magnolia') put(PETALS, [spot[0], spot[1], item[2] * PETALS_SPREAD, item[3]]);
     }
   } else if (key === 'model.bush' && items.length) {
     // One border style per house (the first shrub's position stands in for the lot).

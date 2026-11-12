@@ -685,7 +685,7 @@ export function splitsByGroup(m: ModelMesh, copies: number): boolean {
  * colour, `GAME_WIND_TINT`): `warm` to `cool`, the two ends a plant's hue is drawn between by where it stands, and
  * `value`, how light it is (from, to); `top` and `under`, what faces the sky and what faces the ground (`facing`:
  * the normal's height where it is all `under` and all `top`; `petal`: the linear colour from which a part is a
- * petal, not a leaf, and to which it is all petal, which `top` leaves as it is). From the play camera a crown, a shrub and a hedge
+ * petal, not a leaf, and to which it is all petal, which keeps its colour from plant to plant and under `top`). From the play camera a crown, a shrub and a hedge
  * are seen from above: lit only as the sun fell on them they were one dark green, top and side.
  */
 const LEAVES = tuned('leaves', {
@@ -736,12 +736,12 @@ function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
 			tintInst = instance_line4.xyz;
 		#endif
 		${decl('tintRnd', 'float')} = fract(sin(dot(tintInst.xz, ${v2}(12.9898, 78.233))) * 43758.5453);
-		${decl('tint', 'vec3', true)} = mix(${v3}(${LEAVES.warm.map(f).join(', ')}), ${v3}(${LEAVES.cool.map(f).join(', ')}), tintRnd) * (${f(LEAVES.value[0])} + ${f(LEAVES.value[1] - LEAVES.value[0])} * fract(tintRnd * 7.31));
+		// (Leaves only: a petal, light already, keeps its colour.)
+		${decl('tintLeaf', 'float')} = 1.0 - smoothstep(${f(LEAVES.petal[0])}, ${f(LEAVES.petal[1])}, max(${color}.r, max(${color}.g, ${color}.b)));
+		${decl('tint', 'vec3', true)} = mix(${v3}(1.0), mix(${v3}(${LEAVES.warm.map(f).join(', ')}), ${v3}(${LEAVES.cool.map(f).join(', ')}), tintRnd) * (${f(LEAVES.value[0])} + ${f(LEAVES.value[1] - LEAVES.value[0])} * fract(tintRnd * 7.31)), tintLeaf);
 		#ifdef NORMALS
 			// Lit from above: what faces the sky lighter and a little warmer, what faces the ground darker.
 			${decl('tintUp', 'float')} = smoothstep(${f(LEAVES.facing[0])}, ${f(LEAVES.facing[1])}, normalize(${wgsl ? 'output.vNormalW' : 'vNormalW'}).y);
-			// (Leaves only: a petal, light already, would wash out.)
-			${decl('tintLeaf', 'float')} = 1.0 - smoothstep(${f(LEAVES.petal[0])}, ${f(LEAVES.petal[1])}, max(${color}.r, max(${color}.g, ${color}.b)));
 			tint = tint * mix(${v3}(${f(LEAVES.under)}), mix(${v3}(1.0), ${v3}(${LEAVES.top.map(f).join(', ')}), tintLeaf), tintUp);
 		#endif
 		${color} = ${wgsl ? 'vec4f' : 'vec4'}(${color}.rgb * pow(tint, ${v3}(2.2)), ${color}.a);

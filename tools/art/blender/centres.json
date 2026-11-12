@@ -235,6 +235,7 @@
   "model.flowers": [0.0, 0.0],
   "model.flowers.buttercups": [0.0, 0.0],
   "model.flowers.daisies": [0.0, 0.0],
+  "model.flowers.petals": [0.0, 0.0],
   "model.flowers.violets": [0.0, 0.0],
   "model.foodie.chefsIsland": [0.0, 0.0154],
   "model.foodie.cookbookLectern": [0.022, -0.123],

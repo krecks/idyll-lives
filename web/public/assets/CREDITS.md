@@ -467,7 +467,7 @@ koi comes up to be fed or watched, a blue tit lands on the feeders while a resid
 festoon bulbs glow at night and the string sways.
 
 The ground cover, the woods' rocks and the selection marker (`models/ground/flowers.glb`, the lawn's patches
-`daisies.glb`, `buttercups.glb` and `violets.glb`, `rock.glb`,
+`daisies.glb`, `buttercups.glb` and `violets.glb`, the fallen `petals.glb`, `rock.glb`,
 `marker.glb`, all but the last each with a `.far.glb`, override pack `packs/ground/manifest.json`) are built in
 Blender by `tools/art/blender/families/ground.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The
 lawn's wildflowers sway in the wind and take a tint per instance (the foliage finish). The lawn's grass is no file:
