@@ -691,7 +691,9 @@ export function splitsByGroup(m: ModelMesh, copies: number): boolean {
  * petal, not a leaf, and to which it is all petal, which keeps its colour from plant to plant and under `top`;
  * `needle`: the blue of a green (linear blue over green) from which it is a conifer's and to which it is all one, which
  * takes `needles` less of `top`; `night`: what `top` is by night, a grey, `game_daylight` 0: the warm tops were the
- * one thing the night's grade, which spares what is warm for the lamps' sake, left yellow-green). From the play camera a crown, a shrub and a hedge
+ * one thing the night's grade, which spares what is warm for the lamps' sake, left yellow-green); `petalNight`: how
+ * much of a petal's colour goes to grey by night, for the same reason (a patch of buttercups stayed bright yellow
+ * under the moon). From the play camera a crown, a shrub and a hedge
  * are seen from above: lit only as the sun fell on them they were one dark green, top and side.
  */
 const LEAVES = tuned('leaves', {
@@ -705,6 +707,7 @@ const LEAVES = tuned('leaves', {
   needle: [0.24, 0.36],
   needles: 0.75,
   night: 1.2,
+  petalNight: 0.85,
 });
 
 function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
@@ -756,6 +759,8 @@ function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
 			tint = tint * mix(${v3}(${f(LEAVES.under)}), mix(${v3}(1.0), mix(${v3}(${f(LEAVES.night)}), ${v3}(${LEAVES.top.map(f).join(', ')}), ${u('game_daylight')}), tintLeaf * (1.0 - ${f(LEAVES.needles)} * tintNeedle)), tintUp);
 		#endif
 		${color} = ${wgsl ? 'vec4f' : 'vec4'}(${color}.rgb * pow(tint, ${v3}(2.2)), ${color}.a);
+		// (By night a petal's colour goes most of the way to its grey: the night's grade spares what is warm.)
+		${color} = ${wgsl ? 'vec4f' : 'vec4'}(mix(${color}.rgb, ${v3}(dot(${color}.rgb, ${v3}(0.2126, 0.7152, 0.0722))), (1.0 - tintLeaf) * (1.0 - ${u('game_daylight')}) * ${f(LEAVES.petalNight)}), ${color}.a);
 	}
 #endif`;
   const vsDecl = wgsl

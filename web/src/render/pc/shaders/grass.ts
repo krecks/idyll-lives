@@ -412,8 +412,10 @@ ${windDecl}
 				ggShade = ggTown.g;
 			}
 		}
-		// (Only where the land has lawn: roads, fields and the rest of the landscape skip the gusts.)
-		if (ggCov + ggLawn > 0.0) {
+		// (Only where the land has lawn: roads, fields and the rest of the landscape skip the gusts. Under a thing
+		// in the garden and at a wall's foot no blades grow, but the ground is the lawn's: with the land's own
+		// colour there it was a bright square under a swing or a shrub, the soil's dark ring round it.)
+		if (ggCov + ggLand > 0.0) {
 			${d('ggP', v2)} = ggQ.xz - ${u('game_wind')}.zw * ${f(speed)} * ${u('game_wind')}.x;
 			${d('ggGust', 'float')} = ${gust('ggP')} * ${u('game_wind')}.y;
 			// The lawn's own colour, as dark as the blades and the shade between them average, and darker
@@ -433,8 +435,8 @@ ${windDecl}
 				${d('ggSpeck', 'float')} = 1.0;
 			#endif
 			${mapped('dAlbedo', 'ggMap', 'ggLand')}
-			${grade('dAlbedo', 'ggLawn', 'ggGrade')}
-			dAlbedo = dAlbedo * (1.0 - ggLawn * ${f(1 - LAWN.far)} - ggCov * (1.0 - ggEarth) * ggNear * ${f(LAWN.far - LAWN.under)}) * (1.0 + (ggGust - ${f(calm)}) * ${f(0.65 * LAWN.gust)} * ggLawn);
+			${grade('dAlbedo', 'ggLand', 'ggGrade')}
+			dAlbedo = dAlbedo * (1.0 - ggLand * ${f(1 - LAWN.far)} - ggCov * (1.0 - ggEarth) * ggNear * ${f(LAWN.far - LAWN.under)}) * (1.0 + (ggGust - ${f(calm)}) * ${f(0.65 * LAWN.gust)} * ggLawn);
 			// Bare earth where the lawn is worn away.
 			dAlbedo = mix(dAlbedo, ${list(LAWN.earth)} * ggSpeck, ggEarth);
 		}
