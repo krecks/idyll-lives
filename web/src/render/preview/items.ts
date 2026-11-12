@@ -69,12 +69,12 @@ const turntables = new Map<string, string[]>();
 /**
  * Pictures kept between visits (Cache Storage), across releases: each is keyed by the contents of
  * what it's drawn from (`storeKey`), so a release redraws only what changed. Other caches of the
- * prefix (older keys' schemes) are deleted when it opens. Bump `v4` to drop old pictures after a
+ * prefix (older keys' schemes) are deleted when it opens. Bump `v5` to drop old pictures after a
  * change to how they're drawn (the studio's light, the shaders). Pictures are kept per shading
  * (Settings, Performance, Shading), here and in memory.
  */
 const STORE_PREFIX = 'littlelives-item-pictures-';
-const STORE = `${STORE_PREFIX}v4`;
+const STORE = `${STORE_PREFIX}v5`;
 
 /** A model's picture in the shading the setting asks for now (`thumbs`' key). */
 function thumbKey(model: string): string {

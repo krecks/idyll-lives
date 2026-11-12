@@ -1920,6 +1920,8 @@ def hedge_block(P, length, h, depth, name='hedge', seed=0):
             secs.append(G.ring(length / 2 * (0.97 + 0.03 * k), depth / 2 * k, h * z, verts=n, square=low(7, 5)))
         block = G.loft(f'{name}_block', secs, material=P.leaf)
         G.jitter(block, 0.03, 0.22, seed=seed * 0.01 + 1.0)
+        # (Mounds a hand across to an arm's length: seen from above its top is not a ruled strip.)
+        G.jitter(block, 0.075, 0.5, seed=seed * 0.01 + 7.0)
         for i in range(7):                                           # stems under it
             x = (i - 3) / 3 * length * 0.4 + rng.uniform(-0.05, 0.05)
             y = rng.uniform(-0.12, 0.12) * depth

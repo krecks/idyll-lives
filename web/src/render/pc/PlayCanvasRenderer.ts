@@ -49,6 +49,7 @@ import { GameBirds } from './birds';
 import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming';
 import { steadyShaderKeys } from './shaderKeys';
 import { natureDecor, windStill } from './nature';
+import { PETALS } from '../shared/nature';
 import { TownOverview, townLayer } from './overview';
 import { Placing } from './placing';
 import { Picker } from './picking';
@@ -1693,7 +1694,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!placed) {
       placed = { template, draws: [] };
       for (const m of template.meshes) {
-        const d = new Instances(this.device, this.root, m.mesh, m.material, { name: m.name, castShadows: true, receiveShadows: true });
+        const d = new Instances(this.device, this.root, m.mesh, m.material, { name: m.name, castShadows: key !== PETALS, receiveShadows: true });
         windStill(d.meshInstance, m);
         placed.draws.push(d);
       }
