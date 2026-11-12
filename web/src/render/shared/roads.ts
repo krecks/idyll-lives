@@ -13,6 +13,8 @@
 import type { RoadPlan, WorldStructure } from '../../core/protocol';
 import { rasterRoads, roadEnds, RoadIndex, roadIndex, SIDEWALK } from '../../game/roads';
 import { Geo, type V3 } from './geometry';
+import { asphaltVary, carriageway, repair, STREET_LOOK, tint } from './paving';
+import { valueNoise } from '../../game/noise';
 
 export { RoadIndex, roadIndex, SIDEWALK };
 /** The kerb's width, and the levels of the sidewalk, the kerb and the road. */
@@ -20,6 +22,8 @@ export const KERB = 0.14;
 export const WALK_Y = 0.03;
 export const KERB_Y = 0.045;
 export const ROAD_Y = 0.012;
+/** The course of kerb stones along the back of a sidewalk, by the lots (m wide). */
+const BACK_COURSE = 0.12;
 /** How far a dead end's turning circle reaches past the lane's kerbs (m). */
 const TURNING = 2.4;
 
@@ -223,7 +227,15 @@ export interface RoadMeshes {
  * given: the road surface under the sidewalks too, the sidewalks on top (added to `into`'s meshes if given;
  * `parts`: only the surface, or only the sidewalks, kerbs and gutters).
  */
-export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, margin = 0, into: Partial<RoadMeshes> = {}, parts: 'both' | 'surface' | 'sidewalks' = 'both'): RoadMeshes {
+export function roadMeshes(
+  roads: readonly RoadPlan[],
+  clip: Box | null = null,
+  margin = 0,
+  into: Partial<RoadMeshes> = {},
+  parts: 'both' | 'surface' | 'sidewalks' = 'both',
+  /** The half width of road `ri`'s carriageway (m) if its asphalt is toned by vertex (worn, patched: `paving.ts`); 0 or none: one plain quad a stretch. */
+  worn?: (ri: number) => number,
+): RoadMeshes {
   const [withSurface, withSidewalks] = [parts !== 'sidewalks', parts !== 'surface'];
   const surface = into.surface ?? new Geo();
   const walk = into.walk ?? new Geo();
@@ -240,7 +252,41 @@ export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, 
     for (let i = 0; i + 1 < frames.length; i++) {
       const [mx, mz] = [(frames[i].p[0] + frames[i + 1].p[0]) / 2, (frames[i].p[1] + frames[i + 1].p[1]) / 2];
       if (!near(mx, mz, half)) continue;
-      if (withSurface) surface.poly([P(i, half, ROAD_Y), P(i + 1, half, ROAD_Y), P(i + 1, -half, ROAD_Y), P(i, -half, ROAD_Y)], up);
+      const lane = withSurface ? (worn?.(ri) ?? 0) : 0;
+      if (withSurface && !lane) surface.poly([P(i, half, ROAD_Y), P(i + 1, half, ROAD_Y), P(i + 1, -half, ROAD_Y), P(i, -half, ROAD_Y)], up);
+      if (lane) {
+        // Worn asphalt: rows 4 m along, toned across where wheels run and where they don't.
+        const [a, b] = [frames[i], frames[i + 1]];
+        const at = (t: number, off: number, y: number): V3 => {
+          // (Across as the sidewalks are laid, `Q` below: the wear keeps its distance from the kerbs round a bend.)
+          const [nx, nz] = [a.n[0] + (b.n[0] - a.n[0]) * t, a.n[1] + (b.n[1] - a.n[1]) * t];
+          const l = Math.abs(off) < half - 1e-6 ? Math.hypot(nx, nz) || 1 : 1;
+          return [a.p[0] + (b.p[0] - a.p[0]) * t + (nx / l) * off, y, a.p[1] + (b.p[1] - a.p[1]) * t + (nz / l) * off];
+        };
+        const band = carriageway(lane);
+        const offs = [-half, ...band.at, half].filter((o, k, list) => k === 0 || o - list[k - 1] > 0.05);
+        const rows = Math.max(1, Math.round((b.s - a.s) / 4));
+        const k0 = Math.round(a.s / 4);
+        const toneAt = (t: number, off: number): V3 => {
+          const [x, , z] = at(t, off, 0);
+          return tint(band.tone(off) * asphaltVary(x, z));
+        };
+        for (let k = 0; k < rows; k++) {
+          const [t0, t1] = [k / rows, (k + 1) / rows];
+          for (let o = 0; o + 1 < offs.length; o++) {
+            const c: [number, number][] = [[t0, offs[o + 1]], [t1, offs[o + 1]], [t1, offs[o]], [t0, offs[o]]];
+            surface.poly(c.map(([t, off]) => at(t, off, ROAD_Y)), up, undefined, undefined, c.map(([t, off]) => toneAt(t, off)));
+          }
+          // A repair: a patch of newer asphalt, a hair over the road.
+          const fix = repair(ri, k0 + k);
+          if (fix) {
+            const [o0, o1] = [(fix.across - fix.wide) * lane, (fix.across + fix.wide) * lane];
+            const [u0, u1] = [t0 + (t1 - t0) * fix.from, t0 + (t1 - t0) * Math.min(1, fix.from + fix.long)];
+            const shade = tint(fix.tone);
+            surface.poly([at(u0, o1, ROAD_Y + 0.002), at(u1, o1, ROAD_Y + 0.002), at(u1, o0, ROAD_Y + 0.002), at(u0, o0, ROAD_Y + 0.002)], up, undefined, undefined, [shade, shade, shade, shade]);
+          }
+        }
+      }
       for (const side of withSidewalks ? ([1, -1] as const) : []) {
         // Offsets from the middle: the sidewalk's outer edge, the kerb's top, the road's edge, the gutter.
         const [edge, walkIn, kerb, gutter] = [half, half - (SIDEWALK - KERB), half - SIDEWALK, half - SIDEWALK - 0.4].map((o) => o * side);
@@ -294,18 +340,31 @@ export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, 
         // The quad between two offsets over `t0`..`t1` (`alpha`: the shade's at the first, fading to none at the second).
         const strip = (g: Geo, t0: number, t1: number, a: number, ya: number, b: number, yb: number, n: V3, alpha?: number) =>
           g.poly([Q(t0, a, ya), Q(t1, a, ya), Q(t1, b, yb), Q(t0, b, yb)], n, undefined, alpha === undefined ? undefined : [alpha, alpha, 0, 0]);
+        const LK = STREET_LOOK;
+        // The course of kerb stones at the walk's back, by the lots (m wide).
+        const back = edge - BACK_COURSE * side;
+        const segLen = frames[i + 1].s - frames[i].s;
         for (const [t0, t1] of runs) {
-          walk.color('#E6E6E6');
-          strip(walk, t0, t1, edge, WALK_Y, walkIn, WALK_Y, up);
-          walk.color('#FFFFFF');
+          // The slabs, lighter and darker along the walk (a piece every 3 m or so).
+          const pieces = Math.max(1, Math.round(((t1 - t0) * segLen) / 3));
+          const slab = (t: number, off: number): V3 => {
+            const [x, , z] = Q(t, off, 0);
+            return tint(1 - LK.walkVary + (valueNoise(x / 2.9, z / 2.9, 911) - 0.5) * 2 * LK.walkVary);
+          };
+          walk.color(LK.walk);
+          for (let k = 0; k < pieces; k++) {
+            const [u0, u1] = [t0 + ((t1 - t0) * k) / pieces, t0 + ((t1 - t0) * (k + 1)) / pieces];
+            walk.poly([Q(u0, back, WALK_Y), Q(u1, back, WALK_Y), Q(u1, walkIn, WALK_Y), Q(u0, walkIn, WALK_Y)], up, undefined, undefined, [slab(u0, back), slab(u1, back), slab(u1, walkIn), slab(u0, walkIn)]);
+          }
+          walk.color(LK.kerb);
+          strip(walk, t0, t1, edge, WALK_Y, back, WALK_Y, up);
           strip(walk, t0, t1, walkIn, KERB_Y, kerb, KERB_Y, up);
           // Kerb faces: the step up from the walk and the drop to the road; the walk's own edge.
           strip(walk, t0, t1, walkIn, WALK_Y, walkIn, KERB_Y, out);
           strip(walk, t0, t1, kerb, KERB_Y, kerb, ROAD_Y, inward);
-          walk.color('#E6E6E6');
           strip(walk, t0, t1, edge, WALK_Y, edge, 0, out);
           // Gutter: the road darkens along the kerb.
-          strip(shadows, t0, t1, kerb, ROAD_Y + 0.003, gutter, ROAD_Y + 0.003, up, 0.3);
+          strip(shadows, t0, t1, kerb, ROAD_Y + 0.003, gutter, ROAD_Y + 0.003, up, LK.gutterShade);
         }
       }
     }
@@ -324,12 +383,14 @@ export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, 
         if (!withSidewalks || inLane(ex + Math.cos(am) * (r + SIDEWALK / 2), ez + Math.sin(am) * (r + SIDEWALK / 2))) continue;
         const [edge, walkIn, kerb] = [r + SIDEWALK, r + KERB, r];
         const radial: V3 = [Math.cos(am), 0, Math.sin(am)];
-        walk.color('#E6E6E6').poly([at(a0, walkIn, WALK_Y), at(a0, edge, WALK_Y), at(a1, edge, WALK_Y), at(a1, walkIn, WALK_Y)], up);
-        walk.color('#FFFFFF').poly([at(a0, kerb, KERB_Y), at(a0, walkIn, KERB_Y), at(a1, walkIn, KERB_Y), at(a1, kerb, KERB_Y)], up);
+        const LK = STREET_LOOK;
+        walk.color(LK.walk).poly([at(a0, walkIn, WALK_Y), at(a0, edge - BACK_COURSE, WALK_Y), at(a1, edge - BACK_COURSE, WALK_Y), at(a1, walkIn, WALK_Y)], up);
+        walk.color(LK.kerb).poly([at(a0, edge - BACK_COURSE, WALK_Y), at(a0, edge, WALK_Y), at(a1, edge, WALK_Y), at(a1, edge - BACK_COURSE, WALK_Y)], up);
+        walk.poly([at(a0, kerb, KERB_Y), at(a0, walkIn, KERB_Y), at(a1, walkIn, KERB_Y), at(a1, kerb, KERB_Y)], up);
         walk.poly([at(a0, kerb, ROAD_Y), at(a0, kerb, KERB_Y), at(a1, kerb, KERB_Y), at(a1, kerb, ROAD_Y)], [-radial[0], 0, -radial[2]]);
         walk.poly([at(a0, walkIn, KERB_Y), at(a0, walkIn, WALK_Y), at(a1, walkIn, WALK_Y), at(a1, walkIn, KERB_Y)], radial);
-        walk.color('#E6E6E6').poly([at(a0, edge, 0), at(a1, edge, 0), at(a1, edge, WALK_Y), at(a0, edge, WALK_Y)], radial);
-        shadows.poly([at(a0, kerb, ROAD_Y + 0.003), at(a1, kerb, ROAD_Y + 0.003), at(a1, kerb - 0.4, ROAD_Y + 0.003), at(a0, kerb - 0.4, ROAD_Y + 0.003)], up, undefined, [0.3, 0.3, 0, 0]);
+        walk.poly([at(a0, edge, 0), at(a1, edge, 0), at(a1, edge, WALK_Y), at(a0, edge, WALK_Y)], radial);
+        shadows.poly([at(a0, kerb, ROAD_Y + 0.003), at(a1, kerb, ROAD_Y + 0.003), at(a1, kerb - 0.4, ROAD_Y + 0.003), at(a0, kerb - 0.4, ROAD_Y + 0.003)], up, undefined, [LK.gutterShade, LK.gutterShade, 0, 0]);
       }
     }
   });

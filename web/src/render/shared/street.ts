@@ -53,6 +53,7 @@ import { placementVariation, type StandIn } from './modelEntry';
 import { writeFences } from './fences';
 import { shownFences } from './shownFences';
 import { centroid } from '../../game/roads';
+import { pavedRects } from './paving';
 import { Kerb, KERB, roadIndex, roadMeshes, SIDEWALK, townRoads, WALK_Y, type RoadIndex } from './roads';
 
 /** Vertex-colour alpha for the plain finish, as the material libraries' `encodeFinish`: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. */
@@ -397,6 +398,8 @@ export interface GroundLayer {
   name: string;
   material: string;
   geo: Geo;
+  /** Toned by vertex (`paving.ts`: worn asphalt, paving darker at its sides): drawn with its vertex colours. */
+  toned?: boolean;
 }
 
 /** One stream chunk of the street (`shared/chunks.ts`), as planned for a focus lot: what `StreetPlan` holds, for its square. */
@@ -1429,7 +1432,8 @@ export class TownStreet {
     const shadows = new RoutedGeo((x, z) => at(x, z).parts.shadows).color('#000000');
     roadMeshes(this.roads, null, 0, { walk, shadows }, 'sidewalks');
     if (this.options.ground) {
-      roadMeshes([...this.roads, ...this.ways.country], null, 0, { surface: new RoutedGeo((x, z) => at(x, z).road) }, 'surface');
+      // (The town's streets worn and patched; a big world's country roads plain, as they are from afar.)
+      roadMeshes([...this.roads, ...this.ways.country], null, 0, { surface: new RoutedGeo((x, z) => at(x, z).road) }, 'surface', (ri) => (ri < this.roads.length ? this.roads[ri].width / 2 - SIDEWALK : 0));
       roadMeshes(this.ways.trail, null, 0, { surface: new RoutedGeo((x, z) => at(x, z).trail) }, 'surface');
     }
     // A fountain in the middle of every roundabout, flowers round it.
@@ -1512,15 +1516,17 @@ export class TownStreet {
       const onLot = (r: Rect) => !!F && r.x >= F.x && r.z >= F.z && r.x + r.w <= F.x + F.w && r.z + r.d <= F.z + F.d;
       const mine = (r: Rect) => chunkAt(r.x + r.w / 2, r.z + r.d / 2) === id && !onLot(r);
       const road = this.staticParts().get(id)?.road;
-      if (road && !road.empty) ground.push({ name: 'streets', material: 'material.road', geo: road });
+      if (road && !road.empty) ground.push({ name: 'streets', material: 'material.road', geo: road, toned: true });
       const trail = this.staticParts().get(id)?.trail;
       if (trail && !trail.empty) ground.push({ name: 'trails', material: 'material.path', geo: trail });
       for (const [name, all, material, y] of this.groundRects()) {
         const list = all.filter(mine);
         if (!list.length) continue;
         const geo = new Geo();
-        for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-        ground.push({ name, material, geo });
+        const toned = name === 'paths';
+        if (toned) pavedRects(geo, list, all, y);
+        else for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+        ground.push({ name, material, geo, toned });
         keys.push(`${name}:${list.length}:${hashNumbers(list.flatMap((r) => [r.x, r.z, r.w, r.d]))}`);
       }
     }
@@ -1564,7 +1570,7 @@ class RoutedGeo extends Geo {
   constructor(private readonly target: (x: number, z: number) => Geo) {
     super();
   }
-  override poly(points: readonly V3[], n: V3, uvs?: readonly (readonly [number, number])[], alphas?: readonly number[]): this {
+  override poly(points: readonly V3[], n: V3, uvs?: readonly (readonly [number, number])[], alphas?: readonly number[], tints?: readonly V3[]): this {
     let x = 0;
     let z = 0;
     for (const p of points) {
@@ -1579,7 +1585,7 @@ class RoutedGeo extends Geo {
     g.kind = this.kind;
     g.maskA = this.maskA;
     g.maskB = this.maskB;
-    g.poly(points, n, uvs, alphas);
+    g.poly(points, n, uvs, alphas, tints);
     return this;
   }
 }

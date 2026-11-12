@@ -78,6 +78,7 @@ import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
 import { PLAYBACK_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
+import { pavedRects } from '../shared/paving';
 import { GrassPush } from '../shared/grass';
 import { idleMoment } from '../shared/idle';
 import { coveringSurface, houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
@@ -1562,9 +1563,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const list = all?.filter(onLot) ?? [];
       if (!list.length) continue;
       const geo = new Geo();
-      for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-      const mesh = meshFrom(this.device, geo.meshData());
-      if (mesh) this.lotEntities.push({ entity: drawMesh(this.root, name, mesh, this.lotMaterial(material)), storey: 0 });
+      // Paving toned by vertex (darker and mossy at its sides: `shared/paving.ts`), as the street's.
+      const toned = name === 'paths';
+      if (toned) pavedRects(geo, list, all ?? list, y);
+      else for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+      const mesh = meshFrom(this.device, geo.meshData({ colors: toned }));
+      if (mesh) this.lotEntities.push({ entity: drawMesh(this.root, name, mesh, toned ? this.lib.surface(material, { doubleSided: true, vertexColors: true }) : this.lotMaterial(material)), storey: 0 });
     }
   }
 
