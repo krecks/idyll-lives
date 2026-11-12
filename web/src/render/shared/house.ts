@@ -1117,7 +1117,14 @@ export class HousePlanner {
           const ahead = (into: number) => !!(axis === 'h' ? edges.get('h', x, z + into) : edges.get('v', x + into, z));
           // What a leaf swinging to the side `into` keeps clear of (none: no diagonal in front).
           const slant = (into: number) => obstaclesAt(...tileInFront(axis, x, z, into));
-          const geos = { wood: doorWood, glass, swing, ahead, slant, pocket: (end: -1 | 1) => pocket(axis, x, z, run, end), flip: flipped(axis, x, z, run) };
+          // A wall or a window's wall standing on the door's end node, on the side `side` of the door's wall.
+          const meets = (end: 0 | 1, side: -1 | 1): boolean => {
+            const [cx, cz] = axis === 'h' ? [x + end, side < 0 ? z - 1 : z] : [side < 0 ? x - 1 : x, z + end];
+            const cross = axis === 'h' ? 'v' : 'h';
+            const kind = edges.get(cross, cx, cz);
+            return (kind === 'wall' || kind === 'window') && heightOf(cross, cx, cz) > HALF_WALL_HEIGHT;
+          };
+          const geos = { wood: doorWood, glass, swing, ahead, slant, pocket: (end: -1 | 1) => pocket(axis, x, z, run, end), flip: flipped(axis, x, z, run), meets };
           this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, geos, lookOf(axis, x, z).style, head, run);
         }
       }
@@ -1332,8 +1339,14 @@ export class HousePlanner {
           const plane = sign * T;
           const out = (o: number): [number, number] => (sign > 0 ? [plane, plane + o] : [plane - o, plane]);
           trim.cutting(Cut.Clamp, mask);
-          f.box(trim, o0 - 0.1, o0 + 0.01, 0, DOOR_HEIGHT + 0.1, ...out(0.022));
-          f.box(trim, o1 - 0.01, o1 + 0.1, 0, DOOR_HEIGHT + 0.1, ...out(0.022));
+          // (Their tops, which only a cut shows, in the cut wall's tone: `cutBoard`.)
+          for (const [b0, b1] of [[o0 - 0.1, o0 + 0.01], [o1 - 0.01, o1 + 0.1]]) {
+            const [d0, d1] = out(0.022);
+            const y1 = DOOR_HEIGHT + 0.1;
+            f.box(trim, b0, b1, 0, y1, d0, d1, 'py');
+            trim.color(HOUSE_LOOK.cap).poly([f.at(b0, y1, d0), f.at(b1, y1, d0), f.at(b1, y1, d1), f.at(b0, y1, d1)], [0, 1, 0]);
+            trim.color(TRIM);
+          }
           trim.cutting(Cut.Hide, mask);
           f.box(trim, o0 - 0.1, o1 + 0.1, DOOR_HEIGHT, DOOR_HEIGHT + 0.12, ...out(0.024));
         }
@@ -2033,22 +2046,28 @@ export class HousePlanner {
       slant?: (into: number) => readonly Obstacle[] | undefined;
       pocket?: (end: -1 | 1) => number | undefined;
       flip?: boolean;
+      /** Whether a full-height wall stands on the door's end node (0 its first, 1 its second) on the side `side` of its wall. */
+      meets?: (end: 0 | 1, side: -1 | 1) => boolean;
     },
     style: number | undefined,
     head = DOOR_HEIGHT,
     run: Run = { start: axis === 'h' ? x : z, len: 1, index: 0 },
   ): void {
     // Casings on both faces: two side boards (clamped to stubs when cut) and a head (hidden). A
-    // double door has its side boards at its two ends only, its head board right across.
+    // double door has its side boards at its two ends only, its head board right across. A side
+    // board lies over its post, 0.1 m back from the jamb; where a wall meets the door's wall there
+    // it would lie inside that wall, and on its cut top once the walls are down (two white ticks on
+    // the grey): there it starts at that wall's face.
     const [first, last] = [run.index === 0, run.index === run.len - 1];
     const base = axis === 'h' ? x : z;
     for (const n of axis === 'h' ? ([[0, 0, -1], [0, 0, 1]] as V3[]) : ([[-1, 0, 0], [1, 0, 0]] as V3[])) {
       const plane = axis === 'h' ? z + n[2] * T : x + n[0] * T;
       const a0 = base + T;
       const a1 = base + 1 - T;
+      const side = (axis === 'h' ? n[2] : n[0]) < 0 ? -1 : 1;
       trim.cutting(Cut.Clamp, mask);
-      if (first) trim.box(...span(axis, plane, n, a0 - 0.1, a0 + 0.01, 0, head + 0.1, 0.022));
-      if (last) trim.box(...span(axis, plane, n, a1 - 0.01, a1 + 0.1, 0, head + 0.1, 0.022));
+      if (first) cutBoard(trim, span(axis, plane, n, a0 - (geos.meets?.(0, side) ? 0 : 0.1), a0 + 0.01, 0, head + 0.1, 0.022));
+      if (last) cutBoard(trim, span(axis, plane, n, a1 - 0.01, a1 + (geos.meets?.(1, side) ? 0 : 0.1), 0, head + 0.1, 0.022));
       trim.cutting(Cut.Hide, mask);
       trim.box(...span(axis, plane, n, first ? a0 - 0.1 : base, last ? a1 + 0.1 : base + 1, head, head + 0.12, 0.024));
     }
@@ -2286,9 +2305,22 @@ export class HousePlanner {
     trim.cutting(Cut.Clamp, LOOK.All, LOOK.All);
     trim.color(TRIM);
     // Board on the face whose normal is along x, and one on the face along z.
-    trim.box(Math.min(xa, xa + sx * d), PLINTH, Math.min(za + sz * 0.001, za - sz * w), Math.max(xa, xa + sx * d), WALL_HEIGHT - 0.2, Math.max(za + sz * 0.001, za - sz * w));
-    trim.box(Math.min(xa + sx * d, xa - sx * w), PLINTH, Math.min(za, za + sz * d), Math.max(xa + sx * d, xa - sx * w), WALL_HEIGHT - 0.2, Math.max(za, za + sz * d));
+    cutBoard(trim, [Math.min(xa, xa + sx * d), PLINTH, Math.min(za + sz * 0.001, za - sz * w), Math.max(xa, xa + sx * d), WALL_HEIGHT - 0.2, Math.max(za + sz * 0.001, za - sz * w)]);
+    cutBoard(trim, [Math.min(xa + sx * d, xa - sx * w), PLINTH, Math.min(za, za + sz * d), Math.max(xa + sx * d, xa - sx * w), WALL_HEIGHT - 0.2, Math.max(za, za + sz * d)]);
   }
+}
+
+/**
+ * A trim board that drops to a stub with its wall (`Cut.Clamp`: a door's side casing, a corner board). Its top
+ * shows only then (standing, the casing's head or the frieze lies on it), so it is in the cut wall's tone
+ * (`HOUSE_LOOK.cap`), as the wall's own top is, not a white dash beside it.
+ */
+function cutBoard(trim: Geo, box: [number, number, number, number, number, number]): void {
+  const [x0, , z0, x1, y1, z1] = box;
+  const { r, g, b, a } = trim;
+  trim.box(...box, 'py');
+  trim.color(HOUSE_LOOK.cap).poly([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [0, 1, 0]);
+  [trim.r, trim.g, trim.b, trim.a] = [r, g, b, a];
 }
 
 /**
