@@ -45,7 +45,7 @@ import { addedObjects, BuildBuyInput, editFeedback, liveAdded, placeEffect, type
 import { ownSize } from './surfaces';
 import { colorValues } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
-import { householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
+import { faceFromId, householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { clockTime, openAt, staffed, staffResidents } from './staff';
 import { PointerInput, routeKey } from './input';
 import { useTownContent, type NeighbourhoodDraft } from './town';
@@ -1205,7 +1205,11 @@ async function openSession(
       for (const s of todo.keys()) {
         const { seed, parents, voice } = (s.appearance as Seeded) ?? { seed: nameSeed(s.id, s.name) };
         if (typeof seed !== 'number' || Boolean(parents?.length) !== pass) continue;
-        const from = (parents ?? []).map((p) => bases.get(p) ?? w.sims[p]?.appearance).filter((a) => a && (a as Seeded)?.seed === undefined);
+        // (A parent whose look has no face of its own, an older save's, passes on the one it is drawn with.)
+        const from = (parents ?? [])
+          .map((p) => [p, bases.get(p) ?? w.sims[p]?.appearance] as const)
+          .filter(([, a]) => a && (a as Seeded)?.seed === undefined)
+          .map(([p, a]) => (a.face ? a : { ...a, face: faceFromId(p) }));
         s.appearance = lookFromSeed(assets, s.gender, seed, from);
         // Only the look comes from the seed: a voice stored with it is kept.
         if (voice) s.appearance.voice = voice;

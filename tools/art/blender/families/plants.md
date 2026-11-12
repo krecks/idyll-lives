@@ -111,6 +111,8 @@ bush stands in the woods (`nature.ts` `natureDecor`, thin instances), so they co
 The lot dressing's other two old parts, `model.bush.small` (also in the woods) and `model.bush.flowering`, and
 the streets' and hedged lots' `model.hedge` are built here too (`bushSmall`, `bushFlowering`, `streetHedge`: the
 shrub, the shrub with pink blossom, the garden hedge's block without its sprigs), each one draw call on `foliage`.
+The hedge's block (`hedge_block`) is in soft mounds since 2026-11-12 (a second, wider `G.jitter`, 7.5 cm over half a
+metre): from the play camera, above, its top was a ruled strip; the triangles, the size and the draw are the same.
 
 - **Shrubs** (`shrub`): a dark core lump and clumps round it, lighter on top; flowers (`dots`) spread over the upper
   part of an ellipsoid round the crown.

@@ -661,7 +661,7 @@ export class Street {
     out.set('streetLightPools', { material: () => this.poolMat, colors: false, cast: false, receive: false, alphaIndex: 5 });
     out.set('streetShadows', { material: () => this.lib.contactShadow(false), colors: true, cast: false, receive: true });
     // The ground layers as the lot draws its own: double-sided, in the house's lamps' light.
-    for (const g of plan.ground) out.set(g.name, { material: () => (g.paint ? this.lib.roadPaint() : this.lib.surface(g.material, { doubleSided: true })), colors: !!g.paint, cast: false, receive: true, lit: true });
+    for (const g of plan.ground) out.set(g.name, { material: () => (g.paint ? this.lib.roadPaint() : this.lib.surface(g.material, { doubleSided: true, vertexColors: !!g.toned })), colors: !!g.paint || !!g.toned, cast: false, receive: true, lit: true });
     return out;
   }
 
@@ -938,7 +938,7 @@ function chunkData(plan: ChunkPlan): Map<string, MeshData> {
   put('streetLamps', plan.glow, false);
   put('streetLightPools', plan.pools, false);
   put('streetShadows', plan.shadows, true);
-  for (const g of plan.ground) put(g.name, g.geo, !!g.paint);
+  for (const g of plan.ground) put(g.name, g.geo, !!g.paint || !!g.toned);
   return out;
 }
 

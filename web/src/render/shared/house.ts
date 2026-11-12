@@ -38,6 +38,8 @@ import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalW
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
 import { roadIndex, townRoads } from './roads';
+import { tuned } from '../tune';
+import { smoothstep, valueNoise } from '../../game/noise';
 import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
 import { WALL_HALF, WALL_HEIGHT } from './walls';
 
@@ -203,6 +205,59 @@ const ACCENT = ['#3E5A4A', '#2F4058', '#7A3B34', '#4A4A4A', '#5B6E86', '#6E5A3E'
 const LOUD = ['#E8457A', '#F2B51D', '#3FA7D6', '#7BC950', '#9B5DE5', '#FF7A3D'];
 const ROOF = ['#5C626A', '#6B4A3A', '#8C4E3C', '#4F5A4C', '#3E4148', '#7A6A5A'];
 const TRIM = '#F7F5F0';
+/**
+ * How the house is toned (`?tune=house.…` on the dev server). `cap`: the top of a wall, which is what a
+ * cut wall shows of itself from the play camera: the wall's own section, a mid tone, where the trim's
+ * off-white made every room's outline the brightest thing in the picture.
+ */
+export const HOUSE_LOOK = tuned('house', {
+  cap: '#8D877E',
+  /**
+   * A floor's tone over its room, by vertex (no texture, no read): `floorWall` darker at the foot of a wall
+   * (of the light it reflects), fading over `floorReach` m; `floorMid` the tone out in the room; lighter again,
+   * up to the covering's own colour, by `floorWear` within `floorWearReach` m of a door, where feet wear it
+   * pale; `floorVary` lighter and darker in patches a few metres across; and `floorWarm` warmer the darker it is.
+   */
+  floorWall: 0.34,
+  floorReach: 1.6,
+  floorMid: 0.95,
+  floorWear: 1,
+  floorWearReach: 1.7,
+  floorVary: 0.07,
+  floorWarm: 0.2,
+  /**
+   * A wall face's tone, by vertex: `wallFoot` darker at the floor, fading over `wallFootReach` m up it;
+   * `wallCorner` darker into a room's corner, over `wallCornerReach` m along it; `wallVary` in patches.
+   */
+  wallFoot: 0.24,
+  wallFootReach: 1.3,
+  wallCorner: 0.28,
+  wallCornerReach: 0.9,
+  wallVary: 0.06,
+  /**
+   * The cap shingles of a roof's ridge and hips against its slopes (the colour's multiplier, sRGB). A little
+   * darker only: they stand proud of the slopes, which shades them by day. A fifth darker (0.8), by night and
+   * at dusk, when the slopes either side are one tone, a hip's cap was a hard dark stripe across the roof.
+   */
+  roofCap: 0.95,
+});
+
+/**
+ * A tone (a share of the light reflected, linear) as the vertex colour's multiplier (sRGB). `warm`: the
+ * darker it is the warmer (`HOUSE_LOOK.floorWarm`), as a floor's shade at a wall is lit by the floor beside it.
+ */
+function toneTint(lin: number, warm = 0): V3 {
+  const l = Math.min(1, Math.max(0, lin));
+  const v = (k: number) => Math.pow(l, k / 2.2);
+  return [v(1 - warm), v(1), v(1 + warm * 1.3)];
+}
+
+/** The distance from `(px, pz)` to the segment `a`..`b`. */
+function segmentDistance(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+  const [dx, dz] = [bx - ax, bz - az];
+  const t = Math.min(1, Math.max(0, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz || 1)));
+  return Math.hypot(px - ax - dx * t, pz - az - dz * t);
+}
 const ROOM_WALLS: Record<RoomKind, string[]> = {
   living: ['#EFE3D3', '#E6DECF', '#EAE2D8', '#DCE3E6'],
   bedroom: ['#D8E2D0', '#DCD6E6', '#E6D4C8', '#D2DDE8'],
@@ -870,12 +925,46 @@ export class HousePlanner {
     };
 
     /**
+     * An indoor wall face's tone at height `y`, `corner` m along it from the room's nearest corner, at
+     * `(wx, wz)`: darker at the floor and into a corner, as less light reaches it there, and a little
+     * lighter and darker in patches, so a wall isn't one flat tone from end to end (`HOUSE_LOOK`).
+     */
+    const wallTone = (y: number, corner: number, wx: number, wz: number): V3 => {
+      const L = HOUSE_LOOK;
+      const foot = 1 - smoothstep(0, L.wallFootReach, y);
+      const into = 1 - smoothstep(0, L.wallCornerReach, corner);
+      const vary = (valueNoise(wx / 2.3 + y / 1.9, wz / 2.3 - y / 1.9, 613) - 0.5) * 2 * L.wallVary;
+      return toneTint((1 - L.wallFoot * foot) * (1 - L.wallCorner * into) * (1 - L.wallVary + vary));
+    };
+    /**
+     * A wall face `a0`..`a1` along, `y0`..`y1` high, toned by `tone` at its vertices: in rows up the wall
+     * (and two columns where a corner is near), so the tone runs smoothly over it.
+     */
+    const tonedFace = (g: Geo, P: (a: number, y: number) => V3, a0: number, a1: number, y0: number, y1: number, n: V3, tone: (a: number, y: number) => V3, split: boolean, uv?: (p: V3) => [number, number]) => {
+      const ys = [y0, ...[WALL_STUB, 0.8, 1.4].filter((y) => y > y0 + 0.01 && y < y1 - 0.01), y1];
+      const as = split && a1 - a0 > 0.3 ? [a0, (a0 + a1) / 2, a1] : [a0, a1];
+      for (let j = 0; j + 1 < ys.length; j++) {
+        for (let i = 0; i + 1 < as.length; i++) {
+          const c: [number, number][] = [[as[i], ys[j]], [as[i + 1], ys[j]], [as[i + 1], ys[j + 1]], [as[i], ys[j + 1]]];
+          const pts = c.map(([a, y]) => P(a, y));
+          g.poly(pts, n, uv && pts.map(uv), undefined, c.map(([a, y]) => tone(a, y)));
+        }
+      }
+    };
+
+    /**
      * One wall face (a rectangle on the plane of a wall side) from `a0` to `a1` along the
      * wall, `y0` to `y1` high. `n` is the outward normal; `r` the room that face looks into;
      * `key` names it in `surfaces`.
      */
     const face = (axis: 'h' | 'v', plane: number, a0: number, a1: number, y0: number, y1: number, n: V3, r: number, cover = 0, key?: string) => {
       const P = (a: number, y: number): V3 => (axis === 'h' ? [a, y, plane] : [plane, y, a]);
+      // The room's corners along this face: the nodes either end of its tile where a wall meets it on the room's side.
+      const k0 = Math.floor((a0 + a1) / 2 + 1e-6);
+      const meets = (k: number) => (axis === 'h' ? edges.get('v', k, Math.round(n[2] < 0 ? plane + T - 1 : plane - T)) : edges.get('h', Math.round(n[0] < 0 ? plane + T - 1 : plane - T), k)) !== undefined;
+      const corners = [k0, k0 + 1].filter(meets);
+      const tone = (a: number, y: number) => wallTone(y, corners.length ? Math.min(...corners.map((k) => Math.abs(a - k))) : 9, axis === 'h' ? a : plane, axis === 'h' ? plane : a);
+      const wall = (g: Geo, ya: number, yb: number) => tonedFace(g, P, a0, a1, ya, yb, n, tone, corners.length > 0);
       const own = coverGeo(cover);
       const mark = (y0: number, y1: number) => {
         const S = (a: number, y: number): V3 => (axis === 'h' ? [a, y, plane + n[2] * PROUD] : [plane + n[0] * PROUD, y, a]);
@@ -900,27 +989,39 @@ export class HousePlanner {
         if (y1 >= H - 0.01) {
           const k = trim.kind;
           trim.kind = Cut.Hide;
-          trim.box(...span(axis, plane, n, a0, a1, H - 0.2, H, 0.025));
+          // (No higher than the face: a post's face towards a wall it joins stops a hair under that wall's top, and
+          // its frieze, at the wall's full height, lay in the top's own plane and showed through it as light ticks.)
+          trim.box(...span(axis, plane, n, a0, a1, H - 0.2, Math.min(H, y1), 0.025));
           trim.kind = k;
         }
         if (y0 < 0.01) ao.poly([Q(a0, 0.012, 0), Q(a1, 0.012, 0), Q(a1, 0.012, 0.45), Q(a0, 0.012, 0.45)], [0, 1, 0], undefined, [0.32, 0.32, 0, 0]);
         return;
       }
       mark(y0, y1);
-      if (own) own.poly([P(a0, y0), P(a1, y0), P(a1, y1), P(a0, y1)], n);
+      if (own) wall(own, y0, y1);
       else {
         const tint = roomWall(r);
         const bath = kinds.get(r) === 'bath';
         // Bathrooms are tiled up to 1.25 m (only the part of this face below that).
         const split = bath ? Math.min(Math.max(1.25, y0), y1) : y0;
-        if (split > y0) wainscot.color('#F4F4F2').poly([P(a0, y0), P(a1, y0), P(a1, split), P(a0, split)], n);
-        if (y1 > split) int.color(tint).poly([P(a0, split), P(a1, split), P(a1, y1), P(a0, y1)], n);
+        if (split > y0) wall(wainscot.color('#F4F4F2'), y0, split);
+        if (y1 > split) wall(int.color(tint), split, y1);
       }
       if (y0 < 0.01) {
         trim.box(...span(axis, plane, n, a0, a1, 0, 0.1, 0.014));
         const Q = (a: number, d: number): V3 => (axis === 'h' ? [a, 0.013, plane + n[2] * d] : [plane + n[0] * d, 0.013, a]);
         ao.poly([Q(a0, 0.014), Q(a1, 0.014), Q(a1, 0.34), Q(a0, 0.34)], [0, 1, 0], undefined, [0.3, 0.3, 0, 0]);
       }
+    };
+
+    /**
+     * A wall's top, drawn by `draw` in the cut wall's tone (`HOUSE_LOOK.cap`). A half wall's is a ledge,
+     * finished as the trim is.
+     */
+    const capped = (y: number, draw: () => void) => {
+      if (Math.abs(y - HALF_WALL_HEIGHT) > 0.01) trim.color(HOUSE_LOOK.cap);
+      draw();
+      trim.color(TRIM);
     };
 
     /**
@@ -936,11 +1037,11 @@ export class HousePlanner {
       if (axis === 'h') {
         face('h', z - T, a0, a1, y0, y1, [0, 0, -1], roomP(x + 0.5, z - 0.25), c0, `h:${x}:${z}:0`);
         face('h', z + T, a0, a1, y0, y1, [0, 0, 1], roomP(x + 0.5, z + 0.25), c1, `h:${x}:${z}:1`);
-        if (cap) trim.box(a0, y1 - 0.001, z - T, a1, y1, z + T, 'ny nx px nz pz');
+        if (cap) capped(y1, () => trim.box(a0, y1 - 0.001, z - T, a1, y1, z + T, 'ny nx px nz pz'));
       } else {
         face('v', x - T, a0, a1, y0, y1, [-1, 0, 0], roomP(x - 0.25, z + 0.5), c0, `v:${x}:${z}:0`);
         face('v', x + T, a0, a1, y0, y1, [1, 0, 0], roomP(x + 0.25, z + 0.5), c1, `v:${x}:${z}:1`);
-        if (cap) trim.box(x - T, y1 - 0.001, a0, x + T, y1, a1, 'ny nx px nz pz');
+        if (cap) capped(y1, () => trim.box(x - T, y1 - 0.001, a0, x + T, y1, a1, 'ny nx px nz pz'));
       }
     };
 
@@ -966,7 +1067,8 @@ export class HousePlanner {
       if (first) trim.poly([P(g0, sill, -T), P(g0, sill, T), P(g0, head, T), P(g0, head, -T)], na);
       if (last) trim.poly([P(g1, sill, -T), P(g1, head, -T), P(g1, head, T), P(g1, sill, T)], [-na[0], 0, -na[2]]);
       trim.poly([P(g0, head, -T), P(g0, head, T), P(g1, head, T), P(g1, head, -T)], [0, -1, 0]);
-      trim.poly([P(g0, sill, -T), P(g1, sill, -T), P(g1, sill, T), P(g0, sill, T)], [0, 1, 0]);
+      // (A hair over the wall's top below it, which is in the cut wall's tone: gone with the window when the wall is cut.)
+      trim.poly([P(g0, sill + 0.002, -T), P(g1, sill + 0.002, -T), P(g1, sill + 0.002, T), P(g0, sill + 0.002, T)], [0, 1, 0]);
     };
 
     /**
@@ -1075,7 +1177,14 @@ export class HousePlanner {
           const ahead = (into: number) => !!(axis === 'h' ? edges.get('h', x, z + into) : edges.get('v', x + into, z));
           // What a leaf swinging to the side `into` keeps clear of (none: no diagonal in front).
           const slant = (into: number) => obstaclesAt(...tileInFront(axis, x, z, into));
-          const geos = { wood: doorWood, glass, swing, ahead, slant, pocket: (end: -1 | 1) => pocket(axis, x, z, run, end), flip: flipped(axis, x, z, run) };
+          // A wall or a window's wall standing on the door's end node, on the side `side` of the door's wall.
+          const meets = (end: 0 | 1, side: -1 | 1): boolean => {
+            const [cx, cz] = axis === 'h' ? [x + end, side < 0 ? z - 1 : z] : [side < 0 ? x - 1 : x, z + end];
+            const cross = axis === 'h' ? 'v' : 'h';
+            const kind = edges.get(cross, cx, cz);
+            return (kind === 'wall' || kind === 'window') && heightOf(cross, cx, cz) > HALF_WALL_HEIGHT;
+          };
+          const geos = { wood: doorWood, glass, swing, ahead, slant, pocket: (end: -1 | 1) => pocket(axis, x, z, run, end), flip: flipped(axis, x, z, run), meets };
           this.doorway(axis, x, z, edgeMask(axis, x, z), trim, roomP, scheme, geos, lookOf(axis, x, z).style, head, run);
         }
       }
@@ -1103,7 +1212,7 @@ export class HousePlanner {
         for (const g of wallGeos) g.cutting(Cut.Clamp, maskH, maskV);
         // As tall as the tallest wall it joins (a run of half walls has half posts).
         const top = Math.max(heightOf('h', x - 1, z), heightOf('h', x, z), heightOf('v', x, z - 1), heightOf('v', x, z));
-        trim.box(x - T, top - 0.001, z - T, x + T, top, z + T, 'ny nx px nz pz');
+        capped(top, () => trim.box(x - T, top - 0.001, z - T, x + T, top, z + T, 'ny nx px nz pz'));
         // Faces towards a door are jambs. Faces towards a wall sit inside it while it stands and
         // close its end when that wall is cut but the post is not.
         // `ra`, `rb`: the rooms of the two quadrants on that side of the corner.
@@ -1197,13 +1306,16 @@ export class HousePlanner {
         return;
       }
       mark(y0, y1);
-      if (own) f.face(own, a0, a1, y0, y1, dOff, sign);
+      // (Toned as a straight wall's face is, but for the corners.)
+      const wall = (g: Geo, ya: number, yb: number) =>
+        tonedFace(g, (a, y) => f.at(a, y, dOff), a0, a1, ya, yb, f.normal(sign), (a, y) => wallTone(y, 9, f.at(a, 0, dOff)[0], f.at(a, 0, dOff)[2]), false, (p) => [f.u(p), p[1]]);
+      if (own) wall(own, y0, y1);
       else {
         const tint = roomWall(r);
         const bath = kinds.get(r) === 'bath';
         const split = bath ? Math.min(Math.max(1.25, y0), y1) : y0;
-        if (split > y0) f.face(wainscot.color('#F4F4F2'), a0, a1, y0, split, dOff, sign);
-        if (y1 > split) f.face(int.color(tint), a0, a1, split, y1, dOff, sign);
+        if (split > y0) wall(wainscot.color('#F4F4F2'), y0, split);
+        if (y1 > split) wall(int.color(tint), split, y1);
       }
       if (y0 < 0.01) {
         f.box(trim, a0, a1, 0, 0.1, ...out(0.014), sign > 0 ? 'nd' : 'pd');
@@ -1216,7 +1328,7 @@ export class HousePlanner {
       for (const g of wallGeos) g.cutting(kind, mask);
       faceG(f, a0, a1, y0, y1, -T, -1, d.rooms[0], d.faces?.[0], `${d.axis}:${d.x}:${d.z}:0`);
       faceG(f, a0, a1, y0, y1, T, 1, d.rooms[1], d.faces?.[1], `${d.axis}:${d.x}:${d.z}:1`);
-      if (cap) trim.poly([f.at(a0, y1, -T), f.at(a1, y1, -T), f.at(a1, y1, T), f.at(a0, y1, T)], [0, 1, 0]);
+      if (cap) capped(y1, () => trim.poly([f.at(a0, y1, -T), f.at(a1, y1, -T), f.at(a1, y1, T), f.at(a0, y1, T)], [0, 1, 0]));
     };
     /** Whether a diagonal run continues as a plain wall past one end (room for a shutter). */
     const plainDiagEnd = (d: DiagonalWall, end: 0 | 1) => {
@@ -1247,6 +1359,7 @@ export class HousePlanner {
         trim.poly([f.at(g0, sill, -T), f.at(g0, sill, T), f.at(g0, head, T), f.at(g0, head, -T)], [f.ux, 0, f.uz]);
         trim.poly([f.at(g1, sill, -T), f.at(g1, head, -T), f.at(g1, head, T), f.at(g1, sill, T)], [-f.ux, 0, -f.uz]);
         trim.poly([f.at(g0, head, -T), f.at(g0, head, T), f.at(g1, head, T), f.at(g1, head, -T)], [0, -1, 0]);
+        trim.poly([f.at(g0, sill + 0.002, -T), f.at(g1, sill + 0.002, -T), f.at(g1, sill + 0.002, T), f.at(g0, sill + 0.002, T)], [0, 1, 0]);
         // Glazing bars between the panes, then per face: a pane, frame, sill and (outside) shutters.
         const recess = 0.03;
         trim.cutting(Cut.Hide, mask).color(TRIM);
@@ -1286,8 +1399,14 @@ export class HousePlanner {
           const plane = sign * T;
           const out = (o: number): [number, number] => (sign > 0 ? [plane, plane + o] : [plane - o, plane]);
           trim.cutting(Cut.Clamp, mask);
-          f.box(trim, o0 - 0.1, o0 + 0.01, 0, DOOR_HEIGHT + 0.1, ...out(0.022));
-          f.box(trim, o1 - 0.01, o1 + 0.1, 0, DOOR_HEIGHT + 0.1, ...out(0.022));
+          // (Their tops, which only a cut shows, in the cut wall's tone: `cutBoard`.)
+          for (const [b0, b1] of [[o0 - 0.1, o0 + 0.01], [o1 - 0.01, o1 + 0.1]]) {
+            const [d0, d1] = out(0.022);
+            const y1 = DOOR_HEIGHT + 0.1;
+            f.box(trim, b0, b1, 0, y1, d0, d1, 'py');
+            trim.color(HOUSE_LOOK.cap).poly([f.at(b0, y1, d0), f.at(b1, y1, d0), f.at(b1, y1, d1), f.at(b0, y1, d1)], [0, 1, 0]);
+            trim.color(TRIM);
+          }
           trim.cutting(Cut.Hide, mask);
           f.box(trim, o0 - 0.1, o1 + 0.1, DOOR_HEIGHT, DOOR_HEIGHT + 0.12, ...out(0.024));
         }
@@ -1364,7 +1483,7 @@ export class HousePlanner {
         for (let k = 0; k < outline.length; k++) {
           const p0 = outline[k];
           const p1 = outline[(k + 1) % outline.length];
-          trim.poly([[x, top, z], [p0[0], top, p0[1]], [p1[0], top, p1[1]]], [0, 1, 0]);
+          capped(top, () => trim.poly([[x, top, z], [p0[0], top, p0[1]], [p1[0], top, p1[1]]], [0, 1, 0]));
           // Frames run along +x (or +z) so textures line up with the walls they continue.
           const flip = p1[0] < p0[0] - 1e-9 || (Math.abs(p1[0] - p0[0]) <= 1e-9 && p1[1] < p0[1]);
           const f = flip ? new WallFrame(p1[0], p1[1], p0[0], p0[1]) : new WallFrame(p0[0], p0[1], p1[0], p1[1]);
@@ -1403,6 +1522,42 @@ export class HousePlanner {
     const laid = new Map<number, number>();
     for (const [x, z, c] of world.floors ?? []) laid.set(z * W + x, c);
     const FINISH = { wood, whitewash, tile, carpet, stone: stoneFloor };
+    /**
+     * A floor's tone at a point (`HOUSE_LOOK`): darker at the foot of the walls, where less light reaches
+     * it and nobody walks, lighter out in the room, palest in and before a doorway, where feet wear it, and
+     * a little lighter and darker in patches a few metres across. (Kept per point: tiles share corners.)
+     */
+    const floorTones = new Map<number, V3>();
+    const floorTone = (px: number, pz: number): V3 => {
+      const key = Math.round(pz * 2) * (W * 2 + 3) + Math.round(px * 2);
+      let tone = floorTones.get(key);
+      if (tone) return tone;
+      const L = HOUSE_LOOK;
+      let [wall, door] = [9, 9];
+      const [tx, tz] = [Math.floor(px), Math.floor(pz)];
+      for (let ez = tz - 2; ez <= tz + 3; ez++) {
+        for (let ex = tx - 2; ex <= tx + 3; ex++) {
+          const [h, v, dg] = [edges.get('h', ex, ez), edges.get('v', ex, ez), diagonal(ex, ez)];
+          if (h === 'door') door = Math.min(door, segmentDistance(px, pz, ex + 0.2, ez, ex + 0.8, ez));
+          else if (h) wall = Math.min(wall, segmentDistance(px, pz, ex, ez, ex + 1, ez));
+          if (v === 'door') door = Math.min(door, segmentDistance(px, pz, ex, ez + 0.2, ex, ez + 0.8));
+          else if (v) wall = Math.min(wall, segmentDistance(px, pz, ex, ez, ex, ez + 1));
+          if (dg) {
+            const [a, b] = diagonalEnds(dg.axis, dg.x, dg.z);
+            const far = segmentDistance(px, pz, a[0], a[1], b[0], b[1]);
+            if (dg.kind === 'door') door = Math.min(door, far);
+            else wall = Math.min(wall, far);
+          }
+        }
+      }
+      const worn = (1 - smoothstep(0.2, L.floorWearReach, door)) * L.floorWear;
+      const foot = (1 - smoothstep(0, L.floorReach, wall)) * (1 - worn);
+      const vary = (valueNoise(px / 2.6, pz / 2.6, 577) - 0.5) * 2 * L.floorVary;
+      const mid = L.floorMid + (1 - L.floorMid) * worn;
+      tone = toneTint(mid * (1 - L.floorWall * foot) * (1 + vary * (1 - worn)), L.floorWarm);
+      floorTones.set(key, tone);
+      return tone;
+    };
     for (let z = bounds.z; z < bounds.z + bounds.d; z++) {
       for (let x = bounds.x; x < bounds.x + bounds.w; x++) {
         const r = room(x, z);
@@ -1419,10 +1574,8 @@ export class HousePlanner {
           // A triangle per indoor half of a split tile.
           for (const h of [0, 1] as const) {
             if (d.rooms[h] === 0) continue;
-            floorOf(d.rooms[h]).poly(
-              halfTriangle(d.axis, h).map(([fx, fz]) => [x + fx, 0.01, z + fz] as V3),
-              [0, 1, 0],
-            );
+            const tri = halfTriangle(d.axis, h).map(([fx, fz]) => [x + fx, 0.01, z + fz] as V3);
+            floorOf(d.rooms[h]).poly(tri, [0, 1, 0], undefined, undefined, tri.map((p) => floorTone(p[0], p[2])));
             surface(surfaces.floors, `${x}:${z}`).poly(
               halfTriangle(d.axis, h).map(([fx, fz]) => [x + fx, 0.01 + PROUD, z + fz] as V3),
               [0, 1, 0],
@@ -1430,7 +1583,12 @@ export class HousePlanner {
           }
           continue;
         }
-        floorOf(r).poly([[x, 0.01, z], [x + 1, 0.01, z], [x + 1, 0.01, z + 1], [x, 0.01, z + 1]], [0, 1, 0]);
+        // Four quads a tile, so the tone runs smoothly from the walls out into the room.
+        const g = floorOf(r);
+        for (const [hx, hz] of [[0, 0], [0.5, 0], [0, 0.5], [0.5, 0.5]]) {
+          const q: V3[] = [[x + hx, 0.01, z + hz], [x + hx + 0.5, 0.01, z + hz], [x + hx + 0.5, 0.01, z + hz + 0.5], [x + hx, 0.01, z + hz + 0.5]];
+          g.poly(q, [0, 1, 0], undefined, undefined, q.map((p) => floorTone(p[0], p[2])));
+        }
         const y = 0.01 + PROUD;
         surface(surfaces.floors, `${x}:${z}`).poly([[x, y, z], [x + 1, y, z], [x + 1, y, z + 1], [x, y, z + 1]], [0, 1, 0]);
       }
@@ -1971,22 +2129,28 @@ export class HousePlanner {
       slant?: (into: number) => readonly Obstacle[] | undefined;
       pocket?: (end: -1 | 1) => number | undefined;
       flip?: boolean;
+      /** Whether a full-height wall stands on the door's end node (0 its first, 1 its second) on the side `side` of its wall. */
+      meets?: (end: 0 | 1, side: -1 | 1) => boolean;
     },
     style: number | undefined,
     head = DOOR_HEIGHT,
     run: Run = { start: axis === 'h' ? x : z, len: 1, index: 0 },
   ): void {
     // Casings on both faces: two side boards (clamped to stubs when cut) and a head (hidden). A
-    // double door has its side boards at its two ends only, its head board right across.
+    // double door has its side boards at its two ends only, its head board right across. A side
+    // board lies over its post, 0.1 m back from the jamb; where a wall meets the door's wall there
+    // it would lie inside that wall, and on its cut top once the walls are down (two white ticks on
+    // the grey): there it starts at that wall's face.
     const [first, last] = [run.index === 0, run.index === run.len - 1];
     const base = axis === 'h' ? x : z;
     for (const n of axis === 'h' ? ([[0, 0, -1], [0, 0, 1]] as V3[]) : ([[-1, 0, 0], [1, 0, 0]] as V3[])) {
       const plane = axis === 'h' ? z + n[2] * T : x + n[0] * T;
       const a0 = base + T;
       const a1 = base + 1 - T;
+      const side = (axis === 'h' ? n[2] : n[0]) < 0 ? -1 : 1;
       trim.cutting(Cut.Clamp, mask);
-      if (first) trim.box(...span(axis, plane, n, a0 - 0.1, a0 + 0.01, 0, head + 0.1, 0.022));
-      if (last) trim.box(...span(axis, plane, n, a1 - 0.01, a1 + 0.1, 0, head + 0.1, 0.022));
+      if (first) cutBoard(trim, span(axis, plane, n, a0 - (geos.meets?.(0, side) ? 0 : 0.1), a0 + 0.01, 0, head + 0.1, 0.022));
+      if (last) cutBoard(trim, span(axis, plane, n, a1 - 0.01, a1 + (geos.meets?.(1, side) ? 0 : 0.1), 0, head + 0.1, 0.022));
       trim.cutting(Cut.Hide, mask);
       trim.box(...span(axis, plane, n, first ? a0 - 0.1 : base, last ? a1 + 0.1 : base + 1, head, head + 0.12, 0.024));
     }
@@ -2224,9 +2388,22 @@ export class HousePlanner {
     trim.cutting(Cut.Clamp, LOOK.All, LOOK.All);
     trim.color(TRIM);
     // Board on the face whose normal is along x, and one on the face along z.
-    trim.box(Math.min(xa, xa + sx * d), PLINTH, Math.min(za + sz * 0.001, za - sz * w), Math.max(xa, xa + sx * d), WALL_HEIGHT - 0.2, Math.max(za + sz * 0.001, za - sz * w));
-    trim.box(Math.min(xa + sx * d, xa - sx * w), PLINTH, Math.min(za, za + sz * d), Math.max(xa + sx * d, xa - sx * w), WALL_HEIGHT - 0.2, Math.max(za, za + sz * d));
+    cutBoard(trim, [Math.min(xa, xa + sx * d), PLINTH, Math.min(za + sz * 0.001, za - sz * w), Math.max(xa, xa + sx * d), WALL_HEIGHT - 0.2, Math.max(za + sz * 0.001, za - sz * w)]);
+    cutBoard(trim, [Math.min(xa + sx * d, xa - sx * w), PLINTH, Math.min(za, za + sz * d), Math.max(xa + sx * d, xa - sx * w), WALL_HEIGHT - 0.2, Math.max(za, za + sz * d)]);
   }
+}
+
+/**
+ * A trim board that drops to a stub with its wall (`Cut.Clamp`: a door's side casing, a corner board). Its top
+ * shows only then (standing, the casing's head or the frieze lies on it), so it is in the cut wall's tone
+ * (`HOUSE_LOOK.cap`), as the wall's own top is, not a white dash beside it.
+ */
+function cutBoard(trim: Geo, box: [number, number, number, number, number, number]): void {
+  const [x0, , z0, x1, y1, z1] = box;
+  const { r, g, b, a } = trim;
+  trim.box(...box, 'py');
+  trim.color(HOUSE_LOOK.cap).poly([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [0, 1, 0]);
+  [trim.r, trim.g, trim.b, trim.a] = [r, g, b, a];
 }
 
 /**
@@ -2406,6 +2583,9 @@ function indoorRects(room: (x: number, z: number) => number, x0: number, z0: num
   return out;
 }
 
+/** How far a hip's cap shingles reach down each slope from the hip (m). */
+const HIP_CAP = 0.14;
+
 /** A roof of the scheme's shape (gable, hip or flat) over a rectangle of wall centre lines. */
 function addRoofShaped(
   rect: { x0: number; z0: number; x1: number; z1: number },
@@ -2495,6 +2675,38 @@ export function addRoof(
     plane([[ea1, ye, eb0], [ea1, ye, eb1], [ra1, yr, bc]], [[eb0, 0], [eb1, 0], [bc, vr]], sideA1);
     trim.poly([P(ea0, ye, eb0), P(ea0, ye, eb1), P(ea0, ye + th, eb1), P(ea0, ye + th, eb0)], sideA0);
     trim.poly([P(ea1, ye, eb0), P(ea1, ye + th, eb0), P(ea1, ye + th, eb1), P(ea1, ye, eb1)], sideA1);
+    // Hip caps: a course of cap shingles up each hip, a little darker as the ridge's is (`HOUSE_LOOK.roofCap`),
+    // standing a little proud of the two slopes it covers the joint of (a hip was a bare seam between two tones).
+    const [r, g, b] = [roof.r, roof.g, roof.b];
+    roof.r *= HOUSE_LOOK.roofCap;
+    roof.g *= HOUSE_LOOK.roofCap;
+    roof.b *= HOUSE_LOOK.roofCap;
+    const len = Math.hypot(pitch, 1);
+    type L3 = [number, number, number];
+    const cross = (u: L3, v: L3): L3 => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    for (const [ca, cb, ra] of [[ea0, eb0, ra0], [ea0, eb1, ra0], [ea1, eb0, ra1], [ea1, eb1, ra1]]) {
+      const E: L3 = [ca, ye + th, cb];
+      const R: L3 = [ra, yr + th, bc];
+      const d: L3 = [R[0] - E[0], R[1] - E[1], R[2] - E[2]];
+      // The two slopes that meet here (local a, y, b): their normals, and the way into each from the hip.
+      const slopes: [L3, L3][] = [
+        [[0, 1 / len, (cb < bc ? -pitch : pitch) / len], [ca < ra ? 1 : -1, 0, 0]],
+        [[(ca < ra ? -pitch : pitch) / len, 1 / len, 0], [0, 0, cb < bc ? 1 : -1]],
+      ];
+      for (const [n, into] of slopes) {
+        let p = cross(n, d);
+        const pl = Math.hypot(...p) || 1;
+        const sign = p[0] * into[0] + p[2] * into[2] < 0 ? -1 : 1;
+        p = [(p[0] / pl) * sign * HIP_CAP, (p[1] / pl) * sign * HIP_CAP, (p[2] / pl) * sign * HIP_CAP];
+        const top = (q: L3): V3 => P(q[0], q[1] + 0.045, q[2]);
+        const foot = (q: L3): V3 => P(q[0] + p[0] + n[0] * 0.006, q[1] + p[1] + n[1] * 0.006, q[2] + p[2] + n[2] * 0.006);
+        const pts = [top(E), top(R), foot(R), foot(E)];
+        roof.poly(pts, facing(pts[0], pts[1], pts[2], [0, 1, 0]));
+      }
+    }
+    roof.r = r;
+    roof.g = g;
+    roof.b = b;
   } else {
     // Rake boards along the sloped edges and closed gable triangles on the wall planes.
     for (const [a, side] of [[ea0, sideA0], [ea1, sideA1]] as const) {
@@ -2512,9 +2724,9 @@ export function addRoof(
     const r = roof.r;
     const g = roof.g;
     const b = roof.b;
-    roof.r *= 0.8;
-    roof.g *= 0.8;
-    roof.b *= 0.8;
+    roof.r *= HOUSE_LOOK.roofCap;
+    roof.g *= HOUSE_LOOK.roofCap;
+    roof.b *= HOUSE_LOOK.roofCap;
     roof.box(Math.min(c0[0], c1[0]), c0[1] - 0.02, Math.min(c0[2], c1[2]), Math.max(c0[0], c1[0]), c1[1], Math.max(c0[2], c1[2]), 'ny');
     roof.r = r;
     roof.g = g;

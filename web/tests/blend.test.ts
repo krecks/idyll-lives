@@ -80,6 +80,7 @@ describe('residents crossfade continuity', async () => {
       poses = data;
       width = w;
     },
+    setMorphs: () => {},
     uploadPoses: () => {},
     uploadPoseRows: () => {},
     createPart: () => ({}),

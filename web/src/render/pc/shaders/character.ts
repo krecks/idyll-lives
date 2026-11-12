@@ -21,7 +21,8 @@
  *   the first 64 rows; the rows past them (the town's servers in a full town) always draw.
  * - Before skinning (`getLocalPosition`, `vsLocal`): the face morphs (`GAME_SIM_MORPH`: the set's
  *   morph texture `game_simMorphs`, its block per vertex in `game_simMorph`, the row's (channel,
- *   weight) pairs), position and normal (`normalCoreVS`'s `getLocalNormal` wrapped,
+ *   weight) pairs: the expression's, then the resident's own face, whose weights are signed and
+ *   written once, `layout.ts`), position and normal (`normalCoreVS`'s `getLocalNormal` wrapped,
  *   `RESIDENT_NORMAL`); on shells (`GAME_SIM_CLOTH`) the seated corrective (tone.xyz, as far as
  *   appearance texel 4 b says).
  * - `game_simLayout`: x the first appearance texel (bones · `BONE_TEXELS`), y the morph texture's width, z the
@@ -31,13 +32,16 @@
  * `_CLOTH`, `_HAIR`, `_BROW`, `_LASH`, `_EYE`, `_MOUTH`), the roughness in `getGlossiness`
  * (`gloss`: painted clothes rougher, hair matte, polished shoes glossy), the eye's catchlight in
  * `getEmission` (`emissive`). The light itself is the game's look, as for every lit material
- * (`softLook.ts`, `roomLights.ts`, `underground.ts`, `fog.ts`, `diagView.ts`).
+ * (`softLook.ts`, `roomLights.ts`, `underground.ts`, `fog.ts`, `diagView.ts`). The hair's wisps
+ * (`GAME_SIM_WISP`, with `_HAIR`: the hair's colour and light) are cut out in `getOpacity`
+ * (`opacityPS`, set per material: `RESIDENT_WISP_OPACITY`).
  *
  * Derivatives (`fwidth`) are taken in uniform control flow only (WGSL insists): branches are
  * `select`s and `mix`es.
  */
 
 import { APPEARANCE_TEXELS, BONE_TEXELS, MORPH_TEXELS, SHIRT } from '../../shared/characters/layout';
+import { WISPS_PX } from '../../shared/characters/parts';
 import type { Language, ShaderFeature } from './chunks';
 
 /** Microsurface (1 - roughness) of painted clothes; skin keeps the material's. */
@@ -78,8 +82,32 @@ const FOLD = '0.3';
  * stripes (acne) wherever the map's texels were small: the creator, a close camera, the pages.
  */
 const CASTER_INSET = '0.012';
-/** The eye's catchlight (linear, emissive). */
+/**
+ * The eye's catchlight (linear, emissive): the light's reflection, so as bright as the light on the eye
+ * (`RESIDENT_LIGHT`; at its full strength whatever the light, it glowed at night).
+ */
 const CATCHLIGHT = '0.85';
+/**
+ * Skin lets light through: the light of a lamp or the sun comes round the terminator (`SKIN_WRAP`: how far past
+ * it, as a share of the way round; `RESIDENT_DIFFUSE`), and what came through is red (`SKIN_SCATTER`, its
+ * colour; `RESIDENT_LIGHT`). Its highlight is a weak one (`SKIN_SPECULAR` of a plastic's), weaker in a crease,
+ * where it reflects less of the sky too.
+ * The soft look's extra saturation (`softLook.ts` `gameSaturation`) is left off skin (`SKIN_SATURATION`): on a
+ * tone already warm it turned every face orange.
+ */
+const SKIN_SATURATION = '0.88';
+const SKIN_WRAP = '0.3';
+const SKIN_SCATTER = '1.0, 0.52, 0.4';
+const SKIN_SPECULAR = '0.55';
+/**
+ * The white of the eye (linear; a real one is far from white, and in the lids' shade), how far the upper lid
+ * shades the top of the eye and how far the ball darkens towards its corners as it turns away.
+ */
+const SCLERA = '0.8, 0.775, 0.75';
+const LID_SHADE = '0.45';
+const EYE_ROUND = '0.3';
+/** The line between two teeth (the `mouth` kind, tone.z): its half-width, of a tooth's, and how dark it is. */
+const TOOTH_GAP = { half: '0.05', dark: '0.55' };
 /** The occlusion's darkening, at `gain` per unit of tone.w. */
 const ao = (gain: string): string => `(1.0 - ${AO_DARK} * clamp(${gain} * simT.w, 0.0, 1.0))`;
 /** The painted cuts' bands on the body (`simHem`): the top's edges and the bottom's. */
@@ -87,8 +115,135 @@ const HEM_TOP = `max(max(simHem((simA.w - simF.x) * 0.55, ${BAND.cuff}), simHem(
 const HEM_BOTTOM = `max(simHem(simT4.w - simF.y, ${BAND.waistband}), simHem(simF.y - c5, ${BAND.hem})) * simPlain`;
 /** A shoe's laces: across the instep between the eyelets, under the collar. */
 const LACE = `(1.0 - smoothstep(0.009 - lW, 0.009 + lW, abs(simF.w))) * (1.0 - smoothstep(0.06, 0.065, simF.x)) * smoothstep(0.01, 0.014, simF.x) * mix(smoothstep(0.28 - lAA, 0.28 + lAA, abs(fract(lBar) - 0.5)), 0.44, smoothstep(0.25, 0.5, lAA))`;
+/**
+ * Hair's highlight from the lights (`RESIDENT_HAIR_SPECULAR`, Kajiya-Kay: the strands run down the head, and a
+ * strand shines where it lies across the half vector): its strength (of a plastic's highlight), how narrow the
+ * band is, and how far a lock's middle shifts it along the strands (the band breaks up lock by lock). The band
+ * painted for a light overhead (`HAIR_BAND`) stays at `HAIR_SKY`, as the sky's share: hair in the shade, or in a
+ * room by day, keeps a soft sheen.
+ */
+const HAIR_SHINE = { gain: '5.0', power: '40.0', shift: '0.35' };
+const HAIR_SKY = '0.4';
 /** The hair's highlight band: sharp along the strands up close, broad where they blur. */
 const HAIR_BAND = `mix(pow(hS, 6.0), 0.35 * hS * hS, smoothstep(0.08, 0.25, fwidth(hTH))) * smoothstep(0.0, 0.35, dot(normalW, hHalf)) * mix(0.6, 1.2, hClump)`;
+/**
+ * The hair's wisps (`RESIDENT_WISP_OPACITY`): strands drawn on thin quads past the hair's edges (fields: x metres
+ * along the edge, y 0 at the root .. 1 at the quad's end, z how loose, w the share of y over which they are still
+ * one), the gaps between them cut away. Along the edge they stand in cells, `perM` a metre, a strand each, in
+ * `layers` layers one over the other, each sparser than the last (`sparser`) and set off from it, so an edge is
+ * no comb. A strand is `short` .. 1 of the quad long (a loose one mostly long); half a cell wide at
+ * its root, where it is one with its neighbours, `wide` from `parted` of its length on (two numbers: any between)
+ * and `fine` of that at its tip; its line anywhere within `aside` (cells) about its cell's middle, leaning as far as
+ * `lean` (cells, either way) by its tip. Lengths go up and down along the edge in tufts (`tuft`: cells a tuft, and how much shorter its
+ * shortest). A loose strand waves by `curl` (cells) and is broken along its length (`broken`: how many times,
+ * and how much of it is left). Where a pixel holds `even[0]` of a cell or more they blur into their mean cover,
+ * all of it from `even[1]` (strands thinner than a pixel would flicker). `cut`: the alpha under which nothing is
+ * drawn (the alpha test). `facing`: the least a wisp's normal is turned to the viewer (its cosine; the `albedo`
+ * slot).
+ */
+export const WISP = {
+  perM: '500.0',
+  layers: 3,
+  sparser: '0.71',
+  short: '0.25',
+  wide: '0.16',
+  parted: ['0.04', '0.3'],
+  fine: '0.4',
+  aside: '0.5',
+  lean: '0.5',
+  tuft: ['7.0', '0.45'],
+  curl: '0.35',
+  broken: ['5.0', '0.15'],
+  even: ['0.5', '1.2'],
+  cut: 0.1,
+  facing: '0.5',
+};
+/** What none of the wisps' layers covers (`layer(k)`: layer k's cover), as a product. */
+const wispLayers = (layer: (k: number) => string): string => Array.from({ length: WISP.layers }, (_, k) => `(1.0 - ${layer(k)})`).join(' * ');
+/** Layer k's `simStrands`: sparser than the one before, set off along the edge. */
+const wispLayer = (k: number): string => {
+  const scale = Math.pow(Number(WISP.sparser), k).toFixed(4);
+  return `simStrands(x * ${scale} + ${(k * 7.31).toFixed(2)}, v, fw * ${scale}, fv, loose)`;
+};
+/** The wisps' cover of a pixel: the layers', blurred into the mean, and thinned out as the face gets small (`WISPS_PX`). */
+const WISP_COVER = `mix(1.0 - ${wispLayers(wispLayer)}, 1.0 - ${wispLayers(() => 'simWispMean(v, loose)')}, smoothstep(${WISP.even[0]}, ${WISP.even[1]}, fw)) * smoothstep(${WISPS_PX[0].toFixed(1)}, ${WISPS_PX[1].toFixed(1)}, 0.05 * ${WISP.perM} / fw)`;
+/** The wisps' functions, by a language's words: a function's head, a local, the types. */
+function wispCode(lang: Language): string {
+  const w = lang === 'wgsl';
+  const fn = (name: string, args: [string, string][], ret: string) => (w ? `fn ${name}(${args.map(([n, t]) => `${n}: ${t}`).join(', ')}) -> ${ret}` : `${ret} ${name}(${args.map(([n, t]) => `${t} ${n}`).join(', ')})`);
+  const f = w ? 'f32' : 'float';
+  const v3 = w ? 'vec3f' : 'vec3';
+  const let_ = (name: string, type: string) => (w ? `let ${name}` : `${type} ${name}`);
+  return `
+	// A number 0..1 per cell, three of them.
+	${fn('simCell', [['cell', f]], v3)} {
+		return fract(sin(cell * ${v3}(12.9898, 78.233, 37.719)) * 43758.5453);
+	}
+	// A layer of strands at x (cells along the edge) and v (the quad's free length, 0..1): its cover of a pixel fw
+	// cells by fv of that length.
+	${fn('simStrands', [['x', f], ['v', f], ['fw', f], ['fv', f], ['loose', f]], f)} {
+		${let_('h', v3)} = simCell(floor(x));
+		${let_('tx', f)} = x / ${WISP.tuft[0]};
+		${let_('tuft', f)} = mix(simCell(floor(tx) + 0.5).x, simCell(floor(tx) + 1.5).x, smoothstep(0.0, 1.0, fract(tx)));
+		${let_('len', f)} = mix(${WISP.short}, 1.0, mix(h.x, sqrt(h.x), loose)) * (1.0 - ${WISP.tuft[1]} * tuft);
+		${let_('t', f)} = clamp(v / len, 0.0, 1.0);
+		${let_('parted', f)} = smoothstep(0.0, mix(${WISP.parted[0]}, ${WISP.parted[1]}, h.y), t);
+		${let_('halfW', f)} = mix(0.5, ${WISP.wide}, parted) * (1.0 - (1.0 - ${WISP.fine}) * t);
+		${let_('off', f)} = (h.y - 0.5) * ${WISP.aside} * parted + ((h.z - 0.5) * ${WISP.lean} + loose * ${WISP.curl} * sin(t * 11.0 + h.x * 6.2832)) * t;
+		${let_('across', f)} = clamp((halfW - abs(fract(x) - 0.5 - off)) / fw + 0.5, 0.0, 1.0) * min(2.0 * halfW / fw, 1.0);
+		${let_('whole', f)} = 1.0 - loose * parted * (1.0 - ${WISP.broken[1]}) * smoothstep(-0.3, 0.3, sin((v * ${WISP.broken[0]} + h.z) * 6.2832));
+		return mix(across * whole * clamp((len - v) / fv + 0.5, 0.0, 1.0), 1.0, step(v, 0.0));
+	}
+	// A layer's mean cover at v: a strand of the middle length for all of them, as many as are that long.
+	${fn('simWispMean', [['v', f], ['loose', f]], f)} {
+		${let_('reach', f)} = 1.0 - 0.5 * ${WISP.tuft[1]};
+		${let_('t', f)} = clamp(v / (0.5 * reach), 0.0, 1.0);
+		${let_('parted', f)} = smoothstep(0.0, 0.5 * (${WISP.parted[0]} + ${WISP.parted[1]}), t);
+		${let_('longer', f)} = 1.0 - clamp((v / reach - ${WISP.short}) / (1.0 - ${WISP.short}), 0.0, 1.0);
+		return mix(mix(1.0, 2.0 * ${WISP.wide} * (1.0 - (1.0 - ${WISP.fine}) * t) * (1.0 - loose * (1.0 - ${WISP.broken[1]}) * 0.5) * longer, parted), 1.0, step(v, 0.0));
+	}`;
+}
+/**
+ * Cloth stands off the body it is painted on (the vertex shader, `GAME_SIM_BODY`): the covered skin is drawn out
+ * along its normal, as far as the resident's garments are loose (appearance texel 8: the top's and the bottom's,
+ * 0 for what clings or lies under a shell), so a tee hangs from the chest past the waist, a trouser leg falls
+ * nearly straight from the knee over the shoe, and a cuff or a hem stands a step off the skin. Metres on the base
+ * body by its fields' heights, scaled to the life stage: `thick` everywhere, `hang` more from `chest` down to
+ * `waist` (the top), `seat` more below the hips and `leg` more from `knee` down to `ankle` (the bottom), `sleeve`
+ * on the arms; within `neck` m of the neckline it thins out, under the collars' shells.
+ */
+const EASE = { thick: '0.004', hang: '0.016', chest: '1.30', waist: '1.12', sleeve: '0.007', neck: '0.06', hips: '0.88', thigh: '0.6', seat: '0.006', knee: '0.5', ankle: '0.12', leg: '0.016' };
+/** How dark the skin (or the cloth under it) is just under a loose garment's edge (the step's shade), and how far (m). */
+const EDGE_SHADE = '0.3';
+const EDGE_REACH = '0.018';
+/** The ease's code for a language's vertex shader: `f` the fields, `tx(k)` appearance texel k. */
+function easeCode(lang: Language): string {
+  const w = lang === 'wgsl';
+  const let_ = (name: string, type: string) => (w ? `let ${name}` : `${type} ${name}`);
+  const tx = (k: number) => (w ? `textureLoad(game_simPoses, vec2i(simOff + ${k}, simRow), 0)` : `texelFetch(game_simPoses, ivec2(simOff + ${k}, simRow), 0)`);
+  const add = (v: string) => (w ? `localPos = localPos + ${v};` : `localPos += ${v};`);
+  return `
+		#if defined(GAME_SIM_BODY) && !defined(SHADOW_PASS)
+		{
+			${let_('simEase', 'vec4')} = ${tx(8)};
+			if (simEase.x + simEase.y > 0.0) {
+				${let_('simF', 'vec4')} = game_simField;
+				${let_('simT4', 'vec4')} = ${tx(4)};
+				${let_('simNeck', 'float')} = min(simF.z - ${tx(2)}.w, simF.w - ${tx(3)}.w);
+				${let_('simTopIn', 'float')} = min(min((${tx(0)}.w - simF.x) * 0.55, simF.y - ${tx(1)}.w), simNeck);
+				${let_('simBottomIn', 'float')} = min(min(simT4.w - simF.y, simF.y - ${tx(5)}.w), (-0.5 - simF.x) * 0.55);
+				${let_('simArm', 'float')} = clamp(simF.x + 1.0, 0.0, 1.0);
+				${let_('simHang', 'float')} = 1.0 - smoothstep(${EASE.waist}, ${EASE.chest}, simF.y);
+				${let_('simTopEase', 'float')} = mix(${EASE.thick} + ${EASE.hang} * simHang, ${EASE.sleeve}, simArm) * (0.25 + 0.75 * smoothstep(0.0, ${EASE.neck}, simNeck)) * smoothstep(-0.004, 0.004, simTopIn) * simEase.x * (1.0 - simEase.z * (1.0 - smoothstep(simT4.w, simT4.w + 0.04, simF.y)));
+				${let_('simBottomEase', 'float')} = (${EASE.thick} + ${EASE.seat} * (1.0 - smoothstep(${EASE.thigh}, ${EASE.hips}, simF.y)) + ${EASE.leg} * (1.0 - smoothstep(${EASE.ankle}, ${EASE.knee}, simF.y))) * smoothstep(-0.004, 0.004, simBottomIn) * simEase.y;
+				// (The life stage's size: the vertex's height over its height on the base body, the fields'.)
+				${let_('simSize', 'float')} = clamp(localPos.y / max(simF.y, 0.05), 0.3, 1.2);
+				${add('normalize(vertex_normal) * (max(simTopEase, simBottomEase) * simSize)')}
+			}
+		}
+		#endif`;
+}
+
 /** The first morph pair texel, after the appearance texels. */
 const PAIRS = APPEARANCE_TEXELS;
 
@@ -112,6 +267,159 @@ fn getModelMatrix() -> mat4x4f {
 	return uniform.matrix_model * mat4x4f(instance_line1, instance_line2, instance_line3, instance_line4) * gameSimSkin() * gameSimShown();
 }
 `,
+};
+
+/**
+ * The body's `lightDiffuseLambertPS` (per material): a light's diffuse share on the skin wrapped round the
+ * terminator (`SKIN_WRAP`), Lambert's on painted clothes; what it added is kept for `RESIDENT_LIGHT`. The lights'
+ * shadows still fall on it, so the skin only softens where the body turns from the light.
+ */
+export const RESIDENT_DIFFUSE: Record<Language, string> = {
+  glsl: `
+float getLightDiffuse(vec3 worldNormal, vec3 viewDir, vec3 lightDirNorm) {
+	float nl = dot(worldNormal, -lightDirNorm);
+	float lambert = max(nl, 0.0);
+	#if defined(GAME_RESIDENT) && !defined(SHADOW_PASS)
+		float skin = 1.0 - gameSimCloth;
+		float wrapped = mix(lambert, max((nl + ${SKIN_WRAP}) / (1.0 + ${SKIN_WRAP}), 0.0), skin);
+		gameSimWrapped += wrapped;
+		gameSimWrap += wrapped - lambert;
+		return wrapped;
+	#else
+		return lambert;
+	#endif
+}
+`,
+  wgsl: `
+fn getLightDiffuse(worldNormal: vec3f, viewDir: vec3f, lightDirNorm: vec3f) -> f32 {
+	let nl = dot(worldNormal, -lightDirNorm);
+	let lambert = max(nl, 0.0);
+	#if defined(GAME_RESIDENT) && !defined(SHADOW_PASS)
+		let skin = 1.0 - gameSimCloth;
+		let wrapped = mix(lambert, max((nl + ${SKIN_WRAP}) / (1.0 + ${SKIN_WRAP}), 0.0), skin);
+		gameSimWrapped = gameSimWrapped + wrapped;
+		gameSimWrap = gameSimWrap + wrapped - lambert;
+		return wrapped;
+	#else
+		return lambert;
+	#endif
+}
+`,
+};
+
+/**
+ * The hair's `lightSpecularBlinnPS` (per material; the game's materials shine by Blinn): a light's highlight on hair, a band across the strands
+ * (`HAIR_SHINE`) where it would put a spot on a helmet.
+ */
+export const RESIDENT_HAIR_SPECULAR: Record<Language, string> = {
+  glsl: `
+float getLightSpecular(vec3 h, vec3 reflDir, vec3 worldNormal, vec3 viewDir, vec3 lightDirNorm, float gloss, mat3 tbn) {
+	vec3 strand = normalize(vec3(0.0, 1.0001, 0.0) - worldNormal * worldNormal.y);
+	#if defined(GAME_RESIDENT) && !defined(SHADOW_PASS)
+		strand = normalize(strand + worldNormal * (${HAIR_SHINE.shift} * (vSimTone.z - 0.5)));
+	#endif
+	float across = dot(strand, h);
+	float lit = smoothstep(-0.1, 0.4, dot(worldNormal, -lightDirNorm));
+	return ${HAIR_SHINE.gain} * pow(sqrt(max(1.0 - across * across, 0.0)), ${HAIR_SHINE.power}) * lit;
+}
+`,
+  wgsl: `
+fn getLightSpecular(h: vec3f, reflDir: vec3f, worldNormal: vec3f, viewDir: vec3f, lightDirNorm: vec3f, gloss: f32, tbn: mat3x3f) -> f32 {
+	var strand = normalize(vec3f(0.0, 1.0001, 0.0) - worldNormal * worldNormal.y);
+	#if defined(GAME_RESIDENT) && !defined(SHADOW_PASS)
+		strand = normalize(strand + worldNormal * (${HAIR_SHINE.shift} * (vSimTone.z - 0.5)));
+	#endif
+	let across = dot(strand, h);
+	let lit = smoothstep(-0.1, 0.4, dot(worldNormal, -lightDirNorm));
+	return ${HAIR_SHINE.gain} * pow(sqrt(max(1.0 - across * across, 0.0)), ${HAIR_SHINE.power}) * lit;
+}
+`,
+};
+
+/**
+ * The wisps' `opacityPS` (per material): the strands' cover of the pixel (`WISP`). The material blends by it and
+ * hands it to the multisampling as coverage (`characterMaterial.ts`), so each takes its root: the two together
+ * draw the cover itself, and without multisampling (Low) the blend alone draws a little more of it.
+ */
+export const RESIDENT_WISP_OPACITY: Record<Language, string> = {
+  glsl: `
+#ifndef SHADOW_PASS
+${wispCode('glsl')}
+#endif
+void getOpacity() {
+	#ifdef SHADOW_PASS
+		dAlpha = 1.0;
+	#else
+		// (The strands' own length starts where they part: under fields.w they are one, solid.)
+		float x = vSimField.x * ${WISP.perM};
+		float v = (vSimField.y - vSimField.w) / max(1.0 - vSimField.w, 1e-3);
+		float loose = vSimField.z;
+		float fw = max(fwidth(x), 1e-5);
+		float fv = max(fwidth(v), 1e-5);
+		dAlpha = sqrt(${WISP_COVER});
+	#endif
+}
+`,
+  wgsl: `
+#ifndef SHADOW_PASS
+${wispCode('wgsl')}
+#endif
+fn getOpacity() {
+	#ifdef SHADOW_PASS
+		dAlpha = 1.0;
+	#else
+		let x = vSimField.x * ${WISP.perM};
+		let v = (vSimField.y - vSimField.w) / max(1.0 - vSimField.w, 1e-3);
+		let loose = vSimField.z;
+		let fw = max(fwidth(x), 1e-5);
+		let fv = max(fwidth(v), 1e-5);
+		dAlpha = sqrt(${WISP_COVER});
+	#endif
+}
+`,
+};
+
+/**
+ * The residents' part of the look's `combineColor` (`softLook.ts`, before it splits the light from the
+ * environment, so in both looks): the skin's light that came round the terminator turned red and its highlight
+ * weakened, and the eye's catchlight as bright as the light on the eye.
+ */
+export const RESIDENT_LIGHT: Record<Language, string> = {
+  glsl: `
+#if defined(GAME_RESIDENT) && !defined(SHADOW_PASS)
+	#ifdef GAME_SIM_BODY
+		float simSkin = 1.0 - gameSimCloth;
+		gameSaturation = mix(gameSaturation, ${SKIN_SATURATION}, simSkin);
+		dDiffuseLight *= mix(vec3(1.0), vec3(${SKIN_SCATTER}), simSkin * gameSimWrap / max(gameSimWrapped, 1e-4));
+		#ifdef LIT_SPECULAR
+			dSpecularLight *= mix(1.0, ${SKIN_SPECULAR} * gameSimOcc, simSkin);
+		#endif
+		// (A crease reflects no sky either: the ear's folds, the nose's wings.)
+		#ifdef LIT_REFLECTIONS
+			dReflection.rgb *= mix(1.0, gameSimOcc, simSkin);
+		#endif
+	#endif
+	#ifdef GAME_SIM_EYE
+		litArgs_emission *= clamp(dot(dDiffuseLight + gameAmbient, vec3(0.2126, 0.7152, 0.0722)), 0.05, 1.0);
+	#endif
+#endif`,
+  wgsl: `
+#if defined(GAME_RESIDENT) && !defined(SHADOW_PASS)
+	#ifdef GAME_SIM_BODY
+		let simSkin = 1.0 - gameSimCloth;
+		gameSaturation = mix(gameSaturation, ${SKIN_SATURATION}, simSkin);
+		dDiffuseLight = dDiffuseLight * mix(vec3f(1.0), vec3f(${SKIN_SCATTER}), simSkin * gameSimWrap / max(gameSimWrapped, 1e-4));
+		#ifdef LIT_SPECULAR
+			dSpecularLight = dSpecularLight * mix(1.0, ${SKIN_SPECULAR} * gameSimOcc, simSkin);
+		#endif
+		#ifdef LIT_REFLECTIONS
+			dReflection = vec4f(dReflection.rgb * mix(1.0, gameSimOcc, simSkin), dReflection.a);
+		#endif
+	#endif
+	#ifdef GAME_SIM_EYE
+		litArgs_emission = litArgs_emission * clamp(dot(dDiffuseLight + gameAmbient, vec3f(0.2126, 0.7152, 0.0722)), 0.05, 1.0);
+	#endif
+#endif`,
 };
 
 /** `normalCoreVS`'s `getLocalNormal`, wrapped (the face morphs' normal deltas, `gameSimMorphN`). */
@@ -148,6 +456,10 @@ const VS_GLSL = {
 	varying vec4 vSimField;
 	varying vec4 vSimTone;
 	vec3 gameSimMorphN = vec3(0.0);
+	#if defined(GAME_SIM_BODY) && !defined(SHADOW_PASS)
+		// (The cloth's ease reads the normal in getLocalPosition, before normalCoreVS declares it: RESIDENT_NORMAL leaves it out there.)
+		attribute vec3 vertex_normal;
+	#endif
 	// Bone b's skinning matrix's three rows (a texel each, layout.ts BONE_TEXELS), weighted by w, added to r0..r2.
 	void gameSimBone(int b, int row, float w, inout vec4 r0, inout vec4 r1, inout vec4 r2) {
 		int o = b * ${BONE_TEXELS};
@@ -217,6 +529,7 @@ const VS_GLSL = {
 				}
 			}
 		#endif
+${easeCode('glsl')}
 		#ifdef GAME_SIM_CLOTH
 			// Seated: the shell's corrective (its tone) as far as the thighs are turned forward (texel 4 b).
 			localPos += game_simTone.xyz * texelFetch(game_simPoses, ivec2(simOff + 4, simRow), 0).z;
@@ -320,6 +633,7 @@ const VS_WGSL = {
 				}
 			}
 		#endif
+${easeCode('wgsl')}
 		#ifdef GAME_SIM_CLOTH
 			// Seated: the shell's corrective (its tone) as far as the thighs are turned forward (texel 4 b).
 			localPos = localPos + game_simTone.xyz * textureLoad(game_simPoses, vec2i(simOff + 4, simRow), 0).z;
@@ -354,6 +668,11 @@ const PS_GLSL = {
 	float gameSimCloth = 0.0;
 	float gameSimLip = 0.0;
 	float gameSimCatch = 0.0;
+	// The baked occlusion's shade (the skin's highlight goes with it), and the lights' diffuse on the skin: all
+	// of it, and how much of it came round the terminator (RESIDENT_DIFFUSE).
+	float gameSimOcc = 1.0;
+	float gameSimWrapped = 0.0;
+	float gameSimWrap = 0.0;
 	// Appearance texel k of the resident's row.
 	vec4 simTexel(int k) { return texelFetch(game_simPoses, ivec2(int(game_simLayout.x + 0.5) + k, int(vSimRow + 0.5)), 0); }
 	#if defined(GAME_SIM_BODY) || defined(GAME_SIM_CLOTH)
@@ -429,7 +748,13 @@ const PS_GLSL = {
 			cShoe = simFabric(cShoe, simHemShoe);
 			vec3 topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);
 			vec3 topUnder = mix(mix(skin, cTop, simTop), cBottom, simBottom);
-			return mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe) * ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
+			gameSimOcc = ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
+			// The shade under a loose garment's edge (EASE: it stands a step off what is under it).
+			vec2 simEase = simTexel(8).xy;
+			float simUnderTop = (1.0 - smoothstep(0.0, ${EDGE_REACH}, -gTop)) * (1.0 - simTop) * (simT4.x > 0.5 ? 1.0 : 1.0 - simBottom) * simEase.x;
+			float simUnderBottom = (1.0 - smoothstep(0.0, ${EDGE_REACH}, -gBottom)) * (1.0 - simBottom) * (1.0 - simTop) * simEase.y;
+			float simEdge = 1.0 - ${EDGE_SHADE} * max(simUnderTop, simUnderBottom) * (1.0 - simShoe);
+			return mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe) * gameSimOcc * simEdge;
 		#elif defined(GAME_SIM_CLOTH)
 			// Shells: the flat top / bottom / shoe colour (fields.z = category); soles darker; a skirt's or a
 			// jacket's hem (fields.x: the distance from it; a collar's is out of reach).
@@ -461,7 +786,7 @@ const PS_GLSL = {
 			float hS = 1.0 - hTH * hTH;
 			float hBand = ${HAIR_BAND};
 			vec3 hCol = mix(hc * (1.0 + 0.45 * (hClump - 0.5)), hTint, 0.28 * hDark * hClump);
-			hCol = mix(hCol, hTint, hBand * mix(0.3, 0.75, hDark));
+			hCol = mix(hCol, hTint, ${HAIR_SKY} * hBand * mix(0.3, 0.75, hDark));
 			return hCol * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * ${ao(AO_GAIN)};
 		#elif defined(GAME_SIM_BROW)
 			return simTexel(3).rgb * 0.45;
@@ -480,11 +805,21 @@ const PS_GLSL = {
 			float pupil = 1.0 - smoothstep(simF.w - simAA, simF.w + simAA, simR);
 			float ring = smoothstep(simF.z * 0.62, simF.z, simR);
 			vec3 irisColour = eyeColour * (1.0 - 0.55 * ring) * (0.85 + 0.3 * smoothstep(simF.w, simF.z * 0.7, simR));
-			return mix(mix(vec3(0.93, 0.91, 0.88), irisColour, iris), vec3(0.02), pupil);
+			// The upper lid's shade over the top of the eye, and the ball darker towards its corners: a white left
+			// flat reads as a sticker on the face.
+			float simLid = 1.0 - ${LID_SHADE} * smoothstep(0.1 * simF.z, 1.5 * simF.z, simF.y);
+			float simRound = 1.0 - ${EYE_ROUND} * smoothstep(1.2 * simF.z, 2.6 * simF.z, simR);
+			return mix(mix(vec3(${SCLERA}), irisColour, iris), vec3(0.02), pupil) * simLid * simRound;
 		#elif defined(GAME_SIM_MOUTH)
 			// Inside the mouth: the tongue red (tone.x), shaded (tone.y); the mouth plate (tone.y = 1) dark red.
+			// The teeth (neither): a dark line between one and the next (tone.z counts them from the middle
+			// one), evened out where a tooth is too small on screen to show it.
 			float shade = clamp(simT.y, 0.0, 1.0);
-			vec3 c = mix(albedo, vec3(0.6, 0.17, 0.17), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.6 * shade);
+			float tooth = (1.0 - clamp(simT.x, 0.0, 1.0)) * (1.0 - smoothstep(0.6, 0.7, shade));
+			float tW = fwidth(simT.z);
+			float tGap = 1.0 - smoothstep(${TOOTH_GAP.half} - tW, ${TOOTH_GAP.half} + tW, abs(fract(simT.z + 0.5) - 0.5));
+			tGap = mix(tGap, 2.0 * ${TOOTH_GAP.half}, smoothstep(0.2, 0.45, tW));
+			vec3 c = mix(albedo, vec3(0.6, 0.17, 0.17), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.6 * shade) * (1.0 - ${TOOTH_GAP.dark} * tooth * tGap);
 			return mix(c, vec3(0.09, 0.018, 0.022), smoothstep(0.7, 1.0, shade));
 		#else
 			return albedo;
@@ -493,6 +828,11 @@ const PS_GLSL = {
 #endif`,
   albedo: `
 #ifdef GAME_RESIDENT
+	#ifdef GAME_SIM_WISP
+		// Strands have no side to be seen edge-on: where the quad they are drawn on stands across the view its
+		// normal (the shading's too, after this) is turned to the viewer, or it would mirror the sky there.
+		dVertexNormalW = normalize(dVertexNormalW + dViewDirW * max(${WISP.facing} - dot(dVertexNormalW, dViewDirW), 0.0));
+	#endif
 	dAlbedo = gameSimAlbedo(dAlbedo, dVertexNormalW, dViewDirW);
 #endif`,
   gloss: `
@@ -527,6 +867,9 @@ const PS_WGSL = {
 	var<private> gameSimCloth: f32 = 0.0;
 	var<private> gameSimLip: f32 = 0.0;
 	var<private> gameSimCatch: f32 = 0.0;
+	var<private> gameSimOcc: f32 = 1.0;
+	var<private> gameSimWrapped: f32 = 0.0;
+	var<private> gameSimWrap: f32 = 0.0;
 	fn simTexel(k: i32) -> vec4f { return textureLoad(game_simPoses, vec2i(i32(uniform.game_simLayout.x + 0.5) + k, i32(vSimRow + 0.5)), 0); }
 	#if defined(GAME_SIM_BODY) || defined(GAME_SIM_CLOTH)
 		// See the GLSL: a turned band and its stitch line along a cut edge.
@@ -588,7 +931,12 @@ const PS_WGSL = {
 			cShoe = simFabric(cShoe, simHemShoe);
 			let topOver = mix(mix(skin, cBottom, simBottom), cTop, simTop);
 			let topUnder = mix(mix(skin, cTop, simTop), cBottom, simBottom);
-			return mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe) * ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
+			gameSimOcc = ${ao(`(${AO_GAIN} + ${AO_AGE} * simT4.y)`)};
+			let simEase = simTexel(8).xy;
+			let simUnderTop = (1.0 - smoothstep(0.0, ${EDGE_REACH}, -gTop)) * (1.0 - simTop) * select(1.0 - simBottom, 1.0, simT4.x > 0.5) * simEase.x;
+			let simUnderBottom = (1.0 - smoothstep(0.0, ${EDGE_REACH}, -gBottom)) * (1.0 - simBottom) * (1.0 - simTop) * simEase.y;
+			let simEdge = 1.0 - ${EDGE_SHADE} * max(simUnderTop, simUnderBottom) * (1.0 - simShoe);
+			return mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe) * gameSimOcc * simEdge;
 		#elif defined(GAME_SIM_CLOTH)
 			let simHemShell = simHem(simF.x, ${BAND.hem}) * select(0.0, 1.0, abs(simF.y - 3.0) < 0.5 || simF.z < 0.5);
 			let c = simFabric(select(select(simTexel(6).rgb, simTexel(2).rgb, simF.z < 1.5), simTexel(1).rgb, simF.z < 0.5), simHemShell);
@@ -613,7 +961,7 @@ const PS_WGSL = {
 			let hS = 1.0 - hTH * hTH;
 			let hBand = ${HAIR_BAND};
 			var hCol = mix(hc * (1.0 + 0.45 * (hClump - 0.5)), hTint, 0.28 * hDark * hClump);
-			hCol = mix(hCol, hTint, hBand * mix(0.3, 0.75, hDark));
+			hCol = mix(hCol, hTint, ${HAIR_SKY} * hBand * mix(0.3, 0.75, hDark));
 			return hCol * (1.0 - 0.5 * clamp(simT.y, 0.0, 1.0)) * ${ao(AO_GAIN)};
 		#elif defined(GAME_SIM_BROW)
 			return simTexel(3).rgb * 0.45;
@@ -630,10 +978,16 @@ const PS_WGSL = {
 			let pupil = 1.0 - smoothstep(simF.w - simAA, simF.w + simAA, simR);
 			let ring = smoothstep(simF.z * 0.62, simF.z, simR);
 			let irisColour = eyeColour * (1.0 - 0.55 * ring) * (0.85 + 0.3 * smoothstep(simF.w, simF.z * 0.7, simR));
-			return mix(mix(vec3f(0.93, 0.91, 0.88), irisColour, iris), vec3f(0.02), pupil);
+			let simLid = 1.0 - ${LID_SHADE} * smoothstep(0.1 * simF.z, 1.5 * simF.z, simF.y);
+			let simRound = 1.0 - ${EYE_ROUND} * smoothstep(1.2 * simF.z, 2.6 * simF.z, simR);
+			return mix(mix(vec3f(${SCLERA}), irisColour, iris), vec3f(0.02), pupil) * simLid * simRound;
 		#elif defined(GAME_SIM_MOUTH)
 			let shade = clamp(simT.y, 0.0, 1.0);
-			let c = mix(albedo, vec3f(0.6, 0.17, 0.17), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.6 * shade);
+			let tooth = (1.0 - clamp(simT.x, 0.0, 1.0)) * (1.0 - smoothstep(0.6, 0.7, shade));
+			let tW = fwidth(simT.z);
+			var tGap = 1.0 - smoothstep(${TOOTH_GAP.half} - tW, ${TOOTH_GAP.half} + tW, abs(fract(simT.z + 0.5) - 0.5));
+			tGap = mix(tGap, 2.0 * ${TOOTH_GAP.half}, smoothstep(0.2, 0.45, tW));
+			let c = mix(albedo, vec3f(0.6, 0.17, 0.17), clamp(simT.x, 0.0, 1.0)) * (1.0 - 0.6 * shade) * (1.0 - ${TOOTH_GAP.dark} * tooth * tGap);
 			return mix(c, vec3f(0.09, 0.018, 0.022), smoothstep(0.7, 1.0, shade));
 		#else
 			return albedo;
@@ -642,6 +996,9 @@ const PS_WGSL = {
 #endif`,
   albedo: `
 #ifdef GAME_RESIDENT
+	#ifdef GAME_SIM_WISP
+		dVertexNormalW = normalize(dVertexNormalW + dViewDirW * max(${WISP.facing} - dot(dVertexNormalW, dViewDirW), 0.0));
+	#endif
 	dAlbedo = gameSimAlbedo(dAlbedo, dVertexNormalW, dViewDirW);
 #endif`,
   gloss: `

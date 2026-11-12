@@ -23,6 +23,7 @@ import { ARROW_PS, GHOST_PS, GHOST_VS } from './shaders/ghost';
 import { colorsKey, objectCentre, type PartColors } from '../../core/protocol';
 import type { Lighting } from '../shared/environment';
 import { compose, multiply, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
+import { MaterialLibrary } from './materials';
 import { painted, standInOf } from '../shared/modelEntry';
 import { resizeKey, type ObjectResize, type PlacementGhost, type RendererDeps } from '../types';
 
@@ -217,11 +218,13 @@ export class PlacementGhostView {
       const a = this.arrowAt;
       compose(1, 1, 1, quatYawPitchRoll(a.yaw, 0, 0, this.q), a.x, a.y, a.z, this.arrowLocal);
     }
-    if (ghost.valid !== this.valid) {
+    const turned = ghost.valid !== this.valid;
+    if (turned) {
       this.valid = ghost.valid;
       this.tint();
     }
-    if (!was) this.show();
+    // (Shown anew, or the red copy's draws against the thing's own: `show`.)
+    if (!was || turned) this.show();
     else this.arrow.enabled = this.arrowOn;
   }
 
@@ -365,9 +368,16 @@ export class PlacementGhostView {
     });
   }
 
-  /** Its draws on or off (in hand or not), placed for this frame. */
+  /**
+   * Its draws on or off (in hand or not), placed for this frame. The red copy leaves out a tree's leaf cards
+   * (`MaterialLibrary.isCutout`): its shader has no cut-out, so they would be a cloud of whole quads; the
+   * trunk, the boughs and the solid leaf masses inside the cards are the tree's shape.
+   */
   private show(): void {
-    for (const draw of this.draws) draw.enabled = this.shown;
+    const lib = MaterialLibrary.for(this.app);
+    this.draws.forEach((draw, i) => {
+      draw.enabled = this.shown && (this.valid || !lib.isCutout(this.own[i]));
+    });
     this.arrow.enabled = this.shown && this.arrowOn;
     if (this.shown) this.frame(0);
   }

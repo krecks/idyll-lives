@@ -374,8 +374,10 @@ export interface SimRig {
   relaxArms: number;
   /** Wears a skirt (the hands hang clear of it). */
   skirt: boolean;
-  /** The face's morph weights (one per channel), settling towards the expression. */
+  /** The face's morph weights (one per expression channel), settling towards the expression. */
   faceState: Float32Array;
+  /** What the resident's own face moves and sizes of its eyeballs (`identity.ts` `writeIdentity`; `pose.ts` `Placement.eyes`). */
+  eyes: Float32Array;
   /** Face asymmetry: left / right side scales (~0.9..1.1, from the seed). */
   faceL: number;
   faceR: number;

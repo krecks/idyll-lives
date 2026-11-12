@@ -17,9 +17,9 @@
  *   / ring / blanket instance matrices), never meshes.
  * - Clothes are painted on the body by its shader (each garment's cut over the body's fields);
  *   shells (`top.*`, `bottom.*`, `shoes.*` parts) are added only where the silhouette needs them.
- * - Small face parts (teeth, tongue, lashes, brows) are drawn only on faces big enough on screen to
- *   show them, and faces too small to show expressions skip their morphs (`faceDetail`); only the
- *   instance lists change per frame.
+ * - Small face parts (teeth, tongue, lashes, brows) and the hair's wisps (its soft edges) are drawn
+ *   only on faces big enough on screen to show them, and faces too small to show expressions skip
+ *   their morphs (`faceDetail`); only the instance lists change per frame.
  * - Far from the camera a Sim switches to the low-detail body and shells (`lod.*` parts; with a gap
  *   between switching down and up), and every Sim casts its sun shadow from shadow-only copies of
  *   those (`shadowMeshes`, on the shadow-only layer; none where Sims cast no shadows, `castsShadows`).
@@ -60,7 +60,7 @@ import { LOW_TOP, SIT_LOW } from './clips/low';
 import { RIDE_BIKE, RIDE_BIKE_CHILD, RIDE_SCOOTER } from './clips/rides';
 import { FLOOR_SITS } from './clips/seated';
 import { HANDED } from './clips/serve';
-import { type BodyData, type CharacterSet, type Clip, loadCharacterSet, loadStage } from './data';
+import { CLOSE_UP, type BodyData, type CharacterSet, type Clip, type MorphSet, loadCharacterSet, loadCloseUp, loadStage } from './data';
 import { BEARING_FLOATS, bearing } from './bodyLanguage';
 import { gaitFor } from './gait';
 import { TURN_FADE, isTurn, turnClipIn, turnDone, turnOnSpot, turnYaw } from './turns';
@@ -71,14 +71,15 @@ import { cradled, cuddlePose, onPad, writeCradle } from './cuddles';
 import { lyingPose, measureLegs, measureSit, outfitFit, type PoseKit } from './measure';
 import { type Hands, palmAt, placeFrame, placeHand, placeProp } from './props';
 import { rimOf } from './clips/shot';
-import { DETAIL_PX, FACE_PARTS, LOD_FAR_PX, LOD_HEIGHT_PX, LOD_NEAR_PX, MORPH_PX, POSE_FAR_PX, POSE_NEAR_PX, type PartMesh, Range, YOUNG_STAGES, shellBit, skinChunks } from './parts';
+import { FACE_PARTS, LOD_FAR_PX, LOD_HEIGHT_PX, LOD_NEAR_PX, MORPH_PX, POSE_FAR_PX, POSE_NEAR_PX, type PartMesh, Range, YOUNG_STAGES, detailOf, shellBit, skinChunks, wispsOf } from './parts';
 import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, sampleClip, skin } from './pose';
 import { BABBLE, compose, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clamp, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, hash, lerp, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
 import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './seatFit';
 import { BATH_WEAR, BEDS, BENCH_HIP, BENCH_KNEE, BLANKET_BEDS, BLANKET_MEET, BUNKS, type Bed, CLIP_HEIGHT, CURLED_BEDS, DEFAULT_BED, DEFAULT_SEAT, FEET_UP, FOOTSTOOLS, LEGS_OUT_DROP, LIE_CENTRE, LIE_ENTRY, type LegFit, NO_FEET_UP, ON_FLOOR, PEDAL, type PlacedObject, QUILT_COLOUR, QUILT_PART, REST_BACK, RISING, SEATS, SIDE_BEDS, SIDE_IN, SIT_CLIPS, SIT_FLEX, SIT_FROM, SLING, type Seat, type SeatFit, TUCK, floorSit, seatOf, slingTop } from './seats';
 import { AIM, Anim, EMBRACE, KISS_FIT, REFUSED, gesturesOf } from './socials';
 import { BLANKET_WIDTH, quiltGeometry, quiltTint } from './blanket';
-import { APPEARANCE_TEXELS, BONE_FLOATS, BONE_TEXELS, MORPH_TEXELS } from './layout';
+import { APPEARANCE_TEXELS, BONE_FLOATS, BONE_TEXELS, EXPRESSION_TEXELS, MORPH_TEXELS } from './layout';
+import { faceOf, writeIdentity } from './identity';
 import type { TemplateCache } from '../templateCache';
 import { WALL_HEIGHT } from '../walls';
 import { MOST_CADENCE, MOUNT_SECONDS, MOUNTS, type Mount, mountNodes } from './vehicles';
@@ -177,6 +178,8 @@ function samplePlayer(set: CharacterSet, p: Player, q: Float32Array, t: Float32A
 
 export class Characters<M extends object, Q, P extends ResidentProp> {
   private set: CharacterSet | null = null;
+  /** The morphs the view's texture was last made from, when not the set's own (`closeUp`). */
+  private morphsShown: MorphSet | null = null;
   private failed = false;
   private data!: Float32Array;
   /** The pose texture as last uploaded, and which rows were drawn then (see `upload`). */
@@ -556,6 +559,33 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     return (this.assets.has(key, 'character') ? this.assets.get(key, 'character')!.part : undefined) ?? `hair.${style}`;
   }
 
+  /**
+   * Fetches the close-up body for residents of `gender` at life stage `stage` (the base body's without one), once,
+   * and gives the view the morphs with its own among them. Resolves to whether it is there: a resident built
+   * with `closeUp: true` then draws it in the body's place (`build`), and until then, or without it, the body.
+   * Only for a view where a resident fills the picture (the creator's stage): play never asks, so never fetches it.
+   */
+  async closeUp(gender: string, stage?: string): Promise<boolean> {
+    if (!(await this.init())) return false;
+    const set = this.set!;
+    const base = this.baseBody(gender);
+    const ok = await loadCloseUp(set, base, stage ?? base.stage);
+    if (ok && set.closeUpMorphs && set.closeUpMorphs !== (this.morphsShown ?? set.morphs)) {
+      this.morphsShown = set.closeUpMorphs;
+      this.view.setMorphs(set.closeUpMorphs);
+    }
+    return ok;
+  }
+
+  /** Whether the close-up body for `gender` at `stage` has loaded (`closeUp`). */
+  hasCloseUp(gender: string, stage?: string): boolean {
+    const set = this.set;
+    if (!set) return false;
+    const base = this.baseBody(gender);
+    const body = stage && stage !== base.stage ? set.bodies.get(`${base.name}.${stage}`) : base;
+    return !!body?.parts.has(CLOSE_UP);
+  }
+
   /** The base body (young adult) for a gender. */
   private baseBody(gender: string): BodyData {
     const set = this.set!;
@@ -600,7 +630,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // The low-detail body and clothes' shadow copies; sets without them cast from the full meshes.
     for (const p of this.shadowMeshes.values()) if (p.enabled) out.push(p.mesh);
     if (out.length) return out;
-    for (const [key, p] of this.meshes) if (p.enabled && !/:(eyes|brows|lashes|teeth|tongue|shoes\.)/.test(key)) out.push(p.mesh);
+    for (const [key, p] of this.meshes) if (p.enabled && !/:(eyes|brows|lashes|teeth|tongue|shoes\.)|\.wisps$/.test(key)) out.push(p.mesh);
     return out;
   }
 
@@ -660,10 +690,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const outfitId = (s as SimInfo & { outfitId?: number }).outfitId ?? s.id;
       const day = outfitFor(outfitId, s.gender, s.appearance, body, 'day', undefined, s.outfit);
       // (Pyjamas are the same garments, so the same chunks show at night.)
-      for (const part of skinChunks(body, day.parts)) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
+      // (The close-up body in the body's place for a resident that fills the view, once it has loaded: `closeUp`.)
+      const fine = !!(s as SimInfo & { closeUp?: boolean }).closeUp && body.parts.has(CLOSE_UP);
+      for (const chunk of skinChunks(body, day.parts)) {
+        const part = fine && chunk === 'body' ? CLOSE_UP : chunk;
+        if (body.parts.has(part)) push(`${body.name}:${part}`, s);
+      }
       for (const part of FACE_PARTS) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
-      if (body.parts.has(hairKey)) push(`${body.name}:${hairKey}`, s);
-      if (s.appearance?.beard && !YOUNG_STAGES.has(body.stage) && body.parts.has('hair.beard')) push(`${body.name}:hair.beard`, s);
+      // The hair and the beard, each with its wisps (its soft edges, drawn only close up: `detailOf`).
+      const hair = [hairKey, ...(s.appearance?.beard && !YOUNG_STAGES.has(body.stage) ? ['hair.beard'] : [])];
+      for (const part of hair.flatMap((h) => [h, wispsOf(h)])) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
       for (const part of day.parts) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
       // The low-detail body and clothes (drawn instead when the Sim is far from the camera).
       for (const part of ['lod.body', ...day.parts.map((p) => `lod.${p}`)]) if (body.parts.has(part)) push(`${body.name}:${part}`, s);
@@ -831,7 +867,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         warmth: 1,
         relaxArms: 0,
         skirt: false,
-        faceState: new Float32Array(set.morphs?.channels.length ?? 0),
+        faceState: new Float32Array(set.morphs?.expressions ?? 0),
+        eyes: new Float32Array(4),
         faceL: 1 + (hash(s.id * 7 + 3) - 0.5) * 0.2,
         faceR: 1 + (hash(s.id * 7 + 5) - 0.5) * 0.2,
         speech: null,
@@ -843,6 +880,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const fit = outfitFit(set, base);
       rig.outfits = Object.fromEntries(WEARS.map((wear) => [wear, outfitFor(outfitId, s.gender, s.appearance, body, wear, fit, s.outfit)])) as Record<Wear, OutfitParams>;
       this.wear(rig, s.id, rig.outfits.day);
+      this.writeFace(rig, s.id, faceOf(s.appearance, outfitId));
     }
     for (const p of this.meshes.values()) this.enablePart(p, false);
     for (const p of this.shadowMeshes.values()) this.enablePart(p, false);
@@ -955,10 +993,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         yaw: k,
         seed: hash(id),
         face: { ...NEUTRAL },
-        faceState: new Float32Array(set.morphs?.channels.length ?? 0),
+        faceState: new Float32Array(set.morphs?.expressions ?? 0),
+        eyes: new Float32Array(4),
         speech: null,
       };
       this.sims[id] = rig;
+      this.writeFace(rig, id, faceOf(undefined, id));
       const look = { body: '#5F86C9', skin: '#C08A64', hair: '#2B2320', hairStyle: 'short' as const, height: 1, top: 'top.tee', bottom: 'bottom.trousers', shoes: 'shoes.sneakers' };
       writeOutfit(outfitFor(id, body.name, look, body), this.data, this.row(id) + set.bones.length * BONE_FLOATS);
     }
@@ -1010,6 +1050,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       pl.scale = rig.scale;
       pl.head = rig.head;
       pl.build = rig.build;
+      pl.eyes = rig.eyes;
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp, true);
       this.visible[i] = 1;
     });
@@ -1209,7 +1250,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const baby = shown.grip === 'aim' ? rig.cuddleBaby : -1;
     if (baby >= 0 && this.headJoints[baby * 3 + 1] !== 0) {
       for (let k = 0; k < 3; k++) this.aimAt[k] = this.headJoints[baby * 3 + k];
-      this.aimAt[1] += 0.03 * (this.sims[baby]?.scale ?? 1);
+      this.aimAt[1] += 0.026 * (this.sims[baby]?.scale ?? 1);
       h.aim = this.aimAt;
     } else h.aim = undefined;
     placeHand(m, i, shown, h);
@@ -2169,6 +2210,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       pl.scale = rig.scale;
       pl.head = rig.head;
       pl.build = rig.build;
+      pl.eyes = rig.eyes;
       this.posedAt[i * 2] = pl.x;
       this.posedAt[i * 2 + 1] = pl.z;
       // Sitting or lying on a seat that moves (a rocking chair, a swing): along with it.
@@ -4312,6 +4354,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /**
+   * Gives Sim `i` its own face (`identity.ts`): its identity texels, after the expression's, and what the face moves
+   * of its eyeballs (`rig.eyes`, for `skin`). Once, when the Sim is built: nothing rewrites those texels until the
+   * next build.
+   */
+  private writeFace(rig: SimRig, i: number, face: Record<string, number>): void {
+    const set = this.set!;
+    if (!set.morphs) return;
+    writeIdentity(set.morphs, rig.body, face, this.data, this.row(i) + set.bones.length * BONE_FLOATS + (APPEARANCE_TEXELS + EXPRESSION_TEXELS) * 4, rig.eyes);
+  }
+
+  /**
    * Uploads the pose texture's rows that changed since the last upload (Sims drawn now, or just
    * hidden), as one band of rows: a few of the 64 most frames, none while the game is paused.
    */
@@ -4662,8 +4715,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (cached) return cached;
     if (!body.parts.has(part)) return null;
     const mesh = this.view.createPart(body, part, shadow);
-    const range = shadow ? Range.Always : part.startsWith('lod.') ? Range.Far : part === 'body' || /^(body|top|bottom|shoes)\./.test(part) ? Range.Near : Range.Always;
-    const pm: PartMesh<M> = { mesh, enabled: true, settings: new Float32Array(0), count: 0, all: new Float32Array(0), detail: shadow ? 0 : (DETAIL_PX[part] ?? 0), range, shell: shellBit(part) };
+    const range = shadow ? Range.Always : part.startsWith('lod.') ? Range.Far : part === 'body' || part === CLOSE_UP || /^(body|top|bottom|shoes)\./.test(part) ? Range.Near : Range.Always;
+    const pm: PartMesh<M> = { mesh, enabled: true, settings: new Float32Array(0), count: 0, all: new Float32Array(0), detail: shadow ? 0 : detailOf(part), range, shell: shellBit(part) };
     meshes.set(key, pm);
     if (!shadow) this.parts.set(mesh, pm);
     return pm;
@@ -4702,8 +4755,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /**
    * How big each Sim's face is on screen (`facePx`: px per 5 cm), and the rows each part draws: only
    * those drawn now (not those hidden, away or out of view: every part, shadow-only copies too, or
-   * they're skinned all the same, to nothing), the small face parts (teeth, tongue, lashes, brows)
-   * only on the faces big enough to show them, the low-detail body or the full one by distance, and
+   * they're skinned all the same, to nothing), the small face parts (teeth, tongue, lashes, brows) and the
+   * hair's wisps only on the faces big enough to show them, the low-detail body or the full one by distance, and
    * not the shells clothes leave out. Parts drawn whatever the distance are written again only when
    * who is drawn changes.
    */

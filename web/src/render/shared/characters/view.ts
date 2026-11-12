@@ -19,7 +19,7 @@
 import type { ModelEntry } from '../../../assets/types';
 import type { TemplateCache } from '../templateCache';
 import type { QuiltGeometry } from './blanket';
-import type { BodyData, CharacterSet } from './data';
+import type { BodyData, CharacterSet, MorphSet } from './data';
 
 /** A thing residents carry or hold (content `items`, a station's tool, an object's held part), as the engine built it. */
 export interface ResidentProp {
@@ -51,6 +51,11 @@ export interface ResidentView<M extends object, Q, P extends ResidentProp> {
    * (`set.morphs`), the morph texture (half floats, as `morphs.data`).
    */
   init(set: CharacterSet, data: Float32Array, width: number, rows: number): void;
+  /**
+   * The morph texture again, from `morphs`: a set's `closeUpMorphs` once a close-up body has loaded (larger, and
+   * the same in every texel `set.morphs` uses, so what is drawn stays as it is).
+   */
+  setMorphs(morphs: MorphSet): void;
   /** Uploads the whole pose texture (`build`). */
   uploadPoses(): void;
   /** Uploads rows `from` .. `from + count - 1` of the pose texture (per frame: the band of rows that changed). */

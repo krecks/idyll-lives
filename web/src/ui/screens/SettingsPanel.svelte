@@ -302,15 +302,15 @@
         </SettingRow>
         <SettingRow
           title="Shading"
-          hint="Soft: wide, gentle light, closer to a painting. Classic: the shading the game had before."
-          details="Soft draws every lit surface with a wide, soft ramp in the light's own colour, so golden hour stays golden, lamps stay warm and shade takes the sky's tint. Classic is the physically based shading it replaced. Water, the sky and glass that keeps its reflections have their own look either way."
+          hint="Classic: light as it falls, colours as they are. Soft: wide, gentle light, closer to a painting."
+          details="Classic is physically based shading: skin, grass and wood keep their own colours. Soft draws every lit surface with a wide, soft ramp in the light's own colour and more saturation, so golden hour stays golden, lamps stay warm and shade takes the sky's tint. Water, the sky and glass that keeps its reflections have their own look either way."
         >
           <Segmented
             label="Shading"
             bind:value={settings.shading}
             options={[
-              { value: 'soft', label: 'Soft' },
               { value: 'classic', label: 'Classic' },
+              { value: 'soft', label: 'Soft' },
             ]}
           />
         </SettingRow>

@@ -10,11 +10,15 @@
  * - `cam=orbit` (24 m round the home lot, a turn in 40 s), `wide` (80 m, 90 s), `build` (orbit in
  *   Build mode, paused), `dusk` (orbit at speed 5 from the scene's 18:00, the light changing every frame),
  *   `mirror` (the home lot's first mirror from 4.4 m, from over its room with the walls up, the camera
- *   swinging round the glass every 20 s), `mirror-still` (the same, held still in the swing's middle).
+ *   swinging round the glass every 20 s), `mirror-still` (the same, held still in the swing's middle),
+ *   `street` (the home lot from across its street, low: the house's front, the pavement, the road),
+ *   `town` (the menus' town from the menu's own angle, lit for `hour`).
+ * - `radius=`, `beta=`, `tx=`, `tz=`: the orbit's distance, angle and target instead of its path's (the game
+ *   opens at beta 0.86); `walls=up|cutaway|down`: the walls held that way (up: the house whole, roof on).
  * - `res=1080` that resolution (720, 1080, 1440, 2160; `res=1` every line the window has); `res=auto` (default) the player's setting.
  * - `secs=20` measured after `warmup=5`; `cap=0` frames per second at most (0: every frame shown).
  * - `hud=0` hides the interface; `gpu=0` doesn't time the GPU; `label=…` is kept with the result.
- * - `diag=noshadows,noaa,nonature,nolamps,nomirrors,noglass,nonight,freeze`: features
+ * - `diag=noshadows,noaa,nonature,nolamps,nomirrors,noglass,nonight,noao,noclouds,freeze`: features
  *   left out (to measure what each costs; `nowoods`, `nofarwoods`, `noflowers` and `nograss` leave out
  *   one part of the nature); `freeze` stops time for screenshots (`at=<s>` along the path);
  *   `shaders` logs every shader and pipeline made (the warm-up should leave none for play).
@@ -24,8 +28,9 @@
  */
 
 import { host } from '../game/host';
+import { whenStreamSettled } from '../assets/stream';
 import { deleteSave } from '../persistence/saves';
-import type { FrameCounts, RenderPassInfo } from '../render/types';
+import type { FrameCounts, Renderer, RenderPassInfo } from '../render/types';
 import { settings, unsavedSettings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
 import { services } from '../ui/services';
@@ -49,6 +54,10 @@ const PATHS = {
  * lamp beside the glass, not in front of it.
  */
 const MIRROR_PATH = { distance: 4.4, radius: 6, beta: 0.8, turn: -0.4, swing: 0.2, period: 20 };
+/** `cam=street`: aimed at the home lot's entry from across the street, low enough for the house's front and the far pavement. */
+const STREET = { radius: 22, beta: 1.2 };
+/** `cam=town`: the menus' town as the main menu frames it (`menuScene.ts`), over the whole picture. */
+const TOWN = { beta: 1.32, alpha: 0.55, zoom: 1.55 };
 /**
  * `cam=roam`: the camera's target along a loop over the town at `ROAM.speed` m/s (an ellipse
  * through the home lot, inset from the edge), looking the way it goes from `radius` m up and
@@ -90,6 +99,8 @@ function roamPose(t: number, b: { x0: number; z0: number; x1: number; z1: number
 const START_ALPHA = -Math.PI * 0.62;
 /** Longest wait for the game to start (loading, shaders). */
 const START_LIMIT_MS = 120_000;
+/** Longest wait, before a picture, for the town's files to arrive and for what they hold to be built. */
+const SETTLE_LIMIT_MS = 60_000;
 
 interface Stats {
   avg: number;
@@ -151,8 +162,8 @@ declare global {
   }
 }
 
-/** The game's interface hidden (`hud=0`): the top bar and the household strip, what's over the world, the toasts. */
-const HUD_HIDDEN = '.hud-root, .world-overlay, .toast-layer { display: none !important; }';
+/** The game's interface hidden (`hud=0`): the top bar and the household strip, what's over the world, the toasts, the pill of what streams in. */
+const HUD_HIDDEN = '.hud-root, .world-overlay, .toast-layer, .stream { display: none !important; }';
 
 /** `hud=0` on a page that isn't the benchmark's (`?state=…&debug&hud=0`: pictures of the world for checks): the interface hidden. */
 export function hideHud(): void {
@@ -225,6 +236,9 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
   const frozen = b.diag.has('freeze');
   const mirror = b.cam === 'mirror' || b.cam === 'mirror-still' ? mirrorView(renderer.benchInfo().scene as { mirrorSpots?: Spot[] }, plot) : null;
   if (mirror) controls.setWallMode('up');
+  else if (b.walls) controls.setWallMode(b.walls);
+  // From across the street: the eye past the lot's entry, on the line from the lot's middle through it.
+  const street = b.cam === 'street' && plot ? { alpha: plot.entry ? Math.atan2(plot.entry[1] - centre[2], plot.entry[0] - centre[0]) : START_ALPHA, target: (plot.entry ? [plot.entry[0], 0, plot.entry[1]] : centre) as [number, number, number] } : null;
 
   const intervals: number[] = [];
   const cpuFrame: number[] = [];
@@ -249,6 +263,10 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
         renderer.setCameraPose({ alpha, beta: m.beta, radius: m.radius, target: [g[0] + k * Math.cos(alpha) * s, g[1] + k * Math.cos(m.beta), g[2] + k * Math.sin(alpha) * s] });
       } else if (b.cam === 'roam') {
         renderer.setCameraPose(roamPose(t, bounds));
+      } else if (b.cam === 'town') {
+        // (The town's own camera: `setTownShot`.)
+      } else if (street) {
+        renderer.setCameraPose({ alpha: street.alpha, beta: b.orbit.beta ?? STREET.beta, radius: b.orbit.radius ?? STREET.radius, target: street.target });
       } else {
         const o = b.orbit;
         renderer.setCameraPose({ alpha: START_ALPHA + (2 * Math.PI * t) / path.period, beta: o.beta ?? path.beta, radius: o.radius ?? path.radius, target: [centre[0] + o.tx, centre[1], centre[2] + o.tz] });
@@ -276,6 +294,14 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
 
   try {
     await sleep(b.warmup * 1000);
+    // A picture waits for the town's files and for what is built from them (a measurement keeps its timing).
+    if (frozen) {
+      await Promise.race([whenStreamSettled(), sleep(SETTLE_LIMIT_MS)]);
+      const until = performance.now() + SETTLE_LIMIT_MS;
+      while (renderer.benchInfo().building && performance.now() < until) await sleep(250);
+      await renderer.framesRendered(3);
+    }
+    if (b.cam === 'town') await showTown(renderer, (b.hour ?? 13) * 60);
     window.__benchReady = true;
     // The measured stretch.
     const info = renderer.benchInfo();
@@ -344,6 +370,24 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
     if (!frozen) renderer.setFrameProbe(null);
     renderer.measureGpu(false, 'bench');
   }
+}
+
+/**
+ * `cam=town`: the menus' town of the world in play, framed as the main menu frames it (`MenuScene.baseShot`)
+ * and lit for `minute`. After the warm-up, when the game's own start has let go of the town (it hides the
+ * menus' as it reveals the game); a moment more for the town's models to arrive.
+ */
+async function showTown(renderer: Renderer, minute: number): Promise<void> {
+  const world = renderer.benchWorld();
+  if (!world) throw new Error('No town to show');
+  const main = world.meta?.areas?.[0];
+  const inTown = main ? world.plots.filter((p) => p.x + p.w / 2 >= main.x && p.x + p.w / 2 <= main.x + main.w && p.z + p.d / 2 >= main.z && p.z + p.d / 2 <= main.z + main.d) : world.plots;
+  const [x0, z0] = [Math.min(...inTown.map((p) => p.x)), Math.min(...inTown.map((p) => p.z))];
+  const focus = { x: x0, z: z0, w: Math.max(...inTown.map((p) => p.x + p.w)) - x0, d: Math.max(...inTown.map((p) => p.z + p.d)) - z0 };
+  await renderer.showTown(world, minute);
+  renderer.setTownShot({ focus, ...TOWN, sway: 0, drift: 0, duration: 0, minute }, true);
+  await sleep(3000);
+  if (!renderer.townShown) throw new Error('The town did not stay on screen');
 }
 
 type Spot = { x: number; y: number; z: number; nx: number; ny: number; nz: number };

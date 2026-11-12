@@ -16,6 +16,8 @@ import type { RoadPlan, WorldStructure } from '../../core/protocol';
 import { rasterRoads, roadEnds, RoadIndex, roadIndex, SIDEWALK, trimJoins } from '../../game/roads';
 import { Geo, type V3 } from './geometry';
 import { deriveJunctions, hasSidewalks, JunctionCuts, KERB_RETURN, offsetMeet, planJunctions, turnedBack, turnedOn, type CornerPlan, type JunctionPlan } from './junctions';
+import { asphaltVary, carriageway, repair, STREET_LOOK, tint } from './paving';
+import { valueNoise } from '../../game/noise';
 
 export { RoadIndex, roadIndex, SIDEWALK };
 /** The kerb's width, and the levels of the sidewalk, the kerb and the road. */
@@ -33,6 +35,8 @@ const MARK_IN = 0.15;
 /** The markings' paint: a vertex colour (worn white: no brighter than the sidewalks) with the plain finish's roughness in its alpha (`street.ts` `encodeFinish`: 0.7, not metal). */
 const PAINT = '#D6D6D0';
 const PAINT_FINISH = 0.35;
+/** The course of kerb stones along the back of a sidewalk, by the lots (m wide). */
+const BACK_COURSE = 0.12;
 /** How far a dead end's turning circle reaches past the lane's kerbs (m). */
 const TURNING = 2.4;
 
@@ -267,6 +271,9 @@ export interface RoadMeshes {
   marks?: Geo;
 }
 
+/** How far from another road a road's wear begins to even out (m). */
+const JUNCTION_FADE = 4.5;
+
 /**
  * The roads' surfaces, sidewalks, kerbs and gutters, only near `clip` (grown by `margin`) when
  * given: the road surface under the sidewalks too, the sidewalks on top (added to `into`'s meshes if given;
@@ -275,7 +282,16 @@ export interface RoadMeshes {
  * their markings with the surface into `into.marks` if given. Only streets and lanes have sidewalks:
  * a country road among `roads` only stops theirs.
  */
-export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, margin = 0, into: Partial<RoadMeshes> = {}, parts: 'both' | 'surface' | 'sidewalks' = 'both', junctions: readonly JunctionPlan[] = roadJunctions(roads)): RoadMeshes {
+export function roadMeshes(
+  roads: readonly RoadPlan[],
+  clip: Box | null = null,
+  margin = 0,
+  into: Partial<RoadMeshes> = {},
+  parts: 'both' | 'surface' | 'sidewalks' = 'both',
+  junctions: readonly JunctionPlan[] = roadJunctions(roads),
+  /** The half width of road `ri`'s carriageway (m) if its asphalt is toned by vertex (worn, and patched between kerbs: `paving.ts`); 0 or none: one plain quad a stretch. With it, the junctions' pads are toned too (`STREET_LOOK.junction`). */
+  worn?: (ri: number) => number,
+): RoadMeshes {
   const [withSurface, withSidewalks] = [parts !== 'sidewalks', parts !== 'surface'];
   const surface = into.surface ?? new Geo();
   const walk = into.walk ?? new Geo();
@@ -294,7 +310,50 @@ export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, 
     for (let i = 0; i + 1 < frames.length; i++) {
       const [mx, mz] = [(frames[i].p[0] + frames[i + 1].p[0]) / 2, (frames[i].p[1] + frames[i + 1].p[1]) / 2];
       if (!near(mx, mz, half)) continue;
-      if (withSurface) surface.poly([P(i, half, ROAD_Y), P(i + 1, half, ROAD_Y), P(i + 1, -half, ROAD_Y), P(i, -half, ROAD_Y)], up);
+      const lane = withSurface ? (worn?.(ri) ?? 0) : 0;
+      if (withSurface && !lane) surface.poly([P(i, half, ROAD_Y), P(i + 1, half, ROAD_Y), P(i + 1, -half, ROAD_Y), P(i, -half, ROAD_Y)], up);
+      if (lane) {
+        // Worn asphalt: rows 4 m along, toned across where wheels run and where they don't.
+        const [a, b] = [frames[i], frames[i + 1]];
+        const at = (t: number, off: number, y: number): V3 => {
+          // (Across as the sidewalks are laid, `Q` below: the wear keeps its distance from the kerbs round a bend.)
+          const [nx, nz] = [a.n[0] + (b.n[0] - a.n[0]) * t, a.n[1] + (b.n[1] - a.n[1]) * t];
+          const l = Math.abs(off) < half - 1e-6 ? Math.hypot(nx, nz) || 1 : 1;
+          return [a.p[0] + (b.p[0] - a.p[0]) * t + (nx / l) * off, y, a.p[1] + (b.p[1] - a.p[1]) * t + (nz / l) * off];
+        };
+        const band = carriageway(lane);
+        const offs = [-half, ...band.at, half].filter((o, k, list) => k === 0 || o - list[k - 1] > 0.05);
+        // (A road without kerbs is a country road: longer rows, no repairs.)
+        const kerbed = lane < half - 0.01;
+        // Where another road meets or crosses this one the wear across it fades into one even tone, the same
+        // on both roads: each worn its own way, the one drawn over the other lay on it like a slab, its bands
+        // ending on a ruled line. (Rows of 2 m there, so the fade has vertices to happen between.)
+        const meets = index.onRoad(mx, mz, (b.s - a.s) / 2 + half + JUNCTION_FADE, ri);
+        const rows = Math.max(1, Math.round((b.s - a.s) / (meets ? 2 : kerbed ? 4 : 8)));
+        const k0 = Math.round(a.s / 4);
+        const toneAt = (t: number, off: number): V3 => {
+          const [x, , z] = at(t, off, 0);
+          let even = 0;
+          if (meets) even = index.onRoad(x, z, 0, ri) ? 1 : index.onRoad(x, z, JUNCTION_FADE / 3, ri) ? 0.7 : index.onRoad(x, z, (JUNCTION_FADE * 2) / 3, ri) ? 0.4 : index.onRoad(x, z, JUNCTION_FADE, ri) ? 0.15 : 0;
+          const tone = band.tone(off);
+          return tint((tone + (STREET_LOOK.junction - tone) * even) * asphaltVary(x, z));
+        };
+        for (let k = 0; k < rows; k++) {
+          const [t0, t1] = [k / rows, (k + 1) / rows];
+          for (let o = 0; o + 1 < offs.length; o++) {
+            const c: [number, number][] = [[t0, offs[o + 1]], [t1, offs[o + 1]], [t1, offs[o]], [t0, offs[o]]];
+            surface.poly(c.map(([t, off]) => at(t, off, ROAD_Y)), up, undefined, undefined, c.map(([t, off]) => toneAt(t, off)));
+          }
+          // A repair: a patch of newer asphalt, a hair over the road.
+          const fix = kerbed && !meets ? repair(ri, k0 + k) : null;
+          if (fix) {
+            const [o0, o1] = [(fix.across - fix.wide) * lane, (fix.across + fix.wide) * lane];
+            const [u0, u1] = [t0 + (t1 - t0) * fix.from, t0 + (t1 - t0) * Math.min(1, fix.from + fix.long)];
+            const shade = tint(fix.tone);
+            surface.poly([at(u0, o1, ROAD_Y + 0.002), at(u1, o1, ROAD_Y + 0.002), at(u1, o0, ROAD_Y + 0.002), at(u0, o0, ROAD_Y + 0.002)], up, undefined, undefined, [shade, shade, shade, shade]);
+          }
+        }
+      }
       for (const side of walks ? ([1, -1] as const) : []) {
         // Offsets from the middle: the sidewalk's outer edge, the kerb's top, the road's edge, the gutter.
         const [edge, walkIn, kerb, gutter] = [half, half - (SIDEWALK - KERB), half - SIDEWALK, half - SIDEWALK - 0.4].map((o) => o * side);
@@ -348,18 +407,31 @@ export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, 
         // The quad between two offsets over `t0`..`t1` (`alpha`: the shade's at the first, fading to none at the second).
         const strip = (g: Geo, t0: number, t1: number, a: number, ya: number, b: number, yb: number, n: V3, alpha?: number) =>
           g.poly([Q(t0, a, ya), Q(t1, a, ya), Q(t1, b, yb), Q(t0, b, yb)], n, undefined, alpha === undefined ? undefined : [alpha, alpha, 0, 0]);
+        const LK = STREET_LOOK;
+        // The course of kerb stones at the walk's back, by the lots (m wide).
+        const back = edge - BACK_COURSE * side;
+        const segLen = frames[i + 1].s - frames[i].s;
         for (const [t0, t1] of runs) {
-          walk.color('#E6E6E6');
-          strip(walk, t0, t1, edge, WALK_Y, walkIn, WALK_Y, up);
-          walk.color('#FFFFFF');
+          // The slabs, lighter and darker along the walk (a piece every 3 m or so).
+          const pieces = Math.max(1, Math.round(((t1 - t0) * segLen) / 3));
+          const slab = (t: number, off: number): V3 => {
+            const [x, , z] = Q(t, off, 0);
+            return tint(1 - LK.walkVary + (valueNoise(x / 2.9, z / 2.9, 911) - 0.5) * 2 * LK.walkVary);
+          };
+          walk.color(LK.walk);
+          for (let k = 0; k < pieces; k++) {
+            const [u0, u1] = [t0 + ((t1 - t0) * k) / pieces, t0 + ((t1 - t0) * (k + 1)) / pieces];
+            walk.poly([Q(u0, back, WALK_Y), Q(u1, back, WALK_Y), Q(u1, walkIn, WALK_Y), Q(u0, walkIn, WALK_Y)], up, undefined, undefined, [slab(u0, back), slab(u1, back), slab(u1, walkIn), slab(u0, walkIn)]);
+          }
+          walk.color(LK.kerb);
+          strip(walk, t0, t1, edge, WALK_Y, back, WALK_Y, up);
           strip(walk, t0, t1, walkIn, KERB_Y, kerb, KERB_Y, up);
           // Kerb faces: the step up from the walk and the drop to the road; the walk's own edge.
           strip(walk, t0, t1, walkIn, WALK_Y, walkIn, KERB_Y, out);
           strip(walk, t0, t1, kerb, KERB_Y, kerb, ROAD_Y, inward);
-          walk.color('#E6E6E6');
           strip(walk, t0, t1, edge, WALK_Y, edge, 0, out);
           // Gutter: the road darkens along the kerb.
-          strip(shadows, t0, t1, kerb, ROAD_Y + 0.003, gutter, ROAD_Y + 0.003, up, 0.3);
+          strip(shadows, t0, t1, kerb, ROAD_Y + 0.003, gutter, ROAD_Y + 0.003, up, LK.gutterShade);
         }
       }
     }
@@ -373,23 +445,27 @@ export function roadMeshes(roads: readonly RoadPlan[], clip: Box | null = null, 
       const inLane = (x: number, z: number) => laneIndex.distance(0, x, z) < half;
       for (let k = 0; k < n; k++) {
         const [a0, a1] = [(k / n) * Math.PI * 2, ((k + 1) / n) * Math.PI * 2];
-        if (withSurface) surface.poly([[ex, ROAD_Y, ez], at(a1, r + SIDEWALK, ROAD_Y), at(a0, r + SIDEWALK, ROAD_Y)], up);
+        // (Worn as the lane is: paler in the middle, where cars turn, dark round the kerb.)
+        const turn = withSurface && worn?.(ri) ? [tint(0.85 * asphaltVary(ex, ez)), tint(STREET_LOOK.gutter), tint(STREET_LOOK.gutter)] : undefined;
+        if (withSurface) surface.poly([[ex, ROAD_Y, ez], at(a1, r + SIDEWALK, ROAD_Y), at(a0, r + SIDEWALK, ROAD_Y)], up, undefined, undefined, turn);
         const am = (a0 + a1) / 2;
         if (!walks || inLane(ex + Math.cos(am) * (r + SIDEWALK / 2), ez + Math.sin(am) * (r + SIDEWALK / 2))) continue;
         const [edge, walkIn, kerb] = [r + SIDEWALK, r + KERB, r];
         const radial: V3 = [Math.cos(am), 0, Math.sin(am)];
-        walk.color('#E6E6E6').poly([at(a0, walkIn, WALK_Y), at(a0, edge, WALK_Y), at(a1, edge, WALK_Y), at(a1, walkIn, WALK_Y)], up);
-        walk.color('#FFFFFF').poly([at(a0, kerb, KERB_Y), at(a0, walkIn, KERB_Y), at(a1, walkIn, KERB_Y), at(a1, kerb, KERB_Y)], up);
+        const LK = STREET_LOOK;
+        walk.color(LK.walk).poly([at(a0, walkIn, WALK_Y), at(a0, edge - BACK_COURSE, WALK_Y), at(a1, edge - BACK_COURSE, WALK_Y), at(a1, walkIn, WALK_Y)], up);
+        walk.color(LK.kerb).poly([at(a0, edge - BACK_COURSE, WALK_Y), at(a0, edge, WALK_Y), at(a1, edge, WALK_Y), at(a1, edge - BACK_COURSE, WALK_Y)], up);
+        walk.poly([at(a0, kerb, KERB_Y), at(a0, walkIn, KERB_Y), at(a1, walkIn, KERB_Y), at(a1, kerb, KERB_Y)], up);
         walk.poly([at(a0, kerb, ROAD_Y), at(a0, kerb, KERB_Y), at(a1, kerb, KERB_Y), at(a1, kerb, ROAD_Y)], [-radial[0], 0, -radial[2]]);
         walk.poly([at(a0, walkIn, KERB_Y), at(a0, walkIn, WALK_Y), at(a1, walkIn, WALK_Y), at(a1, walkIn, KERB_Y)], radial);
-        walk.color('#E6E6E6').poly([at(a0, edge, 0), at(a1, edge, 0), at(a1, edge, WALK_Y), at(a0, edge, WALK_Y)], radial);
-        shadows.poly([at(a0, kerb, ROAD_Y + 0.003), at(a1, kerb, ROAD_Y + 0.003), at(a1, kerb - 0.4, ROAD_Y + 0.003), at(a0, kerb - 0.4, ROAD_Y + 0.003)], up, undefined, [0.3, 0.3, 0, 0]);
+        walk.poly([at(a0, edge, 0), at(a1, edge, 0), at(a1, edge, WALK_Y), at(a0, edge, WALK_Y)], radial);
+        shadows.poly([at(a0, kerb, ROAD_Y + 0.003), at(a1, kerb, ROAD_Y + 0.003), at(a1, kerb - 0.4, ROAD_Y + 0.003), at(a0, kerb - 0.4, ROAD_Y + 0.003)], up, undefined, [LK.gutterShade, LK.gutterShade, 0, 0]);
       }
     }
   });
   for (const j of junctions) {
     if (!near(j.x, j.z, 20)) continue;
-    if (withSurface) junctionPad(j, surface);
+    if (withSurface) junctionPad(j, surface, !!worn);
     if (withSidewalks) for (const c of j.corners) if (c.walk) junctionCorner(j, c, walk, shadows);
     if (withSurface && into.marks) junctionMarks(j, into.marks);
   }
@@ -424,7 +500,7 @@ function armPoint(j: JunctionPlan, a: number, along: number, across: number): [n
  * their corners), the kerb returns' arcs between them, fanned from its middle (each corner's arc
  * seen whole from there).
  */
-function junctionPad(j: JunctionPlan, surface: Geo): void {
+function junctionPad(j: JunctionPlan, surface: Geo, toned: boolean): void {
   const ring: [number, number][] = [];
   const n = j.arms.length;
   for (let k = 0; k < n; k++) {
@@ -442,7 +518,9 @@ function junctionPad(j: JunctionPlan, surface: Geo): void {
     }
   }
   if (ring.length < 3) return;
-  surface.poly([[j.x, ROAD_Y, j.z], ...ring.map(([x, z]): V3 => [x, ROAD_Y, z]), [ring[0][0], ROAD_Y, ring[0][1]]], UP);
+  const pts: V3[] = [[j.x, ROAD_Y, j.z], ...ring.map(([x, z]): V3 => [x, ROAD_Y, z]), [ring[0][0], ROAD_Y, ring[0][1]]];
+  // (Toned, it has the one even tone the worn roads fade to where they meet: `STREET_LOOK.junction`.)
+  surface.poly(pts, UP, undefined, undefined, toned ? pts.map(([x, , z]) => tint(STREET_LOOK.junction * asphaltVary(x, z))) : undefined);
 }
 
 const scale = (v: Pt2, k: number): [number, number] => [v[0] * k, v[1] * k];
@@ -466,7 +544,7 @@ function junctionCorner(j: JunctionPlan, c: CornerPlan, walk: Geo, shadows: Geo)
   const inner = arc(o, r - KERB, fb, fa);
   const at = (p: Pt2, y: number): V3 => [p[0], y, p[1]];
   // The sidewalk: fanned from the land's corner (it sees the whole arc).
-  walk.color('#E6E6E6').poly([at(qq, WALK_Y), at(pb, WALK_Y), ...inner.map((p) => at(p, WALK_Y)), at(pa, WALK_Y)], UP);
+  walk.color(STREET_LOOK.walk).poly([at(qq, WALK_Y), at(pb, WALK_Y), ...inner.map((p) => at(p, WALK_Y)), at(pa, WALK_Y)], UP);
   // Its outer edges.
   walk.poly([at(pa, 0), at(qq, 0), at(qq, WALK_Y), at(pa, WALK_Y)], [...nv(turnedOn(A.dir))]);
   walk.poly([at(qq, 0), at(pb, 0), at(pb, WALK_Y), at(qq, WALK_Y)], [...nv(turnedBack(B.dir))]);
@@ -478,10 +556,10 @@ function junctionCorner(j: JunctionPlan, c: CornerPlan, walk: Geo, shadows: Geo)
     const m: Pt2 = [(o0[0] + o1[0]) / 2 - o[0], (o0[1] + o1[1]) / 2 - o[1]];
     const l = Math.hypot(m[0], m[1]) || 1;
     const radial: V3 = [m[0] / l, 0, m[1] / l];
-    walk.color('#FFFFFF').poly([at(i0, KERB_Y), at(o0, KERB_Y), at(o1, KERB_Y), at(i1, KERB_Y)], UP);
+    walk.color(STREET_LOOK.kerb).poly([at(i0, KERB_Y), at(o0, KERB_Y), at(o1, KERB_Y), at(i1, KERB_Y)], UP);
     walk.poly([at(o0, ROAD_Y), at(o0, KERB_Y), at(o1, KERB_Y), at(o1, ROAD_Y)], radial);
     walk.poly([at(i0, KERB_Y), at(i0, WALK_Y), at(i1, WALK_Y), at(i1, KERB_Y)], [-radial[0], 0, -radial[2]]);
-    shadows.poly([at(o0, ROAD_Y + 0.003), at(o1, ROAD_Y + 0.003), at(g1, ROAD_Y + 0.003), at(g0, ROAD_Y + 0.003)], UP, undefined, [0.3, 0.3, 0, 0]);
+    shadows.poly([at(o0, ROAD_Y + 0.003), at(o1, ROAD_Y + 0.003), at(g1, ROAD_Y + 0.003), at(g0, ROAD_Y + 0.003)], UP, undefined, [STREET_LOOK.gutterShade, STREET_LOOK.gutterShade, 0, 0]);
   }
   // A short way on along each arm's sidewalk, under where it begins: no gap where its road bends
   // off the arm's way out (its sidewalk's end is square to its road there, the corner's to the arm).
@@ -497,12 +575,14 @@ function junctionCorner(j: JunctionPlan, c: CornerPlan, walk: Geo, shadows: Geo)
     const n = turnedOn(j.arms[k].dir);
     const out: V3 = [n[0] * side, 0, n[1] * side];
     const inward: V3 = [-out[0], 0, -out[2]];
-    walk.color('#E6E6E6').poly([P(t0, h + KERB, WALK_Y), P(t1, h + KERB, WALK_Y), P(t1, h + SIDEWALK, WALK_Y), P(t0, h + SIDEWALK, WALK_Y)], UP);
+    // (With the course of kerb stones at its back, as the arm's sidewalk has.)
+    walk.color(STREET_LOOK.walk).poly([P(t0, h + KERB, WALK_Y), P(t1, h + KERB, WALK_Y), P(t1, h + SIDEWALK - BACK_COURSE, WALK_Y), P(t0, h + SIDEWALK - BACK_COURSE, WALK_Y)], UP);
+    walk.color(STREET_LOOK.kerb).poly([P(t0, h + SIDEWALK - BACK_COURSE, WALK_Y), P(t1, h + SIDEWALK - BACK_COURSE, WALK_Y), P(t1, h + SIDEWALK, WALK_Y), P(t0, h + SIDEWALK, WALK_Y)], UP);
     walk.poly([P(t0, h + SIDEWALK, 0), P(t1, h + SIDEWALK, 0), P(t1, h + SIDEWALK, WALK_Y), P(t0, h + SIDEWALK, WALK_Y)], out);
-    walk.color('#FFFFFF').poly([P(t0, h, KERB_Y), P(t1, h, KERB_Y), P(t1, h + KERB, KERB_Y), P(t0, h + KERB, KERB_Y)], UP);
+    walk.poly([P(t0, h, KERB_Y), P(t1, h, KERB_Y), P(t1, h + KERB, KERB_Y), P(t0, h + KERB, KERB_Y)], UP);
     walk.poly([P(t0, h, ROAD_Y), P(t1, h, ROAD_Y), P(t1, h, KERB_Y), P(t0, h, KERB_Y)], inward);
     walk.poly([P(t0, h + KERB, WALK_Y), P(t1, h + KERB, WALK_Y), P(t1, h + KERB, KERB_Y), P(t0, h + KERB, KERB_Y)], out);
-    shadows.poly([P(t0, h, ROAD_Y + 0.003), P(t1, h, ROAD_Y + 0.003), P(t1, h - 0.4, ROAD_Y + 0.003), P(t0, h - 0.4, ROAD_Y + 0.003)], UP, undefined, [0.3, 0.3, 0, 0]);
+    shadows.poly([P(t0, h, ROAD_Y + 0.003), P(t1, h, ROAD_Y + 0.003), P(t1, h - 0.4, ROAD_Y + 0.003), P(t0, h - 0.4, ROAD_Y + 0.003)], UP, undefined, [STREET_LOOK.gutterShade, STREET_LOOK.gutterShade, 0, 0]);
   }
 }
 

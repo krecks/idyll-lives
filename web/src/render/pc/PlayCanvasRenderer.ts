@@ -49,6 +49,7 @@ import { GameBirds } from './birds';
 import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming';
 import { steadyShaderKeys } from './shaderKeys';
 import { natureDecor, windStill } from './nature';
+import { PETALS } from '../shared/nature';
 import { TownOverview, townLayer } from './overview';
 import { Placing } from './placing';
 import { Picker } from './picking';
@@ -73,9 +74,11 @@ import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
 import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS } from '../shared/lens';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
+import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
 import { PLAYBACK_RATE } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
+import { pavedRects } from '../shared/paving';
 import { GrassPush } from '../shared/grass';
 import { idleMoment } from '../shared/idle';
 import { coveringSurface, houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
@@ -648,6 +651,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sizeWatch.observe(canvas);
     const forceWebGL = this.deps.backend === 'webgl' || new URLSearchParams(location.search).get('renderer') === 'webgl';
     this.device = await createDevice(canvas, forceWebGL);
+    // (Before the first material is made: Low's shaders are built without the clouds' shadows.)
+    if (!this.quality.cloudShadows) withoutCloudShadows(this.device);
     steadyShaderKeys();
     // Before anything compiles: every shader and pipeline is counted (`?diag=shaders` logs them).
     this.shaderWatch = new ShaderWatch(this.device, this.diag.has('shaders'));
@@ -679,8 +684,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     cam.layers = cam.layers.filter((id) => id !== pc.LAYERID_SKYBOX);
     // The picture after the light: multisampling or FXAA, the image processing
     // and the night grade (`post.ts`; the diag views and `?diag=linear` without them).
-    this.post = new PostProcessing(this.app, cam, gamePostOptions(this.quality.msaaSamples, this.diag, diagViewActive, this.quality.leanTargets));
+    this.post = new PostProcessing(this.app, cam, gamePostOptions(this.quality.msaaSamples, this.diag, diagViewActive, this.quality.leanTargets, this.quality.contactShading));
     this.post.setLook(gameLook(LOOK));
+    // Leaf cards soften their edges with the picture's samples (none on Low, nor without the post-processing).
+    this.lib.setCutoutCoverage(this.post.samples > 1);
 
     this.sun = new pc.Entity('sun');
     this.sun.addComponent('light', {
@@ -932,7 +939,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.sunShadows.frame();
       this.applyCamera();
       this.pushGrass(dt);
-      this.lot.frame(dt); // (the sky round the camera, the grass in view.)
+      this.lot.frame(dt, this.townMode); // (the sky round the camera, the clouds' shadows, the grass in view.)
       if (!this.townMode) this.updateCutaway();
       // (The marker faces the camera as it is now, after this frame's input.)
       this.placeMarker();
@@ -1567,9 +1574,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const list = all?.filter(onLot) ?? [];
       if (!list.length) continue;
       const geo = new Geo();
-      for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-      const mesh = meshFrom(this.device, geo.meshData());
-      if (mesh) this.lotEntities.push({ entity: drawMesh(this.root, name, mesh, this.lotMaterial(material)), storey: 0 });
+      // Paving toned by vertex (darker and mossy at its sides: `shared/paving.ts`), as the street's.
+      const toned = name === 'paths';
+      if (toned) pavedRects(geo, list, all ?? list, y);
+      else for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+      const mesh = meshFrom(this.device, geo.meshData({ colors: toned }));
+      if (mesh) this.lotEntities.push({ entity: drawMesh(this.root, name, mesh, toned ? this.lib.surface(material, { doubleSided: true, vertexColors: true }) : this.lotMaterial(material)), storey: 0 });
     }
   }
 
@@ -1700,7 +1710,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!placed) {
       placed = { template, draws: [] };
       for (const m of template.meshes) {
-        const d = new Instances(this.device, this.root, m.mesh, m.material, { name: m.name, castShadows: true, receiveShadows: true });
+        const d = new Instances(this.device, this.root, m.mesh, m.material, { name: m.name, castShadows: key !== PETALS, receiveShadows: true });
         windStill(d.meshInstance, m);
         placed.draws.push(d);
       }
@@ -2796,6 +2806,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (target === post?.fxaa) return 'imageProcessing';
     return target.name;
   };
+
+  benchWorld(): WorldStructure | null {
+    return this.lastWorld;
+  }
 
   /**
    * What the benchmark reports of the renderer (`debug/bench.ts`), its fields meaning what they mean

@@ -33,8 +33,9 @@ use std::sync::Arc;
 
 use nalgebra::{DMatrix, DVector};
 
-use super::contract::channels;
+use super::contract::expressions;
 use super::head::{HeadFrame, front_z, head_frame, smin};
+use super::identity::Identity;
 use super::kdtree::KdTree;
 use super::meshops::smooth_normals;
 use super::np::{PI, clip, interp, linspace, lstsq, radians, sign, smoothstep};
@@ -64,6 +65,32 @@ struct Style {
     upper: f64,
     lower: f64,
     tilt: f64,
+    /// Both lids' edges turned about the eye's axis (degrees; + the outer corner lower): a face of its own.
+    cant: f64,
+}
+
+/// What a face of its own (identity.rs `Identity`, each of its numbers -1..1) takes on at 1: fuller lips
+/// (of their heights, their depth and how far they stand off the skin), the eyes' outer corners higher
+/// (degrees both lids' edges turn, `Style::cant`), and larger eyes open wider (degrees: the upper lid's edge higher, the
+/// lower's lower).
+const LIP_FULLNESS: f64 = 0.34;
+const EYE_TILT: f64 = -7.0;
+const EYE_OPEN: [f64; 2] = [-3.0, 2.0];
+
+/// The family's style with a face of its own.
+fn style_of(family: &str, id: &Identity) -> Style {
+    let s = style(family);
+    let full = 1.0 + LIP_FULLNESS * id.lip_fullness;
+    Style {
+        lip_u: s.lip_u * full,
+        lip_l: s.lip_l * full,
+        lip_z: s.lip_z * (1.0 + 0.5 * LIP_FULLNESS * id.lip_fullness),
+        proud: s.proud * (1.0 + 0.5 * LIP_FULLNESS * id.lip_fullness),
+        upper: s.upper + EYE_OPEN[0] * id.eye_size,
+        lower: s.lower + EYE_OPEN[1] * id.eye_size,
+        cant: EYE_TILT * id.eye_tilt,
+        ..s
+    }
 }
 
 fn style(family: &str) -> Style {
@@ -83,6 +110,7 @@ fn style(family: &str) -> Style {
             upper: 63.0,
             lower: 121.0,
             tilt: 0.0,
+            cant: 0.0,
         }
     } else {
         Style {
@@ -100,6 +128,7 @@ fn style(family: &str) -> Style {
             upper: 61.0,
             lower: 120.0,
             tilt: -3.0,
+            cant: 0.0,
         }
     }
 }
@@ -151,6 +180,9 @@ fn lip_s() -> Vec<f64> {
 fn bow(s: f64) -> f64 {
     (-((s.abs() - 0.3) / 0.2).powi(2)).exp()
 }
+
+/// A tooth's width (m): what the lines between the teeth are spaced by (the shader's, tone.z).
+const TOOTH: f64 = 0.0075;
 
 fn teeth_s() -> Vec<f64> {
     linspace(-0.62, 0.62, 9)
@@ -378,15 +410,16 @@ fn round_eyes(head: &HeadFrame, tris: &[[V3; 3]]) -> Vec<[V3; 3]> {
 }
 
 impl Face {
-    fn new(family: &str, head: Arc<HeadFrame>) -> Self {
+    /// The face of `head`; `base`: the base stage's head the lids are laid out on (`lid_z`, `seams`), `id`: a
+    /// face of its own (identity.rs: then `head` is that face's head, and `base` too).
+    fn new(family: &str, head: Arc<HeadFrame>, base: Arc<HeadFrame>, id: &Identity) -> Self {
         let mm = 0.001 * head.hh / ADULT_HH;
         let hw = head.mouth_w / 2.0 * 0.92;
         let bare = round_eyes(&head, &head.bare);
-        let base = head_frame(family, BASE_STAGE);
         let base = (base.clone(), round_eyes(&base, &base.bare));
         let mut f = Face {
             h: head,
-            st: style(family),
+            st: style_of(family, id),
             mm,
             hw,
             m0: (0.0, 0.0),
@@ -586,8 +619,8 @@ impl Face {
             let to = t;
             let inner = smoothstep(0.1, -0.9, to);
             let (u0, l0) = (
-                st.upper + 27.0 * t * t + st.tilt * to,
-                st.lower - 21.0 * t * t + 2.0 * to,
+                st.upper + 27.0 * t * t + (st.tilt + st.cant) * to,
+                st.lower - 21.0 * t * t + (2.0 + st.cant) * to,
             );
             // (Overlapping by 20 degrees at most.)
             let corner = (LID_CORNER.1 * (t.abs() - LID_CORNER.0).max(0.0).powi(2))
@@ -1090,6 +1123,8 @@ fn tone(name: &str, pos: &[V3], idx: &[usize], face: &Face) -> Vec<[f64; 4]> {
             let s = (pos[i].x - face.h.mouth[0]).abs() / face.hw;
             let c = clip(s / 0.62, 0.0, 1.0);
             t[i][1] = 0.05 + 0.5 * (c * c);
+            // (The teeth counted from the middle: the shader draws a line at every whole number.)
+            t[i][2] = (pos[i].x - face.h.mouth[0]) / TOOTH;
         }
     }
     t
@@ -1118,8 +1153,45 @@ pub struct FaceOut {
     pub follow: Option<Follow>,
 }
 
+/// The face of a base stage's head at rest, part by part (`PARTS` order; `body`: the lids and lips merged
+/// into it): positions and normals, and how many of `body`'s are the lids' (its first). `id`: a face of
+/// its own on its own head (identity.rs takes its difference from the shared face's; the layout is the
+/// same).
+#[allow(clippy::type_complexity)]
+pub fn rest_parts(
+    family: &str,
+    head: Arc<HeadFrame>,
+    id: &Identity,
+) -> (Vec<(&'static str, Vec<V3>, Vec<V3>)>, usize) {
+    let face = Face::new(family, head.clone(), head, id);
+    let rest = pieces(&face, &Params::default());
+    let parts = PARTS
+        .iter()
+        .map(|&(part, names)| {
+            let (mut pos, mut nor) = (Vec::new(), Vec::new());
+            for &nm in names {
+                pos.extend(&rest[nm].0);
+                nor.extend(smooth_n(nm, &rest[nm].0, &rest[nm].1));
+            }
+            (part, pos, nor)
+        })
+        .collect();
+    let lids = PARTS[0]
+        .1
+        .iter()
+        .filter(|n| n.starts_with("lid"))
+        .map(|n| rest[n].0.len())
+        .sum();
+    (parts, lids)
+}
+
 pub fn build_face(family: &str, stage: &str, head: Arc<HeadFrame>) -> FaceOut {
-    let face = Face::new(family, head);
+    let face = Face::new(
+        family,
+        head,
+        head_frame(family, BASE_STAGE),
+        &Identity::NONE,
+    );
     let rest = pieces(&face, &Params::default());
     let mut parts = vec![("eyes".to_string(), face.eyeballs())];
     let mut body = Vec::new();
@@ -1188,7 +1260,7 @@ pub fn build_face(family: &str, stage: &str, head: Arc<HeadFrame>) -> FaceOut {
             .collect()
     };
     let mut chans: Vec<(&str, PartDeltas)> = Vec::new();
-    for c in channels() {
+    for c in expressions() {
         let d = if let Some(vp) = viseme_params(c) {
             if vp.is_empty() {
                 Vec::new()
@@ -1236,7 +1308,7 @@ pub fn build_face(family: &str, stage: &str, head: Arc<HeadFrame>) -> FaceOut {
     let upper: Vec<bool> = (0..lips.len()).map(|i| i < rest["lipU"].0.len()).collect();
     let mut fm = Vec::new();
     if let Some((_, bm)) = morphs.iter().find(|e| e.0 == "body") {
-        for c in channels() {
+        for c in expressions() {
             if let Some((dp, _)) = bm.get(c) {
                 fm.push((c, dp[k0..k0 + lips.len()].to_vec()));
             }

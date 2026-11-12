@@ -2,11 +2,12 @@
  * Checks the residents' clips (web/src/render/shared/characters/clips) baked on the built rig:
  *
  *     bun tools/characters/check_clips.ts [rig.json] [--body male|female|all]
- *         [--stage <stage>[,<stage>…]|all] [--update-baseline]
+ *         [--stage <stage>[,<stage>…]|all] [--update-baseline] [--reach]
  *
  * - `--body`: the bodies to check on (default `male`, the reference).
  * - `--stage`: the life stages (`baby`, `child`, `teen`, `youngAdult`, `adult`, `elder`, or `all`;
  *   default `youngAdult,baby`: the reference stage, and the babies' for their own clips).
+ * - `--reach`: also list every limb an IK solve placed whose target was out of its reach or inside its fold.
  * - `--update-baseline`: rewrite `clip-baseline.json` (next to this file) with this run's failures,
  *   keeping the entries of bodies and stages it didn't check, and exit 0.
  *
@@ -193,11 +194,13 @@ let path = new URL('../../web/public/assets/characters/rig.json', import.meta.ur
 let bodyArg = 'male';
 let stageArg = 'youngAdult,baby';
 let updateBaseline = false;
+let listReach = false;
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a === '--body') bodyArg = argv[++i];
   else if (a === '--stage') stageArg = argv[++i];
   else if (a === '--update-baseline') updateBaseline = true;
+  else if (a === '--reach') listReach = true;
   else if (a.startsWith('--')) usage(`unknown flag ${a}`);
   else path = a;
 }
@@ -226,7 +229,21 @@ const set = {
   reference: rig.reference ?? null,
   bodies,
 } as any;
-const clips = bake([...clipDefs(), ...TURNS.map(({ deg, sgn, child }) => turnDef(deg, sgn > 0, child))], set);
+/** Per clip and limb an IK solve placed (clips/dsl.ts `ReachReport`): the furthest and the nearest its target was, as shares of the limb's length. */
+const reaches = new Map<string, { clip: string; limb: string; far: number; near: number; fold: number }>();
+const clips = bake([...clipDefs(), ...TURNS.map(({ deg, sgn, child }) => turnDef(deg, sgn > 0, child))], set, (clip, limb, reach, fold) => {
+  const key = `${clip} ${limb}`;
+  const r = reaches.get(key) ?? { clip, limb, far: 0, near: Infinity, fold };
+  r.far = Math.max(r.far, reach);
+  r.near = Math.min(r.near, reach);
+  reaches.set(key, r);
+});
+// `--reach`: every limb whose target was out of its reach or inside its fold, the worst first.
+if (listReach) {
+  const rows = [...reaches.values()].filter((r) => r.far > 0.9995 || r.near < r.fold).sort((a, b) => Math.max(b.far - 1, b.fold - b.near) - Math.max(a.far - 1, a.fold - a.near));
+  for (const r of rows) console.log(`${r.clip.padEnd(28)} ${r.limb}  far ${r.far.toFixed(3)}  near ${r.near.toFixed(3)} (fold ${r.fold.toFixed(3)})`);
+  console.log(`${rows.length} of ${reaches.size} limbs out of reach or inside their fold`);
+}
 const CB = set.clipBones;
 const refBody = bodies.get(set.reference?.body ?? 'male')!;
 

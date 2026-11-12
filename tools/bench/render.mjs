@@ -26,6 +26,8 @@
  *     --extra 'k=v&k=v'        more URL flags for every run
  *     --out <dir>              default <repo>/bench-results/<time>/
  *   --shots <dir>              fixed poses, paused (`diag=freeze`, `hud=0`): one PNG per preset × backend × pose
+ *     --poses orbit-day-0,…    which (`POSES`; `play`: the play set, the pictures a change to the look is judged by;
+ *                              `day`: the day set, the play camera over three homes at three hours of the day)
  *     --pages [gallery,…]      with --shots: the dev pages instead (`PAGES`: the gallery, clips, residents and
  *                              poses benches, each held still), one PNG per page × backend × diag
  *   --compare <dirA> <dirB>    pixel differences between two shot folders (and `--out` for the difference images)
@@ -90,7 +92,39 @@ const POSES = {
   'mirror-day-0': 'cam=mirror&hour=13&at=0',
   'mirror-day-15': 'cam=mirror&hour=13&at=15',
   'mirror-night-0': 'cam=mirror&hour=21&at=0',
+  // The play set (`--poses play`): the home lot as a game opens on it (24 m, beta 0.86) with the sun behind the
+  // camera and ahead of it, at dusk and by night; the same with the walls up (the house whole, roof on); the lot
+  // from across its street; and the menus' town from the main menu's angle.
+  'play-day': 'cam=orbit&hour=13&at=0&beta=0.86',
+  'play-day-b': 'cam=orbit&hour=13&at=20&beta=0.86',
+  'play-dusk': 'cam=orbit&hour=19&at=0&beta=0.86',
+  'play-night': 'cam=orbit&hour=21&at=0&beta=0.86',
+  'up-day': 'cam=orbit&hour=13&at=0&beta=0.86&walls=up',
+  'up-dusk': 'cam=orbit&hour=19&at=0&beta=0.86&walls=up',
+  'up-night': 'cam=orbit&hour=21&at=0&beta=0.86&walls=up',
+  'street-day': 'cam=street&hour=13&walls=up',
+  'street-night': 'cam=street&hour=21&walls=up',
+  'town-day': 'cam=town&hour=16.5',
+  // The day set (`--poses day`): the play camera by day over three homes of the scene, in the morning, at midday
+  // and in the late afternoon. `home` is the home lot (`day-home-13` is `play-day`, `day-back-13` is `play-day-b`:
+  // the same lot from its other side, the street in view); `east` a fuller house with shrubs at its foot, a hedge
+  // and trees; `north` a fenced lot with its drive, the street and a neighbour's house whole.
+  'day-home-9': 'cam=orbit&hour=9.5&at=0&beta=0.86',
+  'day-home-13': 'cam=orbit&hour=13&at=0&beta=0.86',
+  'day-home-16': 'cam=orbit&hour=16.5&at=0&beta=0.86',
+  'day-back-13': 'cam=orbit&hour=13&at=20&beta=0.86',
+  'day-east-9': 'cam=orbit&hour=9.5&at=0&beta=0.86&tx=34',
+  'day-east-13': 'cam=orbit&hour=13&at=0&beta=0.86&tx=34',
+  'day-east-16': 'cam=orbit&hour=16.5&at=0&beta=0.86&tx=34',
+  'day-north-13': 'cam=orbit&hour=13&at=0&beta=0.86&tz=-34',
+  'day-north-16': 'cam=orbit&hour=16.5&at=0&beta=0.86&tz=-34',
 };
+/** `--poses play`: the pictures a change to the look is judged by. */
+const PLAY = ['play-day', 'play-day-b', 'play-dusk', 'play-night', 'up-day', 'up-dusk', 'up-night', 'wide-day-0', 'wide-night-45', 'street-day', 'street-night', 'town-day'];
+/** `--poses day`: the play camera by day, where a change to the daytime look has to show. */
+const DAY = ['day-home-9', 'day-home-13', 'day-home-16', 'day-back-13', 'day-east-9', 'day-east-13', 'day-east-16', 'day-north-13', 'day-north-16', 'up-day'];
+/** Poses outside the default list. */
+const NAMED_ONLY = /^(mirror|play|up|street|town|day)-/;
 
 /**
  * Dev pages for `--shots --pages`: each held still (no wind, clips at a set time, residents' time
@@ -100,11 +134,44 @@ const POSES = {
 const PAGES = {
   'gallery-objects': { path: '/gallery.html', query: 'keys=model.sofa,model.armchair,model.bedDouble,model.fridge,model.bathtub,model.bookcaseTall,model.wardrobe,model.toilet,model.mirror,model.tableLamp&scale=adult&still', webgl: true },
   'gallery-nature': { path: '/gallery.html', query: 'still', webgl: true },
+  // A few things close up, without labels: the furniture's finishes and the trees' foliage (the sheets to judge a look by).
+  'gallery-furniture': { path: '/gallery.html', query: 'keys=model.sofa,model.armchair,model.fridge,model.bedDouble,model.bathtub,model.bookcaseTall&cols=3&labels=0&still', webgl: true },
+  'gallery-trees': { path: '/gallery.html', query: 'keys=model.tree,model.tree.maple,model.tree.birch,model.pine,model.bush,model.hedge&cols=3&labels=0&still', webgl: true },
+  // The broadleaved trees, whose crowns are leaf cards (`--extra 'camera=game&at=model.tree.birch'`: one from the game's camera; `--extra far`: their far versions).
+  'gallery-broadleaves': { path: '/gallery.html', query: 'keys=model.tree,model.tree.maple,model.tree.birch,model.tree.blossom,model.tree.fruit,model.tree.japaneseMaple,model.tree.magnolia,model.tree.willow,model.garden.lemonTree&cols=3&labels=0&still', webgl: true },
   clips: { path: '/clips.html', query: 'keys=model.fridge,model.sofa,model.wardrobe,model.shower&t=0.6', webgl: true },
   characters: { path: '/characters.html', query: 'manual', webgl: true },
+  // The residents' sheets (`characters.ts`): from the side, the heads close up, every skin, hairstyle, garment and
+  // build, and the stages from the game's camera as a game opens (24 m) and zoomed all the way in (6 m).
+  'characters-side': { path: '/characters.html', query: 'manual&view=side&labels=0', webgl: true },
+  'characters-heads': { path: '/characters.html', query: 'manual&closeup=1&labels=0', webgl: true },
+  'characters-close': { path: '/characters.html', query: 'manual&builds=all&closeup=1&labels=0&radius=1.3', webgl: true },
+  'characters-hands': { path: '/characters.html', query: 'manual&builds=all&family=male&closeup=1&gap=0.9&radius=0.75&y=0.84&labels=0', webgl: true },
+  'characters-feet': { path: '/characters.html', query: 'manual&builds=all&family=female&closeup=1&gap=0.9&radius=0.8&y=0.1&beta=1.15&alpha=1.0&labels=0', webgl: true },
+  'characters-skins': { path: '/characters.html', query: 'manual&skins=all&closeup=1&labels=0', webgl: true },
+  'characters-hair': { path: '/characters.html', query: 'manual&hair=all&labels=0', webgl: true },
+  'characters-tops': { path: '/characters.html', query: 'manual&tops=all&labels=0', webgl: true },
+  'characters-builds': { path: '/characters.html', query: 'manual&builds=all&labels=0', webgl: true },
+  'characters-game': { path: '/characters.html', query: 'manual&camera=game&labels=0', webgl: true },
+  'characters-near': { path: '/characters.html', query: 'manual&camera=near&labels=0', webgl: true },
+  // One resident as the household creator's face view frames them (half a metre of face down the picture), bald, to
+  // judge the head's outline: `--extra hd=1` draws the close-up body the creator's stage draws, without it the body.
+  'characters-creator': { path: '/characters.html', query: 'manual&family=male&stage=youngAdult&closeup=1&labels=0&fov=0.46&radius=1.07&skin=%23F3D6C2&hairStyle=none&t=0', webgl: true },
+  'characters-creator-female': { path: '/characters.html', query: 'manual&family=female&stage=youngAdult&closeup=1&labels=0&fov=0.46&radius=1.07&skin=%23F3D6C2&hairStyle=none&t=0', webgl: true },
   'characters-faces': { path: '/characters.html', query: 'manual&face=moods&family=female&cols=6&closeup=1&labels=0', webgl: true },
+  // The faces of their own (the identity channels): the shared face, then each channel at -1 and at +1, four channels
+  // a line, and a line of random faces (`--extra only=jawWidth,chinLength&per=2&radius=1.6`: a few of them, larger).
+  'characters-identity': { path: '/characters.html', query: 'manual&faces=all&family=male&closeup=1&t=0', webgl: true },
+  'characters-identity-female': { path: '/characters.html', query: 'manual&faces=all&family=female&closeup=1&t=0', webgl: true },
+  // Random faces alone, eight men and eight women (`--extra family=male`: one family, larger).
+  'characters-identity-random': { path: '/characters.html', query: 'manual&faces=random&closeup=1&t=0&cols=4', webgl: true },
+  // The sliders' corners: every channel at -1, at +1, and at one end or the other (the furthest a face goes).
+  'characters-identity-ends': { path: '/characters.html', query: 'manual&faces=ends&closeup=1&t=0&cols=5', webgl: true },
   poses: { path: '/poses.html', query: 'manual&labels=0', webgl: true, prepare: () => window.__poses.advance(2) },
   previews: { path: '/previews.html', query: '', webgl: true },
+  // The household creator's stage itself, at its face view (`--extra hd=0`: with the body, where it draws the close-up body).
+  'previews-stage': { path: '/previews.html', query: 'stage=male&zoom=1&bald', webgl: true },
+  'previews-stage-female': { path: '/previews.html', query: 'stage=female&zoom=1&bald', webgl: true },
   'poses-close': { path: '/poses.html', query: 'manual&only=sofa,sleep,cook,bath,piano,hug&cols=3&labels=0', webgl: true, prepare: () => window.__poses.advance(2) },
 };
 
@@ -409,7 +476,7 @@ function table(o, results) {
 
 async function shots(o) {
   const { backends, presets, diags, warmup, out } = o;
-  const poses = o.list('poses', Object.keys(POSES).filter((p) => !p.startsWith('mirror')).join(','));
+  const poses = o.list('poses', Object.keys(POSES).filter((p) => !NAMED_ONLY.test(p)).join(',')).flatMap((p) => (p === 'play' ? PLAY : p === 'day' ? DAY : [p]));
   for (const backend of backends) {
     for (const preset of presets) {
       for (const pose of poses) {

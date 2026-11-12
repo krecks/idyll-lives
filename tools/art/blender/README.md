@@ -8,6 +8,7 @@ The content fields are in [docs/content-packs.md](../../../docs/content-packs.md
 
 ```
 centres.json      where each model built here is centred at rest, for the gate only (the build writes it)
+leafcards.py      renders the trees' leaf-card atlas (`cargo art --leafcards`)
 gamekit/          the toolkit every family imports as G
 families/         one script per family: garden_decor, kitchen (the fridge's doors), living (the wall
                   bed that folds down); _template.py (a chest with a lid and a drawer) is the one to copy
@@ -59,6 +60,7 @@ cargo art kitchen --no-pack        # export without writing the pack
 cargo art --all                    # every family (not _template)
 cargo art _template --preview      # the template only previews
 cargo art --centres                # centres.json from every family (runs Blender, builds nothing)
+cargo art --leafcards              # the trees' leaf-card atlas (textures/leafcards/albedo.png), from leaves it generates
 cargo check-glb [model.fridge …]   # the gate alone (no Blender)
 cargo check-glb --keys             # the keys a build may write
 cargo check-glb --preview          # the gate, then Blender renders each file re-imported (<family>/rt_<name>.png)
@@ -114,7 +116,8 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    - The names become the material names in the file.
    - The finishes become the pack's `materials`, so they're declared only once.
    - The finishes are the base manifest's `material.finish.*`: matte, satin, gloss, metal and chrome
-     (plain), plus fabric, wood, bark and foliage (textured: one more draw call each) and glass.
+     (plain), plus fabric, wood, bark and foliage (textured: one more draw call each), leafcards (a tree's
+     leaf cards, cut out of their atlas: `families/plants.py` `clad` puts them there) and glass.
    - Name the main part the player may colour `body`; list it first in `paint`, then any other parts
      worth colouring, each with what the player calls it. Leave details (drains, water, food) out.
    - Hardware (handles, knobs, pulls, latches, taps) takes a `metal` or `chrome` colour: chrome or
@@ -456,7 +459,7 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
 | `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `turns` (parts out and back in turn), `scroll` (one repeat on, a belt), `path` (through keys), `stages` (a crop's growth); `clips` |
 | `export.py` | `export_glb` (the fixed export settings, the shading baked first), `write_pack`, `stats`, `materials_used` |
-| `shade.py` | `bake_ao`: the creases' shading baked into a grey vertex colour (COLOR_0), which the game multiplies in; the floor shades the foot of a model on the ground (`Model(ground=)`) |
+| `shade.py` | `bake_ao`: the creases' shading baked into a grey vertex colour (COLOR_0), which the game multiplies in; the floor shades the foot of a model on the ground (`Model(ground=)`); a tree's leaf cards keep the shading they were laid with |
 | `preview.py` | `preview` (front three-quarter, Workbench; or `view=` side, front, top), `lit` (EEVEE, as the game lights it: `--lit`), `preview_clips`, `preview_perches` |
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |
 | `far.py` | `far_of` (a far version from the model's own build at low detail), `low`, `is_low` |

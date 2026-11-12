@@ -6,12 +6,13 @@
 
 import { clip, cycle, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { stand, TAU } from './idle';
-import { armIK, wrist, type ArmOptions } from './ik';
+import { armIK, onBody, wrist, type ArmOptions } from './ik';
 
 type Hand = ArmOptions & { at: Vec };
 
 function hands(body: PoseSpec, l: Hand, r: Hand): PoseSpec {
-  return { ...body, ...armIK('l', l.at, body, { pole: [-0.4, -1, -0.2], ...l }), ...armIK('r', r.at, body, { pole: [0.4, -1, -0.2], ...r }) };
+  // (The fists by the chin and before the chest: places on the body, `onBody`.)
+  return { ...body, ...armIK('l', onBody(l.at), body, { pole: [-0.4, -1, -0.2], ...l }), ...armIK('r', onBody(r.at), body, { pole: [0.4, -1, -0.2], ...r }) };
 }
 
 interface Fight {

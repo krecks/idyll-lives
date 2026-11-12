@@ -41,7 +41,8 @@ BASE = dict(
     bloom_accent=('#C2367A', 'satin'),
     sand=('#C8B894', 'matte'),
     moss=('#5E7A34', 'matte'),
-    bed=('#6A4C38', 'matte'),           # a flower bed's soil mound: the part the player colours ("Bed")
+    bed=('#3C2C1E', 'matte'),           # a flower bed's soil mound: the part the player colours ("Bed"); dark earth
+                                        # (in a mid brown, #6A4C38, it was a salmon disc in the game's midday sun)
     bloom2=('#F2C12E', 'satin'),
     bloom3=('#EF6F9C', 'satin'),
     bloom4=('#F08A24', 'satin'),
@@ -61,6 +62,8 @@ M = G.Palette(**BASE)
 # Building a far version (gamekit's `far_of`): every shape with fewer segments (`low`) and no moving part
 # (`LOW[0]`, gamekit's flag, set while it builds).
 from gamekit.far import LOW, far_of, low  # noqa: E402,F401  (trees.py imports them from here too)
+from gamekit.shade import CARD as CARD_SHADE  # noqa: E402  (a leaf card's shading on its corners, kept as it is)
+from gamekit.uv import LAYER as UV_LAYER  # noqa: E402
 
 
 def palette(**colours):
@@ -984,6 +987,258 @@ def lump(name, r, at, material, scale=(1, 1, 1), seed=0.0, noise=0.25, segments=
     return obj
 
 
+# ---- leaf cards (the `leafcards` finish) -----------------------------------------------------------------------
+# A broadleaved tree's leaf masses are drawn as cut-out cards over a dark core, not as lumpy balls: each card a quad
+# carrying a cluster of leaves from the one atlas every tree shares (`cargo art --leafcards`, ../leafcards.py), lying
+# as a spray of leaves does, its normals the mass's hull's (not its own flat one), so the crown still shades as a
+# volume. The game draws the finish cut out by the atlas's alpha, from both sides (web/src/render/pc/materials.ts); the
+# file's materials stay one-sided. A build makes its masses as ever (`leaves`: the lumps, kept out of the model, for
+# what is found on them by casting rays: perches, fruit, blooms) and `clad` draws them as cards at the end, in the
+# lumps' box to the millimetre, so the tree stands where it stood (`G.settle`) with its perches. A far version keeps
+# the lumps.
+
+CARD_TILES = ((0.0, 0.5), (0.5, 0.5), (0.0, 0.0))    # each cluster's corner in the atlas (u, v from the bottom), 0.5 across
+CORE_TILE = (0.5, 0.0)                               # the dense, opaque wall of leaves, in the middle 0.8 of its tile: the cores'
+CARD_INSET = 0.03                                    # a card's UVs stop this far inside its tile: no mipmap of its edge reaches the next
+CARD_OWN = 0.25                                      # how much of its own facing a card's normals keep: sprays differ a little
+CARD_UP = 0.55                                       # how far a card's plane turns from straight out of its mass to straight up
+CARD_REACH = 1.1                                     # a card stays within this of its mass's ellipsoid (the lump's noise reaches as far)
+CARD_TOP = 0.25                                      # a card on top of its mass lies this much farther out: the crown keeps its height
+CARDS = 15                                           # cards a leaf mass
+CORE = 0.8                                           # a core's radius, of its masses' mean
+# Each leaf colour's cards (the palette's names): a card takes its mass's shade.
+CARD_OF = {'leaf': 'card', 'leaf2': 'card2', 'leaf3': 'card3', 'leaf4': 'card4', 'leaf5': 'card5', 'green': 'cardg',
+           'green2': 'cardg2'}
+MASSES = []                                          # the leaf masses of the build in hand, until `clad` draws them
+STAND_INS = []                                       # what else stands in for cards till then (the willow's ribbons)
+
+
+def leaves(name, r, at, material, scale=(1, 1, 1), seed=0.0, noise=0.25, segments=10, rings=6, group=None, cards=CARDS,
+           core=True):
+    """A leaf mass: a lump (`lump`, its arguments), which `clad` draws as `cards` leaf cards over a core (one for
+    all the masses of a `group`; none with `core` off: a spray at a bough's tip). Until then the lump stands in the
+    scene, out of the model (`join_still`), for the rays that find perches, fruit and blooms on the crown. A far
+    version keeps it."""
+    obj = lump(name, r, at, material, scale=scale, seed=seed, noise=noise, segments=segments, rings=rings)
+    if not LOW[0]:
+        half = Vector((r * scale[0], r * scale[1], r * scale[2]))
+        top = max((v.co for v in obj.data.vertices), key=lambda p: p.z).copy()
+        MASSES.append(dict(obj=obj, centre=Vector(at) + Vector((0, 0, half.z)), half=half, top=top, material=material.name,
+                           group=group, cards=cards, core=core, seed=seed))
+    return obj
+
+
+def stand_in(obj):
+    """Keeps `obj` out of the model as the leaf masses are, for the shape `clad`'s cards are to have (`more`): the
+    rays meet it and the cards stay in its box. A far version keeps it."""
+    if not LOW[0]:
+        STAND_INS.append(obj)
+    return obj
+
+
+def join_still(name):
+    """`G.join_all`, but for what `clad` is to draw as cards (`leaves`, `stand_in`): the still part so far."""
+    out = {m['obj'] for m in MASSES} | set(STAND_INS)
+    return G.join([o for o in G.meshes() if o not in out], name, origin=(0, 0, 0))
+
+
+class Cards:
+    """Leaf cards in the making: `over` each mass, then `build` one mesh a material."""
+
+    def __init__(self, name, seed, lo, hi):
+        """`lo`, `hi`: the box no card leaves, and `fill` has them reach (the crown's, as its lumps drew it: the
+        model keeps its size)."""
+        self.name, self.rng, self.lo, self.hi, self.by = name, random.Random(seed), lo, hi, {}
+
+    def add(self, at, facing, size, material, hull, shade, fit):
+        """A card `size` across at `at`, its plane facing `facing`, turned at random in it, moved to where
+        `fit(at, corners' offsets)` has it; `hull(point)` gives the normal at each corner, `shade` (0..1) its baked
+        shading."""
+        rng = self.rng
+        m = Vector(facing).normalized()
+        u = m.orthogonal().normalized()
+        v = m.cross(u)
+        a = rng.uniform(0, math.tau)
+        u, v = u * math.cos(a) + v * math.sin(a), v * math.cos(a) - u * math.sin(a)
+        h = size / 2
+        offsets = [-u * h - v * h, u * h - v * h, u * h + v * h, -u * h + v * h]
+        at = fit(Vector(at), offsets)
+        self._quad([at + o for o in offsets], m, material, hull, shade)
+
+    def hang(self, at, facing, width, height, material, hull, shade):
+        """An upright card `width` across and `height` tall at `at`, its plane facing `facing` (a hanging strand's:
+        the cluster drawn long, as leaves that hang)."""
+        m = Vector(facing).normalized()
+        v = (Vector((0, 0, 1)) - m * m.z).normalized()
+        u = v.cross(m)
+        w, h = width / 2, height / 2
+        self._quad([Vector(at) + o for o in (-u * w - v * h, u * w - v * h, u * w + v * h, -u * w + v * h)], m, material, hull, shade)
+
+    def _quad(self, corners, m, material, hull, shade):
+        """A card of `corners` (round `m`, its plane's facing), moved into the box, its normals `hull`'s at each, a
+        tile of the atlas on it."""
+        rng = self.rng
+        for i in range(3):
+            reach = [c[i] for c in corners]
+            by = max(0.0, self.lo[i] - min(reach)) - max(0.0, max(reach) - self.hi[i])
+            for c in corners:
+                c[i] += by
+        normals = [Vector(hull(c)).normalized() for c in corners]
+        if sum(normals, Vector()).dot(m) < 0:                          # wound to face the way its normals do
+            corners, normals, m = corners[::-1], normals[::-1], -m
+        normals = [n.lerp(m, CARD_OWN).normalized() for n in normals]
+        u0, v0 = CARD_TILES[rng.randrange(len(CARD_TILES))]
+        flip = rng.random() < 0.5
+        k = CARD_INSET
+        uvs = [(u0 + 0.5 * (k + (1 - 2 * k) * ((1 - x) if flip else x)), v0 + 0.5 * (k + (1 - 2 * k) * y))
+               for x, y in ((0, 0), (1, 0), (1, 1), (0, 1))]
+        self.by.setdefault(material.name, (material, []))[1].append((corners, normals, uvs, shade))
+
+    def over(self, centre, half, top, n, size, material, crown, shade, tilt=(0, 20), inside=0.35, push=(0.6, 0.86), blend=0.4,
+             under=-0.45):
+        """`n` cards over the ellipsoid at `centre` (`half` its half sizes): the first level on `top` (the lump's
+        highest point: the mass keeps its height, and a perch on it stays inside the tree), the rest spread evenly
+        round it, but not where it faces the crown's middle (`crown`; over `inside` towards it) nor underneath (below
+        `under`), each `push` of the way out to its surface (`CARD_TOP` more on top), `size` (a range) across. A card
+        lies as a spray of leaves does: its plane faces `CARD_UP` of the way from straight out of the mass to straight
+        up, then `tilt` degrees off that at random, so it is never edge-on to a camera that looks down on the tree (the
+        game's), on the crown's near side or at its outline. Normals: the ellipsoid's, `blend` of the way to the
+        crown's. `shade(direction, point)` gives each card's baked shading."""
+        rng = self.rng
+        c, crown = Vector(centre), Vector(crown)
+        ga = math.pi * (3 - math.sqrt(5))
+        off = rng.random() * math.tau
+        inward = crown - c
+        inward = inward.normalized() if inward.length > 1e-4 else Vector((0, 0, -1))
+
+        def fit(at, offsets):
+            """The card drawn in towards the mass's middle until its corners are within `CARD_REACH` of its ellipsoid."""
+            for _ in range(4):                                         # (each pass by its farthest corner)
+                out, corner = max(((math.sqrt(sum(((at[i] + o[i] - c[i]) / half[i]) ** 2 for i in range(3))), at + o) for o in offsets),
+                                  key=lambda q: q[0])
+                if out <= CARD_REACH:
+                    break
+                at = at - (corner - c) * (1 - CARD_REACH / out)
+            return at
+
+        def hull(p):
+            own = Vector(((p.x - c.x) / half[0] ** 2, (p.y - c.y) / half[1] ** 2, (p.z - c.z) / half[2] ** 2)).normalized()
+            return own.lerp((p - crown).normalized(), blend) + Vector((0, 0, 0.12))
+        self.add(top, (0, 0, 1), rng.uniform(*size), material, hull, shade(Vector((0, 0, 1)), top), lambda at, offsets: at)
+        made, i = 1, 0
+        while made < n and i < n * 4:
+            t = 1 - 2 * ((i + 0.5) / (n * 1.6) % 1.0)
+            ring = math.sqrt(max(0.0, 1 - t * t))
+            a = off + ga * i + rng.uniform(-0.3, 0.3)
+            d = Vector((ring * math.cos(a), ring * math.sin(a), t))
+            i += 1
+            if (d.dot(inward) > inside and d.z < 0.5) or d.z < under:
+                continue
+            at = c + Vector((d.x * half[0], d.y * half[1], d.z * half[2])) * rng.uniform(*push) * (1 + CARD_TOP * max(0.0, d.z))
+            flat = d.lerp(Vector((0, 0, 1)), CARD_UP).normalized()
+            side = flat.orthogonal().normalized()
+            turn = rng.uniform(0, math.tau)
+            side = side * math.cos(turn) + flat.cross(side) * math.sin(turn)
+            lean = math.radians(rng.uniform(*tilt))
+            self.add(at, flat * math.cos(lean) + side * math.sin(lean), rng.uniform(*size), material, hull, shade(d, at), fit)
+            made += 1
+
+    def fill(self):
+        """Moves the card nearest each side of the box out to it (not down to its floor): the cards are the lumps'
+        size across, deep and up to the millimetre, so the model is centred (`G.settle`) where the lumps centred it."""
+        quads = [q for _, cards in self.by.values() for q in cards]
+        for i, bound, pick in ((0, self.lo[0], min), (0, self.hi[0], max), (1, self.lo[1], min), (1, self.hi[1], max), (2, self.hi[2], max)):
+            corners = pick(quads, key=lambda q: pick(c[i] for c in q[0]))[0]
+            by = bound - pick(c[i] for c in corners)
+            for c in corners:
+                c[i] += by
+
+    def build(self):
+        """One mesh a material: four corners a card, their normals, UVs and shading as given."""
+        out = []
+        for material, quads in self.by.values():
+            mesh = bpy.data.meshes.new(f'{self.name}_{material.name}')
+            mesh.from_pydata([tuple(c) for corners, _, _, _ in quads for c in corners], [],
+                             [tuple(range(4 * i, 4 * i + 4)) for i in range(len(quads))])
+            layer = mesh.uv_layers.new(name=UV_LAYER)
+            shade = mesh.attributes.new(CARD_SHADE, 'FLOAT', 'POINT')
+            for i, (_, _, uvs, grey) in enumerate(quads):
+                for k in range(4):
+                    layer.data[4 * i + k].uv = uvs[k]                 # (a quad's loops run in its corners' order)
+                    shade.data[4 * i + k].value = max(0.05, min(1.0, grey))
+            for poly in mesh.polygons:
+                poly.use_smooth = True
+            mesh.normals_split_custom_set_from_vertices([tuple(n) for _, normals, _, _ in quads for n in normals])
+            mesh['uv_metres'] = True                                   # its UVs are the atlas's: gamekit/uv.py leaves them
+            obj = bpy.data.objects.new(mesh.name, mesh)
+            bpy.context.collection.objects.link(obj)
+            obj.data.materials.append(material)
+            out.append(obj)
+        return out
+
+
+def core_uvs(obj, across):
+    """Puts a core's UVs in the atlas's dense tile: a box projection about its own middle, the tile `across` metres,
+    turning back at the tile's edges (mirrored), so the leaves keep their size on a big core and nothing wraps into
+    the cut-out tiles."""
+    mesh = obj.data
+    co = [v.co for v in mesh.vertices]
+    mid = [(min(c[i] for c in co) + max(c[i] for c in co)) / 2 for i in range(3)]
+
+    def fold(x):
+        t = (x / across + 0.5) % 2.0
+        return 0.13 + 0.74 * (2.0 - t if t > 1.0 else t)
+    layer = mesh.uv_layers.get(UV_LAYER) or mesh.uv_layers.new(name=UV_LAYER)
+    for p in mesh.polygons:
+        d = max(range(3), key=lambda i: abs(p.normal[i]))
+        ua, va = [i for i in range(3) if i != d]
+        for li in p.loop_indices:
+            c = co[mesh.loops[li].vertex_index]
+            layer.data[li].uv = (CORE_TILE[0] + 0.5 * fold(c[ua] - mid[ua]), CORE_TILE[1] + 0.5 * fold(c[va] - mid[va]))
+    mesh['uv_metres'] = True
+    return obj
+
+
+def clad(P, still, seed, more=None):
+    """Draws the build's leaf masses (`leaves`) as leaf cards, joined into `still` (returned): over each mass its
+    cards in its colour's (`CARD_OF`, palette `P`), 1 to 1.4 of its radius across, shaded open on top and on the
+    crown's outside, darker underneath and towards its middle; under each group of masses, and each mass of no
+    group, a dark core (`P.core`, `CORE` of their mean radius); the lumps go, and the stand-ins (`stand_in`), which
+    `more(cards)` draws as a tree's own cards (the willow's strands). The cards fill the box of what they replace
+    and no more (`Cards.fill`), so the tree keeps its size and its place. Its own random numbers (`seed`). Nothing on
+    a far version (its lumps stay)."""
+    if not MASSES:
+        return still
+    bpy.context.view_layer.update()
+    lo, hi = G.measure([m['obj'] for m in MASSES] + STAND_INS)
+    crown = (Vector(lo) + Vector(hi)) / 2
+    cards = Cards('cards', seed, lo, hi)
+
+    def shade(d, at):
+        return 0.7 + 0.18 * d.dot((at - crown).normalized()) + 0.16 * d.z + cards.rng.uniform(-0.1, 0.1)
+    groups = {}
+    for i, m in enumerate(MASSES):
+        r = sum(m['half']) / 3
+        cards.over(m['centre'], m['half'], m['top'], m['cards'], (r, 1.4 * r), getattr(P, CARD_OF[m['material']]), crown, shade)
+        if m['core']:
+            groups.setdefault(m['group'] if m['group'] is not None else ('own', i), []).append(m)
+    if more:
+        more(cards)
+    cards.fill()
+    made = cards.build()
+    for k, (key, masses) in enumerate(groups.items()):
+        mid = sum((m['centre'] for m in masses), Vector()) / len(masses)
+        half = sum((m['half'] for m in masses), Vector()) / len(masses) * CORE
+        r = (half.x + half.y) / 2
+        made.append(core_uvs(lump(f'core{k}', r, (mid.x, mid.y, mid.z - half.z), P.core, scale=(half.x / r, half.y / r, half.z / r),
+                                  noise=0.3, seed=masses[0]['seed'], segments=6, rings=5), across=1.5 * r))
+    for obj in [m['obj'] for m in MASSES] + STAND_INS:
+        bpy.data.objects.remove(obj, do_unlink=True)
+    MASSES.clear()
+    STAND_INS.clear()
+    return G.join([still, *made], still.name, origin=(0, 0, 0))
+
+
 def spiral(n, radius, rng, jitter=0.25):
     """`n` points spread evenly over a disc (a sunflower's spiral), jittered: (x, y, degrees round)."""
     ga = math.pi * (3 - math.sqrt(5))
@@ -1666,6 +1921,8 @@ def hedge_block(P, length, h, depth, name='hedge', seed=0):
             secs.append(G.ring(length / 2 * (0.97 + 0.03 * k), depth / 2 * k, h * z, verts=n, square=low(7, 5)))
         block = G.loft(f'{name}_block', secs, material=P.leaf)
         G.jitter(block, 0.03, 0.22, seed=seed * 0.01 + 1.0)
+        # (Mounds a hand across to an arm's length: seen from above its top is not a ruled strip.)
+        G.jitter(block, 0.075, 0.5, seed=seed * 0.01 + 7.0)
         for i in range(7):                                           # stems under it
             x = (i - 3) / 3 * length * 0.4 + rng.uniform(-0.05, 0.05)
             y = rng.uniform(-0.12, 0.12) * depth
@@ -2189,7 +2446,7 @@ def lobed(lobes, depth=0.35):
 def pumpkins():
     """Pumpkin patch: a patch of soil, vines with curling tendrils, big lobed leaves on long stalks and a yellow flower,
     and three ribbed pumpkins on their stalks, grown from seedlings to ripe."""
-    P = palette(bed='#6A4C38', leaf='#4A7A36', leaf_dark='#5A8A3C', leaf_light='#6A9A44', stem='#7AA84C', bloom='#E8822A',
+    P = palette(leaf='#4A7A36', leaf_dark='#5A8A3C', leaf_light='#6A9A44', stem='#7AA84C', bloom='#E8822A',
                 stalk='#5E6A2E', blossom='#F2C12E')
     rng = random.Random(85)
     G.revolve('bed', [(0, 0), (0.46, 0), (0.42, 0.02), (0.3, 0.035), (0, 0.04)], material=P.bed, segments=low(20, 12),

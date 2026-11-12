@@ -8,6 +8,9 @@
 #
 # A model on the ground (`ground`) is also shaded by the floor it stands on, near it only (`GROUND_REACH`): the feet
 # of its sides darken where they meet it.
+#
+# A tree's leaf cards (families/plants.py `Cards`) carry their own shading on their corners (`CARD`, written as they
+# are laid: open on the crown's outside, darker inside it) and shade nothing: they are leaves, not walls.
 import math
 
 import bpy
@@ -23,6 +26,7 @@ STRENGTH = 0.8      # how dark a fully enclosed vertex goes: 1 - STRENGTH
 LIFT = 0.0015       # rays start this far off the surface (m), so they don't hit their own face
 LEVELS = 32         # greys it is rounded to: neighbours share a value, which the build's compression packs tightly
 GROUND_REACH = 0.15  # m: how far up its sides the floor shades a model standing on it
+CARD = 'card_shade'  # a mesh's point attribute: a leaf card's shading at each of its corners (0: not a card's)
 
 
 def _directions(n):
@@ -76,8 +80,15 @@ def _tree(objs, local):
         m = Matrix.Identity(4) if local else o.matrix_world
         base = len(verts)
         verts += [m @ v.co for v in o.data.vertices]
-        polys += [[base + i for i in p.vertices] for p in o.data.polygons]
+        card = _cards(o.data)
+        polys += [[base + i for i in p.vertices] for p in o.data.polygons if not (card and all(card[i] > 0 for i in p.vertices))]
     return BVHTree.FromPolygons(verts, polys, all_triangles=False, epsilon=0.0)
+
+
+def _cards(mesh):
+    """`mesh`'s leaf cards' shading, a value a vertex (`CARD`; 0: not a card's), or None for a mesh without cards."""
+    attr = mesh.attributes.get(CARD)
+    return [d.value for d in attr.data] if attr is not None and attr.domain == 'POINT' else None
 
 
 def _seen(tree, p, n, twist, reach, ground):
@@ -132,6 +143,9 @@ def bake_ao(objs, reach=None, strength=STRENGTH, ground=False):
         local = o in away
         seen = _occlusion(o, _tree([o], True) if local else shared, local, reach, ground and not local)
         mesh = o.data
+        card = _cards(mesh)
+        if card:                                   # (what it sees, for the grey below to come out as its own shading)
+            seen = [1 - (1 - c) / strength if c > 0 else s for s, c in zip(seen, card)]
         old = mesh.color_attributes.get(ATTRIBUTE)
         if old is not None and old.domain != 'POINT':
             mesh.color_attributes.remove(old)

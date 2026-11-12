@@ -13,6 +13,7 @@ Run them from the repo root. The textures are generated, not downloaded.
 | `cargo tex materials` | Writes `materials.json` in the current directory: PBR material + environment entries |
 | `cargo tex clouds <out.png>` | Generates the procedural, tileable cloud layer (`textures/sky/clouds.png`) |
 | `blender/` | The Blender-built glTF models, every model in the game: `cargo art <family>` builds a family script from `blender/families/` on the `blender/gamekit/` toolkit, exports its `.glb` files with their moving parts, writes its pack and runs the gate. See [blender/README.md](blender/README.md), the guide for people and AI agents |
+| `cargo art --leafcards` | Renders the trees' leaf-card atlas (`textures/leafcards/albedo.png`: three cut-out clusters of leaves and a dense wall of them) in Blender from leaves `blender/leafcards.py` generates; the `leafcards` finish every broadleaved tree's crown is cut from (`blender/families/trees.md`) |
 | `cargo check-glb` | The gate for glTF models (`crates/tools/src/checkglb.rs`, no Blender): checks that every model the content draws has a `.glb`, and every `.glb` the manifests use against its entry and its content (origin on the floor and at its `centre`, the wall's face, the footprint, a top's `radius`, triangles and draw calls against the budgets, materials mapped to finishes, one-sided, no unused UVs, extensions the game reads, texture sizes) and exits 1 on an error ("The gate" below). `--preview` also has Blender re-import each file and render it to `blender/previews/<family>/rt_<name>.png` |
 
 ## The gate
@@ -55,7 +56,7 @@ texture of its own, and the functional heights against the content (`docs/design
 
 Texture flow: `cargo tex synth` writes the 19 texture sets into `web/public/assets/textures/` and the sidewalk into
 `web/public/assets/street/sidewalk/` (fixed filenames and resolutions, so the manifest's material bindings stay the
-same). `cargo tex materials` writes the PBR material entries; `cargo tex clouds` regenerates the sky's cloud layer.
+same). The one texture it doesn't make is the trees' leaf-card atlas, rendered by `cargo art --leafcards`. `cargo tex materials` writes the PBR material entries; `cargo tex clouds` regenerates the sky's cloud layer.
 All three are deterministic: the same source makes the same output.
 
 To look at the models without starting a game, run `bun run dev` and open `/gallery.html` (dev only): it draws models in

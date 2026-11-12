@@ -22,6 +22,8 @@
 import { settings } from '../../../settings/settings.svelte';
 import type { Shading } from '../../types';
 import type { ShaderFeature } from './chunks';
+import { RESIDENT_LIGHT } from './character';
+import { ROOM } from './envBrdf';
 import { SPECULAR_UNITS } from '../lightUnits';
 
 const LUM = { glsl: 'vec3(0.2126, 0.7152, 0.0722)', wgsl: 'vec3f(0.2126, 0.7152, 0.0722)' };
@@ -50,6 +52,14 @@ export const BASE = {
 	#endif`,
 };
 
+/**
+ * Contact shading (`post.ts` `CONTACT`, the lit shaders' `LIT_SSAO`): the sky's light is shaded by it in
+ * full (PlayCanvas's ambient by the engine, the hemispheric fill in `chunks.ts`'s patch), the lamps' and
+ * the sun's by this share of it: a lamp casts no shadow here, so without it a lamplit room has none
+ * where a thing stands on the floor or against the wall.
+ */
+export const CONTACT_DIRECT = '0.35';
+
 export const SOFT_LOOK: ShaderFeature = {
   name: 'softLook',
   priority: 300,
@@ -60,6 +70,12 @@ export const SOFT_LOOK: ShaderFeature = {
 	uniform vec3 game_hemiGround;
 	uniform vec3 game_hemiDir;
 	vec3 gameAmbient = vec3(0.0);
+	// Contact shading's share of the light left where things meet (1: none; \`chunks.ts\`'s patch reads it).
+	float gameContact = 1.0;
+	// Whether the reflection is the room's (\`envBrdf.ts\` \`ROOM\`): a unit of it until \`combineColor\`.
+	bool gameRoomRefl = false;
+	// The soft look's saturation (a surface may set its own before the light is combined: the residents' skin).
+	float gameSaturation = 1.15;
 	vec3 gameHemi(vec3 n) {
 		vec3 c = mix(game_hemiGround, game_hemiSky, dot(n, game_hemiDir) * 0.5 + 0.5);
 		#ifdef GAME_UNDERGROUND
@@ -71,10 +87,30 @@ export const SOFT_LOOK: ShaderFeature = {
 #endif`,
     combine: `
 #ifdef GAME_LOOK
+	${RESIDENT_LIGHT.glsl}
 	// The AO map occludes the light falling on a surface as well as the sky's (an ARM map's red,
 	// with no ambient texture), as the look was tuned; PlayCanvas occludes only the sky's.
+	// (With contact shading the engine has put it into \`litArgs_ao\`: the map's share alone here, the
+	// contact's after it, on every surface alike.)
 	#ifdef STD_AO
-		dDiffuseLight *= litArgs_ao;
+		dDiffuseLight *= litArgs_ao / max(gameContact, 0.001);
+	#endif
+	dDiffuseLight *= mix(1.0, gameContact, ${CONTACT_DIRECT});
+	// Contact shading is for the light that falls on a surface. The engine dims the highlights and the
+	// reflections by it too (its occlusion, where a material's dims them): they get theirs back, or a tap
+	// or a towel rail a hand from the wall, which is all reflection, goes black.
+	#ifdef LIT_SSAO
+		#if LIT_OCCLUDE_SPECULAR == AO
+			#ifndef LIT_OCCLUDE_SPECULAR_FLOAT
+				float gameUncontact = 1.0 / max(gameContact, 0.05);
+				#ifdef LIT_SPECULAR
+					dSpecularLight *= gameUncontact;
+				#endif
+				#ifdef LIT_REFLECTIONS
+					dReflection.rgb *= gameUncontact;
+				#endif
+			#endif
+		#endif
 	#endif
 	// The lights' highlights at the look's strength: PlayCanvas's light is the look's / π (its Lambert
 	// has no 1 / π, \`lightUnits.ts\` \`SUN_UNITS\`), but its GGX keeps the 1 / π (\`SPECULAR_UNITS\`).
@@ -88,8 +124,12 @@ export const SOFT_LOOK: ShaderFeature = {
 		if (gameGrey) { gameAmbient = vec3(dot(gameAmbient, ${LUM.glsl})); }
 		gameAmbient *= gameUnder.z;
 		#ifdef LIT_REFLECTIONS
-			dReflection.rgb *= gameUnder.z;
+			if (!gameRoomRefl) { dReflection.rgb *= gameUnder.z; }
 		#endif
+	#endif
+	// A room's reflection (\`envBrdf.ts\` \`ROOM\`): as bright as the light that reaches this fragment.
+	#ifdef LIT_REFLECTIONS
+		if (gameRoomRefl) { dReflection.rgb *= (dDiffuseLight + gameAmbient) * ${ROOM.wall}; }
 	#endif
 	dDiffuseLight += gameAmbient;
 	vec3 pbr = combineColorEngine(gameAlbedo, sheenSpecularity, clearcoatSpecularity);
@@ -108,7 +148,7 @@ export const SOFT_LOOK: ShaderFeature = {
 		vec3 soft = ambient * 0.6 + base * shade * lightCol * clamp(lightAmt * 0.42, 0.0, 1.0);
 		float fres = pow(1.0 - max(dot(litArgs_worldNormal, dViewDirW), 0.0), 3.0);
 		soft *= 1.0 + 0.35 * fres;
-		soft = mix(vec3(dot(soft, ${LUM.glsl})), soft, 1.15);
+		soft = mix(vec3(dot(soft, ${LUM.glsl})), soft, gameSaturation);
 		return max(soft, vec3(0.0));
 	#else
 		return pbr;
@@ -124,6 +164,9 @@ export const SOFT_LOOK: ShaderFeature = {
 	uniform game_hemiGround: vec3f;
 	uniform game_hemiDir: vec3f;
 	var<private> gameAmbient: vec3f = vec3f(0.0);
+	var<private> gameContact: f32 = 1.0;
+	var<private> gameRoomRefl: bool = false;
+	var<private> gameSaturation: f32 = 1.15;
 	fn gameHemi(n: vec3f) -> vec3f {
 		var c = mix(uniform.game_hemiGround, uniform.game_hemiSky, dot(n, uniform.game_hemiDir) * 0.5 + 0.5);
 		#ifdef GAME_UNDERGROUND
@@ -135,9 +178,24 @@ export const SOFT_LOOK: ShaderFeature = {
 #endif`,
     combine: `
 #ifdef GAME_LOOK
+	${RESIDENT_LIGHT.wgsl}
 	// See the GLSL: the AO map occludes the direct light too.
 	#ifdef STD_AO
-		dDiffuseLight = dDiffuseLight * litArgs_ao;
+		dDiffuseLight = dDiffuseLight * (litArgs_ao / max(gameContact, 0.001));
+	#endif
+	dDiffuseLight = dDiffuseLight * mix(1.0, gameContact, ${CONTACT_DIRECT});
+	#ifdef LIT_SSAO
+		#if LIT_OCCLUDE_SPECULAR == AO
+			#ifndef LIT_OCCLUDE_SPECULAR_FLOAT
+				let gameUncontact = 1.0 / max(gameContact, 0.05);
+				#ifdef LIT_SPECULAR
+					dSpecularLight = dSpecularLight * gameUncontact;
+				#endif
+				#ifdef LIT_REFLECTIONS
+					dReflection = vec4f(dReflection.rgb * gameUncontact, dReflection.a);
+				#endif
+			#endif
+		#endif
 	#endif
 	// The lights' highlights at the look's strength (see the GLSL).
 	#ifdef LIT_SPECULAR
@@ -149,8 +207,11 @@ export const SOFT_LOOK: ShaderFeature = {
 		if (gameGrey) { gameAmbient = vec3f(dot(gameAmbient, ${LUM.wgsl})); }
 		gameAmbient = gameAmbient * gameUnder.z;
 		#ifdef LIT_REFLECTIONS
-			dReflection = vec4f(dReflection.rgb * gameUnder.z, dReflection.a);
+			if (!gameRoomRefl) { dReflection = vec4f(dReflection.rgb * gameUnder.z, dReflection.a); }
 		#endif
+	#endif
+	#ifdef LIT_REFLECTIONS
+		if (gameRoomRefl) { dReflection = vec4f(dReflection.rgb * (dDiffuseLight + gameAmbient) * ${ROOM.wall}, dReflection.a); }
 	#endif
 	dDiffuseLight = dDiffuseLight + gameAmbient;
 	let pbr = combineColorEngine(gameAlbedo, sheenSpecularity, clearcoatSpecularity);
@@ -168,7 +229,7 @@ export const SOFT_LOOK: ShaderFeature = {
 		var soft = ambient * 0.6 + base * shade * lightCol * clamp(lightAmt * 0.42, 0.0, 1.0);
 		let fres = pow(1.0 - max(dot(litArgs_worldNormal, dViewDirW), 0.0), 3.0);
 		soft = soft * (1.0 + 0.35 * fres);
-		soft = mix(vec3f(dot(soft, ${LUM.wgsl})), soft, 1.15);
+		soft = mix(vec3f(dot(soft, ${LUM.wgsl})), soft, gameSaturation);
 		return max(soft, vec3f(0.0));
 	#else
 		return pbr;

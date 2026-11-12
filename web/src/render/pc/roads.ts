@@ -11,6 +11,10 @@ import { GAME_FRONT_FACE, MaterialLibrary } from './materials';
 import { drawMesh, meshFrom } from './meshes';
 import { LIFT, STEP, STRAIGHT, type CountryRoads, type Point } from '../shared/countryRoads';
 import { Geo, type V3 } from '../shared/geometry';
+import { asphaltVary, carriageway, tint, STREET_LOOK } from '../shared/paving';
+
+/** The stretches (`STEP` m each) over which a road out of town goes from the junction's even tone to its own wear. */
+const JOIN_FADE = 3;
 
 /** The road surfaces, their centre lines and the welcome signs of `roads`, under `parent`. */
 export function drawRoads(app: pc.AppBase, roads: CountryRoads, parent: pc.Entity): pc.Entity[] {
@@ -21,9 +25,32 @@ export function drawRoads(app: pc.AppBase, roads: CountryRoads, parent: pc.Entit
   const out: pc.Entity[] = [];
   const quad = (g: Geo, p: V3[]) => g.poly(p, [0, 1, 0]);
 
+  /**
+   * A stretch of asphalt worn as the town's streets are (`shared/paving.ts`): strips across it, pale where
+   * wheels run, darker between them and at its edges. `at`: the point `t` along it, `off` m from its middle.
+   * `even`: how much of the wear is evened out to the one tone the streets have where they meet
+   * (`STREET_LOOK.junction`), at `t` along it (0: worn; 1: even).
+   */
+  const worn = (at: (t: number, off: number) => V3, half: number, even: (t: number) => number = () => 0) => {
+    const band = carriageway(half);
+    const offs = [-half, ...band.at.filter((o) => Math.abs(o) < half - 0.05), half];
+    const tone = (t: number, off: number): V3 => {
+      const [x, , z] = at(t, off);
+      const e = even(t);
+      return tint((band.tone(off) * (1 - e) + STREET_LOOK.junction * e) * asphaltVary(x, z));
+    };
+    for (let o = 0; o + 1 < offs.length; o++) {
+      const c: [number, number][] = [[0, offs[o + 1]], [1, offs[o + 1]], [1, offs[o]], [0, offs[o]]];
+      surface.poly(c.map(([t, off]) => at(t, off)), [0, 1, 0], undefined, undefined, c.map(([t, off]) => tone(t, off)));
+    }
+  };
+
   for (const r of roads.links) {
     const y = 0.012;
-    quad(surface, [[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]]);
+    const rows = Math.max(1, Math.round(r.d / 4));
+    // (One even tone, as the streets have where they meet (`STREET_LOOK.junction`): a link lies over the street it
+    // joins, and worn its own way it lay there like a slab.)
+    for (let k = 0; k < rows; k++) worn((t, off) => [r.x + r.w / 2 + off, y, r.z + ((k + t) / rows) * r.d], r.w / 2, () => 1);
     const xc = r.x + r.w / 2;
     for (let z = r.z + 1; z + 2.4 < r.z + r.d - 1; z += 5) quad(lines, [[xc - 0.06, y + 0.005, z], [xc + 0.06, y + 0.005, z], [xc + 0.06, y + 0.005, z + 2.4], [xc - 0.06, y + 0.005, z + 2.4]]);
   }
@@ -37,7 +64,17 @@ export function drawRoads(app: pc.AppBase, roads: CountryRoads, parent: pc.Entit
     });
     const edge = (i: number, s: number, y: number, half = road[i][3] / 2): V3 => [road[i][0] + side[i][0] * half * s, road[i][2] + y, road[i][1] + side[i][1] * half * s];
     for (let i = 0; i + 1 < road.length; i++) {
-      quad(surface, [edge(i, 1, LIFT), edge(i + 1, 1, LIFT), edge(i + 1, -1, LIFT), edge(i, -1, LIFT)]);
+      // (From the town's end, where it meets a link in the one even tone, it comes into its own wear over
+      // `JOIN_FADE` stretches: worn right up to the link, it met it at a straight step of tone.)
+      const joined = (t: number) => 1 - Math.min(1, (i + t) / JOIN_FADE) ** 2 * (3 - 2 * Math.min(1, (i + t) / JOIN_FADE));
+      worn(
+        (t, off) => {
+          const [a, b] = [edge(i, 1, LIFT, -off), edge(i + 1, 1, LIFT, -off)];
+          return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+        },
+        Math.min(road[i][3], road[i + 1][3]) / 2,
+        joined,
+      );
       // A dash along the middle of every stretch (2.4 m of each 4).
       const [ax, az, ah] = road[i];
       const [bx, bz, bh] = road[i + 1];
@@ -50,8 +87,8 @@ export function drawRoads(app: pc.AppBase, roads: CountryRoads, parent: pc.Entit
     const sign = welcomeSign(app, roads.name, road, parent);
     if (sign) out.push(sign);
   }
-  const surfaceMesh = meshFrom(device, surface.meshData());
-  if (surfaceMesh) out.push(drawMesh(parent, 'countryRoads', surfaceMesh, lib.surface('material.road', { doubleSided: true })));
+  const surfaceMesh = meshFrom(device, surface.meshData({ colors: true }));
+  if (surfaceMesh) out.push(drawMesh(parent, 'countryRoads', surfaceMesh, lib.surface('material.road', { doubleSided: true, vertexColors: true })));
   const marks = meshFrom(device, lines.meshData({ colors: true }));
   if (marks) out.push(drawMesh(parent, 'countryRoadLines', marks, lib.finish('material.finish.matte')));
   return out;

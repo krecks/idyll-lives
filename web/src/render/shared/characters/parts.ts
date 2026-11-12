@@ -1,11 +1,11 @@
 /**
  * A resident's part meshes (`residents.ts`): which parts every resident has and which their clothes show, the
  * shells' categories, the surface each part is drawn with, and which parts are drawn by size on screen (the
- * low-detail body far away, the small face parts close up).
+ * low-detail body far away, the small face parts and the hair's wisps close up).
  */
 
 import type { PartColors } from '../../../core/protocol';
-import type { BodyData } from './data';
+import { CLOSE_UP, type BodyData } from './data';
 import { SHELL_BITS } from './outfit';
 
 /** Life stages without facial hair. */
@@ -49,12 +49,17 @@ export interface PartMesh<M> {
 export const Range = { Always: 0, Near: 1, Far: 2 } as const;
 export type Range = (typeof Range)[keyof typeof Range];
 
+/** The part of a hair part's wisps (`hair.long` → `hair.long.wisps`: its soft edges, drawn only close up). */
+export const wispsOf = (hair: string): string => `${hair}.wisps`;
+/** Whether a part is a hair part's wisps. */
+export const isWisps = (part: string): boolean => part.startsWith('hair.') && part.endsWith('.wisps');
+
 /** The surface a part is drawn with (the engine's resident material, `pc/characterMaterial.ts`). */
-export type CharacterSurface = 'body' | 'cloth' | 'hair' | 'brow' | 'lash' | 'mouth' | 'eye';
+export type CharacterSurface = 'body' | 'cloth' | 'hair' | 'wisp' | 'brow' | 'lash' | 'mouth' | 'eye';
 
 /** The surface part `part` is drawn with. */
 export function surfaceOf(part: string): CharacterSurface {
-  return part === 'body' || part === 'lod.body' || part.startsWith('body.')
+  return part === 'body' || part === 'lod.body' || part === CLOSE_UP || part.startsWith('body.')
     ? 'body'
     : part === 'eyes'
       ? 'eye'
@@ -66,7 +71,9 @@ export function surfaceOf(part: string): CharacterSurface {
             ? 'mouth'
             : /^(lod\.)?(top|bottom|shoes)\./.test(part)
               ? 'cloth'
-              : 'hair';
+              : isWisps(part)
+                ? 'wisp'
+                : 'hair';
 }
 /**
  * Sims switch to the low-detail body and clothes below this projected size (px per 5 cm of face, at
@@ -101,5 +108,14 @@ export const POSE_NEAR_PX = 7;
  * of a 5 cm feature (a mouth, an eye with its brow) below which each isn't drawn.
  */
 export const DETAIL_PX: Record<string, number> = { teeth: 8, tongue: 8, lashes: 3, brows: 2 };
+/**
+ * The hair's wisps (same measure): not drawn below the first, and thinned out by their shader from the
+ * second down to it (`pc/shaders/character.ts` `RESIDENT_WISP_OPACITY`), so they come and go without a
+ * step. At the game's default 24 m a face is about 3.1 px per 5 cm (no wisps, no draw); zoomed all the
+ * way in, 6 m, about 12 (all of them).
+ */
+export const WISPS_PX = [4, 7] as const;
+/** The projected size (px per 5 cm of face) below which part `part` isn't drawn (0: always drawn). */
+export const detailOf = (part: string): number => DETAIL_PX[part] ?? (isWisps(part) ? WISPS_PX[0] : 0);
 /** Below this (same measure), a face doesn't run its morphs at all (expressions can't be seen). */
 export const MORPH_PX = 3;

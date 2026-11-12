@@ -133,10 +133,13 @@ export async function optimizeAssets({ force = false, jobs = Math.max(1, os.avai
   return index;
 }
 
+/** The finishes of leaves: the tiling foliage, and the trees' leaf cards. */
+const FOLIAGE_FINISHES = new Set(['material.finish.foliage', 'material.finish.leafcards']);
+
 /**
- * The models drawn with foliage cards: an entry of a manifest (the base one, the packs') mapping one
- * of its file's materials to the foliage finish (`material.finish.foliage`), its far version too.
- * Their geometry keeps its floats (`quantizeGeometry`).
+ * The models drawn with foliage: an entry of a manifest (the base one, the packs') mapping one of its
+ * file's materials to a finish of leaves (`FOLIAGE_FINISHES`), its far version too. Their geometry
+ * keeps its floats (`quantizeGeometry`).
  */
 function foliageModels(files) {
   const models = new Set();
@@ -148,7 +151,7 @@ function foliageModels(files) {
       continue;
     }
     for (const entry of Object.values(manifest.entries ?? {})) {
-      if (entry?.type !== 'model' || !Object.values(entry.materials ?? {}).some((m) => m?.finish === 'material.finish.foliage')) continue;
+      if (entry?.type !== 'model' || !Object.values(entry.materials ?? {}).some((m) => FOLIAGE_FINISHES.has(m?.finish))) continue;
       for (const url of [entry.url, entry.far]) if (typeof url === 'string') models.add(path.posix.normalize(path.posix.join(path.posix.dirname(rel), url)));
     }
   }
@@ -277,8 +280,8 @@ async function workerMain() {
   });
 }
 
-/** A material named for the foliage finish (`name@foliage`): its model's geometry keeps its floats, as one a manifest maps to it (`foliageModels`). */
-const FOLIAGE = /@foliage(\b|$)|^foliage$/i;
+/** A material named for a finish of leaves (`name@foliage`, `name@leafcards`): its model's geometry keeps its floats, as one a manifest maps to it (`foliageModels`). */
+const FOLIAGE = /@(foliage|leafcards)(\b|$)|^foliage$/i;
 
 /**
  * A model's vertex data quantised (`quantize`: glTF-Transform's, KHR_mesh_quantization): the baked

@@ -3,13 +3,14 @@
 # `model.spruce`, `model.cypress`) and the potted lemon tree (`model.garden.lemonTree`).
 #
 # Broadleaves are real branching skeletons: a swept, tapering trunk on root buttresses, limbs found from where the
-# crown's leaf masses are, each forking into curving boughs, and a mass of leafy lumps (`plants.lump`) at each bough's
-# tip, lighter on top, with gaps between (`_branches`, `_mass`; the oak first, by hand). Conifers are whorls of
-# drooping sprays of needles round a trunk (`conifer`), the cypress a flame of upright sprays. Leaves are on `foliage`
-# and trunks on `bark`, which the nature shader sways and tints. Trees stand on every lot and by the thousand in the
-# woods, so each keeps under 4,500 triangles, and each has a far version (`far_of`: the same build at low detail,
-# every random number drawn, one lump a mass, no boughs; about a fifth of the triangles), which the far woods and
-# the town overview draw.
+# crown's leaf masses are, each forking into curving boughs, and a mass of leaves at each bough's tip, lighter on
+# top, with gaps between (`_branches`, `_mass`; the oak first, by hand): leaf cards over a dark core (`plants.leaves`,
+# `clad`: cut-out clusters of leaves from one atlas, on `leafcards`). Conifers are whorls of drooping sprays of
+# needles round a trunk (`conifer`), the cypress a flame of upright sprays, on `foliage`; trunks are on `bark`. The
+# nature shader sways and tints all three. Trees stand on every lot and by the thousand in the woods, so each keeps
+# under 4,500 triangles, and each has a far version (`far_of`: the same build at low detail, every random number
+# drawn, one leafy lump (`plants.lump`, on `foliage`) a mass, no boughs; about a fifth of the triangles), which the
+# far woods and the town overview draw.
 #
 # Run:  cargo art trees [--only oak] [--preview]
 import math
@@ -24,7 +25,8 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gamekit as G  # noqa: E402
-from plants import LOW, _mesh, _with_part, cupped, far_of, low, lump, noise_at, pot, sprigs, tube  # noqa: E402
+from plants import (CARD_OF, LOW, _mesh, _with_part, clad, cupped, far_of, join_still, leaves, low, lump, noise_at, pot,  # noqa: E402
+                    sprigs, stand_in, tube)
 
 BASE = dict(
     bark=('#E4D8C8', 'bark'),           # the bark texture is dark: its colours are pale
@@ -45,16 +47,35 @@ BASE = dict(
     body=('#C0683F', 'satin'),          # the lemon tree's pot
     soil=('#5A4030', 'matte'),
     stalk=('#5E5040', 'satin'),         # the picked fruit's stalk: one draw call with the fruit
+    # the leaf cards (plants.clad): each leaf colour's own (`palette` gives them their colours), and the core under them
+    **{card: ('#FFFFFF', 'leafcards') for card in CARD_OF.values()},
+    core=('#FFFFFF', 'leafcards'),
 )
 M = G.Palette(**BASE)
 LEAVES = ('leaf', 'leaf2', 'leaf3', 'leaf4', 'leaf5')
+# A card's colour, of its leaf colour's: the atlas is lighter than the tiling leaves the far version's lumps wear and
+# its cards catch more sky, so a tree's cards are toned down until it matches its far version where the near woods
+# meet the far (measured in the gallery, `?far` beside it, from 110 m).
+CARD_TONE = 0.85
+# The core's colour, of the darkest leaf shade's: the inside of a crown.
+CORE_TONE = 0.6
+
+
+def _toned(colour, k):
+    """An sRGB hex colour, each channel `k` of its value."""
+    return '#' + ''.join(f'{min(255, round(c * 255 * k)):02X}' for c in G.materials.rgb_of(colour))
 
 
 def palette(leaves=None, **colours):
-    """The family's palette with some colours changed; `leaves` gives the five leaf shades, darkest first."""
+    """The family's palette with some colours changed; `leaves` gives the five leaf shades, darkest first. The leaf
+    cards take their leaf colours' (`CARD_OF`, toned by `CARD_TONE`), the core the darkest's."""
     if leaves:
         colours.update(zip(LEAVES, leaves))
-    return G.Palette(**{**BASE, **{k: (v, BASE[k][1]) for k, v in colours.items()}})
+    made = {**BASE, **{k: (v, BASE[k][1]) for k, v in colours.items()}}
+    for leaf, card in CARD_OF.items():
+        made[card] = (_toned(made[leaf][0], CARD_TONE), 'leafcards')
+    made['core'] = (_toned(made['leaf'][0], CORE_TONE), 'leafcards')
+    return G.Palette(**made)
 
 
 def shades(P, n=5):
@@ -138,11 +159,13 @@ def _mass(name, rng, tip, heading, cols, light, out, k=3, size=(0.5, 0.64), ring
           squash=(0.75, 0.88), noise=0.34, far=1.12, segments=6, rings=5, side=0.86):
     """A leaf mass at a bough's tip (Blender `tip`, the bough heading `heading` radians): a clump on the tip and `k` - 1
     round it, `ring` out and `drop` below, each `size` metres round (`side` x that off the tip), squashed by `squash`,
-    lighter as `light(z)` (0..1) rises. A far version draws one clump spanning the mass's (`far` x their reach), so it
+    lighter as `light(z)` (0..1) rises; leaf cards once the tree is `clad` (`plants.leaves`). A far version draws one
+    lump spanning the mass's clumps (`far` x their reach), so it
     keeps the crown's size. Appends each clump to `out`: (middle, half sizes, -1..1 up the crown, drawn), for the
     perches (`clump_aims`) and what sits on the leaves (blooms)."""
     tip = Vector(tip)
     lo, hi, first = [math.inf] * 3, [-math.inf] * 3, None
+    group = (name, len(out))                                           # the mass: its clumps' cards share a core
     for m in range(k):
         if m == 0:
             at = tip
@@ -161,8 +184,8 @@ def _mass(name, rng, tip, heading, cols, light, out, k=3, size=(0.5, 0.64), ring
         if m == 0:
             first = (col, seed)
         if not G.is_low():
-            lump(f'{name}{len(out)}', s, (at.x, at.y, at.z - s * sq), col, scale=(sx, sy, sq), noise=noise, seed=seed,
-                 segments=segments, rings=rings)
+            leaves(f'{name}{len(out)}', s, (at.x, at.y, at.z - s * sq), col, scale=(sx, sy, sq), noise=noise, seed=seed,
+                   segments=segments, rings=rings, group=group)
     if G.is_low():
         rx, ry, rz = ((hi[j] - lo[j]) / 2 * far for j in range(3))
         lump(f'{name}{len(out)}', rx, ((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2 - rz), first[0],
@@ -241,7 +264,7 @@ def _hearts(rng, cols, n, centre, radii, size, out=0.4, prefix='heart'):
         a = off + math.tau * (i + 0.5) / n + rng.uniform(-0.3, 0.3)
         s, seed = size * rng.uniform(0.9, 1.1), rng.random() * 9
         at = (cx + radii[0] * out * math.cos(a), cy + radii[1] * out * math.sin(a), cz + radii[2] * rng.uniform(-0.45, 0.05) - s * 0.85)
-        lump(f'{prefix}{i}', s, at, cols[rng.randrange(2)], scale=(1, 1, 0.85), noise=0.3, seed=seed, segments=6, rings=5)
+        leaves(f'{prefix}{i}', s, at, cols[rng.randrange(2)], scale=(1, 1, 0.85), noise=0.3, seed=seed, segments=6, rings=5)
 
 
 def limb_points(limbs, along=(0.45, 0.6, 0.75)):
@@ -324,18 +347,18 @@ def oak():
                         continue
                     size *= 1.4
                     half = (size * sx, size * sy, size * sq)
-                lump(f'clump{n}', size, (at.x, at.y, at.z - half[2]), col, scale=(sx, sy, sq), noise=0.34, seed=seed,
-                     segments=6, rings=5)
+                leaves(f'clump{n}', size, (at.x, at.y, at.z - half[2]), col, scale=(sx, sy, sq), noise=0.34, seed=seed,
+                       segments=6, rings=5, group=(prefix, j))
                 n += 1
     # the crown's heart, dark, round the leader: it closes the middle, the gaps between the masses stay
     for i in range(4):
         a = off + math.tau * (i + 0.5) / 4 + rng.uniform(-0.3, 0.3)
         size, seed = rng.uniform(0.75, 0.9), rng.random() * 9
         at = (0.75 * math.cos(a), 0.75 * math.sin(a), rng.uniform(4.0, 4.7))
-        lump(f'heart{i}', size, at, cols[rng.randrange(2)], scale=(1, 1, 0.85), noise=0.3, seed=seed, segments=6, rings=5)
-    still = G.join_all('oak')
+        leaves(f'heart{i}', size, at, cols[rng.randrange(2)], scale=(1, 1, 0.85), noise=0.3, seed=seed, segments=6, rings=5)
+    still = join_still('oak')
     G.perch.find(24, clump_aims(clumps, random.Random(111)))
-    return G.settle([still])
+    return G.settle([clad(P, still, 211)])
 
 
 def maple():
@@ -354,9 +377,9 @@ def maple():
                           limb_r=(0.1, 0.045), bough_r=(0.042, 0.015), fork=(0.45, 0.55), lift=0.1, rise=0.12,
                           mass=dict(k=3, size=(0.5, 0.62), ring=0.4, drop=(-0.25, 0.1), squash=(0.82, 0.95), noise=0.26))
     _hearts(rng, cols, 6, centre, radii, 1.15, out=0.36)
-    still = G.join_all('maple')
+    still = join_still('maple')
     G.perch.find(24, clump_aims(clumps, random.Random(112), per=2))
-    return G.settle([still])
+    return G.settle([clad(P, still, 212)])
 
 
 def birch():
@@ -393,9 +416,9 @@ def birch():
                              mass=dict(k=3, size=(0.34, 0.44), ring=0.3, drop=(-0.5, -0.15), squash=(1.1, 1.35),
                                        noise=0.36, side=0.9))
     _hearts(rng, cols, 3, centre, radii, 0.62, out=0.25)
-    still = G.join_all('birch')
+    still = join_still('birch')
     G.perch.find(20, clump_aims(clumps, random.Random(113), per=2), limbs=limb_points(made), limbs_n=2)
-    return G.settle([still])
+    return G.settle([clad(P, still, 213)])
 
 
 def cherry():
@@ -413,12 +436,12 @@ def cherry():
                           limb_r=(0.11, 0.05), bough_r=(0.045, 0.016), fork=(0.5, 0.62), lift=0.22, wander=0.3, rise=0.2,
                           mass=dict(k=3, size=(0.5, 0.62), ring=0.42, drop=(-0.25, 0.05), squash=(0.6, 0.72), noise=0.36))
     _hearts(rng, cols, 3, centre, radii, 0.75, out=0.35)
-    lump('leaves', 0.4, (2.0, -0.9, 3.25), P.green, scale=(1, 1, 0.62), seed=1.0)
-    lump('leaves2', 0.35, (-1.8, 1.2, 3.38), P.green2, scale=(1, 1, 0.64), seed=2.0)
-    still = G.join_all('cherry')
+    leaves('leaves', 0.4, (2.0, -0.9, 3.25), P.green, scale=(1, 1, 0.62), seed=1.0)
+    leaves('leaves2', 0.35, (-1.8, 1.2, 3.38), P.green2, scale=(1, 1, 0.64), seed=2.0)
+    still = join_still('cherry')
     green = [((2.0, -0.9, 3.5), None, 0.0, True), ((-1.8, 1.2, 3.6), None, 0.0, True)]   # the two green clumps
     G.perch.find(22, clump_aims(clumps + green, random.Random(114)))
-    return G.settle([still])
+    return G.settle([clad(P, still, 214)])
 
 
 # A resident picking fruit (`pickApple*`, `pickLemon*` in web/src/render/shared/characters/clips/uses.ts, fitted to
@@ -431,10 +454,11 @@ PICK_DELAY = 1.6
 BARE = dict(picked=0.001, growing=0.001, planted=0.001)
 
 
-def _fruiting(name, still, crown_mid, fruit, picked=None, at=None):
+def _fruiting(P, name, still, seed, crown_mid, fruit, picked=None, at=None):
     """The still part, and the fruit `fruit()` hangs over the crown (origin `crown_mid`) as a moving part
     following the tree's ripeness; with `picked`, the one at the front it makes (origin `at`) a second one that
-    also shrinks away while it's picked (an apple picked to eat). The far version all one still part, in fruit."""
+    also shrinks away while it's picked (an apple picked to eat). The fruit hung (on the crown's lumps: `_hang`), the
+    still part's leaves are drawn as cards (`clad`, palette `P`, `seed`). The far version all one still part, in fruit."""
     if LOW[0]:
         fruit()
         if picked:
@@ -444,12 +468,14 @@ def _fruiting(name, still, crown_mid, fruit, picked=None, at=None):
         fruit()
     hung = G.join(parts, f'{name}_fruit', origin=crown_mid)
     if not picked:
+        still = clad(P, still, seed)
         G.settle([still, hung])
         G.stages(hung, 'ripen', **BARE)
         return [still, hung]
     with G.new_parts() as parts:
         picked()
     front = G.join(parts, f'{name}_part', origin=at)
+    still = clad(P, still, seed)
     G.settle([still, hung, front])
     G.squash(front, 'pick', 0.001, seconds=0.8)
     G.stages(hung, 'ripen', **BARE)
@@ -494,10 +520,10 @@ def _low_boughs(P, cols):
             pts.append((-r, -out, h))
         _bough(f'low_bough{i}', pts, 0.034, 0.012, P, verts=4, res=2)
         near, tip = pts[1], pts[-1]
-        lump(f'low_leaves{i}', 0.2, (near[0], near[1], near[2] - 0.08), cols[1 + i % 2], scale=(1.15, 1.0, 0.75), noise=0.3,
-             seed=4.2 + i, segments=6, rings=5)
-        lump(f'low_tip{i}', 0.1, (tip[0], tip[1], tip[2] - 0.06), cols[2 + i % 2], scale=(1.2, 1.0, 0.7), noise=0.3,
-             seed=7.7 + i, segments=5, rings=3)
+        leaves(f'low_leaves{i}', 0.2, (near[0], near[1], near[2] - 0.08), cols[1 + i % 2], scale=(1.15, 1.0, 0.75), noise=0.3,
+               seed=4.2 + i, segments=6, rings=5, cards=6)
+        leaves(f'low_tip{i}', 0.1, (tip[0], tip[1], tip[2] - 0.06), cols[2 + i % 2], scale=(1.2, 1.0, 0.7), noise=0.3,
+               seed=7.7 + i, segments=5, rings=3, cards=3, core=False)
 
 
 def _low_apple(name, at, material, r=0.1, segments=6, rings=4):
@@ -526,7 +552,7 @@ def apple():
                           mass=dict(k=3, size=(0.5, 0.62), ring=0.4, drop=(-0.15, 0.05), squash=(0.78, 0.9), noise=0.32))
     _hearts(rng, cols, 3, centre, radii, 0.75, out=0.35)
     _low_boughs(P, cols)
-    still = G.join_all('apple')
+    still = join_still('apple')
     G.perch.find(20, clump_aims(clumps, random.Random(115), per=3))                  # (on the leaves, before the fruit)
 
     def fruit():
@@ -538,7 +564,7 @@ def apple():
     def picked():
         _low_apple('picked_apple', PICKED, P.fruit, r=0.11, segments=8, rings=5)
     x, out, h = PICKED
-    return _fruiting('apple', still, centre, fruit, picked, (-x, -out, h + 0.11))
+    return _fruiting(P, 'apple', still, 215, centre, fruit, picked, (-x, -out, h + 0.11))
 
 
 def _hang(rng, n, centre, radii, size, materials, name, band=(-0.6, 0.5), flat=1.0, segments=6, rings=4, sink=-0.1):
@@ -608,10 +634,10 @@ def japanese_maple():
         tip = Vector((low_pt.x * 0.7, low_pt.y * 0.7, low_pt.z - 0.08))
         _mass('first', rng, tip, a, cols[1:], light, clumps, k=2, size=(0.26, 0.32), ring=0.15, drop=(-0.08, 0.0),
               squash=(0.6, 0.7), noise=0.3)
-    still = G.join_all('japaneseMaple')
+    still = join_still('japaneseMaple')
     G.perch.find(18, clump_aims(clumps, random.Random(116)), gap=0.35)  # (before the sprigs)
     at = (0.0, 0.0, 3.87)
-    return _with_part('sprigs', still, lambda: sprigs('sprig', P, at, 0.35, n=6, length=0.22), at, 'trim')
+    return _with_part('sprigs', clad(P, still, 216), lambda: sprigs('sprig', P, at, 0.35, n=6, length=0.22), at, 'trim')
 
 
 # A magnolia's bloom: a tall cup of petals, open at the top (its inside turned back down to the middle).
@@ -633,8 +659,8 @@ def magnolia():
                           limb_r=(0.085, 0.04), bough_r=(0.036, 0.014), fork=(0.55, 0.68), lift=0.12, wander=0.3, rise=0.1,
                           mass=dict(k=3, size=(0.46, 0.56), ring=0.38, drop=(-0.28, 0.05), squash=(0.78, 0.9), noise=0.3))
     _hearts(rng, shades(P), 2, centre, radii, 0.75, out=0.3)
-    lump('leaves', 0.3, (1.5, 0.8, 2.72), P.green, scale=(1, 1, 0.75), seed=1.0)
-    lump('leaves2', 0.28, (-1.3, -0.9, 3.44), P.green2, scale=(1, 1, 0.73), seed=2.0)
+    leaves('leaves', 0.3, (1.5, 0.8, 2.72), P.green, scale=(1, 1, 0.75), seed=1.0)
+    leaves('leaves2', 0.28, (-1.3, -0.9, 3.44), P.green2, scale=(1, 1, 0.73), seed=2.0)
     # Blooms: upright goblets set into the crown's top and outer shoulders over each clump of its upper part (the
     # branch tips), two to a mass (one on the side of a lower one), white, pink and deep pink as a saucer magnolia's. Each stands where a line out
     # from its clump's middle leaves the crown, sunk a little into it, so none stands off it (a far version: over
@@ -660,10 +686,10 @@ def magnolia():
         if G.is_low() and i % 2:                                       # far: half of them, on the tops
             continue
         cupped(f'bloom{i}', GOBLET, at, cols[i % 4], 90 - math.degrees(a), 8 + 40 * lean, segments=low(6, 4))
-    still = G.join_all('magnolia')
+    still = join_still('magnolia')
     green = [((1.5, 0.8, 2.95), None, 0.0, True), ((-1.3, -0.9, 3.65), None, 0.0, True)]   # the two green clumps
     G.perch.find(20, clump_aims(clumps + green, random.Random(117), per=2), gap=0.35)
-    return G.settle([still])
+    return G.settle([clad(P, still, 217)])
 
 
 def streamer(name, top, heading, reach, drop, width, material):
@@ -684,6 +710,29 @@ def streamer(name, top, heading, reach, drop, width, material):
         faces += [(a + j, a + (j + 1) % 3, b + (j + 1) % 3, b + j) for j in range(3)]
     faces += [(0, 2, 1), (3 * rows, 3 * rows + 1, 3 * rows + 2)]
     return _mesh(name, verts, faces, material)
+
+
+# A strand of the willow's curtain as leaf cards: one every `STRAND_STEP` metres down it, each `STRAND_LAP` of
+# that tall (they overlap) and `STRAND_WIDE` of the ribbon's width across.
+STRAND_STEP = 0.5
+STRAND_LAP = 1.5
+STRAND_WIDE = 1.5
+
+
+def strand(cards, top, heading, reach, drop, width, material):
+    """A willow's hanging strand (`streamer`'s line) as upright leaf cards down it (`plants.Cards.hang`), each turned
+    a little off the next so the curtain shows from every side, the clusters drawn long as hanging leaves; their
+    normals out from the trunk and up, darker towards the ground. (They stay in the ribbons' box: `Cards`.)"""
+    rng = cards.rng
+    out = Vector((math.cos(heading), math.sin(heading), 0))
+    n = max(2, round(drop / STRAND_STEP))
+    for i in range(n):
+        t = (i + 0.5) / n
+        c = Vector(top) + out * reach * (1 - (1 - t) ** 3) - Vector((0, 0, drop * t ** 1.15))
+        turn = heading + rng.uniform(-0.9, 0.9)
+        tall = drop / n * STRAND_LAP
+        cards.hang(c, (math.cos(turn), math.sin(turn), rng.uniform(0.0, 0.3)), width * STRAND_WIDE, tall, material,
+                   lambda p: Vector((p.x, p.y, 0)).normalized() + Vector((0, 0, 0.5)), 0.62 + 0.3 * (1 - t) + rng.uniform(-0.08, 0.08))
 
 
 def willow():
@@ -729,6 +778,7 @@ def willow():
     # Hanging curtains: long, thin leafy streamers all round, out of the crown's edge and straight down to about half
     # a metre off the lawn, in two staggered rows with gaps between them, so whoever sits by the trunk shows through.
     n = 60
+    strands = []
     for i in range(n):
         a = i / n * math.tau + rng.uniform(-0.04, 0.04)
         outer = i % 2 == 0
@@ -738,14 +788,17 @@ def willow():
         heading, reach, width, col = a + rng.uniform(-0.15, 0.15), rng.uniform(0.25, 0.45), rng.uniform(0.17, 0.23), \
             cols[rng.randint(1, 4)]
         if full or outer:                                              # far: the outer row, wider
-            streamer(f'strand{i}', (rr * math.cos(a), rr * math.sin(a), top), heading, reach, top - foot,
-                     width * low(1.0, 1.5), col)
-    still = G.join_all('willow')
+            ribbon = streamer(f'strand{i}', (rr * math.cos(a), rr * math.sin(a), top), heading, reach, top - foot,
+                              width * low(1.0, 1.5), col)
+        if full:                                                       # leaf cards down the ribbon, once the crown is clad
+            stand_in(ribbon)
+            strands.append(((rr * math.cos(a), rr * math.sin(a), top), heading, reach, top - foot, width, getattr(P, CARD_OF[col.name])))
+    still = join_still('willow')
     # On the crown's top, from above (lower, the lines would meet the curtains), and on the limbs under it, inside
     # the curtain.
     G.perch.find(20, clump_aims(clumps, random.Random(118), per=4, up=(0.55, 1.2)),
                  limbs=limb_points(made, (0.3, 0.45, 0.6)), limbs_n=4)
-    return G.settle([still])
+    return G.settle([clad(P, still, 218, more=lambda cards: [strand(cards, *s) for s in strands])])
 
 
 # ---- conifers -----------------------------------------------------------------------------------------
@@ -904,7 +957,7 @@ def lemon_tree():
                           limb_r=(0.02, 0.011), bough_r=(0.011, 0.005), fork=(0.4, 0.5), lift=0.1, wander=0.2, rise=0.1,
                           mass=dict(k=3, size=(0.17, 0.21), ring=0.13, drop=(-0.08, 0.02), squash=(0.8, 0.95), noise=0.3))
     _hearts(rng, cols, 3, centre, radii, 0.24, out=0.3)
-    still = G.join_all('lemonTree')
+    still = join_still('lemonTree')
     G.perch.find(12, clump_aims(clumps, random.Random(122), per=2), inset=0.02, gap=0.2)   # (on the leaves, before the lemons)
     at = (0.1, -0.6, 1.62)
     # a teen's and a child's (I-garden-11): lower on the crown's front, where they reach (`FRUIT.lemon`)
@@ -919,7 +972,7 @@ def lemon_tree():
         lump('picked_lemon', 0.07, at, P.fruit, scale=(1, 1, 1.3), segments=8, rings=5, noise=0.05)
         lump('teen_lemon', 0.07, teen_at, P.fruit3, scale=(1, 1, 1.3), segments=8, rings=5, noise=0.05)
         lump('low_lemon', 0.07, low_at, P.fruit2, scale=(1, 1, 1.3), segments=8, rings=5, noise=0.05)
-    return _fruiting('lemon', still, centre, fruit)
+    return _fruiting(P, 'lemon', still, 222, centre, fruit)
 
 
 # (width, height, depth) as measured. A tree's far version may differ from it by up to `TOLERANCE`.

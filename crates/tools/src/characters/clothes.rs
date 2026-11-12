@@ -114,10 +114,12 @@ pub fn garment_cuts(family: &str, p: &[V3; NB]) -> Cuts {
     for &gid in garments(family) {
         let (kind, name) = gid.split_once('.').unwrap();
         let c = match (kind, name) {
-            ("top", "tee") => top(0.3, hem, Some(0.0), None, false),
-            ("top", "vneck") => top(0.3, hem, None, Some(0.0), false),
-            ("top", "polo") => top(0.36, hem - 0.02, Some(-0.006), None, false),
-            ("top", "long") => top(0.965, hem, Some(0.0), None, false),
+            // (Worn out, as they are: the hem a hand below the waistband, over the bottom. The tank top and the
+            // blouse are tucked in.)
+            ("top", "tee") => top(0.3, lm.hip + 0.045, Some(0.0), None, true),
+            ("top", "vneck") => top(0.3, lm.hip + 0.045, None, Some(0.0), true),
+            ("top", "polo") => top(0.36, lm.hip + 0.04, Some(-0.006), None, true),
+            ("top", "long") => top(0.965, lm.hip + 0.045, Some(0.0), None, true),
             ("top", "shirt") => top(0.965, hem - 0.07, Some(-0.012), None, true),
             // The apron a server wears: the shirt under it is painted as a shirt (long sleeves, its hem at the hip)
             // and the apron itself is a shell over the front (clothes.rs `apron`), from the waist down to above the
