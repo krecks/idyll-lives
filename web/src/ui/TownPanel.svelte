@@ -1,6 +1,6 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
-  import { clock } from './format';
+  import { clock, money } from './format';
   import SimPreview from './kit/SimPreview.svelte';
   import { closeOutside } from './kit/popup';
   import { services } from './services';
@@ -9,6 +9,7 @@
   import { mapScale, screenToMap } from './mapView';
   import { lotTitle, wayText } from './place';
   import { settings } from '../settings/settings.svelte';
+  import { homesForSale, type HomeForSale } from './town/places';
 
   /**
    * In-game town map: who lives where, who's home, and visiting. It pans (drag) and zooms (the
@@ -31,6 +32,16 @@
   const household = $derived(plot ? game.households.find((h) => h.plot === plot.id) : undefined);
   const residents = $derived(household ? game.sims.filter((s) => s.household === household.id) : []);
   const info = (id: number) => game.roster.find((r) => r.id === id);
+  /** The lot picked, if it's for sale (nobody lives there): its price from the land and the house, and its size (`town/places.ts`). */
+  const saleText = (h: HomeForSale) =>
+    [
+      'For sale',
+      h.price && !game.creative ? `from ${money(h.price)}` : '',
+      `${h.floor ? `${h.storeys > 1 ? `${h.storeys} floors, ` : ''}${Math.round(h.floor)} m² of house` : 'an empty lot'} on ${h.w} × ${h.d} m`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  const sale = $derived(plot && !plot.public && !household ? homesForSale([plot], [], services.content.economy.homePrice)[0] : null);
   const homeCount = (plotId: number) => game.sims.filter((s) => s.plot === plotId).length;
 
   // ---- the view: zoom 1..12 round its middle (m); the map's width on screen (px) ----
@@ -145,6 +156,19 @@
     const p = plots[id];
     if (p) target = [p.x + p.w / 2, p.z + p.d / 2];
   }
+  // A lot handed over to pick as the map opens (a home for sale's tag, `town/TownTags.svelte`): picked, shown.
+  $effect(() => {
+    const id = townMap.pick;
+    if (!game.townOpen || id === null) return;
+    townMap.pick = null;
+    dragged = false;
+    pickPlot(id);
+    const p = plots[id];
+    if (p) {
+      zoom = Math.max(zoom, 3);
+      mid = [p.x + p.w / 2, p.z + p.d / 2];
+    }
+  });
   function pickPoint(e: MouseEvent) {
     if (!dragged) target = at(e);
   }
@@ -296,6 +320,9 @@
           <b>{household ? `The ${household.name}s` : plot.name}</b>
           <span class="muted">{plot.name}</span>
         </div>
+        {#if sale}
+          <p class="sale muted">{saleText(sale)}</p>
+        {/if}
         <ul>
           {#each residents as s (s.id)}
             {@const who = info(s.id)}
@@ -551,7 +578,8 @@
     color: var(--text-muted);
     font-size: 12px;
   }
-  .hint {
+  .hint,
+  .sale {
     margin: 0;
   }
   .why {

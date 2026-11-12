@@ -72,7 +72,8 @@ import { within } from '../../core/async';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
-import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS } from '../shared/lens';
+import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS, TOWN_MAX, townBlend } from '../shared/lens';
+import { townView } from '../shared/townView'; // lt-temp
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
 import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
@@ -636,6 +637,28 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const hour = Number(params.get('hour'));
     this.fixedHour = Number.isFinite(hour) && params.has('hour') ? hour : null;
     this.gameRig = new GameCameraRig(this.orbit, { radius: RADIUS_LIMITS, beta: BETA_LIMITS }, (i, out) => this.simHead(i, out), () => this.orbit.stopInertia());
+    // lt-temp: the hud stream's stand-in for the camera stream (docs/design/living-town.md): `?town` lets the play
+    // camera zoom out to `TOWN_MAX`, so the town tags can be seen before the real town view is merged.
+    if (params.has('town')) this.orbit.limits = { radius: [RADIUS_LIMITS[0], TOWN_MAX], beta: BETA_LIMITS };
+  }
+
+  // lt-temp: the stand-in's town view state (`shared/townView.ts`), written each frame from the play camera.
+  private readonly townViewEye = { x: 0, y: 0, z: 0 };
+  private readonly townViewOut = { x: 0, y: 0 };
+  private readonly townViewProject = (x: number, y: number, z: number): [number, number, number] | null => {
+    const out = this.townViewOut;
+    if (!this.camera.project(x, y, z, this.cssSize.width, this.cssSize.height, out)) return null;
+    const e = this.townViewEye;
+    return [out.x, out.y, Math.hypot(x - e.x, y - e.y, z - e.z)];
+  };
+  private writeTownView(): void {
+    const o = this.orbit;
+    townView.radius = o.radius;
+    townView.blend = this.townMode ? 0 : townBlend(o.radius);
+    townView.target.x = o.target.x;
+    townView.target.z = o.target.z;
+    this.camera.eyeInGame(this.townViewEye);
+    townView.project = this.townViewProject;
   }
 
   async init(canvas: HTMLCanvasElement): Promise<void> {
@@ -938,6 +961,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       }
       this.sunShadows.frame();
       this.applyCamera();
+      this.writeTownView(); // lt-temp
       this.pushGrass(dt);
       this.lot.frame(dt, this.townMode); // (the sky round the camera, the clouds' shadows, the grass in view.)
       if (!this.townMode) this.updateCutaway();
@@ -2977,6 +3001,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return true;
   }
 
+  heightAt(x: number, z: number): number {
+    return this.lot.landscape?.heightAt(x, z) ?? 0;
+  }
+
   simHead(index: number, out: { x: number; y: number; z: number }): boolean {
     return index < this.simCount && !!this.characters?.head(index, out);
   }
@@ -3075,6 +3103,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    // lt-temp: the stand-in's town view let go.
+    townView.project = null;
+    townView.blend = 0;
     clearTimeout(this.prepareTimer);
     this.parseQueue = [];
     this.characters?.dispose();

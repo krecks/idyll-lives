@@ -11,6 +11,7 @@ import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SimInfo, SocialEvent, WorldStructure } from '../core/protocol';
 import { groundDepth, lowestStorey } from '../core/protocol';
 import { townMap } from '../ui/townMap.svelte';
+import { townView } from '../render/shared/townView'; // lt-temp
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
 import { tileWorld } from '../debug/tileWorld';
@@ -1409,6 +1410,20 @@ async function openSession(
       const t = renderer.cameraPose().target;
       return [t[0], t[2]];
     },
+    spot(id, out) {
+      if (!renderer.simSpot(id, out)) return false;
+      out.y = renderer.heightAt(out.x, out.z);
+      return true;
+    },
+    ground: (x, z) => renderer.heightAt(x, z),
+  };
+  // lt-temp: the hud stream's stand-in for the camera stream's `townView.goTo` (docs/design/living-town.md): a
+  // flight there, or with `select` the resident selected and followed (the follow takes the camera to them).
+  townView.goTo = (to) => {
+    if (to.select !== undefined && game.sims.some((s) => s.id === to.select)) {
+      controls.inspect(to.select);
+      controls.follow(to.select);
+    } else controls.lookAt(to.x, to.z);
   };
   // The roaming camera settles on a lot: it is shown in full, the camera left where it is (in live
   // mode, not following anyone; build mode keeps the lot it builds on).
@@ -2001,6 +2016,7 @@ async function openSession(
       bridge.dispose();
       townMap.world = null;
       townMap.source = {};
+      townView.goTo = null; // lt-temp
       renderer.onFocusLot(null);
       renderer.onWatch(null);
     },

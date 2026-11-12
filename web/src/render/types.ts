@@ -431,6 +431,8 @@ export interface Renderer {
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean;
   /** Where Sim `index` is on the ground (town tiles, from the last update, drawn or not); false if away or unknown. */
   simSpot(index: number, out: { x: number; z: number }): boolean;
+  /** The ground's height (m) at a town point (the land of a big world; 0 on flat ground or before it's built): the town tags stand on it. */
+  heightAt(x: number, z: number): number;
   /** Interpolated world position above Sim `index`'s head from the last update; false if unknown. */
   simHead(index: number, out: { x: number; y: number; z: number }): boolean;
   /** The garden birds drawn about the viewed lot (render/shared/birds.ts), for the world's sound: kept and refilled, read it at once. */
