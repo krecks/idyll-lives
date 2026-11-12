@@ -330,7 +330,8 @@ function build(world: WorldStructure): LtFixture {
     const area = areaAt(px, pz);
     // The ridge along the road (a terrace's, a shop's), or across it for some houses (the gable end on the street).
     const gableOn = !centre && use === 'house' && front < depth + 1 && rand() < 0.35;
-    const ridge = Math.atan2(gableOn ? nz : uz, gableOn ? nx : ux);
+    // (A turn round +y: the ridge runs along (cos r, −sin r) in x, z, `game/backdrop.ts`.)
+    const ridge = Math.atan2(-(gableOn ? nz : uz), gableOn ? nx : ux);
     const b0: BackdropBuilding = { poly: ccw(poly), y: 0, storeys: Math.max(1, Math.min(6, storeys)), roof, ...(roof === 'gable' || roof === 'mansard' ? { ridge } : {}), use, look: Math.floor(rand() * 1024), area };
     const kind = PLACE_KIND[use];
     if (kind && (use !== 'farm' || rand() < 0.4)) {

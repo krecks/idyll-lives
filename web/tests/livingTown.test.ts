@@ -15,7 +15,8 @@ describe("the town view's buildings", () => {
     const [ux, uz] = [Math.cos(a), Math.sin(a)];
     const [vx, vz] = [-uz, ux];
     const at = (u: number, v: number): [number, number] => [100 + u * ux + v * vx, 50 + u * uz + v * vz];
-    const b: BackdropBuilding = { poly: [at(-6, -4), at(6, -4), at(6, 4), at(-6, 4)], y: 2, storeys: 2, roof: 'gable', ridge: a, use: 'house', look: 3, area: 0 };
+    const b: BackdropBuilding = { poly: [at(-6, -4), at(6, -4), at(6, 4), at(-6, 4)], y: 2, storeys: 2, roof: 'gable', ridge: -a, use: 'house', look: 3, area: 0 };
+    // (`ridge` turns round +y: (cos r, −sin r) in x, z, so this ridge's is −30°.)
     const t = backdropBuilding(b, 0, () => 1.5);
     expect(t.cx).toBeCloseTo(100, 6);
     expect(t.cz).toBeCloseTo(50, 6);

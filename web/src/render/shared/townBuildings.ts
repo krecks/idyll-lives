@@ -138,7 +138,8 @@ export function backdropBuilding(b: BackdropBuilding, index: number, ground: (x:
   // The rectangle's direction: the ridge's, else the longest side's.
   let ux = 1;
   let uz = 0;
-  if (b.ridge !== undefined && (b.roof === 'gable' || b.roof === 'mansard')) [ux, uz] = [Math.cos(b.ridge), Math.sin(b.ridge)];
+  // (`ridge` is a turn round +y, y up: it takes +x to (cos r, −sin r) in x, z, as worldgen writes it, `game/backdrop.ts`.)
+  if (b.ridge !== undefined && (b.roof === 'gable' || b.roof === 'mansard')) [ux, uz] = [Math.cos(b.ridge), -Math.sin(b.ridge)];
   else {
     let best = -1;
     for (let i = 0; i < p.length; i++) {
