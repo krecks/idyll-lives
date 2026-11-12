@@ -58,6 +58,8 @@ import { resizeKey, type ObjectBackgroundClips, type ObjectClipInfo, type Object
 
 /** Radius of the sky dome (m): inside the camera's far plane. */
 const SKY_RADIUS = 700;
+/** How much land (m) past its target the town view's camera sees in front of the sky (`skyReach`): a Big world and the hills round it. */
+const SKY_BEYOND = 1500;
 
 /** The lot as the renderer has it now: the storey in view, where each storey's rows are, and what's in view. */
 export interface LotView {
@@ -464,6 +466,14 @@ export class LotContents {
   setReducedMotion(on: boolean): void {
     this.reducedMotion = on;
     setWind(this.app, on ? 0 : 1);
+  }
+
+  /**
+   * The sky's dome far enough out for a camera `radius` m from its target (the town view, docs/design/living-town.md):
+   * as made up to `SKY_RADIUS` less the land the camera sees past its target; wider past that, so the land stays in front of it.
+   */
+  skyReach(radius: number): void {
+    this.sky.reach(Math.max(1, (radius + SKY_BEYOND) / SKY_RADIUS));
   }
 
   /** Each frame, game or overview, once the camera is placed: the sky round it, the clouds' drift (`dt` ms), the grass in view. */

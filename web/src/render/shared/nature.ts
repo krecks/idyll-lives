@@ -404,7 +404,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   static key(world: WorldStructure): string {
     const look = world.meta?.world;
     const streets = [...(world.meta?.streets ?? []).map((s) => `${s.z}`), ...(world.meta?.roads ?? []).map((r) => `${r.points[0]}:${r.points.length}`)].join(',');
-    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${JSON.stringify(look.landscape)}` : ''}`;
+    // (A backdrop is built land too, `builtField`: a town with one has a landscape of its own.)
+    const backdrop = world.meta?.backdrop?.length ? `:b${world.meta.backdrop.length}` : '';
+    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${JSON.stringify(look.landscape)}` : ''}${backdrop}`;
   }
 
   /**
@@ -459,6 +461,12 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       }
     };
     for (const p of world.plots) mark(p.x, p.z, p.x + p.w, p.z + p.d);
+    // (The living town's backdrop buildings too, and a metre round them: no tree grows in one.)
+    for (const b of world.meta?.backdrop ?? []) {
+      const xs = b.poly.map((q) => q[0]);
+      const zs = b.poly.map((q) => q[1]);
+      mark(Math.min(...xs) - 1, Math.min(...zs) - 1, Math.max(...xs) + 1, Math.max(...zs) + 1);
+    }
     for (const r of world.meta?.roads ?? []) {
       const half = r.width / 2 + 2;
       for (let i = 0; i + 1 < r.points.length; i++) {

@@ -13,6 +13,7 @@
  *   swinging round the glass every 20 s), `mirror-still` (the same, held still in the swing's middle),
  *   `street` (the home lot from across its street, low: the house's front, the pavement, the road),
  *   `town` (the menus' town from the menu's own angle, lit for `hour`).
+ * - `townCentre=1`: the orbit round the drawn world's main town (the town view) instead of the home lot.
  * - `radius=`, `beta=`, `tx=`, `tz=`: the orbit's distance, angle and target instead of its path's (the game
  *   opens at beta 0.86); `walls=up|cutaway|down`: the walls held that way (up: the house whole, roof on).
  * - `res=1080` that resolution (720, 1080, 1440, 2160; `res=1` every line the window has); `res=auto` (default) the player's setting.
@@ -228,10 +229,12 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
 
   const home = game.households.find((h) => h.player)?.plot;
   const plot = home == null ? null : game.plots[home];
-  const centre: [number, number, number] = plot ? [plot.x + plot.w / 2, 0, plot.z + plot.d / 2] : [0, 0, 0];
+  const town = renderer.benchInfo().world as { width: number; depth: number; areas?: [number, number][] } | undefined;
+  // (`townCentre=1`: round the drawn world's main town, the town view's.)
+  const main = b.orbit.town ? town?.areas?.[0] : undefined;
+  const centre: [number, number, number] = main ? [main[0], 0, main[1]] : plot ? [plot.x + plot.w / 2, 0, plot.z + plot.d / 2] : [0, 0, 0];
   const path = PATHS[b.cam === 'wide' ? 'wide' : 'orbit'];
   // The roam's loop: over the town (tiled, the big world's), from the home lot's side.
-  const town = renderer.benchInfo().world as { width: number; depth: number; areas?: [number, number][] } | undefined;
   const bounds = { x0: 0, z0: 0, x1: town?.width ?? 100, z1: town?.depth ?? 100, from: centre, areas: town?.areas && town.areas.length > 1 ? town.areas : undefined };
   const frozen = b.diag.has('freeze');
   const mirror = b.cam === 'mirror' || b.cam === 'mirror-still' ? mirrorView(renderer.benchInfo().scene as { mirrorSpots?: Spot[] }, plot) : null;

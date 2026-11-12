@@ -7,14 +7,16 @@
  * `albedo` and `normals` draw every lit surface as its base colour or world normal instead of
  * its shading (`render/pc/shaders/diagView.ts`), and `nosims` leaves the residents out: geometry
  * and colour compared without the lighting (the reference pictures for the PlayCanvas port). `linear` draws the lit colour as it is,
- * without tone mapping, exposure or grading: the light compared without the image processing.
+ * without tone mapping, exposure or grading: the light compared without the image processing. `notown` leaves the town view's
+ * drawing out (`render/pc/townView.ts`: the backdrop, the far lots, crowns, movers, the ground's map), the far LOD as before it.
  */
 
+import { TOWN_MAX } from '../render/shared/lens';
 import { isResolution, type Resolution } from '../render/shared/resolution';
 
 export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still' | 'roam' | 'street' | 'town';
 
-export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'noao', 'noclouds', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders'] as const;
+export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'noao', 'noclouds', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders', 'notown'] as const;
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
 
 export interface BenchFlags {
@@ -45,8 +47,11 @@ export interface BenchFlags {
   /** With `freeze`: the camera path at this moment (s), held. With `hold=1` (and no `freeze`), the camera is held there while the game and the wind go on. */
   at: number;
   hold: boolean;
-  /** The orbit's radius and angle from vertical instead of its path's (`radius=`, `beta=`), and its target moved by (`tx=`, `tz=`, m): a close look at the lawn. */
-  orbit: { radius: number | null; beta: number | null; tx: number; tz: number };
+  /**
+   * The orbit's radius (to `TOWN_MAX`: the town view) and angle from vertical instead of its path's (`radius=`, `beta=`), and its target moved by
+   * (`tx=`, `tz=`, m): a close look at the lawn. `townCentre=1`: round the drawn world's main town (its first area's middle) instead of the home lot.
+   */
+  orbit: { radius: number | null; beta: number | null; tx: number; tz: number; town: boolean };
   /** `walls=up|cutaway|down`: the walls held that way (`up` from the game's distance shows the house whole, roof on); null: the game's own. */
   walls: 'up' | 'cutaway' | 'down' | null;
   diag: ReadonlySet<BenchDiag>;
@@ -94,7 +99,7 @@ function parse(): BenchFlags | null {
     gpu: params.get('gpu') !== '0',
     at: num('at', 0, 0, 3600),
     hold: params.get('hold') === '1',
-    orbit: { radius: params.has('radius') ? num('radius', 24, 2, 200) : null, beta: params.has('beta') ? num('beta', 0.9, 0.1, 1.5) : null, tx: num('tx', 0, -200, 200), tz: num('tz', 0, -200, 200) },
+    orbit: { radius: params.has('radius') ? num('radius', 24, 2, TOWN_MAX) : null, beta: params.has('beta') ? num('beta', 0.9, 0.1, 1.5) : null, tx: num('tx', 0, -200, 200), tz: num('tz', 0, -200, 200), town: params.get('townCentre') === '1' },
     walls: walls === 'up' || walls === 'cutaway' || walls === 'down' ? walls : null,
     diag,
     label: params.get('label') ?? '',

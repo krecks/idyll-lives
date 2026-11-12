@@ -1876,6 +1876,17 @@ export class HousePlanner {
   }
 
   /**
+   * How a house far off looks (the town view's far lots, `pc/townView.ts`): its walls' outer box, its wall and
+   * roof colours, and its roof's shape and rise over its walls (as `farHouse` and `roofTop` have them).
+   */
+  farLook(plot: { x: number; z: number; house: [number, number, number, number]; roof?: [number, number]; storeys?: number }): { box: [number, number, number, number]; wall: string; roof: string; shape: 'gable' | 'hip' | 'flat'; rise: number } {
+    const s = this.schemeWith(houseScheme(plot.x, plot.z), plot.roof);
+    const [x0, z0, x1, z1] = plot.house;
+    const walls = WALL_HEIGHT * (plot.storeys ?? 1);
+    return { box: [x0 - T, z0 - T, x1 + T, z1 + T], wall: s.wall, roof: s.roof, shape: s.shape, rise: Math.max(0.2, this.roofTop(plot) - walls) };
+  }
+
+  /**
    * Neighbouring houses as dressed boxes: the house's own doors and windows where they lie on
    * the box outline (framed, with muntins, curtains and shutters), corner boards, a porch with a
    * gabled canopy over the front door (`porchDoors`), a chimney on some roofs, and a garage at the
