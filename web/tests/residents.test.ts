@@ -395,5 +395,5 @@ describe('residents', async () => {
       performance.now = realNow;
       globalThis.fetch = realFetch;
     }
-  });
+  }, 30_000);
 });

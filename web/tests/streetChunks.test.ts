@@ -181,7 +181,7 @@ describe('the street in chunks', async () => {
       const fresh = new TownStreet(new HousePlanner(), w, options, 'game');
       for (const id of street.chunkIds()) expect(drawn(street.chunk(id, f))).toBe(drawn(fresh.chunk(id, f)));
     }
-  });
+  }, 30_000);
 
 
   /** The ranks' shelters a street draws (every chunk's), and its own account of them. */

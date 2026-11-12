@@ -14,7 +14,9 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }));
 /** A big world of one kind (every world is a big one now): the file's text. */
 function sample(tag: string, more: string[] = []): string {
   const out = join(dir, `${tag}.json`);
-  const run = Bun.spawnSync([process.execPath, SAMPLE, out, '1', '--kinds', 'small', ...more], { stdout: 'pipe', stderr: 'pipe' });
+  // (Not timed: beside the other tests on CI's runner a big world's layout took over twice its budget,
+  // which `ci-local.sh generated` checks running alone.)
+  const run = Bun.spawnSync([process.execPath, SAMPLE, out, '1', '--kinds', 'small', '--no-timing', ...more], { stdout: 'pipe', stderr: 'pipe' });
   // (A sample that found a layout problem still writes its file, so the exit status is the check.)
   expect(run.exitCode).toBe(0);
   expect(run.stderr.toString()).not.toContain('error');

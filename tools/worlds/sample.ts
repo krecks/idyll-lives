@@ -29,7 +29,7 @@
  * `--seed-base n` (or WORLDS_SEED_BASE; default 0, the worlds CI checks) draws other worlds: the
  * release gate runs the checks over five (`tools/ci-local.sh`, SEED_BASE).
  *
- * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--kinds farm,forest] [--seed-base n]
+ * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--kinds farm,forest] [--seed-base n] [--no-timing]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -328,6 +328,9 @@ const flag = (name: string) => {
 const seedBase = Number(flag('--seed-base') ?? process.env.WORLDS_SEED_BASE ?? 0);
 if (!Number.isInteger(seedBase) || seedBase < 0) throw new Error(`no seed base ${seedBase}`);
 const SEED_STEP = 7919;
+/** `--no-timing`: the layout's and the file's time not checked against their budgets (a run beside others, on a slow runner: `web/tests/sampleWorlds.test.ts`). */
+const timing = !process.argv.includes('--no-timing');
+if (!timing) process.argv.splice(process.argv.indexOf('--no-timing'), 1);
 const kinds = (flag('--kinds')?.split(',') ?? [...WORLD_KINDS]) as (typeof WORLD_KINDS)[number][];
 for (const kind of kinds) if (!WORLD_KINDS.includes(kind)) throw new Error(`no kind ${kind}`);
 const out = process.argv[2] ?? 'worlds.json';
@@ -373,8 +376,8 @@ for (const kind of WORLD_KINDS.filter((k) => kinds.includes(k))) {
     [slowest[0], slowest[1], slowest[2]] = [Math.max(slowest[0], layout), Math.max(slowest[1], houses), Math.max(slowest[2], assemble)];
     for (const p of [...layoutProblems(file), ...(world.diagnostics?.roads ?? [])]) problems.push(`${tag}: ${p}`);
     if (text.length > MAX_FILE) problems.push(`${tag}: the town file is ${(text.length / 1e6).toFixed(1)} MB`);
-    if (layout > LAYOUT_BUDGET * 2) problems.push(`${tag}: laid out in ${layout.toFixed(0)} ms (budget ${LAYOUT_BUDGET})`);
-    if (assemble > ASSEMBLE_BUDGET * 2) problems.push(`${tag}: assembled in ${assemble.toFixed(0)} ms (budget ${ASSEMBLE_BUDGET})`);
+    if (timing && layout > LAYOUT_BUDGET * 2) problems.push(`${tag}: laid out in ${layout.toFixed(0)} ms (budget ${LAYOUT_BUDGET})`);
+    if (timing && assemble > ASSEMBLE_BUDGET * 2) problems.push(`${tag}: assembled in ${assemble.toFixed(0)} ms (budget ${ASSEMBLE_BUDGET})`);
     for (const { household, slot } of town.households) {
       const s = town.slots[slot];
       const price = homePrice(content, templates, s);
