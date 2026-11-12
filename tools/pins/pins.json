@@ -3,9 +3,9 @@
     {
       "name": "contract",
       "file": "docs/design/living-town.md",
-      "sha256": "e0df29869cad086a132fdab8d11b7ab58957b400924dbe9bfe15b7a23d5f8607",
+      "sha256": "20ad198da5b73bd1df9a087b60f8743266ab4be3cf997917b235b705fe89d531",
       "by": "setup",
-      "reason": "the living-town contract"
+      "reason": "the contract: townView shared state"
     },
     {
       "name": "living-town-meta",
@@ -124,6 +124,22 @@
       "sha256": "74837017377b4c3770fe178fb79f0ed781c6b3a237f2e603f8630dc61954ce2e",
       "by": "setup",
       "reason": "household behaviour: not this run's to change"
+    },
+    {
+      "name": "living-town-lens",
+      "file": "web/src/render/shared/lens.ts",
+      "sha256": "e5db8420c1acfd243a94f32ee6f1e019ba48a47f02e35a0f8ddfd04625ddbcb6",
+      "by": "setup",
+      "reason": "the contract's town view constants",
+      "region": "living-town-lens"
+    },
+    {
+      "name": "living-town-view",
+      "file": "web/src/render/shared/townView.ts",
+      "sha256": "6dd57fd75dbe29b294a1dcf1a8f4efdc905fa1a1b487ac158744ea00f32cd0fd",
+      "by": "setup",
+      "reason": "the contract's shared town view state",
+      "region": "living-town-view"
     }
   ]
 }

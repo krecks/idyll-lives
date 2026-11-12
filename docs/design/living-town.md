@@ -128,13 +128,8 @@ them and plays as today. Sample saves may break: re-bless them.
 
 `web/src/render/shared/lens.ts` exports:
 
-```ts
-/** Where the camera is between the play orbit and the town view: 0 at or below TOWN_FROM, 1 at TOWN_FULL. */
-export const TOWN_FROM = 120;   // m of orbit radius
-export const TOWN_FULL = 400;   // m
-export const TOWN_MAX = 900;    // m: the farthest the camera zooms out
-export function townBlend(radius: number): number; // 0..1, smoothstep(TOWN_FROM, TOWN_FULL, radius)
-```
+`TOWN_FROM` (120 m of orbit radius), `TOWN_FULL` (400 m), `TOWN_MAX` (900 m: the farthest the camera
+zooms out) and `townBlend(radius)` (0..1, smoothstep from `TOWN_FROM` to `TOWN_FULL`).
 
 - The zoom is one continuous movement: there is no mode switch or button. Up to `TOWN_FROM` it behaves
   exactly as today, so `RADIUS_LIMITS[1]` is reached as before inside a lot. Past it, the orbit's radius
@@ -144,11 +139,14 @@ export function townBlend(radius: number): number; // 0..1, smoothstep(TOWN_FROM
   - the target is held over land (`panBounds`);
   - the fog's density falls to about a quarter;
   - the far plane covers the whole world.
-- `game.townBlend` (a number, read every frame) is how the renderer and the HUD learn the blend. The
-  renderer publishes it.
-- `services.camera.goTo({ x, z, radius?, select? })` flies to a point. It uses the existing glides
-  (`shared/focus.ts` `Flight`, `cameraRig.ts`), and it is what a tag's click calls. With `select: simId`,
-  the resident is selected and followed when the glide ends.
+- `web/src/render/shared/townView.ts` `townView` is the shared state: `blend`, `radius`, `target` and
+  `project` (a world point to CSS pixels), written by the renderer every frame. It also holds `goTo({ x, z,
+  radius?, select? })`, set once. The camera stream wires all of them in the renderer. The render and hud
+  streams only read them. Before the camera stream is merged, they may wire a stand-in for their own
+  testing, marked `// lt-temp`, which the integrator removes.
+- `goTo` flies to a point using the existing glides (`shared/focus.ts` `Flight`, `cameraRig.ts`), and it is
+  what a tag's click calls. With `select: simId`, the resident is selected and followed when the glide
+  ends.
 
 ## Town-scale drawing (render)
 
