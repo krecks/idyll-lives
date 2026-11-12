@@ -51,6 +51,7 @@ describe('a rider coming into the full-detail area', async () => {
   };
   const view: View = {
     init: () => {},
+    setMorphs: () => {},
     uploadPoses: () => {},
     uploadPoseRows: () => {},
     createPart: () => ({}),

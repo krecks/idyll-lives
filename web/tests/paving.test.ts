@@ -77,7 +77,7 @@ describe('paving', () => {
   test('a worn road covers what the plain one does, toned between its kerbs', () => {
     const road = { points: [[0, 10], [40, 10]] as [number, number][], width: 9, ends: ['out', 'out'] as ['out', 'out'] };
     const plain = roadMeshes([road], null, 0, {}, 'surface').surface;
-    const worn = roadMeshes([road], null, 0, {}, 'surface', () => 9 / 2 - 1.35).surface;
+    const worn = roadMeshes([road], null, 0, {}, 'surface', undefined, () => 9 / 2 - 1.35).surface;
     const span = (g: Geo, k: number) => [Math.min(...g.pos.filter((_, i) => i % 3 === k)), Math.max(...g.pos.filter((_, i) => i % 3 === k))];
     expect(span(worn, 0)).toEqual(span(plain, 0));
     expect(span(worn, 2)).toEqual(span(plain, 2));
