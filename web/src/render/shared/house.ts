@@ -2439,6 +2439,9 @@ function indoorRects(room: (x: number, z: number) => number, x0: number, z0: num
   return out;
 }
 
+/** How far a hip's cap shingles reach down each slope from the hip (m). */
+const HIP_CAP = 0.14;
+
 /** A roof of the scheme's shape (gable, hip or flat) over a rectangle of wall centre lines. */
 function addRoofShaped(
   rect: { x0: number; z0: number; x1: number; z1: number },
@@ -2527,6 +2530,38 @@ export function addRoof(
     plane([[ea1, ye, eb0], [ea1, ye, eb1], [ra1, yr, bc]], [[eb0, 0], [eb1, 0], [bc, vr]], sideA1);
     trim.poly([P(ea0, ye, eb0), P(ea0, ye, eb1), P(ea0, ye + th, eb1), P(ea0, ye + th, eb0)], sideA0);
     trim.poly([P(ea1, ye, eb0), P(ea1, ye + th, eb0), P(ea1, ye + th, eb1), P(ea1, ye, eb1)], sideA1);
+    // Hip caps: a course of cap shingles up each hip, a fifth darker as the ridge's is, standing a little
+    // proud of the two slopes it covers the joint of (a hip was a bare seam between two tones).
+    const [r, g, b] = [roof.r, roof.g, roof.b];
+    roof.r *= 0.8;
+    roof.g *= 0.8;
+    roof.b *= 0.8;
+    const len = Math.hypot(pitch, 1);
+    type L3 = [number, number, number];
+    const cross = (u: L3, v: L3): L3 => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    for (const [ca, cb, ra] of [[ea0, eb0, ra0], [ea0, eb1, ra0], [ea1, eb0, ra1], [ea1, eb1, ra1]]) {
+      const E: L3 = [ca, ye + th, cb];
+      const R: L3 = [ra, yr + th, bc];
+      const d: L3 = [R[0] - E[0], R[1] - E[1], R[2] - E[2]];
+      // The two slopes that meet here (local a, y, b): their normals, and the way into each from the hip.
+      const slopes: [L3, L3][] = [
+        [[0, 1 / len, (cb < bc ? -pitch : pitch) / len], [ca < ra ? 1 : -1, 0, 0]],
+        [[(ca < ra ? -pitch : pitch) / len, 1 / len, 0], [0, 0, cb < bc ? 1 : -1]],
+      ];
+      for (const [n, into] of slopes) {
+        let p = cross(n, d);
+        const pl = Math.hypot(...p) || 1;
+        const sign = p[0] * into[0] + p[2] * into[2] < 0 ? -1 : 1;
+        p = [(p[0] / pl) * sign * HIP_CAP, (p[1] / pl) * sign * HIP_CAP, (p[2] / pl) * sign * HIP_CAP];
+        const top = (q: L3): V3 => P(q[0], q[1] + 0.045, q[2]);
+        const foot = (q: L3): V3 => P(q[0] + p[0] + n[0] * 0.006, q[1] + p[1] + n[1] * 0.006, q[2] + p[2] + n[2] * 0.006);
+        const pts = [top(E), top(R), foot(R), foot(E)];
+        roof.poly(pts, facing(pts[0], pts[1], pts[2], [0, 1, 0]));
+      }
+    }
+    roof.r = r;
+    roof.g = g;
+    roof.b = b;
   } else {
     // Rake boards along the sloped edges and closed gable triangles on the wall planes.
     for (const [a, side] of [[ea0, sideA0], [ea1, sideA1]] as const) {

@@ -14,6 +14,7 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 - **Walls with depth:** a room's walls are darker at the floor and into the corners and vary a little over their length, where each was one flat tone.
 - **A street that has been driven on:** the road is paler where wheels run and darker between them and along the kerb, with a patch of newer asphalt here and there; the pavement has a grey kerb and a course of grey stone at its back, and a darker gutter.
 - **Paths that belong in the garden:** a garden path and a drive are darker and mossy along their sides, where they meet the lawn, instead of ending with a ruler's edge.
+- **Finished roofs:** a hip roof has a course of cap shingles up each of its hips, as its ridge has.
 - **Miniature focus:** the far and near edges of the picture go soft, as in a photograph of a model, and the home in the middle stays sharp. It follows the camera's tilt, fades out as you zoom in, and stays out while you build, in the basement and in the menus. On with High graphics; turn it on or off for any setting in Settings, Performance, Miniature focus.
 - **A smaller download for the residents:** the bodies, faces, hair and clothes are 3.9 MB to download instead of 5.1. A finer copy of the body, for close views, was sent with every game and used by none; it now comes only to the household creator, whose resident stands close enough for it to show: the outline of the head, the jaw, the shoulders and a tee's neckline are smooth curves there, where they had corners.
 
