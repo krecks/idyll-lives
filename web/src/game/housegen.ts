@@ -121,7 +121,17 @@ interface HouseClass {
   storeys: { one: number; two: number };
   width: [number, number];
   depth: [number, number];
+  /**
+   * A house in a row (a terrace's or a semi-detached pair's): its lot cut to it with `ROW_GAP` m
+   * beside it on one side (its +x) and none on the other, no room for a driveway, and the front
+   * yard `margins.front`'s least, so the fronts of a row line up. Next door's house, its own wall
+   * on its lot's edge, stands `ROW_GAP` m off.
+   */
+  row?: boolean;
 }
+
+/** The gap between two houses in a row (m): see `HouseClass.row`. */
+export const ROW_GAP = 1;
 
 type RoomKind = Kind | 'hall';
 /** Rooms with a recipe in the config (`bedroom`, `kitchen`, `bathroom`, `living` and extras; halls have none). */
@@ -461,7 +471,7 @@ function attemptHouse(
 
   // Footprint, within the lot's garden margins.
   const { margins } = cfg;
-  const front = between(rng, margins.front);
+  const front = cls.row ? margins.front[0] : between(rng, margins.front);
   const maxW = lot.width - 2 * margins.side;
   const maxD = lot.depth - front - margins.back;
   let W = Math.min(maxW, between(rng, cls.width));
@@ -493,8 +503,10 @@ function attemptHouse(
   const chanceOf = (chance: number | Record<string, number>) => (typeof chance === 'number' ? chance : (chance[lotSize] ?? 0));
   const extras = (cfg.extras ?? []).filter((e) => cfg.rooms[e.kind] && bedrooms >= (e.minBedrooms ?? 0) && chanceOf(e.chance) > 0);
   for (const e of extras.filter((e) => rng() < chanceOf(e.chance))) add(e.kind, two && e.floor === 'upper' ? upstairs : ground);
-  // Rooms need some floor besides their own (their shapes don't fit together perfectly).
-  while (lists.some(stretched)) {
+  // Rooms need some floor besides their own (their shapes don't fit together perfectly). (A
+  // house in a row keeps its floor while the bedrooms upstairs want it: its narrow upper floor,
+  // shrunk to the kitchen and living room's below, has no room for them.)
+  while (cls.row ? lists.every(stretched) : lists.some(stretched)) {
     const [w, d] = W >= D ? [W - 1, D] : [W, D - 1];
     if (w < 6 || d < 6 || lists.some((l) => least(l) * LEAST_SLACK > floorOf(l, w, d))) break;
     [W, D] = [w, d];
@@ -572,7 +584,7 @@ function attemptHouse(
   // Named before the garden is laid out (a bigger garden draws more numbers: the same house keeps its name).
   const name = `${pick(rng, cfg.names.first)} ${pick(rng, cfg.names.second[cls.label] ?? ['House'])}`;
   // The lot: the whole one, or one cut to fit the house.
-  const plot = fit ? fitLot(fit.spec, random(fit.seed), house, doorX) : { x: 0, width: lot.width, depth: lot.depth };
+  const plot = fit ? fitLot(fit.spec, random(fit.seed), house, doorX, cls.row) : { x: 0, width: lot.width, depth: lot.depth };
   garden(cfg, info, rng, g, house, plot, washesWithoutDrying(info, [g, up, basement]));
 
   // Spawns in front of the front door.
@@ -620,9 +632,16 @@ type Cut = HouseTemplate & { cut?: { x: number; width: number; depth: number } }
 /**
  * A lot cut to fit `house` (lot coordinates, its front yard before it): garden behind it in
  * proportion to its depth, a little beside it, and room for the driveway on the side away from
- * the front door (where `driveway` in `town.ts` puts it). `x`: where the lot starts.
+ * the front door (where `driveway` in `town.ts` puts it); a house in a row (`row`), `ROW_GAP`
+ * beside it on its +x side only. `x`: where the lot starts.
  */
-export function fitLot(spec: GardenSpec, rng: () => number, house: Rect, doorX: number): { x: number; width: number; depth: number } {
+export function fitLot(spec: GardenSpec, rng: () => number, house: Rect, doorX: number, row = false): { x: number; width: number; depth: number } {
+  if (row) {
+    // (In a row: the house's wall on the lot's edge on one side, `ROW_GAP` on the other.)
+    const share = spec.back[0] + rng() * (spec.back[1] - spec.back[0]);
+    const back = Math.max(spec.backMin, Math.min(spec.backMax, Math.round(house.d * share)));
+    return { x: house.x, width: house.w + ROW_GAP, depth: house.z + house.d + back };
+  }
   const side = () => between(rng, spec.side);
   const [left, right] = doorX < house.x + house.w / 2 ? [side(), Math.max(spec.drive, side())] : [Math.max(spec.drive, side()), side()];
   const share = spec.back[0] + rng() * (spec.back[1] - spec.back[0]);

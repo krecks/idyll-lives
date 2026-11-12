@@ -110,6 +110,11 @@
 //! taxi's, `taxis.runs[].progress`) and the tick a traffic light's stage began (`lights`) in real
 //! seconds, and they're rescaled as it loads (`Rescale::drive`): each place along its way is the
 //! same place, as its way is now timed, and each light as many seconds into its stage.
+//! 38 = the town's living-town fields (docs/design/living-town.md, World data) are in its `meta`:
+//! `backdrop` (buildings nobody lives in), `places` (what the town tags name) and `centre` (each
+//! main town's square and high street), as the town file had them; and its homes may be terrace
+//! lots (`terrace`, narrow houses a metre apart). The simulation reads none of them: a file before
+//! it has none and plays as before.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -128,7 +133,7 @@ use crate::{
     clock::MAX_SPEED,
 };
 
-pub const SAVE_VERSION: u32 = 37;
+pub const SAVE_VERSION: u32 = 38;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

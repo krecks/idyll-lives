@@ -22,12 +22,14 @@ import type { Economy, ObjectDef } from '../../web/src/content/content.ts';
 import type { GardenSize, HouseGenConfig, Residents } from '../../web/src/game/housegen.ts';
 import type { Facing, HouseTemplate } from '../../web/src/game/town.ts';
 
-const { GARDEN_SIZES, generateHouse, objectInfos } = await import('../../web/src/game/housegen.ts');
+const { GARDEN_SIZES, generateHouse, objectInfos, ROW_GAP } = await import('../../web/src/game/housegen.ts');
 const { turner } = await import('../../web/src/game/town.ts');
 const { priceOf } = await import('../../web/src/game/price.ts');
 
 /** How much of its lot a house covers (its ground floor), by garden size: least and most. */
 const COVER: Record<GardenSize, [number, number]> = { snug: [0.2, 0.6], roomy: [0.16, 0.45], big: [0.12, 0.32] };
+/** A house in a row (a terrace's, `row` in its class) covers more of its narrow lot, whatever its garden. */
+const ROW_COVER: [number, number] = [0.3, 0.6];
 
 const root = new URL('../../web/public/content/', import.meta.url);
 const cfg = JSON.parse(readFileSync(new URL('housegen.json', root), 'utf8')) as HouseGenConfig;
@@ -140,9 +142,11 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
     // The lot cut to fit it: inside it, and covered no more and no less than its garden size says.
     if (!h.lot) problems.push(`${name}: no lot cut to fit the house`);
     else {
+      // (A house in a row stands on its lot's edge on one side, `ROW_GAP` off it on the other.)
+      const row = Object.values(cfg.classes).some((c) => c.row && c.label === h.class);
       const cover = ((x1 - x0) * (z1 - z0)) / (h.lot.width * h.lot.depth);
-      const [least, most] = COVER[garden];
-      if (x0 < 1 || x1 > h.lot.width - 1 || z1 > h.lot.depth - 4) problems.push(`${name}: the house (${x0}..${x1} × ..${z1}) off its ${h.lot.width}×${h.lot.depth} lot`);
+      const [least, most] = row ? ROW_COVER : COVER[garden];
+      if ((row ? x0 !== 0 || x1 !== h.lot.width - ROW_GAP : x0 < 1 || x1 > h.lot.width - 1) || z1 > h.lot.depth - 4) problems.push(`${name}: the house (${x0}..${x1} × ..${z1}) off its ${h.lot.width}×${h.lot.depth} lot`);
       if (cover < least || cover > most) problems.push(`${name}: covers ${(cover * 100).toFixed(0)}% of its ${h.lot.width}×${h.lot.depth} lot`);
       const k = `${size} ${garden}`;
       covers.set(k, [...(covers.get(k) ?? []), cover]);
@@ -177,8 +181,11 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
     // On its own lot, turned to face a street on any side (as `town.ts` turns lots onto a town).
     const facing = (seed % 4) as Facing;
     const { width, depth } = h.lot ?? lot;
-    const turn = turner(0, 0, width, depth, facing);
-    const [W, D] = facing % 2 ? [depth, width] : [width, depth];
+    // (A house in a row, its wall on its lot's edge, on a town a metre wider all round, as a
+    // town has land beyond its lots: a room against the town's edge is outdoors to the sim.)
+    const pad = Object.values(cfg.classes).some((c) => c.row && c.label === h.class) ? 1 : 0;
+    const turn = turner(pad, pad, width, depth, facing);
+    const [W, D] = facing % 2 ? [depth + 2 * pad, width + 2 * pad] : [width + 2 * pad, depth + 2 * pad];
     const footprint = (def: string): [number, number] => byId.get(def)?.footprint ?? [1, 1];
     // The storey above `D` rows down, the basement on the rows after every storey's (as `town.ts` puts them).
     const storeys = h.upper ? 2 : 1;
@@ -208,7 +215,7 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
         doors: onTown((f, lift) => f.doors.map((d) => turn.edge(d, lift))),
         windows: onTown((f, lift) => (f.windows ?? []).map((d) => turn.edge(d, lift))),
         objects: onTown((f, lift) => f.objects.map((o) => turn.place(o, footprint, lift))),
-        plots: [{ name: 'Home', x: 0, z: 0, w: W, d: D, entry: h.spawns[0] && turn.point(h.spawns[0]) }],
+        plots: [{ name: 'Home', x: pad, z: pad, w: W - 2 * pad, d: D - 2 * pad, entry: h.spawns[0] && turn.point(h.spawns[0]) }],
         households: [{ name: 'Test', plot: 0, player: true }],
         sims: [],
       },

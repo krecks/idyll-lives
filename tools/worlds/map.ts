@@ -4,7 +4,10 @@
  * (public ones blue, farms' fields yellow, outdoor places orange; a tick on the side they face),
  * garden paths and driveways, the ground floor's walls, the things standing about and the ways
  * out of town (red). A big world also shows its land (water,
- * woods, hills, meadows, fields, orchards), its country roads and trails (dashed), and its areas' names.
+ * woods, hills, meadows, fields, orchards), its country roads and trails (dashed), and its areas' names;
+ * and the living town (docs/design/living-town.md): its backdrop buildings (coloured by use, darker the
+ * more storeys), each main town's centre (paved, dashed round), and the places the tags name (a dot at
+ * the door, blue for a public lot, red for a backdrop place, with its name).
  * An index.html shows them all on one page.
  *
  * Run: bun tools/worlds/map.ts worlds.json out-dir [more.json ...]
@@ -32,6 +35,9 @@ type Town = {
     world?: { fields?: Rect[] };
     zones?: { kind: string; poly: Pt[] }[];
     areas?: (Rect & { name: string })[];
+    backdrop?: { poly: Pt[]; storeys: number; use: string }[];
+    centre?: { area: number; poly: Pt[] }[];
+    places?: { name: string; x: number; z: number; plot?: number }[];
   };
 };
 
@@ -42,6 +48,22 @@ const rect = (r: Rect, style: string) => `<rect x="${r.x}" y="${r.z}" width="${r
 const line = (pts: Pt[]) => pts.map((p) => p.join(',')).join(' ');
 const ZONE: Record<string, string> = { water: '#7fb2d9', woods: '#5d8a46', hill: '#b7c48a', meadow: '#c3d98f', fields: '#e2c86b', orchard: '#7fa653' };
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+/** Backdrop buildings' colours, by use. */
+const USE: Record<string, string> = {
+  flats: '#c9a27e',
+  terrace: '#d6b48e',
+  house: '#e3c9a0',
+  shop: '#e98f6b',
+  cafe: '#f0b35a',
+  restaurant: '#d9714e',
+  office: '#9fb3c8',
+  school: '#e5d36b',
+  church: '#bfa6d6',
+  hall: '#c7b79a',
+  workshop: '#a3a392',
+  farm: '#c98f5a',
+  barn: '#a8583e',
+};
 const cards: string[] = [];
 for (const { kind, seed, name, town } of worlds) {
   // 1.5 px a metre, labels in pixels whatever the scale.
@@ -59,6 +81,7 @@ for (const { kind, seed, name, town } of worlds) {
     ...(town.meta?.areas ?? []).map((a) => rect(a, `fill="none" stroke="#4d6b33" stroke-width="${px(1)}" stroke-dasharray="${px(4)} ${px(4)}"`)),
     ...(town.meta?.world?.fields ?? []).map((r) => rect(r, 'fill="#e2c86b"')),
     ...(town.meta?.greens ?? []).map((g) => `<polygon points="${line(g)}" fill="#7fb35e"/>`),
+    ...(town.meta?.centre ?? []).map((c) => `<polygon points="${line(c.poly)}" fill="#e6dcc8" opacity="0.75" stroke="#8a6d3b" stroke-width="${px(1.5)}" stroke-dasharray="${px(6)} ${px(3)}"/>`),
     ...town.plots.map((p) => rect(p, `fill="${p.kind === 'countryside' ? '#f2b366' : p.public ? '#a9c7e8' : '#b9d98f'}" stroke="#4d6b33" stroke-width="0.3"`)),
     // The side each lot faces (its street's).
     ...town.plots.map((p, i) => {
@@ -74,6 +97,10 @@ for (const { kind, seed, name, town } of worlds) {
     ...(town.meta?.paths ?? []).map((r) => rect(r, 'fill="#d8d2c4"')),
     ...town.objects.filter((o) => ground(o.z)).map((o) => `<circle cx="${o.x + 0.5}" cy="${o.z + 0.5}" r="0.35" fill="#5a4a3a"/>`),
     ...town.walls.filter(([, z0, , z1]) => ground(z0) && ground(z1)).map(([x0, z0, x1, z1]) => `<line x1="${x0}" y1="${z0}" x2="${x1}" y2="${z1}" stroke="#7a2e1f" stroke-width="0.35"/>`),
+    // The backdrop: by use, darker the taller.
+    ...(town.meta?.backdrop ?? []).map((b) => `<polygon points="${line(b.poly)}" fill="${USE[b.use] ?? '#999'}" fill-opacity="${Math.min(1, 0.55 + b.storeys * 0.1)}" stroke="#4a3426" stroke-width="0.35"/>`),
+    ...(town.meta?.places ?? []).map((p) => `<circle cx="${p.x}" cy="${p.z}" r="${Math.max(0.9, px(2.5))}" fill="${p.plot === undefined ? '#c0392b' : '#2b5fa8'}"/>`),
+    ...(town.meta?.places ?? []).map((p) => `<text x="${p.x}" y="${p.z - px(4)}" font-size="${px(7)}" text-anchor="middle" font-family="sans-serif" fill="#2a1c12" stroke="#fff" stroke-width="${px(1.5)}" paint-order="stroke">${esc(p.name)}</text>`),
     ...(town.parking ?? []).map((p) => `<rect x="${p.x - 1.5}" y="${p.z - 1.5}" width="3" height="3" fill="#3f6fb5"/>`),
     ...exits.map((e) => `<circle cx="${e.x}" cy="${e.z}" r="${Math.max(1.5, px(5))}" fill="#d33"/>`),
     // Outdoor places' and areas' names.
