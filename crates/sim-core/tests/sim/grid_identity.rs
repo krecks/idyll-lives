@@ -29,13 +29,26 @@ fn residents(w: &World) -> u64 {
     hash(&bytes)
 }
 
+/// The structure's hash, but for the lit junctions' and their poles' layout for the renderer
+/// (`junctions`, `lightPoles`): ways out and yaws from the platform's trigonometry, whose last bit
+/// differs between macOS and Linux (CI), so the same build hashed two ways. The game runs on the
+/// WASM's own maths; the layout has its own tests (`traffic`, `web/tests/junctions.test.ts`).
+fn structure_hash(w: &World) -> u64 {
+    let mut v: serde_json::Value = serde_json::from_str(&structure_json(w)).expect("structure");
+    if let Some(m) = v.as_object_mut() {
+        m.remove("junctions");
+        m.remove("lightPoles");
+    }
+    hash(v.to_string().as_bytes())
+}
+
 fn fingerprint(name: &str, mut w: World) -> String {
-    let loaded = hash(structure_json(&w).as_bytes());
+    let loaded = structure_hash(&w);
     w.lod = false;
     for _ in 0..2 * 60 * sim_core::TICKS_PER_MINUTE {
         w.tick_once();
     }
-    let later = hash(structure_json(&w).as_bytes());
+    let later = structure_hash(&w);
     format!("{name} {loaded:016x} {later:016x} {:016x}", residents(&w))
 }
 
