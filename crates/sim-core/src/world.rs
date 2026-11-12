@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 /// The most residents a town holds (a town file may start with this many; saves, slots, the
 /// snapshot's layout).
-pub const MAX_SIMS: usize = 160;
+pub const MAX_SIMS: usize = 240;
 
 /// A set of residents by slot (`MAX_SIMS` of them, a bit each).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]

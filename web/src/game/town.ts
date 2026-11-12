@@ -589,10 +589,10 @@ export function withLot(town: NeighbourhoodDraft, slot: number, template: string
 }
 
 /**
- * Residents the neighbours number at most (docs/design/open-world.md: the sim holds 160 Sims in
+ * Residents the neighbours number at most (docs/design/open-world.md: the sim holds 240 Sims in
  * a big world; room left for the player's household and babies).
  */
-export const NEIGHBOUR_CAP = 140;
+export const NEIGHBOUR_CAP = 220;
 
 /** Neighbours a big world starts with when nobody asks for a number (docs/design/open-world.md: ~120 residents). */
 const BIG_START = 118;
