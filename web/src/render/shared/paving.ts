@@ -21,10 +21,10 @@ interface Rect {
 /** `?tune=street.…` on the dev server. */
 export const STREET_LOOK = tuned('street', {
   /** Paving: its tone at a side (and the colour it takes there, moss and earth), how far in that fades (m), and its patches' depth. */
-  pathEdge: 1,
-  pathEdgeTint: [1, 1, 1],
+  pathEdge: 0.38,
+  pathEdgeTint: [0.8, 1, 0.62],
   pathReach: 0.5,
-  pathVary: 0,
+  pathVary: 0.1,
   /** Asphalt: the tone where wheels run (the rest is under it), between them, on the crown, along the kerb; its patches' depth; a repair's tone and how many of a road's 4 m stretches have one. */
   wheel: 1,
   between: 0.68,
