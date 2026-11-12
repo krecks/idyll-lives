@@ -1140,23 +1140,18 @@ interface Crown {
  * the woods' squares that don't draw their own trees then (`show`).
  */
 export class FarCrowns {
-  private readonly draws: [Instances, Instances];
+  /** Its draws, made the first time it shows any (nothing of it before the town view: `TownBuildings.made`). */
+  private draws: [Instances, Instances] | null = null;
   private readonly meshes: pc.Mesh[] = [];
   private readonly byKey = new Map<string, Crown[]>();
   private shownKeys = '';
 
-  constructor(app: pc.AppBase, parent: pc.Entity, trees: Iterable<{ kind: string; m: Float32Array }>, sector: (x: number, z: number) => string) {
-    const lib = MaterialLibrary.for(app);
-    const material = lib.instanceColored(lib.plainFinish());
-    this.draws = [false, true].map((cone) => {
-      const mesh = meshFrom(app.graphicsDevice, crownMesh(cone).meshData({ colors: true }))!;
-      mesh.incRefCount();
-      this.meshes.push(mesh);
-      const d = new Instances(app.graphicsDevice, parent, mesh, material, { name: cone ? 'farCrowns.cone' : 'farCrowns.dome', streams: [INSTANCE_COLOR], castShadows: false, receiveShadows: true, capacity: 1024 });
-      lib.excludeFromLights([], [d.meshInstance]);
-      d.enabled = false;
-      return d;
-    }) as [Instances, Instances];
+  constructor(
+    private readonly app: pc.AppBase,
+    private readonly parent: pc.Entity,
+    trees: Iterable<{ kind: string; m: Float32Array }>,
+    sector: (x: number, z: number) => string,
+  ) {
     // Gathered by square.
     const cells = new Map<string, { n: number; x: number; y: number; z: number; s: number; x0: number; x1: number; z0: number; z1: number; cone: number; birch: number; fruit: number }>();
     for (const { kind, m } of trees) {
@@ -1214,13 +1209,29 @@ export class FarCrowns {
     return n;
   }
 
+  private made(): [Instances, Instances] {
+    if (this.draws) return this.draws;
+    const { app, parent } = this;
+    const lib = MaterialLibrary.for(app);
+    const material = lib.instanceColored(lib.plainFinish());
+    return (this.draws = [false, true].map((cone) => {
+      const mesh = meshFrom(app.graphicsDevice, crownMesh(cone).meshData({ colors: true }))!;
+      mesh.incRefCount();
+      this.meshes.push(mesh);
+      const d = new Instances(app.graphicsDevice, parent, mesh, material, { name: cone ? 'farCrowns.cone' : 'farCrowns.dome', streams: [INSTANCE_COLOR], castShadows: false, receiveShadows: true, capacity: 1024 });
+      lib.excludeFromLights([], [d.meshInstance]);
+      d.enabled = false;
+      return d;
+    }) as [Instances, Instances]);
+  }
+
   /** Shows the crowns of the squares `far` says (none: hidden), written again only when that set changes. */
   show(far: ((key: string) => boolean) | null): void {
     const keys = far ? [...this.byKey.keys()].filter(far).sort() : [];
     const sig = keys.join('|');
     if (sig === this.shownKeys) return;
     this.shownKeys = sig;
-    const [dome, cone] = this.draws;
+    const [dome, cone] = this.made();
     const lists = keys.map((k) => this.byKey.get(k)!);
     let nd = 0;
     let nc = 0;
@@ -1236,14 +1247,14 @@ export class FarCrowns {
         d.set(INSTANCE_COLOR, i, c.color);
       }
     }
-    for (const d of this.draws) {
+    for (const d of [dome, cone]) {
       d.update();
       d.enabled = d.count > 0;
     }
   }
 
   destroy(): void {
-    for (const d of this.draws) d.destroy();
+    for (const d of this.draws ?? []) d.destroy();
     for (const mesh of this.meshes) {
       mesh.decRefCount();
       if (mesh.refCount === 0) mesh.destroy();

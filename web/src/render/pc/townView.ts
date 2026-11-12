@@ -47,25 +47,42 @@ const TOWN_INFO: InstanceStream = { semantic: TOWN_INFO_SEMANTIC, components: 4 
 
 /** The town view's buildings: the walls' draw and a draw per roof, over every building given. */
 export class TownBuildings {
-  private readonly material: pc.StandardMaterial;
+  /** Its material and draws, made the first time it is shown (`made`): nothing of it exists for a game that never zooms out. */
+  private material: pc.StandardMaterial | null = null;
   private readonly lib: MaterialLibrary;
   private readonly draws = new Map<'walls' | RoofKind, Instances>();
   private readonly meshes: pc.Mesh[] = [];
   private backdrop: TownBuilding[] = [];
   private lots: TownBuilding[] = [];
+  /** The buildings given since the draws were last written. */
+  private due = false;
   private readonly m = new Float32Array(16);
   private readonly v = new Float32Array(4);
   private shown = false;
   private readonly glow = new Float32Array(3);
 
-  constructor(app: pc.AppBase, parent: pc.Entity) {
-    const lib = (this.lib = MaterialLibrary.for(app));
+  constructor(
+    private readonly app: pc.AppBase,
+    private readonly parent: pc.Entity,
+  ) {
+    this.lib = MaterialLibrary.for(app);
+  }
+
+  /**
+   * Its material and draws, made once. Not before the town view first comes in: a material and draws made with the
+   * game's own (if never drawn) put the game's draws in another order, and surfaces at the same depth (a decal on the
+   * street) came out a few pixels differently in the play view.
+   */
+  private made(): pc.StandardMaterial {
+    if (this.material) return this.material;
+    const { app, parent, lib } = this;
     const mat = lib.plainFinish().clone();
     mat.name = 'townBuildings';
     lib.adopt(mat);
     townBuildingMaterial(mat);
     // No contact shading this far out, nor in the depth it is made from (`post.ts`).
     withoutContact(mat);
+    mat.setParameter('game_townGlow', this.glow);
     this.material = mat;
     const units = unitMeshes();
     for (const key of ['walls', ...ROOFS] as const) {
@@ -78,18 +95,22 @@ export class TownBuildings {
       draw.enabled = false;
       this.draws.set(key, draw);
     }
+    this.due = true;
+    return mat;
   }
 
   /** The backdrop's buildings (a new town's). */
   setBackdrop(list: TownBuilding[]): void {
     this.backdrop = list;
-    this.upload();
+    this.due = true;
+    if (this.shown) this.upload();
   }
 
   /** The far lots' houses (as the chunks streamed in change). */
   setLots(list: TownBuilding[]): void {
     this.lots = list;
-    this.upload();
+    this.due = true;
+    if (this.shown) this.upload();
   }
 
   get count(): number {
@@ -101,9 +122,11 @@ export class TownBuildings {
     const on = fade > 0 && this.count > 0;
     if (on !== this.shown) {
       this.shown = on;
+      if (on) this.made();
+      if (on && this.due) this.upload();
       for (const d of this.draws.values()) d.enabled = on && d.count > 0;
     }
-    if (on) this.material.setParameter('game_townFade', fade);
+    if (on) this.material!.setParameter('game_townFade', fade);
   }
 
   /** The windows' glow at night: the lamps' level (0..1, `Lighting.lamps`) and the glow's colour (linear, the street's windows'). */
@@ -112,10 +135,12 @@ export class TownBuildings {
     this.glow[0] = color.r * k;
     this.glow[1] = color.g * k;
     this.glow[2] = color.b * k;
-    this.material.setParameter('game_townGlow', this.glow);
+    this.material?.setParameter('game_townGlow', this.glow);
   }
 
   private upload(): void {
+    this.made();
+    this.due = false;
     const all = this.backdrop.length ? (this.lots.length ? [...this.backdrop, ...this.lots] : this.backdrop) : this.lots;
     const walls = this.draws.get('walls')!;
     walls.setCount(all.length);
@@ -181,8 +206,10 @@ export class TownBuildings {
       mesh.decRefCount();
       if (mesh.refCount === 0) mesh.destroy();
     }
-    this.lib.release(this.material);
-    this.material.destroy();
+    if (this.material) {
+      this.lib.release(this.material);
+      this.material.destroy();
+    }
   }
 }
 
@@ -224,12 +251,20 @@ export interface Mover {
 
 /** The movers past the near drawing: an instanced draw per shape, written again each frame they're shown. */
 export class TownMovers {
-  private readonly draws: Record<'car' | 'bike' | 'person', Instances>;
+  /** Its draws, made the first movers it is given (as `TownBuildings`' material: nothing of it before the town view). */
+  private draws: Record<'car' | 'bike' | 'person', Instances> | null = null;
   private readonly meshes: pc.Mesh[] = [];
   private readonly m = new Float32Array(16);
   private readonly c = new Float32Array(4);
 
-  constructor(app: pc.AppBase, parent: pc.Entity) {
+  constructor(
+    private readonly app: pc.AppBase,
+    private readonly parent: pc.Entity,
+  ) {}
+
+  private made(): Record<'car' | 'bike' | 'person', Instances> {
+    if (this.draws) return this.draws;
+    const { app, parent } = this;
     const lib = MaterialLibrary.for(app);
     const mat = lib.instanceColored(lib.plainFinish());
     const make = (kind: 'car' | 'bike' | 'person') => {
@@ -241,14 +276,15 @@ export class TownMovers {
       d.enabled = false;
       return d;
     };
-    this.draws = { car: make('car'), bike: make('bike'), person: make('person') };
+    return (this.draws = { car: make('car'), bike: make('bike'), person: make('person') });
   }
 
   /** This frame's movers (none: hidden), drawn `grow` times as large. */
   set(movers: readonly Mover[], grow: number): void {
+    const draws = this.made();
     const counts = { car: 0, bike: 0, person: 0 };
     for (const mv of movers) counts[mv.kind === 'taxi' ? 'car' : mv.kind]++;
-    for (const k of ['car', 'bike', 'person'] as const) this.draws[k].setCount(counts[k]);
+    for (const k of ['car', 'bike', 'person'] as const) draws[k].setCount(counts[k]);
     const at = { car: 0, bike: 0, person: 0 };
     const { m, c } = this;
     for (const mv of movers) {
@@ -267,28 +303,28 @@ export class TownMovers {
       m[14] = mv.z;
       m[15] = 1;
       const i = at[k]++;
-      this.draws[k].setMatrix(i, m);
+      draws[k].setMatrix(i, m);
       c[0] = mv.color[0];
       c[1] = mv.color[1];
       c[2] = mv.color[2];
       c[3] = 1;
-      this.draws[k].set(INSTANCE_COLOR, i, c);
+      draws[k].set(INSTANCE_COLOR, i, c);
     }
     for (const k of ['car', 'bike', 'person'] as const) {
-      const d = this.draws[k];
+      const d = draws[k];
       d.update();
       d.enabled = d.count > 0;
     }
   }
 
   hide(): void {
-    for (const d of Object.values(this.draws)) d.enabled = false;
+    if (this.draws) for (const d of Object.values(this.draws)) d.enabled = false;
   }
 
   stats(): { draws: number; copies: number } {
     let draws = 0;
     let copies = 0;
-    for (const d of Object.values(this.draws)) {
+    for (const d of Object.values(this.draws ?? {})) {
       if (!d.enabled || !d.count) continue;
       draws++;
       copies += d.count;
@@ -297,7 +333,7 @@ export class TownMovers {
   }
 
   destroy(): void {
-    for (const d of Object.values(this.draws)) d.destroy();
+    for (const d of Object.values(this.draws ?? {})) d.destroy();
     for (const mesh of this.meshes) {
       mesh.decRefCount();
       if (mesh.refCount === 0) mesh.destroy();

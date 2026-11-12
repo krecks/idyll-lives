@@ -469,11 +469,12 @@ export class LotContents {
   }
 
   /**
-   * The sky's dome far enough out for a camera `radius` m from its target (the town view, docs/design/living-town.md):
-   * as made up to `SKY_RADIUS` less the land the camera sees past its target; wider past that, so the land stays in front of it.
+   * The sky's dome far enough out for the town view's camera (docs/design/living-town.md), `radius` m from its target and
+   * `blend` into the view: as made at a blend of 0 (the play view sees nothing past it), widened with the blend to take in the
+   * land `SKY_BEYOND` m past the target, so the land stays in front of it.
    */
-  skyReach(radius: number): void {
-    this.sky.reach(Math.max(1, (radius + SKY_BEYOND) / SKY_RADIUS));
+  skyReach(radius: number, blend: number): void {
+    this.sky.reach(1 + Math.max(0, (radius + SKY_BEYOND) / SKY_RADIUS - 1) * Math.min(1, Math.max(0, blend)));
   }
 
   /** Each frame, game or overview, once the camera is placed: the sky round it, the clouds' drift (`dt` ms), the grass in view. */

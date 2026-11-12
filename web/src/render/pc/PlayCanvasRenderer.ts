@@ -1143,7 +1143,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const blend = this.townBlend;
     this.street.setTownView(blend > 0);
     // (The sky's dome as made in the play view; out past the land the town view sees.)
-    this.lot.skyReach(blend > 0 ? this.orbit.radius : 0);
+    this.lot.skyReach(this.orbit.radius, blend);
     this.townBuildings.show(this.diag.has('notownbuildings') ? 0 : Math.min(1, blend / TOWN_FADE));
     // (The ground tiles' materials asked for only while the map is, or is to be, on them.)
     const mapped = this.diag.has('notownground') ? 0 : blend;
@@ -2721,7 +2721,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /** The menus' town comes on screen: the overview's camera from where the game's is (whose pose the orbit keeps), its layer, its light. */
   private enterTown(): void {
-    this.lot.skyReach(0); // (the sky's dome as made: the town view's may have widened it.)
+    this.lot.skyReach(0, 0); // (the sky's dome as made: the town view's may have widened it.)
     this.townMode = true;
     this.shaderWatch.phase = 'town';
     this.birdLife.setTown(true);
