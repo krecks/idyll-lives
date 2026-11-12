@@ -40,7 +40,10 @@ import { tuned } from '../tune';
  * A patch differs by its colour (`LAWN.dryTint`) and hardly by its lightness (`patchTone`, `dryTone`): lighter
  * and darker patches metres across read as stains or as the shade of clouds that never moved, and blurred
  * the hour the real shadows tell. The ring of soil round a bed is half what its kind says (`ring`): with the
- * shade round the bed on top of it, a full one read as a scorch mark.
+ * shade round the bed on top of it, a full one read as a scorch mark. The mower's stripes are a hint (`stripes`
+ * 0.06, 3 % lighter and darker): at twice that, over a large empty lawn a dozen soft bands were the first thing the
+ * eye saw, uneven where patches and the clouds' shade lay over them, and stronger still on Low, whose thinner grass
+ * hides less of the ground.
  */
 export const LAWN_MAP = tuned('ground', {
   patch: [10, 3.7],
@@ -49,7 +52,7 @@ export const LAWN_MAP = tuned('ground', {
   dry: 0.9,
   dryTone: 0.05,
   roughPatch: 1.3,
-  stripes: 0.12,
+  stripes: 0.06,
   stripeWidth: 1,
   wall: 0.8,
   shade: 0.3,
