@@ -77,5 +77,6 @@ describe('town jobs', async () => {
     // (Another seed: other bonds between the neighbours, the same town.)
     if (other.kind !== 'assemble') throw new Error('not a town file');
     expect(JSON.parse(other.lot).plots).toEqual(JSON.parse(a.lot).plots);
-  });
+    // (A whole Big town made, peopled and put together three times: 7 s on CI's runner.)
+  }, 30_000);
 });
