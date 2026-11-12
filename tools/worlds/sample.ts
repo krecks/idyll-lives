@@ -382,7 +382,7 @@ function livingProblems(town: TownFile, careers: readonly string[]): string[] {
     const least = k === 0 ? MAIN_LEAST : HAMLET_LEAST;
     if (n < least) out.push(`${a.name} has ${n} backdrop buildings (${least} or more)`);
   });
-  // The centre: the main town's, its open land (not a road, a lot or a green) built over more
+  // The centre: the main town's, its open land (not a road, a lot, a green or water) built over more
   // densely than the rest of its box's.
   const centre = town.meta.centre?.find((c) => c.area === 0);
   if (!centre || centre.poly.length < 3) out.push('the main town has no centre');
@@ -397,6 +397,8 @@ function livingProblems(town: TownFile, careers: readonly string[]): string[] {
       }
     };
     for (const p of town.plots) fill(corners(p), 1, taken);
+    // (Nor the water: a lakeside town's high street runs along its shore.)
+    if (water) for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
     for (const g of town.meta.greens ?? []) fill(g, 1, taken);
     const built = new Uint8Array(town.width * town.depth);
     for (const b of backdrop) fill(b.poly, 1, built);
@@ -532,6 +534,8 @@ for (const kind of WORLD_KINDS.filter((k) => kinds.includes(k))) {
     const file = JSON.parse(text);
     [slowest[0], slowest[1], slowest[2]] = [Math.max(slowest[0], layout), Math.max(slowest[1], houses), Math.max(slowest[2], assemble)];
     for (const p of [...layoutProblems(file), ...livingProblems(file, content.careerCategories.map((c) => c.id)), ...(world.diagnostics?.roads ?? [])]) problems.push(`${tag}: ${p}`);
+    // (A terrace lot's house is a generated terraced house, its lot cut to it: a fixed layout is wider than the lot.)
+    for (const s of town.slots) if (s.lot === 'terrace' && houseTemplate(templates, s.template)?.class !== 'terraced house') problems.push(`${tag}: terrace lot ${s.index} has a ${s.template}`);
     if (text.length > MAX_FILE) problems.push(`${tag}: the town file is ${(text.length / 1e6).toFixed(1)} MB`);
     if (timing && layout > LAYOUT_BUDGET * 2) problems.push(`${tag}: laid out in ${layout.toFixed(0)} ms (budget ${LAYOUT_BUDGET})`);
     if (timing && assemble > ASSEMBLE_BUDGET * 2) problems.push(`${tag}: assembled in ${assemble.toFixed(0)} ms (budget ${ASSEMBLE_BUDGET})`);

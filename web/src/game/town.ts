@@ -531,6 +531,11 @@ export class Ground {
     for (let i = 0; i < mask.length; i++) if (mask[i]) this.taken[i] = 1;
   }
 
+  /** The tiles the roads take (one per tile, row-major: `roadMask`); not to be changed. */
+  roadTiles(): Readonly<Uint8Array> {
+    return this.roads;
+  }
+
   /** A copy of what is taken (one per tile, row-major). */
   mask(): Uint8Array {
     return this.taken.slice();
@@ -597,6 +602,9 @@ function fronting(facing: Facing, front: number, along: number, W: number, D: nu
   const at = [{ x: a, z: front }, { x: front, z: a }, { x: a, z: front - D }, { x: front - W, z: a }][facing];
   return { ...at, w: W, d: D };
 }
+
+/** Every lot of a row stands with the middle of its front this near its road's edge at most (m; `LotPlacer.placeRow`). */
+const ROW_SET_BACK = 8;
 
 /** A `snug` lot's front corners are at most this much further from its road than its middle (m; a twentieth of its width more). */
 const SNUG = 3;
@@ -822,7 +830,8 @@ export class LotPlacer {
       const at = lotAt(ground, roads[f.road], f, total, depth, this.snug);
       if (!at) continue;
       const row = plotRect(t, { lot: 'terrace', w: total, d: depth, ...at });
-      const out: PlotSlot[] = [];
+      // Each lot's rectangle, the middle of its front and where along the road that is.
+      const lots: { x: number; z: number; rect: Rect; mid: Pt; s: number }[] = [];
       let along = 0;
       for (const [k, u] of units.entries()) {
         const w = widths[k];
@@ -830,16 +839,23 @@ export class LotPlacer {
         const from = at.facing === 0 || at.facing === 3 ? along : total - along - w;
         const x = at.facing % 2 ? row.x : row.x + from;
         const z = at.facing % 2 ? row.z + from : row.z;
-        const front = plotRect(t, { ...u, d: depth, x, z, facing: at.facing });
-        const mid: Pt = at.facing % 2 ? [at.facing === 1 ? front.x : front.x + front.w, front.z + front.d / 2] : [front.x + front.w / 2, at.facing === 0 ? front.z : front.z + front.d];
+        const rect = plotRect(t, { ...u, d: depth, x, z, facing: at.facing });
+        const mid: Pt = at.facing % 2 ? [at.facing === 1 ? rect.x : rect.x + rect.w, rect.z + rect.d / 2] : [rect.x + rect.w / 2, at.facing === 0 ? rect.z : rect.z + rect.d];
         const on = nearest(roads[f.road].points, mid[0], mid[1]);
-        const slot: PlotSlot = { ...u, ...(area === undefined ? {} : { area }), d: depth, index: this.slots.length, x, z, facing: at.facing, anchor: at.facing % 2 ? front.z + front.d / 2 : front.x + front.w / 2 };
-        this.slots.push(slot);
-        this.placed.set(slot, { ...f, s: on.s, p: mid });
-        ground.take(front);
-        out.push(slot);
+        // (Every one by the road: on a bend the row's ends stand back from it.)
+        if (on.dist - roads[f.road].width / 2 > ROW_SET_BACK) break;
+        lots.push({ x, z, rect, mid, s: on.s });
         along += w;
       }
+      if (lots.length < units.length) continue;
+      const out = units.map((u, k): PlotSlot => {
+        const { x, z, rect, mid, s } = lots[k];
+        const slot: PlotSlot = { ...u, ...(area === undefined ? {} : { area }), d: depth, index: this.slots.length, x, z, facing: at.facing, anchor: at.facing % 2 ? rect.z + rect.d / 2 : rect.x + rect.w / 2 };
+        this.slots.push(slot);
+        this.placed.set(slot, { ...f, s, p: mid });
+        ground.take(rect);
+        return slot;
+      });
       ground.take(row, 1);
       return out;
     }

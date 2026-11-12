@@ -143,10 +143,12 @@ describe('driveways', async () => {
   }
 
   // Seed base 13's Snowdale: the driveway of plot 112 stopped where its line crossed a trail, 16 m
-  // short of the lane its car drives onto, and the car drove over the grass between.
-  test('mountain 207684 (Snowdale): every driveway is paved all the way to its road, across a trail', () => {
-    const file = townFile('mountain', 207684);
-    expect(file.cars.some((c) => c.plot === 112)).toBe(true);
+  // short of the lane its car drives onto, and the car drove over the grass between. With the
+  // living town's terraces (2026-11-12) Snowdale's hamlets have other houses; seed base 3's
+  // Frostscar has such a driveway now, plot 107's, across a trail.
+  test('mountain 128494 (Frostscar): every driveway is paved all the way to its road, across a trail', () => {
+    const file = townFile('mountain', 128494);
+    expect(file.cars.some((c) => c.plot === 107)).toBe(true);
     expect(wayOutProblems(file)).toEqual([]);
   }, 30_000);
 });

@@ -147,6 +147,8 @@ const COUNTRY_WIDTH = ROAD_WIDTH;
 const TRAIL_WIDTH = 2;
 /** Houses with no room in any area go along a country road, as far as this from their own area's box (m). */
 const SPILL = 140;
+/** The main town's terrace rows with no room in it go along the country roads leaving it, as far as this from its box (m). */
+const TERRACE_SPILL = 110;
 /** Along a country road: a farmstead every so far (m), and none nearer an area's box than this. */
 const FARM_EVERY: [number, number] = [150, 200];
 const FARM_OFF = 25;
@@ -1628,7 +1630,11 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
       const [places, houses] = [wanted.filter((u) => u.kind !== 'house'), wanted.filter((u) => u.kind === 'house')];
       for (const u of lots.place(places, fronts.get(a)!, plan.greens, plan.centre, a, true)) left.push({ u, from: a });
       reserved = centre ? reserveCentre(centre, ground) : undefined;
-      terraceRows(t, lots, homes, ch, dense);
+      // (Out of room in the town: on along the country roads leaving it, where they run straight.)
+      const countryWays = worldRoads.flatMap((r, i) => (r.kind === 'country' ? [i] : []));
+      const lens = new Map(countryWays.map((r) => [r, lengths(worldRoads[r].points)]));
+      const out = frontageOf(worldRoads, countryWays, plan.centre, dense).filter((f) => offRect(plan.rect, f.p) < TERRACE_SPILL && straight(worldRoads[f.road].points, f.s, lens.get(f.road)!));
+      terraceRows(t, lots, [homes, out], ch, dense);
       fronts.set(a, homes.filter(offCorners));
       for (const u of lots.place(houses, fronts.get(a)!, [], plan.centre, a, true)) left.push({ u, from: a });
     } else for (const u of lots.place(wanted, fronts.get(a)!, plan.greens, plan.centre, a, true)) left.push({ u, from: a });
@@ -1815,26 +1821,48 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
 
 /**
  * The main town's terraces (`Character.terraces` lots, in rows of `Character.rows`: two, a
- * semi-detached pair), each row along the first of `frontage` it fits on (nearest the middle
- * first, `LotPlacer.placeRow`), the longest that fits there; a row that fits nowhere is tried
- * shorter, down to a pair. Their houses are drawn from `rand` (the world's own draws are left as
+ * semi-detached pair), each row along the first stretch of `frontages` it fits on (the town's
+ * nearest its middle first, then the next list's: `LotPlacer.placeRow`); a row that fits nowhere is
+ * tried shorter, down to a pair. Their houses are drawn from `rand` (the world's own draws are left as
  * they were). The rows placed.
  */
-function terraceRows(t: Templates, lots: LotPlacer, frontage: readonly Frontage[], ch: Character, rand: Rand): PlotSlot[][] {
+function terraceRows(t: Templates, lots: LotPlacer, frontages: readonly (readonly Frontage[])[], ch: Character, rand: Rand): PlotSlot[][] {
   const out: PlotSlot[][] = [];
   let left = between(rand, ch.terraces);
+  // (The longest row that went down last: one longer fits nowhere.)
+  let longest = ch.rows[1];
   // (Nowhere for a pair: no more rows.)
   for (let tries = 0; left >= 2 && tries < 400; tries++) {
-    let n = Math.min(left, between(rand, ch.rows));
+    let n = Math.min(left, longest, between(rand, ch.rows));
     if (left - n === 1) n = left === 3 && ch.rows[1] >= 3 ? 3 : n - 1;
-    const units = Array.from({ length: Math.max(2, n) }, () => ({ kind: 'house' as const, name: '', lot: 'terrace' as const, area: 0, ...houseFor(t, 'terrace', 'snug', rand) }));
+    const units = Array.from({ length: Math.max(2, n) }, () => rowHouse(t, rand))
+      .filter((h) => !!h)
+      .map((h) => ({ kind: 'house' as const, name: '', lot: 'terrace' as const, area: 0, ...h }));
+    // (No terraced house to be had: none generated, the content has no row class.)
+    if (units.length < 2) break;
     let placed: PlotSlot[] = [];
-    for (let k = units.length; k >= 2 && !placed.length; k--) placed = lots.placeRow(units.slice(0, k), frontage, 0);
+    for (let k = units.length; k >= 2 && !placed.length; k--) {
+      for (const frontage of frontages) if (!placed.length) placed = lots.placeRow(units.slice(0, k), frontage, 0);
+    }
     if (!placed.length) break;
+    if (placed.length < units.length) longest = placed.length;
     out.push(placed);
     left -= placed.length;
   }
   return out;
+}
+
+/**
+ * A terraced house and its lot (`houseFor` on a terrace lot): one generated (a draw or two in a
+ * hundred lays none out; `houseFor` would put a fixed layout, too wide for the lot, in its place).
+ * Null: none in 40 draws.
+ */
+function rowHouse(t: Templates, rand: Rand): ReturnType<typeof houseFor> | null {
+  for (let k = 0; k < 40; k++) {
+    const h = houseFor(t, 'terrace', 'snug', rand);
+    if (h.template.startsWith('gen:')) return h;
+  }
+  return null;
 }
 
 /** A country road runs nearly straight round arc length `s` (within `BEND` m either way): a car turns in off it without swinging off the road. */

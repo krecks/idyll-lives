@@ -31,7 +31,7 @@
 
 import type { CareerCategory, Content } from '../content/content';
 import type { BackdropBuilding, BackdropUse, TownPlace } from '../core/protocol';
-import { inside, leftOf, lengths, nearest, pointAt, roadMask, RoadIndex, type Pt, type RoadPlan } from './roads';
+import { inside, leftOf, lengths, nearest, pointAt, RoadIndex, type Pt, type RoadPlan } from './roads';
 import type { Ground, PlotSlot, Rect } from './town';
 
 type Rand = () => number;
@@ -41,9 +41,9 @@ const HIGH_STREET = 180;
 const BAND = 32;
 /** A main town's square (m along its street, m deep), the larger first. */
 const SQUARES: readonly [number, number][] = [
-  [32, 24],
-  [26, 20],
+  [26, 18],
   [20, 15],
+  [16, 12],
 ];
 /** A backdrop building keeps this far off a lot's boundary (m). */
 export const LOT_CLEAR = 1;
@@ -53,7 +53,7 @@ export const HAMLET_LEAST = 8;
 /** A backdrop building's side runs within this (radians) of the way the road nearest it runs, or square to it. */
 export const FACING = (15 * Math.PI) / 180;
 /** How far a building in a block's middle may stand from the nearest road's edge (m): the main town's, a hamlet's. */
-const INFILL_REACH = [42, 24];
+const INFILL_REACH = [34, 24];
 /** Off the land's edge (m), as the lots keep. */
 const EDGE = 8;
 
@@ -163,19 +163,38 @@ function tilesOf(poly: readonly Pt[], grow: number, fn: (x: number, z: number) =
  * Whether a footprint faces the road nearest its middle (not a trail): one of its sides runs
  * within `FACING` of the road's way there, or square to it (`FACING` from that too). tools/worlds/sample.ts asks the same.
  */
-export function facesRoad(poly: readonly Pt[], roads: readonly RoadPlan[], index: RoadIndex): boolean {
+export function facesRoad(poly: readonly Pt[], roads: readonly RoadPlan[], index: RoadIndex, slack = 0): boolean {
   const c = centroidOf(poly);
-  let near: { dist: number; t: Pt } | null = null;
-  for (const [r, hit] of index.around(c[0], c[1], 160)) if (roads[r].kind !== 'trail' && (!near || hit.dist < near.dist)) near = hit;
-  if (!near) return false;
-  const t = near.t;
-  return poly.some((p, k) => {
-    const q = poly[(k + 1) % poly.length];
-    const l = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
-    const cos = Math.abs(((q[0] - p[0]) * t[0] + (q[1] - p[1]) * t[1]) / l);
-    return cos >= Math.cos(FACING) || cos <= Math.sin(FACING);
-  });
+  const near = [...index.around(c[0], c[1], 90)].filter(([r]) => roads[r].kind !== 'trail');
+  if (!near.length) return false;
+  const least = Math.min(...near.map(([, hit]) => hit.dist));
+  // (`slack`: every road about as near, as well: the roads rounded in the file may have another nearest.)
+  const lens = (lengthsOf.get(roads) ?? lengthsOf.set(roads, roads.map((r) => lengths(r.points))).get(roads))!;
+  /** Whether a side runs along road `r` at `s` (the way it runs over 4 m there: one segment's way at a bend's corner may be off it). */
+  const along = (r: number, s: number) => {
+    const L = lens[r][lens[r].length - 1];
+    const [a, b] = [pointAt(roads[r].points, Math.max(0, s - 2), lens[r]).p, pointAt(roads[r].points, Math.min(L, s + 2), lens[r]).p];
+    const l = dist(a, b) || 1;
+    const t: Pt = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+    return poly.some((p, k) => {
+      const q = poly[(k + 1) % poly.length];
+      const e = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+      const cos = Math.abs(((q[0] - p[0]) * t[0] + (q[1] - p[1]) * t[1]) / e);
+      return cos >= Math.cos(FACING) || cos <= Math.sin(FACING);
+    });
+  };
+  return near
+    .filter(([, hit]) => hit.dist <= least + slack)
+    .every(([r, hit]) => {
+      if (!along(r, hit.s)) return false;
+      // (Inside a bend, as near to the road at more than one place along it: along it at each.)
+      if (!slack) return true;
+      const pts = roads[r].points;
+      return pts.every((p, i) => dist(p, c) > least + slack || along(r, lens[r][i]));
+    });
 }
+/** Each set of roads' arc lengths (`facesRoad`). */
+const lengthsOf = new WeakMap<readonly RoadPlan[], number[][]>();
 
 /** Whether a polyline crosses itself (two segments not next to each other meeting). */
 function selfCrossing(poly: readonly Pt[]): boolean {
@@ -274,11 +293,15 @@ export function chooseCentre(roads: readonly RoadPlan[], areaRoads: readonly num
  */
 export function reserveCentre(centre: Centre, ground: Ground): Uint8Array {
   const out = new Uint8Array(ground.w * ground.d);
-  tilesOf(centre.poly, 0, (x, z) => {
-    if (x < 0 || z < 0 || x >= ground.w || z >= ground.d || !inside(centre.poly, x + 0.5, z + 0.5) || ground.takenAt(x + 0.5, z + 0.5)) return;
-    out[z * ground.w + x] = 1;
-    ground.take({ x, z, w: 1, d: 1 });
-  });
+  const xs = centre.poly.map((p) => p[0]);
+  const zs = centre.poly.map((p) => p[1]);
+  for (let z = Math.max(0, Math.floor(Math.min(...zs))); z < Math.min(ground.d, Math.ceil(Math.max(...zs))); z++) {
+    for (let x = Math.max(0, Math.floor(Math.min(...xs))); x < Math.min(ground.w, Math.ceil(Math.max(...xs))); x++) {
+      if (!inside(centre.poly, x + 0.5, z + 0.5) || ground.takenAt(x + 0.5, z + 0.5)) continue;
+      out[z * ground.w + x] = 1;
+      ground.take({ x, z, w: 1, d: 1 });
+    }
+  }
   return out;
 }
 
@@ -436,7 +459,7 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
   // a metre round, and the land between a lot's front and its road (its driveway crosses it).
   const blocked = ground.mask();
   if (reserved) for (let i = 0; i < blocked.length; i++) if (reserved[i]) blocked[i] = 0;
-  const roadTiles = roadMask(roads, W, D);
+  const roadTiles = ground.roadTiles();
   const mark = (r: Rect) => {
     for (let z = Math.max(0, r.z); z < Math.min(D, r.z + r.d); z++) for (let x = Math.max(0, r.x); x < Math.min(W, r.x + r.w); x++) blocked[z * W + x] = 1;
   };
@@ -503,7 +526,7 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
    */
   const put = (c: Pt, t: Pt, n: Pt, w: number, d: number, kind: Kind, endOn = false): number => {
     const poly = rectFrom(c, t, n, w, d);
-    if (!fits(poly) || !facesRoad(poly, roads, index)) return -1;
+    if (!fits(poly) || !facesRoad(poly, roads, index, 0.3)) return -1;
     const roof = pick(rand, kind.roofs);
     // (The ridge along the longer side; a church's back from the road.)
     const way = endOn || d > w ? n : t;
@@ -645,16 +668,19 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
         const n = leftOf(t).map((v) => v * near.side) as Pt;
         const zone: Zone = centreAt(p) ? 'centre' : a === 0 ? 'town' : 'hamlet';
         const kind = pickKind(zone);
-        const w = range(rand, ...kind.w);
-        const d = range(rand, ...kind.d);
-        put(add(p, n, -d / 2), t, n, w, d, kind);
+        // (In the centre smaller where it doesn't fit: it is built up close.)
+        for (const shrink of zone === 'centre' ? [1, 0.75, 0.55] : [1]) {
+          const w = Math.max(kind.w[0] * 0.6, range(rand, ...kind.w) * shrink);
+          const d = Math.max(6, (range(rand, ...kind.d) * (shrink + 1)) / 2);
+          if (put(add(p, n, -d / 2), t, n, w, d, kind) >= 0) break;
+        }
       }
     }
   };
   const countIn = (a: number) => built.filter((b) => b.area === a).length;
   // (The centres first, closest: the densest.)
   for (const c of centres) infill(c.area, 1, 6, c.poly);
-  infill(0, 0.55 + 0.4 * density, 11);
+  infill(0, 0.3 + 0.45 * density, 12);
   for (let a = 1; a < areas.length; a++) infill(a, 0.25, 16);
   // (Short of the least: filled in more closely.)
   for (let a = 0; a < areas.length; a++) for (let k = 0; k < 3 && countIn(a) < (a === 0 ? MAIN_LEAST : HAMLET_LEAST); k++) infill(a, 1, 9 - k * 2);
