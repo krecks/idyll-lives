@@ -108,7 +108,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
 
 1. **Copy** `families/_template.py` to `families/<family>.py`, or add a model to an existing family.
    Families group what belongs together. A family's models go to
-   `web/public/assets/models/<family>/<id>.glb` and its entries to `packs/<pack>/manifest.json`; the build
+   `web/public/assets/models/<family>/<id>.glb` and its entries to `web/public/assets/packs/<pack>/manifest.json`; the build
    writes both, so never edit a pack by hand. A pack entry keeps the `vary` of the entry it overrides; the
    build doesn't copy it.
 2. **Palette.** One material per colour, named for what it is, with its finish:
@@ -125,7 +125,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      On a still part with no other plain material it costs a draw call (objects.md, "Hardware is metal").
    - Mirror glass takes the side it reflects to: `glass=('#DCE6EA', 'gloss', 'front')`. Make it a flat
      piece, on the still body or one moving part (a cabinet's door); the game reflects the room in the
-     nearest mirror on screen (two on High). Keep it `gloss`, as the mirrored parts always were: the others
+     nearest mirror on screen (two on High). Keep it `gloss`: the others
      show their glass, and see-through `glass` would show what is behind it (a frame's backing, a door).
    - A lamp's shade or a screen that glows at night takes its glow's colour:
      `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`. Nothing glows by day.
@@ -322,7 +322,7 @@ How the parts work:
     per bunk).
   - `{'clip': 'door_open', 'delay': 0.3, 'hold': 2.4, 'out': 1.6}`: the clip opens again for 1.6 s when
     the use ends (the phone box's door, opened for the caller to step in and shut behind them, letting
-    them out again: `STEP_IN` in characters.ts times their steps to it).
+    them out again: `STEP_IN` in `web/src/render/shared/characters/actions.ts` times their steps to it).
   - `{'loops': {'relax': 'rocking'}}`: a clip that goes round while the use lasts, then finishes its
     round. It must end where it starts: make it with `G.rock`, `G.spin` or `G.turns` (or `G.scroll`, one repeat on).
   - `{'ride': 'rocking'}`: the residents sitting or lying on it move with that clip's (first) part: a
@@ -354,7 +354,7 @@ How the parts work:
   3.5 s) and aren't checked; an ambient clip runs on game time and is off on Low. The clock is the
   residents' animation time. Clock hands are the exception: the game's time sets them, on every preset.
 - **Checks.** The build fails if `motions` names a clip the model doesn't have. `cargo check-glb` fails
-  a clip that nothing plays, a a `delay`, `hold`, `every`, `out` or `slot` that isn't one, and fails a loop
+  a clip that nothing plays, a `delay`, `hold`, `every`, `out` or `slot` that isn't one, and fails a loop
   (or `idle`, an `every` clip, a clock hand) that doesn't end where it starts; one that ends
   a whole fraction of a turn round (a four-bladed fan a quarter turn), or moved at an even speed (`G.scroll`), is
   a warning to check. A part a clip grows (darts, a pot thrown) is measured grown, not at rest; one flattened to
@@ -417,7 +417,8 @@ never one that's already running) and drive Playwright headless with full Chrome
     `__content.object('<id>').interactions`).
   - Wait for the use, don't time it: `__sims()[0]` has `object`, `def`, `interaction`, `using` (at it, not
     walking), `pose` (`stand`/`sit`/`lie`), `action`, `x`, `z` and `needs`.
-  - See a clip play with `__renderer.motion.states.get(<id>)` (each clip's name, time and kind).
+  - See a clip play with `__renderer.objectClips(<id>)`: each clip by name, with its `kind`, `time` and
+    `duration` (null when it has none).
   - Frame it: `__controls.follow(0, {radius: 6, beta: 0.9, y: 1.4})` follows the resident from that
     distance, angle and height; `__camera({alpha, beta, radius, target: [x, y, z]})` puts the camera
     anywhere (`__camera()` reads it). Either stops the camera watching on its own.
@@ -473,7 +474,7 @@ never one that's already running) and drive Playwright headless with full Chrome
   (Shading each corner along its own face's normal was tried: no better in the game, and it streaked the long
   triangles of an extruded frame.)
 - **Smooth, sharp and bevelled.** Smooth parts keep edges over `G.SHARP` (40°) sharp, so a cylinder's cap stays
-  flat (it used to shade into the side); round things with few sides stay round (`G.round_angle`: a 6-sided
+  flat; round things with few sides stay round (`G.round_angle`: a 6-sided
   leg, an 8-sided tube); a lathe (`G.revolve`) keeps only turns over 70° sharp (a jar's coarse shoulder stays
   round); spheres, rings and boulders are smooth all over. A `bevel` is smooth with hardened normals: the faces
   it joins stay flat, the edge rounds. `G.shade(obj, smooth, angle)` and `G.bevel_edges(obj, width)` do the same
