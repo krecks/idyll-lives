@@ -939,8 +939,9 @@ function standIn(device: pc.GraphicsDevice, kind: 'white' | 'normal' | 'arm'): p
 }
 
 /**
- * A texture from the build's compressed copy (KTX2) when there is one, else from the file; a copy
- * that fails to load falls back to the file. Resolves to null when neither loads.
+ * A texture from the build's compressed copy (KTX2) when there is one, else from the file (a release
+ * ships the copy alone, `vite.config.ts` `optimizedAssets`: there is no file to retry). Resolves to
+ * null when it doesn't load.
  *
  * Always in a linear (UNORM) format, colour maps too, as the look was tuned with them (gamma-space
  * textures, without sRGB formats): a base or emissive colour map is then decoded where the material
@@ -963,17 +964,12 @@ export function textureWithFallback(app: pc.AppBase, source: string, anisotropy?
       app.assets.load(asset);
     });
   return load(copy)
-    .catch((err: unknown) => {
-      if (copy === url) throw err;
-      console.warn(`[render] compressed ${copy} failed, loading ${url}`);
-      return load(url);
-    })
     .then((texture) => {
       if (anisotropy !== undefined) texture.anisotropy = anisotropy;
       return texture;
     })
     .catch((err: unknown) => {
-      console.warn(`[render] texture ${url} unavailable`, err);
+      console.warn(`[render] texture ${copy} unavailable`, err);
       return null;
     });
 }

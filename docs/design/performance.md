@@ -854,6 +854,10 @@ What changed:
 - **Two render data workers** (`renderData.ts`): one shades the terrain, the other makes the grass field,
   each with the land laid out (0.12 s); and 16 tiles are asked for ahead, not 4, so the shading keeps
   going while the page is busy. The grass field (1.16 s in its worker) no longer holds the terrain up.
+- **The town's road mesh is made in the render data worker** (`renderData.ts`: a `roads` job): the whole
+  town's roads were a 0.3 s long task on the page (`roadMeshes`). The worker makes them while the street
+  is planned; the overview's ground awaits them (`overview.ts` `buildGround`, the `town: road mesh`
+  span) and builds them on the page where no worker runs.
 - **Longer slices behind the boot's loading screen**: the town's build runs in 40 ms slices
   (`setCovered`), as a game's does behind its loading screen.
 - **A chunk of the street is gathered once**: its key and its plan were each worked out from the same
@@ -862,25 +866,47 @@ What changed:
 After, one boot (the same town): data in at 0.25 s; the worker's land at 2.7 s and its preview at 3.3 s,
 the page meanwhile starting the renderer and warming the studio up (1.2 s, with the clips), then idle
 for 1.8 s; then the town's build, 3.1 s, the page busy nearly throughout (0.35 s idle): the street
-1.2 s of the main thread (planning 0.6, meshes 0.5), the whole town's road mesh 0.3 s (`roadMeshes`, one
-long task), the grass's town mask 0.34 s (`withTownGrass`), the landscape's layout 0.12 s, GC 0.3 s.
+1.2 s of the main thread (planning 0.6, meshes 0.5), the grass's town mask 0.34 s (`withTownGrass`), the
+landscape's layout 0.12 s, GC 0.3 s; the town's road mesh (0.3 s) is made in the render data worker
+meanwhile (its span waits 0 ms on it; the worker's own build is 0.3–0.5 s). Three runs of each: boot
+6.2 → 5.9 s and `session: renderer setWorld` 4.6 → 4.3 s.
 
 Also faster since: a household's entry (Play to the game up) 12.1–13.9 s → 8.6–10.7 s. The town
 worker, which made the showcase's houses, still has them when the game's town file is made
 (`session: assembleTown` 1.9 → 0.6 s), and the game's own landscape builds use the same overlap.
 (The households of step 2 are rolled from other dice than before, so this is not the same household.)
 
+**A returning visit** (`showcaseCache.ts`) keeps the menu's showcase: its seed, the peopled draft, the
+houses the land generated and the menus' preview, as one JSON entry in Cache Storage under the build's
+id (7.3 MB of JSON for the Medium world the menu shows). The seed is kept in `localStorage` with the build's
+id too, so a visit lays out a new valley only when the build changes; a world started from step 1 still
+rolls its own. The entry is written in the town worker, from the `preview` job's `keep` flag, so the
+page never stringifies it; a browser that keeps no cache, or has no room, simply makes the town again
+(`loadShowcase` returns null). The preview's meshes are empty in a menu preview (`townPreview.ts`), so
+what is kept leaves them out and puts empty ones back.
+
+| moment | first visit | returning visit |
+|---|---|---|
+| boot: the page to the main menu | 5.4 s (5.6 before) | 4.3 s (5.9 before) |
+| `boot: menu town` (spans) | 3.9 s (4.2) | 4.0 s (5.6) |
+| the showcase | land 2.1 s + preview 0.5 s, in the worker | read 20 ms |
+
+That is 1.6 s off a returning boot, and 1.3 s off the way to the game (boot and entry together, 13.4 s
+against 14.6). The page's own part (the renderer's build, 4.3 s) is now nearly all of the menu's wait;
+the worker's layout no longer hides behind the page's work but is simply gone. Entry (Play to the game
+up) is a little slower on a returning visit (9.0 s against 8.8): the game's town file is made in a
+fresh town worker, where the menu's layout used to have just warmed one up, so the kept houses are sent
+to it (0.7–0.9 s against 0.4; without them it makes them again, 1.9 s). A first visit is unchanged
+(5.4 s and 9.4 s against 5.6 and 8.9, within the noise).
+
 Left:
 
-- **The 1.8 s the page waits for the showcase's land** (the worker's 2.5 s: its houses and their
+- **The 1.8 s a first visit's page waits for the showcase's land** (the worker's 2.5 s: its houses and their
   furniture are most of it, and each lot's size waits on its house). The landscape could start from the
   land before it is peopled (its terrain, woods and grass don't depend on who lives there), and the
   town's model files and shaders could be made ready meanwhile.
-- **The page's part of the town's build**: the street's planning and meshes (1.2 s), the road mesh
-  (0.3 s, could be made in the render data worker) and the grass's town mask (0.34 s, needs the town's
-  walls and rooms, which stay on the page).
-- **A returning visit** makes a new showcase; one kept from the last visit (Cache Storage, by build and
-  seed) would show the same valley again with no layout at all.
+- **The page's part of the town's build**: the street's planning and meshes (1.2 s) and the grass's town
+  mask (0.34 s, needs the town's walls and rooms, which stay on the page).
 - Step 2's portraits: all of them in 2.3 s (1.8–2.2 before; those in view 1.0 s, 1.1–1.3 before). Step 2's town
   builds on the page while they are drawn; the step-2 households differ between the two builds, so this
   is not settled.

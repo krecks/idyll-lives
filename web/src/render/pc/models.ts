@@ -534,20 +534,12 @@ function hexString(c: pc.Color): string {
 type Container = LoadedContainer<Gltf>;
 
 /**
- * The build's compressed copy of the file if there is one; the file itself if that fails to load.
- * A model being built is wanted `now`: background downloads wait for it.
+ * The build's compressed copy of the file if there is one, else the file itself (a release ships the
+ * copy alone, `vite.config.ts` `optimizedAssets`). A model being built is wanted `now`: background
+ * downloads wait for it.
  */
 function importModel(app: pc.AppBase, url: string, now: boolean): Promise<Container> {
-  const load = async () => {
-    const copy = optimizedUrl(url);
-    if (copy === url) return loadContainer<Gltf>(app, url);
-    try {
-      return await loadContainer<Gltf>(app, copy);
-    } catch (err) {
-      console.warn(`[render] compressed ${copy} failed, loading ${url}`, err);
-      return loadContainer<Gltf>(app, url);
-    }
-  };
+  const load = () => loadContainer<Gltf>(app, optimizedUrl(url));
   return now ? foreground(load) : load();
 }
 
