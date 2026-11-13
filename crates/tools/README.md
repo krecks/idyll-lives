@@ -73,6 +73,11 @@ Numbers to know:
   textures the same size (5.41 MB) with the colour and normal maps' levels the same to 0.2 of 255 on average;
   the packed occlusion and roughness maps' smaller levels are averaged as the data they are (the JavaScript
   tool averaged them as colours: up to 15 of 255 off their source's mean, now up to 4).
+  Normal maps as UASTC with zstd were tried and not taken (2026-11-13): 7 dB nearer their sources (brick's
+  1024 px map 32.4 to 39.3 dB), the textures 13.2 MB where they are 5.2, and in production builds of both, at
+  the close camera (6 m) and the play camera, enlarged twofold side by side, the stone, the boards and the lawn
+  could not be told apart: the maps' texels are under a pixel there. Worth trying again only for a view that
+  comes closer than 6 m.
 - `wasm-opt`: on an M3 Pro, the simulation's WASM took 48–55 s from cold and the voice's 3 s. Expect
   1.5–3 minutes on a CI runner from cold; CI keeps `web/.assets/wasm-opt/` between runs
   (`actions/cache`), so an unchanged WASM is instant. It made the two files 620 KB smaller raw and
