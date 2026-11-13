@@ -1299,7 +1299,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       if (!who) return;
       const defs = ridesFor(content, who, car, s);
       const front = h.doors[0] ? [{ x: h.doors[0].x, z: 0, w: 1, d: h.doors[0].z }] : [];
-      const lot = { width: pw, depth: pd, walls: h.walls, doors: h.doors, objects: [...h.objects, ...(s.farm?.objects ?? [])], paths: front, drive, garages, keep: [...(s.farm?.fields ?? []), ...room] };
+      const lot = { width: pw, depth: pd, walls: h.walls, doors: h.doors, objects: [...h.objects, ...(s.farm?.objects ?? [])], paths: front, drive, garages, keep: [...(s.farm?.fields ?? []), ...room], posts: frontPorchPosts(h.walls, h.doors[0]) };
       placeAll(s, placeRides(content, lot, defs, (k) => hash(s.x, s.z, 90 + k)));
     };
     if (!drive) {
@@ -1356,15 +1356,33 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
  * simulation's (sim-core `porches.rs`). On the door's street side.
  */
 export function frontPorch(walls: readonly Wall[], front: Door, turn: ReturnType<typeof turner>, plot: number): PorchInfo | null {
-  if (front.axis !== 'x' || !walls.length) return null;
-  const xs = walls.flatMap(([x0, , x1]) => [x0, x1]);
-  const zs = walls.flatMap(([, z0, , z1]) => [z0, z1]);
-  if (front.z !== Math.min(...zs) || front.x < Math.min(...xs) || front.x >= Math.max(...xs)) return null;
+  if (!porchedFront(walls, front)) return null;
   const e = turn.edge(front);
   // The way out of the door (towards the street, -z on the plot), turned.
   const [ax, az] = turn.point([front.x + 0.5, front.z]);
   const [bx, bz] = turn.point([front.x + 0.5, front.z - 1]);
   return e.axis === 'x' ? { plot, axis: 'h', x: e.x, z: e.z, out: Math.sign(bz - az) } : { plot, axis: 'v', x: e.x, z: e.z, out: Math.sign(bx - ax) };
+}
+
+/** Whether a layout's front door gets a porch (`frontPorch`): in a wall along x at the front of the box of its walls. */
+function porchedFront(walls: readonly Wall[], front: Door): boolean {
+  if (front.axis !== 'x' || !walls.length) return false;
+  const xs = walls.flatMap(([x0, , x1]) => [x0, x1]);
+  const zs = walls.flatMap(([, z0, , z1]) => [z0, z1]);
+  return front.z === Math.min(...zs) && front.x >= Math.min(...xs) && front.x < Math.max(...xs);
+}
+
+/**
+ * The tiles the posts of the porch over a layout's front door stand on (plot coordinates: the
+ * outer row's sides, sim-core `Porch::post_tiles`), where it has one (`frontPorch`): nobody walks
+ * through them, so the bikes by the house keep round them (`placeRides`).
+ */
+export function frontPorchPosts(walls: readonly Wall[], front: Door | undefined): [number, number][] {
+  if (!front || !porchedFront(walls, front)) return [];
+  return [
+    [front.x - 1, front.z - 2],
+    [front.x + 1, front.z - 2],
+  ];
 }
 
 /**

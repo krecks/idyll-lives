@@ -259,7 +259,9 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   paths (`World::guess_porches`), `[]` none. `porchPieces: { plot, kind: 'post' | 'canopy' |
   'step', x, z, w, d, rot }[]` — the player's porch pieces (`Command::BuildPorchPiece`). Both are
   in the save and the structure (`PorchInfo`, `PorchPieceInfo`), left out of the structure when
-  there are none.
+  there are none. A porch's two posts (the outer row's side tiles, `Porch::post_tiles`) and a post
+  piece's tile are blocked as a garage's are (`cars::reblock`), worked out from these as a town or
+  a save loads: nothing more is saved.
 - `fences: { line: [x0, z0, x1, z1], style?: string, gate?: true }[]` — garden fences, hedges and
   field fences the town puts up (`game/gardenFences.ts`), runs along grid lines on the ground storey
   in a `fenceStyles` id, never on a wall: real `Edge::Fence` / `Edge::Gate` edges, saved like the

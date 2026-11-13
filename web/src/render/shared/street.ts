@@ -50,7 +50,7 @@ import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
 import { CARS, CAR_PAINT, garageAt, garageFor, hash, paintCar, parkCar, pick, type CarBody } from './cars';
 import { chunkAt, chunkCoords, chunkId, distanceToRect, hashNumbers, hashString, RectGrid } from './chunks';
-import type { HousePlanner, SilhouettePlan, SilhouetteSpec } from './house';
+import { canopyBack, type HousePlanner, type SilhouettePlan, type SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
 import { wallCorners, writeFences } from './fences';
@@ -595,6 +595,8 @@ export class TownStreet {
   /** The grid corners walls end or turn at (`wallCorners`), and the walls they're from: a fence meeting a wall there has no post. */
   private wallCornerSet = new Set<string>();
   private wallsOf: unknown = null;
+  /** The edges walls (and the doors and windows in them) stand on, `axis:x:z`, made when first asked for after the walls or openings changed (`walled`). */
+  private wallEdges: Set<string> | null = null;
   private readonly fenceUnits = new Map<number, { hash: number; out: Parts }>();
 
   /** The street's own: sidewalks, the road's surface, fountains, the menus' parked cars (by chunk). */
@@ -800,6 +802,7 @@ export class TownStreet {
     if (world.walls !== this.wallsOf) {
       this.wallsOf = world.walls;
       this.wallCornerSet = wallCorners(world.walls);
+      this.wallEdges = null;
       this.fenceUnits.clear();
       this.version++;
     }
@@ -812,6 +815,7 @@ export class TownStreet {
     // plot's share notices those round its house (`plotOut`).
     if (world.openings !== this.openingsOf) {
       this.openingsOf = world.openings;
+      this.wallEdges = null;
       const grid = new RectGrid<Rect & { o: Opening; i: number }>(8);
       (world.openings ?? []).forEach((o, i) => {
         // (On the ground's rows: an opening upstairs on the face of the house below it; none of the basement's shows.)
@@ -1041,6 +1045,20 @@ export class TownStreet {
     return this.plotsNear(L.info, 2);
   }
 
+  /** Whether a wall (or a door or a window in one) stands on an edge (`SilhouetteSpec.walled`). */
+  private readonly walled = (axis: 'h' | 'v', x: number, z: number): boolean => {
+    if (!this.wallEdges) {
+      this.wallEdges = new Set();
+      for (const e of [...this.world.walls, ...(this.world.openings ?? [])]) this.wallEdges.add(`${e.axis}:${e.x}:${e.z}`);
+    }
+    return this.wallEdges.has(`${axis}:${x}:${z}`);
+  };
+
+  /** Whether a porch piece is a canopy against a wall (it goes with that wall in the cutaway on the viewed lot). */
+  private backed(p: { kind: string; x: number; z: number; w: number; d: number; rot: number }): boolean {
+    return p.kind === 'canopy' && canopyBack(p).some(([axis, x, z]) => this.walled(axis, x, z));
+  }
+
   private plotOut(L: PlotLayout, focus: number): { key: string; out: PlotOut } {
     const deps = this.plotDeps(L);
     const variant = deps.some((d) => d.info.id === focus) ? focus : NO_FOCUS;
@@ -1058,7 +1076,7 @@ export class TownStreet {
     }
     // Its porches and porch pieces.
     for (const p of this.world.porches ?? []) if (p.plot === L.info.id) h = mix(mix(mix(h, p.x), p.z * 7 + (p.axis === 'h' ? 1 : 2)), p.out + 3);
-    for (const p of this.world.porchPieces ?? []) if (p.plot === L.info.id) h = mix(mix(mix(mix(h, p.x), p.z), p.w * 64 + p.d * 8 + p.rot), p.kind.length);
+    for (const p of this.world.porchPieces ?? []) if (p.plot === L.info.id) h = mix(mix(mix(mix(mix(h, p.x), p.z), p.w * 64 + p.d * 8 + p.rot), p.kind.length), this.backed(p) ? 1 : 0);
     // Indoors or out: the things on it, by the rooms under them.
     const W = this.W;
     for (const o of this.objectsByPlot.get(L.info.id) ?? []) h = mix(h, this.world.rooms[o.z * W + o.x] ? 1 : 0);
@@ -1091,6 +1109,8 @@ export class TownStreet {
       const [x0, z0, x1, z1] = L.info.house ?? [lone!.x0, lone!.z0, lone!.x1, lone!.z1];
       const front: [number, number] = L.turned ? [-L.front, 0] : [0, L.front];
       spec = { x0, z0, x1, z1, lot: L.info, home, dressingOnly: home && game, front, door: L.door, garage: g, porches, pieces, roof: L.plot.roof, storeys: L.plot.storeys, lived: kind === 'house' && this.options.lived };
+      // (A canopy against the viewed house's wall goes with it in the cutaway.)
+      if (spec.dressingOnly && pieces?.some((p) => p.kind === 'canopy')) spec.walled = this.walled;
       // The openings on and round its walls, in the town's order (upstairs ones found on the ground's rows).
       const openings = this.openingGrid
         .near({ x: x0, z: z0, w: x1 - x0, d: z1 - z0 }, 2)

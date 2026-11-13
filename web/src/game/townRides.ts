@@ -4,7 +4,7 @@
  * with no car; a kids' bike a child; an e-scooter now and then) and where they stand on its lot
  * (`placeRides`): outdoors by the house or the garage, their backs to it, clear of the driveway
  * and the car on it, the paths, the doors and what's used in the garden, each reached from the
- * street and leaving everything else reached as before.
+ * street (round the porch's posts) and leaving everything else reached as before.
  *
  * Plot coordinates throughout (the street along z = 0, as `town.ts` lays a house out).
  */
@@ -68,6 +68,8 @@ export interface RideLot {
   /** The garage, and where the player could build one (Build mode's Garage tool): wall boxes. */
   garages: readonly Rect[];
   keep?: readonly Rect[];
+  /** Where the posts of the porch over the front door stand (`frontPorchPosts`): nobody walks through them. */
+  posts?: readonly [number, number][];
 }
 
 /** Tiles kept clear round a door, out from it (its doorstep and the tile past it). */
@@ -123,6 +125,7 @@ export function placeRides(content: Content, lot: RideLot, defs: readonly string
   const inHouse = (x: number, z: number) => !!house && x >= house.x0 && x < house.x1 && z >= house.z0 && z < house.z1;
   const inGarage = (x: number, z: number) => lot.garages.some((g) => overlaps(g, x, z));
   for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) if (inHouse(x, z) || inGarage(x, z)) block(x, z);
+  for (const [x, z] of lot.posts ?? []) block(x, z);
   // Not to stand on: the paths, the driveway and a tile round it, doorsteps, where things are used from.
   const keep = new Uint8Array(W * D);
   const keepAt = (x: number, z: number) => inLot(x, z) && (keep[key(x, z)] = 1);

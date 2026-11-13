@@ -505,6 +505,10 @@ pub struct Car {
     /// Ticks it has stood at a zebra's stop line for those on foot (`zebra_yield`). Not saved.
     #[serde(skip)]
     zebra_wait: u32,
+    /// Waiting at a red light this tick (`Traffic::red_for`): those on foot may walk up to its
+    /// nose (`in_the_way`), short of a crosswalk. Not saved.
+    #[serde(skip)]
+    at_red: bool,
     /// Where it is now, which way it faces, whether it's moving and which doors are open (bit
     /// `d` for door `d`); None while it's out of town or unused (`poses`; for the snapshot, not
     /// saved).
@@ -740,6 +744,7 @@ impl Car {
             waited: 0,
             on_foot: Vec::new(),
             zebra_wait: 0,
+            at_red: false,
             shown: None,
             next: None,
             shift: 0.0,
@@ -834,6 +839,7 @@ impl Car {
         self.on_foot.clear();
         self.waited = 0;
         self.zebra_wait = 0;
+        self.at_red = false;
         self.jam = (0, 0, false);
         self.backed_for = None;
         self.pulled_for = None;
@@ -888,6 +894,7 @@ impl Car {
             waited: self.waited,
             on_foot: Vec::new(),
             zebra_wait: 0,
+            at_red: false,
             shown: self.shown,
             next: None,
             shift: 0.0,
@@ -1311,8 +1318,9 @@ pub(crate) struct Route {
     /// worked out with the route (`Route::build`).
     pub(crate) claims: Vec<crate::traffic::Claim>,
     /// Where it stops for those on foot at the zebras of the junctions giving way it goes through,
-    /// should anyone be on one or stepping onto it (`traffic::zebra_stops`, `zebra_yield`), worked
-    /// out with its claims.
+    /// should anyone be on one or stepping onto it (`traffic::zebra_stops`, `zebra_yield`), and at
+    /// a lit junction's side road it turns into on the green, for anyone on its crosswalk
+    /// (`traffic::side_zebra_stops`), worked out with its claims.
     pub(crate) zebras: Vec<crate::traffic::ZebraStop>,
     /// Where it takes turns with one passing a work taxi standing at the kerb the other way
     /// (ticks along it, from and to: `pass_stands`), claims of their own.
@@ -1440,6 +1448,9 @@ impl Route {
         if let Some(t) = travel {
             crate::traffic::gate(&mut self.claims, &t.signals, &trace, len);
             self.zebras = crate::traffic::zebra_stops(&trace, &t.give_way, len);
+            self.zebras
+                .extend(crate::traffic::side_zebra_stops(&trace, &t.signals, len));
+            self.zebras.sort_by(|a, b| a.at.total_cmp(&b.at));
         }
         self.pass = trace.iter().zip(&pass).map(|(s, &p)| (s.0, p)).collect();
     }
@@ -3447,6 +3458,7 @@ fn route_ticks(w: &mut World, c: usize, home: bool) -> f32 {
 /// near, `too_near`). And never deeper into another car than it is (`guard`).
 fn drive_on(w: &mut World, c: usize) {
     let home = w.cars[c].state == CarState::Arriving;
+    w.cars[c].at_red = false;
     match w.cars[c].sight {
         Sight::Seen => {}
         Sight::Ghost => return drive_through(w, c, home),
@@ -3565,7 +3577,9 @@ fn drive_on(w: &mut World, c: usize) {
         // (At a zebra, someone on it or stepping onto it: it stops at the line for them.)
         let waited = cars[c].zebra_wait;
         let route = cars[c].route(exits, Some(travel), home);
-        let whom = zebra_yield(route, &traffic.zebra_walkers, t, waited);
+        let whom = zebra_yield(route, &traffic.zebra_walkers, t, waited, |gate| {
+            traffic.green(Some(gate))
+        });
         match whom {
             Some(whom) if !whom.is_empty() => {
                 let car = &mut cars[c];
@@ -3578,6 +3592,7 @@ fn drive_on(w: &mut World, c: usize) {
         }
         let route = cars[c].route(exits, Some(travel), home);
         if !traffic.may_go(tick, key, u32::from(home), &route.claims, t, t + 1.0) {
+            cars[c].at_red = traffic.red_for(key);
             // (Waiting for its claim: for one in its way that waits for it in turn, on the road
             // or for a claim of its own, as one in its way on the road, so that the later of them
             // backs up out of the other's way, `back_off`.)
@@ -3807,12 +3822,15 @@ const ZEBRA_WAIT: u32 = secs(30.0) as u32;
 /// those on the one of the arm it goes out by (`Traffic::zebra_walkers`), each for as long as
 /// `ZEBRA_KERB_WAIT` and `ZEBRA_WAIT` say. None: at no zebra's line. Empty: it drives on. (Not one
 /// stepping onto the zebra it goes out by: out in the box by then, it'd stand there in the way of
-/// the others; they wait for it to pass.)
+/// the others; they wait for it to pass.) At a lit junction, turning into a side road whose
+/// crosswalk is walked on its green (`Signal::opens_with`), those on that one, while its light is
+/// `green` (on red it waits for the green as ever, asking for it).
 fn zebra_yield(
     route: &Route,
-    walkers: &[(u16, u8, u32, bool)],
+    walkers: &[crate::traffic::OnZebra],
     t: f32,
     waited: u32,
+    green: impl Fn(crate::traffic::Gate) -> bool,
 ) -> Option<Vec<u32>> {
     let mut at_line = false;
     let mut whom = Vec::new();
@@ -3820,10 +3838,12 @@ fn zebra_yield(
         .zebras
         .iter()
         .filter(|z| t <= z.at + 1e-3 && z.at < t + 1.0)
+        .filter(|z| z.lit.is_none_or(|phase| green((z.junction, phase))))
     {
         at_line = true;
-        for &(j, a, id, on) in walkers {
-            if j != z.junction || whom.contains(&id) {
+        for w in walkers {
+            let (a, id, on) = (w.arm, w.id, w.on);
+            if w.junction != z.junction || w.lit != z.lit.is_some() || whom.contains(&id) {
                 continue;
             }
             let into = z.arms[0] == Some(a)
@@ -4830,10 +4850,15 @@ pub(crate) fn pass_stands(w: &mut World) {
             changed = true;
         }
         // (Its claims worked out again: what it held and asked for let go, taken again as it goes
-        // on, `traffic::Traffic::may_go`.)
+        // on, `traffic::Traffic::may_go`; but the group it's in the middle of held on, all of it,
+        // `Traffic::reclaimed`.)
         if changed {
             car.reclaim(travel);
-            traffic.forget(car_first(c));
+            if let Some((home, route)) = car.route.as_ref() {
+                traffic.reclaimed(car_first(c), u32::from(*home), &route.claims, car.progress);
+            } else {
+                traffic.forget(car_first(c));
+            }
         }
     }
     w.traffic.passing = passing;
@@ -6543,7 +6568,14 @@ pub(crate) fn in_the_way(
         if car.on_foot.contains(&id) {
             return walks_into(at, yaw, car.len, car.wid, 0.0, body, from, to);
         }
-        let ahead = if out && !car.moved { 0.0 } else { AHEAD };
+        // (Nor the ground ahead of one waiting at a red light, its nose at the stop line: someone
+        // on the crosswalk just in front of it waited there for it, on the walk, till the walk
+        // was over and it came on at them.)
+        let ahead = if out && !car.moved || car.at_red {
+            0.0
+        } else {
+            AHEAD
+        };
         walks_into(at, yaw, car.len, car.wid, ahead, body, from, to)
             || car.next.is_some_and(|(at, yaw)| {
                 walks_into(at, yaw, car.len, car.wid, ahead, body, from, to)
@@ -7047,14 +7079,16 @@ fn standing_tiles(w: &World, parked: &[u64]) -> Vec<usize> {
             }
         }
     }
-    // (A porch post stands where it is too, as a garage does: `porches.rs`.)
-    for p in w
+    // (A porch post stands where it is too, as a garage does, on its own or a porch's: `porches.rs`.)
+    let posts = w
         .porch_pieces
         .iter()
         .filter(|p| p.kind == crate::porches::PieceKind::Post)
-    {
-        if w.lot.in_bounds(p.x, p.z) {
-            tiles.push(w.lot.tile_index(p.x, p.z));
+        .map(|p| (p.x, p.z))
+        .chain(w.porches.iter().flat_map(|p| p.post_tiles()));
+    for (x, z) in posts {
+        if w.lot.in_bounds(x, z) {
+            tiles.push(w.lot.tile_index(x, z));
         }
     }
     let out = w.cars.len().div_ceil(64);
@@ -7102,16 +7136,17 @@ pub(crate) fn garages_changed(w: &mut World, plot: u32) {
     let parked = parked_bits(w);
     let tiles = standing_tiles(w, &parked);
     w.cars_parked = Some(parked);
-    restand(w, tiles);
+    restand(w, tiles, false);
 }
 
-/// A porch post was built or taken down (or put back by an undo): walking changes only on its
-/// tile (`restand`).
+/// A porch post was built or taken down, on its own or a porch's (or a porch moved with its room):
+/// walking changes only on their tiles (`restand`). A tile freed keeps a thing standing there
+/// blocked: a town's porch may have had one at a post (`porches.rs`, `porch_kept`).
 pub(crate) fn posts_changed(w: &mut World) {
     let parked = parked_bits(w);
     let tiles = standing_tiles(w, &parked);
     w.cars_parked = Some(parked);
-    restand(w, tiles);
+    restand(w, tiles, true);
 }
 
 /// The most separate patches of changed tiles one `restand` notes for walkers (more: the box
@@ -7127,7 +7162,7 @@ const PATCH_GAP: i32 = 2;
 /// taken up or freed, each patch of them noted on its own. (One box round every car in town
 /// would have every walker plan again and the walkable regions of most of a big world labelled
 /// again, for one car pulling out of a driveway.)
-fn restand(w: &mut World, tiles: Vec<usize>) {
+fn restand(w: &mut World, tiles: Vec<usize>, things: bool) {
     // The tiles in one list and not the other (both are sorted).
     let (old, new) = (&w.car_tiles, &tiles);
     let (mut i, mut j) = (0, 0);
@@ -7159,6 +7194,19 @@ fn restand(w: &mut World, tiles: Vec<usize>) {
     }
     for &i in &freed {
         w.blocked[i] = w.travel.ground_blocked(i);
+    }
+    // (A thing may stand where a porch's post stood: cars and garages never stand on one.)
+    if things && !freed.is_empty() {
+        let at: Vec<(i32, i32)> = freed.iter().map(|&i| w.lot.tile_xz(i)).collect();
+        let under: Vec<usize> = w
+            .objects
+            .iter()
+            .flat_map(|o| w.blocking_tiles(o))
+            .filter_map(|t| at.iter().position(|&a| a == t))
+            .collect();
+        for k in under {
+            w.blocked[freed[k]] = true;
+        }
     }
     for &i in &taken {
         w.blocked[i] = true;
@@ -7211,7 +7259,7 @@ pub(crate) fn reblock(w: &mut World) {
     // (Garages too, as they stand.)
     let tiles = standing_tiles(w, &parked);
     w.cars_parked = Some(parked);
-    restand(w, tiles);
+    restand(w, tiles, false);
 }
 
 impl World {

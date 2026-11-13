@@ -218,17 +218,26 @@
     {/snippet}
 
     {#snippet above()}
-      {#if hoveredDef && hovered}
-        <ItemHoverCard def={hoveredDef} at={hovered.at} lovers={lovers.get(hoveredDef.id) ?? []} owned={owned.get(hoveredDef.id) ?? 0} />
-      {/if}
-      {#if pinned}
-        <section class="pinned glass" aria-label={moving || !pinned.owned ? 'In hand' : 'Picked'}>
-          {#if !moving && pinned.owned}
-            <button class="close" aria-label="Put down" title="Done (Esc)" onclick={() => (game.buySelection = null)}><Icon name="icon.ui.close" size={12} /></button>
-          {/if}
-          <ItemDetail def={pinned.def} owned={pinned.owned} />
-        </section>
-      {/if}
+      <!-- The room between the dock and the top bar (`BuildDock`): the pinned card at the right, the hover card over the item
+           pointed at, kept to the left of the pinned one. -->
+      <div class="floats">
+        {#if hoveredDef && hovered}
+          <div class="hover" class:beside={!!pinned} style:--at={hovered.at}>
+            <ItemHoverCard def={hoveredDef} lovers={lovers.get(hoveredDef.id) ?? []} owned={owned.get(hoveredDef.id) ?? 0} />
+          </div>
+        {/if}
+        {#if pinned}
+          <section class="pinned glass" aria-label={moving || !pinned.owned ? 'In hand' : 'Picked'}>
+            {#if !moving && pinned.owned}
+              <button class="close" aria-label="Put down" title="Done (Esc)" onclick={() => (game.buySelection = null)}><Icon name="icon.ui.close" size={12} /></button>
+            {:else}
+              <!-- In hand (bought, or picked up to move): back to the catalog, or back where it stood, as Esc does. -->
+              <button class="close" aria-label="Put it back" title="Put it back (Esc)" onclick={() => services.controls.cancelPlacing()}><Icon name="icon.ui.close" size={12} /></button>
+            {/if}
+            <ItemDetail def={pinned.def} owned={pinned.owned} />
+          </section>
+        {/if}
+      </div>
     {/snippet}
   </BuildDock>
 {/if}
@@ -368,15 +377,50 @@
     gap: 8px;
     padding: 12px 4px;
   }
+  /* The cards over the lot fill the room above the dock (up to the top bar) from its foot: the hover card is
+     no taller than the room, the pinned card's turntable and then its body give way to fit it. */
+  .floats {
+    --hover-w: 290px;
+    --pinned-w: min(340px, 100%);
+    position: absolute;
+    inset: 0;
+    /* (Its height, the room, is what the pinned card's turntable gives way to: `cqh` in `ItemDetail`.) */
+    container-type: size;
+    pointer-events: none;
+  }
+  /* What an item pointed at is worth: over it, held inside the dock's ends. */
+  .hover {
+    position: absolute;
+    bottom: 0;
+    left: clamp(calc(var(--hover-w) / 2 + 5px), calc(var(--at) * 100%), calc(100% - var(--hover-w) / 2 - 5px));
+    transform: translateX(-50%);
+    width: var(--hover-w);
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    z-index: 2;
+  }
+  /* With a card pinned, the hover card stops short of it (it's the pick's card, and stays readable beside the
+     other for comparing); where the dock is too narrow for both side by side, it waits until the pin is let go.
+     (min/max, not clamp: when short of room, the left wins over keeping off the pinned card.) */
+  .hover.beside {
+    left: min(max(calc(var(--hover-w) / 2 + 5px), calc(var(--at) * 100%)), calc(100% - var(--pinned-w) - 8px - var(--hover-w) / 2));
+  }
+  @container dock (width < 640px) {
+    .hover.beside {
+      display: none;
+    }
+  }
   /* The owned object picked or in hand: its card, at the right, out of the way of the lot. */
   .pinned {
     position: absolute;
     right: 0;
     bottom: 0;
-    width: min(340px, 100%);
-    max-height: min(52vh, 520px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    width: var(--pinned-w);
+    max-height: min(100%, 520px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     padding: 10px 12px;
     background: var(--glass-strong);
     pointer-events: auto;

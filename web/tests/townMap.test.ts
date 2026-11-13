@@ -1,10 +1,10 @@
 /**
  * The town map's view (`ui/mapView.ts`): a point on screen to the ground under it when the map
- * fits a box of another shape (the "Bigger" map), and the place pill's words (`ui/place.ts`): where a
+ * fits a box of another shape (the "Bigger" map), its names kept apart, and the place pill's words (`ui/place.ts`): where a
  * resident is off to, on foot or riding.
  */
 import { describe, expect, test } from 'bun:test';
-import { mapScale, screenToMap } from '../src/ui/mapView';
+import { labelWidth, layoutLabels, mapScale, screenToMap, type MapLabel } from '../src/ui/mapView';
 import { placeAt, rideText, tripText, wayText } from '../src/ui/place';
 
 describe('town map view', () => {
@@ -39,6 +39,63 @@ describe('town map view', () => {
   test('an empty box or view doesn’t divide by zero', () => {
     expect(mapScale(0, 0, view)).toBe(1);
     expect(mapScale(100, 100, { x: 0, z: 0, w: 0, d: 0 })).toBe(1);
+  });
+});
+
+describe('town map names', () => {
+  // 400 × 400 m drawn in a 400 px box: a metre a pixel.
+  const view = { x: 0, z: 0, w: 400, d: 400 };
+  const label = (key: string, x: number, z: number, text: string, rank: number, more: Partial<MapLabel<string>> = {}): MapLabel<string> => ({ key, x, z, text, size: 11, rank, ...more });
+  const box = (l: MapLabel<string>, at: { x: number; y: number }) => {
+    const w = labelWidth(l.text, l.size);
+    return { l: at.x - w / 2, r: at.x + w / 2, t: at.y - l.size, b: at.y };
+  };
+  const apart = (a: ReturnType<typeof box>, b: ReturnType<typeof box>) => a.r <= b.l || b.r <= a.l || a.b <= b.t || b.b <= a.t;
+
+  test('a hamlet and its orchard by it: the hamlet’s name where it is, the orchard’s moved clear of it or not drawn', () => {
+    // (The "Bigger" map's "Maple Heights" over "Maple Heights Orchard".)
+    const hamlet = label('hamlet', 200, 200, 'Maple Heights', 0, { size: 14 });
+    const orchard = label('orchard', 230, 202, 'Maple Heights Orchard', 1);
+    const placed = layoutLabels([orchard, hamlet], 400, 400, view);
+    const h = placed.get('hamlet')!;
+    expect(h.x).toBeCloseTo(200);
+    const o = placed.get('orchard');
+    if (o) expect(apart(box(hamlet, h), box(orchard, o))).toBe(true);
+  });
+
+  test('names with room each stay over their point, centred on it', () => {
+    const a = label('a', 100, 100, 'Oakton', 0, { size: 14 });
+    const b = label('b', 300, 300, 'Picnic Meadow', 1);
+    const placed = layoutLabels([a, b], 400, 400, view);
+    expect(placed.get('a')!.x).toBeCloseTo(100);
+    expect(placed.get('b')!.x).toBeCloseTo(300);
+    // The line's baseline a little below the point, its middle on it (11 px: 1.25 × 11 high).
+    expect(placed.get('b')!.y).toBeCloseTo(300 - 11 * 0.625 + 11 * 0.97);
+  });
+
+  test('a pile of names: none drawn over another, the household’s own always', () => {
+    const pile = Array.from({ length: 12 }, (_, i) => label(`p${i}`, 200 + (i % 3) * 4, 200 + i * 2, `Place number ${i}`, 2));
+    const home = label('home', 202, 205, 'The Smiths', 2, { wins: 0 });
+    const placed = layoutLabels([...pile, home], 400, 400, view);
+    expect(placed.has('home')).toBe(true);
+    const shown = [...pile, home].filter((l) => placed.has(l.key)).map((l) => box(l, placed.get(l.key)!));
+    expect(shown.length).toBeLessThan(13);
+    for (let i = 0; i < shown.length; i++) for (let j = i + 1; j < shown.length; j++) expect(apart(shown[i], shown[j])).toBe(true);
+  });
+
+  test('a name out of view isn’t drawn; one by the edge is kept inside the box', () => {
+    const zoomed = { x: 100, z: 100, w: 200, d: 200 };
+    const placed = layoutLabels([label('out', 50, 150, 'Far away', 0), label('edge', 102, 150, 'Cedarbury Lookout', 1)], 400, 400, zoomed);
+    expect(placed.has('out')).toBe(false);
+    // (2 px a metre: its half-width in metres in from the view's left.)
+    expect(placed.get('edge')!.x).toBeCloseTo(100 + labelWidth('Cedarbury Lookout', 11) / 4);
+  });
+
+  test('clear of the zoom buttons', () => {
+    const buttons = { l: 326, t: 360, r: 400, b: 400 };
+    const placed = layoutLabels([label('lookout', 360, 385, 'Lookout', 1)], 400, 400, view, [buttons]);
+    const at = placed.get('lookout');
+    if (at) expect(apart(box(label('lookout', 0, 0, 'Lookout', 1), at), buttons)).toBe(true);
   });
 });
 

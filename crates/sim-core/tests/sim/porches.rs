@@ -1,11 +1,13 @@
 //! Build mode's Porch tool (`World::build_porch`, `World::remove_porch`) and porch pieces
 //! (`World::build_porch_piece`, `World::remove_porch_piece`): a porch over an outside door, paid
 //! for and sold back, undone and made again, kept in blueprints and saves, gone with its door,
-//! moved with its room; posts that nobody walks through and platforms and canopies they walk under
-//! and across; and a town or a save from before porches keeping the ones that were drawn.
+//! moved with its room; posts (a porch's and its own) that nobody walks through or puts a thing
+//! on, the way up to the door kept open, and platforms and canopies they walk under and across;
+//! and a town or a save from before porches keeping the ones that were drawn.
 
 use serde_json::Value;
 use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind};
+use sim_core::path::NavGrid;
 use sim_core::porches::{PieceKind, Porch};
 use sim_core::{Command, World};
 
@@ -122,9 +124,13 @@ fn a_porch_goes_over_an_outside_door_and_is_sold_back() {
         porch(&mut w, 3, 5).unwrap_err(),
         "that door has a porch already"
     );
-    // Its posts don't get in anyone's way: walking stays as it was.
+    // Its posts take their tiles (the outer row's sides); the way up to the door doesn't.
+    assert_eq!(DOOR.post_tiles(), [(2, 6), (4, 6)]);
     for (x, z) in DOOR.post_tiles() {
-        assert!(!blocked(&w, x, z));
+        assert!(blocked(&w, x, z), "a post at ({x}, {z})");
+    }
+    for (x, z) in [(3, 5), (3, 6), (2, 5), (4, 5)] {
+        assert!(!blocked(&w, x, z), "({x}, {z}) is walked across");
     }
     // The view has it.
     let view: Value = serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();
@@ -139,6 +145,9 @@ fn a_porch_goes_over_an_outside_door_and_is_sold_back() {
     })
     .unwrap();
     assert!(w.porches.is_empty());
+    for (x, z) in DOOR.post_tiles() {
+        assert!(!blocked(&w, x, z), "({x}, {z}) is free again");
+    }
     assert_eq!(funds(&w), before - 300, "half back (objectRules.resale)");
     assert_ne!(w.structure_version(), shown, "the view hears of it");
     assert!(
@@ -402,6 +411,143 @@ fn a_post_may_not_shut_anyone_in() {
     assert!(!blocked(&w, 2, 10));
 }
 
+fn buy_chair(w: &mut World, x: i32, z: i32) -> Result<(), String> {
+    w.apply(Command::Buy {
+        household: 0,
+        object: "chair".into(),
+        at: Some([x, z, 0]),
+        colors: Default::default(),
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .map_err(|e| e.to_string())
+}
+
+/// A way on foot from `from` to `to`, as residents find one.
+fn walk(w: &World, from: (i32, i32), to: (i32, i32)) -> Option<Vec<(i32, i32)>> {
+    NavGrid {
+        lot: &w.lot,
+        blocked: w.blocked(),
+        stairs: w.stair_map(),
+        kept_off: &[],
+    }
+    .find_path(from, to)
+}
+
+#[test]
+fn a_porchs_posts_block_walking_and_things_and_the_door_stays_reached() {
+    let mut w = world();
+    build_room(&mut w);
+    // A chair indoors to be walked to through the door.
+    buy_chair(&mut w, 4, 3).unwrap();
+    porch(&mut w, 3, 5).unwrap();
+    // From the street, past the porch: round its posts, never through them.
+    let by = walk(&w, (6, 11), (0, 6)).expect("a way past the porch");
+    for (x, z) in DOOR.post_tiles() {
+        assert!(
+            !by.contains(&(x, z)),
+            "not through the post at ({x}, {z}): {by:?}"
+        );
+    }
+    // Up to the door through the porch's front, and in.
+    let up = walk(&w, (6, 11), (3, 4)).expect("in through the door");
+    assert!(up.contains(&(3, 6)) && up.contains(&(3, 5)), "{up:?}");
+    // Nothing goes on a post's tile; beside it, under the canopy, it does.
+    assert_eq!(
+        buy_chair(&mut w, 4, 6).unwrap_err(),
+        "there's no room for that here"
+    );
+    w.apply(Command::Buy {
+        household: 0,
+        object: "chair".into(),
+        at: Some([4, 5, 3]),
+        colors: Default::default(),
+        turn: None,
+        offset: None,
+        size: None,
+        tall: None,
+    })
+    .expect("on the landing, off the posts, sat on from the door's tile");
+}
+
+#[test]
+fn a_porch_is_refused_onto_someone_or_where_its_posts_shut_the_door_off() {
+    let mut w = world();
+    build_room(&mut w);
+    // Ada stands where a post would go.
+    w.sims[0].pos = [4.5, 6.5];
+    assert_eq!(
+        porch(&mut w, 3, 5).unwrap_err(),
+        "someone is standing where a post goes"
+    );
+    w.sims[0].pos = [1.5, 10.5];
+    // Fences round the porch's ground but for its right-hand post's side: the only way to the
+    // door is through that post's tile.
+    let mut edits = Vec::new();
+    for x in 2..5 {
+        edits.push(EdgeEdit::new(EdgeAxis::H, x, 7, EdgeKind::Fence));
+    }
+    for z in 5..7 {
+        edits.push(EdgeEdit::new(EdgeAxis::V, 2, z, EdgeKind::Fence));
+    }
+    edits.push(EdgeEdit::new(EdgeAxis::V, 5, 5, EdgeKind::Fence));
+    w.apply(Command::Build {
+        household: 0,
+        edits,
+    })
+    .unwrap();
+    assert!(walk(&w, (6, 11), (3, 5)).is_some(), "the door is reached");
+    let before = funds(&w);
+    assert_eq!(porch(&mut w, 3, 5).unwrap_err(), "that would block the way");
+    assert!(w.porches.is_empty());
+    assert_eq!(funds(&w), before, "nothing paid");
+    for (x, z) in DOOR.post_tiles() {
+        assert!(!blocked(&w, x, z), "({x}, {z}) is free");
+    }
+    // The fence on that side opened, the front is the way in: it goes up.
+    w.apply(Command::Build {
+        household: 0,
+        edits: vec![EdgeEdit::new(EdgeAxis::H, 3, 7, EdgeKind::Open)],
+    })
+    .unwrap();
+    porch(&mut w, 3, 5).expect("the way up through its front");
+    assert!(walk(&w, (6, 11), (3, 5)).is_some(), "the door is reached");
+}
+
+#[test]
+fn a_town_porch_with_a_thing_at_a_post_keeps_it_blocked() {
+    // A town whose porch has a chair at its post (as an older save's could have, its posts
+    // walked through then): the chair's tile stays blocked whether the porch stands or goes.
+    let mut w = world();
+    build_room(&mut w);
+    buy_chair(&mut w, 4, 6).unwrap();
+    let mut save: Value = serde_json::from_str(&w.save_json()).unwrap();
+    save["porches"] = serde_json::to_value(vec![DOOR]).unwrap();
+    let mut w = World::from_save_json(CONTENT, &save.to_string()).unwrap();
+    assert_eq!(w.porches, vec![DOOR]);
+    assert!(blocked(&w, 4, 6) && blocked(&w, 2, 6));
+    w.apply(Command::RemovePorch {
+        household: 0,
+        axis: EdgeAxis::H,
+        x: 3,
+        z: 5,
+    })
+    .unwrap();
+    assert!(blocked(&w, 4, 6), "the chair still stands there");
+    assert!(!blocked(&w, 2, 6));
+    // The other way round: the chair sold while the porch stands, its post keeps the tile.
+    let mut w = World::from_save_json(CONTENT, &save.to_string()).unwrap();
+    let chair = w.objects.last().unwrap().stable;
+    w.apply(Command::Sell {
+        household: 0,
+        object: chair,
+    })
+    .unwrap();
+    assert!(blocked(&w, 4, 6), "the post still stands there");
+}
+
 #[test]
 fn porches_and_pieces_are_kept_in_blueprints_and_saves() {
     let mut w = world();
@@ -415,6 +561,9 @@ fn porches_and_pieces_are_kept_in_blueprints_and_saves() {
     assert_eq!(back.porches, w.porches);
     assert_eq!(back.porch_pieces, w.porch_pieces);
     assert!(blocked(&back, 8, 7), "the post stands in the loaded game");
+    for (x, z) in DOOR.post_tiles() {
+        assert!(blocked(&back, x, z), "the porch's post at ({x}, {z}) too");
+    }
     // A blueprint, built on the east lot (turned round: its street on the other side).
     let bp = w.blueprint(0).unwrap();
     assert_eq!(bp.porches.len(), 1);
@@ -484,6 +633,14 @@ fn a_town_or_a_save_from_before_porches_keeps_the_ones_it_had() {
     save.as_object_mut().unwrap().remove("porches");
     let back = World::from_save_json(CONTENT, &save.to_string()).unwrap();
     assert_eq!(back.porches, w.porches);
+    // Its posts stand as it loads (worked out from the porches: nothing more saved).
+    for (x, z) in [(3, 7), (5, 7)] {
+        assert!(
+            blocked(&w, x, z) && blocked(&back, x, z),
+            "a post at ({x}, {z})"
+        );
+    }
+    assert!(!blocked(&back, 4, 7), "the path up to the door is open");
     // From v39 on, no porches saved: none.
     save["version"] = 39.into();
     let back = World::from_save_json(CONTENT, &save.to_string()).unwrap();

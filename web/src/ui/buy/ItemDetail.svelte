@@ -96,162 +96,186 @@
     {/if}
   </div>
   {#if short > 0}<p class="warn">Can't afford — {money(short)} short</p>{/if}
-  {#if def.description}<p class="desc">{def.description}</p>{/if}
-  {#if owned}
-    <div class="owned">
-      {#if !def.stairs}
-        <div class="size muted">
-          Size {metres(ownSize[0])} × {metres(ownSize[1])} m{#if owned.tall}{' · '}{Math.abs(owned.tall)} cm {owned.tall > 0 ? 'taller' : 'shorter'}{/if}
-          · click it to move
+  <!-- The rest scrolls when the card is short of room (the turntable shrinks first). -->
+  <div class="body">
+    {#if def.description}<p class="desc">{def.description}</p>{/if}
+    {#if owned}
+      <div class="owned">
+        {#if !def.stairs}
+          <div class="size muted">
+            Size {metres(ownSize[0])} × {metres(ownSize[1])} m{#if owned.tall}{' · '}{Math.abs(owned.tall)} cm {owned.tall > 0 ? 'taller' : 'shorter'}{/if}
+            · click it to move
+          </div>
+        {/if}
+        {#if (owned.wear ?? 0) >= 1}<div class="broken"><b>Broken.</b> It doesn't work until it's repaired: a resident can do it, or pay for a quick fix.</div>{/if}
+        <div class="row">
+          {#if owned.repairCost !== undefined}
+            <button class="btn small primary" title="Repair it now" onclick={() => services.controls.repair(owned.id)}>{game.creative ? 'Repair' : `Repair · ${money(owned.repairCost)}`}</button>
+          {/if}
+          {#if game.placing?.objectId !== owned.id}
+            <button class="btn ghost small" onclick={() => services.controls.startMoving(owned.id)}>Move</button>
+          {/if}
+          <button class="btn ghost small" title="Rotate (R)" onclick={() => services.controls.rotatePlacing()}>Rotate</button>
+          {#if resized}
+            <button class="btn ghost small" title="Back to its own size" onclick={() => services.controls.resetSize(owned.id)}>Reset size</button>
+          {/if}
+          {#if content.turns(def)}
+            <button class="btn ghost small" title="Turn a little (Shift+R)" onclick={() => services.controls.rotatePlacing(true)}>Turn 15°</button>
+          {/if}
+          {#if owned.sellValue !== null}
+            <button class="btn ghost small danger" title="Sell (Delete)" onclick={() => services.controls.sell(owned.id)}>{game.creative ? 'Sell' : `Sell · ${money(owned.sellValue)}`}</button>
+          {/if}
         </div>
-      {/if}
-      {#if (owned.wear ?? 0) >= 1}<div class="broken"><b>Broken.</b> It doesn't work until it's repaired: a resident can do it, or pay for a quick fix.</div>{/if}
-      <div class="row">
-        {#if owned.repairCost !== undefined}
-          <button class="btn small primary" title="Repair it now" onclick={() => services.controls.repair(owned.id)}>{game.creative ? 'Repair' : `Repair · ${money(owned.repairCost)}`}</button>
+      </div>
+    {/if}
+    {#if lovers.length || collection}
+      <div class="chips">
+        {#if lovers.length}
+          <span class="chip love">♥ {lovers.length === 1 ? lovers[0] : `${lovers.slice(0, -1).join(', ')} & ${lovers[lovers.length - 1]}`} will love it</span>
         {/if}
-        {#if game.placing?.objectId !== owned.id}
-          <button class="btn ghost small" onclick={() => services.controls.startMoving(owned.id)}>Move</button>
-        {/if}
-        <button class="btn ghost small" title="Rotate (R)" onclick={() => services.controls.rotatePlacing()}>Rotate</button>
-        {#if resized}
-          <button class="btn ghost small" title="Back to its own size" onclick={() => services.controls.resetSize(owned.id)}>Reset size</button>
-        {/if}
-        {#if content.turns(def)}
-          <button class="btn ghost small" title="Turn a little (Shift+R)" onclick={() => services.controls.rotatePlacing(true)}>Turn 15°</button>
-        {/if}
-        {#if owned.sellValue !== null}
-          <button class="btn ghost small danger" title="Sell (Delete)" onclick={() => services.controls.sell(owned.id)}>{game.creative ? 'Sell' : `Sell · ${money(owned.sellValue)}`}</button>
+        {#if collection}<span class="chip coll" title={collection.description}><Icon name={collection.icon} size={12} />{collection.label} collection</span>{/if}
+      </div>
+    {/if}
+    {#if addedBills > 0 && (!owned || (upgradable && rules && quality < rules.maxQuality))}
+      <p class="desc tabular">{owned ? 'Each upgrade adds' : 'Adds'} about {money(addedBills)}/wk to your bills</p>
+    {/if}
+
+    {#if colorable && (owned || inHand)}
+      <div class="colour-head">
+        <h4>Colour{#if slots.length > 1}<small> · {slots[0].label}</small>{/if}</h4>
+        <button class="btn ghost small" title="Colour each part, with the item up close" onclick={() => (game.customising = { def: def.id, objectId: owned?.id ?? null })}>
+          {slots.length > 1 ? 'Every part…' : 'Up close…'}
+        </button>
+      </div>
+      <ColorSwatches color={colors?.[slots[0].material] ?? null} onpick={pickColor} />
+      {#if others}<p class="muted others">{others === 1 ? '1 more part' : `${others} more parts`} coloured</p>{/if}
+    {/if}
+
+    {#if upgradable && rules}
+      <div class="quality">
+        <span class="stars" title="Quality {quality} of {rules.maxQuality}">{stars(quality, rules.maxQuality)}</span>
+        <span class="muted">Each ★ +{Math.round(rules.qualityBonus * 100)}% to everything it gives · {game.creative ? 'free' : `${money(upgradeCost)} per ★`}</span>
+        {#if owned}
+          <button
+            class="btn small upgrade"
+            disabled={upgradeBlocker !== null}
+            title={upgradeBlocker ?? `Makes it ${Math.round(rules.qualityBonus * 100)}% better, right away`}
+            onclick={() => services.controls.upgrade(owned.id)}
+          >
+            <Icon name="icon.ui.upgrade" size={14} />
+            {quality >= rules.maxQuality ? 'Top quality' : `Upgrade to ★${quality + 1}${game.creative ? '' : ` · ${money(upgradeCost)}`}`}
+          </button>
+          {#if upgradeBlocker && quality < rules.maxQuality}<small class="reason">{upgradeBlocker}</small>{/if}
         {/if}
       </div>
-    </div>
-  {/if}
-  {#if lovers.length || collection}
-    <div class="chips">
-      {#if lovers.length}
-        <span class="chip love">♥ {lovers.length === 1 ? lovers[0] : `${lovers.slice(0, -1).join(', ')} & ${lovers[lovers.length - 1]}`} will love it</span>
-      {/if}
-      {#if collection}<span class="chip coll" title={collection.description}><Icon name={collection.icon} size={12} />{collection.label} collection</span>{/if}
-    </div>
-  {/if}
-  {#if addedBills > 0 && (!owned || (upgradable && rules && quality < rules.maxQuality))}
-    <p class="desc tabular">{owned ? 'Each upgrade adds' : 'Adds'} about {money(addedBills)}/wk to your bills</p>
-  {/if}
-
-  {#if colorable && (owned || inHand)}
-    <div class="colour-head">
-      <h4>Colour{#if slots.length > 1}<small> · {slots[0].label}</small>{/if}</h4>
-      <button class="btn ghost small" title="Colour each part, with the item up close" onclick={() => (game.customising = { def: def.id, objectId: owned?.id ?? null })}>
-        {slots.length > 1 ? 'Every part…' : 'Up close…'}
-      </button>
-    </div>
-    <ColorSwatches color={colors?.[slots[0].material] ?? null} onpick={pickColor} />
-    {#if others}<p class="muted others">{others === 1 ? '1 more part' : `${others} more parts`} coloured</p>{/if}
-  {/if}
-
-  {#if upgradable && rules}
-    <div class="quality">
-      <span class="stars" title="Quality {quality} of {rules.maxQuality}">{stars(quality, rules.maxQuality)}</span>
-      <span class="muted">Each ★ +{Math.round(rules.qualityBonus * 100)}% to everything it gives · {game.creative ? 'free' : `${money(upgradeCost)} per ★`}</span>
-      {#if owned}
-        <button
-          class="btn small upgrade"
-          disabled={upgradeBlocker !== null}
-          title={upgradeBlocker ?? `Makes it ${Math.round(rules.qualityBonus * 100)}% better, right away`}
-          onclick={() => services.controls.upgrade(owned.id)}
-        >
-          <Icon name="icon.ui.upgrade" size={14} />
-          {quality >= rules.maxQuality ? 'Top quality' : `Upgrade to ★${quality + 1}${game.creative ? '' : ` · ${money(upgradeCost)}`}`}
-        </button>
-        {#if upgradeBlocker && quality < rules.maxQuality}<small class="reason">{upgradeBlocker}</small>{/if}
-      {/if}
-    </div>
-  {/if}
+    {/if}
 
 
-  {#if info.boosts.length || info.drains.length}
-    <h4>Boosts <small>per use{factor > 1 ? ` · incl. ★ bonus` : ''}</small></h4>
-    <ul class="needs">
-      {#each info.boosts as b (b.need.id)}
-        <li title="{b.need.label}: {percent(b.perUse * factor)} per use, {percent(b.perHour * factor)} per hour">
-          <Icon name={b.need.icon} size={14} />
-          <span class="label">{b.need.label}</span>
-          <span class="bar"><span style="width:{Math.min(1, b.perUse * factor) * 100}%"></span></span>
-          <span class="num tabular">{percent(b.perUse * factor)}<small> · {percent(b.perHour * factor)}/h</small></span>
-        </li>
-      {/each}
-      {#each info.drains as b (b.need.id)}
-        <li class="drain" title="{b.need.label}: {percent(b.perUse)} per use">
-          <Icon name={b.need.icon} size={14} />
-          <span class="label">{b.need.label}</span>
-          <span class="bar"><span style="width:{Math.min(1, -b.perUse) * 100}%"></span></span>
-          <span class="num tabular">{percent(b.perUse)}</span>
-        </li>
-      {/each}
-    </ul>
-  {/if}
+    {#if info.boosts.length || info.drains.length}
+      <h4>Boosts <small>per use{factor > 1 ? ` · incl. ★ bonus` : ''}</small></h4>
+      <ul class="needs">
+        {#each info.boosts as b (b.need.id)}
+          <li title="{b.need.label}: {percent(b.perUse * factor)} per use, {percent(b.perHour * factor)} per hour">
+            <Icon name={b.need.icon} size={14} />
+            <span class="label">{b.need.label}</span>
+            <span class="bar"><span style="width:{Math.min(1, b.perUse * factor) * 100}%"></span></span>
+            <span class="num tabular">{percent(b.perUse * factor)}<small> · {percent(b.perHour * factor)}/h</small></span>
+          </li>
+        {/each}
+        {#each info.drains as b (b.need.id)}
+          <li class="drain" title="{b.need.label}: {percent(b.perUse)} per use">
+            <Icon name={b.need.icon} size={14} />
+            <span class="label">{b.need.label}</span>
+            <span class="bar"><span style="width:{Math.min(1, -b.perUse) * 100}%"></span></span>
+            <span class="num tabular">{percent(b.perUse)}</span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
 
-  {#if info.trains.length}
-    <h4>Trains</h4>
-    <div class="chips">
-      {#each info.trains as t (t.skill)}
-        <span class="chip skill" title="+{+(t.perHour * factor).toFixed(2)} {skillLabel(t.skill)} levels per hour"><Icon name={skillIcon(t.skill)} size={12} />{skillLabel(t.skill)}</span>
-      {/each}
-    </div>
-  {/if}
+    {#if info.trains.length}
+      <h4>Trains</h4>
+      <div class="chips">
+        {#each info.trains as t (t.skill)}
+          <span class="chip skill" title="+{+(t.perHour * factor).toFixed(2)} {skillLabel(t.skill)} levels per hour"><Icon name={skillIcon(t.skill)} size={12} />{skillLabel(t.skill)}</span>
+        {/each}
+      </div>
+    {/if}
 
-  {#if info.betterWith.length}
-    <div class="chips">
-      {#each info.betterWith as s (s)}
-        {@const lv = level(s)}
-        <span class="chip better" title="Residents with more {skillLabel(s)} get more out of it">
-          <Icon name={skillIcon(s)} size={12} />Better with {skillLabel(s)}{#if lv !== null && sim}<small> · {sim.name.split(' ')[0]} {lv}</small>{/if}
-        </span>
-      {/each}
-    </div>
-  {/if}
+    {#if info.betterWith.length}
+      <div class="chips">
+        {#each info.betterWith as s (s)}
+          {@const lv = level(s)}
+          <span class="chip better" title="Residents with more {skillLabel(s)} get more out of it">
+            <Icon name={skillIcon(s)} size={12} />Better with {skillLabel(s)}{#if lv !== null && sim}<small> · {sim.name.split(' ')[0]} {lv}</small>{/if}
+          </span>
+        {/each}
+      </div>
+    {/if}
 
-  {#if info.feelings.length}
-    <h4>Can make them feel</h4>
-    <div class="chips">
-      {#each info.feelings as f (f.id)}
-        {@const lv = f.skill ? level(f.skill) : null}
-        <span class="chip feel" class:locked={lv !== null && lv < f.minSkill} title="From “{f.from}”">
-          {#if f.icon}<Icon name={f.icon} size={12} />{:else}✦{/if}{f.label}
-          {#if f.skill && f.minSkill}<small>· needs {skillLabel(f.skill)} {f.minSkill}</small>{/if}
-        </span>
-      {/each}
-    </div>
-  {/if}
+    {#if info.feelings.length}
+      <h4>Can make them feel</h4>
+      <div class="chips">
+        {#each info.feelings as f (f.id)}
+          {@const lv = f.skill ? level(f.skill) : null}
+          <span class="chip feel" class:locked={lv !== null && lv < f.minSkill} title="From “{f.from}”">
+            {#if f.icon}<Icon name={f.icon} size={12} />{:else}✦{/if}{f.label}
+            {#if f.skill && f.minSkill}<small>· needs {skillLabel(f.skill)} {f.minSkill}</small>{/if}
+          </span>
+        {/each}
+      </div>
+    {/if}
 
-  {#if info.actions.length}
-    <h4>Things to do</h4>
-    <ul class="actions">
-      {#each info.actions as a, i (i)}
-        <li>
-          <span class="label">{a.label}</span>
-          {#if a.skill}<span class="skillmark" title="Better with {skillLabel(a.skill)}"><Icon name={skillIcon(a.skill)} size={11} /></span>{/if}
-          <span class="muted tabular">{duration(a.minutes)}</span>
-          {#if a.cost > 0}<span class="cost tabular" class:short={a.cost > game.funds}>{money(a.cost)} per use</span>{/if}
-        </li>
-      {/each}
-    </ul>
-  {/if}
+    {#if info.actions.length}
+      <h4>Things to do</h4>
+      <ul class="actions">
+        {#each info.actions as a, i (i)}
+          <li>
+            <span class="label">{a.label}</span>
+            {#if a.skill}<span class="skillmark" title="Better with {skillLabel(a.skill)}"><Icon name={skillIcon(a.skill)} size={11} /></span>{/if}
+            <span class="muted tabular">{duration(a.minutes)}</span>
+            {#if a.cost > 0}<span class="cost tabular" class:short={a.cost > game.funds}>{money(a.cost)} per use</span>{/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
 
-  {#if info.slots > 1}<p class="facts">Fits {info.slots} residents at once</p>{/if}
-  {#if def.outdoors}<p class="facts">Goes outdoors</p>{/if}
-  {#if def.layer === 'surface'}<p class="facts">Goes on tables, counters, desks and shelves</p>{/if}
-  {#if def.surface}<p class="facts">Small things stand on its top</p>{/if}
-  {#if def.seatAt?.length}<p class="facts">Seat for {seatKinds(def.seatAt)}: pull it up to one</p>{/if}
-
+    {#if info.slots > 1}<p class="facts">Fits {info.slots} residents at once</p>{/if}
+    {#if def.outdoors}<p class="facts">Goes outdoors</p>{/if}
+    {#if def.layer === 'surface'}<p class="facts">Goes on tables, counters, desks and shelves</p>{/if}
+    {#if def.surface}<p class="facts">Small things stand on its top</p>{/if}
+    {#if def.seatAt?.length}<p class="facts">Seat for {seatKinds(def.seatAt)}: pull it up to one</p>{/if}
+  </div>
 </div>
 
 <style>
+  /* Short of room (a short window, or the dock open: the pinned card holds to the room above the
+     dock, `FurnishPanel`'s `.floats`, a size container), the turntable gives way first, down to a
+     strip, keeping about 220 px of the room for the name, the price and the start of the body;
+     then the body scrolls. With room to spare the card stops at its own height and the body
+     scrolls under a whole turntable. */
   .detail {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    min-height: 0;
     font-size: 12px;
+  }
+  .detail > :global(.turntable) {
+    flex: none;
+    max-height: max(64px, 100cqh - 220px);
+  }
+  .head,
+  .warn {
+    flex: none;
+  }
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .head {
     display: flex;
