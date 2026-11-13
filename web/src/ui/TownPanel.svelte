@@ -6,7 +6,7 @@
   import { services } from './services';
   import { game } from './state.svelte';
   import { townMap } from './townMap.svelte';
-  import { mapScale, screenToMap } from './mapView';
+  import { layoutLabels, mapScale, screenToMap, type MapLabel } from './mapView';
   import { lotTitle, wayText } from './place';
   import { settings } from '../settings/settings.svelte';
   import { homesForSale, type HomeForSale } from './town/places';
@@ -63,17 +63,6 @@
   /** Screen pixels a metre: a size in pixels divided by this stays that size whatever the zoom. */
   const ppm = $derived(mapScale(screenW, screenH, { x: x0, z: z0, w: viewW, d: viewD }));
   const px = (n: number) => n / ppm;
-  /**
-   * Where a label's middle goes (m): at `x`, `z`, or as far in from the map's edges as all of `text`
-   * at `size` px needs (its width guessed from its length): a place by the edge kept its name cut
-   * off there.
-   */
-  const labelX = (x: number, text: string, size: number) => {
-    const half = px(size * text.length * 0.31 + 4);
-    return Math.max(-MARGIN + half, Math.min(width + MARGIN - half, x));
-  };
-  const labelZ = (z: number, size: number) => Math.max(-MARGIN + px(size + 2), Math.min(depth + MARGIN - px(4), z));
-
   // ---- layers, worked out once per town ----
   const ZONE_ORDER = ['meadow', 'fields', 'hill', 'woods', 'orchard', 'water'];
   const line = (pts: [number, number][]) => pts.map(([x, z]) => `${x},${z}`).join(' ');
@@ -85,6 +74,23 @@
   const areas = $derived(meta?.areas ?? []);
   /** Outdoor places (a big world levels each to a height of its own: `pads`). */
   const spots = $derived(new Set(Object.keys(meta?.pads ?? {}).map(Number)));
+
+  // ---- names: laid out on screen as the town view's tags are (`mapView.ts` layoutLabels) ----
+  /** A lot's name and the "2 here" under it, a place's name, a hamlet's (`a` and its index): apart, the hamlets' first. */
+  const labels = $derived.by(() => {
+    const list: MapLabel<number | string>[] = [];
+    for (const p of plots) {
+      // Names where there's room for them on screen (outdoor places always).
+      const roomy = p.w * ppm > 46;
+      if (!roomy && !spots.has(p.id)) continue;
+      const wins = p.id === homePlot ? 0 : p.id === picked ? 1 : null;
+      list.push({ key: p.id, x: p.x + p.w / 2, z: p.z + p.d / 2, text: lotTitle(p, game.households, 'Empty'), size: 11, sub: roomy ? 9 : undefined, rank: spots.has(p.id) ? 1 : 2, wins });
+    }
+    areas.forEach((a, i) => list.push({ key: `a${i}`, x: a.x + a.w / 2, z: a.z + a.d / 2, text: a.name, size: 14, rank: 0 }));
+    // (Clear of the zoom buttons in the corner: two of 30 px, and "Whole town" zoomed in.)
+    const zoomBox = { l: screenW - (zoom > 1 ? 160 : 74), t: screenH - 40, r: screenW, b: screenH };
+    return layoutLabels(list, screenW, screenH, { x: x0, z: z0, w: viewW, d: viewD }, [zoomBox]);
+  });
 
   // ---- live: residents twice a second while open; the camera every frame (it flies) ----
   let dots = $state.raw<{ x: number; z: number; mine: boolean }[]>([]);
@@ -197,7 +203,16 @@
 
 {#if game.townOpen}
   <!-- No backdrop: the world behind keeps its clicks and camera drags (`kit/popup.ts`). -->
-  <div class="town glass" class:wide id="town-map" use:closeOutside={() => (game.townOpen = false)} role="dialog" aria-label="Town map">
+  <!-- Above the household strip (`--below`), its key and hint too: the "Bigger" map ran under the strip's cards. -->
+  <div
+    class="town glass"
+    class:wide
+    id="town-map"
+    style:--below={game.stripHeight > 0 ? `calc(${game.stripHeight}px + var(--gap))` : '0px'}
+    use:closeOutside={() => (game.townOpen = false)}
+    role="dialog"
+    aria-label="Town map"
+  >
     <header>
       <b>Town</b>
       {#if me && me.plot !== homePlot}
@@ -209,8 +224,15 @@
       {/if}
       <button class="close" aria-label="Close" onclick={() => (game.townOpen = false)}><Icon name="icon.ui.close" size={14} /></button>
     </header>
-    <!-- The map's own shape, as wide as there's room for and no taller than 70 % of the window. -->
-    <div class="frame" bind:clientWidth={screenW} bind:clientHeight={screenH} style:aspect-ratio="{fullW} / {fullD}" style:width="min(100%, calc(70vh * {fullW} / {fullD}))">
+    <!-- The map's own shape, as wide as there's room for and no taller than 70 % of the window, nor than leaves room for the panel's
+         header, key and hint above the strip (`--chrome`). -->
+    <div
+      class="frame"
+      bind:clientWidth={screenW}
+      bind:clientHeight={screenH}
+      style:aspect-ratio="{fullW} / {fullD}"
+      style:width="min(100%, calc(min(70vh, 100vh / var(--ui-scale) - var(--top) - var(--edge) - var(--below) - var(--chrome)) * {fullW} / {fullD}))"
+    >
       <!-- (Pointer-only panning and zooming: the keyboard has the buttons and the lots.) -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <svg
@@ -254,6 +276,7 @@
         </g>
         {#each plots as p (p.id)}
           {@const name = lotTitle(p, game.households, 'Empty')}
+          {@const at = labels.get(p.id)}
           <g
             class="plot"
             class:mine={p.id === homePlot}
@@ -275,11 +298,11 @@
             {#if p.house}
               <rect class="house" x={p.house[0]} y={p.house[1]} width={p.house[2] - p.house[0]} height={p.house[3] - p.house[1]} rx="0.5" />
             {/if}
-            <!-- Names where there's room for them on screen (outdoor places always). -->
-            {#if p.w * ppm > 46 || spots.has(p.id)}
-              <text x={labelX(p.x + p.w / 2, name, 11)} y={labelZ(p.z + p.d / 2 + px(4), 11)} font-size={px(11)} text-anchor="middle">{name}</text>
+            <!-- Its name where there's room for it (`labels`). -->
+            {#if at}
+              <text x={at.x} y={at.y} font-size={px(11)} text-anchor="middle">{name}</text>
               {#if homeCount(p.id) && p.w * ppm > 46}
-                <text class="count" x={labelX(p.x + p.w / 2, `${homeCount(p.id)} here`, 9)} y={labelZ(p.z + p.d / 2 + px(17), 9)} font-size={px(9)} text-anchor="middle">{homeCount(p.id)} here</text>
+                <text class="count" x={at.x} y={at.subY} font-size={px(9)} text-anchor="middle">{homeCount(p.id)} here</text>
               {/if}
             {/if}
           </g>
@@ -288,7 +311,10 @@
           <circle class="dot" class:mine={d.mine} cx={d.x} cy={d.z} r={px(d.mine ? 4 : 3)} />
         {/each}
         {#each areas as a, i (i)}
-          <text class="area" x={labelX(a.x + a.w / 2, a.name, 14)} y={labelZ(a.z + a.d / 2, 14)} font-size={px(14)} stroke-width={px(3)} text-anchor="middle">{a.name}</text>
+          {@const at = labels.get(`a${i}`)}
+          {#if at}
+            <text class="area" x={at.x} y={at.y} font-size={px(14)} stroke-width={px(3)} text-anchor="middle">{a.name}</text>
+          {/if}
         {/each}
         {#if camera}
           <circle class="camera" cx={camera[0]} cy={camera[1]} r={px(7)} stroke-width={px(2)} />
@@ -354,8 +380,10 @@
     top: var(--top);
     right: var(--edge);
     width: 460px;
-    /* Short windows: it scrolls rather than running off the bottom. */
-    max-height: calc(100% - var(--top) - var(--edge));
+    /* The panel's header, key and hint round the map (px): the map leaves room for them. */
+    --chrome: 128px;
+    /* Short windows: it scrolls rather than running off the bottom (or under the household strip). */
+    max-height: calc(100% - var(--top) - var(--edge) - var(--below));
     overflow-y: auto;
     padding: 14px;
     display: flex;
