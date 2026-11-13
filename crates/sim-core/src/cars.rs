@@ -242,8 +242,11 @@ const SIDEWAYS: f32 = 6.5;
 /// A step of a route shorter than this says nothing of the way a car faces along it (m,
 /// `Legs::timed`): it faces as along the step before. (Where a taxi stands at the kerb, the way on
 /// began 2 to 8 mm from it and mostly across the lane, and it stood 25 to 37 degrees across its
-/// lane: King'ston, Pebble Quay.)
+/// lane: King'ston, Pebble Quay.) Nor does a step shorter than `KINK_STEP` turned back on the one
+/// before (more than a right angle, driving on, not backing: where a taxi stands, the way on began
+/// 4 cm behind it, and it stood 86 degrees across its lane, over the kerb, Oakfield).
 const FACING_STEP: f32 = 0.02;
+const KINK_STEP: f32 = 0.1;
 /// A car turned round joins its new way's lane at the first point it drives on to within this of
 /// the way it faces (the cosine of the angle, `Route::detour`), of those nearer than `JOIN_NEAR`
 /// (m): one further off it drives to however it lies.
@@ -2816,13 +2819,18 @@ impl Legs {
         let mut facing: Vec<f32> = Vec::with_capacity(n - 1);
         for i in 0..n - 1 {
             let (a, b) = (pts[i].0, pts[i + 1].0);
-            let f = if ds[i] > FACING_STEP || i == 0 {
-                let way = (b[0] - a[0]).atan2(b[1] - a[1]);
-                if pts[i + 1].1 {
-                    wrap_angle(way + std::f32::consts::PI)
-                } else {
-                    way
-                }
+            let way = (b[0] - a[0]).atan2(b[1] - a[1]);
+            let way = if pts[i + 1].1 {
+                wrap_angle(way + std::f32::consts::PI)
+            } else {
+                way
+            };
+            let kink = i > 0
+                && ds[i] < KINK_STEP
+                && pts[i + 1].1 == pts[i].1
+                && wrap_angle(way - facing[i - 1]).abs() > std::f32::consts::FRAC_PI_2;
+            let f = if (ds[i] > FACING_STEP || i == 0) && !kink {
+                way
             } else {
                 facing[i - 1]
             };
