@@ -46,7 +46,7 @@ import { WALL_HALF, WALL_HEIGHT } from './walls';
 /** A pattern over a surface's texture (the material libraries' `SurfacePattern`). */
 export type SurfacePattern = 'stripes' | 'whitewash';
 
-/** What a house mesh is drawn with: a surface (manifest key, vertex-coloured), a room's clear glass (0: outdoors), or the contact shadows. */
+/** What a house mesh is drawn with: a surface (manifest key, vertex-coloured), a room's clear glass (0: outdoors; `GLASS_OUT`: looked out through), or the contact shadows. */
 export type HouseSurface = { kind: 'surface'; key: string; pattern?: SurfacePattern } | { kind: 'glass'; room: number } | { kind: 'contactShadow' } | { kind: 'neighbourGlass'; lit: boolean };
 
 /**
@@ -301,6 +301,13 @@ export interface RoomLight {
   /** It can cast shadows (`lampCasts`), where the preset has lamps that do (`pc/lampShadows.ts`). */
   casts?: boolean;
 }
+
+/**
+ * The "room" of the pane a room looks out at the garden through (`HouseSurface` glass): it never glows. A pane
+ * glows with the room behind it, seen from outside; the pane on the room's side of a window glowed with its own
+ * room, a warm sheen over the dark lawn behind it, which came out olive green.
+ */
+export const GLASS_OUT = -1;
 
 /**
  * Whether a lamp can cast shadows: one that lights the room below it or round it. Not a fire or a light that
@@ -1407,8 +1414,8 @@ export class HousePlanner {
           const plane = sign * T;
           const outside = d.rooms[sign > 0 ? 1 : 0] === 0;
           const out = (o: number): [number, number] => (sign > 0 ? [plane, plane + o] : [plane - o, plane]);
-          // (Lit by the room behind it, else the one it faces.)
-          const pane = glass(d.rooms[sign > 0 ? 0 : 1] || d.rooms[sign > 0 ? 1 : 0]).cutting(Cut.Hide, mask);
+          // (Lit by the room behind it; with the garden behind it, not at all: `GLASS_OUT`.)
+          const pane = glass(d.rooms[sign > 0 ? 0 : 1] || (outside ? 0 : GLASS_OUT)).cutting(Cut.Hide, mask);
           f.face(pane, g0, g1, sill, head, plane - sign * recess, sign);
           trim.cutting(Cut.Hide, mask).color(TRIM);
           const fr = 0.07;
@@ -2462,8 +2469,9 @@ export class HousePlanner {
       const behind = axis === 'h' ? roomP(x + 0.5, z - sign * 0.25) : roomP(x - sign * 0.25, z + 0.5);
       const P = (a: number, y: number, d: number): V3 => (axis === 'h' ? [a, y, plane + n[2] * d] : [plane + n[0] * d, y, a]);
       // One clear pane per face, facing out of it (back faces are culled, so each side sees
-      // through exactly one pane), lit by the room behind it (else the one it faces).
-      glass(behind || tileRoom).cutting(Cut.Hide, mask).poly([P(a0, sill, -recess), P(a1, sill, -recess), P(a1, head, -recess), P(a0, head, -recess)], n);
+      // through exactly one pane), lit by the room behind it; the pane a room looks out at the
+      // garden through (the garden behind it) is never lit (`GLASS_OUT`).
+      glass(behind || (outside ? 0 : GLASS_OUT)).cutting(Cut.Hide, mask).poly([P(a0, sill, -recess), P(a1, sill, -recess), P(a1, head, -recess), P(a0, head, -recess)], n);
       trim.cutting(Cut.Hide, mask).color(TRIM);
       const f = 0.07;
       const out = 0.035;

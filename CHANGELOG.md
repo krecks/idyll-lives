@@ -19,6 +19,7 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 - **A voice over the room:** while a resident speaks, the sounds of the world drop to half (about 6 dB) and come back when the line is over, so a line is heard over a running tap or the television. Everything now passes a limiter before the master volume: a shower, a blender and two voices at once are held under full scale, not clipped; on its own no sound reaches it.
 - **Lamps cast shadows:** at night the lamps nearest what you are looking at cast soft shadows: a bench's across the rug under a pendant, a table's on the kitchen tiles, a resident's up the wall as they walk past a floor lamp. Two lamps at a time on Medium, four on High, fading in and out as the view moves through the home; Low has none.
 - **Window light on the garden:** at night a lit room's windows throw a soft warm glow on the lawn under them. It follows the room: when its lamps are switched off or everyone in it falls asleep, the glow goes out with the windows.
+- **Windows of a lit room at night:** the inner sides of a window's opening are no longer vivid blue beside a warm room, nor is the back of a shower or a wardrobe standing against an outside wall, and the lawn seen through a lit room's window is the night's dark blue, not olive green.
 - **Save format 39:** the town's backdrop, places and centres (38) and the porches and porch pieces (39) are in the save. 0.8.0's saves open and play as before, their porches where they were drawn; 0.8.0 can't open the new ones.
 
 ## 0.8.0 — 2026-11-12
