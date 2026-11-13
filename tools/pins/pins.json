@@ -3,9 +3,9 @@
     {
       "name": "contract",
       "file": "docs/design/living-town.md",
-      "sha256": "c91d6afdf4f2f87b00140b983a5b6ff799789282a9b8d3efcba8ed70262fd4f7",
-      "by": "fix/setup-view",
-      "reason": "the town view's haze begins 1.5 times the radius out and fades the land's edge into the sky (townFogFrom, edgeFog): the user found the town view and the menus' town lost in haze"
+      "sha256": "e01dfcd05fd54e493f66e2cf32cb8efda20edd51621a71a1fec905b18b764051",
+      "by": "fix/town-tags",
+      "reason": "the town tags are laid out as the menus' lot tags are (game/tagLayout.ts) and thinned by zoom: the household's own always and on top, a ranked order with area names before places, places and homes for sale fewer farther out, a hamlet's places only while the camera looks into it, a hamlet's name on a repeated place name; the review found them piled up and cut off at the screen's edge 400 m out"
     },
     {
       "name": "living-town-meta",

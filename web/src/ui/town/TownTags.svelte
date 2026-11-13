@@ -5,17 +5,21 @@
   import { services } from '../services';
   import { game } from '../state.svelte';
   import { townMap } from '../townMap.svelte';
-  import { keepApart, type TagBox } from './overlap';
+  import { layoutTags, type Box, type TagSpot } from '../../game/tagLayout';
   import { homesForSale, nameLabels, townPlaces } from './places';
-  import { homeTag, householdTags, nameTags, nearestFew, peopleTags, placeTags, SALE_MOST, saleTags, yourPeople, type TagWorld, type TownTag } from './tags';
+  import { homeTag, householdTags, nameTags, nearestFew, peopleTags, mostSales, placesInView, placeTags, saleTags, tagRank, yourPeople, type TagWorld, type TownTag } from './tags';
   import { MINE_SEEN, mineFade, TAGS_FROM, tagFade } from './fade';
   import { townHud } from './townHud.svelte';
 
   /**
    * The town tags (docs/design/living-town.md, Town tags): HTML labels over the canvas, each over the resident,
    * place, home or street it names, placed each frame through `townView.project`. They fade in with `townBlend`
-   * from 0.2 (the household's own from the town view's start: `mineFade`), show only the kinds the tag menu has on, and are kept from overlapping, the more important one
-   * staying (`overlap.ts`). What they say is worked out from the views as they change; where they stand, every frame
+   * from 0.2 (the household's own from the town view's start: `mineFade`) and show only the kinds the tag menu has on.
+   * They are laid out as the menus' are (`game/tagLayout.ts`): the household's own first and always (moved clear of
+   * each other when they stand together), then by kind (`tagRank`), each kept near its point or hidden, and all of
+   * them inside the screen and clear of the HUD's panels. Of the places, only so many as the zoom has room for and
+   * a hamlet's only while the camera looks into it (`placesInView`); a tag the pointer is on, or near the point of,
+   * shows whatever it is. What they say is worked out from the views as they change; where they stand, every frame
    * (written straight to the elements: nothing reactive moves each frame).
    */
   const meta = $derived(townMap.world?.meta ?? null);
@@ -44,6 +48,7 @@
       time,
       days: WEEKDAYS,
       pupil: (stage) => !!stages.find((s) => s.id === stage)?.school,
+      areas: meta?.areas ?? [],
     };
   });
   const people = $derived(world ? yourPeople(memberIds, world) : []);
@@ -77,9 +82,14 @@
   const pins = new Map<string, HTMLElement>();
   /** Each tag's size (HUD px), measured when its words change. */
   const sizes = new Map<string, { text: string; w: number; h: number }>();
-  let shown = new Set<string>();
+  /** The tags shown last frame and their boxes (HUD px): they keep their places first, and the pointer on one keeps it. */
+  let shown = new Map<string, Box>();
+  /** The tags moved off their point last frame (their stem is hidden). */
+  const edges = new Set<string>();
   let layer = $state<HTMLDivElement>();
   const spot = { x: 0, y: 0, z: 0 };
+  /** The pointer over the town or the tags (HUD px), or null. */
+  let pointer: { x: number; y: number } | null = null;
 
   function pin(el: HTMLElement, key: string) {
     pins.set(key, el);
@@ -109,6 +119,23 @@
     return true;
   }
 
+  /** A pill's stem (px) under its box. */
+  const STEM = 10;
+  /** The pointer this near (px) a tag's point brings its tag up, though there was no room for it or it isn't up at this zoom. */
+  const HOVER_REACH = 24;
+  /** Margin (px) kept between the tags and the screen's edge, and round the HUD's panels. */
+  const EDGE = 8;
+  const PANEL = 4;
+
+  /** A tag up for this frame: its point on screen (HUD px) and its place in the layout. */
+  interface Candidate {
+    key: string;
+    t: TownTag;
+    /** Up at this zoom (else only with the pointer on it). */
+    up: boolean;
+    spot: TagSpot;
+  }
+
   const byKey = $derived(new Map(tags.map((t) => [t.key, t])));
   function frame() {
     const blend = game.mode === 'live' ? townView.blend : 0;
@@ -121,26 +148,39 @@
     // (The household's own are there once they can be seen: a tag too faint to see is not there to be clicked.)
     const near = mine >= MINE_SEEN && !!townView.project;
     if (near !== townHud.near) townHud.near = near;
-    if (!near || !layer) return;
+    if (!near || !layer) {
+      // (The layer goes with them: a new one starts with nothing shown.)
+      shown.clear();
+      edges.clear();
+      return;
+    }
     const scale = settings.uiScale || 1;
     const project = townView.project!;
-    const boxes: TagBox[] = [];
-    const where = new Map<string, [number, number]>();
     const chosen = townHud.chosen;
     const chosenKey = chosen?.kind === 'person' ? `p:${chosen.sim}` : chosen?.kind === 'place' ? `pl:${chosen.place}` : null;
-    // (Of the homes for sale, the few nearest where the camera looks.)
-    const sales: { key: string; far: number }[] = [];
     const look = townView.target;
+    const radius = townView.radius;
+    // (Of the homes for sale, the few nearest where the camera looks; of the places, as many as the zoom has room for.)
+    const sales: { key: string; far: number }[] = [];
     for (const t of tags) if (t.kind === 'sale' && 'x' in t.anchor) sales.push({ key: t.key, far: Math.hypot(t.anchor.x - look.x, t.anchor.z - look.z) });
-    const saleShown = nearestFew(sales, SALE_MOST);
+    const saleUp = nearestFew(sales, mostSales(radius));
+    const placesUp = placesInView(tags, meta?.areas ?? [], look, radius);
+    const area: Box = { l: EDGE, t: EDGE, r: innerWidth / scale - EDGE, b: innerHeight / scale - EDGE };
+    const all: Candidate[] = [];
     for (const [key, el] of pins) {
       const t = byKey.get(key);
       if (!t) continue;
-      if (t.radius && (townView.radius < t.radius[0] || townView.radius > t.radius[1])) continue;
-      if (t.kind === 'sale' && !saleShown.has(key)) continue;
+      if (t.radius && (radius < t.radius[0] || radius > t.radius[1])) continue;
+      const up = t.kind === 'sale' ? saleUp.has(key) : t.kind === 'places' ? placesUp.has(key) : true;
+      // (One not up at this zoom is still looked at for the pointer, if it has something to do.)
+      if (!up && (!pointer || !t.action) && key !== chosenKey) continue;
       if (!pointOf(t)) continue;
       const p = project(spot.x, spot.y, spot.z);
       if (!p) continue;
+      const x = p[0] / scale;
+      const y = p[1] / scale;
+      // (Its point on the screen, or no tag: one pulled in from off it would point at nothing.)
+      if (x < area.l || x > area.r || y < area.t || y > area.b) continue;
       const text = `${t.title}|${t.detail}`;
       let size = sizes.get(key);
       if (!size || size.text !== text) {
@@ -148,23 +188,58 @@
         size = { text, w: tag?.offsetWidth ?? 0, h: tag?.offsetHeight ?? 0 };
         sizes.set(key, size);
       }
-      const x = p[0] / scale;
-      const y = p[1] / scale;
-      where.set(key, [x, y]);
+      // (A name is centred on its point, a pill stands on its stem over it.)
       const name = t.kind === 'names';
-      const climb = t.kind === 'household' ? 3 : t.kind === 'people' ? 2 : 0;
-      boxes.push({ key, kind: t.kind, x: x - size.w / 2, y: name ? y - size.h / 2 : y - 10 - size.h, w: size.w, h: size.h, depth: p[2], pinned: key === chosenKey, climb });
+      const h = name ? size.h : size.h + STEM;
+      all.push({ key, t, up, spot: { sx: x, sy: name ? y + size.h / 2 : y, w: size.w, h, rank: tagRank(t), capped: false, wins: null, held: shown.has(key), x: 0, y: 0, crowded: false } });
     }
-    const kept = keepApart(boxes, { width: innerWidth / scale, height: innerHeight / scale, shown, avoid: panels(scale) });
-    shown = new Set(kept.keys());
-    for (const [key, el] of pins) {
-      const at = where.get(key);
-      const dy = kept.get(key);
-      if (at && dy !== undefined) {
-        el.style.transform = `translate(${at[0].toFixed(1)}px, ${(at[1] + dy).toFixed(1)}px)`;
-        el.style.visibility = 'visible';
-      } else el.style.visibility = '';
+    // The tag the pointer is on (as shown last frame), else the one whose point it is nearest.
+    let hovered: string | null = null;
+    if (pointer) {
+      const { x, y } = pointer;
+      let best = HOVER_REACH;
+      for (const c of all) {
+        if (!c.t.action || c.t.kind === 'household') continue;
+        const b = shown.get(c.key);
+        if (b && x >= b.l && x <= b.r && y >= b.t && y <= b.b) {
+          hovered = c.key;
+          break;
+        }
+        const d = Math.hypot(x - c.spot.sx, y - c.spot.sy);
+        if (d < best) {
+          best = d;
+          hovered = c.key;
+        }
+      }
     }
+    const spots: TagSpot[] = [];
+    const placed: Candidate[] = [];
+    for (const c of all) {
+      // The clicked tag, the household's own and the one under the pointer win: shown however crowded it is.
+      c.spot.wins = c.key === chosenKey ? 0 : c.t.kind === 'household' ? 1 : c.key === hovered ? 2 : null;
+      if (!c.up && c.spot.wins === null) continue;
+      spots.push(c.spot);
+      placed.push(c);
+    }
+    const blocks = panels(scale).map((o) => ({ l: o.x - PANEL, t: o.y - PANEL, r: o.x + o.w + PANEL, b: o.y + o.h + PANEL }));
+    layoutTags(spots, area, blocks);
+    const next = new Map<string, Box>();
+    for (const { key, t, spot: s } of placed) {
+      if (s.crowded) continue;
+      const el = pins.get(key)!;
+      next.set(key, { l: s.x - s.w / 2, t: s.y - s.h, r: s.x + s.w / 2, b: s.y });
+      const name = t.kind === 'names';
+      el.style.transform = `translate(${s.x.toFixed(1)}px, ${(name ? s.y - s.h / 2 : s.y).toFixed(1)}px)`;
+      el.style.visibility = 'visible';
+      const edge = !name && (Math.abs(s.x - s.sx) > 2 || Math.abs(s.y - s.sy) > 2);
+      if (edge !== edges.has(key)) {
+        if (edge) edges.add(key);
+        else edges.delete(key);
+        el.classList.toggle('edge', edge);
+      }
+    }
+    for (const key of shown.keys()) if (!next.has(key)) pins.get(key)?.style.setProperty('visibility', '');
+    shown = next;
   }
 
   /** The HUD's panels (its glass, and the place pill), which no tag covers: looked up twice a second (HUD px). */
@@ -181,6 +256,12 @@
     });
     return panelBoxes;
   }
+  /** The pointer over the town (the canvas) or a tag: where it is (HUD px); anywhere else (a panel, off the window), none. */
+  function track(e: PointerEvent) {
+    const over = e.target instanceof Element && (e.target.matches('canvas.scene') || !!layer?.contains(e.target));
+    const scale = settings.uiScale || 1;
+    pointer = over && e.pointerType !== 'touch' ? { x: e.clientX / scale, y: e.clientY / scale } : null;
+  }
   $effect(() => {
     let raf = 0;
     const loop = () => {
@@ -188,8 +269,14 @@
       frame();
     };
     raf = requestAnimationFrame(loop);
+    const leave = () => (pointer = null);
+    addEventListener('pointermove', track, { passive: true });
+    document.documentElement.addEventListener('pointerleave', leave);
     return () => {
       cancelAnimationFrame(raf);
+      removeEventListener('pointermove', track);
+      document.documentElement.removeEventListener('pointerleave', leave);
+      pointer = null;
       townHud.on = false;
       townHud.fade = 0;
       townHud.near = false;
@@ -261,9 +348,14 @@
     will-change: transform;
     opacity: var(--fade);
   }
-  /* (The household's own: in from the town view's start.) */
+  /* (The household's own: in from the town view's start, and over the others where they had to stand on them.) */
   .pin.own {
     opacity: var(--mine);
+    z-index: 1;
+  }
+  /* (Moved off its point to find room: no stem pointing at something it doesn't stand over.) */
+  .pin:global(.edge) .tag::after {
+    display: none;
   }
   /* The menus' lot tags' look (`kit/TownStage.svelte`): a pill on a stem, a coloured dot. One line: plain, short. */
   .tag {

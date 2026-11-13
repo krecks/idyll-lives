@@ -1,13 +1,14 @@
 /**
  * The town tags' contents (docs/design/living-town.md, Town tags): who and what gets a tag, what it says, where it
  * stands and what a click on it does. Pure: from the game's views (`SimView`, the relationships, the `PlotInfo`s,
- * the town's places); `TownTags.svelte` places them on screen each frame and keeps them apart (`overlap.ts`).
+ * the town's places); which of them are up for the screen at a zoom (`placesInView`, `nearestFew`) and how they rank
+ * there (`tagRank`). `TownTags.svelte` places them on screen each frame (`game/tagLayout.ts`, as the menus do).
  */
 
-import type { HouseholdInfo, PlotInfo, RelationshipView, SimInfo, SimView, TownPlace } from '../../core/protocol';
+import type { HouseholdInfo, PlotInfo, RelationshipView, SimInfo, SimView, TownArea, TownPlace } from '../../core/protocol';
 import { kinLabel, friendLabel, romanceLabel } from '../relationship';
 import { lotInSentence, wayText } from '../place';
-import type { TagKind } from './overlap';
+import type { TagKind } from './kinds';
 import { openState, openText, type HomeForSale, type NameLabel } from './places';
 import { schoolOf, workplaceOf } from './workplace';
 
@@ -35,6 +36,10 @@ export interface TownTag {
   action: TagAction | null;
   /** Shown only with the orbit's radius in this range (m): street names close, area names far. */
   radius?: [number, number];
+  /** A place's: the area (`WorldMeta.areas`) it is in, 0 the main town. */
+  area?: number;
+  /** A place's: one of yours (the household or your people) is there. */
+  ours?: boolean;
 }
 
 /** Where a resident is, as the tags tell it: on a lot, at a place (their work or school, by `workplace.ts`), or on their way or out. */
@@ -63,6 +68,8 @@ export interface TagWorld {
   days: readonly string[];
   /** Whether someone at life stage `stage` goes to school. */
   pupil: (stage: string | null | undefined) => boolean;
+  /** The town's areas (`WorldMeta.areas`: a big world's hamlets), for a hamlet's place whose name another place has too. */
+  areas?: readonly Pick<TownArea, 'name' | 'kind'>[];
 }
 
 /** Where `s` is, in words, and the place they count at. */
@@ -180,9 +187,12 @@ export function peopleTags(people: readonly Person[], w: TagWorld, homePlot: num
 
 /**
  * The places' tags: name, open or closed (and till when), which of `yours` (household and people: id → name) are
- * there, and how many are inside (on its lot, or working there).
+ * there, and how many are inside (on its lot, or working there). A hamlet's place whose name another place has too
+ * ("Bakery" in two hamlets) says which hamlet first ("Millbrook · open till 18:00"); the main town's needs no saying.
  */
 export function placeTags(w: TagWorld, yours: ReadonlyMap<number, string>): TownTag[] {
+  const times = new Map<string, number>();
+  for (const p of w.places) times.set(p.name, (times.get(p.name) ?? 0) + 1);
   const inside = new Array<number>(w.places.length).fill(0);
   const there: string[][] = w.places.map(() => []);
   for (const s of w.sims) {
@@ -194,7 +204,8 @@ export function placeTags(w: TagWorld, yours: ReadonlyMap<number, string>): Town
   }
   return w.places.map((p, i) => {
     const state = openState(p.hours, w.minute, w.weekday);
-    const parts = [openText(state, w.weekday, w.time, w.days)];
+    const hamlet = p.area > 0 && (times.get(p.name) ?? 0) > 1 && w.areas?.[p.area]?.kind === 'hamlet' ? w.areas[p.area].name : '';
+    const parts = [hamlet, openText(state, w.weekday, w.time, w.days)];
     if (there[i].length) parts.push(there[i].slice(0, 3).join(', ') + (there[i].length > 3 ? ` +${there[i].length - 3}` : ''));
     if (inside[i]) parts.push(`${inside[i]} inside`);
     return {
@@ -206,8 +217,74 @@ export function placeTags(w: TagWorld, yours: ReadonlyMap<number, string>): Town
       lift: 7,
       tone: state.open ? ('place' as const) : ('closed' as const),
       action: { kind: 'place' as const, place: i },
+      area: p.area,
+      ours: there[i].length > 0,
     };
   });
+}
+
+/**
+ * The kinds' ranks on screen (`game/tagLayout.ts`: the lower takes the room first; the household's own come before
+ * all of them, and are shown however crowded it is). Your people; the places one of yours is at; the areas' names
+ * (the town's and its hamlets', a few, which say where the rest are); the other places; the homes for sale; the
+ * streets' names.
+ */
+export const TAG_RANK = { people: 1, ours: 2, area: 3, places: 4, sale: 5, street: 6 } as const;
+
+/** `t`'s rank on screen (`TAG_RANK`); the household's own rank first. */
+export function tagRank(t: Pick<TownTag, 'kind' | 'tone' | 'ours'>): number {
+  switch (t.kind) {
+    case 'household':
+      return 0;
+    case 'people':
+      return TAG_RANK.people;
+    case 'places':
+      return t.ours ? TAG_RANK.ours : TAG_RANK.places;
+    case 'sale':
+      return TAG_RANK.sale;
+    case 'names':
+      return t.tone === 'area' ? TAG_RANK.area : TAG_RANK.street;
+  }
+}
+
+/**
+ * How many places' tags are up at once with the camera `radius` m out: a street's worth close in (27 at 200 m), a
+ * dozen or so over the whole main town (14 at 400 m), six from the farthest out. A Big town has 70 places or more:
+ * with them all up, 400 m out, a pile of 30 tags hid the middle of the town.
+ */
+export function mostPlaces(radius: number): number {
+  return Math.max(6, Math.round(5400 / Math.max(1, radius)));
+}
+
+/** How far (m) round a hamlet the camera may look and still be looking into it (its places come up). */
+export const HAMLET_REACH = 40;
+
+/**
+ * The places whose tags are up with the camera looking at `look` from `radius` m out (their keys): every place one
+ * of yours is at; of the rest, the `mostPlaces(radius)` nearest the middle of the view, the main town's (area 0)
+ * and those of a hamlet the camera looks into (its area, `HAMLET_REACH` round it). The other hamlets' places come
+ * with the pointer on them: a big world's hamlets each have their shops, and from over the town they read as
+ * repeats of its own.
+ */
+export function placesInView(
+  tags: readonly Pick<TownTag, 'key' | 'kind' | 'anchor' | 'area' | 'ours'>[],
+  areas: readonly Pick<TownArea, 'x' | 'z' | 'w' | 'd'>[],
+  look: { x: number; z: number },
+  radius: number,
+): Set<string> {
+  const into = (i: number) => {
+    const a = areas[i];
+    return !!a && look.x >= a.x - HAMLET_REACH && look.x <= a.x + a.w + HAMLET_REACH && look.z >= a.z - HAMLET_REACH && look.z <= a.z + a.d + HAMLET_REACH;
+  };
+  const out = new Set<string>();
+  const rest: { key: string; far: number }[] = [];
+  for (const t of tags) {
+    if (t.kind !== 'places' || !('x' in t.anchor)) continue;
+    if (t.ours) out.add(t.key);
+    else if (!t.area || into(t.area)) rest.push({ key: t.key, far: Math.hypot(t.anchor.x - look.x, t.anchor.z - look.z) });
+  }
+  for (const key of nearestFew(rest, mostPlaces(radius))) out.add(key);
+  return out;
 }
 
 /** Homes for sale show up to this far out (m of orbit radius): past it, a big town's dozens of them would bury the rest. */
@@ -219,6 +296,11 @@ export const SALE_REACH = 480;
  * places were lost among them.
  */
 export const SALE_MOST = 12;
+
+/** How many homes for sale show at once with the camera `radius` m out: `SALE_MOST` close in, fewer farther (6 at 400 m), as the places thin. */
+export function mostSales(radius: number): number {
+  return Math.min(SALE_MOST, Math.round(2400 / Math.max(1, radius)));
+}
 
 /** The `most` keys nearest (least `far`), the first by key among equals: which of a crowded kind's tags show. */
 export function nearestFew(tags: readonly { key: string; far: number }[], most: number): Set<string> {

@@ -1,119 +1,134 @@
 /**
- * The town tags (docs/design/living-town.md, Town tags): kept from overlapping by importance (`ui/town/overlap.ts`),
+ * The town tags (docs/design/living-town.md, Town tags): ranked on screen and laid out as the menus' tags are
+ * (`game/tagLayout.ts`), the household's own always shown, places thinned by zoom and a hamlet's only while looked into,
  * workers shown at a place their category works at, stably by id (`ui/town/workplace.ts`), places from the public
  * lots before worldgen's, opening hours, homes for sale, the household's next events and the day bar.
  */
 import { describe, expect, test } from 'bun:test';
 import type { PlotInfo, RelationshipView, SimView, TownPlace } from '../src/core/protocol';
 import { dayBar } from '../src/ui/town/dayBar';
-import { keepApart, TAG_ORDER, type TagBox, type TagKind } from '../src/ui/town/overlap';
+import { layoutTags, tagOrder, type Box, type TagSpot } from '../src/game/tagLayout';
+import { TAG_ORDER } from '../src/ui/town/kinds';
 import { homesForSale, nameLabels, openState, openText, townPlaces } from '../src/ui/town/places';
-import { homeTag, nearestFew, whereabouts, yourPeople, type TagWorld } from '../src/ui/town/tags';
+import { HAMLET_REACH, homeTag, mostPlaces, mostSales, SALE_MOST, SALE_REACH, nearestFew, placesInView, placeTags, TAG_RANK, tagRank, whereabouts, yourPeople, type TagWorld, type TownTag } from '../src/ui/town/tags';
 import { nextEvents, waitText } from '../src/ui/town/today';
 import { schoolOf, workplaceOf } from '../src/ui/town/workplace';
 import { mineFade, tagFade } from '../src/ui/town/fade';
 
-const box = (key: string, kind: TagKind, x: number, y: number, w = 100, h = 20, depth = 100): TagBox => ({ key, kind, x, y, w, h, depth });
-const screen = { width: 1920, height: 1080 };
+const SCREEN: Box = { l: 8, t: 8, r: 1912, b: 1072 };
 
-describe('keeping tags apart', () => {
-  test('the order of importance is household, people, places, for sale, names', () => {
+/** A town tag's spot in the layout as `TownTags.svelte` makes it: a pill 120 × 30 px (its stem in it) over (`sx`, `sy`). */
+const spot = (t: Pick<TownTag, 'kind' | 'tone' | 'ours'>, sx: number, sy: number, wins: number | null = t.kind === 'household' ? 1 : null): TagSpot => ({
+  sx,
+  sy,
+  w: 120,
+  h: 30,
+  rank: tagRank(t),
+  capped: false,
+  wins,
+  x: 0,
+  y: 0,
+  crowded: false,
+});
+const MINE = { kind: 'household', tone: 'mine' } as const;
+const PERSON = { kind: 'people', tone: 'person' } as const;
+const PLACE = { kind: 'places', tone: 'place' } as const;
+
+describe('the town tags on screen', () => {
+  test('the tag menu’s kinds: household, people, places, for sale, names', () => {
     expect(TAG_ORDER).toEqual(['household', 'people', 'places', 'sale', 'names']);
   });
 
-  test('when two meet, the more important stays, whatever order they come in', () => {
-    const kinds = [...TAG_ORDER];
-    for (let i = 0; i < kinds.length; i++) {
-      for (let j = i + 1; j < kinds.length; j++) {
-        const a = box('a', kinds[i], 100, 100);
-        const b = box('b', kinds[j], 150, 110);
-        expect([...keepApart([b, a], screen).keys()]).toEqual(['a']);
-        expect([...keepApart([a, b], screen).keys()]).toEqual(['a']);
-      }
-    }
+  test('ranks: the household’s own, your people, places one of yours is at, areas, other places, homes for sale, streets', () => {
+    const ranks = [MINE, PERSON, { ...PLACE, ours: true }, { kind: 'names', tone: 'area' }, PLACE, { kind: 'sale', tone: 'sale' }, { kind: 'names', tone: 'street' }].map((t) => tagRank(t as TownTag));
+    expect(ranks).toEqual([0, TAG_RANK.people, TAG_RANK.ours, TAG_RANK.area, TAG_RANK.places, TAG_RANK.sale, TAG_RANK.street]);
+    expect([...ranks].sort((a, b) => a - b)).toEqual(ranks);
   });
 
-  test('tags that don’t meet all stay, and the gap between them counts', () => {
-    const tags = [box('a', 'names', 0, 0), box('b', 'names', 104, 0), box('c', 'names', 0, 24)];
-    expect(keepApart(tags, screen).size).toBe(3);
-    // (Two pixels apart, under the three-pixel gap: they meet.)
-    expect(keepApart([box('a', 'places', 0, 0), box('b', 'places', 102, 0)], screen).size).toBe(1);
-    expect(keepApart([box('a', 'places', 0, 0), box('b', 'places', 102, 0)], { ...screen, gap: 0 }).size).toBe(2);
+  test('the household’s own always show, clear of each other where they stand together; a place there gives way', () => {
+    // Four of the household and a place at one spot (all at home, or at work together).
+    const mine = Array.from({ length: 4 }, () => spot(MINE, 900, 500));
+    const place = spot(PLACE, 905, 500);
+    layoutTags([place, ...mine], SCREEN, []);
+    expect(mine.every((t) => !t.crowded)).toBe(true);
+    const boxes = mine.map((t) => ({ l: t.x - 60, t: t.y - 30, r: t.x + 60, b: t.y }));
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) expect(boxes[i].l < boxes[j].r && boxes[j].l < boxes[i].r && boxes[i].t < boxes[j].b && boxes[j].t < boxes[i].b).toBe(false);
+    expect(place.crowded).toBe(true);
   });
 
-  test('of a kind: the one shown last frame stays, else the nearer, else the first by key', () => {
-    const near = box('near', 'places', 100, 100, 100, 20, 50);
-    const far = box('far', 'places', 120, 100, 100, 20, 300);
-    expect([...keepApart([far, near], screen).keys()]).toEqual(['near']);
-    expect([...keepApart([far, near], { ...screen, shown: new Set(['far']) }).keys()]).toEqual(['far']);
-    const x = box('x', 'sale', 0, 0, 100, 20, 80);
-    const y = box('y', 'sale', 10, 0, 100, 20, 80);
-    expect([...keepApart([y, x], screen).keys()]).toEqual(['x']);
+  test('a tag at the screen’s edge comes in whole: the household’s pulled in, the others only within reach of their point', () => {
+    const mine = spot(MINE, 1900, 400);
+    const person = spot(PERSON, 1900, 600);
+    const place = spot(PLACE, 1870, 800);
+    layoutTags([mine, person, place], SCREEN, []);
+    expect(mine.crowded).toBe(false);
+    expect(mine.x + 60).toBeLessThanOrEqual(SCREEN.r);
+    // (The person’s pill would have to move 48 px sideways, 67 counted: too far to say whose it is; the place's 18.)
+    expect(person.crowded).toBe(true);
+    expect(place.crowded).toBe(false);
+    expect(place.x + 60).toBeLessThanOrEqual(SCREEN.r);
   });
 
-  test('the shown-last-frame rule never beats a more important kind', () => {
-    const name = box('name', 'names', 100, 100);
-    const home = box('home', 'household', 120, 105);
-    expect([...keepApart([name, home], { ...screen, shown: new Set(['name']) }).keys()]).toEqual(['home']);
+  test('your people take the room before the places, and a place one of yours is at before the others', () => {
+    const other = spot(PLACE, 500, 500);
+    const ours = spot({ ...PLACE, ours: true }, 505, 502);
+    const person = spot(PERSON, 1000, 500);
+    const placeByPerson = spot(PLACE, 1004, 498);
+    layoutTags([other, ours, placeByPerson, person], SCREEN, []);
+    expect([ours.crowded, other.crowded, person.crowded, placeByPerson.crowded]).toEqual([false, true, false, true]);
   });
 
-  test('a pinned tag (the one clicked) stays over anything', () => {
-    const chosen = { ...box('chosen', 'places', 100, 100), pinned: true };
-    const home = box('home', 'household', 120, 105);
-    expect([...keepApart([home, chosen], screen).keys()]).toEqual(['chosen']);
+  test('a tag shown last frame keeps its place before one of its kind nearer the camera', () => {
+    const near = spot(PLACE, 500, 502);
+    const held = { ...spot(PLACE, 505, 500), held: true };
+    layoutTags([near, held], SCREEN, []);
+    expect([held.crowded, near.crowded]).toEqual([false, true]);
+    expect(tagOrder(held)).toBeLessThan(tagOrder(near));
   });
 
-  test('a tag wholly off the screen is dropped, one partly on it kept', () => {
-    const kept = keepApart([box('left', 'places', -100, 10), box('edge', 'places', -50, 50), box('below', 'places', 10, 1080)], screen);
-    expect([...kept.keys()]).toEqual(['edge']);
+  test('the winners in their order: the clicked tag, the household’s own, the pointer’s', () => {
+    const order = [spot(PLACE, 0, 900, 2), spot(MINE, 0, 100), spot(PERSON, 0, 50, 0), spot(MINE, 0, 700), spot(PERSON, 0, 1000)]
+      .sort((a, b) => tagOrder(a) - tagOrder(b))
+      .map((t) => [t.wins, t.sy]);
+    expect(order).toEqual([
+      [0, 50],
+      [1, 700],
+      [1, 100],
+      [2, 900],
+      [null, 1000],
+    ]);
+  });
+});
+
+describe('places by zoom', () => {
+  const areas = [
+    { x: 0, z: 0, w: 300, d: 300 },
+    { x: 600, z: 0, w: 200, d: 150 },
+    { x: 0, z: 600, w: 200, d: 150 },
+  ];
+  const place = (i: number, x: number, z: number, area: number, ours = false) => ({ key: `pl:${i}`, kind: 'places' as const, anchor: { x, z }, area, ours });
+  // Thirty in the main town along a line out from (0, 0), two in each hamlet.
+  const tags = [...Array.from({ length: 30 }, (_, i) => place(i, i * 10, 0, 0)), place(30, 700, 50, 1), place(31, 720, 60, 1), place(32, 100, 650, 2), place(33, 120, 700, 2, true)];
+
+  test('fewer as the camera goes out: a street’s worth close in, a dozen or so at 400 m, six farthest out', () => {
+    expect(mostPlaces(200)).toBe(27);
+    expect(mostPlaces(400)).toBe(14);
+    expect(mostPlaces(900)).toBe(6);
+    for (let r = 200; r < 900; r += 50) expect(mostPlaces(r + 50)).toBeLessThanOrEqual(mostPlaces(r));
+    // Homes for sale likewise: twelve close in, six at 400 m (none past `SALE_REACH`: `saleTags`).
+    expect([mostSales(150), mostSales(200), mostSales(400), mostSales(SALE_REACH)]).toEqual([SALE_MOST, SALE_MOST, 6, 5]);
   });
 
-  test('a chain: the first keeps its place, the second goes, the third (clear of the first) stays', () => {
-    const tags = [box('a', 'household', 0, 0), box('b', 'people', 60, 0), box('c', 'places', 120, 0)];
-    expect([...keepApart(tags, screen).keys()].sort()).toEqual(['a', 'c']);
-  });
-
-  test('two of the household in one spot: the second steps up over the first instead of going', () => {
-    const a = { ...box('a', 'household', 100, 100), climb: 3 };
-    const b = { ...box('b', 'household', 105, 100), climb: 3 };
-    const kept = keepApart([a, b], screen);
-    expect(kept.get('a')).toBe(0);
-    expect(kept.get('b')).toBe(-23);
-    // (Without the climb, the second goes.)
-    expect([...keepApart([box('a', 'household', 100, 100), box('b', 'household', 105, 102)], screen).keys()]).toEqual(['a']);
-    // Three steps at most.
-    const many = Array.from({ length: 6 }, (_, i) => ({ ...box(`m${i}`, 'household', 100, 500), climb: 3 }));
-    expect(keepApart(many, screen).size).toBe(4);
-  });
-
-  test('the HUD’s panels are kept clear: a tag under one goes, or steps up clear of it', () => {
-    const panel = { x: 0, y: 0, w: 400, h: 60 };
-    expect(keepApart([box('a', 'household', 50, 40)], { ...screen, avoid: [panel] }).size).toBe(0);
-    expect(keepApart([box('a', 'household', 50, 100)], { ...screen, avoid: [panel] }).get('a')).toBe(0);
-    const under = { x: 0, y: 200, w: 400, h: 60 };
-    expect(keepApart([{ ...box('a', 'household', 50, 230), climb: 3 }], { ...screen, avoid: [under] }).get('a')).toBe(-69);
-  });
-
-  test('hundreds of tags across the grid’s cells match a plain pairwise check', () => {
-    let seed = 7;
-    const rand = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32);
-    const tags: TagBox[] = [];
-    for (let i = 0; i < 400; i++) tags.push(box(`t${i}`, TAG_ORDER[i % 5], rand() * 1900, rand() * 1060, 40 + rand() * 200, 18 + rand() * 10, rand() * 900));
-    const kept = keepApart(tags, screen);
-    const list = tags.filter((t) => kept.has(t.key));
-    for (let i = 0; i < list.length; i++) {
-      for (let j = i + 1; j < list.length; j++) {
-        const a = list[i];
-        const b = list[j];
-        const meet = a.x < b.x + b.w + 3 && b.x < a.x + a.w + 3 && a.y < b.y + b.h + 3 && b.y < a.y + a.h + 3;
-        expect(meet).toBe(false);
-      }
-    }
-    // Every dropped tag meets a kept one at least as important.
-    for (const t of tags.filter((t) => !kept.has(t.key))) {
-      const blocked = list.some((k) => TAG_ORDER.indexOf(k.kind) <= TAG_ORDER.indexOf(t.kind) && t.x < k.x + k.w + 3 && k.x < t.x + t.w + 3 && t.y < k.y + k.h + 3 && k.y < t.y + t.h + 3);
-      expect(blocked).toBe(true);
-    }
+  test('the main town’s nearest the middle of the view; a hamlet’s only while the camera looks into it; one of yours is at always', () => {
+    const over = placesInView(tags, areas, { x: 0, z: 0 }, 400);
+    expect(over.size).toBe(mostPlaces(400) + 1);
+    expect([...Array.from({ length: mostPlaces(400) }, (_, i) => `pl:${i}`), 'pl:33'].every((k) => over.has(k))).toBe(true);
+    expect(over.has('pl:30') || over.has('pl:32')).toBe(false);
+    // Looking into the first hamlet (just off its edge counts): its places, nearest first, then the main town's.
+    const hamlet = placesInView(tags, areas, { x: 600 - HAMLET_REACH + 1, z: 50 }, 900);
+    expect(['pl:30', 'pl:31', 'pl:33'].every((k) => hamlet.has(k))).toBe(true);
+    expect(hamlet.has('pl:32')).toBe(false);
+    expect(hamlet.size).toBe(mostPlaces(900) + 1);
   });
 });
 
@@ -291,6 +306,19 @@ describe('who and where', () => {
     expect(whereabouts(sim(1, { plot: 2 }), w)).toEqual({ place: 0, text: 'at Bakery', unplaced: false });
     expect(whereabouts(sim(1, { plot: 1, visiting: 1 }), w).text).toBe('visiting the Lowes');
     expect(whereabouts(sim(1, { stage: 'child', awayUntil: 15 * 60 }), w)).toEqual({ place: null, text: 'at school · home 15:00', unplaced: true });
+  });
+
+  test('a hamlet’s place whose name another has says which hamlet; the main town’s and a name of its own don’t', () => {
+    const same: TownPlace[] = [
+      { name: 'Bakery', kind: 'shop', x: 5, z: 5, area: 0 },
+      { name: 'Bakery', kind: 'shop', x: 400, z: 5, area: 1 },
+      { name: 'Mill Café', kind: 'cafe', x: 410, z: 5, area: 1 },
+      { name: 'Bakery', kind: 'shop', x: 900, z: 5, area: 2 },
+    ];
+    const w = { ...world([]), places: same, placeOfPlot: new Map<number, number>(), areas: [{ name: 'Brightfield', kind: 'hamlet' as const }, { name: 'Millbrook', kind: 'hamlet' as const }, { name: 'Far Fields', kind: 'countryside' as const }] };
+    const tags = placeTags(w, new Map());
+    expect(tags.map((t) => t.detail)).toEqual(['', 'Millbrook', '', '']);
+    expect(tags.map((t) => t.area)).toEqual([0, 1, 1, 2]);
   });
 
   test('your people: family, partners and friends, closest first; not acquaintances, not the household', () => {
