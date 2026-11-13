@@ -1,9 +1,10 @@
 /**
  * Pools of lamplight on the garden's ground on PlayCanvas: under a lamp post, a street lamp, a fire
- * pit or a bulkhead on the outside wall, as the street draws them under its own lamps. The lamps'
+ * pit or a bulkhead on the outside wall, as the street draws them under its own lamps, and outside the
+ * windows of the viewed house's lit rooms (`shared/gardenPools.ts` `windowPools`). The lamps'
  * lights light what stands in the garden, but not the ground (the landscape is kept out of the
- * lamps). A pool is a disc on the ground, added to what's there, unlit and without fog: one draw
- * for all of them (a quad each, its brightness in its vertex colour), none by day.
+ * lamps). A pool is a disc on the ground (a window's an oval), added to what's there, unlit and without
+ * fog: one draw for all of them (a quad each, its brightness in its vertex colour), none by day.
  */
 
 import * as pc from './engine';
@@ -13,7 +14,7 @@ import { gradientTexture } from './street';
 import type { RGB } from '../shared/environment';
 import type { GardenPool } from '../shared/gardenPools';
 
-export { gardenPool, type GardenPool } from '../shared/gardenPools';
+export { gardenPool, windowPools, type GardenPool } from '../shared/gardenPools';
 
 /** A hair over the ground, so the pool isn't lost in it. */
 const LIFT = 0.03;
@@ -59,7 +60,7 @@ export class GardenPools {
     m.update();
   }
 
-  /** The viewed lot's garden lamps (their pools' places), on every change of it. */
+  /** The viewed lot's garden lamps and lit windows (their pools' places), on every change of it. */
   set(pools: GardenPool[]): void {
     this.pools = pools;
     this.entity?.destroy();
@@ -79,9 +80,14 @@ export class GardenPools {
         [1, 1],
         [-1, 1],
       ];
-      corners.forEach(([u, v], k) => {
+      // (Half a pool: the quad and the gradient from its middle to that side only.)
+      const span = (side: '+' | '-' | undefined, c: number): number => (side === '+' ? Math.max(0, c) : side === '-' ? Math.min(0, c) : c);
+      const half = p.half;
+      corners.forEach(([cu, cv], k) => {
         const j = i * 4 + k;
-        positions.set([p.x + u * p.radius, p.y + LIFT, p.z + v * p.radius], j * 3);
+        const u = span(half?.[0] === 'x' ? (half[1] as '+' | '-') : undefined, cu);
+        const v = span(half?.[0] === 'z' ? (half[1] as '+' | '-') : undefined, cv);
+        positions.set([p.x + u * p.radius, p.y + LIFT, p.z + v * (p.depth ?? p.radius)], j * 3);
         normals.set([0, 1, 0], j * 3);
         uvs.set([(u + 1) / 2, (v + 1) / 2], j * 2);
       });
@@ -101,15 +107,16 @@ export class GardenPools {
   }
 
   /**
-   * How bright they are now: `level` the lamps' night level (0 by day), `on` each lamp's
-   * switch (eased, 0..1), `color` the lamps' (linear). Off altogether when none adds anything.
+   * How bright they are now: `level` the lamps' night level (0 by day), `on` how far each pool's light is
+   * on (0..1: its lamp's switch, eased; a window's room's lights), `color` the lamps' (linear). Off altogether
+   * when none adds anything.
    */
-  update(level: number, on: (lamp: number | undefined) => number, color: RGB): void {
+  update(level: number, on: (pool: GardenPool) => number, color: RGB): void {
     let lit = false;
     const c = this.colors;
     for (let i = 0; i < this.pools.length; i++) {
       const p = this.pools[i];
-      const f = level * on(p.lamp) * p.strength;
+      const f = level * on(p) * p.strength;
       for (let k = 0; k < 4; k++) {
         const o = (i * 4 + k) * 4;
         c[o] = color.r * f;

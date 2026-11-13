@@ -31,7 +31,7 @@ import { createApp, createDevice, destroyApp } from './device';
 import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
 import { fenceHedges, wallCorners } from '../shared/fences';
 import { shownFences } from '../shared/shownFences';
-import { gardenPool, GardenPools } from './gardenPools';
+import { gardenPool, GardenPools, windowPools, type GardenPool } from './gardenPools';
 import { HoverTile, ResizeHandles } from './handles';
 import { HeldFrames } from './heldFrames';
 import { HouseBuilder, type HouseDoor } from './house';
@@ -541,7 +541,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly doorHand = new Float32Array(MAX_CHARACTERS);
   /** Pools of lamplight on the lawn under the garden's lamps. */
   private gardenPools: GardenPools | null = null;
-  private readonly poolLampOn = (lamp: number | undefined) => this.lamps.lampOn(lamp); // (as its lamp fades, `lamps.ts`.)
+  private readonly poolOn = (pool: GardenPool) => (pool.room !== undefined ? this.lamps.windowLight(pool.room) : this.lamps.lampOn(pool.lamp)); // (as its lamp fades, or its room's lights, `lamps.ts`.)
   /** Night level of the lamps at the last lighting update (`Lighting.lamps`), the lamps' colour and the windows' glow (linear). */
   private lampsLevel = 0;
   private readonly lampColor = linearHex(LOOK.lampColor);
@@ -781,7 +781,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // The map's size, filtering and bias are the preset's (`sunShadows.ts`).
     this.sunShadows = new SunShadows(this.app, this.sun, { size: this.quality.shadowMapSize, rate: this.quality.shadowRate });
     // (lotContents.ts: the landscape, sky, objects and items.)
-    this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.sunShadows.moved(urgent), landscapeChanged: () => this.lamps.exclude(this.lot.landscapeDraws()) /* (lamps.ts) */ });
+    this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.castersMoved(urgent), landscapeChanged: () => this.lamps.exclude(this.lot.landscapeDraws()) /* (lamps.ts) */ });
     // (the menus' town on a layer of its own, `overview.ts`, the landscape's draws for it too; the sky on both.)
     const town = townLayer(this.app).id;
     this.lot.townLayer = town;
@@ -841,13 +841,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.previews = new BuildPreviews(this.app, this.storeyLayer, this.house, { content: this.deps.content, world: () => this.lastWorld, view: () => this.view, storey: () => this.storey, rowOf: (k) => this.rowOf(k), wallMode: () => this.wallMode });
     if (!this.diag.has('nolamps')) this.gardenPools = new GardenPools(this.app, this.root);
     // (the interior lights, `lamps.ts`.)
-    this.lamps = new Lamps(this.app, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode }, { house: this.house, lot: this.lot, pools: () => this.applyGardenPools() });
+    this.lamps = new Lamps(this.app, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode, whole: () => this.townWhole }, { house: this.house, lot: this.lot, pools: () => this.applyGardenPools(), casters: () => this.lampCasters() });
     // (the mirrors, `mirrors.ts`, their held reflections drawn again when the lamps, the sun or what the map shows changed; held frames, `heldFrames.ts`.)
     const mq = this.quality;
     this.mirrors = new Mirrors(this.app, this.root, this.camera.camera, this.sun.light!, { count: this.diag.has('nomirrors') ? 0 : mq.mirrors, scale: mq.mirrorScale, samples: mq.msaaSamples, rate: mq.mirrorRate }, (mi, bits) => this.characters.drawsRows(mi, bits));
     this.lamps.onChanged = () => this.mirrors.changed();
-    this.sunShadows.onMoved = (urgent) => {
+    this.sunShadows.onMoved = (urgent, casters) => {
       if (urgent) this.mirrors.changed();
+      // (The lamps' shadows, `lampShadows.ts`: what moves on its own is told to them where it moves, `update`.)
+      if (urgent && casters) this.lamps.castersMoved(true);
     };
     this.held = new HeldFrames(this.app, this.camera.camera, this.sun, mq.holdStillFrames);
     // (placing things, `placing.ts`; after the lamps, whose lights light the thing in hand.)
@@ -2126,7 +2128,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     };
     this.markWindowless(world, view);
     const lights: RoomLight[] = this.lotRooms ? placeLights(world, inView, this.lotRooms, (def) => this.deps.content.object(def)?.light).filter((l) => shown(l.z)) : [];
-    this.gardenPools?.set(lights.filter((l) => l.kind === 'lamp' && l.room === 0 && this.storeyOf(l.z) === 0).map((l) => gardenPool(l, this.rowOf(0))));
+    // (Under the garden's lamps, and outside the windows of the house's rooms: lit as the rooms are.)
+    const ground = (z: number) => this.storeyOf(z) === 0;
+    const underLamps = lights.filter((l) => l.kind === 'lamp' && l.room === 0 && ground(l.z)).map((l) => gardenPool(l, this.rowOf(0)));
+    this.gardenPools?.set(this.storey >= 0 ? [...underLamps, ...windowPools(world, ground, this.rowOf(0), inView)] : underLamps);
     this.applyGardenPools();
     // (the interior lights and the rooms they keep to, `lamps.ts`.)
     this.lamps.markRooms(world, view);
@@ -2158,7 +2163,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /** The garden's pools of lamplight, as bright as its lamps are now. */
   private applyGardenPools(): void {
-    this.gardenPools?.update(this.glowLevel, this.poolLampOn, this.lampColor);
+    this.gardenPools?.update(this.glowLevel, this.poolOn, this.lampColor);
   }
 
   /** Model files that failed have come (gathered by `modelRefresh`): the world draws again what it drew without them (once no build runs). */
@@ -2406,6 +2411,25 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (houses.length) this.street.setUp(up);
   }
 
+  /** A thing of the lot that casts changed (`LotContents`): the sun's shadows and the lamps'. */
+  private castersMoved(urgent: boolean): void {
+    this.sunShadows.moved(urgent);
+    // (An urgent change reaches the lamps through the sun's `onMoved`; a moving part only here.)
+    if (!urgent) this.lamps.castersMoved(false);
+  }
+
+  /** What casts in a lamp's light now (`lampShadows.ts`): the lot's things and the residents. One list, filled anew. */
+  private lampCasters(): pc.MeshInstance[] {
+    const out = this.lampCasterList;
+    out.length = 0;
+    this.lot.lampCasters(out, this.lampWarm);
+    this.characters.shadowCasters(out);
+    return out;
+  }
+  private readonly lampCasterList: pc.MeshInstance[] = [];
+  /** The warm-up's frame is being drawn (`warmFrame`): everything that can cast in a lamp's light does. */
+  private lampWarm = false;
+
   /** Life stage ids of babies (content `baby`: they don't count as someone up, as in sim-core). */
   private babyStages(): ReadonlySet<string> {
     const stages = this.deps.content.lifeStages;
@@ -2473,7 +2497,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // resident's pose does: held to the preset's `shadowRate`.)
       urgent ||= leaf.front;
     }
-    if (moved) this.sunShadows.moved(urgent);
+    // (Doors and gates cast only the sun's shadow.)
+    if (moved) this.sunShadows.moved(urgent, false);
   }
 
   update(frame: FrameState): void {
@@ -2494,7 +2519,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     // Who is where: doors open for those going through, neighbours' windows glow while someone is up.
     this.findDarkRooms(frame);
-    this.lamps.frame(this.frameDt / 1000, this.darkRooms, this.awakeRooms); // (lamps and glows fading, `lamps.ts`.)
+    this.lamps.frame(this.frameDt / 1000, this.darkRooms, this.awakeRooms, this.orbit.target.x, this.orbit.target.z); // (lamps and glows fading, which cast shadows, `lamps.ts`.)
     this.swingDoors(PLAYBACK_RATE[curr[h.speed] | 0] ?? 1);
     this.steerCamera(this.frameDt / 1000);
     this.keepCameraClear();
@@ -2559,7 +2584,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     this.lot.takeRestProps(this.characters.restTaken);
     // (Only residents posed where they cast into the map: `shadowPosed`, as the cars' `moved`.)
-    if (this.quality.characterShadows && this.characters.shadowPosed) this.sunShadows.moved(false);
+    if (this.quality.characterShadows && this.characters.shadowPosed) {
+      this.sunShadows.moved(false);
+      this.lamps.residentsMoved(this.occupiedRooms); // (their shadows in the lamps' light, in the rooms they are in.)
+    }
     const blobs = this.simShadow;
     blobs.setCount(count);
     for (let i = 0; i < count; i++) blobs.setMatrix(i, shadows, i * 16);
@@ -2662,7 +2690,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const hidden = this.drawHidden();
     const red = this.drawRedCopies();
     const mirrors = this.mirrors.warm(this.streamOn);
+    // (And a lamp's shadow map, where lamps cast: its shadow pass's shaders, `lampShadows.ts`.)
+    this.lampWarm = true;
+    const lamps = this.lamps.warm(this.orbit.target.x, -this.orbit.target.z);
     return () => {
+      lamps();
+      this.lampWarm = false;
       mirrors();
       red();
       hidden();
@@ -2790,7 +2823,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // The look's colours are used as linear; PlayCanvas takes sRGB and linearises it,
     // so the strength goes into the colour (an intensity below 1 would be linearised with it).
     this.sun.light!.color = gammaColor(l.sunColor, l.sunIntensity * SUN_UNITS, this.colorTmp);
-    this.sunShadows.moved();
+    this.sunShadows.moved(true, false);
     // The sky's hemispheric fill and its image-based light.
     this.lib.setSkyFill(l.skyColor, l.groundColor, l.skyIntensity * SKY_UNITS);
     this.lib.setEnvironmentIntensity(l.envIntensity * ENV_UNITS);

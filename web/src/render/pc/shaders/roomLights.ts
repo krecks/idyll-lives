@@ -16,7 +16,10 @@
  * (`?lights=forward`), in each light's own function (after `lightColor` in `lightFunctionLightPS`).
  * The test itself is a feature of the game's materials (`ROOM_LIGHTS`, declared once for both). A
  * fragment is classed by a point a little out along its normal, so a wall's two faces belong to
- * the rooms they face (and its outside face to the garden, which lamps indoors don't light). Tiles
+ * the rooms they face (and its outside face to the garden, which lamps indoors don't light); what is inside an
+ * outside wall (a window's opening past its glass, a cut wall's top) has the wall's room's own light, its share of
+ * the sky and its lamps' bounce (`gameRoomLit`; the lamps and the reflections keep the mask's own answer,
+ * `gameRoomHere`). Tiles
  * the mask doesn't know (off the lot in view, storeys not shown) are lit by every lamp. The
  * fragment's own room is read once (`gameRoomHere`), a lamp's at each lamp.
  *
@@ -34,15 +37,33 @@
  * falloff had it; the many lamps' ranges are set past their reach for it, `lamps.ts`), the physical
  * cone for a light without an inner cone (its inner angle its outer one) and the glTF cone for one
  * with.
+ *
+ * Shadows (`lampShadows.ts`, where the preset has them): a lamp that casts is a spot light with one shadow
+ * map, read in the clustered loop; a lamp without a shade stays all round (`ALL_ROUND_COS`), and no lamp is
+ * shadowed past its map's cone (`gameLampShadow`, an engine patch round the read).
  */
 
 import type { Language, ShaderFeature } from './chunks';
+import { WALL_HALF } from '../../shared/walls';
 
 /** Rooms with a light of their own (`RoomLightState.light`, a texel each): the mask's first, far more than a lot has. */
 export const ROOM_LIGHT_ROOMS = 256;
 
 /** How far out along its normal a fragment is classed (m): off a wall's face, into the room it faces. */
 export const OUT = '0.1';
+
+/**
+ * A spot light whose inner cone is wider than this (its cosine: 120°, far past any cone a shade has) lights all
+ * round: a lamp without a shade drawn as a spot light for the one shadow map a spot has (`lamps.ts`
+ * `ALL_ROUND_CONE`).
+ */
+const ALL_ROUND_COS = '-0.5';
+
+/**
+ * Half a wall's thickness (m, `shared/walls.ts` `WALL_HALF`): a point nearer than this to a tile's edge with a
+ * room beyond it is inside that room's outside wall (`gameRoomLit`).
+ */
+const IN_WALL = String(WALL_HALF);
 
 /** `-log2(1/100)`: the physical spot falloff, a hundredth of the light at the cone's edge. */
 const CONE_EDGE = '6.64385618977';
@@ -81,6 +102,27 @@ export const ROOM_LIGHTS: ShaderFeature = {
 		}
 		return v.r + v.g * 256.0;
 	}
+	// The room whose own light (\`RoomLightState.light\`: its share of the sky, its lamps' bounce) the fragment at pos
+	// (normal n) has: its own (\`gameRoomHere\`), but for what is outdoors by the mask and inside an outside wall (the
+	// sides of a window's opening past the glass, a door's edge, the outer half of a cut wall's top, the back of a
+	// thing standing against the wall), which has the wall's room's: not the garden's, vivid blue beside a lamplit
+	// room. The lamps themselves keep to the mask's rooms (\`gameRoomSkip\`): a seam in an outside wall's corner would
+	// shine with the room's lamps.
+	float gameRoomLit = -1.0;
+	float gameRoomLitAt(vec3 pos, vec3 n) {
+		if (gameRoomLit >= 0.0) return gameRoomLit;
+		vec3 at = pos + n * ${OUT};
+		if (gameRoomHere < 0.0) gameRoomHere = gameRoomOf(at);
+		gameRoomLit = gameRoomHere;
+		if (gameRoomHere != 1.0) return gameRoomLit;
+		vec2 f = fract(gamePos(at).xz - game_roomLightArea.xy);
+		// (-1 near a tile's low edge, 1 near its high one, in game x and z; PlayCanvas's z is the other way.)
+		vec2 side = step(vec2(1.0 - ${IN_WALL}), f) - step(f, vec2(${IN_WALL}));
+		float beyond = side.x != 0.0 ? gameRoomOf(at + vec3(side.x * 2.0 * ${IN_WALL}, 0.0, 0.0)) : 0.0;
+		if (beyond < 1.5 && side.y != 0.0) beyond = gameRoomOf(at - vec3(0.0, 0.0, side.y * 2.0 * ${IN_WALL}));
+		if (beyond > 1.5) gameRoomLit = beyond;
+		return gameRoomLit;
+	}
 	// Whether a lamp at lightPos is in another room than the fragment at pos (normal n).
 	bool gameRoomSkip(vec3 lightPos, vec3 pos, vec3 n) {
 		if (gameRoomHere < 0.0) gameRoomHere = gameRoomOf(pos + n * ${OUT});
@@ -112,6 +154,21 @@ export const ROOM_LIGHTS: ShaderFeature = {
 		}
 		return v.r + v.g * 256.0;
 	}
+	var<private> gameRoomLit: f32 = -1.0;
+	fn gameRoomLitAt(pos: vec3f, n: vec3f) -> f32 {
+		if (gameRoomLit >= 0.0) { return gameRoomLit; }
+		let at = pos + n * ${OUT};
+		if (gameRoomHere < 0.0) { gameRoomHere = gameRoomOf(at); }
+		gameRoomLit = gameRoomHere;
+		if (gameRoomHere != 1.0) { return gameRoomLit; }
+		let f = fract(gamePos(at).xz - uniform.game_roomLightArea.xy);
+		let side = step(vec2f(1.0 - ${IN_WALL}), f) - step(f, vec2f(${IN_WALL}));
+		var beyond: f32 = 0.0;
+		if (side.x != 0.0) { beyond = gameRoomOf(at + vec3f(side.x * 2.0 * ${IN_WALL}, 0.0, 0.0)); }
+		if (beyond < 1.5 && side.y != 0.0) { beyond = gameRoomOf(at - vec3f(0.0, 0.0, side.y * 2.0 * ${IN_WALL})); }
+		if (beyond > 1.5) { gameRoomLit = beyond; }
+		return gameRoomLit;
+	}
 	fn gameRoomSkip(lightPos: vec3f, pos: vec3f, n: vec3f) -> bool {
 		if (gameRoomHere < 0.0) { gameRoomHere = gameRoomOf(pos + n * ${OUT}); }
 		let there = gameRoomOf(lightPos);
@@ -122,8 +179,20 @@ export const ROOM_LIGHTS: ShaderFeature = {
   },
 };
 
-export const ROOM_LIGHT_CODE: Record<Language, { skip: string; forward: string; noLamps: string; falloff: string; spot: string }> = {
+export const ROOM_LIGHT_CODE: Record<Language, { skip: string; forward: string; noLamps: string; falloff: string; spot: string; shadowDecl: string; shadow: (read: string) => string }> = {
   glsl: {
+    // Before `clusteredLightPS`, and round a spot's shadow read in it (`lampShadows.ts`): a lamp's shadow map covers
+    // a cone round its way (`game_lampShadowCone`: the cosines of its edge and of where the shadows start to fade
+    // towards it); past it the lamp shines unshadowed (PlayCanvas would read the maps beside it in the atlas).
+    shadowDecl: `
+#ifdef CLUSTER_SHADOWS
+	uniform vec2 game_lampShadowCone;
+	float gameLampShadow(float shadow, vec3 spotDir, vec3 lightDirNorm) {
+		return mix(1.0, shadow, smoothstep(game_lampShadowCone.x, game_lampShadowCone.y, dot(lightDirNorm, spotDir)));
+	}
+#endif
+`,
+    shadow: (read) => `gameLampShadow(${read}, light.direction, lightDirNormW)`,
     // After `decodeClusterLightCore(lightIndex)` in `evaluateClusterLight`.
     skip: `
 	#ifdef GAME_LOOK
@@ -154,6 +223,7 @@ float getFalloffInvSquared(float lightRadius, vec3 lightDir) {
     spot: `
 float getSpotEffect(vec3 lightSpotDir, float lightInnerConeAngle, float lightOuterConeAngle, vec3 lightDirNorm) {
 	#ifdef GAME_LOOK
+		if (lightInnerConeAngle < ${ALL_ROUND_COS}) return 1.0;
 		float cosAngle = dot(lightDirNorm, lightSpotDir);
 		if (lightInnerConeAngle <= lightOuterConeAngle + 1e-4) return exp2(${CONE_EDGE} / max(1.0 - lightOuterConeAngle, 1e-4) * (cosAngle - 1.0));
 		float cone = saturate((cosAngle - lightOuterConeAngle) / (lightInnerConeAngle - lightOuterConeAngle));
@@ -165,6 +235,15 @@ float getSpotEffect(vec3 lightSpotDir, float lightInnerConeAngle, float lightOut
 `,
   },
   wgsl: {
+    shadowDecl: `
+#ifdef CLUSTER_SHADOWS
+	uniform game_lampShadowCone: vec2f;
+	fn gameLampShadow(shadow: f32, spotDir: vec3f, lightDirNorm: vec3f) -> f32 {
+		return mix(1.0, shadow, smoothstep(uniform.game_lampShadowCone.x, uniform.game_lampShadowCone.y, dot(lightDirNorm, spotDir)));
+	}
+#endif
+`,
+    shadow: (read) => `gameLampShadow(${read}, light.direction, lightDirNormW)`,
     skip: `
 	#ifdef GAME_LOOK
 		if (gameRoomSkip(clusterLightData.position, vPositionW, worldNormal)) { return; }
@@ -192,6 +271,7 @@ fn getFalloffInvSquared(lightRadius: f32, lightDir: vec3f) -> f32 {
     spot: `
 fn getSpotEffect(lightSpotDir: vec3f, lightInnerConeAngle: f32, lightOuterConeAngle: f32, lightDirNorm: vec3f) -> f32 {
 	#ifdef GAME_LOOK
+		if (lightInnerConeAngle < ${ALL_ROUND_COS}) { return 1.0; }
 		let cosAngle = dot(lightDirNorm, lightSpotDir);
 		if (lightInnerConeAngle <= lightOuterConeAngle + 1e-4) { return exp2(${CONE_EDGE} / max(1.0 - lightOuterConeAngle, 1e-4) * (cosAngle - 1.0)); }
 		let cone = saturate((cosAngle - lightOuterConeAngle) / (lightInnerConeAngle - lightOuterConeAngle));

@@ -19,6 +19,17 @@ export function directionalShadows(app: pc.AppBase): DirectionalShadows | undefi
   return app.renderer?._shadowRendererDirectional;
 }
 
+/** The forward renderer's shadow renderer for spot and point lights (`Renderer._shadowRendererLocal`). */
+export interface LocalShadows {
+  cull(light: pc.Light, comp: object, casters?: pc.MeshInstance[] | null): void;
+}
+
+/** `app`'s shadow renderer for spot and point lights, or `undefined` on a renderer that has none. */
+export function localShadows(app: pc.AppBase): LocalShadows | undefined {
+  // (The forward renderer keeps it in `_shadowRendererLocal`, PlayCanvas 2.23, pinned.)
+  return app.renderer?._shadowRendererLocal;
+}
+
 /** A shader the device made, as far as `shadersCompiling` and `pcmaterials` read it. */
 export interface CompiledShader extends pc.Shader {
   ready: boolean;

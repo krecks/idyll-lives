@@ -49,6 +49,7 @@ import { LOOK as CUT } from '../shared/geometry';
 import { compose, multiply, quatYawPitchRoll, type Quat } from '../shared/math';
 import { REST_PROPS } from '../shared/characters/actions';
 import { contactAtlas, type ContactShape } from '../shared/contactShadow';
+import { lampCasts } from '../shared/house';
 import { motionsOf, paintColors, painted, placementVariation, standInOf, type Motions } from '../shared/modelEntry';
 import { restPoses, slotOf } from '../shared/objectMotion';
 import type { TableRoom } from '../shared/tableTuck';
@@ -192,6 +193,8 @@ export class LotContents {
   /** Templates in a player's colours: let go of once no world draws them. */
   private readonly paintedTemplates = new Set<string>();
   private readonly modelDraws = new Map<string, ModelDraws>();
+  /** The draws of the things that cast the lamps' shadows (`lampCasters`), as last built. */
+  private lampCasterDraws: Instances[] = [];
   /** The objects as drawn by the last build. */
   placed: PlacedObject[] = [];
   /** Mirror glass on the objects drawn (`mirrors.ts` reflects in it). */
@@ -600,6 +603,15 @@ export class LotContents {
     return bits;
   }
 
+  /**
+   * Adds to `out` the draws of the lot's things that cast in a lamp's light (`lampShadows.ts`): every model's
+   * but the lamps' that can cast themselves (those that cast the sun's shadow: PlayCanvas asks each). `all`: those
+   * drawing nothing now too (the warm-up, which draws everything once).
+   */
+  lampCasters(out: pc.MeshInstance[], all = false): void {
+    for (const draw of this.lampCasterDraws) if (!draw.destroyed && (all || (draw.enabled && draw.count > 0))) out.push(draw.meshInstance);
+  }
+
   /** The draws of a model's template (made the first time it's drawn, and again for a template built anew). */
   private drawsOf(key: string, template: ModelTemplate): ModelDraws {
     let d = this.modelDraws.get(key);
@@ -661,6 +673,7 @@ export class LotContents {
     const glows: Glow[] = [];
     const drawnKeys = new Set<string>();
     let partsCast = false;
+    const lampCasters: Instances[] = [];
     // (Low: the opaque bodies cast from one merged mesh, `objectShadows.ts`.)
     const shadowSources: ShadowSource[] = [];
     const m = this.vTmp;
@@ -721,6 +734,9 @@ export class LotContents {
       });
       // At rest, the parts are where the body is.
       for (const part of parts) part.matrices.set(matrices);
+      // (A lamp that can cast shadows casts none in a lamp's light: it would shadow its own, `lampCasts`.)
+      const defLight = this.deps.content.object(list[0].def)?.light;
+      if (!defLight || !lampCasts(defLight)) lampCasters.push(...d.draws);
       d.draws.forEach((draw, j) => {
         const part = motion ? motion.parts[j] : -1;
         draw.setMatrices(part < 0 ? matrices : parts[part].matrices, list.length);
@@ -753,6 +769,7 @@ export class LotContents {
       });
     });
     this.movingPartsCast = partsCast;
+    this.lampCasterDraws = lampCasters;
     this.objectShadows?.build(shadowSources);
     // Models no longer drawn: their draws go off (their templates stay for the next build).
     for (const [key, d] of this.modelDraws) {

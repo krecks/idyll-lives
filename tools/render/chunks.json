@@ -321,6 +321,89 @@
       ]
     },
     {
+      "for": "render/pc/lampShadows.ts, lamps.ts, shaders/roomLights.ts: the lamps' shadows, one map a lamp in the clustered lighting's atlas, drawn again only when asked.",
+      "anchors": [
+        {
+          "file": "scene/renderer/renderer.js",
+          "text": "this._shadowRendererLocal = new ShadowRendererLocal(",
+          "who": "lampShadows.ts: the local shadow renderer it patches (internals.ts `localShadows`)"
+        },
+        {
+          "file": "scene/renderer/culler.js",
+          "text": "renderer._shadowRendererLocal.cull(localRequests[i].light, comp);",
+          "who": "lampShadows.ts: cull called on the instance (so patching it works), without casters of its own"
+        },
+        {
+          "file": "scene/renderer/shadow-renderer-local.js",
+          "text": "cull(light, comp, casters = null) {",
+          "who": "lampShadows.ts: the cull it wraps, handed the lamps' own casters"
+        },
+        {
+          "file": "scene/renderer/shadow-renderer-local.js",
+          "text": "shadowCam.fov = light._outerConeAngle * 2;",
+          "who": "lampShadows.ts: a spot light's map takes its field of view from the light's outer cone (the lamp's shadow cone stands in for it during cull)"
+        },
+        {
+          "file": "scene/renderer/shadow-renderer.js",
+          "text": "lists.push(casters);",
+          "who": "lampShadows.ts: casters handed to cull replace the layers' own"
+        },
+        {
+          "file": "scene/renderer/shadow-renderer.js",
+          "text": "return light.enabled && light.castShadows && light.shadowUpdateMode !== SHADOWUPDATE_NONE && light.visibleThisFrame;",
+          "who": "lampShadows.ts: a map is drawn only while its light's update mode isn't NONE (kept otherwise)"
+        },
+        {
+          "file": "scene/renderer/culler.js",
+          "text": "if (light.atlasSlotUpdated && light.shadowUpdateMode === SHADOWUPDATE_NONE) {",
+          "who": "lampShadows.ts: a light given a new square of the atlas is drawn again by PlayCanvas"
+        },
+        {
+          "file": "scene/lighting/light-texture-atlas.js",
+          "text": "let atlasSplit = lightingParams.atlasSplit;",
+          "who": "lampShadows.ts: the atlas split fixed (four squares), not by the number of lights"
+        },
+        {
+          "file": "scene/lighting/light-texture-atlas.js",
+          "text": "if (previousSlot2.size === slots[i].size && !previousSlot2.used) {",
+          "who": "lampShadows.ts: a light keeps its square while the squares are the same size"
+        },
+        {
+          "file": "scene/renderer/render-pass-shadow-local-clustered.js",
+          "text": "this.shadowRenderer.setupRenderPass(this, shadowCamera, false);",
+          "who": "lampShadows.ts: the atlas isn't cleared whole when one map is drawn (the others are kept)"
+        },
+        {
+          "file": "scene/lighting/world-clusters.js",
+          "text": "light.getBoundingBox(tempBox);",
+          "who": "lamps.ts: the clusters a light is in come from its getBoundingBox (a point light's for a lamp lighting all round as a spot light)"
+        },
+        {
+          "file": "scene/light.js",
+          "text": "let innerCos = Math.cos(this._innerConeAngle * angleShrinkFactor * math.DEG_TO_RAD);",
+          "who": "lamps.ts: a spot light's inner cone reaches the shader as its cosine, whatever the outer one (ALL_ROUND_CONE)"
+        },
+        {
+          "chunk": "lit/frag/clusteredLight.js",
+          "glsl": "getShadowSpotClusteredPCF3(SHADOWMAP_PASS(shadowAtlasTexture), shadowCoord, shadowParams)",
+          "wgsl": "getShadowSpotClusteredPCF3(shadowAtlasTexture, shadowAtlasTextureSampler, shadowCoord, shadowParams)",
+          "who": "shaders/chunks.ts: engine patch, a lamp's shadow kept to its map's cone (round the read, in evaluateLight)"
+        },
+        {
+          "chunk": "lit/frag/clusteredLight.js",
+          "glsl": "getShadowSpotClusteredPCF5(SHADOWMAP_PASS(shadowAtlasTexture), shadowCoord, shadowParams)",
+          "wgsl": "getShadowSpotClusteredPCF5(shadowAtlasTexture, shadowAtlasTextureSampler, shadowCoord, shadowParams)",
+          "who": "shaders/chunks.ts: the same for the 5 × 5 filter"
+        },
+        {
+          "chunk": "lit/frag/clusteredLight.js",
+          "glsl": "falloffAttenuation *= mix(1.0, shadow, light.shadowIntensity);",
+          "wgsl": "falloffAttenuation = falloffAttenuation * mix(1.0, shadow, light.shadowIntensity);",
+          "who": "lampShadows.ts: a light's shadowIntensity scales its shadow (the fades)"
+        }
+      ]
+    },
+    {
       "for": "render/pc/characterMaterial.ts, shaders/character.ts: the hair's wisps, cut out by their strands' cover.",
       "anchors": [
         {
