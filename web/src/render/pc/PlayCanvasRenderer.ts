@@ -31,7 +31,7 @@ import { createApp, createDevice, destroyApp } from './device';
 import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
 import { fenceHedges, wallCorners } from '../shared/fences';
 import { shownFences } from '../shared/shownFences';
-import { gardenPool, GardenPools } from './gardenPools';
+import { gardenPool, GardenPools, windowPools, type GardenPool } from './gardenPools';
 import { HoverTile, ResizeHandles } from './handles';
 import { HeldFrames } from './heldFrames';
 import { HouseBuilder, type HouseDoor } from './house';
@@ -540,7 +540,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly doorHand = new Float32Array(MAX_CHARACTERS);
   /** Pools of lamplight on the lawn under the garden's lamps. */
   private gardenPools: GardenPools | null = null;
-  private readonly poolLampOn = (lamp: number | undefined) => this.lamps.lampOn(lamp); // (as its lamp fades, `lamps.ts`.)
+  private readonly poolOn = (pool: GardenPool) => (pool.room !== undefined ? this.lamps.windowLight(pool.room) : this.lamps.lampOn(pool.lamp)); // (as its lamp fades, or its room's lights, `lamps.ts`.)
   /** Night level of the lamps at the last lighting update (`Lighting.lamps`), the lamps' colour and the windows' glow (linear). */
   private lampsLevel = 0;
   private readonly lampColor = linearHex(LOOK.lampColor);
@@ -2127,7 +2127,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     };
     this.markWindowless(world, view);
     const lights: RoomLight[] = this.lotRooms ? placeLights(world, inView, this.lotRooms, (def) => this.deps.content.object(def)?.light).filter((l) => shown(l.z)) : [];
-    this.gardenPools?.set(lights.filter((l) => l.kind === 'lamp' && l.room === 0 && this.storeyOf(l.z) === 0).map((l) => gardenPool(l, this.rowOf(0))));
+    // (Under the garden's lamps, and outside the windows of the house's rooms: lit as the rooms are.)
+    const ground = (z: number) => this.storeyOf(z) === 0;
+    const underLamps = lights.filter((l) => l.kind === 'lamp' && l.room === 0 && ground(l.z)).map((l) => gardenPool(l, this.rowOf(0)));
+    this.gardenPools?.set(this.storey >= 0 ? [...underLamps, ...windowPools(world, ground, this.rowOf(0), inView)] : underLamps);
     this.applyGardenPools();
     // (the interior lights and the rooms they keep to, `lamps.ts`.)
     this.lamps.markRooms(world, view);
@@ -2159,7 +2162,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /** The garden's pools of lamplight, as bright as its lamps are now. */
   private applyGardenPools(): void {
-    this.gardenPools?.update(this.glowLevel, this.poolLampOn, this.lampColor);
+    this.gardenPools?.update(this.glowLevel, this.poolOn, this.lampColor);
   }
 
   /** Model files that failed have come (gathered by `modelRefresh`): the world draws again what it drew without them (once no build runs). */

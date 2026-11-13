@@ -29,7 +29,8 @@
  *   from one map: a lamp that casts is a spot light, along its shade's way or straight down, and one without
  *   a shade still lights all round (`shape`).
  * - The glows: the shades' and fires' (`LotContents.applyGlow`, through `glow`), the windows' by
- *   room (`HouseBuilder.setWindowGlow`) and the garden's pools (the renderer's, `hooks.pools`).
+ *   room (`HouseBuilder.setWindowGlow`) and the garden's pools (the renderer's, `hooks.pools`: under the
+ *   garden's lamps, and outside the windows of lit rooms, `windowLight`).
  *
  * Per frame (`frame`): the fades, no allocations; lights and glows change only when one moved.
  */
@@ -242,6 +243,17 @@ export class Lamps {
   /** How far lamp `id` is on (1 on, 0 off, between while it fades; a light without a switch: 1). */
   lampOn(id: number | undefined): number {
     return id === undefined ? 1 : (this.lampFade.get(id) ?? (this.lampsOff?.has(id) ? 0 : 1));
+  }
+
+  /**
+   * How much of its light a room throws out through its windows (0..1, the garden's pools under them:
+   * `shared/gardenPools.ts` `windowPools`): its lamplight for its size, as its own light has it (`roomLight`; a room
+   * with only its dim fill a little), going out with its windows' glow as everyone in it falls asleep or its lamps
+   * are all switched off.
+   */
+  windowLight(room: number): number {
+    const lit = this.roomFlux.get(room);
+    return lit ? roomLight(lit.flux, lit.area, 1).bounce * (this.windowGlowOn.get(room) ?? 1) : 0;
   }
 
   /** Leaves `meshes` out of the lamps (the landscape, as it changes: `LotContents.landscapeDraws`). */
