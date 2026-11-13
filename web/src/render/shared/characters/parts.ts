@@ -57,11 +57,11 @@ export const isWisps = (part: string): boolean => part.startsWith('hair.') && pa
 /** The surface a part is drawn with (the engine's resident material, `pc/characterMaterial.ts`). */
 export type CharacterSurface = 'body' | 'cloth' | 'cut' | 'hair' | 'wisp' | 'brow' | 'lash' | 'mouth' | 'eye';
 /**
- * The shells the shader cuts to the resident's own length (`cut`: cloth, with the cut as its opacity): the trousers,
- * one mesh for every bottom with legs (`outfit.ts` `LEGGED`). They have no `lod.` copy: far off the low-detail body
- * is painted.
+ * The shells the shader cuts to the resident's own garment (`cut`: cloth, with the cut as its opacity): the trousers,
+ * one mesh for every bottom with legs (`outfit.ts` `LEGGED`), and the long top, one mesh for every regular top
+ * (`REGULAR`). They have no `lod.` copy: far off the low-detail body is painted.
  */
-export const CUT_SHELLS: ReadonlySet<string> = new Set(['bottom.trousers']);
+export const CUT_SHELLS: ReadonlySet<string> = new Set(['bottom.trousers', 'top.long']);
 
 /** The surface part `part` is drawn with. */
 export function surfaceOf(part: string): CharacterSurface {

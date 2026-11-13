@@ -44,6 +44,13 @@ const ROMPER = 'bottom.shorts';
  */
 const LEGGED = new Set(['bottom.trousers', 'bottom.suit', 'bottom.shorts', 'bottom.capri']);
 const LEGS_SHELL = 'bottom.trousers';
+/**
+ * The tops worn as they are painted (not the jacket, the suit or the apron, shells of their own over a painted
+ * shirt), and the shell they are all worn as near the camera (clothes.rs `tops`: cut to the garment's sleeves, hem
+ * and neckline by the shader).
+ */
+const REGULAR = new Set(['top.tee', 'top.vneck', 'top.polo', 'top.long', 'top.shirt', 'top.tank', 'top.blouse']);
+const TOPS_SHELL = 'top.long';
 /** Shoes that go with formal clothes. */
 const FORMAL = new Set(['top.suit', 'bottom.suit', 'bottom.skirt']);
 
@@ -84,6 +91,8 @@ export interface OutfitParams {
   parts: string[];
   /** 1 if the bottom is worn as the trousers' shell (`LEGS_SHELL`; drawn unless `bare` has the bottoms), else 0. */
   legs: number;
+  /** 1 if the top is worn as the long top's shell (`TOPS_SHELL`; drawn unless `bare` has the tops), else 0. */
+  tops: number;
   /** Skin colour (linear rgb). */
   skin: [number, number, number];
   /** The body's skin reference colour (linear rgb, 1); the shader tints relative to it. */
@@ -221,7 +230,12 @@ function spareLook(id: number, gender: string, appearance: Appearance | null | u
   return look;
 }
 
-/** The outfit for `wear` (`fit`: the base body's, for the towel and swimwear) in the Sim's `outfit`-th clothes (`spareLook`). */
+/**
+ * The outfit for `wear` (`fit`: the base body's, for the towel and swimwear) in the Sim's `outfit`-th clothes
+ * (`spareLook`). `painted`: the top stays painted on the body (a resident drawn with the close-up body, the creator's
+ * stage: the long top's shell is level 1, and at the face view its shoulders and neckline are corners where the
+ * close-up body's are round).
+ */
 export function outfitFor(
   id: number,
   gender: string,
@@ -230,8 +244,9 @@ export function outfitFor(
   wear: Wear = 'day',
   fit?: OutfitFit,
   outfit = 0,
+  painted = false,
 ): OutfitParams {
-  const day = dayOutfit(id, gender, spareLook(id, gender, appearance, body, outfit), body, wear === 'night');
+  const day = dayOutfit(id, gender, spareLook(id, gender, appearance, body, outfit), body, wear === 'night', painted);
   if (fit) day.neck = fit.neck;
   if (wear === 'day') return day;
   const c = [...day.cuts] as OutfitParams['cuts'];
@@ -264,7 +279,7 @@ export function outfitFor(
 }
 
 /** Day outfit (or its colours as pyjamas, `sleep`). */
-function dayOutfit(id: number, gender: string, appearance: Appearance | null | undefined, body: BodyData, sleep: boolean): OutfitParams {
+function dayOutfit(id: number, gender: string, appearance: Appearance | null | undefined, body: BodyData, sleep: boolean, painted = false): OutfitParams {
   const r = (k: number) => hash(id * 31 + k);
   const has = (p: string) => p in body.garments;
   const skin = skinColour(appearance?.skin);
@@ -301,6 +316,8 @@ function dayOutfit(id: number, gender: string, appearance: Appearance | null | u
   // A bottom with legs is cloth of its own near the camera: the trousers' shell, whichever of them it is.
   const legs = LEGGED.has(bottomPart) && has(bottomPart) && body.parts.has(LEGS_SHELL) && body.stage !== 'baby' && appearance?.stage !== 'baby';
   if (legs && !parts.includes(LEGS_SHELL)) parts.push(LEGS_SHELL);
+  const tops = !painted && REGULAR.has(topPart) && has(topPart) && body.parts.has(TOPS_SHELL) && body.stage !== 'baby' && appearance?.stage !== 'baby';
+  if (tops && !parts.includes(TOPS_SHELL)) parts.push(TOPS_SHELL);
   const t: GarmentCut = body.garments[topPart] ?? {};
   const b: GarmentCut = body.garments[bottomPart] ?? {};
   const s: GarmentCut = body.garments[shoePart] ?? {};
@@ -316,6 +333,7 @@ function dayOutfit(id: number, gender: string, appearance: Appearance | null | u
   return {
     parts,
     legs: legs ? 1 : 0,
+    tops: tops ? 1 : 0,
     skin,
     skinRef,
     top,
@@ -349,5 +367,6 @@ export function writeOutfit(o: OutfitParams, row: Float32Array, offset: number):
   row.set([o.skinRef[0], o.skinRef[1], o.skinRef[2], c[5]], offset + 20);
   row.set([o.shoe[0], o.shoe[1], o.shoe[2], c[6]], offset + 24);
   row.set([o.eyes[0], o.eyes[1], o.eyes[2], o.scalp], offset + 28);
-  row.set([o.ease[0], o.ease[1], o.ease[2], o.legs && !(o.bare & SHELL_BITS.bottom) ? 1 : 0], offset + 32);
+  // (a: 1 for the trousers' shell, 2 for the long top's, 3 for both.)
+  row.set([o.ease[0], o.ease[1], o.ease[2], (o.legs && !(o.bare & SHELL_BITS.bottom) ? 1 : 0) + (o.tops && !(o.bare & SHELL_BITS.top) ? 2 : 0)], offset + 32);
 }

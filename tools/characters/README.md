@@ -59,7 +59,7 @@ The generator's `.rs` files are in `crates/tools/src/characters/`.
 | which hair hangs loose and how much (tone.x) | `hair.rs` (`Comp::sway`, `loose`, `SWAY_*`) |
 | how hair and hems swing (the springs, how far, the dead band), and where a hem is loose | `web/src/render/shared/characters/sway.ts`; `web/src/render/pc/shaders/character.ts` (`gameSimSway`, `SWAY_HEM`) |
 | garment cuts and shells | `clothes.rs`, `garments.rs` |
-| the trousers' shell (every bottom with legs): its mesh; who wears it; how it is lifted, cut and shaded | `clothes.rs` (`trousers`, `LEGGED`); `web/src/render/shared/characters/outfit.ts` (`LEGGED`); `web/src/render/pc/shaders/character.ts` (`CUT`, `GAME_SIM_CUT`, `GAME_SIM_FAR`) |
+| the trousers' shell (every bottom with legs) and the long top's (every regular top): their meshes; who wears them; how they are lifted, cut and shaded | `clothes.rs` (`trousers`, `LEGGED`, `tops`, `REGULAR`); `web/src/render/shared/characters/outfit.ts` (`LEGGED`, `REGULAR`); `web/src/render/pc/shaders/character.ts` (`CUT`, `GAME_SIM_CUT`, `GAME_SIM_FAR`) |
 | clips | `clips/*.ts` (`dsl.ts` for the format, `ik.ts` for arm and leg placement) |
 | how a walk starts and stops (the first step, the last steps, the feet kept where they stand) | `web/src/render/shared/characters/stride.ts` (`STRIDE`) |
 | how residents use clips, seats, beds, carried things, what they ride | `web/src/render/shared/characters/` (`residents.ts`, `seats.ts`, `props.ts`, `vehicles.ts` for bikes and e-scooters) |
