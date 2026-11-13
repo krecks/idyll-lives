@@ -54,7 +54,7 @@ import { CUTOUT } from './cutout';
 import { DIAG_VIEW } from './diagView';
 import { gameNormalMap } from './bump';
 import { gameFresnel, gameReflection } from './envBrdf';
-import { gameFog } from './fog';
+import { gameFog, setFogFrom } from './fog';
 import { CONTACT_DIRECT, SOFT_LOOK } from './softLook';
 import { ROOM_LIGHT_CODE, ROOM_LIGHTS } from './roomLights';
 import { PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
@@ -234,7 +234,11 @@ const cache = new WeakMap<pc.GraphicsDevice, Record<Language, Record<string, str
 /** The chunk overrides for `device` (built once). */
 export function gameChunks(device: pc.GraphicsDevice): Record<Language, Record<string, string>> {
   let chunks = cache.get(device);
-  if (!chunks) cache.set(device, (chunks = { glsl: build(device, 'glsl'), wgsl: build(device, 'wgsl') }));
+  if (!chunks) {
+    cache.set(device, (chunks = { glsl: build(device, 'glsl'), wgsl: build(device, 'wgsl') }));
+    // (The haze from the eye until the renderer says otherwise: the gallery and the previews never do.)
+    setFogFrom(device, 0);
+  }
   return chunks;
 }
 
