@@ -48,11 +48,11 @@ Everything else (jobs, skills, money, building, the garden, every control and th
 
 ## Run it
 
-Requirements: Rust through rustup (the version is pinned in `rust-toolchain.toml`: 1.99.1 with clippy, rustfmt and the `wasm32-unknown-unknown` target), `wasm-bindgen-cli` 0.2.129 (it must match the `wasm-bindgen` crate in `Cargo.lock`), Bun 1.4 (the version is pinned in `web/package.json`).
+Requirements: Rust through rustup (the version is pinned in `rust-toolchain.toml`: 1.99.1 with clippy, rustfmt and the `wasm32-unknown-unknown` target), `wasm-bindgen-cli` 0.2.130 (it must match the `wasm-bindgen` crate in `Cargo.lock`), Bun 1.4 (the version is pinned in `web/package.json`).
 
 ```sh
 rustup toolchain install       # in the repo: the pinned toolchain, as CI does
-cargo install wasm-bindgen-cli --version 0.2.129
+cargo install wasm-bindgen-cli --version 0.2.130
 cd web
 bun install
 bun run dev      # builds both WASM modules, fetches the voice and language models, then starts Vite on http://localhost:5173
