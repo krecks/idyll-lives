@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { lookAtAge, randomHousehold } from '../../game/household';
   import { reducedMotion } from '../../game/host';
   import { menuScene } from '../../game/menuScene';
@@ -16,6 +16,10 @@
   /** Lot under the pointer (3D or a household card) and the lot the camera is on. */
   let hover = $state<number | null>(null);
   let focus = $state<number | null>(null);
+  let hoverOff = 0;
+  /** Last pointer position over the town view: the linger below re-checks it before dropping a tag. */
+  let pointerX = 0;
+  let pointerY = 0;
   let list = $state<HTMLElement>();
   /** The household list is scrolled to its end: the fade at its foot (more below) goes away. */
   let listEnd = $state(false);
@@ -44,6 +48,32 @@
         })
       : [],
   );
+
+  /**
+   * A "For sale" tag hangs above its lot, so reaching it means leaving the 3D stage first: the lot
+   * stays hovered a moment after the pointer goes, or the tag would be gone before the pointer got
+   * to it. Anything else (a household, a lot with a permanent tag) clears at once.
+   */
+  function setHover(plot: number | null): void {
+    clearTimeout(hoverOff);
+    const transient = hover !== null && vacant.includes(hover) && vacant.length > VACANT_TAGS;
+    if (plot !== null || !transient) {
+      hover = plot;
+      return;
+    }
+    // Kept only while the pointer is still on that lot (back down from its tag, say): anywhere else
+    // — empty ground, the street — and the tag goes.
+    hoverOff = setTimeout(() => {
+      if (menuScene.plotAt(pointerX, pointerY) !== hover) hover = null;
+    }, 160);
+  }
+
+  /** The pointer left the town view: whatever it was on goes now, tag or no tag. */
+  function leaveView(): void {
+    clearTimeout(hoverOff);
+    hover = null;
+  }
+  onDestroy(() => clearTimeout(hoverOff));
 
   /** The world from step 1, nobody living there yet. */
   const world = (): NeighbourhoodDraft | null => app.world ?? (town && { ...town, households: [] });
@@ -110,9 +140,18 @@
   const focused = $derived(town && focus !== null ? town.households.find((h) => h.slot === focus) : undefined);
 
   // A list that fits its panel needs no fade at the foot (it would dim the last card for nothing).
+  // Re-checked when the town changes and whenever the list's own box does: a taller window fits the
+  // list again, a shorter one (or a wrapped card) brings the fade back. Only the class changes on
+  // the outcome, and that moves no box, so the observer cannot feed itself.
   $effect(() => {
     void town;
-    if (list) listEnd = list.scrollHeight <= list.clientHeight + 4;
+    if (!list) return;
+    const el = list;
+    const fit = () => (listEnd = el.scrollHeight <= el.clientHeight + 4);
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    return () => observer.disconnect();
   });
 
   /** Click on a lot (3D, tag or card): the camera glides to it; again (or empty ground) back out. */
@@ -175,9 +214,18 @@
   </header>
 
   <main>
-    <section class="view">
+    <!-- Passive: the pointer's position and its leaving the view only tune the tag linger above. -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <section
+      class="view"
+      onpointermove={(e) => {
+        pointerX = e.clientX;
+        pointerY = e.clientY;
+      }}
+      onpointerleave={leaveView}
+    >
       {#if town}
-        <TownStage {labels} {hover} selected={focus} {focus} onhover={(p) => (hover = p)} onselect={select} />
+        <TownStage {labels} {hover} selected={focus} {focus} onhover={setHover} onselect={select} />
       {:else}
         <div></div>
       {/if}
@@ -219,19 +267,24 @@
           <span class="eyebrow">Who lives here</span>
           <span class="count">{town.households.length} {town.households.length === 1 ? 'household' : 'households'}</span>
         </header>
-        <div class="list" class:list-end={listEnd} bind:this={list} onscroll={(e) => (listEnd = e.currentTarget.scrollTop + e.currentTarget.clientHeight >= e.currentTarget.scrollHeight - 4)}>
+        <div
+          class="list"
+          class:list-end={listEnd}
+          bind:this={list}
+          onscroll={(e) => (listEnd = e.currentTarget.scrollTop + e.currentTarget.clientHeight >= e.currentTarget.scrollHeight - 4)}
+        >
           {#each town.households as h, i (h.household.name + i)}
             <article
               class="household"
               class:hover={hover === h.slot}
               class:focus={focus === h.slot}
-              onmouseenter={() => (hover = h.slot)}
-              onmouseleave={() => (hover = null)}
+              onmouseenter={() => setHover(h.slot)}
+              onmouseleave={() => setHover(null)}
             >
               <button class="pick" aria-label="Meet the {h.household.name}s" onclick={() => meet(h.slot)}>
                 <span class="faces">
                   {#each h.household.members as m (m.uid)}
-                    <span class="face" style:--skin={m.appearance.skin} title={m.name}><SimPreview appearance={lookAtAge(services.content, services.assets, m.appearance, m.age)} gender={m.gender} size={42} /></span>
+                    <span class="face" style:--skin={m.appearance.skin} title={m.name}><SimPreview appearance={lookAtAge(services.content, services.assets, m.appearance, m.age)} gender={m.gender} size={38} /></span>
                   {/each}
                 </span>
                 <span class="info">
@@ -483,6 +536,13 @@
     flex: none;
     width: 98px;
   }
+  /* Four is as many as a household gets (`maxHousehold`): the fourth widens its row rather than
+     spilling over the names. */
+  .faces:has(.face:nth-child(4)) {
+    width: 126px;
+  }
+  /* 42px across, 2px of it border: the portrait is drawn for the 38px hole it gets, not cropped
+     from 42 (which cut the shoulders and pushed the tinted rim out of sight). */
   .face {
     width: 42px;
     height: 42px;
