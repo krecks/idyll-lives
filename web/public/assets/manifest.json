@@ -984,6 +984,10 @@
       "type": "icon",
       "url": "icons/garage.svg"
     },
+    "icon.ui.porch": {
+      "type": "icon",
+      "url": "icons/porch.svg"
+    },
     "icon.ui.roof": {
       "type": "icon",
       "url": "icons/roof.svg"

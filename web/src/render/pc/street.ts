@@ -178,8 +178,8 @@ export class Street {
   /** The focus lot's own (its garage and porch), as built, and from which chunk key. */
   private lotMeshes: pc.Entity[] = [];
   private lotKey = '';
-  /** The focus lot's porch lamps (under `lotRoot`) and the cutaway's look bits that drop their wall; the cutaway as last given (`cutLot`). */
-  private lotPorch: { entity: pc.Entity; look: number } | null = null;
+  /** The focus lot's porch lamps (under `lotRoot`), a set a wall, and the cutaway's look bits that drop that wall; the cutaway as last given (`cutLot`). */
+  private lotPorches: { entity: pc.Entity; look: number }[] = [];
   private lotCut = { bits: 0, down: false };
   /** Instanced models by key (foliage, props, public places' things), kept hidden between builds. */
   private readonly templates: TemplateCache<ModelTemplate>;
@@ -380,7 +380,7 @@ export class Street {
       this.lotKey = lotKey;
       for (const e of this.lotMeshes) e.destroy();
       this.lotMeshes = [];
-      this.lotPorch = null;
+      this.lotPorches = [];
       const lot = lotPlan?.plan.lot;
       if (lot) {
         let parent = this.lotRoot;
@@ -400,18 +400,18 @@ export class Street {
         add(lot.props, 'streetLotProps', this.lib.plainFinish(), { cast: true });
         add(lot.glow, 'streetLotLamps', this.glowMat, { colors: false });
         add(lot.pools, 'streetLotPools', this.poolMat, { colors: false, receiveShadows: false, alphaIndex: 5 });
-        if (lot.porch) {
+        for (const porch of lot.porches) {
           const entity = new pc.Entity('streetLotPorch');
           this.lotRoot.addChild(entity);
           parent = entity;
-          add(lot.porch.props, 'streetLotPorchProps', this.lib.plainFinish(), { cast: true });
-          add(lot.porch.glow, 'streetLotPorchLamps', this.glowMat, { colors: false });
-          add(lot.porch.pools, 'streetLotPools', this.poolMat, { colors: false, receiveShadows: false, alphaIndex: 5 });
+          add(porch.props, 'streetLotPorchProps', this.lib.plainFinish(), { cast: true });
+          add(porch.glow, 'streetLotPorchLamps', this.glowMat, { colors: false });
+          add(porch.pools, 'streetLotPools', this.poolMat, { colors: false, receiveShadows: false, alphaIndex: 5 });
           // (After its meshes: they go first.)
           this.lotMeshes.push(entity);
-          this.lotPorch = { entity, look: lot.porch.look };
-          this.cutLot(this.lotCut.bits, this.lotCut.down);
+          this.lotPorches.push({ entity, look: porch.look });
         }
+        this.cutLot(this.lotCut.bits, this.lotCut.down);
         this.showPools(this.lotMeshes);
       }
     }
@@ -522,7 +522,7 @@ export class Street {
    */
   cutLot(bits: number, down: boolean): void {
     this.lotCut = { bits, down };
-    if (this.lotPorch) this.lotPorch.entity.enabled = !down && !(bits & this.lotPorch.look);
+    for (const p of this.lotPorches) p.entity.enabled = !down && !(bits & p.look);
   }
 
   /** Neighbours' houses: their wall boxes (x0, z0, x1, z1 on the ground's grid lines). */
@@ -794,7 +794,7 @@ export class Street {
     this.farData.clear();
     for (const e of this.lotMeshes) e.destroy();
     this.lotMeshes = [];
-    this.lotPorch = null;
+    this.lotPorches = [];
     this.lotKey = '';
     this.homes = [];
     this.boxes = [];

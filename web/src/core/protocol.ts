@@ -64,6 +64,14 @@ export type Command =
   | { type: 'buildGarage'; household: number; x0: number; z0: number; x1: number; z1: number; rot: number }
   /** Takes down the home lot's garage (sold back for `objectRules.resale` of its price). */
   | { type: 'sellGarage'; household: number }
+  /** A porch over a door of the home (its edge, `h` or `v`, on the ground storey), on the door's outdoor side; content `build.porch`. */
+  | { type: 'buildPorch'; household: number; axis: 'h' | 'v'; x: number; z: number }
+  /** Takes down the porch over a door of the home (sold back for `objectRules.resale` of its price). */
+  | { type: 'removePorch'; household: number; axis: 'h' | 'v'; x: number; z: number }
+  /** A porch piece on the home lot: tiles `x .. x + w` × `z .. z + d` (as turned), facing `rot`; content `build.porchPost`, or `porchCanopy` / `porchStep` a tile. */
+  | { type: 'buildPorchPiece'; household: number; kind: PorchPieceKind; x: number; z: number; w: number; d: number; rot: number }
+  /** Takes down the porch piece of `kind` on tile (x, z) of the home lot (sold back for `objectRules.resale` of its price). */
+  | { type: 'removePorchPiece'; household: number; kind: PorchPieceKind; x: number; z: number }
   /** New residents move into the household's home (`bonds` index into `sims`); `name` renames the household. */
   | { type: 'moveIn'; household: number; name?: string; sims: SimSpawn[]; bonds: { a: number; b: number; preset: string }[] }
   /** The resident's own routine blocks (the whole list). */
@@ -683,6 +691,10 @@ export interface WorldStructure {
   cars?: CarInfo[];
   /** Garages at the inner ends of driveways (sim-core `cars::Garage`: wall centre lines, by plot). Absent: a game from before them (the street places neighbours' own). */
   garages?: GarageInfo[];
+  /** Porches over doors (sim-core `porches::Porch`): the town's over its front doors, and the ones the player built. Absent: none. */
+  porches?: PorchInfo[];
+  /** Porch pieces standing on their own (sim-core `porches::PorchPiece`): posts, canopies and step platforms the player built. Absent: none. */
+  porchPieces?: PorchPieceInfo[];
   /**
    * The lanes where the kerbside furniture keeps back, for cars to pull over onto the pavement to
    * pass: every lane too narrow for two cars to pass in their lanes (a 6 m lane: sim-core
@@ -759,6 +771,33 @@ export interface GarageInfo {
   x1: number;
   z1: number;
   rot?: number;
+}
+
+/**
+ * A porch over a door (`WorldStructure.porches`): the door's edge on the ground storey (`h` along x
+ * on grid line z, `v` along z on grid line x) and the side it stands on (`out`: 1 towards larger z
+ * or x, -1 the other way). Landing, posts, a gabled canopy and a lamp (`HouseBuilder.porch`).
+ */
+export interface PorchInfo {
+  plot: number;
+  axis: 'h' | 'v';
+  x: number;
+  z: number;
+  out: number;
+}
+
+/** What a porch piece is: a post (it blocks its tile), a gabled canopy, a step platform. */
+export type PorchPieceKind = 'post' | 'canopy' | 'step';
+
+/** A porch piece (`WorldStructure.porchPieces`): the tiles it covers, `x .. x + w` × `z .. z + d` (as turned), and the way it faces (`rot`, as a thing's: 0 towards +z, 1 +x, 2 -z, 3 -x). */
+export interface PorchPieceInfo {
+  plot: number;
+  kind: PorchPieceKind;
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+  rot: number;
 }
 
 /** A household's car (`WorldStructure.cars`): where it parks (its middle, which way it faces: 0 towards +z) and its look (`shared/cars.ts`: its size is its body's). */
@@ -932,7 +971,7 @@ export interface Catalog {
     upgradeSkillPerLevel: number;
     resale: number;
   };
-  build: { wall: number; door: number; window: number; remove: number; diagonalWall?: number; fence?: number; gate?: number; garage?: number };
+  build: { wall: number; door: number; window: number; remove: number; diagonalWall?: number; fence?: number; gate?: number; garage?: number; porch?: number; porchPost?: number; porchCanopy?: number; porchStep?: number };
 }
 
 export interface CareerEntry {

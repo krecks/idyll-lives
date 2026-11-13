@@ -29,7 +29,7 @@ import { GAME_FRONT_FACE, MaterialLibrary } from './materials';
 import { setWallHole, wallHoleFor, type WallHole } from './wallHole';
 import type { Content } from '../../content/content';
 import type { DiagonalWall, Opening, WallEdge, WorldStructure } from '../../core/protocol';
-import type { EdgePreview, GaragePreview, PaintPreviewFace, RoomOverlayTile, ViewRect, WallMode } from '../types';
+import type { EdgePreview, GaragePreview, PaintPreviewFace, PorchPreview, RoomOverlayTile, ViewRect, WallMode } from '../types';
 import { GARAGE_HEIGHT, HALF_WALL_HEIGHT, WALL_HEIGHT, type HouseSurfaces } from '../shared/house';
 import { toLinear } from '../shared/math';
 
@@ -189,6 +189,10 @@ export class BuildPreviews {
   private readonly garageDoor: [Film, Film];
   private garageShown = '';
 
+  // The Porch tool: a porch's or a piece's boxes, green or red, and what they show.
+  private readonly porch: [Film, Film];
+  private porchShown = '';
+
   // The room overlay, and the tile grid.
   private overlay: OverlayDraw | null = null;
   private readonly grid: GridDraw;
@@ -227,7 +231,34 @@ export class BuildPreviews {
     // (A film for each colour: the colour a draw starts with is the one it keeps.)
     this.garage = [film('preview-garage', this.box, 0.34, pc.CULLFACE_NONE, 1, GARAGE_VALID), film('preview-garage-invalid', this.box, 0.34, pc.CULLFACE_NONE, 1, INVALID)];
     this.garageDoor = [film('preview-garage-door', this.box, 0.7, pc.CULLFACE_NONE, 1, GARAGE_DOOR), film('preview-garage-door-invalid', this.box, 0.7, pc.CULLFACE_NONE, 1, INVALID)];
+    this.porch = [film('preview-porch', this.box, 0.34, pc.CULLFACE_NONE, 8, GARAGE_VALID), film('preview-porch-invalid', this.box, 0.34, pc.CULLFACE_NONE, 8, INVALID)];
     this.grid = this.makeGrid();
+  }
+
+  setPorchPreview(p: PorchPreview | null): void {
+    const shown = p ? `${p.valid}|${p.boxes.map((b) => b.join(',')).join(';')}` : '';
+    if (shown === this.porchShown) return;
+    this.porchShown = shown;
+    for (const f of this.porch) f.draw.enabled = false;
+    if (!p || !p.boxes.length) return;
+    // Each box a film over it, as the garage's is.
+    const f = this.porch[p.valid ? 0 : 1];
+    const m = this.m;
+    f.draw.reserve(p.boxes.length);
+    p.boxes.forEach(([x0, y0, z0, x1, y1, z1], i) => {
+      m.fill(0);
+      m[0] = x1 - x0;
+      m[5] = y1 - y0;
+      m[10] = z1 - z0;
+      m[12] = (x0 + x1) / 2;
+      m[13] = (y0 + y1) / 2;
+      m[14] = (z0 + z1) / 2;
+      m[15] = 1;
+      f.draw.setMatrix(i, m);
+    });
+    f.draw.setCount(p.boxes.length);
+    f.draw.update(false);
+    f.draw.enabled = true;
   }
 
   setGaragePreview(g: GaragePreview | null): void {
@@ -418,6 +449,7 @@ export class BuildPreviews {
     this.setFloorPreview([], null);
     this.setRoomOverlay([]);
     this.setGaragePreview(null);
+    this.setPorchPreview(null);
     this.setBuildGrid(null);
     this.surfaces = null;
   }
@@ -425,7 +457,7 @@ export class BuildPreviews {
   destroy(): void {
     this.dropBuilt();
     for (const slot of Object.values(this.laid)) slot.entity?.destroy();
-    for (const f of [...Object.values(this.films), this.paint, this.floor, ...this.garage, ...this.garageDoor]) {
+    for (const f of [...Object.values(this.films), this.paint, this.floor, ...this.garage, ...this.garageDoor, ...this.porch]) {
       f.draw.destroy();
       f.material.destroy();
     }

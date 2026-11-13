@@ -166,6 +166,33 @@ describe('the street in chunks', async () => {
     expect(changed).toEqual([chunkAt(50, 10)]);
   });
 
+  test('a porch or a porch piece built or taken down plans only its lot’s chunk again, and draws it', () => {
+    // (The same world, its porches changed in place as a world message merges into it: `mergeWorld`.)
+    const world: WorldStructure = town(objects);
+    // (Fence styles kept as the game keeps them: the same list each time.)
+    const opts = { ...options, fenceStyles: [] };
+    const street = new TownStreet(new HousePlanner(), world, opts, 'game');
+    street.setWorld(world);
+    const ids = street.chunkIds();
+    const before = new Map(ids.map((id) => [id, street.chunkKey(id, 0)]));
+    const focus = drawn(street.chunk(chunkAt(30, 10), 0));
+    // Lot 2 (x 20..40, north of the road): a porch over its front door, a post in its garden.
+    world.porches = [{ plot: 2, axis: 'h', x: 28, z: 14, out: 1 }];
+    world.porchPieces = [{ plot: 2, kind: 'post', x: 22, z: 16, w: 1, d: 1, rot: 0 }];
+    street.setWorld(world);
+    const changed = ids.filter((id) => before.get(id) !== street.chunkKey(id, 0));
+    expect(changed).toEqual([chunkAt(30, 10)]);
+    const built = drawn(street.chunk(chunkAt(30, 10), 0));
+    expect(built).not.toBe(focus);
+    expect(built).toBe(drawn(new TownStreet(new HousePlanner(), { ...world }, opts, 'game').chunk(chunkAt(30, 10), 0)));
+    // Taken down again: as before.
+    delete world.porches;
+    delete world.porchPieces;
+    street.setWorld(world);
+    expect(ids.filter((id) => before.get(id) !== street.chunkKey(id, 0))).toEqual([]);
+    expect(drawn(street.chunk(chunkAt(30, 10), 0))).toBe(focus);
+  });
+
   test('planned after many focus lots and edits, a chunk is what a fresh street plans', () => {
     const planner = new HousePlanner();
     const world = town(objects);

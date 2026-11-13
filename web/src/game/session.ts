@@ -762,6 +762,11 @@ async function openSession(
         play('rotate');
         return;
       }
+      if (buildBuy.porchTool()) {
+        buildBuy.rotatePorch();
+        play('rotate');
+        return;
+      }
       if (!game.furnishing && !buildBuy.stairsTool()) return;
       // Facing and turn as one angle: a quarter turn, or 15° for things that turn freely.
       const turned = (def: string, rot: number, turn: number) => {
@@ -851,6 +856,14 @@ async function openSession(
     },
     sellGarage() {
       buildBuy.sellGarage();
+    },
+    removePorchHere() {
+      buildBuy.removePorchHere();
+    },
+    setPorchMode(mode, size) {
+      game.porchMode = mode;
+      if (size) game.porchSize = size;
+      buildBuy.porchChanged();
     },
     setRoof(style, color) {
       bridge.send({ type: 'setRoof', household: game.home, style, color });
@@ -1769,6 +1782,7 @@ async function openSession(
       case 'Delete':
       case 'Backspace':
         if (buildBuy.garageTool()) return controls.sellGarage();
+        if (buildBuy.porchTool()) return controls.removePorchHere();
         if (game.furnishing || buildBuy.stairsTool()) {
           const target = game.placing?.objectId ?? game.buySelection;
           if (target !== null) controls.sell(target);

@@ -82,6 +82,8 @@ export function tileWorld(world: WorldStructure, n: number): WorldStructure {
     fences: world.fences && many(world.fences, (f, tx, tz) => ({ ...f, x: f.x + tx * W, z: row(f.z, tz) })),
     floors: world.floors && many(world.floors, ([x, z, c], tx, tz): [number, number, number] => [x + tx * W, row(z, tz), c]),
     garages: world.garages && many(world.garages, (g, tx, tz, k) => ({ ...g, plot: g.plot + k * P, x0: g.x0 + tx * W, x1: g.x1 + tx * W, z0: g.z0 + tz * D, z1: g.z1 + tz * D })),
+    porches: world.porches && many(world.porches, (p, tx, tz, k) => ({ ...p, plot: p.plot + k * P, x: p.x + tx * W, z: p.z + tz * D })),
+    porchPieces: world.porchPieces && many(world.porchPieces, (p, tx, tz, k) => ({ ...p, plot: p.plot + k * P, x: p.x + tx * W, z: p.z + tz * D })),
   };
   last = { from: world, n, to };
   return to;

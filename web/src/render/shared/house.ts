@@ -34,7 +34,7 @@
  */
 
 import type { DoorStyleDef, FloorCoveringDef, LightAim, RoofColorDef, RoofStyleDef, WallCoveringDef, WindowStyleDef } from '../../content/content';
-import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type WorldStructure } from '../../core/protocol';
+import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type PorchInfo, type PorchPieceInfo, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
 import { roadIndex, townRoads } from './roads';
@@ -269,6 +269,8 @@ const CARPET = ['#B8AE9C', '#9FAAB8', '#B49C8C', '#A8B29A', '#C4B4A8'];
 const CURTAINS = ['#F2EDE0', '#E8D9B8', '#C9D6E2', '#E2C4BE', '#F4F1EA', '#E6E0C8'];
 /** Wall height of a garage (lower than the house). */
 export const GARAGE_HEIGHT = 2.5;
+/** How high a porch's posts reach, its canopy's eaves (and a porch piece's: `porchPiece`). */
+const PORCH_TOP = 2.34;
 
 type RoomKind = 'living' | 'bedroom' | 'bath' | 'kitchen';
 
@@ -465,8 +467,12 @@ export interface SilhouetteSpec {
   dressingOnly?: boolean;
   /** The street side: the outward normal (x, z) of the wall that faces the street ([0, 1]: the wall at z1, [-1, 0]: the wall at x0...). */
   front: [number, number];
-  /** Centre of the front door along the front wall (x, or z on a wall along z), where the garden path meets the house, if known. */
+  /** Centre of the front door along the front wall (x, or z on a wall along z), where the garden path meets the house, if known (the flower beds and pots keep clear of it). */
   door: number | null;
+  /** The porches over its doors (the simulation's, `WorldStructure.porches`; `porchDoors`). */
+  porches?: readonly PorchInfo[];
+  /** The porch pieces on its lot (`WorldStructure.porchPieces`; `HouseBuilder.porchPiece`): in its colours. */
+  pieces?: readonly PorchPieceInfo[];
   /** Garage beside the house (wall centre lines), its door facing the street, or `door` (its outward normal: one the player built). */
   garage: { x0: number; z0: number; x1: number; z1: number; door?: [number, number] } | null;
   /** The roof the player chose (`PlotInfo.roof`); absent: the house's own look. */
@@ -489,7 +495,7 @@ export interface SilhouettePlan {
   lamps: [number, number, number, number, number, number?][];
 }
 
-/** A front door a silhouette's porch stands over (`porchDoors`): its wall's axis, the wall's outer face, its outward normal and the door's middle along it. */
+/** A door a porch stands over (`porchDoors`): its wall's axis, the wall's outer face, its outward normal and the door's middle along it. */
 export interface PorchDoor {
   axis: 'h' | 'v';
   plane: number;
@@ -498,23 +504,18 @@ export interface PorchDoor {
 }
 
 /**
- * Where a house's porches stand: over each door on its ground storey in the front wall of its box
- * (`SilhouetteSpec.front`) that the garden path meets (`door`, its middle within 0.6 m). The same
- * for a neighbour's silhouette and the viewed lot's house (`dressingOnly`): a door moved off the
- * path, out of the front wall or taken out has none. `layout`: as for `silhouettes`.
+ * Where a house's porches stand: over the doors the simulation has them over (`SilhouetteSpec.porches`:
+ * the town's over its front doors, and those the player built), on the side each stands on. On the
+ * viewed lot's house (`dressingOnly`) every one; on a silhouette only those over a door in the
+ * outline of its box (one set back in the house would stand inside the box).
  */
-export function porchDoors(b: SilhouetteSpec, openings: readonly Opening[], layout: StoreyLayout | null = null): PorchDoor[] {
+export function porchDoors(b: SilhouetteSpec): PorchDoor[] {
   const out: PorchDoor[] = [];
-  if (b.door === null) return out;
-  const [fx, fz] = b.front;
-  const axis = fz ? 'h' : 'v';
-  const line = fz ? (fz > 0 ? b.z1 : b.z0) : fx > 0 ? b.x1 : b.x0;
-  const [a0, a1] = fz ? [b.x0, b.x1] : [b.z0, b.z1];
-  for (const o of openings) {
-    if (o.kind !== 'door' || o.axis !== axis || (layout && storeyOfRow(layout, o.z) !== 0)) continue;
-    const [at, a] = axis === 'h' ? [o.z, o.x] : [o.x, o.z];
-    if (at !== line || a < a0 || a >= a1 || Math.abs(a + 0.5 - b.door) >= 0.6) continue;
-    out.push({ axis, plane: line + (fz || fx) * T, n: [fx, 0, fz], mid: a + 0.5 });
+  for (const p of b.porches ?? []) {
+    const s = p.out > 0 ? 1 : -1;
+    const [at, a, a0, a1, line] = p.axis === 'h' ? [p.z, p.x, b.x0, b.x1, s > 0 ? b.z1 : b.z0] : [p.x, p.z, b.z0, b.z1, s > 0 ? b.x1 : b.x0];
+    if (!b.dressingOnly && (at !== line || a < a0 || a >= a1)) continue;
+    out.push({ axis: p.axis, plane: at + s * T, n: p.axis === 'h' ? [0, 0, s] : [s, 0, 0], mid: a + 0.5 });
   }
   return out;
 }
@@ -1952,7 +1953,8 @@ export class HousePlanner {
       const walls = s.brick ? brick : siding;
       // The porch over its front door; on the viewed lot's house it goes with its wall in the cutaway.
       const porches = () => {
-        for (const d of porchDoors(b, openings, layout)) this.porch(d, s, walls, roof, trim, lamps, b.dressingOnly ? lookAt(d.n) : 0);
+        for (const d of porchDoors(b)) this.porch(d, s, walls, roof, trim, lamps, b.dressingOnly ? lookAt(d.n) : 0);
+        for (const p of b.pieces ?? []) this.porchPiece(p, s, walls, roof, trim);
       };
       if (b.dressingOnly) {
         if (b.garage) garage(b, b.garage, s, walls);
@@ -2082,7 +2084,7 @@ export class HousePlanner {
     trim.color('#C9C4BA');
     box(mid - half, 0, z0, mid + half, 0.05, z1, 'ny');
     box(mid - half + 0.15, 0, z1, mid + half - 0.15, 0.025, z1 + out * 0.3, 'ny');
-    const top = 2.34;
+    const top = PORCH_TOP;
     trim.color(TRIM);
     cut(Cut.Clamp);
     for (const x of [mid - half + 0.08, mid + half - 0.08]) {
@@ -2105,6 +2107,44 @@ export class HousePlanner {
     box(mid + 0.66, 1.62, plane, mid + 0.78, 1.66, plane + out * 0.05);
     trim.color(TRIM);
     for (const g of [trim, roof, walls]) g.cutting(Cut.Keep);
+  }
+
+  /**
+   * A porch piece on its own (`PorchPieceInfo`), of the porch's parts (`porch`) and in the house's
+   * colours (`s`): a post in the middle of its tile with its base; a gabled canopy over its tiles at
+   * the porch's height, its ridge the way it faces, the house's roof with gables in its walls'
+   * colour, its eaves stopping inside a wall on its outline; a step platform, the porch's landing
+   * over its tiles with a lower step along its front. It stays in the cutaway (nothing of it
+   * stands in a wall, nor shows indoors).
+   */
+  porchPiece(p: PorchPieceInfo, s: HouseScheme, walls: Geo, roof: Geo, trim: Geo): void {
+    for (const g of [trim, roof, walls]) g.cutting(Cut.Keep);
+    const [x0, z0, x1, z1] = [p.x, p.z, p.x + p.w, p.z + p.d];
+    if (p.kind === 'post') {
+      const [cx, cz] = [p.x + 0.5, p.z + 0.5];
+      trim.color(TRIM);
+      trim.box(cx - 0.055, 0, cz - 0.055, cx + 0.055, PORCH_TOP, cz + 0.055, 'ny');
+      trim.box(cx - 0.08, 0, cz - 0.08, cx + 0.08, 0.22, cz + 0.08, 'ny');
+    } else if (p.kind === 'canopy') {
+      walls.color(s.wall);
+      roof.color(s.roof);
+      // Its eaves and gables a centimetre inside a wall on its outline (its back against the house),
+      // so nothing of it shows indoors (as the porch's canopy, a wall's half thickness and its overhang in).
+      const i = 2 * T - 0.01;
+      addRoof({ x0: x0 + i, z0: z0 + i, x1: x1 - i, z1: z1 - i }, false, roof, trim, walls, PORCH_TOP, 0.12, PITCH, p.rot % 2 === 1);
+      trim.color(TRIM);
+    } else {
+      // The landing, and the step down along its front (the way it faces) a little narrower.
+      const r = ((p.rot % 4) + 4) % 4;
+      const step = 0.3;
+      const inset = 0.15;
+      trim.color('#C9C4BA');
+      const [l0, m0, l1, m1] = r === 0 ? [x0, z0, x1, z1 - step] : r === 1 ? [x0, z0, x1 - step, z1] : r === 2 ? [x0, z0 + step, x1, z1] : [x0 + step, z0, x1, z1];
+      trim.box(l0, 0, m0, l1, 0.05, m1, 'ny');
+      const [s0, t0, s1, t1] = r === 0 ? [x0 + inset, z1 - step, x1 - inset, z1] : r === 1 ? [x1 - step, z0 + inset, x1, z1 - inset] : r === 2 ? [x0 + inset, z0, x1 - inset, z0 + step] : [x0, z0 + inset, x0 + step, z1 - inset];
+      trim.box(s0, 0, t0, s1, 0.025, t1, 'ny');
+      trim.color(TRIM);
+    }
   }
 
   /** A brick chimney through one roof slope near a gable end, with a stone cap, on a roof whose eaves are `base` high. */

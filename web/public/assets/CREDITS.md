@@ -508,7 +508,7 @@ override pack
 | `textures/sky/clouds.png` | Cloud band of the sky | `cargo tex clouds` (procedural noise, `crates/tools/src/tex.rs`) |
 | `textures/<set>/albedo.jpg`, `normal.jpg`, `arm.jpg`; `street/sidewalk/*.jpg` | All 20 surface sets (`bark` … `wood_oak`, `sidewalk`) | `cargo tex synth` (procedural height fields, `crates/tools/src/tex/synth.rs`) |
 | `textures/leafcards/albedo.png` | The trees' leaf cards: three cut-out clusters of leaves and a dense wall of them | `cargo art --leafcards` (rendered in Blender from leaves generated in code, `tools/art/blender/leafcards.py`) |
-| `icons/rotate.svg`, `wall.svg`, `door.svg`, `eraser.svg`, `eyedropper.svg`, `environment.svg`, `fence.svg`, `gate.svg`, `garage.svg`, `roof.svg`, `upgrade.svg`, `focused.svg`, `inspired.svg`, `energized.svg`, `relaxed.svg` | UI and emotion icons | Hand-written SVG in the style of the existing set |
+| `icons/rotate.svg`, `wall.svg`, `door.svg`, `eraser.svg`, `eyedropper.svg`, `environment.svg`, `fence.svg`, `gate.svg`, `garage.svg`, `porch.svg`, `roof.svg`, `upgrade.svg`, `focused.svg`, `inspired.svg`, `energized.svg`, `relaxed.svg` | UI and emotion icons | Hand-written SVG in the style of the existing set |
 
 ## Characters (`characters/`)
 
@@ -523,7 +523,7 @@ expressions of TalkingHead by Mika Suominen (MIT, https://github.com/met4citizen
 
 ## Street and gardens (`street/`)
 
-The neighbourhood dressing (`render/shared/street.ts`, drawn by `render/pc/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages in `house.ts`) is built from primitives in code (original, CC0). The flower-clump models are Blender-built (`packs/street`, above); the hedges are the plants pack's (`models/plants/hedge.glb`). The sidewalk surface is `cargo tex synth sidewalk`, generated like the other textures (original, CC0).
+The neighbourhood dressing (`render/shared/street.ts`, drawn by `render/pc/street.ts`: sidewalks, kerbs, streetlights, mailboxes, hydrants, bins, cars, picket fences, flower beds; neighbour porches, chimneys and garages, and the porch pieces, in `house.ts`) is built from primitives in code (original, CC0). The flower-clump models are Blender-built (`packs/street`, above); the hedges are the plants pack's (`models/plants/hedge.glb`). The sidewalk surface is `cargo tex synth sidewalk`, generated like the other textures (original, CC0).
 
 ## Resident voices (`../voice/`, fetched by `cargo fetch-voice`)
 

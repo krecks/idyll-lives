@@ -14,7 +14,7 @@
 
 import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
-import type { GameKind, LandscapeParams, Lifespan, TownArea, TownExit, WorldLook, WorldMeta, WorldSize } from '../core/protocol';
+import type { GameKind, LandscapeParams, Lifespan, PorchInfo, TownArea, TownExit, WorldLook, WorldMeta, WorldSize } from '../core/protocol';
 import { fetchText } from '../content/content';
 import { bedroomsNeeded, householdBonds, householdSpawns, randomHousehold, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { homePrice } from './price';
@@ -1147,6 +1147,8 @@ export interface TownLayout {
   fields: Rect[];
   /** Garages at the inner ends of driveways (`garageFor`: wall centre lines; `plot`: the slot's index). */
   garages: { plot: number; x0: number; z0: number; x1: number; z1: number }[];
+  /** A porch over each house's and shop's front door that stands in the front of its walls (`frontPorch`; `plot`: the slot's index). */
+  porches: PorchInfo[];
   /** Each house's driveway: the middle of its inner end and of its end at the street (town tiles), and where its line meets a road (`driveMeets`). */
   drives: { plot: number; inner: Pt; street: Pt; facing: Facing; meets: DriveMeet | null }[];
   /** The households' cars (`plot`: the slot's index), parked on their driveways where the street draws them (`houseCar`, town tiles). */
@@ -1213,6 +1215,12 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     }
     return false;
   };
+  const porches: PorchInfo[] = [];
+  /** A porch over the front door of a layout's walls (plot coordinates), where it has one (`frontPorch`). */
+  const porchOver = (s: PlotSlot, f: { walls?: Wall[] }, front: Door) => {
+    const p = frontPorch(f.walls ?? [], front, turnOnto(t, s), s.index);
+    if (p) porches.push(p);
+  };
   /** A garden path from a front door (plot coordinates) to the street, and on across the verge. */
   const pathTo = (s: PlotSlot, front: Door) => {
     const r = { x: front.x, z: 0, w: 1, d: front.z };
@@ -1248,7 +1256,10 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       if (!place) continue;
       shell(s, place);
       placeAll(s, place.objects);
-      if (place.doors?.[0]) pathTo(s, place.doors[0]);
+      if (place.doors?.[0]) {
+        pathTo(s, place.doors[0]);
+        porchOver(s, place, place.doors[0]);
+      }
       paths.push(...(place.paths ?? []).map(turnOnto(t, s).rect));
       continue;
     }
@@ -1273,8 +1284,11 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       placeAll(s, h.basement.objects, storeys * town.depth);
       basement = true;
     }
-    // A garden path from the front door to the street.
-    if (h.doors[0]) pathTo(s, h.doors[0]);
+    // A garden path from the front door to the street, and a porch over the door.
+    if (h.doors[0]) {
+      pathTo(s, h.doors[0]);
+      porchOver(s, h, h.doors[0]);
+    }
     // A driveway beside the house, crossing the verge to the road: on the side whose line meets
     // its road squarely (`driveMeets`), where a car can turn out onto it, if either side's does.
     const turn = turnOnto(t, s);
@@ -1345,7 +1359,25 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
   }
   dropCrowdedTrees(content, walls, objects, town.depth);
   const fences = gardenFencesOf(content, town, { walls, objects, paths, fields, garages, plots }, driveOf, roomFor);
-  return { walls, doors, windows, objects, paths, fields, garages, drives, cars, plots, facing: town.slots.map((s) => s.facing), storeys, basement, fences };
+  return { walls, doors, windows, objects, paths, fields, garages, porches, drives, cars, plots, facing: town.slots.map((s) => s.facing), storeys, basement, fences };
+}
+
+/**
+ * The porch over a layout's front door (plot coordinates: its street at z = 0, the door's garden
+ * path running up to it), turned onto the town: where the door stands in the front of the box of
+ * its walls (a door set back in a notch has none), as the street drew porches before they were the
+ * simulation's (sim-core `porches.rs`). On the door's street side.
+ */
+export function frontPorch(walls: readonly Wall[], front: Door, turn: ReturnType<typeof turner>, plot: number): PorchInfo | null {
+  if (front.axis !== 'x' || !walls.length) return null;
+  const xs = walls.flatMap(([x0, , x1]) => [x0, x1]);
+  const zs = walls.flatMap(([, z0, , z1]) => [z0, z1]);
+  if (front.z !== Math.min(...zs) || front.x < Math.min(...xs) || front.x >= Math.max(...xs)) return null;
+  const e = turn.edge(front);
+  // The way out of the door (towards the street, -z on the plot), turned.
+  const [ax, az] = turn.point([front.x + 0.5, front.z]);
+  const [bx, bz] = turn.point([front.x + 0.5, front.z - 1]);
+  return e.axis === 'x' ? { plot, axis: 'h', x: e.x, z: e.z, out: Math.sign(bz - az) } : { plot, axis: 'v', x: e.x, z: e.z, out: Math.sign(bx - ax) };
 }
 
 /**
@@ -1472,7 +1504,7 @@ export function assembleTown(
   { existing = false, mode = 'living', lifespan = 'normal' }: AssembleOptions = {},
   rand: Rand = Math.random,
 ): string {
-  const { walls, doors, windows, objects, paths, fields, garages, drives, cars, plots, facing, storeys, basement, fences } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
+  const { walls, doors, windows, objects, paths, fields, garages, porches, drives, cars, plots, facing, storeys, basement, fences } = layoutTown(content, t, town, playerSlot, existing ? undefined : player);
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
 
   if (existing && !town.households.some((h) => h.slot === playerSlot)) throw new Error('Nobody lives in that house.');
@@ -1549,6 +1581,7 @@ export function assembleTown(
     relationships,
     exits,
     garages,
+    porches,
     roads: town.roads,
     areas: open.areas,
     ...open.file,

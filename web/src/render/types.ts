@@ -181,6 +181,12 @@ export interface GaragePreview {
   sell?: boolean;
 }
 
+/** A porch or a porch piece in preview (`setPorchPreview`): its boxes (`[x0, y0, z0, x1, y1, z1]`, ground rows), green where it fits, red where it doesn't or goes. */
+export interface PorchPreview {
+  boxes: readonly (readonly [number, number, number, number, number, number])[];
+  valid: boolean;
+}
+
 export interface BuildEffect {
   kind: 'place' | 'upgrade' | 'sell' | 'build' | 'remove';
   /** Tile rectangle it covers. */
@@ -495,6 +501,8 @@ export interface Renderer {
   setFloorPreview(tiles: readonly { x: number; z: number }[], floor: number | null): void;
   /** Build mode's Garage tool: the garage it would build or (`sell`) take down (null: none). Cheap; call on every pointer move. */
   setGaragePreview(garage: GaragePreview | null): void;
+  /** Build mode's Porch tool: the porch or the piece a click would build (green, or red where it doesn't fit) or take down (red); null hides it. */
+  setPorchPreview(porch: PorchPreview | null): void;
   /** Build mode's room-score overlay: a film over each tile in its colour (`rgb` 0..1); empty hides it. */
   setRoomOverlay(tiles: readonly RoomOverlayTile[]): void;
   /** Build/buy mode: subtle tile grid over a tile rectangle (null hides it). */
