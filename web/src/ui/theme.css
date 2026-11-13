@@ -105,8 +105,9 @@ button:focus-visible {
   /* Title-screen panel (dark, cinematic). */
   --glass-dark: rgba(14, 18, 26, 0.5);
   --glass-dark-border: rgba(255, 255, 255, 0.14);
-  /* Soft light haze behind header text at the top of the screen. */
-  --scene-haze: linear-gradient(180deg, rgba(252, 249, 243, 0.92) 0%, rgba(252, 249, 243, 0.72) 48%, rgba(252, 249, 243, 0) 100%);
+  /* Soft light haze behind header text at the top of the screen: enough for the text to read on roofs and roads,
+     not so much that the town's far side goes white under it (the scene's own haze begins well past the town). */
+  --scene-haze: linear-gradient(180deg, rgba(252, 249, 243, 0.85) 0%, rgba(252, 249, 243, 0.62) 50%, rgba(252, 249, 243, 0.28) 75%, rgba(252, 249, 243, 0) 100%);
   /* Tags pinned above lots. */
   --tag-bg: rgba(255, 255, 255, 0.93);
   --tag-shadow: 0 6px 18px rgba(16, 22, 40, 0.28), 0 1px 2px rgba(16, 22, 40, 0.18);

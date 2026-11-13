@@ -298,6 +298,14 @@ export class Flight {
   }
 }
 
+/** A big world's warm-up builds and draws this many lots besides the one in view (`PlayCanvasRenderer.warmGame`). */
+export const WARM_LOTS = 6;
+/**
+ * A lot adding fewer new kinds than this isn't worth its build (a quarter to half a second behind the
+ * loading screen): what it would have warmed is made when first seen, a frame or two's work.
+ */
+export const WARM_MIN_GAIN = 3;
+
 /** What `warmLots` reads of a world: its lots and what stands on them (rows of upper storeys below the ground's, `storeyDepth` apart). */
 export interface WarmWorld {
   plots: readonly { x: number; z: number; w: number; d: number; house: unknown }[];
@@ -312,11 +320,11 @@ export interface WarmWorld {
 /**
  * Up to `max` lots with houses (besides `home`) that between them show the most of what a big
  * world's houses are made of (wall coverings, half walls, floors, door and window styles, things):
- * each in turn the one adding the most not yet seen (none once a lot adds nothing). The warm-up
+ * each in turn the one adding the most not yet seen (none once a lot adds less than `WARM_MIN_GAIN`). The warm-up
  * builds each in full behind the loading veil, so a lot the roaming camera settles on later makes
- * few pipelines in play (`PlayCanvasRenderer.warmGame`).
+ * few pipelines in play (`PlayCanvasRenderer.warmGame`). `gains`: how many new kinds each one adds.
  */
-export function warmLots(world: WarmWorld, home: { x: number; z: number } | null, max: number): { x: number; z: number; w: number; d: number }[] {
+export function warmLots(world: WarmWorld, home: { x: number; z: number } | null, max: number, gains?: number[]): { x: number; z: number; w: number; d: number }[] {
   const D = world.storeyDepth ?? world.depth;
   const isHome = (p: { x: number; z: number }) => !!home && p.x === home.x && p.z === home.z;
   const lots = world.plots.filter((p) => p.house || isHome(p));
@@ -341,7 +349,8 @@ export function warmLots(world: WarmWorld, home: { x: number; z: number } | null
       for (const k of s) if (!seen.has(k)) n++;
       if (n > gain) [best, gain] = [i, n];
     });
-    if (best < 0) break;
+    if (best < 0 || gain < WARM_MIN_GAIN) break;
+    gains?.push(gain);
     for (const k of what[best]) seen.add(k);
     const p = lots[best];
     out.push({ x: p.x, z: p.z, w: p.w, d: p.d });

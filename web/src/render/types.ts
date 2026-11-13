@@ -405,6 +405,11 @@ export interface Renderer {
   /** Resolves once the street has built the chunks streamed in round the camera, or after `limitMs`. */
   streamSettled(limitMs: number): Promise<void>;
   /**
+   * The loading screen covers the view (on) or no longer (off): world builds hold the main thread
+   * longer between frames, which nobody sees (the warm-up's always do).
+   */
+  setCovered(on: boolean): void;
+  /**
    * Told (null: no longer) what a world build and the warm-up are at: a step's name and how far
    * through them both it is (0..1), for the loading screen.
    */
@@ -677,20 +682,33 @@ export interface ItemStage {
   detach(): void;
 }
 
+export interface PortraitOptions {
+  /** `now` (the default): on screen, drawn first; `idle`: out of view, or ahead of time, drawn after. */
+  priority?: 'now' | 'idle';
+  /** Aborted: the asker has gone; the portrait isn't drawn for it (unless already being drawn). */
+  signal?: AbortSignal;
+}
+
 export interface SimPreviews {
   /** Attaches the stage to `host`; null when 3D characters are unavailable. */
   stage(host: HTMLElement): Promise<SimStage | null>;
-  /** Portrait image URL (cached by look; batched). Null when 3D characters are unavailable. */
-  portrait(look: SimLook): Promise<string | null>;
+  /**
+   * Portrait image URL (cached by look, for the page and between visits; batched). Null when 3D
+   * characters are unavailable, or once `signal` is aborted.
+   */
+  portrait(look: SimLook, options?: PortraitOptions): Promise<string | null>;
   /** The cached portrait URL, if there is one already. */
   cachedPortrait(look: SimLook): string | null;
   /** Renders portraits ahead of time (e.g. everyone in a game being prepared). */
   prefetch(looks: readonly SimLook[]): void;
+  /** Drops the portraits `prefetch` left for later (the screen that wanted them has gone). */
+  cancelAhead(): void;
   /**
-   * While on (a game is running), the engine stays when idle: new faces come up now and then in
-   * play, and a fresh engine would compile every shader again (a stutter each time).
+   * While anyone keeps it on (`who`: a game is running, the menus are up), the engine stays when idle:
+   * new faces come up now and then, and a fresh engine would compile every shader again (a stutter
+   * each time, and the device made again).
    */
-  keep(on: boolean): void;
+  keep(on: boolean, who?: string): void;
   wardrobe(gender: string): Promise<Wardrobe | null>;
 }
 

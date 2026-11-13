@@ -11,10 +11,17 @@
  *   middle.
  * - The fog factor is taken into linear space (`pow(f, 2.2)`, as the original does for PBR
  *   materials): the haze is about 2.2 times as strong near.
+ * - The haze begins `game_fogFrom` m from the eye (`setFogFrom`, one value a device; 0, from the eye, unless
+ *   told): the distance is counted from there. The play camera's is 0; from high over the town (the town view,
+ *   the menus' town: `shared/townCamera.ts` `townFogFrom`, `menuFogFrom`) it is a share of the camera's distance,
+ *   so the town in the middle of the picture is as clear as the play camera's lot and only what lies well past it
+ *   fades into the horizon. A density low enough to clear the town from up there washed the near half of the
+ *   picture, and left nothing for the far half; one high enough to fade the far land greyed the town.
  *
  * Other materials (unlit decals, particles) keep PlayCanvas's own.
  */
 
+import type * as pc from '../engine';
 import type { Language } from './chunks';
 
 /** The lines of `fogPS` replaced: the fragment's distance, and the exponential-squared factor. */
@@ -23,11 +30,17 @@ export const FOG_ANCHORS = {
   wgsl: { depth: 'let depth = pcPosition.z / pcPosition.w;', exp2: 'return evaluateFogFactorExp2(depth, uniform.fog_density);' },
 } as const;
 
+/** The haze's start's declaration, put before the engine's `fogPS` (whose own uniforms are declared inside its `#if`s). */
+const FOG_FROM_DECL: Record<Language, string> = {
+  glsl: '#ifdef GAME_LOOK\n\tuniform float game_fogFrom;\n#endif\n',
+  wgsl: '#ifdef GAME_LOOK\n\tuniform game_fogFrom: f32;\n#endif\n',
+};
+
 const FOG_CODE: Record<Language, { depth: string; exp2: string }> = {
   glsl: {
     depth: `
 		#ifdef GAME_LOOK
-			float depth = distance(vPositionW, view_position);
+			float depth = max(0.0, distance(vPositionW, view_position) - game_fogFrom);
 		#else
 			float depth = gl_FragCoord.z / gl_FragCoord.w;
 		#endif`,
@@ -40,7 +53,7 @@ const FOG_CODE: Record<Language, { depth: string; exp2: string }> = {
   wgsl: {
     depth: `
 		#ifdef GAME_LOOK
-			let depth = distance(vPositionW, uniform.view_position);
+			let depth = max(0.0, distance(vPositionW, uniform.view_position) - uniform.game_fogFrom);
 		#else
 			let depth = pcPosition.z / pcPosition.w;
 		#endif`,
@@ -57,5 +70,15 @@ const FOG_CODE: Record<Language, { depth: string; exp2: string }> = {
 export function gameFog(engine: string, lang: Language, replaceOnce: (code: string, name: string, anchor: string, replacement: string) => string): string {
   const a = FOG_ANCHORS[lang];
   const c = FOG_CODE[lang];
-  return replaceOnce(replaceOnce(engine, 'fogPS', a.depth, c.depth), 'fogPS', a.exp2, c.exp2);
+  return FOG_FROM_DECL[lang] + replaceOnce(replaceOnce(engine, 'fogPS', a.depth, c.depth), 'fogPS', a.exp2, c.exp2);
+}
+
+/** Where the haze begins for `device`'s game materials: `metres` from the eye (0: at the eye, the play camera's). */
+export function setFogFrom(device: pc.GraphicsDevice, metres: number): void {
+  device.scope.resolve('game_fogFrom').setValue(Math.max(0, metres));
+}
+
+/** The haze's start for `device` as last set (`setFogFrom`; 0 before). */
+export function fogFrom(device: pc.GraphicsDevice): number {
+  return (device.scope.resolve('game_fogFrom').value as number | undefined) ?? 0;
 }

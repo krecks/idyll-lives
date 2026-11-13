@@ -25,6 +25,7 @@ import { MaterialLibrary } from '../pc/materials';
 import { drawAfter } from '../pc/meshes';
 import { pageLook } from '../pc/post';
 import type { AssetRegistry } from '../../assets/registry';
+import { perfTimeAsync } from '../../debug/perf';
 import type { FrameState } from '../../core/bridge';
 import type { SimInfo } from '../../core/protocol';
 import { simFields, tickRates, type SnapshotLayout } from '../../core/snapshot';
@@ -213,8 +214,15 @@ export class Studio {
 
   /** Puts a Sim into row `i` (null empties it). New looks are rebuilt before the next pose. */
   setRow(i: number, row: Row | null): void {
-    if (row) this.rows[i] = row;
-    else if (i < this.rows.length) this.rows[i] = null;
+    this.setRows([[i, row]]);
+  }
+
+  /** Several rows at once (`setRow`), built together. */
+  setRows(rows: readonly (readonly [number, Row | null])[]): void {
+    for (const [i, row] of rows) {
+      if (row) this.rows[i] = row;
+      else if (i < this.rows.length) this.rows[i] = null;
+    }
     while (this.rows.length && !this.rows[this.rows.length - 1]) this.rows.length--;
     this.sync();
   }
@@ -306,8 +314,7 @@ export class Studio {
     if (this.building || key === this.builtKey || this.disposed) return;
     this.building = true;
     const sims = this.rows.flatMap((r, i) => (r ? [simInfo(i, r.look, this.fine(r))] : []));
-    void this.characters
-      .build({ sims, objects: [] }, 'rows')
+    void perfTimeAsync('studio: build', () => this.characters.build({ sims, objects: [] }, 'rows'), `${sims.length} rows`)
       .catch((err: unknown) => console.warn('[preview] build failed', err))
       .finally(() => {
         this.builtKey = key;

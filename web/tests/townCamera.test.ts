@@ -1,14 +1,14 @@
 /**
  * The town view's camera (`render/shared/townCamera.ts`, docs/design/living-town.md "Camera modes"): one zoom from
  * the play orbit out to `TOWN_MAX` with nothing jumping at `TOWN_FROM`, the tilt eased into the bird's-eye range,
- * the target held over land and given back on the way in, the haze and the planes, the flights down from the town
- * view, and the roaming focus left alone up there.
+ * the target held over land and given back on the way in, the haze and the planes (the menus' town's too), the
+ * flights down from the town view, and the roaming focus left alone up there.
  */
 import { describe, expect, test } from 'bun:test';
 import { Flight, panBounds, Roam, SETTLE_MS, type FocusPlot } from '../src/render/shared/focus';
 import { BETA_LIMITS, LENS, RADIUS_LIMITS, TOWN_FROM, TOWN_FULL, TOWN_MAX, townBlend } from '../src/render/shared/lens';
 import { OrbitControls } from '../src/render/shared/orbit';
-import { TOWN_BETA, TOWN_FOG, TOWN_NEAR_SHARE, TOWN_RADIUS_LIMITS, townArrival, townBeta, townFar, townFog, townInset, townKeyZoom, townNear, townOrbit, townWheel } from '../src/render/shared/townCamera';
+import { edgeFog, FOG_EDGE, FOG_FROM, landEdge, menuFog, menuFogFrom, TOWN_BETA, TOWN_FOG, TOWN_NEAR_SHARE, TOWN_RADIUS_LIMITS, townArrival, townBeta, townFar, townFog, townFogFrom, townInset, townKeyZoom, townNear, townOrbit, townWheel } from '../src/render/shared/townCamera';
 
 const WORLD = { width: 1024, depth: 1024, meta: { world: { size: 'big' } } };
 const RING = 260;
@@ -70,6 +70,7 @@ describe('the town view: the orbit', () => {
       expect(townWheel(r)).toBe(1);
       expect(townKeyZoom(r)).toBe(1);
       expect(townFog(r)).toBe(1);
+      expect(townFogFrom(r)).toBe(0);
       expect(townNear(r, 1000)).toBe(Math.max(LENS.near, r * LENS.nearShare));
       expect(townFar(r, 2600, 0, 50, 0, -260, -260, 1284, 1284)).toBe(2600);
     }
@@ -321,6 +322,66 @@ describe('the town view: haze and planes', () => {
     }
     expect(clear(TOWN_MAX)).toBeCloseTo(clear(TOWN_FULL));
     expect(clear(TOWN_MAX)).toBeGreaterThan(0.85);
+  });
+
+  test('the haze begins past the town in the town view, moving out smoothly from the play camera’s', () => {
+    // (What is left of a thing `d` m off, as `shaders/fog.ts` draws it: the exponential-squared factor from the start, to the 2.2th.)
+    const clear = (d: number, r: number) => Math.exp(-2.2 * (Math.max(0, d - townFogFrom(r)) * 0.0032 * townFog(r)) ** 2);
+    let last = 0;
+    for (let r = TOWN_FROM; r <= TOWN_MAX; r += 5) {
+      const from = townFogFrom(r);
+      expect(from).toBeGreaterThanOrEqual(last);
+      expect(from - last).toBeLessThan(FOG_FROM * 5 * 4);
+      // The middle of the picture never hazier than from `TOWN_FROM`, and clear once halfway into the town view.
+      expect(clear(r, r)).toBeGreaterThanOrEqual(clear(TOWN_FROM, TOWN_FROM) - 1e-9);
+      if (townBlend(r) >= 0.5) expect(clear(r, r)).toBe(1);
+      last = from;
+    }
+    expect(townFogFrom(TOWN_FULL)).toBeCloseTo(FOG_FROM * TOWN_FULL);
+    // The town's far side, half the radius past its middle, clear from the full town view out.
+    for (const r of [TOWN_FULL, 650, TOWN_MAX]) expect(clear(r * 1.5, r)).toBe(1);
+  });
+
+  test('the menus’ town has the full town view’s haze at any distance, thinner round mountains', () => {
+    for (const r of [40, 120, 300, 640, 1100]) {
+      expect(menuFogFrom(r)).toBeCloseTo(FOG_FROM * r);
+      expect(menuFog(r, false)).toBeLessThanOrEqual(1);
+      expect(menuFog(r, true)).toBeCloseTo(menuFog(r, false) * 0.35);
+    }
+    expect(menuFog(TOWN_FULL, false)).toBeCloseTo(TOWN_FOG);
+    expect(menuFog(TOWN_MAX, false)).toBeCloseTo(townFog(TOWN_MAX));
+    // Close up (the lot a new-game screen glides to) the look's own density.
+    expect(menuFog(40, false)).toBe(1);
+  });
+
+  test('where the land ends ahead: the nearest of the picture’s middle and sides', () => {
+    const [x0, z0, x1, z1] = [-RING, -RING, 1024 + RING, 1024 + RING];
+    // Looking along -x (α 0) from the middle, the picture straight: the edge at x0, 500 m up.
+    expect(landEdge(512, 500, 512, 0, 0, x0, z0, x1, z1)).toBeCloseTo(Math.hypot(512 + RING, 500));
+    // The picture's sides reach the edge no further than its middle does.
+    expect(landEdge(512, 500, 512, 0, 0.6, x0, z0, x1, z1)).toBeLessThanOrEqual(landEdge(512, 500, 512, 0, 0, x0, z0, x1, z1));
+    // An eye off the land looking across it: where the line leaves it; looking away: nothing ends ahead.
+    expect(landEdge(1024 + RING + 300, 500, 512, 0, 0, x0, z0, x1, z1)).toBeCloseTo(Math.hypot(1024 + 2 * RING + 300, 500));
+    expect(landEdge(-RING - 300, 500, 512, 0, 0, x0, z0, x1, z1)).toBe(Infinity);
+  });
+
+  test('the land fades by its edge seen from above, not on a low camera’s horizon', () => {
+    const r = 900;
+    const from = FOG_FROM * r;
+    const haze = (d: number, density: number) => 1 - Math.exp(-2.2 * (Math.max(0, d - from) * density) ** 2);
+    expect(haze(2600, edgeFog(r, from, 2600, 0.8))).toBeCloseTo(FOG_EDGE);
+    // An edge nearer than the start: never thicker than that haze half the radius on.
+    expect(haze(from + r / 2, edgeFog(r, from, from - 100, 0.8))).toBeCloseTo(FOG_EDGE);
+    expect(edgeFog(r, from, 2600, 1.32)).toBe(0);
+    expect(edgeFog(r, from, Infinity, 0.8)).toBe(0);
+  });
+
+  test('the menus’ town has the full town view’s planes at any distance', () => {
+    const [x0, z0, x1, z1] = [-RING, -RING, 1024 + RING, 1024 + RING];
+    // The main menu's low shot, 440 m out: the far plane past the land's far corner, not the play camera's 1600 m.
+    const [ex, ey, ez] = [100, 110, 300];
+    expect(townFar(440, 1600, ex, ey, ez, x0, z0, x1, z1, 1)).toBeGreaterThan(Math.hypot(x1 - ex, ey, z1 - ez));
+    expect(townNear(440, 110, 1)).toBeCloseTo(Math.min(440 * TOWN_NEAR_SHARE, 55));
   });
 
   test('the near plane moves out with the town view, never past half the eye’s height over the land', () => {

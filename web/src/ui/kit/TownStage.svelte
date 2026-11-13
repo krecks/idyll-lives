@@ -6,6 +6,9 @@
     /** Look of the tag: a household, a house for sale, a public place (park or shop), the player's new home. */
     kind: 'home' | 'sale' | 'park' | 'mine';
   }
+
+  /** Which kinds' tags win room first, unless a screen says otherwise (`order`): the player's, households', houses for sale, places. */
+  export const TAG_ORDER: readonly LotLabel['kind'][] = ['mine', 'home', 'sale', 'park'];
 </script>
 
 <script lang="ts">
@@ -23,10 +26,13 @@
     selected = null,
     focus = null,
     selectable = () => true,
+    order = TAG_ORDER,
     onhover,
     onselect,
   }: {
     labels: LotLabel[];
+    /** Which kinds' tags win room first (`tagLayout.ts`); households' tags are also only so many at once. */
+    order?: readonly LotLabel['kind'][];
     hover?: number | null;
     selected?: number | null;
     /** Lot the camera glides to (null: the whole town). */
@@ -105,13 +111,17 @@
     menuScene.nudge(0, Math.exp(-e.deltaY * 0.0015));
   }
 
-  /** Svelte action: keeps a tag pinned above its lot. */
-  function pin(el: HTMLElement, plot: number) {
-    let detach = menuScene.pin(plot, el);
+  /** Svelte action: keeps a tag pinned above its lot, ranked by its kind (`order`). */
+  function pin(el: HTMLElement, l: LotLabel) {
+    let [plot, kind] = [l.plot, l.kind];
+    let detach = menuScene.pin(plot, el, order.indexOf(kind), kind === 'home');
     return {
-      update(next: number) {
+      // (The labels are made again on every hover: only another lot or kind pins it again.)
+      update(next: LotLabel) {
+        if (next.plot === plot && next.kind === kind) return;
+        [plot, kind] = [next.plot, next.kind];
         detach();
-        detach = menuScene.pin(next, el);
+        detach = menuScene.pin(plot, el, order.indexOf(kind), kind === 'home');
       },
       destroy: () => detach(),
     };
@@ -136,7 +146,7 @@
 
 <div class="tags" bind:this={tags} aria-label="Lots">
   {#each labels as l (l.plot)}
-    <div class="pin" use:pin={l.plot}>
+    <div class="pin" use:pin={l}>
       <button
         class="tag {l.kind}"
         class:hover={hover === l.plot}

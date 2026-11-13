@@ -756,3 +756,52 @@ handler once per message queued. Now (`view::StructureSync`, `core/bridge.ts` `m
   once a frame** on the main thread (`sync`), the newest merged; without frames, 100 ms later.
 - **World messages say which view they were built for** (`setView`'s `seq`): one built for the lot
   before is held until the new lot's comes, instead of being shown as the new lot's.
+
+## Loading: the boot, step 2's portraits, a household's entry (2026-11-13)
+
+What a new player waits for before playing, timed through the menus as a player goes
+(`tools/bench/loading.mjs`: a new browser context a run, the page's `Math.random` seeded so every run and
+build makes the same showcase, world and households; Medium/WebGPU, headless on the M3 Pro, the dev server,
+medians of 3 first visits; other work ran on the machine meanwhile, so single runs vary by ±2 s). Every
+`debug/perf.ts` span now also goes to the dev play log (`perf` lines), with a span per portrait batch, per
+studio build and per lot the warm-up builds.
+
+| moment | before | after |
+|---|---|---|
+| boot: the page to the main menu | 16.3 s | 10.8 s |
+| step 2: its portraits in view shown | 1.9–4.5 s | 1.3 s |
+| step 2: all 118 portraits shown | 8.1 s | 2.6 s |
+| entry: Play to the game up | 17.9 s | 12.6 s |
+
+Where the time went, and what changed:
+
+- **Boot drew 118 portraits nobody saw** (`boot: portraits`, up to its 8 s cap; 5.3 s median). The main menu
+  shows none, the showcase households are dropped when a new game starts, and their keys (`lookKey` of the
+  look without its life stage) never matched what the screens ask for. Now one face, at its age
+  (`lookAtAge`), warms the studio up (0.5 s), and the menu no longer queues the same 118 again.
+- **A batch of portraits took 0.4–2.4 s.** Its 16 Sims were put on their rows two a frame, each time
+  building all of them again (`studio: build` 1, 2, … 16 rows, eight frames before the first draw), and
+  each frame's six draws waited for the last six to be read back (one target per camera). Now the batch's
+  Sims are built at once (`Studio.setRows`, 80–130 ms for 16), each row draws into a target of its own so
+  the next draws don't wait, and a batch holds 32 (about what step 2's list shows), 8 drawn a frame:
+  0.3–0.6 s a batch. What is on screen goes first (`SimPreview` watches itself with an
+  `IntersectionObserver`: `priority` `now`, the rest `idle`), a face that left or changed withdraws its
+  request (`signal`), and the studio is kept from the boot on (`keep(true, 'page')`; the game kept it
+  anyway) rather than made again 4 s after each screen's last face. Portraits are kept between visits in
+  Cache Storage (`PortraitStore`, keyed by `lookKey` and the character files' contents), as the catalog's
+  pictures are.
+- **Entering a household**: its world build (`session: renderer setWorld`) ran in 4 ms slices, a frame's
+  wait after each (`pace`), behind a loading screen that covers it: 8.4 s. Behind the loading screen
+  (`Renderer.setCovered`, and the warm-up) the slices are 40 ms: 5.6 s. The warm-up's lots got the same
+  (`session: warm game` 4.3 → 2.1 s; a lot 0.2–0.25 s, the first 0.4–0.75 s), a lot that adds fewer than
+  `WARM_MIN_GAIN` (3) new kinds is no longer built (in the seeded world all six still are: they add 46–56,
+  29, 21–24, 18–19, 15 and 11–12), and their things' model files come with the house's download
+  (`gameAssetPlan`'s `warm`). The coverage stays: fewer lots would bring the pipelines back to the first
+  roam. The town's other faces wait until the game is
+  ready (drawn while it loaded, 4 at a time, they took frames from its build).
+
+Left as they were: the menu's town build (`boot: menu town`, 9–10 s, most of the boot: the neighbourhood
+generated 2.8 s, its nature and street), step 1's and step 2's town builds (which overlap when the player
+goes on quickly), and the session's `assembleTown` (1.6–2.3 s) and `SimBridge.start` (1.7–1.9 s). The
+warm-up still builds the home again after its lots (0.2 s): building them before the home would change
+where the camera is first placed and which build waits for the birds, for little.

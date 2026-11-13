@@ -143,7 +143,8 @@ zooms out) and `townBlend(radius)` (0..1, smoothstep from `TOWN_FROM` to `TOWN_F
 - As `townBlend` rises from 0 to 1:
   - beta is eased into the range 0.6 to 1.0;
   - the target is held over land (`panBounds`);
-  - the fog's density falls to about a quarter;
+  - the fog's density falls to about a quarter, and the fog begins 1.5 times the radius out, past the town
+    (`townFogFrom`), thick enough by the land's edge to fade it into the sky (`edgeFog`);
   - the far plane covers the whole world.
 - `web/src/render/shared/townView.ts` `townView` is the shared state: `blend`, `radius`, `target` and
   `project` (a world point to CSS pixels), written by the renderer every frame. It also holds `goTo({ x, z,
