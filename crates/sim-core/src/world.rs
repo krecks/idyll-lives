@@ -1909,6 +1909,9 @@ pub struct World {
     /// Which cars (a bit each, 64 to a word) stood parked when `car_tiles` was worked out; None:
     /// work it out again (`cars::reblock`).
     pub(crate) cars_parked: Option<Vec<u64>>,
+    /// Cars by where they are, so a check that pairs one with another need only look at those
+    /// near it (`cars::Near`; built each tick, `cars::update`).
+    pub(crate) cars_near: crate::cars::Near,
     /// Opaque presentation data from the lot/town file, saved unchanged.
     pub meta: serde_json::Value,
     /// The town's paths and driveways (`meta.paths`) as rects (`x0, z0, x1, z1`): where a bike left
@@ -2341,6 +2344,7 @@ impl World {
             car_tiles: Vec::new(),
             cars_nav: 0,
             cars_parked: None,
+            cars_near: Default::default(),
             meta: serde_json::Value::Null,
             paths: Vec::new(),
             undo: Vec::new(),

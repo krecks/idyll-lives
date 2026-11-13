@@ -1017,6 +1017,12 @@ impl Car {
             })
     }
 
+    /// Where its middle is, for the checks that pair it with another (`Near`): as it's drawn, or
+    /// its spot.
+    fn middle(&self) -> [f32; 2] {
+        self.shown.map_or(self.spot, |s| s.0)
+    }
+
     /// Coming into town from the way in (not from a trip's parking spot), it hasn't yet: out of
     /// sight there, waiting for room to come in (`drive_on`).
     fn outside(&self) -> bool {
@@ -3256,6 +3262,8 @@ pub(crate) fn update(w: &mut World) {
     if w.cars.is_empty() {
         return;
     }
+    // (Where each car is, for those pairing up this tick: `pull_want`.)
+    w.cars_near.build(&w.cars);
     let tick = w.tick;
     if w.cars_nav != w.nav_version {
         w.cars_nav = w.nav_version;
@@ -4221,6 +4229,84 @@ fn pull_over(w: &mut World, c: usize, others: &[Driving], moving: bool, waited: 
     }
 }
 
+/// How far apart (m, their middles) car `car` and another can be and still have one pull over for
+/// the other (`pull_want`): their bodies end to end, `PULL_AHEAD` of the way ahead it looks, the
+/// gap it keeps (`PASSING`, `PULL_MARGIN`), and `SLACK` for a tick's driving either way.
+fn pull_reach(len: f32, wid: f32, most_len: f32, most_wid: f32) -> f32 {
+    len + most_len + (wid + most_wid) / 2.0 + PULL_AHEAD + PASSING + PULL_MARGIN + PULL_SLACK
+}
+
+/// Room to spare (m) in `pull_reach` for how far a car may move between `cars::update` building
+/// `Near` and one looking (`drive_on` a tick on, `back_off` a tick back).
+const PULL_SLACK: f32 = 2.0;
+
+/// Cars by where they are, so a check that pairs one with another (`pull_want`) need only look at
+/// those near it, not at every car in town. `cars::update` builds it each tick; `turn_round_by`
+/// puts one back as it's put back along its way (tens of metres at once).
+#[derive(Default)]
+pub(crate) struct Near {
+    /// Each car's middle, as last put (none: not in).
+    at: Vec<Option<[f32; 2]>>,
+    /// The cars that are in, by the x of their middles.
+    by_x: Vec<(f32, usize)>,
+    /// The longest and widest car in, for how far a check reaches (`pull_reach`).
+    most_len: f32,
+    most_wid: f32,
+}
+
+impl Near {
+    /// Whether it has every car (`cars` of them) in it. If not (one driven on its own, a test),
+    /// `pull_want` looks at all of them.
+    fn covers(&self, cars: usize) -> bool {
+        self.at.len() == cars
+    }
+
+    /// Builds it afresh from `cars`.
+    fn build(&mut self, cars: &[Car]) {
+        self.at.clear();
+        self.at.reserve(cars.len());
+        self.most_len = 0.0;
+        self.most_wid = 0.0;
+        for car in cars {
+            self.at.push(Some(car.middle()));
+            self.most_len = self.most_len.max(car.len);
+            self.most_wid = self.most_wid.max(car.wid);
+        }
+        self.reorder();
+    }
+
+    /// Puts car `c` at `at` (as it is now).
+    fn put(&mut self, c: usize, at: [f32; 2]) {
+        if c >= self.at.len() {
+            self.at.resize(c + 1, None);
+        }
+        self.at[c] = Some(at);
+        self.reorder();
+    }
+
+    /// Sorts the cars by the x of their middles, after one is put (`build`, `put`).
+    fn reorder(&mut self) {
+        self.by_x = self
+            .at
+            .iter()
+            .enumerate()
+            .filter_map(|(c, p)| p.map(|p| (p[0], c)))
+            .collect();
+        self.by_x.sort_by(|a, b| a.0.total_cmp(&b.0));
+    }
+
+    /// The cars that may be within `reach` (m) of `at`: those whose middles are, near enough
+    /// along x to be (checked all ways).
+    fn near(&self, at: [f32; 2], reach: f32) -> impl Iterator<Item = usize> + '_ {
+        let lo = self.by_x.partition_point(|&(x, _)| x < at[0] - reach);
+        let hi = self.by_x.partition_point(|&(x, _)| x <= at[0] + reach);
+        self.by_x[lo..hi].iter().filter_map(move |&(_, c)| {
+            let p = self.at[c]?;
+            (crate::travel::dist(p, at) <= reach).then_some(c)
+        })
+    }
+}
+
 /// How far right of its lane car `c` would be pulled over (m) to pass those coming the other way in
 /// front of it (`PULL_AHEAD`) where the lane is too narrow for both in their lanes: half the
 /// way past another car (it pulls over the other half, as far as it can: `Route::room`); as far as
@@ -4274,7 +4360,16 @@ fn pull_want(w: &World, c: usize, moving: bool, after: &dyn Fn(u64) -> bool) -> 
         Some(((PASSING + PULL_MARGIN - gap).max(0.0), m.mine, m.theirs))
     };
     let (mut want, mut whom): (f32, Option<u64>) = (0.0, None);
-    for (o, other) in w.cars.iter().enumerate() {
+    // (Those near enough to be passing it: checking every car in town pairs every one with every
+    // other, `Near`.)
+    let reach = pull_reach(car.len, car.wid, w.cars_near.most_len, w.cars_near.most_wid);
+    let close: Vec<usize> = if w.cars_near.covers(w.cars.len()) {
+        w.cars_near.near(at, reach).collect()
+    } else {
+        (0..w.cars.len()).collect()
+    };
+    for o in close {
+        let other = &w.cars[o];
         // (Standing, waiting for that one (`after`: its turn after it too), it pulls over as far as
         // it can, that one backing out of its driveway too: that one goes by, as it comes on round
         // a bend or out of a driveway.)
@@ -5390,6 +5485,11 @@ fn turn_round_by(w: &mut World, c: usize, d: Detour) -> bool {
     if let Some(f) = halts {
         crate::taxi::moved_halts(w, c, &*f);
     }
+    // (Put back where it now is, for those pairing up this tick: `pull_want`.)
+    if let Some((_, r)) = w.cars[c].route.as_ref() {
+        let at = r.at(w.cars[c].progress).0;
+        w.cars_near.put(c, at);
+    }
     true
 }
 
@@ -5779,11 +5879,16 @@ pub fn hidden(cars: &[Car]) -> Vec<bool> {
             half: [c.len / 2.0, c.wid / 2.0],
         })
     };
-    let out_of_sight: Vec<Rect> = cars
+    // (Out of sight by where their middles are, along x: a car seen need only look at those whose
+    // middles are near enough along x to touch it, `reach` apart at most. That's the same test as
+    // looking at every one of them, without the pair of every car in town.)
+    let mut out_of_sight: Vec<(f32, Rect)> = cars
         .iter()
         .filter(|c| c.sight != Sight::Seen)
-        .filter_map(body)
+        .filter_map(|c| body(c).map(|r| (r.at[0], r)))
         .collect();
+    out_of_sight.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let reach = cars.iter().map(|c| c.len / 2.0).fold(0.0, f32::max);
     for (k, car) in cars.iter().enumerate() {
         if out[k] {
             continue;
@@ -5791,7 +5896,10 @@ pub fn hidden(cars: &[Car]) -> Vec<bool> {
         let Some(r) = body(car) else {
             continue;
         };
-        out[k] = out_of_sight.iter().any(|o| {
+        let most = reach + r.half[0] + 0.5;
+        let lo = out_of_sight.partition_point(|(x, _)| *x < r.at[0] - most);
+        let hi = out_of_sight.partition_point(|(x, _)| *x <= r.at[0] + most);
+        out[k] = out_of_sight[lo..hi].iter().any(|(_, o)| {
             crate::travel::dist(o.at, r.at) < o.half[0] + r.half[0] + 0.5 && o.gap(&r) < TOUCH
         });
     }
