@@ -100,11 +100,14 @@ describe('junctions worked out from the roads', () => {
     expect(far.map((j) => j.arms.filter((a) => a.crosswalk).length)).toEqual([1, 1]);
   });
 
-  test('three country roads meeting give way; a country road meeting a street is lit', () => {
+  test('country roads meeting give way, three or four; a country road meeting a street is lit', () => {
     const road = (pts: [number, number][]): RoadPlan => ({ points: pts, width: 7, ends: ['out', 'out'], kind: 'country' });
     const [t] = deriveJunctions([road(line(0, 50, 100, 50, 100)), { ...road(line(50, 50, 50, 100, 50)), ends: ['join', 'out'] }]);
     expect(t.arms.length).toBe(3);
     expect(t.arms.every((a) => a.light === null && !a.crosswalk)).toBe(true);
+    const [x] = deriveJunctions([road(line(0, 50, 100, 50, 100)), road(line(50, 0, 50, 100, 100))]);
+    expect(x.arms.length).toBe(4);
+    expect(x.arms.every((a) => a.light === null)).toBe(true);
     const [c] = deriveJunctions(COUNTRY);
     expect(c.arms.every((a) => a.light !== null)).toBe(true);
   });

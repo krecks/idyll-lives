@@ -4850,10 +4850,15 @@ pub(crate) fn pass_stands(w: &mut World) {
             changed = true;
         }
         // (Its claims worked out again: what it held and asked for let go, taken again as it goes
-        // on, `traffic::Traffic::may_go`.)
+        // on, `traffic::Traffic::may_go`; but the group it's in the middle of held on, all of it,
+        // `Traffic::reclaimed`.)
         if changed {
             car.reclaim(travel);
-            traffic.forget(car_first(c));
+            if let Some((home, route)) = car.route.as_ref() {
+                traffic.reclaimed(car_first(c), u32::from(*home), &route.claims, car.progress);
+            } else {
+                traffic.forget(car_first(c));
+            }
         }
     }
     w.traffic.passing = passing;

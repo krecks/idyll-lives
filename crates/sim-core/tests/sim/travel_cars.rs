@@ -2265,8 +2265,8 @@ fn two_quiet_ts_close_together_along_a_street_share_one_zebra_between_them() {
 fn country_roads_meeting_out_in_the_open_give_way() {
     // A country road through (along x) with another meeting it from the north: three arms, all
     // country roads', out in the open. It gives way (lit, its lights changed for the odd car):
-    // no lights, no zebras (a country road's arm has none). A country road meeting a street is
-    // still lit (`country_t`), as is a crossroads of four country roads.
+    // no lights, no zebras (a country road's arm has none); and so does a crossroads of four
+    // country roads. A country road meeting a street is still lit (`country_t`).
     let road = |a: [f32; 2], b: [f32; 2], ends: &str| {
         format!(
             r#"{{"points":[{}],"width":7,"kind":"country","ends":{ends},"area":0}}"#,
@@ -2295,7 +2295,12 @@ fn country_roads_meeting_out_in_the_open_give_way() {
         road([200.0, 120.0], [200.0, 280.0], r#"["dead","dead"]"#)
     );
     let w = town_of(CONTENT, more, 400, 400, &cross, exits, &[]);
-    assert_eq!(w.travel.signals.len(), 1, "a country crossroads lit");
+    assert!(w.travel.signals.is_empty(), "a country crossroads lit");
+    assert_eq!(
+        w.travel.give_way.len(),
+        1,
+        "a country crossroads giving way"
+    );
     assert!(
         country_t().travel.signals.len() == 1,
         "a country road meeting a street lit"

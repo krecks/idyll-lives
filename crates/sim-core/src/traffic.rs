@@ -445,8 +445,9 @@ pub fn boxes(g: &Graph) -> Vec<([f32; 2], f32)> {
 /// A junction where `SIGNAL_ARMS` roads for cars or more meet (`settle`), lit or not (`lit`). A big
 /// one is lit (`Travel::signals`): where `LIT_ARMS` arms or more meet, or two main roads (streets or
 /// country roads) do, `LIT_MAIN_ARMS` of its arms theirs (one meeting another, or crossing it; a
-/// country road's arm counted only with a street's there: `lit_of`), and on a roundabout's ring.
-/// Any other (a lane meeting a street or another lane, country roads meeting out in the open)
+/// country road's arm counted only with a street's there, and four or more only country roads'
+/// not: `lit_of`), and on a roundabout's ring. Any other (a lane meeting a street or another lane,
+/// country roads meeting out in the open)
 /// gives way (`Travel::give_way`): cars take turns through its box by the claims as anywhere
 /// (`boxes`), and on a street's arm there's a zebra (`SignalArm::crosswalk`: one of the street's
 /// two arms through it, one for junctions giving way close together along it, `ZEBRA_APART`),
@@ -882,10 +883,11 @@ fn on_ring(ring: &[bool], arms: &[ArmAt]) -> bool {
 }
 
 /// Whether a junction with `arms` (`arms_at`) on roads of `g` is lit (`Signal::lit`): on a
-/// roundabout's ring, `LIT_ARMS` arms or more, or `LIT_MAIN_ARMS` of main roads'; a country road's
-/// arm counts as a main road's only with a street's there too. Where country roads meet out in the
-/// open (three arms of them), it gives way: 121 of seed base 0's 408 lit junctions were country
-/// roads' T's, their lights changing for the odd car (the owner's call, 2026-11-13).
+/// roundabout's ring, `LIT_ARMS` arms or more (not all country roads'), or `LIT_MAIN_ARMS` of main
+/// roads'; a country road's arm counts as a main road's only with a street's there too. Where
+/// only country roads meet, out in the open, it gives way: 151 of seed base 0's 408 lit junctions
+/// were country roads' T's and crossroads, their lights changing for the odd car (the owner's
+/// call, 2026-11-13).
 fn lit_of(g: &Graph, arms: &[ArmAt], ring: &[bool]) -> bool {
     use crate::travel::RoadKind;
     let count = |k: RoadKind| {
@@ -899,7 +901,10 @@ fn lit_of(g: &Graph, arms: &[ArmAt], ring: &[bool]) -> bool {
     } else {
         0
     };
-    on_ring(ring, arms) || arms.len() >= LIT_ARMS || streets + country >= LIT_MAIN_ARMS
+    let all_country = count(RoadKind::Country) == arms.len();
+    on_ring(ring, arms)
+        || arms.len() >= LIT_ARMS && !all_country
+        || streets + country >= LIT_MAIN_ARMS
 }
 
 /// What a junction giving way has along a street's arm (`signal_at`), within `ZEBRA_APART`: no
@@ -1737,6 +1742,33 @@ impl Traffic {
         for a in &mut self.asks {
             a.by.retain(|&k| k != key);
             a.fifo.retain(|&k| k != key);
+        }
+    }
+
+    /// `key`'s claims worked out again `t` ticks along its route (`route`, `claims`: a way laid
+    /// round a taxi standing at the kerb, `cars::pass_stands`): what it held and asked for let go,
+    /// as `forget`, but every part of the group it's in the middle of held at once, as it held it.
+    /// It can't stand clear between them: let go, the rest of a way through two lit junctions
+    /// joined as one was granted to one coming the other way, in its way, and the two stood nose
+    /// to nose in the box for good (Willowley).
+    pub(crate) fn reclaimed(&mut self, key: u64, route: u32, claims: &[Claim], t: f32) {
+        self.forget(key);
+        let Some(group) = claims
+            .iter()
+            .find(|c| c.from <= t + 1e-3 && t < c.to)
+            .map(|c| c.group)
+        else {
+            return;
+        };
+        for (k, c) in claims.iter().enumerate() {
+            if c.group == group && t < c.to {
+                self.holds.push(Hold {
+                    key,
+                    tag: tag(route, k),
+                    claim: c.clone(),
+                    at: t,
+                });
+            }
         }
     }
 
@@ -3669,6 +3701,47 @@ mod tests {
             went_x.is_some_and(|t| t < 2 * CYCLE) && went_y.is_some_and(|t| t < 2 * CYCLE),
             "through both lights: {went_x:?}, {went_y:?}"
         );
+    }
+
+    #[test]
+    fn one_whose_claims_are_worked_out_again_in_the_middle_of_a_group_holds_on_to_all_of_it() {
+        // (Willowley's: a car through two lit junctions joined as one, the second's box a part of
+        // its group still to come, had its claims worked out again in the first's box (its way
+        // round a taxi standing at the kerb, `cars::pass_stands`): let go of all but the part it
+        // was in, the rest was granted to one coming the other way and turning across it, and the
+        // two stood nose to nose in the box for good.) Its group is held on to, all of it: the
+        // other waits.
+        let (a, b) = (1 << 63 | 21, 1 << 63 | 19);
+        let first = claim(&[[-8.0, 0.0], [-4.0, 0.0], [0.0, 0.0]]);
+        let mut second = claim(&[[0.0, 0.0], [4.0, 0.0], [8.0, 0.0], [12.0, 0.0]]);
+        second.from += 10.0;
+        second.to += 10.0;
+        for s in &mut second.samples {
+            s.t += 10.0;
+        }
+        let claims = [first, second];
+        let across = claim(&[[6.0, 8.0], [6.0, 4.0], [6.0, 0.0], [6.0, -4.0], [6.0, -8.0]]);
+        let mut traffic = Traffic::default();
+        traffic.reclaimed(a, 0, &claims, 15.0);
+        assert!(
+            traffic.holds(a, tag(0, 0)) && traffic.holds(a, tag(0, 1)),
+            "the group it's in let go"
+        );
+        let movers = || {
+            vec![
+                standing(a, [-4.0, 0.0], std::f32::consts::FRAC_PI_2),
+                standing(b, [6.0, 11.0], std::f32::consts::PI),
+            ]
+        };
+        let places = [(a, 0, 15.0), (b, 0, 10.0)];
+        for tick in 1..4 {
+            traffic.may_go(tick, b, 0, std::slice::from_ref(&across), 10.0, 11.0);
+            traffic.begin(tick + 1, movers(), &places, &[]);
+        }
+        assert!(!traffic.holding(b), "granted across the rest of its group");
+        // (Out of any part, nothing's held: it asks again as it goes on.)
+        traffic.reclaimed(a, 0, &claims, 5.0);
+        assert!(!traffic.holding(a));
     }
 
     #[test]

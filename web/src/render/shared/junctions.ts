@@ -30,7 +30,7 @@ const ARMS_APART = 4.6;
 const ARM_LOOK = 5;
 /** Two roads' meeting places this near are one junction (m). */
 const SAME_JUNCTION = 1.5;
-/** A junction is lit where this many arms meet, or this many of streets and country roads, a country road's counted only with a street there (sim-core `traffic::LIT_ARMS`, `LIT_MAIN_ARMS`, `lit_of`). */
+/** A junction is lit where this many arms meet (not only country roads), or this many of streets and country roads, a country road's counted only with a street there (sim-core `traffic::LIT_ARMS`, `LIT_MAIN_ARMS`, `lit_of`). */
 const LIT_ARMS = 4;
 const LIT_MAIN_ARMS = 3;
 /** Junctions giving way this near each other along a street (m) have one zebra, between them where it has room, its crosswalk no more than `ZEBRA_SQUEEZE` m further in (sim-core `traffic::ZEBRA_APART`). */
@@ -142,7 +142,8 @@ export function deriveJunctions(roads: readonly RoadPlan[]): Junction[] {
     const kind = (road: number) => roads[road].kind ?? 'street';
     const streets = ways.filter((w) => kind(w.road) === 'street').length;
     const country = streets > 0 ? ways.filter((w) => kind(w.road) === 'country').length : 0;
-    const lit = roundabout || ways.length >= LIT_ARMS || streets + country >= LIT_MAIN_ARMS;
+    const allCountry = ways.every((w) => kind(w.road) === 'country');
+    const lit = roundabout || (ways.length >= LIT_ARMS && !allCountry) || streets + country >= LIT_MAIN_ARMS;
     found.push({ x, z, roundabout, lit, ways });
   }
   const kind = (road: number) => roads[road].kind ?? 'street';
