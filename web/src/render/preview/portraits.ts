@@ -2,14 +2,23 @@
  * Head-and-shoulders portraits from the studio, cached by look.
  *
  * Requests are collected and drawn in batches: up to `BATCH` Sims stand in a row far off to the
- * side of the stage (rows 1..), held still with a friendly face and eye contact. Once they are
- * ready, a few portraits are drawn per frame, each by a camera of its own into a multisampled
- * target (in the studio's frame, `Studio.draw`), read back after it, un-premultiplied and encoded
- * (WebP, PNG where unsupported) into object URLs. The cache outlives the app, so the game asks for
- * each look once per page.
+ * side of the stage (rows 1..), held still with a friendly face and eye contact, all put there at
+ * once (one build of the studio's residents a batch: posing them a couple a frame built them all
+ * again each time, eight frames before the first picture). Once they are ready, a few portraits
+ * are drawn per frame, each by a camera of its own into a multisampled target of its own (in the
+ * studio's frame, `Studio.draw`), read back after it, un-premultiplied and encoded (WebP, PNG where
+ * unsupported) into object URLs. A target per row lets the next few be drawn while the last ones
+ * are still read back (they waited for them, a few frames each time).
+ *
+ * What's on screen comes first (`priority` `now`, in the order asked); the rest (`idle`: drawn ahead
+ * of time, or a face scrolled out of view) fills the batches after it. A request whose asker has gone
+ * (`signal`) is dropped if it isn't being drawn yet. The cache outlives the app, so the game asks for
+ * each look once per page; `PortraitStore` keeps them between visits.
  */
 
 import * as pc from '../pc/engine';
+import { perfEnd, perfStart, type PerfEntry } from '../../debug/perf';
+import { openCache } from '../../ml/assets';
 import type { StageDirection } from '../shared/characters/expressions';
 import { shadingFromSettings } from '../pc/shaders/softLook';
 import type { SimLook } from '../types';
@@ -17,12 +26,11 @@ import { Studio } from './studio';
 
 /** Portrait size in pixels (displayed at up to ~64 CSS px, so 2-3x for sharp HiDPI avatars). */
 export const PORTRAIT_PX = 160;
-const BATCH = 16;
-const PER_FRAME = 6;
+/** Sims a batch stands in a row: about as many faces as step 2's list shows at once, so they come together. */
+const BATCH = 32;
+const PER_FRAME = 8;
 /** Draws in a batch's first frame: those compile the portrait shaders, so they get their own task. */
 const FIRST_DRAW = 1;
-/** Rows posed per frame: each is a Sim's models built, so they'd otherwise land in one ~870 ms task. */
-const POSE_PER_FRAME = 2;
 const FIRST_ROW = 1;
 const ROW_X = 40;
 const ROW_SPACING = 3;
@@ -45,9 +53,13 @@ const REF_TOP = 1.78;
 /** A friendly portrait face. */
 const PORTRAIT_FACE = { smile: 0.6, wide: 0.3, lidL: 0.35, browUp: 0.15 };
 
+/** `now`: on screen (drawn first, in the order asked); `idle`: drawn ahead of time, or out of view. */
+export type PortraitPriority = 'now' | 'idle';
+
 interface Job {
   key: string;
   look: SimLook;
+  priority: PortraitPriority;
   waiters: ((url: string | null) => void)[];
   /** Draws that came back empty (a shader still compiling for the render target). */
   misses: number;
@@ -61,9 +73,11 @@ interface Batch {
   frames: number;
   next: number;
   pending: number;
-  /** Rows posed so far: posing them all in one task took ~870 ms at boot, so it's spread over frames. */
-  posed: number;
+  /** Its rows stand (`direct`, once). */
+  posed: boolean;
   cams: { x: number; y: number; z: number }[];
+  /** Its span (`debug/perf.ts`): from its start to its last portrait read back. */
+  span: PerfEntry;
 }
 
 /** Cache key: everything that changes the picture (the look's own face is in its appearance), the shading included (not the height: framing follows the head; not the voice). */
@@ -97,6 +111,9 @@ function remember(key: string, url: string): void {
 }
 
 export class Portraits {
+  /** `drawn`: each portrait drawn, as encoded (to keep between visits). */
+  constructor(private readonly drawn?: (key: string, blob: Blob) => void) {}
+
   private readonly queue = new Map<string, Job>();
   private batch: Batch | null = null;
   /** A camera and its target per portrait drawn in a frame. */
@@ -106,12 +123,33 @@ export class Portraits {
   private drawingBatch: Batch | null = null;
   private readonly target = { x: 0, y: 0, z: 0 };
 
-  request(key: string, look: SimLook): Promise<string | null> {
+  /**
+   * The portrait of `look` (drawn in a coming batch). `signal`: the asker has gone (its face left the
+   * page, or shows another look now): it gets null, and the look isn't drawn if nobody else waits for
+   * it and its batch hasn't started.
+   */
+  request(key: string, look: SimLook, priority: PortraitPriority = 'now', signal?: AbortSignal): Promise<string | null> {
+    if (signal?.aborted) return Promise.resolve(null);
     return new Promise((resolve) => {
       const inBatch = this.batch?.jobs.find((j) => j.key === key);
-      const job = inBatch ?? this.queue.get(key);
-      if (job) job.waiters.push(resolve);
-      else this.queue.set(key, { key, look: { gender: look.gender, appearance: JSON.parse(JSON.stringify(look.appearance)), id: look.id }, waiters: [resolve], misses: 0 });
+      let job = inBatch ?? this.queue.get(key);
+      if (job) {
+        job.waiters.push(resolve);
+        if (priority === 'now') job.priority = 'now';
+      } else {
+        job = { key, look: { gender: look.gender, appearance: JSON.parse(JSON.stringify(look.appearance)), id: look.id }, priority, waiters: [resolve], misses: 0 };
+        this.queue.set(key, job);
+      }
+      const asked = job;
+      signal?.addEventListener(
+        'abort',
+        () => {
+          asked.waiters = asked.waiters.filter((w) => w !== resolve);
+          resolve(null);
+          if (!asked.waiters.length && this.queue.get(key) === asked) this.queue.delete(key);
+        },
+        { once: true },
+      );
     });
   }
 
@@ -131,8 +169,7 @@ export class Portraits {
     if (!this.batch && this.queue.size) this.startBatch(now);
     const b = this.batch;
     if (!b) return;
-    // Building a Sim's models is the expensive part: a couple a frame, not sixteen in one task.
-    for (let n = 0; b.posed < b.jobs.length && n < POSE_PER_FRAME; n++) this.pose(studio, b, b.posed++);
+    if (!b.posed) this.pose(studio, b);
     const heads = studio.characters.heads;
     b.jobs.forEach((_, j) => {
       const row = FIRST_ROW + j;
@@ -152,19 +189,18 @@ export class Portraits {
   /** After posing: turns on a camera for each portrait ready to draw in this frame (`Studio.draw`); whether any is. */
   prepare(studio: Studio, now: number): boolean {
     const b = this.batch;
-    if (!b || b.pending > 0 || b.next >= b.jobs.length) return false;
-    // Nothing is drawn before every row stands: `direct` poses them over a few frames.
-    if (b.posed < b.jobs.length) return false;
+    if (!b || !b.posed || b.next >= b.jobs.length) return false;
     if (!studio.ready()) {
       if (now - b.started > READY_TIMEOUT) this.finish(studio, true);
       return false;
     }
     if (++b.frames < SETTLE_FRAMES) return false;
-    // The batch's first draws compile the portrait shaders: one a frame then, not six in one task (~850 ms at boot).
+    // The batch's first draws compile the portrait shaders: one a frame then, not eight in one task (~850 ms at boot).
     const limit = b.next === 0 ? FIRST_DRAW : PER_FRAME;
     while (b.next < b.jobs.length && this.drawing.length < limit) {
       const j = b.next++;
-      const slot = this.slot(studio, this.drawing.length);
+      // (A target per row: the ones drawn last frame may still be being read back.)
+      const slot = this.slot(studio, j);
       const top = studio.characters.heads[(FIRST_ROW + j) * 3 + 1];
       this.target.x = ROW_X + j * ROW_SPACING;
       this.target.y = top - FRAME_DROP * (top / REF_TOP);
@@ -173,7 +209,7 @@ export class Portraits {
       this.drawing.push({ job: b.jobs[j], target: slot.target });
     }
     this.drawingBatch = b;
-    b.pending = this.drawing.length;
+    b.pending += this.drawing.length;
     return this.drawing.length > 0;
   }
 
@@ -198,8 +234,11 @@ export class Portraits {
         let empty = false;
         try {
           const pixels = (await target.colorBuffer.read(0, 0, PORTRAIT_PX, PORTRAIT_PX, { immediate: true })) as Uint8Array | null;
-          if (pixels && coverage(pixels) > 0.02) url = await encode(pixels, PORTRAIT_PX, PORTRAIT_PX, bottomUp);
-          else empty = true;
+          if (pixels && coverage(pixels) > 0.02) {
+            const blob = await encode(pixels, PORTRAIT_PX, PORTRAIT_PX, bottomUp);
+            url = URL.createObjectURL(blob);
+            this.drawn?.(job.key, blob);
+          } else empty = true;
         } catch (err) {
           console.warn('[preview] portrait failed', err);
         }
@@ -230,19 +269,21 @@ export class Portraits {
   }
 
   private startBatch(now: number): void {
-    const jobs = [...this.queue.values()].slice(0, BATCH);
+    const queued = [...this.queue.values()];
+    const jobs = [...queued.filter((j) => j.priority === 'now'), ...queued.filter((j) => j.priority !== 'now')].slice(0, BATCH);
     for (const job of jobs) this.queue.delete(job.key);
     const cams = jobs.map(() => ({ x: 0, y: 0, z: 0 }));
-    this.batch = { jobs, started: now, frames: 0, next: 0, pending: 0, posed: 0, cams };
+    this.batch = { jobs, started: now, frames: 0, next: 0, pending: 0, posed: false, cams, span: perfStart('portraits: batch') };
   }
 
-  /** Puts portrait `j` on its row, still, with a friendly face and eye contact. */
-  private pose(studio: Studio, b: Batch, j: number): void {
-    const job = b.jobs[j];
-    const row = FIRST_ROW + j;
-    studio.setRow(row, { look: job.look, x: ROW_X + j * ROW_SPACING, z: 0, yaw: 0 });
-    const dir: StageDirection = { still: true, time: 0.6, face: PORTRAIT_FACE, lookAt: b.cams[j], hands: 0.6 };
-    studio.characters.directions[row] = dir;
+  /** Puts the batch's Sims on their rows (built together), still, with a friendly face and eye contact. */
+  private pose(studio: Studio, b: Batch): void {
+    b.posed = true;
+    studio.setRows(b.jobs.map((job, j) => [FIRST_ROW + j, { look: job.look, x: ROW_X + j * ROW_SPACING, z: 0, yaw: 0 }]));
+    b.jobs.forEach((_, j) => {
+      const dir: StageDirection = { still: true, time: 0.6, face: PORTRAIT_FACE, lookAt: b.cams[j], hands: 0.6 };
+      studio.characters.directions[FIRST_ROW + j] = dir;
+    });
   }
 
   /** Ends the batch and empties its rows; on failure, unanswered requests get null. */
@@ -250,10 +291,9 @@ export class Portraits {
     const b = this.batch;
     if (!b) return;
     if (failed) for (const job of b.jobs) for (const w of job.waiters.splice(0)) w(null);
-    b.jobs.forEach((_, j) => {
-      studio.characters.directions[FIRST_ROW + j] = null;
-      studio.setRow(FIRST_ROW + j, null);
-    });
+    perfEnd(b.span, `${b.jobs.length} looks${failed ? ', failed' : ''}`);
+    b.jobs.forEach((_, j) => (studio.characters.directions[FIRST_ROW + j] = null));
+    studio.setRows(b.jobs.map((_, j) => [FIRST_ROW + j, null]));
     this.batch = null;
   }
 
@@ -274,7 +314,7 @@ export class Portraits {
       });
       const target = new pc.RenderTarget({ name: `portrait${i}`, colorBuffer: texture, depth: true, samples: 4 });
       // (Before the stage's camera, which draws onto the canvas.)
-      const camera = studio.camera(`portraitCamera${i}`, FOV, 0.2, 4, -PER_FRAME + i);
+      const camera = studio.camera(`portraitCamera${i}`, FOV, 0.2, 4, -BATCH + i);
       camera.renderTarget = target;
       this.slots[i] = slot = { camera, target };
     }
@@ -289,8 +329,8 @@ function coverage(data: Uint8Array): number {
   return (n * 4) / (data.length / 4);
 }
 
-/** RGBA (premultiplied by the MSAA resolve over a transparent clear) to an image URL. */
-async function encode(data: Uint8Array, w: number, h: number, flipY: boolean): Promise<string> {
+/** RGBA (premultiplied by the MSAA resolve over a transparent clear) to an image. */
+async function encode(data: Uint8Array, w: number, h: number, flipY: boolean): Promise<Blob> {
   const img = new ImageData(w, h);
   const out = img.data;
   for (let y = 0; y < h; y++) {
@@ -318,5 +358,65 @@ async function encode(data: Uint8Array, w: number, h: number, flipY: boolean): P
     canvas.getContext('2d')!.putImageData(img, 0, 0);
     blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/webp', 0.92));
   }
-  return URL.createObjectURL(blob);
+  return blob;
+}
+
+/**
+ * Portraits kept between visits (Cache Storage), as the catalog's pictures are (`items.ts`): each
+ * under its look's key (`lookKey`: the look and the shading) and `version`, what the faces are drawn
+ * from (the character files' contents; the app's version where the build has no content hashes).
+ * Other caches of the prefix (older schemes) are deleted when it opens. Bump `v1` after a change to
+ * how portraits are drawn (the studio's light, the framing, the face).
+ */
+const STORE_PREFIX = 'littlelives-portraits-';
+const STORE = `${STORE_PREFIX}v1`;
+
+export class PortraitStore {
+  private store: Promise<Cache | null> | null = null;
+
+  constructor(private readonly version: string) {}
+
+  /** The kept portrait of `key` as an object URL (remembered for the page), or null. */
+  async get(key: string): Promise<string | null> {
+    try {
+      const res = await (await this.cache())?.match(this.url(key));
+      if (!res) return null;
+      const url = URL.createObjectURL(await res.blob());
+      remember(key, url);
+      return url;
+    } catch {
+      return null;
+    }
+  }
+
+  put(key: string, blob: Blob): void {
+    void (async () => {
+      try {
+        await (await this.cache())?.put(this.url(key), new Response(blob, { headers: { 'Content-Type': blob.type || 'image/webp' } }));
+      } catch {
+        // Storage full or unavailable: portraits are drawn again next time.
+      }
+    })();
+  }
+
+  private cache(): Promise<Cache | null> {
+    this.store ??= typeof caches === 'undefined' ? Promise.resolve(null) : openCache(STORE_PREFIX, STORE);
+    return this.store;
+  }
+
+  private url(key: string): string {
+    return `${location.origin}/__portraits/${this.version}/${PORTRAIT_PX}/${hash(key)}.webp`;
+  }
+}
+
+/** FNV-1a, as hex (two rounds with different seeds: a look key is long, and two faces must not share a picture). */
+function hash(text: string): string {
+  let a = 0x811c9dc5;
+  let b = 0x01000193;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193);
+    b = Math.imul(b ^ c, 0x5bd1e995);
+  }
+  return (a >>> 0).toString(16).padStart(8, '0') + (b >>> 0).toString(16).padStart(8, '0');
 }

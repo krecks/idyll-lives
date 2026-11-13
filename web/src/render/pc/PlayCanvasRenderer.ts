@@ -67,6 +67,7 @@ import { SunShadows } from './sunShadows';
 import { TemplateCache } from './templateCache';
 import { Thumbnails } from './thumbnail';
 import { benchDiag } from '../../debug/benchFlags';
+import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
 import { fetched } from '../../assets/stream';
 import { within } from '../../core/async';
 import { LOOK } from '../look';
@@ -92,7 +93,7 @@ import { idleMoment } from '../shared/idle';
 import { coveringSurface, houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
 import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
-import { Flight, panBounds, Roam, warmLots, type FocusPlot } from '../shared/focus';
+import { Flight, panBounds, Roam, WARM_LOTS, warmLots, type FocusPlot } from '../shared/focus';
 import { CHUNK, chunkCoords, distanceToRect, RectGrid } from '../shared/chunks';
 import { ModelRefresh } from '../shared/modelRefresh';
 import { OverviewCamera } from '../shared/overviewCamera';
@@ -149,8 +150,6 @@ const TOWN_FADE = 0.03;
 /** A far bike's frame (sRGB). */
 const BIKE: readonly [number, number, number] = [0.22, 0.22, 0.24];
 
-/** A big world's warm-up builds and draws this many lots besides the one in view (`warmGame`). */
-const WARM_LOTS = 6;
 /** Longest wait (ms) for the birds of a game's first build (their models built): they'd pop in in play otherwise. */
 const BIRDS_WAIT_MS = 3000;
 /** Idle time (ms) a frame must have left for a model file to be read ahead of time (`parseAhead`). */
@@ -180,6 +179,12 @@ const ROOF_MIN_DISTANCE = 15;
 const BUILD_SLICE_MS = 8;
 /** The same while the camera roams (a big world, or once it has settled on a lot of its own). */
 const ROAM_SLICE_MS = 4;
+/**
+ * The same behind the loading screen (`setCovered`, and the warm-up): nobody sees the frames, and
+ * each one given costs the build a frame's wait. At 4 ms a slice a game's first build ran a quarter of
+ * the time; at this it runs most of it, and the loading screen's bar still moves (20 frames a second).
+ */
+const COVERED_SLICE_MS = 40;
 /**
  * Daylight doesn't reach under the ground or into a room without windows: no sun, only this much
  * of the sky fill and the environment (as seen, intensity times exposure: the same by day and by
@@ -677,6 +682,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The loading screen's listener (`onLoadStep`); the warm-up's own world builds (its lots) don't report. */
   private loadListener: ((label: string, done: number) => void) | null = null;
   private warming = false;
+  /** The loading screen covers the view (`setCovered`): world builds run in longer slices. */
+  private loadingCover = false;
   /** The birds of this game's first build have been waited for (`buildWorld`). */
   private birdsWaited = false;
   /** Model files to read ahead of time, nearest first (`parseAhead`), and whether that's under way. */
@@ -915,6 +922,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     while (!this.disposed && (this.streaming || this.streamDue || this.worldBuilds) && performance.now() < until) {
       await new Promise((resolve) => setTimeout(resolve, 30));
     }
+  }
+
+  setCovered(on: boolean): void {
+    this.loadingCover = on;
   }
 
   onLoadStep(fn: ((label: string, done: number) => void) | null): void {
@@ -1850,7 +1861,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** A world build (or the overview's) gives the frames it runs behind one every `BUILD_SLICE_MS` of main-thread time. */
   private async pace(): Promise<void> {
     // (Shorter slices once the camera roams: the frames go on moving behind the build, and one it takes shows.)
-    const slice = this.townBuilds === 0 && (this.streamOn || this.roamedTo !== null) ? ROAM_SLICE_MS : BUILD_SLICE_MS;
+    // (Longer ones behind the loading screen: nothing is seen, and nothing roams.)
+    const slice = this.loadingCover || this.warming ? COVERED_SLICE_MS : this.townBuilds === 0 && (this.streamOn || this.roamedTo !== null) ? ROAM_SLICE_MS : BUILD_SLICE_MS;
     if ((!this.worldBuilding && this.townBuilds === 0) || performance.now() - this.sliceStart < slice) return;
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     this.sliceStart = performance.now();
@@ -2593,14 +2605,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const world = this.lastWorld;
     const home = this.view;
     if (world?.meta?.world?.size === 'big' && home && !this.disposed) {
-      const lots = warmLots(world, home, WARM_LOTS);
+      const gains: number[] = [];
+      const lots = warmLots(world, home, WARM_LOTS, gains);
       for (const [i, lot] of lots.entries()) {
         this.loadListener?.(`Warming up (lot ${i + 1} of ${lots.length})`, 0.75 + (0.25 * i) / lots.length);
+        const span = perfStart(`warm: lot ${i + 1} of ${lots.length}`);
         await this.setWorld(world, lot);
         this.warmNext = true;
         await this.framesRendered(1);
+        perfEnd(span, `${gains[i]} new kinds`);
       }
-      await this.setWorld(this.lastWorld ?? world, home);
+      await perfTimeAsync('warm: home again', () => this.setWorld(this.lastWorld ?? world, home));
       this.shaderWatch.note(`warm-up lots done in ${Math.round(performance.now() - t0)} ms`);
     }
     this.shaderWatch.phase = this.townMode ? 'town' : 'game';
