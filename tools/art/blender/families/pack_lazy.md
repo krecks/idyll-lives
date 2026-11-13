@@ -44,9 +44,9 @@ Where the plan's table says "Loop (E1) … Until then static" (the plate), the l
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.lazy.snoozecloudBed` | 1.86 × 1.29 × 1.86 m | 7,904 | 3 | Body, Upholstery (the mattress), Throw |
-| `model.lazy.napPod` | 0.92 × 1.54 × 0.91 m | 6,702 | 3 | Body (the egg), Upholstery (the cushions), Hood |
-| `model.lazy.quiltTable` | 1.82 × 0.77 × 0.93 m | 7,608 | 3 | Body (the table top), Upholstery (the quilt), Poufs |
+| `model.lazy.snoozecloudBed` | 1.86 × 1.29 × 1.86 m | 8,060 | 3 | Body, Upholstery (the mattress), Throw |
+| `model.lazy.napPod` | 0.92 × 1.54 × 0.91 m | 6,970 | 3 | Body (the egg), Upholstery (the cushions), Hood |
+| `model.lazy.quiltTable` | 1.82 × 0.77 × 0.93 m | 8,408 | 3 | Body (the table top), Upholstery (the quilt), Poufs |
 | `model.lazy.deliveryLocker` | 0.86 × 1.96 × 0.81 m | 5,256 | 2 | Body, Doors, Trim |
 | `model.lazy.vibePlate` | 0.67 × 1.25 × 0.77 m | 2,862 | 2 | Body, Trim, Deck |
 | `model.lazy.smartHub` | 0.60 × 0.81 × 0.84 m | 2,282 | 3 | Body (the table), Speaker |
@@ -93,3 +93,7 @@ plate 1,452 → 2,862, hub 2,236 → 2,282; draws unchanged).
 cargo art pack_lazy            # the six .glb, the pack, check-glb
 cargo art pack_lazy --preview  # previews/pack_lazy/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+The snoozecloud bed's mattress halves and pillows are `resting`, the nap pod's pillow sewn flat and stuffed (`waist`). Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 5 models changed shape: `deliveryLocker`, `napPod`, `quiltTable`, `snoozecloudBed`, `vibePlate`; 30,332 to 31,556 triangles.
