@@ -117,7 +117,7 @@ instances, so these costs are per kind of object in view, plus the triangles of 
 - **Textures:** none by default; the finishes bring their own tiling textures. A texture of its
   own (a painting, a label) is one per object, at most 512 px a side (1024 for something over
   2.5 m), PNG or JPEG in the file; the build turns it into KTX2.
-- **Download:** follows from the triangles: about 12 bytes a triangle after `optimize.mjs`
+- **Download:** follows from the triangles: about 12 bytes a triangle after `cargo assets`
   (the six garden models: 445 KB as exported, 280 KB in the build). Untextured models export
   without UVs; textured ones carry them (below, "Export settings").
 - **The presets** draw the same models on the lot. Low trims shadows (the lot's still objects cast
@@ -408,7 +408,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 
 | Setting | Value | Why |
 |---|---|---|
-| Format | GLB (one binary file) | One request; `optimize.mjs` reads GLB |
+| Format | GLB (one binary file) | One request; `cargo assets` reads GLB |
 | Up axis | +Y (`export_yup`) | Blender −Y becomes the game's front, +Z |
 | Modifiers | applied | Bevels and the like are baked in |
 | Selection | the model's mesh objects only | No cameras, lights or helpers in the file |
@@ -480,12 +480,13 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 
 ## Optimisation and registration
 
-- **Optimisation is automatic.** `vite build` runs `tools/assets/optimize.mjs`, which writes a
-  meshopt copy of every `.glb` (and KTX2 for embedded textures) and an index the game reads;
-  the dev server serves the source files. Both load on WebGPU and WebGL2 (checked with the garden
-  models). Quantising the geometry as well (`KHR_mesh_quantization`) would take the six garden
-  models from 280 to 178 KB; it is an `optimize.mjs` change for files from Blender only (the foliage
-  cards keep float data).
+- **Optimisation is automatic.** `vite build` runs `cargo assets` (`crates/tools/src/assets.rs`),
+  which writes a quantised, meshopt-compressed copy of every `.glb` (`KHR_mesh_quantization`:
+  positions to 14 bits of the mesh's box, normals to 10, the baked shading to 8; a model with foliage
+  keeps its floats) and an index the game reads; the dev server serves the source files. Both load
+  on WebGPU and WebGL2. `cargo assets check` reads every copy back and compares it with its source,
+  and `cargo test -p ll-tools` does so for every shipped model. A model with a skin, morph targets
+  or images of its own is left as it is (none of the game's has any).
 - **Registration** is an entry in the family's pack, listed in the base manifest's `packs`:
   ```json
   "model.garden.gnome": { "type": "model", "url": "../../models/garden/gnome.glb", "materials": { "*": { "finish": "material.finish.satin" } } }
@@ -555,6 +556,6 @@ work for files.
    overrides (registry.ts `extended`); gamekit's packs no longer copy it.
 8. ~~**Night glow**~~ Done: a material's `glow` (lamp shades, screens), following the lamp level and
    its room's lights.
-9. **Quantised geometry** in `optimize.mjs` for files from Blender.
+9. ~~**Quantised geometry**~~ Done (`cargo assets`), for every file but those with foliage.
 10. ~~**CI**~~ Done: CI runs `cargo test -p ll-tools`, which includes the gate over every shipped
     model (it needs no Blender), with the other checks.

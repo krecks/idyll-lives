@@ -2,6 +2,7 @@
 //! aliases in `.cargo/config.toml`, e.g. `cargo characters build`). Nothing here is shipped.
 
 pub mod art;
+pub mod assets;
 pub mod characters;
 pub mod checkglb;
 pub mod content;

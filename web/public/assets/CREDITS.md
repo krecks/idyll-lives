@@ -560,10 +560,10 @@ The tokenizer runs with **Tokenizers.js** (`@huggingface/tokenizers`), © Huggin
 
 ## Decoders (`../decoders/`, refreshed by `cargo decoders`)
 
-Production builds ship compressed copies of the assets above (KTX2 textures, meshopt models, made by `tools/assets/optimize.mjs`; the art itself is unchanged). The game decodes the textures with this file, served from its own folder instead of a CDN; the models' meshopt geometry is decoded by meshoptimizer's decoder (Arseny Kapoulkine, MIT), bundled into the game's code:
+Production builds ship compressed copies of the assets above (KTX2 textures, meshopt models, made by `cargo assets`; the art itself is unchanged). The game decodes the textures with this file, served from its own folder instead of a CDN; the models' meshopt geometry is decoded by meshoptimizer's decoder (Arseny Kapoulkine, MIT), bundled into the game's code:
 
 | File(s) | What | Source | Authors | Licence |
 |---|---|---|---|---|
 | `basis/basis.wasm.js`, `basis/basis.wasm.wasm` | Basis Universal transcoder (KTX2 textures) | Basis Universal, PlayCanvas's build (its engine repository, at the `playcanvas` version the game uses) | Binomial LLC | Apache-2.0 |
 
-The build tools that make the compressed copies are not shipped: the Basis Universal encoder (Apache-2.0, through ktx2-encoder, MIT), glTF-Transform (MIT), meshoptimizer (MIT) and sharp (Apache-2.0, with libvips, LGPL-3.0).
+The build tools that make the compressed copies are not shipped: the Basis Universal encoder (Binomial LLC, Apache-2.0, through the `basisu_c_sys` crate, MIT or Apache-2.0) and meshoptimizer (Arseny Kapoulkine, MIT, through the `meshopt` crate, MIT or Apache-2.0).

@@ -10,6 +10,7 @@ Every tool's `src/<name>.rs` opens with what it does and its arguments; this pag
 
 | Alias | Does |
 |---|---|
+| `cargo assets` | Compressed copies of the game's assets for the production build, which runs it (was `tools/assets/optimize.mjs`): textures to KTX2 (Basis Universal ETC1S, with mipmaps), models quantised and meshopt-compressed, the residents' binaries gzipped, kept by content hash in `web/.assets/cache`. `--force`, `--jobs N`, `--verbose`; `cargo assets check [--against <dir>]` reads every copy back and compares it with its source. |
 | `cargo art` | Builds the Blender families and checks what they wrote (was `tools/art/blender/build.py`). `--all`, `--only id`, `--preview`, `--no-pack`, `--centres`. |
 | `cargo characters` | The residents generator: rig, body, face, hair and clothes from code, plus its checks (was `tools/characters/prim/`). |
 | `cargo check-glb` | The gate for the game's glTF models: reads every `.glb` a model entry uses and checks what the game needs of it (was `tools/art/blender/check_glb.py`). |
@@ -59,6 +60,15 @@ What each release tool does, in more words than the table above:
   that the files with Babylon.js code and their headers match its list (`BABYLON_PORTED`).
 
 Numbers to know:
+- `cargo assets`: on an M3 Pro every copy from nothing takes about 23 s (863 files: 61 textures, 778 models, 24
+  residents' binaries; the textures are nearly all of it), and nothing when nothing changed. Two of its crates
+  are C++ underneath (`basisu_c_sys`: Basis Universal's encoder, with bindings made by `bindgen`, so it needs
+  libclang; `meshopt`: meshoptimizer): about two minutes more for a build of the tools from cold. Against the
+  JavaScript tool it replaced (2026-11-13, both read back by `cargo assets check --against`): the same
+  2,190,603 triangles, each within the same 0.29 mm of its source at most; models 0.9 % larger (42.8 MB),
+  textures the same size (5.41 MB) with the colour and normal maps' levels the same to 0.2 of 255 on average;
+  the packed occlusion and roughness maps' smaller levels are averaged as the data they are (the JavaScript
+  tool averaged them as colours: up to 15 of 255 off their source's mean, now up to 4).
 - `wasm-opt`: on an M3 Pro, the simulation's WASM took 48–55 s from cold and the voice's 3 s. Expect
   1.5–3 minutes on a CI runner from cold; CI keeps `web/.assets/wasm-opt/` between runs
   (`actions/cache`), so an unchanged WASM is instant. It made the two files 620 KB smaller raw and
@@ -81,5 +91,4 @@ numbers match a crash stack from the site.
 | `tools/voice/check.mjs`, `samples.mjs`, `tools/llm/check.mjs`, `devices.mjs` (and the `engine.mjs` they share) | They run the models the way the browser does: ONNX Runtime Web, plus the worker's own `web/src/voice/supertonic.ts` and `voices.ts`. Porting them means an ONNX runtime in Rust (`ort` or `tract`) and `supertonic.ts` in Rust. |
 | `tools/characters/check_clips.ts` | Reads the clip data that is generated into `web/src/render/shared/characters/clips/`. |
 | `tools/bench/*.mjs` | Playwright: they drive a real browser and time the render. |
-| `tools/assets/optimize.mjs` | ktx2-encoder, sharp and gltf-transform: image and texture work with no Rust equivalent worth writing. |
 | `tools/housegen/sample.ts`, `tools/worlds/sample.ts` | Bun runs them; they are samples, not build steps. |

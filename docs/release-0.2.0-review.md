@@ -40,7 +40,7 @@ Line numbers refer to 4cde174 unless a later commit is named.
   - `npm run wasm` builds `sim-wasm` in release and runs `wasm-bindgen --target web` into `web/src/core/wasm-pkg/` (gitignored).
   - `npm run voice` does the same for the voice crate and fetches the voice model.
   - `npm run llm` fetches the optional language model.
-  - `npm run build` runs all three, then `vite build`. The production build also writes compressed copies of the assets (`tools/assets/optimize.mjs`: KTX2 textures, meshopt models).
+  - `npm run build` runs all three, then `vite build`. The production build also writes compressed copies of the assets (`tools/assets/optimize.mjs`, since 2026-11 `cargo assets`: KTX2 textures, meshopt models).
   - Vite content-hashes every JS chunk and both `.wasm` files. The wasm-bindgen glue loads its wasm through `new URL(..., import.meta.url)`.
   - Before this release, no `wasm-opt` step ran anywhere.
 - **Deploy:** `.github/workflows/pages.yml` publishes to GitHub Pages (https://krecks.github.io/idyll-lives/) when a `v*` tag is pushed. `tools/release/version.mjs` keeps `web/package.json` and `Cargo.toml` on one version, which the menu and Credits show through `__APP_VERSION__`.

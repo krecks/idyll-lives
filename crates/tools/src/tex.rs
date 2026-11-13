@@ -8,7 +8,7 @@
 //! Python's compensated `sum()`, Pillow's fixed-point resampling and box blur, libjpeg-turbo's decoder and
 //! encoder), so the outputs are the scripts' to the byte; see `pil` and `jpeg`.
 
-mod jpeg;
+pub(crate) mod jpeg;
 pub mod pil;
 pub mod synth;
 
