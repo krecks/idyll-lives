@@ -725,9 +725,11 @@ def windowSeat():
         _mug(F, 'mug', 0.7, 0.72, FRAME_Z + 0.065, 0.038, 0.09, M.mug, turn=200)
         # pillows against the window wall
         F.soft('pillow_l', 0.48, 0.34, 0.12, (-0.62, 0.62, FRAME_Z + 0.1), M.pillow_a, rot=(-10, 0, 8), round=0.05,
-               puff=0.04, flat=3)
+               puff=0.04,
+               waist=0.012, pinch=0.006, resting=True)
         F.soft('pillow_r', 0.42, 0.3, 0.11, (0.66, 0.6, FRAME_Z + 0.1), M.pillow_b, rot=(-10, 0, -6), round=0.045,
-               puff=0.035, flat=3)
+               puff=0.035,
+               waist=0.012, pinch=0.006, resting=True)
     G.join(still, 'body', origin=(0, 0, 0))
     # The seat cushion with its throw and a book left on it, joined with their origin on the cushion's underside:
     # `sink_in` presses them 2 cm while a resident broods or dozes on it.
