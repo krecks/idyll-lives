@@ -3,7 +3,7 @@
 
   /**
    * One entry of a menu over the scene (the title screen, the pause menu): dark glass, light text.
-   * `primary` is the one to press (white), `quiet` a smaller entry without an icon, `danger` red.
+   * `primary` is the one to press (white), `quiet` a smaller, lighter entry, `danger` red.
    */
   let {
     label,

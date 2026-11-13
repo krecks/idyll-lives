@@ -38,6 +38,7 @@
   } = $props();
 
   let stage: HTMLDivElement;
+  let tags: HTMLDivElement;
   let frame = $state<Frame | null>(null);
   let dragging = false;
   let down: { x: number; y: number; moved: boolean } | null = null;
@@ -125,11 +126,15 @@
   {onpointerdown}
   {onpointermove}
   {onpointerup}
-  onpointerleave={() => !dragging && onhover?.(null)}
+  onpointerleave={(e) => {
+    // Moving onto a tag is not leaving the lot: only clear the hover when the pointer goes
+    // somewhere else (the page beside the stage, another panel).
+    if (!dragging && !(e.relatedTarget instanceof Node && tags.contains(e.relatedTarget))) onhover?.(null);
+  }}
   {onwheel}
 ></div>
 
-<div class="tags" aria-label="Lots">
+<div class="tags" bind:this={tags} aria-label="Lots">
   {#each labels as l (l.plot)}
     <div class="pin" use:pin={l.plot}>
       <button
