@@ -15,11 +15,10 @@
  */
 
 import { settings } from '../settings/settings.svelte';
+import { EFFECTS_LEVEL } from './catalog';
 
 export type Bus = 'effects' | 'voices' | 'world';
 
-/** Interface sounds are quiet by design. */
-const EFFECTS_LEVEL = 0.5;
 /** Seconds the master volume takes to fade out or back in as the window loses or gets focus. */
 const FOCUS_FADE = 0.15;
 /**
