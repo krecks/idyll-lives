@@ -1,9 +1,10 @@
 /**
  * Plays voice clips through Web Audio: the voice bus (`audio/mixer.ts`, "Voice volume"), and a
- * stereo panner per clip so a voice comes from where the resident is on screen.
+ * stereo panner per clip so a voice comes from where the resident is on screen. While a clip plays
+ * the world's sounds give way to it (`voiceSpeaking`).
  */
 
-import { audioContext, bus, onHide, updateVolumes } from '../audio/mixer';
+import { audioContext, bus, onHide, updateVolumes, voiceSpeaking } from '../audio/mixer';
 import { SAMPLE_RATE } from './protocol';
 
 export interface Playing {
@@ -44,12 +45,14 @@ export function playClip(samples: Float32Array, pan = 0): Playing | null {
   let done = () => {};
   const ended = new Promise<void>((resolve) => {
     done = () => {
-      playing.delete(stop);
+      // (Once: a clip stopped by hand also gets its `ended` event.)
+      if (playing.delete(stop)) voiceSpeaking(false);
       resolve();
     };
   });
   src.onended = () => done();
   playing.add(stop);
+  voiceSpeaking(true);
   src.start();
   const startTime = performance.now() / 1000 + (ac.outputLatency || ac.baseLatency || 0);
   return {
