@@ -887,16 +887,17 @@ what is kept leaves them out and puts empty ones back.
 
 | moment | first visit | returning visit |
 |---|---|---|
-| boot: the page to the main menu | 5.9 s (6.5 before) | 4.3 s (7.1 before) |
-| `boot: menu town` (spans) | 4.4 s (4.9) | 4.0 s (6.7) |
-| the showcase | land 2.4 s + preview 0.6 s, in the worker | read 25 ms |
+| boot: the page to the main menu | 5.4 s (5.6 before) | 4.3 s (5.9 before) |
+| `boot: menu town` (spans) | 3.9 s (4.2) | 4.0 s (5.6) |
+| the showcase | land 2.1 s + preview 0.5 s, in the worker | read 20 ms |
 
-That is 2.8 s off a returning boot. The page's own part (the renderer's build, 4.4 s) is now nearly all
-of it; the worker's layout no longer hides behind the page's work but is simply gone. Entry (Play to
-the game up) is 0.4 s quicker (10.1 → 9.7 s), as a first visit is (10.1 → 9.6 s): the road mesh is no
-longer on the page. The returning visit's town file takes 0.8 s against a first one's 0.4, the town
-worker starting fresh (the menu's houses go with the job, so it does not make them again: without them
-it took 1.9 s).
+That is 1.6 s off a returning boot, and 1.3 s off the way to the game (boot and entry together, 13.4 s
+against 14.6). The page's own part (the renderer's build, 4.3 s) is now nearly all of the menu's wait;
+the worker's layout no longer hides behind the page's work but is simply gone. Entry (Play to the game
+up) is a little slower on a returning visit (9.0 s against 8.8): the game's town file is made in a
+fresh town worker, where the menu's layout used to have just warmed one up, so the kept houses are sent
+to it (0.7–0.9 s against 0.4; without them it makes them again, 1.9 s). A first visit is unchanged
+(5.4 s and 9.4 s against 5.6 and 8.9, within the noise).
 
 Left:
 
