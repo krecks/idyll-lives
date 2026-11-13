@@ -32,6 +32,7 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 - **Leather that looks like leather:** the leather armchair, the designer lounge chair, the leather pouf, the executive chair, the executive desk's writing pad, the high bar stool and the heavy bag were an even satin; they now have a hide's soft creases and an uneven sheen, polished where they are sat on.
 - **Rounder turned legs:** the cabriole legs of the classic sofa, the armchair, the wingback, the fireside lounge's chair, the journal desk and the vanity are round (twelve sides, where six or eight showed as flats and streaked in the light).
 - **Save format 39:** the town's backdrop, places and centres (38) and the porches and porch pieces (39) are in the save. 0.8.0's saves open and play as before, their porches where they were drawn; 0.8.0 can't open the new ones.
+- **A smaller deploy:** the build ships the compressed copies of the game's models, textures and character data on their own, not the sources beside them (every one has a copy, and the game only ever fetches the copy). `web/dist` is 112 MB smaller (497 to 385 MB), and a release uploads and publishes that much less. What the build doesn't compress (icons, the sky, manifests, a modder's pack) still ships as it is.
 
 ## 0.8.0 — 2026-11-12
 

@@ -1,6 +1,6 @@
 import { defineConfig, searchForWorkspaceRoot, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { appendFile, cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { appendFile, cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { basename, join, resolve } from 'node:path';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
@@ -234,7 +234,29 @@ function optimizedAssets(): Plugin {
       copies = ASSETS_OUT;
     },
     async closeBundle() {
-      if (copies) await cp(copies, join(outDir, 'assets'), { recursive: true });
+      if (copies) {
+        const assets = join(outDir, 'assets');
+        await cp(copies, assets, { recursive: true });
+        // Every file the build encoded is fetched as its compressed copy (`optimizedUrl` in
+        // src/assets/registry.ts): ship that, not both. What the build didn't encode (icons, the
+        // sky, manifests, a modder's pack) stays as it is; a source whose copy is missing stays too.
+        const index = JSON.parse(await readFile(join(copies, 'optimized.json'), 'utf8')) as {
+          files?: Record<string, string>;
+        };
+        let dropped = 0;
+        let bytes = 0;
+        for (const [source, copy] of Object.entries(index.files ?? {})) {
+          try {
+            if (!(await stat(join(assets, copy))).isFile()) continue;
+            bytes += (await stat(join(assets, source))).size;
+            await rm(join(assets, source));
+            dropped++;
+          } catch {
+            // (No source under that name: nothing to drop.)
+          }
+        }
+        this.info(`optimized-assets: ${dropped} sources dropped (${(bytes / 1e6).toFixed(1)} MB); their compressed copies ship instead`);
+      }
     },
   };
 }
