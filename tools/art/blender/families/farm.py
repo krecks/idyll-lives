@@ -1,4 +1,4 @@
-# The farm (docs/objects/community.md CM5): the red barn, the grain silo, the little tractor, the round hay bale,
+# The farm: the red barn, the grain silo, the little tractor, the round hay bale,
 # the stack of hay bales, the scarecrow, the water trough and the chicken coop (`model.farm.<id>`). They stand on
 # the farm lots of farm worlds (web/src/game/town.ts `farmstead`) and are seen from afar in the town
 # overview, so each has a far version (E7), built by hand (the model's plain shapes) but the scarecrow's, decimated.
@@ -1074,7 +1074,7 @@ FAMILY = G.Family(
              paint=[('trough', 'Paint')]),
      G.Model('coop', coop, size=(1.74, 1.88, 1.97), tolerance=TOLERANCE, far=coop_far, motions={'night': 'close'},
              paint=[('coop', 'Paint'), ('coop_roof', 'Roof'), ('coop_trim', 'Trim')])],
-    comment='Blender-built farm (tools/art/blender/families/farm.py, docs/objects/community.md CM5): the '
+    comment='Blender-built farm (tools/art/blender/families/farm.py): the '
             'red barn, the grain silo, the little tractor, the round hay bale, the stack of hay bales, '
             'the scarecrow (an ambient sway), the water trough and the chicken coop (its pop-hole hatch '
             'shut at night, `close`). Each has a far version (`far`, E7) for the town overview. Listed in '

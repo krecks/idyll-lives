@@ -1,5 +1,5 @@
 {
-  "$comment": "Cheerful pack: music, parties and sunshine. Cheerful residents seek out 'party' and 'music' items, sing their way to Charisma and carry good moods (with real buffs) from one activity to the next. See docs/personalities/cheerful.md. Check with: cargo run -q -p sim-core --example check_pack -- web/public/content/packs/cheerful.json",
+  "$comment": "Cheerful pack: music, parties and sunshine. Cheerful residents seek out 'party' and 'music' items, sing their way to Charisma and carry good moods (with real buffs) from one activity to the next. Check with: cargo run -q -p sim-core --example check_pack -- web/public/content/packs/cheerful.json",
   "tags": ["party", "music"],
   "feelings": [
     {

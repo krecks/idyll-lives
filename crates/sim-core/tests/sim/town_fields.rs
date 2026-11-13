@@ -1,4 +1,4 @@
-//! A town file's open-world fields (docs/design/open-world.md) are read, kept on the world
+//! A town file's open-world fields are read, kept on the world
 //! (`World::travel`, `travel::OpenWorld`) and saved with the game: size, roads, areas, typed
 //! exits, terrain masks, parking, plots' areas and kinds, driveways' roads. A town without them
 //! takes its meta's roads as the network (every town is open now: cosy and normal were dropped in

@@ -1,6 +1,6 @@
 # Kids — notes
 
-`kids.py` builds the twenty kids' things of docs/objects/kids.md into `web/public/assets/models/kids/` and their entries
+`kids.py` builds the twenty kids' things into `web/public/assets/models/kids/` and their entries
 in `packs/kids/manifest.json`. Built 2026-10-14; they sat in Validate › Baby And Beds, Toys and Kids
 Study until checked in play.
 

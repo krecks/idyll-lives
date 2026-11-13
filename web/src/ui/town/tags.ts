@@ -1,5 +1,5 @@
 /**
- * The town tags' contents (docs/design/living-town.md, Town tags): who and what gets a tag, what it says, where it
+ * The town tags' contents: who and what gets a tag, what it says, where it
  * stands and what a click on it does. Pure: from the game's views (`SimView`, the relationships, the `PlotInfo`s,
  * the town's places); which of them are up for the screen at a zoom (`placesInView`, `nearestFew`) and how they rank
  * there (`tagRank`). `TownTags.svelte` places them on screen each frame (`game/tagLayout.ts`, as the menus do).

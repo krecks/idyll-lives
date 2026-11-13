@@ -1,5 +1,5 @@
 /**
- * "Today in <town>" (docs/design/living-town.md): the household's next events, from what the views already say
+ * "Today in <town>": the household's next events, from what the views already say
  * about them: a shift (`JobView`'s days and start), school (the content's school days, for pupils), and a planned
  * visit (a routine block of a visiting activity, their own or the household's they keep). Birthdays aren't in
  * the views (only the age in whole years is), so they aren't here.

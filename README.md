@@ -81,7 +81,7 @@ The first `bun run dev` or `bun run build` downloads the voice model (398 MB as 
 | `bun run assets` | Build or update the compressed asset copies (the build does this too) |
 | `bun run decoders` | Refresh `public/decoders` (PlayCanvas's Basis Universal transcoder for KTX2 textures) after a PlayCanvas upgrade (`cargo decoders`) |
 
-From the repo root: `cargo fmt --all` (CI checks the code is formatted) and `cargo clippy --workspace --all-targets -- -D warnings` (CI gates on it), `bun tools/bench/render.mjs` (the rendering benchmark and reference screenshots, see [tools/bench/README.md](tools/bench/README.md) and [docs/design/graphics.md](docs/design/graphics.md)) and `cargo release-version` (the version, see [Versions and releasing](#versions-and-releasing)).
+From the repo root: `cargo fmt --all` (CI checks the code is formatted) and `cargo clippy --workspace --all-targets -- -D warnings` (CI gates on it), `bun tools/bench/render.mjs` (the rendering benchmark and reference screenshots, see [tools/bench/README.md](tools/bench/README.md)) and `cargo release-version` (the version, see [Versions and releasing](#versions-and-releasing)).
 
 **The production build** also:
 - runs binaryen's `wasm-opt -O3` on both WASM files and strips their names (`cargo wasm-opt`; about a minute the first time, then cached in `web/.assets/wasm-opt`). The dev server keeps the WASM as built, with its names;
@@ -97,7 +97,7 @@ From the repo root: `cargo fmt --all` (CI checks the code is formatted) and `car
 |---|---|
 | `?quality=low\|medium\|high` | Overrides the graphics preset for this page |
 | `?renderer=webgl` | Draws with WebGL2 even where WebGPU works (the game, the previews and the dev pages) |
-| `?bench=village` | The rendering benchmark (also `forest`), with `&quality=`, `&hour=`, `&cam=orbit\|wide\|build\|dusk\|mirror\|mirror-still`, `&res=`, `&cap=`, `&diag=` and more ([docs/design/graphics.md](docs/design/graphics.md)) |
+| `?bench=village` | The rendering benchmark (also `forest`), with `&quality=`, `&hour=`, `&cam=orbit\|wide\|build\|dusk\|mirror\|mirror-still`, `&res=`, `&cap=`, `&diag=` and more (`web/src/debug/benchFlags.ts`) |
 | `?hour=13` | Holds the lighting at that hour |
 | `?diag=…` | A comma list. `noshadows`, `noaa`, `nonature`, `nolamps`, `nomirrors`, `noglass`, `nonight` leave a feature out to measure what it costs; `freeze` stops time for screenshots; `albedo` and `normals` draw every lit surface as its base colour or world normal; `nosims` leaves the residents out; `linear` draws the light without tone mapping, exposure or grading; `shaders` logs every shader and pipeline compiled, with its material and phase |
 | `?debug` | Console helpers: `__controls`, `__world()`, `__sims()` (residents live: where, pose, what they use, needs), `__cars()` (the cars and work taxis as the newest snapshot shows them: where, which way, `kind` 0 a household's, 1 a taxi), `__lights()` (the traffic lights' heads), `__send(command)`, `__addFunds(n)`, `__camera(pose)`, `__showPlot(i)`, `__characters`, `__renderer` (its debug hooks), and `__crash('panic'\|'throw'\|'hang'\|'render')` to see how the game copes with a failure |
@@ -145,7 +145,7 @@ Main thread                                   Sim worker
 - The UI gets changes only, at about 10 Hz, never the whole view and never per frame.
 - Import PlayCanvas through `web/src/render/pc/engine.ts`, never as the bare `playcanvas` package (ESLint refuses it): under Vite's dev server the package's entry is PlayCanvas's debug build, which wraps every WebGPU draw in validation error scopes and costs a few frames a second on a full scene; `engine.ts` re-exports the release build by path.
 
-**The renderer** (`web/src/render`, details in [docs/design/graphics.md](docs/design/graphics.md#the-renderer)):
+**The renderer** (`web/src/render`, presets in `web/src/render/quality.ts`):
 
 | Folder | Holds |
 |---|---|
@@ -196,7 +196,7 @@ Add an object to `content/base.json` or one of the files it `include`s (the cata
 
 A production build serves the content from `bundle.json`, which wins over the loose files: to edit content inside a built site, rebuild it or delete `dist/bundle.json`.
 
-Pack authors: see [docs/content-packs.md](docs/content-packs.md). The look of the world is described in [docs/design/look.md](docs/design/look.md), the graphics settings in [docs/design/graphics.md](docs/design/graphics.md).
+Pack authors: see [docs/content-packs.md](docs/content-packs.md).
 
 ## Versions and releasing
 

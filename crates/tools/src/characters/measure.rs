@@ -1,5 +1,5 @@
 //! `cargo characters ratios`: the proportions of every body as built, and its ear, beside a real adult's,
-//! to tune `rig.rs`, the hands and feet and the ears (ear.rs) by (docs/review/residents.md, M-residents-01). Reads the generator,
+//! to tune `rig.rs`, the hands and feet and the ears (ear.rs) by. Reads the generator,
 //! not a built set, so it shows a change before the build.
 
 use super::body::{self, region};

@@ -23,7 +23,7 @@ Run the checker after every change (see [Checking a pack](#checking-a-pack)).
   also packed into one file, `bundle.json`, and the game reads them from there: editing a file
   in `dist/content/` changes nothing until you rebuild, or delete `dist/bundle.json` (the game
   then fetches the files one by one). The dev server has no bundle, and an art pack loaded with
-  `?pack=` is fetched as before.
+  `?pack=` is fetched.
 
 ## Merge rules
 
@@ -66,9 +66,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
   entries stay). A later pack patching the same key wins.
 - `effects.mood` is **added** to the trait's mood; `effects.walkSpeed` is **multiplied**.
 - Other keys are errors. Patch only your own trait, so packs don't fight.
-- A trait's `startingSkills` are the skills new residents with it start with. (Before 0.2.0 the
-  game dropped them while loading, so neither traits nor patches gave any; old saves keep the
-  skills their residents have.) An unknown skill id there is an error.
+- A trait's `startingSkills` are the skills new residents with it start with. An unknown skill id there is an error.
 
 ## Objects
 
@@ -183,7 +181,7 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `whole` | Takes every slot of the object (see `slots`): residents choose it, and it starts, only with nobody else on the object, and while it lasts the object is full for everyone else (their orders for it are dropped when they come up, as for any full object). The player's order fails with "someone is using the …" while someone else is on it. For a nap along a 2-seat bench: the window seat's *Doze under the throw*, the hearth settee's *Nap under the quilt* (the renderer lays the napper along it, `BEDS` `across`). Default `false`. |
 | `recipe` | Starts a recipe (`recipes` id; see [Cooking](#cooking)) instead of being used here alone: the resident goes round the recipe's stations (fridge, counter, stove), from whichever one they clicked, and serves a dish. `minutes` isn't needed (the steps take theirs); `effects` are then only what cooking does for the cook (`{"fun": 0.05}`), the meal's own are the recipe's. Keep the `tags` (`food`, `cooking`): kitchens, plans and traits go by them. `cost` comes from the recipe. |
 | `eat` | Food to sit down with: `{"item": "snack", "minutes": 8}`. `minutes` is then the fetching or making (a snack from the fridge: 2, toast: 4); once that's done the resident holds the `item` (an `items` id, a plate or a bowl), sits down with it like with a served dish (a chair at a table, then a table with seats, then any seat, else standing; see [Cooking](#cooking)) and eats it for the `eat` minutes. The positive `effects` come from eating (times the object's quality), so autonomy weighs the interaction just as before; a negative one is still spread over the fetching. Give it a fetching `anim` (`fetch`, `cook`). Not with `recipe`. Drinks stay plain interactions, gated with `requires` when they need an appliance (coffee needs a coffee machine; `fetch` has it poured there first). Food bought in town is the same: the stall's fruit, the cart's ice cream and hot dog, the snack machine's snack, the bakery's pastry and the grocer's sandwich are fetched (and paid for) at their source, then eaten on a bench or at a café table there (their items have no `emptyAs`: nothing is left to clear; a plate on a table off the household's lot stays while it's eaten). |
-| `yields` | A harvest's produce: `{"item": "gardenProduce", "servings": 2, "minutes": 8}`. When the use finishes (not when it's cancelled or given up at once) the resident holds the `item` (an `items` id) with that many servings and carries it to the home's nearest working fridge (`stores`), puts it away there (a moment, the `cooking.putAwayAnim`) and it's food in the fridge like leftovers: anyone at home eats a serving later, at a table, for `minutes`, and gets the interaction's positive `effects` then (they're moved off the harvest, as with `eat`; residents weigh it all the same). A harvester hungry for it has a serving there and then. With no fridge at home they sit down and eat a serving at once (as `eat`); called away on the way, what they carry is put down (a surface, else the floor). Not with `eat` or `recipe`; `servings` at least 1. The base game's vegetable patch, raised bed, tomatoes, strawberries, pumpkins and apple tree's *Pick the apples* (G-68). |
+| `yields` | A harvest's produce: `{"item": "gardenProduce", "servings": 2, "minutes": 8}`. When the use finishes (not when it's cancelled or given up at once) the resident holds the `item` (an `items` id) with that many servings and carries it to the home's nearest working fridge (`stores`), puts it away there (a moment, the `cooking.putAwayAnim`) and it's food in the fridge like leftovers: anyone at home eats a serving later, at a table, for `minutes`, and gets the interaction's positive `effects` then (they're moved off the harvest, as with `eat`; residents weigh it all the same). A harvester hungry for it has a serving there and then. With no fridge at home they sit down and eat a serving at once (as `eat`); called away on the way, what they carry is put down (a surface, else the floor). Not with `eat` or `recipe`; `servings` at least 1. The base game's vegetable patch, raised bed, tomatoes, strawberries, pumpkins and apple tree's *Pick the apples*. |
 | `tends` | Brings the object's crop on (0..1; the object needs `grows`): a use that finishes grows it this share of its way from planted to ripe at once (a use cut short, its share of that), while it grows (not ripe, not fallow). Weeding and watering (0.15 for a 30-minute *Weed and water*, 0.1 for watering the lemon tree): a crop tended once a day ripens a few hours sooner. Default 0. |
 | `when` | `"open"` or `"closed"`: only offered while the object is so (a wall bed's *Fold up* while it's down). `"ripe"`: only while its crop is (see `grows`). Objects start closed. Residents choose it, and the player's order works, only then; the order fails with "the … is closed" / "is already open". Default: always. |
 | `leaves` | `"picked"`: picks its crop (see `grows`) when the use ends: the hands pick it through the harvest, and such a use goes on to its end even once the needs it fills are full. `"open"` or `"closed"`: opens or closes the object as the use starts (as the resident gets to it), or with `gradual` when it ends, and leaves it so; saved with the object. Nothing closes an object someone else is using or walking to ("someone is using the …"; when someone else gets there first after the order was given, the order is dropped and the story says so, event `notClosed`). After a night's sleep or a nap (`dayRhythm.sleepTags`, `napTags`) in an object that is open, the last one up uses its interaction that `leaves` it `"closed"` (a wall bed's *Sleep* has `"leaves": "open"`; its *Fold up* `"when": "open", "leaves": "closed"`), and so does the last one done after a use with `closeAfter` (below). Nothing else is closed for you (the washing stays on the line until someone takes it in). Its model holds the entry's `motions.open` clip open while it's open (docs/design/objects.md, "Moving parts"). Default: leaves it as it is. |
@@ -332,7 +330,7 @@ the host's to wash up, and the story tells it (`served`). Code: `crates/sim-core
 schedule or buff must tell your objects apart. A tag exists once any interaction uses it;
 to refer to a tag before anything uses it (e.g. in a `traitPatches` preference), declare it
 in a top-level `"tags": ["myTag"]` array. Unknown tags in effects are errors. With 15 packs
-sharing 64 slots (28 in use), **add at most two new tags per pack**.
+sharing 64 slots, **add at most two new tags per pack**.
 
 ## Animations
 
@@ -617,7 +615,7 @@ leaving below 0.7 hunger; `readyMinutes` 45.
 
 ## Life: ages, family, moving
 
-Content `life` (an object, so a pack can change single keys; see `docs/design/life-cycle.md`):
+Content `life` (an object, so a pack can change single keys):
 
 | Key | Meaning |
 |---|---|
@@ -730,7 +728,7 @@ sold back for `objectRules.resale` of it.
 
 ## Rooms, wear and accidents
 
-How the house shows up in residents' lives (see `docs/design/house-matters.md`).
+How the house shows up in residents' lives.
 
 **Room kinds** (`roomKinds`): a room is of the first kind whose `tags` something in it offers.
 
@@ -1104,7 +1102,7 @@ can be reached from the street.
 
 ## What content is refused
 
-Since 0.2.0 the simulation refuses content that would break the game when it loads, with the
+The simulation refuses content that would break the game when it loads, with the
 id and the rule in the message, for example `lazy: walkSpeed 0 must be above 0`. The checks run
 on the merged content, so they don't name a file; only errors while merging the files do
 (`crates/sim-core/src/content.rs`; one test case per

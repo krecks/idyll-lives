@@ -1,5 +1,5 @@
 {
-  "$comment": "Outgoing pack: places to gather, perform and party, plus a way to stay connected when nobody is home. Adds tags 'party' and 'music' (shared vocabulary). See docs/personalities/outgoing.md.",
+  "$comment": "Outgoing pack: places to gather, perform and party, plus a way to stay connected when nobody is home. Adds tags 'party' and 'music' (shared vocabulary).",
   "objects": [
     {
       "id": "outgoing.partyBar",

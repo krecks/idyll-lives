@@ -1,5 +1,5 @@
 /**
- * The living town's world data (docs/design/living-town.md, "World data"), laid out with a big
+ * The living town's world data, laid out with a big
  * world (`macro.ts`):
  *
  * - each main town's centre (`chooseCentre`): its high street, the stretch of its street nearest

@@ -9,7 +9,7 @@
  * home's price (web/src/game/wealth.ts, price.ts); per kind of house, how old its owners are and
  * how high up they work. Problems are listed (and the exit code is 1).
  *
- * Sizes (docs/design/open-world.md): every world is a Big one now (cosy and normal were dropped
+ * Sizes: every world is a Big one now (cosy and normal were dropped
  * in 0.8.0). For every world: the roads (country roads and trails too)
  * one network as the sim joins them (an end within half the wider road's width and a metre of the
  * other's middle), every way out on it, no more courts (dead ends) than an area keeps, none
@@ -23,7 +23,7 @@
  * squares with nothing in them, every quarter of it with an area or homes out in the country),
  * every road named (no two alike), the file under 4 MB, and the time a big world takes (its
  * layout without generating houses, and assembling its file: a problem at twice the budget).
- * And the living town's backdrop, centre and places (`livingProblems`: docs/design/living-town.md).
+ * And the living town's backdrop, centre and places (`livingProblems`).
  * Each world's line counts its terraced houses, backdrop buildings and places.
  *
  * The same arguments make the same files, byte for byte (`Math.random` seeded per world:
@@ -304,7 +304,7 @@ const corners = (r: Rect, by = 0): Pt[] => [
   [r.x - by, r.z + r.d + by],
 ];
 /**
- * The living town's world data (docs/design/living-town.md, World data; `game/backdrop.ts`): every
+ * The living town's world data (`game/backdrop.ts`): every
  * backdrop building a rectangle (4 to 8 corners, counter-clockwise seen from above), 1 to 6 storeys,
  * a roof (a ridge for a gable or mansard), a use, its area and its place; on no lot (and
  * `LOT_CLEAR` m off one), road or trail with its sidewalks (more than half its width off its

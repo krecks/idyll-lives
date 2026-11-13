@@ -1,5 +1,5 @@
 //! Rooms and their scores: kind from what stands in them, size, light, decor, cleanliness and
-//! function, and each plot's garden (see `docs/design/house-matters.md`).
+//! function, and each plot's garden.
 
 use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind, FloorPaint};
 use sim_core::{Command, World};

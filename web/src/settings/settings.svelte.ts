@@ -49,7 +49,7 @@ export interface Settings {
    * panel); `always` gives orders straight away, as before.
    */
   directControl: 'inspect' | 'always';
-  /** Residents speak out loud (docs/design/voices.md). Downloads the voice model when first on. */
+  /** Residents speak out loud. Downloads the voice model when first on. */
   voices: boolean;
   /** Language residents speak (English only, for now). */
   voiceLanguage: 'en';
@@ -67,7 +67,7 @@ export interface Settings {
   voiceWriter: 'lines' | 'llm';
   /** Spoken lines also show as text in the speech bubble. */
   subtitles: boolean;
-  /** Birds, crickets, the wind, things in use at home, footsteps, cars passing and the town from above (audio/world.ts; docs/design/sound.md). */
+  /** Birds, crickets, the wind, things in use at home, footsteps, cars passing and the town from above (audio/world.ts). */
   worldSound: boolean;
   /** 0..1. */
   worldVolume: number;

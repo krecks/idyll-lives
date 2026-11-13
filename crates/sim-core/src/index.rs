@@ -16,7 +16,7 @@ use std::borrow::Cow;
 
 use crate::world::Plot;
 
-/// Spatial cells for public objects (m; docs/design/open-world.md).
+/// Spatial cells for public objects (m).
 pub(crate) const CELL: f32 = 64.0;
 
 #[derive(Debug, Clone, Default)]

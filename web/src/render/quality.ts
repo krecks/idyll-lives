@@ -163,12 +163,12 @@ export interface QualitySettings {
   birds: { count: number; range: number };
   /**
    * Residents outdoors on any lot are drawn within this many metres of the camera's target, and in
-   * the view (`docs/design/open-world.md`, life on every lot); those indoors only on the viewed lot.
+   * the view; those indoors only on the viewed lot.
    * Past `FAR_POSE_DISTANCE` they're posed less often.
    */
   residentRadius: number;
   /**
-   * A big world's distances (`docs/design/open-world.md`): what is drawn round the roaming camera.
+   * A big world's distances: what is drawn round the roaming camera.
    * Medium and High are the open world as it was tuned; Low draws less of it (on WebGL2 the woods and
    * far houses past the haze cost an older laptop's GPU what it can't spare).
    */

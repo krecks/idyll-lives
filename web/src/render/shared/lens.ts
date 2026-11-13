@@ -16,7 +16,7 @@ export const DEFAULT_ORBIT = { alpha: -Math.PI * 0.62, beta: 0.86, radius: 24 } 
 
 // pin:living-town-lens begin
 /**
- * The town view (docs/design/living-town.md, Camera modes): past `TOWN_FROM` m of orbit radius the play camera eases
+ * The town view: past `TOWN_FROM` m of orbit radius the play camera eases
  * into a bird's-eye view of the town, fully at `TOWN_FULL`; it zooms out no farther than `TOWN_MAX`.
  */
 export const TOWN_FROM = 120;

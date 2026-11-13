@@ -25,7 +25,7 @@ The build is deterministic (seeded noise only): the same code gives the same byt
   absent or identity.
 - The rest pose is an A-pose: arms 45 degrees down, legs straight and vertical, a gently curled
   open hand.
-- Meshes are written with clockwise front faces (the left-handed convention, as Babylon had it). Inside the
+- Meshes are written with clockwise front faces (the left-handed convention). Inside the
   generator every mesh is counter-clockwise from outside; `write.py` turns the faces round.
 
 ## Skeleton (33 bones)
@@ -87,8 +87,6 @@ A body entry:
 | `parts` | part name -> byte offsets in `mesh` |
 | `hd` | the close-up body, in a file of its own: `{ mesh: "<family>.hd.bin", parts: { "hd.body": … } }`, laid out as `mesh` and `parts` are (see Close-up body) |
 | `stages` | other life stages: `{ mesh, height, restT, inverseBind, pelvisScale, seatDrop, eyeY, grip, faceScale, parts, hd }` (`hd`: `{ mesh: "<family>.<stage>.hd.bin", parts: { "hd.body": … } }`, the close-up body's deltas) |
-
-No textures: `textures`, `cloth`, `hairTextures`, `hairCards` are gone, and so are UVs.
 
 ## Binaries
 
@@ -156,9 +154,7 @@ with the first of that stage; until they arrive, and if they fail to, the stage 
 Hair (`hair.rs`, up to 7.4k triangles a style, one draw) is closed shapes in locks, so it breaks
 its outline and shades in clumps. Every style's layout is a shape, and it is cut at `DETAIL` (1.5)
 times the rows the layout asks for and its locks on `LOCK` (6) columns each, not 4 (the same locks,
-more finely cut): at 3k a cap was 40 columns and 8-16 rows, which read
-as plates with a polyline for a hem; at 5.2k the curtains were ribbons of six or nine, the width of a
-thumb at arm's length, so the layered styles now ask for ten locks over four rows and the cap of the
+more finely cut); the layered styles ask for ten locks over four rows and the cap of the
 short ones for 52 columns and 18 rows:
 
 - every style has a skull cap: rows from the crown to the hairline in locks 4 of its layout's columns
@@ -496,7 +492,7 @@ collar, at a boot's top; a dress shoe's toe drawn out forward) and skinned as th
 moves with the foot; its edges the collar crosses are split, and every point lies on the curved
 skin. The collar runs round the ankle, low at the sides (a boot's up the shin; a dress shoe's low,
 with a throat down the instep), its lining a band turned in to the skin. The sole stands a few mm out
-round the upper, from the floor (as the old soles: the clips and the seat fit stand on it) to its
+round the upper, from the floor (the clips and the seat fit stand on it) to its
 top; heels are thicker, and a heel's arch and the toe lift off the floor. Laces are bars across the
 instep (fields w and x); a sole is dark, or a thin dark welt over a light midsole over a dark outsole;
 dress shoes are
@@ -555,7 +551,7 @@ Then 20 texels of face morph (channel, weight) pairs, two a texel, a weight of 0
 | 12 (`EXPRESSION_TEXELS`) | the expression: the 24 strongest of the expression channels (`face.ts` `FaceMixer`); a first channel of -1 means no morphs at all on this face this frame (too small on screen, `parts.ts` `MORPH_PX`) | every frame the face is posed |
 | 8 (`IDENTITY_TEXELS`) | the resident's own face: the 16 identity channels at the look's weights, signed, times the body's `faceScale` (`identity.ts` `writeIdentity`) | once, when the resident is built |
 
-A row is 33 x 3 + 11 + 20 = 130 texels (128 before the lag texels). Disabled cuts are -10 (+10 for "below" cuts).
+A row is 33 x 3 + 11 + 20 = 130 texels. Disabled cuts are -10 (+10 for "below" cuts).
 Texels 0 to 8 are the outfit's, written when a resident changes clothes (`writeOutfit`); 9 and 10 are written
 every frame a resident is posed (`residents.ts` `writeSway`).
 
@@ -735,7 +731,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 - Clips in sizes (`street.ts` `sizes`: things at fixed heights, the size picked by the resident's height) are fitted
   by the legs: a size's metres are the object's over its height's share of the reference times `legShare` (a child's
   legs are 0.9 of a grown-up's for the height, from 1.25 m up to 1.4 m in between), as the runtime moves the clip's
-  pelvis by the body's `pelvisScale` (A-residents-12; the rides in `rides.ts` were already).
+  pelvis by the body's `pelvisScale`.
 - Carried things sit on the palms (`grip`): the right one, or between both.
 - Every name the runtime plays, with its loop flag and length (seconds; the runtime sequences
   object use, sitting down and standing up on these lengths):
@@ -833,11 +829,10 @@ over a start, 60 mm over a stop): `tools/characters/transitions.ts` runs the res
 (`residents.ts`, with a view that draws nothing) on a scripted snapshot, twelve residents per body and stage
 standing, walking at 1.5 m/s and stopping at twelve parts of the stride, and adds up the way each foot's contact
 point (the heel or the ball, whichever is lower) goes over the floor while it is within 4 mm of its standing
-height, from a tick before the start to 0.5 s after it and from a tick before the stop to 0.9 s after it. Before
-`stride.ts` that was 314 to 486 mm over a start and 193 to 278 mm on average (231 to 421 at worst) over a stop;
-it is 29 to 48 mm (56 at worst) and 10 to 15 mm (41 at worst). `bun tools/characters/blend_analysis.ts` prints
+height, from a tick before the start to 0.5 s after it and from a tick before the stop to 0.9 s after it. It is
+29 to 48 mm (56 at worst) over a start and 10 to 15 mm (41 at worst) over a stop. `bun tools/characters/blend_analysis.ts` prints
 the table (its section 6), with the travel of a second of plain walking beside it (12 to 47 mm: the standing
-foot's toes swivel a little as the hips turn over it; 40 to 227 mm before the hip roll left the legs alone). The default is the reference: `male` at
+foot's toes swivel a little as the hips turn over it). The default is the reference: `male` at
 `youngAdult`, plus `baby` for the baby's clips.
 Each body and stage plays the clips on its own skeleton (`restT`, the pelvis motion and ground
 speed scaled by `pelvisScale`, `walk`'s hip roll), the sized clips at the size its height picks,

@@ -220,7 +220,7 @@ pub struct LotFile {
     /// Opaque data for the presentation layer (streets, scenery seed...). Saved unchanged.
     #[serde(default)]
     pub meta: serde_json::Value,
-    // ---- Open world (sim-travel; docs/design/open-world.md) -------------------------------
+    // ---- Open world (sim-travel) -------------------------------
     /// `size`, `roads`, `areas`, `terrain` and `parking` (`travel.rs`). All optional.
     #[serde(flatten)]
     pub open_world: crate::travel::OpenWorld,

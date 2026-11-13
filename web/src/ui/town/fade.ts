@@ -1,4 +1,4 @@
-/** The town tags fade in with `townBlend` (docs/design/living-town.md, Town tags): from 0.2, fully at 0.5. */
+/** The town tags fade in with `townBlend`: from 0.2, fully at 0.5. */
 export const TAGS_FROM = 0.2;
 export const TAGS_FULL = 0.5;
 

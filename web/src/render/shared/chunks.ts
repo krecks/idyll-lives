@@ -1,5 +1,5 @@
 /**
- * The renderer's stream chunks (`docs/design/open-world.md`): the town cut into 64 m squares in
+ * The renderer's stream chunks: the town cut into 64 m squares in
  * town coordinates, chunk (cx, cz) covering x in [cx·64, cx·64 + 64) and z in [cz·64, cz·64 + 64)
  * on the ground storey. What the street plans (`shared/street.ts`) is planned per chunk, and drawn
  * merged per draw group: a far-LOD superchunk of 2 × 2 chunks (128 m), one mesh per material, so a

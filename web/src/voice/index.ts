@@ -1,5 +1,5 @@
 /**
- * Resident voices in a game (docs/design/voices.md). Watches the render snapshot and decides
+ * Resident voices in a game. Watches the render snapshot and decides
  * who says what, then plays the line once the voice worker has made it, and hands its mouth
  * shapes to the renderer while it plays (`Renderer.setSpeech`).
  *

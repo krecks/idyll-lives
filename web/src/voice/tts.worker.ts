@@ -2,7 +2,7 @@
  * Voice worker: turns lines of text into 24 kHz audio, one at a time, off the main thread.
  * Supertone's Supertonic 3 runs on ONNX Runtime Web, on the GPU (WebGPU: a whole line in a few
  * large passes, about 30 times faster than it plays) or, in Auto's fallback, on the processor
- * (WASM: about 2.5 times faster than it plays; docs/design/voices.md). Our Rust/WASM
+ * (WASM: about 2.5 times faster than it plays). Our Rust/WASM
  * (`crates/voice-wasm`) shapes the voices, finds the mouth shapes and reads the text plain.
  * `supertonic.ts` makes each line.
  *

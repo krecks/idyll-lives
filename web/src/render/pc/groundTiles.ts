@@ -26,7 +26,7 @@ export function disposeTiles(tiles: readonly GroundTile[]): void {
   for (const t of tiles) for (const m of t.meshes) if (m !== t.mi.mesh) m.destroy();
 }
 
-// ---- the town view's colour map (docs/design/living-town.md: a ground colour map at altitude) ----
+// ---- the town view's colour map (a ground colour map at altitude) ----
 
 /** Texels a metre at most, and the map's side at most (2048: half a metre a texel over a Big world). */
 const MAP_PER_M = 2;

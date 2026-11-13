@@ -4,7 +4,7 @@
 //! a tick on the side they face), garden paths and driveways, the ground floor's walls, the things
 //! standing about and the ways out of town (red). A big world also shows its land (water, woods, hills,
 //! meadows, fields, orchards), its country roads and trails (dashed), and its areas' names; and the
-//! living town (docs/design/living-town.md): its backdrop buildings (coloured by use, darker the more
+//! living town: its backdrop buildings (coloured by use, darker the more
 //! storeys), each main town's centre (paved, dashed round), and the places the tags name (a dot at the
 //! door, blue for a public lot, red for a backdrop place, with its name). An index.html shows them all
 //! on one page.

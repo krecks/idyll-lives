@@ -1,5 +1,5 @@
 /**
- * The town view's shared state (docs/design/living-town.md): what the renderer, the town-scale drawing and the HUD's
+ * The town view's shared state: what the renderer, the town-scale drawing and the HUD's
  * town tags read and write each frame. Engine-neutral: no PlayCanvas, no Svelte.
  *
  * The renderer (camera stream) writes `blend`, `radius`, `target` and `project` every frame and sets `goTo` once; the

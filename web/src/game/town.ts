@@ -228,11 +228,11 @@ export interface TownMeta {
   home?: number | null;
   /** See `WorldMeta.gardenFences`. */
   gardenFences?: boolean;
-  /** Big worlds (docs/design/open-world.md). */
+  /** Big worlds. */
   zones?: WorldMeta['zones'];
   pads?: WorldMeta['pads'];
   areas?: WorldMeta['areas'];
-  /** The living town (docs/design/living-town.md): the backdrop, the places and the main towns' centres. */
+  /** The living town: the backdrop, the places and the main towns' centres. */
   backdrop?: WorldMeta['backdrop'];
   places?: WorldMeta['places'];
   centre?: WorldMeta['centre'];
@@ -619,13 +619,13 @@ export function withLot(town: NeighbourhoodDraft, slot: number, template: string
 }
 
 /**
- * Residents the neighbours number at most (docs/design/open-world.md: the sim holds 240 Sims in
+ * Residents the neighbours number at most (the sim holds 240 Sims in
  * a big world; room left for the player's household and babies).
  */
 export const NEIGHBOUR_CAP = 220;
 
 /**
- * Neighbours a big world starts with when nobody asks for a number (docs/design/open-world.md: ~120
+ * Neighbours a big world starts with when nobody asks for a number (~120
  * residents; the rest of its homes are for sale, and newcomers fill the town from there). Tried at 168
  * in the living-town run and put back: with ~170 from the first morning, a sample world's centre jammed.
  */
@@ -1569,7 +1569,7 @@ export function assembleTown(
   return JSON.stringify({
     mode,
     lifespan,
-    // (docs/design/open-world.md: all optional; every world is a big one now.)
+    // (all optional; every world is a big one now.)
     size: town.world?.size ?? 'big',
     width: town.width,
     depth: town.depth,
@@ -1662,11 +1662,11 @@ function nearestRoad(list: readonly RoadPlan[], roads: ReturnType<typeof roadInd
   return near ? { road: near[0], s: near[1].s } : null;
 }
 
-/** What a plot is, for the simulation (docs/design/open-world.md). */
+/** What a plot is, for the simulation. */
 type PlotKind = 'home' | 'farm' | 'public' | 'shop' | 'countryside';
 
 /**
- * The town file's open-world fields (docs/design/open-world.md): its areas, every house's driveway
+ * The town file's open-world fields: its areas, every house's driveway
  * with where it meets its road and the households' cars on them (sim-core `cars.rs`: they drive
  * the roads), its typed exits (the roads out), the water, public parking, and the zones, pads and
  * areas for the renderer.

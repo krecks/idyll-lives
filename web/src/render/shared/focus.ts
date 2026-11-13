@@ -1,5 +1,5 @@
 /**
- * The roaming camera's share of the world (`docs/design/open-world.md`): which 64 m chunks are
+ * The roaming camera's share of the world: which 64 m chunks are
  * streamed in round the camera, and which lot is the focus, the one drawn in full (its house's
  * rooms, its things, the residents indoors).
  *
@@ -12,8 +12,8 @@
  * - Focus lot: the plot under the target, else the nearest within `FOCUS_REACH` m; reported once
  *   the camera has settled on it for `SETTLE_MS` (a pan across the town doesn't build every lot it
  *   passes). While `pinned` (build mode, following a resident, the director's shots) the game
- *   chooses the focus itself and none is reported. Nor from the town view (past `TOWN_FROM`,
- *   docs/design/living-town.md): from up there a lot is a few pixels, and a pan across the town
+ *   chooses the focus itself and none is reported. Nor from the town view (past `TOWN_FROM`):
+ *   from up there a lot is a few pixels, and a pan across the town
  *   would have one built in full wherever it rests. The focus lot there was stays.
  *
  * Engine-neutral: the renderer feeds it the camera each frame (`update`).

@@ -1453,7 +1453,7 @@ async function openSession(
     },
     ground: (x, z) => renderer.heightAt(x, z),
   };
-  // A town tag's click (docs/design/living-town.md, `townView.goTo`): the camera glides to the place, the player's
+  // A town tag's click (`townView.goTo`): the camera glides to the place, the player's
   // again on the way (the director lets go, a follow ends). With `select`, the glide lands on that resident, and
   // there they are looked at and followed as from the household strip (`inspect`, which selects one of the
   // player's, then `follow`); in Build mode nobody is.

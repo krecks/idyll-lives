@@ -1,5 +1,5 @@
 //! `cargo fetch-voice`: the resident voice model and the pronunciation dictionary, into
-//! `web/public/voice/` (not in git; see docs/design/voices.md). (Was tools/voice/fetch.mjs.)
+//! `web/public/voice/` (not in git). (Was tools/voice/fetch.mjs.)
 //!
 //! - Supertone's Supertonic 3 (BigScience OpenRAIL-M: its licence, with its use restrictions, is
 //!   fetched with it and goes along), its config, text indexer and ten voice styles as published,

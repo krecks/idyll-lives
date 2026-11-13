@@ -1,5 +1,5 @@
 /**
- * The living town's debug fixture (`?ltFixture`, docs/design/living-town.md): until worldgen writes
+ * The living town's debug fixture (`?ltFixture`): until worldgen writes
  * `WorldMeta.backdrop`, a Big world without one gets backdrop buildings here, in its empty land beside
  * its roads, as the contract's rules have them:
  *

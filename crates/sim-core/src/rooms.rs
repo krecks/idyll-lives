@@ -1,4 +1,4 @@
-//! Rooms and how good they are ("the house matters", see `docs/design/house-matters.md`).
+//! Rooms and how good they are ("the house matters").
 //!
 //! A room is an enclosed area of the lot (`Lot::compute_rooms`); each plot's outdoor tiles are
 //! scored as its garden. Room ids change whenever walls do, so nothing here is saved: rooms are

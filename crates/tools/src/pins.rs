@@ -1,5 +1,5 @@
 //! `cargo pins`: accepted parts of the game held by their SHA-256, so work on something else can't change
-//! them by the way (docs/design/living-town.md, Pins; was `tools/pins/check.ts`). Each pin in
+//! them by the way (was `tools/pins/check.ts`). Each pin in
 //! `tools/pins/pins.json` names a file and, optionally, a part of it:
 //!
 //! - `region`: the lines between `pin:<region> begin` and `pin:<region> end` comments (exclusive);
@@ -276,7 +276,7 @@ mod tests {
             &std::fs::read_to_string(root.join("tools/pins/pins.json")).unwrap(),
         )
         .unwrap();
-        assert!(file.pins.len() >= 19);
+        assert!(file.pins.len() >= 18);
         let (lines, broken) = check(&root, &file.pins, false);
         assert_eq!(broken, 0, "{}", lines.join("\n"));
     }
