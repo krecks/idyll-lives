@@ -85,11 +85,13 @@ def _settle():
     G.settle(centre=False)
 
 
-def _pillow(name, w, h, d, x, top, z, tilt=8, material=None, seed=0.0):
-    """A pillow on a mattress top `top`, `h` thick in the middle: plump, thinning to its seams, its head end
-    raised a little and a little crumpled."""
+def _pillow(name, w, h, d, x, top, z, tilt=8, material=None, seed=0.0, pinch=True):
+    """A pillow on a mattress top `top`, `h` thick in the middle: plump, thinning to its seams, its corners pinched
+    in (not `pinch`: its sides drawn in between them instead, for one whose corners are the bed's outermost
+    points, the futon's standing on its back), its head end raised a little and a little crumpled."""
     p = F.soft(name, w, h * 0.34, d, (x, top + h / 2 - 0.01, z), material or M.pillow, rot=(tilt, 0, 0),
-               round=min(h * 0.17, 0.03), puff=h * 0.33, pinch=h * 0.26, waist=h * 0.04, resting=True)
+               round=min(h * 0.17, 0.03), puff=h * 0.33, pinch=h * 0.26 if pinch else 0.0,
+               waist=h * (0.04 if pinch else 0.12), resting=True)
     return G.jitter(p, 0.003, size=0.12, seed=seed + x * 7, up=0.4)
 
 
@@ -97,7 +99,7 @@ def _mattress(name, w, h, d, top, z, x=0.0, material=None, puff=0.006, piping=0.
     """A mattress `w` x `d`, `h` deep, its top (the middle of it, a hair puffed) at `top`, where sleepers lie:
     rounded, with a piped seam round its top and bottom."""
     return F.soft(name, w, h - 2 * puff, d, (x, top - h / 2, z), material or M.mattress, round=round, puff=puff,
-                  flat=flat, piping=piping, resting=True)
+                  flat=flat, piping=piping, pinch=0.0, resting=True)   # (firm, its edges taped: no pinched corners)
 
 
 RUMPLE = 0.03     # how deep the duvet's folds are
@@ -390,7 +392,7 @@ def bedFuton():
                   material=M.bedding_futon, puff=0.008, piping=0.008, round=0.06)
         _tufts('back_tuft', FUTON_TUFTS, (-0.69, -0.42), top - 0.004, M.bedding_futon)
         for s in (-1, 1):
-            _pillow(f'pillow{s}', 0.66, 0.13, 0.34, s * 0.45, top, -0.71, tilt=4)
+            _pillow(f'pillow{s}', 0.66, 0.13, 0.34, s * 0.45, top, -0.71, tilt=4, pinch=False)
     back = G.hinged(G.join(parts, 'futon_back'), F.at(0, 0.3, FUTON_HINGE))
     # Built flat; leaning up is the rest pose (the clip's first key): its head end up, its top to the front.
     G.turn(back, FUTON_BACK, 'X')

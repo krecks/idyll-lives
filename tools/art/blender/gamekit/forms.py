@@ -289,7 +289,9 @@ def soft_box(name, size, at=(0, 0, 0), material=None, rot=(0, 0, 0), round=0.04,
     mattresses, duvets, upholstered arms and backs. What stuffing and seams do to it, each a few centimetres at most
     and none of it past the box (`size` stays its size):
     - `pinch`: its corners pulled in and thinned where the seams meet, so its sides bow out between them, as a
-      boxed cushion's do (metres at the corner; by default 0.6 of its deepest puff, 0 for none);
+      boxed cushion's do (metres at the corner; by default 0.6 of its deepest puff, 0 for none and for a box whose
+      sides are crossed in one step). Its corners are then inside the box: give 0 to one turned so that a corner
+      is the model's outermost point (a folded towel askew on a stack), or the model is that much smaller;
     - `waist`: its sides drawn in between its corners, which stand out as ears, as a pillow sewn flat and stuffed
       does (metres at the middle of a side);
     - `sag`: its top (+z) sinking over its front third to this much lower at its front edge (-y), as a seat
@@ -323,9 +325,8 @@ def soft_box(name, size, at=(0, 0, 0), material=None, rot=(0, 0, 0), round=0.04,
     else:
         puffs = tuple(puff)
     low = is_low()
-    if pinch is None:
-        pinch = 0.6 * max(puffs)
-    pinch = min(pinch, 0.45 * min(h[i] for i in plan))
+    own_pinch = pinch is not None
+    pinch = min(pinch if own_pinch else 0.6 * max(puffs), 0.45 * min(h[i] for i in plan))
     if isinstance(sag, (int, float)):
         sag = (0.0, -sag, 0.0)
     sag = Vector(sag)
@@ -352,6 +353,8 @@ def soft_box(name, size, at=(0, 0, 0), material=None, rot=(0, 0, 0), round=0.04,
             k = 4 * tufts[plan.index(i)]     # a vertex on every tuft and three between two: a dimple, not a pyramid
             n = k * math.ceil(n / k)
         count.append(n)
+    if not own_pinch and min(count[i] for i in plan) < 2:
+        pinch = 0.0   # a side crossed in one step has no middle to stay put: pinching its corners would narrow it
     steps = [_steps(h[i], r, round_segments, count[i]) for i in range(3)]
     shape = _Soft(h, inner, r, puffs, thin, plan, pinch, waist, sag, overhang, tufts, tuft, diamond, rumple, rumple_size,
                   seed, calm)
@@ -495,8 +498,11 @@ class _Soft:
             q[c] -= math.copysign(self.pinch * k, v)
             q[a] -= min(0.5 * self.pinch, 0.45 * h[a]) * k * w
         if self.waist:
-            q[b] -= math.copysign(self.waist * abs(u) ** 3 * max(0.0, 1 - v * v), u)
-            q[c] -= math.copysign(self.waist * abs(v) ** 3 * max(0.0, 1 - u * u), v)
+            # (nothing where a side ends and its corner's rounding begins: its ends are the box's outermost points)
+            along_b = min(1.0, abs(base[b]) / self.inner[b]) if self.inner[b] > 1e-9 else 1.0
+            along_c = min(1.0, abs(base[c]) / self.inner[c]) if self.inner[c] > 1e-9 else 1.0
+            q[b] -= math.copysign(self.waist * abs(u) ** 3 * (1 - along_c ** 2), u)
+            q[c] -= math.copysign(self.waist * abs(v) ** 3 * (1 - along_b ** 2), v)
         if self.overhang and r > 1e-9:
             between = max(0.0, 1 - (base[a] / self.seam) ** 2)
             out = math.hypot(d[b], d[c]) / r
@@ -505,7 +511,7 @@ class _Soft:
         return q
 
 
-def _thinned(points, tolerance=0.0015):
+def _thinned(points, tolerance=0.0025):
     """A closed path with the points left out that lie within `tolerance` of the line between their neighbours kept
     (a straight run's, a gentle bow's): fewer rings for a cord swept along it."""
     pts = [Vector(p) for p in points]
@@ -525,9 +531,12 @@ def _thinned(points, tolerance=0.0015):
 def _piping(name, h, steps, thin, plan, shape, radius, material, sides=(-1, 1)):
     """Cords along the seams of a soft box's thin side (`sides`: which), where its faces turn into the boxing:
     through the shape's own seam, so they follow its pinched corners and bowed sides, standing a fifth of their
-    radius proud of it, so a cord cut straight across a gentle bow never sinks into the cushion."""
+    radius proud of it, so a cord cut straight across a gentle bow never sinks into the cushion. They reach as far
+    out as a cord of `radius` centred on the seam would (a model whose outermost point is a welt keeps its size),
+    so they are that much slimmer."""
     b, c = plan
     made = []
+    radius /= 1.2
     loop = ([(x, -h[c]) for x in steps[b][:-1]] + [(h[b], y) for y in steps[c][:-1]]
             + [(x, h[c]) for x in reversed(steps[b][1:])] + [(-h[b], y) for y in reversed(steps[c][1:])])
     for side in sides:
@@ -539,7 +548,7 @@ def _piping(name, h, steps, thin, plan, shape, radius, material, sides=(-1, 1)):
             pts.append(shape(p) + out.normalized() * radius * 0.2)
         # (four sides stand 1.5 mm in from a 5 mm cord's round, five from one of 8 mm)
         made.append(sweep(f'{name}_piping{side}', _thinned(pts), radius, material=material,
-                          verts=4 if radius <= 0.0051 else 5, closed=True))
+                          verts=4 if radius <= 0.0043 else 5, closed=True))
     return made
 
 

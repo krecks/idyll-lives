@@ -43,15 +43,15 @@
 
 | Model | Size (w × h × d) | Triangles | Draws | Clip | Note |
 |---|---|---|---|---|---|
-| `model.bed` | 1.90 × 1.13 × 1.88 m | 6,962 | 3 | `turn_down` | upholstered linen base piped round top and bottom, piped headboard with four lofted padded channels, teak legs, a sage runner swept over the foot |
-| `model.bedSingle` | 0.96 × 0.95 × 1.91 m | 6,600 | 3 | `turn_down` | oak posts with collars and ball finials, an arched top rail over five rounded slats, a framed and panelled footboard |
-| `model.bedBunk` | 0.97 × 1.90 × 1.90 m | 7,976 | 4 | `turn_down` (lower bunk, slot 0), `turn_down_upper` (slot 1, 5 s in) | oak; posts with capped tops, arched end boards (the upper bunk's with a hand hold), the ladder hooked over the upper rail; the ladder (right, at the foot) is still; each bunk's duvet turns down for its own sleeper (`slot` in `motions.uses`), at a fourth draw; the upper one once its sleeper has climbed the ladder and crawled in (`delay` 5 s, `BUNK_CLIMB_IN`: the climb is 7 s), not at the ladder's foot (A-bedroom-06) |
-| `model.bedFuton` | 1.96 × 0.99 × 1.91 m | 7,716 | 3 | `unfold` (held open) | ash slatted platform with rounded rails and tenons showing, a low headboard with four slots under a rounded cap; tufted seat and back, a folded quilt |
-| `model.bedKing` | 1.98 × 1.40 × 1.90 m | 8,778 | 3 | `turn_down` | piped base and headboard, five lofted padded channels, piped wings, tapered square legs, sage runner |
-| `model.bedDouble` | 1.62 × 0.95 × 1.90 m | 6,920 | 3 | `turn_down` | oak frame with a bead, posts with pyramid caps, an arched top rail over eight rounded teak slats, tapered square legs, blue duvet |
-| `model.bedQueenUpholstered` | 1.76 × 1.30 × 1.89 m | 6,938 | 3 | `turn_down` | stone upholstery; a headboard scalloped over five domed padded channels; piped base |
-| `model.bedCanopy` | 1.73 × 2.135 × 1.90 m | 8,652 | 3 | `turn_down` | turned walnut posts (vase, rings, finial) on foot blocks, a headboard of three raised panels under an arched crest, scalloped linen valance, four pleated curtains drawn in by tie-backs (still) |
-| `model.bedDaybed` | 0.96 × 0.84 × 1.92 m | 7,144 | 2 | — | white posts with ball finials, turned spindles, rounded rails; piped sage fitted cover, piped rose cushions (static) |
+| `model.bed` | 1.90 × 1.13 × 1.88 m | 6,722 | 3 | `turn_down` | upholstered linen base piped round top and bottom, piped headboard with four lofted padded channels, teak legs, a sage runner swept over the foot |
+| `model.bedSingle` | 0.96 × 0.95 × 1.91 m | 6,520 | 3 | `turn_down` | oak posts with collars and ball finials, an arched top rail over five rounded slats, a framed and panelled footboard |
+| `model.bedBunk` | 0.97 × 1.90 × 1.90 m | 7,896 | 4 | `turn_down` (lower bunk, slot 0), `turn_down_upper` (slot 1, 5 s in) | oak; posts with capped tops, arched end boards (the upper bunk's with a hand hold), the ladder hooked over the upper rail; the ladder (right, at the foot) is still; each bunk's duvet turns down for its own sleeper (`slot` in `motions.uses`), at a fourth draw; the upper one once its sleeper has climbed the ladder and crawled in (`delay` 5 s, `BUNK_CLIMB_IN`: the climb is 7 s), not at the ladder's foot (A-bedroom-06) |
+| `model.bedFuton` | 1.96 × 0.99 × 1.91 m | 7,496 | 3 | `unfold` (held open) | ash slatted platform with rounded rails and tenons showing, a low headboard with four slots under a rounded cap; tufted seat and back, a folded quilt |
+| `model.bedKing` | 1.98 × 1.40 × 1.90 m | 8,378 | 3 | `turn_down` | piped base and headboard, five lofted padded channels, piped wings, tapered square legs, sage runner |
+| `model.bedDouble` | 1.62 × 0.95 × 1.90 m | 6,840 | 3 | `turn_down` | oak frame with a bead, posts with pyramid caps, an arched top rail over eight rounded teak slats, tapered square legs, blue duvet |
+| `model.bedQueenUpholstered` | 1.76 × 1.30 × 1.89 m | 6,858 | 3 | `turn_down` | stone upholstery; a headboard scalloped over five domed padded channels; piped base |
+| `model.bedCanopy` | 1.73 × 2.135 × 1.90 m | 8,572 | 3 | `turn_down` | turned walnut posts (vase, rings, finial) on foot blocks, a headboard of three raised panels under an arched crest, scalloped linen valance, four pleated curtains drawn in by tie-backs (still) |
+| `model.bedDaybed` | 0.96 × 0.84 × 1.92 m | 7,064 | 2 | — | white posts with ball finials, turned spindles, rounded rails; piped sage fitted cover, piped rose cushions (static) |
 
 ### Detail (2026-10-22)
 
@@ -65,8 +65,10 @@ Rebuilt with the forms (gamekit/forms.py) and the kit, same sizes, centres, part
   at most and the quilts over sleepers still hide it and the turned-down flap (`_flap`, flat as before, the
   sheet too). Under a runner (`bed`, `bedKing`) the duvet is smooth (`runner=`, the form's `calm`), or the
   runner would bridge its folds. Mattress, duvet and pillows are `resting` (their undersides plain). Since the
-  soft forms pass (2026-11-13): 300 to 1,300 triangles more a bed, the four-poster (8,652) and the king (8,778)
-  over their aim of 8,000. The runners are one cloth
+  soft forms pass (2026-11-13): up to 1,000 triangles more a bed, the four-poster (8,572) and the king (8,378)
+  over their aim of 8,000. Mattresses are not pinched (firm, their edges taped), and the futon's pillows, which
+  stand on its back at rest, have their sides drawn in instead of their corners (`_pillow(pinch=False)`): their
+  corners are the bed's highest points (it was 5 mm lower for a day). Every bed within 1.2 mm of its size before. The runners are one cloth
   swept over the foot (`_runner`, its path's corners rounded by hand: Catmull-Rom overshot 9 cm off the long
   top span).
 - **Headboards.** `_channel` lofts a padded column (domed for the queen), `_board` an arched board with slots,
