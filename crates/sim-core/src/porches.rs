@@ -5,9 +5,10 @@
 //! two posts and a small gabled canopy over it, and a lamp by the door (the renderer's
 //! `HouseBuilder.porch`). It is the door's: it names the door's edge (`Porch::axis`, `x`, `z`) and
 //! the side it stands on (`out`). Its landing is three tiles across (the door's and one either
-//! side, partly) and two deep, its posts near the outer corners of the side tiles. It only looks:
-//! the posts stand at the edges of those tiles and nobody walks into them, so walking round the
-//! house stays as it was (the town's porches came before there was anything to build). The town
+//! side, partly) and two deep, its posts in the outer row's side tiles (`Porch::post_tiles`). Nobody
+//! walks through a post or puts a thing on its tile (`cars::reblock` keeps them as a garage's, as a
+//! post piece's), and the middle tile of either row stays open: the way up to the door is the
+//! porch's front, and building one that would shut anyone or anything off is refused. The town
 //! puts one over the front door of a house or a shop that the garden path meets (`LotFile::
 //! porches`; a file or a save from before porches has them worked out again, `guess`), and the
 //! player builds or takes one down on any outside door of their home for content `build.porch`,
@@ -122,7 +123,8 @@ impl Porch {
         out
     }
 
-    /// The tiles its posts stand at the edges of (either side, the second row).
+    /// The tiles its posts stand on (either side, the outer row): nobody walks through them (the
+    /// door's tile in front, and the one before it, stay open).
     pub fn post_tiles(&self) -> [(i32, i32); 2] {
         [porch_tile(self, -1, 1), porch_tile(self, 1, 1)]
     }
@@ -344,17 +346,31 @@ impl World {
             if let Some(name) = self.thing_on(tx, tz) {
                 return Err(Error::new(format!("the {name} is in the way")));
             }
+        }
+        Ok(porch)
+    }
+
+    /// Whether a new porch's posts have their tiles to themselves: nobody standing there (or
+    /// sitting down from there), nothing else in the way (a parked car, the ground).
+    fn posts_free(&self, porch: &Porch) -> Result<(), Error> {
+        for (tx, tz) in porch.post_tiles() {
+            if self.sims.iter().any(|s| {
+                s.away_until.is_none() && (s.tile() == (tx, tz) || s.seated_from == Some((tx, tz)))
+            }) {
+                return Err(Error::new("someone is standing where a post goes"));
+            }
             if self.blocked[self.lot.tile_index(tx, tz)] {
                 return Err(Error::new("there's no room for a porch there"));
             }
         }
-        Ok(porch)
+        Ok(())
     }
 
     /// Builds a porch over a door of `household`'s home (`axis`, `x`, `z`: the door's edge), on its
     /// outdoor side, for content `build.porch`. Refused (saying why) on a door upstairs, between
     /// two rooms or out into the garden, where it would stand off the lot or indoors, over walls,
-    /// fences, the garage or things, over a door that has one, or without the money.
+    /// fences, the garage or things, its posts on someone or where they'd shut anyone or anything
+    /// off (or the way up to the door), over a door that has one, or without the money.
     pub fn build_porch(
         &mut self,
         household: u32,
@@ -374,9 +390,23 @@ impl World {
             return Err(Error::new("that door has a porch already"));
         }
         let porch = self.porch_at(plot, axis, x, z)?;
+        self.posts_free(&porch)?;
         let price = self.content.build.porch;
         self.can_pay(h, price, || "not enough money for a porch".into())?;
+        // Its posts take their tiles: refused if that shuts anyone or anything off, or the way up
+        // to the door (its tile in front, outdoors) where it could be walked to.
+        let before = self.reach_signature(plot);
         self.porches.push(porch);
+        crate::cars::posts_changed(self);
+        let (fx, fz) = porch.front();
+        let front = self.lot.tile_index(fx, fz);
+        let door_reached = |seen: &[bool]| seen.get(front).copied().unwrap_or(false);
+        let door_kept = !door_reached(&before.1) || door_reached(&self.reachable(plot));
+        if !door_kept || !self.keeps_reach(plot, &before, None) {
+            self.porches.pop();
+            crate::cars::posts_changed(self);
+            return Err(Error::new("that would block the way"));
+        }
         self.pay(h, price);
         self.structure_version = self.structure_version.wrapping_add(1);
         Ok(())
@@ -400,6 +430,7 @@ impl World {
             return Err(Error::new("there's no porch over that door"));
         };
         self.porches.remove(i);
+        crate::cars::posts_changed(self);
         self.refund(h, self.content.build.porch);
         self.structure_version = self.structure_version.wrapping_add(1);
         Ok(())
@@ -575,6 +606,7 @@ impl World {
             return;
         };
         let mut gone = 0;
+        let mut posts = false;
         let mut i = 0;
         while i < self.porches.len() {
             let p = self.porches[i];
@@ -588,9 +620,9 @@ impl World {
             } else {
                 self.porches.remove(i);
                 gone += self.content.build.porch;
+                posts = true;
             }
         }
-        let mut posts = false;
         let mut i = 0;
         while i < self.porch_pieces.len() {
             let p = self.porch_pieces[i];
@@ -637,6 +669,8 @@ impl World {
             self.refund(h, self.content.build.porch * gone.len() as i64);
         }
         if !moved.is_empty() {
+            // (Their posts stand where they went.)
+            crate::cars::posts_changed(self);
             self.structure_version = self.structure_version.wrapping_add(1);
         }
     }

@@ -28,7 +28,7 @@ import type { Sound } from '../ui/sfx';
 import { game, type BuildTool } from '../ui/state.svelte';
 import { approachTile, covers, facedTable, fitOnTop, frontTile, overhangEdges, overhangTiles, ownSize, spotAt, topOf, type Top } from './surfaces';
 import { edgeInGarage, freeGarage, garageFits, garageTiles, onGarage, type GaragePlan, type GarageSite } from './garage';
-import { covers as pieceCovers, innerEdges, PIECE_NAME, pieceBoxes, pieceFits, piecePlan, piecePrice, pieceTiles as pieceTilesOf, porchAt, porchBoxes, porchTiles, type PorchSite, type PreviewBox } from './porch';
+import { covers as pieceCovers, innerEdges, PIECE_NAME, pieceBoxes, pieceFits, piecePlan, piecePrice, pieceTiles as pieceTilesOf, porchAt, porchBoxes, porchPostTiles, porchTiles, type PorchSite, type PreviewBox } from './porch';
 import { drivewayGarage } from '../render/shared/street';
 
 type Point = { x: number; z: number };
@@ -603,6 +603,11 @@ export class BuildBuyInput {
     if (def.outdoors) {
       for (let tz = z; tz < z + d; tz++) for (let tx = x; tx < x + w; tx++) if (this.indoors(tx, tz)) return 'Goes outdoors';
     }
+    // As the simulation: furniture doesn't go where a porch's post stands, or a post on its own.
+    if (layer === 'floor') {
+      const posts = this.postTiles();
+      for (let tz = z; tz < z + d; tz++) for (let tx = x; tx < x + w; tx++) if (posts.has(`${tx}:${tz}`)) return 'A porch post is in the way';
+    }
     if (layer === 'ceiling') {
       for (let tz = z; tz < z + d; tz++) for (let tx = x; tx < x + w; tx++) if (!this.indoors(tx, tz)) return 'Hangs from a ceiling';
     }
@@ -678,6 +683,14 @@ export class BuildBuyInput {
     // (A desk, sat at from behind, may have its screen to a wall: sim-core `wall_edges`.)
     if (def.approach !== 'behind' && this.wallBetween(back[0], back[1], fx, fz)) return 'Faces a wall';
     return moving !== null || (def.price !== undefined && game.affords(def.price)) ? true : null;
+  }
+
+  /** The tiles (`x:z`) the home's porch posts stand on: its porches' and its posts on their own. */
+  private postTiles(): Set<string> {
+    const out = new Set<string>();
+    for (const p of this.homePorches()) for (const [x, z] of porchPostTiles(p)) out.add(`${x}:${z}`);
+    for (const p of this.homePieces()) if (p.kind === 'post') out.add(`${p.x}:${p.z}`);
+    return out;
   }
 
   /** Whether something on layer `on` (other than `moving`) takes a tile. */

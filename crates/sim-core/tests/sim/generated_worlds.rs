@@ -1151,6 +1151,23 @@ fn generated_worlds_cars_keep_to_the_roads() {
                 guessed.iter().filter(|p| !filed_porches.contains(p)).collect::<Vec<_>>(),
             ));
         }
+        // Nothing stands where a porch's posts do (nobody walks through them, `Porch::post_tiles`).
+        for p in &w.porches {
+            for (x, z) in p.post_tiles() {
+                let on = w.objects.iter().find(|o| {
+                    let (sw, sd) = o.size(&w.content);
+                    w.content.objects[o.def].layer == sim_core::content::Layer::Floor
+                        && (o.x..o.x + sw).contains(&x)
+                        && (o.z..o.z + sd).contains(&z)
+                });
+                if let Some(o) = on {
+                    failures.push(format!(
+                        "{label}: the {} at {},{} stands where a porch's post does",
+                        w.content.objects[o.def].id, o.x, o.z
+                    ));
+                }
+            }
+        }
         // The town as it loads (`livable_at_start`); its first half day is `HalfDay`'s too.
         let cellars = livable_at_start(&w, world, &label, &mut failures);
         let filed = world["town"]["cars"].as_array().map_or(0, Vec::len);

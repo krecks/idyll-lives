@@ -65,7 +65,7 @@ export function porchTiles(p: Omit<PorchInfo, 'plot'>): [number, number][] {
   return out;
 }
 
-/** The tiles a porch's posts stand at the edges of. */
+/** The tiles a porch's posts stand on (the outer row's sides): nobody walks through them, nothing goes on them (sim-core `Porch::post_tiles`). */
 export function porchPostTiles(p: Omit<PorchInfo, 'plot'>): [number, number][] {
   return [porchTile(p, -1, 1), porchTile(p, 1, 1)];
 }

@@ -2,7 +2,8 @@
 // `layoutTown`): most households have some, about a bicycle a teen or grown-up (up to three, more
 // often without a car), a kids' bike a child, an e-scooter in about one household in six; each on its
 // own household's lot, outdoors, off the paths and the driveway (where the car parks), clear of the
-// doorways, its front tile reached from the street and nothing else on the lot cut off by it.
+// doorways, its front tile reached from the street (round the posts of the porch over the front
+// door, which nobody walks through) and nothing else on the lot cut off by it.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -28,6 +29,7 @@ describe('town rides', async () => {
   const { DRIVEWAY_MIN_WIDTH, generateWorld, houseTemplate, layoutTown, onLot, populate, turnOnto, useTownContent } = await import('../src/game/town');
   const { BIKES, RIDES } = await import('../src/game/townRides');
   const { frontTile } = await import('../src/game/surfaces');
+  const { porchPostTiles } = await import('../src/game/porch');
   type Templates = import('../src/game/town').Templates;
 
   const content = await Content.load('http://localhost/content/base.json');
@@ -102,6 +104,8 @@ describe('town rides', async () => {
         const blocked = new Uint8Array(W * H);
         for (let z = plot.z; z < plot.z + H; z++) for (let x = plot.x; x < plot.x + W; x++) if (box && x >= box[0] && x < box[2] && z >= box[1] && z < box[3]) blocked[at(x, z)] = 1;
         for (const g of layout.garages.filter((g) => g.plot === slot)) for (let z = Math.floor(g.z0); z < Math.ceil(g.z1); z++) for (let x = Math.floor(g.x0); x < Math.ceil(g.x1); x++) if (onPlot(x, z)) blocked[at(x, z)] = 1;
+        // (And its porch's posts.)
+        for (const p of layout.porches.filter((p) => p.plot === slot)) for (const [x, z] of porchPostTiles(p)) if (onPlot(x, z)) blocked[at(x, z)] = 1;
         const things = ground.filter((o) => inside(plot, o.x, o.z) && (!content.object(o.def)?.layer || content.object(o.def)?.layer === 'floor'));
         for (const o of things) {
           const [w, d] = size(o);
