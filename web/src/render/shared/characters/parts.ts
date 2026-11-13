@@ -55,7 +55,13 @@ export const wispsOf = (hair: string): string => `${hair}.wisps`;
 export const isWisps = (part: string): boolean => part.startsWith('hair.') && part.endsWith('.wisps');
 
 /** The surface a part is drawn with (the engine's resident material, `pc/characterMaterial.ts`). */
-export type CharacterSurface = 'body' | 'cloth' | 'hair' | 'wisp' | 'brow' | 'lash' | 'mouth' | 'eye';
+export type CharacterSurface = 'body' | 'cloth' | 'cut' | 'hair' | 'wisp' | 'brow' | 'lash' | 'mouth' | 'eye';
+/**
+ * The shells the shader cuts to the resident's own length (`cut`: cloth, with the cut as its opacity): the trousers,
+ * one mesh for every bottom with legs (`outfit.ts` `LEGGED`). They have no `lod.` copy: far off the low-detail body
+ * is painted.
+ */
+export const CUT_SHELLS: ReadonlySet<string> = new Set(['bottom.trousers']);
 
 /** The surface part `part` is drawn with. */
 export function surfaceOf(part: string): CharacterSurface {
@@ -69,11 +75,13 @@ export function surfaceOf(part: string): CharacterSurface {
           ? 'lash'
           : part === 'teeth' || part === 'tongue'
             ? 'mouth'
-            : /^(lod\.)?(top|bottom|shoes)\./.test(part)
-              ? 'cloth'
-              : isWisps(part)
-                ? 'wisp'
-                : 'hair';
+            : CUT_SHELLS.has(part)
+              ? 'cut'
+              : /^(lod\.)?(top|bottom|shoes)\./.test(part)
+                ? 'cloth'
+                : isWisps(part)
+                  ? 'wisp'
+                  : 'hair';
 }
 /**
  * Sims switch to the low-detail body and clothes below this projected size (px per 5 cm of face, at

@@ -359,8 +359,13 @@ pub fn check(out: &Path) -> bool {
                 if !gkeys.contains(p) {
                     fail(format!("{fam}: shell {p} has no garment entry"));
                 }
-                if !pkeys.contains(&format!("lod.{p}").as_str()) {
-                    fail(format!("{fam}: shell {p} has no lod copy"));
+                // (But a shell the shader cuts, the trousers: far off the low-detail body is painted.)
+                let painted_far = *p == "bottom.trousers";
+                if pkeys.contains(&format!("lod.{p}").as_str()) == painted_far {
+                    fail(format!(
+                        "{fam}: shell {p} has {} lod copy",
+                        if painted_far { "a" } else { "no" }
+                    ));
                 }
             }
         }

@@ -38,6 +38,12 @@ export const WORKWEAR = ['top.apron'] as const;
  * a baby's legs, drawn up and fallen apart in the crib or in someone's arms.
  */
 const ROMPER = 'bottom.shorts';
+/**
+ * The bottoms with legs, and the shell they are all worn as near the camera (clothes.rs `trousers`: the body's own
+ * surface under them, cut to the garment's waist and length by the shader). A baby's stay painted.
+ */
+const LEGGED = new Set(['bottom.trousers', 'bottom.suit', 'bottom.shorts', 'bottom.capri']);
+const LEGS_SHELL = 'bottom.trousers';
 /** Shoes that go with formal clothes. */
 const FORMAL = new Set(['top.suit', 'bottom.suit', 'bottom.skirt']);
 
@@ -74,8 +80,10 @@ function pickShoes(top: string, bottom: string, r: number): string {
 }
 
 export interface OutfitParams {
-  /** Garments worn (ids; those with a shell are also mesh part names; empty = none). */
+  /** Garments worn (ids; those with a shell are also mesh part names; empty = none), then the shell a bottom with legs is worn as (`legs`). */
   parts: string[];
+  /** 1 if the bottom is worn as the trousers' shell (`LEGS_SHELL`; drawn unless `bare` has the bottoms), else 0. */
+  legs: number;
   /** Skin colour (linear rgb). */
   skin: [number, number, number];
   /** The body's skin reference colour (linear rgb, 1); the shader tints relative to it. */
@@ -290,6 +298,9 @@ function dayOutfit(id: number, gender: string, appearance: Appearance | null | u
   }
 
   const parts = [topPart, bottomPart, shoePart].filter(has);
+  // A bottom with legs is cloth of its own near the camera: the trousers' shell, whichever of them it is.
+  const legs = LEGGED.has(bottomPart) && has(bottomPart) && body.parts.has(LEGS_SHELL) && body.stage !== 'baby' && appearance?.stage !== 'baby';
+  if (legs && !parts.includes(LEGS_SHELL)) parts.push(LEGS_SHELL);
   const t: GarmentCut = body.garments[topPart] ?? {};
   const b: GarmentCut = body.garments[bottomPart] ?? {};
   const s: GarmentCut = body.garments[shoePart] ?? {};
@@ -304,6 +315,7 @@ function dayOutfit(id: number, gender: string, appearance: Appearance | null | u
   ];
   return {
     parts,
+    legs: legs ? 1 : 0,
     skin,
     skinRef,
     top,
@@ -337,5 +349,5 @@ export function writeOutfit(o: OutfitParams, row: Float32Array, offset: number):
   row.set([o.skinRef[0], o.skinRef[1], o.skinRef[2], c[5]], offset + 20);
   row.set([o.shoe[0], o.shoe[1], o.shoe[2], c[6]], offset + 24);
   row.set([o.eyes[0], o.eyes[1], o.eyes[2], o.scalp], offset + 28);
-  row.set([o.ease[0], o.ease[1], o.ease[2], 0], offset + 32);
+  row.set([o.ease[0], o.ease[1], o.ease[2], o.legs && !(o.bare & SHELL_BITS.bottom) ? 1 : 0], offset + 32);
 }

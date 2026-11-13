@@ -127,8 +127,9 @@ Every body has:
 | `hair.<style>` | every hairstyle but `none` (`short crop layered tousled sideSwept afro bob long ponytail braid bun`) | Head, blending to neck_01 / spine_03 below the jaw | `hair` |
 | `hair.beard` | facial hair (male only; hidden for baby, child, teen) | Head; follows the mouth's morphs and the face's identity | `hair` |
 | `hair.<style>.wisps`, `hair.beard.wisps` | the soft edges of each: thin quads past its rims, hems and tips (below), drawn only close up | their hair's, vertex for vertex | `wisp`: the hair's colour and light, cut out in strands |
-| `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, the server's apron (the front from the waist to above the knees), every shoe (below) | from the body | `cloth` (flat colour) |
-| `lod.<shell>` | a low-detail copy of every shell | | `cloth` |
+| `top.*`, `bottom.*`, `shoes.*` | shells: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, the server's apron (the front from the waist to above the knees), every shoe (below) | from the body | `cloth` (flat colour) |
+| `bottom.trousers` | the cloth of every bottom with legs (trousers, suit trousers, shorts, capri: one mesh, 824 triangles): the body's own surface from the highest waistband to the lowest hem, cut to the resident's waist and length by the shader (see Clothes) | as the skin | `cut` (cloth whose opacity is the cut) |
+| `lod.<shell>` | a low-detail copy of every shell but `bottom.trousers` (far off, the low-detail body is painted) | | `cloth` |
 
 `hair.none` has no part: a bald resident's scalp keeps the skin colour (appearance texel 7 w = 0).
 
@@ -329,7 +330,7 @@ hairline and chin as before.
 | Part | x | y | z | w |
 |---|---|---|---|---|
 | body | sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, > 1 hand) | height (m, base body) | crew neckline (m, > 0 covered: distance from the neck's axis plus depth below a curve round the neck's base); head: -1 - scalp weight (the ears: -1) | scoop neckline (women: round and low in front; men: a V); head: -1 - scalp weight (the ears: -1) |
-| shells | hem distance (m; a shoe's from its collar, negative on its lining) | flag: 1 sole, 2 waistband, 3 skirt or apron (a hem band), 4 light midsole, 5 polished | category: 0 top, 1 bottom, 2 shoes | shoes: across the instep (m from its middle; over 1 off its front), else 0 |
+| shells | hem distance (m; a shoe's from its collar, negative on its lining; 0.5, out of every reach, on a shell the shader cuts) | flag: 1 sole, 2 waistband, 3 skirt or apron (a hem band), 4 light midsole, 5 polished, 6 cut to length by the shader (`bottom.trousers`) | category: 0 top, 1 bottom, 2 shoes | shoes: across the instep (m from its middle; over 1 off its front); a shell the shader cuts: the body's height field there (m on the base body, as the cuts are); else 0 |
 | eyes | offset from the iris centre on the eye's front (m), x | y | iris radius (m) | pupil radius (m) |
 | hair | 0.1 (unused) | | | |
 | wisps | along the edge (m, from a start of the row's own) | 0 at the root (on the hair) .. 1 where the quad ends | how loose the strands are: 0 combed, 1 curls | the share of y over which the strands are still one (solid: a hem's lip) |
@@ -400,7 +401,8 @@ the apron on it, instead of standing out round the seat as they hang standing.
 
 ## Clothes
 
-Clothes are painted on the body by its shader. Each garment's cut (metres on the base body's
+Clothes are painted on the body by its shader, and near the camera a bottom with legs is cloth of its
+own over that (the trousers' shell, below). Each garment's cut (metres on the base body's
 fields) decides where it covers:
 
 - top: `(sleeve - x) * 0.55 > 0`, `y > hem`, `z > crew` (if set), `w > scoop` (if set);
@@ -434,6 +436,32 @@ too, from their `fields.x`: the distance from the hem (the jacket's and the apro
 nearest open edge — the hem, the lapels and the neck for the jacket, the hem, the sides and the
 waistband for the apron — not the sleeves' ends; 0 on the turned rim). The collars have none (0.05:
 out of reach).
+
+A bottom with legs (`bottom.trousers`, `bottom.suit`, `bottom.shorts`, `bottom.capri`; `outfit.ts` `LEGGED`) is
+worn near the camera as one shell, `bottom.trousers` (clothes.rs `trousers`, through the jacket's path:
+`clip_by_field` on the bottom's predicate, `shell_on` at every stage): the body's own level-1 surface from
+6 mm over the highest of their waistbands to 6 mm under the lowest of their hems, the arms and hands left
+out, with the body's height in fields.w. The shader does the rest per resident, so shorts and capri are the
+same mesh:
+
+- lifted off the skin (vertex, `GAME_SIM_CUT`) by the bottom's ease, the same `EASE` and looseness the
+  painted cloth has, so the shell near the camera and the paint on the low-detail body far off have one
+  outline;
+- cut at the resident's waist and leg cuts (texels 4 a, 5 a) per fragment: its opacity is 1 between them
+  and 0 past them, a pixel between (the resident feature's `opacity` slot; the material is alpha-tested at
+  0.5 with alpha to coverage, so the hem's edge is as smooth as a mesh's where the target is multisampled);
+- drawn from both sides, the inside (back faces) at half the colour (`CUT.lining`); the waistband's and the
+  hems' bands from the same heights as the painted ones;
+- the body under it (texel 8 a = 1; `body` and `hd.body`, not `lod.body`, whose material has
+  `GAME_SIM_FAR`): its bottom is still painted in the bottom's colour, at half of it (the inside of the
+  legs, seen up a leg or under a hem) and with no ease; from 2 to 5 cm inside the cuts it is drawn in 6 mm
+  (not under a top worn over the bottom, which is cloth out past the shell), so no skin comes through at
+  any distance or on the finer close-up body; a top tucked in loses its ease under the waistband.
+
+It has no `lod.` copy and no seated corrective (its tone's xyz are 0), casts no shadow of its own (the
+low-detail body casts the resident's) and does not sway (its hem distance is out of reach). Babies, pyjamas,
+the towel and swimwear stay painted (`bare`, texel 8 a = 0). A resident near the camera in a bottom with legs
+costs 824 triangles more, and each body and life stage in view one draw more.
 
 The shirt under an open jacket or suit has its own colour (outfit.ts `shirtUnder`): white under a
 suit, a charcoal tee under a light jacket, a white or grey one under a dark one. It is painted on the
@@ -495,7 +523,7 @@ Garment ids per family (outfit.ts):
 | 5 | skin reference (1) | bottom: leg cut |
 | 6 | shoe colour | shoes: the sock's top |
 | 7 | eye colour | 1 if the resident wears hair (the scalp takes the hair colour) |
-| 8 | r, g = how loose the top and the bottom are (0..1: how far the painted cloth stands off the skin, `EASE`); b = 1 if the bottom has a shell round the hips (a skirt) | 0 |
+| 8 | r, g = how loose the top and the bottom are (0..1: how far the painted cloth stands off the skin, `EASE`); b = 1 if the bottom has a shell round the hips (a skirt) | 1 if the bottom is worn as the trousers' shell (a bottom with legs, in day clothes, not a baby) |
 | 9 | the hair's lag: how far a loose end of the hair is drawn from where the head carries it (m, world axes, at looseness 1) | the shoulder line (m, at rest on the resident's body) |
 | 10 | the hems' lag: the same for a shell's hem | the height under which a shell's hem is loose (m, at rest on the resident's body: 8 cm over the pelvis joint on a grown one) |
 
