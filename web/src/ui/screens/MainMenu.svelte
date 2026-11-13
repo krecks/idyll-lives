@@ -65,9 +65,9 @@
       <MenuItem label="Settings" icon="icon.ui.settings" onclick={() => (app.overlay = 'settings')} />
       {#if import.meta.env.DEV}
         <!-- The dev server's model inspector (src/debug/inspect.ts): not in the build. -->
-        <MenuItem label="Inspect models" variant="quiet" onclick={() => (location.href = `${import.meta.env.BASE_URL}inspect.html`)} />
+        <MenuItem label="Inspect models" variant="quiet" icon="icon.ui.perf" onclick={() => (location.href = `${import.meta.env.BASE_URL}inspect.html`)} />
       {/if}
-      <MenuItem label="Credits" variant="quiet" onclick={() => (app.overlay = 'credits')} />
+      <MenuItem label="Credits" variant="quiet" icon="icon.ui.info" onclick={() => (app.overlay = 'credits')} />
     </nav>
 
     <footer>
@@ -117,7 +117,7 @@
     flex-direction: column;
     gap: 24px;
     border-radius: 28px;
-    background: linear-gradient(180deg, rgba(22, 27, 38, 0.56), rgba(14, 18, 26, 0.5));
+    background: linear-gradient(180deg, rgba(22, 27, 38, 0.66), rgba(14, 18, 26, 0.6));
     border: 1px solid var(--glass-dark-border);
     box-shadow:
       0 40px 100px rgba(0, 0, 0, 0.4),

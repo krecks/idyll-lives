@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { lookAtAge, randomHousehold } from '../../game/household';
   import { reducedMotion } from '../../game/host';
   import { menuScene } from '../../game/menuScene';
@@ -16,27 +16,51 @@
   /** Lot under the pointer (3D or a household card) and the lot the camera is on. */
   let hover = $state<number | null>(null);
   let focus = $state<number | null>(null);
+  let hoverOff = 0;
   let list = $state<HTMLElement>();
+  /** The household list is scrolled to its end: the fade at its foot (more below) goes away. */
+  let listEnd = $state(false);
 
   const houseCount = $derived(town ? town.slots.filter((s) => s.kind === 'house').length : 0);
   /** Households at most: a house for each but one, and no more than the world's neighbours (`NEIGHBOUR_CAP`). */
   const mostHouseholds = $derived(Math.max(0, Math.min(houseCount - 1, NEIGHBOUR_CAP)));
   const vacant = $derived(town ? vacantSlots(town).map((s) => s.index) : []);
   const population = $derived(town?.households.reduce((n, h) => n + h.household.members.length, 0) ?? 0);
+  /** Vacant lots up to this many are tagged on the map; more and only the one looked at is. */
+  const VACANT_TAGS = 10;
 
-  const labels = $derived<LotLabel[]>(
-    town
-      ? town.slots.map((s) => {
-          const h = town!.households.find((x) => x.slot === s.index);
-          if (s.kind !== 'house') return { plot: s.index, title: s.name, kind: 'park' };
-          if (h) return { plot: s.index, title: `The ${h.household.name}s`, sub: s.name, kind: 'home' };
-          return { plot: s.index, title: 'For sale', sub: s.name, kind: 'sale' };
-        })
-      : [],
-  );
+  const labels = $derived.by((): LotLabel[] => {
+    const t = town;
+    if (!t) return [];
+    return t.slots.flatMap((s): LotLabel[] => {
+      const h = t.households.find((x) => x.slot === s.index);
+      if (s.kind !== 'house') return [{ plot: s.index, title: s.name, kind: 'park' }];
+      if (h) return [{ plot: s.index, title: `The ${h.household.name}s`, sub: s.name, kind: 'home' }];
+      // A big world has more houses than a screen has room for tags: every vacant lot would be the
+      // same "For sale" pill, hiding the town under them. They are marked on the map and counted in
+      // the stats instead; the one being looked at still says its address (and a small town, where
+      // they fit, tags them all).
+      if (vacant.length > VACANT_TAGS && s.index !== hover && s.index !== focus) return [];
+      return [{ plot: s.index, title: 'For sale', sub: s.name, kind: 'sale' }];
+    });
+  });
+
+  /**
+   * A "For sale" tag floats above its lot: crossing a little empty ground on the way to it should
+   * not drop the tag at once. Anything else clears at once.
+   */
+  function setHover(plot: number | null): void {
+    clearTimeout(hoverOff);
+    if (plot !== null || hover === null || !vacant.includes(hover) || vacant.length <= VACANT_TAGS) {
+      hover = plot;
+      return;
+    }
+    hoverOff = setTimeout(() => (hover = null), 160);
+  }
+  onDestroy(() => clearTimeout(hoverOff));
 
   /** The world from step 1, nobody living there yet. */
-  const world = (): NeighbourhoodDraft | null => app.world ?? (town && { ...town, households: [] });
+  const world = (): NeighbourhoodDraft | null => app.world ?? (town ? { ...town, households: [] } : null);
 
   /** New neighbours in the same world (its streets and houses stay as they are). */
   function generate(count?: number): void {
@@ -44,10 +68,6 @@
     if (!templates || !empty) return;
     // No loading screen: that is only for starting a game. The cards draw their portraits as they come.
     town = populate(content, assets, templates, empty, count);
-  }
-
-  function setNeighbours(count: number) {
-    generate(count);
   }
 
   function rerollHousehold(i: number) {
@@ -99,6 +119,21 @@
   /** The household on the lot in focus (offered to play from the 3D view). */
   const focused = $derived(town && focus !== null ? town.households.find((h) => h.slot === focus) : undefined);
 
+  // A list that fits its panel needs no fade at the foot (it would dim the last card for nothing).
+  // Re-checked when the town changes and whenever the list's own box does: a taller window fits the
+  // list again, a shorter one (or a wrapped card) brings the fade back. Only the class changes on
+  // the outcome, and that moves no box, so the observer cannot feed itself.
+  const atEnd = (el: HTMLElement) => (listEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 4);
+  $effect(() => {
+    void town;
+    if (!list) return;
+    const el = list;
+    atEnd(el);
+    const observer = new ResizeObserver(() => atEnd(el));
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
+
   /** Click on a lot (3D, tag or card): the camera glides to it; again (or empty ground) back out. */
   function select(plot: number | null) {
     focus = plot === focus ? null : plot;
@@ -119,19 +154,16 @@
     keep();
   });
 
-  // The 3D town follows the draft; a new layout drops the focus.
-  $effect(() => {
-    if (!town) return;
-    void menuScene.show(town);
-  });
+  // The 3D town follows the draft. Only a new layout needs it rebuilt: rerolling or removing a
+  // household leaves the streets and houses as they are (the labels and markers follow separately).
   let layout = '';
   $effect(() => {
-    const key = town ? `${town.seed}:${town.slots.map((s) => s.template).join(',')}` : '';
-    if (key !== layout) {
-      layout = key;
-      focus = null;
-      hover = null;
-    }
+    const key = town ? `${town.seed}:${town.width}x${town.depth}:${town.slots.map((s) => `${s.x},${s.z},${s.template}`).join(';')}` : '';
+    if (key === layout) return;
+    layout = key;
+    focus = null;
+    hover = null;
+    if (town) void menuScene.show(town);
   });
 
   $effect(() => {
@@ -145,8 +177,8 @@
 
 <div class="screen scaled">
   <div class="haze" aria-hidden="true"></div>
-  <header>
-    <button class="btn ghost back" onclick={() => (app.screen = 'world')}><Icon name="icon.ui.back" size={18} /> World</button>
+  <header use:avoid>
+    <button class="btn ghost back" onclick={() => { keep(); app.screen = 'world'; }}><Icon name="icon.ui.back" size={18} /> World</button>
     <div class="title">
       <span class="eyebrow">Step 2 of 4 · Choose a household</span>
       <h1 class="town-name">{town?.name ?? app.world?.name ?? ''}</h1>
@@ -161,7 +193,7 @@
   <main>
     <section class="view">
       {#if town}
-        <TownStage {labels} {hover} selected={focus} {focus} onhover={(p) => (hover = p)} onselect={select} />
+        <TownStage {labels} {hover} selected={focus} {focus} onhover={setHover} onselect={select} />
       {:else}
         <div></div>
       {/if}
@@ -174,7 +206,7 @@
               min="0"
               max={mostHouseholds}
               value={town.households.length}
-              onchange={(e) => setNeighbours(Number((e.currentTarget as HTMLInputElement).value))}
+              onchange={(e) => generate(Number((e.currentTarget as HTMLInputElement).value))}
             />
           </label>
           <div class="stats" aria-label="Town summary">
@@ -198,24 +230,29 @@
     </section>
 
     {#if town}
-      <aside class="households menu-glass">
+      <aside class="households menu-glass" use:avoid>
         <header class="list-head">
           <span class="eyebrow">Who lives here</span>
           <span class="count">{town.households.length} {town.households.length === 1 ? 'household' : 'households'}</span>
         </header>
-        <div class="list" bind:this={list}>
+        <div
+          class="list"
+          class:list-end={listEnd}
+          bind:this={list}
+          onscroll={(e) => atEnd(e.currentTarget)}
+        >
           {#each town.households as h, i (h.household.name + i)}
             <article
               class="household"
               class:hover={hover === h.slot}
               class:focus={focus === h.slot}
-              onmouseenter={() => (hover = h.slot)}
-              onmouseleave={() => (hover = null)}
+              onmouseenter={() => setHover(h.slot)}
+              onmouseleave={() => setHover(null)}
             >
               <button class="pick" aria-label="Meet the {h.household.name}s" onclick={() => meet(h.slot)}>
                 <span class="faces">
                   {#each h.household.members as m (m.uid)}
-                    <span class="face" title={m.name}><SimPreview appearance={lookAtAge(services.content, services.assets, m.appearance, m.age)} gender={m.gender} size={42} /></span>
+                    <span class="face" style:--skin={m.appearance.skin} title={m.name}><SimPreview appearance={lookAtAge(services.content, services.assets, m.appearance, m.age)} gender={m.gender} size={38} /></span>
                   {/each}
                 </span>
                 <span class="info">
@@ -334,6 +371,9 @@
     display: grid;
     grid-template-rows: 1fr auto;
     gap: 14px;
+    /* The stream pill floats at the window's bottom edge, centred (StreamIndicator): the controls
+       bar and the stats stay clear above it rather than under it. */
+    padding-bottom: calc(70px / var(--ui-scale));
   }
   .controls {
     display: flex;
@@ -421,6 +461,14 @@
     flex-direction: column;
     gap: 6px;
     padding-right: 4px;
+    /* Room at the end so the last card is not sliced by the panel's edge. */
+    padding-bottom: 4px;
+    overscroll-behavior: contain;
+    /* More households below: the foot of the list fades out rather than cutting a card in half. */
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 30px), transparent);
+  }
+  .list-end {
+    mask-image: none;
   }
   .household {
     display: flex;
@@ -456,12 +504,21 @@
     flex: none;
     width: 98px;
   }
+  /* Four is as many as a household gets (`maxHousehold`): the fourth widens its row rather than
+     spilling over the names. */
+  .faces:has(.face:nth-child(4)) {
+    width: 126px;
+  }
+  /* 42px across, 2px of it border: the portrait is drawn for the 38px hole it gets, not cropped
+     from 42 (which cut the shoulders and pushed the tinted rim out of sight). */
   .face {
     width: 42px;
     height: 42px;
     border-radius: 50%;
     overflow: hidden;
-    background: var(--surface-muted);
+    /* A tint of the resident's own skin under the portrait, so a card whose 3D faces are still
+       streaming shows warm circles instead of empty grey ones. */
+    background: color-mix(in srgb, var(--skin, #d9c3b0) 26%, var(--surface-muted));
     border: 2px solid var(--surface);
     margin-left: -14px;
     display: grid;
