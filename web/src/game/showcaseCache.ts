@@ -1,8 +1,8 @@
 /**
- * The main menu's showcase, kept from visit to visit: its land, the houses it generated and the menus' preview are the same for a build, so a
- * player who comes back sees the same valley again without waiting for the town worker to lay it
- * out. The seed is kept with the build's id: a new build makes a new valley, and only its cache is
- * kept (an older build's is dropped).
+ * The main menu's showcase, kept from visit to visit: its land, the houses it generated and the
+ * menus' preview are the same for a build, so a player who comes back sees the same valley again
+ * without waiting for the town worker to lay it out. The seed is kept with the build's id: a new
+ * build makes a new valley, and only its cache is kept (an older build's is dropped).
  *
  * Kept as JSON in the Cache API (`ml/assets.ts` `openCache`): 7 MB for a Medium world, a few
  * hundredths of a second to read, against seconds to make. `keepShowcase` is called in the town worker
