@@ -11,7 +11,7 @@ import { SIDEWALK, trimJoins } from '../src/game/roads';
 import { Geo } from '../src/render/shared/geometry';
 import { CROSSWALK, JunctionCuts, junctionsOf, KERB_RETURN, planJunctions, STOP_PAST, type JunctionPlan } from '../src/render/shared/junctions';
 import { Kerb, MARK_Y, roadIndex, roadMeshes, ROAD_Y, WALK_Y, walkStops } from '../src/render/shared/roads';
-import { deriveJunctions } from './fixtures/junctions';
+import { deriveJunctions, plansOf } from './fixtures/junctions';
 
 const line = (x0: number, z0: number, x1: number, z1: number, n: number): [number, number][] => Array.from({ length: n + 1 }, (_, i) => [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n]);
 /** A street along x at z = 50; a lane off it to the south (+z), begun at its kerb (`trimJoins`). */
@@ -42,11 +42,6 @@ function covered(tris: [number, number][][], x: number, z: number): boolean {
     const [d0, d1, d2] = [s(a, b), s(b, c), s(c, a)];
     return (d0 >= -1e-9 && d1 >= -1e-9 && d2 >= -1e-9) || (d0 <= 1e-9 && d1 <= 1e-9 && d2 <= 1e-9);
   });
-}
-
-/** The junctions (as drawn) of a set of roads. */
-function plansOf(roads: RoadPlan[]): JunctionPlan[] {
-  return planJunctions(deriveJunctions(roads), roads);
 }
 
 /** The junction (as drawn) of a set of roads: the only one. */

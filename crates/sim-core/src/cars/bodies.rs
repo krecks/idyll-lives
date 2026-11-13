@@ -26,13 +26,13 @@ pub fn hidden(cars: &[Car]) -> Vec<bool> {
     // (Out of sight by where their middles are, along x: a car seen need only look at those whose
     // middles are near enough along x to touch it, `reach` apart at most. That's the same test as
     // looking at every one of them, without the pair of every car in town.)
-    let mut out_of_sight: Vec<(f32, Rect)> = cars
+    let mut out_of_sight: Vec<Rect> = cars
         .iter()
         .filter(|c| c.sight != Sight::Seen)
-        .filter_map(|c| body(c).map(|r| (r.at[0], r)))
+        .filter_map(body)
         .collect();
-    out_of_sight.sort_by(|a, b| a.0.total_cmp(&b.0));
-    let reach = cars.iter().map(|c| c.len / 2.0).fold(0.0, f32::max);
+    out_of_sight.sort_by(|a, b| a.at[0].total_cmp(&b.at[0]));
+    let reach = out_of_sight.iter().map(|o| o.half[0]).fold(0.0, f32::max);
     for (k, car) in cars.iter().enumerate() {
         if out[k] {
             continue;
@@ -41,11 +41,11 @@ pub fn hidden(cars: &[Car]) -> Vec<bool> {
             continue;
         };
         let most = reach + r.half[0] + 0.5;
-        let lo = out_of_sight.partition_point(|(x, _)| *x < r.at[0] - most);
-        let hi = out_of_sight.partition_point(|(x, _)| *x <= r.at[0] + most);
-        out[k] = out_of_sight[lo..hi].iter().any(|(_, o)| {
-            crate::travel::dist(o.at, r.at) < o.half[0] + r.half[0] + 0.5 && o.gap(&r) < TOUCH
-        });
+        out[k] = along_x(&out_of_sight, |o| o.at[0], r.at[0], most)
+            .iter()
+            .any(|o| {
+                crate::travel::dist(o.at, r.at) < o.half[0] + r.half[0] + 0.5 && o.gap(&r) < TOUCH
+            });
     }
     out
 }

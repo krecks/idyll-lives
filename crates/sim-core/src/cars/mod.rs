@@ -702,6 +702,14 @@ fn covered_tiles(x0: f32, z0: f32, x1: f32, z1: f32) -> Vec<(i32, i32)> {
     out
 }
 
+/// Of `sorted` (by `x_of`), those whose x is within `reach` of `x`: all that may be within
+/// `reach` of a point there (`Near`, `hidden`), without looking at the rest.
+pub(crate) fn along_x<T>(sorted: &[T], x_of: impl Fn(&T) -> f32, x: f32, reach: f32) -> &[T] {
+    let lo = sorted.partition_point(|e| x_of(e) < x - reach);
+    let hi = sorted.partition_point(|e| x_of(e) <= x + reach);
+    &sorted[lo..hi]
+}
+
 /// The point `along` the length (forward) and `left` across (to the left) of a car standing at
 /// `spot` facing `yaw`.
 fn local_at(spot: [f32; 2], yaw: f32, along: f32, left: f32) -> [f32; 2] {

@@ -987,14 +987,7 @@ pub(crate) fn pull_over(
     }
 }
 
-/// How far apart (m, their middles) car `car` and another can be and still have one pull over for
-/// the other (`pull_want`): their bodies end to end, `PULL_AHEAD` of the way ahead it looks, the
-/// gap it keeps (`PASSING`, `PULL_MARGIN`), and `SLACK` for a tick's driving either way.
-pub(crate) fn pull_reach(len: f32, wid: f32, most_len: f32, most_wid: f32) -> f32 {
-    len + most_len + (wid + most_wid) / 2.0 + PULL_AHEAD + PASSING + PULL_MARGIN + PULL_SLACK
-}
-
-/// Room to spare (m) in `pull_reach` for how far a car may move between `cars::update` building
+/// Room to spare (m) in `Near::reach` for how far a car may move between `cars::update` building
 /// `Near` and one looking (`drive_on` a tick on, `back_off` a tick back).
 pub(crate) const PULL_SLACK: f32 = 2.0;
 
@@ -1003,65 +996,76 @@ pub(crate) const PULL_SLACK: f32 = 2.0;
 /// puts one back as it's put back along its way (tens of metres at once).
 #[derive(Default)]
 pub(crate) struct Near {
-    /// Each car's middle, as last put (none: not in).
-    at: Vec<Option<[f32; 2]>>,
-    /// The cars that are in, by the x of their middles.
-    by_x: Vec<(f32, usize)>,
-    /// The longest and widest car in, for how far a check reaches (`pull_reach`).
+    /// The cars in it (their middles, as last put), by the x of their middles.
+    by_x: Vec<([f32; 2], usize)>,
+    /// How many cars it was built from: any since (a taxi setting off mid-tick) aren't in it, and
+    /// are looked at whatever.
+    built: usize,
+    /// The longest and widest car in, for how far a check reaches (`reach`).
     most_len: f32,
     most_wid: f32,
 }
 
-impl Near {
-    /// Whether it has every car (`cars` of them) in it. If not (one driven on its own, a test),
-    /// `pull_want` looks at all of them.
-    fn covers(&self, cars: usize) -> bool {
-        self.at.len() == cars
-    }
+/// Orders `by_x`: by x, then by car (the same order whatever order they were put in).
+fn by_x_order(a: &([f32; 2], usize), b: &([f32; 2], usize)) -> std::cmp::Ordering {
+    a.0[0].total_cmp(&b.0[0]).then(a.1.cmp(&b.1))
+}
 
+impl Near {
     /// Builds it afresh from `cars`.
     fn build(&mut self, cars: &[Car]) {
-        self.at.clear();
-        self.at.reserve(cars.len());
-        self.most_len = 0.0;
-        self.most_wid = 0.0;
-        for car in cars {
-            self.at.push(Some(car.middle()));
-            self.most_len = self.most_len.max(car.len);
-            self.most_wid = self.most_wid.max(car.wid);
-        }
-        self.reorder();
+        self.by_x.clear();
+        self.by_x
+            .extend(cars.iter().enumerate().map(|(c, car)| (car.middle(), c)));
+        self.by_x.sort_unstable_by(by_x_order);
+        self.built = cars.len();
+        self.most_len = cars.iter().map(|c| c.len).fold(0.0, f32::max);
+        self.most_wid = cars.iter().map(|c| c.wid).fold(0.0, f32::max);
     }
 
-    /// Puts car `c` at `at` (as it is now).
+    /// Puts car `c` at `at` (as it is now). One not in it is looked at whatever (`near`).
     fn put(&mut self, c: usize, at: [f32; 2]) {
-        if c >= self.at.len() {
-            self.at.resize(c + 1, None);
-        }
-        self.at[c] = Some(at);
-        self.reorder();
+        let Some(k) = self.by_x.iter().position(|&(_, o)| o == c) else {
+            return;
+        };
+        self.by_x.remove(k);
+        let k = self
+            .by_x
+            .partition_point(|e| by_x_order(e, &(at, c)).is_lt());
+        self.by_x.insert(k, (at, c));
     }
 
-    /// Sorts the cars by the x of their middles, after one is put (`build`, `put`).
-    fn reorder(&mut self) {
-        self.by_x = self
-            .at
+    /// How far apart (m, their middles) `car` and another can be and still have one pull over for
+    /// the other (`pull_want`): their bodies end to end, `PULL_AHEAD` of the way ahead it looks,
+    /// the gap it keeps (`PASSING`, `PULL_MARGIN`), and `PULL_SLACK` for a tick's driving either
+    /// way.
+    fn reach(&self, car: &Car) -> f32 {
+        car.len
+            + self.most_len
+            + (car.wid + self.most_wid) / 2.0
+            + PULL_AHEAD
+            + PASSING
+            + PULL_MARGIN
+            + PULL_SLACK
+    }
+
+    /// Of the town's `cars`, those that may be within `reach` (m) of `at`: those in it whose
+    /// middles are (checked all ways), and those not in it.
+    fn near(&self, at: [f32; 2], reach: f32, cars: usize) -> impl Iterator<Item = usize> + '_ {
+        // (Fewer cars than it was built from: their numbers have moved, so every one.)
+        let (window, rest) = if self.built <= cars {
+            (
+                along_x(&self.by_x, |e| e.0[0], at[0], reach),
+                self.built..cars,
+            )
+        } else {
+            (&self.by_x[..0], 0..cars)
+        };
+        window
             .iter()
-            .enumerate()
-            .filter_map(|(c, p)| p.map(|p| (p[0], c)))
-            .collect();
-        self.by_x.sort_by(|a, b| a.0.total_cmp(&b.0));
-    }
-
-    /// The cars that may be within `reach` (m) of `at`: those whose middles are, near enough
-    /// along x to be (checked all ways).
-    fn near(&self, at: [f32; 2], reach: f32) -> impl Iterator<Item = usize> + '_ {
-        let lo = self.by_x.partition_point(|&(x, _)| x < at[0] - reach);
-        let hi = self.by_x.partition_point(|&(x, _)| x <= at[0] + reach);
-        self.by_x[lo..hi].iter().filter_map(move |&(_, c)| {
-            let p = self.at[c]?;
-            (crate::travel::dist(p, at) <= reach).then_some(c)
-        })
+            .filter(move |&&(p, _)| crate::travel::dist(p, at) <= reach)
+            .map(|&(_, c)| c)
+            .chain(rest)
     }
 }
 
@@ -1125,13 +1129,8 @@ pub(crate) fn pull_want(
     let (mut want, mut whom): (f32, Option<u64>) = (0.0, None);
     // (Those near enough to be passing it: checking every car in town pairs every one with every
     // other, `Near`.)
-    let reach = pull_reach(car.len, car.wid, w.cars_near.most_len, w.cars_near.most_wid);
-    let close: Vec<usize> = if w.cars_near.covers(w.cars.len()) {
-        w.cars_near.near(at, reach).collect()
-    } else {
-        (0..w.cars.len()).collect()
-    };
-    for o in close {
+    let reach = w.cars_near.reach(car);
+    for o in w.cars_near.near(at, reach, w.cars.len()) {
         let other = &w.cars[o];
         // (Standing, waiting for that one (`after`: its turn after it too), it pulls over as far as
         // it can, that one backing out of its driveway too: that one goes by, as it comes on round

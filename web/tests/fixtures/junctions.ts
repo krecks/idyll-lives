@@ -6,8 +6,8 @@
  */
 
 import type { Junction, RoadPlan } from '../../src/core/protocol';
-import { lengths, pointAt, SIDEWALK, type Pt } from '../../src/game/roads';
-import { carriageway, CROSSWALK, hasSidewalks, STOP_PAST } from '../../src/render/shared/junctions';
+import { lengths, nearest, pointAt, SIDEWALK, type Pt } from '../../src/game/roads';
+import { carriageway, CROSSWALK, hasSidewalks, planJunctions, STOP_PAST, type JunctionPlan } from '../../src/render/shared/junctions';
 
 /** The box round a junction (sim-core `traffic::boxes`): how far out along its arms (m) at least and at most, and how far apart two arms' lanes are at its edge. */
 const BOX_LEAST = 6;
@@ -29,9 +29,6 @@ const OPPOSITE = -0.866;
 /** Whether cars use a road (not a trail). */
 const drivable = (r: RoadPlan | undefined) => !!r && r.kind !== 'trail' && r.points.length >= 2;
 
-/** Each set of roads' junctions, worked out once. */
-const derived = new WeakMap<readonly RoadPlan[], Junction[]>();
-
 /**
  * The junctions of `roads` as the simulation joins them up (sim-core `travel::Graph::build`): a
  * road's end on another road's middle line (within half the wider one's width and a metre), two
@@ -48,14 +45,12 @@ const derived = new WeakMap<readonly RoadPlan[], Junction[]>();
  * by a lit one).
  */
 export function deriveJunctions(roads: readonly RoadPlan[]): Junction[] {
-  const had = derived.get(roads);
-  if (had) return had;
   const lens = roads.map((r) => lengths(r.points));
   const bounds = roads.map((r) => boundsOf(r.points));
   const ring = (r: RoadPlan) => r.ends[0] === 'loop';
   /** Where two roads meet: the point, and where along each. */
   const touches: { p: Pt; on: [road: number, s: number][] }[] = [];
-  const near = (q: number, x: number, z: number) => nearestOn(roads[q].points, lens[q], x, z);
+  const near = (q: number, x: number, z: number) => nearest(roads[q].points, x, z, lens[q]);
   roads.forEach((r, i) => {
     if (!drivable(r) || ring(r)) return;
     for (const e of [0, 1] as const) {
@@ -167,8 +162,12 @@ export function deriveJunctions(roads: readonly RoadPlan[]): Junction[] {
       }),
     });
   });
-  derived.set(roads, out);
   return out;
+}
+
+/** The junctions (as drawn) of a set of roads. */
+export function plansOf(roads: readonly RoadPlan[]): JunctionPlan[] {
+  return planJunctions(deriveJunctions(roads), roads);
 }
 
 /** How far out along arm `a` a junction's box reaches (m, sim-core `traffic::boxes`): as far as its lane is `ARMS_APART` from another's going the same way. */
@@ -196,20 +195,6 @@ function boundsOf(pts: readonly Pt[]): [number, number, number, number] {
 
 /** Whether `p` is within `m` m of a bounding box. */
 const boxNear = ([x0, z0, x1, z1]: readonly number[], p: Pt, m: number) => p[0] > x0 - m && p[0] < x1 + m && p[1] > z0 - m && p[1] < z1 + m;
-
-/** The nearest point of a polyline (its distance and arc length). */
-function nearestOn(pts: readonly Pt[], ls: readonly number[], x: number, z: number): { dist: number; s: number } {
-  let best = { dist: Infinity, s: 0 };
-  for (let i = 0; i + 1 < pts.length; i++) {
-    const [[ax, az], [bx, bz]] = [pts[i], pts[i + 1]];
-    const [dx, dz] = [bx - ax, bz - az];
-    const l2 = dx * dx + dz * dz || 1;
-    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2));
-    const dist = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
-    if (dist < best.dist) best = { dist, s: ls[i] + t * (ls[i + 1] - ls[i]) };
-  }
-  return best;
-}
 
 /** Where two roads for cars cross away from their ends (sim-core `travel::crossings`): segments filed by 8 m cells, each pair crossing once. */
 function crossings(roads: readonly RoadPlan[], lens: readonly number[][]): { p: Pt; on: [number, number][] }[] {

@@ -11,7 +11,7 @@
  */
 
 import type { Junction, RoadPlan, WorldStructure } from '../../core/protocol';
-import { lengths, pointAt, SIDEWALK, type Pt } from '../../game/roads';
+import { lengths, nearest, pointAt, SIDEWALK, type Pt } from '../../game/roads';
 
 export type { Junction };
 
@@ -139,7 +139,7 @@ function armLine(j: Junction, dir: Pt, r: RoadPlan | undefined): { dir: Pt; off:
   if (!r || r.points.length < 2) return as;
   const [x, z] = [j.x + dir[0] * OFF_AT, j.z + dir[1] * OFF_AT];
   const ls = lengths(r.points);
-  const { dist, s } = nearestOn(r.points, ls, x, z);
+  const { dist, s } = nearest(r.points, x, z, ls);
   const end = r.ends[0] === 'loop' ? Infinity : 0;
   const { p, t } = pointAt(r.points, s, ls);
   const k = t[0] * dir[0] + t[1] * dir[1] < 0 ? -1 : 1;
@@ -162,20 +162,6 @@ export function offsetMeet(a: Pt, da: number, b: Pt, db: number): Pt | null {
   const det = n1[0] * n2[1] - n1[1] * n2[0];
   if (Math.abs(det) < 1e-6) return null;
   return [(da * n2[1] - db * n1[1]) / det, (n1[0] * db - n2[0] * da) / det];
-}
-
-/** The nearest point of a polyline (its distance and arc length). */
-function nearestOn(pts: readonly Pt[], ls: readonly number[], x: number, z: number): { dist: number; s: number } {
-  let best = { dist: Infinity, s: 0 };
-  for (let i = 0; i + 1 < pts.length; i++) {
-    const [[ax, az], [bx, bz]] = [pts[i], pts[i + 1]];
-    const [dx, dz] = [bx - ax, bz - az];
-    const l2 = dx * dx + dz * dz || 1;
-    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2));
-    const dist = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
-    if (dist < best.dist) best = { dist, s: ls[i] + t * (ls[i + 1] - ls[i]) };
-  }
-  return best;
 }
 
 /** The town's junctions as drawn: the simulation's (`WorldStructure.junctions`). */

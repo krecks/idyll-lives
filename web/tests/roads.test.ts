@@ -7,8 +7,8 @@ import { describe, expect, test } from 'bun:test';
 import type { RoadPlan, WorldStructure } from '../src/core/protocol';
 import { trimJoins } from '../src/game/roads';
 import { Kerb, RoadIndex, roadMeshes, roadTiles, SIDEWALK, townRoads, WALK_Y } from '../src/render/shared/roads';
-import { JunctionCuts, planJunctions } from '../src/render/shared/junctions';
-import { deriveJunctions } from './fixtures/junctions';
+import { JunctionCuts } from '../src/render/shared/junctions';
+import { plansOf } from './fixtures/junctions';
 
 const line = (x0: number, z0: number, x1: number, z1: number, n: number): [number, number][] => Array.from({ length: n + 1 }, (_, i) => [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n]);
 /** A road along x at z = 50, and a lane off it to the south (+z) ending in a dead end: beginning at the road's kerb, as the town's lanes do (`trimJoins`). */
@@ -16,8 +16,6 @@ const road: RoadPlan = { points: line(0, 50, 100, 50, 100), width: 7, ends: ['ou
 const [, lane] = trimJoins([road, { points: line(50, 50, 50, 90, 40), width: 6, ends: ['join', 'dead'] }]);
 const index = new RoadIndex([road, lane]);
 /** The junctions (as drawn) of a set of roads. */
-const plansOf = (roads: RoadPlan[]) => planJunctions(deriveJunctions(roads), roads);
-
 describe('roads as drawn', () => {
   test('sidewalks stop where a lane meets the road', () => {
     const { walk } = roadMeshes([road, lane], null, 0, {}, 'both', plansOf([road, lane]));
