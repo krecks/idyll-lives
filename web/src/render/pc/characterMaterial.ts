@@ -27,7 +27,7 @@ import * as pc from './engine';
 import type { InstanceStream } from './instancing';
 import { GAME_FRONT_FACE, MaterialLibrary } from './materials';
 import { BLANKET } from './shaders/blanket';
-import { RESIDENT, RESIDENT_DIFFUSE, RESIDENT_HAIR_SPECULAR, RESIDENT_INSTANCING, RESIDENT_NORMAL, RESIDENT_WISP_OPACITY, WISP } from './shaders/character';
+import { CUT, RESIDENT, RESIDENT_DIFFUSE, RESIDENT_HAIR_SPECULAR, RESIDENT_INSTANCING, RESIDENT_NORMAL, RESIDENT_WISP_OPACITY, WISP } from './shaders/character';
 import { engineChunk, gameChunks, installGameChunks, registerShaderFeature, replaceOnce, type Language } from './shaders/chunks';
 import { BLANKET_WIDTH, COVER, SHEET } from '../shared/characters/blanket';
 import type { MeshPart, MorphSet } from '../shared/characters/data';
@@ -237,7 +237,9 @@ export function characterMaterial(app: pc.AppBase, part: string, options: Charac
   const kind = surfaceOf(part);
   const shadow = !!options.shadow;
   const morph = !shadow && !!options.morph;
-  const key = `${shadow ? 'shadow:' : ''}${kind === 'mouth' ? `mouth:${part}` : kind}${morph ? ':morph' : ''}`;
+  // (The low-detail body is painted whatever shell is worn near the camera: a material of its own, `GAME_SIM_FAR`.)
+  const far = !shadow && part === 'lod.body';
+  const key = `${shadow ? 'shadow:' : ''}${kind === 'mouth' ? `mouth:${part}` : kind}${morph ? ':morph' : ''}${far ? ':far' : ''}`;
   const r = residentsOf(app);
   const have = r.materials.get(key);
   if (have) return have;
@@ -251,12 +253,12 @@ export function characterMaterial(app: pc.AppBase, part: string, options: Charac
   mat.metalness = 0;
   // Roughness, as PlayCanvas's inverted gloss.
   mat.glossInvert = true;
-  const rough: Record<CharacterSurface, number> = { body: 0.55, cloth: 0.85, hair: 0.5, wisp: 0.5, brow: 0.6, lash: 0.6, mouth: 0.5, eye: 0.25 };
+  const rough: Record<CharacterSurface, number> = { body: 0.55, cloth: 0.85, cut: 0.85, hair: 0.5, wisp: 0.5, brow: 0.6, lash: 0.6, mouth: 0.5, eye: 0.25 };
   mat.gloss = rough[kind];
   // (The albedo colours, linear.)
   const albedo = part === 'teeth' ? [1, 0.96, 0.9] : part === 'tongue' ? [0.85, 0.8, 0.8] : kind === 'lash' ? [0.16, 0.12, 0.1] : [1, 1, 1];
   mat.diffuse.set(srgb(albedo[0]), srgb(albedo[1]), srgb(albedo[2]));
-  if (kind === 'cloth' || kind === 'hair' || kind === 'brow' || kind === 'lash') {
+  if (kind === 'cloth' || kind === 'cut' || kind === 'hair' || kind === 'brow' || kind === 'lash') {
     // Open hems and collars, hair cards and lashes show their insides.
     mat.cull = pc.CULLFACE_NONE;
     mat.twoSidedLighting = true;
@@ -273,6 +275,13 @@ export function characterMaterial(app: pc.AppBase, part: string, options: Charac
     mat.alphaTest = WISP.cut;
     mat.alphaToCoverage = true;
     mat.blendType = pc.BLEND_NORMAL;
+  }
+  if (kind === 'cut') {
+    // A shell cut to the resident's own length (the resident feature's `opacity`, `character.ts` `CUT`): what is past the cut is not drawn (the alpha
+    // test), and where the target is multisampled the cut's edge is as smooth as a mesh's (alpha to coverage). Opaque:
+    // no blend.
+    mat.alphaTest = CUT.test;
+    mat.alphaToCoverage = true;
   }
   if (kind === 'mouth') {
     // Warm, soft and hardly lit by the sky (the mouth hides most of it): the environment's light at 0.35.
@@ -304,6 +313,9 @@ export function characterMaterial(app: pc.AppBase, part: string, options: Charac
   }
   mat.setDefine('GAME_RESIDENT', '');
   mat.setDefine(`GAME_SIM_${kind.toUpperCase()}`, '');
+  // (A cut shell is cloth: its colours, its bands, its sway.)
+  if (kind === 'cut') mat.setDefine('GAME_SIM_CLOTH', '');
+  if (far) mat.setDefine('GAME_SIM_FAR', '');
   // (The wisps are hair: its colour and its light.)
   if (kind === 'wisp') mat.setDefine('GAME_SIM_HAIR', '');
   if (morph) mat.setDefine('GAME_SIM_MORPH', '');
@@ -331,7 +343,7 @@ function residentNormalCore(device: pc.GraphicsDevice, lang: Language): string {
   // (GLSL: the body declares the normal itself, before `getLocalPosition` reads it for the cloth's ease, `character.ts` `EASE`.)
   if (lang !== 'glsl') return wrapped;
   const decl = 'attribute vec3 vertex_normal;';
-  return replaceOnce(wrapped, 'normalCoreVS', decl, `#if defined(GAME_SIM_BODY) && !defined(SHADOW_PASS)\n#else\n${decl}\n#endif`);
+  return replaceOnce(wrapped, 'normalCoreVS', decl, `#if (defined(GAME_SIM_BODY) || defined(GAME_SIM_CUT)) && !defined(SHADOW_PASS)\n#else\n${decl}\n#endif`);
 }
 
 /**

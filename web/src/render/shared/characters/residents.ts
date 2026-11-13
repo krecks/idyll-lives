@@ -692,10 +692,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const shaped = !!stage && body.stage === stage;
       const hairKey = this.hairPart(s.appearance?.hairStyle);
       const outfitId = (s as SimInfo & { outfitId?: number }).outfitId ?? s.id;
-      const day = outfitFor(outfitId, s.gender, s.appearance, body, 'day', undefined, s.outfit);
-      // (Pyjamas are the same garments, so the same chunks show at night.)
-      // (The close-up body in the body's place for a resident that fills the view, once it has loaded: `closeUp`.)
+      // (The close-up body in the body's place for a resident that fills the view, once it has loaded: `closeUp`;
+      // its top stays painted on it, `outfitFor`.)
       const fine = !!(s as SimInfo & { closeUp?: boolean }).closeUp && body.parts.has(CLOSE_UP);
+      const day = outfitFor(outfitId, s.gender, s.appearance, body, 'day', undefined, s.outfit, fine);
+      // (Pyjamas are the same garments, so the same chunks show at night.)
       for (const chunk of skinChunks(body, day.parts)) {
         const part = fine && chunk === 'body' ? CLOSE_UP : chunk;
         if (body.parts.has(part)) push(`${body.name}:${part}`, s);
@@ -884,7 +885,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.sims[s.id] = rig;
       // (Day clothes until posed: `wearFor` then picks again.)
       const fit = outfitFit(set, base);
-      rig.outfits = Object.fromEntries(WEARS.map((wear) => [wear, outfitFor(outfitId, s.gender, s.appearance, body, wear, fit, s.outfit)])) as Record<Wear, OutfitParams>;
+      rig.outfits = Object.fromEntries(WEARS.map((wear) => [wear, outfitFor(outfitId, s.gender, s.appearance, body, wear, fit, s.outfit, fine)])) as Record<Wear, OutfitParams>;
       this.wear(rig, s.id, rig.outfits.day);
       this.writeFace(rig, s.id, faceOf(s.appearance, outfitId));
     }

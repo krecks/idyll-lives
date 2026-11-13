@@ -18,7 +18,9 @@
  *   7: eye colour rgb, 1 if the Sim wears hair (the scalp takes the hair colour)
  *   8: r, g = how loose the top and the bottom are (0..1: how far the cloth stands off the skin it is painted on,
  *      the character shader's `EASE`; 0 for what clings or lies under a shell), b = 1 if the bottom has a shell
- *      round the hips (a skirt: the top lies flat under it)
+ *      round the hips (a skirt: the top lies flat under it), a = 1 if the bottom is worn as the trousers' shell
+ *      (`outfit.ts` `LEGS_SHELL`), 2 if the top is worn as the long top's (`TOPS_SHELL`), 3 for both: near the
+ *      camera the body under a shell is not lifted as cloth but drawn in a little, and shaded as its inside
  *   9: the hair's lag (`SWAY_TEXEL.hair`; `sway.ts`): xyz how far a loose end of the hair is drawn from where the
  *      head carries it (m, world axes, at looseness 1: the hair's tone.x), w the shoulder line (m, at rest on the
  *      resident's body: under it the hair hangs behind the back, a wall across)
