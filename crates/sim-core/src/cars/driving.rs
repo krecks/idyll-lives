@@ -1156,8 +1156,11 @@ pub(crate) fn pull_want(
             } else {
                 (all / 2.0).max(all - theirs.room_at(other.progress) * their)
             };
-            if share / mine > want {
-                (want, whom) = (share / mine, Some(car_first(o)));
+            // (Of those wanting it as much, the first car: `near` goes by where they are, not
+            // by their numbers.)
+            let v = share / mine;
+            if v > want || (v == want && v > 0.0 && whom.is_some_and(|k| car_first(o) < k)) {
+                (want, whom) = (v, Some(car_first(o)));
             }
         }
     }

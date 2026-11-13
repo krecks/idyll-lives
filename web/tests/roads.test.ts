@@ -15,7 +15,7 @@ const line = (x0: number, z0: number, x1: number, z1: number, n: number): [numbe
 const road: RoadPlan = { points: line(0, 50, 100, 50, 100), width: 7, ends: ['out', 'out'] };
 const [, lane] = trimJoins([road, { points: line(50, 50, 50, 90, 40), width: 6, ends: ['join', 'dead'] }]);
 const index = new RoadIndex([road, lane]);
-/** The junctions (as drawn) of a set of roads. */
+
 describe('roads as drawn', () => {
   test('sidewalks stop where a lane meets the road', () => {
     const { walk } = roadMeshes([road, lane], null, 0, {}, 'both', plansOf([road, lane]));

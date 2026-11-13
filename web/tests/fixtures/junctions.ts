@@ -6,8 +6,8 @@
  */
 
 import type { Junction, RoadPlan } from '../../src/core/protocol';
-import { lengths, nearest, pointAt, SIDEWALK, type Pt } from '../../src/game/roads';
-import { carriageway, CROSSWALK, hasSidewalks, planJunctions, STOP_PAST, type JunctionPlan } from '../../src/render/shared/junctions';
+import { lengths, nearest, pointAt, type Pt } from '../../src/game/roads';
+import { carriageway, CROSSWALK, planJunctions, STOP_PAST, type JunctionPlan } from '../../src/render/shared/junctions';
 
 /** The box round a junction (sim-core `traffic::boxes`): how far out along its arms (m) at least and at most, and how far apart two arms' lanes are at its edge. */
 const BOX_LEAST = 6;

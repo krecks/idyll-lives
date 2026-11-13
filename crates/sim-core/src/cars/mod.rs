@@ -1025,10 +1025,14 @@ impl Car {
             })
     }
 
-    /// Where its middle is, for the checks that pair it with another (`Near`): as it's drawn, or
-    /// its spot.
+    /// Where its middle is, for the checks that pair it with another (`Near`): along its way, as
+    /// `pull_want` has it (not as drawn: one waiting to come into town isn't, yet comes in this
+    /// tick); else as it's drawn, or its spot.
     fn middle(&self) -> [f32; 2] {
-        self.shown.map_or(self.spot, |s| s.0)
+        match self.route.as_ref() {
+            Some((_, r)) if r.points.len() >= 2 => r.at(self.progress).0,
+            _ => self.shown.map_or(self.spot, |s| s.0),
+        }
     }
 
     /// Coming into town from the way in (not from a trip's parking spot), it hasn't yet: out of
