@@ -1547,11 +1547,15 @@ export class TownStreet {
     const memo = `${id}|${focus}`;
     const known = this.keys.get(memo);
     if (known && known.version === this.version) return known.key;
-    const key = this.gather(id, focus).key;
-    this.keys.set(memo, { version: this.version, key });
-    return key;
+    const gathered = this.gather(id, focus);
+    this.keys.set(memo, { version: this.version, key: gathered.key });
+    // (A chunk's key is most often asked for just before it is planned: `chunk` takes what was gathered.)
+    this.gathered = { memo, version: this.version, gathered };
+    return gathered.key;
   }
   private readonly keys = new Map<string, { version: number; key: string }>();
+  /** What the last `chunkKey` gathered, for `chunk` (once). */
+  private gathered: { memo: string; version: number; gathered: ReturnType<TownStreet['gather']> } | null = null;
   /** Moved on whenever `setWorld` takes a world that changes anything the street is planned from. */
   private version = 0;
 
@@ -1604,7 +1608,9 @@ export class TownStreet {
 
   /** Plans chunk `id` with lot `focus` in view (`NO_FOCUS`: none; in the menus' town the player's lot is the focus). */
   chunk(id: number, focus: number): ChunkPlan {
-    const g = this.gather(id, focus);
+    const kept = this.gathered;
+    this.gathered = null;
+    const g = kept && kept.memo === `${id}|${focus}` && kept.version === this.version ? kept.gathered : this.gather(id, focus);
     const plan: ChunkPlan = {
       id,
       key: g.key,

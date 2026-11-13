@@ -3,7 +3,7 @@
  * the tags (`townView.blend` from 0.2; the household's own from its start), the tag filters (kept in this browser), and the tag the player clicked.
  */
 
-import type { TagKind } from './overlap';
+import type { TagKind } from './kinds';
 
 /** A tag the player clicked, kept open as a card: one of your people (visit or call), or a place. */
 export type Chosen = ({ kind: 'person'; sim: number; plot: number | null } | { kind: 'place'; place: number; plot: number | null }) & {

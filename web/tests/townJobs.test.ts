@@ -1,8 +1,9 @@
 // Worlds and town files made in the town worker (`game/townJobs.ts`, `town.worker.ts`) are the ones
 // the page would make: the job and its result go through a structured clone (as `postMessage` sends
 // them), and the world, its preview and its houses come out as `generateWorld`, `previewWorld` and
-// `houseTemplate` make them for the same seed; a town file as `assembleTown` makes it, its dice
-// (friends, rivals) from the job's own seed.
+// `houseTemplate` make them for the same seed (the main menu's showcase too: its land, and its preview
+// once peopled on the page); a town file as `assembleTown` makes it, its dice (friends, rivals) from
+// the job's own seed.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -64,6 +65,25 @@ describe('town jobs', async () => {
       30_000,
     );
   }
+
+  test(
+    "the main menu's showcase: its land, peopled on the page, and its preview are the page's",
+    () => {
+      const land = inWorker({ kind: 'land', world: 'medium', seed: 2032020577 });
+      if (land.kind !== 'land') throw new Error('not a land');
+      const draft = generateWorld(content, t, 'medium', 2032020577);
+      expect(land.draft).toEqual(draft);
+      const ids = new Set(draft.slots.map((s) => s.template).filter((id) => id.startsWith('gen:')));
+      expect(land.houses.map(([id]) => id).sort()).toEqual([...ids].sort());
+      // (Peopled on the page as the menu does, with the page's dice.)
+      const town = populate(content, assets, t, land.draft);
+      expect(town.households.length).toBeGreaterThan(0);
+      const made = inWorker({ kind: 'preview', town });
+      if (made.kind !== 'preview') throw new Error('not a preview');
+      expect(made.preview).toEqual(previewWorld(content, t, town, null));
+    },
+    30_000,
+  );
 
   test('the worker\'s town file is the page\'s, its dice from the job\'s seed', () => {
     const town = populate(content, assets, t, generateWorld(content, t, 'small', 4242));

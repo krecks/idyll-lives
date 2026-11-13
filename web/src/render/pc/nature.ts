@@ -44,6 +44,7 @@ import { groupInstances, hideLawn, LandscapeLayout, lawnInputs, lawnLayer, lawnM
 import type { OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
 import { tuned } from '../tune';
+import { both } from '../../core/async';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 
 export { decorPlants, natureDecor, type PlantPlacement } from '../shared/nature';
@@ -131,18 +132,26 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
 
   private async buildAll(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder): Promise<NatureResult> {
     const draws: pc.Entity[] = [];
+    // (The grass field's land is made in a worker of its own meanwhile, its town mask here after the
+    // plants: the page has the terrain's meshes and the plants to make first.)
+    const grassLand = this.offThread?.grass(this.ring) ?? Promise.resolve(null);
+    this.batches = [];
     // A big world's ground in 128 m tiles of three levels of detail; a town of today's sizes one mesh, as ever.
-    const grounds = world.meta?.world?.size === 'big' ? await perfTimeAsync('nature: terrain tiles', () => this.terrainTiles(app, parent, pace)) : [await perfTimeAsync('nature: terrain', () => this.terrain(app, parent, pace))];
+    const ground =
+      world.meta?.world?.size === 'big'
+        ? perfTimeAsync('nature: terrain tiles', () => this.terrainTiles(app, parent, pace), `${Math.ceil(this.terrainGrid().size / TILE) ** 2} tiles`)
+        : perfTimeAsync('nature: terrain', () => this.terrain(app, parent, pace)).then((e) => [e]);
+    // The woods and the lawn's flowers meanwhile: the terrain waits on the worker's shading for much of its time.
+    const plants = (async () => {
+      await perfTimeAsync('nature: forests', () => this.forests(app, parent, assets, pace));
+      await perfTimeAsync('nature: lawns', () => this.plantLawns(app, parent, assets, world, pace));
+    })();
+    const [grounds] = await both(ground, plants);
     draws.push(...grounds);
     if (this.watered) draws.push(perfTime('nature: water', () => this.water(app, parent)));
     if (buildRoads) draws.push(...perfTime('nature: roads', () => buildRoads(this.roads, parent)));
     for (const e of draws) e.enabled = false;
     this.others = draws;
-    this.batches = [];
-    // (The grass field's land is made in the worker meanwhile; its town mask here.)
-    const grassLand = this.offThread?.grass(this.ring) ?? Promise.resolve(null);
-    await perfTimeAsync('nature: forests', () => this.forests(app, parent, assets, pace));
-    await perfTimeAsync('nature: lawns', () => this.plantLawns(app, parent, assets, world, pace));
     this.findSquares();
     const field = await perfTimeAsync('nature: grass field', async () => {
       const land = await grassLand;
@@ -150,8 +159,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     });
     const grass = (this.grass = new Grass(app, parent, field, this.grassQuality));
     grass.onGround(grounds.map((g) => g.render!.meshInstances[0]));
-    const plants = gather(this.batches);
-    return { draws: [...draws, ...plants.draws, ...grass.draws.map((d) => d.entity)], casters: plants.casters, only: plants.only };
+    const built = gather(this.batches);
+    return { draws: [...draws, ...built.draws, ...grass.draws.map((d) => d.entity)], casters: built.casters, only: built.only };
   }
 
   /**
@@ -493,8 +502,12 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
 /** A big world's ground tiles (m), and their levels' quads across (the distances they change at are the preset's, `OpenWorldQuality.tiles`). */
 const TILE = 128;
 const TILE_LODS = [64, 32, 16];
-/** Ground tiles the render data worker is asked to shade ahead of the one whose meshes are being made. */
-const SHADE_AHEAD = 4;
+/**
+ * Ground tiles the render data worker is asked to shade ahead of the one whose meshes are being made
+ * (a big world has about 144): enough that it goes on shading while the page is busy with the rest
+ * of the build.
+ */
+const SHADE_AHEAD = 16;
 
 /**
  * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`
