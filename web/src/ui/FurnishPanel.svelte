@@ -225,6 +225,9 @@
         <section class="pinned glass" aria-label={moving || !pinned.owned ? 'In hand' : 'Picked'}>
           {#if !moving && pinned.owned}
             <button class="close" aria-label="Put down" title="Done (Esc)" onclick={() => (game.buySelection = null)}><Icon name="icon.ui.close" size={12} /></button>
+          {:else}
+            <!-- In hand (bought, or picked up to move): back to the catalog, or back where it stood, as Esc does. -->
+            <button class="close" aria-label="Put it back" title="Put it back (Esc)" onclick={() => services.controls.cancelPlacing()}><Icon name="icon.ui.close" size={12} /></button>
           {/if}
           <ItemDetail def={pinned.def} owned={pinned.owned} />
         </section>
