@@ -16,7 +16,7 @@ import { Kerb, MARK_Y, roadIndex, roadMeshes, ROAD_Y, WALK_Y, walkStops } from '
 const line = (x0: number, z0: number, x1: number, z1: number, n: number): [number, number][] => Array.from({ length: n + 1 }, (_, i) => [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n]);
 /** A street along x at z = 50; a lane off it to the south (+z), begun at its kerb (`trimJoins`). */
 const street: RoadPlan = { points: line(0, 50, 100, 50, 100), width: 7, ends: ['out', 'out'] };
-const T = trimJoins([street, { points: line(50, 50, 50, 90, 40), width: 7, ends: ['join', 'dead'] }]);
+const T = trimJoins([street, { points: line(50, 50, 50, 90, 40), width: 7, ends: ['join', 'dead'], kind: 'lane' }]);
 /** Two streets crossing at (50, 50). */
 const CROSS: RoadPlan[] = [street, { points: line(50, 0, 50, 100, 100), width: 7, ends: ['out', 'out'] }];
 /** A country road (no sidewalks) from the south ending on the street's middle, as the worlds' do. */
@@ -63,12 +63,25 @@ describe('junctions worked out from the roads', () => {
     expect(ways).toEqual(expect.arrayContaining([[1, 0, 0], [-1, 0, 0], [0, 1, 1]]));
     for (const a of j.arms) {
       expect(a.width).toBeCloseTo(2 * HALF);
-      // The crosswalk out past the box, the stop line past it; lit, as the simulation lights them.
+      // The crosswalk out past the box, the stop line past it; giving way, as the simulation has a
+      // lane meeting a street: no lights.
       expect(a.walkTo - a.walkFrom).toBeCloseTo(CROSSWALK);
       expect(a.stop - a.walkTo).toBeCloseTo(STOP_PAST);
       expect(a.walkFrom).toBeGreaterThanOrEqual(6);
-      expect(a.light).not.toBeNull();
+      expect(a.light).toBeNull();
     }
+    // A zebra across the street on one side of the lane's mouth (its west arm, the first round from
+    // z towards x), none across the lane.
+    const zebras = j.arms.filter((a) => a.crosswalk).map((a) => [Math.round(a.dir[0]), Math.round(a.dir[1])]);
+    expect(zebras).toEqual([[-1, 0]]);
+  });
+
+  test('a crossroads is lit, every arm with a zebra; a country T lit, but for the country road its arms', () => {
+    const [x] = deriveJunctions(CROSS);
+    expect(x.arms.every((a) => a.light !== null && a.crosswalk)).toBe(true);
+    const [c] = deriveJunctions(COUNTRY);
+    expect(c.arms.every((a) => a.light !== null)).toBe(true);
+    expect(c.arms.map((a) => a.crosswalk)).toEqual(c.arms.map((a) => a.road === 0));
   });
 
   test('two streets crossing are a crossroads; a country road joining a street a country T', () => {
@@ -162,10 +175,10 @@ describe('road markings', () => {
   const paint = (roads: RoadPlan[], plans?: JunctionPlan[]) => flat(roadMeshes(roads, null, 0, { marks: new Geo() }, 'surface', plans).marks!, MARK_Y);
 
   test("a stop line across the half coming in at the arm's stop, a zebra across the whole between its crosswalk's ends", () => {
-    const j = only(T);
-    const lane = j.arms.find((a) => a.road === 1)!;
-    const marks = paint(T);
-    // The lane's arm runs south (+z): those coming in drive north on its east (+x) half (on the right).
+    const j = only(CROSS);
+    const lane = j.arms.find((a) => a.road === 1 && a.dir[1] > 0)!;
+    const marks = paint(CROSS);
+    // The south arm runs south (+z): those coming in drive north on its east (+x) half (on the right).
     const z = 50 + lane.stop - 0.15;
     expect(covered(marks, 50 + HALF / 2, z)).toBe(true);
     expect(covered(marks, 50 - HALF / 2, z)).toBe(false);
@@ -179,6 +192,23 @@ describe('road markings', () => {
     expect(across.some((on, k) => on && k > 60)).toBe(true);
     // Nothing in the junction's box.
     expect(covered(marks, 50, 50 + 2)).toBe(false);
+  });
+
+  test("a T giving way: a zebra and its stop line on one of the street's arms, nothing across the lane", () => {
+    const j = only(T);
+    const [west, east, lane] = [j.arms.find((a) => a.dir[0] < -0.9)!, j.arms.find((a) => a.dir[0] > 0.9)!, j.arms.find((a) => a.road === 1)!];
+    const marks = paint(T);
+    // (Painted anywhere across the carriageway, `along` m out the arm's way `dir`.)
+    const across = (dir: number[], along: number) =>
+      Array.from({ length: 41 }, (_, k) => -HALF + (2 * HALF * k) / 40).some((c) => covered(marks, 50 + dir[0] * along - dir[1] * c, 50 + dir[1] * along + dir[0] * c));
+    // West: the zebra across the street, and the stop line on its south half (those coming in east).
+    expect(across(west.dir, (west.walkFrom + west.walkTo) / 2)).toBe(true);
+    expect(covered(marks, 50 - west.stop + 0.15, 50 + HALF / 2)).toBe(true);
+    // East and across the lane: nothing.
+    expect(across(east.dir, (east.walkFrom + east.walkTo) / 2)).toBe(false);
+    expect(across(east.dir, east.stop - 0.15)).toBe(false);
+    expect(across(lane.dir, (lane.walkFrom + lane.walkTo) / 2)).toBe(false);
+    expect(across(lane.dir, lane.stop - 0.15)).toBe(false);
   });
 
   test("on a country road's arm only a stop line, and only while it's lit", () => {

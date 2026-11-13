@@ -1405,11 +1405,16 @@ pub struct Travel {
     /// crosswalks (`traffic::settle`, `traffic::KEEP_OFF`): blocked to those on foot, who cross on
     /// the zebras. Sorted tile indices; not saved.
     pub(crate) junction_tiles: Vec<usize>,
-    /// The junctions with traffic lights (`traffic::Signal`, `traffic::settle`). Not saved: worked
-    /// out again on load.
+    /// The junctions with traffic lights, the big ones (`traffic::Signal`, `traffic::settle`). Not
+    /// saved: worked out again on load.
     pub signals: Vec<crate::traffic::Signal>,
-    /// The lit junctions' crosswalks by where they are (`traffic::kerb_stop`). Not saved.
+    /// The other junctions, giving way (`Signal::lit` false: no lights, zebras on their streets'
+    /// arms). Not saved.
+    pub give_way: Vec<crate::traffic::Signal>,
+    /// The lit junctions' crosswalks by where they are (`traffic::kerb_stop`), and the zebras of
+    /// those giving way (`traffic::zebra_walkers`). Not saved.
     pub(crate) crossings: crate::traffic::Crossings,
+    pub(crate) zebras: crate::traffic::Crossings,
     /// By public parking spot (`OpenWorld::parking`), whether a car parked there would stand where
     /// a household's car turns into or out of its driveway, or on the driveway (`cars::settle_all`):
     /// not parked at on a trip. Not saved: worked out again on load.
@@ -1437,7 +1442,9 @@ impl Travel {
             junction_tiles: Vec::new(),
             by_a_mouth: Vec::new(),
             signals: Vec::new(),
+            give_way: Vec::new(),
             crossings: Default::default(),
+            zebras: Default::default(),
             doors: Vec::new(),
         }
     }
@@ -1761,8 +1768,14 @@ mod tests {
             "{:?}",
             g.nodes[cross]
         );
-        let sig = crate::traffic::signal_at(&g, cross, &[]).expect("lit");
+        let sig = crate::traffic::signal_at(&g, cross, &[]).expect("a junction");
         assert_eq!((sig.arms.len(), sig.phases), (4, 2));
+        assert!(sig.lit, "a crossroads is lit");
+        // (The two T's further on, a lane meeting the street: giving way.)
+        for &n in junctions.iter().filter(|&&n| n != cross) {
+            let t = crate::traffic::signal_at(&g, n, &[]).expect("a junction");
+            assert!(!t.lit, "a lane's T gives way");
+        }
         // (The street's stretches, end to end along it: none missing, none overlapping.)
         let street: Vec<&Edge> = g.road_edges[0]
             .iter()

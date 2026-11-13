@@ -1739,7 +1739,9 @@ struct StructureView<'a> {
     light_poles: Vec<[f32; 3]>,
     /// Every junction where `traffic::SIGNAL_ARMS` roads for cars or more meet (`traffic::Signal`),
     /// for its pad and markings: its middle, whether it's on a roundabout, and its arms, each with
-    /// its crosswalk and stop line and its signal head's snapshot row; left out when there are none.
+    /// its crosswalk (whether it has one) and stop line and its signal head's snapshot row; the lit
+    /// ones first, in their heads' rows' order, then those giving way (no rows); left out when
+    /// there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     junctions: Vec<JunctionView>,
 }
@@ -1757,8 +1759,9 @@ struct JunctionView {
 
 /// A junction's arm (`traffic::SignalArm`): its road (`meta.roads` index), the way out along it
 /// from the middle (a unit vector, x and z), the road's width between its kerbs (m), its crosswalk
-/// (m out from the junction's middle, `walk_from` to `walk_to`), its stop line (m out, past the
-/// crosswalk: cars stop on red with their noses there) and its signal head's row in the snapshot
+/// (m out from the junction's middle, `walk_from` to `walk_to`; whether there's one, a zebra:
+/// `crosswalk`), its stop line (m out, past the crosswalk: cars stop on red with their noses there,
+/// or for those on foot on the zebra) and its signal head's row in the snapshot
 /// (`snapshot::light`; none: not lit).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1769,10 +1772,12 @@ struct JunctionArmView {
     walk_from: f32,
     walk_to: f32,
     stop: f32,
+    crosswalk: bool,
     light: Option<u32>,
 }
 
-/// `StructureView::junctions`: the lit junctions in their heads' rows' order.
+/// `StructureView::junctions`: the lit junctions in their heads' rows' order, then those giving
+/// way.
 fn junction_views(world: &World) -> Vec<JunctionView> {
     let g = &world.travel.graph;
     let mut head = 0u32;
@@ -1780,6 +1785,7 @@ fn junction_views(world: &World) -> Vec<JunctionView> {
         .travel
         .signals
         .iter()
+        .chain(&world.travel.give_way)
         .map(|s| JunctionView {
             x: s.at[0],
             z: s.at[1],
@@ -1789,7 +1795,7 @@ fn junction_views(world: &World) -> Vec<JunctionView> {
                 .iter()
                 .map(|a| {
                     let row = head;
-                    head += 1;
+                    head += u32::from(s.lit);
                     JunctionArmView {
                         road: g.roads.get(a.road as usize).map_or(a.road, |r| r.source),
                         dir: a.way,
@@ -1797,7 +1803,9 @@ fn junction_views(world: &World) -> Vec<JunctionView> {
                         walk_from: a.walk_from,
                         walk_to: a.walk_to,
                         stop: a.stop,
-                        light: ((row as usize) < crate::snapshot::MAX_LIGHTS).then_some(row),
+                        crosswalk: a.crosswalk,
+                        light: (s.lit && (row as usize) < crate::snapshot::MAX_LIGHTS)
+                            .then_some(row),
                     }
                 })
                 .collect(),

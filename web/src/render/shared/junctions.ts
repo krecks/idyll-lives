@@ -1,6 +1,7 @@
 /**
  * The town's junctions as drawn (engine-neutral): where three roads for cars or more meet, each
- * junction's arms (the way out along each, its carriageway, where its crosswalk and stop line are)
+ * junction's arms (the way out along each, its carriageway, where its crosswalk and stop line are,
+ * whether it has a zebra and lights)
  * as the simulation has them (`WorldStructure.junctions`, sim-core `traffic::Signal`), or worked out
  * from the roads the way the simulation joins them up (`deriveJunctions`: a structure without them,
  * an older sim, the tests), and from them what the renderer draws (`planJunctions`): the pad of
@@ -29,6 +30,11 @@ const ARMS_APART = 4.6;
 const ARM_LOOK = 5;
 /** Two roads' meeting places this near are one junction (m). */
 const SAME_JUNCTION = 1.5;
+/** A junction is lit where this many arms meet, or this many of streets and country roads (sim-core `traffic::LIT_ARMS`, `LIT_MAIN_ARMS`). */
+const LIT_ARMS = 4;
+const LIT_MAIN_ARMS = 3;
+/** Two arms whose ways out are further apart than 150° (the cosine) are across from each other (sim-core `traffic::OPPOSITE`). */
+const OPPOSITE = -0.866;
 /** A corner between two arms gets a kerb return only when they are this far apart, and no further (radians): straight on there's no corner, and a sliver of one would reach far out. */
 const CORNER_LEAST = (20 * Math.PI) / 180;
 const CORNER_MOST = (160 * Math.PI) / 180;
@@ -55,8 +61,12 @@ const derived = new WeakMap<readonly RoadPlan[], Junction[]>();
  * roads crossing, places this near one another one junction; those where three arms or more meet.
  * Its middle is on the road met (a lane begins at that road's kerb: `trimJoins`). Each arm's
  * crosswalk is just out past the junction's box (sim-core `traffic::boxes`), its stop line past
- * that. A junction is lit as the simulation lights them (every one but a roundabout's): its heads
- * numbered in the order worked out, not the snapshot's.
+ * that. A junction is lit as the simulation lights them (sim-core `traffic::signal_at`: a big one,
+ * where four arms or more meet or three of streets and country roads, and a roundabout's), its
+ * heads numbered in the order worked out, not the snapshot's; any other gives way. Its zebras as
+ * the simulation has them too: a lit one's on its streets' and lanes' arms, one giving way's on a
+ * street's arm, one of two through it (the first round from the way out along z, as the
+ * simulation goes round them).
  */
 export function deriveJunctions(roads: readonly RoadPlan[]): Junction[] {
   const had = derived.get(roads);
@@ -124,13 +134,23 @@ export function deriveJunctions(roads: readonly RoadPlan[]): Junction[] {
     if (ways.length < 3) continue;
     const roundabout = ways.some((w) => roads[w.road].island);
     ways.sort((a, b) => Math.atan2(a.dir[1], a.dir[0]) - Math.atan2(b.dir[1], b.dir[0]));
+    const kind = (road: number) => roads[road].kind ?? 'street';
+    const main = ways.filter((w) => kind(w.road) === 'street' || kind(w.road) === 'country').length;
+    const lit = roundabout || ways.length >= LIT_ARMS || main >= LIT_MAIN_ARMS;
+    // (Giving way, of a street's two arms through it the first round as the simulation goes, by
+    // the angle from z towards x.)
+    const round = (d: Pt) => Math.atan2(d[0], d[1]);
+    const across = (w: (typeof ways)[number]) =>
+      ways.some((o) => o !== w && kind(o.road) === 'street' && o.dir[0] * w.dir[0] + o.dir[1] * w.dir[1] < OPPOSITE && round(o.dir) < round(w.dir));
+    const zebra = (w: (typeof ways)[number]) => !roundabout && (kind(w.road) === 'street' ? lit || !across(w) : kind(w.road) === 'lane' && lit);
     out.push({
       x,
       z,
       ...(roundabout ? { roundabout: true as const } : {}),
-      arms: ways.map(({ road, dir }) => {
+      arms: ways.map((w) => {
+        const { road, dir } = w;
         const walkFrom = boxReach(dir, ways.map((w) => w.dir));
-        return { road, dir, width: carriageway(roads[road]), walkFrom, walkTo: walkFrom + CROSSWALK, stop: walkFrom + CROSSWALK + STOP_PAST, light: roundabout ? null : light++ };
+        return { road, dir, width: carriageway(roads[road]), walkFrom, walkTo: walkFrom + CROSSWALK, stop: walkFrom + CROSSWALK + STOP_PAST, crosswalk: zebra(w), light: lit && !roundabout ? light++ : null };
       }),
     });
   }
@@ -238,7 +258,8 @@ function cross(a0: Pt, a1: Pt, b0: Pt, b1: Pt): [number, number] | null {
  * An arm as drawn: its way out (a unit vector), how far its road's middle runs to the anticlockwise
  * side of that way from the junction's (`off`: a lane begun at a street's kerb meets it a little to
  * one side, its way out taken to a point along it), half its carriageway, whether its road has
- * sidewalks, its crosswalk and stop line (m from the middle), whether it's lit.
+ * sidewalks, its crosswalk and stop line (m from the middle), whether there's a zebra on it
+ * (`crosswalk`), whether it's lit.
  */
 export interface ArmPlan {
   road: number;
@@ -249,6 +270,7 @@ export interface ArmPlan {
   walkFrom: number;
   walkTo: number;
   stop: number;
+  crosswalk: boolean;
   lit: boolean;
   /** How far out the pad reaches along it (m). */
   reach: number;
@@ -296,7 +318,8 @@ export function planJunctions(list: readonly Junction[], roads: readonly RoadPla
       .map((a) => {
         const l = Math.hypot(a.dir[0], a.dir[1]) || 1;
         const { dir, off, room } = armLine(j, [a.dir[0] / l, a.dir[1] / l], roads[a.road]);
-        return { road: a.road, dir, off, half: a.width / 2, walks: hasSidewalks(roads[a.road]), walkFrom: a.walkFrom, walkTo: a.walkTo, stop: a.stop, lit: a.light !== null, reach: Math.min(a.walkTo, room), room };
+        const walks = hasSidewalks(roads[a.road]);
+        return { road: a.road, dir, off, half: a.width / 2, walks, walkFrom: a.walkFrom, walkTo: a.walkTo, stop: a.stop, crosswalk: a.crosswalk ?? walks, lit: a.light !== null, reach: Math.min(a.walkTo, room), room };
       })
       .sort((a, b) => Math.atan2(a.dir[1], a.dir[0]) - Math.atan2(b.dir[1], b.dir[0]));
     const corners: CornerPlan[] = [];

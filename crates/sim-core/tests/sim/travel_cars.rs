@@ -1164,7 +1164,14 @@ fn every_junction_is_in_the_structure_with_its_arms_crosswalks_and_stop_lines() 
         assert_eq!(
             keys,
             [
-                "dir", "light", "road", "stop", "walkFrom", "walkTo", "width"
+                "crosswalk",
+                "dir",
+                "light",
+                "road",
+                "stop",
+                "walkFrom",
+                "walkTo",
+                "width"
             ]
             .into_iter()
             .collect(),
@@ -1186,6 +1193,11 @@ fn every_junction_is_in_the_structure_with_its_arms_crosswalks_and_stop_lines() 
         assert!(f("walkFrom") >= 6.0 - 1e-3, "{a}");
         assert!((f("walkTo") - f("walkFrom") - sim_core::traffic::CROSSWALK).abs() < 1e-3);
         assert!((f("stop") - f("walkTo") - sim_core::traffic::STOP_GAP).abs() < 1e-3);
+        assert_eq!(
+            a["crosswalk"].as_bool(),
+            Some(true),
+            "a street's zebra: {a}"
+        );
         rows.push(a["light"].as_u64().expect("lit"));
     }
     ways.sort();
@@ -1643,9 +1655,10 @@ fn someone_on_foot_crossing_a_country_roads_arm_at_a_lit_t_is_not_held_for_the_w
     assert!(across < common::secs(9.0), "across after {across} ticks");
 }
 
-/// A big world's street along z (x = 200, a dead end south at z = 100, the way out north), a lane
-/// off it east at z = 200 and another west at z = 223: two lit T's 23 m apart, as Canalside's on
-/// Foundry Street. Houses up the east lane (`cars` of them) and the west one.
+/// A big world's street along z (x = 200, a dead end south at z = 100, the way out north), a
+/// street off it east at z = 200 and another west at z = 223: two lit T's 23 m apart, as
+/// Canalside's on Foundry Street (lanes there, those T's now giving way). Houses up the east one
+/// (`cars` of them) and the west one.
 fn two_ts(east: usize, west: usize) -> World {
     let road = |a: [f32; 2], b: [f32; 2], kind: &str, ends: &str| {
         format!(
@@ -1664,13 +1677,13 @@ fn two_ts(east: usize, west: usize) -> World {
         road(
             [202.15, 200.0],
             [300.0, 200.0],
-            "lane",
+            "street",
             r#"["join","dead"]"#
         ),
         road(
             [197.85, 223.0],
             [100.0, 223.0],
-            "lane",
+            "street",
             r#"["join","dead"]"#
         )
     );
@@ -1706,9 +1719,9 @@ fn two_ts(east: usize, west: usize) -> World {
 #[test]
 fn between_two_lit_junctions_too_near_to_wait_between_nobody_stands_on_a_crosswalk_or_runs_a_red() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
-    // Cars from the east lane go out north through both T's, and come home back through both; those
-    // of the west lane through the north one. Between the two (23 m, the crosswalks 9 m out from
-    // each) a car has no room to wait clear of both: it waits at the first's stop line till it can
+    // Cars from the east street go out north through both T's, and come home back through both;
+    // those of the west street through the north one. Between the two (23 m, the crosswalks 9 m
+    // out from each) a car has no room to wait clear of both: it waits at the first's stop line till it can
     // go through both, on both their greens. Nobody stands on a crosswalk (a taxi waited at the
     // second's stop line on the first's crosswalk for minutes), nor drives past a stop line on red.
     let mut w = two_ts(4, 3);
@@ -1960,6 +1973,336 @@ fn a_car_pulling_up_at_a_light_resting_on_another_arms_green_gets_its_turn_soon(
         through - start < common::drive_secs(50.0) + common::drive_secs(180.0),
         "through after {} s, the lights resting at {resting:?}",
         (through - start) / common::drive_secs(1.0)
+    );
+}
+
+// ---- Junctions giving way, and zebras --------------------------------------------------------
+
+/// A big world's street along x (z = 200, a dead end west, the way out east) and a lane meeting it
+/// from the north at x = 200: a quiet T, giving way (`traffic::Signal::lit` false). Two houses on
+/// the street west of it, their cars out and home through it.
+fn quiet_t() -> World {
+    let road = |a: [f32; 2], b: [f32; 2], kind: &str, ends: &str| {
+        format!(
+            r#"{{"points":[{}],"width":7,"kind":"{kind}","ends":{ends},"area":0}}"#,
+            line_pts(a, b)
+        )
+    };
+    let roads = format!(
+        "[{},{}]",
+        road([0.5, 200.0], [399.5, 200.0], "street", r#"["dead","out"]"#),
+        road(
+            [200.0, 120.0],
+            [200.0, 197.85],
+            "lane",
+            r#"["dead","join"]"#
+        )
+    );
+    let exits = r#"[{"x":399.5,"z":200,"kind":"road"}]"#;
+    let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
+        "areas":[{"name":"T","kind":"hamlet","x":100,"z":130,"w":200,"d":140}]"#;
+    let house = |x: f32| House {
+        plot: [x - 8.0, 178.0, 16.0, 18.0],
+        inner: [x, 190.5],
+        front: 1.0,
+        along_x: false,
+        road: 0,
+        s: x - 0.5,
+    };
+    town_of(
+        CONTENT,
+        more,
+        400,
+        400,
+        &roads,
+        exits,
+        &[house(130.0), house(150.0)],
+    )
+}
+
+/// The quiet T's zebra (`quiet_t`): the junction, and the arm with it (the street's, one of its
+/// two; none across the lane).
+fn quiet_zebra(w: &World) -> (sim_core::traffic::Signal, usize) {
+    assert!(w.travel.signals.is_empty(), "no lights at a quiet T");
+    assert_eq!(w.travel.give_way.len(), 1, "one junction giving way");
+    let j = w.travel.give_way[0].clone();
+    let zebras: Vec<usize> = (0..j.arms.len()).filter(|&k| j.arms[k].crosswalk).collect();
+    assert_eq!(
+        zebras.len(),
+        1,
+        "one zebra, across the street: {:?}",
+        j.arms
+    );
+    assert!(j.arms[zebras[0]].way[1].abs() < 0.1, "across the street");
+    (j, zebras[0])
+}
+
+/// Where car `c`'s nose is coming in along arm `a` of junction `j` (m out from its middle), if it
+/// is (in its lane, facing in).
+fn nose_in(w: &World, c: usize, j: &sim_core::traffic::Signal, a: usize) -> Option<f32> {
+    let (p, yaw, ..) = w.cars[c].shown?;
+    let half = w.cars[c].len / 2.0;
+    let nose = [p[0] + yaw.sin() * half, p[1] + yaw.cos() * half];
+    let d = [nose[0] - j.at[0], nose[1] - j.at[1]];
+    let arm = j.arms[a];
+    let along = d[0] * arm.way[0] + d[1] * arm.way[1];
+    let across = (d[0] * arm.way[1] - d[1] * arm.way[0]).abs();
+    let inward = yaw.sin() * arm.way[0] + yaw.cos() * arm.way[1] < -0.7;
+    (inward && across <= arm.kerb && (0.0..40.0).contains(&along)).then_some(along)
+}
+
+#[test]
+fn a_car_drives_on_over_an_empty_zebra_at_a_t_giving_way() {
+    // The quiet T, nobody on foot about: a car out through it (in over the zebra on the street's
+    // west arm) and home (out over it) drives on through without stopping, as it would anywhere:
+    // no lights, and nobody on the zebra to stop for. (A tick's wait for its claim on the box at
+    // most, as at any junction.)
+    let mut w = quiet_t();
+    let (j, _) = quiet_zebra(&w);
+    common::run_to(&mut w, 2, 7.0);
+    let (mut passes, mut was_near) = (0, false);
+    let mut stood = 0;
+    let end = w.tick + common::secs(600.0);
+    while w.tick < end {
+        match w.cars[0].state {
+            CarState::Parked => set_off(&mut w, 0),
+            CarState::Away => come_home(&mut w, 0),
+            _ => {}
+        }
+        let before = w.cars[0].progress;
+        w.tick_once();
+        let near = w.cars[0]
+            .shown
+            .is_some_and(|s| (s.0[0] - j.at[0]).hypot(s.0[1] - j.at[1]) < 25.0)
+            && matches!(w.cars[0].state, CarState::Leaving | CarState::Arriving);
+        if near {
+            assert!(
+                sim_core::traffic::waits_on(&w, sim_core::cars::car_key(0))
+                    .iter()
+                    .all(|&k| k >= 1 << 63),
+                "waiting for nobody on foot"
+            );
+            if w.cars[0].progress <= before {
+                stood += 1;
+            }
+        }
+        if was_near && !near {
+            passes += 1;
+            assert!(
+                stood <= 2,
+                "stood {stood} ticks by the zebra on pass {passes}"
+            );
+            stood = 0;
+        }
+        was_near = near;
+    }
+    assert!(passes >= 4, "{passes} times through the T");
+}
+
+#[test]
+fn a_car_stops_at_a_zebra_for_someone_on_it_or_stepping_onto_it_and_then_drives_on() {
+    // The quiet T: someone walks to and fro across the street on its zebra, a car out and home
+    // through the T all the while. No car drives in over the stop line while they're on it (but for
+    // the backstop's way round anyone in its way, as anywhere: never into them); cars stop with
+    // their noses at the stop line for them, waiting for them by name, and drive on once they're
+    // across; and both get where they're going, time and again.
+    let mut w = quiet_t();
+    let (j, zebra) = quiet_zebra(&w);
+    let arm = j.arms[zebra];
+    common::run_to(&mut w, 2, 7.0);
+    let mid = (arm.walk_from + arm.walk_to) / 2.0;
+    let x = j.at[0] + arm.way[0] * mid;
+    let (north, south) = ([x, j.at[1] - arm.kerb - 0.7], [x, j.at[1] + arm.kerb + 0.7]);
+    let walker = 1u32;
+    w.sims[walker as usize].pos = north;
+    let (mut across, mut stops, mut passes) = (0, 0, 0);
+    let mut was: Option<f32> = None;
+    let end = w.tick + common::secs(900.0);
+    while w.tick < end {
+        match w.cars[0].state {
+            CarState::Parked => set_off(&mut w, 0),
+            CarState::Away => come_home(&mut w, 0),
+            _ => {}
+        }
+        if w.sims[walker as usize].current().is_none() {
+            let p = w.sims[walker as usize].pos;
+            let to = if (p[1] - north[1]).abs() < (p[1] - south[1]).abs() {
+                south
+            } else {
+                across += 1;
+                north
+            };
+            walk_to(&mut w, walker, to);
+        }
+        w.tick_once();
+        let on = j.crossing_arm(w.sims[walker as usize].pos) == Some(zebra);
+        let now = nose_in(&w, 0, &j, zebra);
+        if let (Some(before), Some(along)) = (was, now) {
+            // (In over the stop line this tick.)
+            if before >= arm.stop - 0.05 && along < arm.stop - 0.05 {
+                passes += 1;
+                assert!(!on, "car in over the stop line with someone on the zebra");
+            }
+            if (arm.stop - 0.1..arm.stop + 1.0).contains(&along)
+                && (along - before).abs() < 1e-4
+                && sim_core::traffic::waits_on(&w, sim_core::cars::car_key(0))
+                    .contains(&u64::from(walker))
+            {
+                stops += 1;
+            }
+        }
+        was = now;
+    }
+    assert!(passes >= 3, "{passes} cars in over the zebra");
+    assert!(stops > 0, "no car stopped at the zebra for them");
+    assert!(across >= 5, "walked across {across} times");
+}
+
+/// A big world's street along x (z = 200, its two halves meeting at x = 200, ways out east and
+/// west) and a country road meeting it from the north: a lit T (two main roads meeting). A house up
+/// the country road (its car through the T's country arm) and one on the street west of it.
+fn country_t() -> World {
+    let road = |a: [f32; 2], b: [f32; 2], kind: &str, ends: &str| {
+        format!(
+            r#"{{"points":[{}],"width":7,"kind":"{kind}","ends":{ends},"area":0}}"#,
+            line_pts(a, b)
+        )
+    };
+    let roads = format!(
+        "[{},{},{}]",
+        road([0.5, 200.0], [200.0, 200.0], "street", r#"["out","join"]"#),
+        road(
+            [200.0, 200.0],
+            [399.5, 200.0],
+            "street",
+            r#"["join","out"]"#
+        ),
+        road(
+            [200.0, 120.0],
+            [200.0, 200.0],
+            "country",
+            r#"["dead","join"]"#
+        )
+    );
+    let exits = r#"[{"x":0.5,"z":200,"kind":"road"},{"x":399.5,"z":200,"kind":"road"}]"#;
+    let more = r#","size":"big","walls":[],"doors":[],"windows":[],"relationships":[],
+        "areas":[{"name":"T","kind":"hamlet","x":100,"z":130,"w":200,"d":140}]"#;
+    let up_the_country_road = crossroads_house(160.0, true);
+    let on_the_street = House {
+        plot: [142.0, 178.0, 16.0, 18.0],
+        inner: [150.0, 190.5],
+        front: 1.0,
+        along_x: false,
+        road: 0,
+        s: 149.5,
+    };
+    town_of(
+        CONTENT,
+        more,
+        400,
+        400,
+        &roads,
+        exits,
+        &[up_the_country_road, on_the_street],
+    )
+}
+
+#[test]
+fn a_lit_junction_rests_on_its_main_roads_green_and_its_walk_is_over_once_nobody_crosses() {
+    use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
+    // The lit T of a country road on a street. Nobody about, it rests on the street's green (its
+    // main road), not the first phase's; a car from the country road gets its green and through,
+    // and it's back on the street's green after. Someone crossing the street's east arm brings
+    // the walk round: it's over once they're across, not the whole of its open time and its
+    // clearance after.
+    let mut w = country_t();
+    common::run_to(&mut w, 2, 7.0);
+    assert_eq!(w.travel.signals.len(), 1, "the T is lit");
+    let sig = w.travel.signals[0].clone();
+    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    let mut heads = |w: &World| -> Vec<f32> {
+        snapshot::write(w, &mut buf);
+        (0..sig.arms.len())
+            .map(|k| buf[LIGHT_BASE + k * LIGHT_STRIDE + light::STATE])
+            .collect()
+    };
+    let street: Vec<usize> = (0..sig.arms.len())
+        .filter(|&k| sig.arms[k].way[1].abs() < 0.5)
+        .collect();
+    let country = (0..sig.arms.len())
+        .find(|&k| sig.arms[k].way[1] < -0.9)
+        .expect("the country road's arm");
+    assert_eq!(street.len(), 2);
+    let resting =
+        |h: &[f32]| street.iter().all(|&k| h[k] == light::GREEN) && h[country] == light::RED;
+    for _ in 0..common::secs(20.0) {
+        w.tick_once();
+    }
+    let h = heads(&w);
+    assert!(resting(&h), "resting on the street's green: {h:?}");
+    // A car down the country road and through.
+    set_off(&mut w, 0);
+    let (start, mut country_green, mut through) = (w.tick, false, None);
+    while w.tick < start + common::secs(600.0) && through.is_none() {
+        w.tick_once();
+        country_green |= heads(&w)[country] == light::GREEN;
+        if w.cars[0]
+            .shown
+            .is_some_and(|s| (s.0[0] - 200.0).abs() > 20.0)
+        {
+            through = Some(w.tick);
+        }
+    }
+    assert!(through.is_some(), "the car never through");
+    assert!(country_green, "the country road's green never came");
+    let mut back = None;
+    for k in 0..common::secs(30.0) {
+        w.tick_once();
+        if resting(&heads(&w)) {
+            back = Some(k);
+            break;
+        }
+    }
+    assert!(back.is_some(), "never back on the street's green");
+    // Across the street's east arm, from its north pavement to its south.
+    let east = (0..sig.arms.len())
+        .find(|&k| sig.arms[k].way[0] > 0.9)
+        .expect("the east arm");
+    let a = sig.arms[east];
+    let x = sig.at[0] + (a.walk_from + a.walk_to) / 2.0;
+    let (from, to) = ([x, sig.at[1] - a.kerb - 0.7], [x, sig.at[1] + a.kerb + 0.7]);
+    let walker = 1u32;
+    w.sims[walker as usize].pos = from;
+    walk_to(&mut w, walker, to);
+    let start = w.tick;
+    let (mut walk_from, mut walk_over, mut across) = (None, None, None);
+    while w.tick < start + common::secs(60.0) && walk_over.is_none() {
+        w.tick_once();
+        let h = heads(&w);
+        if walk_from.is_none() && h.contains(&light::WALK) {
+            walk_from = Some(w.tick);
+        }
+        if walk_from.is_some() && h.contains(&light::GREEN) {
+            walk_over = Some(w.tick);
+        }
+        let p = w.sims[walker as usize].pos;
+        if across.is_none() && (p[0] - to[0]).hypot(p[1] - to[1]) < 0.3 {
+            across = Some(w.tick);
+        }
+    }
+    let (Some(walk_from), Some(walk_over)) = (walk_from, walk_over) else {
+        panic!("the walk never came round and went");
+    };
+    assert!(
+        across.is_some_and(|t| t <= walk_over),
+        "not across before the cars' green"
+    );
+    // (Their 5.7 m at a walk and all red after: some 6 s, not the walk's 5 s open, its 4.3 s
+    // clearance and the all red after.)
+    assert!(
+        walk_over - walk_from < common::secs(7.5),
+        "the walk and all red {} ticks",
+        walk_over - walk_from
     );
 }
 
@@ -2329,8 +2672,8 @@ fn a_car_held_up_with_no_room_behind_it_to_turn_round_is_counted_and_never_backs
 #[test]
 fn a_knot_of_a_country_road_leaving_a_street_at_a_slant_by_another_junction_is_lit_as_one() {
     // Canalside's knot (j35, j77): a street along x, its two halves meeting at (200, 200), a
-    // country road leaving it there 16° off the street east, and a lane meeting it from the
-    // south 18 m on. The street's two arms through the first junction are green together, though
+    // country road leaving it there 16° off the street east, and another street meeting it from
+    // the south 18 m on (Canalside's was a lane, that junction now giving way: both lit here). The street's two arms through the first junction are green together, though
     // the country road is as nearly across from its west arm; no signal pole stands on any road's
     // asphalt (the street's east arm's stood on the country road's); and between the two lit
     // junctions, too near for a crosswalk and stop line out of the other's box, there's none:
@@ -2361,7 +2704,7 @@ fn a_knot_of_a_country_road_leaving_a_street_at_a_slant_by_another_junction_is_l
         ),
         road(
             line_pts([218.0, 200.0], [218.0, 300.0]),
-            "lane",
+            "street",
             r#"["join","dead"]"#
         )
     );
