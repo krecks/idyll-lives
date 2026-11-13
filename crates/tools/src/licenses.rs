@@ -267,19 +267,26 @@ fn github_url(raw: &str) -> String {
 
 /// The crates (not ours) that sim-wasm and voice-wasm depend on, as built for wasm32.
 fn rust_crates(root: &Path) -> Result<Vec<Package>, String> {
-    let out = std::process::Command::new("cargo")
-        .args([
-            "metadata",
-            "--format-version",
-            "1",
-            "--locked",
-            "--offline",
-            "--filter-platform",
-            "wasm32-unknown-unknown",
-        ])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("cargo metadata: {e}"))?;
+    let metadata = |offline: bool| {
+        let mut args = vec!["metadata", "--format-version", "1", "--locked"];
+        if offline {
+            args.push("--offline");
+        }
+        args.extend(["--filter-platform", "wasm32-unknown-unknown"]);
+        std::process::Command::new("cargo")
+            .args(args)
+            .current_dir(root)
+            .output()
+            .map_err(|e| format!("cargo metadata: {e}"))
+    };
+    // Without the network, as everything a build needs is on the machine by now: but for a crate only
+    // wasm32 would use under one of the tools' own (the Basis encoder's libc++ for the browser, which no
+    // native build fetches; cargo lists the whole workspace's, not the two crates asked about here). Then
+    // once more with it: the crate's source comes down once, and is never built.
+    let mut out = metadata(true)?;
+    if !out.status.success() && String::from_utf8_lossy(&out.stderr).contains("--offline") {
+        out = metadata(false)?;
+    }
     if !out.status.success() {
         return Err(format!(
             "cargo metadata: {}",

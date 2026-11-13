@@ -93,19 +93,14 @@ jobs:
         with:
           bun-version: 1.4.3
 
-      # Accepted parts held by their sha256 (tools/pins/pins.json): a pinned part changed fails here.
-      - name: Pins
-        run: tools/ci-local.sh pins
-
       # The residents' clips on both bodies at every life stage; the known failures are in
       # tools/characters/clip-baseline.json, so only a new one fails.
       - name: Clip check
         run: tools/ci-local.sh clips
 
-      # The renderer: the PlayCanvas shader chunks' anchor lines and private names it patches or
-      # reads, in the pinned release build (tools/render/check_chunks.ts), and its engine-neutral
-      # tests (web/tests, `bun test`, each file in a fresh global). Neither needs the wasm builds.
-      - name: Shader chunks and renderer tests
+      # The renderer's engine-neutral tests (web/tests, `bun test`, each file in a fresh global). They
+      # need no wasm build.
+      - name: Renderer tests
         run: tools/ci-local.sh web
 
   tools:
@@ -126,6 +121,20 @@ jobs:
       # tools. Release without fat LTO, built once for these and the three checks after.
       - name: Tool tests
         run: tools/ci-local.sh tools
+
+      # Accepted parts held by their sha256 (tools/pins/pins.json): a pinned part changed fails here
+      # (`cargo pins`, with the tools' build above).
+      - name: Pins
+        run: tools/ci-local.sh pins
+
+      # The renderer: the PlayCanvas shader chunks' anchor lines and private names it patches or reads
+      # (tools/render/chunks.json), in the pinned release build: Bun fetches the package, the tools' build
+      # above checks it (`cargo check-chunks`).
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - name: Shader chunks
+        run: tools/ci-local.sh chunks
 
       # Every shipped model against the reference's kinds: a content object no kind covers (a new
       # thing nobody sized) fails, where a measure outside its range is the review's to weigh.

@@ -7,7 +7,7 @@
  *
  * The overrides are the engine's own chunks with a function renamed and a wrapper of ours in its
  * place (`getAlbedo` runs the engine's, then the pattern), so a PlayCanvas upgrade keeps its own
- * code; the names and lines they rely on are checked by `tools/render/check_chunks.ts`. The slots:
+ * code; the names and lines they rely on are checked by `tools/render/chunks.json`. The slots:
  *
  * - `vsDecl`, `vsEnd`: `litUserDeclarationVS`, `litUserMainEndVS`.
  * - `normalVS`: an instanced draw's normal corrected for uneven scale (`INSTANCE_NORMAL`).
@@ -182,7 +182,7 @@ const WRAPS = {
   },
 } as const;
 
-/** The anchors the overrides and patches rely on (also listed in `tools/render/check_chunks.ts`). */
+/** The anchors the overrides and patches rely on (also listed in `tools/render/chunks.json`). */
 export const ANCHORS = {
   glsl: {
     transformCoreVS: 'vec3 getLocalPosition(vec3 vertexPosition) {',

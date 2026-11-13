@@ -26,7 +26,7 @@
  *   ACES only), as `tonemappingAces2PS`.
  *
  * GLSL (WebGL2) and WGSL (WebGPU) side by side. The engine lines this relies on are checked by
- * `tools/render/check_chunks.ts`.
+ * `tools/render/chunks.json`.
  */
 
 import { NIGHT_GRADE } from '../nightGrade';

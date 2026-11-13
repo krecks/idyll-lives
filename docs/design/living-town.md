@@ -211,6 +211,6 @@ whose point is off the screen has none.
 
 ## Pins
 
-`tools/pins/pins.json` pins the accepted parts by sha256. `bun tools/pins/check.ts` (and
+`tools/pins/pins.json` pins the accepted parts by sha256. `cargo pins` (and
 `tools/ci-local.sh pins`) fails when a pinned file differs from its hash. Only the integrator may change an
 entry, and when it does it writes `reason` and `by` into the entry. The end report lists every unpin.

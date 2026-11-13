@@ -1,5 +1,5 @@
 /**
- * What the production build's compressed files need (`tools/assets/optimize.mjs`): KTX2 textures
+ * What the production build's compressed files need (`cargo assets`, `crates/tools/src/assets.rs`): KTX2 textures
  * (Basis Universal ETC1S) transcoded by PlayCanvas's Basis transcoder, served from our own
  * `decoders/basis/` (`cargo decoders`), and glTF geometry compressed with `EXT_meshopt_compression`,
  * decoded here with meshoptimizer's decoder through PlayCanvas's buffer-view hook (PlayCanvas has

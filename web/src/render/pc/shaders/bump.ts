@@ -11,7 +11,7 @@
 
 import type { Language } from './chunks';
 
-/** The line replaced (also in `tools/render/check_chunks.ts`). */
+/** The line replaced (also in `tools/render/chunks.json`). */
 export const BUMP_ANCHORS = {
   glsl: 'normalMap = mix(vec3(0.0, 0.0, 1.0), normalMap, material_bumpiness);',
   wgsl: 'normalMap = mix(vec3f(0.0, 0.0, 1.0), normalMap, uniform.material_bumpiness);',

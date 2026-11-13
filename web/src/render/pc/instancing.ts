@@ -98,7 +98,7 @@ export class Instances {
     this.format = new pc.VertexFormat(device, elements);
     this.cull = options.cull ?? true;
     // On its parent's app: the page's current one may be another (`device.ts` `createSideApp`).
-    // SAFETY: an entity keeps its app in `_app` (the constructor's `app`; tools/render/check_chunks.ts).
+    // SAFETY: an entity keeps its app in `_app` (the constructor's `app`; tools/render/chunks.json).
     this.entity = new pc.Entity(options.name ?? 'instances', (parent as unknown as { _app: pc.AppBase })._app);
     this.meshInstance = new pc.MeshInstance(mesh, material, this.entity);
     this.reserve(Math.max(1, options.capacity ?? 1));
@@ -240,7 +240,7 @@ export class Instances {
     // The world box is worked out again only when the box or the entity's place changes: for a custom box
     // PlayCanvas does it every frame, 0.08 ms a frame on Low and 0.19 ms with its woods in squares (518 draws).
     // SAFETY: a mesh instance asks `_updateAabbFunc` for its world box, and a node's `_aabbVer` moves
-    // whenever its world transform does (tools/render/check_chunks.ts).
+    // whenever its world transform does (tools/render/chunks.json).
     const mi = this.meshInstance as unknown as { _updateAabbFunc: ((out: pc.BoundingBox) => pc.BoundingBox) | null };
     mi._updateAabbFunc ??= (out) => {
       const ver = (this.entity as unknown as { _aabbVer: number })._aabbVer;

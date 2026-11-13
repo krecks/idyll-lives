@@ -86,13 +86,13 @@ jobs:
       - name: Quick benchmark runs
         run: cargo run -p sim-core --example tickbench --locked
 
-      # Compressed asset copies (tools/assets/optimize.mjs, run by the build), cached by content
+      # Compressed asset copies (cargo assets, run by the build), cached by content
       # hash so only changed files are encoded again.
       - uses: actions/cache@v6
         with:
           path: web/.assets/cache
-          key: assets-${{ hashFiles('tools/assets/optimize.mjs', 'web/public/assets/**') }}
-          restore-keys: assets-
+          key: assets-rs-${{ hashFiles('crates/tools/src/assets.rs', 'crates/tools/src/assets/**', 'Cargo.lock', 'web/public/assets/**') }}
+          restore-keys: assets-rs-
 
       # wasm-opt's results (each entry keyed by its input's SHA-256, binaryen's version and the
       # flags), so a release doesn't spend a minute optimising the same wasm again; the named

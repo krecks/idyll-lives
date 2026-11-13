@@ -37,7 +37,8 @@
  *                              with the interface, or `--scene bigworld` for the drawing alone)
  *     --pages [gallery,…]      with --shots: the dev pages instead (`PAGES`: the gallery, clips, residents and
  *                              poses benches, each held still), one PNG per page × backend × diag
- *   --compare <dirA> <dirB>    pixel differences between two shot folders (and `--out` for the difference images)
+ *   --compare <dirA> <dirB>    pixel differences between two shot folders (and `--out` for the difference images):
+ *                              `cargo shots compare`, which can be run by itself
  *   --headless / --headed      without or with a window (see below)
  *   --jobs <file.json>         several runs in one go: a JSON list of command lines (each an array of the
  *                              options above), sharing one Vite server per mode and one browser per kind
@@ -61,7 +62,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -602,48 +603,13 @@ async function pageShots(o) {
   console.log(`page shots in ${out}`);
 }
 
-/** Per picture in both folders: how many pixels differ (by more than 2 and more than 16 of 255), the largest difference and the PSNR. */
+/**
+ * Per picture in both folders: how many pixels differ (by more than 2 and more than 16 of 255), the largest difference
+ * and the PSNR; with `diffDir`, a picture of where they differ. The repo's own tool does it (`cargo shots compare`,
+ * crates/tools/src/shots.rs).
+ */
 async function compare(a, b, diffDir) {
-  const sharp = (await import(createRequire(WEB + 'package.json').resolve('sharp'))).default;
-  if (diffDir) mkdirSync(diffDir, { recursive: true });
-  const names = readdirSync(a).filter((f) => f.endsWith('.png') && readdirSync(b).includes(f)).sort();
-  const rows = ['| picture | pixels differing (>2 / >16) | max | mean | PSNR dB |', '|---|---|---|---|---|'];
-  let worst = 0;
-  for (const name of names) {
-    const [x, y] = await Promise.all([a, b].map((dir) => sharp(join(dir, name)).removeAlpha().raw().toBuffer({ resolveWithObject: true })));
-    if (x.info.width !== y.info.width || x.info.height !== y.info.height) {
-      rows.push(`| ${name} | sizes differ | | | |`);
-      continue;
-    }
-    const pixels = x.info.width * x.info.height;
-    const diff = Buffer.alloc(pixels * 3);
-    let over2 = 0;
-    let over16 = 0;
-    let max = 0;
-    let sum = 0;
-    let squares = 0;
-    for (let i = 0; i < pixels; i++) {
-      let d = 0;
-      for (let c = 0; c < 3; c++) {
-        const e = Math.abs(x.data[i * 3 + c] - y.data[i * 3 + c]);
-        d = Math.max(d, e);
-        sum += e;
-        squares += e * e;
-      }
-      if (d > 2) over2++;
-      if (d > 16) over16++;
-      max = Math.max(max, d);
-      // The difference picture: a dim copy of the first, differences in red.
-      const grey = (x.data[i * 3] + x.data[i * 3 + 1] + x.data[i * 3 + 2]) / 12;
-      diff[i * 3] = d > 2 ? Math.min(255, 64 + d * 8) : grey;
-      diff[i * 3 + 1] = d > 2 ? 0 : grey;
-      diff[i * 3 + 2] = d > 2 ? 0 : grey;
-    }
-    const mse = squares / (pixels * 3);
-    worst = Math.max(worst, over2 / pixels);
-    rows.push(`| ${name} | ${((100 * over2) / pixels).toFixed(3)}% / ${((100 * over16) / pixels).toFixed(3)}% | ${max} | ${(sum / (pixels * 3)).toFixed(3)} | ${mse ? (10 * Math.log10((255 * 255) / mse)).toFixed(1) : '∞'} |`);
-    if (diffDir && over2) await sharp(diff, { raw: { width: x.info.width, height: x.info.height, channels: 3 } }).png().toFile(join(diffDir, name));
-  }
-  console.log(rows.join('\n'));
-  console.log(`\n${names.length} pictures compared; the most changed has ${(100 * worst).toFixed(3)}% of its pixels off by more than 2.`);
+  const tool = spawn('cargo', ['shots', 'compare', a, b, ...(diffDir ? ['--out', diffDir] : [])], { cwd: ROOT, stdio: 'inherit' });
+  const code = await new Promise((resolve) => tool.on('exit', resolve));
+  if (code) throw new Error(`cargo shots compare failed (${code})`);
 }

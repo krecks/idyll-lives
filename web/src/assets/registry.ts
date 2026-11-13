@@ -3,7 +3,7 @@
  * so new art can be dropped in without changing code or the base manifest.
  *
  * Production builds also ship compressed copies of the base assets (KTX2 textures, meshopt
- * models, gzipped character data; see `tools/assets/optimize.mjs`) and an index of them,
+ * models, gzipped character data: `cargo assets`, `crates/tools/src/assets.rs`) and an index of them,
  * `optimized.json` next to the base manifest. Loaders ask `optimizedUrl` for the file to fetch;
  * files without a copy (the dev server, a modder's pack) load as they are.
  */
