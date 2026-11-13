@@ -3,7 +3,8 @@
  * snapshot's `light` rows: one per arm of each lit junction, the same rows from tick to tick): where
  * each pole stands on the kerb, which way its head faces (a resident's yaw: towards those coming in
  * along its arm), which lamp it shows, and whether its pedestrians' head shows walk (the junction's
- * walk phase: every car head red, every crossing walk). Read into arrays made once (`SignalRows.read`), so the
+ * walk phase: every car head red, every crossing walk; or a side road's crossing on the main road's
+ * green, its own car head red). Read into arrays made once (`SignalRows.read`), so the
  * renderer (`pc/signals.ts`) reads them every frame without allocating, and knows whether the poles
  * moved (a new world) or only the lamps changed.
  */
@@ -134,7 +135,7 @@ type States = { red: number; amber: number; green: number; walk: number };
 
 /**
  * The lamp a row's `state` shows to traffic: amber or green as they are; red otherwise: while those
- * on foot cross (walk: every head of the junction red), and for a value this renderer doesn't know.
+ * on foot cross its arm (walk), and for a value this renderer doesn't know.
  */
 export function lampOf(state: number, states: States): Lamp {
   if (state === states.green) return GREEN;
@@ -142,7 +143,7 @@ export function lampOf(state: number, states: States): Lamp {
   return RED;
 }
 
-/** Whether a row's `state` shows walk to those on foot (the junction's walk phase); don't walk otherwise. */
+/** Whether a row's `state` shows walk to those on foot (the junction's walk phase, or a side road's crossing on the main road's green); don't walk otherwise. */
 export function walkOf(state: number, states: States): boolean {
   return state === states.walk;
 }

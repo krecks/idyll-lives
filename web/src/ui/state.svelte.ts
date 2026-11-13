@@ -218,6 +218,8 @@ class GameState {
   /** The mouse moved lately: a quiet interface shows itself again for a moment. */
   hudAwake = $state(false);
   journalOpen = $state(false);
+  /** The household strip's height at the foot of the screen (CSS px; 0 while it isn't shown): the town map stops above it. */
+  stripHeight = $state(0);
   /** The rooms and garden of the player's home, with their scores. */
   rooms = $state.raw<RoomView[]>([]);
   /** The planner is open, on a resident (id) or the household's template. */

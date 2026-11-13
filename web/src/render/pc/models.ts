@@ -32,7 +32,7 @@
  */
 
 import * as pc from './engine';
-import { containerOptions, setupDecoders } from './loaders';
+import { loadContainer, type Container as LoadedContainer } from './container';
 import { DEFAULT_FINISH, encodeFinish, GAME_FRONT_FACE, INSTANCE_COLOR_SEMANTIC, MaterialLibrary } from './materials';
 import { installGameChunks } from './shaders/chunks';
 import { optimizedUrl } from '../../assets/registry';
@@ -530,77 +530,8 @@ function hexString(c: pc.Color): string {
   return `#${hex(c.r)}${hex(c.g)}${hex(c.b)}`;
 }
 
-/** What PlayCanvas's container gives of a glTF file: the JSON, its buffer views decoded, its materials and their textures. */
-interface Container {
-  gltf: Gltf;
-  views: (Uint8Array | undefined)[];
-  materials: (pc.StandardMaterial | null)[];
-  textures: pc.Asset[];
-}
-
-/**
- * The file at `url` through PlayCanvas's glTF container (`containerOptions`: meshopt, KTX2), its
- * buffer views kept as they're decoded. PlayCanvas makes none of its own meshes (`skipMeshes`): the
- * geometry is read from the views (`importFile`); its materials stay.
- */
-function loadContainer(app: pc.AppBase, url: string): Promise<Container> {
-  setupDecoders();
-  const decoded = new Map<object, Uint8Array>();
-  // Every view is decoded, but PlayCanvas's `load` waits only for those it uses itself (with
-  // `skipMeshes`, not the geometry read here): when it comes, the rest may still be on their way,
-  // later in some browsers than others (Firefox). Read once all of them are in.
-  let views = Infinity;
-  let allIn: () => void = () => {};
-  const decodedAll = new Promise<void>((resolve) => (allIn = resolve));
-  const options = {
-    ...containerOptions,
-    bufferView: {
-      ...containerOptions.bufferView,
-      postprocess: (view: object, data: Uint8Array) => {
-        decoded.set(view, data);
-        if (decoded.size >= views) allIn();
-      },
-    },
-    // (Its meshes would be uploaded only to be let go of: the geometry is read from the views here.
-    // Without them a skinned node has no mesh to skin: skins aren't read here either.)
-    skipMeshes: true,
-    global: {
-      preprocess: (gltf: { nodes?: { skin?: number }[]; bufferViews?: unknown[] }) => {
-        for (const node of gltf.nodes ?? []) delete node.skin;
-        views = gltf.bufferViews?.length ?? 0;
-        if (decoded.size >= views) allIn();
-      },
-    },
-  };
-  return new Promise((resolve, reject) => {
-    const asset = new pc.Asset(url, 'container', { url }, undefined, options as never);
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const viewsIn = () => Promise.race([decodedAll, new Promise((resolve) => (timer = setTimeout(resolve, VIEWS_WAIT_MS)))]).finally(() => clearTimeout(timer));
-    asset.once('load', () => void viewsIn().then(read).catch(reject));
-    const read = () => {
-      const resource = asset.resource as pc.ContainerResource & { data: { gltf: Gltf; materials: pc.StandardMaterial[]; textures?: pc.Asset[] } };
-      const gltf = resource.data.gltf;
-      const container = { gltf, views: (gltf.bufferViews ?? []).map((v) => decoded.get(v)), materials: resource.data.materials.map((m) => m ?? null), textures: [...(resource.data.textures ?? [])] };
-      // (No meshes were made, `skipMeshes`); the materials (and their textures) stay with the file.
-      for (const render of resource.renders) {
-        render.unload();
-        app.assets.remove(render);
-      }
-      for (const sub of [...resource.materials, ...resource.animations]) app.assets.remove(sub);
-      app.assets.remove(asset);
-      resolve(container);
-    };
-    asset.once('error', (err: unknown) => {
-      app.assets.remove(asset);
-      reject(new Error(`${url}: ${String(err)}`));
-    });
-    app.assets.add(asset);
-    app.assets.load(asset);
-  });
-}
-
-/** The longest a file waits after it loads for the last of its views to be decoded (ms). */
-const VIEWS_WAIT_MS = 5000;
+/** A file as PlayCanvas's container gives it (`container.ts`): the parts of glTF read here. */
+type Container = LoadedContainer<Gltf>;
 
 /**
  * The build's compressed copy of the file if there is one; the file itself if that fails to load.
@@ -609,12 +540,12 @@ const VIEWS_WAIT_MS = 5000;
 function importModel(app: pc.AppBase, url: string, now: boolean): Promise<Container> {
   const load = async () => {
     const copy = optimizedUrl(url);
-    if (copy === url) return loadContainer(app, url);
+    if (copy === url) return loadContainer<Gltf>(app, url);
     try {
-      return await loadContainer(app, copy);
+      return await loadContainer<Gltf>(app, copy);
     } catch (err) {
       console.warn(`[render] compressed ${copy} failed, loading ${url}`, err);
-      return loadContainer(app, url);
+      return loadContainer<Gltf>(app, url);
     }
   };
   return now ? foreground(load) : load();

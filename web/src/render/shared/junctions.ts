@@ -30,9 +30,12 @@ const ARMS_APART = 4.6;
 const ARM_LOOK = 5;
 /** Two roads' meeting places this near are one junction (m). */
 const SAME_JUNCTION = 1.5;
-/** A junction is lit where this many arms meet, or this many of streets and country roads (sim-core `traffic::LIT_ARMS`, `LIT_MAIN_ARMS`). */
+/** A junction is lit where this many arms meet (not only country roads), or this many of streets and country roads, a country road's counted only with a street there (sim-core `traffic::LIT_ARMS`, `LIT_MAIN_ARMS`, `lit_of`). */
 const LIT_ARMS = 4;
 const LIT_MAIN_ARMS = 3;
+/** Junctions giving way this near each other along a street (m) have one zebra, between them where it has room, its crosswalk no more than `ZEBRA_SQUEEZE` m further in (sim-core `traffic::ZEBRA_APART`). */
+const ZEBRA_APART = 40;
+const ZEBRA_SQUEEZE = 1.5;
 /** Two arms whose ways out are further apart than 150° (the cosine) are across from each other (sim-core `traffic::OPPOSITE`). */
 const OPPOSITE = -0.866;
 /** A corner between two arms gets a kerb return only when they are this far apart, and no further (radians): straight on there's no corner, and a sliver of one would reach far out. */
@@ -66,7 +69,9 @@ const derived = new WeakMap<readonly RoadPlan[], Junction[]>();
  * heads numbered in the order worked out, not the snapshot's; any other gives way. Its zebras as
  * the simulation has them too: a lit one's on its streets' and lanes' arms, one giving way's on a
  * street's arm, one of two through it (the first round from the way out along z, as the
- * simulation goes round them).
+ * simulation goes round them); of junctions giving way within `ZEBRA_APART` of each other along a
+ * street, only the first along it has one, on the stretch to the next where that has room (none
+ * by a lit one).
  */
 export function deriveJunctions(roads: readonly RoadPlan[]): Junction[] {
   const had = derived.get(roads);
@@ -103,15 +108,15 @@ export function deriveJunctions(roads: readonly RoadPlan[]): Junction[] {
     if (g) g.push(t);
     else groups.push([t]);
   }
-  const out: Junction[] = [];
-  let light = 0;
+  type Way = { road: number; dir: Pt; k: number; s: number };
+  const found: { x: number; z: number; roundabout: boolean; lit: boolean; ways: Way[] }[] = [];
   for (const g of groups) {
     const x = g.reduce((n, t) => n + t.p[0], 0) / g.length;
     const z = g.reduce((n, t) => n + t.p[1], 0) / g.length;
     // Each road's arms: one out along it from its end, two from its middle.
     const along = new Map<number, number[]>();
     for (const t of g) for (const [road, s] of t.on) along.set(road, [...(along.get(road) ?? []), s]);
-    const ways: { road: number; dir: Pt }[] = [];
+    const ways: { road: number; dir: Pt; k: number; s: number }[] = [];
     for (const [road, ss] of along) {
       const r = roads[road];
       const s = ss.reduce((n, v) => n + v, 0) / ss.length;
@@ -128,32 +133,66 @@ export function deriveJunctions(roads: readonly RoadPlan[]): Junction[] {
         if (l < 0.5) continue;
         const dir: Pt = [(q[0] - x) / l, (q[1] - z) / l];
         if (ways.some((w) => w.dir[0] * dir[0] + w.dir[1] * dir[1] > 0.995)) continue;
-        ways.push({ road, dir });
+        ways.push({ road, dir, k, s });
       }
     }
     if (ways.length < 3) continue;
     const roundabout = ways.some((w) => roads[w.road].island);
     ways.sort((a, b) => Math.atan2(a.dir[1], a.dir[0]) - Math.atan2(b.dir[1], b.dir[0]));
     const kind = (road: number) => roads[road].kind ?? 'street';
-    const main = ways.filter((w) => kind(w.road) === 'street' || kind(w.road) === 'country').length;
-    const lit = roundabout || ways.length >= LIT_ARMS || main >= LIT_MAIN_ARMS;
+    const streets = ways.filter((w) => kind(w.road) === 'street').length;
+    const country = streets > 0 ? ways.filter((w) => kind(w.road) === 'country').length : 0;
+    const allCountry = ways.every((w) => kind(w.road) === 'country');
+    const lit = roundabout || (ways.length >= LIT_ARMS && !allCountry) || streets + country >= LIT_MAIN_ARMS;
+    found.push({ x, z, roundabout, lit, ways });
+  }
+  const kind = (road: number) => roads[road].kind ?? 'street';
+  // (Along a road from `s` its way `k`: the next junction on it, and how far.)
+  const next = (j: number, road: number, s: number, k: number) => {
+    let best: { j: number; d: number } | null = null;
+    found.forEach((o, i) => {
+      if (i === j) return;
+      for (const w of o.ways) {
+        if (w.road !== road) continue;
+        const d = (w.s - s) * k;
+        if (d > 0.5 && (!best || d < best.d)) best = { j: i, d };
+      }
+    });
+    return best as { j: number; d: number } | null;
+  };
+  const out: Junction[] = [];
+  let light = 0;
+  found.forEach(({ x, z, roundabout, lit, ways }, j) => {
+    const dirs = ways.map((w) => w.dir);
+    const reach = ways.map((w) => boxReach(w.dir, dirs));
     // (Giving way, of a street's two arms through it the first round as the simulation goes, by
     // the angle from z towards x.)
     const round = (d: Pt) => Math.atan2(d[0], d[1]);
-    const across = (w: (typeof ways)[number]) =>
-      ways.some((o) => o !== w && kind(o.road) === 'street' && o.dir[0] * w.dir[0] + o.dir[1] * w.dir[1] < OPPOSITE && round(o.dir) < round(w.dir));
-    const zebra = (w: (typeof ways)[number]) => !roundabout && (kind(w.road) === 'street' ? lit || !across(w) : kind(w.road) === 'lane' && lit);
+    const across = (w: Way) => ways.some((o) => o !== w && kind(o.road) === 'street' && o.dir[0] * w.dir[0] + o.dir[1] * w.dir[1] < OPPOSITE && round(o.dir) < round(w.dir));
+    // (And of junctions giving way close together along a street, one zebra: sim-core `signal_at`.)
+    const near = ways.map((w) => {
+      if (lit || kind(w.road) !== 'street') return { at: 'far' as const, d: Infinity };
+      const n = next(j, w.road, w.s, w.k);
+      if (!n || n.d > ZEBRA_APART) return { at: 'far' as const, d: Infinity };
+      return { at: found[n.j].lit ? ('lit' as const) : w.k < 0 ? ('before' as const) : ('after' as const), d: n.d };
+    });
+    const shared = near.some((n) => n.at === 'lit' || n.at === 'before');
+    const order = ways.map((_, i) => i).sort((a, b) => round(ways[a].dir) - round(ways[b].dir));
+    const fits = (i: number) => reach[i] + CROSSWALK + STOP_PAST <= near[i].d / 2 + ZEBRA_SQUEEZE;
+    let toward = order.find((i) => near[i].at === 'after' && fits(i));
+    if (toward === undefined && near.some((n) => n.at === 'after')) toward = order.find((i) => kind(ways[i].road) === 'street' && near[i].at === 'far');
+    const street = (i: number) => !shared && (toward === undefined ? !across(ways[i]) : toward === i);
+    const zebra = (i: number) => !roundabout && (kind(ways[i].road) === 'street' ? lit || street(i) : kind(ways[i].road) === 'lane' && lit);
     out.push({
       x,
       z,
       ...(roundabout ? { roundabout: true as const } : {}),
-      arms: ways.map((w) => {
-        const { road, dir } = w;
-        const walkFrom = boxReach(dir, ways.map((w) => w.dir));
-        return { road, dir, width: carriageway(roads[road]), walkFrom, walkTo: walkFrom + CROSSWALK, stop: walkFrom + CROSSWALK + STOP_PAST, crosswalk: zebra(w), light: lit && !roundabout ? light++ : null };
+      arms: ways.map(({ road, dir }, i) => {
+        const walkFrom = reach[i];
+        return { road, dir, width: carriageway(roads[road]), walkFrom, walkTo: walkFrom + CROSSWALK, stop: walkFrom + CROSSWALK + STOP_PAST, crosswalk: zebra(i), light: lit && !roundabout ? light++ : null };
       }),
     });
-  }
+  });
   derived.set(roads, out);
   return out;
 }
