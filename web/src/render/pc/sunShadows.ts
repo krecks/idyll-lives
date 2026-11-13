@@ -109,7 +109,7 @@ function patch(app: pc.AppBase): void {
   };
 }
 
-/** Anchors of the edge patch in `lightFunctionShadowPS` (also in `tools/render/check_chunks.ts`). */
+/** Anchors of the edge patch in `lightFunctionShadowPS` (also in `tools/render/chunks.json`). */
 export const SHADOW_EDGE_ANCHORS = {
   glsl: {
     coord: 'vec3 shadowCoord = getShadowSampleCoord{i}(shadowMatrix, light{i}_shadowParams, vPositionW, vec3(0.0), lightDirW, dLightDirNormW, dVertexNormalW);',

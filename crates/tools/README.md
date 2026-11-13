@@ -13,6 +13,7 @@ Every tool's `src/<name>.rs` opens with what it does and its arguments; this pag
 | `cargo assets` | Compressed copies of the game's assets for the production build, which runs it (was `tools/assets/optimize.mjs`): textures to KTX2 (Basis Universal ETC1S, with mipmaps), models quantised and meshopt-compressed, the residents' binaries gzipped, kept by content hash in `web/.assets/cache`. `--force`, `--jobs N`, `--verbose`; `cargo assets check [--against <dir>]` reads every copy back and compares it with its source. |
 | `cargo art` | Builds the Blender families and checks what they wrote (was `tools/art/blender/build.py`). `--all`, `--only id`, `--preview`, `--no-pack`, `--centres`. |
 | `cargo characters` | The residents generator: rig, body, face, hair and clothes from code, plus its checks (was `tools/characters/prim/`). |
+| `cargo check-chunks` | Checks that what the renderer patches or reads inside PlayCanvas is still there, in the release build the game imports: the anchors and private names listed in `tools/render/chunks.json` (was `tools/render/check_chunks.ts`; `bun run check:chunks` runs it). |
 | `cargo check-glb` | The gate for the game's glTF models: reads every `.glb` a model entry uses and checks what the game needs of it (was `tools/art/blender/check_glb.py`). |
 | `cargo content` | Moves catalog items into the Validate category and back (was `tools/content/validate.py`). |
 | `cargo decoders` | Refreshes `web/public/decoders/basis/`, PlayCanvas's Basis transcoder, which the cross-origin isolated page can't fetch from a CDN (was `tools/assets/decoders.mjs`). |
@@ -21,6 +22,9 @@ Every tool's `src/<name>.rs` opens with what it does and its arguments; this pag
 | `cargo fetch-llm` | The language model into `web/public/llm/`, repacked smaller without changing what it computes (`llmslim.rs`; was `tools/llm/fetch.mjs`). |
 | `cargo review` | The authenticity review's first pass over every buyable object: `sizes`, `uses`. |
 | `cargo tex` | The texture scripts: `clouds`, `synth` (every surface map, generated in code), `materials` (was `tools/art/*.py`). |
+| `cargo pins` | Accepted parts of the game held by their SHA-256 (`tools/pins/pins.json`: a file, a marked region or an `export const`), so work on something else can't change them by the way (was `tools/pins/check.ts`). `--list`, `--update`, `--add`. |
+| `cargo shots` | Numbers from the bench's pictures: `stats` (brightness, clipping, saturation, how much is one tone, contrast at four sizes), `steady` (how much a picture changes when the camera moves a quarter of a pixel) and `compare` (how many pixels differ between two shot folders, with pictures of where; `render.mjs --compare` runs it). Was `tools/bench/stats.mjs` and part of `render.mjs`. |
+| `cargo world-map` | Draws the sample worlds (`tools/worlds/sample.ts`'s output) from above, an SVG each and an index page (was `tools/worlds/map.ts`). |
 | `cargo release-version` | One version for the whole game. Prints it and fails if `web/package.json`, `Cargo.toml` and `Cargo.lock` differ (CI runs this); with an argument, sets all of them. Not `cargo version`: that is cargo's own. |
 | `cargo licenses` | `dist/THIRD-PARTY-LICENSES.txt`, written by production builds (`web/vite.config.ts`). |
 | `cargo wasm-opt` | Optimises the simulation's and the voice's WebAssembly for release, with the pinned binaryen. |
@@ -90,5 +94,6 @@ numbers match a crash stack from the site.
 |---|---|
 | `tools/voice/check.mjs`, `samples.mjs`, `tools/llm/check.mjs`, `devices.mjs` (and the `engine.mjs` they share) | They run the models the way the browser does: ONNX Runtime Web, plus the worker's own `web/src/voice/supertonic.ts` and `voices.ts`. Porting them means an ONNX runtime in Rust (`ort` or `tract`) and `supertonic.ts` in Rust. |
 | `tools/characters/check_clips.ts` | Reads the clip data that is generated into `web/src/render/shared/characters/clips/`. |
-| `tools/bench/*.mjs` | Playwright: they drive a real browser and time the render. |
-| `tools/housegen/sample.ts`, `tools/worlds/sample.ts` | Bun runs them; they are samples, not build steps. |
+| `tools/bench/*.mjs` | Playwright: they drive a real browser and time the render. What they do with the pictures afterwards is `cargo shots`, but for `sheet.mjs`, which tiles pictures under labels with sharp (it sets the labels' type; the one thing sharp is still here for). |
+| `tools/housegen/sample.ts`, `tools/worlds/sample.ts` | They run the game's own generators, which are TypeScript (`web/src/game`). |
+| `tools/audio/listen.ts`, `tools/characters/blend_analysis.ts` | They run the game's own sound synthesis and clips, which are TypeScript. |

@@ -6,7 +6,7 @@
  *
  *   bun tools/bench/play.mjs --port 5241 --out <dir>
  *     the whole set on medium/webgpu and low/webgl (before a change and after it; pair the two folders with
- *     `looks.mjs --pair`, and measure them with `stats.mjs`). `--poses day`: the day set instead (the play camera
+ *     `looks.mjs --pair`, and measure them with `cargo shots stats`). `--poses day`: the day set instead (the play camera
  *     over three homes in the morning, at midday and in the late afternoon); `--poses day,play`: both.
  *   bun tools/bench/play.mjs --port 5241 --sheet <group> [--out <dir>] [--low] [--with 'look.vignette:0.8']
  *     one build in the variants of `play-variants.json`'s group, each a `?tune=` (dev server only, `web/src/render/tune.ts`),
