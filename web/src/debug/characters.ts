@@ -11,7 +11,9 @@
  *   garment, `?skins=all` eight skin tones, `?builds=all` slim / as built / broad, `?face=moods|visemes`
  *   every mood (and the friendly resting face, a half and a full blink) / viseme; `?body=stand|walk` every
  *   emotion's body language (`bodyLanguage.ts`, through the snapshot's emotion, no stage directions), standing or
- *   walking towards the camera at 1.3 m/s (`?moods=sad,happy`: only those);
+ *   walking towards the camera at 1.3 m/s (`?moods=sad,happy`: only those); with another sheet (`?hair=long,braid&body=walk`)
+ *   that sheet's residents walk instead, and `&stop=1.5` stands them still after that many seconds (the hair and the
+ *   hems swing on and settle: `sway.ts`; `&sway=0`: rigid, as they were, to compare);
  * - `?faces=all` the faces of their own (`Appearance.face`, the set's identity channels): a line per four channels
  *   (`?per=2`: two), the shared face and then each channel at -1 and at +1, and a line of eight random faces
  *   (`?only=jawWidth,noseLength`: only those channels; `?faces=random`: only the random faces; `?faces=ends`: every
@@ -148,7 +150,7 @@ for (const g of families) {
       { label: 'half blink', gender: g, look: common(), face: { lidU: 1 / 0.9 } },
       { label: 'blink', gender: g, look: common(), face: { mood: 'asleep' } },
     ]);
-  } else if (body) {
+  } else if (body && sheets.length === 1) {
     rows.push([{ label: 'neutral', gender: g, look: common() }, ...shown.map((m) => ({ label: m, gender: g, look: common(), emotion: m }))]);
   } else if (params.get('face') === 'visemes') {
     rows.push(VISEMES.map((v, i) => ({ label: v, gender: g, look: common(), viseme: i })));
@@ -212,6 +214,7 @@ const sims: (SimInfo & { closeUp?: boolean })[] = placed.map((p) => ({
   ...(closeUpBody ? { closeUp: true } : {}),
 }));
 const characters = new Characters(app, stage.root, assets, lib);
+if (params.get('sway') === '0') characters.swaying = false;
 if (!(await characters.init())) throw new Error('characters unavailable');
 if (closeUpBody) await Promise.all(sims.map((s) => characters.closeUp(s.gender, s.appearance?.stage)));
 await characters.build({ sims, objects: [] });
@@ -286,12 +289,20 @@ if (params.get('labels') !== '0') {
 // The sun's shadow over the floor.
 stage.shadows.setSquare(0, 0, Math.hypot(width, depth) / 2);
 
+/** `?body=walk&stop=3`: they walk for that many seconds, then stand (the hair and the hems swing on and settle). */
+const stopAt = params.has('stop') ? Number(params.get('stop')) : Infinity;
 let clock = 0;
 function step(dt: number): void {
   clock += dt;
   frame.now = clock * 1000;
   // Walking towards the camera (+z faces it), from a step back.
-  if (body === 'walk') for (const p of placed) snap[HEADER_LEN + p.i * STRIDE + layout.sim.z] = zOf(p.line) - 2 + 1.3 * clock;
+  if (body === 'walk') {
+    for (const p of placed) {
+      const o = HEADER_LEN + p.i * STRIDE;
+      snap[o + layout.sim.z] = zOf(p.line) - 2 + 1.3 * Math.min(clock, stopAt);
+      snap[o + layout.sim.moving] = clock < stopAt ? 1 : 0;
+    }
+  }
   // Visemes: a one-segment voice line per resident, restarted so it never ends.
   const now = performance.now() / 1000;
   for (const p of placed) {
@@ -320,8 +331,9 @@ requestAnimationFrame(() =>
       __scene: app.scene,
       __bench: {
         cells: placed.map((p) => p.label),
-        advance(seconds: number) {
-          for (let t = 0; t < seconds - 1e-6; t += 1 / 30) step(1 / 30);
+        /** `fps`: in frames that long (30 by default; the same motion at any). */
+        advance(seconds: number, fps = 30) {
+          for (let t = 0; t < seconds - 1e-6; t += 1 / fps) step(1 / fps);
         },
         characters,
         camera: orbit,

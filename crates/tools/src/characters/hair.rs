@@ -1,9 +1,10 @@
 //! The residents' hair, built from primitives over the head interface. Contract:
 //!
 //! - `build_hair(family, stage, head, joints)`: `hair.<style>` for every style but `none`, and
-//!   `hair.beard` where the family has it; each pos, nor, idx (CCW out), dense, fields, tone (y:
-//!   shade deep in the hair, z: clump bands 0..1; w: the occlusion, baked later in build.rs). After
-//!   each, its soft edges: `hair.<style>.wisps` (`Strip`, `wisps`).
+//!   `hair.beard` where the family has it; each pos, nor, idx (CCW out), dense, fields, tone (x:
+//!   how loose it hangs, 0 on the head .. 1 at the tips of a long style's curtain, a tail or a
+//!   braid, `Comp::sway`; y: shade deep in the hair, z: clump bands 0..1; w: the occlusion, baked
+//!   later in build.rs). After each, its soft edges: `hair.<style>.wisps` (`Strip`, `wisps`).
 //!
 //! Every style starts from a skull cap: the scalp inside the hair's edge (the head interface's
 //! hairline, smoothed round and brought a little lower over the forehead and temples, going round
@@ -551,8 +552,8 @@ fn grad(h: &HeadFrame, p: V3, e: f64) -> V3 {
 }
 
 /// A component of a style: faces, how far each vertex follows the body rather than the head
-/// (`f`, -1: by height, see `finish`), clump bands (`z`) and shade (`y`); and the wisps past its
-/// edges.
+/// (`f`, -1: by height, see `finish`), clump bands (`z`) and shade (`y`); the wisps past its
+/// edges; and how loose it hangs (`sway`: 0 on the head, as most are; see `finish`).
 #[derive(Clone, Default)]
 pub struct Comp {
     pos: Vec<V3>,
@@ -561,7 +562,18 @@ pub struct Comp {
     z: Vec<f64>,
     y: Vec<f64>,
     wisps: Vec<Strip>,
+    sway: f64,
 }
+
+/// Hair that hangs moves after the head (the runtime's lag vector times tone.x, `sway.ts`): a
+/// component's looseness is its `sway` times how far down it a vertex is. Along a tail or a braid
+/// (its `f`, 0 at the head) as the power `TAIL`; on a curtain by the height below `FROM` head
+/// heights over the chin (about the ears: above, it lies on the head), all of it `OVER` head
+/// heights further down (the shoulder blades), as the power `FALL` between.
+const SWAY_TAIL: f64 = 1.3;
+const SWAY_FROM: f64 = 0.4;
+const SWAY_OVER: f64 = 1.2;
+const SWAY_FALL: f64 = 1.5;
 
 /// A soft edge: a row of quads growing from an edge of a component (or, where it has none, from a
 /// row of its surface: `shingles`), each from two of its vertices next to each other out to where
@@ -666,6 +678,7 @@ fn comp(
         pos,
         idx,
         wisps: Vec::new(),
+        sway: 0.0,
     }
 }
 
@@ -1603,6 +1616,12 @@ fn shingles(
         .collect()
 }
 
+/// A component that hangs loose (`Comp::sway`): a curtain past the shoulders, a tail, a braid.
+fn loose(mut c: Comp) -> Comp {
+    c.sway = 1.0;
+    c
+}
+
 /// A torus as a component (`_tor`).
 fn tor(t: super::prims::Prim) -> Comp {
     let n = t.pos.len();
@@ -2053,7 +2072,7 @@ pub fn build_hair(
     let lt = chin + 0.72 * hh;
     // Further off the back at the shoulders, which rise and roll back under it when sitting down.
     let long_back = |y: f64| back(y) - 0.036 * hh * (-((y - shoulder) / (0.2 * hh)).powi(2)).exp();
-    lng.push(curtain(
+    lng.push(loose(curtain(
         &sc,
         Curtain {
             a0: deg(66.0),
@@ -2073,7 +2092,7 @@ pub fn build_hair(
             seed: 0,
             wisp: 0.08 * hh,
         },
-    ));
+    )));
     for s in [-1.0, 1.0] {
         // Two locks either side of the parting, the outer one down past the cheek to the jaw.
         let outer = [
@@ -2159,10 +2178,10 @@ pub fn build_hair(
     let z = grooved(&mut m, 12, 4.0, 0.16, 2.5);
     let f = m.t.iter().map(|&t| smoothstep(0.1, 0.9, t)).collect();
     let tip = brush(&m.pos, 12, 3, 0.07 * hh, TIP_TAPER, None);
-    pt.push(Comp {
+    pt.push(loose(Comp {
         wisps: vec![tip],
         ..comp(m.pos, m.idx, None, Some(z), None, Some(f))
-    });
+    }));
     styles.push(("ponytail", pt));
 
     // Braid: a cap and three strands plaited down the back, tied off with a tuft below the tie.
@@ -2212,14 +2231,14 @@ pub fn build_hair(
                 .map(|&t| 0.5 + 0.4 * (TAU * 7.0 * t + ph).sin())
                 .collect();
         let f = m.t.iter().map(|&t| smoothstep(0.0, 0.67, t)).collect();
-        br.push(comp(
+        br.push(loose(comp(
             m.pos,
             m.idx,
             None,
             Some(z),
             Some(vec![0.1; m.t.len()]),
             Some(f),
-        ));
+        )));
     }
     let end = axis(1.0);
     let mut knot = tor(torus(
@@ -2231,7 +2250,7 @@ pub fn build_hair(
         v3(0.0, 1.0, 0.0),
     ));
     knot.f = vec![1.0; knot.pos.len()];
-    br.push(knot);
+    br.push(loose(knot));
     let tp: Vec<V3> = linspace(0.0, 1.0, 5)
         .iter()
         .map(|&s| end + v3(0.0, -0.13 * hh * s - 0.015 * hh, -0.01 * hh * s))
@@ -2243,7 +2262,7 @@ pub fn build_hair(
     let mut m = loft(&tp, &r, &r, 8, v3(0.0, 0.0, -1.0), caps(1));
     let z = grooved(&mut m, 8, 3.0, 0.2, 1.0);
     let tip = brush(&m.pos, 8, 2, 0.05 * hh, TIP_TAPER, None);
-    br.push(Comp {
+    br.push(loose(Comp {
         wisps: vec![tip],
         ..comp(
             m.pos,
@@ -2253,7 +2272,7 @@ pub fn build_hair(
             None,
             Some(vec![1.0; m.t.len()]),
         )
-    });
+    }));
     styles.push(("braid", br));
 
     // Buns: a cap and two buns high on each side, twisted, each with a band round its foot.
@@ -2552,6 +2571,7 @@ fn wisps(comps: &[Comp], solid: &Mesh, h: &HeadFrame, ears: &Ears) -> Mesh {
 fn finish(comps: &[Comp], h: &HeadFrame, ears: &Ears, p: &[V3; NB], head_only: bool) -> Mesh {
     let mut pos = Vec::new();
     let (mut idx, mut zz, mut yy, mut ff) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    let mut sway = Vec::new();
     for c in comps {
         let n = pos.len();
         idx.extend(c.idx.iter().map(|&i| i + n));
@@ -2559,6 +2579,7 @@ fn finish(comps: &[Comp], h: &HeadFrame, ears: &Ears, p: &[V3; NB], head_only: b
         zz.extend(&c.z);
         yy.extend(&c.y);
         ff.extend(&c.f);
+        sway.extend(std::iter::repeat_n(c.sway, c.pos.len()));
     }
     clear(&mut pos, h, ears);
     let n = pos.len();
@@ -2584,8 +2605,22 @@ fn finish(comps: &[Comp], h: &HeadFrame, ears: &Ears, p: &[V3; NB], head_only: b
         dense[i][s3] = a * bb;
     }
     let fields = vec![[0.1, 0.0, 0.0, 0.0]; n];
+    // How loose each vertex hangs (tone.x).
+    let from = h.chin_y + SWAY_FROM * h.hh;
     let tone = (0..n)
-        .map(|i| [0.0, clip(yy[i], 0.0, 1.0), clip(zz[i], 0.0, 1.0), 0.0])
+        .map(|i| {
+            let down = if ff[i] >= 0.0 {
+                clip(ff[i], 0.0, 1.0).powf(SWAY_TAIL)
+            } else {
+                clip((from - pos[i].y) / (SWAY_OVER * h.hh), 0.0, 1.0).powf(SWAY_FALL)
+            };
+            [
+                sway[i] * down,
+                clip(yy[i], 0.0, 1.0),
+                clip(zz[i], 0.0, 1.0),
+                0.0,
+            ]
+        })
         .collect();
     Mesh {
         pos,

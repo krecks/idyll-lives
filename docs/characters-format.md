@@ -336,7 +336,8 @@ hairline and chin as before.
 
 ## Tone (4 per vertex)
 
-x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = shade drawn by hand (the
+x = lip / cheek blush (0..1; on the tongue part, the tongue's red; on the hair and its wisps, how loose
+a vertex hangs, 0..1: see Hair and hems that move), y = shade drawn by hand (the
 upper lids' crease, the nostrils: the nose's underside either side of its middle, the teeth's sides,
 deep in the hair; the mouth plate is
 1), and on the lips its opposite sign: negative, how much of the lip's colour they take (up to 0.9,
@@ -495,6 +496,8 @@ Garment ids per family (outfit.ts):
 | 6 | shoe colour | shoes: the sock's top |
 | 7 | eye colour | 1 if the resident wears hair (the scalp takes the hair colour) |
 | 8 | r, g = how loose the top and the bottom are (0..1: how far the painted cloth stands off the skin, `EASE`); b = 1 if the bottom has a shell round the hips (a skirt) | 0 |
+| 9 | the hair's lag: how far a loose end of the hair is drawn from where the head carries it (m, world axes, at looseness 1) | the shoulder line (m, at rest on the resident's body) |
+| 10 | the hems' lag: the same for a shell's hem | the height under which a shell's hem is loose (m, at rest on the resident's body: 8 cm over the pelvis joint on a grown one) |
 
 Then 20 texels of face morph (channel, weight) pairs, two a texel, a weight of 0 unused (`layout.ts`):
 
@@ -503,7 +506,44 @@ Then 20 texels of face morph (channel, weight) pairs, two a texel, a weight of 0
 | 12 (`EXPRESSION_TEXELS`) | the expression: the 24 strongest of the expression channels (`face.ts` `FaceMixer`); a first channel of -1 means no morphs at all on this face this frame (too small on screen, `parts.ts` `MORPH_PX`) | every frame the face is posed |
 | 8 (`IDENTITY_TEXELS`) | the resident's own face: the 16 identity channels at the look's weights, signed, times the body's `faceScale` (`identity.ts` `writeIdentity`) | once, when the resident is built |
 
-A row is 33 x 3 + 9 + 20 = 128 texels (it was 120). Disabled cuts are -10 (+10 for "below" cuts).
+A row is 33 x 3 + 11 + 20 = 130 texels (128 before the lag texels). Disabled cuts are -10 (+10 for "below" cuts).
+Texels 0 to 8 are the outfit's, written when a resident changes clothes (`writeOutfit`); 9 and 10 are written
+every frame a resident is posed (`residents.ts` `writeSway`).
+
+### Hair and hems that move
+
+Hair that hangs and the hems of the shells move after the body, with no bones of their own
+(`characters/sway.ts`). Per resident there are two lag vectors, the hair's and the hems', each a point on
+a damped spring towed by a place fixed to the head (behind the neck) or to the hips (between the
+thighs), so setting off, stopping, a turn of the head or the hips' sway swing it. The spring is stepped
+in closed form from the towing point's change of velocity each frame, so the motion is the same at any
+frame rate; the air holds it back by 2 cm per m/s (a runner's hair streams); what is drawn is no further
+than 13 cm (hair) or 7 cm (hems) on a grown body, keeps part of the vertical lag only and hardly any
+downward, scales with the body, and has a dead band of 1.5 mm, so a resident standing still (breathing,
+shifting their weight) moves nothing. None far off (`poseFar`), lying down (by how upright the head and
+the hips are), on a new resident's first frame, or, for the hems, seated (the seated share, texel 4 b).
+The game being paused holds it.
+
+The character shader (`character.ts` `gameSimSway`, in the per-material `transformInstancingVS`, GLSL
+and WGSL) adds `lag x looseness` to the skinned position of every hair and shell vertex:
+
+- hair and wisps: looseness is tone.x, baked by `hair.rs` (`Comp::sway`, `finish`): 0 on everything that
+  lies on the head, and on the long style's curtain, the ponytail's tail and the braid (strands, tie
+  and tuft) rising to 1 at the tips: along a tail or a braid as the 1.3rd power of how far along it a
+  vertex is, on the curtain as the 1.5th power of its depth below the ears (0.4 head heights over the
+  chin), all of it 1.2 head heights further down. A wisp has its hair vertex's tone, so it goes with it;
+- shells: from the distance to the hem (fields.x): all of it at the hem, none 30 cm up a skirt or 12 cm
+  up a top's shell (the jacket, the suit, the apron), as the 1.5th power between; only under the hips
+  (texel 10 w: a jacket's lapels and collar are open edges too), not on shoes; the `lod.` copies and
+  the shadow copies the same.
+
+Never into the body: the part of the offset that points in to the body's own axis (the vertical
+through the rest pose's origin, as the vertex's skin turns it) is left out, so hair swings round the
+neck and out from it and a hem off the legs. Under the shoulder line (texel 9 w) the body is taken as
+a wall across, the back: hair there keeps its way along the back and loses all of it towards the back
+(with the axis alone, hair beside the spine went into the shoulder blades on a stop). The normals are
+left as they are. Every preset has it: a texel read and a dozen operations per hair or shell vertex,
+and two springs per resident on the CPU.
 
 `appearance.face` is the resident's own face: identity channel name (without `id.`) -> -1..1, 0 or
 missing as the shared face has it (household.ts `FACE_CHANNELS`, `FACE_GROUPS` for the creator's
@@ -828,6 +868,7 @@ rider, the seesaw), which they settle onto as before rather than walk through.
 | body and clothes | `body.rs`, `cage.rs`, `subdiv.rs`, `clothes.rs`, `garments.rs`, `meshops.rs` |
 | face and hair | `face.rs`, `hair.rs`, `prims.rs`; the eye, hair and brow branches of `render/pc/shaders/character.ts`; `characters/face.ts` |
 | a face per resident | `identity.rs` (the channels as differences, the mask), the amounts in `head.rs` and `face.rs`; `characters/identity.ts` (the row's identity texels, the eyes), `game/household.ts` (`Appearance.face`, `randomFace`, `FACE_GROUPS`) |
+| hair and hems that move | `characters/sway.ts` (the springs), `residents.ts` `writeSway`, `character.ts` `gameSimSway`, `hair.rs` `Comp::sway` |
 | clips | `clips/*` (with `clips/ik.ts`) |
 | the runtime | `render/shared/characters/residents.ts` (activities, seats, beds, carrying, faces; its tables in `actions.ts`, `seats.ts`, `socials.ts`, `expressions.ts`, `parts.ts`; drawn through `view.ts` by `pc/characters.ts`), `shared/characters/{data,pose,outfit,blanket}.ts`, `pc/characterMaterial.ts` and `pc/shaders/character.ts` (the shading), `pc/poseTexture.ts`; the creator in `ui/screens/CreateHousehold.svelte` and `render/preview` |
 
@@ -841,7 +882,8 @@ See also `tools/characters/README.md`.
   `?per=2` channels a line, `?faces=random`, `?faces=ends` for the sliders' corners; `?hairStyle=bob`, `?beard=1`; the
   `characters-identity*` pages of `tools/bench/render.mjs`),
   `?clip=<name>&t=<s>`, `?view=side|back`, `?closeup=1` (`?y=`: the height it looks at), `?build=1.2`, `?cols=`, `?manual`
-  (`__bench.advance(s)`); `?hd=1` draws everyone with the close-up body (the `characters-creator` pages of
+  (`__bench.advance(s)`); `?hair=long,ponytail,braid&body=walk&stop=1.5` walks a sheet's residents and stops them
+  (hair and hems swinging on; `&sway=0`: rigid, to compare; `&alpha=-1.57` from behind, `&alpha=0` in profile); `?hd=1` draws everyone with the close-up body (the `characters-creator` pages of
   `tools/bench/render.mjs` frame one resident as the creator's face view does, to shoot both); sets `window.__ready`.
 - `/previews.html?stage=male|female&zoom=1`: the household creator's stage itself (`?hd=0`: with the body, where it
   draws the close-up body; the `previews-stage` pages).

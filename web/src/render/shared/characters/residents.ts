@@ -72,14 +72,15 @@ import { lyingPose, measureLegs, measureSit, outfitFit, type PoseKit } from './m
 import { type Hands, palmAt, placeFrame, placeHand, placeProp } from './props';
 import { rimOf } from './clips/shot';
 import { FACE_PARTS, LOD_FAR_PX, LOD_HEIGHT_PX, LOD_NEAR_PX, MORPH_PX, POSE_FAR_PX, POSE_NEAR_PX, type PartMesh, Range, YOUNG_STAGES, detailOf, shellBit, skinChunks, wispsOf } from './parts';
-import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, sampleClip, skin } from './pose';
+import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, rotate, sampleClip, skin } from './pose';
 import { BABBLE, compose, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clamp, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, hash, lerp, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
 import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './seatFit';
 import { BATH_WEAR, BEDS, BENCH_HIP, BENCH_KNEE, BLANKET_BEDS, BLANKET_MEET, BUNKS, type Bed, CLIP_HEIGHT, CURLED_BEDS, DEFAULT_BED, DEFAULT_SEAT, FEET_UP, FOOTSTOOLS, LEGS_OUT_DROP, LIE_CENTRE, LIE_ENTRY, type LegFit, NO_FEET_UP, ON_FLOOR, PEDAL, type PlacedObject, QUILT_COLOUR, QUILT_PART, REST_BACK, RISING, SEATS, SIDE_BEDS, SIDE_IN, SIT_CLIPS, SIT_FLEX, SIT_FROM, SLING, type Seat, type SeatFit, TUCK, floorSit, seatOf, slingTop } from './seats';
 import { AIM, Anim, EMBRACE, KISS_FIT, REFUSED, gesturesOf } from './socials';
 import { BLANKET_WIDTH, quiltGeometry, quiltTint } from './blanket';
-import { APPEARANCE_TEXELS, BONE_FLOATS, BONE_TEXELS, EXPRESSION_TEXELS, MORPH_TEXELS } from './layout';
+import { APPEARANCE_TEXELS, BONE_FLOATS, BONE_TEXELS, EXPRESSION_TEXELS, MORPH_TEXELS, SWAY_TEXEL } from './layout';
 import { faceOf, writeIdentity } from './identity';
+import { SWAY, SWAY_FLOATS, swayReset, swayStep } from './sway';
 import type { TemplateCache } from '../templateCache';
 import { WALL_HEIGHT } from '../walls';
 import { MOST_CADENCE, MOUNT_SECONDS, MOUNTS, type Mount, mountNodes } from './vehicles';
@@ -2221,6 +2222,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       if (inArms > 0) cradled(this.place, this.cradleQ, this.cradle, rig, this.sims[this.heldBy[i]]!, this.heldBy[i], inArms);
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp, true);
       this.writeSit(rig, i);
+      this.writeSway(rig, i, dt, appeared);
       this.writeMount(rig, i, dt);
       if (rig.cuddleBaby >= 0 && rig.liftW > 0) writeCradle(set.bone, this.scratch.worldT, this.cradle, i, rig);
       this.writeBlanket(rig, i, pose, dt, appeared);
@@ -4502,6 +4504,57 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // (From `SIT_FROM`: a stride's swing of the legs leaves the skirt as it hangs.)
     d[row + set.bones.length * BONE_FLOATS + 18] = clamp((flex / 2 - SIT_FROM) / (SIT_FLEX - SIT_FROM), 0, 1) * rig.size;
   }
+
+  /** Whether hair and hems lag behind the body (`writeSway`); off, they are rigid on it (the dev pages' `?sway=0`, to compare). */
+  swaying = true;
+  /** The lag points' states (`sway.ts`), per Sim row: the hair's, then the hems'. */
+  private readonly sway = new Float32Array(MAX_CHARACTERS * 2 * SWAY_FLOATS);
+
+  /**
+   * Sim `i`'s hair and hems lagging behind its head and hips as just posed (`sway.ts`; `scratch` holds its bones):
+   * the two lag texels of its row (`SWAY_TEXEL`), stepped by `dt`. None far off (`poseFar`: the hair is a few
+   * pixels), lying (not upright: the hair is on the pillow) or, for the hems, seated (the skirt lies on the lap:
+   * the seated share, `writeSit`); `fresh` (just come into view) starts both at rest.
+   */
+  private writeSway(rig: SimRig, i: number, dt: number, fresh: boolean): void {
+    const set = this.set!;
+    const d = this.data;
+    const at = this.row(i) + set.bones.length * BONE_FLOATS;
+    const hair = at + SWAY_TEXEL.hair * 4;
+    const hem = at + SWAY_TEXEL.hem * 4;
+    const o = i * 2 * SWAY_FLOATS;
+    const pelvis = set.bone.pelvis;
+    // (At rest on this body: the shoulder line, under which the hair hangs behind the back, and where a shell's
+    // hem is loose, under the hips.)
+    let [shoulders, hips] = [0, SWAY.hemBelow * rig.size];
+    for (let b = set.bone.neck_01; b >= 0; b = set.parents[b]) shoulders += rig.body.restT[b * 3 + 1];
+    for (let b = pelvis; b >= 0; b = set.parents[b]) hips += rig.body.restT[b * 3 + 1];
+    d[hair + 3] = shoulders;
+    d[hem + 3] = hips;
+    const none = !this.swaying || (this.poseFar[i] === 1 && !this.everyFrame);
+    if (fresh || none) {
+      swayReset(this.sway, o);
+      swayReset(this.sway, o + SWAY_FLOATS);
+      if (none) {
+        d.fill(0, hair, hair + 3);
+        d.fill(0, hem, hem + 3);
+        return;
+      }
+    }
+    const { worldQ: q, worldT: t } = this.scratch;
+    const size = rig.scale * rig.size;
+    const sat = clamp(d[at + 18] / Math.max(rig.size, 1e-3), 0, 1);
+    for (let n = 0; n < 2; n++) {
+      const b = n === 0 ? set.head : pelvis;
+      const from = n === 0 ? SWAY.hairAt : SWAY.hemAt;
+      const [qx, qy, qz, qw] = [q[b * 4], q[b * 4 + 1], q[b * 4 + 2], q[b * 4 + 3]];
+      rotate(qx, qy, qz, qw, from[0] * size, from[1] * size, from[2] * size, this.swayAt, 0);
+      const up = clamp((1 - 2 * (qx * qx + qz * qz) - SWAY.upright[0]) / (SWAY.upright[1] - SWAY.upright[0]), 0, 1);
+      const k = smooth(up) * size * (n === 0 ? 1 : 1 - sat);
+      swayStep(this.sway, o + n * SWAY_FLOATS, t[b * 3] + this.swayAt[0], t[b * 3 + 1] + this.swayAt[1], t[b * 3 + 2] + this.swayAt[2], dt, n === 0 ? SWAY.hair : SWAY.hem, k, d, n === 0 ? hair : hem);
+    }
+  }
+  private readonly swayAt = new Float32Array(3);
 
   /** Someone's `bare` changed: the shells' shadow copies are drawn again for the Sims that wear them now (`faceDetail`). */
   private shadowsBare = false;
