@@ -20,10 +20,10 @@
  * - Nothing on the viewed lot: the player builds there (the mailbox stands on the sidewalk). In
  *   the menus' town the player's lot (`WorldMeta.home`) gets its house as a shell dressed as the
  *   game draws it (its porch, no chimney or garden dressing), and nothing else. Its garage, if the
- *   town gave it one (`WorldStructure.garages`), and its house's porch (over the front door the
- *   garden path meets, as on every silhouette: `porchDoors`) stand on it in the game too, drawn
- *   apart (`StreetPlan.lot`): they go with the lot's ground while its basement is in view, the
- *   porch with its wall in the cutaway. A house looks the same from the street as in the game:
+ *   town gave it one (`WorldStructure.garages`), its house's porches (the simulation's,
+ *   `WorldStructure.porches`, as on every silhouette: `porchDoors`) and its porch pieces stand on it
+ *   in the game too, drawn apart (`StreetPlan.lot`): they go with the lot's ground while its
+ *   basement is in view, each porch with its wall in the cutaway. A house looks the same from the street as in the game:
  *   the lot's look on every storey, the roof the player chose.
  * - Fences: the world's (`shownFences`: the ones a town puts up round its gardens and fields,
  *   `game/gardenFences.ts`, the player's, and in an older town the ones it would have put up) on
@@ -387,11 +387,11 @@ export interface StreetPlan {
   /**
    * The viewed lot's own (the game's): its garage and porch (`SilhouetteSpec.dressingOnly`) and
    * their lamps (caps, glass and pools of light), apart from the street's meshes so they hide with
-   * the lot's ground while its basement is in view. The porch's lamps apart again (`porch`, with
-   * the cutaway's look bits that drop the porch's wall): they go with that wall. Null when it has
-   * no house and no garage.
+   * the lot's ground while its basement is in view. The porches' lamps apart again (`porches`, one
+   * set for each wall they're on, with the cutaway's look bits that drop it): they go with that
+   * wall. Null when it has no house, no garage and no porch pieces.
    */
-  lot: { silhouettes: SilhouettePlan; props: Geo; glow: Geo; pools: Geo; porch: { look: number; props: Geo; glow: Geo; pools: Geo } | null } | null;
+  lot: { silhouettes: SilhouettePlan; props: Geo; glow: Geo; pools: Geo; porches: { look: number; props: Geo; glow: Geo; pools: Geo }[] } | null;
   /** Instanced models in the order they're drawn: the foliage first, then props and things; `cast`: they cast shadows. */
   batches: [key: string, items: Inst[], cast: boolean][];
   /** Other lots' things: their footprints and the boxes they're drawn as without their files, by model key. */
@@ -548,6 +548,10 @@ const mix = (h: number, v: number) => Math.imul(h ^ (v | 0), 16777619);
 export class TownStreet {
   readonly plots: PlotLayout[];
   private world: WorldStructure;
+  /** The porches and porch pieces last given (`setWorld`), and what they were. */
+  private porchesOf: WorldStructure['porches'];
+  private piecesOf: WorldStructure['porchPieces'];
+  private porchesKey = '';
   private readonly roads: RoadPlan[];
   /** A big world's ways between its areas: country roads (a surface, no sidewalks) and trails (a narrow path). */
   private readonly ways: { country: RoadPlan[]; trail: RoadPlan[] };
@@ -819,6 +823,16 @@ export class TownStreet {
       this.openingGrid = grid;
       this.version++;
     }
+    // Porches and porch pieces (one built or taken down): each plot's share notices its own (`plotOut`).
+    if (world.porches !== this.porchesOf || world.porchPieces !== this.piecesOf) {
+      this.porchesOf = world.porches;
+      this.piecesOf = world.porchPieces;
+      const key = JSON.stringify([world.porches ?? null, world.porchPieces ?? null]);
+      if (key !== this.porchesKey) {
+        this.porchesKey = key;
+        this.version++;
+      }
+    }
     const index = new Map(world.plots.map((p, i) => [p.id, i]));
     let relaid = false;
     const same = (a: PlotInfo, b: PlotInfo) => a.public === b.public && a.storeys === b.storeys && String(a.house) === String(b.house) && String(a.roof) === String(b.roof);
@@ -1042,6 +1056,9 @@ export class TownStreet {
       const [x0, z0, x1, z1] = L.info.house;
       for (const { o } of this.openingGrid.near({ x: x0, z: z0, w: x1 - x0, d: z1 - z0 }, 1)) h = mix(mix(mix(h, o.x), o.z * 7 + (o.axis === 'h' ? 1 : 2)), o.kind.length);
     }
+    // Its porches and porch pieces.
+    for (const p of this.world.porches ?? []) if (p.plot === L.info.id) h = mix(mix(mix(h, p.x), p.z * 7 + (p.axis === 'h' ? 1 : 2)), p.out + 3);
+    for (const p of this.world.porchPieces ?? []) if (p.plot === L.info.id) h = mix(mix(mix(mix(h, p.x), p.z), p.w * 64 + p.d * 8 + p.rot), p.kind.length);
     // Indoors or out: the things on it, by the rooms under them.
     const W = this.W;
     for (const o of this.objectsByPlot.get(L.info.id) ?? []) h = mix(h, this.world.rooms[o.z * W + o.x] ? 1 : 0);
@@ -1064,13 +1081,16 @@ export class TownStreet {
     let lot: StreetPlan['lot'] = null;
 
     // ---- its house (the player's in the menus' town a shell; the viewed lot's only its garage and porch) ----
-    // (A garage the player built on their lot before any house: it stands there alone.)
-    const lone = home && game && !L.house ? (this.garages.get(L.info.id) ?? null) : null;
+    // (A garage or porch pieces the player built on their lot before any house: they stand there alone.)
+    const porches = world.porches?.filter((p) => p.plot === L.info.id);
+    const pieces = world.porchPieces?.filter((p) => p.plot === L.info.id);
+    const loneGarage = home && game && !L.house ? (this.garages.get(L.info.id) ?? null) : null;
+    const lone = loneGarage ?? (home && game && !L.house && pieces?.length ? { x0: pieces[0].x, z0: pieces[0].z, x1: pieces[0].x + pieces[0].w, z1: pieces[0].z + pieces[0].d } : null);
     if ((kind === 'house' || kind === 'shop' || home) && (L.house || lone)) {
       const g = kind === 'shop' ? null : world.garages ? (this.garages.get(L.info.id) ?? null) : home ? null : this.legacyGarage(L, focus);
       const [x0, z0, x1, z1] = L.info.house ?? [lone!.x0, lone!.z0, lone!.x1, lone!.z1];
       const front: [number, number] = L.turned ? [-L.front, 0] : [0, L.front];
-      spec = { x0, z0, x1, z1, lot: L.info, home, dressingOnly: home && game, front, door: L.door, garage: g, roof: L.plot.roof, storeys: L.plot.storeys, lived: kind === 'house' && this.options.lived };
+      spec = { x0, z0, x1, z1, lot: L.info, home, dressingOnly: home && game, front, door: L.door, garage: g, porches, pieces, roof: L.plot.roof, storeys: L.plot.storeys, lived: kind === 'house' && this.options.lived };
       // The openings on and round its walls, in the town's order (upstairs ones found on the ground's rows).
       const openings = this.openingGrid
         .near({ x: x0, z: z0, w: x1 - x0, d: z1 - z0 }, 2)
@@ -1078,12 +1098,12 @@ export class TownStreet {
         .map((e) => e.o);
       const plan = this.planner.silhouettes([spec], openings, world);
       if (spec.dressingOnly) {
-        lot = { silhouettes: plan, props: new Geo(), glow: new Geo(), pools: new Geo(), porch: null };
-        // (The porch's lamps go with its wall in the cutaway: drawn apart, `pc/street.ts` `cutLot`.)
-        const porch = plan.lamps.filter((l) => l[5]);
-        if (porch.length) {
-          lot.porch = { look: porch[0][5]!, props: new Geo(), glow: new Geo(), pools: new Geo() };
-          lamps(porch, new Painter(lot.porch.props), new Painter(lot.porch.glow), lot.porch.pools);
+        lot = { silhouettes: plan, props: new Geo(), glow: new Geo(), pools: new Geo(), porches: [] };
+        // (The porches' lamps go with their walls in the cutaway: drawn apart, a set a wall, `pc/street.ts` `cutLot`.)
+        for (const look of new Set(plan.lamps.map((l) => l[5]).filter((l) => l !== undefined))) {
+          const porch = { look, props: new Geo(), glow: new Geo(), pools: new Geo() };
+          lamps(plan.lamps.filter((l) => l[5] === look), new Painter(porch.props), new Painter(porch.glow), porch.pools);
+          lot.porches.push(porch);
         }
         lamps(plan.lamps.filter((l) => !l[5]), new Painter(lot.props), new Painter(lot.glow), lot.pools);
       } else {

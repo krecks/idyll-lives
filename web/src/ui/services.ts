@@ -100,6 +100,10 @@ export interface GameControls {
   buildGarageAtDrive(): void;
   /** Build mode's Garage tool: takes down the home's garage (sold back). */
   sellGarage(): void;
+  /** Build mode's Porch tool: takes down the porch or the piece under the pointer (Delete). */
+  removePorchHere(): void;
+  /** Build mode's Porch tool: what a click builds (a porch over a door, or a piece), and a piece's size (tiles across and deep). */
+  setPorchMode(mode: 'door' | 'post' | 'canopy' | 'step', size?: [number, number]): void;
   /** Build mode: the roof over the home (a roof style and colour). */
   setRoof(style: number, color: number): void;
   /** Build mode: keeps the home as a blueprint (in this browser) under `name`. */

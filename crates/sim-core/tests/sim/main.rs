@@ -73,6 +73,7 @@ mod planner;
 mod play_checks;
 mod player_household;
 mod population_cap;
+mod porches;
 mod positions;
 mod privacy;
 mod public_places;

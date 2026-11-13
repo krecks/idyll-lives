@@ -3834,6 +3834,10 @@
     "fence": 25,
     "gate": 80,
     "garage": 2500,
+    "porch": 600,
+    "porchPost": 60,
+    "porchCanopy": 90,
+    "porchStep": 30,
     "remove": 0,
     "storeys": 3,
     "basement": true

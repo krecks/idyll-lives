@@ -32,6 +32,40 @@
   const garagePrice = $derived(game.creative ? 0 : (prices?.garage ?? 0));
   const refund = $derived(Math.round((prices?.garage ?? 0) * (game.catalog?.objectRules.resale ?? 0) * (game.creative ? 0 : 1)));
 
+  /** The Porch tool's things: a porch over a door and the pieces, with what each costs (a canopy and a platform by the tile). */
+  const PORCH_THINGS = [
+    { id: 'door', label: 'Porch over a door', price: () => prices?.porch ?? 0, unit: '' },
+    { id: 'post', label: 'Post', price: () => prices?.porchPost ?? 0, unit: '' },
+    { id: 'canopy', label: 'Canopy', price: () => prices?.porchCanopy ?? 0, unit: ' a tile' },
+    { id: 'step', label: 'Step platform', price: () => prices?.porchStep ?? 0, unit: ' a tile' },
+  ] as const;
+  /** Tiles across and deep a canopy and a platform may be (sim-core `CANOPY_MOST`, `STEP_MOST`). */
+  const PORCH_MOST = { canopy: [3, 6], step: [4, 4] } as const;
+  const porchThing = $derived(PORCH_THINGS.find((t) => t.id === game.porchMode) ?? PORCH_THINGS[0]);
+  /** The piece's size, as it can be for the piece in hand. */
+  const porchSize = $derived.by((): [number, number] => {
+    const most = game.porchMode === 'canopy' || game.porchMode === 'step' ? PORCH_MOST[game.porchMode] : [1, 1];
+    return [Math.min(game.porchSize[0], most[0]), Math.min(game.porchSize[1], most[1])];
+  });
+  function pickPorch(mode: typeof game.porchMode) {
+    play('tab');
+    services.controls.setPorchMode(mode);
+  }
+  function resizePorch(i: 0 | 1, by: number) {
+    if (game.porchMode !== 'canopy' && game.porchMode !== 'step') return;
+    const most = PORCH_MOST[game.porchMode][i];
+    const size: [number, number] = [...porchSize];
+    size[i] = Math.max(1, Math.min(most, size[i] + by));
+    play('tab');
+    services.controls.setPorchMode(game.porchMode, size);
+  }
+  const porchPrice = $derived.by(() => {
+    if (game.creative) return 'Free';
+    const p = porchThing.price();
+    const tiles = porchThing.unit ? porchSize[0] * porchSize[1] : 1;
+    return p ? money(p * tiles) : 'Free';
+  });
+
   /** Rough colour of each finish's texture, so a swatch shows what the tint does to it. */
   const BASE: Record<WallCoveringDef['finish'], string> = {
     plaster: '#F4F0E8',
@@ -303,6 +337,55 @@
       <span class="chosen"><b class="tabular">{garagePrice ? money(garagePrice) : 'Free'}</b><small> · or click your lot · R turns its door</small></span>
     {/if}
   </div>
+{:else if tool === 'porch'}
+  <div class="row">
+    <div class="swatches fixed" role="radiogroup" aria-label="Porch">
+      {#each PORCH_THINGS as t (t.id)}
+        <button
+          role="radio"
+          aria-checked={game.porchMode === t.id}
+          class="swatch icon"
+          class:active={game.porchMode === t.id}
+          style="--c:#EDE7DC"
+          title="{t.label}{game.creative ? ' · free' : t.price() ? ` · ${money(t.price())}${t.unit}` : ' · free'}"
+          onclick={() => pickPorch(t.id)}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            {#if t.id === 'door'}
+              <path d="M4 10 12 4l8 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+              <path d="M6 9v11M18 9v11M3 20h18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              <path d="M10 20v-6h4v6" fill="none" stroke="currentColor" stroke-width="1.4" />
+            {:else if t.id === 'post'}
+              <path d="M12 4v14M8.5 20h7M10 18h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            {:else if t.id === 'canopy'}
+              <path d="M3 14 12 6l9 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" />
+              <path d="M7 13v7M17 13v7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="1.5 1.5" />
+            {:else}
+              <path d="M3 18h4v-3h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+              <path d="M3 21h18" fill="none" stroke="currentColor" stroke-width="1.2" />
+            {/if}
+          </svg>
+        </button>
+      {/each}
+    </div>
+    {#if game.porchMode === 'canopy' || game.porchMode === 'step'}
+      <div class="size" role="group" aria-label="Size">
+        {#each [0, 1] as const as i (i)}
+          <span class="dim">
+            <button class="step" aria-label="{i ? 'Less deep' : 'Narrower'}" disabled={porchSize[i] <= 1} onclick={() => resizePorch(i, -1)}>−</button>
+            <b class="tabular">{porchSize[i]}</b>
+            <button class="step" aria-label="{i ? 'Deeper' : 'Wider'}" disabled={porchSize[i] >= PORCH_MOST[game.porchMode][i]} onclick={() => resizePorch(i, 1)}>+</button>
+          </span>
+          {#if i === 0}<small>×</small>{/if}
+        {/each}
+      </div>
+    {/if}
+    <span class="chosen shrink"
+      ><b>{porchThing.label}</b><small class="tabular"> · {porchPrice}</small><small
+        >{game.porchMode === 'door' ? ' · click a door; click a porch to take it down' : ' · R turns it; click one to take it down'}</small
+      ></span
+    >
+  </div>
 {:else if tool === 'remove'}
   <p class="row muted">Tearing down walls, doors, windows and fences is free.</p>
 {/if}
@@ -478,6 +561,61 @@
   }
   .muted {
     color: var(--text-muted);
+  }
+  .swatches.fixed {
+    flex: none;
+  }
+  .chosen.shrink {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .swatch.icon {
+    display: grid;
+    place-items: center;
+    color: var(--text-muted);
+  }
+  .swatch.icon.active {
+    color: var(--build);
+  }
+  .swatch.icon svg {
+    width: 20px;
+    height: 20px;
+  }
+  .size {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .size small {
+    color: var(--text-muted);
+  }
+  .dim {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--hairline);
+  }
+  .dim b {
+    min-width: 14px;
+    text-align: center;
+  }
+  .step {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    font-weight: 750;
+    color: var(--text-muted);
+  }
+  .step:hover:not(:disabled) {
+    background: var(--surface);
+    color: var(--build);
+  }
+  .step:disabled {
+    opacity: 0.35;
+    cursor: default;
   }
   .act {
     flex: none;

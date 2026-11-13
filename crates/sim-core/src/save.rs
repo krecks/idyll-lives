@@ -115,6 +115,12 @@
 //! main town's square and high street), as the town file had them; and its homes may be terrace
 //! lots (`terrace`, narrow houses a metre apart). The simulation reads none of them: a file before
 //! it has none and plays as before.
+//! 39 = porches are the simulation's (`porches.rs`): the porches over doors (`porches`: each its
+//! plot, its door's edge, `axis`, `x`, `z`, and the side it stands on, `out`) and the porch pieces
+//! standing on their own (`porchPieces`: a post, a canopy or a step platform, its tiles and its
+//! facing), built and taken down in Build mode. A file before it had its porches drawn by the
+//! renderer over the front door the garden path met: they're worked out again from its doors and
+//! its paths as it loads (`World::guess_porches`), so the town looks as it did; it has no pieces.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -133,7 +139,7 @@ use crate::{
     clock::MAX_SPEED,
 };
 
-pub const SAVE_VERSION: u32 = 38;
+pub const SAVE_VERSION: u32 = 39;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -202,6 +208,12 @@ pub struct SaveFile {
     pub drives: Vec<crate::cars::Drive>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub garages: Vec<crate::cars::Garage>,
+    /// Porches over doors (absent before v39: worked out from the doors and the garden paths,
+    /// `World::guess_porches`; from v39, absent: none) and porch pieces (absent: none).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub porches: Vec<crate::porches::Porch>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub porch_pieces: Vec<crate::porches::PorchPiece>,
     /// Chemistry between every pair of residents (absent before v35: in `relationships`): base64
     /// of the upper triangle as little-endian f32s (`pack_chemistry`).
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -1067,6 +1079,8 @@ impl World {
             taxis: self.taxis.clone(),
             drives: self.drives.clone(),
             garages: self.garages.clone(),
+            porches: self.porches.clone(),
+            porch_pieces: self.porch_pieces.clone(),
             open_world: self.travel.file.clone(),
             items: self
                 .items
@@ -1745,6 +1759,24 @@ impl World {
         }
         world.make_storeys();
         world.refresh_rooms();
+        // The porches (a file before v39: as they were drawn) and the pieces, before the cars: a
+        // post's tile is kept as a garage's (`cars::reblock`).
+        let plots = world.plots.len();
+        world.porches = if save.version < 39 {
+            world.guess_porches()
+        } else {
+            save.porches
+                .iter()
+                .filter(|p| (p.plot as usize) < plots)
+                .copied()
+                .collect()
+        };
+        world.porch_pieces = save
+            .porch_pieces
+            .iter()
+            .filter(|p| (p.plot as usize) < plots && p.w > 0 && p.d > 0)
+            .copied()
+            .collect();
         let cars = ticks.cars(&save.cars);
         crate::cars::load(&mut world, &cars, &save.drives, &save.garages);
         // (The junctions lit are worked out again from the roads: `traffic::settle`.)

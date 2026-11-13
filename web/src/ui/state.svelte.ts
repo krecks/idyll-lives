@@ -20,7 +20,7 @@ export interface MenuState {
 
 /** Live: play. Build: furnish, build and look after the home. Create: a family moving into an empty home (the new game's Creation, for a home left empty). */
 export type GameMode = 'live' | 'build' | 'create';
-export type BuildTool = 'wall' | 'room' | 'fence' | 'gate' | 'paint' | 'floor' | 'door' | 'window' | 'stairs' | 'garage' | 'roof' | 'remove' | 'move' | 'blueprint';
+export type BuildTool = 'wall' | 'room' | 'fence' | 'gate' | 'paint' | 'floor' | 'door' | 'window' | 'stairs' | 'garage' | 'porch' | 'roof' | 'remove' | 'move' | 'blueprint';
 /** Build mode's tabs: Furnish (the catalog: place, move, resize, upgrade, sell), Build (the house itself) and Home (how its rooms are doing). */
 export type BuildTab = 'furnish' | 'build' | 'home';
 
@@ -198,6 +198,12 @@ class GameState {
   /** Garage tool: the home has a garage (to sell), and one fits at the end of its driveway (one click builds it). */
   homeGarage = $state(false);
   drivewayGarage = $state(false);
+  /** Porch tool: what a click builds (a porch over a door, or a piece on its own), the way a piece faces (R turns it) and its size in tiles (across and deep: canopies and step platforms). */
+  porchMode = $state<'door' | 'post' | 'canopy' | 'step'>('door');
+  porchRot = $state(0);
+  porchSize = $state.raw<[number, number]>([2, 2]);
+  /** Porch tool: what a click does where the pointer is: build (what, its price, whether it fits and why not) or take down (what, and what it sells for). */
+  porchHover = $state.raw<{ kind: 'build' | 'remove'; what: string; price: number; valid: boolean; reason: string | null } | null>(null);
   jobBoardOpen = $state(false);
   /** Plot currently shown. */
   viewPlot = $state<number | null>(null);

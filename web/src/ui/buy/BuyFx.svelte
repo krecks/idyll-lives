@@ -53,6 +53,14 @@
       if (!h.valid) return { text: what, sub: h.reason ?? "Doesn't fit here", keys, bad: true };
       return { text: price ? money(price) : 'Free', sub: what, keys, bad: false };
     }
+    if (tool === 'porch' && game.buildTab === 'build') {
+      const h = game.porchHover;
+      if (!h) return null;
+      if (h.kind === 'remove') return { text: `Take down the ${h.what.toLowerCase()}`, sub: h.price ? `Sells for ${money(h.price)}` : undefined, keys: 'Click · Del', bad: false };
+      const keys = game.porchMode === 'door' ? undefined : 'R turns it';
+      if (!h.valid) return { text: h.what, sub: h.reason ?? "Doesn't fit here", keys, bad: true };
+      return { text: h.price ? money(h.price) : 'Free', sub: h.what, keys, bad: false };
+    }
     if (game.buildEdges === 0) return null;
     const cost = game.buildCost;
     const short = !game.affords(cost);

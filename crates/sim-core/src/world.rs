@@ -1898,6 +1898,9 @@ pub struct World {
     pub taxis: crate::taxi::Taxis,
     /// Garages at the inner ends of driveways (`cars::Garage`).
     pub garages: Vec<crate::cars::Garage>,
+    /// Porches over doors, and porch pieces standing on their own (`porches.rs`).
+    pub porches: Vec<crate::porches::Porch>,
+    pub porch_pieces: Vec<crate::porches::PorchPiece>,
     /// The tiles parked cars take up in `blocked` (`cars::reblock`), sorted.
     pub(crate) car_tiles: Vec<usize>,
     /// The `nav_version` the cars' parking spots were last checked at (`cars::update`).
@@ -2244,12 +2247,31 @@ impl World {
             world.spawn_sim(s)?;
         }
         world.init_relationships(&lot_file.relationships)?;
+        // Porches as the file has them (a file from before them: as they were drawn), and the
+        // pieces (before the cars: a post's tile is kept as a garage's, `cars::reblock`).
+        world.porches = match &lot_file.porches {
+            Some(list) => list
+                .iter()
+                .filter(|p| (p.plot as usize) < world.plots.len())
+                .copied()
+                .collect(),
+            None => world.guess_porches(),
+        };
+        world.porch_pieces = lot_file
+            .porch_pieces
+            .iter()
+            .filter(|p| (p.plot as usize) < world.plots.len())
+            .copied()
+            .collect();
         crate::cars::from_file(
             &mut world,
             &lot_file.cars,
             &lot_file.drives,
             &lot_file.garages,
         );
+        if !world.porch_pieces.is_empty() {
+            crate::cars::posts_changed(&mut world);
+        }
         crate::traffic::settle(&mut world);
         // Babies come with a crib (a crowded home is reported to the player as time starts).
         for h in 0..world.households.len() {
@@ -2313,6 +2335,8 @@ impl World {
             drives: Vec::new(),
             taxis: Default::default(),
             garages: Vec::new(),
+            porches: Vec::new(),
+            porch_pieces: Vec::new(),
             car_tiles: Vec::new(),
             cars_nav: 0,
             cars_parked: None,
@@ -5714,6 +5738,33 @@ impl World {
                 rot,
             } => self.build_garage(household, [x0, z0, x1, z1], rot)?,
             Command::SellGarage { household } => self.sell_garage(household)?,
+            Command::BuildPorch {
+                household,
+                axis,
+                x,
+                z,
+            } => self.build_porch(household, axis, x, z)?,
+            Command::RemovePorch {
+                household,
+                axis,
+                x,
+                z,
+            } => self.remove_porch(household, axis, x, z)?,
+            Command::BuildPorchPiece {
+                household,
+                kind,
+                x,
+                z,
+                w,
+                d,
+                rot,
+            } => self.build_porch_piece(household, kind, x, z, w, d, rot)?,
+            Command::RemovePorchPiece {
+                household,
+                kind,
+                x,
+                z,
+            } => self.remove_porch_piece(household, kind, x, z)?,
             Command::MoveIn {
                 household,
                 name,

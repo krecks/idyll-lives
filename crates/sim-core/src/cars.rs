@@ -7047,6 +7047,16 @@ fn standing_tiles(w: &World, parked: &[u64]) -> Vec<usize> {
             }
         }
     }
+    // (A porch post stands where it is too, as a garage does: `porches.rs`.)
+    for p in w
+        .porch_pieces
+        .iter()
+        .filter(|p| p.kind == crate::porches::PieceKind::Post)
+    {
+        if w.lot.in_bounds(p.x, p.z) {
+            tiles.push(w.lot.tile_index(p.x, p.z));
+        }
+    }
     let out = w.cars.len().div_ceil(64);
     for (c, car) in w.cars.iter().enumerate() {
         let home = parked[c / 64] & 1 << (c % 64) != 0;
@@ -7089,6 +7099,15 @@ pub(crate) fn garages_changed(w: &mut World, plot: u32) {
             park_by_garage(w, c);
         }
     }
+    let parked = parked_bits(w);
+    let tiles = standing_tiles(w, &parked);
+    w.cars_parked = Some(parked);
+    restand(w, tiles);
+}
+
+/// A porch post was built or taken down (or put back by an undo): walking changes only on its
+/// tile (`restand`).
+pub(crate) fn posts_changed(w: &mut World) {
     let parked = parked_bits(w);
     let tiles = standing_tiles(w, &parked);
     w.cars_parked = Some(parked);

@@ -1694,6 +1694,12 @@ pub struct BuildRules {
     pub gate: i64,
     /// A garage on the home lot (Build mode's Garage tool; sold back for `objectRules.resale` of it).
     pub garage: i64,
+    /// A porch over a door (Build mode's Porch tool, `porches.rs`; sold back as a garage is), and
+    /// the porch pieces on their own: a post, and a canopy or a step platform by the tile.
+    pub porch: i64,
+    pub porch_post: i64,
+    pub porch_canopy: i64,
+    pub porch_step: i64,
     /// Fence styles (`fenceStyles`): picket, ranch rails, slats... A fence's (or gate's) style is
     /// an index into this list; its `price` is per metre, a gate costs `gate` on top of it.
     pub fences: Vec<BuildStyle>,
@@ -2477,6 +2483,11 @@ struct BuildRaw {
     gate: Option<i64>,
     /// A garage on the home lot.
     garage: Option<i64>,
+    /// A porch over a door, a porch post, and a porch canopy and a step platform a tile.
+    porch: Option<i64>,
+    porch_post: Option<i64>,
+    porch_canopy: Option<i64>,
+    porch_step: Option<i64>,
     storeys: Option<u8>,
     #[serde(default)]
     basement: bool,
@@ -4956,6 +4967,10 @@ impl Content {
             fence: raw.build.fence.unwrap_or(25),
             gate: raw.build.gate.unwrap_or(100),
             garage: raw.build.garage.unwrap_or(2500),
+            porch: raw.build.porch.unwrap_or(600),
+            porch_post: raw.build.porch_post.unwrap_or(60),
+            porch_canopy: raw.build.porch_canopy.unwrap_or(90),
+            porch_step: raw.build.porch_step.unwrap_or(30),
             fences: build_styles(&raw.fence_styles, "fence style")?,
             roofs: build_styles(&raw.roof_styles, "roof style")?,
             roof_colors: build_styles(&raw.roof_colors, "roof colour")?,

@@ -118,6 +118,7 @@ import type {
   ObjectBackgroundClips,
   ObjectClipInfo,
   GaragePreview,
+  PorchPreview,
   PaintPreviewFace,
   PickResult,
   PlacementGhost,
@@ -233,6 +234,17 @@ function sameGarages(a: readonly GarageInfo[] | undefined, b: readonly GarageInf
   return a.every((g, i) => {
     const h = b[i];
     return g.plot === h.plot && g.x0 === h.x0 && g.z0 === h.z0 && g.x1 === h.x1 && g.z1 === h.z1 && g.rot === h.rot;
+  });
+}
+
+/** Whether two lists of flat records are the same, field by field (the porches, the porch pieces). */
+function sameList<T extends object>(a: readonly T[] | undefined, b: readonly T[] | undefined): boolean {
+  if (a === b) return true;
+  if ((a?.length ?? 0) !== (b?.length ?? 0)) return false;
+  if (!a || !b) return true;
+  return a.every((p, i) => {
+    const q = b[i] as Record<string, unknown>;
+    return Object.entries(p).every(([k, v]) => q[k] === v);
   });
 }
 
@@ -1598,6 +1610,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (built.lotVersion !== world.lotVersion) return 'lot';
     // (A garage built or taken down: the street draws it.)
     if (!sameGarages(built.garages, world.garages)) return 'garages';
+    // (Nor a porch or a porch piece: the street draws them too.)
+    if (!sameList(built.porches, world.porches) || !sameList(built.porchPieces, world.porchPieces)) return 'porches';
     if (built.objects.length !== world.objects.length) return 'object count';
     // (A thing that didn't change is the same object: `bridge.ts` `mergeWorld`.)
     for (let i = 0; i < world.objects.length; i++) {
@@ -3379,6 +3393,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   setGaragePreview(garage: GaragePreview | null): void {
     this.previews.setGaragePreview(garage);
+  }
+
+  setPorchPreview(porch: PorchPreview | null): void {
+    this.previews.setPorchPreview(porch);
   }
 
   setRoomOverlay(tiles: readonly RoomOverlayTile[]): void {

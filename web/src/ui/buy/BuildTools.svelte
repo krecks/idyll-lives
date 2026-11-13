@@ -24,6 +24,7 @@
       { id: 'fence', label: 'Fence', icon: 'icon.ui.fence', unit: '/m', hint: 'Drag along the grid, then add a gate', note: 'Fences keep a garden outdoors (no floor, no roof); leave a gate so nobody is shut in.' },
       { id: 'gate', label: 'Gate', icon: 'icon.ui.gate', unit: '', hint: 'Click a fence (or open ground) to fit a gate', note: 'Leave a gate so nobody is shut in.' },
       { id: 'garage', label: 'Garage', icon: 'icon.ui.garage', unit: '', hint: 'Click the driveway for one at its end, or anywhere on your lot · R turns it · click your garage to take it down', note: 'A garage for the car, outdoors on the ground. The car parks in front of one at the end of the driveway. One per home; taken down, it sells back like furniture.' },
+      { id: 'porch', label: 'Porch', icon: 'icon.ui.porch', unit: '', hint: 'Click a door for a porch over it, or pick a piece and click your lot · R turns a piece · click one to take it down', note: 'A porch over an outside door on the ground floor: a landing, two posts, a little gabled roof and a lamp, in your house’s colours. Or make your own from posts, canopies and step platforms. Posts can’t be walked through; taken down, they all sell back like furniture.' },
       { id: 'stairs', label: 'Stairs', icon: 'icon.ui.stairs', unit: '', hint: 'Pick a staircase, click where it starts · R turns it · click your stairs to move them', note: 'Build the storey above first. Stairs placed in the basement lead up into a room on the ground floor. A flight is climbed from the front, a spiral from any side; nothing can stand on the steps or where they come up.' },
       { id: 'roof', label: 'Roof', icon: 'icon.ui.roof', unit: '', hint: 'Pick a shape and a colour: the whole roof changes at once', note: 'The roof covers every room of the house. Changing it is free.' },
     ],
@@ -47,8 +48,8 @@
   /** Tools with nothing to do in the basement (no windows, gardens or roof underground). */
   const aboveGround = new Set<BuildTool>(['window', 'fence', 'gate', 'roof']);
   const underground = (id: BuildTool) => game.storey < 0 && aboveGround.has(id);
-  /** Tools for the ground only (a garage stands on it). */
-  const upstairs = (id: BuildTool) => game.storey !== 0 && id === 'garage';
+  /** Tools for the ground only (a garage and a porch stand on it). */
+  const upstairs = (id: BuildTool) => game.storey !== 0 && (id === 'garage' || id === 'porch');
   /** The staircases the Stairs tool offers, and the one picked (as `LookPicker` shows them). */
   const stairDefs = $derived(content.staircases());
   const stairDef = $derived(stairDefs[game.buildLook.stair] ?? stairDefs[0]);
@@ -89,6 +90,9 @@
       case 'garage':
         p = prices.garage ?? 0;
         break;
+      case 'porch':
+        p = prices.porch ?? 0;
+        break;
       case 'remove':
         p = prices.remove;
         break;
@@ -106,7 +110,7 @@
   );
   const tool = $derived(tools.find((t) => t.id === game.buildTool) ?? tools[0]);
   /** Tools that draw (and so can be cancelled half-way). */
-  const draws = $derived(!['roof', 'blueprint', 'stairs', 'garage'].includes(tool.id));
+  const draws = $derived(!['roof', 'blueprint', 'stairs', 'garage', 'porch'].includes(tool.id));
 
   function pick(id: BuildTool) {
     play('tab');

@@ -22,12 +22,13 @@
 
 import type { Content, ObjectDef } from '../content/content';
 import { colorValues } from '../ui/buy/catalog';
-import { colorsKey, groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type GarageInfo, type ObjectPlacement, type PartColors, type PlotInfo, type WorldStructure } from '../core/protocol';
+import { colorsKey, groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type GarageInfo, type ObjectPlacement, type PartColors, type PlotInfo, type PorchInfo, type PorchPieceInfo, type WorldStructure } from '../core/protocol';
 import type { BuildEffect, ObjectResize, Renderer, ResizeHandle } from '../render/types';
 import type { Sound } from '../ui/sfx';
 import { game, type BuildTool } from '../ui/state.svelte';
 import { approachTile, covers, facedTable, fitOnTop, frontTile, overhangEdges, overhangTiles, ownSize, spotAt, topOf, type Top } from './surfaces';
-import { edgeInGarage, freeGarage, garageFits, onGarage, type GaragePlan, type GarageSite } from './garage';
+import { edgeInGarage, freeGarage, garageFits, garageTiles, onGarage, type GaragePlan, type GarageSite } from './garage';
+import { covers as pieceCovers, innerEdges, PIECE_NAME, pieceBoxes, pieceFits, piecePlan, piecePrice, pieceTiles as pieceTilesOf, porchAt, porchBoxes, porchTiles, type PorchSite, type PreviewBox } from './porch';
 import { drivewayGarage } from '../render/shared/street';
 
 type Point = { x: number; z: number };
@@ -345,6 +346,8 @@ export class BuildBuyInput {
     game.placeHint = null;
     this.preview.setGaragePreview(null);
     game.garageHover = null;
+    this.preview.setPorchPreview(null);
+    game.porchHover = null;
   }
 
 
@@ -397,6 +400,7 @@ export class BuildBuyInput {
     if (!ground) return this.clearPreviews();
     if (this.pressed) this.lastGround = ground;
     if (this.garageTool()) this.hoverGarage(ground);
+    else if (this.porchTool()) this.hoverPorch(ground);
     else if (this.stairsTool() || game.furnishing) this.hoverBuy(ground);
     else if (this.building()) this.hoverBuild(ground);
   }
@@ -476,6 +480,7 @@ export class BuildBuyInput {
     if (this.paintTool() || this.floorTool()) return true;
     if (this.stairsTool()) return this.clickStairs(ground, objectId);
     if (this.garageTool()) return this.clickGarage(ground);
+    if (this.porchTool()) return this.clickPorch(ground);
     if (this.building()) return ground ? this.clickBuild(ground) : true;
     if (game.furnishing) return this.clickBuy(ground, objectId);
     return false;
@@ -902,6 +907,7 @@ export class BuildBuyInput {
     this.handlesKey = null;
     this.syncHandles();
     this.garageState();
+    if (this.porchTool() && this.lastHover) this.hoverPorch(this.lastHover);
   }
 
   // ---- Garage ----------------------------------------------------------------------
@@ -1048,6 +1054,122 @@ export class BuildBuyInput {
     if (game.homeGarage !== own) game.homeGarage = own;
     if (game.drivewayGarage !== drive) game.drivewayGarage = drive;
     if (this.garageTool() && this.lastHover) this.hoverGarage(this.lastHover);
+  }
+
+  // ---- Porch ------------------------------------------------------------------------
+
+  /** Build mode's Porch tool: porches over doors, and porch pieces (`game.porchMode`). */
+  porchTool(): boolean {
+    return this.building() && game.buildTool === 'porch';
+  }
+
+  /** The home's porches and porch pieces. */
+  private homePorches(): PorchInfo[] {
+    const plot = this.homePlot();
+    return (this.world?.porches ?? []).filter((p) => p.plot === plot);
+  }
+  private homePieces(): PorchPieceInfo[] {
+    const plot = this.homePlot();
+    return (this.world?.porchPieces ?? []).filter((p) => p.plot === plot);
+  }
+
+  /** What a porch or a piece on the home lot has to keep clear of (null: not on the ground storey, or no home). */
+  private porchSite(): PorchSite | null {
+    const home = this.home();
+    if (!home || game.storey !== 0) return null;
+    const edge = (k: string) => (this.edges.get(k) ?? 'open') !== 'open';
+    const garage = this.homeGarage();
+    const garaged = new Set(garage ? garageTiles(garage).map(([x, z]) => `${x}:${z}`) : []);
+    return {
+      plot: home,
+      indoors: (x, z) => this.indoors(x, z),
+      walled: (axis, x, z) => (axis === 'd' ? this.diagonals.has(`${x}:${z}`) : edge(`${axis}:${x}:${z}`)),
+      thingAt: (x, z) => this.thingAt(x, z, null, () => true),
+      garage: (x, z) => garaged.has(`${x}:${z}`),
+      pieces: this.homePieces(),
+      drive: this.homeDrive()?.drive ?? null,
+      affords: (price) => game.affords(price),
+    };
+  }
+
+  /**
+   * What a click with the Porch tool does where the pointer is: over a porch (its door or its
+   * ground; a piece of the kind in hand: the piece) it takes it down, else it builds a porch over
+   * the door pointed at or the piece in hand, `game.porchSize` tiles and facing `game.porchRot`,
+   * on whole tiles round the pointer. Null: nothing to do here.
+   */
+  private porchAction(ground: Point): { kind: 'build' | 'remove'; what: string; price: number; valid: boolean; reason: string | null; boxes: PreviewBox[]; command: Command | null } | null {
+    const site = this.porchSite();
+    if (!site) return null;
+    const prices = game.catalog?.build;
+    const cost = (p: number) => (game.creative ? 0 : p);
+    const back = (p: number) => Math.round(cost(p) * (game.catalog?.objectRules.resale ?? 0));
+    const mode = game.porchMode;
+    const t = this.tileOf(ground);
+    const household = game.home;
+    if (mode === 'door') {
+      const e = this.nearestEdge(ground);
+      const own = this.homePorches().find((p) => (p.axis === e.axis && p.x === e.x && p.z === e.z) || porchTiles(p).some(([x, z]) => x === t.x && z === t.z));
+      if (own) return { kind: 'remove', what: 'Porch', price: back(prices?.porch ?? 0), valid: false, reason: null, boxes: porchBoxes(own), command: { type: 'removePorch', household, axis: own.axis, x: own.x, z: own.z } };
+      if (e.axis !== 'h' && e.axis !== 'v') return null;
+      const price = cost(prices?.porch ?? 0);
+      const { porch, reason } = porchAt(e.axis, e.x, e.z, this.edgeState(e) === 'door', site, price);
+      const command: Command | null = porch && !reason ? { type: 'buildPorch', household, axis: e.axis, x: e.x, z: e.z } : null;
+      return { kind: 'build', what: 'Porch', price, valid: !reason, reason, boxes: porch ? porchBoxes(porch) : [], command };
+    }
+    const own = this.homePieces().find((p) => p.kind === mode && pieceCovers(p, t.x, t.z));
+    const label = (p: { w: number; d: number }) => {
+      const name = PIECE_NAME[mode];
+      return `${name[0].toUpperCase()}${name.slice(1)}${mode === 'post' ? '' : ` ${p.w} × ${p.d}`}`;
+    };
+    if (own) return { kind: 'remove', what: label(own), price: back(piecePrice(mode, own.w * own.d, prices)), valid: false, reason: null, boxes: pieceBoxes(own), command: { type: 'removePorchPiece', household, kind: mode, x: t.x, z: t.z } };
+    const [across, deep] = game.porchSize;
+    const plan = piecePlan(mode, ground.x, ground.z, across, deep, game.porchRot);
+    const price = cost(piecePrice(mode, plan.w * plan.d, prices));
+    const fit = pieceFits(plan, site, price);
+    return { kind: 'build', what: label(plan), price, valid: fit === true, reason: fit === true ? null : fit, boxes: pieceBoxes(plan), command: fit === true ? { type: 'buildPorchPiece', household, ...plan } : null };
+  }
+
+  private hoverPorch(ground: Point): void {
+    const a = this.porchAction(ground);
+    this.preview.setPorchPreview(a && a.boxes.length ? { boxes: a.boxes, valid: a.valid } : null);
+    game.porchHover = a && { kind: a.kind, what: a.what, price: a.price, valid: a.valid, reason: a.reason };
+  }
+
+  private clickPorch(ground: Point | null): boolean {
+    if (!ground) return true;
+    const a = this.porchAction(ground);
+    if (!a) return true;
+    // Doesn't fit: say so here rather than ask the simulation to refuse it.
+    if (!a.command) {
+      game.placeRefused++;
+      return true;
+    }
+    this.send(a.command);
+    this.preview.setPorchPreview(null);
+    game.porchHover = null;
+    return true;
+  }
+
+  /** Delete with the Porch tool: takes down the porch or the piece under the pointer. */
+  removePorchHere(): void {
+    const a = this.lastHover && this.porchAction(this.lastHover);
+    if (a?.kind === 'remove' && a.command) {
+      this.send(a.command);
+      this.preview.setPorchPreview(null);
+      game.porchHover = null;
+    }
+  }
+
+  /** R with the Porch tool: the next piece faces the next way round. */
+  rotatePorch(): void {
+    game.porchRot = (game.porchRot + 1) % 4;
+    if (this.lastHover) this.hoverPorch(this.lastHover);
+  }
+
+  /** The Porch tool's panel picked another thing to build, or another size: the preview follows. */
+  porchChanged(): void {
+    if (this.porchTool() && this.lastHover) this.hoverPorch(this.lastHover);
   }
 
   /** Buy: pressing on an arrow of the picked object resizes it (things are moved with clicks, not dragged). */
@@ -1443,6 +1565,17 @@ export class BuildBuyInput {
     return game.buildTool === 'door' || game.buildTool === 'window' || game.buildTool === 'gate' ? game.buildTool : null;
   }
 
+  /** Whether a wall, a fence, a door or a window on an edge would go through a porch or a porch piece (sim-core `porch_across`). */
+  private edgeInPorch(axis: Axis, x: number, z: number): boolean {
+    const inner = (tiles: [number, number][]) => innerEdges(tiles).some(([a, ex, ez]) => a === axis && ex === x && ez === z);
+    const on = (tiles: [number, number][]) => tiles.some(([tx, tz]) => tx === x && tz === z);
+    const diagonal = axis === 'dp' || axis === 'dn';
+    const porches = this.world?.porches ?? [];
+    const pieces = this.world?.porchPieces ?? [];
+    if (diagonal) return porches.some((p) => on(porchTiles(p))) || pieces.some((p) => pieceCovers(p, x, z));
+    return porches.some((p) => inner(porchTiles(p))) || pieces.some((p) => p.kind !== 'post' && inner(pieceTilesOf(p)));
+  }
+
   /** Walls, Room, Fence and Remove: drawn by dragging (or click-then-click). */
   private drawing(): boolean {
     return this.building() && (game.buildTool === 'wall' || game.buildTool === 'room' || game.buildTool === 'fence' || game.buildTool === 'remove');
@@ -1771,7 +1904,9 @@ export class BuildBuyInput {
       : !this.opening() || edges.every((e) => this.edgeState(e) !== 'open' && !(this.edgeState(e) === 'wall' && this.lookOf(e).form));
     // (Nor through a garage: the simulation keeps walls and fences out of them.)
     const garaged = edges.some((e) => e.kind !== 'open' && (this.world?.garages ?? []).some((g) => edgeInGarage(g, e.axis, e.x, e.z)));
-    const valid = inWall && !garaged && this.edgesOnHome(edges) && this.diagonalsFit(edges) && game.affords(game.buildCost);
+    // (Nor through a porch or a porch piece.)
+    const porched = edges.some((e) => e.kind !== 'open' && this.edgeInPorch(e.axis, e.x, e.z));
+    const valid = inWall && !garaged && !porched && this.edgesOnHome(edges) && this.diagonalsFit(edges) && game.affords(game.buildCost);
     this.preview.setEdgePreview(edges, valid);
     game.buildEdges = edges.length;
     game.buildValid = valid;
@@ -2100,6 +2235,32 @@ export function editFeedback(prev: WorldStructure, next: WorldStructure): { effe
     effects.push({ kind: 'remove', ...garageRect(g) });
     sounds.add('remove');
   }
+
+  // A porch or a porch piece built or taken down: dust over it.
+  const porchKey = (p: PorchInfo) => `${p.plot}:${p.axis}:${p.x}:${p.z}:${p.out}`;
+  const pieceKey = (p: PorchPieceInfo) => `${p.plot}:${p.kind}:${p.x}:${p.z}:${p.w}:${p.d}:${p.rot}`;
+  const porchRect = (p: PorchInfo) => {
+    const tiles = porchTiles(p);
+    const xs = tiles.map(([x]) => x);
+    const zs = tiles.map(([, z]) => z);
+    return { x: Math.min(...xs), z: Math.min(...zs), w: Math.max(...xs) - Math.min(...xs) + 1, d: Math.max(...zs) - Math.min(...zs) + 1 };
+  };
+  const pieceRect = (p: PorchPieceInfo) => ({ x: p.x, z: p.z, w: p.w, d: p.d });
+  const changes = <T>(was: readonly T[] | undefined, now: readonly T[] | undefined, key: (t: T) => string, rect: (t: T) => { x: number; z: number; w: number; d: number }) => {
+    const [a, b] = [new Set((was ?? []).map(key)), new Set((now ?? []).map(key))];
+    for (const t of now ?? []) {
+      if (a.has(key(t))) continue;
+      effects.push({ kind: 'build', ...rect(t) });
+      sounds.add('build');
+    }
+    for (const t of was ?? []) {
+      if (b.has(key(t))) continue;
+      effects.push({ kind: 'remove', ...rect(t) });
+      sounds.add('remove');
+    }
+  };
+  if (prev.porches !== next.porches) changes(prev.porches, next.porches, porchKey, porchRect);
+  if (prev.porchPieces !== next.porchPieces) changes(prev.porchPieces, next.porchPieces, pieceKey, pieceRect);
 
   const order: Sound[] = ['upgrade', 'place', 'sell', 'build', 'remove', 'paint', 'rotate'];
   return { effects, sound: order.find((s) => sounds.has(s)) ?? null };

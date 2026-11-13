@@ -33,6 +33,7 @@ pub mod partners;
 pub mod path;
 pub mod phone;
 pub mod planner;
+pub mod porches;
 pub mod privacy;
 pub(crate) mod ride;
 pub mod rng;
