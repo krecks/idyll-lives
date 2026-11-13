@@ -15,7 +15,7 @@ from mathutils import Matrix, Vector
 from mathutils import noise as vnoise
 
 from . import uv
-from .shapes import SHARP, _recalc_normals, bevel_edges, round_angle, shade
+from .shapes import SHARP, _recalc_normals, bevel_edges, round_angle, shade, sides
 
 
 # ---- profiles and outlines (2D) ------------------------------------------------------------------------
@@ -127,10 +127,12 @@ def _frames(pts, closed, up):
     return frames
 
 
-def sweep(name, points, radius=0.02, profile=None, material=None, verts=12, scale=1.0, resolution=1, closed=False,
-          caps=True, up=(0, 0, 1), smooth=True, angle=None):
+def sweep(name, points, radius=0.02, profile=None, material=None, verts=None, scale=1.0, resolution=1, closed=False,
+          caps=True, up=(0, 0, 1), smooth=True, angle=None, least=12):
     """
-    A profile swept along a path through `points` (Blender, metres): a tube of `radius` (`verts` round), or any
+    A profile swept along a path through `points` (Blender, metres): a tube of `radius` (`verts` round: by default
+    `least`, 12, and more for one over 3 cm in radius at its thickest, as many as keep its outline within a
+    millimetre of the circle, `shapes.sides`), or any
     closed `profile` [(u, v), ...] about the path, u along the frame's normal (as near `up` as it goes), v across.
     `resolution` > 1 curves the path through the points (Catmull-Rom), that many steps between each pair.
     `scale` thickens it along the way: a number, a list (one per point, linear between) or a function of how far
@@ -150,6 +152,8 @@ def sweep(name, points, radius=0.02, profile=None, material=None, verts=12, scal
             scales.append(scale[i] + (scale[min(i + 1, last)] - scale[i]) * (f - i) if last else scale[0])
     else:
         scales = [scale] * len(pts)
+    if verts is None and not profile:
+        verts = sides(radius * max(abs(k) for k in scales), least)
     prof = profile or circle(radius, verts)
     frames = _frames(pts, closed, up)
     vs, faces = [], []

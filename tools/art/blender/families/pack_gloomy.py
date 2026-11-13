@@ -474,7 +474,7 @@ def journalDesk():
         for x in (-0.68, 0.68):
             for z in (0.22, 0.42):
                 G.kit.cabriole(F, _name('leg'), x, z, 0.712, M.walnut, math.copysign(0.025, x), math.copysign(0.014, z - 0.32),
-                               r=0.021, verts=8)
+                               r=0.021)
         edge = [(-0.66 + 1.32 * i / 48, 0.0) for i in range(49)]
         edge = [(u, 0.625 + 0.016 * abs(math.sin(math.pi * u / 0.165))) for u, _ in edge]
         F.extrude('apron', [(0.66, 0.712), (-0.66, 0.712)] + edge, 0.02, (0, 0, 0.43), M.walnut, bevel=0.003,

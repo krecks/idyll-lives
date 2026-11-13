@@ -597,7 +597,7 @@ def _wing_chair(F, x, z=0.0):
         F.extrude(_name('chair_wing'), [(z + u, v) for u, v in wing], 0.075, (x + s * (w / 2 - 0.065), 0, 0), M.velvet,
                   plane='side', rot=(0, 0, s * 6), bevel=0.025, bevel_segments=1)
         for lz, dz in ((z0 + 0.07, -1), (z + d / 2 - 0.07, 1)):
-            G.kit.cabriole(F, _name('chair_leg'), ax, lz, 0.16, M.walnut, s * 0.012, dz * 0.012, r=0.02, verts=6)
+            G.kit.cabriole(F, _name('chair_leg'), ax, lz, 0.16, M.walnut, s * 0.012, dz * 0.012, r=0.02)
 
 
 def _log(F, name, a, b, r, seed, material=None):

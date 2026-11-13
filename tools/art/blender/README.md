@@ -148,6 +148,12 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    - `G.mirrored`, `G.cut` (a boolean), `G.jitter` (a hand-made wobble);
    - `G.kit`: whole parts more than one family uses (`kit.tube`, `kit.cabriole`, `kit.moulding`).
 
+   Round things take as many sides as keep their outline within a millimetre of the circle when the family gives
+   no count (`G.sides(radius)`: a polygon's sides stand `r × (1 − cos(π / n))` in): a lathe (`G.revolve`) 24 up to
+   12 cm in radius and more above (32 at 20 cm, 52 at half a metre, 64 at most), a swept tube 12 up to 3 cm,
+   `kit.tube` 8 up to 13 mm; a cabriole leg has 12. A far version built at low detail (`G.far_of`) keeps the least.
+   A count the family gives is kept as it is: `cargo review facets` lists what shows its flat sides (over 1.5 mm).
+
    Spend the triangles where they show (silhouettes, edges, what a hand touches) and keep hidden parts plain
    (`families/living.py` armchair and sofa, `kitchen.py` fridge, `trees.py` oak). End with:
    - `G.join_all('<id>')` for a model with no moving parts;
