@@ -662,14 +662,16 @@ def hearthSettee():
         F.soft('back', 1.66, 0.5, 0.2, (0, 0.62, -0.33), M.body, round=0.07, flat=2)
         for x in (-0.4, 0.4):
             F.soft(_name('back_cushion'), 0.74, 0.36, 0.14, (x, 0.7, -0.2), M.body, rot=(-10, 0, 0), round=0.05, puff=0.03,
-                   piping=0.005, flat=3)
+                   piping=0.005, flat=3, resting=True)
         for s in (-1, 1):
             _rolled_arm(F, _name('arm'), s * 0.82, s, -0.42, 0.37, 0.08, 0.67, 0.11, M.body)
             for z in (-0.36, 0.3):
                 _turned(F, _name('leg'), s * 0.82, 0, z, [(0, 0), (0.018, 0), (0.022, 0.012), (0.03, 0.04), (0.035, 0.07),
                                                           (0.028, 0.09), (0.032, 0.1), (0, 0.1)], M.honey, 12)
-        F.soft('pillow_l', 0.34, 0.3, 0.12, (-0.62, 0.66, -0.12), M.pillow_a, rot=(-12, 0, 18), round=0.05, puff=0.035, flat=3)
-        F.soft('pillow_r', 0.3, 0.28, 0.12, (0.66, 0.66, -0.12), M.pillow_b, rot=(-12, 0, -18), round=0.05, puff=0.035, flat=3)
+        F.soft('pillow_l', 0.34, 0.3, 0.12, (-0.62, 0.66, -0.12), M.pillow_a, rot=(-12, 0, 18), round=0.05, puff=0.035,
+               waist=0.012, pinch=0.006, resting=True)
+        F.soft('pillow_r', 0.3, 0.28, 0.12, (0.66, 0.66, -0.12), M.pillow_b, rot=(-12, 0, -18), round=0.05, puff=0.035,
+               waist=0.012, pinch=0.006, resting=True)
         for k, (x, y, z) in enumerate(((-0.62, 0.66, -0.06), (0.66, 0.66, -0.06))):
             F.sphere(_name('pillow_button'), 0.012, (x + 0.01 * (1 - 2 * k), y, z - 0.004), M.brass, scale=(1, 0.5, 1), segments=6,
                      rings=4)
@@ -693,7 +695,7 @@ def hearthSettee():
         puff = 0.016
         for x in (-0.41, 0.41):
             F.soft(_name('seat_cushion'), 0.8, 0.12 - puff, 0.62, (x, 0.39 - puff / 2, 0.06), M.body, round=0.04, puff=puff,
-                   piping=0.006, flat=3)
+                   piping=0.006, flat=3, resting=True)
         z0, z1 = -0.21, 0.37
         strips = (M.patch_a, M.quilt, M.patch_b, M.patch_c, M.patch_d)
         sw = 0.76 / len(strips)
