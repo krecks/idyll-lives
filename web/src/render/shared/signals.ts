@@ -109,11 +109,11 @@ export class SignalRows {
 
 /**
  * Per snapshot row (`SnapshotLayout.light`), whether its head's arm has a crosswalk, so its pole
- * gets the pedestrians' head: an arm into a street or a lane, as its zebra is drawn (`roads.ts`
- * `junctionMarks`), not a country road's (no sidewalks to cross between) nor a roundabout's (no walk
- * phase), nor one with no crosswalk's width (`walkFrom` to `walkTo`: between two lit junctions so
- * near they're one, the simulation's `signal_at`). Null: the structure doesn't say which arm a row is (one from before `junctions`): every
- * head has it.
+ * gets the pedestrians' head: as the simulation says (`crosswalk`, as its zebra is drawn: `roads.ts`
+ * `junctionMarks`), else an arm into a street or a lane; not a country road's (no sidewalks to
+ * cross between) nor a roundabout's (no walk phase), nor one with no crosswalk's width (`walkFrom`
+ * to `walkTo`: between two lit junctions so near they're one, the simulation's `signal_at`). Null:
+ * the structure doesn't say which arm a row is (one from before `junctions`): every head has it.
  */
 export function crosswalkRows(world: WorldStructure): Uint8Array | null {
   const list = world.junctions;
@@ -124,7 +124,7 @@ export function crosswalkRows(world: WorldStructure): Uint8Array | null {
   const out = new Uint8Array(rows);
   for (const j of list) {
     if (j.roundabout) continue;
-    for (const a of j.arms) if (a.light !== null && hasSidewalks(roads[a.road]) && a.walkTo - a.walkFrom >= 1) out[a.light] = 1;
+    for (const a of j.arms) if (a.light !== null && (a.crosswalk ?? hasSidewalks(roads[a.road])) && a.walkTo - a.walkFrom >= 1) out[a.light] = 1;
   }
   return out;
 }

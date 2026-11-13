@@ -188,6 +188,12 @@ describe("the pedestrians' heads", () => {
     expect(rows && [...rows]).toEqual([1, 0, 1, 1, 1, 1, 1, 0, 0, 0]);
   });
 
+  test("as the simulation says where it says: no zebra, no pedestrians' head", () => {
+    // (A street's arm the simulation gives no crosswalk: joined to a lit junction next to it.)
+    const rows = crosswalkRows(world([{ x: 10, z: 10, arms: [{ ...arm(0, 0), crosswalk: false }, { ...arm(1, 1), crosswalk: true }, arm(3, 2)] }]));
+    expect(rows && [...rows]).toEqual([0, 1, 1]);
+  });
+
   test('hang on every pole for a structure that says nothing of its junctions', () => {
     expect(crosswalkRows(world(undefined))).toBeNull();
   });
