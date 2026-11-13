@@ -48,10 +48,10 @@ parts the rest. So that it stays at 3:
 |---|---|---|---|---|
 | `model.kind.neighbourlyOven` | 1.83 × 1.72 × 0.64 m | 7,938 | 3 | Body (the range's enamel), Fabric (the towel), Cupboards |
 | `model.kind.givingJar` | 0.64 × 1.32 × 0.66 m | 4,912 | 3 | Body (the pedestal), Fabric (the ribbon) |
-| `model.kind.knittingRocker` | 0.74 × 1.05 × 0.86 m | 4,820 | 3 | Body (the chair), Fabric (the cushion) |
+| `model.kind.knittingRocker` | 0.74 × 1.05 × 0.86 m | 4,836 | 3 | Body (the chair), Fabric (the cushion) |
 | `model.kind.welcomeTeaTable` | 1.94 × 0.50 × 0.87 m | 7,380 | 3 | Body (the table), Fabric, Second pouf, Rug |
 | `model.kind.songbirdFeeder` | 0.90 × 1.70 × 0.88 m | 6,724 | 3 | Body (the feeder house), Fabric (the seed sack), Roof |
-| `model.kind.hearthSettee` | 1.90 × 0.95 × 0.82 m | 7,360 | 3 | Body (the velvet), Fabric (the quilt) |
+| `model.kind.hearthSettee` | 1.90 × 0.95 × 0.82 m | 7,440 | 3 | Body (the velvet), Fabric (the quilt) |
 
 The range sits on the wall's face (−0.43), 2.5 cm forward of the old part's; the jar is 3.5 cm taller with the
 coin standing in its slot; the rocker's yarn basket stands 2 cm further out.
@@ -112,3 +112,7 @@ cargo art pack_kind --preview  # previews/pack_kind/<id>.png, <id>@<clip>.png
   5 cm left with the rolling pin in front of it, the patch of flour under where the bowl goes. The bowl (or the board)
   stands there, (0.13, −0.01) at the top's 0.905, and what the cook carried in behind it, (0.13, −0.31)
   (`STATION_SPOTS`, `SET_DOWN_SPOTS`).
+
+## The soft forms pass (2026-11-13)
+
+The hearth settee's pillows are sewn flat and stuffed (`waist`), its seat and back cushions `resting`. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `hearthSettee`, `knittingRocker`, `songbirdFeeder`; 18,904 to 19,000 triangles.

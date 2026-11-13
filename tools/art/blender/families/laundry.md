@@ -84,12 +84,12 @@ Rebuilt with the forms, same sizes, centres, parts, clips (the washer's drum loo
 
 | Model | Size (w × h × d) | Triangles (before → now) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.laundryWasher` | 0.60 × 0.98 × 0.65 m | 3,652 → 3,644 | 4 | Body, Door, Panel |
-| `model.laundryDryer` | 0.60 × 1.09 × 0.65 m | 4,284 → 4,744 | 4 | Body, Door, Panel |
-| `model.towelRail` | 0.73 × 0.59 × 0.10 m | 1,312 → 1,728 | 2 | Rail, Towels, Hand towel |
-| `model.towelLadder` | 0.52 × 1.70 × 0.36 m | 1,240 → 1,272 | 2 | Ladder, Towels, Second towel, Third towel |
-| `model.laundryBasket` | 0.54 × 0.40 × 0.42 m | 3,872 → 3,640 | 2 | Basket, Rim & weave |
-| `model.bathMat` | 0.76 × 0.03 × 0.50 m | 592 → 840 | 1 | Mat, Pile |
+| `model.laundryWasher` | 0.60 × 0.98 × 0.65 m | 3,652 → 3,644 | 3,644 | Body, Door, Panel |
+| `model.laundryDryer` | 0.60 × 1.09 × 0.65 m | 4,284 → 4,744 | 4,744 | Body, Door, Panel |
+| `model.towelRail` | 0.73 × 0.59 × 0.10 m | 1,312 → 1,728 | 1,728 | Rail, Towels, Hand towel |
+| `model.towelLadder` | 0.52 × 1.70 × 0.36 m | 1,240 → 1,272 | 1,272 | Ladder, Towels, Second towel, Third towel |
+| `model.laundryBasket` | 0.54 × 0.40 × 0.42 m | 3,872 → 3,640 | 3,640 | Basket, Rim & weave |
+| `model.bathMat` | 0.76 × 0.03 × 0.50 m | 592 → 840 | 840 | Mat, Pile |
 
 The new hem colours (`towel_hem`, `towel_hem2`) are `fabric` like the towels they're on, in the same draw.
 
@@ -101,3 +101,7 @@ The new hem colours (`towel_hem`, `towel_hem2`) are `fabric` like the towels the
 cargo art laundry            # the six .glb, the pack, check-glb
 cargo art laundry --preview  # previews/laundry/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 4 models changed shape: `bathMat`, `laundryDryer`, `laundryWasher`, `washingArmful`; the same triangles.

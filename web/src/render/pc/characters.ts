@@ -199,6 +199,11 @@ export class PlayCanvasResidentView implements ResidentView<PartDraw, QuiltDraw,
     for (const p of this.parts) if (!p.shadow) p.draw.meshInstance.castShadow = casters.includes(p);
   }
 
+  /** Adds to `out` the residents' draws that cast shadows now (the lamps' own list of casters: `lampShadows.ts`). */
+  shadowCasters(out: pc.MeshInstance[]): void {
+    for (const p of this.parts) if (p.draw.enabled && p.draw.meshInstance.castShadow) out.push(p.draw.meshInstance);
+  }
+
   // --- quilts ----------------------------------------------------------------------------
 
   quiltMaterial(toeZ: number, footZ: number): void {
@@ -390,6 +395,11 @@ export class Characters extends SharedCharacters<PartDraw, QuiltDraw, Prop> {
       if (Math.floor(bits[row >> 4] / 2 ** (row & 15)) % 2 === 1) return true;
     }
     return false;
+  }
+
+  /** Adds to `out` the residents' draws that cast shadows now (`lampShadows.ts`). */
+  shadowCasters(out: pc.MeshInstance[]): void {
+    this.pcView.shadowCasters(out);
   }
 
   /** The resident rows the draw `mi` draws now (`rowsOf`), null for any other draw (the mirrors). */

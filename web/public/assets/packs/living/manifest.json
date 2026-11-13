@@ -656,7 +656,7 @@
       "url": "../../models/living/armchairLeather.glb",
       "materials": {
         "leather": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.leather"
         },
         "teak": {
           "finish": "material.finish.wood"
@@ -690,7 +690,7 @@
           "finish": "material.finish.satin"
         },
         "hide": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.leather"
         },
         "ply": {
           "finish": "material.finish.wood"
@@ -815,10 +815,10 @@
       "url": "../../models/living/pouf.glb",
       "materials": {
         "pouf_button": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.leather"
         },
         "pouf_leather": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.leather"
         },
         "walnut_warm": {
           "finish": "material.finish.wood"

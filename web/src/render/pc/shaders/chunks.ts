@@ -7,7 +7,7 @@
  *
  * The overrides are the engine's own chunks with a function renamed and a wrapper of ours in its
  * place (`getAlbedo` runs the engine's, then the pattern), so a PlayCanvas upgrade keeps its own
- * code; the names and lines they rely on are checked by `tools/render/check_chunks.ts`. The slots:
+ * code; the names and lines they rely on are checked by `tools/render/chunks.json`. The slots:
  *
  * - `vsDecl`, `vsEnd`: `litUserDeclarationVS`, `litUserMainEndVS`.
  * - `normalVS`: an instanced draw's normal corrected for uneven scale (`INSTANCE_NORMAL`).
@@ -36,8 +36,8 @@
  * the sky's hemispheric fill and the split of the ambient from the direct light
  * (`litForwardBackendPS`), the sun kept out of basements (`lightFunctionLightPS`), and the lamps
  * kept in their rooms (`clusteredLightPS`, and `lightFunctionLightPS` for forward lights;
- * `roomLights.ts`). They only act under the game's
- * defines, so other materials draw as PlayCanvas has them. The lamps' falloff
+ * `roomLights.ts`), and a lamp's shadow kept to its map's cone (`clusteredLightPS` too). They only act under the game's
+ * defines, so other materials draw as PlayCanvas has them (but for the shadow's cone, which is every material's). The lamps' falloff
  * (`falloffInvSquaredPS`, `spotPS`) is the game's own in its materials (`roomLights.ts` too).
  *
  * World positions in the fragment shader are PlayCanvas's (`vPositionW`, mirrored in z from game
@@ -56,7 +56,7 @@ import { gameNormalMap } from './bump';
 import { gameFresnel, gameReflection } from './envBrdf';
 import { gameFog, setFogFrom } from './fog';
 import { CONTACT_DIRECT, SOFT_LOOK } from './softLook';
-import { ROOM_LIGHT_CODE, ROOM_LIGHTS } from './roomLights';
+import { ROOM_LIGHT_CODE, ROOM_LIGHT_ROOMS, ROOM_LIGHTS } from './roomLights';
 import { PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
 import { UNDERGROUND } from './underground';
 
@@ -182,7 +182,7 @@ const WRAPS = {
   },
 } as const;
 
-/** The anchors the overrides and patches rely on (also listed in `tools/render/check_chunks.ts`). */
+/** The anchors the overrides and patches rely on (also listed in `tools/render/chunks.json`). */
 export const ANCHORS = {
   glsl: {
     transformCoreVS: 'vec3 getLocalPosition(vec3 vertexPosition) {',
@@ -192,6 +192,7 @@ export const ANCHORS = {
     lightFunctionLightPS: 'vec3 lightColor = light{i}_color;',
     clusteredLightDecode: 'ClusterLightData clusterLightData = decodeClusterLightCore(lightIndex);',
     clusteredLightStart: '\tif (numClusteredLights <= 1)',
+    clusteredSpotShadows: ['PCF3', 'PCF5'].map((f) => `getShadowSpotClustered${f}(SHADOWMAP_PASS(shadowAtlasTexture), shadowCoord, shadowParams)`),
     falloffInvSquaredPS: 'float getFalloffInvSquared(float lightRadius, vec3 lightDir) {',
     spotPS: 'float getSpotEffect(vec3 lightSpotDir, float lightInnerConeAngle, float lightOuterConeAngle, vec3 lightDirNorm) {',
   },
@@ -203,6 +204,7 @@ export const ANCHORS = {
     lightFunctionLightPS: 'var lightColor: vec3f = uniform.light{i}_color;',
     clusteredLightDecode: 'let clusterLightData: ClusterLightData = decodeClusterLightCore(lightIndex);',
     clusteredLightStart: '\tif (uniform.numClusteredLights <= 1) {',
+    clusteredSpotShadows: ['PCF3', 'PCF5'].map((f) => `getShadowSpotClustered${f}(shadowAtlasTexture, shadowAtlasTextureSampler, shadowCoord, shadowParams)`),
     falloffInvSquaredPS: 'fn getFalloffInvSquared(lightRadius: f32, lightDir: vec3f) -> f32 {',
     spotPS: 'fn getSpotEffect(lightSpotDir: vec3f, lightInnerConeAngle: f32, lightOuterConeAngle: f32, lightDirNorm: vec3f) -> f32 {',
   },
@@ -380,6 +382,18 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 	#if defined(GAME_LOOK) && defined(LIT_NEEDS_NORMAL)
 		gameAmbient = dDiffuseLight;
 		dDiffuseLight = gameHemi(litArgs_worldNormal);
+		// In a room with its lamps on by night the eye is set to them: the sky's light, which comes in through the
+		// windows only, is a share of its fill and of its ambient there (and of the moon's, the \`sun\` patch), and the
+		// lamps' light comes off the walls and the floor from every side (\`RoomLightState.light\`, a texel per room:
+		// r the bounce, a the sky's share). The room is the one whose light the fragment has (\`gameRoomLitAt\`,
+		// \`roomLights.ts\`: what is inside an outside wall has the wall's room's).
+		float gameLit = gameRoomLitAt(vPositionW, litArgs_worldNormal);
+		if (gameLit > 1.5 && gameLit < ${ROOM_LIGHT_ROOMS}.0) {
+			vec4 gameRoom = texelFetch(game_roomLight, ivec2(int(gameLit + 0.5), 0), 0);
+			gameRoomSky = gameRoom.a;
+			gameAmbient *= gameRoomSky;
+			dDiffuseLight = dDiffuseLight * gameRoomSky + game_roomBounce * gameRoom.r;
+		}
 		#ifdef LIT_SSAO
 			gameContact = texture2DLod(ssaoTexture, gl_FragCoord.xy * ssaoTextureSizeInv, 0.0).r;
 			dDiffuseLight *= gameContact / mix(1.0, gameContact, ${CONTACT_DIRECT});
@@ -391,6 +405,11 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 		#if LIGHT{i}TYPE == DIRECTIONAL
 			lightColor *= gameUnder.x;
 		#endif
+	#endif
+	#ifdef GAME_LOOK
+		#if LIGHT{i}TYPE == DIRECTIONAL
+			lightColor *= gameRoomSky;
+		#endif
 	#endif`,
   },
   wgsl: {
@@ -398,6 +417,13 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 	#if defined(GAME_LOOK) && defined(LIT_NEEDS_NORMAL)
 		gameAmbient = dDiffuseLight;
 		dDiffuseLight = gameHemi(litArgs_worldNormal);
+		let gameLit = gameRoomLitAt(vPositionW, litArgs_worldNormal);
+		if (gameLit > 1.5 && gameLit < ${ROOM_LIGHT_ROOMS}.0) {
+			let gameRoom = textureLoad(game_roomLight, vec2<i32>(i32(gameLit + 0.5), 0), 0);
+			gameRoomSky = gameRoom.a;
+			gameAmbient = gameAmbient * gameRoomSky;
+			dDiffuseLight = dDiffuseLight * gameRoomSky + uniform.game_roomBounce * gameRoom.r;
+		}
 		#ifdef LIT_SSAO
 			gameContact = textureSampleLevel(ssaoTexture, ssaoTextureSampler, pcPosition.xy * uniform.ssaoTextureSizeInv, 0.0).r;
 			dDiffuseLight = dDiffuseLight * (gameContact / mix(1.0, gameContact, ${CONTACT_DIRECT}));
@@ -408,6 +434,11 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 	#ifdef GAME_UNDERGROUND
 		#if LIGHT{i}TYPE == DIRECTIONAL
 			lightColor = lightColor * gameUnder.x;
+		#endif
+	#endif
+	#ifdef GAME_LOOK
+		#if LIGHT{i}TYPE == DIRECTIONAL
+			lightColor = lightColor * gameRoomSky;
 		#endif
 	#endif`,
   },
@@ -422,6 +453,8 @@ export function patchEngineChunks(device: pc.GraphicsDevice): void {
   patchedDevices.add(device);
   // (No clouds until a renderer has some: the patch below reads their uniforms.)
   noCloudShadows(device);
+  // (No lamp's shadow cone until a renderer has lamps that cast: `lampShadows.ts`.)
+  device.scope.resolve('game_lampShadowCone').setValue(new Float32Array([0, 1]));
   for (const lang of ['glsl', 'wgsl'] as const) {
     const chunks = pc.ShaderChunks.get(device, lang === 'glsl' ? pc.SHADERLANGUAGE_GLSL : pc.SHADERLANGUAGE_WGSL);
     const backend = engineChunk(device, lang, 'litForwardBackendPS');
@@ -443,8 +476,11 @@ export function patchEngineChunks(device: pc.GraphicsDevice): void {
       const room = ROOM_LIGHT_CODE[lang];
       const decode = ANCHORS[lang].clusteredLightDecode;
       const start = ANCHORS[lang].clusteredLightStart;
-      const skipped = replaceOnce(clustered, 'clusteredLightPS', decode, `${decode}${room.skip}`);
-      chunks.set('clusteredLightPS', `${PATCHED}\n${replaceOnce(skipped, 'clusteredLightPS', start, `${room.noLamps}${start}`)}`);
+      let code = replaceOnce(clustered, 'clusteredLightPS', decode, `${decode}${room.skip}`);
+      code = replaceOnce(code, 'clusteredLightPS', start, `${room.noLamps}${start}`);
+      // A lamp's shadow kept to its map's cone (`lampShadows.ts`).
+      for (const read of ANCHORS[lang].clusteredSpotShadows) code = replaceOnce(code, 'clusteredLightPS', read, room.shadow(read));
+      chunks.set('clusteredLightPS', `${PATCHED}\n${room.shadowDecl}${code}`);
     }
   }
 }

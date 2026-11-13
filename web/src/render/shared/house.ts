@@ -46,7 +46,7 @@ import { WALL_HALF, WALL_HEIGHT } from './walls';
 /** A pattern over a surface's texture (the material libraries' `SurfacePattern`). */
 export type SurfacePattern = 'stripes' | 'whitewash';
 
-/** What a house mesh is drawn with: a surface (manifest key, vertex-coloured), a room's clear glass (0: outdoors), or the contact shadows. */
+/** What a house mesh is drawn with: a surface (manifest key, vertex-coloured), a room's clear glass (0: outdoors; `GLASS_OUT`: looked out through), or the contact shadows. */
 export type HouseSurface = { kind: 'surface'; key: string; pattern?: SurfacePattern } | { kind: 'glass'; room: number } | { kind: 'contactShadow' } | { kind: 'neighbourGlass'; lit: boolean };
 
 /**
@@ -278,6 +278,8 @@ const BATH = ['toilet', 'shower', 'bathtub'];
 const KITCHEN = ['fridge', 'sink', 'stove', 'counter', 'diningTable'];
 const BEDROOM = ['bed'];
 const LIVING = ['sofa', 'tv', 'armchair', 'bookshelf', 'computerDesk', 'piano'];
+/** The furniture that says what a room is for, by kind (the footsteps' sound reads a room's floor from it too: `audio/surfaces.ts`). */
+export const ROOM_FURNITURE: Record<RoomKind, readonly string[]> = { bath: BATH, kitchen: KITCHEN, bedroom: BEDROOM, living: LIVING };
 
 export interface RoomLight {
   x: number;
@@ -298,6 +300,26 @@ export interface RoomLight {
   always?: boolean;
   /** Where its shade sends the light (content `light.aim`): a unit direction for a lamp that lights one side only (none: all round). */
   dir?: [number, number, number];
+  /** It can cast shadows (`lampCasts`), where the preset has lamps that do (`pc/lampShadows.ts`). */
+  casts?: boolean;
+}
+
+/**
+ * The "room" of the pane a room looks out at the garden through (`HouseSurface` glass): it never glows. A pane
+ * glows with the room behind it, seen from outside; the pane on the room's side of a window glowed with its own
+ * room, a warm sheen over the dark lawn behind it, which came out olive green.
+ */
+export const GLASS_OUT = -1;
+
+/**
+ * Whether a lamp can cast shadows: one that lights the room below it or round it. Not a fire or a light that
+ * follows a use (their light comes from inside a thing that would shadow all of it: a fireplace, a stove under
+ * its hood), nor a lamp aimed up (its light is on the ceiling, which the game doesn't draw from above). A
+ * lamp that can doesn't cast in another's light either: it would have to be left out of its own, and all copies
+ * of a model are one draw.
+ */
+export function lampCasts(light: LampLight): boolean {
+  return light.while === undefined && !light.fire && light.aim !== 'up';
 }
 
 /** Below the ceiling (m) where an uplighter's light comes off it (`aim: 'ceiling'`), and how much further it reaches from there. */
@@ -349,7 +371,7 @@ export function placeLights(world: WorldStructure, inView: (x: number, z: number
     }
   };
   const lights = [
-    ...lamps.map((l): RoomLight => ({ x: l.x, z: l.z, ...aimed(l), room: l.room, area: areaOf(l.room), kind: 'lamp', power: l.light.intensity, ...(l.light.switch === false && l.light.while === undefined ? {} : { lamp: l.id }), ...(l.light.while === undefined ? {} : { always: true }) })),
+    ...lamps.map((l): RoomLight => ({ x: l.x, z: l.z, ...aimed(l), room: l.room, area: areaOf(l.room), kind: 'lamp', power: l.light.intensity, ...(l.light.switch === false && l.light.while === undefined ? {} : { lamp: l.id }), ...(l.light.while === undefined ? {} : { always: true }), ...(lampCasts(l.light) ? { casts: true } : {}) })),
     // (A light that follows a use isn't the room's lamp: a room whose only light is a hood still gets its dim fill.)
     ...[...rooms.entries()].filter(([r]) => !lamps.some((l) => l.room === r && l.light.while === undefined)).map(([r, t]): RoomLight => ({ x: t.sx / t.n, y: 2.45, z: t.sz / t.n, room: r, area: t.n, kind: 'fill' })),
   ];
@@ -1394,8 +1416,8 @@ export class HousePlanner {
           const plane = sign * T;
           const outside = d.rooms[sign > 0 ? 1 : 0] === 0;
           const out = (o: number): [number, number] => (sign > 0 ? [plane, plane + o] : [plane - o, plane]);
-          // (Lit by the room behind it, else the one it faces.)
-          const pane = glass(d.rooms[sign > 0 ? 0 : 1] || d.rooms[sign > 0 ? 1 : 0]).cutting(Cut.Hide, mask);
+          // (Lit by the room behind it; with the garden behind it, not at all: `GLASS_OUT`.)
+          const pane = glass(d.rooms[sign > 0 ? 0 : 1] || (outside ? 0 : GLASS_OUT)).cutting(Cut.Hide, mask);
           f.face(pane, g0, g1, sill, head, plane - sign * recess, sign);
           trim.cutting(Cut.Hide, mask).color(TRIM);
           const fr = 0.07;
@@ -2449,8 +2471,9 @@ export class HousePlanner {
       const behind = axis === 'h' ? roomP(x + 0.5, z - sign * 0.25) : roomP(x - sign * 0.25, z + 0.5);
       const P = (a: number, y: number, d: number): V3 => (axis === 'h' ? [a, y, plane + n[2] * d] : [plane + n[0] * d, y, a]);
       // One clear pane per face, facing out of it (back faces are culled, so each side sees
-      // through exactly one pane), lit by the room behind it (else the one it faces).
-      glass(behind || tileRoom).cutting(Cut.Hide, mask).poly([P(a0, sill, -recess), P(a1, sill, -recess), P(a1, head, -recess), P(a0, head, -recess)], n);
+      // through exactly one pane), lit by the room behind it; the pane a room looks out at the
+      // garden through (the garden behind it) is never lit (`GLASS_OUT`).
+      glass(behind || (outside ? 0 : GLASS_OUT)).cutting(Cut.Hide, mask).poly([P(a0, sill, -recess), P(a1, sill, -recess), P(a1, head, -recess), P(a0, head, -recess)], n);
       trim.cutting(Cut.Hide, mask).color(TRIM);
       const f = 0.07;
       const out = 0.035;

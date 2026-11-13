@@ -65,12 +65,12 @@ before. Triangles in the table below (was: before the pass).
 
 | Model | Size (w × h × d) | Triangles (2026-10-22) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.bookworm.readingNook` | 1.88 × 1.71 × 0.65 m | 6,868 (was 4,820) | 3 | Wood, Fabric, Cushions |
-| `model.bookworm.libraryWall` | 1.88 × 2.34 × 0.82 m | 6,256 (was 6,492) | 3 | Wood, Ladder |
-| `model.bookworm.writingBureau` | 0.85 × 1.35 × 0.76 m | 7,352 (was 5,144) | 4 | Wood, Fabric, Chair |
-| `model.bookworm.teaTrolley` | 0.75 × 0.94 × 0.49 m | 3,768 (was 3,892) | 3 | Wood, Fabric, Frame |
-| `model.bookworm.firesideLounge` | 1.70 × 2.80 × 1.85 m | 11,520 (was 6,070) | 3 | Wood, Fabric, Rug |
-| `model.bookworm.bedsideStack` | 0.63 × 0.93 × 0.73 m | 3,948 (was 2,976) | 3 | Wood, Fabric, Drawers |
+| `model.bookworm.readingNook` | 1.88 × 1.71 × 0.65 m | 6,868 (was 4,820) | 7,644 | Wood, Fabric, Cushions |
+| `model.bookworm.libraryWall` | 1.88 × 2.34 × 0.82 m | 6,256 (was 6,492) | 6,256 | Wood, Ladder |
+| `model.bookworm.writingBureau` | 0.85 × 1.35 × 0.76 m | 7,352 (was 5,144) | 7,368 | Wood, Fabric, Chair |
+| `model.bookworm.teaTrolley` | 0.75 × 0.94 × 0.49 m | 3,768 (was 3,892) | 3,768 | Wood, Fabric, Frame |
+| `model.bookworm.firesideLounge` | 1.70 × 2.80 × 1.85 m | 11,520 (was 6,070) | 12,416 | Wood, Fabric, Rug |
+| `model.bookworm.bedsideStack` | 0.63 × 0.93 × 0.73 m | 3,948 (was 2,976) | 3,948 | Wood, Fabric, Drawers |
 
 The library wall has no fabric to colour; its second part is the ladder.
 
@@ -84,3 +84,7 @@ sinking and the fire growing; the bureau turned to three facings; colours on the
 cargo art pack_bookworm            # the six .glb, the pack, check-glb
 cargo art pack_bookworm --preview  # previews/pack_bookworm/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+The reading nook's two throw pillows are sewn flat and stuffed: their sides drawn in 1.2 cm between corners that stand out (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `firesideLounge`, `readingNook`, `writingBureau`; 26,604 to 27,428 triangles.

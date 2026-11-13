@@ -9,7 +9,8 @@
  * `flowers` (the lawn's flowers' drifts) and `patches` (the patches of small flowers in them) in `shared/nature.ts`; `shade` (the ground's shade round what stands on it) in
  * `shared/groundShade.ts`; `clouds` (the clouds' shadows) in `pc/cloudShadows.ts`; `house` (the walls' tops, the tone of
  * walls and floors over a room) in `shared/house.ts`; `street` (worn asphalt, the pavement and its kerb, paving's sides) in
- * `shared/paving.ts`; `leaves` (the plants' leaves from above and from plant to plant) in `pc/nature.ts`.
+ * `shared/paving.ts`; `leaves` (the plants' leaves from above and from plant to plant) in `pc/nature.ts`; `room` (a lamplit
+ * room's own light) in `shared/roomLight.ts`; `lampShadows` (the lamps' shadows) in `pc/lampShadows.ts`.
  */
 
 /** `a.b:1;c.d:x` as path → value, both as written. */

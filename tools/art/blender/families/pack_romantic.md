@@ -40,12 +40,12 @@ the shell at x = ±0.5 where the heart narrows, as they do in the old part: the 
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.romantic.candlelitTable` | 1.80 × 1.10 × 0.80 m | 5,594 (was 4,216) | 3 | Body, Fabric, Tablecloth |
-| `model.romantic.heartTub` | 1.87 × 0.78 × 1.82 m | 6,260 (was 5,264) | 3 | Body, Fabric |
-| `model.romantic.vanity` | 0.80 × 1.62 × 0.82 m | 4,238 (was 4,404) | 2 | Body, Fabric, Rose gold |
-| `model.romantic.gramophone` | 0.74 × 1.58 × 0.70 m | 4,884 (was 2,720) | 3 | Body, Horn |
-| `model.romantic.letterBureau` | 0.84 × 1.19 × 0.91 m | 3,018 (was 2,788) | 3 | Body, Fabric |
-| `model.romantic.roseArbourSwing` | 1.83 × 2.61 × 0.82 m | 11,734 (was 7,036) | 3 | Body, Fabric |
+| `model.romantic.candlelitTable` | 1.80 × 1.10 × 0.80 m | 5,594 (was 4,216) | 5,594 | Body, Fabric, Tablecloth |
+| `model.romantic.heartTub` | 1.87 × 0.78 × 1.82 m | 6,260 (was 5,264) | 6,260 | Body, Fabric |
+| `model.romantic.vanity` | 0.80 × 1.62 × 0.82 m | 4,238 (was 4,404) | 4,670 | Body, Fabric, Rose gold |
+| `model.romantic.gramophone` | 0.74 × 1.58 × 0.70 m | 4,884 (was 2,720) | 4,884 | Body, Horn |
+| `model.romantic.letterBureau` | 0.84 × 1.19 × 0.91 m | 3,018 (was 2,788) | 3,018 | Body, Fabric |
+| `model.romantic.roseArbourSwing` | 1.83 × 2.61 × 0.82 m | 11,734 (was 7,036) | 12,528 | Body, Fabric |
 
 Body is the table's gold legs, the tub's shell, the vanity's and bureau's ivory, the gramophone's cabinet and the
 arbour's paint; Fabric the chairs' velvet, the towels, the pouf and the swing's cushion. The gramophone has no
@@ -96,3 +96,7 @@ footprint, where a tender can't stand. 11,734 triangles, 3 draws, as before.
 cargo art pack_romantic            # the six .glb, the pack, check-glb
 cargo art pack_romantic --preview  # previews/pack_romantic/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+The rose arbour swing's pillows are sewn flat and stuffed (`waist`), its seat cushion `resting`. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `candlelitTable`, `letterBureau`, `roseArbourSwing`; 20,346 to 21,140 triangles.

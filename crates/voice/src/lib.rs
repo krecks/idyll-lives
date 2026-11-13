@@ -70,8 +70,8 @@ pub struct LineInputs {
 
 impl LineInputs {
     /// The model's output (at `rate` Hz) at [`SAMPLE_RATE`], with the silence around the speech
-    /// dropped, at the line's pitch, size and speed; and its mouth shapes, flat
-    /// ([`VisemeTrack::flat`]).
+    /// dropped, at the line's pitch, size and speed, and at the one loudness every line has
+    /// ([`dsp::level`]); and its mouth shapes, flat ([`VisemeTrack::flat`]).
     pub fn finish(&self, samples: &[f32], rate: u32) -> (Vec<f32>, Vec<f32>) {
         let v = self.voice;
         let at_rate = if rate == SAMPLE_RATE || rate == 0 {
@@ -79,8 +79,11 @@ impl LineInputs {
         } else {
             resample(samples, rate as f32 / SAMPLE_RATE as f32)
         };
-        let samples = dsp::shape(dsp::trim(&at_rate), v.pitch, v.depth, v.speed);
+        let mut samples = dsp::shape(dsp::trim(&at_rate), v.pitch, v.depth, v.speed);
         let track = visemes::track(&self.phonemes, &samples, SAMPLE_RATE);
+        // (Last: one gain on the whole clip, so its length, its pauses and its mouth shapes,
+        // read from it as the model made it, are what they were.)
+        dsp::level(&mut samples);
         (samples, track.flat())
     }
 }

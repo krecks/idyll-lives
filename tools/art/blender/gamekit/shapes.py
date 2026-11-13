@@ -22,6 +22,22 @@ SHARP = 40  # degrees: an edge turning more than this stays sharp on a smooth pa
 CLOSED = 180  # a closed round thing (a sphere, a ring, a boulder) has no edge to keep sharp: smooth all over
 
 
+FACET = 0.001  # metres: how far a round thing's flat sides may stand in from the curve they are drawn for
+
+
+def sides(radius, least=8, most=64):
+    """How many flat sides a round thing of `radius` needs for its outline to stand no more than `FACET` in from
+    the circle (a polygon's sides stand r × (1 − cos(π / n)) in), in fours (so it stays the same mirrored and turned
+    a quarter): never fewer than `least` (what the part took before it was counted) nor more than `most`. A far
+    version (`far.is_low`) takes `least`: nobody sees its outline to a millimetre."""
+    from .far import is_low
+    radius = abs(radius)
+    if is_low() or radius <= FACET:
+        return least
+    n = math.ceil(math.pi / math.acos(1.0 - FACET / radius) - 1e-9)
+    return max(least, min(most, 4 * math.ceil(n / 4)))
+
+
 def round_angle(sides):
     """The sharp angle for a smooth thing `sides` round: its sides stay smooth (a hexagonal leg turns 60° a
     side), its caps' rims (90°) stay sharp."""
@@ -106,11 +122,14 @@ def rod(name, a, b, radius, material=None, verts=12, smooth=True):
 LATHE_SHARP = 70  # degrees: a lathe's profile is often a few points round a curve (a jar's shoulder turns 53°)
 
 
-def revolve(name, profile, at=(0, 0, 0), material=None, segments=24, scale=(1, 1, 1),
+def revolve(name, profile, at=(0, 0, 0), material=None, segments=None, scale=(1, 1, 1),
             rot=(0, 0, 0), smooth=True, angle=LATHE_SHARP):
     """Surface of revolution around z. `profile` is [(r, z), ...] in metres, top last. Smooth, it stays smooth
     where the profile turns less than `angle` degrees (a few points round a jar's shoulder) and sharp where it turns
-    more (a rim, a step, the edge of its base)."""
+    more (a rim, a step, the edge of its base). `segments` round: by default 24, and more for one over 12 cm in
+    radius, as many as keep its outline within a millimetre of the circle (`sides`)."""
+    if segments is None:
+        segments = sides(max(abs(r) for r, _ in profile) * max(abs(scale[0]), abs(scale[1])), 24)
     verts, faces = [], []
     n = len(profile)
     for s in range(segments):

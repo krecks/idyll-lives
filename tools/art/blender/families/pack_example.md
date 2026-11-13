@@ -34,8 +34,8 @@ The old part's step was buried in the tub's surround; there is none.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.chefStove` | 1.62 × 2.55 × 0.66 m | 10,416 (was 6,828) | 4 | Body, Handles & knobs, Tiles |
-| `model.whirlpoolTub` | 1.86 × 0.93 × 1.86 m | 7,352 (was 7,104) | 4 | Tub, Surround, Headrests |
+| `model.chefStove` | 1.62 × 2.55 × 0.66 m | 10,416 (was 6,828) | 10,416 | Body, Handles & knobs, Tiles |
+| `model.whirlpoolTub` | 1.86 × 0.93 × 1.86 m | 7,352 (was 7,104) | 7,352 | Tub, Surround, Headrests |
 
 `check-glb`: 2 models, 0 failed; the two 4-draw warnings above. Khronos validator: 0 errors, 0 warnings each.
 Clips bench at rest, open and mid-loop on WebGPU and WebGL, coloured. In play (`wants-asking`, WebGPU): the stove in
@@ -73,3 +73,7 @@ lit burner. It goes on the lit front middle burner's grate now, (0, 0) at 0.963,
 cold front right one, (0.5, 0.03) (`STATION_SPOTS`, `SET_DOWN_SPOTS`). The frying pan with the omelette on the back
 right burner turned its handle out to the right along the back row: it reached across that front right burner. (No
 content `surface`: a stove's hob isn't a top things are put on, as the other cookers have none.)
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 2 models changed shape: `chefStove`, `whirlpoolTub`; the same triangles.

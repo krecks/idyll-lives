@@ -15,7 +15,7 @@
 //! oak) are made in [`organic`] instead: sprites (blades, leaves, fibres) drawn into a z-buffered
 //! layer, with their own albedo tone, AO and roughness besides the height.
 //!
-//! The output keeps the filenames and sizes the game expects: the 19 texture sets under
+//! The output keeps the filenames and sizes the game expects: the 20 texture sets under
 //! `textures/<set>/`, the sidewalk under `street/sidewalk/`. Everything is original and CC0; there are
 //! no downloads and no Python.
 
@@ -441,7 +441,7 @@ const fn set_ao(
     }
 }
 
-pub const SETS: [Set; 20] = [
+pub const SETS: [Set; 21] = [
     set("bark", 512, 512, None, 0.010, (0.84, 0.20, 2.3)),
     set_ao("brick", 1024, 1024, None, 0.0041, (0.81, 0.12, 4.5), 0.945),
     set(
@@ -459,6 +459,14 @@ pub const SETS: [Set; 20] = [
         Some((0.80, 0.45, 0.0)),
         0.0006,
         (0.60, 0.10, 1.5),
+    ),
+    set(
+        "leather",
+        512,
+        512,
+        Some((0.97, 0.6, 0.0)),
+        0.0026,
+        (0.44, 0.0, 0.0),
     ),
     set(
         "floor_laminate",
@@ -795,6 +803,23 @@ mod tests {
                 .all(|p| p[0] == 255 && p[2] == 0)
         );
         assert!(a.px.as_chunks::<3>().0.iter().all(|p| p[1] == to_u8(0.8)));
+    }
+
+    #[test]
+    fn leather_has_creases_and_an_uneven_sheen() {
+        let Surface { height, rough, .. } = generate("leather", 256);
+        let rough = rough.expect("leather makes its own roughness");
+        let (lo, hi) = rough.iter().fold((f64::INFINITY, 0.0f64), |(lo, hi), &r| {
+            (lo.min(r), hi.max(r))
+        });
+        // Polished where it is sat on, duller between and in the creases.
+        assert!((0.33..=0.38).contains(&lo), "smoothest {lo}");
+        assert!((0.46..=0.51).contains(&hi), "roughest {hi}");
+        // The creases are the deepest thing in it: a twentieth of the hide lies well under its middle.
+        let mut h = height.v.clone();
+        h.sort_by(f64::total_cmp);
+        let (deep, middle) = (h[h.len() / 20], h[h.len() / 2]);
+        assert!(middle - deep > 0.12, "creases {deep} under {middle}");
     }
 
     #[test]

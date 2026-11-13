@@ -210,11 +210,14 @@ function debugReports(): Plugin {
 }
 
 /**
- * Compressed copies of the assets (KTX2 textures, meshopt models, gzipped character data; see
- * tools/assets/optimize.mjs): encoded when the build starts (only files that changed since the
- * last build, the rest come from web/.assets/cache) and copied into dist/assets when it ends,
+ * Compressed copies of the assets (KTX2 textures, meshopt models, gzipped character data: `cargo
+ * assets`, crates/tools/src/assets.rs): encoded when the build starts (only files that changed since
+ * the last build, the rest come from web/.assets/cache) and copied into dist/assets when it ends,
  * next to the sources. `LL_ASSETS=source` builds without them. The dev server serves sources.
  */
+/** Where `cargo assets` writes: `optimized.json` and the `opt/` tree. */
+const ASSETS_OUT = fileURLToPath(new URL('.assets/out', import.meta.url));
+
 function optimizedAssets(): Plugin {
   const skip = process.env.LL_ASSETS === 'source';
   let outDir = '';
@@ -225,12 +228,10 @@ function optimizedAssets(): Plugin {
     configResolved(config) {
       outDir = resolve(config.root, config.build.outDir);
     },
-    async buildStart() {
+    buildStart() {
       if (skip) return;
-      // Imported by URL so it runs from its own file (it starts worker threads on itself).
-      const tool = await import(new URL('../tools/assets/optimize.mjs', import.meta.url).href);
-      await tool.optimizeAssets({ log: (line: string) => this.info(line) });
-      copies = tool.OUT;
+      for (const line of runTool(['assets'])) this.info(line);
+      copies = ASSETS_OUT;
     },
     async closeBundle() {
       if (copies) await cp(copies, join(outDir, 'assets'), { recursive: true });
@@ -356,10 +357,7 @@ function dataBundle(): Plugin {
         for (const pack of (manifest.packs as string[] | undefined) ?? []) await manifests(relative(path, pack));
       };
       await manifests('assets/manifest.json');
-      if (process.env.LL_ASSETS !== 'source') {
-        const tool = await import(new URL('../tools/assets/optimize.mjs', import.meta.url).href);
-        await add('assets/optimized.json', join(tool.OUT, 'optimized.json'));
-      }
+      if (process.env.LL_ASSETS !== 'source') await add('assets/optimized.json', join(ASSETS_OUT, 'optimized.json'));
       await writeFile(join(outDir, 'bundle.json'), JSON.stringify(files));
     },
   };

@@ -20,6 +20,9 @@
  *   the short one-shots) stays put (< 1 cm); so does a foot on the floor while the body turns on the spot
  *   (`turnR90`, …: every size each way, a grown-up's on the grown-ups and a child's on the children,
  *   the clip turned by its share of the turn as the runtime turns the Sim);
+ * - setting off and coming to a stop (`transitions.ts`, on the runtime's own posing, not on the clips alone): a
+ *   foot on the floor travels no more than `TRAVEL_LIMIT` (70 mm over a start, 60 mm over a stop) at any part of
+ *   the stride, on each body at each stage but the baby's;
  * - every clip's length is within 15% of its target (the runtime sequences on them);
  * - seated (`sit` fitted with the body's `seatDrop`, the legs as the runtime fits them to the floor:
  *   characters/seatFit.ts `feetDown`) on a 0.45 m seat, a child's on the kids' chair (0.31 m), the feet
@@ -73,6 +76,7 @@ const { SHOT, STREET_SHOT } = await import('../../web/src/render/shared/characte
 const { KNEEL_TABLE, SIT_LOW } = await import('../../web/src/render/shared/characters/clips/low.ts');
 const { TURN_ANGLES, turnClip, turnDef, turnSeconds, turnShare } = await import('../../web/src/render/shared/characters/clips/locomotion.ts');
 const { turned } = await import('../../web/src/render/shared/characters/clips/ik.ts');
+const { measureTransitions, summarise, TRAVEL_LIMIT } = await import('./transitions.ts');
 /**
  * Turning on the spot (clips/locomotion.ts, baked by the runtime as needed: `turnDef`): every size each way, a grown-up's
  * and a child's, with its angle (deg, + to the right).
@@ -394,7 +398,9 @@ function checkSkeleton(sk: Skeleton): void {
         const zs: number[] = [];
         for (let f = 0; f < c.frames; f++) {
           const roll = name === 'walk' ? Math.sin((f / c.frames) * Math.PI * 2) * sway : 0;
-          const add = roll ? new Map([[bone.pelvis, [0, 0, Math.sin(roll / 2), Math.cos(roll / 2)]]]) : undefined;
+          // (The pelvis rolled, the thighs turned back by it: the legs stay as the clip has them.)
+          const back = [0, 0, Math.sin(-roll / 2), Math.cos(-roll / 2)];
+          const add = roll ? new Map([[bone.pelvis, [0, 0, Math.sin(roll / 2), Math.cos(roll / 2)]], [bone.thigh_l, back], [bone.thigh_r, back]]) : undefined;
           const p = fk(c, f, sk, add)[bone[`foot_${side}`]];
           ys.push(p[1]);
           zs.push(p[2]);
@@ -579,6 +585,21 @@ function checkBaby(sk: Skeleton): void {
 }
 
 for (const b of bodyNames) for (const s of stageNames) checkSkeleton(skeleton(b, s));
+
+// --- starting and stopping a walk (the runtime itself: transitions.ts) -------------------------
+
+{
+  // A foot on the floor while a resident sets off or comes to a stop stays where it is: its travel, at every part
+  // of the stride, on the runtime's own posing.
+  const stages = stageNames.filter((s) => s !== 'baby');
+  if (stages.length) {
+    for (const t of summarise(await measureTransitions(bodyNames, stages))) {
+      for (const kind of ['start', 'stop'] as const) {
+        if (t[kind].max > TRAVEL_LIMIT[kind]) fail(skeleton(t.body, t.stage), 'walk', 'travel', kind, `walk: a foot on the floor travels ${(t[kind].max * 1000).toFixed(0)} mm over a ${kind} (${(TRAVEL_LIMIT[kind] * 1000).toFixed(0)} mm at most; ${(t[kind].mean * 1000).toFixed(0)} mm on average over the stride)`);
+      }
+    }
+  }
+}
 
 // --- report -----------------------------------------------------------------------------------
 

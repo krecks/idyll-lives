@@ -133,3 +133,7 @@ nothing while the kettle's lid flipped up. Each now has one moving part (two dra
 - `espressoMachineSmall`: two thin streams of coffee (`coffee`) from the portafilter's spouts down into the cup, built
   full length and flattened into the spouts' tips; `brew` runs them down in 0.6 s, held 2.5 s, then they stop and the
   coffee is drunk (*Make a coffee*).
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `monitor`; the same triangles.

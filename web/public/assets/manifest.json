@@ -695,6 +695,16 @@
       "roughness": 1,
       "metallic": 0
     },
+    "material.finish.leather": {
+      "type": "material",
+      "color": "#FFFFFF",
+      "texture": "textures/leather/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 2.0,
+      "roughness": 1,
+      "metallic": 0
+    },
     "material.finish.wood": {
       "type": "material",
       "color": "#FFFFFF",

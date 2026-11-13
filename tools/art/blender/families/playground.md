@@ -66,14 +66,14 @@ build of its own (`parkChessTableFar`): the table, the squares and the stools at
 
 | Model | Size (w × h × d) | Triangles (far), before → after | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.slide` | 0.75 × 2.80 × 1.94 m | 2,020 (498) → 4,308 (1,066) | 2 | Frame, Slide, Roof |
-| `model.climbingFrame` | 1.82 × 3.45 × 1.99 m | 1,656 (406) → 5,564 (1,322) | 3 | Frame, Roof, Net |
-| `model.seesaw` | 2.50 × 0.85 × 0.42 m | 1,808 (452) → 3,964 (974) | 2 | Frame, Seats, Plank |
-| `model.springRider` | 0.40 × 0.95 × 0.96 m | 3,172 (792) → 3,768 (936) | 2 | Horse, Saddle, Spring |
-| `model.merryGoRound` | 1.96 × 1.04 × 1.96 m | 2,924 (714) → 4,044 (1,003) | 2 | Platform, Rails, Stripes |
-| `model.basketballHoop` | 1.20 × 3.70 × 0.97 m | 2,912 (714) → 3,804 (944) | 2 | Frame, Backboard, Hoop |
-| `model.pingPongTable` | 2.74 × 0.92 × 1.83 m | 1,148 (276) → 1,688 (396) → 1,088 (258) | 1 | Table, Legs |
-| `model.parkChessTable` | 1.45 × 0.85 × 0.70 m | 3,468 (1,216) → 5,544 (1,784) | 2 | Table, Stools |
+| `model.slide` | 0.75 × 2.80 × 1.94 m | 2,020 (498) → 4,308 (1,066) | 4,308 | Frame, Slide, Roof |
+| `model.climbingFrame` | 1.82 × 3.45 × 1.99 m | 1,656 (406) → 5,564 (1,322) | 5,564 | Frame, Roof, Net |
+| `model.seesaw` | 2.50 × 0.85 × 0.42 m | 1,808 (452) → 3,964 (974) | 3,964 | Frame, Seats, Plank |
+| `model.springRider` | 0.40 × 0.95 × 0.96 m | 3,172 (792) → 3,768 (936) | 3,768 | Horse, Saddle, Spring |
+| `model.merryGoRound` | 1.96 × 1.04 × 1.96 m | 2,924 (714) → 4,044 (1,003) | 4,044 | Platform, Rails, Stripes |
+| `model.basketballHoop` | 1.20 × 3.70 × 0.97 m | 2,912 (714) → 3,804 (944) | 3,804 | Frame, Backboard, Hoop |
+| `model.pingPongTable` | 2.74 × 0.92 × 1.83 m | 1,148 (276) → 1,688 (396) → 1,088 (258) | 1,088 | Table, Legs |
+| `model.parkChessTable` | 1.45 × 0.85 × 0.70 m | 3,468 (1,216) → 5,544 (1,784) | 5,544 | Table, Stools |
 
 ## Detail pass (2026-10-22)
 
@@ -118,3 +118,7 @@ validator: 0 errors, 0 warnings on all 16 files.
 cargo art playground            # the 16 .glb, the pack, check-glb
 cargo art playground --preview  # previews/playground/<id>.png, <id>@<clip>.png, <id>.far.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `basketballHoop`, `seesaw`, `springRider`; the same triangles.

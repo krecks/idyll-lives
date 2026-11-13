@@ -71,13 +71,13 @@ that say what they colour: the blender `blend_cab` "Frame", `blend_door` "Doors"
 
 | Model | Size (w × h × d) | Triangles (2026-10-22) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.energetic.boulderingWall` | 1.87 × 2.28 × 0.88 m | 5,108 (was 3,772) | 3 | Frame, Pads, Panel |
-| `model.energetic.spinBike` | 0.62 × 1.20 × 1.60 m | 4,000 (was 2,536) | 3 | Frame, Pads, Flywheel |
-| `model.energetic.trampoline` | 1.90 × 0.63 × 1.90 m | 4,364 (was 3,420) | 3 | Frame, Pads, Mat |
-| `model.energetic.streetballHoop` | 0.86 × 2.83 × 0.89 m | 3,700 (was 3,668) | 2 | Frame, Pads, Base |
-| `model.energetic.powerBlender` | 0.82 × 1.32 × 0.63 m | 4,160 (was 3,972) | 4 | Frame, Doors, Blender |
-| `model.energetic.contrastShower` | 0.90 × 2.15 × 0.90 m | 4,884 (was 3,064) | 4 | Frame, Tiles, Mat |
-| `model.energetic.recoveryPod` | 0.86 × 1.18 × 1.86 m | 3,828 (was 2,900) | 3 | Frame, Pads, Boots |
+| `model.energetic.boulderingWall` | 1.87 × 2.28 × 0.88 m | 5,108 (was 3,772) | 5,108 | Frame, Pads, Panel |
+| `model.energetic.spinBike` | 0.62 × 1.20 × 1.60 m | 4,000 (was 2,536) | 4,016 | Frame, Pads, Flywheel |
+| `model.energetic.trampoline` | 1.90 × 0.63 × 1.90 m | 4,364 (was 3,420) | 4,364 | Frame, Pads, Mat |
+| `model.energetic.streetballHoop` | 0.86 × 2.83 × 0.89 m | 3,700 (was 3,668) | 3,700 | Frame, Pads, Base |
+| `model.energetic.powerBlender` | 0.82 × 1.32 × 0.63 m | 4,160 (was 3,972) | 4,160 | Frame, Doors, Blender |
+| `model.energetic.contrastShower` | 0.90 × 2.15 × 0.90 m | 4,884 (was 3,064) | 4,884 | Frame, Tiles, Mat |
+| `model.energetic.recoveryPod` | 0.86 × 1.18 × 1.86 m | 3,828 (was 2,900) | 3,908 | Frame, Pads, Boots |
 
 `check-glb`: 7 models, 0 failed, 2 warnings, both by design:
 - the trampoline's height (0.63 m, old part 0.83 m): the old part's ball sat on the mat; here it is on the
@@ -99,3 +99,7 @@ canopy closed over the head and lifted after), the wall climbed, the shower (rai
 cargo art pack_energetic            # the seven .glb, the pack, check-glb
 cargo art pack_energetic --preview  # previews/pack_energetic/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 4 models changed shape: `boulderingWall`, `recoveryPod`, `spinBike`, `streetballHoop`; 16,636 to 16,732 triangles.

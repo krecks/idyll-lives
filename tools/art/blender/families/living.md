@@ -21,16 +21,16 @@ sofa's 0.425 m.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.sofa` (camel back, cabriole legs) | 1.88 × 0.94 × 0.82 m | 6,084 | 3 | Upholstery, Cushions, Frame, Legs, Pillow, Second pillow |
-| `model.loveseat` | 1.84 × 0.83 × 0.84 m | 5,644 | 3 | Upholstery, Cushions, Legs, Pillow |
-| `model.sofaThree` | 2.82 × 0.87 × 0.86 m | 7,456 | 3 | Upholstery, Cushions, Legs, Pillows, Throw |
-| `model.sofaDesign` (brass rail and legs) | 1.87 × 0.72 × 0.82 m | 5,936 | 3 | Upholstery, Cushions, Frame, Legs |
-| `model.sofaThreeSeat` | 2.86 × 0.82 × 0.88 m | 6,556 | 3 | Upholstery, Cushions, Legs, Pillow, Second pillow |
-| `model.sectionalMiddle` | 1.00 × 0.82 × 0.88 m | 2,656 | 3 | Upholstery, Cushions, Legs |
-| `model.sectionalArmLeft` (arm at +x) | 1.00 × 0.82 × 0.88 m | 3,196 | 3 | Upholstery, Cushions, Legs |
-| `model.sectionalArmRight` (arm at −x) | 1.00 × 0.82 × 0.88 m | 3,196 | 3 | Upholstery, Cushions, Legs |
-| `model.sectionalCorner` | 1.00 × 0.82 × 0.89 m | 3,816 | 3 | Upholstery, Cushions, Legs, Pillow |
-| `model.chaise` (1 × 2) | 0.96 × 0.82 × 1.90 m | 3,384 | 3 | Upholstery, Cushions, Legs, Throw |
+| `model.sofa` (camel back, cabriole legs) | 1.88 × 0.94 × 0.82 m | 6,836 | 3 | Upholstery, Cushions, Frame, Legs, Pillow, Second pillow |
+| `model.loveseat` | 1.84 × 0.83 × 0.84 m | 6,132 | 3 | Upholstery, Cushions, Legs, Pillow |
+| `model.sofaThree` | 2.82 × 0.87 × 0.86 m | 8,108 | 3 | Upholstery, Cushions, Legs, Pillows, Throw |
+| `model.sofaDesign` (brass rail and legs) | 1.87 × 0.72 × 0.82 m | 7,342 | 3 | Upholstery, Cushions, Frame, Legs |
+| `model.sofaThreeSeat` | 2.86 × 0.82 × 0.88 m | 7,108 | 3 | Upholstery, Cushions, Legs, Pillow, Second pillow |
+| `model.sectionalMiddle` | 1.00 × 0.82 × 0.88 m | 2,538 | 3 | Upholstery, Cushions, Legs |
+| `model.sectionalArmLeft` (arm at +x) | 1.00 × 0.82 × 0.88 m | 3,238 | 3 | Upholstery, Cushions, Legs |
+| `model.sectionalArmRight` (arm at −x) | 1.00 × 0.82 × 0.88 m | 3,238 | 3 | Upholstery, Cushions, Legs |
+| `model.sectionalCorner` | 1.00 × 0.82 × 0.89 m | 3,874 | 3 | Upholstery, Cushions, Legs, Pillow |
+| `model.chaise` (1 × 2) | 0.96 × 0.82 × 1.90 m | 3,634 | 3 | Upholstery, Cushions, Legs, Throw |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in play (WebGPU and
 WebGL, day and night, all four facings across the set): residents sit on each, and `sink_in` plays and holds.
@@ -61,14 +61,14 @@ Built as the sofas are, from the old primitive parts (`armchair_bergere` and the
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.armchair` (bergère) | 0.74 × 0.98 × 0.80 m | 3,964 | 3 | Upholstery, Cushion, Frame, Legs, Pillow |
-| `model.armchairLounge` | 0.82 × 0.83 × 0.84 m | 3,736 | 3 | Upholstery, Cushions, Legs |
-| `model.armchairLeather` | 0.73 × 0.95 × 0.85 m | 3,964 | 3 | Frame, Upholstery |
-| `model.armchairDesign` | 0.76 × 0.96 × 0.85 m | 3,588 | 2 | Frame, Upholstery, Base |
-| `model.armchairWingback` | 0.84 × 1.10 × 0.80 m | 3,840 | 3 | Upholstery, Cushion, Legs |
-| `model.recliner` | 0.92 × 0.99 × 0.80 m | 3,716 | 3 | Upholstery, Cushions & footrest |
-| `model.rockingChair` | 0.53 × 1.03 × 0.90 m | 3,732 | 2 | Wood, Cushion |
-| `model.pouf` | 0.72 × 0.47 × 0.50 m | 2,892 | 3 | Leather, Buttons, Legs |
+| `model.armchair` (bergère) | 0.74 × 0.98 × 0.80 m | 4,556 | 3 | Upholstery, Cushion, Frame, Legs, Pillow |
+| `model.armchairLounge` | 0.82 × 0.83 × 0.84 m | 4,028 | 3 | Upholstery, Cushions, Legs |
+| `model.armchairLeather` | 0.73 × 0.95 × 0.85 m | 3,926 | 3 | Frame, Upholstery |
+| `model.armchairDesign` | 0.76 × 0.96 × 0.85 m | 3,472 | 2 | Frame, Upholstery, Base |
+| `model.armchairWingback` | 0.84 × 1.10 × 0.80 m | 4,068 | 3 | Upholstery, Cushion, Legs |
+| `model.recliner` | 0.92 × 0.99 × 0.80 m | 3,626 | 3 | Upholstery, Cushions & footrest |
+| `model.rockingChair` | 0.53 × 1.03 × 0.90 m | 3,644 | 2 | Wood, Cushion |
+| `model.pouf` | 0.72 × 0.47 × 0.50 m | 2,514 | 3 | Leather, Buttons, Legs |
 | `model.ottoman` | 0.62 × 0.45 × 0.62 m | 3,688 | 3 | Upholstery, Buttons, Feet |
 | `model.floorCushion` | 0.62 × 0.14 × 0.62 m | 2,176 | 1 | Cushion, Piping, Button |
 | `model.beanBag` | 0.84 × 0.70 × 0.84 m | 2,500 | 1 | Bag, Seat |
@@ -169,7 +169,7 @@ house generator place it (`cfg.stairs`), not the buy catalog, which leaves stair
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.stairs` | 0.86 × 3.68 × 4.00 m | 5,468 | 2 | Treads, Railing |
+| `model.stairs` | 0.86 × 3.68 × 4.00 m | 5,524 | 2 | Treads, Railing |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings. Seen in play (WebGPU, and WebGL2 at
 night): generated houses with a flight up (facing 2) and flights down to the basement (facings 0, 1 and 3), a
@@ -182,11 +182,25 @@ Every model but the two worked examples (`model.armchair`, `model.sofa`, rebuilt
 forms (gamekit/forms.py), same keys, sizes, centres, nodes, clips, motions, paint and draws; the triangles in the
 tables above. The helpers in living.py:
 
-- **`_cushion`** is a `F.soft` box: rounded, puffed on its two largest faces, piped round both seams (`piping`
-  None: none). `keep_top=True` for a seat cushion: its puffed middle where the old box's top was, its edges lower,
-  so the seat stays at the content height (the gate checks within 2 cm; a puff on top of the old top was 2.5 cm
-  high). **`_panel`**: firm upholstery (a base, an arm, a back), rounded, welted. Never puff a part across its
-  width or depth at the model's edge: `soft_box` puffs both faces, and the model grows (the sofas did, 1–2 cm).
+- **`_cushion`** is a `F.soft` box: rounded, puffed on its two largest faces, its corners pinched in (the shared
+  form's default: two seat cushions part in a V at their front corners), piped round both seams (`piping` None:
+  none), `resting` (it lies on the deck or leans on the back: that face is plain and has no cord). `keep_top=True`
+  for a seat cushion: its puffed middle where the old box's top was, its edges lower, so the seat stays at the
+  content height (the gate checks within 2 cm; a puff on top of the old top was 2.5 cm high), its top sinking
+  1.4 cm over its front third (`SEAT_SAG`: where the hips rest, and the 5 cm round it the gate probes, it keeps
+  its height) and standing 5 mm over its boxing (`SEAT_OVERHANG`). **`_pillow`**: a throw pillow sewn flat and
+  stuffed: thin at its seams, its sides drawn in between corners that stand out as ears (`waist`). **`_panel`**:
+  firm upholstery (a base, an arm, a back), rounded, welted; the designer sofa's back and the pouf's top are
+  tufted by the form (`tufts`, `button`: the dents are in the mesh, a covered button in each). Never puff a part
+  across its width or depth at the model's edge: `soft_box` puffs both faces, and the model grows (the sofas did,
+  1–2 cm).
+- **The soft forms pass (2026-11-13).** Every cushion, pillow and panel takes the shared form's steps (no `flat` or
+  `rs` of the family's own but where a small part saves triangles): the rounded edges turn in equal parts and the
+  crowns have as many steps as keep them within 2 mm. Same sizes, parts, clips and seat heights (`cargo review
+  sizes` is unchanged to the centimetre, every model within 0.5 mm of its size before); the sofas spend 5 to 25 %
+  more triangles (the table above), the armchair (4,556) and the lounge chair (4,028) a little over their aim of
+  4,000. The designer chair's arm pads, crossed in one step, are not pinched (they were, for a day, and the chair
+  7 mm narrower).
 - **`_leg`** (a turned leg: collar, taper, splay), **`_throw`** (a throw swept over a seat's front edge,
   wobbled), **`_rolled_arm`** (an English arm: its section swept, a welt round its scroll), **`_press`** (tufts
   pressed into a top), **`_round_rings`**/**`_disc`** (turned things lofted from (height, radius) rows: table
@@ -237,3 +251,7 @@ What each has now:
 cargo art living            # the .glb files, the pack, check-glb
 cargo art living --preview  # previews/living/<id>.png, <id>@<clip>.png
 ```
+
+## Leather (2026-11-13)
+
+The leather armchair's cushions (`leather`), the designer chair's (`hide`) and the pouf (`pouf_leather`, and its buttons, covered in the same hide so the top stays one draw) are leather. The leather armchair and the pouf stay at 3 draws, the designer chair goes from 2 to 3 (leather, walnut, the plain aluminium). The finish is `leather` (`material.finish.leather`: the generated set `textures/leather`, `cargo tex synth leather`: soft creases a hand's width apart, the hide's waviness, patches polished where it is sat on, roughness 0.35 to 0.5; its colour all but even, 97 % of the part's), where it was plain `satin`: a textured finish, so the part has UVs (`gamekit/uv.py` makes them) and a draw call of its own.

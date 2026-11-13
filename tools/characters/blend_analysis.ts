@@ -10,6 +10,8 @@
  * 3. The pop when a fade is interrupted just under the runtime's 0.5 rule (`start`, `rig.w < 0.5`).
  * 4. The pop when the upper-body clip is swapped at full weight (residents.ts:2089).
  * 5. nlerp vs slerp at the midpoint, for the widest of those.
+ * 6. How far a foot on the floor travels while a resident sets off and comes to a stop, measured on the runtime
+ *    itself (`transitions.ts`; `check_clips.ts` holds it to `TRAVEL_LIMIT`).
  */
 
 import { readFileSync } from "node:fs";
@@ -439,3 +441,17 @@ for (const r of rows)
 console.log(
   `  near-antipodal handoffs (|dot| < 0.1, the sign of the arc ambiguous): ${near}/${rows.length}`,
 );
+
+// --- 6. a foot on the floor over a start and a stop -------------------------------------------
+
+{
+  const { measureTransitions, summarise, TRAVEL_LIMIT, PACE, PHASES } = await import("./transitions.ts");
+  const mm = (v: number) => (v * 1000).toFixed(0).padStart(4);
+  console.log(
+    `\n=== 6. a foot on the floor: its travel (mm) setting off and stopping at ${PACE} m/s, the worse foot, over ${PHASES} parts of the stride (the runtime's own posing; at most ${TRAVEL_LIMIT.start * 1000} and ${TRAVEL_LIMIT.stop * 1000}) ===`,
+  );
+  for (const s of summarise(await measureTransitions()))
+    console.log(
+      `  ${s.body.padEnd(7)}${s.stage.padEnd(11)} start: mean ${mm(s.start.mean)}, most ${mm(s.start.max)}   stop: mean ${mm(s.stop.mean)}, most ${mm(s.stop.max)}   plain walking: ${mm(s.walk)} a second`,
+    );
+}

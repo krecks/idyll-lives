@@ -40,7 +40,7 @@
  * `select`s and `mix`es.
  */
 
-import { APPEARANCE_TEXELS, BONE_TEXELS, MORPH_TEXELS, SHIRT } from '../../shared/characters/layout';
+import { APPEARANCE_TEXELS, BONE_TEXELS, MORPH_TEXELS, SHIRT, SWAY_TEXEL } from '../../shared/characters/layout';
 import { WISPS_PX } from '../../shared/characters/parts';
 import type { Language, ShaderFeature } from './chunks';
 
@@ -216,30 +216,78 @@ const EASE = { thick: '0.004', hang: '0.016', chest: '1.30', waist: '1.12', slee
 /** How dark the skin (or the cloth under it) is just under a loose garment's edge (the step's shade), and how far (m). */
 const EDGE_SHADE = '0.3';
 const EDGE_REACH = '0.018';
+/**
+ * A shell cut to the resident's own length (`GAME_SIM_CUT`: the trousers, one mesh for every bottom with legs): the
+ * alpha under which nothing of it is drawn (its opacity is 1 inside the cut and 0 past it, a pixel between), how
+ * dark its inside is (the back faces, and the body's own paint under it, seen up a leg or under a hem), and how
+ * far the skin well inside it (`within` m from its cuts, eased) is drawn in (m), which is also where the body's own
+ * paint under a top's shell is in that shade (nearer its cuts the paint keeps the cloth's colour: the shell lies
+ * close there, and the finer close-up body may come through a level-1 shell by a millimetre). `tuck`: how far under
+ * the waistband a top tucked in ends (m). `neck`: the least of its ease a top's shell keeps at its neckline (the
+ * painted cloth thins to a quarter there, under the collars; a shell that thin lies in the close-up body's skin).
+ */
+export const CUT = { test: 0.5, lining: '0.5', inside: '0.006', within: ['0.02', '0.05'], tuck: '0.02', neck: '0.7' };
+/** A cut shell's cut (m, > 0 kept), by its category: the top's by all four of the body's fields (`f`), the bottom's by the height. */
+const cutOf = (lang: Language): string => {
+  const sel = (a: string, b: string, c: string) => (lang === 'wgsl' ? `select(${b}, ${a}, ${c})` : `(${c} ? ${a} : ${b})`);
+  // (A top tucked in ends under the waistband, whatever its own hem: the bottom is over it there.)
+  const top = `min(min(min((simTexel(0).w - vSimTone.x) * 0.55, vSimField.w - simTexel(1).w), min(vSimTone.y - simTexel(2).w, vSimTone.z - simTexel(3).w)), ${sel('1.0', `vSimField.w - simTexel(4).w + ${CUT.tuck}`, 'simTexel(4).x > 0.5')})`;
+  return sel(top, 'min(vSimField.w - simTexel(5).w, simTexel(4).w - vSimField.w)', 'vSimField.z < 0.5');
+};
 /** The ease's code for a language's vertex shader: `f` the fields, `tx(k)` appearance texel k. */
 function easeCode(lang: Language): string {
   const w = lang === 'wgsl';
   const let_ = (name: string, type: string) => (w ? `let ${name}` : `${type} ${name}`);
   const tx = (k: number) => (w ? `textureLoad(game_simPoses, vec2i(simOff + ${k}, simRow), 0)` : `texelFetch(game_simPoses, ivec2(simOff + ${k}, simRow), 0)`);
   const add = (v: string) => (w ? `localPos = localPos + ${v};` : `localPos += ${v};`);
+  // (The top's ease at fields `simF` with its neckline's distance `simNeck`, before what is particular to the body or a shell.)
+  const topEase = `mix(${EASE.thick} + ${EASE.hang} * (1.0 - smoothstep(${EASE.waist}, ${EASE.chest}, simF.y)), ${EASE.sleeve}, clamp(simF.x + 1.0, 0.0, 1.0)) * (0.25 + 0.75 * smoothstep(0.0, ${EASE.neck}, simNeck)) * simEase.x * (1.0 - simEase.z * (1.0 - smoothstep(simT4.w, simT4.w + 0.04, simF.y)))`;
+  const bottomEase = (y: string) => `(${EASE.thick} + ${EASE.seat} * (1.0 - smoothstep(${EASE.thigh}, ${EASE.hips}, ${y})) + ${EASE.leg} * (1.0 - smoothstep(${EASE.ankle}, ${EASE.knee}, ${y})))`;
   return `
-		#if defined(GAME_SIM_BODY) && !defined(SHADOW_PASS)
+		#if (defined(GAME_SIM_BODY) || defined(GAME_SIM_CUT)) && !defined(SHADOW_PASS)
 		{
 			${let_('simEase', 'vec4')} = ${tx(8)};
-			if (simEase.x + simEase.y > 0.0) {
+			${let_('simT4', 'vec4')} = ${tx(4)};
+			${let_('simOver', 'float')} = step(0.5, simT4.x);
+			// (Texel 8 a: 1 the bottom worn as a shell, 2 the top, 3 both.)
+			${let_('simLegs', 'float')} = step(0.5, simEase.w - 2.0 * step(1.5, simEase.w));
+			${let_('simTops', 'float')} = step(1.5, simEase.w);
+			#ifdef GAME_SIM_CUT
+				// A cut shell (the body's own surface under the bottom, or under the top: its fields' height in fields.w
+				// and, the top's, the sleeve parameter and the two necklines in the tone): off the skin by the garment's
+				// ease, as the cloth painted on the low-detail body far off is, so the two have one outline.
+				${let_('simF', 'vec4')} = ${w ? 'vec4f' : 'vec4'}(game_simTone.x, game_simField.w, game_simTone.y, game_simTone.z);
+				${let_('simNeck', 'float')} = min(simF.z - ${tx(2)}.w, simF.w - ${tx(3)}.w);
+				${let_('simBottomIn', 'float')} = min(min(simT4.w - simF.y, simF.y - ${tx(5)}.w), (-0.5 - simF.x) * 0.55);
+				// (A top tucked in lies under the trousers' waistband; under a skirt's shell it lies flat.)
+				${let_('simTopEase', 'float')} = ${topEase.replace('(0.25 + 0.75 *', `(${CUT.neck} + (1.0 - ${CUT.neck}) *`)} * (1.0 - simLegs * (1.0 - simOver) * smoothstep(-0.004, 0.02, simBottomIn));
+				${let_('simLift', 'float')} = mix(simTopEase, ${bottomEase('simF.y')} * simEase.y, step(0.5, game_simField.z));
+				${add('normalize(vertex_normal) * (simLift * clamp(localPos.y / max(simF.y, 0.05), 0.3, 1.2))')}
+			#else
+			if (simEase.x + simEase.y + simEase.w > 0.0) {
 				${let_('simF', 'vec4')} = game_simField;
-				${let_('simT4', 'vec4')} = ${tx(4)};
 				${let_('simNeck', 'float')} = min(simF.z - ${tx(2)}.w, simF.w - ${tx(3)}.w);
 				${let_('simTopIn', 'float')} = min(min((${tx(0)}.w - simF.x) * 0.55, simF.y - ${tx(1)}.w), simNeck);
 				${let_('simBottomIn', 'float')} = min(min(simT4.w - simF.y, simF.y - ${tx(5)}.w), (-0.5 - simF.x) * 0.55);
-				${let_('simArm', 'float')} = clamp(simF.x + 1.0, 0.0, 1.0);
-				${let_('simHang', 'float')} = 1.0 - smoothstep(${EASE.waist}, ${EASE.chest}, simF.y);
-				${let_('simTopEase', 'float')} = mix(${EASE.thick} + ${EASE.hang} * simHang, ${EASE.sleeve}, simArm) * (0.25 + 0.75 * smoothstep(0.0, ${EASE.neck}, simNeck)) * smoothstep(-0.004, 0.004, simTopIn) * simEase.x * (1.0 - simEase.z * (1.0 - smoothstep(simT4.w, simT4.w + 0.04, simF.y)));
-				${let_('simBottomEase', 'float')} = (${EASE.thick} + ${EASE.seat} * (1.0 - smoothstep(${EASE.thigh}, ${EASE.hips}, simF.y)) + ${EASE.leg} * (1.0 - smoothstep(${EASE.ankle}, ${EASE.knee}, simF.y))) * smoothstep(-0.004, 0.004, simBottomIn) * simEase.y;
+				// (A garment worn as a shell, near the camera: the shell is the cloth, the body under it is not.)
+				#ifdef GAME_SIM_FAR
+					${let_('simWorn', 'vec2')} = ${w ? 'vec2f' : 'vec2'}(0.0);
+				#else
+					${let_('simWorn', 'vec2')} = ${w ? 'vec2f' : 'vec2'}(simTops, simLegs);
+				#endif
+				// (A painted top tucked in lies under the trousers' waistband, not through it.)
+				${let_('simTopEase', 'float')} = ${topEase} * smoothstep(-0.004, 0.004, simTopIn) * (1.0 - simWorn.x) * (1.0 - simWorn.y * (1.0 - simOver) * smoothstep(-0.004, 0.02, simBottomIn));
+				${let_('simBottomEase', 'float')} = ${bottomEase('simF.y')} * smoothstep(-0.004, 0.004, simBottomIn) * simEase.y * (1.0 - simWorn.y);
+				// Well inside a shell the skin is drawn in a little (under the trousers', not where a painted top is worn
+				// over them, cloth out past the shell): nothing of it comes through the cloth, at any distance or on the
+				// finer close-up body.
+				${let_('simInTop', 'float')} = simWorn.x * smoothstep(${CUT.within[0]}, ${CUT.within[1]}, simTopIn);
+				${let_('simInBottom', 'float')} = simWorn.y * smoothstep(${CUT.within[0]}, ${CUT.within[1]}, simBottomIn) * (1.0 - (1.0 - simWorn.x) * simOver * smoothstep(-0.03, 0.0, simTopIn));
 				// (The life stage's size: the vertex's height over its height on the base body, the fields'.)
 				${let_('simSize', 'float')} = clamp(localPos.y / max(simF.y, 0.05), 0.3, 1.2);
-				${add('normalize(vertex_normal) * (max(simTopEase, simBottomEase) * simSize)')}
+				${add(`normalize(vertex_normal) * ((max(simTopEase, simBottomEase) - ${CUT.inside} * max(simInTop, simInBottom)) * simSize)`)}
 			}
+			#endif
 		}
 		#endif`;
 }
@@ -247,15 +295,60 @@ function easeCode(lang: Language): string {
 /** The first morph pair texel, after the appearance texels. */
 const PAIRS = APPEARANCE_TEXELS;
 
-/** The per-material `transformInstancingVS`: the instance's matrix times the resident's skin. */
+/**
+ * Hair and hems lag behind the body (`shared/characters/sway.ts`): a loose vertex is drawn off by the resident's
+ * lag vector (its row's `SWAY_TEXEL`: m in world axes, the hair's or the hems') times its looseness. The hair's
+ * is baked (tone.x, hair.rs: 0 on the head, 1 at the tips of what hangs); a shell's is its hem's nearness
+ * (fields.x, the distance from the hem: all of it at the hem, none `reach` m up, as the power `fall` of the way
+ * between; a top's shell, the jacket's and the apron's, a shorter way up than a skirt's), under the hips only (the
+ * texel's w: a jacket's lapels and collar are open edges too) and not on shoes. Never towards the body: what
+ * of it points in to the body's own axis (the vertical through its rest pose's origin, as the skin turns it) is
+ * left out, so hair swings round the neck and away from it, not into it, and a hem off the legs, not through them.
+ * Under the shoulder line (the hair texel's w; from `SWAY_BACK[0]` m under it to `[1]` over it) the body is no
+ * column but a wall across, the back: hair there keeps all of its way along the back and has none towards it.
+ */
+const SWAY_HEM = { top: '0.12', bottom: '0.3', fall: '1.5', gate: '0.1' };
+const SWAY_BACK = ['0.03', '0.05'];
+/** `gameSimSway`: the offset (world axes) of this vertex under the skin matrix `skin`, by a language's words. */
+function swayCode(lang: Language): string {
+  const w = lang === 'wgsl';
+  const let_ = (name: string, type: string) => (w ? `let ${name}` : `${type} ${name}`);
+  const tx = (k: number) => (w ? `textureLoad(game_simPoses, vec2i(i32(uniform.game_simLayout.x + 0.5) + ${k}, i32(game_simRow + 0.5)), 0)` : `texelFetch(game_simPoses, ivec2(int(game_simLayout.x + 0.5) + ${k}, int(game_simRow + 0.5)), 0)`);
+  const v3 = w ? 'vec3f' : 'vec3';
+  return `
+#if defined(GAME_SIM_HAIR) || defined(GAME_SIM_CLOTH)
+${w ? 'fn gameSimSway(skin: mat4x4f) -> vec3f' : 'vec3 gameSimSway(mat4 skin)'} {
+	#ifdef GAME_SIM_HAIR
+		${let_('lag', 'vec4')} = ${tx(SWAY_TEXEL.hair)};
+		${let_('loose', 'float')} = game_simTone.x;
+		${let_('column', 'float')} = smoothstep(lag.w - ${SWAY_BACK[0]}, lag.w + ${SWAY_BACK[1]}, vertex_position.y);
+	#else
+		${let_('column', 'float')} = 1.0;
+		${let_('lag', 'vec4')} = ${tx(SWAY_TEXEL.hem)};
+		${let_('reach', 'float')} = mix(${SWAY_HEM.top}, ${SWAY_HEM.bottom}, step(0.5, game_simField.z));
+		${let_('loose', 'float')} = pow(clamp(1.0 - game_simField.x / reach, 0.0, 1.0), ${SWAY_HEM.fall}) * step(game_simField.z, 1.5) * (1.0 - smoothstep(lag.w - ${SWAY_HEM.gate}, lag.w, vertex_position.y));
+	#endif
+	${let_('d', v3)} = lag.xyz * loose;
+	${let_('away', v3)} = ${w ? 'mat3x3f(skin[0].xyz, skin[1].xyz, skin[2].xyz)' : 'mat3(skin)'} * ${v3}(vertex_position.x * column, 0.0, vertex_position.z);
+	return d - away * (min(dot(d, away), 0.0) / max(dot(away, away), 1e-8));
+}
+#endif`;
+}
+
+/** The per-material `transformInstancingVS`: the instance's matrix times the resident's skin, hair and hems lagging (`gameSimSway`). */
 export const RESIDENT_INSTANCING: Record<Language, string> = {
   glsl: `
 attribute vec4 instance_line1;
 attribute vec4 instance_line2;
 attribute vec4 instance_line3;
 attribute vec4 instance_line4;
+${swayCode('glsl')}
 mat4 getModelMatrix() {
-	return matrix_model * mat4(instance_line1, instance_line2, instance_line3, instance_line4) * gameSimSkin() * gameSimShown();
+	mat4 skin = gameSimSkin();
+	#if defined(GAME_SIM_HAIR) || defined(GAME_SIM_CLOTH)
+		skin[3].xyz += gameSimSway(skin);
+	#endif
+	return matrix_model * mat4(instance_line1, instance_line2, instance_line3, instance_line4) * skin * gameSimShown();
 }
 `,
   wgsl: `
@@ -263,8 +356,13 @@ attribute instance_line1: vec4f;
 attribute instance_line2: vec4f;
 attribute instance_line3: vec4f;
 attribute instance_line4: vec4f;
+${swayCode('wgsl')}
 fn getModelMatrix() -> mat4x4f {
-	return uniform.matrix_model * mat4x4f(instance_line1, instance_line2, instance_line3, instance_line4) * gameSimSkin() * gameSimShown();
+	var skin = gameSimSkin();
+	#if defined(GAME_SIM_HAIR) || defined(GAME_SIM_CLOTH)
+		skin[3] = vec4f(skin[3].xyz + gameSimSway(skin), skin[3].w);
+	#endif
+	return uniform.matrix_model * mat4x4f(instance_line1, instance_line2, instance_line3, instance_line4) * skin * gameSimShown();
 }
 `,
 };
@@ -456,7 +554,7 @@ const VS_GLSL = {
 	varying vec4 vSimField;
 	varying vec4 vSimTone;
 	vec3 gameSimMorphN = vec3(0.0);
-	#if defined(GAME_SIM_BODY) && !defined(SHADOW_PASS)
+	#if (defined(GAME_SIM_BODY) || defined(GAME_SIM_CUT)) && !defined(SHADOW_PASS)
 		// (The cloth's ease reads the normal in getLocalPosition, before normalCoreVS declares it: RESIDENT_NORMAL leaves it out there.)
 		attribute vec3 vertex_normal;
 	#endif
@@ -530,7 +628,7 @@ const VS_GLSL = {
 			}
 		#endif
 ${easeCode('glsl')}
-		#ifdef GAME_SIM_CLOTH
+		#if defined(GAME_SIM_CLOTH) && !defined(GAME_SIM_CUT)
 			// Seated: the shell's corrective (its tone) as far as the thighs are turned forward (texel 4 b).
 			localPos += game_simTone.xyz * texelFetch(game_simPoses, ivec2(simOff + 4, simRow), 0).z;
 		#endif
@@ -634,7 +732,7 @@ const VS_WGSL = {
 			}
 		#endif
 ${easeCode('wgsl')}
-		#ifdef GAME_SIM_CLOTH
+		#if defined(GAME_SIM_CLOTH) && !defined(GAME_SIM_CUT)
 			// Seated: the shell's corrective (its tone) as far as the thighs are turned forward (texel 4 b).
 			localPos = localPos + game_simTone.xyz * textureLoad(game_simPoses, vec2i(simOff + 4, simRow), 0).z;
 		#endif
@@ -754,7 +852,27 @@ const PS_GLSL = {
 			float simUnderTop = (1.0 - smoothstep(0.0, ${EDGE_REACH}, -gTop)) * (1.0 - simTop) * (simT4.x > 0.5 ? 1.0 : 1.0 - simBottom) * simEase.x;
 			float simUnderBottom = (1.0 - smoothstep(0.0, ${EDGE_REACH}, -gBottom)) * (1.0 - simBottom) * (1.0 - simTop) * simEase.y;
 			float simEdge = 1.0 - ${EDGE_SHADE} * max(simUnderTop, simUnderBottom) * (1.0 - simShoe);
-			return mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe) * gameSimOcc * simEdge;
+			// Under the trousers' shell (texel 8 a; not the low-detail body, which is the cloth far off) what is
+			// painted as the bottom is the inside of the legs: in their shade.
+			#ifdef GAME_SIM_FAR
+				float simInside = 0.0;
+			#else
+				// (Texel 8 a: 1 the bottom, 2 the top, 3 both. The top's inside from a little way in: its shell lies
+				// close at the neck, and there the paint under it keeps the cloth's own colour.)
+				float simShells = simTexel(8).w;
+				float simInside = max(step(0.5, simShells - 2.0 * step(1.5, simShells)) * simBottom * (simT4.x > 0.5 ? 1.0 - simTop : 1.0), step(1.5, simShells) * smoothstep(${CUT.within[0]}, ${CUT.within[1]}, gTop) * (simT4.x > 0.5 ? 1.0 : 1.0 - simBottom)) * (1.0 - simShoe);
+			#endif
+			return mix(simT4.x > 0.5 ? topOver : topUnder, cShoe, simShoe) * gameSimOcc * simEdge * (1.0 - (1.0 - ${CUT.lining}) * simInside);
+		#elif defined(GAME_SIM_CUT)
+			// The trousers' shell: the bottom's colour with the bands of its cuts (the waistband, the hems: fields.w is
+			// the body's height, as the cuts are), its inside (the back faces) in the legs' shade.
+			vec4 simT4 = simTexel(4);
+			float simPlain = simT4.x < -0.5 ? 0.0 : 1.0;
+			vec2 simHemCut = max(simHem(simT4.w - simF.w, ${BAND.waistband}), simHem(simF.w - simTexel(5).w, ${BAND.hem})) * simPlain;
+			// (The long top's: the cuffs, the hem and the neck's rib or binding, by the body's fields in its tone.)
+			vec2 simHemTops = max(max(simHem((simA.w - simT.x) * 0.55, ${BAND.cuff}), simHem(simF.w - simTexel(1).w, ${BAND.hem})), max(simHem(simT.y - simTexel(2).w, ${BAND.rib}), simHem(simT.z - simTexel(3).w, ${BAND.binding}))) * simPlain;
+			vec3 simCloth = simF.z < 0.5 ? simFabric(simTexel(1).rgb, simHemTops) : simFabric(simTexel(2).rgb, simHemCut);
+			return albedo * simCloth * (gl_FrontFacing ? 1.0 : ${CUT.lining}) * ${ao(AO_GAIN)};
 		#elif defined(GAME_SIM_CLOTH)
 			// Shells: the flat top / bottom / shoe colour (fields.z = category); soles darker; a skirt's or a
 			// jacket's hem (fields.x: the distance from it; a collar's is out of reach).
@@ -834,6 +952,13 @@ const PS_GLSL = {
 		dVertexNormalW = normalize(dVertexNormalW + dViewDirW * max(${WISP.facing} - dot(dVertexNormalW, dViewDirW), 0.0));
 	#endif
 	dAlbedo = gameSimAlbedo(dAlbedo, dVertexNormalW, dViewDirW);
+#endif`,
+  // A cut shell (\`CUT\`): all of it between the resident's waist and leg cuts (appearance texels 4 a and 5 a, heights
+  // on the base body as the shell's fields.w), none past them, the edge a pixel wide.
+  opacity: `
+#if defined(GAME_RESIDENT) && defined(GAME_SIM_CUT) && !defined(SHADOW_PASS)
+	float simCut = ${cutOf('glsl')};
+	dAlpha = clamp(simCut / max(fwidth(simCut), 1e-6) + 0.5, 0.0, 1.0);
 #endif`,
   gloss: `
 #ifdef GAME_RESIDENT
@@ -936,7 +1061,20 @@ const PS_WGSL = {
 			let simUnderTop = (1.0 - smoothstep(0.0, ${EDGE_REACH}, -gTop)) * (1.0 - simTop) * select(1.0 - simBottom, 1.0, simT4.x > 0.5) * simEase.x;
 			let simUnderBottom = (1.0 - smoothstep(0.0, ${EDGE_REACH}, -gBottom)) * (1.0 - simBottom) * (1.0 - simTop) * simEase.y;
 			let simEdge = 1.0 - ${EDGE_SHADE} * max(simUnderTop, simUnderBottom) * (1.0 - simShoe);
-			return mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe) * gameSimOcc * simEdge;
+			#ifdef GAME_SIM_FAR
+				let simInside = 0.0;
+			#else
+				let simShells = simTexel(8).w;
+				let simInside = max(step(0.5, simShells - 2.0 * step(1.5, simShells)) * simBottom * select(1.0, 1.0 - simTop, simT4.x > 0.5), step(1.5, simShells) * smoothstep(${CUT.within[0]}, ${CUT.within[1]}, gTop) * select(1.0 - simBottom, 1.0, simT4.x > 0.5)) * (1.0 - simShoe);
+			#endif
+			return mix(select(topUnder, topOver, simT4.x > 0.5), cShoe, simShoe) * gameSimOcc * simEdge * (1.0 - (1.0 - ${CUT.lining}) * simInside);
+		#elif defined(GAME_SIM_CUT)
+			let simT4 = simTexel(4);
+			let simPlain = select(1.0, 0.0, simT4.x < -0.5);
+			let simHemCut = max(simHem(simT4.w - simF.w, ${BAND.waistband}), simHem(simF.w - simTexel(5).w, ${BAND.hem})) * simPlain;
+			let simHemTops = max(max(simHem((simA.w - simT.x) * 0.55, ${BAND.cuff}), simHem(simF.w - simTexel(1).w, ${BAND.hem})), max(simHem(simT.y - simTexel(2).w, ${BAND.rib}), simHem(simT.z - simTexel(3).w, ${BAND.binding}))) * simPlain;
+			let simCloth = select(simFabric(simTexel(2).rgb, simHemCut), simFabric(simTexel(1).rgb, simHemTops), simF.z < 0.5);
+			return albedo * simCloth * select(${CUT.lining}, 1.0, pcFrontFacing) * ${ao(AO_GAIN)};
 		#elif defined(GAME_SIM_CLOTH)
 			let simHemShell = simHem(simF.x, ${BAND.hem}) * select(0.0, 1.0, abs(simF.y - 3.0) < 0.5 || simF.z < 0.5);
 			let c = simFabric(select(select(simTexel(6).rgb, simTexel(2).rgb, simF.z < 1.5), simTexel(1).rgb, simF.z < 0.5), simHemShell);
@@ -1000,6 +1138,11 @@ const PS_WGSL = {
 		dVertexNormalW = normalize(dVertexNormalW + dViewDirW * max(${WISP.facing} - dot(dVertexNormalW, dViewDirW), 0.0));
 	#endif
 	dAlbedo = gameSimAlbedo(dAlbedo, dVertexNormalW, dViewDirW);
+#endif`,
+  opacity: `
+#if defined(GAME_RESIDENT) && defined(GAME_SIM_CUT) && !defined(SHADOW_PASS)
+	let simCut = ${cutOf('wgsl')};
+	dAlpha = clamp(simCut / max(fwidth(simCut), 1e-6) + 0.5, 0.0, 1.0);
 #endif`,
   gloss: `
 #ifdef GAME_RESIDENT

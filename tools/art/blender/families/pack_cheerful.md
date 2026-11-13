@@ -69,12 +69,12 @@ draws as before. Triangles in the table below (was: before the pass).
 
 | Model | Size (w × h × d) | Triangles (2026-10-22) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.cheerful.jukebox` | 0.75 × 1.43 × 0.50 m | 5,728 (was 4,324) | 4 | Body, Trim |
-| `model.cheerful.karaokeMachine` | 0.76 × 1.76 × 0.85 m | 4,688 (was 3,684) | 3 | Body, Trim, Rug |
-| `model.cheerful.mocktailCart` | 0.84 × 1.64 × 0.57 m | 6,638 (was 6,852) | 3 | Body, Trim, Frame |
-| `model.cheerful.rainbowHammock` | 2.84 × 1.17 × 0.70 m | 4,536 (was 3,048) | 3 | Body, Trim, Pillow |
-| `model.cheerful.sunriseLamp` | 0.78 × 1.64 × 0.87 m | 3,580 (was 2,868) | 2 | Body, Trim, Mat |
-| `model.cheerful.partyBooth` | 1.90 × 1.64 × 1.83 m | 7,652 (was 7,972) | 3 | Body, Trim, Curtain |
+| `model.cheerful.jukebox` | 0.75 × 1.43 × 0.50 m | 5,728 (was 4,324) | 5,728 | Body, Trim |
+| `model.cheerful.karaokeMachine` | 0.76 × 1.76 × 0.85 m | 4,688 (was 3,684) | 4,688 | Body, Trim, Rug |
+| `model.cheerful.mocktailCart` | 0.84 × 1.64 × 0.57 m | 6,638 (was 6,852) | 6,638 | Body, Trim, Frame |
+| `model.cheerful.rainbowHammock` | 2.84 × 1.17 × 0.70 m | 4,536 (was 3,048) | 4,710 | Body, Trim, Pillow |
+| `model.cheerful.sunriseLamp` | 0.78 × 1.64 × 0.87 m | 3,580 (was 2,868) | 3,580 | Body, Trim, Mat |
+| `model.cheerful.partyBooth` | 1.90 × 1.64 × 1.83 m | 7,652 (was 7,972) | 7,732 | Body, Trim, Curtain |
 
 The painted materials: the jukebox `cherry`, `amber`; the karaoke `speaker`, `speaker_trim`, `stage`; the cart
 `mint`, `canopy`, `brass`; the hammock `wood`, `spreader`, `pillow`; the lamp `housing`, `lamp_metal`, `yoga`; the
@@ -97,3 +97,7 @@ across): kept from the old part, as the footprint is fixed.
 cargo art pack_cheerful            # the six .glb, the pack, check-glb
 cargo art pack_cheerful --preview  # previews/pack_cheerful/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+The hammock's pillow is sewn flat and stuffed (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 2 models changed shape: `partyBooth`, `rainbowHammock`; 12,188 to 12,442 triangles.

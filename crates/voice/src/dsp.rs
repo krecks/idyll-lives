@@ -34,6 +34,122 @@ const THRESHOLD: f32 = 0.05;
 const LEAD: usize = 1200;
 const TRAIL: usize = 2400;
 
+/// Levelling: every finished line is brought to this loudness (LUFS, one channel: what a line
+/// is to the ear in the middle of the picture before the voice volume), so one resident's line is
+/// as loud as another's whatever the voice, the words and the shaping. Where the lines were on
+/// average: 110 lines of Supertonic 3 (its ten voices on eight lines, ten residents' shaped
+/// voices on three) came out from -28.8 to -21.1 LUFS, their median -25.3; the voices' means 2.4 LU
+/// apart, one voice's lines up to 4.7 ("Hi!" and "Ouch!" the loudest).
+pub const LEVEL_LUFS: f64 = -25.0;
+/// A line is turned up or down by this much at most (dB): what is nearly silence stays quiet.
+const LEVEL_MOST_DB: f64 = 12.0;
+/// No sample of a levelled line goes over this: a line turned up is turned up only as far.
+const LEVEL_PEAK: f64 = 0.95;
+/// Loudness is read in blocks of 0.4 s every 0.1 s (ITU-R BS.1770).
+const BLOCK: usize = 9_600;
+const BLOCK_STEP: usize = 2_400;
+
+/// `x` through a two-pole filter (`b` over 1, `a[0]`, `a[1]`).
+fn biquad(x: &[f64], b: [f64; 3], a: [f64; 2]) -> Vec<f64> {
+    let (mut x1, mut x2, mut y1, mut y2) = (0.0, 0.0, 0.0, 0.0);
+    x.iter()
+        .map(|&v| {
+            let y = b[0] * v + b[1] * x1 + b[2] * x2 - a[0] * y1 - a[1] * y2;
+            (x2, x1, y2, y1) = (x1, v, y1, y);
+            y
+        })
+        .collect()
+}
+
+/// How loud a clip is to the ear (LUFS, ITU-R BS.1770, one channel at [`SAMPLE_RATE`]): through
+/// the K weighting (a shelf that lifts what the head lifts, 4 dB up from 1682 Hz, then a
+/// high-pass at 38 Hz: the standard's two filters worked out for this rate from their analogue
+/// shapes, as loudness meters do), the mean square of 0.4 s blocks every 0.1 s, the blocks under
+/// -70 LUFS and then those more than 10 LU under the rest's mean left out, so the pauses in a
+/// line don't make it quieter. A clip shorter than a block is one block. Negative infinity for
+/// silence. The same measure as `web/src/audio/loudness.ts`, which the world's sounds are
+/// levelled by.
+pub fn loudness(samples: &[f32]) -> f64 {
+    let rate = SAMPLE_RATE as f64;
+    let x: Vec<f64> = samples.iter().map(|&v| v as f64).collect();
+    let shelf = {
+        let k = (std::f64::consts::PI * 1681.974450955533 / rate).tan();
+        let q = 0.7071752369554196;
+        let vh = 10f64.powf(3.999843853973347 / 20.0);
+        let vb = vh.powf(0.4996667741545416);
+        let a0 = 1.0 + k / q + k * k;
+        (
+            [
+                (vh + vb * k / q + k * k) / a0,
+                2.0 * (k * k - vh) / a0,
+                (vh - vb * k / q + k * k) / a0,
+            ],
+            [2.0 * (k * k - 1.0) / a0, (1.0 - k / q + k * k) / a0],
+        )
+    };
+    let high = {
+        let k = (std::f64::consts::PI * 38.13547087602444 / rate).tan();
+        let q = 0.5003270373238773;
+        let a0 = 1.0 + k / q + k * k;
+        (
+            [1.0, -2.0, 1.0],
+            [2.0 * (k * k - 1.0) / a0, (1.0 - k / q + k * k) / a0],
+        )
+    };
+    let w = biquad(&biquad(&x, shelf.0, shelf.1), high.0, high.1);
+    let block = BLOCK.min(w.len());
+    if block == 0 {
+        return f64::NEG_INFINITY;
+    }
+    let powers: Vec<f64> = (0..=w.len() - block)
+        .step_by(BLOCK_STEP)
+        .map(|at| w[at..at + block].iter().map(|v| v * v).sum::<f64>() / block as f64)
+        .collect();
+    let lufs = |power: f64| {
+        if power > 0.0 {
+            -0.691 + 10.0 * power.log10()
+        } else {
+            f64::NEG_INFINITY
+        }
+    };
+    let mean = |list: &[f64]| list.iter().sum::<f64>() / list.len().max(1) as f64;
+    let heard: Vec<f64> = powers.into_iter().filter(|&p| lufs(p) > -70.0).collect();
+    if heard.is_empty() {
+        return f64::NEG_INFINITY;
+    }
+    let floor = lufs(mean(&heard)) - 10.0;
+    let kept: Vec<f64> = heard.into_iter().filter(|&p| lufs(p) > floor).collect();
+    lufs(mean(&kept))
+}
+
+/// The gain that brings a clip to [`LEVEL_LUFS`]: by `LEVEL_MOST_DB` at most either way, and up
+/// only as far as its highest sample stays under `LEVEL_PEAK`. 1 for silence.
+pub fn level_gain(samples: &[f32]) -> f32 {
+    let loud = loudness(samples);
+    if !loud.is_finite() {
+        return 1.0;
+    }
+    let db = (LEVEL_LUFS - loud).clamp(-LEVEL_MOST_DB, LEVEL_MOST_DB);
+    let peak = samples.iter().fold(0.0f64, |m, &v| m.max(v.abs() as f64));
+    let gain = 10f64.powf(db / 20.0);
+    (if peak * gain > LEVEL_PEAK {
+        LEVEL_PEAK / peak
+    } else {
+        gain
+    }) as f32
+}
+
+/// Brings a clip to [`LEVEL_LUFS`] (`level_gain`): every sample times one gain, so nothing of
+/// its timing or its shape changes.
+pub fn level(samples: &mut [f32]) {
+    let gain = level_gain(samples);
+    if gain != 1.0 {
+        for v in samples.iter_mut() {
+            *v *= gain;
+        }
+    }
+}
+
 /// `samples` without the silence around the sound.
 pub fn trim(samples: &[f32]) -> &[f32] {
     let rms: Vec<f32> = samples
@@ -348,6 +464,102 @@ mod tests {
         let t = trim(&x);
         assert_eq!(t.len(), 4_800 + LEAD + TRAIL);
         assert_eq!(t[LEAD], x[9_600]);
+    }
+
+    /// A sine at `hz` and `amp` for `secs`.
+    fn sine(hz: f64, amp: f64, secs: f64) -> Vec<f32> {
+        (0..(SR * secs) as usize)
+            .map(|i| (amp * (2.0 * std::f64::consts::PI * hz * i as f64 / SR).sin()) as f32)
+            .collect()
+    }
+
+    #[test]
+    fn loudness_reads_the_standards_tone() {
+        // 997 Hz at full scale in one channel is -3.01 LUFS (ITU-R BS.1770); 23 dB down, 23 less.
+        assert!((loudness(&sine(997.0, 1.0, 5.0)) + 3.01).abs() < 0.05);
+        let quiet = sine(997.0, 10f64.powf(-23.0 / 20.0), 5.0);
+        assert!((loudness(&quiet) + 26.01).abs() < 0.05);
+        assert_eq!(loudness(&vec![0.0; 24_000]), f64::NEG_INFINITY);
+        assert_eq!(loudness(&[]), f64::NEG_INFINITY);
+        // A pause in a line does not make it quieter, and a short word is read over its own length.
+        let mut paused = sine(300.0, 0.2, 2.0);
+        paused.extend(vec![0.0; 48_000]);
+        assert!((loudness(&paused) - loudness(&sine(300.0, 0.2, 2.0))).abs() < 0.5);
+        assert!((loudness(&sine(300.0, 0.2, 0.2)) - loudness(&sine(300.0, 0.2, 2.0))).abs() < 0.5);
+    }
+
+    #[test]
+    fn levels_every_line_to_one_loudness() {
+        // A voiced line 10 LU under the level, 10 over and near it; a deep and a high voice; one
+        // with a pause in it.
+        let at = |line: Vec<f32>, lufs: f64| -> Vec<f32> {
+            let gain = 10f64.powf((lufs - loudness(&line)) / 20.0) as f32;
+            line.iter().map(|v| v * gain).collect()
+        };
+        let mut lines: Vec<Vec<f32>> = [-10.0, 2.0, 10.0]
+            .iter()
+            .map(|&off| at(vowel(150.0, 1.5), LEVEL_LUFS + off))
+            .collect();
+        lines.push(at(vowel(90.0, 1.0), LEVEL_LUFS - 6.0));
+        lines.push(at(vowel(300.0, 0.8), LEVEL_LUFS + 5.0));
+        let mut paused = vowel(120.0, 0.7);
+        paused.extend(vec![0.0; 12_000]);
+        paused.extend(vowel(140.0, 0.9));
+        lines.push(at(paused, LEVEL_LUFS - 8.0));
+        let before: Vec<f64> = lines.iter().map(|l| loudness(l)).collect();
+        let spread = |l: &[f64]| {
+            l.iter().copied().fold(f64::MIN, f64::max) - l.iter().copied().fold(f64::MAX, f64::min)
+        };
+        assert!(
+            spread(&before) > 19.0,
+            "the lines differ to begin with: {before:?}"
+        );
+        for line in &mut lines {
+            let was = line.clone();
+            level(line);
+            // One gain: the same length, the same shape.
+            assert_eq!(line.len(), was.len());
+            let gain = level_gain(&was);
+            assert!(
+                line.iter()
+                    .zip(&was)
+                    .all(|(a, b)| (a - b * gain).abs() < 1e-6)
+            );
+            assert!(
+                (loudness(line) - LEVEL_LUFS).abs() < 0.05,
+                "{} LUFS",
+                loudness(line)
+            );
+            assert!(line.iter().all(|v| v.abs() <= LEVEL_PEAK as f32 + 1e-6));
+        }
+        // Levelled once, a line is at its level: again changes nothing to speak of.
+        let again = level_gain(&lines[0]);
+        assert!((again - 1.0).abs() < 0.01, "gain {again}");
+    }
+
+    #[test]
+    fn levelling_keeps_within_bounds() {
+        // Silence stays silence.
+        let mut silent = vec![0.0f32; 12_000];
+        level(&mut silent);
+        assert!(silent.iter().all(|&v| v == 0.0));
+        assert_eq!(level_gain(&[]), 1.0);
+        // What is nearly silence is turned up by the most allowed, not all the way; what is
+        // under the meter's floor (-70 LUFS) is silence, and left alone.
+        assert_eq!(level_gain(&sine(300.0, 1e-5, 1.0)), 1.0);
+        let faint = sine(300.0, 1e-3, 1.0);
+        let most = 10f32.powf(LEVEL_MOST_DB as f32 / 20.0);
+        assert!((level_gain(&faint) - most).abs() < 1e-3);
+        // A far too loud one down by the most allowed.
+        let blast: Vec<f32> = sine(300.0, 1.0, 1.0);
+        assert!(level_gain(&blast) >= 1.0 / most - 1e-3);
+        // A line that is quiet to the ear but has one high peak is turned up only as far as the peak allows.
+        let mut spiky = sine(300.0, 0.01, 1.0);
+        spiky[5_000] = 0.6;
+        let gain = level_gain(&spiky);
+        assert!((gain as f64 * 0.6 - LEVEL_PEAK).abs() < 1e-3, "gain {gain}");
+        level(&mut spiky);
+        assert!(spiky.iter().all(|v| v.abs() <= LEVEL_PEAK as f32 + 1e-6));
     }
 
     #[test]

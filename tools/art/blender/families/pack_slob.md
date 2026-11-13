@@ -30,12 +30,12 @@ it (`ride: recline`), tipping back with it.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.slob.microwaveCart` | 0.74 × 1.10 × 0.78 m | 5,136 (was 2,944) | 2 | Body |
-| `model.slob.beanbag` | 0.88 × 0.66 × 0.87 m | 1,478 (was 2,116) | 2 | Body |
-| `model.slob.snackNightstand` | 0.89 × 0.45 × 0.73 m | 3,672 (was 1,652) | 3 | Body, Top |
-| `model.slob.spritzStation` | 0.68 × 1.62 × 0.80 m | 3,988 (was 2,000) | 3 | Body |
-| `model.slob.arcadeCabinet` | 0.77 × 1.88 × 0.78 m | 2,636 (was 1,676) | 2 | Body, Sides |
-| `model.slob.gamingRecliner` | 1.77 × 1.10 × 0.87 m | 6,844 (was 2,764) | 3 | Body, Stripes |
+| `model.slob.microwaveCart` | 0.74 × 1.10 × 0.78 m | 5,136 (was 2,944) | 5,136 | Body |
+| `model.slob.beanbag` | 0.88 × 0.66 × 0.87 m | 1,478 (was 2,116) | 1,478 | Body |
+| `model.slob.snackNightstand` | 0.89 × 0.45 × 0.73 m | 3,672 (was 1,652) | 3,672 | Body, Top |
+| `model.slob.spritzStation` | 0.68 × 1.62 × 0.80 m | 3,988 (was 2,000) | 3,988 | Body |
+| `model.slob.arcadeCabinet` | 0.77 × 1.88 × 0.78 m | 2,636 (was 1,676) | 2,636 | Body, Sides |
+| `model.slob.gamingRecliner` | 1.77 × 1.10 × 0.87 m | 6,844 (was 2,764) | 6,748 | Body, Stripes |
 
 Body is the cart's red frame, the bag, the nightstand, the spritz station's purple shelves, the arcade cabinet and
 the recliner's leatherette. The nightstand's top, the cabinet's side panels and the recliner's stripes are extra
@@ -75,3 +75,7 @@ Same keys, sizes, parts, clips and paint; draws the same or fewer.
 cargo art pack_slob            # the six .glb, the pack, check-glb
 cargo art pack_slob --preview  # previews/pack_slob/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+The spritz station's laundry heaps are left unpinched (heaps, not cushions). Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 5 models changed shape: `arcadeCabinet`, `beanbag`, `gamingRecliner`, `snackNightstand`, `spritzStation`; 18,618 to 18,522 triangles.

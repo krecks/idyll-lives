@@ -41,9 +41,9 @@ satin book); the tub's ledge `wood`, the rest plain.
 |---|---|---|---|---|
 | `model.gloomy.recordCabinet` | 0.90 × 0.93 × 0.82 m | 3,922 | 4 | Body, Trim |
 | `model.gloomy.cello` | 0.78 × 1.43 × 0.74 m | 6,424 | 3 | Body, Trim, Cello |
-| `model.gloomy.journalDesk` | 1.50 × 1.20 × 0.83 m | 7,134 | 3 | Body, Trim |
+| `model.gloomy.journalDesk` | 1.50 × 1.20 × 0.83 m | 7,422 | 3 | Body, Trim |
 | `model.gloomy.rainLamp` | 0.81 × 1.50 × 0.62 m | 7,384 | 3 | Body, Trim |
-| `model.gloomy.windowSeat` | 1.84 × 1.97 × 0.71 m | 5,828 | 3 | Body, Cushion, Trim |
+| `model.gloomy.windowSeat` | 1.84 × 1.97 × 0.71 m | 6,340 | 3 | Body, Cushion, Trim |
 | `model.gloomy.soakingTub` | 1.86 × 0.92 × 1.85 m | 6,848 | 3 | Body, Trim |
 
 The desk's apron runs only along its far edge and its ends (the old part's deep apron took the writer's hands).
@@ -99,3 +99,7 @@ window seat 3,668 → 5,828, tub 4,120 → 6,848; draws unchanged).
 cargo art pack_gloomy            # the six .glb, the pack, check-glb
 cargo art pack_gloomy --preview  # previews/pack_gloomy/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+The window seat's two pillows are sewn flat and stuffed (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `journalDesk`, `soakingTub`, `windowSeat`; 20,098 to 20,610 triangles.

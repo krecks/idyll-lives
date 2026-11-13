@@ -110,14 +110,14 @@ The family's helpers:
 | `model.barStool` | 0.39 × 0.74 × 0.39 m | 3,376 | 3 | `swivel` 0.5 s (sit, drink; `hold` 0.6 s; ride): turned legs in shoes, foot ring (the `rest`), hub; seat board with a rounded edge, stuffed buttoned cushion with a piped seam |
 | `model.stoolCounter` | 0.39 × 0.69 × 0.39 m | 3,376 | 3 | `swivel` (as the bar stool) |
 | `model.stoolBarHigh` | 0.39 × 1.12 × 0.40 m | 3,048 | 2 | `swivel` (seat and back turn): tube legs in rubber shoes, kick plate, bent back posts, curved back board |
-| `model.diningChair` | 0.44 × 1.00 × 0.47 m | 3,636 | 2 | static: turned front legs and back posts with finials, three bowed slats, piped tie-on pad (ties knotted round the posts), arched aprons, turned stretchers |
+| `model.diningChair` | 0.44 × 1.00 × 0.47 m | 3,432 | 2 | static: turned front legs and back posts with finials, three bowed slats, piped tie-on pad (ties knotted round the posts), arched aprons, turned stretchers |
 | `model.chairWood` | 0.44 × 0.90 × 0.45 m | 2,360 | 1 | static: square tapered front legs, back legs bending back into the posts, bowed rails, swelled spindles, arched aprons |
-| `model.chairUpholstered` | 0.46 × 0.99 × 0.49 m | 1,968 | 2 | static: stuffed, piped seat and back, three buttons, tapered front legs, sabre back legs |
+| `model.chairUpholstered` | 0.46 × 0.99 × 0.49 m | 2,000 | 2 | static: stuffed, piped seat and back, three buttons, tapered front legs, sabre back legs |
 | `model.chairModern` | 0.44 × 0.79 × 0.50 m | 1,420 | 1 | static: one moulded shell (lip, seat, back wrapping round), two sleds each bent from one tube |
 | `model.chairWindsor` | 0.47 × 0.97 × 0.47 m | 2,588 | 1 | static: carved saddle seat, baluster-turned splayed legs, turned H-stretcher, tapering bow, seven spindles |
 | `model.chairBentwood` | 0.43 × 0.96 × 0.45 m | 2,676 | 2 | static: back legs and loop bent from one length, inner loop tied to it, seat ring, cane, leg ring, knee braces |
-| `model.chairFolding` | 0.46 × 0.89 × 0.48 m | 1,948 | 1 | static: two bent tube frames crossing at rivets, seat pan and pad, curved back, rubber feet |
-| `model.chairArm` | 0.57 × 0.92 × 0.47 m | 3,384 | 2 | static: arms sweeping forward and rolling down into their posts, bowed crest rail, piped cushion, padded back |
+| `model.chairFolding` | 0.46 × 0.89 × 0.48 m | 1,856 | 1 | static: two bent tube frames crossing at rivets, seat pan and pad, curved back, rubber feet |
+| `model.chairArm` | 0.57 × 0.92 × 0.47 m | 3,308 | 2 | static: arms sweeping forward and rolling down into their posts, bowed crest rail, piped cushion, padded back |
 | `model.benchDining` | 1.60 × 0.47 × 0.36 m | 1,064 | 1 | static: three planks, splayed square legs through chamfered cleats, arched rail, pegged stretchers |
 
 ## K9 — dining storage
@@ -127,7 +127,7 @@ The family's helpers:
 | `model.sideboard` | 1.82 × 1.10 × 0.66 m | 5,960 | 4 | `door_open` (putting clean things away, `fetch`): half-round reeds on the doors, mushroom knobs, turned legs in brass shoes, moulded top, a bead round the foot; a vase and a bowl of lemons |
 | `model.buffet` | 1.88 × 0.90 × 0.67 m | 5,500 | 3 | `door_open` (putting clean things away, `fetch`): raised-field doors and drawers, brass bar pulls and knobs, moulded oak top, arched apron, turned legs |
 | `model.chinaCabinet` | 0.98 × 2.10 × 0.55 m | 6,704 | 4 | `door_open` (putting clean things away, `fetch`): shaped plinth, raised panels, moulded worktop, cornice (a moulded cap over a cove swept round), glazing bars, rimmed plates leaning on the rails, cups |
-| `model.barCart` | 0.77 × 1.09 × 0.45 m | 6,404 | 3 | `shake` 0.2 s (mix: the shaker taken off): glass trays in bent brass rims, a gallery round the lower tier, finials, castors with forks, a handle bent in one piece, labelled bottles with corks, wine glasses, ice bucket with ice, basket with a handle |
+| `model.barCart` | 0.77 × 1.09 × 0.45 m | 6,248 | 3 | `shake` 0.2 s (mix: the shaker taken off): glass trays in bent brass rims, a gallery round the lower tier, finials, castors with forks, a handle bent in one piece, labelled bottles with corks, wine glasses, ice bucket with ice, basket with a handle |
 
 The crockery in the sideboard's and buffet's cupboards is plain discs and cones under one rimmed plate and one
 open bowl per stack: it shows only while the door is open.
@@ -142,3 +142,11 @@ and WebGL2: the stools' swivel, the doors, the shaker) on 2026-10-22.
 cargo art dining            # the .glbs, the pack, check-glb
 cargo art dining --preview --lit  # previews/dining/<id>.png, <id>.lit.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 8 models changed shape: `barCart`, `chairArm`, `chairFolding`, `chairUpholstered`, `diningChair`, `diningGlass`, `diningOak`, `diningTable`; 38,334 to 37,838 triangles.
+
+## Leather (2026-11-13)
+
+The high bar stool's seat and back (`leather`) are leather. It goes from 2 draws to 3. The finish is `leather` (`material.finish.leather`: the generated set `textures/leather`, `cargo tex synth leather`: soft creases a hand's width apart, the hide's waviness, patches polished where it is sat on, roughness 0.35 to 0.5; its colour all but even, 97 % of the part's), where it was plain `satin`: a textured finish, so the part has UVs (`gamekit/uv.py` makes them) and a draw call of its own.

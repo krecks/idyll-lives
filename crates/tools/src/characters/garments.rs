@@ -3,9 +3,11 @@
 //! landmarks (heights on the base body) the cuts are made from.
 //!
 //! Shell fields: (hem distance (m), flag, category, w); categories 0 top, 1 bottom, 2 shoes; flags
-//! 1 sole (drawn darker), 2 waistband, 3 skirt, 4 light midsole, 5 polished (glossier). On a shoe, a
+//! 1 sole (drawn darker), 2 waistband, 3 skirt, 4 light midsole, 5 polished (glossier), 6 cut to
+//! length by the shader (the trousers: one mesh for every bottom with legs). On a shoe, a
 //! negative hem distance is its lining (drawn dark) and w the distance (m) across the instep from its
-//! middle (over 1 off the front).
+//! middle (over 1 off the front); on a shell cut by the shader, w is the body's height field there
+//! (m on the base body: the resident's waist and leg cuts are heights on it).
 
 use super::V3;
 use super::rig::{NB, b};
@@ -19,6 +21,10 @@ pub const FLAG_SOLE: f64 = 1.0;
 pub const FLAG_SKIRT: f64 = 3.0;
 pub const FLAG_MIDSOLE: f64 = 4.0;
 pub const FLAG_POLISHED: f64 = 5.0;
+pub const FLAG_CUT: f64 = 6.0;
+/// A shell cut by the shader lies on no hem of its own: its hem distance is out of every reach (the
+/// hem band's and the hems' sway are the runtime's, from its height).
+pub const NO_HEM: f64 = 0.5;
 /// The sleeve parameter is scaled to metres in the predicates (about an arm's length).
 pub const ARM_M: f64 = 0.55;
 

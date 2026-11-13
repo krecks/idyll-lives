@@ -105,10 +105,10 @@ round), since a loop can't wait.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.piano` | 1.54 × 1.48 × 0.83 m | 6,216 | 3 | Body, Trim |
+| `model.piano` | 1.54 × 1.48 × 0.83 m | 6,232 | 3 | Body, Trim |
 | `model.ukulele` | 0.35 × 0.84 × 0.26 m | 2,864 | 3 | Body & neck, Top, Stand |
 | `model.guitarElectric` | 0.46 × 1.00 × 0.58 m | 5,400 | 3 | Guitar, Amp |
-| `model.keyboardDigital` | 1.39 × 1.05 × 0.77 m | 4,630 | 2 | Body, Trim |
+| `model.keyboardDigital` | 1.39 × 1.05 × 0.77 m | 4,646 | 2 | Body, Trim |
 | `model.drumKit` | 1.73 × 1.24 × 1.17 m | 7,990 | 3 | Shells, Hardware |
 | `model.guitarAcoustic` | 0.40 × 1.16 × 0.40 m | 4,320 | 3 | Body, Top, Stand |
 | `model.chessTable` | 1.70 × 0.92 × 0.48 m | 4,608 | 3 | Table, Chair |
@@ -185,3 +185,7 @@ Flat details (key gaps, pegboard holes, the board's squares, glue lines) are one
 cargo art hobbies            # the nineteen .glb, the pack, check-glb
 cargo art hobbies --preview  # previews/hobbies/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `arcadeCabinet`, `chessTable`, `keyboardDigital`, `piano`, `potteryWheel`, `sewingTable`, `workbench`; 34,454 to 34,486 triangles.

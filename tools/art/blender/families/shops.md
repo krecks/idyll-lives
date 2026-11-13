@@ -66,11 +66,11 @@ it a second into the sale (`characters/clips/serve.ts`), and it shuts as they ha
 
 | Model | Size (w × h × d) | Triangles (far) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.shopCounter` | 1.96 × 1.28 × 0.79 m | 6,588 (1,533) | 3 | Counter, Trim |
-| `model.bakeryCase` | 1.94 × 1.29 × 0.86 m | 7,600 (1,742) | 3 | Counter, Trim |
-| `model.groceryShelf` | 1.92 × 1.72 × 0.48 m | 7,372 (1,666) | 1 | Shelves, Trim |
-| `model.cafeTable` | 0.62 × 0.75 × 0.62 m | 1,864 (644) | 1 | Top, Frame |
-| `model.cafeChair` | 0.44 × 0.95 × 0.47 m | 1,932 (482) | 2 | Frame, Seat |
+| `model.shopCounter` | 1.96 × 1.28 × 0.79 m | 6,588 (1,533) | 6,588 | Counter, Trim |
+| `model.bakeryCase` | 1.94 × 1.29 × 0.86 m | 7,600 (1,742) | 7,600 | Counter, Trim |
+| `model.groceryShelf` | 1.92 × 1.72 × 0.48 m | 7,372 (1,666) | 7,372 | Shelves, Trim |
+| `model.cafeTable` | 0.62 × 0.75 × 0.62 m | 1,864 (644) | 1,864 | Top, Frame |
+| `model.cafeChair` | 0.44 × 0.95 × 0.47 m | 1,932 (482) | 1,932 | Frame, Seat |
 
 Detail pass 2026-10-22 (the forms and the kit). Before it: the counter 5,640, the case 6,604, the shelves 6,196, the
 table 1,704, the chair 1,840. The café table and chair, placed by the dozen (18 chairs, 9 tables in the town), stay
@@ -90,3 +90,7 @@ cargo art shops --preview  # previews/shops/<id>.png, <id>@<clip>.png, <id>.far.
 
 The Workbench previews draw glass opaque: the case's bakes and its back door only show in the game (the clips bench,
 `/clips.html?keys=model.bakeryCase&alpha=-2&t=99` looks at its back with the door open).
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `bakeryCase`; the same triangles.
