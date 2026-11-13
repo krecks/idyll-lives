@@ -375,22 +375,17 @@ async function fetchOk(url: string): Promise<Response> {
 
 /**
  * A binary of the set: the build's gzipped copy when there is one (hosts rarely compress .bin;
- * the browser inflates it), else the file itself.
+ * the browser inflates it), else the file itself (a release ships the copy alone,
+ * `vite.config.ts` `optimizedAssets`).
  */
 async function fetchBinary(url: string): Promise<ArrayBuffer> {
   const copy = optimizedUrl(url);
-  if (copy !== url) {
-    try {
-      const bytes = await (await fetchOk(copy)).arrayBuffer();
-      // A server may have unpacked it already (Content-Encoding): only inflate real gzip data.
-      const head = new Uint8Array(bytes, 0, 2);
-      if (head[0] !== 0x1f || head[1] !== 0x8b) return bytes;
-      return await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
-    } catch (err) {
-      console.warn(`[render] compressed ${copy} failed, loading ${url}`, err);
-    }
-  }
-  return (await fetchOk(url)).arrayBuffer();
+  const bytes = await (await fetchOk(copy)).arrayBuffer();
+  if (copy === url) return bytes;
+  // A server may have unpacked it already (Content-Encoding): only inflate real gzip data.
+  const head = new Uint8Array(bytes, 0, 2);
+  if (head[0] !== 0x1f || head[1] !== 0x8b) return bytes;
+  return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
 }
 
 async function load(url: string): Promise<CharacterSet> {
