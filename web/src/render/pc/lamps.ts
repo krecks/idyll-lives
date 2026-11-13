@@ -25,6 +25,9 @@
  *   goes out over a second or so as everyone in it falls asleep (or a windowless room empties), and
  *   its windows' glow with it, or with its lamps all switched off (`windowGlowOn`). In the basement
  *   and in rooms without windows the lights are on by day too, as bright as at night.
+ * - Shadows (`lampShadows.ts`, the preset's `lampShadows`): the lamps nearest the camera's target cast them, each
+ *   from one map: a lamp that casts is a spot light, along its shade's way or straight down, and one without
+ *   a shade still lights all round (`shape`).
  * - The glows: the shades' and fires' (`LotContents.applyGlow`, through `glow`), the windows' by
  *   room (`HouseBuilder.setWindowGlow`) and the garden's pools (the renderer's, `hooks.pools`).
  *
@@ -33,6 +36,7 @@
 
 import * as pc from './engine';
 import type { HouseBuilder } from './house';
+import { enableLampShadows, LAMP_SHADOW_LIGHT, LampShadows } from './lampShadows';
 import type { GlowLight, LotContents } from './lotContents';
 import { MaterialLibrary, ROOM_SPLIT, ROOM_SPLIT_DN, type RoomMask } from './materials';
 import { benchDiag } from '../../debug/benchFlags';
@@ -70,6 +74,11 @@ const LAMP_MAX_RANGE = 7;
 const REACH = 2;
 /** A shade's cone (degrees from its direction): full along it, about a quarter at 45°, next to none side-on (`roomLights.ts`). */
 const SHADE_CONE = 90;
+/**
+ * The inner cone (degrees) of a lamp without a shade drawn as a spot light for its shadow map: past anything a
+ * shade has, it says the light goes all round (`shaders/roomLights.ts` `ALL_ROUND_COS`).
+ */
+const ALL_ROUND_CONE = 180;
 /** Seconds over which a room's lights go out (or come back on) as its residents fall asleep (or wake). */
 const LIGHTS_OUT_FADE = 1.2;
 /** Seconds a lamp takes to go off or on at its switch. */
@@ -95,6 +104,8 @@ export interface LampHooks {
   lot: LotContents;
   /** The garden's pools of lamplight again (their lamps' fades: `Lamps.lampOn`). */
   pools(): void;
+  /** What casts the lamps' shadows now (`lampShadows.ts`; one list, filled anew at each call). */
+  casters(): pc.MeshInstance[];
 }
 
 /** One interior light: its entity, what it lights (null: unused), and how far on (1 on, 0 out). */
@@ -103,6 +114,9 @@ interface RoomLamp {
   light: pc.LightComponent;
   use: RoomLight | null;
   on: number;
+  /** It casts shadows (`shape`), and lights all round as a spot light for it (its bounds are a point light's then). */
+  casting: boolean;
+  round: boolean;
 }
 
 export class Lamps {
@@ -116,6 +130,8 @@ export class Lamps {
   private readonly lib: MaterialLibrary;
   private readonly lamps: RoomLamp[] = [];
   private readonly components: pc.LightComponent[] = [];
+  /** The lamps' shadows (null: the preset has none, or the lights aren't the many clustered ones). */
+  private readonly shadows: LampShadows | null;
   /** The lights of the viewed house as placed (before the lamps go round them). */
   private placed: RoomLight[] = [];
   /** More lights than lamps to go round: lamps switched off give theirs up (`assign`). */
@@ -164,9 +180,13 @@ export class Lamps {
     this.clustered = scene.clusteredLightingEnabled;
     this.many = this.clustered && (wanted === 'clustered' || (wanted !== 'forward' && quality.clusteredLamps));
     const count = this.many ? CLUSTERED_LIGHTS : ROOM_LIGHTS;
-    // Lamps cast no shadows and have no cookies or shapes: the clusters' shaders without them.
+    const off = benchDiag().has('nolamps');
+    // Lamps have no cookies or shapes, and no shadows unless the preset has lamps that cast (`lampShadows.ts`): the
+    // clusters' shaders without them.
     const lighting = scene.lighting;
-    lighting.shadowsEnabled = false;
+    const shadows = this.many && !off && quality.lampShadows > 0;
+    if (shadows) enableLampShadows(app);
+    else lighting.shadowsEnabled = false;
     lighting.cookiesEnabled = false;
     lighting.areaLightsEnabled = false;
     lighting.maxLightsPerCell = count;
@@ -175,7 +195,6 @@ export class Lamps {
     const color = new pc.Color(gamma(c.r), gamma(c.g), gamma(c.b));
     const bounce = ROOM.bounce * LAMP_POWER * LAMP_UNITS;
     this.lib.setRoomBounce({ r: c.r * bounce, g: c.g * bounce, b: c.b * bounce });
-    const off = benchDiag().has('nolamps');
     for (let i = 0; i < count; i++) {
       const entity = new pc.Entity(`roomLight${i}`);
       entity.addComponent('light', {
@@ -188,14 +207,28 @@ export class Lamps {
         innerConeAngle: this.many ? SHADE_CONE : 0,
         outerConeAngle: SHADE_CONE,
         castShadows: false,
+        ...(shadows ? LAMP_SHADOW_LIGHT : {}),
         // Only meshes that keep the dynamic bit (`MaterialLibrary.excludeFromLights`).
         mask: pc.MASK_AFFECT_DYNAMIC,
       });
       entity.enabled = !off;
       app.root.addChild(entity);
-      this.lamps.push({ entity, light: entity.light!, use: null, on: 1 });
+      const lamp: RoomLamp = { entity, light: entity.light!, use: null, on: 1, casting: false, round: false };
+      this.lamps.push(lamp);
       this.components.push(entity.light!);
+      if (!shadows) continue;
+      // A lamp lighting all round as a spot light (`shape`) is in every cluster a point light would be in:
+      // PlayCanvas puts a spot light only in those its cone reaches.
+      const light = lamp.light.light;
+      const cone = light.getBoundingBox.bind(light);
+      light.getBoundingBox = (box: pc.BoundingBox) => {
+        if (!lamp.round) return cone(box);
+        const r = light.attenuationEnd;
+        box.center.copy(entity.getPosition());
+        box.halfExtents.set(r, r, r);
+      };
     }
+    this.shadows = shadows ? new LampShadows(this.lamps, quality.lampShadows, quality.lampShadowRate, hooks.casters, { storey: view.storey, storeyOf: view.storeyOf, rowOf: view.rowOf, shape: (i, on) => this.shape(i, on) }) : null;
     // Each lamp lights only its own room (`?roomlights=0` turns it off to compare).
     this.lib.rooms.enabled = params.get('roomlights') !== '0';
     this.glow = {
@@ -250,12 +283,54 @@ export class Lamps {
       const k = this.view.storeyOf(l.z);
       // Game space to PlayCanvas's (the world is mirrored in z: `space.ts`).
       lamp.entity.setPosition(l.x, l.y + k * WALL_HEIGHT, -(l.z - this.view.rowOf(k)));
-      // A shade's side (`dir`, clustered lights only): a spot light shining along its entity's -y.
-      const dir = this.clustered ? l.dir : undefined;
-      lamp.light.type = dir ? 'spot' : 'omni';
-      if (dir) lamp.entity.setRotation(downTo(dir[0], dir[1], -dir[2], this.vTmp, this.qTmp));
+      this.shape(i, lamp.casting);
     }
     this.applyRoomLights();
+    // (After their strengths: a lamp that still casts is lit.)
+    this.shadows?.placed();
+  }
+
+  /**
+   * Lamp `i`'s light as a point or a spot light. A shade's side (`dir`, clustered lights only): a spot light
+   * shining along its entity's -y. A lamp that casts shadows (`casting`, `lampShadows.ts`) is a spot light too,
+   * for the one shadow map a spot light has: without a shade it shines straight down and still lights all
+   * round (`ALL_ROUND_CONE`).
+   */
+  private shape(i: number, casting: boolean): void {
+    const lamp = this.lamps[i];
+    lamp.casting = casting;
+    const l = lamp.use;
+    const dir = this.clustered ? l?.dir : undefined;
+    lamp.round = casting && !dir;
+    const type = dir || casting ? 'spot' : 'omni';
+    if (lamp.light.type !== type) lamp.light.type = type;
+    const inner = lamp.round ? ALL_ROUND_CONE : this.many ? SHADE_CONE : 0;
+    if (lamp.light.innerConeAngle !== inner) lamp.light.innerConeAngle = inner;
+    if (dir) lamp.entity.setRotation(downTo(dir[0], dir[1], -dir[2], this.vTmp, this.qTmp));
+    else if (casting) lamp.entity.setRotation(pc.Quat.IDENTITY);
+  }
+
+  /**
+   * One frame of the warm-up with a lamp's shadow map drawn over (`x`, `z`) (PlayCanvas space; `LampShadows.warm`).
+   * Returns what puts the lamps back as they were.
+   */
+  warm(x: number, z: number): () => void {
+    if (!this.shadows) return () => {};
+    const done = this.shadows.warm(x, z);
+    return () => {
+      done();
+      this.assign();
+    };
+  }
+
+  /** Something that casts the lamps' shadows changed (`LampShadows.moved`). */
+  castersMoved(urgent: boolean): void {
+    this.shadows?.moved(urgent);
+  }
+
+  /** Residents moved, in `rooms` (`LampShadows.residents`). */
+  residentsMoved(rooms: ReadonlySet<number>): void {
+    this.shadows?.residents(rooms);
   }
 
   /**
@@ -330,11 +405,13 @@ export class Lamps {
 
   /**
    * The fades, each frame (`dt` in seconds; `dark` and `awake`: the rooms where everyone is asleep,
-   * and those with someone awake, the renderer's `findDarkRooms`).
+   * and those with someone awake, the renderer's `findDarkRooms`; `targetX`, `targetZ`: what the camera looks at, game
+   * space on the ground, which the lamps nearest it cast shadows for).
    */
-  frame(dt: number, dark: ReadonlySet<number>, awake: ReadonlySet<number>): void {
+  frame(dt: number, dark: ReadonlySet<number>, awake: ReadonlySet<number>, targetX: number, targetZ: number): void {
     this.dark = dark;
     this.awake = awake;
+    this.shadows?.frame(dt, targetX, targetZ);
     const switched = this.fadeLamps(dt);
     if (this.fadeRoomLights(dt) && (this.lampsLevel > 0 || this.view.storey() < 0 || this.dimmed.size > 0)) this.applyRoomLights();
     if ((this.fadeWindowGlow(dt) || switched) && (this.lampsLevel > 0 || this.dimmed.size > 0)) {

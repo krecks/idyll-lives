@@ -298,6 +298,19 @@ export interface RoomLight {
   always?: boolean;
   /** Where its shade sends the light (content `light.aim`): a unit direction for a lamp that lights one side only (none: all round). */
   dir?: [number, number, number];
+  /** It can cast shadows (`lampCasts`), where the preset has lamps that do (`pc/lampShadows.ts`). */
+  casts?: boolean;
+}
+
+/**
+ * Whether a lamp can cast shadows: one that lights the room below it or round it. Not a fire or a light that
+ * follows a use (their light comes from inside a thing that would shadow all of it: a fireplace, a stove under
+ * its hood), nor a lamp aimed up (its light is on the ceiling, which the game doesn't draw from above). A
+ * lamp that can doesn't cast in another's light either: it would have to be left out of its own, and all copies
+ * of a model are one draw.
+ */
+export function lampCasts(light: LampLight): boolean {
+  return light.while === undefined && !light.fire && light.aim !== 'up';
 }
 
 /** Below the ceiling (m) where an uplighter's light comes off it (`aim: 'ceiling'`), and how much further it reaches from there. */
@@ -349,7 +362,7 @@ export function placeLights(world: WorldStructure, inView: (x: number, z: number
     }
   };
   const lights = [
-    ...lamps.map((l): RoomLight => ({ x: l.x, z: l.z, ...aimed(l), room: l.room, area: areaOf(l.room), kind: 'lamp', power: l.light.intensity, ...(l.light.switch === false && l.light.while === undefined ? {} : { lamp: l.id }), ...(l.light.while === undefined ? {} : { always: true }) })),
+    ...lamps.map((l): RoomLight => ({ x: l.x, z: l.z, ...aimed(l), room: l.room, area: areaOf(l.room), kind: 'lamp', power: l.light.intensity, ...(l.light.switch === false && l.light.while === undefined ? {} : { lamp: l.id }), ...(l.light.while === undefined ? {} : { always: true }), ...(lampCasts(l.light) ? { casts: true } : {}) })),
     // (A light that follows a use isn't the room's lamp: a room whose only light is a hood still gets its dim fill.)
     ...[...rooms.entries()].filter(([r]) => !lamps.some((l) => l.room === r && l.light.while === undefined)).map(([r, t]): RoomLight => ({ x: t.sx / t.n, y: 2.45, z: t.sz / t.n, room: r, area: t.n, kind: 'fill' })),
   ];

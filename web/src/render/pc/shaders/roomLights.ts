@@ -34,6 +34,10 @@
  * falloff had it; the many lamps' ranges are set past their reach for it, `lamps.ts`), the physical
  * cone for a light without an inner cone (its inner angle its outer one) and the glTF cone for one
  * with.
+ *
+ * Shadows (`lampShadows.ts`, where the preset has them): a lamp that casts is a spot light with one shadow
+ * map, read in the clustered loop; a lamp without a shade stays all round (`ALL_ROUND_COS`), and no lamp is
+ * shadowed past its map's cone (`gameLampShadow`, an engine patch round the read).
  */
 
 import type { Language, ShaderFeature } from './chunks';
@@ -43,6 +47,13 @@ export const ROOM_LIGHT_ROOMS = 256;
 
 /** How far out along its normal a fragment is classed (m): off a wall's face, into the room it faces. */
 export const OUT = '0.1';
+
+/**
+ * A spot light whose inner cone is wider than this (its cosine: 120°, far past any cone a shade has) lights all
+ * round: a lamp without a shade drawn as a spot light for the one shadow map a spot has (`lamps.ts`
+ * `ALL_ROUND_CONE`).
+ */
+const ALL_ROUND_COS = '-0.5';
 
 /** `-log2(1/100)`: the physical spot falloff, a hundredth of the light at the cone's edge. */
 const CONE_EDGE = '6.64385618977';
@@ -122,8 +133,20 @@ export const ROOM_LIGHTS: ShaderFeature = {
   },
 };
 
-export const ROOM_LIGHT_CODE: Record<Language, { skip: string; forward: string; noLamps: string; falloff: string; spot: string }> = {
+export const ROOM_LIGHT_CODE: Record<Language, { skip: string; forward: string; noLamps: string; falloff: string; spot: string; shadowDecl: string; shadow: (read: string) => string }> = {
   glsl: {
+    // Before `clusteredLightPS`, and round a spot's shadow read in it (`lampShadows.ts`): a lamp's shadow map covers
+    // a cone round its way (`game_lampShadowCone`: the cosines of its edge and of where the shadows start to fade
+    // towards it); past it the lamp shines unshadowed (PlayCanvas would read the maps beside it in the atlas).
+    shadowDecl: `
+#ifdef CLUSTER_SHADOWS
+	uniform vec2 game_lampShadowCone;
+	float gameLampShadow(float shadow, vec3 spotDir, vec3 lightDirNorm) {
+		return mix(1.0, shadow, smoothstep(game_lampShadowCone.x, game_lampShadowCone.y, dot(lightDirNorm, spotDir)));
+	}
+#endif
+`,
+    shadow: (read) => `gameLampShadow(${read}, light.direction, lightDirNormW)`,
     // After `decodeClusterLightCore(lightIndex)` in `evaluateClusterLight`.
     skip: `
 	#ifdef GAME_LOOK
@@ -154,6 +177,7 @@ float getFalloffInvSquared(float lightRadius, vec3 lightDir) {
     spot: `
 float getSpotEffect(vec3 lightSpotDir, float lightInnerConeAngle, float lightOuterConeAngle, vec3 lightDirNorm) {
 	#ifdef GAME_LOOK
+		if (lightInnerConeAngle < ${ALL_ROUND_COS}) return 1.0;
 		float cosAngle = dot(lightDirNorm, lightSpotDir);
 		if (lightInnerConeAngle <= lightOuterConeAngle + 1e-4) return exp2(${CONE_EDGE} / max(1.0 - lightOuterConeAngle, 1e-4) * (cosAngle - 1.0));
 		float cone = saturate((cosAngle - lightOuterConeAngle) / (lightInnerConeAngle - lightOuterConeAngle));
@@ -165,6 +189,15 @@ float getSpotEffect(vec3 lightSpotDir, float lightInnerConeAngle, float lightOut
 `,
   },
   wgsl: {
+    shadowDecl: `
+#ifdef CLUSTER_SHADOWS
+	uniform game_lampShadowCone: vec2f;
+	fn gameLampShadow(shadow: f32, spotDir: vec3f, lightDirNorm: vec3f) -> f32 {
+		return mix(1.0, shadow, smoothstep(uniform.game_lampShadowCone.x, uniform.game_lampShadowCone.y, dot(lightDirNorm, spotDir)));
+	}
+#endif
+`,
+    shadow: (read) => `gameLampShadow(${read}, light.direction, lightDirNormW)`,
     skip: `
 	#ifdef GAME_LOOK
 		if (gameRoomSkip(clusterLightData.position, vPositionW, worldNormal)) { return; }
@@ -192,6 +225,7 @@ fn getFalloffInvSquared(lightRadius: f32, lightDir: vec3f) -> f32 {
     spot: `
 fn getSpotEffect(lightSpotDir: vec3f, lightInnerConeAngle: f32, lightOuterConeAngle: f32, lightDirNorm: vec3f) -> f32 {
 	#ifdef GAME_LOOK
+		if (lightInnerConeAngle < ${ALL_ROUND_COS}) { return 1.0; }
 		let cosAngle = dot(lightDirNorm, lightSpotDir);
 		if (lightInnerConeAngle <= lightOuterConeAngle + 1e-4) { return exp2(${CONE_EDGE} / max(1.0 - lightOuterConeAngle, 1e-4) * (cosAngle - 1.0)); }
 		let cone = saturate((cosAngle - lightOuterConeAngle) / (lightInnerConeAngle - lightOuterConeAngle));

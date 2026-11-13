@@ -199,8 +199,11 @@ export class SunShadows {
   private readonly ground = { x0: -30, z0: -30, x1: 30, z1: 30 };
   private readonly fadeId: pc.ScopeId;
   private readonly fade: number;
-  /** Something in the map changed (`moved`; `urgent`: not a resident's pose), for what else holds a picture of the world (the mirrors). */
-  onMoved: ((urgent: boolean) => void) | null = null;
+  /**
+   * Something in the map changed (`moved`; `urgent`: not a resident's pose; `casters`: something that casts, not
+   * only the sun's way), for what else holds a picture of the world (the mirrors, the lamps' shadows).
+   */
+  onMoved: ((urgent: boolean, casters: boolean) => void) | null = null;
 
   /**
    * Shadows from `sun`'s light: a map of `options.size` texels a side, filtered by 3×3 PCF on every
@@ -267,10 +270,11 @@ export class SunShadows {
 
   /**
    * Something in the map changed: it is drawn again in the next frame. `urgent` changes (the sun,
-   * the walls, a thing placed) draw at once; a resident's pose may wait for the shadow rate.
+   * the walls, a thing placed) draw at once; a resident's pose may wait for the shadow rate. `casters`: false
+   * when only the sun's way changed, or what casts no shadow but the sun's (a door's leaf).
    */
-  moved(urgent = true): void {
-    this.onMoved?.(urgent);
+  moved(urgent = true, casters = true): void {
+    this.onMoved?.(urgent, casters);
     if (this.overview) return;
     const now = performance.now();
     if (this.interval <= 0 || urgent || now - this.lastDraw >= this.interval) {

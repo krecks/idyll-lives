@@ -310,12 +310,13 @@ function resetSetting<K extends keyof Settings>(k: K): void {
   settings[k] = structuredClone(DEFAULT_SETTINGS[k]);
 }
 
-/** Renderer quality: the graphics preset's (`render/quality.ts`); `?quality=low|medium|high` overrides it for testing, `?snapshot=0` turns snapshot rendering off, `?shadowrate=<Hz>` sets the shadow rate, `?woodscell=<m>` the woods' squares. */
+/** Renderer quality: the graphics preset's (`render/quality.ts`); `?quality=low|medium|high` overrides it for testing, `?snapshot=0` turns snapshot rendering off, `?shadowrate=<Hz>` sets the shadow rate, `?woodscell=<m>` the woods' squares, `?lampshadows=<n>` how many lamps cast shadows. */
 export function qualityFromSettings(s: Settings, params: URLSearchParams): RenderQuality {
   const asked = params.get('quality');
   const preset = isGraphicsPreset(asked) ? asked : s.graphics;
   const q = QUALITY[preset];
   const shadowRate = Number(params.get('shadowrate') ?? NaN);
   const woodsCell = Number(params.get('woodscell') || NaN);
-  return { ...q, preset, holdStillFrames: q.holdStillFrames && params.get('snapshot') !== '0', shadowRate: Number.isFinite(shadowRate) ? shadowRate : q.shadowRate, woodsCell: woodsCell >= 0 ? woodsCell : q.woodsCell };
+  const lampShadows = Number(params.get('lampshadows') || NaN);
+  return { ...q, preset, lampShadows: lampShadows >= 0 ? Math.min(4, Math.floor(lampShadows)) : q.lampShadows, holdStillFrames: q.holdStillFrames && params.get('snapshot') !== '0', shadowRate: Number.isFinite(shadowRate) ? shadowRate : q.shadowRate, woodsCell: woodsCell >= 0 ? woodsCell : q.woodsCell };
 }
