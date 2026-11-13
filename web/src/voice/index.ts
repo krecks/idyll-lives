@@ -23,6 +23,8 @@ import type { FrameState } from '../core/bridge';
 import type { SimThreadStats, WorldStructure } from '../core/protocol';
 import { llmReady, llmStats, llmStatus, unloadLlm } from '../llm';
 import { heldSince, inferenceHeld } from '../ml/schedule.svelte';
+import { acoustics } from '../audio/acoustics';
+import type { Place } from '../audio/space';
 import type { Renderer } from '../render/types';
 import { settings } from '../settings/settings.svelte';
 import { deviceTest, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
@@ -168,6 +170,8 @@ export class VoiceDirector {
   private playerTalk: { a: number; b: number; until: number; started: boolean } | null = null;
   private readonly head = { x: 0, y: 0, z: 0 };
   private readonly screen = { x: 0, y: 0 };
+  /** The newest frame (where a speaker stands). */
+  private frame: FrameState | null = null;
   /** With `?debug`: the last lines chosen, as `id key: text` (`window.__voices.heard`). */
   readonly heard: string[] = [];
   private readonly debug = new URLSearchParams(location.search).has('debug');
@@ -209,6 +213,7 @@ export class VoiceDirector {
 
   update(frame: FrameState): void {
     const now = frame.now;
+    this.frame = frame;
     this.watchFrames(now);
     this.watchSim();
     if (now - this.lastTick < TICK_MS) return;
@@ -620,7 +625,7 @@ export class VoiceDirector {
         if (this.disposed || !settings.voices || (entry && !this.speaking.includes(entry))) return;
         // Where the resident is now (rows move as residents come and go).
         const row = entry?.row ?? this.rows.get(id) ?? index;
-        const playing = playClip(samples, this.panFor(row));
+        const playing = playClip(samples, this.placeFor(row));
         if (!playing) return;
         if (entry) {
           entry.playing = playing;
@@ -688,13 +693,26 @@ export class VoiceDirector {
     if (!this.speaking.some((s) => s.row === row)) this.renderer.setSpeech(row, null, 0);
   }
 
-  /** Stereo position from where the resident is on screen. */
-  private panFor(index: number): number {
-    if (!this.renderer.simHead(index, this.head) || !this.renderer.project(this.head.x, this.head.y, this.head.z, this.screen)) return 0;
-    const width = window.innerWidth || 1;
-    const pan = Math.max(-1, Math.min(1, (this.screen.x / width) * 2 - 1)) * 0.7;
-    // Web Audio throws on a non-finite value (and that would stop the frame).
-    return Number.isFinite(pan) ? pan : 0;
+  /**
+   * Where the resident's voice comes from: left to right by where they are on screen, in the room they stand
+   * in (its reverb; behind a wall when the camera is in on another room: `audio/acoustics.ts`).
+   */
+  private placeFor(index: number): Place {
+    let pan = 0;
+    if (this.renderer.simHead(index, this.head) && this.renderer.project(this.head.x, this.head.y, this.head.z, this.screen)) {
+      const width = window.innerWidth || 1;
+      pan = Math.max(-1, Math.min(1, (this.screen.x / width) * 2 - 1)) * 0.7;
+      // Web Audio throws on a non-finite value (and that would stop the frame).
+      if (!Number.isFinite(pan)) pan = 0;
+    }
+    const f = this.frame;
+    if (!f || index >= f.curr[f.layout.header.simCount]) return { pan };
+    // Where they stand (the world's rows: their storey's).
+    const o = f.layout.headerLen + index * f.layout.simStride;
+    const x = f.curr[o + f.layout.sim.x];
+    const z = f.curr[o + f.layout.sim.z];
+    const size = acoustics.sizeAt(x, z);
+    return { pan, muffle: acoustics.muffleAt(x, z), rooms: size ? { [size]: 1 } : undefined };
   }
 
   private pan(frame: FrameState): void {
@@ -704,7 +722,7 @@ export class VoiceDirector {
     for (const s of this.speaking) {
       for (let i = 0; i < count; i++) {
         if (curr[layout.headerLen + i * layout.simStride + layout.sim.id] === s.id) {
-          s.playing.setPan(this.panFor(i));
+          s.playing.setPlace(this.placeFor(i));
           // Their row moved: the mouth shapes go with them.
           if (i !== s.row) {
             const old = s.row;

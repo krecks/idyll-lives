@@ -22,17 +22,46 @@ function biquad(x: Float64Array, b: readonly [number, number, number], a: readon
 }
 
 /**
- * How loud a sound is to the ear (LUFS, ITU-R BS.1770-4): both channels through the K weighting (a shelf that
- * lifts what the head lifts, then a high-pass: the standard's coefficients, which are for 48 kHz), the mean
- * square of 0.4 s blocks a tenth of a second apart, the blocks under -70 LUFS and then those more than 10 LU under
+ * The K weighting's two filters at a sample rate (ITU-R BS.1770: a shelf that lifts what the head lifts, then a
+ * high-pass), as `[b, a]` for `biquad`. At 48 kHz the standard's own coefficients; at any other rate the same
+ * two filters worked out from their analogue shapes (the shelf: 4 dB up from 1682 Hz; the high-pass at 38 Hz), as
+ * loudness meters do for other rates (libebur128's formulas: at 48 kHz they give the standard's numbers to nine
+ * places).
+ */
+export function kWeighting(rate: number): [[readonly [number, number, number], readonly [number, number]], [readonly [number, number, number], readonly [number, number]]] {
+  if (rate === 48_000) {
+    return [
+      [[1.53512485958697, -2.69169618940638, 1.19839281085285], [-1.69065929318241, 0.73248077421585]],
+      [[1, -2, 1], [-1.99004745483398, 0.99007225036621]],
+    ];
+  }
+  const shelf = (() => {
+    const k = Math.tan((Math.PI * 1681.974450955533) / rate);
+    const q = 0.7071752369554196;
+    const vh = 10 ** (3.999843853973347 / 20);
+    const vb = vh ** 0.4996667741545416;
+    const a0 = 1 + k / q + k * k;
+    return [[(vh + (vb * k) / q + k * k) / a0, (2 * (k * k - vh)) / a0, (vh - (vb * k) / q + k * k) / a0], [(2 * (k * k - 1)) / a0, (1 - k / q + k * k) / a0]] as [[number, number, number], [number, number]];
+  })();
+  const high = (() => {
+    const k = Math.tan((Math.PI * 38.13547087602444) / rate);
+    const q = 0.5003270373238773;
+    const a0 = 1 + k / q + k * k;
+    return [[1, -2, 1], [(2 * (k * k - 1)) / a0, (1 - k / q + k * k) / a0]] as [[number, number, number], [number, number]];
+  })();
+  return [shelf, high];
+}
+
+/**
+ * How loud a sound is to the ear (LUFS, ITU-R BS.1770-4): both channels through the K weighting (`kWeighting`),
+ * the mean square of 0.4 s blocks a tenth of a second apart, the blocks under -70 LUFS and then those more than 10 LU under
  * the rest's mean left out (a sound's own silences don't make it quieter). A sound shorter than a block is one
  * block. Peak and RMS say what the samples hold; this says what one sound is against another when heard, which
  * is what a mix is levelled by.
  */
 export function loudness(l: Float32Array, r: Float32Array, rate: number): number {
-  if (rate !== 48_000) throw new Error(`loudness is measured at 48 kHz (the K weighting's coefficients are for it), not ${rate}`);
-  const weighted = (x: Float32Array) =>
-    biquad(biquad(Float64Array.from(x), [1.53512485958697, -2.69169618940638, 1.19839281085285], [-1.69065929318241, 0.73248077421585]), [1, -2, 1], [-1.99004745483398, 0.99007225036621]);
+  const [shelf, high] = kWeighting(rate);
+  const weighted = (x: Float32Array) => biquad(biquad(Float64Array.from(x), shelf[0], shelf[1]), high[0], high[1]);
   const a = weighted(l);
   const b = weighted(r);
   const n = Math.min(a.length, b.length);

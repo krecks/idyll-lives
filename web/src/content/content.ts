@@ -119,7 +119,7 @@ export interface InteractionDef {
   /** Where partners try for a baby (a double bed's): started only by the social, never from the object's menu. */
   conceive?: boolean;
   /**
-   * What it sounds like while it lasts: a world sound by key (`audio/world.ts` `LOOPS`: `chop` for
+   * What it sounds like while it lasts: a world sound by key (`audio/catalog.ts` `LOOPS`: `chop` for
    * a cheese board), or `none`; absent: by the object's `sounds`, else by `anim`. A sound played
    * once (`audio/things.ts` `ONCE_THINGS`: `vendCan`) plays as it starts. Not for a `recipe`, whose
    * steps sound by the station they're done at.

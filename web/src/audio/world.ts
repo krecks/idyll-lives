@@ -2,17 +2,27 @@
  * Sounds of the world, synthesised like the interface sounds (no sound files):
  * - ambience by the game clock: a soft outdoor bed, crickets at night, and by day a few neighbourhood
  *   birds of different species, each with its own song, singing in bouts (most in the dawn chorus);
+ * - the street and the weather (`outside.ts`): the cars driving past, the town from above as the camera
+ *   zooms out, the wind in the leaves by the gusts the grass shows;
  * - things in use on the lot being looked at: a sizzling pan, a shower, a tap, washing up, a bath, the
  *   washing machine and the dryer, the dishwasher being loaded, a TV, music, drums, and the machines,
  *   games and tools of `things.ts` (a treadmill, a blender, darts, a cello...). One loop per kind of
  *   sound, louder the more residents make it, placed left or right like voices; the water sounds are
- *   made in `water.ts`, the things' in `things.ts`. What a use sounds like comes from the thing
+ *   made in `water.ts`, the things' in `things.ts`, those of one channel (a pan, a knife, the TV,
+ *   drums, the outdoor bed, crickets, the knock) in `mono.ts`, the music's pieces in `music.ts`
+ *   (a folk tune by day, a slow one in the evening, a dance while someone dances); the level of each is in
+ *   `catalog.ts`. What a use sounds like comes from the thing
  *   (content `sound` and `sounds`), else from its animation (`ACTION_SOUNDS`);
  * - things that sound by themselves (content `ambient`: a fountain; a machine running on its own, its
  *   `runs.sound`: the washer loaded, nobody at it), while their lot is looked at, some only while a use
  *   under them sounds (`ambientWhile`: a cooker hood over a hob in use);
  * - sounds as something happens: a fridge door as its use starts (a `sound` played once), a toilet's
- *   flush as its use ends (content `endSound`), a visitor's knock at the front door.
+ *   flush as its use ends (content `endSound`), a visitor's knock at the front door;
+ * - the footsteps of the residents in view (`footsteps.ts`).
+ *
+ * A thing's sound is placed (`space.ts`): left or right by where it is on screen, in the reverb of the
+ * room it is made in (dry outdoors), behind a wall when the camera is in on another room, and further
+ * off as the camera zooms out (`acoustics.ts`). The outdoors (the bed, crickets, birds) is all round.
  *
  * Presentation only. Reads the snapshot about ten times a second; residents the renderer doesn't
  * draw (other lots, at work) make no sound.
@@ -20,13 +30,23 @@
 
 import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
-import { storeyOfRow, storeyRow, type WorldStructure } from '../core/protocol';
+import { storeyOfRow, storeyRow, type StoreyLayout, type WorldStructure } from '../core/protocol';
+import { townView } from '../render/shared/townView';
 import { birdActivity, STOREY_HEIGHT, type Renderer, type ViewRect } from '../render/types';
 import { game } from '../ui/state.svelte';
+import { acoustics } from './acoustics';
 import { songSamples, SPECIES, VERSIONS, type Species, type Voice } from './birdsong';
-import { audioContext, bus, updateVolumes } from './mixer';
-import { MADE, ONCE_THINGS, type MadeKind } from './things';
-import { ONCE, WATER, type Stereo } from './water';
+import { Footsteps } from './footsteps';
+import { AMBIENCE, LOOPS, ONCE_KINDS, ONCE_LEVEL, pieceAt, type LoopKind, type OnceKind, type SoundKind } from './catalog';
+import { audioContext, bus, space, updateVolumes } from './mixer';
+import { MONO, type MonoKind } from './mono';
+import type { MusicKind } from './music';
+import { Outside } from './outside';
+import type { RoomSize } from './rooms';
+import { Placed, type Place, type Space } from './space';
+import { makeSound, type WorkerKind } from './made';
+import type { MadeKind } from './things';
+import { random, WATER } from './water';
 import type { SoundReply, SoundRequest } from './water.worker';
 
 const TICK_MS = 100;
@@ -36,13 +56,6 @@ const STALE_MS = 2000;
 const FADE = 0.4;
 /** Seconds a bath runs before the water's turned off and the bather settles in. */
 const BATH_FILL = 7;
-
-/** A sound played once (`ONCE`, `ONCE_THINGS`), not looped. */
-type OnceKind = (typeof ONCE)[number] | (typeof ONCE_THINGS)[number];
-const ONCE_KINDS: readonly string[] = [...ONCE, ...ONCE_THINGS];
-export type LoopKind = 'sizzle' | 'chop' | Exclude<MadeKind, OnceKind> | 'tv' | 'music' | 'drums';
-/** A world sound: a loop, or one played once (as a use starts, when it's a use's sound). */
-export type SoundKind = LoopKind | OnceKind;
 
 /** What each action sounds like (content animation tags; unknown tags are silent; see also `soundOf`). */
 const ACTION_SOUNDS: Record<string, LoopKind> = {
@@ -61,63 +74,6 @@ const ACTION_SOUNDS: Record<string, LoopKind> = {
   // A cooking step in an oven: its fan (a pizza oven's fire, a microwave's hum: by the object's `sounds`).
   bake: 'ovenFan',
 };
-
-interface LoopDef {
-  /** The raw sound, made here; or one of the water's or the things' sounds, made off the main thread. */
-  make?: (ac: AudioContext) => AudioBuffer;
-  made?: MadeKind;
-  /** A filter on the way out (shapes the raw buffer into the sound). */
-  filter?: { type: BiquadFilterType; frequency: number; q: number };
-  level: number;
-  /** How far the speed (and with it the pitch) wanders either way, so a loop doesn't sound the same each time round. */
-  drift?: number;
-}
-
-const LOOPS: Record<LoopKind, LoopDef> = {
-  sizzle: { make: sizzleBuffer, filter: { type: 'highpass', frequency: 1800, q: 0.5 }, level: 0.22 },
-  chop: { make: chopBuffer, filter: { type: 'bandpass', frequency: 1400, q: 0.8 }, level: 0.3 },
-  shower: { made: 'shower', level: 0.28, drift: 0.04 },
-  tap: { made: 'tap', level: 0.22, drift: 0.04 },
-  washUp: { made: 'washUp', level: 0.24, drift: 0.03 },
-  bathFill: { made: 'bathFill', level: 0.26, drift: 0.04 },
-  bathSoak: { made: 'bathSoak', level: 0.35, drift: 0.03 },
-  washer: { made: 'washer', level: 0.2, drift: 0.02 },
-  dryer: { made: 'dryer', level: 0.18, drift: 0.02 },
-  dishwasher: { made: 'dishwasher', level: 0.16, drift: 0.02 },
-  crockery: { made: 'crockery', level: 0.35 },
-  fountain: { made: 'fountain', level: 0.2, drift: 0.03 },
-  tv: { make: murmurBuffer, filter: { type: 'bandpass', frequency: 700, q: 1.1 }, level: 0.35 },
-  music: { make: musicBuffer, filter: { type: 'lowpass', frequency: 2600, q: 0.7 }, level: 0.16 },
-  drums: { make: drumsBuffer, filter: { type: 'lowpass', frequency: 7000, q: 0.7 }, level: 0.2 },
-  treadmill: { made: 'treadmill', level: 0.21, drift: 0.02 },
-  bike: { made: 'bike', level: 0.2, drift: 0.04 },
-  tools: { made: 'tools', level: 0.27 },
-  bikeTools: { made: 'bikeTools', level: 0.27 },
-  pool: { made: 'pool', level: 0.27 },
-  foosball: { made: 'foosball', level: 0.27 },
-  pingPong: { made: 'pingPong', level: 0.27 },
-  darts: { made: 'darts', level: 0.27 },
-  arcade: { made: 'arcade', level: 0.25 },
-  sewing: { made: 'sewing', level: 0.33 },
-  potteryWheel: { made: 'potteryWheel', level: 0.15, drift: 0.02 },
-  bubbling: { made: 'bubbling', level: 0.25, drift: 0.04 },
-  espresso: { made: 'espresso', level: 0.195 },
-  blender: { made: 'blender', level: 0.28, drift: 0.03 },
-  mixer: { made: 'mixer', level: 0.22, drift: 0.02 },
-  microwave: { made: 'microwave', level: 0.24 },
-  toaster: { made: 'toaster', level: 0.37 },
-  ovenFan: { made: 'ovenFan', level: 0.275 },
-  hood: { made: 'hood', level: 0.23, drift: 0.02 },
-  fire: { made: 'fire', level: 0.21, drift: 0.04 },
-  basketball: { made: 'basketball', level: 0.27 },
-  singing: { made: 'singing', level: 0.26 },
-  cello: { made: 'cello', level: 0.29 },
-  punchBag: { made: 'punchBag', level: 0.33 },
-  smash: { made: 'smash', level: 0.33 },
-};
-
-/** Levels of the sounds played once. */
-const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.27, binLid: 0.29, vendSnack: 0.25, vendCan: 0.25, phoneBox: 0.23, hangUp: 0.23, ping: 0.21, toastPop: 0.27, pour: 0.21 };
 
 /** Content `sound` that silences a use whose animation would otherwise make one (toast isn't fried). */
 const SILENT = 'none';
@@ -169,18 +125,27 @@ function unknownSound(key: string): undefined {
   return undefined;
 }
 
-/** What sounded on an update (`WorldSound.playing`): residents and things per loop, and the sounds played once. */
+/** What sounded on an update (`WorldSound.playing`): residents and things per loop and where each loop is heard from, the sounds played once, and the camera's distance (m). */
 interface Heard {
   loops: Partial<Record<LoopKind, number>>;
+  places: Partial<Record<LoopKind, Place>>;
+  /** The piece of music playing or last played (`music.ts`). */
+  piece: string | null;
   once: { kind: OnceKind; at: number }[];
+  radius: number;
+  /** The footsteps (`Footsteps.heard`). */
+  steps: ReturnType<Footsteps['heard']>;
+  /** The cars, the town and the wind (`Outside.heard`). */
+  outside: ReturnType<Outside['heard']>;
 }
 
-/** Something that sounds by itself (content `ambient`), where it stands. */
+/** Something that sounds by itself (content `ambient`), where it stands (`row`: its z in the world's rows, its storey's). */
 interface Ambient {
   kind: LoopKind;
   x: number;
   y: number;
   z: number;
+  row: number;
   /** Only while a use under it (on these tiles, rows as the world's) sounds like this (content `ambientWhile`); and whether one does now. */
   while?: { kind: SoundKind; tiles: Tiles; on: boolean };
 }
@@ -191,9 +156,48 @@ interface Loop {
   panner: StereoPannerNode;
 }
 
+/** A thing's loop, placed in the world's space. */
+interface PlacedLoop {
+  source: AudioBufferSourceNode;
+  gain: GainNode;
+  placed: Placed;
+}
+
+/** Who makes a loop this tick: how many, and where they are on average (left to right, behind a wall, in rooms of which sizes). */
+interface Users {
+  n: number;
+  pan: number;
+  muffle: number;
+  rooms: Record<RoomSize, number>;
+}
+
+/** One more user of a loop at `pan`, at tile point (`x`, `z`: the world's rows). */
+function join(users: Map<LoopKind, Users>, kind: LoopKind, pan: number, x: number, z: number): void {
+  let u = users.get(kind);
+  if (!u) {
+    u = { n: 0, pan: 0, muffle: 0, rooms: { small: 0, medium: 0, large: 0 } };
+    users.set(kind, u);
+  }
+  u.pan = (u.pan * u.n + pan) / (u.n + 1);
+  u.muffle = (u.muffle * u.n + acoustics.muffleAt(x, z)) / (u.n + 1);
+  u.n++;
+  const size = acoustics.sizeAt(x, z);
+  if (size) u.rooms[size]++;
+}
+
+/** Where a sound made at tile point (`x`, `z`: the world's rows) is, on screen at `pan`. */
+function placeAt(pan: number, x: number, z: number): Place {
+  const size = acoustics.sizeAt(x, z);
+  return { pan, muffle: acoustics.muffleAt(x, z), rooms: size ? { [size]: 1 } : undefined };
+}
+
 export class WorldSound {
   private lastTick = 0;
-  private readonly loops = new Map<LoopKind, Loop>();
+  private readonly loops = new Map<LoopKind, PlacedLoop>();
+  /** The piece of music playing (`catalog.ts` `pieceAt`). */
+  private piece: MusicKind | null = null;
+  /** The world's storeys (to find the rows of the one in view). */
+  private storeys: StoreyLayout | null = null;
   private bed: Loop | null = null;
   private crickets: Loop | null = null;
   private readonly made = new WorkerSounds();
@@ -215,7 +219,9 @@ export class WorldSound {
   /** The world's objects' tiles, by their stable id. */
   private readonly tilesOf = new Map<number, Tiles>();
   /** What sounded on the last update (`playing`). */
-  private heard: Heard = { loops: {}, once: [] };
+  private heard: Heard = { loops: {}, places: {}, piece: null, once: [], radius: 0, steps: { steps: 0, walkers: 0, recent: [] }, outside: { cars: [], driving: 0, town: 0, leaves: 0, gust: 0 } };
+  private readonly steps: Footsteps;
+  private readonly outside: Outside;
   private readonly head = { x: 0, y: 0, z: 0 };
   private readonly screen = { x: 0, y: 0 };
   private disposed = false;
@@ -226,7 +232,10 @@ export class WorldSound {
   constructor(
     private readonly renderer: Renderer,
     private readonly content: Content,
-  ) {}
+  ) {
+    this.steps = new Footsteps(renderer, content);
+    this.outside = new Outside(renderer, this.made);
+  }
 
   /** The world's objects, and the lot in view (`view`; null: none): the ones there that sound by themselves. */
   setWorld(world: WorldStructure, view: ViewRect | null): void {
@@ -234,6 +243,9 @@ export class WorldSound {
     this.onceHere = new Set();
     this.defOf.clear();
     this.tilesOf.clear();
+    this.storeys = world;
+    acoustics.setWorld(world);
+    this.steps.setWorld(world);
     const index = new Map(this.content.objectList.map((o, i) => [o.id, i]));
     for (const o of world.objects) {
       this.defOf.set(o.id, index.get(o.def) ?? -1);
@@ -253,7 +265,7 @@ export class WorldSound {
       if (!kind || isOnce(kind) || (o.wear ?? 0) >= 1) continue;
       const under = def.ambientWhile === undefined ? undefined : soundKind(def.ambientWhile);
       const tiles = { x: o.x, z: o.z, w: o.w, d: o.d };
-      this.ambient.push({ kind, x, y: storey * STOREY_HEIGHT + (under ? 1.8 : 0.6), z, while: under && { kind: under, tiles, on: false } });
+      this.ambient.push({ kind, x, y: storey * STOREY_HEIGHT + (under ? 1.8 : 0.6), z, row: o.z + o.d / 2, while: under && { kind: under, tiles, on: false } });
     }
   }
 
@@ -268,11 +280,15 @@ export class WorldSound {
     this.lastTick = now;
     this.hushed = false;
     updateVolumes();
+    // Where the camera looks from (the voices are placed by it too, with the world's sounds off).
+    acoustics.look(townView.target.x, townView.target.z + (this.storeys ? storeyRow(this.storeys, game.storey) : 0), townView.radius);
     const ac = audioContext();
     const out = bus('world');
-    if (!ac || !out || out.gain.value === 0) return;
+    const around = space('world');
+    if (!ac || !out || !around || out.gain.value === 0) return;
     const quiet = document.hidden;
     const t = ac.currentTime;
+    around.distance(acoustics.radius, t);
 
     // Ambience by the time of day.
     const { curr, layout } = frame;
@@ -280,21 +296,24 @@ export class WorldSound {
     const hour = (minute / 60) % 24;
     const day = daylight(hour);
     const night = 1 - smooth(4.5, 6, hour) * (1 - smooth(19.5, 21, hour));
-    this.bed ??= this.loop(ac, out, brownBuffer, { type: 'lowpass', frequency: 650, q: 0.5 });
-    this.crickets ??= this.loop(ac, out, cricketBuffer);
-    fadeTo(this.bed.gain, quiet ? 0 : 0.05 + 0.03 * day, t);
-    fadeTo(this.crickets.gain, quiet ? 0 : 0.1 * night, t);
+    this.bed ??= this.loop(ac, out, mono(ac, 'bed'));
+    this.crickets ??= this.loop(ac, out, mono(ac, 'crickets'));
+    fadeTo(this.bed.gain, quiet ? 0 : AMBIENCE.bed.night + AMBIENCE.bed.day * day, t);
+    fadeTo(this.crickets.gain, quiet ? 0 : AMBIENCE.crickets * night, t);
     this.birds.update(ac, out, now, hour, quiet, this.renderer);
+    // The street and the weather: the cars passing, the town from above, the wind in the leaves.
+    this.outside.update(ac, out, around, frame, t, { quiet, still: game.speed === 0 || game.townOpen, day });
 
     // Things in use on the lot in view, and knocks at the door.
     const k = layout.sim;
     const count = curr[layout.header.simCount];
     const paused = game.speed === 0;
-    const users = new Map<LoopKind, { n: number; pan: number }>();
+    const users = new Map<LoopKind, Users>();
     const seen = new Set<number>();
     const bathing = new Set<number>();
     const once: Heard['once'] = [];
     const here = new Set<number>();
+    let dancing = false;
     for (const kind of this.onceHere) this.made.sound(kind, ac.sampleRate);
     for (const a of this.ambient) if (a.while) a.while.on = false;
     for (let i = 0; i < count; i++) {
@@ -303,6 +322,9 @@ export class WorldSound {
       const tag = action >= 0 ? layout.actions[action] : undefined;
       const id = curr[o + k.id];
       here.add(id);
+      // Where they stand (the world's rows: their storey's).
+      const sx = curr[o + k.x];
+      const sz = curr[o + k.z];
       // Cooking's clearing away and repairs are at an object without a use of it: by what that object is.
       const object = curr[o + k.object];
       const def = k.objectDef !== undefined && curr[o + k.objectDef] >= 0 ? curr[o + k.objectDef] : object >= 0 ? (this.defOf.get(object) ?? -1) : -1;
@@ -312,7 +334,7 @@ export class WorldSound {
       const was = this.ending.get(id);
       if (was && was.use !== use) {
         this.ending.delete(id);
-        if (!quiet && this.renderer.simHead(i, this.head) && this.once(ac, out, was.kind, this.panAt())) once.push({ kind: was.kind, at: now });
+        if (!quiet && this.renderer.simHead(i, this.head) && this.once(ac, around, was.kind, placeAt(this.panAt(), sx, sz))) once.push({ kind: was.kind, at: now });
       }
       const end = use >= 0 ? endSoundOf(this.content, def, interaction) : undefined;
       if (end) {
@@ -327,7 +349,7 @@ export class WorldSound {
       const before = this.doing.get(id);
       if (before !== doing) {
         if (before === undefined || !kind || !isOnce(kind) || !drawn || quiet) this.doing.set(id, doing);
-        else if (!paused && this.once(ac, out, kind, this.panAt())) {
+        else if (!paused && this.once(ac, around, kind, placeAt(this.panAt(), sx, sz))) {
           this.doing.set(id, doing);
           once.push({ kind, at: now });
         }
@@ -337,7 +359,7 @@ export class WorldSound {
       if (tag === 'knock') {
         seen.add(id);
         const next = this.knocking.get(id) ?? 0;
-        if (!quiet && !paused && now >= next) knock(ac, out, pan);
+        if (!quiet && !paused && now >= next) play(ac, around, mono(ac, 'knock'), AMBIENCE.knock, placeAt(pan, sx, sz));
         if (now >= next) this.knocking.set(id, now + 2600 + Math.random() * 1200);
         continue;
       }
@@ -352,10 +374,8 @@ export class WorldSound {
         this.bathers.set(id, since);
         if (now - since > BATH_FILL * 1000) kind = 'bathSoak';
       }
-      const u = users.get(kind) ?? { n: 0, pan: 0 };
-      u.pan = (u.pan * u.n + pan) / (u.n + 1);
-      u.n++;
-      users.set(kind, u);
+      if (kind === 'music' && tag === 'dance') dancing = true;
+      join(users, kind, pan, sx, sz);
     }
     // Things sounding by themselves, unless the town is shown instead of the lot.
     if (!game.townOpen) {
@@ -364,15 +384,22 @@ export class WorldSound {
         this.head.x = a.x;
         this.head.y = a.y;
         this.head.z = a.z;
-        const u = users.get(a.kind) ?? { n: 0, pan: 0 };
-        u.pan = (u.pan * u.n + this.panAt()) / (u.n + 1);
-        u.n++;
-        users.set(a.kind, u);
+        join(users, a.kind, this.panAt(), a.x, a.row);
       }
     }
     for (const id of this.ending.keys()) if (!here.has(id)) this.ending.delete(id);
     for (const id of this.doing.keys()) if (!here.has(id)) this.doing.delete(id);
-    this.heard = { loops: Object.fromEntries([...users].map(([kind, u]) => [kind, u.n])), once: [...this.heard.once.filter((s) => now - s.at < 10_000), ...once] };
+    this.heard = {
+      loops: Object.fromEntries([...users].map(([kind, u]) => [kind, u.n])),
+      places: Object.fromEntries([...users].map(([kind, u]) => [kind, placeOf(u)])),
+      piece: this.piece,
+      once: [...this.heard.once.filter((s) => now - s.at < 10_000), ...once],
+      radius: acoustics.radius,
+      steps: this.steps.heard(),
+      outside: this.outside.heard(),
+    };
+    // The residents' feet (none while the town is shown instead of the lot).
+    this.steps.update(ac, around, frame, t, quiet || paused || game.townOpen);
     for (const id of this.knocking.keys()) if (!seen.has(id)) this.knocking.delete(id);
     for (const id of this.bathers.keys()) if (!bathing.has(id)) this.bathers.delete(id);
     for (const kind of Object.keys(LOOPS) as LoopKind[]) {
@@ -380,34 +407,39 @@ export class WorldSound {
       const def = LOOPS[kind];
       const target = u && !quiet && !paused ? def.level * Math.min(1.6, Math.sqrt(u.n)) : 0;
       let loop = this.loops.get(kind);
-      if (!loop && target === 0) continue;
+      // The music is one of a few pieces: another one wanted (someone dances, the evening comes), this one fades out and the other starts.
+      const piece = kind === 'music' ? pieceAt(hour, dancing) : null;
+      if (loop && piece && target > 0 && piece !== this.piece) {
+        const old = loop;
+        fadeTo(old.gain, 0, t);
+        setTimeout(() => {
+          old.source.stop();
+          old.placed.disconnect();
+        }, FADE * 3000);
+        this.loops.delete(kind);
+        loop = undefined;
+      }
       if (!loop) {
-        const made = def.made ? this.made.sound(def.made, ac.sampleRate) : def.make;
+        if (target === 0 || !u) continue;
+        const made = piece ? this.made.sound(piece, ac.sampleRate) : kind in MONO ? mono(ac, kind as MonoKind) : this.made.sound(kind as WorkerKind, ac.sampleRate);
         // Still being made: it starts when it's ready.
         if (!made) continue;
-        loop = this.loop(ac, out, made, def.filter);
+        loop = this.placedLoop(ac, around, made, placeOf(u));
         this.loops.set(kind, loop);
+        if (piece) this.piece = piece;
         if (def.drift) loop.source.playbackRate.value = 1 + def.drift * (Math.random() * 2 - 1);
       }
       fadeTo(loop.gain, target, t);
-      if (u) loop.panner.pan.setTargetAtTime(u.pan, t, 0.1);
+      if (u) loop.placed.place(placeOf(u), t);
       if (def.drift && target > 0 && Math.random() < 0.05) loop.source.playbackRate.setTargetAtTime(1 + def.drift * (Math.random() * 2 - 1), t, 1.5);
     }
   }
 
   /** Plays a sound once at `pan`; false while it's still being made. */
-  private once(ac: AudioContext, out: AudioNode, kind: OnceKind, pan: number): boolean {
+  private once(ac: AudioContext, around: Space, kind: OnceKind, place: Place): boolean {
     const made = this.made.sound(kind, ac.sampleRate);
     if (!made) return false;
-    const source = ac.createBufferSource();
-    source.buffer = made;
-    const gain = ac.createGain();
-    gain.gain.value = ONCE_LEVEL[kind];
-    const panner = ac.createStereoPanner();
-    panner.pan.value = pan;
-    source.connect(gain).connect(panner).connect(out);
-    source.onended = () => panner.disconnect();
-    source.start();
+    play(ac, around, made, ONCE_LEVEL[kind], place);
     return true;
   }
 
@@ -418,6 +450,7 @@ export class WorldSound {
     if (!ac) return;
     this.hushed = true;
     for (const loop of [...this.loops.values(), this.bed, this.crickets]) if (loop) fadeTo(loop.gain, 0, ac.currentTime);
+    this.outside.hush(ac.currentTime);
     this.birds.hush(ac.currentTime);
   }
 
@@ -431,9 +464,12 @@ export class WorldSound {
       } catch {
         // Never started.
       }
-      loop.panner.disconnect();
+      if ('placed' in loop) loop.placed.disconnect();
+      else loop.panner.disconnect();
     }
     this.loops.clear();
+    this.steps.dispose();
+    this.outside.dispose();
     this.birds.dispose();
     this.made.dispose();
   }
@@ -443,49 +479,54 @@ export class WorldSound {
     return this.renderer.project(this.head.x, this.head.y, this.head.z, this.screen) ? screenPan(this.screen.x, 0.7) : 0;
   }
 
-  /** A looping buffer, silent until faded in; it starts somewhere along the loop, so it never sounds the same twice. */
-  private loop(ac: AudioContext, out: AudioNode, made: AudioBuffer | ((ac: AudioContext) => AudioBuffer), filter?: LoopDef['filter']): Loop {
+  /** A thing's loop at its place, silent until faded in; it starts somewhere along the loop, so it never sounds the same twice. */
+  private placedLoop(ac: AudioContext, around: Space, made: AudioBuffer, place: Place): PlacedLoop {
     const source = ac.createBufferSource();
-    source.buffer = typeof made === 'function' ? cached(ac, made) : made;
+    source.buffer = made;
+    source.loop = true;
+    const gain = ac.createGain();
+    gain.gain.value = 0;
+    const placed = new Placed(ac, around, place);
+    source.connect(gain).connect(placed.input);
+    source.start(0, Math.random() * made.duration);
+    return { source, gain, placed };
+  }
+
+  /** A looping buffer all round (the outdoors), silent until faded in; it starts somewhere along the loop, so it never sounds the same twice. */
+  private loop(ac: AudioContext, out: AudioNode, made: AudioBuffer): Loop {
+    const source = ac.createBufferSource();
+    source.buffer = made;
     source.loop = true;
     const gain = ac.createGain();
     gain.gain.value = 0;
     const panner = ac.createStereoPanner();
-    let node: AudioNode = source;
-    if (filter) {
-      const f = ac.createBiquadFilter();
-      f.type = filter.type;
-      f.frequency.value = filter.frequency;
-      f.Q.value = filter.q;
-      node = node.connect(f);
-    }
-    node.connect(gain).connect(panner).connect(out);
-    source.start(0, Math.random() * source.buffer.duration);
+    source.connect(gain).connect(panner).connect(out);
+    source.start(0, Math.random() * made.duration);
     return { source, gain, panner };
   }
 }
 
 /**
  * Sounds that take a moment to make, made by a worker as audio buffers: the water sounds (the one
- * first wanted, then the rest one after another), the things' sounds and the birds' songs (each
- * when first wanted). Made on the spot if workers aren't available.
+ * first wanted, then the rest one after another), the things' and the outdoors' sounds and the birds'
+ * songs (each when first wanted). Made on the spot if workers aren't available.
  */
-class WorkerSounds {
+export class WorkerSounds {
   private worker: Worker | null = null;
   private rate = 0;
-  private readonly ready = new Map<MadeKind, AudioBuffer>();
+  private readonly ready = new Map<WorkerKind, AudioBuffer>();
   private waterAsked = false;
-  /** The things' sounds asked for. */
-  private readonly asked = new Set<MadeKind>();
+  /** The other sounds asked for. */
+  private readonly asked = new Set<WorkerKind>();
   /** Bird songs by `songKey`: made, or asked for (null). */
   private readonly songs = new Map<string, AudioBuffer | null>();
 
   /** The sound at the sample rate, or null while it's still being made. */
-  sound(kind: MadeKind, rate: number): AudioBuffer | null {
+  sound(kind: WorkerKind, rate: number): AudioBuffer | null {
     this.at(rate);
     let b = this.ready.get(kind);
     if (!b && !this.worker) {
-      b = stereoBuffer(MADE[kind](rate), rate);
+      b = soundBuffer(makeSound(kind, rate), rate);
       this.ready.set(kind, b);
     } else if (!b && kind in WATER && !this.waterAsked) {
       this.waterAsked = true;
@@ -536,7 +577,7 @@ class WorkerSounds {
       const r = e.data;
       if (r.rate !== this.rate) return;
       if ('bird' in r) this.songs.set(songKey(r.bird, r.version), monoBuffer(r.samples, r.rate));
-      else this.ready.set(r.kind, stereoBuffer(r, r.rate));
+      else this.ready.set(r.kind, r.right ? soundBuffer({ left: r.left, right: r.right }, r.rate) : monoBuffer(r.left, r.rate));
     };
     this.worker.onerror = () => this.dispose();
   }
@@ -544,7 +585,9 @@ class WorkerSounds {
 
 const songKey = (bird: Voice, version: number) => `${bird.seed}:${version}`;
 
-function stereoBuffer(s: Stereo, rate: number): AudioBuffer {
+/** A made sound as an audio buffer: two channels, or one. */
+function soundBuffer(s: { left: Float32Array; right: Float32Array } | Float32Array, rate: number): AudioBuffer {
+  if (s instanceof Float32Array) return monoBuffer(s, rate);
   const b = new AudioBuffer({ numberOfChannels: 2, length: s.left.length, sampleRate: rate });
   b.copyToChannel(s.left as Float32Array<ArrayBuffer>, 0);
   b.copyToChannel(s.right as Float32Array<ArrayBuffer>, 1);
@@ -599,9 +642,9 @@ const FLOCK: { species: string; pan: number; dawn?: boolean }[] = [
   { species: 'warbler', pan: -0.8, dawn: true },
 ];
 /** Overall level of the birds. */
-const BIRD_LEVEL = 0.05;
+const BIRD_LEVEL = AMBIENCE.birds;
 /** The unseen birds' level while birds in view sing (they're further off). */
-const FAR_LEVEL = 0.55;
+const FAR_LEVEL = AMBIENCE.far;
 /** A bird in view sings only this near the camera (m); its level falls off with distance. */
 const HEARD_RANGE = 45;
 /** A bird whose song is still being made tries again after this long (ms). */
@@ -802,241 +845,32 @@ function between(r: () => number, [a, b]: [number, number]): number {
   return a + r() * (b - a);
 }
 
-/** Three knocks on a wooden door. */
-function knock(ac: AudioContext, out: AudioNode, pan: number): void {
-  const panner = ac.createStereoPanner();
-  panner.pan.value = pan;
-  panner.connect(out);
-  const t = ac.currentTime + 0.02;
-  for (let n = 0; n < 3; n++) {
-    const at = t + n * 0.17 + (n === 2 ? 0.02 : 0);
-    const osc = ac.createOscillator();
-    const env = ac.createGain();
-    osc.frequency.setValueAtTime(220, at);
-    osc.frequency.exponentialRampToValueAtTime(95, at + 0.08);
-    env.gain.setValueAtTime(0.0001, at);
-    env.gain.exponentialRampToValueAtTime(0.5, at + 0.004);
-    env.gain.exponentialRampToValueAtTime(0.0001, at + 0.11);
-    osc.connect(env).connect(panner);
-    osc.start(at);
-    osc.stop(at + 0.13);
-    const click = ac.createBufferSource();
-    click.buffer = cached(ac, whiteBuffer);
-    const band = ac.createBiquadFilter();
-    band.type = 'bandpass';
-    band.frequency.value = 1400;
-    band.Q.value = 1.2;
-    const clickEnv = ac.createGain();
-    clickEnv.gain.setValueAtTime(0.25, at);
-    clickEnv.gain.exponentialRampToValueAtTime(0.0001, at + 0.03);
-    click.connect(band).connect(clickEnv).connect(panner);
-    click.start(at, Math.random());
-    click.stop(at + 0.04);
-  }
-  setTimeout(() => panner.disconnect(), 1000);
+/** Plays a sound once at `level`, at its place. */
+function play(ac: AudioContext, around: Space, made: AudioBuffer, level: number, place: Place): void {
+  const source = ac.createBufferSource();
+  source.buffer = made;
+  const gain = ac.createGain();
+  gain.gain.value = level;
+  const placed = new Placed(ac, around, place);
+  source.connect(gain).connect(placed.input);
+  // (Its room goes on a moment after it: the longest response is under a second.)
+  source.onended = () => setTimeout(() => placed.disconnect(), 1000);
+  source.start();
 }
 
-// Buffers, made once per audio context.
+/** Where a loop's users are on average, as its place: the share of them in rooms of each size (the rest outdoors). */
+function placeOf(u: Users): Place {
+  return { pan: u.pan, muffle: u.muffle, rooms: { small: u.rooms.small / u.n, medium: u.rooms.medium / u.n, large: u.rooms.large / u.n } };
+}
 
-const buffers = new Map<(ac: AudioContext) => AudioBuffer, AudioBuffer>();
+/** The sounds of one channel (`mono.ts`) as audio buffers, made once per sample rate. */
+const monos = new Map<MonoKind, AudioBuffer>();
 
-function cached(ac: AudioContext, make: (ac: AudioContext) => AudioBuffer): AudioBuffer {
-  let b = buffers.get(make);
+function mono(ac: AudioContext, kind: MonoKind): AudioBuffer {
+  let b = monos.get(kind);
   if (!b || b.sampleRate !== ac.sampleRate) {
-    b = make(ac);
-    buffers.set(make, b);
+    b = monoBuffer(MONO[kind](ac.sampleRate), ac.sampleRate);
+    monos.set(kind, b);
   }
   return b;
-}
-
-/** A small seeded generator, so the sounds are the same every time. */
-function random(seed: number): () => number {
-  let s = seed >>> 0 || 1;
-  return () => {
-    s ^= s << 13;
-    s ^= s >>> 17;
-    s ^= s << 5;
-    return (s >>> 0) / 4294967296;
-  };
-}
-
-function buffer(ac: AudioContext, seconds: number, fill: (data: Float32Array, rate: number) => void): AudioBuffer {
-  const b = ac.createBuffer(1, Math.round(ac.sampleRate * seconds), ac.sampleRate);
-  const data = b.getChannelData(0);
-  fill(data, ac.sampleRate);
-  let peak = 0;
-  for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
-  if (peak > 0) for (let i = 0; i < data.length; i++) data[i] /= peak;
-  return b;
-}
-
-function whiteBuffer(ac: AudioContext): AudioBuffer {
-  const r = random(1);
-  return buffer(ac, 1, (d) => {
-    for (let i = 0; i < d.length; i++) d[i] = r() * 2 - 1;
-  });
-}
-
-/** Soft, low noise: wind and a distant street. */
-function brownBuffer(ac: AudioContext): AudioBuffer {
-  const r = random(2);
-  return buffer(ac, 4, (d) => {
-    let b = 0;
-    for (let i = 0; i < d.length; i++) {
-      b = (b + 0.02 * (r() * 2 - 1)) / 1.02;
-      d[i] = b;
-    }
-    // Ease the loop's seam.
-    const n = Math.min(2000, d.length >> 2);
-    for (let i = 0; i < n; i++) d[d.length - n + i] = d[d.length - n + i] * (1 - i / n) + d[i] * (i / n);
-  });
-}
-
-/** Two crickets, each chirping in short trills. */
-function cricketBuffer(ac: AudioContext): AudioBuffer {
-  const r = random(3);
-  return buffer(ac, 3, (d, rate) => {
-    for (const [freq, level, offset] of [
-      [4600, 1, 0],
-      [4250, 0.6, 0.21],
-    ]) {
-      for (let start = offset; start < 2.8; start += 0.42 + r() * 0.12) {
-        for (let p = 0; p < 3; p++) {
-          const s = Math.round((start + p * 0.032) * rate);
-          const len = Math.round(0.014 * rate);
-          for (let j = 0; j < len && s + j < d.length; j++) {
-            const env = Math.sin((Math.PI * j) / len);
-            d[s + j] += level * env * Math.sin((2 * Math.PI * freq * j) / rate);
-          }
-        }
-      }
-    }
-  });
-}
-
-/** A hot pan: hiss with crackles. */
-function sizzleBuffer(ac: AudioContext): AudioBuffer {
-  const r = random(4);
-  return buffer(ac, 2, (d, rate) => {
-    let pop = 0;
-    let popLevel = 0;
-    for (let i = 0; i < d.length; i++) {
-      if (pop <= 0 && r() < 60 / rate) {
-        pop = Math.round((0.002 + r() * 0.006) * rate);
-        popLevel = 0.3 + r() * 0.7;
-      }
-      const crackle = pop > 0 ? (r() * 2 - 1) * popLevel * (pop-- / (0.008 * rate)) : 0;
-      d[i] = (r() * 2 - 1) * 0.18 + crackle;
-    }
-  });
-}
-
-/** A knife on a chopping board: short woody knocks in uneven runs. */
-function chopBuffer(ac: AudioContext): AudioBuffer {
-  const r = random(9);
-  return buffer(ac, 3, (d, rate) => {
-    let i = 0;
-    while (i < d.length) {
-      // A run of quick chops, then a pause to move the food along.
-      const chops = 3 + Math.floor(r() * 6);
-      for (let c = 0; c < chops && i < d.length; c++) {
-        const len = Math.round(0.035 * rate);
-        const level = 0.6 + r() * 0.4;
-        const tone = 900 + r() * 500;
-        for (let j = 0; j < len && i + j < d.length; j++) {
-          const decay = Math.exp((-j / rate) * 90);
-          d[i + j] = ((r() * 2 - 1) * 0.5 + Math.sin((2 * Math.PI * tone * j) / rate)) * level * decay;
-        }
-        i += Math.round((0.16 + r() * 0.08) * rate);
-      }
-      i += Math.round((0.4 + r() * 0.6) * rate);
-    }
-  });
-}
-
-/** Voices through a wall: noise shaped into syllables, phrases and pauses (the TV). */
-function murmurBuffer(ac: AudioContext): AudioBuffer {
-  const r = random(6);
-  return buffer(ac, 5, (d, rate) => {
-    let i = 0;
-    while (i < d.length) {
-      // A phrase of a few syllables, then a pause.
-      const syllables = 3 + Math.floor(r() * 7);
-      for (let s = 0; s < syllables && i < d.length; s++) {
-        const len = Math.round((0.09 + r() * 0.14) * rate);
-        const level = 0.5 + r() * 0.5;
-        for (let j = 0; j < len && i < d.length; j++, i++) d[i] = (r() * 2 - 1) * level * Math.sin((Math.PI * j) / len);
-      }
-      i += Math.round((0.15 + r() * 0.5) * rate);
-    }
-  });
-}
-
-/** A little tune on a loop (a radio, a record). */
-function musicBuffer(ac: AudioContext): AudioBuffer {
-  const r = random(7);
-  const scale = [0, 2, 4, 7, 9, 12, 14, 16];
-  const root = 261.63;
-  return buffer(ac, 4, (d, rate) => {
-    const pluck = (at: number, freq: number, level: number, decay: number) => {
-      const s = Math.round(at * rate);
-      const len = Math.min(d.length - s, Math.round(decay * 4 * rate));
-      for (let j = 0; j < len; j++) {
-        const t = j / rate;
-        d[s + j] += level * Math.exp(-t / decay) * (Math.sin(2 * Math.PI * freq * t) + 0.3 * Math.sin(4 * Math.PI * freq * t));
-      }
-    };
-    for (let n = 0; n < 16; n++) {
-      const note = scale[Math.floor(r() * scale.length)];
-      if (r() < 0.85) pluck(n * 0.25, root * 2 ** (note / 12), 0.5, 0.18);
-    }
-    for (let n = 0; n < 4; n++) pluck(n, (root / 2) * 2 ** ([0, 9, 5, 7][n] / 12), 0.6, 0.5);
-  });
-}
-
-/** A drum kit played: a rock beat (kick, snare on two and four, the hi-hat on the eighths) at 110 bpm, four bars with a crash at the top and a fill on the toms at the end. */
-function drumsBuffer(ac: AudioContext): AudioBuffer {
-  const r = random(10);
-  const beat = 60 / 110;
-  return buffer(ac, 16 * beat, (d, rate) => {
-    // A hit's tail runs on past the loop's end into its start.
-    const hit = (at: number, seconds: number, level: number, f: (t: number, noise: number) => number) => {
-      const s = Math.round(at * rate);
-      for (let j = 0, last = 0; j < seconds * rate; j++) {
-        const noise = r() * 2 - 1;
-        d[(s + j) % d.length] += level * (1 + 0.1 * (r() - 0.5)) * f(j / rate, noise - last);
-        last = noise;
-      }
-    };
-    // A pitched skin: a sine falling from `from` to `to` Hz as it dies away, with a little noise in its attack.
-    const skin = (at: number, from: number, to: number, decay: number, level: number) => {
-      let phase = 0;
-      hit(at, decay * 5, level, (t, noise) => {
-        phase += (2 * Math.PI * (to + (from - to) * Math.exp(-t / 0.03))) / rate;
-        return Math.exp(-t / decay) * Math.sin(phase) + noise * 0.15 * Math.exp(-t / 0.004);
-      });
-    };
-    const snare = (at: number, level: number) => {
-      let phase = 0;
-      hit(at, 0.4, level, (t, noise) => {
-        phase += (2 * Math.PI * 190) / rate;
-        return 0.5 * noise * Math.exp(-t / 0.08) + 0.6 * Math.sin(phase) * Math.exp(-t / 0.04);
-      });
-    };
-    // Cymbals: high noise (each sample's change, so only the highs), short for the hi-hat, long for the crash.
-    const cymbal = (at: number, decay: number, level: number) => hit(at, decay * 5, level, (t, noise) => noise * Math.exp(-t / decay));
-    cymbal(0, 0.8, 0.35);
-    for (let bar = 0; bar < 4; bar++) {
-      const b = bar * 4 * beat;
-      const fill = bar === 3;
-      for (let e = 0; e < (fill ? 4 : 8); e++) cymbal(b + e * (beat / 2), 0.03, e % 2 ? 0.12 : 0.2);
-      for (const k of fill ? [0] : [0, 2, 2.5]) skin(b + k * beat, 120, 48, 0.16, 0.9);
-      for (const s of fill ? [1] : [1, 3]) snare(b + s * beat, 0.7);
-    }
-    // The fill: sixteenths down the toms.
-    for (let n = 0; n < 8; n++) {
-      const tom = n < 3 ? 210 : n < 6 ? 160 : 115;
-      skin(14 * beat + n * (beat / 4), tom * 1.3, tom, 0.12, 0.5 + 0.1 * (n % 2));
-    }
-  });
 }
