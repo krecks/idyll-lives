@@ -7079,14 +7079,16 @@ fn standing_tiles(w: &World, parked: &[u64]) -> Vec<usize> {
             }
         }
     }
-    // (A porch post stands where it is too, as a garage does: `porches.rs`.)
-    for p in w
+    // (A porch post stands where it is too, as a garage does, on its own or a porch's: `porches.rs`.)
+    let posts = w
         .porch_pieces
         .iter()
         .filter(|p| p.kind == crate::porches::PieceKind::Post)
-    {
-        if w.lot.in_bounds(p.x, p.z) {
-            tiles.push(w.lot.tile_index(p.x, p.z));
+        .map(|p| (p.x, p.z))
+        .chain(w.porches.iter().flat_map(|p| p.post_tiles()));
+    for (x, z) in posts {
+        if w.lot.in_bounds(x, z) {
+            tiles.push(w.lot.tile_index(x, z));
         }
     }
     let out = w.cars.len().div_ceil(64);
@@ -7134,16 +7136,17 @@ pub(crate) fn garages_changed(w: &mut World, plot: u32) {
     let parked = parked_bits(w);
     let tiles = standing_tiles(w, &parked);
     w.cars_parked = Some(parked);
-    restand(w, tiles);
+    restand(w, tiles, false);
 }
 
-/// A porch post was built or taken down (or put back by an undo): walking changes only on its
-/// tile (`restand`).
+/// A porch post was built or taken down, on its own or a porch's (or a porch moved with its room):
+/// walking changes only on their tiles (`restand`). A tile freed keeps a thing standing there
+/// blocked: a town's porch may have had one at a post (`porches.rs`, `porch_kept`).
 pub(crate) fn posts_changed(w: &mut World) {
     let parked = parked_bits(w);
     let tiles = standing_tiles(w, &parked);
     w.cars_parked = Some(parked);
-    restand(w, tiles);
+    restand(w, tiles, true);
 }
 
 /// The most separate patches of changed tiles one `restand` notes for walkers (more: the box
@@ -7159,7 +7162,7 @@ const PATCH_GAP: i32 = 2;
 /// taken up or freed, each patch of them noted on its own. (One box round every car in town
 /// would have every walker plan again and the walkable regions of most of a big world labelled
 /// again, for one car pulling out of a driveway.)
-fn restand(w: &mut World, tiles: Vec<usize>) {
+fn restand(w: &mut World, tiles: Vec<usize>, things: bool) {
     // The tiles in one list and not the other (both are sorted).
     let (old, new) = (&w.car_tiles, &tiles);
     let (mut i, mut j) = (0, 0);
@@ -7191,6 +7194,19 @@ fn restand(w: &mut World, tiles: Vec<usize>) {
     }
     for &i in &freed {
         w.blocked[i] = w.travel.ground_blocked(i);
+    }
+    // (A thing may stand where a porch's post stood: cars and garages never stand on one.)
+    if things && !freed.is_empty() {
+        let at: Vec<(i32, i32)> = freed.iter().map(|&i| w.lot.tile_xz(i)).collect();
+        let under: Vec<usize> = w
+            .objects
+            .iter()
+            .flat_map(|o| w.blocking_tiles(o))
+            .filter_map(|t| at.iter().position(|&a| a == t))
+            .collect();
+        for k in under {
+            w.blocked[freed[k]] = true;
+        }
     }
     for &i in &taken {
         w.blocked[i] = true;
@@ -7243,7 +7259,7 @@ pub(crate) fn reblock(w: &mut World) {
     // (Garages too, as they stand.)
     let tiles = standing_tiles(w, &parked);
     w.cars_parked = Some(parked);
-    restand(w, tiles);
+    restand(w, tiles, false);
 }
 
 impl World {

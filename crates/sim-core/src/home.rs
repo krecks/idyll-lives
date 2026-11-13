@@ -1932,7 +1932,9 @@ impl World {
         for &(x, z) in &freed {
             let i = self.lot.tile_index(x, z);
             if i != crate::lot::VOID {
-                self.blocked[i] = self.travel.ground_blocked(i);
+                // (A porch's post may stand there too: a town's porch had a thing at one.)
+                self.blocked[i] =
+                    self.travel.ground_blocked(i) || self.car_tiles.binary_search(&i).is_ok();
             }
         }
         for o in 0..self.objects.len() {
