@@ -3,7 +3,7 @@
 // them), and the world, its preview and its houses come out as `generateWorld`, `previewWorld` and
 // `houseTemplate` make them for the same seed (the main menu's showcase too: its land, and its preview
 // once peopled on the page); a town file as `assembleTown` makes it, its dice (friends, rivals) from
-// the job's own seed.
+// the job's own seed (and with a returning visit's kept houses, when the job carries them).
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -27,7 +27,7 @@ describe('town jobs', async () => {
   const { AssetRegistry } = await import('../src/assets/registry');
   const { objectInfos } = await import('../src/game/housegen');
   const { randomHousehold } = await import('../src/game/household');
-  const { generateWorld, houseTemplate, populate, useTownContent, vacantSlots } = await import('../src/game/town');
+  const { generateWorld, houseTemplate, populate, primeHouses, useTownContent, vacantSlots } = await import('../src/game/town');
   const { previewWorld } = await import('../src/game/townPreview');
   const { runTownJob } = await import('../src/game/townJobs');
   type Templates = import('../src/game/town').Templates;
@@ -84,6 +84,25 @@ describe('town jobs', async () => {
     },
     30_000,
   );
+
+  test("a returning visit's kept houses make the same town file", () => {
+    const land = inWorker({ kind: 'land', world: 'small', seed: 909 });
+    if (land.kind !== 'land') throw new Error('not a land');
+    const town = populate(content, assets, t, land.draft);
+    const player = randomHousehold(content, assets, 2);
+    const job: TownJob = { kind: 'assemble', town, player, slot: vacantSlots(town)[0].index, options: { mode: 'living', lifespan: 'normal' }, random: 12345 };
+    const plain = runTownJob(content, t, job);
+    // (The menu's houses, as the cache read them back and the job carries them to the worker.)
+    const kept = structuredClone(land.houses);
+    const primed = inWorker({ ...job, houses: kept });
+    if (plain.kind !== 'assemble' || primed.kind !== 'assemble') throw new Error('not a town file');
+    expect(primed.lot).toBe(plain.lot);
+    // (Primed, the worker takes a kept house as it is instead of generating it.)
+    const [id, house] = kept[0];
+    const ungenerated = { ...house!, id: `${id}:primed` };
+    primeHouses([[ungenerated.id, ungenerated]]);
+    expect(houseTemplate(t, ungenerated.id)).toBe(ungenerated);
+  }, 30_000);
 
   test('the worker\'s town file is the page\'s, its dice from the job\'s seed', () => {
     const town = populate(content, assets, t, generateWorld(content, t, 'small', 4242));

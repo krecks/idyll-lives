@@ -10,8 +10,9 @@ import type { LotHighlight, Renderer, TownShot } from '../render/types';
 import { settings } from '../settings/settings.svelte';
 import { services } from '../ui/services';
 import { host } from './host';
-import { loadTemplates, populate, type NeighbourhoodDraft, type Templates } from './town';
-import { keepHouses, townJob } from './townJobs';
+import { loadTemplates, populate, primeHouses, type NeighbourhoodDraft, type Templates } from './town';
+import { keepHouses, shareHouses, townJob } from './townJobs';
+import { loadShowcase, showcaseSeed } from './showcaseCache';
 import { previewWorld } from './townPreview';
 import { perfPhase, perfTime, perfTimeAsync } from '../debug/perf';
 import { layoutTags, type Box, type TagSpot } from './tagLayout';
@@ -102,13 +103,22 @@ class MenuScene {
 
   private async makeShowcase(): Promise<NeighbourhoodDraft> {
     perfPhase('menu: showcase draft');
+    // A returning visit: the same valley, its people and its preview, as the last visit left them
+    // (`showcaseCache.ts`). Read it back (a few dozen milliseconds), not laid out again.
+    const kept = await perfTimeAsync('menu: showcase kept', loadShowcase);
+    if (kept) {
+      primeHouses(kept.houses);
+      shareHouses(kept.draft, kept.houses);
+      this.prepare(kept.draft, kept.preview);
+      return kept.draft;
+    }
     const { content, assets } = services;
-    const seed = (Math.random() * 2 ** 31) >>> 0;
+    const seed = showcaseSeed();
     const land = await perfTimeAsync('menu: showcase land', () => townJob(content, { kind: 'land', world: 'medium', seed }), `seed ${seed}`);
     keepHouses(land);
     const templates = (this.templates ??= await perfTimeAsync('menu: loadTemplates', loadTemplates));
     const draft = perfTime('menu: populate', () => populate(content, assets, templates, land.draft));
-    const { preview } = await perfTimeAsync('menu: showcase preview', () => townJob(content, { kind: 'preview', town: draft }));
+    const { preview } = await perfTimeAsync('menu: showcase preview', () => townJob(content, { kind: 'preview', town: draft, keep: true }));
     this.prepare(draft, preview);
     return draft;
   }

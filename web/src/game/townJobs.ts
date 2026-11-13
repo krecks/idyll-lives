@@ -13,16 +13,21 @@ import { previewWorld } from './townPreview';
 import type { WorldKind } from './world';
 import { LazyWorker, type WorkerAnswer, type WorkerAsk } from '../core/lazyWorker';
 import { mulberry32 } from './noise';
+import { keepShowcase } from './showcaseCache';
 
 export type TownJob =
   /** A new world (`generateWorld`), with the menu's preview of it (`previewWorld`). */
   | { kind: 'world'; world: WorldKind; seed: number; name?: string }
   /** A new world without its preview: the main menu's showcase, peopled on the page (`populate` rolls the page's dice) before its `preview`. */
   | { kind: 'land'; world: WorldKind; seed: number }
-  /** The menu's preview of a town (`previewWorld`, no home). */
-  | { kind: 'preview'; town: NeighbourhoodDraft }
-  /** The simulation's town file (`assembleTown`); `random`: the seed for its dice (neighbours' bonds). */
-  | { kind: 'assemble'; town: NeighbourhoodDraft; player: HouseholdDraft; slot: number; options: AssembleOptions; random: number };
+  /** The menu's preview of a town (`previewWorld`, no home). `keep`: it is the main menu's showcase, kept for the next visit (`showcaseCache.ts`). */
+  | { kind: 'preview'; town: NeighbourhoodDraft; keep?: boolean }
+  /**
+   * The simulation's town file (`assembleTown`); `random`: the seed for its dice (neighbours' bonds).
+   * `houses`: a returning visit's, kept from the menu (`showcaseCache.ts`): a fresh worker would make
+   * them again.
+   */
+  | { kind: 'assemble'; town: NeighbourhoodDraft; player: HouseholdDraft; slot: number; options: AssembleOptions; random: number; houses?: readonly [string, HouseTemplate | undefined][] };
 
 export type TownResult =
   | { kind: 'world'; draft: NeighbourhoodDraft; preview: WorldStructure; houses: [string, HouseTemplate | undefined][] }
@@ -48,8 +53,21 @@ export function runTownJob(content: Content, t: Templates, job: TownJob): TownRe
     const draft = generateWorld(content, t, job.world, job.seed);
     return { kind: 'land', draft, houses: generatedHouses(t, draft.slots.map((s) => s.template)) };
   }
-  if (job.kind === 'preview') return { kind: 'preview', preview: previewWorld(content, t, job.town, null) };
-  return { kind: 'assemble', lot: assembleTown(content, t, job.town, job.player, job.slot, job.options, mulberry32(job.random)) };
+  if (job.kind === 'preview') {
+    const preview = previewWorld(content, t, job.town, null);
+    // (Only the menu's own showcase is kept: a world being edited changes as it goes. Here, in the
+    // worker, stringifying and writing it costs the page nothing.)
+    if (job.keep) {
+      const houses = generatedHouses(t, job.town.slots.map((s) => s.template));
+      void keepShowcase({ draft: job.town, houses, preview });
+    }
+    return { kind: 'preview', preview };
+  }
+  if (job.kind === 'assemble') {
+    if (job.houses) primeHouses(job.houses);
+    return { kind: 'assemble', lot: assembleTown(content, t, job.town, job.player, job.slot, job.options, mulberry32(job.random)) };
+  }
+  throw new Error(`unknown town job: ${(job as TownJob).kind}`);
 }
 
 /** Raised for a job a newer one replaced (or whose signal aborted it). */
@@ -73,7 +91,19 @@ async function onPage(content: Content, job: TownJob): Promise<TownResult> {
  */
 export function townJob<J extends TownJob>(content: Content, job: J, signal?: AbortSignal): Promise<Extract<TownResult, { kind: J['kind'] }>>;
 export function townJob(content: Content, job: TownJob, signal?: AbortSignal): Promise<TownResult> {
-  return towns.ask(job, () => onPage(content, job), { signal });
+  // (A game's town file made from a returning visit's menu: the houses it kept go with it, or the
+  // fresh worker makes them again, a second or so. Only for the valley they were generated for.)
+  const houses = job.kind === 'assemble' && kept && kept.seed === job.town.seed ? kept.houses : undefined;
+  const sent = houses ? { ...job, houses } : job;
+  return towns.ask(sent, () => onPage(content, sent), { signal });
+}
+
+/** The houses a returning visit's menu read back (`showcaseCache.ts`), for the game's town file, and their valley. */
+let kept: { seed: number | undefined; houses: readonly [string, HouseTemplate | undefined][] } | null = null;
+
+/** A returning visit's houses, as the menu read them: the worker primes itself with them (`town.ts` `primeHouses`). */
+export function shareHouses(town: NeighbourhoodDraft, houses: readonly [string, HouseTemplate | undefined][]): void {
+  kept = { seed: town.seed, houses };
 }
 
 /** A world's houses the worker made, kept on the page too (the menu and the screens after need them). */
