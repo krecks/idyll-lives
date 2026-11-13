@@ -165,8 +165,10 @@ def quietPod():
                   bevel_segments=1)
         # the cushions: the seat (top 0.45), a buttoned back cushion, a head roll
         puff = 0.012
-        F.soft('seat', 0.6, 0.1 - puff, 0.56, (0, 0.4 - puff / 2, 0.02), M.cushion, round=0.045, puff=puff, piping=0.005, flat=3)
-        F.soft('back_cushion', 0.58, 0.56, 0.1, (0, 0.76, -0.29), M.cushion, rot=(-6, 0, 0), round=0.04, puff=0.025, flat=3)
+        F.soft('seat', 0.6, 0.1 - puff, 0.56, (0, 0.4 - puff / 2, 0.02), M.cushion, round=0.045, puff=puff, piping=0.005, flat=3,
+               resting=True)
+        F.soft('back_cushion', 0.58, 0.56, 0.1, (0, 0.76, -0.29), M.cushion, rot=(-6, 0, 0), round=0.04, puff=0.025, flat=3,
+               resting=True)
         for u, v in ((-0.14, 0.12), (0.14, 0.12), (0.0, 0.0), (-0.14, -0.12), (0.14, -0.12)):
             out = 0.05 + 0.025 * (1 - (u / 0.29) ** 2) * (1 - (v / 0.28) ** 2) - 0.008
             F.sphere(_name('button'), 0.011, (u, 0.76 + v * G.cosd(6), -0.29 - v * G.sind(6) + out), M.headrest, scale=(1, 0.5, 1),

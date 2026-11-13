@@ -126,14 +126,14 @@ What each model has now:
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
-| `model.counter` | 1.000 × 0.950 × 0.660 m | 2,428 (was 1,404) | 2 | top drawer | `drawer_open` 1.4 s (sandwich, `hold` 1.5 s) |
-| `model.counterCorner` | 1.000 × 1.261 × 0.930 m | 3,540 (was 1,520) | 2 | top drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
-| `model.counterEnd` | 1.000 × 0.950 × 0.660 m | 2,608 (was 1,320) | 2 | — | static (one worktop over the unit and the open end, no seam: G-41) |
-| `model.counterCornerOuter` | 0.810 × 1.035 × 0.660 m | 1,784 (was 972) | 1 | — | static |
-| `model.counterDrawers` | 1.000 × 0.950 × 0.660 m | 2,900 (was 1,620) | 2 | top drawer | `drawer_open` (putting clean dishes away: `fetch` at its prep station, `hold` 1.5 s) |
-| `model.counterOpenShelf` | 1.000 × 0.950 × 0.660 m | 3,888 (was 1,560) | 2 | — | static |
-| `model.butcherBlock` | 0.900 × 0.950 × 0.820 m | 3,520 (was 1,944) | 3 | knife drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
-| `model.counterMarble` | 1.000 × 0.951 × 0.660 m | 3,040 (was 1,620) | 2 | top drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
+| `model.counter` | 1.000 × 0.950 × 0.660 m | 2,428 (was 1,404) | 2,428 | top drawer | `drawer_open` 1.4 s (sandwich, `hold` 1.5 s) |
+| `model.counterCorner` | 1.000 × 1.261 × 0.930 m | 3,540 (was 1,520) | 3,540 | top drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
+| `model.counterEnd` | 1.000 × 0.950 × 0.660 m | 2,608 (was 1,320) | 2,608 | — | static (one worktop over the unit and the open end, no seam: G-41) |
+| `model.counterCornerOuter` | 0.810 × 1.035 × 0.660 m | 1,784 (was 972) | 1,784 | — | static |
+| `model.counterDrawers` | 1.000 × 0.950 × 0.660 m | 2,900 (was 1,620) | 2,900 | top drawer | `drawer_open` (putting clean dishes away: `fetch` at its prep station, `hold` 1.5 s) |
+| `model.counterOpenShelf` | 1.000 × 0.950 × 0.660 m | 3,888 (was 1,560) | 3,888 | — | static |
+| `model.butcherBlock` | 0.900 × 0.950 × 0.820 m | 3,520 (was 1,944) | 3,520 | knife drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
+| `model.counterMarble` | 1.000 × 0.951 × 0.660 m | 3,040 (was 1,620) | 3,040 | top drawer | `drawer_open` (sandwich, `hold` 1.5 s) |
 
 ## K5 — tall and wall storage
 
@@ -150,17 +150,17 @@ minutes, comfort, chores; not autonomous, so generated houses play as before).
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
-| `model.pantry` | 0.940 × 2.268 × 0.630 m | 6,860 (was 2,592) | 3 | two doors | `doors_open` 1.6 s (snack, `hold` 2.5 s) |
-| `model.pantryTall` | 0.960 × 2.388 × 0.700 m | 7,328 (was 3,024) | 3 | two doors | `doors_open` (snack, `hold` 2.5 s) |
-| `model.wallCabinet` | 0.980 × 0.732 × 0.380 m | 3,752 (was 1,880) | 3 | two doors | `doors_open` 0.8 s (putting clean things away: `fetch` at its cupboard station, `hold` 1.5 s) |
-| `model.wallCabinetGlass` | 0.960 × 0.720 × 0.408 m | 3,640 (was 2,460) | 4 | the right glass door | `door_open` 0.8 s (as the wall cabinet) |
-| `model.wallCabinetCorner` | 0.960 × 0.723 × 0.408 m | 3,776 (was 1,832) | 3 | the door | `door_open` 0.8 s (as the wall cabinet) |
-| `model.rangeHood` | 0.900 × 0.712 × 0.515 m | 1,184 (was 648) | 1 | — | static |
-| `model.spiceRack` | 0.520 × 0.440 × 0.105 m | 3,744 (was 2,268) | 3 | — | static |
-| `model.potRail` | 0.908 × 0.546 × 0.220 m | 3,372 (was 1,236) | 1 | — | static |
-| `model.kitchenShelfWall` | 0.900 × 0.757 × 0.240 m | 3,456 (was 1,476) | 3 | — | static |
-| `model.trashCan` | 0.310 × 0.685 × 0.365 m | 1,692 (was 540) | 2 | lid | `lid_open` (scraping a plate in: `clean` at its bin station, `hold` 1 s) |
-| `model.recyclingBins` | 0.920 × 0.660 × 0.455 m | 2,910 (was 972) | 4 | three lids | `lid0_open`, `lid1_open`, `lid2_open` 0.5 s, 0.6 s apart (sortRecycling, `hold` 0.9 s) |
+| `model.pantry` | 0.940 × 2.268 × 0.630 m | 6,860 (was 2,592) | 6,860 | two doors | `doors_open` 1.6 s (snack, `hold` 2.5 s) |
+| `model.pantryTall` | 0.960 × 2.388 × 0.700 m | 7,328 (was 3,024) | 7,328 | two doors | `doors_open` (snack, `hold` 2.5 s) |
+| `model.wallCabinet` | 0.980 × 0.732 × 0.380 m | 3,752 (was 1,880) | 3,752 | two doors | `doors_open` 0.8 s (putting clean things away: `fetch` at its cupboard station, `hold` 1.5 s) |
+| `model.wallCabinetGlass` | 0.960 × 0.720 × 0.408 m | 3,640 (was 2,460) | 3,640 | the right glass door | `door_open` 0.8 s (as the wall cabinet) |
+| `model.wallCabinetCorner` | 0.960 × 0.723 × 0.408 m | 3,776 (was 1,832) | 3,776 | the door | `door_open` 0.8 s (as the wall cabinet) |
+| `model.rangeHood` | 0.900 × 0.712 × 0.515 m | 1,184 (was 648) | 1,184 | — | static |
+| `model.spiceRack` | 0.520 × 0.440 × 0.105 m | 3,744 (was 2,268) | 3,744 | — | static |
+| `model.potRail` | 0.908 × 0.546 × 0.220 m | 3,372 (was 1,236) | 3,372 | — | static |
+| `model.kitchenShelfWall` | 0.900 × 0.757 × 0.240 m | 3,456 (was 1,476) | 3,456 | — | static |
+| `model.trashCan` | 0.310 × 0.685 × 0.365 m | 1,692 (was 540) | 1,692 | lid | `lid_open` (scraping a plate in: `clean` at its bin station, `hold` 1 s) |
+| `model.recyclingBins` | 0.920 × 0.660 × 0.455 m | 2,910 (was 972) | 2,910 | three lids | `lid0_open`, `lid1_open`, `lid2_open` 0.5 s, 0.6 s apart (sortRecycling, `hold` 0.9 s) |
 
 ## K6 — islands and bars
 
@@ -176,11 +176,11 @@ static this pass.
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
-| `model.kitchenIsland` | 1.940 × 0.950 × 0.840 m | 4,612 (was 1,404) | 2 | a drawer | `drawer_open` 1.4 s (sandwich, `hold` 1.5 s) |
-| `model.islandSmall` | 0.960 × 0.950 × 0.912 m | 2,480 (was 972) | 1 | — | static |
-| `model.islandLong` | 2.960 × 0.950 × 0.912 m | 5,180 (was 1,836) | 1 | — | static |
-| `model.barSegment` | 1.000 × 1.060 × 0.890 m | 2,316 (was 1,656) | 2 | — | static |
-| `model.barEnd` | 1.000 × 1.060 × 0.890 m | 2,180 (was 1,656) | 2 | — | static |
+| `model.kitchenIsland` | 1.940 × 0.950 × 0.840 m | 4,612 (was 1,404) | 4,612 | a drawer | `drawer_open` 1.4 s (sandwich, `hold` 1.5 s) |
+| `model.islandSmall` | 0.960 × 0.950 × 0.912 m | 2,480 (was 972) | 2,480 | — | static |
+| `model.islandLong` | 2.960 × 0.950 × 0.912 m | 5,180 (was 1,836) | 5,180 | — | static |
+| `model.barSegment` | 1.000 × 1.060 × 0.890 m | 2,316 (was 1,656) | 2,316 | — | static |
+| `model.barEnd` | 1.000 × 1.060 × 0.890 m | 2,180 (was 1,656) | 2,180 | — | static |
 
 Also from the review: the butcher block's knife drawer has its box; the wall cabinet's pulls sit on its
 doors; the pot rail's brackets start at the wall face (0.22 m deep); the recycling bins' colour parts are
@@ -209,3 +209,7 @@ the old `shallow`). Islands stand free, centred.
 cargo art kitchen_counters            # the .glbs, the pack, check-glb
 cargo art kitchen_counters --preview  # previews/kitchen_counters/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `recyclingBins`; the same triangles.

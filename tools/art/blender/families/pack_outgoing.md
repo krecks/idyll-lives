@@ -36,12 +36,12 @@ each at night).
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.outgoing.partyBar` | 1.84 × 2.00 × 0.88 m | 7,828 (was 7,872) | 3 | Body, Upholstery, Back bar |
-| `model.outgoing.conversationSectional` | 1.90 × 1.42 × 1.86 m | 7,940 (was 4,612) | 3 | Body, Upholstery |
-| `model.outgoing.karaokeStage` | 1.90 × 1.63 × 0.88 m | 3,668 (was 2,532) | 3 | Body, Speakers |
-| `model.outgoing.videoCallNook` | 0.84 × 1.28 × 0.78 m | 3,508 (was 3,132) | 3 | Body, Upholstery, Wood |
-| `model.outgoing.danceFloor` | 1.94 × 2.33 × 1.88 m | 4,112 (was 3,632) | 3 | Body, Speakers |
-| `model.outgoing.photoWall` | 0.90 × 2.14 × 0.49 m | 3,410 (was 3,634) | 3 | Body, Board |
+| `model.outgoing.partyBar` | 1.84 × 2.00 × 0.88 m | 7,828 (was 7,872) | 7,828 | Body, Upholstery, Back bar |
+| `model.outgoing.conversationSectional` | 1.90 × 1.42 × 1.86 m | 7,940 (was 4,612) | 9,072 | Body, Upholstery |
+| `model.outgoing.karaokeStage` | 1.90 × 1.63 × 0.88 m | 3,668 (was 2,532) | 3,668 | Body, Speakers |
+| `model.outgoing.videoCallNook` | 0.84 × 1.28 × 0.78 m | 3,508 (was 3,132) | 3,508 | Body, Upholstery, Wood |
+| `model.outgoing.danceFloor` | 1.94 × 2.33 × 1.88 m | 4,112 (was 3,632) | 4,112 | Body, Speakers |
+| `model.outgoing.photoWall` | 0.90 × 2.14 × 0.49 m | 3,410 (was 3,634) | 3,410 | Body, Board |
 
 "Upholstery" (the plan's second colour part) fits the bar's stool tops, the sectional's cushions and the desk
 chair; the stage and the dance floor take their speakers instead, the photo wall its cork board.
@@ -84,3 +84,7 @@ stand at depth 0.28 as before (the same warning on the file before this pass).
 cargo art pack_outgoing            # the six .glb, the pack, check-glb
 cargo art pack_outgoing --preview  # previews/pack_outgoing/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+The conversation sectional's three pillows are sewn flat and stuffed (`waist`), its seat and back cushions `resting`. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 2 models changed shape: `conversationSectional`, `videoCallNook`; 11,448 to 12,580 triangles.

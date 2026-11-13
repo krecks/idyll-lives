@@ -268,10 +268,13 @@ def conversationSectional():
         _panel('arm_r', 0.16, 0.24, 1.36, (0.86, 0.44, 0.25), M.frame, round=0.06, piping=0.006)
         for x in (-0.42, 0.3):
             F.soft(f'back_cushion{x}', 0.68, 0.36, 0.16, (x, 0.68, -0.2), M.upholstery, rot=(-12, 0, 0), round=0.05,
-                   puff=0.03, piping=0.006, flat=2)
-        F.soft('pillow_l', 0.34, 0.3, 0.1, (-0.6, 0.66, -0.08), M.sunny, rot=(-15, 0, -20), round=0.045, puff=0.035, flat=2, round_segments=1)
-        F.soft('pillow_r', 0.32, 0.3, 0.1, (0.6, 0.66, -0.06), M.body, rot=(-15, 0, 18), round=0.045, puff=0.035, flat=2, round_segments=1)
-        F.soft('pillow_c', 0.28, 0.26, 0.1, (0.74, 0.6, 0.32), M.cream, rot=(-10, 0, 80), round=0.045, puff=0.03, flat=2, round_segments=1)
+                   puff=0.03, piping=0.006, flat=2, resting=True)
+        F.soft('pillow_l', 0.34, 0.3, 0.1, (-0.6, 0.66, -0.08), M.sunny, rot=(-15, 0, -20), round=0.045, puff=0.035,
+               waist=0.012, pinch=0.006, resting=True)
+        F.soft('pillow_r', 0.32, 0.3, 0.1, (0.6, 0.66, -0.06), M.body, rot=(-15, 0, 18), round=0.045, puff=0.035,
+               waist=0.012, pinch=0.006, resting=True)
+        F.soft('pillow_c', 0.28, 0.26, 0.1, (0.74, 0.6, 0.32), M.cream, rot=(-10, 0, 80), round=0.045, puff=0.03,
+               waist=0.012, pinch=0.006, resting=True)
         for x, z in ((-0.86, -0.4), (-0.86, 0.36), (0.86, -0.4), (0.86, 0.88), (0.42, 0.88)):
             F.sweep(f'foot{x}{z}', [(x, 0.045, z), (x, 0.0, z)], 0.025, M.brass, verts=10, scale=[1.0, 0.75])
         # the console behind it: oak top and shelf on brass legs, a lamp, a plant, books and magazines
@@ -308,7 +311,8 @@ def conversationSectional():
     with G.new_parts() as seats:
         for name, w, d, x, z in (('seat_l', 0.84, 0.66, -0.5, 0.06), ('seat_r', 0.64, 0.66, 0.32, 0.06),
                                  ('seat_chaise', 0.5, 0.54, 0.66, 0.65)):
-            F.soft(name, w, 0.11, d, (x, 0.385 - 0.008, z), M.upholstery, round=0.045, puff=0.016, piping=0.006, flat=2)
+            F.soft(name, w, 0.11, d, (x, 0.385 - 0.008, z), M.upholstery, round=0.045, puff=0.016, piping=0.006, flat=2,
+                   resting=True)
     seats = G.hinged(G.join(seats, 'seats'), F.at(0, 0.32, 0.06))
     objs = G.settle(centre=False)
     G.squash(seats, 'sink_in', (1, 1, 0.8), seconds=0.6)

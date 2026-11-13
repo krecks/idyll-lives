@@ -229,9 +229,9 @@ def readingNook():
             F.soft(_name('back_cushion'), 0.48, 0.42, 0.13, (x, 0.68, -0.33), M.cushion, rot=(-8, 0, 0), round=0.045,
                    puff=0.03, piping=0.005, flat=3)
         F.soft('pillow_l', 0.3, 0.28, 0.1, (-0.38, 0.6, -0.22), M.pillow_a, rot=(-12, -6, 30), round=0.04, puff=0.035,
-               flat=2)
+               waist=0.012, pinch=0.006, resting=True)
         F.soft('pillow_r', 0.28, 0.26, 0.1, (0.38, 0.6, -0.23), M.pillow_b, rot=(-12, 6, -28), round=0.04, puff=0.035,
-               flat=2)
+               waist=0.012, pinch=0.006, resting=True)
     G.join(still, 'body', origin=(0, 0, 0))
     # The seat cushion and the throw folded over it, joined with their origin on the underside: `sink_in`
     # presses them 2 cm while a resident is curled up on it.
@@ -597,7 +597,7 @@ def _wing_chair(F, x, z=0.0):
         F.extrude(_name('chair_wing'), [(z + u, v) for u, v in wing], 0.075, (x + s * (w / 2 - 0.065), 0, 0), M.velvet,
                   plane='side', rot=(0, 0, s * 6), bevel=0.025, bevel_segments=1)
         for lz, dz in ((z0 + 0.07, -1), (z + d / 2 - 0.07, 1)):
-            G.kit.cabriole(F, _name('chair_leg'), ax, lz, 0.16, M.walnut, s * 0.012, dz * 0.012, r=0.02, verts=6)
+            G.kit.cabriole(F, _name('chair_leg'), ax, lz, 0.16, M.walnut, s * 0.012, dz * 0.012, r=0.02)
 
 
 def _log(F, name, a, b, r, seed, material=None):

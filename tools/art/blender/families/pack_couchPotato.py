@@ -327,7 +327,8 @@ def gameConsole():
             for lz in (-0.37, 0.13):
                 F.sweep(_name('foot'), [(s * 0.37, 0.06, lz), (s * 0.385, 0.0, lz + 0.01 * (1 if lz > 0 else -1))], 0.016,
                         M.dark, verts=8, scale=[1.0, 0.7])
-        F.soft('pillow', 0.3, 0.28, 0.1, (0.24, 0.64, -0.24), M.mustard, rot=(-10, 0, 20), round=0.04, puff=0.03, flat=2)
+        F.soft('pillow', 0.3, 0.28, 0.1, (0.24, 0.64, -0.24), M.mustard, rot=(-10, 0, 20), round=0.04, puff=0.03,
+               waist=0.012, pinch=0.006, resting=True)
         for x, t in ((-0.2, 10), (0.2, -15)):                     # the controllers on the seats
             _pad(F, x, 0.45, 0.06, t)
         # the screen (at the front edge until turned round) and the shelf between its posts, with the console and two
@@ -398,7 +399,8 @@ def recliner():
         F.soft('back', 0.6, 0.56, 0.13, (0, 0.67, -0.28), M.plush, rot=(-8, 0, 0), round=0.06, flat=1, round_segments=1)
         for k, (y, z, hh) in enumerate(((0.55, -0.2, 0.15), (0.71, -0.22, 0.16))):
             F.soft(_name('back_roll'), 0.5, hh, 0.1, (0, y, z), M.plush, rot=(-8, 0, 0), round=0.04, puff=0.022, flat=2)
-        F.soft('head_pillow', 0.46, 0.13, 0.11, (0, 0.88, -0.21), M.plush, rot=(-8, 0, 0), round=0.05, puff=0.02, flat=2)
+        F.soft('head_pillow', 0.46, 0.13, 0.11, (0, 0.88, -0.21), M.plush, rot=(-8, 0, 0), round=0.05, puff=0.02,
+               waist=0.012, pinch=0.006, resting=True)
     back = G.hinged(G.join(back, 'back'), F.at(0, by, bz))
     fy, fz = FOOT_HINGE
     with G.new_parts() as foot:                    # the footrest, folded down under the seat's front
@@ -600,10 +602,10 @@ def lavaLamp():
         fx, fz = G.sind(TURN), G.cosd(TURN)                     # the way it faces (game x, depth)
         F.soft('pouf', 0.62, 0.36, 0.6, (px, 0.18, pz), M.pouf, rot=(0, 0, -TURN), round=0.13, flat=2)
         F.soft('pouf_top', 0.54, 0.1, 0.52, (px, 0.385, pz), M.pouf, rot=(0, 0, -TURN), round=0.045, puff=0.015,
-               piping=0.007, flat=2)
+               piping=0.007, flat=2, pinch=0.0)   # (turned: its corners are the model's outermost points)
         F.sphere('pouf_button', 0.016, (px, 0.452, pz), M.pouf, scale=(1, 1, 0.5), segments=8, rings=4)
         F.soft('lean', 0.5, 0.36, 0.14, (px - 0.26 * fx, 0.6, pz - 0.26 * fz), M.pouf, rot=(-12, 0, -TURN), round=0.06,
-               puff=0.012, flat=2)
+               puff=0.012, flat=2, pinch=0.0)
         F.cyl('rug', 0.2, 0.012, (-0.22, 0.006, 0.27), M.rug, verts=24, bevel=0.004, bevel_segments=1)
         # the side table: a turned stem on a round foot, a lipped oak top
         F.cyl('table_top', 0.13, 0.03, (tx, 0.5, tz), M.oak, verts=20, bevel=0.008, bevel_segments=1)

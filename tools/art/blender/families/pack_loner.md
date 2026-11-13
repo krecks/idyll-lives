@@ -42,7 +42,7 @@ already moves, so it costs no draw. A mist puff of its own would be a fourth dra
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.loner.quietPod` | 0.84 × 1.55 × 0.78 m | 7,472 | 3 | Body, Wood, Cushions |
+| `model.loner.quietPod` | 0.84 × 1.55 × 0.78 m | 7,632 | 3 | Body, Wood, Cushions |
 | `model.loner.shortwaveRadio` | 0.84 × 1.33 × 0.68 m | 3,526 | 3 | Body, Wood, Seat |
 | `model.loner.puzzleTable` | 0.86 × 1.01 × 0.72 m | 4,530 | 3 | Body, Wood |
 | `model.loner.bonsaiBench` | 0.86 × 1.31 × 0.75 m | 4,706 | 3 | Body, Wood, Pot |
@@ -96,3 +96,7 @@ each.
 cargo art pack_loner            # the six .glb, the pack, check-glb
 cargo art pack_loner --preview  # previews/pack_loner/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+The quiet pod's seat and back cushion are `resting`. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 5 models changed shape: `bonsaiBench`, `deliveryHatch`, `puzzleTable`, `quietPod`, `shortwaveRadio`; 22,914 to 23,074 triangles.

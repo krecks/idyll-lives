@@ -185,7 +185,7 @@ def snoozecloudBed():
         # the foot of the mattress, quilted, a throw folded over its end, a remote on the side
         d = 0.93 - HINGE_Z
         F.soft('mattress_foot', 1.74, 0.2 - 0.016, d - 0.01, (0, MAT_TOP - 0.1 - 0.008, HINGE_Z + d / 2 + 0.005), M.upholstery,
-               round=0.05, puff=0.016, piping=0.006, flat=3)
+               round=0.05, puff=0.016, piping=0.006, flat=3, resting=True)
         throw = F.soft('throw', 1.78, 0.036, 0.42, (0, MAT_TOP + 0.018, 0.66), M.throw, round=0.016, puff=0.006, flat=2)
         G.jitter(throw, 0.004, size=0.15, seed=2.0, up=0.6)
         F.sweep('throw_fold', [(-0.89, MAT_TOP + 0.02, 0.87), (0.89, MAT_TOP + 0.02, 0.87)], 0.02, M.throw, verts=10)
@@ -197,9 +197,10 @@ def snoozecloudBed():
     with G.new_parts() as head:
         hd = HINGE_Z + 0.77
         F.soft('mattress_head', 1.74, 0.2 - 0.016, hd, (0, MAT_TOP - 0.1 - 0.008, HINGE_Z - hd / 2), M.upholstery, round=0.05,
-               puff=0.016, piping=0.006, flat=3)
+               puff=0.016, piping=0.006, flat=3, resting=True)
         for s in (-1, 1):
-            F.soft(_name('pillow'), 0.68, 0.14, 0.36, (s * 0.42, MAT_TOP + 0.06, -0.6), M.pillow, round=0.06, puff=0.03, flat=3)
+            F.soft(_name('pillow'), 0.68, 0.14, 0.36, (s * 0.42, MAT_TOP + 0.06, -0.6), M.pillow, round=0.06, puff=0.03, flat=3,
+                   resting=True)
             F.soft(_name('cushion'), 0.22, 0.26, 0.1, (s * 0.77, MAT_TOP + 0.15, -0.68), M.blush if s < 0 else M.lilac,
                    rot=(18, 0, 0), round=0.045, puff=0.025, flat=2)
     head = G.hinged(G.join(head, 'head_section'), F.at(0, MAT_TOP - 0.2, HINGE_Z))
@@ -243,7 +244,8 @@ def napPod():
             depth = 0.09 * math.sqrt(max(0.0, 1 - (u / 0.3) ** 2 - (v / 0.39) ** 2))
             F.sphere(_name('button'), 0.012, (u, 0.84 + v, -0.21 + depth - 0.004), M.hood, scale=(1, 0.5, 1), segments=6,
                      rings=4)
-        F.soft('pillow', 0.26, 0.2, 0.12, (0.17, 0.56, -0.01), M.blush, rot=(-20, 0, 20), round=0.05, puff=0.035, flat=2)
+        F.soft('pillow', 0.26, 0.2, 0.12, (0.17, 0.56, -0.01), M.blush, rot=(-20, 0, 20), round=0.05, puff=0.035,
+               waist=0.012, pinch=0.006, resting=True)
         # a shaggy rug in front, its pile jittered
         rug = F.cyl('rug', 0.27, 0.016, (0, 0.008, 0.33), M.shag, verts=32, scale=(1, 0.55, 1), bevel=0.006, bevel_segments=1)
         G.jitter(rug, 0.003, size=0.03, seed=1.0, up=0.6)

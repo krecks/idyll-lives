@@ -86,7 +86,7 @@ the side: it came up through the carcass's top (and the single one's side).
 | `model.nightstandLamp` | 0.54 × 1.09 × 0.46 m | 3,284 | 3 | Body, Shade (glows `#FFD9A0` at night; brass foot and collar, trimmed shade on a harp, a finial) |
 | `model.cedarChest` | 0.96 × 0.505 × 0.52 m | 3,212 | 3 | Body, Handles (bracket-cut plinth, two raised panels in frames, iron corner brackets and drop handles, a brass lock; a framed raised field on the lid) |
 | `model.laundryHamper` | 0.47 × 0.63 × 0.48 m | 3,620 | 3 | Hamper (woven staves, braided bands and rim, a domed lid with a loop; rumpled washing, a sleeve over the rim) |
-| `model.benchBedEnd` | 1.60 × 0.47 × 0.42 m | 2,320 | 2 | Frame, Cushion (each end one bent brass tube, glides; a piped, buttoned, puffed cushion) |
+| `model.benchBedEnd` | 1.60 × 0.47 × 0.42 m | 2,400 | 2 | Frame, Cushion (each end one bent brass tube, glides; a piped, buttoned, puffed cushion) |
 | `model.dresser` | 1.44 × 1.35 × 0.54 m | 4,688 | 4 | Body, Handles (bracket feet, a shaped apron, bar pulls, a moulded top; a framed picture on an easel, a turned vase, a lidded box with a clasp) |
 | `model.wardrobe` | 1.84 × 2.41 × 0.63 m | 5,036 | 3 | Body (the doors), Handles (frame-and-panel doors, hinge knuckles; clothes on wire hangers, lidded boxes with labels) |
 | `model.chestOfDrawers` | 0.88 × 1.16 × 0.51 m | 3,012 | 2 | Body, Handles (frame-and-panel drawer fronts, bar pulls, a rounded top) |
@@ -112,3 +112,7 @@ as before). Khronos validator: 0 errors, 0 warnings each.
 cargo art bedroom_storage            # every .glb, the pack, check-glb
 cargo art bedroom_storage --preview  # previews/bedroom_storage/dresser.png, dresser@drawer_open.png, …
 ```
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 9 models changed shape: `benchBedEnd`, `cedarChest`, `chestOfDrawers`, `dresser`, `dresserLow`, `nightstand`, `nightstandDrawers`, `nightstandLamp`, `nightstandModern`; 25,580 to 25,660 triangles.

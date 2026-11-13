@@ -77,14 +77,14 @@ Rebuilt with the forms and the kit, same sizes, centres, parts, clips, glow, pai
 
 | Model | Size at rest (w × h × d) | Triangles (before → now) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.tv` | 0.91 × 1.07 × 0.44 m | 2,144 → 3,548 | 2 | Body (`tv_cabinet`), Trim (`tv_oak`) |
-| `model.tvWall` | 1.24 × 0.87 × 0.10 m | 492 → 884 | 1 | Body (`wall_frame`), Trim (`wall_bar`) |
-| `model.tvRetro` | 0.89 × 0.79 × 0.43 m | 1,892 → 3,584 | 2 | Body (`retro_shell`), Trim (`retro_bezel`) |
-| `model.tvStandLow` | 1.82 × 0.80 × 0.46 m | 2,688 → 4,452 | 3 | Bench (`bench`), TV (`bench_tv`) |
-| `model.homeCinema` | 1.88 × 1.65 × 0.45 m | 2,408 → 6,248 | 3 | Body (`cinema_unit`), Trim (`cinema_oak`) |
-| `model.stereo` | 0.92 × 0.84 × 0.42 m | 3,480 → 3,800 | 4 | Body (`stereo_wood`), Trim (`stereo_dark`) |
-| `model.boombox` | 0.60 × 0.95 × 0.44 m | 3,732 → 2,864 | 3 | Body (`boombox_body`), Trim (`boombox_trim`) |
-| `model.fireplaceElectric` | 1.76 × 1.32 × 0.92 m | 3,580 → 4,906 | 3 | Surround (`surround`), Firebox (`firebox`) |
+| `model.tv` | 0.91 × 1.07 × 0.44 m | 2,144 → 3,548 | 3,548 | Body (`tv_cabinet`), Trim (`tv_oak`) |
+| `model.tvWall` | 1.24 × 0.87 × 0.10 m | 492 → 884 | 884 | Body (`wall_frame`), Trim (`wall_bar`) |
+| `model.tvRetro` | 0.89 × 0.79 × 0.43 m | 1,892 → 3,584 | 3,584 | Body (`retro_shell`), Trim (`retro_bezel`) |
+| `model.tvStandLow` | 1.82 × 0.80 × 0.46 m | 2,688 → 4,452 | 4,452 | Bench (`bench`), TV (`bench_tv`) |
+| `model.homeCinema` | 1.88 × 1.65 × 0.45 m | 2,408 → 6,248 | 6,248 | Body (`cinema_unit`), Trim (`cinema_oak`) |
+| `model.stereo` | 0.92 × 0.84 × 0.42 m | 3,480 → 3,800 | 3,800 | Body (`stereo_wood`), Trim (`stereo_dark`) |
+| `model.boombox` | 0.60 × 0.95 × 0.44 m | 3,732 → 2,864 | 2,864 | Body (`boombox_body`), Trim (`boombox_trim`) |
+| `model.fireplaceElectric` | 1.76 × 1.32 × 0.92 m | 3,580 → 4,906 | 4,986 | Surround (`surround`), Firebox (`firebox`) |
 
 `check-glb`: 8 models, 0 failed, the warnings above. Khronos validator: 0 errors, 0 warnings each. Checked: the
 gallery next to the old parts; the clips bench (rest, 0.4 s, open) on WebGPU; in play (`bathroom-check`): each bought
@@ -99,3 +99,7 @@ colours on the painted parts.
 cargo art media            # the eight .glb, the pack, check-glb
 cargo art media --preview  # previews/media/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `boombox`, `fireplaceElectric`, `homeCinema`, `tv`, `tvRetro`, `tvStandLow`, `tvWall`; 26,486 to 26,566 triangles.

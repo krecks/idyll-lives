@@ -64,12 +64,12 @@ comes off a burning oven (the plan names `flames` for `warmUp` only).
 
 | Model | Size (w × h × d) | Triangles (2026-10-22) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.foodie.herbGarden` | 0.86 × 1.29 × 0.76 m | 5,528 (was 6,708) | 3 | Body, Pots |
-| `model.foodie.deliPantry` | 0.88 × 1.99 × 0.57 m | 5,532 (was 4,392) | 3 | Body, Worktop, Shelves |
-| `model.foodie.espressoBar` | 0.76 × 1.51 × 0.51 m | 6,324 (was 5,364) | 3 | Body, Worktop, Machine |
-| `model.foodie.cookbookLectern` | 0.84 × 1.15 × 0.59 m | 2,644 (was 2,276) | 3 | Body, Stool & ledge, Cookbook |
-| `model.foodie.pizzaOven` | 1.89 × 1.90 × 0.92 m | 7,616 (was 5,056) | 4 | Body, Worktop, Brick |
-| `model.foodie.chefsIsland` | 1.86 × 1.13 × 0.89 m | 6,884 (7,176 before 2026-11-03) | 3 | Body, Worktop, Stools |
+| `model.foodie.herbGarden` | 0.86 × 1.29 × 0.76 m | 5,528 (was 6,708) | 5,528 | Body, Pots |
+| `model.foodie.deliPantry` | 0.88 × 1.99 × 0.57 m | 5,532 (was 4,392) | 5,532 | Body, Worktop, Shelves |
+| `model.foodie.espressoBar` | 0.76 × 1.51 × 0.51 m | 6,324 (was 5,364) | 6,324 | Body, Worktop, Machine |
+| `model.foodie.cookbookLectern` | 0.84 × 1.15 × 0.59 m | 2,644 (was 2,276) | 2,644 | Body, Stool & ledge, Cookbook |
+| `model.foodie.pizzaOven` | 1.89 × 1.90 × 0.92 m | 7,616 (was 5,056) | 7,616 | Body, Worktop, Brick |
+| `model.foodie.chefsIsland` | 1.86 × 1.13 × 0.89 m | 6,884 (7,176 before 2026-11-03) | 6,404 | Body, Worktop, Stools |
 
 The herb garden has no worktop; its second part is the pots. The rosemary stands 7 cm over the old part's.
 
@@ -100,3 +100,7 @@ The game draws the cook's board, bowl or pan and what they carried in on the sta
   top itself, 1.86 × 0.46 at (0, 0.225) (it had no size, so the footprint's 2 × 1, over the stools).
 - `pizzaOven`: the bowl of sauce moved back (x 0.86, depth −0.19), leaving the counter's front right free. It is an
   `oven` station only (2026-11-03: it was a `grill` too, and a barbecue was grilled in its mouth when the grill was busy).
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `espressoBar`; the same triangles.

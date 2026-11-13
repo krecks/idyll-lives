@@ -41,89 +41,89 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 
 | Key | What it shows | Draws | Tris |
 |---|---|---|---|
-| `item.ingredients` | a kraft bag lofted with its gussets folded in, a turned-over cuff; a slashed baguette, a lettuce, a tapering carrot with three swept fronds, a lobed tomato with a star calyx | 1 | 718 |
-| `item.prepBowl` | a wide glazed bowl, its rim rolled, a heap rising 3.5 cm over the rim thick with two dozen dice of potato, carrot and red pepper, swept green beans and peas | 1 | 716 |
-| `item.mealPot` | the iron stew pot: a rolled rim, swept loop handles riveted on, stew with beef, carrot coins, potato, peas and parsley | 1 | 1,376 |
-| `item.potDirty` | the same pot scraped empty: a tidemark, a brown film and burnt bits on the bottom | 1 | 940 |
-| `item.tastingBoard` | a paddle board (one outline, a tab handle with a hole): a cheese wedge and cubes, a fan of salami, crackers, a ramekin of fig jam, grapes on a swept stalk; empties to `item.boardDirty` | 2 | 1,496 |
-| `item.grillPlatter` | an oval platter, rim rolled: two bent sausages 2.8 cm thick with grill marks, a rough-edged marked burger, a cob of corn in kernel rows with butter, parsley | 1 | 1,348 |
-| `item.platterDirty` | the platter with a smear of grease and sauce, crumbs, a gnawed cob and a crumpled napkin | 1 | 976 |
-| `item.pizza` | a round board, a puffed crimped crust, tomato inside it, cheese browned in spots, curled pepperoni, basil leaves, eight slices cut; empties to `item.pizzaBoardDirty` | 2 | 1,436 |
-| `item.bakingTray` | a pressed steel tray, its edge rolled, what it serves (`treatPlate`): six chocolate-chip cookies and three iced cupcakes with cherries | 1 | 1,760 |
-| `item.trayDirty` | the tray with a grease stain, burnt patches, cookie crumbs, smudges of chocolate, a dab of icing and a burnt bit | 1 | 856 |
-| `item.pieDish` | a cherry pie 26 cm across in a fluted dish 4.7 cm deep: a crimped pastry rim and a lattice woven over and under; empties to `item.pieDishDirty` | 1 | 716 |
-| `item.mealPlate` | a plate of stew: beef and carrot coins in gravy, a ridged dollop of mash, bent green beans, parsley (also leftovers) | 1 | 708 |
-| `item.pizzaSlice` | a plate with a slice: base, tomato at the cut sides, cheese browned in a spot, pepperoni, basil, a swept puffed crust | 1 | 548 |
-| `item.treatPlate` | chocolate-chip cookies, one leaning on the others, a cupcake in a pleated case in the well, icing piped in a swirl, a cherry with its stalk (also the snack) | 1 | 740 |
-| `item.pieSlice` | a sixth of the cherry pie (11 cm to its crust) with a crimped swept edge, filling run out at its tip, a piped rosette of cream with mint | 1 | 688 |
-| `item.cakeSlice` | a slice of the café's layer cake on a plate: two sponges, jam and cream between, white icing over the top and round its back, the layers at the cut sides, a strawberry standing on a green calyx, its seeds showing | 1 | 472 |
-| `item.sandwich` | a sandwich cut corner to corner, loaf corners rounded: crumb on top and at the cut, crusts round, lettuce frilled out, cheese, tomato | 1 | 500 |
-| `item.plateDirty` | a plate with a smear of gravy, a streak of sauce, crumbs, a pea, the knife and fork laid side by side (outlines) | 1 | 548 |
-| `item.bbqPlate` | a plate from the barbecue (`grillPlatter`'s `serving`): a sausage marked by the bars, a marked burger, a piece of corn with butter, parsley; eaten with a fork | 1 | 780 |
-| `item.tastingPlate` | a plate from the tasting menu (`tastingBoard`'s `serving`): a wedge and a cube of cheese, folds of salami, two crackers, grapes, a dab of fig jam; eaten with a fork | 1 | 704 |
-| `item.freshPlate` | something fresh from the garden: a salad on the plate, torn leaves in three greens heaped, tomato wedges on their skins, cucumber and radish slices; eaten with a fork | 1 | 708 |
-| `item.plateStackDirty` | three dirty plates stacked, each a little askew, its foot in the well below (the lower two their wells flat, unseen): the top one's leftovers and fork, a drip of gravy down the middle one's rim, a scrap of lettuce over its edge. The sim shows it when two or more dirty plates are carried at once (both hands; content radius 0.156). Over the 750: three plates | 1 | 876 |
-| `tool.board` | the chopping board: rounded, a juice groove, a hanging slot; a tapering carrot, carrot coins, parsley (the knife is in the hand: `tool.knife`) | 2 | 600 |
-| `tool.pan` | the frying pan, its handle to the back: a heavy rim, a riveted bracket, a tapering grip; stir-fry of beef strips, broccoli, peppers and carrot (no longer drawn: the stew is stirred in its pot) | 1 | 1,288 |
-| `tool.grillFood` | two bent sausages 2.8 cm thick with grill marks and a rough-edged marked burger | 1 | 628 |
-| `tool.mixingBowl` | a deep glazed bowl, its rim rolled, flat batter with the whisk's swirl on it, a tapering wooden spoon, its bowl in the batter, its handle resting on the far rim (plain satin, one draw) | 1 | 616 |
-| `item.iceCream` | a dessert bowl, rim rolled, three scoops with ragged lips, chocolate sauce trickled over two of them, a fan wafer (no spoon: the hand's) ; empties to `item.bowlDirty` | 1 | 644 |
-| `item.bowlDirty` | the dessert bowl with a film of melted ice cream lying on its sloping inside, a streak of chocolate, a drip of strawberry from the rim, the spoon left in it | 1 | 438 |
-| `item.toast` | toast cut corner to corner, toasted tops, dark crusts, a scorch, a pat of butter melting into a pool on each half | 1 | 532 |
-| `item.smoothie` | a 14 cm tumbler (thick foot, frothy top) of berry smoothie, a striped bendy straw, a raspberry and mint | 1 | 600 |
-| `item.noodles` | a white card noodle pail with a red band, front and back flaps up, a wire handle, noodles and spring onion (no chopsticks: the hand's) | 1 | 592 |
-| `item.takeout` | an open kraft clamshell, sides flared, its shallow lid up at the back: a sesame burger (patty, cheese, lettuce, tomato) and fries inside | 1 | 700 |
-| `item.boardDirty` | the tasting board cleared: a cheese rind, a bare branching stalk, half a cracker, crumbs, smears of grease and jam | 2 | 640 |
-| `item.pizzaBoardDirty` | the pizza's round board after it: bent crust ends, a grease smear, sauce, crumbs, the pizza wheel | 2 | 712 |
-| `item.pieDishDirty` | the fluted pie dish emptied: a smear of filling, pastry crumbs, the pie server | 1 | 456 |
-| `item.iceCreamCup` | a paper cup 9 cm across in nine pink stripes, two ragged-lipped scoops (vanilla, strawberry) (no spoon: the hand's, `tool.paddle`) | 1 | 340 |
-| `item.hotDog` | a hot dog on a paper boat 9 cm across: a bun 6.3 cm across in two lathed halves side by side, inside the boat, a bent sausage longer than it, a mustard zigzag and a line of ketchup | 1 | 624 |
-| `item.crisps` | a packet of crisps lying on its back, puffed, blue with a yellow band, crimped seals, its top torn open on the silvered inside, five crisps spilt | 1 | 616 |
-| `item.apple` | an apple 7.5 cm across, lobed a little, red with a yellow blush at the stalk and the eye, a stalk and a leaf | 1 | 250 |
-| `item.pastryBag` | a white paper bag 12 cm wide, its top folded open, a croissant of five lobes standing out of it | 1 | 176 |
-| `item.cutFlowers` | a bunch of cut flowers 37 cm tall standing out of the hand, the stems gathered at the grip and curving up to six heads (three daisies with an amber eye, two tulip buds, a small daisy) and four leaves, the same heads as the vase of flowers (`tabletop.py`) | 1 | 624 |
-| `item.daisyChain` | a daisy chain 16 cm across, coiled flat in the hand: a ring of plaited green stems with eleven white daisies round it (an amber eye on each), heads up, and the two stem ends tucked back under where the chain was closed | 1 | 1034 |
-| `item.parcel` | a parcel from the shop 42 x 30 x 34 cm (2026-11-03, sim-core `setup.rs`): a corrugated card box, its edges rounded a little, brown tape over the top seam and a hand's width down the front and back, a white address label with three red lines; at the front door, in both hands, and on the floor while what's in it is put together | 1 | 140 |
-| `tool.book` | an open cloth-bound book, 30 x 22 cm: the boards, two page blocks rising from the spine and curving down to the fore-edges, a sheet over each with seven grey bands of type | 1 | 496 |
-| `tool.phone` | a smartphone 7.2 x 14.8 cm, a rounded dark body, the glass and a lit screen, a camera bump | 1 | 288 |
-| `tool.mug` | a glazed mug 8 cm across with a blue band, its handle to the right, coffee and crema | 1 | 480 |
-| `tool.glass` | a tumbler 7 x 11 cm of an orange drink (seen through the glass), two ice cubes | 1 | 340 |
-| `tool.wineGlass` | a stemmed glass 19 cm high, red wine to the bowl's widest | 1 | 468 |
-| `tool.can` | a 330 ml can, red with a white band, its ends pressed in, a ring pull | 1 | 392 |
-| `tool.fork` | a polished dinner fork 20 cm long, 3 mm thick, an outline extruded: a handle widening to 1.5 cm at its end, four tines 2.6 cm across (chrome, to catch the light from the game camera) | 1 | 92 |
-| `tool.spoon` | a steel dessert spoon 17 cm long, an oval bowl | 1 | 124 |
-| `tool.chopsticks` | a pair of tapering wooden chopsticks 23 cm long | 1 | 24 |
-| `tool.coin` | a brass coin 2.3 cm across, a milled rim | 1 | 140 |
-| `tool.seedBag` | a small kraft bag of bird seed, its top rolled open over the seed | 1 | 116 |
-| `tool.dart` | a steel dart 15 cm long: a knurled barrel, a black shaft, three blue flights | 1 | 180 |
-| `tool.cue` | a pool cue 1.47 m (the pool table's was on its cloth): a wrapped butt, a joint, a tapering shaft, a ferrule and a chalked tip | 1 | 188 |
-| `tool.bat` | a ping-pong bat: a wooden blade 15 x 16 cm, red rubber over black, a flared handle (the ping-pong table's two were on its top) | 1 | 296 |
-| `tool.shaker` | the bar cart's cocktail shaker, 22 cm, chrome (the cart's own is hidden while it is in the hands) | 1 | 320 |
-| `tool.wateringCan` | a green plastic watering can, 5 litres: a round body, a hoop handle over it (held at its middle, 26 cm up), a spout to a rose 35 cm out | 1 | 336 |
-| `tool.secateurs` | bypass secateurs, 17.5 cm, closed: red grips, a steel blade over an iron anvil, the pivot bolt | 1 | 220 |
-| `tool.paintbrush` | an artist's brush, 25 cm: a lacquered wooden handle, a steel ferrule, bristles dipped in blue | 1 | 192 |
-| `tool.chalk` | a stick of white chalk, 8 cm, its tip worn down | 1 | 36 |
-| `tool.babyBottle` | a baby's bottle, 17 cm: a clear body two thirds full of milk, a blue screw ring, a teat | 1 | 380 |
-| `tool.postcard` | a postcard, 14.8 x 10.5 cm, a seaside view in bands | 1 | 48 |
-| `tool.basketball` | a basketball, 25 cm with its seams, orange leather and black seams (the hoops' own is hidden while it is in play: bounced, held, shot and back) | 1 | 672 |
-| `tool.pen` | a ballpoint, 14 cm: a navy barrel, a chrome cone and point, a clip | 1 | 124 |
-| `tool.pencil` | a yellow pencil, 17 cm, six-sided, sharpened: the bare wood cone and the lead | 1 | 60 |
-| `tool.marker` | a whiteboard marker, 15.5 cm with its cap on its back end: a white body, a blue cap and felt tip | 1 | 148 |
-| `tool.receiver` | the phone box's receiver, 21 cm: a black bar, the earpiece's and the mouthpiece's cups (drawn on the box's hook by code, `REST_PROPS`, and in the caller's hand) | 1 | 268 |
-| `tool.paddle` | the ice cream cart's flat wooden spoon, 9.5 cm (`EATEN_WITH.iceCreamCone`) | 1 | 28 |
-| `tool.knife` | a chef's knife 28 cm: a black riveted handle, a steel bolster, a blade curving up to its point, edge to the left | 1 | 156 |
-| `tool.woodenSpoon` | a wooden spoon 31 cm, held 10 cm from its end | 1 | 144 |
-| `tool.spatula` | a slotted turner 27 cm: a black grip, a steel shank bent down to a blade 8 x 10 cm with three slots | 1 | 280 |
-| `tool.whisk` | a balloon whisk 33 cm: a steel handle, four loops of wire 6 cm across | 1 | 464 |
-| `tool.biteSandwich` | half the sandwich (`item.sandwich`'s), its point to the front | 1 | 140 |
-| `tool.biteToast` | half a slice of the buttered toast | 1 | 156 |
-| `tool.bitePizza` | the pizza slice (`item.pizzaSlice`'s), held by its crust | 1 | 328 |
-| `tool.biteCookie` | a chocolate-chip cookie | 1 | 84 |
-| `tool.biteBurger` | the takeaway's sesame burger | 1 | 420 |
-| `tool.biteHotDog` | the hot dog out of its boat, along the depth | 1 | 532 |
-| `tool.biteCracker` | a cracker with a slice of cheese | 1 | 52 |
-| `tool.biteCroissant` | the bakery's croissant, lying | 1 | 100 |
-| `tool.biteCrisps` | three crisps, one on another | 1 | 96 |
+| `item.ingredients` | a kraft bag lofted with its gussets folded in, a turned-over cuff; a slashed baguette, a lettuce, a tapering carrot with three swept fronds, a lobed tomato with a star calyx | 718 | 718 |
+| `item.prepBowl` | a wide glazed bowl, its rim rolled, a heap rising 3.5 cm over the rim thick with two dozen dice of potato, carrot and red pepper, swept green beans and peas | 716 | 716 |
+| `item.mealPot` | the iron stew pot: a rolled rim, swept loop handles riveted on, stew with beef, carrot coins, potato, peas and parsley | 1,376 | 1,376 |
+| `item.potDirty` | the same pot scraped empty: a tidemark, a brown film and burnt bits on the bottom | 940 | 940 |
+| `item.tastingBoard` | a paddle board (one outline, a tab handle with a hole): a cheese wedge and cubes, a fan of salami, crackers, a ramekin of fig jam, grapes on a swept stalk; empties to `item.boardDirty` | 1,496 | 1,496 |
+| `item.grillPlatter` | an oval platter, rim rolled: two bent sausages 2.8 cm thick with grill marks, a rough-edged marked burger, a cob of corn in kernel rows with butter, parsley | 1,348 | 1,348 |
+| `item.platterDirty` | the platter with a smear of grease and sauce, crumbs, a gnawed cob and a crumpled napkin | 976 | 976 |
+| `item.pizza` | a round board, a puffed crimped crust, tomato inside it, cheese browned in spots, curled pepperoni, basil leaves, eight slices cut; empties to `item.pizzaBoardDirty` | 1,436 | 1,436 |
+| `item.bakingTray` | a pressed steel tray, its edge rolled, what it serves (`treatPlate`): six chocolate-chip cookies and three iced cupcakes with cherries | 1,760 | 1,760 |
+| `item.trayDirty` | the tray with a grease stain, burnt patches, cookie crumbs, smudges of chocolate, a dab of icing and a burnt bit | 856 | 856 |
+| `item.pieDish` | a cherry pie 26 cm across in a fluted dish 4.7 cm deep: a crimped pastry rim and a lattice woven over and under; empties to `item.pieDishDirty` | 716 | 716 |
+| `item.mealPlate` | a plate of stew: beef and carrot coins in gravy, a ridged dollop of mash, bent green beans, parsley (also leftovers) | 708 | 708 |
+| `item.pizzaSlice` | a plate with a slice: base, tomato at the cut sides, cheese browned in a spot, pepperoni, basil, a swept puffed crust | 548 | 548 |
+| `item.treatPlate` | chocolate-chip cookies, one leaning on the others, a cupcake in a pleated case in the well, icing piped in a swirl, a cherry with its stalk (also the snack) | 740 | 740 |
+| `item.pieSlice` | a sixth of the cherry pie (11 cm to its crust) with a crimped swept edge, filling run out at its tip, a piped rosette of cream with mint | 688 | 688 |
+| `item.cakeSlice` | a slice of the café's layer cake on a plate: two sponges, jam and cream between, white icing over the top and round its back, the layers at the cut sides, a strawberry standing on a green calyx, its seeds showing | 472 | 472 |
+| `item.sandwich` | a sandwich cut corner to corner, loaf corners rounded: crumb on top and at the cut, crusts round, lettuce frilled out, cheese, tomato | 500 | 500 |
+| `item.plateDirty` | a plate with a smear of gravy, a streak of sauce, crumbs, a pea, the knife and fork laid side by side (outlines) | 548 | 548 |
+| `item.bbqPlate` | a plate from the barbecue (`grillPlatter`'s `serving`): a sausage marked by the bars, a marked burger, a piece of corn with butter, parsley; eaten with a fork | 780 | 780 |
+| `item.tastingPlate` | a plate from the tasting menu (`tastingBoard`'s `serving`): a wedge and a cube of cheese, folds of salami, two crackers, grapes, a dab of fig jam; eaten with a fork | 704 | 704 |
+| `item.freshPlate` | something fresh from the garden: a salad on the plate, torn leaves in three greens heaped, tomato wedges on their skins, cucumber and radish slices; eaten with a fork | 708 | 708 |
+| `item.plateStackDirty` | three dirty plates stacked, each a little askew, its foot in the well below (the lower two their wells flat, unseen): the top one's leftovers and fork, a drip of gravy down the middle one's rim, a scrap of lettuce over its edge. The sim shows it when two or more dirty plates are carried at once (both hands; content radius 0.156). Over the 750: three plates | 876 | 876 |
+| `tool.board` | the chopping board: rounded, a juice groove, a hanging slot; a tapering carrot, carrot coins, parsley (the knife is in the hand: `tool.knife`) | 600 | 600 |
+| `tool.pan` | the frying pan, its handle to the back: a heavy rim, a riveted bracket, a tapering grip; stir-fry of beef strips, broccoli, peppers and carrot (no longer drawn: the stew is stirred in its pot) | 1,288 | 1,288 |
+| `tool.grillFood` | two bent sausages 2.8 cm thick with grill marks and a rough-edged marked burger | 628 | 628 |
+| `tool.mixingBowl` | a deep glazed bowl, its rim rolled, flat batter with the whisk's swirl on it, a tapering wooden spoon, its bowl in the batter, its handle resting on the far rim (plain satin, one draw) | 616 | 616 |
+| `item.iceCream` | a dessert bowl, rim rolled, three scoops with ragged lips, chocolate sauce trickled over two of them, a fan wafer (no spoon: the hand's) ; empties to `item.bowlDirty` | 644 | 644 |
+| `item.bowlDirty` | the dessert bowl with a film of melted ice cream lying on its sloping inside, a streak of chocolate, a drip of strawberry from the rim, the spoon left in it | 438 | 438 |
+| `item.toast` | toast cut corner to corner, toasted tops, dark crusts, a scorch, a pat of butter melting into a pool on each half | 532 | 532 |
+| `item.smoothie` | a 14 cm tumbler (thick foot, frothy top) of berry smoothie, a striped bendy straw, a raspberry and mint | 600 | 600 |
+| `item.noodles` | a white card noodle pail with a red band, front and back flaps up, a wire handle, noodles and spring onion (no chopsticks: the hand's) | 592 | 592 |
+| `item.takeout` | an open kraft clamshell, sides flared, its shallow lid up at the back: a sesame burger (patty, cheese, lettuce, tomato) and fries inside | 700 | 700 |
+| `item.boardDirty` | the tasting board cleared: a cheese rind, a bare branching stalk, half a cracker, crumbs, smears of grease and jam | 640 | 640 |
+| `item.pizzaBoardDirty` | the pizza's round board after it: bent crust ends, a grease smear, sauce, crumbs, the pizza wheel | 712 | 712 |
+| `item.pieDishDirty` | the fluted pie dish emptied: a smear of filling, pastry crumbs, the pie server | 456 | 456 |
+| `item.iceCreamCup` | a paper cup 9 cm across in nine pink stripes, two ragged-lipped scoops (vanilla, strawberry) (no spoon: the hand's, `tool.paddle`) | 340 | 340 |
+| `item.hotDog` | a hot dog on a paper boat 9 cm across: a bun 6.3 cm across in two lathed halves side by side, inside the boat, a bent sausage longer than it, a mustard zigzag and a line of ketchup | 624 | 624 |
+| `item.crisps` | a packet of crisps lying on its back, puffed, blue with a yellow band, crimped seals, its top torn open on the silvered inside, five crisps spilt | 616 | 616 |
+| `item.apple` | an apple 7.5 cm across, lobed a little, red with a yellow blush at the stalk and the eye, a stalk and a leaf | 250 | 250 |
+| `item.pastryBag` | a white paper bag 12 cm wide, its top folded open, a croissant of five lobes standing out of it | 176 | 176 |
+| `item.cutFlowers` | a bunch of cut flowers 37 cm tall standing out of the hand, the stems gathered at the grip and curving up to six heads (three daisies with an amber eye, two tulip buds, a small daisy) and four leaves, the same heads as the vase of flowers (`tabletop.py`) | 624 | 624 |
+| `item.daisyChain` | a daisy chain 16 cm across, coiled flat in the hand: a ring of plaited green stems with eleven white daisies round it (an amber eye on each), heads up, and the two stem ends tucked back under where the chain was closed | 1,034 | 1034 |
+| `item.parcel` | a parcel from the shop 42 x 30 x 34 cm (2026-11-03, sim-core `setup.rs`): a corrugated card box, its edges rounded a little, brown tape over the top seam and a hand's width down the front and back, a white address label with three red lines; at the front door, in both hands, and on the floor while what's in it is put together | 140 | 140 |
+| `tool.book` | an open cloth-bound book, 30 x 22 cm: the boards, two page blocks rising from the spine and curving down to the fore-edges, a sheet over each with seven grey bands of type | 496 | 496 |
+| `tool.phone` | a smartphone 7.2 x 14.8 cm, a rounded dark body, the glass and a lit screen, a camera bump | 288 | 288 |
+| `tool.mug` | a glazed mug 8 cm across with a blue band, its handle to the right, coffee and crema | 480 | 480 |
+| `tool.glass` | a tumbler 7 x 11 cm of an orange drink (seen through the glass), two ice cubes | 340 | 340 |
+| `tool.wineGlass` | a stemmed glass 19 cm high, red wine to the bowl's widest | 468 | 468 |
+| `tool.can` | a 330 ml can, red with a white band, its ends pressed in, a ring pull | 392 | 392 |
+| `tool.fork` | a polished dinner fork 20 cm long, 3 mm thick, an outline extruded: a handle widening to 1.5 cm at its end, four tines 2.6 cm across (chrome, to catch the light from the game camera) | 92 | 92 |
+| `tool.spoon` | a steel dessert spoon 17 cm long, an oval bowl | 124 | 124 |
+| `tool.chopsticks` | a pair of tapering wooden chopsticks 23 cm long | 24 | 24 |
+| `tool.coin` | a brass coin 2.3 cm across, a milled rim | 140 | 140 |
+| `tool.seedBag` | a small kraft bag of bird seed, its top rolled open over the seed | 116 | 116 |
+| `tool.dart` | a steel dart 15 cm long: a knurled barrel, a black shaft, three blue flights | 180 | 180 |
+| `tool.cue` | a pool cue 1.47 m (the pool table's was on its cloth): a wrapped butt, a joint, a tapering shaft, a ferrule and a chalked tip | 188 | 188 |
+| `tool.bat` | a ping-pong bat: a wooden blade 15 x 16 cm, red rubber over black, a flared handle (the ping-pong table's two were on its top) | 296 | 296 |
+| `tool.shaker` | the bar cart's cocktail shaker, 22 cm, chrome (the cart's own is hidden while it is in the hands) | 320 | 320 |
+| `tool.wateringCan` | a green plastic watering can, 5 litres: a round body, a hoop handle over it (held at its middle, 26 cm up), a spout to a rose 35 cm out | 336 | 336 |
+| `tool.secateurs` | bypass secateurs, 17.5 cm, closed: red grips, a steel blade over an iron anvil, the pivot bolt | 220 | 220 |
+| `tool.paintbrush` | an artist's brush, 25 cm: a lacquered wooden handle, a steel ferrule, bristles dipped in blue | 192 | 192 |
+| `tool.chalk` | a stick of white chalk, 8 cm, its tip worn down | 44 | 36 |
+| `tool.babyBottle` | a baby's bottle, 17 cm: a clear body two thirds full of milk, a blue screw ring, a teat | 380 | 380 |
+| `tool.postcard` | a postcard, 14.8 x 10.5 cm, a seaside view in bands | 48 | 48 |
+| `tool.basketball` | a basketball, 25 cm with its seams, orange leather and black seams (the hoops' own is hidden while it is in play: bounced, held, shot and back) | 672 | 672 |
+| `tool.pen` | a ballpoint, 14 cm: a navy barrel, a chrome cone and point, a clip | 124 | 124 |
+| `tool.pencil` | a yellow pencil, 17 cm, six-sided, sharpened: the bare wood cone and the lead | 60 | 60 |
+| `tool.marker` | a whiteboard marker, 15.5 cm with its cap on its back end: a white body, a blue cap and felt tip | 148 | 148 |
+| `tool.receiver` | the phone box's receiver, 21 cm: a black bar, the earpiece's and the mouthpiece's cups (drawn on the box's hook by code, `REST_PROPS`, and in the caller's hand) | 268 | 268 |
+| `tool.paddle` | the ice cream cart's flat wooden spoon, 9.5 cm (`EATEN_WITH.iceCreamCone`) | 28 | 28 |
+| `tool.knife` | a chef's knife 28 cm: a black riveted handle, a steel bolster, a blade curving up to its point, edge to the left | 156 | 156 |
+| `tool.woodenSpoon` | a wooden spoon 31 cm, held 10 cm from its end | 144 | 144 |
+| `tool.spatula` | a slotted turner 27 cm: a black grip, a steel shank bent down to a blade 8 x 10 cm with three slots | 280 | 280 |
+| `tool.whisk` | a balloon whisk 33 cm: a steel handle, four loops of wire 6 cm across | 464 | 464 |
+| `tool.biteSandwich` | half the sandwich (`item.sandwich`'s), its point to the front | 140 | 140 |
+| `tool.biteToast` | half a slice of the buttered toast | 156 | 156 |
+| `tool.bitePizza` | the pizza slice (`item.pizzaSlice`'s), held by its crust | 328 | 328 |
+| `tool.biteCookie` | a chocolate-chip cookie | 84 | 84 |
+| `tool.biteBurger` | the takeaway's sesame burger | 420 | 420 |
+| `tool.biteHotDog` | the hot dog out of its boat, along the depth | 532 | 532 |
+| `tool.biteCracker` | a cracker with a slice of cheese | 52 | 52 |
+| `tool.biteCroissant` | the bakery's croissant, lying | 100 | 100 |
+| `tool.biteCrisps` | three crisps, one on another | 96 | 96 |
 
 - **Detail pass** (2026-10-22): rebuilt with the forms (sweeps, lofts, outlines extruded) at the same sizes, centres,
   origins and draws: crusts, rims, handles, straws, beans and piped icing are sweeps (the rods-and-spheres crusts
@@ -170,3 +170,7 @@ sideways; the pan and the grill food, which stand off their middle, take their m
   pan's handle runs to the back as the old part's (whose crossbar was across, likely by mistake), 2 cm longer.
 - **The old `item.pizzaSlice`** was a three-sided cone stood on its edge, through the plate; it is now a flat wedge
   on the plate.
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `crisps`; the same triangles.
