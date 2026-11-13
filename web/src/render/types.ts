@@ -458,6 +458,8 @@ export interface Renderer {
   heightAt(x: number, z: number): number;
   /** Interpolated world position above Sim `index`'s head from the last update; false if unknown. */
   simHead(index: number, out: { x: number; y: number; z: number }): boolean;
+  /** The wind's gust over the ground at a town point now, 0 (calm) .. 1 (a strong gust), as the grass shows it rolling by: the wind in the leaves sounds by it. */
+  gust(x: number, z: number): number;
   /** Sim `index`'s stride while it is drawn walking, jogging or running (`SimStride`), for the footsteps' sound; false otherwise. */
   simStride(index: number, out: SimStride): boolean;
   /** The garden birds drawn about the viewed lot (render/shared/birds.ts), for the world's sound: kept and refilled, read it at once. */

@@ -23,6 +23,8 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { everySound, GUARD, STEPS, type Group } from '../../web/src/audio/catalog';
 import { loudness as loudnessAt } from '../../web/src/audio/loudness';
 import { fft, spaced, type Hearing } from '../../web/src/audio/offline';
+import { OUTDOORS } from '../../web/src/audio/outdoors';
+import { carSound, leavesLevel, nearness } from '../../web/src/audio/outside';
 import { ROOM_SIZES, ROOMS, roomResponse } from '../../web/src/audio/rooms';
 import { stepSamples, STEP_VERSIONS, SURFACES, type Footwear, type Surface } from '../../web/src/audio/steps';
 import { random } from '../../web/src/audio/water';
@@ -162,7 +164,7 @@ mkdirSync(OUT, { recursive: true });
 const rows: string[] = [];
 const heard: { name: string; group: Group; plays: string; loud: number }[] = [];
 console.log(`${sounds.length} sounds, ${RATE} Hz\n`);
-for (const { name, group, plays, level, note, heard: make } of sounds) {
+for (const { name, group, plays, level, note, who: by, heard: make } of sounds) {
   // As the game plays it: at its level, in the middle of the picture.
   const { left, right } = make(RATE);
   const { peak, rms } = level_(left, right);
@@ -171,7 +173,7 @@ for (const { name, group, plays, level, note, heard: make } of sounds) {
   const secs = left.length / RATE;
   writeFileSync(join(OUT, `${name}.wav`), wav(left, right));
   const used = group === 'things' ? (where.get(name) ?? []) : [];
-  const who = used.join(', ') || (name === 'knock' ? 'a visitor at the door' : WHO[group]) + (note ? ` (${note})` : '');
+  const who = used.join(', ') || (by ?? WHO[group]) + (note ? ` (${note})` : '');
   const shown = String(Number(level.toFixed(4)));
   rows.push(`| \`${name}\` | ${group} | ${num(secs, 2)} | ${plays} | ${shown} | ${num(peak)} | ${num(rms)} | ${num(loud)} | ${num(c, 0)} | ${who} |`);
   heard.push({ name, group, plays, loud });
@@ -245,6 +247,65 @@ for (const [surface, wear, cycle, gear, words] of [
   console.log(`${file.padEnd(30)} ${num(loud).padStart(6)} LUFS  centroid ${num(centroid(d, d), 0).padStart(6)} Hz  ${words}`);
 }
 
+/** A loop read at `at` samples (between its samples, round its end). */
+function read(loop: Float32Array, at: number): number {
+  const k = Math.floor(at);
+  const a = loop[k % loop.length];
+  return a + (loop[(k + 1) % loop.length] - a) * (at - k);
+}
+
+/**
+ * A car driving by at `speed` m/s on screen along a road `aside` m from where the camera looks (24 m out), left
+ * to right over `seconds`, as `outside.ts` plays it: its level by how near it is, its place by where it is.
+ */
+function carPass(speed: number, aside: number, seconds: number): [Float32Array, Float32Array] {
+  const engine = OUTDOORS.carEngine(RATE);
+  const tyres = OUTDOORS.carTyres(RATE);
+  const left = new Float32Array(Math.round(seconds * RATE));
+  const right = new Float32Array(left.length);
+  const s = carSound(speed, 1);
+  for (let i = 0, e = 0, t = 0; i < left.length; i++, e += s.engineRate, t += s.tyresRate) {
+    const along = speed * (i / RATE - seconds / 2);
+    const near = nearness(Math.hypot(aside, along), 24);
+    // (The picture is about 14 m to either side at that distance; off it, 0.8 of the way to that side.)
+    const pan = Math.max(-1, Math.min(1, along / 14)) * 0.8;
+    const v = (read(engine, e) * s.engine + read(tyres, t) * s.tyres) * near;
+    left[i] = v * Math.cos(((pan + 1) * Math.PI) / 4);
+    right[i] = v * Math.sin(((pan + 1) * Math.PI) / 4);
+  }
+  return [left, right];
+}
+
+/** The wind in the leaves for `seconds` as gusts roll by (the gust rising and falling every few seconds), from the game's own zoom, outdoors. */
+function windy(seconds: number): [Float32Array, Float32Array] {
+  const loop = OUTDOORS.leaves(RATE);
+  const left = new Float32Array(Math.round(seconds * RATE));
+  const right = new Float32Array(left.length);
+  for (let i = 0; i < left.length; i++) {
+    const t = i / RATE;
+    const gust = Math.max(0, Math.min(1, 0.5 + 0.45 * Math.sin(t * 0.9) + 0.25 * Math.sin(t * 0.37 + 1)));
+    const level = leavesLevel(gust, 24, 0);
+    left[i] = loop.left[i % loop.left.length] * level;
+    right[i] = loop.right[i % loop.right.length] * level;
+  }
+  return [left, right];
+}
+
+const outsideRows: string[] = [];
+console.log('\nthe street and the weather');
+for (const [file, [left, right], words] of [
+  ['car-pass-street.wav', carPass(30, 10, 6), 'a car driving by at a street\'s speed (30 m/s on screen), 10 m from where the camera looks, left to right'],
+  ['car-pass-slow.wav', carPass(8, 10, 10), 'a car driving by slowly (8 m/s on screen), 10 m from where the camera looks'],
+  ['car-pass-far.wav', carPass(30, 40, 6), 'the same car at a street\'s speed, 40 m off'],
+  ['wind-gusts.wav', windy(20), 'the wind in the leaves over 20 s of gusts'],
+] as [string, [Float32Array, Float32Array], string][]) {
+  const loud = loudnessAt(left, right, RATE);
+  const { peak } = level_(left, right);
+  writeFileSync(join(OUT, file), wav(left, right));
+  outsideRows.push(`| \`${file}\` | ${words} | ${num(loud)} | ${num(peak)} | ${num(centroid(left, right), 0)} |`);
+  console.log(`${file.padEnd(30)} ${num(loud).padStart(6)} LUFS  peak ${num(peak).padStart(6)}  centroid ${num(centroid(left, right), 0).padStart(6)} Hz  ${words}`);
+}
+
 writeFileSync(
   join(OUT, 'index.md'),
   [
@@ -287,6 +348,15 @@ writeFileSync(
     '| file | what | LUFS | centroid |',
     '|---|---|---|---|',
     ...walkRows,
+    '',
+    '## The street and the weather',
+    '',
+    'A car passing and the wind over a while, as `web/src/audio/outside.ts` plays them (the rows `car`, `town`',
+    'and `leaves` above are their loops at full level).',
+    '',
+    '| file | what | LUFS | peak | centroid |',
+    '|---|---|---|---|---|',
+    ...outsideRows,
     '',
     '"by its animation" means no content names the sound: it comes from the animation tag the use',
     'plays (`world.ts` \'s `ACTION_SOUNDS`), so it is heard wherever that animation is (an oven\'s fan',

@@ -60,7 +60,7 @@ describe('the mix', () => {
   // interface's blips in ranges of their own (`GUARD`; `bun run sounds` lists them). One far outside is a level
   // left off, or a sound made much louder or quieter than it was, without the mix having been looked at.
   test('as the game plays them, the sounds are within the mix', () => {
-    expect(listed.length).toBeGreaterThanOrEqual(80);
+    expect(listed.length).toBeGreaterThanOrEqual(83);
     for (const kind of Object.keys(MADE)) expect(kind in LOOPS || kind in ONCE_LEVEL).toBe(true);
     const off: string[] = [];
     for (const { name, group } of listed) {

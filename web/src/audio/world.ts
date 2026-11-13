@@ -2,6 +2,8 @@
  * Sounds of the world, synthesised like the interface sounds (no sound files):
  * - ambience by the game clock: a soft outdoor bed, crickets at night, and by day a few neighbourhood
  *   birds of different species, each with its own song, singing in bouts (most in the dawn chorus);
+ * - the street and the weather (`outside.ts`): the cars driving past, the town from above as the camera
+ *   zooms out, the wind in the leaves by the gusts the grass shows;
  * - things in use on the lot being looked at: a sizzling pan, a shower, a tap, washing up, a bath, the
  *   washing machine and the dryer, the dishwasher being loaded, a TV, music, drums, and the machines,
  *   games and tools of `things.ts` (a treadmill, a blender, darts, a cello...). One loop per kind of
@@ -37,10 +39,12 @@ import { Footsteps } from './footsteps';
 import { AMBIENCE, LOOPS, ONCE_KINDS, ONCE_LEVEL, type LoopKind, type OnceKind, type SoundKind } from './catalog';
 import { audioContext, bus, space, updateVolumes } from './mixer';
 import { MONO, type MonoKind } from './mono';
+import { Outside } from './outside';
 import type { RoomSize } from './rooms';
 import { Placed, type Place, type Space } from './space';
-import { MADE, type MadeKind } from './things';
-import { random, WATER, type Stereo } from './water';
+import { makeSound, type WorkerKind } from './made';
+import type { MadeKind } from './things';
+import { random, WATER } from './water';
 import type { SoundReply, SoundRequest } from './water.worker';
 
 const TICK_MS = 100;
@@ -127,6 +131,8 @@ interface Heard {
   radius: number;
   /** The footsteps (`Footsteps.heard`). */
   steps: ReturnType<Footsteps['heard']>;
+  /** The cars, the town and the wind (`Outside.heard`). */
+  outside: ReturnType<Outside['heard']>;
 }
 
 /** Something that sounds by itself (content `ambient`), where it stands (`row`: its z in the world's rows, its storey's). */
@@ -207,8 +213,9 @@ export class WorldSound {
   /** The world's objects' tiles, by their stable id. */
   private readonly tilesOf = new Map<number, Tiles>();
   /** What sounded on the last update (`playing`). */
-  private heard: Heard = { loops: {}, places: {}, once: [], radius: 0, steps: { steps: 0, walkers: 0, recent: [] } };
+  private heard: Heard = { loops: {}, places: {}, once: [], radius: 0, steps: { steps: 0, walkers: 0, recent: [] }, outside: { cars: [], driving: 0, town: 0, leaves: 0, gust: 0 } };
   private readonly steps: Footsteps;
+  private readonly outside: Outside;
   private readonly head = { x: 0, y: 0, z: 0 };
   private readonly screen = { x: 0, y: 0 };
   private disposed = false;
@@ -221,6 +228,7 @@ export class WorldSound {
     private readonly content: Content,
   ) {
     this.steps = new Footsteps(renderer, content);
+    this.outside = new Outside(renderer, this.made);
   }
 
   /** The world's objects, and the lot in view (`view`; null: none): the ones there that sound by themselves. */
@@ -287,6 +295,8 @@ export class WorldSound {
     fadeTo(this.bed.gain, quiet ? 0 : AMBIENCE.bed.night + AMBIENCE.bed.day * day, t);
     fadeTo(this.crickets.gain, quiet ? 0 : AMBIENCE.crickets * night, t);
     this.birds.update(ac, out, now, hour, quiet, this.renderer);
+    // The street and the weather: the cars passing, the town from above, the wind in the leaves.
+    this.outside.update(ac, out, around, frame, t, { quiet, still: game.speed === 0 || game.townOpen, day });
 
     // Things in use on the lot in view, and knocks at the door.
     const k = layout.sim;
@@ -377,6 +387,7 @@ export class WorldSound {
       once: [...this.heard.once.filter((s) => now - s.at < 10_000), ...once],
       radius: acoustics.radius,
       steps: this.steps.heard(),
+      outside: this.outside.heard(),
     };
     // The residents' feet (none while the town is shown instead of the lot).
     this.steps.update(ac, around, frame, t, quiet || paused || game.townOpen);
@@ -417,6 +428,7 @@ export class WorldSound {
     if (!ac) return;
     this.hushed = true;
     for (const loop of [...this.loops.values(), this.bed, this.crickets]) if (loop) fadeTo(loop.gain, 0, ac.currentTime);
+    this.outside.hush(ac.currentTime);
     this.birds.hush(ac.currentTime);
   }
 
@@ -435,6 +447,7 @@ export class WorldSound {
     }
     this.loops.clear();
     this.steps.dispose();
+    this.outside.dispose();
     this.birds.dispose();
     this.made.dispose();
   }
@@ -473,25 +486,25 @@ export class WorldSound {
 
 /**
  * Sounds that take a moment to make, made by a worker as audio buffers: the water sounds (the one
- * first wanted, then the rest one after another), the things' sounds and the birds' songs (each
- * when first wanted). Made on the spot if workers aren't available.
+ * first wanted, then the rest one after another), the things' and the outdoors' sounds and the birds'
+ * songs (each when first wanted). Made on the spot if workers aren't available.
  */
-class WorkerSounds {
+export class WorkerSounds {
   private worker: Worker | null = null;
   private rate = 0;
-  private readonly ready = new Map<MadeKind, AudioBuffer>();
+  private readonly ready = new Map<WorkerKind, AudioBuffer>();
   private waterAsked = false;
-  /** The things' sounds asked for. */
-  private readonly asked = new Set<MadeKind>();
+  /** The other sounds asked for. */
+  private readonly asked = new Set<WorkerKind>();
   /** Bird songs by `songKey`: made, or asked for (null). */
   private readonly songs = new Map<string, AudioBuffer | null>();
 
   /** The sound at the sample rate, or null while it's still being made. */
-  sound(kind: MadeKind, rate: number): AudioBuffer | null {
+  sound(kind: WorkerKind, rate: number): AudioBuffer | null {
     this.at(rate);
     let b = this.ready.get(kind);
     if (!b && !this.worker) {
-      b = stereoBuffer(MADE[kind](rate), rate);
+      b = soundBuffer(makeSound(kind, rate), rate);
       this.ready.set(kind, b);
     } else if (!b && kind in WATER && !this.waterAsked) {
       this.waterAsked = true;
@@ -542,7 +555,7 @@ class WorkerSounds {
       const r = e.data;
       if (r.rate !== this.rate) return;
       if ('bird' in r) this.songs.set(songKey(r.bird, r.version), monoBuffer(r.samples, r.rate));
-      else this.ready.set(r.kind, stereoBuffer(r, r.rate));
+      else this.ready.set(r.kind, r.right ? soundBuffer({ left: r.left, right: r.right }, r.rate) : monoBuffer(r.left, r.rate));
     };
     this.worker.onerror = () => this.dispose();
   }
@@ -550,7 +563,9 @@ class WorkerSounds {
 
 const songKey = (bird: Voice, version: number) => `${bird.seed}:${version}`;
 
-function stereoBuffer(s: Stereo, rate: number): AudioBuffer {
+/** A made sound as an audio buffer: two channels, or one. */
+function soundBuffer(s: { left: Float32Array; right: Float32Array } | Float32Array, rate: number): AudioBuffer {
+  if (s instanceof Float32Array) return monoBuffer(s, rate);
   const b = new AudioBuffer({ numberOfChannels: 2, length: s.left.length, sampleRate: rate });
   b.copyToChannel(s.left as Float32Array<ArrayBuffer>, 0);
   b.copyToChannel(s.right as Float32Array<ArrayBuffer>, 1);

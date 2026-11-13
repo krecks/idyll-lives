@@ -12,6 +12,7 @@
 import { songSamples, SPECIES } from './birdsong';
 import { BLIPS, blipSamples, type Blip } from './blips';
 import { MONO, ONCE_MONO, type MonoKind } from './mono';
+import { OUTDOORS } from './outdoors';
 import { FOOTWEAR, stepSamples, SURFACES, type Footwear, type Surface } from './steps';
 import { MADE, ONCE_THINGS, type MadeKind } from './things';
 import { ONCE, type Stereo } from './water';
@@ -109,6 +110,23 @@ export const STEPS = {
   farthest: 0.35,
 };
 
+/**
+ * The street and the weather (`outside.ts`, the loops of `outdoors.ts`).
+ * - `car`: a car driving past: its engine's and its tyres' level right by the middle of the picture at `full` m/s
+ *   on screen or more (a street's 32 km/h on the traffic's clock, four times as fast as real time: 35 m/s; stood at a light the engine idles at `idle` of that, the tyres are silent); how near it
+ *   counts as (`reach` of the camera's distance, `least` m at least: half the level that far from where the
+ *   camera looks, nothing under `drop` of it); and how many cars sound at once (`voices`: the nearest).
+ * - `town`: the town from above, at the full town view by day (`night` of it at night); nothing at the play
+ *   camera's distances.
+ * - `leaves`: the wind in the leaves and the grass at a full gust (`calm` of it between gusts), `indoors` of it
+ *   with the camera in on a room, `far` of it from the full town view.
+ */
+export const OUTSIDE = {
+  car: { engine: 0.2, tyres: 0.12, idle: 0.35, full: 30, reach: 0.9, least: 14, drop: 0.06, voices: 3 },
+  town: { level: 0.13, night: 0.6 },
+  leaves: { level: 0.045, calm: 0.15, indoors: 0.3, far: 0.5 },
+};
+
 /** The interface's sounds are quiet by design: the level of their bus (`mixer.ts`). */
 export const EFFECTS_LEVEL = 0.5;
 
@@ -138,6 +156,8 @@ export interface Listed {
   /** The level the game plays it at (a gain on the sound as made); `note` says where that varies. */
   level: number;
   note?: string;
+  /** Who sounds it, where no content names it and its group doesn't say. */
+  who?: string;
   /** What comes out in the middle of the picture at that level. */
   heard: (rate: number) => Stereo;
 }
@@ -165,16 +185,28 @@ export function everySound(): Listed[] {
     const heard = name in MONO ? (rate: number) => centred(MONO[name as MonoKind](rate), level) : (rate: number) => scaled(MADE[name as MadeKind](rate), level);
     list.push({ name, group: 'things', plays: once.has(name) ? 'once' : 'loop', level, heard });
   }
-  list.push({ name: 'knock', group: 'things', plays: 'once', level: AMBIENCE.knock, heard: (rate) => centred(MONO.knock(rate), AMBIENCE.knock) });
+  list.push({ name: 'knock', group: 'things', plays: 'once', level: AMBIENCE.knock, who: 'a visitor at the door', heard: (rate) => centred(MONO.knock(rate), AMBIENCE.knock) });
   for (const surface of SURFACES) {
     for (const wear of FOOTWEAR) {
       const level = STEPS.level[surface][wear];
       list.push({ name: `step-${surface}-${wear}`, group: 'steps', plays: 'once', level, note: 'one step at a walk, one walker', heard: (rate) => centred(stepSamples(surface, wear, 0, rate), level) });
     }
   }
+  const mix = (a: Float32Array, b: Float32Array) => a.map((v, i) => v + b[i]);
+  list.push({
+    name: 'car',
+    group: 'things',
+    plays: 'loop',
+    level: OUTSIDE.car.engine,
+    who: 'a car or the work taxi driving past',
+    note: `a car passing right by at speed: its engine, and its tyres at ${OUTSIDE.car.tyres}; the game plays both higher the faster it goes`,
+    heard: (rate) => centred(mix(OUTDOORS.carEngine(rate).map((v) => v * OUTSIDE.car.engine), OUTDOORS.carTyres(rate).map((v) => v * OUTSIDE.car.tyres)), 1),
+  });
   const day = AMBIENCE.bed.night + AMBIENCE.bed.day;
   list.push({ name: 'bed', group: 'ambience', plays: 'loop', level: day, note: `by day; ${AMBIENCE.bed.night} at night`, heard: (rate) => centred(MONO.bed(rate), day) });
   list.push({ name: 'crickets', group: 'ambience', plays: 'loop', level: AMBIENCE.crickets, note: 'at night', heard: (rate) => centred(MONO.crickets(rate), AMBIENCE.crickets) });
+  list.push({ name: 'town', group: 'ambience', plays: 'loop', level: OUTSIDE.town.level, note: `from the full town view by day; ${OUTSIDE.town.night} of it at night, nothing from the play camera`, heard: (rate) => scaled(OUTDOORS.town(rate), OUTSIDE.town.level) });
+  list.push({ name: 'leaves', group: 'ambience', plays: 'loop', level: OUTSIDE.leaves.level, note: `at a full gust; ${OUTSIDE.leaves.calm} of it between gusts`, heard: (rate) => scaled(OUTDOORS.leaves(rate), OUTSIDE.leaves.level) });
   SPECIES.forEach((sp, i) => {
     const level = AMBIENCE.birds * sp.level * FLOCK_NEAR;
     const voice = { species: sp.name, seed: i, pitch: (sp.pitch[0] + sp.pitch[1]) / 2, pace: 1, near: FLOCK_NEAR };

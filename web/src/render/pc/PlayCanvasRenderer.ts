@@ -48,7 +48,7 @@ import { buildModel, fileImported, importAhead, modelFilesSettled, onModelFileAr
 import { GameBirds } from './birds';
 import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming';
 import { steadyShaderKeys } from './shaderKeys';
-import { natureDecor, windStill } from './nature';
+import { natureDecor, windGust, windStill } from './nature';
 import { PETALS } from '../shared/nature';
 import { TownOverview, townLayer } from './overview';
 import { Placing } from './placing';
@@ -3332,6 +3332,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   simHead(index: number, out: { x: number; y: number; z: number }): boolean {
     return index < this.simCount && !!this.characters?.head(index, out);
+  }
+
+  gust(x: number, z: number): number {
+    return this.app ? windGust(this.app, x, z) : 0;
   }
 
   simStride(index: number, out: SimStride): boolean {

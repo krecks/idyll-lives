@@ -93,6 +93,11 @@ export class Acoustics {
     this.near = focus(this.radius);
   }
 
+  /** How far the camera is in on a room indoors (0..1): 0 looking at the garden or the street, or from the game's own zoom out. */
+  get inside(): number {
+    return this.viewRoom ? this.near : 0;
+  }
+
   /** The room at a tile point (the world's rows; 0: outdoors, or off the map). */
   roomAt(x: number, z: number): number {
     const m = this.map;
