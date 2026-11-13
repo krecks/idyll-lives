@@ -69,6 +69,10 @@ export const SOFT_LOOK: ShaderFeature = {
 	uniform vec3 game_hemiSky;
 	uniform vec3 game_hemiGround;
 	uniform vec3 game_hemiDir;
+	// The lamps' light off a room's walls and floor, at the room's full level (\`MaterialLibrary.setRoomBounce\`).
+	uniform vec3 game_roomBounce;
+	// The share of the sky's and the moon's light in the fragment's room (1 outdoors and by day; \`chunks.ts\`'s patches).
+	float gameRoomSky = 1.0;
 	vec3 gameAmbient = vec3(0.0);
 	// Contact shading's share of the light left where things meet (1: none; \`chunks.ts\`'s patch reads it).
 	float gameContact = 1.0;
@@ -163,6 +167,8 @@ export const SOFT_LOOK: ShaderFeature = {
 	uniform game_hemiSky: vec3f;
 	uniform game_hemiGround: vec3f;
 	uniform game_hemiDir: vec3f;
+	uniform game_roomBounce: vec3f;
+	var<private> gameRoomSky: f32 = 1.0;
 	var<private> gameAmbient: vec3f = vec3f(0.0);
 	var<private> gameContact: f32 = 1.0;
 	var<private> gameRoomRefl: bool = false;
