@@ -1,19 +1,24 @@
 # Checks every push to main and every pull request: clippy (the release gate) and the simulation's
-# tests, the ignored sample tests that need files made first, the residents' clip check, the
-# renderer's quick checks (the PlayCanvas internals it relies on, its tests) and the tools' tests.
+# tests, the residents' clip check, the renderer's quick checks (the PlayCanvas internals it relies
+# on, its tests) and the tools' tests. The generated houses and worlds (the ignored sample tests that
+# need files made first: 16 to 20 minutes, every world a Big one) run only on a release tag (`v*`)
+# and by hand from the Actions tab, so a pull request is checked in about 7 minutes; before a push,
+# `tools/ci-local.sh` still runs them all.
 # The heavy release work — the wasm builds, models, the other web checks and Pages deploy — stays in
 # pages.yml, run by hand or on a tag.
 #
 # Four jobs side by side, each its own runner and its own Rust cache: the generated worlds alone
 # take 12 to 18 minutes (every one a Big one), so one after another the checks took 25 to 40.
-# `test` waits for the four and passes only when all four did: the name the main branch's ruleset
-# requires.
+# `test` waits for the four and passes only when all four did (the generated worlds skipped counts
+# as passed where they don't run): the name the main branch's ruleset requires.
 name: CI
 
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -51,8 +56,10 @@ jobs:
       - name: Simulation tests
         run: tools/ci-local.sh sim
 
+  # Only on a release tag or by hand (see the top).
   generated:
     name: Generated houses and worlds
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-26.04
     timeout-minutes: 40
     steps:
@@ -138,7 +145,8 @@ jobs:
       - name: Models
         run: tools/ci-local.sh models
 
-  # The check the main branch's ruleset requires: all four passed (one skipped or cancelled fails it).
+  # The check the main branch's ruleset requires: all four passed (one skipped or cancelled fails it,
+  # but for the generated worlds where they don't run: a pull request, a push to main).
   test:
     name: test
     needs: [rust, generated, web, tools]
@@ -150,6 +158,10 @@ jobs:
         run: |
           echo "rust: ${{ needs.rust.result }}, generated: ${{ needs.generated.result }}, web: ${{ needs.web.result }}, tools: ${{ needs.tools.result }}"
           test "${{ needs.rust.result }}" = success
-          test "${{ needs.generated.result }}" = success
+          if [ "${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}" = true ]; then
+            test "${{ needs.generated.result }}" = success
+          else
+            test "${{ needs.generated.result }}" = skipped
+          fi
           test "${{ needs.web.result }}" = success
           test "${{ needs.tools.result }}" = success
