@@ -3,7 +3,7 @@
 
   /**
    * One entry of a menu over the scene (the title screen, the pause menu): dark glass, light text.
-   * `primary` is the one to press (white), `quiet` a smaller entry without an icon, `danger` red.
+   * `primary` is the one to press (white), `quiet` a smaller, lighter entry, `danger` red.
    */
   let {
     label,
@@ -28,7 +28,7 @@
 </script>
 
 <button class="item {variant}" {type} {disabled} {onclick}>
-  {#if icon && variant !== 'quiet'}<Icon name={icon} size={18} />{/if}
+  {#if icon}<Icon name={icon} size={18} />{/if}
   <span class="label">{label}</span>
   {#if badge !== undefined}<span class="badge">{badge}</span>{/if}
   {#if arrow}<span class="arrow" aria-hidden="true">→</span>{/if}
@@ -101,7 +101,7 @@
     height: 46px;
     font-size: 15px;
     font-weight: 550;
-    color: rgba(246, 242, 234, 0.74);
+    color: rgba(246, 242, 234, 0.8);
   }
   .danger {
     color: #ff9d8f;

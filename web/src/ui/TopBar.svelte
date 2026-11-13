@@ -5,6 +5,7 @@
   import { MoneyFloats, moneyChange } from './moneyFloats.svelte';
   import { services } from './services';
   import { game, nextWallMode } from './state.svelte';
+  import { dayBar } from './town/dayBar';
 
   const speeds = [
     { value: 0, icon: 'icon.ui.pause', label: 'Pause (Space)' },
@@ -40,6 +41,13 @@
   const still = $derived(settings.reducedMotion || systemMotion.reduced);
   $effect(() => floats.note(game.funds, game.mode === 'live' && !game.creative));
 
+  /** The day from sunrise to sunset, under the clock and the speeds (`town/dayBar.ts`). */
+  const day = $derived(dayBar(game.minute));
+  const speedLabel = $derived(game.mode !== 'live' ? 'Paused' : (speeds.find((s) => s.value === game.speed)?.label.replace(/ \(.*\)$/, '') ?? ''));
+  const dayTitle = $derived(
+    `${day.day ? 'Day' : 'Night'} · sunrise ${clock(day.sunrise, settings.clock24h)}, sunset ${clock(day.sunset, settings.clock24h)} · ${speedLabel}`,
+  );
+
   function storeyLabel(storey: number): string {
     if (storey < 0) return 'Basement';
     if (storey === 0) return 'Ground';
@@ -60,8 +68,11 @@
     </div>
   </div>
 
-  <div class="zone glass">
-    <div class="time">
+  <div class="zone glass clockzone">
+    <div class="daybar" class:night={!day.day} class:still={game.mode !== 'live' || game.speed === 0} title={dayTitle} aria-hidden="true">
+      <span class="fill" style:width="{day.share * 100}%"></span>
+    </div>
+    <div class="time" title={dayTitle}>
       <span class="day tabular">{WEEKDAYS[game.weekday]} · Day {game.day}</span>
       <span class="clock tabular">{clock(game.minute, settings.clock24h)}</span>
     </div>
@@ -163,6 +174,33 @@
   }
   .right {
     justify-self: end;
+  }
+  /* The day bar: sunrise (left) to sunset (right) along the clock's island, its fill the day gone by; paused, it greys. */
+  .clockzone {
+    position: relative;
+  }
+  .daybar {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 3px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--hairline);
+    overflow: hidden;
+  }
+  .daybar .fill {
+    display: block;
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #f2b366, #f0c94a 50%, #f2a15a);
+    transition: width var(--slow) linear;
+  }
+  .daybar.night .fill {
+    background: rgba(91, 124, 250, 0.35);
+  }
+  .daybar.still .fill {
+    filter: grayscale(0.7);
   }
   .brand {
     max-width: 150px;

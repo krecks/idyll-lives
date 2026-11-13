@@ -25,7 +25,7 @@ describe('town rides', async () => {
   const { Content } = await import('../src/content/content');
   const { objectInfos } = await import('../src/game/housegen');
   const { AssetRegistry } = await import('../src/assets/registry');
-  const { DRIVEWAY_MIN_WIDTH, generateWorld, layoutTown, populate, useTownContent } = await import('../src/game/town');
+  const { DRIVEWAY_MIN_WIDTH, generateWorld, houseTemplate, layoutTown, onLot, populate, turnOnto, useTownContent } = await import('../src/game/town');
   const { BIKES, RIDES } = await import('../src/game/townRides');
   const { frontTile } = await import('../src/game/surfaces');
   type Templates = import('../src/game/town').Templates;
@@ -94,7 +94,10 @@ describe('town rides', async () => {
         const H = Math.round(plot.d);
         const at = (x: number, z: number) => (z - plot.z) * W + (x - plot.x);
         const onPlot = (x: number, z: number) => x >= plot.x && z >= plot.z && x < plot.x + W && z < plot.z + H;
-        const walls = layout.walls.filter(([x0, z0, x1, z1]) => Math.max(z0, z1) <= D && inside(plot, x0, z0) && inside(plot, x1, z1));
+        // (Its own house's: a terraced house's neighbour has a wall on the line between their lots.)
+        const s = town.slots[slot];
+        const h = houseTemplate(t, s.template);
+        const walls = h ? onLot(t, h, s, (def) => content.object(def)?.footprint ?? [1, 1]).walls.map((w) => turnOnto(t, s).wall(w)) : layout.walls.filter(([x0, z0, x1, z1]) => Math.max(z0, z1) <= D && inside(plot, x0, z0) && inside(plot, x1, z1));
         const box = walls.length ? [Math.min(...walls.flatMap((w) => [w[0], w[2]])), Math.min(...walls.flatMap((w) => [w[1], w[3]])), Math.max(...walls.flatMap((w) => [w[0], w[2]])), Math.max(...walls.flatMap((w) => [w[1], w[3]]))] : null;
         const blocked = new Uint8Array(W * H);
         for (let z = plot.z; z < plot.z + H; z++) for (let x = plot.x; x < plot.x + W; x++) if (box && x >= box[0] && x < box[2] && z >= box[1] && z < box[3]) blocked[at(x, z)] = 1;

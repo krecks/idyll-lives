@@ -27,7 +27,7 @@ import { LIFT, rollWheels, Vehicles } from './vehicles';
 import type { FrameState } from '../../core/bridge';
 import type { Seat } from '../shared/characters/seats';
 import type { WorldStructure } from '../../core/protocol';
-import { CARS, CAR_PAINT, carDoor, carriedAlong, carRowIsTaxi, DOORS, inCar, paintCar, paintDoor, paintTaxi, paintTaxiDoor, TAXI_BODY, wheelAt, type CarBody, type CarPose } from '../shared/cars';
+import { CARS, CAR_PAINT, TAXI_PAINT, carDoor, carriedAlong, carRowIsTaxi, DOORS, inCar, paintCar, paintDoor, paintTaxi, paintTaxiDoor, TAXI_BODY, wheelAt, type CarBody, type CarPose } from '../shared/cars';
 import { lerpAngle } from '../shared/characters/rig';
 import { DOOR_SWING, ease } from '../shared/doors';
 import { Geo } from '../shared/geometry';
@@ -208,6 +208,14 @@ export class Cars extends Vehicles {
   override setView(chunks: ReadonlySet<number> | null, x: number, z: number): void {
     super.setView(chunks, x, z);
     this.restateAll();
+  }
+
+  /**
+   * Each car in town the near drawing leaves out (outside the chunks streamed in, or far off): where it is this frame,
+   * which way it faces (rad, 0 along +z), its paint (sRGB) and whether it drives; for the town view's movers (`townView.ts`).
+   */
+  forEachFar(fn: (x: number, z: number, yaw: number, paint: string, taxi: boolean, driving: boolean) => void): void {
+    for (const c of this.cars) if (c.at.shown && !c.drawn) fn(c.at.x, c.at.z, c.at.yaw, c.taxi ? TAXI_PAINT : CAR_PAINT[c.paint % CAR_PAINT.length], c.taxi, c.at.shown === 2);
   }
 
   /** The seat of a car at (x, z) where it's drawn (someone sat in it, parked or driving), else null: for `Residents.setCarSeat`. */

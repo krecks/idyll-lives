@@ -1,0 +1,145 @@
+{
+  "pins": [
+    {
+      "name": "contract",
+      "file": "docs/design/living-town.md",
+      "sha256": "c6d2213d06b034a696ba2f73cc33079b1e5a7059318c3e6b67c78ee0ba2ad79b",
+      "by": "integrator",
+      "reason": "blind review 1 of the town view: the household's own tags come in with the town view itself (the rest still from about 0.2), and the home has a tag of its own while nobody is in: the reviewers found nothing marking the family or its home from 150 m"
+    },
+    {
+      "name": "living-town-meta",
+      "file": "web/src/core/protocol.ts",
+      "sha256": "d8846c0cdf9d189ab9e01bd57e1edada9b1233f1b6ba70bcfcabb3fdff0fc35e",
+      "by": "setup",
+      "reason": "the contract's WorldMeta fields",
+      "region": "living-town-meta"
+    },
+    {
+      "name": "living-town-types",
+      "file": "web/src/core/protocol.ts",
+      "sha256": "e7d2b544064f4d25e7af778f7284c9768b169096b9a69fa457199cff66c08db3",
+      "by": "integrator",
+      "reason": "the footprint's winding and the ridge's angle said exactly (counter-clockwise seen from above; a turn round +y, the ridge along (cos r, -sin r) in x, z): worldgen and render had read the ridge opposite ways, and worldgen's reading is the one written down",
+      "region": "living-town-types"
+    },
+    {
+      "name": "look",
+      "file": "web/src/render/look.ts",
+      "sha256": "6eff356119da0209a3521dd2d688c646905e51190bd3127557980757baee5431",
+      "by": "setup",
+      "reason": "setup: accepted before the living-town run (look jump, 0.8.0)"
+    },
+    {
+      "name": "LAWN_MAP",
+      "file": "web/src/render/shared/lawn.ts",
+      "sha256": "c0d1842923ec71b6fdd4fd9e4da0475294d50ec910845765308ab80f839eaf04",
+      "by": "setup",
+      "reason": "setup: accepted before the living-town run (look jump)",
+      "const": "LAWN_MAP"
+    },
+    {
+      "name": "GROUND_SHADE",
+      "file": "web/src/render/shared/groundShade.ts",
+      "sha256": "7fe93657efcc6baa086e7f171aaf1f826bcaa5741e46767e4f94c659ae5ff455",
+      "by": "setup",
+      "reason": "setup: accepted before the living-town run (look jump)",
+      "const": "GROUND_SHADE"
+    },
+    {
+      "name": "HOUSE_LOOK",
+      "file": "web/src/render/shared/house.ts",
+      "sha256": "bbf04ae2140d550a3c8f7eafddd4cd75ed5a1c004055b687c19f79b8c6a9ff48",
+      "by": "setup",
+      "reason": "setup: accepted before the living-town run (look jump)",
+      "const": "HOUSE_LOOK"
+    },
+    {
+      "name": "STREET_LOOK",
+      "file": "web/src/render/shared/paving.ts",
+      "sha256": "d38912e074492c9bf7567640dc446c61e25eeefa3497c728d5c6a43bbefae91b",
+      "by": "setup",
+      "reason": "setup: accepted before the living-town run (look jump)",
+      "const": "STREET_LOOK"
+    },
+    {
+      "name": "sim-ai",
+      "file": "crates/sim-core/src/ai.rs",
+      "sha256": "671a8f1d1ffa8785214c88de8737cfedd1fe3e294352ada62518f10afe2f9c7d",
+      "by": "setup",
+      "reason": "household behaviour: not this run's to change"
+    },
+    {
+      "name": "sim-cooking",
+      "file": "crates/sim-core/src/cooking.rs",
+      "sha256": "97698d6a9795c5a31a5b30f91da69aeccc016cc9ee37917dcf50e0d5729f0783",
+      "by": "setup",
+      "reason": "household behaviour: not this run's to change"
+    },
+    {
+      "name": "sim-social",
+      "file": "crates/sim-core/src/social.rs",
+      "sha256": "e6f7a26273e6060bd87cbfad481065b8aa3fc159fa6eab5f063d7b081a9e2f75",
+      "by": "setup",
+      "reason": "household behaviour: not this run's to change"
+    },
+    {
+      "name": "sim-partners",
+      "file": "crates/sim-core/src/partners.rs",
+      "sha256": "e4c902b361be3def539ed244d042956ffa95cbedb096fb64738cd84eb9a4e368",
+      "by": "setup",
+      "reason": "household behaviour: not this run's to change"
+    },
+    {
+      "name": "sim-planner",
+      "file": "crates/sim-core/src/planner.rs",
+      "sha256": "42601b843ee9b66052a94abd7ff6d3e791bfef20b7aa631b41f8c12017b41f87",
+      "by": "setup",
+      "reason": "household behaviour: not this run's to change"
+    },
+    {
+      "name": "sim-lifecycle",
+      "file": "crates/sim-core/src/lifecycle.rs",
+      "sha256": "c318bb806ca8613dca2398582bf4eb89d79083f26a3f371bff132c0cb754eff0",
+      "by": "setup",
+      "reason": "household behaviour: not this run's to change"
+    },
+    {
+      "name": "sim-hosting",
+      "file": "crates/sim-core/src/hosting.rs",
+      "sha256": "a050370cca378063c5ac4fb584bf2a5a381d5ecd2b2363744e49c4dd76fa9e5f",
+      "by": "setup",
+      "reason": "household behaviour: not this run's to change"
+    },
+    {
+      "name": "sim-carry",
+      "file": "crates/sim-core/src/carry.rs",
+      "sha256": "e87b4e45314f19f3d183c170a38207d0434e80a027369aec80feeb33c609507c",
+      "by": "setup",
+      "reason": "household behaviour: not this run's to change"
+    },
+    {
+      "name": "sim-privacy",
+      "file": "crates/sim-core/src/privacy.rs",
+      "sha256": "74837017377b4c3770fe178fb79f0ed781c6b3a237f2e603f8630dc61954ce2e",
+      "by": "setup",
+      "reason": "household behaviour: not this run's to change"
+    },
+    {
+      "name": "living-town-lens",
+      "file": "web/src/render/shared/lens.ts",
+      "sha256": "e5db8420c1acfd243a94f32ee6f1e019ba48a47f02e35a0f8ddfd04625ddbcb6",
+      "by": "setup",
+      "reason": "the contract's town view constants",
+      "region": "living-town-lens"
+    },
+    {
+      "name": "living-town-view",
+      "file": "web/src/render/shared/townView.ts",
+      "sha256": "6dd57fd75dbe29b294a1dcf1a8f4efdc905fa1a1b487ac158744ea00f32cd0fd",
+      "by": "setup",
+      "reason": "the contract's shared town view state",
+      "region": "living-town-view"
+    }
+  ]
+}

@@ -23,6 +23,10 @@ import { shareAt, ZoneField } from './zones';
  */
 export const RING = 150;
 const WORLD_RING = 260;
+/** How far (m) `world`'s landscape reaches past its land's edge (the layout's own ring, known before one is made). */
+export function landscapeRing(world: { meta?: { world?: unknown } | null }): number {
+  return world.meta?.world ? WORLD_RING : RING;
+}
 /** Flat apron around the town before the hills start. */
 export const APRON = 6;
 /** A big world's distance-from-built grid (m a cell; `distanceToTown`). */
@@ -371,7 +375,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.w = world.width;
     this.d = groundDepth(world);
     this.land = { ...DEFAULT_LANDSCAPE, ...world.meta?.world?.landscape };
-    this.ring = world.meta?.world ? WORLD_RING : RING;
+    this.ring = landscapeRing(world);
     this.built = world.meta?.world?.size === 'big' ? LandscapeLayout.builtField(world, this.w, this.d) : null;
     this.zones = this.built && world.meta?.zones?.length ? new ZoneField(world.meta.zones, this.w, this.d) : null;
     this.orchards = this.zones ? (world.meta?.zones ?? []).filter((z) => z.kind === 'orchard') : [];
@@ -404,7 +408,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   static key(world: WorldStructure): string {
     const look = world.meta?.world;
     const streets = [...(world.meta?.streets ?? []).map((s) => `${s.z}`), ...(world.meta?.roads ?? []).map((r) => `${r.points[0]}:${r.points.length}`)].join(',');
-    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${JSON.stringify(look.landscape)}` : ''}`;
+    // (A backdrop is built land too, `builtField`: a town with one has a landscape of its own.)
+    const backdrop = world.meta?.backdrop?.length ? `:b${world.meta.backdrop.length}` : '';
+    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${JSON.stringify(look.landscape)}` : ''}${backdrop}`;
   }
 
   /**
@@ -459,6 +465,12 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       }
     };
     for (const p of world.plots) mark(p.x, p.z, p.x + p.w, p.z + p.d);
+    // (The living town's backdrop buildings too, and a metre round them: no tree grows in one.)
+    for (const b of world.meta?.backdrop ?? []) {
+      const xs = b.poly.map((q) => q[0]);
+      const zs = b.poly.map((q) => q[1]);
+      mark(Math.min(...xs) - 1, Math.min(...zs) - 1, Math.max(...xs) + 1, Math.max(...zs) + 1);
+    }
     for (const r of world.meta?.roads ?? []) {
       const half = r.width / 2 + 2;
       for (let i = 0; i + 1 < r.points.length; i++) {
@@ -691,6 +703,38 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const edge = Math.min(u - cu, cu + 1 - u, v - cv, cv + 1 - v) * f.size * 0.7;
     // (A hedgerow along the patchwork's lines, and along a big world's field zones' edges.)
     return { kind: kind / 0.82, v: (v - cv) * f.size * 0.7, weight, hedge: edge < 1.6 || (!!zones && Math.abs(inside) < 1.2) };
+  }
+
+  /**
+   * A big world's farmland for the town view's colour map (`pc/groundTiles.ts`), as the terrain colours it
+   * (`terrainColour`, `fieldCell`): the patchwork's grid (cells `size` m along the direction `angle` and `across` m
+   * across it), each cell's colour (`crop`: sRGB into `out`, its furrows' share of it evened out; false for a cell
+   * left as meadow), and how strongly the fields show at a point (`weight`, 0..1: nothing off the field zones or
+   * by the town). Null: no farmland. The ground's own colours are a vertex apart, so from above a field's edge
+   * steps along the grid; the map draws each where it is.
+   */
+  farmland(): { size: number; across: number; angle: number; crop(cu: number, cv: number, out: Rgb): boolean; weight(x: number, z: number): number } | null {
+    const zones = this.zones;
+    if (!zones?.has('fields')) return null;
+    const f = this.land.fields ?? { size: 34, angle: hash(3, 5, this.seed) * Math.PI };
+    const P = (this.palette ??= terrainPalette(this.land.grass));
+    return {
+      size: f.size,
+      across: f.size * 0.7,
+      angle: f.angle,
+      crop: (cu, cv, out) => {
+        const kind = hash(cu, cv, this.seed + 77);
+        if (kind > 0.82) return false;
+        const crop = P.crops[Math.min(P.crops.length - 1, Math.floor((kind / 0.82) * P.crops.length))];
+        // (The furrows' sine over a field, on average: 0.35 × 1/π.)
+        lerp(crop, P.furrow, crop !== P.crops[0] ? 0.11 : 0, out);
+        return true;
+      },
+      weight: (x, z) => {
+        const dist = this.distanceToTown(x, z);
+        return dist < APRON + 3 ? 0 : shareAt(zones.edge('fields', x, z), 4) * smoothstep(APRON + 3, APRON + 6, dist) * 0.9;
+      },
+    };
   }
 
   /**

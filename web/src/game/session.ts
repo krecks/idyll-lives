@@ -26,6 +26,7 @@ import { createSimPreviews } from '../render/preview';
 import { createItemPreviews } from '../render/preview/items';
 import type { CameraPose, Renderer, WallMode } from '../render/types';
 import { carRowIsTaxi } from '../render/shared/cars';
+import { townView, type TownGoTo } from '../render/shared/townView';
 import { settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
 import { prefetchCatalog, services, type GameControls } from '../ui/services';
@@ -412,7 +413,9 @@ async function openSession(
     !game.jobBoardOpen &&
     !game.plannerOpen &&
     viewPlot !== null &&
-    viewPlot === homePlot();
+    viewPlot === homePlot() &&
+    // (Not from the town view: the player zoomed out to look at the town, and the director's shots are the household's.)
+    townView.blend === 0;
   function startWatching(now: number) {
     if (!world) return;
     playerWalls = game.wallMode;
@@ -1409,7 +1412,29 @@ async function openSession(
       const t = renderer.cameraPose().target;
       return [t[0], t[2]];
     },
+    spot(id, out) {
+      if (!renderer.simSpot(id, out)) return false;
+      out.y = renderer.heightAt(out.x, out.z);
+      return true;
+    },
+    ground: (x, z) => renderer.heightAt(x, z),
   };
+  // A town tag's click (docs/design/living-town.md, `townView.goTo`): the camera glides to the place, the player's
+  // again on the way (the director lets go, a follow ends). With `select`, the glide lands on that resident, and
+  // there they are looked at and followed as from the household strip (`inspect`, which selects one of the
+  // player's, then `follow`); in Build mode nobody is.
+  const goTo = (to: TownGoTo) => {
+    if (disposed) return;
+    takeBack();
+    if (game.follow !== null) controls.follow(null);
+    const who = game.mode === 'live' && to.select !== undefined && game.sims.some((s) => s.id === to.select) ? to.select : undefined;
+    renderer.glideTo(to.x, to.z, to.radius, who, () => {
+      if (disposed || who === undefined || game.mode !== 'live') return;
+      controls.inspect(who);
+      controls.follow(who);
+    });
+  };
+  townView.goTo = goTo;
   // The roaming camera settles on a lot: it is shown in full, the camera left where it is (in live
   // mode, not following anyone; build mode keeps the lot it builds on).
   renderer.onFocusLot((lot) => {
@@ -1987,6 +2012,7 @@ async function openSession(
       window.removeEventListener('pointermove', onMove);
       director.stop();
       clearTimeout(hudTimer);
+      if (townView.goTo === goTo) townView.goTo = null;
       renderer.setGameShot(null);
       renderer.followSim(null);
       services.previews.keep(false);

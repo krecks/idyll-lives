@@ -70,7 +70,7 @@ export class BubbleLayer {
   update(frame: FrameState): void {
     const { curr, layout } = frame;
     const k = layout.sim;
-    // (Every resident the snapshot holds: a big world's 160, not the 64 a town held once.)
+    // (Every resident the snapshot holds: a big world's 240, not the 64 a town held once.)
     const count = Math.min(curr[layout.header.simCount], layout.maxSims);
     const now = performance.now();
     for (const [id, s] of this.said) if (s.until < now) this.said.delete(id);

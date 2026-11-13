@@ -7,21 +7,21 @@
 # installed differs: another Bun can pass what CI's fails.
 #
 #   tools/ci-local.sh            every step, and `types` (about 20 minutes)
-#   tools/ci-local.sh --quick    fmt clippy sim clips web types
+#   tools/ci-local.sh --quick    pins fmt clippy sim clips web types
 #   tools/ci-local.sh web sim    those steps
 #   SEED_BASE=3 tools/ci-local.sh generated
 #                                the generated-world checks over other sample worlds (default 0:
 #                                CI's). The same seed base makes the same worlds, so a failure
 #                                replays; the release gate runs `generated` over five seed bases.
 #
-# Steps: fmt clippy sim generated clips web tools sizes uses models, and types (the web's types and
+# Steps: pins fmt clippy sim generated clips web tools sizes uses models, and types (the web's types and
 # lint over fresh wasm builds of the sim and the voice: not in CI's job, which builds no wasm, so run
 # only here).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-all=(fmt clippy sim generated clips web tools sizes uses models types)
-quick=(fmt clippy sim clips web types)
+all=(pins fmt clippy sim generated clips web tools sizes uses models types)
+quick=(pins fmt clippy sim clips web types)
 
 pinned=$(sed -nE 's/^ *bun-version: *([0-9.]+).*/\1/p' .github/workflows/ci.yml | head -1)
 [[ -n "$pinned" ]] || { echo "No bun-version in .github/workflows/ci.yml" >&2; exit 1; }
@@ -39,6 +39,8 @@ tools_cargo() { CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UN
 step() {
   printf '\n== %s\n' "$1"
   case "$1" in
+    # Accepted parts held by their sha256 (tools/pins/pins.json; docs/design/living-town.md, Pins).
+    pins) "${bun_ci[@]}" tools/pins/check.ts ;;
     fmt) cargo fmt --all --check ;;
     clippy) cargo clippy --workspace --all-targets --locked -- -D warnings ;;
     sim) cargo test -p sim-core --locked ;;

@@ -7,6 +7,7 @@
   "small": {"width": 24, "depth": 22},
   "medium": {"width": 30, "depth": 26},
   "large": {"width": 40, "depth": 30},
+  "terrace": {"width": 10, "depth": 24},
   "farm": {"width": 58, "depth": 46}
  },
  "houses": [

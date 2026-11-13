@@ -58,6 +58,8 @@ import { resizeKey, type ObjectBackgroundClips, type ObjectClipInfo, type Object
 
 /** Radius of the sky dome (m): inside the camera's far plane. */
 const SKY_RADIUS = 700;
+/** The dome's radius as a share of the far plane, once the town view moves the plane out (`skyReach`). */
+const SKY_FAR_SHARE = 0.97;
 
 /** The lot as the renderer has it now: the storey in view, where each storey's rows are, and what's in view. */
 export interface LotView {
@@ -458,6 +460,15 @@ export class LotContents {
     this.motion.setLamps(l.lamps);
     const level = Math.min(1, Math.max(0, (l.lamps - 0.35) / 0.5));
     if (level !== this.glowLight.level) this.applyGlow({ ...this.glowLight, level });
+  }
+
+  /**
+   * The sky's dome for a camera whose far plane the town view has moved out to `far` m, `blend` into the town view
+   * (`townBlend`): the play camera's own radius eased out to just inside the plane, so the land past 700 m, which
+   * the thinner haze shows from up there, isn't behind the sky.
+   */
+  skyReach(far: number, blend: number): void {
+    this.sky.reach(SKY_RADIUS + Math.max(0, far * SKY_FAR_SHARE - SKY_RADIUS) * blend);
   }
 
   /** How strongly the wind moves the plants (reduce motion: still), and whether the clouds drift. */

@@ -101,8 +101,12 @@ export interface PublicTemplate {
   entry?: [number, number];
 }
 
-/** `farm`: a large lot's house with fields and a farmyard (farm worlds only; not offered to resize to). */
-export type LotSize = 'small' | 'medium' | 'large' | 'farm';
+/**
+ * `farm`: a large lot's house with fields and a farmyard (farm worlds only; not offered to resize
+ * to). `terrace`: a narrow lot in a main town's terrace row or semi-detached pair, its house a
+ * terraced house (`housegen.ts` `HouseClass.row`, `LotPlacer.placeRow`).
+ */
+export type LotSize = 'small' | 'medium' | 'large' | 'farm' | 'terrace';
 export const LOT_SIZES: readonly LotSize[] = ['small', 'medium', 'large'];
 
 /** The lot size a lot's house is made for (a farmhouse is a large lot's house). */
@@ -228,6 +232,10 @@ export interface TownMeta {
   zones?: WorldMeta['zones'];
   pads?: WorldMeta['pads'];
   areas?: WorldMeta['areas'];
+  /** The living town (docs/design/living-town.md): the backdrop, the places and the main towns' centres. */
+  backdrop?: WorldMeta['backdrop'];
+  places?: WorldMeta['places'];
+  centre?: WorldMeta['centre'];
 }
 
 /** Open land round a town's lots (m). */
@@ -460,8 +468,17 @@ export function withGarden(t: Templates, town: NeighbourhoodDraft, slot: number,
   const at = fronting(old.facing, front, anchor, now.w, now.d);
   const ground = new Ground(town.width, town.depth, town.roads, town.greens);
   for (const s of town.slots) if (s.index !== slot) ground.take(plotRect(t, s));
+  // (Nor onto the backdrop, a metre round it, or a town centre's square.)
+  for (const b of town.open?.backdrop ?? []) ground.take(boundsOf(b.poly), 1);
+  for (const q of town.open?.squares ?? []) ground.take(boundsOf(q));
   if (!ground.free(at, 1)) return town;
   return { ...town, slots: town.slots.map((s) => (s.index === slot ? { ...s, x: at.x, z: at.z, template, garden, ...lotOf(h, s.lot ?? 'medium') } : s)) };
+}
+
+/** The tiles a polygon's bounding box covers (town tiles, whole ones). */
+export function boundsOf(poly: readonly Pt[]): Rect {
+  const [x0, z0] = [Math.floor(Math.min(...poly.map((p) => p[0]))), Math.floor(Math.min(...poly.map((p) => p[1])))];
+  return { x: x0, z: z0, w: Math.ceil(Math.max(...poly.map((p) => p[0]))) - x0, d: Math.ceil(Math.max(...poly.map((p) => p[1]))) - z0 };
 }
 
 /** Each set of roads' land (see `Ground`): the tiles they take alone, and with their greens. */
@@ -512,6 +529,16 @@ export class Ground {
   /** Takes the tiles set in `mask` (one per tile, row-major): water, say. */
   block(mask: Uint8Array): void {
     for (let i = 0; i < mask.length; i++) if (mask[i]) this.taken[i] = 1;
+  }
+
+  /** The tiles the roads take (one per tile, row-major: `roadMask`); not to be changed. */
+  roadTiles(): Readonly<Uint8Array> {
+    return this.roads;
+  }
+
+  /** A copy of what is taken (one per tile, row-major). */
+  mask(): Uint8Array {
+    return this.taken.slice();
   }
 
   /** Whether the tile under a point is taken. */
@@ -576,6 +603,9 @@ function fronting(facing: Facing, front: number, along: number, W: number, D: nu
   return { ...at, w: W, d: D };
 }
 
+/** Every lot of a row stands with the middle of its front this near its road's edge at most (m; `LotPlacer.placeRow`). */
+const ROW_SET_BACK = 8;
+
 /** A `snug` lot's front corners are at most this much further from its road than its middle (m; a twentieth of its width more). */
 const SNUG = 3;
 
@@ -589,12 +619,16 @@ export function withLot(town: NeighbourhoodDraft, slot: number, template: string
 }
 
 /**
- * Residents the neighbours number at most (docs/design/open-world.md: the sim holds 160 Sims in
+ * Residents the neighbours number at most (docs/design/open-world.md: the sim holds 240 Sims in
  * a big world; room left for the player's household and babies).
  */
-export const NEIGHBOUR_CAP = 140;
+export const NEIGHBOUR_CAP = 220;
 
-/** Neighbours a big world starts with when nobody asks for a number (docs/design/open-world.md: ~120 residents). */
+/**
+ * Neighbours a big world starts with when nobody asks for a number (docs/design/open-world.md: ~120
+ * residents; the rest of its homes are for sale, and newcomers fill the town from there). Tried at 168
+ * in the living-town run and put back: with ~170 from the first morning, a sample world's centre jammed.
+ */
 const BIG_START = 118;
 
 /** Time spent generating houses (ms), for the sample tool's budgets: the layout's own time is the rest. */
@@ -780,6 +814,56 @@ export class LotPlacer {
       else this.dropped.push({ name: u.name, kind: u.kind, lot: u.lot });
     }
     return left;
+  }
+
+  /**
+   * A row of houses side by side (a terrace, or a semi-detached pair: `units`, terrace lots each
+   * a house's width and `ROW_GAP` wide), along the first of `frontage` (nearest the middle first)
+   * where the whole row fits as one lot (`lotAt`, `snug`): each lot as deep as the deepest, their
+   * fronts in line, every house `ROW_GAP` from the next (each lot's gap on the same side, as they
+   * all face the same way). The land round the row is taken a metre more, so nothing else comes
+   * up against the house at its end, whose wall is on the row's edge. The lots placed (none if it
+   * fits nowhere).
+   */
+  placeRow(units: readonly Unplaced[], frontage: readonly Frontage[], area?: number): PlotSlot[] {
+    const { t, ground, roads } = this;
+    const widths = units.map((u) => slotDims(t, u).width);
+    const depth = Math.max(...units.map((u) => slotDims(t, u).depth));
+    const total = widths.reduce((a, b) => a + b, 0);
+    for (const f of frontage) {
+      const at = lotAt(ground, roads[f.road], f, total, depth, this.snug);
+      if (!at) continue;
+      const row = plotRect(t, { lot: 'terrace', w: total, d: depth, ...at });
+      // Each lot's rectangle, the middle of its front and where along the road that is.
+      const lots: { x: number; z: number; rect: Rect; mid: Pt; s: number }[] = [];
+      let along = 0;
+      for (const [k, u] of units.entries()) {
+        const w = widths[k];
+        // (Lot x runs along town x facing 0, against it facing 2; along -z facing 1, along z facing 3.)
+        const from = at.facing === 0 || at.facing === 3 ? along : total - along - w;
+        const x = at.facing % 2 ? row.x : row.x + from;
+        const z = at.facing % 2 ? row.z + from : row.z;
+        const rect = plotRect(t, { ...u, d: depth, x, z, facing: at.facing });
+        const mid: Pt = at.facing % 2 ? [at.facing === 1 ? rect.x : rect.x + rect.w, rect.z + rect.d / 2] : [rect.x + rect.w / 2, at.facing === 0 ? rect.z : rect.z + rect.d];
+        const on = nearest(roads[f.road].points, mid[0], mid[1]);
+        // (Every one by the road: on a bend the row's ends stand back from it.)
+        if (on.dist - roads[f.road].width / 2 > ROW_SET_BACK) break;
+        lots.push({ x, z, rect, mid, s: on.s });
+        along += w;
+      }
+      if (lots.length < units.length) continue;
+      const out = units.map((u, k): PlotSlot => {
+        const { x, z, rect, mid, s } = lots[k];
+        const slot: PlotSlot = { ...u, ...(area === undefined ? {} : { area }), d: depth, index: this.slots.length, x, z, facing: at.facing, anchor: at.facing % 2 ? rect.z + rect.d / 2 : rect.x + rect.w / 2 };
+        this.slots.push(slot);
+        this.placed.set(slot, { ...f, s, p: mid });
+        ground.take(rect);
+        return slot;
+      });
+      ground.take(row, 1);
+      return out;
+    }
+    return [];
   }
 
   /**
@@ -1571,6 +1655,6 @@ function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'],
     areas,
     exits,
     file: { terrain: { water: open.water }, parking: open.parking, drives: filed, cars: parked },
-    meta: { zones: open.zones, pads: open.pads, areas },
+    meta: { zones: open.zones, pads: open.pads, areas, ...(open.backdrop ? { backdrop: open.backdrop } : {}), ...(open.places ? { places: open.places } : {}), ...(open.centre ? { centre: open.centre } : {}) },
   };
 }

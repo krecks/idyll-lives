@@ -23,6 +23,8 @@
  * squares with nothing in them, every quarter of it with an area or homes out in the country),
  * every road named (no two alike), the file under 4 MB, and the time a big world takes (its
  * layout without generating houses, and assembling its file: a problem at twice the budget).
+ * And the living town's backdrop, centre and places (`livingProblems`: docs/design/living-town.md).
+ * Each world's line counts its terraced houses, backdrop buildings and places.
  *
  * The same arguments make the same files, byte for byte (`Math.random` seeded per world:
  * web/tests/sampleWorlds.test.ts), so a world a check fails on can be made again and run alone.
@@ -36,7 +38,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { HouseGenConfig } from '../../web/src/game/housegen.ts';
 import type { Facing, Templates } from '../../web/src/game/town.ts';
-import type { RoadPlan } from '../../web/src/core/protocol.ts';
+import type { BackdropBuilding, RoadPlan, TownPlace } from '../../web/src/core/protocol.ts';
 
 // The loaders fetch from the page's address: here, files under web/public.
 const root = new URL('../../web/public/', import.meta.url);
@@ -58,6 +60,8 @@ const { homePrice } = await import('../../web/src/game/price.ts');
 const { savingsOf } = await import('../../web/src/game/wealth.ts');
 const { COURT, lengths, nearest, pointAt, roadMask, sharpestTurn, sideBySide } = await import('../../web/src/game/roads.ts');
 const { mulberry32 } = await import('../../web/src/game/noise.ts');
+const { centreDensity, facesRoad, fillPoly, HAMLET_LEAST, LOT_CLEAR, MAIN_LEAST, overlaps, signedArea2 } = await import('../../web/src/game/backdrop.ts');
+const { RoadIndex, inside } = await import('../../web/src/game/roads.ts');
 
 type Rect = { x: number; z: number; w: number; d: number };
 type Pt = [number, number];
@@ -74,7 +78,16 @@ type TownFile = {
   roads?: Road[];
   areas?: { name: string; x: number; z: number; w: number; d: number }[];
   terrain?: { water?: number[] };
-  meta: { roads?: Road[]; facing?: number[]; zones?: { kind: string; poly: Pt[] }[] };
+  meta: {
+    roads?: Road[];
+    facing?: number[];
+    zones?: { kind: string; poly: Pt[] }[];
+    greens?: Pt[][];
+    backdrop?: BackdropBuilding[];
+    places?: TownPlace[];
+    centre?: { area: number; poly: Pt[] }[];
+  };
+  parking?: { x: number; z: number; rot: number; area: number }[];
 };
 const exitAt = (e: Exit): Pt => (Array.isArray(e) ? e : [e.x, e.z]);
 /** How far a point is from a rectangle (0 inside it). */
@@ -279,6 +292,132 @@ function openProblems(town: TownFile): string[] {
   return out;
 }
 
+/** What a backdrop building may be, and its roofs; the places' kinds. */
+const USES = ['flats', 'terrace', 'house', 'shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'hall', 'workshop', 'farm', 'barn'];
+const ROOFS = ['gable', 'hip', 'flat', 'mansard'];
+const PLACE_KINDS = ['shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'park', 'outdoor', 'workshop', 'farm'];
+/** A rectangle's corners, grown by `by` m. */
+const corners = (r: Rect, by = 0): Pt[] => [
+  [r.x - by, r.z - by],
+  [r.x + r.w + by, r.z - by],
+  [r.x + r.w + by, r.z + r.d + by],
+  [r.x - by, r.z + r.d + by],
+];
+/**
+ * The living town's world data (docs/design/living-town.md, World data; `game/backdrop.ts`): every
+ * backdrop building a rectangle (4 to 8 corners, counter-clockwise seen from above), 1 to 6 storeys,
+ * a roof (a ridge for a gable or mansard), a use, its area and its place; on no lot (and
+ * `LOT_CLEAR` m off one), road or trail with its sidewalks (more than half its width off its
+ * middle: a junction's pad too), parking, water or other backdrop building; a side along the road
+ * nearest it (`facesRoad`); `MAIN_LEAST` or more in the main town and `HAMLET_LEAST` in every hamlet,
+ * the centre's open land built over more densely than the rest of the main town's box's. Every public lot a
+ * place, every backdrop place a place of its kind; each place named (none twice), its hours within
+ * the day, its work careers that are, and every career a resident may hold working somewhere in
+ * the main town. The main town has its centre.
+ */
+function livingProblems(town: TownFile, careers: readonly string[]): string[] {
+  const out: string[] = [];
+  const backdrop = town.meta.backdrop;
+  const places = town.meta.places;
+  if (!backdrop || !places) return ['no backdrop or places'];
+  const areas = town.areas ?? [];
+  const roads = (town.roads ?? town.meta.roads ?? []) as RoadPlan[];
+  const index = new RoadIndex(roads);
+  const water = town.terrain?.water ? unrle(town.terrain.water, town.width * town.depth) : null;
+  const lots = town.plots.map((p) => corners(p, LOT_CLEAR - 0.01));
+  const parking = (town.parking ?? []).map((p) => corners(p.rot % 2 ? { x: p.x - 3, z: p.z - 1.5, w: 6, d: 3 } : { x: p.x - 1.5, z: p.z - 3, w: 3, d: 6 }));
+  const say = (i: number, what: string) => out.push(`backdrop ${i} (${backdrop[i].use}) ${what}`);
+  backdrop.forEach((b, i) => {
+    const { poly } = b;
+    if (poly.length < 4 || poly.length > 8) say(i, `has ${poly.length} corners`);
+    if (signedArea2(poly) >= 0) say(i, 'goes clockwise seen from above');
+    if (!Number.isInteger(b.storeys) || b.storeys < 1 || b.storeys > 6) say(i, `has ${b.storeys} storeys`);
+    if (!ROOFS.includes(b.roof)) say(i, `has a ${b.roof} roof`);
+    if ((b.roof === 'gable' || b.roof === 'mansard') && b.ridge === undefined) say(i, 'has no ridge');
+    if (!USES.includes(b.use)) say(i, 'has no use');
+    if (!Number.isInteger(b.area) || b.area < 0 || b.area >= Math.max(1, areas.length)) say(i, `is in area ${b.area}`);
+    if (PLACE_KINDS.includes(b.use) !== (b.place !== undefined)) say(i, b.place === undefined ? 'is a place with no place' : 'has a place');
+    if (b.place !== undefined && places[b.place]?.kind !== b.use) say(i, `is place ${b.place}, a ${places[b.place]?.kind}`);
+    for (const [k, lot] of lots.entries()) if (overlaps(poly, lot, 0)) say(i, `is within ${LOT_CLEAR} m of plot ${k}`);
+    for (const [k, spot] of parking.entries()) if (overlaps(poly, spot, 0)) say(i, `is on parking space ${k}`);
+    for (let k = 0; k < poly.length; k++) {
+      const [a, c] = [poly[k], poly[(k + 1) % poly.length]];
+      const n = Math.max(1, Math.ceil(Math.hypot(c[0] - a[0], c[1] - a[1]) * 2));
+      for (let j = 0; j <= n; j++) {
+        const [x, z] = [a[0] + ((c[0] - a[0]) * j) / n, a[1] + ((c[1] - a[1]) * j) / n];
+        if (index.onRoad(x, z)) {
+          say(i, `stands on a road at ${x.toFixed(1)}, ${z.toFixed(1)}`);
+          j = n;
+          k = poly.length;
+        }
+      }
+    }
+    if (roads.some((r) => r.points.some(([x, z]) => inside(poly, x, z)))) say(i, 'has a road through it');
+    if (water) {
+      const xs = poly.map((p) => p[0]);
+      const zs = poly.map((p) => p[1]);
+      let wet = 0;
+      for (let z = Math.floor(Math.min(...zs)); z < Math.ceil(Math.max(...zs)); z++) for (let x = Math.floor(Math.min(...xs)); x < Math.ceil(Math.max(...xs)); x++) if (inside(poly, x + 0.5, z + 0.5) && water[z * town.width + x]) wet++;
+      if (wet) say(i, `stands on ${wet} tiles of water`);
+    }
+    // Along the road nearest it: one of its sides within `FACING` of the road's way (or square to it).
+    if (!facesRoad(poly, roads, index)) say(i, "doesn't face the road nearest it");
+  });
+  // (Two touching is a row: overlapping is not.)
+  const cell = new Map<string, number[]>();
+  backdrop.forEach((b, i) => {
+    const xs = b.poly.map((p) => p[0]);
+    const zs = b.poly.map((p) => p[1]);
+    for (let cz = Math.floor(Math.min(...zs) / 32); cz <= Math.floor(Math.max(...zs) / 32); cz++) {
+      for (let cx = Math.floor(Math.min(...xs) / 32); cx <= Math.floor(Math.max(...xs) / 32); cx++) {
+        const list = cell.get(`${cx},${cz}`) ?? [];
+        for (const j of list) if (overlaps(b.poly, backdrop[j].poly)) say(i, `overlaps backdrop ${j}`);
+        list.push(i);
+        cell.set(`${cx},${cz}`, list);
+      }
+    }
+  });
+  areas.forEach((a, k) => {
+    const n = backdrop.filter((b) => b.area === k).length;
+    const least = k === 0 ? MAIN_LEAST : HAMLET_LEAST;
+    if (n < least) out.push(`${a.name} has ${n} backdrop buildings (${least} or more)`);
+  });
+  // The centre: the main town's, its open land (not a road, a lot, a green or water) built over more
+  // densely than the rest of its box's.
+  const centre = town.meta.centre?.find((c) => c.area === 0);
+  if (!centre || centre.poly.length < 3) out.push('the main town has no centre');
+  else if (areas[0]) {
+    const box = areas[0];
+    const taken = roadMask(roads.filter((r) => r.kind !== 'trail'), town.width, town.depth, 0);
+    for (const p of town.plots) fillPoly(corners(p), town.width, town.depth, (i) => (taken[i] = 1));
+    // (Nor the water: a lakeside town's high street runs along its shore.)
+    if (water) for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
+    for (const g of town.meta.greens ?? []) fillPoly(g, town.width, town.depth, (i) => (taken[i] = 1));
+    const { centre: inC, rest: inRest } = centreDensity(town.width, town.depth, taken, box, centre.poly, backdrop.map((b) => b.poly));
+    if (inC <= inRest) out.push(`the centre's open land is ${(inC * 100).toFixed(0)}% built over, the rest of the main town's ${(inRest * 100).toFixed(0)}% (the centre the densest)`);
+  }
+  // Places: every public lot one, named once, open within the day, careers that are.
+  town.plots.forEach((p, i) => {
+    if (!p.public) return;
+    const n = places.filter((q) => q.plot === i).length;
+    if (n !== 1) out.push(`plot ${i} (${p.kind}) has ${n} places`);
+  });
+  const names = new Set<string>();
+  places.forEach((p, i) => {
+    if (!p.name) out.push(`place ${i} has no name`);
+    else if (names.has(p.name)) out.push(`two places called ${p.name}`);
+    names.add(p.name);
+    if (!PLACE_KINDS.includes(p.kind)) out.push(`place ${p.name} is a ${p.kind}`);
+    if (p.plot === undefined && !backdrop.some((b) => b.place === i)) out.push(`place ${p.name} is neither a lot nor a backdrop building`);
+    if (p.hours && !(p.hours.open >= 0 && p.hours.open < p.hours.close && p.hours.close <= 1440 && p.hours.days > 0 && p.hours.days < 128)) out.push(`place ${p.name} is open ${JSON.stringify(p.hours)}`);
+    if (!p.hours && p.kind !== 'park' && p.kind !== 'outdoor') out.push(`place ${p.name} (${p.kind}) has no hours`);
+    for (const w of p.work ?? []) if (!careers.includes(w)) out.push(`place ${p.name}'s workers are ${w}, no career`);
+    if (!Number.isInteger(p.area) || p.area < 0 || p.area >= Math.max(1, areas.length)) out.push(`place ${p.name} is in area ${p.area}`);
+  });
+  for (const c of careers) if (!places.some((p) => p.area === 0 && p.work?.includes(c))) out.push(`no place in the main town where ${c} workers work`);
+  return out;
+}
+
 /**
  * How long a country road may run alongside another road a few metres off (m): where it leaves a
  * port beside a street's end, or joins a road at a slant (`layoutProblems`). Two that follow the
@@ -374,7 +513,9 @@ for (const kind of WORLD_KINDS.filter((k) => kinds.includes(k))) {
     const assemble = performance.now() - t0;
     const file = JSON.parse(text);
     [slowest[0], slowest[1], slowest[2]] = [Math.max(slowest[0], layout), Math.max(slowest[1], houses), Math.max(slowest[2], assemble)];
-    for (const p of [...layoutProblems(file), ...(world.diagnostics?.roads ?? [])]) problems.push(`${tag}: ${p}`);
+    for (const p of [...layoutProblems(file), ...livingProblems(file, content.careerCategories.map((c) => c.id)), ...(world.diagnostics?.roads ?? [])]) problems.push(`${tag}: ${p}`);
+    // (A terrace lot's house is a generated terraced house, its lot cut to it: a fixed layout is wider than the lot.)
+    for (const s of town.slots) if (s.lot === 'terrace' && houseTemplate(templates, s.template)?.class !== 'terraced house') problems.push(`${tag}: terrace lot ${s.index} has a ${s.template}`);
     if (text.length > MAX_FILE) problems.push(`${tag}: the town file is ${(text.length / 1e6).toFixed(1)} MB`);
     if (timing && layout > LAYOUT_BUDGET * 2) problems.push(`${tag}: laid out in ${layout.toFixed(0)} ms (budget ${LAYOUT_BUDGET})`);
     if (timing && assemble > ASSEMBLE_BUDGET * 2) problems.push(`${tag}: assembled in ${assemble.toFixed(0)} ms (budget ${ASSEMBLE_BUDGET})`);
@@ -411,7 +552,8 @@ for (const kind of WORLD_KINDS.filter((k) => kinds.includes(k))) {
     console.log(
       `${tag}: ${town.name} (${town.world?.tagline}) ${town.width}×${town.depth}, ${town.roads.length} road(s) (${courts} courts), ` +
         `${town.open ? `${town.open.areas.length} areas, ${spots} outdoor places, ${((f) => `${(f.built * 100).toFixed(0)}% built and farmed, ${(f.empty * 100).toFixed(0)}% squares empty, `)(fillOf(file))}` : ''}` +
-        `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''}${dropped ? `, ${dropped} lots left out` : ''}, ${basements} with a basement, ${town.households.length} households, ` +
+        `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''} (${town.slots.filter((s) => s.lot === 'terrace').length} terraced)${dropped ? `, ${dropped} lots left out` : ''}, ${basements} with a basement, ${town.households.length} households, ` +
+        `${town.open?.backdrop ? `${town.open.backdrop.length} backdrop buildings (${town.open.backdrop.filter((b) => b.area === 0).length} in the main town), ${town.open.places?.length ?? 0} places, ` : ''}` +
         `${file.sims.length} residents, ${file.objects.length} things, ${(text.length / 1e6).toFixed(2)} MB; ${layout.toFixed(0)} ms + ${houses.toFixed(0)} ms houses, file ${assemble.toFixed(0)} ms`,
     );
   }

@@ -2130,7 +2130,9 @@ struct PlotView<'a> {
     storeys: u8,
 }
 
-/// Bounding box of all wall/door edges (and diagonal walls) inside a plot.
+/// Bounding box of all wall/door edges (and diagonal walls) inside a plot. A wall on the plot's own
+/// edge counts only where the plot's tile beside it is indoors: the wall of the house next door,
+/// standing on the shared line (a terrace's), is that plot's, not this one's.
 fn house_bounds(world: &World, x0: i32, z0: i32, x1: i32, z1: i32) -> Option<[i32; 4]> {
     let lot = &world.lot;
     let mut b: Option<[i32; 4]> = None;
@@ -2140,16 +2142,22 @@ fn house_bounds(world: &World, x0: i32, z0: i32, x1: i32, z1: i32) -> Option<[i3
             Some([a0, b0, a1, b1]) => [a0.min(ax), b0.min(az), a1.max(bx), b1.max(bz)],
         });
     };
+    let indoors = |x: i32, z: i32| lot.room_at(x, z) != 0;
     for z in z0..=z1.min(lot.depth as i32) {
         for x in x0..x1.min(lot.width as i32) {
             if z < lot.depth as i32 + 1 && lot.h_edge(x as usize, z as usize).is_wall() {
+                if (z == z0 && !indoors(x, z)) || (z == z1 && !indoors(x, z - 1)) {
+                    continue;
+                }
                 add(x, z, x + 1, z);
             }
         }
     }
     for z in z0..z1.min(lot.depth as i32) {
         for x in x0..=x1.min(lot.width as i32) {
-            if lot.v_edge(x as usize, z as usize).is_wall() {
+            if lot.v_edge(x as usize, z as usize).is_wall()
+                && !((x == x0 && !indoors(x, z)) || (x == x1 && !indoors(x - 1, z)))
+            {
                 add(x, z, x, z + 1);
             }
             if x < x1 && lot.diag(x, z).is_some() {

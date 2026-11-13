@@ -426,6 +426,13 @@ export interface AccidentDef {
   feeling?: string;
 }
 
+/** When pupils are at school (content `life.school`, sim-core `SchoolRules`): from `start` (hour) for `hours`, on `days` (0 = Monday). */
+export interface SchoolDef {
+  start: number;
+  hours: number;
+  days: number[];
+}
+
 /** A stage of life (content `life.stages`): from `from` years until the next stage's. */
 export interface LifeStageDef {
   id: string;
@@ -693,7 +700,7 @@ interface ContentFile {
   roomKinds?: RoomKindDef[];
   accidents?: AccidentDef[];
   roomRules?: { decorByCategory?: Record<string, number>; lampTiles?: number; windowTiles?: number };
-  life?: { daysPerYear?: number; startAge?: [number, number]; stages?: LifeStageDef[]; adoption?: { cost: number }; retireAt?: number };
+  life?: { daysPerYear?: number; startAge?: [number, number]; stages?: LifeStageDef[]; adoption?: { cost: number }; retireAt?: number; school?: SchoolDef };
   economy?: Partial<Economy>;
   objectRules?: { freeRotation?: string[] };
   /** Animation tags interactions can use as `anim` (the snapshot layout's `actions`). */
@@ -743,6 +750,8 @@ export class Content {
   readonly accidents: readonly AccidentDef[];
   /** Life stages, youngest first. */
   readonly lifeStages: readonly LifeStageDef[];
+  /** When pupils are at school (null: no school in this content). */
+  readonly school: SchoolDef | null;
   /** What adopting costs (null: no adoption). */
   readonly adoptionCost: number | null;
   private readonly decorByCategory: Readonly<Record<string, number>>;
@@ -809,6 +818,7 @@ export class Content {
     this.roomKinds = file.roomKinds ?? [];
     this.accidents = file.accidents ?? [];
     this.lifeStages = file.life?.stages ?? [];
+    this.school = file.life?.school ?? null;
     this.adoptionCost = file.life?.adoption?.cost ?? null;
     this.decorByCategory = file.roomRules?.decorByCategory ?? {};
     this.lampTiles = file.roomRules?.lampTiles ?? 10;

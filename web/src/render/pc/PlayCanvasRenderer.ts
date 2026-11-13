@@ -72,7 +72,14 @@ import { within } from '../../core/async';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
-import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS } from '../shared/lens';
+import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS, TOWN_FROM, townBlend } from '../shared/lens';
+import { TOWN_RADIUS_LIMITS, townArrival, townFar, townFog, townNear, townOrbit } from '../shared/townCamera';
+import { townView } from '../shared/townView';
+import { landscapeRing } from '../shared/nature';
+import { LT_FIXTURE } from '../../debug/livingTown';
+import { applyLtFixture } from '../../debug/ltFixture';
+import { backdropBuilding, backdropGround, gardenHedges, lotBuilding, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
+import { TownGroundMap } from './groundTiles';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
 import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
@@ -135,6 +142,11 @@ declare global {
     __app?: unknown;
   }
 }
+
+/** The town view's buildings fade in over this much of its blend (a dither: nothing pops in past `TOWN_FROM`). */
+const TOWN_FADE = 0.03;
+/** A far bike's frame (sRGB). */
+const BIKE: readonly [number, number, number] = [0.22, 0.22, 0.24];
 
 /** A big world's warm-up builds and draws this many lots besides the one in view (`warmGame`). */
 const WARM_LOTS = 6;
@@ -347,8 +359,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** `?hour=`: the light held at that hour. */
   private readonly fixedHour: number | null;
 
-  /** The player's camera input and the game camera's pose (the director's rig drives it too). */
-  private readonly orbit = new OrbitControls({ ...DEFAULT_ORBIT }, { radius: RADIUS_LIMITS, beta: BETA_LIMITS });
+  /**
+   * The player's camera input and the game camera's pose (the director's rig drives it too). One zoom from the play
+   * camera out to the town view (docs/design/living-town.md): its radius goes to `TOWN_MAX`, and past `TOWN_FROM`
+   * its `shape` (`shared/townCamera.ts`, set with the world) eases the tilt, the pan bounds and the zoom's pace.
+   */
+  private readonly orbit = new OrbitControls({ ...DEFAULT_ORBIT }, { radius: TOWN_RADIUS_LIMITS, beta: BETA_LIMITS });
   private detachOrbit: (() => void) | null = null;
   private readonly gameRig: GameCameraRig;
   /** The overview camera's pose (`OverviewCamera` writes it; the camera takes it each town frame). */
@@ -398,6 +414,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private wallMode: WallMode = 'down';
   /** Something for a wall is in hand: the walls stand whatever `wallMode` says (`placing.ts`). */
   private wallsRaised = false;
+  /** The camera is in the town view (past `TOWN_FROM`): the viewed lot's house stands whole (`shownWallMode`, `roofVisible`). */
+  private townWhole = false;
   /** The cutaway's look bits last given to the walls (-1: none yet). */
   private cutLook = -1;
 
@@ -436,6 +454,26 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private cars!: Cars;
   /** Other lots' bikes and e-scooters (the street leaves them out: they go off with their riders). */
   private parkedRides!: ParkedRides;
+  /**
+   * The town view's drawing (`townView.ts`, `groundTiles.ts`: docs/design/living-town.md), all of it only while
+   * `townView.blend` is over 0: the backdrop and the far lots' houses, the movers past the near drawing, the
+   * ground's colour map. What the far lots were chosen by (the chunks streamed in, the street's list of houses).
+   */
+  private townBuildings!: TownBuildings;
+  private townMovers!: TownMovers;
+  private townGround!: TownGroundMap;
+  private townLotsBy: { chunks: unknown; houses: readonly TownLotHouse[] | null; up: string } = { chunks: null, houses: null, up: '' };
+  /** The far lots with someone up in their house (`findTownUp`: by lot id, and as a key), and when they were last looked for. */
+  private townUp: ReadonlySet<number> = new Set();
+  private townUpKey = '';
+  private townUpAt = 0;
+  /** The weekday of the newest snapshot (0 = Monday: sim-core `clock::weekday`), for the town's opening hours. */
+  private lastWeekday = 0;
+  private townBackdropOf: unknown = null;
+  /** The town view's movers this frame (reused, a pool), and their colours by hex. */
+  private readonly townMoverList: Mover[] = [];
+  private readonly moverColors = new Map<string, readonly [number, number, number]>();
+  private readonly moverAt = { x: 0, y: 0, z: 0 };
   /** The traffic lights at the lit junctions (sim-core `traffic.rs`, `signals.ts`). */
   private signals!: Signals;
   /** What grows and stands on the lot: the landscape and sky, objects and their clips, items (`lotContents.ts`). */
@@ -536,6 +574,20 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly plots = new PlotFinder();
   private readonly flight = new Flight();
   private readonly flightPose = { x: 0, z: 0, radius: 0 };
+  /** A glide to a town point (`glideTo`): the resident it lands on (it goes where they go meanwhile) and what to do once there. */
+  private glide: { follow: number | null; done: (() => void) | null } | null = null;
+  private readonly glideSpot = { x: 0, y: 0, z: 0 };
+  /** The far plane as the world's size and the preset set it (`buildWorld`): the play camera's, which the town view moves out from. */
+  private playFar: number = LENS.far;
+  /** The land and the landscape round it (m): what the town view's far plane reaches past. */
+  private readonly worldReach = { x0: 0, z0: 0, x1: 0, z1: 0 };
+  /** How far into the town view the camera was drawn last (`applyTownCamera`: its planes and the sky are put back once it is out of it). */
+  private townBlendDrawn = 0;
+  /** The game camera's view-projection as this frame is drawn with it (`townView.project`). */
+  private readonly townViewProj = new Float32Array(16);
+  /** `townView.project`: a town point on the canvas (CSS pixels, and its depth in m), for the town tags. */
+  private readonly projectTown = (x: number, y: number, z: number): [number, number, number] | null =>
+    this.townMode || !this.active ? null : GameCamera.projectWith(this.townViewProj, x, y, z, this.cssSize.width, this.cssSize.height);
   private focusLotListener: ((plot: number) => boolean) | null = null;
   /** The lot (index) the roaming camera settled on last and the game took (it is not framed: `buildSims`). */
   private roamedTo: number | null = null;
@@ -740,6 +792,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     });
     this.roam.streamScale = this.quality.openWorld.stream;
     this.cars = new Cars(this.app, this.root, this.quality.streetShadows);
+    this.townBuildings = new TownBuildings(this.app, this.root);
+    this.townMovers = new TownMovers(this.app, this.root);
+    this.townGround = new TownGroundMap(this.app.graphicsDevice);
     this.parkedRides = new ParkedRides(this.app, this.root, this.deps.assets, c, this.quality.streetShadows);
     this.characters.setCarSeat((x, z) => this.cars.seatAt(x, z));
     // Only cars and residents moving where they cast into the sun's map draw it again.
@@ -795,6 +850,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.debug) Object.assign(window, { __scene: this.app.scene, __app: this.app, __renderer: this });
     this.applyLighting(this.lastMinute);
     this.applyCamera();
+    townView.project = this.projectTown;
     void this.characters.init();
     await this.setupEnvironment();
   }
@@ -1000,11 +1056,46 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private applyCamera(): void {
     if (this.townMode) {
       const p = this.townPose;
+      // (The menus' town has the play camera's planes, sky and its own haze: `townFrame`.)
+      this.applyTownCamera(0, 0, 0, 0, true);
       this.camera.setPose(p.alpha, p.beta, p.radius, p.target.x, p.target.y, p.target.z, p.targetScreenOffset.x, p.targetScreenOffset.y);
     } else {
       const o = this.orbit;
+      // (The eye: target + radius × (cos α sin β, cos β, sin α sin β), game space.)
+      const flat = Math.sin(o.beta) * o.radius;
+      this.applyTownCamera(o.radius, o.target.x + Math.cos(o.alpha) * flat, o.target.y + Math.cos(o.beta) * o.radius, o.target.z + Math.sin(o.alpha) * flat, false);
       this.camera.setPose(o.alpha, o.beta, o.radius, o.target.x, o.target.y, o.target.z);
     }
+    this.camera.viewProjectionInto(this.townViewProj);
+    const o = this.orbit;
+    townView.blend = this.townMode ? 0 : townBlend(o.radius);
+    townView.radius = o.radius;
+    townView.target.x = o.target.x;
+    townView.target.z = o.target.z;
+  }
+
+  /**
+   * The town view's share of the camera (docs/design/living-town.md, `shared/townCamera.ts`), before it is posed:
+   * for an orbit `radius` m out with its eye at (`ex`, `ey`, `ez`), the near plane moved out (the roads keep
+   * their depth from 900 m) and the far plane past the whole world, the sky's dome out with it, and the haze
+   * thinned. Up to `TOWN_FROM` all of them are the play camera's own: nothing is set that wasn't. `menus`: the
+   * menus' town is up, which has the play camera's planes and sets its own haze.
+   */
+  private applyTownCamera(radius: number, ex: number, ey: number, ez: number, menus: boolean): void {
+    const blend = menus ? 0 : townBlend(radius);
+    if (blend > 0) {
+      const r = this.worldReach;
+      const far = townFar(radius, this.playFar, ex, ey, ez, r.x0, r.z0, r.x1, r.z1);
+      this.camera.setPlanes(townNear(radius, ey - (this.lot.landscape?.heightAt(ex, ez) ?? 0)), far);
+      this.lot.skyReach(far, blend);
+    } else if (this.townBlendDrawn > 0) {
+      this.camera.setPlanes(0, this.playFar);
+      this.lot.skyReach(this.playFar, 0);
+    }
+    this.townBlendDrawn = blend;
+    if (menus) return;
+    const fog = LOOK.fog * townFog(radius);
+    if (this.app.scene.fog.density !== fog) this.app.scene.fog.density = fog;
   }
 
   cameraPose(): CameraPose {
@@ -1027,6 +1118,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // Keep the viewing angle; move the camera with its target.
     const o = this.orbit;
     this.flight.stop();
+    this.glide = null;
     o.target.x = x;
     o.target.y = 0;
     o.target.z = z;
@@ -1036,7 +1128,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   flyTo(x: number, z: number): void {
     const o = this.orbit;
     o.stopInertia();
+    this.glide = null;
     this.flight.start(o.target.x, o.target.z, o.radius, x, z, Math.min(Math.max(o.radius, 24), 40), !!this.options.reducedMotion);
+  }
+
+  glideTo(x: number, z: number, radius?: number, follow?: number, done?: () => void): void {
+    const o = this.orbit;
+    o.stopInertia();
+    o.takeMoved();
+    const limits = o.limits.radius;
+    const to = Math.min(limits[1], Math.max(limits[0], radius ?? townArrival(o.radius, follow !== undefined)));
+    this.glide = { follow: follow ?? null, done: done ?? null };
+    this.flight.start(o.target.x, o.target.z, o.radius, x, z, to, !!this.options.reducedMotion);
   }
 
   onFocusLot(listener: ((plot: number) => boolean) | null): void {
@@ -1053,17 +1156,34 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    */
   private roamFrame(dt: number): void {
     const o = this.orbit;
+    const glide = this.glide;
+    if (glide && this.flight.active) {
+      // The player's own pan or zoom takes the camera back: the glide ends where it is (and selects nobody).
+      if (o.takeMoved()) {
+        this.flight.stop();
+        this.glide = null;
+      } else if (glide.follow !== null && glide.follow < this.simCount && this.characters.spot(glide.follow, this.glideSpot)) {
+        // (Who it lands on walks on meanwhile.)
+        this.flight.aim(this.glideSpot.x, this.glideSpot.z);
+      }
+    }
     if (this.flight.step(dt / 1000, this.flightPose)) {
       o.target.x = this.flightPose.x;
       o.target.z = this.flightPose.z;
       o.radius = this.flightPose.radius;
       o.checkLimits();
+      if (!this.flight.active && this.glide) {
+        const done = this.glide.done;
+        this.glide = null;
+        done?.();
+      }
     }
     const world = this.builtWorld;
     if (!world || !this.street.layout) return;
     this.followShadows();
+    this.frameTownView();
     this.street.frame(o.target.x, o.target.z);
-    this.lot.landscape?.frameTiles(o.target.x, o.target.z);
+    this.lot.landscape?.frameTiles(o.target.x, o.target.z, this.diag.has('notownwoods') ? 0 : this.townBlend, o.radius);
     this.roam.pinned = this.followIndex !== null || this.gameRig.active || this.flight.active;
     const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
     const fovH = 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect);
@@ -1081,6 +1201,154 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.parkedRides.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
     this.signals.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
     this.reportWatch();
+  }
+
+  /** How far into the town view the drawing is (`townView.blend`; 0 with `?diag=notown`: the drawing as before it). */
+  private get townBlend(): number {
+    return this.diag.has('notown') ? 0 : townView.blend;
+  }
+
+  /**
+   * The town view's drawing for a world (`townView.ts`): the backdrop's buildings (again only for another backdrop),
+   * the ground's colour map (once per town), and the far lots chosen again on the next frame.
+   */
+  private buildTownView(world: WorldStructure): void {
+    const land = this.lot.landscape;
+    const ground = (x: number, z: number) => land?.heightAt(x, z) ?? 0;
+    const backdrop = world.meta?.backdrop;
+    if (backdrop !== this.townBackdropOf) {
+      this.townBackdropOf = backdrop;
+      const list = backdrop ?? [];
+      const driven = (world.meta?.roads ?? []).filter((r) => r.kind !== 'trail');
+      const hedges = gardenHedges(list, list.map((b) => backdropGround(b, driven)), world.plots, driven, ground);
+      this.townBuildings.setBackdrop([...list.map((b, i) => backdropBuilding(b, i, ground, world.meta?.places)), ...hedges]);
+    }
+    this.townGround.bake(world, land ?? null);
+    this.townLotsBy = { chunks: null, houses: null, up: '' };
+  }
+
+  /**
+   * Each frame, the town view by its blend (`townView.blend`; nothing at 0: the play camera draws as it always has):
+   * the buildings fading in, the far LOD's houses the town view's (the street's own hidden), the far lots those of the
+   * chunks not streamed in, and the ground's colour map.
+   */
+  private frameTownView(): void {
+    const blend = this.townBlend;
+    this.street.setTownView(blend > 0);
+    this.townBuildings.show(this.diag.has('notownbuildings') ? 0 : Math.min(1, blend / TOWN_FADE));
+    // (The ground tiles' materials asked for only while the map is, or is to be, on them. In with the buildings: what
+    // they stand on is in it, and the farmland's edges, which step along the ground's grid without it.)
+    const mapped = this.diag.has('notownground') ? 0 : Math.min(1, blend / TOWN_FADE);
+    if (mapped > 0 || this.townGround.active) this.townGround.apply(this.lot.landscape?.groundMaterials() ?? [], mapped);
+    if (blend <= 0) return;
+    this.townBuildings.setTime(this.lastMinute, this.lastWeekday);
+    const houses = this.street.townHouses();
+    const by = this.townLotsBy;
+    if (by.chunks === this.roam.chunks && by.houses === houses && by.up === this.townUpKey) return;
+    this.townLotsBy = { chunks: this.roam.chunks, houses, up: this.townUpKey };
+    const up = this.townUp;
+    const land = this.lot.landscape;
+    const ground = (x: number, z: number) => land?.heightAt(x, z) ?? 0;
+    this.townBuildings.setLots(houses.filter((h) => !this.street.chunkDrawn(h.chunk)).map((h) => lotBuilding(h, ground, up.has(h.id))));
+  }
+
+  /**
+   * Which far lots' houses have someone up in them (`townUp`, by lot id), twice a second while the town view is in
+   * and the lamps are on: their windows glow at night only then (`lotBuilding`), as the neighbours' near the camera do
+   * (`findDarkRooms`). Nothing but the snapshot's positions is read.
+   */
+  private findTownUp(frame: FrameState): void {
+    if (this.townBlend <= 0 || this.lampsLevel <= 0 || frame.now - this.townUpAt < 500) return;
+    this.townUpAt = frame.now;
+    const { curr, layout } = frame;
+    const k = layout.sim;
+    const sleeping = this.sleepActions?.ids;
+    const houses = this.street.townHouses();
+    const babies = this.babyStages();
+    const sims = this.lastWorld?.sims ?? [];
+    const up = new Set<number>();
+    const count = curr[layout.header.simCount];
+    for (let i = 0; i < count; i++) {
+      const o = layout.headerLen + i * layout.simStride;
+      if (curr[o + k.away] !== 0 || babies.has(sims[i]?.stage ?? '')) continue;
+      if (curr[o + k.pose] === Pose.Lie && sleeping?.has(curr[o + k.action] | 0)) continue;
+      const px = curr[o + k.x];
+      const pz = curr[o + k.z];
+      // (Upstairs is a storey's own rows: back to the ground's.)
+      const gz = pz - this.rowOf(this.storeyOf(Math.floor(pz)));
+      for (const h of houses) {
+        const b = h.box;
+        if (px < b[0] || px > b[2] || gz < b[1] || gz > b[3]) continue;
+        up.add(h.id);
+        break;
+      }
+    }
+    const key = [...up].sort((a, b) => a - b).join(',');
+    if (key === this.townUpKey) return;
+    this.townUpKey = key;
+    this.townUp = up;
+  }
+
+  /**
+   * The town view's movers (`townView.ts` `TownMovers`), each frame it is in: the cars and taxis the near drawing
+   * leaves out (`Cars.forEachFar`), and the residents it doesn't draw who are out of doors (on a bike if they ride
+   * one), where the snapshot has them; nothing else of the sim is read.
+   */
+  private updateTownMovers(frame: FrameState): void {
+    const blend = this.townBlend;
+    const world = this.builtWorld;
+    if (blend <= 0 || !world) return this.townMovers.hide();
+    const land = this.lot.landscape;
+    const h = (x: number, z: number) => land?.heightAt(x, z) ?? 0;
+    const list = this.townMoverList;
+    let n = 0;
+    const next = (): Mover => {
+      const m = (list[n] ??= { kind: 'car', x: 0, y: 0, z: 0, yaw: 0, color: [1, 1, 1] });
+      n++;
+      return m;
+    };
+    const color = (hex: string) => {
+      let c = this.moverColors.get(hex);
+      if (!c) {
+        const v = parseInt(hex.slice(1), 16);
+        this.moverColors.set(hex, (c = [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255]));
+      }
+      return c;
+    };
+    const cars0 = n;
+    this.cars.forEachFar((x, z, yaw, paint, taxi) => {
+      const m = next();
+      [m.kind, m.x, m.y, m.z, m.yaw, m.color] = [taxi ? 'taxi' : 'car', x, h(x, z), z, yaw, color(paint)];
+    });
+    const cars1 = n;
+    const { curr, layout } = frame;
+    const count = Math.min(this.simCount + (layout.header.staffCount === undefined ? 0 : curr[layout.header.staffCount]), MAX_CHARACTERS);
+    const at = this.moverAt;
+    const depth = groundDepth(world);
+    const sims = world.sims;
+    const staff = world.staffSims ?? [];
+    for (let i = 0; i < count; i++) {
+      if (this.characters.head(i, at) || !this.characters.spot(i, at)) continue;
+      const ix = Math.floor(at.x);
+      const iz = Math.floor(at.z);
+      // (Indoors, upstairs or in a car: not drawn.)
+      if (iz >= depth || (ix >= 0 && iz >= 0 && ix < world.width && world.rooms[iz * world.width + ix])) continue;
+      let inCar = false;
+      for (let k = cars0; k < cars1 && !inCar; k++) inCar = Math.abs(list[k].x - at.x) < 2.6 && Math.abs(list[k].z - at.z) < 2.6;
+      if (inCar) continue;
+      const o = layout.headerLen + i * layout.simStride;
+      const yaw = curr[o + layout.sim.yaw];
+      const info = i < sims.length ? sims[i] : staff[i - sims.length];
+      const m = next();
+      [m.kind, m.x, m.y, m.z, m.yaw, m.color] = ['person', at.x, h(at.x, at.z), at.z, yaw, color(info?.appearance.body ?? '#B0B0B0')];
+      if (layout.sim.ride !== undefined && curr[o + layout.sim.ride] >= 0) {
+        const b = next();
+        [b.kind, b.x, b.y, b.z, b.yaw, b.color] = ['bike', at.x, m.y, at.z, yaw, BIKE];
+        m.y += 0.55;
+      }
+    }
+    list.length = n;
+    this.townMovers.set(list, 1 + MOVER_GROW * blend);
   }
 
   /**
@@ -1221,7 +1489,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   cameraInfo(): { fov: number; radius: readonly [number, number]; beta: readonly [number, number] } {
-    return { fov: LENS.fov, radius: RADIUS_LIMITS, beta: BETA_LIMITS };
+    return { fov: LENS.fov, radius: this.orbit.limits.radius, beta: BETA_LIMITS };
   }
 
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean {
@@ -1231,6 +1499,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   // --- the world -----------------------------------------------------------------------
 
   setWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
+    // (`?ltFixture`: a Big world without a backdrop gets the debug fixture's, until worldgen writes one.)
+    if (LT_FIXTURE) applyLtFixture(world);
     // A big world is never built whole in full detail (no view: every house's storeys and every
     // thing, hundreds of MB of buffers; Low's merged object shadows alone 260 MB, which lost the
     // WebGPU device): with no lot given, the focus stays the lot built, else the one nearest the camera.
@@ -1404,14 +1674,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     // The camera roams the land (a big world's, or the town and 60 m round it); the street streams
     // its chunks round it in a big world, else draws the whole town as ever. The lot in view is the focus.
-    this.orbit.panBounds = panBounds(world);
+    const pb = (this.orbit.panBounds = panBounds(world));
+    // (From the town view the target is held further inside them, the tilt in a bird's-eye range: `shared/townCamera.ts`.)
+    const ring = landscapeRing(world);
+    this.orbit.shape = townOrbit(width, groundDepth(world), -pb.x0, ring);
+    Object.assign(this.worldReach, { x0: -ring, z0: -ring, x1: width + ring, z1: groundDepth(world) + ring });
     this.orbit.checkLimits();
     this.streamOn = world.meta?.world?.size === 'big' || STREAM_FLAG;
     // A big world's land reaches further: its far plane too (the preset's, `OpenWorldQuality.far`: its far LOD's
-    // houses to 650 m, the hills beyond).
-    const far = world.meta?.world?.size === 'big' ? this.quality.openWorld.far : LENS.far;
-    if (this.camera.camera.farClip !== far) this.camera.setLens({ ...LENS, far });
-    const pb = this.orbit.panBounds;
+    // houses to 650 m, the hills beyond). (The play camera's: the town view moves it out from there, `applyTownCamera`.)
+    const far = (this.playFar = world.meta?.world?.size === 'big' ? this.quality.openWorld.far : LENS.far);
+    if (this.townBlendDrawn === 0 && this.camera.camera.farClip !== far) this.camera.setLens({ ...LENS, far });
     this.roam.setBounds({ x0: pb.x0 - 300, z0: pb.z0 - 300, x1: pb.x1 + 300, z1: pb.z1 + 300 });
     const viewIndex = view ? world.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
     this.roam.setFocus(viewIndex >= 0 ? viewIndex : null);
@@ -1462,6 +1735,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.loadStep('Building the street', 0.35);
     await this.street.build(world, this.view, () => this.pace());
     this.cars.build(world);
+    this.buildTownView(world);
     this.loadStep('Furnishing the house', 0.45);
     // The objects, their clips, contact shadows and items; other lots' bikes and e-scooters alongside.
     await Promise.all([this.lot.buildObjects(world), this.parkedRides.build(world, (x, z) => this.inView(x, z, 0))]);
@@ -1920,9 +2194,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return this.lib.surface(key, { doubleSided: true });
   }
 
-  /** The walls as drawn: up while something for a wall is in hand, else as the player has them. */
+  /** The walls as drawn: up while something for a wall is in hand and from the town view, else as the player has them. */
   private get shownWallMode(): WallMode {
-    return this.wallsRaised ? 'up' : this.wallMode;
+    return this.wallsRaised || this.townWhole ? 'up' : this.wallMode;
   }
 
   /** Something for a wall in hand (`on`) or not: the walls stand meanwhile, so what hangs on them hangs on them. */
@@ -1948,9 +2222,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.updateCutaway();
   }
 
-  /** The viewed lot's roof: only with walls up, and not when zoomed in (it would fill the view), unless a check keeps it (`keepRoof`). */
+  /**
+   * The viewed lot's roof: only with walls up, and not when zoomed in (it would fill the view), unless a check keeps
+   * it (`keepRoof`). From the town view (`townWhole`) it is on whatever the walls' mode.
+   */
   private roofVisible(): boolean {
-    return this.wallMode === 'up' && (this.roofKept || this.orbit.radius > ROOF_MIN_DISTANCE);
+    return (this.wallMode === 'up' || this.townWhole) && (this.roofKept || this.orbit.radius > ROOF_MIN_DISTANCE);
   }
 
   keepRoof(on: boolean): void {
@@ -1973,7 +2250,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * car standing on it (`Cars.hideOn`).
    */
   private applyStoreys(): void {
-    for (const { entity, storey } of this.lotEntities) if (storey !== undefined) entity.enabled = storeyShown(storey, this.storey);
+    // (From the town view the house stands whole, `townWhole`: every storey from the ground up, whichever is in view.)
+    const upTo = this.townWhole && this.storey >= 0 ? this.storeys.count - 1 : this.storey;
+    for (const { entity, storey } of this.lotEntities) if (storey !== undefined) entity.enabled = storeyShown(storey, upTo);
     for (const p of this.decor.values()) for (const d of p.draws) d.enabled = this.storey >= 0 && d.count > 0;
     const v = this.view;
     this.street.showLot(this.storey >= 0);
@@ -2146,6 +2425,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const { curr, layout } = frame;
     const minute = this.fixedHour !== null ? this.fixedHour * 60 : (curr[layout.header.minute] ?? this.lastMinute);
     this.lastMinute = minute;
+    this.lastWeekday = (Math.max(1, curr[layout.header.day] | 0) - 1) % 7;
     if (this.townMode) return;
     const h = layout.header;
     // At speed 3 and up, and in quiet hours, the preset's step (Low's ten minutes: each update re-colours the sun, sky and lamps).
@@ -2167,10 +2447,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.placing.frame(this.frameDt); // (the effects, the thing in hand.)
     this.updateSims(frame);
     this.cars.update(frame);
+    this.updateTownMovers(frame);
+    this.findTownUp(frame);
     this.signals.update(frame);
     // (A car's shadow goes with it: `moved` only for a car that moved where it casts into the map, `setShadowTest`; the lights' poles when they're placed.)
     if (this.cars.moved || this.signals.moved) this.sunShadows.moved(false);
     this.birdLife.update(frame, minute, this.frameDt, this.characters, this.simCount); // (after the residents, who scare them.)
+    // From the town view (past `TOWN_FROM`) the house in view stands whole, its walls up and its roof on, like the
+    // houses round it: cut away it is a hole in the town, and nobody looks into a room from there.
+    const whole = this.orbit.radius > TOWN_FROM;
+    if (whole !== this.townWhole) {
+      this.townWhole = whole;
+      this.applyWallMode();
+      // (And every storey of it, under its roof: a lower one in view would leave it open to the sky.)
+      if (this.storeys.count > 1) this.applyStoreys();
+    }
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
       this.roofShown = !this.roofShown;
       this.showRoofs();
@@ -2467,6 +2758,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const inner = (1 - l.lamps) * 0.9 + 0.05;
     this.lib.setEmissive(this.lib.surface('material.window.inner', { vertexColors: true, cutaway: true }), this.emissiveTmp.set(toLinear(c.r) * inner, toLinear(c.g) * inner, toLinear(c.b) * inner));
     this.street?.setNight(l.lamps, this.glowColor);
+    this.townBuildings?.setNight(l.lamps, this.glowColor);
     this.signals?.setNight(l.lamps); // (the traffic lights' lit lenses.)
     this.overview?.setNight(l.lamps, this.glowColor);
     this.applyGardenPools();
@@ -2977,6 +3269,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return true;
   }
 
+  heightAt(x: number, z: number): number {
+    return this.lot.landscape?.heightAt(x, z) ?? 0;
+  }
+
   simHead(index: number, out: { x: number; y: number; z: number }): boolean {
     return index < this.simCount && !!this.characters?.head(index, out);
   }
@@ -3094,6 +3390,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.onFrame = null;
     this.onView = null;
     this.townListener = null;
+    if (townView.project === this.projectTown) Object.assign(townView, { project: null, blend: 0 });
+    this.glide = null;
     this.detachOrbit?.();
     this.detachOrbit = null;
     this.sizeWatch?.disconnect();
@@ -3109,6 +3407,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.unlistenFiles = null;
     this.overview?.destroy();
     this.street?.destroy();
+    this.townBuildings?.destroy();
+    this.townMovers?.destroy();
+    this.townGround?.dispose();
     this.cars?.destroy();
     this.signals?.destroy();
     this.gardenPools?.destroy();

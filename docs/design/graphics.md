@@ -126,6 +126,61 @@ After 0.3.2 the game moved from Babylon.js 9.30 to PlayCanvas 2.23 (pinned exact
 - **Light units** (`render/pc/lightUnits.ts`). The look (`render/look.ts`) keeps the units it was tuned in up to 0.3.2: a sun, moon or lamp (at a metre) of strength 1 lights a white surface facing it to 1/π, the sky's hemispheric fill of strength 1 lights it to 1. PlayCanvas lights a white surface to a light's strength itself, so the renderer converts: the sun and the moon by 1/π, the lamps likewise (`LAMP_UNITS` in `lamps.ts`), the sky's hemispheric fill as it is, the image-based light 5 % up (PlayCanvas takes the specularity off the ambient once more), and the lights' highlights by a calibrated factor (`SPECULAR_UNITS`; π by the units alone). They were calibrated against the game's pictures up to 0.3.2 at eight hours of the day, with `?diag=linear,nosims` and `?lightmix=` lighting one part at a time. What wasn't a matter of units was matched to those pictures first: the sky's ambient is the same spherical harmonics (`cargo envconv` works them out from the sky's HDRI as the game did up to 0.3.2 and bakes them into the `.pcenv`), and the haze, the lights' Fresnel and the lamps' falloff are the same formulas (`shaders/fog.ts`, `envBrdf.ts`, `roomLights.ts`).
 - **Code from Babylon.js.** So that the game moves and looks as it did, parts of the renderer were ported from Babylon.js (Apache-2.0): the camera controls, the matrix maths, the mesh builders, the build effects' particles, the image processing and FXAA, and a few shader formulas. Each such file starts with a header that says what was ported and how it was changed; Babylon's licence and notice are in `crates/tools/texts/` and in every build's `THIRD-PARTY-LICENSES.txt` (`cargo licenses`, whose test keeps the list of those files and their headers in step).
 
+## The town view
+
+Zoomed out past `TOWN_FROM` (120 m of orbit radius, `render/shared/lens.ts`), the camera eases into the
+living town's view ([living-town.md](living-town.md)), and the renderer draws the town at town scale, all of
+it by `townView.blend` and none of it at 0: up to `TOWN_FROM` the play camera draws exactly as before (pixel for
+pixel: `?diag=notown` leaves it out to compare).
+
+- **Buildings** (`render/pc/townView.ts`, `render/shared/townBuildings.ts`, `shaders/townBuilding.ts`). Every
+  backdrop building of the world (`WorldMeta.backdrop`) and every far lot's house (the street's far LOD, the
+  lots outside the chunks streamed in; the street's own far groups are hidden meanwhile) is a copy of one of
+  five unit meshes: a box of walls, and a gable, hip, flat (a parapet round a felt deck) or mansard roof. One
+  instanced draw each, five for the whole world, in one material. Each copy carries its wall and roof colours,
+  its plinth (the walls go 0.4 m under its lowest corner's ground) and its windows: the fragment shader draws
+  them over the walls in bands a storey (3 m) apart and in bays along each face in the face's own metres (on a
+  shop's long faces a shopfront: wide, paler glass under a fascia in one of four colours), fading to their average
+  where a bay is under a pixel or two; at night a share of them glows with the street's window glow by the lamps'
+  level. The share follows the life there (`litAt`, written again only when one changes): a place with opening hours
+  is lit while it is open and all but dark when closed, a home nobody plays has its evening's lights going out one
+  by one from ten till half past midnight and on again from half past five (`homeLights`), and a far lot's house is
+  lit only while someone is up in it (`findTownUp`, twice a second from the snapshot's positions), as the
+  neighbours' houses near the camera are. A backdrop building's colours come from
+  the backdrop palette by its `look` (warm town tones: red and orange tile roofs, some brown, a few grey slate,
+  over cream, sand, ochre, render and brick; a barn's boards and tin, a church's stone and slate), each a little
+  different, its pitched roof at 0.72 of its palette colour (as bright as the palette they read as lit beside the
+  game's own roofs); a lot's house keeps its own (`HousePlanner.farLook`). A footprint that isn't a rectangle is
+  drawn as the rectangle round it. A backdrop house's garden has a hedge (`gardenHedges`): low boxes in the same
+  draws, along each side but the one its path leaves by and those that would stand on a lot, a road or another
+  building's ground. They fade in by a dither over the first 3 % of the blend (to about 148 m), so nothing pops.
+- **Far woods** (`render/pc/nature.ts` `FarCrowns`). Every woods tree is gathered into crown clusters, one per
+  9 m square (as wide as its trees spread, as tall as they are, a dome or, where conifers are most, a cone), two
+  instanced draws. In the town view the woods draw their own trees only in the squares within
+  `560 → 260 m` of the target (by the blend), crowns in the rest.
+- **Ground** (`render/pc/groundTiles.ts` `TownGroundMap`, `shaders/townGround.ts`). A colour map over the whole
+  world, baked once per town on a 2D canvas (2048², half a metre a texel): the streets and their pavements, the
+  junctions' pads, the trails and paths, the centre's paving (round its lots, laid in courses 5 m apart), water and
+  farm fields; a big world's
+  farmland as its ground colours it (`LandscapeLayout.farmland`: each field of the patchwork a rectangle in its
+  crop's colour, shown as strongly as the terrain shows it; the ground's own colours are a vertex apart, and from
+  above a field's edge stepped along the grid); and what the backdrop's buildings
+  stand on (`backdropGround`: a paved forecourt under flats, shops and halls, a bare yard under a workshop or a
+  barn, and each one's way to the nearest road within 45 m, a garden path for a house). It is laid over the ground
+  tiles' colour over the first 3 % of the blend, with the buildings. Past the chunks streamed in the street draws no
+  road: this is the road there. The ground tiles' material gets the define only while the blend is over 0.
+  (The farmland's zone itself is evened out where the landscape reads it, `shared/zones.ts` `evened`: the generator
+  outlines it in 10 m cells, a staircase along every slanted edge.)
+- **Movers** (`townView.ts` `TownMovers`). The cars, taxis, bikes and residents the near drawing leaves out (past
+  the chunks streamed in, past the residents' radius; not those indoors or in a car) as tiny instanced shapes in
+  their own colours (a car's paint, the taxi's yellow, a resident's top), where the snapshot has them, up to 2.4
+  times as large at the full view so they read.
+- **Culling.** By altitude and the frustum, not the preset's distances: the ground tiles' levels by the eye's
+  distance (the radius times the blend added to the target's), the woods as above, the far lots all drawn (no
+  `farCull`), and the sky's dome widened past the land the camera sees (`LotContents.skyReach`).
+- **Backdrop as built land.** The landscape counts backdrop buildings as built (`builtField`): no tree grows in one,
+  and the land round them is flat as round the lots (a world without a backdrop is as before).
+
 ## The benchmark
 
 Opening the game with `?bench=<scene>` plays a saved game state, `web/public/bench/<scene>.json.gz` (`village`: the menus' valley as a new game makes it, with a household of four at home at 17:55 on day 1; `forest`), with the camera on a path fixed in time. It warms up for 5 s, measures for 20 s, and then shows a summary with a "Copy result" button; the result is also in `window.__benchResult`, and with the dev server in `bench-results/`. It works on the deployed site too, so it can run on any laptop. Nothing changes for players without the flag: the settings it changes are for its page alone and never saved, its save slot is deleted, and the renderer's hooks are null checks.
@@ -140,9 +195,11 @@ Opening the game with `?bench=<scene>` plays a saved game state, `web/public/ben
 | `secs`, `warmup` | 20, 5 | Seconds measured, after the warm-up. |
 | `cap` | 0 (default) | Frames per second at most; 0 draws every refresh. |
 | `speed` | 1 (`dusk`: 5) | The game speed while measuring. |
-| `hud`, `gpu` | `0` | `hud=0` hides the interface and the summary; `gpu=0` doesn't time the GPU. |
+| `radius`, `beta`, `tx`, `tz` | e.g. `400` | The orbit's distance (to `TOWN_MAX`, 900 m: the town view), its angle and its target moved. |
+| `townCentre` | `1` | The orbit round the drawn world's main town (`bench=bigworld`) instead of the home lot. |
+| `hud`, `gpu` | `0` | `hud=0` hides the interface and the summary, `hud=game` only the summary (the game as a player has it: the town set's pictures); `gpu=0` doesn't time the GPU. |
 | `label` | text | Kept with the result. |
-| `diag` | `noshadows`, `noclouds`, `noaa`, `nonature` (or one part of it: `nowoods`, `nofarwoods`, `noflowers`, `nograss`), `nolamps`, `nomirrors`, `noglass`, `nonight`, `freeze`, `albedo`, `normals`, `nosims`, `linear` | Leaves features out, to measure what each costs (a comma list). `freeze` stops time for screenshots that compare pixel for pixel, at `at=<s>` along the path. `albedo` and `normals` draw every lit surface as its base colour or world normal (no light, no image processing), `nosims` leaves the residents out, and `linear` draws the light without tone mapping, exposure or grading: the port compared geometry, colour and light apart with them. Works without `bench` too. |
+| `diag` | `noshadows`, `noclouds`, `noaa`, `nonature` (or one part of it: `nowoods`, `nofarwoods`, `noflowers`, `nograss`), `nolamps`, `nomirrors`, `noglass`, `nonight`, `freeze`, `albedo`, `normals`, `nosims`, `linear`, `notown` (the town view's drawing left out) | Leaves features out, to measure what each costs (a comma list). `freeze` stops time for screenshots that compare pixel for pixel, at `at=<s>` along the path. `albedo` and `normals` draw every lit surface as its base colour or world normal (no light, no image processing), `nosims` leaves the residents out, and `linear` draws the light without tone mapping, exposure or grading: the port compared geometry, colour and light apart with them. Works without `bench` too. |
 | `renderer` | `webgl` | WebGL2 instead of WebGPU. |
 
 The result has the frame interval (average, p50, p95, p99), the main thread's work split into the game's update and the renderer's draw (PlayCanvas's update and render), the GPU time (PlayCanvas's GPU profiler: WebGPU timestamp queries, WebGL2 timer queries where offered), draw calls and triangles (all passes, shadow map, mirrors), the render passes with their pixels and bytes, the residents' posing time, lighting updates and reflections drawn a second, long tasks, the adapter, and a fingerprint of scene counts that shows two runs drew the same scene (compare fingerprints only between runs since the PlayCanvas port: they count draws, where earlier runs counted meshes and material clones). The render passes and target bytes count the shadow map as depth only, which it is (up to 0.3.2 it also had a colour target). `diag=shaders` logs every shader and pipeline compiled, with its material, target and phase: after `warmGame` a session in play compiles only for models never seen before. Its `fps` counts its own `requestAnimationFrame` ticks, which is right without a cap and misleading with one.

@@ -20,6 +20,16 @@
       "width": [11, 15],
       "depth": [8, 11]
     },
+    "terraced": {
+      "label": "terraced house",
+      "bedrooms": [1, 3],
+      "living": 1,
+      "extraBathroom": 0,
+      "storeys": { "one": 0, "two": 1 },
+      "width": [6, 8],
+      "depth": [9, 12],
+      "row": true
+    },
     "townhouse": {
       "label": "town house",
       "bedrooms": [2, 3],
@@ -49,8 +59,9 @@
     }
   },
 
-  "$lots": "Which classes a lot of each size gets, with weights.",
+  "$lots": "Which classes a lot of each size gets, with weights. `terrace`: the narrow lots of a main town's terrace rows and semi-detached pairs (web/src/game/macro.ts); a class with `row` is cut to a lot only a metre wider than the house, with no driveway (housegen.ts `fitLot`).",
   "lots": {
+    "terrace": { "terraced": 1 },
     "small": { "cottage": 3, "bungalow": 2, "townhouse": 2 },
     "medium": { "cottage": 1, "bungalow": 3, "townhouse": 2, "family": 3 },
     "large": { "bungalow": 1, "family": 3, "villa": 3 }
@@ -322,12 +333,12 @@
 
   "$extras": "Rooms a house gets besides bedrooms, a kitchen, bathrooms and a living room. Rooms measure at most their `maxSide` (short and long side), so a house with more floor than its rooms may take gets extras, in this order, each if `chance` (per lot size) says so and the floor still has room to spare: upstairs in a two-storey house with `floor: \"upper\"`, families only with `minBedrooms`. Floor left over after that makes the house smaller. `label` names the room in the house's description.",
   "extras": [
-    { "kind": "dining", "label": "a dining room", "chance": { "small": 0.4, "medium": 0.7, "large": 0.9 } },
-    { "kind": "entry", "label": "an entrance hall", "chance": { "small": 0.2, "medium": 0.4, "large": 0.6 } },
-    { "kind": "study", "label": "a study", "floor": "upper", "chance": { "small": 0.3, "medium": 0.5, "large": 0.7 } },
-    { "kind": "playroom", "label": "a playroom", "floor": "upper", "minBedrooms": 2, "chance": { "small": 0.3, "medium": 0.5, "large": 0.6 } },
-    { "kind": "laundry", "label": "a laundry", "chance": { "small": 0.3, "medium": 0.5, "large": 0.7 } },
-    { "kind": "hobby", "label": "a hobby room", "floor": "upper", "chance": { "small": 0.2, "medium": 0.4, "large": 0.6 } }
+    { "kind": "dining", "label": "a dining room", "chance": { "terrace": 0.6, "small": 0.4, "medium": 0.7, "large": 0.9 } },
+    { "kind": "entry", "label": "an entrance hall", "chance": { "terrace": 0.3, "small": 0.2, "medium": 0.4, "large": 0.6 } },
+    { "kind": "study", "label": "a study", "floor": "upper", "chance": { "terrace": 0.3, "small": 0.3, "medium": 0.5, "large": 0.7 } },
+    { "kind": "playroom", "label": "a playroom", "floor": "upper", "minBedrooms": 2, "chance": { "terrace": 0.2, "small": 0.3, "medium": 0.5, "large": 0.6 } },
+    { "kind": "laundry", "label": "a laundry", "chance": { "terrace": 0.4, "small": 0.3, "medium": 0.5, "large": 0.7 } },
+    { "kind": "hobby", "label": "a hobby room", "floor": "upper", "chance": { "terrace": 0.2, "small": 0.2, "medium": 0.4, "large": 0.6 } }
   ],
 
   "$openPlan": "Chance that the kitchen and living room share one open space (no wall between them).",

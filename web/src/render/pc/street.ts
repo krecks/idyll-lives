@@ -33,6 +33,7 @@ import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry } from '../../assets/types';
 import type { FenceStyleDef } from '../../content/content';
 import type { WorldStructure } from '../../core/protocol';
+import type { TownLotHouse } from '../shared/townBuildings';
 import type { ViewRect } from '../types';
 import type { RGB } from '../shared/environment';
 import type { Geo, MeshData } from '../shared/geometry';
@@ -215,6 +216,8 @@ export class Street {
   private readonly framedAt = new LookedFrom();
   /** The streetlights' pools are drawn (at night: `setNight`). */
   private poolsLit = false;
+  /** The town view draws the far LOD's houses (`setTownView`): the street's own far groups are hidden meanwhile. */
+  private townView = false;
 
   constructor(
     private readonly app: pc.AppBase,
@@ -588,7 +591,7 @@ export class Street {
     if (!this.framedAt.moved(x, z, REFRAME)) return;
     for (const g of this.farGroups.values()) {
       if (!g.entity) continue;
-      g.entity.enabled = Math.hypot(g.x - x, g.z - z) <= this.farCull + SUPERCHUNK * 0.71;
+      g.entity.enabled = !this.townView && Math.hypot(g.x - x, g.z - z) <= this.farCull + SUPERCHUNK * 0.71;
     }
     for (const [k, p] of this.placed) {
       if (!p.far || !this.used.has(k)) continue;
@@ -599,6 +602,43 @@ export class Street {
         showCell(c);
       }
     }
+  }
+
+  /**
+   * The town view (`pc/townView.ts`) draws the far LOD's houses while it is in (`on`), all of them at once: the
+   * street's own far groups are hidden meanwhile (and shown again by `frame` once it is out).
+   */
+  setTownView(on: boolean): void {
+    if (on === this.townView) return;
+    this.townView = on;
+    this.framedAt.forget();
+  }
+
+  /**
+   * The lots' houses the far LOD draws, each with the chunk it is in and how it looks (the town view's,
+   * `townView.ts` `lotBuilding`); the focus lot's left out. Made again only when the town or the focus changes.
+   */
+  townHouses(): readonly TownLotHouse[] {
+    const town = this.town;
+    if (!town) return [];
+    const key = `${this.layoutKey}|${this.focus}`;
+    if (this.townHousesOf?.key !== key) {
+      const planner = this.house.planner;
+      const list = town.townHouses(this.focus).map(({ chunk, plot }): TownLotHouse => ({ id: plot.id, chunk, storeys: plot.storeys ?? 1, ...planner.farLook({ x: plot.x, z: plot.z, house: plot.house!, roof: plot.roof, storeys: plot.storeys }) }));
+      this.townHousesOf = { key, list };
+    }
+    return this.townHousesOf.list;
+  }
+  private townHousesOf: { key: string; list: TownLotHouse[] } | null = null;
+
+  /** Whether chunk `id` is drawn in full (streamed in, or every chunk is), so the far LOD leaves its houses out. */
+  chunkDrawn(id: number): boolean {
+    return !this.wanted || this.wanted.has(id);
+  }
+
+  /** The chunks drawn in full (null: all), as a key: what the town view's far lots were last chosen by. */
+  get drawnKey(): string {
+    return this.wanted ? [...this.wanted].sort((a, b) => a - b).join(',') : 'all';
   }
 
   /** The streetlights' pools among `entities` drawn only at night (`poolsLit`). */

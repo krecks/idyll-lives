@@ -10,6 +10,7 @@ import { mulberry32 } from '../src/game/noise';
 import type { BodyData, MorphSet } from '../src/render/shared/characters/data';
 import { faceOf, writeIdentity } from '../src/render/shared/characters/identity';
 import { IDENTITY_PAIRS } from '../src/render/shared/characters/layout';
+import { MAX_CHARACTERS } from '../src/render/shared/characters/rig';
 
 /** No palettes: every colour is the fallback, the faces are what is looked at. */
 const assets = { get: () => undefined } as unknown as AssetRegistry;
@@ -39,8 +40,8 @@ describe('faces', () => {
 
   test('a look without a face gets one from the id: always the same, and nobody else has it', () => {
     expect(faceFromId(12)).toEqual(faceFromId(12));
-    const faces = new Set(Array.from({ length: 208 }, (_, id) => JSON.stringify(faceFromId(id))));
-    expect(faces.size).toBe(208);
+    const faces = new Set(Array.from({ length: MAX_CHARACTERS }, (_, id) => JSON.stringify(faceFromId(id))));
+    expect(faces.size).toBe(MAX_CHARACTERS);
     const own = { jawWidth: 0.4 };
     expect(faceOf({ face: own } as never, 3)).toBe(own);
     expect(faceOf({} as never, 3)).toBe(faceFromId(3));

@@ -143,10 +143,35 @@ describe('driveways', async () => {
   }
 
   // Seed base 13's Snowdale: the driveway of plot 112 stopped where its line crossed a trail, 16 m
-  // short of the lane its car drives onto, and the car drove over the grass between.
-  test('mountain 207684 (Snowdale): every driveway is paved all the way to its road, across a trail', () => {
-    const file = townFile('mountain', 207684);
-    expect(file.cars.some((c) => c.plot === 112)).toBe(true);
-    expect(wayOutProblems(file)).toEqual([]);
-  }, 30_000);
+  // short of the lane its car drives onto, and the car drove over the grass between. Snowdale's
+  // hamlets have other houses since the living town's terraces (2026-11-12), and whichever plot
+  // has such a driveway moves as the layout does: the first of these worlds with a car whose
+  // driveway's line crosses a trail on the way to its road has it paved across.
+  const acrossTrail: [WorldKind, number][] = [
+    ['mountain', 241142],
+    ['mountain', 207684],
+    ['mountain', 128494],
+  ];
+  test('a driveway across a trail is paved all the way to its road', () => {
+    const crossing = (file: TownFile) =>
+      file.cars.find((car) => {
+        const drive = file.drives.find((d) => d.plot === car.plot);
+        if (drive?.road === undefined) return false;
+        const road = file.roads[drive.road];
+        const way: Pt = drive.frontX ? [drive.frontX, 0] : [0, drive.front];
+        for (let k = 0; k < 40; k += 0.25) {
+          const q: Pt = [car.x + way[0] * k, car.z + way[1] * k];
+          if (off(road.points, q) <= road.width / 2) return false;
+          if (file.roads.some((r) => r.kind === 'trail' && off(r.points, q) <= r.width / 2)) return true;
+        }
+        return false;
+      });
+    for (const [kind, seed] of acrossTrail) {
+      const file = townFile(kind, seed);
+      if (!crossing(file)) continue;
+      expect(wayOutProblems(file)).toEqual([]);
+      return;
+    }
+    throw new Error(`no driveway across a trail in ${acrossTrail.map(([k, s]) => `${k} ${s}`).join(', ')}: find another world that has one`);
+  }, 120_000);
 });

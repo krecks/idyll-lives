@@ -77,13 +77,20 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
   const rooms = Array.from(outdoor, (o) => (o ? 0 : 1));
 
   const plots: PlotInfo[] = layout.plots.map((p, id) => {
-    // Bounding box of the walls on the plot (sim-core `house_bounds`).
+    // Bounding box of the walls on the plot (sim-core `house_bounds`): a wall on the plot's own edge only where the
+    // plot's tile beside it is indoors (next door's wall on the shared line, a terrace's, is next door's).
     let box: [number, number, number, number] | null = null;
     const grow = (ax: number, az: number, bx: number, bz: number) => {
       box = box ? [Math.min(box[0], ax), Math.min(box[1], az), Math.max(box[2], bx), Math.max(box[3], bz)] : [ax, az, bx, bz];
     };
-    for (let z = p.z; z <= Math.min(p.z + p.d, D); z++) for (let x = p.x; x < Math.min(p.x + p.w, W); x++) if (h[z * W + x]) grow(x, z, x + 1, z);
-    for (let z = p.z; z < Math.min(p.z + p.d, D); z++) for (let x = p.x; x <= Math.min(p.x + p.w, W); x++) if (v[z * (W + 1) + x]) grow(x, z, x, z + 1);
+    const indoors = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < D && !outdoor[z * W + x];
+    const [x1, z1] = [p.x + p.w, p.z + p.d];
+    for (let z = p.z; z <= Math.min(z1, D); z++) {
+      for (let x = p.x; x < Math.min(x1, W); x++) if (h[z * W + x] && !(z === p.z && !indoors(x, z)) && !(z === z1 && !indoors(x, z - 1))) grow(x, z, x + 1, z);
+    }
+    for (let z = p.z; z < Math.min(z1, D); z++) {
+      for (let x = p.x; x <= Math.min(x1, W); x++) if (v[z * (W + 1) + x] && !(x === p.x && !indoors(x, z)) && !(x === x1 && !indoors(x - 1, z))) grow(x, z, x, z + 1);
+    }
     return { id, name: p.name, x: p.x, z: p.z, w: p.w, d: p.d, public: p.public, entry: p.entry, house: box, storeys: p.storeys };
   });
 
@@ -99,7 +106,12 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
 
   const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths: layout.paths, facing: layout.facing, seed: town.seed ?? 1, world: worldLook(town, layout.fields), home: playerSlot, gardenFences: true };
   // A big world's land and areas, as the town file carries them (`assembleTown`).
-  if (town.open) Object.assign(meta, { zones: town.open.zones, pads: town.open.pads, areas: town.open.areas });
+  if (town.open) {
+    const { zones, pads, areas, backdrop, places, centre } = town.open;
+    // (And the living town's backdrop, places and centres: the land is cleared for them as in the game, and the
+    // town view over a preview, the bench's Big world, draws them.)
+    Object.assign(meta, { zones, pads, areas, ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...(centre ? { centre } : {}) });
+  }
   return {
     version: 0,
     lotVersion: 0,

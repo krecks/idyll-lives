@@ -7,6 +7,15 @@
  *
  *   bun tools/bench/scene.mjs --name village [--world medium|forest|mountain|…] [--hour 18] [--port 5221]
  *
+ * `--seed <n>`: the new world's seed (the same kind and seed give the same town, neighbours and household; with it
+ * `medium` is a new world too, not the menu's valley). `--home town`: the household moves into a home for sale in the main town (the one
+ * halfway out among those for sale there) instead of the first for sale anywhere. The town view's scenes
+ * (`render.mjs --poses town`: `town-day`, `town-dusk`, `town-night`) are made so, one town at three hours:
+ *
+ *   bun tools/bench/scene.mjs --name town-day --world small --seed 7 --home town --hour 13
+ *   bun tools/bench/scene.mjs --name town-dusk --world small --seed 7 --home town --hour 19.5
+ *   bun tools/bench/scene.mjs --name town-night --world small --seed 7 --home town --hour 23
+ *
  * Starts its own Vite on `--port` (or uses `--url`). Needs Playwright like render.mjs, and runs
  * headless on the real GPU like it (`--headed` for a window).
  */
@@ -27,6 +36,8 @@ const flag = (name, fallback) => {
 };
 const name = flag('name', 'village');
 const world = flag('world', 'medium');
+const seed = flag('seed', null) === null ? null : Number(flag('seed', null));
+const homeIn = flag('home', 'first');
 const goal = Number(flag('hour', '18')) * 60 - 5;
 const port = Number(flag('port', '5221'));
 const base = flag('url', null) ?? `http://localhost:${port}`;
@@ -55,21 +66,48 @@ try {
   await page.goto(`${base}/?debug&seed=7`);
   // (Dev server modules, imported by their paths: the same instances the game uses.)
   await page.waitForFunction(async () => !(await import('/src/ui/app.svelte.ts')).app.booting, null, { timeout: 120_000, polling: 500 });
-  const started = await page.evaluate(async (kind) => {
-    const { app } = await import('/src/ui/app.svelte.ts');
-    const { menuScene } = await import('/src/game/menuScene.ts');
-    const { services } = await import('/src/ui/services.ts');
-    const { generateWorld, populate, loadTemplates, vacantSlots } = await import('/src/game/town.ts');
-    const { randomHousehold } = await import('/src/game/household.ts');
-    const t = await loadTemplates();
-    const empty = kind === 'medium' ? { ...(await menuScene.showcaseDraft()), households: [] } : generateWorld(services.content, t, kind);
-    const town = populate(services.content, services.assets, t, empty);
-    const household = randomHousehold(services.content, services.assets, 4, town.households.map((h) => h.household.name));
-    const slot = vacantSlots(town)[0].index;
-    Object.assign(app, { world: empty, town, household, homeSlot: slot });
-    app.start(app.homeRequest(slot));
-    return { world: town.world?.kind, households: town.households.length, neighbours: town.households.reduce((n, h) => n + h.household.members.length, 0) };
-  }, world);
+  const started = await page.evaluate(
+    async ({ kind, seed, homeIn }) => {
+      const { app } = await import('/src/ui/app.svelte.ts');
+      const { menuScene } = await import('/src/game/menuScene.ts');
+      const { services } = await import('/src/ui/services.ts');
+      const { generateWorld, populate, loadTemplates, vacantSlots } = await import('/src/game/town.ts');
+      const { randomHousehold } = await import('/src/game/household.ts');
+      const t = await loadTemplates();
+      const empty = kind === 'medium' && seed === null ? { ...(await menuScene.showcaseDraft()), households: [] } : generateWorld(services.content, t, kind, seed ?? undefined);
+      // (With a seed, the neighbours and the household are the same ones every time too: their dice are the seed's
+      // while they are made, the household's its own, however many the neighbours took.)
+      const dice = Math.random;
+      const seeded = (n) => {
+        let a = (n ^ 0x9e3779b9) >>> 0;
+        Math.random = () => {
+          a = (a + 0x6d2b79f5) >>> 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      };
+      if (seed !== null) seeded(seed);
+      const town = populate(services.content, services.assets, t, empty);
+      if (seed !== null) seeded(seed + 1);
+      const household = randomHousehold(services.content, services.assets, 4, town.households.map((h) => h.household.name));
+      Math.random = dice;
+      // The home: the first for sale, or (`--home town`) the one halfway out among those for sale in the main town.
+      const vacant = vacantSlots(town);
+      let slot = vacant[0].index;
+      const main = town.areas?.[0];
+      if (homeIn === 'town' && main) {
+        const [cx, cz] = [main.x + main.w / 2, main.z + main.d / 2];
+        const far = (s) => Math.hypot(s.x - cx, s.z - cz);
+        const inMain = vacant.filter((s) => (s.area ?? 0) === 0).sort((a, b) => far(a) - far(b) || a.index - b.index);
+        if (inMain.length) slot = inMain[Math.floor(inMain.length / 2)].index;
+      }
+      Object.assign(app, { world: empty, town, household, homeSlot: slot });
+      app.start(app.homeRequest(slot));
+      return { world: town.world?.kind, seed: town.seed, slot, households: town.households.length, neighbours: town.households.reduce((n, h) => n + h.household.members.length, 0) };
+    },
+    { kind: world, seed, homeIn },
+  );
   console.log(`scene: started`, started);
   await page.waitForFunction(() => !!window.__osw && !!document.querySelector('.hud-root'), null, { timeout: 120_000, polling: 500 });
   await page.waitForTimeout(2000);

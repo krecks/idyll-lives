@@ -31,11 +31,24 @@
   const sizeHint = $derived(world ? `${homes} homes${hamlets ? ` in a town and ${hamlets} hamlets` : ''} · ${world.width} × ${world.depth} m · up to ${NEIGHBOUR_CAP} neighbours` : '');
 
   // Public places and farms have their names on them; plain houses are left untagged (the town reads better).
-  const labels = $derived<LotLabel[]>(
-    world
-      ? world.slots.flatMap((s): LotLabel[] => (s.kind !== 'house' ? [{ plot: s.index, title: s.name, kind: 'park' }] : s.lot === 'farm' ? [{ plot: s.index, title: s.name, kind: 'sale' }] : []))
-      : [],
-  );
+  // A big world's areas each pick their own shops, so one name can come up in two of them: a repeat
+  // says which hamlet it is in (the town's own needs no saying).
+  const labels = $derived.by((): LotLabel[] => {
+    const w = world;
+    if (!w) return [];
+    const shown = w.slots.filter((s) => s.kind !== 'house' || s.lot === 'farm');
+    const times = new Map<string, number>();
+    for (const s of shown) times.set(s.name, (times.get(s.name) ?? 0) + 1);
+    return shown.map((s) => {
+      const area = s.area ?? 0;
+      return {
+        plot: s.index,
+        title: s.name,
+        sub: area > 0 && (times.get(s.name) ?? 0) > 1 ? w.open?.areas[area]?.name : undefined,
+        kind: s.kind === 'house' ? 'sale' : 'park',
+      };
+    });
+  });
 
   /** The world being laid out (the town worker: a big one takes a few seconds); a newer one replaces it. */
   let job: AbortController | null = null;
@@ -140,13 +153,13 @@
 
 <div class="screen scaled">
   <div class="haze" aria-hidden="true"></div>
-  <header>
+  <header use:avoid>
     <button class="btn ghost back" onclick={() => app.toMenu()}><Icon name="icon.ui.back" size={18} /> Menu</button>
     <div class="title">
       <span class="eyebrow">Step 1 of 4 · A new world</span>
-      <div class="name-row">
+      <div class="name-field">
         <input class="input town-name" aria-label="Town name" bind:value={name} oninput={() => (named = true)} maxlength="24" />
-        <button class="btn ghost" aria-label="Another name" title="Another name" onclick={rollName}><Icon name="icon.ui.dice" size={18} /></button>
+        <button class="btn ghost roll" aria-label="Another name" title="Another name" onclick={rollName}><Icon name="icon.ui.dice" size={18} /></button>
       </div>
       {#if world?.world}
         {#key world.seed}<p class="lede">{world.world.tagline}</p>{/key}
@@ -210,7 +223,7 @@
       {/if}
     </section>
 
-    <aside class="kinds menu-glass">
+    <aside class="kinds menu-glass" use:avoid>
       <header class="list-head">
         <span class="eyebrow">Where it takes place</span>
       </header>
@@ -268,26 +281,53 @@
   .title .eyebrow {
     color: #4a5163;
   }
-  .name-row {
+  /* The name is a field you can type in, not a heading: a surface and a hairline of its own at rest,
+     a solid field under the pointer, the accent ring while it has the caret. The dice (roll another
+     name) sits in the field's end. */
+  .name-field {
     display: flex;
     align-items: center;
-    gap: 4px;
+    max-width: 440px;
+    padding: 0 4px 0 12px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--surface) 62%, transparent);
+    transition:
+      background var(--fast) var(--ease),
+      border-color var(--fast) var(--ease),
+      box-shadow var(--fast) var(--ease);
   }
-  .town-name {
-    max-width: 380px;
+  .name-field:hover {
+    background: var(--surface);
+  }
+  .name-field:focus-within {
+    background: var(--surface);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .name-field .town-name {
+    flex: 1;
+    min-width: 0;
+    height: 46px;
+    padding: 0;
     font-size: 26px;
     font-weight: 750;
     letter-spacing: -0.025em;
-    height: 46px;
     color: var(--text-strong);
     background: transparent;
-    border-color: transparent;
-    padding-left: 0;
+    border: none;
+    box-shadow: none;
   }
-  .town-name:hover,
-  .town-name:focus {
-    background: var(--surface);
-    padding-left: 12px;
+  .name-field .town-name:focus {
+    border: none;
+    box-shadow: none;
+  }
+  .roll {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    color: #4a5163;
   }
   .lede {
     margin: 0;
@@ -336,6 +376,9 @@
     display: grid;
     grid-template-rows: 1fr auto;
     gap: 14px;
+    /* The stream pill floats at the window's bottom edge, centred (StreamIndicator): the controls
+       bar and the stats stay clear above it rather than under it. */
+    padding-bottom: calc(70px / var(--ui-scale));
   }
   /* Over the town while the next one is laid out (it stays in view meanwhile). */
   .making {

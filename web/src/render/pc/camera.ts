@@ -28,6 +28,8 @@ export class GameCamera {
   private readonly clip = new pc.Vec4();
   private readonly rayPoint = new pc.Vec3();
   private lens!: Lens;
+  /** The near plane (m) the next pose is given instead of the lens's own (`setPlanes`); 0: the lens's. */
+  private nearHeld = 0;
 
   constructor(parent: pc.Entity, lens: Lens, name = 'camera') {
     this.entity = new pc.Entity(name);
@@ -46,6 +48,15 @@ export class GameCamera {
     c.fov = (lens.fov * 180) / Math.PI;
     c.nearClip = lens.near;
     c.farClip = lens.far;
+  }
+
+  /**
+   * The planes for the poses from now on, instead of the lens's own: `near` (m; 0: the lens's, by its share of the
+   * camera's distance) and `far`. The town view's (`shared/townCamera.ts`): the further out, the further both.
+   */
+  setPlanes(near: number, far: number): void {
+    this.nearHeld = near;
+    if (this.camera.farClip !== far) this.camera.farClip = far;
   }
 
   /**
@@ -87,8 +98,8 @@ export class GameCamera {
     this.entity.setPosition(this.eye);
     this.entity.lookAt(this.aim, pc.Vec3.UP);
     const { near, nearShare } = this.lens;
-    if (nearShare) {
-      const at = Math.max(near, radius * nearShare);
+    if (nearShare || this.nearHeld) {
+      const at = this.nearHeld || Math.max(near, radius * (nearShare ?? 0));
       // (The component's setter tells its listeners every time, changed or not.)
       if (this.camera.nearClip !== at) this.camera.nearClip = at;
     }
@@ -137,6 +148,30 @@ export class GameCamera {
   viewProjection(): Float32Array {
     this.view.copy(this.entity.getWorldTransform()).invert();
     return this.viewProj.mul2(this.camera.camera.projectionMatrix, this.view).data;
+  }
+
+  /**
+   * The view-projection as it stands now, copied into `out` (16 numbers): kept by who projects many points over a
+   * frame (`projectWith`), while `viewProjection`'s own array moves on with the camera.
+   */
+  viewProjectionInto(out: Float32Array): void {
+    out.set(this.viewProjection());
+  }
+
+  /**
+   * Where the game-space point (x, y, z) shows on a canvas `width` × `height` CSS pixels, by the view-projection
+   * `vp` (`viewProjectionInto`): `[x, y, depth]`, the depth in metres along the view; null when it is behind the
+   * camera or off the canvas. A new array each call: the caller may keep it.
+   */
+  static projectWith(vp: Float32Array, x: number, y: number, z: number, width: number, height: number): [number, number, number] | null {
+    // (Game space to PlayCanvas: z turned round.)
+    const wz = -z;
+    const cw = vp[3] * x + vp[7] * y + vp[11] * wz + vp[15];
+    if (!(cw > 0)) return null;
+    const nx = (vp[0] * x + vp[4] * y + vp[8] * wz + vp[12]) / cw;
+    const ny = (vp[1] * x + vp[5] * y + vp[9] * wz + vp[13]) / cw;
+    if (!(nx >= -1 && nx <= 1 && ny >= -1 && ny <= 1)) return null;
+    return [((nx + 1) / 2) * width, ((1 - ny) / 2) * height, cw];
   }
 
   /**
