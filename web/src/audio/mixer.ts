@@ -1,7 +1,9 @@
 /**
  * One audio context for the whole game, with a bus each for interface sounds (`ui/sfx.ts`),
  * resident voices (`voice/player.ts`) and the sounds of the world (`audio/world.ts`), each with
- * its own volume setting, all through a limiter and the master volume.
+ * its own volume setting, all through a limiter and the master volume. The voices and the world's
+ * sounds are placed in a space on their way into their bus (`space`, `space.ts`: left to right,
+ * rooms, walls, and for the world the camera's distance).
  *
  * The mix: while a resident speaks the world's sounds give way to the voice (`DUCK`), and what the
  * buses add up to goes through a limiter (`LIMIT`), so a shower, a blender and two voices at once
@@ -16,6 +18,7 @@
 
 import { settings } from '../settings/settings.svelte';
 import { EFFECTS_LEVEL } from './catalog';
+import { Space } from './space';
 
 export type Bus = 'effects' | 'voices' | 'world';
 
@@ -43,6 +46,8 @@ let duck: GainNode | null = null;
 /** Voice clips playing now. */
 let speaking = 0;
 const buses = new Map<Bus, GainNode>();
+/** The space the world's sounds and the voices are heard in (`space.ts`): their places, walls and rooms, and for the world the camera's distance. */
+const spaces = new Map<Bus, Space>();
 /** The master volume last asked for (it fades there). */
 let masterTarget = -1;
 /** Another window has focus. */
@@ -70,6 +75,19 @@ export function bus(name: Bus): GainNode | null {
   gain.gain.value = level(name);
   fadeMaster();
   return gain;
+}
+
+/** The space the bus's sounds are placed in (`space.ts`): the world's far with the camera, the voices' always near. */
+export function space(name: 'world' | 'voices'): Space | null {
+  const ac = audioContext();
+  const out = bus(name);
+  if (!ac || !out) return null;
+  let s = spaces.get(name);
+  if (!s) {
+    s = new Space(ac, out, name === 'world');
+    spaces.set(name, s);
+  }
+  return s;
 }
 
 /**

@@ -22,6 +22,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { everySound, GUARD, type Group } from '../../web/src/audio/catalog';
 import { loudness as loudnessAt } from '../../web/src/audio/loudness';
+import { fft, spaced, type Hearing } from '../../web/src/audio/offline';
+import { ROOM_SIZES, ROOMS, roomResponse } from '../../web/src/audio/rooms';
 
 const RATE = 48_000;
 /** The checkout. */
@@ -68,38 +70,6 @@ function level_(l: Float32Array, r: Float32Array): { peak: number; rms: number }
     sum += l[i] * l[i] + r[i] * r[i];
   }
   return { peak: db(peak), rms: db(Math.sqrt(sum / Math.max(1, n * 2))) };
-}
-
-/** The DFT of `re` + i·`im`, in place (radix-2: the length a power of two). */
-function fft(re: Float64Array, im: Float64Array): void {
-  const n = re.length;
-  // Bit-reversed order, then the butterflies, each stage twice as wide.
-  for (let i = 1, j = 0; i < n; i++) {
-    let bit = n >> 1;
-    for (; j & bit; bit >>= 1) j ^= bit;
-    j ^= bit;
-    if (i < j) {
-      [re[i], re[j]] = [re[j], re[i]];
-      [im[i], im[j]] = [im[j], im[i]];
-    }
-  }
-  for (let len = 2; len <= n; len <<= 1) {
-    const half = len >> 1;
-    const step = (-2 * Math.PI) / len;
-    for (let k = 0; k < half; k++) {
-      const wr = Math.cos(step * k);
-      const wi = Math.sin(step * k);
-      for (let i = k; i < n; i += len) {
-        const j = i + half;
-        const tr = re[j] * wr - im[j] * wi;
-        const ti = re[j] * wi + im[j] * wr;
-        re[j] = re[i] - tr;
-        im[j] = im[i] - ti;
-        re[i] += tr;
-        im[i] += ti;
-      }
-    }
-  }
 }
 
 /**
@@ -207,6 +177,35 @@ for (const { name, group, plays, level, note, heard: make } of sounds) {
     `${name.padEnd(15)} ${group.padEnd(9)} ${num(secs, 2).padStart(5)} s  ${plays.padEnd(4)}  level ${shown.padEnd(6)}  peak ${num(peak).padStart(6)}  rms ${num(rms).padStart(6)} dBFS  ${num(loud).padStart(6)} LUFS  centroid ${num(c, 0).padStart(6)} Hz  ${who}`,
   );
 }
+// The same sounds heard from somewhere: in a room, through a wall, from far off (`space.ts`, worked out by `offline.ts`).
+const SPACED = ['tv', 'shower', 'knock'];
+const FROM: [string, Hearing, string][] = [
+  ...ROOM_SIZES.map((size): [string, Hearing, string] => [`room-${size}`, { room: size }, `in a ${size} room (its reverb ${num(db(ROOMS[size].send))} dB under the sound)`]),
+  ['wall', { muffle: 1 }, 'from another room, the camera close in on this one'],
+  ['far', { radius: 95 }, 'from the play camera\'s farthest, 95 m'],
+  ['town', { radius: 400 }, 'from the town view, 400 m'],
+];
+const spacedRows: string[] = [];
+console.log('\nheard from somewhere');
+for (const name of SPACED) {
+  const sound = sounds.find((s) => s.name === name)!;
+  const dry = sound.heard(RATE);
+  const plain = loudnessAt(dry.left, dry.right, RATE);
+  for (const [tag, from, words] of FROM) {
+    const { left, right } = spaced(dry, RATE, from, sound.plays === 'loop');
+    const loud = loudnessAt(left, right, RATE);
+    const c = centroid(left, right);
+    const file = `space-${name}-${tag}.wav`;
+    writeFileSync(join(OUT, file), wav(left, right));
+    spacedRows.push(`| \`${file}\` | \`${name}\` ${words} | ${num(loud)} | ${num(loud - plain)} | ${num(c, 0)} |`);
+    console.log(`${file.padEnd(30)} ${num(loud).padStart(6)} LUFS  ${num(loud - plain).padStart(6)} LU  centroid ${num(c, 0).padStart(6)} Hz  ${words}`);
+  }
+}
+for (const size of ROOM_SIZES) {
+  const { left, right } = roomResponse(size, RATE);
+  writeFileSync(join(OUT, `room-${size}.wav`), wav(left, right));
+}
+
 writeFileSync(
   join(OUT, 'index.md'),
   [
@@ -230,6 +229,16 @@ writeFileSync(
     'is the middle of the sound\'s energy in Hz (a fan sits low, a hi-hat high). A loop is made to be',
     'repeated, its end running on into its start; a sound played once is a use starting or ending, a bird\'s',
     'song, a knock, a click of the interface.',
+    '',
+    '## Heard from somewhere',
+    '',
+    'Three of them as the mix places them (`web/src/audio/space.ts`): in a room of each size (the sound plus',
+    'its reverb), through a wall, and from far off. `room-small.wav`, `room-medium.wav` and `room-large.wav`',
+    'are the rooms\' responses themselves (a click heard in each).',
+    '',
+    '| file | what | LUFS | against the sound alone | centroid |',
+    '|---|---|---|---|---|',
+    ...spacedRows,
     '',
     '"by its animation" means no content names the sound: it comes from the animation tag the use',
     'plays (`world.ts` \'s `ACTION_SOUNDS`), so it is heard wherever that animation is (an oven\'s fan',

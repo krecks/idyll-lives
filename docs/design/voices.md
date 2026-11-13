@@ -485,8 +485,13 @@ file; the web side merges them over it key by key (sim-core ignores `voice`). Se
 
 - One shared `AudioContext` with sound effects (`ui/sfx.ts` is refactored to expose it), with
   separate gain nodes for effects and voices.
-- Each speaking resident gets a `PannerNode` at their head position (`renderer.simHead`),
-  updated about 10 times a second, so voices come from where the resident stands.
+- Each clip plays through a `StereoPannerNode` (`voice/player.ts`, `audio/space.ts` `Placed`): left
+  to right by where the resident's head is on screen (`renderer.simHead` projected, 0.7 of the way
+  to either side at the screen's edges), updated about 10 times a second, so a voice comes from
+  where the resident stands in the picture. There is no 3D panner and no distance: a voice is as
+  loud from far as from near. It takes the reverb of the room the resident stands in (a send into
+  the room's convolver; dry outdoors) and, with the camera closed in on another room, the wall's
+  muffling, as the world's sounds do (`docs/design/sound.md`).
 - The speech bubble appears straight away; the voice follows when its clip is ready.
 - **Lip sync.** Every clip comes with a viseme track (`crates/voice/src/visemes.rs`), made in Rust
   together with the audio. Pocket TTS gives no durations, so the phonemes are mapped to the 15
@@ -513,7 +518,7 @@ Web code lives in `web/src/voice/`, behind one small interface used by the game 
 | `voice/pocket.ts` | One line with Pocket TTS (the worker and the Node checks share it). |
 | `voice/record.ts` | A player's own voice from the microphone or a sound file. |
 | `voice/benchmark.ts` | The benchmark and the device choice. |
-| `voice/player.ts` | Voice bus, panners, clip cache. |
+| `voice/player.ts` | Plays a clip on the voice bus at its place (panner, room, wall). |
 
 ## Phases
 

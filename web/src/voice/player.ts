@@ -1,15 +1,18 @@
 /**
- * Plays voice clips through Web Audio: the voice bus (`audio/mixer.ts`, "Voice volume"), and a
- * stereo panner per clip so a voice comes from where the resident is on screen. While a clip plays
- * the world's sounds give way to it (`voiceSpeaking`).
+ * Plays voice clips through Web Audio: the voice bus (`audio/mixer.ts`, "Voice volume"), each clip at
+ * its place (`audio/space.ts`): a stereo panner so a voice comes from where the resident is on screen,
+ * the reverb of the room they speak in, and a wall's muffling when the camera is in on another room.
+ * A voice is not made quieter by the camera's distance. While a clip plays the world's sounds give way
+ * to it (`voiceSpeaking`).
  */
 
-import { audioContext, bus, onHide, updateVolumes, voiceSpeaking } from '../audio/mixer';
+import { audioContext, bus, onHide, space, updateVolumes, voiceSpeaking } from '../audio/mixer';
+import { Placed, type Place } from '../audio/space';
 import { SAMPLE_RATE } from './protocol';
 
 export interface Playing {
-  /** -1 (left) .. 1 (right). */
-  setPan(pan: number): void;
+  /** Where the speaker is now (left to right, their room, behind a wall or not). */
+  setPlace(place: Place): void;
   stop(): void;
   readonly ended: Promise<void>;
   /** When its first sample is heard: seconds on the `performance.now()` clock (output latency included). */
@@ -22,17 +25,18 @@ onHide(() => {
   for (const stop of [...playing]) stop();
 });
 
-export function playClip(samples: Float32Array, pan = 0): Playing | null {
+/** Plays a clip at `place`; without one (the menus), in the middle with no room. */
+export function playClip(samples: Float32Array, place: Place = { pan: 0 }): Playing | null {
   const ac = audioContext();
   const voices = bus('voices');
-  if (!ac || !voices || samples.length === 0) return null;
+  const around = space('voices');
+  if (!ac || !voices || !around || samples.length === 0) return null;
   const buffer = ac.createBuffer(1, samples.length, SAMPLE_RATE);
   buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
   const src = ac.createBufferSource();
   src.buffer = buffer;
-  const panner = ac.createStereoPanner();
-  panner.pan.value = pan;
-  src.connect(panner).connect(voices);
+  const placed = new Placed(ac, around, place);
+  src.connect(placed.input);
   const stop = () => {
     try {
       src.stop();
@@ -46,7 +50,11 @@ export function playClip(samples: Float32Array, pan = 0): Playing | null {
   const ended = new Promise<void>((resolve) => {
     done = () => {
       // (Once: a clip stopped by hand also gets its `ended` event.)
-      if (playing.delete(stop)) voiceSpeaking(false);
+      if (playing.delete(stop)) {
+        voiceSpeaking(false);
+        // (Its room goes on a moment after it: the longest response is under a second.)
+        setTimeout(() => placed.disconnect(), 1000);
+      }
       resolve();
     };
   });
@@ -56,8 +64,8 @@ export function playClip(samples: Float32Array, pan = 0): Playing | null {
   src.start();
   const startTime = performance.now() / 1000 + (ac.outputLatency || ac.baseLatency || 0);
   return {
-    setPan(p) {
-      panner.pan.setTargetAtTime(Math.max(-1, Math.min(1, p)), ac.currentTime, 0.05);
+    setPlace(p) {
+      placed.place(p, ac.currentTime);
     },
     stop,
     ended,
