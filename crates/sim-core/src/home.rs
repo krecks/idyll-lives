@@ -48,6 +48,9 @@ pub(crate) struct HomeSnapshot {
     /// The garages, the cars (one parks in front of a garage built at the end of its driveway) and
     /// the tiles they take up.
     garages: Vec<crate::cars::Garage>,
+    /// The porches and porch pieces (a post's tile is in `car_tiles`, as a garage's).
+    porches: Vec<crate::porches::Porch>,
+    porch_pieces: Vec<crate::porches::PorchPiece>,
     cars: Vec<crate::cars::Car>,
     car_tiles: Vec<usize>,
     cars_parked: Option<Vec<u64>>,
@@ -147,6 +150,8 @@ impl World {
             plots: self.plots.clone(),
             items: self.items.clone(),
             garages: self.garages.clone(),
+            porches: self.porches.clone(),
+            porch_pieces: self.porch_pieces.clone(),
             cars: self.cars.clone(),
             car_tiles: self.car_tiles.clone(),
             cars_parked: self.cars_parked.clone(),
@@ -169,7 +174,9 @@ impl World {
             || before.objects != self.objects
             || lot_changed
             || before.plots != self.plots
-            || before.garages != self.garages;
+            || before.garages != self.garages
+            || before.porches != self.porches
+            || before.porch_pieces != self.porch_pieces;
         if !changed {
             return;
         }
@@ -276,6 +283,11 @@ impl World {
         self.object_plot = s.object_plot;
         self.blocked = s.blocked;
         self.garages = s.garages;
+        if (&self.porches, &self.porch_pieces) != (&s.porches, &s.porch_pieces) {
+            self.structure_version = self.structure_version.wrapping_add(1);
+        }
+        self.porches = s.porches;
+        self.porch_pieces = s.porch_pieces;
         // (The work taxis as they are now: the runs drive them, `taxi.rs`.)
         let taxis: Vec<crate::cars::Car> = self.cars.iter().filter(|c| c.taxi).cloned().collect();
         self.cars = s
@@ -1413,6 +1425,15 @@ impl World {
             {
                 return Err(Error::new("a wall can't go through furniture"));
             }
+            if e.kind != EdgeKind::Open
+                && let Some(what) = self.porch_across(e.axis, e.x, e.z)
+            {
+                return Err(Error::new(if target.is_fence() {
+                    format!("a fence can't go through the {what}")
+                } else {
+                    format!("a wall can't go through the {what}")
+                }));
+            }
             if e.kind != EdgeKind::Open && self.garage_across(e.axis, e.x, e.z) {
                 return Err(Error::new(if target.is_fence() {
                     "a fence can't go through the garage"
@@ -1595,6 +1616,8 @@ impl World {
         }
         self.lot.log_forget(mark);
         self.pay(h, cost);
+        // A porch whose door went goes with it.
+        self.porches_follow(plot);
         // The tiles either side of every edge built on (a diagonal's own tile), and upstairs the
         // plot (its rooms say where there's floor).
         let rect = edits
@@ -1712,7 +1735,7 @@ impl World {
     }
 
     /// Whether a wall edge (or the diagonal across a tile) lies on plot `plot` and on the lot.
-    fn edge_on_plot(&self, plot: u32, axis: EdgeAxis, x: i32, z: i32) -> bool {
+    pub(crate) fn edge_on_plot(&self, plot: u32, axis: EdgeAxis, x: i32, z: i32) -> bool {
         let p = &self.plots[plot as usize];
         let (lw, ld) = (self.lot.width as i32, self.lot.depth as i32);
         if x < 0 || z < 0 || z > ld {

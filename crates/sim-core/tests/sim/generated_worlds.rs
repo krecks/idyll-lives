@@ -1134,6 +1134,23 @@ fn generated_worlds_cars_keep_to_the_roads() {
                 return (tally, failures, None);
             }
         };
+        // Its porches are the ones its houses and shops had drawn before porches were the
+        // simulation's (as an older file or save has them worked out: `World::guess_porches`), so
+        // the town looks as it did.
+        let key = |p: &sim_core::porches::Porch| (p.plot, p.x, p.z, p.out);
+        let mut filed_porches = w.porches.clone();
+        let mut guessed = w.guess_porches();
+        filed_porches.sort_by_key(key);
+        guessed.sort_by_key(key);
+        if filed_porches != guessed {
+            failures.push(format!(
+                "{label}: the town's {} porches aren't the {} drawn before (only filed: {:?}; only drawn: {:?})",
+                filed_porches.len(),
+                guessed.len(),
+                filed_porches.iter().filter(|p| !guessed.contains(p)).collect::<Vec<_>>(),
+                guessed.iter().filter(|p| !filed_porches.contains(p)).collect::<Vec<_>>(),
+            ));
+        }
         // The town as it loads (`livable_at_start`); its first half day is `HalfDay`'s too.
         let cellars = livable_at_start(&w, world, &label, &mut failures);
         let filed = world["town"]["cars"].as_array().map_or(0, Vec::len);

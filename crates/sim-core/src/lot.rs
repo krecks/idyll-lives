@@ -209,6 +209,14 @@ pub struct LotFile {
     /// Garages at the inner ends of driveways (`cars.rs`). Optional.
     #[serde(default)]
     pub garages: Vec<crate::cars::Garage>,
+    /// Porches over doors (`porches.rs`): the town puts one over the front door the garden path
+    /// meets. Absent (a file from before porches): worked out from the doors and the garden paths
+    /// as they were drawn (`World::guess_porches`); `[]`: none.
+    #[serde(default)]
+    pub porches: Option<Vec<crate::porches::Porch>>,
+    /// Porch pieces standing on their own (`porches.rs`). Optional.
+    #[serde(default, rename = "porchPieces")]
+    pub porch_pieces: Vec<crate::porches::PorchPiece>,
     /// Opaque data for the presentation layer (streets, scenery seed...). Saved unchanged.
     #[serde(default)]
     pub meta: serde_json::Value,

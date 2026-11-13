@@ -1728,6 +1728,12 @@ struct StructureView<'a> {
     /// Garages at the inner ends of driveways (`cars::Garage`); left out when there are none.
     #[serde(skip_serializing_if = "<[_]>::is_empty")]
     garages: &'a [crate::cars::Garage],
+    /// Porches over doors (`porches::Porch`); left out when there are none.
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    porches: &'a [crate::porches::Porch],
+    /// Porch pieces standing on their own (`porches::PorchPiece`); left out when there are none.
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    porch_pieces: &'a [crate::porches::PorchPiece],
     /// The streets where the kerbside furniture keeps back for cars to pass pulled over
     /// (`cars::pull_over_streets`); left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -2133,7 +2139,7 @@ struct PlotView<'a> {
 /// Bounding box of all wall/door edges (and diagonal walls) inside a plot. A wall on the plot's own
 /// edge counts only where the plot's tile beside it is indoors: the wall of the house next door,
 /// standing on the shared line (a terrace's), is that plot's, not this one's.
-fn house_bounds(world: &World, x0: i32, z0: i32, x1: i32, z1: i32) -> Option<[i32; 4]> {
+pub(crate) fn house_bounds(world: &World, x0: i32, z0: i32, x1: i32, z1: i32) -> Option<[i32; 4]> {
     let lot = &world.lot;
     let mut b: Option<[i32; 4]> = None;
     let mut add = |ax: i32, az: i32, bx: i32, bz: i32| {
@@ -2495,6 +2501,8 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
         staff: staff_views(world),
         cars: car_views(world),
         garages: &world.garages,
+        porches: &world.porches,
+        porch_pieces: &world.porch_pieces,
         pull_over_streets: pull_over_street_views(world),
         light_poles: light_pole_views(world),
         junctions: junction_views(world),
@@ -2682,6 +2690,11 @@ impl StructureSync {
         parts.part("staff", Some(&staff).filter(|s| !s.is_empty()));
         parts.part("cars", car_views(world).as_ref());
         parts.part("garages", Some(&world.garages).filter(|g| !g.is_empty()));
+        parts.part("porches", Some(&world.porches).filter(|p| !p.is_empty()));
+        parts.part(
+            "porchPieces",
+            Some(&world.porch_pieces).filter(|p| !p.is_empty()),
+        );
         let streets = pull_over_street_views(world);
         parts.part("pullOverStreets", Some(&streets).filter(|s| !s.is_empty()));
         let poles = light_pole_views(world);
@@ -2935,6 +2948,11 @@ struct BuildView {
     gate: i64,
     /// A garage on the home lot.
     garage: i64,
+    /// A porch over a door; a porch post; a porch canopy and a step platform, a tile.
+    porch: i64,
+    porch_post: i64,
+    porch_canopy: i64,
+    porch_step: i64,
 }
 
 /// Every career with all its levels, expanded from the content (sent to the UI once).
@@ -3014,6 +3032,10 @@ pub fn catalog_json(content: &Content) -> String {
             fence: content.build.fence,
             gate: content.build.gate,
             garage: content.build.garage,
+            porch: content.build.porch,
+            porch_post: content.build.porch_post,
+            porch_canopy: content.build.porch_canopy,
+            porch_step: content.build.porch_step,
         },
     })
     .expect("catalog serializes")

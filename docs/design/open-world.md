@@ -224,6 +224,15 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   `cars[].driveSpot?: [x, z, yaw]`, where a car parked before it parked in front of such a garage at
   the end of its driveway. Both are left out when absent, so towns and saves without a garage of
   the player's stay byte for byte as they were.
+- `porches: { plot, axis: 'h' | 'v', x, z, out: 1 | -1 }[]` — a porch over a door (sim-core
+  `porches.rs`, Build mode's Porch tool, `Command::BuildPorch`): the door's edge on the ground
+  storey and the side it stands on. The town puts one over each house's and shop's front door that
+  stands in the front of its walls (`town.ts` `frontPorch`), where the street drew one before; a
+  file without the field (and a save before v39) has them worked out from its doors and garden
+  paths (`World::guess_porches`), `[]` none. `porchPieces: { plot, kind: 'post' | 'canopy' |
+  'step', x, z, w, d, rot }[]` — the player's porch pieces (`Command::BuildPorchPiece`). Both are
+  in the save and the structure (`PorchInfo`, `PorchPieceInfo`), left out of the structure when
+  there are none.
 - `fences: { line: [x0, z0, x1, z1], style?: string, gate?: true }[]` — garden fences, hedges and
   field fences the town puts up (`game/gardenFences.ts`), runs along grid lines on the ground storey
   in a `fenceStyles` id, never on a wall: real `Edge::Fence` / `Edge::Gate` edges, saved like the

@@ -37,6 +37,31 @@ pub struct Blueprint {
     pub roof: Option<BlueprintRoof>,
     #[serde(default)]
     pub objects: Vec<BlueprintObject>,
+    /// Porches over its doors and porch pieces (`porches.rs`; absent in older blueprints: none).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub porches: Vec<BlueprintPorch>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pieces: Vec<BlueprintPiece>,
+}
+
+/// A porch over a door: the door's edge on the ground storey (as in [`EdgeEdit`]); it stands on
+/// the door's outdoor side.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlueprintPorch {
+    pub axis: EdgeAxis,
+    pub x: i32,
+    pub z: i32,
+}
+
+/// A porch piece on its own: its tiles' corner and size (as turned) and the way it faces.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlueprintPiece {
+    pub kind: crate::porches::PieceKind,
+    pub x: i32,
+    pub z: i32,
+    pub w: u8,
+    pub d: u8,
+    pub rot: u8,
 }
 
 /// A wall, door, window, fence or gate, on an edge as in [`EdgeEdit`].
@@ -388,6 +413,22 @@ impl World {
                 quality: o.quality,
             });
         }
+        for p in self.porches.iter().filter(|p| p.plot == plot) {
+            let (x, z) = f.edge(p.axis, p.x, p.z, false);
+            bp.porches.push(BlueprintPorch { axis: p.axis, x, z });
+        }
+        for p in self.porch_pieces.iter().filter(|p| p.plot == plot) {
+            let (w, d) = (i32::from(p.w), i32::from(p.d));
+            let (x, z, rot) = f.object(p.x, p.z, w, d, p.rot, false);
+            bp.pieces.push(BlueprintPiece {
+                kind: p.kind,
+                x,
+                z,
+                w: p.w,
+                d: p.d,
+                rot,
+            });
+        }
         Ok(bp)
     }
 
@@ -615,6 +656,16 @@ impl World {
                 }
             }
         }
+        // Its porches and porch pieces, where they fit (as furniture, one that doesn't is left out).
+        for porch in &bp.porches {
+            let (x, z) = f.edge(porch.axis, porch.x + ox, porch.z, true);
+            let _ = self.build_porch(household, porch.axis, x, z);
+        }
+        for piece in &bp.pieces {
+            let (w, d) = (i32::from(piece.w), i32::from(piece.d));
+            let (x, z, rot) = f.object(piece.x + ox, piece.z, w, d, piece.rot, true);
+            let _ = self.build_porch_piece(household, piece.kind, x, z, piece.w, piece.d, rot);
+        }
         Ok(())
     }
 
@@ -694,6 +745,27 @@ impl World {
             {
                 return Err(Error::new("there's another room in the way"));
             }
+        }
+        // Porches over its doors go with it; others' and porch pieces stay, and the room doesn't go
+        // over them.
+        let porches: Vec<usize> = (0..self.porches.len())
+            .filter(|&i| {
+                let q = &self.porches[i];
+                q.plot == plot
+                    && moving
+                        .iter()
+                        .any(|m| m.0 == edge_ref(q.axis, q.x, q.z) && m.6)
+            })
+            .collect();
+        let porch_in_the_way = self.porches.iter().enumerate().any(|(i, q)| {
+            !porches.contains(&i) && q.tiles().iter().any(|t| target.contains(t) && !ours(*t))
+        });
+        let piece_in_the_way = self
+            .porch_pieces
+            .iter()
+            .any(|q| q.tiles().iter().any(|t| target.contains(t) && !ours(*t)));
+        if porch_in_the_way || piece_in_the_way {
+            return Err(Error::new("the porch is in the way"));
         }
         let content = &self.content;
         let on_top = |o: &ObjectInstance| content.objects[o.def].layer == Layer::Surface;
@@ -824,6 +896,13 @@ impl World {
             // Food and dishes in the room move with it.
             let room: Vec<(i32, i32)> = tiles.iter().copied().collect();
             self.shift_items(&room, dx, dz);
+            // Its porches with it, if there's open ground for them where it goes (else they go).
+            for &i in &porches {
+                self.porches[i].x += dx;
+                self.porches[i].z += dz;
+            }
+            self.porches_moved(plot, &porches);
+            self.porches_follow(plot);
             if unreachable(self) > shut_in {
                 return Err(Error::new("that would shut someone or something in"));
             }

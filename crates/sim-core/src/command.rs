@@ -300,6 +300,44 @@ pub enum Command {
     SellGarage {
         household: u32,
     },
+    /// Build mode: a porch over a door of the home (its edge, `h` or `v`, on the ground storey),
+    /// on the door's outdoor side, for content `build.porch` (see `World::build_porch`).
+    BuildPorch {
+        household: u32,
+        axis: EdgeAxis,
+        x: i32,
+        z: i32,
+    },
+    /// Build mode: takes down the porch over a door of the home, for `objectRules.resale` of it.
+    RemovePorch {
+        household: u32,
+        axis: EdgeAxis,
+        x: i32,
+        z: i32,
+    },
+    /// Build mode: a porch piece on the home lot (a post, a canopy or a step platform), on tiles
+    /// `x .. x + w` × `z .. z + d` (as turned), facing `rot` (as a thing's: 0 towards +z, 1 +x,
+    /// 2 -z, 3 -x; see `World::build_porch_piece`).
+    BuildPorchPiece {
+        household: u32,
+        kind: crate::porches::PieceKind,
+        x: i32,
+        z: i32,
+        #[serde(default = "one")]
+        w: u8,
+        #[serde(default = "one")]
+        d: u8,
+        #[serde(default)]
+        rot: u8,
+    },
+    /// Build mode: takes down the porch piece of `kind` on tile `(x, z)` of the home lot, for
+    /// `objectRules.resale` of its price.
+    RemovePorchPiece {
+        household: u32,
+        kind: crate::porches::PieceKind,
+        x: i32,
+        z: i32,
+    },
     /// Build mode: moves the room around tile `(x, z)` of the home by `(dx, dz)` tiles, with its
     /// walls, doors, windows, floors and everything standing in it (see `World::move_room`).
     MoveRoom {
@@ -320,6 +358,11 @@ pub enum Command {
         #[serde(default)]
         bonds: Vec<crate::lot::BondRaw>,
     },
+}
+
+/// A piece one tile across and deep, unless it says otherwise.
+fn one() -> u8 {
+    1
 }
 
 /// One wall edge to set. `h` edges run along x at the line `z`; `v` edges run along z at the
@@ -460,6 +503,10 @@ impl Command {
             | Command::MoveRoom { household, .. }
             | Command::BuildGarage { household, .. }
             | Command::SellGarage { household }
+            | Command::BuildPorch { household, .. }
+            | Command::RemovePorch { household, .. }
+            | Command::BuildPorchPiece { household, .. }
+            | Command::RemovePorchPiece { household, .. }
             | Command::Repair { household, .. } => Some(household),
             _ => None,
         }
