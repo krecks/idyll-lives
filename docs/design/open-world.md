@@ -1,25 +1,17 @@
-# Open world: the shared contract
+# Open world
 
 Bigger worlds (up to 1024×1024 m) with a main town, hamlets and usable countryside, joined by
-country roads residents travel, and a camera that roams the whole world. The work is split
-across four branches that merge into `feat/open-world` in this order:
-
-1. `feat/open-world-sim-grid` — chunked tile storage, incremental reachability, bounded A*, caps, save v35, wasm views by chunk.
-2. `feat/open-world-sim-travel` — road graph, router, ETA and commutes, cars on roads, nearby choices, outings, countryside content.
-3. `feat/open-world-worldgen` — sizes Cosy/Normal/Big (Cosy and Normal were dropped in 0.8.0: every world is Big now), the Big macro layout, the town file fields below, the pan/zoom town map, sample/map tools.
-4. `feat/open-world-render` — view-independent chunked street, roaming camera, residents by distance, chunked terrain/woods/grass, streaming by distance.
-
-This file is the interface between them. Change it only together (through the coordinator).
+country roads residents travel, and a camera that roams the whole world.
 
 ## Chunks
 
-| What | Size | Owner |
+| What | Size | Code |
 |---|---|---|
-| Sim tile storage | 16 × 16 tiles | sim-grid (`lot.rs`) |
-| Sim spatial/object index cells | 64 m | sim-travel (`index.rs`) |
-| Render stream chunks | 64 m | render (`render/shared/chunks.ts`) |
-| Render far-LOD superchunks | 128 m | render |
-| Terrain tiles | 128 m | render |
+| Sim tile storage | 16 × 16 tiles | `lot.rs` |
+| Sim spatial/object index cells | 64 m | `index.rs` |
+| Render stream chunks | 64 m | `render/shared/chunks.ts` |
+| Render far-LOD superchunks | 128 m | `render/shared/chunks.ts` |
+| Terrain tiles | 128 m | `render/pc/nature.ts` |
 
 Chunk `(cx, cz)` covers tiles `cx*S .. cx*S+S`, `cz*S .. cz*S+S` in town (world) coordinates,
 ground storey. Row blocks for upper storeys and the basement keep today's stacked-rows layout
@@ -28,36 +20,22 @@ ground storey. Row blocks for upper storeys and the basement keep today's stacke
 ## Caps
 
 - Town file: `width`, `depth` ≤ 1024. Saved grid: width ≤ 1024, depth ≤ 1024 × 5.
-- `MAX_SIMS` 240, `MAX_STAFF` 48, `MAX_CARS` 128 (sim-grid). The renderer's `MAX_CHARACTERS`
+- `MAX_SIMS` 240, `MAX_STAFF` 48, `MAX_CARS` 128. The renderer's `MAX_CHARACTERS`
   is the snapshot layout's maxSims + maxStaff (288, `render/shared/characters/rig.ts`; a test holds
   them together); the speech bubbles follow the layout's `maxSims`.
 - Neighbours: `NEIGHBOUR_CAP = 220` in every world; a world starts with ~120 (`BIG_START = 118`:
-  the rest of its homes are for sale) and grows to `MAX_SIMS`. `MAX_SIMS` and `NEIGHBOUR_CAP` were
-  raised from 160 / 140 in the living-town run (2026-11-12), once the two costs that had held them
-  down were gone. `BIG_START` was tried at 168 and put back: with ~170 residents from the first
+  the rest of its homes are for sale) and grows to `MAX_SIMS`. `BIG_START` was tried at 168 and put back: with ~170 residents from the first
   morning in the denser town, one of seed base 0's 24 sample worlds (mountain 209466) jammed at its
   centre by 11:00 on day 1 (a cyclist getting off by the Bakery and a car arriving there waited for
   each other for good, the town's taxis queued behind them, and 11 residents were on their bikes
   for over 2 hours: `generated_worlds_cars_keep_to_the_roads`); with 118 the same world and seed
   bases 0, 17 and 22 are green. It can go up once in-view jams are finished (`BIG_PREVIEW`).
-  - **The 09:30 spike.** A real Big game with ~170 had 16 frames over 33 ms (up to 299 ms) as the
-    town got its jobs at 09:30. The cause: each hire worked out their commute on their next turn
-    (`life::refresh_commute`), never waiting for the search budget, and nearly every commute is an
-    A* over the town's tiles (the walk by road gives up when a waypoint along the road lands on a
-    tile nobody can stand on: `world::road_route`). With the town at full detail they came in one
-    tick: 35 hires, 70-88 ms natively. Now a commute not needed for six hours waits for a tick
-    nobody else's is worked out in (`life::unhurried`): that tick is 22 ms.
-  - **Earshot.** `conversation::within_earshot` searched 12 m of floor to the end for every pair,
-    over a SipHash map; it stops at the first way within earshot now, and someone choosing what to
-    do searches once for everyone they ask about (`conversation::Earshot`). The full-town babies
-    test went from 191 s (at 240) to 4 s.
-  - The work taxis' kerbs (`taxi::kerb_at`): the cheap tests first, 82 ms to 4 ms as a game starts.
 
   The big-world bench at 1024 m (4 game hours, 3 runs, M3 Pro): the synthetic town
   (`SIZE=1024 RESIDENTS=240`) 8,000–8,900 ticks a second, p99 0.35–0.49 ms, the slowest tick
-  7.3–8.0 ms, heap 60 MB (160: 15,100–16,400, p99 0.26–0.30 ms, 10–10.7 ms, 60 MB); a real Big
+  7.3–8.0 ms, heap 60 MB; a real Big
   town (`WORLDS=`, seaside 104736 filled to the cap, 222 residents) 4,800–5,000 a second, p99
-  3.4–3.6 ms, the slowest tick 41–42 ms (98–134 ms before), heap 76 MB. The slowest ticks left are
+  3.4–3.6 ms, the slowest tick 41–42 ms, heap 76 MB. The slowest ticks left are
   the work taxis' plans (`taxi::plan_group`, `book_backs`), people done at work and the traffic.
 
 ## Sizes
@@ -274,14 +252,14 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
 ## Worker protocol (sim worker ↔ main thread)
 
 - `setView(rect)` — the focus lot: its wall/floor meshes and full structure, as today.
-- `setWatch(rect)` — new: the camera's stream rectangle; `World::set_view` uses it for the
+- `setWatch(rect)` — the camera's stream rectangle; `World::set_view` uses it for the
   sim's full-detail area (LOD), the view rect when never sent. It is also what's drawn
   (`World::set_watch`): cars further than 32 m out of it drive through each other, claiming
   nothing (`cars::sight`, the owner's call for big towns); the snapshot leaves them out. A car
   the camera comes to on top of another is put clear along its way before it's drawn, and one
   held up out of the picture (8 m and more from the watch) with all it waits for is put on after
   3 game minutes. Never sent (drawn whole, as before), every car is in sight.
-- `rooms` is sent as a transferable `Uint16Array` (same indexing as today's `number[]`).
+- `rooms` is sent as a transferable `Uint16Array`.
 - Structure is versioned per sim chunk; `structure_rect(x0, z0, x1, z1)` returns the walls,
   doors and objects inside a rectangle, and `chunk_versions()` lists the versions to diff.
 
@@ -328,11 +306,3 @@ Residents outdoors are drawn on every lot within the draw radius, and window glo
 is home. The fences round gardens are the world's (`WorldStructure.fences`), so residents on every
 lot walk round them; they are drawn the same whichever lot is the focus (the focus lot's with the
 lot, the rest merged into the street's chunks, every gate by the game so it swings). Full interiors are drawn for the focus lot (the one under the camera) plus 2 cached ones.
-
-## Integration rules
-
-- Each branch keeps every existing test passing and today's towns identical.
-- New sim tests are separate files under `crates/sim-core/tests/`, written to move into
-  `tests/sim/` unchanged once PR #43 lands.
-- Before merging, run every `ci.yml` step locally.
-- Big was behind the dev flag `?big=1` (UI) until all four branches were in; it is the only size since 0.8.0.

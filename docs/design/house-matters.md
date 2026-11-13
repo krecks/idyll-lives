@@ -1,7 +1,5 @@
 # The house matters
 
-*Status: in 0.1.0 (built in development build 0.11; numbers like 0.11 here are those builds). Roadmap: PLAN.md section 8.*
-
 Building is the main activity, so the house has to show up in how residents live: what a room
 is like changes how they feel and what they choose, missing essentials have visible
 consequences, and residents say what they'd like next. Watching tells you what to build.
@@ -167,7 +165,7 @@ the object's icon or the need's icon, and residents say a line for each.
   nothing that says what it's for), and who wishes what for it. Beside them: the family
   (expecting, adopting), broken things with Repair, and wishes for another room.
 - **Room scores overlay** while the Home tab is open: each room's floor tinted from red
-  to green by its score (`Renderer.setRoomOverlay`, one thin-instance film per tile), with a tag
+  to green by its score (`Renderer.setRoomOverlay`), with a tag
   over its centre showing its kind, score and what would help most (`game/roomOverlay.ts`).
 - Build › Furnish: a broken object says so, and owned worn things offer the quick fix (Repair).
 
@@ -177,14 +175,3 @@ Version 12: per-tile dirt (sparse `[x, z, dirt]`), object `wear`, the environmen
 are saved by id, so older saves load with it at a neutral value), home wishes and the last day a
 resident found the bathroom taken. Older saves
 load clean and unworn.
-
-## Build order
-
-1. Rooms and scores (sim, content, view) with tests.
-2. Environment need and room preference in the AI; balance check with the town soak test.
-3. Dirt and cleaning.
-4. Wear and repairs.
-5. Essentials, fallbacks and accidents.
-6. Opinions, wishes and thoughts.
-7. Our home panel and the overlay.
-8. Soak and balance pass, saves, docs.

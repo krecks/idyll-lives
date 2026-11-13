@@ -1,14 +1,12 @@
 # Life cycle II
 
-*Status: in 0.1.0 (built in development build 0.13; numbers like 0.13 here are those builds). Roadmap: PLAN.md section 8. Builds on 0.12
-([life-cycle.md](life-cycle.md)). Since 0.2.0: babies are cuddled, cry for a parent at night and
+*Builds on [life-cycle.md](life-cycle.md). Since 0.2.0: babies are cuddled, cry for a parent at night and
 have a babysitter when everyone is out (CHANGELOG.md, 0.2.0); a child who leaves the
 crib gets a bed; newborns start at age 0; newcomers arrive grown up; and every life stage has a
-body of its own, made in code (tools/characters/README.md), rather than the scaled adult rig
-described under "Bodies".*
+body of its own, made in code (tools/characters/README.md).*
 
 Families grow: couples have babies or adopt, babies grow into children and teens who go to
-school, and teens grow up into the young adults of 0.12 who work, fall in love and move out. A
+school, and teens grow up into young adults who work, fall in love and move out. A
 town can now run for generations. The house has to have a crib, a child's bed, a desk.
 
 Same principles: data-driven (content `life`), simulated and saved, ids and numbers.
@@ -33,15 +31,6 @@ Content `life.stages` gains the young stages, and every stage says what it allow
 - `effects` as before; children don't cook (`tagPreference` 0 means never on their own).
 
 At *Normal* (2 days a year) a baby is a baby for 4 days, a child for 22, a teen for 10.
-
-## Bodies
-
-The renderer scales the whole rig by the stage's `scale` (on top of the resident's height) and
-the head and face by `head`, around the head joint, in the skinning step (`pose.ts`), so a
-child is a smaller adult with a bigger head; animations, sitting and lying already scale.
-Elders stoop a little (an additive bend of the upper spine). Portraits and the creator's stage
-use the same code, so they show it too. Real child and elder models can replace this later
-through the asset manifest.
 
 ## Babies and cribs
 
@@ -73,7 +62,7 @@ no race car bed, nor toys only a child may use.
 On school days (content `life.school`: `start`, `hours`, `days`, `skills`) children and teens
 leave for school like a shift (away, through the town exit) and come back in the afternoon,
 having practised content `school.skills` a little. A child too tired or hungry still goes. The
-resident panel says "At school". No pay, no career, no grades yet.
+resident panel says "At school". No pay, no career.
 
 ## Having children
 
@@ -94,12 +83,12 @@ resident panel says "At school". No pay, no career, no grades yet.
   from one parent and hair from the other), family links to both parents and any siblings.
 - **Adoption:** the player can adopt a baby or a child (a button in *Our home*), for
   `adoption.cost` (free in Creative), when there's an adult and room; the parents are a couple
-  in the household if there is one. (Neighbours don't adopt yet.)
+  in the household if there is one.
 
 ## Growing up
 
 Reaching *child*: out of the crib, starts school. *Teen*: school goes on. *Young adult*: school
-ends; they can work, fall in love and move out (0.12). Each is a journal moment.
+ends; they can work, fall in love and move out. Each is a journal moment.
 
 ## Interface
 
@@ -113,14 +102,3 @@ ends; they can work, fall in love and move out (0.12). Each is a journal moment.
 
 Version 14: households expecting (parents, due day). Everything else is already saved (ages,
 babies in cribs are `Use` tasks, families are kin).
-
-## Build order
-
-1. Young stages: stage flags (adult, baby, school), gates (romance, jobs, moving, retirement),
-   creator and generated households with children, test town families with children.
-2. Bodies: stage scale and head size in the renderer, elder stoop, portraits.
-3. Babies and cribs: crib content, babies in cribs, care interactions and their AI, crying.
-4. School.
-5. Pregnancy, birth and adoption, mixed looks.
-6. Growing up (out of the crib, school ends), journal texts.
-7. Interface pass, soak over generations, balance, docs.

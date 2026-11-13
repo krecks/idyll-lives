@@ -1,7 +1,7 @@
 # Look
 
 *Design notes for how Idyll Lives looks. Inspired by classic life-simulation games, described
-here on our own terms. Status: 0.7.0 and what has landed since. This is the Medium graphics preset, everyone's default; Low
+here on our own terms. This is the Medium graphics preset, everyone's default; Low
 and High change a few things (softer or sharper shadows, fewer lamps, half the lawn, no cloud shadows, no shadows
 from the woods, the street or the residents and the street's far models on Low, two mirrors
 reflecting every frame on High), listed in

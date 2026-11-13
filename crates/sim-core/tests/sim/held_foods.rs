@@ -1,4 +1,4 @@
-//! The held foods (`docs/missing-items.md` §4): a pot of food, a tasting board, a pizza, a pie, a tray of
+//! The held foods: a pot of food, a tasting board, a pizza, a pie, a tray of
 //! baked treats, a sandwich and a barbecue platter are each carried out of the kitchen in the resident's
 //! hand, and a serving taken from a pizza is a slice. Each is the item the shipped pack has a model for
 //! (`cargo check-glb`), so the game draws a held model rather than an empty hand.

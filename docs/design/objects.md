@@ -1,11 +1,6 @@
 # How to build a new object
 
-*Status: the standard since 0.3.0, written from the review of the first Blender models (the six
-garden decor models, 2026-10-13). Every object's model is built in Blender and exported as glTF:
-all 541 were built and signed off in play by 2026-10-17 ([docs/objects/](../objects/README.md)).
-Files resize, are picked by what's drawn, load once per scene and can have
-[moving parts](#moving-parts); what is left of
-[Before Blender is the standard](#before-blender-is-the-standard) is quantised geometry. The toolkit
+*Every object's model is built in Blender and exported as glTF ([docs/objects/](../objects/README.md)). The toolkit
 and the step-by-step are in [tools/art/blender/](../../tools/art/blender/README.md).*
 
 An object is three things, joined by keys:
@@ -76,9 +71,7 @@ gate below, so the review does.
   what's drawn (the shadow is the model's own shape on the floor, `render/shared/contactShadow.ts`).
 - **Real size, uniform scale.** Build to the object's real size; `G.settle` stands it on the floor,
   centred, by moving it, and the family's `G.Model(size=…, tolerance=…)` asserts its size (2 % by
-  default). `gamekit.fit` scales each axis on its own to hit an exact box: it stretched the garden
-  lantern's hexagon 15 % wider than deep and squashed the boulders to 75 % of their depth and 120 % of
-  their height, until the garden decor was rebuilt at real size (2026-10-14). It, and the manifest's
+  default). `gamekit.fit` scales each axis on its own to hit an exact box. It, and the manifest's
   `fit`, are for third-party files only.
 - **What a model carries is drawn, not its size.** A desk's chair, the picture, vase and jewellery box on a
   chest of drawers, the blocks in front of a toy box, the flag on a climbing frame and the block and bottle
@@ -127,9 +120,6 @@ instances, so these costs are per kind of object in view, plus the triangles of 
 
 ## Detail
 
-Every model was rebuilt in more detail on 2026-10-22 (the median now spends 47 % of its target, up from 33 %).
-The standard it set, for new models too:
-
 - **Shapes as made, not as boxes.** A frame, rail, leg or handle bent from one piece is one `sweep`, never rods
   joined by balls; turned and lofted bodies (`revolve`, `loft`/`ring`) for anything round; outlines with holes
   (`extrude`) for carved aprons, headboards, grilles, cut-outs; stuffed things puffed, pinched at their corners,
@@ -156,8 +146,7 @@ The game's surfaces are a dozen finishes, the `material.finish.*` entries of the
 (see-through). A model's parts are coloured per part; all the plain finishes of a model merge into
 one mesh, so a model costs one draw call for its plain parts plus one per textured or see-through
 finish it uses. The plain finishes carry their roughness and metalness in the vertex colour's alpha
-(`encodeFinish`, read by `PLAIN_FINISH` in `render/pc/shaders/surface.ts`; until 2026-10-15 the
-shader never saw it and drew every plain finish as rough metal). Metals mirror the sky just above the
+(`encodeFinish`, read by `PLAIN_FINISH` in `render/pc/shaders/surface.ts`). Metals mirror the sky just above the
 horizon where they would reflect the ground: the game looks down on everything, so anything upright
 and shiny (a handle, a steel fridge) would otherwise mirror the dark field of the sky map, which no
 room has.
@@ -187,8 +176,7 @@ room has.
   ```
   The file's base colour becomes the part's colour; its roughness and metalness are ignored (the
   finish decides), so choose the finish, not a number. An unmapped material keeps the file's own
-  PBR material: a draw call of its own, a look that doesn't match the furniture, and (today) a
-  material left behind each time the model is rebuilt. `cargo check-glb` warns of each one.
+  PBR material: a draw call of its own and a look that doesn't match the furniture. `cargo check-glb` warns of each one.
 - **Baked shading.** The export bakes how much sky each vertex sees into a grey vertex colour (COLOR_0,
   `gamekit/shade.py`, 32 greys), and the game multiplies it into the part's colour (`restyledMesh`), the
   player's colour too: creases, seams, the gaps between cushions and drawer reveals
@@ -202,8 +190,7 @@ room has.
   with that finish without a `materials` entry (one in the entry still wins). Handy for files not made
   with gamekit, whose palettes write the map themselves.
 - **Colours** are sRGB hex in the script, as in the manifests; `gamekit.mat` converts them to the
-  linear values Blender and glTF use. (The first export wrote sRGB values as linear: every colour
-  came out pale, and white-blue at night.)
+  linear values Blender and glTF use.
 - **One-sided.** Meshes are closed and materials one-sided (`gamekit.mat` sets it).
 - **Water** is `gloss`, opaque. Real glass is `glass`: its own draw call,
   drawn after everything else.
@@ -219,8 +206,7 @@ room has.
   material carries one in its name, `tunic#body` (with a finish: `tunic@fabric#body`): a tint slot,
   as the template's `tints` say. Nothing draws by them today (residents
   have their own rig and outfits).
-- **No styles.** An object has one model, `model.<id>` (the modern, cozy and minimal variants were
-  removed on 2026-10-14). Another look of the same thing is another object with its own model (the
+- **No styles.** An object has one model, `model.<id>`. Another look of the same thing is another object with its own model (the
   mini fridge, the built-in fridge).
 - **Colours the player picks.** A model whose entry has `paint` lists the parts the player may colour:
   `{material, label}` (the double vanity's `body` "Cabinet", `stone` "Worktop", `chrome` "Taps &
@@ -243,7 +229,7 @@ room has.
   will come back for the objects it suits, decided per object.
 - **Quality (★) and wear** change what an object gives, not how it is drawn: nothing to model.
 - **Mirrors:** a material whose `materials` entry has `"mirror": "front"` (or `"back"`) is mirror
-  glass: its face reflects the room, as `mirror` parts did (the quality's
+  glass: its face reflects the room (the quality's
   `mirrors`: the nearest on screen, one on Low and Medium, two on High). Make the glass a flat piece, on the still body or on one moving part
   (a mirror cabinet's door: the reflection swings with it); the face is across its thinnest side,
   square or round as drawn. In gamekit, the palette takes the side: `glass=('#DCE6EA', 'gloss',
@@ -379,7 +365,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 - **Night:** `night` names a clip held open from dusk to dawn, while the lamps are lit (curtains
   drawn): it closes as the lamps come up past half way and opens again as they go down. A room going
   dark because everyone in it is asleep doesn't open it (the curtains stay drawn over the sleepers);
-  what follows a room's own lights is the shade glow (engine item 8). A game loaded at night shows it
+  what follows a room's own lights is the shade glow. A game loaded at night shows it
   closed without playing it.
   ```json
   "motions": { "night": "close" }
@@ -411,7 +397,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   ambient clips or clock hands); nothing is done while all are still.
 - **Resizing** moves each part's hinge with its edge, so a wider fridge's door still turns on its side.
 - **Not yet:** tiles that free up while an object is closed (a folded wall bed still takes all its
-  tiles). The fridges' freezer doors open for "Get some ice cream" (0.3.0).
+  tiles).
 
 ## Export settings
 
@@ -544,38 +530,3 @@ licence in CREDITS.md, and go through the same gate. Blender's licence doesn't e
 - [ ] Parts the player may colour named in `paint` (`body`), the rest in materials of their own.
 - [ ] Pack entry with `url` and `materials` (written by the build); base manifest lists the pack.
 - [ ] CREDITS.md updated; only the changed `.glb` files committed; previews not committed.
-
-## Every model is a Blender file
-
-**Every object is migrated** (2026-10-17): each has a Blender file, signed off in play, and so do the
-things residents carry, the town's street props and the ground's tufts, rocks and marker. The
-primitive-part entries they replaced are gone from the manifests (2026-10-18), so Blender is the only
-source; the models still stand where those parts stood, so each kept its key and saves and content
-didn't change. A new object gets a Blender file from the start.
-
-## Before Blender is the standard
-
-What the engine (`render/pc/models.ts` and around) must do first, most important first.
-Placement, turning, height, shadows, contact shadows, footprints, the fallback when a file fails (a
-plain box, until a background try brings the file),
-WebGPU and WebGL2, the town overview, catalog pictures, meshopt copies and player colours (`paint`) already
-work for files.
-
-1. ~~**Resizing (blocker).**~~ Done: a file's vertices take the same edge bands and rise line as
-   `resizeParts` (`resizeMaps`, `resizeData`), and its moving parts' hinges move with them.
-2. ~~**Picking outline.**~~ Done: `loadGltf` returns the baked geometry's bounds.
-3. ~~**Materials left behind.**~~ Done: each file is imported once per scene (`loadFile`); builds
-   copy its geometry and share its materials.
-4. ~~**Level of detail** for files.~~ Done: an entry's `far` file, `<id>.far.glb`, is what LOD 1 and
-   the town overview draw (`G.Model(far=…)` writes it).
-5. ~~**Mirrors** from files.~~ Done: a material mapped with `mirror` (front or back) gives `mirrors`
-   as `mirror` parts did (`fileMirror`).
-6. ~~**Finishes by name.**~~ Done: a material named `stone@matte` maps itself (`namedFinish`), and
-   `tunic#body` carries a tint slot (`namedTint`).
-7. ~~**Packs that extend.**~~ Done: a pack entry without `vary` keeps the one of the entry it
-   overrides (registry.ts `extended`); gamekit's packs no longer copy it.
-8. ~~**Night glow**~~ Done: a material's `glow` (lamp shades, screens), following the lamp level and
-   its room's lights.
-9. ~~**Quantised geometry**~~ Done (`cargo assets`), for every file but those with foliage.
-10. ~~**CI**~~ Done: CI runs `cargo test -p ll-tools`, which includes the gate over every shipped
-    model (it needs no Blender), with the other checks.

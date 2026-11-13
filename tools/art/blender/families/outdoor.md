@@ -16,7 +16,7 @@ and failed the size check); `_jitter` uses `noise()`, which doesn't.
 
 2026-10-21 (authenticity review, Phase 4): the park bench's and the picnic table's heights, the bistro set's
 chairs, the garden bench, the hammock, the porch swing's seat, the swing set's frame, the hot tub's cover and bench
-and the grill's height and glow were rebuilt to real sizes (`docs/review/outdoor.md`, `systems.md` M-outdoor-01).
+and the grill's height and glow were rebuilt to real sizes (M-outdoor-01).
 
 What each has since the detail pass (2026-10-22):
 

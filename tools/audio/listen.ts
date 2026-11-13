@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Renders every synthesised sound of the game to a WAV, with the numbers that can be measured and
- * the ones only a listener can judge (`G-53`, `docs/authenticity-review.md`): the sounds are made
+ * the ones only a listener can judge: the sounds are made
  * in code (`web/src/audio/`: `water.ts`, `things.ts`, `mono.ts`, `birdsong.ts`, `blips.ts`), so they
  * can be made here, off the browser, and listened to on any player. `bun run sounds` (from `web/`), or
  * `bun tools/audio/listen.ts [--out <folder>]`.

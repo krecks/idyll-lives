@@ -35,5 +35,4 @@ shortcuts, ×1.8) and `gaming` (×1.7), plus Dexterity learning ×1.1.
 ## Other personalities
 Neat residents (who conflict with slobs) get no `cozy` bonus and should prefer the shower over the spritz.
 Couch potatoes and lazy residents share the love of the beanbag and recliner through `lounge`/`rest`.
-Energetic residents may like the arcade's Dexterity training. Other packs can reuse `gaming` and `cozy`
-for consoles, blankets or fireplaces.
+Energetic residents may like the arcade's Dexterity training.

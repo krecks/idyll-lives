@@ -1,6 +1,6 @@
 # Smarter thoughts (research)
 
-*Status: research note for 0.3.0, measured on 2026-11-01 (§"What was measured"). Nothing here
+*Status: research note, measured on 2026-11-01 (§"What was measured"). Nothing here
 ships; the utility AI keeps deciding and saves keep their format.*
 
 Residents already think in fixed kinds: the planner records a `Thought` when a planned block is
@@ -82,8 +82,7 @@ The rule:
 
 For a true replay, the command journal has to contain the accepted `Choose` commands in order,
 alongside the player's. There is no command journal today: saves store state, and tests replay by
-re-running the same seed and commands. Adding one is a save-format change and therefore out of
-scope for 0.3.0. Until then, "recorded" means recorded by the host for the current session; a save
+re-running the same seed and commands. Adding one is a save-format change. Until then, "recorded" means recorded by the host for the current session; a save
 after the fact already contains the outcome (the resident's task and thought), which is enough to
 load and continue.
 

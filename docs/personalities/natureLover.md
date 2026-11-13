@@ -3,8 +3,7 @@
 Pack: `web/public/content/packs/natureLover.json` · models: `web/public/assets/packs/pack_natureLover/manifest.json`
 
 **What the nature lover wants:** to be among living things and get their hands in the soil. The
-base trait only adds a small mood bonus and a strong `nature` preference (×3), but the base game
-has just a potted plant and a flower bed to use it on. This pack gives them a garden to live in:
+base trait only adds a small mood bonus and a strong `nature` preference (×3). This pack gives them a garden to live in:
 everyday needs (snacks, showers, naps, lounging) they can meet outdoors, two training hobbies,
 and a luxury glasshouse that pays off in better rest.
 

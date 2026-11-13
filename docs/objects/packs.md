@@ -13,8 +13,7 @@ chef's stove, whirlpool tub, pizza oven, record cabinet, lava lamp, sauna, glass
 take 4. Back home, a pack thing has no group (`<category> / —`), except the veggie bed (garden / edibles). Seats
 that face a screen or desk at the back of their own footprint carry content `seat.facing: "back"` (the writer's
 bureau, the cinema wall, the game console). The writing desks with their chair built in are written at from that
-chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't apply to them. Open questions are in
-[open.md](open.md); the clip kinds and engine rules (E1–E8) are in [README.md](README.md).
+chair; the chair tuck at separate tables (`seatAt`, `tableTuck.ts`) doesn't apply to them. The clip kinds and engine rules (E1–E8) are in [README.md](README.md).
 
 ## P1. Bookworm (6)
 

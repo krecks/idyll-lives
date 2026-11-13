@@ -3,9 +3,9 @@
     {
       "name": "contract",
       "file": "docs/design/living-town.md",
-      "sha256": "5670a5e5539cd7f73a1bb0b968caf9ba05e591e2b12f5527c8d63db8408ba609",
-      "by": "feat/cargo-assets",
-      "reason": "the pins' check is `cargo pins` now (crates/tools/src/pins.rs; it was `bun tools/pins/check.ts`): the Pins section names the command, nothing else in the contract changed"
+      "sha256": "fb00ab95aa2c22c721e684777bf6db2b9ac5ce3b866c83891aac04a076fa7317",
+      "by": "docs/blender-readme",
+      "reason": "docs cleanup after the living-town streams merged: the stream list, run instructions (Sim scale, budgets, lt-temp, the integrator) and the unbuilt river are gone; World data, Camera modes, Town-scale drawing, Town tags and Pins describe the game as it is"
     },
     {
       "name": "living-town-meta",

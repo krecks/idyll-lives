@@ -1,22 +1,18 @@
 # Life cycle I
 
-*Status: in 0.1.0 (built in development build 0.12; numbers like 0.12 here are those builds). Roadmap: PLAN.md section 8.*
-
 Lives move on: residents age, grow old, retire and pass away; partners move in together, grown
 children move out, and newcomers arrive in empty houses. The house has to grow and shrink with
 the family, and watching follows a story that changes over weeks. Babies, children and teens are
-0.13; here everyone is an adult (young adult, adult or elder).
+in [life-cycle-2.md](life-cycle-2.md).
 
-As in 0.11: everything is data-driven (content `life`), runs in the simulation (deterministic,
+Everything is data-driven (content `life`), runs in the simulation (deterministic,
 saved), and speaks in ids and numbers.
 
 ## Residents come and go: stable ids
 
-Today a resident's index in `World::sims` is its id everywhere: the snapshot row, the renderer's
-rig, the dense relationship matrix, story events, object slots, social targets. The list only
-grows and is capped at `MAX_SIMS` (64).
-
-0.12 keeps index = id and adds two things instead of renumbering:
+A resident's index in `World::sims` is its id everywhere: the snapshot row, the renderer's
+rig, the dense relationship matrix, story events, object slots, social targets. Instead of
+renumbering, there are two things:
 
 - **Gone residents.** A resident who dies or leaves town is not removed: the slot is marked
   `gone` (with why and when). A gone resident isn't simulated, drawn, listed or chosen as a
@@ -62,7 +58,7 @@ game's pace, so changing the lifespan never makes anyone jump in age. Content `l
   130), *Long* (4). Saved in the world.
 - **Birthdays** pass quietly; a new stage is a story event ("Ada is an elder now") with a
   feeling. Elders get tired sooner and walk slower (content `effects`), and their hair greys
-  (presentation only; elder bodies are 0.13).
+  (presentation only).
 - Creation (the household creator) gets an age stage per resident (young adult, adult, elder; a random age
   within it), and generated households get ages that fit (partners within a few years, a grown
   child 20-30 years younger than their parents).
@@ -131,15 +127,3 @@ Version 13: ages, gone residents (`gone: {why, day}`), retirement and pension, f
 and the Moving setting. Slot generations aren't saved (a loaded game starts them over). Older
 saves: everyone gets an age from content `life.startAge` (by name), nobody is gone, and aging is
 off (the player can switch it on); new games age at *Normal*.
-
-## Build order
-
-1. Ages, stages and the life option (sim, content, saves, UI), with tests.
-2. Gone residents and slot reuse (sim, saves, snapshot, renderer, UI), with tests: a resident
-   removed and replaced keeps the journal right and the renderer correct.
-3. Family links (relationships, creator, generated households, UI).
-4. Retirement and death (grief, empty households).
-5. Moving: partners move in together, grown children move out, moving away.
-6. Newcomers in vacant houses (generation in the sim, appearance seeds in the web).
-7. Interface pass (panels, journal texts, settings), soak over a whole life (a town over 150
-   days), balance, docs.

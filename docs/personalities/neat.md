@@ -3,8 +3,7 @@
 Pack: `web/public/content/packs/neat.json` · models: `web/public/assets/packs/pack_neat/manifest.json`
 
 **What a neat resident wants:** to feel clean (hygiene decays 1.2× faster) and to keep the home in
-order (base trait already likes `hygiene` 1.5 and `chores` 1.6). In the base game almost no
-autonomous chore exists, so the trait had little to act on. The pack gives it cleaning that is
+order (base trait already likes `hygiene` 1.5 and `chores` 1.6). The pack gives them cleaning that is
 *fun* for them, a luxury shower that slows the grubby feeling, and skills that grow from
 order (Dexterity, Perception, Business).
 

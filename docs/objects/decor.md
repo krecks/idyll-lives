@@ -40,8 +40,8 @@ cutaway drops it, from either side.
 - The wall clock's hands keep the game's time (ten past ten in the morning, ten to ten at night). Its case's well
   ends behind the face, so the face shows white by default and "Face" colours it.
 - With the cutaway dropping a wall (an inner wall, or an outer wall seen from outside), the things on it hide with
-  it rather than float over the stub; each knows from when it is placed which views drop its wall
-  (`BabylonRenderer.ts`). Checked on inner and outer walls from all four sides; floor things against a wall stay.
+  it rather than float over the stub; each knows from when it is placed which views drop its wall.
+  Checked on inner and outer walls from all four sides; floor things against a wall stay.
 - Since the authenticity review (G-15): the grandfather clock is wound up at its dial (`STEP_IN`, `windClock177`/`147`,
   clips/reach.ts): on tiptoe as far as the height needs, the key into each winding hole for four turns of the wrist,
   the other hand on the hood; a child (`windClock112`), who can't reach the dial, pulls the weights' chains hand over

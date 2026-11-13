@@ -37,4 +37,4 @@ lot keeps household needs at 0.77.
 ## Other personalities
 Bookworms share `cozy` (desk, rain lamp, window seat) and love the writing desk; couch potatoes
 like the cozy window seat; lazy/spa-loving residents will fight over the tub; cheerful residents just see a
-nice bath. Any future `music` items (outgoing/party packs) will also draw gloomy residents in.
+nice bath.
