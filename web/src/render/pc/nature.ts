@@ -37,7 +37,7 @@ import { Geo } from '../shared/geometry';
 import { CountryRoads } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
 import { grassField, gustAt, gustNoise, type GrassQuality } from '../shared/grass';
-import { OffThreadLand, withTownGrass } from '../shared/renderData';
+import { OffThreadLand, withTownGrass, type RoadMeshData } from '../shared/renderData';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
 import { groupInstances, hideLawn, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
@@ -114,14 +114,22 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
 
   /** The land in the render data worker while `build` runs: the terrain's shading and the grass field are made there. */
   private offThread: OffThreadLand | null = null;
+  /**
+   * The town's road mesh the render data worker makes while the landscape builds (the menus'
+   * overview awaits it, `overview.ts` `buildGround`): null where no worker can make it, and the
+   * page builds it as before.
+   */
+  roadMesh: Promise<RoadMeshData | null> = Promise.resolve(null);
 
   /** `grassQuality`: how the grass is drawn (the preset's, `QualitySettings.grass`); `open`: a big world's distances (`QualitySettings.openWorld`). */
   constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, woodsCell: number, private readonly grassQuality: GrassQuality, private readonly open: OpenWorldQuality) {
     super(world, (land, w, name) => new CountryRoads(land, w, name), lawnDensity, lawnLod, woodsCell, open.woodsCell);
   }
 
-  async build(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder): Promise<NatureResult> {
-    this.offThread = OffThreadLand.open(world);
+  async build(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder, townRoads = false): Promise<NatureResult> {
+    this.offThread = OffThreadLand.open(world, townRoads);
+    // (Asked for now, so it is made while the page plans the street; the town's build waits for it.)
+    this.roadMesh = this.offThread?.roads() ?? Promise.resolve(null);
     try {
       return await this.buildAll(app, parent, assets, world, pace, buildRoads);
     } finally {

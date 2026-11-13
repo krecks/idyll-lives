@@ -2863,7 +2863,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /** Builds the overview of `world` (if it isn't already), with its highlights, out of the house's lamps. */
   private async buildOverview(overview: TownOverview, world: WorldStructure): Promise<void> {
-    if (!(await overview.build(world, () => this.pace()))) return;
+    // (The landscape's render data worker makes the town's road mesh; asked for before the street is planned.)
+    const roads = this.lot.roadMesh(world);
+    if (!(await overview.build(world, () => this.pace(), roads))) return;
     if (this.townHighlight) overview.setHighlight(this.townHighlight);
     // Interior lamps of the game's house never reach the overview (nor are they on its layer: this keeps its shaders simple).
     this.lamps.exclude(overview.meshInstances());

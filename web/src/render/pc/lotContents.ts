@@ -55,6 +55,7 @@ import { restPoses, slotOf } from '../shared/objectMotion';
 import type { TableRoom } from '../shared/tableTuck';
 import { WALL_HEIGHT } from '../shared/walls';
 import type { RenderQuality } from '../quality';
+import type { RoadMeshData } from '../shared/renderData';
 import { resizeKey, type ObjectBackgroundClips, type ObjectClipInfo, type ObjectResize, type RendererDeps } from '../types';
 
 /** Radius of the sky dome (m): inside the camera's far plane. */
@@ -294,7 +295,7 @@ export class LotContents {
     if (!set) {
       const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod, this.quality.woodsCell, this.quality.grass, this.quality.openWorld);
       const created: NatureSet = { key, landscape, draws: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve(), refreshing: Promise.resolve() };
-      created.ready = landscape.build(this.app, this.root, this.deps.assets, world, () => this.hooks.pace(), buildRoads).then((nature) => {
+      created.ready = landscape.build(this.app, this.root, this.deps.assets, world, () => this.hooks.pace(), buildRoads, layer === 'town').then((nature) => {
         perfTime('nature: meshes', () => {
           created.draws = nature.draws;
           created.casters = nature.casters;
@@ -328,6 +329,15 @@ export class LotContents {
     this.hooks.landscapeChanged?.();
     this.hooks.shadowsMoved(true);
     return set;
+  }
+
+  /**
+   * The town's road mesh the landscape's render data worker is making for `world` (`useNature`):
+   * the overview awaits it instead of building the roads on the page. Resolves null where no
+   * worker could make it.
+   */
+  roadMesh(world: WorldStructure): Promise<RoadMeshData | null> {
+    return this.natures.get(Landscape.key(world))?.landscape.roadMesh ?? Promise.resolve(null);
   }
 
   /** The landscape's draws (the lamps leave them out: `MaterialLibrary.excludeFromLights`). */

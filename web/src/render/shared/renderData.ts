@@ -1,26 +1,29 @@
 /**
  * The landscape's data built off the main thread (`renderData.worker.ts`): the grass field
- * (`grassField`, a texel a metre over the land: seconds of work round a big world) and the
- * terrain's heights and colours (`LandscapeLayout.shadeTerrain`). The worker lays the land out
- * again from the same world (`LandscapeLayout`, deterministic: the same numbers as the page's)
- * and sends back typed arrays; the page only builds meshes and textures from them. Where no worker
- * runs (or one fails), each call says so and the caller builds on the page as before.
+ * (`grassField`, a texel a metre over the land: seconds of work round a big world), the terrain's
+ * heights and colours (`LandscapeLayout.shadeTerrain`), and the town's road mesh (`roadMeshes`,
+ * the menu overview's streets). The worker lays the land out again from the same world
+ * (`LandscapeLayout`, deterministic: the same numbers as the page's) and sends back typed arrays;
+ * the page only builds meshes and textures from them. Where no worker runs (or one fails), each
+ * call says so and the caller builds on the page as before.
  */
 
 import type { WorldStructure } from '../../core/protocol';
 import { CountryRoads } from './countryRoads';
 import { grassField, townGrass, type GrassField } from './grass';
+import type { MeshData } from './geometry';
 import { LandscapeLayout } from './nature';
 import { LazyWorker } from '../../core/lazyWorker';
 
 /**
  * What of a world the land is laid out from (`LandscapeLayout`, `CountryRoads`, the grass field's
- * land): its size, its lots and its meta (seed, landscape, roads, zones). The town's own contents
- * (rooms, walls, furniture: millions of tiles in a big world) stay on the page: the town's lawn
- * mask is made there (`townGrass`).
+ * land, the town's roads): its size, its lots, its meta (seed, landscape, roads, zones) and its
+ * junctions (the road mesh's pads and markings). The town's own contents (rooms, walls, furniture:
+ * millions of tiles in a big world) stay on the page: the town's lawn mask is made there
+ * (`townGrass`).
  */
 export function landWorld(world: WorldStructure): WorldStructure {
-  const { version, lotVersion, mode, width, depth, storeyDepth, plots, meta } = world;
+  const { version, lotVersion, mode, width, depth, storeyDepth, plots, meta, junctions } = world;
   return {
     version,
     lotVersion,
@@ -30,6 +33,7 @@ export function landWorld(world: WorldStructure): WorldStructure {
     ...(storeyDepth === undefined ? {} : { storeyDepth }),
     plots,
     meta,
+    ...(junctions === undefined ? {} : { junctions }),
     objects: [],
     sims: [],
     households: [],
@@ -74,13 +78,25 @@ export function withTownGrass(land: LandGrass, world: WorldStructure): GrassFiel
   return field;
 }
 
+/** The town's road mesh (`roadMeshes`): its surface, and its markings where it has any. */
+export interface RoadMeshData {
+  surface: MeshData;
+  marks: MeshData | null;
+  /** The worker's own build (ms), for the perf spans. */
+  ms?: number;
+}
+
 export type ToRenderData =
   | { type: 'open'; land: number; world: WorldStructure }
   | { type: 'close'; land: number }
   | { type: 'grass'; land: number; margin: number }
+  | { type: 'roads'; land: number }
   | { type: 'shade'; land: number; positions: Float32Array };
 
-export type RenderDataAnswer = { type: 'grass'; field: LandGrass } | { type: 'shade'; positions: Float32Array; colors: Float32Array };
+export type RenderDataAnswer =
+  | { type: 'grass'; field: LandGrass }
+  | { type: 'roads'; roads: RoadMeshData }
+  | { type: 'shade'; positions: Float32Array; colors: Float32Array };
 
 /** A render data worker (`renderData.worker.ts`); it goes once it has had nothing to do for half a minute. */
 const dataWorker = () =>
@@ -133,19 +149,40 @@ class Opened {
  */
 export class OffThreadLand {
   private closed = false;
+  /** The road mesh asked for as soon as the land is open (its own job, before the grass field). */
+  private readonly road: Promise<RoadMeshData | null>;
 
   private constructor(
     private readonly id: number,
     private readonly shading: Opened,
     private readonly grassing: Opened | null,
-  ) {}
+    town: boolean,
+  ) {
+    // (Only the menus' town draws it; a game's build would wait its worker on a mesh nobody asks for.)
+    if (!town) {
+      this.road = Promise.resolve(null);
+      return;
+    }
+    // (The shading worker: the grass field is longer, and the overview's ground waits for neither
+    // before the street is planned.)
+    const there = this.shading.there ? this.shading : (this.grassing ?? this.shading);
+    this.road = there.ask({ type: 'roads', land: id }).then((reply) => (reply?.type === 'roads' ? reply.roads : null));
+  }
 
-  /** The world's land sent to the workers; null where no worker can run. */
-  static open(world: WorldStructure): OffThreadLand | null {
+  /** The world's land sent to the workers; null where no worker can run. `town`: also make the town's road mesh (`roads`). */
+  static open(world: WorldStructure, town = false): OffThreadLand | null {
     const id = nextLand++;
     const land = landWorld(world);
     const shade = Opened.in(shading, id, land);
-    return shade ? new OffThreadLand(id, shade, Opened.in(grassing, id, land)) : null;
+    return shade ? new OffThreadLand(id, shade, Opened.in(grassing, id, land), town) : null;
+  }
+
+  /**
+   * The town's road mesh, made in the worker while the page is busy with the rest of the town
+   * (`roadMeshes`; the same arrays as the page's, in the same order). Null where it couldn't be.
+   */
+  roads(): Promise<RoadMeshData | null> {
+    return this.road;
   }
 
   /** The grass field's land part, `margin` m round the town (`grassField`). */
