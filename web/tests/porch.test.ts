@@ -171,6 +171,15 @@ describe('porches and looks', async () => {
     const withPieces = await planStreet(new HousePlanner(), built, view(world.plots[0]), options);
     const roofs = (plan: typeof game) => points(plan.lot!.silhouettes.parts.find((p) => p.name === 'silhouetteRoofs')!.geo).length;
     expect(roofs(withPieces)).toBeGreaterThan(roofs(game));
+    // The canopy's lamp lights with the lot's (off the house's walls: it stays in the cutaway).
+    expect(withPieces.lot!.glow.empty).toBe(false);
+    expect(withPieces.lot!.porches.map((p) => p.look)).toEqual([LOOK.NegZ]);
+    // Against the house's front wall (z 14): its lamp goes with that wall, beside the porch's.
+    const backed = { ...world, porchPieces: [{ plot: 0, kind: 'canopy' as const, x: 4, z: 14, w: 2, d: 2, rot: 0 }] };
+    const against = await planStreet(new HousePlanner(), backed, view(world.plots[0]), options);
+    expect(against.lot!.glow.empty).toBe(true);
+    expect(against.lot!.porches.map((p) => p.look)).toEqual([LOOK.NegZ]);
+    expect(against.lot!.porches[0].pools.empty).toBe(false);
   });
 
   test("porch pieces are the porch's parts in the house's colours: a post, a canopy over posts or against a wall, a step platform", () => {
@@ -203,13 +212,41 @@ describe('porches and looks', async () => {
     for (let i = 0; i < roof.pos.length; i += 3) if (roof.pos[i + 1] > top - 0.001) ridge.push(roof.pos[i]);
     expect(ridge.length).toBeGreaterThan(0);
     expect(ridge.every((x) => Math.abs(x - 16) < 0.12)).toBe(true);
-    // The post and the platform: trim, low (the platform at most 5 cm) but for the post; no lamp; nothing goes in the cutaway.
+    // The post and the platform: trim, low (the platform at most 5 cm) but for the post, no lamp of their own; nothing goes in the cutaway.
     const trim = part(plan.parts, 'silhouetteTrim');
     let tall = 0;
     for (let i = 0; i < trim.pos.length; i += 3) if (trim.pos[i] > 16.4 && trim.pos[i] < 16.6 && trim.pos[i + 2] > 16.4 && trim.pos[i + 2] < 16.6) tall = Math.max(tall, trim.pos[i + 1]);
     expect(tall).toBeCloseTo(2.34, 2);
-    expect(plan.lamps).toEqual([]);
     for (const g of [trim, roof]) for (let v = 0; v < g.cut.length / 4; v++) expect(g.cut[v * 4 + 1]).toBe(Cut.Keep);
+    // The canopy's lamp, the porch's: hanging under its ridge (x 16) a little in from its front (z 18),
+    // its glass just under the eaves, its pool under it (no wall to face); it stays in the cutaway.
+    expect(plan.lamps).toHaveLength(1);
+    const [lx, ly, lz, nx, nz, look] = plan.lamps[0];
+    expect([lx, lz, nx, nz, look]).toEqual([16, 17.65, 0, 0, undefined]);
+    expect(ly).toBeGreaterThan(1.75);
+    expect(ly + 0.12).toBeLessThan(2.34);
+    // Only canopies have one.
+    const bare = planner.silhouettes([spec({ dressingOnly: true, porches: [], pieces: pieces.filter((p) => p.kind !== 'canopy') })], []);
+    expect(bare.lamps).toEqual([]);
+  });
+
+  test("a canopy piece against the viewed house's wall goes with it in the cutaway, its lamp too, as the porch's canopy does", () => {
+    const planner = new HousePlanner();
+    // Facing +z, its back on the house's front wall (z 14, x 6..8); one facing -x out from the side wall (x 3).
+    const front = { plot: 0, kind: 'canopy' as const, x: 6, z: 14, w: 2, d: 2, rot: 0 };
+    const side = { plot: 0, kind: 'canopy' as const, x: 1, z: 7, w: 2, d: 3, rot: 3 };
+    const wall = new Set(['h:6:14', 'h:7:14', 'v:3:8']);
+    const walled = (axis: 'h' | 'v', x: number, z: number) => wall.has(`${axis}:${x}:${z}`);
+    const plan = planner.silhouettes([spec({ dressingOnly: true, porches: [], pieces: [front, side], walled })], []);
+    expect(plan.lamps.map((l) => l[5])).toEqual([LOOK.NegZ, LOOK.PosX]);
+    const kinds = (g: Geo) => new Set(Array.from({ length: g.cut.length / 4 }, (_, v) => `${g.cut[v * 4 + 1]}:${g.cut[v * 4]}`));
+    expect(kinds(part(plan.parts, 'silhouetteRoofs'))).toEqual(new Set([`${Cut.Hide}:${LOOK.NegZ}`, `${Cut.Hide}:${LOOK.PosX}`]));
+    // Off the wall (on posts in the garden), or on a neighbour's silhouette: it stays, its lamp with the street's.
+    const free = planner.silhouettes([spec({ dressingOnly: true, porches: [], pieces: [{ ...front, z: 16 }], walled })], []);
+    expect(free.lamps.map((l) => l[5])).toEqual([undefined]);
+    const far = planner.silhouettes([spec({ porches: [], pieces: [front], walled })], []);
+    expect(far.lamps.map((l) => l[5])).toEqual([undefined]);
+    for (const g of [part(free.parts, 'silhouetteRoofs'), part(far.parts, 'silhouetteRoofs')]) for (let v = 0; v < g.cut.length / 4; v++) expect(g.cut[v * 4 + 1]).toBe(Cut.Keep);
   });
 
   // ---- the look -----------------------------------------------------------------------
