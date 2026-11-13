@@ -8,6 +8,8 @@
 //! cargo shots steady <dirA> <dirB> [--json]   how much a picture changes when the camera moves a quarter of a pixel
 //! cargo shots compare <dirA> <dirB> [--out <dir>]
 //!                                             per picture both have: how many pixels differ, by how much
+//! cargo shots sheet --out <dir> [--name <a> ...] <dirA> <dirB> [<dirC> ...]
+//!                                             the pictures every folder has, tiled side by side under the names
 //! ```
 //!
 //! **stats.** The columns (brightness and contrast in the picture's own 0–255 values, as the screen shows them):
@@ -28,6 +30,10 @@
 //! off) comes out different every time, which in play is shimmer as the camera moves, and which one still
 //! does not show. Compare the figure before a change and after it.
 //!
+//! **sheet.** Before and after a change, two looks, a few variants of one setting (`looks.mjs`, `play.mjs`): each
+//! picture under its folder's name (or `--name`, one per folder, in order), two side by side, three or four two
+//! by two, more three to a row. The names are set in dot-matrix letters of the tool's own.
+//!
 //! **compare.** Per picture: the share of pixels differing by more than 2 and by more than 16 of 255, the
 //! largest difference, the mean one and the PSNR; with `--out`, a picture of where they differ (a dim copy
 //! of the first, the differences in red) for each that does.
@@ -37,7 +43,8 @@ use std::path::Path;
 
 pub const USAGE: &str = "usage: cargo shots stats <dir> [<dirB>] [--json]
        cargo shots steady <dirA> <dirB> [--json]
-       cargo shots compare <dirA> <dirB> [--out <dir>]";
+       cargo shots compare <dirA> <dirB> [--out <dir>]
+       cargo shots sheet --out <dir> [--name <a> --name <b> ...] <dirA> <dirB> [<dirC> ...]";
 
 /// A picture's red, green and blue (no alpha) and its brightness (Rec. 709, of the encoded values).
 pub struct Picture {
@@ -605,6 +612,212 @@ fn compare(a: &str, b: &str, out: Option<&str>) -> Result<(), String> {
     Ok(())
 }
 
+// ---- sheets: pictures of the same name from several folders, side by side under their folders' names ----
+
+/// The printable ASCII characters, space to tilde, five columns each of seven dots (a column's lowest bit
+/// its top dot): the classic 5 × 7 dot-matrix letters, enough to say which picture is which.
+#[rustfmt::skip]
+const LETTERS: [[u8; 5]; 95] = [
+    [0x00, 0x00, 0x00, 0x00, 0x00],
+    [0x00, 0x00, 0x5F, 0x00, 0x00],
+    [0x00, 0x07, 0x00, 0x07, 0x00],
+    [0x14, 0x7F, 0x14, 0x7F, 0x14],
+    [0x24, 0x2A, 0x7F, 0x2A, 0x12],
+    [0x23, 0x13, 0x08, 0x64, 0x62],
+    [0x36, 0x49, 0x55, 0x22, 0x50],
+    [0x00, 0x05, 0x03, 0x00, 0x00],
+    [0x00, 0x1C, 0x22, 0x41, 0x00],
+    [0x00, 0x41, 0x22, 0x1C, 0x00],
+    [0x08, 0x2A, 0x1C, 0x2A, 0x08],
+    [0x08, 0x08, 0x3E, 0x08, 0x08],
+    [0x00, 0x50, 0x30, 0x00, 0x00],
+    [0x08, 0x08, 0x08, 0x08, 0x08],
+    [0x00, 0x60, 0x60, 0x00, 0x00],
+    [0x20, 0x10, 0x08, 0x04, 0x02],
+    [0x3E, 0x51, 0x49, 0x45, 0x3E],
+    [0x00, 0x42, 0x7F, 0x40, 0x00],
+    [0x42, 0x61, 0x51, 0x49, 0x46],
+    [0x21, 0x41, 0x45, 0x4B, 0x31],
+    [0x18, 0x14, 0x12, 0x7F, 0x10],
+    [0x27, 0x45, 0x45, 0x45, 0x39],
+    [0x3C, 0x4A, 0x49, 0x49, 0x30],
+    [0x01, 0x71, 0x09, 0x05, 0x03],
+    [0x36, 0x49, 0x49, 0x49, 0x36],
+    [0x06, 0x49, 0x49, 0x29, 0x1E],
+    [0x00, 0x36, 0x36, 0x00, 0x00],
+    [0x00, 0x56, 0x36, 0x00, 0x00],
+    [0x00, 0x08, 0x14, 0x22, 0x41],
+    [0x14, 0x14, 0x14, 0x14, 0x14],
+    [0x41, 0x22, 0x14, 0x08, 0x00],
+    [0x02, 0x01, 0x51, 0x09, 0x06],
+    [0x32, 0x49, 0x79, 0x41, 0x3E],
+    [0x7E, 0x11, 0x11, 0x11, 0x7E],
+    [0x7F, 0x49, 0x49, 0x49, 0x36],
+    [0x3E, 0x41, 0x41, 0x41, 0x22],
+    [0x7F, 0x41, 0x41, 0x22, 0x1C],
+    [0x7F, 0x49, 0x49, 0x49, 0x41],
+    [0x7F, 0x09, 0x09, 0x01, 0x01],
+    [0x3E, 0x41, 0x41, 0x51, 0x32],
+    [0x7F, 0x08, 0x08, 0x08, 0x7F],
+    [0x00, 0x41, 0x7F, 0x41, 0x00],
+    [0x20, 0x40, 0x41, 0x3F, 0x01],
+    [0x7F, 0x08, 0x14, 0x22, 0x41],
+    [0x7F, 0x40, 0x40, 0x40, 0x40],
+    [0x7F, 0x02, 0x04, 0x02, 0x7F],
+    [0x7F, 0x04, 0x08, 0x10, 0x7F],
+    [0x3E, 0x41, 0x41, 0x41, 0x3E],
+    [0x7F, 0x09, 0x09, 0x09, 0x06],
+    [0x3E, 0x41, 0x51, 0x21, 0x5E],
+    [0x7F, 0x09, 0x19, 0x29, 0x46],
+    [0x46, 0x49, 0x49, 0x49, 0x31],
+    [0x01, 0x01, 0x7F, 0x01, 0x01],
+    [0x3F, 0x40, 0x40, 0x40, 0x3F],
+    [0x1F, 0x20, 0x40, 0x20, 0x1F],
+    [0x7F, 0x20, 0x18, 0x20, 0x7F],
+    [0x63, 0x14, 0x08, 0x14, 0x63],
+    [0x03, 0x04, 0x78, 0x04, 0x03],
+    [0x61, 0x51, 0x49, 0x45, 0x43],
+    [0x00, 0x00, 0x7F, 0x41, 0x41],
+    [0x02, 0x04, 0x08, 0x10, 0x20],
+    [0x41, 0x41, 0x7F, 0x00, 0x00],
+    [0x04, 0x02, 0x01, 0x02, 0x04],
+    [0x40, 0x40, 0x40, 0x40, 0x40],
+    [0x00, 0x01, 0x02, 0x04, 0x00],
+    [0x20, 0x54, 0x54, 0x54, 0x78],
+    [0x7F, 0x48, 0x44, 0x44, 0x38],
+    [0x38, 0x44, 0x44, 0x44, 0x20],
+    [0x38, 0x44, 0x44, 0x48, 0x7F],
+    [0x38, 0x54, 0x54, 0x54, 0x18],
+    [0x08, 0x7E, 0x09, 0x01, 0x02],
+    [0x08, 0x14, 0x54, 0x54, 0x3C],
+    [0x7F, 0x08, 0x04, 0x04, 0x78],
+    [0x00, 0x44, 0x7D, 0x40, 0x00],
+    [0x20, 0x40, 0x44, 0x3D, 0x00],
+    [0x00, 0x7F, 0x10, 0x28, 0x44],
+    [0x00, 0x41, 0x7F, 0x40, 0x00],
+    [0x7C, 0x04, 0x18, 0x04, 0x78],
+    [0x7C, 0x08, 0x04, 0x04, 0x78],
+    [0x38, 0x44, 0x44, 0x44, 0x38],
+    [0x7C, 0x14, 0x14, 0x14, 0x08],
+    [0x08, 0x14, 0x14, 0x18, 0x7C],
+    [0x7C, 0x08, 0x04, 0x04, 0x08],
+    [0x48, 0x54, 0x54, 0x54, 0x20],
+    [0x04, 0x3F, 0x44, 0x40, 0x20],
+    [0x3C, 0x40, 0x40, 0x20, 0x7C],
+    [0x1C, 0x20, 0x40, 0x20, 0x1C],
+    [0x3C, 0x40, 0x30, 0x40, 0x3C],
+    [0x44, 0x28, 0x10, 0x28, 0x44],
+    [0x0C, 0x50, 0x50, 0x50, 0x3C],
+    [0x44, 0x64, 0x54, 0x4C, 0x44],
+    [0x00, 0x08, 0x36, 0x41, 0x00],
+    [0x00, 0x00, 0x7F, 0x00, 0x00],
+    [0x00, 0x41, 0x36, 0x08, 0x00],
+    [0x02, 0x01, 0x02, 0x04, 0x02],
+];
+
+/// Height of the band a picture's name stands in, and the sheet's ground.
+const LABEL: usize = 44;
+const BACK: [u8; 3] = [0x1b, 0x1d, 0x21];
+
+/// `text` in white dots on `rgb` (`w` wide), centred on `cx`, its top at `top`, `scale` pixels a dot.
+fn letters(rgb: &mut [u8], w: usize, text: &str, cx: usize, top: usize, scale: usize) {
+    let chars: Vec<usize> = text
+        .chars()
+        .map(|c| {
+            if (' '..='~').contains(&c) {
+                c as usize - 0x20
+            } else {
+                '?' as usize - 0x20
+            }
+        })
+        .collect();
+    let width = chars.len() * 6 * scale;
+    let left = cx.saturating_sub(width / 2);
+    for (i, &c) in chars.iter().enumerate() {
+        for (col, bits) in LETTERS[c].iter().enumerate() {
+            for row in 0..7 {
+                if bits >> row & 1 == 0 {
+                    continue;
+                }
+                for dy in 0..scale {
+                    for dx in 0..scale {
+                        let (x, y) = (left + (i * 6 + col) * scale + dx, top + row * scale + dy);
+                        if x < w && (y * w + x) * 3 + 2 < rgb.len() {
+                            rgb[(y * w + x) * 3..(y * w + x) * 3 + 3]
+                                .copy_from_slice(&[255, 255, 255]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// One sheet: `pictures` (each with its name) tiled, two side by side, three or four two by two, more three
+/// to a row, every cell as large as the largest picture.
+pub fn sheet(pictures: &[(&str, &Picture)]) -> (usize, usize, Vec<u8>) {
+    let n = pictures.len();
+    let cols = if n <= 2 {
+        n.max(1)
+    } else if n <= 4 {
+        2
+    } else {
+        3
+    };
+    let rows = n.div_ceil(cols);
+    let w = pictures.iter().map(|(_, p)| p.w).max().unwrap_or(0);
+    let h = pictures.iter().map(|(_, p)| p.h).max().unwrap_or(0);
+    let (width, height) = (cols * w, rows * (h + LABEL));
+    let mut rgb = BACK.repeat(width * height);
+    for (i, (name, p)) in pictures.iter().enumerate() {
+        let (left, top) = ((i % cols) * w, (i / cols) * (h + LABEL));
+        for y in 0..p.h {
+            let to = ((top + LABEL + y) * width + left) * 3;
+            rgb[to..to + p.w * 3].copy_from_slice(&p.rgb[y * p.w * 3..(y + 1) * p.w * 3]);
+        }
+        // Three pixels a dot where the name fits the cell, two where it is long, cut where even that is too wide.
+        let scale = if name.chars().count() * 18 <= w { 3 } else { 2 };
+        let fits: String = name.chars().take(w / (6 * scale)).collect();
+        letters(
+            &mut rgb,
+            width,
+            &fits,
+            left + w / 2,
+            top + (LABEL - 7 * scale) / 2,
+            scale,
+        );
+    }
+    (width, height, rgb)
+}
+
+fn sheets(dirs: &[&str], names: &[String], out: &str) -> Result<(), String> {
+    std::fs::create_dir_all(out).map_err(|e| format!("{out}: {e}"))?;
+    let mut shared = pngs(Path::new(dirs[0]))?;
+    for dir in &dirs[1..] {
+        let other = pngs(Path::new(dir))?;
+        shared.retain(|f| other.contains(f));
+    }
+    for file in &shared {
+        let pictures: Vec<Picture> = dirs
+            .iter()
+            .map(|d| Picture::load(&Path::new(d).join(file)))
+            .collect::<Result<_, _>>()?;
+        let named: Vec<(&str, &Picture)> = pictures
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (names.get(i).map_or(dirs[i], String::as_str), p))
+            .collect();
+        let (w, h, rgb) = sheet(&named);
+        let to = Path::new(out).join(file);
+        image::RgbImage::from_raw(w as u32, h as u32, rgb)
+            .ok_or("the sheet has no size")?
+            .save(&to)
+            .map_err(|e| format!("{}: {e}", to.display()))?;
+    }
+    println!("{} sheets in {out}", shared.len());
+    Ok(())
+}
+
 pub fn main_with(args: &[String]) -> i32 {
     let as_json = args.iter().any(|a| a == "--json");
     let out = args
@@ -613,11 +826,15 @@ pub fn main_with(args: &[String]) -> i32 {
         .and_then(|i| args.get(i + 1))
         .map(String::as_str);
     let mut plain: Vec<&str> = Vec::new();
+    let mut names: Vec<String> = Vec::new();
     let mut skip = false;
-    for a in args {
+    for (i, a) in args.iter().enumerate() {
         if skip {
             skip = false;
         } else if a == "--out" {
+            skip = true;
+        } else if a == "--name" {
+            names.extend(args.get(i + 1).cloned());
             skip = true;
         } else if !a.starts_with("--") {
             plain.push(a);
@@ -627,6 +844,9 @@ pub fn main_with(args: &[String]) -> i32 {
         ["stats", dirs @ ..] if (1..=2).contains(&dirs.len()) => stats(dirs, as_json),
         ["steady", a, b] => steady(a, b, as_json),
         ["compare", a, b] => compare(a, b, out),
+        ["sheet", dirs @ ..] if !dirs.is_empty() && out.is_some() => {
+            sheets(dirs, &names, out.expect("checked"))
+        }
         _ => {
             let help = args
                 .iter()
@@ -736,6 +956,50 @@ mod tests {
         assert!(
             (d.psnr.unwrap() - 10.0 * (255.0f64 * 255.0 / (409.0 / 300.0)).log10()).abs() < 1e-9
         );
+    }
+
+    #[test]
+    fn a_sheet_of_three() {
+        let a = made(40, 20, |_, _| [200, 0, 0]);
+        let b = made(30, 20, |_, _| [0, 200, 0]);
+        let (w, h, rgb) = sheet(&[("a", &a), ("b", &b), ("c", &a)]);
+        // Two by two, each cell as large as the largest picture, a band over each for its name.
+        assert_eq!((w, h), (80, 2 * (20 + LABEL)));
+        let at = |x: usize, y: usize| {
+            [
+                rgb[(y * w + x) * 3],
+                rgb[(y * w + x) * 3 + 1],
+                rgb[(y * w + x) * 3 + 2],
+            ]
+        };
+        assert_eq!(at(0, LABEL), [200, 0, 0]);
+        assert_eq!(at(40, LABEL), [0, 200, 0]);
+        assert_eq!(at(75, LABEL), BACK);
+        assert_eq!(at(0, 2 * LABEL + 20), [200, 0, 0]);
+        assert_eq!(at(79, 2 * LABEL + 39), BACK);
+        // The first name's dots are in its band, white, and nowhere else is.
+        let white = |x0: usize, x1: usize, y0: usize, y1: usize| {
+            (y0..y1).any(|y| (x0..x1).any(|x| at(x, y) == [255; 3]))
+        };
+        assert!(
+            white(0, 40, 0, LABEL)
+                && white(40, 80, 0, LABEL)
+                && white(0, 40, LABEL + 20, 2 * LABEL + 20)
+        );
+        assert!(!white(40, 80, LABEL + 20, 2 * LABEL + 20));
+    }
+
+    #[test]
+    fn every_letter_has_dots_but_the_space() {
+        for (i, glyph) in LETTERS.iter().enumerate() {
+            assert_eq!(
+                glyph.iter().all(|c| *c == 0),
+                i == 0,
+                "{:?}",
+                (0x20 + i as u8) as char
+            );
+            assert!(glyph.iter().all(|c| *c < 0x80));
+        }
     }
 
     #[test]

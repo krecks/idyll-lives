@@ -3,7 +3,7 @@
 One binary each, under `src/bin/`, run through the cargo aliases in
 [`.cargo/config.toml`](../../.cargo/config.toml). None of them is shipped: the game is `crates/sim-core`
 (and `crates/voice`), and these build, fetch, check and release what surrounds it. Their Python and
-JavaScript predecessors are gone; `tools/` keeps only what needs Playwright, Blender, sharp or the
+JavaScript predecessors are gone; `tools/` keeps only what needs Playwright, Blender or the
 browser's own runtime (see [What is still not Rust](#what-is-still-not-rust)).
 
 Every tool's `src/<name>.rs` opens with what it does and its arguments; this page is the map.
@@ -23,7 +23,7 @@ Every tool's `src/<name>.rs` opens with what it does and its arguments; this pag
 | `cargo review` | The authenticity review's first pass over every buyable object: `sizes`, `uses`; and `colours`, every model's colours against what real surfaces reflect (2 % to 80 % of the light, metals and glass left out): a report of those outside. |
 | `cargo tex` | The texture scripts: `clouds`, `synth` (every surface map, generated in code), `materials` (was `tools/art/*.py`). |
 | `cargo pins` | Accepted parts of the game held by their SHA-256 (`tools/pins/pins.json`: a file, a marked region or an `export const`), so work on something else can't change them by the way (was `tools/pins/check.ts`). `--list`, `--update`, `--add`. |
-| `cargo shots` | Numbers from the bench's pictures: `stats` (brightness, clipping, saturation, how much is one tone, contrast at four sizes), `steady` (how much a picture changes when the camera moves a quarter of a pixel) and `compare` (how many pixels differ between two shot folders, with pictures of where; `render.mjs --compare` runs it). Was `tools/bench/stats.mjs` and part of `render.mjs`. |
+| `cargo shots` | Numbers from the bench's pictures: `stats` (brightness, clipping, saturation, how much is one tone, contrast at four sizes), `steady` (how much a picture changes when the camera moves a quarter of a pixel), `compare` (how many pixels differ between two shot folders, with pictures of where; `render.mjs --compare` runs it) and `sheet` (pictures of the same name from several folders tiled side by side under their names; `looks.mjs` and `play.mjs` run it). Was `tools/bench/stats.mjs`, part of `render.mjs` and `sheet.mjs` on sharp. |
 | `cargo world-map` | Draws the sample worlds (`tools/worlds/sample.ts`'s output) from above, an SVG each and an index page (was `tools/worlds/map.ts`). |
 | `cargo release-version` | One version for the whole game. Prints it and fails if `web/package.json`, `Cargo.toml` and `Cargo.lock` differ (CI runs this); with an argument, sets all of them. Not `cargo version`: that is cargo's own. |
 | `cargo licenses` | `dist/THIRD-PARTY-LICENSES.txt`, written by production builds (`web/vite.config.ts`). |
@@ -94,6 +94,6 @@ numbers match a crash stack from the site.
 |---|---|
 | `tools/voice/check.mjs`, `samples.mjs`, `tools/llm/check.mjs`, `devices.mjs` (and the `engine.mjs` they share) | They run the models the way the browser does: ONNX Runtime Web, plus the worker's own `web/src/voice/supertonic.ts` and `voices.ts`. Porting them means an ONNX runtime in Rust (`ort` or `tract`) and `supertonic.ts` in Rust. |
 | `tools/characters/check_clips.ts` | Reads the clip data that is generated into `web/src/render/shared/characters/clips/`. |
-| `tools/bench/*.mjs` | Playwright: they drive a real browser and time the render. What they do with the pictures afterwards is `cargo shots`, but for `sheet.mjs`, which tiles pictures under labels with sharp (it sets the labels' type; the one thing sharp is still here for). |
+| `tools/bench/*.mjs` | Playwright: they drive a real browser and time the render. What they do with the pictures afterwards is `cargo shots`. |
 | `tools/housegen/sample.ts`, `tools/worlds/sample.ts` | They run the game's own generators, which are TypeScript (`web/src/game`). |
 | `tools/audio/listen.ts`, `tools/characters/blend_analysis.ts` | They run the game's own sound synthesis and clips, which are TypeScript. |
