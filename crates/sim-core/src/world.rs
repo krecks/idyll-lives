@@ -1135,9 +1135,10 @@ pub struct Sim {
     pub(crate) car_door: u8,
     /// Ticks they've waited for a car driving by to pass (`cars::in_the_way`). Not saved.
     pub(crate) car_wait: u32,
-    /// The lit junction whose crosswalk they wait at the kerb of for its walk phase, and the tick
-    /// they last did (`traffic::kerb_stop`). Not saved.
-    pub(crate) kerb_wait: Option<(u16, u64)>,
+    /// The lit junction whose crosswalk they wait at the kerb of, the arm it's on (for its walk
+    /// phase, or its main road's green: `Signal::opens_with`), and the tick they last did
+    /// (`traffic::kerb_stop`). Not saved.
+    pub(crate) kerb_wait: Option<(u16, u8, u64)>,
     /// The work shift (or school day) they're away for starts at this tick: until then they're on
     /// their way (`life::at_work`). Not saved (after a load, it's under way).
     pub(crate) shift_from: u64,
@@ -8819,7 +8820,8 @@ fn progress(
                     sim.yaw = dx.atan2(dz);
                 }
                 // At a lit junction's crosswalk, closed to them: on foot, they wait at the kerb for
-                // its walk phase, which their waiting brings round (`traffic::kerb_stop`). Not in
+                // its walk phase, which their waiting brings round (`traffic::kerb_stop`; a side
+                // road's crosswalk, for its main road's green: `Signal::opens_with`). Not in
                 // the way of a car waiting for them, though: on, out of its way (a taxi turning the
                 // corner and someone waiting there at the kerb waited for each other for good).
                 // On a bike or an e-scooter they ride on with the traffic (stopped at every
@@ -8830,13 +8832,13 @@ fn progress(
                     sim.pos[1] + dz / dist.max(1e-4) * go,
                 ];
                 if sim.riding.is_none()
-                    && let Some((s, f)) =
+                    && let Some((s, arm, f)) =
                         crate::traffic::kerb_stop(ctx.travel, ctx.lights, sim.pos, ahead)
                     && !crate::cars::holding_up(ctx.cars, sim.id, body, sim.pos)
                 {
                     sim.pos[0] += (ahead[0] - sim.pos[0]) * f;
                     sim.pos[1] += (ahead[1] - sim.pos[1]) * f;
-                    sim.kerb_wait = Some((s, ctx.tick));
+                    sim.kerb_wait = Some((s, arm, ctx.tick));
                     break;
                 }
                 sim.kerb_wait = None;
