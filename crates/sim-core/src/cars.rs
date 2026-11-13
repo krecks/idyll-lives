@@ -505,6 +505,10 @@ pub struct Car {
     /// Ticks it has stood at a zebra's stop line for those on foot (`zebra_yield`). Not saved.
     #[serde(skip)]
     zebra_wait: u32,
+    /// Waiting at a red light this tick (`Traffic::red_for`): those on foot may walk up to its
+    /// nose (`in_the_way`), short of a crosswalk. Not saved.
+    #[serde(skip)]
+    at_red: bool,
     /// Where it is now, which way it faces, whether it's moving and which doors are open (bit
     /// `d` for door `d`); None while it's out of town or unused (`poses`; for the snapshot, not
     /// saved).
@@ -740,6 +744,7 @@ impl Car {
             waited: 0,
             on_foot: Vec::new(),
             zebra_wait: 0,
+            at_red: false,
             shown: None,
             next: None,
             shift: 0.0,
@@ -834,6 +839,7 @@ impl Car {
         self.on_foot.clear();
         self.waited = 0;
         self.zebra_wait = 0;
+        self.at_red = false;
         self.jam = (0, 0, false);
         self.backed_for = None;
         self.pulled_for = None;
@@ -888,6 +894,7 @@ impl Car {
             waited: self.waited,
             on_foot: Vec::new(),
             zebra_wait: 0,
+            at_red: false,
             shown: self.shown,
             next: None,
             shift: 0.0,
@@ -1311,8 +1318,9 @@ pub(crate) struct Route {
     /// worked out with the route (`Route::build`).
     pub(crate) claims: Vec<crate::traffic::Claim>,
     /// Where it stops for those on foot at the zebras of the junctions giving way it goes through,
-    /// should anyone be on one or stepping onto it (`traffic::zebra_stops`, `zebra_yield`), worked
-    /// out with its claims.
+    /// should anyone be on one or stepping onto it (`traffic::zebra_stops`, `zebra_yield`), and at
+    /// a lit junction's side road it turns into on the green, for anyone on its crosswalk
+    /// (`traffic::side_zebra_stops`), worked out with its claims.
     pub(crate) zebras: Vec<crate::traffic::ZebraStop>,
     /// Where it takes turns with one passing a work taxi standing at the kerb the other way
     /// (ticks along it, from and to: `pass_stands`), claims of their own.
@@ -1440,6 +1448,9 @@ impl Route {
         if let Some(t) = travel {
             crate::traffic::gate(&mut self.claims, &t.signals, &trace, len);
             self.zebras = crate::traffic::zebra_stops(&trace, &t.give_way, len);
+            self.zebras
+                .extend(crate::traffic::side_zebra_stops(&trace, &t.signals, len));
+            self.zebras.sort_by(|a, b| a.at.total_cmp(&b.at));
         }
         self.pass = trace.iter().zip(&pass).map(|(s, &p)| (s.0, p)).collect();
     }
@@ -3447,6 +3458,7 @@ fn route_ticks(w: &mut World, c: usize, home: bool) -> f32 {
 /// near, `too_near`). And never deeper into another car than it is (`guard`).
 fn drive_on(w: &mut World, c: usize) {
     let home = w.cars[c].state == CarState::Arriving;
+    w.cars[c].at_red = false;
     match w.cars[c].sight {
         Sight::Seen => {}
         Sight::Ghost => return drive_through(w, c, home),
@@ -3565,7 +3577,9 @@ fn drive_on(w: &mut World, c: usize) {
         // (At a zebra, someone on it or stepping onto it: it stops at the line for them.)
         let waited = cars[c].zebra_wait;
         let route = cars[c].route(exits, Some(travel), home);
-        let whom = zebra_yield(route, &traffic.zebra_walkers, t, waited);
+        let whom = zebra_yield(route, &traffic.zebra_walkers, t, waited, |gate| {
+            traffic.green(Some(gate))
+        });
         match whom {
             Some(whom) if !whom.is_empty() => {
                 let car = &mut cars[c];
@@ -3578,6 +3592,7 @@ fn drive_on(w: &mut World, c: usize) {
         }
         let route = cars[c].route(exits, Some(travel), home);
         if !traffic.may_go(tick, key, u32::from(home), &route.claims, t, t + 1.0) {
+            cars[c].at_red = traffic.red_for(key);
             // (Waiting for its claim: for one in its way that waits for it in turn, on the road
             // or for a claim of its own, as one in its way on the road, so that the later of them
             // backs up out of the other's way, `back_off`.)
@@ -3807,12 +3822,15 @@ const ZEBRA_WAIT: u32 = secs(30.0) as u32;
 /// those on the one of the arm it goes out by (`Traffic::zebra_walkers`), each for as long as
 /// `ZEBRA_KERB_WAIT` and `ZEBRA_WAIT` say. None: at no zebra's line. Empty: it drives on. (Not one
 /// stepping onto the zebra it goes out by: out in the box by then, it'd stand there in the way of
-/// the others; they wait for it to pass.)
+/// the others; they wait for it to pass.) At a lit junction, turning into a side road whose
+/// crosswalk is walked on its green (`Signal::opens_with`), those on that one, while its light is
+/// `green` (on red it waits for the green as ever, asking for it).
 fn zebra_yield(
     route: &Route,
-    walkers: &[(u16, u8, u32, bool)],
+    walkers: &[crate::traffic::OnZebra],
     t: f32,
     waited: u32,
+    green: impl Fn(crate::traffic::Gate) -> bool,
 ) -> Option<Vec<u32>> {
     let mut at_line = false;
     let mut whom = Vec::new();
@@ -3820,10 +3838,12 @@ fn zebra_yield(
         .zebras
         .iter()
         .filter(|z| t <= z.at + 1e-3 && z.at < t + 1.0)
+        .filter(|z| z.lit.is_none_or(|phase| green((z.junction, phase))))
     {
         at_line = true;
-        for &(j, a, id, on) in walkers {
-            if j != z.junction || whom.contains(&id) {
+        for w in walkers {
+            let (a, id, on) = (w.arm, w.id, w.on);
+            if w.junction != z.junction || w.lit != z.lit.is_some() || whom.contains(&id) {
                 continue;
             }
             let into = z.arms[0] == Some(a)
@@ -6543,7 +6563,14 @@ pub(crate) fn in_the_way(
         if car.on_foot.contains(&id) {
             return walks_into(at, yaw, car.len, car.wid, 0.0, body, from, to);
         }
-        let ahead = if out && !car.moved { 0.0 } else { AHEAD };
+        // (Nor the ground ahead of one waiting at a red light, its nose at the stop line: someone
+        // on the crosswalk just in front of it waited there for it, on the walk, till the walk
+        // was over and it came on at them.)
+        let ahead = if out && !car.moved || car.at_red {
+            0.0
+        } else {
+            AHEAD
+        };
         walks_into(at, yaw, car.len, car.wid, ahead, body, from, to)
             || car.next.is_some_and(|(at, yaw)| {
                 walks_into(at, yaw, car.len, car.wid, ahead, body, from, to)

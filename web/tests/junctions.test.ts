@@ -84,6 +84,31 @@ describe('junctions worked out from the roads', () => {
     expect(c.arms.map((a) => a.crosswalk)).toEqual(c.arms.map((a) => a.road === 0));
   });
 
+  test('two quiet Ts close together along a street share one zebra, between them; far apart, one each', () => {
+    // Two lanes off the street 17 m apart, either side of it or on one side: one zebra, on the
+    // stretch between them (sim-core `signal_at`); 60 m apart, a zebra at each.
+    const lane = (x: number, south: boolean): RoadPlan => ({ points: south ? line(x, 50, x, 90, 40) : line(x, 50, x, 10, 40), width: 7, ends: ['join', 'dead'], kind: 'lane' });
+    for (const south of [true, false]) {
+      const js = deriveJunctions(trimJoins([street, lane(40, true), lane(57, south)]));
+      expect(js.length).toBe(2);
+      const zebras = js.flatMap((j) => j.arms.filter((a) => a.crosswalk).map((a) => j.x + a.dir[0] * (a.walkFrom + CROSSWALK / 2)));
+      expect(zebras.length).toBe(1);
+      expect(zebras[0]).toBeGreaterThan(40);
+      expect(zebras[0]).toBeLessThan(57);
+    }
+    const far = deriveJunctions(trimJoins([street, lane(20, true), lane(80, false)]));
+    expect(far.map((j) => j.arms.filter((a) => a.crosswalk).length)).toEqual([1, 1]);
+  });
+
+  test('three country roads meeting give way; a country road meeting a street is lit', () => {
+    const road = (pts: [number, number][]): RoadPlan => ({ points: pts, width: 7, ends: ['out', 'out'], kind: 'country' });
+    const [t] = deriveJunctions([road(line(0, 50, 100, 50, 100)), { ...road(line(50, 50, 50, 100, 50)), ends: ['join', 'out'] }]);
+    expect(t.arms.length).toBe(3);
+    expect(t.arms.every((a) => a.light === null && !a.crosswalk)).toBe(true);
+    const [c] = deriveJunctions(COUNTRY);
+    expect(c.arms.every((a) => a.light !== null)).toBe(true);
+  });
+
   test('two streets crossing are a crossroads; a country road joining a street a country T', () => {
     const [x] = deriveJunctions(CROSS);
     expect(x.arms.length).toBe(4);
