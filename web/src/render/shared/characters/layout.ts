@@ -19,6 +19,11 @@
  *   8: r, g = how loose the top and the bottom are (0..1: how far the cloth stands off the skin it is painted on,
  *      the character shader's `EASE`; 0 for what clings or lies under a shell), b = 1 if the bottom has a shell
  *      round the hips (a skirt: the top lies flat under it)
+ *   9: the hair's lag (`SWAY_TEXEL.hair`; `sway.ts`): xyz how far a loose end of the hair is drawn from where the
+ *      head carries it (m, world axes, at looseness 1: the hair's tone.x), w the shoulder line (m, at rest on the
+ *      resident's body: under it the hair hangs behind the back, a wall across)
+ *   10: the hems' lag (`SWAY_TEXEL.hem`): xyz the same for a skirt's, a jacket's or an apron's hem (looseness 1 at
+ *      the hem), w the height under which a shell's hem is loose (m, at rest on the resident's body)
  * Disabled cuts are -10 (or +10 for "below" cuts) so their predicate always / never holds.
  * Then `MORPH_TEXELS` texels of (channel, weight, channel, weight); weight 0 = unused: first the
  * `EXPRESSION_TEXELS` of the face's expression, written every frame (`face.ts` `FaceMixer`; a first
@@ -34,8 +39,10 @@ export const BONE_TEXELS = 3;
 /** Floats a bone in a row (`BONE_TEXELS` RGBA texels). */
 export const BONE_FLOATS = BONE_TEXELS * 4;
 
-/** Appearance texels per resident, after its bone matrices. */
-export const APPEARANCE_TEXELS = 9;
+/** Appearance texels per resident, after its bone matrices: the outfit's nine (`outfit.ts` `writeOutfit`), then the lag texels. */
+export const APPEARANCE_TEXELS = 11;
+/** The lag texels, written every frame a resident is posed (`residents.ts` `writeSway`; read by the character shader's `gameSimSway`). */
+export const SWAY_TEXEL = { hair: 9, hem: 10 } as const;
 
 /**
  * The shirts of texel 4 r (`n`; their colours: the character shader's `SHIRTS`): what shows in an open jacket's V, white,

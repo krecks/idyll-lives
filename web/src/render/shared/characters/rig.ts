@@ -17,6 +17,7 @@ import type { OutfitParams, Wear } from './outfit';
 import type { Placement } from './pose';
 import { type Bed, LIE_BACK, LIE_CENTRE, type PlacedObject } from './seats';
 import { EMBRACE } from './socials';
+import type { Stride } from './stride';
 
 /** Rows in the pose texture: the town's residents, then its vendors and shopkeepers, as many as the snapshot layout holds (`maxSims` + `maxStaff`: 240 + 48 in the open world's sim, 64 + 32 before it). */
 export const MAX_CHARACTERS = 288;
@@ -155,6 +156,10 @@ export interface SimRig {
   /** Weight of `cur` (1 = fully faded in). */
   w: number;
   fadeRate: number;
+  /** Its feet over a start or a stop of a walk (`stride.ts`): how the legs take part in the fade. */
+  stride: Stride;
+  /** How far up (m) the walk's hip roll puts the body this frame, the standing leg's foot on the floor (`procedural`). */
+  hipLift: number;
   /** Upper-body layer (eating while seated, hugging). */
   upper: Player;
   /** The upper clip `upper` is fading in from, and how far (`upperW` is the layer's own weight). */

@@ -40,7 +40,7 @@
  * `select`s and `mix`es.
  */
 
-import { APPEARANCE_TEXELS, BONE_TEXELS, MORPH_TEXELS, SHIRT } from '../../shared/characters/layout';
+import { APPEARANCE_TEXELS, BONE_TEXELS, MORPH_TEXELS, SHIRT, SWAY_TEXEL } from '../../shared/characters/layout';
 import { WISPS_PX } from '../../shared/characters/parts';
 import type { Language, ShaderFeature } from './chunks';
 
@@ -247,15 +247,60 @@ function easeCode(lang: Language): string {
 /** The first morph pair texel, after the appearance texels. */
 const PAIRS = APPEARANCE_TEXELS;
 
-/** The per-material `transformInstancingVS`: the instance's matrix times the resident's skin. */
+/**
+ * Hair and hems lag behind the body (`shared/characters/sway.ts`): a loose vertex is drawn off by the resident's
+ * lag vector (its row's `SWAY_TEXEL`: m in world axes, the hair's or the hems') times its looseness. The hair's
+ * is baked (tone.x, hair.rs: 0 on the head, 1 at the tips of what hangs); a shell's is its hem's nearness
+ * (fields.x, the distance from the hem: all of it at the hem, none `reach` m up, as the power `fall` of the way
+ * between; a top's shell, the jacket's and the apron's, a shorter way up than a skirt's), under the hips only (the
+ * texel's w: a jacket's lapels and collar are open edges too) and not on shoes. Never towards the body: what
+ * of it points in to the body's own axis (the vertical through its rest pose's origin, as the skin turns it) is
+ * left out, so hair swings round the neck and away from it, not into it, and a hem off the legs, not through them.
+ * Under the shoulder line (the hair texel's w; from `SWAY_BACK[0]` m under it to `[1]` over it) the body is no
+ * column but a wall across, the back: hair there keeps all of its way along the back and has none towards it.
+ */
+const SWAY_HEM = { top: '0.12', bottom: '0.3', fall: '1.5', gate: '0.1' };
+const SWAY_BACK = ['0.03', '0.05'];
+/** `gameSimSway`: the offset (world axes) of this vertex under the skin matrix `skin`, by a language's words. */
+function swayCode(lang: Language): string {
+  const w = lang === 'wgsl';
+  const let_ = (name: string, type: string) => (w ? `let ${name}` : `${type} ${name}`);
+  const tx = (k: number) => (w ? `textureLoad(game_simPoses, vec2i(i32(uniform.game_simLayout.x + 0.5) + ${k}, i32(game_simRow + 0.5)), 0)` : `texelFetch(game_simPoses, ivec2(int(game_simLayout.x + 0.5) + ${k}, int(game_simRow + 0.5)), 0)`);
+  const v3 = w ? 'vec3f' : 'vec3';
+  return `
+#if defined(GAME_SIM_HAIR) || defined(GAME_SIM_CLOTH)
+${w ? 'fn gameSimSway(skin: mat4x4f) -> vec3f' : 'vec3 gameSimSway(mat4 skin)'} {
+	#ifdef GAME_SIM_HAIR
+		${let_('lag', 'vec4')} = ${tx(SWAY_TEXEL.hair)};
+		${let_('loose', 'float')} = game_simTone.x;
+		${let_('column', 'float')} = smoothstep(lag.w - ${SWAY_BACK[0]}, lag.w + ${SWAY_BACK[1]}, vertex_position.y);
+	#else
+		${let_('column', 'float')} = 1.0;
+		${let_('lag', 'vec4')} = ${tx(SWAY_TEXEL.hem)};
+		${let_('reach', 'float')} = mix(${SWAY_HEM.top}, ${SWAY_HEM.bottom}, step(0.5, game_simField.z));
+		${let_('loose', 'float')} = pow(clamp(1.0 - game_simField.x / reach, 0.0, 1.0), ${SWAY_HEM.fall}) * step(game_simField.z, 1.5) * (1.0 - smoothstep(lag.w - ${SWAY_HEM.gate}, lag.w, vertex_position.y));
+	#endif
+	${let_('d', v3)} = lag.xyz * loose;
+	${let_('away', v3)} = ${w ? 'mat3x3f(skin[0].xyz, skin[1].xyz, skin[2].xyz)' : 'mat3(skin)'} * ${v3}(vertex_position.x * column, 0.0, vertex_position.z);
+	return d - away * (min(dot(d, away), 0.0) / max(dot(away, away), 1e-8));
+}
+#endif`;
+}
+
+/** The per-material `transformInstancingVS`: the instance's matrix times the resident's skin, hair and hems lagging (`gameSimSway`). */
 export const RESIDENT_INSTANCING: Record<Language, string> = {
   glsl: `
 attribute vec4 instance_line1;
 attribute vec4 instance_line2;
 attribute vec4 instance_line3;
 attribute vec4 instance_line4;
+${swayCode('glsl')}
 mat4 getModelMatrix() {
-	return matrix_model * mat4(instance_line1, instance_line2, instance_line3, instance_line4) * gameSimSkin() * gameSimShown();
+	mat4 skin = gameSimSkin();
+	#if defined(GAME_SIM_HAIR) || defined(GAME_SIM_CLOTH)
+		skin[3].xyz += gameSimSway(skin);
+	#endif
+	return matrix_model * mat4(instance_line1, instance_line2, instance_line3, instance_line4) * skin * gameSimShown();
 }
 `,
   wgsl: `
@@ -263,8 +308,13 @@ attribute instance_line1: vec4f;
 attribute instance_line2: vec4f;
 attribute instance_line3: vec4f;
 attribute instance_line4: vec4f;
+${swayCode('wgsl')}
 fn getModelMatrix() -> mat4x4f {
-	return uniform.matrix_model * mat4x4f(instance_line1, instance_line2, instance_line3, instance_line4) * gameSimSkin() * gameSimShown();
+	var skin = gameSimSkin();
+	#if defined(GAME_SIM_HAIR) || defined(GAME_SIM_CLOTH)
+		skin[3] = vec4f(skin[3].xyz + gameSimSway(skin), skin[3].w);
+	#endif
+	return uniform.matrix_model * mat4x4f(instance_line1, instance_line2, instance_line3, instance_line4) * skin * gameSimShown();
 }
 `,
 };

@@ -34,7 +34,9 @@ cd web && bun run check:clips    # check_clips on both bodies at every life stag
   at every stage, morph channels, garment ids and
   cuts, stage heights, the seat drop, eyes in their sockets and uncovered, hair clear of the head
   (and of every face of its own: each identity channel at its two ends), bounded morphs.
-- `check_clips.ts` fails on NaNs, seams in loops, sliding feet, lengths more than 15% off the
+- `check_clips.ts` fails on NaNs, seams in loops, sliding feet, a foot on the floor that travels more
+  than 70 mm while a resident sets off or 60 mm while they stop (`transitions.ts`: the residents' own
+  runtime posing a scripted walk; `bun tools/characters/blend_analysis.ts` prints the table), lengths more than 15% off the
   runtime's, seated clips that leave the seat or feet off the floor, and a crooked `lie`, on the
   bodies (`--body`, default `male`) and life stages (`--stage`, default `youngAdult,baby`) asked
   for; what a stage reproduces is in its header and in docs/characters-format.md (Checking clips).
@@ -54,8 +56,11 @@ The generator's `.rs` files are in `crates/tools/src/characters/`.
 | a face per resident: the identity channels (how they are made, where they are kept off) | `identity.rs`; how much each adds, in `head.rs` (`JAW_WIDTH` ... `Bump`, `NOSE_LENGTH` ...) and `face.rs` (`LIP_FULLNESS`, `EYE_TILT`, `EYE_OPEN`); the names in `contract.rs` (`IDENTITY`) and `web/src/game/household.ts` (`FACE_CHANNELS`, `FACE_GROUPS`) |
 | how a resident's face is drawn and its eyes moved | `web/src/render/shared/characters/identity.ts`, `pose.ts` (`Placement.eyes`) |
 | hairstyles and the beard | `hair.rs`, built from `prims.rs` |
+| which hair hangs loose and how much (tone.x) | `hair.rs` (`Comp::sway`, `loose`, `SWAY_*`) |
+| how hair and hems swing (the springs, how far, the dead band), and where a hem is loose | `web/src/render/shared/characters/sway.ts`; `web/src/render/pc/shaders/character.ts` (`gameSimSway`, `SWAY_HEM`) |
 | garment cuts and shells | `clothes.rs`, `garments.rs` |
 | clips | `clips/*.ts` (`dsl.ts` for the format, `ik.ts` for arm and leg placement) |
+| how a walk starts and stops (the first step, the last steps, the feet kept where they stand) | `web/src/render/shared/characters/stride.ts` (`STRIDE`) |
 | how residents use clips, seats, beds, carried things, what they ride | `web/src/render/shared/characters/` (`residents.ts`, `seats.ts`, `props.ts`, `vehicles.ts` for bikes and e-scooters) |
 | colours, garments per family, pyjamas | `web/src/render/shared/characters/outfit.ts` |
 | shading (skin, painted clothes, eyes, hair) | `web/src/render/pc/characterMaterial.ts`, `web/src/render/pc/shaders/character.ts` |
