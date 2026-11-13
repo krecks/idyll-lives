@@ -26,7 +26,7 @@
     /** The tab's part of the header line, after the tabs. */
     head?: Snippet;
     body: Snippet;
-    /** Floating over the lot, just above the dock (hover cards, the picked object). */
+    /** Floating over the lot, just above the dock (hover cards, the picked object): absolutely placed in the room up to the top bar. */
     above?: Snippet;
     /** A first-use tip, shown above the dock until dismissed. */
     tip?: Snippet;
@@ -171,11 +171,16 @@
     min-height: 0;
     overflow: hidden;
   }
+  /* The room between the dock and the top bar: what floats over the lot is anchored to its foot and
+     fits in it (`max-height: 100%`), however short the window or open the dock. `100%` is the
+     dock's own height here (this box's containing block); the HUD's is the window's over the
+     interface scale, as in `Modal`. */
   .above {
     position: absolute;
     left: 0;
     right: 0;
     bottom: calc(100% + 8px);
+    height: max(0px, calc(100vh / var(--ui-scale) - var(--top) - var(--edge) - 100% - 8px));
     pointer-events: none;
   }
 </style>
