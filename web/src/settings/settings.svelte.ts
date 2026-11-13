@@ -67,7 +67,7 @@ export interface Settings {
   voiceWriter: 'lines' | 'llm';
   /** Spoken lines also show as text in the speech bubble. */
   subtitles: boolean;
-  /** Birds, crickets, and things in use at home (audio/world.ts). */
+  /** Birds, crickets, the wind, things in use at home, footsteps, cars passing and the town from above (audio/world.ts; docs/design/sound.md). */
   worldSound: boolean;
   /** 0..1. */
   worldVolume: number;

@@ -12,6 +12,7 @@
 import { songSamples, SPECIES } from './birdsong';
 import { BLIPS, blipSamples, type Blip } from './blips';
 import { MONO, ONCE_MONO, type MonoKind } from './mono';
+import { MUSIC, type MusicKind } from './music';
 import { OUTDOORS } from './outdoors';
 import { FOOTWEAR, stepSamples, SURFACES, type Footwear, type Surface } from './steps';
 import { MADE, ONCE_THINGS, type MadeKind } from './things';
@@ -21,7 +22,7 @@ import { ONCE, type Stereo } from './water';
 export type OnceKind = (typeof ONCE)[number] | (typeof ONCE_THINGS)[number];
 export const ONCE_KINDS: readonly string[] = [...ONCE, ...ONCE_THINGS];
 /** A sound that loops while something is in use (or runs by itself). */
-export type LoopKind = 'sizzle' | 'chop' | 'tv' | 'music' | 'drums' | Exclude<MadeKind, OnceKind>;
+export type LoopKind = 'sizzle' | 'chop' | 'tv' | 'music' | 'drums' | MusicKind | Exclude<MadeKind, OnceKind>;
 /** A world sound: a loop, or one played once (as a use starts, when it's a use's sound). */
 export type SoundKind = LoopKind | OnceKind;
 
@@ -31,7 +32,14 @@ export interface LoopDef {
   drift?: number;
 }
 
-/** The loops of things in use, by the key the content names them with (`sound`, `sounds`, `ambient`). */
+/** The music's level, whichever piece it is. */
+const MUSIC_LEVEL = 0.235;
+
+/**
+ * The loops of things in use, by the key the content names them with (`sound`, `sounds`, `ambient`). `music` is
+ * whichever piece suits the hour and the dancing (`pieceAt`); a thing can name a piece of its own (`musicSlow`
+ * for a gramophone's waltz).
+ */
 export const LOOPS: Record<LoopKind, LoopDef> = {
   sizzle: { level: 0.22 },
   chop: { level: 0.3 },
@@ -46,7 +54,10 @@ export const LOOPS: Record<LoopKind, LoopDef> = {
   crockery: { level: 0.35 },
   fountain: { level: 0.2, drift: 0.03 },
   tv: { level: 0.35 },
-  music: { level: 0.16 },
+  music: { level: MUSIC_LEVEL },
+  musicFolk: { level: MUSIC_LEVEL },
+  musicDance: { level: MUSIC_LEVEL },
+  musicSlow: { level: MUSIC_LEVEL },
   drums: { level: 0.2 },
   treadmill: { level: 0.21, drift: 0.02 },
   bike: { level: 0.2, drift: 0.04 },
@@ -74,6 +85,18 @@ export const LOOPS: Record<LoopKind, LoopDef> = {
   punchBag: { level: 0.33 },
   smash: { level: 0.33 },
 };
+
+/**
+ * Which piece the music is (`music.ts`): a dance while someone dances; else a slow one from `evening` o'clock
+ * to `morning`, and a folk tune by day.
+ */
+export const PLAYLIST = { evening: 20, morning: 6 };
+
+/** The piece that plays at `hour` (0..24), `dancing` or not. */
+export function pieceAt(hour: number, dancing: boolean): MusicKind {
+  if (dancing) return 'musicDance';
+  return hour >= PLAYLIST.evening || hour < PLAYLIST.morning ? 'musicSlow' : 'musicFolk';
+}
 
 /** Levels of the sounds played once. */
 export const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.27, binLid: 0.29, vendSnack: 0.25, vendCan: 0.25, phoneBox: 0.23, hangUp: 0.23, ping: 0.21, toastPop: 0.27, pour: 0.21 };
@@ -182,6 +205,13 @@ export function everySound(): Listed[] {
   const things = [...new Set<string>([...Object.keys(LOOPS), ...Object.keys(ONCE_LEVEL)])];
   for (const name of things) {
     const level = name in LOOPS ? LOOPS[name as LoopKind].level : ONCE_LEVEL[name as OnceKind];
+    // (`music` is one of the three pieces, listed by their own names.)
+    if (name === 'music') continue;
+    if (name in MUSIC) {
+      const when: Record<MusicKind, string> = { musicFolk: 'by day', musicDance: 'while someone dances', musicSlow: `from ${PLAYLIST.evening} to ${PLAYLIST.morning} o'clock` };
+      list.push({ name, group: 'things', plays: 'loop', level, note: `the music ${when[name as MusicKind]} (\`music\`: a stereo, a radio, an instrument played), and where a thing names it`, heard: (rate) => scaled(MUSIC[name as MusicKind](rate), level) });
+      continue;
+    }
     const heard = name in MONO ? (rate: number) => centred(MONO[name as MonoKind](rate), level) : (rate: number) => scaled(MADE[name as MadeKind](rate), level);
     list.push({ name, group: 'things', plays: once.has(name) ? 'once' : 'loop', level, heard });
   }

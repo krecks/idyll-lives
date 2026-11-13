@@ -9,7 +9,8 @@
  *   games and tools of `things.ts` (a treadmill, a blender, darts, a cello...). One loop per kind of
  *   sound, louder the more residents make it, placed left or right like voices; the water sounds are
  *   made in `water.ts`, the things' in `things.ts`, those of one channel (a pan, a knife, the TV,
- *   music, drums, the outdoor bed, crickets, the knock) in `mono.ts`; the level of each is in
+ *   drums, the outdoor bed, crickets, the knock) in `mono.ts`, the music's pieces in `music.ts`
+ *   (a folk tune by day, a slow one in the evening, a dance while someone dances); the level of each is in
  *   `catalog.ts`. What a use sounds like comes from the thing
  *   (content `sound` and `sounds`), else from its animation (`ACTION_SOUNDS`);
  * - things that sound by themselves (content `ambient`: a fountain; a machine running on its own, its
@@ -36,9 +37,10 @@ import { game } from '../ui/state.svelte';
 import { acoustics } from './acoustics';
 import { songSamples, SPECIES, VERSIONS, type Species, type Voice } from './birdsong';
 import { Footsteps } from './footsteps';
-import { AMBIENCE, LOOPS, ONCE_KINDS, ONCE_LEVEL, type LoopKind, type OnceKind, type SoundKind } from './catalog';
+import { AMBIENCE, LOOPS, ONCE_KINDS, ONCE_LEVEL, pieceAt, type LoopKind, type OnceKind, type SoundKind } from './catalog';
 import { audioContext, bus, space, updateVolumes } from './mixer';
 import { MONO, type MonoKind } from './mono';
+import type { MusicKind } from './music';
 import { Outside } from './outside';
 import type { RoomSize } from './rooms';
 import { Placed, type Place, type Space } from './space';
@@ -127,6 +129,8 @@ function unknownSound(key: string): undefined {
 interface Heard {
   loops: Partial<Record<LoopKind, number>>;
   places: Partial<Record<LoopKind, Place>>;
+  /** The piece of music playing or last played (`music.ts`). */
+  piece: string | null;
   once: { kind: OnceKind; at: number }[];
   radius: number;
   /** The footsteps (`Footsteps.heard`). */
@@ -190,6 +194,8 @@ function placeAt(pan: number, x: number, z: number): Place {
 export class WorldSound {
   private lastTick = 0;
   private readonly loops = new Map<LoopKind, PlacedLoop>();
+  /** The piece of music playing (`catalog.ts` `pieceAt`). */
+  private piece: MusicKind | null = null;
   /** The world's storeys (to find the rows of the one in view). */
   private storeys: StoreyLayout | null = null;
   private bed: Loop | null = null;
@@ -213,7 +219,7 @@ export class WorldSound {
   /** The world's objects' tiles, by their stable id. */
   private readonly tilesOf = new Map<number, Tiles>();
   /** What sounded on the last update (`playing`). */
-  private heard: Heard = { loops: {}, places: {}, once: [], radius: 0, steps: { steps: 0, walkers: 0, recent: [] }, outside: { cars: [], driving: 0, town: 0, leaves: 0, gust: 0 } };
+  private heard: Heard = { loops: {}, places: {}, piece: null, once: [], radius: 0, steps: { steps: 0, walkers: 0, recent: [] }, outside: { cars: [], driving: 0, town: 0, leaves: 0, gust: 0 } };
   private readonly steps: Footsteps;
   private readonly outside: Outside;
   private readonly head = { x: 0, y: 0, z: 0 };
@@ -307,6 +313,7 @@ export class WorldSound {
     const bathing = new Set<number>();
     const once: Heard['once'] = [];
     const here = new Set<number>();
+    let dancing = false;
     for (const kind of this.onceHere) this.made.sound(kind, ac.sampleRate);
     for (const a of this.ambient) if (a.while) a.while.on = false;
     for (let i = 0; i < count; i++) {
@@ -367,6 +374,7 @@ export class WorldSound {
         this.bathers.set(id, since);
         if (now - since > BATH_FILL * 1000) kind = 'bathSoak';
       }
+      if (kind === 'music' && tag === 'dance') dancing = true;
       join(users, kind, pan, sx, sz);
     }
     // Things sounding by themselves, unless the town is shown instead of the lot.
@@ -384,6 +392,7 @@ export class WorldSound {
     this.heard = {
       loops: Object.fromEntries([...users].map(([kind, u]) => [kind, u.n])),
       places: Object.fromEntries([...users].map(([kind, u]) => [kind, placeOf(u)])),
+      piece: this.piece,
       once: [...this.heard.once.filter((s) => now - s.at < 10_000), ...once],
       radius: acoustics.radius,
       steps: this.steps.heard(),
@@ -398,13 +407,26 @@ export class WorldSound {
       const def = LOOPS[kind];
       const target = u && !quiet && !paused ? def.level * Math.min(1.6, Math.sqrt(u.n)) : 0;
       let loop = this.loops.get(kind);
+      // The music is one of a few pieces: another one wanted (someone dances, the evening comes), this one fades out and the other starts.
+      const piece = kind === 'music' ? pieceAt(hour, dancing) : null;
+      if (loop && piece && target > 0 && piece !== this.piece) {
+        const old = loop;
+        fadeTo(old.gain, 0, t);
+        setTimeout(() => {
+          old.source.stop();
+          old.placed.disconnect();
+        }, FADE * 3000);
+        this.loops.delete(kind);
+        loop = undefined;
+      }
       if (!loop) {
         if (target === 0 || !u) continue;
-        const made = kind in MONO ? mono(ac, kind as MonoKind) : this.made.sound(kind as MadeKind, ac.sampleRate);
+        const made = piece ? this.made.sound(piece, ac.sampleRate) : kind in MONO ? mono(ac, kind as MonoKind) : this.made.sound(kind as WorkerKind, ac.sampleRate);
         // Still being made: it starts when it's ready.
         if (!made) continue;
         loop = this.placedLoop(ac, around, made, placeOf(u));
         this.loops.set(kind, loop);
+        if (piece) this.piece = piece;
         if (def.drift) loop.source.playbackRate.value = 1 + def.drift * (Math.random() * 2 - 1);
       }
       fadeTo(loop.gain, target, t);

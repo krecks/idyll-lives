@@ -18,7 +18,6 @@ export const MONO = {
   chop: chopSound,
   tv: murmurSound,
   drums: drumsSound,
-  music: musicSound,
   bed: bedSound,
   crickets: cricketSound,
   knock: knockSound,
@@ -88,29 +87,6 @@ function murmurSound(rate: number): Float32Array {
     }
   });
   return nodeFilter(d, rate, 'bandpass', 700, 1.1, true);
-}
-
-/** A little tune on a loop (a radio, a record). */
-function musicSound(rate: number): Float32Array {
-  const r = random(7);
-  const scale = [0, 2, 4, 7, 9, 12, 14, 16];
-  const root = 261.63;
-  const d = raw(rate, 4, (d) => {
-    const pluck = (at: number, freq: number, level: number, decay: number) => {
-      const s = Math.round(at * rate);
-      const len = Math.min(d.length - s, Math.round(decay * 4 * rate));
-      for (let j = 0; j < len; j++) {
-        const t = j / rate;
-        d[s + j] += level * Math.exp(-t / decay) * (Math.sin(2 * Math.PI * freq * t) + 0.3 * Math.sin(4 * Math.PI * freq * t));
-      }
-    };
-    for (let n = 0; n < 16; n++) {
-      const note = scale[Math.floor(r() * scale.length)];
-      if (r() < 0.85) pluck(n * 0.25, root * 2 ** (note / 12), 0.5, 0.18);
-    }
-    for (let n = 0; n < 4; n++) pluck(n, (root / 2) * 2 ** ([0, 9, 5, 7][n] / 12), 0.6, 0.5);
-  });
-  return nodeFilter(d, rate, 'lowpass', 2600, 0.7, true);
 }
 
 /** A drum kit played: a rock beat (kick, snare on two and four, the hi-hat on the eighths) at 110 bpm, four bars with a crash at the top and a fill on the toms at the end. */
