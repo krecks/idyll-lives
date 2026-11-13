@@ -103,6 +103,9 @@
   );
   const mine = `The ${household.name}s`;
 
+  /** The houses for sale are what this step is for: their tags win room over the neighbours'. */
+  const ORDER: readonly LotLabel['kind'][] = ['mine', 'sale', 'home', 'park'];
+
   const labels = $derived<LotLabel[]>(
     town.slots.map((s) => {
       const h = town.households.find((x) => x.slot === s.index);
@@ -187,6 +190,7 @@
     <section class="view">
       <TownStage
         {labels}
+        order={ORDER}
         {hover}
         selected={selected?.index ?? null}
         focus={close ? (selected?.index ?? null) : null}
