@@ -653,6 +653,21 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
   inside one, in a hug, kiss, fight or cuddle only the head; seated the head and, sat plainly, a third of the back;
   lying, a baby or under stage directions (the creator, portraits) none. It eases in over about a second. The pace
   is sim-core's: an emotion's `walkSpeed` (content `emotions`), the walk matched to it as to any.
+- Setting off and stopping (`characters/stride.ts`): a foot on the floor stays where it is. A gait begun from a stand
+  starts where it is nearest to that stand (`gaitPhase`: one foot under the hip, the other passing it, on either
+  foot; from a stop cut short, the stride that was left), its legs take the gait's pose in 0.1 s while the rest of
+  the body fades (0.2 s, shorter on shorter legs), the foot it stands on kept where it stood, and until the fade is
+  over the cycle goes on by the way the body has gone, not by the clock (the speed the rate is matched to is taken
+  as it is then, not eased). A gait left for a standing pose stops with the body, and the feet come to where that
+  pose has them one at a time, each in a step through the air (0.12 s and 0.5 s per metre it goes, 0.3 s at most;
+  lifted 22 % of the way, 4.5 cm at most): first the one in the air, or with both down the one behind, the other
+  kept where it stands meanwhile; the fade is as long as its two steps. The legs are put on those points (`legPin`:
+  turned at the hip and bent at the knee, as additive rotations) over whatever the pelvis' fade does above them; a
+  fade cut short holds them as drawn (`legBake`) and steps on from there. Not for a baby, nor to a pose that is no
+  stand (onto a saddle, a seat's clip part way): those fade as before. The walk's hip roll (`GAIT_SWAY`) turns the
+  pelvis and leaves the legs as the clip has them (the thighs turned back by it, the body lifted by what the
+  standing hip drops): rolled with the pelvis, the standing foot went 6 cm sideways over the floor and back at
+  every step of a woman's walk. Measured on the runtime by `tools/characters/transitions.ts` (below).
 - Turning on the spot (`characters/turns.ts`): standing free, a turn of 35° or more steps round with a turn clip
   (`turnR90`, `turnL180Child`, …: below), the Sim's yaw following the clip's steps (`turnShare`) so a planted foot
   stays put; smaller turns pivot on the feet. Not while walked in, inside or up on a thing, getting up, holding or
@@ -763,7 +778,17 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 lengths, sliding feet, the seated pelvis and feet (with the runtime's leg fit, `seatFit.ts`: on a 0.45 m seat, a
 child's on the kids' chair, and the knees clear of every deep seat's `front`), the floor sits' knees and ankles
 against the floor, `lie` and the baby's clips, and the turns on the spot, every size each way, a foot on the floor
-staying put as the clip's share of the turn turns the body (the list is in its header). The default is the reference: `male` at
+staying put as the clip's share of the turn turns the body (the list is in its header). It also holds how far a
+foot on the floor travels while a resident sets off and comes to a stop (check `travel` on `walk`: 70 mm at most
+over a start, 60 mm over a stop): `tools/characters/transitions.ts` runs the residents' own code
+(`residents.ts`, with a view that draws nothing) on a scripted snapshot, twelve residents per body and stage
+standing, walking at 1.5 m/s and stopping at twelve parts of the stride, and adds up the way each foot's contact
+point (the heel or the ball, whichever is lower) goes over the floor while it is within 4 mm of its standing
+height, from a tick before the start to 0.5 s after it and from a tick before the stop to 0.9 s after it. Before
+`stride.ts` that was 314 to 486 mm over a start and 193 to 278 mm on average (231 to 421 at worst) over a stop;
+it is 29 to 48 mm (56 at worst) and 10 to 15 mm (41 at worst). `bun tools/characters/blend_analysis.ts` prints
+the table (its section 6), with the travel of a second of plain walking beside it (12 to 47 mm: the standing
+foot's toes swivel a little as the hips turn over it; 40 to 227 mm before the hip roll left the legs alone). The default is the reference: `male` at
 `youngAdult`, plus `baby` for the baby's clips.
 Each body and stage plays the clips on its own skeleton (`restT`, the pelvis motion and ground
 speed scaled by `pelvisScale`, `walk`'s hip roll), the sized clips at the size its height picks,
@@ -870,6 +895,7 @@ rider, the seesaw), which they settle onto as before rather than walk through.
 | a face per resident | `identity.rs` (the channels as differences, the mask), the amounts in `head.rs` and `face.rs`; `characters/identity.ts` (the row's identity texels, the eyes), `game/household.ts` (`Appearance.face`, `randomFace`, `FACE_GROUPS`) |
 | hair and hems that move | `characters/sway.ts` (the springs), `residents.ts` `writeSway`, `character.ts` `gameSimSway`, `hair.rs` `Comp::sway` |
 | clips | `clips/*` (with `clips/ik.ts`) |
+| setting off and stopping | `characters/stride.ts` (the gait's first phase, the legs' own fade, the feet's steps and pins), `residents.ts` (`start`, `fadeInto`, `holdFade`, the gait going on by the way gone); measured by `tools/characters/transitions.ts` |
 | the runtime | `render/shared/characters/residents.ts` (activities, seats, beds, carrying, faces; its tables in `actions.ts`, `seats.ts`, `socials.ts`, `expressions.ts`, `parts.ts`; drawn through `view.ts` by `pc/characters.ts`), `shared/characters/{data,pose,outfit,blanket}.ts`, `pc/characterMaterial.ts` and `pc/shaders/character.ts` (the shading), `pc/poseTexture.ts`; the creator in `ui/screens/CreateHousehold.svelte` and `render/preview` |
 
 See also `tools/characters/README.md`.

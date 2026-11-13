@@ -80,6 +80,7 @@ import { AIM, Anim, EMBRACE, KISS_FIT, REFUSED, gesturesOf } from './socials';
 import { BLANKET_WIDTH, quiltGeometry, quiltTint } from './blanket';
 import { APPEARANCE_TEXELS, BONE_FLOATS, BONE_TEXELS, EXPRESSION_TEXELS, MORPH_TEXELS, SWAY_TEXEL } from './layout';
 import { faceOf, writeIdentity } from './identity';
+import { STRIDE, ankles, gaitPhase, legBake, legPin, legWeight, newStride, strideStart, strideStop } from './stride';
 import { SWAY, SWAY_FLOATS, swayReset, swayStep } from './sway';
 import type { TemplateCache } from '../templateCache';
 import { WALL_HEIGHT } from '../walls';
@@ -499,6 +500,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (set.morphs) this.mixer = new FaceMixer(set.morphs);
     this.scratch = new PoseScratch(NB);
     this.qA = new Float32Array(NB * 4);
+    this.qGoal = new Float32Array(NB * 4);
+    this.pinAdd = makeAdditive(NB);
     this.qB = new Float32Array(NB * 4);
     this.qC = new Float32Array(NB * 4);
     this.pA = new Float32Array(3);
@@ -751,6 +754,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         prev: player(),
         w: 1,
         fadeRate: 4,
+        stride: newStride(),
+        hipLift: 0,
         upper: player(),
         upperPrev: player(),
         upperFade: 1,
@@ -985,6 +990,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         size: 1,
         cur: player(),
         prev: player(),
+        stride: newStride(),
         upper: player(),
         upperPrev: player(),
         upperFade: 1,
@@ -1966,6 +1972,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         rig.z = tz;
         rig.yaw = tyaw;
         rig.speed = 0;
+        rig.stride.kind = 0;
         rig.lastPose = pose;
         // (Nor on the way off a seat they left before: `riseK`.)
         rig.riseK = 1;
@@ -1985,8 +1992,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       if (riding) rig.speed = 0;
       else if (dt > 0) {
         const inst = dist / dt;
-        rig.speed += (Math.min(inst, 20) - rig.speed) * (1 - Math.exp(-dt * 10));
+        // (Setting off, `stride.ts`: the speed as it is, at once. Eased, the walk's rate took a third of a second to
+        // catch up with the ground, and the feet slid for as long.)
+        rig.speed += (Math.min(inst, 20) - rig.speed) * (moving && (rig.stride.kind === 1 || !GAITS.has(rig.cur.key)) ? 1 : 1 - Math.exp(-dt * 10));
       }
+      const [wasX, wasZ] = [rig.x, rig.z];
       if (moving || riding || this.mounting || dist > SNAP_DISTANCE || appeared) {
         rig.x = gx;
         rig.z = gz;
@@ -2004,6 +2014,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
           rig.z += dz * f;
         }
       }
+      // (How far it went over the floor this frame, on its feet: a gait starting or stopping goes on by it.)
+      const went = appeared || riding || this.mounting || rig.walkT >= 0 ? 0 : Math.min(Math.hypot(rig.x - wasX, rig.z - wasZ), SNAP_DISTANCE);
       let faceYaw = tyaw;
       // Into bed from its side: facing out on its edge, then turned to lie along it as they lie back; out
       // of it to the side sim-core turned them, turned from lying to that as they sit up and rise.
@@ -2099,6 +2111,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
       // Advance and blend.
       const step = dt * animRate;
+      // A gait fading in from a stand goes on by the way gone, not by the clock, and so does one a stop is fading
+      // out, whose own rate is none (`stride.ts`): the foot on the floor stays where it is.
+      const legs = rig.body.pelvisScale * rig.scale;
+      if (rig.stride.kind === 1 && rig.w < 1 && rig.walkT < 0 && dt > 0 && rig.cur.clip?.speed) rig.cur.rate = (Math.sign(rig.cur.rate) || 1) * Math.min(went / (rig.cur.clip.speed * legs * dt), GAIT_MAX_RATE);
+      if (rig.stride.kind === 2 && rig.w < 1 && rig.prev.clip?.speed && !rig.prev.frozen) rig.prev.time += Math.min(went / (rig.prev.clip.speed * legs), GAIT_MAX_RATE * dt);
       advance(rig.cur, GAITS.has(rig.cur.key) || rig.cur.key === 'jog' ? dt : step);
       advance(rig.prev, GAITS.has(rig.prev.key) || rig.prev.key === 'jog' ? dt : step);
       advance(rig.upper, step);
@@ -2117,9 +2134,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
       samplePlayer(set, rig.cur, this.qA, this.pA);
       const w = smooth(rig.w);
+      if (w >= 1) rig.stride.kind = 0;
       if (w < 1 && rig.prev.clip) {
+        // (The pose faded to, alone: the feet go to where it has them, `legPin`.)
+        if (rig.stride.kind) {
+          this.qGoal.set(this.qA);
+          this.pGoal.set(this.pA);
+        }
         samplePlayer(set, rig.prev, this.qB, this.pB);
-        blendInto(this.qB, this.pB, this.qA, this.pA, w, null);
+        this.fadeInto(rig, this.qB, this.pB, this.qA, this.pA);
         this.qA.set(this.qB);
         this.pA.set(this.pB);
       }
@@ -2160,6 +2183,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // Procedural layers.
       resetAdditive(this.add);
       this.procedural(rig, i, social, role, partnerRig, pose, moving, time, dt);
+
       if (this.mounting?.cranks) this.pedalRide(rig, i, this.mounting.cranks, this.mounting.seat[0]);
       // A baby in someone's arms: knees drawn up a little (the baby's lying clips have them drawn up already).
       const holder = this.heldBy[i] >= 0 ? this.sims[this.heldBy[i]] : null;
@@ -2190,7 +2214,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       pl.qz = -sy * sp;
       pl.qw = cyw * cp;
       pl.x = at.x + Math.sin(at.yaw) * rootFwd + Math.cos(at.yaw) * rig.aside;
-      pl.y = rootY + rig.floorY;
+      pl.y = rootY + rig.floorY + rig.hipLift;
       pl.z = at.z + Math.cos(at.yaw) * rootFwd - Math.sin(at.yaw) * rig.aside;
       this.stepPlace(rig, pl, step);
       if (rig.walkT >= 0) this.walkPlace(rig, pl, at.x + Math.sin(rig.walkYaw) * rootFwd, at.z + Math.cos(rig.walkYaw) * rootFwd, step);
@@ -2220,6 +2244,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const pad = this.onPadOf[i];
       if (pad) onPad(this.place, this.cradleQ, rig, pad);
       if (inArms > 0) cradled(this.place, this.cradleQ, this.cradle, rig, this.sims[this.heldBy[i]]!, this.heldBy[i], inArms);
+      // Setting off or stopping, the feet where they stand and step to (`stride.ts`), whatever the body's fade does over them.
+      if (rig.stride.kind && rig.w < 1) {
+        const at = this.placed;
+        [at[0], at[1], at[2], at[3], at[4], at[5], at[6], at[7], at[8], at[9]] = [pl.x, pl.y, pl.z, pl.qx, pl.qy, pl.qz, pl.qw, pl.scale, went > 0 ? rig.x - wasX : 0, went > 0 ? rig.z - wasZ : 0];
+        legPin(set, rig.body, rig.stride, rig.w, this.qA, this.pA, this.qGoal, this.pGoal, this.add, this.placed);
+      }
       skin(set, rig.body, this.qA, this.pA, this.add, pl, this.scratch, this.data, this.row(i), this.headTmp, true);
       this.writeSit(rig, i);
       this.writeSway(rig, i, dt, appeared);
@@ -3358,7 +3388,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const heldFwd = lerp(prev.rootFwd, cur.rootFwd, w);
       const heldPitch = lerp(prev.rootPitch, cur.rootPitch, w);
       const at = prev.frame || cur.frame ? this.framed(rig, w) : null;
-      this.hold(prev, cur, w);
+      this.holdFade(rig);
       // (`copyPlayer` took the incoming clip's root: put back the one the held pose was blended at.)
       prev.rootY = heldY;
       prev.rootFwd = heldFwd;
@@ -3370,6 +3400,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const sameLoop = cur.key === key && clip.loop;
     // Walking into a jog and back: in step (both cycles start at the left heel's strike).
     const inStep = GAITS.has(key) && GAITS.has(cur.key) && cur.clip ? ((cur.time / cur.clip.duration) % 1) * clip.duration : -1;
+    // Into a gait from standing, and out of one (`stride.ts`): the feet where they are put.
+    // (A stop's steps cut short by another pose go on to that one, from where the feet are.)
+    const stepping = rig.stride.kind !== 0 && rig.w < 1;
+    const [setOff, halt] = [GAITS.has(key) && !GAITS.has(cur.key) && !!cur.clip, (GAITS.has(cur.key) || stepping) && !GAITS.has(key)];
+    const set = this.set!;
+    rig.stride.kind = 0;
     cur.clip = clip;
     cur.key = key;
     // Walk cycles of the previous walk keep their phase.
@@ -3380,8 +3416,79 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     cur.rootFwd = rootFwd;
     cur.rootPitch = pitch;
     if (!prev.clip) copyPlayer(cur, prev);
+    else if (setOff && rig.body.stage !== 'baby') {
+      // The gait takes the feet up where the pose before it has them, the legs first.
+      samplePlayer(set, prev, this.qB, this.pB);
+      ankles(set, rig.body, this.qB, this.pB, this.feetA);
+      cur.time = ((gaitPhase(set, rig.body, clip, this.feetA, this.feetB) + STRIDE.lead + 1) % 1) * clip.duration;
+      // (Shorter on shorter legs, whose first step is sooner over: a child's walk is twice as quick as a grown-up's.)
+      fade *= clamp(rig.body.pelvisScale * rig.scale, 0.5, 1);
+      strideStart(rig.stride, this.feetB[0], this.feetB[1], fade);
+    } else if (halt && rig.body.stage !== 'baby') {
+      // The gait stops with the body (it goes on by the way the body still goes: `update`), and the feet step to
+      // where the new pose has them one at a time; the fade is as long as that takes. (Not for a pose that is no
+      // stand: as before.)
+      samplePlayer(set, prev, this.qB, this.pB);
+      samplePlayer(set, cur, this.qC, this.pC);
+      ankles(set, rig.body, this.qB, this.pB, this.feetA);
+      ankles(set, rig.body, this.qC, this.pC, this.feetB);
+      const b = rig.body.restT;
+      const B = set.bone;
+      fade = strideStop(rig.stride, set, rig.body, this.feetA, this.feetB, Math.hypot(b[B.calf_l * 3], b[B.calf_l * 3 + 1], b[B.calf_l * 3 + 2]) + Math.hypot(b[B.foot_l * 3], b[B.foot_l * 3 + 1], b[B.foot_l * 3 + 2]), fade);
+      if (rig.stride.kind) prev.rate = 0;
+    }
     rig.w = 0;
     rig.fadeRate = 1 / Math.max(0.05, fade);
+  }
+  /** Two poses' ankles (`stride.ts` `ankles`), for `start`. */
+  private readonly feetA = new Float32Array(6);
+  private readonly feetB = new Float32Array(6);
+  /** Each bone's weight in a fade (`fadeInto`). */
+  private fadeWeights = new Float32Array(0);
+  /** The pose a stop fades to, alone (`update`), and the body's place this frame, for `legPin`. */
+  private qGoal!: Float32Array;
+  private pGoal = new Float32Array(3);
+  private readonly placed = new Float32Array(10);
+  /** An additive layer of its own for a fade cut short (`holdFade`). */
+  private pinAdd!: Additive;
+
+  /**
+   * The fade of `rig`'s two players at its `w`: `b` (the incoming pose) blended into `a` (the outgoing one) in
+   * place, every bone by the eased `w`, but over a start or a stop of a walk the legs by their own
+   * (`rig.stride`, `stride.ts` `legWeight`).
+   */
+  private fadeInto(rig: SimRig, a: Float32Array, aPelvis: Float32Array, b: Float32Array, bPelvis: Float32Array): void {
+    const w = smooth(rig.w);
+    if (!rig.stride.kind) {
+      blendInto(a, aPelvis, b, bPelvis, w, null);
+      return;
+    }
+    const weights = this.fadeWeights.length === a.length / 4 ? this.fadeWeights : (this.fadeWeights = new Float32Array(a.length / 4));
+    weights.fill(w);
+    const B = this.set!.bone;
+    const [l, r] = [legWeight(rig.stride, 0, rig.w), legWeight(rig.stride, 1, rig.w)];
+    weights[B.thigh_l] = weights[B.calf_l] = weights[B.foot_l] = weights[B.ball_l] = l;
+    weights[B.thigh_r] = weights[B.calf_r] = weights[B.foot_r] = weights[B.ball_r] = r;
+    blendInto(a, aPelvis, b, bPelvis, 1, weights);
+    // (`blendInto` leaves the pelvis' place alone under a mask.)
+    for (let k = 0; k < 3; k++) aPelvis[k] += (bPelvis[k] - aPelvis[k]) * w;
+  }
+
+  /** `rig`'s `prev` takes over from its `cur` (`copyPlayer`) holding the pose their fade had reached (`fadeInto`). */
+  private holdFade(rig: SimRig): void {
+    const set = this.set!;
+    const { prev, cur } = rig;
+    samplePlayer(set, prev, this.qB, this.pB);
+    samplePlayer(set, cur, this.qC, this.pC);
+    this.fadeInto(rig, this.qB, this.pB, this.qC, this.pC);
+    // (Over a start or a stop the legs are put where the feet stand and step, `legPin`: held as drawn.)
+    if (rig.stride.kind && rig.stride.held) {
+      resetAdditive(this.pinAdd);
+      legPin(set, rig.body, rig.stride, rig.w, this.qB, this.pB, this.qC, this.pC, this.pinAdd, rig.stride.place);
+      legBake(set, this.qB, this.pinAdd);
+    }
+    copyPlayer(cur, prev);
+    freezePlayer(prev, this.qB, this.pB);
   }
 
   /** `prev` takes over from `cur` (`copyPlayer`) holding the pose their blend at `w` (smoothed) had reached. */
@@ -3452,13 +3559,21 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       }
       this.stance(rig, pose, moving, dt);
       // Walking: women's hips sway more (the pelvis rolls over each standing leg, the chest
-      // counters it), as in real gaits; one roll each way per stride.
-      const walkW = (rig.cur.key === 'walk' ? smooth(rig.w) : 0) * (GAIT_SWAY[rig.body.family] ?? 0);
-      if (walkW > 0 && rig.cur.clip) {
-        const roll = Math.sin((rig.cur.time / rig.cur.clip.duration) * Math.PI * 2) * walkW;
+      // counters it), as in real gaits; one roll each way per stride. The walk fading out (a stop) keeps its share.
+      const walk = rig.cur.key === 'walk' ? rig.cur : rig.prev.key === 'walk' && rig.w < 1 && !rig.prev.frozen ? rig.prev : null;
+      const walkW = (walk === rig.cur ? smooth(rig.w) : 1 - smooth(rig.w)) * (GAIT_SWAY[rig.body.family] ?? 0);
+      rig.hipLift = 0;
+      if (walk?.clip && walkW > 0) {
+        const roll = Math.sin((walk.time / walk.clip.duration) * Math.PI * 2) * walkW;
         addRotation(add, B.pelvis, 0, 0, 1, roll);
         addRotation(add, B.spine_02, 0, 0, 1, -roll * 0.7);
         addRotation(add, B.spine_03, 0, 0, 1, -roll * 0.4);
+        // The legs stay as the clip has them, under the hips: rolled with the pelvis they swung from it like a
+        // pendulum and the standing foot went 6 cm sideways over the floor and back, every step (a woman's). The
+        // standing leg's hip is the lower one by the roll: the body up by that much, its foot on the floor.
+        addRotation(add, B.thigh_l, 0, 0, 1, -roll);
+        addRotation(add, B.thigh_r, 0, 0, 1, -roll);
+        rig.hipLift = Math.abs(rig.body.restT[B.thigh_l * 3] * Math.sin(roll)) * rig.scale;
       }
       // A hand on a door's handle: as the leaf starts to swing, the right arm comes out and across to
       // the handle's height, and goes down again once they're through (`doorHand`: the leaf's swing is

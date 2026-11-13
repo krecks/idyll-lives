@@ -12,8 +12,9 @@
  *   every mood (and the friendly resting face, a half and a full blink) / viseme; `?body=stand|walk` every
  *   emotion's body language (`bodyLanguage.ts`, through the snapshot's emotion, no stage directions), standing or
  *   walking towards the camera at 1.3 m/s (`?moods=sad,happy`: only those); with another sheet (`?hair=long,braid&body=walk`)
- *   that sheet's residents walk instead, and `&stop=1.5` stands them still after that many seconds (the hair and the
- *   hems swing on and settle: `sway.ts`; `&sway=0`: rigid, as they were, to compare);
+ *   that sheet's residents walk instead, `&go=1.2` from that second on (the first step: `stride.ts`), and `&stop=1.5`
+ *   stands them still after that many seconds (the last step; the hair and the hems swing on and settle: `sway.ts`;
+ *   `&sway=0`: rigid, as they were, to compare);
  * - `?faces=all` the faces of their own (`Appearance.face`, the set's identity channels): a line per four channels
  *   (`?per=2`: two), the shared face and then each channel at -1 and at +1, and a line of eight random faces
  *   (`?only=jawWidth,noseLength`: only those channels; `?faces=random`: only the random faces; `?faces=ends`: every
@@ -289,7 +290,8 @@ if (params.get('labels') !== '0') {
 // The sun's shadow over the floor.
 stage.shadows.setSquare(0, 0, Math.hypot(width, depth) / 2);
 
-/** `?body=walk&stop=3`: they walk for that many seconds, then stand (the hair and the hems swing on and settle). */
+/** `?body=walk&go=1.2&stop=3`: they stand until `go` s, walk until `stop` s, then stand (the first step and the last; the hair and the hems swing on and settle). */
+const goAt = Number(params.get('go')) || 0;
 const stopAt = params.has('stop') ? Number(params.get('stop')) : Infinity;
 let clock = 0;
 function step(dt: number): void {
@@ -299,8 +301,8 @@ function step(dt: number): void {
   if (body === 'walk') {
     for (const p of placed) {
       const o = HEADER_LEN + p.i * STRIDE;
-      snap[o + layout.sim.z] = zOf(p.line) - 2 + 1.3 * Math.min(clock, stopAt);
-      snap[o + layout.sim.moving] = clock < stopAt ? 1 : 0;
+      snap[o + layout.sim.z] = zOf(p.line) - 2 + 1.3 * Math.max(0, Math.min(clock, stopAt) - goAt);
+      snap[o + layout.sim.moving] = clock >= goAt && clock < stopAt ? 1 : 0;
     }
   }
   // Visemes: a one-segment voice line per resident, restarted so it never ends.
