@@ -7,10 +7,11 @@
   import { collectionOf, paintable, percent, summarize } from './catalog';
 
   /**
-   * What a catalog item is worth to the household, at a glance: floats above the card pointed at.
+   * What a catalog item is worth to the household, at a glance: floats above the card pointed at
+   * (`FurnishPanel` places it, in the room above the dock; no taller than that room, its foot is cut).
    * (The whole story, with the turntable, upgrades and things to do, is `ItemDetail`'s, for things owned.)
    */
-  let { def, at, lovers = [], owned = 0 }: { def: ObjectDef; /** Horizontal position over the dock, 0..1. */ at: number; lovers?: string[]; owned?: number } = $props();
+  let { def, lovers = [], owned = 0 }: { def: ObjectDef; lovers?: string[]; owned?: number } = $props();
 
   const content = services.content;
   const info = $derived(summarize(content, def));
@@ -37,7 +38,7 @@
   );
 </script>
 
-<div class="card glass" style="--at:{at}" role="tooltip">
+<div class="card glass" role="tooltip">
   <div class="head">
     <div>
       <b>{def.name}</b>
@@ -90,11 +91,8 @@
 
 <style>
   .card {
-    position: absolute;
-    bottom: 0;
-    left: clamp(150px, calc(var(--at) * 100%), calc(100% - 150px));
-    transform: translateX(-50%);
-    width: 290px;
+    min-height: 0;
+    overflow: hidden;
     padding: 10px 12px;
     display: flex;
     flex-direction: column;
@@ -103,7 +101,10 @@
     background: var(--glass-strong);
     pointer-events: none;
     animation: appear 160ms var(--ease) both;
-    z-index: 2;
+  }
+  /* Short of room, the foot is cut (chips and facts first), not the description squeezed. */
+  .card > * {
+    flex: none;
   }
   .head {
     display: flex;
