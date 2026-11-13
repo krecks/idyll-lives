@@ -6,7 +6,7 @@
  * listened to on any player. `bun run sounds` (from `web/`), or `bun tools/audio/listen.ts`.
  *
  * Each is written to `bench-results/sounds/<kind>.wav` (16-bit stereo) with a line in `index.md`:
- * its length, its level (peak and RMS, dBFS), where its energy sits (the spectral centroid, Hz) and
+ * its length, its level (peak and RMS, dBFS; its loudness to the ear, LUFS), where its energy sits (the spectral centroid, Hz) and
  * whether it loops or is played once; then the objects and uses of the content that sound it, so a
  * listener knows what to expect before pressing play.
  *
@@ -67,6 +67,55 @@ function level_(l: Float32Array, r: Float32Array): { peak: number; rms: number }
     sum += l[i] * l[i] + r[i] * r[i];
   }
   return { peak: db(peak), rms: db(Math.sqrt(sum / Math.max(1, n * 2))) };
+}
+
+/** `x` through a biquad (`b` over 1, `a[0]`, `a[1]`), in double precision. */
+function biquad(x: Float64Array, b: readonly [number, number, number], a: readonly [number, number]): Float64Array {
+  const y = new Float64Array(x.length);
+  let x1 = 0;
+  let x2 = 0;
+  let y1 = 0;
+  let y2 = 0;
+  for (let i = 0; i < x.length; i++) {
+    const v = b[0] * x[i] + b[1] * x1 + b[2] * x2 - a[0] * y1 - a[1] * y2;
+    x2 = x1;
+    x1 = x[i];
+    y2 = y1;
+    y1 = v;
+    y[i] = v;
+  }
+  return y;
+}
+
+/**
+ * How loud the sound is to the ear (LUFS, ITU-R BS.1770-4): both channels through the K weighting (a shelf that
+ * lifts what the head lifts, then a high-pass: the standard's coefficients for 48 kHz, which `RATE` is), the mean
+ * square of 0.4 s blocks a tenth of a second apart, the blocks under -70 LUFS and then those more than 10 LU under
+ * the rest's mean left out (a sound's own silences don't make it quieter). A sound shorter than a block is one
+ * block. Peak and RMS say what the samples hold; this says what one sound is against another when heard, which
+ * is what a mix is levelled by.
+ */
+function loudness(l: Float32Array, r: Float32Array): number {
+  const weighted = (x: Float32Array) =>
+    biquad(biquad(Float64Array.from(x), [1.53512485958697, -2.69169618940638, 1.19839281085285], [-1.69065929318241, 0.73248077421585]), [1, -2, 1], [-1.99004745483398, 0.99007225036621]);
+  const a = weighted(l);
+  const b = weighted(r);
+  const n = Math.min(a.length, b.length);
+  const block = Math.min(n, Math.round(0.4 * RATE));
+  const step = Math.round(0.1 * RATE);
+  if (block === 0) return -Infinity;
+  const powers: number[] = [];
+  for (let start = 0; start + block <= n; start += step) {
+    let sum = 0;
+    for (let i = start; i < start + block; i++) sum += a[i] * a[i] + b[i] * b[i];
+    powers.push(sum / block);
+  }
+  const lufs = (power: number) => (power > 0 ? -0.691 + 10 * Math.log10(power) : -Infinity);
+  const mean = (list: number[]) => list.reduce((s, v) => s + v, 0) / Math.max(1, list.length);
+  const heard = powers.filter((p) => lufs(p) > -70);
+  if (!heard.length) return -Infinity;
+  const floor = lufs(mean(heard)) - 10;
+  return lufs(mean(heard.filter((p) => lufs(p) > floor)));
 }
 
 /** The DFT of `re` + i·`im`, in place (radix-2: the length a power of two). */
@@ -172,11 +221,26 @@ function users(): Map<string, string[]> {
   return found;
 }
 
+/** How far apart the sounds are in loudness, loops and sounds played once apart: what a mix has to even out. */
+function spread(): string[] {
+  const out: string[] = ['| plays | sounds | quietest | median | loudest | spread |', '|---|---|---|---|---|---|'];
+  for (const loop of ['loop', 'once']) {
+    const list = heard.filter((h) => h.loop === loop && Number.isFinite(h.loud)).toSorted((a, b) => a.loud - b.loud);
+    if (!list.length) continue;
+    const first = list[0];
+    const last = list[list.length - 1];
+    const mid = list[Math.floor(list.length / 2)];
+    out.push(`| ${loop} | ${list.length} | \`${first.kind}\` ${num(first.loud)} | ${num(mid.loud)} | \`${last.kind}\` ${num(last.loud)} | ${num(last.loud - first.loud)} LU |`);
+  }
+  return out;
+}
+
 const kinds = Object.keys(MADE) as MadeKind[];
 const where = users();
 const level = levels();
 mkdirSync(OUT, { recursive: true });
 const rows: string[] = [];
+const heard: { kind: string; loop: string; loud: number }[] = [];
 console.log(`${kinds.length} sounds, ${RATE} Hz\n`);
 for (const kind of kinds) {
   const made = (MADE[kind] as (rate: number) => { left: Float32Array; right: Float32Array })(RATE);
@@ -185,14 +249,16 @@ for (const kind of kinds) {
   const left = made.left.map((v) => v * gain);
   const right = made.right.map((v) => v * gain);
   const { peak, rms } = level_(left, right);
+  const loud = loudness(left, right);
   const c = centroid(left, right);
   const secs = left.length / RATE;
   writeFileSync(join(OUT, `${kind}.wav`), wav(left, right));
   const used = where.get(kind) ?? [];
   const loop = ONCE_KINDS.has(kind) ? 'once' : 'loop';
-  rows.push(`| \`${kind}\` | ${num(secs, 2)} | ${loop} | ${gain} | ${num(peak)} | ${num(rms)} | ${num(c, 0)} | ${used.join(', ') || 'by its animation'} |`);
+  rows.push(`| \`${kind}\` | ${num(secs, 2)} | ${loop} | ${gain} | ${num(peak)} | ${num(rms)} | ${num(loud)} | ${num(c, 0)} | ${used.join(', ') || 'by its animation'} |`);
+  heard.push({ kind, loop, loud });
   console.log(
-    `${kind.padEnd(14)} ${num(secs, 2).padStart(5)} s  ${loop.padEnd(4)}  level ${String(gain).padEnd(4)}  peak ${num(peak).padStart(6)}  rms ${num(rms).padStart(6)} dBFS  centroid ${num(c, 0).padStart(6)} Hz  ${used.join(', ') || '(by its animation)'}`,
+    `${kind.padEnd(14)} ${num(secs, 2).padStart(5)} s  ${loop.padEnd(4)}  level ${String(gain).padEnd(4)}  peak ${num(peak).padStart(6)}  rms ${num(rms).padStart(6)} dBFS  ${num(loud).padStart(6)} LUFS  centroid ${num(c, 0).padStart(6)} Hz  ${used.join(', ') || '(by its animation)'}`,
   );
 }
 writeFileSync(
@@ -204,12 +270,15 @@ writeFileSync(
     'what can be measured — length, level, where its energy sits — and the objects and uses that sound',
     'it. Listen to them here; the numbers say what to expect, not whether it sounds like the thing.',
     '',
-    '| sound | s | plays | level | peak | rms | centroid | the content that sounds it |',
-    '|---|---|---|---|---|---|---|---|',
+    '| sound | s | plays | level | peak | rms | LUFS | centroid | the content that sounds it |',
+    '|---|---|---|---|---|---|---|---|---|',
     ...rows,
     '',
+    ...spread(),
+    '',
     'Each WAV is written at the level the game plays it (`world.ts` \'s `LOOPS` and `ONCE_LEVEL`), so one',
-    'against another sounds as it does in the game; peak and RMS are dBFS at that level, and the centroid',
+    'against another sounds as it does in the game; peak and RMS are dBFS at that level, LUFS is how loud',
+    'it is to the ear (ITU-R BS.1770, gated: the second table is how far apart the sounds are), and the centroid',
     'is the middle of the sound\'s energy in Hz (a fan sits low, a hi-hat high). A loop is made to be',
     'repeated, its end cross-faded into its start; a sound played once is a use starting or ending.',
     '',
