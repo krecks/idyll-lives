@@ -10,7 +10,8 @@ import type { LotHighlight, Renderer, TownShot } from '../render/types';
 import { settings } from '../settings/settings.svelte';
 import { services } from '../ui/services';
 import { host } from './host';
-import { generateNeighbourhood, loadTemplates, type NeighbourhoodDraft, type Templates } from './town';
+import { loadTemplates, populate, type NeighbourhoodDraft, type Templates } from './town';
+import { keepHouses, townJob } from './townJobs';
 import { previewWorld } from './townPreview';
 import { perfPhase, perfTime, perfTimeAsync } from '../debug/perf';
 import { layoutTags, type Box, type TagSpot } from './tagLayout';
@@ -44,7 +45,7 @@ const NO_HIGHLIGHT: LotHighlight = { hover: null, selected: null, marked: [], ou
 
 class MenuScene {
   private templates: Templates | null = null;
-  private showcase: NeighbourhoodDraft | null = null;
+  private showcaseMade: Promise<NeighbourhoodDraft> | null = null;
   private draft: NeighbourhoodDraft | null = null;
   /** The lot shown as the player's house (null: none). */
   private home: number | null = null;
@@ -84,14 +85,32 @@ class MenuScene {
     }
   });
 
-  /** The main menu's neighbourhood (generated once per visit to the page). */
-  async showcaseDraft(): Promise<NeighbourhoodDraft> {
-    if (this.showcase) return this.showcase;
+  /**
+   * The main menu's neighbourhood (made once per visit to the page). Its land is laid out in the
+   * town worker (seconds for a big world: the page goes on meanwhile, the boot warming the portrait
+   * studio up), then peopled here (`populate`, on the page's dice, as before) and its preview made in
+   * the worker too (`prepare`d: `show` draws it as it comes).
+   */
+  showcaseDraft(): Promise<NeighbourhoodDraft> {
+    this.showcaseMade ??= this.makeShowcase().catch((err: unknown) => {
+      // (Asked for again, it is made again.)
+      this.showcaseMade = null;
+      throw err;
+    });
+    return this.showcaseMade;
+  }
+
+  private async makeShowcase(): Promise<NeighbourhoodDraft> {
     perfPhase('menu: showcase draft');
-    this.templates ??= await perfTimeAsync('menu: loadTemplates', loadTemplates);
-    const templates = this.templates;
-    this.showcase ??= perfTime('menu: generateNeighbourhood', () => generateNeighbourhood(services.content, services.assets, templates, 'medium'));
-    return this.showcase;
+    const { content, assets } = services;
+    const seed = (Math.random() * 2 ** 31) >>> 0;
+    const land = await perfTimeAsync('menu: showcase land', () => townJob(content, { kind: 'land', world: 'medium', seed }), `seed ${seed}`);
+    keepHouses(land);
+    const templates = (this.templates ??= await perfTimeAsync('menu: loadTemplates', loadTemplates));
+    const draft = perfTime('menu: populate', () => populate(content, assets, templates, land.draft));
+    const { preview } = await perfTimeAsync('menu: showcase preview', () => townJob(content, { kind: 'preview', town: draft }));
+    this.prepare(draft, preview);
+    return draft;
   }
 
   /**

@@ -69,7 +69,7 @@ import { Thumbnails } from './thumbnail';
 import { benchDiag } from '../../debug/benchFlags';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
 import { fetched } from '../../assets/stream';
-import { within } from '../../core/async';
+import { both, within } from '../../core/async';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
@@ -2850,11 +2850,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       try {
         // The landscape on the town layer (the game's, when it's the same town). Same seed and size
         // can still be a new layout ("New neighbours"): the lawn fitted again to its houses.
-        const nature = await this.lot.useNature('town', world, (roads, parent) => drawRoads(this.app, roads, parent));
+        // The landscape and the town's own (its street, its lots' things) side by side: the landscape
+        // waits on the render data workers (the terrain's shading, the grass field) for much of its
+        // build, and the overview's planning fills those waits. (Each gives the frames a turn, `pace`.)
+        const [nature] = await both(this.lot.useNature('town', world, (roads, parent) => drawRoads(this.app, roads, parent)), this.buildOverview(overview, world));
         nature.landscape.refreshLawn(world);
         // The camera keeps a clear view over the hills (and out of the mountains).
         this.townRig.ground = (x, z) => nature.landscape.heightAt(x, z);
-        await this.buildOverview(overview, world);
       } finally {
         this.townBuilds--;
       }

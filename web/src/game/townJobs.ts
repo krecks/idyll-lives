@@ -17,11 +17,17 @@ import { mulberry32 } from './noise';
 export type TownJob =
   /** A new world (`generateWorld`), with the menu's preview of it (`previewWorld`). */
   | { kind: 'world'; world: WorldKind; seed: number; name?: string }
+  /** A new world without its preview: the main menu's showcase, peopled on the page (`populate` rolls the page's dice) before its `preview`. */
+  | { kind: 'land'; world: WorldKind; seed: number }
+  /** The menu's preview of a town (`previewWorld`, no home). */
+  | { kind: 'preview'; town: NeighbourhoodDraft }
   /** The simulation's town file (`assembleTown`); `random`: the seed for its dice (neighbours' bonds). */
   | { kind: 'assemble'; town: NeighbourhoodDraft; player: HouseholdDraft; slot: number; options: AssembleOptions; random: number };
 
 export type TownResult =
   | { kind: 'world'; draft: NeighbourhoodDraft; preview: WorldStructure; houses: [string, HouseTemplate | undefined][] }
+  | { kind: 'land'; draft: NeighbourhoodDraft; houses: [string, HouseTemplate | undefined][] }
+  | { kind: 'preview'; preview: WorldStructure }
   | { kind: 'assemble'; lot: string };
 
 export type ToTownWorker = WorkerAsk<TownJob>;
@@ -38,6 +44,11 @@ export function runTownJob(content: Content, t: Templates, job: TownJob): TownRe
     const preview = previewWorld(content, t, draft, null);
     return { kind: 'world', draft, preview, houses: generatedHouses(t, draft.slots.map((s) => s.template)) };
   }
+  if (job.kind === 'land') {
+    const draft = generateWorld(content, t, job.world, job.seed);
+    return { kind: 'land', draft, houses: generatedHouses(t, draft.slots.map((s) => s.template)) };
+  }
+  if (job.kind === 'preview') return { kind: 'preview', preview: previewWorld(content, t, job.town, null) };
   return { kind: 'assemble', lot: assembleTown(content, t, job.town, job.player, job.slot, job.options, mulberry32(job.random)) };
 }
 
@@ -66,6 +77,6 @@ export function townJob(content: Content, job: TownJob, signal?: AbortSignal): P
 }
 
 /** A world's houses the worker made, kept on the page too (the menu and the screens after need them). */
-export function keepHouses(result: Extract<TownResult, { kind: 'world' }>): void {
+export function keepHouses(result: Extract<TownResult, { kind: 'world' | 'land' }>): void {
   primeHouses(result.houses);
 }

@@ -981,19 +981,6 @@ export function rehouse(content: Content, assets: AssetRegistry, t: Templates, t
   return (s && householdFor(content, assets, bedrooms, homePrice(content, t, s), NEIGHBOUR_CAP, avoidNames)) ?? randomHousehold(content, assets, size, avoidNames);
 }
 
-/** A town of one of the older sizes with its neighbours (a large one is a dense town now). */
-export function generateNeighbourhood(
-  content: Content,
-  assets: AssetRegistry,
-  t: Templates,
-  size: TownSize,
-  name?: string,
-  neighbours?: number,
-  seed?: number,
-): NeighbourhoodDraft {
-  return populate(content, assets, t, generateWorld(content, t, size === 'large' ? 'dense' : size, seed, name), neighbours);
-}
-
 /** What a farm's fields grow: two or three of these, a pair of rows each in turn. */
 const CROPS = ['garden.vegPatch', 'garden.pumpkins', 'garden.sunflowers', 'garden.strawberries', 'garden.tomatoes'];
 /** The farmyard behind a farmhouse, biggest first: [object, fewest, most, turned (rot) or null: any way]. */

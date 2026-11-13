@@ -7,7 +7,9 @@
   import { perfEnd, perfPhase, perfStart, perfTimeAsync } from './debug/perf';
   import { fetchState, loadDebugReport } from './debug/report';
   import { within } from './core/async';
-  import { lookAtAge } from './game/household';
+  import { lookAtAge, lookFromSeed } from './game/household';
+  import type { NeighbourhoodDraft } from './game/town';
+  import type { Renderer } from './render/types';
   import { loadGameData } from './game/session';
   import { prefetchNow, streamGameData } from './assets/stream';
   import { gameDataUrls, menuAssetUrls } from './game/streamPlan';
@@ -75,6 +77,9 @@
   const STEP_LIMIT_MS = 45_000;
   /** The portrait studio's warm-up (`boot`): the menu must not wait long for it. */
   const PORTRAIT_LIMIT_MS = 3_000;
+  /** The warm-up's face (`lookFromSeed`) and age (a grown-up's). */
+  const WARM_FACE = 0x1d7;
+  const WARM_AGE = 34;
   /** A start-up step, or nothing once it has taken `STEP_LIMIT_MS`. */
   const inTime = <T,>(p: Promise<T>) => within(p, STEP_LIMIT_MS, undefined);
 
@@ -94,10 +99,15 @@
     // (`hud=0` on any debug page: the world without the interface, for checks' pictures.)
     if (!BENCH && new URLSearchParams(location.search).get('hud') === '0') (await import('./debug/bench')).hideHud();
     let data: Awaited<ReturnType<typeof loadGameData>>;
+    let showcase: Promise<NeighbourhoodDraft> | null = null;
     try {
       step('Loading game data', 0.05);
       data = await perfTimeAsync('boot: loadGameData', loadGameData);
       app.dataReady = true;
+      // The menu's town is laid out in the town worker from now on, while the page loads the rest,
+      // starts the renderer and warms the portrait studio up.
+      showcase = menuScene.showcaseDraft();
+      showcase.catch(() => {});
       // What the menus and character creation show: every icon and the character set. Fetched
       // now so nothing the player can reach before Play is left to stream.
       step('Loading menu assets', 0.08);
@@ -120,14 +130,30 @@
       app.fatal = err instanceof Error ? err.message : String(err);
       return;
     }
+    let renderer: Renderer | undefined;
     try {
       const snapshot = $state.snapshot(settings);
       step('Starting the renderer', 0.15);
-      await perfTimeAsync('boot: renderer', () => inTime(host.rendererNow(snapshot)));
+      renderer = await perfTimeAsync('boot: renderer', () => inTime(host.rendererNow(snapshot)));
+      // The menu shows no portraits, and its showcase households aren't the ones a new game offers
+      // (step 2 brings its own). One face warms the portrait studio up behind the loading screen (its
+      // device made, its shaders compiled; kept through the menus): step 2's first faces come quickly,
+      // and no compile lands on the menu's first frames. Not longer than a moment (a slow first
+      // compile, or a missing environment texture). While the town worker lays the menu's town out:
+      // a face of its own (seeded: it takes none of the page's dice, which people the showcase).
+      if (services.previews) {
+        step('Preparing portraits', 0.2);
+        // (Kept from now on, as the menus keep it: the town takes seconds yet, and it mustn't go meanwhile.)
+        services.previews.keep(true, 'page');
+        const look = { gender: 'female', appearance: lookAtAge(services.content, services.assets, lookFromSeed(services.assets, 'female', WARM_FACE), WARM_AGE) };
+        await perfTimeAsync('boot: portraits', () => within(services.previews.portrait(look), PORTRAIT_LIMIT_MS, undefined));
+      }
       step('Building the neighbourhood', 0.3);
-      const draft = await perfTimeAsync('boot: menu town', () =>
+      // (Its build runs in longer slices: the loading screen covers it, as it does a game's.)
+      renderer?.setCovered(true);
+      await perfTimeAsync('boot: menu town', () =>
         inTime(
-          menuScene.showcaseDraft().then(async (draft) => {
+          (showcase ?? menuScene.showcaseDraft()).then(async (draft) => {
             menuScene.highlight({});
             menuScene.shoot({ kind: 'menu' }, 2.4);
             await menuScene.show(draft);
@@ -135,19 +161,10 @@
           }),
         ),
       );
-      // The menu shows no portraits, and its showcase households aren't the ones a new game offers
-      // (step 2 brings its own). One face warms the portrait studio up behind the loading screen (its
-      // device made, its shaders compiled; kept through the menus): step 2's first faces come quickly,
-      // and no compile lands on the menu's first frames. Not longer than a moment (a slow first
-      // compile, or a missing environment texture).
-      const first = draft?.households[0]?.household.members[0];
-      if (first && services.previews) {
-        step('Preparing portraits', 0.4);
-        const look = { gender: first.gender, appearance: lookAtAge(services.content, services.assets, first.appearance, first.age) };
-        await perfTimeAsync('boot: portraits', () => within(services.previews.portrait(look), PORTRAIT_LIMIT_MS, undefined));
-      }
     } catch (err) {
       console.warn('[boot]', err);
+    } finally {
+      renderer?.setCovered(false);
     }
     step('Ready', 1);
     perfEnd(booted);
