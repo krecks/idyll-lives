@@ -10,7 +10,7 @@ import type { LotHighlight, Renderer, TownShot } from '../render/types';
 import { settings } from '../settings/settings.svelte';
 import { services } from '../ui/services';
 import { host } from './host';
-import { loadTemplates, populate, primeHouses, type NeighbourhoodDraft, type Templates } from './town';
+import { loadTemplates, populate, type NeighbourhoodDraft, type Templates } from './town';
 import { keepHouses, shareHouses, townJob } from './townJobs';
 import { loadShowcase, showcaseSeed } from './showcaseCache';
 import { previewWorld } from './townPreview';
@@ -107,7 +107,6 @@ class MenuScene {
     // (`showcaseCache.ts`). Read it back (a few dozen milliseconds), not laid out again.
     const kept = await perfTimeAsync('menu: showcase kept', loadShowcase);
     if (kept) {
-      primeHouses(kept.houses);
       shareHouses(kept.draft, kept.houses);
       this.prepare(kept.draft, kept.preview);
       return kept.draft;

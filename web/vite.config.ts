@@ -243,19 +243,23 @@ function optimizedAssets(): Plugin {
         const index = JSON.parse(await readFile(join(copies, 'optimized.json'), 'utf8')) as {
           files?: Record<string, string>;
         };
-        let dropped = 0;
-        let bytes = 0;
-        for (const [source, copy] of Object.entries(index.files ?? {})) {
-          try {
-            if (!(await stat(join(assets, copy))).isFile()) continue;
-            bytes += (await stat(join(assets, source))).size;
-            await rm(join(assets, source));
-            dropped++;
-          } catch {
-            // (No source under that name: nothing to drop.)
-          }
-        }
-        this.info(`optimized-assets: ${dropped} sources dropped (${(bytes / 1e6).toFixed(1)} MB); their compressed copies ship instead`);
+        // (Each in parallel: several hundred files, each a stat of both and a delete.)
+        const sizes = await Promise.all(
+          Object.entries(index.files ?? {}).map(async ([source, copy]) => {
+            try {
+              const [copied, original] = await Promise.all([stat(join(assets, copy)), stat(join(assets, source))]);
+              if (!copied.isFile()) return null;
+              await rm(join(assets, source));
+              return original.size;
+            } catch {
+              // (No source, or no copy, under that name: nothing to drop.)
+              return null;
+            }
+          }),
+        );
+        const dropped = sizes.filter((n) => n !== null);
+        const bytes = dropped.reduce((a, n) => a + n, 0);
+        this.info(`optimized-assets: ${dropped.length} sources dropped (${(bytes / 1e6).toFixed(1)} MB); their compressed copies ship instead`);
       }
     },
   };

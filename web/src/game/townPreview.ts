@@ -10,7 +10,8 @@ import type { Content } from '../content/content';
 import type { FenceEdge, ObjectPlacement, Opening, PlotInfo, WallEdge, WorldStructure } from '../core/protocol';
 import { layoutTown, worldLook, type NeighbourhoodDraft, type Templates, type TownMeta } from './town';
 
-const EMPTY_MESH = { positions: new Float32Array(0), normals: new Float32Array(0), uvs: new Float32Array(0), indices: new Uint32Array(0) };
+/** A menu preview's walls and floors: none (the renderer still expects the three meshes). */
+export const EMPTY_MESH = { positions: new Float32Array(0), normals: new Float32Array(0), uvs: new Float32Array(0), indices: new Uint32Array(0) };
 
 /** World structure of a draft (`playerSlot` is drawn as the player's house, as in the game). */
 export function previewWorld(content: Content, t: Templates, town: NeighbourhoodDraft, playerSlot: number | null = null): WorldStructure {

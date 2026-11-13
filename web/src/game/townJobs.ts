@@ -63,12 +63,12 @@ export function runTownJob(content: Content, t: Templates, job: TownJob): TownRe
     }
     return { kind: 'preview', preview };
   }
-  if (job.kind === 'assemble') {
-    if (job.houses) primeHouses(job.houses);
-    return { kind: 'assemble', lot: assembleTown(content, t, job.town, job.player, job.slot, job.options, mulberry32(job.random)) };
-  }
-  throw new Error(`unknown town job: ${(job as TownJob).kind}`);
+  if (job.houses) primeHouses(job.houses);
+  return { kind: 'assemble', lot: assembleTown(content, t, job.town, job.player, job.slot, job.options, mulberry32(job.random)) };
 }
+
+/** The houses a returning visit's menu read back (`shareHouses`), and their valley. */
+let kept: { seed: number | undefined; houses: readonly [string, HouseTemplate | undefined][] } | null = null;
 
 /** Raised for a job a newer one replaced (or whose signal aborted it). */
 export { Superseded } from '../core/lazyWorker';
@@ -98,11 +98,12 @@ export function townJob(content: Content, job: TownJob, signal?: AbortSignal): P
   return towns.ask(sent, () => onPage(content, sent), { signal });
 }
 
-/** The houses a returning visit's menu read back (`showcaseCache.ts`), for the game's town file, and their valley. */
-let kept: { seed: number | undefined; houses: readonly [string, HouseTemplate | undefined][] } | null = null;
-
-/** A returning visit's houses, as the menu read them: the worker primes itself with them (`town.ts` `primeHouses`). */
+/**
+ * A returning visit's houses, as the menu read them back (`showcaseCache.ts`), with their valley:
+ * the page keeps them, and the game's town file made in that valley carries them to the worker.
+ */
 export function shareHouses(town: NeighbourhoodDraft, houses: readonly [string, HouseTemplate | undefined][]): void {
+  primeHouses(houses);
   kept = { seed: town.seed, houses };
 }
 

@@ -33,10 +33,9 @@ import type { RGB } from '../shared/environment';
 import { Geo, type V3 } from '../shared/geometry';
 import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
 import { placementVariation, standInOf } from '../shared/modelEntry';
-import { junctionsOf } from '../shared/junctions';
 import { pavedRects } from '../shared/paving';
-import { roadMeshes, SIDEWALK, townRoads } from '../shared/roads';
-import type { RoadMeshData } from '../shared/renderData';
+import { townRoadMesh, type RoadMeshData } from '../shared/roads';
+import { townRoadMeshOffThread } from '../shared/renderData';
 import { fieldLayers } from '../shared/street';
 import { perfEnd, perfStart } from '../../debug/perf';
 
@@ -188,15 +187,17 @@ export class TownOverview {
     return drawn;
   }
 
-  /** Builds the overview of `world` (kept when it is the same town); the previous one stays until it is done. True when it was built. `offThread`: the town's road mesh the render data worker is making (`Landscape.roads`). */
-  async build(world: WorldStructure, pace?: () => Promise<void>, offThread?: Promise<RoadMeshData | null>): Promise<boolean> {
+  /** Builds the overview of `world` (kept when it is the same town); the previous one stays until it is done. True when it was built. */
+  async build(world: WorldStructure, pace?: () => Promise<void>): Promise<boolean> {
     const key = townKey(world);
     if (key === this.key) return false;
     const next = this.streets[1 - this.current];
     // (Hidden while it builds: the current one is on screen.)
     next.root.enabled = false;
+    // (Asked for first: the render data worker makes the town's road mesh while the street is planned.)
+    const roads = townRoadMeshOffThread(world);
     await next.build(world, null, pace);
-    const ground = await this.buildGround(world, pace, offThread);
+    const ground = await this.buildGround(world, pace, roads);
     const objects = await this.buildObjects(world, pace);
     await pace?.();
 
@@ -292,13 +293,12 @@ export class TownOverview {
   // ---- building ---------------------------------------------------------------------
 
   /** Road and garden paths / driveways and fields, one flat mesh each (hidden until the swap). */
-  private async buildGround(world: WorldStructure, pace?: () => Promise<void>, offThread?: Promise<RoadMeshData | null>): Promise<pc.Entity[]> {
+  private async buildGround(world: WorldStructure, pace: (() => Promise<void>) | undefined, offThread: Promise<RoadMeshData | null>): Promise<pc.Entity[]> {
     const out: pc.Entity[] = [];
-    // (The junctions' pads with the road, their markings in the road paint over it; worn between the kerbs as the
-    // game's street is, `shared/paving.ts`: the same road from near and from afar.)
-    // (Made in the render data worker while the street was planned; the same arrays, in the same order.)
+    // (The junctions' pads with the road, their markings in the road paint over it: `townRoadMesh`. Made in the
+    // render data worker while the street was planned, or here where none could.)
     const span = perfStart('town: road mesh');
-    let meshes = offThread ? await offThread : null;
+    let meshes = await offThread;
     if (meshes) perfEnd(span, `worker ${Math.round(meshes.ms ?? 0)} ms`);
     else {
       meshes = townRoadMesh(world);
@@ -492,13 +492,6 @@ export class TownOverview {
 }
 
 const ZERO = [0, 0, 0, 0];
-
-/** The town's road mesh, built on the page (the worker's fallback: `renderData.ts`). */
-function townRoadMesh(world: WorldStructure): RoadMeshData {
-  const roads = townRoads(world);
-  const { surface, marks } = roadMeshes(roads, null, 0, { marks: new Geo() }, 'surface', junctionsOf(world, roads), (ri) => roads[ri].width / 2 - SIDEWALK);
-  return { surface: surface.meshData({ colors: true }), marks: marks && !marks.empty ? marks.meshData({ colors: true }) : null };
-}
 
 /** Identity of a town layout: the overview builds again only when it changes. */
 function townKey(world: WorldStructure): string {

@@ -11,8 +11,8 @@
 import type { WorldStructure } from '../../core/protocol';
 import { CountryRoads } from './countryRoads';
 import { grassField, townGrass, type GrassField } from './grass';
-import type { MeshData } from './geometry';
 import { LandscapeLayout } from './nature';
+import type { RoadMeshData } from './roads';
 import { LazyWorker } from '../../core/lazyWorker';
 
 /**
@@ -78,19 +78,11 @@ export function withTownGrass(land: LandGrass, world: WorldStructure): GrassFiel
   return field;
 }
 
-/** The town's road mesh (`roadMeshes`): its surface, and its markings where it has any. */
-export interface RoadMeshData {
-  surface: MeshData;
-  marks: MeshData | null;
-  /** The worker's own build (ms), for the perf spans. */
-  ms?: number;
-}
-
 export type ToRenderData =
   | { type: 'open'; land: number; world: WorldStructure }
   | { type: 'close'; land: number }
   | { type: 'grass'; land: number; margin: number }
-  | { type: 'roads'; land: number }
+  | { type: 'roads'; world: WorldStructure }
   | { type: 'shade'; land: number; positions: Float32Array };
 
 export type RenderDataAnswer =
@@ -149,40 +141,19 @@ class Opened {
  */
 export class OffThreadLand {
   private closed = false;
-  /** The road mesh asked for as soon as the land is open (its own job, before the grass field). */
-  private readonly road: Promise<RoadMeshData | null>;
 
   private constructor(
     private readonly id: number,
     private readonly shading: Opened,
     private readonly grassing: Opened | null,
-    town: boolean,
-  ) {
-    // (Only the menus' town draws it; a game's build would wait its worker on a mesh nobody asks for.)
-    if (!town) {
-      this.road = Promise.resolve(null);
-      return;
-    }
-    // (The shading worker: the grass field is longer, and the overview's ground waits for neither
-    // before the street is planned.)
-    const there = this.shading.there ? this.shading : (this.grassing ?? this.shading);
-    this.road = there.ask({ type: 'roads', land: id }).then((reply) => (reply?.type === 'roads' ? reply.roads : null));
-  }
+  ) {}
 
-  /** The world's land sent to the workers; null where no worker can run. `town`: also make the town's road mesh (`roads`). */
-  static open(world: WorldStructure, town = false): OffThreadLand | null {
+  /** The world's land sent to the workers; null where no worker can run. */
+  static open(world: WorldStructure): OffThreadLand | null {
     const id = nextLand++;
     const land = landWorld(world);
     const shade = Opened.in(shading, id, land);
-    return shade ? new OffThreadLand(id, shade, Opened.in(grassing, id, land), town) : null;
-  }
-
-  /**
-   * The town's road mesh, made in the worker while the page is busy with the rest of the town
-   * (`roadMeshes`; the same arrays as the page's, in the same order). Null where it couldn't be.
-   */
-  roads(): Promise<RoadMeshData | null> {
-    return this.road;
+    return shade ? new OffThreadLand(id, shade, Opened.in(grassing, id, land)) : null;
   }
 
   /** The grass field's land part, `margin` m round the town (`grassField`). */
@@ -212,4 +183,14 @@ export class OffThreadLand {
     this.grassing?.close(this.id);
     this.closed = true;
   }
+}
+
+/**
+ * The town's road mesh (`roads.ts` `townRoadMesh`), made in the shading worker from the world's land
+ * part while the page plans the street (the same arrays as the page's, in the same order). Null where
+ * no worker could make it: the caller builds it on the page.
+ */
+export async function townRoadMeshOffThread(world: WorldStructure): Promise<RoadMeshData | null> {
+  const reply = await shading.ask({ type: 'roads', world: landWorld(world) }, none).catch(none);
+  return reply?.type === 'roads' ? reply.roads : null;
 }

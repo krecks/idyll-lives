@@ -4730,6 +4730,12 @@ impl World {
     /// resident using it, who gets the whole of it.
     fn broadcast(&mut self) {
         let mut scratch = std::mem::take(&mut self.broadcast_scratch);
+        self.broadcast_with(&mut scratch);
+        self.broadcast_scratch = scratch;
+    }
+
+    /// `broadcast` with its buffers (`BroadcastScratch`) out of `self`.
+    fn broadcast_with(&mut self, scratch: &mut BroadcastScratch) {
         let BroadcastScratch {
             sources,
             rooms,
@@ -4737,7 +4743,7 @@ impl World {
             plots,
             asleep,
             heard,
-        } = &mut scratch;
+        } = scratch;
         let content = &self.content;
         sources.clear();
         for sim in &self.sims {
@@ -4784,7 +4790,6 @@ impl World {
             });
         }
         if sources.is_empty() {
-            self.broadcast_scratch = scratch;
             return;
         }
         rooms.clear();
@@ -4844,7 +4849,6 @@ impl World {
                 }
             }
         }
-        self.broadcast_scratch = scratch;
     }
 
     /// Crops grow by `minutes`: fallow ground is planted again, what's planted ripens. A crop

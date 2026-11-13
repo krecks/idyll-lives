@@ -14,8 +14,8 @@
 
 import type { RoadPlan, WorldStructure } from '../../core/protocol';
 import { rasterRoads, roadEnds, RoadIndex, roadIndex, SIDEWALK, trimJoins } from '../../game/roads';
-import { Geo, type V3 } from './geometry';
-import { deriveJunctions, hasSidewalks, JunctionCuts, KERB_RETURN, offsetMeet, planJunctions, turnedBack, turnedOn, type CornerPlan, type JunctionPlan } from './junctions';
+import { Geo, type MeshData, type V3 } from './geometry';
+import { deriveJunctions, hasSidewalks, JunctionCuts, junctionsOf, KERB_RETURN, offsetMeet, planJunctions, turnedBack, turnedOn, type CornerPlan, type JunctionPlan } from './junctions';
 import { asphaltVary, carriageway, repair, STREET_LOOK, tint } from './paving';
 import { valueNoise } from '../../game/noise';
 
@@ -46,6 +46,25 @@ export interface Box {
   z: number;
   w: number;
   d: number;
+}
+
+/** The town's road mesh (`townRoadMesh`): its surface, and its markings where it has any. */
+export interface RoadMeshData {
+  surface: MeshData;
+  marks: MeshData | null;
+  /** The render data worker's own build (ms), for the perf spans. */
+  ms?: number;
+}
+
+/**
+ * The whole town's road surface and markings as the menus' overview draws them: the junctions' pads
+ * with the road, worn between the kerbs as the game's street is (`paving.ts`). Made in the render
+ * data worker (`renderData.ts` `townRoadMeshOffThread`) or, where none runs, on the page.
+ */
+export function townRoadMesh(world: WorldStructure): RoadMeshData {
+  const roads = townRoads(world);
+  const { surface, marks } = roadMeshes(roads, null, 0, { marks: new Geo() }, 'surface', junctionsOf(world, roads), (ri) => roads[ri].width / 2 - SIDEWALK);
+  return { surface: surface.meshData({ colors: true }), marks: marks && !marks.empty ? marks.meshData({ colors: true }) : null };
 }
 
 /** An older town's streets as roads, once per town. */

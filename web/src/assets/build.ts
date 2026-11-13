@@ -6,7 +6,9 @@
  * files are pinned by SHA-256 (a new model gets a new folder), so they stay cached across releases.
  */
 
-/** None outside Vite (tools/worlds/sample.ts runs the loaders in Node). */
+/** This build's id; 'dev' outside Vite (tools/worlds/sample.ts runs the loaders in Node). */
+export const BUILD_ID = typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : 'dev';
+/** None outside Vite. */
 const QUERY = typeof __BUILD_ID__ === 'string' ? `v=${__BUILD_ID__}` : '';
 
 /** `url` with this build's query (once; `data:` and `blob:` URLs stay as they are). */

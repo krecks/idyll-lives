@@ -11,22 +11,20 @@
  * no cache simply makes the town again next visit.
  */
 import type { WorldStructure } from '../core/protocol';
+import { BUILD_ID as BUILD } from '../assets/build';
 import { openCache } from '../ml/assets';
 import type { HouseTemplate, NeighbourhoodDraft } from './town';
+import { EMPTY_MESH } from './townPreview';
 
 const PREFIX = 'littlelives-showcase-';
 const SEED_KEY = 'littlelives.showcase';
 /** Bumped if what is kept stops matching the code that reads it (a build's id already names the cache). */
 const VERSION = 1;
 
-const BUILD = typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : 'dev';
 const CACHE = `${PREFIX}${BUILD}`;
 
 /** The cache's one entry: a URL of its own (Cache Storage needs one; nothing is fetched from it). */
 const ENTRY = new URL('/showcase-cache.json', typeof location === 'undefined' ? 'https://idyll.invalid/' : location.href).href;
-
-/** A menu preview has no meshes of its own (`townPreview.ts`): what the renderer expects to find. */
-const emptyMesh = () => ({ positions: new Float32Array(0), normals: new Float32Array(0), uvs: new Float32Array(0), indices: new Uint32Array(0) });
 
 export interface Showcase {
   /** The town as the menu shows it, people and all (the same pick of neighbours every visit). */
@@ -38,7 +36,7 @@ export interface Showcase {
 }
 
 /** What is kept: the preview without its (empty) meshes, which JSON can't carry. */
-export type Kept = Omit<Showcase, 'preview'> & { version: number; preview: Omit<WorldStructure, 'meshes'> };
+type Kept = Omit<Showcase, 'preview'> & { version: number; preview: Omit<WorldStructure, 'meshes'> };
 
 /** The entry a showcase is kept as (JSON: a house the land didn't generate goes as null). */
 export function keepEntry(showcase: Showcase): Kept {
@@ -54,7 +52,7 @@ export function readEntry(kept: unknown): Showcase | null {
   return {
     draft: entry.draft,
     houses: houses.map(([id, house]) => [id, house ?? undefined]),
-    preview: { ...entry.preview, meshes: { walls: emptyMesh(), wallsLow: emptyMesh(), floors: emptyMesh() } },
+    preview: { ...entry.preview, meshes: { walls: EMPTY_MESH, wallsLow: EMPTY_MESH, floors: EMPTY_MESH } },
   };
 }
 
