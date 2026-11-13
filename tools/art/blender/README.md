@@ -144,9 +144,32 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    - `G.loft` through `G.ring`s (ellipses to rounded squares): bottles, vases, lamp bases;
    - `G.extrude` (`F.extrude`): an outline with holes into a slab: a carved apron, a headboard, a grille;
      `G.rounded_rect` and `G.smooth_outline` draw outlines;
-   - `G.soft_box` (`F.soft`): cushions, pillows, mattresses: rounded, puffed, with piping;
+   - `G.soft_box` (`F.soft`): cushions, pillows, mattresses, duvets: rounded, puffed, pinched, tufted, rumpled, with
+     piping (below, "Soft things");
    - `G.mirrored`, `G.cut` (a boolean), `G.jitter` (a hand-made wobble);
    - `G.kit`: whole parts more than one family uses (`kit.tube`, `kit.cabriole`, `kit.moulding`).
+
+   **Soft things.** `G.soft_box` is a box with what stuffing and seams do to one, each a few centimetres at most (a
+   detail under a centimetre doesn't show at the play camera, where a pixel is 4 mm at its nearest) and none of it
+   past the box, so the size you give is the size it has:
+   - `puff`: its faces crowned (a number: the two across its thin side; three: each pair's own);
+   - `pinch`: its corners pulled in and thinned where the seams meet, its sides bowing out between them, as a boxed
+     cushion's do. On by default, 0.6 of the puff: two cushions side by side part in a V at their corners;
+   - `waist`: its sides drawn in between corners that stand out as ears: a pillow sewn flat and stuffed;
+   - `sag=0.014`: a seat cushion's top sinking over its front third, where legs go over it; its middle and back, where
+     the sitter's hips rest (the content's `seat` height), stay;
+   - `overhang`: its sides drawn in between its seams, the top standing over the boxing;
+   - `tufts=(across, along)`, `tuft` (how deep), `diamond` (rows staggered), `button` (a material: a covered button in
+     each dent): on the face that looks up, or to the front for a back;
+   - `rumple`, `rumple_size`, `seed`: bedding: its top sunk in soft folds lying askew, what hangs down its sides
+     drawn in in flutes to a square hem; only down and in, so a duvet stays under the game's quilt (`calm`: smooth
+     where a runner lies across it);
+   - `piping`: a cord along the seams, following them;
+   - `resting=True`: it lies on its underside or leans on its back: that face's middle is one flat piece, and its seam
+     has no cord. A third fewer triangles: give it to every cushion, mattress and cover that lies on something.
+   Its steps (`flat`, `round_segments`) are chosen to keep its rounded edges within 1.5 mm of their curve and its
+   crowned faces within 2 mm; give them only to save triangles on something small. A seat cushion a clip sinks (`G.squash`) is its own part, as before
+   (`families/living.py` `_cushion`, `_seat`; `bedroom.py` `_pillow`, `_duvet`).
 
    Round things take as many sides as keep their outline within a millimetre of the circle when the family gives
    no count (`G.sides(radius)`: a polygon's sides stand `r × (1 − cos(π / n))` in): a lathe (`G.revolve`) 24 up to

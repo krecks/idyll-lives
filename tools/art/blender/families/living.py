@@ -321,19 +321,27 @@ SINK = 0.02
 SOFA_USES = {'relax': 'sink_in', 'doze': 'sink_in'}
 
 
-def _cushion(name, w, h, d, at, mat, rot=(0, 0, 0), puff=0.018, piping=0.006, flat=3, rs=2, keep_top=False):
-    """A stuffed cushion: its edges rounded, its two largest faces puffed out by `puff`, a piped seam round each
-    (`piping` None: none). `keep_top`: a seat cushion, its puffed middle where the old box's top was (the seat
-    height), its edges `puff` lower."""
+SEAT_SAG = 0.014     # how far a seat cushion's top sinks towards its front edge, where legs go over it
+SEAT_OVERHANG = 0.005  # how far its top stands over its boxing
+
+
+def _cushion(name, w, h, d, at, mat, rot=(0, 0, 0), puff=0.018, piping=0.006, flat=None, rs=None, keep_top=False, **soft):
+    """A stuffed cushion: its edges rounded, its two largest faces puffed out by `puff`, its corners pinched in,
+    a piped seam round each (`piping` None: none). `keep_top`: a seat cushion, its puffed middle where the old
+    box's top was (the seat height), its edges `puff` lower, its top sagging towards its front edge and standing
+    over its boxing. `soft`: more of `G.soft_box`'s (tufts, a pinch of its own)."""
     if keep_top:
         h, at = h - puff, (at[0], at[1] - puff / 2, at[2])
+        soft = {'sag': SEAT_SAG, 'overhang': SEAT_OVERHANG, **soft}
+    # (it lies on the deck or leans on the back: `resting`)
     return F.soft(name, w, h, d, at, mat, rot=rot, round=min(0.045, 0.4 * min(w, h, d)), puff=puff, piping=piping,
-                  flat=flat, round_segments=rs)
+                  flat=flat, round_segments=rs, **{'resting': True, **soft})
 
 
-def _panel(name, w, h, d, at, mat, round=0.05, puff=0.0, piping=None, rot=(0, 0, 0)):
-    """An upholstered panel (a base, an arm, a back): firm, its edges rounded, a welt round its thin side's seams."""
-    return F.soft(name, w, h, d, at, mat, rot=rot, round=round, puff=puff or None, piping=piping, flat=2)
+def _panel(name, w, h, d, at, mat, round=0.05, puff=0.0, piping=None, rot=(0, 0, 0), **soft):
+    """An upholstered panel (a base, an arm, a back): firm, its edges rounded, a welt round its thin side's seams.
+    `soft`: more of `G.soft_box`'s (a buttoned back's `tufts`)."""
+    return F.soft(name, w, h, d, at, mat, rot=rot, round=round, puff=puff or None, piping=piping, **soft)
 
 
 def _leg(name, x, z, h, mat, r=0.022, splay=(0.0, 0.0), verts=10):
@@ -377,8 +385,9 @@ def _taper_leg(name, x, z, h, mat, r=0.022, splay=None):
 
 
 def _pillow(name, x, y, z, mat, turn=0, w=0.4, h=0.36):
-    """A throw pillow leaning back: plump in the middle, its corners pinched."""
-    F.soft(name, w, h, 0.1, (x, y, z), mat, rot=(-13, 0, -turn), round=0.045, puff=0.04, flat=3)
+    """A throw pillow leaning back: plump in the middle, thin at its seams, its corners pinched into ears."""
+    F.soft(name, w, h, 0.07, (x, y, z), mat, rot=(-13, 0, -turn), round=0.03, puff=0.055, pinch=0.008, waist=0.022,
+           resting=True)
 
 
 def _run(up, cush, legs, w, arms=(), backs=('back',), depth=0.88, z=-0.04, n=None, pillows=(), extra=None):
@@ -571,14 +580,9 @@ def sofa_design():
     z = -0.04
     with G.new_parts() as still:
         _panel('deck', 1.84, 0.1, 0.8, (0, 0.27, z), M.teal, round=0.03, piping=0.005)
-        # the back: one buttoned panel, tilted, in two rows of tufts
-        _panel('back', 1.84, 0.4, 0.14, (0, 0.52, z - 0.318), M.teal, rot=(-8, 0, 0), round=0.05, puff=0.012, piping=0.006)
-        tilt = math.radians(8)
-        for x in (-0.42, 0.42):
-            for row, bh in enumerate((0.62, 0.47)):
-                for bx in ((-0.3, -0.1, 0.1, 0.3) if row else (-0.2, 0.0, 0.2)):
-                    bz = z - 0.24 - (bh - 0.52) * math.tan(tilt)   # on the panel's face, which leans back
-                    F.sphere(f'button{x}{bx}{row}', 0.013, (x + bx, bh, bz), M.teal, scale=(1, 0.55, 1), segments=8, rings=5)
+        # the back: one buttoned panel, tilted, tufted in two staggered rows, a covered button in each dent
+        _panel('back', 1.84, 0.4, 0.14, (0, 0.52, z - 0.318), M.teal, rot=(-8, 0, 0), round=0.05, puff=0.014, piping=0.006,
+               tufts=(8, 2), tuft=0.014, diamond=True, button=M.teal, resting=True)
         # a brass rail along the front, its ends turning back into the arms
         F.sweep('front_rail', [(-0.84, 0.22, z + 0.33), (-0.84, 0.22, z + 0.38), (-0.8, 0.22, z + 0.395), (0.8, 0.22, z + 0.395),
                                (0.84, 0.22, z + 0.38), (0.84, 0.22, z + 0.33)], 0.013, M.brass, verts=8, resolution=2)
@@ -924,12 +928,8 @@ def pouf():
     G.join(still, 'pouf', origin=(0, 0, 0))
 
     def cushions():
-        top = F.soft('top', 0.7, 0.05, 0.48, (0, 0, 0), M.pouf_leather, round=0.024, puff=0.012, flat=10, piping=0.005)
-        tufts = [(x, z) for x in (-0.2, 0.0, 0.2) for z in (-0.1, 0.1)]
-        _press(top, [(-x, -z) for x, z in tufts], 0.02, 0.04, above=0.0)
-        top.location = F.at(0, 0.435, 0)
-        for x, z in tufts:
-            F.sphere(f'button{x}{z}', 0.014, (x, 0.455, z), M.pouf_button, scale=(1, 1, 0.6), segments=8, rings=5)
+        F.soft('top', 0.7, 0.05, 0.48, (0, 0.435, 0), M.pouf_leather, round=0.024, puff=0.012, piping=0.005, tufts=(3, 2),
+               tuft=0.02, button=M.pouf_button, resting=True)
         return 0.46
     _settled(_seat(cushions, 0.41, 0))
 

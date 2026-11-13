@@ -59,9 +59,12 @@ class GameFrame:
 
     def soft(self, name, w, h, d, at, material, puff=None, **kw):
         """A soft box (`forms.soft_box`) of game width, height and depth at a game position; a `puff` of three is
-        game (x, height, depth) too."""
+        game (x, height, depth) too, and so is a `sag` of three (a number sags its top towards the front)."""
         if isinstance(puff, (tuple, list)):
             puff = (puff[0], puff[2], puff[1])
+        sag = kw.get('sag')
+        if isinstance(sag, (tuple, list)):
+            kw['sag'] = (-sag[0], -sag[2], sag[1])
         return forms.soft_box(name, (w, d, h), at=self.at(*at), material=material, puff=puff, **kw)
 
     def sweep(self, name, points, radius, material, **kw):

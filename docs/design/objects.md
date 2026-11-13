@@ -132,7 +132,9 @@ The standard it set, for new models too:
 
 - **Shapes as made, not as boxes.** A frame, rail, leg or handle bent from one piece is one `sweep`, never rods
   joined by balls; turned and lofted bodies (`revolve`, `loft`/`ring`) for anything round; outlines with holes
-  (`extrude`) for carved aprons, headboards, grilles, cut-outs; stuffed things puffed and piped (`soft_box`).
+  (`extrude`) for carved aprons, headboards, grilles, cut-outs; stuffed things puffed, pinched at their corners,
+  tufted, rumpled and piped (`soft_box`: a seat cushion sags over its front third, a pillow has ears, a duvet lies
+  in folds and hangs in flutes; all inside the box it is given, so sizes and seat heights hold).
   Doors and drawers are frames round panels (`kit.shaker`), with pulls and knobs (`kit.pull`, `kit.knob`);
   mouldings mitred (`kit.moulding`). `tools/art/blender/README.md` lists the forms and the kit.
 - **The details a real one has, where they read:** rims and lips, feet, hinges, seams, piping, the contents of
