@@ -25,7 +25,7 @@ export type Lamp = typeof RED | typeof AMBER | typeof GREEN;
 export const SIGNAL_LAMPS = ['red', 'amber', 'green'] as const;
 
 /** Signal heads read at most (the snapshot's room, sim-core `snapshot::MAX_LIGHTS`, when the layout doesn't say). */
-export const MOST_SIGNALS = 256;
+export const MOST_SIGNALS = 512;
 
 /** What changed in the rows since the last read. */
 export interface SignalChange {

@@ -1590,7 +1590,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * Whether `world` differs from the built one only in ways what's on screen can take: no new
    * walls, floors, furniture or clothes, the same storey in view. (The simulation sends a world
    * message for every opened door and every growth stage, `structure_version` in
-   * `crates/sim-core/src/world.rs`.)
+   * `crates/sim-core/src/world/mod.rs`.)
    */
   private patchable(world: WorldStructure, view: ViewRect | null): boolean {
     const why = this.unpatchable(world, view);

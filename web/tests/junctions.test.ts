@@ -1,17 +1,17 @@
 /**
  * Junctions as drawn (`render/shared/junctions.ts`, meshes in `render/shared/roads.ts`): worked out
- * from the roads (a T where a lane joins a street, a crossroads, a country road joining a street)
- * as the simulation's `WorldStructure.junctions` has them, or taken from that list; each one's pad
- * of asphalt with a kerb return round each corner, the sidewalk turning the corner, where the
- * roads' own sidewalks stop for it (and for a country road's mouth), and the stop lines and
- * crosswalks on its arms.
+ * from the roads for a test's bare structure (`fixtures/junctions.ts`), or taken from the
+ * simulation's `WorldStructure.junctions`; each one's pad of asphalt with a kerb return round each
+ * corner, the sidewalk turning the corner, where the roads' own sidewalks stop for it (and for a
+ * country road's mouth), and the stop lines and crosswalks on its arms.
  */
 import { describe, expect, test } from 'bun:test';
 import type { Junction, RoadPlan, WorldStructure } from '../src/core/protocol';
 import { SIDEWALK, trimJoins } from '../src/game/roads';
 import { Geo } from '../src/render/shared/geometry';
-import { CROSSWALK, deriveJunctions, junctionsOf, KERB_RETURN, planJunctions, STOP_PAST, type JunctionPlan } from '../src/render/shared/junctions';
+import { CROSSWALK, JunctionCuts, junctionsOf, KERB_RETURN, planJunctions, STOP_PAST, type JunctionPlan } from '../src/render/shared/junctions';
 import { Kerb, MARK_Y, roadIndex, roadMeshes, ROAD_Y, WALK_Y, walkStops } from '../src/render/shared/roads';
+import { deriveJunctions, plansOf } from './fixtures/junctions';
 
 const line = (x0: number, z0: number, x1: number, z1: number, n: number): [number, number][] => Array.from({ length: n + 1 }, (_, i) => [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n]);
 /** A street along x at z = 50; a lane off it to the south (+z), begun at its kerb (`trimJoins`). */
@@ -46,7 +46,7 @@ function covered(tris: [number, number][][], x: number, z: number): boolean {
 
 /** The junction (as drawn) of a set of roads: the only one. */
 function only(roads: RoadPlan[]): JunctionPlan {
-  const plans = planJunctions(deriveJunctions(roads), roads);
+  const plans = plansOf(roads);
   expect(plans.length).toBe(1);
   return plans[0];
 }
@@ -140,7 +140,7 @@ describe('junctions as drawn', () => {
       expect(c.o[1]).toBeCloseTo(HALF + KERB_RETURN, 1);
       expect(c.walk).toBe(true);
     }
-    const { surface, walk } = roadMeshes(T);
+    const { surface, walk } = roadMeshes(T, null, 0, {}, 'both', plansOf(T));
     const pad = flat(surface, ROAD_Y);
     const walks = flat(walk, WALK_Y);
     for (const sx of [1, -1]) {
@@ -154,10 +154,11 @@ describe('junctions as drawn', () => {
       expect(covered(walks, 50 + sx * (HALF + 0.3), 50 + HALF + 0.3)).toBe(false);
     }
     // The street's sidewalk across from the lane runs on unbroken.
-    const north = new Kerb(street, 0, 1, roadIndex(T));
+    const cuts = JunctionCuts.of(plansOf(T));
+    const north = new Kerb(street, 0, 1, roadIndex(T), cuts);
     expect([40, 50, 60].every((s) => north.open(s))).toBe(true);
     // On the lane's side it stops where the arcs begin, and runs again past them.
-    const south = new Kerb(street, 0, -1, roadIndex(T));
+    const south = new Kerb(street, 0, -1, roadIndex(T), cuts);
     expect(south.open(50 + HALF + KERB_RETURN - 0.3)).toBe(false);
     expect(south.open(50 + HALF + KERB_RETURN + 0.3)).toBe(true);
   });
@@ -165,10 +166,11 @@ describe('junctions as drawn', () => {
   test('a crossroads: four corners, a pad joining the four carriageways', () => {
     const j = only(CROSS);
     expect(j.corners.length).toBe(4);
-    const pad = flat(roadMeshes(CROSS).surface, ROAD_Y);
+    const cross = plansOf(CROSS);
+    const pad = flat(roadMeshes(CROSS, null, 0, {}, 'both', cross).surface, ROAD_Y);
     // The middle, and out along each arm to its crosswalk.
     for (const [dx, dz] of [[0, 0], [8, 0], [-8, 0], [0, 8], [0, -8]]) expect(covered(pad, 50 + dx, 50 + dz)).toBe(true);
-    const walks = flat(roadMeshes(CROSS).walk, WALK_Y);
+    const walks = flat(roadMeshes(CROSS, null, 0, {}, 'both', cross).walk, WALK_Y);
     // Each corner's sidewalk at the land's corner.
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) expect(covered(walks, 50 + sx * 3.3, 50 + sz * 3.3)).toBe(true);
   });
@@ -184,8 +186,9 @@ describe('junctions as drawn', () => {
     // South (the country road's side): none across its mouth; north: unbroken.
     expect(covered(walks, 50, 50 + HALF + SIDEWALK / 2)).toBe(false);
     expect(covered(walks, 50, 50 - HALF - SIDEWALK / 2)).toBe(true);
-    expect(new Kerb(street, 0, -1, index).open(50)).toBe(false);
-    expect(new Kerb(street, 0, 1, index).open(50)).toBe(true);
+    const cuts = JunctionCuts.of(plans);
+    expect(new Kerb(street, 0, -1, index, cuts).open(50)).toBe(false);
+    expect(new Kerb(street, 0, 1, index, cuts).open(50)).toBe(true);
     // The kerb returns round from the street's kerb into the country road's edge.
     const j = plans[0];
     expect(j.corners.length).toBe(2);
@@ -200,7 +203,7 @@ describe('junctions as drawn', () => {
 
 describe('road markings', () => {
   /** The paint lying on the road, as (x, z) triangles. */
-  const paint = (roads: RoadPlan[], plans?: JunctionPlan[]) => flat(roadMeshes(roads, null, 0, { marks: new Geo() }, 'surface', plans).marks!, MARK_Y);
+  const paint = (roads: RoadPlan[], plans: JunctionPlan[] = plansOf(roads)) => flat(roadMeshes(roads, null, 0, { marks: new Geo() }, 'surface', plans).marks!, MARK_Y);
 
   test("a stop line across the half coming in at the arm's stop, a zebra across the whole between its crosswalk's ends", () => {
     const j = only(CROSS);
@@ -249,11 +252,11 @@ describe('road markings', () => {
     expect(covered(paint(COUNTRY, unlit), 50 + 1.5, 50 + c.stop - 0.15)).toBe(false);
   });
 
-  test("the simulation's junctions when it sends them, else worked out the same", () => {
+  test("the simulation's junctions are drawn when it sends them, and none without", () => {
     const world = { width: 100, depth: 100, meta: { roads: CROSS } } as unknown as WorldStructure;
     const derived = deriveJunctions(CROSS);
-    // Worked out: the same as from the roads.
-    expect(junctionsOf(world, CROSS)).toEqual(planJunctions(derived, CROSS));
+    // Not sent (an older sim, a test's bare structure): nothing to draw.
+    expect(junctionsOf(world, CROSS)).toEqual([]);
     // Given (the sim's, its stop lines further out): those.
     const given: Junction[] = derived.map((j) => ({ ...j, arms: j.arms.map((a) => ({ ...a, walkFrom: 8, walkTo: 11, stop: 12 })) }));
     const plans = junctionsOf({ ...world, junctions: given }, CROSS);

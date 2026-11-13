@@ -10,7 +10,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan, WorldStructure } from '../src/core/protocol';
 import type { SnapshotLayout } from '../src/core/snapshot';
-import { AMBER, crosswalkRows, GREEN, lampOf, pedestrianHead, RED, SignalRows, walkOf } from '../src/render/shared/signals';
+import { AMBER, crosswalkRows, GREEN, lampOf, MOST_SIGNALS, pedestrianHead, RED, SignalRows, walkOf } from '../src/render/shared/signals';
 import { BASES, constant, layout, LAYOUT, SNAPSHOT_RS } from './snapshotLayout';
 
 /** The light rows' part of the layout, as sim-core's `layout_json` writes it (worked out from snapshot.rs: `snapshotLayout.ts`). */
@@ -54,6 +54,8 @@ describe('signal-head rows', () => {
     expect(Math.max(F.shown, F.x, F.z, F.yaw, F.state)).toBeLessThan(STRIDE);
     expect(COUNT).toBeLessThan(constant('HEADER_LEN'));
     expect(new Set(Object.values(S)).size).toBe(4);
+    // (As many heads as the snapshot has rows for: fewer and the rest go undrawn.)
+    expect(MOST_SIGNALS).toBe(LAYOUT.maxLights);
   });
 
   test('reads each head: where its pole stands, which way it faces, the lamp it shows', () => {
