@@ -19,6 +19,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { MADE, ONCE_THINGS, type MadeKind } from '../../web/src/audio/things';
+import { loudness as loudnessAt } from '../../web/src/audio/loudness';
 import { ONCE, type WaterKind } from '../../web/src/audio/water';
 
 const RATE = 48_000;
@@ -67,55 +68,6 @@ function level_(l: Float32Array, r: Float32Array): { peak: number; rms: number }
     sum += l[i] * l[i] + r[i] * r[i];
   }
   return { peak: db(peak), rms: db(Math.sqrt(sum / Math.max(1, n * 2))) };
-}
-
-/** `x` through a biquad (`b` over 1, `a[0]`, `a[1]`), in double precision. */
-function biquad(x: Float64Array, b: readonly [number, number, number], a: readonly [number, number]): Float64Array {
-  const y = new Float64Array(x.length);
-  let x1 = 0;
-  let x2 = 0;
-  let y1 = 0;
-  let y2 = 0;
-  for (let i = 0; i < x.length; i++) {
-    const v = b[0] * x[i] + b[1] * x1 + b[2] * x2 - a[0] * y1 - a[1] * y2;
-    x2 = x1;
-    x1 = x[i];
-    y2 = y1;
-    y1 = v;
-    y[i] = v;
-  }
-  return y;
-}
-
-/**
- * How loud the sound is to the ear (LUFS, ITU-R BS.1770-4): both channels through the K weighting (a shelf that
- * lifts what the head lifts, then a high-pass: the standard's coefficients for 48 kHz, which `RATE` is), the mean
- * square of 0.4 s blocks a tenth of a second apart, the blocks under -70 LUFS and then those more than 10 LU under
- * the rest's mean left out (a sound's own silences don't make it quieter). A sound shorter than a block is one
- * block. Peak and RMS say what the samples hold; this says what one sound is against another when heard, which
- * is what a mix is levelled by.
- */
-function loudness(l: Float32Array, r: Float32Array): number {
-  const weighted = (x: Float32Array) =>
-    biquad(biquad(Float64Array.from(x), [1.53512485958697, -2.69169618940638, 1.19839281085285], [-1.69065929318241, 0.73248077421585]), [1, -2, 1], [-1.99004745483398, 0.99007225036621]);
-  const a = weighted(l);
-  const b = weighted(r);
-  const n = Math.min(a.length, b.length);
-  const block = Math.min(n, Math.round(0.4 * RATE));
-  const step = Math.round(0.1 * RATE);
-  if (block === 0) return -Infinity;
-  const powers: number[] = [];
-  for (let start = 0; start + block <= n; start += step) {
-    let sum = 0;
-    for (let i = start; i < start + block; i++) sum += a[i] * a[i] + b[i] * b[i];
-    powers.push(sum / block);
-  }
-  const lufs = (power: number) => (power > 0 ? -0.691 + 10 * Math.log10(power) : -Infinity);
-  const mean = (list: number[]) => list.reduce((s, v) => s + v, 0) / Math.max(1, list.length);
-  const heard = powers.filter((p) => lufs(p) > -70);
-  if (!heard.length) return -Infinity;
-  const floor = lufs(mean(heard)) - 10;
-  return lufs(mean(heard.filter((p) => lufs(p) > floor)));
 }
 
 /** The DFT of `re` + i·`im`, in place (radix-2: the length a power of two). */
@@ -249,7 +201,7 @@ for (const kind of kinds) {
   const left = made.left.map((v) => v * gain);
   const right = made.right.map((v) => v * gain);
   const { peak, rms } = level_(left, right);
-  const loud = loudness(left, right);
+  const loud = loudnessAt(left, right, RATE);
   const c = centroid(left, right);
   const secs = left.length / RATE;
   writeFileSync(join(OUT, `${kind}.wav`), wav(left, right));
