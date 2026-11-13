@@ -1,5 +1,5 @@
 /**
- * The town view's HUD state (docs/design/living-town.md, Town tags): whether the town view is in far enough for
+ * The town view's HUD state: whether the town view is in far enough for
  * the tags (`townView.blend` from 0.2; the household's own from its start), the tag filters (kept in this browser), and the tag the player clicked.
  */
 

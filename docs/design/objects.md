@@ -1,6 +1,6 @@
 # How to build a new object
 
-*Every object's model is built in Blender and exported as glTF ([docs/objects/](../objects/README.md)). The toolkit
+*Every object's model is built in Blender and exported as glTF. The toolkit
 and the step-by-step are in [tools/art/blender/](../../tools/art/blender/README.md).*
 
 An object is three things, joined by keys:
@@ -103,7 +103,7 @@ instances, so these costs are per kind of object in view, plus the triangles of 
   of) aim for half the target: the town overview draws every lot's outdoor objects at full detail.
 - **Draw calls:** one per finish group (below). Aim for 1–3, at most 4. Each also draws once more
   in the sun's shadow map, which in live play is redrawn every frame while residents are in view
-  (graphics.md; on Low a still part shares the lot's one merged shadow draw). Map every material to a finish: six garden models took 30 draws unmapped, 9 mapped.
+  (on Low a still part shares the lot's one merged shadow draw). Map every material to a finish: six garden models took 30 draws unmapped, 9 mapped.
   A model whose moving parts can't fit in four says so in its pack entry, `"draws": 5`
   (`G.Model(draws=5)`), and the gate allows it there: the grandfather clock, whose trunk door swings
   open while it is wound (families/decor.md). It is the one such model; nothing else should need it.
@@ -115,7 +115,7 @@ instances, so these costs are per kind of object in view, plus the triangles of 
   without UVs; textured ones carry them (below, "Export settings").
 - **The presets** draw the same models on the lot. Low trims shadows (the lot's still objects cast
   from one merged mesh), the lawn and lamps, and draws the street's far versions, but not the lot's
-  objects; on the M3 Low is limited by geometry (graphics.md), so these budgets are set for Low;
+  objects; on the M3 Low is limited by geometry, so these budgets are set for Low;
   Medium and High have room to spare. Objects on the lot have no level of detail (below).
 
 ## Detail
@@ -473,7 +473,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 - **The Khronos glTF validator**: no errors and no warnings. It is on npm as `gltf-validator`
   (Apache-2.0); install it outside the repo and run `validateBytes` over the files, or drop them on
   the validator's web page.
-- **Looking at it** (headless Chrome for Testing on the real GPU, as graphics.md's runner; not
+- **Looking at it** (headless Chrome for Testing on the real GPU, as the benchmark runner (`tools/bench/render.mjs`); not
   `chrome-headless-shell`, which draws in software):
   - `/gallery.html?keys=model.<family>.<id>` (WebGPU), and the same with `&renderer=webgl`.
   - A lot with the object on it (`?state=<name>` from a test dump, or a bench state with objects
@@ -513,7 +513,7 @@ file or mapping draws a new picture. Check it, as above. An `icon` key is option
 
 ## Credits and licences
 
-All art is original or CC0 (look.md). A model built from a script in this repo is original:
+All art is original or CC0. A model built from a script in this repo is original:
 add it to `web/public/assets/CREDITS.md` (what, which script, "original, CC0"). The scripts are
 code, under the game's GPL. Downloaded models, if ever used, must be CC0, with source, author and
 licence in CREDITS.md, and go through the same gate. Blender's licence doesn't extend to its output.

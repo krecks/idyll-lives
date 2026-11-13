@@ -83,7 +83,7 @@ const SCENARIOS = {
   'mirror-day': 'cam=mirror&hour=13',
   'mirror-night': 'cam=mirror&hour=21',
   'mirror-still': 'cam=mirror-still&hour=13',
-  // The town view's zoom (docs/design/living-town.md): from the home at the game's opening distance out to 900 m and
+  // The town view's zoom: from the home at the game's opening distance out to 900 m and
   // back in, once in 60 s, in a Big world (`SCENARIO_DEFAULTS`).
   'town-zoom': 'cam=zoom&hour=13',
 };
@@ -144,7 +144,7 @@ const POSES = {
   'garden-night': 'cam=orbit&hour=21&at=0&beta=0.86&radius=14&tz=5',
 };
 /**
- * The town set (`--poses town`, docs/design/living-town.md): the town view held over the main town's centre and over
+ * The town set (`--poses town`): the town view held over the main town's centre and over
  * the home, from 150 m (just into the town view), 400 m (the full town view) and 900 m (as far out as it goes), at
  * midday, at dusk and by night. Each is the game as a player has it there: a Big town with its residents, a household
  * of the player's and the interface (the town tags, the day bar), from a scene saved at that hour (`town-day`,

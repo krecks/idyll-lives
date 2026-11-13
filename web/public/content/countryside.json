@@ -1,5 +1,5 @@
 {
-  "$comment": "Countryside spots for big worlds (docs/design/open-world.md): placed by the world generator on countryside plots, reached by trail. They reuse shipped models until their own are made. The fishing spot's use plays `look` until the renderer has a `fish` action (render/shared/characters/actions.ts ACTIONS) and the content declares it in `animations`; then its anim becomes `fish`. The trailhead's walk is `trail`: the resident walks out along the trail it stands at and back while it lasts (sim-core world::trail_step), shown walking.",
+  "$comment": "Countryside spots for big worlds: placed by the world generator on countryside plots, reached by trail. They reuse shipped models until their own are made. The fishing spot's use plays `look` until the renderer has a `fish` action (render/shared/characters/actions.ts ACTIONS) and the content declares it in `animations`; then its anim becomes `fish`. The trailhead's walk is `trail`: the resident walks out along the trail it stands at and back while it lasts (sim-core world::trail_step), shown walking.",
   "objects": [
     {
       "id": "countryside.fishingSpot",

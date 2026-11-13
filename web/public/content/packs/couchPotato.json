@@ -1,5 +1,5 @@
 {
-  "$comment": "Couch Potato pack: things a resident who loves the TV and the sofa wants at home. A home cinema, a game console that rewards practice, a recliner, a snack fridge that saves the walk to the kitchen, a fitness game that gets them moving, and a lava lamp. Adds the shared tags 'gaming' and 'cozy'. Design note: docs/personalities/couchPotato.md",
+  "$comment": "Couch Potato pack: things a resident who loves the TV and the sofa wants at home. A home cinema, a game console that rewards practice, a recliner, a snack fridge that saves the walk to the kitchen, a fitness game that gets them moving, and a lava lamp. Adds the shared tags 'gaming' and 'cozy'.",
   "feelings": [
     {
       "id": "couchPotato.movieNight",

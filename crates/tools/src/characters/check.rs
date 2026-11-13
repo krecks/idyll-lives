@@ -524,7 +524,7 @@ pub fn check(out: &Path) -> bool {
                     super::np::py_repr(target)
                 ));
             }
-            // A real body's heads in its height (docs/review/reference.md: about 4 on a baby, 5-6 on a
+            // A real body's heads in its height (about 4 on a baby, 5-6 on a
             // child, 6.5-7 on a teen, 7-7.5 on the grown).
             let heads = 1.0 / proportions(fam, stage).hh;
             let (lo, hi) = match stage {

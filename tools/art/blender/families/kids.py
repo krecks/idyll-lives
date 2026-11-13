@@ -1,4 +1,4 @@
-# The kids' things (docs/objects/kids.md). Notes: kids.md.
+# The kids' things. Notes: kids.md.
 #
 # KD1 baby and kids' beds: the crib with its changing table (`model.crib`), the kids' bed (`model.kidsBed`),
 #   the race car bed (`model.kidsBedCar`) and the high chair (`model.highChair`).

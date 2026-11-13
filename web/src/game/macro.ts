@@ -1,5 +1,5 @@
 /**
- * A big world (docs/design/open-world.md, size `big`): 896 to 1024 m of land with a main town (the
+ * A big world: 896 to 1024 m of land with a main town (the
  * kind's own shape, larger than a Normal town, its streets reaching all of its box), five to seven
  * hamlets 170 m or more from each other and spread over the whole world, country roads between
  * them and out of the world with farmsteads and cottages along them, and countryside: woods in
@@ -40,7 +40,7 @@ export interface OpenWorldDraft {
   /** The height (m) each outdoor plot is levelled to, by plot index. */
   pads: Record<number, number>;
   parking: { x: number; z: number; rot: number; area: number }[];
-  /** The living town (docs/design/living-town.md, `backdrop.ts`): buildings nobody lives in, the places the tags name, the main town's centre. */
+  /** The living town (`backdrop.ts`): buildings nobody lives in, the places the tags name, the main town's centre. */
   backdrop?: BackdropBuilding[];
   places?: TownPlace[];
   centre?: { area: number; poly: Pt[] }[];
@@ -70,7 +70,7 @@ interface Character {
   spots: string[];
   spotsPerArea: [number, number];
   /**
-   * The main town's terraced houses (docs/design/living-town.md, Denser lots): so many lots in
+   * The main town's terraced houses: so many lots in
    * rows of `rows` houses (two: a semi-detached pair), each row on one lot's frontage
    * (`LotPlacer.placeRow`), off the high street; and how much of the town the backdrop builds
    * over, 0..1 (`backdrop.ts`).

@@ -1,5 +1,5 @@
 {
-  "$comment": "Bookworm pack: reading nooks, a rare-books library wall, a writer's bureau, a tea trolley and a fireside reading lounge. Bookworms already love 'reading'; this pack adds 'cozy' (comfortable reading spots) and 'study' (deep research and drafting) so they seek out these items, and gives them ways to look after comfort, hunger and social while they read. See docs/personalities/bookworm.md.",
+  "$comment": "Bookworm pack: reading nooks, a rare-books library wall, a writer's bureau, a tea trolley and a fireside reading lounge. Bookworms already love 'reading'; this pack adds 'cozy' (comfortable reading spots) and 'study' (deep research and drafting) so they seek out these items, and gives them ways to look after comfort, hunger and social while they read.",
   "objects": [
     {
       "id": "bookworm.readingNook",

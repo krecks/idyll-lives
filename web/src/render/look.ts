@@ -1,6 +1,6 @@
 /**
  * The look of the world: time-of-day lighting, sky, colour grading and the colours of lamps,
- * lit windows and the selection marker (see docs/design/look.md for what it aims for). Pure
+ * lit windows and the selection marker. Pure
  * data; the renderer applies it.
  */
 

@@ -1,4 +1,4 @@
-// The living town's drawing at town scale (docs/design/living-town.md, "Town-scale drawing"): a backdrop
+// The living town's drawing at town scale: a backdrop
 // building fitted to the town view's unit meshes (`render/shared/townBuildings.ts`), their faces facing out, and
 // the debug fixture (`debug/ltFixture.ts`, `?ltFixture`) keeping the contract's rules on a made-up town.
 import { describe, expect, test } from 'bun:test';

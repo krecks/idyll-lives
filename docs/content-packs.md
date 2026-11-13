@@ -615,7 +615,7 @@ leaving below 0.7 hunger; `readyMinutes` 45.
 
 ## Life: ages, family, moving
 
-Content `life` (an object, so a pack can change single keys; see `docs/design/life-cycle.md`):
+Content `life` (an object, so a pack can change single keys):
 
 | Key | Meaning |
 |---|---|
@@ -728,7 +728,7 @@ sold back for `objectRules.resale` of it.
 
 ## Rooms, wear and accidents
 
-How the house shows up in residents' lives (see `docs/design/house-matters.md`).
+How the house shows up in residents' lives.
 
 **Room kinds** (`roomKinds`): a room is of the first kind whose `tags` something in it offers.
 

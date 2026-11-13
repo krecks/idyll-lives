@@ -800,7 +800,7 @@ pub struct AccidentDef {
     pub another_room: Option<usize>,
 }
 
-/// Ages and life stages (content `life`; see `docs/design/life-cycle.md`).
+/// Ages and life stages (content `life`).
 #[derive(Debug, Clone)]
 pub struct LifeRules {
     /// Game days per year of age at the *Normal* lifespan.

@@ -1,5 +1,5 @@
 /**
- * The town view's camera (`render/shared/townCamera.ts`, docs/design/living-town.md "Camera modes"): one zoom from
+ * The town view's camera (`render/shared/townCamera.ts`): one zoom from
  * the play orbit out to `TOWN_MAX` with nothing jumping at `TOWN_FROM`, the tilt eased into the bird's-eye range,
  * the target held over land and given back on the way in, the haze and the planes (the menus' town's too), the
  * flights down from the town view, and the roaming focus left alone up there.

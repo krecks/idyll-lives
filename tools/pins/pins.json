@@ -1,34 +1,27 @@
 {
   "pins": [
     {
-      "name": "contract",
-      "file": "docs/design/living-town.md",
-      "sha256": "fb00ab95aa2c22c721e684777bf6db2b9ac5ce3b866c83891aac04a076fa7317",
-      "by": "docs/blender-readme",
-      "reason": "docs cleanup after the living-town streams merged: the stream list, run instructions (Sim scale, budgets, lt-temp, the integrator) and the unbuilt river are gone; World data, Camera modes, Town-scale drawing, Town tags and Pins describe the game as it is"
-    },
-    {
       "name": "living-town-meta",
       "file": "web/src/core/protocol.ts",
-      "sha256": "d8846c0cdf9d189ab9e01bd57e1edada9b1233f1b6ba70bcfcabb3fdff0fc35e",
-      "by": "setup",
-      "reason": "the contract's WorldMeta fields",
+      "sha256": "a59a98f4ecfa0d031d141011a94e5392bcf87a5811f8b9cc6ba8a8c33505b90d",
+      "by": "docs/cleanup",
+      "reason": "comments only: the pointer to a deleted design doc (docs/design/) is gone",
       "region": "living-town-meta"
     },
     {
       "name": "living-town-types",
       "file": "web/src/core/protocol.ts",
-      "sha256": "e7d2b544064f4d25e7af778f7284c9768b169096b9a69fa457199cff66c08db3",
-      "by": "integrator",
-      "reason": "the footprint's winding and the ridge's angle said exactly (counter-clockwise seen from above; a turn round +y, the ridge along (cos r, -sin r) in x, z): worldgen and render had read the ridge opposite ways, and worldgen's reading is the one written down",
+      "sha256": "c1e71709c5280f4b24533973e22a1fe743c5d4ba16ec33b374be864df1b6b3fa",
+      "by": "docs/cleanup",
+      "reason": "comments only: the pointer to a deleted design doc (docs/design/) is gone",
       "region": "living-town-types"
     },
     {
       "name": "look",
       "file": "web/src/render/look.ts",
-      "sha256": "6eff356119da0209a3521dd2d688c646905e51190bd3127557980757baee5431",
-      "by": "setup",
-      "reason": "setup: accepted before the living-town run (look jump, 0.8.0)"
+      "sha256": "6b7634d8daf16edef819f99c5b4888b3d23dcfead558b3464c429ac313b199ce",
+      "by": "docs/cleanup",
+      "reason": "comments only: the pointer to a deleted design doc (docs/design/) is gone"
     },
     {
       "name": "LAWN_MAP",
@@ -100,9 +93,9 @@
     {
       "name": "sim-lifecycle",
       "file": "crates/sim-core/src/lifecycle.rs",
-      "sha256": "c318bb806ca8613dca2398582bf4eb89d79083f26a3f371bff132c0cb754eff0",
-      "by": "setup",
-      "reason": "household behaviour: not this run's to change"
+      "sha256": "a8714a881d13c5eac474c117cc3e9b91f9c2baffadad0375e6864f999ed989d8",
+      "by": "docs/cleanup",
+      "reason": "comments only: the pointer to a deleted design doc (docs/design/) is gone"
     },
     {
       "name": "sim-hosting",
@@ -128,9 +121,9 @@
     {
       "name": "living-town-lens",
       "file": "web/src/render/shared/lens.ts",
-      "sha256": "e5db8420c1acfd243a94f32ee6f1e019ba48a47f02e35a0f8ddfd04625ddbcb6",
-      "by": "setup",
-      "reason": "the contract's town view constants",
+      "sha256": "fabc07f980ee07eba00d74a487656cba2939765420b756aece40b55b12575044",
+      "by": "docs/cleanup",
+      "reason": "comments only: the pointer to a deleted design doc (docs/design/) is gone",
       "region": "living-town-lens"
     },
     {

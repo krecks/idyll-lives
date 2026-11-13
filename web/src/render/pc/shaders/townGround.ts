@@ -1,5 +1,5 @@
 /**
- * The ground's colour map at altitude (`groundTiles.ts` `TownGroundMap`, docs/design/living-town.md):
+ * The ground's colour map at altitude (`groundTiles.ts` `TownGroundMap`):
  * a texture over the whole world, baked once per town, of what the town lays on its land (the streets
  * and their pavements, the junctions' pads, the centre's paving, the water, the farm fields), laid over
  * the ground tiles' own colour as the town view comes in (`game_townGround`, its blend). Its alpha says

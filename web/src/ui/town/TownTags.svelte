@@ -12,7 +12,7 @@
   import { townHud } from './townHud.svelte';
 
   /**
-   * The town tags (docs/design/living-town.md, Town tags): HTML labels over the canvas, each over the resident,
+   * The town tags: HTML labels over the canvas, each over the resident,
    * place, home or street it names, placed each frame through `townView.project`. They fade in with `townBlend`
    * from 0.2 (the household's own from the town view's start: `mineFade`) and show only the kinds the tag menu has on.
    * They are laid out as the menus' are (`game/tagLayout.ts`): the household's own first and always (moved clear of

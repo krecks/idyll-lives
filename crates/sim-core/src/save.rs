@@ -62,7 +62,7 @@
 //! parked for good. Older files load. Saves
 //! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
 //! alias still reads it.
-//! 35 = open worlds (docs/design/open-world.md): the lot's edge and diagonal strings may be
+//! 35 = open worlds: the lot's edge and diagonal strings may be
 //! run-length coded (a `~` and then `<char><count>` runs split by commas; dense strings still
 //! load), chemistry is one string for every pair (`chemistry`: base64 of the upper triangle,
 //! `(0, 1), (0, 2), …, (1, 2), …`, as little-endian f32s) and relationships list only the pairs
@@ -110,7 +110,7 @@
 //! taxi's, `taxis.runs[].progress`) and the tick a traffic light's stage began (`lights`) in real
 //! seconds, and they're rescaled as it loads (`Rescale::drive`): each place along its way is the
 //! same place, as its way is now timed, and each light as many seconds into its stage.
-//! 38 = the town's living-town fields (docs/design/living-town.md, World data) are in its `meta`:
+//! 38 = the town's living-town fields are in its `meta`:
 //! `backdrop` (buildings nobody lives in), `places` (what the town tags name) and `centre` (each
 //! main town's square and high street), as the town file had them; and its homes may be terrace
 //! lots (`terrace`, narrow houses a metre apart). The simulation reads none of them: a file before

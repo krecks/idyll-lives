@@ -1,5 +1,5 @@
 /**
- * The town view's buildings, engine-neutral (docs/design/living-town.md, "Town-scale drawing"; drawn by
+ * The town view's buildings, engine-neutral (drawn by
  * `pc/townView.ts`): the backdrop palette, how a backdrop building (`WorldMeta.backdrop`) or a far lot's
  * house is fitted to the unit meshes (a rectangle along its ridge or its longest side, its walls from
  * under its ground to its storeys, its roof's rise), and the unit meshes themselves.

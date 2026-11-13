@@ -1,5 +1,5 @@
 /**
- * The town view's camera (docs/design/living-town.md, Camera modes): how the play orbit changes as it zooms out
+ * The town view's camera: how the play orbit changes as it zooms out
  * past `TOWN_FROM` to `TOWN_MAX` (`lens.ts`). There is no switch: everything here is a function of the orbit's
  * radius that is the play camera's own value up to `TOWN_FROM` and eases with `townBlend` from there, so nothing
  * jumps on the way out or back in.
@@ -93,8 +93,8 @@ export function townKeyZoom(radius: number): number {
 }
 
 /**
- * The haze's density for a camera `radius` m out, as a share of the look's: down to `TOWN_FOG` by `TOWN_FULL`
- * (docs/design/living-town.md), and on the way there never more than keeps the middle of the picture as clear as it
+ * The haze's density for a camera `radius` m out, as a share of the look's: down to `TOWN_FOG` by `TOWN_FULL`,
+ * and on the way there never more than keeps the middle of the picture as clear as it
  * is from `TOWN_FROM` (`TOWN_FROM` over the radius: at the look's own density the town 250 m off would be half haze
  * before it clears again). Past `TOWN_FULL` it thins on the same way (a ninth at `TOWN_MAX`): at a flat quarter the
  * town 900 m off is four tenths haze and everything behind it is gone.
@@ -109,7 +109,7 @@ export function townFog(radius: number): number {
  * Where the haze begins (m from the eye) for a camera `radius` m out: at the eye up to `TOWN_FROM` (the play camera's
  * haze), eased out to `FOG_FROM` times the radius halfway into the town view (`HAZE.ramp`) and on from there. Before
  * this the land a little past the town was half haze from 250 m, and from `TOWN_MAX` everything past the town went
- * into a grey-blue wall (docs/design/living-town.md).
+ * into a grey-blue wall.
  */
 export function townFogFrom(radius: number): number {
   return FOG_FROM * radius * Math.min(1, HAZE.ramp * townBlend(radius));

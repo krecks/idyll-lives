@@ -1,4 +1,4 @@
-//! Resident voices (see `docs/design/voices.md`).
+//! Resident voices.
 //!
 //! The model, Supertone's Supertonic 3, reads plain text ([`plain_text`]) in one of ten voices at
 //! a given speed; it runs in the browser with ONNX Runtime Web on WebGPU. This crate shapes the

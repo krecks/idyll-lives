@@ -1,5 +1,5 @@
 /**
- * The town tags' kinds (docs/design/living-town.md, Town tags), each also a filter in the tag menu, most important
+ * The town tags' kinds, each also a filter in the tag menu, most important
  * first. Where they go on screen, and which give way when they meet, is `game/tagLayout.ts` (by `tags.ts` `tagRank`).
  */
 

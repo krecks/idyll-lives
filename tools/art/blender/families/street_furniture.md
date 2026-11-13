@@ -1,6 +1,6 @@
 # Street furniture — notes
 
-`street_furniture.py` builds the ten CM2 street furniture models (docs/objects/community.md) into
+`street_furniture.py` builds the ten CM2 street furniture models into
 `web/public/assets/models/street_furniture/` and their entries in `packs/street_furniture/manifest.json`: the street
 lamp (`model.streetLamp`), the long park bench (`model.parkBench`), the drinking fountain (`model.drinkingFountain`),
 the litter bin (`model.litterBin`), the taxi rank's shelter (`model.busStop`, the bus shelter it was), the post box (`model.postBox`), the notice board

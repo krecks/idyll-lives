@@ -39,7 +39,7 @@ tools_cargo() { CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UN
 step() {
   printf '\n== %s\n' "$1"
   case "$1" in
-    # Accepted parts held by their sha256 (tools/pins/pins.json; docs/design/living-town.md, Pins).
+    # Accepted parts held by their sha256 (tools/pins/pins.json).
     pins) tools_cargo pins ;;
     fmt) cargo fmt --all --check ;;
     clippy) cargo clippy --workspace --all-targets --locked -- -D warnings ;;

@@ -1,5 +1,4 @@
-//! Life cycle: residents age once a day and move through life stages (content `life`; see
-//! `docs/design/life-cycle.md`).
+//! Life cycle: residents age once a day and move through life stages (content `life`).
 
 use serde::{Deserialize, Serialize};
 

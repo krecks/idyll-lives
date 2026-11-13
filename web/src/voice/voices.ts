@@ -1,5 +1,5 @@
 /**
- * How each resident sounds (docs/design/voices.md, "Voices"), all with **Supertonic 3**, which
+ * How each resident sounds, all with **Supertonic 3**, which
  * speaks in ten fixed voices:
  *
  * - Teens and grown-ups: one of the bundled voices (`PRESETS`, five women's and five men's; men

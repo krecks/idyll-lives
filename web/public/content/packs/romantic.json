@@ -1,5 +1,5 @@
 {
-  "$comment": "Romantic pack: date-night furniture for residents who dream of love. Candlelit dinners, a rose-petal tub for two, love letters, a vanity to primp before a date, love songs and a rose-arbour swing. Several items leave feelings that make flirting land more often. New tags: romance (object-side romance; the social tag 'romantic' stays reserved for conversations) and music. See docs/personalities/romantic.md.",
+  "$comment": "Romantic pack: date-night furniture for residents who dream of love. Candlelit dinners, a rose-petal tub for two, love letters, a vanity to primp before a date, love songs and a rose-arbour swing. Several items leave feelings that make flirting land more often. New tags: romance (object-side romance; the social tag 'romantic' stays reserved for conversations) and music.",
   "objects": [
     {
       "id": "romantic.candlelitTable",

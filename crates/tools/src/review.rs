@@ -14,9 +14,9 @@
 //! the defaults apply), and raw for what sim-core keeps no copy of (`model`, `category`, `group`, a use's `when`,
 //! `leaves` and its tags in order). Sizes and heights are `cargo check-glb`'s (`checkglb::measures`), with what
 //! the review measures besides: a top its kind has and its content hasn't, a table's H without its seats and a
-//! stair's top step (`h_of`; docs/review/reference.md, "How to use this"). The manifests give each model's
+//! stair's top step (`h_of`). The manifests give each model's
 //! `motions`; the renderer's `ACTIONS` (render/shared/characters/actions.ts) and action sounds (audio/world.ts) are read from its
-//! source. A category is the docs/objects page the object is on: its buy category, or `packs` for a personality
+//! source. A category is the object's buy category, or `packs` for a personality
 //! pack's objects.
 
 use crate::checkglb::{self, Height, Measure, Paths};
@@ -139,7 +139,7 @@ fn outside(name: &str, v: f64, [lo, hi]: [f64; 2], tolerance: f64) -> String {
 pub struct Object {
     pub id: String,
     pub name: String,
-    /// The docs/objects page it is on (`<page>.md`): its buy category; `packs` for a personality pack's objects.
+    /// Its review category: its buy category; `packs` for a personality pack's objects.
     pub page: String,
     pub category: String,
     pub group: String,
@@ -203,7 +203,7 @@ pub fn objects(dir: &Path) -> Result<Vec<Object>, String> {
         .flatten()
         .filter_map(|o| Some((o.get("id")?.as_str()?, o)))
         .collect();
-    // A personality pack's objects are on docs/objects/packs.md, whatever their category.
+    // A personality pack's objects are in `packs`, whatever their category.
     let mut packed = HashSet::new();
     for f in includes
         .iter()
@@ -941,7 +941,7 @@ fn size_cells(r: &SizeRow) -> String {
 const SIZE_HEAD: &str = "| Object | Kind | W × H × D (m) | Seat | Top | Mattress |";
 const SIZE_RULE: &str = "|---|---|---|---|---|---|";
 
-/// The pages in the order of docs/objects/README.md, then any other.
+/// The pages in the buy catalogue's order, then any other.
 fn page_order(pages: impl IntoIterator<Item = String>) -> Vec<String> {
     const ORDER: [&str; 16] = [
         "kitchen",

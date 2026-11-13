@@ -380,7 +380,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /**
    * The player's camera input and the game camera's pose (the director's rig drives it too). One zoom from the play
-   * camera out to the town view (docs/design/living-town.md): its radius goes to `TOWN_MAX`, and past `TOWN_FROM`
+   * camera out to the town view: its radius goes to `TOWN_MAX`, and past `TOWN_FROM`
    * its `shape` (`shared/townCamera.ts`, set with the world) eases the tilt, the pan bounds and the zoom's pace.
    */
   private readonly orbit = new OrbitControls({ ...DEFAULT_ORBIT }, { radius: TOWN_RADIUS_LIMITS, beta: BETA_LIMITS });
@@ -474,7 +474,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** Other lots' bikes and e-scooters (the street leaves them out: they go off with their riders). */
   private parkedRides!: ParkedRides;
   /**
-   * The town view's drawing (`townView.ts`, `groundTiles.ts`: docs/design/living-town.md), all of it only while
+   * The town view's drawing (`townView.ts`, `groundTiles.ts`), all of it only while
    * `townView.blend` is over 0: the backdrop and the far lots' houses, the movers past the near drawing, the
    * ground's colour map. What the far lots were chosen by (the chunks streamed in, the street's list of houses).
    */
@@ -1107,7 +1107,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   /**
-   * The town view's share of the camera (docs/design/living-town.md, `shared/townCamera.ts`), before it is posed:
+   * The town view's share of the camera (`shared/townCamera.ts`), before it is posed:
    * for an orbit `radius` m out along `alpha`, tilted `beta`, with its eye at (`ex`, `ey`, `ez`), the near plane
    * moved out (the roads keep their depth from 900 m) and the far plane past the whole world, the sky's dome out
    * with it, and the haze thinned, begun further out and thick enough where the land ends in the picture to fade

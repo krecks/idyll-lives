@@ -1,5 +1,5 @@
 {
-  "$comment": "Loner pack: quiet, one-seat hobbies and retreats for residents who recharge alone, plus ways to top up Social without small talk (shortwave radio) and to eat without a doorbell. New shared tags: cozy, garden. See docs/personalities/loner.md.",
+  "$comment": "Loner pack: quiet, one-seat hobbies and retreats for residents who recharge alone, plus ways to top up Social without small talk (shortwave radio) and to eat without a doorbell. New shared tags: cozy, garden.",
   "objects": [
     {
       "id": "loner.quietPod",

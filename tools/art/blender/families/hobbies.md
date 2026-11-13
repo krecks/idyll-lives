@@ -1,6 +1,6 @@
 # Hobbies — notes
 
-`hobbies.py` builds the nineteen hobby models (docs/objects/hobbies.md, H1–H3) into `web/public/assets/models/hobbies/`
+`hobbies.py` builds the nineteen hobby models into `web/public/assets/models/hobbies/`
 and their entries in `packs/hobbies/manifest.json`. Built 2026-10-14;
 they sat in Validate › Music, Games and Crafts until checked in play.
 

@@ -23,7 +23,7 @@
 </script>
 
 <div class="hud" class:quiet={game.watching && settings.hideHudWhileWatching && !game.hudAwake}>
-  <!-- The town view's tags, under everything else (they live in the town view: docs/design/living-town.md). -->
+  <!-- The town view's tags, under everything else (they live in the town view). -->
   <TownTags />
   <TopBar />
   {#if game.mode === 'live'}

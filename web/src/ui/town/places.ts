@@ -1,5 +1,5 @@
 /**
- * What the town tags know of the town itself (docs/design/living-town.md, Town tags): its places (the town file's
+ * What the town tags know of the town itself: its places (the town file's
  * `places`, else made from the public lots), whether a place is open, the homes for sale and what they cost, and
  * the street and area names. Pure: the tag layer (`TownTags.svelte`) gives it the game's views.
  */

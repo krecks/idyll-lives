@@ -1,5 +1,5 @@
 //! Getting about a big world: the road network, long trips on foot along it, how long a trip
-//! takes, and the open-world fields of the town file (docs/design/open-world.md).
+//! takes, and the open-world fields of the town file.
 //!
 //! **Which towns.** Every town is laid out for the open world now (`size` is always `big`, cosy
 //! and normal were dropped in 0.8.0): it has a network, times commutes by the walk, goes on
@@ -207,7 +207,7 @@ pub enum PlotKind {
     Countryside,
 }
 
-/// The open-world fields of a town file (docs/design/open-world.md), all optional, read along
+/// The open-world fields of a town file, all optional, read along
 /// with the rest of it (`LotFile::open_world`) and saved as they came (`SaveFile::open_world`).
 /// Typed exits, `plots[].area/kind` and `drives[].road/s` are read where those are.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

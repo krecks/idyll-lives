@@ -1,6 +1,6 @@
 //! Synthetic open-world towns: hamlets built like `town_with`'s streets (`paste`), set apart in
 //! open country and joined by country roads, with the open-world fields of
-//! docs/design/open-world.md (`roads` with kinds, `areas`, typed `exits`, `size`). `hamlets` places a few where a travel test wants them; `grid` fills a world
+//! a town file (`roads` with kinds, `areas`, typed `exits`, `size`). `hamlets` places a few where a travel test wants them; `grid` fills a world
 //! as big as a town file may be with them, for the big-world benchmark (`tests/big_world.rs`).
 
 use serde_json::{Value, json};

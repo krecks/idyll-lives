@@ -1,5 +1,5 @@
 {
-  "$comment": "Neat pack: cleaning gear, laundry, a luxury steam shower and an organizer desk. Neat residents get grubby fast (hygiene decay x1.2) and love chores; these items turn tidying into fun, skill and mood buffs, and the steam shower slows how fast they feel grubby. New tag: cleaning. See docs/personalities/neat.md.",
+  "$comment": "Neat pack: cleaning gear, laundry, a luxury steam shower and an organizer desk. Neat residents get grubby fast (hygiene decay x1.2) and love chores; these items turn tidying into fun, skill and mood buffs, and the steam shower slows how fast they feel grubby. New tag: cleaning.",
   "objects": [
     {
       "id": "neat.steamMopDock",

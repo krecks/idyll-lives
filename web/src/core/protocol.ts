@@ -398,7 +398,7 @@ export interface RoadPlan {
   lots?: 1 | -1;
   /** What stands in the middle of a ring this small (a roundabout). */
   island?: 'fountain';
-  /** What kind of way it is (default `street`; see docs/design/open-world.md). */
+  /** What kind of way it is (default `street`). */
   kind?: RoadKind;
   /** The area (`OpenWorldTownFields.areas` index) it belongs to; absent for ways between areas. */
   area?: number;
@@ -475,7 +475,7 @@ export interface WorldMeta {
   /** The areas (hamlets) as the generator laid them out, for the map and the camera. */
   areas?: TownArea[];
   // pin:living-town-meta begin
-  /** Living town: buildings nobody lives in that make a town dense (docs/design/living-town.md). */
+  /** Living town: buildings nobody lives in that make a town dense. */
   backdrop?: BackdropBuilding[];
   /** Living town: the places the town tags name (backdrop places and public lots). */
   places?: TownPlace[];
@@ -486,7 +486,7 @@ export interface WorldMeta {
 
 // pin:living-town-types begin
 
-/** What a backdrop building is (docs/design/living-town.md). */
+/** What a backdrop building is. */
 export type BackdropUse =
   | 'flats'
   | 'terrace'
@@ -1149,7 +1149,7 @@ export type ToWorker =
   | { type: 'resync' }
   /** Which part of the town to build geometry for (tile rectangle); null = everything. `seq` comes back with the worlds built for it. */
   | { type: 'view'; region: [number, number, number, number] | null; seq: number }
-  /** The camera's stream rectangle: the sim's full-detail area (docs/design/open-world.md `setWatch`). */
+  /** The camera's stream rectangle: the sim's full-detail area. */
   | { type: 'watch'; region: [number, number, number, number] | null }
   /** `?debug`'s `__crash`: the next step panics, an error nobody catches, or the worker hangs. */
   | { type: 'debugCrash'; what: 'panic' | 'throw' | 'hang' };

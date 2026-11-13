@@ -1,5 +1,5 @@
 /**
- * The town tags (docs/design/living-town.md, Town tags): ranked on screen and laid out as the menus' tags are
+ * The town tags: ranked on screen and laid out as the menus' tags are
  * (`game/tagLayout.ts`), the household's own always shown, places thinned by zoom and a hamlet's only while looked into,
  * workers shown at a place their category works at, stably by id (`ui/town/workplace.ts`), places from the public
  * lots before worldgen's, opening hours, homes for sale, the household's next events and the day bar.

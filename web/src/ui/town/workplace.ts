@@ -1,5 +1,5 @@
 /**
- * Where a resident at work is shown (docs/design/living-town.md, Workplaces): at the place whose `work` lists their
+ * Where a resident at work is shown: at the place whose `work` lists their
  * career's category; when several do, one picked by the resident's id, the same every time; when none do, nowhere
  * ("at work"). The sim doesn't say where anyone works: this is only where the tags put them.
  */

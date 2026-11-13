@@ -1,5 +1,5 @@
 /**
- * The top bar's day bar (docs/design/living-town.md, The top bar): how far the day is from sunrise to sunset, the
+ * The top bar's day bar: how far the day is from sunrise to sunset, the
  * sun's own hours (`render/shared/environment.ts`, the light's arc).
  */
 

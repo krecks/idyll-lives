@@ -1,6 +1,6 @@
 # Garden things (`families/garden_things.py`)
 
-OU5 of `docs/objects/outdoor.md`: the pond, the small garden things and the garden lights. One pack,
+Outdoor (OU5): the pond, the small garden things and the garden lights. One pack,
 `packs/garden_things/manifest.json`. Built 2026-10-16; they sat in Validate › Garden Things until signed off (back to Outdoor ›
 Decor, the two lights to Outdoor › Lights).
 

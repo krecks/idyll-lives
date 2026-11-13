@@ -12,7 +12,7 @@
   import { townHud } from './townHud.svelte';
 
   /**
-   * The town view's left column (docs/design/living-town.md): the tag the player clicked (one of your people, to
+   * The town view's left column: the tag the player clicked (one of your people, to
    * visit or call; a place), "Today in <town>" with the household's next events and who is away out of sight, and
    * the tag menu. The card stays until closed, also back down in the play view; the rest shows in the town view.
    */

@@ -13,7 +13,7 @@
  *   swinging round the glass every 20 s), `mirror-still` (the same, held still in the swing's middle),
  *   `street` (the home lot from across its street, low: the house's front, the pavement, the road),
  *   `town` (the menus' town from the menu's own angle, lit for `hour`),
- *   `over` (the town view, docs/design/living-town.md: the game's camera held `radius=` m out, 400 by default,
+ *   `over` (the town view: the game's camera held `radius=` m out, 400 by default,
  *   over the main town's centre or the home, `over=centre|home`), `zoom` (the one zoom from the home at the
  *   game's opening distance out to 900 m and back in, once in 60 s).
  * - `townCentre=1`: the orbit round the drawn world's main town (the town view) instead of the home lot.

@@ -1,6 +1,6 @@
 # Yard (`families/yard.py`)
 
-The OU4 play and yard things (docs/objects/outdoor.md), and the rides (a city bike, a kids' bike, an e-scooter,
+The OU4 play and yard things, and the rides (a city bike, a kids' bike, an e-scooter,
 below). One pack, `packs/yard/manifest.json`,
 models in `models/yard/`. Built 2026-10-16; they sat in Validate › Yard until signed off (the sandpit and the bike
 rack back to Outdoor › Play, the rest to Outdoor › Yard).

@@ -1,4 +1,4 @@
-# The play and yard things (docs/objects/outdoor.md OU4). Notes: yard.md.
+# The play and yard things. Notes: yard.md.
 #
 # The sandpit (`model.sandbox`), whose sand castle grows while one is built (`castle`); the bike rack
 # (`model.bikeRack`), whose bike lifts its back wheel onto the stand (`wheel_up`) and turns it (`wheel_turn`, a loop)

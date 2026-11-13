@@ -1,6 +1,6 @@
 # Rendering benchmark
 
-The game has a rendering benchmark built in: open it with `?bench=<scene>` (`web/src/debug/bench.ts`, flags in `benchFlags.ts`). These scripts run it over a matrix in a real browser and make its scenes. The flags, what a result holds, and the numbers measured with it are in [docs/design/graphics.md](../../docs/design/graphics.md).
+The game has a rendering benchmark built in: open it with `?bench=<scene>` (`web/src/debug/bench.ts`, flags in `benchFlags.ts`). These scripts run it over a matrix in a real browser and make its scenes.
 
 | Script | Does |
 |---|---|
@@ -11,7 +11,7 @@ The game has a rendering benchmark built in: open it with `?bench=<scene>` (`web
 
 Both need `bun run wasm` first and Playwright (`PLAYWRIGHT=<path to playwright/index.mjs>` if it isn't installed, `CHROME=<executable>` for a browser of your own: Chrome or Chrome for Testing, not `chrome-headless-shell`, which draws in software). Measurements run in a window, so their timing is the real display's. Shots and `scene.mjs`, which time nothing, run headless: no window takes the focus, and it's still the real GPU. `--headless` and `--headed` choose for either. A window's shots come out about 2 of 255 brighter than headless ones (the screen's colour profile), so compare shots taken the same way: two headless runs of the same build differ in at most 0.12 % of their pixels. Both play the game at 1 % volume (`quiet.mjs`).
 
-**The town view** (docs/design/living-town.md: the play camera zoomed out past 120 m, to 900 m). `render.mjs --shots <dir> --poses town` shoots it over the main town's centre and over the home from 150 m (just into the town view), 400 m (the full town view) and 900 m (as far out as it goes), at 13 h, at dusk (19.5 h) and at 23 h: 18 pictures, `town-<centre|home>-<150|400|900>-<day|dusk|night>`, each `cam=over&over=…&radius=…&hour=…`. They are the game as a player has it there: a Big town with its residents going about that hour, a household of the player's, and the interface with the town tags (`hud=game`: the game's interface without the benchmark's summary). Each is taken in a scene saved at its hour, `town-day`, `town-dusk` and `town-night`, which are not in git (half a megabyte each, and they age with the save format); make them once, and again after a change to the simulation or the generator:
+**The town view** (the play camera zoomed out past 120 m, to 900 m). `render.mjs --shots <dir> --poses town` shoots it over the main town's centre and over the home from 150 m (just into the town view), 400 m (the full town view) and 900 m (as far out as it goes), at 13 h, at dusk (19.5 h) and at 23 h: 18 pictures, `town-<centre|home>-<150|400|900>-<day|dusk|night>`, each `cam=over&over=…&radius=…&hour=…`. They are the game as a player has it there: a Big town with its residents going about that hour, a household of the player's, and the interface with the town tags (`hud=game`: the game's interface without the benchmark's summary). Each is taken in a scene saved at its hour, `town-day`, `town-dusk` and `town-night`, which are not in git (half a megabyte each, and they age with the save format); make them once, and again after a change to the simulation or the generator:
 
 ```sh
 bun tools/bench/scene.mjs --name town-day --world small --seed 7 --home town --hour 13

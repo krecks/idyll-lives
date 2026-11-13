@@ -1106,7 +1106,7 @@ export class Sky {
 }
 
 
-// ---- the far woods at altitude (docs/design/living-town.md: crown clusters past the near woods) ----
+// ---- the far woods at altitude (crown clusters past the near woods) ----
 
 /** The trees gathered into one crown cluster per square this wide (m). */
 const CROWN_CELL = 9;

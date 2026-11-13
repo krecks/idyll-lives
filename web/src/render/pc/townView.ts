@@ -1,5 +1,5 @@
 /**
- * The town view's drawing on PlayCanvas (docs/design/living-town.md, "Town-scale drawing"): what the
+ * The town view's drawing on PlayCanvas: what the
  * camera shows of the town once it zooms out past `TOWN_FROM` (`townView.blend > 0`), and nothing
  * before (the play camera draws as it always has).
  *
