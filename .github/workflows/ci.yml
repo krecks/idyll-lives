@@ -2,8 +2,9 @@
 # tests, the residents' clip check, the renderer's quick checks (the PlayCanvas internals it relies
 # on, its tests) and the tools' tests. The generated houses and worlds (the ignored sample tests that
 # need files made first: 16 to 20 minutes, every world a Big one) run only on a release tag (`v*`)
-# and by hand from the Actions tab, so a pull request is checked in about 7 minutes; before a push,
-# `tools/ci-local.sh` still runs them all.
+# and by hand from the Actions tab, and so do the slow tests (`SLOW_TESTS`: the simulation's long
+# runs and the renderer's town-building files, about two thirds of their jobs' test time), so a pull
+# request is checked in about 4 minutes; before a push, `tools/ci-local.sh` still runs them all.
 # The heavy release work — the wasm builds, models, the other web checks and Pages deploy — stays in
 # pages.yml, run by hand or on a tag.
 #
@@ -29,6 +30,9 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # The slow tests (tools/ci-local.sh `sim` and `web`): on a release tag and by hand, not on a pull
+  # request or a push to main.
+  SLOW_TESTS: ${{ (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && '1' || '' }}
 
 # Each step's commands are in tools/ci-local.sh (run there with no step, they all go: before a push
 # or a pull request).

@@ -122,6 +122,7 @@ fn they_ask_for_what_they_want_and_a_yes_buys_it() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn told_no_again_and_again_they_get_cross() {
     let mut w = town(22);
     let h = w.sims[0].household as usize;
@@ -471,6 +472,7 @@ fn wants_and_requests_survive_saving() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn residents_come_up_with_things_to_want() {
     let mut w = town(27);
     run_to(&mut w, 10, 8.0);
@@ -696,6 +698,7 @@ fn the_ui_gets_the_request_and_what_goals_still_take() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn outdoor_things_go_outside_and_pot_plants_inside() {
     let mut w = town(32);
     let h = w.sims[0].household as usize;

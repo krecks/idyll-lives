@@ -2,7 +2,7 @@
  * Neighbours' houses on lots that face a street on any side (`WorldMeta.facing`): a street of
  * houses turned a quarter, the whole town with it, is dressed the same way turned a quarter
  * (gardens, cars, flower beds; the houses' fronts, doors and garages). The fences round gardens are
- * the town's, on the grid (`gardenFences.test.ts`): this town has none.
+ * the town's, on the grid (`gardenFences.slow.test.ts`): this town has none.
  */
 import { describe, expect, test } from 'bun:test';
 import type { PlotInfo, WorldStructure } from '../src/core/protocol';

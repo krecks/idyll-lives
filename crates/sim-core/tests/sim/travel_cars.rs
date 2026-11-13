@@ -1067,6 +1067,7 @@ fn keep_driving(w: &mut World) {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn a_lit_junctions_heads_stand_at_its_stop_lines_and_arms_across_go_green_together() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, header, light};
     let mut w = busy_crossroads();
@@ -1863,6 +1864,7 @@ fn two_ts(east: usize, west: usize) -> World {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn between_two_lit_junctions_too_near_to_wait_between_nobody_stands_on_a_crosswalk_or_runs_a_red() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
     // Cars from the east street go out north through both T's, and come home back through both;
@@ -1976,6 +1978,7 @@ fn between_two_lit_junctions_too_near_to_wait_between_nobody_stands_on_a_crosswa
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn no_car_drives_past_a_stop_line_on_red_or_the_walk_and_on_red_each_waits_at_it() {
     use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
     // The busy crossroads, its cars coming and going all the time, and someone walking to and fro

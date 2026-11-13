@@ -47,6 +47,7 @@ fn check(lot: &Lot, edit: usize) {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn rooms_found_round_the_changes_agree_with_finding_them_all() {
     let mut rng = common::Lcg::new(7);
     let mut lot = Lot::with_ground(W, D, GROUND);
@@ -355,6 +356,7 @@ fn edits_agree(name: &str, mut w: World, seed: u64, edits: usize) {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn rooms_kept_up_to_date_agree_with_finding_them_all_in_a_town() {
     let content = common::content();
     let town = common::town(&content, 3, 2);
@@ -363,6 +365,7 @@ fn rooms_kept_up_to_date_agree_with_finding_them_all_in_a_town() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn rooms_kept_up_to_date_agree_with_finding_them_all_in_saved_towns() {
     let content = common::content();
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves");
@@ -374,6 +377,7 @@ fn rooms_kept_up_to_date_agree_with_finding_them_all_in_saved_towns() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn rooms_kept_up_to_date_agree_with_finding_them_all_in_a_big_world() {
     let content = common::content();
     let (town, _) = common::hamlets::grid(&content, 5, 256, 6, 40, true);
