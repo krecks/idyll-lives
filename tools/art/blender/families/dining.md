@@ -146,3 +146,7 @@ cargo art dining --preview --lit  # previews/dining/<id>.png, <id>.lit.png, <id>
 ## The soft forms pass (2026-11-13)
 
 No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 8 models changed shape: `barCart`, `chairArm`, `chairFolding`, `chairUpholstered`, `diningChair`, `diningGlass`, `diningOak`, `diningTable`; 38,334 to 37,838 triangles.
+
+## Leather (2026-11-13)
+
+The high bar stool's seat and back (`leather`) are leather. It goes from 2 draws to 3. The finish is `leather` (`material.finish.leather`: the generated set `textures/leather`, `cargo tex synth leather`: soft creases a hand's width apart, the hide's waviness, patches polished where it is sat on, roughness 0.35 to 0.5; its colour all but even, 97 % of the part's), where it was plain `satin`: a textured finish, so the part has UVs (`gamekit/uv.py` makes them) and a draw call of its own.

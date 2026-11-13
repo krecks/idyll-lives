@@ -116,3 +116,7 @@ cargo art office --preview  # previews/office/<id>.png, <id>@<clip>.png
 ## The soft forms pass (2026-11-13)
 
 No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 12 models changed shape: `chairExecutive`, `chairTask`, `computerDesk`, `computerGaming`, `deskCorner`, `deskExecutive`, `deskLaptop`, `deskSimple`, `deskStanding`, `deskWriting`, `officeChair`, `whiteboard`; 61,214 to 61,202 triangles.
+
+## Leather (2026-11-13)
+
+The executive chair's upholstery (`leather`, `leather2`) and the executive desk's writing pad (`inlay`) are leather. Each goes from 2 draws to 3. The finish is `leather` (`material.finish.leather`: the generated set `textures/leather`, `cargo tex synth leather`: soft creases a hand's width apart, the hide's waviness, patches polished where it is sat on, roughness 0.35 to 0.5; its colour all but even, 97 % of the part's), where it was plain `satin`: a textured finish, so the part has UVs (`gamekit/uv.py` makes them) and a draw call of its own.

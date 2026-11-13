@@ -511,6 +511,15 @@ pub fn materials() -> J {
             ),
         ),
         (
+            "material.finish.leather",
+            surf(
+                "#FFFFFF",
+                "leather",
+                2.0,
+                &[("roughness", i(1)), ("metallic", i(0))],
+            ),
+        ),
+        (
             "material.finish.wood",
             surf(
                 "#FFFFFF",
@@ -717,7 +726,7 @@ mod tests {
     }
 
     /// `tests/fixtures/tex/materials.json` is what materials.py wrote (but for the sky's URL, since `cargo envconv`'s `.pcenv`,
-    /// and the trees' leaf cards' finish, added since).
+    /// and the trees' leaf cards' and the leather finish, added since).
     #[test]
     fn materials_bytes() {
         assert_eq!(

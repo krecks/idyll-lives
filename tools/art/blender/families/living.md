@@ -251,3 +251,7 @@ What each has now:
 cargo art living            # the .glb files, the pack, check-glb
 cargo art living --preview  # previews/living/<id>.png, <id>@<clip>.png
 ```
+
+## Leather (2026-11-13)
+
+The leather armchair's cushions (`leather`), the designer chair's (`hide`) and the pouf (`pouf_leather`, and its buttons, covered in the same hide so the top stays one draw) are leather. The leather armchair and the pouf stay at 3 draws, the designer chair goes from 2 to 3 (leather, walnut, the plain aluminium). The finish is `leather` (`material.finish.leather`: the generated set `textures/leather`, `cargo tex synth leather`: soft creases a hand's width apart, the hide's waviness, patches polished where it is sat on, roughness 0.35 to 0.5; its colour all but even, 97 % of the part's), where it was plain `satin`: a textured finish, so the part has UVs (`gamekit/uv.py` makes them) and a draw call of its own.

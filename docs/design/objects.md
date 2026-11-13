@@ -151,7 +151,7 @@ The standard it set, for new models too:
 
 The game's surfaces are a dozen finishes, the `material.finish.*` entries of the base manifest:
 `matte` (roughness 0.75), `satin` (0.42), `gloss` (0.12), `metal`, `chrome`, `skin`, `hair`
-(plain), `fabric`, `wood`, `bark`, `foliage` (textured, tinted by the part's colour), `leafcards`
+(plain), `fabric`, `leather`, `wood`, `bark`, `foliage` (textured, tinted by the part's colour), `leafcards`
 (a tree's leaf cards: an atlas of leaf clusters, cut out by its alpha, tinted too) and `glass`
 (see-through). A model's parts are coloured per part; all the plain finishes of a model merge into
 one mesh, so a model costs one draw call for its plain parts plus one per textured or see-through
@@ -161,6 +161,15 @@ shader never saw it and drew every plain finish as rough metal). Metals mirror t
 horizon where they would reflect the ground: the game looks down on everything, so anything upright
 and shiny (a handle, a steel fridge) would otherwise mirror the dark field of the sky map, which no
 room has.
+
+- **Leather is `leather`.** Upholstery, a writing pad or a punch bag in leather takes the `leather` finish: a
+  generated set (`cargo tex synth leather`) whose colour is all but even (the part's colour is the hide's, at
+  97 %) and whose relief and roughness carry what shows from the play camera: soft creases a hand's width apart,
+  each about a centimetre across (a pixel there is 4 mm at its nearest; the pebble grain, 2.5 mm, only breaks
+  the sheen up), and patches polished where it is sat on (roughness 0.35) between duller ones (0.5). It is a
+  textured finish: a draw call for the part's leather beside its plain parts, and UVs. Left plain where that
+  draw is not worth it: a strap (the brass mirror's), the twin recliners of the cinema wall (its curtains have
+  the textured draws), leatherette and vinyl.
 
 - **Hardware is metal.** Handles, knobs, pulls, latches and taps take a `metal` or `chrome` palette
   colour (chrome or brushed steel, brass, black iron as the piece's style wants), on base models and
