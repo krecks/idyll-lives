@@ -4,6 +4,7 @@
 pub mod art;
 pub mod characters;
 pub mod checkglb;
+pub mod colours;
 pub mod content;
 pub mod decoders;
 pub mod download;

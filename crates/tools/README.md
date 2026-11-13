@@ -18,7 +18,7 @@ Every tool's `src/<name>.rs` opens with what it does and its arguments; this pag
 | `cargo envconv` | The sky's lighting: downloads Poly Haven's CC0 HDRI "Belfast Open Field" (1k, pinned by its SHA-256) into `web/.assets/env/` and makes `web/public/assets/env/belfast_open_field.pcenv` of it (cube faces turned and mirrored into the PlayCanvas renderer's space, and the ambient as spherical harmonics, both as the game's look was calibrated on them). The output is committed; run it when the conversion changes. |
 | `cargo fetch-voice` | The voice model and the pronunciation dictionary into `web/public/voice/` (was `tools/voice/fetch.mjs`, `fp16.mjs`). |
 | `cargo fetch-llm` | The language model into `web/public/llm/`, repacked smaller without changing what it computes (`llmslim.rs`; was `tools/llm/fetch.mjs`). |
-| `cargo review` | The authenticity review's first pass over every buyable object: `sizes`, `uses`. |
+| `cargo review` | The authenticity review's first pass over every buyable object: `sizes`, `uses`; and `colours`, every model's colours against what real surfaces reflect (2 % to 80 % of the light, metals and glass left out): a report of those outside. |
 | `cargo tex` | The texture scripts: `clouds`, `synth` (every surface map, generated in code), `materials` (was `tools/art/*.py`). |
 | `cargo release-version` | One version for the whole game. Prints it and fails if `web/package.json`, `Cargo.toml` and `Cargo.lock` differ (CI runs this); with an argument, sets all of them. Not `cargo version`: that is cargo's own. |
 | `cargo licenses` | `dist/THIRD-PARTY-LICENSES.txt`, written by production builds (`web/vite.config.ts`). |
