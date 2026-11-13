@@ -71,12 +71,12 @@ on the wax or glass would be one more draw at night.
 
 | Model | Size (w × h × d) | Triangles (2026-10-22) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.couchPotato.cinemaWall` | 1.88 × 1.52 × 0.91 m | 7,504 (was 4,960) | 3 | Body, Upholstery, Curtains |
-| `model.couchPotato.gameConsole` | 0.89 × 1.34 × 0.90 m | 5,492 (was 3,556) | 3 | Body, Upholstery, Cushion |
-| `model.couchPotato.recliner` | 0.94 × 0.95 × 0.76 m | 3,140 (was 2,324) | 3 | Body, Upholstery, Throw |
-| `model.couchPotato.snackFridge` | 0.58 × 0.54 × 0.54 m | 3,044 (was 2,800) | 3 | Body, Upholstery |
-| `model.couchPotato.fitnessGame` | 0.87 × 1.15 × 0.88 m | 3,208 (was 2,732) | 3 | Body, Mat, Board |
-| `model.couchPotato.lavaLamp` | 0.90 × 1.15 × 0.89 m | 3,444 (was 2,896) | 4 | Body, Upholstery, Glass |
+| `model.couchPotato.cinemaWall` | 1.88 × 1.52 × 0.91 m | 7,504 (was 4,960) | 7,504 | Body, Upholstery, Curtains |
+| `model.couchPotato.gameConsole` | 0.89 × 1.34 × 0.90 m | 5,492 (was 3,556) | 5,650 | Body, Upholstery, Cushion |
+| `model.couchPotato.recliner` | 0.94 × 0.95 × 0.76 m | 3,140 (was 2,324) | 3,330 | Body, Upholstery, Throw |
+| `model.couchPotato.snackFridge` | 0.58 × 0.54 × 0.54 m | 3,044 (was 2,800) | 3,124 | Body, Upholstery |
+| `model.couchPotato.fitnessGame` | 0.87 × 1.15 × 0.88 m | 3,208 (was 2,732) | 3,208 | Body, Mat, Board |
+| `model.couchPotato.lavaLamp` | 0.90 × 1.15 × 0.89 m | 3,444 (was 2,896) | 3,732 | Body, Upholstery, Glass |
 
 The painted materials: the cinema `cinema_frame` (the console between the seats), `leather`, `curtain`; the console
 `console`, `gamer`, `mustard`; the recliner `plinth`, `plush`, `throw`; the fridge `mint`, `lid`; the workout game
@@ -96,3 +96,7 @@ on WebGL (the lava lamp used at night, its glass and wax drawn).
 cargo art pack_couchPotato            # the six .glb, the pack, check-glb
 cargo art pack_couchPotato --preview  # previews/pack_couchPotato/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+The recliner's head pillow and the game console's pillow are sewn flat and stuffed (`waist`), `resting`; the lava lamp's pouf top and lean, turned on the tile, are left unpinched (their corners are the model's outermost points). Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 6 models changed shape: `cinemaWall`, `fitnessGame`, `gameConsole`, `lavaLamp`, `recliner`, `snackFridge`; 25,832 to 26,548 triangles.
