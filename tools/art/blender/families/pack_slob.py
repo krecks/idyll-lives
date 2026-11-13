@@ -386,7 +386,7 @@ def spritzStation():
                 up=(0, 1, 0), resolution=2)
         for k, (x, z, r, m) in enumerate(((-0.112, 0.14, 0.2, M.laundry), (0.08, 0.234, 0.13, M.laundry_red))):
             heap = F.soft(f'laundry{k}', r * 1.75, r * 0.9, r * 1.7, (x, r * 0.45 + 0.03, z), m, round=r * 0.4,
-                          puff=(0.02, 0.03, 0.02), flat=3, round_segments=1)
+                          puff=(0.02, 0.03, 0.02), flat=3, round_segments=1, pinch=0.0)   # (a heap, not a cushion)
             G.jitter(heap, 0.02, size=0.08, seed=k + 1.0, up=0.5)
             for v in heap.data.vertices:                            # (flat on the floor)
                 v.co.z = max(v.co.z, -r * 0.45 - 0.03 + 0.001)

@@ -604,17 +604,17 @@ def roseArbourSwing():
             F.box(f'seat_slat{k}', 1.56, 0.03, 0.075, (0, 0.385, -0.17 + k * 0.08), M.frame, bevel=0.005, bevel_segments=1)
         for z in (-0.21, 0.19):
             F.box(f'seat_rail{z}', 1.6, 0.06, 0.03, (0, 0.37, z), M.frame, bevel=0.005, bevel_segments=1)
-        F.soft('seat_cushion', 1.5, 0.05, 0.38, (0, 0.425, -0.005), M.cushion, round=0.02, puff=0.008, flat=2)
+        F.soft('seat_cushion', 1.5, 0.05, 0.38, (0, 0.425, -0.005), M.cushion, round=0.02, puff=0.008, flat=2, resting=True)
         for k in range(7):                                         # the back's spindles between two rails
             x = -0.6 + k * 0.2
             F.box(f'back_spindle{k}', 0.03, 0.38, 0.02, (x, 0.66, -0.215), M.frame, rot=(-10, 0, 0), bevel=0.004, bevel_segments=1)
         for y in (0.48, 0.86):
             F.box(f'back_rail{y}', 1.6, 0.04, 0.035, (0, y, -0.215 - (y - 0.66) * 0.18), M.frame, rot=(-10, 0, 0), bevel=0.006,
                   bevel_segments=1)
-        F.soft('pillow_l', 0.36, 0.3, 0.1, (-0.6, 0.64, -0.15), M.rose, rot=(-12, 0, -15), round=0.04, puff=0.03, flat=2,
-               round_segments=1)
-        F.soft('pillow_r', 0.34, 0.28, 0.1, (0.62, 0.63, -0.15), M.ivory, rot=(-12, 0, 15), round=0.04, puff=0.03, flat=2,
-               round_segments=1)
+        F.soft('pillow_l', 0.36, 0.3, 0.1, (-0.6, 0.64, -0.15), M.rose, rot=(-12, 0, -15), round=0.04, puff=0.03,
+               waist=0.012, pinch=0.006, resting=True)
+        F.soft('pillow_r', 0.34, 0.28, 0.1, (0.62, 0.63, -0.15), M.ivory, rot=(-12, 0, 15), round=0.04, puff=0.03,
+               waist=0.012, pinch=0.006, resting=True)
         for s in (-1, 1):
             F.sweep(f'arm{s}', [(s * 0.78, 0.86, -0.25), (s * 0.78, 0.63, -0.18), (s * 0.78, 0.62, 0.12), (s * 0.78, 0.6, 0.19)], None,
                     M.frame, profile=G.rounded_rect(0.05, 0.04, 0.012, corner=1), up=(1, 0, 0), resolution=2)

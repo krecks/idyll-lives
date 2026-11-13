@@ -2,20 +2,27 @@
 //! aliases in `.cargo/config.toml`, e.g. `cargo characters build`). Nothing here is shipped.
 
 pub mod art;
+pub mod assets;
 pub mod characters;
 pub mod checkglb;
+pub mod chunks;
+pub mod colours;
 pub mod content;
 pub mod decoders;
 pub mod download;
 pub mod envconv;
+pub mod facets;
 pub mod fp16;
 pub mod int8;
 pub mod licenses;
 pub mod llmfetch;
 pub mod llmslim;
 pub mod pcg64;
+pub mod pins;
 pub mod review;
+pub mod shots;
 pub mod tex;
 pub mod version;
 pub mod voicefetch;
 pub mod wasmopt;
+pub mod worldmap;

@@ -23,9 +23,7 @@ import sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import bpy  # noqa: E402
 import gamekit as G  # noqa: E402
-from mathutils import Vector, noise  # noqa: E402
 
 M = G.Palette(
     # shared
@@ -87,43 +85,40 @@ def _settle():
     G.settle(centre=False)
 
 
-def _pillow(name, w, h, d, x, top, z, tilt=8, material=None, seed=0.0):
-    """A pillow on a mattress top `top`, `h` thick in the middle: plump, thinning to its seams, its head end
-    raised a little and a little crumpled."""
-    p = F.soft(name, w, h * 0.42, d, (x, top + h / 2 - 0.01, z), material or M.pillow, rot=(tilt, 0, 0),
-               round=min(h * 0.2, 0.03), puff=h * 0.29, flat=2)
-    return G.jitter(p, 0.004, size=0.12, seed=seed + x * 7, up=0.4)
+def _pillow(name, w, h, d, x, top, z, tilt=8, material=None, seed=0.0, pinch=True):
+    """A pillow on a mattress top `top`, `h` thick in the middle: plump, thinning to its seams, its corners pinched
+    in (not `pinch`: its sides drawn in between them instead, for one whose corners are the bed's outermost
+    points, the futon's standing on its back), its head end raised a little and a little crumpled."""
+    p = F.soft(name, w, h * 0.34, d, (x, top + h / 2 - 0.01, z), material or M.pillow, rot=(tilt, 0, 0),
+               round=min(h * 0.17, 0.03), puff=h * 0.33, pinch=h * 0.26 if pinch else 0.0,
+               waist=h * (0.04 if pinch else 0.12), resting=True)
+    return G.jitter(p, 0.003, size=0.12, seed=seed + x * 7, up=0.4)
 
 
 def _mattress(name, w, h, d, top, z, x=0.0, material=None, puff=0.006, piping=0.007, round=0.035, flat=3):
     """A mattress `w` x `d`, `h` deep, its top (the middle of it, a hair puffed) at `top`, where sleepers lie:
     rounded, with a piped seam round its top and bottom."""
     return F.soft(name, w, h - 2 * puff, d, (x, top - h / 2, z), material or M.mattress, round=round, puff=puff,
-                  flat=flat, piping=piping)
+                  flat=flat, piping=piping, pinch=0.0, resting=True)   # (firm, its edges taped: no pinched corners)
 
 
-def _duvet(top, half, z_fold, z_foot, drape, material, seed=0.0, flat=5):
+RUMPLE = 0.03     # how deep the duvet's folds are
+FOLDS = 0.26      # and how far apart
+
+
+def _duvet(top, half, z_fold, z_foot, drape, material, seed=0.0, flat=None, runner=None):
     """The duvet's lower two thirds: from the fold to the foot, draped down the sides and the foot end, puffed on
-    top (its middle at `DUVET`) and a little rumpled."""
-    over, puff = 0.028, 0.01
+    top (its middle at `DUVET`) and rumpled, as a duvet shaken out lies: soft folds across it, its sides hanging
+    unevenly, its corners drawn in. The folds only go down and in, so it stays under the game's quilt and inside
+    its box. `runner` (from, to, in game depth): where a runner lies across it and it is smooth."""
+    over, puff = 0.028, 0.012
     y0, y1 = top - drape, top + DUVET
-    d = F.soft('duvet', 2 * (half + over), y1 - y0 - 2 * puff, z_foot + over - z_fold,
-               (0, (y0 + y1) / 2, (z_fold + z_foot + over) / 2), material, round=0.035, puff=puff, flat=flat)
-    _rumple(d, 0.004, top, seed)
-    return d
-
-
-def _rumple(obj, amount, above, seed, size=0.2):
-    """Rumples a cover's top: its vertices above height `above` moved up or down by smooth noise, up to `amount`,
-    never sideways, so its bounds (the size and centre checks) don't move. (G.jitter reads the object's world matrix
-    before the scene has updated it, so where its noise lands depends on what ran before.)"""
-    bpy.context.view_layer.update()
-    mw = obj.matrix_world
-    for v in obj.data.vertices:
-        p = mw @ v.co
-        if p.z > above:
-            v.co.z += noise.noise(Vector((p.x / size + seed, p.y / size - seed, seed))) * amount
-    obj.data.update()
+    mid = (z_fold + z_foot + over) / 2
+    # (the soft box's own y runs to the back: a game depth z is its y = mid - z)
+    calm = (mid - runner[1], mid - runner[0]) if runner else None
+    return F.soft('duvet', 2 * (half + over), y1 - y0 - 2 * puff, z_foot + over - z_fold, (0, (y0 + y1) / 2, mid),
+                  material, round=0.06, puff=puff, flat=flat, pinch=0.0, rumple=RUMPLE, rumple_size=FOLDS,
+                  seed=seed + half, calm=calm, resting=True)
 
 
 def _flap(top, half, z_top, z_fold, material):
@@ -132,18 +127,18 @@ def _flap(top, half, z_top, z_fold, material):
     with G.new_parts() as parts:
         y = top + DUVET - FLAP / 2
         F.soft('flap', 2 * (half + 0.012), FLAP - 0.01, z_fold - z_top, (0, y, (z_top + z_fold) / 2), material,
-               round=0.018, puff=0.005, flat=4)
+               round=0.018, puff=0.005)
         F.soft('flap_sheet', 2 * (half + 0.016), FLAP + 0.008, 0.13, (0, y, z_top + 0.055), M.sheet,
                round=0.022)
     # A hair above the duvet's top, so the flap folded over doesn't lie in its plane.
     return G.hinged(G.join(parts, 'duvet_flap'), F.at(0, top + DUVET + 0.003, z_fold))
 
 
-def _bedding(top, half, z_top, z_foot, drape, material, fold=None, seed=0.0, flat=5):
+def _bedding(top, half, z_top, z_foot, drape, material, fold=None, seed=0.0, flat=None, runner=None):
     """A duvet whose top third turns down: the still lower part (left in the scene, joined with the bed)
     and the flap, returned."""
     z_fold = fold if fold is not None else z_top + (z_foot - z_top) / 3
-    _duvet(top, half, z_fold, z_foot, drape, material, seed, flat)
+    _duvet(top, half, z_fold, z_foot, drape, material, seed, flat, runner)
     return z_fold
 
 
@@ -266,7 +261,7 @@ def bed():
     for s in (-1, 1):
         _pillow(f'pillow{s}', 0.68, 0.15, 0.4, s * 0.42, top, -0.66)
     z_top, z_foot = -0.42, 0.92
-    z_fold = _bedding(top, 0.86, z_top, z_foot, 0.17, M.bedding_cream)
+    z_fold = _bedding(top, 0.86, z_top, z_foot, 0.17, M.bedding_cream, runner=(0.72 - 0.19, 0.72 + 0.19))
     # the runner across the foot, over the duvet and down its sides
     _runner('runner', 0.909, top + DUVET + 0.015, 0.72, 0.38, 0.2, M.throw_sage)
     _finish('bed', (top, 0.86, z_top, z_fold, M.bedding_cream))
@@ -299,7 +294,7 @@ def bedSingle():
     _mattress('mattress', 0.84, 0.18, 1.8, top, 0)
     _pillow('pillow', 0.62, 0.13, 0.34, 0, top, -0.71)
     z_top, z_foot = -0.3, 0.885
-    z_fold = _bedding(top, 0.42, z_top, z_foot, 0.14, M.bedding_sage, flat=3)
+    z_fold = _bedding(top, 0.42, z_top, z_foot, 0.14, M.bedding_sage)
     _finish('bedSingle', (top, 0.42, z_top, z_fold, M.bedding_sage), tiles=1)
 
 
@@ -344,8 +339,8 @@ def bedBunk():
         G.rod(f'rung{i}', F.at(0.465, y, 0.42), F.at(0.465, y, 0.86), 0.016, M.frame_oak, verts=10)
     z_top, z_foot = -0.28, 0.875
     # Each bunk's duvet turns down for the one who sleeps in it (`slot`: the lower bunk is 0, the upper 1).
-    z_fold_upper = _bedding(UPPER, 0.42, z_top, z_foot, 0.12, M.bedding_teal, seed=1, flat=3)
-    z_fold = _bedding(LOWER, 0.42, z_top, z_foot, 0.12, M.bedding_teal, seed=2, flat=3)
+    z_fold_upper = _bedding(UPPER, 0.42, z_top, z_foot, 0.12, M.bedding_teal, seed=1)
+    z_fold = _bedding(LOWER, 0.42, z_top, z_foot, 0.12, M.bedding_teal, seed=2)
     G.join(G.meshes(), 'bedBunk', origin=(0, 0, 0))
     lower = _flap(LOWER, 0.42, z_top, z_fold, M.bedding_teal)
     upper = _flap(UPPER, 0.42, z_top, z_fold_upper, M.bedding_teal)
@@ -397,7 +392,7 @@ def bedFuton():
                   material=M.bedding_futon, puff=0.008, piping=0.008, round=0.06)
         _tufts('back_tuft', FUTON_TUFTS, (-0.69, -0.42), top - 0.004, M.bedding_futon)
         for s in (-1, 1):
-            _pillow(f'pillow{s}', 0.66, 0.13, 0.34, s * 0.45, top, -0.71, tilt=4)
+            _pillow(f'pillow{s}', 0.66, 0.13, 0.34, s * 0.45, top, -0.71, tilt=4, pinch=False)
     back = G.hinged(G.join(parts, 'futon_back'), F.at(0, 0.3, FUTON_HINGE))
     # Built flat; leaning up is the rest pose (the clip's first key): its head end up, its top to the front.
     G.turn(back, FUTON_BACK, 'X')
@@ -423,7 +418,7 @@ def bedKing():
     for s in (-1, 1):
         _pillow(f'pillow{s}', 0.74, 0.16, 0.4, s * 0.45, top, -0.66)
     z_top, z_foot = -0.4, 0.945
-    z_fold = _bedding(top, 0.93, z_top, z_foot, 0.18, M.bedding_cream)
+    z_fold = _bedding(top, 0.93, z_top, z_foot, 0.18, M.bedding_cream, runner=(0.75 - 0.19, 0.75 + 0.19))
     # (just round the duvet's sides: its ends stay under the edges of the quilts over sleepers)
     _runner('runner', 0.959, top + DUVET + 0.015, 0.75, 0.38, 0.21, M.throw_sage)
     _finish('bedKing', (top, 0.93, z_top, z_fold, M.bedding_cream))

@@ -57,13 +57,13 @@ the lettuce sits 2 cm into the soil, so flattened it is hidden.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.natureLover.veggieBed` | 1.87 × 1.30 × 0.91 m | 7,076 (was 4,780) | 4 | Wood, Posts & rails |
-| `model.natureLover.pottingBench` | 1.76 × 1.79 × 0.60 m | 6,992 (was 7,704) | 4 | Wood, Frame |
-| `model.natureLover.birdFeeder` | 0.71 × 1.79 × 0.69 m | 5,624 (was 3,372) | 3 | Wood, Roof |
-| `model.natureLover.gardenHammock` | 2.88 × 1.18 × 0.68 m | 2,920 (was 2,704) | 3 | Wood, Fabric, Stripes |
-| `model.natureLover.cedarShower` | 0.90 × 2.08 × 0.88 m | 3,772 (was 5,736) | 3 | Wood, Copper |
-| `model.natureLover.mossTerrarium` | 0.48 × 1.17 × 0.70 m | 3,588 (was 2,140) | 3 | Wood |
-| `model.natureLover.glasshouse` | 1.88 × 2.48 × 1.86 m | 6,798 (was 7,496) | 4 | Wood, Frame, Cushions |
+| `model.natureLover.veggieBed` | 1.87 × 1.30 × 0.91 m | 7,076 (was 4,780) | 7,076 | Wood, Posts & rails |
+| `model.natureLover.pottingBench` | 1.76 × 1.79 × 0.60 m | 6,992 (was 7,704) | 6,992 | Wood, Frame |
+| `model.natureLover.birdFeeder` | 0.71 × 1.79 × 0.69 m | 5,624 (was 3,372) | 5,624 | Wood, Roof |
+| `model.natureLover.gardenHammock` | 2.88 × 1.18 × 0.68 m | 2,920 (was 2,704) | 3,094 | Wood, Fabric, Stripes |
+| `model.natureLover.cedarShower` | 0.90 × 2.08 × 0.88 m | 3,772 (was 5,736) | 3,772 | Wood, Copper |
+| `model.natureLover.mossTerrarium` | 0.48 × 1.17 × 0.70 m | 3,588 (was 2,140) | 3,588 | Wood |
+| `model.natureLover.glasshouse` | 1.88 × 2.48 × 1.86 m | 6,798 (was 7,496) | 6,798 | Wood, Frame, Cushions |
 
 `check-glb`: 7 models, 0 failed; warnings left: the veggie bed's, the glasshouse's and the potting bench's 4
 draw calls (above).
@@ -114,3 +114,7 @@ rolled rim and a soil mound, open below the soil (never seen). Same keys, sizes,
 cargo art pack_natureLover            # the seven .glb, the pack, check-glb
 cargo art pack_natureLover --preview  # previews/pack_natureLover/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+The hammock's pillow is sewn flat and stuffed (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 5 models changed shape: `birdFeeder`, `gardenHammock`, `glasshouse`, `pottingBench`, `veggieBed`; 29,410 to 29,584 triangles.

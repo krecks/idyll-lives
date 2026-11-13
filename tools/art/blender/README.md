@@ -108,7 +108,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
 
 1. **Copy** `families/_template.py` to `families/<family>.py`, or add a model to an existing family.
    Families group what belongs together. A family's models go to
-   `web/public/assets/models/<family>/<id>.glb` and its entries to `packs/<pack>/manifest.json`; the build
+   `web/public/assets/models/<family>/<id>.glb` and its entries to `web/public/assets/packs/<pack>/manifest.json`; the build
    writes both, so never edit a pack by hand. A pack entry keeps the `vary` of the entry it overrides; the
    build doesn't copy it.
 2. **Palette.** One material per colour, named for what it is, with its finish:
@@ -116,7 +116,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    - The names become the material names in the file.
    - The finishes become the pack's `materials`, so they're declared only once.
    - The finishes are the base manifest's `material.finish.*`: matte, satin, gloss, metal and chrome
-     (plain), plus fabric, wood, bark and foliage (textured: one more draw call each), leafcards (a tree's
+     (plain), plus fabric, leather, wood, bark and foliage (textured: one more draw call each), leafcards (a tree's
      leaf cards, cut out of their atlas: `families/plants.py` `clad` puts them there) and glass.
    - Name the main part the player may colour `body`; list it first in `paint`, then any other parts
      worth colouring, each with what the player calls it. Leave details (drains, water, food) out.
@@ -125,7 +125,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      On a still part with no other plain material it costs a draw call (objects.md, "Hardware is metal").
    - Mirror glass takes the side it reflects to: `glass=('#DCE6EA', 'gloss', 'front')`. Make it a flat
      piece, on the still body or one moving part (a cabinet's door); the game reflects the room in the
-     nearest mirror on screen (two on High). Keep it `gloss`, as the mirrored parts always were: the others
+     nearest mirror on screen (two on High). Keep it `gloss`: the others
      show their glass, and see-through `glass` would show what is behind it (a frame's backing, a door).
    - A lamp's shade or a screen that glows at night takes its glow's colour:
      `shade=('#F2E6CC', 'fabric', {'glow': '#FFD9A0'})`. Nothing glows by day.
@@ -144,9 +144,45 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    - `G.loft` through `G.ring`s (ellipses to rounded squares): bottles, vases, lamp bases;
    - `G.extrude` (`F.extrude`): an outline with holes into a slab: a carved apron, a headboard, a grille;
      `G.rounded_rect` and `G.smooth_outline` draw outlines;
-   - `G.soft_box` (`F.soft`): cushions, pillows, mattresses: rounded, puffed, with piping;
+   - `G.soft_box` (`F.soft`): cushions, pillows, mattresses, duvets: rounded, puffed, pinched, tufted, rumpled, with
+     piping (below, "Soft things");
    - `G.mirrored`, `G.cut` (a boolean), `G.jitter` (a hand-made wobble);
    - `G.kit`: whole parts more than one family uses (`kit.tube`, `kit.cabriole`, `kit.moulding`).
+
+   **Soft things.** `G.soft_box` is a box with what stuffing and seams do to one, each a few centimetres at most (a
+   detail under a centimetre doesn't show at the play camera, where a pixel is 4 mm at its nearest) and none of it
+   past the box, so the size you give is the size it has:
+   - `puff`: its faces crowned (a number: the two across its thin side; three: each pair's own);
+   - `pinch`: its corners pulled in and thinned where the seams meet, its sides bowing out between them, as a boxed
+     cushion's do. On by default, 0.6 of the puff (not for a box whose sides are crossed in one step, `flat=1`): two
+     cushions side by side part in a V at their corners. The corners are then inside the box: give `pinch=0` to one
+     turned so that a corner is the model's outermost or highest point (a towel askew on a stack, a pad leaning on
+     a lounger's back, a futon's pillows standing on its back), or the model is that much smaller, and to what isn't
+     stuffed (a mattress, a heap of washing);
+   - `waist`: its sides drawn in between corners that stand out as ears: a pillow sewn flat and stuffed. The ends
+     of its sides stay where they were, so its box is the same; its sides' middles are not, so not on one whose
+     edge is the model's highest point either;
+   - `sag=0.014`: a seat cushion's top sinking over its front third, where legs go over it; its middle and back, where
+     the sitter's hips rest (the content's `seat` height), stay;
+   - `overhang`: its sides drawn in between its seams, the top standing over the boxing;
+   - `tufts=(across, along)`, `tuft` (how deep), `diamond` (rows staggered), `button` (a material: a covered button in
+     each dent): on the face that looks up, or to the front for a back;
+   - `rumple`, `rumple_size`, `seed`: bedding: its top sunk in soft folds lying askew, what hangs down its sides
+     drawn in in flutes to a square hem; only down and in, so a duvet stays under the game's quilt (`calm`: smooth
+     where a runner lies across it);
+   - `piping`: a cord along the seams, following them, reaching as far out as its radius from the seam (a model
+     whose outermost point is a welt keeps its size);
+   - `resting=True`: it lies on its underside or leans on its back: that face's middle is one flat piece, and its seam
+     has no cord. A third fewer triangles: give it to every cushion, mattress and cover that lies on something.
+   Its steps (`flat`, `round_segments`) are chosen to keep its rounded edges within 1.5 mm of their curve and its
+   crowned faces within 2 mm; give them only to save triangles on something small. A seat cushion a clip sinks (`G.squash`) is its own part, as before
+   (`families/living.py` `_cushion`, `_seat`; `bedroom.py` `_pillow`, `_duvet`).
+
+   Round things take as many sides as keep their outline within a millimetre of the circle when the family gives
+   no count (`G.sides(radius)`: a polygon's sides stand `r × (1 − cos(π / n))` in): a lathe (`G.revolve`) 24 up to
+   12 cm in radius and more above (32 at 20 cm, 52 at half a metre, 64 at most), a swept tube 12 up to 3 cm,
+   `kit.tube` 8 up to 13 mm; a cabriole leg has 12. A far version built at low detail (`G.far_of`) keeps the least.
+   A count the family gives is kept as it is: `cargo review facets` lists what shows its flat sides (over 1.5 mm).
 
    Spend the triangles where they show (silhouettes, edges, what a hand touches) and keep hidden parts plain
    (`families/living.py` armchair and sofa, `kitchen.py` fridge, `trees.py` oak). End with:
@@ -286,7 +322,7 @@ How the parts work:
     per bunk).
   - `{'clip': 'door_open', 'delay': 0.3, 'hold': 2.4, 'out': 1.6}`: the clip opens again for 1.6 s when
     the use ends (the phone box's door, opened for the caller to step in and shut behind them, letting
-    them out again: `STEP_IN` in characters.ts times their steps to it).
+    them out again: `STEP_IN` in `web/src/render/shared/characters/actions.ts` times their steps to it).
   - `{'loops': {'relax': 'rocking'}}`: a clip that goes round while the use lasts, then finishes its
     round. It must end where it starts: make it with `G.rock`, `G.spin` or `G.turns` (or `G.scroll`, one repeat on).
   - `{'ride': 'rocking'}`: the residents sitting or lying on it move with that clip's (first) part: a
@@ -318,7 +354,7 @@ How the parts work:
   3.5 s) and aren't checked; an ambient clip runs on game time and is off on Low. The clock is the
   residents' animation time. Clock hands are the exception: the game's time sets them, on every preset.
 - **Checks.** The build fails if `motions` names a clip the model doesn't have. `cargo check-glb` fails
-  a clip that nothing plays, a a `delay`, `hold`, `every`, `out` or `slot` that isn't one, and fails a loop
+  a clip that nothing plays, a `delay`, `hold`, `every`, `out` or `slot` that isn't one, and fails a loop
   (or `idle`, an `every` clip, a clock hand) that doesn't end where it starts; one that ends
   a whole fraction of a turn round (a four-bladed fan a quarter turn), or moved at an even speed (`G.scroll`), is
   a warning to check. A part a clip grows (darts, a pot thrown) is measured grown, not at rest; one flattened to
@@ -381,7 +417,8 @@ never one that's already running) and drive Playwright headless with full Chrome
     `__content.object('<id>').interactions`).
   - Wait for the use, don't time it: `__sims()[0]` has `object`, `def`, `interaction`, `using` (at it, not
     walking), `pose` (`stand`/`sit`/`lie`), `action`, `x`, `z` and `needs`.
-  - See a clip play with `__renderer.motion.states.get(<id>)` (each clip's name, time and kind).
+  - See a clip play with `__renderer.objectClips(<id>)`: each clip by name, with its `kind`, `time` and
+    `duration` (null when it has none).
   - Frame it: `__controls.follow(0, {radius: 6, beta: 0.9, y: 1.4})` follows the resident from that
     distance, angle and height; `__camera({alpha, beta, radius, target: [x, y, z]})` puts the camera
     anywhere (`__camera()` reads it). Either stops the camera watching on its own.
@@ -437,7 +474,7 @@ never one that's already running) and drive Playwright headless with full Chrome
   (Shading each corner along its own face's normal was tried: no better in the game, and it streaked the long
   triangles of an extruded frame.)
 - **Smooth, sharp and bevelled.** Smooth parts keep edges over `G.SHARP` (40°) sharp, so a cylinder's cap stays
-  flat (it used to shade into the side); round things with few sides stay round (`G.round_angle`: a 6-sided
+  flat; round things with few sides stay round (`G.round_angle`: a 6-sided
   leg, an 8-sided tube); a lathe (`G.revolve`) keeps only turns over 70° sharp (a jar's coarse shoulder stays
   round); spheres, rings and boulders are smooth all over. A `bevel` is smooth with hardened normals: the faces
   it joins stay flat, the edge rounds. `G.shade(obj, smooth, angle)` and `G.bevel_edges(obj, width)` do the same

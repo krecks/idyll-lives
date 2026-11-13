@@ -1,11 +1,14 @@
 /**
  * Builds the landscape's data off the main thread (`renderData.ts`): each world's land laid out
- * once (`Land`), then its grass field and terrain shading as asked, sent back as typed arrays.
+ * once (`Land`), then its grass field and terrain shading as asked, and a town's road mesh (from the
+ * world it is sent, no land needed), sent back as typed arrays.
  */
 
 import type { WorldStructure } from '../../core/protocol';
 import type { WorkerAnswer, WorkerAsk } from '../../core/lazyWorker';
+import type { MeshData } from './geometry';
 import { Land, type RenderDataAnswer, type ToRenderData } from './renderData';
+import { townRoadMesh } from './roads';
 
 interface WorkerScope {
   onmessage: ((e: MessageEvent<WorkerAsk<ToRenderData>>) => void) | null;
@@ -23,6 +26,12 @@ function landOf(id: number): { world: WorldStructure; land: Land } {
   return { world: open.world, land: open.land };
 }
 
+/** A mesh's buffers, to hand over rather than copy. */
+function meshBuffers(mesh: MeshData | null): Transferable[] {
+  if (!mesh) return [];
+  return [mesh.positions.buffer, mesh.normals.buffer, mesh.uvs.buffer, mesh.indices.buffer, ...(mesh.colors ? [mesh.colors.buffer] : [])] as Transferable[];
+}
+
 scope.onmessage = (e) => {
   const { id, message: q } = e.data;
   if (q.type === 'open') {
@@ -35,6 +44,13 @@ scope.onmessage = (e) => {
   }
   void (async () => {
     try {
+      if (q.type === 'roads') {
+        const start = performance.now();
+        const roads = townRoadMesh(q.world);
+        const ms = performance.now() - start;
+        scope.postMessage({ id, answer: { type: 'roads', roads, ms } }, [...meshBuffers(roads.surface), ...meshBuffers(roads.marks)]);
+        return;
+      }
       const { world, land } = landOf(q.land);
       if (q.type === 'grass') {
         const field = await land.grass(world, q.margin);

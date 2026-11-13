@@ -1,7 +1,7 @@
 /**
  * The graphics presets: Low, Medium and High (Settings › Performance › Graphics; `?quality=low|
  * medium|high` overrides the setting for testing). Medium is everyone's default and the game's
- * intended look. High is Medium with sharper sun shadows and two mirrors drawn every frame. Low is
+ * intended look. High is Medium with sharper sun shadows, four lamps casting shadows and two mirrors drawn every frame. Low is
  * Medium with heavier trims for older laptops (integrated Intel graphics): fewer draws and triangles.
  *
  * Every knob is in this one table. A new knob gets a field below, with what it does and what it
@@ -49,6 +49,18 @@ export interface QualitySettings {
    * dark lamps out of the cluster (before: 3.1 / 0.8 ms with every lamp dark).
    */
   clusteredLamps: boolean;
+  /**
+   * How many lamps cast shadows at once (`pc/lampShadows.ts`): those nearest the camera's target on the storey
+   * in view, each from one map of its own (1024 texels a side of a 2048 atlas, 16 MB), drawn again only when
+   * something that casts changed (a thing placed, moved or sold; a moving part or a resident in its room, at
+   * `lampShadowRate`) and read where the lamp lights. 0: none, and the lamps' shaders without the code. Needs
+   * `clusteredLamps`, and things casting from their own draws (not `mergedObjectShadows`). The village orbit by
+   * night on Medium/WebGPU (M3 Pro, medians of 3, 2026-11-13, every map redrawn at the rate: four residents in the
+   * house's one room): none 4.00 ms of GPU and 515 draws, two lamps 4.26 ms and 526, four 4.72 ms and 530.
+   */
+  lampShadows: number;
+  /** At most this many redraws a second of a lamp's shadow map for what moves in its room (0: every change). */
+  lampShadowRate: number;
   /**
    * How many mirrors (the nearest the camera, on screen) reflect the room; 0: none. Each draws again
    * only what can be seen through its glass, and only the residents in it: the village's bathroom
@@ -214,9 +226,9 @@ export interface RenderQuality extends QualitySettings {
 const OPEN_WORLD: OpenWorldQuality = { stream: 1, farCull: 650, woodsFar: 560, woodsCell: 256, flowersFar: 170, tiles: [200, 460], far: 2600 };
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, grass: { radius: 45, density: 0.5, nearest: 1 }, woodsCell: 100, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, holdStillFrames: true, ambientRange: 0, birds: { count: 6, range: 18 }, residentRadius: 90, openWorld: { stream: 0.7, farCull: 450, woodsFar: 400, woodsCell: 128, flowersFar: 120, tiles: [150, 350], far: 1800 }, leanTargets: true, contactShading: false, cloudShadows: false },
-  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 60, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 40, birds: { count: 24, range: 35 }, residentRadius: 140, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true },
-  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 90, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 }, residentRadius: 200, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true },
+  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, lampShadows: 0, lampShadowRate: 15, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, grass: { radius: 45, density: 0.5, nearest: 1 }, woodsCell: 100, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, holdStillFrames: true, ambientRange: 0, birds: { count: 6, range: 18 }, residentRadius: 90, openWorld: { stream: 0.7, farCull: 450, woodsFar: 400, woodsCell: 128, flowersFar: 120, tiles: [150, 350], far: 1800 }, leanTargets: true, contactShading: false, cloudShadows: false },
+  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, lampShadows: 2, lampShadowRate: 15, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 60, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 40, birds: { count: 24, range: 35 }, residentRadius: 140, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true },
+  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, lampShadows: 4, lampShadowRate: 30, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 90, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 }, residentRadius: 200, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true },
 };
 
 export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];

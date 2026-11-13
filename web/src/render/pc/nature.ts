@@ -36,7 +36,7 @@ import { LookedFrom } from '../shared/chunks';
 import { Geo } from '../shared/geometry';
 import { CountryRoads } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
-import { grassField, type GrassQuality } from '../shared/grass';
+import { grassField, gustAt, gustNoise, type GrassQuality } from '../shared/grass';
 import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
@@ -902,6 +902,20 @@ export function windStill(meshInstance: pc.MeshInstance, m: ModelMesh): void {
 export function setWind(app: pc.AppBase, strength: number): void {
   const state = windStates.get(app);
   if (state) state.strength = strength;
+}
+
+/** The gusts' noise for `windGust` (`gustNoise`: the texture the grass reads, on the CPU), made the first time it is asked for. */
+let gusts: Uint8Array | null = null;
+
+/**
+ * The gust over the ground at (`x`, `z`) now, 0 (calm) .. 1 (a strong gust), as the grass shows it (`gustAt`
+ * at the wind's own time, times its strength): what the wind in the leaves sounds by. Zero before the app's
+ * wind exists, and with the wind still.
+ */
+export function windGust(app: pc.AppBase, x: number, z: number): number {
+  const state = windStates.get(app);
+  if (!state || state.strength <= 0) return 0;
+  return gustAt((gusts ??= gustNoise()), state.time, x, z) * state.strength;
 }
 
 /**

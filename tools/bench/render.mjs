@@ -30,12 +30,15 @@
  *   --shots <dir>              fixed poses, paused (`diag=freeze`, `hud=0`): one PNG per preset × backend × pose
  *     --poses orbit-day-0,…    which (`POSES`; `play`: the play set, the pictures a change to the look is judged by;
  *                              `day`: the day set, the play camera over three homes at three hours of the day;
+ *                              `close`: the close set, the play camera zoomed all the way in (6 m) by day, at dusk
+ *                              and by night, and the garden by night;
  *                              `town`: the town view, over the main town's centre and over the home from 150, 400
  *                              and 900 m at midday, at dusk and by night, the game in its `town-day|dusk|night` scenes
  *                              with the interface, or `--scene bigworld` for the drawing alone)
  *     --pages [gallery,…]      with --shots: the dev pages instead (`PAGES`: the gallery, clips, residents and
  *                              poses benches, each held still), one PNG per page × backend × diag
- *   --compare <dirA> <dirB>    pixel differences between two shot folders (and `--out` for the difference images)
+ *   --compare <dirA> <dirB>    pixel differences between two shot folders (and `--out` for the difference images):
+ *                              `cargo shots compare`, which can be run by itself
  *   --headless / --headed      without or with a window (see below)
  *   --jobs <file.json>         several runs in one go: a JSON list of command lines (each an array of the
  *                              options above), sharing one Vite server per mode and one browser per kind
@@ -59,7 +62,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -128,6 +131,17 @@ const POSES = {
   'day-east-16': 'cam=orbit&hour=16.5&at=0&beta=0.86&tx=34',
   'day-north-13': 'cam=orbit&hour=13&at=0&beta=0.86&tz=-34',
   'day-north-16': 'cam=orbit&hour=16.5&at=0&beta=0.86&tz=-34',
+  // The close set (`--poses close`): the play camera zoomed all the way in (6 m, where a pixel is 4 mm and a finish's
+  // texture, a bevel and a cushion's shape show), over the home lot from two sides by day, at dusk and by night, and
+  // over the fuller house to the east; `garden-night` is the home's garden by night from 12 m (the lamps' pools, the
+  // windows' light on the lawn).
+  'close-day': 'cam=orbit&hour=13&at=0&beta=0.86&radius=6&tx=4&tz=2',
+  'close-day-b': 'cam=orbit&hour=13&at=20&beta=0.86&radius=6&tx=4&tz=2',
+  'close-dusk': 'cam=orbit&hour=19&at=0&beta=0.86&radius=6&tx=4&tz=2',
+  'close-night': 'cam=orbit&hour=21&at=0&beta=0.86&radius=6&tx=4&tz=2',
+  'close-east-day': 'cam=orbit&hour=13&at=0&beta=0.86&radius=6&tx=34',
+  'close-east-night': 'cam=orbit&hour=21&at=0&beta=0.86&radius=6&tx=34',
+  'garden-night': 'cam=orbit&hour=21&at=0&beta=0.86&radius=14&tz=5',
 };
 /**
  * The town set (`--poses town`, docs/design/living-town.md): the town view held over the main town's centre and over
@@ -153,8 +167,10 @@ const townScene = (pose) => `town-${pose.slice(pose.lastIndexOf('-') + 1)}`;
 const PLAY = ['play-day', 'play-day-b', 'play-dusk', 'play-night', 'up-day', 'up-dusk', 'up-night', 'wide-day-0', 'wide-night-45', 'street-day', 'street-night', 'town-day'];
 /** `--poses day`: the play camera by day, where a change to the daytime look has to show. */
 const DAY = ['day-home-9', 'day-home-13', 'day-home-16', 'day-back-13', 'day-east-9', 'day-east-13', 'day-east-16', 'day-north-13', 'day-north-16', 'up-day'];
+/** `--poses close`: the play camera zoomed all the way in, where a change to a finish, an edge or a soft thing has to show. */
+const CLOSE = ['close-day', 'close-day-b', 'close-dusk', 'close-night', 'close-east-day', 'close-east-night', 'garden-night'];
 /** Poses outside the default list. */
-const NAMED_ONLY = /^(mirror|play|up|street|town|day)-/;
+const NAMED_ONLY = /^(mirror|play|up|street|town|day|close|garden)-/;
 
 /**
  * Dev pages for `--shots --pages`: each held still (no wind, clips at a set time, residents' time
@@ -169,6 +185,15 @@ const PAGES = {
   'gallery-trees': { path: '/gallery.html', query: 'keys=model.tree,model.tree.maple,model.tree.birch,model.pine,model.bush,model.hedge&cols=3&labels=0&still', webgl: true },
   // The broadleaved trees, whose crowns are leaf cards (`--extra 'camera=game&at=model.tree.birch'`: one from the game's camera; `--extra far`: their far versions).
   'gallery-broadleaves': { path: '/gallery.html', query: 'keys=model.tree,model.tree.maple,model.tree.birch,model.tree.blossom,model.tree.fruit,model.tree.japaneseMaple,model.tree.magnolia,model.tree.willow,model.garden.lemonTree&cols=3&labels=0&still', webgl: true },
+  // Six things each, close up and without labels: seats and beds (cushions, bedding), draped and stuffed things, wooden
+  // furniture, plain-finished appliances and fittings, the shrubs and hedges, and the conifers. The sheets a change to a
+  // texture set, a soft form, a plain finish or the planting is judged by.
+  'gallery-soft': { path: '/gallery.html', query: 'keys=model.sofa,model.sofaThree,model.armchairWingback,model.armchairLeather,model.bedDouble,model.bedKing&cols=3&labels=0&still', webgl: true },
+  'gallery-drape': { path: '/gallery.html', query: 'keys=model.curtains,model.towelRail,model.towelStack,model.beanBag,model.floorCushion,model.bedCanopy&cols=3&labels=0&still', webgl: true },
+  'gallery-wood': { path: '/gallery.html', query: 'keys=model.diningTable,model.chairWindsor,model.bookcaseTall,model.dresser,model.deskWriting,model.chinaCabinet&cols=3&labels=0&still', webgl: true },
+  'gallery-plain': { path: '/gallery.html', query: 'keys=model.fridge,model.laundryWasher,model.wallOven,model.wardrobe,model.bathtub,model.toilet&cols=3&labels=0&still', webgl: true },
+  'gallery-shrubs': { path: '/gallery.html', query: 'keys=model.bush,model.bush.flowering,model.bush.small,model.hedge,model.garden.hedge,model.garden.topiaryCone&cols=3&labels=0&still', webgl: true },
+  'gallery-conifers': { path: '/gallery.html', query: 'keys=model.pine,model.spruce,model.cypress&cols=3&labels=0&still', webgl: true },
   clips: { path: '/clips.html', query: 'keys=model.fridge,model.sofa,model.wardrobe,model.shower&t=0.6', webgl: true },
   characters: { path: '/characters.html', query: 'manual', webgl: true },
   // The residents' sheets (`characters.ts`): from the side, the heads close up, every skin, hairstyle, garment and
@@ -199,6 +224,8 @@ const PAGES = {
   'characters-identity-ends': { path: '/characters.html', query: 'manual&faces=ends&closeup=1&t=0&cols=5', webgl: true },
   poses: { path: '/poses.html', query: 'manual&labels=0', webgl: true, prepare: () => window.__poses.advance(2) },
   previews: { path: '/previews.html', query: '', webgl: true },
+  // The catalog's pictures of a fixed set of things: soft, wooden, plain-finished and planted, as Buy mode shows them.
+  'previews-catalogue': { path: '/previews.html', query: 'ids=sofa,armchairWingback,armchairLeather,bedDouble,towelRail,curtains,diningTable,chairWindsor,bookcaseTall,dresser,fridge,laundryWasher,wardrobe,bathtub,tableLamp,rugLarge,bush,garden.hedge,garden.topiary,pine', webgl: true },
   // The household creator's stage itself, at its face view (`--extra hd=0`: with the body, where it draws the close-up body).
   'previews-stage': { path: '/previews.html', query: 'stage=male&zoom=1&bald', webgl: true },
   'previews-stage-female': { path: '/previews.html', query: 'stage=female&zoom=1&bald', webgl: true },
@@ -512,7 +539,7 @@ function table(o, results) {
 
 async function shots(o) {
   const { backends, presets, diags, warmup, out } = o;
-  const poses = o.list('poses', Object.keys(POSES).filter((p) => !NAMED_ONLY.test(p)).join(',')).flatMap((p) => (p === 'play' ? PLAY : p === 'day' ? DAY : p === 'town' ? TOWN : [p]));
+  const poses = o.list('poses', Object.keys(POSES).filter((p) => !NAMED_ONLY.test(p)).join(',')).flatMap((p) => (p === 'play' ? PLAY : p === 'day' ? DAY : p === 'close' ? CLOSE : p === 'town' ? TOWN : [p]));
   for (const backend of backends) {
     for (const preset of presets) {
       for (const pose of poses) {
@@ -576,48 +603,13 @@ async function pageShots(o) {
   console.log(`page shots in ${out}`);
 }
 
-/** Per picture in both folders: how many pixels differ (by more than 2 and more than 16 of 255), the largest difference and the PSNR. */
+/**
+ * Per picture in both folders: how many pixels differ (by more than 2 and more than 16 of 255), the largest difference
+ * and the PSNR; with `diffDir`, a picture of where they differ. The repo's own tool does it (`cargo shots compare`,
+ * crates/tools/src/shots.rs).
+ */
 async function compare(a, b, diffDir) {
-  const sharp = (await import(createRequire(WEB + 'package.json').resolve('sharp'))).default;
-  if (diffDir) mkdirSync(diffDir, { recursive: true });
-  const names = readdirSync(a).filter((f) => f.endsWith('.png') && readdirSync(b).includes(f)).sort();
-  const rows = ['| picture | pixels differing (>2 / >16) | max | mean | PSNR dB |', '|---|---|---|---|---|'];
-  let worst = 0;
-  for (const name of names) {
-    const [x, y] = await Promise.all([a, b].map((dir) => sharp(join(dir, name)).removeAlpha().raw().toBuffer({ resolveWithObject: true })));
-    if (x.info.width !== y.info.width || x.info.height !== y.info.height) {
-      rows.push(`| ${name} | sizes differ | | | |`);
-      continue;
-    }
-    const pixels = x.info.width * x.info.height;
-    const diff = Buffer.alloc(pixels * 3);
-    let over2 = 0;
-    let over16 = 0;
-    let max = 0;
-    let sum = 0;
-    let squares = 0;
-    for (let i = 0; i < pixels; i++) {
-      let d = 0;
-      for (let c = 0; c < 3; c++) {
-        const e = Math.abs(x.data[i * 3 + c] - y.data[i * 3 + c]);
-        d = Math.max(d, e);
-        sum += e;
-        squares += e * e;
-      }
-      if (d > 2) over2++;
-      if (d > 16) over16++;
-      max = Math.max(max, d);
-      // The difference picture: a dim copy of the first, differences in red.
-      const grey = (x.data[i * 3] + x.data[i * 3 + 1] + x.data[i * 3 + 2]) / 12;
-      diff[i * 3] = d > 2 ? Math.min(255, 64 + d * 8) : grey;
-      diff[i * 3 + 1] = d > 2 ? 0 : grey;
-      diff[i * 3 + 2] = d > 2 ? 0 : grey;
-    }
-    const mse = squares / (pixels * 3);
-    worst = Math.max(worst, over2 / pixels);
-    rows.push(`| ${name} | ${((100 * over2) / pixels).toFixed(3)}% / ${((100 * over16) / pixels).toFixed(3)}% | ${max} | ${(sum / (pixels * 3)).toFixed(3)} | ${mse ? (10 * Math.log10((255 * 255) / mse)).toFixed(1) : '∞'} |`);
-    if (diffDir && over2) await sharp(diff, { raw: { width: x.info.width, height: x.info.height, channels: 3 } }).png().toFile(join(diffDir, name));
-  }
-  console.log(rows.join('\n'));
-  console.log(`\n${names.length} pictures compared; the most changed has ${(100 * worst).toFixed(3)}% of its pixels off by more than 2.`);
+  const tool = spawn('cargo', ['shots', 'compare', a, b, ...(diffDir ? ['--out', diffDir] : [])], { cwd: ROOT, stdio: 'inherit' });
+  const code = await new Promise((resolve) => tool.on('exit', resolve));
+  if (code) throw new Error(`cargo shots compare failed (${code})`);
 }

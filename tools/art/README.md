@@ -72,5 +72,5 @@ too (with its own materials). The keys and the URL options are in `web/src/debug
 Blender flow (real glTF art): `cargo art <family>` (Blender 5.2 LTS; `--preview` renders
 instead of exporting). Each family script in `blender/families/` builds its models on `blender/gamekit/`, exports `.glb`
 files into `web/public/assets/models/<family>/` and writes its override pack (`packs/<pack>/manifest.json`, listed in the
-base manifest's `packs`), which maps the file's materials onto the game's finishes. `tools/assets/optimize.mjs` makes the meshopt copy for the build. How to make a new object or moving
+base manifest's `packs`), which maps the file's materials onto the game's finishes. `cargo assets` makes the quantised, meshopt-compressed copy for the build. How to make a new object or moving
 part: [blender/README.md](blender/README.md); the standard: [docs/design/objects.md](../../docs/design/objects.md).

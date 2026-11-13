@@ -1,6 +1,6 @@
 import { defineConfig, searchForWorkspaceRoot, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { appendFile, cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { appendFile, cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { basename, join, resolve } from 'node:path';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
@@ -210,11 +210,14 @@ function debugReports(): Plugin {
 }
 
 /**
- * Compressed copies of the assets (KTX2 textures, meshopt models, gzipped character data; see
- * tools/assets/optimize.mjs): encoded when the build starts (only files that changed since the
- * last build, the rest come from web/.assets/cache) and copied into dist/assets when it ends,
+ * Compressed copies of the assets (KTX2 textures, meshopt models, gzipped character data: `cargo
+ * assets`, crates/tools/src/assets.rs): encoded when the build starts (only files that changed since
+ * the last build, the rest come from web/.assets/cache) and copied into dist/assets when it ends,
  * next to the sources. `LL_ASSETS=source` builds without them. The dev server serves sources.
  */
+/** Where `cargo assets` writes: `optimized.json` and the `opt/` tree. */
+const ASSETS_OUT = fileURLToPath(new URL('.assets/out', import.meta.url));
+
 function optimizedAssets(): Plugin {
   const skip = process.env.LL_ASSETS === 'source';
   let outDir = '';
@@ -225,15 +228,39 @@ function optimizedAssets(): Plugin {
     configResolved(config) {
       outDir = resolve(config.root, config.build.outDir);
     },
-    async buildStart() {
+    buildStart() {
       if (skip) return;
-      // Imported by URL so it runs from its own file (it starts worker threads on itself).
-      const tool = await import(new URL('../tools/assets/optimize.mjs', import.meta.url).href);
-      await tool.optimizeAssets({ log: (line: string) => this.info(line) });
-      copies = tool.OUT;
+      for (const line of runTool(['assets'])) this.info(line);
+      copies = ASSETS_OUT;
     },
     async closeBundle() {
-      if (copies) await cp(copies, join(outDir, 'assets'), { recursive: true });
+      if (copies) {
+        const assets = join(outDir, 'assets');
+        await cp(copies, assets, { recursive: true });
+        // Every file the build encoded is fetched as its compressed copy (`optimizedUrl` in
+        // src/assets/registry.ts): ship that, not both. What the build didn't encode (icons, the
+        // sky, manifests, a modder's pack) stays as it is; a source whose copy is missing stays too.
+        const index = JSON.parse(await readFile(join(copies, 'optimized.json'), 'utf8')) as {
+          files?: Record<string, string>;
+        };
+        // (Each in parallel: several hundred files, each a stat of both and a delete.)
+        const sizes = await Promise.all(
+          Object.entries(index.files ?? {}).map(async ([source, copy]) => {
+            try {
+              const [copied, original] = await Promise.all([stat(join(assets, copy)), stat(join(assets, source))]);
+              if (!copied.isFile()) return null;
+              await rm(join(assets, source));
+              return original.size;
+            } catch {
+              // (No source, or no copy, under that name: nothing to drop.)
+              return null;
+            }
+          }),
+        );
+        const dropped = sizes.filter((n) => n !== null);
+        const bytes = dropped.reduce((a, n) => a + n, 0);
+        this.info(`optimized-assets: ${dropped.length} sources dropped (${(bytes / 1e6).toFixed(1)} MB); their compressed copies ship instead`);
+      }
     },
   };
 }
@@ -356,10 +383,7 @@ function dataBundle(): Plugin {
         for (const pack of (manifest.packs as string[] | undefined) ?? []) await manifests(relative(path, pack));
       };
       await manifests('assets/manifest.json');
-      if (process.env.LL_ASSETS !== 'source') {
-        const tool = await import(new URL('../tools/assets/optimize.mjs', import.meta.url).href);
-        await add('assets/optimized.json', join(tool.OUT, 'optimized.json'));
-      }
+      if (process.env.LL_ASSETS !== 'source') await add('assets/optimized.json', join(ASSETS_OUT, 'optimized.json'));
       await writeFile(join(outDir, 'bundle.json'), JSON.stringify(files));
     },
   };

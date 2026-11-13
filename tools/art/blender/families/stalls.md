@@ -62,11 +62,11 @@ placed ten times in the town, so it stays under half its size class's target (4,
 
 | Model | Size (w × h × d) | Triangles (far) | Draws | Clip | Colour parts |
 |---|---|---|---|---|---|
-| `model.iceCreamCart` | 1.73 × 2.35 × 0.96 m | 6,444 (1,543) | 3 | `lid_open` (iceCream, delay 1 s, hold 1.4 s) | Body, Parasol, Bands |
-| `model.hotDogStand` | 1.58 × 2.38 × 0.98 m | 5,652 (1,382) | 3 | `lid_open` (hotDog, delay 1 s, hold 1.4 s) | Body, Awning |
-| `model.vendingSnack` | 0.90 × 1.88 × 0.75 m | 6,366 (1,440) | 3 | `drop` (snack) | Body |
-| `model.vendingDrink` | 0.90 × 1.88 × 0.79 m | 3,552 (770) | 2 | `drop` (drink) | Body |
-| `model.marketStall` | 1.84 × 2.14 × 0.98 m | 3,884 (898) | 3 | — | Body, Awning |
+| `model.iceCreamCart` | 1.73 × 2.35 × 0.96 m | 6,444 (1,543) | 6,444 | `lid_open` (iceCream, delay 1 s, hold 1.4 s) | Body, Parasol, Bands |
+| `model.hotDogStand` | 1.58 × 2.38 × 0.98 m | 5,652 (1,382) | 5,652 | `lid_open` (hotDog, delay 1 s, hold 1.4 s) | Body, Awning |
+| `model.vendingSnack` | 0.90 × 1.88 × 0.75 m | 6,366 (1,440) | 6,366 | `drop` (snack) | Body |
+| `model.vendingDrink` | 0.90 × 1.88 × 0.79 m | 3,552 (770) | 3,552 | `drop` (drink) | Body |
+| `model.marketStall` | 1.84 × 2.14 × 0.98 m | 3,884 (898) | 3,884 | — | Body, Awning |
 
 Detail pass 2026-10-22 (the forms and the kit). Before it: the ice cream cart 3,778, the hot dog stand 3,532, the
 snack machine 3,132, the drinks machine 3,312, the market stall 5,248.
@@ -84,3 +84,7 @@ models and their far versions).
 cargo art stalls            # the five .glb and .far.glb, the pack, check-glb
 cargo art stalls --preview  # previews/stalls/<id>.png, <id>@<clip>.png, <id>.far.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `hotDogStand`, `iceCreamCart`, `vendingSnack`; the same triangles.

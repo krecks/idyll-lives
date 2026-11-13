@@ -1,26 +1,29 @@
 /**
  * The landscape's data built off the main thread (`renderData.worker.ts`): the grass field
- * (`grassField`, a texel a metre over the land: seconds of work round a big world) and the
- * terrain's heights and colours (`LandscapeLayout.shadeTerrain`). The worker lays the land out
- * again from the same world (`LandscapeLayout`, deterministic: the same numbers as the page's)
- * and sends back typed arrays; the page only builds meshes and textures from them. Where no worker
- * runs (or one fails), each call says so and the caller builds on the page as before.
+ * (`grassField`, a texel a metre over the land: seconds of work round a big world), the terrain's
+ * heights and colours (`LandscapeLayout.shadeTerrain`), and the town's road mesh (`roadMeshes`,
+ * the menu overview's streets). The worker lays the land out again from the same world
+ * (`LandscapeLayout`, deterministic: the same numbers as the page's) and sends back typed arrays;
+ * the page only builds meshes and textures from them. Where no worker runs (or one fails), each
+ * call says so and the caller builds on the page as before.
  */
 
 import type { WorldStructure } from '../../core/protocol';
 import { CountryRoads } from './countryRoads';
 import { grassField, townGrass, type GrassField } from './grass';
 import { LandscapeLayout } from './nature';
+import type { RoadMeshData } from './roads';
 import { LazyWorker } from '../../core/lazyWorker';
 
 /**
  * What of a world the land is laid out from (`LandscapeLayout`, `CountryRoads`, the grass field's
- * land): its size, its lots and its meta (seed, landscape, roads, zones). The town's own contents
- * (rooms, walls, furniture: millions of tiles in a big world) stay on the page: the town's lawn
- * mask is made there (`townGrass`).
+ * land, the town's roads): its size, its lots, its meta (seed, landscape, roads, zones) and its
+ * junctions (the road mesh's pads and markings). The town's own contents (rooms, walls, furniture:
+ * millions of tiles in a big world) stay on the page: the town's lawn mask is made there
+ * (`townGrass`).
  */
 export function landWorld(world: WorldStructure): WorldStructure {
-  const { version, lotVersion, mode, width, depth, storeyDepth, plots, meta } = world;
+  const { version, lotVersion, mode, width, depth, storeyDepth, plots, meta, junctions } = world;
   return {
     version,
     lotVersion,
@@ -30,6 +33,7 @@ export function landWorld(world: WorldStructure): WorldStructure {
     ...(storeyDepth === undefined ? {} : { storeyDepth }),
     plots,
     meta,
+    ...(junctions === undefined ? {} : { junctions }),
     objects: [],
     sims: [],
     households: [],
@@ -78,9 +82,14 @@ export type ToRenderData =
   | { type: 'open'; land: number; world: WorldStructure }
   | { type: 'close'; land: number }
   | { type: 'grass'; land: number; margin: number }
+  | { type: 'roads'; world: WorldStructure }
   | { type: 'shade'; land: number; positions: Float32Array };
 
-export type RenderDataAnswer = { type: 'grass'; field: LandGrass } | { type: 'shade'; positions: Float32Array; colors: Float32Array };
+export type RenderDataAnswer =
+  | { type: 'grass'; field: LandGrass }
+  /** `ms`: the worker's own build, for the perf spans. */
+  | { type: 'roads'; roads: RoadMeshData; ms: number }
+  | { type: 'shade'; positions: Float32Array; colors: Float32Array };
 
 /** A render data worker (`renderData.worker.ts`); it goes once it has had nothing to do for half a minute. */
 const dataWorker = () =>
@@ -175,4 +184,14 @@ export class OffThreadLand {
     this.grassing?.close(this.id);
     this.closed = true;
   }
+}
+
+/**
+ * The town's road mesh (`roads.ts` `townRoadMesh`), made in the shading worker from the world's land
+ * part while the page plans the street (the same arrays as the page's, in the same order). Null where
+ * no worker could make it: the caller builds it on the page.
+ */
+export async function townRoadMeshOffThread(world: WorldStructure): Promise<{ roads: RoadMeshData; ms: number } | null> {
+  const reply = await shading.ask({ type: 'roads', world: landWorld(world) }, none).catch(none);
+  return reply?.type === 'roads' ? { roads: reply.roads, ms: reply.ms } : null;
 }

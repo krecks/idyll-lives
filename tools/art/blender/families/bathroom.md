@@ -148,7 +148,7 @@ Validate › Showers until checked in play.
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.shower` | 0.90 × 2.15 × 0.90 m | 4,484 | 4 | Tray, Frame, Head & tap, Tiles |
-| `model.showerStall` | 0.90 × 2.08 × 0.90 m | 4,892 | 3 | Tray, Rail, Head & tap, Curtain, Tiles |
+| `model.showerStall` | 0.90 × 2.08 × 0.90 m | 4,912 | 3 | Tray, Rail, Head & tap, Curtain, Tiles |
 | `model.showerWalkIn` | 0.92 × 2.26 × 0.92 m | 3,392 | 3 | Floor, Frame, Head & tap, Wall |
 | `model.showerRain` | 0.94 × 2.18 × 0.93 m | 2,532 | 3 | Tray, Frame, Head & tap, Walls |
 
@@ -231,3 +231,7 @@ their teeth there, and the tall cabinet's upper door while one takes a fresh tow
 cargo art bathroom            # every .glb, the pack, check-glb
 cargo art bathroom --preview --lit  # previews/bathroom/sink.png, sink.lit.png, sink@water_on.png, …
 ```
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 9 models changed shape: `bathCabinetTall`, `bathtub`, `mirrorCabinet`, `showerRain`, `sinkPedestal`, `sinkVessel`, `toiletSmart`, `toiletWallHung`, `vanityDouble`; the same triangles.

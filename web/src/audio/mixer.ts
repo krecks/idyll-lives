@@ -1,7 +1,13 @@
 /**
  * One audio context for the whole game, with a bus each for interface sounds (`ui/sfx.ts`),
  * resident voices (`voice/player.ts`) and the sounds of the world (`audio/world.ts`), each with
- * its own volume setting, all through the master volume.
+ * its own volume setting, all through a limiter and the master volume. The voices and the world's
+ * sounds are placed in a space on their way into their bus (`space`, `space.ts`: left to right,
+ * rooms, walls, and for the world the camera's distance).
+ *
+ * The mix: while a resident speaks the world's sounds give way to the voice (`DUCK`), and what the
+ * buses add up to goes through a limiter (`LIMIT`), so a shower, a blender and two voices at once
+ * are held under full scale and not clipped. Below its threshold the limiter changes nothing.
  *
  * The context starts with the player's first click or key press (browsers allow sound only after
  * one); a context the browser stopped (Safari's `interrupted`) starts again with the next one.
@@ -11,17 +17,37 @@
  */
 
 import { settings } from '../settings/settings.svelte';
+import { EFFECTS_LEVEL } from './catalog';
+import { Space } from './space';
 
 export type Bus = 'effects' | 'voices' | 'world';
 
-/** Interface sounds are quiet by design. */
-const EFFECTS_LEVEL = 0.5;
 /** Seconds the master volume takes to fade out or back in as the window loses or gets focus. */
 const FOCUS_FADE = 0.15;
+/**
+ * The world under a voice: the share of its level left while a resident speaks (about -6 dB: the line is
+ * heard over a tap or a television without the room going silent), and the seconds it takes to give way
+ * and to come back once the last voice has ended.
+ */
+export const DUCK = { level: 0.5, down: 0.08, up: 0.5 };
+/**
+ * The limiter over everything: what goes over `threshold` (dBFS) is held there (`ratio` to one, no knee),
+ * caught within `attack` seconds and let go over `release`. The sounds are made well under it one by one
+ * (`tools/audio/listen.ts`: the loudest loop peaks at -11 dBFS), so it works only when many sound at once.
+ */
+export const LIMIT = { threshold: -3, ratio: 20, attack: 0.003, release: 0.25 };
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+/** What the buses play into: the limiter, then the master volume. */
+let mix: DynamicsCompressorNode | null = null;
+/** The world's bus plays through this: its level under a voice. */
+let duck: GainNode | null = null;
+/** Voice clips playing now. */
+let speaking = 0;
 const buses = new Map<Bus, GainNode>();
+/** The space the world's sounds and the voices are heard in (`space.ts`): their places, walls and rooms, and for the world the camera's distance. */
+const spaces = new Map<Bus, Space>();
 /** The master volume last asked for (it fades there). */
 let masterTarget = -1;
 /** Another window has focus. */
@@ -43,12 +69,43 @@ export function bus(name: Bus): GainNode | null {
   let gain = buses.get(name);
   if (!gain) {
     gain = ac.createGain();
-    gain.connect(master);
+    gain.connect((name === 'world' ? duck : null) ?? mix ?? master);
     buses.set(name, gain);
   }
   gain.gain.value = level(name);
   fadeMaster();
   return gain;
+}
+
+/** The space the bus's sounds are placed in (`space.ts`): the world's far with the camera, the voices' always near. */
+export function space(name: 'world' | 'voices'): Space | null {
+  const ac = audioContext();
+  const out = bus(name);
+  if (!ac || !out) return null;
+  let s = spaces.get(name);
+  if (!s) {
+    s = new Space(ac, out, name === 'world');
+    spaces.set(name, s);
+  }
+  return s;
+}
+
+/**
+ * A resident's voice starts (`on`) or ends: the world's sounds give way while any is speaking (`DUCK`).
+ * Every start is to be followed by one end.
+ */
+export function voiceSpeaking(on: boolean): void {
+  speaking = Math.max(0, speaking + (on ? 1 : -1));
+  if (!ctx || !duck) return;
+  duck.gain.setTargetAtTime(speaking > 0 ? DUCK.level : 1, ctx.currentTime, (speaking > 0 ? DUCK.down : DUCK.up) / 3);
+}
+
+/**
+ * What the mix is doing now, to check it by (null before sound can play): how many voices are speaking, the
+ * world's level under them (1: not held down) and how many dB the limiter is taking off (0: nothing).
+ */
+export function mixNow(): { speaking: number; duck: number; limiting: number } | null {
+  return duck && mix ? { speaking, duck: duck.gain.value, limiting: -mix.reduction } : null;
 }
 
 /** `stop` runs just before sound stops for a hidden tab (sounds that wait for their end, like voices, end there). Returns a function that removes it. */
@@ -97,6 +154,18 @@ function start(): void {
   master = ctx.createGain();
   master.connect(ctx.destination);
   master.gain.value = masterTarget = masterLevel();
+  // The buses' sum through the limiter, then the master volume (a quiet master is not limited any the less).
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = LIMIT.threshold;
+  limiter.knee.value = 0;
+  limiter.ratio.value = LIMIT.ratio;
+  limiter.attack.value = LIMIT.attack;
+  limiter.release.value = LIMIT.release;
+  limiter.connect(master);
+  mix = limiter;
+  duck = ctx.createGain();
+  duck.gain.value = speaking > 0 ? DUCK.level : 1;
+  duck.connect(mix);
 }
 
 /** A click or key press: sound may start (or start again). */

@@ -657,7 +657,8 @@ def rainbowHammock():
         u = (-PILLOW - x0) / (x1 - x0)
         slope = math.degrees(math.atan((SLING_END - SLING_LOW) * 4 * (2 * u - 1) / (x1 - x0)))
         F.soft('pillow', 0.36, 0.11, 0.3, (-PILLOW, _sling_y(u, 0.5) + 0.05, 0), M.pillow, rot=(0, slope, 0), round=0.04,
-               puff=0.03, flat=2)
+               puff=0.03,
+               waist=0.012, pinch=0.006, resting=True)
     sling = G.hinged(G.join(sling, 'sling'), F.at(0, HOOK, 0))
     objs = G.settle(centre=False)
     G.rock(sling, 'sway', 5, seconds=2.4, axis='X')

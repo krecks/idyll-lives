@@ -279,14 +279,15 @@ def _mattress(name, w, h, d, top, z, x=0.0, material=None, puff=0.006, piping=0.
     """A mattress `w` x `d`, `h` deep, the middle of its top at `top` (where the game lays the sleeper): rounded,
     a hair puffed, a piped seam round its top and bottom."""
     return F.soft(name, w, h - 2 * puff, d, (x, top - h / 2, z), material or M.mattress, round=round, puff=puff,
-                  flat=flat, piping=piping)
+                  flat=flat, piping=piping, pinch=0.0, resting=True)   # (firm, its edges taped: no pinched corners)
 
 
 def _soft_pillow(name, w, h, d, x, top, z, material, tilt=8, seed=0.0):
-    """A pillow on `top`, `h` thick in the middle: plump, thinning to its seams, a little crumpled."""
-    p = F.soft(name, w, h * 0.42, d, (x, top + h / 2 - 0.01, z), material, rot=(tilt, 0, 0),
-               round=min(h * 0.2, 0.03), puff=h * 0.29, flat=2)
-    return G.jitter(p, 0.004, size=0.12, seed=seed + x * 7, up=0.4)
+    """A pillow on `top`, `h` thick in the middle: plump, thinning to its seams, its corners pinched in, a little
+    crumpled (as bedroom.py's)."""
+    p = F.soft(name, w, h * 0.34, d, (x, top + h / 2 - 0.01, z), material, rot=(tilt, 0, 0),
+               round=min(h * 0.17, 0.03), puff=h * 0.33, pinch=h * 0.26, waist=h * 0.04, resting=True)
+    return G.jitter(p, 0.003, size=0.12, seed=seed + x * 7, up=0.4)
 
 
 # --- beds: a duvet whose top third turns down (as bedroom.py) ----------------------------------------------
@@ -296,12 +297,13 @@ FLAP = 0.045      # the flap's thickness
 
 def _duvet(top, half, z_fold, z_foot, drape, material, seed=0.0):
     """The duvet's lower two thirds, from the fold to the foot, draped down the sides and the foot end, puffed on
-    top (its middle at `DUVET`) and a little rumpled."""
+    top (its middle at `DUVET`) and rumpled as a duvet shaken out lies (the soft form's `rumple`, as bedroom.py's:
+    folds that only go down and in, so it stays under the game's quilt)."""
     over, puff = 0.02, 0.01
     y0, y1 = top - drape, top + DUVET
-    d = F.soft('duvet', 2 * (half + over), y1 - y0 - 2 * puff, z_foot + over - z_fold,
-               (0, (y0 + y1) / 2, (z_fold + z_foot + over) / 2), material, round=0.03, puff=puff, flat=4)
-    return _rumple(d, 0.004, top, seed)
+    return F.soft('duvet', 2 * (half + over), y1 - y0 - 2 * puff, z_foot + over - z_fold,
+                  (0, (y0 + y1) / 2, (z_fold + z_foot + over) / 2), material, round=0.05, puff=puff, pinch=0.0,
+                  rumple=0.025, rumple_size=0.24, seed=seed + half, resting=True)
 
 
 def _flap(top, half, z_top, z_fold, material):

@@ -552,7 +552,7 @@ def gardenHammock():
         y = _sag(-PILLOW) + 0.0125                       # the sling's top and slope under the pillow
         slope = math.degrees(math.atan(2 * (END - LOW) * PILLOW / XS ** 2))
         F.soft('pillow', 0.36, 0.11, 0.3, (-PILLOW, y + 0.045, 0.0), M.pillow, rot=(0, slope, 0), round=0.045, puff=0.02,
-               flat=2)
+               waist=0.012, pinch=0.006, resting=True)
     sling = G.hinged(G.join(sling, 'sling'), F.at(0, HOOK[1], 0))
     objs = G.settle(centre=False)
     G.rock(sling, 'sway', 8, seconds=2.4, axis='X')

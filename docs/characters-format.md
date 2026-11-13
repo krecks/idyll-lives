@@ -127,8 +127,10 @@ Every body has:
 | `hair.<style>` | every hairstyle but `none` (`short crop layered tousled sideSwept afro bob long ponytail braid bun`) | Head, blending to neck_01 / spine_03 below the jaw | `hair` |
 | `hair.beard` | facial hair (male only; hidden for baby, child, teen) | Head; follows the mouth's morphs and the face's identity | `hair` |
 | `hair.<style>.wisps`, `hair.beard.wisps` | the soft edges of each: thin quads past its rims, hems and tips (below), drawn only close up | their hair's, vertex for vertex | `wisp`: the hair's colour and light, cut out in strands |
-| `top.*`, `bottom.*`, `shoes.*` | shells, only where the silhouette needs one: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, the server's apron (the front from the waist to above the knees), every shoe (below) | from the body | `cloth` (flat colour) |
-| `lod.<shell>` | a low-detail copy of every shell | | `cloth` |
+| `top.*`, `bottom.*`, `shoes.*` | shells: jacket and suit (torso and upper arms, open in a V; the sleeves are painted), the collars of polo and shirt, the skirt, the server's apron (the front from the waist to above the knees), every shoe (below) | from the body | `cloth` (flat colour) |
+| `bottom.trousers` | the cloth of every bottom with legs (trousers, suit trousers, shorts, capri: one mesh, 824 triangles): the body's own surface from the highest waistband to the lowest hem, cut to the resident's waist and length by the shader (see Clothes) | as the skin | `cut` (cloth whose opacity is the cut) |
+| `top.long` | the cloth of every regular top (tee, v-neck, polo, long top, shirt, tank top, blouse: one mesh, 1,212 triangles on a man and 1,160 on a woman): the body's own surface under any of them, cut to the resident's sleeves, hem and neckline by the shader (see Clothes) | as the skin | `cut` |
+| `lod.<shell>` | a low-detail copy of every shell but `bottom.trousers` and `top.long` (far off, the low-detail body is painted) | | `cloth` |
 
 `hair.none` has no part: a bald resident's scalp keeps the skin colour (appearance texel 7 w = 0).
 
@@ -329,14 +331,19 @@ hairline and chin as before.
 | Part | x | y | z | w |
 |---|---|---|---|---|
 | body | sleeve parameter (-1 torso, 0 shoulder .. 1 wrist, > 1 hand) | height (m, base body) | crew neckline (m, > 0 covered: distance from the neck's axis plus depth below a curve round the neck's base); head: -1 - scalp weight (the ears: -1) | scoop neckline (women: round and low in front; men: a V); head: -1 - scalp weight (the ears: -1) |
-| shells | hem distance (m; a shoe's from its collar, negative on its lining) | flag: 1 sole, 2 waistband, 3 skirt or apron (a hem band), 4 light midsole, 5 polished | category: 0 top, 1 bottom, 2 shoes | shoes: across the instep (m from its middle; over 1 off its front), else 0 |
+| shells | hem distance (m; a shoe's from its collar, negative on its lining; 0.5, out of every reach, on a shell the shader cuts) | flag: 1 sole, 2 waistband, 3 skirt or apron (a hem band), 4 light midsole, 5 polished, 6 cut to length by the shader (`bottom.trousers`) | category: 0 top, 1 bottom, 2 shoes | shoes: across the instep (m from its middle; over 1 off its front); a shell the shader cuts: the body's height field there (m on the base body, as the cuts are); else 0 |
+
+A shell the shader cuts has no seated corrective, and `top.long` has the body's other three fields in its tone's
+x, y and z instead (the sleeve parameter, the crew and the scoop neckline: its cut is on all four); w is the
+occlusion as everywhere.
 | eyes | offset from the iris centre on the eye's front (m), x | y | iris radius (m) | pupil radius (m) |
 | hair | 0.1 (unused) | | | |
 | wisps | along the edge (m, from a start of the row's own) | 0 at the root (on the hair) .. 1 where the quad ends | how loose the strands are: 0 combed, 1 curls | the share of y over which the strands are still one (solid: a hem's lip) |
 
 ## Tone (4 per vertex)
 
-x = lip / cheek blush (0..1; on the tongue part, the tongue's red), y = shade drawn by hand (the
+x = lip / cheek blush (0..1; on the tongue part, the tongue's red; on the hair and its wisps, how loose
+a vertex hangs, 0..1: see Hair and hems that move), y = shade drawn by hand (the
 upper lids' crease, the nostrils: the nose's underside either side of its middle, the teeth's sides,
 deep in the hair; the mouth plate is
 1), and on the lips its opposite sign: negative, how much of the lip's colour they take (up to 0.9,
@@ -399,7 +406,8 @@ the apron on it, instead of standing out round the seat as they hang standing.
 
 ## Clothes
 
-Clothes are painted on the body by its shader. Each garment's cut (metres on the base body's
+Clothes are painted on the body by its shader, and near the camera a bottom with legs and a regular top are
+cloth of their own over that (the trousers' and the long top's shells, below). Each garment's cut (metres on the base body's
 fields) decides where it covers:
 
 - top: `(sleeve - x) * 0.55 > 0`, `y > hem`, `z > crew` (if set), `w > scoop` (if set);
@@ -433,6 +441,48 @@ too, from their `fields.x`: the distance from the hem (the jacket's and the apro
 nearest open edge — the hem, the lapels and the neck for the jacket, the hem, the sides and the
 waistband for the apron — not the sleeves' ends; 0 on the turned rim). The collars have none (0.05:
 out of reach).
+
+A bottom with legs (`bottom.trousers`, `bottom.suit`, `bottom.shorts`, `bottom.capri`; `outfit.ts` `LEGGED`) is
+worn near the camera as one shell, `bottom.trousers` (clothes.rs `trousers`, through the jacket's path:
+`clip_by_field` on the bottom's predicate, `shell_on` at every stage): the body's own level-1 surface from
+6 mm over the highest of their waistbands to 6 mm under the lowest of their hems, the arms and hands left
+out, with the body's height in fields.w. The shader does the rest per resident, so shorts and capri are the
+same mesh:
+
+- lifted off the skin (vertex, `GAME_SIM_CUT`) by the bottom's ease, the same `EASE` and looseness the
+  painted cloth has, so the shell near the camera and the paint on the low-detail body far off have one
+  outline;
+- cut at the resident's waist and leg cuts (texels 4 a, 5 a) per fragment: its opacity is 1 between them
+  and 0 past them, a pixel between (the resident feature's `opacity` slot; the material is alpha-tested at
+  0.5 with alpha to coverage, so the hem's edge is as smooth as a mesh's where the target is multisampled);
+- drawn from both sides, the inside (back faces) at half the colour (`CUT.lining`); the waistband's and the
+  hems' bands from the same heights as the painted ones;
+- the body under it (texel 8 a = 1; `body` and `hd.body`, not `lod.body`, whose material has
+  `GAME_SIM_FAR`): its bottom is still painted in the bottom's colour, at half of it (the inside of the
+  legs, seen up a leg or under a hem) and with no ease; from 2 to 5 cm inside the cuts it is drawn in 6 mm
+  (not under a top worn over the bottom, which is cloth out past the shell), so no skin comes through at
+  any distance or on the finer close-up body; a top tucked in loses its ease under the waistband.
+
+It has no `lod.` copy and no seated corrective (its tone's xyz are 0), casts no shadow of its own (the
+low-detail body casts the resident's) and does not sway (its hem distance is out of reach). Babies, pyjamas,
+the towel and swimwear stay painted (`bare`, texel 8 a = 0). A resident near the camera in a bottom with legs
+costs 824 triangles more, and each body and life stage in view one draw more.
+
+A regular top (`top.tee`, `top.vneck`, `top.polo`, `top.long`, `top.shirt`, `top.tank`, `top.blouse`;
+`outfit.ts` `REGULAR`; not the jacket, the suit or the apron, shells of their own over a painted shirt) is worn
+the same way as one shell, `top.long` (clothes.rs `tops`): the body's surface wherever any of them covers, with
+6 mm to spare. Its cut is the top's whole predicate (sleeve, hem, crew, scoop), from the body's four fields
+(fields.w and the tone's x, y, z); its ease is the painted top's (`EASE`: the hang from the chest, the
+sleeves, flat under a skirt's shell), but no thinner than 0.7 of it at the neckline (the painted cloth thins
+to a quarter there; a shell 1 mm off the skin lies in it), and none under the trousers' waistband for a top
+tucked in, which also ends 2 cm under the waistband whatever its own hem (`CUT.tuck`: the bottom is over it
+there). Its bands are the painted ones (cuffs, hem, the neck's rib or binding); the polo's and the shirt's
+collars are their own shells on it as before. The body under it keeps the top's paint without ease, drawn in
+6 mm and at half its colour from 2 to 5 cm inside the cuts (texel 8 a = 2, or 3 with the trousers' shell). A
+resident drawn with the close-up body (the creator's stage) keeps the top painted (`outfitFor`'s `painted`):
+at the face view a level-1 shell's shoulders and neckline are corners where the close-up body's are round. A
+resident near the camera in a regular top costs 1,160 to 1,212 triangles more, and each body and stage in view
+one draw more.
 
 The shirt under an open jacket or suit has its own colour (outfit.ts `shirtUnder`): white under a
 suit, a charcoal tee under a light jacket, a white or grey one under a dark one. It is painted on the
@@ -494,7 +544,9 @@ Garment ids per family (outfit.ts):
 | 5 | skin reference (1) | bottom: leg cut |
 | 6 | shoe colour | shoes: the sock's top |
 | 7 | eye colour | 1 if the resident wears hair (the scalp takes the hair colour) |
-| 8 | r, g = how loose the top and the bottom are (0..1: how far the painted cloth stands off the skin, `EASE`); b = 1 if the bottom has a shell round the hips (a skirt) | 0 |
+| 8 | r, g = how loose the top and the bottom are (0..1: how far the painted cloth stands off the skin, `EASE`); b = 1 if the bottom has a shell round the hips (a skirt) | 1 if the bottom is worn as the trousers' shell (a bottom with legs, in day clothes, not a baby), 2 if the top is worn as the long top's (a regular top, likewise; not on the close-up body), 3 for both |
+| 9 | the hair's lag: how far a loose end of the hair is drawn from where the head carries it (m, world axes, at looseness 1) | the shoulder line (m, at rest on the resident's body) |
+| 10 | the hems' lag: the same for a shell's hem | the height under which a shell's hem is loose (m, at rest on the resident's body: 8 cm over the pelvis joint on a grown one) |
 
 Then 20 texels of face morph (channel, weight) pairs, two a texel, a weight of 0 unused (`layout.ts`):
 
@@ -503,7 +555,44 @@ Then 20 texels of face morph (channel, weight) pairs, two a texel, a weight of 0
 | 12 (`EXPRESSION_TEXELS`) | the expression: the 24 strongest of the expression channels (`face.ts` `FaceMixer`); a first channel of -1 means no morphs at all on this face this frame (too small on screen, `parts.ts` `MORPH_PX`) | every frame the face is posed |
 | 8 (`IDENTITY_TEXELS`) | the resident's own face: the 16 identity channels at the look's weights, signed, times the body's `faceScale` (`identity.ts` `writeIdentity`) | once, when the resident is built |
 
-A row is 33 x 3 + 9 + 20 = 128 texels (it was 120). Disabled cuts are -10 (+10 for "below" cuts).
+A row is 33 x 3 + 11 + 20 = 130 texels (128 before the lag texels). Disabled cuts are -10 (+10 for "below" cuts).
+Texels 0 to 8 are the outfit's, written when a resident changes clothes (`writeOutfit`); 9 and 10 are written
+every frame a resident is posed (`residents.ts` `writeSway`).
+
+### Hair and hems that move
+
+Hair that hangs and the hems of the shells move after the body, with no bones of their own
+(`characters/sway.ts`). Per resident there are two lag vectors, the hair's and the hems', each a point on
+a damped spring towed by a place fixed to the head (behind the neck) or to the hips (between the
+thighs), so setting off, stopping, a turn of the head or the hips' sway swing it. The spring is stepped
+in closed form from the towing point's change of velocity each frame, so the motion is the same at any
+frame rate; the air holds it back by 2 cm per m/s (a runner's hair streams); what is drawn is no further
+than 13 cm (hair) or 7 cm (hems) on a grown body, keeps part of the vertical lag only and hardly any
+downward, scales with the body, and has a dead band of 1.5 mm, so a resident standing still (breathing,
+shifting their weight) moves nothing. None far off (`poseFar`), lying down (by how upright the head and
+the hips are), on a new resident's first frame, or, for the hems, seated (the seated share, texel 4 b).
+The game being paused holds it.
+
+The character shader (`character.ts` `gameSimSway`, in the per-material `transformInstancingVS`, GLSL
+and WGSL) adds `lag x looseness` to the skinned position of every hair and shell vertex:
+
+- hair and wisps: looseness is tone.x, baked by `hair.rs` (`Comp::sway`, `finish`): 0 on everything that
+  lies on the head, and on the long style's curtain, the ponytail's tail and the braid (strands, tie
+  and tuft) rising to 1 at the tips: along a tail or a braid as the 1.3rd power of how far along it a
+  vertex is, on the curtain as the 1.5th power of its depth below the ears (0.4 head heights over the
+  chin), all of it 1.2 head heights further down. A wisp has its hair vertex's tone, so it goes with it;
+- shells: from the distance to the hem (fields.x): all of it at the hem, none 30 cm up a skirt or 12 cm
+  up a top's shell (the jacket, the suit, the apron), as the 1.5th power between; only under the hips
+  (texel 10 w: a jacket's lapels and collar are open edges too), not on shoes; the `lod.` copies and
+  the shadow copies the same.
+
+Never into the body: the part of the offset that points in to the body's own axis (the vertical
+through the rest pose's origin, as the vertex's skin turns it) is left out, so hair swings round the
+neck and out from it and a hem off the legs. Under the shoulder line (texel 9 w) the body is taken as
+a wall across, the back: hair there keeps its way along the back and loses all of it towards the back
+(with the axis alone, hair beside the spine went into the shoulder blades on a stop). The normals are
+left as they are. Every preset has it: a texel read and a dozen operations per hair or shell vertex,
+and two springs per resident on the CPU.
 
 `appearance.face` is the resident's own face: identity channel name (without `id.`) -> -1..1, 0 or
 missing as the shared face has it (household.ts `FACE_CHANNELS`, `FACE_GROUPS` for the creator's
@@ -613,6 +702,21 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
   inside one, in a hug, kiss, fight or cuddle only the head; seated the head and, sat plainly, a third of the back;
   lying, a baby or under stage directions (the creator, portraits) none. It eases in over about a second. The pace
   is sim-core's: an emotion's `walkSpeed` (content `emotions`), the walk matched to it as to any.
+- Setting off and stopping (`characters/stride.ts`): a foot on the floor stays where it is. A gait begun from a stand
+  starts where it is nearest to that stand (`gaitPhase`: one foot under the hip, the other passing it, on either
+  foot; from a stop cut short, the stride that was left), its legs take the gait's pose in 0.1 s while the rest of
+  the body fades (0.2 s, shorter on shorter legs), the foot it stands on kept where it stood, and until the fade is
+  over the cycle goes on by the way the body has gone, not by the clock (the speed the rate is matched to is taken
+  as it is then, not eased). A gait left for a standing pose stops with the body, and the feet come to where that
+  pose has them one at a time, each in a step through the air (0.12 s and 0.5 s per metre it goes, 0.3 s at most;
+  lifted 22 % of the way, 4.5 cm at most): first the one in the air, or with both down the one behind, the other
+  kept where it stands meanwhile; the fade is as long as its two steps. The legs are put on those points (`legPin`:
+  turned at the hip and bent at the knee, as additive rotations) over whatever the pelvis' fade does above them; a
+  fade cut short holds them as drawn (`legBake`) and steps on from there. Not for a baby, nor to a pose that is no
+  stand (onto a saddle, a seat's clip part way): those fade as before. The walk's hip roll (`GAIT_SWAY`) turns the
+  pelvis and leaves the legs as the clip has them (the thighs turned back by it, the body lifted by what the
+  standing hip drops): rolled with the pelvis, the standing foot went 6 cm sideways over the floor and back at
+  every step of a woman's walk. Measured on the runtime by `tools/characters/transitions.ts` (below).
 - Turning on the spot (`characters/turns.ts`): standing free, a turn of 35° or more steps round with a turn clip
   (`turnR90`, `turnL180Child`, …: below), the Sim's yaw following the clip's steps (`turnShare`) so a planted foot
   stays put; smaller turns pivot on the feet. Not while walked in, inside or up on a thing, getting up, holding or
@@ -723,7 +827,17 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 lengths, sliding feet, the seated pelvis and feet (with the runtime's leg fit, `seatFit.ts`: on a 0.45 m seat, a
 child's on the kids' chair, and the knees clear of every deep seat's `front`), the floor sits' knees and ankles
 against the floor, `lie` and the baby's clips, and the turns on the spot, every size each way, a foot on the floor
-staying put as the clip's share of the turn turns the body (the list is in its header). The default is the reference: `male` at
+staying put as the clip's share of the turn turns the body (the list is in its header). It also holds how far a
+foot on the floor travels while a resident sets off and comes to a stop (check `travel` on `walk`: 70 mm at most
+over a start, 60 mm over a stop): `tools/characters/transitions.ts` runs the residents' own code
+(`residents.ts`, with a view that draws nothing) on a scripted snapshot, twelve residents per body and stage
+standing, walking at 1.5 m/s and stopping at twelve parts of the stride, and adds up the way each foot's contact
+point (the heel or the ball, whichever is lower) goes over the floor while it is within 4 mm of its standing
+height, from a tick before the start to 0.5 s after it and from a tick before the stop to 0.9 s after it. Before
+`stride.ts` that was 314 to 486 mm over a start and 193 to 278 mm on average (231 to 421 at worst) over a stop;
+it is 29 to 48 mm (56 at worst) and 10 to 15 mm (41 at worst). `bun tools/characters/blend_analysis.ts` prints
+the table (its section 6), with the travel of a second of plain walking beside it (12 to 47 mm: the standing
+foot's toes swivel a little as the hips turn over it; 40 to 227 mm before the hip roll left the legs alone). The default is the reference: `male` at
 `youngAdult`, plus `baby` for the baby's clips.
 Each body and stage plays the clips on its own skeleton (`restT`, the pelvis motion and ground
 speed scaled by `pelvisScale`, `walk`'s hip roll), the sized clips at the size its height picks,
@@ -828,7 +942,9 @@ rider, the seesaw), which they settle onto as before rather than walk through.
 | body and clothes | `body.rs`, `cage.rs`, `subdiv.rs`, `clothes.rs`, `garments.rs`, `meshops.rs` |
 | face and hair | `face.rs`, `hair.rs`, `prims.rs`; the eye, hair and brow branches of `render/pc/shaders/character.ts`; `characters/face.ts` |
 | a face per resident | `identity.rs` (the channels as differences, the mask), the amounts in `head.rs` and `face.rs`; `characters/identity.ts` (the row's identity texels, the eyes), `game/household.ts` (`Appearance.face`, `randomFace`, `FACE_GROUPS`) |
+| hair and hems that move | `characters/sway.ts` (the springs), `residents.ts` `writeSway`, `character.ts` `gameSimSway`, `hair.rs` `Comp::sway` |
 | clips | `clips/*` (with `clips/ik.ts`) |
+| setting off and stopping | `characters/stride.ts` (the gait's first phase, the legs' own fade, the feet's steps and pins), `residents.ts` (`start`, `fadeInto`, `holdFade`, the gait going on by the way gone); measured by `tools/characters/transitions.ts` |
 | the runtime | `render/shared/characters/residents.ts` (activities, seats, beds, carrying, faces; its tables in `actions.ts`, `seats.ts`, `socials.ts`, `expressions.ts`, `parts.ts`; drawn through `view.ts` by `pc/characters.ts`), `shared/characters/{data,pose,outfit,blanket}.ts`, `pc/characterMaterial.ts` and `pc/shaders/character.ts` (the shading), `pc/poseTexture.ts`; the creator in `ui/screens/CreateHousehold.svelte` and `render/preview` |
 
 See also `tools/characters/README.md`.
@@ -841,7 +957,8 @@ See also `tools/characters/README.md`.
   `?per=2` channels a line, `?faces=random`, `?faces=ends` for the sliders' corners; `?hairStyle=bob`, `?beard=1`; the
   `characters-identity*` pages of `tools/bench/render.mjs`),
   `?clip=<name>&t=<s>`, `?view=side|back`, `?closeup=1` (`?y=`: the height it looks at), `?build=1.2`, `?cols=`, `?manual`
-  (`__bench.advance(s)`); `?hd=1` draws everyone with the close-up body (the `characters-creator` pages of
+  (`__bench.advance(s)`); `?hair=long,ponytail,braid&body=walk&stop=1.5` walks a sheet's residents and stops them
+  (hair and hems swinging on; `&sway=0`: rigid, to compare; `&alpha=-1.57` from behind, `&alpha=0` in profile); `?hd=1` draws everyone with the close-up body (the `characters-creator` pages of
   `tools/bench/render.mjs` frame one resident as the creator's face view does, to shoot both); sets `window.__ready`.
 - `/previews.html?stage=male|female&zoom=1`: the household creator's stage itself (`?hd=0`: with the body, where it
   draws the close-up body; the `previews-stage` pages).

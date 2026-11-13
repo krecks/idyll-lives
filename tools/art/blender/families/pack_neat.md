@@ -35,12 +35,12 @@ and home.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.neat.steamMopDock` | 0.79 × 1.25 × 0.71 m | 3,036 (was 2,152) | 3 | Body, Mop |
-| `model.neat.laundryCenter` | 1.82 × 1.74 × 0.63 m | 7,278 (was 6,286) | 3 | Body, Washer & dryer |
-| `model.neat.rainShowerTower` | 0.90 × 2.20 × 0.90 m | 4,176 (was 2,528) | 4 | Body, Bench |
-| `model.neat.organizerDesk` | 1.60 × 1.25 × 0.91 m | 5,592 (was 4,064) | 3 | Body, Wood, Chair |
-| `model.neat.robotVacuumDock` | 0.86 × 0.52 × 0.86 m | 2,882 (was 2,100) | 3 | Body, Trim, Rug |
-| `model.neat.entryConsole` | 0.87 × 1.81 × 0.32 m | 4,308 (was 4,188) | 3 | Body, Wood |
+| `model.neat.steamMopDock` | 0.79 × 1.25 × 0.71 m | 3,036 (was 2,152) | 3,036 | Body, Mop |
+| `model.neat.laundryCenter` | 1.82 × 1.74 × 0.63 m | 7,278 (was 6,286) | 7,278 | Body, Washer & dryer |
+| `model.neat.rainShowerTower` | 0.90 × 2.20 × 0.90 m | 4,176 (was 2,528) | 4,176 | Body, Bench |
+| `model.neat.organizerDesk` | 1.60 × 1.25 × 0.91 m | 5,592 (was 4,064) | 5,592 | Body, Wood, Chair |
+| `model.neat.robotVacuumDock` | 0.86 × 0.52 × 0.86 m | 2,882 (was 2,100) | 2,882 | Body, Trim, Rug |
+| `model.neat.entryConsole` | 0.87 × 1.81 × 0.32 m | 4,308 (was 4,188) | 4,308 | Body, Wood |
 
 The plan's colour part is "Body" for all six: the white frames and docks (`body`), the robot's white dock and
 robot (`appliance`) and the shower's tiles (`tile`).
@@ -79,3 +79,7 @@ stuffed, poles, rails and hooks swept in one piece. Same keys, sizes, parts, cli
 cargo art pack_neat            # the six .glb, the pack, check-glb
 cargo art pack_neat --preview  # previews/pack_neat/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+The steam mop's spare pad lying askew is left unpinched (a corner is the model's outermost point). Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 4 models changed shape: `entryConsole`, `organizerDesk`, `robotVacuumDock`, `steamMopDock`; the same triangles.

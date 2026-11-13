@@ -7,7 +7,7 @@
       "url": "../../models/pack_hotHeaded/heavyBag.glb",
       "materials": {
         "bag": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.leather"
         },
         "chrome": {
           "finish": "material.finish.chrome"

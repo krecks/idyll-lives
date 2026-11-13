@@ -86,7 +86,7 @@ M = G.Palette(
     cap=('#2B2C2E', 'satin'),             # rubber feet
     frame_oak=('#CDB08A', 'wood'),        # the carver chair, the bar stool
     seat_oak=('#CDB08A', 'wood'),         # the bench's seat
-    leather=('#C08A52', 'satin'),         # the high bar stool's seat
+    leather=('#C08A52', 'leather'),       # the high bar stool's seat
     # storage
     body_walnut=('#7A5234', 'wood'),      # the sideboard
     top_sideboard=('#7A5234', 'wood'),

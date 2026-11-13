@@ -31,6 +31,7 @@ import * as pc from './engine';
 import { skyLighting, type SkyLighting } from './env';
 import { INSTANCE_COLOR_SEMANTIC, installGameChunks, patchEngineChunks, WALL_CUT_SEMANTIC } from './shaders/chunks';
 import { DIAG_VIEW_DEFINE } from './shaders/diagView';
+import { ROOM_LIGHT_ROOMS } from './shaders/roomLights';
 import { softLookWanted } from './shaders/softLook';
 import { withBuild } from '../../assets/build';
 import { materialTextures, optimizedUrl, type AssetRegistry } from '../../assets/registry';
@@ -226,8 +227,28 @@ export class RoomLightState {
   readonly band = new pc.Vec4(0, 0, WALL_HEIGHT, 0);
   private readonly bytes = new Uint8Array(ROOM_MASK_W * ROOM_MASK_H * 4);
   private shown: RoomMask | null = null;
+  /**
+   * The light of each room of the mask, a texel per room at its number there (`ROOM_LIGHT_ROOMS` of them): r how far
+   * its lamps' bounce is up (of `MaterialLibrary.setRoomBounce`), a the share of the sky's light that reaches into
+   * it. A room past the last, and every room until `setLight`, has the open sky's and no bounce.
+   */
+  readonly light: pc.Texture;
+  private readonly lightBytes = new Uint8Array(ROOM_LIGHT_ROOMS * 4);
 
   constructor(device: pc.GraphicsDevice) {
+    for (let i = 3; i < this.lightBytes.length; i += 4) this.lightBytes[i] = 255;
+    this.light = new pc.Texture(device, {
+      name: 'roomLight',
+      width: ROOM_LIGHT_ROOMS,
+      height: 1,
+      format: pc.PIXELFORMAT_RGBA8,
+      mipmaps: false,
+      minFilter: pc.FILTER_NEAREST,
+      magFilter: pc.FILTER_NEAREST,
+      addressU: pc.ADDRESS_CLAMP_TO_EDGE,
+      addressV: pc.ADDRESS_CLAMP_TO_EDGE,
+      levels: [this.lightBytes.slice()],
+    });
     this.mask = new pc.Texture(device, {
       name: 'roomLightMask',
       width: ROOM_MASK_W,
@@ -240,6 +261,27 @@ export class RoomLightState {
       addressV: pc.ADDRESS_CLAMP_TO_EDGE,
       levels: [this.bytes],
     });
+  }
+
+  /**
+   * Each room's light: `levels` holds, per room of the mask (its number there), how far its lamps' bounce is up
+   * and the sky's share (both 0..1); a room it leaves out has the open sky's and no bounce.
+   */
+  setLight(levels: ReadonlyMap<number, { bounce: number; sky: number }>): void {
+    const bytes = this.lightBytes;
+    let changed = false;
+    for (let id = 0; id < ROOM_LIGHT_ROOMS; id++) {
+      const v = levels.get(id);
+      const bounce = v ? Math.round(Math.min(1, Math.max(0, v.bounce)) * 255) : 0;
+      const sky = v ? Math.round(Math.min(1, Math.max(0, v.sky)) * 255) : 255;
+      if (bytes[id * 4] === bounce && bytes[id * 4 + 3] === sky) continue;
+      bytes[id * 4] = bounce;
+      bytes[id * 4 + 3] = sky;
+      changed = true;
+    }
+    if (!changed) return;
+    (this.light.lock() as Uint8Array).set(bytes);
+    this.light.unlock();
   }
 
   /** Shows `rooms` (null: none, every lamp lights everything). Returns whether anything changed. */
@@ -355,6 +397,8 @@ export class MaterialLibrary {
   readonly rooms: RoomLightState;
   /** The sky's hemispheric fill (linear, scaled by its intensity; `setSkyFill`). */
   private readonly skySky = new Float32Array(3);
+  /** The lamps' light off a room's walls and floor at the room's full level (`setRoomBounce`). */
+  private readonly roomBounce = new Float32Array(3);
   private readonly skyGround = new Float32Array(3);
   /** Where it comes from (PlayCanvas space, unit length). */
   private readonly skyDir = new Float32Array(3);
@@ -362,6 +406,7 @@ export class MaterialLibrary {
   private readonly uniforms: { id: pc.ScopeId; value: Float32Array; fill: (out: Float32Array) => void }[];
   private readonly mask: pc.ScopeId;
   private readonly roomMask: pc.ScopeId;
+  private readonly roomLight: pc.ScopeId;
 
   private constructor(readonly app: pc.AppBase) {
     const device = (this.device = app.graphicsDevice);
@@ -382,6 +427,7 @@ export class MaterialLibrary {
       ['game_hemiSky', 3, (o) => o.set(this.skySky)],
       ['game_hemiGround', 3, (o) => o.set(this.skyGround)],
       ['game_hemiDir', 3, (o) => o.set(this.skyDir)],
+      ['game_roomBounce', 3, (o) => o.set(this.roomBounce)],
       ['game_wallCutLook', 4, vec4(cut.look)],
       ['game_wallCutParams', 4, vec4(cut.params)],
       ['game_wallHole', 4, vec4(cut.hole)],
@@ -414,6 +460,7 @@ export class MaterialLibrary {
     this.uniforms = table.map(([name, size, fill]) => ({ id: scope.resolve(name), value: new Float32Array(size), fill }));
     this.mask = scope.resolve('game_windowlessMask');
     this.roomMask = scope.resolve('game_roomLightMask');
+    this.roomLight = scope.resolve('game_roomLight');
     this.pushUniforms();
     // The state as it is now, before every frame (a few uniforms: cheaper than tracking changes, no allocations).
     app.on('prerender', this.pushUniforms, this);
@@ -426,6 +473,7 @@ export class MaterialLibrary {
     }
     this.mask.setValue(this.dig.mask);
     this.roomMask.setValue(this.rooms.mask);
+    this.roomLight.setValue(this.rooms.light);
   }
 
   /**
@@ -679,6 +727,17 @@ export class MaterialLibrary {
     g[2] = ground.b * intensity;
   }
 
+  /**
+   * The lamps' light off a room's walls and floor, at a room's full level (`RoomLightState.light`): added to what the
+   * room's surfaces get from every side (linear, PlayCanvas's units).
+   */
+  setRoomBounce(bounce: RGB): void {
+    const r = this.roomBounce;
+    r[0] = bounce.r;
+    r[1] = bounce.g;
+    r[2] = bounce.b;
+  }
+
   /** Where the sky's fill comes from (game space; the game's is `SKY_FILL_DIRECTION`, the dev pages' straight up). */
   setSkyDirection(d: { x: number; y: number; z: number }): void {
     const len = Math.hypot(d.x, d.y, d.z);
@@ -880,8 +939,9 @@ function standIn(device: pc.GraphicsDevice, kind: 'white' | 'normal' | 'arm'): p
 }
 
 /**
- * A texture from the build's compressed copy (KTX2) when there is one, else from the file; a copy
- * that fails to load falls back to the file. Resolves to null when neither loads.
+ * A texture from the build's compressed copy (KTX2) when there is one, else from the file (a release
+ * ships the copy alone, `vite.config.ts` `optimizedAssets`: there is no file to retry). Resolves to
+ * null when it doesn't load.
  *
  * Always in a linear (UNORM) format, colour maps too, as the look was tuned with them (gamma-space
  * textures, without sRGB formats): a base or emissive colour map is then decoded where the material
@@ -904,17 +964,12 @@ export function textureWithFallback(app: pc.AppBase, source: string, anisotropy?
       app.assets.load(asset);
     });
   return load(copy)
-    .catch((err: unknown) => {
-      if (copy === url) throw err;
-      console.warn(`[render] compressed ${copy} failed, loading ${url}`);
-      return load(url);
-    })
     .then((texture) => {
       if (anisotropy !== undefined) texture.anisotropy = anisotropy;
       return texture;
     })
     .catch((err: unknown) => {
-      console.warn(`[render] texture ${url} unavailable`, err);
+      console.warn(`[render] texture ${copy} unavailable`, err);
       return null;
     });
 }

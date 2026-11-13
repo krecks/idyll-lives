@@ -847,10 +847,10 @@ def sunLounger():
         face = (0, G.cosd(a), G.sind(a))
         c = (0, y0 + 0.345 * along[1] + 0.012 * face[1], z0 + 0.345 * along[2] + 0.012 * face[2])
         F.soft('back_pad', 0.56, 0.68, 0.07, c, M.lounger_pad, rot=(-(90 - a), 0, 0), round=0.028, puff=0.01, flat=2,
-               piping=0.004, round_segments=1)
+               piping=0.004, round_segments=1, pinch=0.0)
         mid = (0, y0 + 0.585 * along[1] + 0.07 * face[1], z0 + 0.585 * along[2] + 0.07 * face[2])
-        F.soft('pillow', 0.42, 0.18, 0.08, mid, M.pillow, rot=(-(90 - a), 0, 0), round=0.035, puff=0.02, flat=2,
-               round_segments=1)
+        # (the pillow's top edge is the lounger's highest point: neither pinched nor drawn in, nor is the pad)
+        F.soft('pillow', 0.42, 0.18, 0.08, mid, M.pillow, rot=(-(90 - a), 0, 0), round=0.035, puff=0.02, pinch=0.0)
     back = G.hinged(G.join(back, 'back'), F.at(0, y0, z0))
     G.settle(centre=False)
     G.swing(back, 'recline', -30, seconds=1.0, axis='X')
@@ -949,7 +949,7 @@ def hammock():
             F.sweep(f'hem{s}', [(x, SLING_END - 0.002, s * (bar - 0.012)) for x in (-0.37, 0.37)], 0.012, M.sling, verts=6)
         head = SLING_LOW + (SLING_END - SLING_LOW) * (SLING_HEAD / SLING_HALF) ** 2
         F.soft('pillow', 0.4, 0.08, 0.26, (0, head + 0.03, -SLING_HEAD), M.pillow, rot=(12, 0, 0), round=0.035, puff=0.02,
-               flat=2, round_segments=1)
+               waist=0.012, pinch=0.006, resting=True)
     bed = G.hinged(G.join(bed, 'sling'), F.at(0, HOOK_Y, 0))
     G.settle(centre=False)
     G.rock(bed, 'sway', 8, seconds=2.0, axis='Y')

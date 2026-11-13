@@ -142,7 +142,7 @@ def steamMopDock():
         F.soft('spare_pad', 0.22, 0.02, 0.14, (0.27, 0.014, 0.16), M.towel_w, round=0.008, puff=0.004, flat=2,
                round_segments=1)
         F.soft('spare_pad_b', 0.22, 0.02, 0.14, (0.27, 0.036, 0.16), M.towel_c, rot=(0, 0, 8), round=0.008, puff=0.004,
-               flat=2, round_segments=1)
+               flat=2, round_segments=1, pinch=0.0)   # (askew: a corner is the model's outermost point)
     G.join(still, 'body', origin=(0, 0, 0))
     # The mop: pole, grip, water tank, head and pad, its origin at its head's foot: hidden while it's used
     # (`mop_off`), the game drawing it in the resident's hands (content `held`), pushed over the floor.

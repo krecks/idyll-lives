@@ -196,3 +196,7 @@ The game draws the cook's food on the grate and what they carried out beside it 
   the cook chops (the board at (0.65, 0)) and sets down the ingredients (behind the board) or the prepped bowl.
 - Both play their clip for any recipe's grilling step (`flip`), not only their own `cook` (a meal started at the
   fridge has no interaction there, only the step's tag), as the cookers do for `stir`.
+
+## The soft forms pass (2026-11-13)
+
+The hammock's pillow is sewn flat and stuffed (its sides drawn in 1.2 cm between corners that stand out, `waist`); the sun lounger's pad and pillow are left unpinched and the pillow whole, their top edge being the lounger's highest point. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 4 models changed shape: `hammock`, `patioChair`, `porchSwing`, `sunLounger`; 8,608 to 9,374 triangles.

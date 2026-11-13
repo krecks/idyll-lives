@@ -215,7 +215,7 @@
           "finish": "material.finish.chrome"
         },
         "inlay": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.leather"
         },
         "pen": {
           "finish": "material.finish.satin"
@@ -610,7 +610,7 @@
           "finish": "material.finish.metal"
         },
         "leather": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.leather"
         },
         "plastic": {
           "finish": "material.finish.satin"

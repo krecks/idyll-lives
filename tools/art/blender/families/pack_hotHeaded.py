@@ -25,7 +25,7 @@ import gamekit as G  # noqa: E402
 
 M = G.Palette(
     body=('#C49A6C', 'wood'),        # the grudge desk's oak top and its chair; the desk's main part
-    bag=('#C8402F', 'satin'),        # the heavy bag's leather
+    bag=('#C8402F', 'leather'),      # the heavy bag's leather
     crate=('#A87547', 'wood'),       # the smash crate and its lid
     shell=('#C8402F', 'gloss'),      # the drum shells
     zafu=('#5F7FA0', 'fabric'),      # the meditation cushion

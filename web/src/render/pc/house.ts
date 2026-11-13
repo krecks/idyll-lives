@@ -20,7 +20,7 @@ import type { Opening, StoreyLayout, WorldStructure } from '../../core/protocol'
 import type { ViewRect } from '../types';
 import type { RGB } from '../shared/environment';
 import type { Geo, MeshData } from '../shared/geometry';
-import { HOUSE_MATERIALS, HousePlanner, type DoorLeaf, type HouseLooks, type HousePart, type HousePlan, type LaidPreview, type SilhouettePlan, type SilhouetteSpec, type StoreyBuild } from '../shared/house';
+import { GLASS_OUT, HOUSE_MATERIALS, HousePlanner, type DoorLeaf, type HouseLooks, type HousePart, type HousePlan, type LaidPreview, type SilhouettePlan, type SilhouetteSpec, type StoreyBuild } from '../shared/house';
 
 /** A part as drawn: its entity (and the part). */
 export interface HouseMesh {
@@ -123,8 +123,12 @@ export class HouseBuilder {
     return this.roomGlow.set(g.r * k, g.g * k, g.b * k);
   }
 
-  /** Clear glass for windows and glazed doors of `room` (0: outdoors, shared; previews share one too). */
+  /**
+   * Clear glass for windows and glazed doors of `room` (0: outdoors, shared; previews share one too;
+   * `GLASS_OUT`: the pane a room looks out at the garden through, which never glows).
+   */
   private glassMaterial(room: number, cut: boolean): pc.StandardMaterial {
+    if (room === GLASS_OUT && cut) return this.lib.surface(HOUSE_MATERIALS.clearGlass, { vertexColors: true, cutaway: true, variant: 'out' });
     if (!room || !cut) return this.material(HOUSE_MATERIALS.clearGlass, cut);
     let mat = this.roomGlass.get(room);
     if (!mat) {

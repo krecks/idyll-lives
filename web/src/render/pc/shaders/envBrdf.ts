@@ -37,7 +37,7 @@ import { OUT } from './roomLights';
  */
 export const ROOM = { wall: '0.7', floor: '0.45', turn: '0.5' };
 
-/** The lines replaced and wrapped (also in `tools/render/check_chunks.ts`). */
+/** The lines replaced and wrapped (also in `tools/render/chunks.json`). */
 export const ENV_BRDF_ANCHORS = {
   glsl: {
     reflection: 'void addReflection(vec3 reflDir, float gloss) {',
