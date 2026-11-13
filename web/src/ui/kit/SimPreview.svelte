@@ -9,6 +9,9 @@
    * neutral silhouette shimmers in its place; only without `gender` or 3D support does a flat
    * illustration stand in (never briefly, so a face doesn't visibly swap for another).
    *
+   * A face on screen is drawn before those scrolled out of view (`priority`); a request whose face
+   * went away, or shows another look now, is withdrawn (not drawn for nobody).
+   *
    * `gender` defaults to the one the look was created for (drafts from `randomSim`).
    * `id` is the Sim's id in a running game (older saves derive clothes from it).
    * `animate` is accepted for compatibility and ignored.
@@ -22,6 +25,16 @@
   }: { appearance: Appearance; gender?: string; id?: number; size?: number; animate?: boolean } = $props();
 
   let url = $state<string | null>(null);
+  let box: HTMLSpanElement;
+  /** On screen (or near it): its portrait is wanted first. */
+  let seen = $state(typeof IntersectionObserver === 'undefined');
+
+  $effect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    const watch = new IntersectionObserver((entries) => (seen = entries[entries.length - 1].isIntersecting), { rootMargin: '120px' });
+    watch.observe(box);
+    return () => watch.disconnect();
+  });
   /** No 3D portrait possible: show the flat illustration instead. */
   let flat = $state(false);
 
@@ -39,24 +52,25 @@
       flat = false;
       return;
     }
-    let alive = true;
+    const priority = seen ? 'now' : 'idle';
+    const asked = new AbortController();
     // A new look keeps the previous portrait until its own is ready (no flash in between).
     // Coalesce quick changes (sliders) and let siblings join the same batch.
     const timer = setTimeout(() => {
-      void services.previews.portrait(look).then((u) => {
-        if (!alive) return;
+      void services.previews.portrait(look, { priority, signal: asked.signal }).then((u) => {
+        if (asked.signal.aborted) return;
         if (u) url = u;
         flat = !u && !url;
       });
     }, 90);
     return () => {
-      alive = false;
+      asked.abort();
       clearTimeout(timer);
     };
   });
 </script>
 
-<span class="sim-portrait" style="width:{size}px;height:{size}px" aria-hidden="true">
+<span class="sim-portrait" bind:this={box} style="width:{size}px;height:{size}px" aria-hidden="true">
   {#if url}
     {#key url}<img src={url} alt="" width={size} height={size} draggable="false" />{/key}
   {:else if !flat}

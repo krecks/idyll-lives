@@ -864,6 +864,11 @@ pub(crate) fn update(w: &mut World) {
                 if t.current.as_ref().is_some_and(|a| !a.task.directed) {
                     end_activity(t, content, objects);
                 }
+                // (Nor an outing of their own still to go on with, queued: on a bike to a place,
+                // asked over, they were let in and off to the place a moment after, Oakwood.)
+                t.queue.retain(|q| {
+                    q.directed || !matches!(q.kind, TaskKind::Visit { plot } if plot != home)
+                });
                 // (Not as well as a visit there already on its way: they went twice, knocking
                 // again just let in, Mirrorpool.)
                 let there = |k: &TaskKind| matches!(k, TaskKind::Visit { plot } if *plot == home);

@@ -592,10 +592,13 @@ const CORNER_ON = 0.6;
 const nv = (v: Pt2): V3 => [v[0], 0, v[1]];
 
 /**
- * A junction's markings: on each arm into a street or lane, a zebra crosswalk across its
- * carriageway (`walkFrom`..`walkTo`) and a stop line across the half coming in (traffic keeps to
- * the right: the clockwise side of the way out) at `stop`; on a country road's arm, only the stop
- * line, and only when it's lit (no sidewalks to cross between).
+ * A junction's markings: on each arm with a crosswalk (`ArmPlan.crosswalk`, as the simulation
+ * has them: a lit junction's streets' and lanes' arms, one giving way's street, on one of its two
+ * arms), a zebra across its carriageway (`walkFrom`..`walkTo`) and a stop line across the half
+ * coming in (traffic keeps to the right: the clockwise side of the way out) at `stop`; on a lit
+ * junction's other arms (a country road's: no sidewalks to cross between), only the stop line; on
+ * one giving way's, nothing (cars give way there by the claims, and stop only for those on a
+ * zebra).
  */
 function junctionMarks(j: JunctionPlan, marks: Geo): void {
   marks.color(PAINT, PAINT_FINISH);
@@ -605,8 +608,8 @@ function junctionMarks(j: JunctionPlan, marks: Geo): void {
     const half = A.half - MARK_IN;
     if (half <= 0.5) return;
     // (Not past the end of a road that ends there.)
-    if ((A.walks || A.lit) && A.stop <= A.room) rect(a, A.stop - STOP_LINE, A.stop, -half, 0);
-    if (!A.walks || A.walkTo - A.walkFrom < 1 || A.walkTo > A.room) return;
+    if ((A.crosswalk || A.lit) && A.stop <= A.room) rect(a, A.stop - STOP_LINE, A.stop, -half, 0);
+    if (!A.crosswalk || A.walkTo - A.walkFrom < 1 || A.walkTo > A.room) return;
     // The stripes across the carriageway, as many as fit, the middle of the road between two or on one.
     const n = Math.max(1, Math.floor((2 * half + STRIPE_GAP) / (STRIPE + STRIPE_GAP)));
     const span = n * STRIPE + (n - 1) * STRIPE_GAP;

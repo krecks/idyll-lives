@@ -325,7 +325,11 @@ fn worn_out_with_the_bladder_low_the_toilet_comes_first_then_bed() {
 /// has a double bed and a race car bed: Ravi, too old for that, fell asleep on the floor the
 /// first night and his father the next two (kept out of the bedroom Ravi was in). To 1 am on day
 /// 3, after Ravi turns 18 at midnight: the parents in their bed, Ravi on the sofa, nobody on the
-/// floor.
+/// floor. (Since most junctions give way, Ravi's walk home goes along the roads, not over open
+/// ground as when every junction's box was kept off those on foot: home at half past one, not a
+/// quarter to twelve. Worn out for two hours of it, he dropped on the doorstep; he sets off with
+/// energy enough to get home on, as he did in the owner's game: what's tested is where they
+/// sleep there.)
 #[test]
 fn nobody_on_birch_road_sleeps_on_the_floor() {
     let path =
@@ -337,6 +341,8 @@ fn nobody_on_birch_road_sleeps_on_the_floor() {
         [&w.sims[jonah].name, &w.sims[elif].name, &w.sims[ravi].name],
         ["Jonah", "Elif", "Ravi"]
     );
+    let energy = need(&w, "energy");
+    w.sims[ravi].needs[energy] = w.sims[ravi].needs[energy].max(0.4);
     let plot = w.households[36].plot.unwrap();
     common::look_at(&mut w, plot);
     let end = clock::tick_at(3, 60.0).unwrap();

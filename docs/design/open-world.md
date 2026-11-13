@@ -123,15 +123,36 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   onto the pavement and pass. Cars take turns where their ways cross or meet (junctions' boxes,
   where two roads cross or touch between their ends too, driveway and bay mouths, a 6 m lane's
   tight bend): one queue of claims, granted in the order asked (`sim-core/src/traffic.rs`).
-- Traffic lights (`traffic::Signal`, `traffic::settle`, worked out again on load): every junction
-  where `SIGNAL_ARMS` (3) roads for cars or more meet is lit. Its arms make phases: two more than
+- Junctions giving way (the owner's call, 2026-11-13: lights and zebras at every junction had cars
+  stopping at a quiet side street's crosswalks for nobody). A junction is where `SIGNAL_ARMS` (3)
+  roads for cars or more meet; only a big one is lit (`Signal::lit`, `Travel::signals`): where
+  `LIT_ARMS` (4) arms or more meet, or `LIT_MAIN_ARMS` (3) of them are streets' or country roads'
+  (two main roads meeting: a street through it has two arms, a road meeting it the third), and a
+  roundabout's. In the sample worlds of seed base 0 that's 408 of 1860 junctions (17 a world, 77
+  before). Every other one gives way (`Travel::give_way`): cars take turns through its box by the
+  claims as at any junction, and its zebras are on a street's arm only, one of a street's two
+  through it (the first round; a lane meeting a street is crossed as anywhere): 573 in all, and 662
+  at the lit ones (4606 before). A car stops at such a zebra's stop line only for someone on foot on
+  it or stepping onto it (`ZEBRA_LOOK` 1.5 m along their way: `traffic::on_crossings`), or on the
+  zebra of the arm it goes out by (`traffic::zebra_stops`, `cars::zebra_yield`), waiting for them by
+  name (`Car::on_foot`: they don't wait for it in turn); else it drives on. Those only stepping onto
+  it it waits for `ZEBRA_KERB_WAIT` 6 s at most (a stream of them, the next wait for it to pass, as
+  anywhere), those on it `ZEBRA_WAIT` 30 s (then it comes on up to them as to anyone in its way,
+  `go_on`). The junction's box takes in its zebras as a lit one's crosswalks (no queue stands on
+  one).
+- Traffic lights (`traffic::Signal`, `traffic::settle`, worked out again on load), at the big
+  junctions. Its arms make phases: two more than
   150° apart share one, an arm with none across from it has its own (a crossroads two, a T two:
   the road through, then the side road; `SignalArm::phase`); of those, one road's two arms through
   it first, then two of a kind, each the most nearly opposite first (`phases_of`: a country road
   16° off a street, straighter on than the street's own way, took the street's arm's place, and
   the street's two arms were never green together, Canalside's j35). One phase is green at a time,
   actuated as the arms were (`MIN_GREEN` 5 s, its share of `CYCLE` 50 s, `AMBER` 2 s, `ALL_RED`
-  4 s); a turn across those coming the other way on the same green is left to the claims. Only a
+  4 s); a car within `APPROACH` (2 s of drive time) of its stop line counts as coming to its green
+  (`Traffic::approaching`), so a green isn't cut short in front of it; and nobody waiting anywhere
+  nor coming, the lights go back to the main road's phase and rest there (`Signal::rest`: its
+  streets' and country roads' arms; a roundabout's stays where it is). A turn across those coming
+  the other way on the same green is left to the claims. Only a
   car's way through a junction's box (within `GATE_THROUGH` 7 m of its middle) goes by its lights,
   on the phase of the arm it comes in by, of the first junction it goes through (`traffic::gate`;
   not one it only comes near, out of a driveway by it). A lit junction's box takes in its
@@ -167,9 +188,13 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   junction there: the stretch between them has no crosswalk (`walk_from` = `walk_to`: no zebra,
   no pedestrians' head) and its stop lines are half way. A
   walk phase follows the cars' (`Signal::walk_phase`): brought round only by someone on foot
-  waiting at the junction's crosswalks, every arm red, the crosswalks open for `WALK_OPEN` 5 s,
-  then its clearance (the widest arm at `WALK_PACE` 1 m/s, 3 s at least), then `ALL_RED`; walk
-  timing stays on the real clock (people don't hurry for the cars' clock). Those on foot cross a
+  waiting at the junction's crosswalks now (one who took a turn this tick and didn't wait at the
+  kerb in it no longer asks: a request standing on for a far resident's turn brought walks round
+  for nobody), every arm red, the crosswalks open for `WALK_OPEN` 5 s at most, then its clearance
+  (the widest arm at `WALK_PACE` 1 m/s, 3 s at least), then `ALL_RED`; the open time is over once
+  nobody waits at the kerbs nor is on the crosswalks (after `WALK_LEAST` 1 s), and the clearance
+  once nobody's on them (`Traffic::crossing`). Walk timing stays on the real clock (people don't
+  hurry for the cars' clock). Those on foot cross a
   lit junction on its zebras only: its box, and each arm's carriageway out past its stop line by
   `KEEP_OFF` 3 m but for the zebra (an arm without one, out to the box's edge), are blocked to
   them for good (`Signal::off_limits`, `Travel::junction_tiles`, in `ground_blocked`), so their
@@ -197,7 +222,7 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   for good at a corner); nor does anyone a car waits for by name wait for it in turn (one backing
   out of a bay by a junction and a cyclist behind it waited for each other for good:
   `cars::in_the_way`). Only an arm into a street or a lane has a crosswalk
-  (`SignalArm::crosswalk`, the renderer's rule for its zebra and pedestrians' head): a country
+  (`SignalArm::crosswalk`, sent to the renderer for its zebra and pedestrians' head): a country
   road's arm is crossed as a road anywhere else, and where only country roads meet there is no walk
   phase. Crossing a road away from the junctions is as before. A roundabout's junctions (a road with `island`) keep an arm a
   phase, the pole just past the box, cars waiting at the box's edge, no crosswalks and no walk.
@@ -209,9 +234,11 @@ All optional; absent means today's behaviour. Types in `web/src/core/protocol.ts
   ring. The worlds' layout doesn't lay a country road from a street's end that another area's
   street comes up to (`macro.ts` `continued`: it ran on beside that street and crossed it).
 - The structure's `junctions` (`JunctionInfo`, `web/src/core/protocol.ts`): every lit junction in
-  the snapshot's signal head rows' order, `{x, z, roundabout?, arms: {road, dir, width, walkFrom,
-  walkTo, stop, light}[]}` (the arm's `meta.roads` index, its unit way out, the carriageway kerb to
-  kerb, its crosswalk and stop line in m out from the middle, its head's snapshot row or null);
+  the snapshot's signal head rows' order, then those giving way, `{x, z, roundabout?, arms: {road,
+  dir, width, walkFrom, walkTo, stop, crosswalk, light}[]}` (the arm's `meta.roads` index, its unit
+  way out, the carriageway kerb to kerb, its crosswalk and stop line in m out from the middle,
+  whether there's a zebra there, its head's snapshot row or null: the renderer draws a zebra and
+  its stop line where `crosswalk` is, a stop line alone on a lit arm without one);
   `lightPoles` stays for the kerbside furniture. The snapshot's light rows are as before; every
   head of a junction shows `STATE` 3 (walk) while its walk phase lets people step out, red in its
   clearance. `snapshot::MAX_LIGHTS` is 512, a row for every head (the generated worlds have up to

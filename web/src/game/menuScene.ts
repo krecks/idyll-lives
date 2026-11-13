@@ -13,6 +13,7 @@ import { host } from './host';
 import { generateNeighbourhood, loadTemplates, type NeighbourhoodDraft, type Templates } from './town';
 import { previewWorld } from './townPreview';
 import { perfPhase, perfTime, perfTimeAsync } from '../debug/perf';
+import { layoutTags, type Box, type TagSpot } from './tagLayout';
 
 /** Golden hour on the title screen: low warm sun, long shadows, no lamps yet. */
 export const MENU_MINUTE = 18 * 60 + 20;
@@ -184,9 +185,13 @@ class MenuScene {
     return p ? p.id : null;
   }
 
-  /** Pins `el` above a plot (its house's roof); positioned every frame while shown. Returns a detach function. */
-  pin(plot: number, el: HTMLElement): () => void {
-    const entry: Label = { el, x: 0, y: -1000, z: 0, px: NaN, py: NaN, shown: false, crowded: false, edge: false, w: 150, h: 40, sx: 0, sy: 0, order: 0 };
+  /**
+   * Pins `el` above a plot (its house's roof); positioned every frame while shown. `rank`: its kind's place when tags
+   * compete for room (the lower first); `capped`: a household's, of which only so many show at once (`tagLayout.ts`).
+   * Returns a detach function.
+   */
+  pin(plot: number, el: HTMLElement, rank = 0, capped = false): () => void {
+    const entry: Label = { el, x: 0, y: -1000, z: 0, px: NaN, py: NaN, shown: false, crowded: false, edge: false, w: 150, h: 40, spot: { sx: 0, sy: 0, w: 150, h: 40, rank, capped, wins: null, x: 0, y: 0, crowded: false } };
     el.style.visibility = 'hidden';
     this.labels.set(plot, entry);
     this.anchor(plot, entry);
@@ -278,27 +283,24 @@ class MenuScene {
   }
 
   /**
-   * Per overview frame: lays out the pinned tags in screen space. Each tag wants to sit above its
-   * lot, inside the stage; in priority order (selected and hovered lots first, then nearer lots,
-   * i.e. lower on screen) each takes the free spot nearest to that, next to the tags already
-   * placed and clear of the UI over the town. Writes transforms only for tags that moved. A lot
-   * whose tag has no room above it (or that is well outside the town in view) gets none: clamped,
-   * such tags floated over empty ground and stacked up in the haze under the header.
+   * Per overview frame: lays out the pinned tags in screen space (`tagLayout.ts`: each above its lot, inside the
+   * stage and clear of the UI over the town, the selected and hovered lots' first, then households', then places').
+   * Writes transforms only for tags that moved. A lot whose tag has no room above it (or that is well outside the
+   * town in view) gets none: clamped, such tags floated over empty ground and stacked up in the haze under the header.
    */
   private readonly positionLabels = () => {
     const r = this.live;
     if (!r || !this.labels.size) return;
     const b = this.bounds;
-    const area = b ? { left: b.left + 8, top: b.top + 8, right: b.right - 8, bottom: b.bottom - 6 } : { left: 8, top: 8, right: window.innerWidth - 8, bottom: window.innerHeight - 8 };
+    const area: Box = b ? { l: b.left + 8, t: b.top + 8, r: b.right - 8, b: b.bottom - 6 } : { l: 8, t: 8, r: window.innerWidth - 8, b: window.innerHeight - 8 };
     const blocks: Box[] = [];
     for (const el of this.obstacles) {
       if (!el.isConnected) continue;
       const o = el.getBoundingClientRect();
       if (o.width && o.height) blocks.push({ l: o.left - 6, t: o.top - 6, r: o.right + 6, b: o.bottom + 6 });
     }
-    const placed: Label[] = [];
     // A low camera still projects a hamlet over the horizon onto the stage, over empty ground: a lot
-    // well outside the town the shot frames has no tag.
+    // well outside the town the shot frames has no tag (unless it is the one selected or pointed at).
     const f = this.framed;
     const onTown = (plot: number) => {
       if (!f) return true;
@@ -310,76 +312,34 @@ class MenuScene {
     };
     // The tag's box has to fit above its lot inside the stage. The selected and hovered lots' tags
     // are still shown when it doesn't (pulled in, and moved out from under the header): they win.
-    const room = (x: number, y: number, h: number) => x >= area.left && x <= area.right && y - h >= area.top && y <= area.bottom;
-    const wins = (plot: number) => plot === this.focusPlots[0] || plot === this.focusPlots[1];
+    const room = (x: number, y: number, h: number) => x >= area.l && x <= area.r && y - h >= area.t && y <= area.b;
+    const wins = (plot: number) => (plot === this.focusPlots[0] ? 0 : plot === this.focusPlots[1] ? 1 : null);
+    const placed: Label[] = [];
     for (const [plot, label] of this.labels) {
-      const visible =
-        label.y > -100 && r.project(label.x, label.y, label.z, this.out) && onTown(plot) && (wins(plot) || room(this.out.x, this.out.y, label.h + STEM));
+      const won = wins(plot);
+      const visible = label.y > -100 && r.project(label.x, label.y, label.z, this.out) && (won !== null || (onTown(plot) && room(this.out.x, this.out.y, label.h + STEM)));
       if (visible !== label.shown) {
         label.shown = visible;
         this.showLabel(label);
       }
       if (!visible) continue;
-      label.sx = this.out.x;
-      label.sy = this.out.y;
-      label.order = plot === this.focusPlots[0] ? -2e5 : plot === this.focusPlots[1] ? -1e5 : -this.out.y;
+      const spot = label.spot;
+      spot.sx = this.out.x;
+      spot.sy = this.out.y;
+      spot.w = label.w;
+      spot.h = label.h + STEM;
+      spot.wins = won;
       placed.push(label);
     }
-    placed.sort((a, c) => a.order - c.order);
-    const done: Box[] = [];
-    const clampX = (x: number, w: number) => Math.min(area.right - w / 2, Math.max(area.left + w / 2, x));
-    const clampY = (y: number, h: number) => Math.min(area.bottom, Math.max(area.top + h, y));
+    layoutTags(placed.map((l) => l.spot), area, blocks);
     for (const label of placed) {
-      const w = label.w;
-      const h = label.h + STEM;
-      // The anchor (x, y) is the stem's foot: the box spans [x - w/2, x + w/2] x [y - h, y].
-      const wx = clampX(label.sx, w);
-      const wy = clampY(label.sy, h);
-      // Inside the town's part of the screen (a tag taller or wider than that has nowhere to go).
-      const inside = (x: number, y: number) => y - h >= area.top - 0.5 && y <= area.bottom + 0.5 && x - w / 2 >= area.left - 0.5 && x + w / 2 <= area.right + 0.5;
-      const free = (x: number, y: number) => {
-        const box = { l: x - w / 2, t: y - h, r: x + w / 2, b: y };
-        return inside(x, y) && !blocks.some((o) => overlaps(box, o)) && !done.some((o) => overlaps(box, o));
-      };
-      // Candidates: the wanted spot, and spots just beside every tag placed and every obstacle
-      // (above, below, left, right and the diagonals); the free one nearest the lot wins.
-      let x = wx;
-      let y = wy;
-      if (!free(wx, wy)) {
-        let best = Infinity;
-        const tryAt = (cx0: number, cy0: number) => {
-          const cx = clampX(cx0, w);
-          const cy = clampY(cy0, h);
-          // Vertical moves read better than sideways ones (the tag stays over its column).
-          const cost = Math.abs(cx - label.sx) * 1.4 + Math.abs(cy - label.sy);
-          if (cost < best && free(cx, cy)) {
-            best = cost;
-            x = cx;
-            y = cy;
-          }
-        };
-        const around = [...done, ...blocks];
-        for (const o of around) {
-          for (const cx of [wx, o.l - w / 2 - 3, o.r + w / 2 + 3]) for (const cy of [wy, o.t - 3, o.b + h + 3]) tryAt(cx, cy);
-        }
-        // Crowded corner: combine edges of different boxes (rare, a little more work).
-        if (best === Infinity) {
-          const xs = [wx, ...around.flatMap((o) => [o.l - w / 2 - 3, o.r + w / 2 + 3])];
-          const ys = [wy, ...around.flatMap((o) => [o.t - 3, o.b + h + 3])];
-          for (const cx of xs) for (const cy of ys) tryAt(cx, cy);
-        }
-      }
-      // Nowhere free (a small window, the town packed into a corner): this tag waits, hidden,
-      // rather than covering one that ranks higher. Its lot is still there to click, and listed.
-      // (The selected or hovered lot's tag shows whatever it covers, unless the town has no room for it at all.)
-      const crowded = label.order > -1e5 ? !free(x, y) : !inside(x, y);
+      const { x, y, crowded, sx, sy } = label.spot;
       if (crowded !== label.crowded) {
         label.crowded = crowded;
         this.showLabel(label);
       }
       if (crowded) continue;
-      done.push({ l: x - w / 2, t: y - h, r: x + w / 2, b: y });
-      const edge = Math.abs(x - label.sx) > 2 || Math.abs(y - label.sy) > 2;
+      const edge = Math.abs(x - sx) > 2 || Math.abs(y - sy) > 2;
       if (edge !== label.edge) {
         label.edge = edge;
         label.el.classList.toggle('edge', edge);
@@ -396,13 +356,6 @@ class MenuScene {
 const STEM = 10;
 /** How far (m) outside the town a shot frames a lot may be and still have its tag (a lot or two around it). */
 const REACH = 60;
-
-interface Box {
-  l: number;
-  t: number;
-  r: number;
-  b: number;
-}
 
 interface Label {
   el: HTMLElement;
@@ -421,12 +374,8 @@ interface Label {
   /** Tag size on screen (CSS pixels). */
   w: number;
   h: number;
-  /** Projected anchor this frame, and layout priority. */
-  sx: number;
-  sy: number;
-  order: number;
+  /** Its place in this frame's layout (`tagLayout.ts`). */
+  spot: TagSpot;
 }
-
-const overlaps = (a: Box, b: Box) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
 
 export const menuScene = new MenuScene();

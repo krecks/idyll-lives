@@ -1,20 +1,24 @@
 /**
  * `SimPreviews`: the household-creator stage and Sim portraits, from one small PlayCanvas app
  * (`studio.ts`, beside the game's) that runs only while it has work: a stage attached, or portraits
- * to draw. It is destroyed a few seconds after the last of either, except while a game keeps it
- * (`keep`): then it only stops drawing, and new faces in play find its shaders compiled (portraits
- * are cached for the page).
+ * to draw. It is destroyed a few seconds after the last of either, except while kept (`keep`: a
+ * game; the page, once the boot has warmed it up): then it only stops drawing, and new faces find its
+ * shaders compiled. Portraits
+ * are cached for the page, and kept between visits (`PortraitStore`).
  *
  * Portraits asked for ahead of time (`prefetch`: a whole town's) are drawn the first few at once
  * (the household's, who the caller puts first: behind the loading screen), the rest a few at a time
- * in idle moments, not a town's worth in the first seconds of play.
+ * in idle moments, not a town's worth in the first seconds of play; `cancelAhead` drops those not
+ * drawn yet (the screen that wanted them has gone).
  */
 
 import type { AssetRegistry } from '../../assets/registry';
+import { contentHash } from '../../assets/registry';
+import { perfTimeAsync } from '../../debug/perf';
 import { loadCharacterSet } from '../shared/characters/data';
 import { idleMoment } from '../shared/idle';
-import type { SimLook, SimPreviews, SimStage, Wardrobe } from '../types';
-import { cached, lookKey, Portraits } from './portraits';
+import type { PortraitOptions, SimLook, SimPreviews, SimStage, Wardrobe } from '../types';
+import { cached, lookKey, PortraitStore, Portraits } from './portraits';
 import { StageController } from './stage';
 import { Studio, type StudioDeps } from './studio';
 
@@ -36,15 +40,19 @@ class Previews implements SimPreviews {
   private live: Studio | null = null;
   private unavailable = false;
   private stageCtl: StageController | null = null;
-  private readonly portraits = new Portraits();
+  private readonly store: PortraitStore;
+  private readonly portraits: Portraits;
   private looping = false;
   private releaseTimer = 0;
-  private kept = false;
+  /** Who keeps the app (`keep`). */
+  private readonly kept = new Set<string>();
   /** Looks to draw in idle moments (`prefetch`), by look key, in the order asked. */
   private readonly ahead = new Map<string, SimLook>();
   private drawingAhead = false;
 
   constructor(private readonly deps: StudioDeps) {
+    this.store = new PortraitStore(facesVersion(deps.assets));
+    this.portraits = new Portraits((key, blob) => this.store.put(key, blob));
     // `?debug`: inspect from the console / test harness (`__previews.live` is the studio, if any).
     if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { __previews: this });
   }
@@ -67,12 +75,12 @@ class Previews implements SimPreviews {
     return ctl;
   }
 
-  portrait(look: SimLook): Promise<string | null> {
+  async portrait(look: SimLook, options: PortraitOptions = {}): Promise<string | null> {
     const key = lookKey(look);
-    const url = cached(key);
-    if (url) return Promise.resolve(url);
-    if (this.unavailable) return Promise.resolve(null);
-    const p = this.portraits.request(key, look);
+    const url = cached(key) ?? (await this.store.get(key));
+    if (url) return url;
+    if (this.unavailable || options.signal?.aborted) return null;
+    const p = this.portraits.request(key, look, options.priority, options.signal);
     void this.open().then((studio) => {
       if (studio) this.loop(studio);
       else this.portraits.failAll();
@@ -110,16 +118,21 @@ class Previews implements SimPreviews {
           next.push(look);
           this.ahead.delete(key);
         }
-        await Promise.all(next.map((look) => this.portrait(look)));
+        await Promise.all(next.map((look) => this.portrait(look, { priority: 'idle' })));
       }
     } finally {
       this.drawingAhead = false;
     }
   }
 
-  keep(on: boolean): void {
-    this.kept = on;
-    if (!on) this.idleCheck();
+  cancelAhead(): void {
+    this.ahead.clear();
+  }
+
+  keep(on: boolean, who = 'game'): void {
+    if (on) this.kept.add(who);
+    else this.kept.delete(who);
+    if (!this.kept.size) this.idleCheck();
   }
 
   async wardrobe(gender: string): Promise<Wardrobe | null> {
@@ -138,7 +151,7 @@ class Previews implements SimPreviews {
   private open(): Promise<Studio | null> {
     clearTimeout(this.releaseTimer);
     if (this.unavailable) return Promise.resolve(null);
-    this.studio ??= Studio.create(this.deps).then(
+    this.studio ??= perfTimeAsync('preview: studio', () => Studio.create(this.deps)).then(
       (studio) => (this.live = studio),
       (err: unknown) => {
         console.warn('[preview] 3D Sim previews unavailable', err);
@@ -176,7 +189,7 @@ class Previews implements SimPreviews {
     clearTimeout(this.releaseTimer);
     this.releaseTimer = window.setTimeout(() => {
       const studio = this.live;
-      if (!studio || this.kept || this.stageCtl || this.portraits.busy) return;
+      if (!studio || this.kept.size || this.stageCtl || this.portraits.busy) return;
       this.live = null;
       this.studio = null;
       this.looping = false;
@@ -184,6 +197,25 @@ class Previews implements SimPreviews {
       studio.dispose();
     }, RELEASE_AFTER);
   }
+}
+
+/** What the faces are drawn from, for the portraits kept between visits: the character files' contents (the app's version where the build has none). */
+function facesVersion(assets: AssetRegistry): string {
+  const hashes: string[] = [];
+  for (const key of assets.keys('character')) {
+    const url = assets.get(key, 'character')?.url;
+    const h = url ? contentHash(url) : null;
+    if (h === null) return `app-${__APP_VERSION__}`;
+    hashes.push(h);
+  }
+  return hashes.length ? `faces-${shortHash(hashes.join('|'))}` : `app-${__APP_VERSION__}`;
+}
+
+/** FNV-1a, as hex. */
+function shortHash(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(16);
 }
 
 function loadSet(assets: AssetRegistry) {

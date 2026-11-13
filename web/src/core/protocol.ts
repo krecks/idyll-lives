@@ -707,8 +707,9 @@ export interface WorldStructure {
    */
   lightPoles?: [number, number, number][];
   /**
-   * Every junction where three or more roads for cars meet (sim-core `traffic::Signal`, in the
-   * snapshot's signal head rows' order), for its pad and markings. Absent: none.
+   * Every junction where three or more roads for cars meet (sim-core `traffic::Signal`), for its
+   * pad and markings: the lit ones first, in the snapshot's signal head rows' order, then those
+   * giving way (no heads). Absent: none.
    */
   junctions?: JunctionInfo[];
 }
@@ -730,7 +731,7 @@ export interface JunctionInfo {
  * along `dir`: the crosswalk from `walkFrom` (the corner, where the kerb's return round from the
  * next arm ends, about `traffic::KERB_RETURN` = 3 m in radius, or the box's edge) to `walkTo`
  * (`traffic::CROSSWALK` = 3 m on), and the stop line at `stop` (`traffic::STOP_GAP` = 0.5 m past
- * it): cars on red stop with their noses there.
+ * it): cars on red stop with their noses there, and at a zebra for those on foot on it.
  */
 export interface JunctionArmInfo {
   /** The arm's road (`meta.roads` index). */
@@ -742,6 +743,12 @@ export interface JunctionArmInfo {
   walkFrom: number;
   walkTo: number;
   stop: number;
+  /**
+   * Whether its crosswalk is there, a zebra (sim-core `SignalArm::crosswalk`): at a lit junction
+   * on a street's or a lane's arm, at one giving way on one of a street's two arms through it.
+   * Absent (an older simulation): on any arm with sidewalks.
+   */
+  crosswalk?: boolean;
   /** Its signal head's row in the snapshot (`SnapshotLayout.light`); null: not lit. */
   light: number | null;
 }

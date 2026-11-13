@@ -24,8 +24,9 @@ import { threadStats } from '../debug/threads';
 import { DEVLOG, devlog, devlogNextSample, devlogPaused, devlogSlowFrame, renderSample, SAMPLE_MS, SLOW_FRAME_MS } from '../debug/devlog';
 import { createSimPreviews } from '../render/preview';
 import { createItemPreviews } from '../render/preview/items';
-import type { CameraPose, Renderer, WallMode } from '../render/types';
+import type { CameraPose, Renderer, SimLook, WallMode } from '../render/types';
 import { carRowIsTaxi } from '../render/shared/cars';
+import { WARM_LOTS, warmLots } from '../render/shared/focus';
 import { townView, type TownGoTo } from '../render/shared/townView';
 import { settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
@@ -53,7 +54,7 @@ import { useTownContent, type NeighbourhoodDraft } from './town';
 import { townJob } from './townJobs';
 import { gameAssetPlan, parseAheadFiles, streamRanks } from './streamPlan';
 import { GameSpeed } from './speed';
-import { perfEnd, perfPhase, perfStart, perfTimeAsync } from '../debug/perf';
+import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
 declare global {
@@ -291,6 +292,12 @@ async function openSession(
   let failReady: (err: Error) => void = () => {};
   /** The player household's portraits (requested with the first world). */
   let portraits: Promise<unknown> | null = null;
+  /**
+   * Everyone's looks, the household first (`prefetch`): drawn ahead of time once the game is ready.
+   * While it loads they took frames from its build (a town's faces, a few at a time).
+   */
+  let faces: SimLook[] | null = null;
+  let facesNow = false;
   const ready = new Promise<void>((resolve, reject) => {
     markReady = resolve;
     failReady = reject;
@@ -299,12 +306,23 @@ async function openSession(
     () => (perfEnd(started), releaseInference()),
     () => (perfEnd(started), releaseInference()),
   );
+  void ready.then(
+    () => {
+      facesNow = true;
+      if (faces && !disposed) services.previews.prefetch(faces);
+    },
+    () => {},
+  );
   // The first world build's steps, and the warm-up's, on the loading screen (until the game is ready).
   renderer.onLoadStep((label, done) => progress(label, 0.65 + 0.25 * done));
-  void ready.then(
-    () => renderer.onLoadStep(null),
-    () => renderer.onLoadStep(null),
-  );
+  // Started from the menus (not prepared behind them): the loading screen covers the builds, which
+  // may take the main thread longer at a time.
+  renderer.setCovered(warm);
+  const uncover = () => {
+    renderer.onLoadStep(null);
+    renderer.setCovered(false);
+  };
+  void ready.then(uncover, uncover);
   /**
    * Before the warm-up's frame: the street's chunks round the camera built (a big world) and the
    * textures asked for loaded, each for a while at most, so that frame draws and uploads what play
@@ -1296,7 +1314,8 @@ async function openSession(
       const mineFirst = [...game.roster].sort((a, b) => Number(!!w.households[b.household]?.player) - Number(!!w.households[a.household]?.player));
       const shown = mineFirst.map((s) => ({ gender: s.gender, appearance: s.appearance, id: s.id }));
       portraits ??= Promise.all(shown.filter((_, i) => w.households[mineFirst[i].household]?.player).map((look) => services.previews.portrait(look)));
-      services.previews.prefetch(shown);
+      faces = shown;
+      if (facesNow) services.previews.prefetch(shown);
     }
     if (!focused) {
       focused = true;
@@ -1321,7 +1340,9 @@ async function openSession(
     if (!homeAssets) {
       // First the house (the loading screen waits for it), then the rest of the town (streamed
       // after Play). Planning once keeps a later world update from restarting the indicator.
-      const plan = gameAssetPlan(content, assets, w, view);
+      // (A big world's warm-up builds a few other lots too: their things come with the house.)
+      const warmLotsAhead = view && w.meta?.world?.size === 'big' ? perfTime('session: warm lots', () => warmLots(w, view, WARM_LOTS)) : [];
+      const plan = gameAssetPlan(content, assets, w, view, warmLotsAhead);
       planStream([...plan.home, ...plan.rest], 'Loading the town nearby…');
       restUrls = plan.rest;
       homeAssets = prefetchNow(plan.home, (done, total) => {
@@ -2030,6 +2051,8 @@ async function openSession(
       renderer.setGameShot(null);
       renderer.followSim(null);
       services.previews.keep(false);
+      // (The town's faces not drawn yet: not for the next game, nor the menus.)
+      services.previews.cancelAhead();
       pointer?.dispose();
       bubbles.dispose();
       roomOverlay.dispose();

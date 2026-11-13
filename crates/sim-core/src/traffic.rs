@@ -442,8 +442,17 @@ pub fn boxes(g: &Graph) -> Vec<([f32; 2], f32)> {
     out
 }
 
-/// A junction with traffic lights (`Travel::signals`: every junction where `SIGNAL_ARMS` roads or
-/// more meet, `settle`): its middle, and its arms, each with its phase (`SignalArm::phase`: two
+/// A junction where `SIGNAL_ARMS` roads for cars or more meet (`settle`), lit or not (`lit`). A big
+/// one is lit (`Travel::signals`): where `LIT_ARMS` arms or more meet, or two main roads (streets or
+/// country roads) do, `LIT_MAIN_ARMS` of its arms theirs (one meeting another, or crossing it), and
+/// on a roundabout's ring. Any other (a lane meeting a street or another lane) gives way
+/// (`Travel::give_way`): cars take turns through its box by the claims as anywhere (`boxes`), and
+/// on a street's arm there's a zebra (`SignalArm::crosswalk`: one of the street's two arms through
+/// it), where they stop only for someone on foot on it or stepping onto it (`zebra_stops`). The
+/// owner's call (2026-11-13): with lights and zebras at every junction, a quiet side street's T had
+/// cars stopping at its crosswalks for nobody.
+///
+/// A lit one: its middle, and its arms, each with its phase (`SignalArm::phase`: two
 /// arms more than `OPPOSITE` apart go together, an arm with none across from it on its own). One
 /// phase at a time has green (`Light`); a group through it is asked for only on its arm's phase's
 /// green (`Claim::gate`), at its arm's stop line (`SignalArm::stop`), and holding it, one goes on
@@ -466,6 +475,12 @@ pub struct Signal {
     /// people don't hurry for the cars' clock). 0: no walk phase (a roundabout's, or one with no
     /// crosswalk: country roads meeting).
     pub walk_clear: u64,
+    /// Whether it has traffic lights (a big junction: see above); else it gives way.
+    pub lit: bool,
+    /// The phase its lights rest on with nobody waiting (`change_lights`): its main road's, the
+    /// phase of its streets' and country roads' arms (a road through it counted twice), the first
+    /// of two as good.
+    pub rest: u8,
 }
 
 impl Signal {
@@ -486,11 +501,20 @@ impl Signal {
     /// (`Travel::junction_tiles`). None of a roundabout's; a country road's arm is crossed as
     /// anywhere else, out past the box.
     pub fn crossing(&self, p: [f32; 2]) -> bool {
-        self.walk_clear > 0
-            && self.arms.iter().filter(|a| a.crosswalk).any(|a| {
+        self.crossing_arm(p).is_some()
+    }
+
+    /// The arm whose crosswalk `p` is on (`crossing`), if any.
+    pub fn crossing_arm(&self, p: [f32; 2]) -> Option<usize> {
+        if self.walk_clear == 0 {
+            return None;
+        }
+        self.arms.iter().position(|a| {
+            a.crosswalk && {
                 let (along, across) = a.out(self.at, p);
                 (a.walk_from..=a.walk_to).contains(&along) && across <= a.kerb - KERB_IN
-            })
+            }
+        })
     }
 
     /// Whether `p` is where those on foot never walk (`Travel::junction_tiles`): its box, between
@@ -533,9 +557,11 @@ impl Signal {
 /// `walk_from` to `walk_to` m out from the junction's middle (from the corner, where the kerb's
 /// return round from the next arm ends, `KERB_RETURN`, or the box's edge, whichever is further
 /// out: `CROSSWALK` wide), and its stop line `stop` m out (`STOP_GAP` past the crosswalk), where
-/// cars stop on red with their noses. Whether it has a crosswalk at all (`crosswalk`): a street's
-/// or a lane's (one with sidewalks, as the renderer draws its zebra and the pedestrians' head), not
-/// a country road's nor a roundabout's; those on foot wait for the walk phase only at those.
+/// cars stop on red with their noses (or for those on foot on its zebra). Whether it has a
+/// crosswalk at all (`crosswalk`, the zebra the renderer draws, and the pedestrians' head): at a lit
+/// junction a street's or a lane's (one with sidewalks), at one giving way a street's, one of its
+/// two arms through it (`signal_at`); not a country road's nor a roundabout's; those on foot wait
+/// for the walk phase only at those.
 /// Where its road's middle is at its crosswalk and out to `KEEP_OFF` past its stop line (`span`:
 /// at `walk_from` and at `stop + KEEP_OFF` out along the road, round its bend): its crosswalk and
 /// the carriageway either side of it are measured across from that (`SignalArm::out`), not from
@@ -621,8 +647,12 @@ pub struct Light {
     pub since: u64,
 }
 
-/// A junction where this many roads for cars meet may have traffic lights (`Signal`).
+/// A junction is where this many roads for cars meet (`Signal`), and it has traffic lights where
+/// `LIT_ARMS` do, or where `LIT_MAIN_ARMS` of them are streets' or country roads' (two main roads
+/// meeting: a street through it has two arms, a lane meeting it one more).
 pub(crate) const SIGNAL_ARMS: usize = 3;
+pub(crate) const LIT_ARMS: usize = 4;
+pub(crate) const LIT_MAIN_ARMS: usize = 3;
 /// How long a phase's green lasts at least, its amber, and all red after while the box
 /// clears (ticks of drive time, as the cars go through).
 const MIN_GREEN: u64 = crate::drive_secs(5.0);
@@ -678,6 +708,9 @@ const SPAN_OFF: f32 = 2.0;
 /// as people walk), and the pace its clearance gives the slowest to get across the widest arm
 /// (m a second; `Signal::walk_clear`), `WALK_CLEAR_LEAST` at least (s).
 const WALK_OPEN: u64 = crate::secs(5.0);
+/// The walk phase is open this long at least (ticks of real time): those waiting at the kerb step
+/// out (`change_lights`).
+const WALK_LEAST: u64 = crate::secs(1.0);
 const WALK_PACE: f32 = 1.0;
 const WALK_CLEAR_LEAST: f32 = 3.0;
 
@@ -818,10 +851,13 @@ fn on_carriageway(g: &Graph, p: [f32; 2], margin: f32) -> bool {
         })
 }
 
-/// The lights of the junction at node `n` of `g` (`Signal`): its arms for cars, each with its pole
-/// on the kerb to the right of the way in, at its stop line, its phase and its crosswalk
-/// (`SignalArm`). `ring`: per road of `g`, whether it's a roundabout's. None: fewer
-/// than `SIGNAL_ARMS` arms.
+/// The junction at node `n` of `g` (`Signal`): whether it's lit (a big one: `LIT_ARMS` arms or
+/// `LIT_MAIN_ARMS` of main roads, or on a roundabout), its arms for cars, each with its pole on the
+/// kerb to the right of the way in, at its stop line, its phase and its crosswalk (`SignalArm`: a
+/// lit one's on its streets' and lanes' arms, one giving way's on one of a street's two arms
+/// through it; the lanes meeting there are crossed as anywhere), and the phase its lights rest on
+/// (`Signal::rest`).
+/// `ring`: per road of `g`, whether it's a roundabout's. None: fewer than `SIGNAL_ARMS` arms.
 pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
     let p = g.nodes[n];
     let arms = arms_at(g, n);
@@ -834,6 +870,32 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
     };
     let roundabout = on_ring(&arms);
     let (phase, phases) = phases_of(g, &arms, roundabout);
+    let kind = |a: &ArmAt| g.roads[a.2.0 as usize].kind;
+    let main = |a: &ArmAt| {
+        matches!(
+            kind(a),
+            crate::travel::RoadKind::Street | crate::travel::RoadKind::Country
+        )
+    };
+    let lit = roundabout
+        || arms.len() >= LIT_ARMS
+        || arms.iter().filter(|a| main(a)).count() >= LIT_MAIN_ARMS;
+    // (Its main road's phase: of its streets' and country roads' arms the most; a lane's counts
+    // half. A roundabout's, its first as ever.)
+    let rest = if roundabout {
+        0
+    } else {
+        (0..phases)
+            .map(|k| {
+                let score: u32 = (0..arms.len())
+                    .filter(|&i| phase[i] == k)
+                    .map(|i| if main(&arms[i]) { 2 } else { 1 })
+                    .sum();
+                (score, k)
+            })
+            .max_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)))
+            .map_or(0, |(_, k)| k)
+    };
     let edges = box_edges(&arms);
     // (Per arm, how far out along it the junction may reach: half way to the next junction, else
     // its stretch's length. And whether that next junction is lit too and so near that this arm's
@@ -863,6 +925,13 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
             (len / 2.0, joined)
         })
         .collect();
+    // (Giving way, a street through it has a zebra on one of its two arms, the first round that
+    // has room for one: one either side of a lane's mouth, a quiet street had two for nobody.)
+    let across = |i: usize| {
+        (0..i).any(|j| {
+            phase[j] == phase[i] && kind(&arms[j]) == crate::travel::RoadKind::Street && !room[j].1
+        })
+    };
     let arms: Vec<SignalArm> = arms
         .iter()
         .enumerate()
@@ -953,10 +1022,11 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
                 span,
                 crosswalk: !roundabout
                     && !joined
-                    && matches!(
-                        r.kind,
-                        crate::travel::RoadKind::Street | crate::travel::RoadKind::Lane
-                    ),
+                    && match r.kind {
+                        crate::travel::RoadKind::Street => lit || !across(i),
+                        crate::travel::RoadKind::Lane => lit,
+                        _ => false,
+                    },
             }
         })
         .collect();
@@ -978,6 +1048,8 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
         phases,
         roundabout,
         walk_clear,
+        lit,
+        rest,
     })
 }
 
@@ -1087,16 +1159,7 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal], trace: &Trace, len:
             // in along the arm, between its kerbs, its nose short of the stop line; no further
             // back than the end of the part before.)
             let least = if k > 0 { claims[k - 1].to } else { 0.0 };
-            let nose = |j: usize| {
-                let (_, p, yaw, back, _) = trace[j];
-                let (s, c) = yaw.sin_cos();
-                let n = [p[0] + s * len / 2.0, p[1] + c * len / 2.0];
-                let d = [n[0] - sig.at[0], n[1] - sig.at[1]];
-                let along = d[0] * a.way[0] + d[1] * a.way[1];
-                let across = (d[0] * a.way[1] - d[1] * a.way[0]).abs();
-                let inward = s * a.way[0] + c * a.way[1] < -0.5;
-                (along, !back && inward && across <= a.kerb + 1.0)
-            };
+            let nose = |j: usize| nose_in(trace, j, sig.at, a, len);
             let start = trace
                 .partition_point(|s| s.0 < claims[k].from)
                 .min(trace.len() - 1);
@@ -1167,6 +1230,136 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal], trace: &Trace, len:
         }
         k = end;
     }
+}
+
+/// Where the nose of a body `len` long at pose `j` of `trace` is on arm `a` of the junction at
+/// `at` (`gate`, `zebra_stops`): how far out along it, and whether it's coming in along it, between
+/// its kerbs (and a metre more), not backing up.
+fn nose_in(trace: &Trace, j: usize, at: [f32; 2], a: &SignalArm, len: f32) -> (f32, bool) {
+    let (_, p, yaw, back, _) = trace[j];
+    let (s, c) = yaw.sin_cos();
+    let n = [p[0] + s * len / 2.0, p[1] + c * len / 2.0];
+    let d = [n[0] - at[0], n[1] - at[1]];
+    let along = d[0] * a.way[0] + d[1] * a.way[1];
+    let across = (d[0] * a.way[1] - d[1] * a.way[0]).abs();
+    let inward = s * a.way[0] + c * a.way[1] < -0.5;
+    (along, !back && inward && across <= a.kerb + 1.0)
+}
+
+/// Where a car's route stops for those on foot at a junction giving way (`Travel::give_way`,
+/// `zebra_stops`): `at` ticks along it, its nose at the stop line of the arm it comes in by (out
+/// past that arm's zebra, where it has one); the junction; and the zebras it crosses there, the
+/// arm's it comes in by and the one's it goes out by. It stops there only for someone on foot on
+/// the first or stepping onto it, or on the second (`cars::zebra_yield`); else it drives on.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct ZebraStop {
+    pub at: f32,
+    pub junction: u16,
+    pub arms: [Option<u8>; 2],
+}
+
+/// A route's stops at the zebras of the junctions giving way it goes through (`ZebraStop`), for a
+/// body `len` long along `trace`, in order along it. A junction it goes through as `gate` has it
+/// (within `GATE_THROUGH` of its middle), its arms in and out those it's on where it first and last
+/// comes within `GATE_REACH`; one it begins or ends by (a driveway by it) not crossed coming in or
+/// going out.
+pub(crate) fn zebra_stops(trace: &Trace, junctions: &[Signal], len: f32) -> Vec<ZebraStop> {
+    let mut out = Vec::new();
+    let n = trace.len();
+    if n == 0 {
+        return out;
+    }
+    let b = trace.iter().fold(
+        [
+            f32::INFINITY,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            f32::NEG_INFINITY,
+        ],
+        |b, s| {
+            [
+                b[0].min(s.1[0]),
+                b[1].min(s.1[1]),
+                b[2].max(s.1[0]),
+                b[3].max(s.1[1]),
+            ]
+        },
+    );
+    for (i, sig) in junctions.iter().enumerate() {
+        let p = sig.at;
+        if sig.walk_clear == 0
+            || p[0] < b[0] - GATE_REACH
+            || p[0] > b[2] + GATE_REACH
+            || p[1] < b[1] - GATE_REACH
+            || p[1] > b[3] + GATE_REACH
+        {
+            continue;
+        }
+        let arm_of = |q: [f32; 2]| {
+            let d = [q[0] - p[0], q[1] - p[1]];
+            (0..sig.arms.len())
+                .max_by(|&x, &y| {
+                    let dot = |a: usize| sig.arms[a].way[0] * d[0] + sig.arms[a].way[1] * d[1];
+                    dot(x).total_cmp(&dot(y))
+                })
+                .unwrap_or(0)
+        };
+        let mut k = 0;
+        while k < n {
+            if dist(trace[k].1, p) >= GATE_REACH {
+                k += 1;
+                continue;
+            }
+            let first = k;
+            let mut near = f32::INFINITY;
+            while k < n && dist(trace[k].1, p) < GATE_REACH {
+                near = near.min(dist(trace[k].1, p));
+                k += 1;
+            }
+            let last = k - 1;
+            if near >= GATE_THROUGH {
+                continue;
+            }
+            let (into, out_by) = (arm_of(trace[first].1), arm_of(trace[last].1));
+            let zebra = |a: usize, crossed: bool| {
+                (crossed && sig.arms[a].crosswalk)
+                    .then(|| u8::try_from(a).ok())
+                    .flatten()
+            };
+            let arms = [zebra(into, first > 0), zebra(out_by, last + 1 < n)];
+            if arms == [None, None] {
+                continue;
+            }
+            // (Back along its way from where it first comes near, while it's coming in along the
+            // arm with its nose short of the stop line; between that pose and the next, where the
+            // nose is at the line.)
+            let a = &sig.arms[into];
+            let mut j = first;
+            while j > 0 {
+                let (along, on) = nose_in(trace, j, p, a, len);
+                if !on || along >= a.stop {
+                    break;
+                }
+                j -= 1;
+            }
+            let mut at = trace[j].0;
+            if let ((was, true), Some((next, true))) = (
+                nose_in(trace, j, p, a, len),
+                (j + 1 < n).then(|| nose_in(trace, j + 1, p, a, len)),
+            ) && was >= a.stop
+                && next < a.stop
+            {
+                at += (trace[j + 1].0 - at) * (was - a.stop) / (was - next);
+            }
+            out.push(ZebraStop {
+                at,
+                junction: i as u16,
+                arms,
+            });
+        }
+    }
+    out.sort_by(|a, b| a.at.total_cmp(&b.at));
+    out
 }
 
 /// The stretches of a car's route along `trace` (pulling over `pass` m at each pose, its ends
@@ -1330,7 +1523,20 @@ pub struct Traffic {
     /// The lit junctions someone on foot waits at a crosswalk of (`Signal` indices, this tick:
     /// `kerb_stop`, `traffic::begin`), for their walk phase.
     pub(crate) walkers: Vec<u16>,
+    /// The lit junctions someone on foot is on a crosswalk of (this tick, `on_crossings`): their
+    /// walk phase isn't over before they're across.
+    pub(crate) crossing: Vec<u16>,
+    /// Those on foot on a zebra of a junction giving way, or stepping onto one (`on_crossings`):
+    /// the junction (`Travel::give_way`), the arm, who, and whether on it.
+    pub(crate) zebra_walkers: Vec<(u16, u8, u32, bool)>,
+    /// The lights cars on the road are coming up to (`Claim::gate`, `cars::movers`: within
+    /// `APPROACH` of their stop line, not yet asking): its green kept on for them.
+    pub(crate) approaching: Vec<Gate>,
 }
+
+/// A car this near its next lights' stop line (ticks along its way: two seconds of drive time,
+/// some 18 m at a town's 9 m/s) counts as coming to its green (`Traffic::approaching`).
+pub(crate) const APPROACH: f32 = crate::drive_ticks(2.0);
 
 /// Claim `k` of a route tagged `route` (`Place`).
 fn tag(route: u32, k: usize) -> u32 {
@@ -1627,12 +1833,15 @@ impl Traffic {
     }
 
     /// The lights a tick on (`Light`): a phase's green `MIN_GREEN` at least, on while anyone comes
-    /// to it (an ask through it, or one holding a claim through it still out of the box) and its
-    /// share of `CYCLE` at most, and only while someone waits at another (or on foot at the
-    /// crosswalks, `Traffic::walkers`); then amber (`AMBER`), all red while the box clears
-    /// (`ALL_RED`), and the next phase round that anyone waits at. The walk phase: those on foot
-    /// may step out for `WALK_OPEN`, then its clearance (`Signal::walk_clear`), then all red, and
-    /// the cars' phase after it. Nobody waiting anywhere, it stays green where it is (the cars').
+    /// to it (an ask through it, one holding a claim through it still out of the box, or one
+    /// coming up to its stop line, `Traffic::approaching`) and its share of `CYCLE` at most, and
+    /// only while someone waits at another (or on foot at the crosswalks, `Traffic::walkers`);
+    /// then amber (`AMBER`), all red while the box clears (`ALL_RED`), and the next phase round
+    /// that anyone waits at. The walk phase: those on foot may step out for `WALK_OPEN` (once
+    /// nobody waits at the kerbs nor is on the crosswalks, after `WALK_LEAST`, no longer), then its
+    /// clearance (`Signal::walk_clear`, over once nobody's on them), then all red, and the cars'
+    /// phase after it. Nobody waiting anywhere nor coming, it goes back to the main road's green
+    /// and rests there (`Signal::rest`; a roundabout's stays where it is).
     fn change_lights(&mut self, tick: u64, signals: &[Signal]) {
         self.lights.resize(signals.len(), Light::default());
         // (Per lit junction, the phases anyone waits at and comes through, bit `phase` of each:
@@ -1696,15 +1905,27 @@ impl Traffic {
                 m[0] |= bit(walk);
             }
         }
+        // (Cars coming up to a light, not yet at its stop line: coming to its green, as those
+        // granted through it and still out of the box are.)
+        for &(s, phase) in &self.approaching {
+            if let Some(m) = phases.get_mut(usize::from(s)) {
+                m[1] |= bit(phase);
+            }
+        }
         for (i, sig) in signals.iter().enumerate() {
             let waits = |phase: u8| phases[i][0] & bit(phase) != 0;
             let coming = |phase: u8| phases[i][1] & bit(phase) != 0;
             let n = sig.turns();
             let mut l = self.lights[i];
-            // (Loaded with another junction's, or the roads changed: the first phase's green.)
+            // (Loaded with another junction's, or the roads changed: the green it rests on.)
             if l.phase >= n {
-                l = Light::default();
+                l = Light {
+                    phase: sig.rest,
+                    ..Light::default()
+                };
             }
+            // (Someone on foot on one of its crosswalks.)
+            let on_it = self.crossing.binary_search(&(i as u16)).is_ok();
             let walk = sig.walk_phase() == Some(l.phase);
             let on = tick.saturating_sub(l.since);
             // (Every phase round in `CYCLE` at most: nobody waits at a red light much longer.)
@@ -1718,8 +1939,10 @@ impl Traffic {
                 ..l
             };
             self.lights[i] = match l.stage {
+                // (The walk: over once nobody waits at its kerbs nor is on its crosswalks, its
+                // clearance with it, `WALK_LEAST` at least, so those waiting have stepped out.)
                 Stage::Green if walk => {
-                    if on >= WALK_OPEN {
+                    if on >= WALK_OPEN || on >= WALK_LEAST && !waits(l.phase) && !on_it {
                         stage(Stage::Amber)
                     } else {
                         l
@@ -1741,23 +1964,36 @@ impl Traffic {
                         Some(_) if !kept && on >= most || on >= MIN_GREEN && !busy || follow => {
                             stage(Stage::Amber)
                         }
+                        // (Nobody waiting anywhere, nor coming to it, off the main road's phase:
+                        // back to that, to rest on, so its cars don't stop for nobody.)
+                        None if l.phase != sig.rest
+                            && !sig.roundabout
+                            && on >= MIN_GREEN
+                            && !busy
+                            && !kept =>
+                        {
+                            stage(Stage::Amber)
+                        }
                         _ => l,
                     }
                 }
-                Stage::Amber if on >= if walk { sig.walk_clear } else { AMBER } => {
-                    stage(Stage::Clear)
-                }
-                // (After the walk phase, nobody waiting: the cars' next phase, to rest on. One
-                // wanted by a lit junction next to it, first; not again straight after its own
-                // turn: those at the others' reds waited for good, one stopped in the box among
-                // them, Wheat Bottom.)
+                // (The walk's clearance: over as soon as nobody's on its crosswalks.)
+                Stage::Amber if walk && (on >= sig.walk_clear || !on_it) => stage(Stage::Clear),
+                Stage::Amber if !walk && on >= AMBER => stage(Stage::Clear),
+                // (Nobody waiting: the phase it rests on, its main road's. One wanted by a lit
+                // junction next to it, first; not again straight after its own turn: those at the
+                // others' reds waited for good, one stopped in the box among them, Wheat Bottom.)
                 Stage::Clear if on >= ALL_RED => Light {
                     phase: (1..=n)
                         .map(|k| (l.phase + k) % n)
                         .find(|&x| phases[i][3] & bit(x) != 0 && x != l.phase)
                         .filter(|_| phases[i][3] & bit(l.phase) == 0)
                         .or_else(|| next(l.phase))
-                        .unwrap_or(if walk { 0 } else { l.phase }),
+                        .unwrap_or(if sig.roundabout && !walk {
+                            l.phase
+                        } else {
+                            sig.rest
+                        }),
                     stage: Stage::Green,
                     since: tick,
                 },
@@ -2487,17 +2723,18 @@ fn rings(g: &Graph, meta: &serde_json::Value) -> Vec<bool> {
         .collect()
 }
 
-/// The junctions' traffic lights (`Travel::signals`: every junction where `SIGNAL_ARMS` roads or
-/// more meet), and every car's claims worked out again with them (`Claim::gate`). Once the cars
-/// are made or loaded. Every head has a row in the snapshot (`snapshot::MAX_LIGHTS`, made room
-/// for the biggest generated worlds' and then some); past that, a junction is still lit, its
-/// heads only not drawn, and a debug build says so.
+/// The junctions (every one where `SIGNAL_ARMS` roads or more meet, `signal_at`): the big ones'
+/// traffic lights (`Travel::signals`), the others giving way with their zebras
+/// (`Travel::give_way`), and every car's claims worked out again with them (`Claim::gate`,
+/// `zebra_stops`). Once the cars are made or loaded. Every head has a row in the snapshot
+/// (`snapshot::MAX_LIGHTS`, made room for the biggest generated worlds' and then some); past that,
+/// a junction is still lit, its heads only not drawn, and a debug build says so.
 pub(crate) fn settle(w: &mut World) {
     let g = &w.travel.graph;
     let ring = rings(g, &w.meta);
-    let signals: Vec<Signal> = (0..g.nodes.len())
+    let (signals, give_way): (Vec<Signal>, Vec<Signal>) = (0..g.nodes.len())
         .filter_map(|n| signal_at(g, n, &ring))
-        .collect();
+        .partition(|s| s.lit);
     let heads: usize = signals.iter().map(|s| s.arms.len()).sum();
     debug_assert!(
         heads <= crate::snapshot::MAX_LIGHTS,
@@ -2505,12 +2742,13 @@ pub(crate) fn settle(w: &mut World) {
         crate::snapshot::MAX_LIGHTS
     );
     w.travel.crossings = Crossings::new(&signals);
+    w.travel.zebras = Crossings::new(&give_way);
     keep_off(w, &signals);
-    // (Each lit junction's box taken out to the far side of its crosswalks: nobody goes onto one
-    // without room to clear it beyond, and a way between two lit junctions too near each other
-    // for a body to stand between them is one group, through both lights: `gate`.)
+    // (Each junction's box taken out to the far side of its crosswalks, a lit one's and a zebra:
+    // nobody goes onto one without room to clear it beyond, and a way between two lit junctions too
+    // near each other for a body to stand between them is one group, through both lights: `gate`.)
     let mut zones = boxes(&w.travel.graph);
-    for sig in &signals {
+    for sig in signals.iter().chain(&give_way) {
         for a in sig.arms.iter().filter(|a| a.crosswalk) {
             let mut d = BOX_LEAST;
             while d < a.walk_to {
@@ -2524,11 +2762,17 @@ pub(crate) fn settle(w: &mut World) {
         }
     }
     w.travel.graph.boxes = zones;
-    w.travel.signals = signals;
-    // (Green on the first phase before the first tick changes them: `change_lights`.)
+    // (Green on the phase each rests on before the first tick changes them: `change_lights`.)
+    let had = w.traffic.lights.len();
+    w.traffic.lights.truncate(signals.len());
     w.traffic
         .lights
-        .resize(w.travel.signals.len(), Light::default());
+        .extend(signals[had.min(signals.len())..].iter().map(|s| Light {
+            phase: s.rest,
+            ..Light::default()
+        }));
+    w.travel.signals = signals;
+    w.travel.give_way = give_way;
     for car in &mut w.cars {
         car.reclaim(&w.travel);
     }
@@ -2671,30 +2915,132 @@ pub(crate) fn kerb_stop(
     None
 }
 
+/// How far along their way someone on foot is looked at for a zebra they're about to step onto (m,
+/// `on_crossings`), a step at a time (`KERB_STEP`).
+const ZEBRA_LOOK: f32 = 1.5;
+
+impl Crossings {
+    /// The junctions whose crosswalks reach into the cell `p` is in.
+    fn at(&self, p: [f32; 2]) -> &[u16] {
+        if self.cells.is_empty() || p[0] < 0.0 || p[1] < 0.0 {
+            return &[];
+        }
+        let (x, z) = ((p[0] / CROSS_CELL) as usize, (p[1] / CROSS_CELL) as usize);
+        if x >= self.cols || z >= self.rows {
+            return &[];
+        }
+        &self.cells[z * self.cols + x]
+    }
+}
+
+/// Those on foot at the crosswalks this tick (`Traffic::crossing`, `Traffic::zebra_walkers`): on
+/// a lit junction's; and on a zebra of one giving way, or walking (`Phase::Routing`) with one
+/// `ZEBRA_LOOK` on along their way. Not those riding (with the traffic), nor anyone at something.
+fn on_crossings(w: &mut World) {
+    let mut crossing = std::mem::take(&mut w.traffic.crossing);
+    let mut zebra = std::mem::take(&mut w.traffic.zebra_walkers);
+    crossing.clear();
+    zebra.clear();
+    let travel = &w.travel;
+    let on_zebra = |p: [f32; 2]| {
+        travel.zebras.at(p).iter().find_map(|&j| {
+            let a = travel.give_way[usize::from(j)].crossing_arm(p)?;
+            Some((j, a as u8))
+        })
+    };
+    let lit = !travel.signals.is_empty();
+    let zebras = !travel.give_way.is_empty();
+    if lit || zebras {
+        for s in w.sims.iter().filter(|s| s.here() && s.riding.is_none()) {
+            let p = s.pos;
+            if lit
+                && let Some(&j) = travel
+                    .crossings
+                    .at(p)
+                    .iter()
+                    .find(|&&j| travel.signals[usize::from(j)].crossing(p))
+            {
+                crossing.push(j);
+            }
+            if !zebras {
+                continue;
+            }
+            let Some(crate::world::Phase::Routing { waypoints, next }) =
+                s.current().map(|a| &a.phase)
+            else {
+                continue;
+            };
+            if let Some((j, a)) = on_zebra(p) {
+                zebra.push((j, a, s.id, true));
+                continue;
+            }
+            // (Along their way, a step at a time: from where they are to the next waypoints.)
+            let mut from = p;
+            let mut left = ZEBRA_LOOK;
+            'look: for &to in waypoints.iter().skip(*next) {
+                let d = dist(from, to);
+                let steps = (d.min(left) / KERB_STEP).ceil() as usize;
+                for k in 1..=steps {
+                    let f = (k as f32 * KERB_STEP).min(d.min(left)) / d.max(1e-4);
+                    let q = [
+                        from[0] + (to[0] - from[0]) * f,
+                        from[1] + (to[1] - from[1]) * f,
+                    ];
+                    if let Some((j, a)) = on_zebra(q) {
+                        zebra.push((j, a, s.id, false));
+                        break 'look;
+                    }
+                }
+                left -= d;
+                if left <= 0.0 {
+                    break;
+                }
+                from = to;
+            }
+        }
+    }
+    crossing.sort_unstable();
+    crossing.dedup();
+    w.traffic.crossing = crossing;
+    w.traffic.zebra_walkers = zebra;
+}
+
 /// The tick's claims, before the cars go on (`Traffic::begin`).
 pub(crate) fn begin(w: &mut World) {
-    // (Those on foot waiting at a lit junction's crosswalks, `kerb_stop`: those at full detail this
-    // tick or last, the others on their last turn, `lod.rs`.)
+    // (Those on foot waiting at a lit junction's crosswalks, `kerb_stop`: those who took a turn
+    // this tick (`lod.rs`) only if they waited this tick, the others as on their last turn. Gone
+    // on, or off doing something else, they no longer ask for the walk: a request standing for a
+    // turn's length after brought round walk phases nobody waited for.)
     let mut walkers = std::mem::take(&mut w.traffic.walkers);
     walkers.clear();
     if !w.travel.signals.is_empty() {
         let tick = w.tick;
         walkers.extend(w.sims.iter().filter_map(|s| {
             s.kerb_wait
-                .filter(|&(_, t)| t + crate::lod::FAR_TICKS >= tick)
+                .filter(|&(_, t)| {
+                    if s.steps > 0 {
+                        t == tick
+                    } else {
+                        t + crate::lod::FAR_TICKS >= tick
+                    }
+                })
                 .map(|(j, _)| j)
         }));
         walkers.sort_unstable();
         walkers.dedup();
     }
     w.traffic.walkers = walkers;
+    on_crossings(w);
     crate::cars::track_stall(w);
     crate::cars::sight(w);
     crate::cars::pass_stands(w);
     crate::cars::unjam(w);
     let mut movers = Vec::new();
     let mut places = Vec::new();
-    crate::cars::movers(w, &mut movers, &mut places);
+    let mut approaching = std::mem::take(&mut w.traffic.approaching);
+    approaching.clear();
+    crate::cars::movers(w, &mut movers, &mut places, &mut approaching);
+    w.traffic.approaching = approaching;
     let tick = w.tick;
     w.traffic.begin(tick, movers, &places, &w.travel.signals);
 }
@@ -2779,6 +3125,8 @@ mod tests {
             phases: phases.iter().max().map_or(0, |p| p + 1),
             roundabout: false,
             walk_clear: crate::secs(4.3),
+            lit: true,
+            rest: 0,
         }
     }
 
