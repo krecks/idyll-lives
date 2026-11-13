@@ -93,3 +93,7 @@ were the default two segments (108 triangles a board); one segment is enough at 
 cargo art pack_hotHeaded            # the six .glb, the pack, check-glb
 cargo art pack_hotHeaded --preview  # previews/pack_hotHeaded/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `coldPlunge`, `coolDownCushion`, `grudgeJournal`; the same triangles.
