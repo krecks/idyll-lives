@@ -10,7 +10,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { BLIPS, blipSamples, type Blip } from '../src/audio/blips';
 import { everySound, GUARD, LOOPS, ONCE_KINDS, ONCE_LEVEL } from '../src/audio/catalog';
-import { loudness } from '../src/audio/loudness';
+import { kWeighting, loudness } from '../src/audio/loudness';
 import { MONO, nodeFilter, sweep } from '../src/audio/mono';
 import { MADE, type MadeKind } from '../src/audio/things';
 import type { Stereo } from '../src/audio/water';
@@ -45,6 +45,22 @@ describe('loudness', () => {
     // 997 Hz at full scale in one channel is -3.01 LUFS; at -23 dBFS in both, -23.0.
     expect(loudness(tone(1), new Float32Array(RATE * 5), RATE)).toBeCloseTo(-3.01, 2);
     expect(loudness(tone(10 ** (-23 / 20)), tone(10 ** (-23 / 20)), RATE)).toBeCloseTo(-23, 2);
+  });
+
+  test('at other sample rates the same weighting (the voices\' 24 kHz, a sound card\'s 44.1 kHz)', () => {
+    for (const rate of [24000, 44100]) {
+      const at = (amp: number) => Float32Array.from({ length: rate * 5 }, (_, i) => amp * Math.sin((2 * Math.PI * 997 * i) / rate));
+      expect(Math.abs(loudness(at(1), new Float32Array(rate * 5), rate) + 3.01)).toBeLessThan(0.05);
+      expect(Math.abs(loudness(at(10 ** (-23 / 20)), at(10 ** (-23 / 20)), rate) + 23)).toBeLessThan(0.05);
+    }
+    // The filters worked out for 48 kHz are the standard's own.
+    const [shelf, high] = kWeighting(48_000);
+    const [s2, h2] = kWeighting(47_999.999);
+    for (let i = 0; i < 3; i++) expect(s2[0][i]).toBeCloseTo(shelf[0][i], 6);
+    for (let i = 0; i < 2; i++) {
+      expect(s2[1][i]).toBeCloseTo(shelf[1][i], 6);
+      expect(h2[1][i]).toBeCloseTo(high[1][i], 6);
+    }
   });
 
   test('silence has none, and a pause in a sound does not make it quieter', () => {

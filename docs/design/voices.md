@@ -485,6 +485,12 @@ file; the web side merges them over it key by key (sim-core ignores `voice`). Se
 
 - One shared `AudioContext` with sound effects (`ui/sfx.ts` is refactored to expose it), with
   separate gain nodes for effects and voices.
+- Every line is made at one loudness: its last step (`crates/voice/src/dsp.rs` `level`, after the
+  shaping and the mouth shapes) reads how loud the clip is to the ear (LUFS, ITU-R BS.1770 at
+  24 kHz, gated so its pauses don't count) and turns the whole clip up or down to -25 LUFS, by one
+  gain (12 dB at most, and up only as far as its peak stays under 0.95), so its length, its pauses
+  and its mouth shapes are untouched. As the model makes them, 110 lines (its ten voices, ten
+  residents' shaped voices) were between -28.8 and -21.1 LUFS, "Hi!" and "Ouch!" the loudest.
 - Each clip plays through a `StereoPannerNode` (`voice/player.ts`, `audio/space.ts` `Placed`): left
   to right by where the resident's head is on screen (`renderer.simHead` projected, 0.7 of the way
   to either side at the screen's edges), updated about 10 times a second, so a voice comes from
