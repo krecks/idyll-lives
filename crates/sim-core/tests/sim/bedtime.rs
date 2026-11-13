@@ -329,7 +329,11 @@ fn worn_out_with_the_bladder_low_the_toilet_comes_first_then_bed() {
 /// ground as when every junction's box was kept off those on foot: home at half past one, not a
 /// quarter to twelve. Worn out for two hours of it, he dropped on the doorstep; he sets off with
 /// energy enough to get home on, as he did in the owner's game: what's tested is where they
-/// sleep there.)
+/// sleep there. With 0.4 he ran out at 1:17, a quarter of an hour short of the door, and what he
+/// did there with none left (the toilet and the sofa, or an espresso at the café and off to work
+/// at four, asleep on the way) came down to the town's one dice roll, which every resident's
+/// choices anywhere move: the junctions' changes moved it, 2026-11-13. With 0.6 he gets in with
+/// some left.)
 #[test]
 fn nobody_on_birch_road_sleeps_on_the_floor() {
     let path =
@@ -342,7 +346,7 @@ fn nobody_on_birch_road_sleeps_on_the_floor() {
         ["Jonah", "Elif", "Ravi"]
     );
     let energy = need(&w, "energy");
-    w.sims[ravi].needs[energy] = w.sims[ravi].needs[energy].max(0.4);
+    w.sims[ravi].needs[energy] = w.sims[ravi].needs[energy].max(0.6);
     let plot = w.households[36].plot.unwrap();
     common::look_at(&mut w, plot);
     let end = clock::tick_at(3, 60.0).unwrap();
