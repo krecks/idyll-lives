@@ -52,8 +52,6 @@ export interface Box {
 export interface RoadMeshData {
   surface: MeshData;
   marks: MeshData | null;
-  /** The render data worker's own build (ms), for the perf spans. */
-  ms?: number;
 }
 
 /**

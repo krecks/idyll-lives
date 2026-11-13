@@ -73,9 +73,11 @@ export async function loadShowcase(): Promise<Showcase | null> {
 export async function keepShowcase(showcase: Showcase): Promise<void> {
   if (typeof caches === 'undefined') return;
   try {
+    // (Stringified now, before any await: on the page, where no worker runs, the draft may change meanwhile.)
+    const body = JSON.stringify(keepEntry(showcase));
     const cache = await openCache(PREFIX, CACHE);
     if (!cache) return;
-    await cache.put(ENTRY, new Response(JSON.stringify(keepEntry(showcase)), { headers: { 'Content-Type': 'application/json' } }));
+    await cache.put(ENTRY, new Response(body, { headers: { 'Content-Type': 'application/json' } }));
   } catch (err) {
     console.warn('[showcase] could not keep it', CACHE, ENTRY, err);
   }

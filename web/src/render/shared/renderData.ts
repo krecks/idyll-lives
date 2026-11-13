@@ -87,7 +87,8 @@ export type ToRenderData =
 
 export type RenderDataAnswer =
   | { type: 'grass'; field: LandGrass }
-  | { type: 'roads'; roads: RoadMeshData }
+  /** `ms`: the worker's own build, for the perf spans. */
+  | { type: 'roads'; roads: RoadMeshData; ms: number }
   | { type: 'shade'; positions: Float32Array; colors: Float32Array };
 
 /** A render data worker (`renderData.worker.ts`); it goes once it has had nothing to do for half a minute. */
@@ -190,7 +191,7 @@ export class OffThreadLand {
  * part while the page plans the street (the same arrays as the page's, in the same order). Null where
  * no worker could make it: the caller builds it on the page.
  */
-export async function townRoadMeshOffThread(world: WorldStructure): Promise<RoadMeshData | null> {
+export async function townRoadMeshOffThread(world: WorldStructure): Promise<{ roads: RoadMeshData; ms: number } | null> {
   const reply = await shading.ask({ type: 'roads', world: landWorld(world) }, none).catch(none);
-  return reply?.type === 'roads' ? reply.roads : null;
+  return reply?.type === 'roads' ? { roads: reply.roads, ms: reply.ms } : null;
 }

@@ -46,9 +46,9 @@ scope.onmessage = (e) => {
     try {
       if (q.type === 'roads') {
         const start = performance.now();
-        const mesh = townRoadMesh(q.world);
-        const roads = { ...mesh, ms: performance.now() - start };
-        scope.postMessage({ id, answer: { type: 'roads', roads } }, [...meshBuffers(roads.surface), ...meshBuffers(roads.marks)]);
+        const roads = townRoadMesh(q.world);
+        const ms = performance.now() - start;
+        scope.postMessage({ id, answer: { type: 'roads', roads, ms } }, [...meshBuffers(roads.surface), ...meshBuffers(roads.marks)]);
         return;
       }
       const { world, land } = landOf(q.land);

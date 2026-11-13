@@ -293,14 +293,17 @@ export class TownOverview {
   // ---- building ---------------------------------------------------------------------
 
   /** Road and garden paths / driveways and fields, one flat mesh each (hidden until the swap). */
-  private async buildGround(world: WorldStructure, pace: (() => Promise<void>) | undefined, offThread: Promise<RoadMeshData | null>): Promise<pc.Entity[]> {
+  private async buildGround(world: WorldStructure, pace: (() => Promise<void>) | undefined, offThread: Promise<{ roads: RoadMeshData; ms: number } | null>): Promise<pc.Entity[]> {
     const out: pc.Entity[] = [];
     // (The junctions' pads with the road, their markings in the road paint over it: `townRoadMesh`. Made in the
     // render data worker while the street was planned, or here where none could.)
     const span = perfStart('town: road mesh');
-    let meshes = await offThread;
-    if (meshes) perfEnd(span, `worker ${Math.round(meshes.ms ?? 0)} ms`);
-    else {
+    const made = await offThread;
+    let meshes: RoadMeshData;
+    if (made) {
+      meshes = made.roads;
+      perfEnd(span, `worker ${Math.round(made.ms)} ms`);
+    } else {
       meshes = townRoadMesh(world);
       perfEnd(span, 'page');
     }
