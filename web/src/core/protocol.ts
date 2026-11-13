@@ -496,14 +496,14 @@ export type BackdropUse =
 
 /** A building that makes a town dense without being a lot: drawn only, never simulated. */
 export interface BackdropBuilding {
-  /** Footprint corners, town metres, counter-clockwise, 4 to 8 points (most are rectangles). */
+  /** Footprint corners, town metres, 4 to 8 points (most are rectangles), counter-clockwise seen from above: the signed area Σ(x·z′ − x′·z) is negative. */
   poly: [number, number][];
   /** Ground height of the footprint's lowest corner (m). */
   y: number;
   /** Storeys (1 to 6), 3 m each. */
   storeys: number;
   roof: 'gable' | 'hip' | 'flat' | 'mansard';
-  /** The ridge's direction for gable and mansard roofs (rad around +y, 0 = along x). */
+  /** The ridge's direction for gable and mansard roofs (rad, 0 = along x): a turn around +y (y up), so it runs along (cos r, −sin r) in (x, z). */
   ridge?: number;
   use: BackdropUse;
   /** A wall and roof colour pair: an index into the renderer's backdrop palette, taken modulo its length. */

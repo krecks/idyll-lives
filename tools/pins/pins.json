@@ -3,9 +3,9 @@
     {
       "name": "contract",
       "file": "docs/design/living-town.md",
-      "sha256": "20ad198da5b73bd1df9a087b60f8743266ab4be3cf997917b235b705fe89d531",
-      "by": "setup",
-      "reason": "the contract: townView shared state"
+      "sha256": "5f4ccd7b77781a2b4c133b0d99c70b259ade30fe9f05ba775b05f79b02fc48d9",
+      "by": "integrator",
+      "reason": "the footprint's winding and the ridge's angle said exactly (counter-clockwise seen from above; a turn round +y, the ridge along (cos r, -sin r) in x, z): worldgen and render had read the ridge opposite ways, and worldgen's reading is the one written down"
     },
     {
       "name": "living-town-meta",
@@ -18,9 +18,9 @@
     {
       "name": "living-town-types",
       "file": "web/src/core/protocol.ts",
-      "sha256": "96ade80f00b749ed01a6e47c7f93fea2f289bc7e1b231009c5674dffaf7beb7c",
-      "by": "setup",
-      "reason": "the contract's types",
+      "sha256": "e7d2b544064f4d25e7af778f7284c9768b169096b9a69fa457199cff66c08db3",
+      "by": "integrator",
+      "reason": "the footprint's winding and the ridge's angle said exactly (counter-clockwise seen from above; a turn round +y, the ridge along (cos r, -sin r) in x, z): worldgen and render had read the ridge opposite ways, and worldgen's reading is the one written down",
       "region": "living-town-types"
     },
     {
