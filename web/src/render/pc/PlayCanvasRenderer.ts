@@ -2201,7 +2201,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * car standing on it (`Cars.hideOn`).
    */
   private applyStoreys(): void {
-    for (const { entity, storey } of this.lotEntities) if (storey !== undefined) entity.enabled = storeyShown(storey, this.storey);
+    // (From the town view the house stands whole, `townWhole`: every storey from the ground up, whichever is in view.)
+    const upTo = this.townWhole && this.storey >= 0 ? this.storeys.count - 1 : this.storey;
+    for (const { entity, storey } of this.lotEntities) if (storey !== undefined) entity.enabled = storeyShown(storey, upTo);
     for (const p of this.decor.values()) for (const d of p.draws) d.enabled = this.storey >= 0 && d.count > 0;
     const v = this.view;
     this.street.showLot(this.storey >= 0);
@@ -2406,6 +2408,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (whole !== this.townWhole) {
       this.townWhole = whole;
       this.applyWallMode();
+      // (And every storey of it, under its roof: a lower one in view would leave it open to the sky.)
+      if (this.storeys.count > 1) this.applyStoreys();
     }
     if (this.roofs.length && this.roofVisible() !== this.roofShown) {
       this.roofShown = !this.roofShown;

@@ -202,6 +202,20 @@ export function placeTags(w: TagWorld, yours: ReadonlyMap<number, string>): Town
 /** Homes for sale show up to this far out (m of orbit radius): past it, a big town's dozens of them would bury the rest. */
 export const SALE_REACH = 480;
 
+/**
+ * How many homes for sale show at once: the ones nearest the middle of the view (`nearestFew`). A Big town has
+ * a couple of hundred, and with them all on, three tags in four were prices: the household's own tags and the
+ * places were lost among them.
+ */
+export const SALE_MOST = 12;
+
+/** The `most` keys nearest (least `far`), the first by key among equals: which of a crowded kind's tags show. */
+export function nearestFew(tags: readonly { key: string; far: number }[], most: number): Set<string> {
+  if (tags.length <= most) return new Set(tags.map((t) => t.key));
+  const order = [...tags].sort((a, b) => a.far - b.far || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  return new Set(order.slice(0, Math.max(0, most)).map((t) => t.key));
+}
+
 /** The homes for sale: their price and size. */
 export function saleTags(homes: readonly HomeForSale[], plots: readonly PlotInfo[], money: (n: number) => string): TownTag[] {
   return homes.map((h) => {

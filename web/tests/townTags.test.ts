@@ -8,7 +8,7 @@ import type { PlotInfo, RelationshipView, SimView, TownPlace } from '../src/core
 import { dayBar } from '../src/ui/town/dayBar';
 import { keepApart, TAG_ORDER, type TagBox, type TagKind } from '../src/ui/town/overlap';
 import { homesForSale, nameLabels, openState, openText, townPlaces } from '../src/ui/town/places';
-import { whereabouts, yourPeople, type TagWorld } from '../src/ui/town/tags';
+import { nearestFew, whereabouts, yourPeople, type TagWorld } from '../src/ui/town/tags';
 import { nextEvents, waitText } from '../src/ui/town/today';
 import { schoolOf, workplaceOf } from '../src/ui/town/workplace';
 import { tagFade } from '../src/ui/town/fade';
@@ -114,6 +114,21 @@ describe('keeping tags apart', () => {
       const blocked = list.some((k) => TAG_ORDER.indexOf(k.kind) <= TAG_ORDER.indexOf(t.kind) && t.x < k.x + k.w + 3 && k.x < t.x + t.w + 3 && t.y < k.y + k.h + 3 && k.y < t.y + t.h + 3);
       expect(blocked).toBe(true);
     }
+  });
+});
+
+describe('the few of a crowded kind', () => {
+  test('the nearest stay, the first by key among equals; all of them when they are few', () => {
+    const tags = [
+      { key: 's:4', far: 90 },
+      { key: 's:1', far: 20 },
+      { key: 's:3', far: 55 },
+      { key: 's:2', far: 20 },
+    ];
+    expect([...nearestFew(tags, 2)].sort()).toEqual(['s:1', 's:2']);
+    expect([...nearestFew(tags, 3)].sort()).toEqual(['s:1', 's:2', 's:3']);
+    expect(nearestFew(tags, 9).size).toBe(4);
+    expect(nearestFew(tags, 0).size).toBe(0);
   });
 });
 

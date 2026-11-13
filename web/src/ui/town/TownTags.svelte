@@ -7,7 +7,7 @@
   import { townMap } from '../townMap.svelte';
   import { keepApart, type TagBox } from './overlap';
   import { homesForSale, nameLabels, townPlaces } from './places';
-  import { householdTags, nameTags, peopleTags, placeTags, saleTags, yourPeople, type TagWorld, type TownTag } from './tags';
+  import { householdTags, nameTags, nearestFew, peopleTags, placeTags, SALE_MOST, saleTags, yourPeople, type TagWorld, type TownTag } from './tags';
   import { TAGS_FROM, tagFade } from './fade';
   import { townHud } from './townHud.svelte';
 
@@ -117,10 +117,16 @@
     const where = new Map<string, [number, number]>();
     const chosen = townHud.chosen;
     const chosenKey = chosen?.kind === 'person' ? `p:${chosen.sim}` : chosen?.kind === 'place' ? `pl:${chosen.place}` : null;
+    // (Of the homes for sale, the few nearest where the camera looks.)
+    const sales: { key: string; far: number }[] = [];
+    const look = townView.target;
+    for (const t of tags) if (t.kind === 'sale' && 'x' in t.anchor) sales.push({ key: t.key, far: Math.hypot(t.anchor.x - look.x, t.anchor.z - look.z) });
+    const saleShown = nearestFew(sales, SALE_MOST);
     for (const [key, el] of pins) {
       const t = byKey.get(key);
       if (!t) continue;
       if (t.radius && (townView.radius < t.radius[0] || townView.radius > t.radius[1])) continue;
+      if (t.kind === 'sale' && !saleShown.has(key)) continue;
       if (!pointOf(t)) continue;
       const p = project(spot.x, spot.y, spot.z);
       if (!p) continue;
