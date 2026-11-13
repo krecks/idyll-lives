@@ -1694,6 +1694,24 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     return i >= 0 && i < MAX_CHARACTERS && !!this.visible[i] && Math.abs(this.storeys[i]) < 0.01;
   }
 
+  /**
+   * The stride of Sim `i` while it is drawn walking, jogging or running, for the footsteps' sound: how far through
+   * its cycle it is now (0: the left heel strikes, 0.5: the right; one far off, posed every few frames, as far on as
+   * the frames since), how fast it goes (cycles a second while the game runs), its gait (an index into `GEARS`) and
+   * whether it goes barefoot. False otherwise (standing, sat, on a ride, not drawn).
+   */
+  stride(i: number, out: { phase: number; rate: number; gear: number; bare: boolean }): boolean {
+    const rig = i >= 0 && i < MAX_CHARACTERS && this.visible[i] ? this.sims[i] : undefined;
+    const cur = rig?.cur;
+    if (!rig || !cur?.clip || cur.frozen !== null || !GAITS.has(cur.key)) return false;
+    const at = (cur.time + rig.lag * cur.rate) / cur.clip.duration;
+    out.phase = at - Math.floor(at);
+    out.rate = cur.rate / cur.clip.duration;
+    out.gear = GEARS.indexOf(cur.key);
+    out.bare = (this.bare[i] & SHELL_BITS.shoes) !== 0;
+    return true;
+  }
+
   /** Where Sim `i` stands (x, z), also when not drawn (another lot); false while away or unknown. */
   spot(i: number, out: { x: number; z: number }): boolean {
     if (i < 0 || i >= MAX_CHARACTERS || Number.isNaN(this.spots[i * 2])) return false;

@@ -20,10 +20,12 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
-import { everySound, GUARD, type Group } from '../../web/src/audio/catalog';
+import { everySound, GUARD, STEPS, type Group } from '../../web/src/audio/catalog';
 import { loudness as loudnessAt } from '../../web/src/audio/loudness';
 import { fft, spaced, type Hearing } from '../../web/src/audio/offline';
 import { ROOM_SIZES, ROOMS, roomResponse } from '../../web/src/audio/rooms';
+import { stepSamples, STEP_VERSIONS, SURFACES, type Footwear, type Surface } from '../../web/src/audio/steps';
+import { random } from '../../web/src/audio/water';
 
 const RATE = 48_000;
 /** The checkout. */
@@ -136,7 +138,7 @@ function users(): Map<string, string[]> {
 }
 
 /** Who makes the sounds no content names. */
-const WHO: Record<Group, string> = { things: 'by its animation', ambience: 'the outdoors', interface: 'the interface' };
+const WHO: Record<Group, string> = { things: 'by its animation', steps: 'a resident walking', ambience: 'the outdoors', interface: 'the interface' };
 
 /** How far apart the sounds are in loudness, by what they belong to, loops and sounds played once apart: what a mix has to even out. */
 function spread(): string[] {
@@ -206,6 +208,43 @@ for (const size of ROOM_SIZES) {
   writeFileSync(join(OUT, `room-${size}.wav`), wav(left, right));
 }
 
+/**
+ * Someone walking for `seconds` at `cycle` s a stride (two steps), as `footsteps.ts` plays it in the middle of the
+ * picture: a version of the step picked each time, the left foot a touch lower than the right, no two quite alike.
+ */
+function walk(surface: Surface, wear: Footwear, cycle: number, gear: number, seconds: number): Float32Array {
+  const r = random(0x3a1c + SURFACES.indexOf(surface));
+  const d = new Float32Array(Math.round(seconds * RATE));
+  for (let n = 0; 0.2 + n * (cycle / 2) < seconds - 0.4; n++) {
+    const step = stepSamples(surface, wear, Math.floor(r() * STEP_VERSIONS), RATE);
+    const speed = (n % 2 ? 1.02 : 0.98) * (0.95 + 0.1 * r());
+    const gain = STEPS.level[surface][wear] * STEPS.gear[gear] * (0.8 + 0.2 * r()) * Math.SQRT1_2;
+    const at = Math.round((0.2 + n * (cycle / 2)) * RATE);
+    // (Played a little faster or slower: read between its samples.)
+    for (let i = 0; i / speed < step.length - 1 && at + i < d.length; i++) {
+      const p = i * speed;
+      const k = Math.floor(p);
+      if (k + 1 < step.length) d[at + i] += gain * (step[k] + (step[k + 1] - step[k]) * (p - k));
+    }
+  }
+  return d;
+}
+const walkRows: string[] = [];
+console.log('\nwalking');
+for (const [surface, wear, cycle, gear, words] of [
+  ...SURFACES.map((s): [Surface, Footwear, number, number, string] => [s, 'shoe', 1.1, 0, `a walk in shoes on ${s}`]),
+  ...SURFACES.map((s): [Surface, Footwear, number, number, string] => [s, 'bare', 1.1, 0, `a walk barefoot on ${s}`]),
+  ['paving', 'shoe', 0.7, 1, 'a jog on paving'] as [Surface, Footwear, number, number, string],
+  ['grass', 'shoe', 0.6, 2, 'a run on grass'] as [Surface, Footwear, number, number, string],
+]) {
+  const d = walk(surface, wear, cycle, gear, 6);
+  const loud = loudnessAt(d, d, RATE);
+  const file = `walk-${surface}-${wear}${gear ? (gear === 1 ? '-jog' : '-run') : ''}.wav`;
+  writeFileSync(join(OUT, file), wav(d, d));
+  walkRows.push(`| \`${file}\` | ${words}, 6 s | ${num(loud)} | ${num(centroid(d, d), 0)} |`);
+  console.log(`${file.padEnd(30)} ${num(loud).padStart(6)} LUFS  centroid ${num(centroid(d, d), 0).padStart(6)} Hz  ${words}`);
+}
+
 writeFileSync(
   join(OUT, 'index.md'),
   [
@@ -239,6 +278,15 @@ writeFileSync(
     '| file | what | LUFS | against the sound alone | centroid |',
     '|---|---|---|---|---|',
     ...spacedRows,
+    '',
+    '## Walking',
+    '',
+    'One resident walking for six seconds on each surface, as the footsteps are played (`web/src/audio/footsteps.ts`:',
+    'a version of the step picked each time, the feet a touch apart in pitch), in the middle of the picture, dry.',
+    '',
+    '| file | what | LUFS | centroid |',
+    '|---|---|---|---|',
+    ...walkRows,
     '',
     '"by its animation" means no content names the sound: it comes from the animation tag the use',
     'plays (`world.ts` \'s `ACTION_SOUNDS`), so it is heard wherever that animation is (an oven\'s fan',

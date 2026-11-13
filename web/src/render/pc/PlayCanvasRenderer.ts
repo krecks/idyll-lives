@@ -131,6 +131,7 @@ import type {
   ResizeHandle,
   RoomOverlayTile,
   SeenBird,
+  SimStride,
   TownShot,
   ViewRect,
   Shading,
@@ -3331,6 +3332,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   simHead(index: number, out: { x: number; y: number; z: number }): boolean {
     return index < this.simCount && !!this.characters?.head(index, out);
+  }
+
+  simStride(index: number, out: SimStride): boolean {
+    return index < this.simCount && !!this.characters?.stride(index, out);
   }
 
   birds(): readonly SeenBird[] {

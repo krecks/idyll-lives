@@ -12,6 +12,7 @@
 import { songSamples, SPECIES } from './birdsong';
 import { BLIPS, blipSamples, type Blip } from './blips';
 import { MONO, ONCE_MONO, type MonoKind } from './mono';
+import { FOOTWEAR, stepSamples, SURFACES, type Footwear, type Surface } from './steps';
 import { MADE, ONCE_THINGS, type MadeKind } from './things';
 import { ONCE, type Stereo } from './water';
 
@@ -83,21 +84,48 @@ export const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.
  */
 export const AMBIENCE = { bed: { night: 0.05, day: 0.03 }, crickets: 0.1, birds: 0.05, far: 0.55, knock: 1 };
 
+/**
+ * Footsteps (`footsteps.ts`): the level of a step by what is walked on and in what (shoes on tiles the
+ * loudest, bare feet on carpet next to nothing), what a jog and a run add (`gear`, by gait), how the level of
+ * each falls with the walkers in view (`crowd` over the square root of how many), how many can sound at once
+ * (`voices`) and start on one look (`perLook`), how far ahead a step is started (`ahead` s) and how close two of
+ * one walker's may fall (`apart` s), and the least of the camera's distance gain at which steps are still made
+ * (`farthest`: to about 68 m).
+ */
+export const STEPS = {
+  level: {
+    wood: { shoe: 0.09, bare: 0.057 },
+    tile: { shoe: 0.16, bare: 0.077 },
+    carpet: { shoe: 0.045, bare: 0.03 },
+    grass: { shoe: 0.038, bare: 0.031 },
+    paving: { shoe: 0.094, bare: 0.061 },
+  } satisfies Record<Surface, Record<Footwear, number>>,
+  gear: [1, 1.25, 1.5],
+  crowd: 1.5,
+  voices: 8,
+  perLook: 4,
+  ahead: 0.18,
+  apart: 0.15,
+  farthest: 0.35,
+};
+
 /** The interface's sounds are quiet by design: the level of their bus (`mixer.ts`). */
 export const EFFECTS_LEVEL = 0.5;
 
-/** What a sound belongs to: a thing in the world, the outdoors, or the interface. */
-export type Group = 'things' | 'ambience' | 'interface';
+/** What a sound belongs to: a thing in the world, a resident's feet, the outdoors, or the interface. */
+export type Group = 'things' | 'steps' | 'ambience' | 'interface';
 
 /**
  * Where each group's sounds sit as the game plays them (LUFS, `loudness.ts`; `bun run sounds` lists them):
- * things in use between a pottery wheel's hum (-35) and a shower (-20), the outdoors under most of them (it is
+ * things in use between a pottery wheel's hum (-35) and a shower (-20), one footstep under the quietest of
+ * them (shoes on tiles -38, bare feet on carpet -48: they are many), the outdoors under most of them (it is
  * always there: -40 to -32), the interface's blips from a tab's tick (-45) to a wall's thump (-28; they are a
  * fraction of a second, measured over their own length). A sound outside its group's range is a level left off, or a sound made much louder or quieter than
  * it was without the mix having been looked at.
  */
 export const GUARD: Record<Group, readonly [number, number]> = {
   things: [-40, -18],
+  steps: [-52, -34],
   ambience: [-46, -28],
   interface: [-50, -24],
 };
@@ -138,6 +166,12 @@ export function everySound(): Listed[] {
     list.push({ name, group: 'things', plays: once.has(name) ? 'once' : 'loop', level, heard });
   }
   list.push({ name: 'knock', group: 'things', plays: 'once', level: AMBIENCE.knock, heard: (rate) => centred(MONO.knock(rate), AMBIENCE.knock) });
+  for (const surface of SURFACES) {
+    for (const wear of FOOTWEAR) {
+      const level = STEPS.level[surface][wear];
+      list.push({ name: `step-${surface}-${wear}`, group: 'steps', plays: 'once', level, note: 'one step at a walk, one walker', heard: (rate) => centred(stepSamples(surface, wear, 0, rate), level) });
+    }
+  }
   const day = AMBIENCE.bed.night + AMBIENCE.bed.day;
   list.push({ name: 'bed', group: 'ambience', plays: 'loop', level: day, note: `by day; ${AMBIENCE.bed.night} at night`, heard: (rate) => centred(MONO.bed(rate), day) });
   list.push({ name: 'crickets', group: 'ambience', plays: 'loop', level: AMBIENCE.crickets, note: 'at night', heard: (rate) => centred(MONO.crickets(rate), AMBIENCE.crickets) });

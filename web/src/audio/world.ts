@@ -14,7 +14,8 @@
  *   `runs.sound`: the washer loaded, nobody at it), while their lot is looked at, some only while a use
  *   under them sounds (`ambientWhile`: a cooker hood over a hob in use);
  * - sounds as something happens: a fridge door as its use starts (a `sound` played once), a toilet's
- *   flush as its use ends (content `endSound`), a visitor's knock at the front door.
+ *   flush as its use ends (content `endSound`), a visitor's knock at the front door;
+ * - the footsteps of the residents in view (`footsteps.ts`).
  *
  * A thing's sound is placed (`space.ts`): left or right by where it is on screen, in the reverb of the
  * room it is made in (dry outdoors), behind a wall when the camera is in on another room, and further
@@ -32,6 +33,7 @@ import { birdActivity, STOREY_HEIGHT, type Renderer, type ViewRect } from '../re
 import { game } from '../ui/state.svelte';
 import { acoustics } from './acoustics';
 import { songSamples, SPECIES, VERSIONS, type Species, type Voice } from './birdsong';
+import { Footsteps } from './footsteps';
 import { AMBIENCE, LOOPS, ONCE_KINDS, ONCE_LEVEL, type LoopKind, type OnceKind, type SoundKind } from './catalog';
 import { audioContext, bus, space, updateVolumes } from './mixer';
 import { MONO, type MonoKind } from './mono';
@@ -123,6 +125,8 @@ interface Heard {
   places: Partial<Record<LoopKind, Place>>;
   once: { kind: OnceKind; at: number }[];
   radius: number;
+  /** The footsteps (`Footsteps.heard`). */
+  steps: ReturnType<Footsteps['heard']>;
 }
 
 /** Something that sounds by itself (content `ambient`), where it stands (`row`: its z in the world's rows, its storey's). */
@@ -203,7 +207,8 @@ export class WorldSound {
   /** The world's objects' tiles, by their stable id. */
   private readonly tilesOf = new Map<number, Tiles>();
   /** What sounded on the last update (`playing`). */
-  private heard: Heard = { loops: {}, places: {}, once: [], radius: 0 };
+  private heard: Heard = { loops: {}, places: {}, once: [], radius: 0, steps: { steps: 0, walkers: 0, recent: [] } };
+  private readonly steps: Footsteps;
   private readonly head = { x: 0, y: 0, z: 0 };
   private readonly screen = { x: 0, y: 0 };
   private disposed = false;
@@ -214,7 +219,9 @@ export class WorldSound {
   constructor(
     private readonly renderer: Renderer,
     private readonly content: Content,
-  ) {}
+  ) {
+    this.steps = new Footsteps(renderer, content);
+  }
 
   /** The world's objects, and the lot in view (`view`; null: none): the ones there that sound by themselves. */
   setWorld(world: WorldStructure, view: ViewRect | null): void {
@@ -224,6 +231,7 @@ export class WorldSound {
     this.tilesOf.clear();
     this.storeys = world;
     acoustics.setWorld(world);
+    this.steps.setWorld(world);
     const index = new Map(this.content.objectList.map((o, i) => [o.id, i]));
     for (const o of world.objects) {
       this.defOf.set(o.id, index.get(o.def) ?? -1);
@@ -368,7 +376,10 @@ export class WorldSound {
       places: Object.fromEntries([...users].map(([kind, u]) => [kind, placeOf(u)])),
       once: [...this.heard.once.filter((s) => now - s.at < 10_000), ...once],
       radius: acoustics.radius,
+      steps: this.steps.heard(),
     };
+    // The residents' feet (none while the town is shown instead of the lot).
+    this.steps.update(ac, around, frame, t, quiet || paused || game.townOpen);
     for (const id of this.knocking.keys()) if (!seen.has(id)) this.knocking.delete(id);
     for (const id of this.bathers.keys()) if (!bathing.has(id)) this.bathers.delete(id);
     for (const kind of Object.keys(LOOPS) as LoopKind[]) {
@@ -423,6 +434,7 @@ export class WorldSound {
       else loop.panner.disconnect();
     }
     this.loops.clear();
+    this.steps.dispose();
     this.birds.dispose();
     this.made.dispose();
   }

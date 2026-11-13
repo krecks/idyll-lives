@@ -278,6 +278,8 @@ const BATH = ['toilet', 'shower', 'bathtub'];
 const KITCHEN = ['fridge', 'sink', 'stove', 'counter', 'diningTable'];
 const BEDROOM = ['bed'];
 const LIVING = ['sofa', 'tv', 'armchair', 'bookshelf', 'computerDesk', 'piano'];
+/** The furniture that says what a room is for, by kind (the footsteps' sound reads a room's floor from it too: `audio/surfaces.ts`). */
+export const ROOM_FURNITURE: Record<RoomKind, readonly string[]> = { bath: BATH, kitchen: KITCHEN, bedroom: BEDROOM, living: LIVING };
 
 export interface RoomLight {
   x: number;
