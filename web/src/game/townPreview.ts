@@ -99,7 +99,12 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
 
   const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths: layout.paths, facing: layout.facing, seed: town.seed ?? 1, world: worldLook(town, layout.fields), home: playerSlot, gardenFences: true };
   // A big world's land and areas, as the town file carries them (`assembleTown`).
-  if (town.open) Object.assign(meta, { zones: town.open.zones, pads: town.open.pads, areas: town.open.areas });
+  if (town.open) {
+    const { zones, pads, areas, backdrop, places, centre } = town.open;
+    // (And the living town's backdrop, places and centres: the land is cleared for them as in the game, and the
+    // town view over a preview, the bench's Big world, draws them.)
+    Object.assign(meta, { zones, pads, areas, ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...(centre ? { centre } : {}) });
+  }
   return {
     version: 0,
     lotVersion: 0,
