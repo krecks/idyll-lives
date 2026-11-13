@@ -31,9 +31,15 @@ ground storey. Row blocks for upper storeys and the basement keep today's stacke
 - `MAX_SIMS` 240, `MAX_STAFF` 48, `MAX_CARS` 128 (sim-grid). The renderer's `MAX_CHARACTERS`
   is the snapshot layout's maxSims + maxStaff (288, `render/shared/characters/rig.ts`; a test holds
   them together); the speech bubbles follow the layout's `maxSims`.
-- Neighbours: `NEIGHBOUR_CAP = 220` in every world; a world starts with ~170 (`BIG_START`, where it
-  has the homes: the rest are for sale) and grows to `MAX_SIMS`. Raised from 160 / 140 / 118 in the
-  living-town run (2026-11-12), once the two costs that had held them down were gone:
+- Neighbours: `NEIGHBOUR_CAP = 220` in every world; a world starts with ~120 (`BIG_START = 118`:
+  the rest of its homes are for sale) and grows to `MAX_SIMS`. `MAX_SIMS` and `NEIGHBOUR_CAP` were
+  raised from 160 / 140 in the living-town run (2026-11-12), once the two costs that had held them
+  down were gone. `BIG_START` was tried at 168 and put back: with ~170 residents from the first
+  morning in the denser town, one of seed base 0's 24 sample worlds (mountain 209466) jammed at its
+  centre by 11:00 on day 1 (a cyclist getting off by the Bakery and a car arriving there waited for
+  each other for good, the town's taxis queued behind them, and 11 residents were on their bikes
+  for over 2 hours: `generated_worlds_cars_keep_to_the_roads`); with 118 the same world and seed
+  bases 0, 17 and 22 are green. It can go up once in-view jams are finished (`BIG_PREVIEW`).
   - **The 09:30 spike.** A real Big game with ~170 had 16 frames over 33 ms (up to 299 ms) as the
     town got its jobs at 09:30. The cause: each hire worked out their commute on their next turn
     (`life::refresh_commute`), never waiting for the search budget, and nearly every commute is an
@@ -59,7 +65,7 @@ ground storey. Row blocks for upper storeys and the basement keep today's stacke
 One size now: `big`. Cosy and normal were dropped in 0.8.0 (Create World has no size option);
 a save or town file that still says `cosy` or `normal` reads as `big`. A world is 896–1024 m: a
 main town (the kind's shape, its streets reaching all of its box) + 5–7 hamlets of 16–24 lots,
-farmsteads and cottages along the country roads, ~170 starting residents, growing to `MAX_SIMS`.
+farmsteads and cottages along the country roads, ~120 starting residents, growing to `MAX_SIMS`.
 Every town has the open world's roads, outings, commutes timed by the walk, cars and taxis; a
 save without the open-world fields takes its network from its meta's roads, or its streets.
 
