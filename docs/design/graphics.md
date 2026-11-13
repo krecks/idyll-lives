@@ -139,22 +139,38 @@ pixel: `?diag=notown` leaves it out to compare).
   five unit meshes: a box of walls, and a gable, hip, flat (a parapet round a felt deck) or mansard roof. One
   instanced draw each, five for the whole world, in one material. Each copy carries its wall and roof colours,
   its plinth (the walls go 0.4 m under its lowest corner's ground) and its windows: the fragment shader draws
-  them over the walls in bands a storey (3 m) apart and in bays along each face in the face's own metres (a
-  shopfront on a shop's ground floor), fading to their average where a bay is under a pixel or two; at night a
-  share of them glows with the street's window glow by the lamps' level. A backdrop building's colours come from
+  them over the walls in bands a storey (3 m) apart and in bays along each face in the face's own metres (on a
+  shop's long faces a shopfront: wide, paler glass under a fascia in one of four colours), fading to their average
+  where a bay is under a pixel or two; at night a share of them glows with the street's window glow by the lamps'
+  level. The share follows the life there (`litAt`, written again only when one changes): a place with opening hours
+  is lit while it is open and all but dark when closed, a home nobody plays has its evening's lights going out one
+  by one from ten till half past midnight and on again from half past five (`homeLights`), and a far lot's house is
+  lit only while someone is up in it (`findTownUp`, twice a second from the snapshot's positions), as the
+  neighbours' houses near the camera are. A backdrop building's colours come from
   the backdrop palette by its `look` (warm town tones: red and orange tile roofs, some brown, a few grey slate,
   over cream, sand, ochre, render and brick; a barn's boards and tin, a church's stone and slate), each a little
-  different; a lot's house keeps its own (`HousePlanner.farLook`). A footprint that isn't a rectangle is drawn as
-  the rectangle round it. They fade in by a dither over the first 3 % of the blend (to about 148 m), so nothing pops.
+  different, its pitched roof at 0.72 of its palette colour (as bright as the palette they read as lit beside the
+  game's own roofs); a lot's house keeps its own (`HousePlanner.farLook`). A footprint that isn't a rectangle is
+  drawn as the rectangle round it. A backdrop house's garden has a hedge (`gardenHedges`): low boxes in the same
+  draws, along each side but the one its path leaves by and those that would stand on a lot, a road or another
+  building's ground. They fade in by a dither over the first 3 % of the blend (to about 148 m), so nothing pops.
 - **Far woods** (`render/pc/nature.ts` `FarCrowns`). Every woods tree is gathered into crown clusters, one per
   9 m square (as wide as its trees spread, as tall as they are, a dome or, where conifers are most, a cone), two
   instanced draws. In the town view the woods draw their own trees only in the squares within
   `560 → 260 m` of the target (by the blend), crowns in the rest.
 - **Ground** (`render/pc/groundTiles.ts` `TownGroundMap`, `shaders/townGround.ts`). A colour map over the whole
   world, baked once per town on a 2D canvas (2048², half a metre a texel): the streets and their pavements, the
-  junctions' pads, the trails and paths, the centre's paving (round its lots), water and farm fields, laid over the
-  ground tiles' colour by the blend. Past the chunks streamed in the street draws no road: this is the road there.
-  The ground tiles' material gets the define only while the blend is over 0.
+  junctions' pads, the trails and paths, the centre's paving (round its lots, laid in courses 5 m apart), water and
+  farm fields; a big world's
+  farmland as its ground colours it (`LandscapeLayout.farmland`: each field of the patchwork a rectangle in its
+  crop's colour, shown as strongly as the terrain shows it; the ground's own colours are a vertex apart, and from
+  above a field's edge stepped along the grid); and what the backdrop's buildings
+  stand on (`backdropGround`: a paved forecourt under flats, shops and halls, a bare yard under a workshop or a
+  barn, and each one's way to the nearest road within 45 m, a garden path for a house). It is laid over the ground
+  tiles' colour over the first 3 % of the blend, with the buildings. Past the chunks streamed in the street draws no
+  road: this is the road there. The ground tiles' material gets the define only while the blend is over 0.
+  (The farmland's zone itself is evened out where the landscape reads it, `shared/zones.ts` `evened`: the generator
+  outlines it in 10 m cells, a staircase along every slanted edge.)
 - **Movers** (`townView.ts` `TownMovers`). The cars, taxis, bikes and residents the near drawing leaves out (past
   the chunks streamed in, past the residents' radius; not those indoors or in a car) as tiny instanced shapes in
   their own colours (a car's paint, the taxi's yellow, a resident's top), where the snapshot has them, up to 2.4
@@ -181,7 +197,7 @@ Opening the game with `?bench=<scene>` plays a saved game state, `web/public/ben
 | `speed` | 1 (`dusk`: 5) | The game speed while measuring. |
 | `radius`, `beta`, `tx`, `tz` | e.g. `400` | The orbit's distance (to `TOWN_MAX`, 900 m: the town view), its angle and its target moved. |
 | `townCentre` | `1` | The orbit round the drawn world's main town (`bench=bigworld`) instead of the home lot. |
-| `hud`, `gpu` | `0` | `hud=0` hides the interface and the summary; `gpu=0` doesn't time the GPU. |
+| `hud`, `gpu` | `0` | `hud=0` hides the interface and the summary, `hud=game` only the summary (the game as a player has it: the town set's pictures); `gpu=0` doesn't time the GPU. |
 | `label` | text | Kept with the result. |
 | `diag` | `noshadows`, `noclouds`, `noaa`, `nonature` (or one part of it: `nowoods`, `nofarwoods`, `noflowers`, `nograss`), `nolamps`, `nomirrors`, `noglass`, `nonight`, `freeze`, `albedo`, `normals`, `nosims`, `linear`, `notown` (the town view's drawing left out) | Leaves features out, to measure what each costs (a comma list). `freeze` stops time for screenshots that compare pixel for pixel, at `at=<s>` along the path. `albedo` and `normals` draw every lit surface as its base colour or world normal (no light, no image processing), `nosims` leaves the residents out, and `linear` draws the light without tone mapping, exposure or grading: the port compared geometry, colour and light apart with them. Works without `bench` too. |
 | `renderer` | `webgl` | WebGL2 instead of WebGPU. |

@@ -5,7 +5,7 @@
  * under its ground to its storeys, its roof's rise), and the unit meshes themselves.
  */
 
-import type { BackdropBuilding, BackdropUse } from '../../core/protocol';
+import type { BackdropBuilding, BackdropUse, RoadPlan, TownPlace } from '../../core/protocol';
 import { Geo, facing, type V3 } from './geometry';
 
 /** Window styles: none (a barn), a house's, a shop's (a shopfront on the ground floor), flats' and offices' (closer bays). */
@@ -54,14 +54,23 @@ const BARN = [['#8A3F2E', '#7B7F80'], ['#6E5040', '#6A6E70'], ['#9A8A70', '#7E5A
 const CHURCH = ['#BDB5A5', '#55595F'] as const;
 const FLAT_ROOF = '#8C8780';
 
-/** A building's window style by what it is, and the share of its windows lit at night. */
+/**
+ * How much of their palette colour the backdrop's pitched roofs keep (sRGB): as bright as the palette has them they
+ * stood out beside the game's own houses' roofs as if lit from inside, most of all at dusk and by night.
+ */
+const ROOF_TONE = 0.72;
+
+/**
+ * A building's window style by what it is, and the share of its windows lit at night: a place's while it is open
+ * (`litAt`: an open shop's front is lit, the windows over it half as often), a home's in the evening (`homeLights`).
+ */
 const STYLE: Record<BackdropUse, [number, number]> = {
-  house: [TOWN_STYLE.house, 0.42],
-  terrace: [TOWN_STYLE.house, 0.45],
+  house: [TOWN_STYLE.house, 0.45],
+  terrace: [TOWN_STYLE.house, 0.48],
   flats: [TOWN_STYLE.flats, 0.5],
-  shop: [TOWN_STYLE.shop, 0.55],
-  cafe: [TOWN_STYLE.shop, 0.6],
-  restaurant: [TOWN_STYLE.shop, 0.7],
+  shop: [TOWN_STYLE.shop, 0.95],
+  cafe: [TOWN_STYLE.shop, 0.95],
+  restaurant: [TOWN_STYLE.shop, 0.95],
   office: [TOWN_STYLE.flats, 0.18],
   school: [TOWN_STYLE.flats, 0.08],
   church: [TOWN_STYLE.house, 0.3],
@@ -70,6 +79,43 @@ const STYLE: Record<BackdropUse, [number, number]> = {
   farm: [TOWN_STYLE.house, 0.4],
   barn: [TOWN_STYLE.none, 0],
 };
+/** The backdrop's homes: their lights go by the hour. */
+const HOMES: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['house', 'terrace', 'flats', 'farm']);
+/** What a closed place keeps of its lights (a night light, a lit sign), and the share of a home's lights on in the small hours and at breakfast. */
+const CLOSED = 0.06;
+const SMALL_HOURS = 0.15;
+const BREAKFAST = 0.7;
+
+/**
+ * The share of a home's evening lights on at `minute` of the day: all of them until ten, going out one by one till
+ * half past midnight, a few left through the small hours, on again from half past five. In steps of a twentieth (the
+ * buildings are written again at each).
+ */
+export function homeLights(minute: number): number {
+  const h = (((minute / 60) % 24) + 24) % 24;
+  const ramp = (a: number, b: number, x: number) => Math.min(1, Math.max(0, (x - a) / (b - a)));
+  let k = 1;
+  if (h >= 22) k = 1 - (1 - SMALL_HOURS) * ramp(22, 24.5, h);
+  else if (h < 0.5) k = 1 - (1 - SMALL_HOURS) * ramp(22, 24.5, h + 24);
+  else if (h < 5.5) k = SMALL_HOURS;
+  else if (h < 12) k = SMALL_HOURS + (BREAKFAST - SMALL_HOURS) * ramp(5.5, 7, h);
+  return Math.round(k * 20) / 20;
+}
+
+/**
+ * The share of `b`'s windows lit at `minute` of the day on `weekday` (0 = Monday): a place with opening hours its own
+ * while it is open and next to none when it is closed, a home its own by the hour (`homeLights`), the rest their own.
+ */
+export function litAt(b: Pick<TownBuilding, 'lit' | 'home' | 'hours'>, minute: number, weekday: number): number {
+  if (b.hours) {
+    const { open, close, days } = b.hours;
+    const m = ((minute % 1440) + 1440) % 1440;
+    // (Hours past midnight when `close` isn't after `open`, as the tags read them: `ui/town/places.ts` `openState`.)
+    const on = close > open ? m >= open && m < close && (days >> weekday) & 1 : (m >= open && (days >> weekday) & 1) || (m < close && (days >> ((weekday + 6) % 7)) & 1);
+    return on ? b.lit : b.lit * CLOSED;
+  }
+  return b.home ? b.lit * homeLights(minute) : b.lit;
+}
 
 /** A building as drawn: a rectangle along (ux, uz) `w` long and `d` deep round (cx, cz), its walls from `base` to `top`, its roof `rise` over them. */
 export interface TownBuilding {
@@ -89,8 +135,15 @@ export interface TownBuilding {
   /** Its floor's height (m): the walls under it are its plinth. */
   floor: number;
   style: number;
+  /** The share of its windows lit at night at most, and now (`litAt`; absent: at most). */
   lit: number;
+  now?: number;
+  /** A home (its lights go by the hour), or a place's opening hours (lit while open): `litAt`. */
+  home?: boolean;
+  hours?: { open: number; close: number; days: number };
   seed: number;
+  /** A number of its own (0..1) for its shopfront's fascia. */
+  accent: number;
 }
 
 /** A far lot's house as the street has it (`Street.townHouses`) and how it looks (`HousePlanner.farLook`). */
@@ -133,7 +186,7 @@ function vary(c: readonly number[], t: number, s: number, amount = 0.07): [numbe
  * ridge or its longest side otherwise), its walls from under its lowest corner's ground (`ground`) to its
  * storeys' height over its floor (`y`), its roof and its colours.
  */
-export function backdropBuilding(b: BackdropBuilding, index: number, ground: (x: number, z: number) => number): TownBuilding {
+export function backdropBuilding(b: BackdropBuilding, index: number, ground: (x: number, z: number) => number, places: readonly TownPlace[] = []): TownBuilding {
   const p = b.poly;
   // The rectangle's direction: the ridge's, else the longest side's.
   let ux = 1;
@@ -178,17 +231,25 @@ export function backdropBuilding(b: BackdropBuilding, index: number, ground: (x:
   let [wallHex, roofHex] = BACKDROP_PALETTE[((b.look % BACKDROP_PALETTE.length) + BACKDROP_PALETTE.length) % BACKDROP_PALETTE.length];
   if (b.use === 'barn') [wallHex, roofHex] = BARN[b.look % BARN.length];
   else if (b.use === 'church') [wallHex, roofHex] = CHURCH;
-  let roofColor = hex(roofHex);
+  let roofColor = hex(roofHex).map((c) => c * ROOF_TONE) as [number, number, number];
   if (roof === 'flat') {
     const g = hex(FLAT_ROOF);
-    roofColor = [g[0] * 0.8 + roofColor[0] * 0.2, g[1] * 0.8 + roofColor[1] * 0.2, g[2] * 0.8 + roofColor[2] * 0.2];
+    const t = hex(roofHex);
+    roofColor = [g[0] * 0.8 + t[0] * 0.2, g[1] * 0.8 + t[1] * 0.2, g[2] * 0.8 + t[2] * 0.2];
   }
   const [style, lit] = STYLE[b.use] ?? STYLE.house;
-  return { roof, cx, cz, ux, uz, w, d, base, top, rise, wall: vary(hex(wallHex), t, s), roofColor: vary(roofColor, s, t, 0.1), floor, style, lit, seed: hash2(index * 31 + 5, b.storeys) };
+  const hours = b.place === undefined ? undefined : places[b.place]?.hours;
+  return { roof, cx, cz, ux, uz, w, d, base, top, rise, wall: vary(hex(wallHex), t, s), roofColor: vary(roofColor, s, t, 0.1), floor, style, lit, home: HOMES.has(b.use), ...(hours ? { hours } : {}), seed: hash2(index * 31 + 5, b.storeys), accent: hash2(index * 17 + 3, b.look) };
 }
 
-/** A far lot's house as drawn: its walls' box on the ground at (`ground`), the street's far LOD's look. */
-export function lotBuilding(h: TownLotHouse, ground: (x: number, z: number) => number): TownBuilding {
+/** The share of a lot's house's windows lit at night while someone is up in it. */
+const LOT_LIT = 0.5;
+
+/**
+ * A far lot's house as drawn: its walls' box on the ground at (`ground`), the street's far LOD's look. `up`: someone
+ * is up in it (its windows glow at night only then, as the neighbours' near the camera do).
+ */
+export function lotBuilding(h: TownLotHouse, ground: (x: number, z: number) => number, up = true): TownBuilding {
   const [x0, z0, x1, z1] = h.box;
   const along = x1 - x0 >= z1 - z0;
   const [w, d] = along ? [x1 - x0, z1 - z0] : [z1 - z0, x1 - x0];
@@ -211,9 +272,123 @@ export function lotBuilding(h: TownLotHouse, ground: (x: number, z: number) => n
     roofColor: hex(h.roof),
     floor: 0,
     style: TOWN_STYLE.house,
-    lit: 0.4,
+    lit: up ? LOT_LIT : 0,
     seed: hash2(h.id, 11),
+    accent: 0,
   };
+}
+
+// ---- what the backdrop's buildings stand on ---------------------------------------------------
+
+/**
+ * What a backdrop building stands on (it is nobody's lot): flats, shops and halls on a paved forecourt, a workshop
+ * or a barn on a bare yard, a house in a garden with a hedge round it.
+ */
+export type GroundKind = 'forecourt' | 'yard' | 'garden';
+const FORECOURT: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['flats', 'shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'hall']);
+const YARD: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['workshop', 'barn']);
+/** How far round its walls a building's ground goes (m), and how far off a road its way to it goes at most. */
+const AROUND: Record<GroundKind, number> = { forecourt: 2, yard: 2.5, garden: 3.5 };
+const WAY_MOST = 45;
+/** A garden's hedge: how high and how thick (m), its greens (sRGB), and how near a road's edge it may stand (m). */
+const HEDGE = { height: 1.05, thick: 0.7, colours: ['#3B6331', '#36602F', '#426A37'], clear: 1 } as const;
+
+export interface BackdropGround {
+  kind: GroundKind;
+  /** The building's middle, and its footprint moved out by `AROUND` (its corners out from the middle). */
+  from: [number, number];
+  round: [number, number][];
+  /** Where its way meets the nearest road (a forecourt or a yard carried on to it, a garden's path); null: none near. */
+  to: [number, number] | null;
+}
+
+/** The point of `roads` nearest (x, z), if within `most` m. */
+export function nearestOnRoads(roads: readonly RoadPlan[], x: number, z: number, most: number): [number, number] | null {
+  let best = most * most;
+  let at: [number, number] | null = null;
+  for (const r of roads) {
+    for (let i = 0; i + 1 < r.points.length; i++) {
+      const [ax, az] = r.points[i];
+      const [bx, bz] = r.points[i + 1];
+      const [dx, dz] = [bx - ax, bz - az];
+      const l2 = dx * dx + dz * dz;
+      const t = l2 > 0 ? Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / l2)) : 0;
+      const [qx, qz] = [ax + dx * t, az + dz * t];
+      const d2 = (qx - x) * (qx - x) + (qz - z) * (qz - z);
+      if (d2 < best) [best, at] = [d2, [qx, qz]];
+    }
+  }
+  return at;
+}
+
+/** What `b` stands on, among `roads` (the town's driven ones: not its trails). */
+export function backdropGround(b: BackdropBuilding, roads: readonly RoadPlan[]): BackdropGround {
+  const n = Math.max(1, b.poly.length);
+  const cx = b.poly.reduce((a, q) => a + q[0], 0) / n;
+  const cz = b.poly.reduce((a, q) => a + q[1], 0) / n;
+  const kind: GroundKind = FORECOURT.has(b.use) ? 'forecourt' : YARD.has(b.use) ? 'yard' : 'garden';
+  // (Each corner out from the middle: a rectangle's sides move out by about `AROUND`.)
+  const k = AROUND[kind] * Math.SQRT2;
+  const round = b.poly.map(([x, z]): [number, number] => {
+    const l = Math.hypot(x - cx, z - cz) || 1;
+    return [x + ((x - cx) / l) * k, z + ((z - cz) / l) * k];
+  });
+  return { kind, from: [cx, cz], round, to: nearestOnRoads(roads, cx, cz, WAY_MOST) };
+}
+
+/**
+ * The gardens' hedges as the town view draws them, low boxes among its buildings: along each side of a garden but
+ * the one its path leaves by (the side nearest the road), and but those that would stand on a lot, on a road or its
+ * pavement, against another building, or in the garden next door (there the two gardens are one).
+ */
+export function gardenHedges(
+  backdrop: readonly BackdropBuilding[],
+  grounds: readonly BackdropGround[],
+  plots: readonly { x: number; z: number; w: number; d: number }[],
+  roads: readonly RoadPlan[],
+  ground: (x: number, z: number) => number,
+): TownBuilding[] {
+  type Box = readonly [number, number, number, number];
+  const box = (p: readonly (readonly [number, number])[], grow = 0): Box => {
+    let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const [x, z] of p) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
+    return [x0 - grow, z0 - grow, x1 + grow, z1 + grow];
+  };
+  const meet = (a: Box, b: Box) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+  const lots = plots.map((p): Box => [p.x, p.z, p.x + p.w, p.z + p.d]);
+  const walls = backdrop.map((b) => box(b.poly, 0.3));
+  const gardens = grounds.map((g) => box(g.round));
+  // (On no road, nor its pavement.)
+  const onRoad = (x: number, z: number) => roads.some((r) => nearestOnRoads([r], x, z, r.width / 2 + HEDGE.clear) !== null);
+  const out: TownBuilding[] = [];
+  grounds.forEach((g, i) => {
+    if (g.kind !== 'garden' || g.round.length < 3) return;
+    const sides = g.round.map((a, k) => [a, g.round[(k + 1) % g.round.length]] as const);
+    // The side its path leaves by: the one whose middle is nearest where the path meets the road.
+    let front = -1;
+    if (g.to) {
+      let best = Infinity;
+      sides.forEach(([a, c], k) => {
+        const d = Math.hypot((a[0] + c[0]) / 2 - g.to![0], (a[1] + c[1]) / 2 - g.to![1]);
+        if (d < best) [best, front] = [d, k];
+      });
+    }
+    sides.forEach(([a, c], k) => {
+      if (k === front) return;
+      const l = Math.hypot(c[0] - a[0], c[1] - a[1]);
+      if (l < 1) return;
+      const mid: [number, number] = [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2];
+      const side = box([a, c], HEDGE.thick / 2);
+      if (lots.some((p) => meet(side, p)) || walls.some((o, j) => j !== i && meet(side, o))) return;
+      if (gardens.some((o, j) => j !== i && grounds[j].kind === 'garden' && mid[0] > o[0] && mid[0] < o[2] && mid[1] > o[1] && mid[1] < o[3])) return;
+      if (onRoad(a[0], a[1]) || onRoad(c[0], c[1]) || onRoad(mid[0], mid[1])) return;
+      const [ya, yc] = [ground(a[0], a[1]), ground(c[0], c[1])];
+      const top = Math.max(ya, yc) + HEDGE.height;
+      const green = vary(hex(HEDGE.colours[(i + k) % HEDGE.colours.length]), hash2(i, k), hash2(k, i + 3), 0.06);
+      out.push({ roof: 'flat', cx: mid[0], cz: mid[1], ux: (c[0] - a[0]) / l, uz: (c[1] - a[1]) / l, w: l + HEDGE.thick, d: HEDGE.thick, base: Math.min(ya, yc) - SINK, top, rise: 0.06, wall: green, roofColor: green, floor: top, style: TOWN_STYLE.none, lit: 0, seed: 0, accent: 0 });
+    });
+  });
+  return out;
 }
 
 // ---- the unit meshes ------------------------------------------------------------------------

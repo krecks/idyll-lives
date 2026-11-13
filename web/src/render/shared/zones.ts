@@ -13,6 +13,8 @@ import type { WorldZone } from '../../core/protocol';
 export const ZONE_CELL = 4;
 /** Cells this near (m) a zone's edge have their true distance to it (`exactNearEdges`); further ones the chamfer's. */
 const EXACT_BAND = 32;
+/** How far (cells) the farmland's edge is evened out each way (`evened`): past the generator's 10 m steps. */
+const EVEN_CELLS = 2;
 
 export type ZoneKind = WorldZone['kind'];
 
@@ -39,7 +41,11 @@ export class ZoneField {
     for (const [kind, list] of Map.groupBy(zones, (z) => z.kind)) {
       const polys = list.map((z) => z.poly);
       const inside = this.rasterise(polys);
-      if (inside.some((v) => v)) this.fields.set(kind, this.exactNearEdges(this.signedDistance(inside), polys));
+      if (!inside.some((v) => v)) continue;
+      const sd = this.exactNearEdges(this.signedDistance(inside), polys);
+      // (Farmland's outline is the generator's 10 m cells', a staircase along every slanted edge: evened out, so its
+      // fields end along a line, not in steps.)
+      this.fields.set(kind, kind === 'fields' ? this.evened(sd, EVEN_CELLS) : sd);
     }
   }
 
@@ -154,6 +160,32 @@ export class ZoneField {
       }
     }
     return sd;
+  }
+
+  /**
+   * `sd` with each cell the mean of the cells within `r` of it, twice over (a box blur each way, twice: nearly a
+   * round one): the edge (where it is 0) loses corners smaller than that, and along a straight edge it is still the
+   * distance to it.
+   */
+  private evened(sd: Float32Array, r: number): Float32Array {
+    const { gw, gd } = this;
+    let from: Float32Array = sd;
+    let to: Float32Array = new Float32Array(sd.length);
+    for (let pass = 0; pass < 4; pass++) {
+      // (Along x on even passes, along z on odd ones; the edge's cells stand in for those past it.)
+      const [n, m, step, row] = pass % 2 === 0 ? [gw, gd, 1, gw] : [gd, gw, gw, 1];
+      for (let j = 0; j < m; j++) {
+        const base = j * row;
+        let sum = 0;
+        for (let k = -r; k <= r; k++) sum += from[base + Math.min(n - 1, Math.max(0, k)) * step];
+        for (let i = 0; i < n; i++) {
+          to[base + i * step] = sum / (2 * r + 1);
+          sum += from[base + Math.min(n - 1, i + r + 1) * step] - from[base + Math.max(0, i - r) * step];
+        }
+      }
+      [from, to] = [to, from === sd ? new Float32Array(sd.length) : from];
+    }
+    return from;
   }
 
   /** Signed distance (m) from each cell's middle to the edge between inside and outside cells (two chamfer passes each way). */

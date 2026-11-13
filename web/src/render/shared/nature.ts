@@ -706,6 +706,38 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   }
 
   /**
+   * A big world's farmland for the town view's colour map (`pc/groundTiles.ts`), as the terrain colours it
+   * (`terrainColour`, `fieldCell`): the patchwork's grid (cells `size` m along the direction `angle` and `across` m
+   * across it), each cell's colour (`crop`: sRGB into `out`, its furrows' share of it evened out; false for a cell
+   * left as meadow), and how strongly the fields show at a point (`weight`, 0..1: nothing off the field zones or
+   * by the town). Null: no farmland. The ground's own colours are a vertex apart, so from above a field's edge
+   * steps along the grid; the map draws each where it is.
+   */
+  farmland(): { size: number; across: number; angle: number; crop(cu: number, cv: number, out: Rgb): boolean; weight(x: number, z: number): number } | null {
+    const zones = this.zones;
+    if (!zones?.has('fields')) return null;
+    const f = this.land.fields ?? { size: 34, angle: hash(3, 5, this.seed) * Math.PI };
+    const P = (this.palette ??= terrainPalette(this.land.grass));
+    return {
+      size: f.size,
+      across: f.size * 0.7,
+      angle: f.angle,
+      crop: (cu, cv, out) => {
+        const kind = hash(cu, cv, this.seed + 77);
+        if (kind > 0.82) return false;
+        const crop = P.crops[Math.min(P.crops.length - 1, Math.floor((kind / 0.82) * P.crops.length))];
+        // (The furrows' sine over a field, on average: 0.35 × 1/π.)
+        lerp(crop, P.furrow, crop !== P.crops[0] ? 0.11 : 0, out);
+        return true;
+      },
+      weight: (x, z) => {
+        const dist = this.distanceToTown(x, z);
+        return dist < APRON + 3 ? 0 : shareAt(zones.edge('fields', x, z), 4) * smoothstep(APRON + 3, APRON + 6, dist) * 0.9;
+      },
+    };
+  }
+
+  /**
    * Woods outside the town: mixed deciduous / birch / conifer stands with bushes and rocks. Trees
    * near the town are the full models and cast shadows; further ones use the low level of detail
    * (a file's own far version), which don't. The game draws them in groups by sector round the town,

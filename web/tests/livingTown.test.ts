@@ -4,7 +4,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { BackdropBuilding, PlotInfo, RoadPlan, WorldStructure } from '../src/core/protocol';
 import { ltFixture } from '../src/debug/ltFixture';
-import { BACKDROP_PALETTE, backdropBuilding, lotBuilding, ROOFS, unitMeshes } from '../src/render/shared/townBuildings';
+import { BACKDROP_PALETTE, backdropBuilding, backdropGround, gardenHedges, homeLights, litAt, lotBuilding, ROOFS, unitMeshes } from '../src/render/shared/townBuildings';
 
 const flat = () => 0;
 
@@ -54,6 +54,90 @@ describe("the town view's buildings", () => {
     const t = lotBuilding({ id: 3, chunk: 0, box: [10, 20, 18, 30], storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip', rise: 2.4 }, flat);
     expect([t.cx, t.cz, t.w, t.d, t.top, t.rise, t.roof]).toEqual([14, 25, 10, 8, 6, 2.4, 'hip']);
     expect(t.uz).toBe(1);
+  });
+
+  test('lights go by the life there: a shop’s while it is open, a home’s by the hour, a lot’s house’s while someone is up', () => {
+    // Homes: all their lights in the evening, most out by half past midnight, on again at breakfast.
+    expect(homeLights(20 * 60)).toBe(1);
+    expect(homeLights(23 * 60)).toBeLessThan(0.8);
+    expect(homeLights(24 * 60 + 30)).toBeCloseTo(0.15);
+    expect(homeLights(3 * 60)).toBeCloseTo(0.15);
+    expect(homeLights(8 * 60)).toBeCloseTo(0.7);
+    let last = 1;
+    for (let m = 22 * 60; m <= 24 * 60 + 30; m += 10) {
+      expect(homeLights(m)).toBeLessThanOrEqual(last);
+      last = homeLights(m);
+    }
+    const shop: BackdropBuilding = { poly: [[0, 0], [10, 0], [10, 6], [0, 6]], y: 0, storeys: 2, roof: 'gable', ridge: 0, use: 'shop', look: 1, place: 0, area: 0 };
+    // Open 09:00 to 18:00, Monday to Saturday.
+    const places = [{ name: 'Shop', kind: 'shop' as const, x: 5, z: 7, hours: { open: 540, close: 1080, days: 0b0111111 }, area: 0 }];
+    const s = backdropBuilding(shop, 0, flat, places);
+    expect(s.hours).toEqual(places[0].hours);
+    expect(litAt(s, 17 * 60, 0)).toBe(s.lit);
+    expect(litAt(s, 20 * 60, 0)).toBeLessThan(s.lit * 0.1);
+    expect(litAt(s, 12 * 60, 6)).toBeLessThan(s.lit * 0.1);
+    // A pub open 17:00 to 01:00 on Friday is still open after midnight on Saturday's clock.
+    const pub = { lit: 0.9, hours: { open: 1020, close: 60, days: 0b0010000 } };
+    expect(litAt(pub, 23 * 60, 4)).toBe(0.9);
+    expect(litAt(pub, 30, 5)).toBe(0.9);
+    expect(litAt(pub, 120, 5)).toBeLessThan(0.1);
+    expect(litAt(pub, 23 * 60, 5)).toBeLessThan(0.1);
+    // A home nobody plays: by the hour. A place without hours: its own share.
+    const home = backdropBuilding({ ...shop, use: 'flats', place: undefined }, 1, flat);
+    expect(home.home).toBe(true);
+    expect(litAt(home, 20 * 60, 0)).toBe(home.lit);
+    expect(litAt(home, 2 * 60, 0)).toBeCloseTo(home.lit * 0.15);
+    const hall = backdropBuilding({ ...shop, use: 'hall', place: undefined }, 2, flat);
+    expect(litAt(hall, 2 * 60, 0)).toBe(hall.lit);
+    // A lot's house far off: lit only while someone is up in it.
+    const lot = { id: 3, chunk: 0, box: [10, 20, 18, 30] as const, storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip' as const, rise: 2.4 };
+    expect(lotBuilding(lot, flat, true).lit).toBeGreaterThan(0.3);
+    expect(lotBuilding(lot, flat, false).lit).toBe(0);
+  });
+
+  test('a pitched roof is toned down from its palette colour (bright tile read as lit beside the game’s own roofs)', () => {
+    const b: BackdropBuilding = { poly: [[0, 0], [10, 0], [10, 6], [0, 6]], y: 0, storeys: 1, roof: 'gable', ridge: 0, use: 'house', look: 0, area: 0 };
+    const t = backdropBuilding(b, 0, flat);
+    const palette = parseInt(BACKDROP_PALETTE[0][1].slice(1, 3), 16) / 255;
+    expect(t.roofColor[0]).toBeLessThan(palette * 0.85);
+    expect(t.roofColor[0]).toBeGreaterThan(palette * 0.6);
+  });
+
+  test('a backdrop building stands on something: a forecourt, a yard or a hedged garden, with a way to the road', () => {
+    const road: RoadPlan = { points: [[-50, -20], [80, -20]], width: 10 } as RoadPlan;
+    const house: BackdropBuilding = { poly: [[0, 0], [10, 0], [10, 8], [0, 8]], y: 0, storeys: 2, roof: 'gable', ridge: 0, use: 'house', look: 0, area: 0 };
+    const shop: BackdropBuilding = { ...house, poly: [[40, 0], [52, 0], [52, 8], [40, 8]], use: 'shop' };
+    const barn: BackdropBuilding = { ...house, poly: [[0, 200], [10, 200], [10, 208], [0, 208]], use: 'barn' };
+    const grounds = [house, shop, barn].map((b) => backdropGround(b, [road]));
+    expect(grounds.map((g) => g.kind)).toEqual(['garden', 'forecourt', 'yard']);
+    // Its way goes to the nearest point of the road; none for the barn 200 m off.
+    expect(grounds[0].to).toEqual([5, -20]);
+    expect(grounds[1].to).toEqual([46, -20]);
+    expect(grounds[2].to).toBeNull();
+    // Its ground reaches a few metres round its walls.
+    const xs = grounds[0].round.map((q) => q[0]);
+    expect(Math.min(...xs)).toBeLessThan(-3);
+    expect(Math.max(...xs)).toBeGreaterThan(13);
+    // The garden's hedge: three sides, the one to the road left open; low, and no windows.
+    const hedges = gardenHedges([house, shop, barn], grounds, [], [road], flat);
+    expect(hedges.length).toBe(3);
+    for (const h of hedges) {
+      expect(h.top - 0).toBeLessThan(1.5);
+      expect(h.d).toBeLessThan(1);
+      expect(h.style).toBe(0);
+      // (None along the side nearest the road, z about -3.5.)
+      expect(h.cz).toBeGreaterThan(-3);
+    }
+    // No hedge along a side that would stand on a lot (the one towards it goes), nor on a road or its pavement.
+    expect(gardenHedges([house], [grounds[0]], [{ x: 12, z: -10, w: 20, d: 15 }], [road], flat).length).toBe(2);
+    const near: RoadPlan = { points: [[-50, -9], [80, -9]], width: 10 } as RoadPlan;
+    const byRoad = gardenHedges([house], [backdropGround(house, [near])], [], [near], flat);
+    expect(byRoad.length).toBe(1);
+    expect(byRoad[0].cz).toBeGreaterThan(10);
+    // Between two houses whose gardens meet there is none: the two are one.
+    const next: BackdropBuilding = { ...house, poly: [[15, 0], [25, 0], [25, 8], [15, 8]] };
+    const pair = [house, next].map((b) => backdropGround(b, [road]));
+    expect(gardenHedges([house, next], pair, [], [road], flat).length).toBe(4);
   });
 
   test("every unit mesh's faces face out from its middle (none drawn inside out)", () => {

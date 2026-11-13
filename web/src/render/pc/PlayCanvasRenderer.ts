@@ -78,7 +78,7 @@ import { townView } from '../shared/townView';
 import { landscapeRing } from '../shared/nature';
 import { LT_FIXTURE } from '../../debug/livingTown';
 import { applyLtFixture } from '../../debug/ltFixture';
-import { backdropBuilding, lotBuilding, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
+import { backdropBuilding, backdropGround, gardenHedges, lotBuilding, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
 import { TownGroundMap } from './groundTiles';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
 import { withoutCloudShadows } from './cloudShadows';
@@ -462,7 +462,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private townBuildings!: TownBuildings;
   private townMovers!: TownMovers;
   private townGround!: TownGroundMap;
-  private townLotsBy: { chunks: unknown; houses: readonly TownLotHouse[] | null } = { chunks: null, houses: null };
+  private townLotsBy: { chunks: unknown; houses: readonly TownLotHouse[] | null; up: string } = { chunks: null, houses: null, up: '' };
+  /** The far lots with someone up in their house (`findTownUp`: by lot id, and as a key), and when they were last looked for. */
+  private townUp: ReadonlySet<number> = new Set();
+  private townUpKey = '';
+  private townUpAt = 0;
+  /** The weekday of the newest snapshot (0 = Monday: sim-core `clock::weekday`), for the town's opening hours. */
+  private lastWeekday = 0;
   private townBackdropOf: unknown = null;
   /** The town view's movers this frame (reused, a pool), and their colours by hex. */
   private readonly townMoverList: Mover[] = [];
@@ -1212,10 +1218,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const backdrop = world.meta?.backdrop;
     if (backdrop !== this.townBackdropOf) {
       this.townBackdropOf = backdrop;
-      this.townBuildings.setBackdrop((backdrop ?? []).map((b, i) => backdropBuilding(b, i, ground)));
+      const list = backdrop ?? [];
+      const driven = (world.meta?.roads ?? []).filter((r) => r.kind !== 'trail');
+      const hedges = gardenHedges(list, list.map((b) => backdropGround(b, driven)), world.plots, driven, ground);
+      this.townBuildings.setBackdrop([...list.map((b, i) => backdropBuilding(b, i, ground, world.meta?.places)), ...hedges]);
     }
-    this.townGround.bake(world);
-    this.townLotsBy = { chunks: null, houses: null };
+    this.townGround.bake(world, land ?? null);
+    this.townLotsBy = { chunks: null, houses: null, up: '' };
   }
 
   /**
@@ -1227,17 +1236,57 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const blend = this.townBlend;
     this.street.setTownView(blend > 0);
     this.townBuildings.show(this.diag.has('notownbuildings') ? 0 : Math.min(1, blend / TOWN_FADE));
-    // (The ground tiles' materials asked for only while the map is, or is to be, on them.)
-    const mapped = this.diag.has('notownground') ? 0 : blend;
+    // (The ground tiles' materials asked for only while the map is, or is to be, on them. In with the buildings: what
+    // they stand on is in it, and the farmland's edges, which step along the ground's grid without it.)
+    const mapped = this.diag.has('notownground') ? 0 : Math.min(1, blend / TOWN_FADE);
     if (mapped > 0 || this.townGround.active) this.townGround.apply(this.lot.landscape?.groundMaterials() ?? [], mapped);
     if (blend <= 0) return;
+    this.townBuildings.setTime(this.lastMinute, this.lastWeekday);
     const houses = this.street.townHouses();
     const by = this.townLotsBy;
-    if (by.chunks === this.roam.chunks && by.houses === houses) return;
-    this.townLotsBy = { chunks: this.roam.chunks, houses };
+    if (by.chunks === this.roam.chunks && by.houses === houses && by.up === this.townUpKey) return;
+    this.townLotsBy = { chunks: this.roam.chunks, houses, up: this.townUpKey };
+    const up = this.townUp;
     const land = this.lot.landscape;
     const ground = (x: number, z: number) => land?.heightAt(x, z) ?? 0;
-    this.townBuildings.setLots(houses.filter((h) => !this.street.chunkDrawn(h.chunk)).map((h) => lotBuilding(h, ground)));
+    this.townBuildings.setLots(houses.filter((h) => !this.street.chunkDrawn(h.chunk)).map((h) => lotBuilding(h, ground, up.has(h.id))));
+  }
+
+  /**
+   * Which far lots' houses have someone up in them (`townUp`, by lot id), twice a second while the town view is in
+   * and the lamps are on: their windows glow at night only then (`lotBuilding`), as the neighbours' near the camera do
+   * (`findDarkRooms`). Nothing but the snapshot's positions is read.
+   */
+  private findTownUp(frame: FrameState): void {
+    if (this.townBlend <= 0 || this.lampsLevel <= 0 || frame.now - this.townUpAt < 500) return;
+    this.townUpAt = frame.now;
+    const { curr, layout } = frame;
+    const k = layout.sim;
+    const sleeping = this.sleepActions?.ids;
+    const houses = this.street.townHouses();
+    const babies = this.babyStages();
+    const sims = this.lastWorld?.sims ?? [];
+    const up = new Set<number>();
+    const count = curr[layout.header.simCount];
+    for (let i = 0; i < count; i++) {
+      const o = layout.headerLen + i * layout.simStride;
+      if (curr[o + k.away] !== 0 || babies.has(sims[i]?.stage ?? '')) continue;
+      if (curr[o + k.pose] === Pose.Lie && sleeping?.has(curr[o + k.action] | 0)) continue;
+      const px = curr[o + k.x];
+      const pz = curr[o + k.z];
+      // (Upstairs is a storey's own rows: back to the ground's.)
+      const gz = pz - this.rowOf(this.storeyOf(Math.floor(pz)));
+      for (const h of houses) {
+        const b = h.box;
+        if (px < b[0] || px > b[2] || gz < b[1] || gz > b[3]) continue;
+        up.add(h.id);
+        break;
+      }
+    }
+    const key = [...up].sort((a, b) => a - b).join(',');
+    if (key === this.townUpKey) return;
+    this.townUpKey = key;
+    this.townUp = up;
   }
 
   /**
@@ -2376,6 +2425,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const { curr, layout } = frame;
     const minute = this.fixedHour !== null ? this.fixedHour * 60 : (curr[layout.header.minute] ?? this.lastMinute);
     this.lastMinute = minute;
+    this.lastWeekday = (Math.max(1, curr[layout.header.day] | 0) - 1) % 7;
     if (this.townMode) return;
     const h = layout.header;
     // At speed 3 and up, and in quiet hours, the preset's step (Low's ten minutes: each update re-colours the sun, sky and lamps).
@@ -2398,6 +2448,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.updateSims(frame);
     this.cars.update(frame);
     this.updateTownMovers(frame);
+    this.findTownUp(frame);
     this.signals.update(frame);
     // (A car's shadow goes with it: `moved` only for a car that moved where it casts into the map, `setShadowTest`; the lights' poles when they're placed.)
     if (this.cars.moved || this.signals.moved) this.sunShadows.moved(false);

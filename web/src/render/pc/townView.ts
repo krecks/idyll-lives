@@ -8,16 +8,18 @@
  *   streamed in) as copies of five unit meshes: a box of walls, and a gable, hip, flat or mansard
  *   roof. One instanced draw per mesh for the whole world, in one material
  *   (`shaders/townBuilding.ts`: the walls' and the roof's colours per copy, the windows drawn by the
- *   fragment shader in bands a storey apart, a share of them lit at night). A backdrop building's
+ *   fragment shader in bands a storey apart, a share of them lit at night: a shop's while it is open, a home's by
+ *   the hour, a lot's house's while someone is up in it). A backdrop building's
  *   colours come from the backdrop palette (`BACKDROP_PALETTE`, by its `look`, varied a little per
  *   building), warm town tones: red and orange tile roofs over cream, sand and brick walls, grey
- *   slate here and there; a lot's house keeps its own (`HousePlanner.farLook`, as the street's far
+ *   slate here and there; its houses' gardens have hedges, low boxes in the same draws (`gardenHedges`);
+ *   a lot's house keeps its own (`HousePlanner.farLook`, as the street's far
  *   LOD has it). A footprint that isn't a rectangle is drawn as the rectangle round it, along its
  *   longest side (or its ridge).
  * - **Movers** (`TownMovers`): the cars, taxis, bikes and residents the near drawing leaves out (past
  *   the chunks streamed in, past the residents' radius), as tiny instanced shapes in their own
- *   colours, where the snapshot has them (`Cars.forEachFar`, `Residents.spot`); a little larger the
- *   further out the camera is, so they read as the toy town's traffic.
+ *   colours, where the snapshot has them (`Cars.forEachFar`, `Residents.spot`); larger the further out
+ *   the camera is, so they read as the toy town's traffic.
  *
  * Both fade in with the blend (a dither: nothing pops in as the camera passes `TOWN_FROM`). Culling
  * is the frustum's (each draw's box over its copies); nothing here is left out by distance.
@@ -32,9 +34,9 @@ import { TOWN_INFO_SEMANTIC, TOWN_ROOF_SEMANTIC, TOWN_WALL_SEMANTIC, townBuildin
 // (The ground's colour map's shader feature, `groundTiles.ts` `TownGroundMap`: registered with the rest before any material is made.)
 import './shaders/townGround';
 import { Geo } from '../shared/geometry';
-import { FINISH, ROOFS, unitMeshes, type RoofKind, type TownBuilding } from '../shared/townBuildings';
+import { FINISH, litAt, ROOFS, unitMeshes, type RoofKind, type TownBuilding } from '../shared/townBuildings';
 
-export { backdropBuilding, lotBuilding, type TownLotHouse } from '../shared/townBuildings';
+export { backdropBuilding, backdropGround, gardenHedges, lotBuilding, type TownLotHouse } from '../shared/townBuildings';
 
 /** How bright a lit window glows at night (times the street's window glow). */
 const GLOW = 1.4;
@@ -106,7 +108,24 @@ export class TownBuildings {
     if (this.shown) this.upload();
   }
 
-  /** The far lots' houses (as the chunks streamed in change). */
+  /**
+   * The hour's lights: each backdrop building's share of lit windows at `minute` of the day on `weekday` (`litAt`: a
+   * place's while it is open, a home's by the hour). The copies are written again only when a share changed.
+   */
+  setTime(minute: number, weekday: number): void {
+    let changed = false;
+    for (const b of this.backdrop) {
+      const now = litAt(b, minute, weekday);
+      if (now === b.now) continue;
+      b.now = now;
+      changed = true;
+    }
+    if (!changed) return;
+    this.due = true;
+    if (this.shown) this.upload();
+  }
+
+  /** The far lots' houses (as the chunks streamed in change, and as their people get up and go to bed). */
   setLots(list: TownBuilding[]): void {
     this.lots = list;
     this.due = true;
@@ -183,7 +202,7 @@ export class TownBuildings {
     draw.set(TOWN_WALL, i, v);
     v.set([b.roofColor[0], b.roofColor[1], b.roofColor[2], b.style]);
     draw.set(TOWN_ROOF, i, v);
-    v.set([b.seed, b.top - b.floor, 0, b.lit]);
+    v.set([b.seed, b.top - b.floor, b.accent, b.now ?? b.lit]);
     draw.set(TOWN_INFO, i, v);
   }
 
