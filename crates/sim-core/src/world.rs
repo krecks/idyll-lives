@@ -1799,6 +1799,33 @@ pub(crate) struct SimBrief {
     pub eats_at: Option<u32>,
 }
 
+/// `World::broadcast`'s per-tick buffers, kept from tick to tick like `briefs`.
+#[derive(Default)]
+struct BroadcastScratch {
+    /// The things residents are using that broadcast to others.
+    sources: Vec<BroadcastSource>,
+    /// Per Sim: the room they're in, their storey, their plot, and whether they're asleep.
+    rooms: Vec<u16>,
+    storeys: Vec<i32>,
+    plots: Vec<Option<u32>>,
+    asleep: Vec<bool>,
+    /// The objects one Sim has already heard this tick.
+    heard: Vec<u32>,
+}
+
+/// A `Use` that broadcasts to residents nearby (`World::broadcast`).
+struct BroadcastSource {
+    object: u32,
+    room: u16,
+    storey: i32,
+    plot: Option<u32>,
+    pos: [f32; 2],
+    gains: [f32; MAX_NEEDS],
+    share: f32,
+    range: f32,
+    user: u32,
+}
+
 pub struct World {
     pub content: Content,
     /// Living or Creative (see `GameMode`).
@@ -1884,6 +1911,11 @@ pub struct World {
     /// What each household has to work on as the tick's step started (`work_waiting`), kept
     /// from tick to tick like `briefs`.
     work: Vec<u8>,
+    /// Who goes first when the tick's searches run over budget (`tick_once`), kept from tick to
+    /// tick like `briefs`.
+    first: Vec<bool>,
+    /// `broadcast`'s per-tick buffers, kept from tick to tick like `briefs`.
+    broadcast_scratch: BroadcastScratch,
     /// Where Sims leave town for work.
     pub exits: Vec<[f32; 2]>,
     /// The road network and the town file's other open-world fields (`travel.rs`).
@@ -2329,6 +2361,8 @@ impl World {
             claimed_places: Vec::new(),
             claimants_cache: Vec::new(),
             work: Vec::new(),
+            first: Vec::new(),
+            broadcast_scratch: BroadcastScratch::default(),
             exits: Vec::new(),
             travel: Default::default(),
             cars: Vec::new(),
@@ -4536,15 +4570,15 @@ impl World {
         crate::lod::plan(self);
         // Those who go first when the tick's searches run over budget: the player's household
         // and whoever is watched (see `SEARCH_BUDGET`).
-        let first: Vec<bool> = (0..self.sims.len())
-            .map(|i| {
-                self.full_detail(i)
-                    || self
-                        .households
-                        .get(self.sims[i].household as usize)
-                        .is_some_and(|h| h.player)
-            })
-            .collect();
+        let mut first = std::mem::take(&mut self.first);
+        first.clear();
+        first.extend((0..self.sims.len()).map(|i| {
+            self.full_detail(i)
+                || self
+                    .households
+                    .get(self.sims[i].household as usize)
+                    .is_some_and(|h| h.player)
+        }));
         let (search_mark, budget) = (self.search_mark, self.search_budget);
         let hour = crate::clock::hour(tick);
         let mut work = std::mem::take(&mut self.work);
@@ -4650,6 +4684,7 @@ impl World {
             }
         }
         self.work = work;
+        self.first = first;
         crate::partners::update(self);
         self.broadcast();
         self.apply_messes();
@@ -4694,19 +4729,17 @@ impl World {
     /// from the sofa, or while eating at the table). Only positive gains carry, and not to the
     /// resident using it, who gets the whole of it.
     fn broadcast(&mut self) {
+        let mut scratch = std::mem::take(&mut self.broadcast_scratch);
+        let BroadcastScratch {
+            sources,
+            rooms,
+            storeys,
+            plots,
+            asleep,
+            heard,
+        } = &mut scratch;
         let content = &self.content;
-        struct Source {
-            object: u32,
-            room: u16,
-            storey: i32,
-            plot: Option<u32>,
-            pos: [f32; 2],
-            gains: [f32; MAX_NEEDS],
-            share: f32,
-            range: f32,
-            user: u32,
-        }
-        let mut sources: Vec<Source> = Vec::new();
+        sources.clear();
         for sim in &self.sims {
             if !sim.here() || sim.away_until.is_some() {
                 continue;
@@ -4738,7 +4771,7 @@ impl World {
                 crate::lot::OUTDOORS
             };
             let quality = content.object_rules.quality_factor(obj.quality);
-            sources.push(Source {
+            sources.push(BroadcastSource {
                 object,
                 room,
                 storey: self.storey_of(z),
@@ -4751,43 +4784,36 @@ impl World {
             });
         }
         if sources.is_empty() {
+            self.broadcast_scratch = scratch;
             return;
         }
-        let rooms: Vec<u16> = self
-            .sims
-            .iter()
-            .map(|s| {
-                let (x, z) = s.tile();
-                let ground = self.ground_z(z);
-                if self.lot.in_bounds(x, ground) {
-                    self.lot.room_at(x, ground)
-                } else {
-                    crate::lot::OUTDOORS
-                }
-            })
-            .collect();
-        let storeys: Vec<i32> = self
-            .sims
-            .iter()
-            .map(|s| self.storey_of(s.tile().1))
-            .collect();
-        let plots: Vec<Option<u32>> = self
-            .sims
-            .iter()
-            .map(|s| {
-                let (x, z) = s.tile();
-                self.plot_at(x, z)
-            })
-            .collect();
-        let asleep: Vec<bool> = self.sims.iter().map(|s| s.asleep(content)).collect();
+        rooms.clear();
+        rooms.extend(self.sims.iter().map(|s| {
+            let (x, z) = s.tile();
+            let ground = self.ground_z(z);
+            if self.lot.in_bounds(x, ground) {
+                self.lot.room_at(x, ground)
+            } else {
+                crate::lot::OUTDOORS
+            }
+        }));
+        storeys.clear();
+        storeys.extend(self.sims.iter().map(|s| self.storey_of(s.tile().1)));
+        plots.clear();
+        plots.extend(self.sims.iter().map(|s| {
+            let (x, z) = s.tile();
+            self.plot_at(x, z)
+        }));
+        asleep.clear();
+        asleep.extend(self.sims.iter().map(|s| s.asleep(content)));
         for (i, sim) in self.sims.iter_mut().enumerate() {
             if !sim.here() || sim.away_until.is_some() || sim.steps == 0 || asleep[i] {
                 continue;
             }
             let minutes = sim.minutes();
             // Two residents watching the same screen are one source, not two.
-            let mut heard: Vec<u32> = Vec::new();
-            for src in &sources {
+            heard.clear();
+            for src in sources.iter() {
                 if src.user == sim.id
                     || heard.contains(&src.object)
                     || (src.plot.is_some() && plots[i] != src.plot)
@@ -4818,6 +4844,7 @@ impl World {
                 }
             }
         }
+        self.broadcast_scratch = scratch;
     }
 
     /// Crops grow by `minutes`: fallow ground is planted again, what's planted ripens. A crop
