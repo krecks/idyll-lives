@@ -3,9 +3,9 @@
     {
       "name": "contract",
       "file": "docs/design/living-town.md",
-      "sha256": "5f4ccd7b77781a2b4c133b0d99c70b259ade30fe9f05ba775b05f79b02fc48d9",
+      "sha256": "c6d2213d06b034a696ba2f73cc33079b1e5a7059318c3e6b67c78ee0ba2ad79b",
       "by": "integrator",
-      "reason": "the footprint's winding and the ridge's angle said exactly (counter-clockwise seen from above; a turn round +y, the ridge along (cos r, -sin r) in x, z): worldgen and render had read the ridge opposite ways, and worldgen's reading is the one written down"
+      "reason": "blind review 1 of the town view: the household's own tags come in with the town view itself (the rest still from about 0.2), and the home has a tag of its own while nobody is in: the reviewers found nothing marking the family or its home from 150 m"
     },
     {
       "name": "living-town-meta",

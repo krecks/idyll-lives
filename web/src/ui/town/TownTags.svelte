@@ -7,14 +7,14 @@
   import { townMap } from '../townMap.svelte';
   import { keepApart, type TagBox } from './overlap';
   import { homesForSale, nameLabels, townPlaces } from './places';
-  import { householdTags, nameTags, nearestFew, peopleTags, placeTags, SALE_MOST, saleTags, yourPeople, type TagWorld, type TownTag } from './tags';
-  import { TAGS_FROM, tagFade } from './fade';
+  import { homeTag, householdTags, nameTags, nearestFew, peopleTags, placeTags, SALE_MOST, saleTags, yourPeople, type TagWorld, type TownTag } from './tags';
+  import { MINE_SEEN, mineFade, TAGS_FROM, tagFade } from './fade';
   import { townHud } from './townHud.svelte';
 
   /**
    * The town tags (docs/design/living-town.md, Town tags): HTML labels over the canvas, each over the resident,
    * place, home or street it names, placed each frame through `townView.project`. They fade in with `townBlend`
-   * from 0.2, show only the kinds the tag menu has on, and are kept from overlapping, the more important one
+   * from 0.2 (the household's own from the town view's start: `mineFade`), show only the kinds the tag menu has on, and are kept from overlapping, the more important one
    * staying (`overlap.ts`). What they say is worked out from the views as they change; where they stand, every frame
    * (written straight to the elements: nothing reactive moves each frame).
    */
@@ -30,7 +30,7 @@
   const time = (m: number) => clock(m, settings.clock24h);
 
   const world = $derived.by((): TagWorld | null => {
-    if (!townHud.on || game.mode !== 'live') return null;
+    if (!townHud.near || game.mode !== 'live') return null;
     return {
       sims: game.sims.filter((s) => inTown.has(s.id)),
       roster: game.roster,
@@ -57,7 +57,13 @@
     if (!world) return [];
     const f = townHud.filters;
     const out: TownTag[] = [];
-    if (f.household) out.push(...household.tags);
+    if (f.household) {
+      out.push(...household.tags);
+      const home = homeTag(homePlot === null ? null : game.plots[homePlot], members, homePlot);
+      if (home) out.push(home);
+    }
+    // (Up to the blend the rest come in at, the household's own only.)
+    if (!townHud.on) return out;
     if (f.people) out.push(...peopleTags(people, world, homePlot));
     if (f.places) {
       const yours = new Map<number, string>([...members.map((s): [number, string] => [s.id, s.name]), ...people.map((p): [number, string] => [p.sim, game.sims.find((s) => s.id === p.sim)?.name ?? ''])]);
@@ -110,7 +116,12 @@
     if (on !== townHud.on) townHud.on = on;
     const fade = Math.round(tagFade(blend) * 20) / 20;
     if (fade !== townHud.fade) townHud.fade = fade;
-    if (!on || !layer) return;
+    const mine = Math.round(mineFade(blend) * 20) / 20;
+    if (mine !== townHud.mine) townHud.mine = mine;
+    // (The household's own are there once they can be seen: a tag too faint to see is not there to be clicked.)
+    const near = mine >= MINE_SEEN && !!townView.project;
+    if (near !== townHud.near) townHud.near = near;
+    if (!near || !layer) return;
     const scale = settings.uiScale || 1;
     const project = townView.project!;
     const boxes: TagBox[] = [];
@@ -181,6 +192,8 @@
       cancelAnimationFrame(raf);
       townHud.on = false;
       townHud.fade = 0;
+      townHud.near = false;
+      townHud.mine = 0;
     };
   });
 
@@ -197,6 +210,10 @@
       if (at) townView.goTo?.({ x: at.x, z: at.z, select: a.sim });
       return;
     }
+    if (a.kind === 'home') {
+      if (at) townView.goTo?.({ x: at.x, z: at.z, radius: 24 });
+      return;
+    }
     if (at) townView.goTo?.({ x: at.x, z: at.z, radius: 60 });
     if (a.kind === 'person') townHud.chosen = { kind: 'person', sim: a.sim, plot: a.plot, title: t.title, detail: t.detail };
     else if (a.kind === 'place') townHud.chosen = { kind: 'place', place: a.place, plot: places[a.place]?.plot ?? null, title: t.title, detail: t.detail };
@@ -209,11 +226,11 @@
   }
 </script>
 
-{#if townHud.on && game.mode === 'live'}
+{#if townHud.near && game.mode === 'live'}
   <!-- (The wheel over a tag zooms the camera as it would over the town: passed on to the canvas.) -->
-  <div class="tags" bind:this={layer} style:opacity={townHud.fade} aria-label="Town" onwheel={passWheel}>
+  <div class="tags" bind:this={layer} style:--fade={townHud.fade} style:--mine={townHud.mine} aria-label="Town" onwheel={passWheel}>
     {#each tags as t (t.key)}
-      <div class="pin" class:name={t.kind === 'names'} use:pin={t.key}>
+      <div class="pin" class:name={t.kind === 'names'} class:own={t.kind === 'household'} use:pin={t.key}>
         {#if t.action}
           <button class="tag {t.tone}" onclick={() => choose(t)} title={t.detail ? `${t.title} · ${t.detail}` : t.title}>
             <span class="dot" aria-hidden="true"></span>
@@ -242,6 +259,11 @@
     top: 0;
     visibility: hidden;
     will-change: transform;
+    opacity: var(--fade);
+  }
+  /* (The household's own: in from the town view's start.) */
+  .pin.own {
+    opacity: var(--mine);
   }
   /* The menus' lot tags' look (`kit/TownStage.svelte`): a pill on a stem, a coloured dot. One line: plain, short. */
   .tag {

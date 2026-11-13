@@ -8,10 +8,10 @@ import type { PlotInfo, RelationshipView, SimView, TownPlace } from '../src/core
 import { dayBar } from '../src/ui/town/dayBar';
 import { keepApart, TAG_ORDER, type TagBox, type TagKind } from '../src/ui/town/overlap';
 import { homesForSale, nameLabels, openState, openText, townPlaces } from '../src/ui/town/places';
-import { nearestFew, whereabouts, yourPeople, type TagWorld } from '../src/ui/town/tags';
+import { homeTag, nearestFew, whereabouts, yourPeople, type TagWorld } from '../src/ui/town/tags';
 import { nextEvents, waitText } from '../src/ui/town/today';
 import { schoolOf, workplaceOf } from '../src/ui/town/workplace';
-import { tagFade } from '../src/ui/town/fade';
+import { mineFade, tagFade } from '../src/ui/town/fade';
 
 const box = (key: string, kind: TagKind, x: number, y: number, w = 100, h = 20, depth = 100): TagBox => ({ key, kind, x, y, w, h, depth });
 const screen = { width: 1920, height: 1080 };
@@ -348,11 +348,29 @@ describe('the day bar and the fade', () => {
     expect(dayBar(21 * 60)).toMatchObject({ share: 1, day: false });
   });
 
+  test('the home has a tag of its own while nobody of the household is in', () => {
+    const home = plot(0, '1 Mill Lane', false, { house: [2, 2, 12, 10], storeys: 2 });
+    const s = (id: number, extra: Partial<SimView>) => ({ id, plot: null, awayUntil: null, ...extra }) as SimView;
+    // Someone in: their own tag marks it.
+    expect(homeTag(home, [s(1, { plot: 0 }), s(2, { awayUntil: 17 * 60 })], 0)).toBeNull();
+    // Everyone out or at work: "Home", over the house, and a click glides down to it.
+    const t = homeTag(home, [s(1, { plot: 3 }), s(2, { awayUntil: 17 * 60 })], 0)!;
+    expect(t).toMatchObject({ kind: 'household', title: 'Home', tone: 'mine', anchor: { x: 7, z: 6 }, action: { kind: 'home' } });
+    expect(t.lift).toBeGreaterThan(6);
+    expect(homeTag(null, [], null)).toBeNull();
+  });
+
   test('the tags fade in from a town blend of 0.2', () => {
     expect(tagFade(0)).toBe(0);
     expect(tagFade(0.2)).toBe(0);
     expect(tagFade(0.35)).toBeCloseTo(0.5);
     expect(tagFade(0.5)).toBe(1);
     expect(tagFade(1)).toBe(1);
+    // The household's own are in from the town view's start: whole by 150 m, where the rest have not begun.
+    expect(mineFade(0)).toBe(0);
+    expect(mineFade(0.015)).toBeCloseTo(0.5);
+    expect(mineFade(0.03)).toBe(1);
+    expect(mineFade(1)).toBe(1);
+    expect(tagFade(0.03)).toBe(0);
   });
 });

@@ -17,6 +17,7 @@ export type TagAnchor = { sim: number } | { x: number; z: number };
 /** What a click on a tag does. */
 export type TagAction =
   | { kind: 'select'; sim: number }
+  | { kind: 'home' }
   | { kind: 'person'; sim: number; plot: number | null }
   | { kind: 'place'; place: number }
   | { kind: 'sale'; plot: number };
@@ -150,6 +151,16 @@ export function householdTags(members: readonly SimView[], w: TagWorld): { tags:
     tags.push({ key: `hh:${s.id}`, kind: 'household', title: s.name, detail: where.text, anchor, lift: 2.2, tone: 'mine', action: { kind: 'select', sim: s.id } });
   }
   return { tags, away };
+}
+
+/**
+ * The household's home's own tag, while none of the household's tags stands there (nobody is in): the home is marked
+ * from anywhere in the town view. Over its house (its lot, without one). A click glides down to it.
+ */
+export function homeTag(home: PlotInfo | null | undefined, members: readonly SimView[], homeId: number | null): TownTag | null {
+  if (!home || members.some((s) => s.plot === homeId && s.awayUntil === null)) return null;
+  const [x0, z0, x1, z1] = home.house ?? [home.x, home.z, home.x + home.w, home.z + home.d];
+  return { key: 'hh:home', kind: 'household', title: 'Home', detail: 'nobody in', anchor: { x: (x0 + x1) / 2, z: (z0 + z1) / 2 }, lift: 3 + 3 * (home.storeys ?? 1), tone: 'mine', action: { kind: 'home' } };
 }
 
 /** Your people's tags, where they are (not those at your home: they're in the play view, with you). */

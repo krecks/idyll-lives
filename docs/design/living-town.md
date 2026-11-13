@@ -173,9 +173,10 @@ zooms out) and `townBlend(radius)` (0..1, smoothstep from `TOWN_FROM` to `TOWN_F
 ## Town tags (hud)
 
 The tags are HTML labels over the canvas, positioned from world points each frame (`ui/town/*`). They fade
-in with `townBlend` (from about 0.2), are filtered, and are kept from overlapping: when two meet, the more
-important one stays. The order of importance is: household > your people > places > homes for sale >
-street names.
+in with `townBlend` (from about 0.2; the household's own from the start of the town view, so the family and
+its home are marked at any distance past `TOWN_FROM`), are filtered, and are kept from overlapping: when two
+meet, the more important one stays. The order of importance is: household > your people > places > homes for
+sale > street names.
 
 | Tag | Shows | Click |
 |---|---|---|
@@ -185,6 +186,8 @@ street names.
 | Home for sale | Price and size | Glide there and open the home picker |
 | Street / area | The street's and the hamlet's names at the right zoom | — |
 
+- The household's home has a tag of its own ("Home") while nobody of the household is in, so the home is marked
+  from anywhere in the town view; a click glides down to it.
 - The tags read only what the sim's views already carry: `SimView.plot`, `visiting`, `trip`, `awayUntil`
   and `job`; relationships; the `PlotInfo`s; and `WorldMeta.places`. No new sim state is added.
 - **Workplaces:** a resident at work (`plot` null, `awayUntil` set) is shown at the place whose `work` lists
