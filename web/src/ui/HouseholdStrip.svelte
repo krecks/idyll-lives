@@ -33,6 +33,8 @@
   }
 
   const doing = (s: SimView) => s.actions.find((a) => a.active) ?? s.actions[0];
+  // (Its height while shown, for the town map to stop above it: none once it's gone.)
+  $effect(() => () => (game.stripHeight = 0));
 </script>
 
 {#snippet face(id: number, size: number)}
@@ -40,7 +42,7 @@
   {#if who}<SimPreview appearance={who.appearance} gender={who.gender} id={who.id} {size} />{/if}
 {/snippet}
 
-<section class="strip" class:beside={game.journalOpen} aria-label="Household">
+<section class="strip" class:beside={game.journalOpen} aria-label="Household" bind:clientHeight={game.stripHeight}>
   {#if !game.occupied}
     <div class="card glass empty">
       <button class="main" title="Creation: a family to live here" onclick={() => services.controls.setMode('create')}>
