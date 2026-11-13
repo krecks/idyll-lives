@@ -87,20 +87,20 @@ Rebuilt with the forms and the kit, same sizes, centres, parts, clips, paint and
 
 | Model | Size (w × h × d) | Triangles (before → now) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.deskSimple` | 1.50 × 0.74 × 0.69 m | 1,488 → 1,916 | 2 | Top, Frame, Drawers |
-| `model.deskCorner` | 1.86 × 1.01 × 1.86 m | 4,784 → 5,520 | 2 | Top, Frame, Drawers, Chair |
-| `model.deskStanding` | 0.96 × 1.54 × 0.63 m | 2,604 → 4,078 | 3 | Top, Frame, Shelf |
-| `model.deskExecutive` | 1.80 × 0.75 × 0.77 m | 2,624 → 4,344 | 2 | Top, Frame, Drawers, Handles, Desk pad |
-| `model.computerDesk` | 1.54 × 1.22 × 0.87 m | 6,728 → 7,396 | 3 | Top, Frame, Drawers, Keyboard tray, Chair |
-| `model.deskWriting` | 1.54 × 1.11 × 0.87 m | 4,944 → 4,944 | 3 | Top, Frame, Drawers, Chair |
-| `model.deskLaptop` | 0.90 × 1.01 × 0.87 m | 4,564 → 5,204 | 3 | Top, Frame, Drawer, Laptop, Chair |
-| `model.computerGaming` | 1.70 × 1.30 × 0.90 m | 6,944 → 7,692 | 3 | Desk, PC & monitors, Lights, Chair |
-| `model.chairExecutive` | 0.62 × 1.33 × 0.64 m | 2,864 → 6,648 | 2 | Frame, Seat |
-| `model.chairTask` | 0.61 × 1.06 × 0.60 m | 2,904 → 5,124 | 3 | Frame, Seat, Back |
-| `model.officeChair` | 0.61 × 1.16 × 0.62 m | 2,648 → 5,248 | 3 | Frame, Seat |
-| `model.filingCabinet` | 0.46 × 1.21 × 0.64 m | 3,340 → 3,520 | 3 | Cabinet, Handles |
-| `model.whiteboard` | 0.93 × 0.65 × 0.07 m | 1,608 → 3,100 | 2 | Board, Frame |
-| `model.corkboard` | 0.74 × 0.52 × 0.03 m | 1,212 → 1,516 | 2 | Board, Frame |
+| `model.deskSimple` | 1.50 × 0.74 × 0.69 m | 1,488 → 1,916 | 1,916 | Top, Frame, Drawers |
+| `model.deskCorner` | 1.86 × 1.01 × 1.86 m | 4,784 → 5,520 | 5,520 | Top, Frame, Drawers, Chair |
+| `model.deskStanding` | 0.96 × 1.54 × 0.63 m | 2,604 → 4,078 | 4,078 | Top, Frame, Shelf |
+| `model.deskExecutive` | 1.80 × 0.75 × 0.77 m | 2,624 → 4,344 | 4,344 | Top, Frame, Drawers, Handles, Desk pad |
+| `model.computerDesk` | 1.54 × 1.22 × 0.87 m | 6,728 → 7,396 | 7,396 | Top, Frame, Drawers, Keyboard tray, Chair |
+| `model.deskWriting` | 1.54 × 1.11 × 0.87 m | 4,944 → 4,944 | 4,944 | Top, Frame, Drawers, Chair |
+| `model.deskLaptop` | 0.90 × 1.01 × 0.87 m | 4,564 → 5,204 | 5,204 | Top, Frame, Drawer, Laptop, Chair |
+| `model.computerGaming` | 1.70 × 1.30 × 0.90 m | 6,944 → 7,692 | 7,632 | Desk, PC & monitors, Lights, Chair |
+| `model.chairExecutive` | 0.62 × 1.33 × 0.64 m | 2,864 → 6,648 | 6,664 | Frame, Seat |
+| `model.chairTask` | 0.61 × 1.06 × 0.60 m | 2,904 → 5,124 | 5,140 | Frame, Seat, Back |
+| `model.officeChair` | 0.61 × 1.16 × 0.62 m | 2,648 → 5,248 | 5,264 | Frame, Seat |
+| `model.filingCabinet` | 0.46 × 1.21 × 0.64 m | 3,340 → 3,520 | 3,520 | Cabinet, Handles |
+| `model.whiteboard` | 0.93 × 0.65 × 0.07 m | 1,608 → 3,100 | 3,100 | Board, Frame |
+| `model.corkboard` | 0.74 × 0.52 × 0.03 m | 1,212 → 1,516 | 1,516 | Board, Frame |
 
 The desks with their own chair spend about half their triangles on it: its castors and arms are lighter there
 (`lite`). `check-glb`: 14 models, 0 failed. Its warnings, all expected: the two boards float (wall things). Khronos
@@ -112,3 +112,7 @@ validator: 0 errors, 0 warnings each.
 cargo art office            # the fourteen .glb, the pack, check-glb
 cargo art office --preview  # previews/office/<id>.png, <id>@<clip>.png
 ```
+
+## The soft forms pass (2026-11-13)
+
+No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 12 models changed shape: `chairExecutive`, `chairTask`, `computerDesk`, `computerGaming`, `deskCorner`, `deskExecutive`, `deskLaptop`, `deskSimple`, `deskStanding`, `deskWriting`, `officeChair`, `whiteboard`; 61,214 to 61,202 triangles.
