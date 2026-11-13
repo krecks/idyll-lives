@@ -5,6 +5,7 @@
 //!                                     docs/review/reference.json: the outliers per category (`--md`: every
 //!                                     object, `<dir>/sizes-<cat>.md`)
 //!   cargo review colours [--all]      every model's colours against what real surfaces reflect (`colours.rs`)
+//!   cargo review facets [--all]       every model's round parts whose outline shows its flat sides (`facets.rs`)
 //!   cargo review uses [--md <dir>]    each object's uses, poses, minutes, effects, skills, slots, approach,
 //!                                     motions and sounds, and what looks wrong there: a summary per category
 //!                                     (`--md`: every object, `<dir>/uses-<cat>.md`)
@@ -1327,13 +1328,16 @@ impl Sources {
     }
 }
 
-pub const USAGE: &str = "usage: cargo review sizes [--md <dir>] | uses [--md <dir>] [--check] | colours [--all] [--check]";
+pub const USAGE: &str = "usage: cargo review sizes [--md <dir>] | uses [--md <dir>] [--check] | colours [--all] [--check] | facets [--all] [--check]";
 
 /// `cargo review <sizes|uses> [--md <dir>] [--check]`: the exit code (2: usage, or no reference for
 /// `sizes`; 1: `--check` found a hard flag, a use the renderer can't play).
 pub fn main(args: &[String]) -> i32 {
     if args.first().map(String::as_str) == Some("colours") {
         return crate::colours::main(&args[1..]);
+    }
+    if args.first().map(String::as_str) == Some("facets") {
+        return crate::facets::main(&args[1..]);
     }
     let check = args.iter().any(|a| a == "--check");
     let md = match args.iter().position(|a| a == "--md") {

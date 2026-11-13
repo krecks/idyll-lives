@@ -184,7 +184,8 @@ pub fn of_model(
     (checked, found)
 }
 
-fn manifests(dir: &Path, out: &mut Vec<PathBuf>) {
+/// Every `manifest.json` under `dir`, in order.
+pub(crate) fn manifests(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };

@@ -464,6 +464,15 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 - **The build** (`Family.run`, before it builds anything; `write_pack` again as a backstop) refuses a
   `key=` that no content object or item names and no manifest has, unless its `Model` has
   `code=True` (a model the game draws by code: a held `tool.*`, a street prop).
+- **`cargo review facets`** (`crates/tools/src/facets.rs`; a report, `--check` makes it a gate, `--all` lists
+  every model) says which round parts show their flat sides: a round thing is flat faces shaded smooth, and
+  its outline is still the polygon. Across each smooth edge (two triangles meeting in corners of the same
+  place and normal) the curve the faces stand for is `(w / 2) × tan(θ / 4)` off the chord, `w` the narrower
+  face's width across the edge and `θ` the turn between them (a regular polygon's `r × (1 − cos(π / n))`);
+  over 1.5 mm it shows in a catalogue picture and at the play camera zoomed in. It gives the edges, their
+  length and the worst per family and per model, and what is over 4 mm (a pixel at 6 m) apart; leaves
+  (`foliage`, `leafcards`: lumps and cards, not round things) are counted apart. What it lists that is not a
+  round thing drawn too coarsely: bark and boulders (jittered by hand), and a cloth's folds.
 - **The Khronos glTF validator**: no errors and no warnings. It is on npm as `gltf-validator`
   (Apache-2.0); install it outside the repo and run `validateBytes` over the files, or drop them on
   the validator's web page.
