@@ -92,12 +92,17 @@ export function gameDataUrls(content: Content, assets: AssetRegistry): string[] 
   return [...home, ...rest];
 }
 
-/** The viewed house's files, and everything else this session may fetch. */
+/**
+ * The viewed house's files, and everything else this session may fetch. `warm`: the lots the
+ * renderer's warm-up builds behind the loading screen (`focus.ts` `warmLots`): their things come with
+ * the house too, fetched together rather than one lot's after another's as each is built.
+ */
 export function gameAssetPlan(
   content: Content,
   assets: AssetRegistry,
   world: Pick<WorldStructure, 'objects'>,
   view: Rect | null,
+  warm: readonly Rect[] = [],
 ): { home: string[]; rest: string[] } {
   const home = new Set<string>();
   const all = new Set<string>();
@@ -132,12 +137,12 @@ export function gameAssetPlan(
   // The rig and every character set are `character` entries, not models (`model.sim` is one too).
   for (const key of assets.keys('character')) addHome(assets.get(key, 'character')?.url ?? null);
 
-  // Furniture in the viewed lot (the rest of the town streams after Play).
+  // Furniture in the viewed lot and the lots warmed up (the rest of the town streams after Play).
   for (const o of world.objects) {
     const url = modelUrl(assets, content.object(o.def)?.model ?? `model.${o.def}`);
     if (!url) continue;
     all.add(url);
-    if (inView(o, view)) home.add(url);
+    if (inView(o, view) || warm.some((lot) => inView(o, lot))) home.add(url);
   }
 
   // The catalog's pictures are built from these models after the stream settles, and cooking

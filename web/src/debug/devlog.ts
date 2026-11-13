@@ -15,6 +15,8 @@
  *   memory, long tasks, the game's day, time and speed;
  * - `resolution`: the size drawn changed (and from what);
  * - `slowFrame`: a gap between frames over `SLOW_FRAME_MS` (a stall), with the game's time.
+ * - `perf`: every span `debug/perf.ts` times (start-up, the menus' town, portrait batches, a game's
+ *   preparation and warm-up), with its start and length in ms since the page loaded.
  *
  * Lines go to the dev server every `FLUSH_MS` (`vite.config.ts`, POST `/__debug/devlog`), and once more
  * when the page is left.
@@ -26,6 +28,8 @@ import { watchLog } from './log';
 /** How often the game's state is sampled while a game is open, and how often lines go to the dev server (ms). */
 export const SAMPLE_MS = 5000;
 const FLUSH_MS = 2000;
+/** A flush this long or longer (characters) isn't sent `keepalive` (the browser's limit is 64 kB in flight). */
+const KEEPALIVE_MAX = 32_000;
 /** A gap between drawn frames this long is a stall worth a line (ms). */
 export const SLOW_FRAME_MS = 100;
 /** Stall lines kept per sample period at most (a long hitch shouldn't flood the log). */
@@ -88,7 +92,9 @@ function flush(leaving = false): void {
     navigator.sendBeacon('/__debug/devlog', new Blob([body], { type: 'application/json' }));
     return;
   }
-  void fetch('/__debug/devlog', { method: 'POST', body, headers: { 'content-type': 'application/json' }, keepalive: true }).catch(() => {});
+  // (A request kept alive past the page may carry 64 kB at most, all of them together: a bigger one is
+  // refused, and its lines were lost. A busy load's spans come to more than that in one flush.)
+  void fetch('/__debug/devlog', { method: 'POST', body, headers: { 'content-type': 'application/json' }, keepalive: body.length < KEEPALIVE_MAX }).catch(() => {});
 }
 
 /** The screen the page is on: CSS size, device pixel ratio, device pixels. */

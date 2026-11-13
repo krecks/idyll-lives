@@ -11,6 +11,7 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 - **The day at a glance:** a bar under the clock shows the day from sunrise to sunset, and from the town view a card lists the household's next shifts, school days and planned visits.
 - **Bigger towns:** a town holds up to 240 residents (160 before); a new world starts with about 120, as before, and the newcomers who move in fill the rest.
 - **Faster with a full town:** the hitch at 09:30, when the town's jobs are handed out, is gone (the new hires' commutes are worked out one a tick: the worst tick went from 70–88 ms to 22 ms in a town of 222), who is within earshot is found far more cheaply with the same answers, and the work taxis' kerbs at the start of a game take 4 ms instead of 82.
+- **Shorter loading:** the game reaches its menu about 5 seconds sooner (it drew portraits of 118 residents nobody saw there), "Choose a household" shows the faces in view in about a second and all of them in under 3 (8 before), the ones on screen first, and a household's game opens about 5 seconds sooner (its world is built in longer steps behind the loading screen, and the town's other faces wait until it is up). Portraits are kept between visits.
 - **Save format 38:** the town's backdrop, places and centres are in the save. 0.8.0's saves open and play as before, without them; 0.8.0 can't open the new ones.
 
 ## 0.8.0 — 2026-11-12

@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { chunkAt, CHUNK } from '../src/render/shared/chunks';
-import { Flight, HYSTERESIS, panBounds, Roam, SETTLE_MS, streamRadius, warmLots, type FocusPlot } from '../src/render/shared/focus';
+import { Flight, HYSTERESIS, panBounds, Roam, SETTLE_MS, streamRadius, WARM_MIN_GAIN, warmLots, type FocusPlot } from '../src/render/shared/focus';
 import { OrbitControls, pointerInteraction } from '../src/render/shared/orbit';
 
 const cam = (x: number, z: number, radius = 30) => ({ x, z, radius, alpha: 0, fovH: 1.1 });
@@ -157,7 +157,7 @@ describe('roaming', () => {
 
 describe('warm-up lots', () => {
   const plot = (x: number) => ({ x, z: 0, w: 10, d: 10, house: [x, 0, x + 5, 5] });
-  test('the lots adding the most not yet seen, the home and houseless lots left out, none that add nothing', () => {
+  test('the lots adding the most not yet seen, the home and houseless lots left out, none that add little', () => {
     const world = {
       plots: [plot(0), plot(10), plot(20), { ...plot(30), house: null }, plot(40)],
       depth: 10,
@@ -170,13 +170,19 @@ describe('warm-up lots', () => {
       openings: [
         { x: 22, z: 1, kind: 'window', style: 2 },
         { x: 23, z: 1, kind: 'door' },
+        { x: 42, z: 11, kind: 'window', style: 3 },
       ],
       floors: [[12, 2, 7]],
       objects: [{ x: 31, z: 1, def: 'sofa' }],
     };
-    // Lot 20 adds 4 (two faces, a window style, a door), lot 40 (upstairs, row 11) two, lot 10 one (its floor: its
-    // faces are the home's, lot 0, seen already).
-    expect(warmLots(world, { x: 0, z: 0 }, 5).map((p) => p.x)).toEqual([20, 40, 10]);
+    // Lot 20 adds 4 (two faces, a window style, a door), lot 40 (upstairs, row 11) three (two faces, a window
+    // style), lot 10 one (its floor: its faces are the home's, lot 0, seen already): fewer than the least worth
+    // building.
+    expect(WARM_MIN_GAIN).toBeGreaterThan(1);
+    expect(WARM_MIN_GAIN).toBeLessThanOrEqual(3);
+    const gains: number[] = [];
+    expect(warmLots(world, { x: 0, z: 0 }, 5, gains).map((p) => p.x)).toEqual([20, 40]);
+    expect(gains).toEqual([4, 3]);
     expect(warmLots(world, { x: 0, z: 0 }, 1).map((p) => p.x)).toEqual([20]);
   });
 });

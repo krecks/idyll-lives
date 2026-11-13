@@ -4,8 +4,12 @@
  * frame beyond one comparison) and printed to the console with `?profile`.
  *
  * `?profile` also logs each span as it ends and a table of everything over 20 ms, so a slow start
- * says which step it was. `window.__perfReport()` returns the same data for a test harness.
+ * says which step it was. `window.__perfReport()` returns the same data for a test harness. On the
+ * dev server every span also goes to the dev play log (`perf` lines, `devlog.ts`), so a slow load
+ * seen while playing can be read afterwards span by span.
  */
+
+import { devlog } from './devlog';
 
 export interface PerfEntry {
   name: string;
@@ -97,6 +101,7 @@ export async function perfTimeAsync<T>(name: string, fn: () => Promise<T>, detai
 function record(entry: PerfEntry): void {
   entries.push(entry);
   if (entries.length > MAX_ENTRIES) entries.shift();
+  devlog('perf', { name: entry.name, start: Math.round(entry.start), ms: Math.round(entry.ms * 10) / 10, ...(entry.detail ? { detail: entry.detail } : {}) });
   if (LOG && entry.ms >= 10) {
     const detail = entry.detail ? ` (${entry.detail})` : '';
     console.info(`[perf] ${entry.name}: ${entry.ms.toFixed(1)} ms${detail}`);

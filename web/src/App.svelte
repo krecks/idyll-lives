@@ -7,6 +7,7 @@
   import { perfEnd, perfPhase, perfStart, perfTimeAsync } from './debug/perf';
   import { fetchState, loadDebugReport } from './debug/report';
   import { within } from './core/async';
+  import { lookAtAge } from './game/household';
   import { loadGameData } from './game/session';
   import { prefetchNow, streamGameData } from './assets/stream';
   import { gameDataUrls, menuAssetUrls } from './game/streamPlan';
@@ -72,8 +73,8 @@
 
   /** Longest wait for one start-up step (a stuck step must not keep the menu away). */
   const STEP_LIMIT_MS = 45_000;
-  /** Portraits draw in the background; the menu must not wait long for them. */
-  const PORTRAIT_LIMIT_MS = 8_000;
+  /** The portrait studio's warm-up (`boot`): the menu must not wait long for it. */
+  const PORTRAIT_LIMIT_MS = 3_000;
   /** A start-up step, or nothing once it has taken `STEP_LIMIT_MS`. */
   const inTime = <T,>(p: Promise<T>) => within(p, STEP_LIMIT_MS, undefined);
 
@@ -134,23 +135,16 @@
           }),
         ),
       );
-      // The menu's household cards show portraits: draw them behind the loading screen, not on
-      // the first menu frames (each new look compiles a set of character shaders).
-      if (draft) {
-        step('Drawing portraits', 0.4);
-        // The cards show the portraits as they arrive; booting the menu should not wait for a
-        // slow first shader compile (or a missing environment texture).
-        await perfTimeAsync('boot: portraits', () =>
-          within(
-            Promise.all(
-              draft.households.flatMap((h) =>
-                h.household.members.map((m) => services.previews?.portrait({ gender: m.gender, appearance: m.appearance }) ?? Promise.resolve(null)),
-              ),
-            ),
-            PORTRAIT_LIMIT_MS,
-            undefined,
-          ),
-        );
+      // The menu shows no portraits, and its showcase households aren't the ones a new game offers
+      // (step 2 brings its own). One face warms the portrait studio up behind the loading screen (its
+      // device made, its shaders compiled; kept through the menus): step 2's first faces come quickly,
+      // and no compile lands on the menu's first frames. Not longer than a moment (a slow first
+      // compile, or a missing environment texture).
+      const first = draft?.households[0]?.household.members[0];
+      if (first && services.previews) {
+        step('Preparing portraits', 0.4);
+        const look = { gender: first.gender, appearance: lookAtAge(services.content, services.assets, first.appearance, first.age) };
+        await perfTimeAsync('boot: portraits', () => within(services.previews.portrait(look), PORTRAIT_LIMIT_MS, undefined));
       }
     } catch (err) {
       console.warn('[boot]', err);
@@ -211,15 +205,22 @@
         menuScene.highlight({});
         menuScene.shoot({ kind: screen }, screen === 'menu' ? 2.4 : 2);
         await menuScene.show(draft).catch((err: unknown) => console.warn('[menu] town preview failed', err));
-        // "New game" starts from this neighbourhood: have its residents' portraits ready by then.
-        if (!cancelled && screen === 'menu') {
-          services.previews?.prefetch(draft.households.flatMap((h) => h.household.members.map((m) => ({ gender: m.gender, appearance: m.appearance }))));
-        }
       })();
     }
     return () => {
       cancelled = true;
     };
+  });
+
+  /**
+   * The portrait studio stays once the boot has warmed it up: through the menus and the new game's
+   * screens (step 2 finds it ready, and going from one step to the next doesn't make its device
+   * again) and into a game (whose household's faces are drawn as it loads, before the game keeps it
+   * too). A game kept it anyway, so this costs the page no more at its peak.
+   */
+  $effect(() => {
+    if (!app.dataReady || app.booting) return;
+    services.previews?.keep(true, 'page');
   });
 
   /**
