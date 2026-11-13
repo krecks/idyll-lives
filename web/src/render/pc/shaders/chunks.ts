@@ -56,7 +56,7 @@ import { gameNormalMap } from './bump';
 import { gameFresnel, gameReflection } from './envBrdf';
 import { gameFog, setFogFrom } from './fog';
 import { CONTACT_DIRECT, SOFT_LOOK } from './softLook';
-import { ROOM_LIGHT_CODE, ROOM_LIGHTS } from './roomLights';
+import { OUT as ROOM_OUT, ROOM_LIGHT_CODE, ROOM_LIGHT_ROOMS, ROOM_LIGHTS } from './roomLights';
 import { PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
 import { UNDERGROUND } from './underground';
 
@@ -380,6 +380,17 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 	#if defined(GAME_LOOK) && defined(LIT_NEEDS_NORMAL)
 		gameAmbient = dDiffuseLight;
 		dDiffuseLight = gameHemi(litArgs_worldNormal);
+		// In a room with its lamps on by night the eye is set to them: the sky's light, which comes in through the
+		// windows only, is a share of its fill and of its ambient there (and of the moon's, the \`sun\` patch), and the
+		// lamps' light comes off the walls and the floor from every side (\`RoomLightState.light\`, a texel per room:
+		// r the bounce, a the sky's share).
+		if (gameRoomHere < 0.0) gameRoomHere = gameRoomOf(vPositionW + litArgs_worldNormal * ${ROOM_OUT});
+		if (gameRoomHere > 1.5 && gameRoomHere < ${ROOM_LIGHT_ROOMS}.0) {
+			vec4 gameRoom = texelFetch(game_roomLight, ivec2(int(gameRoomHere + 0.5), 0), 0);
+			gameRoomSky = gameRoom.a;
+			gameAmbient *= gameRoomSky;
+			dDiffuseLight = dDiffuseLight * gameRoomSky + game_roomBounce * gameRoom.r;
+		}
 		#ifdef LIT_SSAO
 			gameContact = texture2DLod(ssaoTexture, gl_FragCoord.xy * ssaoTextureSizeInv, 0.0).r;
 			dDiffuseLight *= gameContact / mix(1.0, gameContact, ${CONTACT_DIRECT});
@@ -391,6 +402,11 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 		#if LIGHT{i}TYPE == DIRECTIONAL
 			lightColor *= gameUnder.x;
 		#endif
+	#endif
+	#ifdef GAME_LOOK
+		#if LIGHT{i}TYPE == DIRECTIONAL
+			lightColor *= gameRoomSky;
+		#endif
 	#endif`,
   },
   wgsl: {
@@ -398,6 +414,13 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 	#if defined(GAME_LOOK) && defined(LIT_NEEDS_NORMAL)
 		gameAmbient = dDiffuseLight;
 		dDiffuseLight = gameHemi(litArgs_worldNormal);
+		if (gameRoomHere < 0.0) { gameRoomHere = gameRoomOf(vPositionW + litArgs_worldNormal * ${ROOM_OUT}); }
+		if (gameRoomHere > 1.5 && gameRoomHere < ${ROOM_LIGHT_ROOMS}.0) {
+			let gameRoom = textureLoad(game_roomLight, vec2<i32>(i32(gameRoomHere + 0.5), 0), 0);
+			gameRoomSky = gameRoom.a;
+			gameAmbient = gameAmbient * gameRoomSky;
+			dDiffuseLight = dDiffuseLight * gameRoomSky + uniform.game_roomBounce * gameRoom.r;
+		}
 		#ifdef LIT_SSAO
 			gameContact = textureSampleLevel(ssaoTexture, ssaoTextureSampler, pcPosition.xy * uniform.ssaoTextureSizeInv, 0.0).r;
 			dDiffuseLight = dDiffuseLight * (gameContact / mix(1.0, gameContact, ${CONTACT_DIRECT}));
@@ -408,6 +431,11 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 	#ifdef GAME_UNDERGROUND
 		#if LIGHT{i}TYPE == DIRECTIONAL
 			lightColor = lightColor * gameUnder.x;
+		#endif
+	#endif
+	#ifdef GAME_LOOK
+		#if LIGHT{i}TYPE == DIRECTIONAL
+			lightColor = lightColor * gameRoomSky;
 		#endif
 	#endif`,
   },

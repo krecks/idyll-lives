@@ -194,5 +194,19 @@
       "thinner": "patches.dense:1.2",
       "patches of daisies, buttercups and violets (as it is)": ""
     }
+  },
+  "room": {
+    "poses": [
+      "play-night",
+      "close-night",
+      "close-east-night",
+      "play-dusk"
+    ],
+    "variants": {
+      "before 2026-11-13 (the sky's light indoors as outdoors, no bounce)": "room.sky:1;room.bounce:0",
+      "sky 0.4, bounce 0.04": "room.sky:0.4;room.bounce:0.04",
+      "sky 0.25, bounce 0.06": "room.sky:0.25;room.bounce:0.06",
+      "sky 0.15, bounce 0.08 (as it is)": ""
+    }
   }
 }

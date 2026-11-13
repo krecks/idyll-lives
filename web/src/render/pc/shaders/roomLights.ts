@@ -38,6 +38,9 @@
 
 import type { Language, ShaderFeature } from './chunks';
 
+/** Rooms with a light of their own (`RoomLightState.light`, a texel each): the mask's first, far more than a lot has. */
+export const ROOM_LIGHT_ROOMS = 256;
+
 /** How far out along its normal a fragment is classed (m): off a wall's face, into the room it faces. */
 export const OUT = '0.1';
 
@@ -60,6 +63,8 @@ export const ROOM_LIGHTS: ShaderFeature = {
 	uniform vec4 game_roomLightArea;
 	uniform vec4 game_roomLightBand;
 	uniform highp sampler2D game_roomLightMask;
+	// A texel per room of the mask (\`RoomLightState.light\`): r its lamps' bounce, a the sky's share.
+	uniform sampler2D game_roomLight;
 	float gameRoomHere = -1.0;
 	// The room at a point (PlayCanvas space) as the mask has it: 0 unknown, 1 outdoors, 2 and up a room.
 	float gameRoomOf(vec3 at) {
@@ -91,6 +96,7 @@ export const ROOM_LIGHTS: ShaderFeature = {
 	uniform game_roomLightArea: vec4f;
 	uniform game_roomLightBand: vec4f;
 	var game_roomLightMask: texture_2d<f32>;
+	var game_roomLight: texture_2d<f32>;
 	var<private> gameRoomHere: f32 = -1.0;
 	fn gameRoomOf(at: vec3f) -> f32 {
 		if (uniform.game_roomLightBand.w < 0.5) { return 0.0; }

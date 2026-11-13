@@ -41,6 +41,7 @@ import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import type { Lighting, RGB } from '../shared/environment';
 import type { RoomLight } from '../shared/house';
+import { ROOM, roomLight } from '../shared/roomLight';
 import { WALL_HEIGHT } from '../shared/walls';
 import type { ViewRect } from '../types';
 
@@ -172,6 +173,8 @@ export class Lamps {
     // The look's lamp colour (sRGB, as PlayCanvas takes a light's colour).
     const c = linearHex(LOOK.lampColor);
     const color = new pc.Color(gamma(c.r), gamma(c.g), gamma(c.b));
+    const bounce = ROOM.bounce * LAMP_POWER * LAMP_UNITS;
+    this.lib.setRoomBounce({ r: c.r * bounce, g: c.g * bounce, b: c.b * bounce });
     const off = benchDiag().has('nolamps');
     for (let i = 0; i < count; i++) {
       const entity = new pc.Entity(`roomLight${i}`);
@@ -264,6 +267,8 @@ export class Lamps {
     const rooms = this.lib.rooms;
     if (!rooms.enabled || !view) {
       rooms.show(null);
+      this.roomIds = new Map();
+      this.applyRoomLight();
       return;
     }
     const W = world.width;
@@ -300,6 +305,8 @@ export class Lamps {
     }
     const mask: RoomMask = { x0: view.x, z0: view.z, w: view.w, d: view.d, storey: k0, storeys: n, tiles, halves };
     rooms.show(mask);
+    this.roomIds = ids;
+    this.applyRoomLight();
   }
 
   /** Lamps switched off (`Renderer.setLampsOff`): those switched since the last fade out or in. */
@@ -364,6 +371,8 @@ export class Lamps {
   private applyRoomLights(): void {
     const town = this.view.town();
     const basement = this.view.storey() < 0;
+    const rooms = this.roomFlux;
+    rooms.clear();
     for (const lamp of this.lamps) {
       // The overview has no interiors: the game house's lamps stay off behind it.
       const use = town ? null : lamp.use;
@@ -383,14 +392,39 @@ export class Lamps {
           intensity = lit * FILL_POWER * (4 + Math.min(use.area, 30) * 0.35);
           range = 4 + Math.sqrt(use.area) * 1.4;
         }
+        // The room's lamplight (`ROOM`), by night's measure whatever the exposure: a lamp of power 1 is 1.
+        if (use.room) {
+          const flux = Math.min(lit, 1) * (use.kind === 'lamp' ? (use.power ?? 1) : ROOM.fill);
+          const was = rooms.get(use.room);
+          if (was) was.flux += flux;
+          else rooms.set(use.room, { flux, area: use.area });
+        }
       }
       // (A dark light, all of them by day, is left out of the clusters.)
       setIntensity(lamp.light, intensity * LAMP_UNITS);
       const reach = this.many ? Math.min(range, LAMP_MAX_RANGE) * REACH : range;
       if (lamp.light.range !== reach) lamp.light.range = reach;
     }
+    this.applyRoomLight();
     this.onChanged?.();
   }
+
+  /** Each room's own light (`shared/roomLight.ts`) from its lamplight now (`roomFlux`), for the rooms the mask knows. */
+  private applyRoomLight(): void {
+    const levels = this.roomLevels;
+    levels.clear();
+    for (const [room, { flux, area }] of this.roomFlux) {
+      const id = this.roomIds.get(room);
+      if (id === undefined || flux <= 0) continue;
+      levels.set(id, roomLight(flux, area, this.lampsLevel));
+    }
+    this.lib.rooms.setLight(levels);
+  }
+  /** Per room (`WorldStructure.rooms`): its lamps' brightness summed, and its area in tiles. */
+  private readonly roomFlux = new Map<number, { flux: number; area: number }>();
+  private readonly roomLevels = new Map<number, { bounce: number; sky: number }>();
+  /** The mask's number for each room in view (`markRooms`). */
+  private roomIds: ReadonlyMap<number, number> = new Map();
 
   /** A room's fill is out: everyone there is asleep, or nobody awake is in a room without windows. */
   private fillOut(room: number): boolean {
