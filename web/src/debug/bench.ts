@@ -233,7 +233,7 @@ export async function runBench(): Promise<void> {
   }
   window.__benchResult = result;
   console.info(`[bench] ${summary(result)}`);
-  if (b.hud) showPanel(result);
+  if (b.summary) showPanel(result);
   if (import.meta.env.DEV) {
     try {
       const res = await fetch('/__debug/bench', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(result) });

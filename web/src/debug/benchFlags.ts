@@ -43,6 +43,8 @@ export interface BenchFlags {
   speed: number;
   /** The game's interface shown (`hud=0` hides it, and the summary). */
   hud: boolean;
+  /** The benchmark's summary shown over the game when it is done (not with `hud=0`, nor `hud=game`: the game's interface alone, for pictures of the game as a player has it). */
+  summary: boolean;
   /** GPU time measured (`gpu=0`: not, to see what measuring costs). */
   gpu: boolean;
   /** With `freeze`: the camera path at this moment (s), held. With `hold=1` (and no `freeze`), the camera is held there while the game and the wind go on. */
@@ -99,6 +101,7 @@ function parse(): BenchFlags | null {
     // Build mode stands still; the dusk run hurries through the evening; a frozen picture doesn't move.
     speed: frozen || camera === 'build' ? 0 : num('speed', camera === 'dusk' ? 5 : 1, 0, 5),
     hud: params.get('hud') !== '0',
+    summary: params.get('hud') !== '0' && params.get('hud') !== 'game',
     gpu: params.get('gpu') !== '0',
     at: num('at', 0, 0, 3600),
     hold: params.get('hold') === '1',

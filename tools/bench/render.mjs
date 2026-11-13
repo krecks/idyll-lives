@@ -31,7 +31,8 @@
  *     --poses orbit-day-0,…    which (`POSES`; `play`: the play set, the pictures a change to the look is judged by;
  *                              `day`: the day set, the play camera over three homes at three hours of the day;
  *                              `town`: the town view, over the main town's centre and over the home from 150, 400
- *                              and 900 m at midday, at dusk and by night, in a Big world: `--scene bigworld` unless given)
+ *                              and 900 m at midday, at dusk and by night, the game in its `town-day|dusk|night` scenes
+ *                              with the interface, or `--scene bigworld` for the drawing alone)
  *     --pages [gallery,…]      with --shots: the dev pages instead (`PAGES`: the gallery, clips, residents and
  *                              poses benches, each held still), one PNG per page × backend × diag
  *   --compare <dirA> <dirB>    pixel differences between two shot folders (and `--out` for the difference images)
@@ -131,7 +132,10 @@ const POSES = {
 /**
  * The town set (`--poses town`, docs/design/living-town.md): the town view held over the main town's centre and over
  * the home, from 150 m (just into the town view), 400 m (the full town view) and 900 m (as far out as it goes), at
- * midday, at dusk and by night. In a Big world (`--scene bigworld` unless another is given).
+ * midday, at dusk and by night. Each is the game as a player has it there: a Big town with its residents, a household
+ * of the player's and the interface (the town tags, the day bar), from a scene saved at that hour (`town-day`,
+ * `town-dusk`, `town-night`: `scene.mjs` makes them, see its header). With `--scene` (`bigworld`, say) they are
+ * of that scene instead, the interface hidden as in every other set.
  */
 const TOWN_HOURS = { day: 13, dusk: 19.5, night: 23 };
 const TOWN = [];
@@ -143,6 +147,8 @@ for (const over of ['centre', 'home']) {
     }
   }
 }
+/** The town set's scene for a pose: the town saved at the pose's hour. */
+const townScene = (pose) => `town-${pose.slice(pose.lastIndexOf('-') + 1)}`;
 /** `--poses play`: the pictures a change to the look is judged by. */
 const PLAY = ['play-day', 'play-day-b', 'play-dusk', 'play-night', 'up-day', 'up-dusk', 'up-night', 'wide-day-0', 'wide-night-45', 'street-day', 'street-night', 'town-day'];
 /** `--poses day`: the play camera by day, where a change to the daytime look has to show. */
@@ -515,9 +521,12 @@ async function shots(o) {
           const name = `${preset}-${backend}-${pose}${diag === 'none' ? '' : `-${diag}`}.png`;
           process.stdout.write(`${name} … `);
           try {
-            // (The town set is a Big world's, unless the command line gives a scene.)
-            const scene = TOWN.includes(pose) && !o.args.includes('--scene') ? 'bigworld' : o.scene;
-            const { page, done } = await open(o, queryOf(o, preset, backend, `${POSES[pose]}&diag=${d}&hud=0&secs=0&warmup=${warmup}`, scene), 1, '__benchReady', warmup * 1000 + 240_000);
+            // (The town set is the game in its town's scene at that hour, interface and all, unless the command line gives a scene.)
+            const town = TOWN.includes(pose) && !o.args.includes('--scene');
+            const scene = town ? townScene(pose) : o.scene;
+            const { page, done } = await open(o, queryOf(o, preset, backend, `${POSES[pose]}&diag=${d}&hud=${town ? 'game' : '0'}&secs=0&warmup=${warmup}`, scene), 1, '__benchReady', warmup * 1000 + 240_000);
+            // (The tags are placed a frame after the camera, and fade in.)
+            if (town) await page.waitForTimeout(1200);
             // Two more frames, then the picture.
             await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
             await page.screenshot({ path: join(out, name) });
