@@ -120,6 +120,7 @@ fn fresh(w: &World, inspected: Option<u32>) -> Mirror {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn changes_add_up_to_the_whole_view() {
     let mut w = world(false);
     w.speed = 3;

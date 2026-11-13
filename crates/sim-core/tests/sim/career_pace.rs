@@ -102,6 +102,7 @@ fn keep_unhappy(w: &mut World, i: usize) {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn a_decent_worker_is_promoted_within_a_working_week_and_a_poor_one_later() {
     let (mut w, [decent, poor]) = hired();
     // Shifts worked when each got their first promotion.
@@ -146,6 +147,7 @@ fn job_view(w: &World, i: usize) -> Value {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn missing_skills_hold_a_promotion_back_and_the_career_tab_says_which() {
     let (mut w, [i, _]) = hired();
     // Grade D (Professional) with just its skills: grade E asks for a level more of each.

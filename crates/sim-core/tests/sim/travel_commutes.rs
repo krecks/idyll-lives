@@ -36,6 +36,7 @@ struct Day {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn residents_leave_by_their_walk_and_are_never_late() {
     let mut w = world(11);
     let off_map = common::mins(w.content.career_rules.commute_minutes);

@@ -30,7 +30,7 @@ describe('doors', () => {
   test('the pace is how fast sim-core walks them (`world::WALK_SPEED`, m a real second), and the residents step it', () => {
     const sim = (file: string) => readFileSync(new URL(`../../crates/sim-core/src/${file}`, import.meta.url), 'utf8');
     // (A tick's worth of it, as residents.ts works out how far a walker gets between snapshots: PACE / ticksPerSecond.)
-    const walk = /const WALK_SPEED: f32 = ([\d.]+) \/ TICKS_PER_SECOND as f32;/.exec(sim('world.rs'));
+    const walk = /const WALK_SPEED: f32 = ([\d.]+) \/ TICKS_PER_SECOND as f32;/.exec(sim('world/mod.rs'));
     expect(walk).not.toBeNull();
     expect(PACE).toBe(Number(walk![1]));
   });

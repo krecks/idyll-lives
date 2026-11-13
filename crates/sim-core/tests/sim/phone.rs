@@ -772,6 +772,7 @@ fn the_phone_box_is_gone_from_the_market_square() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn a_town_phones_each_other() {
     let content = common::content();
     let mut w = World::from_json(&content, &common::town(&content, 7, 2), 7).unwrap();

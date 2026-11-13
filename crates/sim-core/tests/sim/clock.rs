@@ -99,6 +99,7 @@ fn ages_from(from: u32, days: u32) -> Vec<(u32, f32, usize)> {
 
 /// A late game, crossing day 1167: residents still grow a year-fraction older every midnight.
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn residents_still_age_after_day_1167() {
     let early = ages_from(10, 3);
     let late = ages_from(1166, 3);

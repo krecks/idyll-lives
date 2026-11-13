@@ -180,6 +180,7 @@ fn two_sims_share_a_double_bed_and_sleep_until_morning() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn rent_and_bills_are_charged_weekly_and_debt_hurts() {
     let mut w = world();
     w.autonomy = false;

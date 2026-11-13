@@ -143,6 +143,7 @@ fn a_thousand_jobs_with_grades_and_skills() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn sims_sleep_at_night_and_are_up_by_day() {
     // Several games (one game's six samples hang on chance: an afternoon in bed is allowed).
     // Sixteen of them: with eight the day count sat a sample or two over the line (33 of 48
@@ -221,6 +222,7 @@ fn content_packs_are_included_and_valid() {
 /// Every personality, living with one item from every content pack: needs stay healthy,
 /// nights are for sleeping and per-use spending stays reasonable.
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn every_personality_lives_well_with_all_packs() {
     let content = content();
     let groups = [

@@ -6,13 +6,18 @@
 # The Bun steps run on the Bun CI pins (ci.yml's `bun-version`), fetched with bunx where the one
 # installed differs: another Bun can pass what CI's fails.
 #
-#   tools/ci-local.sh            every step, and `types` (about 20 minutes)
+#   tools/ci-local.sh            every step, and `types`, the slow tests too (about 20 minutes)
 #   tools/ci-local.sh --quick    pins fmt clippy sim clips web chunks types
 #   tools/ci-local.sh web sim    those steps
 #   SEED_BASE=3 tools/ci-local.sh generated
 #                                the generated-world checks over other sample worlds (default 0:
 #                                CI's). The same seed base makes the same worlds, so a failure
 #                                replays; the release gate runs `generated` over five seed bases.
+#   SLOW_TESTS=1 tools/ci-local.sh sim web
+#                                with the slow tests: the simulation's long runs (`slow-tests`
+#                                feature) and the renderer's town-building files (`*.slow.test.ts`).
+#                                A pull request's CI leaves them out; a tag's and a run by hand
+#                                have them, as does this script run with no step.
 #
 # Steps: pins fmt clippy sim generated clips web tools chunks sizes uses models, and types (the web's types and
 # lint over fresh wasm builds of the sim and the voice: not in CI's job, which builds no wasm, so run
@@ -43,7 +48,8 @@ step() {
     pins) tools_cargo pins ;;
     fmt) cargo fmt --all --check ;;
     clippy) cargo clippy --workspace --all-targets --locked -- -D warnings ;;
-    sim) cargo test -p sim-core --locked ;;
+    # (The long runs only with SLOW_TESTS: `#[cfg_attr(not(feature = "slow-tests"), ignore)]`.)
+    sim) cargo test -p sim-core --locked ${SLOW_TESTS:+--features slow-tests} ;;
     # The ignored generated_* tests need sample files made first. In the simulation tests' own build
     # (already optimised): a release build of the whole test binary would cost more than it saves.
     generated)
@@ -66,7 +72,8 @@ step() {
     # The residents' clips on both bodies at every life stage (known failures: tools/characters/clip-baseline.json).
     clips) (cd web && "${bun_ci[@]}" run check:clips) ;;
     # The renderer's engine-neutral tests.
-    web) (cd web && "${bun_ci[@]}" install --frozen-lockfile && "${bun_ci[@]}" run test) ;;
+    # (The town-building files, `*.slow.test.ts`, only with SLOW_TESTS.)
+    web) (cd web && "${bun_ci[@]}" install --frozen-lockfile && "${bun_ci[@]}" run test && if [[ -n "${SLOW_TESTS:-}" ]]; then "${bun_ci[@]}" run test:slow; fi) ;;
     # The character build, the object gate and the content and texture tools.
     tools) tools_cargo test -p ll-tools --release --locked ;;
     # The PlayCanvas shader chunks' anchors and private names the renderer relies on (tools/render/chunks.json),
@@ -86,6 +93,7 @@ step() {
 
 if [[ $# -eq 0 ]]; then
   set -- "${all[@]}"
+  export SLOW_TESTS=${SLOW_TESTS-1}
 elif [[ "$1" == "--quick" ]]; then
   set -- "${quick[@]}"
 fi

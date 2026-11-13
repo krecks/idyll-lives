@@ -5,6 +5,11 @@ edition.workspace = true
 version.workspace = true
 license.workspace = true
 
+[features]
+# The simulation tests' long runs (two weeks of a town, a century, a day of rearranging...): left out
+# of a pull request's CI, run on a release tag and by hand (tools/ci-local.sh, SLOW_TESTS).
+slow-tests = []
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true

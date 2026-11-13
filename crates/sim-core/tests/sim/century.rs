@@ -122,6 +122,7 @@ fn two_days_of_the_century() {
 /// A game that's run for years of play: from day 1166 everyone still ages at every midnight
 /// (and the rest of the checks hold) for a few days.
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn the_town_still_ages_after_day_1167() {
     let content = common::content();
     let town = common::town(&content, 7, 3);

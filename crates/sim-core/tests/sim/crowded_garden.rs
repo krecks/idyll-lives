@@ -106,6 +106,7 @@ fn all_on(w: &mut World, sims: &[usize], object: u32, minutes: u64) -> Option<u6
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn each_thing_in_a_crowded_row_is_used_when_told() {
     for rot in [0, 2] {
         let (save, content, ids) = world(rot);
@@ -213,6 +214,7 @@ fn clusters() -> Vec<(common::Cluster, Option<i32>)> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn everything_in_a_packed_garden_is_reached() {
     let (empty, content, h, area) = garden();
     // (Each layout on a thread of its own: they don't touch.)
@@ -337,6 +339,7 @@ fn packed_garden_failures(
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn a_day_of_free_will_in_a_packed_garden() {
     let (empty, content, h, area) = garden();
     let mut report = Vec::new();

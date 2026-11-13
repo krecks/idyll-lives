@@ -153,6 +153,7 @@ const ELDERS: &str = r#"{"width":20,"depth":10,
     "relationships":[{"a":0,"b":1,"preset":"child"},{"a":0,"b":2,"preset":"friends"}]}"#;
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn working_residents_retire_with_a_pension() {
     let mut w = World::from_json(LATER_LIFE, ELDERS, 1).unwrap();
     w.apply(Command::SetAutonomy {

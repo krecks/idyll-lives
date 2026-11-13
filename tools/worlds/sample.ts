@@ -27,7 +27,7 @@
  * Each world's line counts its terraced houses, backdrop buildings and places.
  *
  * The same arguments make the same files, byte for byte (`Math.random` seeded per world:
- * web/tests/sampleWorlds.test.ts), so a world a check fails on can be made again and run alone.
+ * web/tests/sampleWorlds.slow.test.ts), so a world a check fails on can be made again and run alone.
  * `--seed-base n` (or WORLDS_SEED_BASE; default 0, the worlds CI checks) draws other worlds: the
  * release gate runs the checks over five (`tools/ci-local.sh`, SEED_BASE).
  *
@@ -467,7 +467,7 @@ const flag = (name: string) => {
 const seedBase = Number(flag('--seed-base') ?? process.env.WORLDS_SEED_BASE ?? 0);
 if (!Number.isInteger(seedBase) || seedBase < 0) throw new Error(`no seed base ${seedBase}`);
 const SEED_STEP = 7919;
-/** `--no-timing`: the layout's and the file's time not checked against their budgets (a run beside others, on a slow runner: `web/tests/sampleWorlds.test.ts`). */
+/** `--no-timing`: the layout's and the file's time not checked against their budgets (a run beside others, on a slow runner: `web/tests/sampleWorlds.slow.test.ts`). */
 const timing = !process.argv.includes('--no-timing');
 if (!timing) process.argv.splice(process.argv.indexOf('--no-timing'), 1);
 const kinds = (flag('--kinds')?.split(',') ?? [...WORLD_KINDS]) as (typeof WORLD_KINDS)[number][];

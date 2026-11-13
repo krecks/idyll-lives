@@ -15,7 +15,7 @@
 import type { RoadPlan, WorldStructure } from '../../core/protocol';
 import { rasterRoads, roadEnds, RoadIndex, roadIndex, SIDEWALK, trimJoins } from '../../game/roads';
 import { Geo, type MeshData, type V3 } from './geometry';
-import { deriveJunctions, hasSidewalks, JunctionCuts, junctionsOf, KERB_RETURN, offsetMeet, planJunctions, turnedBack, turnedOn, type CornerPlan, type JunctionPlan } from './junctions';
+import { hasSidewalks, JunctionCuts, junctionsOf, KERB_RETURN, offsetMeet, turnedBack, turnedOn, type CornerPlan, type JunctionPlan } from './junctions';
 import { asphaltVary, carriageway, repair, STREET_LOOK, tint } from './paving';
 import { valueNoise } from '../../game/noise';
 
@@ -156,6 +156,12 @@ function framesOf(road: RoadPlan): Frame[] {
 }
 
 /**
+ * No junctions (a caller that doesn't say gets none: `junctionsOf` supplies the town's, and
+ * `roadMeshes`/`Kerb` take them when it has them).
+ */
+const NO_JUNCTIONS: readonly JunctionPlan[] = [];
+
+/**
  * One side of a road, by distance along it (`s`) and in from the sidewalk's outer edge (`d`):
  * where things on the sidewalk stand, and which way they face the road.
  */
@@ -172,8 +178,8 @@ export class Kerb {
     readonly side: 1 | -1,
     /** The roads (this one at `index`) whose surfaces stop a sidewalk, country roads among them. */
     private readonly others: RoadIndex,
-    /** Where the junctions' corners stop it (default: the junctions of `others`' roads as worked out from them). */
-    private readonly cuts: JunctionCuts = defaultCuts(others.roads),
+    /** Where the junctions' corners stop it (none: a caller with junctions passes `JunctionCuts.of(plans)`). */
+    private readonly cuts: JunctionCuts = JunctionCuts.of(NO_JUNCTIONS),
   ) {
     this.frames = framesOf(road);
     this.ends = deadEnds(road);
@@ -262,15 +268,6 @@ export function walkStops(roads: readonly RoadPlan[]): RoadPlan[] {
   return out;
 }
 
-/** The junctions of a set of roads as worked out from them, as drawn (`junctions.ts`). */
-export function roadJunctions(roads: readonly RoadPlan[]): JunctionPlan[] {
-  return planJunctions(deriveJunctions(roads), roads);
-}
-
-function defaultCuts(roads: readonly RoadPlan[]): JunctionCuts {
-  return JunctionCuts.of(roadJunctions(roads));
-}
-
 /** A road's turning circles: their middles and radii (to the kerb). */
 function deadEnds(road: RoadPlan): [number, number, number][] {
   const r = road.width / 2 - SIDEWALK + TURNING;
@@ -294,10 +291,10 @@ const JUNCTION_FADE = 4.5;
 /**
  * The roads' surfaces, sidewalks, kerbs and gutters, only near `clip` (grown by `margin`) when
  * given: the road surface under the sidewalks too, the sidewalks on top (added to `into`'s meshes if given;
- * `parts`: only the surface, or only the sidewalks, kerbs and gutters). The `junctions` (default: as
- * worked out from `roads`): their pads with the surface, their corners' sidewalks with the sidewalks,
- * their markings with the surface into `into.marks` if given. Only streets and lanes have sidewalks:
- * a country road among `roads` only stops theirs.
+ * `parts`: only the surface, or only the sidewalks, kerbs and gutters). The `junctions` (default:
+ * none): their pads with the surface, their corners' sidewalks with the sidewalks, their markings
+ * with the surface into `into.marks` if given. Only streets and lanes have sidewalks: a country
+ * road among `roads` only stops theirs.
  */
 export function roadMeshes(
   roads: readonly RoadPlan[],
@@ -305,7 +302,7 @@ export function roadMeshes(
   margin = 0,
   into: Partial<RoadMeshes> = {},
   parts: 'both' | 'surface' | 'sidewalks' = 'both',
-  junctions: readonly JunctionPlan[] = roadJunctions(roads),
+  junctions: readonly JunctionPlan[] = NO_JUNCTIONS,
   /** The half width of road `ri`'s carriageway (m) if its asphalt is toned by vertex (worn, and patched between kerbs: `paving.ts`); 0 or none: one plain quad a stretch. With it, the junctions' pads are toned too (`STREET_LOOK.junction`). */
   worn?: (ri: number) => number,
 ): RoadMeshes {
