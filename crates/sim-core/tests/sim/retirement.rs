@@ -202,6 +202,7 @@ fn a_job_the_player_gives_a_retiree_sticks() {
 /// The base game's basic pension pays a home of one's rent and bills: someone made at 70, alone
 /// in the first house of a town, doesn't lose money over four weeks.
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn the_basic_pension_pays_for_a_home_of_one() {
     // Four weeks age a resident by 14 years here (`life.daysPerYear` 2): no deaths, so this
     // checks the pension and the rent, not whether an old resident happens to survive.

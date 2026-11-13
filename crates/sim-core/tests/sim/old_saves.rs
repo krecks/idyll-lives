@@ -61,6 +61,7 @@ fn a_town_saved_by_the_live_build_after_v0_1_0_plays_on() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn a_village_saved_by_v0_4_2_plays_on() {
     play_a_day("v042_village.json");
 }
@@ -188,6 +189,7 @@ fn a_game_saved_while_the_town_had_buses_loads_without_them() {
 /// 0.7.0's Normal world at 07:40 on day 2, saved at 20 ticks a second and a 20-tick game minute,
 /// plays on from the same minute with its cars and the taxi still on their way.
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn an_open_world_saved_by_0_7_0_plays_on() {
     use sim_core::clock;
     let path =

@@ -46,6 +46,7 @@ fn flood(nav: &NavGrid) -> Vec<u32> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn incremental_reach_agrees_with_a_full_rebuild() {
     let mut rng = common::Lcg::new(42);
     let mut lot = Lot::new(SIZE, SIZE);

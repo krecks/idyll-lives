@@ -167,6 +167,7 @@ fn report(w: &World, stats: &[Stats]) {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn a_town_lives_on_its_own_for_two_weeks() {
     let (w, stats, _) = run(14, 7, 2);
     report(&w, &stats);
@@ -229,6 +230,7 @@ fn a_town_lives_on_its_own_for_two_weeks() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn same_seed_same_town() {
     let (a, ..) = run(2, 3, 2);
     let (b, ..) = run(2, 3, 2);

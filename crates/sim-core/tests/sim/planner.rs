@@ -31,6 +31,7 @@ fn homebody(w: &mut World) {
 const EVERY_DAY: u8 = 0x7f;
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn a_planned_workout_happens_most_days() {
     // Life gets in the way sometimes (visits, a full bladder, a mess to tidy, a bad mood), but
     // most blocks get real time: counted over eight towns, as one town's week can be unlucky
@@ -184,6 +185,7 @@ fn disciplined_residents_skip_less_than_lazy_ones() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn planned_sleep_moves_bedtime() {
     let mut w = town(6);
     homebody(&mut w);
@@ -240,6 +242,7 @@ fn overlapping_blocks_are_refused() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn a_job_goal_finds_work_and_completes() {
     let mut w = town(9);
     w.sims[0].job = None;
@@ -256,6 +259,7 @@ fn a_job_goal_finds_work_and_completes() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn residents_suggest_goals_and_neighbours_take_theirs_on() {
     let mut w = town(12);
     // Two weeks: an idea comes about every other day, so a week can go by without one.

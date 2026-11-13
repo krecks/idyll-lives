@@ -1168,6 +1168,7 @@ fn a_baby_loaded_from_a_save_lies_back_in_the_crib() {
 /// A town as full as it grows (`MAX_SIMS`): partners don't keep trying
 /// for a baby that can't come.
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn partners_in_a_full_town_dont_keep_trying_for_a_baby() {
     let content = r#"{
         "needs":[{"id":"social","label":"Social","decayPerHour":0.5}],

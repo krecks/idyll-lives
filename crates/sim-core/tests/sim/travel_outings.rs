@@ -31,6 +31,7 @@ fn on_outings(w: &World) -> Vec<(u32, u32)> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn with_no_car_nor_bike_an_outing_a_walk_of_hours_away_goes_by_taxi() {
     // Two hamlets 160 m apart: the other's park is a walk of about two hours (more than
     // `outingMinutes`), and nobody has a car to drive there in nor a bike to ride: whoever goes
@@ -74,6 +75,7 @@ fn with_no_car_nor_bike_an_outing_a_walk_of_hours_away_goes_by_taxi() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn an_outing_by_car_in_reach_is_picked_and_theyre_home_by_the_hour() {
     // The same hamlets with a car on every driveway and a parking bay by the other's park
     // (`hamlets::two_hamlets_with_parking`): it's a short drive. Whoever drives there parks in
@@ -127,6 +129,7 @@ fn an_outing_by_car_in_reach_is_picked_and_theyre_home_by_the_hour() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn someone_with_a_bike_rides_to_a_place_beyond_walking_reach_and_is_home_by_the_hour() {
     // The hamlets again, no cars, and a city bike in the garden of the player's home: the other
     // hamlet's park is a ride of about forty minutes.

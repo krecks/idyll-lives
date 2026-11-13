@@ -142,21 +142,25 @@ fn rearranging_homes_for_a_day(seed: u64) {
 
 // (Four towns, a test each: they run side by side.)
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn rearranging_homes_for_a_day_breaks_nothing() {
     rearranging_homes_for_a_day(5);
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn rearranging_a_second_town_for_a_day_breaks_nothing() {
     rearranging_homes_for_a_day(6);
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn rearranging_a_third_town_for_a_day_breaks_nothing() {
     rearranging_homes_for_a_day(7);
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn rearranging_a_fourth_town_for_a_day_breaks_nothing() {
     rearranging_homes_for_a_day(8);
 }

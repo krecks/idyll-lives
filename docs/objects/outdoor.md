@@ -173,7 +173,7 @@ Outdoor › Bikes & scooters, and new towns stand them in most gardens (`web/src
 
 **Checked:** in the sim tests (`crates/sim-core/tests/sim/travel_bikes.rs`: ridden to work and home again, a third
 of the walk's time out of town, a short way walked, one bike between two, a save mid-ride, a bike sold while ridden,
-a rider kept clear of a car on a narrow lane) and the web's (`web/tests/townRides.test.ts`: how many a new town
+a rider kept clear of a car on a narrow lane) and the web's (`web/tests/townRides.slow.test.ts`: how many a new town
 gives, and where they stand). The riders' clips (`rideBike`, `rideBikeChild`, `rideScooter`) are in
 `docs/characters-format.md`; their sizes in `docs/review/reference.md` (`cityBike`, `kidsBike`, `eScooter`).
 

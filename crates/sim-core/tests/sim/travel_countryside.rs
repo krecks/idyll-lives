@@ -24,6 +24,7 @@ fn countryside(w: &World, object: u32) -> Option<&str> {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn residents_use_the_countryside_spots() {
     // Over three days in each of four towns: the residents of three of them at least go out to the
     // countryside, and between them to at least three different spots. (One town alone is a coin

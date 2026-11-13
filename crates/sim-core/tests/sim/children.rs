@@ -119,6 +119,7 @@ const SCHOOL: &str = r#"{
     "economy":{"startingFunds":1000}}"#;
 
 #[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn children_go_to_school_on_school_days() {
     let town = r#"{"width":10,"depth":10,
         "plots":[{"name":"Home","x":0,"z":0,"w":10,"d":10,"entry":[5.5,9.5]}],
