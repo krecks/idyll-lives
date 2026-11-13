@@ -97,6 +97,8 @@ export interface LampView {
   rowOf(k: number): number;
   /** The menus' town is shown (the lamps are dark behind it). */
   town(): boolean;
+  /** The house stands whole, its roof on, seen from the town view: nobody looks into a room from there (no lamp casts shadows). */
+  whole(): boolean;
 }
 
 /** What the lamps light besides the lot's surfaces. */
@@ -229,7 +231,7 @@ export class Lamps {
         box.halfExtents.set(r, r, r);
       };
     }
-    this.shadows = shadows ? new LampShadows(this.lamps, quality.lampShadows, quality.lampShadowRate, hooks.casters, { storey: view.storey, storeyOf: view.storeyOf, rowOf: view.rowOf, shape: (i, on) => this.shape(i, on) }) : null;
+    this.shadows = shadows ? new LampShadows(this.lamps, quality.lampShadows, quality.lampShadowRate, hooks.casters, { storey: view.storey, storeyOf: view.storeyOf, rowOf: view.rowOf, whole: view.whole, shape: (i, on) => this.shape(i, on) }) : null;
     // Each lamp lights only its own room (`?roomlights=0` turns it off to compare).
     this.lib.rooms.enabled = params.get('roomlights') !== '0';
     this.glow = {

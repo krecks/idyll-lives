@@ -4,7 +4,8 @@
  *
  * - Which lamps: the household's lamps that can cast (`RoomLight.casts`, `shared/house.ts` `lampCasts`), lit, in
  *   a room on the storey in view, nearest the camera's target first (`choose`; one that casts keeps its place
- *   until another is nearer by a margin, `LAMP_SHADOWS.keep`). A lamp's shadows fade in and out as it takes or
+ *   until another is nearer by a margin, `LAMP_SHADOWS.keep`); none from the town view, where the house stands
+ *   whole under its roof. A lamp's shadows fade in and out as it takes or
  *   gives up its place (`LAMP_SHADOWS.fade` seconds, the light's `shadowIntensity`).
  * - One map a lamp: a lamp that casts is a spot light (PlayCanvas's clustered lighting gives a spot light one
  *   map in its shadow atlas, a point light six), shining along its shade's way, or straight down for a lamp
@@ -70,6 +71,8 @@ export interface LampShadowHooks {
   storey(): number;
   storeyOf(z: number): number;
   rowOf(k: number): number;
+  /** The house is seen whole from the town view (`LampView.whole`): no lamp casts. */
+  whole(): boolean;
   /** Lamp `i` is drawn as one that casts (`on`), or as it was. */
   shape(i: number, on: boolean): void;
 }
@@ -255,12 +258,14 @@ export class LampShadows {
   /** Marks the lamps that should cast (`want`): the `count` nearest the target that can (`pickCasters`). Returns whether any. */
   private choose(tx: number, tz: number): boolean {
     const storey = this.hooks.storey();
+    // (From the town view the rooms are under their roof: no maps to draw as the residents move.)
+    const none = this.hooks.whole();
     for (let i = 0; i < this.casts.length; i++) {
       const lamp = this.lamps[i];
       const use = lamp.use;
       this.casting[i] = this.casts[i].casting;
       this.distance[i] = Infinity;
-      if (!use || !use.casts || !use.room || lamp.on <= 0 || lamp.light.intensity <= 0) continue;
+      if (none || !use || !use.casts || !use.room || lamp.on <= 0 || lamp.light.intensity <= 0) continue;
       const k = this.hooks.storeyOf(use.z);
       if (k === storey) this.distance[i] = Math.hypot(use.x - tx, use.z - this.hooks.rowOf(k) - tz);
     }
