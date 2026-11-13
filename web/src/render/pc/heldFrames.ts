@@ -7,7 +7,7 @@
  *
  * What changes a held view, each found without being told:
  * - the game camera's pose, lens, layers or picture size; the drawing's size (a resized canvas starts blank);
- * - the light: the sun's way and colour, the fog, the clear colour (the town's hour easing);
+ * - the light: the sun's way and colour, the fog (and where it begins), the clear colour (the town's hour easing);
  * - what the layers draw: a draw added to or taken from any layer (builds, things streaming in);
  * - a file or texture that came (`app.assets`, `onModelFileArrived`), the page shown again.
  * What it can't see (a material's colour or a draw's matrices changed in place: the overview's
@@ -21,6 +21,7 @@
 
 import * as pc from './engine';
 import { onModelFileArrived } from './models';
+import { fogFrom } from './shaders/fog';
 
 /** Frames still drawn after a change before the view is held. */
 const SETTLE = 3;
@@ -111,6 +112,7 @@ export class HeldFrames {
     out[k++] = fog.color.r;
     out[k++] = fog.color.g;
     out[k++] = fog.color.b;
+    out[k++] = fogFrom(device);
     const q = this.sun.getRotation();
     out[k++] = q.x;
     out[k++] = q.y;

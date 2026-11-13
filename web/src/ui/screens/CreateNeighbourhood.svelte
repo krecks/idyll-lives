@@ -26,32 +26,42 @@
   const mostHouseholds = $derived(Math.max(0, Math.min(houseCount - 1, NEIGHBOUR_CAP)));
   const vacant = $derived(town ? vacantSlots(town).map((s) => s.index) : []);
   const population = $derived(town?.households.reduce((n, h) => n + h.household.members.length, 0) ?? 0);
-  /** Vacant lots up to this many are tagged on the map; more and only the one looked at is. */
+  /** Vacant lots up to this many are tagged on the map; more and none is (they are marked on it, and counted). */
   const VACANT_TAGS = 10;
 
+  /**
+   * The tags over the town. The households' first: they are what this step is for (`tagLayout.ts` ranks them over
+   * the places, and shows only the nearest few when the town is zoomed out). Public places only in the town itself:
+   * a big world's hamlets each have a shop or two of the same names ("The Grocer" three times over), tagged only
+   * while looked at, with the hamlet's name under them as on step 1.
+   */
   const labels = $derived.by((): LotLabel[] => {
     const t = town;
     if (!t) return [];
     return t.slots.flatMap((s): LotLabel[] => {
       const h = t.households.find((x) => x.slot === s.index);
-      if (s.kind !== 'house') return [{ plot: s.index, title: s.name, kind: 'park' }];
+      if (s.kind !== 'house') {
+        const area = s.area ?? 0;
+        if (area === 0) return [{ plot: s.index, title: s.name, kind: 'park' }];
+        return s.index === hover || s.index === focus ? [{ plot: s.index, title: s.name, sub: t.open?.areas[area]?.name, kind: 'park' }] : [];
+      }
       if (h) return [{ plot: s.index, title: `The ${h.household.name}s`, sub: s.name, kind: 'home' }];
-      // A big world has more houses than a screen has room for tags: every vacant lot would be the
-      // same "For sale" pill, hiding the town under them. They are marked on the map and counted in
-      // the stats instead; the one being looked at still says its address (and a small town, where
-      // they fit, tags them all).
-      if (vacant.length > VACANT_TAGS && s.index !== hover && s.index !== focus) return [];
+      // A big world has more houses than a screen has room for tags: every vacant lot would be the same "For sale"
+      // pill, hiding the town under them, and one coming and going under the pointer wherever it went. They are
+      // marked on the map and counted in the stats instead (a small town, where they fit, tags them all).
+      if (vacant.length > VACANT_TAGS) return [];
       return [{ plot: s.index, title: 'For sale', sub: s.name, kind: 'sale' }];
     });
   });
 
   /**
-   * A "For sale" tag floats above its lot: crossing a little empty ground on the way to it should
-   * not drop the tag at once. Anything else clears at once.
+   * A tag shown only while its lot is looked at (a hamlet's place, a household's past the nearest few) floats
+   * above the lot: crossing a little empty ground on the way to it should not drop the tag at once. Hovering
+   * something else changes at once.
    */
   function setHover(plot: number | null): void {
     clearTimeout(hoverOff);
-    if (plot !== null || hover === null || !vacant.includes(hover) || vacant.length <= VACANT_TAGS) {
+    if (plot !== null || hover === null) {
       hover = plot;
       return;
     }

@@ -74,9 +74,10 @@ import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
 import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS, TOWN_FROM, townBlend } from '../shared/lens';
-import { TOWN_RADIUS_LIMITS, townArrival, townFar, townFog, townNear, townOrbit } from '../shared/townCamera';
+import { edgeFog, landEdge, menuFog, menuFogFrom, TOWN_RADIUS_LIMITS, townArrival, townFar, townFog, townFogFrom, townNear, townOrbit } from '../shared/townCamera';
 import { townView } from '../shared/townView';
 import { landscapeRing } from '../shared/nature';
+import { setFogFrom } from './shaders/fog';
 import { LT_FIXTURE } from '../../debug/livingTown';
 import { applyLtFixture } from '../../debug/ltFixture';
 import { backdropBuilding, backdropGround, gardenHedges, lotBuilding, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
@@ -586,6 +587,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private playFar: number = LENS.far;
   /** The land and the landscape round it (m): what the town view's far plane reaches past. */
   private readonly worldReach = { x0: 0, z0: 0, x1: 0, z1: 0 };
+  /** The menus' town's land and the landscape round it (`worldReach`'s, for the town `showTown` was given last). */
+  private readonly townReach = { x0: 0, z0: 0, x1: 0, z1: 0 };
+  /** Where the haze begins (m from the eye) as last set (`shaders/fog.ts` `setFogFrom`). */
+  private fogFromSet = 0;
   /** How far into the town view the camera was drawn last (`applyTownCamera`: its planes and the sky are put back once it is out of it). */
   private townBlendDrawn = 0;
   /** The game camera's view-projection as this frame is drawn with it (`townView.project`). */
@@ -1067,14 +1072,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private applyCamera(): void {
     if (this.townMode) {
       const p = this.townPose;
-      // (The menus' town has the play camera's planes, sky and its own haze: `townFrame`.)
-      this.applyTownCamera(0, 0, 0, 0, true);
+      // (The menus' town has the full town view's planes, sky and haze at any distance: `applyTownCamera`.)
+      const flat = Math.sin(p.beta) * p.radius;
+      this.applyTownCamera(p.radius, p.alpha, p.beta, p.target.x + Math.cos(p.alpha) * flat, p.target.y + Math.cos(p.beta) * p.radius, p.target.z + Math.sin(p.alpha) * flat, true);
       this.camera.setPose(p.alpha, p.beta, p.radius, p.target.x, p.target.y, p.target.z, p.targetScreenOffset.x, p.targetScreenOffset.y);
     } else {
       const o = this.orbit;
       // (The eye: target + radius × (cos α sin β, cos β, sin α sin β), game space.)
       const flat = Math.sin(o.beta) * o.radius;
-      this.applyTownCamera(o.radius, o.target.x + Math.cos(o.alpha) * flat, o.target.y + Math.cos(o.beta) * o.radius, o.target.z + Math.sin(o.alpha) * flat, false);
+      this.applyTownCamera(o.radius, o.alpha, o.beta, o.target.x + Math.cos(o.alpha) * flat, o.target.y + Math.cos(o.beta) * o.radius, o.target.z + Math.sin(o.alpha) * flat, false);
       this.camera.setPose(o.alpha, o.beta, o.radius, o.target.x, o.target.y, o.target.z);
     }
     this.camera.viewProjectionInto(this.townViewProj);
@@ -1087,26 +1093,48 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /**
    * The town view's share of the camera (docs/design/living-town.md, `shared/townCamera.ts`), before it is posed:
-   * for an orbit `radius` m out with its eye at (`ex`, `ey`, `ez`), the near plane moved out (the roads keep
-   * their depth from 900 m) and the far plane past the whole world, the sky's dome out with it, and the haze
-   * thinned. Up to `TOWN_FROM` all of them are the play camera's own: nothing is set that wasn't. `menus`: the
-   * menus' town is up, which has the play camera's planes and sets its own haze.
+   * for an orbit `radius` m out along `alpha`, tilted `beta`, with its eye at (`ex`, `ey`, `ez`), the near plane
+   * moved out (the roads keep their depth from 900 m) and the far plane past the whole world, the sky's dome out
+   * with it, and the haze thinned, begun further out and thick enough where the land ends in the picture to fade
+   * its edge. Up to `TOWN_FROM` all of them are the play camera's own: nothing is set that wasn't. `menus`: the menus' town is up, which is fully in
+   * the town view at any distance (its land, `townReach`), with a haze of its own (`menuFog`). With the play
+   * camera's planes there, its sky's dome (700 m out, drawn over whatever is further) hid all but the near town
+   * from the main menu's low shot, and from the new-game screens zoomed out the whole picture was the dome's flat
+   * underside, the lots' tags floating on grey.
    */
-  private applyTownCamera(radius: number, ex: number, ey: number, ez: number, menus: boolean): void {
-    const blend = menus ? 0 : townBlend(radius);
+  private applyTownCamera(radius: number, alpha: number, beta: number, ex: number, ey: number, ez: number, menus: boolean): void {
+    const blend = menus ? 1 : townBlend(radius);
+    const r = menus ? this.townReach : this.worldReach;
     if (blend > 0) {
-      const r = this.worldReach;
-      const far = townFar(radius, this.playFar, ex, ey, ez, r.x0, r.z0, r.x1, r.z1);
-      this.camera.setPlanes(townNear(radius, ey - (this.lot.landscape?.heightAt(ex, ez) ?? 0)), far);
+      const land = (menus ? this.lot.landscapeOf('town') : this.lot.landscape)?.heightAt(ex, ez) ?? 0;
+      const far = townFar(radius, this.playFar, ex, ey, ez, r.x0, r.z0, r.x1, r.z1, blend);
+      this.camera.setPlanes(townNear(radius, ey - land, blend), far);
       this.lot.skyReach(far, blend);
     } else if (this.townBlendDrawn > 0) {
       this.camera.setPlanes(0, this.playFar);
       this.lot.skyReach(this.playFar, 0);
     }
     this.townBlendDrawn = blend;
-    if (menus) return;
-    const fog = LOOK.fog * townFog(radius);
-    if (this.app.scene.fog.density !== fog) this.app.scene.fog.density = fog;
+    // The haze: the play camera's up to `TOWN_FROM`. From higher up it would wash the town out (and the mountains
+    // round a mountain town, which are meant to be seen): thinner, from well past the town, and where the land ends
+    // in the picture still enough to fade its edge into the sky.
+    const mountains = this.lot.landscapeOf(menus ? 'town' : 'world')?.mountainous ? 0.35 : 1;
+    const from = menus ? menuFogFrom(radius) : townFogFrom(radius);
+    const own = LOOK.fog * (menus ? menuFog(radius, mountains < 1) : townFog(radius));
+    let fog = own;
+    if (blend > 0) {
+      const spread = Math.atan(Math.tan(LENS.fov / 2) * (this.cssSize.width / Math.max(1, this.cssSize.height)));
+      fog = Math.max(own, edgeFog(radius, from, landEdge(ex, ey, ez, alpha, spread, r.x0, r.z0, r.x1, r.z1), beta) * blend * mountains);
+    }
+    if (Math.abs(fog - this.app.scene.fog.density) > fog * 0.01) this.app.scene.fog.density = fog;
+    this.setFogFrom(from);
+  }
+
+  /** Where the haze begins (m from the eye), told to the shaders only when it moved (`shaders/fog.ts`). */
+  private setFogFrom(metres: number): void {
+    if (Math.abs(metres - this.fogFromSet) < 0.05) return;
+    this.fogFromSet = metres;
+    setFogFrom(this.device, metres);
   }
 
   cameraPose(): CameraPose {
@@ -2802,6 +2830,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // Requests queue up while one builds; only the newest is built.
       if (ticket !== this.townTicket || this.disposed) return;
       const overview = (this.overview ??= new TownOverview(this.app, this.root, this.deps.assets, this.deps.content, this.house));
+      const ring = landscapeRing(world);
+      Object.assign(this.townReach, { x0: -ring, z0: -ring, x1: world.width + ring, z1: groundDepth(world) + ring });
       if (this.townBuilds++ === 0 && !this.worldBuilding) this.sliceStart = performance.now();
       try {
         // The landscape on the town layer (the game's, when it's the same town). Same seed and size
@@ -2929,7 +2959,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sunShadows.moved();
   }
 
-  /** Overview per frame: the camera rig, the highlights, the light at the menu's hour, the haze. Allocation-free. */
+  /** Overview per frame: the camera rig, the highlights, the light at the menu's hour (its haze: `applyTownCamera`). Allocation-free. */
   private townFrame(dt: number): void {
     const w = this.cssSize.width || 1;
     const h = this.cssSize.height || 1;
@@ -2950,11 +2980,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // (The streetlights' and windows' glows too, in their materials.)
       this.held.changed();
     }
-    // Haze is tuned for the game's close camera; from high above it would wash the town out
-    // (and the mountains round a mountain town, which are meant to be seen).
-    const clear = this.lot.landscapeOf('town')?.mountainous ? 0.35 : 1;
-    const fog = LOOK.fog * Math.min(1, Math.max(0.3, 55 / this.townPose.radius)) * clear;
-    if (Math.abs(fog - this.app.scene.fog.density) > LOOK.fog * 0.02) this.app.scene.fog.density = fog;
   }
 
   /**
