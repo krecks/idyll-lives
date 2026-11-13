@@ -175,9 +175,18 @@ zooms out) and `townBlend(radius)` (0..1, smoothstep from `TOWN_FROM` to `TOWN_F
 
 The tags are HTML labels over the canvas, positioned from world points each frame (`ui/town/*`). They fade
 in with `townBlend` (from about 0.2; the household's own from the start of the town view, so the family and
-its home are marked at any distance past `TOWN_FROM`), are filtered, and are kept from overlapping: when two
-meet, the more important one stays. The order of importance is: household > your people > places > homes for
-sale > street names.
+its home are marked at any distance past `TOWN_FROM`) and are filtered. They are laid out as the menus' lot
+tags are (`game/tagLayout.ts`): the household's own first and always, moved clear of each other where they
+stand together; then by rank, your people > places one of yours is at > area names > other places > homes for
+sale > street names, each tag in the free spot nearest its point or, with none within a nudge of it, hidden
+(not stacked away from what it names). Every tag is whole on the screen and clear of the HUD's panels; a tag
+whose point is off the screen has none.
+
+- **Thinned by zoom:** of the places, the ones nearest the middle of the view, 27 at 200 m out, 14 at 400 m,
+  6 from 900 m (`mostPlaces`), besides any place one of yours is at; of the homes for sale, 12 close in, 6 at
+  400 m. A hamlet's places come up only while the camera looks into the hamlet. The pointer on a tag's point
+  brings up that tag whatever it is (a hamlet's place, one with no room), and a clicked tag stays up.
+- A hamlet's place whose name another place has too says which hamlet it is in ("Millbrook · open till 18:00").
 
 | Tag | Shows | Click |
 |---|---|---|

@@ -5,7 +5,7 @@
   import { settings } from '../../settings/settings.svelte';
   import { game } from '../state.svelte';
   import { townMap } from '../townMap.svelte';
-  import { TAG_ORDER, type TagKind } from './overlap';
+  import { TAG_ORDER, type TagKind } from './kinds';
   import { lotInSentence } from '../place';
   import { areaAt } from './places';
   import { eventText, nextEvents, waitText, type TodayMember } from './today';

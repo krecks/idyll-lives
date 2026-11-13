@@ -1,11 +1,13 @@
 /**
- * Where the menus' lot tags go on screen (`menuScene.ts`), apart from the page so the rules can be tested: each tag
- * wants to sit right above its lot, inside the town's part of the screen and clear of the panels over it. In order
- * of rank (the selected lot's, the hovered lot's, then by kind as the screen ranks them: `TownStage`'s `order`,
- * households before places on the new-game screens; each kind from the bottom of the screen up, nearer the camera
- * first) each takes the free spot nearest its lot. A tag with no free spot near its lot waits, hidden, rather than covering one that ranks
- * higher or floating off to where it no longer says which lot it is: zoomed out, the tags of a whole town piled up
- * round its middle and down the left of the picture. Its lot is still there to hover and click, and listed.
+ * Where the lot tags go on screen, the menus' (`menuScene.ts`) and the town view's in the game (`ui/town/TownTags.svelte`),
+ * apart from the page so the rules can be tested: each tag wants to sit right above its lot (or resident), inside
+ * the town's part of the screen and clear of the panels over it. In order of rank (the winners first: the selected
+ * lot's, the hovered lot's, in the game the household's own; then by kind as the screen ranks them: `TownStage`'s
+ * `order`, households before places on the new-game screens; each kind from the bottom of the screen up, nearer the
+ * camera first, a tag shown last frame before the others of its kind) each takes the free spot nearest its lot. A
+ * tag with no free spot near its lot waits, hidden, rather than covering one that ranks higher or floating off to
+ * where it no longer says which lot it is: zoomed out, the tags of a whole town piled up round its middle and down
+ * the left of the picture. Its lot is still there to hover and click, and listed.
  *
  * And no more than `MOST_HOMES` households' tags at once (the nearest): a zoomed-out town shows a few, the others
  * come with the pointer on their lot or their row, or nearer.
@@ -21,7 +23,7 @@ export interface Box {
   b: number;
 }
 
-/** At most this many households' tags are shown at once, the selected and hovered lots' apart. */
+/** At most this many households' tags are shown at once, the winners' apart. */
 export const MOST_HOMES = 8;
 /**
  * How far (CSS pixels, sideways moves counted 1.4 times) a tag may be moved from right above its lot to find room:
@@ -42,8 +44,13 @@ export interface TagSpot {
   rank: number;
   /** A household's tag: counted against `MOST_HOMES`. */
   capped: boolean;
-  /** The selected lot's tag (0) or the hovered lot's (1): it is placed first and shown whatever it covers. */
-  wins: 0 | 1 | null;
+  /**
+   * A winner: placed before every other tag, the lower first (the selected lot's 0, the hovered lot's 1 on the menus),
+   * and shown however far it has to move and whatever it covers; null for the rest.
+   */
+  wins: number | null;
+  /** Shown last frame: placed before the others of its rank, so two tags of a kind don't trade places as the camera moves. */
+  held?: boolean;
   /** Out: where its stem's foot goes. */
   x: number;
   y: number;
@@ -51,9 +58,9 @@ export interface TagSpot {
   crowded: boolean;
 }
 
-/** The order tags are placed in: the winners, then by rank, each rank from the bottom of the screen up. */
-export function tagOrder(t: Pick<TagSpot, 'sy' | 'rank' | 'wins'>): number {
-  return t.wins === 0 ? -2e5 : t.wins === 1 ? -1e5 : t.rank * 1e4 - t.sy;
+/** The order tags are placed in: the winners, then by rank, each rank the tags held from last frame first, then from the bottom of the screen up. */
+export function tagOrder(t: Pick<TagSpot, 'sy' | 'rank' | 'wins' | 'held'>): number {
+  return t.wins !== null ? (t.wins - 100) * 1e5 - t.sy : t.rank * 1e4 - t.sy - (t.held ? 5e3 : 0);
 }
 
 const overlaps = (a: Box, b: Box) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
@@ -71,6 +78,14 @@ export function layoutTags(tags: TagSpot[], area: Box, blocks: readonly Box[]): 
   const clampY = (y: number, h: number) => Math.min(area.b, Math.max(area.t + h, y));
   for (const tag of sorted) {
     const { w, h } = tag;
+    const wins = tag.wins !== null;
+    // (The households' few are shown already: no need to look for room.)
+    if (!wins && tag.capped && homes >= MOST_HOMES) {
+      tag.x = tag.sx;
+      tag.y = tag.sy;
+      tag.crowded = true;
+      continue;
+    }
     // The anchor (x, y) is the stem's foot: the box spans [x - w/2, x + w/2] x [y - h, y].
     const wx = clampX(tag.sx, w);
     const wy = clampY(tag.sy, h);
@@ -92,7 +107,8 @@ export function layoutTags(tags: TagSpot[], area: Box, blocks: readonly Box[]): 
         const cx = clampX(cx0, w);
         const cy = clampY(cy0, h);
         const cost = shift(cx, cy);
-        if (cost < best && free(cx, cy)) {
+        // (Only a winner may go further than `MOST_SHIFT`: the rest don't look there.)
+        if (cost < best && (wins || cost <= MOST_SHIFT) && free(cx, cy)) {
           best = cost;
           x = cx;
           y = cy;
@@ -111,9 +127,9 @@ export function layoutTags(tags: TagSpot[], area: Box, blocks: readonly Box[]): 
     }
     tag.x = x;
     tag.y = y;
-    tag.crowded = tag.wins !== null ? !inside(x, y) : !free(x, y) || shift(x, y) > MOST_SHIFT || (tag.capped && homes >= MOST_HOMES);
+    tag.crowded = wins ? !inside(x, y) : !free(x, y) || shift(x, y) > MOST_SHIFT;
     if (tag.crowded) continue;
-    if (tag.wins === null && tag.capped) homes++;
+    if (!wins && tag.capped) homes++;
     done.push({ l: x - w / 2, t: y - h, r: x + w / 2, b: y });
   }
 }
