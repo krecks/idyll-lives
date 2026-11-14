@@ -12,6 +12,20 @@
 # take 12 to 18 minutes (every one a Big one), so one after another the checks took 25 to 40.
 # `test` waits for the four and passes only when all four did (the generated worlds skipped counts
 # as passed where they don't run): the name the main branch's ruleset requires.
+#
+# A job runs only for what can change its answer. `changes` maps the files a pull request touches
+# (against its base) to the jobs that read them (tools/ci-changes.sh has the map, traced from what
+# each step opens): a docs-only change runs none, a renderer change the renderer's and the tools'.
+# A push to main, a tag and a run by hand run every job. A path the map doesn't know runs every
+# job; ci.yml, tools/ci-local.sh and tools/ci-changes.sh too. (Not `paths` on the workflow: `test`
+# would then never report and the pull request could not merge.) And a job that passed on exactly
+# these files before is not run again: on a pull request and a push to main, `changes` hashes the
+# files each job reads (with ci.yml, so its tool versions and SLOW_TESTS too), the job looks the
+# hash up in the Actions cache, and on a hit skips its steps and reports success; on a pass it saves
+# the hash. A pull request sees its own and its base branch's (main's) hashes, main only its own, so
+# what a pull request passed runs once more on main after the merge. A tag and a run by hand neither
+# look up nor save. When in doubt it runs: `changes` failing fails `test`, a failed or missing
+# lookup runs the job.
 name: CI
 
 on:
@@ -37,28 +51,103 @@ env:
 # Each step's commands are in tools/ci-local.sh (run there with no step, they all go: before a push
 # or a pull request).
 jobs:
+  # Which of rust, web and tools to run, and the hash of each one's files (see the top): `rust=true`
+  # and `rust-key=<sha256>` lines. Only the script and the trees: no other file's contents are fetched.
+  changes:
+    name: What the change touches
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      rust: ${{ steps.map.outputs.rust }}
+      web: ${{ steps.map.outputs.web }}
+      tools: ${{ steps.map.outputs.tools }}
+      rust-key: ${{ steps.map.outputs.rust-key }}
+      web-key: ${{ steps.map.outputs.web-key }}
+      tools-key: ${{ steps.map.outputs.tools-key }}
+    steps:
+      # (A pull request's merge commit and its parents: the base it was merged onto is the first.)
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          filter: blob:none
+          sparse-checkout: tools/ci-changes.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Jobs to run
+        id: map
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            # The tested merge commit against the base it merged onto (not a merge: fail).
+            git rev-parse --verify -q HEAD^2 > /dev/null
+            tools/ci-changes.sh changed HEAD^1 HEAD > jobs
+          else
+            tools/ci-changes.sh all > jobs
+          fi
+          if [ "$EVENT" = pull_request ] || { [ "$EVENT" = push ] && [ "$REF" = refs/heads/main ]; }; then
+            for job in rust web tools; do echo "$job-key=$(tools/ci-changes.sh key "$job")" >> jobs; done
+          fi
+          cat jobs
+          cat jobs >> "$GITHUB_OUTPUT"
+
+  # fmt and clippy over the workspace, sim-core's tests: crates/, Cargo.*, .cargo/, the toolchain,
+  # web/public/content and web/public/assets.
   rust:
     name: Rust checks and simulation tests
+    needs: changes
+    # (Anything but a plain "false" runs it.)
+    if: needs.changes.outputs.rust != 'false'
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
+      # Passed on these very files before (see the top): the steps below are skipped.
+      - name: Passed before
+        id: passed
+        if: needs.changes.outputs.rust-key != ''
+        continue-on-error: true
+        uses: actions/cache/restore@v6
+        with:
+          path: .ci-passed
+          key: ci-passed-rust-${{ needs.changes.outputs.rust-key }}
+          lookup-only: true
+
       - uses: actions/checkout@v7
+        if: steps.passed.outputs.cache-hit != 'true'
 
       - name: Rust toolchain
+        if: steps.passed.outputs.cache-hit != 'true'
         run: |
           rustup toolchain install
           rustc --version
           cargo clippy --version
       - uses: Swatinem/rust-cache@v2
+        if: steps.passed.outputs.cache-hit != 'true'
 
       - name: Formatting
+        if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh fmt
 
       - name: Clippy
+        if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh clippy
 
       - name: Simulation tests
+        if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh sim
+
+      # Passed: the hash kept for the next run on the same files.
+      - name: Remember the pass
+        if: steps.passed.outputs.cache-hit != 'true' && needs.changes.outputs.rust-key != ''
+        run: mkdir -p .ci-passed && echo "${{ github.sha }} run ${{ github.run_id }}" > .ci-passed/rust
+      - uses: actions/cache/save@v6
+        if: steps.passed.outputs.cache-hit != 'true' && needs.changes.outputs.rust-key != ''
+        # (Not saved, e.g. another run saved the same hash first: no reason to fail a pass.)
+        continue-on-error: true
+        with:
+          path: .ci-passed
+          key: ci-passed-rust-${{ needs.changes.outputs.rust-key }}
 
   # Only on a release tag or by hand (see the top).
   generated:
@@ -85,64 +174,117 @@ jobs:
       - name: Generated houses and worlds
         run: tools/ci-local.sh generated
 
+  # The clip check and the renderer tests: web/, tools/characters, tools/worlds (the slow
+  # sampleWorlds), crates/sim-core/src (read by doors, tickRates and snapshotLayout).
   web:
     name: Clips and renderer tests
+    needs: changes
+    if: needs.changes.outputs.web != 'false'
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
+      # (As in `rust`.)
+      - name: Passed before
+        id: passed
+        if: needs.changes.outputs.web-key != ''
+        continue-on-error: true
+        uses: actions/cache/restore@v6
+        with:
+          path: .ci-passed
+          key: ci-passed-web-${{ needs.changes.outputs.web-key }}
+          lookup-only: true
+
       - uses: actions/checkout@v7
+        if: steps.passed.outputs.cache-hit != 'true'
 
       # Bun runs the clip check (no packages) and the renderer's checks; no Rust here.
       - uses: oven-sh/setup-bun@v2
+        if: steps.passed.outputs.cache-hit != 'true'
         with:
           bun-version: 1.4.3
 
       # The residents' clips on both bodies at every life stage; the known failures are in
       # tools/characters/clip-baseline.json, so only a new one fails.
       - name: Clip check
+        if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh clips
 
       # The renderer's engine-neutral tests (web/tests, `bun test`, each file in a fresh global). They
       # need no wasm build.
       - name: Renderer tests
+        if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh web
 
+      - name: Remember the pass
+        if: steps.passed.outputs.cache-hit != 'true' && needs.changes.outputs.web-key != ''
+        run: mkdir -p .ci-passed && echo "${{ github.sha }} run ${{ github.run_id }}" > .ci-passed/web
+      - uses: actions/cache/save@v6
+        if: steps.passed.outputs.cache-hit != 'true' && needs.changes.outputs.web-key != ''
+        continue-on-error: true
+        with:
+          path: .ci-passed
+          key: ci-passed-web-${{ needs.changes.outputs.web-key }}
+
+  # ll-tools' tests, pins, chunks, sizes, uses, models: crates/, Cargo.*, .cargo/, the toolchain,
+  # web/ but its tests, tools/pins, tools/render, tools/art/blender/centres.json,
+  # docs/review/reference.json.
   tools:
     name: Tools, object sizes, uses and models
+    needs: changes
+    if: needs.changes.outputs.tools != 'false'
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
+      # (As in `rust`.)
+      - name: Passed before
+        id: passed
+        if: needs.changes.outputs.tools-key != ''
+        continue-on-error: true
+        uses: actions/cache/restore@v6
+        with:
+          path: .ci-passed
+          key: ci-passed-tools-${{ needs.changes.outputs.tools-key }}
+          lookup-only: true
+
       - uses: actions/checkout@v7
+        if: steps.passed.outputs.cache-hit != 'true'
 
       - name: Rust toolchain
+        if: steps.passed.outputs.cache-hit != 'true'
         run: |
           rustup toolchain install
           rustc --version
       - uses: Swatinem/rust-cache@v2
+        if: steps.passed.outputs.cache-hit != 'true'
 
       # The repo's tools (crates/tools): a fresh character build against the committed set and its
       # checks, the object gate over every shipped model (no Blender), and the content and texture
       # tools. Release without fat LTO, built once for these and the three checks after.
       - name: Tool tests
+        if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh tools
 
       # Accepted parts held by their sha256 (tools/pins/pins.json): a pinned part changed fails here
       # (`cargo pins`, with the tools' build above).
       - name: Pins
+        if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh pins
 
       # The renderer: the PlayCanvas shader chunks' anchor lines and private names it patches or reads
       # (tools/render/chunks.json), in the pinned release build: Bun fetches the package, the tools' build
       # above checks it (`cargo check-chunks`).
       - uses: oven-sh/setup-bun@v2
+        if: steps.passed.outputs.cache-hit != 'true'
         with:
           bun-version: 1.4.3
       - name: Shader chunks
+        if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh chunks
 
       # Every shipped model against the reference's kinds: a content object no kind covers (a new
       # thing nobody sized) fails, where a measure outside its range is the review's to weigh.
       - name: Object sizes
+        if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh sizes
 
       # Every use the renderer can play and every open that has its clip: a use whose animation
@@ -150,31 +292,60 @@ jobs:
       # `motions.open` fails. An object with no use of its own, a duration out of the median and a
       # sound only another kind makes stay the review's to weigh (the summary counts them).
       - name: Object uses
+        if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh uses
 
       # Every shipped model at the gate (no Blender): a clip that does not run rest to rest, a part that
       # moves without one, a budget over, a functional height (seat, top, mattress, lamp) the mesh and the
       # content disagree on. A measure out of range is the review's to weigh; a broken model fails here.
       - name: Models
+        if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh models
 
-  # The check the main branch's ruleset requires: all four passed (one skipped or cancelled fails it,
-  # but for the generated worlds where they don't run: a pull request, a push to main).
+      - name: Remember the pass
+        if: steps.passed.outputs.cache-hit != 'true' && needs.changes.outputs.tools-key != ''
+        run: mkdir -p .ci-passed && echo "${{ github.sha }} run ${{ github.run_id }}" > .ci-passed/tools
+      - uses: actions/cache/save@v6
+        if: steps.passed.outputs.cache-hit != 'true' && needs.changes.outputs.tools-key != ''
+        continue-on-error: true
+        with:
+          path: .ci-passed
+          key: ci-passed-tools-${{ needs.changes.outputs.tools-key }}
+
+  # The check the main branch's ruleset requires: every job the change touches passed (one failed
+  # or cancelled fails it), and the others were skipped: rust, web and tools where `changes` said so,
+  # the generated worlds but on a tag or by hand. `changes` itself failing fails it: then nothing is
+  # known to be unaffected.
   test:
     name: test
-    needs: [rust, generated, web, tools]
+    needs: [changes, rust, generated, web, tools]
     if: always()
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
-      - name: All four passed
+      - name: All passed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          RUST: ${{ needs.rust.result }}
+          RUST_RUN: ${{ needs.changes.outputs.rust }}
+          WEB: ${{ needs.web.result }}
+          WEB_RUN: ${{ needs.changes.outputs.web }}
+          TOOLS: ${{ needs.tools.result }}
+          TOOLS_RUN: ${{ needs.changes.outputs.tools }}
+          GENERATED: ${{ needs.generated.result }}
+          GENERATED_RUN: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
         run: |
-          echo "rust: ${{ needs.rust.result }}, generated: ${{ needs.generated.result }}, web: ${{ needs.web.result }}, tools: ${{ needs.tools.result }}"
-          test "${{ needs.rust.result }}" = success
-          if [ "${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}" = true ]; then
-            test "${{ needs.generated.result }}" = success
-          else
-            test "${{ needs.generated.result }}" = skipped
-          fi
-          test "${{ needs.web.result }}" = success
-          test "${{ needs.tools.result }}" = success
+          echo "changes: $CHANGES; rust: $RUST (to run: $RUST_RUN), web: $WEB (to run: $WEB_RUN), tools: $TOOLS (to run: $TOOLS_RUN), generated: $GENERATED (to run: $GENERATED_RUN)"
+          test "$CHANGES" = success || { echo "::error::changes: $CHANGES"; exit 1; }
+          # To run: passed (a pass remembered counts); not: skipped. Neither "true" nor "false": failed.
+          ran() {
+            case "$3" in
+              true) test "$2" = success ;;
+              false) test "$2" = skipped ;;
+              *) false ;;
+            esac || { echo "::error::$1: $2 (to run: $3)"; return 1; }
+          }
+          ran rust "$RUST" "$RUST_RUN"
+          ran web "$WEB" "$WEB_RUN"
+          ran tools "$TOOLS" "$TOOLS_RUN"
+          ran generated "$GENERATED" "$GENERATED_RUN"
