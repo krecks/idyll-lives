@@ -26,7 +26,7 @@ import { withoutContact } from './post';
 import { Grass, grassGround, type GrassPusher } from './grass';
 import { disposeTiles, type GroundTile } from './groundTiles';
 import { Instances, INSTANCE_COLOR } from './instancing';
-import { meshFrom } from './meshes';
+import { gpuOnly, meshFrom } from './meshes';
 import { GAME_FRONT_FACE, MaterialLibrary, textureWithFallback } from './materials';
 import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from './models';
 import { codeFor, float, registerShaderFeature, type ShaderFeature } from './shaders/chunks';
@@ -414,6 +414,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     mesh.setColors(colors);
     mesh.setIndices(indices);
     mesh.update(pc.PRIMITIVE_TRIANGLES);
+    gpuOnly(mesh);
     // (A copy of its own: the gusts' define is the landscape's.)
     const material = MaterialLibrary.for(app).surface('material.ground', { vertexColors: true, variant: 'grass' });
     grassGround(app.graphicsDevice, material);
@@ -576,7 +577,7 @@ function tileMesh(app: pc.AppBase, positions: Float32Array, colors: Float32Array
   mesh.setColors(col);
   mesh.setIndices(pos.length / 3 > 65535 ? new Uint32Array(idx) : new Uint16Array(idx));
   mesh.update(pc.PRIMITIVE_TRIANGLES);
-  return mesh;
+  return gpuOnly(mesh);
 }
 
 /** An entity of `app` drawing `mesh` with `material`, switched off, under `parent`; it receives shadows and casts none. */
