@@ -1,5 +1,5 @@
 //! The residents' set: the committed one passes the checks, and a fresh build matches it (within
-//! the diff's tolerances). The build is slow unoptimised; `cargo test -p ll-tools --release`.
+//! the diff's tolerances). The build is slow unoptimised; `cargo test -p ll-tools --profile tools`.
 
 use ll_tools::characters::{build, check, default_out, diff};
 
