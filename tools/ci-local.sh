@@ -48,8 +48,12 @@ step() {
     pins) tools_cargo pins ;;
     fmt) cargo fmt --all --check ;;
     clippy) cargo clippy --workspace --all-targets --locked -- -D warnings ;;
-    # (The long runs only with SLOW_TESTS: `#[cfg_attr(not(feature = "slow-tests"), ignore)]`.)
-    sim) cargo test -p sim-core --locked ${SLOW_TESTS:+--features slow-tests} ;;
+    # (The long runs only with SLOW_TESTS: `#[cfg_attr(not(feature = "slow-tests"), ignore)]`.) Then
+    # tickbench, which `cargo test` only compiles, run once (the tests' build, so its timings are rough).
+    sim)
+      cargo test -p sim-core --locked ${SLOW_TESTS:+--features slow-tests}
+      cargo run -p sim-core --example tickbench --locked ${SLOW_TESTS:+--features slow-tests}
+      ;;
     # The ignored generated_* tests need sample files made first. In the simulation tests' own build
     # (already optimised): a release build of the whole test binary would cost more than it saves.
     generated)

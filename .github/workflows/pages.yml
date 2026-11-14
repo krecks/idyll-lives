@@ -4,7 +4,14 @@
 # the release, and publishes only with `-f deploy=true`. Pushes to main alone don't publish. The
 # github-pages environment must allow `v*` tags (and any branch that is deployed by hand).
 # Run it by hand on main just before tagging: caches saved by a tag run can't be read by the next
-# tag, those saved on main can.
+# tag, those saved on main can (and only main saves the Rust one, which is most of the size).
+#
+# The tests are CI's (ci.yml), not run again here: fmt, clippy, the simulation and the tools' tests,
+# the shader chunks and the renderer tests. A deploy waits for CI to pass on the same commit instead
+# (the `ci` job): on a tag the tag's own CI run, which has the generated worlds and the slow tests
+# too and runs beside this build; by hand with deploy, a CI run on the commit that passed (a push to
+# main, a pull request's or one by hand). What only a release build can check stays here: the
+# version, the voice's tests and check, the web's types and lint, the build and its size.
 name: Deploy to GitHub Pages
 
 on:
@@ -21,6 +28,8 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  # (The `ci` job reads CI's runs.)
+  actions: read
 
 # One run at a time; a second one waits rather than cancelling a deploy halfway.
 concurrency:
@@ -38,13 +47,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # The version pinned in rust-toolchain.toml, with clippy and the wasm32 target.
+      # The version pinned in rust-toolchain.toml, with the wasm32 target.
       - name: Rust toolchain
         run: |
           rustup toolchain install
           rustc --version
-          cargo clippy --version
+      # (Saved on main only: see the top.)
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       # Must match the wasm-bindgen crate version in Cargo.lock.
       - uses: taiki-e/install-action@v2
         with:
@@ -65,26 +76,6 @@ jobs:
             if ! grep -qE "^## ${version//./\\.}( |$)" CHANGELOG.md; then echo "::error::CHANGELOG.md has no '## $version' heading"; exit 1; fi
           fi
           echo "Version $version"
-
-      - name: Formatting
-        run: cargo fmt --all --check
-
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
-
-      - name: Simulation tests
-        run: cargo test -p sim-core --locked
-
-      # The repo's tools (crates/tools): a fresh character build against the committed set and its
-      # checks, the object gate over every shipped model (no Blender), and the content and texture
-      # tools. Release, as the character build is slow unoptimised.
-      - name: Tool tests
-        run: cargo test -p ll-tools --release --locked
-
-      # Examples are only compiled by cargo test; this one should also run (dev profile, so its
-      # timings are rough).
-      - name: Quick benchmark runs
-        run: cargo run -p sim-core --example tickbench --locked
 
       # Compressed asset copies (cargo assets, run by the build), cached by content
       # hash so only changed files are encoded again.
@@ -144,15 +135,27 @@ jobs:
           bun run check:voice
           bun run check
           bun run lint
-          bun run check:chunks
-          bun run test
 
-      # Also optimises the wasm (binaryen) and writes THIRD-PARTY-LICENSES.txt.
-      - name: Build
+      # Also optimises the wasm (binaryen) and writes THIRD-PARTY-LICENSES.txt. Beside it, on the
+      # cores the build leaves idle, the same optimisations with the name section kept, so a crash
+      # stack from the site can be read with it (release review §4, P3-06; the wasm as wasm-bindgen
+      # made it has names but different function numbers, so it can't): one after the other they
+      # took 187 and 152 s, binaryen being one core a file.
+      - name: Build, and the wasm with names (for crash stacks)
         working-directory: web
         env:
           REPO_NAME: ${{ github.event.repository.name }}
-        run: bunx vite build --base="/$REPO_NAME/"
+        run: |
+          mkdir -p .assets/wasm-names
+          cp src/core/wasm-pkg/sim_wasm_bg.wasm .assets/wasm-names/sim_wasm_bg.wasm
+          cp src/voice/wasm-pkg/voice_wasm_bg.wasm .assets/wasm-names/voice_wasm_bg.wasm
+          cargo wasm-opt --names .assets/wasm-names/sim_wasm_bg.wasm .assets/wasm-names/voice_wasm_bg.wasm > .assets/wasm-names.log 2>&1 &
+          names=$!
+          bunx vite build --base="/$REPO_NAME/"
+          status=0
+          wait "$names" || status=$?
+          cat .assets/wasm-names.log
+          if [ "$status" -ne 0 ]; then echo "::error::wasm-opt --names failed"; exit 1; fi
 
       # Pages publishes at most 1 GB; the voice and language models are most of it.
       - name: Site size
@@ -162,17 +165,6 @@ jobs:
           size=$(du -sm --apparent-size web/dist | cut -f1)
           echo "web/dist: $size MB"
           if [ "$size" -gt 900 ]; then echo "::error::web/dist is $size MB, over the 900 MB kept below Pages' 1 GB limit"; exit 1; fi
-
-      # The site's own optimisations with the name section kept, so a crash stack from the site can
-      # be read with it (release review §4, P3-06). The wasm as wasm-bindgen made it has names but
-      # different function numbers, so it can't.
-      - name: Wasm with names (for crash stacks)
-        working-directory: web
-        run: |
-          mkdir -p .assets/wasm-names
-          cp src/core/wasm-pkg/sim_wasm_bg.wasm .assets/wasm-names/sim_wasm_bg.wasm
-          cp src/voice/wasm-pkg/voice_wasm_bg.wasm .assets/wasm-names/voice_wasm_bg.wasm
-          cargo wasm-opt --names .assets/wasm-names/sim_wasm_bg.wasm .assets/wasm-names/voice_wasm_bg.wasm
 
       - uses: actions/upload-artifact@v7
         with:
@@ -185,8 +177,58 @@ jobs:
         with:
           path: web/dist
 
+  # CI passed on this commit (see the top). On a tag, the CI run the tag's push started; by hand,
+  # the newest CI run on the commit that passed, or else one still running, waited for. A run that
+  # fails, or none at all, fails this and the deploy waits on it; the build above runs anyway.
+  ci:
+    name: CI passed on this commit
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)
+    runs-on: ubuntu-26.04
+    # (The tag's CI is about 20 minutes, the generated worlds the longest.)
+    timeout-minutes: 60
+    steps:
+      - name: Wait for CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT" = push ]; then
+            pick="[.workflow_runs[] | select(.event == \"push\" and .head_branch == \"$TAG\")][0].id // empty"
+          else
+            pick='([.workflow_runs[] | select(.conclusion == "success")] + [.workflow_runs[] | select(.status != "completed")])[0].id // empty'
+          fi
+          # (A tag's CI run can start a little after this one.)
+          id=
+          for _ in $(seq 30); do
+            id=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$SHA&per_page=100" --jq "$pick") || id=
+            [ -n "$id" ] && break
+            sleep 10
+          done
+          if [ -z "$id" ]; then
+            echo "::error::No CI run on $SHA to wait for (a tag: its own CI run; by hand: one that passed or is running)"
+            exit 1
+          fi
+          url="https://github.com/$REPO/actions/runs/$id"
+          echo "Waiting for CI: $url"
+          errors=0
+          while :; do
+            if state=$(gh api "repos/$REPO/actions/runs/$id" --jq '"\(.status) \(.conclusion)"'); then
+              errors=0
+              case "$state" in completed\ *) break ;; esac
+            else
+              errors=$((errors + 1))
+              if [ "$errors" -ge 10 ]; then echo "::error::CI's run can't be read ($url)"; exit 1; fi
+            fi
+            sleep 30
+          done
+          echo "CI: ${state#completed } ($url)"
+          if [ "$state" != "completed success" ]; then echo "::error::CI on $SHA: ${state#completed } ($url)"; exit 1; fi
+
   deploy:
-    needs: build
+    needs: [build, ci]
     # Release tags publish; a run by hand only with deploy checked.
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)
     runs-on: ubuntu-26.04
