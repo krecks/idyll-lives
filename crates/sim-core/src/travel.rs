@@ -422,6 +422,91 @@ pub struct Graph {
     pub boxes: Vec<([f32; 2], f32)>,
 }
 
+/// What `Graph::seek` shows the road segments near a point to.
+trait Seeker {
+    /// A segment `d` m off, its nearest point `s` m along road `road`.
+    fn visit(&mut self, road: u32, s: f32, d: f32);
+    /// How far off a segment may be and still count, as found so far.
+    fn enough(&self) -> f32;
+}
+
+/// `Graph::nearest`'s search: the least (how far, road, how far along) of a road in the network.
+struct Nearest<'a> {
+    graph: &'a Graph,
+    best: Option<(f32, u32, f32)>,
+}
+
+impl Seeker for Nearest<'_> {
+    fn visit(&mut self, r: u32, s: f32, d: f32) {
+        let better = self
+            .best
+            .is_none_or(|(bd, br, bs)| d < bd || (d == bd && (r < br || (r == br && s < bs))));
+        // (Not a road too short for an edge: not in the network, `Graph::edge_at`.)
+        if better
+            && self
+                .graph
+                .road_edges
+                .get(r as usize)
+                .is_some_and(|l| !l.is_empty())
+        {
+            self.best = Some((d, r, s));
+        }
+    }
+
+    fn enough(&self) -> f32 {
+        self.best.map_or(f32::INFINITY, |(d, ..)| d)
+    }
+}
+
+/// `Graph::near`'s search: each road's nearest point (the least of how far, then how far along).
+/// Once `n` roads in the network are found, one further off than the `n`th nearest doesn't count.
+struct Near<'a> {
+    graph: &'a Graph,
+    n: usize,
+    best: Vec<RoadPoint>,
+}
+
+impl Seeker for Near<'_> {
+    fn visit(&mut self, r: u32, s: f32, d: f32) {
+        match self.best.iter_mut().find(|b| b.road == r) {
+            Some(b) if d < b.off || (d == b.off && s < b.s) => {
+                b.s = s;
+                b.off = d;
+            }
+            Some(_) => {}
+            None => self.best.push(RoadPoint {
+                edge: 0,
+                road: r,
+                s,
+                off: d,
+            }),
+        }
+    }
+
+    fn enough(&self) -> f32 {
+        if self.n == 0 || self.best.len() < self.n {
+            return f32::INFINITY;
+        }
+        // (The `n`th nearest of the roads in the network.)
+        let mut offs: Vec<f32> = self
+            .best
+            .iter()
+            .filter(|b| {
+                self.graph
+                    .road_edges
+                    .get(b.road as usize)
+                    .is_some_and(|l| !l.is_empty())
+            })
+            .map(|b| b.off)
+            .collect();
+        if offs.len() < self.n {
+            return f32::INFINITY;
+        }
+        offs.sort_by(f32::total_cmp);
+        offs[self.n - 1]
+    }
+}
+
 /// What a trip along the roads looks like: the points it passes (on the middle line), and how
 /// long it is.
 #[derive(Debug, Clone, Default)]
@@ -1012,8 +1097,6 @@ impl Graph {
         list.get(i.min(list.len().checked_sub(1)?)).copied()
     }
 
-    /// The nearest points on up to `n` different roads within `reach` m of `p` that `mode` may
-    /// use, nearest first.
     /// Whether network road `road` comes within `reach` of `p` somewhere else than about `s` along
     /// it (more than `apart` further on or back): a road come back over itself, a hairpin's way
     /// back beside its way out (`near` gives each road's nearest point only: there, `s` itself).
@@ -1042,11 +1125,60 @@ impl Graph {
         })
     }
 
+    /// The nearest points on up to `n` different roads within `reach` m of `p` that `mode` may
+    /// use, nearest first.
     pub fn near(&self, p: [f32; 2], reach: f32, n: usize, mode: Mode) -> Vec<RoadPoint> {
-        if self.is_empty() {
-            return Vec::new();
+        if n == 1 && p.iter().all(|v| v.is_finite()) {
+            return self.nearest(p, reach, mode).into_iter().collect();
         }
-        let mut best: Vec<RoadPoint> = Vec::new();
+        let mut near = Near {
+            graph: self,
+            n,
+            best: Vec::new(),
+        };
+        self.seek(p, reach, mode, &mut near);
+        let mut best = near.best;
+        // (Not a road too short for an edge: not in the network.)
+        best.retain_mut(|b| self.edge_at(b.road, b.s).map(|e| b.edge = e).is_some());
+        best.sort_by(|a, b| a.off.total_cmp(&b.off).then(a.road.cmp(&b.road)));
+        best.truncate(n);
+        best
+    }
+
+    /// `near`'s nearest point (`n` 1), without gathering every road's: the least of (how far,
+    /// road, how far along), as `near`'s sort ends up with.
+    pub fn nearest(&self, p: [f32; 2], reach: f32, mode: Mode) -> Option<RoadPoint> {
+        // (Not a point: `near`'s way, whatever that makes of it.)
+        if !p.iter().all(|v| v.is_finite()) {
+            return self.near(p, reach, 1, mode).first().copied();
+        }
+        let mut nearest = Nearest {
+            graph: self,
+            best: None,
+        };
+        self.seek(p, reach, mode, &mut nearest);
+        let (off, road, s) = nearest.best?;
+        Some(RoadPoint {
+            edge: self.edge_at(road, s)?,
+            road,
+            s,
+            off,
+        })
+    }
+
+    /// Shows `seeker` the road segments within `reach` m of `p` that `mode` may use
+    /// (`Seeker::visit`), the cells nearest `p` first, a ring of cells at a time, until no
+    /// segment further out can count (`Seeker::enough`).
+    ///
+    /// A segment's nearest point to `p` is in one of the cells it's listed in (`index`), and one
+    /// `d` m off in a cell `d` m off at most; so cells further than `reach`, or than `enough`,
+    /// from `p` (and a metre more, for rounding) aren't looked in, and once a ring's next is that
+    /// far the search ends. A segment in several cells comes up once from each. Segments surely
+    /// out of either (by the square of the distance) are passed over before the square root.
+    fn seek<S: Seeker>(&self, p: [f32; 2], reach: f32, mode: Mode, seeker: &mut S) {
+        if self.is_empty() {
+            return;
+        }
         let (x0, x1) = (
             self.cell(p[0] - reach, self.cols),
             self.cell(p[0] + reach, self.cols),
@@ -1055,38 +1187,77 @@ impl Graph {
             self.cell(p[1] - reach, self.rows),
             self.cell(p[1] + reach, self.rows),
         );
-        for cz in z0..=z1 {
-            for cx in x0..=x1 {
-                for &(r, i) in &self.cells[cz * self.cols + cx] {
-                    let road = &self.roads[r as usize];
-                    if mode == Mode::Car && !road.drivable() || !road.walkable() {
-                        continue;
+        let (px, pz) = (
+            self.cell(p[0], self.cols).clamp(x0, x1),
+            self.cell(p[1], self.rows).clamp(z0, z1),
+        );
+        // How far `v` is outside cell `c` of `n` along an axis (the first and last reach on out:
+        // `cell` clamps).
+        let gap = |v: f32, c: usize, n: usize| {
+            let lo = if c == 0 {
+                f32::NEG_INFINITY
+            } else {
+                c as f32 * CELL
+            };
+            let hi = if c + 1 >= n {
+                f32::INFINITY
+            } else {
+                (c + 1) as f32 * CELL
+            };
+            (lo - v).max(v - hi).max(0.0)
+        };
+        let look = |cx: usize, cz: usize, limit: f32, seeker: &mut S| {
+            let (gx, gz) = (gap(p[0], cx, self.cols), gap(p[1], cz, self.rows));
+            if gx * gx + gz * gz > (limit + 1.0) * (limit + 1.0) {
+                return;
+            }
+            let far2 = limit * limit * 1.001 + 1e-3;
+            for &(r, i) in &self.cells[cz * self.cols + cx] {
+                let road = &self.roads[r as usize];
+                if mode == Mode::Car && !road.drivable() || !road.walkable() {
+                    continue;
+                }
+                // (`Road::project_segment`, step by step.)
+                let i = i as usize;
+                let (a, b) = (road.pts[i], road.pts[i + 1]);
+                let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
+                let len2 = (dx * dx + dz * dz).max(1e-9);
+                let t = (((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / len2).clamp(0.0, 1.0);
+                let q = [a[0] + dx * t, a[1] + dz * t];
+                let (ex, ez) = (p[0] - q[0], p[1] - q[1]);
+                if ex * ex + ez * ez > far2 {
+                    continue;
+                }
+                let d = dist(p, q);
+                if d > reach {
+                    continue;
+                }
+                seeker.visit(r, road.cum[i] + t * len2.sqrt(), d);
+            }
+        };
+        let rings = (px - x0).max(x1 - px).max(pz - z0).max(z1 - pz);
+        for k in 0..=rings {
+            let limit = reach.min(seeker.enough());
+            // (The cells of ring `k` are `k - 1` cells off at least.)
+            if k > 0 && (k - 1) as f32 * CELL > limit + 1.0 {
+                break;
+            }
+            // (Ring `k`: the cells `k` from `p`'s, along a row or a column or both.)
+            for cz in pz.saturating_sub(k).max(z0)..=(pz + k).min(z1) {
+                if cz + k == pz || cz == pz + k {
+                    for cx in px.saturating_sub(k).max(x0)..=(px + k).min(x1) {
+                        look(cx, cz, limit, seeker);
                     }
-                    let (s, d) = road.project_segment(i as usize, p);
-                    if d > reach {
-                        continue;
+                } else {
+                    if px >= x0 + k {
+                        look(px - k, cz, limit, seeker);
                     }
-                    match best.iter_mut().find(|b| b.road == r) {
-                        Some(b) if d < b.off || (d == b.off && s < b.s) => {
-                            b.s = s;
-                            b.off = d;
-                        }
-                        Some(_) => {}
-                        None => best.push(RoadPoint {
-                            edge: 0,
-                            road: r,
-                            s,
-                            off: d,
-                        }),
+                    if k > 0 && px + k <= x1 {
+                        look(px + k, cz, limit, seeker);
                     }
                 }
             }
         }
-        // (Not a road too short for an edge: not in the network.)
-        best.retain_mut(|b| self.edge_at(b.road, b.s).map(|e| b.edge = e).is_some());
-        best.sort_by(|a, b| a.off.total_cmp(&b.off).then(a.road.cmp(&b.road)));
-        best.truncate(n);
-        best
     }
 
     /// Cost of `len` metres of a road of `kind` for `mode` (metres on foot, seconds of drive time by
@@ -1419,13 +1590,17 @@ pub struct Travel {
     /// a household's car turns into or out of its driveway, or on the driveway (`cars::settle_all`):
     /// not parked at on a trip. Not saved: worked out again on load.
     pub(crate) by_a_mouth: Vec<bool>,
-    /// By plot, for the public places: their door and where it gets on the roads on foot and by
-    /// car (`entry`), kept as each tick starts (`note_doors`): a resident weighing an outing asks
-    /// how long the way to every one is. Not saved.
+    /// By plot: its door and where it gets on the roads on foot and by car (`entry`), kept as
+    /// each tick starts (`note_doors`): a resident weighing an outing asks how long the way to
+    /// every public place is, one out on one how long the way home. Not saved.
     doors: Vec<Option<Door>>,
+    /// By public parking spot (`OpenWorld::parking`): where a car parked there stands, which way
+    /// it faces and whether it's a bay off the road (`cars::park_spot`), worked out once: the
+    /// spots and the roads stay as the town file has them. Not saved.
+    pub(crate) parked: Vec<Option<([f32; 2], f32, bool)>>,
 }
 
-/// A public place's door (its bits) and where it gets on the roads on foot and by car
+/// A plot's door (its bits) and where it gets on the roads on foot and by car
 /// (`Travel::doors`).
 type Door = ([u32; 2], [Option<RoadPoint>; 2]);
 
@@ -1434,7 +1609,7 @@ impl Travel {
         // Every town is one (cosy and normal were dropped in 0.8.0): a town without open-world
         // fields takes its meta's roads, or its streets, as the network.
         let graph = Graph::from_town(&file, meta);
-        Self {
+        let mut travel = Self {
             file,
             graph,
             country_speed: COUNTRY_SPEED,
@@ -1446,32 +1621,35 @@ impl Travel {
             crossings: Default::default(),
             zebras: Default::default(),
             doors: Vec::new(),
-        }
+            parked: Vec::new(),
+        };
+        travel.parked = (0..travel.file.parking.len())
+            .map(|k| crate::cars::park_spot(&travel, k))
+            .collect();
+        travel
     }
 
     /// Where a trip from or to `p` gets on the roads for `mode` (the nearest road within
     /// `ENTRY_REACH`), as `eta` finds it.
     pub fn entry(&self, p: [f32; 2], mode: Mode) -> Option<RoadPoint> {
-        self.graph.near(p, ENTRY_REACH, 1, mode).first().copied()
+        self.graph.nearest(p, ENTRY_REACH, mode)
     }
 
-    /// Notes the public places' doors and where they get on the roads (`doors`), again only for
-    /// a door that moved.
+    /// Notes the plots' doors and where they get on the roads (`doors`), again only for a door
+    /// that moved.
     pub(crate) fn note_doors(&mut self, plots: &[crate::world::Plot]) {
         self.doors.resize(plots.len(), None);
         for (i, p) in plots.iter().enumerate() {
             let door = p.arrival_point();
             let bits = door.map(f32::to_bits);
-            if !p.public {
-                self.doors[i] = None;
-            } else if self.doors[i].is_none_or(|(at, _)| at != bits) {
+            if self.doors[i].is_none_or(|(at, _)| at != bits) {
                 let entries = [self.entry(door, Mode::Foot), self.entry(door, Mode::Car)];
                 self.doors[i] = Some((bits, entries));
             }
         }
     }
 
-    /// `entry` for the door `door` of public place `plot`, as noted (`note_doors`), or found.
+    /// `entry` for the door `door` of plot `plot`, as noted (`note_doors`), or found.
     /// (The sim tests check it against `entry`: `common::check_lookups`.)
     pub fn door_entry(&self, plot: u32, door: [f32; 2], mode: Mode) -> Option<RoadPoint> {
         match self.doors.get(plot as usize) {
@@ -1524,6 +1702,26 @@ impl Travel {
             walk,
             || self.entry(from, mode),
             || self.entry(to, mode),
+        )
+    }
+
+    /// `eta` to the door `door` of plot `plot`, where it gets off the roads as noted for it
+    /// (`door_entry`).
+    pub fn eta_to_door(
+        &self,
+        from: [f32; 2],
+        plot: u32,
+        door: [f32; 2],
+        mode: Mode,
+        walk: f32,
+    ) -> f32 {
+        self.eta_via(
+            from,
+            door,
+            mode,
+            walk,
+            || self.entry(from, mode),
+            || self.door_entry(plot, door, mode),
         )
     }
 
@@ -1739,6 +1937,105 @@ mod tests {
     fn line(a: [f32; 2], b: [f32; 2]) -> Vec<[f32; 2]> {
         let n = dist(a, b).ceil() as usize;
         (0..=n).map(|i| lerp(a, b, i as f32 / n as f32)).collect()
+    }
+
+    /// `Graph::near` and `nearest` (cells nearest first, a ring at a time, stopping once
+    /// nothing further out counts) find what looking at every segment of every road finds.
+    #[test]
+    fn near_finds_what_every_segment_says() {
+        // (A little generator of its own: the same roads every run.)
+        let mut seed = 0x2545_f491_4f6c_dd1du64;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed >> 40) as f32 / (1u64 << 24) as f32
+        };
+        let kinds = [
+            RoadKind::Street,
+            RoadKind::Lane,
+            RoadKind::Country,
+            RoadKind::Trail,
+        ];
+        let mut roads = Vec::new();
+        for k in 0..24 {
+            // Winding roads of a few dozen points, 1 to 9 m apart.
+            let mut at = [next() * 300.0, next() * 300.0];
+            let mut heading = next() * std::f32::consts::TAU;
+            let mut pts = vec![at];
+            for _ in 0..(10 + (next() * 40.0) as usize) {
+                heading += (next() - 0.5) * 0.8;
+                let step = 1.0 + next() * 8.0;
+                at = [at[0] + heading.cos() * step, at[1] + heading.sin() * step];
+                pts.push(at);
+            }
+            roads.push(road(&pts, 4.0 + next() * 6.0, kinds[k % kinds.len()]));
+        }
+        // (A road too short for an edge: not in the network.)
+        roads.push(road(
+            &[[150.0, 150.0], [150.2, 150.1]],
+            6.0,
+            RoadKind::Street,
+        ));
+        let g = Graph::build(&roads);
+        let every = |p: [f32; 2], reach: f32, n: usize, mode: Mode| {
+            let mut best: Vec<RoadPoint> = Vec::new();
+            for (r, road) in g.roads.iter().enumerate() {
+                if mode == Mode::Car && !road.drivable() {
+                    continue;
+                }
+                for i in 0..road.pts.len() - 1 {
+                    let (s, d) = road.project_segment(i, p);
+                    if d > reach {
+                        continue;
+                    }
+                    match best.iter_mut().find(|b| b.road == r as u32) {
+                        Some(b) if d < b.off || (d == b.off && s < b.s) => {
+                            b.s = s;
+                            b.off = d;
+                        }
+                        Some(_) => {}
+                        None => best.push(RoadPoint {
+                            edge: 0,
+                            road: r as u32,
+                            s,
+                            off: d,
+                        }),
+                    }
+                }
+            }
+            best.retain_mut(|b| g.edge_at(b.road, b.s).map(|e| b.edge = e).is_some());
+            best.sort_by(|a, b| a.off.total_cmp(&b.off).then(a.road.cmp(&b.road)));
+            best.truncate(n);
+            best
+        };
+        let mut found = 0;
+        for k in 0..3000 {
+            // (Around the roads and past the cells' edges, on and off them.)
+            let p = if k % 7 == 0 {
+                let r = &g.roads[k % g.roads.len()];
+                r.at(next() * r.len())
+            } else {
+                [next() * 420.0 - 60.0, next() * 420.0 - 60.0]
+            };
+            let reach = [2.0, 8.0, 30.0, 64.0, 150.0][k % 5];
+            for mode in [Mode::Foot, Mode::Car] {
+                for n in [1, 3, 6] {
+                    let want = every(p, reach, n, mode);
+                    assert_eq!(
+                        g.near(p, reach, n, mode),
+                        want,
+                        "{p:?} {reach} {n} {mode:?}"
+                    );
+                    found += want.len();
+                }
+                assert_eq!(
+                    g.nearest(p, reach, mode),
+                    every(p, reach, 1, mode).first().copied(),
+                );
+            }
+        }
+        assert!(found > 1000, "few roads found: {found}");
     }
 
     #[test]

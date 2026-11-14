@@ -874,6 +874,28 @@ pub(crate) fn opinions(w: &mut World) {
     };
     let tick = w.tick;
     let today = crate::clock::day(tick);
+    // By plot, its rooms and its objects, in order: gathered once for everyone (a big world's
+    // thousands of each, asked after for every resident's home).
+    let mut rooms_on: Vec<Vec<&RoomInfo>> = Vec::new();
+    for r in &w.rooms {
+        if let Some(p) = r.plot {
+            let p = p as usize;
+            if rooms_on.len() <= p {
+                rooms_on.resize_with(p + 1, Vec::new);
+            }
+            rooms_on[p].push(r);
+        }
+    }
+    let mut objects_on: Vec<Vec<usize>> = Vec::new();
+    for (o, p) in w.object_plot.iter().enumerate().take(w.objects.len()) {
+        if let Some(p) = *p {
+            let p = p as usize;
+            if objects_on.len() <= p {
+                objects_on.resize_with(p + 1, Vec::new);
+            }
+            objects_on[p].push(o);
+        }
+    }
     for i in 0..w.sims.len() {
         let s = &w.sims[i];
         let Some(home) = w.households[s.household as usize].plot.filter(|_| s.here()) else {
@@ -882,13 +904,13 @@ pub(crate) fn opinions(w: &mut World) {
         let (x, z) = s.tile();
         let at_home =
             s.away_until.is_none() && !s.asleep(&w.content) && w.plot_at(x, z) == Some(home);
-        let rooms: Vec<&RoomInfo> = w.rooms.iter().filter(|r| r.plot == Some(home)).collect();
-        let broken: Vec<usize> = w
-            .objects
+        let rooms: &[&RoomInfo] = rooms_on.get(home as usize).map_or(&[], Vec::as_slice);
+        let on_home: &[usize] = objects_on.get(home as usize).map_or(&[], Vec::as_slice);
+        let broken: Vec<usize> = on_home
             .iter()
-            .zip(&w.object_plot)
-            .filter(|(o, p)| o.broken() && **p == Some(home))
-            .map(|(o, _)| o.def)
+            .map(|&o| &w.objects[o])
+            .filter(|o| o.broken())
+            .map(|o| o.def)
             .collect();
         // Wishes that came true.
         let good = |kind: Option<usize>, garden: bool, factor: u8| {
@@ -967,19 +989,16 @@ pub(crate) fn opinions(w: &mut World) {
                 if w.sims[i].needs[acc.need] >= 0.15 || have >= 2 {
                     continue;
                 }
-                let fillers: Vec<&crate::world::ObjectInstance> = w
-                    .objects
+                let fillers: Vec<&crate::world::ObjectInstance> = on_home
                     .iter()
-                    .zip(&w.object_plot)
-                    .filter(|(o, p)| {
-                        **p == Some(home)
-                            && !o.broken()
+                    .map(|&o| &w.objects[o])
+                    .filter(|o| {
+                        !o.broken()
                             && w.content.objects[o.def]
                                 .interactions
                                 .iter()
                                 .any(|it| it.autonomous && it.total_gain[acc.need] > 0.0)
                     })
-                    .map(|(o, _)| o)
                     .collect();
                 // (Taken, or in a room someone else keeps shut: the bathroom with someone in it.)
                 let here = w.lot.room_at(x, z);

@@ -860,6 +860,37 @@ pub(crate) fn leave_at(sim: &Sim, content: &Content, tick: u64) -> Option<u64> {
         .filter(|&leave| leave > tick)
 }
 
+/// Whether they leave for work or school later today and by tick `by` (`leave_at`): for a job,
+/// the time asked before whether today is a workday (`life::work_days`, the dearer question, and
+/// most of the time the answer is no anyway: asked of everyone every tick, `SimBrief::free`).
+pub(crate) fn leaves_by(sim: &Sim, content: &Content, tick: u64, by: u64) -> bool {
+    let leaves = match &sim.job {
+        Some(job) => {
+            // (`life::shift_today`, its parts the other way round.)
+            let level = &content.careers[job.career].levels[job.level];
+            let day = crate::clock::day(tick);
+            crate::clock::tick_at(day, level.start_hour * 60.0).is_some_and(|start| {
+                let leave =
+                    start.saturating_sub(crate::life::ticks(content.career_rules.commute_minutes));
+                let leave = crate::life::leave_for(sim, leave, start);
+                leave > tick
+                    && leave <= by
+                    && crate::life::work_days(content, job, &sim.skills)
+                        & (1 << crate::clock::weekday(day))
+                        != 0
+            })
+        }
+        None => crate::life::school_today(content, sim, tick)
+            .map(|(leave, start, _)| crate::life::leave_for(sim, leave, start))
+            .is_some_and(|leave| leave > tick && leave <= by),
+    };
+    debug_assert_eq!(
+        leaves,
+        leave_at(sim, content, tick).is_some_and(|t| t <= by)
+    );
+    leaves
+}
+
 /// What they do out of habit at a turning point of their day (`DayRhythm::habits`): for the
 /// habit for `at` whose need is lowest (for it), the nearest quick thing on `plot` that fills
 /// it. None: nothing to see to, or nothing there for it.

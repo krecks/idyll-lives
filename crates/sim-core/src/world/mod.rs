@@ -1437,12 +1437,19 @@ impl Sim {
     /// Whether a need a chat won't help with is about to run out (the bladder): no time to talk.
     pub fn pressed(&self, content: &Content) -> bool {
         let rules = &content.autonomy;
-        let essentials = rules.urgent & !rules.social_fills;
-        (0..content.needs.len()).any(|n| {
-            !content.needs[n].room
-                && essentials & (1 << n) != 0
-                && self.needs[n] < rules.urgent_below
-        })
+        // (Only the needs in the mask looked at: asked of everyone every tick, `SimBrief`.)
+        let mut essentials = rules.urgent & !rules.social_fills;
+        while essentials != 0 {
+            let n = essentials.trailing_zeros() as usize;
+            essentials &= essentials - 1;
+            if n >= content.needs.len() {
+                break;
+            }
+            if !content.needs[n].room && self.needs[n] < rules.urgent_below {
+                return true;
+            }
+        }
+        false
     }
 
     /// Whether another Sim can pull this one into a conversation right now.
@@ -3857,8 +3864,7 @@ impl World {
             .front()
             .is_some_and(|t| t.directed || matches!(t.kind, TaskKind::Work));
         let ready = social::minutes_to_ticks(content.day_rhythm.ready_minutes);
-        let leaving =
-            leave_at(sim, content, self.tick).is_some_and(|leave| leave <= self.tick + ready);
+        let leaving = leaves_by(sim, content, self.tick, self.tick + ready);
         picked && !next && !leaving
     }
 
@@ -4512,9 +4518,10 @@ impl World {
         for s in &self.sims {
             let (x, z) = s.tile();
             let plot = self.plot_at(x, z);
+            let available = s.here() && s.available_for_social(&self.content);
             briefs.push(SimBrief {
                 pos: s.pos,
-                available: s.here() && s.available_for_social(&self.content),
+                available,
                 gender_ix: s.gender_ix,
                 household: s.household,
                 plot: plot.filter(|_| s.here()),
@@ -4538,7 +4545,12 @@ impl World {
                 lying: s.pose == Pose::Lie,
                 eating: s.eating_seated(),
                 game: s.game,
-                free: crate::partners::free_now(&self.content, s, tick),
+                // (`partners::free_now`, its start just above.)
+                free: {
+                    let free = available && crate::partners::free_besides(&self.content, s, tick);
+                    debug_assert_eq!(free, crate::partners::free_now(&self.content, s, tick));
+                    free
+                },
                 bound_for_car: s.bound_for_car.filter(|_| {
                     s.current()
                         .is_some_and(|a| matches!(a.task.kind, TaskKind::Work))
