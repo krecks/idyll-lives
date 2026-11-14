@@ -1910,7 +1910,7 @@ mod tests {
             }
             let back: Vec<[f32; 2]> = pts[200..400].iter().rev().copied().collect();
             pts.extend(back);
-            pts.extend_from_slice(&pts[10..20].to_vec());
+            pts.extend_from_within(10..20);
             let grid = NearestPoint::new(pts.clone());
             assert!(!grid.scan, "cells over that many points");
             let scan = |p: [f32; 2]| {
