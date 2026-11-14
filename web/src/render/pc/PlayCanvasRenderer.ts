@@ -761,7 +761,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     cam.layers = cam.layers.filter((id) => id !== pc.LAYERID_SKYBOX);
     // The picture after the light: multisampling or FXAA, the image processing
     // and the night grade (`post.ts`; the diag views and `?diag=linear` without them).
-    this.post = new PostProcessing(this.app, cam, gamePostOptions(this.quality.msaaSamples, this.diag, diagViewActive, this.quality.leanTargets, this.quality.contactShading));
+    this.post = new PostProcessing(this.app, cam, gamePostOptions(this.samples, this.diag, diagViewActive, this.quality.leanTargets, this.quality.contactShading));
     this.post.setLook(gameLook(LOOK));
     // Leaf cards soften their edges with the picture's samples (none on Low, nor without the post-processing).
     this.lib.setCutoutCoverage(this.post.samples > 1);
@@ -779,9 +779,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     });
     this.app.root.addChild(this.sun);
     // The map's size, filtering and bias are the preset's (`sunShadows.ts`).
-    this.sunShadows = new SunShadows(this.app, this.sun, { size: this.quality.shadowMapSize, rate: this.quality.shadowRate });
+    this.sunShadows = new SunShadows(this.app, this.sun, { size: this.quality.shadowMapSize, rate: this.quality.shadowRate, still: !this.diag.has('wholeshadows') });
     // (lotContents.ts: the landscape, sky, objects and items.)
-    this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.castersMoved(urgent), landscapeChanged: () => this.lamps.exclude(this.lot.landscapeDraws()) /* (lamps.ts) */ });
+    this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.castersMoved(urgent), partsMoved: () => this.partsMoved(), landscapeChanged: () => this.lamps.exclude(this.lot.landscapeDraws()) /* (lamps.ts) */ });
     // (the menus' town on a layer of its own, `overview.ts`, the landscape's draws for it too; the sky on both.)
     const town = townLayer(this.app).id;
     this.lot.townLayer = town;
@@ -792,6 +792,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.characters.setRide((id) => this.lot.ride(id));
     this.characters.setLoop((id) => this.lot.loopPhase(id));
     this.characters.setSun(() => this.lighting.sunDirection);
+    // (A redraw of the sun's map for their poses alone draws only them and the moving parts over the rest's picture: `SunShadows.posed`.)
+    if (this.quality.characterShadows)
+      this.sunShadows.movers = (out) => {
+        this.characters.shadowCasters(out);
+        this.lot.movingCasters(out);
+      };
     this.birdLife = new GameBirds(this.app, this.root, this.deps.assets, this.deps.content, this.quality.birds, { eye: (out) => this.camera.eyeInGame(out), storey: () => this.storey, roofShown: () => this.roofShown, calm: () => !!this.options.reducedMotion }, this.debug); // (the garden birds.)
     const blob = contactBlob(this.app);
     this.simShadow = new Instances(this.device, this.root, blob.mesh, blob.material, { name: 'simShadows', castShadows: false, receiveShadows: false, capacity: MAX_CHARACTERS, cull: false });
@@ -844,7 +850,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lamps = new Lamps(this.app, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode, whole: () => this.townWhole }, { house: this.house, lot: this.lot, pools: () => this.applyGardenPools(), casters: () => this.lampCasters() });
     // (the mirrors, `mirrors.ts`, their held reflections drawn again when the lamps, the sun or what the map shows changed; held frames, `heldFrames.ts`.)
     const mq = this.quality;
-    this.mirrors = new Mirrors(this.app, this.root, this.camera.camera, this.sun.light!, { count: this.diag.has('nomirrors') ? 0 : mq.mirrors, scale: mq.mirrorScale, samples: mq.msaaSamples, rate: mq.mirrorRate }, (mi, bits) => this.characters.drawsRows(mi, bits));
+    this.mirrors = new Mirrors(this.app, this.root, this.camera.camera, this.sun.light!, { count: this.diag.has('nomirrors') ? 0 : mq.mirrors, scale: mq.mirrorScale, samples: this.samples, rate: mq.mirrorRate }, (mi, bits) => this.characters.drawsRows(mi, bits));
     this.lamps.onChanged = () => this.mirrors.changed();
     this.sunShadows.onMoved = (urgent, casters) => {
       if (urgent) this.mirrors.changed();
@@ -2418,6 +2424,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!urgent) this.lamps.castersMoved(false);
   }
 
+  /** A use moved the lot's moving parts (`LotContents.update`): the sun's shadows as for a pose, and the lamps'. */
+  private partsMoved(): void {
+    this.sunShadows.posed();
+    this.lamps.castersMoved(false);
+  }
+
   /** What casts in a lamp's light now (`lampShadows.ts`): the lot's things and the residents. One list, filled anew. */
   private lampCasters(): pc.MeshInstance[] {
     const out = this.lampCasterList;
@@ -2585,7 +2597,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lot.takeRestProps(this.characters.restTaken);
     // (Only residents posed where they cast into the map: `shadowPosed`, as the cars' `moved`.)
     if (this.quality.characterShadows && this.characters.shadowPosed) {
-      this.sunShadows.moved(false);
+      this.sunShadows.posed();
       this.lamps.residentsMoved(this.occupiedRooms); // (their shadows in the lamps' light, in the rooms they are in.)
     }
     const blobs = this.simShadow;
@@ -3168,6 +3180,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return this.gpuTiming.passes(reset);
   }
 
+  /** The picture's multisampling on this device (`QualitySettings.msaaSamples`, `webglMsaaSamples` on WebGL2). */
+  private get samples(): number {
+    return this.device.isWebGPU ? this.quality.msaaSamples : this.quality.webglMsaaSamples;
+  }
+
   /** The sun's shadow map's target (null: none made, or the sun casts none). */
   private shadowTarget(): pc.RenderTarget | null {
     const light = this.sun?.light;
@@ -3256,6 +3273,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         mirrorsLive: this.mirrors.live,
         mirrorSpots: this.mirrors.spots,
         mirrorDraws: this.mirrors.draws,
+        sunShadowDraws: { ...this.sunShadows.draws },
         nightGrade: this.post?.night ?? 0,
         lightingUpdates: this.counts.lightingUpdates,
         shaders: this.shaderWatch.shaders,
@@ -3515,6 +3533,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.cars?.destroy();
     this.signals?.destroy();
     this.gardenPools?.destroy();
+    this.sunShadows?.destroy();
     for (const p of this.decor.values()) for (const d of p.draws) d.destroy();
     this.decor.clear();
     this.post?.destroy();

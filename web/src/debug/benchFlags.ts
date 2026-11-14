@@ -10,6 +10,7 @@
  * without tone mapping, exposure or grading: the light compared without the image processing. `notown` leaves the town view's
  * drawing out (`render/pc/townView.ts`: the backdrop, the far lots, crowns, movers, the ground's map), the far LOD as before it;
  * `notownwoods`, `notownground` and `notownbuildings` one part of it: the woods as before, no colour map, no buildings.
+ * `wholeshadows` draws every caster into the sun's map every time, also when only the residents moved (`render/pc/sunShadows.ts`).
  */
 
 import { TOWN_MAX } from '../render/shared/lens';
@@ -17,7 +18,7 @@ import { isResolution, type Resolution } from '../render/shared/resolution';
 
 export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still' | 'roam' | 'street' | 'town' | 'over' | 'zoom';
 
-export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'noao', 'noclouds', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders', 'notown', 'notownwoods', 'notownground', 'notownbuildings'] as const;
+export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'noao', 'noclouds', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders', 'notown', 'notownwoods', 'notownground', 'notownbuildings', 'wholeshadows'] as const;
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
 
 export interface BenchFlags {

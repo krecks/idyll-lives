@@ -27,7 +27,7 @@ function sun(rate = 0) {
     light.light!.shadowUpdateMode = pc.SHADOWUPDATE_NONE;
     return now;
   };
-  return { shadows, drawn };
+  return { shadows, drawn, device };
 }
 
 describe("the sun's shadow square", () => {
@@ -64,5 +64,86 @@ describe("the sun's shadow square", () => {
     const { shadows } = sun();
     shadows.setOverview(true);
     expect(shadows.reaches(9000, 9000)).toBe(true);
+  });
+});
+
+// The still casters' picture (`SunShadows.still`): a redraw for what moves alone (`posed`) copies it into the map and
+// draws only what moves over it; anything else (`moved`, the light's view, a still caster that came, went or moved)
+// draws the picture again first. On the null device: the passes' draws and copies recorded, not made.
+describe("the sun's map over the still casters' picture", () => {
+  function split() {
+    const { shadows, device } = sun();
+    const cam = new pc.Camera(device);
+    cam.node = new pc.GraphNode('light');
+    cam.projection = pc.PROJECTION_ORTHOGRAPHIC;
+    cam.aspectRatioMode = pc.ASPECT_MANUAL;
+    cam.aspectRatio = 1;
+    cam.orthoHeight = 30;
+    cam.node.setPosition(0, 50, 0);
+    cam.node.setEulerAngles(-90, 0, 0);
+    const depth = new pc.Texture(device, { width: 256, height: 256, format: pc.PIXELFORMAT_DEPTH, mipmaps: false });
+    const map = new pc.RenderTarget({ name: 'map', depthBuffer: depth });
+    cam.renderTarget = map;
+    const caster = (x: number, cull = true) => {
+      const aabb = new pc.BoundingBox(new pc.Vec3(x, 0.5, 0), new pc.Vec3(0.5, 0.5, 0.5));
+      return { cull, aabb, instancingCount: 1 } as unknown as pc.MeshInstance;
+    };
+    const house = caster(0);
+    const tree = caster(10);
+    const body = caster(0, false);
+    const visibleCasters = [house, body, tree];
+    const light = { numCascades: 1, _shadowMap: {}, _shadowCascadesInvalidated: false, shadowUpdateOverrides: null, getRenderData: () => ({ shadowCamera: cam, visibleCasters }) };
+    const log: string[] = [];
+    const name = (mi: pc.MeshInstance) => (mi === house ? 'house' : mi === tree ? 'tree' : 'body');
+    const renderer = { renderFace: (_l: unknown, _c: unknown, _f: number, clear: boolean) => log.push(`${cam.renderTarget === map ? 'map' : 'still'}${clear ? ' cleared' : ''}: ${visibleCasters.map(name).join(' ')}`) };
+    const d = device as unknown as Record<string, unknown>;
+    d.startRenderPass = () => {};
+    d.endRenderPass = () => {};
+    d.copyRenderTarget = (from: pc.RenderTarget, to: pc.RenderTarget) => log.push(`copy ${from === map ? 'map' : 'still'} → ${to === map ? 'map' : 'still'}`);
+    const pass = { light, camera: cam, renderTarget: map, shadowRenderer: renderer, depthStencilOps: { clearDepth: true }, before() {}, execute() {} };
+    shadows.movers = (out) => out.push(body);
+    const draw = () => {
+      log.length = 0;
+      shadows.drawStill(pass as unknown as Parameters<typeof shadows.drawStill>[0]);
+      shadows.drawPass(pass as unknown as Parameters<typeof shadows.drawPass>[0]);
+      return log.slice();
+    };
+    return { shadows, cam, house, tree, body, visibleCasters, draw };
+  }
+
+  test('the first redraw draws the still casters into their picture; a pose only copies it and draws the residents', () => {
+    const { shadows, draw, visibleCasters, house, body, tree } = split();
+    expect(draw()).toEqual(['still: house tree', 'copy still → map', 'map: body']);
+    shadows.posed();
+    expect(draw()).toEqual(['copy still → map', 'map: body']);
+    expect(visibleCasters).toEqual([house, body, tree]);
+    expect(shadows.draws).toEqual({ whole: 1, moving: 1 });
+  });
+
+  test('anything else drawn again first: a thing moved, a still caster moved or went, the light turned', () => {
+    const { shadows, draw, tree, visibleCasters, cam } = split();
+    draw();
+    shadows.moved(false);
+    expect(draw()[0]).toBe('still: house tree');
+    tree.aabb.center.x += 1;
+    shadows.posed();
+    expect(draw()[0]).toBe('still: house tree');
+    visibleCasters.pop();
+    shadows.posed();
+    expect(draw()[0]).toBe('still: house');
+    cam.node.setPosition(1, 50, 0);
+    shadows.posed();
+    expect(draw()[0]).toBe('still: house');
+    // The fit's float noise (as the camera turns) is no change.
+    cam.node.setPosition(1 + 1e-9, 50, 0);
+    shadows.posed();
+    expect(draw()).toEqual(['copy still → map', 'map: body']);
+  });
+
+  test("without what moves to ask (`movers`), or the picture off, the pass is PlayCanvas's own", () => {
+    const { shadows } = split();
+    expect(shadows.splits({ numCascades: 1 } as never)).toBe(true);
+    shadows.movers = null;
+    expect(shadows.splits({ numCascades: 1 } as never)).toBe(false);
   });
 });
