@@ -1476,6 +1476,12 @@ pub fn nodes_searched() -> u64 {
     NODES.get()
 }
 
+/// Counts `nodes` as searched (`nodes_searched`) without a search: for a search's answer used
+/// again, so a budget per tick comes out as it did when it was searched for again.
+pub(crate) fn charge_nodes(nodes: u64) {
+    NODES.set(NODES.get() + nodes);
+}
+
 /// The search costs on this thread since the last call (and starts counting again).
 pub fn take_search_stats() -> SearchStats {
     STATS.with_borrow_mut(std::mem::take)
