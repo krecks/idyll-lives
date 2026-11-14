@@ -31,6 +31,46 @@
       ]
     },
     {
+      "for": "render/pc/sunShadows.ts: the still casters' picture copied into the sun's map, what moves drawn over it (`stillPasses`, `drawStill`, `drawPass`).",
+      "anchors": [
+        {
+          "file": "scene/renderer/shadow-renderer-directional.js",
+          "text": "this.shadowRenderer.setupRenderPass(renderPass, shadowCamera, renderPass.allCascadesRendering);",
+          "who": "sunShadows.ts: the sun's pass set up through the shadow renderer's instance (so wrapping it works)"
+        },
+        {
+          "file": "scene/renderer/render-pass-shadow-directional.js",
+          "text": "shadowRenderer.renderFace(light, camera, face, !allCascadesRendering);",
+          "who": "sunShadows.ts: the pass's execute it replaces draws each cascade by renderFace"
+        },
+        {
+          "file": "scene/renderer/shadow-renderer.js",
+          "text": "renderFace(light, camera, face, clear) {",
+          "who": "sunShadows.ts: renderFace it calls, for the still casters' picture and for what moves"
+        },
+        {
+          "file": "scene/renderer/shadow-renderer.js",
+          "text": "const rt = shadowCam.renderTarget;",
+          "who": "sunShadows.ts: renderFace sizes its viewport by the light camera's target (set to the picture's while it is drawn)"
+        },
+        {
+          "file": "platform/graphics/render-pass.js",
+          "text": "this.before();",
+          "who": "sunShadows.ts: a pass's before runs outside the GPU's pass (the picture drawn and copied there)"
+        },
+        {
+          "file": "platform/graphics/webgpu/webgpu-graphics-device.js",
+          "text": "copyRenderTarget(source, dest, color, depth) {",
+          "who": "sunShadows.ts: the picture's depth copied into the map (WebGPU)"
+        },
+        {
+          "file": "platform/graphics/webgl/webgl-graphics-device.js",
+          "text": "copyRenderTarget(source, dest, color, depth) {",
+          "who": "sunShadows.ts: the picture's depth copied into the map (WebGL2)"
+        }
+      ]
+    },
+    {
       "for": "render/pc/mirrors.ts: the reflection cameras share the game camera's sun shadow matrices and pass.",
       "anchors": [
         {

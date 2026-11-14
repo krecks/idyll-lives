@@ -80,6 +80,8 @@ export interface LotHooks {
   pace(): Promise<void>;
   /** The sun's shadows draw again (`urgent`: now, not at the shadow rate). */
   shadowsMoved(urgent: boolean): void;
+  /** A use moved moving parts that cast (`movingCasters`): the shadows drawn again, as for the residents' poses. */
+  partsMoved(): void;
   /** The landscapes drawn changed (their draws are `LotContents.landscapeDraws`: the lamps leave them out). */
   landscapeChanged?(): void;
 }
@@ -216,6 +218,8 @@ export class LotContents {
   private restTicket = 0;
   /** Whether a moving part casts the sun's shadow (then its moves draw the shadows again). */
   private movingPartsCast = false;
+  /** The moving parts' draws that cast (`movingCasters`). */
+  private movingCasterDraws: Instances[] = [];
   private glows: Glow[] = [];
   private glowLight: GlowLight = { level: 0, lampOn: (id) => (this.lampsOff.has(id) ? 0 : 1), roomOn: () => 1, dimmed: () => false };
   /** The objects residents use this frame (screens are lit by it) and when that was. */
@@ -328,6 +332,11 @@ export class LotContents {
     this.hooks.landscapeChanged?.();
     this.hooks.shadowsMoved(true);
     return set;
+  }
+
+  /** Adds to `out` the moving parts' draws that cast the sun's shadow (drawn again at every redraw of its map: `SunShadows.movers`). */
+  movingCasters(out: pc.MeshInstance[]): void {
+    for (const d of this.movingCasterDraws) if (!d.destroyed && d.enabled && d.meshInstance.castShadow) out.push(d.meshInstance);
   }
 
   /** The landscape's draws (the lamps leave them out: `MaterialLibrary.excludeFromLights`). */
@@ -673,6 +682,7 @@ export class LotContents {
     const glows: Glow[] = [];
     const drawnKeys = new Set<string>();
     let partsCast = false;
+    const movingCasters: Instances[] = [];
     const lampCasters: Instances[] = [];
     // (Low: the opaque bodies cast from one merged mesh, `objectShadows.ts`.)
     const shadowSources: ShadowSource[] = [];
@@ -750,7 +760,10 @@ export class LotContents {
         if (render && render.castShadows === merged) render.castShadows = !merged;
         if (merged && part < 0) shadowSources.push({ mesh: draw.mesh, matrices, count: list.length });
         // (A moving part casting makes its moves draw the shadows again.)
-        if (part >= 0 && render?.castShadows) partsCast = true;
+        if (part >= 0 && render?.castShadows) {
+          partsCast = true;
+          movingCasters.push(draw);
+        }
       });
       (template.glows ?? []).forEach(({ part, screen }, j) => {
         // Strengths per instance (`applyGlow`), by the room each stands in; on a moving part, its buffer.
@@ -769,6 +782,7 @@ export class LotContents {
       });
     });
     this.movingPartsCast = partsCast;
+    this.movingCasterDraws = movingCasters;
     this.lampCasterDraws = lampCasters;
     this.objectShadows?.build(shadowSources);
     // Models no longer drawn: their draws go off (their templates stay for the next build).
@@ -1104,11 +1118,12 @@ export class LotContents {
 
   /** Draws the chairs residents sit pulled up to a table (`pulled`: by chair, how far in, m), and those let go back where they stand (the residents call it each frame). */
   pullChairs(pulled: ReadonlyMap<number, number>, held: number | null = null): void {
+    let moved = false;
     for (const [id, was] of this.pulledIn) {
       if (pulled.has(id)) continue;
       for (const { target, matrix } of was.saved) this.write(target, matrix);
       this.pulledIn.delete(id);
-      this.hooks.shadowsMoved(true);
+      moved = true;
     }
     for (const [id, by] of pulled) {
       const was = this.pulledIn.get(id);
@@ -1126,8 +1141,10 @@ export class LotContents {
         m[14] += Math.cos(yaw) * by;
         this.write(target as PopTarget, m);
       }
-      this.hooks.shadowsMoved(true);
+      moved = true;
     }
+    // (Eased in and out over a few frames, as the residents' poses: their shadows at the shadow rate, once a frame at most.)
+    if (moved) this.hooks.shadowsMoved(false);
   }
 
   /** How object `id`'s seat has moved from rest (`ObjectMotion.ride`), for the residents on it. */
@@ -1230,7 +1247,7 @@ export class LotContents {
   update(frame: FrameState): boolean {
     toGame(this.camera.getPosition(), this.eye);
     const moved = this.motion.update(frame, frame.layout.actions ?? [], this.eye);
-    if (moved.moved && this.movingPartsCast) this.hooks.shadowsMoved(false);
+    if (moved.moved && this.movingPartsCast) this.hooks.partsMoved();
     this.animateScreens(frame);
     return moved.moved;
   }

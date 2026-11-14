@@ -175,6 +175,8 @@ export interface BenchResult {
   lightingPerSecond: number;
   /** Reflections drawn a second (all mirrors). */
   reflectionsPerSecond: number;
+  /** The sun's map drawn again a second: with the still casters too, and only what moves over their picture (`sunShadows.ts`). */
+  sunShadowsPerSecond?: { whole: number; moving: number };
   longTasks: { count: number; maxMs: number; totalMs: number };
   /** Frames that took longer than two at 60 Hz (33 ms between them). */
   over33?: number;
@@ -358,6 +360,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
     renderer.gpuPasses(true);
     const lighting0 = (info.scene as { lightingUpdates: number }).lightingUpdates;
     const reflections0 = (info.scene as { mirrorDraws: number }).mirrorDraws;
+    const sun0 = (info.scene as { sunShadowDraws?: { whole: number; moving: number } }).sunShadowDraws ?? { whole: 0, moving: 0 };
     const long: number[] = [];
     const observer = typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes?.includes('longtask')
       ? new PerformanceObserver((list) => list.getEntries().forEach((e) => long.push(e.duration)))
@@ -409,6 +412,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
       residentsMs: per(sums.residents),
       lightingPerSecond: ((end.scene as { lightingUpdates: number }).lightingUpdates - lighting0) / secs,
       reflectionsPerSecond: ((end.scene as { mirrorDraws: number }).mirrorDraws - reflections0) / secs,
+      sunShadowsPerSecond: ((sun) => ({ whole: (sun.whole - sun0.whole) / secs, moving: (sun.moving - sun0.moving) / secs }))((end.scene as { sunShadowDraws?: { whole: number; moving: number } }).sunShadowDraws ?? sun0),
       longTasks: { count: long.length, maxMs: Math.max(0, ...long), totalMs: long.reduce((a, x) => a + x, 0) },
       over33: intervals.filter((ms) => ms > 33.4).length,
       slow,
