@@ -21,8 +21,8 @@
 import { groundDepth, type WorldStructure } from '../../core/protocol';
 import type { RGB } from './environment';
 import { lawnMap } from './lawn';
-import { groundShade } from './groundShade';
-import { bareTiles, fbm, lawnMask, smoothstep, splitHalf, WIND } from './nature';
+import { updateGroundShade, type TexelRect } from './groundShade';
+import { bareTiles, fbm, lawnMask, smoothstep, splitHalf, WIND, type LawnMask } from './nature';
 
 /** Blades a patch at full density (`GRASS.perPatch`), and the draws: each a step of √2 sparser (`GRASS.lods`). */
 const PER_PATCH = 448;
@@ -170,13 +170,20 @@ function byte(v: number): number {
   return Math.max(0, Math.min(255, Math.round(v * 255)));
 }
 
+/** What `townGrass` changed: the town tiles whose mask it made again and the shade's texels (null: all of them). */
+export interface TownGrassChange {
+  tiles: Uint8Array | null;
+  shade: TexelRect[] | null;
+}
+
 /**
  * The lawn as it grows on the town's ground now, into `field.town` (and the patches with any grass
  * again): none indoors (on a tile split by a diagonal wall, on its indoor half), under furniture,
  * on patios, streets, paths and fields, nor within `GRASS.wallClear` of a wall. And the lawn's map
- * (`field.lawn`, `shared/lawn.ts`).
+ * (`field.lawn`, `shared/lawn.ts`) and the ground's shade (`field.shade`). `mask`, `bare`: the
+ * world's `lawnMask` and `bareTiles`, if the caller has them. Says what it changed.
  */
-export function townGrass(field: GrassField, world: WorldStructure): void {
+export function townGrass(field: GrassField, world: WorldStructure, mask: LawnMask = lawnMask(world), bare: Uint8Array = bareTiles(world, mask)): TownGrassChange {
   const n = GRASS.townTexels;
   const [tw, td] = [world.width, groundDepth(world)];
   const W = tw * n;
@@ -185,12 +192,11 @@ export function townGrass(field: GrassField, world: WorldStructure): void {
   field.town = town;
   field.townW = W;
   field.townD = D;
-  const mask = lawnMask(world);
-  const bare = bareTiles(world, mask);
   // What the grass is like, tile by tile (its tone, worn earth, mown or rough): again whatever changed.
   field.lawn = lawnMap(world, bare, field.lawn);
-  // The shade on the ground round what stands on it.
-  field.shade = groundShade(world, n, field.shade);
+  // The shade on the ground round what stands on it (again only round what changed).
+  const shaded = updateGroundShade(world, n, field.shade);
+  field.shade = shaded.shade;
   const walls = wallSegments(world, tw, td);
   // Only the tiles whose lawn could have changed since the last time (furniture, rooms, walls: a lot
   // shown or edited), the whole town the first time: a big world's mask is millions of texels.
@@ -199,13 +205,22 @@ export function townGrass(field: GrassField, world: WorldStructure): void {
   const before = field.town === town && lawnState.get(field);
   const tiles = new Uint8Array(tw * td);
   let changed = 0;
-  for (let t = 0; t < tw * td; t++) {
-    if (before && before.bare[t] === bare[t] && before.walls.get(t) === wallKeys.get(t) && (bare[t] < 2 || before.split.get(t) === mask.splitAxis.get(t))) continue;
+  const mark = (t: number): void => {
+    if (tiles[t]) return;
     tiles[t] = 1;
     changed++;
-  }
+  };
+  if (before && before.bare.length === bare.length) {
+    for (let t = 0; t < tw * td; t++) if (before.bare[t] !== bare[t]) mark(t);
+    for (const [t, key] of wallKeys) if (before.walls.get(t) !== key) mark(t);
+    for (const t of before.walls.keys()) if (!wallKeys.has(t)) mark(t);
+    // (A split tile's diagonal: what matters only where the tile is split, `bare` 2 or more.)
+    for (const [t, axis] of mask.splitAxis) if (t < tw * td && bare[t] > 1 && before.split.get(t) !== axis) mark(t);
+    for (const t of before.split.keys()) if (t < tw * td && bare[t] > 1 && !mask.splitAxis.has(t)) mark(t);
+  } else for (let t = 0; t < tw * td; t++) mark(t);
   lawnState.set(field, { bare, walls: wallKeys, split: new Map(mask.splitAxis) });
-  if (!changed) return;
+  const all = !before || changed === tw * td;
+  if (!changed) return { tiles: new Uint8Array(0), shade: shaded.changed };
   for (let tz = 0; tz < td; tz++) {
     for (let tx = 0; tx < tw; tx++) {
       const t = tz * tw + tx;
@@ -225,7 +240,8 @@ export function townGrass(field: GrassField, world: WorldStructure): void {
       }
     }
   }
-  markPatches(field);
+  markPatches(field, all ? null : tiles);
+  return { tiles: all ? null : tiles, shade: shaded.changed };
 }
 
 /** What each field's town mask was last made from (`townGrass`), by tile: its bare tiles, walls and split tiles' diagonals. */
@@ -283,37 +299,63 @@ export function grassAt(field: GrassField, x: number, z: number): number {
   return g;
 }
 
-/** Marks the patches with any grass (`field.patches`). */
-function markPatches(field: GrassField): void {
+/**
+ * Marks the patches with any grass (`field.patches`): all of them, or (`tiles`) only those near the town tiles
+ * marked there, whose mask changed.
+ */
+function markPatches(field: GrassField, tiles: Uint8Array | null): void {
   const p = GRASS.patch;
-  const n = GRASS.townTexels;
-  field.patches.fill(0);
-  for (let j = 0; j < field.pd; j++) {
-    for (let i = 0; i < field.pw; i++) {
-      const px = field.x0 + i * p;
-      const pz = field.z0 + j * p;
-      let any = false;
-      // The land's grassiness over the patch (its texels, and the filter's reach past them).
-      for (let z = Math.floor(pz - field.z0) - 1; z <= Math.floor(pz - field.z0) + p && !any; z++) {
-        for (let x = Math.floor(px - field.x0) - 1; x <= Math.floor(px - field.x0) + p && !any; x++) {
-          if (x < 0 || z < 0 || x >= field.w || z >= field.d) continue;
-          if (field.colour[(z * field.w + x) * 4 + 3] > 0) any = true;
-        }
+  if (!tiles) {
+    field.patches.fill(0);
+    for (let j = 0; j < field.pd; j++) for (let i = 0; i < field.pw; i++) markPatch(field, i, j);
+    return;
+  }
+  // (A patch reads the mask a texel past its edges: those a tile's change could reach, and one more each way.)
+  const tw = field.townW / GRASS.townTexels;
+  const todo = new Uint8Array(field.pw * field.pd);
+  for (let t = 0; t < tiles.length; t++) {
+    if (!tiles[t]) continue;
+    const [tx, tz] = [t % tw, Math.floor(t / tw)];
+    const i0 = Math.max(0, Math.floor((tx - field.x0) / p) - 1);
+    const i1 = Math.min(field.pw - 1, Math.floor((tx + 1 - field.x0) / p) + 1);
+    const j0 = Math.max(0, Math.floor((tz - field.z0) / p) - 1);
+    const j1 = Math.min(field.pd - 1, Math.floor((tz + 1 - field.z0) / p) + 1);
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        if (todo[j * field.pw + i]) continue;
+        todo[j * field.pw + i] = 1;
+        markPatch(field, i, j);
       }
-      // In town, the lawn's mask too: a patch all indoors, or all street, has none.
-      if (any && px + p > 0 && pz + p > 0 && px < field.townW / n && pz < field.townD / n) {
-        any = false;
-        for (let z = Math.max(0, Math.floor(pz * n) - 1); z < Math.min(field.townD, Math.ceil((pz + p) * n) + 1) && !any; z++) {
-          for (let x = Math.max(0, Math.floor(px * n) - 1); x < Math.min(field.townW, Math.ceil((px + p) * n) + 1) && !any; x++) {
-            if (field.town[z * field.townW + x] > 0) any = true;
-          }
-        }
-        // (Part of a patch at the town's edge lies outside its mask: there, the land's grassiness counts.)
-        if (!any && (px < 0 || pz < 0 || px + p > field.townW / n || pz + p > field.townD / n)) any = true;
-      }
-      field.patches[j * field.pw + i] = any ? 1 : 0;
     }
   }
+}
+
+/** Patch (i, j): 1 where any grass grows on it (`field.patches`). */
+function markPatch(field: GrassField, i: number, j: number): void {
+  const p = GRASS.patch;
+  const n = GRASS.townTexels;
+  const px = field.x0 + i * p;
+  const pz = field.z0 + j * p;
+  let any = false;
+  // The land's grassiness over the patch (its texels, and the filter's reach past them).
+  for (let z = Math.floor(pz - field.z0) - 1; z <= Math.floor(pz - field.z0) + p && !any; z++) {
+    for (let x = Math.floor(px - field.x0) - 1; x <= Math.floor(px - field.x0) + p && !any; x++) {
+      if (x < 0 || z < 0 || x >= field.w || z >= field.d) continue;
+      if (field.colour[(z * field.w + x) * 4 + 3] > 0) any = true;
+    }
+  }
+  // In town, the lawn's mask too: a patch all indoors, or all street, has none.
+  if (any && px + p > 0 && pz + p > 0 && px < field.townW / n && pz < field.townD / n) {
+    any = false;
+    for (let z = Math.max(0, Math.floor(pz * n) - 1); z < Math.min(field.townD, Math.ceil((pz + p) * n) + 1) && !any; z++) {
+      for (let x = Math.max(0, Math.floor(px * n) - 1); x < Math.min(field.townW, Math.ceil((px + p) * n) + 1) && !any; x++) {
+        if (field.town[z * field.townW + x] > 0) any = true;
+      }
+    }
+    // (Part of a patch at the town's edge lies outside its mask: there, the land's grassiness counts.)
+    if (!any && (px < 0 || pz < 0 || px + p > field.townW / n || pz + p > field.townD / n)) any = true;
+  }
+  field.patches[j * field.pw + i] = any ? 1 : 0;
 }
 
 // ---- Density with distance ------------------------------------------------------------
