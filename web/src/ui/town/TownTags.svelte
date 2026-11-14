@@ -20,7 +20,8 @@
    * them inside the screen and clear of the HUD's panels. Of the places, only so many as the zoom has room for and
    * a hamlet's only while the camera looks into it (`placesInView`); a tag the pointer is on, or near the point of,
    * shows whatever it is. What they say is worked out from the views as they change; where they stand, every frame
-   * (written straight to the elements: nothing reactive moves each frame).
+   * (written straight to the elements: nothing reactive moves each frame), laid out again only when a point, a size,
+   * the screen or the panels changed since the last frame (a still camera over a paused or still town lays out nothing).
    */
   const meta = $derived(townMap.world?.meta ?? null);
   const places = $derived(townPlaces(meta, game.plots));
@@ -58,6 +59,8 @@
     townHud.away = household.away.map((a) => ({ id: a.sim.id, name: a.sim.name, text: a.text }));
   });
 
+  /** The homes for sale's tags (a Big town's hundreds): made again when the plots or households change, not each game minute. */
+  const sales = $derived(saleTags(homesForSale(game.plots, game.households, services.content.economy.homePrice), game.plots, money));
   const tags = $derived.by((): TownTag[] => {
     if (!world) return [];
     const f = townHud.filters;
@@ -74,7 +77,7 @@
       const yours = new Map<number, string>([...members.map((s): [number, string] => [s.id, s.name]), ...people.map((p): [number, string] => [p.sim, game.sims.find((s) => s.id === p.sim)?.name ?? ''])]);
       out.push(...placeTags(world, yours));
     }
-    if (f.sale) out.push(...saleTags(homesForSale(game.plots, game.households, services.content.economy.homePrice), game.plots, money));
+    if (f.sale) out.push(...sales);
     if (f.names) out.push(...nameTags(names));
     return out;
   });
@@ -86,6 +89,12 @@
   let shown = new Map<string, Box>();
   /** The tags moved off their point last frame (their stem is hidden). */
   const edges = new Set<string>();
+  /** Where each tag shown was last put (its transform as written), so one that stays put isn't written again. */
+  const placedAt = new Map<string, string>();
+  /** What the last layout was given (`sameAsLaid`): the tags in order, their elements, and the numbers it read. */
+  let laidKeys: string[] = [];
+  let laidEls: HTMLElement[] = [];
+  let laidIn: number[] = [];
   let layer = $state<HTMLDivElement>();
   const spot = { x: 0, y: 0, z: 0 };
   /** The pointer over the town or the tags (HUD px), or null. */
@@ -152,6 +161,8 @@
       // (The layer goes with them: a new one starts with nothing shown.)
       shown.clear();
       edges.clear();
+      placedAt.clear();
+      laidKeys = [];
       return;
     }
     const scale = settings.uiScale || 1;
@@ -221,7 +232,11 @@
       spots.push(c.spot);
       placed.push(c);
     }
-    const blocks = panels(scale).map((o) => ({ l: o.x - PANEL, t: o.y - PANEL, r: o.x + o.w + PANEL, b: o.y + o.h + PANEL }));
+    const boxes = panels(scale);
+    // (The same tags at the same points, sizes and ranks, on the same screen round the same panels: the same layout as
+    // last frame, already on the page.)
+    if (sameAsLaid(placed, area, boxes)) return;
+    const blocks = boxes.map((o) => ({ l: o.x - PANEL, t: o.y - PANEL, r: o.x + o.w + PANEL, b: o.y + o.h + PANEL }));
     layoutTags(spots, area, blocks);
     const next = new Map<string, Box>();
     for (const { key, t, spot: s } of placed) {
@@ -229,8 +244,12 @@
       const el = pins.get(key)!;
       next.set(key, { l: s.x - s.w / 2, t: s.y - s.h, r: s.x + s.w / 2, b: s.y });
       const name = t.kind === 'names';
-      el.style.transform = `translate(${s.x.toFixed(1)}px, ${(name ? s.y - s.h / 2 : s.y).toFixed(1)}px)`;
-      el.style.visibility = 'visible';
+      const at = `translate(${s.x.toFixed(1)}px, ${(name ? s.y - s.h / 2 : s.y).toFixed(1)}px)`;
+      if (placedAt.get(key) !== at) {
+        el.style.transform = at;
+        placedAt.set(key, at);
+      }
+      if (!shown.has(key)) el.style.visibility = 'visible';
       const edge = !name && (Math.abs(s.x - s.sx) > 2 || Math.abs(s.y - s.sy) > 2);
       if (edge !== edges.has(key)) {
         if (edge) edges.add(key);
@@ -238,8 +257,31 @@
         el.classList.toggle('edge', edge);
       }
     }
-    for (const key of shown.keys()) if (!next.has(key)) pins.get(key)?.style.setProperty('visibility', '');
+    for (const key of shown.keys()) {
+      if (next.has(key)) continue;
+      pins.get(key)?.style.setProperty('visibility', '');
+      placedAt.delete(key);
+    }
     shown = next;
+  }
+
+  /**
+   * Whether the layout this frame would be given what the last one was (the tags in order, each one's element, point,
+   * size, rank, win and whether it was shown, the area and the panels); if not, keeps this frame's for the next.
+   */
+  function sameAsLaid(placed: readonly Candidate[], area: Box, boxes: readonly { x: number; y: number; w: number; h: number }[]): boolean {
+    let same = placed.length === laidKeys.length;
+    for (let i = 0; same && i < placed.length; i++) same = placed[i].key === laidKeys[i] && pins.get(placed[i].key) === laidEls[i];
+    const given = [area.l, area.t, area.r, area.b];
+    for (const o of boxes) given.push(o.x, o.y, o.w, o.h);
+    for (const { spot: s } of placed) given.push(s.sx, s.sy, s.w, s.h, s.rank, s.wins ?? -1, s.held ? 1 : 0);
+    same &&= given.length === laidIn.length && given.every((v, i) => v === laidIn[i]);
+    laidIn = given;
+    if (!same) {
+      laidKeys = placed.map((c) => c.key);
+      laidEls = placed.map((c) => pins.get(c.key)!);
+    }
+    return same;
   }
 
   /** The HUD's panels (its glass, and the place pill), which no tag covers: looked up twice a second (HUD px). */

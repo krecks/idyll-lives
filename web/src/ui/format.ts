@@ -24,10 +24,14 @@ export function timeAgo(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString();
 }
 
+/** The page's number format (what `toLocaleString()` makes afresh each call: the town's prices are hundreds). */
+let digits: Intl.NumberFormat | null = null;
+
 /** Money in the content's currency, e.g. "$1,250" or "-$40". */
 export function money(amount: number): string {
   const symbol = services.content?.economy.currency ?? '$';
-  return `${amount < 0 ? '-' : ''}${symbol}${Math.abs(Math.round(amount)).toLocaleString()}`;
+  digits ??= new Intl.NumberFormat();
+  return `${amount < 0 ? '-' : ''}${symbol}${digits.format(Math.abs(Math.round(amount)))}`;
 }
 
 export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
