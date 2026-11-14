@@ -384,14 +384,14 @@ impl Game {
 /// seeded with their count.
 fn rooms_print(rooms: &[u16]) -> u64 {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ rooms.len() as u64;
-    let mut chunks = rooms.chunks_exact(4);
-    for c in &mut chunks {
+    let (chunks, rest) = rooms.as_chunks::<4>();
+    for c in chunks {
         let v =
             u64::from(c[0]) | u64::from(c[1]) << 16 | u64::from(c[2]) << 32 | u64::from(c[3]) << 48;
         h = (h ^ v).wrapping_mul(0x0000_0100_0000_01b3);
         h ^= h >> 29;
     }
-    for &r in chunks.remainder() {
+    for &r in rest {
         h = (h ^ u64::from(r)).wrapping_mul(0x0000_0100_0000_01b3);
     }
     h
