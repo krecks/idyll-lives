@@ -3002,11 +3002,8 @@ fn lay_route(
                 lane.remove(0);
             }
             let lane = crate::cars::round_corners(&lane);
-            let nearest = |p: [f32; 2]| {
-                (0..full.len())
-                    .min_by(|&a, &b| dist(full[a], p).total_cmp(&dist(full[b], p)))
-                    .unwrap_or(0)
-            };
+            let near_full = crate::travel::NearestPoint::new(full.clone());
+            let nearest = |p: [f32; 2]| near_full.nearest(p).unwrap_or(0);
             let way = |i: usize| {
                 let (a, b) = (lane[i.saturating_sub(1)], lane[(i + 1).min(lane.len() - 1)]);
                 let l = dist(a, b).max(1e-6);
