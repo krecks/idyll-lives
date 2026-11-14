@@ -179,6 +179,11 @@ const GATE_CELL = 8;
 const ROOF_MIN_DISTANCE = 15;
 /** Main-thread time (ms) a world build runs before the frames it runs behind get one (`pace`). */
 const BUILD_SLICE_MS = 8;
+/**
+ * How long after the game comes on screen the menus' town is let go (`releaseTown`): its destroy
+ * (some 20 ms) after the reveal's frames and the fly-in's last ones.
+ */
+const TOWN_RELEASE_MS = 1000;
 /** The same while the camera roams (a big world, or once it has settled on a lot of its own). */
 const ROAM_SLICE_MS = 4;
 /**
@@ -2967,9 +2972,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lastLightMinute = -1;
   }
 
-  /** The game comes on screen again (the overview stays built, for the menus' next visit). */
+  /** The game comes on screen again (the menus' town is let go a moment later: `releaseTown`). */
   private leaveTown(): void {
     this.townMode = false;
+    const ticket = this.townTicket;
+    setTimeout(() => this.releaseTown(ticket), TOWN_RELEASE_MS);
     this.shaderWatch.phase = 'game';
     this.birdLife.setTown(false);
     this.applyDig(); // (the basement and windowless rooms dark again.)
@@ -2982,6 +2989,28 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lastLightMinute = this.lastMinute;
     this.cutLook = -1;
     this.updateCutaway();
+  }
+
+  /**
+   * Lets go of the menus' town while the game is on screen: the overview (a Big world's is some
+   * 800 MB of heap, 230 MB of buffers and 130 MB of GPU memory) and its landscape, unless it is the
+   * game's too. Not if the town was asked for again since (`ticket`): the next `showTown` builds it
+   * again (some seconds behind the menus' own backdrop, as a new town's).
+   */
+  private releaseTown(ticket: number): void {
+    const gone = () => this.townMode || this.disposed || ticket !== this.townTicket;
+    if (gone()) return;
+    // (After a build or a refresh still running: neither shows the town now, `townTicket`.)
+    this.townQueue = this.townQueue
+      .then(() => {
+        if (gone()) return;
+        this.overview?.destroy();
+        this.overview = null;
+        this.townWorld = null;
+        this.townRig.ground = null;
+        this.lot.dropNature('town');
+      })
+      .catch(() => {});
   }
 
   /**

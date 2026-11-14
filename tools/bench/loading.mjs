@@ -7,6 +7,13 @@
  *   portraits in view in its list shown, and to every household's (`.households .face img`);
  * - entry: "Play" on a household to the game up (its interface there, the loading screen gone).
  *
+ * With `--back`, then the way back and in again: the long tasks in the 5 s after the entry (`entryLong`),
+ * "Save and quit" from the menu shown to its live town on screen (`back`; the menus' town was the new
+ * game's, so the main menu's is built), Continue (once the latest save has been prepared behind the
+ * menu) to the game up (`continue`, and `continueLong` after it), the heap in that game (CDP, after a
+ * collection: `heapMB`, its array buffers `buffersMB`), and "Quit without saving" from the menu shown
+ * to its live town (`again`, with the long tasks meanwhile, `againLong`).
+ *
  * Each run is a new browser context (nothing kept: a first visit); `--again` also opens the page a
  * second time in the same context (a returning player: what the browser kept between visits). The
  * page's `Math.random` is seeded (`--seed`), so the showcase, the world of step 1 and its households are
@@ -16,6 +23,7 @@
  *   bun tools/bench/loading.mjs [options]
  *     --runs 3                 runs (medians reported)
  *     --again                  a second visit per run, in the same context
+ *     --back                   the way back to the menu and in again (above)
  *     --seed 7                 the page's Math.random seed
  *     --household 0            which household's Play is pressed (its index in the list)
  *     --renderer webgpu        or webgl
@@ -45,6 +53,7 @@ const pick = Number(flag('household', '0'));
 const renderer = flag('renderer', 'webgpu');
 const port = Number(flag('port', '5222'));
 const again = has('again');
+const back = has('back');
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
 const out = flag('out', join(ROOT, 'bench-results', `loading-${stamp}`));
 mkdirSync(out, { recursive: true });
@@ -97,8 +106,14 @@ const browser = await chromium.launch({
 
 const query = ['profile', renderer === 'webgl' ? 'renderer=webgl' : ''].filter(Boolean).join('&');
 
+/** The page's long tasks (start and duration, ms), from its first script on. */
+function longTasks() {
+  window.__longTasks = [];
+  new PerformanceObserver((list) => list.getEntries().forEach((e) => window.__longTasks.push({ start: e.startTime, ms: e.duration }))).observe({ type: 'longtask', buffered: true });
+}
+
 /** One visit: boot, step 2's portraits, a household's entry (ms each), and the page's spans. */
-async function visit(page) {
+async function visit(page, cdp) {
   const now = () => page.evaluate(() => performance.now());
   // (The page keeps its last 500 spans: read them after each moment, so none is lost.)
   const entries = new Map();
@@ -153,10 +168,55 @@ async function visit(page) {
   await plays.nth(Math.min(pick, (await plays.count()) - 1)).click();
   await page.waitForFunction(() => !!document.querySelector('.hud-root') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 100 });
   const entered = await now();
+  const marks = { boot, opened, shown, pressed, entered };
+  const more = back ? await backAndIn(page, cdp, now, marks) : {};
   clearInterval(polling);
   await keep();
-  const report = { entries: [...entries.values()].sort((a, b) => a.start - b.start), marks: { boot, opened, shown, pressed, entered } };
-  return { boot, inView: inView - opened, portraits: shown - opened, faces, entry: entered - pressed, report };
+  const report = { entries: [...entries.values()].sort((a, b) => a.start - b.start), marks };
+  return { boot, inView: inView - opened, portraits: shown - opened, faces, entry: entered - pressed, ...more, report };
+}
+
+/** `--back`: from the game to the menu and in again (see the header), ms each. */
+async function backAndIn(page, cdp, now, marks) {
+  /** The long tasks (ms) that began between `from` and `to`. */
+  const long = (from, to) => page.evaluate(([a, b]) => window.__longTasks.filter((t) => t.start >= a && t.start < b).map((t) => Math.round(t.ms)), [from, to]);
+  const inGame = () => page.waitForFunction(() => !!document.querySelector('.hud-root') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 100 });
+  /** Leaves the game by the pause menu's `choice`: from the main menu shown to its live town (ms), and the long tasks meanwhile. */
+  const leave = async (choice) => {
+    await page.keyboard.press('Escape');
+    await page.getByText('Quit to main menu', { exact: true }).click();
+    await page.getByText(choice, { exact: true }).click();
+    await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.pause'), null, { timeout: 60_000, polling: 20 });
+    const menu = await now();
+    await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.game-layer.hidden'), null, { timeout: 60_000, polling: 20 });
+    const live = await now();
+    return { ms: live - menu, long: await long(menu, live + 500) };
+  };
+  await page.waitForTimeout(5000);
+  const entryLong = await long(marks.entered, marks.entered + 5000);
+  const first = await leave('Save and quit');
+  // (The latest save prepared behind the menu meanwhile: Continue as a player finds it.)
+  await page.waitForTimeout(15_000);
+  marks.continuePressed = await now();
+  await page.locator('button.continue').click();
+  await inGame();
+  marks.continued = await now();
+  await page.waitForTimeout(5000);
+  const continueLong = await long(marks.continued, marks.continued + 5000);
+  for (let i = 0; i < 3; i++) await cdp.send('HeapProfiler.collectGarbage');
+  const heap = await cdp.send('Runtime.getHeapUsage');
+  const second = await leave('Quit without saving');
+  return {
+    entryLong,
+    back: first.ms,
+    backLong: first.long,
+    continue: marks.continued - marks.continuePressed,
+    continueLong,
+    heapMB: heap.usedSize / 1048576,
+    buffersMB: (heap.backingStorageSize ?? 0) / 1048576,
+    again: second.ms,
+    againLong: second.long,
+  };
 }
 
 const results = [];
@@ -165,12 +225,14 @@ for (let r = 0; r < runs; r++) {
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
   await context.addInitScript(quiet);
   await context.addInitScript(seeded, seed);
+  await context.addInitScript(longTasks);
   const page = await context.newPage();
+  const cdp = back ? await context.newCDPSession(page) : null;
   page.on('pageerror', (e) => console.error(`  page error: ${e.message}`));
   let visits;
   try {
-    visits = [await visit(page)];
-    if (again) visits.push(await visit(page));
+    visits = [await visit(page, cdp)];
+    if (again) visits.push(await visit(page, cdp));
   } catch (err) {
     // (Headless Chromium's page sometimes crashes on a load with others running: that run again, once.)
     await context.close();
@@ -183,6 +245,10 @@ for (let r = 0; r < runs; r++) {
   for (const [i, v] of visits.entries()) {
     const label = i === 0 ? 'first' : 'again';
     console.log(`run ${r + 1} (${label}): boot ${v.boot.toFixed(0)} ms · step-2 portraits in view ${v.inView.toFixed(0)} ms, all ${v.portraits.toFixed(0)} ms (${v.faces}) · entry ${v.entry.toFixed(0)} ms`);
+    if (back) {
+      const tasks = (xs) => (xs.length ? `${xs.length} long (max ${Math.max(...xs)} ms)` : 'no long tasks');
+      console.log(`  after entry ${tasks(v.entryLong)} · back ${v.back.toFixed(0)} ms, ${tasks(v.backLong)} · continue ${v.continue.toFixed(0)} ms, then ${tasks(v.continueLong)} · heap ${v.heapMB.toFixed(0)} MB, buffers ${v.buffersMB.toFixed(0)} MB · again ${v.again.toFixed(0)} ms, ${tasks(v.againLong)}`);
+    }
     writeFileSync(join(out, `run${r + 1}-${label}.json`), JSON.stringify({ query, seed, ...v }, null, 2));
     results.push({ label, ...v });
   }
@@ -206,7 +272,9 @@ for (const label of ['first', 'again']) {
   if (!list.length) continue;
   md.push(`## ${label === 'first' ? 'First visit' : 'Second visit'}`, '');
   md.push('| moment | median ms | runs |', '|---|---|---|');
-  for (const k of ['boot', 'inView', 'portraits', 'entry']) md.push(`| ${k} | ${median(list.map((v) => v[k])).toFixed(0)} | ${list.map((v) => v[k].toFixed(0)).join(', ')} |`);
+  for (const k of ['boot', 'inView', 'portraits', 'entry', ...(back ? ['back', 'continue', 'heapMB', 'buffersMB', 'again'] : [])]) md.push(`| ${k} | ${median(list.map((v) => v[k])).toFixed(0)} | ${list.map((v) => v[k].toFixed(0)).join(', ')} |`);
+  // (`--back`: the longest task in each stretch.)
+  if (back) for (const k of ['entryLong', 'backLong', 'continueLong', 'againLong']) md.push(`| ${k} (longest) | ${median(list.map((v) => Math.max(0, ...v[k]))).toFixed(0)} | ${list.map((v) => Math.max(0, ...v[k])).join(', ')} |`);
   md.push('', '| span | median ms (summed) | count |', '|---|---|---|');
   const names = [...new Set(list.flatMap((v) => v.report?.entries.map((e) => named(e.name)) ?? []))];
   for (const name of names.filter((n) => /^(boot|session|host|warm|portraits|preview|studio|menu: showTown|render: nature)/.test(n))) {
