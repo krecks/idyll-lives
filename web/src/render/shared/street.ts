@@ -475,6 +475,22 @@ interface KerbOut {
   rank?: { shelter: number; sign: number | null; others: number[] };
 }
 
+/** What a plot's share is planned from (`TownStreet.plotKey`): the plot, the focus lot it is planned for (or `NO_FOCUS`), its unit's id and a hash. */
+interface PlotKey {
+  L: PlotLayout;
+  variant: number;
+  id: string;
+  hash: number;
+}
+
+/** What a chunk's fences are planned from (`TownStreet.fenceKey`): its fences, those round it (for the posts) and a hash. */
+interface FenceKey {
+  id: number;
+  list: FenceEdge[];
+  round: FenceEdge[];
+  hash: number;
+}
+
 /** Something on the street that blocks props: a thing's footprint or a garage, and the plot it's on (-1: none). */
 interface Blocker extends Rect {
   plot: number;
@@ -585,7 +601,7 @@ export class TownStreet {
   private objectsByPlot = new Map<number, ObjectPlacement[]>();
   private garages = new Map<number, SilhouetteSpec['garage']>();
   /** Things on no plot's ground (on the street, on lots not laid out). */
-  private readonly plotUnits = new Map<string, { hash: number; out: PlotOut }>();
+  private readonly plotUnits = new Map<string, { hash: number; out: PlotOut; chunk: number; variant: number }>();
   private readonly kerbUnits = new Map<string, { hash: number; out: KerbOut }>();
   /** The world's fences by the chunk their middle is in, as last taken (`setWorld`), and each chunk's share of the street. */
   private fencesOf: FenceEdge[] | null = null;
@@ -780,7 +796,7 @@ export class TownStreet {
   /** Takes the world's things, houses and rooms as they are now (the layout stays: see `layoutKey`). */
   setWorld(world: WorldStructure): void {
     this.world = world;
-    // Fences (one put up or taken down): found again by chunk; each chunk's share notices its own (`fenceOut`).
+    // Fences (one put up or taken down): found again by chunk; each chunk's share notices its own (`fenceKey`).
     const fences = shownFences(world, this.options.fenceStyles ?? []);
     if (fences !== this.fencesOf) {
       this.fencesOf = fences;
@@ -812,7 +828,7 @@ export class TownStreet {
       this.version++;
     }
     // Doors and windows (a window put in on the focus lot): found again by where they are; each
-    // plot's share notices those round its house (`plotOut`).
+    // plot's share notices those round its house (`plotKey`).
     if (world.openings !== this.openingsOf) {
       this.openingsOf = world.openings;
       this.wallEdges = null;
@@ -827,7 +843,7 @@ export class TownStreet {
       this.openingGrid = grid;
       this.version++;
     }
-    // Porches and porch pieces (one built or taken down): each plot's share notices its own (`plotOut`).
+    // Porches and porch pieces (one built or taken down): each plot's share notices its own (`plotKey`).
     if (world.porches !== this.porchesOf || world.porchPieces !== this.piecesOf) {
       this.porchesOf = world.porches;
       this.piecesOf = world.porchPieces;
@@ -1059,7 +1075,8 @@ export class TownStreet {
     return p.kind === 'canopy' && canopyBack(p).some(([axis, x, z]) => this.walled(axis, x, z));
   }
 
-  private plotOut(L: PlotLayout, focus: number): { key: string; out: PlotOut } {
+  /** What a plot's share is planned from with lot `focus` in view (its unit's id and a hash), without planning it. */
+  private plotKey(L: PlotLayout, focus: number): PlotKey {
     const deps = this.plotDeps(L);
     const variant = deps.some((d) => d.info.id === focus) ? focus : NO_FOCUS;
     const id = `${L.info.id}|${variant}`;
@@ -1080,11 +1097,28 @@ export class TownStreet {
     // Indoors or out: the things on it, by the rooms under them.
     const W = this.W;
     for (const o of this.objectsByPlot.get(L.info.id) ?? []) h = mix(h, this.world.rooms[o.z * W + o.x] ? 1 : 0);
+    return { L, variant, id, hash: h };
+  }
+
+  /** A plot's share as `plotKey` found it: the one kept, or planned now. */
+  private plotOut({ L, variant, id, hash }: PlotKey): PlotOut {
     const cached = this.plotUnits.get(id);
-    if (cached && cached.hash === h) return { key: `p${id}:${h}`, out: cached.out };
+    if (cached && cached.hash === hash) return cached.out;
     const out = this.planPlot(L, variant);
-    this.plotUnits.set(id, { hash: h, out });
-    return { key: `p${id}:${h}`, out };
+    this.plotUnits.set(id, { hash, out, chunk: this.plotChunk(L), variant });
+    return out;
+  }
+
+  /**
+   * Lets go of the parts kept that the street won't soon plan a chunk from: the plots' and the
+   * fences' of the chunks not in `chunks` (null: every chunk's are kept), and the plots' for another
+   * focus lot than `focus`. A chunk's key needs none of them (`chunkKey`): a chunk streamed in with
+   * the key it was built with plans nothing; one whose key changed meanwhile plans its plots and
+   * fences afresh.
+   */
+  keepUnits(chunks: ReadonlySet<number> | null, focus: number): void {
+    for (const [id, u] of this.plotUnits) if ((chunks && !chunks.has(u.chunk)) || (u.variant !== NO_FOCUS && u.variant !== focus)) this.plotUnits.delete(id);
+    if (chunks) for (const id of this.fenceUnits.keys()) if (!chunks.has(id)) this.fenceUnits.delete(id);
   }
 
   /** A plot's share of the street with lot `focus` in view (see the rules at the top). */
@@ -1465,7 +1499,7 @@ export class TownStreet {
    * focus lot's (on its edges too) nor the gates (the game draws those, swinging); in the menus'
    * town all of them.
    */
-  private fenceOut(id: number, focus: number): { key: string; out: Parts } | null {
+  private fenceKey(id: number, focus: number): FenceKey | null {
     const all = this.fencesByChunk.get(id);
     if (!all?.length) return null;
     const F = this.mode === 'game' ? this.byId.get(focus)?.info : undefined;
@@ -1479,14 +1513,19 @@ export class TownStreet {
     const edge = (h: number, f: FenceEdge) => mix(mix(mix(h, f.x * 2 + (f.axis === 'h' ? 1 : 0)), f.z), (f.style ?? 0) * 2 + (f.kind === 'gate' ? 1 : 0));
     let h = list.reduce(edge, 0);
     h = round.reduce(edge, mix(h, round.length));
+    return { id, list, round, hash: h };
+  }
+
+  /** A chunk's fences as `fenceKey` found them: those kept, or planned now. */
+  private fenceOut({ id, list, round, hash }: FenceKey): Parts {
     const cached = this.fenceUnits.get(id);
-    if (cached && cached.hash === h) return { key: `e${id}:${h}`, out: cached.out };
+    if (cached && cached.hash === hash) return cached.out;
     const parts = new Parts(this.options.has);
     const postHere = (x: number, z: number) => this.postOwner.get(`${x}:${z}`) === id;
     const wallAt = (x: number, z: number) => this.wallCornerSet.has(`${x}:${z}`);
     writeFences(parts.props, list, this.options.fenceStyles ?? [], { gates: null, hedges: parts.plants.hedge, postsFrom: round, postHere, wallAt });
-    this.fenceUnits.set(id, { hash: h, out: parts });
-    return { key: `e${id}:${h}`, out: parts };
+    this.fenceUnits.set(id, { hash, out: parts });
+    return parts;
   }
 
   /** Sidewalks and kerbs, the road's surface (the game's), the fountains on roundabouts, the menus' parked cars: by chunk, planned once. */
@@ -1579,13 +1618,13 @@ export class TownStreet {
   /** Moved on whenever `setWorld` takes a world that changes anything the street is planned from. */
   private version = 0;
 
-  private gather(id: number, focus: number): { key: string; plots: PlotOut[]; kerbs: Parts[]; fields: Parts[]; ground: GroundLayer[] } {
+  private gather(id: number, focus: number): { key: string; plots: PlotKey[]; kerbs: Parts[]; fence: FenceKey | null; ground: GroundLayer[] } {
     const keys: string[] = [];
-    const plots: PlotOut[] = [];
+    const plots: PlotKey[] = [];
     for (const L of this.plotsByChunk().get(id) ?? []) {
-      const { key, out } = this.plotOut(L, focus);
-      keys.push(key);
-      plots.push(out);
+      const k = this.plotKey(L, focus);
+      keys.push(`p${k.id}:${k.hash}`);
+      plots.push(k);
     }
     const kerbs: Parts[] = [];
     for (const r of this.rows.keys()) {
@@ -1594,12 +1633,8 @@ export class TownStreet {
       keys.push(`k${r}:${c.sig}`);
       kerbs.push(c.parts);
     }
-    const fields: Parts[] = [];
-    const fence = this.fenceOut(id, focus);
-    if (fence) {
-      keys.push(fence.key);
-      fields.push(fence.out);
-    }
+    const fence = this.fenceKey(id, focus);
+    if (fence) keys.push(`e${id}:${fence.hash}`);
     // Ground layers: garden paths and fields off the focus lot (the lot draws its own, on its ground).
     const ground: GroundLayer[] = [];
     if (this.options.ground) {
@@ -1623,7 +1658,7 @@ export class TownStreet {
         keys.push(`${name}:${list.length}:${hashNumbers(list.flatMap((r) => [r.x, r.z, r.w, r.d]))}`);
       }
     }
-    return { key: `${id}|${this.options.lived}|${keys.join(';')}`, plots, kerbs, fields, ground };
+    return { key: `${id}|${this.options.lived}|${keys.join(';')}`, plots, kerbs, fence, ground };
   }
 
   /** Plans chunk `id` with lot `focus` in view (`NO_FOCUS`: none; in the menus' town the player's lot is the focus). */
@@ -1647,14 +1682,15 @@ export class TownStreet {
     };
     const st = this.staticParts().get(id);
     if (st) mergeParts(plan, st.parts);
-    for (const p of g.plots) {
+    for (const k of g.plots) {
+      const p = this.plotOut(k);
       if (p.spec) plan.specs.push(p.spec);
       if (p.silhouettes) mergeSilhouettes(plan.silhouettes, p.silhouettes);
       if (p.lot) plan.lot = p.lot;
       mergeParts(plan, p.parts);
     }
     for (const p of g.kerbs) mergeParts(plan, p);
-    for (const p of g.fields) mergeParts(plan, p);
+    if (g.fence) mergeParts(plan, this.fenceOut(g.fence));
     return plan;
   }
 }
