@@ -167,7 +167,7 @@ jobs:
       # Bun runs the sample makers.
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
 
       # The generated_* tests are ignored because they need sample files; made here so they run
       # instead of passing without checking anything.
@@ -201,7 +201,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: steps.passed.outputs.cache-hit != 'true'
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
 
       # The residents' clips on both bodies at every life stage; the known failures are in
       # tools/characters/clip-baseline.json, so only a new one fails.
@@ -276,7 +276,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: steps.passed.outputs.cache-hit != 'true'
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - name: Shader chunks
         if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh chunks
