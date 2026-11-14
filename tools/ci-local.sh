@@ -37,15 +37,11 @@ if command -v bun >/dev/null && [[ "$(bun --version)" != "$pinned" ]]; then
   bun_ci=(bunx "bun@$pinned")
 fi
 
-# The tools' release build without fat LTO, its tests and the checks the same build (slow to link;
-# the answers are the same).
-tools_cargo() { CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 cargo "$@"; }
-
 step() {
   printf '\n== %s\n' "$1"
   case "$1" in
     # Accepted parts held by their sha256 (tools/pins/pins.json).
-    pins) tools_cargo pins ;;
+    pins) cargo pins ;;
     fmt) cargo fmt --all --check ;;
     clippy) cargo clippy --workspace --all-targets --locked -- -D warnings ;;
     # (The long runs only with SLOW_TESTS: `#[cfg_attr(not(feature = "slow-tests"), ignore)]`.)
@@ -74,15 +70,16 @@ step() {
     # The renderer's engine-neutral tests.
     # (The town-building files, `*.slow.test.ts`, only with SLOW_TESTS.)
     web) (cd web && "${bun_ci[@]}" install --frozen-lockfile && "${bun_ci[@]}" run test && if [[ -n "${SLOW_TESTS:-}" ]]; then "${bun_ci[@]}" run test:slow; fi) ;;
-    # The character build, the object gate and the content and texture tools.
-    tools) tools_cargo test -p ll-tools --release --locked ;;
+    # The character build, the object gate and the content and texture tools, in the build the
+    # aliases above and below run (Cargo.toml's `tools` profile).
+    tools) cargo test -p ll-tools --profile tools --locked ;;
     # The PlayCanvas shader chunks' anchors and private names the renderer relies on (tools/render/chunks.json),
     # in the release build the game imports: its package, then the tools' check.
-    chunks) (cd web && "${bun_ci[@]}" install --frozen-lockfile) && tools_cargo check-chunks ;;
+    chunks) (cd web && "${bun_ci[@]}" install --frozen-lockfile) && cargo check-chunks ;;
     # Every shipped model against the reference's kinds; every use the renderer can play; every model at the gate.
-    sizes) tools_cargo review sizes ;;
-    uses) tools_cargo review uses --check ;;
-    models) tools_cargo check-glb ;;
+    sizes) cargo review sizes ;;
+    uses) cargo review uses --check ;;
+    models) cargo check-glb ;;
     types) (cd web && bun run wasm && bun run voice:wasm && "${bun_ci[@]}" run check && "${bun_ci[@]}" run lint) ;;
     *)
       echo "unknown step: $1 (steps: ${all[*]})" >&2
