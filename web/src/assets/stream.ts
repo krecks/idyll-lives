@@ -82,7 +82,7 @@ export function background<T>(load: () => Promise<T>, url: string | null = null)
     });
 }
 
-/** A URL without this build's query: one key per file across releases. */
+/** A URL without the query `withBuild` gave it (the build's id or the file's hash): one key per file across releases. */
 function key(url: string): string {
   return withoutBuild(url);
 }

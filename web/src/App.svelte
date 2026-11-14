@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, type Component } from 'svelte';
-  import { host } from './game/host';
+  import { host, loadSessionCode } from './game/host';
   import { menuScene } from './game/menuScene';
   import { BENCH } from './debug/benchFlags';
   import { watchLog } from './debug/log';
@@ -10,7 +10,7 @@
   import { lookAtAge, lookFromSeed } from './game/household';
   import type { NeighbourhoodDraft } from './game/town';
   import type { Renderer } from './render/types';
-  import { loadGameData } from './game/session';
+  import { loadGameData } from './game/gameData';
   import { prefetchNow, streamGameData } from './assets/stream';
   import { gameDataUrls, menuAssetUrls } from './game/streamPlan';
   import { latestSave, UnloadableSave } from './persistence/saves';
@@ -170,6 +170,8 @@
     perfEnd(booted);
     app.booting = false;
     void perfTimeAsync('boot: game screen chunk', loadGameView);
+    // (And the session's code, which a prepared save or "Play" starts with.)
+    void perfTimeAsync('boot: session chunk', loadSessionCode).catch((err: unknown) => console.warn('[app] the session code failed to load', err));
     // The rest of the game's data streams from the menu on (not while benchmarking: it would show
     // in the measurements), once the menu's entrance is over.
     if (!BENCH) void menuScene.settled().then(() => streamGameData(gameDataUrls(data.content, data.assets)));
