@@ -286,6 +286,11 @@ export class SunShadows {
     }
   }
 
+  /** A redraw is still to come: held back to the rate, or asked for and not drawn yet. */
+  get waiting(): boolean {
+    return this.pending || this.light.shadowUpdateMode === pc.SHADOWUPDATE_THISFRAME;
+  }
+
   /** Each frame: a pose redraw held back draws once the interval has passed. */
   frame(): void {
     if (!this.pending || performance.now() - this.lastDraw < this.interval) return;

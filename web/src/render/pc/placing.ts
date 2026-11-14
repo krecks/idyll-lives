@@ -134,6 +134,11 @@ export class Placing {
     this.hideHeld();
   }
 
+  /** Something of it moves on its own: the thing in hand (it glides, bobs and pulses), or an effect playing. */
+  get animating(): boolean {
+    return this.ghost.shown || this.fx.playing;
+  }
+
   /** Each game frame (`dtMs`): the effects, and the thing in hand. */
   frame(dtMs: number): void {
     // Things springing into place cast as they grow.
