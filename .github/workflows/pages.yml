@@ -52,7 +52,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
 
       - name: Version check (web, Rust and Cargo.lock match; on a release tag, the tag and CHANGELOG.md too)
         env:
