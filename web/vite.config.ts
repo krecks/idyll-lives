@@ -2,9 +2,10 @@ import { defineConfig, searchForWorkspaceRoot, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { appendFile, cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { basename, join, resolve } from 'node:path';
+import { basename, join, resolve, sep } from 'node:path';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 // SharedArrayBuffer (zero-copy sim -> render snapshots, threads for the language model on the
 // CPU) requires cross-origin isolation. Where production hosting can't send these two headers
@@ -309,18 +310,23 @@ function releaseWasm(): Plugin {
  */
 function earlyEnvironment(): Plugin {
   let base = '/';
+  let build = false;
   return {
     name: 'early-environment',
     configResolved(config) {
       base = config.base;
+      build = config.command === 'build';
     },
-    transformIndexHtml() {
+    async transformIndexHtml() {
       const manifest = JSON.parse(readFileSync(new URL('./public/assets/manifest.json', import.meta.url), 'utf8')) as { entries: Record<string, { url?: string }> };
       const file = manifest.entries['environment.sky']?.url;
       if (!file) return [];
-      // As the asset registry resolves it (src/assets/registry.ts, build.ts), so the URLs match.
+      // As the asset registry resolves it (src/assets/registry.ts, build.ts), so the URLs match:
+      // by its content hash in a build, else with the build's id.
       const url = new URL(file, `http://x${base}assets/manifest.json`);
-      const href = JSON.stringify(`${url.pathname}${url.search ? `${url.search}&` : '?'}v=${BUILD_ID}`);
+      const hash = build && !url.search ? (await dataHashes())[url.pathname.slice(base.length)] : undefined;
+      const query = hash ? `h=${hash}` : `v=${BUILD_ID}`;
+      const href = JSON.stringify(`${url.pathname}${url.search ? `${url.search}&` : '?'}${query}`);
       const children = `self.__skyEnv = { url: ${href}, bytes: fetch(${href}).then((res) => (res.ok ? res.arrayBuffer() : null)).catch(() => null) };`;
       return [{ tag: 'script', children, injectTo: 'head' }];
     },
@@ -350,11 +356,54 @@ function minifiedManifests(): Plugin {
   };
 }
 
+/** The folders below public/ whose files the game fetches through `withBuild` (src/assets/build.ts). */
+const DATA_DIRS = ['assets', 'content', 'decoders'];
+
+let hashed: Promise<Record<string, string>> | null = null;
+
+/**
+ * The content hash of every data file the build ships from public/ (`DATA_DIRS`), by its path below
+ * the site's base as a URL spells it: the first 12 hex digits of its SHA-256. The game asks for each
+ * by it (`?h=<hash>`, src/assets/build.ts), so the isolation service worker keeps a file from
+ * release to release while it doesn't change. A source the build ships a compressed copy of instead
+ * (`optimizedAssets`) is left out, its copy in. Made once per build (after `cargo assets` has run).
+ */
+function dataHashes(): Promise<Record<string, string>> {
+  return (hashed ??= (async () => {
+    const pub = fileURLToPath(new URL('./public/', import.meta.url));
+    const copies =
+      process.env.LL_ASSETS === 'source'
+        ? {}
+        : ((JSON.parse(await readFile(join(ASSETS_OUT, 'optimized.json'), 'utf8')) as { files?: Record<string, string> }).files ?? {});
+    const replaced = new Set(Object.keys(copies).map((source) => `assets/${source}`));
+    const files: [string, string][] = Object.values(copies).map((copy) => [`assets/${copy}`, join(ASSETS_OUT, copy)]);
+    for (const dir of DATA_DIRS) {
+      for (const entry of await readdir(join(pub, dir), { recursive: true, withFileTypes: true })) {
+        if (!entry.isFile() || entry.name.startsWith('.')) continue;
+        const path = join(entry.parentPath, entry.name);
+        const rel = path.slice(pub.length).split(sep).join('/');
+        if (!replaced.has(rel)) files.push([rel, path]);
+      }
+    }
+    const out: Record<string, string> = {};
+    // (A few dozen at a time: a thousand files open at once would pass the open-file limit.)
+    for (let i = 0; i < files.length; i += 64) {
+      const batch = files.slice(i, i + 64);
+      const hashes = await Promise.all(batch.map(async ([, path]) => createHash('sha256').update(await readFile(path)).digest('hex').slice(0, 12)));
+      batch.forEach(([rel], j) => (out[new URL(rel, 'http://x/').pathname.slice(1)] = hashes[j]));
+    }
+    return out;
+  })());
+}
+
 /**
  * `bundle.json`: what every start fetches from public/ in one file (src/assets/bundle.ts):
  * `content/base.json` and the files it includes, the house templates, the asset manifests and the
  * packs they list, and the index of compressed copies; each file's text, minified, by its path
- * below the base URL. The files still ship one by one beside it.
+ * below the base URL (`files`). The files still ship one by one beside it. And the content hash of
+ * every data file the build ships (`hashes`, `dataHashes`), by which the game asks for them, and the
+ * build's own hashed files (`built`: scripts, styles, wasm, fonts), which the isolation service worker
+ * keeps across builds while a build still ships them.
  */
 function dataBundle(): Plugin {
   let outDir = '';
@@ -384,16 +433,28 @@ function dataBundle(): Plugin {
       };
       await manifests('assets/manifest.json');
       if (process.env.LL_ASSETS !== 'source') await add('assets/optimized.json', join(ASSETS_OUT, 'optimized.json'));
-      await writeFile(join(outDir, 'bundle.json'), JSON.stringify(files));
+      const [hashed, elsewhere] = [workerPattern('HASHED'), workerPattern('KEPT_ELSEWHERE')];
+      const built = (await readdir(join(outDir, 'assets'))).filter((name) => hashed.test(name) && !elsewhere.test(name)).map((name) => `assets/${name}`);
+      await writeFile(join(outDir, 'bundle.json'), JSON.stringify({ files, hashes: await dataHashes(), built }));
     },
   };
 }
 
+/** A pattern the isolation service worker (public/isolation-sw.js) declares as `const <name> = /…/;`. */
+function workerPattern(name: string): RegExp {
+  const code = readFileSync(new URL('./public/isolation-sw.js', import.meta.url), 'utf8');
+  const pattern = new RegExp(`const ${name} = /(.+)/;`).exec(code)?.[1];
+  if (!pattern) throw new Error(`isolation-sw.js has no \`const ${name} = /…/;\``);
+  return new RegExp(pattern);
+}
+
 /**
  * The isolation service worker (public/isolation-sw.js) gets this build's id, which names the
- * cache it keeps the build's hashed files in: every build is a new version of the worker, so
- * returning players' browsers install it and drop the last build's cache. The worker tells the
- * build's files by their names in `assets/`, so no file from public/ may look like one.
+ * cache it keeps what the build fetches by its id in (`?v=`): every build is a new version of the
+ * worker, so returning players' browsers install it and drop the last build's cache. (The files that
+ * never change under their URL, hashed build files and data by content hash, it keeps across builds.)
+ * The worker tells the build's files by their names in `assets/`, so no file from public/ may look
+ * like one.
  */
 function isolationWorker(): Plugin {
   let outDir = '';
@@ -409,9 +470,7 @@ function isolationWorker(): Plugin {
       const stamped = code.replace("const BUILD = 'dev';", `const BUILD = '${BUILD_ID}';`);
       if (stamped === code) throw new Error("isolation-worker: no `const BUILD = 'dev';` in isolation-sw.js");
       await writeFile(file, stamped);
-      const pattern = /const HASHED = \/(.+)\/;/.exec(code)?.[1];
-      if (!pattern) throw new Error('isolation-worker: no `const HASHED = /…/;` in isolation-sw.js');
-      const hashed = new RegExp(pattern);
+      const hashed = workerPattern('HASHED');
       const own = await readdir(fileURLToPath(new URL('./public/assets/', import.meta.url))).catch(() => [] as string[]);
       const clash = own.filter((name) => hashed.test(name));
       if (clash.length) throw new Error(`isolation-worker: public/assets/${clash[0]} looks like a hashed build file (the service worker would keep it for good)`);

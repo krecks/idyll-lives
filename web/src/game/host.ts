@@ -20,7 +20,8 @@ import { basicReport, within } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
 import { webGpuFailed } from '../render/shared/gpu';
 import type { HouseholdDraft } from './household';
-import { loadGameData, startSession, type GameSession, type StartRequest } from './session';
+import { loadGameData } from './gameData';
+import type { GameSession, StartRequest } from './session';
 
 function requestKey(r: StartRequest): string {
   if (r.kind === 'load') return `load:${r.saveId}`;
@@ -36,6 +37,20 @@ const FLY_IN = 1.3;
 const VEIL_MS = 260;
 /** The loading bar's share before the warm-up, for a session prepared without it (the warm-up comes once it's started). */
 const BEFORE_WARM = 0.9;
+
+/**
+ * The session's code (`session.ts`, with Build mode's and the game's input): a script chunk of its
+ * own, so the page reaches the menu without it. Fetched once the menu is up (`loadSessionCode`, from
+ * the boot), long before a prepared save or "Play" needs it; a failed fetch is tried again next time.
+ */
+let sessionCode: Promise<typeof import('./session')> | null = null;
+export function loadSessionCode(): Promise<typeof import('./session')> {
+  sessionCode ??= import('./session').catch((err: unknown) => {
+    sessionCode = null;
+    throw err;
+  });
+  return sessionCode;
+}
 
 interface Entry {
   key: string;
@@ -191,6 +206,8 @@ class GameHost {
       const renderer = await this.rendererFor(settings);
       // One session at a time on the shared renderer: a replaced one must finish clearing it first.
       await previous;
+      if (this.current !== entry) throw new Error('Replaced by another game.');
+      const { startSession } = await loadSessionCode();
       if (this.current !== entry) throw new Error('Replaced by another game.');
       return startSession(
         renderer,
