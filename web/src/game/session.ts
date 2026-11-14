@@ -4,9 +4,7 @@
  * in the background while the player is still in a menu — and go live with `reveal()`.
  */
 
-import { AssetRegistry } from '../assets/registry';
 import { prefetch, prefetchNow, planStream, reprioritize, whenStreamSettled } from '../assets/stream';
-import { Content } from '../content/content';
 import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SimInfo, SocialEvent, WorldStructure } from '../core/protocol';
 import { groundDepth, lowestStorey } from '../core/protocol';
@@ -22,8 +20,6 @@ import { plainState } from '../debug/snapshot.svelte';
 import { liveSims } from '../debug/sims';
 import { threadStats } from '../debug/threads';
 import { DEVLOG, devlog, devlogNextSample, devlogPaused, devlogSlowFrame, renderSample, SAMPLE_MS, SLOW_FRAME_MS } from '../debug/devlog';
-import { createSimPreviews } from '../render/preview';
-import { createItemPreviews } from '../render/preview/items';
 import type { CameraPose, Renderer, SimLook, WallMode } from '../render/types';
 import { carRowIsTaxi } from '../render/shared/cars';
 import { WARM_LOTS, warmLots } from '../render/shared/focus';
@@ -50,7 +46,8 @@ import { play } from '../ui/sfx';
 import { faceFromId, householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { clockTime, openAt, staffed, staffResidents } from './staff';
 import { PointerInput, routeKey } from './input';
-import { useTownContent, type NeighbourhoodDraft } from './town';
+import type { NeighbourhoodDraft } from './town';
+import { compileSim, loadGameData } from './gameData';
 import { townJob } from './townJobs';
 import { gameAssetPlan, parseAheadFiles, streamRanks } from './streamPlan';
 import { GameSpeed } from './speed';
@@ -150,42 +147,6 @@ export interface GameSession {
   reveal(): void;
   /** Ends the session; resolves once it has let go of the renderer, which is kept for the next one. */
   dispose(): Promise<void>;
-}
-
-/** The simulation's wasm, compiled once a page (from boot on) and handed to each game's worker; null if it couldn't be (the worker then fetches it). */
-let simModule: Promise<WebAssembly.Module | null> | null = null;
-export function compileSim(): Promise<WebAssembly.Module | null> {
-  simModule ??= (async () => {
-    const url = new URL('../core/wasm-pkg/sim_wasm_bg.wasm', import.meta.url);
-    try {
-      return await (typeof WebAssembly.compileStreaming === 'function' ? WebAssembly.compileStreaming(fetch(url)) : WebAssembly.compile(await (await fetch(url)).arrayBuffer()));
-    } catch (err) {
-      console.warn('[session] the simulation could not be compiled ahead; each game compiles its own', err);
-      return null;
-    }
-  })();
-  return simModule;
-}
-
-/** Shared, immutable data: loaded once per page. */
-let shared: Promise<{ content: Content; assets: AssetRegistry }> | null = null;
-export function loadGameData(): Promise<{ content: Content; assets: AssetRegistry }> {
-  const params = new URLSearchParams(location.search);
-  const base = import.meta.env.BASE_URL;
-  shared ??= Promise.all([
-    perfTimeAsync('data: content', () => Content.load(`${base}content/base.json`)),
-    perfTimeAsync('data: assets', () => AssetRegistry.load(`${base}assets/manifest.json`, params.getAll('pack'))),
-  ]).then(([content, assets]) => {
-    services.content = content;
-    services.assets = assets;
-    useTownContent(content);
-    services.previews = createSimPreviews({ assets, emotions: content.emotions.map((e) => e.id), backend: () => liveSettings.renderer });
-    services.items = createItemPreviews(assets, () => liveSettings.renderer);
-    // (The simulation compiles meanwhile, once: every game's worker takes it as it is.)
-    void compileSim();
-    return { content, assets };
-  });
-  return shared;
 }
 
 /** Reports a loading step and the overall progress (0..1) while a session is prepared. */

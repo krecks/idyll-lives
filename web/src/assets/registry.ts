@@ -138,7 +138,7 @@ function extended(below: AssetEntry | undefined, entry: AssetEntry): AssetEntry 
 /** The file references an entry has: every kind of entry has one or two of `URL_FIELDS`. */
 type UrlFields = Partial<Record<(typeof URL_FIELDS)[number], string>>;
 
-/** Makes file references absolute relative to the manifest that declared them, with this build's query. */
+/** Makes file references absolute relative to the manifest that declared them, with the query this build fetches them by (`withBuild`). */
 function resolveUrls(entry: AssetEntry, base: URL): AssetEntry {
   const out = { ...entry } as AssetEntry & UrlFields;
   for (const field of URL_FIELDS) {

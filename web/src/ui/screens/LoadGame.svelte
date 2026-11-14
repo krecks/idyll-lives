@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { SimBridge } from '../../core/bridge';
-  import { loadGameData } from '../../game/session';
+  import { loadGameData } from '../../game/gameData';
   import { deleteSave, exportSave, importProblemText, listSaves, onSavesChanged, parseSaveFile, playable, writeSave, type SaveMeta } from '../../persistence/saves';
   import { settings } from '../../settings/settings.svelte';
   import { app } from '../app.svelte';

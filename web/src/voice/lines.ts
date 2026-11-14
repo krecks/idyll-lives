@@ -6,7 +6,7 @@
  * so voices can't change the game.
  */
 
-import { withBuild } from '../assets/build';
+import { dataUrl } from '../assets/bundle';
 import { mergeDeep } from '../content/content';
 import { hashUnit } from './voices';
 import type { LineRequest } from './writer';
@@ -62,7 +62,8 @@ const files = new Map<string, Promise<LinesFile | null>>();
 export function loadLines(language: string): Promise<LinesFile | null> {
   let file = files.get(language);
   if (!file) {
-    file = fetch(withBuild(`${import.meta.env.BASE_URL}content/voice/${language}.json`))
+    file = dataUrl(`${import.meta.env.BASE_URL}content/voice/${language}.json`)
+      .then((url) => fetch(url))
       .then((r) => (r.ok ? (r.json() as Promise<LinesFile>) : null))
       .catch(() => null);
     files.set(language, file);

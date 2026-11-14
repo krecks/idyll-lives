@@ -79,7 +79,6 @@ import { townView } from '../shared/townView';
 import { landscapeRing } from '../shared/nature';
 import { setFogFrom } from './shaders/fog';
 import { LT_FIXTURE } from '../../debug/livingTown';
-import { applyLtFixture } from '../../debug/ltFixture';
 import { backdropBuilding, backdropGround, gardenHedges, lotBuilding, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
 import { TownGroundMap } from './groundTiles';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
@@ -1553,8 +1552,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   // --- the world -----------------------------------------------------------------------
 
   setWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
-    // (`?ltFixture`: a Big world without a backdrop gets the debug fixture's, until worldgen writes one.)
-    if (LT_FIXTURE) applyLtFixture(world);
+    // (`?ltFixture`: a Big world without a backdrop gets the debug fixture's, until worldgen writes
+    // one; its code is a chunk of its own.)
+    if (LT_FIXTURE) {
+      return import('../../debug/ltFixture').then(({ applyLtFixture }) => {
+        applyLtFixture(world);
+        return this.placeWorld(world, view);
+      });
+    }
+    return this.placeWorld(world, view);
+  }
+
+  private placeWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
     // A big world is never built whole in full detail (no view: every house's storeys and every
     // thing, hundreds of MB of buffers; Low's merged object shadows alone 260 MB, which lost the
     // WebGPU device): with no lot given, the focus stays the lot built, else the one nearest the camera.
