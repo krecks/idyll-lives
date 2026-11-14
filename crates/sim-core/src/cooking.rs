@@ -2599,15 +2599,9 @@ pub(crate) fn using(
                     };
                     sim.needs[n] = (sim.needs[n] + g * minutes).clamp(0.0, 1.0);
                 }
-                for s in 0..content.skills.len() {
-                    if inter.skill_gain[s] > 0.0 {
-                        crate::world::practise(
-                            sim,
-                            content,
-                            s,
-                            inter.skill_gain[s] * boost,
-                            minutes,
-                        );
+                for (s, &gain) in inter.skill_gain[..content.skills.len()].iter().enumerate() {
+                    if gain > 0.0 {
+                        crate::world::practise(sim, content, s, gain * boost, minutes);
                     }
                 }
             }

@@ -898,10 +898,10 @@ impl Graph {
         }
         // (Each group in the middle of its members.)
         let mut sum: Vec<([f32; 2], u32)> = vec![([0.0, 0.0], 0); n];
-        for v in 0..n {
+        for (v, node) in self.nodes.iter().enumerate() {
             let r = find(&mut parent, v);
-            sum[r].0[0] += self.nodes[v][0];
-            sum[r].0[1] += self.nodes[v][1];
+            sum[r].0[0] += node[0];
+            sum[r].0[1] += node[1];
             sum[r].1 += 1;
         }
         for v in 0..n {

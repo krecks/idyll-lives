@@ -343,12 +343,8 @@ pub(crate) fn against<'a>(d: &'a Driving, them: &'a [Driving]) -> impl Iterator<
                 return false;
             }
             let reach = d.len + d.ahead.max(d.behind) + o.len;
-            if (o.at[0] - d.at[0]).hypot(o.at[1] - d.at[1]) > reach
-                || front.overlap(&o.body()) <= 0.0
-            {
-                return false;
-            }
-            true
+            let far = (o.at[0] - d.at[0]).hypot(o.at[1] - d.at[1]) > reach;
+            !(far || front.overlap(&o.body()) <= 0.0)
         })
         .map(|(k, _)| k)
 }

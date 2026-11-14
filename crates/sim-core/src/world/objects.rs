@@ -56,9 +56,9 @@ pub(crate) fn use_object(
             wakes |= sim.needs[n] < low && content.day_rhythm.wake_for & (1 << n) != 0;
         }
     }
-    for s in 0..content.skills.len() {
-        if inter.skill_gain[s] > 0.0 {
-            practise(sim, content, s, inter.skill_gain[s] * boost, minutes);
+    for (s, &gain) in inter.skill_gain[..content.skills.len()].iter().enumerate() {
+        if gain > 0.0 {
+            practise(sim, content, s, gain * boost, minutes);
         }
     }
     let sleep = inter.tags & rhythm.sleep_tags != 0;
