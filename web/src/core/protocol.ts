@@ -623,14 +623,16 @@ export type GameKind = 'living' | 'creative';
 /**
  * A `world` message's structure (sim-core `view::StructureSync`): what changed since the last
  * message, the first time everything. The parts it has replace the last ones, those `unset` names
- * are gone (the last garage sold), and `objectChanges` are things that changed, by index, while
- * the list of things stays the same (a door opened, a crop grown). The lot's walls, openings,
- * diagonals, fences and floors come only when the lot changed; its rooms and meshes come beside it
- * (typed arrays, transferred).
+ * are gone (the last garage sold). The things: `objectSplice` (`[start, deleted, things]`, as
+ * `Array.splice`) the ones bought, sold or set up, then `objectChanges` the others that changed, by
+ * their index in the list after the splice (a door opened, a crop grown). The lot's walls,
+ * openings, diagonals, fences and floors come only when the lot changed, and only those that did;
+ * its rooms (when they changed) and meshes come beside it (typed arrays, transferred).
  */
 export type WorldUpdate = Partial<Omit<WorldStructure, 'rooms' | 'meshes' | 'staffSims'>> & {
   version: number;
   lotVersion: number;
+  objectSplice?: [number, number, ObjectPlacement[]];
   objectChanges?: [number, ObjectPlacement][];
   unset?: (keyof WorldStructure)[];
 };

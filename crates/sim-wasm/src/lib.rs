@@ -128,6 +128,8 @@ pub struct Game {
     /// Per storage chunk: its fingerprint and version, as of `chunks_at` (`chunk_versions`).
     chunks: Vec<(u64, u32)>,
     chunks_at: Option<u32>,
+    /// A fingerprint of the rooms as `rooms_changed` last gave them (None: not yet).
+    rooms_sent: Option<u64>,
 }
 
 #[wasm_bindgen]
@@ -274,6 +276,18 @@ impl Game {
         self.world.lot.rooms_row_major()
     }
 
+    /// `rooms`, if they changed since this last gave them (or never did): a big world's are
+    /// megabytes, and most edits of the lot (a fence, a floor painted, a door) leave them as they were.
+    pub fn rooms_changed(&mut self) -> Option<Vec<u16>> {
+        let rooms = self.world.lot.rooms_row_major();
+        let print = rooms_print(&rooms);
+        if self.rooms_sent == Some(print) {
+            return None;
+        }
+        self.rooms_sent = Some(print);
+        Some(rooms)
+    }
+
     /// The walls, doors, windows, fences, diagonals, floor coverings and objects inside the tile
     /// rectangle `[x0, z0, x1, z1)` (stacked rows, as the structure's; JSON, see
     /// `sim_core::view::structure_rect_json`).
@@ -366,6 +380,23 @@ impl Game {
     }
 }
 
+/// A fingerprint of the rooms (`Game::rooms_changed`): an FNV-like hash over them four at a time,
+/// seeded with their count.
+fn rooms_print(rooms: &[u16]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ rooms.len() as u64;
+    let mut chunks = rooms.chunks_exact(4);
+    for c in &mut chunks {
+        let v =
+            u64::from(c[0]) | u64::from(c[1]) << 16 | u64::from(c[2]) << 32 | u64::from(c[3]) << 48;
+        h = (h ^ v).wrapping_mul(0x0000_0100_0000_01b3);
+        h ^= h >> 29;
+    }
+    for &r in chunks.remainder() {
+        h = (h ^ u64::from(r)).wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
+}
+
 impl Game {
     fn with_world(world: World) -> Game {
         let mut game = Game {
@@ -377,6 +408,7 @@ impl Game {
             watch: None,
             chunks: Vec::new(),
             chunks_at: None,
+            rooms_sent: None,
         };
         snapshot::write(&game.world, &mut game.snapshot);
         game

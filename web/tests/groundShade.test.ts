@@ -3,7 +3,7 @@
 // its footprint and a tree's round its trunk, nothing from a thing indoors or on a top.
 import { describe, expect, test } from 'bun:test';
 import type { WorldStructure } from '../src/core/protocol';
-import { GROUND_SHADE, groundShade } from '../src/render/shared/groundShade';
+import { GROUND_SHADE, groundShade, updateGroundShade } from '../src/render/shared/groundShade';
 
 const [W, D, N] = [16, 14, 4];
 
@@ -77,6 +77,21 @@ describe('the ground’s shade', () => {
     const indoors = { id: 1, def: 'sofa', x: 6, z: 6, w: 1, d: 1, rot: 0 };
     const onTop = { id: 2, def: 'vase', x: 2, z: 11, w: 1, d: 1, rot: 0, lift: 0.8 };
     expect(Buffer.from(groundShade(town([indoors, onTop]), N)).equals(Buffer.from(bare))).toBe(true);
+  });
+
+  test('made again only round what changed: the same bytes as made whole', () => {
+    const chair = { id: 1, def: 'chairGarden', x: 2, z: 11, w: 1, d: 1, rot: 0 };
+    const tree = { id: 2, def: 'garden.maple', x: 13, z: 2, w: 2, d: 2, rot: 0 };
+    const map = groundShade(town([chair]), N);
+    // A tree bought beside it, then the chair moved next to the tree (their shades laid over each other), then sold.
+    for (const objects of [[chair, tree], [{ ...chair, x: 12, z: 3 }, tree], [tree]]) {
+      const { shade, changed } = updateGroundShade(town(objects), N, map);
+      expect(shade).toBe(map);
+      expect(changed?.length).toBeGreaterThan(0);
+      expect(Buffer.from(map).equals(Buffer.from(groundShade(town(objects), N)))).toBe(true);
+    }
+    // Nothing changed: no texel made again.
+    expect(updateGroundShade(town([tree]), N, map).changed).toEqual([]);
   });
 
   test('made again into the same bytes', () => {

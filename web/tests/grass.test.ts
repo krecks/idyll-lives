@@ -91,6 +91,39 @@ describe('where the grass grows', () => {
     expect(Buffer.from(field.patches).equals(Buffer.from(fresh.patches))).toBe(true);
   });
 
+  test('a thing bought, moved or sold, a fence or a wall: made again only round it, as a field grown afresh', async () => {
+    const world = lot();
+    const field = await grassField(world, land);
+    const same = async (what: string) => {
+      const fresh = await grassField(world, land);
+      for (const part of ['town', 'shade', 'patches', 'lawn'] as const) expect(`${what} ${part}: ${Buffer.from(field[part]).equals(Buffer.from(fresh[part]))}`).toBe(`${what} ${part}: true`);
+    };
+    // A chair bought outdoors: only its tiles and its shade change.
+    world.objects = [...world.objects, { id: 2, def: 'gardenChair', x: 7, z: 7, rot: 0, w: 1, d: 1 } as WorldStructure['objects'][number]];
+    const bought = townGrass(field, world);
+    expect(bought.tiles?.reduce((a, b) => a + b, 0)).toBe(1);
+    expect(bought.shade?.length).toBe(1);
+    await same('bought');
+    // Moved, then sold.
+    world.objects = world.objects.map((o) => (o.id === 2 ? { ...o, x: 10, z: 1 } : o));
+    expect(townGrass(field, world).shade?.length).toBe(2);
+    await same('moved');
+    world.objects = world.objects.filter((o) => o.id !== 2);
+    townGrass(field, world);
+    await same('sold');
+    // A fence, then a wall taken down.
+    world.fences = [{ axis: 'v', x: 11, z: 5, kind: 'fence' }];
+    townGrass(field, world);
+    await same('fence');
+    world.walls = world.walls.filter((w) => !(w.axis === 'v' && w.x === 5 && w.z === 3));
+    townGrass(field, world);
+    await same('wall');
+    // Nothing changed: nothing to do.
+    const none = townGrass(field, world);
+    expect(none.tiles?.length).toBe(0);
+    expect(none.shade?.length).toBe(0);
+  });
+
   test('a patch with any grass is drawn; one all indoors is not', async () => {
     const field = await grassField(lot(), land);
     const at = (x: number, z: number) => field.patches[Math.floor((z - field.z0) / GRASS.patch) * field.pw + Math.floor((x - field.x0) / GRASS.patch)];
