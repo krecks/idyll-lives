@@ -40,7 +40,7 @@ import { grassField, gustAt, gustNoise, type GrassQuality } from '../shared/gras
 import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
-import { groupInstances, hideLawn, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
+import { groupInstances, hideLawn, keepBareTiles, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
 import type { OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
 import { tuned } from '../tune';
@@ -261,7 +261,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.lawnInputs = inputs;
     this.lawnMask = lawnMask(world);
     hideLawn(this.lawn, this.lawnMask, uploadLawn);
-    this.grass?.refresh(world);
+    // (Its bare tiles kept for the birds, who ask next.)
+    this.grass?.refresh(world, this.lawnMask, keepBareTiles(world, inputs, this.lawnMask));
   }
 
   /**

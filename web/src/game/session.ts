@@ -1326,6 +1326,8 @@ async function openSession(
       // Start on the home lot; its geometry arrives in the next world message.
       const home = w.households.find((h) => h.player)?.plot;
       if (home != null && w.plots[home]) return showPlot(home);
+      // (No home: the whole town's walls and floors, which come once a view is asked for.)
+      if (!w.meshes) return bridge.setView(null);
     } else if (!playerSims().includes(game.selected)) {
       // A family just moved in: the first of them is the one to look at.
       const first = playerSims()[0];
