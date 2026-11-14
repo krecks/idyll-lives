@@ -210,6 +210,29 @@ describe('the street in chunks', async () => {
     }
   }, 30_000);
 
+  test('a street that lets go of the parts of chunks not drawn keeps their keys and plans them again as a fresh street does', () => {
+    const world = town(objects);
+    const street = new TownStreet(new HousePlanner(), world, options, 'game');
+    const ids = street.chunkIds();
+    for (const id of ids) street.chunk(id, 0);
+    const keys = new Map(ids.map((id) => [id, street.chunkKey(id, 0)]));
+    // Only the first chunk's parts kept (and none for another focus lot): every key the same.
+    const units = (street as unknown as { plotUnits: Map<string, unknown> }).plotUnits;
+    const before = units.size;
+    street.keepUnits(new Set([ids[0]]), 0);
+    expect(units.size).toBeLessThan(before);
+    for (const id of ids) expect(street.chunkKey(id, 0)).toBe(keys.get(id)!);
+    // A focus elsewhere, a thing moved, nothing kept at all: each chunk as a fresh street plans it.
+    const moved = town([thing(1, 46, 3), objects[1], objects[2]]);
+    street.setWorld(moved);
+    for (const [kept, f] of [[[ids[0]], 9], [[], 10], [ids, NO_FOCUS]] as const) {
+      for (const id of ids) street.chunk(id, f);
+      street.keepUnits(new Set(kept), f);
+      const fresh = new TownStreet(new HousePlanner(), moved, options, 'game');
+      for (const id of ids) expect(drawn(street.chunk(id, f))).toBe(drawn(fresh.chunk(id, f)));
+    }
+  }, 30_000);
+
 
   /** The ranks' shelters a street draws (every chunk's), and its own account of them. */
   const ranksOf = (street: InstanceType<typeof TownStreet>) => ({
