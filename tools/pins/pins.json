@@ -65,9 +65,9 @@
     {
       "name": "sim-cooking",
       "file": "crates/sim-core/src/cooking.rs",
-      "sha256": "97698d6a9795c5a31a5b30f91da69aeccc016cc9ee37917dcf50e0d5729f0783",
-      "by": "setup",
-      "reason": "household behaviour: not this run's to change"
+      "sha256": "1d82c57a3f54db44c0ef7b3c5ec7a6f0efde365e3b389ef3ba80cfab2eacbb17",
+      "by": "chore/rust-1.100",
+      "reason": "no behaviour change: the skills loop over the gains themselves, for clippy 1.100's needless_range_loop"
     },
     {
       "name": "sim-social",

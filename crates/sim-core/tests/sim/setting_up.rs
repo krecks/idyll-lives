@@ -219,8 +219,8 @@ fn nobody_free_it_is_set_up_for_them_in_the_end() {
     // Every grown-up away for longer than it waits.
     let hours = w.content.object_rules.set_up.wait_hours;
     let back = w.tick + ((hours + 2.0) * 60.0) as u64 * sim_core::TICKS_PER_MINUTE;
-    for i in 0..2 {
-        w.sims[i].away_until = Some(back);
+    for sim in &mut w.sims[..2] {
+        sim.away_until = Some(back);
     }
     let done = until(&mut w, ((hours + 1.0) * 60.0) as u64, |w| {
         assert!(setting_up(w).is_empty(), "the children leave it be");

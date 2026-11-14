@@ -1,9 +1,11 @@
 # The Rust that builds and checks the game, here and in CI (.github/workflows/pages.yml). Bump it
 # on purpose: a new stable can bring new clippy lints, and clippy (-D warnings) gates releases.
 # 1.97.0 miscompiles `review::size_row` on x86-64 (a SIGSEGV in ll-tools' tests/review.rs), so no
-# 1.97.0 anywhere; 1.99.1 was bumped to after a full clippy, test and wasm build on it.
+# 1.97.0 anywhere. 1.100.0 was bumped to after a full clippy (its needless_range_loop and needless_bool
+# fire in more places), the tests with the slow ones, the generated worlds, and both wasm builds through
+# wasm-opt on it, on aarch64 macOS: the pull request's CI was its x86-64 check.
 [toolchain]
-channel = "1.99.1"
+channel = "1.100.0"
 components = ["clippy", "rustfmt"]
 targets = ["wasm32-unknown-unknown"]
 profile = "minimal"

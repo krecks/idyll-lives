@@ -57,9 +57,9 @@ fn workday(w: &mut World) -> (f32, f32) {
         for _ in 0..common::mins(15.0) {
             w.tick_once();
         }
-        for k in 0..2 {
-            lowest = lowest.min(w.sims[2].needs[k]);
-            sum += w.sims[2].needs[k];
+        for &need in &w.sims[2].needs[..2] {
+            lowest = lowest.min(need);
+            sum += need;
             n += 1;
         }
     }
@@ -248,9 +248,9 @@ fn while_out(w: &mut World) -> (f32, f32, bool) {
             w.tick_once();
         }
         visited |= w.sims[0].visiting.is_some_and(|v| v.plot == 2);
-        for k in 0..2 {
-            lowest = lowest.min(w.sims[1].needs[k]);
-            sum += w.sims[1].needs[k];
+        for &need in &w.sims[1].needs[..2] {
+            lowest = lowest.min(need);
+            sum += need;
             n += 1;
         }
     }

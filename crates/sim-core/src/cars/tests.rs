@@ -1154,13 +1154,12 @@ fn a_car_faces_along_its_lane_where_the_next_step_is_a_hair_across_it() {
         legs.push_lane(p, FAST, 0.0, LANE);
     }
     let route = legs.timed(true, true);
-    for i in 1..route.points.len() - 1 {
-        let yaw = route.points[i].1;
+    for &(at, yaw, ..) in &route.points[1..route.points.len() - 1] {
         assert!(
             yaw.abs().to_degrees() < 4.0,
             "{}° across its lane at {:?}",
             yaw.to_degrees(),
-            route.points[i].0
+            at
         );
     }
 }

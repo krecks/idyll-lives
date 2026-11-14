@@ -892,8 +892,8 @@ mod tests {
         let want = [corner[2], -corner[1], corner[0]];
         assert!(want[1] > 0.6, "above the horizon");
         let (mut best, mut at) = (0.0, [0.0; 3]);
-        for f in 0..6 {
-            for (i, c) in sky.cube.faces[f].iter().enumerate() {
+        for (f, face) in sky.cube.faces.iter().enumerate() {
+            for (i, c) in face.iter().enumerate() {
                 if c[0] as f64 > best {
                     best = c[0] as f64;
                     // (Babylon samples a texel at its corner.)
@@ -1090,13 +1090,13 @@ mod tests {
     fn mean_light(cube: &Cube, world: &dyn Fn([f64; 3]) -> [f64; 3]) -> [f64; 3] {
         let mut m = [0.0; 3];
         let n = cube.size;
-        for f in 0..6 {
+        for (f, face) in cube.faces.iter().enumerate() {
             for y in 0..n {
                 for x in 0..n {
                     let s = (x as f64 + 0.5) / n as f64 * 2.0 - 1.0;
                     let t = (y as f64 + 0.5) / n as f64 * 2.0 - 1.0;
                     let w = (1.0 + s * s + t * t).powf(-1.5);
-                    let c = cube.faces[f][y * n + x];
+                    let c = face[y * n + x];
                     let l =
                         w * (0.2126 * c[0] as f64 + 0.7152 * c[1] as f64 + 0.0722 * c[2] as f64);
                     let d = world(face_dir(f, s, t));
