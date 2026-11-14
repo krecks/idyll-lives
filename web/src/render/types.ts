@@ -603,7 +603,8 @@ export interface Renderer {
    */
   showTown(world: WorldStructure, minute: number): Promise<void>;
   /**
-   * Back to the game world (the overview is kept for the next menu). With `glide` > 0 the camera
+   * Back to the game world (the overview and the town's landscape are let go a moment after, and
+   * built again by the next `showTown`). With `glide` > 0 the camera
    * first flies from the overview into the game's view (seconds); resolves when it is shown.
    */
   hideTown(glide?: number): Promise<void>;
