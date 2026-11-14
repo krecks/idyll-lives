@@ -77,9 +77,9 @@ jobs:
 
       # The repo's tools (crates/tools): a fresh character build against the committed set and its
       # checks, the object gate over every shipped model (no Blender), and the content and texture
-      # tools. Release, as the character build is slow unoptimised.
+      # tools. In the `tools` profile, as in CI and as the build's `cargo assets` runs.
       - name: Tool tests
-        run: cargo test -p ll-tools --release --locked
+        run: cargo test -p ll-tools --profile tools --locked
 
       # Examples are only compiled by cargo test; this one should also run (dev profile, so its
       # timings are rough).
