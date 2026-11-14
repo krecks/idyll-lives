@@ -1701,6 +1701,152 @@ pub fn dist(a: [f32; 2], b: [f32; 2]) -> f32 {
     (a[0] - b[0]).hypot(a[1] - b[1])
 }
 
+/// The nearest of a line of points (a route's path) to points asked about: what a scan of them
+/// all with `dist` gives (`min_by`: the lowest index on a tie), found through cells over them (a
+/// route laid asked for every lane point's nearest twice, a scan of 1,200 points each time, and
+/// was most of a big world's slowest ticks).
+pub(crate) struct NearestPoint {
+    pts: Vec<[f32; 2]>,
+    /// Where cell (0, 0) begins, and the cells' size (m).
+    origin: [f32; 2],
+    cell: f32,
+    cols: i64,
+    rows: i64,
+    /// Each cell's points (indices, in order) are `items[start[c]..start[c + 1]]`.
+    start: Vec<u32>,
+    items: Vec<u32>,
+    /// Too few points for cells to pay, or one not finite: every point scanned.
+    scan: bool,
+}
+
+/// Fewer points than this are scanned.
+const NEAREST_SCAN: usize = 48;
+
+impl NearestPoint {
+    pub(crate) fn new(pts: Vec<[f32; 2]>) -> NearestPoint {
+        let mut out = NearestPoint {
+            pts,
+            origin: [0.0; 2],
+            cell: 1.0,
+            cols: 0,
+            rows: 0,
+            start: Vec::new(),
+            items: Vec::new(),
+            scan: true,
+        };
+        let pts = &out.pts;
+        let n = pts.len();
+        if n < NEAREST_SCAN || !pts.iter().all(|p| p[0].is_finite() && p[1].is_finite()) {
+            return out;
+        }
+        let (mut lo, mut hi) = (pts[0], pts[0]);
+        let mut len = 0.0f64;
+        for (i, p) in pts.iter().enumerate() {
+            lo = [lo[0].min(p[0]), lo[1].min(p[1])];
+            hi = [hi[0].max(p[0]), hi[1].max(p[1])];
+            if i > 0 {
+                len += f64::from(dist(pts[i - 1], *p));
+            }
+        }
+        // (A few points' spacing along the line a side; fewer, larger cells where that'd be more
+        // cells than a few for each point.)
+        let mut cell = ((4.0 * len / n as f64) as f32).max(1.0);
+        let (cols, rows) = loop {
+            let cols = (((hi[0] - lo[0]) / cell) as i64).saturating_add(1);
+            let rows = (((hi[1] - lo[1]) / cell) as i64).saturating_add(1);
+            if cols.saturating_mul(rows) <= 4 * n as i64 + 64 {
+                break (cols, rows);
+            }
+            cell *= 2.0;
+        };
+        out.origin = lo;
+        out.cell = cell;
+        out.cols = cols;
+        out.rows = rows;
+        let at: Vec<usize> = pts
+            .iter()
+            .map(|&p| {
+                let (cx, cz) = out.cell_of(p);
+                (cz.clamp(0, rows - 1) * cols + cx.clamp(0, cols - 1)) as usize
+            })
+            .collect();
+        let mut start = vec![0u32; (cols * rows) as usize + 1];
+        for &c in &at {
+            start[c + 1] += 1;
+        }
+        for c in 0..start.len() - 1 {
+            start[c + 1] += start[c];
+        }
+        let mut fill = start.clone();
+        let mut items = vec![0u32; n];
+        for (i, &c) in at.iter().enumerate() {
+            items[fill[c] as usize] = i as u32;
+            fill[c] += 1;
+        }
+        out.start = start;
+        out.items = items;
+        out.scan = false;
+        out
+    }
+
+    fn cell_of(&self, p: [f32; 2]) -> (i64, i64) {
+        (
+            ((p[0] - self.origin[0]) / self.cell).floor() as i64,
+            ((p[1] - self.origin[1]) / self.cell).floor() as i64,
+        )
+    }
+
+    /// The index of the point nearest `p` (`dist`; the lowest of those as near). None: no points.
+    pub(crate) fn nearest(&self, p: [f32; 2]) -> Option<usize> {
+        if self.scan || !(p[0].is_finite() && p[1].is_finite()) {
+            return (0..self.pts.len())
+                .min_by(|&a, &b| dist(self.pts[a], p).total_cmp(&dist(self.pts[b], p)));
+        }
+        let (qx, qz) = self.cell_of(p);
+        // (Rings of cells round `p`'s, out from the first with any of the grid in it to the last.)
+        let first = [-qx, qx - (self.cols - 1), -qz, qz - (self.rows - 1), 0]
+            .into_iter()
+            .max()
+            .unwrap_or(0);
+        let last = [qx, self.cols - 1 - qx, qz, self.rows - 1 - qz]
+            .into_iter()
+            .max()
+            .unwrap_or(0);
+        let mut best: Option<(f32, u32)> = None;
+        let visit = |cx: i64, cz: i64, best: &mut Option<(f32, u32)>| {
+            let c = (cz * self.cols + cx) as usize;
+            for &i in &self.items[self.start[c] as usize..self.start[c + 1] as usize] {
+                let d = dist(self.pts[i as usize], p);
+                if best.is_none_or(|(bd, bi)| d < bd || d == bd && i < bi) {
+                    *best = Some((d, i));
+                }
+            }
+        };
+        for r in first..=last {
+            // (A point `r` cells round is `r - 1` cells away at least; a margin for rounding.)
+            if let Some((bd, _)) = best
+                && (r - 1) as f32 * self.cell * 0.99 - 0.01 > bd
+            {
+                break;
+            }
+            for cz in (qz - r).max(0)..=(qz + r).min(self.rows - 1) {
+                if (cz - qz).abs() == r {
+                    for cx in (qx - r).max(0)..=(qx + r).min(self.cols - 1) {
+                        visit(cx, cz, &mut best);
+                    }
+                } else {
+                    for cx in [qx - r, qx + r] {
+                        if (0..self.cols).contains(&cx) {
+                            visit(cx, cz, &mut best);
+                        }
+                    }
+                }
+            }
+        }
+        best.map(|(_, i)| i as usize)
+    }
+}
+
 fn lerp(a: [f32; 2], b: [f32; 2], t: f32) -> [f32; 2] {
     [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
 }
@@ -1739,6 +1885,81 @@ mod tests {
     fn line(a: [f32; 2], b: [f32; 2]) -> Vec<[f32; 2]> {
         let n = dist(a, b).ceil() as usize;
         (0..=n).map(|i| lerp(a, b, i as f32 / n as f32)).collect()
+    }
+
+    #[test]
+    fn nearest_point_is_the_scans_ties_and_all() {
+        // What `NearestPoint` gives is what a scan of every point gives (`min_by`: the first of
+        // those as near): over a winding line of points (one going back over itself, points
+        // repeated), on whole metres too (many as near), asked about near it, across its box and
+        // far outside it.
+        let mut seed = 0x2545_f491_4f6c_dd1du64;
+        let mut rand = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed >> 40) as f32 / (1u64 << 24) as f32
+        };
+        for whole in [false, true] {
+            let mut pts: Vec<[f32; 2]> = Vec::new();
+            let (mut at, mut heading) = ([1200.0f32, -300.0f32], 0.0f32);
+            for _ in 0..1300 {
+                heading += (rand() - 0.5) * 0.6;
+                at = [at[0] + 2.5 * heading.cos(), at[1] + 2.5 * heading.sin()];
+                pts.push(if whole { at.map(f32::round) } else { at });
+            }
+            let back: Vec<[f32; 2]> = pts[200..400].iter().rev().copied().collect();
+            pts.extend(back);
+            pts.extend_from_within(10..20);
+            let grid = NearestPoint::new(pts.clone());
+            assert!(!grid.scan, "cells over that many points");
+            let scan = |p: [f32; 2]| {
+                (0..pts.len()).min_by(|&a, &b| dist(pts[a], p).total_cmp(&dist(pts[b], p)))
+            };
+            let (lo, hi) = pts
+                .iter()
+                .fold(([f32::MAX; 2], [f32::MIN; 2]), |(lo, hi), p| {
+                    (
+                        [lo[0].min(p[0]), lo[1].min(p[1])],
+                        [hi[0].max(p[0]), hi[1].max(p[1])],
+                    )
+                });
+            let mut ties = 0;
+            for i in (0..pts.len()).step_by(2) {
+                let p = pts[i];
+                let near = [
+                    p,
+                    [p[0] + (rand() - 0.5) * 9.0, p[1] + (rand() - 0.5) * 9.0],
+                    // (Half way between two points: as near to each, on whole metres.)
+                    lerp(p, pts[(i + 1) % pts.len()], 0.5),
+                    [p[0].round() + 0.5, p[1].round()],
+                ];
+                let across = [
+                    lo[0] + rand() * (hi[0] - lo[0]),
+                    lo[1] + rand() * (hi[1] - lo[1]),
+                ];
+                let far = [
+                    lo[0] + (rand() * 3.0 - 1.0) * (hi[0] - lo[0]) - 50.0,
+                    hi[1] + rand() * 4000.0,
+                ];
+                for q in near.into_iter().chain([across, far]) {
+                    let want = scan(q);
+                    assert_eq!(grid.nearest(q), want, "nearest {q:?}");
+                    let d = dist(pts[want.expect("points")], q);
+                    if pts[want.expect("points") + 1..]
+                        .iter()
+                        .any(|&p| dist(p, q) == d)
+                    {
+                        ties += 1;
+                    }
+                }
+            }
+            assert!(ties > 500, "ties asked about: {ties}");
+        }
+        // (Few points, none, and one not finite: scanned.)
+        assert_eq!(NearestPoint::new(Vec::new()).nearest([0.0, 0.0]), None);
+        let few = vec![[0.0, 0.0], [2.0, 0.0], [1.0, 5.0]];
+        assert_eq!(NearestPoint::new(few).nearest([1.0, 0.0]), Some(0));
     }
 
     #[test]
