@@ -10,6 +10,13 @@
  * the square or near it (`reaches`). Casters outside the square aren't drawn. The menus' town is fitted round the camera's
  * view instead, and drawn every frame.
  *
+ * The still casters' picture is kept apart (`still`, `stillPasses`): a depth texture the map's size holding all but
+ * what moves on its own (the residents' draws, the lot's moving parts: `movers`). A redraw for what moves alone (a
+ * resident's pose, a door a use opens: `posed`) copies that picture into the map and draws only what moves over it
+ * (about 40 of the village's 220 draws); the picture is drawn again first when something in it changed (`moved`, the
+ * light's view, a still caster that came, went or moved). Depths are depths whatever order they are drawn in, so the
+ * map is the same as drawn at once (pixel for pixel on both backends). `?diag=wholeshadows` draws everything every time.
+ *
  * PlayCanvas fits a directional light's map to the camera's view. For a light with a square, the
  * fit is handed the square instead: the directional shadow renderer's `cull` asks the camera for
  * the corners of its view, and gets eight points of a sphere round the square's middle (its
@@ -67,6 +74,62 @@ const SHADOW_BIAS = 0.02;
  * resident or a car with the sun low): one moving further out leaves the map as it is (`reaches`).
  */
 export const CASTER_REACH = 8;
+
+/**
+ * How far the light's view × projection may differ, element by element, from the one the still casters were drawn
+ * with for their picture to be used again (`SunShadows.drawPass`): PlayCanvas fits it again for every redraw, and its
+ * float noise as the camera turns (±2.4e-7 measured) moves the map by a ten-thousandth of a texel. 1e-6: under 0.03 of
+ * a texel 30 m from the middle.
+ */
+const VIEW_NOISE = 1e-6;
+
+/** The sun's pass as PlayCanvas 2.23 makes it (`RenderPassShadowDirectional`; `check:chunks`). */
+interface ShadowPass {
+  light: SceneLight;
+  camera: pc.Camera;
+  renderTarget: pc.RenderTarget | null;
+  shadowRenderer: { renderFace(light: SceneLight, camera: pc.Camera, face: number, clear: boolean): void };
+  depthStencilOps: { clearDepth: boolean };
+  before(): void;
+  execute(): void;
+}
+
+/** PlayCanvas 2.23's scene light, as far as the sun's pass reads it (`check:chunks`). */
+interface SceneLight {
+  numCascades: number;
+  _shadowMap: object | null;
+  _shadowCascadesInvalidated: boolean;
+  shadowUpdateOverrides: number[] | null;
+  getRenderData(camera: pc.Camera, face: number): { shadowCamera: pc.Camera; visibleCasters: pc.MeshInstance[] };
+}
+
+/** The game's sun shadows by PlayCanvas's light (`stillPasses`). */
+const owners = new WeakMap<object, SunShadows>();
+const stillPatched = new WeakSet<object>();
+
+/**
+ * The sun's pass draws as `SunShadows` says (`drawStill`, `drawPass`): before it starts, the still casters' picture
+ * into the map (drawn again first when they changed); in it, without clearing, what moves.
+ */
+function stillPasses(app: pc.AppBase): void {
+  // SAFETY: PlayCanvas 2.23's `ShadowRendererDirectional.getLightRenderPass` makes the pass and hands it to
+  // `this.shadowRenderer.setupRenderPass(renderPass, shadowCamera, clear)`, asked of the instance; a pass calls its
+  // `before` outside the GPU's pass and its `execute` in it, which draws each cascade with
+  // `shadowRenderer.renderFace` (`tools/render/chunks.json`).
+  const sr = directionalShadows(app) as unknown as { shadowRenderer?: { setupRenderPass(pass: ShadowPass, camera: pc.Camera, clear: boolean): void } } | undefined;
+  const shadows = sr?.shadowRenderer;
+  if (!shadows || stillPatched.has(shadows)) return;
+  stillPatched.add(shadows);
+  const setup = shadows.setupRenderPass.bind(shadows);
+  shadows.setupRenderPass = (pass, camera, clear) => {
+    setup(pass, camera, clear);
+    const owner = pass.light ? owners.get(pass.light) : undefined;
+    if (!owner?.splits(pass.light)) return;
+    pass.depthStencilOps.clearDepth = false;
+    pass.before = () => owner.drawStill(pass);
+    pass.execute = () => owner.drawPass(pass);
+  };
+}
 
 interface Square {
   /** The middle (PlayCanvas space) and the half side (m). */
@@ -184,6 +247,11 @@ export interface SunShadowOptions {
   rate: number;
   /** The fade to lit at the map's edge (default `SHADOW_EDGE_FADE`, the game's; 0: none). */
   fade?: number;
+  /**
+   * The still casters' picture kept apart, so a redraw for what moves on its own alone draws only that over a copy of
+   * it (`posed`; default true; `?diag=wholeshadows` off). A second depth texture the map's size.
+   */
+  still?: boolean;
 }
 
 export class SunShadows {
@@ -204,6 +272,30 @@ export class SunShadows {
    * only the sun's way), for what else holds a picture of the world (the mirrors, the lamps' shadows).
    */
   onMoved: ((urgent: boolean, casters: boolean) => void) | null = null;
+  /**
+   * What moves on its own and casts (the residents' draws, the lot's moving parts), drawn at every redraw over the
+   * still casters' picture (`still`); null: every redraw draws everything.
+   */
+  movers: ((out: pc.MeshInstance[]) => void) | null = null;
+  /** Whether the still casters' picture is kept (`SunShadowOptions.still`). */
+  readonly still: boolean;
+  /** Redraws since the page opened: of the still casters too, and of only what moves (the bench's counts). */
+  readonly draws = { whole: 0, moving: 0 };
+  /** The still casters' picture is drawn again at the next redraw: something in it changed (`moved`). */
+  private whole = true;
+  /** The still casters' picture (a depth texture the map's size) and what it was drawn of. */
+  private stillTarget: pc.RenderTarget | null = null;
+  private readonly drawn = { viewProj: new Float32Array(16), map: null as object | null, casters: [] as pc.MeshInstance[], boxes: new Float64Array(0), counts: new Float64Array(0) };
+  /** This redraw's casters: those that move (`movers`), the still ones, and all of them as PlayCanvas culled them. */
+  private readonly moving = new Set<pc.MeshInstance>();
+  private readonly movingList: pc.MeshInstance[] = [];
+  private readonly stillCasters: pc.MeshInstance[] = [];
+  private readonly allCasters: pc.MeshInstance[] = [];
+  private readonly viewProj = new pc.Mat4();
+  private readonly view = new pc.Mat4();
+  /** A pass drawing the still casters into their picture (`drawStill`). */
+  private stillPass: pc.RenderPass | null = null;
+  private readonly device: pc.GraphicsDevice;
 
   /**
    * Shadows from `sun`'s light: a map of `options.size` texels a side, filtered by 3×3 PCF on every
@@ -212,6 +304,11 @@ export class SunShadows {
   constructor(app: pc.AppBase, sun: pc.Entity, options: SunShadowOptions) {
     patch(app);
     patchShadowEdge(app.graphicsDevice);
+    this.device = app.graphicsDevice;
+    this.still = options.still ?? true;
+    if (this.still) stillPasses(app);
+    // (A lost context loses the picture too.)
+    this.device.on('devicerestored', this.restored);
     this.fade = options.fade ?? SHADOW_EDGE_FADE;
     this.fadeId = app.graphicsDevice.scope.resolve('game_sunShadowFade');
     this.fadeId.setValue(this.fade);
@@ -225,6 +322,7 @@ export class SunShadows {
     l.shadowBias = SHADOW_BIAS;
     l.shadowUpdateMode = pc.SHADOWUPDATE_NONE;
     squares.set(l.light, this.square);
+    owners.set(l.light, this);
     shadowOnlyLayer(app, sun);
     this.applyBias();
   }
@@ -269,11 +367,26 @@ export class SunShadows {
   }
 
   /**
-   * Something in the map changed: it is drawn again in the next frame. `urgent` changes (the sun,
-   * the walls, a thing placed) draw at once; a resident's pose may wait for the shadow rate. `casters`: false
-   * when only the sun's way changed, or what casts no shadow but the sun's (a door's leaf).
+   * Something in the map changed: it is drawn again (whole) in the next frame. `urgent` changes (the sun,
+   * the walls, a thing placed) draw at once; what moves on its own (a car, a door indoors, a moving part, a chair
+   * pulled in) may wait for the shadow rate. `casters`: false when only the sun's way changed, or what casts no
+   * shadow but the sun's (a door's leaf).
    */
   moved(urgent = true, casters = true): void {
+    this.whole = true;
+    this.redraw(urgent, casters);
+  }
+
+  /**
+   * What moves on its own moved where it casts into the map (a resident's pose, a moving part a use moves): drawn
+   * again at the shadow rate, over the still casters' picture unless something else changed too (`moved`).
+   */
+  posed(): void {
+    if (!this.still || !this.movers) this.whole = true;
+    this.redraw(false, true);
+  }
+
+  private redraw(urgent: boolean, casters: boolean): void {
     this.onMoved?.(urgent, casters);
     if (this.overview) return;
     const now = performance.now();
@@ -292,5 +405,180 @@ export class SunShadows {
     this.pending = false;
     this.lastDraw = performance.now();
     this.light.shadowUpdateMode = pc.SHADOWUPDATE_THISFRAME;
+  }
+
+  /** Whether the sun's pass for `light` is drawn as two (`stillPasses`): the still casters' picture, then what moves. */
+  splits(light: SceneLight): boolean {
+    return this.still && !!this.movers && !this.overview && light.numCascades === 1;
+  }
+
+  /**
+   * Before the sun's pass (outside the GPU's pass): the still casters' picture drawn again if they changed (whole: as
+   * PlayCanvas would draw the map, without what moves), then copied into the map. The light's view must be the one
+   * the picture was drawn with (within `VIEW_NOISE`), the map the same, and the still casters the same ones in the same
+   * places (each one's box and copies); else it is drawn again.
+   */
+  drawStill(pass: ShadowPass): void {
+    const { light, camera } = pass;
+    const map = pass.renderTarget;
+    const data = light.getRenderData(camera, 0);
+    const casters = data.visibleCasters;
+    // This redraw's casters, the moving and the still.
+    const moving = this.moving;
+    const list = this.movingList;
+    moving.clear();
+    list.length = 0;
+    this.movers?.(list);
+    for (const mi of list) moving.add(mi);
+    const still = this.stillCasters;
+    still.length = 0;
+    for (const mi of casters) if (!moving.has(mi)) still.push(mi);
+    this.lightViewProj(data.shadowCamera);
+    if (!map?.depthBuffer) return;
+    const redraw = this.whole || !this.sameStill(light, still);
+    if (redraw && !this.drawStillCasters(pass, map, still)) return;
+    // SAFETY: both of PlayCanvas 2.23's devices copy a render target's depth with `copyRenderTarget(source, dest,
+    // color, depth)` (WebGPU `copyTextureToTexture`, WebGL2 `blitFramebuffer`), outside a pass (`check:chunks`).
+    (this.device as unknown as { copyRenderTarget(source: pc.RenderTarget, dest: pc.RenderTarget, color: boolean, depth: boolean): boolean }).copyRenderTarget(this.stillTarget!, map, false, true);
+    if (redraw) this.draws.whole++;
+    else this.draws.moving++;
+    this.whole = false;
+  }
+
+  /** In the sun's pass: what moves, over the still casters' picture (or everything, if that couldn't be made). */
+  drawPass(pass: ShadowPass): void {
+    const { light, camera, shadowRenderer } = pass;
+    const data = light.getRenderData(camera, 0);
+    const casters = data.visibleCasters;
+    const all = this.allCasters;
+    all.length = 0;
+    for (const mi of casters) all.push(mi);
+    const copied = this.stillTarget !== null && !this.whole;
+    if (copied) {
+      casters.length = 0;
+      for (const mi of all) if (this.moving.has(mi)) casters.push(mi);
+    }
+    try {
+      // (Without the picture: cleared here, every caster drawn, as PlayCanvas would.)
+      shadowRenderer.renderFace(light, camera, 0, !copied);
+    } finally {
+      casters.length = 0;
+      for (const mi of all) casters.push(mi);
+      all.length = 0;
+    }
+    // (What PlayCanvas's own `execute` does after it.)
+    if (light.shadowUpdateOverrides?.[0] === pc.SHADOWUPDATE_THISFRAME) light.shadowUpdateOverrides[0] = pc.SHADOWUPDATE_NONE;
+    light._shadowCascadesInvalidated = false;
+  }
+
+  /** Whether the still casters are those the picture was drawn of, as they were, seen the same way. */
+  private sameStill(light: SceneLight, still: readonly pc.MeshInstance[]): boolean {
+    const d = this.drawn;
+    if (!this.stillTarget || light._shadowMap !== d.map || d.casters.length !== still.length) return false;
+    const vp = this.viewProj.data;
+    // (The fit's float noise as the camera moves isn't a change: `VIEW_NOISE`.)
+    for (let k = 0; k < 16; k++) if (Math.abs(vp[k] - d.viewProj[k]) > VIEW_NOISE) return false;
+    for (let i = 0; i < still.length; i++) {
+      const mi = still[i];
+      if (mi !== d.casters[i] || mi.instancingCount !== d.counts[i]) return false;
+      const b = mi.aabb;
+      const o = i * 6;
+      const c = b.center;
+      const h = b.halfExtents;
+      if (c.x !== d.boxes[o] || c.y !== d.boxes[o + 1] || c.z !== d.boxes[o + 2] || h.x !== d.boxes[o + 3] || h.y !== d.boxes[o + 4] || h.z !== d.boxes[o + 5]) return false;
+    }
+    return true;
+  }
+
+  /** The still casters drawn into their picture (made, the map's size and format, the first time), and remembered. */
+  private drawStillCasters(pass: ShadowPass, map: pc.RenderTarget, still: readonly pc.MeshInstance[]): boolean {
+    const { light, camera, shadowRenderer } = pass;
+    const depth = map.depthBuffer!;
+    let target = this.stillTarget;
+    if (target && (target.width !== map.width || target.height !== map.height || target.depthBuffer?.format !== depth.format)) {
+      this.dropStill();
+      target = null;
+    }
+    if (!target) {
+      const texture = new pc.Texture(this.device, { name: 'sunStillCasters', format: depth.format, width: map.width, height: map.height, mipmaps: false, minFilter: pc.FILTER_NEAREST, magFilter: pc.FILTER_NEAREST });
+      target = this.stillTarget = new pc.RenderTarget({ name: 'sunStillCasters', depthBuffer: texture });
+      const p = (this.stillPass = new pc.RenderPass(this.device));
+      p.init(target);
+      p.depthStencilOps.clearDepth = true;
+      p.depthStencilOps.clearDepthValue = 1;
+      p.depthStencilOps.storeDepth = true;
+    }
+    const data = light.getRenderData(camera, 0);
+    const casters = data.visibleCasters;
+    const cam = data.shadowCamera;
+    const all = this.allCasters;
+    all.length = 0;
+    for (const mi of casters) all.push(mi);
+    casters.length = 0;
+    for (const mi of still) casters.push(mi);
+    const p = this.stillPass!;
+    // (The light camera draws into the picture for the while: `renderFace` sizes its viewport by it.)
+    const own = cam.renderTarget;
+    cam.renderTarget = target;
+    p.execute = () => shadowRenderer.renderFace(light, camera, 0, false);
+    try {
+      p.render();
+    } finally {
+      cam.renderTarget = own;
+      casters.length = 0;
+      for (const mi of all) casters.push(mi);
+      all.length = 0;
+    }
+    this.remember(light, still);
+    return true;
+  }
+
+  /** The light camera's view × projection (`viewProj`), as PlayCanvas's `setCameraUniforms` makes it (x and y). */
+  private lightViewProj(cam: pc.Camera): void {
+    const node = cam.node;
+    this.view.setTRS(node.getPosition(), node.getRotation(), pc.Vec3.ONE).invert();
+    this.viewProj.mul2(cam.projectionMatrix, this.view);
+  }
+
+  /** What the still casters' picture was drawn of: the light's view, the map, the casters with their boxes and copies. */
+  private remember(light: SceneLight, still: readonly pc.MeshInstance[]): void {
+    const d = this.drawn;
+    d.viewProj.set(this.viewProj.data);
+    d.map = light._shadowMap;
+    d.casters.length = 0;
+    if (d.boxes.length !== still.length * 6) d.boxes = new Float64Array(still.length * 6);
+    if (d.counts.length !== still.length) d.counts = new Float64Array(still.length);
+    for (let i = 0; i < still.length; i++) {
+      const mi = still[i];
+      d.casters.push(mi);
+      d.counts[i] = mi.instancingCount;
+      const b = mi.aabb;
+      const o = i * 6;
+      d.boxes[o] = b.center.x;
+      d.boxes[o + 1] = b.center.y;
+      d.boxes[o + 2] = b.center.z;
+      d.boxes[o + 3] = b.halfExtents.x;
+      d.boxes[o + 4] = b.halfExtents.y;
+      d.boxes[o + 5] = b.halfExtents.z;
+    }
+  }
+
+  private dropStill(): void {
+    this.stillPass?.destroy();
+    this.stillPass = null;
+    this.stillTarget?.destroyTextureBuffers();
+    this.stillTarget?.destroy();
+    this.stillTarget = null;
+    this.drawn.map = null;
+  }
+
+  private readonly restored = (): void => {
+    this.whole = true;
+  };
+
+  /** Lets go of the still casters' picture. */
+  destroy(): void {
+    this.device.off('devicerestored', this.restored);
+    this.dropStill();
   }
 }

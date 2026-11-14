@@ -29,15 +29,24 @@ export interface QualitySettings {
    * would draw it every frame: 181 casters, 0.9 ms of CPU and 0.6 ms of the GPU on the M3). Everything
    * else that changes it (the sun's step, the walls, a thing placed or hidden) draws it at once; while
    * the game is paused nothing does. 0: every change (about 22 fps fewer on the village orbit, Medium,
-   * WebGPU). `?shadowrate=<Hz>` overrides it.
+   * WebGPU). `?shadowrate=<Hz>` overrides it. Where residents cast shadows (`characterShadows`), such a redraw
+   * copies a picture of everything else (kept apart: a second map, 16 MB at 2048 texels, 64 MB at 4096) and draws
+   * only the residents and the moving parts over it (`pc/sunShadows.ts`).
    */
   shadowRate: number;
   /**
    * 4: 4× multisampling of the HDR scene (smooth edges): 3.0 ms of Medium's 10.6 ms by day; about
    * 100 MB of memory traffic a frame at 1080p, about 4.5 ms on Intel. 1: FXAA instead (a cheap
-   * filter pass; edges a little softer).
+   * filter pass; edges a little softer). On WebGPU (which has only 1 and 4); WebGL2 has its own,
+   * `webglMsaaSamples`. `?msaa=1|2|4` overrides both (2 is 4 on WebGPU).
    */
   msaaSamples: number;
+  /**
+   * `msaaSamples` on WebGL2, where it is most of Medium's GPU time (M3 Pro, the village orbit, medians of 3,
+   * 2026-11-14): 4× 5.36 ms by day and 7.07 ms by night, without it 3.93 and 4.86 ms, its targets 133 → 58 MB
+   * (WebGPU: 0.34 and 0.58 ms). 2: half the samples (WebGL2 only); 1: FXAA, as Low.
+   */
+  webglMsaaSamples: number;
   /**
    * Anisotropic filtering of the floor, wall, road and ground textures (sharp at a slant).
    * Not measured apart; texture bandwidth, small on the M3.
@@ -226,9 +235,9 @@ export interface RenderQuality extends QualitySettings {
 const OPEN_WORLD: OpenWorldQuality = { stream: 1, farCull: 650, woodsFar: 560, woodsCell: 256, flowersFar: 170, tiles: [200, 460], far: 2600 };
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, anisotropy: 4, clusteredLamps: false, lampShadows: 0, lampShadowRate: 15, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, grass: { radius: 45, density: 0.5, nearest: 1 }, woodsCell: 100, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, holdStillFrames: true, ambientRange: 0, birds: { count: 6, range: 18 }, residentRadius: 90, openWorld: { stream: 0.7, farCull: 450, woodsFar: 400, woodsCell: 128, flowersFar: 120, tiles: [150, 350], far: 1800 }, leanTargets: true, contactShading: false, cloudShadows: false },
-  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, lampShadows: 2, lampShadowRate: 15, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 60, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 40, birds: { count: 24, range: 35 }, residentRadius: 140, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true },
-  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, anisotropy: 8, clusteredLamps: true, lampShadows: 4, lampShadowRate: 30, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 90, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 }, residentRadius: 200, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true },
+  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, webglMsaaSamples: 1, anisotropy: 4, clusteredLamps: false, lampShadows: 0, lampShadowRate: 15, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, grass: { radius: 45, density: 0.5, nearest: 1 }, woodsCell: 100, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, holdStillFrames: true, ambientRange: 0, birds: { count: 6, range: 18 }, residentRadius: 90, openWorld: { stream: 0.7, farCull: 450, woodsFar: 400, woodsCell: 128, flowersFar: 120, tiles: [150, 350], far: 1800 }, leanTargets: true, contactShading: false, cloudShadows: false },
+  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, webglMsaaSamples: 4, anisotropy: 8, clusteredLamps: true, lampShadows: 2, lampShadowRate: 15, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 60, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 40, birds: { count: 24, range: 35 }, residentRadius: 140, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true },
+  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, webglMsaaSamples: 4, anisotropy: 8, clusteredLamps: true, lampShadows: 4, lampShadowRate: 30, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 90, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 }, residentRadius: 200, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true },
 };
 
 export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];
