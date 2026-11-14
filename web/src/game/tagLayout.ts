@@ -66,43 +66,69 @@ export function tagOrder(t: Pick<TagSpot, 'sy' | 'rank' | 'wins' | 'held'>): num
 const overlaps = (a: Box, b: Box) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
 
 /**
+ * How far round its point (CSS pixels) a tag that doesn't win can stand: `MOST_SHIFT` sideways (counted 1.4 times)
+ * and up or down, and a pixel more for rounding. Only what lies there can be in its way.
+ */
+const REACH_X = MOST_SHIFT / 1.4 + 1;
+const REACH_Y = MOST_SHIFT + 1;
+
+/**
  * Places `tags` inside `area` clear of `blocks` (the panels over the town), setting each one's `x`, `y` and
  * `crowded`. A winner is pulled inside the area and shown wherever it lands (unless the area has no room for it at
  * all); the others only where they fit, near their lot.
+ *
+ * (Run every frame the town view moves: a tag that doesn't win is checked only against the boxes within its reach,
+ * and of the spots tried for it only those it may move to, which places every tag where trying them all would.)
  */
 export function layoutTags(tags: TagSpot[], area: Box, blocks: readonly Box[]): void {
   const sorted = tags.slice().sort((a, c) => tagOrder(a) - tagOrder(c));
   const done: Box[] = [];
+  /** What may be in the way of the tag being placed: everything for a winner, else what lies within its reach. */
+  const near: Box[] = [];
   let homes = 0;
   const clampX = (x: number, w: number) => Math.min(area.r - w / 2, Math.max(area.l + w / 2, x));
   const clampY = (y: number, h: number) => Math.min(area.b, Math.max(area.t + h, y));
   for (const tag of sorted) {
-    const { w, h } = tag;
+    const { w, h, sx, sy } = tag;
     const wins = tag.wins !== null;
     // (The households' few are shown already: no need to look for room.)
     if (!wins && tag.capped && homes >= MOST_HOMES) {
-      tag.x = tag.sx;
-      tag.y = tag.sy;
+      tag.x = sx;
+      tag.y = sy;
       tag.crowded = true;
       continue;
     }
+    near.length = 0;
+    if (wins) {
+      for (const o of done) near.push(o);
+      for (const o of blocks) near.push(o);
+    } else {
+      const reach: Box = { l: sx - REACH_X - w / 2, t: sy - REACH_Y - h, r: sx + REACH_X + w / 2, b: sy + REACH_Y };
+      for (const o of done) if (overlaps(o, reach)) near.push(o);
+      for (const o of blocks) if (overlaps(o, reach)) near.push(o);
+    }
     // The anchor (x, y) is the stem's foot: the box spans [x - w/2, x + w/2] x [y - h, y].
-    const wx = clampX(tag.sx, w);
-    const wy = clampY(tag.sy, h);
+    const wx = clampX(sx, w);
+    const wy = clampY(sy, h);
     // Inside the town's part of the screen (a tag taller or wider than that has nowhere to go).
     const inside = (x: number, y: number) => y - h >= area.t - 0.5 && y <= area.b + 0.5 && x - w / 2 >= area.l - 0.5 && x + w / 2 <= area.r + 0.5;
     const free = (x: number, y: number) => {
-      const box = { l: x - w / 2, t: y - h, r: x + w / 2, b: y };
-      return inside(x, y) && !blocks.some((o) => overlaps(box, o)) && !done.some((o) => overlaps(box, o));
+      if (!inside(x, y)) return false;
+      const l = x - w / 2;
+      const r = x + w / 2;
+      const t = y - h;
+      for (const o of near) if (l < o.r && r > o.l && t < o.b && y > o.t) return false;
+      return true;
     };
     // Vertical moves read better than sideways ones (the tag stays over its column).
-    const shift = (x: number, y: number) => Math.abs(x - tag.sx) * 1.4 + Math.abs(y - tag.sy);
+    const shift = (x: number, y: number) => Math.abs(x - sx) * 1.4 + Math.abs(y - sy);
     // Candidates: the wanted spot, and spots just beside every tag placed and every obstacle (above, below, left,
     // right and the diagonals); the free one nearest the lot wins.
     let x = wx;
     let y = wy;
     if (!free(wx, wy)) {
       let best = Infinity;
+      /** Tries the spot (`cx`, `cy`), clamped: taken if free and nearer the lot than the best so far. */
       const tryAt = (cx0: number, cy0: number) => {
         const cx = clampX(cx0, w);
         const cy = clampY(cy0, h);
@@ -114,15 +140,28 @@ export function layoutTags(tags: TagSpot[], area: Box, blocks: readonly Box[]): 
           y = cy;
         }
       };
-      const around = [...done, ...blocks];
+      const around = done.length ? [...done, ...blocks] : blocks;
       for (const o of around) {
-        for (const cx of [wx, o.l - w / 2 - 3, o.r + w / 2 + 3]) for (const cy of [wy, o.t - 3, o.b + h + 3]) tryAt(cx, cy);
+        for (let i = 0; i < 3; i++) {
+          const cx = i === 0 ? wx : i === 1 ? o.l - w / 2 - 3 : o.r + w / 2 + 3;
+          // (A spot that far sideways costs more than the best, or than a tag that doesn't win may move, whatever its height.)
+          const across = Math.abs(clampX(cx, w) - sx) * 1.4;
+          if (across >= best || (!wins && across > MOST_SHIFT)) continue;
+          tryAt(cx, wy);
+          tryAt(cx, o.t - 3);
+          tryAt(cx, o.b + h + 3);
+        }
       }
-      // Crowded corner: combine edges of different boxes (rare, a little more work).
+      // Crowded corner: combine edges of different boxes (rare, a little more work). For a tag that doesn't win,
+      // only the edges within `MOST_SHIFT` of its point (a spot further either way costs more than that).
       if (best === Infinity) {
-        const xs = [wx, ...around.flatMap((o) => [o.l - w / 2 - 3, o.r + w / 2 + 3])];
-        const ys = [wy, ...around.flatMap((o) => [o.t - 3, o.b + h + 3])];
-        for (const cx of xs) for (const cy of ys) tryAt(cx, cy);
+        const xs = [wx];
+        const ys = [wy];
+        for (const o of around) xs.push(o.l - w / 2 - 3, o.r + w / 2 + 3);
+        for (const o of around) ys.push(o.t - 3, o.b + h + 3);
+        const xsIn = wins ? xs : xs.filter((cx) => Math.abs(clampX(cx, w) - sx) * 1.4 <= MOST_SHIFT);
+        const ysIn = wins ? ys : ys.filter((cy) => Math.abs(clampY(cy, h) - sy) <= MOST_SHIFT);
+        for (const cx of xsIn) for (const cy of ysIn) tryAt(cx, cy);
       }
     }
     tag.x = x;
