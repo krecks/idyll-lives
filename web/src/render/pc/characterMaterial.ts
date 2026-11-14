@@ -26,6 +26,7 @@
 import * as pc from './engine';
 import type { InstanceStream } from './instancing';
 import { GAME_FRONT_FACE, MaterialLibrary } from './materials';
+import { gpuOnly } from './meshes';
 import { BLANKET } from './shaders/blanket';
 import { CUT, RESIDENT, RESIDENT_DIFFUSE, RESIDENT_HAIR_SPECULAR, RESIDENT_INSTANCING, RESIDENT_NORMAL, RESIDENT_WISP_OPACITY, WISP } from './shaders/character';
 import { engineChunk, gameChunks, installGameChunks, registerShaderFeature, replaceOnce, type Language } from './shaders/chunks';
@@ -130,7 +131,7 @@ export function residentMesh(device: pc.GraphicsDevice, part: MeshPart): pc.Mesh
   const box = new pc.BoundingBox();
   box.setMinMax(new pc.Vec3(...part.min), new pc.Vec3(...part.max));
   mesh.aabb = box;
-  return mesh;
+  return gpuOnly(mesh);
 }
 
 /** The set's face morphs as a texture (half floats, RGBA), for `setResidentTextures`. */

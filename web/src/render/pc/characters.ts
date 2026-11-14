@@ -27,6 +27,7 @@ import { Instances } from './instancing';
 import { shadowOnlyLayer } from './layers';
 import { contactBlob } from './lotContents';
 import type { MaterialLibrary } from './materials';
+import { gpuOnly } from './meshes';
 import { fileColour, onModelFileArrived } from './models';
 import { PoseTexture } from './poseTexture';
 import { ResidentProps, type Prop } from './residentProps';
@@ -220,6 +221,7 @@ export class PlayCanvasResidentView implements ResidentView<PartDraw, QuiltDraw,
     mesh.setUvs(0, geometry.uvs);
     mesh.setIndices(geometry.indices);
     mesh.update(pc.PRIMITIVE_TRIANGLES);
+    gpuOnly(mesh);
     const draw = new Instances(this.device, this.root, mesh, this.quiltMat!, { name, streams: [BLANKET_EXT, BLANKET_TINT], castShadows: false, receiveShadows: true, cull: false, capacity: MAX_CHARACTERS });
     draw.mesh.decRefCount();
     draw.enabled = false;

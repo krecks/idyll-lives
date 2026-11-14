@@ -1094,6 +1094,41 @@
           "who": "chunks.ts backend patch: the occlusion's texture size under LIT_SSAO (WGSL)"
         }
       ]
+    },
+    {
+      "for": "render/pc/meshes.ts gpuOnly: a static mesh's CPU copy (its buffers' storage) let go once uploaded.",
+      "anchors": [
+        {
+          "file": "platform/graphics/vertex-buffer.js",
+          "text": "this.adjustVramSizeTracking(device._vram, -this.storage.byteLength);",
+          "who": "meshes.ts gpuOnly: destroy takes the storage's size off the GPU memory count (given the size let go instead)"
+        },
+        {
+          "file": "platform/graphics/index-buffer.js",
+          "text": "this.adjustVramSizeTracking(device._vram, -this.storage.byteLength);",
+          "who": "meshes.ts gpuOnly: the same for an index buffer"
+        },
+        {
+          "file": "platform/graphics/vertex-buffer.js",
+          "text": "restoreContext() {\n\t\tthis.unlock();",
+          "who": "meshes.ts gpuOnly: a restored device uploads the storage again (nothing to upload: a no-op)"
+        },
+        {
+          "file": "platform/graphics/index-buffer.js",
+          "text": "restoreContext() {\n\t\tthis.unlock();",
+          "who": "meshes.ts gpuOnly: the same for an index buffer"
+        },
+        {
+          "file": "platform/graphics/webgpu/webgpu-buffer.js",
+          "text": "wgpu.queue.writeBuffer(this.buffer, byteOffset, srcBuffer, srcOffset, byteLength);",
+          "who": "meshes.ts gpuOnly: WebGPU copies the storage as it is uploaded (unlock), so it can go after"
+        },
+        {
+          "file": "platform/graphics/webgl/webgl-buffer.js",
+          "text": "gl.bufferData(target, storage, glUsage);",
+          "who": "meshes.ts gpuOnly: WebGL2 copies the storage as it is uploaded (unlock), so it can go after"
+        }
+      ]
     }
   ]
 }
