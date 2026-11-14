@@ -189,14 +189,18 @@ pub(crate) fn hold(
 /// up, and doing nothing or something they picked that they can drop (`available_for_social`
 /// says it isn't busy; not on their way to someone, on the phone or carrying something).
 pub(crate) fn free_now(content: &Content, s: &Sim, tick: u64) -> bool {
+    s.here() && s.available_for_social(content) && free_besides(content, s, tick)
+}
+
+/// `free_now` but for being here and `available_for_social` (which the tick's briefs know
+/// already).
+pub(crate) fn free_besides(content: &Content, s: &Sim, tick: u64) -> bool {
     let ready = crate::social::minutes_to_ticks(content.day_rhythm.ready_minutes);
-    s.here()
-        && !content.life.baby(s.age)
+    !content.life.baby(s.age)
         && s.carried_by.is_none()
         && s.ladder_ticks == 0
         && s.follow_up.is_none()
         && !s.queue().any(|t| t.directed)
-        && s.available_for_social(content)
         && !s.asleep(content)
         && s.current().is_none_or(|c| {
             matches!(
@@ -204,7 +208,7 @@ pub(crate) fn free_now(content: &Content, s: &Sim, tick: u64) -> bool {
                 TaskKind::Use { .. } | TaskKind::MoveTo { .. } | TaskKind::Clean { .. }
             )
         })
-        && !crate::world::leave_at(s, content, tick).is_some_and(|t| t <= tick + ready)
+        && !crate::world::leaves_by(s, content, tick, tick + ready)
 }
 
 /// Whether resident `j` is free to play `inter` at an object on `plot` with `a` now (`free_now`,
