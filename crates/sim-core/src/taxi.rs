@@ -3967,7 +3967,7 @@ pub(crate) fn back_minutes(
     sim: &crate::world::Sim,
     place: u32,
     pos: [f32; 2],
-    door: [f32; 2],
+    (home, door): (u32, [f32; 2]),
 ) -> Option<f32> {
     let came = ctx.taxis.out_at.contains(&(sim.id, place))
         || sim.taxi.is_some_and(|b| {
@@ -3977,27 +3977,32 @@ pub(crate) fn back_minutes(
                 .any(|r| r.id == b.run && r.home && r.place == Some(place))
         });
     came.then(|| {
+        // (Where the ride gets on and off the roads, for it and the kerbs alike; home's door as
+        // noted, `Travel::door_entry`.)
+        let car = crate::travel::Mode::Car;
+        let on = ctx.travel.entry(pos, car);
+        let off = ctx.travel.door_entry(home, door, car);
+        let walk = sim.walk_per_minute(ctx.content);
         BACK_SLACK as f32 * crate::MINUTES_PER_TICK
-            + ctx.travel.eta(
-                pos,
-                door,
-                crate::travel::Mode::Car,
-                sim.walk_per_minute(ctx.content),
-            ) * crate::travel::DRIVE_MINUTES
-            + kerb_walks(ctx.travel, pos, door, sim.walk_per_minute(ctx.content))
+            + ctx.travel.eta_via(pos, door, car, walk, || on, || off) * crate::travel::DRIVE_MINUTES
+            + kerb_walks(ctx.travel, (pos, on), (door, off), walk)
     })
 }
 
 /// Minutes on foot by taxi from `from` to `to` besides the ride (`leisure_eta`, `back_minutes`):
-/// out to the road nearest the one and in from the road nearest the other, at `walk` m a minute,
-/// and the taxi's stands and the wait (`LEISURE_KERBS`).
-fn kerb_walks(travel: &crate::travel::Travel, from: [f32; 2], to: [f32; 2], walk: f32) -> f32 {
-    let to_road = |p: [f32; 2]| {
-        travel
-            .entry(p, crate::travel::Mode::Car)
-            .map_or(0.0, |r| crate::travel::dist(p, travel.graph.point(r)))
+/// out to the road nearest the one and in from the road nearest the other (where each gets on
+/// the roads by car, `Travel::entry`), at `walk` m a minute, and the taxi's stands and the wait
+/// (`LEISURE_KERBS`).
+fn kerb_walks(
+    travel: &crate::travel::Travel,
+    (from, on): ([f32; 2], Option<crate::travel::RoadPoint>),
+    (to, off): ([f32; 2], Option<crate::travel::RoadPoint>),
+    walk: f32,
+) -> f32 {
+    let to_road = |p: [f32; 2], entry: Option<crate::travel::RoadPoint>| {
+        entry.map_or(0.0, |r| crate::travel::dist(p, travel.graph.point(r)))
     };
-    (to_road(from) + to_road(to)) * KERB_WINDING / walk.max(0.1) + LEISURE_KERBS
+    (to_road(from, on) + to_road(to, off)) * KERB_WINDING / walk.max(0.1) + LEISURE_KERBS
 }
 
 /// Resident `i` gets out of taxi `c` (seat `seat`) at `place`'s kerb and walks on in, a visit or

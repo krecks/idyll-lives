@@ -194,6 +194,14 @@ pub(crate) fn parking_for(
 /// faces and whether it's a bay off the road (nose in, facing away from it: `parking_bay`; else
 /// as the spot, on the road).
 pub(crate) fn parked_at(travel: &Travel, k: usize) -> Option<([f32; 2], f32, bool)> {
+    match travel.parked.get(k) {
+        Some(&spot) => spot,
+        None => park_spot(travel, k),
+    }
+}
+
+/// `parked_at` worked out (`Travel::parked` keeps it).
+pub(crate) fn park_spot(travel: &Travel, k: usize) -> Option<([f32; 2], f32, bool)> {
     let p = travel.file.parking.get(k)?;
     let at = [p.x, p.z];
     at.iter().all(|v| v.is_finite()).then_some(())?;
