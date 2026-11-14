@@ -286,14 +286,31 @@ pub(crate) type WalkMemo = Vec<Option<([u32; 6], f32)>>;
 const FIRM_UP_MINUTES: f32 = 6.0;
 
 /// `leave_for`, worked out again from where they are once it's close (`FIRM_UP_MINUTES`).
-fn firm_leave(w: &mut World, i: usize, leave: u64, start: u64, day: u32) -> u64 {
+/// `fresh`: their commute was worked out anew just now, in this tick and from where they are
+/// (`update`), at the cost of this many tiles searched.
+fn firm_leave(
+    w: &mut World,
+    i: usize,
+    leave: u64,
+    start: u64,
+    day: u32,
+    fresh: Option<u64>,
+) -> u64 {
     let planned = leave_for(&w.sims[i], leave, start);
     if w.sims[i].commute.is_some_and(|c| !c.firm)
         && w.tick + ticks(FIRM_UP_MINUTES) >= planned
         && !heading_out(&w.sims[i])
     {
-        w.sims[i].commute = None;
-        refresh_commute(w, i, day);
+        // (Worked out just now, from here, the same again: firm as it is. Its searches still
+        // count against the tick's budget, as when they were run twice: on Snowdale at 08:00 a
+        // third of the walks out of town were searched for twice in a row, 49,000 tiles each.)
+        match fresh {
+            Some(nodes) => crate::path::charge_nodes(nodes),
+            None => {
+                w.sims[i].commute = None;
+                refresh_commute(w, i, day);
+            }
+        }
         if let Some(c) = w.sims[i].commute.as_mut() {
             c.firm = true;
         }
@@ -403,7 +420,8 @@ pub fn leave_for(sim: &crate::world::Sim, leave: u64, start: u64) -> u64 {
 /// way, as it always was. A new day starts from the day before's (firmed up from where they were
 /// as they set off, mostly): it is worked out again only shortly before they leave
 /// (`firm_leave`), not for everyone in town at midnight, a walk across a big world each.
-pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
+/// Whether it was worked out anew.
+pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) -> bool {
     // (Nowhere to go: no job, and not of an age for school.)
     let sim = &w.sims[i];
     let commutes = sim.job.is_some()
@@ -411,7 +429,7 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
             && w.content.life.stage_at(sim.age).is_some_and(|s| s.school);
     if w.exits.is_empty() || !commutes {
         w.sims[i].commute = None;
-        return;
+        return false;
     }
     let home = w
         .households
@@ -424,7 +442,7 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
             c.day = day;
             c.firm = false;
         }
-        return;
+        return false;
     }
     let sim = &w.sims[i];
     // From where they are at home, else from the front door.
@@ -439,7 +457,7 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
     let start = next_start(w, i);
     let Some(exit) = crate::world::quickest_exit(&w.travel, &w.exits, ground) else {
         w.sims[i].commute = None;
-        return;
+        return false;
     };
     // On foot, or on a bike of theirs at home (`ride.rs`): picked now, and the one they set off
     // on, so the time they leave is the time their way takes. (Not with a car to go in: it's
@@ -450,12 +468,18 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
         .flatten();
     let on_foot = w.sims[i].walk_per_minute(&w.content);
     let walk = on_foot * bike.map_or(1.0, |(_, speed)| speed);
-    let (mut minutes, mut total) = walk_commute(w, i, from, ground, walk, exit);
+    // (The way is found once, for the ride and, if the ride is too long, for the walk: the same
+    // way at another pace.)
+    let searched = crate::path::nodes_searched();
+    let metres = commute_metres(w, i, from, ground, exit);
+    let (mut minutes, mut total) = walk_commute(w, metres, ground, walk, exit);
     // (A ride out longer than `BIKE_MOST` is ridden in the work taxi, `taxi.rs`, or walked.)
     let long_ride = bike.is_some() && minutes - OUT_OF_THE_HOUSE > BIKE_MOST;
     if long_ride {
         bike = None;
-        (minutes, total) = walk_commute(w, i, from, ground, on_foot, exit);
+        // (Counted against the tick's search budget as when it was searched for again.)
+        crate::path::charge_nodes(crate::path::nodes_searched() - searched);
+        (minutes, total) = walk_commute(w, metres, ground, on_foot, exit);
     }
     let c = Commute {
         day,
@@ -468,19 +492,18 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) {
         firm: false,
     };
     w.sims[i].commute = Some(c);
+    true
 }
 
-/// An open-world town's walk out for `i` from `from` (`ground`: over the ground) at `walk` m a
-/// minute to `exit` (the way out quickest on foot): the minutes to it (with `WALK_MARGIN` and
-/// `OUT_OF_THE_HOUSE`), and the ticks in all before work starts.
-fn walk_commute(
+/// The metres of an open-world town's way out for `i` from `from` (`ground`: over the ground) to
+/// `exit`: the way they'd walk it (in the house's grounds and the public ways), if one is found.
+fn commute_metres(
     w: &World,
     i: usize,
     from: [f32; 2],
     ground: [f32; 2],
-    walk: f32,
     exit: usize,
-) -> (f32, u64) {
+) -> Option<f32> {
     let sim = &w.sims[i];
     let target = w.exits[exit];
     // The way they'd walk it (in the house's grounds and the public ways), or the estimate.
@@ -489,7 +512,7 @@ fn walk_commute(
     let start = (from[0].floor() as i32, from[1].floor() as i32);
     let grounds = crate::world::grounds(&w.tile_plot, &w.plots, &w.households, &nav, sim, goal);
     let reach = (w.reach_version == w.nav_version).then_some(&w.reach);
-    let metres = crate::world::trip(
+    crate::world::trip(
         &nav,
         reach,
         &w.travel,
@@ -502,7 +525,21 @@ fn walk_commute(
     .map(|wp| {
         let wp: Vec<[f32; 2]> = wp.iter().map(|&p| w.stairs.ground_pos(p)).collect();
         crate::travel::length(ground, &wp)
-    });
+    })
+}
+
+/// An open-world town's walk out over `metres` (`commute_metres`; None: the estimate from
+/// `ground`, over the ground) at `walk` m a minute to `exit` (the way out quickest on foot): the
+/// minutes to it (with `WALK_MARGIN` and `OUT_OF_THE_HOUSE`), and the ticks in all before work
+/// starts.
+fn walk_commute(
+    w: &World,
+    metres: Option<f32>,
+    ground: [f32; 2],
+    walk: f32,
+    exit: usize,
+) -> (f32, u64) {
+    let target = w.exits[exit];
     let minutes = match metres {
         Some(m) => m / walk.max(1e-3),
         None => w
@@ -611,13 +648,16 @@ pub(crate) fn update(w: &mut World) {
                 } else {
                     unhurried(w, i)
                 };
+            let mut fresh = None;
             if !waits {
                 let before = w.sims[i].commute;
-                refresh_commute(w, i, day);
+                let searched = crate::path::nodes_searched();
+                fresh =
+                    refresh_commute(w, i, day).then(|| crate::path::nodes_searched() - searched);
                 refreshed |= w.sims[i].commute != before;
             }
-            schedule_work(w, i, day);
-            schedule_school(w, i, day);
+            schedule_work(w, i, day, fresh);
+            schedule_school(w, i, day, fresh);
             end_visit_if_due(w, i, hour);
         }
         childcare(w, i);
@@ -743,14 +783,14 @@ pub fn school_today(
 }
 
 /// Off to school when it's time (once a day; too late, and it's skipped for today).
-fn schedule_school(w: &mut World, i: usize, day: u32) {
+fn schedule_school(w: &mut World, i: usize, day: u32, fresh: Option<u64>) {
     if w.sims[i].school_day == day {
         return;
     }
     let Some((leave, start, _)) = school_today(&w.content, &w.sims[i], w.tick) else {
         return;
     };
-    let leave = firm_leave(w, i, leave, start, day);
+    let leave = firm_leave(w, i, leave, start, day, fresh);
     // By car, when the drive takes it (`cars::lead_ticks`); by the work taxi, in time for it at the
     // kerb (`taxi::leave_at`).
     let leave = match crate::cars::lead_ticks(w, i, start) {
@@ -789,7 +829,7 @@ fn schedule_school(w: &mut World, i: usize, day: u32) {
 
 /// Leave for work when it's time; count a shift as missed if the Sim never left. The last
 /// grown-up at home with a baby and no money for a babysitter stays home instead.
-fn schedule_work(w: &mut World, i: usize, day: u32) {
+fn schedule_work(w: &mut World, i: usize, day: u32, fresh: Option<u64>) {
     let tick = w.tick;
     let sim = &w.sims[i];
     let Some(job) = sim.job.as_ref() else { return };
@@ -799,7 +839,7 @@ fn schedule_work(w: &mut World, i: usize, day: u32) {
     let Some((leave, start, _)) = shift_today(&w.content, job, &sim.skills, tick) else {
         return;
     };
-    let leave = firm_leave(w, i, leave, start, day);
+    let leave = firm_leave(w, i, leave, start, day, fresh);
     let sim = &w.sims[i];
     // By car, when the drive takes it (`cars::lead_ticks`); by the work taxi, in time for it at the
     // kerb (`taxi::leave_at`).
