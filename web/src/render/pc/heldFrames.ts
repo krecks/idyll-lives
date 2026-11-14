@@ -1,6 +1,6 @@
 /**
- * Held frames (the preset's `holdStillFrames`, for the menus' town): a view standing still is drawn
- * once and shown again, not drawn anew, until something in it changes. The canvas is the render
+ * Held frames (the preset's `holdStillFrames`: the menus' town, and the game while it is paused): a
+ * view standing still is drawn once and shown again, not drawn anew, until something in it changes. The canvas is the render
  * target that holds it: a frame not drawn leaves the canvas's last picture on screen (WebGPU's
  * canvas keeps its last texture, WebGL2's its last drawing buffer), so a held frame costs neither
  * the CPU (no culling, no draw calls) nor the GPU.
@@ -13,10 +13,13 @@
  * What it can't see (a material's colour or a draw's matrices changed in place: the overview's
  * highlights, birds flying) its owner says with `changed()`.
  *
- * After a change it draws `SETTLE` frames more before it holds (late material swaps, uploads). It
- * holds only while `active` (the renderer: the menus' town standing still, no build running) and
- * the preset allows; a frame something waits for (`draw(true)`: `framesRendered`) is always drawn.
- * Wind and the clouds' drift stand still while a frame is held. Per frame: no allocations.
+ * After a change it draws `SETTLE` frames more before it holds (late material swaps, uploads), and
+ * for `settleMs` after it (the game's: a shadow map, a reflection or a lamp's shadow held to its rate
+ * draws a little later). It holds only while `active` (the renderer: the menus' town standing still,
+ * or the game paused, no build running) and the preset allows; a frame something waits for
+ * (`draw(true)`: `framesRendered`) is always drawn. Wind, the clouds' drift and the selection
+ * marker's bob stand still while a frame is held (the renderer's clock for them stops, so they go on
+ * from there). Per frame: no allocations.
  */
 
 import * as pc from './engine';
@@ -33,7 +36,10 @@ export class HeldFrames {
   active = false;
   /** The last frame was held (not drawn). */
   holding = false;
+  /** After a change, frames are drawn for at least this long (ms) as well as `SETTLE` frames. */
+  settleMs = 0;
   private left = SETTLE;
+  private changedAt = -Infinity;
   private readonly last = new Float64Array(SAMPLES);
   private readonly now = new Float64Array(SAMPLES);
   private readonly unlisten: (() => void)[] = [];
@@ -61,6 +67,7 @@ export class HeldFrames {
   /** Something in the view changed that `draw` can't see: the next frames are drawn. */
   changed(): void {
     this.left = SETTLE;
+    if (this.settleMs > 0) this.changedAt = performance.now();
   }
 
   /**
@@ -76,12 +83,13 @@ export class HeldFrames {
     this.sample(this.now);
     if (!same(this.now, this.last)) {
       this.last.set(this.now);
-      this.left = SETTLE;
+      this.changed();
     }
     if (this.left > 0) {
       this.left--;
       return true;
     }
+    if (this.settleMs > 0 && performance.now() - this.changedAt < this.settleMs) return true;
     if (wanted) return true;
     this.holding = true;
     return false;

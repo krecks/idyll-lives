@@ -47,14 +47,17 @@ describe("the sun's shadow square", () => {
     const { shadows, drawn } = sun(10);
     shadows.setSquare(100, 200, 40);
     expect(drawn()).toBe(true);
-    // A caster moving right after: held back for the rate, drawn once it has passed.
+    // A caster moving right after: held back for the rate, drawn once it has passed (a held game frame waits for it).
     shadows.moved(false);
+    expect(shadows.waiting).toBe(true);
     expect(drawn()).toBe(false);
     shadows.frame();
     expect(drawn()).toBe(false);
     await Bun.sleep(110);
     shadows.frame();
+    expect(shadows.waiting).toBe(true);
     expect(drawn()).toBe(true);
+    expect(shadows.waiting).toBe(false);
     // The sun, the walls, a thing placed: at once.
     shadows.moved();
     expect(drawn()).toBe(true);
