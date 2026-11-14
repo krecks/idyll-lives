@@ -146,7 +146,19 @@ pub struct StairMap {
     links: Vec<(u64, u32, (i32, i32))>,
     /// Whether `steps` and `links` index `stairs` (else they're scanned).
     indexed: bool,
+    /// Which `STAIR_BLOCK`-tile squares hold a step or a link's end, a bit each, row by row
+    /// `block_cols` across: most tiles a search tries are nowhere near a stair, and are told so
+    /// without a search of the index (half a big world's search, Snowdale's walks out of town,
+    /// was looking tiles up in it). Empty with `block_cols` 0: none kept, every tile looked up.
+    blocks: Vec<u64>,
+    block_cols: u32,
 }
+
+/// The side of the squares `StairMap::blocks` marks, a power of two (tiles).
+const STAIR_BLOCK_SHIFT: u32 = 3;
+/// At most this many squares are marked: past it (stairs far apart in a lot as big as no town
+/// is), every tile is looked up.
+const STAIR_BLOCKS_MOST: u64 = 1 << 24;
 
 /// No storeys, no stairs.
 pub static NO_STAIRS: StairMap = StairMap {
@@ -156,6 +168,8 @@ pub static NO_STAIRS: StairMap = StairMap {
     steps: Vec::new(),
     links: Vec::new(),
     indexed: true,
+    blocks: Vec::new(),
+    block_cols: 0,
 };
 
 /// A tile's key in the stairs' index.
@@ -233,9 +247,59 @@ impl StairMap {
         links.sort_by_key(|&(k, o, _)| (k, o));
         links.dedup_by_key(|e| e.0);
         self.stairs = stairs;
+        (self.blocks, self.block_cols) =
+            Self::blocks_of(steps.iter().map(|e| e.0).chain(links.iter().map(|e| e.0)));
         self.steps = steps;
         self.links = links;
         self.indexed = true;
+    }
+
+    /// `blocks` and `block_cols` over the tiles with these keys (`tile_key`): none kept (every
+    /// tile looked up) if one is off the grid's corner or they'd be too many.
+    fn blocks_of(keys: impl Iterator<Item = u64> + Clone) -> (Vec<u64>, u32) {
+        let at = |k: u64| ((k & 0xffff_ffff) as u32 as i32, (k >> 32) as u32 as i32);
+        if keys.clone().any(|k| {
+            let (x, z) = at(k);
+            x < 0 || z < 0
+        }) {
+            return (Vec::new(), 0);
+        }
+        let (cols, rows) = keys.clone().fold((0u64, 0u64), |(c, r), k| {
+            let (x, z) = at(k);
+            (
+                c.max((x as u64 >> STAIR_BLOCK_SHIFT) + 1),
+                r.max((z as u64 >> STAIR_BLOCK_SHIFT) + 1),
+            )
+        });
+        if cols == 0 || cols * rows > STAIR_BLOCKS_MOST {
+            return (Vec::new(), 0);
+        }
+        let mut blocks = vec![0u64; (cols * rows).div_ceil(64) as usize];
+        for k in keys {
+            let (x, z) = at(k);
+            let b = (z as u64 >> STAIR_BLOCK_SHIFT) * cols + (x as u64 >> STAIR_BLOCK_SHIFT);
+            blocks[(b / 64) as usize] |= 1 << (b % 64);
+        }
+        (blocks, cols as u32)
+    }
+
+    /// Whether the tile may be a step or a link's end (`blocks`): false only where it surely
+    /// isn't one.
+    fn near_stairs(&self, x: i32, z: i32) -> bool {
+        if self.block_cols == 0 {
+            return true;
+        }
+        if x < 0 || z < 0 {
+            return false;
+        }
+        let (bx, bz) = (x as u64 >> STAIR_BLOCK_SHIFT, z as u64 >> STAIR_BLOCK_SHIFT);
+        if bx >= u64::from(self.block_cols) {
+            return false;
+        }
+        let b = bz * u64::from(self.block_cols) + bx;
+        self.blocks
+            .get((b / 64) as usize)
+            .is_some_and(|w| w & (1 << (b % 64)) != 0)
     }
 
     /// The flight a tile is a step of, and which step.
@@ -248,6 +312,9 @@ impl StairMap {
                 .stairs
                 .iter()
                 .find_map(|s| s.step(x, z).map(|i| (s, i)));
+        }
+        if !self.near_stairs(x, z) {
+            return None;
         }
         let k = tile_key(x, z);
         let at = self.steps.binary_search_by_key(&k, |e| e.0).ok()?;
@@ -270,6 +337,9 @@ impl StairMap {
                     None
                 }
             });
+        }
+        if !self.near_stairs(x, z) {
+            return None;
         }
         let k = tile_key(x, z);
         let at = self.links.binary_search_by_key(&k, |e| e.0).ok()?;
@@ -1922,6 +1992,19 @@ mod tests {
         assert_eq!(map.link(2, 3), Some((2, 12)));
         assert_eq!(map.link(2, 12), Some((2, 3)));
         assert_eq!(map.link(3, 3), None);
+        // Every tile as a scan of the flights finds it, near them or not (`near_stairs`).
+        let far = Stair::new(&[(70, 41), (71, 41)], (69, 41), false, (72, 51));
+        map.set_stairs(vec![flight(2), flight(5), far]);
+        let scan = StairMap {
+            stairs: map.stairs.clone(),
+            ..Default::default()
+        };
+        for z in -2..60 {
+            for x in -2..90 {
+                assert_eq!(map.step(x, z), scan.step(x, z), "({x}, {z})");
+                assert_eq!(map.link(x, z), scan.link(x, z), "({x}, {z})");
+            }
+        }
     }
 
     #[test]
