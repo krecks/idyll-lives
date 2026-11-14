@@ -78,7 +78,7 @@ jobs:
       # Bun runs the sample makers.
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
 
       # The generated_* tests are ignored because they need sample files; made here so they run
       # instead of passing without checking anything.
@@ -95,7 +95,7 @@ jobs:
       # Bun runs the clip check (no packages) and the renderer's checks; no Rust here.
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
 
       # The residents' clips on both bodies at every life stage; the known failures are in
       # tools/characters/clip-baseline.json, so only a new one fails.
@@ -136,7 +136,7 @@ jobs:
       # above checks it (`cargo check-chunks`).
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - name: Shader chunks
         run: tools/ci-local.sh chunks
 
