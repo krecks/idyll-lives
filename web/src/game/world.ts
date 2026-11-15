@@ -154,6 +154,14 @@ export interface WorldSpec extends LotMix {
   spotsPerArea: [number, number];
   /** One of the worlds from before places and options (`CLASSIC`). */
   classic?: true;
+
+  // What a place with options has besides (none of it in a classic world).
+  /** Meadow where the noise is over this (0.58 if not given: lower, more; a heath's heather). */
+  meadowCut?: number;
+  /** What a metre of height costs a country road, in cells of flat open land (hilly land and mountains: the roads keep to the valleys). */
+  climb?: number;
+  /** Woods grow into the hamlets' boxes up to their roads, lots and buildings (Wooded), the main town's too (`all`) when it is a hamlet; else every box is cleared. */
+  wildBoxes?: 'hamlets' | 'all';
 }
 
 /** A place as step 1 lists it, and the options it starts with. */
@@ -179,10 +187,11 @@ export function grass(rand: Rand, base: LandscapeParams['grass'], warm: [number,
   return base.map((g) => tint(g, rand, w, l)) as LandscapeParams['grass'];
 }
 
-/** Grass palettes: the classic valley's, the mountains', the coast's. */
+/** Grass palettes: the classic valley's, the mountains', the coast's, the heath's (heather where the meadows are, bracken on the hills). */
 export const GREEN = DEFAULT_LANDSCAPE.grass;
 export const ALPINE: LandscapeParams['grass'] = ['#557F3A', '#6E9142', '#8C9A55', '#4F7238'];
 export const COAST: LandscapeParams['grass'] = ['#7AA046', '#93AD55', '#B2B46A', '#6C9142'];
+export const HEATH: LandscapeParams['grass'] = ['#6E8A3E', '#82994A', '#8C7088', '#9C7A46'];
 
 /** The classic valley, rolled a little differently for each world. */
 export const valley = (rand: Rand): LandscapeParams => ({
@@ -472,47 +481,47 @@ export function fill(rand: Rand, roads: readonly RoadPlan[], box: Box, count: nu
 export const WORLDS: Record<WorldKind, Place> = {
   country: {
     label: 'Countryside',
-    blurb: 'A market town in rolling country, villages along the lanes round it.',
+    blurb: 'Rolling country, hedged lanes and ponds, villages strung along the roads.',
     defaults: { town: 'town', villages: 'many', hills: 'rolling', woods: 'some' },
   },
   farm: {
     label: 'Farmland',
-    blurb: 'A country road, farmsteads with fields and barns, open land all round.',
+    blurb: 'Flat open fields, farmsteads with barns and orchards along every road.',
     defaults: { town: 'village', villages: 'few', hills: 'flat', woods: 'open' },
   },
   seaside: {
     label: 'Seaside',
-    blurb: 'Homes above a sandy shore, a café and the smell of the sea.',
+    blurb: 'Homes along a sandy shore, the sea down one side of the world.',
     defaults: { town: 'village', villages: 'few', hills: 'rolling', woods: 'some' },
   },
   lakeside: {
     label: 'Lakeside',
-    blurb: 'A town by still water, reeds and a sandy bank, gentle hills.',
+    blurb: 'A broad lake in the middle of the land, homes along its shore.',
     defaults: { town: 'town', villages: 'few', hills: 'rolling', woods: 'some' },
   },
   river: {
     label: 'River valley',
-    blurb: 'A town on a winding river, bridges across it, meadows along its banks.',
+    blurb: 'A winding river across the land, homes on its banks, bridges over it.',
     defaults: { town: 'town', villages: 'few', hills: 'rolling', woods: 'some' },
   },
   mountain: {
     label: 'Mountains',
-    blurb: 'A few big gardens in a high valley, pines on steep slopes all round.',
+    blurb: 'A hamlet in a high valley, pines on steep slopes and peaks all round.',
     defaults: { town: 'hamlet', villages: 'few', hills: 'mountains', woods: 'wooded' },
   },
   forest: {
     label: 'Forest',
-    blurb: 'A clearing in deep woods: big gardens, few neighbours, birdsong.',
+    blurb: 'A clearing in deep woods, big gardens and birdsong.',
     defaults: { town: 'hamlet', villages: 'few', hills: 'rolling', woods: 'wooded' },
   },
   heath: {
     label: 'Heath',
-    blurb: 'Open moorland, heather and bracken, a hamlet in the lee of the hills.',
+    blurb: 'Open moorland, heather and bracken on high bare hills, few trees.',
     defaults: { town: 'hamlet', villages: 'few', hills: 'hilly', woods: 'open' },
   },
   island: {
     label: 'Island',
-    blurb: 'A village on an island, the sea all round, a causeway to the mainland.',
+    blurb: 'An island with the sea all round, a causeway to the mainland.',
     defaults: { town: 'village', villages: 'few', hills: 'rolling', woods: 'some' },
   },
 };
@@ -536,30 +545,6 @@ export function placeOf(kind: string): WorldKind {
 /** The options a place starts with. */
 export function defaultsOf(kind: WorldKind): WorldOptions {
   return { ...WORLDS[kind].defaults };
-}
-
-/** The classic world each place is laid out as, until places have tables of their own. */
-const STAND_IN: Record<WorldKind, ClassicKind> = {
-  country: 'medium',
-  farm: 'farm',
-  seaside: 'seaside',
-  lakeside: 'lakeside',
-  river: 'medium',
-  mountain: 'mountain',
-  forest: 'forest',
-  heath: 'medium',
-  island: 'medium',
-};
-
-/**
- * A place with its options as the generator lays it out: `options` over the place's own
- * (`defaultsOf`). For now each place is laid out as the classic world nearest it (`STAND_IN`); the
- * options are kept with the world (`WorldInfo.options`) but don't change it yet.
- */
-export function specOf(kind: WorldKind, options: Partial<WorldOptions> = {}): WorldSpec {
-  const chosen = Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) as Partial<WorldOptions>;
-  const { classic: _classic, ...base } = CLASSIC[STAND_IN[kind]];
-  return { ...base, kind, options: { ...defaultsOf(kind), ...chosen }, blurb: WORLDS[kind].blurb };
 }
 
 /** The worlds from before places and options: the kinds a world was, each with its own tables. */
@@ -849,6 +834,307 @@ export const CLASSIC: Record<ClassicKind, WorldSpec> = {
   },
 };
 
+/**
+ * A main town of each size (`specOf`): the area of its box (m², the shape of the place's own; none:
+ * the place's own box, lots and lanes), its lots (a place with a bigger town of its own takes the
+ * more), how far its lanes reach, its cross streets and outer streets, its public places besides
+ * the park; its terraced houses (lots, rows), how built over it is, and its fewest backdrop buildings.
+ */
+interface SizeTable {
+  area?: number;
+  lots?: [number, number];
+  scale?: number;
+  extend?: number;
+  fill?: number;
+  places?: [number, number];
+  terraces: [number, number];
+  rows: [number, number];
+  density: number;
+  mainLeast: number;
+}
+const SIZES: Record<TownSize, SizeTable> = {
+  hamlet: { area: 42_000, lots: [20, 24], scale: 1.1, extend: 1, fill: 2, places: [1, 1], terraces: [0, 0], rows: [2, 2], density: 0.25, mainLeast: 10 },
+  village: { area: 70_000, lots: [46, 54], scale: 1.25, extend: 3, fill: 3, places: [2, 2], terraces: [18, 30], rows: [2, 3], density: 0.4, mainLeast: 28 },
+  town: { terraces: [90, 120], rows: [2, 5], density: 0.6, mainLeast: 60 },
+  city: { area: 152_000, lots: [104, 110], scale: 1.3, extend: 8, fill: 6, places: [6, 6], terraces: [125, 140], rows: [3, 6], density: 0.85, mainLeast: 60 },
+};
+/** The town sizes, smallest first. */
+export const TOWN_SIZES: readonly TownSize[] = ['hamlet', 'village', 'town', 'city'];
+
+/** The world's size (m, both ways) by how many villages round the main town and how big it is. */
+const WORLD_SIZE: Record<WorldOptions['villages'], Record<TownSize, [number, number]>> = {
+  none: { hamlet: [576, 576], village: [640, 640], town: [704, 768], city: [832, 832] },
+  few: { hamlet: [704, 768], village: [768, 832], town: [832, 896], city: [896, 960] },
+  many: { hamlet: [896, 960], village: [896, 960], town: [896, 960], city: [960, 1024] },
+};
+
+/**
+ * How hilly (`specOf`): the generator's hills (m), the mountains' height either side of the
+ * valley (m), the steepest the drawn land rises from anything built (`LandscapeParams.slope`), the
+ * landscape's own small hills times this (`swell`), and what a metre of height costs a road (`climb`).
+ */
+const HILLS: Record<WorldOptions['hills'], { hills: number; massif?: [number, number]; slope: number; swell: number; climb?: number }> = {
+  flat: { hills: 3, slope: 0.15, swell: 0.4 },
+  rolling: { hills: 9, slope: 0.25, swell: 1 },
+  hilly: { hills: 20, slope: 0.4, swell: 1.2, climb: 0.05 },
+  mountains: { hills: 12, massif: [120, 160], slope: 0.75, swell: 1, climb: 0.04 },
+};
+
+/** How wooded (`specOf`): the share of the land in woods before the towns and roads are cleared out of it, and trees out on open land (`LandscapeParams.scatter`). */
+const WOODS: Record<WorldOptions['woods'], { share: number; scatter: number }> = {
+  open: { share: 0.1, scatter: 0.5 },
+  some: { share: 0.4, scatter: 1 },
+  wooded: { share: 0.72, scatter: 1.2 },
+};
+
+/** A value by town size, or the same at every size. */
+type BySize<T> = T | Record<TownSize, T>;
+const bySize = <T>(v: BySize<T>, size: TownSize): T => (v && typeof v === 'object' && 'hamlet' in v ? (v as Record<TownSize, T>)[size] : (v as T));
+
+/**
+ * A place (`specOf`): the classic world a main town of each size starts from (its box's shape; at
+ * town size its box, lots and lanes; its lot mix), the town's shape and its name list by size, how
+ * its land looks (drawn from the look's own stream), farm lots in the main town by size, its land
+ * (water, ponds, farmland, outdoor places, hamlets), trees out on open land times the Woods
+ * option's, and more for the landscape.
+ */
+interface PlaceTable {
+  from: BySize<ClassicKind>;
+  shape: BySize<Shape>;
+  names: BySize<string>;
+  look: WorldSpec['landscape'];
+  farms?: Partial<Record<TownSize, [number, number]>>;
+  mix?: Partial<LotMix>;
+  land: Pick<WorldSpec, 'water' | 'ponds' | 'spots' | 'spotsPerArea' | 'hamlet'> & Partial<Pick<WorldSpec, 'fields' | 'fieldsCut' | 'farmEvery' | 'meadowCut'>>;
+  scatter?: number;
+  more?: Partial<LandscapeParams>;
+}
+
+/** A river valley's land: the classic valley, lusher and with more birches by the water. */
+const riverLook = (rand: Rand): LandscapeParams => ({
+  ...valley(rand),
+  hills: range(rand, 8, 13),
+  forest: range(rand, -0.06, 0.06),
+  birches: range(rand, 0.6, 0.85),
+  grass: grass(rand, GREEN, [-0.05, 0.02], [0.98, 1.06]),
+});
+
+/** A heath's land: heather and bracken, few trees and those mostly birches and pines, bushes among them. */
+const heathLook = (rand: Rand): LandscapeParams => ({
+  ...valley(rand),
+  hills: range(rand, 10, 16),
+  forest: range(rand, -0.25, -0.12),
+  treeline: range(rand, 4, 8),
+  conifers: range(rand, 0.55, 0.8),
+  birches: range(rand, 0.55, 0.8),
+  grass: grass(rand, HEATH, [-0.02, 0.05], [0.95, 1.04]),
+});
+
+/** A heath's hamlets: a high street with a back lane, now and then a crescent round a green. */
+const HEATH_HAMLET: HamletSpec = { shapes: [highStreet, highStreet, crescentTown], box: { w: 220, d: 160 }, lots: [14, 20], places: [1, 1], scale: 1.1, fill: 2, extend: 1 };
+
+const PLACES: Record<WorldKind, PlaceTable> = {
+  country: {
+    from: { hamlet: 'small', village: 'small', town: 'medium', city: 'dense' },
+    shape: { hamlet: highStreet, village: highStreet, town: crescentTown, city: crossroads },
+    names: { hamlet: 'small', village: 'small', town: 'medium', city: 'dense' },
+    look: valley,
+    land: { water: 'ponds', ponds: [1, 2], fields: 100, spots: ['picnicMeadow', 'fishingJetty', 'lookout', 'orchard', 'hammockGrove'], spotsPerArea: [1, 1], hamlet: HAMLET },
+  },
+  farm: {
+    from: 'farm',
+    shape: { hamlet: countryLane, village: countryLane, town: crossroads, city: crossroads },
+    names: 'farm',
+    look: (rand, w, d, side) => CLASSIC.farm.landscape(rand, w, d, side),
+    farms: { hamlet: [2, 3], village: [3, 4], town: [1, 2], city: [0, 1] },
+    land: {
+      water: 'ponds',
+      ponds: [3, 3],
+      fields: 220,
+      fieldsCut: 0.32,
+      farmEvery: [110, 150],
+      spots: ['orchard', 'picnicMeadow', 'fishingJetty', 'lookout'],
+      spotsPerArea: [1, 1],
+      hamlet: CLASSIC.farm.hamlet,
+    },
+  },
+  seaside: {
+    from: 'seaside',
+    shape: shoreRoad,
+    names: 'seaside',
+    look: (rand, w, d, side) => CLASSIC.seaside.landscape(rand, w, d, side),
+    land: { water: 'sea', ponds: [0, 0], fields: 90, spots: ['fishingJetty', 'lookout', 'picnicMeadow', 'hammockGrove'], spotsPerArea: [1, 1], hamlet: HAMLET },
+  },
+  lakeside: {
+    from: 'lakeside',
+    shape: lakeRoad,
+    names: 'lakeside',
+    look: (rand, w, d, side) => CLASSIC.lakeside.landscape(rand, w, d, side),
+    land: { water: 'lake', ponds: [0, 0], fields: 90, spots: ['fishingJetty', 'picnicMeadow', 'hammockGrove', 'lookout'], spotsPerArea: [1, 1], hamlet: HAMLET },
+  },
+  river: {
+    from: 'lakeside',
+    shape: lakeRoad,
+    names: 'river',
+    look: riverLook,
+    land: { water: 'river', ponds: [0, 0], fields: 90, spots: ['fishingJetty', 'picnicMeadow', 'lookout', 'hammockGrove'], spotsPerArea: [1, 1], hamlet: HAMLET },
+    more: { beach: 3 },
+  },
+  mountain: {
+    from: 'mountain',
+    shape: switchback,
+    names: 'mountain',
+    look: (rand, w, d, side) => CLASSIC.mountain.landscape(rand, w, d, side),
+    land: { water: 'ponds', ponds: [1, 2], spots: ['lookout', 'campfire', 'hammockGrove', 'fishingJetty'], spotsPerArea: [1, 1], hamlet: HAMLET },
+  },
+  forest: {
+    from: 'forest',
+    shape: clearing,
+    names: 'forest',
+    look: (rand, w, d, side) => CLASSIC.forest.landscape(rand, w, d, side),
+    land: { water: 'ponds', ponds: [2, 2], spots: ['campfire', 'hammockGrove', 'lookout', 'fishingJetty', 'picnicMeadow'], spotsPerArea: [1, 2], hamlet: CLASSIC.forest.hamlet },
+  },
+  heath: {
+    from: 'small',
+    shape: highStreet,
+    names: 'heath',
+    look: heathLook,
+    mix: { gaps: [0.45, 0.2], small: 0.2, large: 0.3, gardens: { roomy: 2, big: 2 }, places: [1, 2], prefer: ['cafe', 'bakery'] },
+    land: { water: 'ponds', ponds: [2, 3], fields: 60, meadowCut: 0.45, spots: ['lookout', 'picnicMeadow', 'campfire'], spotsPerArea: [1, 1], hamlet: HEATH_HAMLET },
+    scatter: 0.4,
+    more: { scrub: 0.6 },
+  },
+  island: {
+    from: 'seaside',
+    shape: shoreRoad,
+    names: 'island',
+    look: (rand, w, d, side) => CLASSIC.seaside.landscape(rand, w, d, side),
+    land: { water: 'island', ponds: [0, 0], fields: 90, spots: ['fishingJetty', 'lookout', 'picnicMeadow', 'hammockGrove'], spotsPerArea: [1, 1], hamlet: HAMLET },
+  },
+};
+
+/**
+ * The main town of a place at town size `size`, from the classic world's at town size (`base`):
+ * as it is at town size; else a box of the size's area in the same shape, the size's lots (the more
+ * the bigger the place's own town), lanes and streets; farm lots `farms` if given.
+ */
+function mainTown(base: SizeSpec, size: TownSize, farms?: [number, number]): SizeSpec {
+  const s = SIZES[size];
+  if (!s.area || !s.lots) return farms ? { ...base, farms } : base;
+  const w = Math.round(Math.sqrt((s.area * base.box.w) / base.box.d));
+  const k = Math.max(0, Math.min(1, (base.lots - 66) / (84 - 66)));
+  return {
+    box: { w, d: Math.round(s.area / w) },
+    lots: Math.round(s.lots[0] + (s.lots[1] - s.lots[0]) * k),
+    scale: s.scale ?? base.scale,
+    extend: s.extend,
+    fill: s.fill,
+    places: s.places,
+    ...(farms ?? base.farms ? { farms: farms ?? base.farms } : {}),
+  };
+}
+
+/** Undefined options taken out (so they don't hide the place's own). */
+const given = (options: Partial<WorldOptions>) => Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) as Partial<WorldOptions>;
+
+/**
+ * A place with its options as the generator lays it out: `options` over the place's own
+ * (`defaultsOf`), from the tables above. The main town's size sets its box, lots and lanes, its
+ * terraced houses, how built over it is and its civic places; the villages how many hamlets and how
+ * big the world; the hills how high the land rises (mountains either side of a valley, or round the
+ * water) and how steep it is drawn; the woods how much of the land is wooded and how many trees
+ * stand out in the open. The place sets the rest: its town's shape, its names, its water and how its
+ * land looks (drawn from a stream of its own, so the palette and the trees stay as an option changes).
+ */
+export function specOf(kind: WorldKind, options: Partial<WorldOptions> = {}): WorldSpec {
+  const o: WorldOptions = { ...defaultsOf(kind), ...given(options) };
+  const p = PLACES[kind];
+  const size = o.town;
+  const from = CLASSIC[bySize(p.from, size)];
+  const s = SIZES[size];
+  const hills = HILLS[o.hills];
+  const woods = WOODS[o.woods];
+  const island = p.land.water === 'island';
+  const small = size === 'hamlet' || size === 'village';
+  return {
+    kind,
+    options: o,
+    names: bySize(p.names, size),
+    blurb: WORLDS[kind].blurb,
+    town: mainTown(from.town, size, p.farms?.[size]),
+    shape: bySize(p.shape, size),
+    landscape: (rand, width, depth, side) => {
+      // (The massif's height is the generator's: `macro.ts` sets `mountains` from it.)
+      const { mountains: _mountains, ...look } = p.look(rand, width, depth, side);
+      return { ...look, hills: look.hills * hills.swell, slope: hills.slope, scatter: woods.scatter * (p.scatter ?? 1), ...p.more };
+    },
+    gaps: from.gaps,
+    small: from.small,
+    large: from.large,
+    gardens: from.gardens,
+    places: from.places,
+    ...(from.prefer ? { prefer: from.prefer } : {}),
+    ...(from.farms ? { farms: from.farms } : {}),
+    ...p.mix,
+    world: WORLD_SIZE[o.villages][size],
+    hamlets: o.villages === 'none' ? [0, 0] : o.villages === 'few' ? [2, 3] : island ? [3, 4] : [5, 7],
+    hamlet: p.land.hamlet,
+    terraces: s.terraces,
+    rows: s.rows,
+    density: s.density,
+    civic: size,
+    mainLeast: s.mainLeast,
+    exits: island ? (small ? [1, 1] : [2, 2]) : size === 'hamlet' ? [1, 2] : [2, 3],
+    water: p.land.water,
+    ponds: p.land.ponds,
+    woods: woods.share,
+    hills: hills.hills,
+    ...(hills.massif ? { massif: hills.massif } : {}),
+    ...(p.land.fields ? { fields: p.land.fields } : {}),
+    fieldsCut: p.land.fieldsCut ?? 0.4,
+    farmEvery: p.land.farmEvery ?? [150, 200],
+    spots: p.land.spots,
+    spotsPerArea: p.land.spotsPerArea,
+    ...(p.land.meadowCut ? { meadowCut: p.land.meadowCut } : {}),
+    ...(hills.climb ? { climb: hills.climb } : {}),
+    ...(o.woods === 'wooded' ? { wildBoxes: size === 'hamlet' ? ('all' as const) : ('hamlets' as const) } : {}),
+  };
+}
+
+/**
+ * What a world of a place with its options has at least (`tools/worlds/sample.ts` checks it): the
+ * share of its land (less the water) built and farmed (the areas' boxes, the lots, the fields and
+ * orchards), the most share of its 100 m squares with nothing in them (null: not checked; on a
+ * heath its meadows, the heather, count) and how many of its quarters hold an area or homes; its
+ * fewest homes; the main town's fewest backdrop buildings, and whether every career works there
+ * (a town's or a city's); an island's ways out of the world, its causeways (fewest, most; null:
+ * not checked, a world with land at its edges has as many as its roads find).
+ */
+export interface Expected {
+  built: number;
+  empty: number | null;
+  meadow: boolean;
+  quarters: number;
+  homes: number;
+  mainLeast: number;
+  careers: boolean;
+  exits: [number, number] | null;
+}
+export function expectations(kind: WorldKind, options: Partial<WorldOptions> = {}): Expected {
+  const o: WorldOptions = { ...defaultsOf(kind), ...given(options) };
+  const v = o.villages;
+  return {
+    built: { none: 0.08, few: 0.15, many: 0.25 }[v] * (o.woods === 'wooded' ? 0.6 : 1),
+    empty: { none: null, few: 0.2, many: 0.1 }[v],
+    meadow: kind === 'heath',
+    quarters: { none: 0, few: 3, many: 4 }[v],
+    homes: { hamlet: 14, village: 40, town: 110, city: 150 }[o.town] + { none: 0, few: 25, many: 70 }[v],
+    mainLeast: SIZES[o.town].mainLeast,
+    careers: o.town === 'town' || o.town === 'city',
+    exits: null,
+  };
+}
+
 const pickOf = <T>(list: readonly T[], rand: Rand): T => list[Math.floor(rand() * list.length)];
 
 /** A world's names from the content's list `names` (none: the town and street lists). */
@@ -895,8 +1181,27 @@ export function streetNames(content: Content, names: string, rand: Rand, count: 
   return out;
 }
 
-/** One line about a world: from the content's taglines for its `names`, else its `blurb`. */
-export function worldTagline(content: Content, spec: Pick<WorldSpec, 'names' | 'blurb'>, rand: Rand): string {
+/** Words in a tagline that say how big a place is, and the town sizes each fits. */
+const SIZE_WORDS: readonly [RegExp, readonly TownSize[]][] = [
+  [/\b(hamlet|handful)\b/i, ['hamlet']],
+  [/\bvillage\b/i, ['hamlet', 'village']],
+  [/\btown\b/i, ['town', 'city']],
+  [/\bcity\b/i, ['city']],
+];
+
+/**
+ * One line about a world: from the content's taglines for its `names`, else its `blurb`. A place's
+ * world (one with options) leaves out the lines that name a town of another size ("A hamlet that
+ * hears its own echo." is no city's); a classic world takes any.
+ */
+export function worldTagline(content: Content, spec: Pick<WorldSpec, 'names' | 'blurb' | 'options'>, rand: Rand): string {
   const lines = content.names.worlds?.[spec.names]?.taglines ?? [];
-  return lines.length ? pickOf(lines, rand) : spec.blurb;
+  if (!lines.length) return spec.blurb;
+  const at = Math.floor(rand() * lines.length);
+  const size = spec.options?.town;
+  if (!size) return lines[at];
+  // (The one drawn if it fits, else the next that does: a world keeps its line as its town grows, where it can.)
+  const fits = (line: string) => SIZE_WORDS.every(([words, sizes]) => !words.test(line) || sizes.includes(size));
+  for (let k = 0; k < lines.length; k++) if (fits(lines[(at + k) % lines.length])) return lines[(at + k) % lines.length];
+  return spec.blurb;
 }

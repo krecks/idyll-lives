@@ -1,5 +1,5 @@
 /**
- * Makes sample worlds of every kind (web/src/game/world.ts) with the shipped content, the way a
+ * Makes sample worlds of every place (web/src/game/world.ts) with the shipped content, the way a
  * new game does (a world, its neighbours, a player household moving into an empty house), and
  * writes their town files for the simulation to check
  * (`cargo test -p sim-core --test sim generated_worlds:: -- --ignored`, reading WORLDS). Checks the
@@ -19,19 +19,26 @@
  * country road turning further than 70° over 40 m (no hairpins: `COUNTRY_TURN`), none running
  * alongside another road a few metres off for more than `SIDE_BY_SIDE` m, areas apart,
  * hamlets of four lots or more, residents within the
- * cap, the world filled (a quarter of it or more built and farmed, at most a tenth of its 100 m
- * squares with nothing in them, every quarter of it with an area or homes out in the country),
- * every road named (no two alike), the file under 4 MB, and the time a big world takes (its
- * layout without generating houses, and assembling its file: a problem at twice the budget).
+ * cap, the world filled and its homes as many as its place and options want (`world.ts`
+ * `expectations`: so much of its land less the water built and farmed, at most so many of its
+ * 100 m squares with nothing in them, so many of its quarters with an area or homes out in the
+ * country, so many homes), every road named (no two alike), the file under 4 MB, and the time a
+ * big world takes (its layout without generating houses, and assembling its file: a problem at
+ * twice the budget). Over the water only bridges and causeways, each over its deck (`bridge`)
+ * alone, straight and not too long; a river world has a bridge, an island its ways out.
  * And the living town's backdrop, centre and places (`livingProblems`).
  * Each world's line counts its terraced houses, backdrop buildings and places.
+ *
+ * Every place at its own options (`perKind` worlds each), and one world each of `EXTREMES`, the
+ * options at their furthest (`--no-extremes`: not those). `--options town=city,villages=many`:
+ * every place with those options instead.
  *
  * The same arguments make the same files, byte for byte (`Math.random` seeded per world:
  * web/tests/sampleWorlds.slow.test.ts), so a world a check fails on can be made again and run alone.
  * `--seed-base n` (or WORLDS_SEED_BASE; default 0, the worlds CI checks) draws other worlds: the
  * release gate runs the checks over five (`tools/ci-local.sh`, SEED_BASE).
  *
- * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--kinds farm,forest] [--seed-base n] [--no-timing]
+ * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--kinds farm,forest] [--options town=city,...] [--no-extremes] [--seed-base n] [--no-timing]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -54,18 +61,20 @@ const { AssetRegistry } = await import('../../web/src/assets/registry.ts');
 const { objectInfos } = await import('../../web/src/game/housegen.ts');
 const { randomHousehold } = await import('../../web/src/game/household.ts');
 const { assembleTown, BIG_COURTS, COURTS, generateStats, generateWorld, houseTemplate, NEIGHBOUR_CAP, populate, turner, vacantSlots } = await import('../../web/src/game/town.ts');
-const { WORLD_KINDS } = await import('../../web/src/game/world.ts');
+const { expectations, WORLD_KINDS } = await import('../../web/src/game/world.ts');
+type Expected = import('../../web/src/game/world.ts').Expected;
+type WorldOptions = import('../../web/src/game/world.ts').WorldOptions;
 const { AREA_APART, COUNTRY_TURN, unrle } = await import('../../web/src/game/macro.ts');
 const { homePrice } = await import('../../web/src/game/price.ts');
 const { savingsOf } = await import('../../web/src/game/wealth.ts');
 const { COURT, lengths, nearest, pointAt, roadMask, sharpestTurn, sideBySide } = await import('../../web/src/game/roads.ts');
 const { mulberry32 } = await import('../../web/src/game/noise.ts');
-const { centreDensity, facesRoad, fillPoly, HAMLET_LEAST, LOT_CLEAR, MAIN_LEAST, overlaps, signedArea2 } = await import('../../web/src/game/backdrop.ts');
+const { centreDensity, facesRoad, fillPoly, HAMLET_LEAST, LOT_CLEAR, overlaps, signedArea2 } = await import('../../web/src/game/backdrop.ts');
 const { RoadIndex, inside } = await import('../../web/src/game/roads.ts');
 
 type Rect = { x: number; z: number; w: number; d: number };
 type Pt = [number, number];
-type Road = { points: Pt[]; width: number; ends: [string, string]; name?: string; kind?: string; area?: number };
+type Road = { points: Pt[]; width: number; ends: [string, string]; name?: string; kind?: string; area?: number; bridge?: [number, number] };
 type Exit = Pt | { x: number; z: number; kind: 'road' };
 type TownFile = {
   size?: 'big';
@@ -100,29 +109,34 @@ const LAYOUT_BUDGET = 1500;
 const ASSEMBLE_BUDGET = 1500;
 const MAX_FILE = 4e6;
 
-/** A big world filled at least this much with what is built and farmed (its areas' boxes, lots, fields and orchards). */
-const BUILT_SHARE = 0.25;
-/** At most this share of a big world's 100 m squares hold nothing (no lot, road, woods, field, orchard or water). */
-const EMPTY_SHARE = 0.1;
 /** A square holds something if this much of it does (m²). */
 const HOLDS = 200;
+/** The longest deck a bridge has over the water, a causeway (a road out of the world) (m). */
+const SPAN = 45;
+const CAUSEWAY = 140;
+/** A bridge's deck runs straight: it turns no further than this (radians) end to end. */
+const DECK_TURN = 0.05;
 
-/** How filled a big world is: the share of it built and farmed, the share of its 100 m squares with nothing in them. */
-function fillOf(town: TownFile): { built: number; empty: number } {
+/**
+ * How filled a big world is: the share of its land (less the water) built and farmed, the share of
+ * its 100 m squares with nothing in them (with `meadow`, a heath's: its meadows, the heather, count).
+ */
+function fillOf(town: TownFile, meadow = false): { built: number; empty: number } {
   const had = fills.get(town);
   if (had) return had;
-  const fill = measureFill(town);
+  const fill = measureFill(town, meadow);
   fills.set(town, fill);
   return fill;
 }
 /** Each town file's `fillOf`, measured once (the checks and the log line both ask). */
 const fills = new WeakMap<TownFile, { built: number; empty: number }>();
-function measureFill(town: TownFile): { built: number; empty: number } {
+function measureFill(town: TownFile, meadow: boolean): { built: number; empty: number } {
   const { width: W, depth: D } = town;
   const C = 2;
   const [gw, gd] = [Math.ceil(W / C), Math.ceil(D / C)];
   const built = new Uint8Array(gw * gd);
   const some = new Uint8Array(gw * gd);
+  const wet = new Uint8Array(gw * gd);
   const box = (mask: Uint8Array, r: Rect) => {
     for (let z = Math.max(0, Math.floor(r.z / C)); z < Math.min(gd, Math.ceil((r.z + r.d) / C)); z++) for (let x = Math.max(0, Math.floor(r.x / C)); x < Math.min(gw, Math.ceil((r.x + r.w) / C)); x++) mask[z * gw + x] = 1;
   };
@@ -147,12 +161,17 @@ function measureFill(town: TownFile): { built: number; empty: number } {
     if (z.kind === 'fields' || z.kind === 'orchard') {
       poly(built, z.poly);
       poly(some, z.poly);
-    } else if (z.kind === 'woods' || z.kind === 'water') poly(some, z.poly);
+    } else if (z.kind === 'woods' || z.kind === 'water' || (meadow && z.kind === 'meadow')) poly(some, z.poly);
+    if (z.kind === 'water') poly(wet, z.poly);
   }
   const roads = roadMask(town.roads ?? town.meta.roads ?? [], W, D, 0);
   for (let z = 0; z < D; z += C) for (let x = 0; x < W; x += C) if (roads[z * W + x]) some[(z / C) * gw + x / C] = 1;
-  let filled = 0;
-  for (const v of built) filled += v;
+  let [filled, land] = [0, 0];
+  for (let i = 0; i < built.length; i++) {
+    if (wet[i]) continue;
+    filled += built[i];
+    land++;
+  }
   let [squares, empty] = [0, 0];
   for (let sz = 0; sz < D; sz += 100) {
     for (let sx = 0; sx < W; sx += 100) {
@@ -164,11 +183,11 @@ function measureFill(town: TownFile): { built: number; empty: number } {
       if (n * C * C < Math.min(HOLDS, (cells * C * C) / 50)) empty += (cells * C * C) / 1e4;
     }
   }
-  return { built: filled / (gw * gd), empty: empty / squares };
+  return { built: filled / Math.max(1, land), empty: empty / squares };
 }
 
-/** What's wrong with how a town's roads join up, its areas, water, trails and names (the open-world checks). */
-function openProblems(town: TownFile): string[] {
+/** What's wrong with how a town's roads join up, its areas, water, bridges, trails and names (the open-world checks), and how filled it is (`expect`). */
+function openProblems(town: TownFile, expect: Expected, river: boolean): string[] {
   const out: string[] = [];
   const roads = town.roads ?? town.meta.roads ?? [];
   // Joined as the sim joins them (travel.rs `Graph::build`): an end within half the wider road's width and a metre of the other's middle.
@@ -237,6 +256,7 @@ function openProblems(town: TownFile): string[] {
       if (r.points.some(([x, z]) => wet(x, z))) out.push(`road ${r.name ?? i} runs over water`);
     });
   }
+  out.push(...bridgeProblems(town, roads, river));
   // Trails: each outdoor place at the end of one, near its area; no trail through a lot.
   const ends = roads.flatMap((r) => [r.points[0], r.points[r.points.length - 1]]);
   town.plots.forEach((p, i) => {
@@ -270,27 +290,67 @@ function openProblems(town: TownFile): string[] {
     const deg = (a: number) => ((a * 180) / Math.PI).toFixed(0);
     if (angle > COUNTRY_TURN + 1e-3) out.push(`country road ${r.name} turns ${deg(angle)}° over 40 m at ${x.toFixed(0)}, ${z.toFixed(0)} (${deg(COUNTRY_TURN)}° at most)`);
   }
-  const fill = fillOf(town);
-  if (fill.built < BUILT_SHARE) out.push(`${(fill.built * 100).toFixed(0)}% of the world built and farmed (${BUILT_SHARE * 100}% or more wanted)`);
-  if (fill.empty > EMPTY_SHARE) out.push(`${(fill.empty * 100).toFixed(0)}% of its 100 m squares hold nothing (${EMPTY_SHARE * 100}% at most)`);
+  const fill = fillOf(town, expect.meadow);
+  const pc = (v: number) => `${(v * 100).toFixed(0)}%`;
+  if (fill.built < expect.built) out.push(`${pc(fill.built)} of the land built and farmed (${pc(expect.built)} or more wanted)`);
+  if (expect.empty !== null && fill.empty > expect.empty) out.push(`${pc(fill.empty)} of its 100 m squares hold nothing (${pc(expect.empty)} at most)`);
   // Spread over the whole world: each quarter of it an area's middle, or a farmstead or cottage out in the country.
   const inArea = (p: Rect) => areas.some((a) => offRect(a, p.x + p.w / 2, p.z + p.d / 2) === 0);
   const country = town.plots.filter((p) => (p.kind === 'home' || p.kind === 'farm') && !inArea(p)).map((p): Pt => [p.x + p.w / 2, p.z + p.d / 2]);
   const quarter = ([x, z]: Pt) => (x < town.width / 2 ? 0 : 1) + (z < town.depth / 2 ? 0 : 2);
   const held = new Set([...centres, ...country].map(quarter));
-  for (const q of [0, 1, 2, 3]) if (!held.has(q)) out.push(`the ${['north-west', 'north-east', 'south-west', 'south-east'][q]} quarter has no area, farmstead or cottage`);
+  if (held.size < expect.quarters) out.push(`only the ${[...held].map((q) => ['north-west', 'north-east', 'south-west', 'south-east'][q]).join(', ')} quarters have an area, farmstead or cottage (${expect.quarters} wanted)`);
   areas.forEach((a, k) => {
     const lots = town.plots.filter((p) => (p.area ?? 0) === k && p.kind !== 'countryside').length;
     if (k > 0 && lots < 4) out.push(`hamlet ${a.name} has ${lots} lots`);
   });
   const homes = town.plots.filter((p) => p.kind === 'home' || p.kind === 'farm');
-  if (homes.length < 70) out.push(`${homes.length} homes (a big world has 70 or more)`);
+  if (homes.length < expect.homes) out.push(`${homes.length} homes (${expect.homes} or more wanted)`);
   // Neighbours within the cap (the player's household aside).
   const player = town.households.findIndex((h) => h.player);
   const neighbours = town.sims.filter((s) => s.household !== player).length;
   if (neighbours > NEIGHBOUR_CAP) out.push(`${neighbours} neighbours (the cap is ${NEIGHBOUR_CAP})`);
   return out;
 }
+
+/**
+ * What's wrong with a world's bridges and causeways: a road over the water (a water zone) but on
+ * its deck (`bridge`, its arc lengths); a deck longer than `SPAN` (a causeway's, a road out of the
+ * world, `CAUSEWAY`) or not straight; a deck over no water; a river (`river`) with no bridge.
+ */
+function bridgeProblems(town: TownFile, roads: readonly Road[], river: boolean): string[] {
+  const out: string[] = [];
+  const water = (town.meta.zones ?? []).filter((z) => z.kind === 'water').map((z) => z.poly);
+  const wet = (x: number, z: number) => water.some((poly) => inside(poly, x, z));
+  for (const [i, r] of roads.entries()) {
+    const name = r.name ?? `road ${i}`;
+    const ls = lengths(r.points);
+    if (!r.bridge) {
+      const at = r.points.find(([x, z]) => wet(x, z));
+      if (at) out.push(`${name} runs over the water at ${at[0].toFixed(0)}, ${at[1].toFixed(0)} with no bridge`);
+      continue;
+    }
+    const [s0, s1] = r.bridge;
+    if (!(s0 >= 0 && s1 > s0 && s1 <= ls[ls.length - 1] + 0.01)) {
+      out.push(`${name}'s deck runs ${s0} to ${s1} m along it (${ls[ls.length - 1].toFixed(0)} m long)`);
+      continue;
+    }
+    const off = r.points.findIndex(([x, z], k) => wet(x, z) && (ls[k] < s0 || ls[k] > s1));
+    if (off >= 0) out.push(`${name} runs over the water off its deck at ${r.points[off][0].toFixed(0)}, ${r.points[off][1].toFixed(0)}`);
+    if (!r.points.some(([x, z], k) => ls[k] >= s0 && ls[k] <= s1 && wet(x, z))) out.push(`${name}'s deck is over no water`);
+    const most = r.ends.includes('out') ? CAUSEWAY : SPAN;
+    if (s1 - s0 > most) out.push(`${name}'s deck is ${(s1 - s0).toFixed(0)} m long (${most} m at most)`);
+    const turn = Math.abs(headingAt(r.points, s1, ls) - headingAt(r.points, s0, ls));
+    if (Math.min(turn, 2 * Math.PI - turn) > DECK_TURN) out.push(`${name}'s deck turns ${((turn * 180) / Math.PI).toFixed(0)}°`);
+  }
+  if (river && !roads.some((r) => r.bridge && !r.ends.includes('out'))) out.push('a river with no bridge over it');
+  return out;
+}
+/** Which way a polyline heads at arc length `s` (radians). */
+const headingAt = (pts: readonly Pt[], s: number, ls: number[]) => {
+  const { t } = pointAt(pts, s, ls);
+  return Math.atan2(t[1], t[0]);
+};
 
 /** What a backdrop building may be, and its roofs; the places' kinds. */
 const USES = ['flats', 'terrace', 'house', 'shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'hall', 'workshop', 'farm', 'barn'];
@@ -309,13 +369,13 @@ const corners = (r: Rect, by = 0): Pt[] => [
  * a roof (a ridge for a gable or mansard), a use, its area and its place; on no lot (and
  * `LOT_CLEAR` m off one), road or trail with its sidewalks (more than half its width off its
  * middle: a junction's pad too), parking, water or other backdrop building; a side along the road
- * nearest it (`facesRoad`); `MAIN_LEAST` or more in the main town and `HAMLET_LEAST` in every hamlet,
+ * nearest it (`facesRoad`); as many as its size wants in the main town (`expect.mainLeast`) and `HAMLET_LEAST` in every hamlet,
  * the centre's open land built over more densely than the rest of the main town's box's. Every public lot a
  * place, every backdrop place a place of its kind; each place named (none twice), its hours within
- * the day, its work careers that are, and every career a resident may hold working somewhere in
- * the main town. The main town has its centre.
+ * the day, its work careers that are, and (in a town or a city: `expect.careers`) every career a
+ * resident may hold working somewhere in the main town. The main town has its centre.
  */
-function livingProblems(town: TownFile, careers: readonly string[]): string[] {
+function livingProblems(town: TownFile, careers: readonly string[], expect: Expected): string[] {
   const out: string[] = [];
   const backdrop = town.meta.backdrop;
   const places = town.meta.places;
@@ -379,7 +439,7 @@ function livingProblems(town: TownFile, careers: readonly string[]): string[] {
   });
   areas.forEach((a, k) => {
     const n = backdrop.filter((b) => b.area === k).length;
-    const least = k === 0 ? MAIN_LEAST : HAMLET_LEAST;
+    const least = k === 0 ? expect.mainLeast : HAMLET_LEAST;
     if (n < least) out.push(`${a.name} has ${n} backdrop buildings (${least} or more)`);
   });
   // The centre: the main town's, its open land (not a road, a lot, a green or water) built over more
@@ -414,7 +474,7 @@ function livingProblems(town: TownFile, careers: readonly string[]): string[] {
     for (const w of p.work ?? []) if (!careers.includes(w)) out.push(`place ${p.name}'s workers are ${w}, no career`);
     if (!Number.isInteger(p.area) || p.area < 0 || p.area >= Math.max(1, areas.length)) out.push(`place ${p.name} is in area ${p.area}`);
   });
-  for (const c of careers) if (!places.some((p) => p.area === 0 && p.work?.includes(c))) out.push(`no place in the main town where ${c} workers work`);
+  if (expect.careers) for (const c of careers) if (!places.some((p) => p.area === 0 && p.work?.includes(c))) out.push(`no place in the main town where ${c} workers work`);
   return out;
 }
 
@@ -424,8 +484,8 @@ function livingProblems(town: TownFile, careers: readonly string[]): string[] {
  * same way for longer share it.
  */
 const SIDE_BY_SIDE = 60;
-function layoutProblems(town: TownFile): string[] {
-  const out: string[] = openProblems(town);
+function layoutProblems(town: TownFile, expect: Expected, river: boolean): string[] {
+  const out: string[] = openProblems(town, expect, river);
   // (Trails are on foot, between the lots: `openProblems` checks they keep off them.)
   const roads = (town.meta.roads ?? []).filter((r) => r.kind !== 'trail');
   const mask = roadMask(roads, town.width, town.depth, 0);
@@ -450,6 +510,7 @@ function layoutProblems(town: TownFile): string[] {
   for (const { a, b, length, at } of sideBySide(all, SIDE_BY_SIDE, 'country')) out.push(`${all[a].name} runs alongside ${all[b].name} a few metres off for ${length} m by ${at.map(Math.round).join(', ')}`);
   for (const [x, z] of town.exits.map(exitAt)) if (Math.min(x, z, town.width - x, town.depth - z) > 1) out.push(`a way out of town at ${x}, ${z}, not on its edge`);
   if (!town.exits.length) out.push('no way out of town');
+  if (expect.exits && (town.exits.length < expect.exits[0] || town.exits.length > expect.exits[1])) out.push(`${town.exits.length} ways out of the world (${expect.exits[0]} to ${expect.exits[1]} wanted)`);
   return out;
 }
 const problems: string[] = [];
@@ -472,6 +533,38 @@ const timing = !process.argv.includes('--no-timing');
 if (!timing) process.argv.splice(process.argv.indexOf('--no-timing'), 1);
 const kinds = (flag('--kinds')?.split(',') ?? [...WORLD_KINDS]) as (typeof WORLD_KINDS)[number][];
 for (const kind of kinds) if (!WORLD_KINDS.includes(kind)) throw new Error(`no kind ${kind}`);
+/** `--options town=city,villages=many`: every place with these options (else its own). */
+const OPTION_VALUES: Record<keyof WorldOptions, readonly string[]> = { town: ['hamlet', 'village', 'town', 'city'], villages: ['none', 'few', 'many'], hills: ['flat', 'rolling', 'hilly', 'mountains'], woods: ['open', 'some', 'wooded'] };
+const optionsOf = (text: string): Partial<WorldOptions> => {
+  const out: Record<string, string> = {};
+  for (const pair of text.split(',').filter(Boolean)) {
+    const [key, value] = pair.split('=');
+    if (!(key in OPTION_VALUES) || !OPTION_VALUES[key as keyof WorldOptions].includes(value)) throw new Error(`no option ${pair}`);
+    out[key] = value;
+  }
+  return out as Partial<WorldOptions>;
+};
+const forced = ((text) => (text === undefined ? undefined : optionsOf(text)))(flag('--options'));
+/**
+ * The options at their furthest, one world of each (of the places sampled; not with `--options`
+ * or `--no-extremes`): the biggest and smallest worlds, the woods and hills at their most and
+ * least, each town shape at a size it has never had.
+ */
+const EXTREMES: [(typeof WORLD_KINDS)[number], string][] = [
+  ['country', 'town=city,villages=many'],
+  ['country', 'town=hamlet,villages=none,hills=flat,woods=open'],
+  ['forest', 'town=hamlet,villages=none,woods=wooded'],
+  ['mountain', 'town=city,villages=many,woods=wooded'],
+  ['island', 'town=city,villages=many'],
+  ['river', 'town=village,villages=none'],
+  ['river', 'town=city,villages=many'],
+  ['heath', 'town=hamlet,villages=few,hills=hilly,woods=open'],
+  ['seaside', 'town=town,villages=many,hills=mountains'],
+  ['farm', 'town=city,villages=few,hills=flat,woods=open'],
+  ['lakeside', 'town=hamlet,villages=many,hills=hilly,woods=wooded'],
+];
+const extremes = !process.argv.includes('--no-extremes') && !forced;
+if (process.argv.includes('--no-extremes')) process.argv.splice(process.argv.indexOf('--no-extremes'), 1);
 const out = process.argv[2] ?? 'worlds.json';
 const perKind = Number(process.argv[3] ?? 3);
 // (A flag this script no longer takes: a call site that still passes one, rather than one silently
@@ -491,72 +584,75 @@ const SENIOR = 5;
 const forSale: Record<string, number> = {};
 /** Worlds, courts in all and the most in one world. */
 const courtsOf: [number, number, number] = [0, 0, 0];
-for (const kind of WORLD_KINDS.filter((k) => kinds.includes(k))) {
-  for (let i = 1; i <= perKind; i++) {
-    const seed = i * 104729 + kind.length + seedBase * SEED_STEP;
-    const tag = `${kind} ${seed}`;
-    // (The households, the player's and the neighbours', drawn with `Math.random`: seeded here
-    // by the world's seed, the same seeds make the same files, so a failure in a
-    // check of them can be run again.)
-    Math.random = mulberry32(seed);
-    generateStats.houseMs = 0;
-    let t0 = performance.now();
-    const world = generateWorld(content, templates, kind, seed);
-    const houses = generateStats.houseMs;
-    const layout = performance.now() - t0 - houses;
-    const town = populate(content, assets, templates, world);
-    const home = vacantSlots(town)[0];
-    if (!home) throw new Error(`${tag}: no empty house`);
-    const player = randomHousehold(content, assets, 2);
-    t0 = performance.now();
-    const text = assembleTown(content, templates, town, player, home.index);
-    const assemble = performance.now() - t0;
-    const file = JSON.parse(text);
-    [slowest[0], slowest[1], slowest[2]] = [Math.max(slowest[0], layout), Math.max(slowest[1], houses), Math.max(slowest[2], assemble)];
-    for (const p of [...layoutProblems(file), ...livingProblems(file, content.careerCategories.map((c) => c.id)), ...(world.diagnostics?.roads ?? [])]) problems.push(`${tag}: ${p}`);
-    // (A terrace lot's house is a generated terraced house, its lot cut to it: a fixed layout is wider than the lot.)
-    for (const s of town.slots) if (s.lot === 'terrace' && houseTemplate(templates, s.template)?.class !== 'terraced house') problems.push(`${tag}: terrace lot ${s.index} has a ${s.template}`);
-    if (text.length > MAX_FILE) problems.push(`${tag}: the town file is ${(text.length / 1e6).toFixed(1)} MB`);
-    if (timing && layout > LAYOUT_BUDGET * 2) problems.push(`${tag}: laid out in ${layout.toFixed(0)} ms (budget ${LAYOUT_BUDGET})`);
-    if (timing && assemble > ASSEMBLE_BUDGET * 2) problems.push(`${tag}: assembled in ${assemble.toFixed(0)} ms (budget ${ASSEMBLE_BUDGET})`);
-    for (const { household, slot } of town.households) {
-      const s = town.slots[slot];
-      const price = homePrice(content, templates, s);
-      const savings = savingsOf(content, household);
-      if (savings < price) problems.push(`${tag}: the ${household.name}s saved $${savings} for ${s.name}, which costs $${price}`);
-      const house = houseTemplate(templates, s.template);
-      const cls = house?.class ?? house?.name ?? s.template;
-      const adults = household.members.filter((m) => content.isAdult(m.age));
-      const owners = (owned[cls] ??= { homes: 0, age: 0, level: 0, settled: 0, price: 0, savings: 0 });
-      const eldest = Math.max(0, ...adults.map((m) => m.age));
-      const level = Math.max(-1, ...adults.map((m) => m.job?.level ?? -1));
-      owners.homes++;
-      owners.age += eldest;
-      owners.level += level;
-      if (eldest >= SETTLED_AGE || level >= SENIOR) owners.settled++;
-      owners.price += price;
-      owners.savings += savings;
-    }
-    for (const s of vacantSlots(town)) {
-      const house = houseTemplate(templates, s.template);
-      const cls = house?.class ?? house?.name ?? s.template;
-      forSale[cls] = (forSale[cls] ?? 0) + 1;
-    }
-    worlds.push({ kind, seed, name: town.name, town: file });
-    const farms = town.slots.filter((s) => s.lot === 'farm').length;
-    const basements = town.slots.filter((s) => s.kind === 'house' && houseTemplate(templates, s.template)?.basement).length;
-    const spots = town.slots.filter((s) => s.kind === 'outdoor').length;
-    const dropped = world.diagnostics?.dropped.length ?? 0;
-    const courts = town.roads.filter((r) => r.kind !== 'trail').reduce((n, r) => n + r.ends.filter((e) => e === 'dead').length, 0);
-    [courtsOf[0], courtsOf[1], courtsOf[2]] = [courtsOf[0] + 1, courtsOf[1] + courts, Math.max(courtsOf[2], courts)];
-    console.log(
-      `${tag}: ${town.name} (${town.world?.tagline}) ${town.width}×${town.depth}, ${town.roads.length} road(s) (${courts} courts), ` +
-        `${town.open ? `${town.open.areas.length} areas, ${spots} outdoor places, ${((f) => `${(f.built * 100).toFixed(0)}% built and farmed, ${(f.empty * 100).toFixed(0)}% squares empty, `)(fillOf(file))}` : ''}` +
-        `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''} (${town.slots.filter((s) => s.lot === 'terrace').length} terraced)${dropped ? `, ${dropped} lots left out` : ''}, ${basements} with a basement, ${town.households.length} households, ` +
-        `${town.open?.backdrop ? `${town.open.backdrop.length} backdrop buildings (${town.open.backdrop.filter((b) => b.area === 0).length} in the main town), ${town.open.places?.length ?? 0} places, ` : ''}` +
-        `${file.sims.length} residents, ${file.objects.length} things, ${(text.length / 1e6).toFixed(2)} MB; ${layout.toFixed(0)} ms + ${houses.toFixed(0)} ms houses, file ${assemble.toFixed(0)} ms`,
-    );
+/** The worlds to make: each place `perKind` times at its own options (or `--options`), then the extremes. */
+const runs: { kind: (typeof WORLD_KINDS)[number]; seed: number; options?: Partial<WorldOptions> }[] = [
+  ...WORLD_KINDS.filter((k) => kinds.includes(k)).flatMap((kind) => Array.from({ length: perKind }, (_, i) => ({ kind, seed: (i + 1) * 104729 + kind.length + seedBase * SEED_STEP, ...(forced ? { options: forced } : {}) }))),
+  ...(extremes ? EXTREMES.flatMap(([kind, text], k) => (kinds.includes(kind) ? [{ kind, seed: (100 + k) * 104729 + kind.length + seedBase * SEED_STEP, options: optionsOf(text) }] : [])) : []),
+];
+for (const { kind, seed, options } of runs) {
+  const tag = `${kind} ${seed}${options ? ` (${Object.values(options).join(', ')})` : ''}`;
+  const expect = expectations(kind, options);
+  // (The households, the player's and the neighbours', drawn with `Math.random`: seeded here
+  // by the world's seed, the same seeds make the same files, so a failure in a
+  // check of them can be run again.)
+  Math.random = mulberry32(seed);
+  generateStats.houseMs = 0;
+  let t0 = performance.now();
+  const world = generateWorld(content, templates, kind, seed, undefined, undefined, options);
+  const houses = generateStats.houseMs;
+  const layout = performance.now() - t0 - houses;
+  const town = populate(content, assets, templates, world);
+  const home = vacantSlots(town)[0];
+  if (!home) throw new Error(`${tag}: no empty house`);
+  const player = randomHousehold(content, assets, 2);
+  t0 = performance.now();
+  const text = assembleTown(content, templates, town, player, home.index);
+  const assemble = performance.now() - t0;
+  const file = JSON.parse(text);
+  [slowest[0], slowest[1], slowest[2]] = [Math.max(slowest[0], layout), Math.max(slowest[1], houses), Math.max(slowest[2], assemble)];
+  for (const p of [...layoutProblems(file, expect, false), ...livingProblems(file, content.careerCategories.map((c) => c.id), expect), ...(world.diagnostics?.roads ?? [])]) problems.push(`${tag}: ${p}`);
+  // (A terrace lot's house is a generated terraced house, its lot cut to it: a fixed layout is wider than the lot.)
+  for (const s of town.slots) if (s.lot === 'terrace' && houseTemplate(templates, s.template)?.class !== 'terraced house') problems.push(`${tag}: terrace lot ${s.index} has a ${s.template}`);
+  if (text.length > MAX_FILE) problems.push(`${tag}: the town file is ${(text.length / 1e6).toFixed(1)} MB`);
+  if (timing && layout > LAYOUT_BUDGET * 2) problems.push(`${tag}: laid out in ${layout.toFixed(0)} ms (budget ${LAYOUT_BUDGET})`);
+  if (timing && assemble > ASSEMBLE_BUDGET * 2) problems.push(`${tag}: assembled in ${assemble.toFixed(0)} ms (budget ${ASSEMBLE_BUDGET})`);
+  for (const { household, slot } of town.households) {
+    const s = town.slots[slot];
+    const price = homePrice(content, templates, s);
+    const savings = savingsOf(content, household);
+    if (savings < price) problems.push(`${tag}: the ${household.name}s saved $${savings} for ${s.name}, which costs $${price}`);
+    const house = houseTemplate(templates, s.template);
+    const cls = house?.class ?? house?.name ?? s.template;
+    const adults = household.members.filter((m) => content.isAdult(m.age));
+    const owners = (owned[cls] ??= { homes: 0, age: 0, level: 0, settled: 0, price: 0, savings: 0 });
+    const eldest = Math.max(0, ...adults.map((m) => m.age));
+    const level = Math.max(-1, ...adults.map((m) => m.job?.level ?? -1));
+    owners.homes++;
+    owners.age += eldest;
+    owners.level += level;
+    if (eldest >= SETTLED_AGE || level >= SENIOR) owners.settled++;
+    owners.price += price;
+    owners.savings += savings;
   }
+  for (const s of vacantSlots(town)) {
+    const house = houseTemplate(templates, s.template);
+    const cls = house?.class ?? house?.name ?? s.template;
+    forSale[cls] = (forSale[cls] ?? 0) + 1;
+  }
+  worlds.push({ kind, seed, ...(options ? { options } : {}), name: town.name, town: file });
+  const farms = town.slots.filter((s) => s.lot === 'farm').length;
+  const basements = town.slots.filter((s) => s.kind === 'house' && houseTemplate(templates, s.template)?.basement).length;
+  const spots = town.slots.filter((s) => s.kind === 'outdoor').length;
+  const dropped = world.diagnostics?.dropped.length ?? 0;
+  const courts = town.roads.filter((r) => r.kind !== 'trail').reduce((n, r) => n + r.ends.filter((e) => e === 'dead').length, 0);
+  [courtsOf[0], courtsOf[1], courtsOf[2]] = [courtsOf[0] + 1, courtsOf[1] + courts, Math.max(courtsOf[2], courts)];
+  console.log(
+    `${tag}: ${town.name} (${town.world?.tagline}) ${town.width}×${town.depth}, ${town.roads.length} road(s) (${courts} courts), ` +
+      `${town.open ? `${town.open.areas.length} areas, ${spots} outdoor places, ${((f) => `${(f.built * 100).toFixed(0)}% built and farmed, ${(f.empty * 100).toFixed(0)}% squares empty, `)(fillOf(file, expect.meadow))}` : ''}` +
+      `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''} (${town.slots.filter((s) => s.lot === 'terrace').length} terraced)${dropped ? `, ${dropped} lots left out` : ''}, ${basements} with a basement, ${town.households.length} households, ` +
+      `${town.open?.backdrop ? `${town.open.backdrop.length} backdrop buildings (${town.open.backdrop.filter((b) => b.area === 0).length} in the main town), ${town.open.places?.length ?? 0} places, ` : ''}` +
+      `${file.sims.length} residents, ${file.objects.length} things, ${(text.length / 1e6).toFixed(2)} MB; ${layout.toFixed(0)} ms + ${houses.toFixed(0)} ms houses, file ${assemble.toFixed(0)} ms`,
+  );
 }
 console.log(`Owners per kind of house (the eldest grown-up, the highest job grade, A = 0; settled: ${SETTLED_AGE}+ or grade F up):`);
 for (const cls of [...HOUSE_CLASSES, ...Object.keys(owned).filter((c) => !HOUSE_CLASSES.includes(c))]) {

@@ -19,7 +19,7 @@
  */
 
 import type { Content } from '../content/content';
-import type { BackdropBuilding, Rle, TownArea, TownPlace, WorldZone } from '../core/protocol';
+import type { BackdropBuilding, Rle, TownArea, TownPlace, WorldMeta, WorldZone } from '../core/protocol';
 import { distanceToRect } from '../render/shared/chunks';
 import { chooseCentre, layBackdrop, reserveCentre } from './backdrop';
 import { random } from './housegen';
@@ -46,6 +46,8 @@ export interface OpenWorldDraft {
   centre?: { area: number; poly: Pt[] }[];
   /** The centres' squares (kept clear of lots: `withGarden`); not in the town file. */
   squares?: Pt[][];
+  /** How high the land stands over the level the towns are built at (`reliefOf`); none in a classic world. */
+  relief?: WorldMeta['relief'];
 }
 
 /** The land's cells (m). */
@@ -627,6 +629,12 @@ interface Plan {
 
 /** A stream of draws of its own for the massif's height (so a spec without one draws as it did). */
 const MASSIF = 0x6d617373;
+/** A stream of its own for how a place's land looks (`WorldSpec.landscape`): its palette and trees stay as the options change. */
+const LOOK = 0x6c6f6f6b;
+/** The mountains rise this far from the valley, the shore, the lake (m), past this much of it flat (m); the low-z side (the menus' camera's) to this share of their height. */
+const MASSIF_RISE = 260;
+const MASSIF_FLAT = 70;
+const MASSIF_NEAR = 0.45;
 
 /** How many, in words (the ways out the world wants at least). */
 const WORDS = ['no', 'one', 'two', 'three', 'four'];
@@ -649,12 +657,25 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const valley = !!spec.massif;
   const massif = spec.massif ? range(random((seed ^ MASSIF) >>> 0), ...spec.massif) : 0;
   const valleyZ = (x: number) => D / 2 + (fbm(x / 420, 3.7, nseed + 3, 3) - 0.47) * 260;
+  const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
   for (let i = 0; i < gw * gd; i++) {
     const [x, z] = land.centre(i);
     let h = fbm(x / 230, z / 230, nseed, 4) * spec.hills * 2;
-    if (valley) h += massif * Math.min(1, Math.max(0, (Math.abs(z - valleyZ(x)) - 70) / 260)) ** 1.4;
+    if (valley && spec.classic) h += massif * clamp01((Math.abs(z - valleyZ(x)) - MASSIF_FLAT) / MASSIF_RISE) ** 1.4;
     land.height[i] = h;
   }
+  /**
+   * A place's mountains (not a classic world's): the massif's height times `m(x, z)`^1.4 (0 where
+   * the land stays low, 1 where the mountains stand full height), lower on the low-z side, once
+   * the water they rise from is laid.
+   */
+  const raise = (m: (x: number, z: number) => number) => {
+    if (!valley || spec.classic) return;
+    for (let i = 0; i < gw * gd; i++) {
+      const [x, z] = land.centre(i);
+      land.height[i] += massif * clamp01(m(x, z)) ** 1.4 * (MASSIF_NEAR + (1 - MASSIF_NEAR) * clamp01(z / (0.6 * D)));
+    }
+  };
 
   // ---- the main town: its roads first (which side its water is on), then where it goes -------
   const mainSpec = spec.town;
@@ -663,14 +684,16 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const box = mainSpec.box;
   const waterSide = layout.water ?? (rand() < 0.5 ? 'zmin' : 'zmax');
 
-  // The sea along one edge, a lake in the middle.
+  // The sea along one edge, a lake in the middle; the mountains (a place's) inland of them, else either side of the valley.
   if (spec.water === 'sea') {
     const deep = range(rand, 120, 160);
+    const shoreOf = (x: number) => deep + (fbm(x / 160, 9.1, nseed + 5, 3) - 0.47) * 90;
     for (let i = 0; i < gw * gd; i++) {
       const [x, z] = land.centre(i);
-      const shore = deep + (fbm(x / 160, 9.1, nseed + 5, 3) - 0.47) * 90;
+      const shore = shoreOf(x);
       if (waterSide === 'zmax' ? z > D - shore : z < shore) land.water[i] = 1;
     }
+    raise((x, z) => ((waterSide === 'zmax' ? D - shoreOf(x) - z : z - shoreOf(x)) - 160) / MASSIF_RISE);
   }
   const lake: Pt = [W / 2 + range(rand, -50, 50), D / 2 + range(rand, -40, 40)];
   if (spec.water === 'lake') {
@@ -680,7 +703,9 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const r = ((x - lake[0]) / rx) ** 2 + ((z - lake[1]) / rz) ** 2;
       if (r < 1 + (fbm(x / 90, z / 90, nseed + 6, 3) - 0.47) * 0.7) land.water[i] = 1;
     }
+    raise((x, z) => ((Math.hypot((x - lake[0]) / rx, (z - lake[1]) / rz) - 1.9) * Math.min(rx, rz)) / 200);
   }
+  if (spec.water === 'ponds') raise((x, z) => (Math.abs(z - valleyZ(x)) - MASSIF_FLAT) / MASSIF_RISE);
   /** The first dry z going from `from` towards `dir` across x0..x1 (the shore nearest the town). */
   const shoreAt = (x0: number, x1: number, dir: 1 | -1, from: number): number => {
     let best = dir > 0 ? Infinity : -Infinity;
@@ -806,6 +831,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     }
   }
   const rim = new Uint8Array(gw * gd);
+  const climb = spec.climb ?? 0;
   for (let i = 0; i < gw * gd; i++) if (i % gw < 2 || i % gw >= gw - 2 || i < gw * 2 || i >= gw * (gd - 2)) rim[i] = 1;
   const wetNear = new Uint8Array(gw * gd);
   for (let i = 0; i < gw * gd; i++) if (land.water[i]) for (const d of [0, -1, 1, -gw, gw, -gw - 1, -gw + 1, gw - 1, gw + 1]) if (i + d >= 0 && i + d < gw * gd) wetNear[i + d] = 1;
@@ -816,8 +842,9 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const c = land.centre(i);
       if (!ends.some((e) => dist(c, e) < 26)) return Infinity;
     }
-    // (Not along the world's edge: smoothed, it would wander out of the world and back.)
-    return 1 + land.slope(i) * 40 + land.woods[i] * 0.3 + (rim[i] ? 12 : 0);
+    // (Not along the world's edge: smoothed, it would wander out of the world and back. In hilly
+    // land and the mountains, along the valleys.)
+    return 1 + land.slope(i) * 40 + land.woods[i] * 0.3 + (rim[i] ? 12 : 0) + (climb ? land.height[i] * climb : 0);
   };
   /** As `roadCost`, but along the water's edge too (not over it), and less put off by the slope: for when that finds no way. */
   const relaxedCost = (ends: readonly Pt[]) => {
@@ -1674,6 +1701,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     greens: allGreens,
     water: waterMask,
     density: spec.density,
+    least: spec.mainLeast,
+    civic: spec.civic,
     rand: dense,
   });
 
@@ -1682,7 +1711,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     for (let z = Math.floor((r.z - grow) / CELL); z <= Math.floor((r.z + r.d + grow) / CELL); z++) for (let x = Math.floor((r.x - grow) / CELL); x <= Math.floor((r.x + r.w + grow) / CELL); x++) if (x >= 0 && z >= 0 && x < gw && z < gd) mask[z * gw + x] = 0;
   };
   const woods = land.woods.slice();
-  for (const plan of plans) clearAround(woods, plan.rect, 10);
+  // (Wooded: round a hamlet the woods come up to its roads and lots.)
+  for (const [a, plan] of plans.entries()) if (!spec.wildBoxes || (a === 0 && spec.wildBoxes === 'hamlets')) clearAround(woods, plan.rect, 10);
   for (const s of slots) clearAround(woods, rectOf(s), 4);
   for (const r of orchards) clearAround(woods, r, 4);
   const footprints = backdrop.map((b) => boundsOf(b.poly));
@@ -1705,7 +1735,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     if (land.water[i]) continue;
     const [x, z] = land.centre(i);
     if (land.height[i] > hillCut) hills[i] = 1;
-    if (!woods[i] && !areaBlock[i] && fbm(x / 70, z / 70, nseed + 11, 3) > 0.58) meadow[i] = 1;
+    if (!woods[i] && !areaBlock[i] && fbm(x / 70, z / 70, nseed + 11, 3) > (spec.meadowCut ?? 0.58)) meadow[i] = 1;
     if (spec.fields && !woods[i] && !areaBlock[i] && !meadow[i] && nearFarmland([x, z]) && fbm(x / 110, z / 110, nseed + 13, 3) > spec.fieldsCut) fields[i] = 1;
   }
   for (const plan of plans) clearAround(hills, plan.rect, 0);
@@ -1730,8 +1760,11 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   ];
 
   const areas: TownArea[] = plans.map((p) => ({ name: p.name, kind: 'hamlet', x: p.rect.x, z: p.rect.z, w: p.rect.w, d: p.rect.d }));
-  // (The landscape round the world: its sea or lake is in the zones now.)
-  const { water: _water, ...landscape } = spec.landscape(rand, W, D, waterSide);
+  // (The landscape round the world: its sea or lake is in the zones now. A place's from its own
+  // stream; its mountains as high as the massif.)
+  const { water: _water, ...landscape } = spec.landscape(spec.classic ? rand : random((seed ^ LOOK) >>> 0), W, D, waterSide);
+  if (!spec.classic && massif) landscape.mountains = Math.round(massif);
+  const relief = spec.classic ? undefined : reliefOf(land, [...slots.map(rectOf), ...footprints]);
   step?.('homes');
   return {
     name: name ?? rolledName,
@@ -1753,8 +1786,50 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       backdrop,
       places,
       ...(centre ? { centre: [{ area: centre.area, poly: centre.poly }], squares: centre.square ? [centre.square] : [] } : {}),
+      ...(relief ? { relief } : {}),
     },
   };
+}
+
+/** The relief's cells (m). */
+const RELIEF = 16;
+
+/**
+ * How high the land stands over the level the towns are built at (`WorldMeta.relief`): the land's
+ * height averaged over 16 m cells, less the middle height (the median) of the cells anything
+ * stands on (`built`: the lots and the backdrop), in decimetres, never below 0, and 0 where the
+ * cell is mostly water. The renderer draws its hills from it.
+ */
+function reliefOf(land: Land, built: readonly Rect[]): NonNullable<WorldMeta['relief']> {
+  const k = RELIEF / CELL;
+  const [cols, rows] = [Math.ceil(land.W / RELIEF), Math.ceil(land.D / RELIEF)];
+  const mean = new Float32Array(cols * rows);
+  const wet = new Uint8Array(cols * rows);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      let [sum, n, water] = [0, 0, 0];
+      for (let dz = 0; dz < k; dz++) {
+        for (let dx = 0; dx < k; dx++) {
+          const [x, z] = [c * k + dx, r * k + dz];
+          if (x >= land.gw || z >= land.gd) continue;
+          sum += land.height[z * land.gw + x];
+          water += land.water[z * land.gw + x];
+          n++;
+        }
+      }
+      mean[r * cols + c] = n ? sum / n : 0;
+      wet[r * cols + c] = water * 2 >= n && n ? 1 : 0;
+    }
+  }
+  const on = new Uint8Array(cols * rows);
+  for (const b of built) {
+    for (let r = Math.max(0, Math.floor(b.z / RELIEF)); r <= Math.min(rows - 1, Math.floor((b.z + b.d) / RELIEF)); r++) {
+      for (let c = Math.max(0, Math.floor(b.x / RELIEF)); c <= Math.min(cols - 1, Math.floor((b.x + b.w) / RELIEF)); c++) on[r * cols + c] = 1;
+    }
+  }
+  const levels = [...mean.filter((_, i) => on[i] && !wet[i])].sort((a, b) => a - b);
+  const level = levels[Math.floor(levels.length / 2)] ?? 0;
+  return { cell: RELIEF, cols, rows, h: Array.from(mean, (h, i) => (wet[i] ? 0 : Math.max(0, Math.round((h - level) * 10)))) };
 }
 
 /**

@@ -761,6 +761,45 @@
           "Moss on the roofs and mushrooms in every garden.",
           "The forest keeps the secrets; the neighbours keep the rest."
         ]
+      },
+      "heath": {
+        "start": ["Heather", "Ling", "Gorse", "Curlew", "Lark", "Peat", "Grouse", "Whin", "Moor", "Bilberry"],
+        "end": ["moor", "ton", " Edge", "top", "beck", "thwaite", " Fell", "side"],
+        "streets": ["Moor", "Heather", "Tor", "Peat", "Curlew", "Packhorse", "Gorse", "Cairn"],
+        "ways": ["Lane", "Road", "Row", "Track"],
+        "taglines": [
+          "Heather to the skyline and a wind that never quite drops.",
+          "Curlews overhead, peat smoke from the chimneys.",
+          "Open moorland, dry-stone walls and a kettle always on.",
+          "Where the bracken turns copper and the sky goes on for ever.",
+          "Bilberry picking on the hill, scones at the café after."
+        ]
+      },
+      "river": {
+        "start": ["Ash", "Alder", "Mill", "Ferry", "Kings", "Weir", "Otter", "Salmon", "Bridge", "Water"],
+        "end": ["ford", "bridge", "bourne", "mouth", "ham", "ton", " Mill", " Weir"],
+        "streets": ["Bridge", "Mill", "Wharf", "Towpath", "Ferry", "Weir", "Lock", "Riverside"],
+        "ways": ["Street", "Lane", "Row", "Walk"],
+        "taglines": [
+          "Rowing boats, willows and a bridge everyone has an opinion about.",
+          "The river runs through it, and so does the gossip.",
+          "Kingfishers on the bank, picnics on the meadows.",
+          "Two banks, one bridge, a friendly rivalry.",
+          "Where the mill wheel turns and the evenings are long."
+        ]
+      },
+      "island": {
+        "start": ["Puffin", "Seal", "Kelp", "Gannet", "Skerry", "Fulmar", "Tern", "Wrack", "Holy", "Long"],
+        "end": [" Isle", "ey", "holm", "ness", "ay", " Island", "wick", "sound"],
+        "streets": ["Harbour", "Causeway", "Pier", "Lighthouse", "Ferry", "Chapel", "Seal", "Kirk"],
+        "ways": ["Road", "Row", "Lane", "Brae"],
+        "taglines": [
+          "When the tide is in, the island is all yours.",
+          "Sea on every side, and a causeway home.",
+          "Seals on the rocks, washing on the line.",
+          "Everyone knows the tide tables by heart.",
+          "Far enough from the mainland to feel like an adventure."
+        ]
       }
     }
   },
