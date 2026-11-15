@@ -3,7 +3,7 @@
  * into interpolatable frames for the renderer. Allocation-free per frame.
  */
 
-import type { Catalog, Command, FromWorker, GameSource, ItemPlacement, SaveProblem, SimThreadStats, SocialEvent, SocialOption, ToWorker, UiUpdate, WorldStructure } from './protocol';
+import { mergeShapeLand, type Catalog, type Command, type FromWorker, type GameSource, type ItemPlacement, type SaveProblem, type ShapeLandCommand, type SimThreadStats, type SocialEvent, type SocialOption, type ToWorker, type UiUpdate, type WorldStructure } from './protocol';
 import { SharedSnapshotReader, tickRates, type SnapshotLayout } from './snapshot';
 
 type WorldMessage = Extract<FromWorker, { type: 'world' }>;
@@ -290,6 +290,22 @@ export class SimBridge {
     return reply.data;
   }
 
+  /**
+   * Shapes the land (Build mode's Land tab): resolves once the simulation took the stroke (charged
+   * it, changed the water), rejects with why it refused it (the message is the simulation's own),
+   * and nothing changed. Taken, the world's `meta` has the stroke merged in (`mergeShapeLand`: a
+   * new `meta`, the rest of the world the same objects), handed to the world listeners as any
+   * changed world is; the funds come with the next UI update, and new or dried water with the
+   * next world (who may walk where; the simulation keeps no picture of the water).
+   */
+  async shapeLand(command: ShapeLandCommand): Promise<void> {
+    await this.request<null>((requestId) => ({ type: 'shapeLand', requestId, command }));
+    if (!this.world) return;
+    // (A new world: the one shown is never changed in place.)
+    this.world = { ...this.world, meta: mergeShapeLand(this.world.meta, command.meta) };
+    this.deliverSoon();
+  }
+
   /** `?debug`'s `__crash` (game/session.ts): the simulation fails on purpose. */
   debugCrash(what: 'panic' | 'throw' | 'hang'): void {
     this.worker.postMessage({ type: 'debugCrash', what } satisfies ToWorker);
@@ -535,6 +551,9 @@ export class SimBridge {
         break;
       case 'blueprint':
         this.resolve(msg.requestId, { data: msg.data, error: msg.error });
+        break;
+      case 'shaped':
+        this.resolve(msg.requestId, null);
         break;
       case 'stats':
         this.threadStats = msg.stats;

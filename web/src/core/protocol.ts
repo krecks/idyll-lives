@@ -103,6 +103,40 @@ export interface ShapeLandMeta {
   zones?: WorldZone[];
 }
 
+/**
+ * A `shapeLand` command, as `SimBridge.shapeLand` sends it (answered, unlike `send`'s commands).
+ * The first one of a world without `meta.land` carries the land's whole header (`cols` and `rows`
+ * at least); a tile it doesn't send is empty (flat at 0 and dry). A tile index past the land's, a
+ * cost over the household's funds (Living), and new water on a lot, on a road (its width with the
+ * sidewalks), on a resident or where something stands are refused whole, with the reason.
+ */
+export type ShapeLandCommand = Extract<Command, { type: 'shapeLand' }>;
+
+/**
+ * `meta` with a `shapeLand` stroke's `patch` merged in as the simulation merges it: `land.h` and
+ * `land.wl` tile by tile, the land's other fields and `zones` replaced. A new object (and a new
+ * `land`), `meta` left as it is; null with no land and no zones to merge.
+ */
+export function mergeShapeLand(meta: WorldMeta | null, patch: ShapeLandMeta): WorldMeta | null {
+  if (!patch.land && !patch.zones) return meta;
+  const out: WorldMeta = { ...(meta ?? {}) };
+  if (patch.land) {
+    const { h, wl, ...header } = patch.land;
+    const land = { ...out.land, ...header } as LandFile;
+    const tiles = Math.ceil(land.cols / (land.tile ?? 64)) * Math.ceil(land.rows / (land.tile ?? 64));
+    const merged = (old: string[] | undefined, by: Record<number, string> | undefined) => {
+      const codes = Array.from({ length: tiles }, (_, t) => old?.[t] ?? '');
+      for (const [t, code] of Object.entries(by ?? {})) codes[Number(t)] = code;
+      return codes;
+    };
+    land.h = merged(out.land?.h, h);
+    land.wl = merged(out.land?.wl, wl);
+    out.land = land;
+  }
+  if (patch.zones) out.zones = patch.zones;
+  return out;
+}
+
 /** A routine block: an activity (content `activities` id) on weekdays (bit 0 = Monday) from `start` (minute of the day) for `minutes`. */
 export interface RoutineIn {
   id?: number;
@@ -1055,7 +1089,37 @@ export interface Catalog {
     upgradeSkillPerLevel: number;
     resale: number;
   };
-  build: { wall: number; door: number; window: number; remove: number; diagonalWall?: number; fence?: number; gate?: number; garage?: number; porch?: number; porchPost?: number; porchCanopy?: number; porchStep?: number };
+  build: {
+    wall: number;
+    door: number;
+    window: number;
+    remove: number;
+    diagonalWall?: number;
+    fence?: number;
+    gate?: number;
+    garage?: number;
+    porch?: number;
+    porchPost?: number;
+    porchCanopy?: number;
+    porchStep?: number;
+    /** Shaping the land (Build mode's Land tab; content `build.land`). */
+    land?: LandPrices;
+  };
+}
+
+/**
+ * What shaping the land costs (content `build.land`): `earth` a cubic metre raised or lowered by
+ * the brushes, `mountain` one by the peak, range and level tools (volume: Σ|Δh| × 4 m² over the
+ * 2 m samples); the rest a square metre, of water made and of cover planted or cleared.
+ */
+export interface LandPrices {
+  earth: number;
+  mountain: number;
+  water: number;
+  woods: number;
+  meadow: number;
+  fields: number;
+  clear: number;
 }
 
 export interface CareerEntry {
@@ -1220,6 +1284,8 @@ export type ToWorker =
   | { type: 'events'; requestId: number }
   /** The household's home as a blueprint. */
   | { type: 'blueprint'; requestId: number; household: number }
+  /** The land shaped (`SimBridge.shapeLand`): answered with `shaped`, or `failed` with why it was refused. */
+  | { type: 'shapeLand'; requestId: number; command: ShapeLandCommand }
   /** The resident whose panel is open (their details and relationships are sent too); null: none. */
   | { type: 'inspect'; sim: number | null }
   /** The next UI update sends everything. */
@@ -1268,6 +1334,8 @@ export type FromWorker =
   | { type: 'events'; requestId: number; events: SocialEvent[] }
   /** JSON, or null with `error`. */
   | { type: 'blueprint'; requestId: number; data: string | null; error?: string }
+  /** A `shapeLand` done (charged, and its meta and water changed). */
+  | { type: 'shaped'; requestId: number }
   /** Fallback transport when SharedArrayBuffer is unavailable. */
   | { type: 'snapshot'; data: Float32Array; step: number }
   /** About once a second. */
