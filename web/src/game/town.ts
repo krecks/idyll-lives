@@ -1677,7 +1677,8 @@ type PlotKind = 'home' | 'farm' | 'public' | 'shop' | 'countryside';
  * The town file's open-world fields: its areas, every house's driveway
  * with where it meets its road and the households' cars on them (sim-core `cars.rs`: they drive
  * the roads), its typed exits (the roads out), the water, public parking, and the zones, pads and
- * areas for the renderer, and the land once the player has shaped it (`meta.land`).
+ * areas for the renderer, and the land (`meta.land`) once the player has shaped it or when its town
+ * follows its slopes (a new place's: `landFollow.ts` `withLand`).
  */
 function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'], cars: TownLayout['cars']) {
   const areas: TownArea[] = town.open?.areas ?? [{ name: town.name, kind: 'hamlet', x: 0, z: 0, w: town.width, d: town.depth }];
@@ -1701,6 +1702,6 @@ function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'],
     areas,
     exits,
     file: { terrain: { water: open.water }, parking: open.parking, drives: filed, cars: parked },
-    meta: { zones: open.zones, pads: open.pads, areas, ...(open.backdrop ? { backdrop: open.backdrop } : {}), ...(open.places ? { places: open.places } : {}), ...(open.centre ? { centre: open.centre } : {}), ...(open.relief ? { relief: open.relief } : {}), ...(open.land?.edited ? { land: encodeLand(open.land) } : {}) },
+    meta: { zones: open.zones, pads: open.pads, areas, ...(open.backdrop ? { backdrop: open.backdrop } : {}), ...(open.places ? { places: open.places } : {}), ...(open.centre ? { centre: open.centre } : {}), ...(open.relief ? { relief: open.relief } : {}), ...(open.land && (open.land.edited || open.land.seeded === 'follow') ? { land: encodeLand(open.land) } : {}) },
   };
 }

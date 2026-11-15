@@ -8,7 +8,8 @@
 import type { Content } from '../content/content';
 import type { WorldOptions, WorldStructure } from '../core/protocol';
 import type { HouseholdDraft } from './household';
-import type { Land } from './land';
+import { encodeLand, type Land } from './land';
+import { withLand } from './landFollow';
 import { assembleTown, generatedHouses, generateWorld, loadTemplates, primeHouses, type AssembleOptions, type HouseTemplate, type NeighbourhoodDraft, type Templates } from './town';
 import { previewWorld } from './townPreview';
 import type { WorldStep } from './world';
@@ -17,11 +18,12 @@ import { mulberry32 } from './noise';
 
 export type TownJob =
   /**
-   * A new world (`generateWorld`), with the menu's preview of it (`previewWorld`): `world` is its
-   * place (`WorldKind`, or a kind from before places: `LEGACY_KINDS`), `options` the player's (the
-   * place's own where not given). `land`: the town laid again on a land the player shaped (step
-   * 1's "Lay the town again", or Town or Villages changed on a shaped land); it crosses to the
-   * worker copied (its typed arrays cloned), so the page keeps its own.
+   * A new world (`generateWorld`), with the menu's preview of it (`previewWorld`) and, a place's,
+   * its land graded under its town (`landFollow.ts` `withLand`, from the preview's lots and paths):
+   * `world` is its place (`WorldKind`, or a kind from before places: `LEGACY_KINDS`), `options` the
+   * player's (the place's own where not given). `land`: the town laid again on a land the player
+   * shaped (step 1's "Lay the town again", or Town or Villages changed on a shaped land); it
+   * crosses to the worker copied (its typed arrays cloned), so the page keeps its own.
    */
   | { kind: 'world'; world: string; seed: number; name?: string; options?: Partial<WorldOptions>; land?: Land }
   /** The simulation's town file (`assembleTown`); `random`: the seed for its dice (neighbours' bonds). */
@@ -42,8 +44,10 @@ export type FromTownWorker = WorkerAnswer<TownResult, WorldStep>;
  */
 export function runTownJob(content: Content, t: Templates, job: TownJob, step?: (done: WorldStep) => void): TownResult {
   if (job.kind === 'world') {
-    const draft = generateWorld(content, t, job.world, job.seed, job.name, step, job.options, job.land);
-    const preview = previewWorld(content, t, draft, null);
+    const laid = generateWorld(content, t, job.world, job.seed, job.name, step, job.options, job.land);
+    const preview = previewWorld(content, t, laid, null);
+    const draft = withLand(laid, preview);
+    if (draft.open?.land && draft !== laid) preview.meta = { ...preview.meta, land: encodeLand(draft.open.land) };
     const houses = generatedHouses(t, draft.slots.map((s) => s.template));
     step?.('houses');
     return { kind: 'world', draft, preview, houses };

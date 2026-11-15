@@ -61,6 +61,13 @@ export interface OpenWorldDraft {
   /** How high the land stands over the level the towns are built at (`reliefOf`); none in a classic world. */
   relief?: WorldMeta['relief'];
   /**
+   * The land's height (m) per 8 m cell, read at the cells' middles, over the level the towns are
+   * built at (`heightsOf`: below it too, unlike `relief`), row-major from the world's corner. What
+   * a place's land as a height field is seeded from (`landFollow.ts` `withLand`); none in a classic
+   * world or one laid again on a shaped land, and not in the town file.
+   */
+  heights?: { cell: number; cols: number; rows: number; h: Float32Array };
+  /**
    * The land as a height field (`land.ts`), once the player has shaped it (step 1's brushes,
    * `landEdit.ts` `applyLand`) or the town was laid again on it (`generateFromSpec`'s `shaped`):
    * the town file carries it as `meta.land` once it is `edited`.
@@ -1914,6 +1921,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const { water: _water, ...landscape } = spec.landscape(spec.classic ? rand : random((seed ^ LOOK) >>> 0), W, D, waterSide);
   if (!spec.classic && massif) landscape.mountains = Math.round(massif);
   const relief = spec.classic ? undefined : reliefOf(land, [...slots.map(rectOf), ...footprints]);
+  const signed = spec.classic || shaped ? undefined : heightsOf(land, [...slots.map(rectOf), ...footprints], worldRoads);
   // The roads cut to the world; each bridge's and causeway's deck over its water (and a little
   // past it), and the water the sim walks round without the decks.
   const filed = cropRoads(worldRoads, 0, 0, W, D);
@@ -1944,6 +1952,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       places,
       ...(centre ? { centre: [{ area: centre.area, poly: centre.poly }], squares: centre.square ? [centre.square] : [] } : {}),
       ...(relief ? { relief } : {}),
+      ...(signed ? { heights: signed } : {}),
       ...(laid ? { land: laid } : {}),
     },
   };
@@ -2049,14 +2058,15 @@ const GRADE_BANK = 25;
  * A shaped land with a town laid on it (`generateFromSpec`'s `shaped`): a copy, flat at 0 under
  * what is built and rising back to its own height round it (as the renderer draws a world's
  * land round its towns), but never below a bank over the water beside it; and its cover open
- * within 2 m of anything built. Marked `edited`.
+ * within 2 m of anything built. Marked `edited`. A land whose town follows its slopes (`seeded`
+ * `'follow'`) keeps its heights: the town is graded into it afterwards (`landFollow.ts` `withLand`).
  */
 function settleTown(field: LandField, built: BuiltLand): LandField {
   const { cols, rows } = field;
   const out: LandField = { ...field, h: field.h.slice(), wl: field.wl.slice(), cover: field.cover.slice(), edited: true };
   const guard = new Protection(cols, rows, built);
   const wet = (k: number) => out.wl[k] !== NONE && out.wl[k] > out.h[k];
-  for (let k = 0; k < cols * rows; k++) {
+  for (let k = 0; k < cols * rows && field.seeded !== 'follow'; k++) {
     if (wet(k)) continue;
     const d = guard.dist[k];
     if (d >= APRON + GRADE_RISE) continue;
@@ -2064,7 +2074,7 @@ function settleTown(field: LandField, built: BuiltLand): LandField {
     out.h[k] = Math.round(field.h[k] * t * t * (3 - 2 * t));
   }
   // (Beside water, no lower than a bank over it, nor than the land was.)
-  for (let j = 0; j < rows; j++) {
+  for (let j = 0; j < rows && field.seeded !== 'follow'; j++) {
     for (let i = 0; i < cols; i++) {
       const k = j * cols + i;
       if (wet(k) || out.h[k] === field.h[k]) continue;
@@ -2222,6 +2232,32 @@ function reliefOf(land: Land, built: readonly Rect[]): NonNullable<WorldMeta['re
   const levels = [...mean.filter((_, i) => on[i] && !wet[i])].sort((a, b) => a - b);
   const level = levels[Math.floor(levels.length / 2)] ?? 0;
   return { cell: RELIEF, cols, rows, h: Array.from(mean, (h, i) => (wet[i] ? 0 : Math.max(0, Math.round((h - level) * 10)))) };
+}
+
+/** The share of the built cells lower than the level the towns are built at (`heightsOf`). */
+const BUILT_LOW = 0.05;
+
+/**
+ * The land's signed heights (`OpenWorldDraft.heights`): each 8 m cell's height less the level the
+ * towns are built at, the height `BUILT_LOW` of the cells anything is built on stand lower than
+ * (the lots, the backdrop and the roads but the trails; not water). Mostly the built land is a
+ * little over 0, and the sea (`land.ts` `SEA_CM`) a little under it, as the renderer has always
+ * drawn them.
+ */
+function heightsOf(land: Land, built: readonly Rect[], roads: readonly RoadPlan[]): NonNullable<OpenWorldDraft['heights']> {
+  const { gw, gd } = land;
+  const on = new Uint8Array(gw * gd);
+  for (const b of built) {
+    for (let z = Math.max(0, Math.floor(b.z / CELL)); z <= Math.min(gd - 1, Math.floor((b.z + b.d) / CELL)); z++) {
+      for (let x = Math.max(0, Math.floor(b.x / CELL)); x <= Math.min(gw - 1, Math.floor((b.x + b.w) / CELL)); x++) on[z * gw + x] = 1;
+    }
+  }
+  for (const r of roads) if (r.kind !== 'trail') for (const [x, z] of r.points) if (x >= 0 && z >= 0 && x < land.W && z < land.D) on[land.cell(x, z)] = 1;
+  const levels: number[] = [];
+  for (let i = 0; i < gw * gd; i++) if (on[i] && !land.water[i]) levels.push(land.height[i]);
+  levels.sort((a, b) => a - b);
+  const level = levels[Math.floor(levels.length * BUILT_LOW)] ?? 0;
+  return { cell: CELL, cols: gw, rows: gd, h: Float32Array.from(land.height, (h) => h - level) };
 }
 
 /**
