@@ -573,6 +573,34 @@ function rasterize(polys: readonly Pt[][], W: number, D: number): Uint8Array {
   return mask;
 }
 
+/** A `W` × `D` mask of tiles grown by `by` tiles every way (a square round each). */
+function grown(mask: Uint8Array, W: number, D: number, by: number): Uint8Array {
+  const across = new Uint8Array(mask.length);
+  for (let z = 0; z < D; z++) {
+    for (let x = 0, last = -Infinity; x < W; x++) {
+      if (mask[z * W + x]) last = x;
+      // (The nearest set tile at or before x, within `by`; then the one after.)
+      if (x - last <= by) across[z * W + x] = 1;
+    }
+    for (let x = W - 1, next = Infinity; x >= 0; x--) {
+      if (mask[z * W + x]) next = x;
+      if (next - x <= by) across[z * W + x] = 1;
+    }
+  }
+  const out = new Uint8Array(mask.length);
+  for (let x = 0; x < W; x++) {
+    for (let z = 0, last = -Infinity; z < D; z++) {
+      if (across[z * W + x]) last = z;
+      if (z - last <= by) out[z * W + x] = 1;
+    }
+    for (let z = D - 1, next = Infinity; z >= 0; z--) {
+      if (across[z * W + x]) next = z;
+      if (next - z <= by) out[z * W + x] = 1;
+    }
+  }
+  return out;
+}
+
 /** A 0/1 mask, run-length (`Rle`): [run, value, run, value, ...] from tile 0. */
 export function rle(mask: Uint8Array): Rle {
   const out: Rle = [];
@@ -645,6 +673,8 @@ const MASSIF_NEAR = 0.45;
 const LAKE_WORLD = 992;
 /** A place's outdoor places no further than this from their area's box (m: the sample's check is 150). */
 const SPOT_REACH = 130;
+/** A place's lots keep this far from the water (m). */
+const SHORE_GAP = 3;
 /** Streams of their own for a river's course and its bridges (a place's). */
 const RIVER = 0x72697672;
 /** A river's width (m), how far its meanders swing (m), how far its mountains stand back from it (m). */
@@ -1782,7 +1812,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   }
   const allGreens = plans.flatMap((p) => p.greens);
   const ground = new Ground(W, D, worldRoads, allGreens);
-  ground.block(waterMask);
+  // (A place's lots and buildings keep a strip of bank between them and the water: a way round behind the gardens.)
+  ground.block(spec.classic ? waterMask : grown(waterMask, W, D, SHORE_GAP));
   // The living town's own draws (the centre, the terraces, the backdrop), apart from the layout's:
   // the rest of the world is laid out as it was.
   const dense = random((seed ^ 0x2545f491) >>> 0);
