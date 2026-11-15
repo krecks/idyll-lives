@@ -8,6 +8,7 @@
 import type { Content } from '../content/content';
 import type { WorldOptions, WorldStructure } from '../core/protocol';
 import type { HouseholdDraft } from './household';
+import type { Land } from './land';
 import { assembleTown, generatedHouses, generateWorld, loadTemplates, primeHouses, type AssembleOptions, type HouseTemplate, type NeighbourhoodDraft, type Templates } from './town';
 import { previewWorld } from './townPreview';
 import type { WorldStep } from './world';
@@ -18,9 +19,11 @@ export type TownJob =
   /**
    * A new world (`generateWorld`), with the menu's preview of it (`previewWorld`): `world` is its
    * place (`WorldKind`, or a kind from before places: `LEGACY_KINDS`), `options` the player's (the
-   * place's own where not given).
+   * place's own where not given). `land`: the town laid again on a land the player shaped (step
+   * 1's "Lay the town again", or Town or Villages changed on a shaped land); it crosses to the
+   * worker copied (its typed arrays cloned), so the page keeps its own.
    */
-  | { kind: 'world'; world: string; seed: number; name?: string; options?: Partial<WorldOptions> }
+  | { kind: 'world'; world: string; seed: number; name?: string; options?: Partial<WorldOptions>; land?: Land }
   /** The simulation's town file (`assembleTown`); `random`: the seed for its dice (neighbours' bonds). */
   | { kind: 'assemble'; town: NeighbourhoodDraft; player: HouseholdDraft; slot: number; options: AssembleOptions; random: number };
 
@@ -39,7 +42,7 @@ export type FromTownWorker = WorkerAnswer<TownResult, WorldStep>;
  */
 export function runTownJob(content: Content, t: Templates, job: TownJob, step?: (done: WorldStep) => void): TownResult {
   if (job.kind === 'world') {
-    const draft = generateWorld(content, t, job.world, job.seed, job.name, step, job.options);
+    const draft = generateWorld(content, t, job.world, job.seed, job.name, step, job.options, job.land);
     const preview = previewWorld(content, t, draft, null);
     const houses = generatedHouses(t, draft.slots.map((s) => s.template));
     step?.('houses');

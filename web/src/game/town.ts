@@ -23,6 +23,7 @@ import { connect, inside, leftOf, lengths, nearest, pointAt, roadExits, roadInde
 import { householdFunds, savingsOf } from './wealth';
 import { extend, fill, LEGACY_KINDS, placeOf, specOf, type LotMix, type RoadLayout, type SizeSpec, type WorldStep } from './world';
 import { generateFromSpec, type OpenWorldDraft } from './macro';
+import { encodeLand, type Land } from './land';
 import { garageAt, garageFor, hash, houseCar, type ParkedCar } from '../render/shared/cars';
 import { placeRides, ridesFor } from './townRides';
 import { fenceRuns, townFences, type TownFence } from './gardenFences';
@@ -646,12 +647,13 @@ export const generateStats = { houseMs: 0 };
  * the middle out, each turned to face its road, with a gap or a stretch of meadow between some.
  * Nobody lives there yet (see `populate`). A kind from before places (`LEGACY_KINDS`: a tool's or
  * a test's) is its place, at its town size unless `options` say otherwise. `step`: told as each
- * part of it is done.
+ * part of it is done. `land`: laid again on a land the player shaped (`macro.ts`
+ * `generateFromSpec`'s `shaped`).
  */
-export function generateWorld(content: Content, t: Templates, kind: string, seed = (Math.random() * 2 ** 31) >>> 0, name?: string, step?: (done: WorldStep) => void, options?: Partial<WorldOptions>): NeighbourhoodDraft {
+export function generateWorld(content: Content, t: Templates, kind: string, seed = (Math.random() * 2 ** 31) >>> 0, name?: string, step?: (done: WorldStep) => void, options?: Partial<WorldOptions>, land?: Land): NeighbourhoodDraft {
   const chosen = { ...options };
   if (Object.hasOwn(LEGACY_KINDS, kind)) chosen.town ??= LEGACY_KINDS[kind].town;
-  return generateFromSpec(content, t, specOf(placeOf(kind), chosen), seed, name, step);
+  return generateFromSpec(content, t, specOf(placeOf(kind), chosen), seed, name, step, land);
 }
 
 /** Courts (lanes left with a dead end) a town keeps at most; a big world's main town, `BIG_COURTS`. */
@@ -1675,7 +1677,7 @@ type PlotKind = 'home' | 'farm' | 'public' | 'shop' | 'countryside';
  * The town file's open-world fields: its areas, every house's driveway
  * with where it meets its road and the households' cars on them (sim-core `cars.rs`: they drive
  * the roads), its typed exits (the roads out), the water, public parking, and the zones, pads and
- * areas for the renderer.
+ * areas for the renderer, and the land once the player has shaped it (`meta.land`).
  */
 function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'], cars: TownLayout['cars']) {
   const areas: TownArea[] = town.open?.areas ?? [{ name: town.name, kind: 'hamlet', x: 0, z: 0, w: town.width, d: town.depth }];
@@ -1699,6 +1701,6 @@ function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'],
     areas,
     exits,
     file: { terrain: { water: open.water }, parking: open.parking, drives: filed, cars: parked },
-    meta: { zones: open.zones, pads: open.pads, areas, ...(open.backdrop ? { backdrop: open.backdrop } : {}), ...(open.places ? { places: open.places } : {}), ...(open.centre ? { centre: open.centre } : {}), ...(open.relief ? { relief: open.relief } : {}) },
+    meta: { zones: open.zones, pads: open.pads, areas, ...(open.backdrop ? { backdrop: open.backdrop } : {}), ...(open.places ? { places: open.places } : {}), ...(open.centre ? { centre: open.centre } : {}), ...(open.relief ? { relief: open.relief } : {}), ...(open.land?.edited ? { land: encodeLand(open.land) } : {}) },
   };
 }
