@@ -200,6 +200,9 @@ describe('cover and mountains', () => {
     stroke(e2, { tool: 'range', radius: 40, strength: 1, height: 30 }, line([100, 256], [400, 256], 30));
     for (const x of [120, 200, 300, 380]) expect(ridge.h[at(ridge, x, 256)]).toBeGreaterThan(1500);
     expect(ridge.h[at(ridge, 250, 256 + 45)]).toBe(0);
+    // (The editor strokes along a list of points in one go.)
+    expect(e2.stroke({ tool: 'raise', radius: 10, strength: 1 }, [[50, 50], [60, 50], [70, 50]])).not.toBeNull();
+    expect(e2.stroke({ tool: 'raise', radius: 10, strength: 1 }, [])).toBeNull();
     // (A bare stroke has a ghost too.)
     const s = strokeOf({ tool: 'range', radius: 40, strength: 1 });
     stamp(ridge, s.brush, { x: 10, z: 10, dt: 0 }, s, FREE);
@@ -377,7 +380,16 @@ describe('cost', () => {
     const cells = land.cover.filter((c) => c === COVER.woods).length;
     expect(editor.cost(woods, PRICES)).toBe(Math.round(cells * 16 * 6));
 
-    const peak = stroke(editor, { tool: 'peak', radius: 60, strength: 1, height: 40 }, [[128, 128]])!;
+    // While a stroke is under way, what it has cost so far; a peak, what its ghost would.
+    editor.begin({ tool: 'woods', radius: 10, strength: 1 }, 40, 200);
+    editor.move(60, 200, 0.1);
+    const sofar = editor.running(PRICES);
+    expect(sofar).toBeGreaterThan(0);
+    expect(editor.cost(editor.end()!, PRICES)).toBe(sofar);
+    editor.begin({ tool: 'peak', radius: 60, strength: 1, height: 40 }, 128, 128);
+    const ghost = editor.running(PRICES);
+    const peak = editor.end()!;
+    expect(Math.abs(editor.cost(peak, PRICES) - ghost)).toBeLessThanOrEqual(2);
     expect(editor.cost(peak, PRICES)).toBeGreaterThan(0);
     expect(editor.cost(peak, PRICES)).toBeLessThan(editor.cost(raised, PRICES));
   });

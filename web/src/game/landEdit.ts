@@ -12,7 +12,7 @@
 import type { NeighbourhoodDraft, Rect } from './town';
 import type { Rle, RoadPlan, WorldStructure, WorldZone } from '../core/protocol';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, SEA_CM, type Land, type LandPatch, type LandRect } from './land';
-import { coverCells, coverSamples, mountainGhost, placeMountain, stamp, strokeOf, TOOL_KIND, unionRect, type Brush, type Free, type LandTool, type MountainGhost, type StrokeState, type Wettable } from './landBrush';
+import { coverCells, coverSamples, mountainGhost, mountainOf, placeMountain, stamp, strokeOf, TOOL_KIND, unionRect, type Brush, type Free, type LandTool, type MountainGhost, type StrokeState, type Wettable } from './landBrush';
 import { outlines, rle, unrle } from './landMasks';
 import { deckTiles } from './macro';
 import { smoothstep } from './noise';
@@ -319,7 +319,7 @@ export class LandEditor {
   readonly generated: { water?: Rle; zones?: readonly WorldZone[] };
   /** The bridge decks' tiles (the water under them stays dry to walk on), made when first asked for. */
   private decks: Set<number> | null = null;
-  private stroke: StrokeState | null = null;
+  private active: StrokeState | null = null;
   /** Where the stroke last stamped, and the seconds since. */
   private last: [number, number] = [0, 0];
   private pending = 0;
@@ -355,7 +355,7 @@ export class LandEditor {
 
   /** The stroke under way, or null. */
   get current(): StrokeState | null {
-    return this.stroke;
+    return this.active;
   }
 
   get canUndo(): boolean {
@@ -368,8 +368,8 @@ export class LandEditor {
 
   /** Starts a stroke of `brush` at world point (`x`, `z`); returns the samples it changed. */
   begin(brush: Brush, x: number, z: number): LandRect | null {
-    if (this.stroke) this.end();
-    this.stroke = strokeOf({ ...brush }, this.land, { h: this.shadow.h, wl: this.shadow.wl });
+    if (this.active) this.end();
+    this.active = strokeOf({ ...brush }, this.land, { h: this.shadow.h, wl: this.shadow.wl });
     this.hint = null;
     this.last = [x, z];
     this.pending = 0;
@@ -382,7 +382,7 @@ export class LandEditor {
    * held still, again every `HOLD_EVERY` s.
    */
   move(x: number, z: number, dt: number): LandRect | null {
-    const stroke = this.stroke;
+    const stroke = this.active;
     if (!stroke) return null;
     this.pending += Math.max(0, dt);
     const spacing = Math.max(SPACING_MIN, stroke.brush.radius / 4);
@@ -403,40 +403,68 @@ export class LandEditor {
     return out;
   }
 
+  /**
+   * A whole stroke of `brush` along `points` (world m), `dt` seconds between them: `begin` at the
+   * first, `move` to each of the rest, `end`. For tests, benches and the `window.__land` hook.
+   */
+  stroke(brush: Brush, points: readonly (readonly [number, number])[], dt = 1 / 60): LandPatch | null {
+    if (!points.length) return null;
+    this.begin(brush, points[0][0], points[0][1]);
+    for (let k = 1; k < points.length; k++) this.move(points[k][0], points[k][1], dt);
+    return this.end();
+  }
+
+  /**
+   * What the stroke under way has cost so far at `prices` (0 if none), to show at the cursor and
+   * to stop a stroke at the household's funds; a `peak` or `range` what its ghost would cost.
+   */
+  running(prices: LandPrices): number {
+    const stroke = this.active;
+    if (!stroke) return 0;
+    const tool = stroke.brush.tool;
+    if (tool === 'peak' || tool === 'range') {
+      const m = mountainOf(stroke);
+      if (!m) return 0;
+      const [x0, z0, x1, z1] = m.bounds;
+      let moved = 0;
+      for (let j = Math.max(0, Math.ceil(z0 / LAND_CELL)); j < Math.min(this.land.rows, Math.floor(z1 / LAND_CELL) + 1); j++) {
+        for (let i = Math.max(0, Math.ceil(x0 / LAND_CELL)); i < Math.min(this.land.cols, Math.floor(x1 / LAND_CELL) + 1); i++) {
+          const fr = this.free(i, j);
+          if (fr > 0) moved += m.lift(i * LAND_CELL, j * LAND_CELL) * fr;
+        }
+      }
+      return Math.round(moved * LAND_CELL * LAND_CELL * prices.mountain);
+    }
+    const patch = this.patchOf(stroke);
+    if (!patch) return 0;
+    this.kept.set(patch, { tool, refund: false });
+    return this.cost(patch, prices);
+  }
+
   /** The ghost of the mountain a `peak` or `range` stroke under way would raise on release, every `step` m (null: none). */
   ghost(step = 4): MountainGhost | null {
-    const tool = this.stroke?.brush.tool;
-    return tool === 'peak' || tool === 'range' ? mountainGhost(this.stroke!, step) : null;
+    const tool = this.active?.brush.tool;
+    return tool === 'peak' || tool === 'range' ? mountainGhost(this.active!, step) : null;
   }
 
   /** Ends the stroke: what it changed held before it (pushed on the undo stack), or null if it changed nothing. */
   end(): LandPatch | null {
-    const stroke = this.stroke;
+    const stroke = this.active;
     if (!stroke) return null;
-    this.stroke = null;
+    this.active = null;
     const tool = stroke.brush.tool;
     if (tool === 'peak' || tool === 'range') placeMountain(this.land, stroke, this.free, this.wettable);
     this.hint = stroke.stopped ?? stroke.hint ?? null;
-    const rect = stroke.touched;
-    if (!rect) return null;
-    const { cols } = this.land;
-    const patch: LandPatch = { rect };
-    if (TOOL_KIND[tool] === 'cover') {
-      const cells = coverCells(this.land, rect);
-      patch.cover = { rect: cells, data: cut(this.shadow.cover, coverSpan(cols), cells) };
-    } else {
-      patch.h = cut(this.shadow.h, cols, rect);
-      patch.wl = cut(this.shadow.wl, cols, rect);
-    }
-    if (!this.differ(patch)) return null;
-    this.sync(rect, patch.cover?.rect);
+    const patch = this.patchOf(stroke);
+    if (!patch || !this.differ(patch)) return null;
+    this.sync(patch.rect, patch.cover?.rect);
     this.push(patch, tool);
     return patch;
   }
 
   /** Takes back the last stroke; returns the patch that redoes it (its rectangle is what changed), or null if there is none. */
   undo(): LandPatch | null {
-    if (this.stroke) this.end();
+    if (this.active) this.end();
     const patch = this.undone.pop();
     if (!patch) return null;
     this.swap(patch);
@@ -448,7 +476,7 @@ export class LandEditor {
 
   /** Puts back the last stroke taken back; returns the patch that undoes it again, or null if there is none. */
   redo(): LandPatch | null {
-    if (this.stroke) this.end();
+    if (this.active) this.end();
     const patch = this.redone.pop();
     if (!patch) return null;
     this.swap(patch);
@@ -464,7 +492,7 @@ export class LandEditor {
    * a reset never pays back more than the strokes cost.
    */
   reset(): LandRect | null {
-    if (this.stroke) this.end();
+    if (this.active) this.end();
     const { cols, rows } = this.land;
     const [cw, cd] = [coverSpan(cols), coverSpan(rows)];
     const cells = differs(this.land.cover, this.original.cover, cw, cd);
@@ -601,8 +629,20 @@ export class LandEditor {
 
   // ---- The stacks ----------------------------------------------------------------------------
 
+  /** What `stroke` has touched as it was before it (cut from the copy of the land before the stroke), or null if it touched nothing. */
+  private patchOf(stroke: StrokeState): LandPatch | null {
+    const rect = stroke.touched;
+    if (!rect) return null;
+    const { cols } = this.land;
+    if (TOOL_KIND[stroke.brush.tool] === 'cover') {
+      const cells = coverCells(this.land, rect);
+      return { rect, cover: { rect: cells, data: cut(this.shadow.cover, coverSpan(cols), cells) } };
+    }
+    return { rect, h: cut(this.shadow.h, cols, rect), wl: cut(this.shadow.wl, cols, rect) };
+  }
+
   private stampAt(x: number, z: number, dt: number): LandRect | null {
-    const stroke = this.stroke!;
+    const stroke = this.active!;
     return stamp(this.land, stroke.brush, { x, z, dt }, stroke, this.free, this.wettable);
   }
 
