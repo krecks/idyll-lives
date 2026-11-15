@@ -1,11 +1,14 @@
 #!/usr/bin/env bun
 /**
  * Takes the main menu's picture shipped with the game (`web/public/menu/still.jpg`, what a first visit's
- * menu shows: `game/menuStill.ts` `FIRST_STILL`): a world made as step 1 makes one (`--world`, `--seed`),
+ * menu shows: `game/menuStill.ts` `FIRST_STILL`): a world made as step 1 makes one (`--world`, `--options`, `--seed`),
  * built behind the menu and taken as the menu takes its own (`menuScene.keepStill`: the menu's shot, at
  * golden hour), once every model and texture has come. Prints the town's name: `FIRST_STILL.name` is it.
  *
- *   bun tools/bench/menu-still.mjs [--world medium] [--seed 2098028765] [--width 1920 --height 1080] [--port 5223]
+ *   bun tools/bench/menu-still.mjs [--world country] [--options town=city,villages=many] [--seed 2098028765] [--width 1920 --height 1080] [--port 5223]
+ *
+ * `--world`: a place (default the countryside, as a new player's step 1 makes it), `--options` the
+ * player's options (the place's own where not given; `worldFlags.mjs`).
  *
  * Starts its own Vite on `--port` (or uses `--url`). Needs Playwright like render.mjs (`PLAYWRIGHT`), and
  * runs headless on the real GPU like it (`--headed` for a window).
@@ -17,6 +20,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { quiet } from './quiet.mjs';
+import { worldFlags } from './worldFlags.mjs';
 
 const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
 const args = process.argv.slice(2);
@@ -24,7 +28,7 @@ const flag = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 && args[i + 1] !== undefined ? args[i + 1] : fallback;
 };
-const world = flag('world', 'medium');
+const { world, options } = worldFlags(flag);
 const seed = Number(flag('seed', '2098028765'));
 const width = Number(flag('width', '1920'));
 const height = Number(flag('height', '1080'));
@@ -59,11 +63,11 @@ try {
   await page.waitForTimeout(3000);
   await page.waitForFunction(() => !document.querySelector('.stream'), null, { timeout: 300_000, polling: 1000 }).catch(() => console.warn('menu-still: the game data still streams; taken anyway'));
   const taken = await page.evaluate(
-    async ({ kind, seed }) => {
+    async ({ kind, seed, options }) => {
       const { menuScene } = await import('/src/game/menuScene.ts');
       const { townJob, keepHouses } = await import('/src/game/townJobs.ts');
       const { services } = await import('/src/ui/services.ts');
-      const made = await townJob(services.content, { kind: 'world', world: kind, seed });
+      const made = await townJob(services.content, { kind: 'world', world: kind, seed, options });
       keepHouses(made);
       menuScene.prepare(made.draft, made.preview);
       menuScene.shoot({ kind: 'menu' }, 0);
@@ -77,7 +81,7 @@ try {
       for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
       return { name: still.name, data: btoa(binary) };
     },
-    { kind: world, seed },
+    { kind: world, seed, options },
   );
   const dir = join(WEB, 'public/menu');
   mkdirSync(dir, { recursive: true });
