@@ -87,7 +87,21 @@ export type Command =
   | { type: 'dismissSuggestion'; sim: number; index: number }
   /** Yes or no to what a resident asked to buy (a yes buys and places it). */
   | { type: 'acceptPurchase'; sim: number }
-  | { type: 'declinePurchase'; sim: number };
+  | { type: 'declinePurchase'; sim: number }
+  /**
+   * The land shaped (Build mode's Land tab): `cost` charged to the household (Living; free in
+   * Creative; negative: a refund, an undone stroke). `meta.land` merges into the world's
+   * `meta.land` tile by tile (`h` and `wl` by tile index, the rest replaced); `meta.zones`, when
+   * given, replaces the world's. `water`: the world's whole water mask (1 m tiles, `Rle`), when
+   * the stroke changed the water. Not a home edit: the land's own undo sends the reverse.
+   */
+  | { type: 'shapeLand'; household: number; cost: number; meta: ShapeLandMeta; water?: Rle };
+
+/** What a `shapeLand` command changes in the world's `meta`: the land's touched tiles, and the zones derived from it. */
+export interface ShapeLandMeta {
+  land?: Partial<Omit<LandFile, 'h' | 'wl'>> & { h?: Record<number, string>; wl?: Record<number, string> };
+  zones?: WorldZone[];
+}
 
 /** A routine block: an activity (content `activities` id) on weekdays (bit 0 = Monday) from `start` (minute of the day) for `minutes`. */
 export interface RoutineIn {
@@ -504,6 +518,35 @@ export interface WorldMeta {
    * Missing in older saves: the land is drawn from the landscape alone.
    */
   relief?: { cell: number; cols: number; rows: number; h: number[] };
+  /**
+   * The land as a height field (`game/land.ts`), once there is one: shaped by the player, or
+   * surveyed for a new world. Missing: the land is drawn from `relief` and the landscape.
+   */
+  land?: LandFile;
+}
+
+/**
+ * The land as the town file and saves carry it (`game/land.ts` `encodeLand`): heights and water
+ * levels every `cell` m over `cols` × `rows` samples from the world's corner, cut into tiles of
+ * `tile` × `tile` samples (row-major, the last row and column of tiles cut short at the edge).
+ */
+export interface LandFile {
+  v: 1;
+  cell: 2;
+  cols: number;
+  rows: number;
+  tile: 64;
+  /**
+   * The heights (cm) by tile: each the base64 of zigzag varints of every sample less the one left
+   * of it (the first of a row less 0), a run of zeros as a 0x00 then the run's length.
+   */
+  h: string[];
+  /** The water levels (cm; `NONE` where dry) by tile, coded as `h`; '' for a tile with no water. */
+  wl: string[];
+  /** The cover every 4 m (row-major), run-length `[run, value, ...]`: 0 open, 1 woods, 2 meadow, 3 fields. */
+  cover: number[];
+  /** How the field was first filled: `drawn` from the land as the renderer drew it, `follow` with the town on its slopes. */
+  seeded: 'drawn' | 'follow';
 }
 
 // pin:living-town-types begin

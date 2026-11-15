@@ -113,6 +113,7 @@ import type {
   FrameCounts,
   FrameProbe,
   GameShot,
+  LandCursor,
   LiveRenderOptions,
   LotHighlight,
   ObjectBackgroundClips,
@@ -138,6 +139,7 @@ import type {
   Shading,
   WallMode,
 } from '../types';
+import type { Land, LandRect } from '../../game/land';
 
 declare global {
   interface Window {
@@ -3045,6 +3047,28 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   onTownFrame(fn: (() => void) | null): void {
     this.townListener = fn;
+  }
+
+  // The land as a height field (stage B2 builds these; until then null is let through, so that
+  // clearing the land and hiding the cursor already work).
+  landOf(): Promise<Land> {
+    return Promise.reject(new Error('not built yet'));
+  }
+
+  setLand(land: Land | null): void {
+    if (land) throw new Error('not built yet');
+  }
+
+  landChanged(_rect: LandRect, _done: boolean): void {
+    throw new Error('not built yet');
+  }
+
+  pickLand(_x: number, _y: number): { x: number; y: number; z: number } | null {
+    throw new Error('not built yet');
+  }
+
+  setLandBrush(cursor: LandCursor | null): void {
+    if (cursor) throw new Error('not built yet');
   }
 
   /** The menus' town comes on screen: the overview's camera from where the game's is (whose pose the orbit keeps), its layer, its light. */
