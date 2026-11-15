@@ -610,7 +610,7 @@ for (const { kind, seed, options } of runs) {
   const assemble = performance.now() - t0;
   const file = JSON.parse(text);
   [slowest[0], slowest[1], slowest[2]] = [Math.max(slowest[0], layout), Math.max(slowest[1], houses), Math.max(slowest[2], assemble)];
-  for (const p of [...layoutProblems(file, expect, false), ...livingProblems(file, content.careerCategories.map((c) => c.id), expect), ...(world.diagnostics?.roads ?? [])]) problems.push(`${tag}: ${p}`);
+  for (const p of [...layoutProblems(file, expect, kind === 'river'), ...livingProblems(file, content.careerCategories.map((c) => c.id), expect), ...(world.diagnostics?.roads ?? [])]) problems.push(`${tag}: ${p}`);
   // (A terrace lot's house is a generated terraced house, its lot cut to it: a fixed layout is wider than the lot.)
   for (const s of town.slots) if (s.lot === 'terrace' && houseTemplate(templates, s.template)?.class !== 'terraced house') problems.push(`${tag}: terrace lot ${s.index} has a ${s.template}`);
   if (text.length > MAX_FILE) problems.push(`${tag}: the town file is ${(text.length / 1e6).toFixed(1)} MB`);

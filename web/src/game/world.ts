@@ -1131,7 +1131,7 @@ export function expectations(kind: WorldKind, options: Partial<WorldOptions> = {
     homes: { hamlet: 14, village: 40, town: 110, city: 150 }[o.town] + { none: 0, few: 25, many: 70 }[v],
     mainLeast: SIZES[o.town].mainLeast,
     careers: o.town === 'town' || o.town === 'city',
-    exits: null,
+    exits: kind === 'island' ? specOf(kind, o).exits : null,
   };
 }
 

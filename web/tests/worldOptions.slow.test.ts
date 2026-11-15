@@ -2,8 +2,9 @@
 // place, seed and options make the same world twice; each option changes it, the way it says (the
 // main town's size, how many villages, how high the land stands, how much of it is wooded) while
 // the world keeps its name and its look; the options are kept with it, in the draft and the town
-// file; the land's relief comes with it; and the kinds from before places (small, medium, dense)
-// are the countryside at their town sizes.
+// file; the land's relief comes with it; a river's bridges and an island's causeways span their
+// water, their decks dry to walk on; and the kinds from before places (small, medium, dense) are
+// the countryside at their town sizes.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -28,6 +29,9 @@ describe('world options', async () => {
   const { randomHousehold } = await import('../src/game/household');
   const { assembleTown, generateWorld, populate, useTownContent, vacantSlots } = await import('../src/game/town');
   const { defaultsOf, expectations, placeOf, specOf } = await import('../src/game/world');
+  const macro = await import('../src/game/macro');
+  const { inside, lengths } = await import('../src/game/roads');
+  const lengthOf = (r: { points: [number, number][] }) => lengths(r.points).at(-1)!;
   type Templates = import('../src/game/town').Templates;
   type WorldOptions = import('../src/game/world').WorldOptions;
   type Draft = import('../src/game/town').NeighbourhoodDraft;
@@ -129,6 +133,33 @@ describe('world options', async () => {
     expect(JSON.stringify(legacy)).toBe(JSON.stringify(generateWorld(content, t, 'country', 77, undefined, undefined, { town: 'village' })));
     expect(legacy.world!.kind).toBe('country');
   }, 60_000);
+
+  test("a river's bridge spans it, its deck dry to walk on; an island's causeways are its ways out", () => {
+    const { unrle } = macro;
+    for (const [kind, options, crossings] of [['river', { town: 'village' }, 1], ['island', { town: 'village' }, 1], ['island', { town: 'town' }, 2]] as const) {
+      const d = world(options, kind, 31);
+      const bridges = d.roads.filter((r) => r.bridge);
+      expect(bridges.length).toBe(crossings);
+      const walk = unrle(d.open!.water, d.width * d.depth);
+      const sea = d.open!.zones.filter((z) => z.kind === 'water');
+      for (const r of bridges) {
+        const [s0, s1] = r.bridge!;
+        expect(s1 - s0).toBeGreaterThan(4);
+        expect(s1 - s0).toBeLessThanOrEqual(kind === 'island' ? 140 : 45);
+        expect(r.ends.includes('out')).toBe(kind === 'island');
+        // Over the water (a zone), but its deck and verges not in the water the sim walks round.
+        const mid = r.points[Math.round(r.points.length * ((s0 + s1) / 2 / lengthOf(r)))] ?? r.points[0];
+        expect(sea.some((z) => inside(z.poly, mid[0], mid[1]))).toBe(true);
+        for (const p of r.points) expect(walk[Math.min(d.depth - 1, Math.floor(p[1])) * d.width + Math.min(d.width - 1, Math.floor(p[0]))]).toBe(0);
+      }
+      if (kind === 'island') {
+        // The sea reaches every edge of the world; the causeways leave it, one per way out.
+        const corners = [[2, 2], [d.width - 2, 2], [d.width - 2, d.depth - 2], [2, d.depth - 2]];
+        for (const [x, z] of corners) expect(sea.some((zone) => inside(zone.poly, x, z))).toBe(true);
+        expect(d.roads.filter((r) => r.ends.includes('out')).length).toBe(crossings);
+      }
+    }
+  }, 120_000);
 
   test('what a world is expected to have follows its options', () => {
     const small = expectations('country', { town: 'hamlet', villages: 'none', woods: 'wooded' });
