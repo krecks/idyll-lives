@@ -29,6 +29,13 @@
  * And the living town's backdrop, centre and places (`livingProblems`).
  * Each world's line counts its terraced houses, backdrop buildings and places.
  *
+ * A place's land (`meta.land`, its town graded into it: `landFollow.ts` `withLand`, timed against
+ * `LAND_BUDGET`), checked on the surface the renderer works out from the town file
+ * (`builtSurface.ts`): no road steeper than its kind's `GRADE` by more than 1 %, no road or lot cut
+ * into the land as it was seeded or standing over it by more than `CUT_MAX`, no lot's edge over
+ * the land beside it by more than `RETAIN_MAX`, every bridge's deck `BRIDGE_CLEAR` over its water.
+ * A table of each world's steepest ways, tallest edges and deepest cuts follows the worlds.
+ *
  * Every place at its own options (`perKind` worlds each), and one world each of `EXTREMES`, the
  * options at their furthest (`--no-extremes`: not those). `--options town=city,villages=many`:
  * every place with those options instead.
@@ -71,6 +78,12 @@ const { COURT, lengths, nearest, pointAt, roadMask, sharpestTurn, sideBySide } =
 const { mulberry32 } = await import('../../web/src/game/noise.ts');
 const { centreDensity, facesRoad, fillPoly, HAMLET_LEAST, LOT_CLEAR, overlaps, signedArea2 } = await import('../../web/src/game/backdrop.ts');
 const { RoadIndex, inside } = await import('../../web/src/game/roads.ts');
+const { previewWorld } = await import('../../web/src/game/townPreview.ts');
+const { withLand } = await import('../../web/src/game/landFollow.ts');
+const { decodeLand, heightAt, LAND_CELL, NONE } = await import('../../web/src/game/land.ts');
+const { BRIDGE_CLEAR, builtSurfaceOf, CUT_MAX, GRADE, RETAIN_MAX, surfacePlots } = await import('../../web/src/render/shared/builtSurface.ts');
+type Land = import('../../web/src/game/land.ts').Land;
+type LandFile = import('../../web/src/core/protocol.ts').LandFile;
 
 type Rect = { x: number; z: number; w: number; d: number };
 type Pt = [number, number];
@@ -89,6 +102,9 @@ type TownFile = {
   terrain?: { water?: number[] };
   meta: {
     roads?: Road[];
+    paths?: Rect[];
+    land?: LandFile;
+    world?: { landscape?: { slope?: number } };
     facing?: number[];
     zones?: { kind: string; poly: Pt[] }[];
     greens?: Pt[][];
@@ -108,6 +124,8 @@ const offRect = (r: Rect, x: number, z: number) => Math.hypot(Math.max(r.x - x, 
 const LAYOUT_BUDGET = 1500;
 const ASSEMBLE_BUDGET = 1500;
 const MAX_FILE = 4e6;
+/** A place's land seeded and its town graded into it (`withLand`), ms: about twice the slowest world measured (2026-11-16, M3 Pro). */
+const LAND_BUDGET = 450;
 
 /** A square holds something if this much of it does (m²). */
 const HOLDS = 200;
@@ -184,6 +202,110 @@ function measureFill(town: TownFile, meadow: boolean): { built: number; empty: n
     }
   }
   return { built: filled / Math.max(1, land), empty: empty / squares };
+}
+
+/** A world's land as its town file and the renderer have it: the steepest of each kind of way (rise per m), the tallest lot edges (m: over the land beside, another lot, a road), the deepest cuts and fills (m: roads, lots), the least a bridge clears its water by (m), how far the land stored is from the surface worked out from it (m). */
+interface Slopes {
+  grade: Record<string, number>;
+  retain: { land: number; lot: number; road: number };
+  cut: { road: number; lot: number };
+  clear: number;
+  drift: number;
+}
+
+/**
+ * The land checks (see the top of this file) on the surface the renderer works out from a town file
+ * (`builtSurfaceOf` on its `meta.land`), against `seeded`, the land before the town was graded in.
+ */
+function slopeChecks(town: TownFile, seeded: Land): { problems: string[]; slopes: Slopes } {
+  const out: string[] = [];
+  const land = decodeLand(town.meta.land!);
+  const surface = builtSurfaceOf(town, land);
+  const roads = town.meta.roads ?? [];
+  const slopes: Slopes = { grade: {}, retain: { land: 0, lot: 0, road: 0 }, cut: { road: 0, lot: 0 }, clear: Infinity, drift: 0 };
+  const wetAt = (l: Land, k: number) => l.wl[k] !== NONE && l.wl[k] > l.h[k];
+  roads.forEach((r, i) => {
+    const kind = (r.kind ?? 'street') as keyof typeof GRADE;
+    const { s, y } = surface.profile(i);
+    let steepest = 0;
+    for (let k = 0; k + 1 < s.length; k++) if (s[k + 1] - s[k] > 0.5) steepest = Math.max(steepest, Math.abs(y[k + 1] - y[k]) / (s[k + 1] - s[k]));
+    slopes.grade[kind] = Math.max(slopes.grade[kind] ?? 0, steepest);
+    if (steepest > GRADE[kind] + 0.01) out.push(`${kind} ${r.name ?? i} climbs ${(steepest * 100).toFixed(1)} % (at most ${GRADE[kind] * 100} %)`);
+    // Cut and fill along its middle (not over a bridge's deck); a bridge's clearance.
+    const span = r.bridge && r.bridge[1] > r.bridge[0] ? r.bridge : null;
+    const pts = r.points;
+    const ls = lengths(pts);
+    let clear = Infinity;
+    for (let k = 0; k < s.length; k++) {
+      const { p } = pointAt(pts, s[k], ls);
+      const [i0, j0] = [Math.round(p[0] / LAND_CELL), Math.round(p[1] / LAND_CELL)];
+      const at = Math.min(seeded.rows - 1, Math.max(0, j0)) * seeded.cols + Math.min(seeded.cols - 1, Math.max(0, i0));
+      if (span && s[k] >= span[0] && s[k] <= span[1]) {
+        if (wetAt(land, at)) clear = Math.min(clear, y[k] - land.wl[at] / 100);
+        continue;
+      }
+      if (wetAt(seeded, at)) continue;
+      slopes.cut.road = Math.max(slopes.cut.road, Math.abs(y[k] - heightAt(seeded, p[0], p[1])));
+    }
+    if (span) {
+      slopes.clear = Math.min(slopes.clear, clear);
+      if (clear < BRIDGE_CLEAR - 0.01) out.push(`the bridge on ${r.name ?? i} clears its water by ${clear.toFixed(2)} m (at least ${BRIDGE_CLEAR})`);
+    }
+  });
+  if (slopes.cut.road > CUT_MAX) out.push(`a road is cut ${slopes.cut.road.toFixed(1)} m into the land or stands over it (at most ${CUT_MAX})`);
+  // The lots: cut and fill under each pad, and its edges.
+  const index = new RoadIndex(roads);
+  /** Whether (x, z) is on a pad but `skip`'s (a lot's or a backdrop building's), or within `by` m of one. */
+  const pads = surfacePlots(town);
+  const inLot = (x: number, z: number, skip: number, by = 0) => pads.some((q, n) => n !== skip && x >= q.x - by && x <= q.x + q.w + by && z >= q.z - by && z <= q.z + q.d + by);
+  let deepest = '';
+  town.plots.forEach((p, n) => {
+    const pad = surface.padY(n);
+    for (let j = Math.ceil(p.z / LAND_CELL); j <= Math.floor((p.z + p.d) / LAND_CELL); j++) {
+      for (let i = Math.ceil(p.x / LAND_CELL); i <= Math.floor((p.x + p.w) / LAND_CELL); i++) {
+        if (i >= seeded.cols || j >= seeded.rows) continue;
+        const cut = Math.abs(pad - seeded.h[j * seeded.cols + i] / 100);
+        if (cut <= slopes.cut.lot) continue;
+        slopes.cut.lot = cut;
+        deepest = `${p.kind ?? 'lot'} ${n}, ${p.w}×${p.d} m`;
+      }
+    }
+    const edge = (x: number, z: number) => {
+      const [gx, gz] = [Math.max(0, Math.min(town.width - 0.01, x)), Math.max(0, Math.min(town.depth - 0.01, z))];
+      if (gx !== x || gz !== z) return;
+      const step = Math.abs(surface.at(x, z) - pad);
+      // (Land narrower than the land's grain between two pads is the other pad's edge, a lot's or a backdrop
+      // building's; between a pad and a road, the road's: a verge.)
+      if (inLot(x, z, n, LAND_CELL)) slopes.retain.lot = Math.max(slopes.retain.lot, step);
+      else if (index.onRoad(x, z, LAND_CELL)) slopes.retain.road = Math.max(slopes.retain.road, step);
+      else slopes.retain.land = Math.max(slopes.retain.land, step);
+    };
+    for (let t = 0.5; t < p.w; t += 1) {
+      edge(p.x + t, p.z - 0.3);
+      edge(p.x + t, p.z + p.d + 0.3);
+    }
+    for (let t = 0.5; t < p.d; t += 1) {
+      edge(p.x - 0.3, p.z + t);
+      edge(p.x + p.w + 0.3, p.z + t);
+    }
+  });
+  if (slopes.cut.lot > CUT_MAX) out.push(`a lot (${deepest}) is cut ${slopes.cut.lot.toFixed(1)} m into the land or stands over it (at most ${CUT_MAX})`);
+  if (slopes.retain.land > RETAIN_MAX + 0.01) out.push(`a lot's edge stands ${slopes.retain.land.toFixed(2)} m over the land beside it (at most ${RETAIN_MAX})`);
+  // The land stored against the surface worked out from it, off what is built.
+  const lot = new Uint8Array(land.h.length);
+  for (const p of town.plots) {
+    for (let j = Math.ceil(p.z / LAND_CELL); j <= Math.min(land.rows - 1, Math.floor((p.z + p.d) / LAND_CELL)); j++) {
+      for (let i = Math.ceil(p.x / LAND_CELL); i <= Math.min(land.cols - 1, Math.floor((p.x + p.w) / LAND_CELL)); i++) lot[j * land.cols + i] = 1;
+    }
+  }
+  for (let k = 0; k < land.h.length; k++) {
+    if (wetAt(land, k)) continue;
+    const [x, z] = [(k % land.cols) * LAND_CELL, Math.floor(k / land.cols) * LAND_CELL];
+    const on = lot[k] ? null : surface.roadAt(x, z);
+    if (on && roads[on.road].bridge && on.s >= roads[on.road].bridge![0] && on.s <= roads[on.road].bridge![1]) continue;
+    slopes.drift = Math.max(slopes.drift, Math.abs((lot[k] || on ? surface.at(x, z) : surface.conformed[k]) - land.h[k] / 100));
+  }
+  return { problems: out, slopes };
 }
 
 /** What's wrong with how a town's roads join up, its areas, water, bridges, trails and names (the open-world checks), and how filled it is (`expect`). */
@@ -585,6 +707,8 @@ const SENIOR = 5;
 const forSale: Record<string, number> = {};
 /** Worlds, courts in all and the most in one world. */
 const courtsOf: [number, number, number] = [0, 0, 0];
+/** Each world's land: its slopes (`slopeChecks`), how long it took to grade (ms), its size in the file (KB). */
+const landTable: { tag: string; slopes: Slopes; ms: number; kb: number }[] = [];
 /** The worlds to make: each place `perKind` times at its own options (or `--options`), then the extremes. */
 const runs: { kind: (typeof WORLD_KINDS)[number]; seed: number; options?: Partial<WorldOptions> }[] = [
   ...WORLD_KINDS.filter((k) => kinds.includes(k)).flatMap((kind) => Array.from({ length: perKind }, (_, i) => ({ kind, seed: (i + 1) * 104729 + kind.length + seedBase * SEED_STEP, ...(forced ? { options: forced } : {}) }))),
@@ -599,9 +723,15 @@ for (const { kind, seed, options } of runs) {
   Math.random = mulberry32(seed);
   generateStats.houseMs = 0;
   let t0 = performance.now();
-  const world = generateWorld(content, templates, kind, seed, undefined, undefined, options);
+  const laid = generateWorld(content, templates, kind, seed, undefined, undefined, options);
   const houses = generateStats.houseMs;
   const layout = performance.now() - t0 - houses;
+  // The land graded under the town, as the town job does it (from the preview of the world).
+  const preview = previewWorld(content, templates, laid, null);
+  let seeded: Land | null = null;
+  t0 = performance.now();
+  const world = withLand(laid, preview, (l) => (seeded = l));
+  const landMs = performance.now() - t0;
   const town = populate(content, assets, templates, world);
   const home = vacantSlots(town)[0];
   if (!home) throw new Error(`${tag}: no empty house`);
@@ -617,6 +747,13 @@ for (const { kind, seed, options } of runs) {
   if (text.length > MAX_FILE) problems.push(`${tag}: the town file is ${(text.length / 1e6).toFixed(1)} MB`);
   if (timing && layout > LAYOUT_BUDGET * 2) problems.push(`${tag}: laid out in ${layout.toFixed(0)} ms (budget ${LAYOUT_BUDGET})`);
   if (timing && assemble > ASSEMBLE_BUDGET * 2) problems.push(`${tag}: assembled in ${assemble.toFixed(0)} ms (budget ${ASSEMBLE_BUDGET})`);
+  if (timing && seeded && landMs > LAND_BUDGET * 2) problems.push(`${tag}: its land graded in ${landMs.toFixed(0)} ms (budget ${LAND_BUDGET})`);
+  if (!file.meta.land) problems.push(`${tag}: it carries no land`);
+  if (seeded && file.meta.land) {
+    const { problems: found, slopes } = slopeChecks(file, seeded);
+    for (const p of found) problems.push(`${tag}: ${p}`);
+    landTable.push({ tag, slopes, ms: landMs, kb: JSON.stringify(file.meta.land).length / 1000 });
+  }
   for (const { household, slot } of town.households) {
     const s = town.slots[slot];
     const price = homePrice(content, templates, s);
@@ -665,6 +802,17 @@ for (const cls of [...HOUSE_CLASSES, ...Object.keys(owned).filter((c) => !HOUSE_
   console.log(
     `  ${cls.padEnd(13)} ${String(n).padStart(3)} lived in, ${String(forSale[cls] ?? 0).padStart(3)} for sale: age ${mean(o?.age ?? 0)}, grade ${mean(o?.level ?? 0)}, ${n ? Math.round((100 * o!.settled) / n) : '-'}% settled, price ${dollars(o?.price ?? 0)}, saved ${dollars(o?.savings ?? 0)}`,
   );
+}
+if (landTable.length) {
+  const pc = (v: number | undefined) => (v === undefined ? '    -' : `${(v * 100).toFixed(1).padStart(5)}`);
+  const m = (v: number) => v.toFixed(2).padStart(5);
+  console.log('Land (grades %: street, lane, country, trail; lot edges m: over the land, another lot, a road; cuts m: roads, lots; bridge clearance m; drift m; ms; KB):');
+  for (const { tag, slopes: s, ms, kb } of landTable) {
+    console.log(
+      `  ${tag.padEnd(58)} ${pc(s.grade.street)} ${pc(s.grade.lane)} ${pc(s.grade.country)} ${pc(s.grade.trail)} | ${m(s.retain.land)} ${m(s.retain.lot)} ${m(s.retain.road)} | ${m(s.cut.road)} ${m(s.cut.lot)} | ${Number.isFinite(s.clear) ? m(s.clear) : '    -'} | ${m(s.drift)} | ${ms.toFixed(0).padStart(4)} ${kb.toFixed(0).padStart(4)}`,
+    );
+  }
+  console.log(`Slowest land: ${Math.max(...landTable.map((l) => l.ms)).toFixed(0)} ms (budget ${LAND_BUDGET})`);
 }
 const [n, all, most] = courtsOf;
 console.log(`Courts: ${all} in ${n} worlds (${(all / n).toFixed(1)} a world, ${most} at most)`);
