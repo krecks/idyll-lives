@@ -2,6 +2,10 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## 0.8.2 — 2026-11-15
+
+- **Shadows where they belong on WebGPU:** since 0.8.1 the sun's shadows of everything that stands still (houses, trees, fences) came out mirrored on WebGPU, lying across the lawn away from what cast them, while the residents' were right. The kept picture of the still casters was drawn the other way up from the sun's map and copied in so; it is drawn the same way up now. WebGL2 was not affected.
+
 ## 0.8.1 — 2026-11-15
 
 - **A game holds less memory:** the town behind the menus (the whole neighbourhood, its streets, gardens and land) stayed built through every game, for the next visit to the menu, and took about 800 MB of the page's memory, 230 MB of buffers and 130 MB of graphics memory, more than the game's own world. It is let go a second after the game comes on screen now: a game of the village holds 189 MB instead of 999, a Big world's 882 instead of 1,738, and a game continued from the menu 1.2 GB instead of 2.0 (dev server). Leaving a game you continued or loaded now shows the menu's painted backdrop for about three seconds while its town is built again, as leaving a new game always has; starting, continuing and moving in are as fast as before.
