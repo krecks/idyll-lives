@@ -79,6 +79,7 @@ import { townView } from '../shared/townView';
 import { landscapeRing } from '../shared/nature';
 import { setFogFrom } from './shaders/fog';
 import { LT_FIXTURE } from '../../debug/livingTown';
+import { applyLandFixture, LAND_FIXTURE } from '../landFixture';
 import { backdropBuilding, backdropGround, gardenHedges, lotBuilding, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
 import { TownGroundMap } from './groundTiles';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
@@ -1615,6 +1616,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   setWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
     this.pictureChanged();
+    // (`?landFixture=…` on the dev server: a relief grid, a river with bridges or an island's sea for a Big world,
+    // until worldgen writes them.)
+    if (LAND_FIXTURE.size) applyLandFixture(world);
     // (`?ltFixture`: a Big world without a backdrop gets the debug fixture's, until worldgen writes
     // one; its code is a chunk of its own.)
     if (LT_FIXTURE) {
@@ -2965,6 +2969,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   showTown(world: WorldStructure, minute: number, onStep?: (done: TownBuildStep) => void): Promise<void> {
+    if (LAND_FIXTURE.size) applyLandFixture(world);
     const ticket = ++this.townTicket;
     this.townWorld = world;
     const run = this.townQueue.then(async () => {
