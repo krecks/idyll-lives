@@ -53,6 +53,23 @@ export function fbm(x: number, z: number, seed: number, octaves = 4, period = 0)
   return sum;
 }
 
+/** Ridged noise, 0..1: sharp crests where plain noise crosses its middle (mountain ridges). */
+export function ridged(x: number, z: number, seed: number, octaves = 5): number {
+  let sum = 0;
+  let amp = 0.5;
+  let freq = 1;
+  let weight = 1;
+  for (let i = 0; i < octaves; i++) {
+    const r = Math.pow(1 - Math.abs(valueNoise(x * freq, z * freq, seed + i * 31) * 2 - 1), 2) * weight;
+    sum += r * amp;
+    // Detail mostly on the ridges, little in the valleys.
+    weight = Math.min(1, r * 1.6);
+    amp *= 0.5;
+    freq *= 2.1;
+  }
+  return Math.min(1, sum / 0.9);
+}
+
 export const smoothstep = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);

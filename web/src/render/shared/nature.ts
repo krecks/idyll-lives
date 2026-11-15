@@ -13,7 +13,7 @@ import { DEFAULT_LANDSCAPE, groundDepth, type LandscapeParams, type WorldStructu
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
-import { fbm, hash, mulberry32, smoothstep, valueNoise } from '../../game/noise';
+import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../game/noise';
 import { tuned } from '../tune';
 import { shareAt, ZoneField } from './zones';
 
@@ -102,8 +102,8 @@ export interface PlantPlacement {
 
 // ---- Deterministic noise ------------------------------------------------------------
 
-// (The seeded generator, lattice hash, value noise, fractal noise and smooth step: the world generator's own, `game/noise.ts`, so the land it lays out and the land drawn agree.)
-export { fbm, hash, mulberry32, smoothstep, valueNoise };
+// (The seeded generator, lattice hash, value noise, fractal noise, ridged noise and smooth step: the world generator's own, `game/noise.ts`, so the land it lays out and the land drawn agree.)
+export { fbm, hash, mulberry32, ridged, smoothstep, valueNoise };
 
 /**
  * The smaller of `a` and `b` (both 0 or more), rounded off where they come within `k` of each other (a
@@ -113,23 +113,6 @@ export function smoothMin(a: number, b: number, k: number): number {
   const m = Math.min(a, b);
   const t = Math.max(k - Math.abs(a - b), 0) / k;
   return m - Math.min(t * t * k * 0.25, m * 0.5);
-}
-
-/** Ridged noise, 0..1: sharp crests where plain noise crosses its middle (mountain ridges). */
-function ridged(x: number, z: number, seed: number, octaves = 5): number {
-  let sum = 0;
-  let amp = 0.5;
-  let freq = 1;
-  let weight = 1;
-  for (let i = 0; i < octaves; i++) {
-    const r = Math.pow(1 - Math.abs(valueNoise(x * freq, z * freq, seed + i * 31) * 2 - 1), 2) * weight;
-    sum += r * amp;
-    // Detail mostly on the ridges, little in the valleys.
-    weight = Math.min(1, r * 1.6);
-    amp *= 0.5;
-    freq *= 2.1;
-  }
-  return Math.min(1, sum / 0.9);
 }
 
 // ---- Colours ------------------------------------------------------------------------
