@@ -3,7 +3,9 @@
  * Times the three waits a new player has before playing, through the menus as a player goes:
  *
  * - boot: the page opened to the main menu (the loading screen gone, its picture shown);
- * - world: "New game" to step 1's world made and built (its "Choose a household" enabled);
+ * - world: "New game" to step 1's world made and built (its "Choose a household" enabled), in the
+ *   countryside with its own options, as a new player gets it, unless `--world` and `--options` say
+ *   otherwise (the page's `?world=` and `?options=`);
  * - inView, portraits: step 2 ("Choose a household", after "New game" and step 1) opened to the
  *   portraits in view in its list shown, and to every household's (`.households .face img`);
  * - entry: "Play" on a household to the game up (its interface there, the loading screen gone).
@@ -25,6 +27,8 @@
  *     --again                  a second visit per run, in the same context
  *     --back                   the way back to the menu and in again (above)
  *     --seed 7                 the page's Math.random seed
+ *     --world country          step 1's place (a kind from before places, such as dense, is its place at its size)
+ *     --options town=city,villages=many   step 1's options (the place's own where not given)
  *     --household 0            which household's Play is pressed (its index in the list)
  *     --renderer webgpu        or webgl
  *     --headed                 in a window (default headless: the real GPU either way)
@@ -37,6 +41,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { quiet } from './quiet.mjs';
+import { worldFlags } from './worldFlags.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const WEB = join(ROOT, 'web/');
@@ -51,6 +56,9 @@ const runs = Number(flag('runs', '3'));
 const seed = Number(flag('seed', '7'));
 const pick = Number(flag('household', '0'));
 const renderer = flag('renderer', 'webgpu');
+// (None given: step 1 as a player gets it, the URL without them.)
+const made = worldFlags(flag, null);
+const worldQuery = [made.world ? `world=${made.world}` : '', made.query ? `options=${made.query}` : ''];
 const port = Number(flag('port', '5222'));
 const again = has('again');
 const back = has('back');
@@ -104,7 +112,7 @@ const browser = await chromium.launch({
   args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'],
 });
 
-const query = ['profile', renderer === 'webgl' ? 'renderer=webgl' : ''].filter(Boolean).join('&');
+const query = ['profile', renderer === 'webgl' ? 'renderer=webgl' : '', ...worldQuery].filter(Boolean).join('&');
 
 /** The page's long tasks (start and duration, ms), from its first script on. */
 function longTasks() {

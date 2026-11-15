@@ -25,6 +25,8 @@
  *     --throughput             no vsync and no frame-rate limit: frames as fast as they can be made
  *     --hud 0|1                the game's interface during the run (default 0: measure the renderer;
  *                              1 measures the interface too, which Build mode's catalog dominates)
+ *     --world <place>          `--scene bigworld`'s world: a place (default the countryside; `big=`), and
+ *     --options town=city,…    its options (the place's own where not given; `options=`)
  *     --extra 'k=v&k=v'        more URL flags for every run
  *     --out <dir>              default <repo>/bench-results/<time>/
  *   --shots <dir>              fixed poses, paused (`diag=freeze`, `hud=0`): one PNG per preset × backend × pose
@@ -67,6 +69,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { quiet } from './quiet.mjs';
+import { worldFlags } from './worldFlags.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const WEB = join(ROOT, 'web/');
@@ -263,6 +266,7 @@ function optionsOf(args) {
     warmup: Number(flag('warmup', shots ? '6' : '5')),
     runs: Number(flag('runs', '1')),
     extra: flag('extra', ''),
+    world: worldFlags(flag, null),
     throughput: has('throughput'),
     hud: flag('hud', '0'),
     headed: has('headed') || (!shots && !has('headless')),
@@ -415,7 +419,7 @@ async function open(o, query, throttle, key, timeoutMs, path = '/') {
 }
 
 const queryOf = (o, preset, backend, more, scene = o.scene) =>
-  [`bench=${scene}`, `quality=${preset}`, backend === 'webgl' ? 'renderer=webgl' : '', `res=${o.res}`, more, o.extra].filter(Boolean).join('&');
+  [`bench=${scene}`, `quality=${preset}`, backend === 'webgl' ? 'renderer=webgl' : '', `res=${o.res}`, o.world.world ? `big=${o.world.world}` : '', o.world.query ? `options=${o.world.query}` : '', more, o.extra].filter(Boolean).join('&');
 
 /** One job: a comparison, shots, page shots or a measured matrix. */
 async function run(o) {
