@@ -4,6 +4,8 @@
 // met); laid out the same on lots turned a quarter; and written into the town file as runs.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
+import type { WorldOptions } from '../src/core/protocol';
+import { CLASSIC } from './support/classicWorlds';
 
 const WEB = new URL('../', import.meta.url).pathname;
 
@@ -24,6 +26,7 @@ describe('garden fences', async () => {
   const { Content } = await import('../src/content/content');
   const { objectInfos } = await import('../src/game/housegen');
   const { generateWorld, layoutTown, useTownContent, vacantSlots } = await import('../src/game/town');
+  const { generateFromSpec } = await import('../src/game/macro');
   const { fenceRuns, townFences } = await import('../src/game/gardenFences');
   type Templates = import('../src/game/town').Templates;
   type TownFence = import('../src/game/gardenFences').TownFence;
@@ -34,14 +37,15 @@ describe('garden fences', async () => {
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
   const key = (f: { axis: string; x: number; z: number }) => `${f.axis}:${f.x}:${f.z}`;
   // (Each laid out once with nobody's lot the player's: the tests below share it.)
-  const towns = (['medium', 'dense', 'farm'] as const).map((kind) => {
-    const town = generateWorld(content, t, kind, 4242);
-    return { kind, town, layout: layoutTown(content, t, town, null) };
+  // (The countryside's town and its city, and farmland.)
+  const kinds: [string, Partial<WorldOptions>][] = [['country', {}], ['country', { town: 'city' }], ['farm', {}]];
+  const towns = kinds.map(([kind, options]) => {
+    const town = generateWorld(content, t, kind, 4242, undefined, undefined, options);
+    return { kind, label: `${kind}${options.town ? ` ${options.town}` : ''}`, town, layout: layoutTown(content, t, town, null) };
   });
 
   test('on tile edges of the ground, never on a wall, across a path or driveway, or in a doorway', () => {
-    for (const { kind, town, layout } of towns) {
-      const label = kind;
+    for (const { kind, label, town, layout } of towns) {
       expect(layout.fences.length, label).toBeGreaterThan(20);
       const walls = new Set<string>();
       for (const [x0, z0, x1, z1] of layout.walls) {
@@ -74,9 +78,9 @@ describe('garden fences', async () => {
   });
 
   test('the same whichever lot the player takes', () => {
-    for (const { kind, town, layout } of towns) {
+    for (const { label, town, layout } of towns) {
       const base = layout.fences.map(key).sort();
-      for (const slot of vacantSlots(town).slice(0, 2)) expect(layoutTown(content, t, town, slot.index).fences.map(key).sort(), `${kind} with the player at ${slot.index}`).toEqual(base);
+      for (const slot of vacantSlots(town).slice(0, 2)) expect(layoutTown(content, t, town, slot.index).fences.map(key).sort(), `${label} with the player at ${slot.index}`).toEqual(base);
     }
   });
 
@@ -132,8 +136,8 @@ describe('garden fences', async () => {
   });
 
   test('no land shut in between gardens, in a big world whose lots leave gaps between them', () => {
-    // (A big small town: its lots kept off junctions and bends left 90 tiles between four gardens.)
-    const town = generateWorld(content, t, 'small', 314192);
+    // (A classic small town: its lots kept off junctions and bends left 90 tiles between four gardens.)
+    const town = generateFromSpec(content, t, CLASSIC.small, 314192);
     const layout = layoutTown(content, t, town, null);
     const W = town.width;
     const D = town.depth;

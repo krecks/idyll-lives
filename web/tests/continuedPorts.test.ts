@@ -6,6 +6,7 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { nearest } from '../src/game/roads';
+import { CLASSIC } from './support/classicWorlds';
 
 const WEB = new URL('../', import.meta.url).pathname;
 
@@ -24,7 +25,8 @@ describe('country roads by streets meeting end to end', async () => {
   });
   const { Content } = await import('../src/content/content');
   const { objectInfos } = await import('../src/game/housegen');
-  const { generateWorld, useTownContent } = await import('../src/game/town');
+  const { useTownContent } = await import('../src/game/town');
+  const { generateFromSpec } = await import('../src/game/macro');
   type Templates = import('../src/game/town').Templates;
   const content = await Content.load('http://localhost/content/base.json');
   useTownContent(content);
@@ -34,7 +36,7 @@ describe('country roads by streets meeting end to end', async () => {
   test(
     'big dense 808114082 (Canalside): the two streets meet, and no country road leaves where they do',
     () => {
-      const town = generateWorld(content, t, 'dense', 808114082);
+      const town = generateFromSpec(content, t, CLASSIC.dense, 808114082);
       expect(town.name).toBe('Canalside');
       const streets = town.roads.filter((r) => r.kind !== 'country' && r.kind !== 'trail' && r.area !== undefined);
       // (Each pair of other areas' streets whose ends meet: no country road ends there.)

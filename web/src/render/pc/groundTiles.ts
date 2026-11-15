@@ -8,6 +8,8 @@ import * as pc from './engine';
 import { groundDepth, type RoadPlan, type WorldStructure, type WorldZone } from '../../core/protocol';
 import { carriageway, hasSidewalks } from '../shared/junctions';
 import { backdropGround } from '../shared/townBuildings';
+import { bridgeDeck } from '../shared/roads';
+import { BRIDGE } from '../shared/street';
 
 /** A ground tile as `terrainTiles` builds it: its draw, its meshes by level, where its middle is and the level drawn. */
 export interface GroundTile {
@@ -31,12 +33,11 @@ export function disposeTiles(tiles: readonly GroundTile[]): void {
 /** Texels a metre at most, and the map's side at most (2048: half a metre a texel over a Big world). */
 const MAP_PER_M = 2;
 const MAP_MAX = 2048;
-/** The map's colours (sRGB): the asphalt and pavements as the street's textures and tones come out, the centre's paving, water, soil, paths, and what the backdrop's buildings stand on. */
+/** The map's colours (sRGB): the asphalt and pavements as the street's textures and tones come out, the centre's paving, soil, paths, and what the backdrop's buildings stand on. */
 const MAP = {
   asphalt: '#55544F',
   pavement: '#C4C0B6',
   paving: '#B3A58E',
-  water: '#3E6E80',
   soil: '#6B4E37',
   furrow: '#5A412E',
   path: '#A99C86',
@@ -60,7 +61,7 @@ const FIELD_SOFT = 8;
 
 /**
  * The ground's colour map at altitude: what the town lays on its land (streets and pavements, the junctions'
- * pads, the centre's paving, its water, its farm fields and paths, a big world's farmland as its ground has it,
+ * pads, the centre's paving, its farm fields and paths, a big world's farmland as its ground has it,
  * and what the backdrop's buildings stand on: forecourts, yards, a way to the road) over the whole
  * world in one texture, baked
  * once per town (`bake`; again only for another town), and laid over the ground tiles' colour by the town
@@ -103,13 +104,8 @@ export class TownGroundMap {
       g.closePath();
     };
     const roads = meta.roads ?? [];
-    // Water (a big world's water zones: its river and ponds).
-    g.fillStyle = MAP.water;
-    for (const z of meta.zones ?? []) {
-      if (z.kind !== 'water') continue;
-      poly(z.poly);
-      g.fill();
-    }
+    // (No water: the water's sheet over the ground draws it, inside the world as past its edge. Painted here, a sea
+    // reaching past the edge stepped from one blue to another along it.)
     // The centre's paving, laid in courses (`COURSE` m apart, a joint's line each way): a square's stone, not a slab.
     for (const c of meta.centre ?? []) {
       g.fillStyle = MAP.paving;
@@ -174,6 +170,15 @@ export class TownGroundMap {
       g.stroke();
     };
     for (const r of roads) if (hasSidewalks(r)) stroke(r, r.width, MAP.pavement);
+    // A bridge's stone deck, wider than its road (`street.ts` `bridge`), under its asphalt: from up here its
+    // parapets are lost, the deck over the water isn't.
+    // (Square at its ends: the banks are where its stone stops.)
+    g.lineCap = 'butt';
+    for (const r of roads) {
+      const deck = bridgeDeck(r);
+      if (deck) stroke({ ...r, points: deck }, r.width + 2 * BRIDGE.apron, MAP.pavement);
+    }
+    g.lineCap = 'round';
     for (const r of roads) if (r.kind === 'trail') stroke(r, r.width, MAP.path);
     for (const r of roads) if (r.kind !== 'trail') stroke(r, carriageway(r), MAP.asphalt);
     // The junctions' pads: where the roads' ends meet, asphalt as wide as the widest carriageway there.

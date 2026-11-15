@@ -13,7 +13,7 @@
  */
 
 import type { RoadPlan, WorldStructure } from '../../core/protocol';
-import { rasterRoads, roadEnds, RoadIndex, roadIndex, SIDEWALK, trimJoins } from '../../game/roads';
+import { lengths, pointAt, rasterRoads, roadEnds, RoadIndex, roadIndex, SIDEWALK, trimJoins } from '../../game/roads';
 import { Geo, type MeshData, type V3 } from './geometry';
 import { hasSidewalks, JunctionCuts, junctionsOf, KERB_RETURN, offsetMeet, turnedBack, turnedOn, type CornerPlan, type JunctionPlan } from './junctions';
 import { asphaltVary, carriageway, repair, STREET_LOOK, tint } from './paving';
@@ -63,6 +63,25 @@ export function townRoadMesh(world: WorldStructure): RoadMeshData {
   const roads = townRoads(world);
   const { surface, marks } = roadMeshes(roads, null, 0, { marks: new Geo() }, 'surface', junctionsOf(world, roads), (ri) => roads[ri].width / 2 - SIDEWALK);
   return { surface: surface.meshData({ colors: true }), marks: marks && !marks.empty ? marks.meshData({ colors: true }) : null };
+}
+
+/**
+ * A bridge's or a causeway's deck (`RoadPlan.bridge`): the stretch of `road` from its span's first arc length
+ * to its last (m along it, kept within the road), as points along its middle. Null: no bridge, or one
+ * shorter than a centimetre.
+ */
+export function bridgeDeck(road: RoadPlan): [number, number][] | null {
+  if (!road.bridge || road.points.length < 2) return null;
+  const pts = road.points;
+  const ls = lengths(pts);
+  const total = ls[ls.length - 1];
+  const s0 = Math.max(0, Math.min(total, Math.min(...road.bridge)));
+  const s1 = Math.max(0, Math.min(total, Math.max(...road.bridge)));
+  if (s1 - s0 < 0.01) return null;
+  const out: [number, number][] = [pointAt(pts, s0, ls).p];
+  for (let i = 1; i < pts.length - 1; i++) if (ls[i] > s0 && ls[i] < s1) out.push([pts[i][0], pts[i][1]]);
+  out.push(pointAt(pts, s1, ls).p);
+  return out;
 }
 
 /** An older town's streets as roads, once per town. */

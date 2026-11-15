@@ -14,15 +14,15 @@
 
 import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
-import type { GameKind, LandscapeParams, Lifespan, PorchInfo, TownArea, TownExit, WorldLook, WorldMeta, WorldSize } from '../core/protocol';
+import type { GameKind, LandscapeParams, Lifespan, PorchInfo, TownArea, TownExit, WorldLook, WorldMeta, WorldOptions, WorldSize } from '../core/protocol';
 import { fetchText } from '../content/content';
 import { bedroomsNeeded, householdBonds, householdSpawns, randomHousehold, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { homePrice } from './price';
 import { crownClear, generateHouse, objectInfos, residentsKey, weighted, type GardenSize, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
 import { connect, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Box, type Pt, type RoadPlan } from './roads';
 import { householdFunds, savingsOf } from './wealth';
-import { extend, fill, WORLDS, type RoadLayout, type SizeSpec, type WorldKind, type WorldStep } from './world';
-import { generateBigWorld, type OpenWorldDraft } from './macro';
+import { extend, fill, LEGACY_KINDS, placeOf, specOf, type LotMix, type RoadLayout, type SizeSpec, type WorldStep } from './world';
+import { generateFromSpec, type OpenWorldDraft } from './macro';
 import { garageAt, garageFor, hash, houseCar, type ParkedCar } from '../render/shared/cars';
 import { placeRides, ridesFor } from './townRides';
 import { fenceRuns, townFences, type TownFence } from './gardenFences';
@@ -129,8 +129,8 @@ export interface Templates {
   windowTiles?: number;
 }
 
-/** Town sizes of drafts from older code (worlds have a `WorldKind` now). */
-export type TownSize = 'small' | 'medium' | 'large';
+/** Town sizes of drafts from older code (worlds have a place and options now). */
+export type OldTownSize = 'small' | 'medium' | 'large';
 
 export interface PlotSlot {
   index: number;
@@ -175,7 +175,7 @@ export interface Rect {
 export interface NeighbourhoodDraft {
   name: string;
   /** Drafts from older code; worlds say what kind they are in `world`. */
-  size?: TownSize;
+  size?: OldTownSize;
   width: number;
   depth: number;
   slots: PlotSlot[];
@@ -204,11 +204,14 @@ export interface NeighbourhoodDraft {
 
 /** What kind of world a town is in, one line about it, and how its land looks. */
 export interface WorldInfo {
-  kind: WorldKind;
+  /** Its place (`world.ts` `WorldKind`); a classic world's kind, or an older draft's (`LEGACY_KINDS`). */
+  kind: string;
   /** How big the world is (always `big`; missing in drafts from older code). */
   size?: WorldSize;
   tagline: string;
   landscape: LandscapeParams;
+  /** What the player chose besides the place (missing in a classic world and in drafts from older code). */
+  options?: WorldOptions;
 }
 
 /** Presentation data the renderer reads back from the world (it survives save/load). */
@@ -635,16 +638,20 @@ const BIG_START = 118;
 export const generateStats = { houseMs: 0 };
 
 /**
- * Lays out a world of `kind` from `seed` (the same kind and seed always give the same town): its
- * roads, lots, houses, public places and farms, its name, tagline and land. The roads come first
- * (`WorldRecipe.roads`), then the lots along them: the park on the green if there is one, the
- * public places round the town's middle, farms out on its edge, the houses from the middle out,
- * each turned to face its road, with a gap or a stretch of meadow between some. The town is cut
- * to the land its lots and roads take. Nobody lives there yet (see `populate`). Every world is a
- * Big one (cosy and normal were dropped in 0.8.0). `step`: told as each part of it is done.
+ * Lays out a world in place `kind` with `options` (the place's own where not given) from `seed`
+ * (the same place, options and seed always give the same world): its roads, lots, houses, public
+ * places and farms, its name, tagline and land (`world.ts` `specOf`, `macro.ts` `generateFromSpec`).
+ * The roads come first (`WorldSpec.shape`), then the lots along them: the park on the green if
+ * there is one, the public places round the town's middle, farms out on its edge, the houses from
+ * the middle out, each turned to face its road, with a gap or a stretch of meadow between some.
+ * Nobody lives there yet (see `populate`). A kind from before places (`LEGACY_KINDS`: a tool's or
+ * a test's) is its place, at its town size unless `options` say otherwise. `step`: told as each
+ * part of it is done.
  */
-export function generateWorld(content: Content, t: Templates, kind: WorldKind, seed = (Math.random() * 2 ** 31) >>> 0, name?: string, step?: (done: WorldStep) => void): NeighbourhoodDraft {
-  return generateBigWorld(content, t, kind, seed, name, step);
+export function generateWorld(content: Content, t: Templates, kind: string, seed = (Math.random() * 2 ** 31) >>> 0, name?: string, step?: (done: WorldStep) => void, options?: Partial<WorldOptions>): NeighbourhoodDraft {
+  const chosen = { ...options };
+  if (Object.hasOwn(LEGACY_KINDS, kind)) chosen.town ??= LEGACY_KINDS[kind].town;
+  return generateFromSpec(content, t, specOf(placeOf(kind), chosen), seed, name, step);
 }
 
 /** Courts (lanes left with a dead end) a town keeps at most; a big world's main town, `BIG_COURTS`. */
@@ -652,7 +659,7 @@ export const COURTS = 2;
 export const BIG_COURTS = 3;
 
 /**
- * A town's roads as its recipe laid them out, joined up (`roads.ts` `connect`: its lanes' dead
+ * A town's roads as its shape laid them out, joined up (`roads.ts` `connect`: its lanes' dead
  * ends go on to another road, `courts` of them at most left as courts), streets out into what
  * of its box they leave empty (`spec.fill`: a big town's), and `spec.extend` cross streets between
  * them (a bigger town's blocks).
@@ -665,7 +672,7 @@ export function joinUp(rand: Rand, layout: RoadLayout, spec: SizeSpec, courts = 
 }
 
 /**
- * A town's roads as its recipe laid them out in `box`, settled: dead ends stop short of the edge
+ * A town's roads as its shape laid them out in `box`, settled: dead ends stop short of the edge
  * of the land (the roads out of town go on past it), and lanes begin at the kerb of the road they join.
  */
 export function settleRoads(laid: readonly RoadPlan[], box: Box): RoadPlan[] {
@@ -682,30 +689,29 @@ export function settleRoads(laid: readonly RoadPlan[], box: Box): RoadPlan[] {
 export type Unplaced = Omit<PlotSlot, 'index' | 'x' | 'z' | 'facing'>;
 
 /**
- * What goes on a town's lots: the park (unless `park` is false) and the other public places the
- * kind of world would rather have, farms, and houses to make up `spec.lots`.
+ * What goes on a town's lots, as its world's lot mix has them (`mix`): the park (unless `park` is
+ * false) and the other public places the world would rather have, farms, and houses to make up `spec.lots`.
  */
-export function wantedLots(content: Content, t: Templates, kind: WorldKind, spec: SizeSpec, rand: Rand, { park = true, avoid = [] as readonly string[] } = {}): Unplaced[] {
-  const recipe = WORLDS[kind];
-  const [fewest, most] = spec.places ?? recipe.places;
+export function wantedLots(content: Content, t: Templates, mix: LotMix, spec: SizeSpec, rand: Rand, { park = true, avoid = [] as readonly string[] } = {}): Unplaced[] {
+  const [fewest, most] = spec.places ?? mix.places;
   const count = fewest + Math.floor(rand() * (most - fewest + 1));
-  // The places this kind of world would rather have first, in no particular order, then the rest.
-  const prefer = recipe.prefer ?? [];
+  // The places this world would rather have first, in no particular order, then the rest.
+  const prefer = mix.prefer ?? [];
   const others = shuffled(
     t.parks.slice(1).filter((p) => p.kind !== 'outdoor'),
     rand,
   )
     .sort((a, b) => Number(!prefer.includes(a.id)) - Number(!prefer.includes(b.id)) || Number(avoid.includes(a.id)) - Number(avoid.includes(b.id)))
     .slice(0, count);
-  const [fewFarms, mostFarms] = spec.farms ?? recipe.farms ?? [0, 0];
+  const [fewFarms, mostFarms] = spec.farms ?? mix.farms ?? [0, 0];
   const farmCount = t.lotSizes?.farm ? fewFarms + Math.floor(rand() * (mostFarms - fewFarms + 1)) : 0;
   const farmWords = shuffled(content.names.worlds?.farm?.start ?? ['Meadow', 'Barley', 'Clover'], rand);
   const lotSize = (): LotSize => {
     if (!t.lotSizes) return 'medium';
     const r = rand();
-    return r < recipe.small ? 'small' : r < 1 - recipe.large ? 'medium' : 'large';
+    return r < mix.small ? 'small' : r < 1 - mix.large ? 'medium' : 'large';
   };
-  const gardenSize = () => weighted(rand, recipe.gardens as Record<string, number>) as GardenSize;
+  const gardenSize = () => weighted(rand, mix.gardens as Record<string, number>) as GardenSize;
   const wanted: Unplaced[] = [
     // On a lot of the frame they are drawn for.
     ...[...(park ? [t.parks[0]] : []), ...others].map((p): Unplaced => ({ kind: p.kind === 'shop' ? 'shop' : 'park', template: p.id, name: p.name, lot: 'medium', w: t.plot.width, d: t.plot.depth })),
@@ -1483,7 +1489,7 @@ function gardenFencesOf(
 
 /** What the renderer needs to know about a town's world (it survives save/load in `meta`). */
 export function worldLook(town: NeighbourhoodDraft, fields: Rect[]): WorldLook | undefined {
-  return town.world && { kind: town.world.kind, size: town.world.size ?? 'big', landscape: town.world.landscape, ...(fields.length ? { fields } : {}) };
+  return town.world && { kind: town.world.kind, size: town.world.size ?? 'big', landscape: town.world.landscape, ...(town.world.options ? { options: town.world.options } : {}), ...(fields.length ? { fields } : {}) };
 }
 
 export interface AssembleOptions {
@@ -1693,6 +1699,6 @@ function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'],
     areas,
     exits,
     file: { terrain: { water: open.water }, parking: open.parking, drives: filed, cars: parked },
-    meta: { zones: open.zones, pads: open.pads, areas, ...(open.backdrop ? { backdrop: open.backdrop } : {}), ...(open.places ? { places: open.places } : {}), ...(open.centre ? { centre: open.centre } : {}) },
+    meta: { zones: open.zones, pads: open.pads, areas, ...(open.backdrop ? { backdrop: open.backdrop } : {}), ...(open.places ? { places: open.places } : {}), ...(open.centre ? { centre: open.centre } : {}), ...(open.relief ? { relief: open.relief } : {}) },
   };
 }

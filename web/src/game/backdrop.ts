@@ -20,7 +20,10 @@
  * more than half a road's width off its middle line), the water, a trail, the parking, a square or
  * another backdrop building (two may touch: a row of shops). Its footprint is a rectangle turned to
  * the road nearest it (`FACING`: its long side or its gable end along the road). Every main town
- * has `MAIN_LEAST` or more, every hamlet `HAMLET_LEAST`; the centre is the densest.
+ * has as many as its size wants (`BackdropInput.least`: `MAIN_LEAST` in a town or a city), every
+ * hamlet `HAMLET_LEAST`; the centre is the densest. A main town has the civic places of its size
+ * (`Civic.least`): a hamlet a parish hall, a church, an inn and a shop; a village a school, a
+ * garage, builders, studios and a garden centre besides; a town or a city every one.
  *
  * Footprints go counter-clockwise seen from above (+y up, x right: z runs down the screen, so the
  * signed area x·z' − x'·z is negative), in town metres. `y` is 0, the town's flat land: they stand
@@ -30,7 +33,7 @@
  */
 
 import type { CareerCategory, Content } from '../content/content';
-import type { BackdropBuilding, BackdropUse, TownPlace } from '../core/protocol';
+import type { BackdropBuilding, BackdropUse, TownPlace, TownSize } from '../core/protocol';
 import { inside, leftOf, lengths, nearest, pointAt, RoadIndex, type Pt, type RoadPlan } from './roads';
 import type { Ground, PlotSlot, Rect } from './town';
 
@@ -49,7 +52,7 @@ const SQUARES: readonly [number, number][] = [
 ];
 /** A backdrop building keeps this far off a lot's boundary (m). */
 export const LOT_CLEAR = 1;
-/** At least this many backdrop buildings in a main town, in a hamlet. */
+/** At least this many backdrop buildings in a main town of a town or a city, in a hamlet. */
 export const MAIN_LEAST = 60;
 export const HAMLET_LEAST = 8;
 /** A main town's centre is built over at least this many times as densely as the rest of its box (`centreDensity`). */
@@ -428,35 +431,42 @@ const KINDS = {
 } as const satisfies Record<string, readonly (readonly [Kind, number])[]>;
 type Zone = keyof typeof KINDS;
 
-/** A main town's civic places, laid first, nearest its square (its high street's middle): what, its kind, how big, its name, the careers working there. */
+/**
+ * A main town's civic places, laid first, nearest its square (its high street's middle): what, its
+ * kind, how big, its name, the careers working there, and the smallest town that has it.
+ */
 interface Civic {
   kind: Kind;
   place: TownPlace['kind'];
   name: (n: Namer) => string;
   work: string[];
+  least: TownSize;
   /** Its gable end to the road (a church): deeper than wide, the ridge running back from the road. */
   endOn?: boolean;
 }
+/** The town sizes, smallest first. */
+const SIZES: readonly TownSize[] = ['hamlet', 'village', 'town', 'city'];
 const CIVIC: readonly Civic[] = [
-  { kind: K('office', [16, 20], [12, 14], [3, 3], ['hip', 'mansard']), place: 'office', name: (n) => `${n.town} Town Hall`, work: ['politics'] },
-  { kind: K('church', [11, 13], [22, 28], [3, 3], ['gable']), place: 'church', name: (n) => `St ${pick(n.rand, SAINTS)}'s Church`, work: [], endOn: true },
-  { kind: K('school', [28, 36], [14, 18], [2, 2], ['hip', 'flat']), place: 'school', name: (n) => `${n.town} School`, work: ['education'] },
-  { kind: K('office', [12, 16], [11, 13], [2, 3], ['flat', 'hip']), place: 'office', name: (n) => `${n.town} Police Station`, work: ['detective'] },
-  { kind: K('workshop', [16, 20], [14, 16], [2, 2], ['flat']), place: 'workshop', name: (n) => `${n.town} Fire Station`, work: ['firefighter'] },
-  { kind: K('office', [14, 18], [11, 13], [2, 2], ['flat', 'hip']), place: 'office', name: (n) => `${n.street()} Medical Centre`, work: ['medicine'] },
-  { kind: K('workshop', [22, 28], [16, 20], [2, 2], ['flat']), place: 'workshop', name: (n) => `${n.town} Leisure Centre`, work: ['sports'] },
-  { kind: K('office', [12, 16], [11, 13], [3, 4], ['flat', 'mansard']), place: 'office', name: (n) => `${n.last()} Bank`, work: ['finance', 'business'] },
-  { kind: K('office', [12, 16], [11, 13], [3, 4], ['flat']), place: 'office', name: (n) => `The ${n.town} Gazette`, work: ['journalism', 'tv', 'influencer'] },
-  { kind: K('office', [16, 22], [12, 15], [3, 5], ['flat']), place: 'office', name: (n) => `${n.street()} Works`, work: ['it', 'science'] },
-  { kind: K('office', [9, 12], [10, 12], [3, 3], ['mansard', 'gable']), place: 'office', name: (n) => `${n.last()} & ${n.last()} Solicitors`, work: ['law'] },
-  { kind: K('office', [12, 16], [11, 13], [2, 2], ['flat']), place: 'office', name: () => 'Army Reserve Centre', work: ['military'] },
-  { kind: K('workshop', [14, 18], [12, 14], [1, 2], ['flat', 'gable']), place: 'workshop', name: (n) => `${n.last()}'s Garage`, work: ['mechanics', 'transport'] },
-  { kind: K('workshop', [14, 18], [12, 14], [1, 2], ['gable']), place: 'workshop', name: (n) => `${n.last()} Builders`, work: ['trades'] },
-  { kind: K('workshop', [10, 14], [10, 12], [2, 2], ['gable']), place: 'workshop', name: (n) => `${n.street()} Studios`, work: ['arts'] },
-  { kind: K('restaurant', [12, 16], [12, 14], [2, 3], ['gable', 'hip']), place: 'restaurant', name: (n) => n.inn(), work: ['culinary', 'hospitality', 'music'] },
-  { kind: K('restaurant', [16, 22], [12, 14], [3, 4], ['mansard', 'hip']), place: 'restaurant', name: (n) => `The ${n.town} Hotel`, work: ['hospitality'] },
-  { kind: K('shop', [8, 10], [10, 12], [2, 3], ['gable', 'mansard']), place: 'shop', name: (n) => `${n.last()}'s Boutique`, work: ['fashion', 'retail'] },
-  { kind: K('shop', [14, 20], [12, 16], [1, 1], ['flat', 'gable']), place: 'shop', name: (n) => `${n.town} Garden Centre`, work: ['nature', 'retail'] },
+  // (A hamlet's hall is its parish's, a village's its own: the careers no other place takes work there.)
+  { kind: K('office', [16, 20], [12, 14], [3, 3], ['hip', 'mansard']), place: 'office', name: (n) => `${n.town} ${{ hamlet: 'Parish Hall', village: 'Village Hall', town: 'Town Hall', city: 'Town Hall' }[n.size]}`, work: ['politics'], least: 'hamlet' },
+  { kind: K('church', [11, 13], [22, 28], [3, 3], ['gable']), place: 'church', name: (n) => `St ${pick(n.rand, SAINTS)}'s Church`, work: [], least: 'hamlet', endOn: true },
+  { kind: K('school', [28, 36], [14, 18], [2, 2], ['hip', 'flat']), place: 'school', name: (n) => `${n.town} School`, work: ['education'], least: 'village' },
+  { kind: K('office', [12, 16], [11, 13], [2, 3], ['flat', 'hip']), place: 'office', name: (n) => `${n.town} Police Station`, work: ['detective'], least: 'town' },
+  { kind: K('workshop', [16, 20], [14, 16], [2, 2], ['flat']), place: 'workshop', name: (n) => `${n.town} Fire Station`, work: ['firefighter'], least: 'town' },
+  { kind: K('office', [14, 18], [11, 13], [2, 2], ['flat', 'hip']), place: 'office', name: (n) => `${n.street()} Medical Centre`, work: ['medicine'], least: 'town' },
+  { kind: K('workshop', [22, 28], [16, 20], [2, 2], ['flat']), place: 'workshop', name: (n) => `${n.town} Leisure Centre`, work: ['sports'], least: 'town' },
+  { kind: K('office', [12, 16], [11, 13], [3, 4], ['flat', 'mansard']), place: 'office', name: (n) => `${n.last()} Bank`, work: ['finance', 'business'], least: 'town' },
+  { kind: K('office', [12, 16], [11, 13], [3, 4], ['flat']), place: 'office', name: (n) => `The ${n.town} Gazette`, work: ['journalism', 'tv', 'influencer'], least: 'town' },
+  { kind: K('office', [16, 22], [12, 15], [3, 5], ['flat']), place: 'office', name: (n) => `${n.street()} Works`, work: ['it', 'science'], least: 'town' },
+  { kind: K('office', [9, 12], [10, 12], [3, 3], ['mansard', 'gable']), place: 'office', name: (n) => `${n.last()} & ${n.last()} Solicitors`, work: ['law'], least: 'town' },
+  { kind: K('office', [12, 16], [11, 13], [2, 2], ['flat']), place: 'office', name: () => 'Army Reserve Centre', work: ['military'], least: 'town' },
+  { kind: K('workshop', [14, 18], [12, 14], [1, 2], ['flat', 'gable']), place: 'workshop', name: (n) => `${n.last()}'s Garage`, work: ['mechanics', 'transport'], least: 'village' },
+  { kind: K('workshop', [14, 18], [12, 14], [1, 2], ['gable']), place: 'workshop', name: (n) => `${n.last()} Builders`, work: ['trades'], least: 'village' },
+  { kind: K('workshop', [10, 14], [10, 12], [2, 2], ['gable']), place: 'workshop', name: (n) => `${n.street()} Studios`, work: ['arts'], least: 'village' },
+  { kind: K('restaurant', [12, 16], [12, 14], [2, 3], ['gable', 'hip']), place: 'restaurant', name: (n) => n.inn(), work: ['culinary', 'hospitality', 'music'], least: 'hamlet' },
+  { kind: K('restaurant', [16, 22], [12, 14], [3, 4], ['mansard', 'hip']), place: 'restaurant', name: (n) => `The ${n.town} Hotel`, work: ['hospitality'], least: 'town' },
+  { kind: K('shop', [8, 10], [10, 12], [2, 3], ['gable', 'mansard']), place: 'shop', name: (n) => (n.size === 'hamlet' ? `${n.last()}'s Village Shop` : `${n.last()}'s Boutique`), work: ['fashion', 'retail'], least: 'hamlet' },
+  { kind: K('shop', [14, 20], [12, 16], [1, 1], ['flat', 'gable']), place: 'shop', name: (n) => `${n.town} Garden Centre`, work: ['nature', 'retail'], least: 'village' },
 ];
 const SAINTS = ['Mary', 'John', 'Peter', 'Michael', 'Andrew', 'James', 'Anne', 'Catherine', 'Luke', 'Margaret', 'Martin', 'Nicholas'];
 const SHOPS = ['Bakery', 'Butcher', 'Greengrocer', 'Bookshop', 'Hardware', 'Chemist', 'Florist', 'Newsagent', 'Toy Shop', 'Deli', 'Tailor', 'Cobbler', 'Fishmonger', 'Gift Shop', 'Bike Shop', 'Record Shop', 'Sweet Shop', 'Wool Shop', 'Antiques', 'Opticians'];
@@ -505,6 +515,8 @@ export function hoursFor(base: NonNullable<TownPlace['hours']>, work: readonly s
 interface Namer {
   rand: Rand;
   town: string;
+  /** How big the main town is (a hamlet's area: as its main town). */
+  size: TownSize;
   last(): string;
   street(): string;
   inn(): string;
@@ -530,12 +542,15 @@ export interface BackdropInput {
   water: Uint8Array;
   /** How much of a main town's land is built over, 0..1 (a dense town's most). */
   density: number;
+  /** The fewest backdrop buildings in the main town, and how big a town it is (which civic places it has: `Civic.least`). */
+  least: number;
+  civic: TownSize;
   rand: Rand;
 }
 
 /** The backdrop and the places of a big world: see the top of this file. */
 export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[]; places: TownPlace[] } {
-  const { content, W, D, roads, areas, slots, rectOf, ground, centres, reserved, greens, water, density, rand } = input;
+  const { content, W, D, roads, areas, slots, rectOf, ground, centres, reserved, greens, water, density, least, civic: size, rand } = input;
   const index = new RoadIndex(roads);
   const ways = roads.map((r) => r.kind !== 'trail');
   // What a building may not stand on (a tile each): what the ground takes (roads, greens, water,
@@ -673,6 +688,7 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
     }
     fronts.sort((x, y) => x.far - y.far);
     for (const c of CIVIC) {
+      if (SIZES.indexOf(c.least) > SIZES.indexOf(size)) continue;
       for (const f of fronts) {
         const { c: mid, t, n } = frontAt(f.r, f.s, f.side, range(rand, 2.4, 4));
         const probe = add(mid, n, 2);
@@ -771,7 +787,7 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
   infill(0, 0.3 + 0.45 * density, 12);
   for (let a = 1; a < areas.length; a++) infill(a, 0.25, 16);
   // (Short of the least: filled in more closely.)
-  for (let a = 0; a < areas.length; a++) for (let k = 0; k < 3 && countIn(a) < (a === 0 ? MAIN_LEAST : HAMLET_LEAST); k++) infill(a, 1, 9 - k * 2);
+  for (let a = 0; a < areas.length; a++) for (let k = 0; k < 3 && countIn(a) < (a === 0 ? least : HAMLET_LEAST); k++) infill(a, 1, 9 - k * 2);
 
   // ---- the centre the densest: houses and such taken away round it till it is --------------------
   // (Its square and what the centres' public places leave open count as open land: in a town whose
@@ -806,7 +822,7 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
     const drop = new Set<number>();
     const want = d.centre / DENSEST;
     for (const { i } of spare) {
-      if (rest / Math.max(1, d.open[1]) < want || built.length - drop.size <= 0 || countIn(c.area) - drop.size <= MAIN_LEAST) break;
+      if (rest / Math.max(1, d.open[1]) < want || built.length - drop.size <= 0 || countIn(c.area) - drop.size <= least) break;
       drop.add(i);
       rest -= d.per[i];
     }
@@ -866,6 +882,7 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
     const self: Namer = {
       rand,
       town: areas[a].name,
+      size,
       last: () => pick(rand, lastNames),
       // (A street's own word: "Mill" of "Mill Lane, Ashby".)
       street: () => (streets.length ? pick(rand, streets).split(',')[0].replace(/ (Street|Road|Lane|Way|Avenue|Row|Close|Drive|Hill|Walk|Crescent|Place|Gardens|Terrace|Parade|Square|Rise|Green|End|Mews|Court)$/, '') : areas[a].name),

@@ -41,12 +41,31 @@ const ORCHARD_STEP = 5;
 /** A big world's hill zones rise this high (m) at most (between what is built: the land there stays flat). */
 const BIG_HILLS = 16;
 const TERRAIN_STEP = 2.5;
+/** A big world's ground tiles (m; `pc/nature.ts` `terrainTiles`), laid from the terrain's corner. */
+export const GROUND_TILE = 128;
 /** At most this many terrain quads across (a wider landscape gets coarser ones). */
 const TERRAIN_SEGMENTS = 260;
 /** Trees within this distance of the town cast shadows; further ones don't. */
 const SHADOW_RANGE = 28;
 /** Mountains: no trees above about this height (m). */
 const TREELINE = 12;
+/** Mountains: bare rock and then snow from these shares of their height up to these (a relief grid's: higher up, its massif is all of it). */
+const ROCK_SNOW: [[number, number], [number, number]] = [
+  [0.16, 0.28],
+  [0.33, 0.45],
+];
+const RELIEF_ROCK_SNOW: [[number, number], [number, number]] = [
+  [0.45, 0.6],
+  [0.76, 0.92],
+];
+/** A world with a relief grid among mountains: no trees above this share of the mountains' height. */
+const RELIEF_TREELINE = 0.3;
+/** How smoothly (m) a relief grid's land meets the most it may rise from what is built (`smoothMin`). */
+const RELIEF_BLEND = 6;
+/** A relief grid's land rises at most this steeply from what is built where the world doesn't say (`LandscapeParams.slope`). */
+const RELIEF_SLOPE = 0.5;
+/** The mountains past a relief world's edge rise over this far (m) out from it. */
+const EDGE_MOUNTAINS: [number, number] = [10, 150];
 /** The random draws a lawn tuft took (its scale, turn and spot), still taken so the flowers stand where they did. */
 const TUFT_DRAWS = 4;
 /** No lawn this close to a road's edge (m): the grass's blades lean, and would reach over it. */
@@ -85,6 +104,16 @@ export interface PlantPlacement {
 
 // (The seeded generator, lattice hash, value noise, fractal noise and smooth step: the world generator's own, `game/noise.ts`, so the land it lays out and the land drawn agree.)
 export { fbm, hash, mulberry32, smoothstep, valueNoise };
+
+/**
+ * The smaller of `a` and `b` (both 0 or more), rounded off where they come within `k` of each other (a
+ * polynomial smooth minimum), and never below half the smaller: two that are both 0 stay 0.
+ */
+export function smoothMin(a: number, b: number, k: number): number {
+  const m = Math.min(a, b);
+  const t = Math.max(k - Math.abs(a - b), 0) / k;
+  return m - Math.min(t * t * k * 0.25, m * 0.5);
+}
 
 /** Ridged noise, 0..1: sharp crests where plain noise crosses its middle (mountain ridges). */
 function ridged(x: number, z: number, seed: number, octaves = 5): number {
@@ -358,6 +387,13 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   protected readonly land: LandscapeParams;
   /** How far the land reaches past the town (m). */
   protected readonly ring: number;
+  /** How far the sand reaches from the shoreline (m; `LandscapeParams.beach`). */
+  private readonly beach: number;
+  /**
+   * A big world's relief grid (`WorldMeta.relief`) in metres over the built level, and how steeply the land
+   * may rise from what is built (`LandscapeParams.slope`). Null: none (older saves, the classic specs).
+   */
+  private readonly relief: { cell: number; cols: number; rows: number; h: Float32Array; slope: number } | null;
   /** Where the roads leave town (the mountains part there). */
   private readonly passes: TownExit[];
   /** The roads out of town (the ground is levelled under them). */
@@ -386,7 +422,13 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.d = groundDepth(world);
     this.land = { ...DEFAULT_LANDSCAPE, ...world.meta?.world?.landscape };
     this.ring = landscapeRing(world);
+    this.beach = this.land.beach ?? BEACH;
     this.built = world.meta?.world?.size === 'big' ? LandscapeLayout.builtField(world, this.w, this.d) : null;
+    const relief = world.meta?.relief;
+    this.relief =
+      this.built && relief && relief.cell > 0 && relief.cols > 0 && relief.rows > 0 && relief.h.length >= relief.cols * relief.rows
+        ? { cell: relief.cell, cols: relief.cols, rows: relief.rows, h: Float32Array.from(relief.h, (v) => v / 10), slope: this.land.slope ?? RELIEF_SLOPE }
+        : null;
     this.zones = this.built && world.meta?.zones?.length ? new ZoneField(world.meta.zones, this.w, this.d) : null;
     this.orchards = this.zones ? (world.meta?.zones ?? []).filter((z) => z.kind === 'orchard') : [];
     this.passes = townExits(world);
@@ -420,7 +462,12 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const streets = [...(world.meta?.streets ?? []).map((s) => `${s.z}`), ...(world.meta?.roads ?? []).map((r) => `${r.points[0]}:${r.points.length}`)].join(',');
     // (A backdrop is built land too, `builtField`: a town with one has a landscape of its own.)
     const backdrop = world.meta?.backdrop?.length ? `:b${world.meta.backdrop.length}` : '';
-    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${JSON.stringify(look.landscape)}` : ''}${backdrop}`;
+    // (The options, the zones and the relief too: a world made again with only its woods or its hills changed
+    // keeps its seed, name and roads, and must not keep the landscape it had.)
+    const options = look?.options ? `:o${JSON.stringify(look.options)}` : '';
+    const zones = world.meta?.zones ? `:z${world.meta.zones.length}` : '';
+    const relief = world.meta?.relief ? `:r${reliefSum(world.meta.relief)}` : '';
+    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${JSON.stringify(look.landscape)}` : ''}${backdrop}${options}${zones}${relief}`;
   }
 
   /**
@@ -541,7 +588,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   private mountain(x: number, z: number, dist: number): number {
     const top = this.land.mountains;
     if (!top) return 0;
-    const ramp = smoothstep(APRON + 10, APRON + 130, dist);
+    // (A world with a relief grid has its mountains in it: these rise past its edge, out to the horizon.)
+    const ramp = this.relief ? smoothstep(EDGE_MOUNTAINS[0], EDGE_MOUNTAINS[1], Math.hypot(Math.max(0 - x, 0, x - this.w), Math.max(0 - z, 0, z - this.d))) : smoothstep(APRON + 10, APRON + 130, dist);
     if (ramp <= 0) return 0;
     const open = this.openness(z);
     // A pass where each road leaves town: lower along its way out (`past` the town, `aside` from that way).
@@ -570,17 +618,64 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       // (A big world's rim rises round the world, past its edge; between its hamlets its hill zones do.)
       const rimFrom = this.zones ? Math.hypot(Math.max(0 - x, 0, x - this.w), Math.max(0 - z, 0, z - this.d)) : dist - L.rimFrom;
       const rim = Math.pow(Math.max(0, rimFrom) / RING, 2) * L.rim * open;
-      const zoned = this.zones ? this.zones.share('hill', x, z, 40) * BIG_HILLS * (0.55 + 0.9 * fbm(x * 0.008 + 5, z * 0.008, this.seed + 303, 3)) : 0;
       // By water the land stays above it (no puddles in the hollows).
-      h = Math.max(water ? 0 : -0.4, rise * (hills + zoned) + rim) + this.mountain(x, z, dist);
+      if (this.relief) {
+        // (The mountains past the edge rise from the grid's land there, not on top of all of it: peaks of the
+        // grid's height and the mountains' together would wall the world in.)
+        const r = this.relieved(x, z, dist, open);
+        h = Math.max(water ? 0 : -0.4, rise * hills + rim + r) + Math.max(0, this.mountain(x, z, dist) - 0.5 * r);
+      } else {
+        const zoned = this.zones ? this.zones.share('hill', x, z, 40) * BIG_HILLS * (0.55 + 0.9 * fbm(x * 0.008 + 5, z * 0.008, this.seed + 303, 3)) : 0;
+        h = Math.max(water ? 0 : -0.4, rise * (hills + zoned) + rim) + this.mountain(x, z, dist);
+      }
     }
     if (!water || dist === 0) return h;
     // Down a sandy bank to the shore, then under the water.
     const e = this.waterEdge(x, z);
-    if (e < -BEACH * 1.5) return h;
+    const beach = this.beach;
+    if (e < -beach * 1.5) return h;
     if (e > 0) return WATER_Y - Math.min(4, e * 0.22 + e * e * 0.004);
     const bank = WATER_Y - e * 0.09;
-    return h + (Math.min(h, bank) - h) * smoothstep(-BEACH * 1.5, -BEACH * 0.3, e);
+    return h + (Math.min(h, bank) - h) * smoothstep(-beach * 1.5, -beach * 0.3, e);
+  }
+
+  /** The relief grid's height (m) at (x, z), read between the cells' middles, the edge's past the world's edge. */
+  reliefAt(x: number, z: number): number {
+    const R = this.relief;
+    if (!R) return 0;
+    const gx = Math.min(R.cols - 1, Math.max(0, x / R.cell - 0.5));
+    const gz = Math.min(R.rows - 1, Math.max(0, z / R.cell - 0.5));
+    const x0 = Math.floor(gx);
+    const z0 = Math.floor(gz);
+    const x1 = Math.min(R.cols - 1, x0 + 1);
+    const z1 = Math.min(R.rows - 1, z0 + 1);
+    const u = gx - x0;
+    const v = gz - z0;
+    const h = R.h;
+    const a = h[z0 * R.cols + x0];
+    const b = h[z0 * R.cols + x1];
+    const c = h[z1 * R.cols + x0];
+    const d = h[z1 * R.cols + x1];
+    return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v;
+  }
+
+  /**
+   * What a relief grid raises the land by at (x, z), `dist` m from what is built (`open`: `openness` among
+   * mountains): the grid's height, roughened a little by noise (and among mountains by ridges above 20 m, more on
+   * the valley's far side), and no more than the world's `slope` lets it rise from what is built, the two met
+   * smoothly (`smoothMin`).
+   */
+  private relieved(x: number, z: number, dist: number, open: number): number {
+    const r = this.reliefAt(x, z);
+    if (r <= 0) return 0;
+    let g = r * (0.85 + 0.3 * fbm(x * 0.012, z * 0.012, this.seed + 517, 3));
+    if (this.land.mountains && g > 15) g += g * 0.35 * (ridged(x * 0.0075, z * 0.0075, this.seed + 211) - 0.5) * smoothstep(15, 25, g) * (0.4 + 0.6 * open);
+    return smoothMin(g, this.relief!.slope * Math.max(0, dist - APRON), RELIEF_BLEND);
+  }
+
+  /** No trees above this (m) among mountains, give or take (`woods`), and the alpine meadow from about here. */
+  private get treeTop(): number {
+    return this.relief && this.land.mountains ? this.land.mountains * RELIEF_TREELINE : TREELINE;
   }
 
   /** The terrain's square (m across, centred on the town) and its quads across. */
@@ -589,9 +684,17 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     return { size, segments: Math.min(TERRAIN_SEGMENTS, Math.round(size / TERRAIN_STEP)) };
   }
 
-  /** The sheet of the sea or the lake: its size, at the water line under the whole landscape. */
+  /**
+   * The sheet of the sea or the lake: its size, at the water line under the whole landscape. A big world's
+   * ground is drawn in `GROUND_TILE` m tiles from the terrain's corner, the last ones reaching past its square:
+   * the sheet reaches as far (else the sea round an island stops short of the ground's edge there, and the sea
+   * floor shows past it).
+   */
   protected waterSheet(): { size: number; x: number; y: number; z: number } {
-    return { size: Math.max(this.w, this.d) + this.ring * 2, x: this.w / 2, y: WATER_Y, z: this.d / 2 };
+    const size = Math.max(this.w, this.d) + this.ring * 2;
+    if (!this.built) return { size, x: this.w / 2, y: WATER_Y, z: this.d / 2 };
+    const tiled = Math.ceil(size / GROUND_TILE) * GROUND_TILE;
+    return { size: tiled, x: this.w / 2 + (tiled - size) / 2, y: WATER_Y, z: this.d / 2 + (tiled - size) / 2 };
   }
 
   /**
@@ -660,10 +763,13 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     if (top) {
       const steep = Math.hypot(this.heightAt(x + 1.5, z) - h, this.heightAt(x, z + 1.5) - h) / 1.5;
       // Pale alpine meadow above the trees, then rock, then snow.
-      lerp(out, P.alpine, smoothstep(TREELINE * 0.8, TREELINE * 1.25, h + fine * 6) * 0.8, out);
-      const rocky = Math.max(smoothstep(top * 0.16, top * 0.28, h + fine * 12), smoothstep(0.7, 1.2, steep) * smoothstep(8, 18, h)) * 0.92;
+      const line = this.treeTop;
+      lerp(out, P.alpine, smoothstep(line * 0.8, line * 1.25, h + fine * 6) * 0.8, out);
+      // (A relief grid's massif is the world's own, its whole height: its rock and snow begin higher up it.)
+      const [rock, snow] = this.relief ? RELIEF_ROCK_SNOW : ROCK_SNOW;
+      const rocky = Math.max(smoothstep(top * rock[0], top * rock[1], h + fine * 12), smoothstep(0.7, 1.2, steep) * smoothstep(8, 18, h)) * 0.92;
       lerp(out, P.rock, rocky, out);
-      const snowy = smoothstep(top * 0.33, top * 0.45, h + patch * 20) * (1 - smoothstep(1.5, 2.6, steep) * 0.5);
+      const snowy = smoothstep(top * snow[0], top * snow[1], h + patch * 20) * (1 - smoothstep(1.5, 2.6, steep) * 0.5);
       lerp(out, P.snow, snowy, out);
       lawn *= (1 - rocky) * (1 - snowy);
     }
@@ -678,8 +784,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     if (this.roads.onLink(x, z, LAWN_CLEAR)) lawn = 0;
     // Sand along the water, darker where it is wet.
     const e = this.waterEdge(x, z);
-    if (e > -BEACH) {
-      const sandy = smoothstep(-BEACH, -BEACH * 0.45, e);
+    const beach = this.beach;
+    if (e > -beach) {
+      const sandy = smoothstep(-beach, -beach * 0.45, e);
       lerp(out, e > -1.5 ? P.wetSand : P.sand, sandy, out);
       lawn *= 1 - sandy;
     }
@@ -760,6 +867,10 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const near = new Map<string, Float32Array[]>();
     const far = new Map<string, Float32Array[]>();
     const spacing = 4.2;
+    const [beach, treeline, scatter] = [this.beach, this.treeTop, this.land.scatter ?? 1];
+    // The bush roll: rocks below 0.08, then bushes, then small ones (`scrub` of the roll in all, two to one).
+    const scrub = this.land.scrub === undefined ? null : Math.min(0.92, Math.max(0, this.land.scrub));
+    const [bushTo, smallTo] = scrub === null ? [0.2, 0.26] : [0.08 + (scrub * 2) / 3, 0.08 + scrub];
     const size = Math.max(this.w, this.d) + this.ring * 2;
     const x0 = this.w / 2 - size / 2;
     const z0 = this.d / 2 - size / 2;
@@ -778,15 +889,15 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         if (this.zones) {
           if (this.zones.edge('orchard', x, z) > -3) continue;
           const wood = this.zones.share('woods', x, z, 8);
-          density = wood * (0.6 + 0.3 * smoothstep(0.3, 0.6, forest)) + (1 - wood) * (0.12 + 0.08 * smoothstep(0.42, 0.7, forest));
+          density = wood * (0.6 + 0.3 * smoothstep(0.3, 0.6, forest)) + (1 - wood) * (0.12 + 0.08 * smoothstep(0.42, 0.7, forest)) * scatter;
           density *= 1 - 0.6 * this.zones.share('meadow', x, z, 6);
         }
         // Fields are open, with hedgerows and the odd tree along their edges; nothing grows in the water or on the beach.
         const cell = this.fieldCell(x, z);
         if (cell) density = cell.hedge ? 0.55 : density * (1 - cell.weight);
-        if (this.watered && this.waterEdge(x, z) > -BEACH * 0.8) continue;
+        if (this.watered && this.waterEdge(x, z) > -beach * 0.8) continue;
         // Bare tops on mountains.
-        if (L.mountains && this.heightAt(x, z) > TREELINE + forest * 10) continue;
+        if (L.mountains && this.heightAt(x, z) > treeline + forest * 10) continue;
         // Nothing on the roads or right by them.
         const road = this.roads.near(x, z);
         if (road && road.dist < road.width / 2 + 2.5) continue;
@@ -799,8 +910,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         let kind: string;
         if (roll < 0.08) kind = 'model.rock';
         // (A hedgerow mostly bushes.)
-        else if (roll < 0.2 || (cell?.hedge && roll < 0.55)) kind = 'model.bush';
-        else if (roll < 0.26) kind = 'model.bush.small';
+        else if (roll < bushTo || (cell?.hedge && roll < 0.55)) kind = 'model.bush';
+        else if (roll < smallTo) kind = 'model.bush.small';
         else if ((forest > 0.56 && rand() < Math.min(1, (0.62 * L.conifers) / 0.5)) || (L.conifers > 0.5 && rand() < (L.conifers - 0.5) * 1.6)) kind = rand() < 0.4 ? 'model.spruce' : 'model.pine';
         else if (grove > 0.55 - Math.max(0, L.birches - 0.5) * 0.3 && rand() < Math.min(1, (0.7 * L.birches) / 0.5)) kind = 'model.tree.birch';
         else kind = rand() < 0.35 ? 'model.tree.maple' : 'model.tree';
@@ -874,7 +985,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         // (A big world's water is on its tiles: no flowers in it.)
         // In drifts a few metres across, as daisies and clover grow, with a single one here and there between them.
         const drift = smoothstep(FLOWER_DRIFTS.from, FLOWER_DRIFTS.full, valueNoise(x / FLOWER_DRIFTS.span, z / FLOWER_DRIFTS.span, this.seed + 421));
-        if (rand() < FLOWER_DRIFTS.single + FLOWER_DRIFTS.dense * drift && !(this.zones && this.waterEdge(x + 0.5, z + 0.5) > -BEACH * 0.6)) {
+        if (rand() < FLOWER_DRIFTS.single + FLOWER_DRIFTS.dense * drift && !(this.zones && this.waterEdge(x + 0.5, z + 0.5) > -this.beach * 0.6)) {
           flowers.push(scatter(x, z, rand, 0.8 + rand() * 0.5));
           flowerTiles.push(i);
         }
@@ -886,7 +997,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       const x = -APRON - 30 + rand() * (world.width + APRON * 2 + 60);
       const z = -APRON - 30 + rand() * (groundDepth(world) + APRON * 2 + 60);
       const dist = this.distanceToTown(x, z);
-      if (dist === 0 || rand() < dist / 40 || this.waterEdge(x, z) > -BEACH * 0.6) continue;
+      if (dist === 0 || rand() < dist / 40 || this.waterEdge(x, z) > -this.beach * 0.6) continue;
       const road = this.roads.near(x, z);
       if (road && road.dist < road.width / 2 + 0.3) continue;
       // (In this order, as ever: the scale, the turn, the spot, then whether it's a flower; nine in ten were tufts.)
@@ -926,7 +1037,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         const i = z * world.width + x;
         if (paved[i] || !mown[i] || !clearOfPaving(x, z)) continue;
         const drift = smoothstep(FLOWER_PATCHES.from, FLOWER_PATCHES.full, valueNoise(x / FLOWER_DRIFTS.span, z / FLOWER_DRIFTS.span, this.seed + 421));
-        if (drift <= 0 || (this.zones && this.waterEdge(x + 0.5, z + 0.5) > -BEACH * 0.6)) continue;
+        if (drift <= 0 || (this.zones && this.waterEdge(x + 0.5, z + 0.5) > -this.beach * 0.6)) continue;
         const which = valueNoise(x / FLOWER_PATCHES.kindSpan, z / FLOWER_PATCHES.kindSpan, this.seed + 433);
         const into = patches[which < FLOWER_PATCHES.split[0] ? 0 : which < FLOWER_PATCHES.split[1] ? 1 : 2];
         const n = Math.floor(drift * FLOWER_PATCHES.dense + patchRand());
@@ -949,6 +1060,18 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     ];
   }
 }
+
+/** A relief grid's checksum (for `LandscapeLayout.key`), once per grid. */
+function reliefSum(relief: { cols: number; rows: number; h: readonly number[] }): string {
+  let sum = reliefSums.get(relief);
+  if (sum === undefined) {
+    let h = 0x811c9dc5;
+    for (const v of relief.h) h = Math.imul(h ^ v, 0x01000193) >>> 0;
+    reliefSums.set(relief, (sum = `${relief.cols}x${relief.rows}:${h.toString(36)}`));
+  }
+  return sum;
+}
+const reliefSums = new WeakMap<object, string>();
 
 // ---- Garden dressing ------------------------------------------------------------------
 

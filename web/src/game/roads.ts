@@ -1,7 +1,7 @@
 /**
  * A town's roads, laid out from a few shapes (`through`, `branch`, `loop`, `ring`, `lane`), each
- * a smooth curve through a handful of points (Catmull-Rom, a point every metre). Each kind of
- * world puts its own together (`WorldRecipe.roads` in `world.ts`): a winding high street, a
+ * a smooth curve through a handful of points (Catmull-Rom, a point every metre). Each town in a
+ * world puts its own together (`WorldSpec.shape` in `world.ts`): a winding high street, a
  * crescent round a green, a crossroads, a lane along the shore, a ring round a clearing. The lots
  * go along them (`town.ts` `generateWorld`), turned to face the nearest one.
  *
