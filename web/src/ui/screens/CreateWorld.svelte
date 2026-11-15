@@ -212,6 +212,26 @@
   });
   $effect(() => () => menuScene.highlight({}));
 
+  /**
+   * Arrow keys in the place grid: across by one (wrapping round), up and down by a row, as many as
+   * the grid shows in a row (three beside the town, more under it when narrow). A radio group: a move
+   * chooses the place, as a click does.
+   */
+  function onPlaceKey(e: KeyboardEvent) {
+    const grid = e.currentTarget as HTMLElement;
+    const row = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+    const step = ({ ArrowRight: 1, ArrowLeft: -1, ArrowDown: row, ArrowUp: -row } as Record<string, number>)[e.key];
+    if (!step) return;
+    e.preventDefault();
+    if (!templates) return;
+    const n = WORLD_KINDS.length;
+    const at = WORLD_KINDS.indexOf(kind);
+    const next = Math.abs(step) === 1 ? (at + step + n) % n : at + step;
+    if (next < 0 || next >= n) return;
+    choose(WORLD_KINDS[next]);
+    (grid.children[next] as HTMLElement | undefined)?.focus();
+  }
+
   /** Keeps lot tags clear of this element. */
   const avoid = (el: HTMLElement) => ({ destroy: menuScene.avoid(el) });
 </script>
@@ -245,27 +265,102 @@
 {/snippet}
 
 <div class="screen scaled">
-  <div class="haze" aria-hidden="true"></div>
-  <header use:avoid>
-    <button class="btn ghost back" onclick={toMenu}><Icon name="icon.ui.back" size={18} /> Menu</button>
-    <div class="title">
-      <span class="eyebrow">Step 1 of 4 · A new world</span>
-      <div class="name-field">
-        <input class="input town-name" aria-label="Town name" placeholder={world ? "" : "Naming the town…"} bind:value={name} oninput={() => (named = true)} maxlength="24" />
-        <button class="btn ghost roll" aria-label="Another name" title="Another name" onclick={rollName}><Icon name="icon.ui.dice" size={18} /></button>
+  <div class="layout">
+    <aside class="side menu-glass" use:avoid aria-label="A new world">
+      <div class="head" use:avoid>
+        <button class="btn ghost back" onclick={toMenu}><Icon name="icon.ui.back" size={16} /> Menu</button>
+        <span class="eyebrow">Step 1 of 4 · A new world</span>
+        <div class="name-field">
+          <input class="input town-name" aria-label="Town name" placeholder={world ? '' : 'Naming the town…'} bind:value={name} oninput={() => (named = true)} maxlength="24" />
+          <button class="btn ghost roll" aria-label="Another name" title="Another name" onclick={rollName}><Icon name="icon.ui.dice" size={18} /></button>
+        </div>
+        {#if world?.world}
+          {#key world.seed}<p class="lede">{world.world.tagline}</p>{/key}
+        {/if}
       </div>
-      {#if world?.world}
-        {#key world.seed}<p class="lede">{world.world.tagline}</p>{/key}
-      {/if}
-    </div>
-    <div class="actions">
-      <button class="btn" disabled={!templates} onclick={another}><Icon name="icon.ui.dice" size={18} /> Another world</button>
-      <button class="btn primary" disabled={!world || making || waiting} onclick={next}>Choose a household →</button>
-    </div>
-  </header>
 
-  <main>
+      <!-- The world's choices, in sections down the panel (scrolling when they don't fit). A switch
+           between them and tools for the land itself can sit first in the panel, over the sections. -->
+      <div class="panel" use:avoid>
+        <div class="sections">
+          <section class="group" aria-labelledby="place-head">
+            <h2 class="eyebrow" id="place-head">Place</h2>
+            <div class="places" role="radiogroup" aria-labelledby="place-head" aria-describedby="place-blurb" tabindex="-1" onkeydown={onPlaceKey}>
+              {#each WORLD_KINDS as k (k)}
+                <button class="place" role="radio" aria-checked={kind === k} class:on={kind === k} tabindex={kind === k ? 0 : -1} disabled={!templates} onclick={() => choose(k)}>
+                  <span class="glyph">{@render glyph(k)}</span>
+                  <span class="label">{WORLDS[k].label}</span>
+                </button>
+              {/each}
+            </div>
+            <p class="blurb" id="place-blurb">{WORLDS[kind].blurb}</p>
+          </section>
+
+          <section class="group" aria-labelledby="yours-head">
+            <h2 class="eyebrow" id="yours-head">Your world</h2>
+            <p class="hint summary">{sizeHint || '\u00a0'}</p>
+            <div class="options">
+              {#each OPTION_FIELDS as f (f.key)}
+                <div class="option">
+                  <span class="eyebrow sub">{f.label}</span>
+                  <Segmented fill label={f.label} value={options[f.key]} options={f.choices} onchange={(v) => setOption(f.key, v)} />
+                </div>
+              {/each}
+            </div>
+          </section>
+
+          <div class="game">
+            <section class="group" aria-labelledby="game-head">
+              <h2 class="eyebrow" id="game-head">Game</h2>
+              <Segmented
+                fill
+                label="Game"
+                bind:value={app.mode}
+                options={[
+                  { value: 'living', label: 'Living' },
+                  { value: 'creative', label: 'Creative' },
+                ]}
+              />
+              <p class="hint">{app.mode === 'creative' ? 'Building is free. No rent or bills at home.' : 'Your residents earn the money to build with.'}</p>
+            </section>
+            <section class="group" aria-labelledby="lifespan-head">
+              <h2 class="eyebrow" id="lifespan-head">Lifespan</h2>
+              <Segmented
+                fill
+                label="Lifespan"
+                bind:value={app.lifespan}
+                options={[
+                  { value: 'off', label: 'Off' },
+                  { value: 'short', label: 'Short' },
+                  { value: 'normal', label: 'Normal' },
+                  { value: 'long', label: 'Long' },
+                ]}
+              />
+              <p class="hint">{lifespanHint(app.lifespan)}</p>
+            </section>
+          </div>
+        </div>
+      </div>
+    </aside>
+
     <section class="view">
+      {#if world}
+        <TownStage {labels} {hover} selected={focus} {focus} onhover={(p) => (hover = p)} onselect={(p) => (focus = p === focus ? null : p)} />
+      {:else}
+        <div></div>
+      {/if}
+      {#if world}
+        <div class="stats" use:avoid aria-label="World summary">
+          <span><b>{roadCount}</b> {roadCount === 1 ? 'road' : 'roads'}</span>
+          <span><b>{homes}</b> homes</span>
+          {#if farms}<span><b>{farms}</b> {farms === 1 ? 'farm' : 'farms'}</span>{/if}
+          <span><b>{places}</b> public {places === 1 ? 'place' : 'places'}</span>
+        </div>
+      {/if}
+      <div class="actions" use:avoid>
+        <button class="btn" disabled={!templates} onclick={another}><Icon name="icon.ui.dice" size={18} /> Another world</button>
+        <button class="btn primary" disabled={!world || making || waiting} onclick={next}>Choose a household →</button>
+      </div>
       {#if making}
         <div class="making menu-glass" role="status" aria-live="polite" aria-label="Making the world">
           <span class="eyebrow">{changing ? 'Changing the world' : world ? 'Another world' : 'A new world'}</span>
@@ -280,128 +375,68 @@
           </ol>
         </div>
       {/if}
-      {#if world}
-        <TownStage {labels} {hover} selected={focus} {focus} onhover={(p) => (hover = p)} onselect={(p) => (focus = p === focus ? null : p)} />
-      {:else}
-        <div></div>
-      {/if}
-      {#if world}
-        <div class="controls menu-glass" use:avoid>
-          <div class="row yours" role="group" aria-label="Your world">
-            <div class="control summary">
-              <span class="eyebrow">Your world</span>
-              <span class="hint">{sizeHint}</span>
-            </div>
-            {#each OPTION_FIELDS as f (f.key)}
-              <div class="control option">
-                <span class="eyebrow">{f.label}</span>
-                <Segmented label={f.label} value={options[f.key]} options={f.choices} onchange={(v) => setOption(f.key, v)} />
-              </div>
-            {/each}
-          </div>
-          <div class="row">
-            <div class="control">
-              <span class="eyebrow">Game</span>
-              <Segmented
-                label="Game"
-                bind:value={app.mode}
-                options={[
-                  { value: 'living', label: 'Living' },
-                  { value: 'creative', label: 'Creative' },
-                ]}
-              />
-              <span class="hint">{app.mode === 'creative' ? 'Building is free. No rent or bills at home.' : 'Your residents earn the money to build with.'}</span>
-            </div>
-            <div class="control">
-              <span class="eyebrow">Lifespan</span>
-              <Segmented
-                label="Lifespan"
-                bind:value={app.lifespan}
-                options={[
-                  { value: 'off', label: 'Off' },
-                  { value: 'short', label: 'Short' },
-                  { value: 'normal', label: 'Normal' },
-                  { value: 'long', label: 'Long' },
-                ]}
-              />
-              <span class="hint">{lifespanHint(app.lifespan)}</span>
-            </div>
-            <div class="stats" aria-label="World summary">
-              <span><b>{roadCount}</b> {roadCount === 1 ? 'road' : 'roads'}</span>
-              <span><b>{homes}</b> homes</span>
-              {#if farms}<span><b>{farms}</b> {farms === 1 ? 'farm' : 'farms'}</span>{/if}
-              <span><b>{places}</b> public {places === 1 ? 'place' : 'places'}</span>
-            </div>
-          </div>
-        </div>
-      {/if}
     </section>
-
-    <aside class="kinds menu-glass" use:avoid>
-      <header class="list-head">
-        <span class="eyebrow">Where it takes place</span>
-      </header>
-      <div class="list" role="radiogroup" aria-label="Kind of world">
-        {#each WORLD_KINDS as k (k)}
-          <button class="kind" role="radio" aria-checked={kind === k} class:on={kind === k} disabled={!templates} onclick={() => choose(k)}>
-            <span class="glyph">{@render glyph(k)}</span>
-            <span class="info">
-              <b>{WORLDS[k].label}</b>
-              <span>{WORLDS[k].blurb}</span>
-            </span>
-          </button>
-        {/each}
-      </div>
-    </aside>
-  </main>
+  </div>
 </div>
 
 <style>
+  /* Beside the town: one slim panel down the left (the world's name, its place and options, the
+     game's), the town in the rest of the screen, the way on at its top right. */
   .screen {
+    --pad: 18px;
     position: relative;
     /* (Viewport units count in the UI scale.) */
     height: calc(100vh / var(--ui-scale));
     container: setup / inline-size;
+  }
+  .layout {
+    height: 100%;
     display: grid;
-    /* As wide as the screen, whatever the header's buttons would like. */
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 1fr;
+    grid-template-columns: clamp(300px, 24%, 340px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: 'side view';
     padding: 20px 28px 24px;
-    gap: 14px;
+    gap: 24px;
   }
-  /* Light haze behind the header so its text reads on any part of the scene. */
-  .haze {
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 150px;
-    background: var(--scene-haze);
-    pointer-events: none;
-  }
-  header {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-  }
-  .back {
-    color: var(--text-strong);
-  }
-  .title {
-    flex: 1;
+  /* (As tall as its choices, and no taller than the screen: then they scroll.) */
+  .side {
+    grid-area: side;
+    align-self: start;
+    max-height: 100%;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    overflow: hidden;
+    animation: rise 520ms var(--ease) both;
   }
-  .title .eyebrow {
+  .head {
+    grid-area: head;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 10px var(--pad) 14px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .back {
+    height: 32px;
+    padding: 0 10px;
+    margin: 0 0 2px -10px;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-strong);
+  }
+  .eyebrow {
+    margin: 0;
     color: #4a5163;
   }
   /* The name is a field you can type in, not a heading: a surface and a hairline of its own at rest,
      a solid field under the pointer, the accent ring while it has the caret. The dice (roll another
      name) sits in the field's end. */
   .name-field {
+    align-self: stretch;
     display: flex;
     align-items: center;
-    max-width: 440px;
     padding: 0 4px 0 12px;
     border: 1px solid var(--hairline);
     border-radius: var(--radius-md);
@@ -422,11 +457,11 @@
   .name-field .town-name {
     flex: 1;
     min-width: 0;
-    height: 46px;
+    height: 42px;
     padding: 0;
-    font-size: 26px;
+    font-size: 22px;
     font-weight: 750;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.02em;
     color: var(--text-strong);
     background: transparent;
     border: none;
@@ -443,65 +478,205 @@
     padding: 0;
     color: #4a5163;
   }
+  /* (Two lines kept for it, as for the place's blurb: the choices under it stay put from world to world.) */
   .lede {
-    margin: 0;
-    font-size: 14px;
+    margin: 2px 0 0;
+    min-height: 2lh;
+    font-size: 13px;
     font-weight: 550;
     font-style: italic;
+    line-height: 1.4;
     color: #3b4254;
     animation: rise 420ms var(--ease) both;
   }
-  .actions {
-    display: flex;
-    gap: 10px;
-  }
-  main {
-    position: relative;
+  /* The choices: they scroll under the name when the window is too short for them all. */
+  .panel {
+    grid-area: panel;
+    flex: 1;
     min-height: 0;
-    display: grid;
-    grid-template-columns: 1fr minmax(360px, 420px);
-    /* One row as tall as the screen allows: a long side panel scrolls rather than stretching the town view. */
-    grid-template-rows: minmax(0, 1fr);
-    gap: 24px;
+    overflow: auto;
+    overscroll-behavior: contain;
   }
-  /* Too narrow for the town beside the panel (a small window or a large UI scale): the town on
-     top, the panel under it. */
-  @container setup (max-width: 760px) {
-    .screen > header {
-      flex-wrap: wrap;
-      row-gap: 10px;
-    }
-    /* The title keeps a readable width; the buttons take the next line when they must. */
-    .screen > header .title {
-      flex: 1 1 300px;
-    }
-    main {
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr);
-      gap: 14px;
-    }
-    .kinds {
-      align-self: stretch;
-    }
+  .sections {
+    display: flex;
+    flex-direction: column;
+  }
+  .group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px var(--pad) 14px;
+  }
+  .group + .group,
+  .group + .game,
+  .game .group + .group {
+    border-top: 1px solid var(--hairline);
+  }
+  .hint {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-muted);
+  }
+  /* The nine places: a glyph each with its name under it, the chosen one ringed. */
+  .places {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .place {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    padding: 6px 4px;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    background: color-mix(in srgb, var(--surface) 40%, transparent);
+    color: var(--text-strong);
+    transition:
+      background var(--fast) var(--ease),
+      border-color var(--fast) var(--ease),
+      box-shadow var(--fast) var(--ease);
+  }
+  .place:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.8);
+  }
+  .place:disabled {
+    cursor: default;
+  }
+  .place.on {
+    background: #fff;
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .glyph {
+    display: grid;
+    place-items: center;
+    width: 50px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-muted);
+    color: #4a5163;
+    transition:
+      background var(--fast) var(--ease),
+      color var(--fast) var(--ease);
+  }
+  .glyph :global(svg) {
+    width: 38px;
+    height: 25px;
+  }
+  .place.on .glyph {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .place .label {
+    max-width: 100%;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .place.on .label {
+    color: var(--accent);
+  }
+  /* (Two lines kept for it, the longest place's: the options under it don't jump as places change.) */
+  .blurb {
+    margin: 2px 0 0;
+    min-height: 2lh;
+    font-size: 12.5px;
+    line-height: 1.4;
+    font-weight: 550;
+    color: var(--text-muted);
+  }
+  .summary {
+    color: #3b4254;
+    font-weight: 550;
+    margin-bottom: 2px;
+  }
+  .options {
+    display: grid;
+    gap: 8px;
+  }
+  .option {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 13px;
+  }
+  .eyebrow.sub {
+    font-size: 10.5px;
+    color: var(--text-muted);
+  }
+  .group :global(.segmented) {
+    font-size: 13px;
   }
   .view {
+    grid-area: view;
     position: relative;
     min-height: 0;
     display: grid;
-    grid-template-rows: 1fr auto;
-    gap: 14px;
-    /* The stream pill floats at the window's bottom edge, centred (StreamIndicator): the controls
-       bar and the stats stay clear above it rather than under it. */
-    padding-bottom: calc(70px / var(--ui-scale));
+    grid-template-rows: minmax(0, 1fr);
   }
-  /* The world's making, step by step: in the middle of the stage (over the last world, if any, which stays in view meanwhile). */
+  /* The way on, at the top right over the town, a short haze behind it so it reads on roofs and roads. */
+  .actions {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+    animation: rise 520ms 80ms var(--ease) both;
+  }
+  .actions::before {
+    content: '';
+    position: absolute;
+    inset: -60px -60px -50px -90px;
+    z-index: -1;
+    background: radial-gradient(closest-side, rgba(252, 249, 243, 0.7), rgba(252, 249, 243, 0.35) 55%, rgba(252, 249, 243, 0));
+    pointer-events: none;
+  }
+  /* The world in figures, small at the top left of the town (clear of the stream pill at the bottom). */
+  .stats {
+    position: absolute;
+    top: 6px;
+    left: 0;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: calc(100% - 420px);
+    color: #3b4254;
+    font-size: 12px;
+    font-weight: 550;
+    pointer-events: none;
+    animation: rise 520ms 120ms var(--ease) both;
+  }
+  .stats span {
+    padding: 5px 10px;
+    border-radius: var(--radius-pill);
+    background: var(--glass-menu);
+    border: 1px solid var(--glass-menu-border);
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  }
+  .stats b {
+    color: var(--text-strong);
+    font-weight: 750;
+  }
+  /* The world's making, step by step: in the middle of the town's view (over the last world, if any, which stays in view meanwhile). */
   .making {
     position: absolute;
     inset: 0;
     margin: auto;
     width: min(320px, 100%);
     height: max-content;
-    z-index: 1;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -553,158 +728,110 @@
     width: 12px;
     height: 12px;
   }
-  /* Two rows: the world's options (with the world in a line), then the game's; each wraps when narrow. */
-  .controls {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 14px 20px;
-    justify-self: start;
-    max-width: 100%;
-    animation: rise 520ms var(--ease) both;
-  }
-  .row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px 28px;
-  }
-  .row.yours {
-    align-items: flex-start;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--hairline);
-  }
-  .control {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-width: 200px;
-  }
-  .control.option {
-    min-width: 0;
-  }
-  .summary .hint {
-    max-width: 230px;
-  }
-  .hint {
-    font-size: 12px;
-    color: var(--text-muted);
-    max-width: 210px;
-  }
-  .controls .eyebrow,
-  .list-head .eyebrow {
-    color: #4a5163;
-  }
-  .stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    color: #3b4254;
-    font-size: 13px;
-    font-weight: 550;
-  }
-  .stats span {
-    padding: 5px 10px;
-    border-radius: var(--radius-pill);
-    background: rgba(29, 34, 48, 0.06);
-  }
-  .stats b {
-    color: var(--text-strong);
-    font-weight: 750;
-  }
-  .kinds {
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    padding: 16px 12px 12px 16px;
-    align-self: start;
-    max-height: 100%;
-    animation: rise 520ms 80ms var(--ease) both;
-  }
-  .list-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    padding: 0 6px 10px 2px;
-    border-bottom: 1px solid var(--hairline);
-    margin-bottom: 8px;
-  }
-  .list {
-    min-height: 0;
-    overflow: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding-right: 4px;
-  }
-  .kind {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 10px 12px;
-    text-align: left;
-    border-radius: var(--radius-md);
-    border: 1px solid transparent;
-    color: var(--text-strong);
-    transition:
-      background var(--fast) var(--ease),
-      border-color var(--fast) var(--ease);
-  }
-  .kind:hover {
-    background: rgba(255, 255, 255, 0.75);
-  }
-  .kind.on {
-    background: #fff;
-    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
-  }
-  .glyph {
-    flex: none;
-    display: grid;
-    place-items: center;
-    width: 60px;
-    height: 44px;
-    border-radius: var(--radius-md);
-    background: var(--surface-muted);
-    color: #4a5163;
-  }
-  .kind.on .glyph {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-  .info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .info span {
-    color: var(--text-muted);
-    font-size: 12.5px;
-    font-weight: 550;
-  }
-  /* Narrow (as above): the town gets what height there is. The stream pill floats over the places'
-     list instead (its last place scrolls clear of it), the world's line takes the panel's width, and
-     the stats, which that line already sums up, are left out. */
-  @container setup (max-width: 760px) {
-    .view {
-      padding-bottom: 0;
+  /* A window not much wider than the panel and the town: the stream pill, centred at the window's
+     bottom edge, would reach the panel's end; the panel stops short of it (its choices scroll sooner),
+     and the stats make way for the buttons. */
+  @container setup (max-width: 1000px) {
+    .side {
+      max-height: calc(100% - 72px / var(--ui-scale));
     }
-    .list {
-      padding-bottom: calc(56px / var(--ui-scale));
-    }
-    .summary {
-      flex-basis: 100%;
-      flex-flow: row wrap;
-      align-items: baseline;
-      gap: 4px 12px;
-    }
-    .summary .hint {
-      max-width: none;
-    }
+  }
+  @container setup (max-width: 1120px) {
     .stats {
       display: none;
+    }
+  }
+  /* Too narrow for the town beside the panel (a small window or a large UI scale): the name on top,
+     the way on under it, the town, then the choices in a panel of their own. The stats are left
+     out (the world's line sums them up). */
+  @container setup (max-width: 760px) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-areas: 'head' 'view' 'panel';
+      gap: 12px;
+      /* (The stream pill, centred at the window's bottom edge, gets a strip of town of its own under the panel.) */
+      padding: 16px 20px calc(70px / var(--ui-scale) + 26px);
+    }
+    .side {
+      display: contents;
+    }
+    .head,
+    .panel {
+      background: var(--glass-menu);
+      border: 1px solid var(--glass-menu-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--glass-menu-shadow);
+      backdrop-filter: blur(22px) saturate(1.5);
+      -webkit-backdrop-filter: blur(22px) saturate(1.5);
+    }
+    .head {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 6px 12px;
+      padding: 10px 14px 12px;
+    }
+    .back {
+      margin: 0 0 0 -6px;
+    }
+    .head > :not(.back) {
+      grid-column: 1 / -1;
+    }
+    .head > .eyebrow {
+      grid-column: 2;
+      grid-row: 1;
+    }
+    .view {
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 10px;
+    }
+    /* (First in the view, over the town: before it, or its stand-in while the first world is made.) */
+    .actions {
+      order: -1;
+      position: relative;
+      justify-content: flex-start;
+    }
+    .actions::before {
+      display: none;
+    }
+    /* (All nine in a row at the narrow layout's widest; a second row as it narrows.) */
+    .places {
+      grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+      gap: 4px;
+    }
+    .place {
+      padding-inline: 0;
+    }
+    .place .label {
+      font-size: 11px;
+      letter-spacing: -0.01em;
+    }
+    .lede {
+      min-height: 0;
+    }
+    .options {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 16px;
+    }
+    .game {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .game .group + .group {
+      border-top: 0;
+      border-left: 1px solid var(--hairline);
+    }
+  }
+  /* Narrower still (a phone's width): one option to a row. */
+  @container setup (max-width: 560px) {
+    .options,
+    .game {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .game .group + .group {
+      border-left: 0;
+      border-top: 1px solid var(--hairline);
     }
   }
   @keyframes rise {
