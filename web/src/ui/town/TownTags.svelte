@@ -89,8 +89,11 @@
   let shown = new Map<string, Box>();
   /** The tags moved off their point last frame (their stem is hidden). */
   const edges = new Set<string>();
-  /** Where each tag shown was last put (its transform as written), so one that stays put isn't written again. */
-  const placedAt = new Map<string, string>();
+  /**
+   * Where each tag shown was last put (its element and transform as written), so one that stays put isn't written
+   * again; a tag whose element was made again (the keyed `each`) is written whole.
+   */
+  const placedAt = new Map<string, { el: HTMLElement; at: string }>();
   /** What the last layout was given (`sameAsLaid`): the tags in order, their elements, and the numbers it read. */
   let laidKeys: string[] = [];
   let laidEls: HTMLElement[] = [];
@@ -245,13 +248,15 @@
       next.set(key, { l: s.x - s.w / 2, t: s.y - s.h, r: s.x + s.w / 2, b: s.y });
       const name = t.kind === 'names';
       const at = `translate(${s.x.toFixed(1)}px, ${(name ? s.y - s.h / 2 : s.y).toFixed(1)}px)`;
-      if (placedAt.get(key) !== at) {
+      const last = placedAt.get(key);
+      const fresh = last?.el !== el;
+      if (fresh || last.at !== at) {
         el.style.transform = at;
-        placedAt.set(key, at);
+        placedAt.set(key, { el, at });
       }
-      if (!shown.has(key)) el.style.visibility = 'visible';
+      if (fresh || !shown.has(key)) el.style.visibility = 'visible';
       const edge = !name && (Math.abs(s.x - s.sx) > 2 || Math.abs(s.y - s.sy) > 2);
-      if (edge !== edges.has(key)) {
+      if (fresh || edge !== edges.has(key)) {
         if (edge) edges.add(key);
         else edges.delete(key);
         el.classList.toggle('edge', edge);

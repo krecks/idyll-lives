@@ -285,6 +285,8 @@ export class SunShadows {
   private whole = true;
   /** The still casters' picture (a depth texture the map's size) and what it was drawn of. */
   private stillTarget: pc.RenderTarget | null = null;
+  /** Whether this redraw's `drawStill` copied the still casters' picture into the map (`drawPass` then draws only what moves). */
+  private copied = false;
   private readonly drawn = { viewProj: new Float32Array(16), map: null as object | null, casters: [] as pc.MeshInstance[], boxes: new Float64Array(0), counts: new Float64Array(0) };
   /** This redraw's casters: those that move (`movers`), the still ones, and all of them as PlayCanvas culled them. */
   private readonly moving = new Set<pc.MeshInstance>();
@@ -428,6 +430,7 @@ export class SunShadows {
     const map = pass.renderTarget;
     const data = light.getRenderData(camera, 0);
     const casters = data.visibleCasters;
+    this.copied = false;
     // This redraw's casters, the moving and the still.
     const moving = this.moving;
     const list = this.movingList;
@@ -445,6 +448,7 @@ export class SunShadows {
     // SAFETY: both of PlayCanvas 2.23's devices copy a render target's depth with `copyRenderTarget(source, dest,
     // color, depth)` (WebGPU `copyTextureToTexture`, WebGL2 `blitFramebuffer`), outside a pass (`check:chunks`).
     (this.device as unknown as { copyRenderTarget(source: pc.RenderTarget, dest: pc.RenderTarget, color: boolean, depth: boolean): boolean }).copyRenderTarget(this.stillTarget!, map, false, true);
+    this.copied = true;
     if (redraw) this.draws.whole++;
     else this.draws.moving++;
     this.whole = false;
@@ -458,7 +462,9 @@ export class SunShadows {
     const all = this.allCasters;
     all.length = 0;
     for (const mi of casters) all.push(mi);
-    const copied = this.stillTarget !== null && !this.whole;
+    // (Only over a picture this redraw copied in: a `drawStill` that returned early left last redraw's map there.)
+    const copied = this.copied;
+    this.copied = false;
     if (copied) {
       casters.length = 0;
       for (const mi of all) if (this.moving.has(mi)) casters.push(mi);

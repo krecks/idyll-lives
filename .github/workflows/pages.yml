@@ -198,7 +198,8 @@ jobs:
           if [ "$EVENT" = push ]; then
             pick="[.workflow_runs[] | select(.event == \"push\" and .head_branch == \"$TAG\")][0].id // empty"
           else
-            pick='([.workflow_runs[] | select(.conclusion == "success")] + [.workflow_runs[] | select(.status != "completed")])[0].id // empty'
+            # (Not a pull request's run: it tested the commit merged into main, not the commit itself.)
+            pick='[.workflow_runs[] | select(.event != "pull_request")] | ([.[] | select(.conclusion == "success")] + [.[] | select(.status != "completed")])[0].id // empty'
           fi
           # (A tag's CI run can start a little after this one.)
           id=
