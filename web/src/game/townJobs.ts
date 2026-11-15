@@ -6,17 +6,21 @@
  */
 
 import type { Content } from '../content/content';
-import type { WorldStructure } from '../core/protocol';
+import type { WorldOptions, WorldStructure } from '../core/protocol';
 import type { HouseholdDraft } from './household';
 import { assembleTown, generatedHouses, generateWorld, loadTemplates, primeHouses, type AssembleOptions, type HouseTemplate, type NeighbourhoodDraft, type Templates } from './town';
 import { previewWorld } from './townPreview';
-import type { WorldKind, WorldStep } from './world';
+import type { WorldStep } from './world';
 import { LazyWorker, type WorkerAnswer, type WorkerAsk } from '../core/lazyWorker';
 import { mulberry32 } from './noise';
 
 export type TownJob =
-  /** A new world (`generateWorld`), with the menu's preview of it (`previewWorld`). */
-  | { kind: 'world'; world: WorldKind; seed: number; name?: string }
+  /**
+   * A new world (`generateWorld`), with the menu's preview of it (`previewWorld`): `world` is its
+   * place (`WorldKind`, or a kind from before places: `LEGACY_KINDS`), `options` the player's (the
+   * place's own where not given).
+   */
+  | { kind: 'world'; world: string; seed: number; name?: string; options?: Partial<WorldOptions> }
   /** The simulation's town file (`assembleTown`); `random`: the seed for its dice (neighbours' bonds). */
   | { kind: 'assemble'; town: NeighbourhoodDraft; player: HouseholdDraft; slot: number; options: AssembleOptions; random: number };
 
@@ -35,7 +39,7 @@ export type FromTownWorker = WorkerAnswer<TownResult, WorldStep>;
  */
 export function runTownJob(content: Content, t: Templates, job: TownJob, step?: (done: WorldStep) => void): TownResult {
   if (job.kind === 'world') {
-    const draft = generateWorld(content, t, job.world, job.seed, job.name, step);
+    const draft = generateWorld(content, t, job.world, job.seed, job.name, step, job.options);
     const preview = previewWorld(content, t, draft, null);
     const houses = generatedHouses(t, draft.slots.map((s) => s.template));
     step?.('houses');

@@ -8,6 +8,7 @@
 // the generated-world checks failed on (`tools/worlds/sample.ts`, made here the same way).
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
+import { CLASSIC, type ClassicKind } from './support/classicWorlds';
 
 const WEB = new URL('../', import.meta.url).pathname;
 /** sim-core `cars::OBLIQUE`: the least cosine of a driveway's line to its road's side. */
@@ -102,10 +103,10 @@ describe('driveways', async () => {
   const { objectInfos } = await import('../src/game/housegen');
   const { AssetRegistry } = await import('../src/assets/registry');
   const { randomHousehold } = await import('../src/game/household');
-  const { assembleTown, generateWorld, populate, useTownContent, vacantSlots } = await import('../src/game/town');
+  const { assembleTown, populate, useTownContent, vacantSlots } = await import('../src/game/town');
+  const { generateFromSpec } = await import('../src/game/macro');
   const { mulberry32 } = await import('../src/game/noise');
   type Templates = import('../src/game/town').Templates;
-  type WorldKind = import('../src/game/world').WorldKind;
 
   const content = await Content.load('http://localhost/content/base.json');
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json');
@@ -114,16 +115,16 @@ describe('driveways', async () => {
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
 
   /** A world's town file as `tools/worlds/sample.ts` makes it (its households seeded by its seed, the player in the first empty house). */
-  const townFile = (kind: WorldKind, seed: number): TownFile => {
+  const townFile = (kind: ClassicKind, seed: number): TownFile => {
     Math.random = mulberry32(seed);
-    const town = populate(content, assets, t, generateWorld(content, t, kind, seed));
+    const town = populate(content, assets, t, generateFromSpec(content, t, CLASSIC[kind], seed));
     const home = vacantSlots(town)[0];
     return JSON.parse(assembleTown(content, t, town, randomHousehold(content, assets, 2), home.index)) as TownFile;
   };
 
   // Seed base 14's worlds whose cars had no way out: their driveways came alongside the road
   // (Brackenshaw's by a loop bending away from the lot's corner, Kingfisher Lake's by a junction).
-  const noWayOut: [WorldKind, number][] = [
+  const noWayOut: [ClassicKind, number][] = [
     ['forest', 425059],
     ['lakeside', 215603],
     ['forest', 320330],
@@ -147,7 +148,7 @@ describe('driveways', async () => {
   // hamlets have other houses since the living town's terraces (2026-11-12), and whichever plot
   // has such a driveway moves as the layout does: the first of these worlds with a car whose
   // driveway's line crosses a trail on the way to its road has it paved across.
-  const acrossTrail: [WorldKind, number][] = [
+  const acrossTrail: [ClassicKind, number][] = [
     ['mountain', 241142],
     ['mountain', 207684],
     ['mountain', 128494],

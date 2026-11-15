@@ -29,6 +29,7 @@ describe('town jobs', async () => {
   const { generateWorld, houseTemplate, populate, useTownContent, vacantSlots } = await import('../src/game/town');
   const { previewWorld } = await import('../src/game/townPreview');
   const { runTownJob } = await import('../src/game/townJobs');
+  const { defaultsOf } = await import('../src/game/world');
   type Templates = import('../src/game/town').Templates;
   type TownJob = import('../src/game/townJobs').TownJob;
   const content = await Content.load('http://localhost/content/base.json');
@@ -40,9 +41,9 @@ describe('town jobs', async () => {
   const inWorker = (job: TownJob) => structuredClone(runTownJob(content, t, structuredClone(job)));
 
   const worlds = [
-    { kind: 'medium', seed: 7 },
+    { kind: 'country', seed: 7 },
     { kind: 'farm', seed: 3141 },
-    { kind: 'seaside', seed: 271828, name: 'Typed In' },
+    { kind: 'seaside', seed: 271828, name: 'Typed In', options: { town: 'town', hills: 'hilly' } },
     { kind: 'forest', seed: 99 },
   ] as const;
 
@@ -51,10 +52,13 @@ describe('town jobs', async () => {
       `${w.kind} ${w.seed}: the worker's world is the page's`,
       () => {
         const name = 'name' in w ? w.name : undefined;
-        const made = inWorker({ kind: 'world', world: w.kind, seed: w.seed, name });
+        const options = 'options' in w ? w.options : undefined;
+        const made = inWorker({ kind: 'world', world: w.kind, seed: w.seed, name, options });
         if (made.kind !== 'world') throw new Error('not a world');
-        const draft = generateWorld(content, t, w.kind, w.seed, name);
+        const draft = generateWorld(content, t, w.kind, w.seed, name, undefined, options);
         expect(made.draft).toEqual(draft);
+        // (Its options kept with it: the place's own, but for those chosen.)
+        expect(draft.world?.options).toEqual({ ...defaultsOf(w.kind), ...options });
         expect(made.preview).toEqual(previewWorld(content, t, draft, null));
         // Every generated house its lots use, as the page makes it.
         const ids = new Set(draft.slots.map((s) => s.template).filter((id) => id.startsWith('gen:')));
@@ -67,14 +71,14 @@ describe('town jobs', async () => {
 
   test('a world tells its steps in turn, and is the same world for it', () => {
     const steps: string[] = [];
-    const made = runTownJob(content, t, { kind: 'world', world: 'small', seed: 909 }, (step) => steps.push(step));
+    const made = runTownJob(content, t, { kind: 'world', world: 'country', seed: 909 }, (step) => steps.push(step));
     expect(steps).toEqual(['land', 'roads', 'homes', 'houses']);
     if (made.kind !== 'world') throw new Error('not a world');
-    expect(made.draft).toEqual(generateWorld(content, t, 'small', 909));
+    expect(made.draft).toEqual(generateWorld(content, t, 'country', 909));
   }, 30_000);
 
   test('the worker\'s town file is the page\'s, its dice from the job\'s seed', () => {
-    const town = populate(content, assets, t, generateWorld(content, t, 'small', 4242));
+    const town = populate(content, assets, t, generateWorld(content, t, 'country', 4242));
     const player = randomHousehold(content, assets, 2);
     const job: TownJob = { kind: 'assemble', town, player, slot: vacantSlots(town)[0].index, options: { mode: 'living', lifespan: 'normal' }, random: 12345 };
     const a = inWorker(job);

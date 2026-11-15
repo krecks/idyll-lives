@@ -11,12 +11,12 @@ const SAMPLE = new URL('../../tools/worlds/sample.ts', import.meta.url).pathname
 const dir = mkdtempSync(join(tmpdir(), 'sample-worlds-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-/** A big world of one kind (every world is a big one now): the file's text. */
+/** A big world of one place, the countryside (every world is a big one now): the file's text. */
 function sample(tag: string, more: string[] = []): string {
   const out = join(dir, `${tag}.json`);
   // (Not timed: beside the other tests on CI's runner a big world's layout took over twice its budget,
   // which `ci-local.sh generated` checks running alone.)
-  const run = Bun.spawnSync([process.execPath, SAMPLE, out, '1', '--kinds', 'small', '--no-timing', ...more], { stdout: 'pipe', stderr: 'pipe' });
+  const run = Bun.spawnSync([process.execPath, SAMPLE, out, '1', '--kinds', 'country', '--no-timing', ...more], { stdout: 'pipe', stderr: 'pipe' });
   // (A sample that found a layout problem still writes its file, so the exit status is the check.)
   expect(run.exitCode).toBe(0);
   expect(run.stderr.toString()).not.toContain('error');
@@ -28,14 +28,14 @@ test('sampling the same worlds twice makes the same files', () => {
   const [first, second] = [sample('a'), sample('b')];
   expect(first.length).toBeGreaterThan(0);
   expect(second === first).toBe(true);
-  // (Seed base 0 is the default, CI's worlds: the first of a kind seeded 104729 and its name's length.)
+  // (Seed base 0 is the default, CI's worlds: the first of a place seeded 104729 and its name's length.)
   const zero = sample('zero', ['--seed-base', '0']);
   expect(zero === first).toBe(true);
-  expect(seeds(first)).toEqual([104729 + 'small'.length]);
+  expect(seeds(first)).toEqual([104729 + 'country'.length]);
 }, 120_000);
 
 test('another seed base samples other worlds, the same each time', () => {
   const [one, again] = [sample('one', ['--seed-base', '1']), sample('again', ['--seed-base', '1'])];
-  expect(seeds(one)[0]).not.toBe(104729 + 'small'.length);
+  expect(seeds(one)[0]).not.toBe(104729 + 'country'.length);
   expect(one === again).toBe(true);
 }, 120_000);

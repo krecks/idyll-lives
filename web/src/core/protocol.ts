@@ -402,10 +402,26 @@ export interface RoadPlan {
   kind?: RoadKind;
   /** The area (`OpenWorldTownFields.areas` index) it belongs to; absent for ways between areas. */
   area?: number;
+  /** A bridge or a causeway: the arc lengths (m) along it where its deck over the water begins and ends. */
+  bridge?: [number, number];
 }
 
 /** `street` (default) · `lane` · `country` (between areas) · `trail` (2 m, on foot only). */
 export type RoadKind = 'street' | 'lane' | 'country' | 'trail';
+
+/** How big a world's main town is: a hamlet, a village, a town or a city. */
+export type TownSize = 'hamlet' | 'village' | 'town' | 'city';
+
+/**
+ * What the player chose for a world besides its place (`game/world.ts` `WorldKind`): how big its
+ * main town is, how many villages round it, how hilly and how wooded its land.
+ */
+export interface WorldOptions {
+  town: TownSize;
+  villages: 'none' | 'few' | 'many';
+  hills: 'flat' | 'rolling' | 'hilly' | 'mountains';
+  woods: 'open' | 'some' | 'wooded';
+}
 
 /** How big a world is: every world is a Big one (cosy and normal were dropped in 0.8.0; a save that still says so reads as `big`). */
 export type WorldSize = 'big';
@@ -482,6 +498,12 @@ export interface WorldMeta {
   /** Living town: each main town's centre, the square and the high street. */
   centre?: { area: number; poly: [number, number][] }[];
   // pin:living-town-meta end
+  /**
+   * Big worlds: how high the land stands over the level the towns are built at, a grid of `cell` m
+   * squares (`cols` × `rows`, row-major from the world's corner), in decimetres (0 on the water).
+   * Missing in older saves: the land is drawn from the landscape alone.
+   */
+  relief?: { cell: number; cols: number; rows: number; h: number[] };
 }
 
 // pin:living-town-types begin
@@ -545,6 +567,8 @@ export interface WorldLook {
   /** How big the world is (always `big` now). */
   size?: WorldSize;
   landscape: LandscapeParams;
+  /** What the player chose for the world besides its place (missing in older saves). */
+  options?: WorldOptions;
   /** Tilled fields on farm lots (town tiles): drawn as soil, fenced in. */
   fields?: { x: number; z: number; w: number; d: number }[];
 }
@@ -578,6 +602,14 @@ export interface LandscapeParams {
    * the town from there) and parted by a pass where the road leaves town.
    */
   mountains?: number;
+  /** The steepest the land rises from anything built (rise per m); missing: as steep as the hills make it. */
+  slope?: number;
+  /** Trees out on open land, times the usual (default 1). */
+  scatter?: number;
+  /** The share of the trees that are bushes (default: the usual share). */
+  scrub?: number;
+  /** How far the sand reaches from the shoreline (m; default 8). */
+  beach?: number;
 }
 
 export const DEFAULT_LANDSCAPE: LandscapeParams = {

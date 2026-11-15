@@ -3,7 +3,7 @@
   import { menuScene } from '../../game/menuScene';
   import { loadTemplates, NEIGHBOUR_CAP, type NeighbourhoodDraft, type Templates } from '../../game/town';
   import { keepHouses, Superseded, townJob } from '../../game/townJobs';
-  import { WORLD_KINDS, WORLDS, worldName, type WorldKind, type WorldStep } from '../../game/world';
+  import { placeOf, specOf, WORLD_KINDS, WORLDS, worldName, type WorldKind, type WorldStep } from '../../game/world';
   import type { TownBuildStep } from '../../render/types';
   import { app } from '../app.svelte';
   import { toast } from '../state.svelte';
@@ -16,7 +16,7 @@
   const { content } = services;
   let templates = $state.raw<Templates | null>(null);
   let world = $state.raw<NeighbourhoodDraft | null>(app.world);
-  let kind = $state<WorldKind>(app.world?.world?.kind ?? 'medium');
+  let kind = $state<WorldKind>(placeOf(app.world?.world?.kind ?? 'country'));
   let name = $state(app.world?.name ?? '');
   /** The name was typed or rolled here (kept when the world is made again). */
   let named = $state(false);
@@ -120,7 +120,7 @@
   }
 
   function rollName() {
-    name = worldName(content, kind, Math.random);
+    name = worldName(content, specOf(kind).names, Math.random);
     named = true;
   }
 
@@ -162,12 +162,14 @@
 
 {#snippet glyph(k: WorldKind)}
   <svg viewBox="0 0 48 32" width="48" height="32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
-    {#if k === 'small'}
-      <path d="M8 27V17l7-6 7 6v10M26 27V19l6-5 6 5v8M4 27h40" />
-    {:else if k === 'medium'}
+    {#if k === 'country'}
       <path d="M4 27V18l6-5 6 5v9M18 27V15l6-5 6 5v12M32 27V18l6-5 6 5v9M2 27h44" />
-    {:else if k === 'dense'}
-      <path d="M5 27V12h9v15M14 27V6h10v21M24 27V10h9v17M33 27V14h10v13M2 27h44M8 16h3M8 21h3M18 11h3M18 16h3M18 21h3M28 15h2M28 20h2M37 18h3M37 23h3" />
+    {:else if k === 'river'}
+      <path d="M2 13c6 0 8 5 14 5s8-5 14-5 10 5 16 5M2 21c6 0 8 5 14 5s8-5 14-5 10 5 16 5M17 23c1-6 13-6 14 0" />
+    {:else if k === 'heath'}
+      <path d="M2 21c8-8 16-8 22-2s14-6 22 0M2 27h44M9 27v-3M12 27v-4M15 27v-3M31 27v-3M34 27v-4M37 27v-3" />
+    {:else if k === 'island'}
+      <path d="M11 22c2-6 7-9 13-9s11 3 13 9zM24 13V5l6 3-6 2M4 27c3-2 5-2 8 0s5 2 8 0 5-2 8 0 5 2 8 0 5-2 8 0" />
     {:else if k === 'farm'}
       <path d="M6 27V15l9-7 9 7v12M11 27v-6h8v6M30 27V9a4 4 0 0 1 8 0v18M2 27h44M38 18h6M41 15v12" />
     {:else if k === 'seaside'}

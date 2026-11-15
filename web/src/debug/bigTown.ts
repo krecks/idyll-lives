@@ -14,15 +14,13 @@ import type { Content } from '../content/content';
 import type { WorldStructure } from '../core/protocol';
 import { generateWorld, loadTemplates, populate } from '../game/town';
 import { previewWorld } from '../game/townPreview';
-import { WORLD_KINDS } from '../game/world';
 import { perfTimeAsync } from './perf';
 
-/** The big world of kind `kind` (an unknown one: 'small'), seed fixed: the same town every run. */
+/** The big world of kind `kind` (a place, or a kind from before places: `LEGACY_KINDS`; an unknown one: the countryside), seed fixed: the same town every run. */
 export async function benchBigWorld(content: Content, assets: AssetRegistry, kind: string): Promise<WorldStructure> {
   return perfTimeAsync('bench: big world', async () => {
     const t = await loadTemplates();
-    const k = WORLD_KINDS.find((w) => w === kind) ?? 'small';
-    const draft = populate(content, assets, t, generateWorld(content, t, k, 7));
+    const draft = populate(content, assets, t, generateWorld(content, t, kind, 7));
     return previewWorld(content, t, draft);
   });
 }
