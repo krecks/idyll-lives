@@ -1084,7 +1084,7 @@ export function specOf(kind: WorldKind, options: Partial<WorldOptions> = {}): Wo
     density: s.density,
     civic: size,
     mainLeast: s.mainLeast,
-    exits: island ? (small ? [1, 1] : [2, 2]) : size === 'hamlet' ? [1, 2] : [2, 3],
+    exits: island ? (small ? [1, 1] : [2, 2]) : [2, 3],
     water: p.land.water,
     ponds: p.land.ponds,
     woods: woods.share,

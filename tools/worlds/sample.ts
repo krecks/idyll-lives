@@ -321,7 +321,8 @@ function openProblems(town: TownFile, expect: Expected, river: boolean): string[
 function bridgeProblems(town: TownFile, roads: readonly Road[], river: boolean): string[] {
   const out: string[] = [];
   const water = (town.meta.zones ?? []).filter((z) => z.kind === 'water').map((z) => z.poly);
-  const wet = (x: number, z: number) => water.some((poly) => inside(poly, x, z));
+  // (At the 1 m tile's middle, as the water's tiles are made from the zones: `macro.ts` `rasterize`.)
+  const wet = (x: number, z: number) => water.some((poly) => inside(poly, Math.floor(x) + 0.5, Math.floor(z) + 0.5));
   for (const [i, r] of roads.entries()) {
     const name = r.name ?? `road ${i}`;
     const ls = lengths(r.points);

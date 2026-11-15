@@ -641,6 +641,10 @@ const LOOK = 0x6c6f6f6b;
 const MASSIF_RISE = 260;
 const MASSIF_FLAT = 70;
 const MASSIF_NEAR = 0.45;
+/** The size of world (m) a lake is drawn for: in a smaller one (a place's), smaller in proportion. */
+const LAKE_WORLD = 992;
+/** A place's outdoor places no further than this from their area's box (m: the sample's check is 150). */
+const SPOT_REACH = 130;
 /** Streams of their own for a river's course and its bridges (a place's). */
 const RIVER = 0x72697672;
 /** A river's width (m), how far its meanders swing (m), how far its mountains stand back from it (m). */
@@ -725,7 +729,13 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   }
   const lake: Pt = [W / 2 + range(rand, -50, 50), D / 2 + range(rand, -40, 40)];
   if (spec.water === 'lake') {
-    const [rx, rz] = [range(rand, 150, 185), range(rand, 95, 120)];
+    let [rx, rz] = [range(rand, 150, 185), range(rand, 95, 120)];
+    // (A place's: a lake in proportion to its world, and room for the town between it and the world's edge, on its side of it.)
+    if (!spec.classic) {
+      [rx, rz] = [rx * Math.min(1, W / LAKE_WORLD), rz * Math.min(1, W / LAKE_WORLD)];
+      const room = EDGE / 2 + box.d + 4 + rz * 1.4;
+      lake[1] = waterSide === 'zmin' ? Math.min(lake[1], D - room) : Math.max(lake[1], room);
+    }
     for (let i = 0; i < gw * gd; i++) {
       const [x, z] = land.centre(i);
       const r = ((x - lake[0]) / rx) ** 2 + ((z - lake[1]) / rz) ** 2;
@@ -766,7 +776,9 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   let ox = Math.round(W / 2 - box.w / 2 + range(rand, -0.08, 0.08) * W);
   let oz = Math.round(D / 2 - box.d / 2 + range(rand, -0.08, 0.08) * D);
   ox = Math.max(EDGE, Math.min(W - EDGE - box.w, ox));
-  const river = spec.water === 'river' ? riverAcross(random((seed ^ RIVER) >>> 0), W, D, [ox, ox + box.w], nseed) : null;
+  // (Room for the town between the river and the world's edge, on its side of it.)
+  const room = EDGE / 2 + box.d + 40;
+  const river = spec.water === 'river' ? riverAcross(random((seed ^ RIVER) >>> 0), W, D, [ox, ox + box.w], nseed, waterSide === 'zmax' ? [room, D] : [0, D - room]) : null;
   if (river) {
     for (let i = 0; i < gw * gd; i++) {
       const [x, z] = land.centre(i);
@@ -1873,7 +1885,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const id = spec.spots[next++ % spec.spots.length];
       const place = outdoor.get(id);
       if (!place) continue;
-      const spot = siteFor(place, plan, land, ground, waterMask, t, rand, W, D);
+      const spot = siteFor(place, plan, land, ground, waterMask, t, rand, W, D, spec.classic ? Infinity : SPOT_REACH);
       if (!spot) continue;
       const slot = lots.put({ kind: 'outdoor', template: place.id, name: `${plan.name} ${place.name}`, lot: 'medium', w: spot.w, d: spot.d, area: a }, spot, null);
       const r = rectOf(slot);
@@ -2034,10 +2046,10 @@ interface River {
 /**
  * A river across a `W` × `D` world from west to east: meandering 70 to 110 m either way, but a
  * fifth as much along `reach` (the main town's stretch of it, from x to x) and a little past it,
- * 14 to 22 m wide, its middle near the world's.
+ * 14 to 22 m wide, its middle near the world's (within `middle`, from z to z, where the town has room).
  */
-function riverAcross(rand: Rand, W: number, D: number, reach: [number, number], nseed: number): River {
-  const c = D / 2 + range(rand, -0.04, 0.04) * D;
+function riverAcross(rand: Rand, W: number, D: number, reach: [number, number], nseed: number, middle: [number, number]): River {
+  const c = Math.max(middle[0], Math.min(middle[1], D / 2 + range(rand, -0.04, 0.04) * D));
   const tilt = range(rand, -0.05, 0.05);
   const amp = range(rand, ...MEANDER);
   const k = rand() * 50;
@@ -2302,9 +2314,10 @@ function alongCountryRoads(content: Content, t: Templates, lots: LotPlacer, plan
 /**
  * Where an outdoor place of area `plan` goes: on its kind of land (by the water, its back to it;
  * up a hill; in the woods; in a meadow), 50 to 140 m from the area's middle, on land nothing else
- * takes. Its rectangle and which way it faces (towards the area: its trail comes from there).
+ * takes, no further than `reach` from the area's box. Its rectangle and which way it faces
+ * (towards the area: its trail comes from there).
  */
-function siteFor(place: PublicTemplate, plan: Plan, land: Land, ground: Ground, water: Uint8Array, t: Templates, rand: Rand, W: number, D: number): { x: number; z: number; facing: Facing; w: number; d: number } | null {
+function siteFor(place: PublicTemplate, plan: Plan, land: Land, ground: Ground, water: Uint8Array, t: Templates, rand: Rand, W: number, D: number, reach = Infinity): { x: number; z: number; facing: Facing; w: number; d: number } | null {
   const frame = place.lot ?? t.plot;
   let best: { at: { x: number; z: number; facing: Facing; w: number; d: number }; score: number } | null = null;
   const wetAt = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < D && water[Math.floor(z) * W + Math.floor(x)] === 1;
@@ -2312,6 +2325,7 @@ function siteFor(place: PublicTemplate, plan: Plan, land: Land, ground: Ground, 
     const angle = rand() * Math.PI * 2;
     const r = range(rand, 50, 140) + Math.max(plan.rect.w, plan.rect.d) * 0.3;
     const c: Pt = [plan.centre[0] + Math.cos(angle) * r, plan.centre[1] + Math.sin(angle) * r];
+    if (offRect(plan.rect, c) > reach) continue;
     // From the area towards the place (its trail comes from there), or towards the water behind it.
     let n: Pt = [(c[0] - plan.centre[0]) / r, (c[1] - plan.centre[1]) / r];
     let score = 0;
