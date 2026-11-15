@@ -1,6 +1,6 @@
 /** Top-level navigation: which screen is shown, and which modal is open on top of it. */
 
-import type { GameKind, Lifespan } from '../core/protocol';
+import type { GameKind, Lifespan, WorldOptions } from '../core/protocol';
 import type { HouseholdDraft } from '../game/household';
 import type { MenuStill } from '../game/menuStill';
 import type { StartRequest } from '../game/session';
@@ -44,6 +44,8 @@ class AppState {
   world = $state.raw<NeighbourhoodDraft | null>(null);
   town = $state.raw<NeighbourhoodDraft | null>(null);
   household = $state.raw<HouseholdDraft | null>(null);
+  /** The world's options as step 1 last had them (null: not chosen yet), kept when going to step 2 and back. */
+  worldOptions = $state.raw<WorldOptions | null>(null);
   /** Living (the residents earn the money) or Creative (building is free). */
   mode = $state<GameKind>('living');
   /** How fast residents age (the new game's choice). */
@@ -71,6 +73,7 @@ class AppState {
     this.world = null;
     this.town = null;
     this.household = null;
+    this.worldOptions = null;
     this.playSlot = null;
     this.emptyLot = false;
     this.screen = 'world';

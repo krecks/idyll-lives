@@ -11,8 +11,15 @@
  * drawing out (`render/pc/townView.ts`: the backdrop, the far lots, crowns, movers, the ground's map), the far LOD as before it;
  * `notownwoods`, `notownground` and `notownbuildings` one part of it: the woods as before, no colour map, no buildings.
  * `wholeshadows` draws every caster into the sun's map every time, also when only the residents moved (`render/pc/sunShadows.ts`).
+ *
+ * `?world=<place>` (and `?options=town:city,villages:many`, `game/worldOptions.ts`) works without
+ * `?bench` too: step 1 of a new game makes its first world there, with those options (`WORLD_FLAG`;
+ * the timing tools' worlds). `?bench=bigworld` draws a Big world of `big=<place>` (default the
+ * countryside), with `options=` as well.
  */
 
+import type { WorldOptions } from '../core/protocol';
+import { parseOptions } from '../game/worldOptions';
 import { TOWN_MAX } from '../render/shared/lens';
 import { isResolution, type Resolution } from '../render/shared/resolution';
 
@@ -26,8 +33,14 @@ export interface BenchFlags {
   scene: string;
   /** The scene's town laid out `tile × tile` times for the renderer, as a big world (`debug/tileWorld.ts`); 1: as it is. */
   tile: number;
-  /** A real Big world of this kind for the renderer (`debug/bigTown.ts`; `bench=bigworld`: `big=` or 'small'); null: the scene's town. */
+  /**
+   * A real Big world in this place for the renderer (`debug/bigTown.ts`; `bench=bigworld`: `big=`,
+   * else the countryside; a kind from before places, such as `dense`, is its place at its size); null:
+   * the scene's town.
+   */
   big: string | null;
+  /** That world's options (`options=town:city,villages:many`; the place's own where not given). */
+  options: Partial<WorldOptions>;
   /** `?quality=` (the presets in `render/quality.ts`; the renderer reads it itself). */
   quality: 'low' | 'medium' | 'high' | null;
   /** `?hour=`: the lighting held at that hour (the renderer reads it itself); null: the game's clock. */
@@ -91,7 +104,8 @@ function parse(): BenchFlags | null {
   return {
     scene,
     tile: num('tile', 1, 1, 6),
-    big: scene === 'bigworld' ? (params.get('big') ?? 'small') : params.get('big'),
+    big: scene === 'bigworld' ? (params.get('big') ?? 'country') : params.get('big'),
+    options: parseOptions(params.get('options')),
     quality: quality === 'low' || quality === 'medium' || quality === 'high' ? quality : null,
     hour: params.has('hour') && Number.isFinite(Number(params.get('hour'))) ? Number(params.get('hour')) : null,
     cam: camera,
@@ -117,3 +131,10 @@ function parse(): BenchFlags | null {
 
 /** The benchmark asked for in the URL, or null (a normal game). */
 export const BENCH: BenchFlags | null = parse();
+
+/**
+ * `?world=<place>`: the place step 1 makes its first world in (a kind from before places, such as
+ * `dense`, is its place at its size), with `?options=` (the place's own where not given); null: the
+ * countryside, as a player gets it. Unknown options are left out.
+ */
+export const WORLD_FLAG: { kind: string; options: Partial<WorldOptions> } | null = params.has('world') ? { kind: params.get('world') ?? '', options: parseOptions(params.get('options')) } : null;
