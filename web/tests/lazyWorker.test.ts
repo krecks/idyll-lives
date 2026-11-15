@@ -2,14 +2,14 @@
 // data workers'): answers matched to asks by id; where no worker can start, or once one broke, asks go
 // to the page's fallback (those waiting too); an aborted ask the worker is on stops it, and the asks
 // behind it go to a fresh one (or to the page, where what they handed over, or what was posted, went
-// with the old one).
+// with the old one). Notes on an ask (how it goes) reach that ask's listener only, until it is answered.
 import { describe, expect, jest, test } from 'bun:test';
 import { LazyWorker, Superseded, type WorkerAnswer, type WorkerAsk } from '../src/core/lazyWorker';
 
 class FakeWorker {
   readonly sent: WorkerAsk<string>[] = [];
   terminated = false;
-  onmessage: ((e: { data: WorkerAnswer<string> }) => void) | null = null;
+  onmessage: ((e: { data: WorkerAnswer<string, number> }) => void) | null = null;
   onerror: ((e: { message: string; preventDefault(): void }) => void) | null = null;
   postMessage(message: WorkerAsk<string>): void {
     if (message.message === 'uncloneable') throw new DOMException('could not be cloned', 'DataCloneError');
@@ -18,7 +18,7 @@ class FakeWorker {
   terminate(): void {
     this.terminated = true;
   }
-  answer(a: WorkerAnswer<string>): void {
+  answer(a: WorkerAnswer<string, number>): void {
     this.onmessage?.({ data: a });
   }
 }
@@ -26,7 +26,7 @@ class FakeWorker {
 function lazy(start: () => FakeWorker = () => new FakeWorker()) {
   const workers: FakeWorker[] = [];
   const broke: string[] = [];
-  const w = new LazyWorker<string, string>({
+  const w = new LazyWorker<string, string, number>({
     start: () => {
       const made = start();
       workers.push(made);
@@ -62,6 +62,25 @@ describe('lazy worker', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  test("notes go to their ask's listener, until it is answered", async () => {
+    const { w, workers } = lazy();
+    const heard: string[] = [];
+    const a = w.ask('a', page('a'), { onNote: (n) => heard.push(`a${n}`) });
+    const b = w.ask('b', page('b'), { onNote: (n) => heard.push(`b${n}`) });
+    const [worker] = workers;
+    const [ia, ib] = worker.sent.map((s) => s.id);
+    worker.answer({ id: ia, note: 1 });
+    worker.answer({ id: ib, note: 1 });
+    worker.answer({ id: ia, note: 2 });
+    worker.answer({ id: ia, answer: 'A' });
+    worker.answer({ id: ia, note: 3 });
+    expect(await a).toBe('A');
+    expect(heard).toEqual(['a1', 'b1', 'a2']);
+    // (A note isn't an answer: b still waits.)
+    worker.answer({ id: ib, answer: 'B' });
+    expect(await b).toBe('B');
   });
 
   test('a hold keeps it running while idle', () => {

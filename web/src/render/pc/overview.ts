@@ -241,10 +241,14 @@ export class TownOverview {
     this.streets[this.current].setNight(lamps, glow);
   }
 
-  /** Which lots glow (see `Renderer.setLotHighlight`). */
-  setHighlight(h: LotHighlight): void {
+  /** Which lots glow (see `Renderer.setLotHighlight`; `snap`: no easing to it). */
+  setHighlight(h: LotHighlight, snap = false): void {
     this.state = h;
     this.updateTargets();
+    if (snap && this.level.length === this.target.length) {
+      this.level.set(this.target);
+      this.dirty = true;
+    }
   }
 
   /** Per frame (`dt` in s): eases the highlights; true while their colours changed. Allocation-free. */

@@ -2,21 +2,21 @@
 /**
  * Times the three waits a new player has before playing, through the menus as a player goes:
  *
- * - boot: the page opened to the main menu (the loading screen gone);
+ * - boot: the page opened to the main menu (the loading screen gone, its picture shown);
+ * - world: "New game" to step 1's world made and built (its "Choose a household" enabled);
  * - inView, portraits: step 2 ("Choose a household", after "New game" and step 1) opened to the
  *   portraits in view in its list shown, and to every household's (`.households .face img`);
  * - entry: "Play" on a household to the game up (its interface there, the loading screen gone).
  *
  * With `--back`, then the way back and in again: the long tasks in the 5 s after the entry (`entryLong`),
- * "Save and quit" from the menu shown to its live town on screen (`back`; the menus' town was the new
- * game's, so the main menu's is built), Continue (once the latest save has been prepared behind the
+ * "Save and quit" from the menu shown to its picture on screen (`back`), Continue (once the latest save has been prepared behind the
  * menu) to the game up (`continue`, and `continueLong` after it), the heap in that game (CDP, after a
  * collection: `heapMB`, its array buffers `buffersMB`), and "Quit without saving" from the menu shown
- * to its live town (`again`, with the long tasks meanwhile, `againLong`).
+ * to its picture (`again`, with the long tasks meanwhile, `againLong`).
  *
  * Each run is a new browser context (nothing kept: a first visit); `--again` also opens the page a
  * second time in the same context (a returning player: what the browser kept between visits). The
- * page's `Math.random` is seeded (`--seed`), so the showcase, the world of step 1 and its households are
+ * page's `Math.random` is seeded (`--seed`), so the world of step 1 and its households are
  * the same in every run and in every build measured. The page's spans (`window.__perfReport()`, with
  * `?profile`) are kept per run; they are the dev play log's `perf` lines too.
  *
@@ -112,7 +112,7 @@ function longTasks() {
   new PerformanceObserver((list) => list.getEntries().forEach((e) => window.__longTasks.push({ start: e.startTime, ms: e.duration }))).observe({ type: 'longtask', buffered: true });
 }
 
-/** One visit: boot, step 2's portraits, a household's entry (ms each), and the page's spans. */
+/** One visit: boot, step 1's world, step 2's portraits, a household's entry (ms each), and the page's spans. */
 async function visit(page, cdp) {
   const now = () => page.evaluate(() => performance.now());
   // (The page keeps its last 500 spans: read them after each moment, so none is lost.)
@@ -122,15 +122,17 @@ async function visit(page, cdp) {
   };
   const polling = setInterval(() => void keep(), 1000);
   await page.goto(`${base}/?${query}`);
-  await page.waitForFunction(() => !!document.querySelector('.main-menu, .menu') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 100 });
+  await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.loading') && !!document.querySelector('.backdrop .still.loaded'), null, { timeout: 180_000, polling: 100 });
   const boot = await now();
   await keep();
   // (The menu's entrance, and what the menu itself sets going, before "New game".)
   await page.waitForTimeout(1500);
+  const newGame = await now();
   await page.getByText('New game', { exact: true }).click();
   const next = page.getByRole('button', { name: /Choose a household/ });
   await next.waitFor({ timeout: 60_000 });
   await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => /Choose a household/.test(b.textContent ?? '') && !b.disabled), null, { timeout: 60_000, polling: 100 });
+  const made = await now();
   await page.waitForTimeout(500);
   await next.click();
   const opened = await now();
@@ -168,12 +170,12 @@ async function visit(page, cdp) {
   await plays.nth(Math.min(pick, (await plays.count()) - 1)).click();
   await page.waitForFunction(() => !!document.querySelector('.hud-root') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 100 });
   const entered = await now();
-  const marks = { boot, opened, shown, pressed, entered };
+  const marks = { boot, newGame, made, opened, shown, pressed, entered };
   const more = back ? await backAndIn(page, cdp, now, marks) : {};
   clearInterval(polling);
   await keep();
   const report = { entries: [...entries.values()].sort((a, b) => a.start - b.start), marks };
-  return { boot, inView: inView - opened, portraits: shown - opened, faces, entry: entered - pressed, ...more, report };
+  return { boot, world: made - newGame, inView: inView - opened, portraits: shown - opened, faces, entry: entered - pressed, ...more, report };
 }
 
 /** `--back`: from the game to the menu and in again (see the header), ms each. */
@@ -181,14 +183,14 @@ async function backAndIn(page, cdp, now, marks) {
   /** The long tasks (ms) that began between `from` and `to`. */
   const long = (from, to) => page.evaluate(([a, b]) => window.__longTasks.filter((t) => t.start >= a && t.start < b).map((t) => Math.round(t.ms)), [from, to]);
   const inGame = () => page.waitForFunction(() => !!document.querySelector('.hud-root') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 100 });
-  /** Leaves the game by the pause menu's `choice`: from the main menu shown to its live town (ms), and the long tasks meanwhile. */
+  /** Leaves the game by the pause menu's `choice`: from the main menu shown to its picture (ms), and the long tasks meanwhile. */
   const leave = async (choice) => {
     await page.keyboard.press('Escape');
     await page.getByText('Quit to main menu', { exact: true }).click();
     await page.getByText(choice, { exact: true }).click();
     await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.pause'), null, { timeout: 60_000, polling: 20 });
     const menu = await now();
-    await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.game-layer.hidden'), null, { timeout: 60_000, polling: 20 });
+    await page.waitForFunction(() => !!document.querySelector('.menu') && !!document.querySelector('.game-layer.hidden') && !!document.querySelector('.backdrop .still.loaded'), null, { timeout: 60_000, polling: 20 });
     const live = await now();
     return { ms: live - menu, long: await long(menu, live + 500) };
   };
@@ -272,12 +274,12 @@ for (const label of ['first', 'again']) {
   if (!list.length) continue;
   md.push(`## ${label === 'first' ? 'First visit' : 'Second visit'}`, '');
   md.push('| moment | median ms | runs |', '|---|---|---|');
-  for (const k of ['boot', 'inView', 'portraits', 'entry', ...(back ? ['back', 'continue', 'heapMB', 'buffersMB', 'again'] : [])]) md.push(`| ${k} | ${median(list.map((v) => v[k])).toFixed(0)} | ${list.map((v) => v[k].toFixed(0)).join(', ')} |`);
+  for (const k of ['boot', 'world', 'inView', 'portraits', 'entry', ...(back ? ['back', 'continue', 'heapMB', 'buffersMB', 'again'] : [])]) md.push(`| ${k} | ${median(list.map((v) => v[k])).toFixed(0)} | ${list.map((v) => v[k].toFixed(0)).join(', ')} |`);
   // (`--back`: the longest task in each stretch.)
   if (back) for (const k of ['entryLong', 'backLong', 'continueLong', 'againLong']) md.push(`| ${k} (longest) | ${median(list.map((v) => Math.max(0, ...v[k]))).toFixed(0)} | ${list.map((v) => Math.max(0, ...v[k])).join(', ')} |`);
   md.push('', '| span | median ms (summed) | count |', '|---|---|---|');
   const names = [...new Set(list.flatMap((v) => v.report?.entries.map((e) => named(e.name)) ?? []))];
-  for (const name of names.filter((n) => /^(boot|session|host|warm|portraits|preview|studio|menu: showTown|render: nature)/.test(n))) {
+  for (const name of names.filter((n) => /^(boot|session|host|warm|portraits|preview|studio|menu: showTown|menu: still|render: nature)/.test(n))) {
     const s = spans(list, name);
     if (s.ms >= 5) md.push(`| ${name} | ${s.ms.toFixed(0)} | ${s.n} |`);
   }

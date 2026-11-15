@@ -8,8 +8,7 @@
   import { fetchState, loadDebugReport } from './debug/report';
   import { within } from './core/async';
   import { lookAtAge, lookFromSeed } from './game/household';
-  import type { NeighbourhoodDraft } from './game/town';
-  import type { Renderer } from './render/types';
+  import { FIRST_STILL, forgetShowcase, loadStill, type MenuStill } from './game/menuStill';
   import { loadGameData } from './game/gameData';
   import { prefetchNow, streamGameData } from './assets/stream';
   import { gameDataUrls, menuAssetUrls } from './game/streamPlan';
@@ -83,9 +82,25 @@
   /** A start-up step, or nothing once it has taken `STEP_LIMIT_MS`. */
   const inTime = <T,>(p: Promise<T>) => within(p, STEP_LIMIT_MS, undefined);
 
+  /** Longest wait for the menu's picture (read back, then decoded): the menu goes on without it. */
+  const STILL_LIMIT_MS = 2_000;
+
+  /** Resolves once the picture at `url` is decoded (shown with no pop-in), or failed to. */
+  const decoded = (url: string) => {
+    const img = new Image();
+    img.src = url;
+    return img.decode().catch(() => {});
+  };
+
+  /** Shows `still` on the main menu (decoded first), letting the one it replaces go. */
+  async function showStill(still: MenuStill): Promise<void> {
+    await within(decoded(still.url), STILL_LIMIT_MS, undefined);
+    app.setStill(still);
+  }
+
   /**
-   * Start-up behind the loading screen: game data, the renderer and the menu's town (its shaders
-   * compiled). Then the menu, which prepares the latest save behind it so "Continue" is quick.
+   * Start-up behind the loading screen: game data, the renderer and the menu's picture (no world is
+   * made before New game). Then the menu, which prepares the latest save behind it so "Continue" is quick.
    */
   async function boot() {
     const booted = perfStart('boot');
@@ -99,15 +114,13 @@
     // (`hud=0` on any debug page: the world without the interface, for checks' pictures.)
     if (!BENCH && new URLSearchParams(location.search).get('hud') === '0') (await import('./debug/bench')).hideHud();
     let data: Awaited<ReturnType<typeof loadGameData>>;
-    let showcase: Promise<NeighbourhoodDraft> | null = null;
+    // The menu's picture: the last world made, else the one the game ships (read meanwhile).
+    const still = within(loadStill(), STILL_LIMIT_MS, null).then((kept) => kept ?? FIRST_STILL);
+    void forgetShowcase();
     try {
       step('Loading game data', 0.05);
       data = await perfTimeAsync('boot: loadGameData', loadGameData);
       app.dataReady = true;
-      // The menu's town is laid out in the town worker from now on, while the page loads the rest,
-      // starts the renderer and warms the portrait studio up.
-      showcase = menuScene.showcaseDraft();
-      showcase.catch(() => {});
       // What the menus and character creation show: every icon and the character set. Fetched
       // now so nothing the player can reach before Play is left to stream.
       step('Loading menu assets', 0.08);
@@ -130,41 +143,25 @@
       app.fatal = err instanceof Error ? err.message : String(err);
       return;
     }
-    let renderer: Renderer | undefined;
     try {
       const snapshot = $state.snapshot(settings);
       step('Starting the renderer', 0.15);
-      renderer = await perfTimeAsync('boot: renderer', () => inTime(host.rendererNow(snapshot)));
-      // The menu shows no portraits, and its showcase households aren't the ones a new game offers
-      // (step 2 brings its own). One face warms the portrait studio up behind the loading screen (its
-      // device made, its shaders compiled; kept through the menus): step 2's first faces come quickly,
-      // and no compile lands on the menu's first frames. Not longer than a moment (a slow first
-      // compile, or a missing environment texture). While the town worker lays the menu's town out:
-      // a face of its own (seeded: it takes none of the page's dice, which people the showcase).
+      await perfTimeAsync('boot: renderer', () => inTime(host.rendererNow(snapshot)));
+      // The menu shows no portraits. One face warms the portrait studio up behind the loading screen
+      // (its device made, its shaders compiled; kept through the menus): step 2's first faces come
+      // quickly. Not longer than a moment (a slow first compile, or a missing environment texture).
+      // A face of its own (seeded: it takes none of the page's dice).
       if (services.previews) {
-        step('Preparing portraits', 0.2);
-        // (Kept from now on, as the menus keep it: the town takes seconds yet, and it mustn't go meanwhile.)
+        step('Preparing portraits', 0.3);
+        // (Kept from now on, as the menus keep it.)
         services.previews.keep(true, 'page');
         const look = { gender: 'female', appearance: lookAtAge(services.content, services.assets, lookFromSeed(services.assets, 'female', WARM_FACE), WARM_AGE) };
         await perfTimeAsync('boot: portraits', () => within(services.previews.portrait(look), PORTRAIT_LIMIT_MS, undefined));
       }
-      step('Building the neighbourhood', 0.3);
-      // (Its build runs in longer slices: the loading screen covers it, as it does a game's.)
-      renderer?.setCovered(true);
-      await perfTimeAsync('boot: menu town', () =>
-        inTime(
-          (showcase ?? menuScene.showcaseDraft()).then(async (draft) => {
-            menuScene.highlight({});
-            menuScene.shoot({ kind: 'menu' }, 2.4);
-            await menuScene.show(draft);
-            return draft;
-          }),
-        ),
-      );
+      step('Painting the menu', 0.8);
+      await perfTimeAsync('boot: menu picture', async () => showStill(await still));
     } catch (err) {
       console.warn('[boot]', err);
-    } finally {
-      renderer?.setCovered(false);
     }
     step('Ready', 1);
     perfEnd(booted);
@@ -173,8 +170,8 @@
     // (And the session's code, which a prepared save or "Play" starts with.)
     void perfTimeAsync('boot: session chunk', loadSessionCode).catch((err: unknown) => console.warn('[app] the session code failed to load', err));
     // The rest of the game's data streams from the menu on (not while benchmarking: it would show
-    // in the measurements), once the menu's entrance is over.
-    if (!BENCH) void menuScene.settled().then(() => streamGameData(gameDataUrls(data.content, data.assets)));
+    // in the measurements).
+    if (!BENCH) void streamGameData(gameDataUrls(data.content, data.assets));
     await openDebugReport();
     await bench?.runBench();
   }
@@ -208,22 +205,29 @@
   });
 
   /**
-   * The live 3D town behind the menus: a showcase neighbourhood on the main menu (and its
-   * overlays), the household's new town behind character creation. The neighbourhood and
-   * home screens show and frame their town themselves.
+   * The live 3D town behind the new game's screens: the household's new town behind character
+   * creation (the world, neighbourhood and home screens show and frame theirs themselves). None on
+   * the main menu, which shows its picture of the last world made: back from a new game's screen,
+   * the camera glides to the menu's shot, the picture is taken, and the town goes.
    */
   $effect(() => {
     if (!app.dataReady || app.fatal || app.booting) return;
     const screen = app.screen;
     const town = app.town;
     let cancelled = false;
-    if (screen === 'menu' || screen === 'create') {
+    if (screen === 'create' && town) {
+      menuScene.highlight({});
+      menuScene.shoot({ kind: 'create' }, 2);
+      void menuScene.show(town).catch((err: unknown) => console.warn('[menu] town preview failed', err));
+    } else if (screen === 'menu') {
       void (async () => {
-        const draft = screen === 'create' && town ? town : await menuScene.showcaseDraft();
+        const still = await menuScene.keepStill(true).catch((err: unknown) => {
+          console.warn('[menu] its picture failed', err);
+          return null;
+        });
         if (cancelled) return;
-        menuScene.highlight({});
-        menuScene.shoot({ kind: screen }, screen === 'menu' ? 2.4 : 2);
-        await menuScene.show(draft).catch((err: unknown) => console.warn('[menu] town preview failed', err));
+        if (still) await showStill(still);
+        if (!cancelled) await menuScene.hide();
       })();
     }
     return () => {
@@ -330,7 +334,7 @@
     {/key}
   {/if}
 {:else}
-  {#if !app.liveBackdrop}<MenuBackdrop />{/if}
+  {#if !app.liveBackdrop}<MenuBackdrop still={app.screen === 'menu' ? app.menuStill?.url : undefined} />{/if}
   {#if app.screen === 'world'}
     <CreateWorld />
   {:else if app.screen === 'neighbourhood'}
@@ -402,7 +406,7 @@
     inset: 0;
     pointer-events: none;
   }
-  /* Fades the scene out and in when it changes completely (menu town <-> a saved game). */
+  /* Fades the scene out and in when it changes completely (the menus' town <-> a saved game). */
   .game-layer :global(.scene-veil) {
     position: absolute;
     inset: 0;

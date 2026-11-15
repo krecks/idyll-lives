@@ -3,7 +3,8 @@
   import { menuScene } from '../../game/menuScene';
   import { loadTemplates, NEIGHBOUR_CAP, type NeighbourhoodDraft, type Templates } from '../../game/town';
   import { keepHouses, Superseded, townJob } from '../../game/townJobs';
-  import { WORLD_KINDS, WORLDS, worldName, type WorldKind } from '../../game/world';
+  import { WORLD_KINDS, WORLDS, worldName, type WorldKind, type WorldStep } from '../../game/world';
+  import type { TownBuildStep } from '../../render/types';
   import { app } from '../app.svelte';
   import { toast } from '../state.svelte';
   import { lifespanHint } from '../format';
@@ -50,19 +51,46 @@
     });
   });
 
-  /** The world being laid out (the town worker: a big one takes a few seconds); a newer one replaces it. */
-  let job: AbortController | null = null;
-  let making = $state(false);
+  /**
+   * Making a world, as the progress panel lists it: laid out in the town worker (`WorldStep`, in
+   * turn), then built in 3D (`TownBuildStep`, side by side: they tick off in any order).
+   */
+  const STEPS: readonly { key: WorldStep | TownBuildStep; label: string }[] = [
+    { key: 'land', label: 'Shaping the land' },
+    { key: 'roads', label: 'Laying the roads' },
+    { key: 'homes', label: 'Placing the homes' },
+    { key: 'houses', label: 'Building the houses' },
+    { key: 'hills', label: 'Raising the hills' },
+    { key: 'woods', label: 'Planting the woods' },
+    { key: 'town', label: 'Building the town' },
+    { key: 'grass', label: 'Sowing the grass' },
+  ];
 
-  /** A new world of the chosen kind (a new seed: a different place every time). */
+  /** The world being made (laid out in the town worker, then built); a newer one replaces it. */
+  let job: AbortController | null = null;
+  /** A world is being made: the progress panel shows (over the last one, if there is one). */
+  let making = $state(false);
+  /** Its steps done so far. */
+  let done = $state.raw<ReadonlySet<string>>(new Set());
+  /** The first step not done yet (the one under way while the world is laid out). */
+  const current = $derived(STEPS.find((s) => !done.has(s.key))?.key ?? null);
+  const progress = $derived(done.size / STEPS.length);
+
+  /** A new world of the chosen kind (a new seed: a different place every time), laid out and built. */
   async function make() {
     if (!templates) return;
     job?.abort();
     const control = (job = new AbortController());
     making = true;
+    done = new Set();
+    const tick = (step: WorldStep | TownBuildStep) => {
+      if (job === control) done = new Set([...done, step]);
+    };
     const typed = named && name.trim() ? name.trim() : undefined;
+    // (Nothing in view yet: the first world is built in longer slices.)
+    const first = !world;
     try {
-      const made = await townJob(content, { kind: 'world', world: kind, seed: (Math.random() * 2 ** 31) >>> 0, name: typed }, control.signal);
+      const made = await townJob(content, { kind: 'world', world: kind, seed: (Math.random() * 2 ** 31) >>> 0, name: typed }, control.signal, tick);
       if (job !== control) return;
       // Its houses and preview come with it: the menu draws it without making them again.
       keepHouses(made);
@@ -70,6 +98,8 @@
       world = made.draft;
       name = typed ?? world.name;
       focus = null;
+      // (The panel stays until it is built and on screen.)
+      await menuScene.show(world, null, tick, first);
     } catch (err) {
       if (err instanceof Superseded) return;
       console.error('[world] making the world failed:', err);
@@ -106,19 +136,20 @@
 
   onMount(async () => {
     templates = await loadTemplates();
-    if (!world) {
-      // Start from the town the main menu showed (the same valley, nobody living there yet).
-      const showcase = await menuScene.showcaseDraft();
-      world = { ...showcase, households: [] };
-      kind = showcase.world?.kind ?? 'medium';
-      name = world.name;
+    // Back from step 2: the world made before (still on screen). Else a new one is made now.
+    if (world) void menuScene.show(world);
+    else {
+      // (Not the town the main menu glided away from, if it is still there.)
+      void menuScene.hide();
+      await make();
     }
   });
 
-  $effect(() => {
-    if (!world) return;
-    void menuScene.show(world);
-  });
+  /** Leaving for the main menu: its picture is taken of the world in view (`App.svelte`). */
+  function toMenu() {
+    job?.abort();
+    app.toMenu();
+  }
 
   $effect(() => {
     menuScene.highlight({ hover, selected: focus, marked: [], outlines: true });
@@ -154,11 +185,11 @@
 <div class="screen scaled">
   <div class="haze" aria-hidden="true"></div>
   <header use:avoid>
-    <button class="btn ghost back" onclick={() => app.toMenu()}><Icon name="icon.ui.back" size={18} /> Menu</button>
+    <button class="btn ghost back" onclick={toMenu}><Icon name="icon.ui.back" size={18} /> Menu</button>
     <div class="title">
       <span class="eyebrow">Step 1 of 4 · A new world</span>
       <div class="name-field">
-        <input class="input town-name" aria-label="Town name" bind:value={name} oninput={() => (named = true)} maxlength="24" />
+        <input class="input town-name" aria-label="Town name" placeholder={world ? "" : "Naming the town…"} bind:value={name} oninput={() => (named = true)} maxlength="24" />
         <button class="btn ghost roll" aria-label="Another name" title="Another name" onclick={rollName}><Icon name="icon.ui.dice" size={18} /></button>
       </div>
       {#if world?.world}
@@ -174,7 +205,18 @@
   <main>
     <section class="view">
       {#if making}
-        <div class="making menu-glass" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span> Laying out the town…</div>
+        <div class="making menu-glass" role="status" aria-live="polite" aria-label="Making the world">
+          <span class="eyebrow">{world ? 'Another world' : 'A new world'}</span>
+          <div class="bar"><div class="fill" style:transform="scaleX({progress})"></div></div>
+          <ol>
+            {#each STEPS as s (s.key)}
+              <li class:done={done.has(s.key)} class:now={s.key === current}>
+                <span class="mark" aria-hidden="true">{#if done.has(s.key)}✓{:else if s.key === current}<span class="spinner"></span>{/if}</span>
+                {s.label}
+              </li>
+            {/each}
+          </ol>
+        </div>
       {/if}
       {#if world}
         <TownStage {labels} {hover} selected={focus} {focus} onhover={(p) => (hover = p)} onselect={(p) => (focus = p === focus ? null : p)} />
@@ -380,24 +422,64 @@
        bar and the stats stay clear above it rather than under it. */
     padding-bottom: calc(70px / var(--ui-scale));
   }
-  /* Over the town while the next one is laid out (it stays in view meanwhile). */
+  /* The world's making, step by step: in the middle of the stage (over the last world, if any, which stays in view meanwhile). */
   .making {
     position: absolute;
-    top: 12px;
-    left: 0;
-    right: 0;
-    margin: 0 auto;
-    width: max-content;
+    inset: 0;
+    margin: auto;
+    width: min(320px, 100%);
+    height: max-content;
     z-index: 1;
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px 24px;
     font-size: 13px;
     font-weight: 600;
     color: var(--text-strong);
     pointer-events: none;
     animation: rise 260ms var(--ease) both;
+  }
+  .making .bar {
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--text-strong) 12%, transparent);
+  }
+  .making .fill {
+    height: 100%;
+    background: var(--accent);
+    transform-origin: left;
+    transition: transform 300ms var(--ease);
+  }
+  .making ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+  }
+  .making li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    transition: color var(--fast) var(--ease);
+  }
+  .making li.now,
+  .making li.done {
+    color: var(--text-strong);
+  }
+  .making .mark {
+    flex: none;
+    width: 16px;
+    display: grid;
+    place-items: center;
+    color: var(--accent);
+  }
+  .making .mark .spinner {
+    width: 12px;
+    height: 12px;
   }
   .controls {
     display: flex;

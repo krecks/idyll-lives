@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { host } from '../../game/host';
+  import { menuScene } from '../../game/menuScene';
   import type { GameSession } from '../../game/session';
   import { UnloadableSave } from '../../persistence/saves';
   import { settings, systemMotion } from '../../settings/settings.svelte';
@@ -48,6 +49,14 @@
         error = err instanceof Error ? err.message : String(err);
         if (err instanceof UnloadableSave) errorTitle = "Couldn't open this save";
       });
+    // A new world's game: the main menu's picture of it is taken now, behind the loading screen
+    // (`start` put it up; the town the menus showed is still there, under it, until the fly-in).
+    if (app.request?.kind === 'new' && app.loading) {
+      void menuScene
+        .keepStill(false)
+        .then((still) => still && app.setStill(still))
+        .catch((err: unknown) => console.warn('[menu] its picture failed', err));
+    }
     return () => {
       left = true;
       host.release();

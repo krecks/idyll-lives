@@ -14,6 +14,13 @@ import { branch, centroid, clearOf, crossing, crossStreet, cutAround, inside, la
 export type WorldKind = 'small' | 'medium' | 'dense' | 'farm' | 'seaside' | 'mountain' | 'lakeside' | 'forest';
 export const WORLD_KINDS: readonly WorldKind[] = ['small', 'medium', 'dense', 'farm', 'seaside', 'mountain', 'lakeside', 'forest'];
 
+/**
+ * A part of making a world done, in order (step 1's progress, `CreateWorld.svelte`): the land and its
+ * towns' streets, the country roads between them, the lots, then the houses and the menus' preview
+ * (`townJobs.ts`). Told as each ends; what it says doesn't change the world.
+ */
+export type WorldStep = 'land' | 'roads' | 'homes' | 'houses';
+
 type Rand = () => number;
 
 /** A town's roads as a recipe lays them out (`box`'s coordinates). */

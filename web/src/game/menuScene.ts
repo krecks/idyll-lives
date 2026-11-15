@@ -1,18 +1,17 @@
 /**
- * The live 3D scene behind the menus: which town the overview shows (a showcase neighbourhood
- * on the main menu, the draft being edited during a new game), its camera shots, lot
- * highlights, labels pinned to lots and lot picking. Screens call this; it reaches the renderer
- * through the host (never the sim worker).
+ * The live 3D scene behind the new game's screens: which town the overview shows (the draft being
+ * edited), its camera shots, lot highlights, labels pinned to lots and lot picking, and the main
+ * menu's picture of it (`keepStill`; the menu itself shows no town). Screens call this; it reaches
+ * the renderer through the host (never the sim worker).
  */
 
 import { groundDepth, type WorldStructure } from '../core/protocol';
-import type { LotHighlight, Renderer, TownShot } from '../render/types';
+import type { LotHighlight, Renderer, TownBuildStep, TownShot } from '../render/types';
 import { settings } from '../settings/settings.svelte';
 import { services } from '../ui/services';
 import { host } from './host';
-import { loadTemplates, populate, type NeighbourhoodDraft, type Templates } from './town';
-import { keepHouses, shareHouses, townJob } from './townJobs';
-import { loadShowcase, showcaseSeed } from './showcaseCache';
+import { loadTemplates, type NeighbourhoodDraft, type Templates } from './town';
+import { keepStill, type MenuStill } from './menuStill';
 import { previewWorld } from './townPreview';
 import { perfPhase, perfTime, perfTimeAsync } from '../debug/perf';
 import { layoutTags, type Box, type TagSpot } from './tagLayout';
@@ -44,9 +43,11 @@ export type Shot =
 
 const NO_HIGHLIGHT: LotHighlight = { hover: null, selected: null, marked: [], outlines: false };
 
+/** The menu's picture at most this wide (pixels); as the screen is, if smaller. */
+const STILL_WIDTH = 1920;
+
 class MenuScene {
   private templates: Templates | null = null;
-  private showcaseMade: Promise<NeighbourhoodDraft> | null = null;
   private draft: NeighbourhoodDraft | null = null;
   /** The lot shown as the player's house (null: none). */
   private home: number | null = null;
@@ -56,7 +57,9 @@ class MenuScene {
   /** Previews made elsewhere (the town worker: `townJobs.ts`), by draft, with no home. */
   private readonly prepared = new WeakMap<NeighbourhoodDraft, WorldStructure>();
   private shotKey = '';
-  private wanted: { shot: Shot; duration: number } | null = null;
+  private wanted: { shot: Shot; duration: number; cut?: boolean } | null = null;
+  /** The highlight asked for last (put back after the menu's picture is taken). */
+  private lit: Partial<LotHighlight> = {};
   /** When the camera's glide to the current shot ends (performance.now() ms). */
   private glideEnd = 0;
   /** Tags of lots outside this screen area stay at its edge (pointing the way). */
@@ -87,47 +90,13 @@ class MenuScene {
   });
 
   /**
-   * The main menu's neighbourhood (made once per visit to the page). Its land is laid out in the
-   * town worker (seconds for a big world: the page goes on meanwhile, the boot warming the portrait
-   * studio up), then peopled here (`populate`, on the page's dice, as before) and its preview made in
-   * the worker too (`prepare`d: `show` draws it as it comes).
-   */
-  showcaseDraft(): Promise<NeighbourhoodDraft> {
-    this.showcaseMade ??= this.makeShowcase().catch((err: unknown) => {
-      // (Asked for again, it is made again.)
-      this.showcaseMade = null;
-      throw err;
-    });
-    return this.showcaseMade;
-  }
-
-  private async makeShowcase(): Promise<NeighbourhoodDraft> {
-    perfPhase('menu: showcase draft');
-    // A returning visit: the same valley, its people and its preview, as the last visit left them
-    // (`showcaseCache.ts`). Read it back (a few dozen milliseconds), not laid out again.
-    const kept = await perfTimeAsync('menu: showcase kept', loadShowcase);
-    if (kept) {
-      shareHouses(kept.draft, kept.houses);
-      this.prepare(kept.draft, kept.preview);
-      return kept.draft;
-    }
-    const { content, assets } = services;
-    const seed = showcaseSeed();
-    const land = await perfTimeAsync('menu: showcase land', () => townJob(content, { kind: 'land', world: 'medium', seed }), `seed ${seed}`);
-    keepHouses(land);
-    const templates = (this.templates ??= await perfTimeAsync('menu: loadTemplates', loadTemplates));
-    const draft = perfTime('menu: populate', () => populate(content, assets, templates, land.draft));
-    const { preview } = await perfTimeAsync('menu: showcase preview', () => townJob(content, { kind: 'preview', town: draft, keep: true }));
-    this.prepare(draft, preview);
-    return draft;
-  }
-
-  /**
    * Shows a neighbourhood behind the menus (the renderer rebuilds it only when its layout
    * changed). Again after a game, too: starting one hides the overview. `home`: the lot the
    * player will live on (the chosen home, the household's), drawn as the game will show it.
+   * `onStep`: the parts of the town as they are built (none for a town already shown). `covered`: no
+   * town is in view meanwhile (a panel says how its making goes): it is built in longer slices.
    */
-  async show(draft: NeighbourhoodDraft, home: number | null = null): Promise<void> {
+  async show(draft: NeighbourhoodDraft, home: number | null = null, onStep?: (done: TownBuildStep) => void, covered = false): Promise<void> {
     if (draft === this.draft && home === this.home && this.live?.townShown) return;
     this.draft = draft;
     this.home = home;
@@ -144,7 +113,49 @@ class MenuScene {
     this.attach(renderer);
     for (const [plot, label] of this.labels) this.anchor(plot, label);
     this.applyShot();
-    await perfTimeAsync('menu: showTown (renderer)', () => host.showTown(world, MENU_MINUTE, { ...settings }));
+    if (covered) renderer.setCovered(true);
+    try {
+      await perfTimeAsync('menu: showTown (renderer)', () => host.showTown(world, MENU_MINUTE, { ...settings }, onStep));
+    } finally {
+      if (covered) renderer.setCovered(false);
+    }
+  }
+
+  /** Takes the town away (the main menu shows its picture). */
+  hide(): Promise<void> {
+    this.draft = null;
+    this.home = null;
+    return host.hideTown();
+  }
+
+  /**
+   * Takes the main menu's picture of the town shown (its shot, at golden hour, no lot lit up) and
+   * keeps it (`menuStill.ts`). `glide`: the camera glides there and stays (the main menu, whose town
+   * goes once the picture is taken); else it cuts there and back, behind a loading screen (a new
+   * game starting). Null if no town is on screen or the picture couldn't be drawn.
+   */
+  async keepStill(glide: boolean): Promise<MenuStill | null> {
+    const renderer = this.live;
+    const draft = this.draft;
+    if (!renderer?.townShown || !draft || !this.world) return null;
+    const before = this.wanted;
+    const lit = this.lit;
+    this.highlight({}, !glide);
+    this.shoot({ kind: 'menu' }, glide ? 2.4 : 0, !glide);
+    if (glide) await this.settled();
+    // (The cut's light and pose, and the sun's map for them, are drawn by then.)
+    await renderer.framesRendered(2);
+    if (this.draft !== draft || !renderer.townShown) return null;
+    const scale = Math.min(1, STILL_WIDTH / Math.max(1, window.innerWidth * (window.devicePixelRatio || 1))) * (window.devicePixelRatio || 1);
+    const url = await perfTimeAsync('menu: still', () => renderer.captureThumbnail(window.innerWidth * scale, window.innerHeight * scale));
+    if (!glide && before && this.draft === draft) {
+      this.shoot(before.shot, 0, true);
+      this.highlight(lit, true);
+    }
+    if (!url) return null;
+    const picture = await (await fetch(url)).blob();
+    await keepStill(picture, draft.name);
+    return { url: URL.createObjectURL(picture), name: draft.name };
   }
 
   /** A draft's preview (`previewWorld` with no home), already made: `show` uses it. */
@@ -157,9 +168,9 @@ class MenuScene {
     return this.draft;
   }
 
-  /** Points the camera (applied once the town is shown); repeated identical shots are ignored. */
-  shoot(shot: Shot, duration = 1.6): void {
-    this.wanted = { shot, duration };
+  /** Points the camera (applied once the town is shown); repeated identical shots are ignored. `cut`: there at once, its light too. */
+  shoot(shot: Shot, duration = 1.6, cut = false): void {
+    this.wanted = { shot, duration, cut };
     this.applyShot();
   }
 
@@ -167,7 +178,7 @@ class MenuScene {
     const world = this.world;
     const renderer = this.live;
     if (!world || !renderer || !this.wanted) return;
-    const { shot, duration } = this.wanted;
+    const { shot, duration, cut } = this.wanted;
     this.bounds = shot.kind === 'overview' || shot.kind === 'lot' ? shot.frame : null;
     const townShot = this.townShot(shot, world, duration);
     // What the camera frames is the town as far as the tags go (see `positionLabels`); before the key
@@ -175,9 +186,11 @@ class MenuScene {
     this.framed = shot.kind === 'overview' || shot.kind === 'lot' ? townShot.focus : null;
     const key = `${JSON.stringify(shot)}|${world.width}x${groundDepth(world)}|${window.innerWidth}x${window.innerHeight}`;
     if (key === this.shotKey) return;
-    const first = this.shotKey === '';
+    const first = this.shotKey === '' || !!cut;
     this.shotKey = key;
     renderer.setTownShot(townShot, first);
+    // (A cut is once: the shot applied again later, for a new town or screen size, glides.)
+    if (cut) this.wanted = { shot, duration };
     this.glideEnd = performance.now() + (first ? 0 : (townShot.duration ?? 0) * 1000);
   }
 
@@ -188,9 +201,11 @@ class MenuScene {
     }
   }
 
-  highlight(h: Partial<LotHighlight>): void {
+  /** Lights lots up (`snap`: at once, not eased; for a picture). */
+  highlight(h: Partial<LotHighlight>, snap = false): void {
+    this.lit = h;
     this.focusPlots = [h.selected ?? null, h.hover ?? null];
-    this.live?.setLotHighlight({ ...NO_HIGHLIGHT, ...h });
+    this.live?.setLotHighlight({ ...NO_HIGHLIGHT, ...h }, snap);
   }
 
   /** Keeps lot tags clear of `el` (a button or bar over the town). Returns a detach function. */

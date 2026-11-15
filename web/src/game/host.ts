@@ -10,7 +10,7 @@
 
 import type { WorldStructure } from '../core/protocol';
 import { PlayCanvasRenderer } from '../render/pc/PlayCanvasRenderer';
-import type { Renderer, RenderFailure } from '../render/types';
+import type { Renderer, RenderFailure, TownBuildStep } from '../render/types';
 import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app, type Progress } from '../ui/app.svelte';
 import { perfTime, perfTimeAsync } from '../debug/perf';
@@ -79,7 +79,7 @@ class GameHost {
   private canvas: HTMLCanvasElement;
   readonly overlay: HTMLDivElement;
   private readonly root: HTMLDivElement;
-  /** Fades the canvas out and in when the scene changes completely (menu town <-> a saved game). */
+  /** Fades the canvas out and in when the scene changes completely (the menus' town <-> a saved game). */
   private readonly veil: HTMLDivElement;
   private renderer: Promise<Renderer> | null = null;
   private rendererKey = '';
@@ -143,16 +143,16 @@ class GameHost {
 
   /**
    * Shows `world` as the town overview behind the menus. The renderer keeps drawing while it is
-   * shown; `app.liveBackdrop` turns true once it is on screen.
+   * shown; `app.liveBackdrop` turns true once it is on screen. `onStep`: its parts as they are built.
    */
-  async showTown(world: WorldStructure, minute: number, settings: Settings): Promise<void> {
-    // A game started meanwhile (e.g. Continue before the menu town finished loading): it owns the view.
+  async showTown(world: WorldStructure, minute: number, settings: Settings, onStep?: (done: TownBuildStep) => void): Promise<void> {
+    // A game started meanwhile (e.g. Play before the town finished building): it owns the view.
     if (this.current?.live) return;
     this.town = { world, minute };
     const renderer = await this.rendererNow(settings);
     if (this.town?.world !== world || this.current?.live) return;
     if (!renderer.townShown) renderer.configure(liveOptions(settings));
-    await renderer.showTown(world, minute);
+    await renderer.showTown(world, minute, onStep);
     if (this.current?.live) {
       // Too late: the game went live while the town was being built. Take it away again.
       this.town = null;
@@ -163,6 +163,21 @@ class GameHost {
     this.syncActive(renderer);
     await renderer.framesRendered(2);
     if (this.town?.world === world) app.liveBackdrop = true;
+  }
+
+  /**
+   * Takes the menus' town away (the main menu shows a picture): the renderer lets its overview and
+   * landscape go and draws nothing more behind the menus. Not while a game is live (it owns the view).
+   */
+  async hideTown(): Promise<void> {
+    if (this.current?.live) return;
+    this.town = null;
+    app.liveBackdrop = false;
+    const renderer = await this.renderer?.catch(() => null);
+    if (!renderer || this.town || this.current?.live) return;
+    if (renderer.townShown) await renderer.hideTown(0);
+    // (A town asked for meanwhile is shown again by its own `showTown`.)
+    if (!this.town) this.syncActive(renderer);
   }
 
   /** Live settings while only the menus use the renderer (a running game applies its own). */
@@ -207,6 +222,7 @@ class GameHost {
       // One session at a time on the shared renderer: a replaced one must finish clearing it first.
       await previous;
       if (this.current !== entry) throw new Error('Replaced by another game.');
+      this.syncActive(renderer);
       const { startSession } = await loadSessionCode();
       if (this.current !== entry) throw new Error('Replaced by another game.');
       return startSession(
@@ -248,6 +264,7 @@ class GameHost {
     const entry = this.current;
     if (entry) {
       entry.live = true;
+      void this.renderer?.then((r) => this.current === entry && this.syncActive(r), () => {});
       // Still loading (prepared behind the menus, or not at all): from now on, the loading screen says so.
       if (!entry.ready) app.loading = entry.progress;
     }
@@ -336,9 +353,14 @@ class GameHost {
   }
 
   /** Draws only while something is on screen: the game, or the menus' town. */
+  /**
+   * The renderer draws while something is shown (the game, the menus' town) or a game is being
+   * prepared (its builds and warm-up wait on frames; the main menu shows no town to keep it drawing).
+   */
   private syncActive(renderer: Renderer | undefined | null): void {
     if (!renderer) return;
-    renderer.setActive(!!this.current?.live || renderer.townShown);
+    const preparing = !!this.current && !this.current.ready;
+    renderer.setActive(!!this.current?.live || renderer.townShown || preparing);
   }
 
   private setVeil(on: boolean): Promise<void> {

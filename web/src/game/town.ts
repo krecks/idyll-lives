@@ -21,7 +21,7 @@ import { homePrice } from './price';
 import { crownClear, generateHouse, objectInfos, residentsKey, weighted, type GardenSize, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
 import { connect, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Box, type Pt, type RoadPlan } from './roads';
 import { householdFunds, savingsOf } from './wealth';
-import { extend, fill, WORLDS, type RoadLayout, type SizeSpec, type WorldKind } from './world';
+import { extend, fill, WORLDS, type RoadLayout, type SizeSpec, type WorldKind, type WorldStep } from './world';
 import { generateBigWorld, type OpenWorldDraft } from './macro';
 import { garageAt, garageFor, hash, houseCar, type ParkedCar } from '../render/shared/cars';
 import { placeRides, ridesFor } from './townRides';
@@ -641,10 +641,10 @@ export const generateStats = { houseMs: 0 };
  * public places round the town's middle, farms out on its edge, the houses from the middle out,
  * each turned to face its road, with a gap or a stretch of meadow between some. The town is cut
  * to the land its lots and roads take. Nobody lives there yet (see `populate`). Every world is a
- * Big one (cosy and normal were dropped in 0.8.0).
+ * Big one (cosy and normal were dropped in 0.8.0). `step`: told as each part of it is done.
  */
-export function generateWorld(content: Content, t: Templates, kind: WorldKind, seed = (Math.random() * 2 ** 31) >>> 0, name?: string): NeighbourhoodDraft {
-  return generateBigWorld(content, t, kind, seed, name);
+export function generateWorld(content: Content, t: Templates, kind: WorldKind, seed = (Math.random() * 2 ** 31) >>> 0, name?: string, step?: (done: WorldStep) => void): NeighbourhoodDraft {
+  return generateBigWorld(content, t, kind, seed, name, step);
 }
 
 /** Courts (lanes left with a dead end) a town keeps at most; a big world's main town, `BIG_COURTS`. */
