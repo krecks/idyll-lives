@@ -57,7 +57,7 @@ import { wallCorners, writeFences } from './fences';
 import { shownFences } from './shownFences';
 import { centroid } from '../../game/roads';
 import { pavedRects } from './paving';
-import { Kerb, KERB, roadIndex, roadMeshes, SIDEWALK, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
+import { bridgeDeck, Kerb, KERB, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
 import { JunctionCuts, junctionsOf, type JunctionPlan } from './junctions';
 
 /** Vertex-colour alpha for the plain finish, as the material libraries' `encodeFinish`: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. */
@@ -1561,6 +1561,11 @@ export class TownStreet {
         P.plants.flowers.push([cx + Math.cos(a) * 2.6, cz + Math.sin(a) * 2.6, 0.9 + hash(cx, k, 91) * 0.3, 0.85 + hash(cz, k, 92) * 0.3, a]);
       }
     }
+    // Bridges and causeways: a stone deck under each one's span over the water, parapets along it.
+    for (const road of this.ways.country) {
+      const deck = bridgeDeck(road);
+      if (deck) bridge(deck, road.width, (x, z) => at(x, z).parts.props);
+    }
     // The world's own cars, parked, in the menus' town (the game draws them coming and going: `pc/cars.ts`).
     if (this.world.cars && this.mode === 'town') {
       for (const c of this.world.cars) parked(at(c.x, c.z).parts, c.x, c.z, c.yaw, CARS[c.body % CARS.length], CAR_PAINT[c.paint % CAR_PAINT.length]);
@@ -1719,6 +1724,132 @@ class RoutedGeo extends Geo {
     g.poly(points, n, uvs, alphas, tints);
     return this;
   }
+}
+
+/**
+ * A stone bridge's measures (m): its deck reaches `apron` past the road's edges each side, from `under` (below
+ * the water line) to just under the road; its parapets stand `parapet` high along its edges, `wall` thick, with a
+ * coping on top and a post at each end; a pier's nose (a cutwater, carried up the parapet's outside as a
+ * buttress: the deck stands only a few hand-widths over the water) juts `nose` out of each side every `pier` m,
+ * `noseWide` across, its top `noseDrop` lower at its tip than under the coping.
+ */
+export const BRIDGE = { apron: 2, under: -0.6, top: ROAD_Y - 0.004, parapet: 0.9, wall: 0.4, coping: 0.08, post: 0.55, postUp: 1.1, pier: 8, nose: 0.9, noseWide: 1.4, noseDrop: 0.35 } as const;
+const BRIDGE_STONE = '#A1998C';
+const BRIDGE_COPING = '#BCB4A6';
+
+/**
+ * A bridge's (or a causeway's) stone along `deck` (its middle line, `bridgeDeck`) for a road `width` wide: the
+ * deck, its parapets and their end posts, and a pier's nose each side every `BRIDGE.pier` m or a little less (its
+ * length shared out evenly; none at its ends, on the banks), in pieces at most that long, each written into the
+ * painter `into` gives for where it is (the street's chunks). A deck that bends is drawn a straight run at a time
+ * (a generated road's points are a metre apart), each run's pieces reaching a little past its ends round a bend.
+ */
+export function bridge(deck: readonly (readonly [number, number])[], width: number, into: (x: number, z: number) => Painter): void {
+  const B = BRIDGE;
+  const half = width / 2 + B.apron;
+  const runs = straightRuns(deck, 0.03);
+  const ls = [0];
+  for (let i = 1; i < runs.length; i++) ls.push(ls[i - 1] + Math.hypot(runs[i][0] - runs[i - 1][0], runs[i][1] - runs[i - 1][1]));
+  const total = ls[ls.length - 1];
+  if (total < 0.01) return;
+  const n = Math.max(1, Math.ceil(total / B.pier - 1e-6));
+  const P = total / n;
+  const dirOf = (i: number): [number, number] => {
+    const l = ls[i + 1] - ls[i];
+    return [(runs[i + 1][0] - runs[i][0]) / l, (runs[i + 1][1] - runs[i][1]) / l];
+  };
+  // (How far a run's pieces reach past its end round the bend into the next: the gap on the bend's outside, half each.)
+  const past = (i: number): number => {
+    if (i <= 0 || i >= runs.length - 1) return 0;
+    const [a, b] = [dirOf(i - 1), dirOf(i)];
+    const turn = Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1])));
+    return half * Math.tan(Math.min(turn, 1) / 2) + 0.01;
+  };
+  for (let i = 0; i + 1 < runs.length; i++) {
+    const len = ls[i + 1] - ls[i];
+    const [dx, dz] = dirOf(i);
+    // (Local +z along the deck: `Painter.at` turns +z to (sin yaw, cos yaw).)
+    const yaw = Math.atan2(dx, dz);
+    // The run cut where the piers stand.
+    const cuts = [0];
+    for (let k = Math.floor(ls[i] / P + 1e-6) + 1; k * P < ls[i + 1] - 1e-6; k++) cuts.push(k * P - ls[i]);
+    cuts.push(len);
+    for (let c = 0; c + 1 < cuts.length; c++) {
+      const u0 = cuts[c] - (c === 0 ? past(i) : 0);
+      const u1 = cuts[c + 1] + (c + 2 === cuts.length ? past(i + 1) : 0);
+      const L = u1 - u0;
+      const [mx, mz] = [runs[i][0] + dx * (u0 + L / 2), runs[i][1] + dz * (u0 + L / 2)];
+      const p = into(mx, mz).at(mx, mz, yaw);
+      const [first, last] = [i === 0 && c === 0, i + 2 === runs.length && c + 2 === cuts.length];
+      // The deck (no underside: it is under the water), closed at the bridge's two ends.
+      const ends = `${first ? '' : 'nz'}${last ? '' : 'pz'}`;
+      p.paint(BRIDGE_STONE, 0.9).box(-half, B.under, -L / 2, half, B.top, L / 2, `ny${ends}`);
+      for (const side of [-1, 1]) {
+        const [o0, o1] = side < 0 ? [-half, -half + B.wall] : [half - B.wall, half];
+        p.paint(BRIDGE_STONE, 0.9).box(o0, B.top, -L / 2, o1, B.top + B.parapet - B.coping, L / 2, `ny${ends}`);
+        p.paint(BRIDGE_COPING, 0.8).box(o0 - 0.05, B.top + B.parapet - B.coping, -L / 2, o1 + 0.05, B.top + B.parapet, L / 2, ends);
+        // A post at each end of the parapet.
+        for (const [end, at] of [[first, -L / 2], [last, L / 2]] as const) {
+          if (!end) continue;
+          const x = side * (half - B.post / 2);
+          p.paint(BRIDGE_COPING, 0.85).box(x - B.post / 2, B.top, at - B.post / 2, x + B.post / 2, B.top + B.postUp, at + B.post / 2, 'ny');
+        }
+        // A pier's nose where the piece begins (not at the bridge's start: its abutment is on the bank).
+        if (cuts[c] > 1e-6) nose(p, side, half, cuts[c] - u0 - L / 2);
+      }
+    }
+  }
+}
+
+/** A polyline with the points dropped where it runs on straight: each run's points within `most` m of the line from its start to its end. */
+function straightRuns(pts: readonly (readonly [number, number])[], most: number): [number, number][] {
+  const out: [number, number][] = [[pts[0][0], pts[0][1]]];
+  let from = 0;
+  const fits = (to: number) => {
+    const [[ax, az], [bx, bz]] = [pts[from], pts[to]];
+    const l = Math.hypot(bx - ax, bz - az) || 1;
+    for (let k = from + 1; k < to; k++) if (Math.abs((pts[k][0] - ax) * (bz - az) - (pts[k][1] - az) * (bx - ax)) / l > most) return false;
+    return true;
+  };
+  for (let i = 1; i < pts.length; i++) {
+    if (i + 1 < pts.length && fits(i + 1)) continue;
+    const [x, z] = pts[i];
+    const [px, pz] = out[out.length - 1];
+    if (Math.hypot(x - px, z - pz) > 1e-6) out.push([x, z]);
+    from = i;
+  }
+  return out;
+}
+
+/** A pier's cutwater on `side` of a deck `half` m wide, at `at` along it: a three-sided prism jutting out of the deck's side up to the parapet's coping, its top sloping down to its tip. */
+function nose(p: Painter, side: number, half: number, at: number): void {
+  const B = BRIDGE;
+  const [y0, y1, drop] = [B.under, B.top + B.parapet - B.coping, B.noseDrop];
+  const w = B.noseWide / 2;
+  const [x0, x1] = [side * half, side * (half + B.nose)];
+  const l = Math.hypot(B.nose, w);
+  p.paint(BRIDGE_STONE, 0.9);
+  // Its two faces, out from the deck's side and along it either way (`Geo.poly` winds each to its normal).
+  for (const s of [-1, 1]) {
+    p.poly(
+      [
+        [x0, y0, at + s * w],
+        [x1, y0, at],
+        [x1, y1 - drop, at],
+        [x0, y1, at + s * w],
+      ],
+      [(side * w) / l, 0, (s * B.nose) / l],
+    );
+  }
+  const up = Math.hypot(drop, B.nose);
+  p.poly(
+    [
+      [x0, y1, at - w],
+      [x0, y1, at + w],
+      [x1, y1 - drop, at],
+    ],
+    [(side * drop) / up, B.nose / up, 0],
+  );
 }
 
 /** A parked car on a driveway, its contact shadow. */
