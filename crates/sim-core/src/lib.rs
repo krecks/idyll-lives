@@ -21,6 +21,7 @@ pub mod home;
 pub mod hosting;
 mod index;
 pub mod items;
+pub mod land;
 pub mod life;
 pub mod lifecycle;
 pub mod lights;

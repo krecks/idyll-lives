@@ -1700,6 +1700,8 @@ pub struct BuildRules {
     pub porch_post: i64,
     pub porch_canopy: i64,
     pub porch_step: i64,
+    /// What shaping the land costs (Build mode's Land tab, `Command::ShapeLand`).
+    pub land: LandPrices,
     /// Fence styles (`fenceStyles`): picket, ranch rails, slats... A fence's (or gate's) style is
     /// an index into this list; its `price` is per metre, a gate costs `gate` on top of it.
     pub fences: Vec<BuildStyle>,
@@ -1711,6 +1713,36 @@ pub struct BuildRules {
     pub storeys: u8,
     /// Whether a house may have a basement, a storey below the ground (`build.basement`).
     pub basement: bool,
+}
+
+/// What shaping the land costs (`build.land`): the page works out a stroke's price from these and
+/// the simulation charges it (`Command::ShapeLand`). `earth` is a cubic metre of earth raised or
+/// lowered by the brushes, `mountain` one raised or lowered by the peak, range and level tools
+/// (cheap: a range is a lot of earth); the rest are a square metre: of `water` made, and of
+/// `woods`, `meadow` or `fields` planted, or of cover `clear`ed.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
+pub struct LandPrices {
+    pub earth: f64,
+    pub mountain: f64,
+    pub water: f64,
+    pub woods: f64,
+    pub meadow: f64,
+    pub fields: f64,
+    pub clear: f64,
+}
+
+impl Default for LandPrices {
+    fn default() -> Self {
+        Self {
+            earth: 3.0,
+            mountain: 0.02,
+            water: 2.0,
+            woods: 6.0,
+            meadow: 1.0,
+            fields: 2.0,
+            clear: 1.5,
+        }
+    }
 }
 
 /// A look for walls, doors or windows. The simulation only needs its id (saves) and price; the
@@ -2488,9 +2520,49 @@ struct BuildRaw {
     porch_post: Option<i64>,
     porch_canopy: Option<i64>,
     porch_step: Option<i64>,
+    /// Shaping the land (`LandPrices`); a price left out is the default's.
+    land: LandPricesRaw,
     storeys: Option<u8>,
     #[serde(default)]
     basement: bool,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct LandPricesRaw {
+    earth: Option<f64>,
+    mountain: Option<f64>,
+    water: Option<f64>,
+    woods: Option<f64>,
+    meadow: Option<f64>,
+    fields: Option<f64>,
+    clear: Option<f64>,
+}
+
+impl LandPricesRaw {
+    /// The prices, each a number ≥ 0 (left out: the default's).
+    fn prices(&self) -> Result<LandPrices, Error> {
+        let d = LandPrices::default();
+        let price = |name: &str, v: Option<f64>, or: f64| {
+            let v = v.unwrap_or(or);
+            if v.is_finite() && v >= 0.0 {
+                Ok(v)
+            } else {
+                Err(Error::new(format!(
+                    "build.land.{name} {v} must be a number ≥ 0"
+                )))
+            }
+        };
+        Ok(LandPrices {
+            earth: price("earth", self.earth, d.earth)?,
+            mountain: price("mountain", self.mountain, d.mountain)?,
+            water: price("water", self.water, d.water)?,
+            woods: price("woods", self.woods, d.woods)?,
+            meadow: price("meadow", self.meadow, d.meadow)?,
+            fields: price("fields", self.fields, d.fields)?,
+            clear: price("clear", self.clear, d.clear)?,
+        })
+    }
 }
 
 #[derive(Deserialize)]
@@ -4971,6 +5043,7 @@ impl Content {
             porch_post: raw.build.porch_post.unwrap_or(60),
             porch_canopy: raw.build.porch_canopy.unwrap_or(90),
             porch_step: raw.build.porch_step.unwrap_or(30),
+            land: raw.build.land.prices()?,
             fences: build_styles(&raw.fence_styles, "fence style")?,
             roofs: build_styles(&raw.roof_styles, "roof style")?,
             roof_colors: build_styles(&raw.roof_colors, "roof colour")?,

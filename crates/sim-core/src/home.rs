@@ -188,6 +188,38 @@ impl World {
         self.redo.clear();
     }
 
+    /// The land was shaped (`World::shape_land`) while home edits are kept for undo and redo: they
+    /// put back the money and who may walk where as they were, so what the land took stays taken
+    /// through them. Household `h` paid `paid` (negative: was refunded), the tiles `wet` are under
+    /// water now and `dried` aren't (`Lot::tile_index`), walked on or not as they are now.
+    pub(crate) fn keep_land_in_edits(
+        &mut self,
+        h: usize,
+        paid: i64,
+        wet: &[usize],
+        dried: &[usize],
+    ) {
+        let now: Vec<bool> = dried
+            .iter()
+            .map(|&i| self.blocked.get(i).copied().unwrap_or(false))
+            .collect();
+        for s in self.undo.iter_mut().chain(self.redo.iter_mut()) {
+            if let Some(hh) = s.households.get_mut(h) {
+                hh.funds -= paid;
+            }
+            for &i in wet {
+                if let Some(b) = s.blocked.get_mut(i) {
+                    *b = true;
+                }
+            }
+            for (&i, &b) in dried.iter().zip(&now) {
+                if let Some(was) = s.blocked.get_mut(i) {
+                    *was = b;
+                }
+            }
+        }
+    }
+
     /// Build and buy edits the household can take back.
     pub fn undo_steps(&self, household: usize) -> usize {
         self.undo
