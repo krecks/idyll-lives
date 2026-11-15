@@ -175,7 +175,7 @@
   }
 
   function rollName() {
-    name = worldName(content, specOf(kind).names, Math.random);
+    name = worldName(content, specOf(kind, options).names, Math.random);
     named = true;
   }
 
