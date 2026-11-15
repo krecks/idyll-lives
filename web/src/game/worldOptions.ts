@@ -86,7 +86,9 @@ const TOWN_NAMES: Record<TownSize, string> = { hamlet: 'a hamlet', village: 'a v
  */
 export function worldLine(w: { homes: number; villages: number; width: number; depth: number; town?: TownSize; cap: number }): string {
   const homes = `${w.homes} ${w.homes === 1 ? 'home' : 'homes'} in ${TOWN_NAMES[w.town ?? 'town']}`;
-  const villages = w.villages ? ` and ${w.villages} ${w.villages === 1 ? 'village' : 'villages'}` : '';
+  // (Its villages round it: "more" after a village, so it doesn't read as "a village and 2 villages".)
+  const more = w.town === 'village' ? 'more ' : '';
+  const villages = w.villages ? ` and ${w.villages} ${more}${w.villages === 1 ? 'village' : 'villages'} round it` : '';
   const room = w.homes - 1 >= w.cap ? ` · up to ${w.cap}\u00a0neighbours` : '';
   // (The land's size kept on one line.)
   return `${homes}${villages} · ${w.width}\u00a0×\u00a0${w.depth}\u00a0m${room}`;

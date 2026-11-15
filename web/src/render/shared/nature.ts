@@ -55,8 +55,8 @@ const ROCK_SNOW: [[number, number], [number, number]] = [
   [0.33, 0.45],
 ];
 const RELIEF_ROCK_SNOW: [[number, number], [number, number]] = [
-  [0.38, 0.5],
-  [0.62, 0.78],
+  [0.45, 0.6],
+  [0.76, 0.92],
 ];
 /** A world with a relief grid among mountains: no trees above this share of the mountains' height. */
 const RELIEF_TREELINE = 0.3;

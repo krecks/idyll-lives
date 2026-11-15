@@ -39,8 +39,9 @@ describe('the world in a line', () => {
   });
 
   test('a town with villages and room for the cap', () => {
-    expect(worldLine({ homes: 344, villages: 6, width: 960, depth: 960, town: 'town', cap: 220 })).toBe('344 homes in a town and 6 villages · 960 × 960 m · up to 220 neighbours');
-    expect(worldLine({ homes: 221, villages: 1, width: 896, depth: 832, town: 'city', cap: 220 })).toBe('221 homes in a city and 1 village · 896 × 832 m · up to 220 neighbours');
+    expect(worldLine({ homes: 344, villages: 6, width: 960, depth: 960, town: 'town', cap: 220 })).toBe('344 homes in a town and 6 villages round it · 960 × 960 m · up to 220 neighbours');
+    expect(worldLine({ homes: 221, villages: 1, width: 896, depth: 832, town: 'city', cap: 220 })).toBe('221 homes in a city and 1 village round it · 896 × 832 m · up to 220 neighbours');
+    expect(worldLine({ homes: 129, villages: 2, width: 768, depth: 768, town: 'village', cap: 220 })).toBe('129 homes in a village and 2 more villages round it · 768 × 768 m');
     expect(worldLine({ homes: 220, villages: 0, width: 896, depth: 832, town: 'city', cap: 220 })).toBe('220 homes in a city · 896 × 832 m');
   });
 

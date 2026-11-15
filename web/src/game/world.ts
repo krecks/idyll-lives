@@ -191,7 +191,7 @@ export function grass(rand: Rand, base: LandscapeParams['grass'], warm: [number,
 export const GREEN = DEFAULT_LANDSCAPE.grass;
 export const ALPINE: LandscapeParams['grass'] = ['#557F3A', '#6E9142', '#8C9A55', '#4F7238'];
 export const COAST: LandscapeParams['grass'] = ['#7AA046', '#93AD55', '#B2B46A', '#6C9142'];
-export const HEATH: LandscapeParams['grass'] = ['#6E8A3E', '#82994A', '#8C7088', '#9C7A46'];
+export const HEATH: LandscapeParams['grass'] = ['#76783F', '#7F9146', '#86687F', '#937046'];
 
 /** The classic valley, rolled a little differently for each world. */
 export const valley = (rand: Rand): LandscapeParams => ({
