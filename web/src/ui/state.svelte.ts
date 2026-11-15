@@ -21,8 +21,11 @@ export interface MenuState {
 /** Live: play. Build: furnish, build and look after the home. Create: a family moving into an empty home (the new game's Creation, for a home left empty). */
 export type GameMode = 'live' | 'build' | 'create';
 export type BuildTool = 'wall' | 'room' | 'fence' | 'gate' | 'paint' | 'floor' | 'door' | 'window' | 'stairs' | 'garage' | 'porch' | 'roof' | 'remove' | 'move' | 'blueprint';
-/** Build mode's tabs: Furnish (the catalog: place, move, resize, upgrade, sell), Build (the house itself) and Home (how its rooms are doing). */
-export type BuildTab = 'furnish' | 'build' | 'home';
+/**
+ * Build mode's tabs: Furnish (the catalog: place, move, resize, upgrade, sell), Build (the house
+ * itself), Home (how its rooms are doing) and Land (shaping the world's land; not shown yet).
+ */
+export type BuildTab = 'furnish' | 'build' | 'home' | 'land';
 
 /** What Build mode puts up: wall covering (0: automatic, else wall covering + 1) and form, door and window style. */
 export interface BuildLook {
