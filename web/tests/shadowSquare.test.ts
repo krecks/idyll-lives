@@ -85,7 +85,8 @@ describe("the sun's map over the still casters' picture", () => {
     cam.node.setPosition(0, 50, 0);
     cam.node.setEulerAngles(-90, 0, 0);
     const depth = new pc.Texture(device, { width: 256, height: 256, format: pc.PIXELFORMAT_DEPTH, mipmaps: false });
-    const map = new pc.RenderTarget({ name: 'map', depthBuffer: depth });
+    // (Bottom-up, as PlayCanvas makes the sun's map: `ShadowMap.create2dMap`.)
+    const map = new pc.RenderTarget({ name: 'map', depthBuffer: depth, origin: pc.RENDERTARGET_ORIGIN_BOTTOM });
     cam.renderTarget = map;
     const caster = (x: number, cull = true) => {
       const aabb = new pc.BoundingBox(new pc.Vec3(x, 0.5, 0), new pc.Vec3(0.5, 0.5, 0.5));
@@ -98,7 +99,13 @@ describe("the sun's map over the still casters' picture", () => {
     const light = { numCascades: 1, _shadowMap: {}, _shadowCascadesInvalidated: false, shadowUpdateOverrides: null, getRenderData: () => ({ shadowCamera: cam, visibleCasters }) };
     const log: string[] = [];
     const name = (mi: pc.MeshInstance) => (mi === house ? 'house' : mi === tree ? 'tree' : 'body');
-    const renderer = { renderFace: (_l: unknown, _c: unknown, _f: number, clear: boolean) => log.push(`${cam.renderTarget === map ? 'map' : 'still'}${clear ? ' cleared' : ''}: ${visibleCasters.map(name).join(' ')}`) };
+    const origins = new Set<string>();
+    const renderer = {
+      renderFace: (_l: unknown, _c: unknown, _f: number, clear: boolean) => {
+        origins.add(cam.renderTarget!.origin);
+        log.push(`${cam.renderTarget === map ? 'map' : 'still'}${clear ? ' cleared' : ''}: ${visibleCasters.map(name).join(' ')}`);
+      },
+    };
     const d = device as unknown as Record<string, unknown>;
     d.startRenderPass = () => {};
     d.endRenderPass = () => {};
@@ -111,7 +118,7 @@ describe("the sun's map over the still casters' picture", () => {
       shadows.drawPass(pass as unknown as Parameters<typeof shadows.drawPass>[0]);
       return log.slice();
     };
-    return { shadows, cam, house, tree, body, visibleCasters, draw };
+    return { shadows, cam, house, tree, body, visibleCasters, draw, origins };
   }
 
   test('the first redraw draws the still casters into their picture; a pose only copies it and draws the residents', () => {
@@ -141,6 +148,13 @@ describe("the sun's map over the still casters' picture", () => {
     cam.node.setPosition(1 + 1e-9, 50, 0);
     shadows.posed();
     expect(draw()).toEqual(['copy still → map', 'map: body']);
+  });
+
+  // On WebGPU a bottom-up target is drawn with Y flipped: a picture the other way up was copied in mirrored (0.8.1).
+  test('the picture is drawn the same way up as the map', () => {
+    const { draw, origins } = split();
+    draw();
+    expect([...origins]).toEqual([pc.RENDERTARGET_ORIGIN_BOTTOM]);
   });
 
   test("without what moves to ask (`movers`), or the picture off, the pass is PlayCanvas's own", () => {

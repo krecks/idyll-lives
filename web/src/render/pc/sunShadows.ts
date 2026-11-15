@@ -501,18 +501,22 @@ export class SunShadows {
     return true;
   }
 
-  /** The still casters drawn into their picture (made, the map's size and format, the first time), and remembered. */
+  /**
+   * The still casters drawn into their picture (made, the map's size, format and origin, the first time), and
+   * remembered. The origin matters on WebGPU: PlayCanvas makes the map bottom-up (`RENDERTARGET_ORIGIN_BOTTOM`, drawn
+   * with Y flipped there), and a picture drawn the other way up would be copied in mirrored.
+   */
   private drawStillCasters(pass: ShadowPass, map: pc.RenderTarget, still: readonly pc.MeshInstance[]): boolean {
     const { light, camera, shadowRenderer } = pass;
     const depth = map.depthBuffer!;
     let target = this.stillTarget;
-    if (target && (target.width !== map.width || target.height !== map.height || target.depthBuffer?.format !== depth.format)) {
+    if (target && (target.width !== map.width || target.height !== map.height || target.depthBuffer?.format !== depth.format || target.origin !== map.origin)) {
       this.dropStill();
       target = null;
     }
     if (!target) {
       const texture = new pc.Texture(this.device, { name: 'sunStillCasters', format: depth.format, width: map.width, height: map.height, mipmaps: false, minFilter: pc.FILTER_NEAREST, magFilter: pc.FILTER_NEAREST });
-      target = this.stillTarget = new pc.RenderTarget({ name: 'sunStillCasters', depthBuffer: texture });
+      target = this.stillTarget = new pc.RenderTarget({ name: 'sunStillCasters', depthBuffer: texture, origin: map.origin });
       const p = (this.stillPass = new pc.RenderPass(this.device));
       p.init(target);
       p.depthStencilOps.clearDepth = true;
