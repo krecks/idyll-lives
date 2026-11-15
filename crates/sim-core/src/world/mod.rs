@@ -2426,20 +2426,7 @@ impl World {
         travel.country_speed = self.content.cars.country_speed;
         // Water and other ground nobody walks on: blocked underneath everything (`base_blocked`).
         if let Some(terrain) = &travel.file.terrain {
-            let (w, d) = (
-                self.lot.width,
-                if self.stairs.depth > 0 {
-                    self.stairs.depth as usize
-                } else {
-                    self.lot.depth
-                },
-            );
-            let mask = terrain.mask(w, d);
-            travel.base_blocked = (0..mask.len())
-                .filter(|&i| mask[i])
-                .map(|i| self.lot.tile_index((i % w) as i32, (i / w) as i32))
-                .collect();
-            travel.base_blocked.sort_unstable();
+            travel.base_blocked = self.terrain_blocked(terrain);
             for &i in &travel.base_blocked {
                 if let Some(b) = self.blocked.get_mut(i) {
                     *b = true;
@@ -4983,6 +4970,9 @@ impl World {
                 | Command::AcceptSuggestion { .. }
                 | Command::DismissSuggestion { .. }
                 | Command::DeclinePurchase { .. }
+                // (The land keeps its own undo; `shape_land` carries what it changed into the
+                // home edits kept.)
+                | Command::ShapeLand { .. }
         );
         if let Err(e) = self.apply_command(cmd) {
             // (Nothing to keep for undo.)
@@ -5813,6 +5803,12 @@ impl World {
                 x,
                 z,
             } => self.remove_porch_piece(household, kind, x, z)?,
+            Command::ShapeLand {
+                household,
+                cost,
+                meta,
+                water,
+            } => self.shape_land(household, cost, &meta, water)?,
             Command::MoveIn {
                 household,
                 name,

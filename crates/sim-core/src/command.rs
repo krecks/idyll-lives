@@ -347,6 +347,20 @@ pub enum Command {
         dx: i32,
         dz: i32,
     },
+    /// Build mode's Land tab: the land shaped by a stroke (see `World::shape_land`). `cost` is
+    /// charged to the household (in Living; nothing in Creative), a negative one refunded (a
+    /// stroke undone). `meta` is what changes in the world's `meta`: `land`, its touched tiles
+    /// (`h` and `wl` by tile index) and any header fields, merged into `meta.land`; `zones`, all
+    /// of them, replacing `meta.zones`. `water`, when the stroke changed it: the world's whole
+    /// water mask (run-length, as the town file's `terrain.water`). Not a home edit: the land
+    /// keeps its own undo, which sends the reverse stroke.
+    ShapeLand {
+        household: u32,
+        cost: i64,
+        meta: serde_json::Value,
+        #[serde(default)]
+        water: Option<Vec<u32>>,
+    },
     /// New residents move into a household that has a home (an empty one, after building
     /// first): they arrive where `sims` stand (their `household` is ignored), with `bonds`
     /// between them (indices into `sims`). `name` renames the household.
