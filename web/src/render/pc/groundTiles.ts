@@ -18,6 +18,15 @@ export interface GroundTile {
   x: number;
   z: number;
   lod: number;
+  /**
+   * Its finest grid's colours as shaded (RGBA bytes, sRGB, its ring too): the meshes keep none on the CPU, and a
+   * height field's brushes draw its levels again with them (`Landscape.reground`) until it's shaded again.
+   */
+  kept?: Uint8Array;
+  /** Its meshes keep their vertices on the CPU and are written into when it's drawn again (a brush has reached it). */
+  live?: boolean;
+  /** How the roads level the land at each point of its grid (`Landscape.roadLevels`), once a brush has reached it. */
+  levels?: Float32Array;
 }
 
 /**
@@ -48,7 +57,9 @@ const MAP = {
 
 /** What the map asks of the land: a big world's farmland as the terrain colours it (`LandscapeLayout.farmland`). */
 export interface TownGroundLand {
-  farmland(): { size: number; across: number; angle: number; crop(cu: number, cv: number, out: { r: number; g: number; b: number }): boolean; weight(x: number, z: number): number } | null;
+  farmland(): { size: number; across: number; angle: number; crop(cu: number, cv: number, out: { r: number; g: number; b: number }): boolean; weight(x: number, z: number): number; box?: [number, number, number, number] } | null;
+  /** Counts the changes of a land drawn from a height field (its cover moves the farmland): the map is made again for a new one. */
+  readonly landVersion?: number;
 }
 
 /** The centre's paving's courses (m apart). */
@@ -84,7 +95,7 @@ export class TownGroundMap {
     const meta = world.meta;
     const W = world.width;
     const D = groundDepth(world);
-    const key = `${meta?.seed ?? 0}|${W}x${D}|${meta?.roads?.length ?? 0}|${world.plots.length}|${meta?.centre?.length ?? 0}|${meta?.backdrop?.length ?? 0}|${land ? 1 : 0}`;
+    const key = `${meta?.seed ?? 0}|${W}x${D}|${meta?.roads?.length ?? 0}|${world.plots.length}|${meta?.centre?.length ?? 0}|${meta?.backdrop?.length ?? 0}|${land ? 1 : 0}|${land?.landVersion ?? 0}`;
     if (key === this.key || typeof OffscreenCanvas === 'undefined' || !meta) return;
     this.key = key;
     const size = Math.min(MAP_MAX, 2 ** Math.ceil(Math.log2(Math.max(W, D) * MAP_PER_M)));
@@ -94,7 +105,7 @@ export class TownGroundMap {
     const g = canvas.getContext('2d', { willReadFrequently: true })!;
     // A big world's farmland first, under everything: the patchwork its ground has, each field's edge where it is.
     const farmland = land?.farmland();
-    if (farmland && meta.zones) this.farmland(g, size, sx, sz, meta.zones, farmland);
+    if (farmland && (meta.zones || farmland.box)) this.farmland(g, size, sx, sz, meta.zones ?? [], farmland);
     g.setTransform(sx, 0, 0, sz, 0, 0);
     g.lineCap = 'round';
     g.lineJoin = 'round';
@@ -212,10 +223,13 @@ export class TownGroundMap {
    * edges and by the town).
    */
   private farmland(g: OffscreenCanvasRenderingContext2D, size: number, sx: number, sz: number, zones: readonly WorldZone[], land: NonNullable<ReturnType<TownGroundLand['farmland']>>): void {
-    let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
-    for (const zone of zones) {
-      if (zone.kind !== 'fields') continue;
-      for (const [x, z] of zone.poly) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
+    // (Round the field zones; a land drawn from a height field says where its fields are, `box`.)
+    let [x0, z0, x1, z1] = land.box ?? [Infinity, Infinity, -Infinity, -Infinity];
+    if (!land.box) {
+      for (const zone of zones) {
+        if (zone.kind !== 'fields') continue;
+        for (const [x, z] of zone.poly) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
+      }
     }
     const i0 = Math.max(0, Math.floor((x0 - FIELD_SOFT) * sx));
     const j0 = Math.max(0, Math.floor((z0 - FIELD_SOFT) * sz));
