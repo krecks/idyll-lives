@@ -2,6 +2,7 @@
 
 import type { GameKind, Lifespan } from '../core/protocol';
 import type { HouseholdDraft } from '../game/household';
+import type { MenuStill } from '../game/menuStill';
 import type { StartRequest } from '../game/session';
 import { EMPTY_LOT, withLot, type NeighbourhoodDraft } from '../game/town';
 
@@ -55,8 +56,10 @@ class AppState {
   playSlot = $state<number | null>(null);
   /** A live 3D scene is rendering behind the menus. */
   liveBackdrop = $state(false);
+  /** The main menu's picture (the last world made, `menuStill.ts`); null: the painted backdrop only. */
+  menuStill = $state.raw<MenuStill | null>(null);
   /**
-   * Start-up: everything the menus need is loaded first (game data, renderer, the menu's town)
+   * Start-up: everything the menus need is loaded first (game data, renderer, the menu's picture)
    * behind a loading screen; the menu shows after (and prepares the latest save behind it).
    */
   booting = $state(true);
@@ -107,6 +110,13 @@ class AppState {
     this.overlay = null;
     this.request = null;
     this.screen = 'menu';
+  }
+
+  /** The main menu's picture from now on (the one it replaces let go once the menu has swapped it). */
+  setStill(still: MenuStill): void {
+    const old = this.menuStill;
+    this.menuStill = still;
+    if (old?.url.startsWith('blob:') && old.url !== still.url) setTimeout(() => URL.revokeObjectURL(old.url), 2000);
   }
 
   /** Shows the crash screen (unless it already shows for an earlier reason). */

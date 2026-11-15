@@ -43,6 +43,7 @@ import { computeNormals, sphereData } from '../shared/modelParts';
 import { groupInstances, hideLawn, keepBareTiles, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
 import type { OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
+import type { TownBuildStep } from '../types';
 import { tuned } from '../tune';
 import { both } from '../../core/async';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
@@ -89,6 +90,9 @@ export const NATURE_DIAGS = [
 /** Draws the country roads (`pc/roads.ts`): their entities, under `parent`. */
 export type RoadBuilder = (roads: CountryRoads, parent: pc.Entity) => pc.Entity[];
 
+/** A part of the landscape built (`Landscape.build`'s `onStep`). */
+export type NatureStep = Exclude<TownBuildStep, 'town'>;
+
 // ---- Landscape ----------------------------------------------------------------------
 
 /** The landscape as PlayCanvas draws it (its layout and growth: `shared/nature.ts`). */
@@ -120,17 +124,18 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     super(world, (land, w, name) => new CountryRoads(land, w, name), lawnDensity, lawnLod, woodsCell, open.woodsCell);
   }
 
-  async build(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder): Promise<NatureResult> {
+  /** `onStep`: told as its ground, its woods and lawns and its grass are each built. */
+  async build(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder, onStep?: (done: NatureStep) => void): Promise<NatureResult> {
     this.offThread = OffThreadLand.open(world);
     try {
-      return await this.buildAll(app, parent, assets, world, pace, buildRoads);
+      return await this.buildAll(app, parent, assets, world, pace, buildRoads, onStep);
     } finally {
       this.offThread?.close();
       this.offThread = null;
     }
   }
 
-  private async buildAll(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder): Promise<NatureResult> {
+  private async buildAll(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder, onStep?: (done: NatureStep) => void): Promise<NatureResult> {
     const draws: pc.Entity[] = [];
     // (The grass field's land is made in a worker of its own meanwhile, its town mask here after the
     // plants: the page has the terrain's meshes and the plants to make first.)
@@ -141,10 +146,12 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       world.meta?.world?.size === 'big'
         ? perfTimeAsync('nature: terrain tiles', () => this.terrainTiles(app, parent, pace), `${Math.ceil(this.terrainGrid().size / TILE) ** 2} tiles`)
         : perfTimeAsync('nature: terrain', () => this.terrain(app, parent, pace)).then((e) => [e]);
+    void ground.then(() => onStep?.('hills'), () => {});
     // The woods and the lawn's flowers meanwhile: the terrain waits on the worker's shading for much of its time.
     const plants = (async () => {
       await perfTimeAsync('nature: forests', () => this.forests(app, parent, assets, pace));
       await perfTimeAsync('nature: lawns', () => this.plantLawns(app, parent, assets, world, pace));
+      onStep?.('woods');
     })();
     const [grounds] = await both(ground, plants);
     draws.push(...grounds);
@@ -158,6 +165,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       return land ? withTownGrass(land, world) : grassField(world, this, pace, this.ring);
     });
     const grass = (this.grass = new Grass(app, parent, field, this.grassQuality));
+    onStep?.('grass');
     grass.onGround(grounds.map((g) => g.render!.meshInstances[0]));
     const built = gather(this.batches);
     return { draws: [...draws, ...built.draws, ...grass.draws.map((d) => d.entity)], casters: built.casters, only: built.only };

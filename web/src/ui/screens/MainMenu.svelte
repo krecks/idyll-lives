@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { menuScene } from '../../game/menuScene';
   import { listSaves, onSavesChanged, playable, type SaveMeta } from '../../persistence/saves';
   import { settings } from '../../settings/settings.svelte';
   import { app } from '../app.svelte';
@@ -16,8 +15,8 @@
     typeof navigator !== 'undefined' && 'gpu' in navigator && settings.renderer !== 'webgl' && new URLSearchParams(location.search).get('renderer') !== 'webgl',
   );
   let nav = $state<HTMLElement>();
-  /** The neighbourhood drifting behind the menu. */
-  let townName = $state('');
+  /** The town in the menu's picture (the last world made). */
+  const townName = $derived(app.menuStill?.name ?? '');
 
   const refresh = () =>
     listSaves()
@@ -26,10 +25,6 @@
 
   onMount(() => {
     void refresh();
-    menuScene
-      .showcaseDraft()
-      .then((d) => (townName = d.name))
-      .catch(() => {});
     // A save set aside (or imported) while the menu shows.
     return onSavesChanged(() => void refresh());
   });

@@ -299,6 +299,9 @@ export interface PaintPreviewFace {
   half: boolean;
 }
 
+/** A part of the menus' town built (`showTown`): the ground, the woods and lawns, the town's own (its street and lots), the grass. */
+export type TownBuildStep = 'hills' | 'woods' | 'town' | 'grass';
+
 /** A camera shot of the town overview (menus). */
 export interface TownShot {
   /** World rectangle (metres) to keep in view. */
@@ -599,9 +602,10 @@ export interface Renderer {
   /**
    * Menus: draws an overview of `world` (every lot as a dressed shell, no interiors or Sims) in
    * place of the game world, which stays loaded, hidden, and can keep building meanwhile.
-   * Lighting is fixed at `minute` of the day. Resolves once the overview is built.
+   * Lighting is fixed at `minute` of the day. Resolves once the overview is built; `onStep` is told
+   * each part of it built (in whatever order they end; none for a town already built).
    */
-  showTown(world: WorldStructure, minute: number): Promise<void>;
+  showTown(world: WorldStructure, minute: number, onStep?: (done: TownBuildStep) => void): Promise<void>;
   /**
    * Back to the game world (the overview and the town's landscape are let go a moment after, and
    * built again by the next `showTown`). With `glide` > 0 the camera
@@ -614,7 +618,8 @@ export interface Renderer {
   setTownShot(shot: TownShot, cut?: boolean): void;
   /** Overview camera: user orbit (radians) and zoom factor on top of the shot. */
   nudgeTown(dAlpha: number, zoom: number): void;
-  setLotHighlight(highlight: LotHighlight): void;
+  /** Which lots glow; they ease to it, or (`snap`) are so from the next frame (a picture taken). */
+  setLotHighlight(highlight: LotHighlight, snap?: boolean): void;
   /** Runs each overview frame after the camera moved, before drawing (to pin labels); null removes it. */
   onTownFrame(fn: (() => void) | null): void;
   dispose(): void;

@@ -25,7 +25,7 @@ import { random } from './housegen';
 import { fbm } from './noise';
 import { centroid, cropRoads, curve, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, sharpestTurn, straightAround, tangent, type Box, type Pt, type RoadPlan } from './roads';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, LotPlacer, plotRect, settleRoads, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates } from './town';
-import { clearing, countryLane, crescentTown, crossroads, highStreet, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind } from './world';
+import { clearing, countryLane, crescentTown, crossroads, highStreet, streetNames, WORLDS, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldStep } from './world';
 
 type Rand = () => number;
 type Shape = (rand: Rand, box: Box, scale?: number) => RoadLayout;
@@ -700,9 +700,9 @@ interface Plan {
 
 /**
  * Lays out a big world of `kind` from `seed` (the same kind and seed always give the same world).
- * See the top of this file.
+ * See the top of this file. `step`: told as each part of it is done (it changes nothing).
  */
-export function generateBigWorld(content: Content, t: Templates, kind: WorldKind, seed: number, name?: string): NeighbourhoodDraft {
+export function generateBigWorld(content: Content, t: Templates, kind: WorldKind, seed: number, name?: string, step?: (done: WorldStep) => void): NeighbourhoodDraft {
   const recipe = WORLDS[kind];
   const ch = CHARACTER[kind];
   const rand = random(seed);
@@ -864,6 +864,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   const missing = ch.hamlets[0] - (plans.length - 1);
   if (missing > 0) plans[0].spec = { ...mainSpec, lots: mainSpec.lots + missing * ch.hamlet.lots[0] };
 
+  step?.('land');
   // ---- country roads: between the areas (a tree of them and one more for a loop), and out ----
   const areaBlock = new Uint8Array(gw * gd);
   for (const [a, plan] of plans.entries()) {
@@ -1563,6 +1564,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
     }
   }
 
+  step?.('roads');
   // ---- water and woods: zones, the mask the lots keep off -------------------------------------
   const waterPolys = outlines(land.water, gw, gd, 2);
   const waterMask = rasterize(waterPolys, W, D);
@@ -1797,6 +1799,7 @@ export function generateBigWorld(content: Content, t: Templates, kind: WorldKind
   const areas: TownArea[] = plans.map((p) => ({ name: p.name, kind: 'hamlet', x: p.rect.x, z: p.rect.z, w: p.rect.w, d: p.rect.d }));
   // (The landscape round the world: its sea or lake is in the zones now.)
   const { water: _water, ...landscape } = recipe.landscape(rand, W, D, waterSide);
+  step?.('homes');
   return {
     name: name ?? rolledName,
     width: W,

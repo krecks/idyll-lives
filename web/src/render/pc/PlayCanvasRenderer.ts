@@ -131,6 +131,7 @@ import type {
   RoomOverlayTile,
   SeenBird,
   SimStride,
+  TownBuildStep,
   TownShot,
   ViewRect,
   Shading,
@@ -2963,7 +2964,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.townMode) this.lastLightMinute = -1;
   }
 
-  showTown(world: WorldStructure, minute: number): Promise<void> {
+  showTown(world: WorldStructure, minute: number, onStep?: (done: TownBuildStep) => void): Promise<void> {
     const ticket = ++this.townTicket;
     this.townWorld = world;
     const run = this.townQueue.then(async () => {
@@ -2979,7 +2980,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         // The landscape and the town's own (its street, its lots' things) side by side: the landscape
         // waits on the render data workers (the terrain's shading, the grass field) for much of its
         // build, and the overview's planning fills those waits. (Each gives the frames a turn, `pace`.)
-        const [nature] = await both(this.lot.useNature('town', world, (roads, parent) => drawRoads(this.app, roads, parent)), this.buildOverview(overview, world));
+        const [nature] = await both(
+          this.lot.useNature('town', world, (roads, parent) => drawRoads(this.app, roads, parent), onStep),
+          this.buildOverview(overview, world).then(() => onStep?.('town')),
+        );
         nature.landscape.refreshLawn(world);
         // The camera keeps a clear view over the hills (and out of the mountains).
         this.townRig.ground = (x, z) => nature.landscape.heightAt(x, z);
@@ -3029,9 +3033,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.townMode) this.townRig.nudge(dAlpha, zoom);
   }
 
-  setLotHighlight(highlight: LotHighlight): void {
+  setLotHighlight(highlight: LotHighlight, snap = false): void {
     this.townHighlight = highlight;
-    this.overview?.setHighlight(highlight);
+    this.overview?.setHighlight(highlight, snap);
   }
 
   onTownFrame(fn: (() => void) | null): void {

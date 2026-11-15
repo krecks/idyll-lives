@@ -34,7 +34,7 @@ import type { GrassPusher } from './grass';
 import { setDaylight } from './daylight';
 import { CloudShadows } from './cloudShadows';
 import { smoothstep } from '../../game/noise';
-import { installNature, Landscape, NATURE_DIAGS, setWind, Sky, windStill, type RoadBuilder } from './nature';
+import { installNature, Landscape, NATURE_DIAGS, setWind, Sky, windStill, type NatureStep, type RoadBuilder } from './nature';
 import { ObjectMotion, writeInstance, type MovingObject, type PopTarget } from './objectMotion';
 import { ObjectShadows, type ShadowSource } from './objectShadows';
 import { toGame } from './space';
@@ -289,16 +289,17 @@ export class LotContents {
 
   /**
    * The landscape of `world` for a layer: shared with the other layer when it is the same town
-   * (seed and size), otherwise built; one no layer shows any more is destroyed.
+   * (seed and size), otherwise built; one no layer shows any more is destroyed. `onStep`: told as
+   * its parts are built (all at once for one built already).
    */
-  async useNature(layer: 'world' | 'town', world: WorldStructure, buildRoads?: RoadBuilder): Promise<NatureSet> {
+  async useNature(layer: 'world' | 'town', world: WorldStructure, buildRoads?: RoadBuilder, onStep?: (done: NatureStep) => void): Promise<NatureSet> {
     const key = Landscape.key(world);
     const ticket = ++this.natureTicket[layer];
     let set = this.natures.get(key);
     if (!set) {
       const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod, this.quality.woodsCell, this.quality.grass, this.quality.openWorld);
       const created: NatureSet = { key, landscape, draws: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve(), refreshing: Promise.resolve() };
-      created.ready = landscape.build(this.app, this.root, this.deps.assets, world, () => this.hooks.pace(), buildRoads).then((nature) => {
+      created.ready = landscape.build(this.app, this.root, this.deps.assets, world, () => this.hooks.pace(), buildRoads, onStep).then((nature) => {
         perfTime('nature: meshes', () => {
           created.draws = nature.draws;
           created.casters = nature.casters;
@@ -307,6 +308,9 @@ export class LotContents {
         });
       });
       this.natures.set(key, (set = created));
+    } else if (onStep) {
+      // (Built, or being built, for the other layer: its parts are told once it is.)
+      void set.ready.then(() => (['hills', 'woods', 'grass'] as const).forEach(onStep), () => {});
     }
     set.pending++;
     try {

@@ -26,7 +26,8 @@ scope.onmessage = (e) => {
   ready.then(
     ({ content, templates }) => {
       try {
-        scope.postMessage({ id, answer: runTownJob(content, templates, job) });
+        const answer = runTownJob(content, templates, job, (note) => scope.postMessage({ id, note }));
+        scope.postMessage({ id, answer });
       } catch (err) {
         scope.postMessage({ id, error: err instanceof Error ? err.message : String(err) });
       }

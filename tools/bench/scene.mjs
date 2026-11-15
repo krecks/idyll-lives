@@ -1,14 +1,14 @@
 #!/usr/bin/env bun
 /**
  * Makes a benchmark scene (`web/public/bench/<name>.json.gz`, see web/src/debug/bench.ts): a new game
- * as the menus make one (the menu's valley, or a new world of `--world`; its neighbours as the
+ * as the menus make one (a new world of `--world`; its neighbours as the
  * neighbourhood step makes them; a household of four in the first home for sale), played at full
  * speed to `--hour` (5 minutes before it) on day 1, paused and saved.
  *
  *   bun tools/bench/scene.mjs --name village [--world medium|forest|mountain|…] [--hour 18] [--port 5221]
  *
- * `--seed <n>`: the new world's seed (the same kind and seed give the same town, neighbours and household; with it
- * `medium` is a new world too, not the menu's valley). `--home town`: the household moves into a home for sale in the main town (the one
+ * `--seed <n>`: the new world's seed (the same kind and seed give the same town, neighbours and household).
+ * `--home town`: the household moves into a home for sale in the main town (the one
  * halfway out among those for sale there) instead of the first for sale anywhere. The town view's scenes
  * (`render.mjs --poses town`: `town-day`, `town-dusk`, `town-night`) are made so, one town at three hours:
  *
@@ -69,12 +69,11 @@ try {
   const started = await page.evaluate(
     async ({ kind, seed, homeIn }) => {
       const { app } = await import('/src/ui/app.svelte.ts');
-      const { menuScene } = await import('/src/game/menuScene.ts');
       const { services } = await import('/src/ui/services.ts');
       const { generateWorld, populate, loadTemplates, vacantSlots } = await import('/src/game/town.ts');
       const { randomHousehold } = await import('/src/game/household.ts');
       const t = await loadTemplates();
-      const empty = kind === 'medium' && seed === null ? { ...(await menuScene.showcaseDraft()), households: [] } : generateWorld(services.content, t, kind, seed ?? undefined);
+      const empty = generateWorld(services.content, t, kind, seed ?? undefined);
       // (With a seed, the neighbours and the household are the same ones every time too: their dice are the seed's
       // while they are made, the household's its own, however many the neighbours took.)
       const dice = Math.random;
