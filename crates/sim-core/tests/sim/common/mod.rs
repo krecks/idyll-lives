@@ -348,7 +348,7 @@ pub fn garden_cluster(
 
 /// The quick answers the simulation keeps or works out in one go agree with asking afresh: what
 /// each item is on or in (`items::holders`, one pass over the objects, against `items::holder`),
-/// and where each public place's door gets on the roads on foot and by car
+/// and where each plot's door gets on the roads on foot and by car
 /// (`Travel::door_entry`, noted as each tick starts, against `Travel::entry`). Returns how many
 /// items were held by something and how many doors had a way onto the roads (to tell that it
 /// checked something).
@@ -360,7 +360,7 @@ pub fn check_lookups(w: &World) -> (usize, usize) {
         assert_eq!(held, afresh, "what the item at {at:?} is on or in");
     }
     let mut doors = 0;
-    for p in w.plots.iter().filter(|p| p.public) {
+    for p in &w.plots {
         let door = p.arrival_point();
         for mode in [Mode::Foot, Mode::Car] {
             let noted = w.travel.door_entry(p.id, door, mode);

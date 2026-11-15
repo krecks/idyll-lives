@@ -1276,7 +1276,6 @@ pub(crate) fn lane_tops(
 /// to standing. None: no road near either, or no way between by road. (A world's drive across,
 /// timed: the tests.)
 pub fn empty_drive_ticks(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<f32> {
-    use crate::travel::dist;
     let g = &travel.graph;
     let a = *g.near(from, ROAD_REACH, 1, Mode::Car).first()?;
     let b = *g.near(to, ROAD_REACH, 1, Mode::Car).first()?;
@@ -1292,12 +1291,8 @@ pub fn empty_drive_ticks(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Optio
         ROUTE_TOLERANCE,
     ));
     let junctions: Vec<[f32; 2]> = g.junctions().collect();
-    let road_at = |p: [f32; 2]| {
-        path.pts
-            .iter()
-            .min_by(|x, y| dist(x.0, p).total_cmp(&dist(y.0, p)))
-            .map(|x| (x.1, x.2))
-    };
+    let near_path = crate::travel::NearestPoint::new(path.pts.iter().map(|x| x.0).collect());
+    let road_at = |p: [f32; 2]| near_path.nearest(p).map(|i| (path.pts[i].1, path.pts[i].2));
     let tops = lane_tops(&lane, travel, &junctions, |i| {
         road_at(lane[i]).map_or(crate::travel::RoadKind::Street, |r| r.1)
     });
@@ -1671,11 +1666,11 @@ impl Route {
         }
         let junctions: Vec<[f32; 2]> = g.junctions().collect();
         // (The road at `p`: its width and kind, those of the path's point nearest it.)
+        let near_path = crate::travel::NearestPoint::new(path.pts.iter().map(|x| x.0).collect());
         let road_at = |p: [f32; 2]| {
-            path.pts
-                .iter()
-                .min_by(|x, y| dist(x.0, p).total_cmp(&dist(y.0, p)))
-                .map_or((7.0, RoadKind::Street), |x| (x.1, x.2))
+            near_path
+                .nearest(p)
+                .map_or((7.0, RoadKind::Street), |i| (path.pts[i].1, path.pts[i].2))
         };
         let tops = lane_tops(&lane, travel, &junctions, |i| road_at(lane[i]).1);
         // A trip's parking bay off the road (`parking_bay`), turned into nose first and backed
@@ -1937,11 +1932,11 @@ impl Route {
             return None;
         }
         let junctions: Vec<[f32; 2]> = g.junctions().collect();
+        let near_path = crate::travel::NearestPoint::new(path.pts.iter().map(|x| x.0).collect());
         let road_at = |q: [f32; 2]| {
-            path.pts
-                .iter()
-                .min_by(|x, y| dist(x.0, q).total_cmp(&dist(y.0, q)))
-                .map_or((7.0, RoadKind::Street), |x| (x.1, x.2))
+            near_path
+                .nearest(q)
+                .map_or((7.0, RoadKind::Street), |i| (path.pts[i].1, path.pts[i].2))
         };
         let tops = lane_tops(&lane, travel, &junctions, |i| road_at(lane[i]).1);
         // Off the lane at the end: into its driveway, coming from the side the way comes in

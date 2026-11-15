@@ -575,11 +575,9 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
     let table = write_parts(&out.join(format!("{family}.bin")), &base.parts[..play])?;
     let hd_mesh = format!("{family}.hd.bin");
     let hd_table = write_parts(&out.join(&hd_mesh), &base.parts[play..])?;
-    let mut stages = OMap::new();
-    for &stage in &STAGES {
-        if stage == BASE_STAGE {
-            continue;
-        }
+    // The other stages, each on a thread of its own (each only reads the base stage), in order.
+    let others: Vec<&'static str> = STAGES.into_iter().filter(|&s| s != BASE_STAGE).collect();
+    let built = in_parallel(&others, |stage| -> io::Result<StageEntry> {
         let st = assemble(family, stage, Some(&base.cuts));
         let mut a: Vec<&str> = st.parts.iter().map(|e| e.0.as_str()).collect();
         let mut b: Vec<&str> = base.parts.iter().map(|e| e.0.as_str()).collect();
@@ -591,18 +589,19 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
         let t = write_stage(&out.join(&mesh), &base.parts, &st.parts[..play])?;
         let hd_mesh = format!("{family}.{stage}.hd.bin");
         let hd_t = write_stage(&out.join(&hd_mesh), &base.parts, &st.parts[play..])?;
-        stages.insert(
-            stage,
-            StageEntry {
-                mesh,
-                sk: skeleton_json(family, stage, &st.meta),
-                parts: t,
-                hd: CloseUp {
-                    mesh: hd_mesh,
-                    parts: hd_t,
-                },
+        Ok(StageEntry {
+            mesh,
+            sk: skeleton_json(family, stage, &st.meta),
+            parts: t,
+            hd: CloseUp {
+                mesh: hd_mesh,
+                parts: hd_t,
             },
-        );
+        })
+    });
+    let mut stages = OMap::new();
+    for (stage, entry) in others.into_iter().zip(built) {
+        stages.insert(stage, entry?);
     }
     let mut chunks = OMap::new();
     chunks.insert("body", []);
@@ -673,12 +672,37 @@ struct Rig {
     bodies: OMap<BodyEntry>,
 }
 
+/// `f` of each item, each on a thread of its own, the results in the items' order (8 MB stacks, as
+/// `cargo characters`' main thread has; a panic is passed on).
+fn in_parallel<T: Send>(items: &[&'static str], f: impl Fn(&'static str) -> T + Sync) -> Vec<T> {
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = items
+            .iter()
+            .map(|&item| {
+                let f = &f;
+                std::thread::Builder::new()
+                    .name(item.to_string())
+                    .stack_size(8 << 20)
+                    .spawn_scoped(scope, move || f(item))
+                    .expect("a thread for the build")
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|h| h.join().unwrap_or_else(|e| std::panic::resume_unwind(e)))
+            .collect()
+    })
+}
+
 /// Writes the set into `out` (rig.json and the binaries).
 pub fn build(out: &Path) -> io::Result<()> {
     std::fs::create_dir_all(out)?;
+    // The families side by side (nothing is shared but the caches, which are made the same on
+    // any thread), in order.
+    let built = in_parallel(&FAMILIES, |family| build_family(family, out));
     let mut bodies = OMap::new();
-    for &family in &FAMILIES {
-        bodies.insert(family, build_family(family, out)?);
+    for (&family, body) in FAMILIES.iter().zip(built) {
+        bodies.insert(family, body?);
     }
     let mut eyes = OMap::new();
     for &family in &FAMILIES {

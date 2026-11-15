@@ -29,9 +29,11 @@ Every tool's `src/<name>.rs` opens with what it does and its arguments; this pag
 | `cargo licenses` | `dist/THIRD-PARTY-LICENSES.txt`, written by production builds (`web/vite.config.ts`). |
 | `cargo wasm-opt` | Optimises the simulation's and the voice's WebAssembly for release, with the pinned binaryen. |
 
-The release tools and the three fetchers are unoptimised aliases (no `--release`): they wait on the
-network or on binaryen, so a release build would only cost minutes of compiling. The rest are
-release builds, as the character build is slow otherwise.
+The release tools and the three fetchers are unoptimised aliases (no `--profile tools`): they wait on
+the network or on binaryen, so an optimised build would only cost minutes of compiling. The rest, and
+the tests (`cargo test -p ll-tools --profile tools`), are built in the `tools` profile (the workspace
+`Cargo.toml`), as the character build is slow otherwise: release's optimisations without its fat LTO,
+so a change here builds again in seconds, with the same outputs to the byte.
 
 ## Release
 

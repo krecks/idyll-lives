@@ -11,7 +11,8 @@
  *
  * Everything here is drawn on the town layer (`townLayer`: the camera draws it in place of the world
  * layer while the menus show the town, and the sun lights it then, `PlayCanvasRenderer.enterTown`),
- * so it can be built and kept while the game world is on screen, and the other way round. The
+ * so it can be built while the game world is (hidden, being prepared), and the other way round; the
+ * renderer lets it go once a game is on screen (`PlayCanvasRenderer.releaseTown`). The
  * landscape round it is `LotContents`' (`useNature('town', …)`), shared with the game's when it is
  * the same town; the camera rig is the renderer's (`shared/overviewCamera.ts`).
  */
@@ -115,6 +116,8 @@ export class TownOverview {
 
   // Lot highlights: ring (outline), fill (inner glow) and wall (light curtain), one instance per plot.
   private readonly glowMaterial: pc.Material;
+  /** What `glowMaterial` is made from (`glowByInstance`): both go with the overview. */
+  private readonly glowBase: pc.StandardMaterial;
   private hl: Highlight[] = [];
   private hlSize = '';
   private state: LotHighlight = { hover: null, selected: null, marked: [], outlines: false };
@@ -162,6 +165,7 @@ export class TownOverview {
     mat.cull = pc.CULLFACE_NONE;
     mat.slopeDepthBias = HIGHLIGHT_DEPTH_SLOPE;
     mat.update();
+    this.glowBase = mat;
     this.glowMaterial = glowByInstance(app, mat);
   }
 
@@ -288,6 +292,8 @@ export class TownOverview {
     for (const [, t] of this.templates) void t.then((template) => disposeTemplate(template)).catch(() => {});
     this.templates.clear();
     this.root.destroy();
+    this.glowMaterial.destroy();
+    this.glowBase.destroy();
   }
 
   // ---- building ---------------------------------------------------------------------

@@ -14,7 +14,7 @@
 
 import * as pc from './engine';
 import { MaterialLibrary, type SurfacePattern } from './materials';
-import { drawMesh, meshFrom } from './meshes';
+import { drawMesh, meshFrom, type MeshUse } from './meshes';
 import { shadowOnlyLayer } from './sunShadows';
 import type { Opening, StoreyLayout, WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
@@ -145,7 +145,7 @@ export class HouseBuilder {
   }
 
   /** What a part is drawn with. */
-  private materialOf(part: HousePart): pc.Material {
+  private materialOf(part: Omit<HousePart, 'geo'>): pc.Material {
     const s = part.surface;
     switch (s.kind) {
       case 'surface':
@@ -159,23 +159,26 @@ export class HouseBuilder {
     }
   }
 
-  /** A part's entity under `parent` (null when it's empty). */
-  private draw(part: HousePart, parent: pc.Entity): HouseMesh | null {
-    return this.drawData(part, part.geo.meshData({ colors: true, cut: part.cut }), parent);
+  /** A part's entity under `parent` (null when it's empty). `use`: its mesh's (`MeshUse`). */
+  private draw(part: HousePart, parent: pc.Entity, use: MeshUse = 'static'): HouseMesh | null {
+    const entity = this.drawData(part, part.geo.meshData({ colors: true, cut: part.cut }), parent, use);
+    return entity && { entity, part };
   }
 
-  /** A part drawn from vertex arrays of its own (the street merges its chunks' parts: `pc/street.ts`), under `parent`; null when empty. */
-  drawData(part: HousePart, data: MeshData, parent: pc.Entity): HouseMesh | null {
-    const mesh = meshFrom(this.device, data);
+  /**
+   * A part drawn from vertex arrays of its own (the street merges its chunks' parts: `pc/street.ts`;
+   * the part's own geometry isn't read), under `parent`; null when empty.
+   */
+  drawData(part: Omit<HousePart, 'geo'>, data: MeshData, parent: pc.Entity, use: MeshUse = 'static'): pc.Entity | null {
+    const mesh = meshFrom(this.device, data, use);
     if (!mesh) return null;
-    const entity = drawMesh(parent, part.name, mesh, this.materialOf(part), {
+    return drawMesh(parent, part.name, mesh, this.materialOf(part), {
       castShadows: part.cast,
       receiveShadows: !part.shadowOnly,
       ...(part.shadowOnly ? { layers: [this.shadowOnly] } : {}),
       // Glass is see-through: drawn after the other blended surfaces (contact shadows).
       alphaIndex: part.glass ? 10 : 0,
     });
-    return { entity, part };
   }
 
   /** The viewed lot's house on one storey (`storey`), under `parent` (lifted to the storey's height); null without a wall layout. */
@@ -195,7 +198,8 @@ export class HouseBuilder {
     });
     for (const part of plan.parts) {
       const door = doorParts.get(part);
-      const drawn = this.draw(part, door ? door.pivot : parent);
+      // (The birds find the roof's ridge in its vertices: `birds.ts`.)
+      const drawn = this.draw(part, door ? door.pivot : parent, part.roof ? 'read' : 'static');
       if (!drawn) continue;
       // A leaf's parts in its pivot's frame.
       if (door) drawn.entity.setLocalPosition(-door.base.x, 0, -door.base.z);

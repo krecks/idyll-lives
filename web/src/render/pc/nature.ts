@@ -26,7 +26,7 @@ import { withoutContact } from './post';
 import { Grass, grassGround, type GrassPusher } from './grass';
 import { disposeTiles, type GroundTile } from './groundTiles';
 import { Instances, INSTANCE_COLOR } from './instancing';
-import { meshFrom } from './meshes';
+import { gpuOnly, meshFrom } from './meshes';
 import { GAME_FRONT_FACE, MaterialLibrary, textureWithFallback } from './materials';
 import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from './models';
 import { codeFor, float, registerShaderFeature, type ShaderFeature } from './shaders/chunks';
@@ -40,7 +40,7 @@ import { grassField, gustAt, gustNoise, type GrassQuality } from '../shared/gras
 import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
-import { groupInstances, hideLawn, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
+import { groupInstances, hideLawn, keepBareTiles, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
 import type { OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
 import { tuned } from '../tune';
@@ -261,7 +261,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.lawnInputs = inputs;
     this.lawnMask = lawnMask(world);
     hideLawn(this.lawn, this.lawnMask, uploadLawn);
-    this.grass?.refresh(world);
+    // (Its bare tiles kept for the birds, who ask next.)
+    this.grass?.refresh(world, this.lawnMask, keepBareTiles(world, inputs, this.lawnMask));
   }
 
   /**
@@ -414,6 +415,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     mesh.setColors(colors);
     mesh.setIndices(indices);
     mesh.update(pc.PRIMITIVE_TRIANGLES);
+    gpuOnly(mesh);
     // (A copy of its own: the gusts' define is the landscape's.)
     const material = MaterialLibrary.for(app).surface('material.ground', { vertexColors: true, variant: 'grass' });
     grassGround(app.graphicsDevice, material);
@@ -576,7 +578,7 @@ function tileMesh(app: pc.AppBase, positions: Float32Array, colors: Float32Array
   mesh.setColors(col);
   mesh.setIndices(pos.length / 3 > 65535 ? new Uint32Array(idx) : new Uint16Array(idx));
   mesh.update(pc.PRIMITIVE_TRIANGLES);
-  return mesh;
+  return gpuOnly(mesh);
 }
 
 /** An entity of `app` drawing `mesh` with `material`, switched off, under `parent`; it receives shadows and casts none. */

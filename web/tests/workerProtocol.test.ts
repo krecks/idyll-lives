@@ -83,6 +83,21 @@ describe('mergeWorld', () => {
     expect(next.objects.length).toBe(1);
     expect(shown.objects.length).toBe(3);
   });
+
+  test('a splice adds and takes away things, the others kept as they were', () => {
+    const shown = mergeWorld(null, null, { world: first(), rooms: new Uint16Array(16), meshes: meshes() });
+    // Thing 2 sold, things 4 and 5 bought in its place, then thing 5 (now at index 2) opened.
+    const next = mergeWorld(shown, shown, { world: { version: 2, lotVersion: 1, objectSplice: [1, 1, [thing(4), thing(5)]], objectChanges: [[2, thing(5, true)]] } });
+    expect(next.objects.map((o) => o.id)).toEqual([1, 4, 5, 3]);
+    expect(next.objects[2].open).toBe(true);
+    expect(next.objects[0]).toBe(shown.objects[0]);
+    expect(next.objects[3]).toBe(shown.objects[2]);
+    expect(shown.objects.map((o) => o.id)).toEqual([1, 2, 3]);
+    // Bought at the end, on a world nobody has seen yet: changed in place.
+    const end = mergeWorld(next, shown, { world: { version: 3, lotVersion: 1, objectSplice: [4, 0, [thing(6)]] } });
+    expect(end).toBe(next);
+    expect(end.objects.map((o) => o.id)).toEqual([1, 4, 5, 3, 6]);
+  });
 });
 
 describe('shared snapshot', () => {

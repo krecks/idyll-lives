@@ -6,7 +6,8 @@
 # runs and the renderer's town-building files, about two thirds of their jobs' test time), so a pull
 # request is checked in about 4 minutes; before a push, `tools/ci-local.sh` still runs them all.
 # The heavy release work — the wasm builds, models, the other web checks and Pages deploy — stays in
-# pages.yml, run by hand or on a tag.
+# pages.yml, run by hand or on a tag; it runs none of these tests again, and publishes only once this
+# workflow has passed on the same commit (on a tag, the tag's own run).
 #
 # Four jobs side by side, each its own runner and its own Rust cache: the generated worlds alone
 # take 12 to 18 minutes (every one a Big one), so one after another the checks took 25 to 40.
@@ -26,6 +27,11 @@
 # what a pull request passed runs once more on main after the merge. A tag and a run by hand neither
 # look up nor save. When in doubt it runs: `changes` failing fails `test`, a failed or missing
 # lookup runs the job.
+#
+# The Actions cache holds 10 GB a repository, and over that GitHub evicts the least recently used.
+# So only main saves the big caches (Rust's target folders, Bun): a pull request, a branch run by hand
+# and a tag restore main's and save nothing, and `generated` restores the `rust` job's (the same
+# simulation tests' build). Only the pass markers above (a few bytes each) are saved everywhere.
 name: CI
 
 on:
@@ -124,6 +130,8 @@ jobs:
           cargo clippy --version
       - uses: Swatinem/rust-cache@v2
         if: steps.passed.outputs.cache-hit != 'true'
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Formatting
         if: steps.passed.outputs.cache-hit != 'true'
@@ -162,12 +170,17 @@ jobs:
         run: |
           rustup toolchain install
           rustc --version
+      # The `rust` job's cache (its simulation tests are these tests' build), restored only.
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust
+          save-if: false
 
       # Bun runs the sample makers.
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
+          no-cache: ${{ github.ref != 'refs/heads/main' }}
 
       # The generated_* tests are ignored because they need sample files; made here so they run
       # instead of passing without checking anything.
@@ -202,6 +215,8 @@ jobs:
         if: steps.passed.outputs.cache-hit != 'true'
         with:
           bun-version: 1.4.4
+          # (Bun's own cache: on main only, as the Rust caches; elsewhere it is fetched.)
+          no-cache: ${{ github.ref != 'refs/heads/main' }}
 
       # The residents' clips on both bodies at every life stage; the known failures are in
       # tools/characters/clip-baseline.json, so only a new one fails.
@@ -256,6 +271,8 @@ jobs:
           rustc --version
       - uses: Swatinem/rust-cache@v2
         if: steps.passed.outputs.cache-hit != 'true'
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # The repo's tools (crates/tools): a fresh character build against the committed set and its
       # checks, the object gate over every shipped model (no Blender), and the content and texture
@@ -277,6 +294,7 @@ jobs:
         if: steps.passed.outputs.cache-hit != 'true'
         with:
           bun-version: 1.4.4
+          no-cache: ${{ github.ref != 'refs/heads/main' }}
       - name: Shader chunks
         if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh chunks

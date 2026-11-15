@@ -215,8 +215,12 @@ fn big_world_benchmark() {
     let saved = t.elapsed();
     let t = Instant::now();
     World::from_save_json(&content, &json).expect("the save loads");
+    // (The save's hash: a change meant to keep results as they were keeps it.)
+    let hash = json.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+    });
     eprintln!(
-        "save {:.0} KB in {:.1} ms, loaded back in {:.1} ms",
+        "save {:.0} KB (hash {hash:016x}) in {:.1} ms, loaded back in {:.1} ms",
         json.len() as f64 / 1024.0,
         ms(saved),
         ms(t.elapsed())

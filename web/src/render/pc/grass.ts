@@ -8,8 +8,8 @@
  * copy each, its matrix moving it to its corner on the ground, its `GRASS_SLOPE` the ground's tilt
  * under it. Its own material (the textures and the eye are this town's): both faces, lit alike,
  * casting no shadow, receiving the sun's. The textures: the field's colour (and grassiness), the
- * town's mask and the lawn's map (`shared/lawn.ts`: its tone, worn earth, mown or rough; both again on
- * `refresh`, when the lot changes) and the gusts' noise.
+ * town's mask with the ground's shade and the lawn's map (`shared/lawn.ts`: its tone, worn earth, mown
+ * or rough; again on `refresh`, when the lot changes, where they changed) and the gusts' noise.
  */
 
 import { daylightByDefault } from './daylight';
@@ -22,6 +22,8 @@ import { GRASS_SHADER } from './shaders/grass';
 import type { WorldStructure } from '../../core/protocol';
 import { identity } from '../shared/math';
 import { GRASS, GRASS_PUSHERS, grassLod, gustNoise, townGrass, type GrassField, type GrassPusher, type GrassQuality } from '../shared/grass';
+import type { TexelRect } from '../shared/groundShade';
+import type { LawnMask } from '../shared/nature';
 
 export type { GrassPusher, GrassQuality } from '../shared/grass';
 
@@ -227,13 +229,17 @@ export class Grass {
     return new pc.Texture(this.app.graphicsDevice, { name: 'grassTown', width: Math.max(1, f.townW), height: Math.max(1, f.townD), format: pc.PIXELFORMAT_RG8, mipmaps: false, minFilter: pc.FILTER_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [this.townTexels(new Uint8Array(Math.max(1, f.townW * f.townD) * 2))] });
   }
 
-  /** The mask and the shade, texel by texel, into `out` (the texture's bytes). */
-  private townTexels(out: Uint8Array): Uint8Array {
-    const { town, shade } = this.field;
+  /** The mask and the shade, texel by texel, into `out` (the texture's bytes): all, or only in `rects` (texels, last ones included). */
+  private townTexels(out: Uint8Array, rects?: readonly TexelRect[]): Uint8Array {
+    const { town, shade, townW } = this.field;
     const shaded = shade.length === town.length;
-    for (let i = 0, o = 0; i < town.length; i++, o += 2) {
-      out[o] = town[i];
-      out[o + 1] = shaded ? shade[i] : 0;
+    for (const [i0, j0, i1, j1] of rects ?? [[0, 0, townW - 1, town.length / Math.max(1, townW) - 1]]) {
+      for (let j = j0; j <= j1; j++) {
+        for (let i = j * townW + i0, o = i * 2; i <= j * townW + i1; i++, o += 2) {
+          out[o] = town[i];
+          out[o + 1] = shaded ? shade[i] : 0;
+        }
+      }
     }
     return out;
   }
@@ -276,9 +282,12 @@ export class Grass {
     this.setTown();
   }
 
-  /** The lawn grows as the lot is now (rooms and furniture changed): the town's mask again. */
-  refresh(world: WorldStructure): void {
-    townGrass(this.field, world);
+  /**
+   * The lawn grows as the lot is now (rooms and furniture changed): the town's mask again, where it changed
+   * (`mask`, `bare`: the world's `lawnMask` and `bareTiles`, if the caller has them).
+   */
+  refresh(world: WorldStructure, mask?: LawnMask, bare?: Uint8Array): void {
+    const change = townGrass(this.field, world, mask, bare);
     // (A lot of another shape, even of the same area, needs a texture of its own.)
     if (this.field.townW !== this.town.width || this.field.townD !== this.town.height || !this.field.town.length) {
       this.town.destroy();
@@ -286,8 +295,12 @@ export class Grass {
       this.lawn.destroy();
       this.lawn = this.lawnTexture();
     } else {
-      this.townTexels(this.town.lock() as Uint8Array);
-      this.town.unlock();
+      // The texels whose mask or shade changed (a thing bought: a few metres of a big world's millions).
+      const rects = change.tiles && change.shade ? [...change.shade, ...tileRects(change.tiles, this.field.townW / GRASS.townTexels, GRASS.townTexels)] : undefined;
+      if (!rects || rects.length) {
+        this.townTexels(this.town.lock() as Uint8Array, rects);
+        this.town.unlock();
+      }
       const lawn = this.lawn.lock() as Uint8Array;
       lawn.set(this.field.lawn);
       this.lawn.unlock();
@@ -397,4 +410,17 @@ export class Grass {
     this.town.destroy();
     this.lawn.destroy();
   }
+}
+
+/** The texels (`n` a tile) of the tiles marked in `tiles` (`tw` across), a rectangle per run of them along a row. */
+function tileRects(tiles: Uint8Array, tw: number, n: number): TexelRect[] {
+  const out: TexelRect[] = [];
+  for (let t = 0; t < tiles.length; t++) {
+    if (!tiles[t]) continue;
+    const start = t;
+    while (t + 1 < tiles.length && tiles[t + 1] && (t + 1) % tw !== 0) t++;
+    const [x0, x1, z] = [start % tw, t % tw, Math.floor(start / tw)];
+    out.push([x0 * n, z * n, (x1 + 1) * n - 1, (z + 1) * n - 1]);
+  }
+  return out;
 }

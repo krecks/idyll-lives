@@ -15,8 +15,14 @@ type WorldMessage = Extract<FromWorker, { type: 'world' }>;
  * never changed in place; `current`, if it isn't that, is changed in place (nobody has seen it).
  */
 export function mergeWorld(current: WorldStructure | null, shown: WorldStructure | null, msg: Pick<WorldMessage, 'world' | 'rooms' | 'meshes'>): WorldStructure {
-  const { objectChanges, unset, ...parts } = msg.world;
+  const { objectSplice, objectChanges, unset, ...parts } = msg.world;
   const world = (!current ? parts : current === shown ? { ...current, ...parts } : Object.assign(current, parts)) as WorldStructure;
+  if (objectSplice) {
+    // (A new list: the shown world keeps its own. The things around the splice stay the same objects.)
+    const [start, deleted, added] = objectSplice;
+    const list = world.objects;
+    world.objects = list.slice(0, start).concat(added, list.slice(start + deleted));
+  }
   if (objectChanges?.length) {
     // (Copied once: the shown world keeps its list.)
     if (world.objects === shown?.objects) world.objects = world.objects.slice();

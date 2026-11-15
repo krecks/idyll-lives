@@ -224,6 +224,16 @@ export function bareTiles(world: WorldStructure, mask?: LawnMask): Uint8Array {
 }
 let lastBare: { inputs: LawnInputs; bare: Uint8Array } | null = null;
 
+/**
+ * `bareTiles` for a world whose lawn inputs (`lawnInputs`) and mask the caller has made already (the
+ * landscape's `refreshLawn`): kept as the answer `bareTiles` gives for those inputs (the birds' next).
+ */
+export function keepBareTiles(world: WorldStructure, inputs: LawnInputs, mask: LawnMask): Uint8Array {
+  const bare = bareTilesOf(world, mask);
+  lastBare = { inputs, bare };
+  return bare;
+}
+
 function bareTilesOf(world: WorldStructure, mask: LawnMask): Uint8Array {
   const w = world.width;
   const d = groundDepth(world);

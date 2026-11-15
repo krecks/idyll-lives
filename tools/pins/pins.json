@@ -79,9 +79,9 @@
     {
       "name": "sim-partners",
       "file": "crates/sim-core/src/partners.rs",
-      "sha256": "e4c902b361be3def539ed244d042956ffa95cbedb096fb64738cd84eb9a4e368",
-      "by": "setup",
-      "reason": "household behaviour: not this run's to change"
+      "sha256": "aa4ad8c8247ad49e289bf920731f9156727cb9038253ff5d2bc8b6759afa046d",
+      "by": "release/0.8.1",
+      "reason": "no behaviour change: free_now split so the tick's briefs ask available_for_social once (perf/sim-smaller, results bit-identical)"
     },
     {
       "name": "sim-planner",

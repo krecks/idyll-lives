@@ -61,6 +61,11 @@ let itemsAt = -Infinity;
 let sentObject = -1;
 /** Tile rectangle whose walls and floors are sent to the renderer (null = whole town). */
 let region: [number, number, number, number] | null = null;
+/**
+ * The main thread has said which region it views (`view`, null too). Till then no meshes go: the
+ * first world names the home it asks for next, and a big world's whole town is 34 MB of them.
+ */
+let viewed = false;
 /** Tile rectangle the camera streams in: the sim's full-detail area (null: the view's). */
 let watched: [number, number, number, number] | null = null;
 /** What the simulation said as it panicked (its panic hook calls `__wasmPanic` just before the trap). */
@@ -94,6 +99,7 @@ scope.onmessage = (e) => {
       scope.postMessage({ type: 'saved', requestId: msg.requestId, data: game.save() });
     } else if (msg.type === 'view') {
       region = msg.region;
+      viewed = true;
       viewSeq = msg.seq;
       if (game) {
         watch(game);
@@ -312,7 +318,8 @@ function publish(now = false): void {
 
 /**
  * What changed of the structure since the last world sent: the lot (walls, openings, floors, and
- * the rooms as a typed array) only when it changed, its meshes when it or the viewed region did.
+ * the rooms as a typed array) only when it changed, and of it only what did; its meshes when it or
+ * the viewed region did (once the main thread has said which it views).
  * Most changes are a door opened or a thing moved: the main thread keeps the rest.
  */
 function postWorld(): void {
@@ -322,18 +329,20 @@ function postWorld(): void {
   const lot = g.lot_version();
   const area = JSON.stringify(region);
   const lotChanged = lot !== lastLot;
-  const viewChanged = area !== lastRegion;
+  const meshesDue = viewed && (lotChanged || area !== lastRegion);
   lastLot = lot;
-  lastRegion = area;
   const world: WorldUpdate = JSON.parse(g.structure_update(lotChanged));
-  for (const o of world.objects ?? []) sentObject = Math.max(sentObject, o.id);
+  for (const o of world.objects ?? world.objectSplice?.[2] ?? []) sentObject = Math.max(sentObject, o.id);
   const message: Extract<FromWorker, { type: 'world' }> = { type: 'world', view: viewSeq, world };
   const transfer: Transferable[] = [];
-  if (lotChanged) {
-    message.rooms = g.rooms();
-    transfer.push(message.rooms.buffer);
+  // (Only when they changed: a big world's are megabytes, and a fence or a floor leaves them.)
+  const rooms = lotChanged ? g.rooms_changed() : undefined;
+  if (rooms) {
+    message.rooms = rooms;
+    transfer.push(rooms.buffer);
   }
-  if (lotChanged || viewChanged) {
+  if (meshesDue) {
+    lastRegion = area;
     const meshes = { walls: mesh(g, 0), wallsLow: mesh(g, 1), floors: mesh(g, 2) };
     message.meshes = meshes;
     transfer.push(...Object.values(meshes).flatMap((m) => [m.positions.buffer, m.normals.buffer, m.uvs.buffer, m.indices.buffer]));

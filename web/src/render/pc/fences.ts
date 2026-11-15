@@ -38,7 +38,7 @@ export function buildFences(
   const plan = planFences(fences, styles, { hedgeBoxes, wallAt });
   if (!plan) return null;
   const data = plan.geo.meshData({ colors: true });
-  const mesh = meshFrom(app.graphicsDevice, data, plan.gates.length > 0);
+  const mesh = meshFrom(app.graphicsDevice, data, plan.gates.length > 0 ? 'dynamic' : 'static');
   if (!mesh) return null;
   const entity = drawMesh(parent, 'fences', mesh, MaterialLibrary.for(app).plainFinish(), { castShadows: true });
   return { entity, gates: plan.gates, mesh, positions: data.positions, normals: data.normals };

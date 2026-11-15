@@ -8,6 +8,7 @@
  */
 
 import { MeshoptDecoder } from 'meshoptimizer/decoder';
+import { withBuild } from '../../assets/build';
 import * as pc from './engine';
 
 const BASE = new URL(`${import.meta.env.BASE_URL}decoders/basis/`, location.href).href;
@@ -34,7 +35,8 @@ function decodeMeshopt(count: number, stride: number, source: Uint8Array, mode: 
 export function setupDecoders(): void {
   if (basisStarted) return;
   basisStarted = true;
-  pc.basisInitialize({ glueUrl: `${BASE}basis.wasm.js`, wasmUrl: `${BASE}basis.wasm.wasm`, lazyInit: true, numWorkers: 2 });
+  // (By their content hash in a build, as the game's data: kept across releases.)
+  pc.basisInitialize({ glueUrl: withBuild(`${BASE}basis.wasm.js`), wasmUrl: withBuild(`${BASE}basis.wasm.wasm`), lazyInit: true, numWorkers: 2 });
 }
 
 interface MeshoptExtension {

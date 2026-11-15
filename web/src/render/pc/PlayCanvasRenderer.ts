@@ -79,7 +79,6 @@ import { townView } from '../shared/townView';
 import { landscapeRing } from '../shared/nature';
 import { setFogFrom } from './shaders/fog';
 import { LT_FIXTURE } from '../../debug/livingTown';
-import { applyLtFixture } from '../../debug/ltFixture';
 import { backdropBuilding, backdropGround, gardenHedges, lotBuilding, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
 import { TownGroundMap } from './groundTiles';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
@@ -169,6 +168,12 @@ const FRAME_WAIT_LIMIT_MS = 15_000;
 const MAX_FRAME_MS = 100;
 /** Frames still drawn once a full-screen menu covers the view (its frosted glass shows the last). */
 const HOLD_FRAMES = 2;
+/**
+ * The paused game's frames go on being drawn this long (ms) after a change before the picture is held
+ * (`heldFrames.ts`): longer than the slowest rate anything is drawn again at (the sun's map and the lamps'
+ * shadows 15 a second on Low, the reflections 10).
+ */
+const GAME_SETTLE_MS = 250;
 /** Metres the sun's shadow square reaches past the viewed lot. */
 const SHADOW_MARGIN = 10;
 /** The basement's pit (and the ground dug away over it) reaches this far past the plot (m), clear of walls on its edge. */
@@ -179,6 +184,11 @@ const GATE_CELL = 8;
 const ROOF_MIN_DISTANCE = 15;
 /** Main-thread time (ms) a world build runs before the frames it runs behind get one (`pace`). */
 const BUILD_SLICE_MS = 8;
+/**
+ * How long after the game comes on screen the menus' town is let go (`releaseTown`): its destroy
+ * (some 20 ms) after the reveal's frames and the fly-in's last ones.
+ */
+const TOWN_RELEASE_MS = 1000;
 /** The same while the camera roams (a big world, or once it has settled on a lot of its own). */
 const ROAM_SLICE_MS = 4;
 /**
@@ -502,6 +512,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** (the mirrors' reflections, `mirrors.ts`; the menus' town held while it stands still, `heldFrames.ts`.) */
   private mirrors!: Mirrors;
   private held!: HeldFrames;
+  /** The game is paused (the snapshot's speed 0): its picture may be held while nothing in it changes. */
+  private gamePaused = false;
+  /** The clock (ms) of what moves only for the eye (the wind, the clouds, the selection marker): still while the frame is held. */
+  private shownMs = 0;
   /** (buy mode's thing in hand, the object picked up, the effects, `placing.ts`; the rebuilds files that came set off, gathered, `shared/modelRefresh.ts`.) */
   private placing!: Placing;
   private readonly modelRefresh = new ModelRefresh((urls) => this.refreshStreet(urls));
@@ -761,7 +775,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     cam.layers = cam.layers.filter((id) => id !== pc.LAYERID_SKYBOX);
     // The picture after the light: multisampling or FXAA, the image processing
     // and the night grade (`post.ts`; the diag views and `?diag=linear` without them).
-    this.post = new PostProcessing(this.app, cam, gamePostOptions(this.quality.msaaSamples, this.diag, diagViewActive, this.quality.leanTargets, this.quality.contactShading));
+    this.post = new PostProcessing(this.app, cam, gamePostOptions(this.samples, this.diag, diagViewActive, this.quality.leanTargets, this.quality.contactShading));
     this.post.setLook(gameLook(LOOK));
     // Leaf cards soften their edges with the picture's samples (none on Low, nor without the post-processing).
     this.lib.setCutoutCoverage(this.post.samples > 1);
@@ -779,9 +793,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     });
     this.app.root.addChild(this.sun);
     // The map's size, filtering and bias are the preset's (`sunShadows.ts`).
-    this.sunShadows = new SunShadows(this.app, this.sun, { size: this.quality.shadowMapSize, rate: this.quality.shadowRate });
+    this.sunShadows = new SunShadows(this.app, this.sun, { size: this.quality.shadowMapSize, rate: this.quality.shadowRate, still: !this.diag.has('wholeshadows') });
     // (lotContents.ts: the landscape, sky, objects and items.)
-    this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.castersMoved(urgent), landscapeChanged: () => this.lamps.exclude(this.lot.landscapeDraws()) /* (lamps.ts) */ });
+    this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.castersMoved(urgent), partsMoved: () => this.partsMoved(), landscapeChanged: () => this.lamps.exclude(this.lot.landscapeDraws()) /* (lamps.ts) */ });
     // (the menus' town on a layer of its own, `overview.ts`, the landscape's draws for it too; the sky on both.)
     const town = townLayer(this.app).id;
     this.lot.townLayer = town;
@@ -792,6 +806,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.characters.setRide((id) => this.lot.ride(id));
     this.characters.setLoop((id) => this.lot.loopPhase(id));
     this.characters.setSun(() => this.lighting.sunDirection);
+    // (A redraw of the sun's map for their poses alone draws only them and the moving parts over the rest's picture: `SunShadows.posed`.)
+    if (this.quality.characterShadows)
+      this.sunShadows.movers = (out) => {
+        this.characters.shadowCasters(out);
+        this.lot.movingCasters(out);
+      };
     this.birdLife = new GameBirds(this.app, this.root, this.deps.assets, this.deps.content, this.quality.birds, { eye: (out) => this.camera.eyeInGame(out), storey: () => this.storey, roofShown: () => this.roofShown, calm: () => !!this.options.reducedMotion }, this.debug); // (the garden birds.)
     const blob = contactBlob(this.app);
     this.simShadow = new Instances(this.device, this.root, blob.mesh, blob.material, { name: 'simShadows', castShadows: false, receiveShadows: false, capacity: MAX_CHARACTERS, cull: false });
@@ -844,9 +864,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lamps = new Lamps(this.app, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode, whole: () => this.townWhole }, { house: this.house, lot: this.lot, pools: () => this.applyGardenPools(), casters: () => this.lampCasters() });
     // (the mirrors, `mirrors.ts`, their held reflections drawn again when the lamps, the sun or what the map shows changed; held frames, `heldFrames.ts`.)
     const mq = this.quality;
-    this.mirrors = new Mirrors(this.app, this.root, this.camera.camera, this.sun.light!, { count: this.diag.has('nomirrors') ? 0 : mq.mirrors, scale: mq.mirrorScale, samples: mq.msaaSamples, rate: mq.mirrorRate }, (mi, bits) => this.characters.drawsRows(mi, bits));
-    this.lamps.onChanged = () => this.mirrors.changed();
+    this.mirrors = new Mirrors(this.app, this.root, this.camera.camera, this.sun.light!, { count: this.diag.has('nomirrors') ? 0 : mq.mirrors, scale: mq.mirrorScale, samples: this.samples, rate: mq.mirrorRate }, (mi, bits) => this.characters.drawsRows(mi, bits));
+    this.lamps.onChanged = () => {
+      this.mirrors.changed();
+      this.pictureChanged();
+    };
     this.sunShadows.onMoved = (urgent, casters) => {
+      // (Whatever moves in the sun's map moves in the picture: a held game frame is drawn again.)
+      this.pictureChanged();
       if (urgent) this.mirrors.changed();
       // (The lamps' shadows, `lampShadows.ts`: what moves on its own is told to them where it moves, `update`.)
       if (urgent && casters) this.lamps.castersMoved(true);
@@ -1011,6 +1036,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const frozen = this.diag.has('freeze');
     const dt = (this.frameDt = frozen ? 0 : Math.min(this.lastTime ? time - this.lastTime : 1000 / 60, MAX_FRAME_MS));
     this.lastTime = time;
+    // (What moves only for the eye, the wind, the clouds and the selection marker's bob, stands still while the frame is
+    // held, and goes on from there when it is drawn again: `heldFrames.ts`.)
+    const shownDt = this.held.holding ? 0 : dt;
+    this.shownMs += shownDt;
     const probe = this.probe;
     let updated = start;
     if (probe) this.drawCounts.reset();
@@ -1026,17 +1055,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.sunShadows.frame();
       this.applyCamera();
       this.pushGrass(dt);
-      this.lot.frame(dt, this.townMode); // (the sky round the camera, the clouds' shadows, the grass in view.)
+      this.lot.frame(shownDt, this.townMode); // (the sky round the camera, the clouds' shadows, the grass in view.)
       if (!this.townMode) this.updateCutaway();
       // (The marker faces the camera as it is now, after this frame's input.)
       this.placeMarker();
       this.handles.frame(this.camera.eyeInGame(this.eyeTmp));
       if (this.townMode) this.townListener?.();
       else this.onView?.();
-      this.app.update(dt / 1000);
-      // (the reflections drawn this frame, `mirrors.ts`; the menus' town held while it stands still, `heldFrames.ts`.)
+      this.app.update(shownDt / 1000);
+      // (the reflections drawn this frame, `mirrors.ts`; the menus' town held while it stands still, and the game while
+      // it is paused and nothing in it changes, `heldFrames.ts`.)
       this.mirrors.frame(this.characters, this.simCount, this.townMode);
-      this.held.active = this.townMode && !this.flyingIn && !this.worldBuilding && this.townBuilds === 0; // (nor while the overview builds.)
+      this.holdIfStill();
       // (the warm-up's frame, `warmGame`, undone once drawn.)
       const warm = this.warmNext ? this.warmFrame() : null;
       this.warmNext = false;
@@ -1045,7 +1075,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
           this.app.render();
           this.drawCalls = this.device._drawCallsPerFrame;
           this.device._drawCallsPerFrame = 0;
-        }
+        } else this.drawCalls = 0;
       } finally {
         warm?.();
       }
@@ -1080,6 +1110,32 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       probe.after(start, updated, end, c);
     }
   };
+
+  /**
+   * Whether this frame may be held (`heldFrames.ts`): the menus' town standing still, nothing of it being built; the
+   * game paused (residents, objects, birds and cars stand still then), nothing being built or streamed in. In the
+   * game, what changes the picture in place is told (`pictureChanged`), and frames are drawn for `GAME_SETTLE_MS`
+   * after it (what is drawn at a rate of its own: the sun's map, the reflections, the lamps' shadows).
+   */
+  private holdIfStill(): void {
+    const held = this.held;
+    if (this.townMode) {
+      held.settleMs = 0;
+      held.active = !this.flyingIn && !this.worldBuilding && this.townBuilds === 0; // (nor while the overview builds.)
+      return;
+    }
+    held.settleMs = GAME_SETTLE_MS;
+    held.active = this.gamePaused && !this.worldBuilding && !this.worldBuilds && !this.streaming && !this.streamDue && !this.warming;
+    if (!held.active) return;
+    // What moves in place while the game is paused: a resident posed (a voice's lips, a look changed), the thing in
+    // hand and the build effects, a shadow map's redraw still to come.
+    if (this.characters.posed || this.placing.animating || this.sunShadows.waiting) held.changed();
+  }
+
+  /** Something in the game's picture changed that the held frame can't see (`heldFrames.ts`): it is drawn again. */
+  private pictureChanged(): void {
+    if (!this.townMode) this.held?.changed();
+  }
 
   // --- the camera ----------------------------------------------------------------------
 
@@ -1250,6 +1306,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       return taken;
     });
     if (!changed) return;
+    this.pictureChanged();
     if (this.streamOn && this.street.setChunks(this.roam.chunks)) this.streamStreet();
     this.cars.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
     this.parkedRides.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
@@ -1340,6 +1397,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const key = [...up].sort((a, b) => a - b).join(',');
     if (key === this.townUpKey) return;
     this.townUpKey = key;
+    this.pictureChanged();
     this.townUp = up;
   }
 
@@ -1493,12 +1551,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   setGameShot(shot: GameShot | null, cut = false): void {
+    this.pictureChanged();
     if (!shot) return this.gameRig.release();
     this.followIndex = null;
     this.gameRig.setShot(shot, cut || this.townMode);
   }
 
   followSim(index: number | null): void {
+    this.pictureChanged();
     if (index !== this.followIndex) this.followCaught = false;
     this.followIndex = index;
   }
@@ -1553,8 +1613,19 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   // --- the world -----------------------------------------------------------------------
 
   setWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
-    // (`?ltFixture`: a Big world without a backdrop gets the debug fixture's, until worldgen writes one.)
-    if (LT_FIXTURE) applyLtFixture(world);
+    this.pictureChanged();
+    // (`?ltFixture`: a Big world without a backdrop gets the debug fixture's, until worldgen writes
+    // one; its code is a chunk of its own.)
+    if (LT_FIXTURE) {
+      return import('../../debug/ltFixture').then(({ applyLtFixture }) => {
+        applyLtFixture(world);
+        return this.placeWorld(world, view);
+      });
+    }
+    return this.placeWorld(world, view);
+  }
+
+  private placeWorld(world: WorldStructure, view: ViewRect | null): Promise<void> {
     // A big world is never built whole in full detail (no view: every house's storeys and every
     // thing, hundreds of MB of buffers; Low's merged object shadows alone 260 MB, which lost the
     // WebGPU device): with no lot given, the focus stays the lot built, else the one nearest the camera.
@@ -2199,6 +2270,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   clear(): void {
+    this.pictureChanged();
     this.characters.clear();
     this.birdLife.clear();
     this.simShadowMatrices.fill(0);
@@ -2291,6 +2363,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   keepRoof(on: boolean): void {
+    this.pictureChanged();
     this.roofKept = on;
   }
 
@@ -2418,6 +2491,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!urgent) this.lamps.castersMoved(false);
   }
 
+  /** A use moved the lot's moving parts (`LotContents.update`): the sun's shadows as for a pose, and the lamps'. */
+  private partsMoved(): void {
+    this.sunShadows.posed();
+    this.lamps.castersMoved(false);
+  }
+
   /** What casts in a lamp's light now (`lampShadows.ts`): the lot's things and the residents. One list, filled anew. */
   private lampCasters(): pc.MeshInstance[] {
     const out = this.lampCasterList;
@@ -2508,6 +2587,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lastWeekday = (Math.max(1, curr[layout.header.day] | 0) - 1) % 7;
     if (this.townMode) return;
     const h = layout.header;
+    this.gamePaused = (curr[h.speed] | 0) === 0;
     // At speed 3 and up, and in quiet hours, the preset's step (Low's ten minutes: each update re-colours the sun, sky and lamps).
     const fast = curr[h.speed] >= 3 || (h.calm !== undefined && curr[h.calm] > 0);
     const step = fast ? Math.max(LIGHT_STEP, this.quality.lightingStep) : LIGHT_STEP;
@@ -2523,7 +2603,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.swingDoors(PLAYBACK_RATE[curr[h.speed] | 0] ?? 1);
     this.steerCamera(this.frameDt / 1000);
     this.keepCameraClear();
-    if (this.lot.update(frame)) this.mirrors.changed(); // (the objects' clips, the screens; things moving, in the held reflections.)
+    if (this.lot.update(frame)) {
+      this.mirrors.changed(); // (the objects' clips, the screens; things moving, in the held reflections.)
+      this.pictureChanged();
+    }
     this.placing.frame(this.frameDt); // (the effects, the thing in hand.)
     this.updateSims(frame);
     this.cars.update(frame);
@@ -2531,8 +2614,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.findTownUp(frame);
     this.signals.update(frame);
     // (A car's shadow goes with it: `moved` only for a car that moved where it casts into the map, `setShadowTest`; the lights' poles when they're placed.)
-    if (this.cars.moved || this.signals.moved) this.sunShadows.moved(false);
-    this.birdLife.update(frame, minute, this.frameDt, this.characters, this.simCount); // (after the residents, who scare them.)
+    if (this.cars.moved || this.signals.moved) {
+      this.sunShadows.moved(false);
+      this.pictureChanged();
+    }
+    // (After the residents, who scare them. Paused, the birds keep still but for the wind's sway on their perches, which
+    // stands still with the wind's clock while the frame is held: no change of the picture's.)
+    this.birdLife.update(frame, minute, this.frameDt, this.characters, this.simCount);
     // From the town view (past `TOWN_FROM`) the house in view stands whole, its walls up and its roof on, like the
     // houses round it: cut away it is a hole in the town, and nobody looks into a room from there.
     const whole = this.orbit.radius > TOWN_FROM;
@@ -2585,7 +2673,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lot.takeRestProps(this.characters.restTaken);
     // (Only residents posed where they cast into the map: `shadowPosed`, as the cars' `moved`.)
     if (this.quality.characterShadows && this.characters.shadowPosed) {
-      this.sunShadows.moved(false);
+      this.sunShadows.posed();
       this.lamps.residentsMoved(this.occupiedRooms); // (their shadows in the lamps' light, in the rooms they are in.)
     }
     const blobs = this.simShadow;
@@ -2602,7 +2690,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const sel = this.selectedSim;
     const shown = !this.townMode && !!frame && sel !== null && sel < this.simCount && this.characters.head(sel, this.markerHead);
     const emotion = shown ? frame.curr[frame.layout.headerLen + sel * frame.layout.simStride + frame.layout.sim.emotion] : 0;
-    this.marker.place(shown ? this.markerHead : null, emotion, this.camera.entity, frame?.now ?? 0, !!this.options.reducedMotion);
+    // (Its bob by the clock of what is shown: still while the frame is held.)
+    this.marker.place(shown ? this.markerHead : null, emotion, this.camera.entity, this.shownMs, !!this.options.reducedMotion);
   }
 
   /**
@@ -2788,9 +2877,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   setItems(items: readonly ItemPlacement[]): void {
+    this.pictureChanged();
     this.lot.setItems(items);
   }
   setLampsOff(off: ReadonlySet<number>): void {
+    this.pictureChanged();
     this.lot.setLampsOff(off); // (fans and fires.)
     this.lamps.setLampsOff(off); // (their light and fades, `lamps.ts`.)
     this.applyGardenPools();
@@ -2807,6 +2898,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    */
   private applyLighting(minute: number): void {
     this.counts.lightingUpdates++;
+    this.pictureChanged(); // (the sky, its light and the lamps', not all of which a held frame sees.)
     const l = lightingAt(minute, LOOK, this.lighting);
     const mix = this.lightMix;
     if (mix) {
@@ -2967,9 +3059,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lastLightMinute = -1;
   }
 
-  /** The game comes on screen again (the overview stays built, for the menus' next visit). */
+  /** The game comes on screen again (the menus' town is let go a moment later: `releaseTown`). */
   private leaveTown(): void {
     this.townMode = false;
+    const ticket = this.townTicket;
+    setTimeout(() => this.releaseTown(ticket), TOWN_RELEASE_MS);
     this.shaderWatch.phase = 'game';
     this.birdLife.setTown(false);
     this.applyDig(); // (the basement and windowless rooms dark again.)
@@ -2982,6 +3076,28 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lastLightMinute = this.lastMinute;
     this.cutLook = -1;
     this.updateCutaway();
+  }
+
+  /**
+   * Lets go of the menus' town while the game is on screen: the overview (a Big world's is some
+   * 800 MB of heap, 230 MB of buffers and 130 MB of GPU memory) and its landscape, unless it is the
+   * game's too. Not if the town was asked for again since (`ticket`): the next `showTown` builds it
+   * again (some seconds behind the menus' own backdrop, as a new town's).
+   */
+  private releaseTown(ticket: number): void {
+    const gone = () => this.townMode || this.disposed || ticket !== this.townTicket;
+    if (gone()) return;
+    // (After a build or a refresh still running: neither shows the town now, `townTicket`.)
+    this.townQueue = this.townQueue
+      .then(() => {
+        if (gone()) return;
+        this.overview?.destroy();
+        this.overview = null;
+        this.townWorld = null;
+        this.townRig.ground = null;
+        this.lot.dropNature('town');
+      })
+      .catch(() => {});
   }
 
   /**
@@ -3079,6 +3195,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   setResizeHandles(handles: readonly ResizeHandle[] | null, hot: string | null = null): void {
+    this.pictureChanged();
     // In render space: an upper storey's rows lie over the ground's, a storey's height up.
     this.handles.set(
       handles,
@@ -3099,6 +3216,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   // --- settings, stats, the benchmark --------------------------------------------------
 
   configure(options: LiveRenderOptions): void {
+    this.pictureChanged();
     // Taken before the merge, which would otherwise hide the change. (`?look=` on the dev server wins over the setting.)
     const shading = options.shading === undefined ? undefined : (softLookFromURL() ?? options.shading);
     this.options = { ...this.options, ...options };
@@ -3166,6 +3284,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   gpuPasses(reset = false): { name: string; ms: number; frames: number }[] {
     return this.gpuTiming.passes(reset);
+  }
+
+  /** The picture's multisampling on this device (`QualitySettings.msaaSamples`, `webglMsaaSamples` on WebGL2). */
+  private get samples(): number {
+    return this.device.isWebGPU ? this.quality.msaaSamples : this.quality.webglMsaaSamples;
   }
 
   /** The sun's shadow map's target (null: none made, or the sun casts none). */
@@ -3256,6 +3379,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         mirrorsLive: this.mirrors.live,
         mirrorSpots: this.mirrors.spots,
         mirrorDraws: this.mirrors.draws,
+        sunShadowDraws: { ...this.sunShadows.draws },
         nightGrade: this.post?.night ?? 0,
         lightingUpdates: this.counts.lightingUpdates,
         shaders: this.shaderWatch.shaders,
@@ -3383,21 +3507,25 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.birdLife?.sings(id, seconds);
   }
   setSelectedSim(id: number | null): void {
+    this.pictureChanged();
     this.selectedSim = id;
     this.characters?.select(id);
   }
 
   setSpeech(index: number, track: VisemeTrack | null, startTime: number): void {
+    this.pictureChanged();
     this.characters?.setSpeech(index, track, startTime);
   }
 
   // --- build and buy -----------------------------------------------------------------
 
   setHoverTile(tile: { x: number; z: number } | null): void {
+    this.pictureChanged();
     this.hoverTile.set(tile);
   }
 
   setWallMode(mode: WallMode): void {
+    this.pictureChanged();
     this.wallMode = mode;
     this.applyWallMode();
   }
@@ -3406,6 +3534,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const k = Math.max(this.storeys.lowest, Math.min(this.storeys.count - 1, Math.round(storey)));
     if (k === this.storey) return;
     this.storey = k;
+    this.pictureChanged();
     this.storeyLayer?.setLocalPosition(0, k * WALL_HEIGHT, -this.rowOf(k));
     this.applyStoreys();
     // The lights go to the storey now in view (also while a build is running, which skips the rebuild below).
@@ -3415,6 +3544,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
   // (placing things, `placing.ts`.)
   setPlacementGhost(ghost: PlacementGhost | null): void {
+    this.pictureChanged();
     this.placing.setPlacementGhost(ghost);
   }
 
@@ -3424,34 +3554,42 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   // (Build mode's previews and overlays, `buildPreviews.ts`.)
   setEdgePreview(edges: readonly EdgePreview[], valid: boolean): void {
+    this.pictureChanged();
     this.previews.setEdgePreview(edges, valid);
   }
 
   setPaintPreview(faces: readonly PaintPreviewFace[], cover: number | null): void {
+    this.pictureChanged();
     this.previews.setPaintPreview(faces, cover);
   }
 
   setFloorPreview(tiles: readonly { x: number; z: number }[], floor: number | null): void {
+    this.pictureChanged();
     this.previews.setFloorPreview(tiles, floor);
   }
 
   setGaragePreview(garage: GaragePreview | null): void {
+    this.pictureChanged();
     this.previews.setGaragePreview(garage);
   }
 
   setPorchPreview(porch: PorchPreview | null): void {
+    this.pictureChanged();
     this.previews.setPorchPreview(porch);
   }
 
   setRoomOverlay(tiles: readonly RoomOverlayTile[]): void {
+    this.pictureChanged();
     this.previews.setRoomOverlay(tiles);
   }
 
   setBuildGrid(rect: ViewRect | null): void {
+    this.pictureChanged();
     this.previews.setBuildGrid(rect);
   }
 
   buildEffect(fx: BuildEffect): void {
+    this.pictureChanged();
     this.placing.buildEffect(fx);
   }
 
@@ -3515,6 +3653,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.cars?.destroy();
     this.signals?.destroy();
     this.gardenPools?.destroy();
+    this.sunShadows?.destroy();
     for (const p of this.decor.values()) for (const d of p.draws) d.destroy();
     this.decor.clear();
     this.post?.destroy();

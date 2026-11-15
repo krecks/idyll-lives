@@ -197,17 +197,21 @@ pub(crate) fn leisure_way(
         || travel.door_entry(plot, door, mode),
     );
     let minutes = match way {
-        Way::Car => trip_minutes(eta, true) + park_walk(travel, door, walk),
+        Way::Car => trip_minutes(eta, true) + park_walk(travel, (plot, door), walk),
         _ => eta,
     };
     (way, minutes)
 }
 
-/// Minutes on foot from the public parking nearest `door` to it (`cars::parking_near`): a trip
-/// there by car walks it, as much as 120 m.
-pub(crate) fn park_walk(travel: &crate::travel::Travel, door: [f32; 2], walk: f32) -> f32 {
+/// Minutes on foot from the public parking nearest `door` (of `plot`) to it
+/// (`cars::parking_near`): a trip there by car walks it, as much as 120 m.
+pub(crate) fn park_walk(
+    travel: &crate::travel::Travel,
+    (plot, door): (u32, [f32; 2]),
+    walk: f32,
+) -> f32 {
     crate::cars::parking_near(travel, door).map_or(0.0, |at| {
-        travel.eta(at, door, crate::travel::Mode::Foot, walk)
+        travel.eta_to_door(at, plot, door, crate::travel::Mode::Foot, walk)
     })
 }
 
@@ -395,17 +399,21 @@ pub(crate) fn outing_leave_by(
             ))
         });
     let foot = crate::travel::Mode::Foot;
+    // (Home: its door as noted, `Travel::door_entry`.)
     let minutes = match (car, bike) {
         (Some(at), _) => {
             travel.eta(pos, at, foot, walk)
-                + trip_minutes(travel.eta(at, door, crate::travel::Mode::Car, walk), true)
+                + trip_minutes(
+                    travel.eta_to_door(at, home, door, crate::travel::Mode::Car, walk),
+                    true,
+                )
         }
         (None, Some((at, speed))) => {
-            travel.eta(pos, at, foot, walk) + travel.eta(at, door, foot, walk * speed)
+            travel.eta(pos, at, foot, walk) + travel.eta_to_door(at, home, door, foot, walk * speed)
         }
         // (Come by taxi: the taxi back, `taxi::back_minutes`.)
-        (None, None) => crate::taxi::back_minutes(ctx, sim, plot, pos, door)
-            .unwrap_or_else(|| travel.eta(pos, door, foot, walk)),
+        (None, None) => crate::taxi::back_minutes(ctx, sim, plot, pos, (home, door))
+            .unwrap_or_else(|| travel.eta_to_door(pos, home, door, foot, walk)),
     };
     let back = ((minutes + OUTING_LEAVING_MINUTES) * TICKS_PER_MINUTE as f32) as u64;
     let home_by = crate::clock::tick_at(ctx.day, content.visits.outing_home_by * 60.0)?;

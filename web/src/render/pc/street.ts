@@ -37,11 +37,11 @@ import type { TownLotHouse } from '../shared/townBuildings';
 import type { ViewRect } from '../types';
 import type { RGB } from '../shared/environment';
 import type { Geo, MeshData } from '../shared/geometry';
-import type { HousePart } from '../shared/house';
+import type { HousePart, SilhouettePlan } from '../shared/house';
 import type { StandIn } from '../shared/modelEntry';
 import { chunkAt, chunkCoords, distanceToRect, groupOf, LookedFrom, SUPERCHUNK } from '../shared/chunks';
 import { groupInstances } from '../shared/nature';
-import { castsShadow, FOLIAGE, instanceMatrix, NO_FOCUS, TownStreet, type ChunkPlan, type Inst, type ObjectLook } from '../shared/street';
+import { castsShadow, FOLIAGE, instanceMatrix, NO_FOCUS, TownStreet, type ChunkPlan, type GroundLayer, type Inst, type ObjectLook } from '../shared/street';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
 
 export interface StreetOptions {
@@ -117,11 +117,25 @@ const REFRAME = 1;
 /** Plans kept per chunk (`planned`): the focus lot's chunks with it and without it, and one more. */
 const PLANS_KEPT = 3;
 
-/** A chunk as built: its plan, and each of its meshes' vertex arrays (by draw name), made once. */
+/** A chunk as built: what is kept of its plan (`ChunkShape`), and each of its meshes' vertex arrays (by draw name), made once. */
 interface BuiltChunk {
   key: string;
-  plan: ChunkPlan;
+  shape: ChunkShape;
   data: Map<string, MeshData>;
+}
+
+/**
+ * What a built chunk keeps of its plan once its vertex arrays are made: how its meshes are drawn
+ * (the house parts and ground layers without their geometry), its neighbours' window glass, the
+ * focus lot's own and its instances. The plan's merged geometry goes (a copy of what `data` holds):
+ * kept for every chunk planned, it was most of a big world's street.
+ */
+interface ChunkShape {
+  parts: Omit<HousePart, 'geo'>[];
+  ground: Omit<GroundLayer, 'geo'>[];
+  homes: SilhouettePlan['homes'];
+  lot: ChunkPlan['lot'];
+  batches: ChunkPlan['batches'];
 }
 
 /** A neighbour's house whose glass glows while someone is up: its wall box, its panes, its group. */
@@ -151,7 +165,7 @@ interface Draw {
   /** In the viewed house's lamps' light (the ground layers, as the lot's); the rest is kept out of them. */
   lit?: boolean;
   /** A house part (drawn by the house builder, in its surface). */
-  part?: HousePart;
+  part?: Omit<HousePart, 'geo'>;
 }
 
 export class Street {
@@ -322,7 +336,7 @@ export class Street {
     const wanted = this.wanted ? all.filter((id) => this.wanted!.has(id)) : all;
     const dirty = this.dirtyGroups;
     const wantedSet = new Set(wanted);
-    // Chunks no longer drawn go (their plans are kept: streamed in again, they cost only their group's meshes).
+    // Chunks no longer drawn go (their vertex arrays are kept: streamed in again, they cost only their group's meshes).
     for (const id of [...this.chunks.keys()]) {
       if (wantedSet.has(id)) continue;
       this.chunks.delete(id);
@@ -335,7 +349,7 @@ export class Street {
       const at = kept.findIndex((k) => k.key === key);
       const built = at >= 0 ? kept[at] : (() => {
         const plan = town.chunk(id, focus);
-        return { key, plan, data: chunkData(plan) };
+        return { key, shape: shapeOf(plan), data: chunkData(plan) };
       })();
       if (at !== 0) this.planned.set(id, [built, ...kept.filter((k) => k !== built)].slice(0, PLANS_KEPT));
       return built;
@@ -361,6 +375,9 @@ export class Street {
       }
       this.prepared = true;
     }
+    // (The plots' and fences' planned parts are kept for the chunks drawn: what a focus moving next
+    // door or a thing moved plans again. Every other chunk keeps its vertex arrays alone.)
+    town.keepUnits(this.wanted ? wantedSet : null, focus);
     perfEnd(span);
     if (planned || dirty.size) this.instancesDue = true;
 
@@ -381,14 +398,14 @@ export class Street {
       for (const e of this.lotMeshes) e.destroy();
       this.lotMeshes = [];
       this.lotPorches = [];
-      const lot = lotPlan?.plan.lot;
+      const lot = lotPlan?.shape.lot;
       if (lot) {
         let parent = this.lotRoot;
         for (const part of lot.silhouettes.parts) {
-          const m = this.house.drawData(part, part.geo.meshData({ colors: true, cut: part.cut }), parent);
-          if (!m) continue;
-          this.dress(m.entity, part.cast);
-          this.lotMeshes.push(m.entity);
+          const entity = this.house.drawData(part, part.geo.meshData({ colors: true, cut: part.cut }), parent);
+          if (!entity) continue;
+          this.dress(entity, part.cast);
+          this.lotMeshes.push(entity);
         }
         const add = (geo: Geo, name: string, material: pc.Material, opts: { cast?: boolean; colors?: boolean } & DrawOptions = {}) => {
           const mesh = meshFrom(this.device, geo.meshData({ colors: opts.colors ?? true }));
@@ -426,7 +443,7 @@ export class Street {
     const order = [...this.chunks.keys()].sort((a, b) => a - b);
     const batches = new Map<string, Inst[]>((Object.values(FOLIAGE) as string[]).map((k) => [k, []]));
     for (const id of order) {
-      for (const [k, items] of this.chunks.get(id)!.plan.batches) {
+      for (const [k, items] of this.chunks.get(id)!.shape.batches) {
         let list = batches.get(k);
         if (!list) batches.set(k, (list = []));
         for (const i of items) list.push(i);
@@ -692,16 +709,16 @@ export class Street {
   // ---- helpers ----------------------------------------------------------------------------
 
   /** How each of a chunk's meshes is drawn, by name. */
-  private draws(plan: ChunkPlan): Map<string, Draw> {
+  private draws(shape: ChunkShape): Map<string, Draw> {
     const out = new Map<string, Draw>();
-    for (const part of plan.silhouettes.parts) out.set(part.name, { material: () => this.lib.plainFinish(), colors: true, cut: part.cut, cast: part.cast, receive: !part.shadowOnly, part });
+    for (const part of shape.parts) out.set(part.name, { material: () => this.lib.plainFinish(), colors: true, cut: part.cut, cast: part.cast, receive: !part.shadowOnly, part });
     out.set('streetSidewalks', { material: () => this.lib.surface('material.sidewalk', { vertexColors: true }), colors: true, cast: false, receive: true });
     out.set('streetProps', { material: () => this.lib.plainFinish(), colors: true, cast: true, receive: true });
     out.set('streetLamps', { material: () => this.glowMat, colors: false, cast: false, receive: true });
     out.set('streetLightPools', { material: () => this.poolMat, colors: false, cast: false, receive: false, alphaIndex: 5 });
     out.set('streetShadows', { material: () => this.lib.contactShadow(false), colors: true, cast: false, receive: true });
     // The ground layers as the lot draws its own: double-sided, in the house's lamps' light.
-    for (const g of plan.ground) out.set(g.name, { material: () => (g.paint ? this.lib.roadPaint() : this.lib.surface(g.material, { doubleSided: true, vertexColors: !!g.toned })), colors: !!g.paint || !!g.toned, cast: false, receive: true, lit: true });
+    for (const g of shape.ground) out.set(g.name, { material: () => (g.paint ? this.lib.roadPaint() : this.lib.surface(g.material, { doubleSided: true, vertexColors: !!g.toned })), colors: !!g.paint || !!g.toned, cast: false, receive: true, lit: true });
     return out;
   }
 
@@ -717,12 +734,12 @@ export class Street {
     // The new meshes built hidden, a material at a time between frames, then put in place of the old at once.
     const fresh: pc.Entity[] = [];
     const draws = new Map<string, Draw>();
-    for (const [, c] of members) for (const [k, d] of this.draws(c.plan)) if (!draws.has(k)) draws.set(k, d);
+    for (const [, c] of members) for (const [k, d] of this.draws(c.shape)) if (!draws.has(k)) draws.set(k, d);
     for (const [name, d] of draws) {
       const data = concatMeshData(members.map(([, c]) => c.data.get(name)).filter((m) => m !== undefined));
       if (!data) continue;
       let entity: pc.Entity | null = null;
-      if (d.part) entity = this.house.drawData(d.part, data, this.root)?.entity ?? null;
+      if (d.part) entity = this.house.drawData(d.part, data, this.root);
       else {
         const mesh = meshFrom(this.device, data);
         if (mesh) entity = drawMesh(this.root, name, mesh, d.material(), { castShadows: d.cast && this.shadows, receiveShadows: d.receive, alphaIndex: d.alphaIndex, ...(this.layers ? { layers: this.layers } : {}) });
@@ -753,7 +770,7 @@ export class Street {
     const wasUp = new Map(this.homes.map((h) => [`${h.box[0]},${h.box[1]}`, h.up]));
     const homes: Home[] = [];
     for (const id of [...this.chunks.keys()].sort((a, b) => a - b)) {
-      for (const { spec, panes } of this.chunks.get(id)!.plan.silhouettes.homes) {
+      for (const { spec, panes } of this.chunks.get(id)!.shape.homes) {
         homes.push({ box: [spec.x0, spec.z0, spec.x1, spec.z1], panes, up: wasUp.get(`${spec.x0},${spec.z0}`) ?? true, group: groupOf(id) });
       }
     }
@@ -964,6 +981,17 @@ function showCell(c: Cell): void {
 function dropCell(c: Cell): void {
   for (const d of c.near) d?.destroy();
   for (const d of c.far) d.destroy();
+}
+
+/** What a built chunk keeps of its plan (`ChunkShape`). */
+function shapeOf(plan: ChunkPlan): ChunkShape {
+  return {
+    parts: plan.silhouettes.parts.map(({ geo: _, ...part }) => part),
+    ground: plan.ground.map(({ geo: _, ...layer }) => layer),
+    homes: plan.silhouettes.homes,
+    lot: plan.lot,
+    batches: plan.batches,
+  };
 }
 
 /** A chunk's meshes as vertex arrays, by draw name (the house parts with their cutaway attribute). */

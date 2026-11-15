@@ -2634,16 +2634,19 @@ fn car_views(world: &World) -> Option<Vec<CarView>> {
 
 /// The world structure as updates for a view that keeps what it was sent (the sim worker's
 /// `world` messages): the first update has everything; later ones only what changed since the
-/// last (`structure_json`'s parts by name, `unset` naming those now left out, and
-/// `objectChanges` the things that changed, by index, while the list of things stays the same).
-/// `meta`, which the simulation carries unchanged, comes only with everything. The rooms never
-/// come (`Lot::rooms_row_major` goes as a typed array); the other lot parts only when asked for
-/// (`lot`: the lot changed, see `lotVersion`).
+/// last (`structure_json`'s parts by name, `unset` naming those now left out). The things: the
+/// whole list the first time, then `objectSplice` (`[start, deleted, [things]]`, as
+/// `Array.splice`: the things bought, sold or set up, between the things the list starts and
+/// ends with as last sent) and `objectChanges`, the other things that changed, by their index in
+/// the list after the splice. `meta`, which the simulation carries unchanged, comes only with
+/// everything. The rooms never come (`Lot::rooms_row_major` goes as a typed array); the other lot
+/// parts only when asked for (`lot`: the lot changed, see `lotVersion`), and then only those that
+/// changed (a fence built: the fences).
 ///
-/// A big world has some 16 000 things and a quarter of a megabyte of presentation data (`meta`),
+/// A big world has some 19 000 things and a quarter of a megabyte of presentation data (`meta`),
 /// and its structure changes with every door opened or crop grown: sent whole, that was 2 MB to
-/// parse each time on the main thread. Each thing is still written out to see whether it
-/// changed (the world doesn't say which did).
+/// parse each time on the main thread (and a thing bought sent the whole list again). Each thing
+/// is still written out to see whether it changed (the world doesn't say which did).
 #[derive(Default)]
 pub struct StructureSync {
     /// Fingerprints of the parts as last sent, by name (left out: not sent, or unset since).
@@ -2709,6 +2712,18 @@ impl StructureSync {
         parts.part("lightPoles", Some(&poles).filter(|p| !p.is_empty()));
         let junctions = junction_views(world);
         parts.part("junctions", Some(&junctions).filter(|j| !j.is_empty()));
+        // The lot's parts, those that changed (asked for only when the lot did; never unset).
+        if lot {
+            let (walls, openings, fences) = wall_edges(&world.lot, world.lot.walls());
+            parts.part("walls", Some(&walls));
+            parts.part("openings", Some(&openings));
+            parts.part("fences", Some(&fences));
+            parts.part(
+                "diagonals",
+                Some(&diagonals(&world.lot, world.lot.diagonal_walls())),
+            );
+            parts.part("floors", Some(&floor_views(world)));
+        }
 
         // The things: those that changed, by index, while the list is the same things in the same
         // order (a door opened, a crop grown); else the whole list (one bought, sold or moved in).
@@ -2723,31 +2738,65 @@ impl StructureSync {
             unset,
             ..
         } = parts;
-        let same = !fresh
-            && self.objects.len() == world.objects.len()
-            && self
+        // The things the list starts and ends with as last sent (by stable id); those between are
+        // new (bought, set up), gone (sold) or reordered: they go as a splice (`objectSplice`, the
+        // whole list the first time), the rest by index as they changed.
+        let (start, end) = if fresh {
+            self.objects.clear();
+            (0, 0)
+        } else {
+            let start = self
                 .objects
                 .iter()
                 .zip(&world.objects)
-                .all(|(s, o)| s.0 == o.stable);
-        if !same {
-            self.objects.clear();
+                .take_while(|(s, o)| s.0 == o.stable)
+                .count();
+            let end = self.objects[start..]
+                .iter()
+                .rev()
+                .zip(world.objects[start..].iter().rev())
+                .take_while(|(s, o)| s.0 == o.stable)
+                .count();
+            (start, end)
+        };
+        let spliced = start..world.objects.len() - end;
+        let sent_spliced = start..self.objects.len() - end;
+        let splice = fresh || !spliced.is_empty() || !sent_spliced.is_empty();
+        if fresh {
             out.extend_from_slice(b",\"objects\":[");
+        } else if splice {
+            let _ = write!(out, ",\"objectSplice\":[{start},{},[", sent_spliced.len());
         }
+        let new = if fresh {
+            0..world.objects.len()
+        } else {
+            spliced.clone()
+        };
+        let mut news = Vec::with_capacity(new.len());
+        for o in &world.objects[new] {
+            buf.clear();
+            serde_json::to_writer(&mut buf, &object_view(world, &lifts, o))
+                .expect("object serializes");
+            if !news.is_empty() {
+                out.push(b',');
+            }
+            out.extend_from_slice(&buf);
+            news.push((o.stable, fingerprint(&buf)));
+        }
+        if splice {
+            out.extend_from_slice(if fresh { b"]" } else { b"]]" });
+            self.objects.splice(sent_spliced, news);
+        }
+        // (Those outside the splice: at the same index in the list as it is now.)
         let mut changed = 0;
         for (i, o) in world.objects.iter().enumerate() {
+            if fresh || spliced.contains(&i) {
+                continue;
+            }
             buf.clear();
             serde_json::to_writer(&mut buf, &object_view(world, &lifts, o))
                 .expect("object serializes");
             let p = fingerprint(&buf);
-            if !same {
-                if i > 0 {
-                    out.push(b',');
-                }
-                out.extend_from_slice(&buf);
-                self.objects.push((o.stable, p));
-                continue;
-            }
             let sent = &mut self.objects[i].1;
             if *sent == p {
                 continue;
@@ -2763,7 +2812,7 @@ impl StructureSync {
             out.extend_from_slice(&buf);
             out.push(b']');
         }
-        if !same || changed > 0 {
+        if changed > 0 {
             out.push(b']');
         }
         self.lifts = Some((key, lifts));
@@ -2771,15 +2820,7 @@ impl StructureSync {
             let _ = write!(out, ",\"{key}\":");
             serde_json::to_writer(out, v).expect("structure part serializes");
         }
-        if lot {
-            let (walls, openings, fences) = wall_edges(&world.lot, world.lot.walls());
-            field(&mut out, "walls", &walls);
-            field(&mut out, "openings", &openings);
-            field(&mut out, "fences", &fences);
-            let diagonals = diagonals(&world.lot, world.lot.diagonal_walls());
-            field(&mut out, "diagonals", &diagonals);
-            field(&mut out, "floors", &floor_views(world));
-        }
+
         if !unset.is_empty() {
             field(&mut out, "unset", &unset);
         }
