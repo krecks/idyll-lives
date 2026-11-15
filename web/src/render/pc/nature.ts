@@ -40,7 +40,7 @@ import { grassField, gustAt, gustNoise, type GrassQuality } from '../shared/gras
 import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
-import { groupInstances, hideLawn, keepBareTiles, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
+import { GROUND_TILE, groupInstances, hideLawn, keepBareTiles, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
 import type { OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
 import type { TownBuildStep } from '../types';
@@ -510,7 +510,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
 }
 
 /** A big world's ground tiles (m), and their levels' quads across (the distances they change at are the preset's, `OpenWorldQuality.tiles`). */
-const TILE = 128;
+const TILE = GROUND_TILE;
 const TILE_LODS = [64, 32, 16];
 /**
  * Ground tiles the render data worker is asked to shade ahead of the one whose meshes are being made
