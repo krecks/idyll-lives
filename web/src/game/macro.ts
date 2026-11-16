@@ -35,7 +35,7 @@ import { chooseCentre, layBackdrop, reserveCentre } from './backdrop';
 import { random } from './housegen';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, type Land as LandField } from './land';
 import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEdit';
-import { seedBare, smoothHeights } from './landFollow';
+import { GENTLE_TILT, seedBare, smoothHeights } from './landFollow';
 import { chaikin, outlines, rasterize, rle, simplify, simplifyRing, unrle } from './landMasks';
 import { fbm } from './noise';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_TURN, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
@@ -207,6 +207,8 @@ const WAYS = 5;
 /** A country road between two areas goes straight on from a way out of one to a street of the other this near (m), where that street bends less than `STRAIGHT_BEND` (radians) over 28 m. */
 const STRAIGHT_ON = 160;
 const STRAIGHT_BEND = 0.6;
+/** Two areas' ways that face each other within this (radians) of the line between them are joined by it (`headOn`). */
+const HEAD_ON = Math.PI / 15;
 /** An area's lots keep their middles this far along their road from where it meets another (m), and off where it turns more than `TIGHT_BEND` (radians) over as far (a bend of 20 m radius or less). */
 export const CORNER = 18;
 export const TIGHT_BEND = 0.9;
@@ -239,6 +241,8 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
 
 /** Among a place's mountains, a hamlet's box no higher or lower than the area it joins by more than this share of a country road's climb (`countryRouter.ts` `COUNTRY_GRADE`) over the gap between them; and how much a metre of height counts against a site there (the valley floor first). */
 const REACHABLE = 0.7;
+/** What two areas' gentle ground may differ by besides, where their boxes come nearest (m): half the most a road may be cut into its land or stand over it (`builtSurface.ts` `CUT_MAX`) on either side. */
+const PLANE_SLACK = 2;
 const MOUNTAIN_LOW = 0.3;
 /** A road out of a place's world looks for the lowest of an edge this far (m) either way of straight out; a metre more than it may climb counts this much against that edge (m). */
 const EDGE_WINDOW = 200;
@@ -592,6 +596,41 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     }
     return n ? sum / n : 0;
   };
+  /**
+   * The gentle ground a box's town is eased to (as `landFollow.ts` `gentler` fits it, near enough):
+   * the plane through its cells' heights, tilted no more than `GENTLE_TILT`; its height at a point.
+   */
+  const planeOf = (r: Rect) => {
+    const pts: Pt[] = [];
+    const hs: number[] = [];
+    for (let z = Math.max(0, Math.floor(r.z / CELL)); z <= Math.min(gd - 1, Math.floor((r.z + r.d) / CELL)); z++) {
+      for (let x = Math.max(0, Math.floor(r.x / CELL)); x <= Math.min(gw - 1, Math.floor((r.x + r.w) / CELL)); x++) {
+        pts.push(land.centre(z * gw + x));
+        hs.push(land.height[z * gw + x]);
+      }
+    }
+    const n = pts.length || 1;
+    const [cx, cz, mean] = [pts.reduce((t, p) => t + p[0], 0) / n, pts.reduce((t, p) => t + p[1], 0) / n, hs.reduce((t, h) => t + h, 0) / n];
+    let [sxx, sxz, szz, sxh, szh] = [0, 0, 0, 0, 0];
+    pts.forEach(([x, z], i) => {
+      const [dx, dz, dh] = [x - cx, z - cz, hs[i] - mean];
+      [sxx, sxz, szz, sxh, szh] = [sxx + dx * dx, sxz + dx * dz, szz + dz * dz, sxh + dx * dh, szh + dz * dh];
+    });
+    const det = sxx * szz - sxz * sxz;
+    let [bx, bz] = Math.abs(det) > 1e-9 ? [(sxh * szz - szh * sxz) / det, (szh * sxx - sxh * sxz) / det] : [0, 0];
+    const tilt = Math.hypot(bx, bz);
+    if (tilt > GENTLE_TILT) [bx, bz] = [(bx * GENTLE_TILT) / tilt, (bz * GENTLE_TILT) / tilt];
+    return ([x, z]: Pt) => mean + bx * (x - cx) + bz * (z - cz);
+  };
+  /** Each area's `planeOf` its box, once asked for. */
+  const planes: ((p: Pt) => number)[] = [];
+  /** The nearest points of two boxes to each other (the middle of where they overlap, along an axis they overlap on). */
+  const facingPts = (a: Rect, b: Rect): [Pt, Pt] => {
+    const axis = (a0: number, a1: number, b0: number, b1: number): [number, number] => (a1 < b0 ? [a1, b0] : b1 < a0 ? [a0, b1] : [(Math.max(a0, b0) + Math.min(a1, b1)) / 2, (Math.max(a0, b0) + Math.min(a1, b1)) / 2]);
+    const [ax, bx] = axis(a.x, a.x + a.w, b.x, b.x + b.w);
+    const [az, bz] = axis(a.z, a.z + a.d, b.z, b.z + b.d);
+    return [[ax, az], [bx, bz]];
+  };
   const rectGap = (a: Rect, b: Rect) => Math.hypot(Math.max(0, a.x - (b.x + b.w), b.x - (a.x + a.w)), Math.max(0, a.z - (b.z + b.d), b.z - (a.z + a.d)));
   const candidates: Pt[] = Array.from({ length: 700 }, (): Pt => [range(rand, EDGE + 80, W - EDGE - 80), range(rand, EDGE + 60, D - EDGE - 60)]);
   /** Which quarter of the world a point is in: the hamlets go first to those without an area. */
@@ -615,12 +654,28 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
         const joins = plans.reduce((a, b) => (dist(b.centre, p) < dist(a.centre, p) ? b : a));
         if (Math.abs(boxHeight(rect) - boxHeight(joins.rect)) > REACHABLE * COUNTRY_GRADE * rectGap(rect, joins.rect)) continue;
       }
+      // (Drawn for every site that fits so far: one the next rule turns away leaves the draws after it as they were.)
+      const jitter = rand() * 0.5;
+      // In a place's world (its towns follow its slopes), only where the gentle ground its town will
+      // be eased to meets every other area's within what a road between them can climb: the two
+      // at the boxes' nearest points no further apart than `REACHABLE` of a country road's climb
+      // over the gap between them, and `PLANE_SLACK` m. (Two boxes close together on a hillside,
+      // each eased to its own plane, meet in a cliff of eased land, and a street reaching from one
+      // into the other is cut deep into it.)
+      if (!spec.classic) {
+        const own = planeOf(rect);
+        const apart = plans.some((o, k) => {
+          const [pa, pb] = facingPts(rect, o.rect);
+          return Math.abs(own(pa) - (planes[k] ??= planeOf(o.rect))(pb)) > REACHABLE * COUNTRY_GRADE * rectGap(rect, o.rect) + PLANE_SLACK;
+        });
+        if (apart) continue;
+      }
       let score = Math.abs(near - AREA_AIM) / 40 + steep * 40 + land.at(p[0], p[1]) * (reachable ? MOUNTAIN_LOW : valley ? 0.08 : 0.02) + (held.has(quarter(p)) ? 0 : -5);
       // A fishing cove on the shore; a hamlet across the lake from the town.
       if (n === 0 && spec.water === 'sea') score += land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 70) ? -6 : 6;
       if (n === 0 && river) score += bank(p) !== bank(mainCentre) ? -6 : 6;
       if (n === 0 && spec.water === 'lake') score += ((p[0] - lake[0]) * (mainCentre[0] - lake[0]) + (p[1] - lake[1]) * (mainCentre[1] - lake[1]) < 0 ? -6 : 6) + (land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 60) ? -3 : 3);
-      score += rand() * 0.5;
+      score += jitter;
       if (!best || score < best.score) best = { p, score };
     }
     if (!best) {
@@ -728,6 +783,28 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       return ok ? { p, len: dist(w.p, p) } : null;
     }
     return null;
+  };
+  /**
+   * Whether way `w` out of area `a` and way `v` into area `b` face each other head on (each within
+   * `HEAD_ON` of the straight line between them), no further apart than `STRAIGHT_ON`, with nothing
+   * between them but land: no water, no other area's box, no road. (Two areas close together, a
+   * port of one in line with a T or a port of the other: the road between them is that line, not
+   * one routed round and into a far port, through the other's streets.)
+   */
+  const headOn = (w: Way, v: Way, a: number, b: number): boolean => {
+    const l = dist(w.p, v.p);
+    if (l < CELL || l > STRAIGHT_ON) return false;
+    const u: Pt = [(v.p[0] - w.p[0]) / l, (v.p[1] - w.p[1]) / l];
+    if (u[0] * w.dir[0] + u[1] * w.dir[1] < Math.cos(HEAD_ON) || -(u[0] * v.dir[0] + u[1] * v.dir[1]) < Math.cos(HEAD_ON)) return false;
+    const index = new RoadIndex(roads);
+    for (let d = 2; d < l - 1; d += 2) {
+      const q: Pt = [w.p[0] + u[0] * d, w.p[1] + u[1] * d];
+      const owner = areaBlock[land.cell(q[0], q[1])];
+      if (land.wet(q[0], q[1], 3) || (owner && owner !== a + 1 && owner !== b + 1)) return false;
+      // (Clear of every road but by its ends, where it meets the roads it leaves and comes to.)
+      if (d > ROAD_WIDTH && d < l - ROAD_WIDTH && index.nearest(q[0], q[1], ROAD_WIDTH)) return false;
+    }
+    return true;
   };
   /**
    * A way out of area `a` towards `toward` by a T off one of its streets or lanes: where it runs
@@ -845,7 +922,12 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       .map(({ w, to }) => ({ w, hit: straightOn(w, to) }))
       .flatMap(({ w, hit }) => (hit ? [{ w, hit, cost: hit.len + router.wayCost(w) * CELL }] : []))
       .sort((x, y) => x.cost - y.cost)[0];
-    if (direct) {
+    // (A place's: a way out of one facing a way into the other head on, near enough, straight from one to the other.)
+    const faced = spec.classic ? undefined : outs.flatMap((w) => ins.flatMap((v) => (headOn(w, v, a, b) ? [{ w, v, cost: dist(w.p, v.p) + (router.wayCost(w) + router.wayCost(v)) * CELL }] : []))).sort((x, y) => x.cost - y.cost)[0];
+    if (faced && (!direct || faced.cost < direct.cost)) {
+      const pts = curve(evenly([faced.w.p, faced.v.p], CTRL_APART));
+      made = { road: { points: pts, width: COUNTRY_WIDTH, ends: ['join', 'join'], kind: 'country', name: '' }, pa: faced.w, pb: faced.v, bad: 0 };
+    } else if (direct) {
       const pts = curve(evenly([direct.w.p, direct.hit.p], CTRL_APART));
       made = { road: { points: pts, width: COUNTRY_WIDTH, ends: ['join', 'join'], kind: 'country', name: '' }, pa: direct.w, pb: { p: direct.hit.p, dir: [-direct.w.dir[0], -direct.w.dir[1]] }, bad: 0 };
     }

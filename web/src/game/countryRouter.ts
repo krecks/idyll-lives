@@ -13,7 +13,7 @@
 
 import type { RoadPlan } from '../core/protocol';
 import { simplify } from './landMasks';
-import { curve, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, sharpestTurn, tangent, type Pt } from './roads';
+import { curve, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, sharpestTurn, sideBySide, tangent, type Pt } from './roads';
 import type { Rect } from './town';
 import type { WorldSpec } from './world';
 
@@ -50,6 +50,12 @@ const SHARED_REACH = 2;
 const SHARED_RUN = 3;
 const SHARED_GAP = 2;
 const SHARED_ANGLE = Math.PI / 4;
+/**
+ * A country road laid whole rather than in such pieces (they would wind round) may not run
+ * alongside another road a few metres off for longer than this (m: the town check's limit,
+ * `townCheck.ts` `SIDE_BY_SIDE`): in pieces then, winding or not (`course`).
+ */
+const ALONGSIDE = 60;
 /** A country road tries this many ways for one that doesn't wind round further than `WINDING` (radians) within `WINDING_OVER` m (a loop). */
 export const TRIES = 4;
 const WINDING = Math.PI;
@@ -690,18 +696,37 @@ export class CountryRouter {
     const add = (from: number, to: number, pa: Way, pb: Way | null, first: boolean, last: boolean) => {
       if (to >= from) out.push({ a: pa, cells: cells.slice(from, to + 1), b: pb, first, last });
     };
-    // (By it from its start, or by it from a port on: straight onto it, no cells.)
+    // (By it from its start, or by it from a port on: straight onto it, no cells. In a place's
+    // world, running along it from its first cell: straight from the start onto it where it comes
+    // nearest (`nearestT`). A classic world's are as they were: such a
+    // course is laid whole, its ends not joined by the pieces.)
+    const place = !this.spec.classic;
+    // (Where `list` comes nearest end `w`, a T to go straight to `w` from; null if that T is on the
+    // street `w` is on already (its port's, or the one it leaves in a T): the two meet there, and
+    // the street carries it the rest of the way.)
+    const nearestT = (list: ReadonlySet<number>, w: Way): Way | null => {
+      const at = tee(list, w.p, w.p);
+      const street = atPort(w) ?? roads.findIndex((r, i) => !list.has(i) && r.kind !== 'trail' && nearest(r.points, w.p[0], w.p[1]).dist < 1);
+      return street >= 0 && nearest(roads[street].points, at.p[0], at.p[1]).dist <= roads[street].width / 2 + 1 ? null : at;
+    };
     if (onto) out.push({ a, cells: [], b: onto, first: true, last: false });
-    else add(0, runs[0].from - 1, a, tee(runs[0].roads, cells[Math.max(0, runs[0].from - 1)], behind(0, runs[0].from - 1)), true, false);
+    else if (place && runs[0].from === 0) {
+      const at = nearestT(runs[0].roads, a);
+      if (at) out.push({ a, cells: [], b: at, first: true, last: false });
+    } else add(0, runs[0].from - 1, a, tee(runs[0].roads, cells[Math.max(0, runs[0].from - 1)], behind(0, runs[0].from - 1)), true, false);
     for (let k = 0; k + 1 < runs.length; k++) {
       const [r, n] = [runs[k], runs[k + 1]];
       // (Not off a road and back onto it: it goes on along it.)
       if ([...r.roads].some((x) => n.roads.has(x))) continue;
       add(r.to + 1, n.from - 1, tee(r.roads, cells[r.to + 1], ahead(r.to + 1, n.from - 1)), tee(n.roads, cells[n.from - 1], behind(r.to + 1, n.from - 1)), false, false);
     }
-    // (By it to its end: off it straight to the end.)
+    // (By it to its end: off it straight to the end. Running along it to its last cell: off it
+    // where it comes nearest the end, straight to it: `nearestT`.)
     if (off) out.push({ a: off, cells: [], b, first: false, last: true });
-    else add(end.to + 1, cells.length - 1, tee(end.roads, cells[Math.min(cells.length - 1, end.to + 1)], ahead(end.to + 1, cells.length - 1)), b, false, true);
+    else if (place && end.to === cells.length - 1 && b) {
+      const at = nearestT(end.roads, b);
+      if (at) out.push({ a: at, cells: [], b, first: false, last: true });
+    } else add(end.to + 1, cells.length - 1, tee(end.roads, cells[Math.min(cells.length - 1, end.to + 1)], ahead(end.to + 1, cells.length - 1)), b, false, true);
     return out;
   }
 
@@ -746,9 +771,18 @@ export class CountryRouter {
     const laid = parts.map((part) => this.settle(this.piece(part, side))).filter((r) => lengths(r.points)[r.points.length - 1] > COUNTRY_WIDTH / 2 + 1);
     // (Nor pieces that wind or turn worse than the road would whole: a short one between two Ts
     // close together can double back.)
+    // (Pieces that only wind, though, before a whole road in a place's world that would run beside
+    // a road laid already a few metres off for long: `alongside`.)
     const worst = Math.max(0, ...laid.map((r) => this.fault(r)));
-    if (worst > this.fault(this.settle(whole)) || !this.joins(laid, whole.points[0], whole.points[whole.points.length - 1])) return { laid: [whole], first: true, last: true };
+    const own = this.fault(this.settle(whole));
+    const beside = worst === 1 && own === 0 && !this.spec.classic && this.alongside(this.settle(whole));
+    if (worst > own + (beside ? 1 : 0) || !this.joins(laid, whole.points[0], whole.points[whole.points.length - 1])) return { laid: [whole], first: true, last: true };
     return { laid, first: !!parts[0]?.first, last: !!parts[parts.length - 1]?.last };
+  }
+
+  /** Whether `road` would run alongside a road laid already (not a trail) a few metres off for more than `ALONGSIDE` m (`roads.ts` `sideBySide`). */
+  alongside(road: RoadPlan): boolean {
+    return this.roads.some((r) => r.kind !== 'trail' && sideBySide([road, r], ALONGSIDE).length > 0);
   }
 
   /**
