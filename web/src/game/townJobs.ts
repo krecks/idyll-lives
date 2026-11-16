@@ -12,7 +12,7 @@ import { encodeLand, type Land } from './land';
 import { settleLand } from './landFollow';
 import { assembleTown, generatedHouses, generateWorld, loadTemplates, primeHouses, type AssembleOptions, type HouseTemplate, type NeighbourhoodDraft, type Templates } from './town';
 import { previewWorld } from './townPreview';
-import { landDraft } from './macro';
+import { landDraft, layOn } from './macro';
 import type { Pt } from './roads';
 import type { WorldStep } from './world';
 import { LazyWorker, type WorkerAnswer, type WorkerAsk } from '../core/lazyWorker';
@@ -25,11 +25,12 @@ export type TownJob =
    */
   | { kind: 'land'; world: string; seed: number; options?: Partial<WorldOptions> }
   /**
-   * Step 2's town, laid on `land` (step 1's) from `seed` with `options` (over the land's own), its
-   * land settled under it as a new world's is (the `world` job's); named `name`, else as the land is. `site`: where its main town goes
-   * (else where the land's plan has it); `waterKept`: the land's water is as its plan has it. For
-   * now it is the `world` job for the land's place and options (its shaped land, if it has one);
-   * the site and the plan are not read yet.
+   * Step 2's town, laid on `land` (step 1's, with its plan) from `seed` (the town's own: the land's
+   * by default) with `options` over the land's own, its land settled under it as a new world's is
+   * (the `world` job's); named `name`, else as the land is. `site`: the middle of its main town
+   * (else the plan's site); `waterKept`: the land's water is as its plan has it (its river is
+   * bridged as a new world's; else the town goes on the largest piece of dry land and no bridge is
+   * laid). `macro.ts` `layOn`.
    */
   | { kind: 'town'; land: NeighbourhoodDraft; seed: number; name?: string; options: Partial<WorldOptions>; site?: Pt; waterKept: boolean }
   /**
@@ -83,8 +84,8 @@ export function runTownJob(content: Content, t: Templates, job: TownJob, step?: 
       return { kind: 'land', draft, preview: previewWorld(content, t, draft, null) };
     }
     case 'town': {
-      const options = { ...job.land.world?.options, ...job.options };
-      return { kind: 'town', ...laidOut(content, t, generateWorld(content, t, job.land.world?.kind ?? 'country', job.seed, job.name ?? job.land.name, step, options, job.land.open?.land), step) };
+      const lay = { townSeed: job.seed, waterKept: job.waterKept, ...(job.site ? { site: job.site } : {}) };
+      return { kind: 'town', ...laidOut(content, t, layOn(content, t, job.land, job.options, lay, job.name ?? job.land.name, step), step) };
     }
     case 'edit':
       throw new Error('The edit job is not built yet.');
@@ -99,6 +100,7 @@ function laidOut(content: Content, t: Templates, laid: NeighbourhoodDraft, step?
   const draft = settled.draft;
   const preview = settled.world;
   if (draft.open?.land && draft !== laid) preview.meta = { ...preview.meta, land: encodeLand(draft.open.land) };
+  step?.('grade');
   const houses = generatedHouses(t, draft.slots.map((s) => s.template));
   step?.('houses');
   return { draft, preview, houses };
