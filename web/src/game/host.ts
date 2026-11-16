@@ -27,10 +27,11 @@ import type { GameSession, StartRequest } from './session';
 function requestKey(r: StartRequest): string {
   if (r.kind === 'load') return `load:${r.saveId}`;
   const members = (h: HouseholdDraft) => h.members.map((m) => m.uid).join(',');
-  // The whole town counts: going back and changing the neighbours (or the world's options) needs a new session.
-  // (A shaped land is another world: its fingerprint, `landHash`.)
+  // The whole town counts: going back and changing the neighbours (or the land, or the town laid on it) needs a new session.
+  // (A shaped land is another world: its fingerprint, `landHash`. The land's size and where the lots stand tell
+  // one town laid on a land from another: another town seed, or the town moved.)
   const land = r.town.open?.land?.edited ? landHash(r.town.open.land) : '';
-  const town = `${r.town.name}:${r.town.world?.kind ?? ''}:${JSON.stringify(r.town.world?.options ?? null)}:${r.town.seed}:${land}:${r.town.slots.map((s) => `${s.template}@${s.lot ?? 'medium'}`).join(',')}:${r.town.households.map((h) => `${h.slot}=${members(h.household)}`).join(';')}`;
+  const town = `${r.town.name}:${r.town.world?.kind ?? ''}:${JSON.stringify(r.town.world?.options ?? null)}:${r.town.seed}:${r.town.width}x${r.town.depth}:${land}:${r.town.slots.map((s) => `${s.template}@${s.lot ?? 'medium'}@${s.x},${s.z}`).join(',')}:${r.town.households.map((h) => `${h.slot}=${members(h.household)}`).join(';')}`;
   // A household edited after its session was prepared (back to step 2) needs a new one too.
   return `${r.existing ? 'play' : 'new'}:${r.mode ?? 'living'}:${r.lifespan ?? 'normal'}:${town}:${r.slot}:${JSON.stringify(r.household)}`;
 }
