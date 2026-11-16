@@ -33,9 +33,9 @@ export function buildFences(
   parent: pc.Entity,
   fences: readonly FenceEdge[],
   styles: readonly FenceStyleDef[],
-  { hedgeBoxes = false, wallAt }: { hedgeBoxes?: boolean; wallAt?: (x: number, z: number) => boolean } = {},
+  { hedgeBoxes = false, wallAt, ground }: { hedgeBoxes?: boolean; wallAt?: (x: number, z: number) => boolean; ground?: (x: number, z: number) => number } = {},
 ): Fences | null {
-  const plan = planFences(fences, styles, { hedgeBoxes, wallAt });
+  const plan = planFences(fences, styles, { hedgeBoxes, wallAt, ground });
   if (!plan) return null;
   const data = plan.geo.meshData({ colors: true });
   const mesh = meshFrom(app.graphicsDevice, data, plan.gates.length > 0 ? 'dynamic' : 'static');

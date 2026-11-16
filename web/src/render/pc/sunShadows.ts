@@ -135,6 +135,8 @@ interface Square {
   /** The middle (PlayCanvas space) and the half side (m). */
   centre: pc.Vec3;
   radius: number;
+  /** How far (m) the land in it rises or falls from its middle at most (a land with relief): its depth reaches that much further. */
+  relief: number;
 }
 
 /** The squares of the lights that have one (by PlayCanvas's scene light). */
@@ -157,10 +159,10 @@ function patch(app: pc.AppBase): void {
     camera.getFrustumCorners = () => {
       // Eight points whose middle is the square's and whose farthest is its half side away, in the camera's space (`cull` turns them back into the world).
       inverse.copy(camera.node.getWorldTransform()).invert();
-      const { centre: c, radius: r } = square;
+      const { centre: c, radius: r, relief } = square;
       for (let i = 0; i < 8; i++) {
         const [x, y, z] = offsets[i];
-        inverse.transformPoint(corners[i].set(c.x + x * r, c.y + y * r, c.z + z * r), corners[i]);
+        inverse.transformPoint(corners[i].set(c.x + x * r, c.y + y * (r + relief), c.z + z * r), corners[i]);
       }
       return corners;
     };
@@ -262,7 +264,7 @@ export class SunShadows {
   private pending = false;
   private overview = false;
   private readonly size: number;
-  private readonly square: Square = { centre: new pc.Vec3(), radius: 30 };
+  private readonly square: Square = { centre: new pc.Vec3(), radius: 30, relief: 0 };
   /** The square on the ground (game space, m): from (`x0`, `z0`) to (`x1`, `z1`). */
   private readonly ground = { x0: -30, z0: -30, x1: 30, z1: 30 };
   private readonly fadeId: pc.ScopeId;
@@ -334,10 +336,15 @@ export class SunShadows {
     this.light.normalOffsetBias = (NORMAL_OFFSET_TEXELS * 2 * this.square.radius) / this.size;
   }
 
-  /** The square round the viewed lot: its middle (game space, on the ground) and half side (m). */
-  setSquare(x: number, z: number, radius: number): void {
-    toEngine(x, 0, z, this.square.centre);
+  /**
+   * The square round the viewed lot: its middle (game space, on the ground: `y` m up, the engine's height there, on a
+   * land with relief) and half side (m), and how far the land in it rises or falls from `y` (`relief`, m: the map's
+   * depth reaches that much further up and down, so a hillside in it casts and takes its shadows).
+   */
+  setSquare(x: number, z: number, radius: number, y = 0, relief = 0): void {
+    toEngine(x, y, z, this.square.centre);
     this.square.radius = radius;
+    this.square.relief = relief;
     const g = this.ground;
     g.x0 = x - radius;
     g.z0 = z - radius;

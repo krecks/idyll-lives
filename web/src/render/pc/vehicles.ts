@@ -129,6 +129,32 @@ export abstract class Vehicles {
     this.inMap = inMap;
   }
 
+  /** The ground they stand on (game space, m: `BuiltSurface.at` on a land the town follows), or 0 everywhere (null). */
+  setGround(ground: ((x: number, z: number) => number) | null): void {
+    this.ground = ground;
+  }
+  protected ground: ((x: number, z: number) => number) | null = null;
+
+  /**
+   * Where a vehicle at `at`, `wheelBase` m between its axles, stands: the ground under its middle (`y`) and its pitch
+   * from the ground under its two axles (`pitch`, rad, nose up), into `out` (0 and 0 without a ground).
+   */
+  protected standing(at: { x: number; z: number; yaw: number }, wheelBase: number, out: { y: number; pitch: number }): { y: number; pitch: number } {
+    const g = this.ground;
+    if (!g) {
+      out.y = 0;
+      out.pitch = 0;
+      return out;
+    }
+    // (Its nose along (sin yaw, cos yaw).)
+    const [fx, fz] = [Math.sin(at.yaw) * (wheelBase / 2), Math.cos(at.yaw) * (wheelBase / 2)];
+    const [front, back] = [g(at.x + fx, at.z + fz), g(at.x - fx, at.z - fz)];
+    out.y = (front + back) / 2;
+    out.pitch = wheelBase > 0 ? Math.atan2(front - back, wheelBase) : 0;
+    return out;
+  }
+  protected readonly stand = { y: 0, pitch: 0 };
+
   abstract clear(): void;
 
   destroy(): void {
@@ -173,11 +199,14 @@ export abstract class Vehicles {
   }
 
   /** A drawn vehicle's four wheels (`wide`: their width, as a wheel's) and its contact shadow, at `slot` in their draws. */
-  protected writeAt(slot: number, at: Spot, size: { wid: number; len: number; wheelR: number }, four: readonly Wheel[], v: Rolling, wide = 1): void {
+  protected writeAt(slot: number, at: Spot, size: { wid: number; len: number; wheelR: number; wheelBase?: number }, four: readonly Wheel[], v: Rolling, wide = 1): void {
     const { m, q } = this;
     const s = Math.sin(at.yaw);
     const c = Math.cos(at.yaw);
     const wheels = this.wheels;
+    // (On a land the town follows, each wheel on the ground under it, the shadow under the body's middle, pitched as it.)
+    const g = this.ground;
+    const stand = this.standing(at, size.wheelBase ?? size.len * 0.6, this.stand);
     if (wheels) {
       const r = size.wheelR;
       for (let w = 0; w < 4; w++) {
@@ -186,12 +215,13 @@ export abstract class Vehicles {
         const yaw = at.yaw + (front ? v.steer : 0) + (side < 0 ? Math.PI : 0);
         const spin = side < 0 ? -v.spin : v.spin;
         // Turned about y (`yaw`), then about x (`spin`), scaled by its radius across y and z.
-        compose(wide, r, r, quatYawPitchRoll(yaw, spin, 0, q), at.x + x * c + z * s, r + LIFT, at.z - x * s + z * c, m);
+        const [wx, wz] = [at.x + x * c + z * s, at.z - x * s + z * c];
+        compose(wide, r, r, quatYawPitchRoll(yaw, spin, 0, q), wx, r + LIFT + (g ? g(wx, wz) : 0), wz, m);
         wheels.setMatrix(slot * 4 + w, m);
       }
     }
     // (A blob of radius 1, stretched to its size.)
-    this.shadowDraw?.setMatrix(slot, compose(size.wid * 0.62, 1, size.len * 0.56, quatYawPitchRoll(at.yaw, 0, 0, q), at.x, 0, at.z, m));
+    this.shadowDraw?.setMatrix(slot, compose(size.wid * 0.62, 1, size.len * 0.56, quatYawPitchRoll(at.yaw, -stand.pitch, 0, q), at.x, stand.y, at.z, m));
   }
 
   /** The wheels and contact shadows written (`writeAt`) sent to the GPU, drawn while there are any. */

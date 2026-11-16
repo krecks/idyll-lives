@@ -373,7 +373,7 @@ export class Cars extends Vehicles {
       n = 0;
       for (const car of this.cars) {
         if (car.look !== look || !car.drawn || car.owned) continue;
-        p.draw.setMatrix(n++, this.carMatrix(car.at));
+        p.draw.setMatrix(n++, this.carMatrix(car.at, car.shape));
       }
       p.draw.update();
       p.draw.enabled = n > 0;
@@ -404,9 +404,10 @@ export class Cars extends Vehicles {
     this.writeAt(car.slot, car.at, car.shape, WHEELS[car.body], car);
   }
 
-  /** A parked car's body in game space (turned about y). */
-  private carMatrix(at: Drawn['at']): Float32Array {
-    compose(1, 1, 1, quatYawPitchRoll(at.yaw, 0, 0, this.q), at.x, 0, at.z, this.m);
+  /** A parked car's body in game space (turned about y; on a land the town follows, on the ground, pitched with it). */
+  private carMatrix(at: Drawn['at'], shape: CarBody): Float32Array {
+    const stand = this.standing(at, shape.wheelBase, this.stand);
+    compose(1, 1, 1, quatYawPitchRoll(at.yaw, -stand.pitch, 0, this.q), at.x, stand.y, at.z, this.m);
     return this.m;
   }
 
@@ -414,10 +415,12 @@ export class Cars extends Vehicles {
   private placeOwn(car: Drawn): void {
     const own = (car.own ??= this.makeOwn(car));
     if (!own.entity.enabled) own.entity.enabled = true;
-    own.entity.setLocalPosition(car.at.x, 0, car.at.z);
+    // (On a land the town follows, on the ground under it, pitched with it as well as by its speed changing.)
+    const stand = this.standing(car.at, car.shape.wheelBase, this.stand);
+    own.entity.setLocalPosition(car.at.x, stand.y, car.at.z);
     own.entity.setLocalEulerAngles(0, (car.at.yaw * 180) / Math.PI, 0);
     // (Nose up: turned back about x.)
-    own.tilt.setLocalEulerAngles((-car.pitch * 180) / Math.PI, 0, 0);
+    own.tilt.setLocalEulerAngles((-(car.pitch + stand.pitch) * 180) / Math.PI, 0, 0);
     // The rear edge swings out (`paintDoor`).
     for (let d = 0; d < DOORS; d++) own.doors[d].setLocalEulerAngles(0, -car.sides[d] * DOOR_OPEN * ease(car.open[d]), 0);
     const shut = !car.ajar;

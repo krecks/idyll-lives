@@ -41,7 +41,13 @@
  * into the lawn's colour towards it too), `game_grassDensity` (the preset's, `grassShare`), `game_grassArea` (the colour texture's corner and 1 / its
  * size in metres), `game_grassTownSize` (the town's ground in metres, and from how far round it to
  * how far the lawn's tone fades out), `game_grassTone` (the share of the lawn map's tone drawn: less on a thinner lawn, `pc/grass.ts`), `game_daylight` (0 by night to 1 by day, `pc/daylight.ts`), `game_grassPush[16]`.
- * Per copy: `game_grassSlope` (the ground's slope along x and z under its patch).
+ * Per copy: `game_grassSlope` (the ground's slope along x and z under its patch). The ground reads the eye where
+ * it is drawn (`game_grassGroundEye`: the eye in the engine's heights, `pc/space.ts` `setDatum`; the blades, built
+ * in game space, read `game_grassEye`).
+ *
+ * `GAME_PAD_MASK`, on the terrain of a land the town follows (`pc/nature.ts`): no ground is drawn inside a lot,
+ * whose pad is a slab of its own at its level: `game_padMask` (a byte a metre, over `game_padArea`: its corner and
+ * 1 / its size in metres) is set inside lots.
  */
 
 import { codeFor, float as f, type ShaderFeature } from './chunks';
@@ -349,10 +355,15 @@ ${windDecl}
 #if defined(GAME_GRASS) && !defined(SHADOW_PASS)
 	varying vGameGrass: vec4f;
 #endif
+#if defined(GAME_PAD_MASK) && !defined(SHADOW_PASS)
+	var game_padMask: texture_2d<f32>;
+	var game_padMaskSampler: sampler;
+	uniform game_padArea: vec4f;
+#endif
 #if defined(GAME_GRASS_GROUND) && !defined(SHADOW_PASS)
 ${windDecl}
 	uniform game_grassArea: vec4f;
-	uniform game_grassEye: vec4f;
+	uniform game_grassGroundEye: vec4f;
 	uniform game_grassTownSize: vec4f;
 	uniform game_daylight: f32;
 	uniform game_grassTone: f32;
@@ -369,10 +380,14 @@ ${windDecl}
 #if defined(GAME_GRASS) && !defined(SHADOW_PASS)
 	varying vec4 vGameGrass;
 #endif
+#if defined(GAME_PAD_MASK) && !defined(SHADOW_PASS)
+	uniform sampler2D game_padMask;
+	uniform vec4 game_padArea;
+#endif
 #if defined(GAME_GRASS_GROUND) && !defined(SHADOW_PASS)
 ${windDecl}
 	uniform vec4 game_grassArea;
-	uniform vec4 game_grassEye;
+	uniform vec4 game_grassGroundEye;
 	uniform vec4 game_grassTownSize;
 	uniform float game_daylight;
 	uniform float game_grassTone;
@@ -383,6 +398,15 @@ ${windDecl}
 #endif`;
 
   const albedo = `
+#if defined(GAME_PAD_MASK) && !defined(SHADOW_PASS)
+	{
+		// (Inside a lot the ground is its pad's slab.)
+		${d('pmUv', v2)} = (gamePos(vPositionW).xz - ${u('game_padArea')}.xy) * ${u('game_padArea')}.zw;
+		if (${inTown('pmUv')}) {
+			if (${tex('game_padMask', 'pmUv')}.r > 0.5) { discard; }
+		}
+	}
+#endif
 #if defined(GAME_GRASS) && !defined(SHADOW_PASS)
 	dAlbedo = vGameGrass.rgb;
 #endif
@@ -424,7 +448,7 @@ ${windDecl}
 			${d('ggGust', 'float')} = ${gust('ggP')} * ${u('game_wind')}.y;
 			// The lawn's own colour, as dark as the blades and the shade between them average, and darker
 			// under the blades near the eye (the shade between them), blending out towards the grass's reach.
-			${d('ggNear', 'float')} = 1.0 - smoothstep(${u('game_grassEye')}.w * ${f(LAWN.blend[0])}, ${u('game_grassEye')}.w * ${f(LAWN.blend[1])}, length(ggQ - ${u('game_grassEye')}.xyz));
+			${d('ggNear', 'float')} = 1.0 - smoothstep(${u('game_grassGroundEye')}.w * ${f(LAWN.blend[0])}, ${u('game_grassGroundEye')}.w * ${f(LAWN.blend[1])}, length(ggQ - ${u('game_grassGroundEye')}.xyz));
 			// What the lawn is like here (the lawn's map, as the blades read it; past the town its edge: the land as it is).
 			${lawnUv('ggQ.xz', 'ggM')}
 			${d('ggMap', v4)} = ${wgsl ? 'textureSampleGrad(game_grassLawn, game_grassLawnSampler, ggMUv, ggDx, ggDy)' : 'textureGrad(game_grassLawn, ggMUv, ggDx, ggDy)'};
