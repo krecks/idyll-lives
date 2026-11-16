@@ -3,11 +3,12 @@
  * Times the three waits a new player has before playing, through the menus as a player goes:
  *
  * - boot: the page opened to the main menu (the loading screen gone, its picture shown);
- * - world: "New game" to step 1's world made and built (its "Choose a household" enabled), in the
- *   countryside with its own options, as a new player gets it, unless `--world` and `--options` say
- *   otherwise (the page's `?world=` and `?options=`);
- * - inView, portraits: step 2 ("Choose a household", after "New game" and step 1) opened to the
- *   portraits in view in its list shown, and to every household's (`.households .face img`);
+ * - world: "New game" to step 1's land made and built (its "Lay out the town" enabled), in the
+ *   countryside with its own options, as a new player gets it, unless `--world` and `--options` (or
+ *   `--code`) say otherwise (the page's `?world=`, `?options=`, `?code=`);
+ * - town: "Lay out the town" to step 2's town laid on that land and built (its "Choose a household" enabled);
+ * - inView, portraits: step 3 ("Choose a household") opened to the portraits in view in its list
+ *   shown, and to every household's (`.households .face img`);
  * - entry: "Play" on a household to the game up (its interface there, the loading screen gone).
  *
  * With `--back`, then the way back and in again: the long tasks in the 5 s after the entry (`entryLong`),
@@ -29,6 +30,7 @@
  *     --seed 7                 the page's Math.random seed
  *     --world country          step 1's place (a kind from before places, such as dense, is its place at its size)
  *     --options town=city,villages=many   step 1's options (the place's own where not given)
+ *     --code river-mhs-k2x9q   the world's code instead (a bare number: the land's seed)
  *     --household 0            which household's Play is pressed (its index in the list)
  *     --renderer webgpu        or webgl
  *     --headed                 in a window (default headless: the real GPU either way)
@@ -58,7 +60,8 @@ const pick = Number(flag('household', '0'));
 const renderer = flag('renderer', 'webgpu');
 // (None given: step 1 as a player gets it, the URL without them.)
 const made = worldFlags(flag, null);
-const worldQuery = [made.world ? `world=${made.world}` : '', made.query ? `options=${made.query}` : ''];
+const code = flag('code', null);
+const worldQuery = [made.world ? `world=${made.world}` : '', made.query ? `options=${made.query}` : '', code ? `code=${encodeURIComponent(code)}` : ''];
 const port = Number(flag('port', '5222'));
 const again = has('again');
 const back = has('back');
@@ -120,7 +123,10 @@ function longTasks() {
   new PerformanceObserver((list) => list.getEntries().forEach((e) => window.__longTasks.push({ start: e.startTime, ms: e.duration }))).observe({ type: 'longtask', buffered: true });
 }
 
-/** One visit: boot, step 1's world, step 2's portraits, a household's entry (ms each), and the page's spans. */
+/** A step's way on (`label`, a pattern) enabled: its world made and built. */
+const enabled = (page, label) => page.waitForFunction((src) => [...document.querySelectorAll('button')].some((b) => new RegExp(src).test(b.textContent ?? '') && !b.disabled), label.source, { timeout: 120_000, polling: 100 });
+
+/** One visit: boot, step 1's land, step 2's town, step 3's portraits, a household's entry (ms each), and the page's spans. */
 async function visit(page, cdp) {
   const now = () => page.evaluate(() => performance.now());
   // (The page keeps its last 500 spans: read them after each moment, so none is lost.)
@@ -137,10 +143,17 @@ async function visit(page, cdp) {
   await page.waitForTimeout(1500);
   const newGame = await now();
   await page.getByText('New game', { exact: true }).click();
+  const toTown = page.getByRole('button', { name: /Lay out the town/ });
+  await toTown.waitFor({ timeout: 60_000 });
+  await enabled(page, /Lay out the town/);
+  const made = await now();
+  await page.waitForTimeout(500);
+  const layPressed = await now();
+  await toTown.click();
   const next = page.getByRole('button', { name: /Choose a household/ });
   await next.waitFor({ timeout: 60_000 });
-  await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => /Choose a household/.test(b.textContent ?? '') && !b.disabled), null, { timeout: 60_000, polling: 100 });
-  const made = await now();
+  await enabled(page, /Choose a household/);
+  const laid = await now();
   await page.waitForTimeout(500);
   await next.click();
   const opened = await now();
@@ -178,12 +191,12 @@ async function visit(page, cdp) {
   await plays.nth(Math.min(pick, (await plays.count()) - 1)).click();
   await page.waitForFunction(() => !!document.querySelector('.hud-root') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 100 });
   const entered = await now();
-  const marks = { boot, newGame, made, opened, shown, pressed, entered };
+  const marks = { boot, newGame, made, layPressed, laid, opened, shown, pressed, entered };
   const more = back ? await backAndIn(page, cdp, now, marks) : {};
   clearInterval(polling);
   await keep();
   const report = { entries: [...entries.values()].sort((a, b) => a.start - b.start), marks };
-  return { boot, world: made - newGame, inView: inView - opened, portraits: shown - opened, faces, entry: entered - pressed, ...more, report };
+  return { boot, world: made - newGame, town: laid - layPressed, inView: inView - opened, portraits: shown - opened, faces, entry: entered - pressed, ...more, report };
 }
 
 /** `--back`: from the game to the menu and in again (see the header), ms each. */
@@ -254,7 +267,7 @@ for (let r = 0; r < runs; r++) {
   }
   for (const [i, v] of visits.entries()) {
     const label = i === 0 ? 'first' : 'again';
-    console.log(`run ${r + 1} (${label}): boot ${v.boot.toFixed(0)} ms · step-2 portraits in view ${v.inView.toFixed(0)} ms, all ${v.portraits.toFixed(0)} ms (${v.faces}) · entry ${v.entry.toFixed(0)} ms`);
+    console.log(`run ${r + 1} (${label}): boot ${v.boot.toFixed(0)} ms · land ${v.world.toFixed(0)} ms · town ${v.town.toFixed(0)} ms · step-3 portraits in view ${v.inView.toFixed(0)} ms, all ${v.portraits.toFixed(0)} ms (${v.faces}) · entry ${v.entry.toFixed(0)} ms`);
     if (back) {
       const tasks = (xs) => (xs.length ? `${xs.length} long (max ${Math.max(...xs)} ms)` : 'no long tasks');
       console.log(`  after entry ${tasks(v.entryLong)} · back ${v.back.toFixed(0)} ms, ${tasks(v.backLong)} · continue ${v.continue.toFixed(0)} ms, then ${tasks(v.continueLong)} · heap ${v.heapMB.toFixed(0)} MB, buffers ${v.buffersMB.toFixed(0)} MB · again ${v.again.toFixed(0)} ms, ${tasks(v.againLong)}`);
@@ -282,7 +295,7 @@ for (const label of ['first', 'again']) {
   if (!list.length) continue;
   md.push(`## ${label === 'first' ? 'First visit' : 'Second visit'}`, '');
   md.push('| moment | median ms | runs |', '|---|---|---|');
-  for (const k of ['boot', 'world', 'inView', 'portraits', 'entry', ...(back ? ['back', 'continue', 'heapMB', 'buffersMB', 'again'] : [])]) md.push(`| ${k} | ${median(list.map((v) => v[k])).toFixed(0)} | ${list.map((v) => v[k].toFixed(0)).join(', ')} |`);
+  for (const k of ['boot', 'world', 'town', 'inView', 'portraits', 'entry', ...(back ? ['back', 'continue', 'heapMB', 'buffersMB', 'again'] : [])]) md.push(`| ${k} | ${median(list.map((v) => v[k])).toFixed(0)} | ${list.map((v) => v[k].toFixed(0)).join(', ')} |`);
   // (`--back`: the longest task in each stretch.)
   if (back) for (const k of ['entryLong', 'backLong', 'continueLong', 'againLong']) md.push(`| ${k} (longest) | ${median(list.map((v) => Math.max(0, ...v[k]))).toFixed(0)} | ${list.map((v) => Math.max(0, ...v[k])).join(', ')} |`);
   md.push('', '| span | median ms (summed) | count |', '|---|---|---|');

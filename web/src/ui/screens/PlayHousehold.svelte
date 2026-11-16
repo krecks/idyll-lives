@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * New game, the other path from step 1: play a household that already lives in town. Shows who
+   * New game, the other path from step 3: play a household that already lives in town. Shows who
    * they are and where they live; starting flies the camera into their lot, like Move in.
    */
   import { onMount } from 'svelte';
@@ -110,7 +110,7 @@
 <div class="screen scaled">
   <div class="haze" aria-hidden="true"></div>
   <header>
-    <button class="btn ghost back" onclick={() => (app.screen = 'neighbourhood')}><Icon name="icon.ui.back" size={18} /> Neighbourhood</button>
+    <button class="btn ghost back" onclick={() => (app.screen = 'household')}><Icon name="icon.ui.back" size={18} /> Households</button>
     <div class="title">
       <span class="eyebrow">Play a household · {town.name}</span>
       <h1>{chosen ? `Meet the ${chosen.household.name}s` : 'Nobody lives here yet'}</h1>

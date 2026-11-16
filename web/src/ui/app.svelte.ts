@@ -1,16 +1,35 @@
 /** Top-level navigation: which screen is shown, and which modal is open on top of it. */
 
-import type { GameKind, Lifespan, WorldOptions } from '../core/protocol';
+import type { GameKind, Lifespan } from '../core/protocol';
 import type { HouseholdDraft } from '../game/household';
 import type { MenuStill } from '../game/menuStill';
+import type { Pt } from '../game/roads';
 import type { StartRequest } from '../game/session';
 import { EMPTY_LOT, withLot, type NeighbourhoodDraft } from '../game/town';
+import type { Chosen } from './newGame';
 
 /**
- * New game: world → neighbourhood (choose a household) → household (Creation) → home → game; or
- * world → neighbourhood → play (take over a household that already lives there) → game.
+ * New game, in four steps: land (step 1) → town (step 2) → household (step 3: choose one of the
+ * town's, or make your own in Creation, `create`) → home (step 4) → game. A household chosen from
+ * the town can be met first (`play`; it goes once step 4 offers their home, U4).
  */
-export type Screen = 'menu' | 'world' | 'neighbourhood' | 'create' | 'home' | 'play' | 'game';
+export type Screen = 'menu' | 'land' | 'town' | 'household' | 'create' | 'home' | 'play' | 'game';
+
+/** A step's draft and the key of what it was made from (`newGame.ts` `landKey`, `townKey`): a later step whose key no longer matches is made again. */
+export interface Keyed {
+  draft: NeighbourhoodDraft;
+  key: string;
+}
+
+/** Step 1's land: no town on it yet. `waterKept`: its water is as generated (the town laid on it may use its plan's river and coast). */
+export interface MadeLand extends Keyed {
+  waterKept: boolean;
+}
+
+/** Step 2's town, nobody living there yet. `edited`: changed by hand (the editor's tools): what lays it out again asks first. */
+export interface LaidTown extends Keyed {
+  edited: boolean;
+}
 export type Overlay = 'settings' | 'load' | 'credits' | null;
 /** A loading step and the overall progress, 0..1. */
 export interface Progress {
@@ -40,12 +59,26 @@ class AppState {
   crash = $state.raw<Crash | null>(null);
   /** A file of this version couldn't be fetched (most likely a new version was published meanwhile): a banner offers to reload. */
   newVersion = $state(false);
-  /** Drafts kept while moving back and forth through the new-game steps: the world (nobody living there yet), then the town with its neighbours. */
-  world = $state.raw<NeighbourhoodDraft | null>(null);
+  // What the new game's steps made, kept while the player goes back and forth through them. Each is
+  // made again only when what it was made from changed (its key): a land shaped or chosen again
+  // lays the town again; a town laid again is lived in again; a household made in Creation is kept.
+
+  /** The world's code as chosen so far: step 1's place, land and seed, step 2's town, villages and town seed. Null until step 1 opens. */
+  code = $state.raw<Chosen | null>(null);
+  /** Step 1's land (with the player's shaping). */
+  land = $state.raw<MadeLand | null>(null);
+  /** Where the player moved the town (its box's corner, m; step 2's "Move the town"); null: where the land has it. */
+  site = $state.raw<Pt | null>(null);
+  /** The town's name as typed or rolled in step 2; null: the one it was laid with. */
+  townName = $state<string | null>(null);
+  /** Step 2's town (nobody living there yet). */
+  world = $state.raw<LaidTown | null>(null);
+  /** Step 3's town with its neighbours, and the key of step 2's town it was filled from (`world.key`). */
   town = $state.raw<NeighbourhoodDraft | null>(null);
+  townOf = '';
+  /** The households step 3 offers (their lots, in order); empty until step 3 offers a sample of the town's. */
+  offer = $state.raw<readonly number[]>([]);
   household = $state.raw<HouseholdDraft | null>(null);
-  /** The world's options as step 1 last had them (null: not chosen yet), kept when going to step 2 and back. */
-  worldOptions = $state.raw<WorldOptions | null>(null);
   /** Living (the residents earn the money) or Creative (building is free). */
   mode = $state<GameKind>('living');
   /** How fast residents age (the new game's choice). */
@@ -70,13 +103,19 @@ class AppState {
   loading = $state.raw<Progress | null>(null);
 
   newGame(): void {
+    this.code = null;
+    this.land = null;
+    this.site = null;
+    this.townName = null;
     this.world = null;
     this.town = null;
+    this.townOf = '';
+    this.offer = [];
     this.household = null;
-    this.worldOptions = null;
     this.playSlot = null;
+    this.homeSlot = null;
     this.emptyLot = false;
-    this.screen = 'world';
+    this.screen = 'land';
   }
 
   /** The town as the home screen shows it: the chosen lot cleared when starting on an empty lot. */
