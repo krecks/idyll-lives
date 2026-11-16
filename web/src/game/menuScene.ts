@@ -40,7 +40,11 @@ export type Shot =
   /** The whole neighbourhood from above, framed into `frame`. */
   | { kind: 'overview'; frame: Frame }
   /** One lot as the game will first show it, framed into `frame`. */
-  | { kind: 'lot'; plot: number; frame: Frame };
+  | { kind: 'lot'; plot: number; frame: Frame }
+  /** The whole world from above, framed into `frame` (the new game's land and home steps). Framed as `overview` until it has its own shot. */
+  | { kind: 'world'; frame: Frame }
+  /** One area (`OpenWorldDraft.areas` index: the main town, a village) from above, framed into `frame`. Framed as `overview` until it has its own shot. */
+  | { kind: 'area'; area: number; frame: Frame };
 
 const NO_HIGHLIGHT: LotHighlight = { hover: null, selected: null, marked: [], outlines: false };
 
@@ -180,11 +184,11 @@ class MenuScene {
     const renderer = this.live;
     if (!world || !renderer || !this.wanted) return;
     const { shot, duration, cut } = this.wanted;
-    this.bounds = shot.kind === 'overview' || shot.kind === 'lot' ? shot.frame : null;
+    this.bounds = 'frame' in shot ? shot.frame : null;
     const townShot = this.townShot(shot, world, duration);
     // What the camera frames is the town as far as the tags go (see `positionLabels`); before the key
     // check, since a new world of the same size and shot can leave the key unchanged.
-    this.framed = shot.kind === 'overview' || shot.kind === 'lot' ? townShot.focus : null;
+    this.framed = 'frame' in shot ? townShot.focus : null;
     const key = `${JSON.stringify(shot)}|${world.width}x${groundDepth(world)}|${window.innerWidth}x${window.innerHeight}`;
     if (key === this.shotKey) return;
     const first = this.shotKey === '' || !!cut;
@@ -348,6 +352,8 @@ class MenuScene {
       case 'create':
         return { focus: plots, frame: { left: W * 0.12, top: H * 0.1, right: W * 0.88, bottom: H * 0.98 }, beta: 1.3, alpha: 0.9, zoom: 1.8, sway: 0.25, duration, minute: CREATE_MINUTE };
       case 'overview':
+      case 'world':
+      case 'area':
         // Among mountains, lower: the peaks round the valley in the picture too.
         return world.meta?.world?.landscape.mountains
           ? // The mountainside behind the town in the picture too (the camera looks from low z).

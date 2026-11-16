@@ -10,11 +10,11 @@
  */
 
 import type { Content, WorldNames } from '../content/content';
-import { DEFAULT_LANDSCAPE, type LandscapeParams, type TownSize, type WorldOptions } from '../core/protocol';
+import { DEFAULT_LANDSCAPE, type LandSize, type LandscapeParams, type TownSize, type WorldOptions } from '../core/protocol';
 import type { GardenSize } from './housegen';
 import { branch, centroid, clearOf, crossing, crossStreet, cutAround, inside, lane, leftOf, lengths, loop, nearest, pointAt, range, ring, RoadIndex, roomAt, roundabout, through, type Box, type Pt, type RoadPlan } from './roads';
 
-export type { TownSize, WorldOptions };
+export type { LandSize, TownSize, WorldOptions };
 
 /** A place a world is set in. */
 export type WorldKind = 'country' | 'farm' | 'seaside' | 'lakeside' | 'river' | 'mountain' | 'forest' | 'heath' | 'island';
@@ -24,9 +24,10 @@ export const WORLD_KINDS: readonly WorldKind[] = ['country', 'farm', 'seaside', 
 /**
  * A part of making a world done, in order (step 1's progress, `CreateWorld.svelte`): the land and its
  * towns' streets, the country roads between them, the lots, then the houses and the menus' preview
- * (`townJobs.ts`). Told as each ends; what it says doesn't change the world.
+ * (`townJobs.ts`), and the land graded under the town (`grade`). Told as each ends; what it says
+ * doesn't change the world.
  */
-export type WorldStep = 'land' | 'roads' | 'homes' | 'houses';
+export type WorldStep = 'land' | 'roads' | 'homes' | 'houses' | 'grade';
 
 type Rand = () => number;
 
@@ -867,6 +868,21 @@ const WORLD_SIZE: Record<WorldOptions['villages'], Record<TownSize, [number, num
   few: { hamlet: [704, 768], village: [768, 832], town: [832, 896], city: [896, 960] },
   many: { hamlet: [896, 960], village: [896, 960], town: [896, 960], city: [960, 1024] },
 };
+
+/** The land a new world has (m, both ways) by its size (`WorldOptions.size`). */
+export const LAND_SIZE: Record<LandSize, number> = { small: 640, medium: 832, large: 960 };
+/** The land sizes, smallest first. */
+const LAND_SIZES: readonly LandSize[] = ['small', 'medium', 'large'];
+
+/** Whether a main town of `town` and `villages` round it fit on land of `size`: it is at least as big as such a world is at its smallest (`WORLD_SIZE`). */
+export function townFits(size: LandSize, town: TownSize, villages: WorldOptions['villages']): boolean {
+  return LAND_SIZE[size] >= WORLD_SIZE[villages][town][0];
+}
+
+/** The smallest land a main town of `town` and `villages` round it fit on (`townFits`); the largest if none does. */
+export function sizeFor(town: TownSize, villages: WorldOptions['villages']): LandSize {
+  return LAND_SIZES.find((s) => townFits(s, town, villages)) ?? 'large';
+}
 
 /**
  * How hilly (`specOf`): the generator's hills (m), the mountains' height either side of the

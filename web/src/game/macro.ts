@@ -25,7 +25,7 @@
  */
 
 import type { Content } from '../content/content';
-import type { BackdropBuilding, Rle, TownArea, TownPlace, WorldMeta, WorldZone } from '../core/protocol';
+import type { BackdropBuilding, LandSize, Rle, TownArea, TownPlace, WorldMeta, WorldOptions, WorldZone } from '../core/protocol';
 import { distanceToRect } from '../render/shared/chunks';
 import { chooseCentre, layBackdrop, reserveCentre } from './backdrop';
 import { random } from './housegen';
@@ -35,7 +35,7 @@ import { chaikin, outlines, rasterize, rle, simplify, simplifyRing, unrle } from
 import { fbm } from './noise';
 import { centroid, cropRoads, curve, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, sharpestTurn, straightAround, tangent, type Box, type Pt, type RoadPlan } from './roads';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, LotPlacer, plotRect, settleRoads, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates } from './town';
-import { streetNames, worldName, worldTagline, type SizeSpec, type WorldSpec, type WorldStep } from './world';
+import { LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
 
 /** The mask helpers moved to `landMasks.ts`; still here for those that import them from the generator. */
 export { chaikin, outlines, rasterize, rle, simplifyRing, unrle };
@@ -73,6 +73,81 @@ export interface OpenWorldDraft {
    * the town file carries it as `meta.land` once it is `edited`.
    */
   land?: LandField;
+  /** How the place's land was planned (`LandPlan`), carried with the land so the town laid on it finds its water. */
+  plan?: LandPlan;
+  /** Where the main town's box was put (its corner, m): the plan's site, or where the player moved it. */
+  site?: Pt;
+}
+
+/**
+ * A place's land before any town is laid on it, as its own seed plans it: the side
+ * its water is on, the main town's site, the level the towns are built at, the mountains' height,
+ * and its water: a river across it (where it runs: its middle `c`, how it tilts, how far its
+ * meanders swing, their noise's offset `k`, and the calm reach where the town is), a lake, an
+ * island's coast, ponds. A town laid on a land whose water is as planned uses these, so its
+ * bridges and causeways are as a generated world's.
+ */
+export interface LandPlan {
+  v: 1;
+  kind: WorldKind;
+  seed: number;
+  size: LandSize;
+  side: 'zmin' | 'zmax';
+  site: Pt;
+  level: number;
+  massif: number;
+  river?: { c: number; tilt: number; amp: number; k: number; reach: [number, number] };
+  lake?: { x: number; z: number; rx: number; rz: number };
+  coast?: Pt[];
+  ponds?: { x: number; z: number; r: number }[];
+}
+
+/**
+ * How a town is laid on a land (`generateFromSpec`'s `lay`): from its own seed (`townSeed`; else
+ * the world's), with its main town's box at `site` (else the plan's), and `waterKept` when the land's
+ * water is as its plan has it (the town may then use the plan's river and coast for its bridges).
+ */
+export interface LayOptions {
+  townSeed?: number;
+  site?: Pt;
+  waterKept?: boolean;
+}
+
+/**
+ * A place's land, with no town on it (step 1): `kind` with `options` (the place's own where not
+ * given) from `seed`. For now it is the world `generateFromSpec` lays, with its town taken away:
+ * no lots, roads, greens, backdrop, places or areas; its land (heights, water, woods, meadows,
+ * hills) kept, but the fields and orchards that came with its farms gone.
+ */
+export function landDraft(content: Content, t: Templates, kind: string, options: Partial<WorldOptions> | undefined, seed: number): NeighbourhoodDraft {
+  const chosen = { ...options };
+  if (Object.hasOwn(LEGACY_KINDS, kind)) chosen.town ??= LEGACY_KINDS[kind].town;
+  const laid = generateFromSpec(content, t, specOf(placeOf(kind), chosen), seed);
+  const open = laid.open;
+  return {
+    name: laid.name,
+    width: laid.width,
+    depth: laid.depth,
+    slots: [],
+    roads: [],
+    greens: [],
+    households: [],
+    ...(laid.seed === undefined ? {} : { seed: laid.seed }),
+    ...(laid.world ? { world: laid.world } : {}),
+    ...(open
+      ? {
+          open: {
+            areas: [],
+            zones: open.zones.filter((z) => z.kind !== 'fields' && z.kind !== 'orchard'),
+            water: open.water,
+            pads: {},
+            parking: [],
+            ...(open.relief ? { relief: open.relief } : {}),
+            ...(open.heights ? { heights: open.heights } : {}),
+          },
+        }
+      : {}),
+  };
 }
 
 /** The land's cells (m). */
@@ -509,7 +584,7 @@ function grown(mask: Uint8Array, W: number, D: number, by: number): Uint8Array {
 }
 
 /** A road end that led out of an area's box (`Plan.ports`): where, which way out, and whether a country road goes on from it yet. */
-interface Port {
+export interface Port {
   road: number;
   end: 0 | 1;
   area: number;
@@ -523,7 +598,7 @@ interface Port {
  * `reach` m (across the area's own land, from a T off one of its streets) before it may turn; the
  * port it goes on from (or off the country road from), if any.
  */
-interface Way {
+export interface Way {
   p: Pt;
   dir: Pt;
   reach?: number;

@@ -134,6 +134,7 @@ import type {
   SeenBird,
   SimStride,
   TownBuildStep,
+  TownGhosts,
   TownShot,
   ViewRect,
   Shading,
@@ -3105,6 +3106,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.townHighlight = highlight;
     this.overview?.setHighlight(highlight, snap);
   }
+
+  /** Not drawn yet (the ghosts' drawing is to come). */
+  setTownGhosts(_ghosts: TownGhosts | null): void {}
 
   onTownFrame(fn: (() => void) | null): void {
     this.townListener = fn;
