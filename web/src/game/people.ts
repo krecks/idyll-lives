@@ -5,8 +5,9 @@
  * They come in two waves. `populate` (on entering step 3) fills the homes as the town has always
  * been filled, leaving a quarter of them for the player to choose from. `offered` picks the
  * residents step 3 offers as households to play. `fillTown` (on Move in) gives every home still for
- * sale a household, but for a few of the cheapest (`keepForSale`), up to `START_CAP` neighbours;
- * `fillPlan` says ahead of time who those households are, so their houses can be furnished early.
+ * sale a household, but for a few of the cheapest (`keepForSale`), up to `FILL_CAP` neighbours, or
+ * fewer homes on a machine that holds fewer (`FillTier`); `fillPlan` says ahead of time who those
+ * households are, so their houses can be furnished early (`townJobs.ts` `furnishAhead`).
  * `neighbourBonds` rolls who among the neighbours already know each other. `rehouse` finds another
  * household for one home. Moved here from `town.ts`, which still exports what it did.
  */
@@ -22,10 +23,10 @@ import { savingsOf } from './wealth';
 type Rand = () => number;
 
 /**
- * Residents the neighbours number at most (the sim holds 240 Sims in
- * a big world; room left for the player's household and babies).
+ * Residents the neighbours number at most, when someone asks for a number (the sim holds 768
+ * residents, sim-core `MAX_SIMS`; room left for the player's household and babies).
  */
-export const NEIGHBOUR_CAP = 220;
+export const NEIGHBOUR_CAP = 720;
 
 /**
  * Neighbours a big world starts with when nobody asks for a number (~120
@@ -46,8 +47,69 @@ export function householdsAtMost(homes: number): number {
   return Math.max(0, homes - Math.min(homes, Math.max(LEFT_TO_CHOOSE, Math.ceil(homes / 4))));
 }
 
-/** Neighbours a world starts with once the player has moved in (`fillTown`): room left under the sim's 240 for the player's household, babies and newcomers. */
-export const START_CAP = 150;
+/** The residents the simulation holds at most (sim-core `MAX_SIMS`): what a town filled in full may grow to. */
+export const SIM_RESIDENTS = 768;
+
+/**
+ * Neighbours a world starts with at most once the player has moved in (`fillTown`, in full). The
+ * biggest worlds have about 390 homes, which their natural households would fill with about 850
+ * people; the smallest homes then take one or two each. It leaves 88 of the sim's 768 for the
+ * player's household, babies and newcomers.
+ */
+export const FILL_CAP = 680;
+
+/**
+ * How full the second wave fills the town, for the machine the game runs on (`tierFor`). Each home's
+ * household comes from its own lot's stream, so a smaller tier is the same people in fewer homes:
+ * - `full`: every home but the few kept for sale, up to `FILL_CAP` neighbours;
+ * - `half`: the main town and the player's own village in full, every other village's homes half
+ *   lived in, up to 500;
+ * - `near`: the homes within 250 m of the player's in full, a third of the others in each area,
+ *   up to 340.
+ */
+export type FillTier = 'full' | 'half' | 'near';
+
+/** Each tier's neighbours at most (`fill`), and the most residents its town grows to by births and newcomers (`most`: the town file's `residentsMost`). */
+const TIERS: Record<FillTier, { fill: number; most: number }> = {
+  full: { fill: FILL_CAP, most: SIM_RESIDENTS },
+  half: { fill: 500, most: 576 },
+  near: { fill: 340, most: 384 },
+};
+
+/** The most residents a town filled at `tier` grows to by births and newcomers (the town file's `residentsMost`). */
+export function residentsMost(tier: FillTier = 'full'): number {
+  return TIERS[tier].most;
+}
+
+/**
+ * The tier each graphics preset fills the town at (`render/quality.ts` `GraphicsPreset`). Full for
+ * all of them until the measurements on the 8 GB M1 say a slower machine cannot hold a full town:
+ * this table is the one place that changes then.
+ */
+const TIER_FOR: Record<string, FillTier> = { low: 'full', medium: 'full', high: 'full' };
+
+/** The tier to fill the town at on a machine with the graphics preset `preset` (full for one this does not know). */
+export function tierFor(preset: string | undefined): FillTier {
+  return (preset && TIER_FOR[preset]) || 'full';
+}
+
+/**
+ * Births and newcomers' room over the residents a town starts with, in a town not filled by
+ * `fillTown` (`defaultResidentsMost`): the room the full fill leaves.
+ */
+const GROWTH_ROOM = SIM_RESIDENTS - FILL_CAP;
+/** The most residents every town grew to before the sim's limit was raised (0.8.2 and earlier). */
+const OLD_LIMIT = 240;
+
+/**
+ * The most residents a town grows to when nothing filled it (`fillTown` sets its own): those it
+ * starts with and room for births and newcomers, but never under the 240 every town could grow to
+ * before, so a town of the first wave alone (the tools, Creation's path, older code) still fills
+ * its empty homes with newcomers as it always did, and never swells past it unasked.
+ */
+export function defaultResidentsMost(residents: number): number {
+  return Math.min(SIM_RESIDENTS, Math.max(OLD_LIMIT, residents + GROWTH_ROOM));
+}
 
 /** The homes left for sale once the town is filled (`fillTown`), of `homes` in all: one in twenty, two at least. */
 export function keepForSale(homes: number): number {
@@ -219,8 +281,13 @@ export function offered(town: NeighbourhoodDraft, streams: PeopleStreams, most =
   return chosen;
 }
 
-/** How `fillPlan` and `fillTown` fill: the neighbours at most (`START_CAP` by default), and family names none of their households takes (the player's). */
+/**
+ * How `fillPlan` and `fillTown` fill: at which tier (`FillTier`, full by default); the neighbours
+ * at most in full (`FILL_CAP` by default; a smaller tier stops at its own limit when that is fewer);
+ * and family names none of their households takes (the player's).
+ */
 export interface FillOptions {
+  tier?: FillTier;
   cap?: number;
   avoid?: readonly string[];
 }
@@ -229,6 +296,8 @@ export interface FillOptions {
 const STREET_NEAR = 80;
 /** Households each village gets before the main town's homes are filled. */
 const VILLAGE_FIRST = 2;
+/** The `near` tier fills every home this near the player's (m), or the main town's middle before the player has chosen. */
+const TIER_NEAR = 250;
 
 /**
  * Who the second wave would move in, home by home (see `fillTown`): for every home still for sale
@@ -239,7 +308,10 @@ const VILLAGE_FIRST = 2;
  * and the countryside's other homes. Where the households the homes would naturally have would
  * pass the cap, the smallest homes take one or two people instead (smallest first, then the
  * cheapest), until they fit: every home lit counts for more than every bed taken. A home nobody
- * turns up for stays for sale.
+ * turns up for stays for sale. A tier below full then leaves some of those homes for sale (see
+ * `FillTier`; which, by each lot's own place in the order) and stops at its own limit: the
+ * households are drawn and sized as for the full fill first, so the people in the homes it fills
+ * are the full fill's.
  */
 export function fillPlan(
   content: Content,
@@ -248,7 +320,7 @@ export function fillPlan(
   town: NeighbourhoodDraft,
   playerSlot: number | undefined,
   streams: PeopleStreams,
-  { cap = START_CAP, avoid = [] }: FillOptions = {},
+  { tier = 'full', cap = FILL_CAP, avoid = [] }: FillOptions = {},
 ): { slot: number; household: HouseholdDraft }[] {
   const houses = town.slots.filter((s) => s.kind === 'house');
   const lived = new Set(town.households.map((h) => h.slot));
@@ -281,8 +353,8 @@ export function fillPlan(
     const own = homes.filter((s) => areaOf(s) === k && !street.has(s.index)).sort((p, q) => far(p, at) - far(q, at) || byPlace(p, q));
     for (const s of own.slice(0, VILLAGE_FIRST)) villageFirst.add(s.index);
   });
-  const tier = (s: PlotSlot) => (street.has(s.index) ? 0 : villageFirst.has(s.index) ? 1 : areaOf(s) === 0 ? 2 : 3);
-  const order = [...homes].sort((a, b) => tier(a) - tier(b) || far(a, from) - far(b, from) || byPlace(a, b));
+  const band = (s: PlotSlot) => (street.has(s.index) ? 0 : villageFirst.has(s.index) ? 1 : areaOf(s) === 0 ? 2 : 3);
+  const order = [...homes].sort((a, b) => band(a) - band(b) || far(a, from) - far(b, from) || byPlace(a, b));
 
   // Each home's household as it would naturally be, in that order (the family names taken in it).
   const taken = new Set<string>([...avoid, ...town.households.map((h) => h.household.name)]);
@@ -311,12 +383,28 @@ export function fillPlan(
       total -= before.members.length - household.members.length;
     }
   }
+  // The homes the tier fills: all of them in full; else those it fills in full, and of the others in
+  // each area the first half (or third) in each lot's own order.
+  const fills = (() => {
+    if (tier === 'full') return () => true;
+    const whole = (s: PlotSlot) => (tier === 'half' ? areaOf(s) === 0 || (player !== undefined && areaOf(s) === areaOf(player)) : far(s, from) <= TIER_NEAR);
+    const share = tier === 'half' ? 1 / 2 : 1 / 3;
+    const rest = new Map<number, PlotSlot[]>();
+    for (const s of order) if (drawn.has(s.index) && !whole(s)) rest.set(areaOf(s), [...(rest.get(areaOf(s)) ?? []), s]);
+    const some = new Set<number>();
+    for (const list of rest.values()) {
+      const ranked = [...list].sort((a, b) => streams.order(a.x, a.z) - streams.order(b.x, b.z) || byPlace(a, b));
+      for (const s of ranked.slice(0, Math.ceil(list.length * share))) some.add(s.index);
+    }
+    return (s: PlotSlot) => whole(s) || some.has(s.index);
+  })();
+  const limit = tier === 'full' ? cap : Math.min(cap, TIERS[tier].fill);
   // Moved in in order, while there is room.
   const plan: { slot: number; household: HouseholdDraft }[] = [];
   let residents = already;
   for (const s of order) {
     const household = drawn.get(s.index);
-    if (!household || residents + household.members.length > cap) continue;
+    if (!household || !fills(s) || residents + household.members.length > limit) continue;
     residents += household.members.length;
     plan.push({ slot: s.index, household });
   }
@@ -325,7 +413,8 @@ export function fillPlan(
 
 /**
  * `town` once the player has moved into `playerSlot`: the second wave (`fillPlan`) moved into the
- * homes still for sale, so the town is lived in but for a few of its cheapest homes.
+ * homes still for sale, so the town is lived in but for a few of its cheapest homes (fewer at a
+ * tier below full), and the most residents it grows to set for its town file (`residentsMost`).
  */
 export function fillTown(
   content: Content,
@@ -336,7 +425,7 @@ export function fillTown(
   streams: PeopleStreams,
   options?: FillOptions,
 ): NeighbourhoodDraft {
-  return { ...town, households: [...town.households, ...fillPlan(content, assets, t, town, playerSlot, streams, options)] };
+  return { ...town, households: [...town.households, ...fillPlan(content, assets, t, town, playerSlot, streams, options)], residentsMost: residentsMost(options?.tier) };
 }
 
 /** Ties a neighbour has with the others, on average (about what three in ten of a town of ~120 gave each). */

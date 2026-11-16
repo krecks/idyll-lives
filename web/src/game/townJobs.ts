@@ -7,10 +7,10 @@
 
 import type { Content } from '../content/content';
 import type { WorldOptions, WorldStructure } from '../core/protocol';
-import type { HouseholdDraft } from './household';
+import { residentsOf, type HouseholdDraft } from './household';
 import { encodeLand, type Land } from './land';
 import { settleLand } from './landFollow';
-import { assembleTown, generatedHouses, generateWorld, loadTemplates, primeHouses, type AssembleOptions, type HouseTemplate, type NeighbourhoodDraft, type Templates } from './town';
+import { assembleTown, generatedHouses, generateWorld, houseTemplate, loadTemplates, primeHouses, type AssembleOptions, type HouseTemplate, type NeighbourhoodDraft, type Templates } from './town';
 import { previewWorld } from './townPreview';
 import { landDraft } from './macro';
 import type { Pt } from './roads';
@@ -48,7 +48,14 @@ export type TownJob =
    */
   | { kind: 'world'; world: string; seed: number; name?: string; options?: Partial<WorldOptions>; land?: Land }
   /** The simulation's town file (`assembleTown`); `random`: the seed for its dice (neighbours' bonds). */
-  | { kind: 'assemble'; town: NeighbourhoodDraft; player: HouseholdDraft; slot: number; options: AssembleOptions; random: number };
+  | { kind: 'assemble'; town: NeighbourhoodDraft; player: HouseholdDraft; slot: number; options: AssembleOptions; random: number }
+  /**
+   * The houses of `town` furnished for the households about to live in them (`slot`: each one's
+   * home), ahead of the `assemble` job that would otherwise furnish them all at Move in. They are
+   * kept where the job ran (the worker's houses, or the page's where no worker runs), so the
+   * `assemble` after it finds them made. Sent by `furnishAhead`.
+   */
+  | { kind: 'furnish'; town: NeighbourhoodDraft; households: readonly { slot: number; household: HouseholdDraft }[] };
 
 /** A town laid out: its draft, the menus' preview of it, and the houses made for its lots (by template id). */
 export interface LaidTown {
@@ -63,7 +70,9 @@ export type TownResult =
   /** The settled town, what is wrong with it (`townCheck.ts`: `hard` blocks Next), and the edits refused (by their index among the `ops`) with why. */
   | ({ kind: 'edit'; problems: { hard: string[]; soft: string[] }; refused: { op: number; why: string }[] } & LaidTown)
   | ({ kind: 'world' } & LaidTown)
-  | { kind: 'assemble'; lot: string };
+  | { kind: 'assemble'; lot: string }
+  /** How many houses were furnished (`furnish`), and how long that took (ms). */
+  | { kind: 'furnish'; houses: number; ms: number };
 
 export type ToTownWorker = WorkerAsk<TownJob>;
 /** `broken`: the worker couldn't load the content (every job fails there). A note: a world's step done (`WorldStep`). */
@@ -90,7 +99,20 @@ export function runTownJob(content: Content, t: Templates, job: TownJob, step?: 
       throw new Error('The edit job is not built yet.');
     case 'assemble':
       return { kind: 'assemble', lot: assembleTown(content, t, job.town, job.player, job.slot, job.options, mulberry32(job.random)) };
+    case 'furnish':
+      return { kind: 'furnish', ...furnish(content, t, job.town, job.households) };
   }
+}
+
+/** The houses of `town` furnished for `households` (as `layoutTown` furnishes them), kept with the houses made: how many, and in how long (ms). */
+function furnish(content: Content, t: Templates, town: NeighbourhoodDraft, households: readonly { slot: number; household: HouseholdDraft }[]): { houses: number; ms: number } {
+  const t0 = performance.now();
+  let houses = 0;
+  for (const { slot, household } of households) {
+    const s = town.slots[slot];
+    if (s?.kind === 'house' && houseTemplate(t, s.template, residentsOf(content, household))) houses++;
+  }
+  return { houses, ms: performance.now() - t0 };
 }
 
 /** A town just laid (`laid`) with its land settled under it (`settleLand`), its preview and its houses. */
@@ -126,7 +148,58 @@ async function onPage(content: Content, job: TownJob, step?: (done: WorldStep) =
  */
 export function townJob<J extends TownJob>(content: Content, job: J, signal?: AbortSignal, step?: (done: WorldStep) => void): Promise<Extract<TownResult, { kind: J['kind'] }>>;
 export function townJob(content: Content, job: TownJob, signal?: AbortSignal, step?: (done: WorldStep) => void): Promise<TownResult> {
-  return towns.ask(job, () => onPage(content, job, step), { signal, onNote: step });
+  const asked = towns.ask(job, () => onPage(content, job, step), { signal, onNote: step });
+  // (The houses furnished ahead are of no more use once the town file is made.)
+  if (job.kind === 'assemble') asked.then(letFurnishedGo, letFurnishedGo);
+  return asked;
+}
+
+/**
+ * How long the worker is kept for the houses furnished ahead, at most, when no `assemble` job comes
+ * (ms): the player may stay in step 4 a while, and an idle worker goes after a minute with them.
+ */
+const FURNISHED_KEPT_MS = 15 * 60_000;
+/** Letting go of the worker kept for the houses furnished ahead, while it is kept. */
+let furnishedHold: (() => void) | null = null;
+
+function letFurnishedGo(): void {
+  furnishedHold?.();
+  furnishedHold = null;
+}
+
+/**
+ * Furnishes ahead, in the town worker, the houses of `town` for the households about to live in
+ * them (`households`: their homes' slots), so Move in's `assemble` job need not (on the biggest
+ * worlds that is most of its time). Meant for step 4, before the player has chosen a home: the households of both
+ * waves, the first wave's (`town.households`) and the second's as `people.ts` `fillPlan` has them
+ * with no home chosen yet (a few may come out differently once one is: those are furnished at Move
+ * in). The worker is kept running until the next `assemble` job is done (or `FURNISHED_KEPT_MS`
+ * passes), since a fresh one would have lost them: so leave the job running at Move in (the
+ * `assemble` waits behind it), as aborting it stops the worker. Another call replaces this one's
+ * hold; an aborted `signal` drops the job. Resolves to how many houses were furnished and in how long.
+ */
+export async function furnishAhead(
+  content: Content,
+  town: NeighbourhoodDraft,
+  households: readonly { slot: number; household: HouseholdDraft }[],
+  signal?: AbortSignal,
+): Promise<{ houses: number; ms: number }> {
+  letFurnishedGo();
+  const release = towns.hold();
+  const hold = () => {
+    clearTimeout(timer);
+    release();
+  };
+  const timer = setTimeout(() => furnishedHold === hold && letFurnishedGo(), FURNISHED_KEPT_MS);
+  furnishedHold = hold;
+  try {
+    const { houses, ms } = await townJob(content, { kind: 'furnish', town, households }, signal);
+    return { houses, ms };
+  } catch (err) {
+    // (Dropped or failed: nothing furnished worth keeping the worker for.)
+    if (furnishedHold === hold) letFurnishedGo();
+    throw err;
+  }
 }
 
 /** A world's houses the worker made, kept on the page too (the menu and the screens after need them). */

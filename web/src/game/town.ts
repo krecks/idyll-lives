@@ -26,7 +26,7 @@ import { encodeLand, type Land } from './land';
 import { garageAt, garageFor, hash, houseCar, type ParkedCar } from '../render/shared/cars';
 import { placeRides, ridesFor } from './townRides';
 import { fenceRuns, townFences, type TownFence } from './gardenFences';
-import { neighbourBonds } from './people';
+import { defaultResidentsMost, neighbourBonds } from './people';
 
 /** The households moved to `people.ts`; still here for those that import them from the town. */
 export { NEIGHBOUR_CAP, populate, rehouse } from './people';
@@ -189,6 +189,8 @@ export interface NeighbourhoodDraft {
   greens: Pt[][];
   /** Neighbour households and the slot each lives in. */
   households: { household: HouseholdDraft; slot: number }[];
+  /** The most residents the town grows to by births and newcomers, as `people.ts` `fillTown` filled it (its town file's `residentsMost`); missing: `defaultResidentsMost`. */
+  residentsMost?: number;
   /**
    * Landscape seed (hills, woods, lawn detail). Kept while the draft is edited, so the 3D preview
    * in the menus and the game itself show the same valley. Missing in drafts from older code.
@@ -1422,7 +1424,8 @@ export interface AssembleOptions {
  * neighbours. With `existing`, `player` is the neighbour household already
  * living at `playerSlot`: it stays where it is in the list (with its jobs and history) and only
  * becomes the player's. A new household on an empty lot gets money to build with in Living games.
- * `rand` rolls its dice (who among the neighbours are friends, rivals).
+ * `rand` rolls its dice (who among the neighbours are friends, rivals). The file says the most
+ * residents the town grows to (`residentsMost`): the draft's, else `people.ts` `defaultResidentsMost`.
  */
 export function assembleTown(
   content: Content,
@@ -1502,6 +1505,7 @@ export function assembleTown(
     households,
     sims,
     relationships,
+    residentsMost: town.residentsMost ?? defaultResidentsMost(sims.length),
     exits,
     garages,
     porches,

@@ -15,7 +15,7 @@ import type { GameKind, Lifespan, Rle, WorldOptions } from '../core/protocol';
 import type { HouseholdDraft } from '../game/household';
 import { COVER, landHash, NONE, type Land } from '../game/land';
 import { hash } from '../game/noise';
-import { fillTown, offered, peopleStreams, type PeopleStreams } from '../game/people';
+import { fillPlan, fillTown, offered, peopleStreams, type FillTier, type PeopleStreams } from '../game/people';
 import type { Pt } from '../game/roads';
 import type { StartRequest } from '../game/session';
 import { EMPTY_LOT, withLot, type NeighbourhoodDraft, type Templates } from '../game/town';
@@ -221,11 +221,37 @@ export function moveInRequest(m: MoveIn): Extract<StartRequest, { kind: 'new' }>
  * The town a new game starts in (`session.ts`, before its town file is put together). With `fill`,
  * the second wave of neighbours (`people.ts` `fillTown`): every home still for sale lived in but for
  * the few cheapest kept, up to the neighbours' cap, nearest the player's home first, none of them
- * with the player's family name. Drawn from the request's people seed (none: one from `random`).
+ * with the player's family name, at `tier` (`people.ts` `tierFor` the machine's graphics preset; full
+ * by default). Drawn from the request's people seed (none: one from `random`).
  */
-export function townOnMoveIn(content: Content, assets: AssetRegistry, t: Templates, request: Extract<StartRequest, { kind: 'new' }>, random: () => number = Math.random): NeighbourhoodDraft {
+export function townOnMoveIn(
+  content: Content,
+  assets: AssetRegistry,
+  t: Templates,
+  request: Extract<StartRequest, { kind: 'new' }>,
+  random: () => number = Math.random,
+  tier: FillTier = 'full',
+): NeighbourhoodDraft {
   if (!request.fill) return request.town;
   const streams = peopleStreams(request.peopleSeed ?? (random() * 2 ** 32) >>> 0);
-  // (The fill's tier, by the machine's quality preset, goes in these options once `fillTown` takes one.)
-  return fillTown(content, assets, t, request.town, request.slot, streams, { avoid: [request.household.name] });
+  return fillTown(content, assets, t, request.town, request.slot, streams, { tier, avoid: [request.household.name] });
+}
+
+/**
+ * The households whose houses step 4 has the town worker furnish ahead (`townJobs.ts`
+ * `furnishAhead`), before the player has chosen a home: the town's own (`town`: step 3's) and those
+ * Move in would move into the homes still for sale (`people.ts` `fillPlan` with no home chosen),
+ * drawn as `townOnMoveIn` draws them (`household`: the player's, whose family name none takes). Once
+ * a home is chosen a few may come out otherwise; Move in furnishes those.
+ */
+export function householdsAhead(
+  content: Content,
+  assets: AssetRegistry,
+  t: Templates,
+  town: NeighbourhoodDraft,
+  peopleSeed: number,
+  household: HouseholdDraft,
+  tier: FillTier = 'full',
+): { slot: number; household: HouseholdDraft }[] {
+  return [...town.households, ...fillPlan(content, assets, t, town, undefined, peopleStreams(peopleSeed), { tier, avoid: [household.name] })];
 }

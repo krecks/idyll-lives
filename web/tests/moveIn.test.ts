@@ -29,9 +29,10 @@ describe('moving in', async () => {
   const { objectInfos } = await import('../src/game/housegen');
   const { randomHousehold } = await import('../src/game/household');
   const { EMPTY_LOT, generateWorld, useTownContent, vacantSlots } = await import('../src/game/town');
-  const { keepForSale, peopleStreams, populate, START_CAP } = await import('../src/game/people');
+  const { keepForSale, peopleStreams, populate, FILL_CAP } = await import('../src/game/people');
   const { mulberry32 } = await import('../src/game/noise');
-  const { moveInRequest, peopleSeedOf, startCode, townOnMoveIn } = await import('../src/ui/newGame');
+  const { householdsAhead, moveInRequest, peopleSeedOf, startCode, townOnMoveIn } = await import('../src/ui/newGame');
+  const { residentsOf } = await import('../src/game/household');
   type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
   type PlotSlot = import('../src/game/town').PlotSlot;
@@ -132,17 +133,30 @@ describe('moving in', async () => {
     expect(vacantSlots(stayed).length).toBe(keepForSale(homes(hamlet)));
   });
 
-  test('a big town is filled up to the cap and no further, nearest the player first', () => {
-    const big = gridTown(180);
+  test('a big town is filled up to the cap and no further, every home but the kept lived in', () => {
+    const big = gridTown(480);
     const town = firstWave(big);
     const home = vacantSlots(town).find((s) => (s.area ?? 0) === 0)!.index;
     const request = moveInRequest({ town, slot: home, household: player(), from: null, ...common });
     const filled = townOnMoveIn(content, assets, t, request);
-    expect(residents(filled)).toBeLessThanOrEqual(START_CAP);
-    expect(residents(filled)).toBeGreaterThan(residents(town));
-    expect(vacantSlots(filled).length).toBeGreaterThan(keepForSale(homes(big)));
-    // The village has its first households, and the home next door is lived in.
+    expect(residents(filled)).toBeLessThanOrEqual(FILL_CAP);
+    expect(residents(filled)).toBeGreaterThan(FILL_CAP - 4);
+    expect(vacantSlots(filled).filter((s) => s.index !== home).length).toBe(keepForSale(homes(big)));
+    // The village has its households.
     expect(filled.households.some((h) => (filled.slots[h.slot].area ?? 0) === 1)).toBe(true);
+    // A smaller tier: fewer homes.
+    expect(townOnMoveIn(content, assets, t, request, Math.random, 'near').households.length).toBeLessThan(filled.households.length);
+  });
+
+  test('the houses furnished ahead in step 4 are for the households Move in moves into them', () => {
+    const town = firstWave(gridTown(180));
+    const household = player();
+    const ahead = new Map(householdsAhead(content, assets, t, town, SEED, household).map((h) => [h.slot, h.household]));
+    const home = vacantSlots(town).find((s) => (s.area ?? 0) === 0)!.index;
+    const filled = townOnMoveIn(content, assets, t, moveInRequest({ town, slot: home, household, from: null, ...common }));
+    // (A house is furnished for who lives in it: the same residents, the same furniture.)
+    const same = filled.households.filter((h) => ahead.has(h.slot) && JSON.stringify(residentsOf(content, ahead.get(h.slot)!)) === JSON.stringify(residentsOf(content, h.household)));
+    expect(same.length).toBeGreaterThan(filled.households.length * 0.95);
   });
 
   test('a request without the fill (or with no people seed: then a seed of its own) starts as it is', () => {
