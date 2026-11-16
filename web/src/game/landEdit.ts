@@ -474,6 +474,23 @@ export class LandEditor {
     return patch;
   }
 
+  /** Forgets the strokes taken back (a stroke the game refused, taken back as if it had never been). */
+  dropRedo(): void {
+    this.redone.length = 0;
+  }
+
+  /**
+   * Whether `tool` would do nothing at world point (`x`, `z`) (the cursor's red): the land is
+   * built there (not free to change), or it is a lake or river where water may not go.
+   */
+  refuses(tool: LandTool, x: number, z: number): boolean {
+    const { cols, rows } = this.land;
+    const i = Math.min(cols - 1, Math.max(0, Math.round(x / LAND_CELL)));
+    const j = Math.min(rows - 1, Math.max(0, Math.round(z / LAND_CELL)));
+    if (this.free(i, j) <= 0) return true;
+    return (tool === 'lake' || tool === 'river') && !!this.wettable && !this.wettable(i, j);
+  }
+
   /** Puts back the last stroke taken back; returns the patch that undoes it again, or null if there is none. */
   redo(): LandPatch | null {
     if (this.active) this.end();

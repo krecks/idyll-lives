@@ -13,8 +13,14 @@
   import { lifespanHint } from '../format';
   import Icon from '../Icon.svelte';
   import Segmented from '../kit/Segmented.svelte';
-  import TownStage, { type LotLabel } from '../kit/TownStage.svelte';
+  import TownStage, { type LotLabel, type StageTool } from '../kit/TownStage.svelte';
   import { services } from '../services';
+  import { landHash, type Land } from '../../game/land';
+  import { applyLand, builtOf, LandEditor } from '../../game/landEdit';
+  import LandPalette from '../land/LandPalette.svelte';
+  import { installLandHook } from '../land/landHook';
+  import { LandStroke, type LandSurface } from '../land/landStroke';
+  import { brushOf, startBrush, type BrushState } from '../land/landTools';
 
   const { content } = services;
   let templates = $state.raw<Templates | null>(null);
@@ -102,7 +108,7 @@
    * A world of the chosen place with the chosen options from `seed`, named `asName` (else its
    * seed's name), laid out and built; the one being made meanwhile is dropped.
    */
-  async function make(seed: number, asName?: string, again = false) {
+  async function make(seed: number, asName?: string, again = false, land?: Land) {
     clearTimeout(settling);
     waiting = false;
     if (!templates) return;
@@ -118,8 +124,10 @@
     // (Nothing in view yet: the first world is built in longer slices.)
     const first = !world;
     try {
-      const made = await townJob(content, { kind: 'world', world: kind, seed, name: asName, options: { ...options } }, control.signal, tick);
+      const made = await townJob(content, { kind: 'world', world: kind, seed, name: asName, options: { ...options }, ...(land ? { land } : {}) }, control.signal, tick);
       if (job !== control) return;
+      // (Another world, or the town laid again: the land is surveyed again for the brushes, below.)
+      dropEditor();
       // Its houses and preview come with it: the menu draws it without making them again.
       keepHouses(made);
       menuScene.prepare(made.draft, made.preview);
@@ -127,15 +135,17 @@
       name = asName ?? world.name;
       focus = null;
       // (The panel stays until it is built and on screen.)
-      await menuScene.show(world, null, tick, first);
+      await (shown = menuScene.show(world, null, tick, first));
     } catch (err) {
       if (err instanceof Superseded) return;
       console.error('[world] making the world failed:', err);
-      toast('That world could not be made. Try another.');
+      // (Laid again on a shaped land, the generator says why it couldn't: no dry land big enough.)
+      toast(land && err instanceof Error && err.message ? err.message : 'That world could not be made. Try another.');
     } finally {
       if (job === control) {
         job = null;
         making = false;
+        if (view === 'shape') void survey();
       }
     }
   }
@@ -144,17 +154,22 @@
     job?.abort();
   });
 
-  /** Another world of the chosen place (the options as they are). */
+  /** Another world of the chosen place (the options as they are); the land's shaping goes with it (asked first). */
   function another() {
+    if (shaped) return ask('Another world leaves your changes to the land behind.', 'Another world', 'actions', () => void make(roll(), typedName()));
     void make(roll(), typedName());
   }
 
-  /** Another place: a new world there, with the place's own options. */
+  /** Another place: a new world there, with the place's own options; the land's shaping goes with it (asked first). */
   function choose(k: WorldKind) {
     if (k === kind && world) return;
-    kind = k;
-    app.worldOptions = defaultsOf(k);
-    void make(roll(), typedName());
+    const go = () => {
+      kind = k;
+      app.worldOptions = defaultsOf(k);
+      void make(roll(), typedName());
+    };
+    if (shaped) return ask(`${WORLDS[k].label} is another world: your changes to the land go.`, `Go to ${WORLDS[k].label}`, 'panel', go);
+    go();
   }
 
   /**
@@ -164,14 +179,178 @@
    */
   function setOption(key: keyof WorldOptions, value: string) {
     if (options[key] === value) return;
+    // (The town and villages are laid again on the land as shaped; the hills and woods make the land itself again.)
+    if (shaped && keepLand && (key === 'hills' || key === 'woods')) {
+      const label = OPTION_FIELDS.find((f) => f.key === key)?.label.toLowerCase() ?? key;
+      return ask(`Changing the ${label} makes the land again: your changes to it go.`, `Change the ${label}`, 'panel', () => {
+        keepLand = false;
+        setOption(key, value);
+      });
+    }
     app.worldOptions = { ...options, [key]: value };
     clearTimeout(settling);
     waiting = true;
     settling = setTimeout(() => {
       const seed = making ? wanted?.seed : world?.seed;
+      const land = keepLand ? shapedLand() : undefined;
+      keepLand = true;
       if (seed === undefined) return void (waiting = false);
-      void make(seed, making ? wanted?.name : name.trim() || undefined, true);
+      void make(seed, making ? wanted?.name : name.trim() || undefined, true, land);
     }, 300);
+  }
+
+  // ---- Shaping the land (the Shape panel) ------------------------------------------------------
+
+  /** The panel shows the world's choices, or the land brushes. */
+  let view = $state<'world' | 'shape'>('world');
+  /** The brushes' editor, for the world shown (null until Shape is first chosen for it). */
+  let editor = $state.raw<LandEditor | null>(null);
+  let editorOf: NeighbourhoodDraft | null = null;
+  let surveying = $state(false);
+  let brush = $state<BrushState>(startBrush());
+  /** Counts the land's changes (the editor changes it in place): what reads the editor reads it. */
+  let landTick = $state(0);
+  const land = $derived.by(() => {
+    void landTick;
+    const e = editor;
+    const changed = e?.changed();
+    return { canUndo: !!e?.canUndo, canRedo: !!e?.canRedo, hint: e?.hint ?? null, edited: !!e?.land.edited, changed: !!changed && (changed.heights || changed.water || changed.cover) };
+  });
+  /** The land differs from the world as generated (shaped here, or before step 2): what makes the land again asks first. */
+  const shaped = $derived(land.edited || (!editor && !!world?.open?.land?.edited));
+  /** A mountain's ghost while it is dragged out (SVG path data, screen pixels). */
+  let ghost = $state('');
+  /** A choice that would throw the land's shaping away, waiting for a yes (shown where it was made). */
+  let confirming = $state<{ text: string; yes: string; at: 'panel' | 'actions'; go: () => void } | null>(null);
+  /** Bumped when a choice is not made after all (the switches show the choice as it was). */
+  let unasked = $state(0);
+  /** The next option change lays the town on the shaped land (false once the player chose to let it go). */
+  let keepLand = true;
+  /** The town on screen, once it is (the land is surveyed from it). */
+  let shown: Promise<void> = Promise.resolve();
+
+  function ask(text: string, yes: string, at: 'panel' | 'actions', go: () => void) {
+    confirming = { text, yes, at, go };
+  }
+  function answer(yes: boolean) {
+    const c = confirming;
+    confirming = null;
+    if (yes) c?.go();
+    else unasked++;
+  }
+
+  /** The shaped land, to lay a town on again (none if it isn't shaped). */
+  function shapedLand(): Land | undefined {
+    if (editor) return editor.land.edited ? editor.land : undefined;
+    return world?.open?.land?.edited ? world.open.land : undefined;
+  }
+
+  const surface: LandSurface = {
+    pick: (x, y) => menuScene.landAt(x, y),
+    changed: (rect, done) => menuScene.landChanged(rect, done),
+    cursor: (c) => menuScene.brush(c),
+    project: (x, y, z, out) => menuScene.project(x, y, z, out),
+  };
+  const stroke = $derived(editor ? new LandStroke(editor, surface, { brush: () => brushOf(brush), ended: () => landTick++, ghost: (d) => (ghost = d) }) : null);
+  /** The brush in the town's hand while Shape is up (and the world isn't being made again). */
+  const stageTool = $derived.by((): StageTool | null => {
+    const s = stroke;
+    if (view !== 'shape' || !s || making) return null;
+    return {
+      down: (x, y) => s.down(x, y),
+      move: (x, y) => s.move(x, y),
+      up: () => void s.up(),
+      hover: (x, y) => s.hover(x, y),
+      leave: () => s.leave(),
+      cancel: () => {
+        s.cancel();
+        ghost = '';
+        landTick++;
+      },
+    };
+  });
+
+  function setView(v: 'world' | 'shape') {
+    view = v;
+    confirming = null;
+    if (v === 'shape') {
+      focus = null;
+      hover = null;
+      void survey();
+    }
+  }
+
+  /** The land of the world shown, for the brushes: surveyed once (behind a spinner), then drawn from the field the brushes change. */
+  async function survey() {
+    const w = world;
+    if (!w || making || (editor && editorOf === w) || surveying) return;
+    surveying = true;
+    try {
+      await shown;
+      const field = await menuScene.landOf();
+      const preview = menuScene.preview;
+      if (world !== w || making || !preview) return;
+      // (A world laid again on a shaped land, or shaped before step 2, is shaped already: what makes the land again still asks.)
+      field.edited ||= !!w.open?.land?.edited;
+      editor = LandEditor.forWorld(field, builtOf(preview), { water: w.open?.water, zones: w.open?.zones });
+      editorOf = w;
+      menuScene.setLand(field);
+      landTick++;
+    } catch (err) {
+      console.error('[land] surveying the land failed:', err);
+      toast("The land couldn't be surveyed. Try again in a moment.");
+      view = 'world';
+    } finally {
+      surveying = false;
+    }
+  }
+
+  /** The editor let go (another world, or the town laid again: its land is surveyed again). */
+  function dropEditor() {
+    stroke?.dispose();
+    editor = null;
+    editorOf = null;
+    ghost = '';
+    landTick++;
+  }
+
+  function landUndo() {
+    const patch = editor?.undo();
+    if (patch) menuScene.landChanged(patch.rect, true);
+    landTick++;
+  }
+  function landRedo() {
+    const patch = editor?.redo();
+    if (patch) menuScene.landChanged(patch.rect, true);
+    landTick++;
+  }
+  function landReset() {
+    const rect = editor?.reset();
+    if (rect) menuScene.landChanged(rect, true);
+    landTick++;
+  }
+
+  /** The town and its villages laid out again on the land as shaped (its roads, lots and names as near as they fit). */
+  function layAgain() {
+    const field = shapedLand();
+    if (!field || !world) return;
+    void make(world.seed ?? roll(), name.trim() || undefined, true, field);
+  }
+
+  function onShapeKey(e: KeyboardEvent) {
+    if (view !== 'shape' || !editor || making) return;
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.type !== 'range') return;
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    const key = e.key.toLowerCase();
+    if (key === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) landRedo();
+      else landUndo();
+    } else if (key === 'y' && e.ctrlKey) {
+      e.preventDefault();
+      landRedo();
+    }
   }
 
   function rollName() {
@@ -181,9 +360,17 @@
 
   function next() {
     if (!world) return;
-    const chosen = { ...world, name: name.trim() || world.name };
-    // The same world as before (back and forth): its neighbours stay.
-    const same = app.town && app.town.seed === chosen.seed && app.town.world?.kind === chosen.world?.kind && sameOptions(app.town.world?.options, chosen.world?.options);
+    stroke?.cancel();
+    // The land as shaped goes with it (`applyLand`: in its town file, the water walked round, the zones).
+    const named = { ...world, name: name.trim() || world.name };
+    const chosen = editor && editorOf === world ? applyLand(named, editor) : named;
+    // The same world as before (back and forth, the land as it was): its neighbours stay.
+    const same =
+      app.town &&
+      app.town.seed === chosen.seed &&
+      app.town.world?.kind === chosen.world?.kind &&
+      sameOptions(app.town.world?.options, chosen.world?.options) &&
+      landHash(app.town.open?.land?.edited ? app.town.open.land : null) === landHash(chosen.open?.land?.edited ? chosen.open.land : null);
     app.town = same && app.town ? { ...app.town, name: chosen.name } : null;
     app.world = chosen;
     app.screen = 'neighbourhood';
@@ -192,7 +379,7 @@
   onMount(async () => {
     templates = await loadTemplates();
     // Back from step 2: the world made before (still on screen). Else a new one is made now.
-    if (world) void menuScene.show(world);
+    if (world) shown = menuScene.show(world);
     else {
       // (Not the town the main menu glided away from, if it is still there.)
       void menuScene.hide();
@@ -211,6 +398,21 @@
     menuScene.highlight({ hover, selected: focus, marked: [], outlines: true });
   });
   $effect(() => () => menuScene.highlight({}));
+  // Leaving step 1: the brush put down, its cursor gone.
+  $effect(() => () => {
+    stroke?.dispose();
+    menuScene.brush(null);
+  });
+  $effect(() =>
+    installLandHook({
+      editor: () => editor,
+      surface: () => surface,
+      undo: landUndo,
+      redo: landRedo,
+      changed: () => landTick++,
+      camera: { pan: (dx, dz) => menuScene.pan(dx, dz), zoom: (f) => menuScene.nudge(0, f) },
+    }),
+  );
 
   /**
    * Arrow keys in the place grid: across by one (wrapping round), up and down by a row, as many as
@@ -264,6 +466,18 @@
   </svg>
 {/snippet}
 
+{#snippet confirm(c: { text: string; yes: string })}
+  <div class="confirm menu-glass" role="alertdialog" aria-label="Your changes to the land">
+    <p>{c.text}</p>
+    <div class="row">
+      <button class="btn small" onclick={() => answer(false)}>Keep my land</button>
+      <button class="btn small danger" onclick={() => answer(true)}>{c.yes}</button>
+    </div>
+  </div>
+{/snippet}
+
+<svelte:window onkeydown={onShapeKey} />
+
 <div class="screen scaled">
   <div class="layout">
     <aside class="side menu-glass" use:avoid aria-label="A new world">
@@ -279,9 +493,51 @@
         {/if}
       </div>
 
-      <!-- The world's choices, in sections down the panel (scrolling when they don't fit). A switch
-           between them and tools for the land itself can sit first in the panel, over the sections. -->
+      <!-- The world's choices, in sections down the panel (scrolling when they don't fit), or (Shape)
+           the brushes for the land itself; a switch between the two first in the panel. -->
       <div class="panel" use:avoid>
+        <div class="switch">
+          <Segmented
+            fill
+            label="Panel"
+            value={view}
+            options={[
+              { value: 'world', label: 'World' },
+              { value: 'shape', label: 'Shape the land', disabled: !world },
+            ]}
+            onchange={setView}
+          />
+        </div>
+        {#if confirming?.at === 'panel'}
+          {@render confirm(confirming)}
+        {/if}
+        {#if view === 'shape'}
+          <div class="shape">
+            {#if surveying || (!editor && making)}
+              <p class="surveying" role="status"><span class="spinner"></span> {making ? 'Laying out the world…' : 'Surveying the land…'}</p>
+            {:else if editor}
+              <LandPalette
+                bind:brush
+                canUndo={land.canUndo}
+                canRedo={land.canRedo}
+                canReset={land.changed}
+                hint={land.hint}
+                disabled={making}
+                onundo={landUndo}
+                onredo={landRedo}
+                onreset={landReset}
+              >
+                {#snippet extra()}
+                  <div class="again">
+                    <button class="btn" disabled={!shaped || making} onclick={layAgain}><Icon name="icon.ui.home" size={16} /> Lay the town again</button>
+                    <p class="hint">The roads and lots laid out afresh to fit the land as you shaped it. Changing the Town or Villages does this too.</p>
+                  </div>
+                {/snippet}
+              </LandPalette>
+              <p class="keys"><b>Left</b> paints · <b>right</b> turns · <b>middle</b> or <kbd>Space</kbd> pans · wheel zooms</p>
+            {/if}
+          </div>
+        {:else}
         <div class="sections">
           <section class="group" aria-labelledby="place-head">
             <h2 class="eyebrow" id="place-head">Place</h2>
@@ -300,12 +556,14 @@
             <h2 class="eyebrow" id="yours-head">Your world</h2>
             <p class="hint summary">{sizeHint || '\u00a0'}</p>
             <div class="options">
-              {#each OPTION_FIELDS as f (f.key)}
-                <div class="option">
-                  <span class="eyebrow sub">{f.label}</span>
-                  <Segmented fill label={f.label} value={options[f.key]} options={f.choices} onchange={(v) => setOption(f.key, v)} />
-                </div>
-              {/each}
+              {#key unasked}
+                {#each OPTION_FIELDS as f (f.key)}
+                  <div class="option">
+                    <span class="eyebrow sub">{f.label}</span>
+                    <Segmented fill label={f.label} value={options[f.key]} options={f.choices} onchange={(v) => setOption(f.key, v)} />
+                  </div>
+                {/each}
+              {/key}
             </div>
           </section>
 
@@ -340,12 +598,13 @@
             </section>
           </div>
         </div>
+        {/if}
       </div>
     </aside>
 
     <section class="view">
       {#if world}
-        <TownStage {labels} {hover} selected={focus} {focus} onhover={(p) => (hover = p)} onselect={(p) => (focus = p === focus ? null : p)} />
+        <TownStage {labels} {hover} selected={focus} {focus} onhover={(p) => (hover = p)} onselect={(p) => (focus = p === focus ? null : p)} tool={stageTool} {ghost} />
       {:else}
         <div></div>
       {/if}
@@ -360,6 +619,9 @@
       <div class="actions" use:avoid>
         <button class="btn" disabled={!templates} onclick={another}><Icon name="icon.ui.dice" size={18} /> Another world</button>
         <button class="btn primary" disabled={!world || making || waiting} onclick={next}>Choose a household →</button>
+        {#if confirming?.at === 'actions'}
+          {@render confirm(confirming)}
+        {/if}
       </div>
       {#if making}
         <div class="making menu-glass" role="status" aria-live="polite" aria-label="Making the world">
@@ -500,6 +762,101 @@
   .sections {
     display: flex;
     flex-direction: column;
+  }
+  /* World | Shape the land: over everything else in the panel. */
+  .switch {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 12px var(--pad) 10px;
+    background: linear-gradient(var(--glass-menu) 75%, transparent);
+  }
+  .switch :global(.segmented) {
+    font-size: 13px;
+  }
+  .shape {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 4px var(--pad) 16px;
+    animation: rise 260ms var(--ease) both;
+  }
+  .surveying {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 18px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+  .again {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+    padding-top: 12px;
+    border-top: 1px solid var(--hairline);
+  }
+  .again .btn {
+    align-self: stretch;
+    justify-content: center;
+    gap: 8px;
+  }
+  .keys {
+    margin: 0;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+  .keys b {
+    font-weight: 650;
+    color: var(--text);
+  }
+  kbd {
+    padding: 0 5px;
+    border-radius: 4px;
+    background: var(--hairline);
+    font-family: inherit;
+    font-size: 11px;
+  }
+  /* A choice that would throw the land's shaping away: asked first, where it was made. */
+  .confirm {
+    margin: 0 var(--pad) 10px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 550;
+    color: var(--text-strong);
+    animation: rise 220ms var(--ease) both;
+  }
+  .confirm p {
+    margin: 0;
+    line-height: 1.4;
+  }
+  .confirm .row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  /* (Under the way on, at its right.) */
+  .actions .confirm {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: min(340px, 100%);
+    margin: 0;
+  }
+  .btn.small {
+    height: 30px;
+    padding: 0 11px;
+    font-size: 12.5px;
+  }
+  .danger {
+    background: var(--bad);
+    color: #fff;
   }
   .group {
     display: flex;

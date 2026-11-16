@@ -3055,6 +3055,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.townMode) this.townRig.nudge(dAlpha, zoom);
   }
 
+  panTown(dx: number, dz: number): void {
+    if (this.townMode) this.townRig.pan(dx, dz);
+  }
+
   setLotHighlight(highlight: LotHighlight, snap = false): void {
     this.townHighlight = highlight;
     this.overview?.setHighlight(highlight, snap);

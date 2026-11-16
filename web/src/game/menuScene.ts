@@ -6,7 +6,8 @@
  */
 
 import { groundDepth, type WorldStructure } from '../core/protocol';
-import type { LotHighlight, Renderer, TownBuildStep, TownShot } from '../render/types';
+import type { LandCursor, LotHighlight, Renderer, TownBuildStep, TownShot } from '../render/types';
+import type { Land, LandRect } from './land';
 import { settings } from '../settings/settings.svelte';
 import { services } from '../ui/services';
 import { host } from './host';
@@ -217,6 +218,52 @@ class MenuScene {
   /** Orbit / zoom from the player's drag and wheel on the town. */
   nudge(dAlpha: number, zoom: number): void {
     this.live?.nudgeTown(dAlpha, zoom);
+  }
+
+  /** The player's pan: the camera's target moved (`dx`, `dz`) m over the ground. */
+  pan(dx: number, dz: number): void {
+    this.live?.panTown(dx, dz);
+  }
+
+  /** The preview of the town shown (its built land: `landEdit.ts` `builtOf`), once it is shown. */
+  get preview(): WorldStructure | null {
+    return this.live?.townShown ? this.world : null;
+  }
+
+  // ---- The land in view, for step 1's brushes (`Renderer.landOf` and the rest) ----------------
+
+  /** The town's land as a height field (a copy): its `meta.land`, or surveyed from the land as drawn (100–160 ms). */
+  landOf(): Promise<Land> {
+    const r = this.live;
+    if (!r?.townShown) return Promise.reject(new Error('no town is shown'));
+    return r.landOf();
+  }
+
+  /** The town drawn from `land` from now on (the brushes change it in place); null: from its landscape again. */
+  setLand(land: Land | null): void {
+    if (this.live?.townShown) this.live.setLand(land);
+  }
+
+  /** Samples of the land given to `setLand` changed: drawn again now, the rest once the stroke is `done`. */
+  landChanged(rect: LandRect, done: boolean): void {
+    if (this.live?.townShown) this.live.landChanged(rect, done);
+  }
+
+  /** Where the land is under a screen point (CSS pixels; a town point and its height, m), if it is. */
+  landAt(x: number, y: number): { x: number; y: number; z: number } | null {
+    const r = this.live;
+    return r?.townShown ? r.pickLand(x, y) : null;
+  }
+
+  /** Shows the land brush's cursor (null hides it). */
+  brush(cursor: LandCursor | null): void {
+    if (this.live?.townShown || !cursor) this.live?.setLandBrush(cursor);
+  }
+
+  /** Projects a town point onto the screen (CSS pixels); false when it is behind the camera. */
+  project(x: number, y: number, z: number, out: { x: number; y: number }): boolean {
+    const r = this.live;
+    return !!r?.townShown && r.project(x, y, z, out);
   }
 
   /** Plot under a screen point (CSS pixels), if any. */

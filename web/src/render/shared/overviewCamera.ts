@@ -26,6 +26,10 @@ export const OVERVIEW_TOWN_HEIGHT = 7;
 
 /** How near (radians, and parts of the radius) a settled camera comes to its goal before it's put there. */
 const SNAP = 1e-4;
+/** The player's zoom comes in as near as this (m from the target), however far out the shot is. */
+export const OVERVIEW_NEAREST = 50;
+/** How far (m) the player may pan the camera off the shot's focus. */
+const PAN_REACH = 1500;
 
 interface Pose {
   alpha: number;
@@ -59,6 +63,9 @@ export class OverviewCamera {
   /** User orbit and zoom on top of the shot. */
   private userAlpha = 0;
   private userZoom = 1;
+  /** The player's pan (m) on top of the shot's focus. */
+  private panX = 0;
+  private panZ = 0;
   private aspect = 16 / 9;
   private viewW = 1920;
   private viewH = 1080;
@@ -97,6 +104,9 @@ export class OverviewCamera {
     const alphaChanged = shot.alpha !== undefined && shot.alpha !== this.shot?.alpha;
     if (alphaChanged) this.userAlpha = 0;
     if (shot.zoom !== this.shot?.zoom || alphaChanged) this.userZoom = 1;
+    // (Another part of the world framed: the player's pan is let go.)
+    const f = this.shot?.focus;
+    if (!f || f.x !== shot.focus.x || f.z !== shot.focus.z || f.w !== shot.focus.w || f.d !== shot.focus.d) this.panX = this.panZ = 0;
     this.shot = shot;
     this.drift = shot.drift ?? 0;
     this.sway = shot.sway ?? 0;
@@ -113,14 +123,22 @@ export class OverviewCamera {
     this.sway = 0;
     this.userAlpha = 0;
     this.userZoom = 1;
+    this.panX = this.panZ = 0;
     Object.assign(this.goal, { alpha: target.alpha, beta: target.beta, radius: target.radius, tx: target.x, tz: target.z, ox: 0, oy: 0 });
     this.onArrive = done;
     this.startGlide(seconds);
   }
 
+  /** The player's orbit (radians) and zoom (a factor) on top of the shot; the zoom comes in to `OVERVIEW_NEAREST` m at most. */
   nudge(dAlpha: number, zoom: number): void {
     this.userAlpha += dAlpha;
-    this.userZoom = Math.min(2.6, Math.max(0.6, this.userZoom * zoom));
+    this.userZoom = Math.min(Math.max(2.6, this.goal.radius / OVERVIEW_NEAREST), Math.max(0.6, this.userZoom * zoom));
+  }
+
+  /** The player's pan: the camera's target moved (`dx`, `dz`) m over the ground, on top of the shot's focus. */
+  pan(dx: number, dz: number): void {
+    this.panX = Math.min(PAN_REACH, Math.max(-PAN_REACH, this.panX + dx));
+    this.panZ = Math.min(PAN_REACH, Math.max(-PAN_REACH, this.panZ + dz));
   }
 
   /** Advances and applies the pose. */
@@ -138,6 +156,7 @@ export class OverviewCamera {
     const c = this.cur;
     const zoom = this.userZoom;
     const ga = g.alpha + this.userAlpha;
+    const [gx, gz] = [g.tx + this.panX, g.tz + this.panZ];
     if (this.t < this.duration) {
       this.t = Math.min(this.duration, this.t + dt);
       const k = ease(this.t / this.duration);
@@ -146,8 +165,8 @@ export class OverviewCamera {
       c.beta = f.beta + (g.beta - f.beta) * k;
       // Zooms glide in log space (a long pull-back doesn't rush at the start).
       c.radius = Math.exp(Math.log(f.radius) + (Math.log(g.radius / zoom) - Math.log(f.radius)) * k);
-      c.tx = f.tx + (g.tx - f.tx) * k;
-      c.tz = f.tz + (g.tz - f.tz) * k;
+      c.tx = f.tx + (gx - f.tx) * k;
+      c.tz = f.tz + (gz - f.tz) * k;
       c.ox = f.ox + ((g.ox * c.radius) / g.radius - f.ox) * k;
       c.oy = f.oy + ((g.oy * c.radius) / g.radius - f.oy) * k;
       if (this.t >= this.duration && this.onArrive) {
@@ -161,17 +180,17 @@ export class OverviewCamera {
       c.alpha += angleDelta(c.alpha, ga) * k;
       c.beta += (g.beta - c.beta) * k;
       c.radius += (g.radius / zoom - c.radius) * k;
-      c.tx += (g.tx - c.tx) * k;
-      c.tz += (g.tz - c.tz) * k;
+      c.tx += (gx - c.tx) * k;
+      c.tz += (gz - c.tz) * k;
       c.ox += ((g.ox * c.radius) / g.radius - c.ox) * k;
       c.oy += ((g.oy * c.radius) / g.radius - c.oy) * k;
       // Within a hair of the goal: there (a camera that keeps creeping is never still: held frames).
-      if (Math.abs(angleDelta(c.alpha, ga)) + Math.abs(g.beta - c.beta) < SNAP && Math.abs(g.radius / zoom - c.radius) + Math.abs(g.tx - c.tx) + Math.abs(g.tz - c.tz) < SNAP * c.radius) {
+      if (Math.abs(angleDelta(c.alpha, ga)) + Math.abs(g.beta - c.beta) < SNAP && Math.abs(g.radius / zoom - c.radius) + Math.abs(gx - c.tx) + Math.abs(gz - c.tz) < SNAP * c.radius) {
         c.alpha = ga;
         c.beta = g.beta;
         c.radius = g.radius / zoom;
-        c.tx = g.tx;
-        c.tz = g.tz;
+        c.tx = gx;
+        c.tz = gz;
         c.ox = (g.ox * c.radius) / g.radius;
         c.oy = (g.oy * c.radius) / g.radius;
       }
@@ -216,6 +235,8 @@ export class OverviewCamera {
       Object.assign(this.cur, this.goal);
       this.cur.alpha += this.userAlpha;
       this.cur.radius /= this.userZoom;
+      this.cur.tx += this.panX;
+      this.cur.tz += this.panZ;
       if (this.onArrive) {
         const done = this.onArrive;
         this.onArrive = null;
