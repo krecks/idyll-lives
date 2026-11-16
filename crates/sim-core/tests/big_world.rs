@@ -204,10 +204,12 @@ fn big_world_benchmark() {
     // (Where the ticks' time went, phase by phase: with `--features profile` only.)
     eprint!("{}", sim_core::profile::report());
     eprintln!(
-        "A*: {} searches, {:.0} tiles each on average, {} at most",
+        "A*: {} searches, {:.0} tiles each on average, {} at most; {} found no way or gave up, {:.0} tiles each",
         searches.searches,
         searches.nodes as f64 / searches.searches.max(1) as f64,
-        searches.max_nodes
+        searches.max_nodes,
+        searches.failed,
+        searches.failed_nodes as f64 / searches.failed.max(1) as f64,
     );
     eprintln!(
         "heap {:.1} MB held after ticking ({:.1} MB at most), {} residents and {} cars by then",
