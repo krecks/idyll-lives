@@ -1,0 +1,299 @@
+/**
+ * Step 2's editing, as state: the town's plan draft (what the player's edits make, `game/edit/`),
+ * the town settled from it and on screen, undo and redo (`TownHistory`), and what is wrong with the
+ * plan (the Problems list). No Svelte in it, so the tests can drive it; `editor.svelte.ts` wraps it
+ * for the screens.
+ *
+ * Editing is two-layer (decision 10). An edit takes at once: the plan changes, and the screen shows
+ * the change as ghosts over the town (`ghosts.ts` `editGhosts`, the plan against the town on
+ * screen). Once edits have paused for `QUIET` ms the plan is settled (`settle.ts` `settle`) and the
+ * town built again from it (`show`); edits made meanwhile wait for the next pause. One settle at a
+ * time: a pause that comes while one runs is taken once it is done. `flush` settles now (the way on
+ * to step 3 takes the town as it stands).
+ */
+
+import type { Edited } from '../../game/edit/edited';
+import { TownHistory } from '../../game/edit/history';
+import type { NeighbourhoodDraft } from '../../game/town';
+import type { TownIssues } from './problems';
+import type { Settled } from './settle';
+
+/** How long edits pause (ms) before the town is settled and built again with them. */
+export const QUIET = 1200;
+/** How long after an edit (ms) the Problems list is checked again (the ghosts first). */
+export const CHECK_AFTER = 40;
+
+/** Timers, as `setTimeout`'s (the tests' are their own). */
+export interface Timers {
+  set(fn: () => void, ms: number): unknown;
+  clear(handle: unknown): void;
+}
+
+/** What the session needs from outside it. */
+export interface SessionHooks {
+  /** A plan settled (`settle.ts` `settle`; `ops`: edits since the last). Rejects with `Superseded` if `signal` aborts it. */
+  settle(plan: NeighbourhoodDraft, ops: number, signal: AbortSignal): Promise<Settled>;
+  /** The settled town put on screen; resolves once it is. `plan`: what it was settled from. */
+  show(settled: Settled, plan: NeighbourhoodDraft): Promise<void>;
+  /** Something the screens show changed (the plan, the town on screen, the problems, whether a settle runs). */
+  changed(): void;
+  /**
+   * What is wrong with a plan (`problems.ts` `townIssues`; `base`: the town as it was laid's). It may
+   * answer later (a big town's checks take seconds: they run in a worker, `checkJob.ts`); one runs at a time.
+   */
+  check?(plan: NeighbourhoodDraft, base?: TownIssues): TownIssues | Promise<TownIssues>;
+  /** A settle refused an edit, or failed: why (shown to the player). */
+  report?(why: string): void;
+  timers?: Timers;
+  now?: () => number;
+  quiet?: number;
+}
+
+/** One settle's timing (ms): the settle itself, putting the town on screen, and from the last edit before it to the town on screen. */
+export interface SettleTiming {
+  settle: number;
+  show: number;
+  fromEdit: number;
+}
+
+const realTimers: Timers = { set: (fn, ms) => setTimeout(fn, ms), clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>) };
+const NO_ISSUES: TownIssues = { blocking: [], warnings: [] };
+
+export class EditSession {
+  readonly history: TownHistory;
+  /** The plan draft as the edits left it. */
+  plan: NeighbourhoodDraft;
+  /** The settled town on screen, and the plan it was settled from. */
+  settled: NeighbourhoodDraft;
+  settledFrom: NeighbourhoodDraft;
+  /** What is wrong with the plan, and with the town as it was laid (its problems block nothing). */
+  issues: TownIssues = NO_ISSUES;
+  private baseIssues: TownIssues | undefined;
+  /** A settle under way. */
+  settling = false;
+  readonly timings: SettleTiming[] = [];
+  private readonly timers: Timers;
+  private readonly now: () => number;
+  private readonly quiet: number;
+  private timer: unknown = null;
+  /** The Problems list's next check, waiting for its moment; the checks under way. */
+  private checkTimer: unknown = null;
+  private checking: Promise<void> | null = null;
+  /** The plan `issues` are of. */
+  private checkedFor: NeighbourhoodDraft | null = null;
+  private running: Promise<void> | null = null;
+  private again = false;
+  private control: AbortController | null = null;
+  private lastEdit = 0;
+  /** Edits since the town on screen was settled. */
+  private ops = 0;
+  private disposed = false;
+
+  /**
+   * `settled`: the town on screen (as laid, or settled before); `history`: the edits made before (kept
+   * while the player goes back and forth through the steps), else none; `from`: the plan `settled`
+   * came from (else `settled` itself). A plan past it is settled after the first pause.
+   */
+  constructor(
+    settled: NeighbourhoodDraft,
+    private readonly hooks: SessionHooks,
+    history?: TownHistory,
+    from?: NeighbourhoodDraft,
+  ) {
+    this.history = history ?? new TownHistory(settled);
+    this.plan = this.history.draft;
+    this.settled = settled;
+    this.settledFrom = from ?? settled;
+    this.timers = hooks.timers ?? realTimers;
+    this.now = hooks.now ?? (() => performance.now());
+    this.quiet = hooks.quiet ?? QUIET;
+    this.lastEdit = this.now();
+    this.recheck(true);
+    if (this.pending) this.schedule();
+  }
+
+  /** The Problems list is of the plan as it stands. */
+  get checked(): boolean {
+    return !this.hooks.check || this.checkedFor === this.plan;
+  }
+
+  /** The plan has edits the town on screen hasn't yet. */
+  get pending(): boolean {
+    return this.plan !== this.settledFrom;
+  }
+  get edits(): number {
+    return this.history.edits;
+  }
+  get canUndo(): boolean {
+    return this.history.canUndo;
+  }
+  get canRedo(): boolean {
+    return this.history.canRedo;
+  }
+
+  /** An edit made (`game/edit/`): taken on (null), or why it was refused. An edit that changes nothing is not one. */
+  apply(edited: Edited): string | null {
+    if ('refused' in edited) return edited.refused;
+    if (edited.draft === this.plan) return null;
+    this.history.push(edited.draft);
+    this.take(edited.draft);
+    return null;
+  }
+
+  /** The last edit undone; false if there was none. */
+  undo(): boolean {
+    const d = this.history.undo();
+    if (d) this.take(d);
+    return !!d;
+  }
+
+  redo(): boolean {
+    const d = this.history.redo();
+    if (d) this.take(d);
+    return !!d;
+  }
+
+  /** Back to the town as it was laid, every edit dropped. */
+  reset(): void {
+    const base = this.history.reset();
+    if (base !== this.plan) this.take(base);
+    else this.hooks.changed();
+  }
+
+  /** The town settled from the plan as it stands, now (the timer not waited for); resolves once it is on screen. */
+  async flush(): Promise<void> {
+    this.clearTimer();
+    // (A settle under way is waited for; then the plan, if it moved on meanwhile, settled too.)
+    for (let k = 0; k < 4 && this.pending && !this.disposed; k++) await (this.running ?? this.run());
+  }
+
+  /** The town settled and on screen, and the Problems list checked, as the plan stands now (the way on to step 3 waits for both). */
+  async ready(): Promise<void> {
+    await this.flush();
+    if (this.checkTimer !== null) {
+      this.timers.clear(this.checkTimer);
+      this.checkTimer = null;
+    }
+    if (!this.checked) await (this.checking ?? this.runChecks());
+  }
+
+  /** The session let go: no settle starts after this, and one under way is dropped. */
+  dispose(): void {
+    this.disposed = true;
+    this.clearTimer();
+    if (this.checkTimer !== null) this.timers.clear(this.checkTimer);
+    this.control?.abort();
+  }
+
+  private take(draft: NeighbourhoodDraft): void {
+    this.plan = draft;
+    this.ops++;
+    this.lastEdit = this.now();
+    this.hooks.changed();
+    this.recheck(false);
+    this.schedule();
+  }
+
+  /** The Problems list checked again: now (`now`), else shortly (so the edit's ghosts show first). A check under way takes the new plan up when it is done. */
+  private recheck(now: boolean): void {
+    if (!this.hooks.check || this.checking) return;
+    if (this.checkTimer !== null) this.timers.clear(this.checkTimer);
+    this.checkTimer = null;
+    if (now) void this.runChecks();
+    else
+      this.checkTimer = this.timers.set(() => {
+        this.checkTimer = null;
+        void this.runChecks();
+      }, CHECK_AFTER);
+  }
+
+  /** The plan checked, again while it moved on meanwhile (the town as it was laid first, once: its problems block nothing). */
+  private runChecks(): Promise<void> {
+    const check = this.hooks.check;
+    if (!check) return Promise.resolve();
+    if (this.checking) return this.checking;
+    const work = (async () => {
+      while (!this.disposed && this.checkedFor !== this.plan) {
+        const plan = this.plan;
+        try {
+          this.baseIssues ??= await check(this.history.base);
+          const issues = plan === this.history.base ? this.baseIssues : await check(plan, this.baseIssues);
+          if (this.disposed) return;
+          // (Shown even if the plan moved on meanwhile: the last known, until the next is.)
+          this.issues = issues;
+          this.checkedFor = plan;
+          this.hooks.changed();
+        } catch (err) {
+          console.error('[town] checking the edited town failed:', err);
+          this.checkedFor = plan;
+          return;
+        }
+      }
+    })();
+    this.checking = work.finally(() => (this.checking = null));
+    return this.checking;
+  }
+
+  private clearTimer(): void {
+    if (this.timer !== null) this.timers.clear(this.timer);
+    this.timer = null;
+  }
+
+  private schedule(): void {
+    this.clearTimer();
+    if (this.disposed) return;
+    this.timer = this.timers.set(() => {
+      this.timer = null;
+      if (this.running) this.again = true;
+      else void this.run();
+    }, this.quiet);
+  }
+
+  /** The plan settled and put on screen (one at a time: see `flush` and `schedule`). */
+  private run(): Promise<void> {
+    if (this.running) return this.running;
+    if (!this.pending || this.disposed) return Promise.resolve();
+    const plan = this.plan;
+    const ops = this.ops;
+    const since = this.lastEdit;
+    const control = (this.control = new AbortController());
+    this.settling = true;
+    this.hooks.changed();
+    const work = (async () => {
+      const t0 = this.now();
+      try {
+        const s = await this.hooks.settle(plan, ops, control.signal);
+        const t1 = this.now();
+        if (this.disposed) return;
+        await this.hooks.show(s, plan);
+        if (this.disposed) return;
+        this.settled = s.draft;
+        this.settledFrom = plan;
+        this.ops -= ops;
+        const t2 = this.now();
+        this.timings.push({ settle: t1 - t0, show: t2 - t1, fromEdit: t2 - since });
+        for (const r of s.refused ?? []) this.hooks.report?.(r.why);
+      } catch (err) {
+        if (control.signal.aborted || (err instanceof Error && err.name === 'Superseded')) return;
+        console.error('[town] settling the edited town failed:', err);
+        this.hooks.report?.('The town could not be built again with your changes.');
+        // (Not tried again until the next edit: the same plan would fail the same way.)
+        this.again = false;
+        this.settledFrom = plan;
+      }
+    })();
+    this.running = work.finally(() => {
+      this.running = null;
+      this.settling = false;
+      if (this.control === control) this.control = null;
+      if (!this.disposed) {
+        this.hooks.changed();
+        if (this.again && this.pending) {
+          this.again = false;
+          void this.run();
+        }
+      }
+    });
+    return this.running;
+  }
+}

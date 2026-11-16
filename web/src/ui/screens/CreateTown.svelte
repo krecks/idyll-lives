@@ -5,8 +5,13 @@
    * town from a new seed, and the town moved by a click on the land. The editor's tools (UE) come
    * into the panel's slot for them; what lays the town out again asks first once it has the
    * player's own changes (`app.world.edited`).
+   *
+   * The editor (`townedit/`) works on the town's plan draft and shows its edits as ghosts until the
+   * town is built again with them; the way on waits for that, and for its Problems list, and is
+   * shut while a problem blocks it.
    */
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
+  import { rename } from '../../game/edit/streets';
   import { menuScene } from '../../game/menuScene';
   import type { Pt } from '../../game/roads';
   import { NEIGHBOUR_CAP, type NeighbourhoodDraft } from '../../game/town';
@@ -23,6 +28,8 @@
   import { fitted, optionsOf, SIZE_CHOICES, startCode, townKey, type Chosen } from '../newGame';
   import SetupConfirm from './SetupConfirm.svelte';
   import SetupShell, { type Making } from './SetupShell.svelte';
+  import { TownEditorState } from '../townedit/editor.svelte';
+  import TownEditor from '../townedit/TownEditor.svelte';
 
   const { content } = services;
   /** A new seed: a different town every time. */
@@ -36,6 +43,28 @@
   let hover = $state<number | null>(null);
   let focus = $state<number | null>(null);
 
+  /** The town editor (its tools, cards, undo and Problems list), over the town shown. */
+  const editor = new TownEditorState({
+    content,
+    getName: () => name,
+    setName(typed) {
+      name = typed;
+      app.townName = typed.trim() || null;
+    },
+    glide: (plot) => (focus = plot),
+  });
+  // (The editor's own writes to `app.world` come back here: it keeps its session over them.)
+  $effect(() => {
+    const w = app.world;
+    untrack(() => editor.attach(making ? null : w));
+  });
+  $effect(() => () => editor.dispose());
+  /** The town as the edits left it (the figures follow the edits at once; the town shown follows once they pause). */
+  const plan = $derived(editor.ready ? editor.draft : town);
+  /** On to step 3 asked for: waiting for the town to be brought up to date with the edits, and checked. */
+  let leaving = $state(false);
+  const blocked = $derived(editor.issues.blocking.length > 0);
+
   /** The town's own options (the land's are step 1's). */
   const TOWN_FIELDS = OPTION_FIELDS.filter((f) => f.key === 'town' || f.key === 'villages') as readonly { key: 'town' | 'villages'; label: string; choices: readonly { value: string; label: string }[] }[];
   /** A choice the land is too small for, ruled out: a town too big even with no villages, villages too many for the town chosen. */
@@ -47,13 +76,13 @@
   );
   const sizeLabel = $derived(SIZE_CHOICES.find((s) => s.value === code.size)?.label.toLowerCase() ?? code.size);
 
-  const homes = $derived(town ? town.slots.filter((s) => s.kind === 'house').length : 0);
-  const farms = $derived(town ? town.slots.filter((s) => s.lot === 'farm').length : 0);
-  const places = $derived(town ? town.slots.filter((s) => s.kind !== 'house').length : 0);
-  const roadCount = $derived(town ? town.roads.length : 0);
-  const villages = $derived(town?.open ? Math.max(0, town.open.areas.length - 1) : 0);
+  const homes = $derived(plan ? plan.slots.filter((s) => s.kind === 'house').length : 0);
+  const farms = $derived(plan ? plan.slots.filter((s) => s.lot === 'farm').length : 0);
+  const places = $derived(plan ? plan.slots.filter((s) => s.kind !== 'house').length : 0);
+  const roadCount = $derived(plan ? plan.roads.length : 0);
+  const villages = $derived(plan?.open ? Math.max(0, plan.open.areas.length - 1) : 0);
   /** The town in a line: homes, its size, land, how many residents it holds. */
-  const summary = $derived(town ? worldLine({ homes, villages, width: town.width, depth: town.depth, town: code.town, cap: NEIGHBOUR_CAP }) : '');
+  const summary = $derived(plan ? worldLine({ homes, villages, width: plan.width, depth: plan.depth, town: code.town, cap: NEIGHBOUR_CAP }) : '');
 
   // Public places and farms have their names on them; plain houses are left untagged (the town reads better).
   // A big world's areas each pick their own shops, so one name can come up in two of them: a repeat
@@ -105,6 +134,8 @@
     if (!land) return;
     job?.abort();
     const control = (job = new AbortController());
+    // (The editor lets go of the town being replaced: no edit of it is settled over the new one.)
+    editor.attach(null);
     const asked = code;
     const site = app.site;
     const key = townKey(land.key, asked, site);
@@ -137,6 +168,7 @@
       if (job === control) {
         job = null;
         making = null;
+        editor.attach(app.world);
       }
     }
   }
@@ -250,7 +282,7 @@
       moving = false;
     },
   };
-  const stageTool = $derived(moving && !making ? moveTool : null);
+  const stageTool = $derived(making ? null : moving ? moveTool : editor.stageTool);
 
   function toggleMove() {
     moving = !moving;
@@ -258,8 +290,13 @@
     if (moving) {
       focus = null;
       hover = null;
+      editor.take(null);
     }
   }
+  // (An editor tool taken up puts "Move the town" down.)
+  $effect(() => {
+    if (editor.toolId) untrack(() => (moving = false));
+  });
 
   function onKey(e: KeyboardEvent) {
     if (e.key === 'Escape' && moving) {
@@ -270,12 +307,26 @@
 
   // ---- On and back -----------------------------------------------------------------------------
 
-  /** On to step 3 with the town as named here (its neighbours are made there, or kept if it is the town they live in). */
-  function next() {
+  /**
+   * On to step 3 with the town as named here (its neighbours are made there, or kept if it is the
+   * town they live in): once the town is up to date with the edits and checked, unless a problem blocks it.
+   */
+  async function next() {
+    if (leaving) return;
+    leaving = true;
+    try {
+      await editor.settled();
+    } finally {
+      leaving = false;
+    }
     const w = app.world;
-    if (!w) return;
+    if (!w || editor.issues.blocking.length || app.screen !== 'town') return;
     const named = name.trim();
-    if (named && named !== w.draft.name) app.world = { ...w, draft: { ...w.draft, name: named } };
+    if (named && named !== w.draft.name) {
+      // (The main town is its first area: it is named with it.)
+      const renamed = rename(w.draft, { kind: 'town' }, named);
+      app.world = { ...w, draft: 'draft' in renamed ? renamed.draft : { ...w.draft, name: named } };
+    }
     app.screen = 'household';
   }
 
@@ -312,7 +363,7 @@
   });
 
   $effect(() => {
-    menuScene.highlight({ hover, selected: focus, marked: [], outlines: true });
+    menuScene.highlight({ hover: stageTool ? editor.hoverPlot : hover, selected: editor.selectedPlot ?? focus, marked: [], outlines: true });
   });
   $effect(() => () => menuScene.highlight({}));
 </script>
@@ -361,12 +412,27 @@
     time through the stage's `tool`), the card of the tool in hand, rename, undo and the Problems list.
     An edit marks the town as the player's own (`app.world.edited`): what lays it out again then asks first.
   -->
-  <div class="editor-slot" data-slot="town-editor"></div>
+  <div class="editor-slot" data-slot="town-editor">
+    <TownEditor {editor} disabled={!town || !!making || moving} />
+  </div>
 {/snippet}
 
 {#snippet stage()}
   {#if town}
-    <TownStage {labels} {hover} selected={focus} {focus} shot="world" tool={stageTool} {ghost} onhover={(p) => (hover = p)} onselect={(p) => (focus = p === focus ? null : p)} />
+    <TownStage
+      {labels}
+      {hover}
+      selected={editor.selectedPlot ?? focus}
+      {focus}
+      shot="world"
+      tool={stageTool}
+      {ghost}
+      onhover={(p) => (hover = p)}
+      onselect={(p) => {
+        focus = null;
+        editor.selectShown(p);
+      }}
+    />
   {:else}
     <div></div>
   {/if}
@@ -383,7 +449,10 @@
 {/snippet}
 
 {#snippet actions()}
-  <button class="btn primary" disabled={!town || !!making || waiting} onclick={next}>Choose a household →</button>
+  {#if blocked}
+    <span class="blocked" role="status">A problem in the list keeps the town from its households</span>
+  {/if}
+  <button class="btn primary" disabled={!town || !!making || waiting || blocked || leaving} title={blocked ? 'Mend the problems in red first' : undefined} onclick={next}>{leaving ? 'Bringing the town up to date…' : 'Choose a household →'}</button>
 {/snippet}
 
 <svelte:window onkeydown={onKey} />
@@ -426,5 +495,14 @@
   }
   .editor-slot {
     display: contents;
+  }
+  .blocked {
+    align-self: center;
+    padding: 6px 12px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--surface) 80%, transparent);
+    color: #a3552c;
+    font-size: 12.5px;
+    font-weight: 600;
   }
 </style>

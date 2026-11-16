@@ -1,6 +1,7 @@
 /** Top-level navigation: which screen is shown, and which modal is open on top of it. */
 
 import type { GameKind, Lifespan } from '../core/protocol';
+import type { TownHistory } from '../game/edit/history';
 import type { HouseholdDraft } from '../game/household';
 import type { MenuStill } from '../game/menuStill';
 import type { Pt } from '../game/roads';
@@ -26,9 +27,17 @@ export interface MadeLand extends Keyed {
   waterKept: boolean;
 }
 
-/** Step 2's town, nobody living there yet. `edited`: changed by hand (the editor's tools): what lays it out again asks first. */
+/**
+ * Step 2's town, nobody living there yet: `draft` is the town settled from the player's edits (the
+ * town the next steps read). `edited`: changed by hand (the editor's tools): what lays it out again
+ * asks first. Once edited, the editor keeps its `plan` (the draft its edits made, which `draft` is
+ * settled from: ahead of it until edits pause) and its undo `history` here, so going back and forth
+ * through the steps keeps them.
+ */
 export interface LaidTown extends Keyed {
   edited: boolean;
+  plan?: NeighbourhoodDraft;
+  history?: TownHistory;
 }
 export type Overlay = 'settings' | 'load' | 'credits' | null;
 /** A loading step and the overall progress, 0..1. */

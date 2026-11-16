@@ -15,7 +15,7 @@ export class TownHistory {
   private dropped = 0;
 
   /** `base`: the town as it was laid (what `reset` goes back to). */
-  constructor(private readonly base: NeighbourhoodDraft) {
+  constructor(readonly base: NeighbourhoodDraft) {
     this.drafts = [base];
   }
 

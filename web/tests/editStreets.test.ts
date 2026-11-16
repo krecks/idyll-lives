@@ -5,7 +5,8 @@
 // tighter than 9 m; crosses a 30 m river on a straight bridge and is refused over 60 m; clears what
 // is in its way; is named apart from every name in town. A road removed takes what it leaves
 // joined to nothing, keeps one network, and gives the water under a bridge back. `bun test`.
-import { describe, expect, test } from 'bun:test';
+import { afterAll, describe, expect, test } from 'bun:test';
+import { existsSync, readFileSync } from 'node:fs';
 import type { Content } from '../src/content/content';
 import type { RoadPlan } from '../src/core/protocol';
 import { drawStreet, removeRoad, rename, whatGoes } from '../src/game/edit/streets';
@@ -257,6 +258,32 @@ describe('removing a road', () => {
     expect(refusal(removeRoad(town(), t, 0))).toContain('no road would lead out of the world');
   });
 
+  test('refused if it would leave a country road a dead end longer than a court (no taxi turns round there)', () => {
+    // A country road from the road round the river's end west to x 200, joined there by a road up from the high street.
+    const all = town();
+    const roads: RoadPlan[] = [
+      ...all.roads,
+      { points: line(376.5, 150, 200, 150), width: 7, ends: ['join', 'join'], kind: 'country', name: 'Link Road' },
+      { points: line(200, MAIN_Z + 3.5, 200, 153.5), width: 7, ends: ['join', 'join'], kind: 'country', name: 'West Road' },
+    ];
+    const linked = { ...all, roads };
+    expect(refusal(removeRoad(linked, t, 5))).toContain('Link Road would end 17');
+    // As a lane it may be left so (the Problems list says so).
+    const lane = { ...linked, roads: roads.map((r, i) => (i === 4 ? { ...r, kind: 'lane' as const, area: 0 } : r)) };
+    expect('draft' in removeRoad(lane, t, 5)).toBe(true);
+  });
+
+  test("refused if it would take the town's last homes (as a lot removed on its own is)", () => {
+    // Only the far lane's homes: the road round the river's end takes them all with the far lane.
+    const all = town();
+    const farOnly: NeighbourhoodDraft = { ...all, slots: all.slots.slice(7).map((s, i) => ({ ...s, index: i })) };
+    const goes = whatGoes(farOnly, t, 3);
+    expect('refused' in goes && goes.refused).toContain('The town keeps its last home');
+    expect(refusal(removeRoad(farOnly, t, 3))).toContain('The town keeps its last home');
+    // With the high street's homes as well, it may go.
+    expect('draft' in removeRoad(all, t, 3)).toBe(true);
+  });
+
   test('its parking goes; a road joined to it ends there in a dead end; the water under a bridge is water again', () => {
     const goes = whatGoes(town(), t, 1);
     expect(goes).toEqual({ roads: [1], lots: [], backdrop: [], parking: [0] });
@@ -292,5 +319,67 @@ describe('renaming', () => {
     const { draft } = made(rename(town(), { kind: 'town' }, 'Ashwell'));
     expect(draft.name).toBe('Ashwell');
     expect(draft.open!.areas[0].name).toBe('Ashwell');
+  });
+});
+
+// A street drawn with `fill` on a generated world (not the hand-made town above, which has no lot
+// mix): it gets homes from the world's lot mix (`lots.ts` `fillStreet`), along it and numbered on it.
+describe('a street drawn with homes along it, on a generated world', async () => {
+  const WEB = new URL('../', import.meta.url).pathname;
+  const realLocation = globalThis.location;
+  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
+    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
+    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
+  }) as typeof fetch;
+  afterAll(() => {
+    globalThis.fetch = realFetch;
+    Object.assign(globalThis, { location: realLocation });
+  });
+  const { Content } = await import('../src/content/content');
+  const { objectInfos } = await import('../src/game/housegen');
+  const { generateWorld, useTownContent } = await import('../src/game/town');
+  const { entriesOf } = await import('../src/game/edit/ground');
+  const real = await Content.load('http://localhost/content/base.json');
+  useTownContent(real);
+  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
+  const templates: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(real), lampTiles: real.lampTiles, windowTiles: real.windowTiles };
+  const hamlet = generateWorld(real, templates, 'country', 4242, undefined, undefined, { town: 'hamlet', villages: 'none' });
+
+  /** The first street that may be drawn off one of the main town's streets, square off it, `long` m (what is in its way cleared), that gets homes. */
+  function firstStreet(draft: NeighbourhoodDraft, long: number): { points: Pt[]; drawn: NeighbourhoodDraft; cleared: number } {
+    for (const r of draft.roads) {
+      if (r.area !== 0 || r.kind === 'trail' || r.bridge) continue;
+      const ls = lengths(r.points);
+      for (let s = 10; s < ls[ls.length - 1] - 10; s += 12) {
+        const { p, t: tq } = pointAt(r.points, s, ls);
+        for (const side of [1, -1]) {
+          const n: Pt = [-tq[1] * side, tq[0] * side];
+          const from: Pt = [p[0] + n[0] * (r.width / 2 + 2), p[1] + n[1] * (r.width / 2 + 2)];
+          const points: Pt[] = [from, [from[0] + n[0] * long, from[1] + n[1] * long]];
+          const e = drawStreet(draft, templates, real, { points, kind: 'street', clear: true, fill: true, seed: 11 });
+          if ('draft' in e && e.draft.roads.length > draft.roads.length && e.draft.slots.length > draft.slots.length - e.cleared.lots.length) return { points, drawn: e.draft, cleared: e.cleared.lots.length };
+        }
+      }
+    }
+    throw new Error('no street with homes could be drawn');
+  }
+
+  test('it gets homes from the lot mix, along it', () => {
+    // (A dead end off a street, a court's length: the hamlet's streets leave no room for one joined at both ends.)
+    const { points, drawn, cleared } = firstStreet(hamlet, 40);
+    const road = drawn.roads.length - 1;
+    const e = entriesOf(drawn, templates);
+    const along = drawn.slots.filter((s, i) => s.kind === 'house' && e[i].road === road);
+    expect(along.length).toBeGreaterThan(0);
+    expect(drawn.slots.length).toBe(hamlet.slots.length - cleared + along.length);
+    // Numbered on it, by its name.
+    for (const s of along) expect(s.name.endsWith(` ${drawn.roads[road].name}`)).toBe(true);
+    // The same stroke without homes has none along it.
+    const bare = drawStreet(hamlet, templates, real, { points, kind: 'street', clear: true, fill: false, seed: 11 });
+    if ('refused' in bare) throw new Error(bare.refused);
+    expect(bare.draft.slots.length).toBe(hamlet.slots.length - cleared);
   });
 });
