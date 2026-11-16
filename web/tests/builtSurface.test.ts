@@ -1,6 +1,7 @@
 // Built land on a land that slopes (`render/shared/builtSurface.ts`), on a small made-up world: a steep
 // street with a bridge over a channel, a lane in a T off it, a street crossing it, a country road carrying
-// it on, a trail off it, two lots on paths and one off any road. Every road within its kind's grade;
+// it on, a trail off it, two lots on paths and one off any road. Every road within its kind's grade (a
+// trail, a footpath, on the land as it lies);
 // each junction one height over its arms; each pad within a short drive of its road where its way in
 // meets it, at the middle of the land under it where it may be, and near the pads beside it; the
 // bridge clear of its water; the land graded within the cones and the retaining edge; `update` after an
@@ -8,7 +9,7 @@
 // roads. `bun test tests/builtSurface.test.ts`.
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
-import { blankLand, LAND_CELL, type Land } from '../src/game/land';
+import { blankLand, heightAt, LAND_CELL, type Land } from '../src/game/land';
 import { lengths, pointAt, type Pt } from '../src/game/roads';
 import { BRIDGE_CLEAR, BuiltSurface, builtSurfaceOf, ENTRY_MAX, GRADE, RETAIN_MAX, ROAD_SINK, surfacePlots, type SurfaceWorld } from '../src/render/shared/builtSurface';
 import { chunkAt } from '../src/render/shared/chunks';
@@ -77,9 +78,15 @@ describe('built land on a slope', () => {
   const land = makeLand();
   const surface = builtSurfaceOf(world, land);
 
-  test('every road within its grade', () => {
+  test('every road within its grade, a trail on the land as it lies', () => {
     roads.forEach((r, i) => {
       const { s, y } = surface.profile(i);
+      if (r.kind === 'trail') {
+        // (A footpath: no grade, the land under it.)
+        const ls = lengths(r.points);
+        for (let k = 0; k < s.length; k++) expect(y[k]).toBeCloseTo(heightAt(land, ...pointAt(r.points, s[k], ls).p), 4);
+        return;
+      }
       expect(s.length).toBeGreaterThan(1);
       for (let k = 0; k + 1 < s.length; k++) expect(Math.abs(y[k + 1] - y[k]) / (s[k + 1] - s[k])).toBeLessThanOrEqual(GRADE[r.kind ?? 'street'] + 1e-3);
     });
@@ -99,9 +106,8 @@ describe('built land on a slope', () => {
         for (let s = a.from; s <= a.to; s += 0.5) expect(surface.roadY(a.road, s)).toBeCloseTo(j.y, 4);
       }
     }
-    // A join carries the street on into the country road, the trail off it, at one height.
+    // A join carries the street on into the country road at one height.
     expect(surface.roadY(2, 0)).toBeCloseTo(surface.roadY(0, 130), 4);
-    expect(surface.roadY(3, 0)).toBeCloseTo(surface.roadY(0, 110), 4);
   });
 
   test("a lot's pad stands near its road's height where its way in meets it", () => {
@@ -183,6 +189,7 @@ describe('built land on a slope', () => {
 
   test('at() has no jump along a road', () => {
     roads.forEach((r) => {
+      if (r.kind === 'trail') return;
       const ls = lengths(r.points);
       let last: number | null = null;
       for (let s = 0; s <= ls[ls.length - 1]; s += 0.25) {

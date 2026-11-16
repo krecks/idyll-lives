@@ -33,7 +33,7 @@ describe('a land the town follows', async () => {
   const { decodeLand, encodeLand, LAND_CELL } = await import('../src/game/land');
   const { generateFromSpec } = await import('../src/game/macro');
   const { CLASSIC } = await import('../src/game/world');
-  const { builtSurfaceOf } = await import('../src/render/shared/builtSurface');
+  const { builtSurfaceOf, ENTRY_MAX } = await import('../src/render/shared/builtSurface');
   type Templates = import('../src/game/town').Templates;
   const content = await Content.load('http://localhost/content/base.json');
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
@@ -65,7 +65,8 @@ describe('a land the town follows', async () => {
       most = Math.max(most, Math.abs(surface.at(x, z) - stored.h[(z / LAND_CELL) * stored.cols + x / LAND_CELL] / 100));
       expect(surface.at(x, z)).toBeGreaterThanOrEqual(surface.padY(i) - 1e-6);
     });
-    expect(most).toBeLessThan(0.5);
+    // (Worked out again at load, a pad may settle elsewhere in its window by its road, but not past it.)
+    expect(most).toBeLessThanOrEqual(ENTRY_MAX);
     // Unshaped, step 1 keeps it with the world.
     const editor = new LandEditor(decodeLand(file.meta.land), () => 1);
     expect(applyLand(made.draft, editor).open!.land).toBe(land);

@@ -274,9 +274,10 @@ class Heap {
 
 /**
  * The cheapest way over a `gw` × `gd` grid (8 neighbours, cost per cell `cost`: Infinity where
- * blocked) from any of `starts` to a cell `goal` accepts, `h` guessing the rest: the cells, start first.
+ * blocked, and `rise` more a step from cell to cell where given) from any of `starts` to a cell
+ * `goal` accepts, `h` guessing the rest: the cells, start first.
  */
-function astar(gw: number, gd: number, cost: (i: number) => number, starts: readonly number[], goal: (i: number) => boolean, h: (i: number) => number, limit = 400000): number[] | null {
+function astar(gw: number, gd: number, cost: (i: number) => number, starts: readonly number[], goal: (i: number) => boolean, h: (i: number) => number, limit = 400000, rise?: Rise): number[] | null {
   const g = new Float32Array(gw * gd).fill(Infinity);
   const from = new Int32Array(gw * gd).fill(-1);
   const open = new Heap();
@@ -308,7 +309,7 @@ function astar(gw: number, gd: number, cost: (i: number) => number, starts: read
         if (c === Infinity) continue;
         // (No cutting a blocked corner.)
         if (dx && dz && (cost(z * gw + nx) === Infinity || cost(nz * gw + x) === Infinity)) continue;
-        const ng = g[i] + ((here + c) / 2) * (dx && dz ? Math.SQRT2 : 1);
+        const ng = g[i] + ((here + c) / 2) * (dx && dz ? Math.SQRT2 : 1) + (rise ? rise(i, j) : 0);
         if (ng < g[j]) {
           g[j] = ng;
           from[j] = i;
@@ -319,6 +320,9 @@ function astar(gw: number, gd: number, cost: (i: number) => number, starts: read
   }
   return null;
 }
+
+/** What a step from one cell to a neighbour costs more than its cells do (a climb steeper than a road may make). */
+type Rise = (from: number, to: number) => number;
 
 /** The eight ways a cell steps to its neighbours, in turn round the compass, an eighth of a turn apart. */
 const STEPS: readonly Pt[] = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
@@ -334,11 +338,11 @@ const along = (h: number, d: Pt) => (STEPS[h][0] * d[0] + STEPS[h][1] * d[1]) / 
  * the other way (a bend round something). From whichever of `starts` (a cell, the way it heads,
  * and what starting there costs already) to a cell and heading `goal` accepts (what it costs to
  * end there; -1 if it is no end). Cost per cell `cost` (Infinity where blocked), plus `TURN_COST`
- * a turn and `TIGHT_COST` more for one only a cell after the last, `h` guessing the rest. Given
- * `toward`, it never heads back the other way (so never round in a loop). The cells, start first;
- * which start; the heading it ends on.
+ * a turn and `TIGHT_COST` more for one only a cell after the last, and `rise` a step where given,
+ * `h` guessing the rest. Given `toward`, it never heads back the other way (so never round in a
+ * loop). The cells, start first; which start; the heading it ends on.
  */
-function steer(gw: number, gd: number, cost: Float32Array, starts: readonly { cell: number; h: number; g: number }[], goal: (i: number, h: number) => number, h: (i: number) => number, toward?: Pt, limit = 400000): { cells: number[]; start: number; h: number } | null {
+function steer(gw: number, gd: number, cost: Float32Array, starts: readonly { cell: number; h: number; g: number }[], goal: (i: number, h: number) => number, h: (i: number) => number, toward?: Pt, limit = 400000, rise?: Rise): { cells: number[]; start: number; h: number } | null {
   // A state: a cell, a heading and how it came there: (0, 1) by a turn one way or the other, (2, 3)
   // a cell straight on after one, (4) two or more (or from the start).
   const K = 5;
@@ -378,7 +382,7 @@ function steer(gw: number, gd: number, cost: Float32Array, starts: readonly { ce
       if (dx && dz && (cost[z * gw + nx] === Infinity || cost[nz * gw + x] === Infinity)) continue;
       const nk = (j * 8 + nh) * K + (turn ? (turn > 0 ? 0 : 1) : c < 2 ? c + 2 : 4);
       if (closed[nk]) continue;
-      const ng = g[k] + ((cost[i] + cost[j]) / 2) * (dx && dz ? Math.SQRT2 : 1) + (turn ? TURN_COST + (c < 4 ? TIGHT_COST : 0) : 0);
+      const ng = g[k] + ((cost[i] + cost[j]) / 2) * (dx && dz ? Math.SQRT2 : 1) + (turn ? TURN_COST + (c < 4 ? TIGHT_COST : 0) : 0) + (rise ? rise(i, j) : 0);
       if (ng < g[nk]) {
         g[nk] = ng;
         from[nk] = k;
@@ -394,6 +398,19 @@ function steer(gw: number, gd: number, cost: Float32Array, starts: readonly { ce
   const start = starts.findIndex((s) => (s.cell * 8 + s.h) * K + 4 === first);
   return { cells: path.map((k) => Math.floor(k / K / 8)), start, h: Math.floor(done.k / K) % 8 };
 }
+/** The steepest a country road climbs (`builtSurface.ts` `GRADE.country`); among a place's mountains, a hamlet's box no higher or lower than the area it joins by more than this share of that over the gap between them; and how much a metre of height counts against a site there (the valley floor first). */
+const COUNTRY_GRADE = 0.12;
+const REACHABLE = 0.7;
+const MOUNTAIN_LOW = 0.3;
+/** A country road keeps under this grade where it can in a place's world (a little under its limit, `builtSurface.ts` `GRADE`), a step steeper costing it `ROUTE_STEEP` cells of flat open land for each 1 of grade over. */
+const ROUTE_GRADE = 0.1;
+const ROUTE_STEEP = 300;
+/** A road out of a place's world looks for the lowest of an edge this far (m) either way of straight out; a metre more than it may climb counts this much against that edge (m). */
+const EDGE_WINDOW = 200;
+const OVER_CLIMB = 40;
+/** A place's country road that would stand further off its land than this (m) to keep within its grade is too steep to lay (`tooSteep`); what that counts against a way on. */
+const STEEP_OFF = 3;
+const STEEP_FAULT = 1000;
 /** What `steer` adds for a turn, and for one soon after the last (a cell's worth of flat open land is 1): a road keeps straight where it may, and to wide curves. */
 const TURN_COST = 1;
 const TIGHT_COST = 2;
@@ -811,6 +828,25 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     return false;
   };
   const hamlets = between(rand, spec.hamlets);
+  /**
+   * A place among mountains (its towns follow its slopes): a hamlet only where a country road from
+   * the area nearest it can reach it within its grade, the two boxes' heights (their land's mean)
+   * no further apart than `REACHABLE` of a country road's climb over the gap between them; and the
+   * valley floor before the slopes (`MOUNTAIN_LOW`). Where none can go, it is left out (its houses
+   * go to the others: `missing`).
+   */
+  const reachable = !spec.classic && spec.options?.hills === 'mountains';
+  const boxHeight = (r: Rect) => {
+    let [sum, n] = [0, 0];
+    for (let z = Math.max(0, Math.floor(r.z / CELL)); z <= Math.min(gd - 1, Math.floor((r.z + r.d) / CELL)); z++) {
+      for (let x = Math.max(0, Math.floor(r.x / CELL)); x <= Math.min(gw - 1, Math.floor((r.x + r.w) / CELL)); x++) {
+        sum += land.height[z * gw + x];
+        n++;
+      }
+    }
+    return n ? sum / n : 0;
+  };
+  const rectGap = (a: Rect, b: Rect) => Math.hypot(Math.max(0, a.x - (b.x + b.w), b.x - (a.x + a.w)), Math.max(0, a.z - (b.z + b.d), b.z - (a.z + a.d)));
   const candidates: Pt[] = Array.from({ length: 700 }, (): Pt => [range(rand, EDGE + 80, W - EDGE - 80), range(rand, EDGE + 60, D - EDGE - 60)]);
   /** Which quarter of the world a point is in: the hamlets go first to those without an area. */
   const quarter = (p: Pt) => (p[0] < W / 2 ? 0 : 1) + (p[1] < D / 2 ? 0 : 2);
@@ -835,7 +871,11 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       let steep = 0;
       for (let z = rect.z; z < rect.z + bd; z += CELL * 2) for (let x = rect.x; x < rect.x + bw; x += CELL * 2) steep = Math.max(steep, land.slope(land.cell(x, z)));
       if (steep > 0.35 - relax * 0.1 && !relax) continue;
-      let score = Math.abs(near - AREA_AIM) / 40 + steep * 40 + land.at(p[0], p[1]) * (valley ? 0.08 : 0.02) + (held.has(quarter(p)) ? 0 : -5);
+      if (reachable) {
+        const joins = plans.reduce((a, b) => (dist(b.centre, p) < dist(a.centre, p) ? b : a));
+        if (Math.abs(boxHeight(rect) - boxHeight(joins.rect)) > REACHABLE * COUNTRY_GRADE * rectGap(rect, joins.rect)) continue;
+      }
+      let score = Math.abs(near - AREA_AIM) / 40 + steep * 40 + land.at(p[0], p[1]) * (reachable ? MOUNTAIN_LOW : valley ? 0.08 : 0.02) + (held.has(quarter(p)) ? 0 : -5);
       // A fishing cove on the shore; a hamlet across the lake from the town.
       if (n === 0 && spec.water === 'sea') score += land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 70) ? -6 : 6;
       if (n === 0 && river) score += bank(p) !== bank(mainCentre) ? -6 : 6;
@@ -886,6 +926,18 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     // land and the mountains, along the valleys.)
     return 1 + land.slope(i) * 40 + land.woods[i] * 0.3 + (rim[i] ? 12 : 0) + (climb ? land.height[i] * climb : 0);
   };
+  /**
+   * A place's land (its town follows its slopes: `landFollow.ts`): what a step costs a country road
+   * where it climbs more steeply than `ROUTE_GRADE`, so it keeps within a country road's grade
+   * where the land lets it (along the valleys, through the passes, round a steep bank, rather than
+   * over the massif). None in a classic world.
+   */
+  const rise: Rise | undefined = spec.classic
+    ? undefined
+    : (a, b) => {
+        const g = Math.abs(land.height[b] - land.height[a]) / (a % gw !== b % gw && Math.floor(a / gw) !== Math.floor(b / gw) ? CELL * Math.SQRT2 : CELL);
+        return g > ROUTE_GRADE ? (g - ROUTE_GRADE) * ROUTE_STEEP : 0;
+      };
   /** As `roadCost`, but along the water's edge too (not over it), and less put off by the slope: for when that finds no way. */
   const relaxedCost = (ends: readonly Pt[]) => {
     const strict = roadCost(ends);
@@ -912,10 +964,10 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const l = goal(i, hd, true);
       return l >= 0 ? l + LOOSE_COST : -1;
     };
-    const found = (toward && steer(gw, gd, grid, starts, either, h, toward)) || steer(gw, gd, grid, starts, goal, h, undefined, LOOSE_LIMIT);
+    const found = (toward && steer(gw, gd, grid, starts, either, h, toward, undefined, rise)) || steer(gw, gd, grid, starts, goal, h, undefined, LOOSE_LIMIT, rise);
     if (found) return { cells: found.cells, from: found.start, h: found.h, steered: true };
     for (const c of [cost, fallback]) {
-      const cells = astar(gw, gd, c, [starts[0].cell], (i) => goal(i) >= 0, h);
+      const cells = astar(gw, gd, c, [starts[0].cell], (i) => goal(i) >= 0, h, undefined, rise);
       if (cells) return { cells, from: 0, steered: false };
     }
     return null;
@@ -1420,6 +1472,22 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     }
     return false;
   });
+  /**
+   * A place's land: how much more a road from `p` to edge `side` (`d` m off) would climb than a
+   * country road may (m, from the lowest of that edge within `EDGE_WINDOW` m either way of straight
+   * out), times `OVER_CLIMB`: the ways out go down the valley or through a pass, not over the
+   * massif. 0 in a classic world.
+   */
+  const overClimb = (p: Pt, side: number, d: number) => {
+    if (spec.classic) return 0;
+    const along = side % 2 ? p[1] : p[0];
+    let low = Infinity;
+    for (let t = Math.max(0, along - EDGE_WINDOW); t <= Math.min(side % 2 ? D : W, along + EDGE_WINDOW); t += CELL) {
+      const [x, z] = side % 2 ? [side === 1 ? W - 1 : 0, t] : [t, side === 2 ? D - 1 : 0];
+      low = Math.min(low, land.at(x, z));
+    }
+    return Math.max(0, Math.abs(low - land.at(p[0], p[1])) - ROUTE_GRADE * d) * OVER_CLIMB;
+  };
   for (let tries = 0; made < outs && tries < outs + 12; tries++) {
     const ports = plans
       .flatMap((plan) => plan.ports)
@@ -1432,7 +1500,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
         // (Not across the river to its far edge.)
         if (river && side % 2 === 0 && bank(q.p) !== (side === 0 ? -1 : 1)) continue;
         const facing = FACING[side];
-        const score = d - (q.dir[0] * facing[0] + q.dir[1] * facing[1]) * 80 + (q.used ? 400 : 0) + (usedEdges.has(side) ? 500 : 0);
+        const score = d - (q.dir[0] * facing[0] + q.dir[1] * facing[1]) * 80 + (q.used ? 400 : 0) + (usedEdges.has(side) ? 500 : 0) + overClimb(q.p, side, d);
         if (!best || score < best.d) best = { q, side, d: score };
       }
     }
@@ -1495,6 +1563,32 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
    * the world; if the road there turns too sharply or winds round, the nearest somewhere else. Its
    * course, where it ends, and the way it leaves by. Null if there is none.
    */
+  /**
+   * Whether a place's country road along `pts` would have to stand off its land by more than
+   * `STEEP_OFF` m to keep within `COUNTRY_GRADE` (the land's heights along it, the least the most a
+   * road within its grade must leave them by: half the gap between its grade-limited envelopes).
+   * Never in a classic world.
+   */
+  const tooSteep = (pts: readonly Pt[]) => {
+    if (spec.classic || pts.length < 2) return false;
+    const along = evenly(pts, CELL / 2);
+    const ls = lengths(along);
+    const up = along.map(([x, z]) => land.at(x, z));
+    const down = up.slice();
+    for (const [a, b] of [
+      [1, 0],
+      [-1, along.length - 1],
+    ] as const) {
+      for (let i = b + a; i >= 0 && i < along.length; i += a) {
+        const g = COUNTRY_GRADE * Math.abs(ls[i] - ls[i - a]);
+        up[i] = Math.min(up[i], up[i - a] + g);
+        down[i] = Math.max(down[i], down[i - a] - g);
+      }
+    }
+    return up.some((u, i) => (down[i] - u) / 2 > STEEP_OFF);
+  };
+  /** The ports left without a way on because every way on was too steep (`tooSteep`). */
+  const steepOn = new Set<Port>();
   const wayOn = (q: Port, k: number) => {
     /** Country roads' cells out in the country, and which way the road runs there. */
     const country = new Map<number, { road: number; t: Pt }>();
@@ -1551,11 +1645,16 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
         side = edgeOf(end);
         road = toEdge(q, cells, side, '');
       }
-      const bad = fault(road);
+      const bad = fault(road) + (tooSteep(road.points) ? STEEP_FAULT : 0);
       if (!made || bad < made.bad) made = { road, to, bad, cells: course, b, side };
       // (Not there again.)
       const [ex, ez] = [end % gw, Math.floor(end / gw)];
       for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) if (ex + dx >= 0 && ez + dz >= 0 && ex + dx < gw && ez + dz < gd) banned.add((ez + dz) * gw + ex + dx);
+    }
+    // (A place's street end with no way on a country road could climb: it ends there.)
+    if (made && made.bad >= STEEP_FAULT) {
+      steepOn.add(q);
+      return null;
     }
     return made && { made, from };
   };
@@ -1573,9 +1672,10 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       if (q.used || continued(q)) continue;
       const on = wayOn(q, k);
       if (!on) {
-        // (A place's street running out to the shore, with no way round from there: it ends by the water.)
+        // (A place's street running out to the shore, with no way round from there: it ends by the water; or up to
+        // land no country road could climb: it ends there.)
         const shore = !spec.classic && [8, 16, 24, 32, 40, 48, 56].some((d) => land.wet(q.p[0] + q.dir[0] * d, q.p[1] + q.dir[1] * d, 4));
-        if (!shore) failed.push(`no country road on from ${plan.name}`);
+        if (!shore && !steepOn.has(q)) failed.push(`no country road on from ${plan.name}`);
         continue;
       }
       if (layOn(on, plan.name)) q.used = true;

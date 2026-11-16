@@ -31,7 +31,8 @@
  *
  * A place's land (`meta.land`, its town graded into it: `landFollow.ts` `withLand`, timed against
  * `LAND_BUDGET`), checked on the surface the renderer works out from the town file
- * (`builtSurface.ts`): no road steeper than its kind's `GRADE` by more than 1 %, no road or lot cut
+ * (`builtSurface.ts`): no road steeper than its kind's `GRADE` by more than 1 % (a trail, a footpath on
+ * the land as it lies, listed only), no road (not a trail) or lot cut
  * into the land as it was seeded or standing over it by more than `CUT_MAX`, no lot's edge over
  * the land or the pad beside it by more than `RETAIN_MAX`, every bridge's deck `BRIDGE_CLEAR` over
  * its water. (A lot's edge over its road along its front is listed, not checked.)
@@ -231,6 +232,8 @@ function slopeChecks(town: TownFile, seeded: Land): { problems: string[]; slopes
     let steepest = 0;
     for (let k = 0; k + 1 < s.length; k++) if (s[k + 1] - s[k] > 0.5) steepest = Math.max(steepest, Math.abs(y[k + 1] - y[k]) / (s[k + 1] - s[k]));
     slopes.grade[kind] = Math.max(slopes.grade[kind] ?? 0, steepest);
+    // (A trail is a footpath on the land as it lies: its grade only listed, nothing cut for it.)
+    if (kind === 'trail') return;
     if (steepest > GRADE[kind] + 0.01) out.push(`${kind} ${r.name ?? i} climbs ${(steepest * 100).toFixed(1)} % (at most ${GRADE[kind] * 100} %)`);
     // Cut and fill along its middle (not over a bridge's deck); a bridge's clearance.
     const span = r.bridge && r.bridge[1] > r.bridge[0] ? r.bridge : null;

@@ -5,8 +5,9 @@
  * generator bakes it into the land it makes, `game/landFollow.ts` `withLand`; the renderer works it
  * out again when a world loads). Nothing of it is stored.
  *
- * - **Roads** climb with the land, smoothed and no steeper than their kind may be (`GRADE`). All of
- *   them are solved together: each starts as the land along its middle line averaged over
+ * - **Roads** climb with the land, smoothed and no steeper than their kind may be (`GRADE`); the
+ *   trails, footpaths, lie on the land as it is (their `GRADE` only a measure), meet nothing at a
+ *   junction and have nothing graded to them. The others are solved together: each starts as the land along its middle line averaged over
  *   `PROFILE_REACH` m either way, and the network as a whole is first brought within its grades
  *   the least it can be (`withinGrades`); then, `PASSES` times over, each road is smoothed, its grade clamped
  *   (moving both ends of a stretch too steep), every junction made one height (its roads' there,
@@ -37,7 +38,7 @@ import { lengths, nearest, pointAt, RoadIndex } from '../../game/roads';
 import { chunkAt, chunksIn } from './chunks';
 import { carriageway, CROSSWALK, KERB_RETURN, planJunctions, type JunctionPlan } from './junctions';
 
-/** The steepest each kind of way climbs (rise per m). */
+/** The steepest each kind of way climbs (rise per m); a trail's is a measure only (it lies on the land). */
 export const GRADE: Record<RoadKind, number> = { street: 0.08, lane: 0.08, country: 0.12, trail: 0.22 };
 /** The tallest a lot's edge stands over the land beside it (m), the deepest a road or a lot is cut into the land or stands on it (m). */
 export const RETAIN_MAX = 1.5;
@@ -64,6 +65,8 @@ const NODE_MERGE = 3;
 const PLAN_MATCH = 6;
 /** Where along a road (m from an end) counts as its end. */
 const END_NEAR = 0.5;
+/** The furthest (m) a town's streets are moved off their land for the country roads between towns (`tiered`). */
+const TOWN_GIVE = 2;
 /** A road is smoothed where its height bends by more than this (m) from one sample to the next (a grade changing by 1 % over `PROFILE_STEP`). */
 const BEND = 0.02;
 /** A height changed by more than this (m) is a change (`update`, `version`). */
@@ -165,6 +168,8 @@ export class BuiltSurface {
   private readonly versions = new Map<number, number>();
   /** The widest road (m). */
   private readonly widest: number;
+  /** Whether the country roads are solved after the towns' streets, each on its own (`tiered`). */
+  private apart = false;
   /** How many places each road is joined at (its nodes). */
   private readonly joins: number[];
 
@@ -500,7 +505,8 @@ export class BuiltSurface {
       }
       for (const a of j.arms) node.reach.set(a.road, Math.max(node.reach.get(a.road) ?? 0, a.reach));
     }
-    return raw.map((n) => this.nodeOf(n.x, n.z, n.atts, n.reach));
+    // (A trail meets nothing: it lies on the land.)
+    return raw.map((n) => ({ ...n, atts: n.atts.filter(([r]) => !this.draped(r)) })).filter((n) => n.atts.length >= 2).map((n) => this.nodeOf(n.x, n.z, n.atts, n.reach));
   }
 
   /** Where two roads' middles cross away from their ends (each road's segments filed by 8 m cell). */
@@ -601,6 +607,13 @@ export class BuiltSurface {
     const { profiles, roads, land } = this;
     profiles.forEach((p, road) => {
       const n = p.y.length;
+      p.pin.fill(0);
+      p.floor.fill(-Infinity);
+      if (this.draped(road)) {
+        // A trail: the land under it, as it lies.
+        for (let i = 0; i < n; i++) p.ground[i] = p.y[i] = heightAt(land, p.x[i], p.z[i]);
+        return;
+      }
       // The land along its middle line (the water's top where it is wet), averaged over `PROFILE_REACH` m either way.
       // (Twice: what the first average left out, averaged and put back, so a crest or a hollow along a road
       // already smooth keeps its height, and the land graded to its roads gives the same roads again.)
@@ -610,8 +623,6 @@ export class BuiltSurface {
       const rest = averaged(p.s, raw.map((v, i) => v - mean[i]));
       for (let i = 0; i < n; i++) p.ground[i] = mean[i] + rest[i];
       p.y.set(p.ground);
-      p.pin.fill(0);
-      p.floor.fill(-Infinity);
       // A bridge's deck clear of its water, a little higher in its middle.
       const span = roads[road].bridge;
       if (span && span[1] > span[0]) {
@@ -629,44 +640,64 @@ export class BuiltSurface {
     for (const node of this.nodes) for (const a of node.atts) if (a.from >= 0) profiles[a.road].pin.fill(1, a.from, a.to + 1);
     this.tiered();
     const scratch = new Float32Array(Math.max(0, ...profiles.map((p) => p.y.length)));
+    const solid = profiles.filter((_, r) => !this.draped(r));
     for (let pass = 0; pass < PASSES; pass++) {
-      for (const p of profiles) {
+      for (const p of solid) {
         smooth(p, scratch);
         lift(p);
         clampGrade(p, 1);
         clampGrade(p, -1);
       }
       for (const node of this.nodes) this.join(node);
-      for (const p of profiles) lift(p);
+      for (const p of solid) lift(p);
     }
     // (The passes leave a junction's arm a little steep here and there, between two junctions close together: once more within the grades, as little as can be.)
     this.tiered();
-    for (const p of profiles) lift(p);
+    for (const p of solid) lift(p);
+  }
+
+  /** Whether road `road` is a footpath (a trail): it lies on the land as it is, no grade, no junction, nothing graded to it. */
+  private draped(road: number): boolean {
+    return this.roads[road].kind === 'trail';
   }
 
   /**
-   * A road's rank: the ways between places first (the towns' streets and lanes, the country roads
-   * other roads join in two places or more), then the other country roads (out of the world, to a
-   * dead end), then the trails.
+   * A road's rank: the ways between places first (the towns' streets and lanes, and the country
+   * roads other roads join in two places or more, unless `apart`), then the other country roads; the
+   * trails (lying on the land) none of them.
    */
   private tier(road: number): number {
     const r = this.roads[road];
-    if (r.kind === 'trail') return 3;
-    return r.kind === 'country' && this.joins[road] < 2 ? 2 : 1;
+    if (r.kind === 'trail') return 0;
+    return r.kind === 'country' && (this.apart || this.joins[road] < 2) ? 2 : 1;
   }
 
   /**
    * Every road brought within its grade, moved as little as it can be, a rank at a time so a climb
    * no road could make stays on the road that has it: the ways between places all together
    * (`withinGrades`: where two villages stand further apart in height than the country road between
-   * them can climb, each gives a little), then each road out of the world or to a dead end, then
-   * each trail, on its own (`withinRoad`: held where it meets a way solved already,
+   * them can climb, each gives a little; but if a town's streets would give more than `TOWN_GIVE`,
+   * they give that at most, and those country roads come after them), then each other country road
+   * on its own (`withinRoad`: held where it meets a way solved already,
    * climbing between two such as steeply as it must); each junction at one height once the first
    * road through it is solved.
    */
   private tiered(): void {
     const { profiles, nodes } = this;
+    const was = profiles.map((p) => p.y.slice());
+    this.apart = false;
     this.withinGrades((r) => this.tier(r) === 1);
+    // (Towns further apart in height than the country roads between them can climb: no town's streets dragged more
+    // than `TOWN_GIVE` off their land for it; the country roads between them solved on their own after them.)
+    const town = (r: number) => this.roads[r].kind !== 'country' && !this.draped(r);
+    if (profiles.some((p, r) => town(r) && p.y.some((y, i) => Math.abs(y - was[r][i]) > TOWN_GIVE))) {
+      this.apart = true;
+      profiles.forEach((p, r) => {
+        if (!town(r)) p.y.set(was[r]);
+        else for (let i = 0; i < p.y.length; i++) p.y[i] = was[r][i] + Math.max(-TOWN_GIVE, Math.min(TOWN_GIVE, p.y[i] - was[r][i]));
+      });
+      this.withinGrades((r) => this.tier(r) === 1);
+    }
     const fixed = profiles.map((p, r) => new Uint8Array(p.y.length).fill(this.tier(r) === 1 ? 1 : 0));
     const settled = new Uint8Array(nodes.length);
     const touching: number[][] = profiles.map(() => []);
@@ -692,7 +723,7 @@ export class BuiltSurface {
       }
     };
     nodes.forEach((_, n) => settle(n, -1));
-    for (const rank of [2, 3]) {
+    for (const rank of [2]) {
       profiles.forEach((p, r) => {
         if (this.tier(r) !== rank) return;
         withinRoad(p, fixed[r]);
@@ -773,6 +804,7 @@ export class BuiltSurface {
     const c = LAND_CELL;
     // Roads, out to their sidewalks' edges (where two overlap, the one whose middle is nearer); a bridge's deck is not on the land.
     roads.forEach((r, road) => {
+      if (this.draped(road)) return;
       const ls = this.lens[road];
       const half = r.width / 2;
       const reach = Math.max(half, c);

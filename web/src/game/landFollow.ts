@@ -7,7 +7,7 @@
  * is graded again under the town laid on it.
  */
 
-import { DEFAULT_LANDSCAPE, type WorldStructure, type WorldZone } from '../core/protocol';
+import { DEFAULT_LANDSCAPE, type RoadPlan, type WorldStructure, type WorldZone } from '../core/protocol';
 import { builtSurfaceOf, type BuiltSurface, type SurfaceWorld } from '../render/shared/builtSurface';
 import { blankLand, COVER, COVER_CELL, coverSpan, LAND_CELL, SEA_CM, type Land } from './land';
 import { APRON, builtOf, Protection } from './landEdit';
@@ -17,6 +17,11 @@ import type { Pt } from './roads';
 
 /** The steepest a town's or a village's ground is tilted (rise per m: `gentler`). */
 export const GENTLE_TILT = 0.06;
+
+/** An area's lots this near its box and streets (m) are on its gentle ground (`gentler`); those further out have their own. */
+const AREA_LOTS = 30;
+/** How much more a town's or a village's plane has to say in the blend than a lone lot's (`gentler`). */
+const TOWN_SAY = 1000;
 
 /** Dry land stays this far over the sea's level (m) in a world with water: the sea is one sheet over the whole world. */
 const DRY_OVER = 0.15;
@@ -99,7 +104,7 @@ export function seedFollow(draft: NeighbourhoodDraft, world: FollowWorld): Land 
       h[k] = base + rise * detail;
     }
   }
-  gentler(h, cols, rows, dist, world, open.areas, look.rise);
+  gentler(h, cols, rows, dist, world, open.areas, draft.roads, draft.slots.map((s) => s.area ?? 0), look.rise);
 
   // ---- the water ----
   const wet = scan(
@@ -169,17 +174,31 @@ export function seedFollow(draft: NeighbourhoodDraft, world: FollowWorld): Land 
 
 /**
  * The land (`h`, m per sample) eased under what is built towards gentle ground: each area's box (a
- * town or a village), and each lot or backdrop building out of every box, gets a plane fitted to
+ * town or a village, with its own streets and lanes where they reach out past it), and each lot or backdrop building out of every box, gets a plane fitted to
  * the land under what is built in it (least squares, tilted no more than `GENTLE_TILT`), the land
  * on it that plane, and the land round it eased back to its own height over `reach` m (the look's
- * `rise`). Where two come near each other, their planes are blended by how near each is. The hills
+ * `rise`). Where two come near each other, their planes are blended by how near each is (in its
+ * own box, almost wholly its own; near a town or a village, its plane before a lone lot's). The hills
  * and mountains rise round the towns, not under them. `dist`: each sample's distance from what is
  * built (`Protection.dist`: 0 on it).
  */
-function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array, world: FollowWorld, areas: readonly { x: number; z: number; w: number; d: number }[], reach: number): void {
+function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array, world: FollowWorld, areas: readonly { x: number; z: number; w: number; d: number }[], roads: readonly RoadPlan[], areaOf: readonly number[], reach: number): void {
   const c = LAND_CELL;
   type Box = { x0: number; z0: number; x1: number; z1: number };
-  const boxes: Box[] = areas.map((a) => ({ x0: a.x, z0: a.z, x1: a.x + a.w, z1: a.z + a.d }));
+  const grow = (box: Box, x0: number, z0: number, x1: number, z1: number) => Object.assign(box, { x0: Math.min(box.x0, x0), z0: Math.min(box.z0, z0), x1: Math.max(box.x1, x1), z1: Math.max(box.z1, z1) });
+  // (An area's box, its own streets and lanes, which may reach out past it, and its own lots by them.)
+  const boxes: Box[] = areas.map((a, n) => {
+    const box = { x0: a.x, z0: a.z, x1: a.x + a.w, z1: a.z + a.d };
+    for (const r of roads) {
+      if ((r.area ?? -1) !== n || r.kind === 'country' || r.kind === 'trail') continue;
+      for (const [x, z] of r.points) grow(box, x, z, x, z);
+    }
+    const near = { ...box };
+    world.plots.forEach((p, i) => {
+      if (areaOf[i] === n && p.x < near.x1 + AREA_LOTS && p.x + p.w > near.x0 - AREA_LOTS && p.z < near.z1 + AREA_LOTS && p.z + p.d > near.z0 - AREA_LOTS) grow(box, p.x, p.z, p.x + p.w, p.z + p.d);
+    });
+    return box;
+  });
   const within = (b: Box, x: number, z: number) => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1;
   const alone: Box[] = [];
   const footprints = [
@@ -192,7 +211,7 @@ function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array
   ];
   for (const f of footprints) if (!boxes.some((b) => within(b, (f.x0 + f.x1) / 2, (f.z0 + f.z1) / 2))) alone.push(f);
   // Each one's plane: through the land under what is built in it (in a box: every built sample; a lot alone: its own).
-  const planes: { box: Box; a: number; bx: number; bz: number; cx: number; cz: number }[] = [];
+  const planes: { box: Box; a: number; bx: number; bz: number; cx: number; cz: number; town: boolean }[] = [];
   for (const [n, box] of [...boxes, ...alone].entries()) {
     const own = n >= boxes.length;
     const [i0, i1] = [Math.max(0, Math.ceil(box.x0 / c)), Math.min(cols - 1, Math.floor(box.x1 / c))];
@@ -217,7 +236,7 @@ function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array
     const tilt = Math.hypot(bx, bz);
     if (tilt > GENTLE_TILT) [bx, bz] = [(bx * GENTLE_TILT) / tilt, (bz * GENTLE_TILT) / tilt];
     // (Tilted less, the plane through the land's mean again.)
-    planes.push({ box, a: mean, bx, bz, cx, cz });
+    planes.push({ box, a: mean, bx, bz, cx, cz, town: !own });
   }
   // Each sample eased towards the planes near it: the nearest's weight, their heights weighted by each one's.
   const sum = new Float64Array(cols * rows);
@@ -233,8 +252,11 @@ function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array
         const w = 1 - smoothstep(0, reach, off);
         if (w <= 0) continue;
         const k = j * cols + i;
-        sum[k] += w * (p.a + p.bx * (x - p.cx) + p.bz * (z - p.cz));
-        weight[k] += w;
+        // (Each plane's say in the blend falls off far faster than its pull: in its own box, its own; a town's or a
+        // village's over a lone lot's near it.)
+        const say = w ** 8 * (p.town ? TOWN_SAY : 1);
+        sum[k] += say * (p.a + p.bx * (x - p.cx) + p.bz * (z - p.cz));
+        weight[k] += say;
         if (w > most[k]) most[k] = w;
       }
     }
