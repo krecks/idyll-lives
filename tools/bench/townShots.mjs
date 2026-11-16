@@ -209,6 +209,10 @@ try {
       });
       console.log(`townShots: ${renderer}: ghosts set again in ${ghostMs.toFixed(2)} ms`);
       await shoot('ghosts-area0');
+      // Closer (the player's zoom on the main town's shot): the ribbons, the lots' outlines, the veil over a house.
+      await page.evaluate(() => window.__ng.menuScene.nudge(0, 2.6));
+      await shoot('ghosts-close');
+      await page.evaluate(() => window.__ng.menuScene.reframe(0));
       await page.evaluate(() => {
         const ng = window.__ng;
         ng.menuScene.shoot({ kind: 'world', frame: ng.frame }, 0, true);
