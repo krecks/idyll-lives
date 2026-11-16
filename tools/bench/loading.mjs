@@ -7,9 +7,11 @@
  *   countryside with its own options, as a new player gets it, unless `--world` and `--options` (or
  *   `--code`) say otherwise (the page's `?world=`, `?options=`, `?code=`);
  * - town: "Lay out the town" to step 2's town laid on that land and built (its "Choose a household" enabled);
- * - inView, portraits: step 3 ("Choose a household") opened to the portraits in view in its list
- *   shown, and to every household's (`.households .face img`);
- * - entry: "Play" on a household to the game up (its interface there, the loading screen gone).
+ * - inView, portraits: step 3 ("Choose a household") opened to the portraits in view on its cards
+ *   shown, and to every card's (`.offer .face img`);
+ * - entry: step 4's "Move in" to the game up (its interface there, the loading screen gone). Step 4
+ *   is reached by "Play" on a household's card, or with `--create` through Creation (its household
+ *   as it comes, "Choose a home"), and its home as it opens.
  *
  * With `--back`, then the way back and in again: the long tasks in the 5 s after the entry (`entryLong`),
  * "Save and quit" from the menu shown to its picture on screen (`back`), Continue (once the latest save has been prepared behind the
@@ -31,7 +33,8 @@
  *     --world country          step 1's place (a kind from before places, such as dense, is its place at its size)
  *     --options town=city,villages=many   step 1's options (the place's own where not given)
  *     --code river-mhs-k2x9q   the world's code instead (a bare number: the land's seed)
- *     --household 0            which household's Play is pressed (its index in the list)
+ *     --household 0            which household's Play is pressed (its card's index)
+ *     --create                 step 4 through Creation instead
  *     --renderer webgpu        or webgl
  *     --headed                 in a window (default headless: the real GPU either way)
  *     --port 5222 | --url <u>  a dev server on the port (started if none answers), or one already running
@@ -65,6 +68,7 @@ const worldQuery = [made.world ? `world=${made.world}` : '', made.query ? `optio
 const port = Number(flag('port', '5222'));
 const again = has('again');
 const back = has('back');
+const create = has('create');
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
 const out = flag('out', join(ROOT, 'bench-results', `loading-${stamp}`));
 mkdirSync(out, { recursive: true });
@@ -157,11 +161,11 @@ async function visit(page, cdp) {
   await page.waitForTimeout(500);
   await next.click();
   const opened = await now();
-  // (The faces in view first: the list's rows that show without scrolling.)
+  // (The faces in view first: the cards that show without scrolling.)
   await page.waitForFunction(
     () => {
-      const list = document.querySelector('.households .list');
-      const faces = [...document.querySelectorAll('.households .face')];
+      const list = document.querySelector('.offer .cards');
+      const faces = [...document.querySelectorAll('.offer .face')];
       if (!list || !faces.length) return false;
       const box = list.getBoundingClientRect();
       const inView = faces.filter((f) => {
@@ -176,7 +180,7 @@ async function visit(page, cdp) {
   const inView = await now();
   await page.waitForFunction(
     () => {
-      const faces = document.querySelectorAll('.households .face');
+      const faces = document.querySelectorAll('.offer .face');
       return faces.length > 0 && [...faces].every((f) => f.querySelector('img'));
     },
     null,
@@ -184,11 +188,27 @@ async function visit(page, cdp) {
   );
   const shown = await now();
   await keep();
-  const faces = await page.evaluate(() => document.querySelectorAll('.households .face').length);
+  const faces = await page.evaluate(() => document.querySelectorAll('.offer .face').length);
   await page.waitForTimeout(500);
-  const plays = page.locator('.households .btn.play');
+  if (create) {
+    await page.getByRole('button', { name: /Create your own/ }).first().click();
+    const home = page.getByRole('button', { name: /Choose a home/ });
+    await home.waitFor({ timeout: 60_000 });
+    await home.click();
+  } else {
+    const plays = page.locator('.offer .card[data-slot] .go');
+    await plays.nth(Math.min(pick, (await plays.count()) - 1)).click();
+  }
+  const moveIn = page.getByRole('button', { name: /^Move in/ });
+  await moveIn.waitFor({ timeout: 60_000 });
+  await enabled(page, /^Move in/);
+  await page.waitForTimeout(500);
   const pressed = await now();
-  await plays.nth(Math.min(pick, (await plays.count()) - 1)).click();
+  await moveIn.click();
+  // (Fewer beds than sleepers: step 4 asks first, and is answered.)
+  const asked = () => [...document.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Move in anyway');
+  await page.waitForFunction(`(${asked})() || (!!document.querySelector('.hud-root') && !document.querySelector('.loading'))`, null, { timeout: 180_000, polling: 100 });
+  if (await page.evaluate(asked)) await page.getByRole('button', { name: 'Move in anyway' }).click();
   await page.waitForFunction(() => !!document.querySelector('.hud-root') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 100 });
   const entered = await now();
   const marks = { boot, newGame, made, layPressed, laid, opened, shown, pressed, entered };
