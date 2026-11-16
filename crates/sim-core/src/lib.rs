@@ -36,6 +36,7 @@ pub mod phone;
 pub mod planner;
 pub mod porches;
 pub mod privacy;
+pub mod profile;
 pub(crate) mod ride;
 pub mod rng;
 pub mod rooms;

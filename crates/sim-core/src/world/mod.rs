@@ -4469,108 +4469,113 @@ impl World {
     }
 
     pub fn tick_once(&mut self) {
-        self.sync_tile_arrays();
-        // Time moves on: edits can no longer be taken back.
-        self.undo.clear();
-        self.redo.clear();
-        // (An edit still under way can't be taken back now: nothing more to keep of it.)
-        self.lot.log_off();
-        if self.rooms_version != self.room_layout_version
-            || self.rooms_dirty
-            || self.rooms_things
-            || self.rooms_rescore
-        {
-            self.update_rooms();
-        } else if self.tick.is_multiple_of(ROOM_REFRESH_TICKS) {
-            self.rescore_rooms();
-        }
-        self.refresh_reach();
-        self.refresh_index();
-        self.travel.note_doors(&self.plots);
-        // A new game's first step: the player hears of anyone without a bed (told as the world was
-        // made, it would be the story so far, which the view doesn't show as news).
-        if self.tick == 0 {
-            for h in 0..self.households.len() {
-                crate::lifecycle::notify_missing_beds(self, h);
+        let tick = crate::profile::phase("prep", || {
+            self.sync_tile_arrays();
+            // Time moves on: edits can no longer be taken back.
+            self.undo.clear();
+            self.redo.clear();
+            // (An edit still under way can't be taken back now: nothing more to keep of it.)
+            self.lot.log_off();
+            if self.rooms_version != self.room_layout_version
+                || self.rooms_dirty
+                || self.rooms_things
+                || self.rooms_rescore
+            {
+                self.update_rooms();
+            } else if self.tick.is_multiple_of(ROOM_REFRESH_TICKS) {
+                self.rescore_rooms();
             }
-        }
-        self.tick += 1;
-        let tick = self.tick;
-        self.search_mark = crate::path::nodes_searched();
+            self.refresh_reach();
+            self.refresh_index();
+            self.travel.note_doors(&self.plots);
+            // A new game's first step: the player hears of anyone without a bed (told as the world was
+            // made, it would be the story so far, which the view doesn't show as news).
+            if self.tick == 0 {
+                for h in 0..self.households.len() {
+                    crate::lifecycle::notify_missing_beds(self, h);
+                }
+            }
+            self.tick += 1;
+            self.search_mark = crate::path::nodes_searched();
+            self.tick
+        });
 
-        crate::partners::refresh(self);
-        crate::staff::update(self);
-        let mut briefs = std::mem::take(&mut self.briefs);
-        briefs.clear();
-        for s in &self.sims {
-            let (x, z) = s.tile();
-            let plot = self.plot_at(x, z);
-            let available = s.here() && s.available_for_social(&self.content);
-            briefs.push(SimBrief {
-                pos: s.pos,
-                available,
-                gender_ix: s.gender_ix,
-                household: s.household,
-                plot: plot.filter(|_| s.here()),
-                away: s.away_until.is_some() || !s.here(),
-                leaving: crate::life::leaving_home(self, s),
-                baby: s.here() && self.content.life.baby(s.age),
-                needs: s.needs,
-                here: s.here(),
-                partnered: self.relationships.partner_of(s.id as usize).is_some(),
-                adult: s.adult(&self.content),
-                age: s.age,
-                conversing: None,
-                cleaning: s.current().and_then(|a| {
-                    if let TaskKind::Clean { x, z } = a.task.kind {
-                        Some((x, z))
-                    } else {
-                        None
-                    }
-                }),
-                seated: s.pose == Pose::Sit && !s.is_moving(),
-                lying: s.pose == Pose::Lie,
-                eating: s.eating_seated(),
-                game: s.game,
-                // (`partners::free_now`, its start just above.)
-                free: {
-                    let free = available && crate::partners::free_besides(&self.content, s, tick);
-                    debug_assert_eq!(free, crate::partners::free_now(&self.content, s, tick));
-                    free
-                },
-                bound_for_car: s.bound_for_car.filter(|_| {
-                    s.current()
-                        .is_some_and(|a| matches!(a.task.kind, TaskKind::Work))
-                }),
-                trip_car: s.bound_for_car.filter(|_| {
-                    s.current().is_some_and(|a| {
-                        matches!(a.task.kind, TaskKind::Visit { .. } | TaskKind::GoHome)
-                    })
-                }),
-                bike: s.commute.and_then(|c| c.bike),
-                bike_spot: s.bike_spot.map(|(at, _)| at),
-                guest_at: s.visiting.map(|v| v.plot),
-                eats_at: match s.current().map(|a| a.task.kind) {
-                    Some(TaskKind::Eat { seat, stage: 1, .. }) => seat,
-                    _ => None,
-                },
-            });
-        }
-        // Who's in a conversation, and whose (for joining in).
-        for (i, s) in self.sims.iter().enumerate() {
-            if let Some((t, social, ..)) = s.conversation(&self.content) {
-                briefs[i].conversing = Some((i as u32, social));
-                briefs[t as usize].conversing = Some((i as u32, social));
+        crate::profile::phase("partners: refresh", || crate::partners::refresh(self));
+        crate::profile::phase("staff", || crate::staff::update(self));
+        crate::profile::phase("briefs", || {
+            let mut briefs = std::mem::take(&mut self.briefs);
+            briefs.clear();
+            for s in &self.sims {
+                let (x, z) = s.tile();
+                let plot = self.plot_at(x, z);
+                let available = s.here() && s.available_for_social(&self.content);
+                briefs.push(SimBrief {
+                    pos: s.pos,
+                    available,
+                    gender_ix: s.gender_ix,
+                    household: s.household,
+                    plot: plot.filter(|_| s.here()),
+                    away: s.away_until.is_some() || !s.here(),
+                    leaving: crate::life::leaving_home(self, s),
+                    baby: s.here() && self.content.life.baby(s.age),
+                    needs: s.needs,
+                    here: s.here(),
+                    partnered: self.relationships.partner_of(s.id as usize).is_some(),
+                    adult: s.adult(&self.content),
+                    age: s.age,
+                    conversing: None,
+                    cleaning: s.current().and_then(|a| {
+                        if let TaskKind::Clean { x, z } = a.task.kind {
+                            Some((x, z))
+                        } else {
+                            None
+                        }
+                    }),
+                    seated: s.pose == Pose::Sit && !s.is_moving(),
+                    lying: s.pose == Pose::Lie,
+                    eating: s.eating_seated(),
+                    game: s.game,
+                    // (`partners::free_now`, its start just above.)
+                    free: {
+                        let free =
+                            available && crate::partners::free_besides(&self.content, s, tick);
+                        debug_assert_eq!(free, crate::partners::free_now(&self.content, s, tick));
+                        free
+                    },
+                    bound_for_car: s.bound_for_car.filter(|_| {
+                        s.current()
+                            .is_some_and(|a| matches!(a.task.kind, TaskKind::Work))
+                    }),
+                    trip_car: s.bound_for_car.filter(|_| {
+                        s.current().is_some_and(|a| {
+                            matches!(a.task.kind, TaskKind::Visit { .. } | TaskKind::GoHome)
+                        })
+                    }),
+                    bike: s.commute.and_then(|c| c.bike),
+                    bike_spot: s.bike_spot.map(|(at, _)| at),
+                    guest_at: s.visiting.map(|v| v.plot),
+                    eats_at: match s.current().map(|a| a.task.kind) {
+                        Some(TaskKind::Eat { seat, stage: 1, .. }) => seat,
+                        _ => None,
+                    },
+                });
             }
-        }
-        for (i, s) in self.sims.iter().enumerate() {
-            if let Some(l) = s.listening_to() {
-                briefs[i].conversing = briefs[l as usize].conversing.filter(|c| c.0 == l);
+            // Who's in a conversation, and whose (for joining in).
+            for (i, s) in self.sims.iter().enumerate() {
+                if let Some((t, social, ..)) = s.conversation(&self.content) {
+                    briefs[i].conversing = Some((i as u32, social));
+                    briefs[t as usize].conversing = Some((i as u32, social));
+                }
             }
-        }
-        self.briefs = briefs;
-        crate::privacy::refresh(self);
-        crate::lod::plan(self);
+            for (i, s) in self.sims.iter().enumerate() {
+                if let Some(l) = s.listening_to() {
+                    briefs[i].conversing = briefs[l as usize].conversing.filter(|c| c.0 == l);
+                }
+            }
+            self.briefs = briefs;
+        });
+        crate::profile::phase("privacy: refresh", || crate::privacy::refresh(self));
+        crate::profile::phase("lod", || crate::lod::plan(self));
         // Those who go first when the tick's searches run over budget: the player's household
         // and whoever is watched (see `SEARCH_BUDGET`).
         let mut first = std::mem::take(&mut self.first);
@@ -4586,7 +4591,7 @@ impl World {
         let hour = crate::clock::hour(tick);
         let mut work = std::mem::take(&mut self.work);
         self.fill_work_waiting(&mut work);
-        {
+        crate::profile::phase("sims: step", || {
             let World {
                 content,
                 lot,
@@ -4685,46 +4690,54 @@ impl World {
                 sim.deferred = false;
                 step_sim(sim, &ctx, objects, items, rng);
             }
-        }
+        });
         self.work = work;
         self.first = first;
-        crate::partners::update(self);
-        self.broadcast();
-        self.apply_messes();
-        crate::carry::after_step(self);
-        crate::setup::update(self);
-        self.wake_for_crying_babies();
-        conversation::update(self);
-        crate::privacy::after_step(self);
-        crate::hosting::update(self);
-        crate::phone::update(self);
-        crate::life::update(self);
-        crate::lifecycle::update(self);
-        crate::traffic::begin(self);
-        crate::cars::update(self);
-        crate::taxi::update(self);
-        crate::planner::update(self);
-        crate::cooking::after_step(self);
-        crate::lights::update(self);
-        crate::lights::update_while(self);
+        crate::profile::phase("partners: update", || crate::partners::update(self));
+        crate::profile::phase("broadcast", || self.broadcast());
+        crate::profile::phase("messes", || self.apply_messes());
+        crate::profile::phase("carry", || crate::carry::after_step(self));
+        crate::profile::phase("setup", || crate::setup::update(self));
+        crate::profile::phase("wake: babies", || self.wake_for_crying_babies());
+        crate::profile::phase("conversation", || conversation::update(self));
+        crate::profile::phase("privacy: after", || crate::privacy::after_step(self));
+        crate::profile::phase("hosting", || crate::hosting::update(self));
+        crate::profile::phase("phone", || crate::phone::update(self));
+        crate::profile::phase("life", || crate::life::update(self));
+        crate::profile::phase("lifecycle", || crate::lifecycle::update(self));
+        crate::profile::phase("traffic", || crate::traffic::begin(self));
+        crate::profile::phase("cars", || crate::cars::update(self));
+        crate::profile::phase("taxi", || crate::taxi::update(self));
+        crate::profile::phase("planner", || crate::planner::update(self));
+        crate::profile::phase("cooking", || crate::cooking::after_step(self));
+        crate::profile::phase("lights", || {
+            crate::lights::update(self);
+            crate::lights::update_while(self);
+        });
         if self.tick.is_multiple_of(TICKS_PER_HOUR) {
-            crate::rooms::opinions(self);
+            crate::profile::phase("rooms: opinions", || crate::rooms::opinions(self));
         }
 
-        for s in self.sims.iter_mut().filter(|s| s.steps > 0) {
-            s.feelings.retain(|m| m.expires > tick);
-            if self.content.buff_feelings {
-                s.refresh_buffs(&self.content);
+        crate::profile::phase("feelings", || {
+            for s in self.sims.iter_mut().filter(|s| s.steps > 0) {
+                s.feelings.retain(|m| m.expires > tick);
+                if self.content.buff_feelings {
+                    s.refresh_buffs(&self.content);
+                }
             }
-        }
+        });
         if tick.is_multiple_of(TICKS_PER_DAY) {
-            self.relationships.decay(&self.content.social_rules);
+            crate::profile::phase("relationships: decay", || {
+                self.relationships.decay(&self.content.social_rules)
+            });
         }
         if tick.is_multiple_of(GROWTH_STEP_MINUTES * TICKS_PER_MINUTE) {
-            self.grow(GROWTH_STEP_MINUTES as f32);
+            crate::profile::phase("grow", || self.grow(GROWTH_STEP_MINUTES as f32));
         }
         if tick.is_multiple_of(crate::machines::STEP_MINUTES * TICKS_PER_MINUTE) {
-            crate::machines::run(self, crate::machines::STEP_MINUTES as f32);
+            crate::profile::phase("machines", || {
+                crate::machines::run(self, crate::machines::STEP_MINUTES as f32)
+            });
         }
     }
 
