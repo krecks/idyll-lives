@@ -50,6 +50,7 @@ import { LandMode } from './landMode';
 import { installLandHook } from '../ui/land/landHook';
 import { brushOf } from '../ui/land/landTools';
 import type { NeighbourhoodDraft } from './town';
+import { peopleStreams } from './people';
 import { compileSim, loadGameData } from './gameData';
 import { townJob } from './townJobs';
 import { gameAssetPlan, parseAheadFiles, streamRanks } from './streamPlan';
@@ -89,6 +90,12 @@ export type StartRequest =
       mode?: GameKind;
       /** How fast residents age (default normal). */
       lifespan?: Lifespan;
+      /**
+       * The people seed the town's households were drawn from (`people.ts` `peopleStreams`): the
+       * neighbours' bonds and the simulation's own dice come from it too (the page's `?seed=` still
+       * wins for the dice). Missing: both are random.
+       */
+      peopleSeed?: number;
     }
   | { kind: 'load'; saveId: string };
 
@@ -207,10 +214,12 @@ async function openSession(
   let gameId: string;
   if (request.kind === 'new') {
     // (In the town worker: a big world's file takes most of a second to put together.)
+    const people = request.peopleSeed === undefined ? null : peopleStreams(request.peopleSeed);
+    const random = people?.bonds ?? (Math.random() * 2 ** 32) >>> 0;
     const made = await perfTimeAsync('session: assembleTown', () =>
-      townJob(content, { kind: 'assemble', town: request.town, player: request.household, slot: request.slot, options: { existing: request.existing, mode: request.mode, lifespan: request.lifespan }, random: (Math.random() * 2 ** 32) >>> 0 }),
+      townJob(content, { kind: 'assemble', town: request.town, player: request.household, slot: request.slot, options: { existing: request.existing, mode: request.mode, lifespan: request.lifespan }, random }),
     );
-    source = { lot: made.lot, seed: Number(params.get('seed')) || (Math.random() * 2 ** 31) >>> 0 };
+    source = { lot: made.lot, seed: Number(params.get('seed')) || (people?.sim ?? (Math.random() * 2 ** 31) >>> 0) };
     household = request.household.name.trim();
     gameId = crypto.randomUUID();
   } else {
