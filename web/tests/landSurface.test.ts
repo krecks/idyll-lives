@@ -10,7 +10,7 @@ import type { PlotInfo, RoadPlan, WorldStructure } from '../src/core/protocol';
 import { blankLand, encodeLand, LAND_CELL } from '../src/game/land';
 import { Geo } from '../src/render/shared/geometry';
 import { follows, Levels, levelsOf, surfaceOf } from '../src/render/shared/landSurface';
-import { EDGE_FOOT, padGeometry, padMask, padsOf, STEP_LEAST } from '../src/render/shared/pads';
+import { EDGE_FOOT, PAD_RECTS, padGeometry, padMask, padRects, padsOf, STEP_LEAST } from '../src/render/shared/pads';
 import { ROAD_Y, roadMeshes, WALK_LIP, WALK_Y } from '../src/render/shared/roads';
 import { junctionsOf } from '../src/render/shared/junctions';
 
@@ -124,6 +124,14 @@ describe('the renderer on a land the town follows', () => {
     }
     // (Not on the street.)
     expect(mask[40 * W + 50]).toBe(0);
+    // The terrain's rectangles over the whole world: every metre the mask has inside one of them.
+    const rects = new Float32Array(PAD_RECTS * 4);
+    const n = padRects(pads, [0, 0, W, D], rects);
+    expect(n).toBeLessThanOrEqual(pads.length);
+    // (Two lots side by side: one rectangle.)
+    expect(padRects([{ x: 0, z: 0, w: 10, d: 20, y: 1 }, { x: 10, z: 0, w: 10, d: 20, y: 2 }], [0, 0, 50, 50], new Float32Array(PAD_RECTS * 4))).toBe(1);
+    const inside = (x: number, z: number) => Array.from({ length: n }, (_, i) => rects.subarray(i * 4, i * 4 + 4)).some((r) => x > r[0] && z > r[1] && x < r[2] && z < r[3]);
+    for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) expect(inside(x + 0.5, z + 0.5)).toBe(mask[z * W + x] === 255);
     const { LandscapeLayout } = await import('../src/render/shared/nature');
     const { CountryRoads } = await import('../src/render/shared/countryRoads');
     const layout = new LandscapeLayout(w, (l, ww, n) => new CountryRoads(l, ww, n));

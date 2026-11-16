@@ -59,17 +59,21 @@ const LAND_EDGE_FADE = 60;
 /** Lots are filed for `padAt` by cells this wide (m). */
 const PAD_CELL = 16;
 
-/** `values` (a `cols` × `rows` grid of `LAND_CELL` m samples) at (`x`, `z`), between the samples round it, the edge's past the edge. */
+/**
+ * `values` (a `cols` × `rows` grid of `LAND_CELL` m samples) at (`x`, `z`) on the triangles the terrain draws them
+ * as (`pc/nature.ts` `tileMesh`: each cell split from its corner at (x, z + cell) to the one at (x + cell, z)), the
+ * edge's past the edge: what stands on the land stands on the terrain drawn, not a hair above or below it.
+ */
 function between(values: Float32Array, cols: number, rows: number, x: number, z: number): number {
   const fx = Math.min(cols - 1, Math.max(0, x / LAND_CELL));
   const fz = Math.min(rows - 1, Math.max(0, z / LAND_CELL));
   const i = Math.min(Math.floor(fx), Math.max(0, cols - 2));
   const j = Math.min(Math.floor(fz), Math.max(0, rows - 2));
-  const [tx, tz] = [fx - i, fz - j];
   const [i1, j1] = [Math.min(i + 1, cols - 1), Math.min(j + 1, rows - 1)];
-  const top = values[j * cols + i] * (1 - tx) + values[j * cols + i1] * tx;
-  const bottom = values[j1 * cols + i] * (1 - tx) + values[j1 * cols + i1] * tx;
-  return top * (1 - tz) + bottom * tz;
+  // (u across from the cell's west side, v down from its north (larger z) side: the split is u = v.)
+  const [u, v] = [fx - i, 1 - (fz - j)];
+  const [h00, h10, h01, h11] = [values[j1 * cols + i], values[j1 * cols + i1], values[j * cols + i], values[j * cols + i1]];
+  return u >= v ? h00 + u * (h10 - h00) + v * (h11 - h10) : h00 + v * (h01 - h00) + u * (h11 - h01);
 }
 
 /**

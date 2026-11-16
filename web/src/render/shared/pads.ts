@@ -1,7 +1,7 @@
 /**
  * The lots of a land the town follows as the ground draws them (engine-neutral; `pc/nature.ts` draws
  * them): each lot is a level pad (`builtSurface.ts`), and a 2 m terrain can't hold the step at its edge,
- * so inside a lot the terrain isn't drawn (`padMask`, a byte a metre: the ground's `GAME_PAD_MASK`) and the
+ * so inside a lot the terrain isn't drawn (`padRects`, each ground tile's: the ground's `GAME_PAD_MASK`) and the
  * pad is a slab of its own at its level, coloured as the terrain round it; where the land beside a lot
  * stands higher or lower than its pad by `STEP_LEAST` or more, a retaining edge stands from the lower to
  * the higher, `EDGE_FOOT` into the ground (`padGeometry`).
@@ -20,6 +20,9 @@ const SLAB_STEP = 2;
 const EDGE_STEP = 1;
 /** The retaining edges' tint over the foundations' stone (sRGB). */
 const EDGE_TINT = '#E2DCD2';
+
+/** How many lots' rectangles a ground tile's terrain leaves out at most (`padRects`; the ground's `GAME_PAD_MASK`). */
+export const PAD_RECTS = 32;
 
 /** A lot as the pads take it: its rectangle and its pad (m). */
 interface Pad {
@@ -40,7 +43,7 @@ export function padsOf(surface: BuiltSurface, count: number): Pad[] {
   return out;
 }
 
-/** The pad mask: a byte a metre over a `w` × `d` m world from its corner, 255 where the metre's middle is inside a lot. */
+/** The pad mask: a byte a metre over a `w` × `d` m world from its corner, 255 where the metre's middle is inside a lot (for checks: the terrain takes `padRects`). */
 export function padMask(pads: readonly Pad[], w: number, d: number): Uint8Array {
   const [cols, rows] = [Math.max(1, Math.ceil(w)), Math.max(1, Math.ceil(d))];
   const out = new Uint8Array(cols * rows);
@@ -50,6 +53,37 @@ export function padMask(pads: readonly Pad[], w: number, d: number): Uint8Array 
     for (let j = j0; j <= j1; j++) out.fill(255, j * cols + i0, j * cols + i1 + 1);
   }
   return out;
+}
+
+/**
+ * The lots in a box (x0, z0, x1, z1: a ground tile, a little past it) as rectangles for the terrain to leave out
+ * (x0, z0, x1, z1 each, clipped to the box): lots side by side in a row (the same depth, touching) one rectangle,
+ * then rows one over another (the same width, touching) one; at most `PAD_RECTS`, the biggest (a tile of a dense
+ * town has more lots than that only in its corners). Into `out` (`PAD_RECTS` × 4 floats); says how many.
+ */
+export function padRects(pads: readonly Pad[], box: readonly [number, number, number, number], out: Float32Array): number {
+  const [bx0, bz0, bx1, bz1] = box;
+  let rects: [number, number, number, number][] = [];
+  for (const p of pads) {
+    const r: [number, number, number, number] = [Math.max(bx0, p.x), Math.max(bz0, p.z), Math.min(bx1, p.x + p.w), Math.min(bz1, p.z + p.d)];
+    if (r[2] > r[0] && r[3] > r[1]) rects.push(r);
+  }
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
+  // Along rows, then down columns.
+  for (const [lo, hi, a0, a1] of [[0, 2, 1, 3], [1, 3, 0, 2]] as const) {
+    rects.sort((p, q) => p[a0] - q[a0] || p[a1] - q[a1] || p[lo] - q[lo]);
+    const merged: [number, number, number, number][] = [];
+    for (const r of rects) {
+      const last = merged[merged.length - 1];
+      if (last && near(last[a0], r[a0]) && near(last[a1], r[a1]) && r[lo] <= last[hi] + 1e-6) last[hi] = Math.max(last[hi], r[hi]);
+      else merged.push([...r]);
+    }
+    rects = merged;
+  }
+  if (rects.length > PAD_RECTS) rects = rects.sort((p, q) => (q[2] - q[0]) * (q[3] - q[1]) - (p[2] - p[0]) * (p[3] - p[1])).slice(0, PAD_RECTS);
+  out.fill(0);
+  rects.forEach((r, i) => out.set(r, i * 4));
+  return rects.length;
 }
 
 /** The slabs and the retaining edges of one group of lots (a ground tile's). */
