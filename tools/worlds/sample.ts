@@ -1,6 +1,8 @@
 /**
  * Makes sample worlds of every place (web/src/game/world.ts) with the shipped content, the way a
- * new game does (a world, its neighbours, a player household moving into an empty house), and
+ * new game does (its land, step 1's `land` job: `macro.ts` `landDraft`; its town laid on that, step
+ * 2's `town` job: `layOn` and `landFollow.ts` `settleLand`; its neighbours, a player household
+ * moving into an empty house), and
  * writes their town files for the simulation to check
  * (`cargo test -p sim-core --test sim generated_worlds:: -- --ignored`, reading WORLDS). Checks each
  * world's layout with `web/src/game/townCheck.ts` `townProblems` (its roads, areas, water, bridges,
@@ -8,9 +10,9 @@
  * `world.ts` `expectations`), and no country road the layout found no way for. And the neighbours:
  * every household's savings cover its home's price (web/src/game/wealth.ts, price.ts); per kind of
  * house, how old its owners are and how high up they work. And the file under 4 MB, and the time a
- * big world takes (its layout without generating houses, and assembling its file: a problem at
- * twice the budget). Problems are listed (and the exit code is 1). Every world is a Big one now
- * (cosy and normal were dropped in 0.8.0).
+ * big world takes (its land, its town's layout without generating houses, its land settled under
+ * it, and assembling its file: a problem at twice the budget). Problems are listed (and the exit
+ * code is 1). Every world is a Big one now (cosy and normal were dropped in 0.8.0).
  * Each world's line counts its terraced houses, backdrop buildings and places.
  *
  * A place's land (`meta.land`, its town graded into it: `landFollow.ts` `withLand`, timed against
@@ -52,7 +54,8 @@ const { Content } = await import('../../web/src/content/content.ts');
 const { AssetRegistry } = await import('../../web/src/assets/registry.ts');
 const { objectInfos } = await import('../../web/src/game/housegen.ts');
 const { randomHousehold } = await import('../../web/src/game/household.ts');
-const { assembleTown, generateStats, generateWorld, houseTemplate, populate, vacantSlots } = await import('../../web/src/game/town.ts');
+const { assembleTown, generateStats, houseTemplate, populate, vacantSlots } = await import('../../web/src/game/town.ts');
+const { landDraft, layOn } = await import('../../web/src/game/macro.ts');
 const { expectations, WORLD_KINDS } = await import('../../web/src/game/world.ts');
 type WorldOptions = import('../../web/src/game/world.ts').WorldOptions;
 const { homePrice } = await import('../../web/src/game/price.ts');
@@ -68,9 +71,11 @@ const { decodeLand } = await import('../../web/src/game/land.ts');
 type Land = import('../../web/src/game/land.ts').Land;
 
 /**
- * Budgets (ms): a big world's layout (without generating its houses) and assembling its file. (Not
- * targets: a big world may take a while to build. They catch one that runs away.)
+ * Budgets (ms): a place's land with no town on it (step 1's `land` job: planned, seeded and
+ * previewed), a big world's layout on it (without generating its houses) and assembling its file.
+ * (Not targets: a big world may take a while to build. They catch one that runs away.)
  */
+const LAND_JOB_BUDGET = 400;
 const LAYOUT_BUDGET = 1500;
 const ASSEMBLE_BUDGET = 1500;
 const MAX_FILE = 4e6;
@@ -108,7 +113,7 @@ if (!timing) process.argv.splice(process.argv.indexOf('--no-timing'), 1);
 const kinds = (flag('--kinds')?.split(',') ?? [...WORLD_KINDS]) as (typeof WORLD_KINDS)[number][];
 for (const kind of kinds) if (!WORLD_KINDS.includes(kind)) throw new Error(`no kind ${kind}`);
 /** `--options town=city,villages=many`: every place with these options (else its own). */
-const OPTION_VALUES: Record<keyof WorldOptions, readonly string[]> = { town: ['hamlet', 'village', 'town', 'city'], villages: ['none', 'few', 'many'], hills: ['flat', 'rolling', 'hilly', 'mountains'], woods: ['open', 'some', 'wooded'] };
+const OPTION_VALUES: Record<keyof WorldOptions, readonly string[]> = { town: ['hamlet', 'village', 'town', 'city'], villages: ['none', 'few', 'many'], hills: ['flat', 'rolling', 'hilly', 'mountains'], woods: ['open', 'some', 'wooded'], size: ['small', 'medium', 'large'] };
 const optionsOf = (text: string): Partial<WorldOptions> => {
   const out: Record<string, string> = {};
   for (const pair of text.split(',').filter(Boolean)) {
@@ -146,8 +151,8 @@ const perKind = Number(process.argv[3] ?? 3);
 const leftover = process.argv.slice(2).filter((a) => a.startsWith('--'));
 if (leftover.length) throw new Error(`no flag ${leftover.join(' ')}`);
 const worlds: unknown[] = [];
-/** The slowest world (ms): the layout (without houses), the houses, the file. */
-const slowest: [number, number, number] = [0, 0, 0];
+/** The slowest world (ms): the layout (without houses), the houses, the file, the land (step 1's job). */
+const slowest: [number, number, number, number] = [0, 0, 0, 0];
 /** The house classes, smallest first (`housegen.json` `classes`, by the label houses carry as `class`). */
 const HOUSE_CLASSES = Object.values(templates.gen!.classes).map((c) => c.label);
 /** Per house class: homes lived in, and their owners' summed eldest grown-up's age, top job grade (-1 none), how many are settled (`SETTLED_AGE` or `SENIOR`), price, savings. */
@@ -172,9 +177,14 @@ for (const { kind, seed, options } of runs) {
   // by the world's seed, the same seeds make the same files, so a failure in a
   // check of them can be run again.)
   Math.random = mulberry32(seed);
-  generateStats.houseMs = 0;
+  // Its land (step 1's job, with its preview), then its town laid on it from the same seed (step 2's).
   let t0 = performance.now();
-  const laid = generateWorld(content, templates, kind, seed, undefined, undefined, options);
+  const bare = landDraft(content, templates, kind, options, seed);
+  previewWorld(content, templates, bare, null);
+  const landJob = performance.now() - t0;
+  generateStats.houseMs = 0;
+  t0 = performance.now();
+  const laid = layOn(content, templates, bare, {}, { waterKept: true });
   const houses = generateStats.houseMs;
   const layout = performance.now() - t0 - houses;
   // The land graded under the town, as the town job does it (from the preview of the world, giving up what still breaks the slope limits).
@@ -194,12 +204,13 @@ for (const { kind, seed, options } of runs) {
   const text = assembleTown(content, templates, town, player, home.index);
   const assemble = performance.now() - t0;
   const file = JSON.parse(text);
-  [slowest[0], slowest[1], slowest[2]] = [Math.max(slowest[0], layout), Math.max(slowest[1], houses), Math.max(slowest[2], assemble)];
+  [slowest[0], slowest[1], slowest[2], slowest[3]] = [Math.max(slowest[0], layout), Math.max(slowest[1], houses), Math.max(slowest[2], assemble), Math.max(slowest[3], landJob)];
   const found = townProblems(file, expect, { river: kind === 'river', careers: content.careerCategories.map((c) => c.id), given: world.diagnostics?.slopes?.backdropIn });
   for (const p of [...found.hard, ...found.soft, ...(world.diagnostics?.roads ?? [])]) problems.push(`${tag}: ${p}`);
   // (A terrace lot's house is a generated terraced house, its lot cut to it: a fixed layout is wider than the lot.)
   for (const s of town.slots) if (s.lot === 'terrace' && houseTemplate(templates, s.template)?.class !== 'terraced house') problems.push(`${tag}: terrace lot ${s.index} has a ${s.template}`);
   if (text.length > MAX_FILE) problems.push(`${tag}: the town file is ${(text.length / 1e6).toFixed(1)} MB`);
+  if (timing && landJob > LAND_JOB_BUDGET * 2) problems.push(`${tag}: its land made in ${landJob.toFixed(0)} ms (budget ${LAND_JOB_BUDGET})`);
   if (timing && layout > LAYOUT_BUDGET * 2) problems.push(`${tag}: laid out in ${layout.toFixed(0)} ms (budget ${LAYOUT_BUDGET})`);
   if (timing && assemble > ASSEMBLE_BUDGET * 2) problems.push(`${tag}: assembled in ${assemble.toFixed(0)} ms (budget ${ASSEMBLE_BUDGET})`);
   if (timing && seeded && landMs > LAND_BUDGET * 2) problems.push(`${tag}: its land graded in ${landMs.toFixed(0)} ms (budget ${LAND_BUDGET})`);
@@ -244,7 +255,7 @@ for (const { kind, seed, options } of runs) {
       `${town.open ? `${town.open.areas.length} areas, ${spots} outdoor places, ${((f) => `${(f.built * 100).toFixed(0)}% built and farmed, ${(f.empty * 100).toFixed(0)}% squares empty, `)(fillOf(file, expect.meadow))}` : ''}` +
       `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''} (${town.slots.filter((s) => s.lot === 'terrace').length} terraced)${dropped ? `, ${dropped} lots left out` : ''}, ${basements} with a basement, ${town.households.length} households, ` +
       `${town.open?.backdrop ? `${town.open.backdrop.length} backdrop buildings (${town.open.backdrop.filter((b) => b.area === 0).length} in the main town), ${town.open.places?.length ?? 0} places, ` : ''}` +
-      `${file.sims.length} residents, ${file.objects.length} things, ${(text.length / 1e6).toFixed(2)} MB; ${layout.toFixed(0)} ms + ${houses.toFixed(0)} ms houses, file ${assemble.toFixed(0)} ms`,
+      `${file.sims.length} residents, ${file.objects.length} things, ${(text.length / 1e6).toFixed(2)} MB; land ${landJob.toFixed(0)} ms, town ${(layout + houses + landMs).toFixed(0)} ms (${layout.toFixed(0)} layout + ${houses.toFixed(0)} houses + ${landMs.toFixed(0)} settled), file ${assemble.toFixed(0)} ms`,
   );
 }
 console.log(`Owners per kind of house (the eldest grown-up, the highest job grade, A = 0; settled: ${SETTLED_AGE}+ or grade F up):`);
@@ -271,7 +282,7 @@ if (landTable.length) {
 }
 const [n, all, most] = courtsOf;
 console.log(`Courts: ${all} in ${n} worlds (${(all / n).toFixed(1)} a world, ${most} at most)`);
-console.log(`Slowest: layout ${slowest[0].toFixed(0)} ms, houses ${slowest[1].toFixed(0)} ms, file ${slowest[2].toFixed(0)} ms`);
+console.log(`Slowest: land ${slowest[3].toFixed(0)} ms, layout ${slowest[0].toFixed(0)} ms, houses ${slowest[1].toFixed(0)} ms, file ${slowest[2].toFixed(0)} ms`);
 writeFileSync(out, JSON.stringify(worlds));
 console.log(`${worlds.length} worlds → ${out}`);
 if (problems.length) {
