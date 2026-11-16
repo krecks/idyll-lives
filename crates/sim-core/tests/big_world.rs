@@ -160,13 +160,22 @@ fn big_world_benchmark() {
     let ticks = hours * 60 * sim_core::TICKS_PER_MINUTE;
     let mut times = Vec::with_capacity(ticks as usize);
     sim_core::profile::reset();
-    let run = Instant::now();
+    // (The public parking spots taken, by cars on a trip there or on their way to one: the most at
+    // once, and the ticks nine in ten or more were taken; outside the timing.)
+    let spots = w.travel.file.parking.len();
+    let (mut most_parked, mut full_ticks) = (0, 0u64);
+    let mut ticking = Duration::ZERO;
     for _ in 0..ticks {
         let t = Instant::now();
         w.tick_once();
-        times.push(t.elapsed());
+        let dt = t.elapsed();
+        ticking += dt;
+        times.push(dt);
+        let parked = w.cars.iter().filter(|c| c.trip.is_some()).count();
+        most_parked = most_parked.max(parked);
+        full_ticks += u64::from(spots > 0 && parked * 10 >= spots * 9);
     }
-    let total = run.elapsed();
+    let total = ticking;
     let searches = sim_core::path::take_search_stats();
     let mut slowest: Vec<(Duration, usize)> = times.iter().copied().zip(0..).collect();
     slowest.sort_unstable_by(|a, b| b.cmp(a));
@@ -210,6 +219,10 @@ fn big_world_benchmark() {
         searches.max_nodes,
         searches.failed,
         searches.failed_nodes as f64 / searches.failed.max(1) as f64,
+    );
+    eprintln!(
+        "parking: {spots} public spots, at most {most_parked} taken at once, nine in ten or more taken {:.1} game hours of {hours}",
+        full_ticks as f64 / (60 * sim_core::TICKS_PER_MINUTE) as f64
     );
     eprintln!(
         "heap {:.1} MB held after ticking ({:.1} MB at most), {} residents and {} cars by then",
