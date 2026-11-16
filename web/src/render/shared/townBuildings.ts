@@ -356,14 +356,31 @@ export interface BackdropGround {
   to: [number, number] | null;
 }
 
+/** Each road's box (x0, z0, x1, z1), made the first time it is asked for: `nearestOnRoads` passes over a road whose box is out of reach. */
+const roadBoxes = new WeakMap<RoadPlan, readonly [number, number, number, number]>();
+function roadBox(r: RoadPlan): readonly [number, number, number, number] {
+  let box = roadBoxes.get(r);
+  if (!box) {
+    let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const [x, z] of r.points) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
+    roadBoxes.set(r, (box = [x0, z0, x1, z1]));
+  }
+  return box;
+}
+
 /** The point of `roads` nearest (x, z), if within `most` m. */
 export function nearestOnRoads(roads: readonly RoadPlan[], x: number, z: number, most: number): [number, number] | null {
   let best = most * most;
   let at: [number, number] | null = null;
   for (const r of roads) {
+    const [x0, z0, x1, z1] = roadBox(r);
+    if (x < x0 - most || x > x1 + most || z < z0 - most || z > z1 + most) continue;
     for (let i = 0; i + 1 < r.points.length; i++) {
       const [ax, az] = r.points[i];
       const [bx, bz] = r.points[i + 1];
+      // (A stretch out of reach either way: passed over.)
+      const reach = Math.sqrt(best);
+      if ((ax < x - reach && bx < x - reach) || (ax > x + reach && bx > x + reach) || (az < z - reach && bz < z - reach) || (az > z + reach && bz > z + reach)) continue;
       const [dx, dz] = [bx - ax, bz - az];
       const l2 = dx * dx + dz * dz;
       const t = l2 > 0 ? Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / l2)) : 0;

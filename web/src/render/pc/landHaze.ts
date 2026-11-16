@@ -19,8 +19,8 @@ const FADE = 240;
 const RINGS: readonly [number, number][] = [
   [FADE, 0],
   [FADE * 0.6, 0.3],
-  [FADE * 0.25, 0.72],
-  [0, 0.92],
+  [FADE * 0.25, 0.8],
+  [0, 1],
   [-200, 1],
   [-6000, 1],
 ];
