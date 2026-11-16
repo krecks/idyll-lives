@@ -366,7 +366,14 @@ async function editSession(page, renderer, shootAs, setStep) {
     const bare = await along();
     await tool('lot');
     const f = await along();
-    console.log(`create: ${renderer} edit: frames while the lot's ghost follows the pointer: ${line(f)} (with no tool in hand: ${line(bare)})`);
+    // The editor's own work per pointer move (the lot fitted, its ghost made and handed to the renderer), apart from the frame.
+    const each = await bench((pts) => {
+      const tool = window.__townEditor.stageTool;
+      const t0 = performance.now();
+      for (let k = 0; k < 5; k++) for (const p of pts) tool.hover(p.x + k, p.y);
+      return (performance.now() - t0) / (pts.length * 5);
+    }, spots);
+    console.log(`create: ${renderer} edit: frames while the lot's ghost follows the pointer: ${line(f)} (with no tool in hand: ${line(bare)}); the editor's own work ${each.toFixed(2)} ms a pointer move`);
   }
   let placed = false;
   for (const p of spots) {
