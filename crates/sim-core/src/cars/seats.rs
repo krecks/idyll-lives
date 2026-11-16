@@ -296,7 +296,12 @@ pub(crate) fn lead_by<'a>(
     let Some(car) = car else {
         return 0;
     };
-    WALK_TO_CAR_TICKS + u64::from(GET_IN_TICKS) + drive_out_ticks(car) + off_map(content)
+    // (A little early, all in it together: `life::early`, by its household.)
+    WALK_TO_CAR_TICKS
+        + u64::from(GET_IN_TICKS)
+        + drive_out_ticks(car)
+        + off_map(content)
+        + crate::life::early(car.household)
 }
 
 /// Once in `car` for work or school: the wait for it to go and the drive out of town.

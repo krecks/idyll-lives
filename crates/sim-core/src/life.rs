@@ -407,12 +407,27 @@ pub(crate) const LOW_NEED: f32 = 0.15;
 pub const WALK_MARGIN: f32 = 1.05;
 
 /// When someone with work or school starting at `start` leaves (the content's `leave`, unless
-/// they live in an open-world town: then by their walk, `Sim::commute`).
+/// they live in an open-world town: then by their walk, `Sim::commute`), a worker a little early
+/// (`early`).
 pub fn leave_for(sim: &crate::world::Sim, leave: u64, start: u64) -> u64 {
-    match sim.commute {
+    let leave = match sim.commute {
         Some(c) => start.saturating_sub(c.ticks),
         None => leave,
-    }
+    };
+    leave.saturating_sub(if sim.job.is_some() { early(sim.id) } else { 0 })
+}
+
+/// The most a worker sets off before their way to work says they must (game minutes).
+const EARLY_MOST: f32 = 20.0;
+
+/// How much earlier than their way needs someone off to work sets off (ticks, up to
+/// `EARLY_MOST`), by a hash of `key` (a resident's id; for those going by car, its household's,
+/// so all in it go together: `cars::lead_ticks`): the same every day and after a load, so it is
+/// never saved. With every worker off at the last minute, a full town's commuters met at the
+/// ways out in one queue. Not for school: its day starts for every pupil at once anyway.
+pub(crate) fn early(key: u32) -> u64 {
+    let h = (u64::from(key) + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15) >> 32;
+    h % (ticks(EARLY_MOST) + 1)
 }
 
 /// How long `i`'s way to work takes (`Commute`), worked out when they first need it and when they

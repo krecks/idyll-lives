@@ -426,7 +426,9 @@ fn a_car_waits_for_someone_in_its_way_who_then_steps_aside() {
     w.cars[0].driver = Some(0);
     w.cars[0].aboard = vec![0];
     w.sims[0].away_until = Some(w.tick + 100_000);
-    // ...and Bo stands right in front of it (it faces the street).
+    // ...and Bo stands right in front of it (it faces the street), no shift of his to set off
+    // for in the while (`life::early`: he'd be off a little before it).
+    w.sims[1].job = None;
     w.sims[1].pos = [34.0, 6.5];
     for _ in 0..secs(1.0) {
         w.tick_once();

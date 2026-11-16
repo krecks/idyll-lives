@@ -173,8 +173,10 @@ fn the_toilet_before_leaving_for_work() {
     .unwrap();
     run_to(&mut w, 2, 0.5);
     let job = w.sims[0].job.clone().unwrap();
-    let (leave, ..) =
+    let (leave, start, _) =
         life::shift_today(&w.content, &job, &w.sims[0].skills, w.tick).expect("a workday");
+    // (As they leave: a little early, `life::early`.)
+    let leave = life::leave_for(&w.sims[0], leave, start);
     // An hour before they leave, up and about with a bladder not quite full (breakfast over:
     // the toilet after a meal, `dayRhythm.habits` `meal`, isn't the one this is about).
     let ready = common::mins(w.content.day_rhythm.ready_minutes);
