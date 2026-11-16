@@ -154,11 +154,12 @@ describe('an island', () => {
     const land = new LandscapeLayout(world, (l, w, name) => new CountryRoads(l, w, name));
     const grown = land as unknown as { waterSheet(): { size: number; x: number; z: number }; terrainGrid(): { size: number } };
     expect(land.watered).toBe(true);
-    // The water's sheet is under the whole ground: its tiles (`GROUND_TILE` m, from the terrain's corner) reach past
-    // the terrain's square, and the sheet as far.
+    // The water's sheet is under the whole ground, as far as it reaches: the terrain's square (its last tiles stop at
+    // its edge, though a whole tile would reach past it).
     const sheet = grown.waterSheet();
     const size = grown.terrainGrid().size;
-    const [x0, x1] = [SIDE / 2 - size / 2, SIDE / 2 - size / 2 + Math.ceil(size / GROUND_TILE) * GROUND_TILE];
+    expect(size % GROUND_TILE).not.toBe(0);
+    const [x0, x1] = [SIDE / 2 - size / 2, SIDE / 2 + size / 2];
     expect(sheet.x - sheet.size / 2).toBeCloseTo(x0, 6);
     expect(sheet.x + sheet.size / 2).toBeCloseTo(x1, 6);
     expect(sheet.z - sheet.size / 2).toBeCloseTo(x0, 6);

@@ -1181,16 +1181,11 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   }
 
   /**
-   * The sheet of the sea or the lake: its size, at the water line under the whole landscape. A big world's
-   * ground is drawn in `GROUND_TILE` m tiles from the terrain's corner, the last ones reaching past its square:
-   * the sheet reaches as far (else the sea round an island stops short of the ground's edge there, and the sea
-   * floor shows past it).
+   * The sheet of the sea or the lake: its size, at the water line under the whole landscape: the terrain's square,
+   * where the ground stops too (a big world's ground tiles included: `pc/nature.ts` `tileGrid`).
    */
   protected waterSheet(): { size: number; x: number; y: number; z: number } {
-    const size = Math.max(this.w, this.d) + this.ring * 2;
-    if (!this.built) return { size, x: this.w / 2, y: WATER_Y, z: this.d / 2 };
-    const tiled = Math.ceil(size / GROUND_TILE) * GROUND_TILE;
-    return { size: tiled, x: this.w / 2 + (tiled - size) / 2, y: WATER_Y, z: this.d / 2 + (tiled - size) / 2 };
+    return { size: this.terrainGrid().size, x: this.w / 2, y: WATER_Y, z: this.d / 2 };
   }
 
   /**
