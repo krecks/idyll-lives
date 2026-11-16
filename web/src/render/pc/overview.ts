@@ -147,6 +147,8 @@ export class TownOverview {
   private readonly placed = new Map<string, Placed>();
   private readonly templatesInUse = new Set<string>();
   private key = '';
+  /** What the backdrop's buildings were drawn from (`backdropKey`): a town whose layout (`key`) is the same but for them has only them drawn again. */
+  private backdropKey = '';
   plots: PlotInfo[] = [];
   width = 0;
   depth = 0;
@@ -247,7 +249,16 @@ export class TownOverview {
   /** Builds the overview of `world` (kept when it is the same town); the previous one stays until it is done. True when it was built. */
   async build(world: WorldStructure, pace?: () => Promise<void>): Promise<boolean> {
     const key = townKey(world);
-    if (key === this.key) return false;
+    const drawn = backdropKey(world);
+    if (key === this.key && drawn === this.backdropKey) return false;
+    if (key === this.key) {
+      // Only the backdrop changed (a street built up with the town's buildings alone, or cleared of them): the street,
+      // the ground and the things are as they were, and only the buildings are written again.
+      this.buildings.setBackdrop(this.backdropOf(world));
+      this.buildings.show(1);
+      this.backdropKey = drawn;
+      return true;
+    }
     // (Asked for first: the render data worker makes the town's road mesh while the street is planned. Not for
     // another town with the same roads at the same heights: a lot removed keeps it.)
     const roadsKey = roadKey(world);
@@ -257,10 +268,7 @@ export class TownOverview {
     const objects = await this.buildObjects(world, pace);
     await pace?.();
     const surface = surfaceOf(world);
-    const height = surface ? (x: number, z: number) => surface.at(x, z) : () => 0;
-    const span = perfStart('town: backdrop');
-    const backdrop = townBackdrop(world, height, surface ? height : null, this.drawnBuildings);
-    perfEnd(span, `${world.meta?.backdrop?.length ?? 0} buildings`);
+    const backdrop = this.backdropOf(world);
 
     const swap = perfStart('town: swap');
     // Swap: the previous town's ground and things go (those it keeps stay), the new ones are shown.
@@ -286,12 +294,23 @@ export class TownOverview {
     // The previous overview's boxes for files that have come since are drawn no more.
     this.disposeStale();
     this.key = key;
+    this.backdropKey = drawn;
     this.plots = world.plots;
     this.width = world.width;
     this.depth = groundDepth(world);
     this.buildHighlights(world.plots, surface);
     perfEnd(swap);
     return true;
+  }
+
+  /** `world`'s backdrop buildings as drawn, on its built surface (`townBackdrop`; those drawn last kept where nothing of them changed). */
+  private backdropOf(world: WorldStructure): TownBuilding[] {
+    const surface = surfaceOf(world);
+    const height = surface ? (x: number, z: number) => surface.at(x, z) : () => 0;
+    const span = perfStart('town: backdrop');
+    const out = townBackdrop(world, height, surface ? height : null, this.drawnBuildings);
+    perfEnd(span, `${world.meta?.backdrop?.length ?? 0} buildings`);
+    return out;
   }
 
   /** Streetlights, porch lamps and window glass follow the lighting key's lamp level (`glow`: the lamps' colour, linear). */
@@ -648,9 +667,13 @@ function townKey(world: WorldStructure): string {
     (world.meta?.paths ?? []).map((r) => `${r.x},${r.z},${r.w}`).join(';'),
     JSON.stringify(world.meta?.world ?? null),
     world.meta?.home ?? '-',
-    // (The backdrop: a street built up with the town's buildings alone, or cleared of them, changes nothing else.)
-    hashString(JSON.stringify([world.meta?.backdrop ?? null, (world.meta?.places ?? []).map((p) => p.hours ?? null)])),
   ].join('|');
+}
+
+/** What a town's backdrop buildings are drawn from (`townBackdrop`): its buildings, its places' hours, and on a land it follows the surface's roads (as the road mesh is keyed: `roadKey`). */
+function backdropKey(world: WorldStructure): string {
+  const surface = surfaceOf(world);
+  return `${hashString(JSON.stringify([world.meta?.backdrop ?? null, (world.meta?.places ?? []).map((p) => p.hours ?? null)]))}|${surface ? surface.roadsSig() : '-'}`;
 }
 
 /** A highlight's colour (into `out`): the states mixed by intensity (an added glow, alpha its strength). */
