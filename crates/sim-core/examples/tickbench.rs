@@ -40,6 +40,7 @@ fn main() {
         }
         let mut world = World::from_json(&c.to_string(), &lot.to_string(), 1).unwrap();
         let ticks = sim_core::clock::TICKS_PER_DAY as u32;
+        sim_core::profile::reset();
         let start = Instant::now();
         for _ in 0..ticks {
             world.tick_once();
@@ -49,5 +50,7 @@ fn main() {
             "{label}: {:?}/tick, {events} social events",
             start.elapsed() / ticks
         );
+        // (Phase by phase: with `--features profile` only.)
+        print!("{}", sim_core::profile::report());
     }
 }

@@ -13,6 +13,7 @@
 //! of a 1024 world have homes for about 580) and
 //! `HOURS=6` (game hours to run, default 4) in the environment. The world is a town with roads and
 //! areas; `OPEN=0` makes it one without them (as the first baseline was measured on).
+//! `--features profile` adds where the ticks' time went, phase by phase (`profile.rs`).
 //! `WORLDS=worlds.json` (a file of `tools/worlds/sample.ts`'s shape) runs a real Big town instead,
 //! the `WORLD`th in it (default 0), as it was made (`SIZE` and `RESIDENTS` don't apply), the view on
 //! the player's home.
@@ -158,6 +159,7 @@ fn big_world_benchmark() {
     );
     let ticks = hours * 60 * sim_core::TICKS_PER_MINUTE;
     let mut times = Vec::with_capacity(ticks as usize);
+    sim_core::profile::reset();
     let run = Instant::now();
     for _ in 0..ticks {
         let t = Instant::now();
@@ -199,6 +201,8 @@ fn big_world_benchmark() {
         ms(p99),
         ms(max),
     );
+    // (Where the ticks' time went, phase by phase: with `--features profile` only.)
+    eprint!("{}", sim_core::profile::report());
     eprintln!(
         "A*: {} searches, {:.0} tiles each on average, {} at most",
         searches.searches,

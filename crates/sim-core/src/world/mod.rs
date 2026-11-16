@@ -3002,8 +3002,6 @@ impl World {
 
     /// What runs along the whole back edge of `obj`: None if not a wall (plain or with a window)
     /// all along, else whether a window is part of it.
-    /// What runs along the whole back edge of `obj`: None if not a wall (plain or with a window)
-    /// all along, else whether a window is part of it.
     pub(crate) fn wall_behind(&self, obj: &ObjectInstance) -> Option<bool> {
         use crate::lot::Edge;
         let lot = &self.lot;
@@ -4562,12 +4560,12 @@ impl World {
             || self.rooms_things
             || self.rooms_rescore
         {
-            self.update_rooms();
+            crate::profile::phase("update_rooms", || self.update_rooms());
         } else if self.tick.is_multiple_of(ROOM_REFRESH_TICKS) {
-            self.rescore_rooms();
+            crate::profile::phase("rescore_rooms", || self.rescore_rooms());
         }
-        self.refresh_reach();
-        self.refresh_index();
+        crate::profile::phase("refresh_reach", || self.refresh_reach());
+        crate::profile::phase("refresh_index", || self.refresh_index());
         self.travel.note_doors(&self.plots);
         // A new game's first step: the player hears of anyone without a bed (told as the world was
         // made, it would be the story so far, which the view doesn't show as news).
@@ -4580,8 +4578,9 @@ impl World {
         let tick = self.tick;
         self.search_mark = crate::path::nodes_searched();
 
-        crate::partners::refresh(self);
-        crate::staff::update(self);
+        crate::profile::phase("partners::refresh", || crate::partners::refresh(self));
+        crate::profile::phase("staff::update", || crate::staff::update(self));
+        let briefs_start = crate::profile::start();
         let mut briefs = std::mem::take(&mut self.briefs);
         briefs.clear();
         for s in &self.sims {
@@ -4651,8 +4650,10 @@ impl World {
             }
         }
         self.briefs = briefs;
-        crate::privacy::refresh(self);
-        crate::lod::plan(self);
+        crate::profile::end("briefs", briefs_start);
+        crate::profile::phase("privacy::refresh", || crate::privacy::refresh(self));
+        crate::profile::phase("lod::plan", || crate::lod::plan(self));
+        let steps_start = crate::profile::start();
         // Those who go first when the tick's searches run over budget: the player's household
         // and whoever is watched (see `SEARCH_BUDGET`).
         let mut first = std::mem::take(&mut self.first);
@@ -4772,25 +4773,26 @@ impl World {
         }
         self.work = work;
         self.first = first;
-        crate::partners::update(self);
-        self.broadcast();
-        self.apply_messes();
-        crate::carry::after_step(self);
-        crate::setup::update(self);
-        self.wake_for_crying_babies();
-        conversation::update(self);
-        crate::privacy::after_step(self);
-        crate::hosting::update(self);
-        crate::phone::update(self);
-        crate::life::update(self);
-        crate::lifecycle::update(self);
-        crate::traffic::begin(self);
-        crate::cars::update(self);
-        crate::taxi::update(self);
-        crate::planner::update(self);
-        crate::cooking::after_step(self);
-        crate::lights::update(self);
-        crate::lights::update_while(self);
+        crate::profile::end("step_sim", steps_start);
+        crate::profile::phase("partners::update", || crate::partners::update(self));
+        crate::profile::phase("broadcast", || self.broadcast());
+        crate::profile::phase("apply_messes", || self.apply_messes());
+        crate::profile::phase("carry::after_step", || crate::carry::after_step(self));
+        crate::profile::phase("setup::update", || crate::setup::update(self));
+        crate::profile::phase("wake_for_crying_babies", || self.wake_for_crying_babies());
+        crate::profile::phase("conversation::update", || conversation::update(self));
+        crate::profile::phase("privacy::after_step", || crate::privacy::after_step(self));
+        crate::profile::phase("hosting::update", || crate::hosting::update(self));
+        crate::profile::phase("phone::update", || crate::phone::update(self));
+        crate::profile::phase("life::update", || crate::life::update(self));
+        crate::profile::phase("lifecycle::update", || crate::lifecycle::update(self));
+        crate::profile::phase("traffic::begin", || crate::traffic::begin(self));
+        crate::profile::phase("cars::update", || crate::cars::update(self));
+        crate::profile::phase("taxi::update", || crate::taxi::update(self));
+        crate::profile::phase("planner::update", || crate::planner::update(self));
+        crate::profile::phase("cooking::after_step", || crate::cooking::after_step(self));
+        crate::profile::phase("lights::update", || crate::lights::update(self));
+        crate::profile::phase("lights::update_while", || crate::lights::update_while(self));
         if self.tick.is_multiple_of(TICKS_PER_HOUR) {
             crate::rooms::opinions(self);
         }
