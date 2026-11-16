@@ -96,7 +96,7 @@ describe("step 2's settle", async () => {
     const off = ([x, z]: Pt) => Math.min(...areas.map((a) => Math.hypot(Math.max(a.x - x, 0, x - a.x - a.w), Math.max(a.z - z, 0, z - a.z - a.d))));
     // A country road well out of every village, and a street drawn from it square to it out of the world.
     let found: { drawn: NeighbourhoodDraft; from: Pt; dir: Pt; road: RoadPlan } | null = null;
-    for (const [i, r] of plan.roads.entries()) {
+    for (const r of plan.roads) {
       if (r.kind !== 'country' || r.bridge || found) continue;
       const ls = lengths(r.points);
       for (let s = 30; s < ls[ls.length - 1] - 30 && !found; s += 15) {
@@ -111,7 +111,6 @@ describe("step 2's settle", async () => {
           if ('refused' in e) continue;
           const road = e.draft.roads[e.draft.roads.length - 1];
           if (road.kind !== 'country' || road.ends[1] !== 'out' || nearest(road.points, ...p).dist > 6) continue;
-          void i;
           found = { drawn: e.draft, from: p, dir, road };
           break;
         }
