@@ -99,6 +99,9 @@ export class GameCameraRig {
     this.stopInput();
   }
 
+  /** Where the target stands (m, the renderer's heights: on a land with relief, the ground under it); none: at 0. */
+  ground: ((x: number, z: number) => number) | null = null;
+
   /** Advances and applies the pose. */
   frame(dt: number): void {
     const shot = this.shot;
@@ -137,7 +140,7 @@ export class GameCameraRig {
     cam.beta = c.beta;
     cam.radius = c.radius;
     cam.target.x = c.tx;
-    cam.target.y = 0;
+    cam.target.y = this.ground ? this.ground(c.tx, c.tz) : 0;
     cam.target.z = c.tz;
     // The director owns the camera: no leftover spin from the player's last drag.
     this.stopInput();

@@ -39,6 +39,7 @@ import type { Lighting } from '../shared/environment';
 import { grassField, gustAt, gustNoise, markGrassPatches, recolourGrass, regroundGrass, type GrassQuality } from '../shared/grass';
 import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { pondQuads, rectBox } from '../shared/landBake';
+import { PAD_RECTS, padGeometry, padRects, padsOf } from '../shared/pads';
 import { LAND_CELL, type LandRect } from '../../game/land';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
@@ -177,6 +178,9 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     })();
     const [grounds] = await both(ground, plants);
     draws.push(...grounds);
+    // (On a land the town follows, each lot's pad a slab of its own, with its retaining edges: `shared/pads.ts`.)
+    const pads = this.surface ? perfTime('nature: pads', () => this.padDraws(app, parent, grounds)) : { slabs: [], edges: [] };
+    draws.push(...pads.slabs, ...pads.edges);
     if (this.seaSheet) draws.push((this.sheet = perfTime('nature: water', () => this.water(app, parent))));
     // (A height field's water above the sea's level: its own, tile by tile.)
     if (this.heightField) for (let k = 0; k < this.tiles.length; k++) draws.push(...this.pond(k));
@@ -190,7 +194,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     });
     const grass = (this.grass = new Grass(app, parent, field, this.grassQuality));
     onStep?.('grass');
-    grass.onGround(grounds.map((g) => g.render!.meshInstances[0]));
+    grass.onGround([...grounds, ...pads.slabs].map((g) => g.render!.meshInstances[0]));
     const built = gather(this.batches);
     return { draws: [...draws, ...built.draws, ...grass.draws.map((d) => d.entity)], casters: built.casters, only: built.only };
   }
@@ -249,6 +253,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     disposeTiles(this.tiles);
     this.tiles = [];
     this.groundMats = null;
+    this.slabMaterial = null;
     this.woodsSquares = [];
     this.flowerSquares = [];
     for (const e of this.others) e.destroy();
@@ -279,8 +284,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   }
 
   /** Each frame: the grass near the eye (game space) in view of the camera (`Grass.frame`). */
-  grassFrame(eye: { x: number; y: number; z: number }, camera: pc.CameraComponent): void {
-    this.grass?.frame(eye, camera.frustum);
+  grassFrame(eye: { x: number; y: number; z: number }, camera: pc.CameraComponent, datum = 0): void {
+    this.grass?.frame(eye, camera.frustum, datum);
   }
 
   /** The residents pushing the grass aside now (`Grass.setPushers`). */
@@ -313,8 +318,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    */
   private async terrainTiles(app: pc.AppBase, parent: pc.Entity, pace?: () => Promise<void>): Promise<pc.Entity[]> {
     const { count } = this.tileFrame();
-    const material = MaterialLibrary.for(app).surface('material.ground', { vertexColors: true, variant: 'grass' });
-    grassGround(app.graphicsDevice, material);
+    const material = this.groundMaterial(app);
     const out: pc.Entity[] = [];
     this.tiles = [];
     // The worker shades a few tiles ahead while one's meshes are made here (its round trips overlap);
@@ -420,6 +424,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    */
   reground(rect: LandRect): number {
     if (!this.heightField || !this.host) return 0;
+    // (On a land its town follows, drawn from the field there until the stroke is done: `landChanged`.)
+    this.landStamped(rect);
     const box = this.landBox(rect, LAND_CELL);
     const tiles = this.tilesIn(box);
     const { n } = this.tileFrame();
@@ -429,10 +435,14 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       if (!t?.kept) continue;
       const positions = this.tileGrid(k);
       // (`heightAt`, the roads' levelling kept by point: the roads don't move as the land is shaped.)
-      const levels = (t.levels ??= this.roadLevels(positions));
-      for (let v = 1, q = 0; v < positions.length; v += 3, q += 2) {
-        const g = this.ground(positions[v - 1], positions[v + 1]);
-        positions[v] = g + (levels[q + 1] - g) * levels[q];
+      if (this.surface) {
+        for (let v = 1; v < positions.length; v += 3) positions[v] = this.terrainAt(positions[v - 1], positions[v + 1]);
+      } else {
+        const levels = (t.levels ??= this.roadLevels(positions));
+        for (let v = 1, q = 0; v < positions.length; v += 3, q += 2) {
+          const g = this.ground(positions[v - 1], positions[v + 1]);
+          positions[v] = g + (levels[q + 1] - g) * levels[q];
+        }
       }
       for (let q = 0; q < colors.length; q++) colors[q] = t.kept[q] / 255;
       this.redrawTile(t, positions, colors);
@@ -551,8 +561,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    */
   async landDone(rect: LandRect, pace?: () => Promise<void>): Promise<[number, number, number, number] | null> {
     if (!this.heightField || !this.host) return null;
-    this.landChanged(rect);
-    const box = this.landBox(rect, LAND_DONE_PAD);
+    // (On a land its town follows, what the surface solved again moved too.)
+    const box = this.landBox(this.landChanged(rect), LAND_DONE_PAD);
     for (const k of this.tilesIn(box)) {
       await pace?.();
       const t = this.tiles[k];
@@ -817,9 +827,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     mesh.update(pc.PRIMITIVE_TRIANGLES);
     gpuOnly(mesh);
     // (A copy of its own: the gusts' define is the landscape's.)
-    const material = MaterialLibrary.for(app).surface('material.ground', { vertexColors: true, variant: 'grass' });
-    grassGround(app.graphicsDevice, material);
-    return drawOf(app, parent, 'terrain', mesh, material);
+    return drawOf(app, parent, 'terrain', mesh, this.groundMaterial(app));
   }
 
   /**
@@ -859,11 +867,68 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return mat;
   }
 
-  /** The ground tiles' materials (the town view lays its colour map over them: `groundTiles.ts` `TownGroundMap`). */
+  /** The ground tiles' materials (the town view lays its colour map over them: `groundTiles.ts` `TownGroundMap`), the pads' slabs' too. */
   groundMaterials(): readonly pc.StandardMaterial[] {
     // (Worked out once: the tiles keep their material.)
-    return (this.groundMats ??= [...new Set(this.tiles.map((t) => t.mi.material as pc.StandardMaterial))]);
+    return (this.groundMats ??= [...new Set([...this.tiles.map((t) => t.mi.material as pc.StandardMaterial), ...(this.slabMaterial ? [this.slabMaterial] : [])])]);
   }
+
+  /**
+   * The terrain's material: the ground's, with the gusts (a copy of its own: their define is the landscape's), and on
+   * a land the town follows another copy that draws nothing inside a lot (`GAME_PAD_MASK`: the lots' pads are slabs).
+   */
+  private groundMaterial(app: pc.AppBase): pc.StandardMaterial {
+    const material = MaterialLibrary.for(app).surface('material.ground', { vertexColors: true, variant: this.surface ? 'grassPads' : 'grass' });
+    grassGround(app.graphicsDevice, material);
+    if (this.surface) padMasked(material);
+    return material;
+  }
+
+  /**
+   * On a land the town follows: the lots each terrain draw leaves out (`grounds`, by tile), and each lot's slab at its pad (the
+   * ground's own material, its colours the terrain's there) and its retaining edges (the foundations' stone, tinted) in a draw
+   * of each per ground tile.
+   */
+  private padDraws(app: pc.AppBase, parent: pc.Entity, grounds: readonly pc.Entity[]): { slabs: pc.Entity[]; edges: pc.Entity[] } {
+    const surface = this.surface!;
+    const device = app.graphicsDevice;
+    const pads = padsOf(surface, this.world?.plots.length ?? 0);
+    const { x0, z0, size } = this.tileFrame();
+    const count = Math.ceil(size / TILE);
+    // Each ground tile's draw leaves out the lots on it (a little past it: its skirt, its coarser levels).
+    grounds.forEach((g, k) => {
+      const mi = g.render!.meshInstances[0];
+      const t = this.tiles[k];
+      const rects = new Float32Array(PAD_RECTS * 4);
+      const n = t ? padRects(pads, [t.x - TILE / 2 - 4, t.z - TILE / 2 - 4, t.x + TILE / 2 + 4, t.z + TILE / 2 + 4], rects) : 0;
+      mi.setParameter('game_padRects[0]', rects);
+      mi.setParameter('game_padCount', n);
+    });
+    const groupOf = (x: number, z: number) => Math.max(0, Math.min(count - 1, Math.floor((z - z0) / TILE))) * count + Math.max(0, Math.min(count - 1, Math.floor((x - x0) / TILE)));
+    const geos = padGeometry(
+      (x, z) => this.terrainAt(x, z),
+      pads,
+      groupOf,
+      (x, z, y, out) => this.terrainColour(x, z, y, out),
+      (x, z) => [(x - x0) / size, (z - z0) / size],
+    );
+    const lib = MaterialLibrary.for(app);
+    const slab = (this.slabMaterial = lib.surface('material.ground', { vertexColors: true, variant: 'grass' }));
+    grassGround(device, slab);
+    // (The retaining edges in the houses' foundation stone: the soil's and the paving's textures are laid along xz,
+    // in streaks up a wall.)
+    const stone = lib.surface('material.wall.stone', { vertexColors: true, doubleSided: true });
+    const out = { slabs: [] as pc.Entity[], edges: [] as pc.Entity[] };
+    for (const [k, g] of geos) {
+      const slabs = meshFrom(device, g.slabs.meshData({ colors: true }));
+      if (slabs) out.slabs.push(drawOf(app, parent, `pads${k}`, slabs, slab));
+      const edges = meshFrom(device, g.edges.meshData({ colors: true }));
+      if (edges) out.edges.push(drawOf(app, parent, `padEdges${k}`, edges, stone));
+    }
+    return out;
+  }
+  /** The slabs' material (`padDraws`). */
+  private slabMaterial: pc.StandardMaterial | null = null;
   private groundMats: pc.StandardMaterial[] | null = null;
 
   /** Crown clusters gathered from the woods (for the report), 0 without them. */
@@ -1045,6 +1110,17 @@ function writeVertices(mesh: pc.Mesh, streams: Record<string, Float32Array>, cou
   box.compute(streams[pc.SEMANTIC_POSITION], count);
   mesh.aabb = box;
   return true;
+}
+
+/** The pad mask's define on the terrain's material (`padDraws` sets each draw's own lots): none until a draw has some. */
+const padMasks = new WeakSet<pc.StandardMaterial>();
+function padMasked(material: pc.StandardMaterial): void {
+  if (padMasks.has(material)) return;
+  padMasks.add(material);
+  material.setDefine('GAME_PAD_MASK', '');
+  material.setParameter('game_padRects[0]', new Float32Array(PAD_RECTS * 4));
+  material.setParameter('game_padCount', 0);
+  material.update();
 }
 
 /** An entity of `app` drawing `mesh` with `material`, switched off, under `parent`; it receives shadows and casts none. */

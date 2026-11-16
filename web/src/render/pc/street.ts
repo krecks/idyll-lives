@@ -510,6 +510,12 @@ export class Street {
   }
 
   /** Lets go of everything (the street's models too). */
+  /** The viewed lot's own (`lotRoot`: its garage and porch, planned at its 0) stands at its pad (m, game space; 0: as ever). */
+  setLotY(y: number): void {
+    const p = this.lotRoot.getLocalPosition();
+    if (p.y !== y) this.lotRoot.setLocalPosition(p.x, y, p.z);
+  }
+
   destroy(): void {
     this.clear();
     this.destroyed = true;

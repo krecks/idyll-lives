@@ -12,6 +12,7 @@
 import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
 import type { WorldOptions, WorldStructure } from '../core/protocol';
+import { withLand } from '../game/landFollow';
 import { generateWorld, loadTemplates, populate } from '../game/town';
 import { previewWorld } from '../game/townPreview';
 import { BENCH } from './benchFlags';
@@ -25,7 +26,10 @@ import { perfTimeAsync } from './perf';
 export async function benchBigWorld(content: Content, assets: AssetRegistry, kind: string, options: Partial<WorldOptions> = BENCH?.options ?? {}): Promise<WorldStructure> {
   return perfTimeAsync('bench: big world', async () => {
     const t = await loadTemplates();
-    const draft = populate(content, assets, t, generateWorld(content, t, kind, 7, undefined, undefined, options));
+    let laid = generateWorld(content, t, kind, 7, undefined, undefined, options);
+    // (`&follow`: its land graded under its town, as a new game's is: `landFollow.ts` `withLand`.)
+    if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('follow')) laid = withLand(laid, previewWorld(content, t, laid, null));
+    const draft = populate(content, assets, t, laid);
     return previewWorld(content, t, draft);
   });
 }

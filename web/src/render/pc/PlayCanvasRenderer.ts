@@ -57,7 +57,7 @@ import { gameLook, gamePostOptions, PostProcessing } from './post';
 import { diagViewActive } from './shaders/diagView';
 import { shadingFromSettings, softLookFromURL } from './shaders/softLook';
 import { drawRoads } from './roads';
-import { createWorldRoot, toEngine } from './space';
+import { createWorldRoot, setDatum, toEngine } from './space';
 import { Street } from './street';
 import { Signals } from './signals';
 import { Cars } from './cars';
@@ -188,6 +188,8 @@ const HOLD_FRAMES = 2;
 const GAME_SETTLE_MS = 250;
 /** Metres the sun's shadow square reaches past the viewed lot. */
 const SHADOW_MARGIN = 10;
+/** The game camera's target eases to the ground under it over this (s): `settleTarget`. */
+const TARGET_EASE = 0.25;
 /** The basement's pit (and the ground dug away over it) reaches this far past the plot (m), clear of walls on its edge. */
 const PIT_MARGIN = 0.3;
 /** Cells (m) the residents on the move are sorted into for the gates (`swingDoors`). */
@@ -388,6 +390,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private app!: pc.AppBase;
   /** The world, in game space (`space.ts`). */
   private root!: pc.Entity;
+  /** The viewed lot's layers (its house, things, fences, paths, the tools' previews), raised by the datum over `root` (`space.ts` `setDatum`). */
+  private lotRoot!: pc.Entity;
+  /**
+   * The datum (m, game space): on a land the town follows, the viewed lot's pad, else 0. The world is drawn this
+   * much lower (the viewed lot at the engine's 0); the heights the renderer hands out are relative to it. The
+   * menus' town draws at 0 (`enterTown`).
+   */
+  private datum = 0;
   private camera!: GameCamera;
   /** The image processing, FXAA and night grade on the camera (`post.ts`). */
   private post: PostProcessing | null = null;
@@ -739,6 +749,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const hour = Number(params.get('hour'));
     this.fixedHour = Number.isFinite(hour) && params.has('hour') ? hour : null;
     this.gameRig = new GameCameraRig(this.orbit, { radius: RADIUS_LIMITS, beta: BETA_LIMITS }, (i, out) => this.simHead(i, out), () => this.orbit.stopInertia());
+    this.gameRig.ground = (x, z) => this.targetGround(x, z);
   }
 
   async init(canvas: HTMLCanvasElement): Promise<void> {
@@ -781,6 +792,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     scene.fog.density = LOOK.fog;
 
     this.root = createWorldRoot(this.app);
+    // The viewed lot's layers, raised by the datum over the world root (`space.ts` `setDatum`).
+    this.lotRoot = new pc.Entity('lot');
+    this.root.addChild(this.lotRoot);
     this.camera = new GameCamera(this.app.root, LENS);
     const cam = this.camera.camera;
     // (Not PlayCanvas's skybox: the environment atlas would draw as one.)
@@ -809,6 +823,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (lotContents.ts: the landscape, sky, objects and items.)
     this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.castersMoved(urgent), partsMoved: () => this.partsMoved(), landscapeChanged: () => this.lamps.exclude(this.lot.landscapeDraws()) /* (lamps.ts) */ });
     // (the menus' town on a layer of its own, `overview.ts`, the landscape's draws for it too; the sky on both.)
+    this.lot.objectsRoot = this.lotRoot;
     const town = townLayer(this.app).id;
     this.lot.townLayer = town;
     for (const r of this.lot.sky.dome.findComponents('render') as pc.RenderComponent[]) r.layers = [pc.LAYERID_WORLD, town];
@@ -860,23 +875,29 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.signals = new Signals(this.app, this.root, this.deps.assets, { shadows: this.quality.streetShadows, lod: this.quality.streetLod });
     this.characters.setShadowTest(inMap);
     this.characters.setCarRide((frame, x, z, yaw, aboard, out) => this.cars.ride(frame, x, z, yaw, aboard, out));
-    // (Out on the hills between hamlets, on the land, not sunk into it: `Characters.setGround`.)
+    // (Out on the hills between hamlets, on the land, not sunk into it: `Characters.setGround`. On a land the town
+    // follows, on its roads and its lots' pads too.)
     this.characters.setGround((x, z) => this.lot.landscape?.heightAt(x, z) ?? 0);
+    // (The cars, the parked rides and the traffic lights only on a land the town follows: elsewhere at 0, as ever.)
+    const builtGround = (x: number, z: number) => this.lot.landscape?.surface?.at(x, z) ?? 0;
+    this.cars.setGround(builtGround);
+    this.parkedRides.setGround(builtGround);
+    this.signals.setGround(builtGround);
     this.decorTemplates = new TemplateCache(this.app);
     this.storeyLayer = new pc.Entity('storeyLayer');
-    this.root.addChild(this.storeyLayer);
+    this.lotRoot.addChild(this.storeyLayer);
     // Picking, the resize arrows (in render space) and the hover tile (in lot rows, on the storey layer).
     this.picker = new Picker(this.camera, this.lot, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), size: this.cssSize });
-    this.handles = new ResizeHandles(this.device, this.root);
+    this.handles = new ResizeHandles(this.device, this.lotRoot);
     this.hoverTile = new HoverTile(this.device, this.storeyLayer);
     // (the wall tools' previews, the Paint and Floor tools', the room overlay and the grid.)
     this.previews = new BuildPreviews(this.app, this.storeyLayer, this.house, { content: this.deps.content, world: () => this.lastWorld, view: () => this.view, storey: () => this.storey, rowOf: (k) => this.rowOf(k), wallMode: () => this.wallMode });
-    if (!this.diag.has('nolamps')) this.gardenPools = new GardenPools(this.app, this.root);
+    if (!this.diag.has('nolamps')) this.gardenPools = new GardenPools(this.app, this.lotRoot);
     // (the interior lights, `lamps.ts`.)
     this.lamps = new Lamps(this.app, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode, whole: () => this.townWhole }, { house: this.house, lot: this.lot, pools: () => this.applyGardenPools(), casters: () => this.lampCasters() });
     // (the mirrors, `mirrors.ts`, their held reflections drawn again when the lamps, the sun or what the map shows changed; held frames, `heldFrames.ts`.)
     const mq = this.quality;
-    this.mirrors = new Mirrors(this.app, this.root, this.camera.camera, this.sun.light!, { count: this.diag.has('nomirrors') ? 0 : mq.mirrors, scale: mq.mirrorScale, samples: this.samples, rate: mq.mirrorRate }, (mi, bits) => this.characters.drawsRows(mi, bits));
+    this.mirrors = new Mirrors(this.app, this.lotRoot, this.camera.camera, this.sun.light!, { count: this.diag.has('nomirrors') ? 0 : mq.mirrors, scale: mq.mirrorScale, samples: this.samples, rate: mq.mirrorRate }, (mi, bits) => this.characters.drawsRows(mi, bits));
     this.lamps.onChanged = () => {
       this.mirrors.changed();
       this.pictureChanged();
@@ -890,7 +911,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     };
     this.held = new HeldFrames(this.app, this.camera.camera, this.sun, mq.holdStillFrames);
     // (placing things, `placing.ts`; after the lamps, whose lights light the thing in hand.)
-    this.placing = new Placing(this.app, this.root, this.storeyLayer, this.camera.camera, this.deps, this.lot, { storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode, shadowsMoved: () => this.sunShadows.moved(), raiseWalls: (on) => this.raiseWalls(on) });
+    this.placing = new Placing(this.app, this.lotRoot, this.storeyLayer, this.camera.camera, this.deps, this.lot, { storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), town: () => this.townMode, shadowsMoved: () => this.sunShadows.moved(), raiseWalls: (on) => this.raiseWalls(on) });
     // A file that failed has come: the thing in hand and the landscape's plants are built with it now, the rest
     // once the files settle (`shared/modelRefresh.ts`, held while the town streams: `holdModelRefresh`).
     this.unlistenFiles = onModelFileArrived(this.app, (url) => {
@@ -1191,7 +1212,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const blend = menus ? 1 : townBlend(radius);
     const r = menus ? this.townReach : this.worldReach;
     if (blend > 0) {
-      const land = (menus ? this.lot.landscapeOf('town') : this.lot.landscape)?.heightAt(ex, ez) ?? 0;
+      const land = menus ? (this.lot.landscapeOf('town')?.heightAt(ex, ez) ?? 0) : this.groundY(ex, ez);
       const far = townFar(radius, this.playFar, ex, ey, ez, r.x0, r.z0, r.x1, r.z1, blend);
       this.camera.setPlanes(townNear(radius, ey - land, blend), far);
       this.lot.skyReach(far, blend);
@@ -1244,7 +1265,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.flight.stop();
     this.glide = null;
     o.target.x = x;
-    o.target.y = 0;
+    o.target.y = this.targetGround(x, z);
     o.target.z = z;
     o.radius = Math.min(o.radius, 32);
   }
@@ -1495,7 +1516,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (onLot) {
       if (this.shadowSquare === 'lot') return;
       this.shadowSquare = 'lot';
-      this.sunShadows.setSquare(v.x + v.w / 2, v.z + v.d / 2, Math.hypot(v.w, v.d) / 2 + SHADOW_MARGIN);
+      const r = Math.hypot(v.w, v.d) / 2 + SHADOW_MARGIN;
+      this.sunShadows.setSquare(v.x + v.w / 2, v.z + v.d / 2, r, 0, this.reliefRound(v.x + v.w / 2, v.z + v.d / 2, r, 0));
       return;
     }
     // (Numbers compared, not a key made: this runs every frame.)
@@ -1509,7 +1531,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     at[0] = x;
     at[1] = z;
     at[2] = step;
-    this.sunShadows.setSquare(x, z, half);
+    // (On a land with relief, round the ground there, deep enough for the land's rise and fall in the square.)
+    const y = this.targetGround(x, z);
+    this.sunShadows.setSquare(x, z, half, y, this.reliefRound(x, z, half, y));
+  }
+
+  /** How far (m) the land in a square (`half` m round (`x`, `z`)) rises or falls from `y` (relative to the datum) at most: 0 without a height field. */
+  private reliefRound(x: number, z: number, half: number, y: number): number {
+    if (!this.lot.landscape?.heightField) return 0;
+    let most = 0;
+    for (let j = -4; j <= 4; j++) for (let i = -4; i <= 4; i++) most = Math.max(most, Math.abs(this.groundY(x + (i * half) / 4, z + (j * half) / 4) - y));
+    return most;
   }
   /** The shadow square round the viewed lot (`lot`; `buildWorld` sets it there) or round the roaming camera's target (`roam`, `roamSquare`). */
   private shadowSquare: 'lot' | 'roam' = 'lot';
@@ -1596,7 +1628,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const s = Math.sin(o.beta) * o.radius;
       const x = o.target.x + Math.cos(o.alpha) * s;
       const z = o.target.z + Math.sin(o.alpha) * s;
-      if (o.target.y + Math.cos(o.beta) * o.radius >= land.heightAt(x, z) + 4) break;
+      if (o.target.y + Math.cos(o.beta) * o.radius >= land.heightAt(x, z) - this.datum + 4) break;
       o.beta = Math.max(0.3, o.beta - 0.03);
       o.inertialBetaOffset = 0;
     }
@@ -1815,7 +1847,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const { width, depth } = world;
     const [cx, cz] = [view ? view.x + view.w / 2 : width / 2, view ? view.z + view.d / 2 : depth / 2];
     // The sun's shadows cover a fixed square round the lot (`sunShadows.ts`).
-    this.sunShadows.setSquare(cx, cz, Math.hypot(view?.w ?? width, view?.d ?? depth) / 2 + SHADOW_MARGIN);
+    this.sunShadows.setSquare(cx, cz, Math.hypot(view?.w ?? width, view?.d ?? depth) / 2 + SHADOW_MARGIN, 0, this.reliefRound(cx, cz, Math.hypot(view?.w ?? width, view?.d ?? depth) / 2 + SHADOW_MARGIN, 0));
     this.shadowSquare = 'lot';
     if (!this.cameraPlaced) {
       this.aimAt(cx, cz);
@@ -1853,6 +1885,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.loadStep('Laying out the land', 0.05);
     await this.lot.buildNature(world, (roads, parent) => drawRoads(this.app, roads, parent));
 
+    // The datum: on a land the town follows, the viewed lot's pad (the world drawn that much lower, the lot at 0).
+    const surface = this.lot.landscape?.surface ?? null;
+    const datum = surface && viewIndex >= 0 ? surface.padY(viewIndex) : 0;
+    this.applyDatum(datum);
+    this.street.setLotY(datum);
     const lotKey = this.lotKeyOf(world, view);
     const lotBuilt = lotKey !== this.lotKey;
     const v = view;
@@ -1872,8 +1909,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // hedges with the garden's shrubs: `lotHedges`); other lots' are the street's, but for their gates, which swing.
       const walls = wallCorners(world.walls);
       const wallAt = (x: number, z: number) => walls.has(`${x}:${z}`);
+      // (The lot's on its own layer; the other lots' gates on the land, on their pads where the town follows it.)
+      const pads = this.lot.landscape?.surface ?? null;
       for (const [list, storey] of [[lotFences, 0], [shown.filter((f) => !onLot(f) && f.kind === 'gate'), undefined]] as const) {
-        const fences = buildFences(this.app, this.root, list, this.deps.content.fenceStyles, { wallAt });
+        const ours = storey === 0;
+        const fences = buildFences(this.app, ours ? this.lotRoot : this.root, list, this.deps.content.fenceStyles, { wallAt, ...(!ours && pads ? { ground: (x: number, z: number) => pads.at(x, z) } : {}) });
         if (!fences) continue;
         this.lotEntities.push({ entity: fences.entity, storey });
         for (const leaf of fences.gates) this.gates.push({ fences, leaf, open: 0, towards: 1 });
@@ -1957,10 +1997,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const o = this.orbit;
     const sb = Math.sin(o.beta);
     const eye = [o.target.x + o.radius * Math.cos(o.alpha) * sb, o.target.y + o.radius * Math.cos(o.beta), o.target.z + o.radius * Math.sin(o.alpha) * sb];
-    const [dx, dy, dz] = [eye[0] - x, eye[1], eye[2] - z];
+    const y = this.targetGround(x, z);
+    const [dx, dy, dz] = [eye[0] - x, eye[1] - y, eye[2] - z];
     const r = Math.hypot(dx, dy, dz) || o.radius;
     o.target.x = x;
-    o.target.y = 0;
+    o.target.y = y;
     o.target.z = z;
     o.radius = r;
     o.alpha = Math.atan2(dz, dx);
@@ -2003,7 +2044,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       if (toned) pavedRects(geo, list, all ?? list, y);
       else for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
       const mesh = meshFrom(this.device, geo.meshData({ colors: toned }));
-      if (mesh) this.lotEntities.push({ entity: drawMesh(this.root, name, mesh, toned ? this.lib.surface(material, { doubleSided: true, vertexColors: true }) : this.lotMaterial(material)), storey: 0 });
+      if (mesh) this.lotEntities.push({ entity: drawMesh(this.lotRoot, name, mesh, toned ? this.lib.surface(material, { doubleSided: true, vertexColors: true }) : this.lotMaterial(material)), storey: 0 });
     }
   }
 
@@ -2064,7 +2105,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // Lifted (or lowered) to its height, back over the ground rows.
       const storey = new pc.Entity(`storey${k}`);
       storey.setLocalPosition(0, k * WALL_HEIGHT, -shift);
-      this.root.addChild(storey);
+      this.lotRoot.addChild(storey);
       const built = this.house.build(world, view, k === 0 ? { covered, holes, landings } : { upper: true, basement: k < 0, covered, holes, landings }, storey);
       if (!built) {
         storey.destroy();
@@ -2094,7 +2135,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const add = (name: string, data: WorldStructure['meshes']['walls'], material: pc.StandardMaterial) => {
         const mesh = meshFrom(this.device, data);
         if (!mesh) return null;
-        const entity = drawMesh(this.root, name, mesh, material, { castShadows: true });
+        const entity = drawMesh(this.lotRoot, name, mesh, material, { castShadows: true });
         this.lotEntities.push({ entity });
         return entity;
       };
@@ -2134,7 +2175,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!placed) {
       placed = { template, draws: [] };
       for (const m of template.meshes) {
-        const d = new Instances(this.device, this.root, m.mesh, m.material, { name: m.name, castShadows: key !== PETALS, receiveShadows: true });
+        const d = new Instances(this.device, this.lotRoot, m.mesh, m.material, { name: m.name, castShadows: key !== PETALS, receiveShadows: true });
         windStill(d.meshInstance, m);
         placed.draws.push(d);
       }
@@ -2170,7 +2211,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     geo.poly([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], [-1, 0, 0]);
     const mesh = meshFrom(this.device, geo.meshData({ colors: true }));
     if (!mesh) return;
-    const entity = drawMesh(this.root, 'basementPit', mesh, this.lib.surface('material.soil', { vertexColors: true, doubleSided: true }), { castShadows: true });
+    const entity = drawMesh(this.lotRoot, 'basementPit', mesh, this.lib.surface('material.soil', { vertexColors: true, doubleSided: true }), { castShadows: true });
     this.lotEntities.push({ entity, storey });
   }
 
@@ -2624,6 +2665,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lamps.frame(this.frameDt / 1000, this.darkRooms, this.awakeRooms, this.orbit.target.x, this.orbit.target.z); // (lamps and glows fading, which cast shadows, `lamps.ts`.)
     this.swingDoors(PLAYBACK_RATE[curr[h.speed] | 0] ?? 1);
     this.steerCamera(this.frameDt / 1000);
+    this.settleTarget(this.frameDt / 1000);
     this.keepCameraClear();
     if (this.lot.update(frame)) {
       this.mirrors.changed(); // (the objects' clips, the screens; things moving, in the held reflections.)
@@ -3173,7 +3215,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!at) return null;
     const { origin, dir } = this.landRay;
     this.camera.ray(x, y, this.cssSize.width, this.cssSize.height, origin, dir);
-    return marchToGround(origin, dir, (px, pz) => at.scape.heightAt(px, pz));
+    // (The ray in the engine's heights: the land's less the datum.)
+    const datum = this.townMode ? 0 : this.datum;
+    return marchToGround(origin, dir, (px, pz) => at.scape.heightAt(px, pz) - datum);
   }
 
   setLandBrush(cursor: LandCursor | null): void {
@@ -3204,6 +3248,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const p = this.townPose;
     Object.assign(p, { alpha: o.alpha, beta: o.beta, radius: o.radius });
     Object.assign(p.target, o.target);
+    // (The menus' town at datum 0: the game's pose there in game space.)
+    p.target.y += this.datum;
+    setDatum(this.root, this.lotRoot, 0);
+    this.lot.datum = 0;
     p.targetScreenOffset.x = p.targetScreenOffset.y = 0;
     this.townRig.syncFromCamera();
     if (this.townShot) this.townRig.setShot(this.townShot, true);
@@ -3218,6 +3266,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The game comes on screen again (the menus' town is let go a moment later: `releaseTown`). */
   private leaveTown(): void {
     this.townMode = false;
+    setDatum(this.root, this.lotRoot, this.datum);
+    this.lot.datum = this.datum;
     const ticket = this.townTicket;
     setTimeout(() => this.releaseTown(ticket), TOWN_RELEASE_MS);
     this.shaderWatch.phase = 'game';
@@ -3640,11 +3690,51 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   heightAt(x: number, z: number): number {
-    return this.lot.landscape?.heightAt(x, z) ?? 0;
+    return this.groundY(x, z);
   }
 
   simHead(index: number, out: { x: number; y: number; z: number }): boolean {
-    return index < this.simCount && !!this.characters?.head(index, out);
+    if (!(index < this.simCount && !!this.characters?.head(index, out))) return false;
+    out.y -= this.datum;
+    return true;
+  }
+
+  /** The ground (m) at (`x`, `z`) relative to the datum: the engine's height of what stands there (the landscape's `heightAt`). */
+  private groundY(x: number, z: number): number {
+    return (this.lot.landscape?.heightAt(x, z) ?? 0) - this.datum;
+  }
+
+  /**
+   * Where the game camera's target stands (m, relative to the datum): on a land drawn from a height field (a land the
+   * town follows, or one the brushes shaped) the ground under it, so it never aims into a hill; elsewhere at 0, as ever.
+   */
+  private targetGround(x: number, z: number): number {
+    return this.lot.landscape?.heightField ? this.groundY(x, z) : 0;
+  }
+
+  /**
+   * The datum taken on (`d`, game space): the world root lowered by it and the viewed lot's layers raised (outside the
+   * menus' town, which draws at 0), and the camera's target shifted by the old datum less the new one in the same frame,
+   * so nothing jumps (it then eases to the ground under it: `settleTarget`).
+   */
+  private applyDatum(d: number): void {
+    if (d === this.datum) return;
+    this.orbit.target.y += this.datum - d;
+    this.datum = d;
+    if (!this.townMode) {
+      setDatum(this.root, this.lotRoot, d);
+      this.lot.datum = d;
+    }
+    this.sunShadows.moved();
+  }
+
+  /** The game camera's target eased to the ground under it (`targetGround`; a quarter of a second): no jump as it crosses a step. */
+  private settleTarget(dt: number): void {
+    if (!this.lot.landscape?.heightField) return;
+    const t = this.orbit.target;
+    const goal = this.targetGround(t.x, t.z);
+    if (Math.abs(goal - t.y) < 1e-4) return;
+    t.y += (goal - t.y) * (1 - Math.exp(-dt / TARGET_EASE));
   }
 
   gust(x: number, z: number): number {
