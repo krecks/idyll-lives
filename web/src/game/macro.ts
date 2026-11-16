@@ -732,10 +732,11 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // ---- the main town: its roads first (which side its water is on), then where it goes -------
   const mainSpec = spec.town;
   const shape = spec.shape(rand, mainSpec.box, mainSpec.scale);
-  // (On a planned land, its water on the side the site has it: the town's shape turned over if it was drawn the other way.)
+  const joined = settleRoads(joinUp(rand, shape, mainSpec, BIG_COURTS), mainSpec.box);
+  // (On a planned land, its water on the side the site has it: the town, as laid out, turned over if it was drawn the other way.)
   const facing = plan && siteAt ? (lay?.site ? sideOf(plan, siteAt, planRiver, D) : plan.side) : undefined;
-  const layout = facing && shape.water && shape.water !== facing ? mirrored(shape, mainSpec.box) : shape;
-  const mainRoads = settleRoads(joinUp(rand, layout, mainSpec, BIG_COURTS), mainSpec.box);
+  const layout = facing && shape.water && shape.water !== facing ? mirrored({ ...shape, roads: joined }, mainSpec.box) : { ...shape, roads: joined };
+  const mainRoads = layout.roads;
   const box = mainSpec.box;
   const waterSide = facing ?? layout.water ?? (rand() < 0.5 ? 'zmin' : 'zmax');
 
@@ -2644,7 +2645,7 @@ function bareDraft(content: Content, spec: WorldSpec, seed: number): Neighbourho
   return { ...draft, open: { ...rest, land: seedBare(draft) } };
 }
 
-/** A main town's roads as `shape` laid them out in `box`, turned over front to back (its water on the other side). */
+/** A main town's roads as laid out in `box` (`shape`: joined up and settled), turned over front to back (its water on the other side). */
 function mirrored(shape: RoadLayout, box: Box): RoadLayout {
   const flip = ([x, z]: Pt): Pt => [x, box.d - z];
   return {

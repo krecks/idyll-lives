@@ -233,7 +233,7 @@ const SETTLE_MARGIN = 0.15;
  * round (`SETTLE_ROUNDS` at most): a lot or a backdrop building cut too deep or whose edge stands
  * too tall (of two pads, the backdrop building, else the later lot) is left out (`diagnostics.dropped`);
  * a country road cut too deep (a way out, a loop between places) is left out, and the lots and
- * backdrop buildings on it, where the roads left are still one network with a way out; a dead end reaching past `COURT` m beyond the last road it meets is
+ * backdrop buildings on it (those by it, and those it was the nearest road to), where the roads left are still one network with a way out; a dead end reaching past `COURT` m beyond the last road it meets is
  * cut back to that, and the lots past it left out. What it gave up: `diagnostics.slopes`.
  * `preview`: the world as the menus' preview has it (its lots' paths: `previewWorld`; asked of the
  * draft without its land). The draft and that world.
@@ -344,9 +344,18 @@ function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasur
       if (n < plots && p.entry?.road === c.road && (p.entry.s < from - 0.5 || p.entry.s > to + 0.5)) lots.add(n);
     });
   }
-  // (The lots on a road left out, and the backdrop buildings by it.)
+  // (The lots on a road left out, and the backdrop buildings by it or facing it: no road of their own left nearer.)
+  const facedGone = (x: number, z: number) => {
+    let best = { road: -1, dist: Infinity };
+    draft.roads.forEach((r, i) => {
+      const d = nearest(r.points, x, z).dist;
+      if (d < best.dist) best = { road: i, dist: d };
+    });
+    return gone.has(best.road);
+  };
   entries.forEach((p, n) => {
-    if (n < plots ? p.entry && gone.has(p.entry.road) : [...gone].some((r) => nearest(draft.roads[r].points, p.x + p.w / 2, p.z + p.d / 2).dist < BY_ROAD)) (n < plots ? lots : backdrop).add(n < plots ? n : n - plots);
+    const [x, z] = [p.x + p.w / 2, p.z + p.d / 2];
+    if (n < plots ? p.entry && gone.has(p.entry.road) : gone.size && ([...gone].some((r) => nearest(draft.roads[r].points, x, z).dist < BY_ROAD) || facedGone(x, z))) (n < plots ? lots : backdrop).add(n < plots ? n : n - plots);
   });
   if (!gone.size && !lots.size && !backdrop.size && roads.every((r, i) => r === draft.roads[i] || r.points.length === draft.roads[i].points.length)) return null;
   roads = roads.filter((_, i) => !gone.has(i));

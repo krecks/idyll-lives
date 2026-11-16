@@ -1158,7 +1158,8 @@ export function expectations(kind: WorldKind, options: Partial<WorldOptions> = {
   const o = optionsFor(kind, options);
   const v = o.villages;
   return {
-    built: { none: 0.08, few: 0.15, many: 0.25 }[v] * (o.woods === 'wooded' ? 0.6 : 1),
+    // (Wooded: the woods come up to the hamlets; among mountains, the towns keep to the valleys.)
+    built: { none: 0.08, few: 0.15, many: 0.25 }[v] * (o.woods === 'wooded' ? 0.6 : 1) * (o.hills === 'mountains' ? 0.8 : 1),
     empty: { none: null, few: 0.2, many: 0.1 }[v],
     meadow: kind === 'heath',
     // (Among mountains, along the valley: across a half of the world, it may be.)

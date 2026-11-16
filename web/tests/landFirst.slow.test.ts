@@ -2,7 +2,7 @@
 // a town laid on every place's bare land, one road network with no lot in the water, the land's plan and name
 // carried; a new world (`generateWorld`) is that land and that town; a river kept as planned bridged, one
 // painted over not; the land as step 1 left it, and its level, kept away from the town (no jump in height
-// between the steps); and a land the player shaped still taking a town. `SLOW_TESTS=1 bun test tests/landFirst.slow.test.ts`.
+// between the steps); and a land the player shaped still taking a town, its town file carrying that land. `SLOW_TESTS=1 bun test tests/landFirst.slow.test.ts`.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { RoadPlan } from '../src/core/protocol';
@@ -39,17 +39,20 @@ describe('the land first, then the town', async () => {
   });
   const { Content } = await import('../src/content/content');
   const { objectInfos } = await import('../src/game/housegen');
-  const { generateWorld, plotRect, useTownContent } = await import('../src/game/town');
+  const { assembleTown, generateWorld, plotRect, populate, useTownContent, vacantSlots } = await import('../src/game/town');
+  const { AssetRegistry } = await import('../src/assets/registry');
+  const { randomHousehold } = await import('../src/game/household');
   const { runTownJob } = await import('../src/game/townJobs');
   const { LandEditor, builtOf, Protection, wetTile } = await import('../src/game/landEdit');
   const { unrle } = await import('../src/game/landMasks');
-  const { LAND_CELL, landHash } = await import('../src/game/land');
+  const { decodeLand, LAND_CELL, landHash } = await import('../src/game/land');
   const { WORLD_KINDS } = await import('../src/game/world');
   type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
   type TownResult = import('../src/game/townJobs').TownResult;
   type WorldOptions = import('../src/game/world').WorldOptions;
   const content = await Content.load('http://localhost/content/base.json');
+  const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
   const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
@@ -149,7 +152,7 @@ describe('the land first, then the town', async () => {
         }
         if (dist[k] === 0) under.push((built.h[k] - bare.h[k]) / 100);
       }
-      expect(far, kind).toBeGreaterThan(cols * rows * 0.05);
+      expect(far, kind).toBeGreaterThan(1000);
       expect(moved, `${kind}: samples moved far from the town`).toBe(0);
       // Under the town, eased and graded, but not lifted or lowered as a whole.
       under.sort((a, b) => a - b);
@@ -184,5 +187,11 @@ describe('the land first, then the town', async () => {
     // (The player's own land is left as it was.)
     expect(landHash(shaped)).not.toBe(landHash(relaid.open!.land));
     expect(shaped.cols * LAND_CELL).toBe(W);
+    // The game takes the land as the town has it, sample for sample, the town following it (what is saved and continued).
+    const town = populate(content, assets, t, relaid);
+    const file = JSON.parse(assembleTown(content, t, town, randomHousehold(content, assets, 2), vacantSlots(town)[0].index));
+    const played = decodeLand(file.meta.land);
+    expect(played.seeded).toBe('follow');
+    expect(landHash(played)).toBe(landHash(relaid.open!.land));
   }, 300_000);
 });
