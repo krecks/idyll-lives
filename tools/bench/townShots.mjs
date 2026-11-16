@@ -19,6 +19,7 @@
  *     --port 5297 | --url <u>      a dev server on the port (started if none answers), or one already running
  *     --out <dir>                  default /tmp/ng-render/
  *     --no-time                    pictures only
+ *     --no-shots                   timings only (from the bare land)
  *
  * Needs Playwright like render.mjs (`PLAYWRIGHT=<path to playwright/index.mjs>`).
  */
@@ -46,6 +47,7 @@ const made = worldFlags(flag, 'country');
 const port = Number(flag('port', '5297'));
 const out = flag('out', '/tmp/ng-render');
 const timing = !has('no-time');
+const shots = !has('no-shots');
 mkdirSync(out, { recursive: true });
 
 async function playwright() {
@@ -90,7 +92,7 @@ async function setUp({ kind, options, seed, side }) {
   Object.assign(band.style, { position: 'fixed', left: '0', top: '0', bottom: '0', width: `${side}px`, background: 'rgba(40, 44, 52, 0.55)', zIndex: '99999', pointerEvents: 'none' });
   document.body.append(band);
   window.__ng = { menuScene, land, town, frame: { left: side, top: 0, right: innerWidth, bottom: innerHeight } };
-  return { areas: town.open?.areas.length ?? 0, slots: town.slots.length, roads: town.roads.length, width: town.width, depth: town.depth };
+  return { areas: town.open?.areas.length ?? 0, slots: town.slots.length, roads: town.roads.length, width: town.width, depth: town.depth, land: town.open?.land?.seeded ?? 'none' };
 }
 
 /** In the page: shows a draft (`land`, `town` or one put there) and frames a shot, cut, then waits for its frames. */
@@ -122,7 +124,7 @@ try {
     await page.goto(`${base}/?${renderer === 'webgl' ? 'renderer=webgl' : ''}`);
     await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 200 });
     const facts = await page.evaluate(setUp, { kind: made.world, options: made.options, seed, side: Math.round(width * 0.24) });
-    console.log(`townShots: ${renderer}: ${made.world} ${made.query || '(its own options)'} seed ${seed}: ${facts.width}x${facts.depth} m, ${facts.areas} areas, ${facts.slots} lots, ${facts.roads} roads`);
+    console.log(`townShots: ${renderer}: ${made.world} ${made.query || '(its own options)'} seed ${seed}: ${facts.width}x${facts.depth} m, ${facts.areas} areas, ${facts.slots} lots, ${facts.roads} roads, land ${facts.land}`);
     const shoot = async (name, wait = 1200) => {
       await page.waitForTimeout(wait);
       const file = join(out, `${renderer}-${name}.png`);
@@ -130,48 +132,109 @@ try {
       console.log(`townShots: ${file}`);
     };
 
-    await page.evaluate(frameShot, { which: 'land', shot: { kind: 'world' } });
-    await shoot('land-world', 2500);
-    // Panned far past the land's edge: the camera stops over the land (its target at the corner).
-    await page.evaluate(() => window.__ng.menuScene.pan(-5000, -5000));
-    await shoot('land-panned');
-    // Dragged from near the top of the picture (the far land, or the sky) down: the land comes towards the camera.
-    await page.evaluate(() => {
-      window.__ng.menuScene.reframe(0);
-      for (let k = 0; k < 10; k++) window.__ng.menuScene.drag(innerWidth * 0.6, 40 + k * 30, innerWidth * 0.6, 70 + k * 30);
-    });
-    await shoot('land-dragged');
+    if (shots) {
+      await page.evaluate(frameShot, { which: 'land', shot: { kind: 'world' } });
+      await shoot('land-world', 2500);
+      // Panned far past the land's edge: the camera stops over the land (its target at the corner).
+      await page.evaluate(() => window.__ng.menuScene.pan(-5000, -5000));
+      await shoot('land-panned');
+      // Dragged from near the top of the picture (the far land, or the sky) down: the land comes towards the camera.
+      await page.evaluate(() => {
+        window.__ng.menuScene.reframe(0);
+        for (let k = 0; k < 10; k++) window.__ng.menuScene.drag(innerWidth * 0.6, 40 + k * 30, innerWidth * 0.6, 70 + k * 30);
+      });
+      await shoot('land-dragged');
 
-    await page.evaluate(frameShot, { which: 'town', shot: { kind: 'world' } });
-    await shoot('town-world', 2500);
-    await page.evaluate(frameShot, { which: 'town', shot: { kind: 'area', area: 0 } });
-    await shoot('town-area0');
-    if (facts.areas > 1) {
-      await page.evaluate(frameShot, { which: 'town', shot: { kind: 'area', area: 1 } });
-      await shoot('town-area1');
-    }
-    // Lots for sale lit up, the dearer half in the second tint; one hovered, one selected.
-    await page.evaluate(() => {
-      const ng = window.__ng;
-      const homes = ng.town.slots.map((s, i) => (s.kind === 'house' ? i : -1)).filter((i) => i >= 0);
-      const marked = homes.filter((_, k) => k % 2 === 0);
-      const dear = marked.filter((_, k) => k % 3 === 0);
-      ng.menuScene.shoot({ kind: 'area', area: 0, frame: ng.frame }, 0, true);
-      ng.menuScene.highlight({ marked, dear, hover: marked[1] ?? null, selected: marked[2] ?? null, outlines: false }, true);
-    });
-    await shoot('town-tints');
-    // The same from the whole land's shot, where step 4 opens: the lit lots washed over whole.
-    await page.evaluate(() => {
-      const ng = window.__ng;
-      ng.menuScene.shoot({ kind: 'world', frame: ng.frame }, 0, true);
-    });
-    await shoot('town-tints-world');
-    await page.evaluate(() => window.__ng.menuScene.highlight({}, true));
-    // Back to the bare land with every lot outlined (as step 1 asks): no ring of the town's lots is left on it.
-    await page.evaluate(() => window.__ng.menuScene.highlight({ outlines: true }, true));
-    await page.evaluate(frameShot, { which: 'land', shot: { kind: 'area', area: 0 } });
-    await shoot('land-again', 2500);
-    await page.evaluate(() => window.__ng.menuScene.highlight({}, true));
+      await page.evaluate(frameShot, { which: 'town', shot: { kind: 'world' } });
+      await shoot('town-world', 2500);
+      await page.evaluate(frameShot, { which: 'town', shot: { kind: 'area', area: 0 } });
+      await shoot('town-area0');
+      if (facts.areas > 1) {
+        await page.evaluate(frameShot, { which: 'town', shot: { kind: 'area', area: 1 } });
+        await shoot('town-area1');
+      }
+      // Step 2's ghosts over the main town: a street drawn, one that may not go (red), a bridge, a lot placed, one that
+      // may not go and one to be removed (its house under a veil), a village's box placed and one that may not go;
+      // then the time one change of them takes (as on every pointer move).
+      await page.evaluate(frameShot, { which: 'town', shot: { kind: 'area', area: 0 } });
+      const ghostMs = await page.evaluate(() => {
+        const ng = window.__ng;
+        const world = ng.menuScene.preview;
+        const a = ng.town.open?.areas[0] ?? { x: 0, z: 0, w: world.width, d: world.depth };
+        const inside = (p) => p.x + p.w / 2 >= a.x && p.x + p.w / 2 <= a.x + a.w && p.z + p.d / 2 >= a.z && p.z + p.d / 2 <= a.z + a.d;
+        const homes = world.plots.filter((p) => p.house && inside(p));
+        const [cx, cz] = [a.x + a.w / 2, a.z + a.d / 2];
+        const bend = (x0, z0, len, dz) => Array.from({ length: 13 }, (_, k) => [x0 + (len * k) / 12, z0 + dz * Math.sin((k / 12) * Math.PI)]);
+        const bridged = ng.town.roads.find((r) => r.bridge);
+        const bridge = bridged
+          ? (() => {
+              const [s0, s1] = [bridged.bridge[0] - 12, bridged.bridge[1] + 12];
+              let s = 0;
+              const pts = [];
+              for (let k = 0; k < bridged.points.length; k++) {
+                if (k) s += Math.hypot(bridged.points[k][0] - bridged.points[k - 1][0], bridged.points[k][1] - bridged.points[k - 1][1]);
+                if (s >= s0 && s <= s1) pts.push(bridged.points[k]);
+              }
+              return pts.map(([x, z]) => [x + 14, z + 14]);
+            })()
+          : bend(cx - 60, cz + 60, 50, 0);
+        const g = {
+          roads: [
+            { points: bend(cx - 80, cz - 30, 160, 25), width: 9, tone: 'new' },
+            { points: bend(cx - 70, cz + 25, 120, -15), width: 7, tone: 'bad' },
+            { points: bridge, width: 7, tone: 'bridge' },
+          ],
+          lots: [
+            ...homes.slice(0, 2).map((p) => ({ x: p.x, z: p.z, w: p.w, d: p.d, tone: 'gone' })),
+            ...homes.slice(2, 3).map((p) => ({ x: p.x + p.w * 3, z: p.z, w: p.w, d: p.d, tone: 'new' })),
+            ...homes.slice(3, 4).map((p) => ({ x: p.x, z: p.z + p.d * 0.5, w: p.w, d: p.d, tone: 'bad' })),
+          ],
+          boxes: [
+            { x: a.x + a.w + 30, z: a.z + 20, w: 110, d: 80, tone: 'new' },
+            { x: a.x - 120, z: a.z + a.d - 90, w: 100, d: 80, tone: 'bad' },
+          ],
+        };
+        ng.menuScene.ghosts(g);
+        window.__ghosts = g;
+        // (As on pointer moves: the street being drawn grows a little each time.)
+        const t0 = performance.now();
+        for (let k = 0; k < 100; k++) {
+          g.roads[0].points[g.roads[0].points.length - 1] = [cx + 80 + k * 0.3, cz - 30];
+          ng.menuScene.ghosts(g);
+        }
+        return (performance.now() - t0) / 100;
+      });
+      console.log(`townShots: ${renderer}: ghosts set again in ${ghostMs.toFixed(2)} ms`);
+      await shoot('ghosts-area0');
+      await page.evaluate(() => {
+        const ng = window.__ng;
+        ng.menuScene.shoot({ kind: 'world', frame: ng.frame }, 0, true);
+      });
+      await shoot('ghosts-world');
+      await page.evaluate(() => window.__ng.menuScene.ghosts(null));
+      // Lots for sale lit up, the dearer half in the second tint; one hovered, one selected.
+      await page.evaluate(() => {
+        const ng = window.__ng;
+        const homes = ng.town.slots.map((s, i) => (s.kind === 'house' ? i : -1)).filter((i) => i >= 0);
+        const marked = homes.filter((_, k) => k % 2 === 0);
+        const dear = marked.filter((_, k) => k % 3 === 0);
+        ng.menuScene.shoot({ kind: 'area', area: 0, frame: ng.frame }, 0, true);
+        ng.menuScene.highlight({ marked, dear, hover: marked[1] ?? null, selected: marked[2] ?? null, outlines: false }, true);
+      });
+      await shoot('town-tints');
+      // The same from the whole land's shot, where step 4 opens: the lit lots washed over whole.
+      await page.evaluate(() => {
+        const ng = window.__ng;
+        ng.menuScene.shoot({ kind: 'world', frame: ng.frame }, 0, true);
+      });
+      await shoot('town-tints-world');
+      await page.evaluate(() => window.__ng.menuScene.highlight({}, true));
+      // Back to the bare land with every lot outlined (as step 1 asks): no ring of the town's lots is left on it.
+      await page.evaluate(() => window.__ng.menuScene.highlight({ outlines: true }, true));
+      await page.evaluate(frameShot, { which: 'land', shot: { kind: 'area', area: 0 } });
+      await shoot('land-again', 2500);
+      await page.evaluate(() => window.__ng.menuScene.highlight({}, true));
+    } else await page.evaluate(frameShot, { which: 'land', shot: { kind: 'world' } });
 
     if (timing) {
       const times = await page.evaluate(async () => {

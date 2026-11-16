@@ -76,7 +76,7 @@ import { GameCameraRig, keepUp } from '../shared/cameraRig';
 import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS, TOWN_FROM, townBlend } from '../shared/lens';
 import { edgeFog, landEdge, menuFog, menuFogFrom, TOWN_RADIUS_LIMITS, townArrival, townFar, townFog, townFogFrom, townNear, townOrbit } from '../shared/townCamera';
 import { townView } from '../shared/townView';
-import { landscapeRing } from '../shared/nature';
+import { landscapeRing, WATER_Y } from '../shared/nature';
 import { setFogFrom } from './shaders/fog';
 import { LT_FIXTURE } from '../../debug/livingTown';
 import { applyLandFixture, LAND_FIXTURE } from '../landFixture';
@@ -140,10 +140,11 @@ import type {
   Shading,
   WallMode,
 } from '../types';
-import type { Land, LandRect } from '../../game/land';
+import { LAND_CELL, NONE, type Land, type LandRect } from '../../game/land';
 import { bakeLand, copyLand, fullRect, marchToGround, sameLand } from '../shared/landBake';
 import { OffThreadLand } from '../shared/renderData';
 import { LandCursorDraw } from './landCursor';
+import { TownGhostDraw, type Drape } from './townGhosts';
 import { installLandDebug } from './landDebug';
 import type { Landscape } from './nature';
 
@@ -354,6 +355,19 @@ class PlotFinder {
 class BuildSuperseded extends Error {}
 
 /** The same part of the town in view (the messages make a new rect each time). */
+/** Where step 2's ghosts lie on a landscape (`townGhosts.ts`): its ground, or its water's top where it is wet (a bridge's ghost over a river). */
+function groundOrWater(scape: Landscape): Drape {
+  const field = scape.heightField;
+  return (x, z) => {
+    const h = scape.heightAt(x, z);
+    if (!field) return scape.waterEdge(x, z) > 0 ? Math.max(h, WATER_Y) : h;
+    const [i, j] = [Math.round(x / LAND_CELL), Math.round(z / LAND_CELL)];
+    if (i < 0 || j < 0 || i >= field.cols || j >= field.rows) return h;
+    const k = j * field.cols + i;
+    return field.wl[k] !== NONE && field.wl[k] > field.h[k] ? Math.max(h, field.wl[k] / 100) : h;
+  };
+}
+
 function sameView(a: ViewRect | null, b: ViewRect | null): boolean {
   return a === b || (!!a && !!b && a.x === b.x && a.z === b.z && a.w === b.w && a.d === b.d);
 }
@@ -3057,10 +3071,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       } finally {
         this.townBuilds--;
       }
+      // (Step 2's ghosts over the land as it is built now.)
+      if (ticket === this.townTicket && !this.disposed) this.drawGhosts();
       if (ticket !== this.townTicket || this.disposed || this.townMode) return;
       // Entering from the game (or at start-up): the shot's hour at once.
       this.townMinute = this.townMinuteGoal = this.townShot?.minute ?? minute;
       this.enterTown();
+      this.drawGhosts();
     });
     this.townQueue = run.catch(() => {});
     return run;
@@ -3146,8 +3163,25 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.overview?.setHighlight(highlight, snap);
   }
 
-  /** Not drawn yet (the ghosts' drawing is to come). */
-  setTownGhosts(_ghosts: TownGhosts | null): void {}
+  setTownGhosts(ghosts: TownGhosts | null): void {
+    this.ghosts = ghosts;
+    this.drawGhosts();
+  }
+
+  /** Step 2's edits over the town (`setTownGhosts`), and their drawing (made the first time there are any). */
+  private ghosts: TownGhosts | null = null;
+  private ghostDraw: TownGhostDraw | null = null;
+
+  /** The ghosts drawn again over the land in view (after they changed, or the town under them was built again). */
+  private drawGhosts(): void {
+    const at = this.townMode || !this.lot.landscape ? this.landInView() : null;
+    const ghosts = at ? this.ghosts : null;
+    if (!ghosts && !this.ghostDraw) return;
+    this.ghostDraw ??= new TownGhostDraw(this.app, this.root);
+    const layer = this.lot.townLayer ?? pc.LAYERID_WORLD;
+    this.ghostDraw.set(ghosts, at ? groundOrWater(at.scape) : () => 0, layer, this.townWorld);
+    this.held?.changed();
+  }
 
   onTownFrame(fn: (() => void) | null): void {
     this.townListener = fn;
@@ -3309,6 +3343,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The game comes on screen again (the menus' town is let go a moment later: `releaseTown`). */
   private leaveTown(): void {
     this.townMode = false;
+    // (The game has no ghosts: drawn again over the town when it is shown again.)
+    this.ghostDraw?.set(null, () => 0, 0, null);
     setDatum(this.root, this.lotRoot, this.datum);
     this.lot.datum = this.datum;
     const ticket = this.townTicket;
@@ -3911,6 +3947,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.handles?.destroy();
     this.hoverTile?.destroy();
     this.landCursor?.destroy();
+    this.ghostDraw?.destroy();
     this.previews?.destroy();
     this.placing?.dispose();
     this.modelRefresh.dispose();

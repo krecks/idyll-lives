@@ -319,12 +319,15 @@ export class Street {
     const mode = view ? 'game' : 'town';
     const layoutKey = TownStreet.layoutKey(world, mode);
     const span = perfStart('street: plan');
+    let layoutMs = 0;
     if (!this.town || layoutKey !== this.layoutKey) {
+      const t0 = performance.now();
       this.dropChunks();
       const entry = (k: string) => (this.assets.has(k, 'model') ? (this.assets.get(k, 'model') as ModelEntry) : undefined);
       this.town = new TownStreet(this.house.planner, world, { has: (k) => this.assets.has(k, 'model'), entry, lived: this.lived, look: this.look, ground: this.ground, fenceStyles: this.fenceStyles }, mode);
       this.layoutKey = layoutKey;
       this.townWorld = world;
+      layoutMs = performance.now() - t0;
     } else if (world !== this.townWorld) {
       this.town.setWorld(world);
       this.townWorld = world;
@@ -354,10 +357,15 @@ export class Street {
       if (at !== 0) this.planned.set(id, [built, ...kept.filter((k) => k !== built)].slice(0, PLANS_KEPT));
       return built;
     };
+    let [keyMs, planMs] = [0, 0];
     for (const id of wanted) {
+      const t0 = performance.now();
       const key = town.chunkKey(id, focus);
+      const t1 = performance.now();
+      keyMs += t1 - t0;
       if (this.chunks.get(id)?.key !== key) {
         this.chunks.set(id, planOf(id, key));
+        planMs += performance.now() - t1;
         dirty.add(groupOf(id));
         planned++;
       }
@@ -378,7 +386,7 @@ export class Street {
     // (The plots' and fences' planned parts are kept for the chunks drawn: what a focus moving next
     // door or a thing moved plans again. Every other chunk keeps its vertex arrays alone.)
     town.keepUnits(this.wanted ? wantedSet : null, focus);
-    perfEnd(span);
+    perfEnd(span, `layout ${Math.round(layoutMs)}, keys ${Math.round(keyMs)}, ${planned} of ${wanted.length} chunks planned ${Math.round(planMs)}`);
     if (planned || dirty.size) this.instancesDue = true;
 
     const meshesSpan = perfStart('street: meshes');
