@@ -368,12 +368,12 @@ pub(crate) fn pick_autonomous(
         }
         // Chat with people within earshot (they call out to them); nobody crosses the house or
         // the lot for a chat, and crossing town is a visit.
-        let distance = ctx.nav.stairs.distance(other.pos, sim.pos);
         let heard = earshot.hears(other.pos);
         // Nor out on the street, minding the baby.
         if !heard || (minding && other.plot != own) {
             continue;
         }
+        let distance = ctx.nav.stairs.distance(other.pos, sim.pos);
         // Not over the fence into someone else's garden to chat (a guest is welcome at the host's).
         if let Some(b) = other.plot
             && here != Some(b)
@@ -473,11 +473,11 @@ pub(crate) fn pick_autonomous(
             continue;
         }
         // (Only where they can hear them talking.)
-        let distance = ctx.nav.stairs.distance(leader.pos, sim.pos);
         let heard = earshot.hears(leader.pos);
         if !heard || (minding && leader.plot != own) {
             continue;
         }
+        let distance = ctx.nav.stairs.distance(leader.pos, sim.pos);
         if let Some(b) = leader.plot
             && here != Some(b)
             && access(ctx, sim, Some(b)) == Access::None

@@ -604,7 +604,7 @@ pub fn arrive(w: &mut World, plot: u32) -> bool {
     let grown = grown_stage(w);
     let most = beds.most(grown).min(content.rules.max_household).max(1);
     let here = w.sims.iter().filter(|s| s.here()).count();
-    let cap = crate::world::MAX_SIMS;
+    let cap = w.residents_most();
     if here >= cap || content.genders.is_empty() {
         return false;
     }
@@ -937,10 +937,9 @@ pub(crate) fn conceive(w: &mut World, a: usize, b: usize) {
     w.events.push(w.tick, EventKind::Expecting, a, b, None);
 }
 
-/// Room in household `h` for one more (and in the town).
+/// Room in household `h` for one more (and in the town, `World::room_in_town`).
 pub(crate) fn room_for_one(w: &World, h: usize) -> bool {
-    members(w, h).len() < w.content.rules.max_household
-        && w.sims.iter().filter(|s| s.here()).count() < crate::world::MAX_SIMS
+    members(w, h).len() < w.content.rules.max_household && w.room_in_town()
 }
 
 /// At midnight: babies who are due are born (returned).

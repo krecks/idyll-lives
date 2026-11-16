@@ -19,8 +19,12 @@ import { type Bed, LIE_BACK, LIE_CENTRE, type PlacedObject } from './seats';
 import { EMBRACE } from './socials';
 import type { Stride } from './stride';
 
-/** Rows in the pose texture: the town's residents, then its vendors and shopkeepers, as many as the snapshot layout holds (`maxSims` + `maxStaff`: 240 + 48 in the open world's sim, 64 + 32 before it). */
-export const MAX_CHARACTERS = 288;
+/**
+ * Rows in the pose texture: the town's residents, then its vendors and shopkeepers, as many as the snapshot layout holds
+ * (`maxSims` + `maxStaff`: 768 + 48; 240 + 48 before 0.8.3). Kept with the layout (`core/snapshot.ts`), which refuses
+ * one that would not fit.
+ */
+export { MAX_CHARACTERS } from '../../../core/snapshot';
 /** How far the feet reach past the slot centre for a lying Sim, and their back's height above the feet line: babies (much smaller) lie centred in the crib, on the mattress. */
 export function lieCentre(rig: SimRig): number {
   // (A smaller body than its family's base body, a child's, lies with its head where a grown-up's would be, on the pillow.)
