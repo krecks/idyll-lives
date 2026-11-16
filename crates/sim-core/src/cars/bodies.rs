@@ -748,14 +748,14 @@ pub(crate) fn walks_into(
     g < KEEP && g <= gap(from)
 }
 
-/// Whether a step from `from` to `to` with `body` (turned the way of the step) comes nearer
-/// something `len` by `wid` m at `at` facing `yaw`, within `KEEP` of it and the ground `AHEAD` of
-/// both its ends, from outside that ground: crossing it, or stepping out of it, is fine.
-#[allow(clippy::too_many_arguments)]
+/// Whether a step from `from` to `to` with `body` (turned the way of the step) comes nearer the
+/// ground something `wid` m wide at `at` facing `yaw` keeps clear, reaching `reach` m behind its
+/// middle and in front of it, within `KEEP` of it, from outside it: crossing it, or stepping out
+/// of it, is fine.
 pub(crate) fn comes_into(
     at: [f32; 2],
     yaw: f32,
-    len: f32,
+    reach: [f32; 2],
     wid: f32,
     body: Body,
     from: [f32; 2],
@@ -766,8 +766,7 @@ pub(crate) fn comes_into(
         yaw: (to[0] - from[0]).atan2(to[1] - from[1]),
         ..body
     };
-    let reach = len / 2.0 + AHEAD;
-    let gap = |p: [f32; 2]| body.gap(at, turn, p, -reach, reach, wid / 2.0);
+    let gap = |p: [f32; 2]| body.gap(at, turn, p, -reach[0], reach[1], wid / 2.0);
     let (was, will) = (gap(from), gap(to));
     was >= 0.0 && will < KEEP && will < was
 }
@@ -839,18 +838,20 @@ pub(crate) fn in_the_way(
             return false;
         };
         // (One it waits for by name (`Car::on_foot`), out of the ground it waits for them to
-        // clear, doesn't come back into it: where it would be a tick on, its ground ahead and
-        // behind (which way it goes they can't tell). Inside it, crossing it, they go on as
-        // below. Stepped out of its way (`clear_of`, `make_way`), a cyclist whose way ran through
+        // clear, doesn't come back into it: where it would be a tick on, and the ground it keeps
+        // clear in front of it or behind it there (`Car::next_ground`). Inside it, crossing it,
+        // they go on as below. Stepped out of its way (`clear_of`, `make_way`), a cyclist whose way ran through
         // a car turning out of a driveway rode straight back into its swing, and the two waited
         // for each other for good, others queued behind on both sides, Otter Weir. Not at a
         // zebra's line, where it stands for those it waits for to cross in front of it:
         // `zebra_yield`.)
         if car.on_foot.contains(&id)
             && car.zebra_wait == 0
-            && car
-                .next
-                .is_some_and(|(at, yaw)| comes_into(at, yaw, car.len, car.wid, body, from, to))
+            && car.next.is_some_and(|(at, yaw)| {
+                let [ahead, behind] = car.next_ground;
+                let reach = [car.len / 2.0 + behind, car.len / 2.0 + ahead];
+                comes_into(at, yaw, reach, car.wid, body, from, to)
+            })
         {
             return true;
         }

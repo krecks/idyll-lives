@@ -438,6 +438,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         ..me
     };
     car.next = Some((at, yaw));
+    car.next_ground = [ahead, behind];
     // Not into what's left of a claim another holds. (Pulling over to pass one in it only as far
     // as it will on its way: not into a junction's box just ahead, `pull_want`.)
     let (body_now, body_next) = (now.body(), me.body());
@@ -637,6 +638,7 @@ pub(crate) fn drive_through(w: &mut World, c: usize, home: bool) {
     let at = shifted(p, yaw, shift);
     car.shift = shift;
     car.next = Some((at, yaw));
+    car.next_ground = forward_ground();
     car.progress = t + 1.0;
     car.moved = true;
     if car.progress < ticks {
@@ -1375,6 +1377,7 @@ pub(crate) fn sight(w: &mut World) {
                 let (p, yaw, _) = r.at(to);
                 car.shown = Some((p, yaw, true, 0));
                 car.next = Some((r.at(to + 1.0).0, r.at(to + 1.0).1));
+                car.next_ground = forward_ground();
             }
         }
         if !matches!(sight, Sight::Wait(_)) {
@@ -1521,6 +1524,7 @@ pub(crate) fn unstick(w: &mut World) {
             car.shown = Some((p, yaw, true, 0));
             let (q, qy, _) = r.at(to + 1.0);
             car.next = Some((q, qy));
+            car.next_ground = forward_ground();
         }
     }
 }
