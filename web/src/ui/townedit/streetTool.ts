@@ -136,8 +136,8 @@ export const streetTool: TownTool = {
   does: 'Draw a street, a lane, a country road or a footpath: click points or drag, and end it on a road.',
   stage(editor: TownEditor) {
     const s = new StreetDrawing();
-    /** A press under way: where, how many points there were before it, whether it became a drag. */
-    let press: { x: number; y: number; had: number; moved: boolean } | null = null;
+    /** A press under way: where, and whether it became a drag. */
+    let press: { x: number; y: number; moved: boolean } | null = null;
     /** The last click let go (for a double click). */
     let lastClick: { at: number; x: number; y: number } | null = null;
     /** The seed of the street's homes and names (a new one after each street drawn). */
@@ -209,7 +209,7 @@ export const streetTool: TownTool = {
       return open ? `${what}${also}. ${sentence(open)}` : `${what}${also}. Click to set a point; Enter or a double click ends it here as a dead end.`;
     };
 
-    /** The street drawn as it stands (`end`: as a dead end where it is, else only if it reached a road): true if it was. */
+    /** The street drawn as it stands (`asDeadEnd`: ended where it is, else only if it reached a road): true if it was. */
     const finish = (asDeadEnd: boolean): boolean => {
       clearTimeout(rest);
       const pts = s.points;
@@ -266,7 +266,7 @@ export const streetTool: TownTool = {
           finish(true);
           return true;
         }
-        press = { x, y, had: s.points.length, moved: false };
+        press = { x, y, moved: false };
         s.add(g);
         s.cursor = null;
         show();
