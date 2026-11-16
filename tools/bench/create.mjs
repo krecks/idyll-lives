@@ -10,7 +10,9 @@
  * narrowest with its cards scrolled to their end), then at the first size with a card chosen (the
  * camera on its area) and after "Show others".
  *
- * The stream pill is shown throughout (as on a first visit, while models still come).
+ * The stream pill (as on a first visit, while models still come) is put up for each shot's checks of the UI over the
+ * town, then taken down again before the shot: the shots show the page's own (none once the game's data has all come),
+ * and each says how far the page's own stream is (`stream n/m`), so a stream that stops short shows in the log.
  *
  * With `--shots …,edit`, between steps 2 and 3, a scripted edit session in step 2's town editor
  * (`web/src/ui/townedit/`), each step shot at the edit sizes (`--edit-sizes`): a lot picked, removed,
@@ -830,8 +832,9 @@ async function editSession(page, renderer, shootAs, setStep) {
     await buildFromCard('town', 'both', 'buildup-town');
     // 15. A village's street built up with both (the card's choice for a village is homes).
     const village = await buildFromCard('village', 'both', 'buildup-village');
-    // 16. What it was built up with cleared from its card again.
-    if (village) {
+    // 16. What it was built up with cleared from its card again (if anything fitted along it).
+    if (village && !(await card('Clear its buildings').isEnabled())) console.log(`create: ${renderer} edit clear: nothing built along ${village.name} to clear`);
+    else if (village) {
       const had = await counts();
       await card('Clear its buildings').click();
       await page.waitForTimeout(300);
@@ -921,20 +924,29 @@ try {
     await page.waitForTimeout(1500);
     await page.getByText('New game', { exact: true }).click();
     await ready(page);
-    // The stream pill up, as on a first visit while the models still come (by then they may all have
-    // come): the shots show it, and the UI over the town is checked against it.
-    await page.evaluate(async () => {
-      const { streamState } = await import('/src/assets/streamState.svelte.ts');
-      streamState.apply({ total: 400, done: 260, label: 'Loading houses', active: true });
-    });
+    /**
+     * The stream pill as on a first visit, while the models still come (`on`), for the UI over the town to be checked
+     * against; else the page's own again (none if its stream is done: it went a few seconds after). How far the page's
+     * own stream is.
+     */
+    const pill = (on) =>
+      page.evaluate(async (on) => {
+        const [{ streamState }, { streamSnapshot }] = await Promise.all([import('/src/assets/streamState.svelte.ts'), import('/src/assets/stream.ts')]);
+        const own = streamSnapshot();
+        streamState.apply(on ? { total: 400, done: 260, label: 'Loading the town nearby…', active: true } : own.active ? own : { ...own, total: 0 });
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        return `stream ${own.done}/${own.total}${own.active ? `, still coming: ${own.label}` : ''}`;
+      }, on);
 
     let stepName = 'step1';
     const shoot = async (name) => {
       const file = join(out, `${stepName}-${renderer}-${name}.png`);
-      await page.screenshot({ path: file });
+      await pill(true);
       for (const line of await page.evaluate(overlaps)) fault(`${renderer} ${name}: ${line}`);
-      const pill = await page.evaluate(() => !!document.querySelector('.stream'));
-      console.log(`create: ${file}${pill ? ' (the stream pill up)' : ''}`);
+      const own = await pill(false);
+      await page.screenshot({ path: file });
+      const up = await page.evaluate(() => !!document.querySelector('.stream'));
+      console.log(`create: ${file} (${own}${up ? '; its pill up' : ''})`);
     };
     /** The step at every size, and the narrowest with its choices (`scroller`) scrolled to their end. `settled`: waited for after each resize. */
     const everySize = async (scroller = '.side .panel', settled = async () => {}) => {
