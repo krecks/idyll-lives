@@ -53,7 +53,11 @@ mod enabled {
                 .iter()
                 .map(|&(name, d, calls)| {
                     let ms = d.as_secs_f64() * 1000.0;
-                    let share = if ms_total == 0.0 { 0.0 } else { 100.0 * ms / ms_total };
+                    let share = if ms_total == 0.0 {
+                        0.0
+                    } else {
+                        100.0 * ms / ms_total
+                    };
                     let ns = d.as_nanos() as f64 / ticks.max(1) as f64;
                     (name, ms, share, ns, calls as f64 / ticks.max(1) as f64)
                 })
@@ -89,7 +93,7 @@ mod disabled {
     }
 }
 
-#[cfg(feature = "profile")]
-pub use enabled::{phase, report, reset};
 #[cfg(not(feature = "profile"))]
 pub use disabled::{phase, report, reset};
+#[cfg(feature = "profile")]
+pub use enabled::{phase, report, reset};
