@@ -62,6 +62,24 @@ export interface TownGroundLand {
   readonly landVersion?: number;
 }
 
+/**
+ * What a town's ground map is drawn from, as a hash: its roads, lots, centres, backdrop, greens, fields and zones (not
+ * how many of each: another town with a street moved, or a lot moved, has the same counts). Kept per world's meta.
+ */
+function groundVersion(world: WorldStructure): number {
+  const meta = world.meta;
+  if (!meta) return 0;
+  const known = groundVersions.get(meta);
+  if (known?.plots === world.plots) return known.version;
+  const text = JSON.stringify([meta.roads, world.plots.map((p) => [p.x, p.z, p.w, p.d]), meta.centre, meta.backdrop?.map((b) => [b.poly, b.use]), meta.greens, meta.world?.fields, meta.zones, meta.paths]);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  const version = h >>> 0;
+  groundVersions.set(meta, { plots: world.plots, version });
+  return version;
+}
+const groundVersions = new WeakMap<object, { plots: WorldStructure['plots']; version: number }>();
+
 /** The centre's paving's courses (m apart). */
 const COURSE = 5;
 /** How wide a building's way to the road is drawn (m): a forecourt's or a yard's carried on to it, a garden's path. */
@@ -82,6 +100,8 @@ const FIELD_SOFT = 8;
 export class TownGroundMap {
   private texture: pc.Texture | null = null;
   private key = '';
+  /** Counts the maps baked: one more for each town whose ground differs from the last's (`groundVersion`). */
+  version = 0;
   private area = new Float32Array(4);
   private on = false;
 
@@ -95,9 +115,10 @@ export class TownGroundMap {
     const meta = world.meta;
     const W = world.width;
     const D = groundDepth(world);
-    const key = `${meta?.seed ?? 0}|${W}x${D}|${meta?.roads?.length ?? 0}|${world.plots.length}|${meta?.centre?.length ?? 0}|${meta?.backdrop?.length ?? 0}|${land ? 1 : 0}|${land?.landVersion ?? 0}`;
+    const key = `${meta?.seed ?? 0}|${W}x${D}|${groundVersion(world)}|${land ? 1 : 0}|${land?.landVersion ?? 0}`;
     if (key === this.key || typeof OffscreenCanvas === 'undefined' || !meta) return;
     this.key = key;
+    this.version++;
     const size = Math.min(MAP_MAX, 2 ** Math.ceil(Math.log2(Math.max(W, D) * MAP_PER_M)));
     const sx = size / W;
     const sz = size / D;

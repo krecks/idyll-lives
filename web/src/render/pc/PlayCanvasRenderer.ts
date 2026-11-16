@@ -67,7 +67,7 @@ import { SunShadows } from './sunShadows';
 import { TemplateCache } from './templateCache';
 import { Thumbnails } from './thumbnail';
 import { benchDiag } from '../../debug/benchFlags';
-import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
+import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 import { fetched } from '../../assets/stream';
 import { both, within } from '../../core/async';
 import { LOOK } from '../look';
@@ -3037,7 +3037,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!(await overview.build(world, () => this.pace()))) return;
     if (this.townHighlight) overview.setHighlight(this.townHighlight);
     // Interior lamps of the game's house never reach the overview (nor are they on its layer: this keeps its shaders simple).
-    this.lamps.exclude(overview.meshInstances());
+    perfTime('town: lamps kept out', () => this.lamps.exclude(overview.meshInstances()));
     // (The new street's lamps and windows at the hour shown.)
     if (this.townMode) this.lastLightMinute = -1;
   }
@@ -3065,7 +3065,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
           this.lot.useNature('town', world, (roads, parent) => drawRoads(this.app, roads, parent), onStep),
           this.buildOverview(overview, world).then(() => onStep?.('town')),
         );
-        nature.landscape.refreshLawn(world);
+        perfTime('town: lawn', () => nature.landscape.refreshLawn(world));
         // The camera keeps a clear view over the hills (and out of the mountains).
         this.townRig.ground = (x, z) => nature.landscape.heightAt(x, z);
       } finally {

@@ -20,6 +20,7 @@
  *     --out <dir>                  default /tmp/ng-render/
  *     --no-time                    pictures only
  *     --no-shots                   timings only (from the bare land)
+ *     --follow                     the town on a land it follows (`withLand`), as every new game's will be
  *
  * Needs Playwright like render.mjs (`PLAYWRIGHT=<path to playwright/index.mjs>`).
  */
@@ -79,11 +80,13 @@ if (!flag('url', null) && !(await running(base))) {
 }
 
 /** In the page: the modules the shots need, the UI hidden, a band where the side panel would be. */
-async function setUp({ kind, options, seed, side }) {
-  const [{ menuScene }, { landDraft }, { generateWorld, loadTemplates }, { services }] = await Promise.all([import('/src/game/menuScene.ts'), import('/src/game/macro.ts'), import('/src/game/town.ts'), import('/src/ui/services.ts')]);
+async function setUp({ kind, options, seed, side, follow }) {
+  const [{ menuScene }, { landDraft }, { generateWorld, loadTemplates }, { services }, { withLand }, { previewWorld }] = await Promise.all([import('/src/game/menuScene.ts'), import('/src/game/macro.ts'), import('/src/game/town.ts'), import('/src/ui/services.ts'), import('/src/game/landFollow.ts'), import('/src/game/townPreview.ts')]);
+  const { removeLots } = await import('/src/game/edit/lots.ts');
   const t = await loadTemplates();
   const land = landDraft(services.content, t, kind, options, seed);
-  const town = generateWorld(services.content, t, kind, seed, undefined, undefined, options);
+  const made = generateWorld(services.content, t, kind, seed, undefined, undefined, options);
+  const town = follow && !made.open?.land ? withLand(made, previewWorld(services.content, t, made, null)) : made;
   const style = document.createElement('style');
   style.textContent = 'body * { visibility: hidden !important; } canvas, .ng-side { visibility: visible !important; }';
   document.head.append(style);
@@ -91,7 +94,7 @@ async function setUp({ kind, options, seed, side }) {
   band.className = 'ng-side';
   Object.assign(band.style, { position: 'fixed', left: '0', top: '0', bottom: '0', width: `${side}px`, background: 'rgba(40, 44, 52, 0.55)', zIndex: '99999', pointerEvents: 'none' });
   document.body.append(band);
-  window.__ng = { menuScene, land, town, frame: { left: side, top: 0, right: innerWidth, bottom: innerHeight } };
+  window.__ng = { menuScene, land, town, removeLots, frame: { left: side, top: 0, right: innerWidth, bottom: innerHeight } };
   return { areas: town.open?.areas.length ?? 0, slots: town.slots.length, roads: town.roads.length, width: town.width, depth: town.depth, land: town.open?.land?.seeded ?? 'none' };
 }
 
@@ -123,7 +126,7 @@ try {
     page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
     await page.goto(`${base}/?${renderer === 'webgl' ? 'renderer=webgl' : ''}`);
     await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 200 });
-    const facts = await page.evaluate(setUp, { kind: made.world, options: made.options, seed, side: Math.round(width * 0.24) });
+    const facts = await page.evaluate(setUp, { kind: made.world, options: made.options, seed, side: Math.round(width * 0.24), follow: has('follow') });
     console.log(`townShots: ${renderer}: ${made.world} ${made.query || '(its own options)'} seed ${seed}: ${facts.width}x${facts.depth} m, ${facts.areas} areas, ${facts.slots} lots, ${facts.roads} roads, land ${facts.land}`);
     const shoot = async (name, wait = 1200) => {
       await page.waitForTimeout(wait);
@@ -261,7 +264,8 @@ try {
         results.push(await timed('the town after the bare land (whole)', town));
         results.push(await timed('the same town as a new draft (nothing changed)', { ...town }));
         const lot = town.slots.findIndex((s) => s.kind === 'house');
-        const lessOne = { ...town, slots: town.slots.filter((_, i) => i !== lot) };
+        // (As the editor removes one: the lots after it numbered again, and what names them with them.)
+        const lessOne = ng.removeLots(town, new Set([lot]));
         results.push(await timed('a lot removed', lessOne));
         const road = town.roads.find((r) => r.kind !== 'trail' && r.points.length >= 2);
         const added = road ? { ...lessOne, roads: [...lessOne.roads, { ...road, name: 'Bench Lane', points: road.points.map(([x, z]) => [x + 30, z + 30]) }] } : lessOne;

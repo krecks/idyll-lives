@@ -97,10 +97,11 @@ function drawn(c: ChunkPlan): string {
 }
 
 describe('the street in chunks', async () => {
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' }, requestAnimationFrame: () => 0, window: {} });
+  // (A window the camera's tests can use too, run in the same process: listeners taken and dropped.)
+  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' }, requestAnimationFrame: () => 0, window: { addEventListener: () => {}, removeEventListener: () => {} } });
   const { HousePlanner } = await import('../src/render/shared/house');
   const { TownStreet, NO_FOCUS } = await import('../src/render/shared/street');
-  const { chunkAt } = await import('../src/render/shared/chunks');
+  const { chunkAt, chunkRect } = await import('../src/render/shared/chunks');
   const objects = [thing(1, 44, 2), thing(2, 61, 30), thing(3, 141, 3)];
 
   test('the town spans chunks, and every one has its share', () => {
@@ -399,7 +400,7 @@ describe('the street in chunks', async () => {
     void WALK_Y;
   });
 
-  test('a chunk whose heights moved is planned again (its key has the surface’s version)', () => {
+  test('a chunk whose heights moved is planned again (its key has the heights in it)', () => {
     const world = onLand(town(objects));
     const surface = surfaceOf(world)!;
     const street = new TownStreet(new HousePlanner(), world, options, 'game');
@@ -411,5 +412,52 @@ describe('the street in chunks', async () => {
     surface.update({ i0: 70, j0: 0, i1: 95, j1: land.rows });
     expect(surface.version(id)).toBeGreaterThan(0);
     expect(street.chunkKey(id, NO_FOCUS)).not.toBe(key);
+  });
+
+  /** `world` without the lot at index `gone`: the lots after it numbered again, their paths and facings with them (as the editor removes one). */
+  const without = (world: WorldStructure, gone: number): WorldStructure => {
+    const meta = world.meta!;
+    return {
+      ...world,
+      plots: world.plots.filter((_, i) => i !== gone).map((p, i) => ({ ...p, id: i, name: `${i}` })),
+      meta: { ...meta, paths: meta.paths!.filter((_, k) => Math.floor(k / 2) !== gone), facing: meta.facing!.filter((_, i) => i !== gone) },
+    } as WorldStructure;
+  };
+
+  test('another town with a lot removed: the chunks away from it keep their keys, and draw the same (its lots by place, not by index)', () => {
+    const world = town(objects);
+    // (A lot in the middle of the south row: every lot after it gets another index.)
+    const gone = 13;
+    const lot = world.plots[gone];
+    const a = new TownStreet(new HousePlanner(), world, options, 'town');
+    const b = new TownStreet(new HousePlanner(), without(world, gone), options, 'town');
+    let kept = 0;
+    for (const id of a.chunkIds()) {
+      const r = chunkRect(id);
+      const near = r.x < lot.x + lot.w + 64 && r.x + r.w > lot.x - 64;
+      const same = a.chunkKey(id, NO_FOCUS) === b.chunkKey(id, NO_FOCUS);
+      if (!near) expect(same).toBe(true);
+      // (A key the same is a chunk drawn the same: what lets the overview keep it.)
+      if (same) {
+        expect(drawn(b.chunk(id, NO_FOCUS))).toBe(drawn(a.chunk(id, NO_FOCUS)));
+        kept++;
+      }
+    }
+    expect(kept).toBeGreaterThan(0);
+    // Its own chunk is planned again.
+    expect(a.chunkKey(chunkAt(lot.x + lot.w / 2, lot.z + lot.d / 2), NO_FOCUS)).not.toBe(b.chunkKey(chunkAt(lot.x + lot.w / 2, lot.z + lot.d / 2), NO_FOCUS));
+  });
+
+  test('another town with a road added: the chunks it does not reach keep their keys (the menus’ street, which draws no road surface)', () => {
+    const one = streets([23]);
+    const two = streets([23, 120]);
+    const overview = { ...options, ground: false };
+    const a = new TownStreet(new HousePlanner(), one, overview, 'town');
+    const b = new TownStreet(new HousePlanner(), { ...two, plots: one.plots, depth: two.depth, rooms: two.rooms, meta: { ...two.meta!, paths: one.meta!.paths, facing: one.meta!.facing } } as WorldStructure, overview, 'town');
+    for (const id of a.chunkIds()) {
+      const r = chunkRect(id);
+      if (r.z + r.d > 64) continue;
+      expect(b.chunkKey(id, NO_FOCUS)).toBe(a.chunkKey(id, NO_FOCUS));
+    }
   });
 });

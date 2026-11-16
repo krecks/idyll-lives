@@ -35,7 +35,7 @@
 import type { JunctionInfo, RoadKind, RoadPlan } from '../../core/protocol';
 import { LAND_CELL, NONE, heightAt, type Land, type LandRect } from '../../game/land';
 import { lengths, nearest, pointAt, RoadIndex } from '../../game/roads';
-import { chunkAt, chunksIn } from './chunks';
+import { CHUNK, chunkAt, chunksIn } from './chunks';
 import { carriageway, CROSSWALK, KERB_RETURN, planJunctions, type JunctionPlan } from './junctions';
 
 /** The steepest each kind of way climbs (rise per m); a trail's is a measure only (it lies on the land). */
@@ -311,6 +311,54 @@ export class BuiltSurface {
   }
 
   /**
+   * A hash of every height street chunk `chunk` (`chunks.ts` `chunkId`) stands on, to the millimetre: the roads'
+   * samples within reach of it, the pads of the lots reaching into it and the graded land under it. Two surfaces
+   * (of two towns on one land: a lot removed, a street added) give a chunk the same one where nothing in it moved,
+   * so its street need not be planned again. Worked out for every chunk at once, the first time one is asked for,
+   * and again after `update`.
+   */
+  chunkSig(chunk: number): number {
+    this.sigs ??= this.chunkSigs();
+    return this.sigs.get(chunk) ?? 0;
+  }
+  private sigs: Map<number, number> | null = null;
+
+  /** A hash of every road's heights (to the millimetre): two surfaces with the same roads and this the same draw them alike. */
+  roadsSig(): number {
+    let h = 0x811c9dc5;
+    for (const p of this.profiles) {
+      h = Math.imul(h ^ p.y.length, 16777619);
+      for (let i = 0; i < p.y.length; i++) h = Math.imul(h ^ Math.round(p.y[i] * 1000), 16777619);
+    }
+    return h >>> 0;
+  }
+
+  private chunkSigs(): Map<number, number> {
+    const out = new Map<number, number>();
+    const add = (c: number, v: number) => out.set(c, Math.imul((out.get(c) ?? 0x811c9dc5) ^ Math.round(v * 1000), 16777619));
+    // (Each height into every chunk within reach of it: what stands at a chunk's edge reads them across it.)
+    const reach = this.widest / 2 + PROFILE_STEP;
+    for (const p of this.profiles) for (let i = 0; i < p.y.length; i++) for (const c of chunksIn(p.x[i] - reach, p.z[i] - reach, p.x[i] + reach, p.z[i] + reach)) add(c, p.y[i]);
+    this.plots.forEach((p, i) => {
+      for (const c of chunksIn(p.x - LAND_CELL, p.z - LAND_CELL, p.x + p.w + LAND_CELL, p.z + p.d + LAND_CELL)) add(c, this.pads[i]);
+    });
+    const { cols, rows, conformed } = this;
+    const per = CHUNK / LAND_CELL;
+    for (let cj = 0; cj * per < rows; cj++) {
+      for (let ci = 0; ci * per < cols; ci++) {
+        const c = chunkAt(ci * CHUNK, cj * CHUNK);
+        let h = out.get(c) ?? 0x811c9dc5;
+        for (let j = Math.max(0, cj * per - 1); j <= Math.min(rows - 1, (cj + 1) * per + 1); j++) {
+          for (let i = Math.max(0, ci * per - 1), k = j * cols + i; i <= Math.min(cols - 1, (ci + 1) * per + 1); i++, k++) h = Math.imul(h ^ Math.round(conformed[k] * 1000), 16777619);
+        }
+        out.set(c, h);
+      }
+    }
+    for (const [c, h] of out) out.set(c, h >>> 0);
+    return out;
+  }
+
+  /**
    * The land with the built land graded into it (cm, as `Land.h`): the road's own height under a
    * road (not sunk), the pad in a lot, the graded land round them; water left as it is. What the
    * generator stores (`withLand`), so a world's land agrees with its town.
@@ -336,6 +384,7 @@ export class BuiltSurface {
     const oldPads = this.pads.slice();
     const oldLand = this.conformed.slice();
     this.solve();
+    this.sigs = null;
     const bumped = new Set<number>();
     const roads: number[] = [];
     this.profiles.forEach((p, r) => {

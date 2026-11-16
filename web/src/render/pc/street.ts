@@ -42,6 +42,7 @@ import type { StandIn } from '../shared/modelEntry';
 import { chunkAt, chunkCoords, distanceToRect, groupOf, LookedFrom, SUPERCHUNK } from '../shared/chunks';
 import { groupInstances } from '../shared/nature';
 import { castsShadow, FOLIAGE, instanceMatrix, NO_FOCUS, TownStreet, type ChunkPlan, type GroundLayer, type Inst, type ObjectLook } from '../shared/street';
+import { surfaceOf } from '../shared/landSurface';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
 
 export interface StreetOptions {
@@ -144,6 +145,12 @@ interface Home {
   panes: Geo;
   up: boolean;
   group: number;
+}
+
+/** A draw group built again (`Street.buildGroup`): put in place of the old, or dropped. */
+interface GroupSwap {
+  commit(): void;
+  discard(): void;
 }
 
 /** A draw group's meshes (one per material), and its lit and dark window glass. */
@@ -322,12 +329,27 @@ export class Street {
     let layoutMs = 0;
     if (!this.town || layoutKey !== this.layoutKey) {
       const t0 = performance.now();
-      this.dropChunks();
+      // (Another layout keeps the chunks built: each is planned again only where its key, what it is planned from,
+      // changed. Not for the other mode's street, planned otherwise.)
+      if (this.town?.mode !== mode) this.dropChunks();
+      this.prepared = false;
       const entry = (k: string) => (this.assets.has(k, 'model') ? (this.assets.get(k, 'model') as ModelEntry) : undefined);
-      this.town = new TownStreet(this.house.planner, world, { has: (k) => this.assets.has(k, 'model'), entry, lived: this.lived, look: this.look, ground: this.ground, fenceStyles: this.fenceStyles }, mode);
+      // (Its land's surface solved first, the frames given a turn, then the layout, the street's own and the kerbs
+      // a part at a time: none of it in one long stall.)
+      surfaceOf(world);
+      layoutMs += performance.now() - t0;
+      await pace?.();
+      if (stale()) return;
+      const t1 = performance.now();
+      const town = new TownStreet(this.house.planner, world, { has: (k) => this.assets.has(k, 'model'), entry, lived: this.lived, look: this.look, ground: this.ground, fenceStyles: this.fenceStyles }, mode);
+      layoutMs += performance.now() - t1;
+      await pace?.();
+      if (stale()) return;
+      await town.prepare(pace);
+      if (stale()) return;
+      this.town = town;
       this.layoutKey = layoutKey;
       this.townWorld = world;
-      layoutMs = performance.now() - t0;
     } else if (world !== this.townWorld) {
       this.town.setWorld(world);
       this.townWorld = world;
@@ -390,13 +412,20 @@ export class Street {
     if (planned || dirty.size) this.instancesDue = true;
 
     const meshesSpan = perfStart('street: meshes');
-    // (A group left by a build a newer one stopped stays dirty for that one.)
+    // (A group left by a build a newer one stopped stays dirty for that one. The groups built are put in place of the
+    // old together once all are built: another town shows whole, not a group at a time.)
     const rebuilt = dirty.size > 0;
+    const groups = dirty.size;
+    const swaps: GroupSwap[] = [];
     for (const g of [...dirty]) {
-      await this.buildGroup(g, pace, stale);
-      if (stale()) return;
-      dirty.delete(g);
+      swaps.push(await this.buildGroup(g, pace, stale));
+      if (stale()) {
+        for (const s of swaps) s.discard();
+        return;
+      }
     }
+    for (const s of swaps) s.commit();
+    for (const g of [...dirty]) dirty.delete(g);
     // The focus lot's garage and porch (apart: they go with the lot's ground).
     const focusChunk = town.focusChunk(focus);
     const lotPlan = focusChunk !== null ? this.chunks.get(focusChunk) : undefined;
@@ -442,7 +471,7 @@ export class Street {
     }
     if (rebuilt) this.gatherHomes();
     this.buildFar(town, all, focus);
-    perfEnd(meshesSpan);
+    perfEnd(meshesSpan, `${groups} groups`);
 
     if (!this.instancesDue) return;
     this.instancesDue = false;
@@ -736,14 +765,21 @@ export class Street {
     return out;
   }
 
-  /** A draw group's meshes again, from its chunks' vertex arrays (one mesh a material), and its window glass. */
-  private async buildGroup(id: number, pace?: () => Promise<void>, stale?: () => boolean): Promise<void> {
+  /**
+   * A draw group's meshes again, from its chunks' vertex arrays (one mesh a material), built hidden between frames:
+   * `commit` puts them in place of the old (its window glass is drawn again with the homes), `discard` drops them.
+   */
+  private async buildGroup(id: number, pace?: () => Promise<void>, stale?: () => boolean): Promise<GroupSwap> {
     const members = [...this.chunks.entries()].filter(([c]) => groupOf(c) === id).sort(([a], [b]) => a - b);
-    let g = this.groups.get(id);
     if (!members.length) {
-      if (g) for (const e of [...g.meshes, ...g.windows.map((w) => w.entity)]) e.destroy();
-      this.groups.delete(id);
-      return;
+      return {
+        commit: () => {
+          const g = this.groups.get(id);
+          if (g) for (const e of [...g.meshes, ...g.windows.map((w) => w.entity)]) e.destroy();
+          this.groups.delete(id);
+        },
+        discard: () => {},
+      };
     }
     // The new meshes built hidden, a material at a time between frames, then put in place of the old at once.
     const fresh: pc.Entity[] = [];
@@ -765,18 +801,22 @@ export class Street {
       entity.enabled = false;
       fresh.push(entity);
       await pace?.();
-      if (stale?.()) {
-        for (const e of fresh) e.destroy();
-        return;
-      }
+      if (stale?.()) break;
     }
-    g = this.groups.get(id);
-    if (g) for (const e of g.meshes) e.destroy();
-    else this.groups.set(id, (g = { meshes: [], windows: [], windowsDue: false }));
-    for (const e of fresh) e.enabled = true;
-    g.meshes = fresh;
-    g.windowsDue = true;
-    this.showPools(fresh);
+    return {
+      commit: () => {
+        let g = this.groups.get(id);
+        if (g) for (const e of g.meshes) e.destroy();
+        else this.groups.set(id, (g = { meshes: [], windows: [], windowsDue: false }));
+        for (const e of fresh) e.enabled = true;
+        g.meshes = fresh;
+        g.windowsDue = true;
+        this.showPools(fresh);
+      },
+      discard: () => {
+        for (const e of fresh) e.destroy();
+      },
+    };
   }
 
   /** The neighbours' houses whose glass glows, over every chunk drawn (who was up stays so: the lights don't flick on for a frame). */
