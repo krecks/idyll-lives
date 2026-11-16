@@ -256,7 +256,7 @@ function benchHelpers() {
       },
       /**
        * A street for the Street tool to draw, off a road, square to it, on screen: `join` (across open land to another
-       * road, nothing in its way, no bridge), `bridge` (over the water on a bridge), `tight` (a bend tighter than 9 m)
+       * road, nothing in its way, no bridge; `join-any`: clearing what is in its way), `bridge` (over the water on a bridge), `tight` (a bend tighter than 9 m)
        * or `steep` (a stretch too steep, nothing else wrong). Its ground points and their screen points (the last on
        * the road it reaches), and `drawStreet`'s own time on it.
        */
@@ -278,10 +278,11 @@ function benchHelpers() {
             return 'draft' in e ? v : null;
           }
           if (v.why || !v.reached || v.end?.kind !== 'join' || (what === 'bridge') !== v.bridges.length > 0) return null;
+          // (`join-any`: a street to another road that may clear what is in its way, where none runs over open land.)
           const t0 = performance.now();
           const e = live.verdictOf(d, t, ed().content, pts, 'street', true, 1);
           const ms = performance.now() - t0;
-          return 'draft' in e && (what === 'bridge' || e.cleared.lots.length + e.cleared.backdrop.length === 0) ? { ...v, ms } : null;
+          return 'draft' in e && (what !== 'join' || e.cleared.lots.length + e.cleared.backdrop.length === 0) ? { ...v, ms } : null;
         };
         for (const i of order) {
           const r = d.roads[i];
@@ -303,7 +304,7 @@ function benchHelpers() {
                 // (A line that reaches a road ends on it: the last click where the line drawn meets that road. The clicks
                 // are judged again from the ground under their screen points, as the tool will have them.)
                 let clicks = tried;
-                if (what === 'join' || what === 'bridge' || (what === 'steep' && v.reached)) {
+                if (what === 'join' || what === 'join-any' || what === 'bridge' || (what === 'steep' && v.reached)) {
                   const [a, b] = tried;
                   const e = v.line[v.line.length - 1];
                   const u = [b[0] - a[0], b[1] - a[1]];
@@ -611,9 +612,9 @@ async function editSession(page, renderer, shootAs, setStep) {
     };
 
     // 9. A street across open land from one road to another, by clicks.
-    const across = await bench(() => window.__bench.stroke('join'));
+    const across = (await bench(() => window.__bench.stroke('join'))) ?? (await bench(() => window.__bench.stroke('join-any')));
     if (across) await draw(across, 'street');
-    else fault(`${renderer} edit: no street across open land on screen to draw`);
+    else fault(`${renderer} edit: no street from one road to another on screen to draw`);
 
     // 10. Over the water on a bridge (if the world has a crossing on screen).
     const over = await bench(() => window.__bench.stroke('bridge'));
