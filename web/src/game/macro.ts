@@ -109,8 +109,10 @@ const FARM_OFF = 25;
 /** Cottages by the country roads: so many where each leaves an area or meets another, within this of the spot (m). */
 const COTTAGES: [number, number] = [2, 4];
 const COTTAGE_REACH = 70;
-/** Land steeper than this (rise per m) is no place for a farmstead or a cottage. */
+/** Land steeper than this (rise per m) is no place for a farmstead or a cottage; in a place's world (its towns follow its slopes) nor for any lot out along a country road, within `SPILL_LOOK` m of where it goes. */
 const STEEP = 0.25;
+const PLACE_STEEP = 0.12;
+const SPILL_LOOK = 12;
 /** An orchard beside a farmstead: this deep from the lot's side (m), a gap of this from it. */
 const ORCHARD = 26;
 const ORCHARD_GAP = 3;
@@ -938,6 +940,12 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
         const g = Math.abs(land.height[b] - land.height[a]) / (a % gw !== b % gw && Math.floor(a / gw) !== Math.floor(b / gw) ? CELL * Math.SQRT2 : CELL);
         return g > ROUTE_GRADE ? (g - ROUTE_GRADE) * ROUTE_STEEP : 0;
       };
+  /** Whether the land within `SPILL_LOOK` m of `p` is gentle enough for a lot out along a country road (any, in a classic world). */
+  const gentleBy = (p: Pt) => {
+    if (spec.classic) return true;
+    for (let dz = -SPILL_LOOK; dz <= SPILL_LOOK; dz += CELL) for (let dx = -SPILL_LOOK; dx <= SPILL_LOOK; dx += CELL) if (land.slope(land.cell(p[0] + dx, p[1] + dz)) > PLACE_STEEP) return false;
+    return true;
+  };
   /** As `roadCost`, but along the water's edge too (not over it), and less put off by the slope: for when that finds no way. */
   const relaxedCost = (ends: readonly Pt[]) => {
     const strict = roadCost(ends);
@@ -1843,7 +1851,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       // (Out of room in the town: on along the country roads leaving it, where they run straight.)
       const countryWays = worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : []));
       const lens = new Map(countryWays.map((r) => [r, lengths(worldRoads[r].points)]));
-      const out = frontageOf(worldRoads, countryWays, plan.centre, dense).filter((f) => offRect(plan.rect, f.p) < TERRACE_SPILL && straight(worldRoads[f.road].points, f.s, lens.get(f.road)!));
+      const out = frontageOf(worldRoads, countryWays, plan.centre, dense).filter((f) => offRect(plan.rect, f.p) < TERRACE_SPILL && straight(worldRoads[f.road].points, f.s, lens.get(f.road)!) && gentleBy(f.p));
       terraceRows(t, lots, [homes, out], spec, dense);
       fronts.set(a, homes.filter(offCorners));
       for (const u of lots.place(houses, fronts.get(a)!, [], plan.centre, a, true)) left.push({ u, from: a });
@@ -1853,20 +1861,21 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     plan.roads.forEach((r, k) => (names[r] = streets[k]));
   }
   // Houses with no room in their own area go to the nearest other that has room (homes, not shops).
+  // (In a place's world, out along the country roads only where the land by the road is gentle: `PLACE_STEEP`.)
   let country: ReturnType<typeof frontageOf> | undefined;
   for (const { u, from } of left) {
     const others = plans.map((_, a) => a).filter((a) => a !== from && u.kind === 'house').sort((x, y) => dist(plans[x].centre, plans[from].centre) - dist(plans[y].centre, plans[from].centre));
     const placed = others.some((a) => !lots.place([u], fronts.get(a)!, [], plans[a].centre, a, true).length);
     if (placed) continue;
     // Else along a country road, near its own area's end of it.
-    country ??= frontageOf(worldRoads, worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : [])), plans[0].centre, rand).filter((f) => straight(worldRoads[f.road].points, f.s, lengths(worldRoads[f.road].points)));
+    country ??= frontageOf(worldRoads, worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : [])), plans[0].centre, rand).filter((f) => straight(worldRoads[f.road].points, f.s, lengths(worldRoads[f.road].points)) && gentleBy(f.p));
     const r = plans[from].rect;
     const off = (p: Pt) => offRect(r, p);
     const near = country.filter((f) => off(f.p) < SPILL).sort((x, y) => dist(x.p, plans[from].centre) - dist(y.p, plans[from].centre));
     if (u.kind === 'house' && !lots.place([u], near, [], plans[from].centre, from, true).length) continue;
     lots.dropped.push({ name: u.name, kind: u.kind, lot: u.lot });
   }
-  const farmsteads = alongCountryRoads(content, t, lots, plans, worldRoads, land, spec.farmEvery, rand);
+  const farmsteads = alongCountryRoads(content, t, lots, plans, worldRoads, land, spec.farmEvery, rand, spec.classic ? STEEP : PLACE_STEEP);
   lots.number(names);
   const slots = lots.slots;
   const rectOf = (s: PlotSlot) => plotRect(t, s);
@@ -2041,7 +2050,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     households: [],
     seed,
     world: { kind: spec.kind, size: 'big', tagline, landscape, ...(spec.options ? { options: spec.options } : {}) },
-    diagnostics: { dropped: lots.dropped, ...(failed.length ? { roads: failed } : {}) },
+    diagnostics: { dropped: lots.dropped, ...(failed.length ? { roads: failed } : {}), ...(reachable && missing > 0 ? { villages: { left: missing, homes: missing * spec.hamlet.lots[0] } } : {}) },
     open: {
       areas,
       zones,
@@ -2415,7 +2424,7 @@ const straight = (pts: readonly Pt[], s: number, ls: number[]) => straightAround
  * and yard) every `every` m of road (150 to 200 in the classic worlds), each clear of the areas,
  * the water and steep land, and of the area it is nearest. The farmsteads placed.
  */
-function alongCountryRoads(content: Content, t: Templates, lots: LotPlacer, plans: readonly Plan[], roads: readonly RoadPlan[], land: Land, every: [number, number], rand: Rand): PlotSlot[] {
+function alongCountryRoads(content: Content, t: Templates, lots: LotPlacer, plans: readonly Plan[], roads: readonly RoadPlan[], land: Land, every: [number, number], rand: Rand, steepest = STEEP): PlotSlot[] {
   const country = roads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : []));
   const byRoad = new Map<number, Frontage[]>();
   const lens = new Map(country.map((r) => [r, lengths(roads[r].points)]));
@@ -2432,7 +2441,7 @@ function alongCountryRoads(content: Content, t: Templates, lots: LotPlacer, plan
   /** Dry and not steep within `r` m of `p`. */
   const buildable = (p: Pt, r: number) => {
     if (land.wet(p[0], p[1], r)) return false;
-    for (let dz = -r; dz <= r; dz += CELL * 2) for (let dx = -r; dx <= r; dx += CELL * 2) if (land.slope(land.cell(p[0] + dx, p[1] + dz)) > STEEP) return false;
+    for (let dz = -r; dz <= r; dz += CELL * 2) for (let dx = -r; dx <= r; dx += CELL * 2) if (land.slope(land.cell(p[0] + dx, p[1] + dz)) > steepest) return false;
     return true;
   };
   const house = (lot: 'small' | 'farm', name: string, area: number) => ({ kind: 'house' as const, name, lot, area, ...houseFor(t, lot, lot === 'farm' ? 'roomy' : rand() < 0.5 ? 'snug' : 'roomy', rand) });

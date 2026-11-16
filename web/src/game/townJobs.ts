@@ -9,7 +9,7 @@ import type { Content } from '../content/content';
 import type { WorldOptions, WorldStructure } from '../core/protocol';
 import type { HouseholdDraft } from './household';
 import { encodeLand, type Land } from './land';
-import { withLand } from './landFollow';
+import { settleLand } from './landFollow';
 import { assembleTown, generatedHouses, generateWorld, loadTemplates, primeHouses, type AssembleOptions, type HouseTemplate, type NeighbourhoodDraft, type Templates } from './town';
 import { previewWorld } from './townPreview';
 import type { WorldStep } from './world';
@@ -19,7 +19,8 @@ import { mulberry32 } from './noise';
 export type TownJob =
   /**
    * A new world (`generateWorld`), with the menu's preview of it (`previewWorld`) and, a place's,
-   * its land graded under its town (`landFollow.ts` `withLand`, from the preview's lots and paths):
+   * its land graded under its town (`landFollow.ts` `settleLand`, from the preview's lots and paths,
+   * giving up what still breaks the slope limits):
    * `world` is its place (`WorldKind`, or a kind from before places: `LEGACY_KINDS`), `options` the
    * player's (the place's own where not given). `land`: the town laid again on a land the player
    * shaped (step 1's "Lay the town again", or Town or Villages changed on a shaped land); it
@@ -45,8 +46,9 @@ export type FromTownWorker = WorkerAnswer<TownResult, WorldStep>;
 export function runTownJob(content: Content, t: Templates, job: TownJob, step?: (done: WorldStep) => void): TownResult {
   if (job.kind === 'world') {
     const laid = generateWorld(content, t, job.world, job.seed, job.name, step, job.options, job.land);
-    const preview = previewWorld(content, t, laid, null);
-    const draft = withLand(laid, preview);
+    const settled = settleLand(laid, (d) => previewWorld(content, t, d, null));
+    const draft = settled.draft;
+    const preview = settled.world;
     if (draft.open?.land && draft !== laid) preview.meta = { ...preview.meta, land: encodeLand(draft.open.land) };
     const houses = generatedHouses(t, draft.slots.map((s) => s.template));
     step?.('houses');

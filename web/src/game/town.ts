@@ -200,7 +200,14 @@ export interface NeighbourhoodDraft {
    * What the layout couldn't do: lots that found no room along the roads (left out of the town),
    * and (a big world) the country roads it found no way for (`roads`: which, and between what).
    */
-  diagnostics?: { dropped: { name: string; kind: PlotSlot['kind']; lot?: LotSize }[]; roads?: string[] };
+  diagnostics?: {
+    dropped: { name: string; kind: PlotSlot['kind']; lot?: LotSize }[];
+    roads?: string[];
+    /** Among a place's mountains, the hamlets left out for want of a site a country road could reach (`macro.ts`), and the homes they would have brought. */
+    villages?: { left: number; homes: number };
+    /** Lots and backdrop buildings, roads out and courts given up so the world's built land keeps within its slope limits (`landFollow.ts` `settleLand`). */
+    slopes?: { lots: number; backdrop: number; roads: number; courts: number };
+  };
 }
 
 /** What kind of world a town is in, one line about it, and how its land looks. */
