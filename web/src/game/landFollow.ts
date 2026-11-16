@@ -179,8 +179,9 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
         slopes.retain.lot = Math.max(slopes.retain.lot, step);
         if (step > edgeMost) {
           if (step > RETAIN_MAX + 0.01) out.push(`lot ${n}'s edge stands ${step.toFixed(2)} m over the pad beside it (at most ${RETAIN_MAX})`);
-          // (The backdrop building, else the later lot, gives way.)
-          pads.add(other >= world.plots.length ? other : Math.max(n, other));
+          // (The backdrop building, else the later lot, gives way; but a lot gives way to a building that is a place, a shop or the like.)
+          const place = other >= world.plots.length && world.meta?.backdrop?.[other - world.plots.length]?.place !== undefined;
+          pads.add(place ? n : other >= world.plots.length ? other : Math.max(n, other));
         }
       } else if (index.onRoad(x, z, LAND_CELL)) slopes.retain.road = Math.max(slopes.retain.road, step);
       else {
@@ -231,7 +232,7 @@ const SETTLE_MARGIN = 0.15;
  * `withLand`, and the last resort: a place's world whose built land still breaks a slope limit
  * (`measureLand`, a little within it) gives up what breaks it and is graded again, round after
  * round (`SETTLE_ROUNDS` at most): a lot or a backdrop building cut too deep or whose edge stands
- * too tall (of two pads, the backdrop building, else the later lot) is left out (`diagnostics.dropped`);
+ * too tall (of two pads, the backdrop building, else the later lot; a lot before a building that is a place) is left out (`diagnostics.dropped`);
  * a country road cut too deep (a way out, a loop between places) is left out, and the lots and
  * backdrop buildings on it (those by it, and those it was the nearest road to), where the roads left are still one network with a way out; a dead end reaching past `COURT` m beyond the last road it meets is
  * cut back to that, and the lots past it left out. What it gave up: `diagnostics.slopes`.
