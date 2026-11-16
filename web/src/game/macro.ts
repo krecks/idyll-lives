@@ -1753,6 +1753,17 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const pts = q.end === 0 ? [...road.points].reverse() : road.points;
       let keep = pts.length;
       while (keep > 2 && !within(pts[keep - 1])) keep--;
+      // (Not back past where another road joins it: a road out laid off it in a T would be left on its own.)
+      for (const o of roads) {
+        if (o === road) continue;
+        for (const e of [o.points[0], o.points[o.points.length - 1]]) {
+          for (let k = pts.length - 1; k >= keep; k--) {
+            if (dist(pts[k], e) > Math.max(o.width, road.width) / 2 + 1) continue;
+            keep = k + 1;
+            break;
+          }
+        }
+      }
       if (keep < pts.length) road.points = q.end === 0 ? pts.slice(0, keep).reverse() : pts.slice(0, keep);
     }
   }

@@ -8,7 +8,7 @@
  */
 
 import { DEFAULT_LANDSCAPE, type RoadPlan, type WorldStructure, type WorldZone } from '../core/protocol';
-import { BRIDGE_CLEAR, builtSurfaceOf, CUT_MAX, GRADE, RETAIN_MAX, surfacePlots, type BuiltSurface, type SurfaceWorld } from '../render/shared/builtSurface';
+import { BRIDGE_CLEAR, builtSurfaceOf, CUT_MAX, CUT_MAX_MOUNTAIN_ROAD, GRADE, RETAIN_MAX, surfacePlots, type BuiltSurface, type SurfaceWorld } from '../render/shared/builtSurface';
 import { blankLand, COVER, COVER_CELL, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, type Land } from './land';
 import { APRON, builtOf, Protection } from './landEdit';
 import { fbm, ridged, smoothstep } from './noise';
@@ -87,13 +87,14 @@ export interface LandMeasure {
  * The slope limits checked on `world`'s built land as the renderer works it out from `land` (the
  * land stored: `builtSurfaceOf`), against `seeded` (the land before its town was graded in): no
  * road (not a trail, a footpath on the land as it lies) steeper than its kind's `GRADE` by more
- * than 1 %, or cut into the land or standing over it by more than `CUT_MAX` (not over a bridge's
- * deck); no lot cut or filled by more than that; no lot's edge over the land or the pad beside it
+ * than 1 %, or cut into the land or standing over it by more than `CUT_MAX` (a country road among
+ * mountains `CUT_MAX_MOUNTAIN_ROAD`; not over a bridge's deck); no lot cut or filled by more than that; no lot's edge over the land or the pad beside it
  * by more than `RETAIN_MAX` (land narrower than the land's grain between two pads is the other
  * pad's edge; between a pad and a road, a verge: listed, not checked); every bridge's deck
- * `BRIDGE_CLEAR` over its water. `margin` (m) the limits are kept within besides (the last resort's).
+ * `BRIDGE_CLEAR` over its water. `margin` (m) the limits are kept within besides (the last resort's);
+ * `drift`: whether to measure how far the land stored is from the surface (`Slopes.drift`, else 0).
  */
-export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin = 0): LandMeasure {
+export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin = 0, drift = true): LandMeasure {
   const out: string[] = [];
   const pads = new Set<number>();
   const bad = new Set<number>();
@@ -102,6 +103,9 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
   const slopes: Slopes = { grade: {}, retain: { land: 0, lot: 0, road: 0 }, cut: { road: 0, lot: 0 }, clear: Infinity, drift: 0 };
   const wet = (l: Land, k: number) => l.wl[k] !== NONE && l.wl[k] > l.h[k];
   const [cutMost, edgeMost] = [CUT_MAX - margin, RETAIN_MAX + 0.01 - margin];
+  // (Among mountains a country road, a pass, may be cut deeper into the rock.)
+  const mountains = (world.meta?.world as { options?: { hills?: string } } | undefined)?.options?.hills === 'mountains';
+  const roadMost = (kind: string) => (mountains && kind === 'country' ? CUT_MAX_MOUNTAIN_ROAD : CUT_MAX);
   roads.forEach((r, i) => {
     const kind = r.kind ?? 'street';
     const { s, y } = surface.profile(i);
@@ -126,8 +130,8 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
       if (!wet(seeded, at)) cut = Math.max(cut, Math.abs(y[k] - heightAt(seeded, p[0], p[1])));
     }
     slopes.cut.road = Math.max(slopes.cut.road, cut);
-    if (cut > cutMost) {
-      if (cut > CUT_MAX) out.push(`${kind} ${r.name ?? i} is cut ${cut.toFixed(1)} m into the land or stands over it (at most ${CUT_MAX})`);
+    if (cut > roadMost(kind) - margin) {
+      if (cut > roadMost(kind)) out.push(`${kind} ${r.name ?? i} is cut ${cut.toFixed(1)} m into the land or stands over it (at most ${roadMost(kind)})`);
       bad.add(i);
     }
     if (span) {
@@ -138,8 +142,20 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
   // The lots: cut and fill under each pad, and its edges.
   const index = new RoadIndex(roads);
   const all = surfacePlots(world);
-  /** The pad (a lot's or a backdrop building's) but `skip`'s within `by` m of (x, z), if any. */
-  const padNear = (x: number, z: number, skip: number, by = 0) => all.findIndex((q, n) => n !== skip && x >= q.x - by && x <= q.x + q.w + by && z >= q.z - by && z <= q.z + q.d + by);
+  const cells = new Map<number, number[]>();
+  all.forEach((q, n) => {
+    for (let cz = Math.floor((q.z - LAND_CELL) / PAD_CELL); cz <= Math.floor((q.z + q.d + LAND_CELL) / PAD_CELL); cz++) {
+      for (let cx = Math.floor((q.x - LAND_CELL) / PAD_CELL); cx <= Math.floor((q.x + q.w + LAND_CELL) / PAD_CELL); cx++) cells.set(cx * 65536 + cz, [...(cells.get(cx * 65536 + cz) ?? []), n]);
+    }
+  });
+  /** The pad (a lot's or a backdrop building's) but `skip`'s within `by` m (no more than the land's grain) of (x, z), if any (the first). */
+  const padNear = (x: number, z: number, skip: number, by = 0) => {
+    for (const n of cells.get(Math.floor(x / PAD_CELL) * 65536 + Math.floor(z / PAD_CELL)) ?? []) {
+      const q = all[n];
+      if (n !== skip && x >= q.x - by && x <= q.x + q.w + by && z >= q.z - by && z <= q.z + q.d + by) return n;
+    }
+    return -1;
+  };
   world.plots.forEach((p, n) => {
     const pad = surface.padY(n);
     let cut = 0;
@@ -180,7 +196,8 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
       edge(p.x + p.w + 0.3, p.z + t);
     }
   });
-  // The land stored against the surface worked out from it, off what is built.
+  // The land stored against the surface worked out from it, off what is built (unless not asked: the last resort).
+  if (!drift) return { slopes, problems: out, pads, roads: bad };
   const lot = new Uint8Array(land.h.length);
   for (const p of world.plots) {
     for (let j = Math.ceil(p.z / LAND_CELL); j <= Math.min(land.rows - 1, Math.floor((p.z + p.d) / LAND_CELL)); j++) {
@@ -196,6 +213,9 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
   }
   return { slopes, problems: out, pads, roads: bad };
 }
+
+/** Pads are filed for `measureLand` by cells this wide (m). */
+const PAD_CELL = 16;
 
 /** The last resort's rounds at most, and how far within the limits it keeps (m: the town file's surface may differ a little from its preview's). */
 const SETTLE_ROUNDS = 5;
@@ -216,7 +236,7 @@ const SETTLE_MARGIN = 0.15;
  */
 export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, preview: (draft: NeighbourhoodDraft) => W, seeded?: (land: Land) => void): { draft: NeighbourhoodDraft; world: W } {
   let draft = laid;
-  const given = { lots: 0, backdrop: 0, roads: 0, courts: 0 };
+  const given = { lots: 0, backdrop: 0, roads: 0, courts: 0, backdropIn: {} as Record<number, number> };
   for (let round = 0; ; round++) {
     const world = preview(draft);
     let first: Land | null = null;
@@ -224,11 +244,12 @@ export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, prev
     const land = graded.open?.land;
     if (!land || !first) return { draft: graded, world };
     const courts = longCourts(draft.roads);
-    const found = round < SETTLE_ROUNDS ? measureLand(world, land, first, SETTLE_MARGIN) : null;
+    const found = round < SETTLE_ROUNDS ? measureLand(world, land, first, SETTLE_MARGIN, false) : null;
     const next = found ? giveUp(draft, world, found, courts, given) : null;
     if (!next) {
       seeded?.(first);
       const total = given.lots + given.backdrop + given.roads + given.courts;
+      if (!given.backdrop) delete (given as { backdropIn?: unknown }).backdropIn;
       return { draft: total ? { ...graded, diagnostics: { ...(graded.diagnostics ?? { dropped: [] }), slopes: given } } : graded, world };
     }
     draft = next;
@@ -265,7 +286,7 @@ function longCourts(roads: readonly RoadPlan[]): { road: number; end: 0 | 1; at:
  * `draft` without what `found` and `courts` say breaks the limits (see `settleLand`), counted in
  * `given`; null if it gives up nothing (all that breaks them is what it may not give up).
  */
-function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasure, courts: ReturnType<typeof longCourts>, given: { lots: number; backdrop: number; roads: number; courts: number }): NeighbourhoodDraft | null {
+function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasure, courts: ReturnType<typeof longCourts>, given: { lots: number; backdrop: number; roads: number; courts: number; backdropIn: Record<number, number> }): NeighbourhoodDraft | null {
   const open = draft.open;
   if (!open) return null;
   const plots = world.plots.length;
@@ -292,7 +313,10 @@ function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasur
     const pts: Pt[] = [pointAt(r.points, from, ls).p];
     for (let k = 0; k < r.points.length; k++) if (ls[k] > from && ls[k] < to) pts.push(r.points[k]);
     pts.push(pointAt(r.points, to, ls).p);
-    roads[c.road] = { ...r, points: pts };
+    const trimmed = roads.map((o, i) => (i === c.road ? { ...r, points: pts } : o));
+    // (Never one that leaves the roads in two.)
+    if (!oneNetwork(trimmed, gone)) continue;
+    roads = trimmed;
     given.courts++;
     // (The lots past the new end.)
     entries.forEach((p, n) => {
@@ -303,10 +327,14 @@ function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasur
   entries.forEach((p, n) => {
     if (n < plots ? p.entry && gone.has(p.entry.road) : [...gone].some((r) => nearest(draft.roads[r].points, p.x + p.w / 2, p.z + p.d / 2).dist < BY_ROAD)) (n < plots ? lots : backdrop).add(n < plots ? n : n - plots);
   });
-  if (!gone.size && !lots.size && !backdrop.size && !courts.length) return null;
+  if (!gone.size && !lots.size && !backdrop.size && roads.every((r, i) => r === draft.roads[i] || r.points.length === draft.roads[i].points.length)) return null;
   roads = roads.filter((_, i) => !gone.has(i));
   given.lots += lots.size;
   given.backdrop += backdrop.size;
+  for (const i of backdrop) {
+    const area = open.backdrop?.[i]?.area ?? 0;
+    given.backdropIn[area] = (given.backdropIn[area] ?? 0) + 1;
+  }
   // The slots left, numbered again; the pads, places and backdrop buildings that name them with them.
   const kept = draft.slots.filter((s) => !lots.has(s.index));
   const renumber = new Map(kept.map((s, i) => [s.index, i]));

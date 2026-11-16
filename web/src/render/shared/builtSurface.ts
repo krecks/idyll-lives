@@ -43,6 +43,8 @@ export const GRADE: Record<RoadKind, number> = { street: 0.08, lane: 0.08, count
 /** The tallest a lot's edge stands over the land beside it (m), the deepest a road or a lot is cut into the land or stands on it (m). */
 export const RETAIN_MAX = 1.5;
 export const CUT_MAX = 4;
+/** Among mountains (a world whose Hills are `mountains`), a country road (a pass, a way out of the world) may be cut into the rock or stand over the land by this much (m). */
+export const CUT_MAX_MOUNTAIN_ROAD = 10;
 /** The graded land under a road lies this far below it (m), so it never shows through on a bend. */
 export const ROAD_SINK = 0.06;
 /** A bridge's deck stands at least this far over its water (m). */

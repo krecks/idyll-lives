@@ -206,7 +206,7 @@ export interface NeighbourhoodDraft {
     /** Among a place's mountains, the hamlets left out for want of a site a country road could reach (`macro.ts`), and the homes they would have brought. */
     villages?: { left: number; homes: number };
     /** Lots and backdrop buildings, roads out and courts given up so the world's built land keeps within its slope limits (`landFollow.ts` `settleLand`). */
-    slopes?: { lots: number; backdrop: number; roads: number; courts: number };
+    slopes?: { lots: number; backdrop: number; roads: number; courts: number; backdropIn?: Record<number, number> };
   };
 }
 
