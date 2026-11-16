@@ -1,0 +1,296 @@
+// Step 2's street edits (`game/edit/streets.ts`) on a small hand-made town: a high street across the
+// world with a lane off it, a river south of it with a far lane over the water reached round its
+// end. A street snaps to the road it starts by (a T at the kerb) or carries on a dead end; meets a
+// road at 35° or more (square within 15°), 14 m from another junction; is refused where it bends
+// tighter than 9 m; crosses a 30 m river on a straight bridge and is refused over 60 m; clears what
+// is in its way; is named apart from every name in town. A road removed takes what it leaves
+// joined to nothing, keeps one network, and gives the water under a bridge back. `bun test`.
+import { describe, expect, test } from 'bun:test';
+import type { Content } from '../src/content/content';
+import type { RoadPlan } from '../src/core/protocol';
+import { drawStreet, removeRoad, rename, whatGoes } from '../src/game/edit/streets';
+import type { Edited } from '../src/game/edit/edited';
+import { rle, unrle } from '../src/game/landMasks';
+import { lengths, nearest, pointAt, type Pt } from '../src/game/roads';
+import type { NeighbourhoodDraft, PlotSlot, Templates } from '../src/game/town';
+
+const W = 400;
+const D = 400;
+/** The high street's middle (z) and the river's banks (z), west of `RIVER_END` (x). */
+const MAIN_Z = 100;
+const RIVER_END = 340;
+const FAR_Z = 290;
+/** Where the lane leaves the high street (x). */
+const LANE_X = 170;
+
+const line = (x0: number, z0: number, x1: number, z1: number): Pt[] => {
+  const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0)));
+  return Array.from({ length: n + 1 }, (_, i): Pt => [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n]);
+};
+const rect = (x0: number, z0: number, x1: number, z1: number): Pt[] => [
+  [x0, z0],
+  [x1, z0],
+  [x1, z1],
+  [x0, z1],
+];
+
+/** A house lot, `w` × `d`, south of the high street (its street to the north: facing 0), or north of the far lane (facing 2). */
+function lot(index: number, x: number, z: number, facing: 0 | 2, name: string): PlotSlot {
+  return { index, kind: 'house', template: 'house', name, x, z, facing, lot: 'medium', w: 14, d: 18 };
+}
+
+/**
+ * The town: the high street (0) out of the world both ways; a lane off it at x 170 (1), a 28 m court, a parking space by it;
+ * the far lane north of the river (2), a dead end at x 40, joined at x 380 to the road round the
+ * river's end (3). Houses along the high street's south side and the far lane's north side. The
+ * river runs from the west edge to x 340 between z 200 and 200 + `river`.
+ */
+function town(river = 30): NeighbourhoodDraft {
+  const roads: RoadPlan[] = [
+    { points: line(0, MAIN_Z, W, MAIN_Z), width: 7, ends: ['out', 'out'], kind: 'street', area: 0, name: 'High Street' },
+    { points: line(LANE_X, MAIN_Z + 2.15, LANE_X, 130), width: 7, ends: ['join', 'dead'], kind: 'lane', area: 0, name: 'Mill Lane' },
+    { points: line(40, FAR_Z, 380, FAR_Z), width: 7, ends: ['dead', 'join'], kind: 'country', name: 'Far Lane' },
+    { points: line(380, MAIN_Z + 2.15, 380, FAR_Z), width: 7, ends: ['join', 'join'], kind: 'country', name: 'Round Road' },
+  ];
+  const slots: PlotSlot[] = [];
+  for (let x = 60; x <= 320; x += 40) slots.push(lot(slots.length, x, MAIN_Z + 6, 0, `${slots.length * 2 + 1} High Street`));
+  for (let x = 60; x <= 320; x += 40) slots.push(lot(slots.length, x, FAR_Z - 6 - 18, 2, `${slots.length} Far Lane`));
+  const water = new Uint8Array(W * D);
+  for (let z = 200; z < 200 + river; z++) for (let x = 0; x < RIVER_END; x++) water[z * W + x] = 1;
+  return {
+    name: 'Ashby',
+    width: W,
+    depth: D,
+    slots,
+    roads,
+    greens: [],
+    households: [],
+    open: {
+      areas: [{ name: 'Ashby', kind: 'hamlet', x: 50, z: 50, w: 300, d: 200 }],
+      zones: [{ kind: 'water', poly: rect(0, 200, RIVER_END, 200 + river) }],
+      water: rle(water),
+      pads: {},
+      parking: [{ x: LANE_X + 7, z: 120, rot: 0, area: 0 }],
+      places: [],
+      backdrop: [],
+    },
+  };
+}
+
+const t: Templates = { plot: { width: 14, depth: 18 }, houses: [], parks: [] };
+const content = { names: { streets: ['Orchard Way', 'Church Road', 'Kiln Lane', 'Station Road', 'Brook Street', 'Elm Close'] } } as unknown as Content;
+
+/** The street drawn through `points` on `draft`. */
+const draw = (draft: NeighbourhoodDraft, points: Pt[], more: Partial<{ kind: RoadPlan['kind'] & string; clear: boolean; seed: number }> = {}) => drawStreet(draft, t, content, { points, kind: more.kind ?? 'street', clear: more.clear ?? true, fill: false, seed: more.seed ?? 7 });
+const made = (e: Edited) => {
+  if ('refused' in e) throw new Error(`refused: ${e.refused}`);
+  return e;
+};
+const refusal = (e: Edited) => ('refused' in e ? e.refused : '');
+
+/** The angle (degrees, 0..90) a road's end meets road `o` at. */
+function meeting(r: RoadPlan, end: 0 | 1, o: RoadPlan): number {
+  const pts = end ? r.points : [...r.points].reverse();
+  const L = lengths(pts).at(-1)!;
+  const a = pointAt(pts, L - 3).p;
+  const e = pts[pts.length - 1];
+  const v = [e[0] - a[0], e[1] - a[1]];
+  const tq = pointAt(o.points, nearest(o.points, e[0], e[1]).s).t;
+  const cos = Math.abs(v[0] * tq[0] + v[1] * tq[1]) / Math.hypot(v[0], v[1]);
+  return (Math.acos(Math.min(1, cos)) * 180) / Math.PI;
+}
+
+/** Whether `roads` are one network, joined as the sim joins them, with a way out. */
+function oneNetwork(roads: readonly RoadPlan[]): boolean {
+  const parent = roads.map((_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  roads.forEach((r, i) => {
+    for (const p of [r.points[0], r.points[r.points.length - 1]]) roads.forEach((o, j) => j !== i && nearest(o.points, p[0], p[1]).dist <= Math.max(o.width, r.width) / 2 + 1 && (parent[find(i)] = find(j)));
+  });
+  return new Set(roads.map((_, i) => find(i))).size === 1 && roads.some((r) => r.ends.includes('out'));
+}
+
+describe('drawing a street', () => {
+  test('its start snaps to a road within 10 m of its edge, a T beginning at the kerb', () => {
+    const { draft } = made(draw(town(), [[100, MAIN_Z + 3.5 + 9], [100, 140]]));
+    const r = draft.roads.at(-1)!;
+    expect(r.ends).toEqual(['join', 'dead']);
+    // At the high street's kerb (its middle 3.5 m off, the sidewalk 1.35 m of that).
+    expect(r.points[0][1]).toBeGreaterThanOrEqual(MAIN_Z + 3.5 - 1.35 - 0.01);
+    expect(r.points[0][1]).toBeLessThan(MAIN_Z + 3.5);
+    expect(Math.abs(r.points[0][0] - 100)).toBeLessThan(1);
+    expect(r.kind).toBe('street');
+    expect(r.area).toBe(0);
+    // Further off, it joins nothing.
+    expect(refusal(draw(town(), [[100, MAIN_Z + 3.5 + 15], [100, 150]]))).toBe('it joins none of the roads');
+  });
+
+  test('a stroke that reaches a road ends there, joining it', () => {
+    // From the high street south, round and back north across it: it stops at its kerb.
+    const { draft } = made(draw(town(), [[60, MAIN_Z + 6], [65, 135], [80, 145], [95, 135], [100, MAIN_Z - 30]]));
+    const r = draft.roads.at(-1)!;
+    expect(r.ends).toEqual(['join', 'join']);
+    // Its end on the high street's kerb, not across it.
+    expect(r.points.at(-1)![1]).toBeGreaterThan(MAIN_Z);
+    expect(draft.roads.length).toBe(5);
+  });
+
+  test("a dead end it starts by is carried on, the road keeping its name", () => {
+    const before = town();
+    const { draft } = made(draw(before, [[LANE_X, 133], [LANE_X + 5, 150], [LANE_X + 25, 165], [LANE_X + 45, 150], [LANE_X + 50, 125], [LANE_X + 50, MAIN_Z + 6]]));
+    expect(draft.roads.length).toBe(before.roads.length);
+    const lane = draft.roads[1];
+    expect(lane.name).toBe('Mill Lane');
+    expect(lane.ends).toEqual(['join', 'join']);
+    expect(lengths(lane.points).at(-1)!).toBeGreaterThan(80);
+  });
+
+  test('it meets a road at 35° or more, and square within 15° of it', () => {
+    const square = made(draw(town(), [[130, 140], [128, MAIN_Z + 5]]));
+    const r = square.draft.roads.at(-1)!;
+    expect(meeting(r, r.ends[0] === 'join' ? 0 : 1, square.draft.roads[0])).toBeGreaterThan(89.5);
+    // Round from the high street and back onto it at about 25° over its last 13 m: turned to 35°.
+    const slant = made(draw(town(), [[60, MAIN_Z + 6], [60, 135], [95, 140], [118, 113], [130, MAIN_Z + 7.5]]));
+    const s = slant.draft.roads.at(-1)!;
+    const angle = meeting(s, 1, slant.draft.roads[0]);
+    expect(angle).toBeGreaterThanOrEqual(34.5);
+    expect(angle).toBeLessThan(75);
+    // A long way at a slant alongside it is refused.
+    expect(refusal(draw(town(), [[10, 128], [130, MAIN_Z + 6]]))).toContain('alongside');
+  });
+
+  test('a junction keeps 14 m from the next', () => {
+    // North off the high street, 10 m along from the lane's junction, then 26 m.
+    expect(refusal(draw(town(), [[LANE_X + 10, MAIN_Z - 6], [LANE_X + 11, 62]]))).toContain('within 14 m of another junction');
+    made(draw(town(), [[LANE_X + 26, MAIN_Z - 6], [LANE_X + 26, 62]]));
+  });
+
+  test('a bend tighter than 9 m is refused', () => {
+    expect(refusal(draw(town(), [[60, MAIN_Z + 6], [60, 140], [66, 140], [66, 125]]))).toBe('it bends tighter than 9 m');
+  });
+
+  test('a dead end reaches 45 m past the road it leaves at most', () => {
+    expect(refusal(draw(town(), [[100, MAIN_Z + 6], [100, 170]]))).toContain('a dead end reaches 45 m at most');
+  });
+
+  test("what is in its way is cleared, or the street refused", () => {
+    const e = made(draw(town(), [[100, MAIN_Z + 6], [100, 140]]));
+    // The lot at x 100 south of the high street.
+    expect(e.cleared.lots).toEqual([1]);
+    expect(e.draft.slots.length).toBe(town().slots.length - 1);
+    expect(e.draft.slots.map((s) => s.index)).toEqual(e.draft.slots.map((_, i) => i));
+    expect(refusal(draw(town(), [[100, MAIN_Z + 6], [100, 140]], { clear: false }))).toBe('1 lot is in its way');
+  });
+
+  test('a 30 m river is bridged by a straight country road with one deck, the street split round it', () => {
+    const before = town(30);
+    const { draft } = made(draw(before, [[120, MAIN_Z + 6], [120, FAR_Z - 6]]));
+    const added = draft.roads.slice(before.roads.length);
+    expect(added.length).toBe(3);
+    const bridge = added.find((r) => r.bridge)!;
+    expect(bridge.kind).toBe('country');
+    const [s0, s1] = bridge.bridge!;
+    expect(s1 - s0).toBeGreaterThan(30);
+    expect(s1 - s0).toBeLessThanOrEqual(45);
+    // Straight: every point on the line between its ends.
+    const [a, b] = [bridge.points[0], bridge.points.at(-1)!];
+    for (const p of bridge.points) expect(Math.abs((p[0] - a[0]) * (b[1] - a[1]) - (p[1] - a[1]) * (b[0] - a[0])) / Math.hypot(b[0] - a[0], b[1] - a[1])).toBeLessThan(0.05);
+    // 12 m before the bank and after it.
+    expect(Math.min(a[1], b[1])).toBeLessThanOrEqual(200 - 12 + 0.5);
+    expect(Math.max(a[1], b[1])).toBeGreaterThanOrEqual(230 + 12 - 0.5);
+    // The street before and after it, joined end to end; nothing else over the water.
+    const [first, , after] = [draft.roads[before.roads.length], bridge, added.find((r) => r !== bridge && r !== draft.roads[before.roads.length])!];
+    expect(first.ends).toEqual(['join', 'join']);
+    expect(after.ends).toEqual(['join', 'join']);
+    const wet = unrle(draft.open!.water, W * D);
+    const before0 = unrle(before.open!.water, W * D);
+    for (const r of [first, after]) for (const [x, z] of r.points) expect(before0[Math.floor(z) * W + Math.floor(x)]).toBe(0);
+    // The deck walked dry, the rest of the river not.
+    expect(wet[215 * W + 120]).toBe(0);
+    expect(wet[215 * W + 60]).toBe(1);
+    // Names: all different, none the town had.
+    const names = draft.roads.map((r) => r.name);
+    expect(new Set(names).size).toBe(names.length);
+    expect(bridge.name).toMatch(/Bridge$/);
+    expect(oneNetwork(draft.roads)).toBe(true);
+  });
+
+  test('a 60 m crossing is refused', () => {
+    expect(refusal(draw(town(60), [[120, MAIN_Z + 6], [120, FAR_Z - 6]]))).toContain('the water is 60 m across');
+  });
+
+  test('a footpath does not cross the water', () => {
+    expect(refusal(draw(town(30), [[120, MAIN_Z + 6], [120, FAR_Z - 6]], { kind: 'trail' }))).toBe('a footpath does not cross the water');
+  });
+
+  test('new names are none the town has, and differ street to street', () => {
+    const first = made(draw(town(), [[100, MAIN_Z + 6], [100, 140]], { seed: 3 })).draft;
+    const second = made(draw(first, [[260, MAIN_Z + 6], [260, 140]], { seed: 3 })).draft;
+    const names = second.roads.map((r) => r.name);
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).not.toContain('Ashby');
+  });
+
+  test('the same stroke gives the same town', () => {
+    const a = draw(town(), [[120, MAIN_Z + 6], [120, FAR_Z - 6]], { seed: 11 });
+    const b = draw(town(), [[120, MAIN_Z + 6], [120, FAR_Z - 6]], { seed: 11 });
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+});
+
+describe('removing a road', () => {
+  test('the roads it leaves joined to nothing go with it, and their lots', () => {
+    const before = town();
+    const goes = whatGoes(before, t, 3);
+    if ('refused' in goes) throw new Error(goes.refused);
+    // The road round the river's end, and the far lane it alone joined to the rest.
+    expect(goes.roads).toEqual([2, 3]);
+    expect(goes.lots).toEqual([7, 8, 9, 10, 11, 12, 13]);
+    const { draft, cleared } = made(removeRoad(before, t, 3));
+    expect(cleared.lots).toEqual(goes.lots);
+    expect(draft.roads.map((r) => r.name)).toEqual(['High Street', 'Mill Lane']);
+    expect(draft.slots.length).toBe(7);
+    expect(oneNetwork(draft.roads)).toBe(true);
+  });
+
+  test('refused if no road out of the world is left', () => {
+    expect(refusal(removeRoad(town(), t, 0))).toContain('no road would lead out of the world');
+  });
+
+  test('its parking goes; a road joined to it ends there in a dead end; the water under a bridge is water again', () => {
+    const goes = whatGoes(town(), t, 1);
+    expect(goes).toEqual({ roads: [1], lots: [], backdrop: [], parking: [0] });
+    const { draft } = made(removeRoad(town(), t, 1));
+    expect(draft.roads.length).toBe(3);
+    expect(draft.open!.parking).toEqual([]);
+    const bridged = made(draw(town(), [[120, MAIN_Z + 6], [120, FAR_Z - 6]])).draft;
+    const bridge = bridged.roads.findIndex((r) => r.bridge);
+    const after = made(removeRoad(bridged, t, bridge)).draft;
+    // The street either side of it now ends at the water.
+    expect(after.roads.filter((r) => r.ends.includes('dead')).length).toBe(bridged.roads.filter((r) => r.ends.includes('dead')).length + 2);
+    // The river is wet again where the deck was.
+    expect(unrle(after.open!.water, W * D)[215 * W + 120]).toBe(1);
+    expect(oneNetwork(after.roads)).toBe(true);
+  });
+});
+
+describe('renaming', () => {
+  test("a road, its houses' addresses with it", () => {
+    const { draft } = made(rename(town(), { kind: 'road', road: 0 }, '  Market   Street '));
+    expect(draft.roads[0].name).toBe('Market Street');
+    expect(draft.slots[0].name).toBe('1 Market Street');
+    expect(draft.slots[7].name).toBe('7 Far Lane');
+  });
+
+  test('a name taken, or none, is refused', () => {
+    expect(refusal(rename(town(), { kind: 'road', road: 0 }, 'Far Lane'))).toBe('Far Lane is taken');
+    expect(refusal(rename(town(), { kind: 'road', road: 0 }, 'Ashby'))).toBe('Ashby is taken');
+    expect(refusal(rename(town(), { kind: 'road', road: 0 }, '   '))).toBe('a name needs a letter or two');
+  });
+
+  test('the town is its main area', () => {
+    const { draft } = made(rename(town(), { kind: 'town' }, 'Ashwell'));
+    expect(draft.name).toBe('Ashwell');
+    expect(draft.open!.areas[0].name).toBe('Ashwell');
+  });
+});
