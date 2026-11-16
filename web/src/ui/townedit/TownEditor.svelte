@@ -25,6 +25,13 @@
     if (off) return;
     const t = e.target;
     if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return;
+    // (The tool in hand first: Esc drops what it is drawing before it puts the tool down. A key the
+    // town stage took already, Esc ending a drag, is done with.)
+    if (e.defaultPrevented) return;
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && editor.stageTool?.key?.(e)) {
+      e.preventDefault();
+      return;
+    }
     if (e.key === 'Escape') {
       if (!editor.toolId && !editor.selected) return;
       editor.take(null);

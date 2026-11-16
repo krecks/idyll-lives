@@ -17,6 +17,7 @@ import { lotTool } from './lotTool';
 import type { Picked, PickWhat } from './pick';
 import { removeTool } from './removeTool';
 import { selectTool } from './selectTool';
+import { streetTool } from './streetTool';
 
 /**
  * What the editor gives a tool and a card (`editor.svelte.ts` `TownEditorState`). Everything works
@@ -55,6 +56,15 @@ export interface TownEditor {
   townName: string;
 }
 
+/**
+ * What the town stage does with the pointer while a tool is in hand (`StageTool`), and a key pressed
+ * meanwhile (not in a text field): true if the tool took it (the editor then does nothing else with
+ * it: Esc, say, drops what the tool is drawing rather than putting the tool down).
+ */
+export interface TownStageTool extends StageTool {
+  key?(e: KeyboardEvent): boolean;
+}
+
 export interface TownTool {
   id: string;
   label: string;
@@ -63,10 +73,10 @@ export interface TownTool {
   /** What it does, in a line (the palette's title). */
   does: string;
   /** What the town stage does with the pointer while the tool is in hand. */
-  stage(editor: TownEditor): StageTool;
+  stage(editor: TownEditor): TownStageTool;
   /** The tool's card, shown beside the town while the tool is in hand. */
   card?: Component<{ editor: TownEditor }>;
 }
 
 /** The tools, in the order the palette shows them. */
-export const TOWN_TOOLS: readonly TownTool[] = [selectTool, lotTool, removeTool];
+export const TOWN_TOOLS: readonly TownTool[] = [selectTool, streetTool, lotTool, removeTool];

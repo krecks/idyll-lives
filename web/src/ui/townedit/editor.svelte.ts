@@ -17,7 +17,6 @@ import { loadTemplates, type NeighbourhoodDraft, type Templates } from '../../ga
 import type { TownGhosts } from '../../render/types';
 import type { LaidTown } from '../app.svelte';
 import { app } from '../app.svelte';
-import type { StageTool } from '../kit/stageTool';
 import { toast } from '../state.svelte';
 import { checkTown } from './checkJob';
 import { buildingBox, editGhosts, joinGhosts, lotBox, roadGhost } from './ghosts';
@@ -25,7 +24,7 @@ import { find, keyOf, pick, type Picked, type PickWhat } from './pick';
 import type { Issue, TownIssues } from './problems';
 import { EditSession, type SettleTiming } from './session';
 import { settle } from './settle';
-import { TOWN_TOOLS, type TownEditor, type TownTool } from './tools';
+import { TOWN_TOOLS, type TownEditor, type TownStageTool, type TownTool } from './tools';
 import { sentence } from './words';
 
 /** What the screen gives the editor: the town's name as step 2's field has it, and the camera's glide to a lot of the town on screen. */
@@ -53,7 +52,7 @@ export class TownEditorState implements TownEditor {
   note = $state<string | null>(null);
   private session: EditSession | null = null;
   private toolGhosts: Partial<TownGhosts> | null = null;
-  private readonly stages = new Map<string, StageTool>();
+  private readonly stages = new Map<string, TownStageTool>();
   private seeds = (Math.random() * 2 ** 31) >>> 0;
   private noteTimer: ReturnType<typeof setTimeout> | undefined;
   /** The edit ghosts as last worked out, and the drafts they were of. */
@@ -129,7 +128,7 @@ export class TownEditorState implements TownEditor {
   }
 
   /** What the town stage does with the pointer: the tool in hand's (one made per tool, kept: the stage keys on it). */
-  get stageTool(): StageTool | null {
+  get stageTool(): TownStageTool | null {
     const tool = this.tool;
     if (!tool || !this.ready) return null;
     let stage = this.stages.get(tool.id);
@@ -139,7 +138,10 @@ export class TownEditorState implements TownEditor {
 
   /** A tool taken in hand (null: put down; the same one again puts it down). */
   take(id: string | null): void {
+    // (What the tool put down was drawing is dropped with it.)
+    const was = this.toolId;
     this.toolId = id === this.toolId ? null : id;
+    if (was && was !== this.toolId) this.stages.get(was)?.cancel();
     this.preview(null);
     this.hint(null);
     this.hover(null);

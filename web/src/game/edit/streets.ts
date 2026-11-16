@@ -55,14 +55,14 @@ export interface StreetStroke {
 export type Named = { kind: 'road'; road: number } | { kind: 'place'; place: number } | { kind: 'area'; area: number } | { kind: 'town' };
 
 /** An end of a drawn street snaps to a road, or a dead end, this near (m, from the road's edge; from the dead end's last point). */
-const SNAP = 10;
+export const SNAP = 10;
 /** The least angle a street meets a road at, and how near square it is made square. */
 const MEET = (35 * Math.PI) / 180;
 const SQUARE = (15 * Math.PI) / 180;
 /** Junctions on one road this far apart at least (m: `roads.ts` `ROOM`, as `roomAt` keeps it). */
-const ROOM = 14;
+export const ROOM = 14;
 /** A footpath keeps this far from a road alongside it (m); roads keep `clearOf`'s 18 m. */
-const TRAIL_APART = 6;
+export const TRAIL_APART = 6;
 /** A street drawn this near an area's box (m) is one of its streets. */
 const NEAR_AREA = 30;
 /** A drawn line is simplified to this (m), and has a point this often before it is made a curve (m: `macro.ts` `CTRL_APART`). */
@@ -82,7 +82,7 @@ const CORRIDOR = 1.5;
 /** A street joins a road no nearer its end than this (m). */
 const NEAR_END = 6;
 /** Wet stretches of a line closer than this (m) are crossed on one bridge (each bridge's straight approaches and the road's turns onto them would overlap). */
-const ONE_CROSSING = 56;
+export const ONE_CROSSING = 56;
 /** An outdoor place stands this near the end of its trail (m: `townCheck.ts` checks 6). */
 const TRAIL_END = 6;
 
@@ -210,7 +210,7 @@ function bridgeName(street: string, taken: Set<string>): string {
 }
 
 /** How a drawn street ends: on its own (a dead end), out of the world, joining a road in a T, or carrying on a road's dead end. */
-type End = { kind: 'free' } | { kind: 'out' } | { kind: 'join'; road: number } | { kind: 'extend'; road: number; end: 0 | 1 };
+export type End = { kind: 'free' } | { kind: 'out' } | { kind: 'join'; road: number } | { kind: 'extend'; road: number; end: 0 | 1 };
 
 const endKind = (e: End): RoadPlan['ends'][0] => (e.kind === 'free' ? 'dead' : e.kind === 'out' ? 'out' : 'join');
 const reversed = (pts: readonly Pt[]): Pt[] => [...pts].reverse();
@@ -219,7 +219,7 @@ const reversed = (pts: readonly Pt[]): Pt[] => [...pts].reverse();
  * The town's roads as a drawn street meets them: what it may join (a car's road a car's road, a
  * footpath any; never a roundabout) and what its ends snap to.
  */
-class Meeting {
+export class Meeting {
   readonly index: RoadIndex;
   private readonly widest: number;
 
@@ -345,7 +345,7 @@ function toEdge(line: Pt[], W: number, D: number): Pt[] {
 }
 
 /** The area whose box (and `NEAR_AREA` m round it) most of `line` runs in; -1: none. */
-function areaOf(draft: NeighbourhoodDraft, line: readonly Pt[]): number {
+export function areaOf(draft: NeighbourhoodDraft, line: readonly Pt[]): number {
   const areas = draft.open?.areas ?? [];
   let [best, most] = [-1, 0];
   areas.forEach((a, k) => {
@@ -412,59 +412,73 @@ function longestCourt(roads: readonly RoadPlan[], which: readonly number[]): { r
   return worst;
 }
 
-/**
- * `draft` with the street `stroke` draws (see the top of this file), its homes (`stroke.fill`, a
- * street or a lane: `lots.ts` `fillStreet`) and names drawn from `stroke.seed`; `content`, for the
- * place's street names and the homes. The new road is the last of the draft's roads (a dead end
- * it carries on keeps its index), and the roads it was split into at its bridges come after it.
- * What it cleared out of its way is in `cleared`.
- */
-export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Content, stroke: StreetStroke): Edited {
-  const [W, D] = [draft.width, draft.depth];
-  const trail = stroke.kind === 'trail';
-  const width = trail ? TRAIL_WIDTH : ROAD_WIDTH;
-  const roads = draft.roads;
-  const meet = new Meeting(roads, trail, width);
-  const named = (r: number) => roads[r].name ?? 'a road';
+/** A drawn street's line: the player's points simplified, rounded and made a curve, carried out past the world's edge where an end nears it, and cut to the world; with its ends (`out` where it leaves the world). */
+export interface StreetLine {
+  points: Pt[];
+  ends: RoadPlan['ends'];
+}
 
-  // ---- the line, cut to the world ----
-  const raw = stroke.points.filter((p, i) => Number.isFinite(p[0]) && Number.isFinite(p[1]) && (i === 0 || Math.hypot(p[0] - stroke.points[i - 1][0], p[1] - stroke.points[i - 1][1]) > 0.5));
-  if (raw.length < 2) return refused('a street is drawn with two points or more');
+/** The line `points` make for a road `width` wide on a `W` × `D` m world (see the top of this file), or why there is none. */
+export function streetLine(points: readonly Pt[], W: number, D: number, width: number): StreetLine | string {
+  const raw = points.filter((p, i) => Number.isFinite(p[0]) && Number.isFinite(p[1]) && (i === 0 || Math.hypot(p[0] - points[i - 1][0], p[1] - points[i - 1][1]) > 0.5));
+  if (raw.length < 2) return 'a street is drawn with two points or more';
   const cut = cropRoads([{ points: toEdge(curve(evenly(rounded(simplify(raw, SIMPLIFY)), CTRL_APART)), W, D), width, ends: ['dead', 'dead'] }], 0, 0, W, D);
-  if (cut.length !== 1) return refused(cut.length ? 'it leaves the world other than by its end' : 'it is off the world');
-  let line = cut[0].points;
-  if (lengthOf(line) < SHORTEST) return refused(`it is too short (${SHORTEST} m at least)`);
+  if (cut.length !== 1) return cut.length ? 'it leaves the world other than by its end' : 'it is off the world';
+  if (lengthOf(cut[0].points) < SHORTEST) return `it is too short (${SHORTEST} m at least)`;
+  return { points: cut[0].points, ends: cut[0].ends };
+}
+
+/** How a drawn street's line meets the town's roads (`streetCourse`). */
+export interface StreetCourse {
+  start: End;
+  end: End;
+  junctions: { at: Pt; road: number }[];
+  part: Pt[];
+  head: Pt[];
+  foot: Pt[];
+  ends: RoadPlan['ends'];
+}
+
+/**
+ * Where a drawn street's line meets the town's roads (`meet`): what it starts and ends at (the
+ * first road it reaches ending it; a dead end it carries on its start), the line turned to meet the
+ * roads it joins in a T (`junctions`), and the stretch that is new (`part`) between the dead ends
+ * it carries on before it (`head`, its dead end last) and after it (`foot`, its dead end first),
+ * with the made road's ends; or why not.
+ */
+export function streetCourse(meet: Meeting, shaped: StreetLine): StreetCourse | string {
+  const roads = meet.roads;
+  const named = (r: number) => roads[r].name ?? 'a road';
+  let line = shaped.points;
 
   // ---- its ends: where it starts, the first road it reaches, where it ends ----
-  let start: End = cut[0].ends[0] === 'out' ? { kind: 'out' } : meet.snap(line[0]);
+  let start: End = shaped.ends[0] === 'out' ? { kind: 'out' } : meet.snap(line[0]);
   const hit = meet.contact(line, start.kind === 'join' || start.kind === 'extend' ? start.road : -1);
   let end: End;
   if (hit) {
-    if (!meet.joinable(hit.road)) return refused(roads[hit.road].island ? 'it runs into the roundabout' : `it crosses ${roads[hit.road].name ?? 'a footpath'}`);
+    if (!meet.joinable(hit.road)) return roads[hit.road].island ? 'it runs into the roundabout' : `it crosses ${roads[hit.road].name ?? 'a footpath'}`;
     line = line.slice(0, hit.i + 1);
     const snapped = meet.snap(line[line.length - 1]);
     end = snapped.kind === 'free' ? { kind: 'join', road: hit.road } : snapped;
-  } else end = cut[0].ends[1] === 'out' ? { kind: 'out' } : meet.snap(line[line.length - 1]);
-  if (lengthOf(line) < SHORTEST) return refused(`it is too short (${SHORTEST} m at least)`);
+  } else end = shaped.ends[1] === 'out' ? { kind: 'out' } : meet.snap(line[line.length - 1]);
+  if (lengthOf(line) < SHORTEST) return `it is too short (${SHORTEST} m at least)`;
   // (A dead end it carries on is its start.)
   if (end.kind === 'extend' && start.kind !== 'extend') {
     [start, end] = [end, start];
     line = reversed(line);
   }
   const base = start.kind === 'extend' ? start.road : -1;
-  if (base >= 0 && (end.kind === 'extend' || end.kind === 'join') && end.road === base) return refused(`it would join ${named(base)} to itself`);
+  if (base >= 0 && (end.kind === 'extend' || end.kind === 'join') && end.road === base) return `it would join ${named(base)} to itself`;
 
   // ---- the ends shaped: T-joins turned to meet their road, a dead end's way carried on ----
   const junctions: { at: Pt; road: number }[] = [];
   for (const [e, j] of [start, end].entries()) {
     if (j.kind !== 'join') continue;
     const joined = meet.joinTo(e ? line : reversed(line), j.road);
-    if (typeof joined === 'string') return refused(joined);
+    if (typeof joined === 'string') return joined;
     line = e ? joined.pts : reversed(joined.pts);
     junctions.push({ at: joined.at, road: j.road });
   }
-  // The new stretch of road (what is checked), and the road it makes: the dead ends it carries on
-  // before it (`head`, its dead end last) and after it (`foot`, its dead end first).
   let part = line;
   let head: Pt[] = [];
   let foot: Pt[] = [];
@@ -477,6 +491,33 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
       [part, foot, ends] = [reversed(y.ext), reversed(y.road), [x.ends[0], y.ends[0]]];
     }
   }
+  return { start, end, junctions, part, head, foot, ends };
+}
+
+/** The width of a drawn road of `kind` (m): a footpath's, or every road's in a big world. */
+export const streetWidth = (kind: RoadKind) => (kind === 'trail' ? TRAIL_WIDTH : ROAD_WIDTH);
+
+/**
+ * `draft` with the street `stroke` draws (see the top of this file), its homes (`stroke.fill`, a
+ * street or a lane: `lots.ts` `fillStreet`) and names drawn from `stroke.seed`; `content`, for the
+ * place's street names and the homes. The new road is the last of the draft's roads (a dead end
+ * it carries on keeps its index), and the roads it was split into at its bridges come after it.
+ * What it cleared out of its way is in `cleared`.
+ */
+export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Content, stroke: StreetStroke): Edited {
+  const [W, D] = [draft.width, draft.depth];
+  const trail = stroke.kind === 'trail';
+  const width = streetWidth(stroke.kind);
+  const roads = draft.roads;
+  const meet = new Meeting(roads, trail, width);
+  const named = (r: number) => roads[r].name ?? 'a road';
+
+  const shaped = streetLine(stroke.points, W, D, width);
+  if (typeof shaped === 'string') return refused(shaped);
+  const course = streetCourse(meet, shaped);
+  if (typeof course === 'string') return refused(course);
+  const { start, end, junctions, part, head, foot, ends } = course;
+  const base = start.kind === 'extend' ? start.road : -1;
   const made = [...head, ...part.slice(head.length ? 1 : 0), ...foot.slice(1)];
 
   // ---- the generator's rules ----
