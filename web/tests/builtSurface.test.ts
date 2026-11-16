@@ -1,15 +1,16 @@
 // Built land on a land that slopes (`render/shared/builtSurface.ts`), on a small made-up world: a steep
 // street with a bridge over a channel, a lane in a T off it, a street crossing it, a country road carrying
 // it on, a trail off it, two lots on paths and one off any road. Every road within its kind's grade;
-// each junction one height over its arms; each pad its road's height where its way in meets it; the
+// each junction one height over its arms; each pad within a short drive of its road where its way in
+// meets it, at the middle of the land under it where it may be, and near the pads beside it; the
 // bridge clear of its water; the land graded within the cones and the retaining edge; `update` after an
 // edit the same as a surface made afresh, its chunks' versions moved; `at` without a jump along the
 // roads. `bun test tests/builtSurface.test.ts`.
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
-import { blankLand, heightAt, LAND_CELL, type Land } from '../src/game/land';
+import { blankLand, LAND_CELL, type Land } from '../src/game/land';
 import { lengths, pointAt, type Pt } from '../src/game/roads';
-import { BRIDGE_CLEAR, BuiltSurface, builtSurfaceOf, GRADE, RETAIN_MAX, ROAD_SINK, surfacePlots, type SurfaceWorld } from '../src/render/shared/builtSurface';
+import { BRIDGE_CLEAR, BuiltSurface, builtSurfaceOf, ENTRY_MAX, GRADE, RETAIN_MAX, ROAD_SINK, surfacePlots, type SurfaceWorld } from '../src/render/shared/builtSurface';
 import { chunkAt } from '../src/render/shared/chunks';
 
 const [W, D] = [160, 120];
@@ -103,21 +104,50 @@ describe('built land on a slope', () => {
     expect(surface.roadY(3, 0)).toBeCloseTo(surface.roadY(0, 110), 4);
   });
 
-  test("a lot's pad is its road's height where its way in meets it", () => {
+  test("a lot's pad stands near its road's height where its way in meets it", () => {
     const found = surfacePlots(world);
     expect(found[0].entry?.road).toBe(0);
     expect(found[0].entry!.s).toBeCloseTo(21.5, 1);
+    expect(found[0].front![0]).toBeCloseTo(10, 1);
+    expect(found[0].front![1]).toBeCloseTo(25, 1);
     expect(found[1].entry?.road).toBe(1);
     expect(found[2].entry).toBeNull();
+    /** The middle of the land under a lot. */
+    const middle = (p: { x: number; z: number; w: number; d: number }) => {
+      const under: number[] = [];
+      // (Inside its edges.)
+      for (let z = (Math.floor(p.z / LAND_CELL) + 1) * LAND_CELL; z < p.z + p.d; z += LAND_CELL) for (let x = (Math.floor(p.x / LAND_CELL) + 1) * LAND_CELL; x < p.x + p.w; x += LAND_CELL) under.push(land.h[(z / LAND_CELL) * land.cols + x / LAND_CELL] / 100);
+      return (Math.min(...under) + Math.max(...under)) / 2;
+    };
     found.forEach((p, i) => {
-      if (p.entry) expect(surface.padY(i)).toBe(surface.roadY(p.entry.road, p.entry.s));
+      if (!p.entry) return;
+      // The entry is the road's height there; the pad within a short drive of it, and at the land's middle where it may be.
+      expect(surface.entryY(i)).toBe(surface.roadY(p.entry.road, p.entry.s));
+      expect(Math.abs(surface.padY(i) - surface.entryY(i))).toBeLessThanOrEqual(ENTRY_MAX + 1e-9);
+      if (Math.abs(middle(p) - surface.entryY(i)) < ENTRY_MAX - 0.01) expect(surface.padY(i)).toBeCloseTo(middle(p), 4);
     });
-    // Off any road: the land at its middle.
-    expect(surface.padY(2)).toBe(heightAt(land, 135, 95));
+    // Off any road: the middle of the land under it, its entry its pad.
+    expect(surface.padY(2)).toBeCloseTo(middle(plots[2]), 6);
+    expect(surface.entryY(2)).toBe(surface.padY(2));
     // The surface in a lot is its pad, its land graded to it.
     expect(surface.at(17, 27)).toBe(surface.padY(0));
     const graded = surface.graded();
     expect(graded[(26 / LAND_CELL) * land.cols + 16 / LAND_CELL]).toBe(Math.round(surface.padY(0) * 100));
+  });
+
+  test('lots side by side on a steep street step no more than a retaining edge', () => {
+    // A street climbing at 8 %, the land with it; two lots on it, side by side, their entries 1.6 m apart.
+    const slope = blankLand(120, 60, 'follow');
+    for (let j = 0; j < slope.rows; j++) for (let i = 0; i < slope.cols; i++) slope.h[j * slope.cols + i] = Math.round(0.08 * i * LAND_CELL * 100);
+    const street = [line([0, 20], [119, 20], 7, 'street', ['out', 'out'])];
+    const lots = [
+      { x: 20, z: 0, w: 20, d: 16, entry: { road: 0, s: 30 }, front: [20, 40] as [number, number] },
+      { x: 40, z: 0, w: 20, d: 16, entry: { road: 0, s: 50 }, front: [40, 60] as [number, number] },
+    ];
+    const both = new BuiltSurface(slope, street, lots, [], 0.4);
+    expect(Math.abs(both.entryY(1) - both.entryY(0))).toBeGreaterThan(RETAIN_MAX);
+    expect(Math.abs(both.padY(1) - both.padY(0))).toBeLessThanOrEqual(RETAIN_MAX);
+    for (const i of [0, 1]) expect(Math.abs(both.padY(i) - both.entryY(i))).toBeLessThanOrEqual(ENTRY_MAX + 1e-9);
   });
 
   test('the bridge clears its water', () => {

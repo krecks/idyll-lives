@@ -15,6 +15,9 @@ import { fbm, ridged, smoothstep } from './noise';
 import type { NeighbourhoodDraft } from './town';
 import type { Pt } from './roads';
 
+/** The steepest a town's or a village's ground is tilted (rise per m: `gentler`). */
+export const GENTLE_TILT = 0.06;
+
 /** Dry land stays this far over the sea's level (m) in a world with water: the sea is one sheet over the whole world. */
 const DRY_OVER = 0.15;
 /** The land beside water rises from this far over it (m), no steeper than the world's slope. */
@@ -64,6 +67,7 @@ export function gradeLand(land: Land, world: SurfaceWorld): BuiltSurface {
  * - the generator's heights between its cells' middles, and fading in from what is built (as the
  *   renderer's hills fade in, over the look's `rise`), the finer hills, some roughness, and among
  *   mountains their ridges;
+ * - under each town and village, and each lot out on its own, gentler ground (`gentler`);
  * - its water from the water zones: what reaches the world's edge or is bigger than `POND_MOST`
  *   at the sea's level (`SEA_CM`), each pond at its own, a little below the lowest land round it;
  *   the land beside water no higher than over it by the world's slope, the bed going down from the
@@ -95,6 +99,7 @@ export function seedFollow(draft: NeighbourhoodDraft, world: FollowWorld): Land 
       h[k] = base + rise * detail;
     }
   }
+  gentler(h, cols, rows, dist, world, open.areas, look.rise);
 
   // ---- the water ----
   const wet = scan(
@@ -160,6 +165,81 @@ export function seedFollow(draft: NeighbourhoodDraft, world: FollowWorld): Land 
     for (let c = 0; c < mask.length; c++) if (mask[c]) land.cover[c] = COVER[kind];
   }
   return land;
+}
+
+/**
+ * The land (`h`, m per sample) eased under what is built towards gentle ground: each area's box (a
+ * town or a village), and each lot or backdrop building out of every box, gets a plane fitted to
+ * the land under what is built in it (least squares, tilted no more than `GENTLE_TILT`), the land
+ * on it that plane, and the land round it eased back to its own height over `reach` m (the look's
+ * `rise`). Where two come near each other, their planes are blended by how near each is. The hills
+ * and mountains rise round the towns, not under them. `dist`: each sample's distance from what is
+ * built (`Protection.dist`: 0 on it).
+ */
+function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array, world: FollowWorld, areas: readonly { x: number; z: number; w: number; d: number }[], reach: number): void {
+  const c = LAND_CELL;
+  type Box = { x0: number; z0: number; x1: number; z1: number };
+  const boxes: Box[] = areas.map((a) => ({ x0: a.x, z0: a.z, x1: a.x + a.w, z1: a.z + a.d }));
+  const within = (b: Box, x: number, z: number) => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1;
+  const alone: Box[] = [];
+  const footprints = [
+    ...world.plots.map((p) => ({ x0: p.x, z0: p.z, x1: p.x + p.w, z1: p.z + p.d })),
+    ...(world.meta?.backdrop ?? []).map((b) => {
+      const xs = b.poly.map((q) => q[0]);
+      const zs = b.poly.map((q) => q[1]);
+      return { x0: Math.min(...xs), z0: Math.min(...zs), x1: Math.max(...xs), z1: Math.max(...zs) };
+    }),
+  ];
+  for (const f of footprints) if (!boxes.some((b) => within(b, (f.x0 + f.x1) / 2, (f.z0 + f.z1) / 2))) alone.push(f);
+  // Each one's plane: through the land under what is built in it (in a box: every built sample; a lot alone: its own).
+  const planes: { box: Box; a: number; bx: number; bz: number; cx: number; cz: number }[] = [];
+  for (const [n, box] of [...boxes, ...alone].entries()) {
+    const own = n >= boxes.length;
+    const [i0, i1] = [Math.max(0, Math.ceil(box.x0 / c)), Math.min(cols - 1, Math.floor(box.x1 / c))];
+    const [j0, j1] = [Math.max(0, Math.ceil(box.z0 / c)), Math.min(rows - 1, Math.floor(box.z1 / c))];
+    const pts: [number, number, number][] = [];
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (own || dist[j * cols + i] === 0) pts.push([i * c, j * c, h[j * cols + i]]);
+    if (!pts.length) continue;
+    const cx = pts.reduce((t, p) => t + p[0], 0) / pts.length;
+    const cz = pts.reduce((t, p) => t + p[1], 0) / pts.length;
+    const mean = pts.reduce((t, p) => t + p[2], 0) / pts.length;
+    let [sxx, sxz, szz, sxh, szh] = [0, 0, 0, 0, 0];
+    for (const [x, z, v] of pts) {
+      const [dx, dz, dv] = [x - cx, z - cz, v - mean];
+      sxx += dx * dx;
+      sxz += dx * dz;
+      szz += dz * dz;
+      sxh += dx * dv;
+      szh += dz * dv;
+    }
+    const det = sxx * szz - sxz * sxz;
+    let [bx, bz] = Math.abs(det) > 1e-9 ? [(sxh * szz - szh * sxz) / det, (szh * sxx - sxh * sxz) / det] : [sxx > 0 ? sxh / sxx : 0, szz > 0 ? szh / szz : 0];
+    const tilt = Math.hypot(bx, bz);
+    if (tilt > GENTLE_TILT) [bx, bz] = [(bx * GENTLE_TILT) / tilt, (bz * GENTLE_TILT) / tilt];
+    // (Tilted less, the plane through the land's mean again.)
+    planes.push({ box, a: mean, bx, bz, cx, cz });
+  }
+  // Each sample eased towards the planes near it: the nearest's weight, their heights weighted by each one's.
+  const sum = new Float64Array(cols * rows);
+  const weight = new Float64Array(cols * rows);
+  const most = new Float32Array(cols * rows);
+  for (const p of planes) {
+    const [i0, i1] = [Math.max(0, Math.ceil((p.box.x0 - reach) / c)), Math.min(cols - 1, Math.floor((p.box.x1 + reach) / c))];
+    const [j0, j1] = [Math.max(0, Math.ceil((p.box.z0 - reach) / c)), Math.min(rows - 1, Math.floor((p.box.z1 + reach) / c))];
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const [x, z] = [i * c, j * c];
+        const off = Math.hypot(Math.max(p.box.x0 - x, 0, x - p.box.x1), Math.max(p.box.z0 - z, 0, z - p.box.z1));
+        const w = 1 - smoothstep(0, reach, off);
+        if (w <= 0) continue;
+        const k = j * cols + i;
+        sum[k] += w * (p.a + p.bx * (x - p.cx) + p.bz * (z - p.cz));
+        weight[k] += w;
+        if (w > most[k]) most[k] = w;
+      }
+    }
+  }
+  for (let k = 0; k < h.length; k++) if (weight[k] > 0) h[k] += most[k] * (sum[k] / weight[k] - h[k]);
 }
 
 /** The generator's heights (m) at (`x`, `z`), between its cells' middles (the edge's past the edge). */

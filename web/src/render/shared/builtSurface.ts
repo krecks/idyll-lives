@@ -14,9 +14,13 @@
  *   junction, a trail or a road carried on, meets it at one height), and every bridge's deck lifted
  *   clear of its water. Last, the network is brought within its grades once more (the passes leave
  *   an arm between two junctions close together a little steep here and there).
- * - **Lots** are level pads at their road's height where their driveway (or their path) meets it,
- *   so the way in is flush; a lot off any road stands at the land's height at its middle. So do the
- *   backdrop's buildings, at the height of the road nearest them.
+ * - **Lots** are level pads. Each lot's way in (its driveway, else its path) meets its road at the
+ *   *entry* (`entryY`), and its pad (`padY`) is within `ENTRY_MAX` of that: a short sloped drive or
+ *   a step or two between them. Within that, a pad stands as near the middle of the land under it
+ *   as it can (the least cut and fill), no further than `RETAIN_MAX` from its road along its front,
+ *   and no further than that from the pads it touches, as far as the windows allow. A lot off any
+ *   road stands at the middle of the land under it. So do the backdrop's buildings, their entry the
+ *   road nearest them.
  * - **The land round them** is held between two cones from everything built, `bank` (the world's
  *   `LandscapeParams.slope`) steep: no higher than the built land nearest plus `bank` a metre away
  *   from it, no lower than it less as much. Under a road it is the road's height less `ROAD_SINK`
@@ -72,7 +76,16 @@ export interface SurfacePlot {
   w: number;
   d: number;
   entry: { road: number; s: number } | null;
+  /** Along its entry's road, the stretch its front faces (arc lengths, the lesser first); none for a backdrop building. */
+  front?: [number, number];
 }
+
+/** A pad stands no further than this (m) above or below its road at its entry (a short drive, a few steps). */
+export const ENTRY_MAX = 1;
+/** How many times the pads are set again to meet their neighbours'. */
+const PAD_PASSES = 8;
+/** Pads touching each other (no more than the land's grain apart) are kept this near (m): a retaining edge, less a little. */
+const PAD_STEP = RETAIN_MAX - 0.05;
 
 /** A road's solved height: its samples (arc length, where they stand, the land there, the height). */
 interface Profile {
@@ -138,6 +151,10 @@ export class BuiltSurface {
   conformed: Float32Array;
   private profiles: Profile[] = [];
   private pads: Float64Array;
+  /** Each lot's road's height at its entry (NaN: none). */
+  private entries: Float64Array;
+  /** Each lot's neighbours: the pads within the land's grain of it. */
+  private readonly touching: number[][];
   private nodes: Node[] = [];
   /** Per sample: the built height there (NaN: nothing built), and what is built (0 nothing, 1 a road, 2 a lot, `BESIDE` a narrow way's land beside it). */
   private builtY: Float32Array;
@@ -148,6 +165,8 @@ export class BuiltSurface {
   private readonly versions = new Map<number, number>();
   /** The widest road (m). */
   private readonly widest: number;
+  /** How many places each road is joined at (its nodes). */
+  private readonly joins: number[];
 
   constructor(
     readonly land: Land,
@@ -163,6 +182,8 @@ export class BuiltSurface {
     this.lens = roads.map((r) => lengths(r.points));
     this.profiles = roads.map((r, i) => this.sampled(r, i));
     this.nodes = this.findNodes();
+    this.joins = roads.map(() => 0);
+    for (const node of this.nodes) for (const r of new Set(node.atts.map((a) => a.road))) this.joins[r]++;
     plots.forEach((p, i) => {
       for (let cz = Math.floor(p.z / LOT_CELL); cz <= Math.floor((p.z + p.d) / LOT_CELL); cz++) {
         for (let cx = Math.floor(p.x / LOT_CELL); cx <= Math.floor((p.x + p.w) / LOT_CELL); cx++) {
@@ -174,6 +195,19 @@ export class BuiltSurface {
       }
     });
     this.pads = new Float64Array(plots.length);
+    this.entries = new Float64Array(plots.length);
+    this.touching = plots.map((p, i) => {
+      const out = new Set<number>();
+      for (let cz = Math.floor((p.z - LAND_CELL) / LOT_CELL); cz <= Math.floor((p.z + p.d + LAND_CELL) / LOT_CELL); cz++) {
+        for (let cx = Math.floor((p.x - LAND_CELL) / LOT_CELL); cx <= Math.floor((p.x + p.w + LAND_CELL) / LOT_CELL); cx++) {
+          for (const j of this.lotGrid.get(cx * 65536 + cz) ?? []) {
+            const q = plots[j];
+            if (j !== i && Math.max(q.x - (p.x + p.w), p.x - (q.x + q.w), 0) <= LAND_CELL && Math.max(q.z - (p.z + p.d), p.z - (q.z + q.d), 0) <= LAND_CELL) out.add(j);
+          }
+        }
+      }
+      return [...out].sort((a, b) => a - b);
+    });
     this.builtY = new Float32Array(this.cols * this.rows);
     this.kind = new Uint8Array(this.cols * this.rows);
     this.conformed = new Float32Array(this.cols * this.rows);
@@ -194,9 +228,19 @@ export class BuiltSurface {
     return p.y[i] + (p.y[i + 1] - p.y[i]) * t;
   }
 
-  /** Lot `plot`'s pad (m): the level its ground stands at. */
+  /** Lot `plot`'s pad (m): the level its ground stands at (within `ENTRY_MAX` of `entryY`). */
   padY(plot: number): number {
     return this.pads[plot] ?? 0;
+  }
+
+  /**
+   * The height (m) of lot `plot`'s road where its way in meets it (`SurfacePlot.entry`): its drive
+   * or path runs from there, at the road's edge, to the pad (`padY`), sloping by no more than
+   * `ENTRY_MAX`. A lot off any road: its pad.
+   */
+  entryY(plot: number): number {
+    const e = this.entries[plot];
+    return Number.isFinite(e) ? e : this.padY(plot);
   }
 
   /** The surface (m) at (`x`, `z`): a lot's pad in a lot (the highest where two touch), a road's height on a road (its deck on a bridge), else the graded land. */
@@ -318,8 +362,59 @@ export class BuiltSurface {
   /** The roads, the pads and the graded land, from the land as it is. */
   private solve(): void {
     this.solveRoads();
-    this.plots.forEach((p, i) => (this.pads[i] = p.entry ? this.roadY(p.entry.road, p.entry.s) : heightAt(this.land, p.x + p.w / 2, p.z + p.d / 2)));
+    this.solvePads();
     this.solveLand();
+  }
+
+  /** Every pad (see the file's comment). */
+  private solvePads(): void {
+    const { plots, land, pads, entries, touching } = this;
+    const { cols, rows } = land;
+    const c = LAND_CELL;
+    const n = plots.length;
+    const middle = new Float64Array(n);
+    const window = new Float64Array(2 * n);
+    plots.forEach((p, i) => {
+      // The middle of the land under it (dry, inside its edges, which it may share with the lot beside it; the land at its middle if no sample is).
+      let [lo, hi] = [Infinity, -Infinity];
+      for (let j = Math.max(0, Math.floor(p.z / c) + 1); j <= Math.min(rows - 1, Math.ceil((p.z + p.d) / c) - 1); j++) {
+        for (let k = j * cols + Math.max(0, Math.floor(p.x / c) + 1), end = j * cols + Math.min(cols - 1, Math.ceil((p.x + p.w) / c) - 1); k <= end; k++) {
+          if (wet(land, k)) continue;
+          lo = Math.min(lo, land.h[k]);
+          hi = Math.max(hi, land.h[k]);
+        }
+      }
+      middle[i] = lo <= hi ? (lo + hi) / 200 : heightAt(land, p.x + p.w / 2, p.z + p.d / 2);
+      let [from, to] = [-Infinity, Infinity];
+      entries[i] = NaN;
+      if (p.entry) {
+        const e = this.roadY(p.entry.road, p.entry.s);
+        entries[i] = e;
+        [from, to] = [e - ENTRY_MAX, e + ENTRY_MAX];
+        if (p.front) {
+          // Within a retaining edge of its road all along its front, if the window allows.
+          let [low, high] = [Infinity, -Infinity];
+          const [s0, s1] = p.front;
+          for (let s = s0; ; s = Math.min(s1, s + PROFILE_STEP)) {
+            const y = this.roadY(p.entry.road, s);
+            [low, high] = [Math.min(low, y), Math.max(high, y)];
+            if (s >= s1) break;
+          }
+          [from, to] = narrowed(from, to, high - RETAIN_MAX, low + RETAIN_MAX);
+        }
+      }
+      window[2 * i] = from;
+      window[2 * i + 1] = to;
+      pads[i] = Math.min(to, Math.max(from, middle[i]));
+    });
+    // Near the pads they touch, as far as their windows let them.
+    for (let pass = 0; pass < PAD_PASSES; pass++) {
+      for (let i = 0; i < n; i++) {
+        let [from, to] = [window[2 * i], window[2 * i + 1]];
+        for (const j of touching[i]) [from, to] = narrowed(from, to, pads[j] - PAD_STEP, pads[j] + PAD_STEP);
+        pads[i] = Math.min(to, Math.max(from, middle[i]));
+      }
+    }
   }
 
   /** Road `r`'s samples, every `PROFILE_STEP` m from its start and its end. */
@@ -532,7 +627,7 @@ export class BuiltSurface {
       }
     });
     for (const node of this.nodes) for (const a of node.atts) if (a.from >= 0) profiles[a.road].pin.fill(1, a.from, a.to + 1);
-    this.withinGrades();
+    this.tiered();
     const scratch = new Float32Array(Math.max(0, ...profiles.map((p) => p.y.length)));
     for (let pass = 0; pass < PASSES; pass++) {
       for (const p of profiles) {
@@ -545,8 +640,66 @@ export class BuiltSurface {
       for (const p of profiles) lift(p);
     }
     // (The passes leave a junction's arm a little steep here and there, between two junctions close together: once more within the grades, as little as can be.)
-    this.withinGrades();
+    this.tiered();
     for (const p of profiles) lift(p);
+  }
+
+  /**
+   * A road's rank: the ways between places first (the towns' streets and lanes, the country roads
+   * other roads join in two places or more), then the other country roads (out of the world, to a
+   * dead end), then the trails.
+   */
+  private tier(road: number): number {
+    const r = this.roads[road];
+    if (r.kind === 'trail') return 3;
+    return r.kind === 'country' && this.joins[road] < 2 ? 2 : 1;
+  }
+
+  /**
+   * Every road brought within its grade, moved as little as it can be, a rank at a time so a climb
+   * no road could make stays on the road that has it: the ways between places all together
+   * (`withinGrades`: where two villages stand further apart in height than the country road between
+   * them can climb, each gives a little), then each road out of the world or to a dead end, then
+   * each trail, on its own (`withinRoad`: held where it meets a way solved already,
+   * climbing between two such as steeply as it must); each junction at one height once the first
+   * road through it is solved.
+   */
+  private tiered(): void {
+    const { profiles, nodes } = this;
+    this.withinGrades((r) => this.tier(r) === 1);
+    const fixed = profiles.map((p, r) => new Uint8Array(p.y.length).fill(this.tier(r) === 1 ? 1 : 0));
+    const settled = new Uint8Array(nodes.length);
+    const touching: number[][] = profiles.map(() => []);
+    nodes.forEach((node, n) => {
+      for (const a of node.atts) touching[a.road].push(n);
+    });
+    /** Node `n` at the height of road `road`'s held samples in it, averaged (`road` -1: its streets' and lanes'). */
+    const settle = (n: number, road: number) => {
+      const node = nodes[n];
+      let [sum, count] = [0, 0];
+      for (const a of node.atts) {
+        if (a.from < 0 || (road >= 0 ? a.road !== road : this.tier(a.road) !== 1)) continue;
+        for (let i = a.from; i <= a.to; i++) sum += profiles[a.road].y[i];
+        count += a.to - a.from + 1;
+      }
+      if (!count) return;
+      settled[n] = 1;
+      node.y = sum / count;
+      for (const a of node.atts) {
+        if (a.from < 0) continue;
+        profiles[a.road].y.fill(node.y, a.from, a.to + 1);
+        fixed[a.road].fill(1, a.from, a.to + 1);
+      }
+    };
+    nodes.forEach((_, n) => settle(n, -1));
+    for (const rank of [2, 3]) {
+      profiles.forEach((p, r) => {
+        if (this.tier(r) !== rank) return;
+        withinRoad(p, fixed[r]);
+        fixed[r].fill(1);
+        for (const n of touching[r]) if (!settled[n]) settle(n, r);
+      });
+    }
   }
 
   /**
@@ -556,7 +709,7 @@ export class BuiltSurface {
    * a junction's held samples at one height (`grade-limited envelopes over the network, by
    * Dijkstra: the midpoint of the two is the closest such heights in the max norm).
    */
-  private withinGrades(): void {
+  private withinGrades(only: (road: number) => boolean = () => true): void {
     const { profiles, nodes } = this;
     const base: number[] = [];
     let total = 0;
@@ -568,10 +721,10 @@ export class BuiltSurface {
     const size = total + nodes.length;
     const pairs: number[] = [];
     profiles.forEach((p, r) => {
-      for (let i = 0; i + 1 < p.y.length; i++) pairs.push(base[r] + i, base[r] + i + 1, p.grade * (p.s[i + 1] - p.s[i]));
+      if (only(r)) for (let i = 0; i + 1 < p.y.length; i++) pairs.push(base[r] + i, base[r] + i + 1, p.grade * (p.s[i + 1] - p.s[i]));
     });
     nodes.forEach((node, n) => {
-      for (const a of node.atts) for (let i = a.from; i >= 0 && i <= a.to; i++) pairs.push(total + n, base[a.road] + i, 0);
+      for (const a of node.atts) if (only(a.road)) for (let i = a.from; i >= 0 && i <= a.to; i++) pairs.push(total + n, base[a.road] + i, 0);
     });
     const edges = adjacency(size, pairs);
     const start = new Float64Array(size);
@@ -581,7 +734,7 @@ export class BuiltSurface {
     const hubOf = (sign: 1 | -1) => {
       nodes.forEach((node, n) => {
         let v = sign * Infinity;
-        for (const a of node.atts) for (let i = a.from; i >= 0 && i <= a.to; i++) v = sign > 0 ? Math.min(v, start[base[a.road] + i]) : Math.max(v, start[base[a.road] + i]);
+        for (const a of node.atts) for (let i = a.from; i >= 0 && i <= a.to && only(a.road); i++) v = sign > 0 ? Math.min(v, start[base[a.road] + i]) : Math.max(v, start[base[a.road] + i]);
         start[total + n] = Number.isFinite(v) ? v : 0;
       });
     };
@@ -591,16 +744,17 @@ export class BuiltSurface {
     hubOf(-1);
     const lower = envelope(start, edges, -1);
     profiles.forEach((p, r) => {
-      for (let i = 0; i < p.y.length; i++) p.y[i] = (upper[base[r] + i] + lower[base[r] + i]) / 2;
+      if (only(r)) for (let i = 0; i < p.y.length; i++) p.y[i] = (upper[base[r] + i] + lower[base[r] + i]) / 2;
     });
   }
 
   /** A node's roads made to meet at one height: the mean of their held samples (a junction's ways for cars', not its trails'), every held sample set to it. */
   private join(node: Node): void {
     const { profiles } = this;
-    const cars = node.atts.filter((a) => a.car);
+    // (The town's streets set it where they meet it, else the country roads, else the trails.)
+    const first = Math.min(...node.atts.map((a) => this.tier(a.road)));
     let [sum, n] = [0, 0];
-    for (const a of cars.length ? cars : node.atts) {
+    for (const a of node.atts.filter((o) => this.tier(o.road) === first)) {
       if (a.from < 0) continue;
       const y = profiles[a.road].y;
       for (let i = a.from; i <= a.to; i++) sum += y[i];
@@ -752,6 +906,12 @@ function cones(hi: Float32Array, lo: Float32Array, cols: number, rows: number, s
 /** A sample beside a way narrower than the land's grain, whose middle crosses its cell: graded to the way's height, not sunk (`solveLand`). */
 const BESIDE = 3;
 
+/** [`from`, `to`] narrowed to [`lo`, `hi`] where they overlap (else as it was). */
+function narrowed(from: number, to: number, lo: number, hi: number): [number, number] {
+  const [a, b] = [Math.max(from, lo), Math.min(to, hi)];
+  return a <= b ? [a, b] : [from, to];
+}
+
 /** Lots are filed for `at` by cells this wide (m). */
 const LOT_CELL = 16;
 
@@ -818,6 +978,47 @@ function adjacency(size: number, pairs: readonly number[]): Adjacency {
     cost[fill[b]++] = w;
   }
   return { first, to, cost };
+}
+
+/**
+ * One road brought within its grade, moved as little as it can be (the midpoint of its own
+ * grade-limited envelopes, a deck no lower than its floor), and held to the samples `fixed` (where
+ * it meets roads solved already): no further from them than its grade allows. Where two of those
+ * stand further apart than its grade can climb, it climbs between them as steeply as it must.
+ */
+function withinRoad(p: Profile, fixed: Uint8Array): void {
+  const { y, s, floor } = p;
+  const n = y.length;
+  if (!n) return;
+  let grade = p.grade;
+  for (let i = 0, last = -1; i < n; i++) {
+    if (!fixed[i]) continue;
+    if (last >= 0 && s[i] > s[last]) grade = Math.max(grade, Math.abs(y[i] - y[last]) / (s[i] - s[last]));
+    last = i;
+  }
+  const up = new Float64Array(n);
+  const down = new Float64Array(n);
+  const hi = new Float64Array(n);
+  const lo = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    up[i] = down[i] = Math.max(y[i], floor[i]);
+    hi[i] = fixed[i] ? y[i] : Infinity;
+    lo[i] = fixed[i] ? y[i] : -Infinity;
+  }
+  const sweep = (i: number, j: number) => {
+    const g = grade * Math.abs(s[i] - s[j]);
+    up[i] = Math.min(up[i], up[j] + g);
+    down[i] = Math.max(down[i], down[j] - g);
+    hi[i] = Math.min(hi[i], hi[j] + g);
+    lo[i] = Math.max(lo[i], lo[j] - g);
+  };
+  for (let i = 1; i < n; i++) sweep(i, i - 1);
+  for (let i = n - 2; i >= 0; i--) sweep(i, i + 1);
+  for (let i = 0; i < n; i++) {
+    if (fixed[i]) continue;
+    const mid = (up[i] + down[i]) / 2;
+    y[i] = lo[i] <= hi[i] ? Math.min(hi[i], Math.max(lo[i], mid)) : (lo[i] + hi[i]) / 2;
+  }
 }
 
 /**
@@ -972,7 +1173,8 @@ const DEFAULT_BANK = 0.5;
 
 /**
  * A world's lots as the surface takes them, in its plots' order, then its backdrop's buildings
- * (each its footprint's box): where each lot's way in meets its road. That is the far end of the
+ * (each its footprint's box): where each lot's way in meets its road, and the stretch of that road
+ * its front faces. That is the far end of the
  * widest of its paths across the verge from its front (a driveway's, else its front path's: the
  * town's `meta.paths` that touch its front edge from outside), else the first road straight out
  * from its front's middle within `ENTRY_REACH` m, else none. A backdrop building's is the road
@@ -982,6 +1184,18 @@ export function surfacePlots(world: SurfaceWorld): SurfacePlot[] {
   const roads = world.meta?.roads ?? [];
   const index = new RoadIndex(roads);
   const paths = world.meta?.paths ?? [];
+  // (The paths filed by cell, for those touching a lot's front.)
+  const cells = new Map<number, number[]>();
+  paths.forEach((r, n) => {
+    for (let cz = Math.floor(r.z / LOT_CELL); cz <= Math.floor((r.z + r.d) / LOT_CELL); cz++) {
+      for (let cx = Math.floor(r.x / LOT_CELL); cx <= Math.floor((r.x + r.w) / LOT_CELL); cx++) {
+        const key = cx * 65536 + cz;
+        const list = cells.get(key);
+        if (list) list.push(n);
+        else cells.set(key, [n]);
+      }
+    }
+  });
   const widest = Math.max(0, ...roads.map((r) => r.width));
   const onRoad = (x: number, z: number, within = 0) => {
     let best: { road: number; s: number; dist: number } | null = null;
@@ -1000,9 +1214,14 @@ export function surfacePlots(world: SurfaceWorld): SurfacePlot[] {
     const lo = across ? p.x : p.z;
     const hi = across ? p.x + p.w : p.z + p.d;
     let way: { r: (typeof paths)[number]; wide: number } | null = null;
-    for (const r of paths) {
-      const near = nz < 0 ? r.z + r.d : nz > 0 ? r.z : nx < 0 ? r.x + r.w : r.x;
-      if (Math.abs(near - edge) > 0.01) continue;
+    const near = new Set<number>();
+    const [ex0, ez0, ex1, ez1] = across ? [lo, edge, hi, edge] : [edge, lo, edge, hi];
+    for (let cz = Math.floor((ez0 - 0.1) / LOT_CELL); cz <= Math.floor((ez1 + 0.1) / LOT_CELL); cz++) {
+      for (let cx = Math.floor((ex0 - 0.1) / LOT_CELL); cx <= Math.floor((ex1 + 0.1) / LOT_CELL); cx++) for (const n of cells.get(cx * 65536 + cz) ?? []) near.add(n);
+    }
+    for (const r of [...near].sort((a, b) => a - b).map((n) => paths[n])) {
+      const side = nz < 0 ? r.z + r.d : nz > 0 ? r.z : nx < 0 ? r.x + r.w : r.x;
+      if (Math.abs(side - edge) > 0.01) continue;
       const [a, b] = across ? [r.x, r.x + r.w] : [r.z, r.z + r.d];
       if (a < lo - 0.01 || b > hi + 0.01) continue;
       const wide = b - a;
@@ -1023,18 +1242,29 @@ export function surfacePlots(world: SurfaceWorld): SurfacePlot[] {
         entry = onRoad(x, z);
       }
     }
-    return { x: p.x, z: p.z, w: p.w, d: p.d, entry };
+    if (!entry) return { x: p.x, z: p.z, w: p.w, d: p.d, entry };
+    // The stretch of its road its front faces: from where each front corner is nearest it.
+    const road = entry.road;
+    const ends = (across ? [[lo, edge], [hi, edge]] : [[edge, lo], [edge, hi]]).map(([x, z]) => index.along(road, x, z));
+    return { x: p.x, z: p.z, w: p.w, d: p.d, entry, front: [Math.min(...ends), Math.max(...ends)] };
   });
   for (const b of world.meta?.backdrop ?? []) {
     const xs = b.poly.map((q) => q[0]);
     const zs = b.poly.map((q) => q[1]);
     const [x0, z0, x1, z1] = [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)];
     let entry: SurfacePlot['entry'] = null;
-    let far = BACKDROP_REACH;
-    for (const [road, m] of index.around((x0 + x1) / 2, (z0 + z1) / 2, BACKDROP_REACH)) {
-      if (roads[road].kind === 'trail' || m.dist >= far) continue;
-      far = m.dist;
-      entry = { road, s: m.s };
+    const [cx, cz] = [(x0 + x1) / 2, (z0 + z1) / 2];
+    // (The nearest road, unless it is a trail: then the nearest that isn't.)
+    const reach = Math.max(x1 - x0, z1 - z0) / 2;
+    const first = index.nearest(cx, cz, reach + 6) ?? index.nearest(cx, cz, BACKDROP_REACH);
+    if (first && roads[first.road].kind !== 'trail') entry = { road: first.road, s: first.s };
+    else if (first) {
+      let far = BACKDROP_REACH;
+      for (const [road, m] of index.around(cx, cz, BACKDROP_REACH)) {
+        if (roads[road].kind === 'trail' || m.dist >= far) continue;
+        far = m.dist;
+        entry = { road, s: m.s };
+      }
     }
     out.push({ x: x0, z: z0, w: x1 - x0, d: z1 - z0, entry });
   }

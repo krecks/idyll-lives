@@ -33,7 +33,8 @@
  * `LAND_BUDGET`), checked on the surface the renderer works out from the town file
  * (`builtSurface.ts`): no road steeper than its kind's `GRADE` by more than 1 %, no road or lot cut
  * into the land as it was seeded or standing over it by more than `CUT_MAX`, no lot's edge over
- * the land beside it by more than `RETAIN_MAX`, every bridge's deck `BRIDGE_CLEAR` over its water.
+ * the land or the pad beside it by more than `RETAIN_MAX`, every bridge's deck `BRIDGE_CLEAR` over
+ * its water. (A lot's edge over its road along its front is listed, not checked.)
  * A table of each world's steepest ways, tallest edges and deepest cuts follows the worlds.
  *
  * Every place at its own options (`perKind` worlds each), and one world each of `EXTREMES`, the
@@ -291,6 +292,7 @@ function slopeChecks(town: TownFile, seeded: Land): { problems: string[]; slopes
   });
   if (slopes.cut.lot > CUT_MAX) out.push(`a lot (${deepest}) is cut ${slopes.cut.lot.toFixed(1)} m into the land or stands over it (at most ${CUT_MAX})`);
   if (slopes.retain.land > RETAIN_MAX + 0.01) out.push(`a lot's edge stands ${slopes.retain.land.toFixed(2)} m over the land beside it (at most ${RETAIN_MAX})`);
+  if (slopes.retain.lot > RETAIN_MAX + 0.01) out.push(`a lot's edge stands ${slopes.retain.lot.toFixed(2)} m over the pad beside it (at most ${RETAIN_MAX})`);
   // The land stored against the surface worked out from it, off what is built.
   const lot = new Uint8Array(land.h.length);
   for (const p of town.plots) {
