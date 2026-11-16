@@ -732,13 +732,14 @@ export class LandEditor {
  * `open.land` the land (written to `meta.land` once it has been shaped), the water the sim walks
  * the generator's with the tiles whose water changed taken from the land (`LandEditor.water`), and
  * the zones from the land where its water or cover changed (`LandEditor.zonesOf`). The draft
- * itself is left as it was; an unshaped land leaves it as generated (and no `open.land`).
+ * itself is left as it was; an unshaped land leaves it as generated (no `open.land`, but for a land
+ * its town follows the slopes of, `seeded` `'follow'`: that is the world's own, kept).
  */
 export function applyLand(draft: NeighbourhoodDraft, editor: LandEditor): NeighbourhoodDraft {
   const open = draft.open;
   if (!open) return draft;
   const { land: _old, ...rest } = open;
-  if (!editor.land.edited) return { ...draft, open: rest };
+  if (!editor.land.edited) return open.land?.seeded === 'follow' ? draft : { ...draft, open: rest };
   const changed = editor.changed();
   return {
     ...draft,

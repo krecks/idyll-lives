@@ -200,7 +200,14 @@ export interface NeighbourhoodDraft {
    * What the layout couldn't do: lots that found no room along the roads (left out of the town),
    * and (a big world) the country roads it found no way for (`roads`: which, and between what).
    */
-  diagnostics?: { dropped: { name: string; kind: PlotSlot['kind']; lot?: LotSize }[]; roads?: string[] };
+  diagnostics?: {
+    dropped: { name: string; kind: PlotSlot['kind']; lot?: LotSize }[];
+    roads?: string[];
+    /** Among a place's mountains, the hamlets left out for want of a site a country road could reach (`macro.ts`), and the homes they would have brought. */
+    villages?: { left: number; homes: number };
+    /** Lots and backdrop buildings, roads out and courts given up so the world's built land keeps within its slope limits (`landFollow.ts` `settleLand`). */
+    slopes?: { lots: number; backdrop: number; roads: number; courts: number; backdropIn?: Record<number, number> };
+  };
 }
 
 /** What kind of world a town is in, one line about it, and how its land looks. */
@@ -1677,7 +1684,8 @@ type PlotKind = 'home' | 'farm' | 'public' | 'shop' | 'countryside';
  * The town file's open-world fields: its areas, every house's driveway
  * with where it meets its road and the households' cars on them (sim-core `cars.rs`: they drive
  * the roads), its typed exits (the roads out), the water, public parking, and the zones, pads and
- * areas for the renderer, and the land once the player has shaped it (`meta.land`).
+ * areas for the renderer, and the land (`meta.land`) once the player has shaped it or when its town
+ * follows its slopes (a new place's: `landFollow.ts` `withLand`).
  */
 function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'], cars: TownLayout['cars']) {
   const areas: TownArea[] = town.open?.areas ?? [{ name: town.name, kind: 'hamlet', x: 0, z: 0, w: town.width, d: town.depth }];
@@ -1701,6 +1709,6 @@ function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'],
     areas,
     exits,
     file: { terrain: { water: open.water }, parking: open.parking, drives: filed, cars: parked },
-    meta: { zones: open.zones, pads: open.pads, areas, ...(open.backdrop ? { backdrop: open.backdrop } : {}), ...(open.places ? { places: open.places } : {}), ...(open.centre ? { centre: open.centre } : {}), ...(open.relief ? { relief: open.relief } : {}), ...(open.land?.edited ? { land: encodeLand(open.land) } : {}) },
+    meta: { zones: open.zones, pads: open.pads, areas, ...(open.backdrop ? { backdrop: open.backdrop } : {}), ...(open.places ? { places: open.places } : {}), ...(open.centre ? { centre: open.centre } : {}), ...(open.relief ? { relief: open.relief } : {}), ...(open.land && (open.land.edited || open.land.seeded === 'follow') ? { land: encodeLand(open.land) } : {}) },
   };
 }

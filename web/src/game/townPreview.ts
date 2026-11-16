@@ -112,8 +112,8 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     const { zones, pads, areas, backdrop, places, centre, relief, land } = town.open;
     // (And the living town's backdrop, places and centres: the land is cleared for them as in the game, and the
     // town view over a preview, the bench's Big world, draws them; and the land's relief, its hills; and the land
-    // once it has been shaped, as the town file carries it.)
-    Object.assign(meta, { zones, pads, areas, ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...(centre ? { centre } : {}), ...(relief ? { relief } : {}), ...(land?.edited ? { land: encodeLand(land) } : {}) });
+    // once it has been shaped or graded under its town, as the town file carries it.)
+    Object.assign(meta, { zones, pads, areas, ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...(centre ? { centre } : {}), ...(relief ? { relief } : {}), ...(land && (land.edited || land.seeded === 'follow') ? { land: encodeLand(land) } : {}) });
   }
   return {
     version: 0,
