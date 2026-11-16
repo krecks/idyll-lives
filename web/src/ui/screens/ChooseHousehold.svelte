@@ -1,11 +1,18 @@
 <script lang="ts">
+  /**
+   * New game, step 3: the household. Play one of the households who live in step 2's town (its
+   * neighbours are made here the first time, and again whenever the town was laid out again), or make
+   * your own in Creation. The game's choices (Living or Creative, the lifespan) are made here too.
+   */
   import { onDestroy, onMount } from 'svelte';
   import { lookAtAge, randomHousehold } from '../../game/household';
   import { reducedMotion } from '../../game/host';
   import { menuScene } from '../../game/menuScene';
   import { loadTemplates, NEIGHBOUR_CAP, populate, rehouse, vacantSlots, type NeighbourhoodDraft, type Templates } from '../../game/town';
   import { app } from '../app.svelte';
+  import { lifespanHint } from '../format';
   import Icon from '../Icon.svelte';
+  import Segmented from '../kit/Segmented.svelte';
   import SimPreview from '../kit/SimPreview.svelte';
   import TownStage, { type LotLabel } from '../kit/TownStage.svelte';
   import { services } from '../services';
@@ -69,8 +76,8 @@
   }
   onDestroy(() => clearTimeout(hoverOff));
 
-  /** The world from step 1, nobody living there yet. */
-  const world = (): NeighbourhoodDraft | null => app.world ?? (town ? { ...town, households: [] } : null);
+  /** Step 2's town, nobody living there yet. */
+  const world = (): NeighbourhoodDraft | null => app.world?.draft ?? (town ? { ...town, households: [] } : null);
 
   /** New neighbours in the same world (its streets and houses stay as they are). */
   function generate(count?: number): void {
@@ -95,10 +102,11 @@
     town = { ...town, households: town.households.filter((_, j) => j !== i) };
   }
 
-  /** The town as the next steps should see it. */
+  /** The town as the next steps should see it (and the town of step 2's it was filled from). */
   function keep() {
     if (!town) return;
     app.town = town;
+    app.townOf = app.world?.key ?? app.townOf;
   }
 
   function next() {
@@ -154,13 +162,17 @@
 
   onMount(async () => {
     templates = await loadTemplates();
-    if (town) return;
-    if (!app.world) {
-      // No world made yet: that is the first step.
-      app.screen = 'world';
+    const laid = app.world;
+    if (!laid) {
+      // No town laid yet: that is step 2 (or step 1, with no land either).
+      app.screen = app.land ? 'town' : 'land';
       return;
     }
-    generate();
+    // The town its neighbours were made for, back and forth: they stay (under the name it has now).
+    // Another town (laid out again in step 2, or on another land): new neighbours.
+    if (town && app.townOf === laid.key) {
+      if (town.name !== laid.draft.name) town = { ...town, name: laid.draft.name };
+    } else generate();
     keep();
   });
 
@@ -188,10 +200,10 @@
 <div class="screen scaled">
   <div class="haze" aria-hidden="true"></div>
   <header use:avoid>
-    <button class="btn ghost back" onclick={() => { keep(); app.screen = 'world'; }}><Icon name="icon.ui.back" size={18} /> World</button>
+    <button class="btn ghost back" onclick={() => { keep(); app.screen = 'town'; }}><Icon name="icon.ui.back" size={18} /> Town</button>
     <div class="title">
-      <span class="eyebrow">Step 2 of 4 · Choose a household</span>
-      <h1 class="town-name">{town?.name ?? app.world?.name ?? ''}</h1>
+      <span class="eyebrow">Step 3 of 4 · Household</span>
+      <h1 class="town-name">{town?.name ?? app.world?.draft.name ?? ''}</h1>
       <p class="lede">Play one of the households who live here, or make your own in Creation.</p>
     </div>
     <div class="actions">
@@ -241,6 +253,37 @@
 
     {#if town}
       <aside class="households menu-glass" use:avoid>
+        <!-- The game's choices: how it plays, and how fast its residents age. -->
+        <div class="game" aria-label="Your game">
+          <div class="choice">
+            <span class="eyebrow">Game</span>
+            <Segmented
+              fill
+              label="Game"
+              bind:value={app.mode}
+              options={[
+                { value: 'living', label: 'Living' },
+                { value: 'creative', label: 'Creative' },
+              ]}
+            />
+            <p class="hint">{app.mode === 'creative' ? 'Building is free. No rent or bills at home.' : 'Your residents earn the money to build with.'}</p>
+          </div>
+          <div class="choice">
+            <span class="eyebrow">Lifespan</span>
+            <Segmented
+              fill
+              label="Lifespan"
+              bind:value={app.lifespan}
+              options={[
+                { value: 'off', label: 'Off' },
+                { value: 'short', label: 'Short' },
+                { value: 'normal', label: 'Normal' },
+                { value: 'long', label: 'Long' },
+              ]}
+            />
+            <p class="hint">{lifespanHint(app.lifespan)}</p>
+          </div>
+        </div>
         <header class="list-head">
           <span class="eyebrow">Who lives here</span>
           <span class="count">{town.households.length} {town.households.length === 1 ? 'household' : 'households'}</span>
@@ -450,6 +493,38 @@
     align-self: start;
     max-height: 100%;
     animation: rise 520ms 80ms var(--ease) both;
+  }
+  /* The game's choices, side by side over the list (one over the other in a narrow panel). */
+  .game {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
+    padding: 0 6px 12px 2px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .choice {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .choice .eyebrow {
+    color: #4a5163;
+  }
+  .choice :global(.segmented) {
+    font-size: 12.5px;
+  }
+  .hint {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--text-muted);
+  }
+  @container setup (max-width: 520px) {
+    .game {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
   .list-head {
     display: flex;

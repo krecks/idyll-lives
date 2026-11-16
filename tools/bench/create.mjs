@@ -1,22 +1,24 @@
 #!/usr/bin/env bun
 /**
- * Pictures of step 1 ("A new world") as a player gets there: the main menu, "New game", step 1's world
- * made and built, then shot at each size (`--sizes`) on each renderer (`--renderers`): the town's view,
- * the side panel, the way on and the stats. At the narrowest size, also the panel scrolled to its end.
- * Then, at the first size, an arrow key in the place grid (down a row: another place) and the
- * making panel while that world is made.
+ * Pictures of a new game's first two steps as a player gets there: the main menu, "New game", step 1's
+ * land made and built, then shot at each size (`--sizes`) on each renderer (`--renderers`): the land's
+ * view, the side panel, the way on and the figures. At the narrowest size, also the panel scrolled to
+ * its end. Then, at the first size, an arrow key in the place grid (down a row: another place) and the
+ * making panel while that land is made. Then "Lay out the town →": step 2's town laid on that land
+ * (its making panel shot meanwhile), shot at each size the same way.
  *
  * The stream pill is shown throughout (as on a first visit, while models still come).
  *
  * Besides the pictures it checks what it can by measure, and says so (`create: …`): the side panel,
- * the way on and the stats clear of the stream pill (if it is up) and of every lot tag shown; the arrow
- * key chose the place a row down and moved the focus there.
+ * the way on and the figures clear of the stream pill (if it is up) and of every lot tag shown; the arrow
+ * key chose the place a row down and moved the focus there; step 2 says it is step 2.
  *
  *   bun tools/bench/create.mjs [options]
  *     --sizes 2380x1546,1920x1080,740x1000   window sizes (CSS px)
  *     --renderers webgpu,webgl               the page's renderer (`?renderer=webgl`)
  *     --seed 7                               the page's Math.random seed (the same world in every run)
  *     --world country --options town=city    step 1's place and options (the URL's `?world=`, `?options=`)
+ *     --code river-mhs-k2x9q                 the world's code instead (the URL's `?code=`; a bare number: the land's seed)
  *     --headed                               in a window (default headless: the real GPU either way)
  *     --port 5184 | --url <u>                a dev server on the port (started if none answers), or one already running
  *     --out <dir>                            default bench-results/create-<time>/
@@ -48,7 +50,8 @@ const renderers = flag('renderers', 'webgpu,webgl').split(',');
 const seed = Number(flag('seed', '7'));
 // (None given: step 1 as a player gets it, the URL without them.)
 const made = worldFlags(flag, null);
-const worldQuery = [made.world ? `world=${made.world}` : '', made.query ? `options=${made.query}` : ''];
+const code = flag('code', null);
+const worldQuery = [made.world ? `world=${made.world}` : '', made.query ? `options=${made.query}` : '', code ? `code=${encodeURIComponent(code)}` : ''];
 const port = Number(flag('port', '5184'));
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
 const out = flag('out', join(ROOT, 'bench-results', `create-${stamp}`));
@@ -93,8 +96,12 @@ function seeded(n) {
   };
 }
 
-/** Step 1's world made and built: "Choose a household" can be pressed. */
-const ready = (page) => page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => /Choose a household/.test(b.textContent ?? '') && !b.disabled), null, { timeout: 120_000, polling: 100 });
+/** A step's world made and built: its way on (`label`, a pattern) can be pressed. */
+const enabled = (page, label) => page.waitForFunction((src) => [...document.querySelectorAll('button')].some((b) => new RegExp(src).test(b.textContent ?? '') && !b.disabled), label.source, { timeout: 120_000, polling: 100 });
+/** Step 1's land made and built: "Lay out the town" can be pressed. */
+const ready = (page) => enabled(page, /Lay out the town/);
+/** Step 2's town laid and built: "Choose a household" can be pressed. */
+const townReady = (page) => enabled(page, /Choose a household/);
 
 /**
  * What overlaps on screen now: the UI over the town (the side panel, or its two parts when narrow; the
@@ -151,32 +158,36 @@ try {
       streamState.apply({ total: 400, done: 260, label: 'Loading houses', active: true });
     });
 
+    let stepName = 'step1';
     const shoot = async (name) => {
-      const file = join(out, `step1-${renderer}-${name}.png`);
+      const file = join(out, `${stepName}-${renderer}-${name}.png`);
       await page.screenshot({ path: file });
       for (const line of await page.evaluate(overlaps)) fault(`${renderer} ${name}: ${line}`);
       const pill = await page.evaluate(() => !!document.querySelector('.stream'));
       console.log(`create: ${file}${pill ? ' (the stream pill up)' : ''}`);
     };
-    for (const size of sizes) {
-      await page.setViewportSize(size);
-      // (The camera glides to frame the town in the resized view; its tags settle after it.)
-      await page.waitForTimeout(2500);
-      await shoot(`${size.width}x${size.height}`);
-    }
-    // The narrowest: its choices scrolled to their end.
-    const narrow = sizes.reduce((a, b) => (b.width < a.width ? b : a));
-    await page.setViewportSize(narrow);
-    await page.waitForTimeout(800);
-    const scrolls = await page.evaluate(() => {
-      const panel = document.querySelector('.side .panel');
-      if (!panel) return false;
-      panel.scrollTop = panel.scrollHeight;
-      return panel.scrollHeight > panel.clientHeight + 1;
-    });
-    await page.waitForTimeout(400);
-    await shoot(`${narrow.width}x${narrow.height}-scrolled`);
-    if (!scrolls) console.log(`create: ${renderer}: the panel fits at ${narrow.width}x${narrow.height} (nothing to scroll)`);
+    /** The step at every size, and the narrowest with its choices scrolled to their end. */
+    const everySize = async () => {
+      for (const size of sizes) {
+        await page.setViewportSize(size);
+        // (The camera glides to frame the world in the resized view; its tags settle after it.)
+        await page.waitForTimeout(2500);
+        await shoot(`${size.width}x${size.height}`);
+      }
+      const narrow = sizes.reduce((a, b) => (b.width < a.width ? b : a));
+      await page.setViewportSize(narrow);
+      await page.waitForTimeout(800);
+      const scrolls = await page.evaluate(() => {
+        const panel = document.querySelector('.side .panel');
+        if (!panel) return false;
+        panel.scrollTop = panel.scrollHeight;
+        return panel.scrollHeight > panel.clientHeight + 1;
+      });
+      await page.waitForTimeout(400);
+      await shoot(`${narrow.width}x${narrow.height}-scrolled`);
+      if (!scrolls) console.log(`create: ${renderer} ${stepName}: the panel fits at ${narrow.width}x${narrow.height} (nothing to scroll)`);
+    };
+    await everySize();
 
     // Back to the first size: an arrow key down the place grid chooses the place a row down (as
     // many as the grid shows in a row; across by one if there is no row under it), and its world is
@@ -202,6 +213,17 @@ try {
     await ready(page);
     await page.waitForTimeout(2500);
     await shoot(`${sizes[0].width}x${sizes[0].height}-place`);
+
+    // Step 2: the town laid on that land (its making panel shot while it is laid), then at every size.
+    await page.getByRole('button', { name: /Lay out the town/ }).click();
+    stepName = 'step2';
+    await page.waitForFunction(() => !!document.querySelector('.making'), null, { timeout: 10_000, polling: 50 }).catch(() => fault(`${renderer}: no making panel while the town is laid out`));
+    await page.waitForTimeout(700);
+    await shoot(`${sizes[0].width}x${sizes[0].height}-making`);
+    await townReady(page);
+    const eyebrow = await page.evaluate(() => document.querySelector('.side .head .eyebrow')?.textContent ?? '');
+    if (!/Step 2 of 4 · Town/.test(eyebrow)) fault(`${renderer}: step 2 says "${eyebrow}"`);
+    await everySize();
     await context.close();
   }
 } finally {

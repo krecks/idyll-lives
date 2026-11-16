@@ -6,6 +6,7 @@
  * with those fields.
  */
 
+import { groundDepth } from '../../core/protocol';
 import type { TownShot } from '../types';
 import { angleDelta, ease } from './angles';
 
@@ -28,8 +29,21 @@ export const OVERVIEW_TOWN_HEIGHT = 7;
 const SNAP = 1e-4;
 /** The player's zoom comes in as near as this (m from the target), however far out the shot is. */
 export const OVERVIEW_NEAREST = 50;
-/** How far (m) the player may pan the camera off the shot's focus. */
+/**
+ * No shot is framed from further out than this (m from the target), and the player's zoom goes out no further: the
+ * whole of the largest land (960 m) fits the narrowest stage beside the side panel well within it.
+ */
+export const OVERVIEW_FARTHEST = 2400;
+/** How far (m) the player may pan the camera off the shot's focus when no land is given to keep it over (`bounds`). */
 const PAN_REACH = 1500;
+
+/** A rectangle of the world (m) the camera's target is kept over. */
+export interface OverviewBounds {
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+}
 
 interface Pose {
   alpha: number;
@@ -73,6 +87,8 @@ export class OverviewCamera {
 
   /** Height of the land round the town (null: flat), so the camera stays above it with the town in sight. */
   ground: ((x: number, z: number) => number) | null = null;
+  /** The land the player's pan keeps the camera's target over (null: within `PAN_REACH` of the shot's focus). */
+  private bounds: OverviewBounds | null = null;
 
   constructor(private readonly camera: OverviewCameraTarget) {}
 
@@ -99,6 +115,12 @@ export class OverviewCamera {
     this.swayBase = base;
   }
 
+  /** The land the camera's target is kept over while the player pans (null: none); the pan already made is pulled in. */
+  setBounds(bounds: OverviewBounds | null): void {
+    this.bounds = bounds;
+    this.clampPan();
+  }
+
   /** Frames `shot`; with `duration` 0 (or `cut`) it jumps there. */
   setShot(shot: TownShot, cut = false): void {
     const alphaChanged = shot.alpha !== undefined && shot.alpha !== this.shot?.alpha;
@@ -113,7 +135,17 @@ export class OverviewCamera {
     this.swayTime = 0;
     this.fitGoal(shot);
     this.swayBase = this.goal.alpha;
+    this.clampPan();
     this.startGlide(cut ? 0 : (shot.duration ?? 1.2));
+  }
+
+  /** The player's orbit, zoom and pan let go: the camera glides back to the shot as it frames it (`seconds`; 0 cuts). */
+  reframe(seconds = 1.2): void {
+    if (!this.shot) return;
+    this.userAlpha = 0;
+    this.userZoom = 1;
+    this.panX = this.panZ = 0;
+    this.startGlide(seconds);
   }
 
   /** Glides to an exact camera pose (the game's view of a lot) and calls back on arrival. */
@@ -132,13 +164,37 @@ export class OverviewCamera {
   /** The player's orbit (radians) and zoom (a factor) on top of the shot; the zoom comes in to `OVERVIEW_NEAREST` m at most. */
   nudge(dAlpha: number, zoom: number): void {
     this.userAlpha += dAlpha;
-    this.userZoom = Math.min(Math.max(2.6, this.goal.radius / OVERVIEW_NEAREST), Math.max(0.6, this.userZoom * zoom));
+    // (Out to the shot's distance over 0.6, and never past `OVERVIEW_FARTHEST`.)
+    const out = Math.min(1, Math.max(0.6, this.goal.radius / OVERVIEW_FARTHEST));
+    this.userZoom = Math.min(Math.max(2.6, this.goal.radius / OVERVIEW_NEAREST), Math.max(out, this.userZoom * zoom));
   }
 
-  /** The player's pan: the camera's target moved (`dx`, `dz`) m over the ground, on top of the shot's focus. */
+  /**
+   * The player's pan: the camera's target moved (`dx`, `dz`) m over the ground, on top of the shot's focus. It stays
+   * over the land (`setBounds`), or within `PAN_REACH` of the focus without one.
+   */
   pan(dx: number, dz: number): void {
-    this.panX = Math.min(PAN_REACH, Math.max(-PAN_REACH, this.panX + dx));
-    this.panZ = Math.min(PAN_REACH, Math.max(-PAN_REACH, this.panZ + dz));
+    this.panX += dx;
+    this.panZ += dz;
+    this.clampPan();
+  }
+
+  /** The player's pan pulled in so the target (the shot's, moved by it) stays over the land. */
+  private clampPan(): void {
+    const b = this.bounds;
+    if (!b || !this.shot) {
+      this.panX = Math.min(PAN_REACH, Math.max(-PAN_REACH, this.panX));
+      this.panZ = Math.min(PAN_REACH, Math.max(-PAN_REACH, this.panZ));
+      return;
+    }
+    const { tx, tz } = this.goal;
+    this.panX = Math.min(Math.max(this.panX, Math.min(0, b.x0 - tx)), Math.max(0, b.x1 - tx));
+    this.panZ = Math.min(Math.max(this.panZ, Math.min(0, b.z0 - tz)), Math.max(0, b.z1 - tz));
+  }
+
+  /** Where the camera's target is now (m), and its distance from it: for a drag over the land (`PlayCanvasRenderer.dragTown`). */
+  get pose(): { readonly tx: number; readonly tz: number; readonly radius: number } {
+    return this.cur;
   }
 
   /** Advances and applies the pose. */
@@ -320,7 +376,7 @@ export class OverviewCamera {
       return (b.maxX - b.minX) / 2 <= hx && (b.maxY - b.minY) / 2 <= hy;
     };
     let lo = 4;
-    let hi = 900;
+    let hi = OVERVIEW_FARTHEST;
     for (let i = 0; i < 28; i++) {
       const mid = (lo + hi) / 2;
       if (fits(mid)) hi = mid;
@@ -329,4 +385,44 @@ export class OverviewCamera {
     g.radius = hi;
     [g.ox, g.oy] = offsets(hi);
   }
+}
+
+/** What `areaFocus` reads of a world (`WorldStructure`). */
+export interface AreaWorld {
+  width: number;
+  depth: number;
+  storeyDepth?: number;
+  plots: readonly { x: number; z: number; w: number; d: number }[];
+  meta?: { areas?: readonly { x: number; z: number; w: number; d: number }[] } | null;
+}
+
+/** Land kept round an area's lots in its shot (m): the street past the last house, a field. */
+const AREA_MARGIN = 16;
+
+/**
+ * The part of the world an area's shot frames: the lots whose middles lie in its box, with a margin; the box itself
+ * while it has none (a village just placed); the whole land for an area the world doesn't have (a bare land).
+ */
+export function areaFocus(world: AreaWorld, area: number): { x: number; z: number; w: number; d: number } {
+  const box = world.meta?.areas?.[area];
+  const depth = groundDepth(world);
+  if (!box) return { x: 0, z: 0, w: world.width, d: depth };
+  let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const p of world.plots) {
+    const cx = p.x + p.w / 2;
+    const cz = p.z + p.d / 2;
+    if (cx < box.x || cx > box.x + box.w || cz < box.z || cz > box.z + box.d) continue;
+    x0 = Math.min(x0, p.x);
+    z0 = Math.min(z0, p.z);
+    x1 = Math.max(x1, p.x + p.w);
+    z1 = Math.max(z1, p.z + p.d);
+  }
+  if (x0 > x1) [x0, z0, x1, z1] = [box.x, box.z, box.x + box.w, box.z + box.d];
+  else [x0, z0, x1, z1] = [x0 - AREA_MARGIN, z0 - AREA_MARGIN, x1 + AREA_MARGIN, z1 + AREA_MARGIN];
+  // (Within the land.)
+  x0 = Math.max(0, x0);
+  z0 = Math.max(0, z0);
+  x1 = Math.min(world.width, x1);
+  z1 = Math.min(depth, z1);
+  return { x: x0, z: z0, w: Math.max(1, x1 - x0), d: Math.max(1, z1 - z0) };
 }

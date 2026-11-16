@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
 /**
- * The land brushes as a player uses them, by script (`window.__land`, `?debug`): step 1's world made,
+ * The land brushes as a player uses them, by script (`window.__land`, `?debug`): step 1's land made,
  * "Shape the land" chosen, then a mound, a pond on its top, a river from the hill down to the sea (or
  * the nearest water), woods painted and half cleared, and a peak, each a stroke a point a frame; the
- * frames' times during each stroke, and pictures before and after. Then "Choose a household", a
- * household played: the step-1 pond is water to the simulation, someone is sent across it, and the
+ * frames' times during each stroke, and pictures before and after. Then "Lay out the town" (step 2's
+ * town laid on the land as shaped), "Choose a household", a household played (step 3, with the game's
+ * mode chosen there): the step-1 pond is water to the simulation (where the town left it), someone is sent across it, and the
  * camera looks at it; then Build mode's Land tab: a mound by the home (paid in Living, free in
  * Creative; undo pays back, redo pays again) and a pond; saved, continued from the menu, and the
  * land and the water are still there. In step 1 too, the ends of the size range: 120 m raise, smooth
@@ -18,7 +19,7 @@
  *     --world country --options …  step 1's place and options (`?world=`, `?options=`)
  *     --no-play                    step 1 only
  *     --plain                      no shaping in step 1: the game's world has no land of its own until its first stroke
- *     --mode living|creative       the game's mode (step 1's choice)
+ *     --mode living|creative       the game's mode (step 3's choice)
  *     --headed                     in a window
  *     --port 5186 | --url <u>      a dev server on the port (started if none answers), or one already running
  *     --out <dir>                  default bench-results/land-<time>/
@@ -421,6 +422,9 @@ async function sizeEnds(page, renderer, mound, shot, stroke) {
   return r;
 }
 
+/** A step's way on (`label`, a pattern) enabled: its world made and built. */
+const enabled = (page, label) => page.waitForFunction((src) => [...document.querySelectorAll('button')].some((b) => new RegExp(src).test(b.textContent ?? '') && !b.disabled), label.source, { timeout: 120_000, polling: 100 });
+
 try {
   for (const renderer of renderers) {
     const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
@@ -434,8 +438,7 @@ try {
     await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 200 });
     await page.waitForTimeout(1500);
     await page.getByText('New game', { exact: true }).click();
-    await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => /Choose a household/.test(b.textContent ?? '') && !b.disabled), null, { timeout: 120_000, polling: 100 });
-    if (mode === 'creative') await page.getByRole('radio', { name: 'Creative' }).click();
+    await enabled(page, /Lay out the town/);
     await page.waitForTimeout(1500);
     const shot = async (name) => {
       const file = join(out, `${renderer}-${name}.png`);
@@ -626,10 +629,15 @@ try {
     }
 
     if (!has('no-play')) {
-      await page.getByRole('button', { name: /Choose a household/ }).click();
-      await page.waitForSelector('.households .btn.play', { timeout: 120_000 });
+      await page.getByRole('button', { name: /Lay out the town/ }).click();
+      await enabled(page, /Choose a household/);
       await page.waitForTimeout(1500);
       await shot('10-step2');
+      await page.getByRole('button', { name: /Choose a household/ }).click();
+      await page.waitForSelector('.households .btn.play', { timeout: 120_000 });
+      if (mode === 'creative') await page.getByRole('radio', { name: 'Creative' }).click();
+      await page.waitForTimeout(1500);
+      await shot('10-step3');
       await page.locator('.households .btn.play').first().click();
       await inGame(page);
       await page.waitForTimeout(4000);

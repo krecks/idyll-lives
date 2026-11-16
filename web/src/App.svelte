@@ -19,9 +19,10 @@
   import { game, toast } from './ui/state.svelte';
   import Modal from './ui/kit/Modal.svelte';
   import ChooseHome from './ui/screens/ChooseHome.svelte';
+  import ChooseHousehold from './ui/screens/ChooseHousehold.svelte';
   import CreateHousehold from './ui/screens/CreateHousehold.svelte';
-  import CreateNeighbourhood from './ui/screens/CreateNeighbourhood.svelte';
-  import CreateWorld from './ui/screens/CreateWorld.svelte';
+  import CreateLand from './ui/screens/CreateLand.svelte';
+  import CreateTown from './ui/screens/CreateTown.svelte';
   import CrashScreen from './ui/screens/CrashScreen.svelte';
   import Credits from './ui/screens/Credits.svelte';
   import LoadGame from './ui/screens/LoadGame.svelte';
@@ -206,7 +207,7 @@
 
   /**
    * The live 3D town behind the new game's screens: the household's new town behind character
-   * creation (the world, neighbourhood and home screens show and frame theirs themselves). None on
+   * creation (the land, town, household and home screens show and frame theirs themselves). None on
    * the main menu, which shows its picture of the last world made: back from a new game's screen,
    * the camera glides to the menu's shot, the picture is taken, and the town goes.
    */
@@ -258,7 +259,7 @@
       services.items?.holdAhead(true);
       return;
     }
-    if (!['world', 'neighbourhood', 'create', 'home', 'play'].includes(screen)) return;
+    if (!['land', 'town', 'household', 'create', 'home', 'play'].includes(screen)) return;
     services.items?.holdAhead(false);
     prefetchCatalog();
   });
@@ -335,10 +336,12 @@
   {/if}
 {:else}
   {#if !app.liveBackdrop}<MenuBackdrop still={app.screen === 'menu' ? app.menuStill?.url : undefined} />{/if}
-  {#if app.screen === 'world'}
-    <CreateWorld />
-  {:else if app.screen === 'neighbourhood'}
-    <CreateNeighbourhood />
+  {#if app.screen === 'land'}
+    <CreateLand />
+  {:else if app.screen === 'town'}
+    <CreateTown />
+  {:else if app.screen === 'household'}
+    <ChooseHousehold />
   {:else if app.screen === 'create'}
     <CreateHousehold />
   {:else if app.screen === 'home'}

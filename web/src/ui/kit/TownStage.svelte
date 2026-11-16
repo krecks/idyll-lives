@@ -23,6 +23,10 @@
    * With a `tool` in hand the left button is the tool's, the right button turns the camera, the
    * middle button (or the left with Space held) pans it, the wheel zooms; lots aren't lit up or
    * tagged meanwhile. `ghost`: SVG path data drawn over the town (a mountain's ghost, screen pixels).
+   * With no tool, the middle button pans the camera too.
+   *
+   * `shot`: what the camera frames with no lot in focus: the main town (`overview`), the whole world
+   * (`world`), or one of its areas (`{ area }`: the main town is 0, then the villages).
    */
   import { onMount } from 'svelte';
   import { menuScene, type Frame } from '../../game/menuScene';
@@ -38,6 +42,7 @@
     onselect,
     tool = null,
     ghost = '',
+    shot = 'overview',
   }: {
     labels: LotLabel[];
     /** Which kinds' tags win room first (`tagLayout.ts`); households' tags are also only so many at once. */
@@ -52,6 +57,7 @@
     onselect?: (plot: number | null) => void;
     tool?: StageTool | null;
     ghost?: string;
+    shot?: 'overview' | 'world' | { area: number };
   } = $props();
 
   let stage: HTMLDivElement;
@@ -101,11 +107,9 @@
     if (!held) cursor = tool ? 'crosshair' : 'default';
   }
 
-  /** Pans the camera by the ground between two screen points (as if the land were dragged along), or by a share of the view where the sky is. */
+  /** Pans the camera as if the land under the pointer were dragged along (over the sky, a plane at the land's level stands in), kept over the land. */
   function panBy(x0: number, y0: number, x1: number, y1: number) {
-    const a = menuScene.landAt(x0, y0);
-    const b = menuScene.landAt(x1, y1);
-    if (a && b) menuScene.pan(a.x - b.x, a.z - b.z);
+    menuScene.drag(x0, y0, x1, y1);
   }
 
   function toolDown(e: PointerEvent): void {
@@ -165,10 +169,13 @@
     };
   });
 
-  // Camera: the lot in focus, or the whole town, framed into the stage.
+  // Camera: the lot in focus, or the town, the world or one of its areas, framed into the stage.
   $effect(() => {
     if (!frame) return;
-    menuScene.shoot(focus === null ? { kind: 'overview', frame } : { kind: 'lot', plot: focus, frame });
+    if (focus !== null) menuScene.shoot({ kind: 'lot', plot: focus, frame });
+    else if (shot === 'world') menuScene.shoot({ kind: 'world', frame });
+    else if (typeof shot === 'object') menuScene.shoot({ kind: 'area', area: shot.area, frame });
+    else menuScene.shoot({ kind: 'overview', frame });
   });
 
   function pointAt(e: PointerEvent): number | null {
@@ -177,6 +184,13 @@
 
   function onpointerdown(e: PointerEvent) {
     if (tool) return toolDown(e);
+    if (e.button === 1 && !held) {
+      e.preventDefault();
+      held = { kind: 'pan', x: e.clientX, y: e.clientY };
+      cursor = 'grabbing';
+      stage.setPointerCapture(e.pointerId);
+      return;
+    }
     if (e.button !== 0) return;
     down = { x: e.clientX, y: e.clientY, moved: false };
     stage.setPointerCapture(e.pointerId);
@@ -184,6 +198,12 @@
 
   function onpointermove(e: PointerEvent) {
     if (tool) return toolMove(e);
+    if (held) {
+      panBy(held.x, held.y, e.clientX, e.clientY);
+      held.x = e.clientX;
+      held.y = e.clientY;
+      return;
+    }
     if (down) {
       const dx = e.clientX - down.x;
       if (!down.moved && Math.abs(dx) + Math.abs(e.clientY - down.y) > 5) down.moved = dragging = true;
@@ -200,6 +220,12 @@
 
   function onpointerup(e: PointerEvent) {
     if (tool) return toolUp(e);
+    if (held) {
+      held = null;
+      if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
+      cursor = 'default';
+      return;
+    }
     const click = down && !down.moved;
     down = null;
     dragging = false;

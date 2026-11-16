@@ -180,7 +180,7 @@
   <header>
     <button class="btn ghost back" onclick={back}><Icon name="icon.ui.back" size={18} /> Household</button>
     <div class="title">
-      <span class="eyebrow">Step 4 of 4 · Choose a home</span>
+      <span class="eyebrow">Step 4 of 4 · Home</span>
       <h1>Where will the {household.name}s live?</h1>
     </div>
     <button class="btn primary large move" disabled={!selected || tooDear} title={tooDear ? `The ${household.name}s can't afford this home` : undefined} onclick={moveIn}>Move in →</button>

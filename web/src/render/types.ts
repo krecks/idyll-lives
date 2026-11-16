@@ -645,8 +645,15 @@ export interface Renderer {
   setTownShot(shot: TownShot, cut?: boolean): void;
   /** Overview camera: user orbit (radians) and zoom factor on top of the shot. */
   nudgeTown(dAlpha: number, zoom: number): void;
-  /** Overview camera: the player's pan, the target moved (`dx`, `dz`) m over the ground on top of the shot. */
+  /** Overview camera: the player's pan, the target moved (`dx`, `dz`) m over the ground on top of the shot; it stays over the land. */
   panTown(dx: number, dz: number): void;
+  /**
+   * Overview camera: the player's pan by a drag from canvas CSS pixel (`x0`, `y0`) to (`x1`, `y1`): the land under
+   * the pointer follows it (over the sky, the level of the land in view does). Any button, any step, no tool needed.
+   */
+  dragTown(x0: number, y0: number, x1: number, y1: number): void;
+  /** Overview camera: the player's orbit, zoom and pan let go, back to the shot as framed (`seconds`, default 1.2; 0 cuts). */
+  reframeTown(seconds?: number): void;
   /** Which lots glow; they ease to it, or (`snap`) are so from the next frame (a picture taken). */
   setLotHighlight(highlight: LotHighlight, snap?: boolean): void;
   /** Step 2's edits drawn over the town (`TownGhosts`) until the town is built again; null: none. */

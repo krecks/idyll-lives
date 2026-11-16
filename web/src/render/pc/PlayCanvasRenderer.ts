@@ -3038,6 +3038,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const overview = (this.overview ??= new TownOverview(this.app, this.root, this.deps.assets, this.deps.content, this.house));
       const ring = landscapeRing(world);
       Object.assign(this.townReach, { x0: -ring, z0: -ring, x1: world.width + ring, z1: groundDepth(world) + ring });
+      // (The player's pan keeps the camera over the land, the town or none.)
+      this.townRig.setBounds({ x0: 0, z0: 0, x1: world.width, z1: groundDepth(world) });
       if (this.townBuilds++ === 0 && !this.worldBuilding) this.sliceStart = performance.now();
       try {
         // The landscape on the town layer (the game's, when it's the same town). Same seed and size
@@ -3100,6 +3102,43 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   panTown(dx: number, dz: number): void {
     if (this.townMode) this.townRig.pan(dx, dz);
+  }
+
+  dragTown(x0: number, y0: number, x1: number, y1: number): void {
+    if (!this.townMode) return;
+    // The land under the pointer follows it; where either point is over the sky or past the land, the level of the
+    // land under the camera's target does instead (a drag that starts on the horizon still pans).
+    const a = this.pickLand(x0, y0);
+    const b = a && this.pickLand(x1, y1);
+    if (a && b) {
+      this.townRig.pan(a.x - b.x, a.z - b.z);
+      return;
+    }
+    const pose = this.townRig.pose;
+    const level = this.townRig.ground?.(pose.tx, pose.tz) ?? 0;
+    const reach = pose.radius * 4;
+    const p = this.rayToLevel(x0, y0, level, reach, this.dragFrom);
+    const q = p && this.rayToLevel(x1, y1, level, reach, this.dragTo);
+    if (p && q) this.townRig.pan(p.x - q.x, p.z - q.z);
+  }
+
+  reframeTown(seconds = 1.2): void {
+    this.townRig.reframe(seconds);
+  }
+
+  private readonly dragFrom = { x: 0, z: 0 };
+  private readonly dragTo = { x: 0, z: 0 };
+
+  /** Where the ray through canvas CSS pixel (`x`, `y`) meets the level `y` m (into `out`), no further than `reach` m along it; null if it rises. */
+  private rayToLevel(x: number, y: number, level: number, reach: number, out: { x: number; z: number }): { x: number; z: number } | null {
+    const { origin, dir } = this.landRay;
+    this.camera.ray(x, y, this.cssSize.width, this.cssSize.height, origin, dir);
+    if (dir.y > -1e-3) return null;
+    const t = Math.min(reach, (level - origin.y) / dir.y);
+    if (t <= 0) return null;
+    out.x = origin.x + dir.x * t;
+    out.z = origin.z + dir.z * t;
+    return out;
   }
 
   setLotHighlight(highlight: LotHighlight, snap = false): void {
@@ -3342,7 +3381,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const secs = Math.min(0.1, dt / 1000);
     this.townRig.setViewport(w, h);
     this.townRig.frame(secs, w / h);
-    // (Its highlights' colours are written in place: the held frame is drawn again, `heldFrames.ts`.)
+    // (Its highlights' colours are written in place: the held frame is drawn again, `heldFrames.ts`. From far out the
+    // lit lots are washed over whole.)
+    this.overview?.setReach(this.townPose.radius);
     if (this.overview?.frame(secs)) this.held.changed();
     // The light eases between the screens' hours (about two seconds).
     const goal = this.townMinuteGoal;
