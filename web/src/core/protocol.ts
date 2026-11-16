@@ -1286,6 +1286,8 @@ export type ToWorker =
   | { type: 'blueprint'; requestId: number; household: number }
   /** The land shaped (`SimBridge.shapeLand`): answered with `shaped`, or `failed` with why it was refused. */
   | { type: 'shapeLand'; requestId: number; command: ShapeLandCommand }
+  /** The water mask as it is now (`SimBridge.waterMask`): answered with `waterMask`. */
+  | { type: 'waterMask'; requestId: number }
   /** The resident whose panel is open (their details and relationships are sent too); null: none. */
   | { type: 'inspect'; sim: number | null }
   /** The next UI update sends everything. */
@@ -1336,6 +1338,8 @@ export type FromWorker =
   | { type: 'blueprint'; requestId: number; data: string | null; error?: string }
   /** A `shapeLand` done (charged, and its meta and water changed). */
   | { type: 'shaped'; requestId: number }
+  /** The water mask the simulation walks (1 m tiles over the ground, `width` × `depth`), as it is now. */
+  | { type: 'waterMask'; requestId: number; water: Rle; width: number; depth: number }
   /** Fallback transport when SharedArrayBuffer is unavailable. */
   | { type: 'snapshot'; data: Float32Array; step: number }
   /** About once a second. */

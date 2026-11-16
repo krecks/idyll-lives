@@ -285,3 +285,27 @@ fn the_shipped_content_prices_the_land() {
             "fields": 2.0, "clear": 1.5})
     );
 }
+
+#[test]
+fn the_page_reads_the_water_mask_and_sends_it_back_changed() {
+    let mut w = world();
+    // No water yet: all dry, the ground's size.
+    let (mask, width, depth) = w.water_mask();
+    assert_eq!((width, depth), (W, D));
+    assert_eq!(mask, vec![(W * D) as u32, 0]);
+    // A pond: the mask the page reads is the one it sent.
+    shape(&mut w, 0, json!({}), Some(water(in_pond))).unwrap();
+    assert_eq!(w.water_mask().0, water(in_pond));
+    let json: Value = serde_json::from_str(&w.water_mask_json()).unwrap();
+    assert_eq!(json["water"], json!(water(in_pond)));
+    assert_eq!((json["width"].clone(), json["depth"].clone()), (json!(W), json!(D)));
+    // A second pond laid over the mask read back keeps the first: nothing else changes.
+    let (now, _, _) = w.water_mask();
+    let mut wet: Vec<bool> = Vec::new();
+    for pair in now.chunks(2) {
+        wet.extend(std::iter::repeat_n(pair[1] != 0, pair[0] as usize));
+    }
+    let both = water(|x, z| wet[z * W + x] || ((36..44).contains(&x) && (24..30).contains(&z)));
+    shape(&mut w, 0, json!({}), Some(both)).unwrap();
+    assert!(wet_now(&w, 28, 7) && wet_now(&w, 40, 26));
+}
