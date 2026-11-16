@@ -317,10 +317,14 @@ fn firm_leave(
         return leave_for(&w.sims[i], leave, start);
     }
     // Wherever they've got to since (out in the garden, at a neighbour's), at least as long as
-    // the walk from there looks.
+    // the walk from there looks. Not out by taxi: it brings them home first, by the end of their
+    // stay, and they set off from there. (Timed as a walk out of town from the place it took them
+    // to, hours across a big world, the walk set their stay's end: home 38 minutes after getting
+    // there, Maple Park, country 241141 at seed base 4.)
     let sim = &w.sims[i];
     if let Some(c) = sim.commute
         && !heading_out(sim)
+        && !crate::taxi::out_by_taxi(&w.taxis, sim)
         && let Some(&exit) = w.exits.get(c.exit)
     {
         // At the pace they'd go from there: at home, on the bike their way is timed by
@@ -2039,7 +2043,7 @@ fn give_up_farewell(w: &mut World, i: usize) {
 
 #[cfg(test)]
 mod tests {
-    use super::{doors, knocking};
+    use super::{doors, firm_leave, knocking, refresh_commute};
     use crate::social::EventKind;
     use crate::world::{Activity, Phase, Task, TaskKind};
     use crate::{Command, World, clock, mins, secs};
@@ -2379,5 +2383,39 @@ mod tests {
 
     fn ticks_of(minutes: f32) -> u64 {
         (minutes * crate::TICKS_PER_MINUTE as f32) as u64
+    }
+
+    #[test]
+    fn out_by_taxi_their_way_to_work_is_from_home_not_from_where_it_took_them() {
+        // The worker, out at their neighbour's at the far end of the street from the way out:
+        // there on foot, their way to work is at least the walk from there; brought by taxi, it
+        // brings them home first, and their way is from home. (Timed as a walk across a big world
+        // from the place the taxi took them to, their stay there ended 38 minutes in, Maple Park.)
+        let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+        let i = 0usize;
+        let day = clock::day(w.tick);
+        refresh_commute(&mut w, i, day);
+        let home = w.sims[i].commute.expect("a way to work").ticks;
+        let (leave, start) = (w.tick + mins(600.0), w.tick + mins(660.0));
+        w.sims[i].pos = [35.5, 3.5];
+        w.sims[i].visiting = Some(super::Visit {
+            plot: 1,
+            until: w.tick + mins(120.0),
+            idle: 0,
+            farewell: 0,
+            offer_at: 0,
+            arrived: w.tick,
+            leaving: false,
+            home_by: true,
+        });
+        w.taxis.out_at.push((i as u32, 1));
+        firm_leave(&mut w, i, leave, start, day, None);
+        assert_eq!(w.sims[i].commute.unwrap().ticks, home, "by taxi: from home");
+        w.taxis.out_at.clear();
+        firm_leave(&mut w, i, leave, start, day, None);
+        assert!(
+            w.sims[i].commute.unwrap().ticks > home,
+            "on foot: at least the walk from there"
+        );
     }
 }

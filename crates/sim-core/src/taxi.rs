@@ -3772,6 +3772,20 @@ fn time_leisure(w: &World, run: &mut Run) -> bool {
     true
 }
 
+/// Whether `sim` is out by leisure taxi (`book_leisure`): booked on one out or back, riding it,
+/// or at the place it took them to (`Taxis::out_at`). The taxi brings them home by the end of their
+/// stay, and they set off for work or school from there (`life::firm_leave`).
+pub(crate) fn out_by_taxi(taxis: &Taxis, sim: &crate::world::Sim) -> bool {
+    sim.taxi.is_some_and(|b| {
+        taxis
+            .runs
+            .iter()
+            .any(|r| r.id == b.run && r.place.is_some())
+    }) || sim
+        .visiting
+        .is_some_and(|v| taxis.out_at.contains(&(sim.id, v.plot)))
+}
+
 /// Whether `sim` waits at home for a leisure taxi out booked for them (`book_leisure`): they don't
 /// go off on another visit or an outing meanwhile (`world`'s choices); off on one, the taxi's
 /// time came while they were there, and it took them away twenty minutes in (Ottertarn).
