@@ -385,7 +385,27 @@ pub(crate) fn claimed_places(
 ///
 /// Guests, and anyone from another house, are nobody's own. As each tick starts, before anyone's
 /// free will has chosen anything.
-fn room_claimants(w: &World, room: u16) -> Vec<u32> {
+/// Those living on each plot (`lives_on`), by plot, for `room_claimants`: found once a tick, when a
+/// room's people are first looked for, not among the whole town for each room.
+fn living_by_plot(w: &World) -> Vec<Vec<u32>> {
+    let mut by = vec![Vec::new(); w.plots.len()];
+    for s in &w.sims {
+        if s.visiting.is_some() {
+            continue;
+        }
+        if let Some(list) = w
+            .households
+            .get(s.household as usize)
+            .and_then(|h| h.plot)
+            .and_then(|p| by.get_mut(p as usize))
+        {
+            list.push(s.id);
+        }
+    }
+    by
+}
+
+fn room_claimants(w: &World, room: u16, by_plot: &[Vec<u32>]) -> Vec<u32> {
     let mut out = Vec::new();
     let Ok(k) = w.claimed_places.binary_search_by_key(&room, |(r, _)| *r) else {
         return out;
@@ -414,12 +434,26 @@ fn room_claimants(w: &World, room: u16) -> Vec<u32> {
     out.extend_from_slice(&lying);
     // Only those living on a place's plot may have a place there (`goes_to`): found in one pass
     // for all the room's places and their uses, rather than one over the whole town for each.
-    let living: Vec<&Sim> = w
-        .sims
-        .iter()
-        .filter(|s| s.here() && s.carried_by.is_none())
-        .filter(|s| places.iter().any(|&(_, _, plot)| lives_on(w, s, plot)))
-        .collect();
+    // (A lot without plots is one home throughout: everyone.)
+    let mut living: Vec<&Sim> = if places.iter().any(|p| p.2.is_none()) {
+        w.sims
+            .iter()
+            .filter(|s| places.iter().any(|&(_, _, plot)| lives_on(w, s, plot)))
+            .collect()
+    } else {
+        let mut plots: Vec<u32> = places.iter().filter_map(|p| p.2).collect();
+        plots.sort_unstable();
+        plots.dedup();
+        plots
+            .iter()
+            .filter_map(|&p| by_plot.get(p as usize))
+            .flatten()
+            .filter_map(|&i| w.sims.get(i as usize))
+            .collect()
+    };
+    living.retain(|s| s.here() && s.carried_by.is_none());
+    // (In the town's order, as ever.)
+    living.sort_unstable_by_key(|s| s.id);
     for &(o, def, plot) in &places {
         let here = lying_in(o, plot);
         for (i, inter) in def.interactions.iter().enumerate() {
@@ -529,6 +563,7 @@ pub(crate) fn refresh(w: &mut World) {
     // were fingerprinted, and their people copied, once for everyone in them).
     let mut cache = std::mem::take(&mut w.claimants_cache);
     let mut presence = None;
+    let mut by_plot = None;
     let tick = w.tick;
     let none: Arc<[u32]> = Arc::new([]);
     shut.clear();
@@ -560,14 +595,17 @@ pub(crate) fn refresh(w: &mut World) {
                         match found {
                             Ok(k) => {
                                 if cache[k].1 != hash {
+                                    let by = by_plot.get_or_insert_with(|| living_by_plot(w));
                                     cache[k].1 = hash;
-                                    cache[k].2 = room_claimants(w, room).into();
+                                    cache[k].2 = room_claimants(w, room, by).into();
                                 }
                                 cache[k].3 = tick;
                                 k
                             }
                             Err(k) => {
-                                cache.insert(k, (room, hash, room_claimants(w, room).into(), tick));
+                                let by = by_plot.get_or_insert_with(|| living_by_plot(w));
+                                let people = room_claimants(w, room, by).into();
+                                cache.insert(k, (room, hash, people, tick));
                                 k
                             }
                         }
