@@ -18,8 +18,11 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 /// The most residents a town holds (a town file may start with this many; saves, slots, the
-/// snapshot's layout).
-pub const MAX_SIMS: usize = 240;
+/// snapshot's layout). Sized to the largest Big world filled: a city with many villages has up to
+/// about 390 homes, which their households fill to 700 or more, so a full town (680 neighbours)
+/// leaves room for the player's household and births. A town file may ask for fewer
+/// (`residentsMost`, `World::residents_most`).
+pub const MAX_SIMS: usize = 768;
 
 /// A set of residents by slot (`MAX_SIMS` of them, a bit each).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -1867,6 +1870,10 @@ pub struct World {
     /// Whether the player's residents move in with partners and out of the family home on
     /// their own (a per-game option; others always do).
     pub player_moves: bool,
+    /// The most residents the town grows to by newcomers and births, as its town file asks
+    /// (`residentsMost`; none: `MAX_SIMS`). Kept as given and saved with the town, so a town made
+    /// for fewer stays so on a machine that could hold more. Read through `residents_most`.
+    pub residents_most_given: Option<u32>,
     /// People whose slot someone new took, for the story (`social::FORMER` references).
     pub former: Vec<Former>,
     /// Bumped per slot when someone new takes it (views rebuild that resident).
@@ -1913,7 +1920,8 @@ pub struct World {
     /// home.
     pub(crate) claimed_places: Vec<(u16, Vec<u32>)>,
     /// The people who have a place in each claimed room, with the fingerprint they were found
-    /// for (`privacy::refresh`), so a tick needn't look for them again while nothing changes.
+    /// for (`privacy::refresh`), so a tick needn't look for them again while nothing changes. In
+    /// the rooms' order.
     pub(crate) claimants_cache: Vec<(u16, u64, Vec<u32>)>,
     /// What each household has to work on as the tick's step started (`work_waiting`), kept
     /// from tick to tick like `briefs`.
@@ -2053,6 +2061,9 @@ pub(crate) struct Ctx<'a> {
     /// The work taxis' runs (`World::taxis`).
     pub taxis: &'a crate::taxi::Taxis,
     pub autonomy: bool,
+    /// Whether the town has room for one more by a birth (`World::room_in_town`), worked out
+    /// once a tick rather than by every pair asking.
+    pub room_in_town: bool,
     /// Room score per tile (`World::room_score`).
     pub room_score: &'a [f32],
     /// Dirt per tile (`World::dirt`).
@@ -2171,6 +2182,7 @@ impl World {
         }
         world.mode = lot_file.mode;
         world.lifespan = lot_file.lifespan;
+        world.residents_most_given = lot_file.residents_most;
         world.meta = lot_file.meta.clone();
         world.note_paths();
         // (A bus stop in an older town file is no way out: left out.)
@@ -2351,6 +2363,7 @@ impl World {
             autonomy: true,
             lifespan: Default::default(),
             player_moves: true,
+            residents_most_given: None,
             former: Vec::new(),
             generations: Vec::new(),
             rng,
@@ -2499,6 +2512,18 @@ impl World {
             });
     }
 
+    /// The most residents the town grows to by newcomers and births: the town file's
+    /// `residentsMost`, at most `MAX_SIMS`.
+    pub fn residents_most(&self) -> usize {
+        self.residents_most_given
+            .map_or(MAX_SIMS, |n| (n as usize).min(MAX_SIMS))
+    }
+
+    /// Whether a newcomer or a baby would find room in town (fewer here than `residents_most`).
+    pub(crate) fn room_in_town(&self) -> bool {
+        self.sims.iter().filter(|s| s.here()).count() < self.residents_most()
+    }
+
     /// Whether people at `a` and `b` see each other, as two talking must (see
     /// `conversation::in_sight`).
     pub fn in_sight(&self, a: [f32; 2], b: [f32; 2]) -> bool {
@@ -2528,6 +2553,7 @@ impl World {
             lights: &self.traffic.lights,
             taxis: &self.taxis,
             autonomy: self.autonomy,
+            room_in_town: self.room_in_town(),
             room_score: &self.room_score,
             dirt: &self.dirt,
             hour: crate::clock::hour(tick),
@@ -3375,6 +3401,8 @@ impl World {
                 "at most {most} residents per household"
             )));
         }
+        // (The player's own choice: up to the sim's limit, past a town file's `residentsMost`,
+        // which holds back only newcomers and births.)
         let cap = MAX_SIMS;
         if self.sims.iter().filter(|s| s.here()).count() + sims.len() > cap {
             return Err(Error::new(format!("at most {cap} residents in this town")));
@@ -3460,12 +3488,15 @@ impl World {
     ) -> Result<(), Error> {
         let n = self.sims.len();
         let default_bond = self.content.social_rules.default_bond;
+        // (Who is new, by slot: a whole town is, as it loads, and a search of the list for every
+        // pair grew with the cube of the town.)
+        let mut is_new = vec![false; n];
+        for &i in new.iter().filter(|&&i| i < n) {
+            is_new[i] = true;
+        }
         for a in 0..n {
             for b in a + 1..n {
-                if !(new.contains(&a) || new.contains(&b))
-                    || !self.sims[a].here()
-                    || !self.sims[b].here()
-                {
+                if !(is_new[a] || is_new[b]) || !self.sims[a].here() || !self.sims[b].here() {
                     continue;
                 }
                 let (sa, sb) = (&self.sims[a], &self.sims[b]);
@@ -4586,6 +4617,7 @@ impl World {
         let hour = crate::clock::hour(tick);
         let mut work = std::mem::take(&mut self.work);
         self.fill_work_waiting(&mut work);
+        let room_in_town = self.room_in_town();
         {
             let World {
                 content,
@@ -4646,6 +4678,7 @@ impl World {
                 lights: &traffic.lights,
                 taxis,
                 autonomy: *autonomy,
+                room_in_town,
                 hour,
                 day: crate::clock::day(tick),
                 minute: crate::clock::minute_of_day(tick),

@@ -445,7 +445,9 @@ impl<'a> Earshot<'a> {
     /// `within_earshot(nav, from, b)`.
     pub(crate) fn hears(&mut self, b: [f32; 2]) -> bool {
         let nav = self.nav;
-        if nav.stairs.distance(self.from, b) > EARSHOT {
+        // (Further apart across than earshot: no walk between them is any shorter. Most of a big
+        // town is, for each one asking about everyone, and is passed over without the walk.)
+        if (self.from[0] - b[0]).abs() > EARSHOT || nav.stairs.distance(self.from, b) > EARSHOT {
             return false;
         }
         let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
@@ -598,6 +600,16 @@ pub(crate) fn update(w: &mut World) {
             && !matches!(sims[a as usize].current.as_ref().map(|c| c.task.kind), Some(TaskKind::Social { target, .. }) if target as usize == i)
         {
             sims[i].heeding = None;
+        }
+    }
+
+    // Who has someone listening in, counted once: nobody starts listening before the joining
+    // below, so whoever has nobody now talks only with the one they talk to (`open_up`), and
+    // isn't looked for among the whole town every tick of their talk.
+    let mut listened_to = vec![false; n];
+    for l in sims.iter().filter_map(Sim::listening_to) {
+        if let Some(heard) = listened_to.get_mut(l as usize) {
+            *heard = true;
         }
     }
 
@@ -784,7 +796,7 @@ pub(crate) fn update(w: &mut World) {
                     sims[t].engaged_with = None;
                     end_activity(&mut sims[i], content, objects);
                 } else {
-                    open_up(sims, content, i, t);
+                    open_up(sims, content, i, t, listened_to[i]);
                     set_phase(&mut sims[i], Phase::Conversing { elapsed, success });
                 }
             }
@@ -1069,15 +1081,20 @@ fn take_place<'a>(
             success: true,
         },
     );
-    open_up(sims, content, l, t);
+    open_up(sims, content, l, t, true);
 }
 
 /// The two talking (`l` and `t`) face each other, or, with others listening in, open up to the
 /// group: everyone there faces its middle (where they all are, on average), so nobody has their
 /// back turned. Called as people join and every tick of the conversation, so it follows people
-/// leaving too.
-fn open_up(sims: &mut [Sim], content: &Content, l: usize, t: usize) {
-    let members = group(sims, content, l);
+/// leaving too. `listened`: whether anyone might be listening in (if not, only the two are
+/// there, without looking).
+fn open_up(sims: &mut [Sim], content: &Content, l: usize, t: usize, listened: bool) {
+    let members = if listened {
+        group(sims, content, l)
+    } else {
+        vec![l, t]
+    };
     // (Those sitting stay turned the way their seat faces: their heads turn, `characters.ts`.)
     let standing = |sims: &[Sim], m: usize| sims[m].pose == Pose::Stand;
     if members.len() <= 2 {

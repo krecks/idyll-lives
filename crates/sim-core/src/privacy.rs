@@ -411,13 +411,21 @@ fn room_claimants(w: &World, room: u16) -> Vec<u32> {
         .flat_map(|&(o, _, plot)| lying_in(o, plot))
         .collect();
     out.extend_from_slice(&lying);
+    // Only those living on a place's plot may have a place there (`goes_to`): found in one pass
+    // for all the room's places and their uses, rather than one over the whole town for each.
+    let living: Vec<&Sim> = w
+        .sims
+        .iter()
+        .filter(|s| s.here() && s.carried_by.is_none())
+        .filter(|s| places.iter().any(|&(_, _, plot)| lives_on(w, s, plot)))
+        .collect();
     for &(o, def, plot) in &places {
         let here = lying_in(o, plot);
         for (i, inter) in def.interactions.iter().enumerate() {
             if !offers_place(&w.content, inter) {
                 continue;
             }
-            for s in w.sims.iter().filter(|s| s.here() && s.carried_by.is_none()) {
+            for &s in &living {
                 if !goes_to(w, o, s.id, plot, i) {
                     continue;
                 }
@@ -535,16 +543,18 @@ pub(crate) fn refresh(w: &mut World) {
             let claimed = w.claimed_rooms.binary_search(&room).is_ok();
             let claimants = if doing.is_none() && claimed {
                 let hash = room_hash(w, room, presence);
-                match cache.iter_mut().find(|(r, _, _)| *r == room) {
-                    Some((_, cached, people)) if *cached == hash => people.clone(),
-                    Some((_, cached, people)) => {
-                        *cached = hash;
-                        *people = room_claimants(w, room);
-                        people.clone()
+                // (The cache in the rooms' order, looked up by halves: one in a private room
+                // each asks, and a full town's bedrooms number hundreds.)
+                match cache.binary_search_by_key(&room, |(r, _, _)| *r) {
+                    Ok(k) if cache[k].1 == hash => cache[k].2.clone(),
+                    Ok(k) => {
+                        cache[k].1 = hash;
+                        cache[k].2 = room_claimants(w, room);
+                        cache[k].2.clone()
                     }
-                    None => {
+                    Err(k) => {
                         let people = room_claimants(w, room);
-                        cache.push((room, hash, people.clone()));
+                        cache.insert(k, (room, hash, people.clone()));
                         people
                     }
                 }

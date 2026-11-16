@@ -76,11 +76,11 @@ describe('moving in', async () => {
     };
   });
 
-  test("the people seed is the code's own, else its town's, else its land's", () => {
+  test("the people seed is the code's own, else drawn from its town's seed (or its land's)", () => {
     const code = startCode('river', 1234);
-    expect(peopleSeedOf(code)).toBe(1234);
-    expect(peopleSeedOf({ ...code, townSeed: 77 })).toBe(77);
-    expect(peopleSeedOf({ ...code, townSeed: 77, peopleSeed: 5 })).toBe(5);
+    expect(peopleSeedOf({ ...code, peopleSeed: 5 })).toBe(5);
+    expect(peopleSeedOf({ ...code, townSeed: 77 })).toBe(peopleSeedOf({ ...code, townSeed: 77 }));
+    expect(peopleSeedOf({ ...code, townSeed: 77 })).not.toBe(peopleSeedOf(code));
   });
 
   test('a household made in Creation moves into the home chosen, as it stands or on an empty lot', () => {

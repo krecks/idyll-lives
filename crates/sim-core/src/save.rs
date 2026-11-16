@@ -128,6 +128,12 @@
 //! town file's water mask (`openWorld.terrain.water`) may now change in play too, and is saved as
 //! it is then; who may walk where is worked out from it again as the game loads. A file without
 //! `meta.land` has its land drawn from the landscape, as before, so nothing changes version.
+//! Still 39: a town holds up to 768 residents (`world::MAX_SIMS`, 240 before) and 384 cars
+//! (`cars::MAX_CARS`, 128 before). Nothing saved is sized by either: residents, cars and
+//! relationships are lists, the chemistry string is as long as the residents there are, and the
+//! sets sized by the limit (`world::SimSet`) and the snapshot's layout are not saved. A town may
+//! say the most residents it grows to (`residentsMost`, optional): saved with the town when it
+//! does, and a file without it (every file before it) grows to the limit.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -174,6 +180,10 @@ pub struct SaveFile {
     /// Whether the player's residents move on their own (absent: yes).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player_moves: Option<bool>,
+    /// The most residents the town grows to by newcomers and births, as its town file asked
+    /// (`World::residents_most_given`; absent: `world::MAX_SIMS`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub residents_most: Option<u32>,
     pub rng: u32,
     /// The seed the game started from (absent before v23: 0, unknown).
     #[serde(default, skip_serializing_if = "is_zero_u32")]
@@ -994,6 +1004,7 @@ impl World {
             storeys: Some(self.storeys),
             basement: (self.stairs.basement > 0).then_some(self.stairs.basement as u8),
             player_moves: (!self.player_moves).then_some(false),
+            residents_most: self.residents_most_given,
             rng: self.rng.state(),
             seed: self.seed,
             lot: LotSave {
@@ -1201,6 +1212,7 @@ impl World {
         world.autonomy = save.autonomy || legacy_free_will;
         world.lifespan = save.lifespan.unwrap_or(crate::lifecycle::Lifespan::Off);
         world.player_moves = save.player_moves.unwrap_or(true);
+        world.residents_most_given = save.residents_most;
         world.meta = save.meta.clone();
         world.note_paths();
         // (Bus stops, in a file written while the town had buses, are no ways out.)

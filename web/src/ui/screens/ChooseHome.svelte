@@ -44,7 +44,11 @@
   /** What can be chosen: the homes for sale, and the household's own home if it has one. */
   const choosable = $derived(new Set(from === null ? vacantIds : [from, ...vacantIds]));
 
-  let selectedIndex = $state<number | null>(app.homeSlot !== null && (app.homeSlot === from || vacantSlots(app.town!).some((v) => v.index === app.homeSlot)) ? app.homeSlot : from);
+  /**
+   * The home chosen: a household of the town's opens on its own; one made in Creation on the home
+   * chosen last time, else (once the prices are known) the one it can afford nearest the town's middle.
+   */
+  let selectedIndex = $state<number | null>(from ?? (app.homeSlot !== null && vacantSlots(app.town!).some((v) => v.index === app.homeSlot) ? app.homeSlot : null));
   const selected = $derived(selectedIndex === null ? null : (town.slots[selectedIndex] ?? null));
   /** The household stays in its own home (the game takes it over as it is). */
   const staying = $derived(from !== null && selectedIndex === from);
@@ -53,7 +57,7 @@
   });
 
   /** The house as it stands, or an empty lot to build on (not for a household staying in its own home). */
-  let lot = $state<'house' | 'empty'>(app.emptyLot && app.homeSlot !== from ? 'empty' : 'house');
+  let lot = $state<'house' | 'empty'>(app.emptyLot && from === null ? 'empty' : 'house');
   $effect(() => {
     app.emptyLot = lot === 'empty' && !staying;
   });
@@ -299,6 +303,11 @@
 
   onMount(async () => {
     templates = await loadTemplates();
+    if (selectedIndex !== null) return;
+    const a = areas[0];
+    const [cx, cz] = a ? [a.x + a.w / 2, a.z + a.d / 2] : [town.width / 2, town.depth / 2];
+    const near = (s: PlotSlot) => ((s.area ?? 0) === 0 ? 0 : 1e6) + Math.hypot(s.x - cx, s.z - cz);
+    selectedIndex = vacant.filter((s) => !dear(s.index)).sort((p, q) => near(p) - near(q))[0]?.index ?? null;
   });
 
   // The 3D town shows the chosen home as the game will (cleared when starting on an empty lot).

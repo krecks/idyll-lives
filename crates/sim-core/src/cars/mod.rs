@@ -99,8 +99,10 @@ use crate::world::{
 };
 use crate::{DRIVE_TICKS_PER_SECOND, drive_secs, drive_ticks, secs};
 
-/// Most cars in a town (the snapshot's rows).
-pub const MAX_CARS: usize = 128;
+/// Most cars in a town (the snapshot's rows): the households' and the work taxis'. A full city
+/// world's households have a car in about one home in three (some 110 to 130), well inside it;
+/// past it, cars are dropped as the town loads and no taxi is made.
+pub const MAX_CARS: usize = 384;
 /// Doors: 0 front left (the driver's), 1 front right, 2 back left, 3 back right.
 pub const DOORS: usize = 4;
 /// How long the driver waits in the car for the others setting off at the same time.

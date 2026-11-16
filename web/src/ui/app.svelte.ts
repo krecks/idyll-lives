@@ -73,11 +73,13 @@ class AppState {
   townName = $state<string | null>(null);
   /** Step 2's town (nobody living there yet). */
   world = $state.raw<LaidTown | null>(null);
-  /** Step 3's town with its neighbours, and the key of step 2's town it was filled from (`world.key`). */
+  /** Step 3's town with its neighbours, and what it was filled from: step 2's town and the people's seed (`newGame.ts` `peopleKey`). */
   town = $state.raw<NeighbourhoodDraft | null>(null);
   townOf = '';
   /** The households step 3 offers (their lots, in order); empty until step 3 offers a sample of the town's. */
   offer = $state.raw<readonly number[]>([]);
+  /** How many times step 3's "Show others" was pressed for `offer` (`newGame.ts` `offerPage`). */
+  offerPage = $state(0);
   household = $state.raw<HouseholdDraft | null>(null);
   /** Living (the residents earn the money) or Creative (building is free). */
   mode = $state<GameKind>('living');
@@ -87,7 +89,11 @@ class AppState {
   emptyLot = $state(false);
   /** House picked on the home screen (prepared in the background). */
   homeSlot = $state<number | null>(null);
-  /** Home of the town's household chosen in step 3 to play (null: one made in Creation, `household`). */
+  /**
+   * The household chosen in step 3 from those living in town, by its home's slot (step 4 opens on
+   * that home); null: the player's own from Creation (`household`). It wins over `household`: a
+   * household made in Creation is kept while the player looks through the town's.
+   */
   playSlot = $state<number | null>(null);
   /** A live 3D scene is rendering behind the menus. */
   liveBackdrop = $state(false);
@@ -111,11 +117,17 @@ class AppState {
     this.town = null;
     this.townOf = '';
     this.offer = [];
+    this.offerPage = 0;
     this.household = null;
     this.playSlot = null;
     this.homeSlot = null;
     this.emptyLot = false;
     this.screen = 'land';
+  }
+
+  /** The seed the town's people come from (the code's own, else drawn from the town's); undefined before step 1. */
+  get peopleSeed(): number | undefined {
+    return this.code ? peopleSeedOf(this.code) : undefined;
   }
 
   /** The town as the home screen shows it: the chosen lot cleared when starting on an empty lot. */

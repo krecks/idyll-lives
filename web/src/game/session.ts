@@ -223,7 +223,8 @@ async function openSession(
     const people = request.peopleSeed === undefined ? null : peopleStreams(request.peopleSeed);
     const random = people?.bonds ?? (Math.random() * 2 ** 32) >>> 0;
     // The rest of the homes for sale filled (Move in): a few tens of milliseconds on the page, said on
-    // the loading screen first.
+    // the loading screen first. (Their houses are furnished in the assemble job below; houses furnished
+    // ahead in step 4, by the town worker, would be handed to it here.)
     let town = request.town;
     if (request.fill) {
       progress('Moving the neighbours in', 0.06);
