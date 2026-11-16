@@ -1009,11 +1009,29 @@ impl World {
         }
         let p = &self.plots[plot as usize];
         let lot = &self.lot;
+        // (What could be in its way anywhere on the plot, found once: as far past the plot's
+        // edges as it reaches, turned any way, from a tile on it.)
+        let d = &self.content.objects[def];
+        let reach = i32::from(d.footprint[0].max(d.footprint[1]))
+            + d.overhang
+                .iter()
+                .map(|&(r, f)| r.abs().max(f.abs()))
+                .max()
+                .unwrap_or(0)
+            + 1;
+        let near = self.objects_reaching([
+            p.x - reach,
+            p.z - reach,
+            p.x + p.w + reach,
+            p.z + p.d + reach,
+        ]);
         let mut spots = Vec::new();
         for z in p.z..p.z + p.d {
             for x in p.x..p.x + p.w {
                 for rot in 0..4u8 {
-                    let Ok(obj) = self.check_fit(def, x, z, rot, Layout::default()) else {
+                    let Ok(obj) =
+                        self.check_fit_among(def, x, z, rot, Layout::default(), Some(&near))
+                    else {
                         continue;
                     };
                     if !self.fits_on_plot(&obj, plot)

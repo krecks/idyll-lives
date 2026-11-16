@@ -639,6 +639,17 @@ impl ObjectInstance {
             .map(move |&(r, f)| (x + r * rx + f * fx, z + r * rz + f * fz))
     }
 
+    /// The tiles it stands on and reaches over (`tiles`, `overhang_tiles`) as a rectangle
+    /// `[x0, z0, x1, z1)`.
+    pub(crate) fn reach(&self, content: &Content) -> [i32; 4] {
+        let (w, d) = self.size(content);
+        let mut r = [self.x, self.z, self.x + w, self.z + d];
+        for (x, z) in self.overhang_tiles(content) {
+            r = [r[0].min(x), r[1].min(z), r[2].max(x + 1), r[3].max(z + 1)];
+        }
+        r
+    }
+
     /// Pairs of neighbouring tiles the arm to each `overhang_tiles` crosses (along the row, then
     /// the column): no wall may stand between them.
     pub(crate) fn overhang_edges(&self, content: &Content) -> Vec<((i32, i32), (i32, i32))> {
@@ -2699,6 +2710,24 @@ impl World {
         rot: u8,
         layout: Layout,
     ) -> Result<ObjectInstance, Error> {
+        self.check_fit_among(def, x, z, rot, layout, None)
+    }
+
+    /// `check_fit`, looking for what's in the way only among `near` (in id order) when given:
+    /// every object whose tiles or overhang reach where it would go (`ObjectInstance::reach`),
+    /// found once for many tries over one plot (`find_spot`). Without it, those are found among
+    /// the whole town first: a check of each tile against every object in a full town, for every
+    /// spot a delivered bed was tried at, made the noon a newcomer or an adoption came half a
+    /// second long.
+    pub(crate) fn check_fit_among(
+        &self,
+        def: usize,
+        x: i32,
+        z: i32,
+        rot: u8,
+        layout: Layout,
+        near: Option<&[&ObjectInstance]>,
+    ) -> Result<ObjectInstance, Error> {
         let obj = ObjectInstance {
             id: self.objects.len() as u32,
             stable: 0,
@@ -2734,6 +2763,14 @@ impl World {
         if layer == Layer::Surface {
             return self.check_surface_fit(obj);
         }
+        let found;
+        let near = match near {
+            Some(near) => near,
+            None => {
+                found = self.objects_reaching(obj.reach(&self.content));
+                &found[..]
+            }
+        };
         let on = |o: &ObjectInstance, t: (i32, i32)| o.tiles(&self.content).any(|q| q == t);
         // (Reaching over it at head height: an arc lamp's shade.)
         let over =
@@ -2745,18 +2782,18 @@ impl World {
             // head height takes the floor from walking only: furniture goes under it.
             let floor = self.lot.in_bounds(tx, tz) && self.blocked[self.lot.tile_index(tx, tz)];
             let furniture = || {
-                self.objects
-                    .iter()
+                near.iter()
+                    .copied()
                     .any(|o| !self.content.objects[o.def].layer.mounted() && on(o, (tx, tz)))
             };
             let taken = if layer.mounted() {
-                self.objects
-                    .iter()
+                near.iter()
+                    .copied()
                     .any(|o| self.content.objects[o.def].layer == layer && on(o, (tx, tz)))
                     || (d.hangs_low && floor && !furniture())
             } else {
                 let hung = || {
-                    self.objects.iter().any(|o| {
+                    near.iter().copied().any(|o| {
                         ((self.content.objects[o.def].hangs_low
                             || self.content.objects[o.def].head_height)
                             && on(o, (tx, tz)))
@@ -2772,7 +2809,7 @@ impl World {
             }
             // Furniture as tall as the wall leaves no room on the wall or the ceiling over it; a
             // thing hanging low from the ceiling none under it.
-            let clash = self.objects.iter().find(|o| {
+            let clash = near.iter().copied().find(|o| {
                 let other = &self.content.objects[o.def];
                 on(o, (tx, tz))
                     && match (layer, other.layer) {
@@ -2785,8 +2822,8 @@ impl World {
             });
             // Nor under (or into) a lamp's shade reaching over from beside.
             let clash = clash.or_else(|| {
-                self.objects
-                    .iter()
+                near.iter()
+                    .copied()
                     .find(|o| over(o, (tx, tz)) && (d.fills_wall || d.hangs_low || d.head_height))
             });
             if let Some(o) = clash {
@@ -2830,7 +2867,7 @@ impl World {
                 (on(o, (tx, tz)) && (def.fills_wall || def.hangs_low || def.head_height))
                     || over(o, (tx, tz))
             };
-            if let Some(o) = self.objects.iter().find(|o| other(o)) {
+            if let Some(o) = near.iter().copied().find(|o| other(o)) {
                 return Err(Error::new(format!(
                     "'{name}' at {x},{z} would hang into the {}",
                     called(o)
@@ -2951,6 +2988,20 @@ impl World {
         }
     }
 
+    /// The objects whose tiles or overhang (`ObjectInstance::reach`) touch the tile rectangle
+    /// `[x0, z0, x1, z1)`, in id order: all a fit there needs to look at (`check_fit_among`).
+    pub(crate) fn objects_reaching(&self, [x0, z0, x1, z1]: [i32; 4]) -> Vec<&ObjectInstance> {
+        self.objects
+            .iter()
+            .filter(|o| {
+                let [a0, b0, a1, b1] = o.reach(&self.content);
+                a0 < x1 && x0 < a1 && b0 < z1 && z0 < b1
+            })
+            .collect()
+    }
+
+    /// What runs along the whole back edge of `obj`: None if not a wall (plain or with a window)
+    /// all along, else whether a window is part of it.
     /// What runs along the whole back edge of `obj`: None if not a wall (plain or with a window)
     /// all along, else whether a window is part of it.
     pub(crate) fn wall_behind(&self, obj: &ObjectInstance) -> Option<bool> {
