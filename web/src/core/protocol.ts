@@ -469,7 +469,8 @@ export type LandSize = 'small' | 'medium' | 'large';
 /**
  * What the player chose for a world besides its place (`game/world.ts` `WorldKind`): how big its
  * main town is, how many villages round it, how hilly and how wooded its land, and (`size`) how
- * much land it has (none: as its town and villages want, `sizeFor`).
+ * much land it has (none: the place's own, or for another town and villages the smallest land they
+ * fit on: `world.ts` `optionsFor`, `sizeFor`).
  */
 export interface WorldOptions {
   town: TownSize;

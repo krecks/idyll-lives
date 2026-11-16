@@ -483,47 +483,47 @@ export const WORLDS: Record<WorldKind, Place> = {
   country: {
     label: 'Countryside',
     blurb: 'Rolling country, hedged lanes and ponds, villages strung along the roads.',
-    defaults: { town: 'town', villages: 'many', hills: 'rolling', woods: 'some' },
+    defaults: { town: 'town', villages: 'many', hills: 'rolling', woods: 'some', size: 'large' },
   },
   farm: {
     label: 'Farmland',
     blurb: 'Flat open fields, farmsteads with barns and orchards along every road.',
-    defaults: { town: 'village', villages: 'few', hills: 'flat', woods: 'open' },
+    defaults: { town: 'village', villages: 'few', hills: 'flat', woods: 'open', size: 'medium' },
   },
   seaside: {
     label: 'Seaside',
     blurb: 'Homes along a sandy shore, the sea down one side of the world.',
-    defaults: { town: 'village', villages: 'few', hills: 'rolling', woods: 'some' },
+    defaults: { town: 'village', villages: 'few', hills: 'rolling', woods: 'some', size: 'medium' },
   },
   lakeside: {
     label: 'Lakeside',
     blurb: 'A broad lake in the middle of the land, homes along its shore.',
-    defaults: { town: 'town', villages: 'few', hills: 'rolling', woods: 'some' },
+    defaults: { town: 'town', villages: 'few', hills: 'rolling', woods: 'some', size: 'medium' },
   },
   river: {
     label: 'River valley',
     blurb: 'A winding river across the land, homes on its banks, bridges over it.',
-    defaults: { town: 'town', villages: 'few', hills: 'rolling', woods: 'some' },
+    defaults: { town: 'town', villages: 'few', hills: 'rolling', woods: 'some', size: 'medium' },
   },
   mountain: {
     label: 'Mountains',
     blurb: 'A hamlet in a high valley, pines on steep slopes and peaks all round.',
-    defaults: { town: 'hamlet', villages: 'few', hills: 'mountains', woods: 'wooded' },
+    defaults: { town: 'hamlet', villages: 'few', hills: 'mountains', woods: 'wooded', size: 'medium' },
   },
   forest: {
     label: 'Forest',
     blurb: 'A clearing in deep woods, big gardens and birdsong.',
-    defaults: { town: 'hamlet', villages: 'few', hills: 'rolling', woods: 'wooded' },
+    defaults: { town: 'hamlet', villages: 'few', hills: 'rolling', woods: 'wooded', size: 'medium' },
   },
   heath: {
     label: 'Heath',
     blurb: 'Open moorland, heather and bracken on high bare hills, few trees.',
-    defaults: { town: 'hamlet', villages: 'few', hills: 'hilly', woods: 'open' },
+    defaults: { town: 'hamlet', villages: 'few', hills: 'hilly', woods: 'open', size: 'medium' },
   },
   island: {
     label: 'Island',
     blurb: 'An island with the sea all round, a causeway to the mainland.',
-    defaults: { town: 'village', villages: 'few', hills: 'rolling', woods: 'some' },
+    defaults: { town: 'village', villages: 'few', hills: 'rolling', woods: 'some', size: 'medium' },
   },
 };
 
@@ -862,21 +862,26 @@ const SIZES: Record<TownSize, SizeTable> = {
 /** The town sizes, smallest first. */
 export const TOWN_SIZES: readonly TownSize[] = ['hamlet', 'village', 'town', 'city'];
 
-/** The world's size (m, both ways) by how many villages round the main town and how big it is. */
-const WORLD_SIZE: Record<WorldOptions['villages'], Record<TownSize, [number, number]>> = {
-  none: { hamlet: [576, 576], village: [640, 640], town: [704, 768], city: [832, 832] },
-  few: { hamlet: [704, 768], village: [768, 832], town: [832, 896], city: [896, 960] },
-  many: { hamlet: [896, 960], village: [896, 960], town: [896, 960], city: [960, 1024] },
-};
-
 /** The land a new world has (m, both ways) by its size (`WorldOptions.size`). */
 export const LAND_SIZE: Record<LandSize, number> = { small: 640, medium: 832, large: 960 };
 /** The land sizes, smallest first. */
 const LAND_SIZES: readonly LandSize[] = ['small', 'medium', 'large'];
 
-/** Whether a main town of `town` and `villages` round it fit on land of `size`: it is at least as big as such a world is at its smallest (`WORLD_SIZE`). */
+/**
+ * The smallest land a main town and the villages round it fit on, as the generator lays them
+ * (measured over the places, 2026-11-16): a small land holds a hamlet or a village alone (a town
+ * by a lake has no room on it); a medium one any town with a few villages; many villages want a
+ * large one (on a medium land only three or four of five are placed).
+ */
+const LEAST_LAND: Record<WorldOptions['villages'], Record<TownSize, LandSize>> = {
+  none: { hamlet: 'small', village: 'small', town: 'medium', city: 'medium' },
+  few: { hamlet: 'medium', village: 'medium', town: 'medium', city: 'medium' },
+  many: { hamlet: 'large', village: 'large', town: 'large', city: 'large' },
+};
+
+/** Whether a main town of `town` and `villages` round it fit on land of `size` (`LEAST_LAND`). */
 export function townFits(size: LandSize, town: TownSize, villages: WorldOptions['villages']): boolean {
-  return LAND_SIZE[size] >= WORLD_SIZE[villages][town][0];
+  return LAND_SIZES.indexOf(size) >= LAND_SIZES.indexOf(LEAST_LAND[villages][town]);
 }
 
 /** The smallest land a main town of `town` and `villages` round it fit on (`townFits`); the largest if none does. */
@@ -1054,6 +1059,19 @@ function mainTown(base: SizeSpec, size: TownSize, farms?: [number, number]): Siz
 const given = (options: Partial<WorldOptions>) => Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) as Partial<WorldOptions>;
 
 /**
+ * A place's options in full: `options` over the place's own (`defaultsOf`), and its land's size as
+ * chosen; else the place's own with its own town and villages, or the smallest land the town and
+ * villages chosen fit on (`sizeFor`).
+ */
+export function optionsFor(kind: WorldKind, options: Partial<WorldOptions> = {}): WorldOptions & { size: LandSize } {
+  const chosen = given(options);
+  const own = defaultsOf(kind);
+  const o = { ...own, ...chosen };
+  const size = chosen.size ?? (o.town === own.town && o.villages === own.villages && own.size ? own.size : sizeFor(o.town, o.villages));
+  return { ...o, size };
+}
+
+/**
  * A place with its options as the generator lays it out: `options` over the place's own
  * (`defaultsOf`), from the tables above. The main town's size sets its box, lots and lanes, its
  * terraced houses, how built over it is and its civic places; the villages how many hamlets and how
@@ -1063,7 +1081,7 @@ const given = (options: Partial<WorldOptions>) => Object.fromEntries(Object.entr
  * land looks (drawn from a stream of its own, so the palette and the trees stay as an option changes).
  */
 export function specOf(kind: WorldKind, options: Partial<WorldOptions> = {}): WorldSpec {
-  const o: WorldOptions = { ...defaultsOf(kind), ...given(options) };
+  const o = optionsFor(kind, options);
   const p = PLACES[kind];
   const size = o.town;
   const from = CLASSIC[bySize(p.from, size)];
@@ -1092,7 +1110,7 @@ export function specOf(kind: WorldKind, options: Partial<WorldOptions> = {}): Wo
     ...(from.prefer ? { prefer: from.prefer } : {}),
     ...(from.farms ? { farms: from.farms } : {}),
     ...p.mix,
-    world: WORLD_SIZE[o.villages][size],
+    world: [LAND_SIZE[o.size], LAND_SIZE[o.size]],
     hamlets: o.villages === 'none' ? [0, 0] : o.villages === 'few' ? [2, 3] : island ? [3, 4] : [5, 7],
     hamlet: p.land.hamlet,
     terraces: s.terraces,
@@ -1137,13 +1155,14 @@ export interface Expected {
   exits: [number, number] | null;
 }
 export function expectations(kind: WorldKind, options: Partial<WorldOptions> = {}): Expected {
-  const o: WorldOptions = { ...defaultsOf(kind), ...given(options) };
+  const o = optionsFor(kind, options);
   const v = o.villages;
   return {
     built: { none: 0.08, few: 0.15, many: 0.25 }[v] * (o.woods === 'wooded' ? 0.6 : 1),
     empty: { none: null, few: 0.2, many: 0.1 }[v],
     meadow: kind === 'heath',
-    quarters: { none: 0, few: 3, many: 4 }[v],
+    // (Among mountains, along the valley: across a half of the world, it may be.)
+    quarters: Math.min({ none: 0, few: 3, many: 4 }[v], o.hills === 'mountains' ? 2 : 4),
     homes: { hamlet: 14, village: 40, town: 110, city: 150 }[o.town] + { none: 0, few: 25, many: 70 }[v],
     mainLeast: SIZES[o.town].mainLeast,
     careers: o.town === 'town' || o.town === 'city',
