@@ -52,7 +52,8 @@ const { Content } = await import('../../web/src/content/content.ts');
 const { AssetRegistry } = await import('../../web/src/assets/registry.ts');
 const { objectInfos } = await import('../../web/src/game/housegen.ts');
 const { randomHousehold } = await import('../../web/src/game/household.ts');
-const { assembleTown, generateStats, generateWorld, houseTemplate, populate, vacantSlots } = await import('../../web/src/game/town.ts');
+const { assembleTown, generateStats, generateWorld, houseTemplate, vacantSlots } = await import('../../web/src/game/town.ts');
+const { fillTown, peopleStreams, populate } = await import('../../web/src/game/people.ts');
 const { expectations, WORLD_KINDS } = await import('../../web/src/game/world.ts');
 type WorldOptions = import('../../web/src/game/world.ts').WorldOptions;
 const { homePrice } = await import('../../web/src/game/price.ts');
@@ -186,12 +187,16 @@ for (const { kind, seed, options } of runs) {
   const left = world.diagnostics?.villages;
   const given = world.diagnostics?.slopes;
   if (left || given) Object.assign(expect, { quarters: Math.max(0, expect.quarters - (left?.left ?? 0)), homes: expect.homes - (left?.homes ?? 0) - (given?.lots ?? 0) });
-  const town = populate(content, assets, templates, world);
-  const home = vacantSlots(town)[0];
+  // The neighbours in two waves, as a new game has them: the first before the home is chosen, the
+  // rest of the homes filled once the player has moved in (`people.ts`), from the world's seed.
+  const people = peopleStreams(seed);
+  const first = populate(content, assets, templates, world, undefined, people);
+  const home = vacantSlots(first)[0];
   if (!home) throw new Error(`${tag}: no empty house`);
+  const town = fillTown(content, assets, templates, first, home.index, people);
   const player = randomHousehold(content, assets, 2);
   t0 = performance.now();
-  const text = assembleTown(content, templates, town, player, home.index);
+  const text = assembleTown(content, templates, town, player, home.index, undefined, mulberry32(people.bonds));
   const assemble = performance.now() - t0;
   const file = JSON.parse(text);
   [slowest[0], slowest[1], slowest[2]] = [Math.max(slowest[0], layout), Math.max(slowest[1], houses), Math.max(slowest[2], assemble)];
