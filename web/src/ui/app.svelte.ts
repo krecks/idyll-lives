@@ -6,14 +6,14 @@ import type { MenuStill } from '../game/menuStill';
 import type { Pt } from '../game/roads';
 import type { StartRequest } from '../game/session';
 import { EMPTY_LOT, withLot, type NeighbourhoodDraft } from '../game/town';
-import { peopleSeedOf, type Chosen } from './newGame';
+import { moveInRequest, peopleSeedOf, type Chosen } from './newGame';
 
 /**
  * New game, in four steps: land (step 1) → town (step 2) → household (step 3: choose one of the
- * town's, or make your own in Creation, `create`) → home (step 4) → game. A household chosen from
- * the town can be met first (`play`; it goes once step 4 offers their home, U4).
+ * town's, or make your own in Creation, `create`) → home (step 4, on the whole world: a household
+ * of the town's has its own home chosen, and may move) → game.
  */
-export type Screen = 'menu' | 'land' | 'town' | 'household' | 'create' | 'home' | 'play' | 'game';
+export type Screen = 'menu' | 'land' | 'town' | 'household' | 'create' | 'home' | 'game';
 
 /** A step's draft and the key of what it was made from (`newGame.ts` `landKey`, `townKey`): a later step whose key no longer matches is made again. */
 export interface Keyed {
@@ -137,20 +137,27 @@ class AppState {
     return this.emptyLot ? withLot(town, slot, EMPTY_LOT) : town;
   }
 
-  /** The new game the home screen starts on `slot` (also prepared in the background). */
-  homeRequest(slot: number): StartRequest | null {
-    const town = this.homeTown(slot);
-    const household = this.household;
-    if (!town || !household) return null;
-    return { kind: 'new', town, household, slot, mode: this.mode, lifespan: this.lifespan, peopleSeed: this.peopleSeed };
+  /** The home of the town's household chosen to play (`playSlot`), while one still lives there; null: the household is Creation's. */
+  get residentSlot(): number | null {
+    const slot = this.playSlot;
+    return slot !== null && !!this.town?.households.some((h) => h.slot === slot) ? slot : null;
   }
 
-  /** The new game that takes over the household already living on `slot` (also prepared in the background). */
-  playRequest(slot: number): StartRequest | null {
+  /** The household moving in: the town's chosen in step 3, else the one made in Creation. */
+  get mover(): HouseholdDraft | null {
+    const from = this.residentSlot;
+    return from === null ? this.household : (this.town?.households.find((h) => h.slot === from)?.household ?? null);
+  }
+
+  /**
+   * The new game Move in starts on `slot` (`newGame.ts` `moveInRequest`): the household taking over
+   * its own home, or moving into this one; the rest of the homes for sale filled on the way in.
+   */
+  homeRequest(slot: number): StartRequest | null {
     const town = this.town;
-    const household = town?.households.find((h) => h.slot === slot)?.household;
+    const household = this.mover;
     if (!town || !household) return null;
-    return { kind: 'new', town, household, slot, existing: true, mode: this.mode, lifespan: this.lifespan, peopleSeed: this.peopleSeed };
+    return moveInRequest({ town, slot, household, from: this.residentSlot, emptyLot: this.emptyLot, mode: this.mode, lifespan: this.lifespan, ...(this.code ? { peopleSeed: peopleSeedOf(this.code) } : {}) });
   }
 
   start(request: StartRequest): void {
