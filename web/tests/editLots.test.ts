@@ -46,7 +46,7 @@ describe('lot edits', async () => {
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
 
   /** A small generated world (a hamlet, no villages). */
-  const hamlet = generateWorld(content, t, 'country', 4242, undefined, undefined, { town: 'hamlet', villages: 'none' });
+  const hamlet = generateWorld(content, t, 'country', 4245, undefined, undefined, { town: 'hamlet', villages: 'none' });
 
   /** The draft an edit made (failing the test with its reason if it was refused). */
   const made = (e: Edited): NeighbourhoodDraft => {
