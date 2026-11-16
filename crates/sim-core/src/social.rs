@@ -639,10 +639,17 @@ impl Kin {
 /// the bits its index) rather than a resident slot: their slot has someone new in it.
 pub const FORMER: u32 = 1 << 31;
 
-/// Directional relationship matrix plus symmetric chemistry. Sized to the Sim count.
+/// Residents the relationship matrix makes room for at a time (`Relationships::grow`).
+const GROW_BY: usize = 64;
+
+/// Directional relationship matrix plus symmetric chemistry. Sized to the Sim count, its rows
+/// `stride` long: room is made `GROW_BY` residents at a time, so a town loading or someone moving
+/// in doesn't copy the whole matrix for each one (a full town's is megabytes).
 #[derive(Debug, Clone, Default)]
 pub struct Relationships {
     n: usize,
+    /// Residents the matrix has room for (`n` or more; the rows and columns past `n` untouched).
+    stride: usize,
     rel: Vec<Relationship>,
     chemistry: Vec<f32>,
     /// Each one's partner, kept with `rel` (asked every tick for everyone; a row scan each
@@ -671,33 +678,29 @@ impl Relationships {
         if n <= self.n {
             return;
         }
-        let mut rel = vec![Relationship::default(); n * n];
-        let mut chemistry = vec![0.0; n * n];
-        for a in 0..self.n {
-            for b in 0..self.n {
-                rel[a * n + b] = self.rel[a * self.n + b];
-                chemistry[a * n + b] = self.chemistry[a * self.n + b];
+        if n > self.stride {
+            let stride = n.next_multiple_of(GROW_BY);
+            let mut rel = vec![Relationship::default(); stride * stride];
+            let mut chemistry = vec![0.0; stride * stride];
+            for a in 0..self.n {
+                let (from, to) = (a * self.stride, a * stride);
+                rel[to..to + self.n].copy_from_slice(&self.rel[from..from + self.n]);
+                chemistry[to..to + self.n].copy_from_slice(&self.chemistry[from..from + self.n]);
             }
+            (self.stride, self.rel, self.chemistry) = (stride, rel, chemistry);
         }
-        let mut partner = std::mem::take(&mut self.partner);
-        partner.resize(n, None);
-        let version = self.version.wrapping_add(1);
-        *self = Self {
-            n,
-            rel,
-            chemistry,
-            partner,
-            version,
-        };
+        self.n = n;
+        self.partner.resize(n, None);
+        self.version = self.version.wrapping_add(1);
     }
 
     /// Forgets everything between `a` and everyone (they're gone, or someone new took the slot).
     pub fn clear(&mut self, a: usize) {
         for b in 0..self.n {
-            self.rel[a * self.n + b] = Relationship::default();
-            self.rel[b * self.n + a] = Relationship::default();
-            self.chemistry[a * self.n + b] = 0.0;
-            self.chemistry[b * self.n + a] = 0.0;
+            self.rel[a * self.stride + b] = Relationship::default();
+            self.rel[b * self.stride + a] = Relationship::default();
+            self.chemistry[a * self.stride + b] = 0.0;
+            self.chemistry[b * self.stride + a] = 0.0;
         }
         for b in 0..self.n {
             if b == a || self.partner[b] == Some(a as u32) {
@@ -708,12 +711,12 @@ impl Relationships {
     }
 
     pub fn get(&self, a: usize, b: usize) -> &Relationship {
-        &self.rel[a * self.n + b]
+        &self.rel[a * self.stride + b]
     }
 
     /// The relationship to change (partners change with `set_partners`).
     pub fn get_mut(&mut self, a: usize, b: usize) -> &mut Relationship {
-        &mut self.rel[a * self.n + b]
+        &mut self.rel[a * self.stride + b]
     }
 
     /// Replaces how `a` sees `b` (loading a game).
@@ -740,13 +743,13 @@ impl Relationships {
     }
 
     pub fn chemistry(&self, a: usize, b: usize) -> f32 {
-        self.chemistry[a * self.n + b]
+        self.chemistry[a * self.stride + b]
     }
 
     pub fn set_chemistry(&mut self, a: usize, b: usize, value: f32) {
         let v = value.clamp(-1.0, 1.0);
-        self.chemistry[a * self.n + b] = v;
-        self.chemistry[b * self.n + a] = v;
+        self.chemistry[a * self.stride + b] = v;
+        self.chemistry[b * self.stride + a] = v;
     }
 
     /// Applies a preset in both directions and marks the pair as having met (family links
@@ -1296,6 +1299,20 @@ mod tests {
         assert_eq!(r.get(1, 0).friendship, 0.0);
         assert_eq!(r.chemistry(1, 0), 0.4);
         assert_eq!(r.len(), 3);
+        // (Past the room made for it, one resident at a time, as a town loads.)
+        r.adjust(2, 1, -10.0, 0.0);
+        for n in 4..=2 * GROW_BY + 1 {
+            r.grow(n);
+            r.adjust(n - 1, 0, n as f32 / 10.0, 0.0);
+        }
+        assert_eq!(r.len(), 2 * GROW_BY + 1);
+        assert_eq!(r.get(0, 1).friendship, 20.0);
+        assert_eq!(r.get(2, 1).friendship, -10.0);
+        assert_eq!(r.chemistry(0, 1), 0.4);
+        for n in 4..=2 * GROW_BY + 1 {
+            assert_eq!(r.get(n - 1, 0).friendship, n as f32 / 10.0);
+            assert_eq!(*r.get(0, n - 1), Relationship::default());
+        }
     }
 
     #[test]

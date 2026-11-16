@@ -1920,7 +1920,8 @@ pub struct World {
     /// home.
     pub(crate) claimed_places: Vec<(u16, Vec<u32>)>,
     /// The people who have a place in each claimed room, with the fingerprint they were found
-    /// for (`privacy::refresh`), so a tick needn't look for them again while nothing changes.
+    /// for (`privacy::refresh`), so a tick needn't look for them again while nothing changes. In
+    /// the rooms' order.
     pub(crate) claimants_cache: Vec<(u16, u64, Vec<u32>)>,
     /// What each household has to work on as the tick's step started (`work_waiting`), kept
     /// from tick to tick like `briefs`.
@@ -3487,12 +3488,15 @@ impl World {
     ) -> Result<(), Error> {
         let n = self.sims.len();
         let default_bond = self.content.social_rules.default_bond;
+        // (Who is new, by slot: a whole town is, as it loads, and a search of the list for every
+        // pair grew with the cube of the town.)
+        let mut is_new = vec![false; n];
+        for &i in new.iter().filter(|&&i| i < n) {
+            is_new[i] = true;
+        }
         for a in 0..n {
             for b in a + 1..n {
-                if !(new.contains(&a) || new.contains(&b))
-                    || !self.sims[a].here()
-                    || !self.sims[b].here()
-                {
+                if !(is_new[a] || is_new[b]) || !self.sims[a].here() || !self.sims[b].here() {
                     continue;
                 }
                 let (sa, sb) = (&self.sims[a], &self.sims[b]);
