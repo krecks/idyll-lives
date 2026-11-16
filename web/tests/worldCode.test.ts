@@ -52,13 +52,17 @@ describe('land sizes', () => {
     expect(sizeFor('village', 'none')).toBe('small');
     expect(sizeFor('city', 'none')).toBe('medium');
     expect(sizeFor('town', 'few')).toBe('medium');
-    expect(sizeFor('city', 'few')).toBe('large');
+    expect(sizeFor('city', 'few')).toBe('medium');
+    expect(sizeFor('hamlet', 'few')).toBe('medium');
+    expect(sizeFor('hamlet', 'many')).toBe('large');
     expect(sizeFor('city', 'many')).toBe('large');
   });
 
   test('a land too small for the town and villages chosen', () => {
     expect(townFits('small', 'town', 'none')).toBe(false);
     expect(townFits('medium', 'hamlet', 'many')).toBe(false);
+    expect(townFits('small', 'hamlet', 'few')).toBe(false);
+    expect(townFits('medium', 'city', 'few')).toBe(true);
     expect(townFits('large', 'city', 'many')).toBe(true);
     expect(townFits('large', 'hamlet', 'none')).toBe(true);
   });

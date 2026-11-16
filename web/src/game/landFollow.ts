@@ -1,10 +1,11 @@
 /**
  * A new place's land as a height field whose town follows its slopes (`Land.seeded` `'follow'`):
- * seeded from the generator's own heights (`OpenWorldDraft.heights`), the built land not
- * flattened, then the roads, the lots and the land round them graded into it
- * (`render/shared/builtSurface.ts`), so the land a world stores agrees with its town. Classic
- * worlds and older saves have none (they stay flat); a land a player shaped keeps its heights and
- * is graded again under the town laid on it.
+ * seeded bare, with no town on it, from the generator's own heights (`OpenWorldDraft.heights`:
+ * `seedBare`, step 1); once a town is laid on it, gentle ground eased in under the town
+ * (`gentleUnder`, the built land not flattened), then the roads, the lots and the land round them
+ * graded into it (`render/shared/builtSurface.ts`), so the land a world stores agrees with its
+ * town. Classic worlds and older saves have none (they stay flat); a land a player shaped keeps
+ * its heights and is eased and graded the same way under the town laid on it.
  */
 
 import { DEFAULT_LANDSCAPE, type RoadPlan, type WorldStructure, type WorldZone } from '../core/protocol';
@@ -42,19 +43,21 @@ const bedBelow = (e: number) => Math.min(DEPTH_MOST, e * 0.22 + e * e * 0.004);
 export type FollowWorld = Pick<WorldStructure, 'width' | 'depth' | 'plots' | 'meta'> & SurfaceWorld;
 
 /**
- * `draft` with its land (`open.land`) whose town follows its slopes: a place's new world seeded
- * (`seedFollow`) and graded (`gradeLand`); a world laid again on a land the player shaped
- * (`open.land`, seeded `'follow'`) graded again. Anything else (a classic world, a draft from older
- * code, a land drawn flat under its town) as it was. `world`: the draft's preview (`previewWorld`),
- * for its lots, their paths and its roads. `seeded`: given the land before it is graded (a copy).
+ * `draft` with its land (`open.land`) whose town follows its slopes: the land it was laid on
+ * (`open.land`, seeded `'follow'`: step 1's, shaped or not), or else one seeded bare from its
+ * heights (`seedBare`), given gentle ground under its towns (`gentleUnder`) and graded
+ * (`gradeLand`). Anything else (a classic world, a draft from older code, a land drawn flat under
+ * its town) as it was. `world`: the draft's preview (`previewWorld`), for its lots, their paths
+ * and its roads. `seeded`: given the land before it is graded, its gentle ground in it (a copy).
  */
 export function withLand(draft: NeighbourhoodDraft, world: FollowWorld, seeded?: (land: Land) => void): NeighbourhoodDraft {
   const open = draft.open;
   if (!open) return draft;
   let land: Land | null;
   if (open.land) land = open.land.seeded === 'follow' ? { ...open.land, h: open.land.h.slice() } : null;
-  else land = seedFollow(draft, world);
+  else land = open.heights ? seedBare(draft) : null;
   if (!land) return draft;
+  gentleUnder(land, world, draft.slots.map((s) => s.area ?? 0));
   seeded?.({ ...land, h: land.h.slice(), wl: land.wl.slice(), cover: land.cover.slice() });
   gradeLand(land, world);
   return { ...draft, open: { ...open, land } };
@@ -176,8 +179,9 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
         slopes.retain.lot = Math.max(slopes.retain.lot, step);
         if (step > edgeMost) {
           if (step > RETAIN_MAX + 0.01) out.push(`lot ${n}'s edge stands ${step.toFixed(2)} m over the pad beside it (at most ${RETAIN_MAX})`);
-          // (The backdrop building, else the later lot, gives way.)
-          pads.add(other >= world.plots.length ? other : Math.max(n, other));
+          // (The backdrop building, else the later lot, gives way; but a lot gives way to a building that is a place, a shop or the like.)
+          const place = other >= world.plots.length && world.meta?.backdrop?.[other - world.plots.length]?.place !== undefined;
+          pads.add(place ? n : other >= world.plots.length ? other : Math.max(n, other));
         }
       } else if (index.onRoad(x, z, LAND_CELL)) slopes.retain.road = Math.max(slopes.retain.road, step);
       else {
@@ -228,18 +232,18 @@ const SETTLE_MARGIN = 0.15;
  * `withLand`, and the last resort: a place's world whose built land still breaks a slope limit
  * (`measureLand`, a little within it) gives up what breaks it and is graded again, round after
  * round (`SETTLE_ROUNDS` at most): a lot or a backdrop building cut too deep or whose edge stands
- * too tall (of two pads, the backdrop building, else the later lot) is left out (`diagnostics.dropped`);
+ * too tall (of two pads, the backdrop building, else the later lot; a lot before a building that is a place) is left out (`diagnostics.dropped`);
  * a country road cut too deep (a way out, a loop between places) is left out, and the lots and
- * backdrop buildings on it, where the roads left are still one network with a way out; a dead end reaching past `COURT` m beyond the last road it meets is
+ * backdrop buildings on it (those by it, and those it was the nearest road to), where the roads left are still one network with a way out; a dead end reaching past `COURT` m beyond the last road it meets is
  * cut back to that, and the lots past it left out. What it gave up: `diagnostics.slopes`.
- * `preview`: the world as the menus' preview has it (its lots' paths: `previewWorld`). The draft and
- * that world.
+ * `preview`: the world as the menus' preview has it (its lots' paths: `previewWorld`; asked of the
+ * draft without its land). The draft and that world.
  */
 export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, preview: (draft: NeighbourhoodDraft) => W, seeded?: (land: Land) => void): { draft: NeighbourhoodDraft; world: W } {
   let draft = laid;
   const given = { lots: 0, backdrop: 0, roads: 0, courts: 0, backdropIn: {} as Record<number, number> };
   for (let round = 0; ; round++) {
-    const world = preview(draft);
+    const world = preview(unlanded(draft));
     let first: Land | null = null;
     const graded = withLand(draft, world, (l) => (first = l));
     const land = graded.open?.land;
@@ -265,6 +269,13 @@ export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, prev
  */
 export function settleEdit<W extends FollowWorld>(_plan: NeighbourhoodDraft, _preview: (draft: NeighbourhoodDraft) => W, _before?: LandMeasure): { draft: NeighbourhoodDraft; world: W; refused: { op: number; why: string }[] } {
   throw new Error('settleEdit: not built yet');
+}
+
+/** `draft` without its land (`open.land`): what a settle round previews, its land not wanted there (nor coded into the preview). */
+function unlanded(draft: NeighbourhoodDraft): NeighbourhoodDraft {
+  if (!draft.open?.land) return draft;
+  const { land: _land, ...open } = draft.open;
+  return { ...draft, open };
 }
 
 /** The dead ends (not trails') reaching past `COURT` m beyond the last road they meet: each road, its end, and how far along it the last meeting is. */
@@ -334,9 +345,18 @@ function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasur
       if (n < plots && p.entry?.road === c.road && (p.entry.s < from - 0.5 || p.entry.s > to + 0.5)) lots.add(n);
     });
   }
-  // (The lots on a road left out, and the backdrop buildings by it.)
+  // (The lots on a road left out, and the backdrop buildings by it or facing it: no road of their own left nearer.)
+  const facedGone = (x: number, z: number) => {
+    let best = { road: -1, dist: Infinity };
+    draft.roads.forEach((r, i) => {
+      const d = nearest(r.points, x, z).dist;
+      if (d < best.dist) best = { road: i, dist: d };
+    });
+    return gone.has(best.road);
+  };
   entries.forEach((p, n) => {
-    if (n < plots ? p.entry && gone.has(p.entry.road) : [...gone].some((r) => nearest(draft.roads[r].points, p.x + p.w / 2, p.z + p.d / 2).dist < BY_ROAD)) (n < plots ? lots : backdrop).add(n < plots ? n : n - plots);
+    const [x, z] = [p.x + p.w / 2, p.z + p.d / 2];
+    if (n < plots ? p.entry && gone.has(p.entry.road) : gone.size && ([...gone].some((r) => nearest(draft.roads[r].points, x, z).dist < BY_ROAD) || facedGone(x, z))) (n < plots ? lots : backdrop).add(n < plots ? n : n - plots);
   });
   if (!gone.size && !lots.size && !backdrop.size && roads.every((r, i) => r === draft.roads[i] || r.points.length === draft.roads[i].points.length)) return null;
   roads = roads.filter((_, i) => !gone.has(i));
@@ -377,62 +397,36 @@ export function gradeLand(land: Land, world: SurfaceWorld): BuiltSurface {
 }
 
 /**
- * A place's bare land (step 1), from its draft with no town on it (`macro.ts` `landDraft`): its
- * heights, water and cover as `seedFollow` makes them, with no built land to fade in from or
- * gentle ground under. Only its shape is here so far.
- */
-export function seedBare(_draft: NeighbourhoodDraft): Land {
-  throw new Error('seedBare: not built yet');
-}
-
-/**
- * Gentler ground under the towns, the villages and the lots out on their own of `world`, fitted
- * into `land` (its heights changed in place) as `seedFollow` fits it: what `withLand` does before
- * it grades a town laid on a bare land. Only its shape is here so far.
- */
-export function gentleUnder(_land: Land, _world: FollowWorld): void {
-  throw new Error('gentleUnder: not built yet');
-}
-
-/**
- * A place's land before its town is graded into it, from its draft (null: it has no
- * `open.heights`, a classic world or an older draft). Every `LAND_CELL` m:
- * - the generator's heights between its cells' middles, and fading in from what is built (as the
- *   renderer's hills fade in, over the look's `rise`), the finer hills, some roughness, and among
- *   mountains their ridges;
- * - under each town and village, and each lot out on its own, gentler ground (`gentler`);
+ * A place's bare land (step 1), from its draft with no town on it (`macro.ts` `landDraft`: its
+ * `open.heights`, which a classic world has not). Every `LAND_CELL` m:
+ * - the generator's heights between its cells' middles, over the level the town is built at
+ *   (`LandPlan.level`), with the finer hills, some roughness, and among mountains their ridges
+ *   everywhere (`gentleUnder` takes them out again under and round what is built);
  * - its water from the water zones: what reaches the world's edge or is bigger than `POND_MOST`
  *   at the sea's level (`SEA_CM`), each pond at its own, a little below the lowest land round it;
- *   the land beside water no higher than over it by the world's slope, the bed going down from the
- *   shore as the renderer's does, and in a world with water the dry land over the sea's level;
+ *   the land beside water no higher than over it by the world's slope (`shoreClamp`), the bed
+ *   going down from the shore as the renderer's does, and in a world with water the dry land over
+ *   the sea's level;
  * - its cover from the woods, meadow and fields zones.
  */
-export function seedFollow(draft: NeighbourhoodDraft, world: FollowWorld): Land | null {
+export function seedBare(draft: NeighbourhoodDraft): Land {
   const open = draft.open;
   const heights = open?.heights;
-  if (!open || !heights) return null;
+  if (!open || !heights) throw new Error('seedBare: the draft has no heights');
   const land = blankLand(draft.width, draft.depth, 'follow');
   const { cols, rows, h: cm, wl } = land;
   const look = { ...DEFAULT_LANDSCAPE, ...draft.world?.landscape };
   const seed = draft.seed ?? 1;
-  const bank = look.slope ?? 0.5;
-  const dist = new Protection(cols, rows, builtOf(world)).dist;
   const h = new Float32Array(cols * rows);
   for (let j = 0; j < rows; j++) {
     for (let i = 0; i < cols; i++) {
       const [x, z] = [i * LAND_CELL, j * LAND_CELL];
-      const k = j * cols + i;
       const base = between(heights, x, z);
-      const rise = smoothstep(APRON, APRON + look.rise, dist[k]);
-      let detail = 0;
-      if (rise > 0) {
-        detail = (fbm(x * 0.018, z * 0.018, seed) - 0.5) * look.hills + base * 0.3 * (fbm(x * 0.012, z * 0.012, seed + 517, 3) - 0.5);
-        if (look.mountains && base > 15) detail += base * 0.35 * (ridged(x * 0.0075, z * 0.0075, seed + 211) - 0.5) * smoothstep(15, 25, base);
-      }
-      h[k] = base + rise * detail;
+      let detail = (fbm(x * 0.018, z * 0.018, seed) - 0.5) * look.hills + base * 0.3 * (fbm(x * 0.012, z * 0.012, seed + 517, 3) - 0.5);
+      if (look.mountains && base > 15) detail += base * 0.35 * (ridged(x * 0.0075, z * 0.0075, seed + 211) - 0.5) * smoothstep(15, 25, base);
+      h[j * cols + i] = base + detail;
     }
   }
-  gentler(h, cols, rows, dist, world, open.areas, draft.roads, draft.slots.map((s) => s.area ?? 0), look.rise);
 
   // ---- the water ----
   const wet = scan(
@@ -470,18 +464,14 @@ export function seedFollow(draft: NeighbourhoodDraft, world: FollowWorld): Land 
       const level = pond ? Math.round((rim - POND_BELOW) * 100) : SEA_CM;
       for (const k of members) wl[k] = level;
     }
-    // How far each wet sample is from dry land, and the highest the dry land may stand by the water.
+    // How far each wet sample is from dry land: its bed.
     const into = new Float32Array(cols * rows);
-    const top = new Float32Array(cols * rows);
-    for (let k = 0; k < h.length; k++) {
-      into[k] = wet[k] ? Infinity : 0;
-      top[k] = wet[k] ? wl[k] / 100 + SHORE_OVER : Infinity;
-    }
+    for (let k = 0; k < h.length; k++) into[k] = wet[k] ? Infinity : 0;
     chamfer(cols, rows, (k, n, d) => {
       if (into[n] + d < into[k]) into[k] = into[n] + d;
-      if (top[n] + bank * d < top[k]) top[k] = top[n] + bank * d;
     });
-    for (let k = 0; k < h.length; k++) h[k] = wet[k] ? wl[k] / 100 - bedBelow(into[k]) : Math.min(h[k], Math.max(top[k], sea + DRY_OVER));
+    for (let k = 0; k < h.length; k++) if (wet[k]) h[k] = wl[k] / 100 - bedBelow(into[k]);
+    shoreClamp(h, wl, cols, rows, look.slope ?? 0.5);
   }
   for (let k = 0; k < h.length; k++) cm[k] = Math.max(-32767, Math.min(32767, Math.round(h[k] * 100)));
 
@@ -501,6 +491,103 @@ export function seedFollow(draft: NeighbourhoodDraft, world: FollowWorld): Land 
 }
 
 /**
+ * The dry land beside water (`h`, m per sample; `wl` its water levels, cm) brought down to no
+ * higher over the water than the world's slope (`bank`, rise per m) takes it from `SHORE_OVER`
+ * over it at the shore, and in a world with water no lower than `DRY_OVER` over the sea's level.
+ * The water's beds are left as they are.
+ */
+function shoreClamp(h: Float32Array, wl: Int16Array, cols: number, rows: number, bank: number): void {
+  const sea = SEA_CM / 100;
+  const wet = (k: number) => wl[k] !== NONE && wl[k] / 100 > h[k];
+  const top = new Float32Array(cols * rows);
+  let any = false;
+  for (let k = 0; k < h.length; k++) {
+    top[k] = wet(k) ? wl[k] / 100 + SHORE_OVER : Infinity;
+    any ||= wet(k);
+  }
+  if (!any) return;
+  chamfer(cols, rows, (k, n, d) => {
+    if (top[n] + bank * d < top[k]) top[k] = top[n] + bank * d;
+  });
+  for (let k = 0; k < h.length; k++) if (!wet(k)) h[k] = Math.min(Math.max(h[k], sea + DRY_OVER), Math.max(top[k], sea + DRY_OVER));
+}
+
+/** How far the fine hills are smoothed out under and round what is built (`smoothHeights`: samples either way, and how many times). */
+const SMOOTH_REACH = 8;
+const SMOOTH_PASSES = 3;
+
+/**
+ * The land's dry heights (m) with its finer hills smoothed out (three box blurs of
+ * `SMOOTH_REACH` samples either way, over the dry samples alone: a gaussian of about 17 m), its
+ * wider hills and its mountains kept: what the land under and round a town eases to
+ * (`gentleUnder`), and what the generator lays a town by (`macro.ts` `fillFrom`). Wet samples get
+ * the dry land's round them.
+ */
+export function smoothHeights(land: Land): Float32Array {
+  const { cols, rows } = land;
+  const n = cols * rows;
+  const sum = new Float32Array(n);
+  const weight = new Float32Array(n);
+  for (let k = 0; k < n; k++) {
+    if (land.wl[k] !== NONE && land.wl[k] > land.h[k]) continue;
+    sum[k] = land.h[k] / 100;
+    weight[k] = 1;
+  }
+  const line = new Float64Array(Math.max(cols, rows) + 1);
+  // (A box along each row, then each column, the edge's past the edge.)
+  const blur = (a: Float32Array) => {
+    const R = SMOOTH_REACH;
+    const out = new Float32Array(n);
+    for (const [count, length, stride, step] of [
+      [rows, cols, cols, 1],
+      [cols, rows, 1, cols],
+    ] as const) {
+      const src = step === 1 ? a : out.slice();
+      const dst = step === 1 ? out : a;
+      for (let r = 0; r < count; r++) {
+        const at = (i: number) => src[r * stride + Math.min(length - 1, Math.max(0, i)) * step];
+        line[0] = 0;
+        for (let i = 0; i < length + 2 * R; i++) line[i + 1] = line[i] + at(i - R);
+        // (Summed from -R: line[i] holds the samples -R .. i - R - 1.)
+        for (let i = 0; i < length; i++) dst[r * stride + i * step] = (line[i + 2 * R + 1] - line[i]) / (2 * R + 1);
+      }
+    }
+    return a;
+  };
+  for (let p = 0; p < SMOOTH_PASSES; p++) {
+    blur(sum);
+    blur(weight);
+  }
+  const out = new Float32Array(n);
+  for (let k = 0; k < n; k++) out[k] = weight[k] > 1e-6 ? sum[k] / weight[k] : land.h[k] / 100;
+  return out;
+}
+
+/**
+ * Gentler ground under the towns, the villages and the lots out on their own of `world`, fitted
+ * into `land` (its dry heights changed in place; `areaOf`: each plot's area; not given, a plot by a box counts as its area's), as
+ * a place's land yields to its town: within the look's `rise` of anything built its finer hills
+ * fade out (`smoothHeights`), as the renderer's hills fade in from a town's edge; then each area's
+ * box, and each lot out of every box, gets a plane (`gentler`); then the land beside water is
+ * kept to its shore again (`shoreClamp`). What `withLand` does before it grades the town in.
+ */
+export function gentleUnder(land: Land, world: FollowWorld, areaOf: readonly number[] = []): void {
+  const { cols, rows } = land;
+  const look = { ...DEFAULT_LANDSCAPE, ...(world.meta?.world as { landscape?: Partial<typeof DEFAULT_LANDSCAPE> } | undefined)?.landscape };
+  const dist = new Protection(cols, rows, builtOf(world)).dist;
+  const smooth = smoothHeights(land);
+  const h = new Float32Array(cols * rows);
+  const dry = (k: number) => land.wl[k] === NONE || land.wl[k] <= land.h[k];
+  for (let k = 0; k < h.length; k++) {
+    const own = land.h[k] / 100;
+    h[k] = dry(k) ? smooth[k] + smoothstep(APRON, APRON + look.rise, dist[k]) * (own - smooth[k]) : own;
+  }
+  gentler(h, cols, rows, dist, world, world.meta?.areas ?? [], world.meta?.roads ?? [], areaOf, look.rise, dry);
+  shoreClamp(h, land.wl, cols, rows, look.slope ?? 0.5);
+  for (let k = 0; k < h.length; k++) if (dry(k)) land.h[k] = Math.max(-32767, Math.min(32767, Math.round(h[k] * 100)));
+}
+
+/**
  * The land (`h`, m per sample) eased under what is built towards gentle ground: each area's box (a
  * town or a village, with its own streets and lanes where they reach out past it), and each lot or backdrop building out of every box, gets a plane fitted to
  * the land under what is built in it (least squares, tilted no more than `GENTLE_TILT`), the land
@@ -508,9 +595,9 @@ export function seedFollow(draft: NeighbourhoodDraft, world: FollowWorld): Land 
  * `rise`). Where two come near each other, their planes are blended by how near each is (in its
  * own box, almost wholly its own; near a town or a village, its plane before a lone lot's). The hills
  * and mountains rise round the towns, not under them. `dist`: each sample's distance from what is
- * built (`Protection.dist`: 0 on it).
+ * built (`Protection.dist`: 0 on it). The water (`dry` false) is left as it is.
  */
-function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array, world: FollowWorld, areas: readonly { x: number; z: number; w: number; d: number }[], roads: readonly RoadPlan[], areaOf: readonly number[], reach: number): void {
+function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array, world: FollowWorld, areas: readonly { x: number; z: number; w: number; d: number }[], roads: readonly RoadPlan[], areaOf: readonly number[], reach: number, dry: (k: number) => boolean): void {
   const c = LAND_CELL;
   type Box = { x0: number; z0: number; x1: number; z1: number };
   const grow = (box: Box, x0: number, z0: number, x1: number, z1: number) => Object.assign(box, { x0: Math.min(box.x0, x0), z0: Math.min(box.z0, z0), x1: Math.max(box.x1, x1), z1: Math.max(box.z1, z1) });
@@ -523,7 +610,7 @@ function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array
     }
     const near = { ...box };
     world.plots.forEach((p, i) => {
-      if (areaOf[i] === n && p.x < near.x1 + AREA_LOTS && p.x + p.w > near.x0 - AREA_LOTS && p.z < near.z1 + AREA_LOTS && p.z + p.d > near.z0 - AREA_LOTS) grow(box, p.x, p.z, p.x + p.w, p.z + p.d);
+      if ((areaOf[i] ?? n) === n && p.x < near.x1 + AREA_LOTS && p.x + p.w > near.x0 - AREA_LOTS && p.z < near.z1 + AREA_LOTS && p.z + p.d > near.z0 - AREA_LOTS) grow(box, p.x, p.z, p.x + p.w, p.z + p.d);
     });
     return box;
   });
@@ -589,7 +676,7 @@ function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array
       }
     }
   }
-  for (let k = 0; k < h.length; k++) if (weight[k] > 0) h[k] += most[k] * (sum[k] / weight[k] - h[k]);
+  for (let k = 0; k < h.length; k++) if (weight[k] > 0 && dry(k)) h[k] += most[k] * (sum[k] / weight[k] - h[k]);
 }
 
 /** The generator's heights (m) at (`x`, `z`), between its cells' middles (the edge's past the edge). */

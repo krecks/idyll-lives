@@ -21,7 +21,7 @@ import { crownClear, generateHouse, objectInfos, residentsKey, weighted, type Ga
 import { connect, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Box, type Pt, type RoadPlan } from './roads';
 import { householdFunds, savingsOf } from './wealth';
 import { extend, fill, LEGACY_KINDS, placeOf, specOf, type LotMix, type RoadLayout, type SizeSpec, type WorldStep } from './world';
-import { generateFromSpec, type OpenWorldDraft } from './macro';
+import { generateFromSpec, landDraft, layOn, type OpenWorldDraft } from './macro';
 import { encodeLand, type Land } from './land';
 import { garageAt, garageFor, hash, houseCar, type ParkedCar } from '../render/shared/cars';
 import { placeRides, ridesFor } from './townRides';
@@ -225,6 +225,10 @@ export interface WorldInfo {
   landscape: LandscapeParams;
   /** What the player chose besides the place (missing in a classic world and in drafts from older code). */
   options?: WorldOptions;
+  /** The seed its town was laid from, where it is not the land's (`macro.ts` `LayOptions.townSeed`; `WorldLook.townSeed`). */
+  townSeed?: number;
+  /** Its town was laid on a land the player shaped (`WorldLook.shaped`). */
+  shaped?: true;
 }
 
 /** Presentation data the renderer reads back from the world (it survives save/load). */
@@ -640,8 +644,9 @@ export const generateStats = { houseMs: 0 };
 /**
  * Lays out a world in place `kind` with `options` (the place's own where not given) from `seed`
  * (the same place, options and seed always give the same world): its roads, lots, houses, public
- * places and farms, its name, tagline and land (`world.ts` `specOf`, `macro.ts` `generateFromSpec`).
- * The roads come first (`WorldSpec.shape`), then the lots along them: the park on the green if
+ * places and farms, its name, tagline and land (`world.ts` `specOf`, `macro.ts` `generateFromSpec`):
+ * as a new game makes it, its land first (`macro.ts` `landDraft`), then its town laid on that from
+ * the same seed (`layOn`). The roads come first (`WorldSpec.shape`), then the lots along them: the park on the green if
  * there is one, the public places round the town's middle, farms out on its edge, the houses from
  * the middle out, each turned to face its road, with a gap or a stretch of meadow between some.
  * Nobody lives there yet (see `populate`). A kind from before places (`LEGACY_KINDS`: a tool's or
@@ -650,9 +655,13 @@ export const generateStats = { houseMs: 0 };
  * `generateFromSpec`'s `shaped`).
  */
 export function generateWorld(content: Content, t: Templates, kind: string, seed = (Math.random() * 2 ** 31) >>> 0, name?: string, step?: (done: WorldStep) => void, options?: Partial<WorldOptions>, land?: Land): NeighbourhoodDraft {
-  const chosen = { ...options };
-  if (Object.hasOwn(LEGACY_KINDS, kind)) chosen.town ??= LEGACY_KINDS[kind].town;
-  return generateFromSpec(content, t, specOf(placeOf(kind), chosen), seed, name, step, land);
+  if (land) {
+    const chosen = { ...options };
+    if (Object.hasOwn(LEGACY_KINDS, kind)) chosen.town ??= LEGACY_KINDS[kind].town;
+    return generateFromSpec(content, t, specOf(placeOf(kind), chosen), seed, name, step, land);
+  }
+  // As a new game makes one: its land (step 1), then its town laid on it (step 2), the town from the land's seed.
+  return layOn(content, t, landDraft(content, t, kind, options, seed), {}, { waterKept: true }, name, step);
 }
 
 /** Courts (lanes left with a dead end) a town keeps at most; a big world's main town, `BIG_COURTS`. */

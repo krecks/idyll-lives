@@ -195,8 +195,8 @@ export function townFences(input: FenceInput): TownFence[] {
         for (let z = Math.floor(z0); z < z1; z++) for (let x = Math.floor(x0); x < x1; x++) if (input.onRoad?.(x + 0.5, z + 0.5)) return false;
         return true;
       };
-      // (Never over another plot.)
-      const free = (g: Rect) => input.plots.every((o) => o === a || !overlaps(g, o.rect, -0.01));
+      // (Never over another plot, nor over the gap another garden has grown over already: two would fence a tile in between them.)
+      const free = (g: Rect) => input.plots.every((o) => o === a || !overlaps(g, grown.get(o) ?? o.rect, -0.01));
       if (gapX > 0.01 && gapX <= NARROW_GAP && along(r.z, r.z + r.d, q.z, q.z + q.d) > 3 && clear(r.x + r.w, Math.max(r.z, q.z), q.x, Math.min(r.z + r.d, q.z + q.d)) && free({ ...r, w: q.x - r.x })) r.w = q.x - r.x;
       else if (gapZ > 0.01 && gapZ <= NARROW_GAP && along(r.x, r.x + r.w, q.x, q.x + q.w) > 3 && clear(Math.max(r.x, q.x), r.z + r.d, Math.min(r.x + r.w, q.x + q.w), q.z) && free({ ...r, d: q.z - r.z })) r.d = q.z - r.z;
     }
