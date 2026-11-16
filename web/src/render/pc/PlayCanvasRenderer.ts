@@ -80,8 +80,10 @@ import { landscapeRing, WATER_Y } from '../shared/nature';
 import { setFogFrom } from './shaders/fog';
 import { LT_FIXTURE } from '../../debug/livingTown';
 import { applyLandFixture, LAND_FIXTURE } from '../landFixture';
-import { backdropBuilding, backdropGround, gardenHedges, lotBuilding, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
+import { lotBuilding, MOVER_GROW, TownBuildings, TownMovers, townBackdrop, type Mover, type TownLotHouse } from './townView';
+import { surfaceOf } from '../shared/landSurface';
 import { TownGroundMap } from './groundTiles';
+import { LandHaze } from './landHaze';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
 import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
@@ -205,6 +207,8 @@ const BUILD_SLICE_MS = 8;
  * (some 20 ms) after the reveal's frames and the fly-in's last ones.
  */
 const TOWN_RELEASE_MS = 1000;
+/** The day of the week the menus' town is shown on (0 Monday): a working day, its shops and offices open by day. */
+const MENU_WEEKDAY = 2;
 /** The same while the camera roams (a big world, or once it has settled on a lot of its own). */
 const ROAM_SLICE_MS = 4;
 /**
@@ -368,6 +372,15 @@ function groundOrWater(scape: Landscape): Drape {
   };
 }
 
+/** A number of each landscape's own, for what is made from it (`LandHaze.set`). */
+const landscapeIds = new WeakMap<object, number>();
+let landscapesSeen = 0;
+function landscapeId(scape: object): number {
+  const id = landscapeIds.get(scape) ?? ++landscapesSeen;
+  landscapeIds.set(scape, id);
+  return id;
+}
+
 function sameView(a: ViewRect | null, b: ViewRect | null): boolean {
   return a === b || (!!a && !!b && a.x === b.x && a.z === b.z && a.w === b.w && a.d === b.d);
 }
@@ -466,6 +479,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * are on (`showLayers`).
    */
   private overview: TownOverview | null = null;
+  /** The haze the menus' land fades into past its edge, from far out (`landHaze.ts`); made with the first town shown. */
+  private landHaze: LandHaze | null = null;
   private townShot: TownShot | null = null;
   private townHighlight: LotHighlight | null = null;
   private townWorld: WorldStructure | null = null;
@@ -1379,10 +1394,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const backdrop = world.meta?.backdrop;
     if (backdrop !== this.townBackdropOf) {
       this.townBackdropOf = backdrop;
-      const list = backdrop ?? [];
-      const driven = (world.meta?.roads ?? []).filter((r) => r.kind !== 'trail');
-      const hedges = gardenHedges(list, list.map((b) => backdropGround(b, driven)), world.plots, driven, ground);
-      this.townBuildings.setBackdrop([...list.map((b, i) => backdropBuilding(b, i, ground, world.meta?.places)), ...hedges]);
+      // (On a land the town follows, each on its pad: `townBackdrop`.)
+      const surface = surfaceOf(world);
+      this.townBuildings.setBackdrop(townBackdrop(world, ground, surface ? (x, z) => surface.at(x, z) : null));
     }
     this.townGround.bake(world, land ?? null);
     this.townLotsBy = { chunks: null, houses: null, up: '' };
@@ -3004,6 +3018,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // given: linear.
     const c = l.clearColor;
     this.app.scene.fog.color.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
+    this.landHaze?.setColour(this.app.scene.fog.color);
     this.camera.camera.clearColor = this.colorTmp.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
     // The look's exposure for the hour and the moonlight grade (`post.ts`: uniforms).
     if (this.post) this.post.exposure = l.exposure * LOOK.exposure;
@@ -3068,6 +3083,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         perfTime('town: lawn', () => nature.landscape.refreshLawn(world));
         // The camera keeps a clear view over the hills (and out of the mountains).
         this.townRig.ground = (x, z) => nature.landscape.heightAt(x, z);
+        // (The land faded into the haze past its landscape's edge, from far out.)
+        const haze = (this.landHaze ??= new LandHaze(this.app, this.root));
+        haze.set(this.townReach, (x, z) => nature.landscape.heightAt(x, z), townLayer(this.app).id, `${landscapeId(nature.landscape)}|${nature.landscape.landVersion}`);
+        haze.setColour(this.app.scene.fog.color);
       } finally {
         this.townBuilds--;
       }
@@ -3343,6 +3362,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The game comes on screen again (the menus' town is let go a moment later: `releaseTown`). */
   private leaveTown(): void {
     this.townMode = false;
+    this.landHaze?.show(false);
     // (The game has no ghosts: drawn again over the town when it is shown again.)
     this.ghostDraw?.set(null, () => 0, 0, null);
     setDatum(this.root, this.lotRoot, this.datum);
@@ -3379,6 +3399,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         this.overview?.destroy();
         this.overview = null;
         this.townWorld = null;
+        this.landHaze?.destroy();
+        this.landHaze = null;
         this.townRig.ground = null;
         this.lot.dropNature('town');
       })
@@ -3420,6 +3442,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (Its highlights' colours are written in place: the held frame is drawn again, `heldFrames.ts`. From far out the
     // lit lots are washed over whole.)
     this.overview?.setReach(this.townPose.radius);
+    this.landHaze?.show(this.townPose.radius);
     if (this.overview?.frame(secs)) this.held.changed();
     // The light eases between the screens' hours (about two seconds).
     const goal = this.townMinuteGoal;
@@ -3430,6 +3453,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.lastLightMinute !== this.townMinute) {
       this.applyLighting(this.townMinute);
       this.lastLightMinute = this.townMinute;
+      // (The backdrop's windows by the hour: a weekday's, the shops open by day.)
+      this.overview?.setTime(this.townMinute, MENU_WEEKDAY);
       // (The streetlights' and windows' glows too, in their materials.)
       this.held.changed();
     }
@@ -3975,6 +4000,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.unlistenFiles?.();
     this.unlistenFiles = null;
     this.overview?.destroy();
+    this.landHaze?.destroy();
     this.street?.destroy();
     this.townBuildings?.destroy();
     this.townMovers?.destroy();

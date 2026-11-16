@@ -36,7 +36,7 @@ import './shaders/townGround';
 import { Geo } from '../shared/geometry';
 import { FINISH, litAt, ROOFS, unitMeshes, type RoofKind, type TownBuilding } from '../shared/townBuildings';
 
-export { backdropBuilding, backdropGround, gardenHedges, lotBuilding, type TownLotHouse } from '../shared/townBuildings';
+export { backdropBuilding, backdropGround, gardenHedges, lotBuilding, townBackdrop, type TownLotHouse } from '../shared/townBuildings';
 
 /** How bright a lit window glows at night (times the street's window glow). */
 const GLOW = 1.4;
@@ -63,9 +63,11 @@ export class TownBuildings {
   private shown = false;
   private readonly glow = new Float32Array(3);
 
+  /** `layers`: the layers its draws are on (none given: the world's; the menus' town has its own, `overview.ts`). */
   constructor(
     private readonly app: pc.AppBase,
     private readonly parent: pc.Entity,
+    private readonly layers?: number[],
   ) {
     this.lib = MaterialLibrary.for(app);
   }
@@ -91,7 +93,7 @@ export class TownBuildings {
       const mesh = meshFrom(app.graphicsDevice, units[key].meshData({ colors: true }))!;
       mesh.incRefCount();
       this.meshes.push(mesh);
-      const draw = new Instances(app.graphicsDevice, parent, mesh, mat, { name: `town.${key}`, streams: [TOWN_WALL, TOWN_ROOF, TOWN_INFO], castShadows: false, receiveShadows: true, capacity: 256 });
+      const draw = new Instances(app.graphicsDevice, parent, mesh, mat, { name: `town.${key}`, streams: [TOWN_WALL, TOWN_ROOF, TOWN_INFO], castShadows: false, receiveShadows: true, capacity: 256, ...(this.layers ? { layers: this.layers } : {}) });
       draw.meshInstance.setParameter('game_townPart', key === 'walls' ? 0 : 1);
       lib.excludeFromLights([], [draw.meshInstance]);
       draw.enabled = false;
