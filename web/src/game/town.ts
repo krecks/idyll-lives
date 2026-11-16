@@ -26,6 +26,7 @@ import { encodeLand, type Land } from './land';
 import { garageAt, garageFor, hash, houseCar, type ParkedCar } from '../render/shared/cars';
 import { placeRides, ridesFor } from './townRides';
 import { fenceRuns, townFences, type TownFence } from './gardenFences';
+import { neighbourBonds } from './people';
 
 /** The households moved to `people.ts`; still here for those that import them from the town. */
 export { NEIGHBOUR_CAP, populate, rehouse } from './people';
@@ -1471,16 +1472,10 @@ export function assembleTown(
     });
   });
 
-  // Neighbours have history with each other; a newly arrived player household doesn't.
+  // Neighbours have history with each other (`people.ts` `neighbourBonds`); a newly arrived player household doesn't.
   const newcomers = existing ? 0 : player.members.length;
-  for (let a = newcomers; a < sims.length; a++) {
-    for (let b = a + 1; b < sims.length; b++) {
-      if (sims[a].household === sims[b].household) continue;
-      const roll = rand();
-      const preset = roll < 0.03 ? 'rivals' : roll < 0.09 ? 'friends' : roll < 0.3 ? 'acquaintances' : null;
-      if (preset && content.bondPresets.includes(preset)) relationships.push({ a, b, preset });
-    }
-  }
+  const homes = residents.map((r): Pt => [town.slots[r.slot].x, town.slots[r.slot].z]);
+  relationships.push(...neighbourBonds(sims, homes, rand, { from: newcomers, presets: content.bondPresets }));
 
   const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (rand() * 2 ** 31) >>> 0, world: worldLook(town, fields), gardenFences: true };
   const open = openWorldFields(town, drives, cars);
