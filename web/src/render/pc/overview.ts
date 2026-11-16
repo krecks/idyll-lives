@@ -57,13 +57,26 @@ const HIGHLIGHT_DEPTH_SLOPE = -6;
 const GLOW_HEADROOM = 2;
 const HEADROOM_SRGB = 1 / Math.pow(GLOW_HEADROOM, 1 / 2.2);
 
-/** The highlights' colours (sRGB), outline, hover, selected and marked. */
-const COLORS: Record<'outline' | 'hover' | 'selected' | 'marked', RGB> = {
+/**
+ * The highlights' colours (sRGB): outline, hover, selected, marked (a home for sale) and dear (one for sale the
+ * household can't afford: a dusky rose, apart from the marked amber and the selected blue, and drawn fainter).
+ */
+const COLORS: Record<'outline' | 'hover' | 'selected' | 'marked' | 'dear', RGB> = {
   outline: { r: 1, g: 0.97, b: 0.9 },
   hover: { r: 1, g: 0.98, b: 0.92 },
   selected: { r: 0.42, g: 0.62, b: 1.25 },
   marked: { r: 1.0, g: 0.78, b: 0.38 },
+  dear: { r: 0.95, g: 0.42, b: 0.5 },
 };
+/** Intensities a plot eases between: outline, hover, selected, marked, dear. */
+const STATES = 5;
+/**
+ * From this far out (m, the camera from its target) a lit lot is washed over whole as well as ringed, fully from
+ * `WASH_FULL`: the whole land's shot is some 1,300 m out, where a ring and its band are a pixel or two and the homes
+ * for sale were lost among the rest.
+ */
+const WASH_FROM = 220;
+const WASH_FULL = 900;
 
 const townLayers = new WeakMap<pc.AppBase, pc.Layer>();
 
@@ -91,7 +104,7 @@ interface Placed {
   draws: Instances[];
 }
 
-/** One of the three highlight draws (ring, fill, wall): an instance per plot. */
+/** One of the four highlight draws (ring, fill, wall, wash): an instance per plot. */
 interface Highlight {
   draw: Instances;
 }
@@ -121,12 +134,14 @@ export class TownOverview {
   private hl: Highlight[] = [];
   private hlSize = '';
   private state: LotHighlight = { hover: null, selected: null, marked: [], outlines: false };
-  /** Per plot: current and target intensity of [outline, hover, selected, marked]. */
+  /** Per plot: current and target intensity of [outline, hover, selected, marked, dear] (`STATES` each). */
   private level = new Float32Array(0);
   private target = new Float32Array(0);
   /** Colours must be written even though nothing is fading (after a rebuild). */
   private dirty = false;
   private time = 0;
+  /** How far into the wash the camera's distance is (0 near, 1 from `WASH_FULL`: `setReach`). */
+  private far = 0;
   private readonly rgba = new Float32Array(4);
   private readonly m = new Float32Array(16);
   private readonly q: Quat = [0, 0, 0, 1];
@@ -251,6 +266,15 @@ export class TownOverview {
     }
   }
 
+  /** The camera's distance from its target (m), each frame: from far out the lit lots are washed over whole (`WASH_FROM`). */
+  setReach(radius: number): void {
+    const t = Math.min(1, Math.max(0, (radius - WASH_FROM) / (WASH_FULL - WASH_FROM)));
+    const far = t * t * (3 - 2 * t);
+    if (Math.abs(far - this.far) < 0.01 && (far > 0 || this.far === 0)) return;
+    this.far = far;
+    this.dirty = true;
+  }
+
   /** Per frame (`dt` in s): eases the highlights; true while their colours changed. Allocation-free. */
   frame(dt: number): boolean {
     this.time += dt;
@@ -258,7 +282,7 @@ export class TownOverview {
     if (!this.hl.length || !n) return false;
     let moving = false;
     const k = 1 - Math.exp(-dt / FADE);
-    for (let i = 0; i < n * 4; i++) {
+    for (let i = 0; i < n * STATES; i++) {
       const d = this.target[i] - this.level[i];
       if (Math.abs(d) < 0.002) this.level[i] = this.target[i];
       else {
@@ -270,17 +294,21 @@ export class TownOverview {
     if (!moving && !pulse && !this.dirty) return false;
     this.dirty = false;
     const beat = 0.82 + 0.18 * Math.sin(this.time * 3.2);
-    const [ring, fill, wall] = this.hl;
+    const [ring, fill, wall, wash] = this.hl;
     const c = this.rgba;
+    const far = this.far;
     for (let i = 0; i < n; i++) {
-      const outline = this.level[i * 4];
-      const hover = this.level[i * 4 + 1];
-      const sel = this.level[i * 4 + 2] * beat;
-      const marked = this.level[i * 4 + 3];
+      const at = i * STATES;
+      const outline = this.level[at];
+      const hover = this.level[at + 1];
+      const sel = this.level[at + 2] * beat;
+      const marked = this.level[at + 3];
+      const dear = this.level[at + 4];
       // Ring: the strongest of the states, blended by colour.
-      ring.draw.set(INSTANCE_COLOR, i, writeColor(c, outline * 0.32, hover * 1.15, sel * 1.1, marked * 0.6));
-      fill.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.4, sel * 0.34, marked * 0.05));
-      wall.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.2, sel * 0.32, 0));
+      ring.draw.set(INSTANCE_COLOR, i, writeColor(c, outline * 0.32, hover * 1.15, sel * 1.1, marked * 0.6, dear * 0.5));
+      fill.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.4, sel * 0.34, marked * 0.05, dear * 0.07));
+      wall.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.2, sel * 0.32, 0, 0));
+      wash.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.3 * far, sel * 0.32 * far, marked * 0.26 * far, dear * 0.24 * far));
     }
     for (const h of this.hl) h.draw.update(false);
     return true;
@@ -425,7 +453,17 @@ export class TownOverview {
   /** Highlight meshes for the plot size (built again only when it changes) and one instance per plot. */
   private buildHighlights(plots: PlotInfo[]): void {
     const first = plots[0];
-    if (!first) return;
+    if (!first) {
+      // A bare land (step 1, no town): the previous town's highlights go (a ring each would stay drawn over it).
+      for (const h of this.hl) {
+        h.draw.setCount(0);
+        h.draw.update(false);
+        h.draw.enabled = false;
+      }
+      this.level = new Float32Array(0);
+      this.target = new Float32Array(0);
+      return;
+    }
     const size = `${first.w}x${first.d}`;
     if (size !== this.hlSize) {
       this.dropHighlights();
@@ -434,6 +472,12 @@ export class TownOverview {
       const ring = new Geo().color('#FFFFFF');
       const fill = new Geo().color('#FFFFFF');
       const wall = new Geo().color('#FFFFFF');
+      // Wash: the whole lot inside the outline, even (drawn only from far out: `setReach`).
+      const wash = new Geo().color('#FFFFFF');
+      wash.poly(
+        path.map(([x, z]): V3 => [x, 0.2, z]),
+        [0, 1, 0],
+      );
       const up: V3 = [0, 1, 0];
       for (let i = 0; i < path.length; i++) {
         const [ax, az, anx, anz] = path[i];
@@ -458,6 +502,7 @@ export class TownOverview {
           [ring, 'lotRing'],
           [fill, 'lotFill'],
           [wall, 'lotWall'],
+          [wash, 'lotWash'],
         ] as const
       ).map(([geo, name]) => {
         const mesh = meshFrom(this.device, geo.meshData({ colors: true }))!;
@@ -468,6 +513,7 @@ export class TownOverview {
     const n = plots.length;
     const m = this.m;
     for (const h of this.hl) {
+      h.draw.enabled = true;
       h.draw.setCount(n);
       plots.forEach((p, i) => {
         m.fill(0);
@@ -482,8 +528,8 @@ export class TownOverview {
       });
       h.draw.update(false);
     }
-    this.level = new Float32Array(n * 4);
-    this.target = new Float32Array(n * 4);
+    this.level = new Float32Array(n * STATES);
+    this.target = new Float32Array(n * STATES);
     this.updateTargets();
     // Start at the targets (no fade-in after a rebuild), then write the colours once.
     this.level.set(this.target);
@@ -492,14 +538,20 @@ export class TownOverview {
 
   private updateTargets(): void {
     const n = this.plots.length;
-    if (this.target.length !== n * 4) return;
-    const { hover, selected, marked, outlines } = this.state;
+    if (this.target.length !== n * STATES) return;
+    const { hover, selected, outlines } = this.state;
+    const marked = new Set(this.state.marked);
+    const dear = new Set(this.state.dear);
     for (let i = 0; i < n; i++) {
       const id = this.plots[i].id;
-      this.target[i * 4] = outlines ? 1 : 0;
-      this.target[i * 4 + 1] = hover === id && selected !== id ? 1 : 0;
-      this.target[i * 4 + 2] = selected === id ? 1 : 0;
-      this.target[i * 4 + 3] = marked.includes(id) && selected !== id && hover !== id ? 1 : 0;
+      const at = i * STATES;
+      const lit = hover === id || selected === id;
+      this.target[at] = outlines ? 1 : 0;
+      this.target[at + 1] = hover === id && selected !== id ? 1 : 0;
+      this.target[at + 2] = selected === id ? 1 : 0;
+      // (A dear lot is one of the marked, in its own tint; one dear but not marked is lit as dear all the same.)
+      this.target[at + 3] = marked.has(id) && !dear.has(id) && !lit ? 1 : 0;
+      this.target[at + 4] = dear.has(id) && !lit ? 1 : 0;
     }
   }
 }
@@ -523,8 +575,8 @@ function townKey(world: WorldStructure): string {
 }
 
 /** A highlight's colour (into `out`): the states mixed by intensity (an added glow, alpha its strength). */
-function writeColor(out: Float32Array, outline: number, hover: number, selected: number, marked: number): Float32Array {
-  const a = outline + hover + selected + marked;
+function writeColor(out: Float32Array, outline: number, hover: number, selected: number, marked: number, dear: number): Float32Array {
+  const a = outline + hover + selected + marked + dear;
   if (a < 1e-4) {
     out.fill(0);
     return out;
@@ -533,9 +585,9 @@ function writeColor(out: Float32Array, outline: number, hover: number, selected:
   // (The strength over 1 in the colour, and the colour within the headroom: see `GLOW_HEADROOM`.)
   const alpha = Math.min(1.2, a);
   const k = (HEADROOM_SRGB * Math.pow(Math.max(1, alpha), 1 / 2.2)) / a;
-  out[0] = (c.outline.r * outline + c.hover.r * hover + c.selected.r * selected + c.marked.r * marked) * k;
-  out[1] = (c.outline.g * outline + c.hover.g * hover + c.selected.g * selected + c.marked.g * marked) * k;
-  out[2] = (c.outline.b * outline + c.hover.b * hover + c.selected.b * selected + c.marked.b * marked) * k;
+  out[0] = (c.outline.r * outline + c.hover.r * hover + c.selected.r * selected + c.marked.r * marked + c.dear.r * dear) * k;
+  out[1] = (c.outline.g * outline + c.hover.g * hover + c.selected.g * selected + c.marked.g * marked + c.dear.g * dear) * k;
+  out[2] = (c.outline.b * outline + c.hover.b * hover + c.selected.b * selected + c.marked.b * marked + c.dear.b * dear) * k;
   out[3] = Math.min(1, alpha);
   return out;
 }
