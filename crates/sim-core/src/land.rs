@@ -98,7 +98,13 @@ impl World {
     pub fn water_mask(&self) -> (Vec<u32>, usize, usize) {
         let (w, d) = self.ground_grid();
         let size = w * d;
-        let rle = match self.travel.file.terrain.as_ref().and_then(|t| t.water.as_deref()) {
+        let rle = match self
+            .travel
+            .file
+            .terrain
+            .as_ref()
+            .and_then(|t| t.water.as_deref())
+        {
             // (Cut or padded to the grid, as `rle_mask` reads it.)
             Some(rle) => {
                 let mask = rle_mask(Some(rle), size);

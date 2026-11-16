@@ -298,7 +298,10 @@ fn the_page_reads_the_water_mask_and_sends_it_back_changed() {
     assert_eq!(w.water_mask().0, water(in_pond));
     let json: Value = serde_json::from_str(&w.water_mask_json()).unwrap();
     assert_eq!(json["water"], json!(water(in_pond)));
-    assert_eq!((json["width"].clone(), json["depth"].clone()), (json!(W), json!(D)));
+    assert_eq!(
+        (json["width"].clone(), json["depth"].clone()),
+        (json!(W), json!(D))
+    );
     // A second pond laid over the mask read back keeps the first: nothing else changes.
     let (now, _, _) = w.water_mask();
     let mut wet: Vec<bool> = Vec::new();
