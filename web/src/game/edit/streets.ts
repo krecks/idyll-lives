@@ -40,7 +40,7 @@ import { bends, clearOf, connector, COURT, cropRoads, curve, inside, leftOf, len
 import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '../town';
 import { placeOf, specOf, streetNames } from '../world';
 import type { Edited } from './edited';
-import { fillStreet, removeLots } from './lots';
+import { fillStreet, removalRefused, removeLots } from './lots';
 
 /** A street being drawn: its points as the player set them, its kind, whether what is in its way is cleared (else it is refused there) and whether it is filled with homes, and the seed its homes and names are drawn from. */
 export interface StreetStroke {
@@ -595,7 +595,8 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
  * world (`roads`, with `road` itself), the lots whose way in is on one of them and the outdoor
  * places at a gone trail's end (`lots`, slot indices), the backdrop buildings fronting them
  * (`backdrop`), the parking by them (`parking`); or why it may not go: no road out of the world
- * would be left, or the roads left would be two networks each with its own way out.
+ * would be left, the roads left would be two networks each with its own way out, or its lots are
+ * the town's last homes or its last park (`lots.ts` `removalRefused`).
  */
 export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number): { roads: number[]; lots: number[]; backdrop: number[]; parking: number[] } | { refused: string } {
   const roads = draft.roads;
@@ -614,6 +615,9 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
     const e = entries[rects.length + i]?.entry;
     return e && gone.has(e.road) ? [i] : [];
   });
+  // (The town keeps its last home and its last park, as a lot removed on its own does.)
+  const kept = removalRefused(draft, new Set(lots));
+  if (kept) return { refused: `${kept.replace(/\.$/, '')}: without ${roads[road].name ?? 'it'} it would go` };
   const index = new RoadIndex(roads);
   const parking = (open?.parking ?? []).flatMap((p, i) => {
     const near = index.nearest(p.x, p.z, ROAD_WIDTH / 2 + 6);
@@ -624,7 +628,7 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
 
 /**
  * `draft` without road `road`, its lots and parking, and any road it leaves joined to nothing; refused
- * if no road out of the world would be left (see `whatGoes`). A road that met it in a T and stays
+ * if no road out of the world would be left, or it would take the town's last home or park (see `whatGoes`). A road that met it in a T and stays
  * now ends there in a dead end; the water under a bridge that goes is water again.
  */
 export function removeRoad(draft: NeighbourhoodDraft, t: Templates, road: number): Edited {
