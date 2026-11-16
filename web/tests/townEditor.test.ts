@@ -89,6 +89,43 @@ describe('the edit session', () => {
     expect(s.timings.length).toBe(1);
   });
 
+  test('an edit the settle refuses is undone, and the plan before it settled; the next settle has the batch and the marks', async () => {
+    const c = clock();
+    const base = draft('base');
+    const [a, b, d] = [draft('a'), draft('b'), draft('d')];
+    const asked: { plan: NeighbourhoodDraft; ops: number; steps: readonly NeighbourhoodDraft[]; before?: readonly string[] }[] = [];
+    const told: string[] = [];
+    const s = new EditSession(base, {
+      timers: c.timers,
+      now: c.now,
+      settle: async (plan, ops, _signal, batch) => {
+        asked.push({ plan, ops, ...batch });
+        // (The second edit of the first batch goes over a limit.)
+        return (asked.length === 1 ? { draft: a, preview: {}, refused: [{ op: 1, why: 'too steep' }], step: 1, marks: ['m'] } : { draft: plan, preview: {}, refused: [], step: ops, marks: ['m', 'n'] }) as unknown as Settled;
+      },
+      show: async () => {},
+      changed: () => {},
+      report: (why) => void told.push(why),
+    });
+    s.apply(edit(a));
+    s.apply(edit(b));
+    await c.advance(QUIET);
+    expect(asked[0].steps).toEqual([base, a, b]);
+    expect(asked[0].before).toBeUndefined();
+    expect(told).toEqual(['too steep']);
+    expect(s.plan).toBe(a);
+    expect(s.settledFrom).toBe(a);
+    expect(s.pending).toBe(false);
+    expect(s.canRedo).toBe(false);
+    expect(s.edits).toBe(1);
+    s.apply(edit(d));
+    await c.advance(QUIET);
+    expect(asked[1].steps).toEqual([a, d]);
+    expect(asked[1].before).toEqual(['m']);
+    expect(s.undo()).toBe(true);
+    expect(s.plan).toBe(a);
+  });
+
   test('a refusal is given back and changes nothing', () => {
     const { s } = session();
     const before = s.plan;

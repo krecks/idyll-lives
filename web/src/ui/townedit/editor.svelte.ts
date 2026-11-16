@@ -13,6 +13,7 @@ import type { Content } from '../../content/content';
 import type { Edited } from '../../game/edit/edited';
 import { lotKey, slotOf } from '../../game/edit/lots';
 import { menuScene } from '../../game/menuScene';
+import { holdTownWorker } from '../../game/townJobs';
 import { loadTemplates, type NeighbourhoodDraft, type Templates } from '../../game/town';
 import type { TownGhosts } from '../../render/types';
 import type { LaidTown } from '../app.svelte';
@@ -51,6 +52,8 @@ export class TownEditorState implements TownEditor {
   hintText = $state<string | null>(null);
   note = $state<string | null>(null);
   private session: EditSession | null = null;
+  /** Lets go of the town worker held while a town is edited. */
+  private letWorkerGo: (() => void) | null = null;
   private toolGhosts: Partial<TownGhosts> | null = null;
   private readonly stages = new Map<string, TownStageTool>();
   private seeds = (Math.random() * 2 ** 31) >>> 0;
@@ -156,8 +159,10 @@ export class TownEditorState implements TownEditor {
    */
   attach(world: LaidTown | null): void {
     const s = this.session;
-    if (s && world && (world.history ? world.history === s.history : s.history.base === world.draft && s.edits === 0)) return;
+    if (s && world && (world.history ? world.history === s.history : s.history.base === (world.plan ?? world.draft) && s.edits === 0)) return;
     s?.dispose();
+    this.letWorkerGo?.();
+    this.letWorkerGo = null;
     this.session = null;
     this.editGhostsOf = null;
     this.pickedKey = null;
@@ -165,6 +170,8 @@ export class TownEditorState implements TownEditor {
     this.toolGhosts = null;
     this.note = null;
     if (world) {
+      // (The town worker kept while the town is edited: a fresh one would make every house again.)
+      this.letWorkerGo = holdTownWorker();
       const session: EditSession = (this.session = new EditSession(
         world.draft,
         {

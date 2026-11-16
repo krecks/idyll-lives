@@ -11,8 +11,10 @@
 import { DEFAULT_LANDSCAPE, type RoadPlan, type WorldStructure, type WorldZone } from '../core/protocol';
 import { BRIDGE_CLEAR, builtSurfaceOf, CUT_MAX, CUT_MAX_MOUNTAIN_ROAD, GRADE, RETAIN_MAX, surfacePlots, type BuiltSurface, type SurfaceWorld } from '../render/shared/builtSurface';
 import { blankLand, COVER, COVER_CELL, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, type Land } from './land';
-import { APRON, builtOf, Protection } from './landEdit';
-import { removeLots } from './edit/lots';
+import { APRON, builtOf, landZones, Protection, wetTiles } from './landEdit';
+import { lotKey, removeLots } from './edit/lots';
+import { rle, unrle } from './landMasks';
+import { deckTiles } from './macro';
 import { fbm, ridged, smoothstep } from './noise';
 import type { NeighbourhoodDraft } from './town';
 import { COURT, lengths, nearest, pointAt, RoadIndex, type Pt } from './roads';
@@ -79,12 +81,28 @@ export interface Slopes {
   drift: number;
 }
 
-/** What `measureLand` found over the limits: in words, and which pads (`surfacePlots` indices) and roads break them. */
+/**
+ * How far a road or a pad is over a slope limit (`measureLand`): it climbs too steeply (`climb`), is
+ * cut into the land or stands over it too far (`cut`), or its edge stands too tall over the land
+ * (`edge`) or the pad (`edgePad`) beside it; `by` how much (rise per m, or m) and the limit `most`.
+ */
+export interface Over {
+  what: 'climb' | 'cut' | 'edge' | 'edgePad';
+  by: number;
+  most: number;
+}
+
+/**
+ * What `measureLand` found over the limits: in words, and which pads (`surfacePlots` indices) and
+ * roads break them; and for those over the limits themselves (not only within `margin` of them), how
+ * (`over`: the first limit each breaks, keyed as `pads` and `roads` are).
+ */
 export interface LandMeasure {
   slopes: Slopes;
   problems: string[];
   pads: Set<number>;
   roads: Set<number>;
+  over: { pads: Map<number, Over>; roads: Map<number, Over> };
 }
 
 /**
@@ -105,6 +123,8 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
   const surface = builtSurfaceOf(world, land);
   const roads = world.meta?.roads ?? [];
   const slopes: Slopes = { grade: {}, retain: { land: 0, lot: 0, road: 0 }, cut: { road: 0, lot: 0 }, clear: Infinity, drift: 0 };
+  const over: LandMeasure['over'] = { pads: new Map(), roads: new Map() };
+  const note = (into: Map<number, Over>, n: number, o: Over) => into.has(n) || into.set(n, o);
   const wet = (l: Land, k: number) => l.wl[k] !== NONE && l.wl[k] > l.h[k];
   const [cutMost, edgeMost] = [CUT_MAX - margin, RETAIN_MAX + 0.01 - margin];
   // (Among mountains a country road, a pass, may be cut deeper into the rock.)
@@ -119,6 +139,7 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
     if (kind === 'trail') return;
     if (steepest > GRADE[kind] + 0.01) {
       out.push(`${kind} ${r.name ?? i} climbs ${(steepest * 100).toFixed(1)} % (at most ${GRADE[kind] * 100} %)`);
+      note(over.roads, i, { what: 'climb', by: steepest, most: GRADE[kind] });
       bad.add(i);
     }
     const span = r.bridge && r.bridge[1] > r.bridge[0] ? r.bridge : null;
@@ -135,7 +156,10 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
     }
     slopes.cut.road = Math.max(slopes.cut.road, cut);
     if (cut > roadMost(kind) - margin) {
-      if (cut > roadMost(kind)) out.push(`${kind} ${r.name ?? i} is cut ${cut.toFixed(1)} m into the land or stands over it (at most ${roadMost(kind)})`);
+      if (cut > roadMost(kind)) {
+        out.push(`${kind} ${r.name ?? i} is cut ${cut.toFixed(1)} m into the land or stands over it (at most ${roadMost(kind)})`);
+        note(over.roads, i, { what: 'cut', by: cut, most: roadMost(kind) });
+      }
       bad.add(i);
     }
     if (span) {
@@ -168,7 +192,10 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
     }
     slopes.cut.lot = Math.max(slopes.cut.lot, cut);
     if (cut > cutMost) {
-      if (cut > CUT_MAX) out.push(`lot ${n} (${p.w}×${p.d} m) is cut ${cut.toFixed(1)} m into the land or stands over it (at most ${CUT_MAX})`);
+      if (cut > CUT_MAX) {
+        out.push(`lot ${n} (${p.w}×${p.d} m) is cut ${cut.toFixed(1)} m into the land or stands over it (at most ${CUT_MAX})`);
+        note(over.pads, n, { what: 'cut', by: cut, most: CUT_MAX });
+      }
       pads.add(n);
     }
     const edge = (x: number, z: number) => {
@@ -178,16 +205,23 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
       if (other >= 0) {
         slopes.retain.lot = Math.max(slopes.retain.lot, step);
         if (step > edgeMost) {
-          if (step > RETAIN_MAX + 0.01) out.push(`lot ${n}'s edge stands ${step.toFixed(2)} m over the pad beside it (at most ${RETAIN_MAX})`);
           // (The backdrop building, else the later lot, gives way; but a lot gives way to a building that is a place, a shop or the like.)
           const place = other >= world.plots.length && world.meta?.backdrop?.[other - world.plots.length]?.place !== undefined;
-          pads.add(place ? n : other >= world.plots.length ? other : Math.max(n, other));
+          const gives = place ? n : other >= world.plots.length ? other : Math.max(n, other);
+          if (step > RETAIN_MAX + 0.01) {
+            out.push(`lot ${n}'s edge stands ${step.toFixed(2)} m over the pad beside it (at most ${RETAIN_MAX})`);
+            note(over.pads, gives, { what: 'edgePad', by: step, most: RETAIN_MAX });
+          }
+          pads.add(gives);
         }
       } else if (index.onRoad(x, z, LAND_CELL)) slopes.retain.road = Math.max(slopes.retain.road, step);
       else {
         slopes.retain.land = Math.max(slopes.retain.land, step);
         if (step > edgeMost) {
-          if (step > RETAIN_MAX + 0.01) out.push(`lot ${n}'s edge stands ${step.toFixed(2)} m over the land beside it (at most ${RETAIN_MAX})`);
+          if (step > RETAIN_MAX + 0.01) {
+            out.push(`lot ${n}'s edge stands ${step.toFixed(2)} m over the land beside it (at most ${RETAIN_MAX})`);
+            note(over.pads, n, { what: 'edge', by: step, most: RETAIN_MAX });
+          }
           pads.add(n);
         }
       }
@@ -202,7 +236,7 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
     }
   });
   // The land stored against the surface worked out from it, off what is built (unless not asked: the last resort).
-  if (!drift) return { slopes, problems: out, pads, roads: bad };
+  if (!drift) return { slopes, problems: out, pads, roads: bad, over };
   const lot = new Uint8Array(land.h.length);
   for (const p of world.plots) {
     for (let j = Math.ceil(p.z / LAND_CELL); j <= Math.min(land.rows - 1, Math.floor((p.z + p.d) / LAND_CELL)); j++) {
@@ -216,7 +250,7 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
     if (on && roads[on.road].bridge && on.s >= roads[on.road].bridge![0] && on.s <= roads[on.road].bridge![1]) continue;
     slopes.drift = Math.max(slopes.drift, Math.abs((lot[k] || on ? surface.at(x, z) : surface.conformed[k]) - land.h[k] / 100));
   }
-  return { slopes, problems: out, pads, roads: bad };
+  return { slopes, problems: out, pads, roads: bad, over };
 }
 
 /** Pads are filed for `measureLand` by cells this wide (m). */
@@ -261,14 +295,190 @@ export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, prev
   }
 }
 
+// ---- step 2's settle ---------------------------------------------------------------------------
+
+/** What `settleEdit` gives: see there. */
+export interface EditSettled<W> {
+  draft: NeighbourhoodDraft;
+  world: W;
+  /** The edits refused (`op`: an edit's index in the batch, from 0), each with why: in words, as a clause ("Mill Lane would climb 21 %, …"). */
+  refused: { op: number; why: string }[];
+  /** What in the settled town is over a slope limit (`settleKeys`): the next settle's `before`. */
+  marks: string[];
+  /** The plan settled: its index in the batch's `steps` (the last, unless an edit was refused: then the one that edit was made on). */
+  step: number;
+}
+
 /**
- * Step 2's settle: the town's plan draft (`plan`, on step 1's bare land) with its land settled
- * under it as `settleLand` does, but giving nothing up: an edit whose built land breaks a slope
- * limit that `before` (the land as the last settle measured it) kept is refused, with its reason
- * (`op`: the edit's index in the batch). Only its shape is here so far.
+ * Step 2's settle: the town's plan draft (`plan`: its `open.land` the land as laid, its heights not
+ * yet graded under the town; step 1's, with the town's woods and fields) with its land settled under
+ * it as `settleLand` settles a new town's (gentle ground under the town: `gentleUnder`; the roads and
+ * lots graded in: `gradeLand`), but giving nothing up (decision 11: an edit never makes something
+ * else go). Its cover is opened within 2 m of anything built (as `macro.ts` `settleTown` opens it),
+ * the woods, meadows and fields of its zones made again from that (the water, hills and orchards
+ * kept), and its walkers' water (`open.water`) made again, the plan's (else the land's), with every
+ * bridge's deck dried (`deckTiles` over `RoadPlan.bridge`) as the generator dries them. A plan with
+ * no land of that kind (a classic town) is its own settle. `preview`: the world as the menus'
+ * preview has it (asked of the plan without its land).
+ *
+ * What the batch of edits made over a slope limit (`measureLand`: a road too steep, a road or a lot
+ * cut too deep or standing too high, a lot's edge too tall) is refused. `steps`: the plans the batch
+ * went through, the first the plan last settled, the last `plan` (so its edits are `steps.length - 1`).
+ * `before`: what was over a limit in the last settle (its `marks`); not given, the first step is
+ * settled too to find it (its time again). What is over a limit now and wasn't then is the batch's:
+ * each is laid to the edit that brought it in (a road or a lot that edit added or changed), else to
+ * the edit whose changes are nearest it (removing a lot changes the ground under its neighbours).
+ * Each refused edit is given the reason for the first of its; the plan the first refused edit was
+ * made on is settled instead, and checked again in turn (the edits after it go with it: the plans
+ * build on each other). With no `steps` nothing is refused.
  */
-export function settleEdit<W extends FollowWorld>(_plan: NeighbourhoodDraft, _preview: (draft: NeighbourhoodDraft) => W, _before?: LandMeasure): { draft: NeighbourhoodDraft; world: W; refused: { op: number; why: string }[] } {
-  throw new Error('settleEdit: not built yet');
+export function settleEdit<W extends FollowWorld>(plan: NeighbourhoodDraft, preview: (draft: NeighbourhoodDraft) => W, before?: Iterable<string>, steps?: readonly NeighbourhoodDraft[]): EditSettled<W> {
+  const path = steps && steps.length > 1 ? [...steps.slice(0, -1), plan] : [plan];
+  let at = path.length - 1;
+  let settled = settleOnce(plan, preview);
+  const refused: { op: number; why: string }[] = [];
+  if (at > 0) {
+    let first: Settle<W> | null = null;
+    const had = new Set(before ?? (first = settleOnce(path[0], preview)).over.keys());
+    // (Each step's things by their keys, made once.)
+    const things = path.map(thingsOf);
+    for (;;) {
+      const fresh = [...settled.over].filter(([key]) => !had.has(key));
+      if (!fresh.length || at === 0) break;
+      // (Each edit's reason: the first of what it brought in itself, else the first of what it broke nearby.)
+      const blamed = new Map<number, { why: string; own: boolean }>();
+      for (const [key, o] of fresh) {
+        const { op, own } = blame(key, o.at, things.slice(0, at + 1));
+        if (!blamed.has(op) || (own && !blamed.get(op)!.own)) blamed.set(op, { why: o.why, own });
+      }
+      for (const [op, { why }] of blamed) if (!refused.some((r) => r.op === op)) refused.push({ op, why });
+      at = Math.min(...blamed.keys());
+      settled = at === 0 && first ? first : settleOnce(path[at], preview);
+    }
+    refused.sort((a, b) => a.op - b.op);
+  }
+  return { draft: settled.draft, world: settled.world, refused, marks: [...settled.over.keys()], step: at };
+}
+
+/** One settle of `settleEdit`'s: the plan's draft settled, its preview, and what is over a slope limit in it (by its key: where it is, and why in words). */
+interface Settle<W> {
+  draft: NeighbourhoodDraft;
+  world: W;
+  over: Map<string, { at: Pt[]; why: string }>;
+}
+
+/** `plan` settled as `settleEdit` settles it, giving nothing up: see there. */
+function settleOnce<W extends FollowWorld>(plan: NeighbourhoodDraft, preview: (draft: NeighbourhoodDraft) => W): Settle<W> {
+  const open = plan.open;
+  const laid = open?.land;
+  if (!open || !laid || laid.seeded !== 'follow') return { draft: plan, world: preview(plan), over: new Map() };
+  const world = preview(unlanded(plan));
+  const land: Land = { ...laid, h: laid.h.slice(), wl: laid.wl.slice(), cover: laid.cover.slice() };
+  // The cover open under and by what is built (`macro.ts` `settleTown`), and the zones' woods, meadows and fields from it.
+  const guard = new Protection(land.cols, land.rows, builtOf(world));
+  const cw = coverSpan(land.cols);
+  const c = COVER_CELL / LAND_CELL;
+  for (let r = 0; r < coverSpan(land.rows); r++) for (let q = 0; q < cw; q++) if (guard.dist[Math.min(land.rows - 1, r * c + 1) * land.cols + Math.min(land.cols - 1, q * c + 1)] <= 2) land.cover[r * cw + q] = COVER.open;
+  const cover = landZones(land, { cover: true });
+  const zones = (['water', 'hill', 'fields', 'meadow', 'woods', 'orchard'] as const).flatMap((kind) => (kind === 'fields' || kind === 'meadow' || kind === 'woods' ? cover : open.zones).filter((z) => z.kind === kind));
+  // The walkers' water: the plan's (else the land's), every bridge's deck dry.
+  const [W, D] = [plan.width, plan.depth];
+  const walk = open.water ? unrle(open.water, W * D) : wetTiles(land, W, D);
+  for (const r of plan.roads) if (r.bridge && r.bridge[1] > r.bridge[0]) deckTiles(r, r.bridge, W, D, (tile) => (walk[tile] = 0));
+  // The land eased and graded under the town, and measured (no margin: the limits themselves).
+  gentleUnder(land, world, plan.slots.map((s) => s.area ?? 0));
+  const seeded: Land = { ...land, h: land.h.slice() };
+  gradeLand(land, world);
+  const found = measureLand(world, land, seeded, 0, false);
+  const over = new Map<string, { at: Pt[]; why: string }>();
+  for (const [i, o] of found.over.roads) {
+    const r = plan.roads[i];
+    over.set(roadKey(r), { at: r.points, why: overWords(o, r.name ?? `the ${r.kind ?? 'street'}`, r.kind ?? 'street') });
+  }
+  const plots = world.plots.length;
+  const building = surfacePlots(world);
+  for (const [n, o] of found.over.pads) {
+    const p = building[n];
+    const at: Pt[] = [[p.x, p.z], [p.x + p.w, p.z + p.d]];
+    if (n < plots) over.set(slotKey(plan.slots[n]), { at, why: overWords(o, plan.slots[n].name || 'the lot', 'lot') });
+    else over.set(buildingKey(open.backdrop![n - plots]), { at, why: overWords(o, 'a building there', 'building') });
+  }
+  return { draft: { ...plan, open: { ...open, land, zones, water: rle(walk) } }, world, over };
+}
+
+/** How `o` breaks a slope limit, in words, of `name` (a road of `kind`, a lot or a building). */
+function overWords(o: Over, name: string, kind: string): string {
+  const m = (v: number) => `${v.toFixed(1)} m`;
+  switch (o.what) {
+    case 'climb':
+      return `${name} would climb ${Math.round(o.by * 100)} %, more than a ${kind} may (${Math.round(o.most * 100)} %)`;
+    case 'cut':
+      return `the ground under ${name} would have to be dug out or built up ${m(o.by)} (${m(o.most)} at most)`;
+    case 'edge':
+      return `${name} would stand ${m(o.by)} over the land beside it (${m(o.most)} at most)`;
+    case 'edgePad':
+      return `${name} would stand ${m(o.by)} over the lot beside it (${m(o.most)} at most)`;
+  }
+}
+
+/**
+ * What is over a slope limit is known across edits by keys (`EditSettled.marks`): a road by where it
+ * begins and ends, its points, kind and width (a road renamed is the same road; one drawn on further
+ * another); a lot by where it stands (`lotKey`), the way it faces, its size and its house; a backdrop
+ * building by its footprint. Whatever changes how the land is graded under it changes its key.
+ */
+const tenth = (v: number) => Math.round(v * 10) / 10;
+function roadKey(r: RoadPlan): string {
+  const [a, b] = [r.points[0], r.points[r.points.length - 1]];
+  return `road ${tenth(a[0])},${tenth(a[1])} ${tenth(b[0])},${tenth(b[1])} ${r.points.length} ${r.kind ?? 'street'} ${r.width}`;
+}
+function slotKey(s: NeighbourhoodDraft['slots'][number]): string {
+  return `lot ${lotKey(s)} ${s.facing} ${s.lot ?? ''} ${s.w ?? ''}x${s.d ?? ''} ${s.template}`;
+}
+function buildingKey(b: { poly: readonly Pt[] }): string {
+  return `building ${b.poly.map(([x, z]) => `${tenth(x)},${tenth(z)}`).join(' ')}`;
+}
+
+/** A plan's roads, lots and backdrop buildings by their keys, and where each is (a lot by its corner). */
+function thingsOf(draft: NeighbourhoodDraft): Map<string, readonly Pt[]> {
+  const out = new Map<string, readonly Pt[]>();
+  for (const r of draft.roads) out.set(roadKey(r), r.points);
+  for (const s of draft.slots) out.set(slotKey(s), [[s.x, s.z]]);
+  for (const b of draft.open?.backdrop ?? []) out.set(buildingKey(b), b.poly);
+  return out;
+}
+
+/**
+ * Which edit (its index among `steps.length - 1`) what is over a limit (`key`, at `at`) is laid to:
+ * the last that brought it in (`own`), else the one whose changes (what it added or took away) are
+ * nearest it; the last edit if none changed anything there is.
+ */
+function blame(key: string, at: readonly Pt[], steps: readonly Map<string, readonly Pt[]>[]): { op: number; own: boolean } {
+  const ops = steps.length - 1;
+  for (let i = ops - 1; i >= 0; i--) if (steps[i + 1].has(key) && !steps[i].has(key)) return { op: i, own: true };
+  let [best, far] = [ops - 1, Infinity];
+  for (let i = 0; i < ops; i++) {
+    const [a, b] = [steps[i], steps[i + 1]];
+    for (const [one, other] of [
+      [b, a],
+      [a, b],
+    ]) {
+      for (const [k, pts] of one) {
+        if (other.has(k)) continue;
+        const d = apart(at, pts);
+        if (d <= far) [best, far] = [i, d];
+      }
+    }
+  }
+  return { op: best, own: false };
+}
+
+/** The least distance between two sets of points (m; every 4th of a long one, and its ends). */
+function apart(a: readonly Pt[], b: readonly Pt[]): number {
+  const thin = (p: readonly Pt[]) => (p.length > 16 ? p.filter((_, i) => i % 4 === 0 || i === p.length - 1) : p);
+  let d = Infinity;
+  for (const [x, z] of thin(a)) for (const [u, v] of thin(b)) d = Math.min(d, Math.hypot(x - u, z - v));
+  return d;
 }
 
 /** `draft` without its land (`open.land`): what a settle round previews, its land not wanted there (nor coded into the preview). */

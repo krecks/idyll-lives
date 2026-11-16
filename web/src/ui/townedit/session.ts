@@ -16,7 +16,7 @@ import type { Edited } from '../../game/edit/edited';
 import { TownHistory } from '../../game/edit/history';
 import type { NeighbourhoodDraft } from '../../game/town';
 import type { TownIssues } from './problems';
-import type { Settled } from './settle';
+import type { Batch, Settled } from './settle';
 
 /** How long edits pause (ms) before the town is settled and built again with them. */
 export const QUIET = 1200;
@@ -31,8 +31,8 @@ export interface Timers {
 
 /** What the session needs from outside it. */
 export interface SessionHooks {
-  /** A plan settled (`settle.ts` `settle`; `ops`: edits since the last). Rejects with `Superseded` if `signal` aborts it. */
-  settle(plan: NeighbourhoodDraft, ops: number, signal: AbortSignal): Promise<Settled>;
+  /** A plan settled (`settle.ts` `settle`; `ops`: edits since the last, `batch` the plans they went through). Rejects with `Superseded` if `signal` aborts it. */
+  settle(plan: NeighbourhoodDraft, ops: number, signal: AbortSignal, batch: Batch): Promise<Settled>;
   /** The settled town put on screen; resolves once it is. `plan`: what it was settled from. */
   show(settled: Settled, plan: NeighbourhoodDraft): Promise<void>;
   /** Something the screens show changed (the plan, the town on screen, the problems, whether a settle runs). */
@@ -85,8 +85,11 @@ export class EditSession {
   private again = false;
   private control: AbortController | null = null;
   private lastEdit = 0;
-  /** Edits since the town on screen was settled. */
+  /** Edits since the town on screen was settled, and the plans they made, in turn. */
   private ops = 0;
+  private taken: NeighbourhoodDraft[] = [];
+  /** What is over a slope limit in the town on screen (its settle's `marks`), once known. */
+  private marks: readonly string[] | undefined;
   private disposed = false;
 
   /**
@@ -100,7 +103,7 @@ export class EditSession {
     history?: TownHistory,
     from?: NeighbourhoodDraft,
   ) {
-    this.history = history ?? new TownHistory(settled);
+    this.history = history ?? new TownHistory(from ?? settled);
     this.plan = this.history.draft;
     this.settled = settled;
     this.settledFrom = from ?? settled;
@@ -188,6 +191,7 @@ export class EditSession {
   private take(draft: NeighbourhoodDraft): void {
     this.plan = draft;
     this.ops++;
+    this.taken.push(draft);
     this.lastEdit = this.now();
     this.hooks.changed();
     this.recheck(false);
@@ -255,6 +259,7 @@ export class EditSession {
     if (!this.pending || this.disposed) return Promise.resolve();
     const plan = this.plan;
     const ops = this.ops;
+    const steps = [this.settledFrom, ...this.taken];
     const since = this.lastEdit;
     const control = (this.control = new AbortController());
     this.settling = true;
@@ -262,14 +267,28 @@ export class EditSession {
     const work = (async () => {
       const t0 = this.now();
       try {
-        const s = await this.hooks.settle(plan, ops, control.signal);
+        const s = await this.hooks.settle(plan, ops, control.signal, { steps, ...(this.marks ? { before: this.marks } : {}) });
         const t1 = this.now();
         if (this.disposed) return;
-        await this.hooks.show(s, plan);
+        // (An edit refused: the plan it was made on is the one settled; it and every edit after it go, those made meanwhile too.)
+        const back = s.refused?.length ? steps[s.step ?? 0] : null;
+        if (back) {
+          this.history.revert(back);
+          this.plan = back;
+          this.again = false;
+          this.hooks.changed();
+          this.recheck(true);
+        }
+        await this.hooks.show(s, back ?? plan);
         if (this.disposed) return;
         this.settled = s.draft;
-        this.settledFrom = plan;
-        this.ops -= ops;
+        this.settledFrom = back ?? plan;
+        this.marks = s.marks;
+        if (back) [this.ops, this.taken] = [0, []];
+        else {
+          this.ops -= ops;
+          this.taken = this.taken.slice(ops);
+        }
         const t2 = this.now();
         this.timings.push({ settle: t1 - t0, show: t2 - t1, fromEdit: t2 - since });
         for (const r of s.refused ?? []) this.hooks.report?.(r.why);
@@ -280,6 +299,9 @@ export class EditSession {
         // (Not tried again until the next edit: the same plan would fail the same way.)
         this.again = false;
         this.settledFrom = plan;
+        this.marks = undefined;
+        this.ops -= ops;
+        this.taken = this.taken.slice(ops);
       }
     })();
     this.running = work.finally(() => {
