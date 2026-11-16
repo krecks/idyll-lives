@@ -573,9 +573,12 @@ export function areaSize(main: TownSize, area: number): TownSize {
   return area === 0 ? main : SIZES[Math.min(SIZES.indexOf(main), SIZES.indexOf('village'))];
 }
 
-/** Whether civic place `c` is for a bigger place than one of `size` (`Civic.least`). */
-export function civicTooBig(c: Civic, size: TownSize): boolean {
-  return SIZES.indexOf(c.least) > SIZES.indexOf(size);
+/**
+ * Whether civic place `c` is for a bigger place than area `area`, of `size` (`Civic.least`, `areaSize`): a village is
+ * given a village's by hand. The main town may be given any (the player's own town: a hamlet may have its school).
+ */
+export function civicTooBig(c: Civic, size: TownSize, area: number): boolean {
+  return area > 0 && SIZES.indexOf(c.least) > SIZES.indexOf(size);
 }
 
 /** Which civic place `place` is (an index into `CIVIC`), or -1: its kind, the careers it was made for first, and its name's look. */
@@ -585,14 +588,14 @@ export function civicOf(place: TownPlace | undefined): number {
 }
 
 /**
- * The civic places area `area` of `draft` (the main town unless given) does not have yet, of its size (`areaSize`:
- * a village has no police station), for step 2's Lot tool to set by hand: each one's index into `CIVIC`, what it is
+ * The civic places area `area` of `draft` (the main town unless given) does not have yet, a village's of a village's
+ * size (`civicTooBig`: a village has no police station), for step 2's Lot tool to set by hand: each one's index into `CIVIC`, what it is
  * called on a card (`civicLabel`), and how big its building may be (m along the road, m deep).
  */
 export function civicChoices(draft: NeighbourhoodDraft, area = 0): { index: number; name: string; w: [number, number]; d: [number, number] }[] {
   const has = new Set((draft.open?.places ?? []).filter((p) => p.area === area).map(civicOf));
   const size = areaSize(draftSize(draft), area);
-  return CIVIC.flatMap((c, index) => (has.has(index) || civicTooBig(c, size) ? [] : [{ index, name: civicLabel(c, size), w: c.kind.w, d: c.kind.d }]));
+  return CIVIC.flatMap((c, index) => (has.has(index) || civicTooBig(c, size, area) ? [] : [{ index, name: civicLabel(c, size), w: c.kind.w, d: c.kind.d }]));
 }
 
 /** How big `draft`'s main town is (its place's and options' `civic`). */

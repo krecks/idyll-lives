@@ -354,7 +354,7 @@ function civicAt(draft: NeighbourhoodDraft, t: Templates, content: Content, op: 
   const size = areaSize(draftSize(draft), area);
   const label = civicLabel(c, size).toLowerCase();
   const where = draft.open?.areas[area]?.name ?? draft.name;
-  if (civicTooBig(c, size)) return { refused: `${where} is too small for a ${label}` };
+  if (civicTooBig(c, size, area)) return { refused: `${where} is too small for a ${label}` };
   if (!civicChoices(draft, area).some((k) => k.index === op.civic)) return { refused: `${where} has a ${label} already` };
   const rand = mulberry32(mix(op.seed, roadKey(r), 'civic', String(op.civic)));
   const pass = new BackdropPass({ draft, t, content });

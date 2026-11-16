@@ -14,6 +14,7 @@ import type { RoadSpot } from '../../game/edit/ground';
 import { addCivic, areaOfRoad } from '../../game/edit/buildup';
 import type { Edited } from '../../game/edit/edited';
 import { addLot, canPlace, CIVIC_PLACES, moveLot, type LotChoice } from '../../game/edit/lots';
+import { areaSize, civicLabel, draftSize } from '../../game/backdrop';
 import type { TownGhosts } from '../../render/types';
 import { choiceOf, choiceSize, civicChosen, lotChoice } from './lotChoice.svelte';
 import LotCard from './LotCard.svelte';
@@ -65,7 +66,7 @@ export const lotTool: TownTool = {
       civicWhy = null;
       const b = e.draft.open!.backdrop!.at(-1)!;
       editor.preview({ lots: [{ ...buildingBox(b), tone: 'new' }] });
-      editor.hint(`Click to put the ${CIVIC_PLACES[civic].label.toLowerCase()} down on ${draft.roads[at.road]?.name ?? 'this road'}.`);
+      editor.hint(`Click to put the ${civicLabel(CIVIC_PLACES[civic], areaSize(draftSize(draft), area)).toLowerCase()} down on ${draft.roads[at.road]?.name ?? 'this road'}.`);
       return e;
     };
 
