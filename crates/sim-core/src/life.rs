@@ -837,7 +837,7 @@ fn schedule_school(w: &mut World, i: usize, day: u32, fresh: Option<u64>) {
     if tick < leave {
         return;
     }
-    if !heading_out(sim) {
+    if !heading_out(sim) && !in_a_car(sim) {
         set_off(sim, content, objects, tick);
     }
 }
@@ -871,7 +871,7 @@ fn schedule_work(w: &mut World, i: usize, day: u32, fresh: Option<u64>) {
         miss_shift(w, i, day);
         return;
     }
-    if tick < leave || heading_out(sim) {
+    if tick < leave || heading_out(sim) || in_a_car(sim) {
         return;
     }
     if let Some(baby) = stays_home_for(w, i) {
@@ -914,6 +914,19 @@ fn set_off(
 }
 
 /// On their way to work or school (or about to set off).
+/// Whether `sim` is at the wheel of a car on its way, or getting in or out of one: off to work
+/// only once they're out of it (`schedule_work`). Called away mid-drive, a driver on a trip walked
+/// off to work and left the car standing on the road for good with them still its driver
+/// (Mirror Reach, full).
+fn in_a_car(sim: &Sim) -> bool {
+    sim.current.as_ref().is_some_and(|a| {
+        matches!(
+            a.phase,
+            Phase::Driving | Phase::Boarding { .. } | Phase::Alighting { .. }
+        )
+    })
+}
+
 pub(crate) fn heading_out(sim: &Sim) -> bool {
     matches!(
         sim.current.as_ref().map(|a| a.task.kind),
