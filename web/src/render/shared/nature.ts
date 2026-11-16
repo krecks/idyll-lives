@@ -80,21 +80,21 @@ function between(values: Float32Array, cols: number, rows: number, x: number, z:
  * The surface's graded land (`BuiltSurface.conformed`) with the samples inside the first `count` of its plots (the
  * world's lots, not its backdrop's buildings, which stand on the land) carried in from the land round them: ring by
  * ring from their edges, each the mean of its neighbours reached already (the terrain beside a lot is the land's, not
- * a slope to its pad: `LandscapeLayout.terrainField`).
+ * a slope to its pad: `LandscapeLayout.terrainField`). A sample of a lot beside another lot (a step or less apart:
+ * the narrow strip between them, which has no sample of its own) keeps its pad, so the strip lies between the two
+ * pads, not down at the land beyond them.
  */
 export function lotsFilled(surface: BuiltSurface, count: number): Float32Array {
   const { cols, rows, conformed } = surface;
   const out = conformed.slice();
-  const inLot = new Uint8Array(cols * rows);
+  // Each sample's lot (-1: none; on a shared edge, the last).
+  const owner = new Int32Array(cols * rows).fill(-1);
   for (let n = 0; n < Math.min(count, surface.plots.length); n++) {
     const p = surface.plots[n];
     for (let j = Math.max(0, Math.ceil(p.z / LAND_CELL)); j <= Math.min(rows - 1, Math.floor((p.z + p.d) / LAND_CELL)); j++) {
-      for (let i = Math.max(0, Math.ceil(p.x / LAND_CELL)); i <= Math.min(cols - 1, Math.floor((p.x + p.w) / LAND_CELL)); i++) inLot[j * cols + i] = 1;
+      for (let i = Math.max(0, Math.ceil(p.x / LAND_CELL)); i <= Math.min(cols - 1, Math.floor((p.x + p.w) / LAND_CELL)); i++) owner[j * cols + i] = n;
     }
   }
-  // (1: still to fill.)
-  let ring: number[] = [];
-  for (let k = 0; k < inLot.length; k++) if (inLot[k]) ring.push(k);
   const around = (k: number, visit: (n: number) => void) => {
     const [i, j] = [k % cols, Math.floor(k / cols)];
     if (i > 0) visit(k - 1);
@@ -102,6 +102,17 @@ export function lotsFilled(surface: BuiltSurface, count: number): Float32Array {
     if (j > 0) visit(k - cols);
     if (j < rows - 1) visit(k + cols);
   };
+  // (1: still to fill. A lot's sample beside another lot's keeps its pad: none to fill.)
+  const todo = new Uint8Array(cols * rows);
+  let ring: number[] = [];
+  for (let k = 0; k < owner.length; k++) {
+    if (owner[k] < 0) continue;
+    let beside = false;
+    around(k, (q) => (beside ||= owner[q] >= 0 && owner[q] !== owner[k]));
+    if (beside) continue;
+    todo[k] = 1;
+    ring.push(k);
+  }
   while (ring.length) {
     const reached: number[] = [];
     const values: number[] = [];
@@ -109,7 +120,7 @@ export function lotsFilled(surface: BuiltSurface, count: number): Float32Array {
     for (const k of ring) {
       let [sum, n] = [0, 0];
       around(k, (q) => {
-        if (inLot[q]) return;
+        if (todo[q]) return;
         sum += out[q];
         n++;
       });
@@ -122,12 +133,13 @@ export function lotsFilled(surface: BuiltSurface, count: number): Float32Array {
     if (!reached.length) break;
     reached.forEach((k, m) => {
       out[k] = values[m];
-      inLot[k] = 0;
+      todo[k] = 0;
     });
     ring = later;
   }
   return out;
 }
+
 /** A height field whose top stands over this (m) has rock, snow and a treeline on it, as mountains do. */
 const LAND_PEAKS = 40;
 /**
