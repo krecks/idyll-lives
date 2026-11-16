@@ -4,6 +4,7 @@
   import { MoneyFloats, moneyChange } from '../moneyFloats.svelte';
   import { services } from '../services';
   import { game } from '../state.svelte';
+  import { costLabel, toolInfo } from '../land/landTools';
 
   /**
    * Build mode's pointer companions: a tag beside the cursor saying what a click will
@@ -25,6 +26,18 @@
   const tag = $derived.by((): { text: string; sub?: string; keys?: string; bad: boolean } | null => {
     if (game.mode !== 'build' || !onCanvas) return null;
     if (game.pickHint !== null) return { text: 'Pick up', sub: game.pickHint, bad: game.pickHint.startsWith('Nothing') };
+    if (game.buildTab === 'land') {
+      // The land brush: what the stroke under way costs so far, or what the brush does here.
+      const l = game.land;
+      if (!l.ready) return null;
+      const tool = toolInfo(game.landBrush.tool);
+      if (l.stroking) {
+        const c = costLabel(l.cost, game.creative, game.funds, money);
+        return { text: c.text, sub: tool.label, keys: 'Esc or right-click cancels', bad: c.bad };
+      }
+      if (l.refused) return { text: tool.label, sub: tool.group === 'water' && tool.id !== 'dry' ? 'Water keeps off lots and roads' : 'Lots and roads stay as they are', bad: true };
+      return null;
+    }
     const placing = game.placing;
     if (game.furnishing || (game.buildTool === 'stairs' && placing)) {
       if (!placing) return null;
