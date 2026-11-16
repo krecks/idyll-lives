@@ -107,11 +107,9 @@
     if (!held) cursor = tool ? 'crosshair' : 'default';
   }
 
-  /** Pans the camera by the ground between two screen points (as if the land were dragged along), or by a share of the view where the sky is. */
+  /** Pans the camera as if the land under the pointer were dragged along (over the sky, a plane at the land's level stands in), kept over the land. */
   function panBy(x0: number, y0: number, x1: number, y1: number) {
-    const a = menuScene.landAt(x0, y0);
-    const b = menuScene.landAt(x1, y1);
-    if (a && b) menuScene.pan(a.x - b.x, a.z - b.z);
+    menuScene.drag(x0, y0, x1, y1);
   }
 
   function toolDown(e: PointerEvent): void {
