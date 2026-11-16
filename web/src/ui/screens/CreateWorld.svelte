@@ -13,8 +13,14 @@
   import { lifespanHint } from '../format';
   import Icon from '../Icon.svelte';
   import Segmented from '../kit/Segmented.svelte';
-  import TownStage, { type LotLabel } from '../kit/TownStage.svelte';
+  import TownStage, { type LotLabel, type StageTool } from '../kit/TownStage.svelte';
   import { services } from '../services';
+  import { landHash, type Land } from '../../game/land';
+  import { applyLand, builtOf, LandEditor } from '../../game/landEdit';
+  import LandPalette from '../land/LandPalette.svelte';
+  import { installLandHook } from '../land/landHook';
+  import { LandStroke, type LandSurface } from '../land/landStroke';
+  import { brushOf, startBrush, type BrushState } from '../land/landTools';
 
   const { content } = services;
   let templates = $state.raw<Templates | null>(null);
@@ -102,7 +108,7 @@
    * A world of the chosen place with the chosen options from `seed`, named `asName` (else its
    * seed's name), laid out and built; the one being made meanwhile is dropped.
    */
-  async function make(seed: number, asName?: string, again = false) {
+  async function make(seed: number, asName?: string, again = false, land?: Land) {
     clearTimeout(settling);
     waiting = false;
     if (!templates) return;
@@ -118,8 +124,10 @@
     // (Nothing in view yet: the first world is built in longer slices.)
     const first = !world;
     try {
-      const made = await townJob(content, { kind: 'world', world: kind, seed, name: asName, options: { ...options } }, control.signal, tick);
+      const made = await townJob(content, { kind: 'world', world: kind, seed, name: asName, options: { ...options }, ...(land ? { land } : {}) }, control.signal, tick);
       if (job !== control) return;
+      // (Another world, or the town laid again: the land is surveyed again for the brushes, below.)
+      dropEditor();
       // Its houses and preview come with it: the menu draws it without making them again.
       keepHouses(made);
       menuScene.prepare(made.draft, made.preview);
@@ -127,15 +135,17 @@
       name = asName ?? world.name;
       focus = null;
       // (The panel stays until it is built and on screen.)
-      await menuScene.show(world, null, tick, first);
+      await (shown = menuScene.show(world, null, tick, first));
     } catch (err) {
       if (err instanceof Superseded) return;
       console.error('[world] making the world failed:', err);
-      toast('That world could not be made. Try another.');
+      // (Laid again on a shaped land, the generator says why it couldn't: no dry land big enough.)
+      toast(land && err instanceof Error && err.message ? err.message : 'That world could not be made. Try another.');
     } finally {
       if (job === control) {
         job = null;
         making = false;
+        if (view === 'shape') void survey();
       }
     }
   }
@@ -144,17 +154,22 @@
     job?.abort();
   });
 
-  /** Another world of the chosen place (the options as they are). */
+  /** Another world of the chosen place (the options as they are); the land's shaping goes with it (asked first). */
   function another() {
+    if (shaped) return ask('Another world leaves your changes to the land behind.', 'Another world', 'actions', () => void make(roll(), typedName()));
     void make(roll(), typedName());
   }
 
-  /** Another place: a new world there, with the place's own options. */
+  /** Another place: a new world there, with the place's own options; the land's shaping goes with it (asked first). */
   function choose(k: WorldKind) {
     if (k === kind && world) return;
-    kind = k;
-    app.worldOptions = defaultsOf(k);
-    void make(roll(), typedName());
+    const go = () => {
+      kind = k;
+      app.worldOptions = defaultsOf(k);
+      void make(roll(), typedName());
+    };
+    if (shaped) return ask(`${WORLDS[k].label} is another world: your changes to the land go.`, `Go to ${WORLDS[k].label}`, 'panel', go);
+    go();
   }
 
   /**
@@ -164,14 +179,178 @@
    */
   function setOption(key: keyof WorldOptions, value: string) {
     if (options[key] === value) return;
+    // (The town and villages are laid again on the land as shaped; the hills and woods make the land itself again.)
+    if (shaped && keepLand && (key === 'hills' || key === 'woods')) {
+      const label = OPTION_FIELDS.find((f) => f.key === key)?.label.toLowerCase() ?? key;
+      return ask(`Changing the ${label} makes the land again: your changes to it go.`, `Change the ${label}`, 'panel', () => {
+        keepLand = false;
+        setOption(key, value);
+      });
+    }
     app.worldOptions = { ...options, [key]: value };
     clearTimeout(settling);
     waiting = true;
     settling = setTimeout(() => {
       const seed = making ? wanted?.seed : world?.seed;
+      const land = keepLand ? shapedLand() : undefined;
+      keepLand = true;
       if (seed === undefined) return void (waiting = false);
-      void make(seed, making ? wanted?.name : name.trim() || undefined, true);
+      void make(seed, making ? wanted?.name : name.trim() || undefined, true, land);
     }, 300);
+  }
+
+  // ---- Shaping the land (the Shape panel) ------------------------------------------------------
+
+  /** The panel shows the world's choices, or the land brushes. */
+  let view = $state<'world' | 'shape'>('world');
+  /** The brushes' editor, for the world shown (null until Shape is first chosen for it). */
+  let editor = $state.raw<LandEditor | null>(null);
+  let editorOf: NeighbourhoodDraft | null = null;
+  let surveying = $state(false);
+  let brush = $state<BrushState>(startBrush());
+  /** Counts the land's changes (the editor changes it in place): what reads the editor reads it. */
+  let landTick = $state(0);
+  const land = $derived.by(() => {
+    void landTick;
+    const e = editor;
+    const changed = e?.changed();
+    return { canUndo: !!e?.canUndo, canRedo: !!e?.canRedo, hint: e?.hint ?? null, edited: !!e?.land.edited, changed: !!changed && (changed.heights || changed.water || changed.cover) };
+  });
+  /** The land differs from the world as generated (shaped here, or before step 2): what makes the land again asks first. */
+  const shaped = $derived(land.edited || (!editor && !!world?.open?.land?.edited));
+  /** A mountain's ghost while it is dragged out (SVG path data, screen pixels). */
+  let ghost = $state('');
+  /** A choice that would throw the land's shaping away, waiting for a yes (shown where it was made). */
+  let confirming = $state<{ text: string; yes: string; at: 'panel' | 'actions'; go: () => void } | null>(null);
+  /** Bumped when a choice is not made after all (the switches show the choice as it was). */
+  let unasked = $state(0);
+  /** The next option change lays the town on the shaped land (false once the player chose to let it go). */
+  let keepLand = true;
+  /** The town on screen, once it is (the land is surveyed from it). */
+  let shown: Promise<void> = Promise.resolve();
+
+  function ask(text: string, yes: string, at: 'panel' | 'actions', go: () => void) {
+    confirming = { text, yes, at, go };
+  }
+  function answer(yes: boolean) {
+    const c = confirming;
+    confirming = null;
+    if (yes) c?.go();
+    else unasked++;
+  }
+
+  /** The shaped land, to lay a town on again (none if it isn't shaped). */
+  function shapedLand(): Land | undefined {
+    if (editor) return editor.land.edited ? editor.land : undefined;
+    return world?.open?.land?.edited ? world.open.land : undefined;
+  }
+
+  const surface: LandSurface = {
+    pick: (x, y) => menuScene.landAt(x, y),
+    changed: (rect, done) => menuScene.landChanged(rect, done),
+    cursor: (c) => menuScene.brush(c),
+    project: (x, y, z, out) => menuScene.project(x, y, z, out),
+  };
+  const stroke = $derived(editor ? new LandStroke(editor, surface, { brush: () => brushOf(brush), ended: () => landTick++, ghost: (d) => (ghost = d) }) : null);
+  /** The brush in the town's hand while Shape is up (and the world isn't being made again). */
+  const stageTool = $derived.by((): StageTool | null => {
+    const s = stroke;
+    if (view !== 'shape' || !s || making) return null;
+    return {
+      down: (x, y) => s.down(x, y),
+      move: (x, y) => s.move(x, y),
+      up: () => void s.up(),
+      hover: (x, y) => s.hover(x, y),
+      leave: () => s.leave(),
+      cancel: () => {
+        s.cancel();
+        ghost = '';
+        landTick++;
+      },
+    };
+  });
+
+  function setView(v: 'world' | 'shape') {
+    view = v;
+    confirming = null;
+    if (v === 'shape') {
+      focus = null;
+      hover = null;
+      void survey();
+    }
+  }
+
+  /** The land of the world shown, for the brushes: surveyed once (behind a spinner), then drawn from the field the brushes change. */
+  async function survey() {
+    const w = world;
+    if (!w || making || (editor && editorOf === w) || surveying) return;
+    surveying = true;
+    try {
+      await shown;
+      const field = await menuScene.landOf();
+      const preview = menuScene.preview;
+      if (world !== w || making || !preview) return;
+      // (A world laid again on a shaped land, or shaped before step 2, is shaped already: what makes the land again still asks.)
+      field.edited ||= !!w.open?.land?.edited;
+      editor = LandEditor.forWorld(field, builtOf(preview), { water: w.open?.water, zones: w.open?.zones });
+      editorOf = w;
+      menuScene.setLand(field);
+      landTick++;
+    } catch (err) {
+      console.error('[land] surveying the land failed:', err);
+      toast("The land couldn't be surveyed. Try again in a moment.");
+      view = 'world';
+    } finally {
+      surveying = false;
+    }
+  }
+
+  /** The editor let go (another world, or the town laid again: its land is surveyed again). */
+  function dropEditor() {
+    stroke?.dispose();
+    editor = null;
+    editorOf = null;
+    ghost = '';
+    landTick++;
+  }
+
+  function landUndo() {
+    const patch = editor?.undo();
+    if (patch) menuScene.landChanged(patch.rect, true);
+    landTick++;
+  }
+  function landRedo() {
+    const patch = editor?.redo();
+    if (patch) menuScene.landChanged(patch.rect, true);
+    landTick++;
+  }
+  function landReset() {
+    const rect = editor?.reset();
+    if (rect) menuScene.landChanged(rect, true);
+    landTick++;
+  }
+
+  /** The town and its villages laid out again on the land as shaped (its roads, lots and names as near as they fit). */
+  function layAgain() {
+    const field = shapedLand();
+    if (!field || !world) return;
+    void make(world.seed ?? roll(), name.trim() || undefined, true, field);
+  }
+
+  function onShapeKey(e: KeyboardEvent) {
+    if (view !== 'shape' || !editor || making) return;
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.type !== 'range') return;
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    const key = e.key.toLowerCase();
+    if (key === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) landRedo();
+      else landUndo();
+    } else if (key === 'y' && e.ctrlKey) {
+      e.preventDefault();
+      landRedo();
+    }
   }
 
   function rollName() {
@@ -181,9 +360,17 @@
 
   function next() {
     if (!world) return;
-    const chosen = { ...world, name: name.trim() || world.name };
-    // The same world as before (back and forth): its neighbours stay.
-    const same = app.town && app.town.seed === chosen.seed && app.town.world?.kind === chosen.world?.kind && sameOptions(app.town.world?.options, chosen.world?.options);
+    stroke?.cancel();
+    // The land as shaped goes with it (`applyLand`: in its town file, the water walked round, the zones).
+    const named = { ...world, name: name.trim() || world.name };
+    const chosen = editor && editorOf === world ? applyLand(named, editor) : named;
+    // The same world as before (back and forth, the land as it was): its neighbours stay.
+    const same =
+      app.town &&
+      app.town.seed === chosen.seed &&
+      app.town.world?.kind === chosen.world?.kind &&
+      sameOptions(app.town.world?.options, chosen.world?.options) &&
+      landHash(app.town.open?.land?.edited ? app.town.open.land : null) === landHash(chosen.open?.land?.edited ? chosen.open.land : null);
     app.town = same && app.town ? { ...app.town, name: chosen.name } : null;
     app.world = chosen;
     app.screen = 'neighbourhood';
@@ -192,7 +379,7 @@
   onMount(async () => {
     templates = await loadTemplates();
     // Back from step 2: the world made before (still on screen). Else a new one is made now.
-    if (world) void menuScene.show(world);
+    if (world) shown = menuScene.show(world);
     else {
       // (Not the town the main menu glided away from, if it is still there.)
       void menuScene.hide();
@@ -211,6 +398,41 @@
     menuScene.highlight({ hover, selected: focus, marked: [], outlines: true });
   });
   $effect(() => () => menuScene.highlight({}));
+  // Leaving step 1: the brush put down, its cursor gone.
+  $effect(() => () => {
+    stroke?.dispose();
+    menuScene.brush(null);
+  });
+  $effect(() =>
+    installLandHook({
+      editor: () => editor,
+      surface: () => surface,
+      undo: landUndo,
+      redo: landRedo,
+      changed: () => landTick++,
+      camera: { pan: (dx, dz) => menuScene.pan(dx, dz), zoom: (f) => menuScene.nudge(0, f) },
+    }),
+  );
+
+  /**
+   * Arrow keys in the place grid: across by one (wrapping round), up and down by a row, as many as
+   * the grid shows in a row (three beside the town, more under it when narrow). A radio group: a move
+   * chooses the place, as a click does.
+   */
+  function onPlaceKey(e: KeyboardEvent) {
+    const grid = e.currentTarget as HTMLElement;
+    const row = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+    const step = ({ ArrowRight: 1, ArrowLeft: -1, ArrowDown: row, ArrowUp: -row } as Record<string, number>)[e.key];
+    if (!step) return;
+    e.preventDefault();
+    if (!templates) return;
+    const n = WORLD_KINDS.length;
+    const at = WORLD_KINDS.indexOf(kind);
+    const next = Math.abs(step) === 1 ? (at + step + n) % n : at + step;
+    if (next < 0 || next >= n) return;
+    choose(WORLD_KINDS[next]);
+    (grid.children[next] as HTMLElement | undefined)?.focus();
+  }
 
   /** Keeps lot tags clear of this element. */
   const avoid = (el: HTMLElement) => ({ destroy: menuScene.avoid(el) });
@@ -244,28 +466,163 @@
   </svg>
 {/snippet}
 
-<div class="screen scaled">
-  <div class="haze" aria-hidden="true"></div>
-  <header use:avoid>
-    <button class="btn ghost back" onclick={toMenu}><Icon name="icon.ui.back" size={18} /> Menu</button>
-    <div class="title">
-      <span class="eyebrow">Step 1 of 4 · A new world</span>
-      <div class="name-field">
-        <input class="input town-name" aria-label="Town name" placeholder={world ? "" : "Naming the town…"} bind:value={name} oninput={() => (named = true)} maxlength="24" />
-        <button class="btn ghost roll" aria-label="Another name" title="Another name" onclick={rollName}><Icon name="icon.ui.dice" size={18} /></button>
-      </div>
-      {#if world?.world}
-        {#key world.seed}<p class="lede">{world.world.tagline}</p>{/key}
-      {/if}
+{#snippet confirm(c: { text: string; yes: string })}
+  <div class="confirm menu-glass" role="alertdialog" aria-label="Your changes to the land">
+    <p>{c.text}</p>
+    <div class="row">
+      <button class="btn small" onclick={() => answer(false)}>Keep my land</button>
+      <button class="btn small danger" onclick={() => answer(true)}>{c.yes}</button>
     </div>
-    <div class="actions">
-      <button class="btn" disabled={!templates} onclick={another}><Icon name="icon.ui.dice" size={18} /> Another world</button>
-      <button class="btn primary" disabled={!world || making || waiting} onclick={next}>Choose a household →</button>
-    </div>
-  </header>
+  </div>
+{/snippet}
 
-  <main>
+<svelte:window onkeydown={onShapeKey} />
+
+<div class="screen scaled">
+  <div class="layout">
+    <aside class="side menu-glass" use:avoid aria-label="A new world">
+      <div class="head" use:avoid>
+        <button class="btn ghost back" onclick={toMenu}><Icon name="icon.ui.back" size={16} /> Menu</button>
+        <span class="eyebrow">Step 1 of 4 · A new world</span>
+        <div class="name-field">
+          <input class="input town-name" aria-label="Town name" placeholder={world ? '' : 'Naming the town…'} bind:value={name} oninput={() => (named = true)} maxlength="24" />
+          <button class="btn ghost roll" aria-label="Another name" title="Another name" onclick={rollName}><Icon name="icon.ui.dice" size={18} /></button>
+        </div>
+        {#if world?.world}
+          {#key world.seed}<p class="lede">{world.world.tagline}</p>{/key}
+        {/if}
+      </div>
+
+      <!-- The world's choices, in sections down the panel (scrolling when they don't fit), or (Shape)
+           the brushes for the land itself; a switch between the two first in the panel. -->
+      <div class="panel" use:avoid>
+        <div class="switch">
+          <Segmented
+            fill
+            label="Panel"
+            value={view}
+            options={[
+              { value: 'world', label: 'World' },
+              { value: 'shape', label: 'Shape the land', disabled: !world },
+            ]}
+            onchange={setView}
+          />
+        </div>
+        {#if confirming?.at === 'panel'}
+          {@render confirm(confirming)}
+        {/if}
+        {#if view === 'shape'}
+          <div class="shape">
+            {#if surveying || (!editor && making)}
+              <p class="surveying" role="status"><span class="spinner"></span> {making ? 'Laying out the world…' : 'Surveying the land…'}</p>
+            {:else if editor}
+              <LandPalette
+                bind:brush
+                canUndo={land.canUndo}
+                canRedo={land.canRedo}
+                canReset={land.changed}
+                hint={land.hint}
+                disabled={making}
+                onundo={landUndo}
+                onredo={landRedo}
+                onreset={landReset}
+              >
+                {#snippet extra()}
+                  <div class="again">
+                    <button class="btn" disabled={!shaped || making} onclick={layAgain}><Icon name="icon.ui.home" size={16} /> Lay the town again</button>
+                    <p class="hint">The roads and lots laid out afresh to fit the land as you shaped it. Changing the Town or Villages does this too.</p>
+                  </div>
+                {/snippet}
+              </LandPalette>
+              <p class="keys"><b>Left</b> paints · <b>right</b> turns · <b>middle</b> or <kbd>Space</kbd> pans · wheel zooms</p>
+            {/if}
+          </div>
+        {:else}
+        <div class="sections">
+          <section class="group" aria-labelledby="place-head">
+            <h2 class="eyebrow" id="place-head">Place</h2>
+            <div class="places" role="radiogroup" aria-labelledby="place-head" aria-describedby="place-blurb" tabindex="-1" onkeydown={onPlaceKey}>
+              {#each WORLD_KINDS as k (k)}
+                <button class="place" role="radio" aria-checked={kind === k} class:on={kind === k} tabindex={kind === k ? 0 : -1} disabled={!templates} onclick={() => choose(k)}>
+                  <span class="glyph">{@render glyph(k)}</span>
+                  <span class="label">{WORLDS[k].label}</span>
+                </button>
+              {/each}
+            </div>
+            <p class="blurb" id="place-blurb">{WORLDS[kind].blurb}</p>
+          </section>
+
+          <section class="group" aria-labelledby="yours-head">
+            <h2 class="eyebrow" id="yours-head">Your world</h2>
+            <p class="hint summary">{sizeHint || '\u00a0'}</p>
+            <div class="options">
+              {#key unasked}
+                {#each OPTION_FIELDS as f (f.key)}
+                  <div class="option">
+                    <span class="eyebrow sub">{f.label}</span>
+                    <Segmented fill label={f.label} value={options[f.key]} options={f.choices} onchange={(v) => setOption(f.key, v)} />
+                  </div>
+                {/each}
+              {/key}
+            </div>
+          </section>
+
+          <div class="game">
+            <section class="group" aria-labelledby="game-head">
+              <h2 class="eyebrow" id="game-head">Game</h2>
+              <Segmented
+                fill
+                label="Game"
+                bind:value={app.mode}
+                options={[
+                  { value: 'living', label: 'Living' },
+                  { value: 'creative', label: 'Creative' },
+                ]}
+              />
+              <p class="hint">{app.mode === 'creative' ? 'Building is free. No rent or bills at home.' : 'Your residents earn the money to build with.'}</p>
+            </section>
+            <section class="group" aria-labelledby="lifespan-head">
+              <h2 class="eyebrow" id="lifespan-head">Lifespan</h2>
+              <Segmented
+                fill
+                label="Lifespan"
+                bind:value={app.lifespan}
+                options={[
+                  { value: 'off', label: 'Off' },
+                  { value: 'short', label: 'Short' },
+                  { value: 'normal', label: 'Normal' },
+                  { value: 'long', label: 'Long' },
+                ]}
+              />
+              <p class="hint">{lifespanHint(app.lifespan)}</p>
+            </section>
+          </div>
+        </div>
+        {/if}
+      </div>
+    </aside>
+
     <section class="view">
+      {#if world}
+        <TownStage {labels} {hover} selected={focus} {focus} onhover={(p) => (hover = p)} onselect={(p) => (focus = p === focus ? null : p)} tool={stageTool} {ghost} />
+      {:else}
+        <div></div>
+      {/if}
+      {#if world}
+        <div class="stats" use:avoid aria-label="World summary">
+          <span><b>{roadCount}</b> {roadCount === 1 ? 'road' : 'roads'}</span>
+          <span><b>{homes}</b> homes</span>
+          {#if farms}<span><b>{farms}</b> {farms === 1 ? 'farm' : 'farms'}</span>{/if}
+          <span><b>{places}</b> public {places === 1 ? 'place' : 'places'}</span>
+        </div>
+      {/if}
+      <div class="actions" use:avoid>
+        <button class="btn" disabled={!templates} onclick={another}><Icon name="icon.ui.dice" size={18} /> Another world</button>
+        <button class="btn primary" disabled={!world || making || waiting} onclick={next}>Choose a household →</button>
+        {#if confirming?.at === 'actions'}
+          {@render confirm(confirming)}
+        {/if}
+      </div>
       {#if making}
         <div class="making menu-glass" role="status" aria-live="polite" aria-label="Making the world">
           <span class="eyebrow">{changing ? 'Changing the world' : world ? 'Another world' : 'A new world'}</span>
@@ -280,128 +637,68 @@
           </ol>
         </div>
       {/if}
-      {#if world}
-        <TownStage {labels} {hover} selected={focus} {focus} onhover={(p) => (hover = p)} onselect={(p) => (focus = p === focus ? null : p)} />
-      {:else}
-        <div></div>
-      {/if}
-      {#if world}
-        <div class="controls menu-glass" use:avoid>
-          <div class="row yours" role="group" aria-label="Your world">
-            <div class="control summary">
-              <span class="eyebrow">Your world</span>
-              <span class="hint">{sizeHint}</span>
-            </div>
-            {#each OPTION_FIELDS as f (f.key)}
-              <div class="control option">
-                <span class="eyebrow">{f.label}</span>
-                <Segmented label={f.label} value={options[f.key]} options={f.choices} onchange={(v) => setOption(f.key, v)} />
-              </div>
-            {/each}
-          </div>
-          <div class="row">
-            <div class="control">
-              <span class="eyebrow">Game</span>
-              <Segmented
-                label="Game"
-                bind:value={app.mode}
-                options={[
-                  { value: 'living', label: 'Living' },
-                  { value: 'creative', label: 'Creative' },
-                ]}
-              />
-              <span class="hint">{app.mode === 'creative' ? 'Building is free. No rent or bills at home.' : 'Your residents earn the money to build with.'}</span>
-            </div>
-            <div class="control">
-              <span class="eyebrow">Lifespan</span>
-              <Segmented
-                label="Lifespan"
-                bind:value={app.lifespan}
-                options={[
-                  { value: 'off', label: 'Off' },
-                  { value: 'short', label: 'Short' },
-                  { value: 'normal', label: 'Normal' },
-                  { value: 'long', label: 'Long' },
-                ]}
-              />
-              <span class="hint">{lifespanHint(app.lifespan)}</span>
-            </div>
-            <div class="stats" aria-label="World summary">
-              <span><b>{roadCount}</b> {roadCount === 1 ? 'road' : 'roads'}</span>
-              <span><b>{homes}</b> homes</span>
-              {#if farms}<span><b>{farms}</b> {farms === 1 ? 'farm' : 'farms'}</span>{/if}
-              <span><b>{places}</b> public {places === 1 ? 'place' : 'places'}</span>
-            </div>
-          </div>
-        </div>
-      {/if}
     </section>
-
-    <aside class="kinds menu-glass" use:avoid>
-      <header class="list-head">
-        <span class="eyebrow">Where it takes place</span>
-      </header>
-      <div class="list" role="radiogroup" aria-label="Kind of world">
-        {#each WORLD_KINDS as k (k)}
-          <button class="kind" role="radio" aria-checked={kind === k} class:on={kind === k} disabled={!templates} onclick={() => choose(k)}>
-            <span class="glyph">{@render glyph(k)}</span>
-            <span class="info">
-              <b>{WORLDS[k].label}</b>
-              <span>{WORLDS[k].blurb}</span>
-            </span>
-          </button>
-        {/each}
-      </div>
-    </aside>
-  </main>
+  </div>
 </div>
 
 <style>
+  /* Beside the town: one slim panel down the left (the world's name, its place and options, the
+     game's), the town in the rest of the screen, the way on at its top right. */
   .screen {
+    --pad: 18px;
     position: relative;
     /* (Viewport units count in the UI scale.) */
     height: calc(100vh / var(--ui-scale));
     container: setup / inline-size;
+  }
+  .layout {
+    height: 100%;
     display: grid;
-    /* As wide as the screen, whatever the header's buttons would like. */
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 1fr;
+    grid-template-columns: clamp(300px, 24%, 340px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: 'side view';
     padding: 20px 28px 24px;
-    gap: 14px;
+    gap: 24px;
   }
-  /* Light haze behind the header so its text reads on any part of the scene. */
-  .haze {
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 150px;
-    background: var(--scene-haze);
-    pointer-events: none;
-  }
-  header {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-  }
-  .back {
-    color: var(--text-strong);
-  }
-  .title {
-    flex: 1;
+  /* (As tall as its choices, and no taller than the screen: then they scroll.) */
+  .side {
+    grid-area: side;
+    align-self: start;
+    max-height: 100%;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    overflow: hidden;
+    animation: rise 520ms var(--ease) both;
   }
-  .title .eyebrow {
+  .head {
+    grid-area: head;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 10px var(--pad) 14px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .back {
+    height: 32px;
+    padding: 0 10px;
+    margin: 0 0 2px -10px;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-strong);
+  }
+  .eyebrow {
+    margin: 0;
     color: #4a5163;
   }
   /* The name is a field you can type in, not a heading: a surface and a hairline of its own at rest,
      a solid field under the pointer, the accent ring while it has the caret. The dice (roll another
      name) sits in the field's end. */
   .name-field {
+    align-self: stretch;
     display: flex;
     align-items: center;
-    max-width: 440px;
     padding: 0 4px 0 12px;
     border: 1px solid var(--hairline);
     border-radius: var(--radius-md);
@@ -422,11 +719,11 @@
   .name-field .town-name {
     flex: 1;
     min-width: 0;
-    height: 46px;
+    height: 42px;
     padding: 0;
-    font-size: 26px;
+    font-size: 22px;
     font-weight: 750;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.02em;
     color: var(--text-strong);
     background: transparent;
     border: none;
@@ -443,65 +740,300 @@
     padding: 0;
     color: #4a5163;
   }
+  /* (Two lines kept for it, as for the place's blurb: the choices under it stay put from world to world.) */
   .lede {
-    margin: 0;
-    font-size: 14px;
+    margin: 2px 0 0;
+    min-height: 2lh;
+    font-size: 13px;
     font-weight: 550;
     font-style: italic;
+    line-height: 1.4;
     color: #3b4254;
     animation: rise 420ms var(--ease) both;
   }
-  .actions {
-    display: flex;
-    gap: 10px;
-  }
-  main {
-    position: relative;
+  /* The choices: they scroll under the name when the window is too short for them all. */
+  .panel {
+    grid-area: panel;
+    flex: 1;
     min-height: 0;
-    display: grid;
-    grid-template-columns: 1fr minmax(360px, 420px);
-    /* One row as tall as the screen allows: a long side panel scrolls rather than stretching the town view. */
-    grid-template-rows: minmax(0, 1fr);
-    gap: 24px;
+    overflow: auto;
+    overscroll-behavior: contain;
   }
-  /* Too narrow for the town beside the panel (a small window or a large UI scale): the town on
-     top, the panel under it. */
-  @container setup (max-width: 760px) {
-    .screen > header {
-      flex-wrap: wrap;
-      row-gap: 10px;
-    }
-    /* The title keeps a readable width; the buttons take the next line when they must. */
-    .screen > header .title {
-      flex: 1 1 300px;
-    }
-    main {
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr);
-      gap: 14px;
-    }
-    .kinds {
-      align-self: stretch;
-    }
+  .sections {
+    display: flex;
+    flex-direction: column;
+  }
+  /* World | Shape the land: over everything else in the panel. */
+  .switch {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 12px var(--pad) 10px;
+    background: linear-gradient(var(--glass-menu) 75%, transparent);
+  }
+  .switch :global(.segmented) {
+    font-size: 13px;
+  }
+  .shape {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 4px var(--pad) 16px;
+    animation: rise 260ms var(--ease) both;
+  }
+  .surveying {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 18px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+  .again {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+    padding-top: 12px;
+    border-top: 1px solid var(--hairline);
+  }
+  .again .btn {
+    align-self: stretch;
+    justify-content: center;
+    gap: 8px;
+  }
+  .keys {
+    margin: 0;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+  .keys b {
+    font-weight: 650;
+    color: var(--text);
+  }
+  kbd {
+    padding: 0 5px;
+    border-radius: 4px;
+    background: var(--hairline);
+    font-family: inherit;
+    font-size: 11px;
+  }
+  /* A choice that would throw the land's shaping away: asked first, where it was made. */
+  .confirm {
+    margin: 0 var(--pad) 10px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 550;
+    color: var(--text-strong);
+    animation: rise 220ms var(--ease) both;
+  }
+  .confirm p {
+    margin: 0;
+    line-height: 1.4;
+  }
+  .confirm .row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  /* (Under the way on, at its right.) */
+  .actions .confirm {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: min(340px, 100%);
+    margin: 0;
+  }
+  .btn.small {
+    height: 30px;
+    padding: 0 11px;
+    font-size: 12.5px;
+  }
+  .danger {
+    background: var(--bad);
+    color: #fff;
+  }
+  .group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px var(--pad) 14px;
+  }
+  .group + .group,
+  .group + .game,
+  .game .group + .group {
+    border-top: 1px solid var(--hairline);
+  }
+  .hint {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-muted);
+  }
+  /* The nine places: a glyph each with its name under it, the chosen one ringed. */
+  .places {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .place {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    padding: 6px 4px;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    background: color-mix(in srgb, var(--surface) 40%, transparent);
+    color: var(--text-strong);
+    transition:
+      background var(--fast) var(--ease),
+      border-color var(--fast) var(--ease),
+      box-shadow var(--fast) var(--ease);
+  }
+  .place:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.8);
+  }
+  .place:disabled {
+    cursor: default;
+  }
+  .place.on {
+    background: #fff;
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .glyph {
+    display: grid;
+    place-items: center;
+    width: 50px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-muted);
+    color: #4a5163;
+    transition:
+      background var(--fast) var(--ease),
+      color var(--fast) var(--ease);
+  }
+  .glyph :global(svg) {
+    width: 38px;
+    height: 25px;
+  }
+  .place.on .glyph {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .place .label {
+    max-width: 100%;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .place.on .label {
+    color: var(--accent);
+  }
+  /* (Two lines kept for it, the longest place's: the options under it don't jump as places change.) */
+  .blurb {
+    margin: 2px 0 0;
+    min-height: 2lh;
+    font-size: 12.5px;
+    line-height: 1.4;
+    font-weight: 550;
+    color: var(--text-muted);
+  }
+  .summary {
+    color: #3b4254;
+    font-weight: 550;
+    margin-bottom: 2px;
+  }
+  .options {
+    display: grid;
+    gap: 8px;
+  }
+  .option {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 13px;
+  }
+  .eyebrow.sub {
+    font-size: 10.5px;
+    color: var(--text-muted);
+  }
+  .group :global(.segmented) {
+    font-size: 13px;
   }
   .view {
+    grid-area: view;
     position: relative;
     min-height: 0;
     display: grid;
-    grid-template-rows: 1fr auto;
-    gap: 14px;
-    /* The stream pill floats at the window's bottom edge, centred (StreamIndicator): the controls
-       bar and the stats stay clear above it rather than under it. */
-    padding-bottom: calc(70px / var(--ui-scale));
+    grid-template-rows: minmax(0, 1fr);
   }
-  /* The world's making, step by step: in the middle of the stage (over the last world, if any, which stays in view meanwhile). */
+  /* The way on, at the top right over the town, a short haze behind it so it reads on roofs and roads. */
+  .actions {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+    animation: rise 520ms 80ms var(--ease) both;
+  }
+  .actions::before {
+    content: '';
+    position: absolute;
+    inset: -60px -60px -50px -90px;
+    z-index: -1;
+    background: radial-gradient(closest-side, rgba(252, 249, 243, 0.7), rgba(252, 249, 243, 0.35) 55%, rgba(252, 249, 243, 0));
+    pointer-events: none;
+  }
+  /* The world in figures, small at the top left of the town (clear of the stream pill at the bottom). */
+  .stats {
+    position: absolute;
+    top: 6px;
+    left: 0;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: calc(100% - 420px);
+    color: #3b4254;
+    font-size: 12px;
+    font-weight: 550;
+    pointer-events: none;
+    animation: rise 520ms 120ms var(--ease) both;
+  }
+  .stats span {
+    padding: 5px 10px;
+    border-radius: var(--radius-pill);
+    background: var(--glass-menu);
+    border: 1px solid var(--glass-menu-border);
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  }
+  .stats b {
+    color: var(--text-strong);
+    font-weight: 750;
+  }
+  /* The world's making, step by step: in the middle of the town's view (over the last world, if any, which stays in view meanwhile). */
   .making {
     position: absolute;
     inset: 0;
     margin: auto;
     width: min(320px, 100%);
     height: max-content;
-    z-index: 1;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -553,158 +1085,110 @@
     width: 12px;
     height: 12px;
   }
-  /* Two rows: the world's options (with the world in a line), then the game's; each wraps when narrow. */
-  .controls {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 14px 20px;
-    justify-self: start;
-    max-width: 100%;
-    animation: rise 520ms var(--ease) both;
-  }
-  .row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px 28px;
-  }
-  .row.yours {
-    align-items: flex-start;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--hairline);
-  }
-  .control {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-width: 200px;
-  }
-  .control.option {
-    min-width: 0;
-  }
-  .summary .hint {
-    max-width: 230px;
-  }
-  .hint {
-    font-size: 12px;
-    color: var(--text-muted);
-    max-width: 210px;
-  }
-  .controls .eyebrow,
-  .list-head .eyebrow {
-    color: #4a5163;
-  }
-  .stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    color: #3b4254;
-    font-size: 13px;
-    font-weight: 550;
-  }
-  .stats span {
-    padding: 5px 10px;
-    border-radius: var(--radius-pill);
-    background: rgba(29, 34, 48, 0.06);
-  }
-  .stats b {
-    color: var(--text-strong);
-    font-weight: 750;
-  }
-  .kinds {
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    padding: 16px 12px 12px 16px;
-    align-self: start;
-    max-height: 100%;
-    animation: rise 520ms 80ms var(--ease) both;
-  }
-  .list-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    padding: 0 6px 10px 2px;
-    border-bottom: 1px solid var(--hairline);
-    margin-bottom: 8px;
-  }
-  .list {
-    min-height: 0;
-    overflow: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding-right: 4px;
-  }
-  .kind {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 10px 12px;
-    text-align: left;
-    border-radius: var(--radius-md);
-    border: 1px solid transparent;
-    color: var(--text-strong);
-    transition:
-      background var(--fast) var(--ease),
-      border-color var(--fast) var(--ease);
-  }
-  .kind:hover {
-    background: rgba(255, 255, 255, 0.75);
-  }
-  .kind.on {
-    background: #fff;
-    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
-  }
-  .glyph {
-    flex: none;
-    display: grid;
-    place-items: center;
-    width: 60px;
-    height: 44px;
-    border-radius: var(--radius-md);
-    background: var(--surface-muted);
-    color: #4a5163;
-  }
-  .kind.on .glyph {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-  .info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .info span {
-    color: var(--text-muted);
-    font-size: 12.5px;
-    font-weight: 550;
-  }
-  /* Narrow (as above): the town gets what height there is. The stream pill floats over the places'
-     list instead (its last place scrolls clear of it), the world's line takes the panel's width, and
-     the stats, which that line already sums up, are left out. */
-  @container setup (max-width: 760px) {
-    .view {
-      padding-bottom: 0;
+  /* A window not much wider than the panel and the town: the stream pill, centred at the window's
+     bottom edge, would reach the panel's end; the panel stops short of it (its choices scroll sooner),
+     and the stats make way for the buttons. */
+  @container setup (max-width: 1000px) {
+    .side {
+      max-height: calc(100% - 72px / var(--ui-scale));
     }
-    .list {
-      padding-bottom: calc(56px / var(--ui-scale));
-    }
-    .summary {
-      flex-basis: 100%;
-      flex-flow: row wrap;
-      align-items: baseline;
-      gap: 4px 12px;
-    }
-    .summary .hint {
-      max-width: none;
-    }
+  }
+  @container setup (max-width: 1120px) {
     .stats {
       display: none;
+    }
+  }
+  /* Too narrow for the town beside the panel (a small window or a large UI scale): the name on top,
+     the way on under it, the town, then the choices in a panel of their own. The stats are left
+     out (the world's line sums them up). */
+  @container setup (max-width: 760px) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-areas: 'head' 'view' 'panel';
+      gap: 12px;
+      /* (The stream pill, centred at the window's bottom edge, gets a strip of town of its own under the panel.) */
+      padding: 16px 20px calc(70px / var(--ui-scale) + 26px);
+    }
+    .side {
+      display: contents;
+    }
+    .head,
+    .panel {
+      background: var(--glass-menu);
+      border: 1px solid var(--glass-menu-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--glass-menu-shadow);
+      backdrop-filter: blur(22px) saturate(1.5);
+      -webkit-backdrop-filter: blur(22px) saturate(1.5);
+    }
+    .head {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 6px 12px;
+      padding: 10px 14px 12px;
+    }
+    .back {
+      margin: 0 0 0 -6px;
+    }
+    .head > :not(.back) {
+      grid-column: 1 / -1;
+    }
+    .head > .eyebrow {
+      grid-column: 2;
+      grid-row: 1;
+    }
+    .view {
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 10px;
+    }
+    /* (First in the view, over the town: before it, or its stand-in while the first world is made.) */
+    .actions {
+      order: -1;
+      position: relative;
+      justify-content: flex-start;
+    }
+    .actions::before {
+      display: none;
+    }
+    /* (All nine in a row at the narrow layout's widest; a second row as it narrows.) */
+    .places {
+      grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+      gap: 4px;
+    }
+    .place {
+      padding-inline: 0;
+    }
+    .place .label {
+      font-size: 11px;
+      letter-spacing: -0.01em;
+    }
+    .lede {
+      min-height: 0;
+    }
+    .options {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 16px;
+    }
+    .game {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .game .group + .group {
+      border-top: 0;
+      border-left: 1px solid var(--hairline);
+    }
+  }
+  /* Narrower still (a phone's width): one option to a row. */
+  @container setup (max-width: 560px) {
+    .options,
+    .game {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .game .group + .group {
+      border-left: 0;
+      border-top: 1px solid var(--hairline);
     }
   }
   @keyframes rise {

@@ -121,6 +121,13 @@
 //! facing), built and taken down in Build mode. A file before it had its porches drawn by the
 //! renderer over the front door the garden path met: they're worked out again from its doors and
 //! its paths as it loads (`World::guess_porches`), so the town looks as it did; it has no pieces.
+//! Still 39: the land may be shaped in play (Build mode's Land tab, `land.rs`). Its heights, water
+//! levels and cover are the page's, carried in the meta (`meta.land`: the land's size and its
+//! tiles, `h` and `wl` coded strings by tile, `cover` run-length; `meta.zones` worked out again
+//! from it), saved and loaded as the rest of the meta is, without the simulation reading it. The
+//! town file's water mask (`openWorld.terrain.water`) may now change in play too, and is saved as
+//! it is then; who may walk where is worked out from it again as the game loads. A file without
+//! `meta.land` has its land drawn from the landscape, as before, so nothing changes version.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 

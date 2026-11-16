@@ -1,6 +1,7 @@
 // Residents on the land (`residents.ts` `setGround`): out on a big world's hills between its hamlets a resident walks
 // on the ground there, not at the flat 0 of what's built (sunk into a hill, floating over a hollow), and with no land
-// given (or flat land) nothing changes. `bun test`.
+// given (or flat land) nothing changes. On a land the town follows a step in the ground (onto a lot's pad, over a
+// kerb) is eased over a few frames, not taken at once. `bun test`.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { readFileSync, existsSync } from 'node:fs';
 import { TICK_RATES, TICKS_PER_SECOND } from './snapshotLayout';
@@ -106,8 +107,8 @@ describe('residents on the land', async () => {
     snap[o + k.mood] = 0.5;
   }
 
-  /** The head's height over the land under it, frame by frame, walking up `land` (none: flat). */
-  async function walk(land: ((x: number, z: number) => number) | null): Promise<{ over: number[]; floors: number[] }> {
+  /** The head's height over the land under it, frame by frame, walking up `land` (none: flat); `xs` where they were each frame. */
+  async function walk(land: ((x: number, z: number) => number) | null): Promise<{ over: number[]; floors: number[]; xs: number[] }> {
     const realNow = performance.now;
     let now = 0;
     performance.now = () => now;
@@ -126,6 +127,7 @@ describe('residents on the land', async () => {
       const head = { x: 0, y: 0, z: 0 };
       const over: number[] = [];
       const floors: number[] = [];
+      const xs: number[] = [];
       let tick = 0;
       const FPS = 60;
       for (let n = 0; n < SECONDS * FPS; n++) {
@@ -144,9 +146,10 @@ describe('residents on the land', async () => {
         if (t > 0.5 && characters.head(0, head)) {
           over.push(head.y - (land ? land(head.x, head.z) : 0));
           floors.push(rig.floorY);
+          xs.push(head.x);
         }
       }
-      return { over, floors };
+      return { over, floors, xs };
     } finally {
       performance.now = realNow;
     }
@@ -173,5 +176,22 @@ describe('residents on the land', async () => {
     const none = await walk(null);
     const flat = await walk(() => 0);
     expect(flat.over).toEqual(none.over);
+  }, 30_000);
+
+  test('a step in the ground is eased over a few frames, not taken at once; a slope is followed as it is', async () => {
+    // A 40 cm step up halfway along the walk (onto a lot's pad), the land flat either side.
+    const STEP_AT = (SPEED * SECONDS) / 2;
+    const stepped = await walk((x) => (x > STEP_AT ? 0.4 : 0));
+    const jumps = stepped.floors.slice(1).map((f, i) => f - stepped.floors[i]);
+    // No frame takes the whole step: about a third of what is left at 60 frames a second.
+    expect(Math.max(...jumps)).toBeLessThan(0.2);
+    expect(Math.max(...jumps)).toBeGreaterThan(0.05);
+    // Within 120 ms of the step (7 frames), all but a few centimetres of it taken.
+    const at = stepped.floors.findIndex((f) => f > 0.01);
+    expect(at).toBeGreaterThan(0);
+    expect(stepped.floors[at + 7]).toBeGreaterThan(0.38);
+    // A slope (1 in 5) is followed frame by frame, nothing eased: as before.
+    const hill = await walk((x) => 2 + 0.2 * x);
+    for (let i = 0; i < hill.floors.length; i++) expect(Math.abs(hill.floors[i] - (2 + 0.2 * hill.xs[i]))).toBeLessThan(0.5);
   }, 30_000);
 });

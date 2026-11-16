@@ -45,6 +45,8 @@ export interface RoadLand {
   /** Metres past the shoreline (above 0 in the water). */
   waterEdge(x: number, z: number): number;
   distanceToTown(x: number, z: number): number;
+  /** The town's built land follows the land's slopes (`LandscapeLayout.surface`): a road leaves town at the land's height there, not at 0. */
+  follows?: boolean;
 }
 
 /** A point on a road: where it is, the road's surface height there and its width. */
@@ -125,7 +127,7 @@ export class CountryRoads {
       let sum = 0;
       let n = 0;
       for (let k = Math.max(0, i - 3); k <= Math.min(raw.length - 1, i + 3); k++, n++) sum += raw[k];
-      const h = i < 2 ? 0 : Math.max(0.1, sum / n);
+      const h = i < 2 ? (land.follows ? raw[i] : 0) : Math.max(land.follows ? -0.05 : 0.1, sum / n);
       const width = TOWN_WIDTH + (COUNTRY_WIDTH - TOWN_WIDTH) * Math.min(1, i / 6);
       return [px, pz, h, width];
     });

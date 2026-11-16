@@ -109,13 +109,16 @@ export class Geo {
     return this;
   }
 
-  /** Adds `other`'s geometry as it is, its own colours and cutaway data (`append` paints it in this one's colour). */
-  merge(other: Geo): this {
+  /** Adds `other`'s geometry as it is, its own colours and cutaway data (`append` paints it in this one's colour), `dy` m higher. */
+  merge(other: Geo, dy = 0): this {
     const base = this.pos.length / 3;
     const push = (to: number[], from: readonly number[]) => {
       for (let i = 0; i < from.length; i++) to.push(from[i]);
     };
-    push(this.pos, other.pos);
+    if (dy) {
+      const from = other.pos;
+      for (let i = 0; i < from.length; i += 3) this.pos.push(from[i], from[i + 1] + dy, from[i + 2]);
+    } else push(this.pos, other.pos);
     push(this.nor, other.nor);
     push(this.uv, other.uv);
     push(this.col, other.col);
@@ -152,6 +155,13 @@ export class Geo {
     const fz = ax * cy - ay * cx;
     if (fx * n[0] + fy * n[1] + fz * n[2] >= 0) this.idx.push(a, b, c);
     else this.idx.push(a, c, b);
+  }
+
+  /** Every vertex lifted onto the ground: `ground(x, z)` m added to its height (a decal laid flat at 0, draped over a land that slopes). */
+  drape(ground: (x: number, z: number) => number): this {
+    const p = this.pos;
+    for (let i = 0; i < p.length; i += 3) p[i + 1] += ground(p[i], p[i + 2]);
+    return this;
   }
 
   /** The geometry's arrays, with its colours and its cutaway attribute if asked for. */

@@ -10,6 +10,9 @@ import type { ObjectPlacement, PlotInfo, WorldStructure } from '../src/core/prot
 import type { ChunkPlan } from '../src/render/shared/street';
 
 const LOTS = 12;
+/** The street of `town(objects)` drawn, hashed: as it was before land that slopes (see the test). */
+const FLAT_STREET = 2564060151;
+const FLAT_STREET_FOCUS = 3388714705;
 const LOT_W = 20;
 
 /** Lots along both sides of a road running along x at z = 23 (lots north z 0..20, south z 26..46). */
@@ -319,5 +322,94 @@ describe('the street in chunks', async () => {
         for (const t of signs) expect(Math.hypot(t[0] - name![0], t[1] - name![1])).toBeGreaterThanOrEqual(RANK_HALF + 2 * RANK_GAP);
       }
     }
+  });
+
+  // ---- on a land the town follows (`landSurface.ts`), and on one it doesn't --------------------------------------
+
+  /** Every chunk of a street as drawn, for focus `focus`, hashed (`drawn`). */
+  const hashOf = (street: InstanceType<typeof TownStreet>, focus = NO_FOCUS) => {
+    let h = 2166136261;
+    for (const id of street.chunkIds()) for (const ch of drawn(street.chunk(id, focus))) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+    return h >>> 0;
+  };
+  const { blankLand, encodeLand, LAND_CELL } = await import('../src/game/land');
+  const { surfaceOf } = await import('../src/render/shared/landSurface');
+  const { ROAD_Y, WALK_Y } = await import('../src/render/shared/roads');
+  /** `world` on a land rising 6 % along x and 3 % along z, its town following it (or drawn, `seeded`). */
+  const onLand = (world: WorldStructure, seeded: 'follow' | 'drawn' = 'follow'): WorldStructure => {
+    const land = blankLand(world.width, world.depth, seeded);
+    for (let j = 0; j < land.rows; j++) for (let i = 0; i < land.cols; i++) land.h[j * land.cols + i] = Math.round((0.06 * i + 0.03 * j) * LAND_CELL * 100);
+    return { ...world, meta: { ...world.meta!, land: encodeLand(land) } };
+  };
+
+  test('a world its town doesn’t follow draws as it always has', () => {
+    // (Pinned before land that slopes: the street of a world without one, or with one drawn flat under its town.)
+    const flat = hashOf(new TownStreet(new HousePlanner(), town(objects), options, 'game'));
+    expect(flat).toBe(FLAT_STREET);
+    expect(hashOf(new TownStreet(new HousePlanner(), onLand(town(objects), 'drawn'), options, 'game'))).toBe(flat);
+    expect(hashOf(new TownStreet(new HousePlanner(), town(objects), options, 'game'), 4)).toBe(FLAT_STREET_FOCUS);
+  });
+
+  test('on a land the town follows, each lot’s share stands on its pad, the road and its kerbside things on the road', () => {
+    const world = onLand(town(objects));
+    const surface = surfaceOf(world)!;
+    expect(surface).not.toBeNull();
+    const flat = new TownStreet(new HousePlanner(), town(objects), options, 'game');
+    const street = new TownStreet(new HousePlanner(), world, options, 'game');
+    // A house's walls: as on flat land, its pad higher.
+    const lot = 16;
+    const id = chunkAt(world.plots[lot].x + 10, world.plots[lot].z + 10);
+    const pad = surface.padY(lot);
+    expect(pad).toBeGreaterThan(5);
+    const minY = (c: ChunkPlan, x0: number, x1: number, z0: number, z1: number) => {
+      let low = Infinity;
+      for (const part of c.silhouettes.parts) {
+        const p = part.geo.pos;
+        for (let k = 0; k < p.length; k += 3) if (p[k] >= x0 && p[k] <= x1 && p[k + 2] >= z0 && p[k + 2] <= z1) low = Math.min(low, p[k + 1]);
+      }
+      return low;
+    };
+    const P = world.plots[lot];
+    const [a, b] = [flat.chunk(id, NO_FOCUS), street.chunk(id, NO_FOCUS)];
+    expect(minY(b, P.x, P.x + P.w, P.z, P.z + P.d) - minY(a, P.x, P.x + P.w, P.z, P.z + P.d)).toBeCloseTo(pad, 4);
+    // A thing in a garden lifted by its lot's pad (lot 4's bench at x 44).
+    const bench = (st: InstanceType<typeof TownStreet>) => st.chunk(chunkAt(44, 2), NO_FOCUS).batches.get('model.gardenBench')!.find(([x]) => x > 40 && x < 50)!;
+    expect((bench(street)[5] ?? 0) - (bench(flat)[5] ?? 0)).toBeCloseTo(surface.padY(4), 4);
+    // The road's surface on the road's height (`ROAD_Y` over it), every vertex.
+    const road = world.meta!.roads![0];
+    for (const cid of street.chunkIds()) {
+      const g = street.chunk(cid, NO_FOCUS).ground.find((l) => l.name === 'streets');
+      if (!g) continue;
+      const p = g.geo.pos;
+      for (let k = 0; k < p.length; k += 3) {
+        const s = p[k] + 10;
+        if (s < 0.5 || s > road.points[1][0] + 9.5) continue;
+        expect(Math.abs(p[k + 1] - (surface.roadY(0, s) + ROAD_Y))).toBeLessThan(0.01);
+      }
+    }
+    // The kerbside things on the sidewalk where they stand: the street's signs at the road's height there.
+    const signs = street.chunkIds().flatMap((cid) => street.chunk(cid, NO_FOCUS).batches.get('model.street.sign') ?? []);
+    expect(signs.length).toBeGreaterThan(0);
+    for (const [x, z, , , , y] of signs) expect(y ?? 0).toBeCloseTo(surface.at(x, z), 4);
+    // Lifted, not moved: the same houses' vertices across, their heights the only change; the props as many.
+    const xs = (c: ChunkPlan) => c.silhouettes.parts.map((q) => q.geo.pos.filter((_, k) => k % 3 !== 1).join(','));
+    expect(xs(b)).toEqual(xs(a));
+    for (const cid of street.chunkIds()) expect(street.chunk(cid, NO_FOCUS).props.pos.length).toBe(flat.chunk(cid, NO_FOCUS).props.pos.length);
+    // A lamp's post on the sidewalk: its foot at the walk's height over the road there.
+    void WALK_Y;
+  });
+
+  test('a chunk whose heights moved is planned again (its key has the surface’s version)', () => {
+    const world = onLand(town(objects));
+    const surface = surfaceOf(world)!;
+    const street = new TownStreet(new HousePlanner(), world, options, 'game');
+    const id = chunkAt(world.plots[16].x + 10, 10);
+    const key = street.chunkKey(id, NO_FOCUS);
+    const land = surface.land;
+    // The land under lot 16 and its road lowered (a stroke the brushes may make from stage E): its pad and road move.
+    for (let j = 0; j < land.rows; j++) for (let i = 70; i < 95 && i < land.cols; i++) land.h[j * land.cols + i] -= 300;
+    surface.update({ i0: 70, j0: 0, i1: 95, j1: land.rows });
+    expect(surface.version(id)).toBeGreaterThan(0);
+    expect(street.chunkKey(id, NO_FOCUS)).not.toBe(key);
   });
 });

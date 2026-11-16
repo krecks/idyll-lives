@@ -87,7 +87,55 @@ export type Command =
   | { type: 'dismissSuggestion'; sim: number; index: number }
   /** Yes or no to what a resident asked to buy (a yes buys and places it). */
   | { type: 'acceptPurchase'; sim: number }
-  | { type: 'declinePurchase'; sim: number };
+  | { type: 'declinePurchase'; sim: number }
+  /**
+   * The land shaped (Build mode's Land tab): `cost` charged to the household (Living; free in
+   * Creative; negative: a refund, an undone stroke). `meta.land` merges into the world's
+   * `meta.land` tile by tile (`h` and `wl` by tile index, the rest replaced); `meta.zones`, when
+   * given, replaces the world's. `water`: the world's whole water mask (1 m tiles, `Rle`), when
+   * the stroke changed the water. Not a home edit: the land's own undo sends the reverse.
+   */
+  | { type: 'shapeLand'; household: number; cost: number; meta: ShapeLandMeta; water?: Rle };
+
+/** What a `shapeLand` command changes in the world's `meta`: the land's touched tiles, and the zones derived from it. */
+export interface ShapeLandMeta {
+  land?: Partial<Omit<LandFile, 'h' | 'wl'>> & { h?: Record<number, string>; wl?: Record<number, string> };
+  zones?: WorldZone[];
+}
+
+/**
+ * A `shapeLand` command, as `SimBridge.shapeLand` sends it (answered, unlike `send`'s commands).
+ * The first one of a world without `meta.land` carries the land's whole header (`cols` and `rows`
+ * at least); a tile it doesn't send is empty (flat at 0 and dry). A tile index past the land's, a
+ * cost over the household's funds (Living), and new water on a lot, on a road (its width with the
+ * sidewalks), on a resident or where something stands are refused whole, with the reason.
+ */
+export type ShapeLandCommand = Extract<Command, { type: 'shapeLand' }>;
+
+/**
+ * `meta` with a `shapeLand` stroke's `patch` merged in as the simulation merges it: `land.h` and
+ * `land.wl` tile by tile, the land's other fields and `zones` replaced. A new object (and a new
+ * `land`), `meta` left as it is; null with no land and no zones to merge.
+ */
+export function mergeShapeLand(meta: WorldMeta | null, patch: ShapeLandMeta): WorldMeta | null {
+  if (!patch.land && !patch.zones) return meta;
+  const out: WorldMeta = { ...(meta ?? {}) };
+  if (patch.land) {
+    const { h, wl, ...header } = patch.land;
+    const land = { ...out.land, ...header } as LandFile;
+    const tiles = Math.ceil(land.cols / (land.tile ?? 64)) * Math.ceil(land.rows / (land.tile ?? 64));
+    const merged = (old: string[] | undefined, by: Record<number, string> | undefined) => {
+      const codes = Array.from({ length: tiles }, (_, t) => old?.[t] ?? '');
+      for (const [t, code] of Object.entries(by ?? {})) codes[Number(t)] = code;
+      return codes;
+    };
+    land.h = merged(out.land?.h, h);
+    land.wl = merged(out.land?.wl, wl);
+    out.land = land;
+  }
+  if (patch.zones) out.zones = patch.zones;
+  return out;
+}
 
 /** A routine block: an activity (content `activities` id) on weekdays (bit 0 = Monday) from `start` (minute of the day) for `minutes`. */
 export interface RoutineIn {
@@ -504,6 +552,35 @@ export interface WorldMeta {
    * Missing in older saves: the land is drawn from the landscape alone.
    */
   relief?: { cell: number; cols: number; rows: number; h: number[] };
+  /**
+   * The land as a height field (`game/land.ts`), once there is one: shaped by the player, or
+   * surveyed for a new world. Missing: the land is drawn from `relief` and the landscape.
+   */
+  land?: LandFile;
+}
+
+/**
+ * The land as the town file and saves carry it (`game/land.ts` `encodeLand`): heights and water
+ * levels every `cell` m over `cols` × `rows` samples from the world's corner, cut into tiles of
+ * `tile` × `tile` samples (row-major, the last row and column of tiles cut short at the edge).
+ */
+export interface LandFile {
+  v: 1;
+  cell: 2;
+  cols: number;
+  rows: number;
+  tile: 64;
+  /**
+   * The heights (cm) by tile: each the base64 of zigzag varints of every sample less the one left
+   * of it (the first of a row less 0), a run of zeros as a 0x00 then the run's length.
+   */
+  h: string[];
+  /** The water levels (cm; `NONE` where dry) by tile, coded as `h`; '' for a tile with no water. */
+  wl: string[];
+  /** The cover every 4 m (row-major), run-length `[run, value, ...]`: 0 open, 1 woods, 2 meadow, 3 fields. */
+  cover: number[];
+  /** How the field was first filled: `drawn` from the land as the renderer drew it, `follow` with the town on its slopes. */
+  seeded: 'drawn' | 'follow';
 }
 
 // pin:living-town-types begin
@@ -1012,7 +1089,37 @@ export interface Catalog {
     upgradeSkillPerLevel: number;
     resale: number;
   };
-  build: { wall: number; door: number; window: number; remove: number; diagonalWall?: number; fence?: number; gate?: number; garage?: number; porch?: number; porchPost?: number; porchCanopy?: number; porchStep?: number };
+  build: {
+    wall: number;
+    door: number;
+    window: number;
+    remove: number;
+    diagonalWall?: number;
+    fence?: number;
+    gate?: number;
+    garage?: number;
+    porch?: number;
+    porchPost?: number;
+    porchCanopy?: number;
+    porchStep?: number;
+    /** Shaping the land (Build mode's Land tab; content `build.land`). */
+    land?: LandPrices;
+  };
+}
+
+/**
+ * What shaping the land costs (content `build.land`): `earth` a cubic metre raised or lowered by
+ * the brushes, `mountain` one by the peak, range and level tools (volume: Σ|Δh| × 4 m² over the
+ * 2 m samples); the rest a square metre, of water made and of cover planted or cleared.
+ */
+export interface LandPrices {
+  earth: number;
+  mountain: number;
+  water: number;
+  woods: number;
+  meadow: number;
+  fields: number;
+  clear: number;
 }
 
 export interface CareerEntry {
@@ -1177,6 +1284,10 @@ export type ToWorker =
   | { type: 'events'; requestId: number }
   /** The household's home as a blueprint. */
   | { type: 'blueprint'; requestId: number; household: number }
+  /** The land shaped (`SimBridge.shapeLand`): answered with `shaped`, or `failed` with why it was refused. */
+  | { type: 'shapeLand'; requestId: number; command: ShapeLandCommand }
+  /** The water mask as it is now (`SimBridge.waterMask`): answered with `waterMask`. */
+  | { type: 'waterMask'; requestId: number }
   /** The resident whose panel is open (their details and relationships are sent too); null: none. */
   | { type: 'inspect'; sim: number | null }
   /** The next UI update sends everything. */
@@ -1225,6 +1336,10 @@ export type FromWorker =
   | { type: 'events'; requestId: number; events: SocialEvent[] }
   /** JSON, or null with `error`. */
   | { type: 'blueprint'; requestId: number; data: string | null; error?: string }
+  /** A `shapeLand` done (charged, and its meta and water changed). */
+  | { type: 'shaped'; requestId: number }
+  /** The water mask the simulation walks (1 m tiles over the ground, `width` × `depth`), as it is now. */
+  | { type: 'waterMask'; requestId: number; water: Rle; width: number; depth: number }
   /** Fallback transport when SharedArrayBuffer is unavailable. */
   | { type: 'snapshot'; data: Float32Array; step: number }
   /** About once a second. */

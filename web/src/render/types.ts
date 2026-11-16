@@ -8,6 +8,7 @@ import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { ItemPlacement, PartColors, WorldStructure } from '../core/protocol';
 import type { Appearance } from '../game/household';
+import type { Land, LandRect } from '../game/land';
 import type { Resolution } from './shared/resolution';
 import type { VisemeTrack } from '../voice/visemes';
 
@@ -399,6 +400,18 @@ export interface RendererDebugHooks {
   keepRoof(on: boolean): void;
 }
 
+/**
+ * The land brush's cursor (`Renderer.setLandBrush`): two rings draped over the land round town point
+ * (`x`, `z`), `radius` m and (where the brush is at full strength) `inner` m, tinted by what it does.
+ */
+export interface LandCursor {
+  x: number;
+  z: number;
+  radius: number;
+  inner: number;
+  tone: 'up' | 'down' | 'water' | 'cover' | 'bad';
+}
+
 export interface Renderer {
   init(canvas: HTMLCanvasElement): Promise<void>;
   /**
@@ -618,10 +631,28 @@ export interface Renderer {
   setTownShot(shot: TownShot, cut?: boolean): void;
   /** Overview camera: user orbit (radians) and zoom factor on top of the shot. */
   nudgeTown(dAlpha: number, zoom: number): void;
+  /** Overview camera: the player's pan, the target moved (`dx`, `dz`) m over the ground on top of the shot. */
+  panTown(dx: number, dz: number): void;
   /** Which lots glow; they ease to it, or (`snap`) are so from the next frame (a picture taken). */
   setLotHighlight(highlight: LotHighlight, snap?: boolean): void;
   /** Runs each overview frame after the camera moved, before drawing (to pin labels); null removes it. */
   onTownFrame(fn: (() => void) | null): void;
+  /**
+   * The land of the world in view (the menus' town while it is shown, else the game's) as a height
+   * field: its `meta.land` if it has one, else surveyed from the land as drawn.
+   */
+  landOf(): Promise<Land>;
+  /** Draws the world's land from `land` (kept, and changed in place by the brushes) from now on; null: from its landscape again. */
+  setLand(land: Land | null): void;
+  /**
+   * The samples in `rect` of the land given to `setLand` changed: their ground and water drawn
+   * again now, and once the stroke is `done`, the rest (shading, grass, woods, zones) over frames.
+   */
+  landChanged(rect: LandRect, done: boolean): void;
+  /** Where the ray through canvas CSS pixel (`x`, `y`) meets the land (a town point and its height, m), or null if it doesn't. */
+  pickLand(x: number, y: number): { x: number; y: number; z: number } | null;
+  /** Shows the land brush's cursor (null hides it). Cheap; call on every pointer move. */
+  setLandBrush(cursor: LandCursor | null): void;
   dispose(): void;
 }
 

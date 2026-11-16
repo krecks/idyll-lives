@@ -3002,6 +3002,9 @@ struct BuildView {
     porch_post: i64,
     porch_canopy: i64,
     porch_step: i64,
+    /// Shaping the land (`content::LandPrices`): per cubic metre (`earth`, `mountain`) or square
+    /// metre (the rest).
+    land: crate::content::LandPrices,
 }
 
 /// Every career with all its levels, expanded from the content (sent to the UI once).
@@ -3085,6 +3088,7 @@ pub fn catalog_json(content: &Content) -> String {
             porch_post: content.build.porch_post,
             porch_canopy: content.build.porch_canopy,
             porch_step: content.build.porch_step,
+            land: content.build.land,
         },
     })
     .expect("catalog serializes")

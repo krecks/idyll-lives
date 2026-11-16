@@ -127,6 +127,15 @@ scope.onmessage = (e) => {
     } else if (msg.type === 'socialOptions' && game) {
       const options = JSON.parse(game.social_options(msg.actor, msg.target));
       scope.postMessage({ type: 'socialOptions', requestId: msg.requestId, options });
+    } else if (msg.type === 'shapeLand' && game) {
+      // (Refused: thrown, and answered as `failed` below, not told to the player as other commands' errors are.)
+      game.command(JSON.stringify(msg.command));
+      publish(true);
+      postUi();
+      scope.postMessage({ type: 'shaped', requestId: msg.requestId });
+    } else if (msg.type === 'waterMask' && game) {
+      const mask = JSON.parse(game.water_mask()) as { water: number[]; width: number; depth: number };
+      scope.postMessage({ type: 'waterMask', requestId: msg.requestId, ...mask });
     } else if (msg.type === 'command' && game) {
       game.command(JSON.stringify(msg.command));
       // (What the player did shows at once.)

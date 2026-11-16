@@ -87,6 +87,8 @@ export interface GameControls {
   undo(): void;
   /** Build mode: makes the last undone edit again (Ctrl/⌘+Shift+Z, Ctrl+Y). */
   redo(): void;
+  /** Build mode's Land tab: the land put back as it was before it was shaped here (undone as one stroke). */
+  landReset(): void;
   /** Gives something at home its parts' colours, all at once (none: as made). Free; effects stay the same. */
   recolor(objectId: number, colors: PartColors | undefined): void;
   /** Gives the new purchase in hand its parts' colours (none: as made). */

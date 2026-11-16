@@ -8,6 +8,7 @@
 
 import type { Content } from '../content/content';
 import type { FenceEdge, ObjectPlacement, Opening, PlotInfo, WallEdge, WorldStructure } from '../core/protocol';
+import { encodeLand } from './land';
 import { layoutTown, worldLook, type NeighbourhoodDraft, type Templates, type TownMeta } from './town';
 
 /** A menu preview's walls and floors: none (the renderer still expects the three meshes). */
@@ -108,10 +109,11 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
   const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths: layout.paths, facing: layout.facing, seed: town.seed ?? 1, world: worldLook(town, layout.fields), home: playerSlot, gardenFences: true };
   // A big world's land and areas, as the town file carries them (`assembleTown`).
   if (town.open) {
-    const { zones, pads, areas, backdrop, places, centre, relief } = town.open;
+    const { zones, pads, areas, backdrop, places, centre, relief, land } = town.open;
     // (And the living town's backdrop, places and centres: the land is cleared for them as in the game, and the
-    // town view over a preview, the bench's Big world, draws them; and the land's relief, its hills.)
-    Object.assign(meta, { zones, pads, areas, ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...(centre ? { centre } : {}), ...(relief ? { relief } : {}) });
+    // town view over a preview, the bench's Big world, draws them; and the land's relief, its hills; and the land
+    // once it has been shaped or graded under its town, as the town file carries it.)
+    Object.assign(meta, { zones, pads, areas, ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...(centre ? { centre } : {}), ...(relief ? { relief } : {}), ...(land && (land.edited || land.seeded === 'follow') ? { land: encodeLand(land) } : {}) });
   }
   return {
     version: 0,

@@ -151,6 +151,9 @@ const FAR_LAG = 0.25;
  * frames), or seen to jump further than they could have gone (a catch-up out of it, or after a pause).
  */
 export const REVEAL_MS = 250;
+/** A step in the land under a resident (m) past which it is eased, not taken at once, and the easing's time constant (s: most of the way in 120 ms). */
+const GROUND_STEP = 0.05;
+const GROUND_EASE = 0.04;
 
 /** How fast a rise cut short (`SimRig.riseK`) finishes its step off the seat (per second: a quarter of a second, less
  * when the action runs fast). */
@@ -1916,6 +1919,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         }
         if (rig) rig.cover = 0;
         this.visible[i] = 0;
+        // (Shown again: on the ground where they are then, not eased there from where they were.)
+        this.landY[i] = NaN;
         if (rig) rig.visible = false;
         this.writeProp(this.heldProp, i, null);
         this.writeProp(this.toolProp, i, null);
@@ -1938,7 +1943,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         rig.lag += frameDt;
         const moved = curr[o + k.moving] > 0 || riding;
         const dx = moved ? tx - rig.x : 0;
-        const dy = moved ? this.floorAt(th, tx, tz) - rig.floorY : 0;
+        const dy = moved ? this.floorAt(th, tx, tz, i, frameDt) - rig.floorY : 0;
         const dz = moved ? tz - rig.z : 0;
         if (frameDt > 0) rig.speed += (Math.min(Math.hypot(dx, dz) / frameDt, 20) - rig.speed) * (1 - Math.exp(-frameDt * 10));
         if (dx || dy || dz) this.carryPose(rig, i, dx, dy, dz, shadows);
@@ -1948,7 +1953,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const dt = Math.min(FAR_LAG, frameDt + rig.lag);
       rig.lag = 0;
       const dir = (rig.dir = this.directions[i] ?? null);
-      rig.floorY = this.floorAt(th, tx, tz);
+      rig.floorY = this.floorAt(th, tx, tz, i, dt);
       const pose = curr[o + k.pose];
       const moving = curr[o + k.moving] > 0;
       // Calling someone over (sim-core's `call`): a wave, looking at them.
@@ -3362,11 +3367,21 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     this.ground = ground;
   }
 
-  /** The floor Sim at (x, z) stands on, on storey `th` (fractions on the stairs): the storey's height over the land there. */
-  private floorAt(th: number, x: number, z: number): number {
-    const land = this.ground ? this.ground(x, z) : 0;
-    return th * WALL_HEIGHT + (Number.isFinite(land) ? land : 0);
+  /**
+   * The floor Sim `i` at (x, z) stands on, on storey `th` (fractions on the stairs): the storey's height over the land
+   * there. A step in the land (onto a lot's pad, a kerb) of more than `GROUND_STEP` is eased over `GROUND_EASE`
+   * seconds (`dt` since the last), not taken at once; drawn again after being hidden, they stand where they are.
+   */
+  private floorAt(th: number, x: number, z: number, i: number, dt: number): number {
+    const at = this.ground ? this.ground(x, z) : 0;
+    let land = Number.isFinite(at) ? at : 0;
+    const was = this.landY[i];
+    if (!Number.isNaN(was) && Math.abs(land - was) > GROUND_STEP) land = was + (land - was) * (1 - Math.exp(-Math.max(0, dt) / GROUND_EASE));
+    this.landY[i] = land;
+    return th * WALL_HEIGHT + land;
   }
+  /** Each resident's land as last drawn (`floorAt`; NaN: hidden since, taken as it is). */
+  private readonly landY = new Float64Array(MAX_CHARACTERS).fill(NaN);
 
   /**
    * Where the sim moves residents every tick (a big world's chunks streamed in, as sent it: sim-core `lod::full_detail`),

@@ -3877,6 +3877,7 @@
     "porchPost": 60,
     "porchCanopy": 90,
     "porchStep": 30,
+    "land": {"earth": 3, "mountain": 0.02, "water": 2, "woods": 6, "meadow": 1, "fields": 2, "clear": 1.5},
     "remove": 0,
     "storeys": 3,
     "basement": true

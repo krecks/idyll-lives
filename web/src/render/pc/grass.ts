@@ -78,7 +78,7 @@ export function grassGround(device: pc.GraphicsDevice, material: pc.StandardMate
   material.setParameter('game_grassTown', none.town);
   material.setParameter('game_grassLawn', none.lawn);
   material.setParameter('game_grassArea', new Float32Array([0, 0, 1, 1]));
-  material.setParameter('game_grassEye', new Float32Array(4));
+  material.setParameter('game_grassGroundEye', new Float32Array(4));
   // (No town: its mask isn't read, nor the lawn's tone drawn.)
   material.setParameter('game_grassTownSize', new Float32Array([0, 0, -2, -1]));
   material.setParameter('game_grassTone', 1);
@@ -159,6 +159,8 @@ export class Grass {
    * changed in place.
    */
   private readonly eye = new Float32Array(4);
+  /** The eye as the ground reads it (`game_grassGroundEye`): in the engine's heights, the datum's below the game's (`pc/space.ts` `setDatum`). */
+  private readonly groundEye = new Float32Array(4);
   /** The colour texture's corner and 1 / its size (m). */
   private readonly area: Float32Array;
   /** The town's ground in metres (the mask's size), and from how far round it to how far the lawn's tone fades out on the ground. */
@@ -174,6 +176,8 @@ export class Grass {
   private readonly last = new Float32Array(6 * 4 + 3);
   /** The patches with grass changed (`refresh`): chosen again whether or not anything moved. */
   private stale = true;
+  /** How far the world is lowered under the viewed lot (`frame`). */
+  private datum = 0;
 
   constructor(
     private readonly app: pc.AppBase,
@@ -190,6 +194,7 @@ export class Grass {
     this.townSize[2] = field.margin;
     this.townSize[3] = field.margin + GRASS.toneFade;
     this.eye[3] = quality.radius;
+    this.groundEye[3] = quality.radius;
     const mat = (this.material = new pc.StandardMaterial());
     mat.name = 'grass';
     mat.frontFace = GAME_FRONT_FACE;
@@ -275,7 +280,7 @@ export class Grass {
     // (A big world's ground is tiles: each draw of it.)
     this.grounds = Array.isArray(meshInstances) ? [...meshInstances] : [meshInstances as pc.MeshInstance];
     for (const mi of this.grounds) {
-      mi.setParameter('game_grassEye', this.eye);
+      mi.setParameter('game_grassGroundEye', this.groundEye);
       mi.setParameter('game_grassColour', this.colour);
       mi.setParameter('game_grassArea', this.area);
     }
@@ -309,6 +314,24 @@ export class Grass {
     this.stale = true;
   }
 
+  /**
+   * The land under it changed (the land's brushes): its heights (`GrassField.ground`, changed in place) are read
+   * again as the patches are chosen; `colour`: its colour texture's texels changed too (`GrassField.colour`), up to the GPU.
+   */
+  landChanged(colour: boolean): void {
+    if (colour) {
+      const data = this.colour.lock() as Uint8Array;
+      if (data !== this.field.colour) data.set(this.field.colour);
+      this.colour.unlock();
+    }
+    this.stale = true;
+  }
+
+  /** The grass field it draws (the land's brushes change it in place, then `landChanged`). */
+  get grassField(): GrassField {
+    return this.field;
+  }
+
   /** The residents pushing the grass aside (the nearest first; at most `GRASS_PUSHERS`). */
   setPushers(pushers: readonly GrassPusher[]): void {
     const push = this.push;
@@ -323,12 +346,17 @@ export class Grass {
 
   /**
    * Each frame: the patches in view near `eye` (game space) into their draws. `frustum` is the
-   * camera's as last drawn (PlayCanvas space: z mirrored); chosen again only when it or the eye moved.
+   * camera's as last drawn (PlayCanvas space: z mirrored, and `datum` m lower: `pc/space.ts`
+   * `setDatum`); chosen again only when it or the eye moved.
    */
-  frame(eye: { x: number; y: number; z: number }, frustum: pc.Frustum): void {
+  frame(eye: { x: number; y: number; z: number }, frustum: pc.Frustum, datum = 0): void {
     this.eye[0] = eye.x;
     this.eye[1] = eye.y;
     this.eye[2] = eye.z;
+    this.groundEye[0] = eye.x;
+    this.groundEye[1] = eye.y - datum;
+    this.groundEye[2] = eye.z;
+    this.datum = datum;
     if (!this.moved(frustum) && !this.stale) return;
     this.stale = false;
     const f = this.field;
@@ -356,8 +384,8 @@ export class Grass {
         const dy = eye.y - y;
         const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
         if (d > r) continue;
-        // (PlayCanvas space: the world root mirrors z.)
-        centre.set(x + p / 2, y + 0.15, -(z + p / 2));
+        // (PlayCanvas space: the world root mirrors z, and lowers the world by the datum.)
+        centre.set(x + p / 2, y + 0.15 - this.datum, -(z + p / 2));
         if (!frustum.containsSphere(this.sphere)) continue;
         // (As near as the eye may come before they're chosen again.)
         const lod = Math.max(nearest, grassLod(d - SLACK, density));

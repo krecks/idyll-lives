@@ -9,13 +9,17 @@
  * Placements are matrices in game space (the layout of `math.ts`): 16 floats each.
  */
 
-import { DEFAULT_LANDSCAPE, groundDepth, type LandscapeParams, type WorldStructure, type WorldZone } from '../../core/protocol';
+import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, type WorldStructure, type WorldZone } from '../../core/protocol';
+import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, type Land, type LandRect } from '../../game/land';
+import { coverAt, landTop, landWater, wetDistance, wetEdgeAt } from './landBake';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
+import type { BuiltSurface } from './builtSurface';
+import { surfaceOf } from './landSurface';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
-import { fbm, hash, mulberry32, smoothstep, valueNoise } from '../../game/noise';
+import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../game/noise';
 import { tuned } from '../tune';
-import { shareAt, ZoneField } from './zones';
+import { shareAt, ZONE_CELL, ZoneField, type ZoneKind } from './zones';
 
 /**
  * How far the landscape extends beyond the town (metres): towns of older code, and worlds (which
@@ -47,6 +51,110 @@ export const GROUND_TILE = 128;
 const TERRAIN_SEGMENTS = 260;
 /** Trees within this distance of the town cast shadows; further ones don't. */
 const SHADOW_RANGE = 28;
+/**
+ * A land drawn from its height field (`LandscapeLayout.setLand`): past the world's edge the landscape's own land,
+ * moved by how far the field's edge stands off it there, the move fading out over this far (m).
+ */
+const LAND_EDGE_FADE = 60;
+/** Lots are filed for `padAt` by cells this wide (m). */
+const PAD_CELL = 16;
+
+/**
+ * `values` (a `cols` × `rows` grid of `LAND_CELL` m samples) at (`x`, `z`) on the triangles the terrain draws them
+ * as (`pc/nature.ts` `tileMesh`: each cell split from its corner at (x, z + cell) to the one at (x + cell, z)), the
+ * edge's past the edge: what stands on the land stands on the terrain drawn, not a hair above or below it.
+ */
+function between(values: Float32Array, cols: number, rows: number, x: number, z: number): number {
+  const fx = Math.min(cols - 1, Math.max(0, x / LAND_CELL));
+  const fz = Math.min(rows - 1, Math.max(0, z / LAND_CELL));
+  const i = Math.min(Math.floor(fx), Math.max(0, cols - 2));
+  const j = Math.min(Math.floor(fz), Math.max(0, rows - 2));
+  const [i1, j1] = [Math.min(i + 1, cols - 1), Math.min(j + 1, rows - 1)];
+  // (u across from the cell's west side, v down from its north (larger z) side: the split is u = v.)
+  const [u, v] = [fx - i, 1 - (fz - j)];
+  const [h00, h10, h01, h11] = [values[j1 * cols + i], values[j1 * cols + i1], values[j * cols + i], values[j * cols + i1]];
+  return u >= v ? h00 + u * (h10 - h00) + v * (h11 - h10) : h00 + v * (h01 - h00) + u * (h11 - h01);
+}
+
+/**
+ * The surface's graded land (`BuiltSurface.conformed`) with the samples inside the first `count` of its plots (the
+ * world's lots, not its backdrop's buildings, which stand on the land) carried in from the land round them: ring by
+ * ring from their edges, each the mean of its neighbours reached already (the terrain beside a lot is the land's, not
+ * a slope to its pad: `LandscapeLayout.terrainField`). A sample of a lot beside another lot (a step or less apart:
+ * the narrow strip between them, which has no sample of its own) keeps its pad, so the strip lies between the two
+ * pads, not down at the land beyond them.
+ */
+export function lotsFilled(surface: BuiltSurface, count: number): Float32Array {
+  const { cols, rows, conformed } = surface;
+  const out = conformed.slice();
+  // Each sample's lot (-1: none; on a shared edge, the last).
+  const owner = new Int32Array(cols * rows).fill(-1);
+  for (let n = 0; n < Math.min(count, surface.plots.length); n++) {
+    const p = surface.plots[n];
+    for (let j = Math.max(0, Math.ceil(p.z / LAND_CELL)); j <= Math.min(rows - 1, Math.floor((p.z + p.d) / LAND_CELL)); j++) {
+      for (let i = Math.max(0, Math.ceil(p.x / LAND_CELL)); i <= Math.min(cols - 1, Math.floor((p.x + p.w) / LAND_CELL)); i++) owner[j * cols + i] = n;
+    }
+  }
+  const around = (k: number, visit: (n: number) => void) => {
+    const [i, j] = [k % cols, Math.floor(k / cols)];
+    if (i > 0) visit(k - 1);
+    if (i < cols - 1) visit(k + 1);
+    if (j > 0) visit(k - cols);
+    if (j < rows - 1) visit(k + cols);
+  };
+  // (1: still to fill. A lot's sample beside another lot's keeps its pad: none to fill.)
+  const todo = new Uint8Array(cols * rows);
+  let ring: number[] = [];
+  for (let k = 0; k < owner.length; k++) {
+    if (owner[k] < 0) continue;
+    let beside = false;
+    around(k, (q) => (beside ||= owner[q] >= 0 && owner[q] !== owner[k]));
+    if (beside) continue;
+    todo[k] = 1;
+    ring.push(k);
+  }
+  while (ring.length) {
+    const reached: number[] = [];
+    const values: number[] = [];
+    const later: number[] = [];
+    for (const k of ring) {
+      let [sum, n] = [0, 0];
+      around(k, (q) => {
+        if (todo[q]) return;
+        sum += out[q];
+        n++;
+      });
+      if (n) {
+        reached.push(k);
+        values.push(sum / n);
+      } else later.push(k);
+    }
+    // (A lot no land reaches, all of the world: its pad stays.)
+    if (!reached.length) break;
+    reached.forEach((k, m) => {
+      out[k] = values[m];
+      todo[k] = 0;
+    });
+    ring = later;
+  }
+  return out;
+}
+
+/** A height field whose top stands over this (m) has rock, snow and a treeline on it, as mountains do. */
+const LAND_PEAKS = 40;
+/**
+ * A land drawn from its height field grows its woods and flowers in squares this wide (m), each from a stream of
+ * its own (`mulberry32(hash(bx, bz, seed))`): a stroke of the brushes grows only the squares it reached again.
+ */
+export const LAND_BLOCK = 32;
+/** A square's woods on a grid of this many points across (`LAND_BLOCK` / 8 = 4 m apart, not the 4.2 of one stream: as dense, less this share). */
+const BLOCK_GRID = 8;
+/** The cover's kinds as zones (`COVER`). */
+const COVER_ZONES: readonly [ZoneKind, number][] = [
+  ['woods', COVER.woods],
+  ['meadow', COVER.meadow],
+  ['fields', COVER.fields],
+];
 /** Mountains: no trees above about this height (m). */
 const TREELINE = 12;
 /** Mountains: bare rock and then snow from these shares of their height up to these (a relief grid's: higher up, its massif is all of it). */
@@ -102,8 +210,8 @@ export interface PlantPlacement {
 
 // ---- Deterministic noise ------------------------------------------------------------
 
-// (The seeded generator, lattice hash, value noise, fractal noise and smooth step: the world generator's own, `game/noise.ts`, so the land it lays out and the land drawn agree.)
-export { fbm, hash, mulberry32, smoothstep, valueNoise };
+// (The seeded generator, lattice hash, value noise, fractal noise, ridged noise and smooth step: the world generator's own, `game/noise.ts`, so the land it lays out and the land drawn agree.)
+export { fbm, hash, mulberry32, ridged, smoothstep, valueNoise };
 
 /**
  * The smaller of `a` and `b` (both 0 or more), rounded off where they come within `k` of each other (a
@@ -113,23 +221,6 @@ export function smoothMin(a: number, b: number, k: number): number {
   const m = Math.min(a, b);
   const t = Math.max(k - Math.abs(a - b), 0) / k;
   return m - Math.min(t * t * k * 0.25, m * 0.5);
-}
-
-/** Ridged noise, 0..1: sharp crests where plain noise crosses its middle (mountain ridges). */
-function ridged(x: number, z: number, seed: number, octaves = 5): number {
-  let sum = 0;
-  let amp = 0.5;
-  let freq = 1;
-  let weight = 1;
-  for (let i = 0; i < octaves; i++) {
-    const r = Math.pow(1 - Math.abs(valueNoise(x * freq, z * freq, seed + i * 31) * 2 - 1), 2) * weight;
-    sum += r * amp;
-    // Detail mostly on the ridges, little in the valleys.
-    weight = Math.min(1, r * 1.6);
-    amp *= 0.5;
-    freq *= 2.1;
-  }
-  return Math.min(1, sum / 0.9);
 }
 
 // ---- Colours ------------------------------------------------------------------------
@@ -430,10 +521,18 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         ? { cell: relief.cell, cols: relief.cols, rows: relief.rows, h: Float32Array.from(relief.h, (v) => v / 10), slope: this.land.slope ?? RELIEF_SLOPE }
         : null;
     this.zones = this.built && world.meta?.zones?.length ? new ZoneField(world.meta.zones, this.w, this.d) : null;
-    this.orchards = this.zones ? (world.meta?.zones ?? []).filter((z) => z.kind === 'orchard') : [];
+    this.zonesToday = this.zones;
+    this.zoneList = world.meta?.zones ?? [];
+    this.drawnWatered = !!this.land.water || !!this.zones?.has('water');
+    this.orchards = this.built ? this.zoneList.filter((z) => z.kind === 'orchard') : [];
+    // (A world with a height field is drawn from it from the start, its roads laid on it; one its town
+    // follows with the surface its town is graded to, the world's own shared with the street.)
+    this.metaLand = world.meta?.land;
+    this.laidOut = world;
+    if (this.metaLand) this.adoptLand(null);
     this.passes = townExits(world);
     this.roads = makeRoads(
-      { seed: this.seed, w: this.w, d: this.d, ring: this.ring, ground: (x, z) => this.ground(x, z), waterEdge: (x, z) => this.waterEdge(x, z), distanceToTown: (x, z) => this.distanceToTown(x, z) },
+      { seed: this.seed, w: this.w, d: this.d, ring: this.ring, ground: (x, z) => this.ground(x, z), waterEdge: (x, z) => this.waterEdge(x, z), distanceToTown: (x, z) => this.distanceToTown(x, z), follows: !!this.surface },
       world,
       world.meta?.name ?? '',
     );
@@ -451,13 +550,175 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     return !!this.land.mountains;
   }
 
-  /** Whether there is a sea or a lake (a big world's: water zones). */
+  /** Whether there is a sea or a lake (a big world's: water zones; with a height field, its water too). */
   get watered(): boolean {
-    return !!this.land.water || !!this.zones?.has('water');
+    return this.drawnWatered || (!!this.field && this.fieldWater.any);
   }
 
-  /** Identity of a town's landscape (built once per town and kept while it is shown). */
+  /** Whether the water sheet at the sea's level is drawn: the landscape's own water, or a height field's at that level. */
+  get seaSheet(): boolean {
+    return this.drawnWatered || (!!this.field && this.fieldWater.sea);
+  }
+
+  /** The height field the land is drawn from (`setLand`), or null. */
+  get heightField(): Land | null {
+    return this.field;
+  }
+
+  /**
+   * Draws the land from `land` from now on (kept: the brushes change it in place, then `landChanged`); null: from
+   * the world's own (`meta.land`) if it has one, else from the landscape. What is already built isn't drawn again
+   * here (the engine's side does that).
+   */
+  setLand(land: Land | null): void {
+    this.field = null;
+    this.surface = null;
+    this.stale = null;
+    this.wetSd = null;
+    this.coverSeen = null;
+    this.zones = this.zonesToday;
+    if (land || this.metaLand) this.adoptLand(land);
+    this.landVersion++;
+  }
+
+  /**
+   * The samples in `rect` of the height field changed (a stroke done): its water's edge, its highest point and the
+   * zones of the cover kinds that changed made again; on a land its town follows, the surface solved again
+   * (`BuiltSurface.update`), the land it grades drawn from it again (the samples it changed join `rect`'s).
+   */
+  landChanged(rect: LandRect): LandRect {
+    if (!this.field) return rect;
+    let out = rect;
+    if (this.surface) {
+      const moved = this.surface.update(rect).rect;
+      this.stale = null;
+      this.terrainField = lotsFilled(this.surface, this.laidOut.plots.length);
+      if (moved) out = { i0: Math.min(rect.i0, moved.i0), j0: Math.min(rect.j0, moved.j0), i1: Math.max(rect.i1, moved.i1), j1: Math.max(rect.j1, moved.j1) };
+    }
+    this.measureLand(rect);
+    this.landVersion++;
+    return out;
+  }
+
+  /**
+   * The samples in `rect` changed under a stroke still going (a brush's stamp): drawn from the field as it is there
+   * (`fieldAt`) until the stroke is done and the surface is solved again (`landChanged`).
+   */
+  protected landStamped(rect: LandRect): void {
+    if (!this.surface) return;
+    const s = this.stale;
+    this.stale = s ? { i0: Math.min(s.i0, rect.i0), j0: Math.min(s.j0, rect.j0), i1: Math.max(s.i1, rect.i1), j1: Math.max(s.j1, rect.j1) } : { ...rect };
+  }
+
+  /**
+   * A height field taken on (`setLand`; null: the world's own, `meta.land`): its water, top and zones, and on a land
+   * its town follows the surface its town stands on (the world's own shared, `landSurface.ts` `surfaceOf`).
+   */
+  private adoptLand(land: Land | null): void {
+    const surface = land ? surfaceOf(this.laidOut, land) : surfaceOf(this.laidOut);
+    this.surface = surface;
+    this.stale = null;
+    this.terrainField = surface ? lotsFilled(surface, this.laidOut.plots.length) : null;
+    this.field = surface ? surface.land : (land ?? decodeLand(this.metaLand!));
+    this.coverSeen = null;
+    this.measureLand(null);
+  }
+
+  /** The world it lays out (for its surface). */
+  private readonly laidOut: WorldStructure;
+
+  /**
+   * The surface of the built land on a land its town follows (`builtSurface.ts`: the roads, the lots' pads and the
+   * land graded round them): what the land is drawn from inside the world, and what stands on it stands on. Null:
+   * a world without one (everything built at 0 as ever).
+   */
+  surface: BuiltSurface | null = null;
+  /** The samples a stroke still going has changed (`landStamped`): drawn from the field there, not the surface. */
+  private stale: LandRect | null = null;
+  /**
+   * On a land its town follows, the land as its terrain draws it: the surface's graded land (`BuiltSurface.conformed`),
+   * but inside a lot the land round it carried in (`lotsFilled`): the terrain isn't drawn inside a lot (its pad is a
+   * slab of its own, `pc/nature.ts`), so beside it the land is the land's, not a slope down to the pad, and a
+   * retaining edge stands between them (`shared/pads.ts`).
+   */
+  private terrainField: Float32Array | null = null;
+
+  /** The land (m) inside the world as its terrain draws it: `terrainField`, or the field's where a stroke still going changed it, or the field's. */
+  private fieldAt(x: number, z: number): number {
+    const t = this.terrainField;
+    if (t) {
+      const r = this.stale;
+      if (!r || x < (r.i0 - 1) * LAND_CELL || z < (r.j0 - 1) * LAND_CELL || x > r.i1 * LAND_CELL || z > r.j1 * LAND_CELL) return between(t, this.field!.cols, this.field!.rows, x, z);
+    }
+    return landHeight(this.field!, x, z);
+  }
+
+  /** The height field's water, top and (a big world's) zones from its cover: the cover kinds changed in `rect`, or all. */
+  private measureLand(rect: LandRect | null): void {
+    const land = this.field!;
+    this.wetSd = wetDistance(land);
+    this.fieldWater = landWater(land);
+    this.fieldTop = landTop(land);
+    if (!this.built) return;
+    const seen = this.coverSeen;
+    const changed = new Set<number>();
+    if (seen && seen.length === land.cover.length && rect) {
+      const cw = Math.ceil((land.cols * LAND_CELL) / COVER_CELL);
+      const cd = land.cover.length / cw;
+      const [ci0, cj0] = [Math.max(0, Math.floor((rect.i0 * LAND_CELL) / COVER_CELL) - 1), Math.max(0, Math.floor((rect.j0 * LAND_CELL) / COVER_CELL) - 1)];
+      const [ci1, cj1] = [Math.min(cw, Math.ceil((rect.i1 * LAND_CELL) / COVER_CELL) + 1), Math.min(cd, Math.ceil((rect.j1 * LAND_CELL) / COVER_CELL) + 1)];
+      for (let j = cj0; j < cj1; j++) {
+        for (let i = ci0; i < ci1; i++) {
+          const k = j * cw + i;
+          if (seen[k] === land.cover[k]) continue;
+          changed.add(seen[k]);
+          changed.add(land.cover[k]);
+        }
+      }
+      if (!changed.size) return;
+    }
+    this.coverSeen = land.cover.slice();
+    const masks = new Map<ZoneKind, Uint8Array>();
+    const gw = Math.max(1, Math.ceil(this.w / ZONE_CELL));
+    const gd = Math.max(1, Math.ceil(this.d / ZONE_CELL));
+    for (const [kind, value] of COVER_ZONES) {
+      if (seen && rect && !changed.has(value) && this.zones !== this.zonesToday) continue;
+      const mask = new Uint8Array(gw * gd);
+      for (let j = 0; j < gd; j++) for (let i = 0; i < gw; i++) if (coverAt(land, (i + 0.5) * ZONE_CELL, (j + 0.5) * ZONE_CELL) === value) mask[j * gw + i] = 1;
+      masks.set(kind, mask);
+    }
+    if (this.zones && this.zones !== this.zonesToday) for (const [kind, mask] of masks) this.zones.setMask(kind, mask);
+    else this.zones = new ZoneField(this.zoneList, this.w, this.d, masks);
+  }
+
+  /** What covers the ground at (x, z) (`COVER`): the height field's cover, else the zones' (fields, then woods, then meadows). */
+  coverAt(x: number, z: number): number {
+    if (this.field) return coverAt(this.field, x, z);
+    const zones = this.zonesToday;
+    if (!zones) return COVER.open;
+    if (zones.edge('fields', x, z) > 0) return COVER.fields;
+    if (zones.edge('woods', x, z) > 0) return COVER.woods;
+    if (zones.edge('meadow', x, z) > 0) return COVER.meadow;
+    return COVER.open;
+  }
+
+  /** The height the rock, the snow and the treeline go by: the mountains', or a height field's top where it stands over `LAND_PEAKS`. */
+  private get peaks(): number {
+    const top = this.land.mountains ?? 0;
+    return this.field && this.fieldTop > LAND_PEAKS ? Math.max(top, this.fieldTop) : top;
+  }
+
+  /**
+   * Identity of a town's landscape (built once per town and kept while it is shown). A world with a height field
+   * (`meta.land`) is told by `:L`, not by its zones or its field's contents: those change with every stroke of the
+   * brushes (a new `meta` each, its zones derived from the field), drawn in place (`landChanged`).
+   */
   static key(world: WorldStructure): string {
+    return world.meta?.land ? `${LandscapeLayout.baseKey(world)}:L` : `${LandscapeLayout.baseKey(world)}${world.meta?.zones ? `:z${world.meta.zones.length}` : ''}`;
+  }
+
+  /** `key` without the zones and the height field: a landscape drawn from a field (`setLand`) is still the one for its world once that world carries the field (`LotContents.useNature`). */
+  static baseKey(world: WorldStructure): string {
     const look = world.meta?.world;
     const streets = [...(world.meta?.streets ?? []).map((s) => `${s.z}`), ...(world.meta?.roads ?? []).map((r) => `${r.points[0]}:${r.points.length}`)].join(',');
     // (A backdrop is built land too, `builtField`: a town with one has a landscape of its own.)
@@ -465,9 +726,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     // (The options, the zones and the relief too: a world made again with only its woods or its hills changed
     // keeps its seed, name and roads, and must not keep the landscape it had.)
     const options = look?.options ? `:o${JSON.stringify(look.options)}` : '';
-    const zones = world.meta?.zones ? `:z${world.meta.zones.length}` : '';
     const relief = world.meta?.relief ? `:r${reliefSum(world.meta.relief)}` : '';
-    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${JSON.stringify(look.landscape)}` : ''}${backdrop}${options}${zones}${relief}`;
+    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${JSON.stringify(look.landscape)}` : ''}${backdrop}${options}${relief}`;
   }
 
   /**
@@ -475,9 +735,15 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * -Infinity without water. The shore wanders a little but never comes into the town.
    */
   waterEdge(x: number, z: number): number {
+    // (A height field's: the edge of its water.)
+    return this.field ? wetEdgeAt(this.field, this.wetSd, x, z) : this.drawnWaterEdge(x, z);
+  }
+
+  /** `waterEdge` as the landscape lays it out (without a height field). */
+  private drawnWaterEdge(x: number, z: number): number {
     const water = this.land.water;
     // (A big world's water is its zones'.)
-    if (!water) return this.zones ? this.zones.edge('water', x, z) - (fbm(x * 0.03, z * 0.03, this.seed + 61, 3) - 0.45) * 6 : -Infinity;
+    if (!water) return this.zonesToday ? this.zonesToday.edge('water', x, z) - (fbm(x * 0.03, z * 0.03, this.seed + 61, 3) - 0.45) * 6 : -Infinity;
     if (water.kind === 'sea') {
       const past = water.side === 'zmin' ? -z : z - this.d;
       return past - water.shore - fbm(x * 0.02, 3.7, this.seed + 61, 3) * 8;
@@ -507,8 +773,33 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   protected readonly built: { gw: number; gd: number; dist: Float32Array } | null;
 
-  /** A big world's zones (`meta.zones`): its water, its hills, and where woods, meadows, fields and orchards are. Null elsewhere. */
-  protected readonly zones: ZoneField | null;
+  /**
+   * A big world's zones (`meta.zones`): its water, its hills, and where woods, meadows, fields and orchards are. Null
+   * elsewhere. With a height field (`setLand`), its woods, meadows and fields are the field's cover.
+   */
+  protected zones: ZoneField | null;
+  /** The zones as `meta.zones` has them (the land as the landscape lays it out: past the edge of a height field's). */
+  private readonly zonesToday: ZoneField | null;
+  /** The world's zones as given (`meta.zones`). */
+  private readonly zoneList: readonly WorldZone[];
+  /** Whether the landscape has water of its own (a sea or a lake; a big world's water zones): `watered` without a height field. */
+  private readonly drawnWatered: boolean;
+
+  /**
+   * The land as a height field (`game/land.ts`), once there is one: the world's `meta.land`, or given (`setLand`;
+   * the brushes change it in place, `landChanged`). The land is drawn from it inside the world. Null: from the landscape.
+   */
+  protected field: Land | null = null;
+  /** The world's own height field (`meta.land`), what `setLand(null)` goes back to. */
+  private readonly metaLand: LandFile | undefined;
+  /** The field's water: the signed distance from its edge (`wetDistance`), whether it has any and any at the sea's level, and its highest sample. */
+  private wetSd: Float32Array | null = null;
+  private fieldWater = { any: false, sea: false };
+  private fieldTop = 0;
+  /** The field's cover as its zones were last made from it (`landChanged`: only the kinds that changed again). */
+  private coverSeen: Uint8Array | null = null;
+  /** Counts the field's changes (the town view's ground map is made again for a new one). */
+  landVersion = 0;
   /** A big world's orchards (`meta.zones`), each a rectangle. */
   private readonly orchards: readonly WorldZone[];
 
@@ -569,14 +860,82 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     return { gw, gd, dist };
   }
 
-  /** Height of the land, levelled under the roads out of town. */
+  /**
+   * Height of the land, levelled under the roads out of town. On a land its town follows, inside the world the
+   * surface anything stands on: a lot's pad, a road's height, else the graded land (`BuiltSurface.at`).
+   */
   heightAt(x: number, z: number): number {
+    if (this.surface && x >= 0 && z >= 0 && x <= this.w && z <= this.d) return this.stale ? this.staleAt(x, z) : this.builtAt(x, z);
     const h = this.ground(x, z);
     const road = this.roads.near(x, z);
     if (!road) return h;
     // Level with the road across it, then graded back into the land beside it.
     const t = 1 - smoothstep(road.width / 2 + 0.4, road.width / 2 + ROAD_VERGE, road.dist);
     return h + (road.h - 0.02 - h) * t;
+  }
+
+  /**
+   * On a land its town follows, the pad (m) of the lot (or the backdrop's building) a point is in (the highest where
+   * two touch), or null outside every one (the grass levels its patches on them: `shared/grass.ts` `settlePads`).
+   * Undefined: no surface.
+   */
+  get padAt(): ((x: number, z: number) => number | null) | undefined {
+    const surface = this.surface;
+    if (!surface) return undefined;
+    if (this.padsFor !== surface) {
+      this.padsFor = surface;
+      const grid = new Map<number, number[]>();
+      for (let i = 0; i < surface.plots.length; i++) {
+        const p = surface.plots[i];
+        for (let cz = Math.floor(p.z / PAD_CELL); cz <= Math.floor((p.z + p.d) / PAD_CELL); cz++) {
+          for (let cx = Math.floor(p.x / PAD_CELL); cx <= Math.floor((p.x + p.w) / PAD_CELL); cx++) {
+            const key = cx * 65536 + cz;
+            const list = grid.get(key);
+            if (list) list.push(i);
+            else grid.set(key, [i]);
+          }
+        }
+      }
+      this.padLookup = (x, z) => {
+        let best: number | null = null;
+        for (const i of grid.get(Math.floor(x / PAD_CELL) * 65536 + Math.floor(z / PAD_CELL)) ?? []) {
+          const p = surface.plots[i];
+          if (x < p.x || x > p.x + p.w || z < p.z || z > p.z + p.d) continue;
+          const y = surface.padY(i);
+          if (best === null || y > best) best = y;
+        }
+        return best;
+      };
+    }
+    return this.padLookup!;
+  }
+  private padsFor: BuiltSurface | null = null;
+  private padLookup: ((x: number, z: number) => number | null) | null = null;
+
+  /** `heightAt` while a stroke goes on: the field where it changed, the surface elsewhere. */
+  private staleAt(x: number, z: number): number {
+    const r = this.stale!;
+    if (x < (r.i0 - 1) * LAND_CELL || z < (r.j0 - 1) * LAND_CELL || x > r.i1 * LAND_CELL || z > r.j1 * LAND_CELL) return this.builtAt(x, z);
+    return landHeight(this.field!, x, z);
+  }
+
+  /** On a land its town follows, what stands at (`x`, `z`): a lot's pad (the highest where two touch), a road's height, else the land as the terrain draws it (`fieldAt`). */
+  private builtAt(x: number, z: number): number {
+    const pad = this.padAt!(x, z);
+    if (pad !== null) return pad;
+    const s = this.surface!;
+    const on = s.roadAt(x, z);
+    return on ? s.roadY(on.road, on.s) : this.fieldAt(x, z);
+  }
+
+  /**
+   * The terrain's height (m) at a point of its grid: `heightAt`, but on a land its town follows the graded land
+   * inside the world (`fieldAt`: under a road `ROAD_SINK` below it, so it never shows through; the lots' pads are
+   * slabs of their own, `pc/nature.ts`).
+   */
+  terrainAt(x: number, z: number): number {
+    if (this.surface && x >= 0 && z >= 0 && x <= this.w && z <= this.d) return this.fieldAt(x, z);
+    return this.heightAt(x, z);
   }
 
   /** How high the mountains rise on this side, 0..1: the valley opens out flat towards low z, where the menus look at the town from. */
@@ -604,11 +963,27 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     return top * ramp * open * pass * (0.25 + 0.75 * crest);
   }
 
-  /** Height of the land before the roads are cut in. */
+  /**
+   * Height of the land before the roads are cut in. With a height field (`setLand`): the field's inside the world;
+   * past its edge the landscape's own, moved by how far the field's edge stands off it there, that fading out over
+   * `LAND_EDGE_FADE` m (no shore bank of the landscape's: the field has its own).
+   */
   ground(x: number, z: number): number {
+    const field = this.field;
+    if (!field) return this.drawnGround(x, z);
+    if (x >= 0 && z >= 0 && x <= this.w && z <= this.d) return this.fieldAt(x, z);
+    const cx = Math.min(this.w, Math.max(0, x));
+    const cz = Math.min(this.d, Math.max(0, z));
+    const today = this.drawnGround(x, z);
+    const fade = 1 - smoothstep(0, LAND_EDGE_FADE, Math.hypot(x - cx, z - cz));
+    return fade > 0 ? today + (this.fieldAt(cx, cz) - this.drawnGround(cx, cz)) * fade : today;
+  }
+
+  /** `ground` as the landscape lays it out (without a height field). */
+  private drawnGround(x: number, z: number): number {
     const dist = this.distanceToTown(x, z);
     const L = this.land;
-    const water = this.watered;
+    const water = this.drawnWatered;
     let h = 0;
     if (dist > APRON) {
       const rise = smoothstep(APRON, APRON + L.rise, dist);
@@ -616,7 +991,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       const open = L.mountains ? this.openness(z) : 1;
       const hills = (fbm(x * 0.018, z * 0.018, this.seed) * L.hills - (L.hills * 4) / 14) * (0.15 + 0.85 * open);
       // (A big world's rim rises round the world, past its edge; between its hamlets its hill zones do.)
-      const rimFrom = this.zones ? Math.hypot(Math.max(0 - x, 0, x - this.w), Math.max(0 - z, 0, z - this.d)) : dist - L.rimFrom;
+      const rimFrom = this.zonesToday ? Math.hypot(Math.max(0 - x, 0, x - this.w), Math.max(0 - z, 0, z - this.d)) : dist - L.rimFrom;
       const rim = Math.pow(Math.max(0, rimFrom) / RING, 2) * L.rim * open;
       // By water the land stays above it (no puddles in the hollows).
       if (this.relief) {
@@ -625,13 +1000,13 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         const r = this.relieved(x, z, dist, open);
         h = Math.max(water ? 0 : -0.4, rise * hills + rim + r) + Math.max(0, this.mountain(x, z, dist) - 0.5 * r);
       } else {
-        const zoned = this.zones ? this.zones.share('hill', x, z, 40) * BIG_HILLS * (0.55 + 0.9 * fbm(x * 0.008 + 5, z * 0.008, this.seed + 303, 3)) : 0;
+        const zoned = this.zonesToday ? this.zonesToday.share('hill', x, z, 40) * BIG_HILLS * (0.55 + 0.9 * fbm(x * 0.008 + 5, z * 0.008, this.seed + 303, 3)) : 0;
         h = Math.max(water ? 0 : -0.4, rise * (hills + zoned) + rim) + this.mountain(x, z, dist);
       }
     }
     if (!water || dist === 0) return h;
     // Down a sandy bank to the shore, then under the water.
-    const e = this.waterEdge(x, z);
+    const e = this.drawnWaterEdge(x, z);
     const beach = this.beach;
     if (e < -beach * 1.5) return h;
     if (e > 0) return WATER_Y - Math.min(4, e * 0.22 + e * e * 0.004);
@@ -675,7 +1050,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
 
   /** No trees above this (m) among mountains, give or take (`woods`), and the alpine meadow from about here. */
   private get treeTop(): number {
-    return this.relief && this.land.mountains ? this.land.mountains * RELIEF_TREELINE : TREELINE;
+    const top = this.peaks;
+    return this.relief && top ? top * RELIEF_TREELINE : TREELINE;
   }
 
   /** The terrain's square (m across, centred on the town) and its quads across. */
@@ -710,7 +1086,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       if (++seen % 4096 === 0) await pace?.();
       const x = positions[i];
       const z = positions[i + 2];
-      const h = this.heightAt(x, z);
+      const h = this.terrainAt(x, z);
       positions[i + 1] = h;
       const lawn = this.terrainColour(x, z, h, tmp);
       colors[c] = tmp.r;
@@ -759,7 +1135,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       lawn *= 1 - cell.weight;
     }
     // Mountains: bare rock above the trees and on steep faces, snow on the tops.
-    const top = this.land.mountains;
+    const top = this.peaks;
     if (top) {
       const steep = Math.hypot(this.heightAt(x + 1.5, z) - h, this.heightAt(x, z + 1.5) - h) / 1.5;
       // Pale alpine meadow above the trees, then rock, then snow.
@@ -830,15 +1206,18 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * by the town). Null: no farmland. The ground's own colours are a vertex apart, so from above a field's edge
    * steps along the grid; the map draws each where it is.
    */
-  farmland(): { size: number; across: number; angle: number; crop(cu: number, cv: number, out: Rgb): boolean; weight(x: number, z: number): number } | null {
+  farmland(): { size: number; across: number; angle: number; crop(cu: number, cv: number, out: Rgb): boolean; weight(x: number, z: number): number; box?: [number, number, number, number] } | null {
     const zones = this.zones;
     if (!zones?.has('fields')) return null;
+    // (A height field's fields are its cover's: where they are, as the zones' outlines no longer say.)
+    const box = this.field ? zones.extent('fields') : null;
     const f = this.land.fields ?? { size: 34, angle: hash(3, 5, this.seed) * Math.PI };
     const P = (this.palette ??= terrainPalette(this.land.grass));
     return {
       size: f.size,
       across: f.size * 0.7,
       angle: f.angle,
+      ...(box ? { box } : {}),
       crop: (cu, cv, out) => {
         const kind = hash(cu, cv, this.seed + 77);
         if (kind > 0.82) return false;
@@ -861,78 +1240,118 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * or by square (`woodsCell`).
    */
   protected async woods(pace?: () => Promise<void>): Promise<Woods> {
-    const rand = mulberry32(this.seed ^ 0x5eed);
     this.nearWoods = [];
     this.woodsAsked = null;
     const near = new Map<string, Float32Array[]>();
     const far = new Map<string, Float32Array[]>();
-    const spacing = 4.2;
-    const [beach, treeline, scatter] = [this.beach, this.treeTop, this.land.scatter ?? 1];
-    // The bush roll: rocks below 0.08, then bushes, then small ones (`scrub` of the roll in all, two to one).
-    const scrub = this.land.scrub === undefined ? null : Math.min(0.92, Math.max(0, this.land.scrub));
-    const [bushTo, smallTo] = scrub === null ? [0.2, 0.26] : [0.08 + (scrub * 2) / 3, 0.08 + scrub];
+    const rules = this.woodsRules();
     const size = Math.max(this.w, this.d) + this.ring * 2;
     const x0 = this.w / 2 - size / 2;
     const z0 = this.d / 2 - size / 2;
-    for (let gx = 0; gx * spacing < size; gx++) {
-      if (gx % 4 === 0) await pace?.();
-      for (let gz = 0; gz * spacing < size; gz++) {
-        const x = x0 + (gx + rand()) * spacing;
-        const z = z0 + (gz + rand()) * spacing;
-        const dist = this.distanceToTown(x, z);
-        const L = this.land;
-        if (dist < APRON + L.treeline) continue;
-        const forest = fbm(x * 0.025, z * 0.025, this.seed + 7, 3);
-        let density = smoothstep(0.42 - L.forest, 0.62 - L.forest, forest) * 0.85 + 0.06 + L.forest * 0.25 - (dist < 14 ? 0.05 : 0);
-        // A big world's woods are its woods zones (trees dotted about the open land, fewer on its
-        // meadows), and its orchards their own (rows of fruit trees, below).
-        if (this.zones) {
-          if (this.zones.edge('orchard', x, z) > -3) continue;
-          const wood = this.zones.share('woods', x, z, 8);
-          density = wood * (0.6 + 0.3 * smoothstep(0.3, 0.6, forest)) + (1 - wood) * (0.12 + 0.08 * smoothstep(0.42, 0.7, forest)) * scatter;
-          density *= 1 - 0.6 * this.zones.share('meadow', x, z, 6);
+    // (The woods' stream carries on into the orchards without a height field: theirs as they always were. With
+    // one, the woods' are the squares' own, and the orchards have one of their own.)
+    let rand = mulberry32(this.seed ^ 0x5eed);
+    if (this.field) {
+      // A height field's woods in squares, each from its own stream (`woodsBlocks`).
+      this.woodBlocks = null;
+      await this.woodsBlocks(null, pace);
+      this.gatherWoods(near, far);
+      rand = mulberry32(this.seed ^ 0x0c4a2d);
+    } else {
+      const spacing = 4.2;
+      for (let gx = 0; gx * spacing < size; gx++) {
+        if (gx % 4 === 0) await pace?.();
+        for (let gz = 0; gz * spacing < size; gz++) {
+          const x = x0 + (gx + rand()) * spacing;
+          const z = z0 + (gz + rand()) * spacing;
+          this.plant(x, z, rand, rules, 1, near, far, this.nearWoods);
         }
-        // Fields are open, with hedgerows and the odd tree along their edges; nothing grows in the water or on the beach.
-        const cell = this.fieldCell(x, z);
-        if (cell) density = cell.hedge ? 0.55 : density * (1 - cell.weight);
-        if (this.watered && this.waterEdge(x, z) > -beach * 0.8) continue;
-        // Bare tops on mountains.
-        if (L.mountains && this.heightAt(x, z) > treeline + forest * 10) continue;
-        // Nothing on the roads or right by them.
-        const road = this.roads.near(x, z);
-        if (road && road.dist < road.width / 2 + 2.5) continue;
-        // The far woods of a wide world thinner (seen through haze; fewer trees to draw).
-        if (this.ring > RING && dist > RING && rand() < 0.45) continue;
-        if (rand() > density) continue;
-        // Species: conifers in the dense cores, birches in groves at the edges, broadleaves elsewhere.
-        const grove = fbm(x * 0.06 + 40, z * 0.06 - 15, this.seed + 3, 2);
-        const roll = rand();
-        let kind: string;
-        if (roll < 0.08) kind = 'model.rock';
-        // (A hedgerow mostly bushes.)
-        else if (roll < bushTo || (cell?.hedge && roll < 0.55)) kind = 'model.bush';
-        else if (roll < smallTo) kind = 'model.bush.small';
-        else if ((forest > 0.56 && rand() < Math.min(1, (0.62 * L.conifers) / 0.5)) || (L.conifers > 0.5 && rand() < (L.conifers - 0.5) * 1.6)) kind = rand() < 0.4 ? 'model.spruce' : 'model.pine';
-        else if (grove > 0.55 - Math.max(0, L.birches - 0.5) * 0.3 && rand() < Math.min(1, (0.7 * L.birches) / 0.5)) kind = 'model.tree.birch';
-        else kind = rand() < 0.35 ? 'model.tree.maple' : 'model.tree';
-        const tree = kind.startsWith('model.tree') || kind === 'model.pine' || kind === 'model.spruce';
-        const scale = kind === 'model.rock' ? 0.6 + rand() * 0.7 : tree ? 0.75 + rand() * 0.6 : 0.8 + rand() * 0.6;
-        // (Drawn in this order, as ever: the same woods from the same seed.)
-        const up = scale * (0.9 + rand() * 0.25);
-        const yaw = rand() * Math.PI * 2;
-        const y = this.heightAt(x, z) - 0.05;
-        const m = placed(scale, up, scale, yaw, x, y, z);
-        // (A big world's: all far versions, none casting. Its roads and trails run everywhere, and every tree
-        // along them would be a full model in the sun's shadows.)
-        const close = !this.built && dist < SHADOW_RANGE && kind !== 'model.rock';
-        if (close) this.nearWoods.push({ key: kind, x, y, z, sx: scale, sy: up, sz: scale, yaw });
-        const bucket = close ? near : far;
-        let list = bucket.get(kind);
-        if (!list) bucket.set(kind, (list = []));
-        list.push(m);
       }
     }
     // A big world's orchards: fruit trees in rows across each (its own draws, so the woods above are as they were).
+    // (With a height field, from a stream of their own: the woods' are the squares'.)
+    this.plantOrchards(rand, far);
+    return { near, far, sector: this.woodsSectors() };
+  }
+
+  /** How the woods' squares are named (`Woods.sector`). */
+  protected woodsSectors(): (x: number, z: number) => string {
+    const [cx, cz] = [this.w / 2, this.d / 2];
+    // (A big world's woods in squares, whatever the preset: sectors from its middle would each reach a kilometre.)
+    const cell = this.built ? this.bigWoodsCell : this.woodsCell;
+    return cell > 0 ? (x: number, z: number) => `${Math.floor(x / cell)}:${Math.floor(z / cell)}` : (x: number, z: number) => `${Math.floor((Math.atan2(z - cz, x - cx) / (Math.PI * 2) + 1) * FOREST_SECTORS) % FOREST_SECTORS}`;
+  }
+
+  /** The woods' numbers as the landscape has them: the beach, the treeline, the trees' scatter and the bush roll's shares. */
+  private woodsRules(): { beach: number; treeline: number; scatter: number; bushTo: number; smallTo: number; top: number } {
+    // The bush roll: rocks below 0.08, then bushes, then small ones (`scrub` of the roll in all, two to one).
+    const scrub = this.land.scrub === undefined ? null : Math.min(0.92, Math.max(0, this.land.scrub));
+    const [bushTo, smallTo] = scrub === null ? [0.2, 0.26] : [0.08 + (scrub * 2) / 3, 0.08 + scrub];
+    return { beach: this.beach, treeline: this.treeTop, scatter: this.land.scatter ?? 1, bushTo, smallTo, top: this.peaks };
+  }
+
+  /**
+   * Whether a tree, bush or rock of the woods grows at (x, z) and which, by the draws of `rand` (always in the same
+   * order: the same woods from the same stream), into `near` or `far` (and `plants`, those near the town). `thin`:
+   * the share of the roll kept (a square's grid is a little denser than one stream's).
+   */
+  private plant(x: number, z: number, rand: () => number, rules: ReturnType<LandscapeLayout['woodsRules']>, thin: number, near: Map<string, Float32Array[]>, far: Map<string, Float32Array[]>, plants: PlantPlacement[]): void {
+    const { beach, treeline, scatter, bushTo, smallTo, top } = rules;
+    const dist = this.distanceToTown(x, z);
+    const L = this.land;
+    if (dist < APRON + L.treeline) return;
+    const forest = fbm(x * 0.025, z * 0.025, this.seed + 7, 3);
+    let density = smoothstep(0.42 - L.forest, 0.62 - L.forest, forest) * 0.85 + 0.06 + L.forest * 0.25 - (dist < 14 ? 0.05 : 0);
+    // A big world's woods are its woods zones (trees dotted about the open land, fewer on its
+    // meadows), and its orchards their own (rows of fruit trees, below).
+    if (this.zones) {
+      if (this.zones.edge('orchard', x, z) > -3) return;
+      const wood = this.zones.share('woods', x, z, 8);
+      density = wood * (0.6 + 0.3 * smoothstep(0.3, 0.6, forest)) + (1 - wood) * (0.12 + 0.08 * smoothstep(0.42, 0.7, forest)) * scatter;
+      density *= 1 - 0.6 * this.zones.share('meadow', x, z, 6);
+    }
+    // Fields are open, with hedgerows and the odd tree along their edges; nothing grows in the water or on the beach.
+    const cell = this.fieldCell(x, z);
+    if (cell) density = cell.hedge ? 0.55 : density * (1 - cell.weight);
+    if (this.watered && this.waterEdge(x, z) > -beach * 0.8) return;
+    // Bare tops on mountains.
+    if (top && this.heightAt(x, z) > treeline + forest * 10) return;
+    // Nothing on the roads or right by them.
+    const road = this.roads.near(x, z);
+    if (road && road.dist < road.width / 2 + 2.5) return;
+    // The far woods of a wide world thinner (seen through haze; fewer trees to draw).
+    if (this.ring > RING && dist > RING && rand() < 0.45) return;
+    if (rand() > density * thin) return;
+    // Species: conifers in the dense cores, birches in groves at the edges, broadleaves elsewhere.
+    const grove = fbm(x * 0.06 + 40, z * 0.06 - 15, this.seed + 3, 2);
+    const roll = rand();
+    let kind: string;
+    if (roll < 0.08) kind = 'model.rock';
+    // (A hedgerow mostly bushes.)
+    else if (roll < bushTo || (cell?.hedge && roll < 0.55)) kind = 'model.bush';
+    else if (roll < smallTo) kind = 'model.bush.small';
+    else if ((forest > 0.56 && rand() < Math.min(1, (0.62 * L.conifers) / 0.5)) || (L.conifers > 0.5 && rand() < (L.conifers - 0.5) * 1.6)) kind = rand() < 0.4 ? 'model.spruce' : 'model.pine';
+    else if (grove > 0.55 - Math.max(0, L.birches - 0.5) * 0.3 && rand() < Math.min(1, (0.7 * L.birches) / 0.5)) kind = 'model.tree.birch';
+    else kind = rand() < 0.35 ? 'model.tree.maple' : 'model.tree';
+    const tree = kind.startsWith('model.tree') || kind === 'model.pine' || kind === 'model.spruce';
+    const scale = kind === 'model.rock' ? 0.6 + rand() * 0.7 : tree ? 0.75 + rand() * 0.6 : 0.8 + rand() * 0.6;
+    // (Drawn in this order, as ever: the same woods from the same seed.)
+    const up = scale * (0.9 + rand() * 0.25);
+    const yaw = rand() * Math.PI * 2;
+    const y = this.heightAt(x, z) - 0.05;
+    const m = placed(scale, up, scale, yaw, x, y, z);
+    // (A big world's: all far versions, none casting. Its roads and trails run everywhere, and every tree
+    // along them would be a full model in the sun's shadows.)
+    const close = !this.built && dist < SHADOW_RANGE && kind !== 'model.rock';
+    if (close) plants.push({ key: kind, x, y, z, sx: scale, sy: up, sz: scale, yaw });
+    const bucket = close ? near : far;
+    let list = bucket.get(kind);
+    if (!list) bucket.set(kind, (list = []));
+    list.push(m);
+  }
+
+  /** A big world's orchards into `far`: fruit trees in rows across each, by the draws of `draw`. */
+  private plantOrchards(draw: () => number, far: Map<string, Float32Array[]>): void {
     for (const zone of this.zones ? this.orchards : []) {
       const xs = zone.poly.map((p) => p[0]);
       const zs = zone.poly.map((p) => p[1]);
@@ -944,22 +1363,112 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       const per = Math.max(1, Math.floor((len - 2) / ORCHARD_STEP));
       for (let r = 0; r < rows; r++) {
         for (let k = 0; k < per; k++) {
-          const u = (len - (per - 1) * ORCHARD_STEP) / 2 + k * ORCHARD_STEP + (rand() - 0.5) * 0.6;
-          const v = (across - (rows - 1) * ORCHARD_ROWS) / 2 + r * ORCHARD_ROWS + (rand() - 0.5) * 0.6;
+          const u = (len - (per - 1) * ORCHARD_STEP) / 2 + k * ORCHARD_STEP + (draw() - 0.5) * 0.6;
+          const v = (across - (rows - 1) * ORCHARD_ROWS) / 2 + r * ORCHARD_ROWS + (draw() - 0.5) * 0.6;
           const [x, z] = along ? [x0o + u, z0o + v] : [x0o + v, z0o + u];
-          const scale = 0.85 + rand() * 0.3;
-          const m = placed(scale, scale * (0.95 + rand() * 0.1), scale, rand() * Math.PI * 2, x, this.heightAt(x, z) - 0.05, z);
+          const scale = 0.85 + draw() * 0.3;
+          const m = placed(scale, scale * (0.95 + draw() * 0.1), scale, draw() * Math.PI * 2, x, this.heightAt(x, z) - 0.05, z);
           let list = far.get('model.tree.fruit');
           if (!list) far.set('model.tree.fruit', (list = []));
           list.push(m);
         }
       }
     }
-    const [cx, cz] = [this.w / 2, this.d / 2];
-    // (A big world's woods in squares, whatever the preset: sectors from its middle would each reach a kilometre.)
-    const cell = this.built ? this.bigWoodsCell : this.woodsCell;
-    const sector = cell > 0 ? (x: number, z: number) => `${Math.floor(x / cell)}:${Math.floor(z / cell)}` : (x: number, z: number) => `${Math.floor((Math.atan2(z - cz, x - cx) / (Math.PI * 2) + 1) * FOREST_SECTORS) % FOREST_SECTORS}`;
-    return { near, far, sector };
+  }
+
+  // ---- A height field's woods and flowers, square by square ------------------------------
+
+  /** The landscape's square (m: its corner and side) and its `LAND_BLOCK` squares: the first's indices and how many across. */
+  private blockGrid(): { bx0: number; bz0: number; n: number } {
+    const size = Math.max(this.w, this.d) + this.ring * 2;
+    const x0 = this.w / 2 - size / 2;
+    const z0 = this.d / 2 - size / 2;
+    const bx0 = Math.floor(x0 / LAND_BLOCK);
+    const bz0 = Math.floor(z0 / LAND_BLOCK);
+    return { bx0, bz0, n: Math.max(Math.floor((x0 + size) / LAND_BLOCK) - bx0, Math.floor((z0 + size) / LAND_BLOCK) - bz0) + 1 };
+  }
+
+  /** The squares (`blockGrid` indices) a box (m) reaches, or all of them. */
+  private blocksIn(box: [number, number, number, number] | null): number[] {
+    const { bx0, bz0, n } = this.blockGrid();
+    const [i0, j0, i1, j1] = box ? [Math.floor(box[0] / LAND_BLOCK) - bx0, Math.floor(box[1] / LAND_BLOCK) - bz0, Math.floor(box[2] / LAND_BLOCK) - bx0, Math.floor(box[3] / LAND_BLOCK) - bz0] : [0, 0, n - 1, n - 1];
+    const out: number[] = [];
+    for (let j = Math.max(0, j0); j <= Math.min(n - 1, j1); j++) for (let i = Math.max(0, i0); i <= Math.min(n - 1, i1); i++) out.push(j * n + i);
+    return out;
+  }
+
+  /** A height field's woods, by square (`blockGrid` index): what grows in each (null before the first `woods`). */
+  private woodBlocks: ({ near: Map<string, Float32Array[]>; far: Map<string, Float32Array[]>; plants: PlantPlacement[] } | undefined)[] | null = null;
+
+  /**
+   * Grows the woods of the squares a box (m) reaches again (all: null) from each square's own stream: the same
+   * draws as one stream's (`plant`), on a grid of `BLOCK_GRID` points a side. Says which models' trees changed.
+   */
+  protected async woodsBlocks(box: [number, number, number, number] | null, pace?: () => Promise<void>): Promise<Set<string>> {
+    const { bx0, bz0, n } = this.blockGrid();
+    const blocks = (this.woodBlocks ??= new Array(n * n));
+    const rules = this.woodsRules();
+    const spacing = LAND_BLOCK / BLOCK_GRID;
+    // (One stream's grid was 4.2 m apart: as many trees a hectare.)
+    const thin = (spacing / 4.2) ** 2;
+    const changed = new Set<string>();
+    const size = Math.max(this.w, this.d) + this.ring * 2;
+    const [x0, z0] = [this.w / 2 - size / 2, this.d / 2 - size / 2];
+    let done = 0;
+    for (const b of this.blocksIn(box)) {
+      if (++done % 8 === 0) await pace?.();
+      const [bx, bz] = [bx0 + (b % n), bz0 + Math.floor(b / n)];
+      const rand = mulberry32(Math.floor(hash(bx, bz, this.seed ^ 0x5eed) * 4294967296));
+      const near = new Map<string, Float32Array[]>();
+      const far = new Map<string, Float32Array[]>();
+      const plants: PlantPlacement[] = [];
+      for (let gz = 0; gz < BLOCK_GRID; gz++) {
+        for (let gx = 0; gx < BLOCK_GRID; gx++) {
+          const x = bx * LAND_BLOCK + (gx + rand()) * spacing;
+          const z = bz * LAND_BLOCK + (gz + rand()) * spacing;
+          // (Only on the landscape's square, as one stream's.)
+          if (x < x0 || z < z0 || x >= x0 + size || z >= z0 + size) continue;
+          this.plant(x, z, rand, rules, thin, near, far, plants);
+        }
+      }
+      for (const map of [blocks[b]?.near, blocks[b]?.far, near, far]) for (const key of map?.keys() ?? []) changed.add(key);
+      blocks[b] = { near, far, plants };
+    }
+    return changed;
+  }
+
+  /** The squares' woods gathered into `near` and `far` (square by square, in order), and those near the town for the birds. */
+  private gatherWoods(near: Map<string, Float32Array[]>, far: Map<string, Float32Array[]>): void {
+    this.nearWoods = [];
+    this.woodsAsked = null;
+    for (const block of this.woodBlocks ?? []) {
+      if (!block) continue;
+      for (const [from, into] of [
+        [block.near, near],
+        [block.far, far],
+      ] as const) {
+        for (const [key, list] of from) {
+          const all = into.get(key);
+          if (all) all.push(...list);
+          else into.set(key, [...list]);
+        }
+      }
+      this.nearWoods.push(...block.plants);
+    }
+  }
+
+  /**
+   * A height field's woods grown again where a box (m) reaches (a stroke's, done): the squares there from their own
+   * streams, the orchards on the land as it is now; all of the woods as placed, and which models' trees changed.
+   */
+  protected async woodsAgain(box: [number, number, number, number] | null, pace?: () => Promise<void>): Promise<{ woods: Woods; changed: Set<string> }> {
+    const changed = await this.woodsBlocks(box, pace);
+    const near = new Map<string, Float32Array[]>();
+    const far = new Map<string, Float32Array[]>();
+    this.gatherWoods(near, far);
+    this.plantOrchards(mulberry32(this.seed ^ 0x0c4a2d), far);
+    if (this.orchards.length) changed.add('model.tree.fruit');
+    return { woods: { near, far, sector: this.woodsSectors() }, changed };
   }
 
   /**
@@ -969,6 +1478,10 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * their order, so the flowers stand where they always have.
    */
   protected async lawns(world: WorldStructure, pace?: () => Promise<void>): Promise<LawnPlacement[]> {
+    if (this.field) {
+      this.flowerBlocks = null;
+      return (await this.lawnsAgain(world, null, pace)).lawns;
+    }
     const rand = mulberry32(this.seed ^ 0x1a3d);
     // (Tiles whose middle is paved.)
     const paved = unlawned(world, false);
@@ -1058,6 +1571,110 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       { key: 'model.flowers', matrices: thin(flowers), tiles: thin(flowerTiles), ...(cell ? { cell } : {}) },
       ...patches.filter((p) => p.matrices.length).map((p) => ({ key: p.kind, matrices: thin(p.matrices), tiles: thin(p.tiles), cell: patchCell, clear: true })),
     ];
+  }
+
+  /** A height field's lawn flowers, by square (`blockGrid` index): each model's matrices and town tiles (null before the first `lawns`). */
+  private flowerBlocks: (Map<string, { matrices: Float32Array[]; tiles: number[] }> | undefined)[] | null = null;
+
+  /**
+   * A height field's lawn flowers grown again where a box (m) reaches (all: null), square by square from each one's
+   * own streams, standing on the land (`lawns` as one stream grows them, on the ground's height): all of them as
+   * placed, and which models' changed.
+   */
+  protected async lawnsAgain(world: WorldStructure, box: [number, number, number, number] | null, pace?: () => Promise<void>): Promise<{ lawns: LawnPlacement[]; changed: Set<string> }> {
+    const { bx0, bz0, n } = this.blockGrid();
+    const blocks = (this.flowerBlocks ??= new Array(n * n));
+    const W = world.width;
+    const D = groundDepth(world);
+    const paved = unlawned(world, false);
+    const pavedNear = unlawned(world, true);
+    const mown = new Uint8Array(paved.length);
+    for (const p of world.plots ?? []) for (let z = Math.max(0, p.z); z < Math.min(D, p.z + p.d); z++) mown.fill(1, z * W + Math.max(0, p.x), z * W + Math.min(W, p.x + p.w));
+    const clearOfPaving = (x: number, z: number): boolean => {
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (x + dx >= 0 && x + dx < W && z + dz >= 0 && z + dz < D && pavedNear[(z + dz) * W + x + dx]) return false;
+      return true;
+    };
+    const wet = (x: number, z: number) => this.watered && this.waterEdge(x, z) > -this.beach * 0.6;
+    // (Round the town as one stream's 5000 tries over the town and its apron, as many a square.)
+    const [ax0, az0, ax1, az1] = [-APRON - 30, -APRON - 30, W + APRON + 30, D + APRON + 30];
+    const tries = Math.round((5000 * LAND_BLOCK * LAND_BLOCK) / ((ax1 - ax0) * (az1 - az0)) * 10) / 10;
+    const d = this.lawnDensity;
+    const thin = <T>(list: T[]) => (d >= 1 ? list : list.filter((_, k) => Math.floor((k + 1) * d) > Math.floor(k * d)));
+    const changed = new Set<string>();
+    let done = 0;
+    for (const b of this.blocksIn(box)) {
+      if (++done % 8 === 0) await pace?.();
+      const [bx, bz] = [bx0 + (b % n), bz0 + Math.floor(b / n)];
+      const rand = mulberry32(Math.floor(hash(bx, bz, this.seed ^ 0x1a3d) * 4294967296));
+      const patchRand = mulberry32(Math.floor(hash(bx, bz, this.seed ^ 0x5d21f) * 4294967296));
+      const out = new Map<string, { matrices: Float32Array[]; tiles: number[] }>();
+      const put = (key: string, m: Float32Array, tile: number) => {
+        let at = out.get(key);
+        if (!at) out.set(key, (at = { matrices: [], tiles: [] }));
+        at.matrices.push(m);
+        at.tiles.push(tile);
+      };
+      // (A flower's turn, then its spot in the tile, then it stands on the land there.)
+      const standing = (x: number, z: number, r: () => number, scale: number) => {
+        const yaw = r() * Math.PI * 2;
+        const [px, pz] = [x + r(), z + r()];
+        return placed(scale, scale, scale, yaw, px, this.heightAt(px, pz), pz);
+      };
+      const [tx0, tz0] = [Math.max(0, bx * LAND_BLOCK), Math.max(0, bz * LAND_BLOCK)];
+      const [tx1, tz1] = [Math.min(W, (bx + 1) * LAND_BLOCK), Math.min(D, (bz + 1) * LAND_BLOCK)];
+      for (let z = tz0; z < tz1; z++) {
+        for (let x = tx0; x < tx1; x++) {
+          const i = z * W + x;
+          if (paved[i]) continue;
+          // In drifts a few metres across, as daisies and clover grow, with a single one here and there between them.
+          const drift = smoothstep(FLOWER_DRIFTS.from, FLOWER_DRIFTS.full, valueNoise(x / FLOWER_DRIFTS.span, z / FLOWER_DRIFTS.span, this.seed + 421));
+          if (rand() < FLOWER_DRIFTS.single + FLOWER_DRIFTS.dense * drift && !wet(x + 0.5, z + 0.5)) put('model.flowers', standing(x, z, rand, 0.8 + rand() * 0.5), i);
+          // The patches of one kind of small flower where they gather, on the plots' mown lawns, clear of paving.
+          if (this.lawnDensity < 1 || !mown[i] || !clearOfPaving(x, z)) continue;
+          const many = smoothstep(FLOWER_PATCHES.from, FLOWER_PATCHES.full, valueNoise(x / FLOWER_DRIFTS.span, z / FLOWER_DRIFTS.span, this.seed + 421));
+          if (many <= 0 || wet(x + 0.5, z + 0.5)) continue;
+          const which = valueNoise(x / FLOWER_PATCHES.kindSpan, z / FLOWER_PATCHES.kindSpan, this.seed + 433);
+          const kind = FLOWER_PATCHES.kinds[which < FLOWER_PATCHES.split[0] ? 0 : which < FLOWER_PATCHES.split[1] ? 1 : 2];
+          const copies = Math.floor(many * FLOWER_PATCHES.dense + patchRand());
+          for (let k = 0; k < copies; k++) put(kind, standing(x, z, patchRand, 0.85 + patchRand() * 0.5), i);
+        }
+      }
+      // Lawn detail round the town too, thinning out with distance.
+      const count = Math.floor(tries) + (rand() < tries % 1 ? 1 : 0);
+      for (let t = 0; t < count; t++) {
+        const x = bx * LAND_BLOCK + rand() * LAND_BLOCK;
+        const z = bz * LAND_BLOCK + rand() * LAND_BLOCK;
+        if (x < ax0 || z < az0 || x >= ax1 || z >= az1) continue;
+        const dist = this.distanceToTown(x, z);
+        if (dist === 0 || rand() < dist / 40 || wet(x, z)) continue;
+        const road = this.roads.near(x, z);
+        if (road && road.dist < road.width / 2 + 0.3) continue;
+        if (rand() >= 0.1) continue;
+        const m = standing(x - 0.5, z - 0.5, rand, 0.8 + rand() * 0.7);
+        if (this.roads.onLink(m[12], m[14])) continue;
+        put('model.flowers', m, -1);
+      }
+      for (const at of out.values()) {
+        at.matrices = thin(at.matrices);
+        at.tiles = thin(at.tiles);
+      }
+      for (const map of [blocks[b], out]) for (const key of map?.keys() ?? []) changed.add(key);
+      blocks[b] = out;
+    }
+    const all = new Map<string, { matrices: Float32Array[]; tiles: number[] }>();
+    for (const key of ['model.flowers', ...FLOWER_PATCHES.kinds]) all.set(key, { matrices: [], tiles: [] });
+    for (const block of blocks) {
+      for (const [key, at] of block ?? []) {
+        const into = all.get(key)!;
+        into.matrices.push(...at.matrices);
+        into.tiles.push(...at.tiles);
+      }
+    }
+    const cell = this.built ? (x: number, z: number) => `${Math.floor(x / BIG_FLOWERS_CELL)}:${Math.floor(z / BIG_FLOWERS_CELL)}` : (x: number, z: number) => `${Math.floor(x / FLOWER_PATCHES.cell)}:${Math.floor(z / FLOWER_PATCHES.cell)}`;
+    const lawns = [...all]
+      .filter(([, at]) => at.matrices.length)
+      .map(([key, at]) => ({ key, matrices: at.matrices, tiles: at.tiles, cell, ...(key === 'model.flowers' ? {} : { clear: true }) }));
+    return { lawns, changed };
   }
 }
 

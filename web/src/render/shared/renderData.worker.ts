@@ -42,6 +42,10 @@ scope.onmessage = (e) => {
     lands.delete(q.land);
     return;
   }
+  if (q.type === 'field') {
+    landOf(q.land).land.setLand(q.field);
+    return;
+  }
   void (async () => {
     try {
       if (q.type === 'roads') {
@@ -55,6 +59,11 @@ scope.onmessage = (e) => {
       if (q.type === 'grass') {
         const field = await land.grass(world, q.margin);
         scope.postMessage({ id, answer: { type: 'grass', field } }, [field.colour.buffer, field.ground.buffer]);
+      } else if (q.type === 'bake') {
+        const start = performance.now();
+        const field = land.bake(world);
+        const ms = performance.now() - start;
+        scope.postMessage({ id, answer: { type: 'bake', field, ms } }, [field.h.buffer, field.wl.buffer, field.cover.buffer]);
       } else {
         const colors = await land.shade(q.positions);
         scope.postMessage({ id, answer: { type: 'shade', positions: q.positions, colors } }, [q.positions.buffer, colors.buffer]);

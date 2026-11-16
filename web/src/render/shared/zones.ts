@@ -31,14 +31,21 @@ export class ZoneField {
   /** Each kind's signed distance at the cells' middles (m, above 0 inside); missing: no zone of it. */
   private readonly fields = new Map<ZoneKind, Float32Array>();
 
+  /**
+   * `masks`: kinds drawn from a grid of cells instead of `zones`' outlines (the land's cover, `game/land.ts`:
+   * `gw` × `gd` cells of `ZONE_CELL` m, 1 inside), each `setMask`'s way; the outlines of those kinds are left out.
+   */
   constructor(
     zones: readonly WorldZone[],
     private readonly w: number,
     private readonly d: number,
+    masks?: ReadonlyMap<ZoneKind, Uint8Array>,
   ) {
     this.gw = Math.max(1, Math.ceil(w / ZONE_CELL));
     this.gd = Math.max(1, Math.ceil(d / ZONE_CELL));
+    for (const [kind, mask] of masks ?? []) this.setMask(kind, mask);
     for (const [kind, list] of Map.groupBy(zones, (z) => z.kind)) {
+      if (masks?.has(kind)) continue;
       const polys = list.map((z) => z.poly);
       const inside = this.rasterise(polys);
       if (!inside.some((v) => v)) continue;
@@ -47,6 +54,39 @@ export class ZoneField {
       // fields end along a line, not in steps.)
       this.fields.set(kind, kind === 'fields' ? this.evened(sd, EVEN_CELLS) : sd);
     }
+  }
+
+  /** The grid's cells across and down (`ZONE_CELL` m each, from the world's corner). */
+  get size(): [number, number] {
+    return [this.gw, this.gd];
+  }
+
+  /**
+   * The zones of `kind` from a grid of cells (`size`, row-major; not 0: inside) rather than outlines: its signed
+   * distance (two chamfer passes each way, from the cells' middles), evened out as the farmland's outline is
+   * (`EVEN_CELLS`): the grid's steps would show along every slanted edge. An empty mask: no zone of it.
+   */
+  setMask(kind: ZoneKind, mask: Uint8Array): void {
+    const inside = mask.length === this.gw * this.gd ? mask : new Uint8Array(this.gw * this.gd);
+    if (!inside.some((v) => v)) {
+      this.fields.delete(kind);
+      return;
+    }
+    this.fields.set(kind, this.evened(this.signedDistance(inside), EVEN_CELLS));
+  }
+
+  /** The box (m: x0, z0, x1, z1) round the cells inside the zones of `kind`, or null without any. */
+  extent(kind: ZoneKind): [number, number, number, number] | null {
+    const f = this.fields.get(kind);
+    if (!f) return null;
+    let [i0, j0, i1, j1] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (let j = 0; j < this.gd; j++) {
+      for (let i = 0; i < this.gw; i++) {
+        if (f[j * this.gw + i] <= 0) continue;
+        [i0, j0, i1, j1] = [Math.min(i0, i), Math.min(j0, j), Math.max(i1, i), Math.max(j1, j)];
+      }
+    }
+    return i0 === Infinity ? null : [i0 * ZONE_CELL, j0 * ZONE_CELL, (i1 + 1) * ZONE_CELL, (j1 + 1) * ZONE_CELL];
   }
 
   /** Whether the world has a zone of `kind`. */

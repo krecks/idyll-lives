@@ -1,7 +1,7 @@
 // Worlds and town files made in the town worker (`game/townJobs.ts`, `town.worker.ts`) are the ones
 // the page would make: the job and its result go through a structured clone (as `postMessage` sends
 // them), and the world, its preview and its houses come out as `generateWorld`, `previewWorld` and
-// `houseTemplate` make them for the same seed, its steps told as it goes (step 1's progress); a town
+// `houseTemplate` make them for the same seed (its land graded under its town: `landFollow.ts` `settleLand`), its steps told as it goes (step 1's progress); a town
 // file as `assembleTown` makes it, its dice (friends, rivals) from the job's own seed.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
@@ -29,6 +29,7 @@ describe('town jobs', async () => {
   const { generateWorld, houseTemplate, populate, useTownContent, vacantSlots } = await import('../src/game/town');
   const { previewWorld } = await import('../src/game/townPreview');
   const { runTownJob } = await import('../src/game/townJobs');
+  const { settleLand } = await import('../src/game/landFollow');
   const { defaultsOf } = await import('../src/game/world');
   type Templates = import('../src/game/town').Templates;
   type TownJob = import('../src/game/townJobs').TownJob;
@@ -55,7 +56,9 @@ describe('town jobs', async () => {
         const options = 'options' in w ? w.options : undefined;
         const made = inWorker({ kind: 'world', world: w.kind, seed: w.seed, name, options });
         if (made.kind !== 'world') throw new Error('not a world');
-        const draft = generateWorld(content, t, w.kind, w.seed, name, undefined, options);
+        const laid = generateWorld(content, t, w.kind, w.seed, name, undefined, options);
+        const draft = settleLand(laid, (d) => previewWorld(content, t, d, null)).draft;
+        expect(draft.open?.land?.seeded).toBe('follow');
         expect(made.draft).toEqual(draft);
         // (Its options kept with it: the place's own, but for those chosen.)
         expect(draft.world?.options).toEqual({ ...defaultsOf(w.kind), ...options });
@@ -74,7 +77,8 @@ describe('town jobs', async () => {
     const made = runTownJob(content, t, { kind: 'world', world: 'country', seed: 909 }, (step) => steps.push(step));
     expect(steps).toEqual(['land', 'roads', 'homes', 'houses']);
     if (made.kind !== 'world') throw new Error('not a world');
-    expect(made.draft).toEqual(generateWorld(content, t, 'country', 909));
+    const laid = generateWorld(content, t, 'country', 909);
+    expect(made.draft).toEqual(settleLand(laid, (d) => previewWorld(content, t, d, null)).draft);
   }, 30_000);
 
   test('the worker\'s town file is the page\'s, its dice from the job\'s seed', () => {

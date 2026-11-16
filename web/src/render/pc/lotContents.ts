@@ -34,7 +34,7 @@ import type { GrassPusher } from './grass';
 import { setDaylight } from './daylight';
 import { CloudShadows } from './cloudShadows';
 import { smoothstep } from '../../game/noise';
-import { installNature, Landscape, NATURE_DIAGS, setWind, Sky, windStill, type NatureStep, type RoadBuilder } from './nature';
+import { installNature, Landscape, NATURE_DIAGS, setWind, Sky, windStill, type NatureRebuild, type NatureStep, type RoadBuilder } from './nature';
 import { ObjectMotion, writeInstance, type MovingObject, type PopTarget } from './objectMotion';
 import { ObjectShadows, type ShadowSource } from './objectShadows';
 import { toGame } from './space';
@@ -239,6 +239,14 @@ export class LotContents {
   private readonly qTmp: Quat = [0, 0, 0, 1];
   private readonly eye = { x: 0, y: 0, z: 0 };
 
+  /**
+   * Where the viewed lot's things hang (their draws, lot-relative heights): the renderer's `lotRoot`, raised by the
+   * datum over the world root (`space.ts` `setDatum`); the root itself until it says.
+   */
+  objectsRoot: pc.Entity;
+  /** The datum (m): the world root is this much lower than game space (`space.ts` `setDatum`). */
+  datum = 0;
+
   constructor(
     private readonly app: pc.AppBase,
     private readonly root: pc.Entity,
@@ -250,6 +258,7 @@ export class LotContents {
     private readonly view: LotView,
     private readonly hooks: LotHooks,
   ) {
+    this.objectsRoot = root;
     this.lib = MaterialLibrary.for(app);
     // Wind sway and tint variation for the plant finishes (hooks them as the models load).
     installNature(app);
@@ -296,9 +305,22 @@ export class LotContents {
     const key = Landscape.key(world);
     const ticket = ++this.natureTicket[layer];
     let set = this.natures.get(key);
+    // A landscape drawn from a height field already (the land shaped: `setLand`) is the one for its world once the
+    // world carries the field (`meta.land`, a stroke's), its zones derived from it: kept under the new key, not built again.
+    if (!set && world.meta?.land) {
+      const base = Landscape.baseKey(world);
+      const shaped = [...this.natures.values()].find((n) => n.key !== key && !!n.landscape.heightField && !!n.landscape.builtFor && Landscape.baseKey(n.landscape.builtFor) === base);
+      if (shaped) {
+        this.natures.delete(shaped.key);
+        shaped.key = key;
+        this.natures.set(key, (set = shaped));
+      }
+    }
     if (!set) {
       const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod, this.quality.woodsCell, this.quality.grass, this.quality.openWorld);
       const created: NatureSet = { key, landscape, draws: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve(), refreshing: Promise.resolve() };
+      // (A height field's water coming and going as the land is shaped: drawn as the rest of it.)
+      landscape.onDraws = (added, removed) => this.natureDrawsChanged(created, added, removed);
       created.ready = landscape.build(this.app, this.root, this.deps.assets, world, () => this.hooks.pace(), buildRoads, onStep).then((nature) => {
         perfTime('nature: meshes', () => {
           created.draws = nature.draws;
@@ -406,6 +428,32 @@ export class LotContents {
     }
   }
 
+  /** Draws of a landscape come (switched off, as built) and gone (destroyed after) outside a build: shown as the rest of it. */
+  private natureDrawsChanged(set: NatureSet, added: pc.Entity[], removed: pc.Entity[]): void {
+    const gone = new Set(removed);
+    set.draws = [...set.draws.filter((e) => !gone.has(e)), ...added];
+    set.casters = set.casters.filter((e) => !gone.has(e));
+    for (const e of removed) set.only.delete(e);
+    for (const e of added) this.prepareNature(e);
+    if (this.natures.get(set.key) !== set) return;
+    this.showNature(set);
+    this.hooks.landscapeChanged?.();
+  }
+
+  /**
+   * `landscape`'s woods and flowers grown again where a box (m) reaches (all: null), its land shaped
+   * (`Landscape.regrow`): built between frames and unseen, then swapped in, as `rebuildNature` does. After any
+   * building again already under way. Resolves once swapped in (or not, the landscape gone).
+   */
+  regrowNature(landscape: Landscape, box: [number, number, number, number] | null, gone: () => boolean, pace: () => Promise<void>): Promise<void> {
+    const set = [...this.natures.values()].find((n) => n.landscape === landscape);
+    if (!set) return Promise.resolve();
+    set.refreshing = set.refreshing
+      .then(() => this.swapNature(set, () => set.landscape.regrow(this.deps.assets, box, pace), gone))
+      .catch((err) => console.error('[render] growing the landscape again on the shaped land failed', err));
+    return set.refreshing;
+  }
+
   /** A model file that failed has come: each landscape's plants built without it are built again (`rebuildNature`). */
   refreshNature(url: string, gone: () => boolean): void {
     for (const set of this.natures.values()) {
@@ -420,7 +468,12 @@ export class LotContents {
    * destroyed after. No world is built again for it. (PlayCanvas compiles a shader as it's first
    * drawn: nothing waits for the new draws' shaders before they are swapped in.)
    */
-  private async rebuildNature(set: NatureSet, url: string, gone: () => boolean): Promise<void> {
+  private rebuildNature(set: NatureSet, url: string, gone: () => boolean): Promise<void> {
+    return this.swapNature(set, () => set.landscape.rebuild(this.app, this.root, this.deps.assets, url, () => this.hooks.pace()), gone);
+  }
+
+  /** Plants of `set` built again (`make`) and swapped in once built (see `rebuildNature`). */
+  private async swapNature(set: NatureSet, make: () => Promise<NatureRebuild | null>, gone: () => boolean): Promise<void> {
     try {
       await set.ready;
     } catch {
@@ -429,7 +482,7 @@ export class LotContents {
     }
     const lost = () => gone() || this.natures.get(set.key) !== set;
     if (lost()) return;
-    const built = await set.landscape.rebuild(this.app, this.root, this.deps.assets, url, () => this.hooks.pace());
+    const built = await make();
     if (!built) return;
     if (lost()) {
       built.discard();
@@ -496,6 +549,8 @@ export class LotContents {
   /** Each frame, game or overview, once the camera is placed: the sky round it, the clouds' drift (`dt` ms), the grass in view. */
   frame(dt: number, held = false): void {
     const eye = toGame(this.camera.getPosition(), this.eye);
+    // (Game space: the engine's heights are the datum's lower.)
+    eye.y += this.datum;
     this.sky.follow(eye.x, eye.y, eye.z);
     if (!this.reducedMotion) this.sky.drift(dt);
     // (The clouds' shadows hold still with Reduce motion, and in the menus' town, whose picture is held while nothing in it moves.)
@@ -503,8 +558,8 @@ export class LotContents {
     const camera = this.camera.camera;
     if (!camera) return;
     const { world, town } = this.natureIn;
-    world?.landscape.grassFrame(eye, camera);
-    if (town && town !== world) town.landscape.grassFrame(eye, camera);
+    world?.landscape.grassFrame(eye, camera, this.datum);
+    if (town && town !== world) town.landscape.grassFrame(eye, camera, this.datum);
   }
 
   /** The residents pushing the game world's grass aside (the nearest the eye first). */
@@ -634,12 +689,12 @@ export class LotContents {
     d = {
       template,
       draws: template.meshes.map((m) => {
-        const draw = new Instances(device, this.root, m.mesh, m.material, { name: m.name, castShadows: true, receiveShadows: true });
+        const draw = new Instances(device, this.objectsRoot, m.mesh, m.material, { name: m.name, castShadows: true, receiveShadows: true });
         windStill(draw.meshInstance, m);
         return draw;
       }),
       // (Glows: unlit, added on top, their strength per instance in its colour: `applyGlow`.)
-      glows: (template.glows ?? []).map((g) => new Instances(device, this.root, g.mesh.mesh, glowByInstance(this.app, g.mesh.material), { name: g.mesh.name, streams: [INSTANCE_COLOR], castShadows: false, receiveShadows: false })),
+      glows: (template.glows ?? []).map((g) => new Instances(device, this.objectsRoot, g.mesh.mesh, glowByInstance(this.app, g.mesh.material), { name: g.mesh.name, streams: [INSTANCE_COLOR], castShadows: false, receiveShadows: false })),
     };
     this.modelDraws.set(key, d);
     return d;
@@ -830,7 +885,7 @@ export class LotContents {
     this.shadowDraw = null;
     if (!shown.length) return;
     const placed = new Map(this.placed.map((p) => [p.id, p]));
-    const draw = (this.shadowDraw = new Instances(this.app.graphicsDevice, this.root, contactBlob(this.app).mesh, this.shadowMaterial, { name: 'objectShadows', streams: [ATLAS_TILE], castShadows: false, receiveShadows: false, capacity: shown.length }));
+    const draw = (this.shadowDraw = new Instances(this.app.graphicsDevice, this.objectsRoot, contactBlob(this.app).mesh, this.shadowMaterial, { name: 'objectShadows', streams: [ATLAS_TILE], castShadows: false, receiveShadows: false, capacity: shown.length }));
     const matrices = new Float32Array(shown.length * 16);
     // Each shape's copies (each shape a tile of the atlas).
     const byShape = new Map<ContactShape, number[]>();
@@ -924,7 +979,7 @@ export class LotContents {
         matrices.set(out, i * 16);
       });
       const draws = template.meshes.map((m) => {
-        const draw = new Instances(this.app.graphicsDevice, this.root, m.mesh, m.material, { name: `rest:${key}`, castShadows: true, receiveShadows: true, capacity: list.length });
+        const draw = new Instances(this.app.graphicsDevice, this.objectsRoot, m.mesh, m.material, { name: `rest:${key}`, castShadows: true, receiveShadows: true, capacity: list.length });
         draw.setMatrices(matrices, list.length);
         draw.update();
         return draw;
