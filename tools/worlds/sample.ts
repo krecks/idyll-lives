@@ -53,7 +53,8 @@ const { AssetRegistry } = await import('../../web/src/assets/registry.ts');
 const { objectInfos } = await import('../../web/src/game/housegen.ts');
 const { randomHousehold } = await import('../../web/src/game/household.ts');
 const { assembleTown, generateStats, generateWorld, houseTemplate, vacantSlots } = await import('../../web/src/game/town.ts');
-const { fillTown, peopleStreams, populate } = await import('../../web/src/game/people.ts');
+const { fillPlan, fillTown, peopleStreams, populate } = await import('../../web/src/game/people.ts');
+const { runTownJob } = await import('../../web/src/game/townJobs.ts');
 const { expectations, WORLD_KINDS } = await import('../../web/src/game/world.ts');
 type WorldOptions = import('../../web/src/game/world.ts').WorldOptions;
 const { homePrice } = await import('../../web/src/game/price.ts');
@@ -190,12 +191,16 @@ for (const { kind, seed, options } of runs) {
   const given = world.diagnostics?.slopes;
   if (left || given) Object.assign(expect, { quarters: Math.max(0, expect.quarters - (left?.left ?? 0)), homes: expect.homes - (left?.homes ?? 0) - (given?.lots ?? 0) });
   // The neighbours in two waves, as a new game has them: the first before the home is chosen, the
-  // rest of the homes filled once the player has moved in (`people.ts`), from the world's seed.
+  // rest of the homes filled in full once the player has moved in (`people.ts`), from the world's
+  // seed. Their houses furnished ahead first, as step 4 has the town worker do it, so the file's
+  // time is Move in's.
   const people = peopleStreams(seed);
   const first = populate(content, assets, templates, world, undefined, people);
   const home = vacantSlots(first)[0];
   if (!home) throw new Error(`${tag}: no empty house`);
-  const town = fillTown(content, assets, templates, first, home.index, people);
+  const ahead = runTownJob(content, templates, { kind: 'furnish', town: first, households: [...first.households, ...fillPlan(content, assets, templates, first, undefined, people, { tier: 'full' })] });
+  const furnished = ahead.kind === 'furnish' ? ahead : { houses: 0, ms: 0 };
+  const town = fillTown(content, assets, templates, first, home.index, people, { tier: 'full' });
   const player = randomHousehold(content, assets, 2);
   t0 = performance.now();
   const text = assembleTown(content, templates, town, player, home.index, undefined, mulberry32(people.bonds));
@@ -251,7 +256,8 @@ for (const { kind, seed, options } of runs) {
       `${town.open ? `${town.open.areas.length} areas, ${spots} outdoor places, ${((f) => `${(f.built * 100).toFixed(0)}% built and farmed, ${(f.empty * 100).toFixed(0)}% squares empty, `)(fillOf(file, expect.meadow))}` : ''}` +
       `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''} (${town.slots.filter((s) => s.lot === 'terrace').length} terraced)${dropped ? `, ${dropped} lots left out` : ''}, ${basements} with a basement, ${town.households.length} households, ` +
       `${town.open?.backdrop ? `${town.open.backdrop.length} backdrop buildings (${town.open.backdrop.filter((b) => b.area === 0).length} in the main town), ${town.open.places?.length ?? 0} places, ` : ''}` +
-      `${file.sims.length} residents, ${file.objects.length} things, ${(text.length / 1e6).toFixed(2)} MB; ${layout.toFixed(0)} ms + ${houses.toFixed(0)} ms houses, file ${assemble.toFixed(0)} ms`,
+      `${file.sims.length} residents, residentsMost ${file.residentsMost}, ${file.relationships.length} relationships, ${file.objects.length} things, ${(text.length / 1e6).toFixed(2)} MB; ` +
+      `${layout.toFixed(0)} ms + ${houses.toFixed(0)} ms houses, ${furnished.houses} furnished ahead in ${furnished.ms.toFixed(0)} ms, file ${assemble.toFixed(0)} ms`,
   );
   // What a full town would hold: every home but the few kept for sale (`max(2, 5 %)`, the
   // smallest), each household as `householdFor` sizes it (its bedrooms or one more, at most four:

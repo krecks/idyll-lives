@@ -5,14 +5,20 @@
  *
  * A step's draft carries the key of what it was made from. Step 1's land is keyed by its place,
  * size, hills, woods and seed, and by a fingerprint of the land as the player shaped it. Step 2's
- * town adds the town, the villages, the town's seed and where the player moved it. A step whose key
- * no longer matches is made again from the step before it.
+ * town adds the town, the villages, the town's seed and where the player moved it; step 3's people
+ * add the people's seed. A step whose key no longer matches is made again from the step before it.
  */
 
-import type { Rle, WorldOptions } from '../core/protocol';
+import type { AssetRegistry } from '../assets/registry';
+import type { Content } from '../content/content';
+import type { GameKind, Lifespan, Rle, WorldOptions } from '../core/protocol';
+import type { HouseholdDraft } from '../game/household';
 import { COVER, landHash, NONE, type Land } from '../game/land';
+import { hash } from '../game/noise';
+import { fillPlan, fillTown, offered, peopleStreams, type FillTier, type PeopleStreams } from '../game/people';
 import type { Pt } from '../game/roads';
-import type { NeighbourhoodDraft } from '../game/town';
+import type { StartRequest } from '../game/session';
+import { EMPTY_LOT, withLot, type NeighbourhoodDraft, type Templates } from '../game/town';
 import { defaultsOf, LAND_SIZE, LEGACY_KINDS, placeOf, sizeFor, townFits, type WorldKind } from '../game/world';
 import { readCode, type WorldCode } from '../game/worldCode';
 
@@ -95,6 +101,51 @@ export function townKey(land: string, code: Chosen, site: Pt | null): string {
   return `${land}|${code.town}:${code.villages}:${code.townSeed ?? ''}:${site ? `${Math.round(site[0])},${Math.round(site[1])}` : ''}`;
 }
 
+/** What the people's seed is drawn from when the code has none of its own (`peopleSeedOf`). */
+const PEOPLE_SALT = 0x9e0b1e;
+
+/**
+ * The seed `code`'s people are drawn from (`people.ts` `peopleStreams`): its own, once "New
+ * neighbours" rolled one or a code typed in gave one; else a mix of the town's seed (the land's
+ * while the town has none of its own), so a code without one still makes the same people.
+ */
+export function peopleSeedOf(code: WorldCode): number {
+  if (code.peopleSeed !== undefined) return code.peopleSeed >>> 0;
+  return Math.floor(hash(code.townSeed ?? code.seed, PEOPLE_SALT, 0x5eed) * 2 ** 32) >>> 0;
+}
+
+/** Step 3's key: step 2's town's (`townKey`) and the people's seed. The town is lived in again only when this changed. */
+export function peopleKey(town: string, seed: number): string {
+  return `${town}|${seed >>> 0}`;
+}
+
+/** Households left not yet offered, under which "Show others" starts the round again (or all of them, in a smaller town). */
+const FRESH_LEAST = 10;
+
+/**
+ * The households step 3 offers once "Show others" has been pressed `page` times: each offer is
+ * `offered` from one stream running on, among the households not offered yet, so every press shows
+ * others; once fewer than ten are left the round starts again from all of them. Page 0 is
+ * `offered(town, streams)` itself, so the same code offers the same households first.
+ */
+export function offerPage(town: NeighbourhoodDraft, streams: PeopleStreams, page: number): number[] {
+  const rand = streams.offer();
+  const running: PeopleStreams = { ...streams, offer: () => rand };
+  const all = town.households;
+  let shown = new Set<number>();
+  let offer: number[] = [];
+  for (let p = 0; p <= page; p++) {
+    let rest = all.filter((h) => !shown.has(h.slot));
+    if (rest.length < Math.min(FRESH_LEAST, all.length)) {
+      shown = new Set();
+      rest = all;
+    }
+    offer = offered({ ...town, households: rest }, running);
+    for (const slot of offer) shown.add(slot);
+  }
+  return offer;
+}
+
 /** Step 1's figures: the land's size (m), and the share of it under water and under woods (0..1). */
 export interface LandStats {
   width: number;
@@ -133,4 +184,74 @@ function polygonArea(poly: readonly [number, number][]): number {
   let twice = 0;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) twice += (poly[j][0] + poly[i][0]) * (poly[j][1] - poly[i][1]);
   return Math.abs(twice) / 2;
+}
+
+/** Step 4's choice: the household, the home chosen for it, and the game's choices. */
+export interface MoveIn {
+  /** Step 3's town with its neighbours (the first wave). */
+  town: NeighbourhoodDraft;
+  /** The home chosen. */
+  slot: number;
+  household: HouseholdDraft;
+  /** The home of the town's household chosen in step 3 (null: a household made in Creation). */
+  from: number | null;
+  /** Start on an empty lot, the house there cleared away (not for a household staying in its own home). */
+  emptyLot: boolean;
+  mode: GameKind;
+  lifespan: Lifespan;
+  /** `peopleSeedOf` the world's code (none: the newcomers are drawn from a seed of their own). */
+  peopleSeed?: number;
+}
+
+/**
+ * The new game Move in starts. A household of the town's that stays in its home is taken over as
+ * it is (`existing`). One that moves leaves its old home empty, for sale and for the fill like any
+ * other, and moves into the new one as a household made in Creation does. Either way the homes
+ * still for sale are filled on the way in (`fill`, `townOnMoveIn`).
+ */
+export function moveInRequest(m: MoveIn): Extract<StartRequest, { kind: 'new' }> {
+  const common = { mode: m.mode, lifespan: m.lifespan, fill: true, ...(m.peopleSeed === undefined ? {} : { peopleSeed: m.peopleSeed }) };
+  if (m.from === m.slot) return { kind: 'new', town: m.town, household: m.household, slot: m.slot, existing: true, ...common };
+  let town = m.from === null ? m.town : { ...m.town, households: m.town.households.filter((h) => h.slot !== m.from) };
+  if (m.emptyLot) town = withLot(town, m.slot, EMPTY_LOT);
+  return { kind: 'new', town, household: m.household, slot: m.slot, ...common };
+}
+
+/**
+ * The town a new game starts in (`session.ts`, before its town file is put together). With `fill`,
+ * the second wave of neighbours (`people.ts` `fillTown`): every home still for sale lived in but for
+ * the few cheapest kept, up to the neighbours' cap, nearest the player's home first, none of them
+ * with the player's family name, at `tier` (`people.ts` `tierFor` the machine's graphics preset; full
+ * by default). Drawn from the request's people seed (none: one from `random`).
+ */
+export function townOnMoveIn(
+  content: Content,
+  assets: AssetRegistry,
+  t: Templates,
+  request: Extract<StartRequest, { kind: 'new' }>,
+  random: () => number = Math.random,
+  tier: FillTier = 'full',
+): NeighbourhoodDraft {
+  if (!request.fill) return request.town;
+  const streams = peopleStreams(request.peopleSeed ?? (random() * 2 ** 32) >>> 0);
+  return fillTown(content, assets, t, request.town, request.slot, streams, { tier, avoid: [request.household.name] });
+}
+
+/**
+ * The households whose houses step 4 has the town worker furnish ahead (`townJobs.ts`
+ * `furnishAhead`), before the player has chosen a home: the town's own (`town`: step 3's) and those
+ * Move in would move into the homes still for sale (`people.ts` `fillPlan` with no home chosen),
+ * drawn as `townOnMoveIn` draws them (`household`: the player's, whose family name none takes). Once
+ * a home is chosen a few may come out otherwise; Move in furnishes those.
+ */
+export function householdsAhead(
+  content: Content,
+  assets: AssetRegistry,
+  t: Templates,
+  town: NeighbourhoodDraft,
+  peopleSeed: number,
+  household: HouseholdDraft,
+  tier: FillTier = 'full',
+): { slot: number; household: HouseholdDraft }[] {
+  return [...town.households, ...fillPlan(content, assets, t, town, undefined, peopleStreams(peopleSeed), { tier, avoid: [household.name] })];
 }

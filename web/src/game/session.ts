@@ -49,8 +49,9 @@ import { PointerInput, routeKey } from './input';
 import { LandMode } from './landMode';
 import { installLandHook } from '../ui/land/landHook';
 import { brushOf } from '../ui/land/landTools';
-import type { NeighbourhoodDraft } from './town';
-import { peopleStreams } from './people';
+import { loadTemplates, type NeighbourhoodDraft } from './town';
+import { townOnMoveIn } from '../ui/newGame';
+import { peopleStreams, tierFor } from './people';
 import { compileSim, loadGameData } from './gameData';
 import { townJob } from './townJobs';
 import { gameAssetPlan, parseAheadFiles, streamRanks } from './streamPlan';
@@ -96,6 +97,11 @@ export type StartRequest =
        * wins for the dice). Missing: both are random.
        */
       peopleSeed?: number;
+      /**
+       * The homes still for sale are filled on the way in (`ui/newGame.ts` `townOnMoveIn`): all but a
+       * few, from the people seed's streams (step 4's Move in).
+       */
+      fill?: boolean;
     }
   | { kind: 'load'; saveId: string };
 
@@ -216,8 +222,19 @@ async function openSession(
     // (In the town worker: a big world's file takes most of a second to put together.)
     const people = request.peopleSeed === undefined ? null : peopleStreams(request.peopleSeed);
     const random = people?.bonds ?? (Math.random() * 2 ** 32) >>> 0;
+    // The rest of the homes for sale filled (Move in), at the tier for the machine's graphics preset:
+    // a few tens of milliseconds on the page, said on the loading screen first. (Their houses were
+    // furnished ahead in step 4, in the town worker the assemble job below runs in: `furnishAhead`.)
+    let town = request.town;
+    if (request.fill) {
+      progress('Moving the neighbours in', 0.06);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const t = await loadTemplates();
+      town = perfTime('session: fill the town', () => townOnMoveIn(content, assets, t, request, Math.random, tierFor(liveSettings.graphics)));
+      progress('Laying out the neighbourhood', 0.09);
+    }
     const made = await perfTimeAsync('session: assembleTown', () =>
-      townJob(content, { kind: 'assemble', town: request.town, player: request.household, slot: request.slot, options: { existing: request.existing, mode: request.mode, lifespan: request.lifespan }, random }),
+      townJob(content, { kind: 'assemble', town, player: request.household, slot: request.slot, options: { existing: request.existing, mode: request.mode, lifespan: request.lifespan }, random }),
     );
     source = { lot: made.lot, seed: Number(params.get('seed')) || (people?.sim ?? (Math.random() * 2 ** 31) >>> 0) };
     household = request.household.name.trim();

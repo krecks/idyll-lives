@@ -3,8 +3,9 @@
 // file, byte for byte, with `Math.random` never called (it throws here). A home's household comes
 // from its lot's own stream, so taking away a lot elsewhere leaves it be. After Move in every home
 // is lived in but for the few cheapest kept for sale, up to the cap, with smaller households in the
-// smallest homes when the cap is near; and each neighbour knows about 35 others, likelier those
-// living near.
+// smallest homes when the cap is near; a smaller tier is the same people in fewer homes; each
+// neighbour knows about 35 others, likelier those living near; the town file says the most
+// residents the town grows to; and the houses furnished ahead are the ones Move in finds made.
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -32,7 +33,7 @@ describe('seeded people', async () => {
   const { objectInfos } = await import('../src/game/housegen');
   const { randomHousehold } = await import('../src/game/household');
   const { assembleTown, generateWorld, useTownContent, vacantSlots } = await import('../src/game/town');
-  const { fillPlan, fillTown, keepForSale, neighbourBonds, offered, peopleStreams, populate, START_CAP } = await import('../src/game/people');
+  const { defaultResidentsMost, FILL_CAP, fillPlan, fillTown, keepForSale, neighbourBonds, offered, peopleStreams, populate, residentsMost, SIM_RESIDENTS, tierFor } = await import('../src/game/people');
   const { homePrice } = await import('../src/game/price');
   const { mulberry32 } = await import('../src/game/noise');
   const { runTownJob } = await import('../src/game/townJobs');
@@ -81,7 +82,7 @@ describe('seeded people', async () => {
   });
 
   /** Both waves of a town's people from `seed`, the player moving into the first home left, and whom step 3 offers. */
-  const people = (town: NeighbourhoodDraft, seed: number, cap = START_CAP) => {
+  const people = (town: NeighbourhoodDraft, seed: number, cap = FILL_CAP) => {
     const streams = peopleStreams(seed);
     const first = populate(content, assets, t, town, undefined, streams);
     const offer = offered(first, streams);
@@ -160,7 +161,7 @@ describe('seeded people', async () => {
       // After it, only the kept ones and the player's.
       const left = vacantSlots(filled).filter((s) => s.index !== home);
       expect(left.length).toBe(keepForSale(houses.length));
-      expect(residents(filled, home)).toBeLessThanOrEqual(START_CAP);
+      expect(residents(filled, home)).toBeLessThanOrEqual(FILL_CAP);
       // The cheapest of those for sale were kept.
       const price = (s: PlotSlot) => homePrice(content, t, s);
       const moved = filled.households.slice(first.households.length).map((h) => town.slots[h.slot]);
@@ -208,11 +209,12 @@ describe('seeded people', async () => {
       const far = (b: { a: number; b: number }) => Math.hypot(homes[sims[b.a].household][0] - homes[sims[b.b].household][0], homes[sims[b.a].household][1] - homes[sims[b.b].household][1]);
       return { mean: count.reduce((a, b) => a + b, 0) / sims.length, bonds, far, sims };
     };
-    // 118, 150 and 560 residents.
+    // 118, 150, 560 and 680 residents.
     for (const [households, per] of [
       [59, 2],
       [75, 2],
       [280, 2],
+      [340, 2],
     ]) {
       const { mean } = ties(households, per, 40);
       expect(mean).toBeGreaterThan(32);
@@ -253,6 +255,101 @@ describe('seeded people', async () => {
     expect(neighbours.length).toBeGreaterThan(118);
     expect(mean).toBeGreaterThan(31);
     expect(mean).toBeLessThan(39);
+  });
+
+  /** A town too big for its natural households under `FILL_CAP` (612 homes of one or two bedrooms), both waves from seed 21. */
+  const big = (() => {
+    const town = gridTown(600);
+    const streams = peopleStreams(21);
+    const first = populate(content, assets, t, town, undefined, streams);
+    const home = vacantSlots(first)[0].index;
+    return { town, streams, first, home, filled: fillTown(content, assets, t, first, home, streams) };
+  })();
+
+  test('a full fill of a big town lights every home but the kept, under FILL_CAP, the smallest homes in ones and twos', () => {
+    const { town, first, filled, home, streams } = big;
+    const houses = town.slots.filter((s) => s.kind === 'house');
+    expect(houses.length).toBe(612);
+    const left = vacantSlots(filled).filter((s) => s.index !== home);
+    expect(left.length).toBe(keepForSale(houses.length));
+    const total = residents(filled, home);
+    expect(total).toBeLessThanOrEqual(FILL_CAP);
+    expect(total).toBeGreaterThan(FILL_CAP - 4);
+    // The households the homes would naturally have passed the cap; the size rule made those of the
+    // smallest homes ones and twos first: wherever a home's household was made smaller, every
+    // smaller home's has one or two people.
+    const natural = new Map(fillPlan(content, assets, t, first, home, streams, { cap: 10_000 }).map((p) => [p.slot, p.household]));
+    expect(residents(first) + [...natural.values()].reduce((n, h) => n + h.members.length, 0)).toBeGreaterThan(FILL_CAP + 20);
+    const moved = filled.households.slice(first.households.length);
+    const bedrooms = (slot: number) => (town.slots[slot].template === 'oakridge' ? 2 : 1);
+    const smaller = moved.filter((h) => h.household.members.length < natural.get(h.slot)!.members.length);
+    expect(smaller.length).toBeGreaterThan(0);
+    for (const c of smaller) for (const h of moved) if (bedrooms(h.slot) < bedrooms(c.slot)) expect(h.household.members.length).toBeLessThanOrEqual(2);
+    expect(filled.residentsMost).toBe(SIM_RESIDENTS);
+  });
+
+  test("a smaller tier is the full fill's people in fewer homes, under its own limit", () => {
+    // A big town, where each tier stops at its limit, and one where none does.
+    const mid = gridTown(160);
+    const midStreams = peopleStreams(22);
+    const midFirst = populate(content, assets, t, mid, undefined, midStreams);
+    for (const { town, streams, first, home } of [big, { town: mid, streams: midStreams, first: midFirst, home: vacantSlots(midFirst)[0].index }]) {
+      const full = new Map(fillPlan(content, assets, t, first, home, streams).map((p) => [p.slot, JSON.stringify(p.household)]));
+      const at = town.slots[home];
+      const counts: number[] = [];
+      for (const tier of ['half', 'near'] as const) {
+        const plan = fillPlan(content, assets, t, first, home, streams, { tier });
+        const slots = new Set(plan.map((p) => p.slot));
+        counts.push(plan.length);
+        expect(plan.length).toBeLessThan(full.size);
+        for (const p of plan) expect(JSON.stringify(p.household)).toBe(full.get(p.slot)!);
+        const filled = fillTown(content, assets, t, first, home, streams, { tier });
+        expect(filled.residentsMost).toBe(residentsMost(tier));
+        expect(residents(filled, home)).toBeLessThan(residentsMost(tier));
+        if (town !== mid) continue;
+        const inFull = [...full.keys()].map((slot) => town.slots[slot]);
+        if (tier === 'half') {
+          // The main town (the player's own) in full; the village half.
+          for (const s of inFull.filter((s) => s.area === 0)) expect(slots.has(s.index)).toBe(true);
+          const village = inFull.filter((s) => s.area === 1);
+          expect(village.filter((s) => slots.has(s.index)).length).toBe(Math.ceil(village.length / 2));
+        } else {
+          // Every home near the player's lived in.
+          for (const s of inFull.filter((s) => Math.hypot(s.x - at.x, s.z - at.z) <= 250)) expect(slots.has(s.index)).toBe(true);
+        }
+      }
+      expect(counts[1]).toBeLessThan(counts[0]);
+    }
+  });
+
+  test("the town file says the most residents the town grows to: its tier's, else what it starts with and room", () => {
+    const { first, filled, home, streams } = people(hamlet, 31);
+    const p = player();
+    const fileOf = (town: NeighbourhoodDraft) => JSON.parse(assembleTown(content, t, town, p, home, {}, mulberry32(streams.bonds))) as { sims: unknown[]; residentsMost?: number };
+    expect(fileOf(filled).residentsMost).toBe(SIM_RESIDENTS);
+    expect(fileOf(fillTown(content, assets, t, first, home, streams, { tier: 'near' })).residentsMost).toBe(residentsMost('near'));
+    // The first wave alone (no fill): what it starts with and room, but never under the old 240.
+    const unfilled = fileOf(first);
+    expect(unfilled.residentsMost).toBe(defaultResidentsMost(unfilled.sims.length));
+    expect(defaultResidentsMost(120)).toBe(240);
+    expect(defaultResidentsMost(400)).toBe(400 + SIM_RESIDENTS - FILL_CAP);
+    expect(defaultResidentsMost(760)).toBe(SIM_RESIDENTS);
+    // Every graphics preset fills in full until the M1's numbers say otherwise.
+    for (const preset of ['low', 'medium', 'high', undefined]) expect(tierFor(preset)).toBe('full');
+  });
+
+  test('the furnish job furnishes the houses the households about to move in need, and the town file is the same after it', () => {
+    const { first, home, streams } = people(hamlet, 44);
+    const ahead = [...first.households, ...fillPlan(content, assets, t, first, undefined, streams)];
+    const filled = fillTown(content, assets, t, first, home, streams);
+    const job: TownJob = { kind: 'assemble', town: filled, player: player(), slot: home, options: {}, random: streams.bonds };
+    const before = runTownJob(content, t, job);
+    const done = runTownJob(content, t, structuredClone({ kind: 'furnish', town: first, households: ahead } satisfies TownJob));
+    if (done.kind !== 'furnish' || before.kind !== 'assemble') throw new Error('not furnished');
+    expect(done.houses).toBe(ahead.length);
+    const after = runTownJob(content, t, job);
+    if (after.kind !== 'assemble') throw new Error('not a town file');
+    expect(after.lot).toBe(before.lot);
   });
 
   test('step 3 offers all of ten or fewer, else six in ten between 10 and 30, all different', () => {

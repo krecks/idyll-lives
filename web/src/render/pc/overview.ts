@@ -35,7 +35,9 @@ import { Geo, type V3 } from '../shared/geometry';
 import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
 import { placementVariation, standInOf } from '../shared/modelEntry';
 import { pavedRects } from '../shared/paving';
-import { townRoadMesh, type RoadMeshData } from '../shared/roads';
+import { townRoadMesh, townRoads, type RoadMeshData } from '../shared/roads';
+import { surfaceOf } from '../shared/landSurface';
+import { hashString } from '../shared/chunks';
 import { townRoadMeshOffThread } from '../shared/renderData';
 import { fieldLayers } from '../shared/street';
 import { perfEnd, perfStart } from '../../debug/perf';
@@ -115,10 +117,13 @@ export class TownOverview {
   private readonly layers: number[];
   private readonly lib: MaterialLibrary;
   private readonly device: pc.GraphicsDevice;
-  /** Two streets used in turn: the next one builds (hidden) while the current one stays on screen. */
-  private readonly streets: [Street, Street];
-  private current = 0;
-  private ground: pc.Entity[] = [];
+  /**
+   * The street: built again in place for another town, only its chunks whose plan changed (a lot removed, a street
+   * added: the few round it), the old drawn until the new is built (`Street.build`).
+   */
+  private readonly street: Street;
+  /** The town's ground draws (the roads and their markings, the paths, the fields), each with what it was made from: kept for another town with the same. */
+  private ground = new Map<string, { key: string; entity: pc.Entity }>();
   private readonly templates: TemplateCache<ModelTemplate>;
   private readonly placed = new Map<string, Placed>();
   private readonly templatesInUse = new Set<string>();
@@ -159,7 +164,7 @@ export class TownOverview {
     this.root = new pc.Entity('townOverview');
     parent.addChild(this.root);
     this.templates = new TemplateCache(app);
-    this.streets = [new Street(app, this.root, assets, house, { layers: this.layers, fenceStyles: content.fenceStyles }), new Street(app, this.root, assets, house, { layers: this.layers, fenceStyles: content.fenceStyles })];
+    this.street = new Street(app, this.root, assets, house, { layers: this.layers, fenceStyles: content.fenceStyles });
     // Unlit: the output is the vertex colour times the instance colour (`glowByInstance`), added by its alpha.
     const mat = new pc.StandardMaterial();
     mat.name = 'lotGlow';
@@ -201,7 +206,7 @@ export class TownOverview {
     // Those the overview doesn't draw (hidden) go now; it's built again only for those it does.
     this.disposeStale(keys.filter((k) => !this.templatesInUse.has(k)));
     let drawn = keys.some((k) => this.templatesInUse.has(k));
-    for (const street of this.streets) drawn = street.invalidate(url) || drawn;
+    drawn = this.street.invalidate(url) || drawn;
     if (drawn) this.key = '';
     return drawn;
   }
@@ -210,23 +215,20 @@ export class TownOverview {
   async build(world: WorldStructure, pace?: () => Promise<void>): Promise<boolean> {
     const key = townKey(world);
     if (key === this.key) return false;
-    const next = this.streets[1 - this.current];
-    // (Hidden while it builds: the current one is on screen.)
-    next.root.enabled = false;
-    // (Asked for first: the render data worker makes the town's road mesh while the street is planned.)
-    const roads = townRoadMeshOffThread(world);
-    await next.build(world, null, pace);
-    const ground = await this.buildGround(world, pace, roads);
+    // (Asked for first: the render data worker makes the town's road mesh while the street is planned. Not for
+    // another town with the same roads at the same heights: a lot removed keeps it.)
+    const roadsKey = roadKey(world);
+    const roads = this.ground.get('townStreets')?.key === roadsKey ? null : townRoadMeshOffThread(world);
+    await this.street.build(world, null, pace);
+    const ground = await this.buildGround(world, pace, roads, roadsKey);
     const objects = await this.buildObjects(world, pace);
     await pace?.();
 
-    // Swap: drop the previous overview, show the new one.
-    this.streets[this.current].clear();
-    this.current = 1 - this.current;
-    next.root.enabled = true;
-    for (const e of this.ground) e.destroy();
+    const swap = perfStart('town: swap');
+    // Swap: the previous town's ground and things go (those it keeps stay), the new ones are shown.
+    for (const [name, g] of this.ground) if (ground.get(name)?.entity !== g.entity) g.entity.destroy();
     this.ground = ground;
-    for (const e of ground) e.enabled = true;
+    for (const { entity } of ground.values()) entity.enabled = true;
     for (const [k, p] of this.placed) if (!objects.has(k)) for (const d of p.draws) d.enabled = false;
     this.templatesInUse.clear();
     for (const [k, { template, matrices }] of objects) {
@@ -248,12 +250,13 @@ export class TownOverview {
     this.width = world.width;
     this.depth = groundDepth(world);
     this.buildHighlights(world.plots);
+    perfEnd(swap);
     return true;
   }
 
   /** Streetlights, porch lamps and window glass follow the lighting key's lamp level (`glow`: the lamps' colour, linear). */
   setNight(lamps: number, glow: RGB): void {
-    this.streets[this.current].setNight(lamps, glow);
+    this.street.setNight(lamps, glow);
   }
 
   /** Which lots glow (see `Renderer.setLotHighlight`; `snap`: no easing to it). */
@@ -315,9 +318,9 @@ export class TownOverview {
   }
 
   destroy(): void {
-    for (const street of this.streets) street.destroy();
-    for (const e of this.ground) e.destroy();
-    this.ground = [];
+    this.street.destroy();
+    for (const { entity } of this.ground.values()) entity.destroy();
+    this.ground.clear();
     this.dropHighlights();
     for (const p of this.placed.values()) for (const d of p.draws) d.destroy();
     this.placed.clear();
@@ -330,33 +333,47 @@ export class TownOverview {
 
   // ---- building ---------------------------------------------------------------------
 
-  /** Road and garden paths / driveways and fields, one flat mesh each (hidden until the swap). */
-  private async buildGround(world: WorldStructure, pace: (() => Promise<void>) | undefined, offThread: Promise<{ roads: RoadMeshData; ms: number } | null>): Promise<pc.Entity[]> {
-    const out: pc.Entity[] = [];
-    // (The junctions' pads with the road, their markings in the road paint over it: `townRoadMesh`. Made in the
-    // render data worker while the street was planned, or here where none could.)
-    const span = perfStart('town: road mesh');
-    const made = await offThread;
-    let meshes: RoadMeshData;
-    if (made) {
-      meshes = made.roads;
-      perfEnd(span, `worker ${Math.round(made.ms)} ms`);
+  /**
+   * Road and garden paths / driveways and fields, one flat mesh each (hidden until the swap). A draw whose rectangles
+   * (or, the roads', whose roads and heights: `roadsKey`; `offThread` null) are the town's last is kept as it is.
+   */
+  private async buildGround(world: WorldStructure, pace: (() => Promise<void>) | undefined, offThread: Promise<{ roads: RoadMeshData; ms: number } | null> | null, roadsKey: string): Promise<Map<string, { key: string; entity: pc.Entity }>> {
+    const out = new Map<string, { key: string; entity: pc.Entity }>();
+    const keep = (name: string, key: string) => {
+      const had = this.ground.get(name);
+      if (had?.key !== key) return false;
+      out.set(name, had);
+      return true;
+    };
+    if (!offThread) {
+      keep('townStreets', roadsKey);
+      keep('townMarks', roadsKey);
     } else {
-      meshes = townRoadMesh(world);
-      perfEnd(span, 'page');
-    }
-    const road = meshFrom(this.device, meshes.surface);
-    if (road) {
-      const entity = drawMesh(this.root, 'townStreets', road, this.lib.surface('material.road', { doubleSided: true, vertexColors: true }), { receiveShadows: true, layers: this.layers });
-      entity.enabled = false;
-      out.push(entity);
-    }
-    const marks = meshes.marks;
-    const paint = marks ? meshFrom(this.device, marks) : null;
-    if (paint) {
-      const entity = drawMesh(this.root, 'townMarks', paint, this.lib.roadPaint(), { receiveShadows: true, layers: this.layers });
-      entity.enabled = false;
-      out.push(entity);
+      // (The junctions' pads with the road, their markings in the road paint over it: `townRoadMesh`. Made in the
+      // render data worker while the street was planned, or here where none could.)
+      const span = perfStart('town: road mesh');
+      const made = await offThread;
+      let meshes: RoadMeshData;
+      if (made) {
+        meshes = made.roads;
+        perfEnd(span, `worker ${Math.round(made.ms)} ms`);
+      } else {
+        meshes = townRoadMesh(world);
+        perfEnd(span, 'page');
+      }
+      const road = meshFrom(this.device, meshes.surface);
+      if (road) {
+        const entity = drawMesh(this.root, 'townStreets', road, this.lib.surface('material.road', { doubleSided: true, vertexColors: true }), { receiveShadows: true, layers: this.layers });
+        entity.enabled = false;
+        out.set('townStreets', { key: roadsKey, entity });
+      }
+      const marks = meshes.marks;
+      const paint = marks ? meshFrom(this.device, marks) : null;
+      if (paint) {
+        const entity = drawMesh(this.root, 'townMarks', paint, this.lib.roadPaint(), { receiveShadows: true, layers: this.layers });
+        entity.enabled = false;
+        out.set('townMarks', { key: roadsKey, entity });
+      }
     }
     const layers: [string, { x: number; z: number; w: number; d: number }[] | undefined, string, number][] = [
       ['townPaths', world.meta?.paths, 'material.path', 0.014],
@@ -364,6 +381,8 @@ export class TownOverview {
     ];
     for (const [name, rects, material, y] of layers) {
       if (!rects?.length) continue;
+      const key = `${material}|${y}|${rects.map((r) => `${r.x},${r.z},${r.w},${r.d}`).join(';')}`;
+      if (keep(name, key)) continue;
       await pace?.();
       const g = new Geo();
       // (Paving toned as the game's is.)
@@ -374,7 +393,7 @@ export class TownOverview {
       if (!mesh) continue;
       const entity = drawMesh(this.root, name, mesh, this.lib.surface(material, { doubleSided: true, vertexColors: toned }), { receiveShadows: true, layers: this.layers });
       entity.enabled = false;
-      out.push(entity);
+      out.set(name, { key, entity });
     }
     return out;
   }
@@ -557,6 +576,12 @@ export class TownOverview {
 }
 
 const ZERO = [0, 0, 0, 0];
+
+/** What the town's road mesh is made from (`townRoadMesh`): its roads and junctions, and on a land the town follows their heights. */
+function roadKey(world: WorldStructure): string {
+  const surface = surfaceOf(world);
+  return `${hashString(JSON.stringify([townRoads(world), world.junctions ?? null]))}|${surface ? surface.roadsSig() : '-'}`;
+}
 
 /** Identity of a town layout: the overview builds again only when it changes. */
 function townKey(world: WorldStructure): string {
