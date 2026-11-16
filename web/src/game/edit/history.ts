@@ -1,6 +1,7 @@
 /**
  * Step 2's undo and redo: the town's plan drafts as the edits made them (unsettled, with no copy of
- * the land), the last `HISTORY_MOST` kept. Undo and redo give a draft to settle again like any edit.
+ * the land), the last `HISTORY_MOST` kept. Undo and redo give a draft to settle again like any edit;
+ * an edit the settle refused is dropped (`revert`).
  */
 
 import type { NeighbourhoodDraft } from '../town';
@@ -57,6 +58,22 @@ export class TownHistory {
   redo(): NeighbourhoodDraft | null {
     if (!this.canRedo) return null;
     return this.drafts[++this.at];
+  }
+
+  /**
+   * Back to `draft`, a plan the edits went through, when the settle refused the edit made on it
+   * (`landFollow.ts` `settleEdit`): the edits since are dropped, none to redo (a refused edit
+   * redone would only be refused again). A plan no longer kept (more than `HISTORY_MOST` back, or
+   * dropped by an edit after an undo) is taken on as an edit. The draft as it stands then.
+   */
+  revert(draft: NeighbourhoodDraft): NeighbourhoodDraft {
+    const at = this.drafts.lastIndexOf(draft, this.at);
+    if (at < 0) this.push(draft);
+    else {
+      this.drafts = this.drafts.slice(0, at + 1);
+      this.at = at;
+    }
+    return this.draft;
   }
 
   /** Back to the town as it was laid, every edit dropped (none can be redone). */
