@@ -35,6 +35,7 @@ describe("step 2's villages", async () => {
   const { addLot } = await import('../src/game/edit/lots');
   const { removeRoad } = await import('../src/game/edit/streets');
   const { townIssues } = await import('../src/ui/townedit/problems');
+  const { editedProblems } = await import('../src/game/edit/checked');
   const { lengths, nearest } = await import('../src/game/roads');
   type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
@@ -63,6 +64,11 @@ describe("step 2's villages", async () => {
   };
   /** What keeps the player from step 3 (the Problems list), but what the town as laid had already. */
   const blocking = (d: NeighbourhoodDraft, base: NeighbourhoodDraft) => townIssues(d, t, content, townIssues(base, t, content)).blocking.map((i) => i.text);
+  /** The town checks' hard problems on an edited town (`townProblems`, as the edit job checks it), but those the town as laid had. */
+  const hardNew = (d: NeighbourhoodDraft, base: NeighbourhoodDraft) => {
+    const had = new Set(editedProblems(base, t, content).hard);
+    return editedProblems(d, t, content).hard.filter((h) => !had.has(h));
+  };
   /** The middles a village may go round on `d`, a 20 m grid scanned (nearest the middle of the world first), and how long each test took (ms). */
   const sites = (d: NeighbourhoodDraft, swap = false) => {
     const out: { p: Pt; why: string | null }[] = [];
@@ -135,6 +141,7 @@ describe("step 2's villages", async () => {
     expect(d.slots.slice(0, big.slots.length)).toEqual(big.slots);
     expect(d.roads.slice(0, big.roads.length)).toEqual(big.roads);
     expect(blocking(d, big)).toEqual([]);
+    expect(hardNew(d, big)).toEqual([]);
     noDangling(d);
     console.log(`placed ${name}: ${own.length} streets, ${road.length} road${road.length > 1 ? 's' : ''} to it (${road.map((r) => `${r.name} ${Math.round(lengths(r.points).at(-1)!)} m`).join(', ')}), ${lots.length} lots (${homes.length} homes)`);
   });
@@ -188,6 +195,7 @@ describe("step 2's villages", async () => {
     const meets = ([x, z]: Pt) => streets.some((r) => nearest(r.points, x, z).dist <= r.width / 2 + 1);
     expect(fresh.some((r) => meets(r.points[0]) || meets(r.points[r.points.length - 1]))).toBe(true);
     expect(blocking(d, big)).toEqual([]);
+    expect(hardNew(d, big)).toEqual([]);
     noDangling(d);
     // And the settle takes it.
     const settled = inWorker({ kind: 'edit', plan: d, ops: 1, steps: [before, d], check: false });
@@ -280,6 +288,7 @@ describe("step 2's villages", async () => {
     expect(d.slots.length).toBe(coast.slots.length - goes.lots.length);
     noDangling(d);
     expect(blocking(d, coast)).toEqual([]);
+    expect(hardNew(d, coast)).toEqual([]);
     console.log(`removed ${areas[k].name}: ${goes.roads} of its roads and ${goes.others} that led to it, ${goes.lots.length} lots, ${goes.backdrop.length} buildings`);
     // A site too near another area refused with why (and one in the water, on the large land's ponds).
     const near = sites(coast).all.find((s) => s.why?.includes(`of ${areas[0].name}`) || s.why?.includes(`${areas[0].name}'s`));

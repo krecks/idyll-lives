@@ -846,14 +846,14 @@ function removeOnce(draft: NeighbourhoodDraft, t: Templates, area: number): Edit
   );
   for (const i of draft.roads.keys()) if (!left.from.includes(i)) gone.add(i);
   if (!left.roads.some((r) => r.ends.includes('out')) || !reaches(left.roads, left.roads.flatMap((r, i) => (r.area === 0 ? [i] : [])))) return { refused: `without ${name} no road would lead out of the world` };
-  // Its buildings, and those by a road that goes; the parking by its roads and theirs.
+  // Its buildings (all of its area's: a farm's barn too), and those by a road that goes; the parking by its roads and theirs.
   const index = roadIndex(draft.roads);
   const byGone = (x: number, z: number, within: number) => {
     const near = index.nearest(x, z, within);
     return !!near && gone.has(near.road);
   };
   const backdrop = new Set(parts.backdrop);
-  (open.backdrop ?? []).forEach((b, i) => byGone(...middleOfPoly(b.poly), 40) && backdrop.add(i));
+  (open.backdrop ?? []).forEach((b, i) => (b.area === area || byGone(...middleOfPoly(b.poly), 40)) && backdrop.add(i));
   const parking = new Set(open.parking.flatMap((p, i) => (parts.parking.has(i) || byGone(p.x, p.z, 10) ? [i] : [])));
   let next: NeighbourhoodDraft = {
     ...draft,
