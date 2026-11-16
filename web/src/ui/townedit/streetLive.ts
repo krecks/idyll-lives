@@ -12,9 +12,12 @@
  * - running into or alongside another road, or across a green, where it does;
  * - a crossing of the water: a bridge stretch, or red where it is too wide, bends, or a road or a
  *   lot is on it, as `bridgeable` says;
- * - a stretch the land would need more than `CUT_MAX` m of cut or fill under (`profileOf`),
- *   "too steep here". This one is the settle's to judge, not `drawStreet`'s: the tool refuses it
- *   too, so the settle seldom has to.
+ * - a stretch the land would need more than `CUT_MAX` m of cut or fill under (`profileOf`, on the
+ *   plan's land as the settle measures against it: the land as laid with its finer hills smoothed
+ *   out, as `gentleUnder` smooths them under anything built), "too steep here". This one is a
+ *   forecast, not a refusal (`slope`, apart from `why`): the settle is the judge (decision 11) and
+ *   refuses the street with its own reason. Inside a town's or a village's box the settle lays the
+ *   land to the area's plane first, so stretches there are not judged.
  *
  * What it leaves to `drawStreet` itself, run when the pointer rests and when the street is ended
  * (`verdictOf`): what is in the way, how far a dead end reaches past the roads it carries on, the
@@ -27,7 +30,8 @@ import type { RoadKind, RoadPlan } from '../../core/protocol';
 import { bridgeable, bridgeStretch, wetSpans } from '../../game/bridges';
 import type { Edited } from '../../game/edit/edited';
 import { areaOf, drawStreet, Meeting, ONE_CROSSING, ROOM, streetCourse, streetLine, streetWidth, TRAIL_APART, type End, type StreetLine } from '../../game/edit/streets';
-import { heightAt, type Land } from '../../game/land';
+import { heightAt, NONE, type Land } from '../../game/land';
+import { smoothHeights } from '../../game/landFollow';
 import { unrle } from '../../game/landMasks';
 import { bends, clearOf, COURT, inside, lengths, pointAt, roomAt, tangent, type Fit, type Pt } from '../../game/roads';
 import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '../../game/town';
@@ -58,10 +62,11 @@ export interface LiveStreet {
   joins: { at: Pt; ok: boolean }[];
   /** The stretches drawn red or as bridges, by arc length along `line`. */
   stretches: Stretch[];
-  /** Why it would be refused (the first reason, in `drawStreet`'s order, then the slope's); null: as far as the live checks tell, it may be drawn. */
+  /** Why it would be refused (the first reason, in `drawStreet`'s order); null: as far as the live checks tell, it may be drawn. */
   why: string | null;
-  /** Some of it is too steep. */
+  /** Some of it looks too steep (red), and what the settle would say of it: a forecast, not a refusal (see the top of this file). */
   steep: boolean;
+  slope: string | null;
   /** Why it can't be ended where it ends yet, though nothing is wrong with it so far: it joins no road, or is a dead end longer than a court. */
   open: string | null;
   /** It ends on a road, or at the world's edge: it is finished there. */
@@ -75,7 +80,7 @@ interface Context {
   draft: NeighbourhoodDraft;
   /** The water's 1 m tiles, unpacked. */
   wet: Uint8Array | null;
-  /** The land the town is laid on (none in a classic world). */
+  /** The land the town is laid on as the settle measures a new road against it (`settledLand`; none in a classic world). */
   land: Land | null;
   mountains: boolean;
   plots: Rect[];
@@ -83,6 +88,31 @@ interface Context {
 }
 
 const contexts = new WeakMap<NeighbourhoodDraft, Context>();
+const smoothed = new WeakMap<Land, Land>();
+const unpacked = new WeakMap<object, Uint8Array>();
+
+/** The water's tiles unpacked (kept per run-length list: the edits keep a town's unless a bridge changes it). */
+function wetOf(water: Parameters<typeof unrle>[0], size: number): Uint8Array {
+  let out = unpacked.get(water);
+  if (!out) unpacked.set(water, (out = unrle(water, size)));
+  return out;
+}
+
+/**
+ * `land` as the settle measures a new road's cut and fill against it: its dry heights with the finer
+ * hills smoothed out (`landFollow.ts` `smoothHeights`), as `gentleUnder` smooths the land under
+ * anything built before the town is graded in (kept per land: the plan drafts share theirs).
+ */
+function settledLand(land: Land): Land {
+  let out = smoothed.get(land);
+  if (!out) {
+    const smooth = smoothHeights(land);
+    const h = land.h.slice();
+    for (let k = 0; k < h.length; k++) if (land.wl[k] === NONE || land.wl[k] <= land.h[k]) h[k] = Math.max(-32767, Math.min(32767, Math.round(smooth[k] * 100)));
+    smoothed.set(land, (out = { ...land, h }));
+  }
+  return out;
+}
 
 /** What the live checks keep of `draft` (`t` for its lots' rectangles). */
 function contextOf(draft: NeighbourhoodDraft, t: Templates): Context {
@@ -92,8 +122,8 @@ function contextOf(draft: NeighbourhoodDraft, t: Templates): Context {
     const options = draft.world?.options as { hills?: string } | undefined;
     c = {
       draft,
-      wet: open ? unrle(open.water, draft.width * draft.depth) : null,
-      land: open?.land ?? null,
+      wet: open ? wetOf(open.water, draft.width * draft.depth) : null,
+      land: open?.land ? settledLand(open.land) : null,
       mountains: options?.hills === 'mountains',
       plots: draft.slots.map((s) => plotRect(t, s)),
       meetings: new Map(),
@@ -101,6 +131,11 @@ function contextOf(draft: NeighbourhoodDraft, t: Templates): Context {
     contexts.set(draft, c);
   }
   return c;
+}
+
+/** What the live checks keep of `draft` made now (the smoothed land takes tens of milliseconds on a big world): before the first pointer move asks. */
+export function warmLive(draft: NeighbourhoodDraft, t: Templates): void {
+  contextOf(draft, t);
 }
 
 function meetingOf(c: Context, trail: boolean): Meeting {
@@ -188,7 +223,7 @@ const heightOn = (land: Land, p: Pt) => heightAt(land, p[0], p[1]);
 /** A live street that can't be made at all: the line as drawn (or shaped), red, and why. */
 function cannot(line: Pt[], width: number, why: string): LiveStreet {
   const L = line.length > 1 ? lengths(line)[line.length - 1] : 0;
-  return { line, width, kind: null, area: -1, start: null, end: null, joins: [], stretches: L > 0 ? [{ from: 0, to: L, tone: 'bad' }] : [], why, steep: false, open: null, reached: false, bridges: [] };
+  return { line, width, kind: null, area: -1, start: null, end: null, joins: [], stretches: L > 0 ? [{ from: 0, to: L, tone: 'bad' }] : [], why, steep: false, slope: null, open: null, reached: false, bridges: [] };
 }
 
 /**
@@ -292,20 +327,21 @@ export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: read
   }
 
   // ---- the land: no more cut or fill under it than the settle allows ----
-  let steep = false;
+  let slope: string | null = null;
   if (c.land && made !== 'trail') {
     const most = c.mountains && made === 'country' ? CUT_MAX_MOUNTAIN_ROAD : CUT_MAX;
     const held = (e: End, p: Pt) => (e.kind === 'join' || e.kind === 'extend' ? heightOn(c.land!, p) : undefined);
     const profile = profileOf(part, made, c.land, { start: held(start, part[0]), end: held(end, part[part.length - 1]) });
+    const boxes = draft.open?.areas ?? [];
     const where: Stretch[] = [];
     for (let i = 0; i < profile.s.length; i++) {
-      const s = profile.s[i];
-      if (Math.abs(profile.cut[i]) <= most || decks.some((d) => s >= d.from && s <= d.to)) continue;
+      const [s, x, z] = [profile.s[i], profile.x[i], profile.z[i]];
+      if (Math.abs(profile.cut[i]) <= most || decks.some((d) => s >= d.from && s <= d.to) || boxes.some((b) => x >= b.x && x <= b.x + b.w && z >= b.z && z <= b.z + b.d)) continue;
       where.push({ from: s - 1.5, to: s + 1.5, tone: 'bad' });
     }
     if (where.length) {
-      steep = true;
-      refuse(`it is too steep here: the land would need more than ${most} m of cut or fill under it`, ...where);
+      slope = `it is too steep here: the land would need more than ${most} m of cut or fill under it`;
+      list.push(...where);
     }
   }
 
@@ -317,7 +353,7 @@ export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: read
   // (Its far end is the one nearest the last point drawn: a dead end it carries on is its start, whichever end the player drew it from.)
   const last = points[points.length - 1];
   const reached = onRoad(near(last) === 0 ? start : end);
-  return { line: part, width, kind: made, area, start, end, joins, stretches: merged(list, L), why, steep, open, reached, bridges };
+  return { line: part, width, kind: made, area, start, end, joins, stretches: merged(list, L), why, steep: slope !== null, slope, open, reached, bridges };
 }
 
 /** `drawStreet`'s own verdict on the street drawn through `points` (no homes along it: what it would be, not what it fills). */

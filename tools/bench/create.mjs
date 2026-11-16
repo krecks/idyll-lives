@@ -260,15 +260,23 @@ function benchHelpers() {
        * or `steep` (a stretch too steep, nothing else wrong). Its ground points and their screen points (the last on
        * the road it reaches), and `drawStreet`'s own time on it.
        */
-      stroke(what) {
+      stroke(what, skip = 0) {
         const d = plan();
+        /** Steep ones found, the reddest first (the likelier the settle refuses it). */
+        const found = [];
+        const red = (v) => v.stretches.filter((x) => x.tone === 'bad').reduce((a, x) => a + x.to - x.from, 0);
         const order = d.roads.map((r, i) => i).sort((a, b) => ((d.roads[a].area ?? 9) === 0 ? 0 : 1) - ((d.roads[b].area ?? 9) === 0 ? 0 : 1));
         const add = (p, v, k) => [p[0] + v[0] * k, p[1] + v[1] * k];
         /** The live street through `pts` if it is what is wanted (`drawStreet`'s own time on it, `ms`, for a street drawn), else null. */
         const judge = (pts) => {
           const v = live.liveStreet(d, t, pts, 'street', true);
           if (what === 'tight') return v.why === 'it bends tighter than 9 m' ? v : null;
-          if (what === 'steep') return v.steep && /too steep/.test(v.why ?? '') && !v.bridges.length ? v : null;
+          if (what === 'steep') {
+            // (One that may be drawn, a street to another road or a short dead end, for the settle to refuse.)
+            if (!v.steep || v.why || v.bridges.length || (v.open && !v.reached)) return null;
+            const e = live.verdictOf(d, t, ed().content, pts, 'street', true, 1);
+            return 'draft' in e ? v : null;
+          }
           if (v.why || !v.reached || v.end?.kind !== 'join' || (what === 'bridge') !== v.bridges.length > 0) return null;
           const t0 = performance.now();
           const e = live.verdictOf(d, t, ed().content, pts, 'street', true, 1);
@@ -287,14 +295,15 @@ function benchHelpers() {
             for (const side of [1, -1]) {
               const n = [-tq[1] * side, tq[0] * side];
               const from = add(p, n, r.width / 2 + 3);
-              const tries = what === 'tight' ? [[from, add(from, n, 34), add(add(from, n, 34), tq, 9), add(from, n, 50)]] : [60, 90, 120, 160, 200, 260, 320].map((len) => [from, add(from, n, len)]);
+              const lens = what === 'steep' ? [30, 40, 60, 90, 120, 160, 200] : [60, 90, 120, 160, 200, 260, 320];
+              const tries = what === 'tight' ? [[from, add(from, n, 34), add(add(from, n, 34), tq, 9), add(from, n, 50)]] : lens.map((len) => [from, add(from, n, len)]);
               for (const tried of tries) {
                 const v = judge(tried);
                 if (!v) continue;
                 // (A line that reaches a road ends on it: the last click where the line drawn meets that road. The clicks
                 // are judged again from the ground under their screen points, as the tool will have them.)
                 let clicks = tried;
-                if (what === 'join' || what === 'bridge') {
+                if (what === 'join' || what === 'bridge' || (what === 'steep' && v.reached)) {
                   const [a, b] = tried;
                   const e = v.line[v.line.length - 1];
                   const u = [b[0] - a[0], b[1] - a[1]];
@@ -310,12 +319,18 @@ function benchHelpers() {
                 });
                 const w = judge(back);
                 if (!w) continue;
-                return { road: r.name, ground: back, screens, verdictMs: w.ms ?? null, bridges: w.bridges, why: w.why };
+                if (what === 'steep') {
+                  found.push({ red: red(w), road: r.name, ground: back, screens, slope: w.slope, reached: w.reached });
+                  if (found.length >= 40) break;
+                  continue;
+                }
+                return { road: r.name, ground: back, screens, verdictMs: w.ms ?? null, bridges: w.bridges, why: w.why, slope: w.slope, reached: w.reached };
               }
             }
           }
         }
-        return null;
+        found.sort((a, b) => b.red - a.red);
+        return found[skip] ?? null;
       },
       /** The page's frames from now (their gaps, ms) until `stop`: the 50th, 95th percentiles and the longest. */
       startFrames() {
@@ -628,20 +643,53 @@ async function editSession(page, renderer, shootAs, setStep) {
       await page.waitForTimeout(150);
     } else fault(`${renderer} edit: no tight bend on screen to try`);
 
-    // 12. A stretch too steep (if the land has one on screen).
-    const steep = await bench(() => window.__bench.stroke('steep'));
-    if (steep) {
-      await clickAt(steep.screens[0]);
+    // 12. A street up a slope too steep out in the country (if the land has one on screen): tinted red as it is drawn, a
+    // forecast; drawn all the same, the settle refuses it with its reason and the town goes back to how it was.
+    let steep = null;
+    for (let k = 0; k < 3; k++) {
+      steep = await bench((k) => window.__bench.stroke('steep', k), k);
+      if (!steep) break;
+      const had = (await state()).roads;
+      for (const p of steep.screens.slice(0, -1)) await clickAt(p);
       const last = steep.screens[steep.screens.length - 1];
       await page.mouse.move(last.x, last.y, { steps: 10 });
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(400);
       const s = await state();
       if (!/too steep/.test(s.hint ?? '')) fault(`${renderer} edit too steep: says "${s.hint}"`);
-      console.log(`create: ${renderer} edit too steep: off ${steep.road}, says "${s.hint}"`);
-      await shots('street-steep');
-      await page.keyboard.press('Escape');
+      console.log(`create: ${renderer} edit too steep: off ${steep.road} (${Math.round(steep.red)} m of it red), says "${s.hint}"`);
+      await shots(`street-steep-${k + 1}`);
+      await page.mouse.down();
+      await page.mouse.up();
       await page.waitForTimeout(150);
-    } else console.log(`create: ${renderer} edit: no stretch too steep on screen`);
+      if (!steep.reached) await page.keyboard.press('Enter');
+      await page.waitForTimeout(150);
+      if ((await state()).roads <= had) {
+        fault(`${renderer} edit too steep: not drawn for the settle to judge (${(await state()).note})`);
+        await page.keyboard.press('Escape');
+        break;
+      }
+      // (The settle's refusal is a toast; the town goes back to the plan before the street.)
+      const toasts = [];
+      const watch = setInterval(async () => {
+        for (const text of await page.evaluate(() => [...document.querySelectorAll('.toasts .toast')].map((el) => el.textContent?.trim() ?? '')).catch(() => [])) if (!toasts.includes(text)) toasts.push(text);
+      }, 100);
+      await built('a street too steep');
+      await page.waitForTimeout(400);
+      clearInterval(watch);
+      const after = await state();
+      const why = toasts.find((t) => /dug out|built up|steep|cut|fill/i.test(t));
+      if (after.roads === had && why) {
+        console.log(`create: ${renderer} edit too steep: drawn, then the settle refused it: "${why}"; ${after.roads} roads, as before`);
+        await shots(`street-steep-${k + 1}-refused`);
+        break;
+      }
+      // (The forecast is the settle's to judge: one it keeps is taken back, and the next tried.)
+      console.log(`create: ${renderer} edit too steep: the settle kept it (${after.roads} roads of ${had}; toasts: ${toasts.join(' | ') || 'none'}): undone, the next tried`);
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z');
+      await built('undo a street the settle kept');
+      if (k === 2) fault(`${renderer} edit too steep: the settle kept all three streets the tool tinted too steep`);
+    }
+    if (!steep) console.log(`create: ${renderer} edit: no (more) streets too steep out in the country on screen`);
 
     // 13. Backspace takes the last point back; Esc drops the street (and a second Esc puts the tool down).
     const again = (await bench(() => window.__bench.stroke('tight'))) ?? (await bench(() => window.__bench.stroke('join')));

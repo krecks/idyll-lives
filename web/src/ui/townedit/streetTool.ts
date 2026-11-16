@@ -20,7 +20,7 @@ import type { TownGhosts } from '../../render/types';
 import { buildingBox, lotBox, roadGhost } from './ghosts';
 import StreetCard from './StreetCard.svelte';
 import { fillsHomes, streetChoice, strokeKind } from './streetChoice.svelte';
-import { liveStreet, newRoads, runsOf, unfinished, verdictOf, type LiveStreet, type StrokeKind } from './streetLive';
+import { liveStreet, newRoads, runsOf, unfinished, verdictOf, warmLive, type LiveStreet, type StrokeKind } from './streetLive';
 import type { TownEditor, TownTool } from './tools';
 import { sentence } from './words';
 
@@ -103,14 +103,19 @@ export function streetGhosts(editor: Pick<TownEditor, 'draft' | 't'>, live: Live
   const draft = editor.draft;
   const ghosts: TownGhosts = { roads: [], lots: [], boxes: [] };
   const refused = verdict && 'refused' in verdict && !unfinished(verdict.refused);
-  if (verdict && 'draft' in verdict && !live.why) {
-    // What it makes, as `drawStreet` makes it (cut at the kerbs, split at its bridges), and what it clears.
-    for (const i of newRoads(draft, verdict.draft)) ghosts.roads.push(roadGhost(verdict.draft.roads[i], 'new'));
-    for (const i of verdict.cleared.lots) if (draft.slots[i]) ghosts.lots.push({ ...lotBox(editor.t, draft.slots[i]), tone: 'gone' });
-    for (const i of verdict.cleared.backdrop) if (draft.open?.backdrop?.[i]) ghosts.lots.push({ ...buildingBox(draft.open.backdrop[i]), tone: 'gone' });
+  const made = verdict && 'draft' in verdict && !live.why ? verdict : null;
+  if (made && !live.slope) {
+    // What it makes, as `drawStreet` makes it (cut at the kerbs, split at its bridges).
+    for (const i of newRoads(draft, made.draft)) ghosts.roads.push(roadGhost(made.draft.roads[i], 'new'));
   } else {
+    // (The line as the live checks have it: where it is refused, or looks too steep, red.)
     const whole = refused && !live.why ? [{ from: 0, to: Infinity, tone: 'bad' as const }] : live.stretches;
     for (const run of runsOf(live.line, whole)) ghosts.roads.push({ points: run.points, width: live.width, tone: run.tone });
+  }
+  // What it clears out of its way.
+  if (made) {
+    for (const i of made.cleared.lots) if (draft.slots[i]) ghosts.lots.push({ ...lotBox(editor.t, draft.slots[i]), tone: 'gone' });
+    for (const i of made.cleared.backdrop) if (draft.open?.backdrop?.[i]) ghosts.lots.push({ ...buildingBox(draft.open.backdrop[i]), tone: 'gone' });
   }
   for (const j of live.joins) ghosts.lots.push(mark(j.at, j.ok));
   return ghosts;
@@ -141,6 +146,8 @@ export const streetTool: TownTool = {
     let shown: { key: string; live: LiveStreet; verdict: Edited | null } | null = null;
     let rest: ReturnType<typeof setTimeout> | undefined;
     const meetings = new WeakMap<object, Meeting>();
+    // (What the live checks keep of the town made ahead of the first move, not on it.)
+    setTimeout(() => warmLive(editor.draft, editor.t), 0);
 
     const keyOf = (pts: readonly Pt[], ask: StreetAsk) => `${ask.kind}|${ask.clear}|${editor.version}|${pts.map(([x, z]) => `${x.toFixed(1)},${z.toFixed(1)}`).join(';')}`;
 
@@ -192,6 +199,8 @@ export const streetTool: TownTool = {
     const lineOf = (live: LiveStreet, verdict: Edited | null): string => {
       if (live.why) return sentence(live.why);
       if (verdict && 'refused' in verdict && !unfinished(verdict.refused)) return sentence(verdict.refused);
+      // (Too steep is the settle's to judge: said, and the street may still be drawn for it to.)
+      if (live.slope) return `${sentence(live.slope)} The town would refuse it once brought up to date.`;
       const what = kindLine(editor.draft, live);
       const clears = verdict && 'draft' in verdict ? verdict.cleared.lots.length + verdict.cleared.backdrop.length : 0;
       const also = clears ? `, clearing ${clears === 1 ? 'a lot or building' : `${clears} lots and buildings`} out of its way` : '';

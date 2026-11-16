@@ -35,39 +35,26 @@
     <span class="eyebrow sub">Kind</span>
     <Segmented fill label="Kind of road" value={kind} options={KINDS} onchange={(v) => (streetChoice.kind = v)} />
     <p class="hint">
-      {#if streetChoice.kind === 'auto'}
-        A street where it runs in {editor.townName || 'the town'} or a village, a country road outside them.
-      {:else if streetChoice.kind === 'street' || streetChoice.kind === 'country'}
-        A street in the town or a village, a country road outside them, whichever is picked.
-        <button class="link" onclick={() => (streetChoice.kind = 'auto')}>By where it runs</button>
+      {#if streetChoice.kind === 'trail'}
+        No cars and nothing along it; it does not cross the water.
       {:else if streetChoice.kind === 'lane'}
-        A narrow lane of the town or village it runs in; a country road outside them.
+        A narrow lane in {editor.townName || 'the town'} or a village; a country road outside them.
       {:else}
-        A footpath: no cars, no homes along it, and it does not cross the water.
+        A street in {editor.townName || 'the town'} or a village, a country road outside them.
+        {#if streetChoice.kind !== 'auto'}<button class="link" onclick={() => (streetChoice.kind = 'auto')}>By where it runs</button>{/if}
       {/if}
     </p>
   </div>
   <label class="row">
-    <span>Clear what's in the way</span>
+    <span>Clear what's in the way{#if !streetChoice.clear}<span class="sub-note"> (else it is refused there)</span>{/if}</span>
     <Toggle label="Clear what's in the way" bind:checked={streetChoice.clear} />
   </label>
-  {#if !streetChoice.clear}
-    <p class="hint">A street over a lot or a building is refused.</p>
-  {/if}
   <div class="option" class:off={trail}>
     <span class="eyebrow sub">Along it</span>
     <Segmented fill label="Along it" bind:value={streetChoice.along} options={ALONG} />
-    <p class="hint">
-      {#if trail}
-        Nothing is put along a footpath.
-      {:else}
-        Town buildings along it are coming, with building streets up. A country road outside the town and villages gets nothing.
-      {/if}
-    </p>
+    <p class="hint">Town buildings: coming, with building streets up.</p>
   </div>
-  <p class="hint keys">
-    Click to set points, or drag to draw. It ends on the road it reaches; <kbd>Enter</kbd> or a double click ends it as a dead end. <kbd>Backspace</kbd> takes the last point back, <kbd>Esc</kbd> drops it.
-  </p>
+  <p class="hint keys"><kbd>Enter</kbd> or a double click ends it as a dead end, <kbd>Backspace</kbd> takes a point back, <kbd>Esc</kbd> drops it.</p>
 </div>
 
 <style>
@@ -96,6 +83,10 @@
   }
   .hint {
     margin: 0;
+  }
+  .sub-note {
+    font-weight: 500;
+    color: var(--text-muted);
   }
   .link {
     padding: 0;

@@ -3,7 +3,8 @@
 // lane past the river. The live checks agree with `drawStreet` on the same strokes, reason for reason
 // (a tight bend, a junction too near another, a road alongside, a crossing too wide, a footpath over
 // the water), tell an unfinished street from a refused one, and tint a street up a steep slope; on a
-// generated river world every live verdict is `drawStreet`'s, within the per-move budget. The tool
+// generated river world every live verdict is `drawStreet`'s, within the per-move budget. (The slope is
+// the settle's to judge, through the town worker: `editSettle.slow.test.ts`; here only its forecast.) The tool
 // itself, driven as the town stage drives it: clicks, a freehand drag, Backspace, Esc and Enter, the
 // street drawn picked. `bun test`.
 import { afterAll, describe, expect, mock, test } from 'bun:test';
@@ -205,7 +206,7 @@ describe('the live checks agree with drawStreet', () => {
     expect(unfinished('it bends tighter than 9 m')).toBe(false);
   });
 
-  test('a street up a steep slope is tinted where it would need more cut or fill than the settle allows; on flat land it is not', () => {
+  test('a street up a steep slope is tinted where it would need more cut or fill than the settle allows, a forecast for the settle to judge; on flat land it is not', () => {
     const steep = blankLand(W, D);
     // (Rising 30 m over 40 m north of the high street: z 60 to 20.)
     for (let j = 0; j < steep.rows; j++) for (let i = 0; i < steep.cols; i++) steep.h[j * steep.cols + i] = Math.round(Math.min(30, Math.max(0, (60 - j * 2) * 0.75)) * 100);
@@ -214,13 +215,21 @@ describe('the live checks agree with drawStreet', () => {
       [250, 20],
       [250, 2],
     ];
-    const live = liveStreet(town(30, steep), t, up, 'street');
+    // (Out of the town's box: inside it the settle lays the land to the town's plane first.)
+    const draft = town(30, steep);
+    draft.open!.areas[0] = { ...draft.open!.areas[0], z: MAIN_Z - 5, d: 150 };
+    const live = liveStreet(draft, t, up, 'street');
     expect(live.steep).toBe(true);
-    expect(live.why).toMatch(/too steep here/);
+    expect(live.slope).toMatch(/too steep here/);
+    expect(live.why).toBeNull();
     expect(live.stretches.some((s) => s.tone === 'bad')).toBe(true);
     const flat = liveStreet(town(30, blankLand(W, D)), t, up, 'street');
     expect(flat.steep).toBe(false);
     expect(flat.why).toBeNull();
+    // Inside the town's box the same slope is not judged.
+    const inTown = town(30, steep);
+    inTown.open!.areas[0] = { ...inTown.open!.areas[0], z: 0, d: 250 };
+    expect(liveStreet(inTown, t, up, 'street').steep).toBe(false);
   });
 });
 
@@ -347,7 +356,7 @@ describe('the tool', () => {
 });
 
 // On a generated river world: random strokes in and round the main town, each judged by the live
-// checks and by drawStreet. Every reason the live checks give (but the slope, the settle's) is
+// checks and by drawStreet. Every reason the live checks give (the slope is not one) is
 // drawStreet's own; drawStreet refuses nothing the live checks pass but what they leave to it.
 describe('on a generated world', async () => {
   const WEB = new URL('../', import.meta.url).pathname;
@@ -394,7 +403,7 @@ describe('on a generated world', async () => {
       const live = liveStreet(world, templates, pts, kind);
       times.push(performance.now() - t0);
       const why = refusal(verdictOf(world, templates, real, pts, kind, true, 1));
-      const liveWhy = live.steep ? null : live.why;
+      const liveWhy = live.why;
       if (live.bridges.length) bridged++;
       if (liveWhy) {
         refused++;
