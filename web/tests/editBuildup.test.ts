@@ -230,6 +230,37 @@ describe('build-up', async () => {
     expect('refused' in again && again.refused).toMatch(/has a church already/);
   });
 
+  test("a village is offered a village's civic places, by a village's names: its hall a village hall, no police station", () => {
+    const village = town.open!.areas.findIndex((_, a) => a > 0 && streetsOf(town, a).length > 0);
+    expect(village).toBeGreaterThan(0);
+    const offered = civicOffered(town, village);
+    expect(offered.find((c) => c.civic === 0)?.label).toBe('Village hall');
+    expect(offered.some((c) => /Police|Fire|Bank|Hotel/.test(c.label))).toBe(false);
+    // (The main town is offered as before: a town's hall is its town hall.)
+    expect(civicChoices(town, 0).every((c) => c.index !== 0 || c.name === 'Town hall')).toBe(true);
+    // Put down on one of its streets, it is named as the village's hall.
+    let put: NeighbourhoodDraft | null = null;
+    for (const road of streetsOf(town, village)) {
+      const L = lengths(town.roads[road].points).at(-1)!;
+      for (let s = 8; s < L - 8 && !put; s += 4) {
+        for (const side of [1, -1] as const) {
+          const e = addCivic(bare(town, road), t, content, { civic: 0, road, s, side, seed: 2 });
+          if ('draft' in e) {
+            put = e.draft;
+            break;
+          }
+        }
+      }
+      if (put) break;
+    }
+    expect(put).not.toBeNull();
+    const b = put!.open!.backdrop!.at(-1)!;
+    expect(put!.open!.places![b.place!].name).toBe(`${town.open!.areas[village].name} Village Hall`);
+    // One a village is too small for is refused, and says so.
+    const police = addCivic(town, t, content, { civic: 3, road: streetsOf(town, village)[0], s: 20, side: 1, seed: 1 });
+    expect('refused' in police && police.refused).toMatch(/too small for a police station/);
+  });
+
   test('on hilly land the settle takes every building a street is built up with: those that would break a slope limit are left out first', () => {
     const settle = (steps: readonly NeighbourhoodDraft[]) => inWorker({ kind: 'edit', plan: steps[steps.length - 1], ops: steps.length - 1, steps, check: false });
     const hilly = planOf('heath', 5, { town: 'town', villages: 'few', size: 'medium', hills: 'hilly' });

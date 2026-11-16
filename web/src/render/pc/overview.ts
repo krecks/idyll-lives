@@ -26,6 +26,7 @@ import { buildModel, disposeTemplate, glowByInstance, type ModelTemplate } from 
 import { windStill } from './nature';
 import { Street } from './street';
 import { TemplateCache } from './templateCache';
+import { TownBuildings, townBackdrop } from './townView';
 import type { AssetRegistry } from '../../assets/registry';
 import type { Content } from '../../content/content';
 import { groundDepth, objectCentre, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../../core/protocol';
@@ -37,9 +38,11 @@ import { placementVariation, standInOf } from '../shared/modelEntry';
 import { pavedRects } from '../shared/paving';
 import { townRoadMesh, townRoads, type RoadMeshData } from '../shared/roads';
 import { surfaceOf } from '../shared/landSurface';
+import type { BuiltSurface } from '../shared/builtSurface';
 import { hashString } from '../shared/chunks';
 import { townRoadMeshOffThread } from '../shared/renderData';
 import { fieldLayers } from '../shared/street';
+import type { TownBuilding } from '../shared/townBuildings';
 import { perfEnd, perfStart } from '../../debug/perf';
 
 /** Height that labels and fits allow for (roofs, chimneys, crowns). */
@@ -79,6 +82,14 @@ const STATES = 5;
  */
 const WASH_FROM = 220;
 const WASH_FULL = 900;
+/**
+ * How strongly a home for sale (`MARKED`) and one the household can't afford (`DEAR`) are lit: their ring and the glow
+ * inside it (added), and their wash (laid over the lot: `washMaterial`) near and from `WASH_FULL` out. A dear one is
+ * washed a little up close as well, so its rose reads beside the amber; neither near enough to hide the houses, which
+ * stand over the wash.
+ */
+const MARKED = { ring: 0.75, fill: 0.08, near: 0, far: 0.5 } as const;
+const DEAR = { ring: 0.85, fill: 0.14, near: 0.2, far: 0.5 } as const;
 
 const townLayers = new WeakMap<pc.AppBase, pc.Layer>();
 
@@ -125,9 +136,19 @@ export class TownOverview {
   /** The town's ground draws (the roads and their markings, the paths, the fields), each with what it was made from: kept for another town with the same. */
   private ground = new Map<string, { key: string; entity: pc.Entity }>();
   private readonly templates: TemplateCache<ModelTemplate>;
+  /**
+   * The backdrop's buildings (shops, offices, terraces nobody lives in, the civic places) and their gardens' hedges, as
+   * the game's town view draws them (`townView.ts`: a few instanced draws for the whole world, cheap from any
+   * distance), on the land as the town's built surface has it; and those drawn last, by what each is drawn from
+   * (`townBackdrop`'s `kept`).
+   */
+  private readonly buildings: TownBuildings;
+  private readonly drawnBuildings = new Map<string, TownBuilding>();
   private readonly placed = new Map<string, Placed>();
   private readonly templatesInUse = new Set<string>();
   private key = '';
+  /** What the backdrop's buildings were drawn from (`backdropKey`): a town whose layout (`key`) is the same but for them has only them drawn again. */
+  private backdropKey = '';
   plots: PlotInfo[] = [];
   width = 0;
   depth = 0;
@@ -136,6 +157,13 @@ export class TownOverview {
   private readonly glowMaterial: pc.Material;
   /** What `glowMaterial` is made from (`glowByInstance`): both go with the overview. */
   private readonly glowBase: pc.StandardMaterial;
+  /**
+   * The wash's: the same, laid over what is under it rather than added to it (`BLEND_NORMAL`). An added amber or rose
+   * over a green lawn came out a yellowish green either way, and from far out the homes for sale were lost in the
+   * fields; laid over, a lot reads in the tint the legend gives it.
+   */
+  private readonly washMaterial: pc.Material;
+  private readonly washBase: pc.StandardMaterial;
   private hl: Highlight[] = [];
   private hlSize = '';
   private state: LotHighlight = { hover: null, selected: null, marked: [], outlines: false };
@@ -165,6 +193,7 @@ export class TownOverview {
     parent.addChild(this.root);
     this.templates = new TemplateCache(app);
     this.street = new Street(app, this.root, assets, house, { layers: this.layers, fenceStyles: content.fenceStyles });
+    this.buildings = new TownBuildings(app, this.root, this.layers);
     // Unlit: the output is the vertex colour times the instance colour (`glowByInstance`), added by its alpha.
     const mat = new pc.StandardMaterial();
     mat.name = 'lotGlow';
@@ -187,6 +216,12 @@ export class TownOverview {
     mat.update();
     this.glowBase = mat;
     this.glowMaterial = glowByInstance(app, mat);
+    const wash = mat.clone();
+    wash.name = 'lotWash';
+    wash.blendType = pc.BLEND_NORMAL;
+    wash.update();
+    this.washBase = wash;
+    this.washMaterial = glowByInstance(app, wash);
   }
 
   /** Every mesh instance the overview draws (the house's lamps leave them out: `Lamps.exclude`). */
@@ -214,7 +249,16 @@ export class TownOverview {
   /** Builds the overview of `world` (kept when it is the same town); the previous one stays until it is done. True when it was built. */
   async build(world: WorldStructure, pace?: () => Promise<void>): Promise<boolean> {
     const key = townKey(world);
-    if (key === this.key) return false;
+    const drawn = backdropKey(world);
+    if (key === this.key && drawn === this.backdropKey) return false;
+    if (key === this.key) {
+      // Only the backdrop changed (a street built up with the town's buildings alone, or cleared of them): the street,
+      // the ground and the things are as they were, and only the buildings are written again.
+      this.buildings.setBackdrop(this.backdropOf(world));
+      this.buildings.show(1);
+      this.backdropKey = drawn;
+      return true;
+    }
     // (Asked for first: the render data worker makes the town's road mesh while the street is planned. Not for
     // another town with the same roads at the same heights: a lot removed keeps it.)
     const roadsKey = roadKey(world);
@@ -223,6 +267,8 @@ export class TownOverview {
     const ground = await this.buildGround(world, pace, roads, roadsKey);
     const objects = await this.buildObjects(world, pace);
     await pace?.();
+    const surface = surfaceOf(world);
+    const backdrop = this.backdropOf(world);
 
     const swap = perfStart('town: swap');
     // Swap: the previous town's ground and things go (those it keeps stay), the new ones are shown.
@@ -230,6 +276,8 @@ export class TownOverview {
     this.ground = ground;
     for (const { entity } of ground.values()) entity.enabled = true;
     for (const [k, p] of this.placed) if (!objects.has(k)) for (const d of p.draws) d.enabled = false;
+    this.buildings.setBackdrop(backdrop);
+    this.buildings.show(1);
     this.templatesInUse.clear();
     for (const [k, { template, matrices }] of objects) {
       this.templatesInUse.add(k);
@@ -246,17 +294,34 @@ export class TownOverview {
     // The previous overview's boxes for files that have come since are drawn no more.
     this.disposeStale();
     this.key = key;
+    this.backdropKey = drawn;
     this.plots = world.plots;
     this.width = world.width;
     this.depth = groundDepth(world);
-    this.buildHighlights(world.plots);
+    this.buildHighlights(world.plots, surface);
     perfEnd(swap);
     return true;
+  }
+
+  /** `world`'s backdrop buildings as drawn, on its built surface (`townBackdrop`; those drawn last kept where nothing of them changed). */
+  private backdropOf(world: WorldStructure): TownBuilding[] {
+    const surface = surfaceOf(world);
+    const height = surface ? (x: number, z: number) => surface.at(x, z) : () => 0;
+    const span = perfStart('town: backdrop');
+    const out = townBackdrop(world, height, surface ? height : null, this.drawnBuildings);
+    perfEnd(span, `${world.meta?.backdrop?.length ?? 0} buildings`);
+    return out;
   }
 
   /** Streetlights, porch lamps and window glass follow the lighting key's lamp level (`glow`: the lamps' colour, linear). */
   setNight(lamps: number, glow: RGB): void {
     this.street.setNight(lamps, glow);
+    this.buildings.setNight(lamps, glow);
+  }
+
+  /** The hour shown (`minute` of the day, on `weekday`, 0 Monday): the backdrop's lit windows, a shop's while it is open (`litAt`). */
+  setTime(minute: number, weekday: number): void {
+    this.buildings.setTime(minute, weekday);
   }
 
   /** Which lots glow (see `Renderer.setLotHighlight`; `snap`: no easing to it). */
@@ -308,10 +373,10 @@ export class TownOverview {
       const marked = this.level[at + 3];
       const dear = this.level[at + 4];
       // Ring: the strongest of the states, blended by colour.
-      ring.draw.set(INSTANCE_COLOR, i, writeColor(c, outline * 0.32, hover * 1.15, sel * 1.1, marked * 0.6, dear * 0.5));
-      fill.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.4, sel * 0.34, marked * 0.05, dear * 0.07));
+      ring.draw.set(INSTANCE_COLOR, i, writeColor(c, outline * 0.32, hover * 1.15, sel * 1.1, marked * MARKED.ring, dear * DEAR.ring));
+      fill.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.4, sel * 0.34, marked * MARKED.fill, dear * DEAR.fill));
       wall.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.2, sel * 0.32, 0, 0));
-      wash.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.3 * far, sel * 0.32 * far, marked * 0.26 * far, dear * 0.24 * far));
+      wash.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.3 * far, sel * 0.32 * far, marked * (MARKED.near + (MARKED.far - MARKED.near) * far), dear * (DEAR.near + (DEAR.far - DEAR.near) * far)));
     }
     for (const h of this.hl) h.draw.update(false);
     return true;
@@ -319,6 +384,7 @@ export class TownOverview {
 
   destroy(): void {
     this.street.destroy();
+    this.buildings.destroy();
     for (const { entity } of this.ground.values()) entity.destroy();
     this.ground.clear();
     this.dropHighlights();
@@ -329,6 +395,8 @@ export class TownOverview {
     this.root.destroy();
     this.glowMaterial.destroy();
     this.glowBase.destroy();
+    this.washMaterial.destroy();
+    this.washBase.destroy();
   }
 
   // ---- building ---------------------------------------------------------------------
@@ -470,7 +538,8 @@ export class TownOverview {
   }
 
   /** Highlight meshes for the plot size (built again only when it changes) and one instance per plot. */
-  private buildHighlights(plots: PlotInfo[]): void {
+  /** The highlights over `plots`, each on its lot's pad where the town follows its land (`surface`; else at 0, the flat town's). */
+  private buildHighlights(plots: PlotInfo[], surface: BuiltSurface | null): void {
     const first = plots[0];
     if (!first) {
       // A bare land (step 1, no town): the previous town's highlights go (a ring each would stay drawn over it).
@@ -525,7 +594,7 @@ export class TownOverview {
         ] as const
       ).map(([geo, name]) => {
         const mesh = meshFrom(this.device, geo.meshData({ colors: true }))!;
-        const draw = new Instances(this.device, this.root, mesh, this.glowMaterial, { name, streams: [INSTANCE_COLOR], castShadows: false, receiveShadows: false, layers: this.layers, cull: false });
+        const draw = new Instances(this.device, this.root, mesh, name === 'lotWash' ? this.washMaterial : this.glowMaterial, { name, streams: [INSTANCE_COLOR], castShadows: false, receiveShadows: false, layers: this.layers, cull: false });
         return { draw };
       });
     }
@@ -540,6 +609,8 @@ export class TownOverview {
         m[5] = 1;
         m[10] = p.d / first.d;
         m[12] = p.x;
+        // (On a hill a lot's pad stands over or under 0: a ring at 0 was buried under the raised ones.)
+        m[13] = surface ? surface.padY(i) : 0;
         m[14] = p.z;
         m[15] = 1;
         h.draw.setMatrix(i, m);
@@ -597,6 +668,12 @@ function townKey(world: WorldStructure): string {
     JSON.stringify(world.meta?.world ?? null),
     world.meta?.home ?? '-',
   ].join('|');
+}
+
+/** What a town's backdrop buildings are drawn from (`townBackdrop`): its buildings, its places' hours, and on a land it follows the surface's roads (as the road mesh is keyed: `roadKey`). */
+function backdropKey(world: WorldStructure): string {
+  const surface = surfaceOf(world);
+  return `${hashString(JSON.stringify([world.meta?.backdrop ?? null, (world.meta?.places ?? []).map((p) => p.hours ?? null)]))}|${surface ? surface.roadsSig() : '-'}`;
 }
 
 /** A highlight's colour (into `out`): the states mixed by intensity (an added glow, alpha its strength). */
