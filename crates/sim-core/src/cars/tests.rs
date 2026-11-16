@@ -1251,33 +1251,69 @@ fn rider_and_car_waiting_on_them_never_come_back_into_its_turn() {
     assert_eq!(in_the_way(&w.cars, 1, body, at, step(-0.1)), None);
 }
 
-/// A car pulled over as far as the claims count on it passing one coming the other way there
-/// (`Route::pass_at`) may drive on so: the room `drive_on` lets it go on with is no less. (Where
-/// its room ran out between two points, a taxi was let through on the claims pulled over beside
-/// one standing the other way, pulled over standing, and was then held to pull back in first,
-/// which it couldn't beside that one: it waited for that one, which waited for the car behind
-/// it, which waited for it, for good, Clover Acres.)
+/// A car standing a moment, held up by nobody (its claim just granted, say), goes on: it pulls
+/// over for one coming the other way only as far as it can go on with, as on the move. (A taxi
+/// let through stood at the start of its claim beside one standing the other way, pulled over
+/// as far as it had room where it stood, more than it had on its way a tick on; it had to pull
+/// back in first, couldn't beside that one, and waited for it to pass; that one waited for the
+/// car behind the first, which waited for the first, for good, Clover Acres.)
 #[test]
-fn a_car_may_go_on_pulled_over_as_far_as_the_claims_count_on() {
-    let mut legs = Legs::default();
-    for k in 0..=20 {
-        let room = if k < 12 { 0.215 } else { 0.0 };
-        legs.push_lane([k as f32 * 2.0, 30.0], 5.0, room, LANE);
+fn a_car_held_up_by_nobody_pulls_over_only_as_far_as_it_goes_on_with() {
+    let town = TOWN.replace(
+        r#""cars":[{"plot":0"#,
+        r#""cars":[{"plot":0,"x":30.0,"z":3.0,"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,"body":1,"paint":1},{"plot":0"#,
+    );
+    let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+    // Car 0 east along z = 9.5, its room running out a little ahead; car 1 coming west beside
+    // it, standing, their bodies 0.2 m apart.
+    let lane = |from: f32, to: f32, z: f32, room: &dyn Fn(f32) -> f32| {
+        let mut legs = Legs::default();
+        let n = ((to - from).abs() / 2.0) as i32;
+        for k in 0..=n {
+            let x = from + (to - from).signum() * 2.0 * k as f32;
+            legs.push_lane([x, z], 5.0, room(x), LANE);
+        }
+        let mut r = legs.timed(true, true);
+        r.claim(4.4, 1.8, None);
+        r
+    };
+    let mine = lane(10.0, 50.0, 9.5, &|x| if x < 31.0 { 0.215 } else { 0.0 });
+    let t = mine.points.iter().find(|p| p.0[0] >= 29.0).unwrap().2;
+    let (p, yaw, _) = mine.at(t);
+    let right = shifted([0.0, 0.0], yaw, 1.0);
+    let theirs = lane(50.0, 10.0, 9.5 - right[1] * 2.0, &|_| 0.0);
+    let u = theirs
+        .points
+        .iter()
+        .find(|q| q.0[0] <= p[0] + 1.0)
+        .unwrap()
+        .2;
+    let (q, qyaw, _) = theirs.at(u);
+    for (c, route, at, (pos, facing)) in [(0, mine, t, (p, yaw)), (1, theirs, u, (q, qyaw))] {
+        let car = &mut w.cars[c];
+        car.state = if c == 0 {
+            CarState::Leaving
+        } else {
+            CarState::Arriving
+        };
+        car.route = Some((c == 1, route));
+        car.progress = at;
+        car.shown = Some((pos, facing, true, 0));
     }
-    let mut route = legs.timed(true, true);
-    route.claim(4.6, 1.88, None);
-    let mut c = car([0.0, 10.0], 0.0, 30.0);
-    let ticks = route.ticks();
-    c.route = Some((false, route));
-    let route = &c.route.as_ref().unwrap().1;
-    // (Where the claims sample its way, `Route::pass`; so far along it, the room runs out.)
-    assert!(route.pass.iter().any(|&(_, p)| p > 0.2));
-    assert!(route.pass.iter().any(|&(t, p)| p == 0.0 && t < ticks));
-    for &(t, pass) in &route.pass {
-        assert!(
-            route_room(&c, t) >= pass - 1e-6,
-            "{t} ticks along: room {} to go on with, the claims count on {pass}",
-            route_room(&c, t),
-        );
-    }
+    let room_on = route_room(&w.cars[0], t + 1.0);
+    assert!(room_on < 0.01 && w.cars[0].route.as_ref().unwrap().1.room_here(t) > 0.2);
+    let others = vehicles(&w.cars, Some(0));
+    pull_over(&mut w, 0, &others, false, None);
+    assert!(
+        w.cars[0].shift <= room_on + 1e-4,
+        "pulled over {:.3} m, with {room_on:.3} m to go on with",
+        w.cars[0].shift
+    );
+    // (Held up by that one, it pulls over for it as far as it has room where it stands.)
+    let others = vehicles(&w.cars, Some(0));
+    pull_over(&mut w, 0, &others, false, Some(car_first(1)));
+    assert!(
+        w.cars[0].shift > 0.0,
+        "held up, it pulls over to let that one by"
+    );
 }
