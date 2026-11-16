@@ -627,8 +627,9 @@ const bucketKey = (cx: number, cz: number) => cx * 4096 + cz;
  *
  * Made from a draft (`BackdropDraft`), it builds on a town laid already: what may not be built on
  * is the town's ground as the edits see it (`edit/ground.ts` `townGround`: its roads, water, lots,
- * parking, squares, trails and backdrop) with every lot's margin and the land before it to its road
- * marked, and every building standing is in the overlap test. New buildings are added after those
+ * parking, squares and trails) with every lot's margin and the land before it to its road marked,
+ * and every building standing is in the overlap test (a new one may touch it, as the generator's
+ * do). New buildings are added after those
  * (`rowsAlong`, `secondRow`, `put`, `putCivic`) and named by `placesFor`; the town's own are not
  * moved. A draft's pass has no centres to lay civic places round or to thin (`civic`, `thin`).
  */
@@ -682,7 +683,10 @@ export class BackdropPass {
       }));
       this.slots = draft.slots;
       this.rectOf = (s) => plotRect(t, s);
-      this.ground = townGround(draft, t);
+      // (The ground without the buildings standing: they are in the overlap test, where two may
+      // touch, as a row of shops does; the ground keeps lots a metre off their boxes, which would
+      // keep a new building off its neighbours.)
+      this.ground = townGround(open ? { ...draft, open: { ...open, backdrop: [] } } : draft, t);
       this.centres = [];
       this.outlines = (open?.centre ?? []).map((c) => c.poly);
       // (Only `thin` reads the greens and the water, and a draft's pass has no centres to thin.)

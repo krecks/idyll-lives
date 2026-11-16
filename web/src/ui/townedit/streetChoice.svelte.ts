@@ -8,20 +8,23 @@ import type { RoadKind } from '../../core/protocol';
 
 /** The kind asked for; `auto`: as `drawStreet` chooses by where it runs (a street of the town or village it runs in, else a country road). */
 export type StreetKindChoice = 'auto' | 'street' | 'lane' | 'country' | 'trail';
-/** What goes along a new street: homes from the area's lot mix, the town's other buildings, both, or nothing. */
-export type Along = 'homes' | 'buildings' | 'both' | 'none';
+/** What goes along a new street: homes from the area's lot mix, the town's other buildings, both, or nothing; `auto`: by where it runs (`alongFor`). */
+export type Along = 'auto' | 'homes' | 'buildings' | 'both' | 'none';
 
 export const streetChoice = $state({
   kind: 'auto' as StreetKindChoice,
   clear: true,
-  /** Homes for now: town buildings come with building streets up (`buildup.ts`), and then the default is both in the main town. */
-  along: 'homes' as Along,
-  /** What the street under the pointer would be (the card shows `auto` as it). */
+  along: 'auto' as Along,
+  /** What the street under the pointer would be (the card shows `auto` as it), and the area it is a street of (-1: none). */
   shown: 'street' as RoadKind,
+  shownArea: -1,
 });
 
 /** The kind `drawStreet` is asked for (`street` for `auto`: it makes a street a country road outside the town and villages). */
 export const strokeKind = (k: StreetKindChoice): RoadKind => (k === 'auto' ? 'street' : k);
 
-/** Whether homes are put along it (`drawStreet`'s `fill`). */
-export const fillsHomes = (a: Along) => a === 'homes' || a === 'both';
+/** What goes along a street of area `area` (-1: none): `auto` is both homes and the town's buildings in the main town, homes elsewhere. */
+export const alongFor = (a: Along, area: number): Exclude<Along, 'auto'> => (a !== 'auto' ? a : area === 0 ? 'both' : 'homes');
+
+/** Whether homes are put along it by `drawStreet` itself (its `fill`): homes alone (with the town's buildings, build-up lays both: `buildup.ts` `builtAlong`). */
+export const fillsHomes = (a: Exclude<Along, 'auto'>) => a === 'homes';
