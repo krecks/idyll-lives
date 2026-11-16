@@ -595,8 +595,9 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
  * world (`roads`, with `road` itself), the lots whose way in is on one of them and the outdoor
  * places at a gone trail's end (`lots`, slot indices), the backdrop buildings fronting them
  * (`backdrop`), the parking by them (`parking`); or why it may not go: no road out of the world
- * would be left, the roads left would be two networks each with its own way out, or its lots are
- * the town's last homes or its last park (`lots.ts` `removalRefused`).
+ * would be left, the roads left would be two networks each with its own way out, a country road
+ * it met would be left a dead end longer than `COURT`, or its lots are the town's last homes or its
+ * last park (`lots.ts` `removalRefused`).
  */
 export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number): { roads: number[]; lots: number[]; backdrop: number[]; parking: number[] } | { refused: string } {
   const roads = draft.roads;
@@ -606,6 +607,12 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
   if (!leaves.size) return { refused: `without ${roads[road].name ?? 'it'} no road would lead out of the world` };
   if (leaves.size > 1) return { refused: `without ${roads[road].name ?? 'it'} the roads would be cut in two` };
   const gone = new Set([road, ...[...nets.entries()].filter(([, n]) => !leaves.has(n)).map(([i]) => i)]);
+  // (A country road it leaves ending in a dead end reaches no further past the last road it meets
+  // than a drawn one may: no taxi turns round in a country road. A street or a lane may be left
+  // longer, the sim turning round in any of theirs; the Problems list says so.)
+  const left = withoutRoads(roads, gone);
+  const court = longestCourt(left.roads, left.ended.filter((i) => left.roads[i].kind === 'country'));
+  if (court && court.stub > COURT + 0.5) return { refused: `without ${roads[road].name ?? 'it'}, ${left.roads[court.road].name ?? 'a road'} would end ${Math.round(court.stub)} m past the last road it meets (a dead end reaches ${COURT} m at most)` };
   const open = draft.open;
   const rects = draft.slots.map((s) => plotRect(t, s));
   const entries = surfacePlots({ plots: rects, meta: { roads, facing: draft.slots.map((s) => s.facing), backdrop: open?.backdrop ?? [] } });
@@ -626,6 +633,23 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
   return { roads: [...gone].sort((a, b) => a - b), lots, backdrop, parking };
 }
 
+/** `roads` without those in `gone`; a join left with nothing to join is a dead end (`ended`: those roads, by their index in what is left). */
+function withoutRoads(roads: readonly RoadPlan[], gone: ReadonlySet<number>): { roads: RoadPlan[]; ended: number[] } {
+  const kept = roads.filter((_, i) => !gone.has(i));
+  const ended: number[] = [];
+  const left = kept.map((r, i) => {
+    const ends = r.ends.map((e, k) => {
+      if (e !== 'join') return e;
+      const p = k ? r.points[r.points.length - 1] : r.points[0];
+      return kept.some((o, j) => j !== i && nearest(o.points, p[0], p[1]).dist <= Math.max(o.width, r.width) / 2 + 1) ? e : 'dead';
+    }) as RoadPlan['ends'];
+    if (ends[0] === r.ends[0] && ends[1] === r.ends[1]) return r;
+    ended.push(i);
+    return { ...r, ends };
+  });
+  return { roads: left, ended };
+}
+
 /**
  * `draft` without road `road`, its lots and parking, and any road it leaves joined to nothing; refused
  * if no road out of the world would be left, or it would take the town's last home or park (see `whatGoes`). A road that met it in a T and stays
@@ -634,17 +658,7 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
 export function removeRoad(draft: NeighbourhoodDraft, t: Templates, road: number): Edited {
   const goes = whatGoes(draft, t, road);
   if ('refused' in goes) return goes;
-  const gone = new Set(goes.roads);
-  const kept = draft.roads.filter((_, i) => !gone.has(i));
-  // A join left with nothing to join is a dead end.
-  const roads = kept.map((r, i) => {
-    const ends = r.ends.map((e, k) => {
-      if (e !== 'join') return e;
-      const p = k ? r.points[r.points.length - 1] : r.points[0];
-      return kept.some((o, j) => j !== i && nearest(o.points, p[0], p[1]).dist <= Math.max(o.width, r.width) / 2 + 1) ? e : 'dead';
-    }) as RoadPlan['ends'];
-    return ends[0] === r.ends[0] && ends[1] === r.ends[1] ? r : { ...r, ends };
-  });
+  const { roads } = withoutRoads(draft.roads, new Set(goes.roads));
   const open = draft.open;
   let next: NeighbourhoodDraft = { ...draft, roads };
   if (open) {

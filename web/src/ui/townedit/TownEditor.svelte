@@ -94,7 +94,10 @@
     {#if editor.note}
       <p class="hint warn" role="alert">{editor.note}</p>
     {/if}
-    <SelectCard {editor} />
+    {#if tool?.card !== SelectCard}
+      <!-- (What is picked shows its card with any tool in hand: the Select tool's own card is it.) -->
+      <SelectCard {editor} />
+    {/if}
   {/if}
 </section>
 

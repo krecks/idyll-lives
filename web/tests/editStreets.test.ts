@@ -258,6 +258,21 @@ describe('removing a road', () => {
     expect(refusal(removeRoad(town(), t, 0))).toContain('no road would lead out of the world');
   });
 
+  test('refused if it would leave a country road a dead end longer than a court (no taxi turns round there)', () => {
+    // A country road from the road round the river's end west to x 200, joined there by a road up from the high street.
+    const all = town();
+    const roads: RoadPlan[] = [
+      ...all.roads,
+      { points: line(376.5, 150, 200, 150), width: 7, ends: ['join', 'join'], kind: 'country', name: 'Link Road' },
+      { points: line(200, MAIN_Z + 3.5, 200, 153.5), width: 7, ends: ['join', 'join'], kind: 'country', name: 'West Road' },
+    ];
+    const linked = { ...all, roads };
+    expect(refusal(removeRoad(linked, t, 5))).toContain('Link Road would end 17');
+    // As a lane it may be left so (the Problems list says so).
+    const lane = { ...linked, roads: roads.map((r, i) => (i === 4 ? { ...r, kind: 'lane' as const, area: 0 } : r)) };
+    expect('draft' in removeRoad(lane, t, 5)).toBe(true);
+  });
+
   test("refused if it would take the town's last homes (as a lot removed on its own is)", () => {
     // Only the far lane's homes: the road round the river's end takes them all with the far lane.
     const all = town();

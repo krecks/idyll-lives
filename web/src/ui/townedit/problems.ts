@@ -11,8 +11,8 @@
  * `townIssues` sorts what the checks find into what blocks the way on to step 3 and what only warns,
  * in the player's words. Blocking: what would leave the sim a town it can't run well, as the plan
  * has it: the roads not one network or no way out, a lot off its road or on a road or the water, a
- * road over water with no deck, a court past its length, a village with no road, fewer than two
- * homes. The rest only warns (a career with nowhere to work, a village of few lots, a road with a
+ * road over water with no deck, a country road's dead end past a court's length, a village with no
+ * road, fewer than two homes. The rest only warns (a career with nowhere to work, a village of few lots, a road with a
  * hairpin). The checks of how the generator fills a town (how many backdrop buildings an area
  * keeps, the centre the densest) are left out: they hold for generated towns, not edited ones.
  */
@@ -101,9 +101,21 @@ const BLOCKING: readonly RegExp[] = [
   /^trail .* runs through plot \d+$/,
   /^two roads called /,
   /^road \d+ .* has no name$/,
-  / ends \d+ m past the last road it meets/,
   /^fewer than two homes/,
 ];
+
+/**
+ * Whether a checks' line is a country road's dead end reaching past `COURT`: no taxi turns round in
+ * a country road. A street's or a lane's only warns: the sim turns round in any of theirs (the
+ * renderer paves a turning circle at every dead end), as `streets.ts` has it.
+ */
+function longCountryCourt(line: string, draft: NeighbourhoodDraft): boolean {
+  const m = / ends \d+ m past the last road it meets/.exec(line);
+  if (!m) return false;
+  const name = line.slice(0, m.index);
+  const road = draft.roads.find((r) => r.name === name) ?? draft.roads[Number(/^road (\d+)$/.exec(name)?.[1] ?? -1)];
+  return !road || road.kind === 'country';
+}
 
 /** The checks of how the generator fills a town, which an edited town needn't keep (see the top of this file). */
 const GENERATED_ONLY: readonly RegExp[] = [/ has \d+ backdrop buildings \(\d+ or more\)$/, /^the centre's open land is /, /^the main town has no centre$/];
@@ -168,7 +180,7 @@ export function townIssues(draft: NeighbourhoodDraft, t: Templates, content: Con
   for (const line of lines) {
     if (GENERATED_ONLY.some((p) => p.test(line))) continue;
     const issue = issueOf(line, draft, t);
-    if (BLOCKING.some((p) => p.test(line)) && !had.has(issue.text)) out.blocking.push(issue);
+    if ((BLOCKING.some((p) => p.test(line)) || longCountryCourt(line, draft)) && !had.has(issue.text)) out.blocking.push(issue);
     else out.warnings.push(issue);
   }
   for (const line of found.soft) out.warnings.push(issueOf(line, draft, t));

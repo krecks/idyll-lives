@@ -12,6 +12,13 @@
  *
  * The stream pill is shown throughout (as on a first visit, while models still come).
  *
+ * With `--shots …,edit`, between steps 2 and 3, a scripted edit session in step 2's town editor
+ * (`web/src/ui/townedit/`), each step shot at the edit sizes (`--edit-sizes`): a lot picked, removed,
+ * the removal undone, a home put down, a lot dragged elsewhere, a park made another public place, a
+ * street renamed, then a street removed with its lots. It measures the frames while the Lot tool's
+ * ghost follows the pointer, and each edit's way to the town built again (the pause, the settle, the
+ * town shown: the editor's own timings), and says them (`create: edit …`).
+ *
  * Besides the pictures it checks what it can by measure, and says so (`create: …`): the side panel,
  * the way on and the figures clear of the stream pill (if it is up) and of every lot tag shown; the arrow
  * key chose the place a row down and moved the focus there; step 2 says it is step 2; step 3 says it is
@@ -24,7 +31,8 @@
  *     --seed 7                               the page's Math.random seed (the same world in every run)
  *     --world country --options town=city    step 1's place and options (the URL's `?world=`, `?options=`)
  *     --code river-mhs-k2x9q                 the world's code instead (the URL's `?code=`; a bare number: the land's seed)
- *     --shots 1,2,3                          the steps shot (the others only gone through)
+ *     --shots 1,2,3                          the steps shot (the others only gone through); `edit`: step 2's edit session
+ *     --edit-sizes 1920x1080,740x1000        the edit session's shots' sizes (it runs at the first)
  *     --headed                               in a window (default headless: the real GPU either way)
  *     --port 5184 | --url <u>                a dev server on the port (started if none answers), or one already running
  *     --out <dir>                            default bench-results/create-<time>/
@@ -57,7 +65,11 @@ const seed = Number(flag('seed', '7'));
 // (None given: step 1 as a player gets it, the URL without them.)
 const made = worldFlags(flag, null);
 const code = flag('code', null);
-const shots = new Set(flag('shots', '1,2,3').split(',').map(Number));
+const shots = new Set(flag('shots', '1,2,3').split(','));
+const editSizes = flag('edit-sizes', '1920x1080,740x1000')
+  .split(',')
+  .map((s) => s.split('x').map(Number))
+  .map(([width, height]) => ({ width, height }));
 const worldQuery = [made.world ? `world=${made.world}` : '', made.query ? `options=${made.query}` : '', code ? `code=${encodeURIComponent(code)}` : ''];
 const port = Number(flag('port', '5184'));
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
@@ -134,6 +146,317 @@ function overlaps() {
   return found;
 }
 
+/**
+ * In the page: helpers for the edit session (`window.__bench`), over the town editor (`window.__townEditor`, dev only)
+ * and the step's town: where a thing of the plan is on screen (a point the stage itself is under, no panel over it),
+ * frames counted while the pointer moves.
+ */
+function benchHelpers() {
+  return (async () => {
+    const [{ app }, { menuScene }, lots, streets, town, pickMod] = await Promise.all([
+      import('/src/ui/app.svelte.ts'),
+      import('/src/game/menuScene.ts'),
+      import('/src/game/edit/lots.ts'),
+      import('/src/game/edit/streets.ts'),
+      import('/src/game/town.ts'),
+      import('/src/ui/townedit/pick.ts'),
+    ]);
+    const t = await town.loadTemplates();
+    const ed = () => window.__townEditor;
+    const plan = () => ed().draft;
+    /** A ground point (m) on screen (CSS px), at the land's height there; null if no stage is under it. */
+    const screen = (x, z) => {
+      const out = { x: 0, y: 0 };
+      let y = 0;
+      for (let k = 0; k < 3; k++) {
+        if (!menuScene.project(x, y, z, out)) return null;
+        const g = menuScene.landAt(out.x, out.y);
+        if (!g) break;
+        y = g.y;
+      }
+      const el = document.elementFromPoint(out.x, out.y);
+      return el?.classList.contains('stage') ? { x: out.x, y: out.y } : null;
+    };
+    const centre = (s) => {
+      const r = town.plotRect(t, s);
+      return [r.x + r.w / 2, r.z + r.d / 2];
+    };
+    const pointAt = (pts, s) => {
+      let at = 0;
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const l = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
+        if (at + l >= s) {
+          const f = (s - at) / (l || 1);
+          return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * f, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f];
+        }
+        at += l;
+      }
+      return pts[pts.length - 1];
+    };
+    const length = (pts) => pts.reduce((a, p, i) => (i ? a + Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) : 0), 0);
+    let frames = null;
+    window.__bench = {
+      /** A lot of the main town of kind `kind` ('home', 'park') on screen: its slot and point. */
+      lot(kind, skip = 0) {
+        const d = plan();
+        const ok = (s) => (kind === 'home' ? s.kind === 'house' && s.lot !== 'farm' && s.lot !== 'terrace' : s.kind === kind) && (s.area ?? 0) === 0;
+        let n = 0;
+        for (const s of d.slots) {
+          if (!ok(s)) continue;
+          const p = screen(...centre(s));
+          if (p && n++ >= skip) return { slot: s.index, name: s.name, ...p };
+        }
+        return null;
+      },
+      /** A road of the main town on screen (its middle), and what removing it takes: one taking homes (`withLots`) or none. */
+      road(withLots) {
+        const d = plan();
+        for (const [i, r] of d.roads.entries()) {
+          if (r.kind === 'trail' || r.bridge || (r.area ?? -1) !== 0) continue;
+          const goes = streets.whatGoes(d, t, i);
+          if (withLots !== undefined && ('refused' in goes || (goes.lots.length > 0) !== withLots)) continue;
+          const L = length(r.points);
+          for (const f of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+            const p = screen(...pointAt(r.points, L * f));
+            if (!p) continue;
+            const picked = pickMod.pick(d, t, ...pointAt(r.points, L * f));
+            if (picked?.kind === 'road' && picked.road === i) return { road: i, name: r.name, lots: 'refused' in goes ? 0 : goes.lots.length, ...p };
+          }
+        }
+        return null;
+      },
+      /** Where a lot of `what` (a `LotChoice`, or `{ slot }` to move one) may go along the roads (the main town's first, then the rest): points on screen of the lots' middles, in turn. */
+      spots(what, most = 12) {
+        const d = plan();
+        const out = [];
+        const order = d.roads.map((r, i) => i).sort((a, b) => ((d.roads[a].area ?? 9) === 0 ? 0 : 1) - ((d.roads[b].area ?? 9) === 0 ? 0 : 1));
+        for (const i of order) {
+          const r = d.roads[i];
+          if (r.kind === 'trail' || r.bridge) continue;
+          const L = length(r.points);
+          for (let s = 8; s < L - 8 && out.length < most; s += 7) {
+            for (const side of [1, -1]) {
+              const fit = lots.canPlace(d, t, { road: i, s, side }, what, 1);
+              if ('refused' in fit) continue;
+              const p = screen(fit.x + fit.w / 2, fit.z + fit.d / 2);
+              if (p) out.push(p);
+            }
+          }
+        }
+        return out;
+      },
+      /** The page's frames from now (their gaps, ms) until `stop`: the 50th, 95th percentiles and the longest. */
+      startFrames() {
+        frames = [];
+        let last = performance.now();
+        const tick = (now) => {
+          if (!frames) return;
+          frames.push(now - last);
+          last = now;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      },
+      stopFrames() {
+        const f = (frames ?? []).slice(1).sort((a, b) => a - b);
+        frames = null;
+        const q = (k) => f[Math.min(f.length - 1, Math.floor(f.length * k))] ?? 0;
+        return { frames: f.length, p50: q(0.5), p95: q(0.95), max: f[f.length - 1] ?? 0 };
+      },
+      /** The editor: what it says, whether it is settling, the settles' timings, the Problems list. */
+      state() {
+        const e = ed();
+        return { hint: e.hintText, note: e.note, settling: e.settling, timings: [...e.timings], blocking: e.issues.blocking.map((i) => i.text), warnings: e.issues.warnings.length, edits: e.edits, selected: e.selected, slots: e.draft.slots.length, roads: e.draft.roads.length, edited: app.world?.edited };
+      },
+    };
+    return true;
+  })();
+}
+
+/**
+ * Step 2's edit session (see the top of this file): each step shot at every edit size, each edit's way to the town
+ * built again measured, the frames while the Lot tool's ghost follows the pointer.
+ */
+async function editSession(page, renderer, shootAs, setStep) {
+  setStep('edit');
+  const [first] = editSizes;
+  await page.setViewportSize(first);
+  await page.waitForTimeout(2500);
+  await page.evaluate(benchHelpers);
+  const bench = (fn, arg) => page.evaluate(fn, arg);
+  const state = () => bench(() => window.__bench.state());
+  let n = 0;
+  /** Each edit size shot (`label`), back at the first after. */
+  const shots = async (label) => {
+    n++;
+    const name = `${String(n).padStart(2, '0')}-${label}`;
+    for (const size of editSizes) {
+      if (size !== first) {
+        await page.setViewportSize(size);
+        await page.waitForTimeout(2200);
+      }
+      await shootAs(`${size.width}x${size.height}-${name}`);
+    }
+    if (editSizes.length > 1) {
+      await page.setViewportSize(first);
+      await page.waitForTimeout(2200);
+    }
+  };
+  /** The town built again with the edits (the editor no longer settling); its settle's timing said. */
+  const built = async (what) => {
+    const t0 = Date.now();
+    await page.waitForFunction(() => !window.__townEditor.settling, null, { timeout: 60_000, polling: 50 }).catch(() => fault(`${renderer} edit: ${what}: the town not built again within 60 s`));
+    const s = await state();
+    const last = s.timings[s.timings.length - 1];
+    if (last) console.log(`create: ${renderer} edit ${what}: built again ${Math.round(last.fromEdit)} ms after the edit (the pause, then settle ${Math.round(last.settle)} ms, town shown ${Math.round(last.show)} ms; waited ${Date.now() - t0} ms)`);
+    return s;
+  };
+  const tool = async (id) => {
+    const on = await page.evaluate((id) => document.querySelector(`[data-tool="${id}"]`)?.getAttribute('aria-checked') === 'true', id);
+    if (!on) await page.locator(`[data-tool="${id}"]`).click();
+    await page.waitForTimeout(150);
+  };
+  const click = async (p) => {
+    await page.mouse.move(p.x, p.y, { steps: 4 });
+    await page.waitForTimeout(80);
+    await page.mouse.click(p.x, p.y);
+    await page.waitForTimeout(250);
+  };
+
+  // 1. A home picked: its card.
+  await tool('select');
+  const home = await bench(() => window.__bench.lot('home', 2));
+  if (!home) return fault(`${renderer} edit: no home on screen to pick`);
+  await click(home);
+  if ((await state()).selected?.kind !== 'lot') fault(`${renderer} edit: a click on ${home.name} picked ${JSON.stringify((await state()).selected)}`);
+  await shots('select');
+
+  // 2. Removed from its card: its ghost greyed at once, the town built again after the pause.
+  const before = (await state()).slots;
+  await page.locator('.card button', { hasText: /^\s*Remove\s*$/ }).click();
+  await page.waitForTimeout(200);
+  if ((await state()).slots !== before - 1) fault(`${renderer} edit: removing ${home.name} left ${(await state()).slots} lots (of ${before})`);
+  await shots('remove');
+  await built('remove a lot');
+  await shots('removed-built');
+
+  // 3. Undone.
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z');
+  await page.waitForTimeout(250);
+  if ((await state()).slots !== before) fault(`${renderer} edit: undo left ${(await state()).slots} lots (of ${before})`);
+  await built('undo');
+  await shots('undo');
+
+  // 4. A home put down with the Lot tool, the frames measured while its ghost follows the pointer.
+  await tool('lot');
+  await page.locator('.lot-card [role="radio"]', { hasText: 'Home' }).first().click();
+  const spots = await bench(() => window.__bench.spots({ kind: 'house', size: 'medium' }));
+  if (!spots.length) fault(`${renderer} edit: nowhere on screen for a home`);
+  if (spots.length > 1) {
+    /** The frames while the pointer goes along the spots (the same way each time). */
+    const along = async () => {
+      await page.mouse.move(spots[0].x, spots[0].y);
+      await bench(() => window.__bench.startFrames());
+      for (const p of spots.slice(1)) await page.mouse.move(p.x, p.y, { steps: 20 });
+      return bench(() => window.__bench.stopFrames());
+    };
+    const line = (f) => `${f.frames} frames, p50 ${f.p50.toFixed(1)} ms, p95 ${f.p95.toFixed(1)} ms, longest ${f.max.toFixed(1)} ms`;
+    // (The same way with no tool in hand first: what the page does anyway, the lots lit as the pointer goes.)
+    await page.keyboard.press('Escape');
+    const bare = await along();
+    await tool('lot');
+    const f = await along();
+    console.log(`create: ${renderer} edit: frames while the lot's ghost follows the pointer: ${line(f)} (with no tool in hand: ${line(bare)})`);
+  }
+  let placed = false;
+  for (const p of spots) {
+    await page.mouse.move(p.x, p.y, { steps: 3 });
+    await page.waitForTimeout(60);
+    if (!/^Click to put it down/.test((await state()).hint ?? '')) continue;
+    await shots('add-ghost');
+    const had = (await state()).slots;
+    await page.mouse.click(p.x, p.y);
+    await page.waitForTimeout(200);
+    placed = (await state()).slots === had + 1;
+    break;
+  }
+  if (!placed) fault(`${renderer} edit: no home put down (${(await state()).hint})`);
+  await shots('add');
+  await built('add a home');
+
+  // 5. A lot dragged elsewhere with the Lot tool.
+  const mover = await bench(() => window.__bench.lot('home', 6));
+  if (mover) {
+    const targets = await bench((slot) => window.__bench.spots({ slot }), mover.slot);
+    await page.mouse.move(mover.x, mover.y, { steps: 3 });
+    await page.mouse.down();
+    let moved = false;
+    for (const p of targets) {
+      await page.mouse.move(p.x, p.y, { steps: 8 });
+      await page.waitForTimeout(60);
+      if (/^Let go to move/.test((await state()).hint ?? '')) {
+        await shots('move-drag');
+        await page.mouse.up();
+        moved = true;
+        break;
+      }
+    }
+    if (!moved) {
+      await page.mouse.up();
+      fault(`${renderer} edit: ${mover.name} found nowhere to go (${(await state()).hint})`);
+    }
+    await page.waitForTimeout(200);
+    await shots('move');
+    await built('move a lot');
+  } else fault(`${renderer} edit: no home on screen to move`);
+
+  // 6. A park made another public place, from its card.
+  await tool('select');
+  const park = await bench(() => window.__bench.lot('park'));
+  if (park) {
+    await click(park);
+    const chip = page.locator('.card .chip[aria-checked="false"]').first();
+    if (await chip.count()) {
+      await chip.click();
+      await page.waitForTimeout(250);
+      await shots('swap-park');
+      await built('swap a park');
+    } else fault(`${renderer} edit: ${park.name}'s card offers no other place`);
+  } else fault(`${renderer} edit: no park on screen`);
+
+  // 7. A street renamed from its card.
+  const street = await bench(() => window.__bench.road());
+  if (street) {
+    await click(street);
+    const field = page.locator('.card input.rename');
+    await field.fill('Bench Street');
+    await field.press('Enter');
+    await page.waitForTimeout(250);
+    const named = await page.evaluate(() => window.__townEditor.draft.roads.some((r) => r.name === 'Bench Street'));
+    if (!named) fault(`${renderer} edit: ${street.name} not renamed (${(await state()).note})`);
+    await shots('rename');
+  } else fault(`${renderer} edit: no street on screen`);
+
+  // 8. A street removed with its lots, from its card (what goes listed first).
+  const doomed = await bench(() => window.__bench.road(true));
+  if (doomed) {
+    await click(doomed);
+    await shots('street-card');
+    const had = (await state()).slots;
+    await page.locator('.card button', { hasText: /^\s*Remove / }).click();
+    await page.waitForTimeout(250);
+    const s = await state();
+    if (s.slots >= had) fault(`${renderer} edit: removing ${doomed.name} took no lots (${s.note})`);
+    await shots('remove-street');
+    await built('remove a street with its lots');
+    await shots('remove-street-built');
+  } else fault(`${renderer} edit: no street with lots that may go`);
+  const end = await state();
+  console.log(`create: ${renderer} edit: ${end.edits} edits, ${end.slots} lots, ${end.roads} roads; problems: ${end.blocking.length} blocking${end.blocking.length ? ` (${end.blocking.join('; ')})` : ''}, ${end.warnings} warnings; edited: ${end.edited}`);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+}
+
 const { chromium } = await playwright();
 const browser = await chromium.launch({
   headless: !has('headed'),
@@ -196,7 +519,7 @@ try {
       await shoot(`${narrow.width}x${narrow.height}-scrolled`);
       if (!scrolls) console.log(`create: ${renderer} ${stepName}: the panel fits at ${narrow.width}x${narrow.height} (nothing to scroll)`);
     };
-    if (shots.has(1)) await everySize();
+    if (shots.has('1')) await everySize();
 
     // Back to the first size: an arrow key down the place grid chooses the place a row down (as
     // many as the grid shows in a row; across by one if there is no row under it), and its world is
@@ -218,23 +541,25 @@ try {
     if (after.checked !== wanted || after.focused !== wanted) fault(`${renderer}: ${key} from place ${before} chose ${after.checked}, focus on ${after.focused} (wanted ${wanted})`);
     await page.waitForFunction(() => !!document.querySelector('.making'), null, { timeout: 10_000, polling: 50 }).catch(() => fault(`${renderer}: no making panel after a new place`));
     await page.waitForTimeout(700);
-    if (shots.has(1)) await shoot(`${sizes[0].width}x${sizes[0].height}-making`);
+    if (shots.has('1')) await shoot(`${sizes[0].width}x${sizes[0].height}-making`);
     await ready(page);
     await page.waitForTimeout(2500);
-    if (shots.has(1)) await shoot(`${sizes[0].width}x${sizes[0].height}-place`);
+    if (shots.has('1')) await shoot(`${sizes[0].width}x${sizes[0].height}-place`);
 
     // Step 2: the town laid on that land (its making panel shot while it is laid), then at every size.
     await page.getByRole('button', { name: /Lay out the town/ }).click();
     stepName = 'step2';
     await page.waitForFunction(() => !!document.querySelector('.making'), null, { timeout: 10_000, polling: 50 }).catch(() => fault(`${renderer}: no making panel while the town is laid out`));
     await page.waitForTimeout(700);
-    if (shots.has(2)) await shoot(`${sizes[0].width}x${sizes[0].height}-making`);
+    if (shots.has('2')) await shoot(`${sizes[0].width}x${sizes[0].height}-making`);
     await townReady(page);
     const eyebrow = await page.evaluate(() => document.querySelector('.side .head .eyebrow')?.textContent ?? '');
     if (!/Step 2 of 4 · Town/.test(eyebrow)) fault(`${renderer}: step 2 says "${eyebrow}"`);
-    if (shots.has(2)) await everySize();
+    if (shots.has('2')) await everySize();
 
-    if (shots.has(3)) {
+    if (shots.has('edit')) await editSession(page, renderer, (name) => shoot(name), (name) => (stepName = name));
+
+    if (shots.has('3')) {
       // Step 3: the town lived in, its households offered as cards; shot once the portraits in view are drawn.
       await page.setViewportSize(sizes[0]);
       await page.waitForTimeout(800);

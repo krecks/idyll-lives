@@ -57,9 +57,13 @@ export class TownEditorState implements TownEditor {
   private seeds = (Math.random() * 2 ** 31) >>> 0;
   private noteTimer: ReturnType<typeof setTimeout> | undefined;
   /** The edit ghosts as last worked out, and the drafts they were of. */
+  /** What was drawn last: the edits' ghosts and the rest's (as JSON). */
+  private drawn: { edits: TownGhosts | null; key: string } | null = null;
   private editGhostsOf: { settled: NeighbourhoodDraft; plan: NeighbourhoodDraft; ghosts: TownGhosts | null } | null = null;
 
   constructor(private readonly hooks: EditorHooks) {
+    // (The bench drives the editor and reads its settles' timings: `tools/bench/create.mjs`.)
+    if (import.meta.env.DEV) Object.assign(globalThis, { __townEditor: this });
     void loadTemplates().then((t) => {
       this.templates = t;
       this.changed();
@@ -159,18 +163,18 @@ export class TownEditorState implements TownEditor {
     this.toolGhosts = null;
     this.note = null;
     if (world) {
-      this.session = new EditSession(
+      const session: EditSession = (this.session = new EditSession(
         world.draft,
         {
           settle,
-          show: (settled, plan) => this.show(settled.draft, settled.preview, plan),
+          show: (settled, plan) => this.show(session, settled.draft, settled.preview, plan),
           changed: () => this.changed(),
           check: (plan, base) => checkTown(this.hooks.content, plan, base),
           report: (why) => toast(sentence(why)),
         },
         world.history,
         world.plan,
-      );
+      ));
     }
     this.changed();
   }
@@ -183,13 +187,13 @@ export class TownEditorState implements TownEditor {
   }
 
   /** The settled town put on screen, and kept as the town the next steps read (`app.world.draft`). */
-  private async show(draft: NeighbourhoodDraft, preview: Parameters<typeof menuScene.prepare>[1], plan: NeighbourhoodDraft): Promise<void> {
+  private async show(session: EditSession, draft: NeighbourhoodDraft, preview: Parameters<typeof menuScene.prepare>[1], plan: NeighbourhoodDraft): Promise<void> {
     menuScene.prepare(draft, preview);
     await menuScene.show(draft, null);
     const w = app.world;
-    const s = this.session;
-    if (!w || !s) return;
-    app.world = { ...w, draft, plan, history: s.history, edited: s.edits > 0 };
+    // (Not if the town was laid again meanwhile: this session's edits are of the one before.)
+    if (!w || this.session !== session) return;
+    app.world = { ...w, draft, plan, history: session.history, edited: session.edits > 0 };
   }
 
   /** Something changed: the panel told, the ghosts drawn again, `app.world` told of the edits. */
@@ -368,11 +372,18 @@ export class TownEditorState implements TownEditor {
     const s = this.session;
     const t = this.templates;
     if (!s || !t) {
+      this.drawn = null;
       menuScene.ghosts(null);
       return;
     }
     if (!this.editGhostsOf || this.editGhostsOf.settled !== s.settled || this.editGhostsOf.plan !== s.plan) this.editGhostsOf = { settled: s.settled, plan: s.plan, ghosts: editGhosts(s.settled, s.plan, t) };
-    menuScene.ghosts(joinGhosts(joinGhosts(this.editGhostsOf.ghosts, this.litGhosts()), this.toolGhosts));
+    // (Drawn again only when they changed: a new ghost makes the renderer draw a whole frame, and the
+    // pointer moves many times over while a lot's ghost stays snapped where it is.)
+    const lit = this.litGhosts();
+    const key = JSON.stringify([lit, this.toolGhosts]);
+    if (this.editGhostsOf.ghosts === this.drawn?.edits && key === this.drawn.key) return;
+    this.drawn = { edits: this.editGhostsOf.ghosts, key };
+    menuScene.ghosts(joinGhosts(joinGhosts(this.editGhostsOf.ghosts, lit), this.toolGhosts));
   }
 }
 

@@ -75,10 +75,17 @@
   const areaLots = $derived(picked?.kind === 'village' ? draft.slots.filter((s) => s.area === picked.area) : []);
 
   const renamed = (what: Parameters<typeof rename>[1]) => (name: string) => editor.apply(rename(draft, what, name));
+
+  /** Svelte action: the card brought into the panel's view when something else is picked (a narrow screen's panel scrolls). */
+  function shown(el: HTMLElement, key: string) {
+    const bring = () => el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    bring();
+    return { update: (next: string) => next !== key && ((key = next), bring()) };
+  }
 </script>
 
 {#if picked}
-  <div class="card" aria-live="polite">
+  <div class="card" aria-live="polite" use:shown={JSON.stringify(picked)}>
     <button class="close btn ghost" aria-label="Put it down" title="Put it down (Esc)" onclick={() => editor.select(null)}><Icon name="icon.ui.close" size={14} /></button>
     {#if lot && picked.kind === 'lot'}
       <span class="eyebrow sub">{lotKind(lot)}</span>
