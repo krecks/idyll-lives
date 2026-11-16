@@ -103,6 +103,25 @@ describe("a land drawn from a height field: a stamp's tiles", async () => {
     expect(ps[at * 3 + 1]).toBeCloseTo(scape.heightAt(180, 180), 5);
   });
 
+  test('the ground stops at the landscape’s square, though its last tiles would reach past it', () => {
+    const { scape, count } = shaped();
+    const inner = scape as unknown as { tileGrid(k: number): Float32Array; terrainGrid(): { size: number } };
+    // (The square from -260 to 772 m each way: 9 tiles would reach to 892 m.)
+    const size = inner.terrainGrid().size;
+    const [lo, hi] = [SIDE / 2 - size / 2, SIDE / 2 + size / 2];
+    expect(lo + count * GROUND_TILE).toBeGreaterThan(hi);
+    let [x0, x1, z0, z1] = [Infinity, -Infinity, Infinity, -Infinity];
+    for (let k = 0; k < count * count; k++) {
+      const g = inner.tileGrid(k);
+      for (let v = 0; v < g.length; v += 3) [x0, x1, z0, z1] = [Math.min(x0, g[v]), Math.max(x1, g[v]), Math.min(z0, g[v + 2]), Math.max(z1, g[v + 2])];
+    }
+    // (Its grids' ring of one past each tile reaches out on the near sides, for the normals there.)
+    expect(x1).toBe(hi);
+    expect(z1).toBe(hi);
+    expect(x0).toBeGreaterThanOrEqual(lo - GROUND_TILE / 64);
+    expect(z0).toBeGreaterThanOrEqual(lo - GROUND_TILE / 64);
+  });
+
   test('samples on a tile’s edge draw both tiles; at the world’s edge, the tiles past it too', () => {
     const { scape, tiles, count } = shaped();
     const before = drawn(tiles);
