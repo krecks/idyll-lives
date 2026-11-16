@@ -207,6 +207,8 @@ const WAYS = 5;
 /** A country road between two areas goes straight on from a way out of one to a street of the other this near (m), where that street bends less than `STRAIGHT_BEND` (radians) over 28 m. */
 const STRAIGHT_ON = 160;
 const STRAIGHT_BEND = 0.6;
+/** Two areas' ways that face each other within this (radians) of the line between them are joined by it (`headOn`). */
+const HEAD_ON = Math.PI / 15;
 /** An area's lots keep their middles this far along their road from where it meets another (m), and off where it turns more than `TIGHT_BEND` (radians) over as far (a bend of 20 m radius or less). */
 export const CORNER = 18;
 export const TIGHT_BEND = 0.9;
@@ -783,6 +785,28 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     return null;
   };
   /**
+   * Whether way `w` out of area `a` and way `v` into area `b` face each other head on (each within
+   * `HEAD_ON` of the straight line between them), no further apart than `STRAIGHT_ON`, with nothing
+   * between them but land: no water, no other area's box, no road. (Two areas close together, a
+   * port of one in line with a T or a port of the other: the road between them is that line, not
+   * one routed round and into a far port, through the other's streets.)
+   */
+  const headOn = (w: Way, v: Way, a: number, b: number): boolean => {
+    const l = dist(w.p, v.p);
+    if (l < CELL || l > STRAIGHT_ON) return false;
+    const u: Pt = [(v.p[0] - w.p[0]) / l, (v.p[1] - w.p[1]) / l];
+    if (u[0] * w.dir[0] + u[1] * w.dir[1] < Math.cos(HEAD_ON) || -(u[0] * v.dir[0] + u[1] * v.dir[1]) < Math.cos(HEAD_ON)) return false;
+    const index = new RoadIndex(roads);
+    for (let d = 2; d < l - 1; d += 2) {
+      const q: Pt = [w.p[0] + u[0] * d, w.p[1] + u[1] * d];
+      const owner = areaBlock[land.cell(q[0], q[1])];
+      if (land.wet(q[0], q[1], 3) || (owner && owner !== a + 1 && owner !== b + 1)) return false;
+      // (Clear of every road but by its ends, where it meets the roads it leaves and comes to.)
+      if (d > ROAD_WIDTH && d < l - ROAD_WIDTH && index.nearest(q[0], q[1], ROAD_WIDTH)) return false;
+    }
+    return true;
+  };
+  /**
    * A way out of area `a` towards `toward` by a T off one of its streets or lanes: where it runs
    * straight (and not by a junction), square to it on the side facing `toward` (within
    * `SIDE_FACING`), straight on across the area's land clear of its other roads, its lots' depth
@@ -898,7 +922,12 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       .map(({ w, to }) => ({ w, hit: straightOn(w, to) }))
       .flatMap(({ w, hit }) => (hit ? [{ w, hit, cost: hit.len + router.wayCost(w) * CELL }] : []))
       .sort((x, y) => x.cost - y.cost)[0];
-    if (direct) {
+    // (A place's: a way out of one facing a way into the other head on, near enough, straight from one to the other.)
+    const faced = spec.classic ? undefined : outs.flatMap((w) => ins.flatMap((v) => (headOn(w, v, a, b) ? [{ w, v, cost: dist(w.p, v.p) + (router.wayCost(w) + router.wayCost(v)) * CELL }] : []))).sort((x, y) => x.cost - y.cost)[0];
+    if (faced && (!direct || faced.cost < direct.cost)) {
+      const pts = curve(evenly([faced.w.p, faced.v.p], CTRL_APART));
+      made = { road: { points: pts, width: COUNTRY_WIDTH, ends: ['join', 'join'], kind: 'country', name: '' }, pa: faced.w, pb: faced.v, bad: 0 };
+    } else if (direct) {
       const pts = curve(evenly([direct.w.p, direct.hit.p], CTRL_APART));
       made = { road: { points: pts, width: COUNTRY_WIDTH, ends: ['join', 'join'], kind: 'country', name: '' }, pa: direct.w, pb: { p: direct.hit.p, dir: [-direct.w.dir[0], -direct.w.dir[1]] }, bad: 0 };
     }
