@@ -407,33 +407,29 @@ pub(crate) const LOW_NEED: f32 = 0.15;
 pub const WALK_MARGIN: f32 = 1.05;
 
 /// When someone with work or school starting at `start` leaves (the content's `leave`, unless
-/// they live in an open-world town: then by their walk, `Sim::commute`), a worker a little early
-/// (`early`).
+/// they live in an open-world town: then by their walk, `Sim::commute`). (A worker sets off a
+/// little before that: `early`.)
 pub fn leave_for(sim: &crate::world::Sim, leave: u64, start: u64) -> u64 {
-    let leave = match sim.commute {
+    match sim.commute {
         Some(c) => start.saturating_sub(c.ticks),
         None => leave,
-    };
-    leave.saturating_sub(if sim.job.is_some() {
-        early(sim.household)
-    } else {
-        0
-    })
+    }
 }
 
 /// The most a worker sets off before their way to work says they must (game minutes).
 const EARLY_MOST: f32 = 20.0;
 
-/// How much earlier than their way needs someone off to work sets off (ticks, up to
-/// `EARLY_MOST`), by a hash of `key`: their household's, on foot or by bike as by car (the car's
-/// household's, so all in it go together: `cars::lead_ticks`), so their way on foot and by car
-/// move together and a visit or an outing timed by the one isn't cut short by the other (by
-/// each resident's own, a car's driver was called home from visits before their time). The same
-/// every day and after a load, so it is never saved. With every worker off at the last minute, a
-/// full town's commuters met at the ways out in one queue. Not for school: its day starts for
-/// every pupil at once anyway.
-pub(crate) fn early(key: u32) -> u64 {
-    let h = (u64::from(key) + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15) >> 32;
+/// How much earlier than their way needs a household's workers set off for work (ticks, up to
+/// `EARLY_MOST`), by a hash of the household (all in its car go together): the same every day
+/// and after a load, so it is never saved. With every worker off at the last minute, a full
+/// town's commuters met at the ways out in one queue. Only the setting off moves
+/// (`schedule_work`): what's planned round it (getting up and ready, a visit or an outing, a
+/// way home in time) keeps to the leave their way says, and whatever they're at is dropped for
+/// work as ever. (Moved for all of it, every timing done by the leave moved, and a guest was
+/// called home from a visit minutes after getting there: Foundryside, seed base 1.) Not for
+/// school: its day starts for every pupil at once anyway.
+pub(crate) fn early(household: u32) -> u64 {
+    let h = (u64::from(household) + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15) >> 32;
     h % (ticks(EARLY_MOST) + 1)
 }
 
@@ -861,7 +857,16 @@ fn schedule_work(w: &mut World, i: usize, day: u32, fresh: Option<u64>) {
     let Some((leave, start, _)) = shift_today(&w.content, job, &sim.skills, tick) else {
         return;
     };
-    let leave = firm_leave(w, i, leave, start, day, fresh);
+    // (A little early, `early`: the walk firmed up as that comes near.)
+    let early = early(sim.household);
+    let leave = firm_leave(
+        w,
+        i,
+        leave.saturating_sub(early),
+        start.saturating_sub(early),
+        day,
+        fresh,
+    );
     let sim = &w.sims[i];
     // By car, when the drive takes it (`cars::lead_ticks`); by the work taxi, in time for it at the
     // kerb (`taxi::leave_at`).
@@ -869,7 +874,7 @@ fn schedule_work(w: &mut World, i: usize, day: u32, fresh: Option<u64>) {
         0 => leave,
         // (By the drive's time, not the walk's: a way out on foot of hours had drivers off in the
         // night.)
-        lead => start.saturating_sub(lead),
+        lead => start.saturating_sub(lead + early),
     };
     let by_taxi = crate::taxi::leave_at(w, i);
     let leave = by_taxi.unwrap_or(leave);
