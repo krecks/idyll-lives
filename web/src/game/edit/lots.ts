@@ -243,8 +243,8 @@ function lotPlace(draft: NeighbourhoodDraft, t: Templates, content: Content, s: 
   };
 }
 
-/** `draft` with the place of public lot `slot` (`lotPlace`) put in, in place of the one it had. */
-function withLotPlace(draft: NeighbourhoodDraft, t: Templates, content: Content, slot: number): NeighbourhoodDraft {
+/** `draft` with the place of public lot `slot` (`lotPlace`) put in, in place of the one it had (a village placed by hand gives its public lots theirs: `villages.ts`). */
+export function withLotPlace(draft: NeighbourhoodDraft, t: Templates, content: Content, slot: number): NeighbourhoodDraft {
   const open = draft.open;
   if (!open?.places) return draft;
   const had = open.places.findIndex((q) => q.plot === slot);
@@ -552,8 +552,12 @@ export function swapPlace(draft: NeighbourhoodDraft, t: Templates, content: Cont
 
 // ---- civic places (`backdrop.ts` `CIVIC`) ---------------------------------------------------------
 
-/** The civic places (`backdrop.ts` `CIVIC`), as step 2's cards know them: their indices are `CIVIC`'s. */
-export const CIVIC_PLACES = CIVIC;
+/**
+ * The civic places (`backdrop.ts` `CIVIC`), as step 2's cards know them: their indices are `CIVIC`'s.
+ * (Passed on as it is, not read here as this module loads: `backdrop.ts` reaches this module again
+ * through `ground.ts`, `macro.ts` and `landFollow.ts`, and may not have made `CIVIC` yet.)
+ */
+export { CIVIC as CIVIC_PLACES } from '../backdrop';
 
 /** The civic places a civic building (`building`, in `open.backdrop`) may become: those its area doesn't have yet. */
 export function civicSwaps(draft: NeighbourhoodDraft, building: number): { civic: number; label: string }[] {
@@ -561,7 +565,7 @@ export function civicSwaps(draft: NeighbourhoodDraft, building: number): { civic
   const places = draft.open?.places ?? [];
   if (!b || civicOf(places[b.place ?? -1]) < 0) return [];
   const has = new Set(places.filter((p) => p.area === b.area).map(civicOf));
-  return CIVIC_PLACES.flatMap((c, i) => (has.has(i) ? [] : [{ civic: i, label: c.label }]));
+  return CIVIC.flatMap((c, i) => (has.has(i) ? [] : [{ civic: i, label: c.label }]));
 }
 
 /**
@@ -574,7 +578,7 @@ export function civicSwaps(draft: NeighbourhoodDraft, building: number): { civic
 export function swapCivic(draft: NeighbourhoodDraft, building: number, civic: number, content: Content, seed = 0): Edited {
   const open = draft.open;
   const b = open?.backdrop?.[building];
-  const c = CIVIC_PLACES[civic];
+  const c = CIVIC[civic];
   if (!open?.backdrop || !open.places || !b || b.place === undefined) return { refused: 'That is not a civic building.' };
   if (!c) return { refused: 'There is no such civic place.' };
   const old = open.places[b.place];
@@ -590,7 +594,7 @@ export function swapCivic(draft: NeighbourhoodDraft, building: number, civic: nu
   const taken = new Set([...open.places.filter((_, i) => i !== b.place).map((p) => p.name), ...draft.slots.map((s) => s.name)]);
   const namer = namerFor(rand, area?.name ?? draft.name, draft.world?.options?.town ?? 'village', lastNames, streets, taken);
   const name = namer.unique(() => c.name(namer));
-  const extra = (old.work ?? []).filter((w) => !CIVIC_PLACES[was].work.includes(w));
+  const extra = (old.work ?? []).filter((w) => !CIVIC[was].work.includes(w));
   const work = [...c.work, ...extra.filter((w) => !c.work.includes(w))];
   const place: TownPlace = { name, kind: c.place, x: old.x, z: old.z, hours: hoursFor(HOURS[c.place as keyof typeof HOURS], work, content.careerCategories), ...(work.length ? { work } : {}), area: b.area };
   // The footprint stays; the storeys and the roof are the new kind's (a ridge along the footprint's longest side if the roof wants one and had none).
