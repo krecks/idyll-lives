@@ -19,6 +19,9 @@
   import { homePrice, priceParts } from '../../game/price';
   import { householdFunds, jobTitle, savingsOf } from '../../game/wealth';
   import { settings } from '../../settings/settings.svelte';
+  import { tierFor } from '../../game/people';
+  import { furnishAhead } from '../../game/townJobs';
+  import { householdsAhead } from '../newGame';
   import { app } from '../app.svelte';
   import { money } from '../format';
   import Icon from '../Icon.svelte';
@@ -303,6 +306,13 @@
 
   onMount(async () => {
     templates = await loadTemplates();
+    // The houses Move in fills furnished ahead in the town worker while the player chooses (left
+    // running past this screen: Move in's town file waits behind it and finds them made).
+    const seed = app.peopleSeed;
+    if (seed !== undefined) {
+      const ahead = householdsAhead(content, assets, templates, town, seed, household, tierFor(settings.graphics));
+      furnishAhead(content, town, ahead).catch(() => {});
+    }
     if (selectedIndex !== null) return;
     const a = areas[0];
     const [cx, cz] = a ? [a.x + a.w / 2, a.z + a.d / 2] : [town.width / 2, town.depth / 2];
