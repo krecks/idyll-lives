@@ -19,8 +19,9 @@
 
 import type { Content } from '../../content/content';
 import type { RoadPlan } from '../../core/protocol';
-import { pointAt, roadExits, lengths } from '../../game/roads';
-import { townProblems, type CheckedTown } from '../../game/townCheck';
+import { pointAt, lengths } from '../../game/roads';
+import { checkedTown } from '../../game/edit/checked';
+import { townProblems } from '../../game/townCheck';
 import { plotRect, type NeighbourhoodDraft, type Templates } from '../../game/town';
 
 /** A problem as the list shows it: what it says, and where it is on the town (if it is somewhere). */
@@ -38,45 +39,8 @@ export interface TownIssues {
   warnings: Issue[];
 }
 
-/** The town file's kind of a lot (`assembleTown`'s `PlotKind`). */
-const plotKind = (s: NeighbourhoodDraft['slots'][number]): string => (s.kind === 'house' ? (s.lot === 'farm' ? 'farm' : 'home') : s.kind === 'shop' ? 'shop' : s.kind === 'outdoor' ? 'countryside' : 'public');
-
-/**
- * The part of `draft`'s town file the checks read (`CheckedTown`), written as `assembleTown` writes
- * it, with nobody living there yet. A few milliseconds, not the second or so a whole file takes.
- */
-export function checkedTown(draft: NeighbourhoodDraft, t: Templates): CheckedTown {
-  const open = draft.open;
-  const W = draft.width;
-  const D = draft.depth;
-  const plots = draft.slots.map((s) => ({ ...plotRect(t, s), public: s.kind !== 'house', area: s.area ?? 0, kind: plotKind(s) }));
-  // (A place's ways out are where its roads, not its footpaths, leave the world; a classic town's, any road's.)
-  const exits = open ? roadExits(draft.roads.filter((r) => r.kind !== 'trail'), W, D).map(([x, z]) => ({ x, z, kind: 'road' as const })) : roadExits(draft.roads, W, D);
-  return {
-    size: 'big',
-    width: W,
-    depth: D,
-    plots,
-    exits,
-    sims: [],
-    households: [],
-    roads: draft.roads,
-    ...(open ? { areas: open.areas, terrain: { water: open.water }, parking: open.parking } : {}),
-    meta: {
-      roads: draft.roads,
-      greens: draft.greens,
-      facing: draft.slots.map((s) => s.facing),
-      ...(open
-        ? {
-            zones: open.zones,
-            ...(open.backdrop ? { backdrop: open.backdrop } : {}),
-            ...(open.places ? { places: open.places } : {}),
-            ...(open.centre ? { centre: open.centre } : {}),
-          }
-        : {}),
-    },
-  };
-}
+/** The checks' view of a draft, as the town file would have it (`game/edit/checked.ts`, which the edit job uses too). */
+export { checkedTown } from '../../game/edit/checked';
 
 /** The checks' lines that keep the player from step 3 (see the top of this file). */
 const BLOCKING: readonly RegExp[] = [
