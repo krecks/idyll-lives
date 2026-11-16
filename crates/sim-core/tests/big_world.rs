@@ -9,7 +9,8 @@
 //!
 //! Timing depends on the machine, so it is opt-in and prints its numbers:
 //! `cargo test --release -p sim-core --test big_world -- --ignored --nocapture`
-//! with `SIZE=1024` (default 256), `RESIDENTS=160` (default: as many as a town holds) and
+//! with `SIZE=1024` (default 256), `RESIDENTS=640` (default: as many as a town holds; the hamlets
+//! of a 1024 world have homes for about 580) and
 //! `HOURS=6` (game hours to run, default 4) in the environment. The world is a town with roads and
 //! areas; `OPEN=0` makes it one without them (as the first baseline was measured on).
 //! `WORLDS=worlds.json` (a file of `tools/worlds/sample.ts`'s shape) runs a real Big town instead,
@@ -205,9 +206,11 @@ fn big_world_benchmark() {
         searches.max_nodes
     );
     eprintln!(
-        "heap {:.1} MB held after ticking ({:.1} MB at most)",
+        "heap {:.1} MB held after ticking ({:.1} MB at most), {} residents and {} cars by then",
         mb(HELD.load(Ordering::Relaxed) - before),
-        mb(PEAK.load(Ordering::Relaxed) - before)
+        mb(PEAK.load(Ordering::Relaxed) - before),
+        w.sims.iter().filter(|s| s.here()).count(),
+        w.cars.len(),
     );
 
     let t = Instant::now();

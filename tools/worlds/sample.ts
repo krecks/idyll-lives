@@ -619,6 +619,8 @@ const forSale: Record<string, number> = {};
 const courtsOf: [number, number, number] = [0, 0, 0];
 /** Each world's land: its slopes (`slopeChecks`), how long it took to grade (ms), its size in the file (KB). */
 const landTable: { tag: string; slopes: Slopes; ms: number; kb: number; given: { lots: number; backdrop: number; roads: number; courts: number } }[] = [];
+/** Each world's homes, and the neighbours and cars it would hold with every home but a few lived in. */
+const room: { tag: string; homes: number; full: number; fullCars: number }[] = [];
 /** The worlds to make: each place `perKind` times at its own options (or `--options`), then the extremes. */
 const runs: { kind: (typeof WORLD_KINDS)[number]; seed: number; options?: Partial<WorldOptions> }[] = [
   ...WORLD_KINDS.filter((k) => kinds.includes(k)).flatMap((kind) => Array.from({ length: perKind }, (_, i) => ({ kind, seed: (i + 1) * 104729 + kind.length + seedBase * SEED_STEP, ...(forced ? { options: forced } : {}) }))),
@@ -704,6 +706,32 @@ for (const { kind, seed, options } of runs) {
       `${town.open?.backdrop ? `${town.open.backdrop.length} backdrop buildings (${town.open.backdrop.filter((b) => b.area === 0).length} in the main town), ${town.open.places?.length ?? 0} places, ` : ''}` +
       `${file.sims.length} residents, ${file.objects.length} things, ${(text.length / 1e6).toFixed(2)} MB; ${layout.toFixed(0)} ms + ${houses.toFixed(0)} ms houses, file ${assemble.toFixed(0)} ms`,
   );
+  // What a full town would hold: every home but the few kept for sale (`max(2, 5 %)`, the
+  // smallest), each household as `householdFor` sizes it (its bedrooms or one more, at most four:
+  // `min(4, bedrooms + 0.5)` on average), scaled by how far this world's households fall short of
+  // that; its cars at this world's cars a household.
+  const homes = town.slots.filter((s) => s.kind === 'house');
+  const bedroomsOf = (s: (typeof homes)[number]) => houseTemplate(templates, s.template)?.bedrooms ?? 1;
+  const sized = (b: number) => Math.min(4, b + 0.5);
+  const bedrooms = homes.reduce((n, s) => n + bedroomsOf(s), 0);
+  const livedIn = town.households.length;
+  const residents = file.sims.length - player.members.length;
+  const rule = town.households.reduce((n, h) => n + sized(bedroomsOf(town.slots[h.slot])), 0);
+  const kept = Math.max(2, Math.ceil(homes.length * 0.05));
+  const fullRule = homes.map(bedroomsOf).sort((a, b) => b - a).slice(0, homes.length - kept).reduce((n, b) => n + sized(b), 0);
+  const full = Math.round((fullRule * residents) / Math.max(1, rule));
+  const cars = (file.cars ?? []).length;
+  const fullCars = Math.round(((homes.length - kept) * cars) / Math.max(1, livedIn + 1));
+  room.push({ tag, homes: homes.length, full, fullCars });
+  console.log(
+    `  homes ${homes.length} (${bedrooms} bedrooms, ${(bedrooms / Math.max(1, homes.length)).toFixed(2)} a home), ${livedIn} lived in by ${residents} neighbours (${(residents / Math.max(1, livedIn)).toFixed(2)} a home, ` +
+      `${(residents / Math.max(1, rule)).toFixed(2)} of the size rule's), ${cars} cars; all but ${kept} homes lived in: about ${full} neighbours, ${fullCars} cars`,
+  );
+}
+if (room.length) {
+  const most = room.reduce((a, r) => (r.full > a.full ? r : a));
+  const homes = room.reduce((a, r) => (r.homes > a.homes ? r : a));
+  console.log(`Room: most homes ${homes.homes} (${homes.tag}); most neighbours when full about ${most.full}, with ${most.fullCars} cars (${most.tag})`);
 }
 console.log(`Owners per kind of house (the eldest grown-up, the highest job grade, A = 0; settled: ${SETTLED_AGE}+ or grade F up):`);
 for (const cls of [...HOUSE_CLASSES, ...Object.keys(owned).filter((c) => !HOUSE_CLASSES.includes(c))]) {

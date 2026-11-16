@@ -150,11 +150,22 @@ export interface SnapshotLayout {
 export const Pose = { Stand: 0, Sit: 1, Lie: 2 } as const;
 
 /**
+ * Character rows the renderer keeps (its pose texture, the residents' arrays and the instance pools:
+ * `render/shared/characters/rig.ts` `MAX_CHARACTERS`): the sim's residents and then its vendors and shopkeepers,
+ * `maxSims` + `maxStaff` (768 + 48). `readLayout` refuses a layout with more, so a sim built with a larger limit fails
+ * as the game starts rather than drawing some residents and not others.
+ */
+export const MAX_CHARACTERS = 816;
+
+/**
  * The layout from sim-core's JSON (`Game::snapshot_layout`), `ticksPerMinute` filled in where it didn't send one (a game
- * minute was a real second), and `driveScale` (vehicles went at real time).
+ * minute was a real second), and `driveScale` (vehicles went at real time). Throws if its residents and servers would
+ * not fit the renderer's rows (`MAX_CHARACTERS`).
  */
 export function readLayout(json: string): SnapshotLayout {
   const layout = JSON.parse(json) as Omit<SnapshotLayout, 'ticksPerMinute' | 'driveScale'> & { ticksPerMinute?: number; driveScale?: number };
+  const rows = layout.maxSims + (layout.maxStaff ?? 0);
+  if (rows > MAX_CHARACTERS) throw new Error(`the sim's snapshot has ${rows} character rows, the renderer room for ${MAX_CHARACTERS}`);
   return { ...layout, ticksPerMinute: layout.ticksPerMinute ?? layout.ticksPerSecond, driveScale: layout.driveScale ?? 1 };
 }
 
