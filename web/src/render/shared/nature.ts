@@ -13,6 +13,8 @@ import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, ty
 import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, type Land, type LandRect } from '../../game/land';
 import { coverAt, landTop, landWater, wetDistance, wetEdgeAt } from './landBake';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
+import type { BuiltSurface } from './builtSurface';
+import { surfaceOf } from './landSurface';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
 import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../game/noise';
@@ -54,6 +56,74 @@ const SHADOW_RANGE = 28;
  * moved by how far the field's edge stands off it there, the move fading out over this far (m).
  */
 const LAND_EDGE_FADE = 60;
+/** Lots are filed for `padAt` by cells this wide (m). */
+const PAD_CELL = 16;
+
+/** `values` (a `cols` × `rows` grid of `LAND_CELL` m samples) at (`x`, `z`), between the samples round it, the edge's past the edge. */
+function between(values: Float32Array, cols: number, rows: number, x: number, z: number): number {
+  const fx = Math.min(cols - 1, Math.max(0, x / LAND_CELL));
+  const fz = Math.min(rows - 1, Math.max(0, z / LAND_CELL));
+  const i = Math.min(Math.floor(fx), Math.max(0, cols - 2));
+  const j = Math.min(Math.floor(fz), Math.max(0, rows - 2));
+  const [tx, tz] = [fx - i, fz - j];
+  const [i1, j1] = [Math.min(i + 1, cols - 1), Math.min(j + 1, rows - 1)];
+  const top = values[j * cols + i] * (1 - tx) + values[j * cols + i1] * tx;
+  const bottom = values[j1 * cols + i] * (1 - tx) + values[j1 * cols + i1] * tx;
+  return top * (1 - tz) + bottom * tz;
+}
+
+/**
+ * The surface's graded land (`BuiltSurface.conformed`) with the samples inside the first `count` of its plots (the
+ * world's lots, not its backdrop's buildings, which stand on the land) carried in from the land round them: ring by
+ * ring from their edges, each the mean of its neighbours reached already (the terrain beside a lot is the land's, not
+ * a slope to its pad: `LandscapeLayout.terrainField`).
+ */
+export function lotsFilled(surface: BuiltSurface, count: number): Float32Array {
+  const { cols, rows, conformed } = surface;
+  const out = conformed.slice();
+  const inLot = new Uint8Array(cols * rows);
+  for (let n = 0; n < Math.min(count, surface.plots.length); n++) {
+    const p = surface.plots[n];
+    for (let j = Math.max(0, Math.ceil(p.z / LAND_CELL)); j <= Math.min(rows - 1, Math.floor((p.z + p.d) / LAND_CELL)); j++) {
+      for (let i = Math.max(0, Math.ceil(p.x / LAND_CELL)); i <= Math.min(cols - 1, Math.floor((p.x + p.w) / LAND_CELL)); i++) inLot[j * cols + i] = 1;
+    }
+  }
+  // (1: still to fill.)
+  let ring: number[] = [];
+  for (let k = 0; k < inLot.length; k++) if (inLot[k]) ring.push(k);
+  const around = (k: number, visit: (n: number) => void) => {
+    const [i, j] = [k % cols, Math.floor(k / cols)];
+    if (i > 0) visit(k - 1);
+    if (i < cols - 1) visit(k + 1);
+    if (j > 0) visit(k - cols);
+    if (j < rows - 1) visit(k + cols);
+  };
+  while (ring.length) {
+    const reached: number[] = [];
+    const values: number[] = [];
+    const later: number[] = [];
+    for (const k of ring) {
+      let [sum, n] = [0, 0];
+      around(k, (q) => {
+        if (inLot[q]) return;
+        sum += out[q];
+        n++;
+      });
+      if (n) {
+        reached.push(k);
+        values.push(sum / n);
+      } else later.push(k);
+    }
+    // (A lot no land reaches, all of the world: its pad stays.)
+    if (!reached.length) break;
+    reached.forEach((k, m) => {
+      out[k] = values[m];
+      inLot[k] = 0;
+    });
+    ring = later;
+  }
+  return out;
+}
 /** A height field whose top stands over this (m) has rock, snow and a treeline on it, as mountains do. */
 const LAND_PEAKS = 40;
 /**
@@ -439,12 +509,14 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.zoneList = world.meta?.zones ?? [];
     this.drawnWatered = !!this.land.water || !!this.zones?.has('water');
     this.orchards = this.built ? this.zoneList.filter((z) => z.kind === 'orchard') : [];
-    // (A world with a height field is drawn from it from the start, its roads laid on it.)
+    // (A world with a height field is drawn from it from the start, its roads laid on it; one its town
+    // follows with the surface its town is graded to, the world's own shared with the street.)
     this.metaLand = world.meta?.land;
-    if (this.metaLand) this.adoptLand(decodeLand(this.metaLand));
+    this.laidOut = world;
+    if (this.metaLand) this.adoptLand(null);
     this.passes = townExits(world);
     this.roads = makeRoads(
-      { seed: this.seed, w: this.w, d: this.d, ring: this.ring, ground: (x, z) => this.ground(x, z), waterEdge: (x, z) => this.waterEdge(x, z), distanceToTown: (x, z) => this.distanceToTown(x, z) },
+      { seed: this.seed, w: this.w, d: this.d, ring: this.ring, ground: (x, z) => this.ground(x, z), waterEdge: (x, z) => this.waterEdge(x, z), distanceToTown: (x, z) => this.distanceToTown(x, z), follows: !!this.surface },
       world,
       world.meta?.name ?? '',
     );
@@ -484,29 +556,85 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   setLand(land: Land | null): void {
     this.field = null;
+    this.surface = null;
+    this.stale = null;
     this.wetSd = null;
     this.coverSeen = null;
     this.zones = this.zonesToday;
-    if (land) this.adoptLand(land);
-    else if (this.metaLand) this.adoptLand(decodeLand(this.metaLand));
+    if (land || this.metaLand) this.adoptLand(land);
     this.landVersion++;
   }
 
   /**
    * The samples in `rect` of the height field changed (a stroke done): its water's edge, its highest point and the
-   * zones of the cover kinds that changed made again.
+   * zones of the cover kinds that changed made again; on a land its town follows, the surface solved again
+   * (`BuiltSurface.update`), the land it grades drawn from it again (the samples it changed join `rect`'s).
    */
-  landChanged(rect: LandRect): void {
-    if (!this.field) return;
+  landChanged(rect: LandRect): LandRect {
+    if (!this.field) return rect;
+    let out = rect;
+    if (this.surface) {
+      const moved = this.surface.update(rect).rect;
+      this.stale = null;
+      this.terrainField = lotsFilled(this.surface, this.laidOut.plots.length);
+      if (moved) out = { i0: Math.min(rect.i0, moved.i0), j0: Math.min(rect.j0, moved.j0), i1: Math.max(rect.i1, moved.i1), j1: Math.max(rect.j1, moved.j1) };
+    }
     this.measureLand(rect);
     this.landVersion++;
+    return out;
   }
 
-  /** A height field taken on (`setLand`): its water, top and zones. */
-  private adoptLand(land: Land): void {
-    this.field = land;
+  /**
+   * The samples in `rect` changed under a stroke still going (a brush's stamp): drawn from the field as it is there
+   * (`fieldAt`) until the stroke is done and the surface is solved again (`landChanged`).
+   */
+  protected landStamped(rect: LandRect): void {
+    if (!this.surface) return;
+    const s = this.stale;
+    this.stale = s ? { i0: Math.min(s.i0, rect.i0), j0: Math.min(s.j0, rect.j0), i1: Math.max(s.i1, rect.i1), j1: Math.max(s.j1, rect.j1) } : { ...rect };
+  }
+
+  /**
+   * A height field taken on (`setLand`; null: the world's own, `meta.land`): its water, top and zones, and on a land
+   * its town follows the surface its town stands on (the world's own shared, `landSurface.ts` `surfaceOf`).
+   */
+  private adoptLand(land: Land | null): void {
+    const surface = land ? surfaceOf(this.laidOut, land) : surfaceOf(this.laidOut);
+    this.surface = surface;
+    this.stale = null;
+    this.terrainField = surface ? lotsFilled(surface, this.laidOut.plots.length) : null;
+    this.field = surface ? surface.land : (land ?? decodeLand(this.metaLand!));
     this.coverSeen = null;
     this.measureLand(null);
+  }
+
+  /** The world it lays out (for its surface). */
+  private readonly laidOut: WorldStructure;
+
+  /**
+   * The surface of the built land on a land its town follows (`builtSurface.ts`: the roads, the lots' pads and the
+   * land graded round them): what the land is drawn from inside the world, and what stands on it stands on. Null:
+   * a world without one (everything built at 0 as ever).
+   */
+  surface: BuiltSurface | null = null;
+  /** The samples a stroke still going has changed (`landStamped`): drawn from the field there, not the surface. */
+  private stale: LandRect | null = null;
+  /**
+   * On a land its town follows, the land as its terrain draws it: the surface's graded land (`BuiltSurface.conformed`),
+   * but inside a lot the land round it carried in (`lotsFilled`): the terrain isn't drawn inside a lot (its pad is a
+   * slab of its own, `pc/nature.ts`), so beside it the land is the land's, not a slope down to the pad, and a
+   * retaining edge stands between them (`shared/pads.ts`).
+   */
+  private terrainField: Float32Array | null = null;
+
+  /** The land (m) inside the world as its terrain draws it: `terrainField`, or the field's where a stroke still going changed it, or the field's. */
+  private fieldAt(x: number, z: number): number {
+    const t = this.terrainField;
+    if (t) {
+      const r = this.stale;
+      if (!r || x < (r.i0 - 1) * LAND_CELL || z < (r.j0 - 1) * LAND_CELL || x > r.i1 * LAND_CELL || z > r.j1 * LAND_CELL) return between(t, this.field!.cols, this.field!.rows, x, z);
+    }
+    return landHeight(this.field!, x, z);
   }
 
   /** The height field's water, top and (a big world's) zones from its cover: the cover kinds changed in `rect`, or all. */
@@ -716,14 +844,82 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     return { gw, gd, dist };
   }
 
-  /** Height of the land, levelled under the roads out of town. */
+  /**
+   * Height of the land, levelled under the roads out of town. On a land its town follows, inside the world the
+   * surface anything stands on: a lot's pad, a road's height, else the graded land (`BuiltSurface.at`).
+   */
   heightAt(x: number, z: number): number {
+    if (this.surface && x >= 0 && z >= 0 && x <= this.w && z <= this.d) return this.stale ? this.staleAt(x, z) : this.builtAt(x, z);
     const h = this.ground(x, z);
     const road = this.roads.near(x, z);
     if (!road) return h;
     // Level with the road across it, then graded back into the land beside it.
     const t = 1 - smoothstep(road.width / 2 + 0.4, road.width / 2 + ROAD_VERGE, road.dist);
     return h + (road.h - 0.02 - h) * t;
+  }
+
+  /**
+   * On a land its town follows, the pad (m) of the lot (or the backdrop's building) a point is in (the highest where
+   * two touch), or null outside every one (the grass levels its patches on them: `shared/grass.ts` `settlePads`).
+   * Undefined: no surface.
+   */
+  get padAt(): ((x: number, z: number) => number | null) | undefined {
+    const surface = this.surface;
+    if (!surface) return undefined;
+    if (this.padsFor !== surface) {
+      this.padsFor = surface;
+      const grid = new Map<number, number[]>();
+      for (let i = 0; i < surface.plots.length; i++) {
+        const p = surface.plots[i];
+        for (let cz = Math.floor(p.z / PAD_CELL); cz <= Math.floor((p.z + p.d) / PAD_CELL); cz++) {
+          for (let cx = Math.floor(p.x / PAD_CELL); cx <= Math.floor((p.x + p.w) / PAD_CELL); cx++) {
+            const key = cx * 65536 + cz;
+            const list = grid.get(key);
+            if (list) list.push(i);
+            else grid.set(key, [i]);
+          }
+        }
+      }
+      this.padLookup = (x, z) => {
+        let best: number | null = null;
+        for (const i of grid.get(Math.floor(x / PAD_CELL) * 65536 + Math.floor(z / PAD_CELL)) ?? []) {
+          const p = surface.plots[i];
+          if (x < p.x || x > p.x + p.w || z < p.z || z > p.z + p.d) continue;
+          const y = surface.padY(i);
+          if (best === null || y > best) best = y;
+        }
+        return best;
+      };
+    }
+    return this.padLookup!;
+  }
+  private padsFor: BuiltSurface | null = null;
+  private padLookup: ((x: number, z: number) => number | null) | null = null;
+
+  /** `heightAt` while a stroke goes on: the field where it changed, the surface elsewhere. */
+  private staleAt(x: number, z: number): number {
+    const r = this.stale!;
+    if (x < (r.i0 - 1) * LAND_CELL || z < (r.j0 - 1) * LAND_CELL || x > r.i1 * LAND_CELL || z > r.j1 * LAND_CELL) return this.builtAt(x, z);
+    return landHeight(this.field!, x, z);
+  }
+
+  /** On a land its town follows, what stands at (`x`, `z`): a lot's pad (the highest where two touch), a road's height, else the land as the terrain draws it (`fieldAt`). */
+  private builtAt(x: number, z: number): number {
+    const pad = this.padAt!(x, z);
+    if (pad !== null) return pad;
+    const s = this.surface!;
+    const on = s.roadAt(x, z);
+    return on ? s.roadY(on.road, on.s) : this.fieldAt(x, z);
+  }
+
+  /**
+   * The terrain's height (m) at a point of its grid: `heightAt`, but on a land its town follows the graded land
+   * inside the world (`fieldAt`: under a road `ROAD_SINK` below it, so it never shows through; the lots' pads are
+   * slabs of their own, `pc/nature.ts`).
+   */
+  terrainAt(x: number, z: number): number {
+    if (this.surface && x >= 0 && z >= 0 && x <= this.w && z <= this.d) return this.fieldAt(x, z);
+    return this.heightAt(x, z);
   }
 
   /** How high the mountains rise on this side, 0..1: the valley opens out flat towards low z, where the menus look at the town from. */
@@ -759,12 +955,12 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   ground(x: number, z: number): number {
     const field = this.field;
     if (!field) return this.drawnGround(x, z);
-    if (x >= 0 && z >= 0 && x <= this.w && z <= this.d) return landHeight(field, x, z);
+    if (x >= 0 && z >= 0 && x <= this.w && z <= this.d) return this.fieldAt(x, z);
     const cx = Math.min(this.w, Math.max(0, x));
     const cz = Math.min(this.d, Math.max(0, z));
     const today = this.drawnGround(x, z);
     const fade = 1 - smoothstep(0, LAND_EDGE_FADE, Math.hypot(x - cx, z - cz));
-    return fade > 0 ? today + (landHeight(field, cx, cz) - this.drawnGround(cx, cz)) * fade : today;
+    return fade > 0 ? today + (this.fieldAt(cx, cz) - this.drawnGround(cx, cz)) * fade : today;
   }
 
   /** `ground` as the landscape lays it out (without a height field). */
@@ -874,7 +1070,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       if (++seen % 4096 === 0) await pace?.();
       const x = positions[i];
       const z = positions[i + 2];
-      const h = this.heightAt(x, z);
+      const h = this.terrainAt(x, z);
       positions[i + 1] = h;
       const lawn = this.terrainColour(x, z, h, tmp);
       colors[c] = tmp.r;

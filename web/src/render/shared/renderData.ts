@@ -61,8 +61,8 @@ export class Land extends LandscapeLayout {
 
   /** The grass field's land part (`grassField`; its town mask is left to the page). */
   async grass(world: WorldStructure, margin: number): Promise<LandGrass> {
-    const { x0, z0, margin: m, w, d, colour, pw, pd, ground } = await grassField(world, this, undefined, margin);
-    return { x0, z0, margin: m, w, d, colour, pw, pd, ground };
+    const { x0, z0, margin: m, w, d, colour, pw, pd, ground, uneven } = await grassField(world, this, undefined, margin);
+    return { x0, z0, margin: m, w, d, colour, pw, pd, ground, ...(uneven ? { uneven } : {}) };
   }
 
   /** The land surveyed as drawn (`bakeLand`). */
