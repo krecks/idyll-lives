@@ -414,17 +414,24 @@ pub fn leave_for(sim: &crate::world::Sim, leave: u64, start: u64) -> u64 {
         Some(c) => start.saturating_sub(c.ticks),
         None => leave,
     };
-    leave.saturating_sub(if sim.job.is_some() { early(sim.id) } else { 0 })
+    leave.saturating_sub(if sim.job.is_some() {
+        early(sim.household)
+    } else {
+        0
+    })
 }
 
 /// The most a worker sets off before their way to work says they must (game minutes).
 const EARLY_MOST: f32 = 20.0;
 
 /// How much earlier than their way needs someone off to work sets off (ticks, up to
-/// `EARLY_MOST`), by a hash of `key` (a resident's id; for those going by car, its household's,
-/// so all in it go together: `cars::lead_ticks`): the same every day and after a load, so it is
-/// never saved. With every worker off at the last minute, a full town's commuters met at the
-/// ways out in one queue. Not for school: its day starts for every pupil at once anyway.
+/// `EARLY_MOST`), by a hash of `key`: their household's, on foot or by bike as by car (the car's
+/// household's, so all in it go together: `cars::lead_ticks`), so their way on foot and by car
+/// move together and a visit or an outing timed by the one isn't cut short by the other (by
+/// each resident's own, a car's driver was called home from visits before their time). The same
+/// every day and after a load, so it is never saved. With every worker off at the last minute, a
+/// full town's commuters met at the ways out in one queue. Not for school: its day starts for
+/// every pupil at once anyway.
 pub(crate) fn early(key: u32) -> u64 {
     let h = (u64::from(key) + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15) >> 32;
     h % (ticks(EARLY_MOST) + 1)
