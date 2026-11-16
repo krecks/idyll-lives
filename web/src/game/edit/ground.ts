@@ -9,6 +9,7 @@
  */
 
 import { unrle } from '../landMasks';
+import { grown, SHORE_GAP } from '../macro';
 import { inside, nearest, pointAt, roadIndex, type Pt, type RoadPlan } from '../roads';
 import { boundsOf, Ground, plotRect, turner, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';
 
@@ -20,41 +21,10 @@ export interface RoadSpot {
 }
 
 /**
- * A place's lots and buildings keep a strip of bank this wide between them and the water (m).
- * Copied from `macro.ts` `SHORE_GAP`, which is not exported. A classic world has no strip there;
- * its towns are not edited in step 2, so the strip is kept here for every world.
+ * A place's lots and buildings keep a strip of bank (`macro.ts` `SHORE_GAP`) between them and the
+ * water. A classic world has no strip there; its towns are not edited in step 2, so the strip is kept
+ * here for every world.
  */
-const SHORE_GAP = 3;
-
-/**
- * A `W` × `D` mask of tiles grown by `by` tiles every way (a square round each). Copied from
- * `macro.ts` `grown`, which is not exported.
- */
-function grown(mask: Uint8Array, W: number, D: number, by: number): Uint8Array {
-  const across = new Uint8Array(mask.length);
-  for (let z = 0; z < D; z++) {
-    for (let x = 0, last = -Infinity; x < W; x++) {
-      if (mask[z * W + x]) last = x;
-      if (x - last <= by) across[z * W + x] = 1;
-    }
-    for (let x = W - 1, next = Infinity; x >= 0; x--) {
-      if (mask[z * W + x]) next = x;
-      if (next - x <= by) across[z * W + x] = 1;
-    }
-  }
-  const out = new Uint8Array(mask.length);
-  for (let x = 0; x < W; x++) {
-    for (let z = 0, last = -Infinity; z < D; z++) {
-      if (across[z * W + x]) last = z;
-      if (z - last <= by) out[z * W + x] = 1;
-    }
-    for (let z = D - 1, next = Infinity; z >= 0; z--) {
-      if (across[z * W + x]) next = z;
-      if (next - z <= by) out[z * W + x] = 1;
-    }
-  }
-  return out;
-}
 
 /** What a set of roads' fixed ground was made from, and the mask of what it takes besides the roads and greens. */
 interface Base {

@@ -33,10 +33,12 @@
 import type { Content } from '../../content/content';
 import type { RoadKind, RoadPlan } from '../../core/protocol';
 import { surfacePlots } from '../../render/shared/builtSurface';
-import { BRIDGE_IN, BRIDGE_SPAN, bridgeable, bridgeStretch, wetSpans, withBridge, withoutDeck } from '../bridges';
+import { bridgeable, bridgeStretch, wetSpans, withBridge, withoutDeck } from '../bridges';
+import { CTRL_APART } from '../countryRouter';
 import { rle, simplify, unrle } from '../landMasks';
 import { mulberry32 } from '../noise';
-import { bends, clearOf, connector, COURT, cropRoads, curve, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roomAt, trimJoins, type Fit, type Pt } from '../roads';
+import { BRIDGE_IN, BRIDGE_SPAN, ROAD_WIDTH, TRAIL_WIDTH } from '../macro';
+import { bends, clearOf, connector, COURT, cropRoads, curve, endDir, evenly, inside, leftOf, lengths, MEET, nearest, pointAt, RoadIndex, ROOM, roomAt, trimJoins, type Fit, type Pt } from '../roads';
 import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '../town';
 import { placeOf, specOf, streetNames } from '../world';
 import type { Edited } from './edited';
@@ -56,21 +58,14 @@ export type Named = { kind: 'road'; road: number } | { kind: 'place'; place: num
 
 /** An end of a drawn street snaps to a road, or a dead end, this near (m, from the road's edge; from the dead end's last point). */
 const SNAP = 10;
-/** The least angle a street meets a road at, and how near square it is made square. */
-const MEET = (35 * Math.PI) / 180;
+/** A street meets a road at `roads.ts` `MEET` at least, and is made square within this of it. Junctions on one road keep `ROOM` apart (`roomAt`). */
 const SQUARE = (15 * Math.PI) / 180;
-/** Junctions on one road this far apart at least (m: `roads.ts` `ROOM`, as `roomAt` keeps it). */
-const ROOM = 14;
 /** A footpath keeps this far from a road alongside it (m); roads keep `clearOf`'s 18 m. */
 const TRAIL_APART = 6;
 /** A street drawn this near an area's box (m) is one of its streets. */
 const NEAR_AREA = 30;
-/** A drawn line is simplified to this (m), and has a point this often before it is made a curve (m: `macro.ts` `CTRL_APART`). */
+/** A drawn line is simplified to this (m), and has a point every `CTRL_APART` m (a country road's) before it is made a curve. Widths: `macro.ts` `ROAD_WIDTH`, `TRAIL_WIDTH`. */
 const SIMPLIFY = 5;
-const CTRL_APART = 16;
-/** Widths (m): every road in a big world (`macro.ts` `ROAD_WIDTH`), a footpath. */
-const ROAD_WIDTH = 7;
-const TRAIL_WIDTH = 2;
 /** How much of a drawn line (m) is turned to meet a road, or to carry on a dead end's way. */
 const APPROACH = 16;
 /** A street's last metres into a junction run straight (m). */
@@ -95,20 +90,6 @@ const lengthOf = (pts: readonly Pt[]) => lengths(pts)[pts.length - 1];
 const refused = (why: string): Edited => ({ refused: why });
 
 /**
- * A polyline with points put in along its longer stretches, none longer than `most` m (copied from
- * `macro.ts` `evenly`, which is not exported): what `curve` makes of it keeps to it.
- */
-function evenly(pts: readonly Pt[], most: number): Pt[] {
-  const out: Pt[] = pts.length ? [pts[0]] : [];
-  for (let i = 1; i < pts.length; i++) {
-    const n = Math.ceil(Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]) / most);
-    for (let k = 1; k < n; k++) out.push([pts[i - 1][0] + ((pts[i][0] - pts[i - 1][0]) * k) / n, pts[i - 1][1] + ((pts[i][1] - pts[i - 1][1]) * k) / n]);
-    out.push(pts[i]);
-  }
-  return out;
-}
-
-/**
  * An open polyline with its corners cut (Chaikin, `times` over; its ends where they were): a
  * corner the player clicked is rounded by a share of the stretches either side of it, so a long
  * stretch turns widely and only a short zig-zag stays tight.
@@ -128,18 +109,10 @@ function rounded(pts: readonly Pt[], times = 3): Pt[] {
   return out;
 }
 
-/** The way a polyline leaves at its last point (a unit direction, from 3 m back; copied from `roads.ts` `endDir`, which is not exported). */
-function endDir(pts: readonly Pt[]): Pt {
-  const ls = lengths(pts);
-  const back = pointAt(pts, ls[ls.length - 1] - 3, ls).p;
-  const e = pts[pts.length - 1];
-  return unit(e[0] - back[0], e[1] - back[1]);
-}
-
 /**
  * Whether the roads but those `without` are one network (as the sim joins them: an end within half
- * the wider road's width and a metre of the other's middle) with a road out of the world on it
- * (copied from `landFollow.ts` `oneNetwork`, which is not exported).
+ * the wider road's width and a metre of the other's middle) with a road out of the world on it.
+ * (`landFollow.ts` has its own `oneNetwork`, not exported.)
  */
 function oneNetwork(roads: readonly RoadPlan[], without: ReadonlySet<number>): boolean {
   const nets = networks(roads, without);

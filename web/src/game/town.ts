@@ -617,7 +617,7 @@ export function lotAt(ground: Ground, road: RoadPlan, f: Frontage, w: number, d:
  * A `W` × `D` rectangle (town tiles) facing `facing`'s way, its front edge on the tile line `front`
  * (z when it faces north or south, x when east or west) and its middle at `along` across it.
  */
-function fronting(facing: Facing, front: number, along: number, W: number, D: number): Rect {
+export function fronting(facing: Facing, front: number, along: number, W: number, D: number): Rect {
   const a = Math.round(along - (facing % 2 ? D : W) / 2);
   const at = [{ x: a, z: front }, { x: front, z: a }, { x: a, z: front - D }, { x: front - W, z: a }][facing];
   return { ...at, w: W, d: D };
@@ -882,26 +882,9 @@ export class LotPlacer {
     return [];
   }
 
-  /**
-   * Whether a house on lot `u` at `at` has a driveway whose line meets a road squarely
-   * (`driveMeets`): a car can turn out of it onto the road, not come alongside it (on a bend
-   * the road takes away from the lot's corner, or by a junction). Or no room for one.
-   */
-  private drivesOut(u: Unplaced, at: { x: number; z: number; facing: Facing }): boolean {
-    const { t, roads } = this;
-    const house = u.kind === 'house' ? houseTemplate(t, u.template) : undefined;
-    if (!house) return true;
-    const footprint = (def: string): [number, number] => this.content.object(def)?.footprint ?? [1, 1];
-    const { width, depth } = slotDims(t, u);
-    const sides = driveways(onLot(t, house, u, footprint), width, depth, footprint);
-    const turn = turner(at.x, at.z, width, depth, at.facing);
-    return (
-      !sides.length ||
-      sides.some((r) => {
-        const [a, b] = [turn.point([r.x + r.w / 2, 0]), turn.point([r.x + r.w / 2, -1])];
-        return driveMeets(roads, roadIndex(roads), a, [b[0] - a[0], b[1] - a[1]], DRIVE_REACH)?.square;
-      })
-    );
+  /** Whether a car can turn out of a house on lot `u` at `at` onto the road (`drivesOut`), its things' footprints as the content has them. */
+  drivesOut(u: Unplaced, at: { x: number; z: number; facing: Facing }): boolean {
+    return drivesOut(this.roads, this.t, u, at, (def) => this.content.object(def)?.footprint ?? [1, 1]);
   }
 
   /** House numbers along each road (odd on its left, even on its right), and the roads' names (`names`, by road; those without one are left as they are). */
@@ -1008,7 +991,7 @@ function farmstead(content: Content, t: Templates, slot: PlotSlot, rand: Rand): 
 /** Driveways are paths wider than this (garden paths are 1 m); see `driveway`. */
 export const DRIVEWAY_MIN_WIDTH = 1.8;
 /** How far a driveway goes on across the verge to its road at most (m; a garden path's goes 12). */
-const DRIVE_REACH = 30;
+export const DRIVE_REACH = 30;
 
 /** Driveway length past the front wall of the house: room to park a car beside it. */
 const DRIVEWAY_PAST_FRONT = 5.4;
@@ -1531,7 +1514,28 @@ export function assembleTown(
  * Further from square it comes alongside the road rather than onto it, and its car has no way
  * to turn out onto it.
  */
-const DRIVE_SQUARE = 0.55;
+export const DRIVE_SQUARE = 0.55;
+
+/**
+ * Whether a house on lot `u` at `at` (on `roads`) has a driveway whose line meets a road squarely
+ * (`driveMeets`): a car can turn out of it onto the road, not come alongside it (on a bend the road
+ * takes away from the lot's corner, or by a junction). Or no room for one. `footprint`: how big a
+ * thing on the lot is (its object's, as the content or the templates have it).
+ */
+export function drivesOut(roads: readonly RoadPlan[], t: Templates, u: Unplaced, at: { x: number; z: number; facing: Facing }, footprint: (def: string) => [number, number]): boolean {
+  const house = u.kind === 'house' ? houseTemplate(t, u.template) : undefined;
+  if (!house) return true;
+  const { width, depth } = slotDims(t, u);
+  const sides = driveways(onLot(t, house, u, footprint), width, depth, footprint);
+  const turn = turner(at.x, at.z, width, depth, at.facing);
+  return (
+    !sides.length ||
+    sides.some((r) => {
+      const [a, b] = [turn.point([r.x + r.w / 2, 0]), turn.point([r.x + r.w / 2, -1])];
+      return driveMeets(roads, roadIndex(roads), a, [b[0] - a[0], b[1] - a[1]], DRIVE_REACH)?.square;
+    })
+  );
+}
 
 /** Where a driveway meets its road (`driveMeets`). */
 export interface DriveMeet {
@@ -1549,7 +1553,7 @@ export interface DriveMeet {
  * it squarely there, as the simulation measures it (the way the road's segment runs there:
  * sim-core `Bay::new`). Null: none.
  */
-function driveMeets(list: readonly RoadPlan[], roads: ReturnType<typeof roadIndex>, street: Pt, way: Pt, reach: number): DriveMeet | null {
+export function driveMeets(list: readonly RoadPlan[], roads: ReturnType<typeof roadIndex>, street: Pt, way: Pt, reach: number): DriveMeet | null {
   const at = (k: number): Pt => [street[0] + way[0] * k, street[1] + way[1] * k];
   const widest = Math.max(0, ...list.map((r) => r.width));
   for (let k = 0.5; k <= reach; k += 0.5) {
@@ -1575,7 +1579,7 @@ function driveMeets(list: readonly RoadPlan[], roads: ReturnType<typeof roadInde
 }
 
 /** The way a polyline's segment at arc length `s` runs (a unit direction; as sim-core `Road::tangent`). */
-function segmentWay(pts: readonly Pt[], s: number): Pt {
+export function segmentWay(pts: readonly Pt[], s: number): Pt {
   const ls = lengths(pts);
   let i = 1;
   while (i < pts.length - 1 && ls[i] <= s) i++;

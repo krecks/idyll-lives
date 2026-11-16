@@ -11,33 +11,32 @@
  * A lot is known by where it stands (`lotKey`), to the whole metre, as the people's streams key
  * its household (`people.ts` `peopleStreams`): its slot index changes as lots before it go.
  *
- * Some of the generator's pieces are not exported; small copies of them are here, each saying where
- * it comes from: the corner and bend limits (`macro.ts`), the driveway test (`town.ts`
- * `LotPlacer.drivesOut`, `driveMeets`, `segmentWay`), the public lots' hours and careers and the
- * civic places (`backdrop.ts` `LOT_HOURS`, `LOT_WORK`, `HOURS`, `CIVIC` and the names they use).
+ * The generator's own pieces are used as it uses them: the corner and bend limits (`macro.ts`), the
+ * driveway test (`town.ts` `drivesOut`), the public lots' hours and careers and the civic places
+ * (`backdrop.ts` `LOT_HOURS`, `LOT_WORK`, `HOURS`, `CIVIC` and the names it draws: `namerFor`).
  */
 
 import type { Content } from '../../content/content';
-import type { BackdropBuilding, BackdropUse, RoadPlan, TownPlace, TownSize } from '../../core/protocol';
-import { hoursFor } from '../backdrop';
+import type { BackdropBuilding, RoadPlan, TownPlace } from '../../core/protocol';
+import { CIVIC, civicOf, HOURS, hoursFor, LOT_HOURS, LOT_WORK, namerFor } from '../backdrop';
 import { weighted, type GardenSize } from '../housegen';
 import { heightAt } from '../land';
+import { BEND, BEND_MOST, CORNER, TIGHT_BEND, TRAIL_WIDTH } from '../macro';
 import { mulberry32 } from '../noise';
-import { leftOf, lengths, pointAt, roadIndex, straightAround, tangent, type Pt } from '../roads';
+import { evenly, leftOf, lengths, pointAt, roadIndex, straightAround, tangent, type Pt } from '../roads';
 import {
-  driveways,
+  drivesOut as drivesOutOn,
   fitsLot,
+  fronting,
   frontageOf,
   generatedId,
   houseFor,
   houseTemplate,
   lotAt,
   LotPlacer,
-  onLot,
   plotRect,
   shuffled,
   slotDims,
-  turner,
   wantedLots,
   type Facing,
   type Frontage,
@@ -84,16 +83,6 @@ export function slotOf(draft: NeighbourhoodDraft, key: string): number {
 
 // ---- the generator's rules ------------------------------------------------------------------------
 
-/**
- * An area's lots keep their middles this far along their road from where it meets another (m), and
- * off where it turns more than `TIGHT_BEND` (radians) over as far: a driveway there comes out at a
- * junction or on a tight bend. Copied from `macro.ts` `CORNER` and `TIGHT_BEND`, not exported.
- */
-const CORNER = 18;
-const TIGHT_BEND = 0.9;
-/** A home by a country road stands where it turns less than `BEND_MOST` (radians) over `BEND` m either side. Copied from `macro.ts`. */
-const BEND = 16;
-const BEND_MOST = 0.3;
 /** Nor right at a road's ends (m; `frontageOf`). */
 const END = 4;
 
@@ -117,25 +106,13 @@ function meetsOf(roads: readonly RoadPlan[]): Map<number, number[]> {
   const index = roadIndex(roads);
   roads.forEach((o, j) => {
     if (o.kind === 'trail') return;
-    for (const [x, z] of everyTwo(o.points)) {
+    for (const [x, z] of evenly(o.points, 2)) {
       for (const [r, hit] of index.around(x, z, 10)) {
         if (r !== j && out.has(r) && hit.dist <= (o.width + roads[r].width) / 2 + 2) out.get(r)!.push(hit.s);
       }
     }
   });
   junctions.set(roads, out);
-  return out;
-}
-
-/** A polyline's points with more put in along its stretches longer than 2 m (`macro.ts` `evenly`, not exported). */
-function everyTwo(pts: readonly Pt[]): Pt[] {
-  const out: Pt[] = pts.length ? [pts[0]] : [];
-  for (let i = 1; i < pts.length; i++) {
-    const [a, b] = [pts[i - 1], pts[i]];
-    const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 2);
-    for (let k = 1; k < n; k++) out.push([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
-    out.push(b);
-  }
   return out;
 }
 
@@ -188,71 +165,12 @@ function fitAt(draft: NeighbourhoodDraft, t: Templates, at: RoadSpot, u: Unplace
   return { ...r, facing: lot.facing, anchor: lot.anchor, f };
 }
 
-// ---- the driveway test (`town.ts` `LotPlacer.drivesOut`, private) ----------------------------------
-
-/** A driveway turns out onto its road when it meets it squarely enough (`town.ts` `DRIVE_SQUARE`, not exported). */
-const DRIVE_SQUARE = 0.55;
-/** How far a driveway goes on across the verge to its road at most (m; `town.ts` `DRIVE_REACH`, not exported). */
-const DRIVE_REACH = 30;
-
 /**
- * Whether a house on lot `u` at `at` has a driveway whose line meets a road squarely: a car can
- * turn out of it onto the road. Or no room for one. A copy of `town.ts` `LotPlacer.drivesOut`
- * (private), with things' footprints from the templates' object infos (as the content gives them).
+ * Whether a car can turn out of a house on lot `u` at `at` onto the road (`town.ts` `drivesOut`),
+ * with things' footprints from the templates' object infos (as the content gives them).
  */
 function drivesOut(roads: readonly RoadPlan[], t: Templates, u: Unplaced, at: { x: number; z: number; facing: Facing }): boolean {
-  const house = u.kind === 'house' ? houseTemplate(t, u.template) : undefined;
-  if (!house) return true;
-  const footprint = (def: string): [number, number] => t.info?.(def)?.footprint ?? [1, 1];
-  const { width, depth } = slotDims(t, u);
-  const sides = driveways(onLot(t, house, u, footprint), width, depth, footprint);
-  const turn = turner(at.x, at.z, width, depth, at.facing);
-  return (
-    !sides.length ||
-    sides.some((r) => {
-      const [a, b] = [turn.point([r.x + r.w / 2, 0]), turn.point([r.x + r.w / 2, -1])];
-      return meetsSquarely(roads, a, [b[0] - a[0], b[1] - a[1]]);
-    })
-  );
-}
-
-/**
- * Whether a driveway's line, on from its end at the plot's edge (`street`, running `way`), first
- * comes onto a road a car can drive (not a trail) within `DRIVE_REACH` m and meets it squarely
- * where it gets nearest its middle. A copy of `town.ts` `driveMeets` (private), its answer only.
- */
-function meetsSquarely(list: readonly RoadPlan[], street: Pt, way: Pt): boolean {
-  const roads = roadIndex(list);
-  const at = (k: number): Pt => [street[0] + way[0] * k, street[1] + way[1] * k];
-  const widest = Math.max(0, ...list.map((r) => r.width));
-  for (let k = 0.5; k <= DRIVE_REACH; k += 0.5) {
-    let on: { road: number; dist: number } | null = null;
-    for (const [road, hit] of roads.around(...at(k), widest / 2)) {
-      if (list[road].kind === 'trail' || hit.dist > list[road].width / 2 || (on && on.dist <= hit.dist)) continue;
-      on = { road, dist: hit.dist };
-    }
-    if (!on) continue;
-    const width = list[on.road].width;
-    let [best, kb] = [on.dist, k];
-    for (let j = k + 0.25; j <= k + width; j += 0.25) {
-      const d = roads.distance(on.road, ...at(j), width);
-      if (d >= best) break;
-      [best, kb] = [d, j];
-    }
-    const [tx, tz] = segmentWay(list[on.road].points, roads.along(on.road, ...at(kb)));
-    return Math.abs(tx * way[1] - tz * way[0]) >= DRIVE_SQUARE;
-  }
-  return false;
-}
-
-/** The way a polyline's segment at arc length `s` runs (a unit direction). A copy of `town.ts` `segmentWay` (private). */
-function segmentWay(pts: readonly Pt[], s: number): Pt {
-  const ls = lengths(pts);
-  let i = 1;
-  while (i < pts.length - 1 && ls[i] <= s) i++;
-  const [a, b] = [pts[i - 1], pts[i]];
-  const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-  return [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+  return drivesOutOn(roads, t, u, at, (def) => t.info?.(def)?.footprint ?? [1, 1]);
 }
 
 // ---- the world's lot mix, areas, places ------------------------------------------------------------
@@ -292,11 +210,6 @@ function middleOf(draft: NeighbourhoodDraft, a: number): Pt {
 function placeKindOf(s: Pick<PlotSlot, 'kind' | 'template'>): TownPlace['kind'] {
   return s.kind === 'outdoor' ? 'outdoor' : s.kind === 'park' ? (s.template === 'market' ? 'shop' : 'park') : s.template === 'cafe' ? 'cafe' : 'shop';
 }
-
-/** The sim's own shops (public lots) are open as long as an outing may go there. Copied from `backdrop.ts` `LOT_HOURS` (not exported). */
-const LOT_HOURS: NonNullable<TownPlace['hours']> = { open: 7 * 60, close: 23 * 60, days: 0b1111111 };
-/** The careers working at the sim's public places, by template. Copied from `backdrop.ts` `LOT_WORK` (not exported). */
-const LOT_WORK: Record<string, string[]> = { cafe: ['culinary', 'hospitality'], grocer: ['retail'], bakery: ['culinary', 'retail'], market: ['retail', 'nature'] };
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -372,8 +285,6 @@ function trailInto(draft: NeighbourhoodDraft, t: Templates, s: PlotSlot, f: Fron
   const p = (x: number, z: number): [number, number] => [r2(x), r2(z)];
   return { points: [p(f.p[0], f.p[1]), p(fx + nx, fz + nz)], width: TRAIL_WIDTH, ends: ['join', 'dead'], kind: 'trail', name, area: s.area ?? 0 };
 }
-/** A trail's width (m; `macro.ts` `TRAIL_WIDTH`, not exported). */
-const TRAIL_WIDTH = 2;
 
 /**
  * The trail leading to outdoor lot `slot` alone (its end within 6 m of it, as the town checks want,
@@ -582,16 +493,6 @@ function freeBeyond(ground: Ground, r: Rect, was: Rect): boolean {
 }
 
 /**
- * A `W` × `D` rectangle facing `facing`'s way, its front edge on the tile line `front` and its
- * middle at `along` across it. A copy of `town.ts` `fronting` (private).
- */
-function fronting(facing: Facing, front: number, along: number, W: number, D: number): Rect {
-  const a = Math.round(along - (facing % 2 ? D : W) / 2);
-  const at = [{ x: a, z: front }, { x: front, z: a }, { x: a, z: front - D }, { x: front - W, z: a }][facing];
-  return { ...at, w: W, d: D };
-}
-
-/**
  * `draft` with another house (`template`: a generated house's id, `generatedId`, or a fixed
  * layout's) on home `slot`, its lot cut for it with its front where it was, where it fits as
  * `withGarden` fits one and a car can drive out. Not a farm's or a terraced house's.
@@ -649,74 +550,10 @@ export function swapPlace(draft: NeighbourhoodDraft, t: Templates, content: Cont
   return { draft: withLotPlace(next, t, content, slot), cleared: NOTHING };
 }
 
-// ---- civic places (`backdrop.ts` `CIVIC`, not exported) ---------------------------------------------
+// ---- civic places (`backdrop.ts` `CIVIC`) ---------------------------------------------------------
 
-/** What a place is called by, as `backdrop.ts`'s `Namer` (its town, how big the main town is, a family name, a street's own word, an inn). */
-interface Namer {
-  rand: Rand;
-  town: string;
-  size: TownSize;
-  last(): string;
-  street(): string;
-  inn(): string;
-}
-
-/** A civic place: what it is called on the card, its building's use, storeys and roofs, its place's kind, the careers working there, its name, and what its name looks like (to know one in a town). */
-interface Civic {
-  label: string;
-  use: BackdropUse;
-  storeys: [number, number];
-  roofs: readonly BackdropBuilding['roof'][];
-  place: TownPlace['kind'];
-  work: readonly string[];
-  name: (n: Namer) => string;
-  known: RegExp;
-}
-
-/** Each kind of place's hours before its workers' shifts widen them. Copied from `backdrop.ts` `HOURS` (not exported), the civic kinds only. */
-const HOURS: Partial<Record<TownPlace['kind'], NonNullable<TownPlace['hours']>>> = {
-  shop: { open: 9 * 60, close: 18 * 60, days: 0b0111111 },
-  restaurant: { open: 12 * 60, close: 23 * 60, days: 0b1111111 },
-  office: { open: 8 * 60, close: 18 * 60, days: 0b0011111 },
-  school: { open: 8 * 60, close: 16 * 60, days: 0b0011111 },
-  church: { open: 8 * 60, close: 20 * 60, days: 0b1111111 },
-  workshop: { open: 7 * 60 + 30, close: 17 * 60, days: 0b0111111 },
-};
-const SAINTS = ['Mary', 'John', 'Peter', 'Michael', 'Andrew', 'James', 'Anne', 'Catherine', 'Luke', 'Margaret', 'Martin', 'Nicholas'];
-const INN_A = ['Red', 'Golden', 'Black', 'White', 'Green', 'Old', 'Royal', 'Blue', 'Silver', 'Merry'];
-const INN_B = ['Lion', 'Hart', 'Swan', 'Bell', 'Crown', 'Anchor', 'Plough', 'Fox', 'Stag', 'Oak', 'Boar', 'Hound'];
-
-const C = (label: string, use: BackdropUse, storeys: [number, number], roofs: readonly BackdropBuilding['roof'][], place: TownPlace['kind'], work: readonly string[], name: (n: Namer) => string, known: RegExp): Civic => ({ label, use, storeys, roofs, place, work, name, known });
-/** The civic places, in `backdrop.ts` `CIVIC`'s order (G2's `civicChoices` will give the same indices). */
-export const CIVIC_PLACES: readonly Civic[] = [
-  C('Town hall', 'office', [3, 3], ['hip', 'mansard'], 'office', ['politics'], (n) => `${n.town} ${{ hamlet: 'Parish Hall', village: 'Village Hall', town: 'Town Hall', city: 'Town Hall' }[n.size]}`, / (Parish|Village|Town) Hall$/),
-  C('Church', 'church', [3, 3], ['gable'], 'church', [], (n) => `St ${pick(SAINTS, n)}'s Church`, /^St .+'s Church$/),
-  C('School', 'school', [2, 2], ['hip', 'flat'], 'school', ['education'], (n) => `${n.town} School`, / School$/),
-  C('Police station', 'office', [2, 3], ['flat', 'hip'], 'office', ['detective'], (n) => `${n.town} Police Station`, / Police Station$/),
-  C('Fire station', 'workshop', [2, 2], ['flat'], 'workshop', ['firefighter'], (n) => `${n.town} Fire Station`, / Fire Station$/),
-  C('Medical centre', 'office', [2, 2], ['flat', 'hip'], 'office', ['medicine'], (n) => `${n.street()} Medical Centre`, / Medical Centre$/),
-  C('Leisure centre', 'workshop', [2, 2], ['flat'], 'workshop', ['sports'], (n) => `${n.town} Leisure Centre`, / Leisure Centre$/),
-  C('Bank', 'office', [3, 4], ['flat', 'mansard'], 'office', ['finance', 'business'], (n) => `${n.last()} Bank`, / Bank$/),
-  C('Newspaper', 'office', [3, 4], ['flat'], 'office', ['journalism', 'tv', 'influencer'], (n) => `The ${n.town} Gazette`, /^The .+ Gazette$/),
-  C('Works', 'office', [3, 5], ['flat'], 'office', ['it', 'science'], (n) => `${n.street()} Works`, / Works$/),
-  C('Solicitors', 'office', [3, 3], ['mansard', 'gable'], 'office', ['law'], (n) => `${n.last()} & ${n.last()} Solicitors`, / Solicitors$/),
-  C('Army reserve centre', 'office', [2, 2], ['flat'], 'office', ['military'], () => 'Army Reserve Centre', /^Army Reserve Centre/),
-  C('Garage', 'workshop', [1, 2], ['flat', 'gable'], 'workshop', ['mechanics', 'transport'], (n) => `${n.last()}'s Garage`, /'s Garage$/),
-  C('Builders', 'workshop', [1, 2], ['gable'], 'workshop', ['trades'], (n) => `${n.last()} Builders`, / Builders$/),
-  C('Studios', 'workshop', [2, 2], ['gable'], 'workshop', ['arts'], (n) => `${n.street()} Studios`, / Studios$/),
-  C('Inn', 'restaurant', [2, 3], ['gable', 'hip'], 'restaurant', ['culinary', 'hospitality', 'music'], (n) => n.inn(), /^The \S+ \S+$/),
-  C('Hotel', 'restaurant', [3, 4], ['mansard', 'hip'], 'restaurant', ['hospitality'], (n) => `The ${n.town} Hotel`, / Hotel$/),
-  C('Boutique', 'shop', [2, 3], ['gable', 'mansard'], 'shop', ['fashion', 'retail'], (n) => (n.size === 'hamlet' ? `${n.last()}'s Village Shop` : `${n.last()}'s Boutique`), /'s (Village Shop|Boutique)$/),
-  C('Garden centre', 'shop', [1, 1], ['flat', 'gable'], 'shop', ['nature', 'retail'], (n) => `${n.town} Garden Centre`, / Garden Centre$/),
-];
-
-const pick = <T>(list: readonly T[], n: Namer): T => list[Math.floor(n.rand() * list.length)];
-
-/** Which civic place `place` is (an index into `CIVIC_PLACES`), or -1: its kind, the careers it was made for first, and its name's look. */
-function civicOf(place: TownPlace | undefined): number {
-  if (!place) return -1;
-  return CIVIC_PLACES.findIndex((c) => c.place === place.kind && c.work.every((w, i) => place.work?.[i] === w) && c.known.test(place.name));
-}
+/** The civic places (`backdrop.ts` `CIVIC`), as step 2's cards know them: their indices are `CIVIC`'s. */
+export const CIVIC_PLACES = CIVIC;
 
 /** The civic places a civic building (`building`, in `open.backdrop`) may become: those its area doesn't have yet. */
 export function civicSwaps(draft: NeighbourhoodDraft, building: number): { civic: number; label: string }[] {
@@ -750,26 +587,18 @@ export function swapCivic(draft: NeighbourhoodDraft, building: number, civic: nu
   const rand = mulberry32(seed);
   const lastNames = content.names.last.length ? content.names.last : ['Smith'];
   const streets = draft.roads.filter((r) => r.area === b.area && r.name && !/Trail|Path/.test(r.name)).map((r) => r.name!);
-  const namer: Namer = {
-    rand,
-    town: area?.name ?? draft.name,
-    size: draft.world?.options?.town ?? 'village',
-    last: () => lastNames[Math.floor(rand() * lastNames.length)],
-    street: () => (streets.length ? streets[Math.floor(rand() * streets.length)].split(',')[0].replace(/ (Street|Road|Lane|Way|Avenue|Row|Close|Drive|Hill|Walk|Crescent|Place|Gardens|Terrace|Parade|Square|Rise|Green|End|Mews|Court)$/, '') : (area?.name ?? draft.name)),
-    inn: () => `The ${INN_A[Math.floor(rand() * INN_A.length)]} ${INN_B[Math.floor(rand() * INN_B.length)]}`,
-  };
   const taken = new Set([...open.places.filter((_, i) => i !== b.place).map((p) => p.name), ...draft.slots.map((s) => s.name)]);
-  let name = c.name(namer);
-  for (let k = 0; k < 8 && taken.has(name); k++) name = c.name(namer);
-  for (let k = 2, first = name; taken.has(name); k++) name = `${first} ${k}`;
+  const namer = namerFor(rand, area?.name ?? draft.name, draft.world?.options?.town ?? 'village', lastNames, streets, taken);
+  const name = namer.unique(() => c.name(namer));
   const extra = (old.work ?? []).filter((w) => !CIVIC_PLACES[was].work.includes(w));
   const work = [...c.work, ...extra.filter((w) => !c.work.includes(w))];
-  const place: TownPlace = { name, kind: c.place, x: old.x, z: old.z, hours: hoursFor(HOURS[c.place]!, work, content.careerCategories), ...(work.length ? { work } : {}), area: b.area };
+  const place: TownPlace = { name, kind: c.place, x: old.x, z: old.z, hours: hoursFor(HOURS[c.place as keyof typeof HOURS], work, content.careerCategories), ...(work.length ? { work } : {}), area: b.area };
   // The footprint stays; the storeys and the roof are the new kind's (a ridge along the footprint's longest side if the roof wants one and had none).
-  const storeys = Math.min(c.storeys[1], Math.max(c.storeys[0], b.storeys));
-  const roof = c.roofs.includes(b.roof) ? b.roof : c.roofs[0];
+  const { use, storeys: [fewest, most], roofs } = c.kind;
+  const storeys = Math.min(most, Math.max(fewest, b.storeys));
+  const roof = roofs.includes(b.roof) ? b.roof : roofs[0];
   const ridged = roof === 'gable' || roof === 'mansard';
-  const built: BackdropBuilding = { ...b, use: c.use, storeys, roof, ...(ridged ? { ridge: b.ridge ?? ridgeOf(b.poly) } : {}) };
+  const built: BackdropBuilding = { ...b, use, storeys, roof, ...(ridged ? { ridge: b.ridge ?? ridgeOf(b.poly) } : {}) };
   if (!ridged) delete built.ridge;
   const backdrop = open.backdrop.map((q, i) => (i === building ? built : q));
   const places = open.places.map((p, i) => (i === b.place ? place : p));
