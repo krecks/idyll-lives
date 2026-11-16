@@ -1818,6 +1818,11 @@ pub(crate) struct SimBrief {
     pub guest_at: Option<u32>,
     /// The seat they eat at, or are on their way to with something to eat (`cooking::company`).
     pub eats_at: Option<u32>,
+    /// Carried by someone (`Sim::carried_by`), and the use behind a shut door they're at
+    /// (`privacy::private_use`): for the rooms kept shut, found from the briefs rather than
+    /// from the whole of every resident again (`privacy::refresh`).
+    pub carried: bool,
+    pub private: Option<(u32, usize)>,
 }
 
 /// `World::broadcast`'s per-tick buffers, kept from tick to tick like `briefs`.
@@ -1931,15 +1936,15 @@ pub struct World {
     /// home.
     pub(crate) claimed_places: Vec<(u16, Vec<u32>)>,
     /// The people who have a place in each claimed room, with the fingerprint they were found
-    /// for (`privacy::refresh`), so a tick needn't look for them again while nothing changes. In
-    /// the rooms' order.
-    pub(crate) claimants_cache: Vec<(u16, u64, Vec<u32>)>,
+    /// for and the tick it was last checked in (`privacy::refresh`), so a tick needn't look for
+    /// them again while nothing changes. In the rooms' order.
+    pub(crate) claimants_cache: Vec<(u16, u64, std::sync::Arc<[u32]>, u64)>,
     /// What each household has to work on as the tick's step started (`work_waiting`), kept
     /// from tick to tick like `briefs`.
     work: Vec<u8>,
     /// Who goes first when the tick's searches run over budget (`tick_once`), kept from tick to
     /// tick like `briefs`.
-    first: Vec<bool>,
+    pub(crate) first: Vec<bool>,
     /// `broadcast`'s per-tick buffers, kept from tick to tick like `briefs`.
     broadcast_scratch: BroadcastScratch,
     /// Where Sims leave town for work.
@@ -4635,6 +4640,8 @@ impl World {
                     Some(TaskKind::Eat { seat, stage: 1, .. }) => seat,
                     _ => None,
                 },
+                carried: s.carried_by.is_some(),
+                private: crate::privacy::private_use(&self.content, &self.objects, s),
             });
         }
         // Who's in a conversation, and whose (for joining in).
@@ -4656,15 +4663,8 @@ impl World {
         let steps_start = crate::profile::start();
         // Those who go first when the tick's searches run over budget: the player's household
         // and whoever is watched (see `SEARCH_BUDGET`).
-        let mut first = std::mem::take(&mut self.first);
-        first.clear();
-        first.extend((0..self.sims.len()).map(|i| {
-            self.full_detail(i)
-                || self
-                    .households
-                    .get(self.sims[i].household as usize)
-                    .is_some_and(|h| h.player)
-        }));
+        // (At full detail, as `lod::plan` found them: the player's household always is.)
+        let first = std::mem::take(&mut self.first);
         let (search_mark, budget) = (self.search_mark, self.search_budget);
         let hour = crate::clock::hour(tick);
         let mut work = std::mem::take(&mut self.work);
