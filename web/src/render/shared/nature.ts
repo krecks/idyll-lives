@@ -180,6 +180,8 @@ const TUFT_DRAWS = 4;
 const LAWN_CLEAR = 0.6;
 /** Height of the sea or a lake (m); the shore is where the land meets it. */
 export const WATER_Y = -0.35;
+/** How far (m) round a road, lot or building that came or went the land's plants and lawn are grown again (`relayout`): past what clears them. */
+const RELAY_REACH = 12;
 /** Sand from the shoreline up the bank (m). */
 const BEACH = 8;
 /**
@@ -486,9 +488,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   private readonly relief: { cell: number; cols: number; rows: number; h: Float32Array; slope: number } | null;
   /** Where the roads leave town (the mountains part there). */
-  private readonly passes: TownExit[];
-  /** The roads out of town (the ground is levelled under them). */
-  readonly roads: R;
+  private passes: TownExit[];
+  /** The roads out of town (the ground is levelled under them; laid again for another town on the same land, `relayout`). */
+  roads: R;
   /** The woods' trees and bushes near the town (full models), where birds may live (`woodsNear`). */
   private nearWoods: PlantPlacement[] = [];
   /** `woodsNear`'s last answer, and where it was asked (the same array while that's unchanged). */
@@ -531,11 +533,129 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.laidOut = world;
     if (this.metaLand) this.adoptLand(null);
     this.passes = townExits(world);
-    this.roads = makeRoads(
+    this.makeRoads = makeRoads;
+    this.roads = this.layRoads(world);
+  }
+
+  /** How the engine lays its country roads (the constructor's `makeRoads`). */
+  private readonly makeRoads: (land: RoadLand, world: WorldStructure, name: string) => R;
+
+  /** The country roads of `world` laid on this landscape. */
+  private layRoads(world: WorldStructure): R {
+    return this.makeRoads(
       { seed: this.seed, w: this.w, d: this.d, ring: this.ring, ground: (x, z) => this.ground(x, z), waterEdge: (x, z) => this.waterEdge(x, z), distanceToTown: (x, z) => this.distanceToTown(x, z), follows: !!this.surface },
       world,
       world.meta?.name ?? '',
     );
+  }
+
+  /**
+   * Whether `world` is another town on the land this landscape was laid out for, which it can take on in place
+   * (`relayout`): a land its town follows (a surface), the same land's size, seed, look and options, but other roads,
+   * lots, backdrop or heights (step 2's edits: a lot removed, a street drawn, a village placed).
+   */
+  canRelay(world: WorldStructure): boolean {
+    return !!this.surface && world.meta?.land?.seeded === 'follow' && LandscapeLayout.relayKey(world) === LandscapeLayout.relayKey(this.laidOut);
+  }
+
+  /**
+   * Whether `world` lays out the same town as the one laid out (`relayout` would change nothing): the same land, roads,
+   * lots and backdrop, whatever arrays they come in (a menu's preview made again for the same draft).
+   */
+  sameLayout(world: WorldStructure): boolean {
+    const a = this.laidOut;
+    if (a === world) return true;
+    const land = (w: WorldStructure) => w.meta?.land;
+    const [la, lb] = [land(a), land(world)];
+    if (la !== lb && (!la || !lb || la.cols !== lb.cols || la.rows !== lb.rows || la.h.join() !== lb.h.join() || la.wl.join() !== lb.wl.join() || la.cover.join() !== lb.cover.join())) return false;
+    const rects = (w: WorldStructure) => w.plots.map((p) => `${p.x},${p.z},${p.w},${p.d}`).join(';');
+    return a.plots.length === world.plots.length && rects(a) === rects(world) && JSON.stringify(a.meta?.roads ?? []) === JSON.stringify(world.meta?.roads ?? []) && JSON.stringify(a.meta?.backdrop ?? []) === JSON.stringify(world.meta?.backdrop ?? []);
+  }
+
+  /** `baseKey` without the roads and the backdrop: what another town on the same land keeps (`canRelay`). */
+  static relayKey(world: WorldStructure): string {
+    const look = world.meta?.world;
+    const options = look?.options ? `:o${JSON.stringify(look.options)}` : '';
+    const relief = world.meta?.relief ? `:r${reliefSum(world.meta.relief)}` : '';
+    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}${look ? `:${look.kind}:${JSON.stringify(look.landscape)}` : ''}${options}${relief}`;
+  }
+
+  /**
+   * Takes on another town on the same land (`canRelay`): its roads, lots and backdrop, and its land (the settle may
+   * have graded it again): the surface solved for it, the country roads laid again, a big world's built field, the
+   * field's water and zones. Says what its drawing must do again: the samples whose drawn land changed (`rect`) and
+   * the box (m) its roads, lots, buildings or land changed in (`box`, for the woods and the lawn); null: nothing.
+   */
+  protected relayout(world: WorldStructure): { rect: LandRect; box: [number, number, number, number] } | null {
+    const before = this.laidOut;
+    const field = this.field;
+    const drawn = this.terrainField?.slice() ?? null;
+    this.laidOut = world;
+    this.metaLand = world.meta?.land;
+    this.built = world.meta?.world?.size === 'big' ? LandscapeLayout.builtField(world, this.w, this.d) : null;
+    this.passes = townExits(world);
+    this.setLand(null);
+    this.roads = this.layRoads(world);
+    this.woodsAsked = null;
+    // What the drawing must do again: where the land as drawn moved (the surface's grading, the land itself), where
+    // the field's water or cover changed, and round every road, lot and building that came or went.
+    const now = this.field!;
+    const { cols, rows } = now;
+    let [i0, j0, i1, j1] = [Infinity, Infinity, -Infinity, -Infinity];
+    const take = (i: number, j: number) => {
+      i0 = Math.min(i0, i);
+      j0 = Math.min(j0, j);
+      i1 = Math.max(i1, i + 1);
+      j1 = Math.max(j1, j + 1);
+    };
+    const same = !!field && field.cols === cols && field.rows === rows;
+    const terrain = this.terrainField;
+    for (let k = 0; k < cols * rows; k++) {
+      const moved = !same || !drawn || !terrain || Math.abs(drawn[k] - terrain[k]) > 1e-3 || field.h[k] !== now.h[k] || field.wl[k] !== now.wl[k];
+      if (moved) take(k % cols, Math.floor(k / cols));
+    }
+    if (same && field.cover.length === now.cover.length) {
+      const cw = Math.ceil((cols * LAND_CELL) / COVER_CELL);
+      for (let k = 0; k < now.cover.length; k++) {
+        if (field.cover[k] === now.cover[k]) continue;
+        const [x, z] = [(k % cw) * COVER_CELL, Math.floor(k / cw) * COVER_CELL];
+        take(Math.floor(x / LAND_CELL), Math.floor(z / LAND_CELL));
+        take(Math.min(cols - 1, Math.ceil((x + COVER_CELL) / LAND_CELL)), Math.min(rows - 1, Math.ceil((z + COVER_CELL) / LAND_CELL)));
+      }
+    }
+    const box = [Infinity, Infinity, -Infinity, -Infinity];
+    const add = (x0: number, z0: number, x1: number, z1: number) => {
+      box[0] = Math.min(box[0], x0);
+      box[1] = Math.min(box[1], z0);
+      box[2] = Math.max(box[2], x1);
+      box[3] = Math.max(box[3], z1);
+    };
+    for (const [a, b] of [
+      [before, world],
+      [world, before],
+    ]) {
+      const roads = new Set((b.meta?.roads ?? []).map((r) => JSON.stringify(r)));
+      for (const r of a.meta?.roads ?? []) {
+        if (roads.has(JSON.stringify(r))) continue;
+        const m = r.width / 2 + ROAD_VERGE + RELAY_REACH;
+        for (const [x, z] of r.points) add(x - m, z - m, x + m, z + m);
+      }
+      const plots = new Set(b.plots.map((p) => `${p.x},${p.z},${p.w},${p.d}`));
+      for (const p of a.plots) if (!plots.has(`${p.x},${p.z},${p.w},${p.d}`)) add(p.x - RELAY_REACH, p.z - RELAY_REACH, p.x + p.w + RELAY_REACH, p.z + p.d + RELAY_REACH);
+      const backdrop = new Set((b.meta?.backdrop ?? []).map((q) => JSON.stringify(q.poly)));
+      for (const q of a.meta?.backdrop ?? []) {
+        if (backdrop.has(JSON.stringify(q.poly))) continue;
+        for (const [x, z] of q.poly) add(x - RELAY_REACH, z - RELAY_REACH, x + RELAY_REACH, z + RELAY_REACH);
+      }
+    }
+    if (box[0] <= box[2]) {
+      take(Math.max(0, Math.floor(box[0] / LAND_CELL)), Math.max(0, Math.floor(box[1] / LAND_CELL)));
+      take(Math.min(cols - 1, Math.ceil(box[2] / LAND_CELL)), Math.min(rows - 1, Math.ceil(box[3] / LAND_CELL)));
+    }
+    if (i0 > i1) return null;
+    const rect: LandRect = { i0: Math.max(0, i0), j0: Math.max(0, j0), i1: Math.min(cols, i1), j1: Math.min(rows, j1) };
+    const [x0, z0, x1, z1] = [rect.i0 * LAND_CELL - RELAY_REACH, rect.j0 * LAND_CELL - RELAY_REACH, rect.i1 * LAND_CELL + RELAY_REACH, rect.j1 * LAND_CELL + RELAY_REACH];
+    return { rect, box: [x0, z0, x1, z1] };
   }
 
   /** The woods' trees and bushes within `range` m of a point (those near the town only), for the birds: the same array when asked the same again. */
@@ -624,8 +744,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.measureLand(null);
   }
 
-  /** The world it lays out (for its surface). */
-  private readonly laidOut: WorldStructure;
+  /** The world it lays out (for its surface; another town on the same land, `relayout`). */
+  private laidOut: WorldStructure;
 
   /**
    * The surface of the built land on a land its town follows (`builtSurface.ts`: the roads, the lots' pads and the
@@ -771,7 +891,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * its roads and trails with a verge, so every hamlet gets the flat apron a town has and the land
    * rises between them (two chamfer passes, ~2 % off the true distance). Null: not a big world.
    */
-  protected readonly built: { gw: number; gd: number; dist: Float32Array } | null;
+  protected built: { gw: number; gd: number; dist: Float32Array } | null;
 
   /**
    * A big world's zones (`meta.zones`): its water, its hills, and where woods, meadows, fields and orchards are. Null
@@ -791,7 +911,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   protected field: Land | null = null;
   /** The world's own height field (`meta.land`), what `setLand(null)` goes back to. */
-  private readonly metaLand: LandFile | undefined;
+  private metaLand: LandFile | undefined;
   /** The field's water: the signed distance from its edge (`wetDistance`), whether it has any and any at the sea's level, and its highest sample. */
   private wetSd: Float32Array | null = null;
   private fieldWater = { any: false, sea: false };

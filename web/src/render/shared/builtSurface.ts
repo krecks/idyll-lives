@@ -35,7 +35,7 @@
 import type { JunctionInfo, RoadKind, RoadPlan } from '../../core/protocol';
 import { LAND_CELL, NONE, heightAt, type Land, type LandRect } from '../../game/land';
 import { lengths, nearest, pointAt, RoadIndex } from '../../game/roads';
-import { chunkAt, chunksIn } from './chunks';
+import { CHUNK, chunkAt, chunksIn } from './chunks';
 import { carriageway, CROSSWALK, KERB_RETURN, planJunctions, type JunctionPlan } from './junctions';
 
 /** The steepest each kind of way climbs (rise per m); a trail's is a measure only (it lies on the land). */
@@ -311,6 +311,54 @@ export class BuiltSurface {
   }
 
   /**
+   * A hash of every height street chunk `chunk` (`chunks.ts` `chunkId`) stands on, to the millimetre: the roads'
+   * samples within reach of it, the pads of the lots reaching into it and the graded land under it. Two surfaces
+   * (of two towns on one land: a lot removed, a street added) give a chunk the same one where nothing in it moved,
+   * so its street need not be planned again. Worked out for every chunk at once, the first time one is asked for,
+   * and again after `update`.
+   */
+  chunkSig(chunk: number): number {
+    this.sigs ??= this.chunkSigs();
+    return this.sigs.get(chunk) ?? 0;
+  }
+  private sigs: Map<number, number> | null = null;
+
+  /** A hash of every road's heights (to the millimetre): two surfaces with the same roads and this the same draw them alike. */
+  roadsSig(): number {
+    let h = 0x811c9dc5;
+    for (const p of this.profiles) {
+      h = Math.imul(h ^ p.y.length, 16777619);
+      for (let i = 0; i < p.y.length; i++) h = Math.imul(h ^ Math.round(p.y[i] * 1000), 16777619);
+    }
+    return h >>> 0;
+  }
+
+  private chunkSigs(): Map<number, number> {
+    const out = new Map<number, number>();
+    const add = (c: number, v: number) => out.set(c, Math.imul((out.get(c) ?? 0x811c9dc5) ^ Math.round(v * 1000), 16777619));
+    // (Each height into every chunk within reach of it: what stands at a chunk's edge reads them across it.)
+    const reach = this.widest / 2 + PROFILE_STEP;
+    for (const p of this.profiles) for (let i = 0; i < p.y.length; i++) for (const c of chunksIn(p.x[i] - reach, p.z[i] - reach, p.x[i] + reach, p.z[i] + reach)) add(c, p.y[i]);
+    this.plots.forEach((p, i) => {
+      for (const c of chunksIn(p.x - LAND_CELL, p.z - LAND_CELL, p.x + p.w + LAND_CELL, p.z + p.d + LAND_CELL)) add(c, this.pads[i]);
+    });
+    const { cols, rows, conformed } = this;
+    const per = CHUNK / LAND_CELL;
+    for (let cj = 0; cj * per < rows; cj++) {
+      for (let ci = 0; ci * per < cols; ci++) {
+        const c = chunkAt(ci * CHUNK, cj * CHUNK);
+        let h = out.get(c) ?? 0x811c9dc5;
+        for (let j = Math.max(0, cj * per - 1); j <= Math.min(rows - 1, (cj + 1) * per + 1); j++) {
+          for (let i = Math.max(0, ci * per - 1), k = j * cols + i; i <= Math.min(cols - 1, (ci + 1) * per + 1); i++, k++) h = Math.imul(h ^ Math.round(conformed[k] * 1000), 16777619);
+        }
+        out.set(c, h);
+      }
+    }
+    for (const [c, h] of out) out.set(c, h >>> 0);
+    return out;
+  }
+
+  /**
    * The land with the built land graded into it (cm, as `Land.h`): the road's own height under a
    * road (not sunk), the pad in a lot, the graded land round them; water left as it is. What the
    * generator stores (`withLand`), so a world's land agrees with its town.
@@ -336,6 +384,7 @@ export class BuiltSurface {
     const oldPads = this.pads.slice();
     const oldLand = this.conformed.slice();
     this.solve();
+    this.sigs = null;
     const bumped = new Set<number>();
     const roads: number[] = [];
     this.profiles.forEach((p, r) => {
@@ -426,23 +475,7 @@ export class BuiltSurface {
 
   /** Road `r`'s samples, every `PROFILE_STEP` m from its start and its end. */
   private sampled(r: RoadPlan, road: number): Profile {
-    const ls = this.lens[road];
-    const len = ls[ls.length - 1] ?? 0;
-    const n = r.points.length < 2 ? (r.points.length ? 1 : 0) : Math.ceil(len / PROFILE_STEP - 1e-6) + 1;
-    const s = new Float32Array(n);
-    const x = new Float32Array(n);
-    const z = new Float32Array(n);
-    let k = 0;
-    for (let i = 0; i < n; i++) {
-      const at = i === n - 1 ? len : i * PROFILE_STEP;
-      while (k < ls.length - 2 && ls[k + 1] < at) k++;
-      const [a, b] = [r.points[k], r.points[k + 1] ?? r.points[k]];
-      const f = Math.max(0, Math.min(1, (at - ls[k]) / (ls[k + 1] - ls[k] || 1)));
-      s[i] = at;
-      x[i] = a[0] + (b[0] - a[0]) * f;
-      z[i] = a[1] + (b[1] - a[1]) * f;
-    }
-    return { len, s, x, z, ground: new Float32Array(n), y: new Float32Array(n), floor: new Float32Array(n).fill(-Infinity), pin: new Uint8Array(n), grade: GRADE[r.kind ?? 'street'] };
+    return sampleLine(r.points, this.lens[road], GRADE[r.kind ?? 'street']);
   }
 
   /**
@@ -616,15 +649,7 @@ export class BuiltSurface {
         for (let i = 0; i < n; i++) p.ground[i] = p.y[i] = heightAt(land, p.x[i], p.z[i]);
         return;
       }
-      // The land along its middle line (the water's top where it is wet), averaged over `PROFILE_REACH` m either way.
-      // (Twice: what the first average left out, averaged and put back, so a crest or a hollow along a road
-      // already smooth keeps its height, and the land graded to its roads gives the same roads again.)
-      const raw = new Float32Array(n);
-      for (let i = 0; i < n; i++) raw[i] = surfaceAt(land, p.x[i], p.z[i]);
-      const mean = averaged(p.s, raw);
-      const rest = averaged(p.s, raw.map((v, i) => v - mean[i]));
-      for (let i = 0; i < n; i++) p.ground[i] = mean[i] + rest[i];
-      p.y.set(p.ground);
+      groundOf(p, land);
       // A bridge's deck clear of its water, a little higher in its middle.
       const span = roads[road].bridge;
       if (span && span[1] > span[0]) {
@@ -644,12 +669,7 @@ export class BuiltSurface {
     const scratch = new Float32Array(Math.max(0, ...profiles.map((p) => p.y.length)));
     const solid = profiles.filter((_, r) => !this.draped(r));
     for (let pass = 0; pass < PASSES; pass++) {
-      for (const p of solid) {
-        smooth(p, scratch);
-        lift(p);
-        clampGrade(p, 1);
-        clampGrade(p, -1);
-      }
+      for (const p of solid) settlePass(p, scratch);
       for (const node of this.nodes) this.join(node);
       for (const p of solid) lift(p);
     }
@@ -1138,6 +1158,50 @@ function averaged(s: Float32Array, values: Float32Array): Float32Array {
   return out;
 }
 
+/** A polyline's samples every `PROFILE_STEP` m from its start, its end last (`ls`: its arc lengths, `lengths`), as a profile of `grade`. */
+function sampleLine(points: readonly (readonly [number, number])[], ls: readonly number[], grade: number): Profile {
+  const len = ls[ls.length - 1] ?? 0;
+  const n = points.length < 2 ? (points.length ? 1 : 0) : Math.ceil(len / PROFILE_STEP - 1e-6) + 1;
+  const s = new Float32Array(n);
+  const x = new Float32Array(n);
+  const z = new Float32Array(n);
+  let k = 0;
+  for (let i = 0; i < n; i++) {
+    const at = i === n - 1 ? len : i * PROFILE_STEP;
+    while (k < ls.length - 2 && ls[k + 1] < at) k++;
+    const [a, b] = [points[k], points[k + 1] ?? points[k]];
+    const f = Math.max(0, Math.min(1, (at - ls[k]) / (ls[k + 1] - ls[k] || 1)));
+    s[i] = at;
+    x[i] = a[0] + (b[0] - a[0]) * f;
+    z[i] = a[1] + (b[1] - a[1]) * f;
+  }
+  return { len, s, x, z, ground: new Float32Array(n), y: new Float32Array(n), floor: new Float32Array(n).fill(-Infinity), pin: new Uint8Array(n), grade };
+}
+
+/**
+ * A road's first height (into `ground` and `y`): the land along its middle line (the water's top where it is wet),
+ * averaged over `PROFILE_REACH` m either way. (Twice: what the first average left out, averaged and put back, so a
+ * crest or a hollow along a road already smooth keeps its height, and the land graded to its roads gives the same
+ * roads again.)
+ */
+function groundOf(p: Profile, land: Land): void {
+  const n = p.y.length;
+  const raw = new Float32Array(n);
+  for (let i = 0; i < n; i++) raw[i] = surfaceAt(land, p.x[i], p.z[i]);
+  const mean = averaged(p.s, raw);
+  const rest = averaged(p.s, raw.map((v, i) => v - mean[i]));
+  for (let i = 0; i < n; i++) p.ground[i] = mean[i] + rest[i];
+  p.y.set(p.ground);
+}
+
+/** One of the solver's passes over a road on its own: smoothed where it bends, its deck up to its floor, its grade clamped both ways. */
+function settlePass(p: Profile, scratch: Float32Array): void {
+  smooth(p, scratch);
+  lift(p);
+  clampGrade(p, 1);
+  clampGrade(p, -1);
+}
+
 /**
  * Three-tap smoothing of a road's heights where it bends (its grade changing by more than `BEND`
  * from one sample to the next; not where a junction holds it, nor at its ends): the kinks the
@@ -1346,12 +1410,64 @@ export function builtSurfaceOf(world: SurfaceWorld, land: Land): BuiltSurface {
   return new BuiltSurface(land, roads, surfacePlots(world), planJunctions(world.junctions ?? [], roads), bankOf(world));
 }
 
+/** A road's profile as `profileOf` gives it: per sample, how far along (m), where, its height and its cut or fill. */
+export interface RoadProfile {
+  s: number[];
+  x: number[];
+  z: number[];
+  y: number[];
+  /**
+   * How far the road there is cut into the land or stands over it (m, positive over it): its height less the land's
+   * (`heightAt`). 0 over water, where it would be a bridge, and along a trail, which lies on the land.
+   */
+  cut: number[];
+}
+
 /**
- * The height a road of `kind` drawn along `points` would have on `land`, every `PROFILE_STEP` m
- * along it (`s`, m): the land averaged over `PROFILE_REACH` m either way, its grade clamped to the
- * kind's `GRADE` (`y`), and how far that is cut into the land or stands over it there (`cut`, m;
- * the street tool tints a stretch past `CUT_MAX`). Only its shape is here so far.
+ * The height a road of `kind` drawn along `points` would have on `land`, every `PROFILE_STEP` m along it (`s`, m):
+ * what the surface's solver (`BuiltSurface`) gives a road of that kind on its own, its first height the land
+ * averaged over `PROFILE_REACH` m either way (`groundOf`), brought within the kind's `GRADE` as little as it can be
+ * (`withinRoad`), then the same passes of smoothing and clamping (`settlePass`). `ends`: the heights its first and
+ * last samples are held at (the road it joins there, as a junction holds it), if any. `cut` is how far that is cut
+ * into the land or stands over it (the street tool tints a stretch past `CUT_MAX`; among mountains a country road
+ * may go to `CUT_MAX_MOUNTAIN_ROAD`, as `measureLand` judges it). A trail lies on the land as it is.
+ *
+ * Cheap enough for every pointer move (a few hundred samples for a long road). The settle has the last word: it
+ * solves the road with the rest of the network, so a junction in the middle of it, or a road it is carried on
+ * from, can move it a little.
  */
-export function profileOf(_points: readonly (readonly [number, number])[], _kind: RoadKind, _land: Land): { s: number[]; y: number[]; cut: number[] } {
-  throw new Error('profileOf: not built yet');
+export function profileOf(points: readonly (readonly [number, number])[], kind: RoadKind, land: Land, ends?: { start?: number; end?: number }): RoadProfile {
+  const p = sampleLine(points, lengths(points as [number, number][]), GRADE[kind]);
+  const n = p.y.length;
+  const out: RoadProfile = { s: Array.from(p.s), x: Array.from(p.x), z: Array.from(p.z), y: new Array<number>(n), cut: new Array<number>(n).fill(0) };
+  if (kind === 'trail') {
+    for (let i = 0; i < n; i++) out.y[i] = heightAt(land, p.x[i], p.z[i]);
+    return out;
+  }
+  groundOf(p, land);
+  // (Held at its ends as a junction holds a road's samples there: not smoothed, set back after each pass.)
+  const fixed = new Uint8Array(n);
+  const held: [number, number][] = [];
+  if (n && ends?.start !== undefined) held.push([0, ends.start]);
+  if (n > 1 && ends?.end !== undefined) held.push([n - 1, ends.end]);
+  const hold = () => {
+    for (const [i, y] of held) p.y[i] = y;
+  };
+  for (const [i] of held) fixed[i] = p.pin[i] = 1;
+  hold();
+  withinRoad(p, fixed);
+  const scratch = new Float32Array(n);
+  for (let pass = 0; pass < PASSES; pass++) {
+    settlePass(p, scratch);
+    hold();
+    lift(p);
+  }
+  withinRoad(p, fixed);
+  lift(p);
+  for (let i = 0; i < n; i++) {
+    out.y[i] = p.y[i];
+    const [ci, cj] = [Math.min(land.cols - 1, Math.max(0, Math.round(p.x[i] / LAND_CELL))), Math.min(land.rows - 1, Math.max(0, Math.round(p.z[i] / LAND_CELL)))];
+    out.cut[i] = wet(land, cj * land.cols + ci) ? 0 : p.y[i] - heightAt(land, p.x[i], p.z[i]);
+  }
+  return out;
 }

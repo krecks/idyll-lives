@@ -6,7 +6,7 @@
  */
 
 import { groundDepth, type WorldStructure } from '../core/protocol';
-import type { LandCursor, LotHighlight, Renderer, TownBuildStep, TownShot } from '../render/types';
+import type { LandCursor, LotHighlight, Renderer, TownBuildStep, TownGhosts, TownShot } from '../render/types';
 import { areaFocus } from '../render/shared/overviewCamera';
 import type { Land, LandRect } from './land';
 import { settings } from '../settings/settings.svelte';
@@ -17,6 +17,7 @@ import { keepStill, type MenuStill } from './menuStill';
 import { previewWorld } from './townPreview';
 import { perfPhase, perfTime, perfTimeAsync } from '../debug/perf';
 import { layoutTags, type Box, type TagSpot } from './tagLayout';
+import { roadIndex } from './roads';
 
 /** Golden hour on the title screen: low warm sun, long shadows, no lamps yet. */
 export const MENU_MINUTE = 18 * 60 + 20;
@@ -286,6 +287,35 @@ class MenuScene {
     if (this.live?.townShown || !cursor) this.live?.setLandBrush(cursor);
   }
 
+  /**
+   * Step 2's edits drawn over the town (`TownGhosts`: streets being drawn, lots placed or to be removed, villages'
+   * boxes) until the town is built again with them; null: none. Cheap: every pointer move. They stay drawn while the
+   * town is built again (`show`) and over the new one: the editor takes them away once it shows what they were.
+   */
+  ghosts(g: TownGhosts | null): void {
+    this.live?.setTownGhosts(g);
+  }
+
+  /**
+   * The road under a screen point (CSS pixels), if any: its index in the town shown (`NeighbourhoodDraft.roads`, the
+   * preview's `meta.roads`) and how far along it (m) the point is. On a road's surface out to its sidewalks, or within
+   * `ROAD_PICK` m of a narrow one (a trail); of those, the one whose middle is nearest. As precise as `landAt`.
+   */
+  roadAt(x: number, y: number): { road: number; s: number } | null {
+    const at = this.landAt(x, y);
+    const roads = this.world?.meta?.roads;
+    if (!at || !roads?.length) return null;
+    const index = roadIndex(roads);
+    let reach = ROAD_PICK;
+    for (const r of roads) reach = Math.max(reach, r.width / 2);
+    let best: { road: number; s: number; dist: number } | null = null;
+    for (const [road, m] of index.around(at.x, at.z, reach)) {
+      if (m.dist > Math.max(roads[road].width / 2, ROAD_PICK) || (best && best.dist <= m.dist)) continue;
+      best = { road, s: m.s, dist: m.dist };
+    }
+    return best && { road: best.road, s: best.s };
+  }
+
   /** Projects a town point onto the screen (CSS pixels); false when it is behind the camera. */
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean {
     const r = this.live;
@@ -483,6 +513,8 @@ const MAP_ALPHA = -Math.PI / 2;
 const WORLD_BETA = 0.62;
 /** The tilt of an area's shot: the overview's, a little steeper (a village's houses stand clear of each other). */
 const AREA_BETA = 0.74;
+/** A road narrower than twice this (a trail) is picked within this (m) of its middle (`roadAt`). */
+const ROAD_PICK = 1.5;
 /** Height of a tag's stem below its body (see TownStage). */
 const STEM = 10;
 /** How far (m) outside the town a shot frames a lot may be and still have its tag (a lot or two around it). */

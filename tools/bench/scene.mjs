@@ -106,7 +106,9 @@ try {
         if (inMain.length) slot = inMain[Math.floor(inMain.length / 2)].index;
       }
       Object.assign(app, { world: empty, town, household, homeSlot: slot });
-      app.start(app.homeRequest(slot));
+      // (The rest of the homes for sale are filled on the way in: from the seed too, when there is one.)
+      const request = app.homeRequest(slot);
+      app.start(seed === null ? request : { ...request, peopleSeed: seed });
       return { world: town.world?.kind, seed: town.seed, slot, households: town.households.length, neighbours: town.households.reduce((n, h) => n + h.household.members.length, 0) };
     },
     { kind: world, seed, homeIn, options },
