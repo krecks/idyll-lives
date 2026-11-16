@@ -46,6 +46,9 @@ import { play } from '../ui/sfx';
 import { faceFromId, householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { clockTime, openAt, staffed, staffResidents } from './staff';
 import { PointerInput, routeKey } from './input';
+import { LandMode } from './landMode';
+import { installLandHook } from '../ui/land/landHook';
+import { brushOf } from '../ui/land/landTools';
 import type { NeighbourhoodDraft } from './town';
 import { compileSim, loadGameData } from './gameData';
 import { townJob } from './townJobs';
@@ -356,6 +359,27 @@ async function openSession(
     setStorey(storey);
   };
   game.catalog = bridge.catalog;
+  /** Build mode's Land tab: the world's land shaped by brush strokes (`landMode.ts`). */
+  const landMode = new LandMode({
+    renderer,
+    shapeLand: (command) => bridge.shapeLand(command),
+    waterMask: () => bridge.waterMask(),
+    world: () => world,
+    household: () => game.home,
+    prices: () => game.catalog?.build.land ?? null,
+    creative: () => game.creative,
+    funds: () => game.funds,
+    brush: () => brushOf(game.landBrush),
+    changed: (state) => (game.land = state),
+    refused: (why) => {
+      play('error');
+      toast(why);
+    },
+    ghost: (path) => (game.landGhost = path),
+  });
+  const landTab = () => game.mode === 'build' && game.buildTab === 'land';
+  /** `?debug`'s `window.__land` for the game's land (put up the first time the tab is: step 1's is gone by then). */
+  let landHook: (() => void) | null = null;
   /** Sims the player controls. */
   const playerSims = () => game.roster.filter((s) => game.households[s.household]?.player).map((s) => s.id);
   /** Names of the player's household: a save's members (Load game lists them), not the whole town. */
@@ -682,6 +706,7 @@ async function openSession(
       if (mode !== 'live' && game.follow !== null) controls.follow(null);
       const fromLive = game.mode === 'live';
       buildBuy.cancel();
+      if (mode !== 'build') landMode.putAway();
       game.eyedropper = false;
       game.pickHint = null;
       game.mode = mode;
@@ -709,7 +734,13 @@ async function openSession(
       controls.setMode('build');
       if (game.buildTab === tab) return;
       buildBuy.cancel();
+      if (game.buildTab === 'land') landMode.putAway();
       game.buildTab = tab;
+      // (The land surveyed the first time the tab comes up.)
+      if (tab === 'land') {
+        void landMode.ready();
+        landHook ??= installLandHook({ editor: () => landMode.current, surface: () => landMode.surface, ended: (patch) => landMode.commit(patch), undo: () => landMode.undo(), redo: () => landMode.redo(), simWater: () => bridge.waterMask() });
+      }
       game.buildStart = null;
       buildBuy.clearPreviews();
       refreshRoomOverlay();
@@ -778,6 +809,8 @@ async function openSession(
       bridge.send({ type: 'repair', household: game.home, object: objectId });
     },
     undo() {
+      // (The Land tab's strokes have an undo of their own.)
+      if (landTab()) return void landMode.undo();
       // The step count follows a little later; don't send more undos than there are steps.
       if (game.mode !== 'build' || game.undoSteps <= 0) return;
       // (It may move or remove things: something carried goes back first.)
@@ -789,6 +822,7 @@ async function openSession(
       bridge.send({ type: 'undo', household: game.home });
     },
     redo() {
+      if (landTab()) return void landMode.redo();
       if (game.mode !== 'build' || game.redoSteps <= 0) return;
       buildBuy.dropOwned();
       game.redoSteps--;
@@ -796,6 +830,9 @@ async function openSession(
       game.buySelection = null;
       buildBuy.clearPreviews();
       bridge.send({ type: 'redo', household: game.home });
+    },
+    landReset() {
+      if (landTab()) void landMode.reset();
     },
     recolor(objectId, colors) {
       bridge.send({ type: 'recolor', household: game.home, object: objectId, colors: colorValues(colors) });
@@ -875,6 +912,7 @@ async function openSession(
       // Changing tab or tool, or (re)entering the Stairs tool, drops what's in hand.
       const fromTab = game.buildTab;
       if (fromTab !== 'build' || tool !== game.buildTool || tool === 'stairs') buildBuy.cancel();
+      if (fromTab === 'land') landMode.putAway();
       game.buildTab = 'build';
       game.buildTool = tool;
       if (fromTab !== 'build') {
@@ -1564,6 +1602,8 @@ async function openSession(
       game.socialMenu = null;
       game.townOpen = false;
       if (game.mode === 'create') return;
+      // (The Land tab's brush takes the press itself: `press`.)
+      if (landTab()) return;
       if (game.mode === 'build') {
         const hit = renderer.pick(x, y);
         const ground = hit.ground && inLot(hit.ground.x, hit.ground.z) ? hit.ground : null;
@@ -1606,6 +1646,10 @@ async function openSession(
       } else if (!direct) controls.inspect(null);
     },
     hover(x, y) {
+      if (landTab()) {
+        renderer.setHoverTile(null);
+        return landMode.hover(x, y);
+      }
       const hit = renderer.pick(x, y);
       const g = hit.ground;
       renderer.setHoverTile(g && inLot(g.x, g.z) && !game.pauseMenu ? { x: Math.floor(g.x), z: Math.floor(g.z) } : null);
@@ -1614,21 +1658,25 @@ async function openSession(
     leave() {
       renderer.setHoverTile(null);
       buildBuy.clearPreviews();
+      landMode.leave();
     },
     // Wall and Remove tools: press, drag, release (see `BuildBuyInput.press`).
     press(x, y) {
       // The eyedropper picks with a plain click.
-      if (game.pauseMenu || game.mode !== 'build' || buildBuy.picking()) return false;
+      if (game.pauseMenu || game.mode !== 'build') return false;
+      if (landTab()) return landMode.press(x, y);
+      if (buildBuy.picking()) return false;
       const hit = renderer.pick(x, y);
       const g = hit.ground;
       return buildBuy.press(g && inLot(g.x, g.z) ? g : null, { x, y });
     },
     release(x, y, moved) {
+      if (landTab()) return landMode.release();
       const g = renderer.pick(x, y).ground;
       buildBuy.release(g && inLot(g.x, g.z) ? g : null, moved);
     },
-    cancel: () => buildBuy.cancelDrawing(),
-    abort: () => buildBuy.abortPress(),
+    cancel: () => (landTab() ? landMode.cancel() : buildBuy.cancelDrawing()),
+    abort: () => (landTab() ? void landMode.cancel() : buildBuy.abortPress()),
   });
 
   /** Puts what the eyedropper picked up in hand: a build tool with its look, or another object. */
@@ -1680,7 +1728,8 @@ async function openSession(
     if (route === 'escape') {
       if (game.townOpen) return void (game.townOpen = false);
       if (game.eyedropper) return controls.toggleEyedropper();
-      // Step back: drop what's in hand, then leave Build mode.
+      // Step back: drop what's in hand (a land stroke under way), then leave Build mode.
+      if (landTab() && landMode.cancel()) return;
       if (buildBuy.cancel()) return;
       if (game.mode !== 'live') return controls.setMode('live');
       if (game.menu || game.socialMenu) return controls.closeMenu();
@@ -1727,6 +1776,11 @@ async function openSession(
         // Construct: Build mode's walls, rooms and paint (again: back to Live). (Not Ctrl/⌘+C: that copies, `routeKey`.)
         if (game.mode === 'build' && game.buildTab === 'build') return controls.setMode('live');
         return controls.setBuildTab('build');
+      case 'g':
+      case 'G':
+        // The ground: Build mode's Land tab (again: back to Live).
+        if (landTab()) return controls.setMode('live');
+        return controls.setBuildTab('land');
       case 'o':
       case 'O':
         // Our home: Build mode's Home tab (again: back to Live).
@@ -2022,6 +2076,8 @@ async function openSession(
       voices.dispose();
       worldSound.dispose();
       buildBuy.dispose();
+      landMode.dispose();
+      landHook?.();
       await building;
       renderer.clear();
       bridge.dispose();

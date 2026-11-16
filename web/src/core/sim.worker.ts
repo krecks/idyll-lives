@@ -133,6 +133,9 @@ scope.onmessage = (e) => {
       publish(true);
       postUi();
       scope.postMessage({ type: 'shaped', requestId: msg.requestId });
+    } else if (msg.type === 'waterMask' && game) {
+      const mask = JSON.parse(game.water_mask()) as { water: number[]; width: number; depth: number };
+      scope.postMessage({ type: 'waterMask', requestId: msg.requestId, ...mask });
     } else if (msg.type === 'command' && game) {
       game.command(JSON.stringify(msg.command));
       // (What the player did shows at once.)

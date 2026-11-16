@@ -140,6 +140,14 @@ import type {
   WallMode,
 } from '../types';
 import type { Land, LandRect } from '../../game/land';
+import { bakeLand, copyLand, fullRect, marchToGround, sameLand } from '../shared/landBake';
+import { OffThreadLand } from '../shared/renderData';
+import { LandCursorDraw } from './landCursor';
+import { installLandDebug } from './landDebug';
+import type { Landscape } from './nature';
+
+/** The land's work after a stroke runs in slices this long (ms) a frame (`landPace`). */
+const LAND_SLICE_MS = 6;
 
 declare global {
   interface Window {
@@ -904,6 +912,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.detachOrbit = o.attach(canvas);
 
     if (this.debug) Object.assign(window, { __scene: this.app.scene, __app: this.app, __renderer: this });
+    // (The land's own debug hook, `landDebug.ts`: scripted strokes through the land methods.)
+    if (this.debug && import.meta.env.DEV) installLandDebug(this, () => this.landQueue);
     this.applyLighting(this.lastMinute);
     this.applyCamera();
     townView.project = this.projectTown;
@@ -1354,6 +1364,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (The ground tiles' materials asked for only while the map is, or is to be, on them. In with the buildings: what
     // they stand on is in it, and the farmland's edges, which step along the ground's grid without it.)
     const mapped = this.diag.has('notownground') ? 0 : Math.min(1, blend / TOWN_FADE);
+    // (The land shaped since it was made: `landMapped`; made again by its land's version.)
+    if (mapped > 0 && this.townGroundStale && this.builtWorld) {
+      this.townGroundStale = false;
+      this.townGround.bake(this.builtWorld, this.lot.landscape);
+    }
     if (mapped > 0 || this.townGround.active) this.townGround.apply(this.lot.landscape?.groundMaterials() ?? [], mapped);
     if (blend <= 0) return;
     this.townBuildings.setTime(this.lastMinute, this.lastWeekday);
@@ -3040,6 +3055,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.townMode) this.townRig.nudge(dAlpha, zoom);
   }
 
+  panTown(dx: number, dz: number): void {
+    if (this.townMode) this.townRig.pan(dx, dz);
+  }
+
   setLotHighlight(highlight: LotHighlight, snap = false): void {
     this.townHighlight = highlight;
     this.overview?.setHighlight(highlight, snap);
@@ -3049,26 +3068,130 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.townListener = fn;
   }
 
-  // The land as a height field (stage B2 builds these; until then null is let through, so that
-  // clearing the land and hiding the cursor already work).
+  // --- the land as a height field (`game/land.ts`; `shared/landBake.ts`) ------------------
+
+  /** The land brush's cursor (`setLandBrush`), made the first time it's shown. */
+  private landCursor: LandCursorDraw | null = null;
+  /** The work of strokes done and fields taken on (`landChanged`, `setLand`), one after another, a slice a frame. */
+  private landQueue: Promise<void> = Promise.resolve();
+  private landSliceStart = 0;
+  private readonly landRay = { origin: { x: 0, y: 0, z: 0 }, dir: { x: 0, y: -1, z: 0 } };
+
+  /** The landscape in view and its world: the menus' town while it is shown (or there is no game world), else the game's. */
+  private landInView(): { scape: Landscape; world: WorldStructure } | null {
+    const town = this.lot.landscapeOf('town');
+    const game = this.lot.landscape;
+    if ((this.townMode || !game) && town && this.townWorld) return { scape: town, world: town.builtFor ?? this.townWorld };
+    return game && this.builtWorld ? { scape: game, world: game.builtFor ?? this.builtWorld } : null;
+  }
+
+  /** The land's work gives the frames a turn every `LAND_SLICE_MS` of main-thread time. */
+  private readonly landPace = async (): Promise<void> => {
+    if (performance.now() - this.landSliceStart < LAND_SLICE_MS) return;
+    await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    this.landSliceStart = performance.now();
+  };
+
+  /** Runs `job` after the land's work before it, in slices (`landPace`); a failure is logged, the queue goes on. */
+  private queueLand(name: string, job: () => Promise<void>): Promise<void> {
+    const run = this.landQueue.then(async () => {
+      if (this.disposed) return;
+      this.landSliceStart = performance.now();
+      await perfTimeAsync(name, job);
+      this.held?.changed();
+    });
+    this.landQueue = run.catch((err) => console.error(`[render] ${name} failed`, err));
+    return this.landQueue;
+  }
+
+  /** The game world's ground map at altitude to be made again (its farmland follows the land's cover: `TownGroundMap`), the next time the town view draws it. */
+  private landMapped(scape: Landscape): void {
+    if (scape === this.lot.landscape) this.townGroundStale = true;
+  }
+  private townGroundStale = false;
+
   landOf(): Promise<Land> {
-    return Promise.reject(new Error('not built yet'));
+    const at = this.landInView();
+    if (!at) return Promise.reject(new Error('no land in view'));
+    // (Drawn from a height field already, the world's own or one given: a copy of it as it is now.)
+    const field = at.scape.heightField;
+    if (field) return Promise.resolve(copyLand(field));
+    return perfTimeAsync('land: survey', async () => {
+      const off = OffThreadLand.open(at.world);
+      try {
+        const made = await off?.bake();
+        if (made) {
+          perfEnd(Object.assign(perfStart('land: survey (worker)'), { start: performance.now() - made.ms }));
+          return made.field;
+        }
+      } finally {
+        off?.close();
+      }
+      return bakeLand(at.scape, at.world.width, groundDepth(at.world));
+    });
   }
 
   setLand(land: Land | null): void {
-    if (land) throw new Error('not built yet');
+    const at = this.landInView();
+    if (!at) return;
+    const { scape } = at;
+    const before = scape.heightField;
+    // (The same land again, `landOf`'s copy of it: taken on, nothing drawn again.)
+    if (land && before && sameLand(land, before)) {
+      scape.setLand(land);
+      return;
+    }
+    if (!land && !before) return;
+    scape.setLand(land);
+    void this.queueLand('land: drawn again', async () => {
+      await scape.redrawLand(this.landPace);
+      await this.lot.regrowNature(scape, null, () => this.disposed, this.landPace);
+      this.landMapped(scape);
+    });
   }
 
-  landChanged(_rect: LandRect, _done: boolean): void {
-    throw new Error('not built yet');
+  landChanged(rect: LandRect, done: boolean): void {
+    const at = this.landInView();
+    const field = at?.scape.heightField;
+    if (!at || !field) return;
+    const { scape } = at;
+    const span = perfStart('land: stamp');
+    const tiles = scape.reground(rect);
+    perfEnd(span, `${tiles} tiles`);
+    this.held?.changed();
+    if (!done) return;
+    void this.queueLand('land: stroke done', async () => {
+      const box = await scape.landDone(rect, this.landPace);
+      if (!box) return;
+      await this.lot.regrowNature(scape, box, () => this.disposed, this.landPace);
+      this.landMapped(scape);
+    });
   }
 
-  pickLand(_x: number, _y: number): { x: number; y: number; z: number } | null {
-    throw new Error('not built yet');
+  pickLand(x: number, y: number): { x: number; y: number; z: number } | null {
+    const at = this.landInView();
+    if (!at) return null;
+    const { origin, dir } = this.landRay;
+    this.camera.ray(x, y, this.cssSize.width, this.cssSize.height, origin, dir);
+    return marchToGround(origin, dir, (px, pz) => at.scape.heightAt(px, pz));
   }
 
   setLandBrush(cursor: LandCursor | null): void {
-    if (cursor) throw new Error('not built yet');
+    const at = this.landInView();
+    if (!cursor || !at) {
+      this.landCursor?.set(null, () => 0, 0);
+      return;
+    }
+    this.landCursor ??= new LandCursorDraw(this.app, this.root);
+    const layer = this.townMode ? (this.lot.townLayer ?? pc.LAYERID_WORLD) : pc.LAYERID_WORLD;
+    this.landCursor.set(cursor, (x, z) => at.scape.heightAt(x, z), layer);
+    this.held?.changed();
+  }
+
+  /** The whole land's samples (`landDebug.ts`). */
+  landRect(): LandRect | null {
+    const field = this.landInView()?.scape.heightField;
+    return field ? fullRect(field) : null;
   }
 
   /** The menus' town comes on screen: the overview's camera from where the game's is (whose pose the orbit keeps), its layer, its light. */
@@ -3652,6 +3775,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.marker?.destroy();
     this.handles?.destroy();
     this.hoverTile?.destroy();
+    this.landCursor?.destroy();
     this.previews?.destroy();
     this.placing?.dispose();
     this.modelRefresh.dispose();

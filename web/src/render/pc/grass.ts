@@ -309,6 +309,24 @@ export class Grass {
     this.stale = true;
   }
 
+  /**
+   * The land under it changed (the land's brushes): its heights (`GrassField.ground`, changed in place) are read
+   * again as the patches are chosen; `colour`: its colour texture's texels changed too (`GrassField.colour`), up to the GPU.
+   */
+  landChanged(colour: boolean): void {
+    if (colour) {
+      const data = this.colour.lock() as Uint8Array;
+      if (data !== this.field.colour) data.set(this.field.colour);
+      this.colour.unlock();
+    }
+    this.stale = true;
+  }
+
+  /** The grass field it draws (the land's brushes change it in place, then `landChanged`). */
+  get grassField(): GrassField {
+    return this.field;
+  }
+
   /** The residents pushing the grass aside (the nearest first; at most `GRASS_PUSHERS`). */
   setPushers(pushers: readonly GrassPusher[]): void {
     const push = this.push;

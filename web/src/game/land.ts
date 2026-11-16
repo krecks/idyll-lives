@@ -82,6 +82,25 @@ export function heightAt(land: Land, x: number, z: number): number {
   return (top * (1 - tz) + bottom * tz) / 100;
 }
 
+/**
+ * A short fingerprint of the land's contents (FNV-1a over its heights, water and cover): two
+ * lands with the same one are, as near as matters, the same (the setup screens tell a shaped world
+ * from the world as it was by it). '' for none.
+ */
+export function landHash(land: Land | null | undefined): string {
+  if (!land) return '';
+  let a = 0x811c9dc5;
+  let b = 0x1b873593;
+  const mix = (v: number) => {
+    a = Math.imul(a ^ (v & 0xffff), 0x01000193);
+    b = Math.imul(b ^ (v & 0xffff), 0x85ebca6b) ^ (b >>> 13);
+  };
+  for (let k = 0; k < land.h.length; k++) mix(land.h[k]);
+  for (let k = 0; k < land.wl.length; k++) mix(land.wl[k]);
+  for (let k = 0; k < land.cover.length; k++) mix(land.cover[k]);
+  return `${land.cols}x${land.rows}:${(a >>> 0).toString(36)}${(b >>> 0).toString(36)}`;
+}
+
 /** Whether sample (`i`, `j`) is under water (its level over its ground); false off the land. */
 export function wetAt(land: Land, i: number, j: number): boolean {
   if (i < 0 || j < 0 || i >= land.cols || j >= land.rows) return false;

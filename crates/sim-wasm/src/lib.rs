@@ -214,6 +214,12 @@ impl Game {
         view::social_options_json(&self.world, actor as usize, target as usize)
     }
 
+    /// The water mask as it is now (JSON: `{"water": rle, "width", "depth"}`; see
+    /// `World::water_mask`): what Build mode's Land tab lays its strokes' water over.
+    pub fn water_mask(&self) -> String {
+        self.world.water_mask_json()
+    }
+
     /// The household's home as a blueprint (JSON; see `sim_core::blueprint`).
     pub fn blueprint(&self, household: u32) -> Result<String, JsError> {
         self.world

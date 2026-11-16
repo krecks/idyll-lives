@@ -9,6 +9,19 @@
 
   /** Which kinds' tags win room first, unless a screen says otherwise (`order`): the player's, households', houses for sale, places. */
   export const TAG_ORDER: readonly LotLabel['kind'][] = ['mine', 'home', 'sale', 'park'];
+
+  /** A tool in hand on the town (step 1's land brushes): the left button is its, at screen points (CSS pixels). */
+  export interface StageTool {
+    /** Pressed at (`x`, `y`): true if it took the press (a stroke began). */
+    down(x: number, y: number): boolean;
+    move(x: number, y: number): void;
+    up(): void;
+    /** The pointer over the town with no button down (the cursor follows it). */
+    hover(x: number, y: number): void;
+    leave(): void;
+    /** The stroke under way dropped (right-click, Escape). */
+    cancel(): void;
+  }
 </script>
 
 <script lang="ts">
@@ -16,6 +29,10 @@
    * A transparent stage over the live 3D town (drawn by the renderer behind the page). Frames the
    * camera into this box, turns pointer input into lot hover / clicks, a drag to look around and
    * the wheel to zoom, and pins a tag above every lot. The camera itself is driven by `menuScene`.
+   *
+   * With a `tool` in hand the left button is the tool's, the right button turns the camera, the
+   * middle button (or the left with Space held) pans it, the wheel zooms; lots aren't lit up or
+   * tagged meanwhile. `ghost`: SVG path data drawn over the town (a mountain's ghost, screen pixels).
    */
   import { onMount } from 'svelte';
   import { menuScene, type Frame } from '../../game/menuScene';
@@ -29,6 +46,8 @@
     order = TAG_ORDER,
     onhover,
     onselect,
+    tool = null,
+    ghost = '',
   }: {
     labels: LotLabel[];
     /** Which kinds' tags win room first (`tagLayout.ts`); households' tags are also only so many at once. */
@@ -41,6 +60,8 @@
     onhover?: (plot: number | null) => void;
     /** A lot (or empty ground: null) was clicked. */
     onselect?: (plot: number | null) => void;
+    tool?: StageTool | null;
+    ghost?: string;
   } = $props();
 
   let stage: HTMLDivElement;
@@ -49,6 +70,95 @@
   let dragging = false;
   let down: { x: number; y: number; moved: boolean } | null = null;
   let cursor = $state('default');
+  /** A drag with a tool in hand: the tool's stroke, the camera turned, or panned. */
+  let held: { kind: 'stroke' | 'orbit' | 'pan'; x: number; y: number } | null = null;
+  /** Space is held (with a tool in hand, the left button pans). */
+  let space = $state(false);
+
+  // A tool put down mid-stroke: its stroke dropped. (Lots lit up before it are let go.)
+  $effect(() => {
+    if (!tool) return;
+    onhover?.(null);
+    const t = tool;
+    return () => {
+      if (held?.kind === 'stroke') t.cancel();
+      held = null;
+      t.leave();
+    };
+  });
+
+  function typing(target: EventTarget | null): boolean {
+    return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable);
+  }
+
+  function onkeydown(e: KeyboardEvent) {
+    if (!tool) return;
+    if (e.key === 'Escape' && held?.kind === 'stroke') {
+      e.preventDefault();
+      tool.cancel();
+      held = null;
+      return;
+    }
+    if (e.key !== ' ' || typing(e.target) || e.target instanceof HTMLButtonElement) return;
+    e.preventDefault();
+    space = true;
+    if (!held) cursor = 'grab';
+  }
+
+  function onkeyup(e: KeyboardEvent) {
+    if (e.key !== ' ') return;
+    space = false;
+    if (!held) cursor = tool ? 'crosshair' : 'default';
+  }
+
+  /** Pans the camera by the ground between two screen points (as if the land were dragged along), or by a share of the view where the sky is. */
+  function panBy(x0: number, y0: number, x1: number, y1: number) {
+    const a = menuScene.landAt(x0, y0);
+    const b = menuScene.landAt(x1, y1);
+    if (a && b) menuScene.pan(a.x - b.x, a.z - b.z);
+  }
+
+  function toolDown(e: PointerEvent): void {
+    const t = tool!;
+    if (e.button === 2 && held?.kind === 'stroke') {
+      t.cancel();
+      held = null;
+      return;
+    }
+    if (held) return;
+    const kind = e.button === 0 && !space ? 'stroke' : e.button === 1 || e.button === 0 ? 'pan' : e.button === 2 ? 'orbit' : null;
+    if (!kind) return;
+    if (e.button === 1) e.preventDefault();
+    if (kind === 'stroke' && !t.down(e.clientX, e.clientY)) return;
+    held = { kind, x: e.clientX, y: e.clientY };
+    if (kind !== 'stroke') {
+      t.leave();
+      cursor = 'grabbing';
+    }
+    stage.setPointerCapture(e.pointerId);
+  }
+
+  function toolMove(e: PointerEvent): void {
+    const t = tool!;
+    if (!held) {
+      t.hover(e.clientX, e.clientY);
+      cursor = space ? 'grab' : 'crosshair';
+      return;
+    }
+    if (held.kind === 'stroke') t.move(e.clientX, e.clientY);
+    else if (held.kind === 'orbit') menuScene.nudge(-e.movementX * 0.006, 1);
+    else panBy(held.x, held.y, e.clientX, e.clientY);
+    held.x = e.clientX;
+    held.y = e.clientY;
+  }
+
+  function toolUp(e: PointerEvent): void {
+    if (!held) return;
+    if (held.kind === 'stroke') tool!.up();
+    held = null;
+    if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
+    cursor = space ? 'grab' : 'crosshair';
+  }
 
   onMount(() => {
     const measure = () => {
@@ -76,12 +186,14 @@
   }
 
   function onpointerdown(e: PointerEvent) {
+    if (tool) return toolDown(e);
     if (e.button !== 0) return;
     down = { x: e.clientX, y: e.clientY, moved: false };
     stage.setPointerCapture(e.pointerId);
   }
 
   function onpointermove(e: PointerEvent) {
+    if (tool) return toolMove(e);
     if (down) {
       const dx = e.clientX - down.x;
       if (!down.moved && Math.abs(dx) + Math.abs(e.clientY - down.y) > 5) down.moved = dragging = true;
@@ -97,6 +209,7 @@
   }
 
   function onpointerup(e: PointerEvent) {
+    if (tool) return toolUp(e);
     const click = down && !down.moved;
     down = null;
     dragging = false;
@@ -128,6 +241,8 @@
   }
 </script>
 
+<svelte:window {onkeydown} {onkeyup} onblur={() => (space = false)} />
+
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="stage"
@@ -136,7 +251,17 @@
   {onpointerdown}
   {onpointermove}
   {onpointerup}
+  onpointercancel={(e) => {
+    if (tool && held?.kind === 'stroke') tool.cancel();
+    held = null;
+    if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
+  }}
+  oncontextmenu={(e) => tool && e.preventDefault()}
   onpointerleave={(e) => {
+    if (tool) {
+      if (!held) tool.leave();
+      return;
+    }
     // Moving onto a tag is not leaving the lot: only clear the hover when the pointer goes
     // somewhere else (the page beside the stage, another panel).
     if (!dragging && !(e.relatedTarget instanceof Node && tags.contains(e.relatedTarget))) onhover?.(null);
@@ -144,8 +269,12 @@
   {onwheel}
 ></div>
 
+{#if ghost}
+  <svg class="ghost" aria-hidden="true"><path d={ghost} /></svg>
+{/if}
+
 <div class="tags" bind:this={tags} aria-label="Lots">
-  {#each labels as l (l.plot)}
+  {#each tool ? [] : labels as l (l.plot)}
     <div class="pin" use:pin={l}>
       <button
         class="tag {l.kind}"
@@ -172,6 +301,24 @@
     min-height: 0;
     height: 100%;
     touch-action: none;
+  }
+  /* A mountain's ghost, in screen pixels (the UI scale undone, as for the tags). */
+  .ghost {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    zoom: calc(1 / var(--ui-scale));
+    pointer-events: none;
+    z-index: 1;
+    overflow: visible;
+  }
+  .ghost path {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.85);
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 1.5px rgba(40, 46, 90, 0.7));
   }
   /* Tags are positioned in screen pixels: undo the UI scale for the layer, keep it for the tags. */
   .tags {

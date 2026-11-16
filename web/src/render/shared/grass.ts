@@ -165,6 +165,76 @@ export async function grassField(world: WorldStructure, land: GrassLand, pace?: 
   return field;
 }
 
+/** The patches (`GrassField` indices, inclusive) whose corner lies within a box (m) or a patch from it. */
+function patchSpan(field: GrassField, x0: number, z0: number, x1: number, z1: number): [number, number, number, number] {
+  const p = GRASS.patch;
+  return [Math.max(0, Math.floor((x0 - field.x0) / p) - 1), Math.max(0, Math.floor((z0 - field.z0) / p) - 1), Math.min(field.pw - 1, Math.floor((x1 - field.x0) / p) + 1), Math.min(field.pd - 1, Math.floor((z1 - field.z0) / p) + 1)];
+}
+
+/**
+ * The land's height changed within a box (m; the brushes): the patches' heights and slopes there again (`ground`,
+ * as `grassField` makes them), and their neighbours' slopes, which lean on them.
+ */
+export function regroundGrass(field: GrassField, land: Pick<GrassLand, 'heightAt'>, x0: number, z0: number, x1: number, z1: number): void {
+  const p = GRASS.patch;
+  const { pw, pd, ground } = field;
+  const [i0, j0, i1, j1] = patchSpan(field, x0, z0, x1, z1);
+  if (i1 < i0 || j1 < j0) return;
+  // (The middles of the patches round the box too: each slope reads its two neighbours.)
+  const [a0, b0, a1, b1] = [Math.max(0, i0 - 1), Math.max(0, j0 - 1), Math.min(pw - 1, i1 + 1), Math.min(pd - 1, j1 + 1)];
+  const w = a1 - a0 + 1;
+  const mid = new Float32Array(w * (b1 - b0 + 1));
+  for (let j = b0; j <= b1; j++) for (let i = a0; i <= a1; i++) mid[(j - b0) * w + i - a0] = land.heightAt(field.x0 + (i + 0.5) * p, field.z0 + (j + 0.5) * p);
+  // (A patch past the box's ring: its height as the field has it, its corner less its slopes.)
+  const at = (i: number, j: number) => {
+    const [ci, cj] = [Math.min(pw - 1, Math.max(0, i)), Math.min(pd - 1, Math.max(0, j))];
+    if (ci >= a0 && ci <= a1 && cj >= b0 && cj <= b1) return mid[(cj - b0) * w + ci - a0];
+    const k = (cj * pw + ci) * 3;
+    return ground[k] + (ground[k + 1] + ground[k + 2]) * (p / 2);
+  };
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      const sx = (at(i + 1, j) - at(i - 1, j)) / (p * (Math.min(pw - 1, i + 1) - Math.max(0, i - 1)));
+      const sz = (at(i, j + 1) - at(i, j - 1)) / (p * (Math.min(pd - 1, j + 1) - Math.max(0, j - 1)));
+      const k = (j * pw + i) * 3;
+      ground[k] = at(i, j) - (sx + sz) * (p / 2);
+      ground[k + 1] = sx;
+      ground[k + 2] = sz;
+    }
+  }
+}
+
+/**
+ * The land's colours and grassiness changed within a box (m; a stroke done): the colour texels there again (as
+ * `grassField` makes them) and which patches have any grass. Says the texels (inclusive), or null if none.
+ */
+export function recolourGrass(field: GrassField, land: GrassLand, x0: number, z0: number, x1: number, z1: number): [number, number, number, number] | null {
+  const { w, d, colour, margin: m } = field;
+  const [t0, s0, t1, s1] = [Math.max(0, Math.floor(x0 - field.x0)), Math.max(0, Math.floor(z0 - field.z0)), Math.min(w - 1, Math.ceil(x1 - field.x0)), Math.min(d - 1, Math.ceil(z1 - field.z0))];
+  if (t1 < t0 || s1 < s0) return null;
+  const tmp: RGB = { r: 0, g: 0, b: 0 };
+  for (let j = s0; j <= s1; j++) {
+    for (let i = t0; i <= t1; i++) {
+      const x = field.x0 + i + 0.5;
+      const z = field.z0 + j + 0.5;
+      const o = (j * w + i) * 4;
+      const edge = 1 - smoothstep(m * 0.7, m * 0.95, land.distanceToTown(x, z));
+      if (edge <= 0) {
+        colour.fill(0, o, o + 4);
+        continue;
+      }
+      const lawn = land.terrainColour(x, z, land.heightAt(x, z), tmp);
+      colour[o] = byte(tmp.r);
+      colour[o + 1] = byte(tmp.g);
+      colour[o + 2] = byte(tmp.b);
+      colour[o + 3] = byte(lawn * edge);
+    }
+  }
+  const [i0, j0, i1, j1] = patchSpan(field, x0, z0, x1, z1);
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) markPatch(field, i, j);
+  return [t0, s0, t1, s1];
+}
+
 /** 0..1 as a byte. */
 function byte(v: number): number {
   return Math.max(0, Math.min(255, Math.round(v * 255)));
@@ -297,6 +367,11 @@ export function grassAt(field: GrassField, x: number, z: number): number {
   const tj = Math.floor(z * n);
   if (ti >= 0 && tj >= 0 && ti < field.townW && tj < field.townD) g = Math.min(g, field.town[tj * field.townW + ti] / 255);
   return g;
+}
+
+/** Which patches have any grass, all of them again (the land's grass made again whole: `field.colour`). */
+export function markGrassPatches(field: GrassField): void {
+  markPatches(field, null);
 }
 
 /**

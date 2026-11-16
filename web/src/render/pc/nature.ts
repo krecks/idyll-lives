@@ -34,13 +34,15 @@ import type { AssetRegistry } from '../../assets/registry';
 import type { WorldStructure } from '../../core/protocol';
 import { LookedFrom } from '../shared/chunks';
 import { Geo } from '../shared/geometry';
-import { CountryRoads } from '../shared/countryRoads';
+import { CountryRoads, ROAD_VERGE } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
-import { grassField, gustAt, gustNoise, type GrassQuality } from '../shared/grass';
+import { grassField, gustAt, gustNoise, markGrassPatches, recolourGrass, regroundGrass, type GrassQuality } from '../shared/grass';
 import { OffThreadLand, withTownGrass } from '../shared/renderData';
+import { pondQuads, rectBox } from '../shared/landBake';
+import { LAND_CELL, type LandRect } from '../../game/land';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
-import { GROUND_TILE, groupInstances, hideLawn, keepBareTiles, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask } from '../shared/nature';
+import { GROUND_TILE, groupInstances, hideLawn, keepBareTiles, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask, type LawnPlacement, type Woods } from '../shared/nature';
 import type { OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
 import type { TownBuildStep } from '../types';
@@ -118,6 +120,24 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
 
   /** The land in the render data worker while `build` runs: the terrain's shading and the grass field are made there. */
   private offThread: OffThreadLand | null = null;
+  /** The world it was built for (as last fitted, `refreshLawn`): its lawns grown again from it (`regrow`). */
+  private world: WorldStructure | null = null;
+  /** The world it was built for (as last fitted), null before a build. */
+  get builtFor(): WorldStructure | null {
+    return this.world;
+  }
+
+  /** The app and the entity its draws hang under (`build`'s). */
+  private host: { app: pc.AppBase; parent: pc.Entity } | null = null;
+  /** The water sheet at the sea's level (`water`), while it is drawn. */
+  private sheet: pc.Entity | null = null;
+  /** A height field's water above the sea's level, by ground tile (`pondQuads`). */
+  private readonly ponds = new Map<number, pc.Entity>();
+  /**
+   * Its draws changed outside a build (a height field's water came or went: `landChanged`, `redrawLand`): the
+   * owner shows the `added` (switched off, as a build's) and lets go of the `removed` (destroyed after it's told).
+   */
+  onDraws: ((added: pc.Entity[], removed: pc.Entity[]) => void) | null = null;
 
   /** `grassQuality`: how the grass is drawn (the preset's, `QualitySettings.grass`); `open`: a big world's distances (`QualitySettings.openWorld`). */
   constructor(world: WorldStructure, lawnDensity: number, lawnLod: 0 | 1, woodsCell: number, private readonly grassQuality: GrassQuality, private readonly open: OpenWorldQuality) {
@@ -126,6 +146,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
 
   /** `onStep`: told as its ground, its woods and lawns and its grass are each built. */
   async build(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, world: WorldStructure, pace?: () => Promise<void>, buildRoads?: RoadBuilder, onStep?: (done: NatureStep) => void): Promise<NatureResult> {
+    this.world = world;
+    this.host = { app, parent };
     this.offThread = OffThreadLand.open(world);
     try {
       return await this.buildAll(app, parent, assets, world, pace, buildRoads, onStep);
@@ -155,7 +177,9 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     })();
     const [grounds] = await both(ground, plants);
     draws.push(...grounds);
-    if (this.watered) draws.push(perfTime('nature: water', () => this.water(app, parent)));
+    if (this.seaSheet) draws.push((this.sheet = perfTime('nature: water', () => this.water(app, parent))));
+    // (A height field's water above the sea's level: its own, tile by tile.)
+    if (this.heightField) for (let k = 0; k < this.tiles.length; k++) draws.push(...this.pond(k));
     if (buildRoads) draws.push(...perfTime('nature: roads', () => buildRoads(this.roads, parent)));
     for (const e of draws) e.enabled = false;
     this.others = draws;
@@ -228,6 +252,12 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.woodsSquares = [];
     this.flowerSquares = [];
     for (const e of this.others) e.destroy();
+    for (const e of this.ponds.values()) e.destroy();
+    this.ponds.clear();
+    this.sheet = null;
+    // (The land's work still to come, `landDone`, `redrawLand`, `regrow`, finds nothing to draw into.)
+    this.host = null;
+    this.world = null;
     if (this.waterMaterial) {
       this.waterMaterial.lib.release(this.waterMaterial.material);
       this.waterMaterial.material.destroy();
@@ -263,6 +293,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    * the flowers (on a tile split by a diagonal wall, each follows the half it stands in) and the grass.
    */
   refreshLawn(world: WorldStructure): void {
+    this.world = world;
     // (A world message that changed nothing the lawn grows round, a focus lot shown: nothing to do.)
     const inputs = lawnInputs(world);
     if (this.lawnInputs && sameLawnInputs(this.lawnInputs, inputs)) return;
@@ -281,45 +312,406 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    * coarser take every second and fourth of its points.
    */
   private async terrainTiles(app: pc.AppBase, parent: pc.Entity, pace?: () => Promise<void>): Promise<pc.Entity[]> {
-    const { size } = this.terrainGrid();
-    const x0 = this.w / 2 - size / 2;
-    const z0 = this.d / 2 - size / 2;
-    const count = Math.ceil(size / TILE);
+    const { count } = this.tileFrame();
     const material = MaterialLibrary.for(app).surface('material.ground', { vertexColors: true, variant: 'grass' });
     grassGround(app.graphicsDevice, material);
     const out: pc.Entity[] = [];
     this.tiles = [];
-    const S = TILE_LODS[0];
-    const c = TILE / S;
-    const n = S + 3; // (a ring of one past the tile for the normals)
-    // Tile k (i across, j down) and its finest level's grid point (col, row), col and row from -1 to
-    // S + 1; row 0 at the tile's far (max z) edge.
-    const corner = (k: number) => [k % count, Math.floor(k / count), x0 + (k % count) * TILE, z0 + Math.floor(k / count) * TILE];
-    const grid = (k: number) => () => {
-      const [, , tx, tz] = corner(k);
-      const positions = new Float32Array(n * n * 3);
-      for (let row = -1, v = 0; row <= S + 1; row++) for (let col = -1; col <= S + 1; col++, v++) [positions[v * 3], positions[v * 3 + 2]] = [tx + col * c, tz + (S - row) * c];
-      return positions;
-    };
-    const at = (col: number, row: number) => (row + 1) * n + col + 1;
     // The worker shades a few tiles ahead while one's meshes are made here (its round trips overlap);
     // on the page, one at a time.
     const ahead = this.offThread ? SHADE_AHEAD : 0;
     const shading: Promise<{ positions: Float32Array; colors: Float32Array }>[] = [];
     for (let k = 0; k < count * count; k++) {
-      while (shading.length <= ahead && k + shading.length < count * count) shading.push(this.shaded(grid(k + shading.length), pace));
+      while (shading.length <= ahead && k + shading.length < count * count) {
+        const at = k + shading.length;
+        shading.push(this.shaded(() => this.tileGrid(at), pace));
+      }
       const { positions, colors } = await shading.shift()!;
-      const [i, j, tx, tz] = corner(k);
-      const meshes = TILE_LODS.map((segs) => tileMesh(app, positions, colors, at, segs, S / segs, c, x0, z0, size));
+      const [i, j, tx, tz] = this.tileCorner(k);
+      const meshes = this.tileMeshes(app, positions, colors);
       const mi = new pc.MeshInstance(meshes[1], material);
       const entity = new pc.Entity(`terrain${i},${j}`, app);
       entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: true });
       entity.enabled = false;
       parent.addChild(entity);
       out.push(entity);
-      this.tiles.push({ mi, meshes, x: tx + TILE / 2, z: tz + TILE / 2, lod: 1 });
+      // (Its colours kept as bytes: the meshes keep none on the CPU, and a height field's brushes draw it again with them.)
+      this.tiles.push({ mi, meshes, x: tx + TILE / 2, z: tz + TILE / 2, lod: 1, kept: bytesOf(colors) });
     }
     return out;
+  }
+
+  /** The ground tiles' layout: the landscape's square's corner and side, tiles across, and the finest level's quads across (`S`), their size (`c`) and its grid's points across with a ring (`n`). */
+  private tileFrame(): { x0: number; z0: number; size: number; count: number; S: number; c: number; n: number } {
+    const { size } = this.terrainGrid();
+    const S = TILE_LODS[0];
+    return { x0: this.w / 2 - size / 2, z0: this.d / 2 - size / 2, size, count: Math.ceil(size / TILE), S, c: TILE / S, n: S + 3 };
+  }
+
+  /** Tile `k`'s place: across, down, and its corner (m). */
+  private tileCorner(k: number): [number, number, number, number] {
+    const { x0, z0, count } = this.tileFrame();
+    return [k % count, Math.floor(k / count), x0 + (k % count) * TILE, z0 + Math.floor(k / count) * TILE];
+  }
+
+  /** Tile `k`'s finest grid (x and z; y to be set), a ring of one past it for the normals: (col, row) from -1 to S + 1, row 0 at its far (max z) edge. */
+  private tileGrid(k: number): Float32Array {
+    const { S, c, n } = this.tileFrame();
+    const [, , tx, tz] = this.tileCorner(k);
+    const positions = new Float32Array(n * n * 3);
+    for (let row = -1, v = 0; row <= S + 1; row++) for (let col = -1; col <= S + 1; col++, v++) [positions[v * 3], positions[v * 3 + 2]] = [tx + col * c, tz + (S - row) * c];
+    return positions;
+  }
+
+  /** A tile's three levels from its finest grid's shaded points (`tileMesh`). */
+  private tileMeshes(app: pc.AppBase, positions: Float32Array, colors: Float32Array): pc.Mesh[] {
+    const { S, c, n, x0, z0, size } = this.tileFrame();
+    return TILE_LODS.map((segs) => tileMesh(app, positions, colors, n, segs, S / segs, c, x0, z0, size));
+  }
+
+  /**
+   * A tile's levels drawn from its finest grid's shaded points again: written into its own meshes once it has been
+   * drawn so (`live`: they keep their vertices on the CPU, to be written into), else made anew (live from now on) and
+   * the old ones destroyed. A brush's stamps draw the same tiles again and again: no new buffers each time.
+   */
+  private redrawTile(t: GroundTile, positions: Float32Array, colors: Float32Array): void {
+    if (!this.host) return;
+    const { app } = this.host;
+    const { S, c, n, x0, z0, size } = this.tileFrame();
+    if (t.live) {
+      TILE_LODS.forEach((segs, q) => tileMesh(app, positions, colors, n, segs, S / segs, c, x0, z0, size, t.meshes[q]));
+      return;
+    }
+    const meshes = TILE_LODS.map((segs) => tileMesh(app, positions, colors, n, segs, S / segs, c, x0, z0, size, 'live'));
+    t.live = true;
+    this.swapTile(t, meshes);
+  }
+
+  /**
+   * The ground tiles a box (m) reaches (their grids' rings too), by index. With a height field, the box of the samples
+   * in `rect` (out to the ones beside them, and `pad` m more; to `LAND_EDGE_FADE` past the world's edge where it
+   * reaches it: the land past it follows the edge).
+   */
+  private tilesIn(box: [number, number, number, number]): number[] {
+    const { x0, z0, count, c } = this.tileFrame();
+    const out: number[] = [];
+    const [i0, j0] = [Math.max(0, Math.floor((box[0] - c - x0) / TILE)), Math.max(0, Math.floor((box[1] - c - z0) / TILE))];
+    const [i1, j1] = [Math.min(count - 1, Math.floor((box[2] + c - x0) / TILE)), Math.min(count - 1, Math.floor((box[3] + c - z0) / TILE))];
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) out.push(j * count + i);
+    return out;
+  }
+
+  /** The box (m) round the samples in `rect` the land's drawing leans on, `pad` m out, and on past the world's edge where it reaches it. */
+  landBox(rect: LandRect, pad = 0): [number, number, number, number] {
+    const field = this.heightField!;
+    const box = rectBox(rect, pad);
+    const fade = LAND_EDGE_FADE_M + pad;
+    if (rect.i0 <= 0) box[0] = Math.min(box[0], -fade);
+    if (rect.j0 <= 0) box[1] = Math.min(box[1], -fade);
+    if (rect.i1 >= field.cols) box[2] = Math.max(box[2], Math.max(this.w, field.cols * LAND_CELL) + fade);
+    if (rect.j1 >= field.rows) box[3] = Math.max(box[3], Math.max(this.d, field.rows * LAND_CELL) + fade);
+    return box;
+  }
+
+  /**
+   * A height field's samples in `rect` changed (a brush's stamp): the ground tiles there drawn again from it, with the
+   * colours they had (`kept`; shaded again once the stroke is done, `landDone`), the grass's heights there and the
+   * water above the sea's level. Cheap: every stamp. Says how many tiles it drew again.
+   */
+  reground(rect: LandRect): number {
+    if (!this.heightField || !this.host) return 0;
+    const box = this.landBox(rect, LAND_CELL);
+    const tiles = this.tilesIn(box);
+    const { n } = this.tileFrame();
+    const colors = new Float32Array(n * n * 4);
+    for (const k of tiles) {
+      const t = this.tiles[k];
+      if (!t?.kept) continue;
+      const positions = this.tileGrid(k);
+      // (`heightAt`, the roads' levelling kept by point: the roads don't move as the land is shaped.)
+      const levels = (t.levels ??= this.roadLevels(positions));
+      for (let v = 1, q = 0; v < positions.length; v += 3, q += 2) {
+        const g = this.ground(positions[v - 1], positions[v + 1]);
+        positions[v] = g + (levels[q + 1] - g) * levels[q];
+      }
+      for (let q = 0; q < colors.length; q++) colors[q] = t.kept[q] / 255;
+      this.redrawTile(t, positions, colors);
+    }
+    this.pondsIn(tiles);
+    const grass = this.grass?.grassField;
+    if (grass) {
+      regroundGrass(grass, this, box[0], box[1], box[2], box[3]);
+      this.grass?.landChanged(false);
+    }
+    return tiles.length;
+  }
+
+  /**
+   * How the roads level the land at each point of a tile's grid (`heightAt`): how much of the way (0..1) to the
+   * height it is levelled to (a pair a point).
+   */
+  private roadLevels(positions: Float32Array): Float32Array {
+    const out = new Float32Array((positions.length / 3) * 2);
+    for (let v = 0, q = 0; v < positions.length; v += 3, q += 2) {
+      const road = this.roads.near(positions[v], positions[v + 2]);
+      if (!road) continue;
+      out[q] = 1 - smoothstep(road.width / 2 + 0.4, road.width / 2 + ROAD_VERGE, road.dist);
+      out[q + 1] = road.h - 0.02;
+    }
+    return out;
+  }
+
+  /** A tile's levels drawn from `meshes` now (its level kept), the old ones destroyed. */
+  private swapTile(t: GroundTile, meshes: pc.Mesh[]): void {
+    const old = t.meshes;
+    t.meshes = meshes;
+    t.mi.mesh = meshes[t.lod];
+    for (const m of old) m.destroy();
+  }
+
+  /** The water above the sea's level of the tiles `tiles` drawn again (`pond`), the owner told what came and went. */
+  private pondsIn(tiles: readonly number[]): void {
+    const added: pc.Entity[] = [];
+    const removed: pc.Entity[] = [];
+    for (const k of tiles) {
+      const old = this.ponds.get(k);
+      // (A tile with water before and after keeps its draw: its mesh is swapped.)
+      if (old && this.pondMesh(k, old)) continue;
+      if (old) removed.push(old);
+      this.ponds.delete(k);
+      added.push(...this.pond(k));
+    }
+    this.drawsChanged(added, removed);
+  }
+
+  /** The owner told of draws come and gone (`onDraws`), and the gone destroyed. */
+  private drawsChanged(added: pc.Entity[], removed: pc.Entity[]): void {
+    if (!added.length && !removed.length) return;
+    this.onDraws?.(added, removed);
+    for (const e of removed) e.destroy();
+  }
+
+  /** Tile `k`'s water above the sea's level as a mesh (`pondQuads`), or null without any. */
+  private pondData(k: number): pc.Mesh | null {
+    const field = this.heightField;
+    if (!field || !this.host) return null;
+    const [, , tx, tz] = this.tileCorner(k);
+    const quads = pondQuads(field, tx, tz, tx + TILE, tz + TILE);
+    if (!quads) return null;
+    const mesh = new pc.Mesh(this.host.app.graphicsDevice);
+    mesh.setPositions(quads.positions);
+    mesh.setNormals(new Float32Array(quads.positions.length).map((_, q) => (q % 3 === 1 ? 1 : 0)));
+    mesh.setIndices(quads.indices);
+    mesh.update(pc.PRIMITIVE_TRIANGLES);
+    return mesh;
+  }
+
+  /** Tile `k`'s water drawn again by its draw `entity` (its old mesh destroyed); false if it has none now. */
+  private pondMesh(k: number, entity: pc.Entity): boolean {
+    const mesh = this.pondData(k);
+    if (!mesh) return false;
+    const mi = entity.render!.meshInstances[0];
+    const old = mi.mesh;
+    mi.mesh = mesh;
+    old?.destroy();
+    return true;
+  }
+
+  /** Tile `k`'s water above the sea's level (`pondQuads`), as a draw in the sheet's material (switched off), kept by tile; none without any. */
+  private pond(k: number): pc.Entity[] {
+    const mesh = this.pondData(k);
+    if (!mesh || !this.host) return [];
+    const [i, j] = this.tileCorner(k);
+    const { app, parent } = this.host;
+    const entity = drawOf(app, parent, `pond${i},${j}`, mesh, this.waterMat(app));
+    this.ponds.set(k, entity);
+    return [entity];
+  }
+
+  /** The water sheet drawn if the land has water at the sea's level (or the landscape its own), taken away if not. */
+  private sheetAsNeeded(): void {
+    if (!this.host) return;
+    if (this.seaSheet && !this.sheet) {
+      this.sheet = this.water(this.host.app, this.host.parent);
+      this.others.push(this.sheet);
+      this.drawsChanged([this.sheet], []);
+    } else if (!this.seaSheet && this.sheet) {
+      const gone = this.sheet;
+      this.sheet = null;
+      this.others = this.others.filter((e) => e !== gone);
+      this.drawsChanged([], [gone]);
+    }
+  }
+
+  /**
+   * A stroke of the brushes done over the samples in `rect`: the land's water, top and zones measured again
+   * (`LandscapeLayout.landChanged`), then the ground tiles there shaded again (their colours too, and kept), the
+   * sheet as the water now needs it, and the grass's colours there, a tile or a strip of the grass at a time between
+   * `pace`s. (The woods and flowers: `regrow`.) Says the box (m) it reached.
+   */
+  async landDone(rect: LandRect, pace?: () => Promise<void>): Promise<[number, number, number, number] | null> {
+    if (!this.heightField || !this.host) return null;
+    this.landChanged(rect);
+    const box = this.landBox(rect, LAND_DONE_PAD);
+    for (const k of this.tilesIn(box)) {
+      await pace?.();
+      const t = this.tiles[k];
+      if (!t || !this.host) return null;
+      const positions = this.tileGrid(k);
+      const colors = new Float32Array((positions.length / 3) * 4);
+      // (Whole before its meshes are made: it gives a turn every 4096 points, `pace` or not.)
+      const span = perfStart('land: shade tile');
+      await this.shadeTerrain(positions, colors);
+      perfEnd(span);
+      t.kept = bytesOf(colors);
+      this.redrawTile(t, positions, colors);
+    }
+    this.sheetAsNeeded();
+    const grass = this.grass?.grassField;
+    if (grass) {
+      for (let z = box[1]; z < box[3]; z += LAND_GRASS_STRIP) {
+        await pace?.();
+        perfTime('land: grass strip', () => recolourGrass(grass, this, box[0], z, box[2], Math.min(box[3], z + LAND_GRASS_STRIP)), `${Math.round(box[2] - box[0])} m`);
+      }
+      perfTime('land: grass upload', () => this.grass?.landChanged(true));
+    }
+    return box;
+  }
+
+  /**
+   * The land drawn again whole (a height field taken on or let go of, `setLand`): every ground tile shaded again and
+   * its colours kept, the water above the sea's level, the sheet, and the grass field, made in the render data worker
+   * where one runs (sent the field), else here between `pace`s. (The woods and flowers: `regrow`.)
+   */
+  async redrawLand(pace?: () => Promise<void>): Promise<void> {
+    const world = this.world;
+    if (!world || !this.host || !this.tiles.length) return;
+    const { app } = this.host;
+    const off = OffThreadLand.open(world);
+    off?.setField(this.heightField);
+    this.offThread = off;
+    try {
+      const grassLand = off?.grass(this.ring) ?? Promise.resolve(null);
+      const ahead = off ? SHADE_AHEAD : 0;
+      const shading: Promise<{ positions: Float32Array; colors: Float32Array }>[] = [];
+      const count = this.tiles.length;
+      for (let k = 0; k < count; k++) {
+        while (shading.length <= ahead && k + shading.length < count) {
+          const at = k + shading.length;
+          shading.push(this.shaded(() => this.tileGrid(at), pace));
+        }
+        const { positions, colors } = await shading.shift()!;
+        await pace?.();
+        const t = this.tiles[k];
+        if (!t || !this.host) return;
+        t.kept = bytesOf(colors);
+        // (Made anew, kept off the CPU: most of them no brush will reach.)
+        t.live = false;
+        this.swapTile(t, this.tileMeshes(app, positions, colors));
+      }
+      this.pondsIn([...this.tiles.keys()]);
+      this.sheetAsNeeded();
+      const grass = this.grass?.grassField;
+      if (grass) {
+        const made = await grassLand;
+        if (made && made.colour.length === grass.colour.length && made.ground.length === grass.ground.length) {
+          grass.colour.set(made.colour);
+          grass.ground.set(made.ground);
+          markGrassPatches(grass);
+        } else {
+          const [x1, z1] = [grass.x0 + grass.w, grass.z0 + grass.d];
+          for (let z = grass.z0; z < z1; z += LAND_GRASS_STRIP) {
+            await pace?.();
+            recolourGrass(grass, this, grass.x0, z, x1, Math.min(z1, z + LAND_GRASS_STRIP));
+          }
+          regroundGrass(grass, this, grass.x0, grass.z0, x1, z1);
+        }
+        this.grass?.landChanged(true);
+      }
+    } finally {
+      off?.close();
+      this.offThread = null;
+    }
+  }
+
+  /**
+   * The woods and the lawn's flowers grown again: with a height field, the squares a box (m) reaches (all: null)
+   * from their own streams (`woodsAgain`, `lawnsAgain`), else all of them from the one stream, as built. The models
+   * whose plants changed are drawn anew (their templates kept), as `rebuild` does: the new draws, the ones they
+   * replace, and `commit` or `discard`. Null before a build.
+   */
+  async regrow(assets: AssetRegistry, box: [number, number, number, number] | null, pace?: () => Promise<void>): Promise<NatureRebuild | null> {
+    const world = this.world;
+    if (!world || !this.host) return null;
+    const { app, parent } = this.host;
+    let woods: Woods;
+    let woodsChanged: Set<string> | null = null;
+    let lawns: LawnPlacement[];
+    let lawnsChanged: Set<string> | null = null;
+    if (this.heightField) {
+      ({ woods, changed: woodsChanged } = await perfTimeAsync('land: woods', () => this.woodsAgain(box, pace)));
+      ({ lawns, changed: lawnsChanged } = await perfTimeAsync('land: flowers', () => this.lawnsAgain(world, box, pace)));
+    } else {
+      woods = await this.woods(pace);
+      lawns = await this.lawns(world, pace);
+    }
+    const isWoods = (b: Batch) => b.part === 'woods' || b.part === 'farWoods';
+    const stale = this.batches.filter((b) => (isWoods(b) ? !woodsChanged || woodsChanged.has(b.key) : !lawnsChanged || lawnsChanged.has(b.key)));
+    const templates = new Map<string, ModelTemplate>();
+    for (const b of stale) if (b.built.template && !b.built.failed) templates.set(`${b.key}|${b.lod}`, b.built.template);
+    const fresh: Batch[] = [];
+    const freshLawns: { at: number; matrices: Float32Array[]; tiles: readonly number[]; clear?: boolean }[] = [];
+    for (const [bucket, casts] of [
+      [woods.near, true],
+      [woods.far, false],
+    ] as const) {
+      for (const [key, list] of bucket) {
+        if (woodsChanged && !woodsChanged.has(key)) continue;
+        const lod = casts ? 0 : 1;
+        const built = await instanced(app, parent, assets, key, list, lod, woods.sector, pace, templates.get(`${key}|${lod}`));
+        fresh.push(batch({ key, matrices: list, lod, cell: woods.sector }, casts, casts ? 'woods' : 'farWoods', built));
+      }
+    }
+    for (const { key, matrices, tiles, cell, clear } of lawns) {
+      if (lawnsChanged && !lawnsChanged.has(key)) continue;
+      const lod = this.lawnLod;
+      const built = await instanced(app, parent, assets, key, matrices, lod, cell, pace, templates.get(`${key}|${lod}`));
+      freshLawns.push({ at: fresh.length, matrices, tiles, clear });
+      fresh.push(batch({ key, matrices, lod, cell, tiles, clear }, false, 'flowers', built));
+    }
+    // A big world's crown clusters, gathered again from every tree.
+    let crowns: FarCrowns | null = null;
+    if (this.built && (!woodsChanged || woodsChanged.size)) {
+      const trees: { kind: string; m: Float32Array }[] = [];
+      for (const map of [woods.near, woods.far]) for (const [kind, list] of map) for (const m of list) trees.push({ kind, m });
+      crowns = new FarCrowns(app, parent, trees, woods.sector);
+    }
+    const kept = new Set(templates.values());
+    const replaced = gather(stale).draws;
+    const commit = () => {
+      const used = new Set(fresh.map((b) => b.built.template));
+      for (const b of stale) release(b.built, used);
+      const going = new Set(stale);
+      this.batches = [...this.batches.filter((b) => !going.has(b)), ...fresh];
+      const gone = new Set(replaced);
+      this.lawn = this.lawn.filter((layer) => !layer.draws.some((d) => gone.has(d.entity)));
+      for (const { at, matrices, tiles, clear } of freshLawns) {
+        const layers = lawnLayers(fresh[at].built, matrices, tiles, clear);
+        this.lawn.push(...layers);
+        if (this.lawnMask) hideLawn(layers, this.lawnMask, uploadLawn);
+      }
+      if (crowns) {
+        this.crowns?.destroy();
+        this.crowns = crowns;
+      }
+      this.woodsSector = woods.sector;
+      this.findSquares();
+    };
+    const discard = () => {
+      for (const b of fresh) release(b.built, kept);
+      crowns?.destroy();
+    };
+    return { ...gather(fresh), replaced, commit, discard };
   }
 
   /** A big world's woods and flower squares, by where they are: those far from the camera are left out (`frameTiles`). */
@@ -444,6 +836,12 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     mesh.setUvs(0, [0, 1, 1, 1, 0, 0, 1, 0]);
     mesh.setIndices([3, 1, 0, 2, 3, 0]);
     mesh.update(pc.PRIMITIVE_TRIANGLES);
+    return drawOf(app, parent, 'water', mesh, this.waterMat(app));
+  }
+
+  /** The water's material (the sheet's and a height field's ponds'), made once: its own, it goes with the landscape. */
+  private waterMat(app: pc.AppBase): pc.StandardMaterial {
+    if (this.waterMaterial) return this.waterMaterial.material;
     const mat = new pc.StandardMaterial();
     mat.name = 'water';
     mat.frontFace = GAME_FRONT_FACE;
@@ -458,7 +856,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     lib.adopt(mat);
     mat.update();
     this.waterMaterial = { material: mat, lib };
-    return drawOf(app, parent, 'water', mesh, mat);
+    return mat;
   }
 
   /** The ground tiles' materials (the town view lays its colour map over them: `groundTiles.ts` `TownGroundMap`). */
@@ -518,6 +916,19 @@ const TILE_LODS = [64, 32, 16];
  * of the build.
  */
 const SHADE_AHEAD = 16;
+/** How far (m) past a stroke's samples the ground is shaded again once it's done: the zones' soft edges and the beach lean on them. */
+const LAND_DONE_PAD = 16;
+/** The grass's colours made again this many metres (rows of texels) at a time once a stroke is done. */
+const LAND_GRASS_STRIP = 12;
+/** How far past the world's edge a height field's edge carries (`LandscapeLayout.ground`). */
+const LAND_EDGE_FADE_M = 60;
+
+/** Colours 0..1 as bytes (a ground tile's kept colours: 18 KB a tile, not the 72 of floats). */
+function bytesOf(colors: Float32Array): Uint8Array {
+  const out = new Uint8Array(colors.length);
+  for (let q = 0; q < colors.length; q++) out[q] = Math.max(0, Math.min(255, Math.round(colors[q] * 255)));
+  return out;
+}
 
 /**
  * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`
@@ -525,68 +936,115 @@ const SHADE_AHEAD = 16;
  * finest heights round each point, and a skirt down from the edges. UVs as the one-mesh ground's
  * (over the landscape's square from `x0`, `z0`, `size` across).
  */
-function tileMesh(app: pc.AppBase, positions: Float32Array, colors: Float32Array, at: (col: number, row: number) => number, segs: number, step: number, c: number, x0: number, z0: number, size: number): pc.Mesh {
+function tileMesh(app: pc.AppBase, positions: Float32Array, colors: Float32Array, n: number, segs: number, step: number, c: number, x0: number, z0: number, size: number, into: pc.Mesh | 'live' | null = null): pc.Mesh {
   const m = segs + 1;
-  const pos: number[] = [];
-  const nor: number[] = [];
-  const uv: number[] = [];
-  const col: number[] = [];
-  const idx: number[] = [];
-  const vertex = (k: number, drop = 0) => {
-    const [x, y, z] = [positions[k * 3], positions[k * 3 + 1], positions[k * 3 + 2]];
-    pos.push(x, y - drop, z);
-    uv.push((x - x0) / size, (z - z0) / size);
-    col.push(colors[k * 4], colors[k * 4 + 1], colors[k * 4 + 2], colors[k * 4 + 3]);
-    return pos.length / 3 - 1;
-  };
-  const normal = (cc: number, rr: number) => {
-    const h = (a: number, b: number) => positions[at(a, b) * 3 + 1];
-    // (Rows run towards -z: the slope along z is the other way round.)
-    const dx = (h(cc + 1, rr) - h(cc - 1, rr)) / (2 * c);
-    const dz = (h(cc, rr - 1) - h(cc, rr + 1)) / (2 * c);
-    const l = Math.hypot(dx, 1, dz);
-    nor.push(-dx / l, 1 / l, -dz / l);
-  };
+  // (Point (col, row) of the finest grid, from -1: `(row + 1) * n + col + 1`.)
+  // (The grid's points, then each edge's again for the skirt: written straight into arrays of their size.)
+  const count = m * m + 4 * m;
+  const pos = new Float32Array(count * 3);
+  const nor = new Float32Array(count * 3);
+  const uv = new Float32Array(count * 2);
+  const col = new Float32Array(count * 4);
+  const idx = count > 65535 ? new Uint32Array(segs * segs * 6 + 4 * segs * 12) : new Uint16Array(segs * segs * 6 + 4 * segs * 12);
+  let v = 0;
+  let k = 0;
   for (let row = 0; row < m; row++) {
-    for (let cc = 0; cc < m; cc++) {
-      vertex(at(cc * step, row * step));
-      normal(cc * step, row * step);
+    for (let cc = 0; cc < m; cc++, v++) {
+      const p = (row * step + 1) * n + cc * step + 1;
+      const [p3, v3, v2, v4, p4] = [p * 3, v * 3, v * 2, v * 4, p * 4];
+      pos[v3] = positions[p3];
+      pos[v3 + 1] = positions[p3 + 1];
+      pos[v3 + 2] = positions[p3 + 2];
+      uv[v2] = (pos[v3] - x0) / size;
+      uv[v2 + 1] = (pos[v3 + 2] - z0) / size;
+      col[v4] = colors[p4];
+      col[v4 + 1] = colors[p4 + 1];
+      col[v4 + 2] = colors[p4 + 2];
+      col[v4 + 3] = colors[p4 + 3];
+      // Normals from the finest heights round each point. (Rows run towards -z: the slope along z is the other way round.)
+      const dx = (positions[p3 + 4] - positions[p3 - 2]) / (2 * c);
+      const dz = (positions[p3 - n * 3 + 1] - positions[p3 + n * 3 + 1]) / (2 * c);
+      const l = Math.sqrt(dx * dx + 1 + dz * dz);
+      nor[v3] = -dx / l;
+      nor[v3 + 1] = 1 / l;
+      nor[v3 + 2] = -dz / l;
     }
   }
   for (let row = 0; row < segs; row++) {
     for (let cc = 0; cc < segs; cc++) {
-      idx.push(cc + 1 + (row + 1) * m, cc + 1 + row * m, cc + row * m, cc + (row + 1) * m, cc + 1 + (row + 1) * m, cc + row * m);
+      idx[k++] = cc + 1 + (row + 1) * m;
+      idx[k++] = cc + 1 + row * m;
+      idx[k++] = cc + row * m;
+      idx[k++] = cc + (row + 1) * m;
+      idx[k++] = cc + 1 + (row + 1) * m;
+      idx[k++] = cc + row * m;
     }
   }
   // The skirt: each edge's points again, a cell and a metre lower, joined to the edge both ways round.
   const drop = c * step + 1;
-  const edges = [Array.from({ length: m }, (_, k) => k), Array.from({ length: m }, (_, k) => segs * m + k), Array.from({ length: m }, (_, k) => k * m), Array.from({ length: m }, (_, k) => k * m + segs)];
+  const edges = [(q: number) => q, (q: number) => segs * m + q, (q: number) => q * m, (q: number) => q * m + segs];
   for (const edge of edges) {
-    const low = edge.map((v) => {
-      const k = vertex(0);
-      // (A copy of the edge point, lowered: overwrite what `vertex(0)` wrote.)
-      pos[k * 3] = pos[v * 3];
-      pos[k * 3 + 1] = pos[v * 3 + 1] - drop;
-      pos[k * 3 + 2] = pos[v * 3 + 2];
-      uv[k * 2] = uv[v * 2];
-      uv[k * 2 + 1] = uv[v * 2 + 1];
-      for (let q = 0; q < 4; q++) col[k * 4 + q] = col[v * 4 + q];
-      nor.push(nor[v * 3], nor[v * 3 + 1], nor[v * 3 + 2]);
-      return k;
-    });
-    for (let k = 0; k + 1 < edge.length; k++) {
-      const [a, b, la, lb] = [edge[k], edge[k + 1], low[k], low[k + 1]];
-      idx.push(a, b, lb, a, lb, la, a, lb, b, a, la, lb);
+    const low = v;
+    for (let q = 0; q < m; q++, v++) {
+      const e = edge(q);
+      pos[v * 3] = pos[e * 3];
+      pos[v * 3 + 1] = pos[e * 3 + 1] - drop;
+      pos[v * 3 + 2] = pos[e * 3 + 2];
+      uv[v * 2] = uv[e * 2];
+      uv[v * 2 + 1] = uv[e * 2 + 1];
+      col.copyWithin(v * 4, e * 4, e * 4 + 4);
+      nor.copyWithin(v * 3, e * 3, e * 3 + 3);
+    }
+    for (let q = 0; q + 1 < m; q++) {
+      const [a, b, la, lb] = [edge(q), edge(q + 1), low + q, low + q + 1];
+      idx[k++] = a;
+      idx[k++] = b;
+      idx[k++] = lb;
+      idx[k++] = a;
+      idx[k++] = lb;
+      idx[k++] = la;
+      idx[k++] = a;
+      idx[k++] = lb;
+      idx[k++] = b;
+      idx[k++] = a;
+      idx[k++] = la;
+      idx[k++] = lb;
     }
   }
-  const mesh = new pc.Mesh(app.graphicsDevice);
+  // (A tile of a height field drawn again, `Landscape.redrawTile`: written into `into`'s buffers as they are, its
+  // indices kept; or made `live`, its vertices kept on the CPU to be written into.)
+  const again = into instanceof pc.Mesh;
+  if (again && writeVertices(into, { [pc.SEMANTIC_POSITION]: pos, [pc.SEMANTIC_NORMAL]: nor, [pc.SEMANTIC_TEXCOORD0]: uv, [pc.SEMANTIC_COLOR]: col }, count)) return into;
+  const mesh = again ? into : new pc.Mesh(app.graphicsDevice);
+  if (into === 'live') mesh.clear(true, false);
   mesh.setPositions(pos);
   mesh.setNormals(nor);
   mesh.setUvs(0, uv);
   mesh.setColors(col);
-  mesh.setIndices(pos.length / 3 > 65535 ? new Uint32Array(idx) : new Uint16Array(idx));
+  if (!again) mesh.setIndices(idx);
   mesh.update(pc.PRIMITIVE_TRIANGLES);
-  return gpuOnly(mesh);
+  return into ? mesh : gpuOnly(mesh);
+}
+
+/**
+ * Writes `streams` (by semantic, floats) straight into `mesh`'s vertex buffer as it is laid out (one block a stream,
+ * as `Mesh.update` lays out its own), up to the GPU, and its box again: what `Mesh.update` does element by element,
+ * a block at a time. False (nothing written) where the buffer isn't laid out so or keeps no copy to write into.
+ */
+function writeVertices(mesh: pc.Mesh, streams: Record<string, Float32Array>, count: number): boolean {
+  const vb = mesh.vertexBuffer;
+  if (!vb || vb.numVertices !== count || vb.format.interleaved || !vb.storage?.byteLength) return false;
+  const elements = vb.format.elements;
+  if (elements.length !== Object.keys(streams).length) return false;
+  for (const el of elements) if (!streams[el.name] || el.dataType !== pc.TYPE_FLOAT32 || el.numComponents * count !== streams[el.name].length) return false;
+  const locked = vb.lock();
+  const [data, base] = locked instanceof ArrayBuffer ? [locked, 0] : [locked.buffer, locked.byteOffset];
+  for (const el of elements) new Float32Array(data, base + el.offset, el.numComponents * count).set(streams[el.name]);
+  vb.unlock();
+  const box = new pc.BoundingBox();
+  box.compute(streams[pc.SEMANTIC_POSITION], count);
+  mesh.aabb = box;
+  return true;
 }
 
 /** An entity of `app` drawing `mesh` with `material`, switched off, under `parent`; it receives shadows and casts none. */
@@ -622,13 +1080,16 @@ interface Instanced {
 }
 
 /** Takes down a model's plants: their draws, then the template's meshes. */
-function release(built: Instanced): void {
+function release(built: Instanced, keep?: ReadonlySet<ModelTemplate | undefined>): void {
   for (const d of [...built.shared, ...built.whole, ...built.cells.flatMap((c) => c.draws)]) d.destroy();
-  if (built.template) disposeTemplate(built.template);
+  if (built.template && !keep?.has(built.template)) disposeTemplate(built.template);
 }
 
 /** One model's plants, as the landscape keeps them. */
 interface Batch {
+  /** Its model, and the level drawn (`instanced`'s). */
+  key: string;
+  lod: 0 | 1;
   built: Instanced;
   /** Its parts drawn whole cast shadows (the woods near the town). */
   casts: boolean;
@@ -651,7 +1112,7 @@ interface BatchSource {
 
 /** A batch of plants built from `source`, which it keeps only if it was built without a file (all of them are several MB a landscape). */
 function batch(source: BatchSource, casts: boolean, part: Batch['part'], built: Instanced): Batch {
-  return { built, casts, part, ...(built.failed ? { again: source } : {}) };
+  return { key: source.key, lod: source.lod, built, casts, part, ...(built.failed ? { again: source } : {}) };
 }
 
 /** The draws of `batches`: which cast shadows, and which are drawn only in the game or only in the menus' town (see `NatureResult`). */
@@ -695,11 +1156,12 @@ async function instanced(
   lod: 0 | 1 = 0,
   cell?: (x: number, z: number) => string,
   pace?: () => Promise<void>,
+  made?: ModelTemplate,
 ): Promise<Instanced> {
   if (matrices.length === 0) return { shared: [], whole: [], cells: [] };
   await pace?.();
-  // Without its file, nothing, until the file comes (`Landscape.rebuild`).
-  const template = await perfTimeAsync(`nature: model ${key}`, () => buildModel(app, key, assets.get(key, 'model'), [1, 1], { lod }));
+  // Without its file, nothing, until the file comes (`Landscape.rebuild`). (`made`: the template built already, its plants grown again.)
+  const template = made ?? (await perfTimeAsync(`nature: model ${key}`, () => buildModel(app, key, assets.get(key, 'model'), [1, 1], { lod })));
   await pace?.();
   const groups = cell ? groupInstances(matrices, (m) => cell(m[12], m[14])) : new Map<string, number[]>();
   const split = groups.size > 1 ? template.meshes.filter((m) => splitsByGroup(m, matrices.length)) : [];

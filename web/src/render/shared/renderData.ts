@@ -1,16 +1,18 @@
 /**
  * The landscape's data built off the main thread (`renderData.worker.ts`): the grass field
  * (`grassField`, a texel a metre over the land: seconds of work round a big world), the terrain's
- * heights and colours (`LandscapeLayout.shadeTerrain`), and the town's road mesh (`roadMeshes`,
- * the menu overview's streets). The worker lays the land out again from the same world
+ * heights and colours (`LandscapeLayout.shadeTerrain`), the land surveyed as a height field
+ * (`bakeLand`), and the town's road mesh (`roadMeshes`, the menu overview's streets). The worker lays the land out again from the same world
  * (`LandscapeLayout`, deterministic: the same numbers as the page's) and sends back typed arrays;
  * the page only builds meshes and textures from them. Where no worker runs (or one fails), each
  * call says so and the caller builds on the page as before.
  */
 
-import type { WorldStructure } from '../../core/protocol';
+import { groundDepth, type WorldStructure } from '../../core/protocol';
+import type { Land as HeightField } from '../../game/land';
 import { CountryRoads } from './countryRoads';
 import { grassField, townGrass, type GrassField } from './grass';
+import { bakeLand } from './landBake';
 import { LandscapeLayout } from './nature';
 import type { RoadMeshData } from './roads';
 import { LazyWorker } from '../../core/lazyWorker';
@@ -63,6 +65,11 @@ export class Land extends LandscapeLayout {
     return { x0, z0, margin: m, w, d, colour, pw, pd, ground };
   }
 
+  /** The land surveyed as drawn (`bakeLand`). */
+  bake(world: WorldStructure): HeightField {
+    return bakeLand(this, world.width, groundDepth(world));
+  }
+
   /** The terrain's heights (into `positions`) and colours (`shadeTerrain`). */
   async shade(positions: Float32Array): Promise<Float32Array> {
     const colors = new Float32Array((positions.length / 3) * 4);
@@ -83,13 +90,19 @@ export type ToRenderData =
   | { type: 'close'; land: number }
   | { type: 'grass'; land: number; margin: number }
   | { type: 'roads'; world: WorldStructure }
-  | { type: 'shade'; land: number; positions: Float32Array };
+  | { type: 'shade'; land: number; positions: Float32Array }
+  /** The land surveyed as a height field (`bakeLand`). */
+  | { type: 'bake'; land: number }
+  /** The land drawn from a height field from now on (`LandscapeLayout.setLand`; null: from the world's own again). */
+  | { type: 'field'; land: number; field: HeightField | null };
 
 export type RenderDataAnswer =
   | { type: 'grass'; field: LandGrass }
   /** `ms`: the worker's own build, for the perf spans. */
   | { type: 'roads'; roads: RoadMeshData; ms: number }
-  | { type: 'shade'; positions: Float32Array; colors: Float32Array };
+  | { type: 'shade'; positions: Float32Array; colors: Float32Array }
+  /** `ms`: the worker's own survey, for the perf spans. */
+  | { type: 'bake'; field: HeightField; ms: number };
 
 /** A render data worker (`renderData.worker.ts`); it goes once it has had nothing to do for half a minute. */
 const dataWorker = () =>
@@ -124,6 +137,11 @@ class Opened {
 
   get there(): boolean {
     return this.worker.run === this.run;
+  }
+
+  /** A message needing no answer. */
+  post(message: ToRenderData): void {
+    this.worker.post(message);
   }
 
   ask(message: ToRenderData, transfer: Transferable[] = []): Promise<RenderDataAnswer | null> {
@@ -175,6 +193,22 @@ export class OffThreadLand {
     if (this.closed || !this.shading.there) return null;
     const reply = await this.shading.ask({ type: 'shade', land: this.id, positions }, [positions.buffer]);
     return reply?.type === 'shade' ? reply : null;
+  }
+
+  /**
+   * The land surveyed as a height field (`bakeLand`: as the landscape draws it), and how long the worker took (ms);
+   * null where the worker couldn't.
+   */
+  async bake(): Promise<{ field: HeightField; ms: number } | null> {
+    if (this.closed || !this.shading.there) return null;
+    const reply = await this.shading.ask({ type: 'bake', land: this.id });
+    return reply?.type === 'bake' ? { field: reply.field, ms: reply.ms } : null;
+  }
+
+  /** The land drawn from `field` from now on in both workers (a copy goes over: the page keeps its own). */
+  setField(field: HeightField | null): void {
+    if (this.closed) return;
+    for (const there of [this.shading, this.grassing]) if (there?.there) there.post({ type: 'field', land: this.id, field });
   }
 
   /** Done with this world: the workers forget its land (and go once idle). */
