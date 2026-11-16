@@ -25,6 +25,13 @@
     if (off) return;
     const t = e.target;
     if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return;
+    // (The tool in hand first: Esc drops what it is drawing before it puts the tool down. A key the
+    // town stage took already, Esc ending a drag, is done with.)
+    if (e.defaultPrevented) return;
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && editor.stageTool?.key?.(e)) {
+      e.preventDefault();
+      return;
+    }
     if (e.key === 'Escape') {
       if (!editor.toolId && !editor.selected) return;
       editor.take(null);
@@ -81,15 +88,19 @@
   {#if !off}
     {#if tool}
       <p class="hint does"><b>{tool.label}</b> {tool.does} <kbd>Esc</kbd> puts it down.</p>
+      <!-- (What the tool would do under the pointer, above its card: a tall card would push it out of view.) -->
+      {#if editor.hintText}
+        <p class="hint pointer" aria-live="polite">{editor.hintText}</p>
+      {/if}
       {#if tool.card}
         {@const Card = tool.card}
         <Card {editor} />
       {/if}
     {:else}
       <p class="hint does">Take a tool, or click a lot to see what can be done to it.</p>
-    {/if}
-    {#if editor.hintText}
-      <p class="hint pointer" aria-live="polite">{editor.hintText}</p>
+      {#if editor.hintText}
+        <p class="hint pointer" aria-live="polite">{editor.hintText}</p>
+      {/if}
     {/if}
     {#if editor.note}
       <p class="hint warn" role="alert">{editor.note}</p>
