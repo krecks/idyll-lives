@@ -446,6 +446,8 @@ export interface Civic {
   name: (n: Namer) => string;
   work: string[];
   least: TownSize;
+  /** What a card calls it in a smaller place than a town (a village's hall is its village hall): `civicLabel`. */
+  labels?: Partial<Record<TownSize, string>>;
   /** Its gable end to the road (a church): deeper than wide, the ridge running back from the road. */
   endOn?: boolean;
   known: RegExp;
@@ -455,7 +457,7 @@ const SIZES: readonly TownSize[] = ['hamlet', 'village', 'town', 'city'];
 /** The civic places, in the order a main town lays them (an index into this is a civic place's in step 2's choices: `civicChoices`). */
 export const CIVIC: readonly Civic[] = [
   // (A hamlet's hall is its parish's, a village's its own: the careers no other place takes work there.)
-  { label: 'Town hall', kind: K('office', [16, 20], [12, 14], [3, 3], ['hip', 'mansard']), place: 'office', name: (n) => `${n.town} ${{ hamlet: 'Parish Hall', village: 'Village Hall', town: 'Town Hall', city: 'Town Hall' }[n.size]}`, work: ['politics'], least: 'hamlet', known: / (Parish|Village|Town) Hall$/ },
+  { label: 'Town hall', kind: K('office', [16, 20], [12, 14], [3, 3], ['hip', 'mansard']), place: 'office', name: (n) => `${n.town} ${{ hamlet: 'Parish Hall', village: 'Village Hall', town: 'Town Hall', city: 'Town Hall' }[n.size]}`, work: ['politics'], least: 'hamlet', labels: { hamlet: 'Parish hall', village: 'Village hall' }, known: / (Parish|Village|Town) Hall$/ },
   { label: 'Church', kind: K('church', [11, 13], [22, 28], [3, 3], ['gable']), place: 'church', name: (n) => `St ${pick(n.rand, SAINTS)}'s Church`, work: [], least: 'hamlet', endOn: true, known: /^St .+'s Church$/ },
   { label: 'School', kind: K('school', [28, 36], [14, 18], [2, 2], ['hip', 'flat']), place: 'school', name: (n) => `${n.town} School`, work: ['education'], least: 'village', known: / School$/ },
   { label: 'Police station', kind: K('office', [12, 16], [11, 13], [2, 3], ['flat', 'hip']), place: 'office', name: (n) => `${n.town} Police Station`, work: ['detective'], least: 'town', known: / Police Station$/ },
@@ -472,7 +474,7 @@ export const CIVIC: readonly Civic[] = [
   { label: 'Studios', kind: K('workshop', [10, 14], [10, 12], [2, 2], ['gable']), place: 'workshop', name: (n) => `${n.street()} Studios`, work: ['arts'], least: 'village', known: / Studios$/ },
   { label: 'Inn', kind: K('restaurant', [12, 16], [12, 14], [2, 3], ['gable', 'hip']), place: 'restaurant', name: (n) => n.inn(), work: ['culinary', 'hospitality', 'music'], least: 'hamlet', known: /^The \S+ \S+$/ },
   { label: 'Hotel', kind: K('restaurant', [16, 22], [12, 14], [3, 4], ['mansard', 'hip']), place: 'restaurant', name: (n) => `The ${n.town} Hotel`, work: ['hospitality'], least: 'town', known: / Hotel$/ },
-  { label: 'Boutique', kind: K('shop', [8, 10], [10, 12], [2, 3], ['gable', 'mansard']), place: 'shop', name: (n) => (n.size === 'hamlet' ? `${n.last()}'s Village Shop` : `${n.last()}'s Boutique`), work: ['fashion', 'retail'], least: 'hamlet', known: /'s (Village Shop|Boutique)$/ },
+  { label: 'Boutique', kind: K('shop', [8, 10], [10, 12], [2, 3], ['gable', 'mansard']), place: 'shop', name: (n) => (n.size === 'hamlet' ? `${n.last()}'s Village Shop` : `${n.last()}'s Boutique`), work: ['fashion', 'retail'], least: 'hamlet', labels: { hamlet: 'Village shop' }, known: /'s (Village Shop|Boutique)$/ },
   { label: 'Garden centre', kind: K('shop', [14, 20], [12, 16], [1, 1], ['flat', 'gable']), place: 'shop', name: (n) => `${n.town} Garden Centre`, work: ['nature', 'retail'], least: 'village', known: / Garden Centre$/ },
 ];
 const SAINTS = ['Mary', 'John', 'Peter', 'Michael', 'Andrew', 'James', 'Anne', 'Catherine', 'Luke', 'Margaret', 'Martin', 'Nicholas'];
@@ -557,6 +559,25 @@ export function namerFor(rand: Rand, town: string, size: TownSize, lastNames: re
   };
 }
 
+/** What a card calls civic place `c` in a place of `size` (its own label, else the size's: `Civic.labels`). */
+export function civicLabel(c: Civic, size: TownSize): string {
+  return c.labels?.[size] ?? c.label;
+}
+
+/**
+ * How big area `area` of a town whose main town is `main` is, for its civic places and their names: the main town
+ * (area 0) its own size; a village (any other area) a village, and no bigger than its main town (round a hamlet,
+ * a hamlet). A village is offered a village's civic places (`Civic.least`) and its hall is a village hall.
+ */
+export function areaSize(main: TownSize, area: number): TownSize {
+  return area === 0 ? main : SIZES[Math.min(SIZES.indexOf(main), SIZES.indexOf('village'))];
+}
+
+/** Whether civic place `c` is for a bigger place than one of `size` (`Civic.least`). */
+export function civicTooBig(c: Civic, size: TownSize): boolean {
+  return SIZES.indexOf(c.least) > SIZES.indexOf(size);
+}
+
 /** Which civic place `place` is (an index into `CIVIC`), or -1: its kind, the careers it was made for first, and its name's look. */
 export function civicOf(place: TownPlace | undefined): number {
   if (!place) return -1;
@@ -564,13 +585,19 @@ export function civicOf(place: TownPlace | undefined): number {
 }
 
 /**
- * The civic places area `area` of `draft` (the main town unless given) does not have yet, for step
- * 2's Lot tool to set by hand: each one's index into `CIVIC`, what it is called on a card, and how
- * big its building may be (m along the road, m deep).
+ * The civic places area `area` of `draft` (the main town unless given) does not have yet, of its size (`areaSize`:
+ * a village has no police station), for step 2's Lot tool to set by hand: each one's index into `CIVIC`, what it is
+ * called on a card (`civicLabel`), and how big its building may be (m along the road, m deep).
  */
 export function civicChoices(draft: NeighbourhoodDraft, area = 0): { index: number; name: string; w: [number, number]; d: [number, number] }[] {
   const has = new Set((draft.open?.places ?? []).filter((p) => p.area === area).map(civicOf));
-  return CIVIC.flatMap((c, index) => (has.has(index) ? [] : [{ index, name: c.label, w: c.kind.w, d: c.kind.d }]));
+  const size = areaSize(draftSize(draft), area);
+  return CIVIC.flatMap((c, index) => (has.has(index) || civicTooBig(c, size) ? [] : [{ index, name: civicLabel(c, size), w: c.kind.w, d: c.kind.d }]));
+}
+
+/** How big `draft`'s main town is (its place's and options' `civic`). */
+export function draftSize(draft: NeighbourhoodDraft): TownSize {
+  return specOf(placeOf(draft.world?.kind ?? 'country'), draft.world?.options).civic;
 }
 
 export interface BackdropInput {
@@ -650,6 +677,8 @@ export class BackdropPass {
   private readonly density: number;
   private readonly least: number;
   private readonly size: TownSize;
+  /** How big area `a` is for its places' names (`areaSize` on a draft, the main town's size for the generator). */
+  private readonly sizeOf: (a: number) => TownSize;
   private readonly index: RoadIndex;
   /** Which roads are ways (not trails). */
   private readonly ways: boolean[];
@@ -695,6 +724,8 @@ export class BackdropPass {
       this.density = spec.density;
       this.least = spec.mainLeast;
       this.size = spec.civic;
+      // (By hand, a village's civic place is named as a village's: its village hall.)
+      this.sizeOf = (a) => areaSize(spec.civic, a);
       this.placeList.push(...(open?.places ?? []));
     } else {
       this.content = input.content;
@@ -712,6 +743,8 @@ export class BackdropPass {
       this.density = input.density;
       this.least = input.least;
       this.size = input.civic;
+      const size = input.civic;
+      this.sizeOf = () => size;
     }
     const { W, D, roads, slots, ground } = this;
     this.index = new RoadIndex(roads);
@@ -1107,7 +1140,7 @@ export class BackdropPass {
     const { roads, areas } = this;
     const lastNames = this.content.names.last.length ? this.content.names.last : ['Smith'];
     const streets = areas[a].roads.map((r) => roads[r].name).filter((n): n is string => !!n && !/Trail|Path/.test(n));
-    return namerFor(rand, areas[a].name, this.size, lastNames, streets, taken);
+    return namerFor(rand, areas[a].name, this.sizeOf(a), lastNames, streets, taken);
   }
 
   /** Building `i`'s place, if it is one (a civic place, a farm building, a shop, a café...): named (none of `taken`), its tag at its door, its hours and the careers working there. */
