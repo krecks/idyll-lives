@@ -39,7 +39,7 @@ import type { Content } from '../../content/content';
 import type { RoadPlan, TownArea } from '../../core/protocol';
 import { along, clearOfBoxes, CountryRouter, TRIES, type Cells, type Onward, type Port, type Way } from '../countryRouter';
 import { heightAt, type Land } from '../land';
-import { AREA_APART, cells8, cornersOf, hamletFits, hamletLots, hamletOf, putHamlet, type AreaPlan } from '../macro';
+import { AREA_APART, cells8, cornersOf, hamletFits, hamletLots, hamletOf, parkingFor, putHamlet, type AreaPlan } from '../macro';
 import { mulberry32 } from '../noise';
 import { COURT, endDir, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, roadIndex, tangent, type Pt } from '../roads';
 import { boundsOf, frontageOf, LotPlacer, plotRect, type Facing, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';
@@ -69,8 +69,6 @@ const EDGE = 50;
 const BOX_GAP = 24;
 /** Nothing already standing (a road, a lot, a building) within this of a village's box (m): its streets reach its edges. */
 const WAY = 8;
-/** A village's parking spaces (`macro.ts` `PARKING_VILLAGE`). */
-const PARKING = 2;
 /** A road on from a port meets what lies within this of straight on before what lies to the side, which costs it more (`countryRouter.ts` `AHEAD`, `ASIDE`). */
 const AHEAD = Math.PI / 3;
 const ASIDE = 30;
@@ -536,10 +534,11 @@ export function placeVillage(draft: NeighbourhoodDraft, t: Templates, content: C
   hamletLots(content, t, spec, plan, a, placer, roads, cornersOf(roads, plan.roads), rand);
   if (placer.slots.length < FEWEST_LOTS) return { refused: 'there is no room for a village’s homes along its streets there' };
   const slots = placer.slots.map((s, k): PlotSlot => ({ ...s, index: draft.slots.length + k, area: a }));
-  // Its parking: a few spaces by the verge nearest its middle (as the generator lays a hamlet's).
+  // Its parking: a few spaces by the verge nearest its middle, more for more homes (as the generator lays a hamlet's).
+  const spaces = parkingFor(slots.filter((s) => s.kind === 'house').length, false);
   const parking: { x: number; z: number; rot: number; area: number }[] = [];
   for (const f of frontageOf(roads, plan.roads, plan.centre, rand)) {
-    if (parking.length >= PARKING) break;
+    if (parking.length >= spaces) break;
     const facing = (Math.abs(f.n[1]) >= Math.abs(f.n[0]) ? (f.n[1] > 0 ? 0 : 2) : f.n[0] > 0 ? 1 : 3) as Facing;
     const reach = roads[f.road].width / 2 + 0.5;
     const [qx, qz] = [f.p[0] + f.n[0] * (reach + 3), f.p[1] + f.n[1] * (reach + 3)];

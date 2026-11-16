@@ -334,8 +334,8 @@ describe('seeded people', async () => {
     expect(defaultResidentsMost(120)).toBe(240);
     expect(defaultResidentsMost(400)).toBe(400 + SIM_RESIDENTS - FILL_CAP);
     expect(defaultResidentsMost(760)).toBe(SIM_RESIDENTS);
-    // Every graphics preset fills in full until the M1's numbers say otherwise.
-    for (const preset of ['low', 'medium', 'high', undefined]) expect(tierFor(preset)).toBe('full');
+    // A lower graphics preset fills a smaller town; a preset it does not know fills in full.
+    expect(['low', 'medium', 'high', undefined].map(tierFor)).toEqual(['near', 'half', 'full', 'full']);
   });
 
   test('the furnish job furnishes the houses the households about to move in need, and the town file is the same after it', () => {

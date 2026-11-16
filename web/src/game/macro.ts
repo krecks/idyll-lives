@@ -216,13 +216,21 @@ export const BEND_MOST = 0.3;
 /** A T leaves a street where it turns less than this (radians) over 14 m either side. */
 const T_BEND = 0.3;
 /**
- * Public parking spaces by the verge nearest an area's middle: so many in the main town, so many in
- * each village. The main town's is to grow with its size (more spaces by its public places in a
- * town or a city than in a hamlet), from the sim stream's measures of where cars queue for a space
- * once the town is filled; until those are in, it is the count every world has had.
+ * Public parking spaces by the verge nearest an area's middle: at least so many in the main town and
+ * in each village, and in a place's areas one for every so many homes if that is more
+ * (`parkingFor`). With the town filled, the old four and two had nine spaces in ten taken for seven
+ * or eight game hours a day; about twice as many should bring that to two, like a town a third
+ * full. A classic world keeps the fixed count.
  */
 const PARKING_MAIN = 4;
 const PARKING_VILLAGE = 2;
+const HOMES_PER_SPACE_MAIN = 25;
+const HOMES_PER_SPACE_VILLAGE = 15;
+
+/** The public parking spaces an area with `homes` homes gets (`main`: the main town). */
+export function parkingFor(homes: number, main: boolean): number {
+  return main ? Math.max(PARKING_MAIN, Math.round(homes / HOMES_PER_SPACE_MAIN)) : Math.max(PARKING_VILLAGE, Math.round(homes / HOMES_PER_SPACE_VILLAGE));
+}
 
 const range = (rand: Rand, lo: number, hi: number) => lo + (hi - lo) * rand();
 const between = (rand: Rand, [lo, hi]: [number, number]) => lo + Math.floor(rand() * (hi - lo + 1));
@@ -1205,10 +1213,12 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // ---- parking in each area ------------------------------------------------------------------
   const parking: OpenWorldDraft['parking'] = [];
   for (const [a, plan] of plans.entries()) {
-    // Parking: a few spaces by the verge nearest the middle.
+    // Parking: a few spaces by the verge nearest the middle, more in a place's bigger areas.
+    const homes = spec.classic ? 0 : slots.filter((s) => s.kind === 'house' && (s.area ?? 0) === a).length;
+    const spaces = parkingFor(homes, a === 0);
     const frontage = frontageOf(worldRoads, plan.roads, plan.centre, rand);
     for (const f of frontage) {
-      if (parking.filter((p) => p.area === a).length >= (a === 0 ? PARKING_MAIN : PARKING_VILLAGE)) break;
+      if (parking.filter((p) => p.area === a).length >= spaces) break;
       const facing = (Math.abs(f.n[1]) >= Math.abs(f.n[0]) ? (f.n[1] > 0 ? 0 : 2) : f.n[0] > 0 ? 1 : 3) as Facing;
       const reach = worldRoads[f.road].width / 2 + 0.5;
       const [qx, qz] = [f.p[0] + f.n[0] * (reach + 3), f.p[1] + f.n[1] * (reach + 3)];
