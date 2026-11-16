@@ -12,6 +12,9 @@ import { roadExits } from '../roads';
 import { plotRect, type NeighbourhoodDraft, type Templates } from '../town';
 import { townProblems, type CheckedTown } from '../townCheck';
 
+/** The checks of how the generator fills a town (the backdrop each area keeps, the centre the densest), which an edited town needn't keep. */
+const GENERATED_ONLY: readonly RegExp[] = [/ has \d+ backdrop buildings \(\d+ or more\)$/, /^the centre's open land is /, /^the main town has no centre$/];
+
 /** The town file's kind of a lot (`assembleTown`'s `PlotKind`). */
 const plotKind = (s: NeighbourhoodDraft['slots'][number]): string => (s.kind === 'house' ? (s.lot === 'farm' ? 'farm' : 'home') : s.kind === 'shop' ? 'shop' : s.kind === 'outdoor' ? 'countryside' : 'public');
 
@@ -52,13 +55,15 @@ export function checkedTown(draft: NeighbourhoodDraft, t: Templates): CheckedTow
 /**
  * What is wrong with an edited town (`townProblems`, `hard` and `soft`): its layout checked as every
  * generated world's is, but nothing asked of how filled it is (its homes, its built land, its
- * quarters: the player's to choose), only that a town or a city has somewhere for every career to
- * work; and fewer than two homes is hard.
+ * quarters, the backdrop each area keeps, its centre: the player's to choose), only that a town or a
+ * city has somewhere for every career to work; and fewer than two homes is hard.
  */
 export function editedProblems(draft: NeighbourhoodDraft, t: Templates, content: Content): { hard: string[]; soft: string[] } {
   const size = draft.world?.options?.town;
   const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, mainLeast: 0, careers: size === 'town' || size === 'city', exits: null };
   const found = townProblems(checkedTown(draft, t), expect, { river: false, careers: content.careerCategories.map((c) => c.id) });
   const homes = draft.slots.filter((s) => s.kind === 'house').length;
-  return { hard: homes < 2 ? [...found.hard, `fewer than two homes (${homes})`] : found.hard, soft: found.soft };
+  // (How the generator fills a town, which an edited one needn't keep: a village placed by hand has no backdrop, decision 15.)
+  const hard = found.hard.filter((line) => !GENERATED_ONLY.some((p) => p.test(line)));
+  return { hard: homes < 2 ? [...hard, `fewer than two homes (${homes})`] : hard, soft: found.soft };
 }

@@ -43,6 +43,7 @@ import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '..
 import { placeOf, specOf, streetNames } from '../world';
 import type { Edited } from './edited';
 import { fillStreet, removalRefused, removeLots } from './lots';
+import { withoutEmptyAreas } from './villages';
 
 /** A street being drawn: its points as the player set them, its kind, whether what is in its way is cleared (else it is refused there) and whether it is filled with homes, and the seed its homes and names are drawn from. */
 export interface StreetStroke {
@@ -669,7 +670,8 @@ function withoutRoads(roads: readonly RoadPlan[], gone: ReadonlySet<number>): { 
 /**
  * `draft` without road `road`, its lots and parking, and any road it leaves joined to nothing; refused
  * if no road out of the world would be left, or it would take the town's last home or park (see `whatGoes`). A road that met it in a T and stays
- * now ends there in a dead end; the water under a bridge that goes is water again.
+ * now ends there in a dead end; the water under a bridge that goes is water again; a village left with
+ * no road and no lot goes too (`villages.ts` `withoutEmptyAreas`).
  */
 export function removeRoad(draft: NeighbourhoodDraft, t: Templates, road: number): Edited {
   const goes = whatGoes(draft, t, road);
@@ -691,7 +693,8 @@ export function removeRoad(draft: NeighbourhoodDraft, t: Templates, road: number
     }
     next = { ...next, open: { ...open, water, parking: open.parking.filter((_, i) => !parking.has(i)) } };
   }
-  return { draft: removeLots(next, new Set(goes.lots), new Set(goes.backdrop)), cleared: { lots: goes.lots, backdrop: goes.backdrop } };
+  // (A village whose only road it was goes with it: its streets and lots went, so its area does too, the others numbered again.)
+  return { draft: withoutEmptyAreas(removeLots(next, new Set(goes.lots), new Set(goes.backdrop))), cleared: { lots: goes.lots, backdrop: goes.backdrop } };
 }
 
 /**

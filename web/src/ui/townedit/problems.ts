@@ -12,8 +12,8 @@
  * in the player's words. Blocking: what would leave the sim a town it can't run well, as the plan
  * has it: the roads not one network or no way out, a lot off its road or on a road or the water, a
  * road over water with no deck, a country road's dead end past a court's length, a village with no
- * road, fewer than two homes. The rest only warns (a career with nowhere to work, a village of few lots, a road with a
- * hairpin). The checks of how the generator fills a town (how many backdrop buildings an area
+ * road (said "No road to Ashby"), fewer than two homes. The rest only warns (a career with nowhere to work, a village of few lots, a road with a
+ * hairpin, a country road that comes to a dead end out in the country, as one that led to a village moved away may). The checks of how the generator fills a town (how many backdrop buildings an area
  * keeps, the centre the densest) are left out: they hold for generated towns, not edited ones.
  */
 
@@ -122,6 +122,9 @@ export function issueOf(line: string, draft: NeighbourhoodDraft, t: Templates): 
     else if (area) at = { x: area.x + area.w / 2, z: area.z + area.d / 2 };
   }
   text = text.replace(/^road (\d+) \((\w+)\) has no name$/, 'a $2 has no name');
+  // (A village no road reaches: one placed or moved where none could be routed, for the player to draw.)
+  const cut = / has no way out$/.exec(text);
+  if (cut && (draft.open?.areas ?? []).some((a, k) => k > 0 && a.name === text.slice(0, cut.index))) text = `no road to ${text.slice(0, cut.index)}`;
   text = text.charAt(0).toUpperCase() + text.slice(1);
   return { text, ...(lot !== undefined && slots[lot] ? { lot } : {}), ...(at ? { at } : {}) };
 }
@@ -148,5 +151,23 @@ export function townIssues(draft: NeighbourhoodDraft, t: Templates, content: Con
     else out.warnings.push(issue);
   }
   for (const line of found.soft) out.warnings.push(issueOf(line, draft, t));
+  out.warnings.push(...countryDeadEnds(draft));
   return out;
+}
+
+/**
+ * The country roads that end out in the country (a dead end): what a village moved or removed leaves
+ * of the road that led to it where homes stand on it (`villages.ts`). A note, for the player to draw
+ * it on to somewhere or remove it; a long one blocks besides (a country road's court, above).
+ */
+function countryDeadEnds(draft: NeighbourhoodDraft): Issue[] {
+  return draft.roads.flatMap((r) =>
+    r.kind === 'country' && r.points.length
+      ? r.ends.flatMap((e, k) => {
+          if (e !== 'dead') return [];
+          const [x, z] = k ? r.points[r.points.length - 1] : r.points[0];
+          return [{ text: `${r.name ?? 'A country road'} comes to a dead end out in the country`, at: { x, z } }];
+        })
+      : [],
+  );
 }

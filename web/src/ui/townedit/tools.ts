@@ -18,6 +18,7 @@ import type { Picked, PickWhat } from './pick';
 import { removeTool } from './removeTool';
 import { selectTool } from './selectTool';
 import { streetTool } from './streetTool';
+import { villageTool } from './villageTool';
 
 /**
  * What the editor gives a tool and a card (`editor.svelte.ts` `TownEditorState`). Everything works
@@ -54,6 +55,9 @@ export interface TownEditor {
   hint(text: string | null): void;
   /** The town's name, as step 2's own name field has it (the two kept as one). */
   townName: string;
+  /** The tool in hand (its `TownTool.id`), and a tool taken in hand (the same one again puts it down; null: none), as a card's action may ("Move" a village). */
+  readonly toolId: string | null;
+  take(id: string | null): void;
 }
 
 /**
@@ -79,4 +83,4 @@ export interface TownTool {
 }
 
 /** The tools, in the order the palette shows them. */
-export const TOWN_TOOLS: readonly TownTool[] = [selectTool, streetTool, lotTool, removeTool];
+export const TOWN_TOOLS: readonly TownTool[] = [selectTool, streetTool, lotTool, villageTool, removeTool];

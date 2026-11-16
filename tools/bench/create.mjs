@@ -28,6 +28,8 @@
  * buildings), a village's street built up with both, its buildings cleared, a civic place the village
  * lacks put down with the Lot tool, and a street drawn with the Street tool's "Along it" left as it
  * is (both in the main town); each checked by what the plan gained or lost, and shot.
+ * Then villages (`--edit …,villages`): a village put down with the Village tool, dragged elsewhere,
+ * removed from its card and the removal undone (`villageSession`).
  *
  * Besides the pictures it checks what it can by measure, and says so (`create: …`): the side panel,
  * the way on and the figures clear of the stream pill (if it is up) and of every lot tag shown; the arrow
@@ -42,6 +44,8 @@
  *     --world country --options town=city    step 1's place and options (the URL's `?world=`, `?options=`)
  *     --code river-mhs-k2x9q                 the world's code instead (the URL's `?code=`; a bare number: the land's seed)
  *     --shots 1,2,3                          the steps shot (the others only gone through); `edit`: step 2's edit session
+ *     --stay                                 step 1's place kept as given (no arrow key down the place grid: a place's
+ *                                            own options would replace `--options`; the village edits want a large land)
  *     --edit-sizes 1920x1080,740x1000        the edit session's shots' sizes (it runs at the first)
  *     --edit lots,streets,buildup            the edit session's parts: the lot and street edits above, the Street tool, build-up
  *     --keep-place                           no arrow key in step 1's place grid: the place asked for (`--code`) kept
@@ -82,7 +86,7 @@ const editSizes = flag('edit-sizes', '1920x1080,740x1000')
   .split(',')
   .map((s) => s.split('x').map(Number))
   .map(([width, height]) => ({ width, height }));
-const editParts = new Set(flag('edit', 'lots,streets,buildup').split(','));
+const editParts = new Set(flag('edit', 'lots,streets,buildup,villages').split(','));
 const worldQuery = [made.world ? `world=${made.world}` : '', made.query ? `options=${made.query}` : '', code ? `code=${encodeURIComponent(code)}` : ''];
 const port = Number(flag('port', '5184'));
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
@@ -166,7 +170,7 @@ function overlaps() {
  */
 function benchHelpers() {
   return (async () => {
-    const [{ app }, { menuScene }, lots, streets, town, pickMod, live, buildup] = await Promise.all([
+    const [{ app }, { menuScene }, lots, streets, town, pickMod, live, buildup, villages] = await Promise.all([
       import('/src/ui/app.svelte.ts'),
       import('/src/game/menuScene.ts'),
       import('/src/game/edit/lots.ts'),
@@ -175,6 +179,7 @@ function benchHelpers() {
       import('/src/ui/townedit/pick.ts'),
       import('/src/ui/townedit/streetLive.ts'),
       import('/src/game/edit/buildup.ts'),
+      import('/src/game/edit/villages.ts'),
     ]);
     const t = await town.loadTemplates();
     const ed = () => window.__townEditor;
@@ -399,6 +404,56 @@ function benchHelpers() {
         }
         return out;
       },
+      /** Where a village may be put down (`canPlaceVillage`, a 20 m grid), on screen, the nearest the middle of the view first; and how long each test took (ms). */
+      villageSpots(swap = false) {
+        const d = plan();
+        const out = [];
+        const t0 = performance.now();
+        let [n, fits] = [0, 0];
+        for (let z = 60; z < d.depth - 60; z += 20) {
+          for (let x = 60; x < d.width - 60; x += 20) {
+            n++;
+            if ('refused' in villages.canPlaceVillage(d, t, { x, z, swap })) continue;
+            fits++;
+            const p = screen(x, z);
+            if (p) out.push({ ...p, gx: x, gz: z });
+          }
+        }
+        const each = (performance.now() - t0) / n;
+        const [cx, cy] = [innerWidth / 2, innerHeight / 2];
+        out.sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy));
+        return { spots: out.slice(0, 16), each, fits, world: `${d.world?.kind} ${d.width} m, ${d.open?.areas.length} areas` };
+      },
+      /** Village `area` on screen: a point in its box the Village tool picks it at (no lot or road there), and the ground there. */
+      village(area) {
+        const d = plan();
+        const a = d.open?.areas[area];
+        if (!a) return null;
+        for (const fz of [0.5, 0.3, 0.7, 0.15, 0.85]) {
+          for (const fx of [0.5, 0.3, 0.7, 0.15, 0.85]) {
+            const [gx, gz] = [a.x + a.w * fx, a.z + a.d * fz];
+            const picked = pickMod.pick(d, t, gx, gz);
+            if (picked?.kind !== 'village' || picked.area !== area) continue;
+            const p = screen(gx, gz);
+            if (p) return { ...p, gx, gz, name: a.name };
+          }
+        }
+        return null;
+      },
+      /** Where village `area`, taken at ground point (`gx`, `gz`), may be dragged to (`canMoveVillage`): points on screen, the nearest first. */
+      villageMoves(area, gx, gz) {
+        const d = plan();
+        const out = [];
+        for (let k = 6; k <= 24 && out.length < 8; k += 2) {
+          for (const [ux, uz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+            const [dx, dz] = [ux * k * 10, uz * k * 10];
+            if ('refused' in villages.canMoveVillage(d, t, area, dx, dz)) continue;
+            const p = screen(gx + dx, gz + dz);
+            if (p) out.push({ ...p, dx, dz });
+          }
+        }
+        return out;
+      },
       /** How many backdrop buildings and places the plan has. */
       built() {
         const d = plan();
@@ -425,7 +480,9 @@ function benchHelpers() {
       /** The editor: what it says, whether it is settling, the settles' timings, the Problems list. */
       state() {
         const e = ed();
-        return { hint: e.hintText, note: e.note, settling: e.settling, timings: [...e.timings], blocking: e.issues.blocking.map((i) => i.text), warnings: e.issues.warnings.length, edits: e.edits, selected: e.selected, slots: e.draft.slots.length, roads: e.draft.roads.length, edited: app.world?.edited };
+        const areas = e.draft.open?.areas ?? [];
+        const shown = app.world?.draft?.open?.areas ?? [];
+        return { hint: e.hintText, note: e.note, settling: e.settling, timings: [...e.timings], blocking: e.issues.blocking.map((i) => i.text), warnings: e.issues.warnings.length, edits: e.edits, selected: e.selected, slots: e.draft.slots.length, roads: e.draft.roads.length, areas: areas.map((a) => ({ name: a.name, x: a.x, z: a.z })), shownAreas: shown.length, edited: app.world?.edited };
       },
     };
     return true;
@@ -891,10 +948,134 @@ async function editSession(page, renderer, shootAs, setStep) {
   if (editParts.has('lots')) await lotEdits();
   if (editParts.has('streets')) await streetEdits();
   if (editParts.has('buildup')) await buildupEdits();
+  if (editParts.has('villages')) await villageSession(page, renderer, { bench, state, shots, built, tool, click });
   const end = await state();
   console.log(`create: ${renderer} edit: ${end.edits} edits, ${end.slots} lots, ${end.roads} roads; problems: ${end.blocking.length} blocking${end.blocking.length ? ` (${end.blocking.join('; ')})` : ''}, ${end.warnings} warnings; edited: ${end.edited}`);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
+}
+
+/**
+ * Step 2's villages (part of the edit session): a village put down with the Village tool (its ghost shot where it may go
+ * and over the main town, where it may not), the town built again with it (the real `edit` job's settle: what it took,
+ * what it refused); dragged elsewhere and built again; picked and removed from its card (what goes listed first); the
+ * removal undone. Each step shot; the settles' timings and the Problems list said.
+ */
+async function villageSession(page, renderer, { bench, state, shots, built, tool, click }) {
+  /** What the editor says once the town is built again after a village edit: the areas the settled town has, the refusal if any, what blocks. */
+  const settled = async (what, areas) => {
+    const s = await built(what);
+    console.log(`create: ${renderer} edit ${what}: settled town has ${s.shownAreas} areas (the plan ${s.areas.length}, wanted ${areas})${s.note ? `; said "${s.note}"` : ''}; problems: ${s.blocking.length} blocking${s.blocking.length ? ` (${s.blocking.join('; ')})` : ''}, ${s.warnings} warnings`);
+    if (s.areas.length !== areas || s.shownAreas !== areas) fault(`${renderer} edit ${what}: ${s.areas.length} areas in the plan, ${s.shownAreas} in the town shown (wanted ${areas})`);
+    return s;
+  };
+  await tool('village');
+  const had = (await state()).areas.length;
+  const { spots, each, fits, world } = await bench(() => window.__bench.villageSpots(false));
+  console.log(`create: ${renderer} edit: ${world}: ${fits} village sites, ${spots.length} of them on screen; canPlaceVillage ${each.toFixed(3)} ms a test`);
+  if (!spots.length) return fault(`${renderer} edit: nowhere on screen for a village`);
+  // (Its ghost over the main town first: red, with why.)
+  const main = await bench(() => window.__bench.village(0));
+  const town = main ?? (await bench(() => window.__bench.lot('home', 0)));
+  if (town) {
+    await page.mouse.move(town.x, town.y, { steps: 4 });
+    await page.waitForTimeout(150);
+    console.log(`create: ${renderer} edit: the village's ghost over the main town says "${(await state()).hint}"`);
+    await shots('village-refused');
+  }
+  let placed = false;
+  for (const p of spots) {
+    await page.mouse.move(p.x, p.y, { steps: 4 });
+    await page.waitForTimeout(80);
+    if (!/^Click to put a village down/.test((await state()).hint ?? '')) continue;
+    await shots('village-ghost');
+    const t0 = Date.now();
+    await page.mouse.click(p.x, p.y);
+    await page.waitForTimeout(200);
+    const s = await state();
+    placed = s.areas.length === had + 1;
+    console.log(`create: ${renderer} edit: village ${placed ? `${s.areas[had].name} put down (${Date.now() - t0} ms to the click's answer)` : `not put down (${s.note})`}`);
+    break;
+  }
+  if (!placed) return fault(`${renderer} edit: no village put down (${(await state()).hint})`);
+  const area = had;
+  await shots('village');
+  await settled('place a village', had + 1);
+  await shots('village-built');
+
+  // Dragged elsewhere by its box.
+  const v = await bench((a) => window.__bench.village(a), area);
+  if (!v) return fault(`${renderer} edit: the village is not on screen to drag`);
+  const targets = await bench(([a, gx, gz]) => window.__bench.villageMoves(a, gx, gz), [area, v.gx, v.gz]);
+  const from = (await state()).areas[area];
+  await page.mouse.move(v.x, v.y, { steps: 3 });
+  await page.mouse.down();
+  let dragged = false;
+  for (const p of targets) {
+    await page.mouse.move(p.x, p.y, { steps: 10 });
+    await page.waitForTimeout(80);
+    if (!/^Let go to move/.test((await state()).hint ?? '')) continue;
+    await shots('village-drag');
+    await page.mouse.up();
+    dragged = true;
+    break;
+  }
+  if (!dragged) {
+    await page.mouse.up();
+    return fault(`${renderer} edit: ${v.name} found nowhere to go (${(await state()).hint})`);
+  }
+  await page.waitForTimeout(250);
+  const to = (await state()).areas[area];
+  if (!to || (to.x === from.x && to.z === from.z)) fault(`${renderer} edit: ${v.name} not moved (${(await state()).note})`);
+  else console.log(`create: ${renderer} edit: ${v.name} moved by ${to.x - from.x}, ${to.z - from.z}`);
+  await shots('village-moved');
+  await settled('move a village', had + 1);
+  await shots('village-moved-built');
+
+  // Picked (a click on it with the Village tool) and removed from its card.
+  const w = await bench((a) => window.__bench.village(a), area);
+  if (!w) return fault(`${renderer} edit: the village is not on screen to pick`);
+  await click(w);
+  if ((await state()).selected?.kind !== 'village') return fault(`${renderer} edit: a click on ${w.name} picked ${JSON.stringify((await state()).selected)}`);
+  const says = await page.evaluate(() => document.querySelector('.card .option .hint')?.textContent ?? '');
+  console.log(`create: ${renderer} edit: ${w.name}'s card: "${says}"`);
+  await shots('village-card');
+  await page.locator('.card button', { hasText: /^\s*Remove / }).click();
+  await page.waitForTimeout(250);
+  if ((await state()).areas.length !== had) fault(`${renderer} edit: removing ${w.name} left ${(await state()).areas.length} areas (wanted ${had})`);
+  await shots('village-removed');
+  await settled('remove a village', had);
+
+  // The removal undone.
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z');
+  await page.waitForTimeout(300);
+  if ((await state()).areas.length !== had + 1) fault(`${renderer} edit: undoing the removal left ${(await state()).areas.length} areas`);
+  await settled('undo the removal', had + 1);
+  await shots('village-undo');
+  await page.keyboard.press('Escape');
+}
+
+/** Step 1: an arrow key down the place grid, the place a row down chosen and its land made (see where it is called). */
+async function anotherPlace(page, renderer, shoot) {
+  await page.locator('.places [role="radio"][aria-checked="true"]').focus();
+  const { before, row, count } = await page.evaluate(() => {
+    const grid = document.querySelector('.places');
+    const radios = [...grid.querySelectorAll('[role="radio"]')];
+    return { before: radios.findIndex((b) => b.getAttribute('aria-checked') === 'true'), row: getComputedStyle(grid).gridTemplateColumns.split(' ').length, count: radios.length };
+  });
+  const [key, wanted] = before + row < count ? ['ArrowDown', before + row] : ['ArrowRight', (before + 1) % count];
+  await page.keyboard.press(key);
+  const after = await page.evaluate(() => {
+    const radios = [...document.querySelectorAll('.places [role="radio"]')];
+    return { checked: radios.findIndex((b) => b.getAttribute('aria-checked') === 'true'), focused: radios.indexOf(document.activeElement) };
+  });
+  if (after.checked !== wanted || after.focused !== wanted) fault(`${renderer}: ${key} from place ${before} chose ${after.checked}, focus on ${after.focused} (wanted ${wanted})`);
+  await page.waitForFunction(() => !!document.querySelector('.making'), null, { timeout: 10_000, polling: 50 }).catch(() => fault(`${renderer}: no making panel after a new place`));
+  await page.waitForTimeout(700);
+  if (shots.has('1')) await shoot(`${sizes[0].width}x${sizes[0].height}-making`);
+  await ready(page);
+  await page.waitForTimeout(2500);
+  if (shots.has('1')) await shoot(`${sizes[0].width}x${sizes[0].height}-place`);
 }
 
 const { chromium } = await playwright();
@@ -961,33 +1142,13 @@ try {
     };
     if (shots.has('1')) await everySize();
 
-    // (`--keep-place`: the place asked for, `--code`'s say, kept through step 1.)
-    if (!has('keep-place')) {
-      // Back to the first size: an arrow key down the place grid chooses the place a row down (as
-      // many as the grid shows in a row; across by one if there is no row under it), and its world is
-      // made (the making panel shown meanwhile).
-      await page.setViewportSize(sizes[0]);
-      await page.waitForTimeout(1200);
-      await page.locator('.places [role="radio"][aria-checked="true"]').focus();
-      const { before, row, count } = await page.evaluate(() => {
-        const grid = document.querySelector('.places');
-        const radios = [...grid.querySelectorAll('[role="radio"]')];
-        return { before: radios.findIndex((b) => b.getAttribute('aria-checked') === 'true'), row: getComputedStyle(grid).gridTemplateColumns.split(' ').length, count: radios.length };
-      });
-      const [key, wanted] = before + row < count ? ['ArrowDown', before + row] : ['ArrowRight', (before + 1) % count];
-      await page.keyboard.press(key);
-      const after = await page.evaluate(() => {
-        const radios = [...document.querySelectorAll('.places [role="radio"]')];
-        return { checked: radios.findIndex((b) => b.getAttribute('aria-checked') === 'true'), focused: radios.indexOf(document.activeElement) };
-      });
-      if (after.checked !== wanted || after.focused !== wanted) fault(`${renderer}: ${key} from place ${before} chose ${after.checked}, focus on ${after.focused} (wanted ${wanted})`);
-      await page.waitForFunction(() => !!document.querySelector('.making'), null, { timeout: 10_000, polling: 50 }).catch(() => fault(`${renderer}: no making panel after a new place`));
-      await page.waitForTimeout(700);
-      if (shots.has('1')) await shoot(`${sizes[0].width}x${sizes[0].height}-making`);
-      await ready(page);
-      await page.waitForTimeout(2500);
-      if (shots.has('1')) await shoot(`${sizes[0].width}x${sizes[0].height}-place`);
-    }
+    // Back to the first size: an arrow key down the place grid chooses the place a row down (as
+    // many as the grid shows in a row; across by one if there is no row under it), and its world is
+    // made (the making panel shown meanwhile). Not with `--keep-place` (`--code`'s place kept through
+    // step 1) or `--stay`.
+    await page.setViewportSize(sizes[0]);
+    await page.waitForTimeout(1200);
+    if (!has('keep-place') && !has('stay')) await anotherPlace(page, renderer, shoot);
 
     // Step 2: the town laid on that land (its making panel shot while it is laid), then at every size.
     await page.getByRole('button', { name: /Lay out the town/ }).click();

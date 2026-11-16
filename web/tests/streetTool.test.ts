@@ -265,6 +265,8 @@ function fakeEditor(draft: NeighbourhoodDraft) {
     preview: (g) => void (said.ghosts = g),
     hint: (text) => void said.hints.push(text),
     townName: 'Ashby',
+    toolId: 'street',
+    take: () => {},
   };
   return editor;
 }

@@ -7,12 +7,14 @@
    *   town's other buildings or both (`buildup.ts`: both in the main town, homes elsewhere, unless
    *   chosen; each press another seed), or clear the buildings fronting it;
    * - a building: a civic place made another the town hasn't got, remove it;
-   * - a village: rename it (moving and removing it come with the Village tool);
+   * - a village: rename it, move it (the Village tool taken in hand for it), remove it (what goes with
+   *   it listed first);
    * - the main town: rename it (step 2's own name field, the two kept as one).
    */
   import { areaOfRoad, buildingsOn, buildUp, clearBuildings, notBuilt, roadKey, type BuildMode } from '../../game/edit/buildup';
   import { anotherHouse, civicSwaps, publicChoices, removeLotsEdit, setGarden, swapCivic, swapPlace } from '../../game/edit/lots';
   import { removeRoad, rename, whatGoes } from '../../game/edit/streets';
+  import { removeVillage, villageGoes } from '../../game/edit/villages';
   import type { GardenSize } from '../../game/housegen';
   import { lengths } from '../../game/roads';
   import { generatedId, slotDims, type LotSize } from '../../game/town';
@@ -20,6 +22,7 @@
   import Segmented from '../kit/Segmented.svelte';
   import RenameField from './RenameField.svelte';
   import type { TownEditor } from './tools';
+  import { applyVillage, moveWithTool } from './villageChoice.svelte';
   import { count, listed, lotKind, sentence, whatGoesLine } from './words';
 
   const { editor }: { editor: TownEditor } = $props();
@@ -96,6 +99,21 @@
   // ---- a village ----
   const area = $derived(picked?.kind === 'village' ? draft.open?.areas[picked.area] : undefined);
   const areaLots = $derived(picked?.kind === 'village' ? draft.slots.filter((s) => s.area === picked.area) : []);
+  const villageGone = $derived(picked?.kind === 'village' ? villageGoes(draft, t, picked.area) : null);
+  /** What removing the village takes, in words: its streets, the roads that led to it, its homes, other lots, buildings, parking. */
+  const villageGoesLines = $derived.by(() => {
+    const g = villageGone;
+    if (!g || 'refused' in g) return [];
+    const homes = g.lots.filter((i) => draft.slots[i]?.kind === 'house').length;
+    return [
+      count(g.roads, 'street'),
+      ...(g.others ? [count(g.others, 'road that led to it', 'roads that led to it')] : []),
+      ...(homes ? [count(homes, 'home')] : []),
+      ...(g.lots.length > homes ? [count(g.lots.length - homes, 'other lot')] : []),
+      ...(g.backdrop.length ? [count(g.backdrop.length, 'building')] : []),
+      ...(g.parking ? [count(g.parking, 'parking space')] : []),
+    ];
+  });
 
   const renamed = (what: Parameters<typeof rename>[1]) => (name: string) => editor.apply(rename(draft, what, name));
 
@@ -185,7 +203,20 @@
     {:else if area && picked.kind === 'village'}
       <span class="eyebrow sub">Village · {count(areaLots.filter((s) => s.kind === 'house').length, 'home')}</span>
       <RenameField label="Village name" value={area.name} onname={renamed({ kind: 'area', area: picked.area })} />
-      <p class="hint">Moving and removing a village come with the Village tool.</p>
+      <div class="row">
+        <button class="btn small" title="Take the Village tool to move it: click where it goes" onclick={() => moveWithTool(editor, picked.area)}><Icon name="icon.ui.move" size={14} /> Move</button>
+      </div>
+      <div class="option">
+        <span class="eyebrow sub">Remove it</span>
+        {#if villageGone && 'refused' in villageGone}
+          <p class="hint warn">{sentence(villageGone.refused)}</p>
+        {:else}
+          <p class="hint">It takes with it {listed(villageGoesLines)}.</p>
+        {/if}
+        <div class="row">
+          <button class="btn small danger-soft" disabled={!villageGone || 'refused' in villageGone} onclick={() => applyVillage(editor, removeVillage(draft, t, picked.area)) && editor.select(null)}><Icon name="icon.ui.trash" size={14} /> Remove {area.name}</button>
+        </div>
+      </div>
     {:else if picked.kind === 'town'}
       <span class="eyebrow sub">The town</span>
       <RenameField label="Town name" value={editor.townName} onname={(name) => ((editor.townName = name), true)} />
