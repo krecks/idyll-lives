@@ -9,13 +9,14 @@ import type { Content } from '../content/content';
 import type { WorldOptions, WorldStructure } from '../core/protocol';
 import { residentsOf, type HouseholdDraft } from './household';
 import { encodeLand, type Land } from './land';
-import { settleLand } from './landFollow';
+import { settleEdit, settleLand } from './landFollow';
+import { editedProblems } from './edit/checked';
 import { assembleTown, generatedHouses, generateWorld, houseTemplate, loadTemplates, primeHouses, type AssembleOptions, type HouseTemplate, type NeighbourhoodDraft, type Templates } from './town';
 import { previewWorld } from './townPreview';
 import { landDraft, layOn } from './macro';
 import type { Pt } from './roads';
 import type { WorldStep } from './world';
-import { LazyWorker, type WorkerAnswer, type WorkerAsk } from '../core/lazyWorker';
+import { LazyWorker, Superseded, type WorkerAnswer, type WorkerAsk } from '../core/lazyWorker';
 import { mulberry32 } from './noise';
 
 export type TownJob =
@@ -34,10 +35,15 @@ export type TownJob =
    */
   | { kind: 'town'; land: NeighbourhoodDraft; seed: number; name?: string; options: Partial<WorldOptions>; site?: Pt; waterKept: boolean }
   /**
-   * Step 2's edits made: the town's plan draft (`game/edit/`) settled on its land
-   * (`landFollow.ts` `settleEdit`), after `ops` edits. Not built yet: it fails.
+   * Step 2's edits made: the town's plan draft (`game/edit/`; its land the land as laid, not graded:
+   * `LaidTown.plan`) settled on its land (`landFollow.ts` `settleEdit`), after `ops` edits. `steps`:
+   * the plans the batch went through, the first the plan the town on screen was settled from, the
+   * last `plan` (`ops + 1` of them): with them an edit that takes the land over a slope limit is
+   * refused, and the plan before it settled instead (without, nothing is refused). `before`: the last
+   * settle's `marks` (not given, the first step is settled too, to find them). `check`: whether the
+   * settled town is checked (`problems`; yes unless false: half a second on a city, M3).
    */
-  | { kind: 'edit'; plan: NeighbourhoodDraft; ops: number }
+  | { kind: 'edit'; plan: NeighbourhoodDraft; ops: number; steps?: readonly NeighbourhoodDraft[]; before?: readonly string[]; check?: boolean }
   /**
    * A new world (`generateWorld`), with the menu's preview of it (`previewWorld`) and, a place's,
    * its land graded under its town (`landFollow.ts` `settleLand`, from the preview's lots and paths,
@@ -58,18 +64,37 @@ export type TownJob =
    */
   | { kind: 'furnish'; town: NeighbourhoodDraft; households: readonly { slot: number; household: HouseholdDraft }[] };
 
-/** A town laid out: its draft, the menus' preview of it, and the houses made for its lots (by template id). */
+/**
+ * A town laid out: its draft, the menus' preview of it, and the houses made for its lots (by template
+ * id). `plan`: a town laid on a land whose town follows its slopes (`town`, `world`): the draft with
+ * its land as laid, not yet graded under the town (step 2's edits start from it; settling it again,
+ * `edit`, gives `draft`).
+ */
 export interface LaidTown {
   draft: NeighbourhoodDraft;
   preview: WorldStructure;
   houses: [string, HouseTemplate | undefined][];
+  plan?: NeighbourhoodDraft;
+}
+
+/**
+ * Step 2's edits settled (`edit`): the town settled (`draft`, its `preview`; `houses`: those its lots
+ * use that the first step's didn't, all of them without steps); the plan that was settled (`step`: its
+ * index in the job's `steps`, the last unless an edit was refused); the edits refused (`op`: an edit's
+ * index in the batch, from 0) with why, as a clause; what in it is over a slope limit (`marks`, the
+ * next job's `before`); and what is wrong with it (`townCheck.ts`, `hard` blocks Next), if checked.
+ */
+export interface EditedTown extends Omit<LaidTown, 'plan'> {
+  step: number;
+  refused: { op: number; why: string }[];
+  marks: string[];
+  problems?: { hard: string[]; soft: string[] };
 }
 
 export type TownResult =
   | { kind: 'land'; draft: NeighbourhoodDraft; preview: WorldStructure }
   | ({ kind: 'town' } & LaidTown)
-  /** The settled town, what is wrong with it (`townCheck.ts`: `hard` blocks Next), and the edits refused (by their index among the `ops`) with why. */
-  | ({ kind: 'edit'; problems: { hard: string[]; soft: string[] }; refused: { op: number; why: string }[] } & LaidTown)
+  | ({ kind: 'edit' } & EditedTown)
   | ({ kind: 'world' } & LaidTown)
   | { kind: 'assemble'; lot: string }
   /** How many houses were furnished (`furnish`), and how long that took (ms). */
@@ -97,7 +122,7 @@ export function runTownJob(content: Content, t: Templates, job: TownJob, step?: 
       return { kind: 'town', ...laidOut(content, t, layOn(content, t, job.land, job.options, lay, job.name ?? job.land.name, step), step) };
     }
     case 'edit':
-      throw new Error('The edit job is not built yet.');
+      return { kind: 'edit', ...edited(content, t, job) };
     case 'assemble':
       return { kind: 'assemble', lot: assembleTown(content, t, job.town, job.player, job.slot, job.options, mulberry32(job.random)) };
     case 'furnish':
@@ -116,7 +141,7 @@ function furnish(content: Content, t: Templates, town: NeighbourhoodDraft, house
   return { houses, ms: performance.now() - t0 };
 }
 
-/** A town just laid (`laid`) with its land settled under it (`settleLand`), its preview and its houses. */
+/** A town just laid (`laid`) with its land settled under it (`settleLand`), its preview, its houses and its plan (`LaidTown.plan`). */
 function laidOut(content: Content, t: Templates, laid: NeighbourhoodDraft, step?: (done: WorldStep) => void): LaidTown {
   const settled = settleLand(laid, (d) => previewWorld(content, t, d, null));
   const draft = settled.draft;
@@ -125,7 +150,21 @@ function laidOut(content: Content, t: Templates, laid: NeighbourhoodDraft, step?
   step?.('grade');
   const houses = generatedHouses(t, draft.slots.map((s) => s.template));
   step?.('houses');
-  return { draft, preview, houses };
+  // (The land as laid: what was given up gone from the town, but its land not graded.)
+  const land = laid.open?.land;
+  const plan = draft.open && land?.seeded === 'follow' && draft.open.land !== land ? { ...draft, open: { ...draft.open, land } } : undefined;
+  return { draft, preview, houses, ...(plan ? { plan } : {}) };
+}
+
+/** Step 2's edits settled (`EditedTown`): `settleEdit`, the settled land coded into the preview as `laidOut` codes it, the new houses, the checks. */
+function edited(content: Content, t: Templates, job: Extract<TownJob, { kind: 'edit' }>): EditedTown {
+  const settled = settleEdit(job.plan, (d) => previewWorld(content, t, d, null), job.before, job.steps);
+  const { draft, world: preview } = settled;
+  if (draft.open?.land && draft !== job.plan) preview.meta = { ...preview.meta, zones: draft.open.zones, land: encodeLand(draft.open.land) };
+  // (The page has the houses of the town it settled last: `keepHouses`.)
+  const had = new Set(job.steps && job.steps.length > 1 ? job.steps[0].slots.map((s) => s.template) : []);
+  const houses = generatedHouses(t, draft.slots.map((s) => s.template).filter((id) => !had.has(id)));
+  return { draft, preview, houses, step: settled.step, refused: settled.refused, marks: settled.marks, ...(job.check === false ? {} : { problems: editedProblems(draft, t, content) }) };
 }
 
 /** Raised for a job a newer one replaced (or whose signal aborted it). */
@@ -154,6 +193,47 @@ export function townJob(content: Content, job: TownJob, signal?: AbortSignal, st
   // (The houses furnished ahead are of no more use once the town file is made.)
   if (job.kind === 'assemble') asked.then(letFurnishedGo, letFurnishedGo);
   return asked;
+}
+
+/** The `edit` jobs asked (`editTown`): the newest's number, and the one the worker is on. */
+let editsAsked = 0;
+let editRunning: Promise<unknown> | null = null;
+
+/**
+ * Settles step 2's edits in the town worker (the `edit` job; on the page if no worker can run), a
+ * newer ask replacing an older one: an ask waiting behind the one under way is dropped when a newer
+ * one comes (rejected with `Superseded`), and so is the answer to one under way, which is let run to
+ * its end (stopping it would stop the worker, and the houses it has made would go with it). An
+ * aborted `signal` drops the ask the same way. Resolves to the newest ask's answer.
+ */
+export async function editTown(content: Content, job: Omit<Extract<TownJob, { kind: 'edit' }>, 'kind'>, signal?: AbortSignal): Promise<Extract<TownResult, { kind: 'edit' }>> {
+  const asked = ++editsAsked;
+  const dropped = () => asked !== editsAsked || !!signal?.aborted;
+  const aborted = new Promise<never>((_, reject) => signal?.addEventListener('abort', () => reject(new Superseded()), { once: true }));
+  aborted.catch(() => {});
+  while (editRunning) {
+    await Promise.race([editRunning.catch(() => {}), aborted]);
+    if (dropped()) throw new Superseded();
+  }
+  if (dropped()) throw new Superseded();
+  const run = townJob(content, { kind: 'edit', ...job });
+  editRunning = run;
+  try {
+    const answer = await Promise.race([run, aborted]);
+    if (dropped()) throw new Superseded();
+    return answer;
+  } finally {
+    if (editRunning === run) editRunning = null;
+  }
+}
+
+/**
+ * Keeps the town worker running (not stopped for being idle) until the returned function is called:
+ * for step 2's editor while it is open, since a fresh worker has none of the town's houses made and
+ * its first settle makes them all again (a city's: about 1.7 s rather than 0.5, M3).
+ */
+export function holdTownWorker(): () => void {
+  return towns.hold();
 }
 
 /**
