@@ -90,6 +90,46 @@ impl World {
         Ok(())
     }
 
+    /// The water mask as it is now (run-length over the ground grid, `[run, value, ...]`, as the
+    /// town file's `terrain.water`; all dry when the town has none), with the grid's width and
+    /// depth. The page asks for it once before shaping the land in a game (it may not hold the
+    /// town file, as after loading a save), and lays its strokes' water over it, sending the whole
+    /// mask back with each stroke that changes the water.
+    pub fn water_mask(&self) -> (Vec<u32>, usize, usize) {
+        let (w, d) = self.ground_grid();
+        let size = w * d;
+        let rle = match self
+            .travel
+            .file
+            .terrain
+            .as_ref()
+            .and_then(|t| t.water.as_deref())
+        {
+            // (Cut or padded to the grid, as `rle_mask` reads it.)
+            Some(rle) => {
+                let mask = rle_mask(Some(rle), size);
+                let mut out: Vec<u32> = Vec::new();
+                for &wet in &mask {
+                    let v = u32::from(wet);
+                    match out.len() {
+                        n if n >= 2 && out[n - 1] == v => out[n - 2] += 1,
+                        _ => out.extend([1, v]),
+                    }
+                }
+                out
+            }
+            None if size > 0 => vec![size as u32, 0],
+            None => Vec::new(),
+        };
+        (rle, w, d)
+    }
+
+    /// The water mask (`water_mask`) as JSON: `{"water": [...], "width": w, "depth": d}`.
+    pub fn water_mask_json(&self) -> String {
+        let (water, width, depth) = self.water_mask();
+        serde_json::json!({ "water": water, "width": width, "depth": depth }).to_string()
+    }
+
     /// The ground grid the town file's terrain masks cover: the lot's width by the ground
     /// storey's rows.
     pub(crate) fn ground_grid(&self) -> (usize, usize) {

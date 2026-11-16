@@ -7,7 +7,7 @@
   import FirstTip from './FirstTip.svelte';
 
   /**
-   * Build mode's dock at the foot of the screen: one frame for each tab (Furnish, Construct, Home),
+   * Build mode's dock at the foot of the screen: one frame for each tab (Furnish, Construct, Home, Land),
    * so the tabs and the actions beside them never move. The tab's own header shares the top line;
    * its body sits below. While something is in hand the body folds away to the header line;
    * pointing at that line opens it again.
@@ -37,6 +37,10 @@
   } = $props();
 
   const folded = $derived(!!game.placing && !over);
+  /** On the Land tab Undo and Redo are the land's strokes' (their own stack). */
+  const land = $derived(game.buildTab === 'land');
+  const canUndo = $derived(land ? game.land.canUndo && !game.land.busy : game.undoSteps > 0);
+  const canRedo = $derived(land ? game.land.canRedo && !game.land.busy : game.redoSteps > 0);
 </script>
 
 <section
@@ -65,26 +69,28 @@
     <div class="actions">
       <button
         class="action"
-        disabled={game.undoSteps === 0}
-        title={game.undoSteps ? 'Undo the last change (Ctrl+Z / ⌘Z)' : 'Nothing to undo. Changes can be undone until time moves on.'}
+        disabled={!canUndo}
+        title={land ? (canUndo ? 'Undo the last stroke (Ctrl+Z / ⌘Z)' : 'Nothing to undo') : game.undoSteps ? 'Undo the last change (Ctrl+Z / ⌘Z)' : 'Nothing to undo. Changes can be undone until time moves on.'}
         aria-label="Undo"
         onclick={() => services.controls.undo()}
       >
         <Icon name="icon.ui.undo" size={15} />
       </button>
-      <button class="action" disabled={game.redoSteps === 0} title={game.redoSteps ? 'Redo what you undid (Ctrl+Shift+Z / ⌘⇧Z)' : 'Nothing to redo'} aria-label="Redo" onclick={() => services.controls.redo()}>
+      <button class="action" disabled={!canRedo} title={canRedo ? 'Redo what you undid (Ctrl+Shift+Z / ⌘⇧Z)' : 'Nothing to redo'} aria-label="Redo" onclick={() => services.controls.redo()}>
         <span class="mirror"><Icon name="icon.ui.undo" size={15} /></span>
       </button>
-      <button
-        class="action"
-        class:on={game.eyedropper}
-        aria-pressed={game.eyedropper}
-        title="Eyedropper (E, or hold Alt): click a wall, floor, door, window or object to build or buy more of the same"
-        aria-label="Eyedropper"
-        onclick={() => services.controls.toggleEyedropper()}
-      >
-        <Icon name="icon.ui.eyedropper" size={15} />
-      </button>
+      {#if !land}
+        <button
+          class="action"
+          class:on={game.eyedropper}
+          aria-pressed={game.eyedropper}
+          title="Eyedropper (E, or hold Alt): click a wall, floor, door, window or object to build or buy more of the same"
+          aria-label="Eyedropper"
+          onclick={() => services.controls.toggleEyedropper()}
+        >
+          <Icon name="icon.ui.eyedropper" size={15} />
+        </button>
+      {/if}
     </div>
   </header>
   <div class="drawer" inert={folded}>

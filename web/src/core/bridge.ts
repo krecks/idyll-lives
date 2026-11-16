@@ -3,7 +3,7 @@
  * into interpolatable frames for the renderer. Allocation-free per frame.
  */
 
-import { mergeShapeLand, type Catalog, type Command, type FromWorker, type GameSource, type ItemPlacement, type SaveProblem, type ShapeLandCommand, type SimThreadStats, type SocialEvent, type SocialOption, type ToWorker, type UiUpdate, type WorldStructure } from './protocol';
+import { mergeShapeLand, type Catalog, type Command, type FromWorker, type GameSource, type ItemPlacement, type SaveProblem, type Rle, type ShapeLandCommand, type SimThreadStats, type SocialEvent, type SocialOption, type ToWorker, type UiUpdate, type WorldStructure } from './protocol';
 import { SharedSnapshotReader, tickRates, type SnapshotLayout } from './snapshot';
 
 type WorldMessage = Extract<FromWorker, { type: 'world' }>;
@@ -306,6 +306,15 @@ export class SimBridge {
     this.deliverSoon();
   }
 
+  /**
+   * The water mask the simulation walks, as it is now (1 m tiles over the ground, run-length, as
+   * the town file's `terrain.water`), with the ground's size: what Build mode's Land tab lays its
+   * strokes' water over (the page holds no town file once a save is loaded).
+   */
+  waterMask(): Promise<{ water: Rle; width: number; depth: number }> {
+    return this.request((requestId) => ({ type: 'waterMask', requestId }));
+  }
+
   /** `?debug`'s `__crash` (game/session.ts): the simulation fails on purpose. */
   debugCrash(what: 'panic' | 'throw' | 'hang'): void {
     this.worker.postMessage({ type: 'debugCrash', what } satisfies ToWorker);
@@ -554,6 +563,9 @@ export class SimBridge {
         break;
       case 'shaped':
         this.resolve(msg.requestId, null);
+        break;
+      case 'waterMask':
+        this.resolve(msg.requestId, { water: msg.water, width: msg.width, depth: msg.depth });
         break;
       case 'stats':
         this.threadStats = msg.stats;

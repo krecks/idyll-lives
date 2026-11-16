@@ -631,6 +631,8 @@ export interface Renderer {
   setTownShot(shot: TownShot, cut?: boolean): void;
   /** Overview camera: user orbit (radians) and zoom factor on top of the shot. */
   nudgeTown(dAlpha: number, zoom: number): void;
+  /** Overview camera: the player's pan, the target moved (`dx`, `dz`) m over the ground on top of the shot. */
+  panTown(dx: number, dz: number): void;
   /** Which lots glow; they ease to it, or (`snap`) are so from the next frame (a picture taken). */
   setLotHighlight(highlight: LotHighlight, snap?: boolean): void;
   /** Runs each overview frame after the camera moved, before drawing (to pin labels); null removes it. */
