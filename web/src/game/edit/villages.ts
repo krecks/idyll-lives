@@ -461,6 +461,47 @@ function cutTo(r: RoadPlan, end: 0 | 1, keep: number): RoadPlan {
 }
 
 /**
+ * `roads` (each from road `from[i]` of `draft`; past its end, or -1, a new one) with the other
+ * areas' streets and lanes (not village `area`'s) left ending in a dead end where a road that went
+ * met them (village `place` removed or moved) held to `COURT` m past the last road they meet, as a
+ * drawn street's dead end is (`streets.ts`): cut back to that, and said in the notes. `kept`: per
+ * road cut back (by its index in `draft`), the stretch of it kept (m along it as it was). Refused,
+ * the reason opening with `why`, where a lot stands on the stretch that would be cut off (its way
+ * in there: `lotsOn`, the lots left on a road of `draft`). (A country road left so is `tidy`'s.)
+ */
+function capCourts(draft: NeighbourhoodDraft, roads: readonly RoadPlan[], from: readonly number[], lotsOn: (road: number) => readonly Rect[], place: string, area: number, why: string): { roads: RoadPlan[]; kept: Map<number, [number, number]>; notes: string[] } | { refused: string } {
+  const out = roads.slice();
+  const kept = new Map<number, [number, number]>();
+  const notes: string[] = [];
+  for (const [i, r] of roads.entries()) {
+    const old = from[i] ?? -1;
+    if (old < 0 || r.kind === 'country' || r.kind === 'trail' || r.area === area) continue;
+    for (const end of [0, 1] as const) {
+      if (draft.roads[old].ends[end] !== 'join' || out[i].ends[end] !== 'dead') continue;
+      const ls = lengths(out[i].points);
+      const L = ls[ls.length - 1];
+      const last = Math.max(0, ...meetings(out, i, end));
+      if (L - last <= COURT + 0.5) continue;
+      // (Kept from its other end: `last` and a court's length.)
+      const keep = last + COURT - 1;
+      const was = lengths(draft.roads[old].points);
+      const lot = lotsOn(old).find((q) => {
+        const at = nearest(draft.roads[old].points, q.x + q.w / 2, q.z + q.d / 2, was);
+        return (end === 1 ? at.s : was[was.length - 1] - at.s) > keep;
+      });
+      const what = r.name ?? 'a street';
+      if (lot) return { refused: `${why}, ${what} would end ${Math.round(L - last)} m past the last road it meets, with homes on it past a dead end's ${COURT} m` };
+      out[i] = cutTo(out[i], end, keep);
+      const Lw = was[was.length - 1];
+      const [a, b] = kept.get(old) ?? [0, Lw];
+      kept.set(old, end === 1 ? [a, Math.min(b, a + keep)] : [Math.max(a, b - keep), b]);
+      notes.push(`${what} is cut back to a dead end where ${place} was`);
+    }
+  }
+  return { roads: out, kept, notes };
+}
+
+/**
  * A road laid from one of a village's ports (`ports`, in box `rect`, the village named `place`) to
  * the network (`toNetwork`), the port nearest a country road first, its pieces named; every port
  * then settled (`settlePort`). The router keeps out of `areas`' boxes (the village's among them).
@@ -789,16 +830,28 @@ export function moveVillage(draft: NeighbourhoodDraft, t: Templates, area: numbe
   const ports = portsOf(roads, ownAt, own.map((i) => draft.roads[i]), rect, area);
   const areas = open.areas.map((a, k) => (k === area ? rect : rectOf(a)));
   const linked = ports.length > 0 && linkUp(draft, roads, areas, ports, rect, name, namesIn({ ...draft, roads }), thingsOf(draft, t, parts));
+  // The other areas' streets and lanes it leaves ending where it was, held to a court's length (once
+  // its new road is down: that may meet one again); the buildings and parking by a stretch cut off go.
+  const capped = capCourts(draft, roads, left.from, lotsOnOf(draft, t, parts.lots), name, area, `with ${name} moved`);
+  if ('refused' in capped) return capped;
+  notes.push(...capped.notes);
+  const byCut = (x: number, z: number, within: number) => {
+    const near = index.nearest(x, z, within);
+    const kept = near && capped.kept.get(near.road);
+    return !!kept && (near.s < kept[0] - 0.5 || near.s > kept[1] + 0.5);
+  };
+  const cut = new Set((open.backdrop ?? []).flatMap((b, i) => (!parts.backdrop.has(i) && byCut(...middleOfPoly(b.poly), 40) ? [i] : [])));
 
-  const next: NeighbourhoodDraft = {
+  let next: NeighbourhoodDraft = {
     ...draft,
-    roads: deadEnds(roads),
+    roads: deadEnds(capped.roads),
     slots,
     greens,
-    open: { ...open, areas: open.areas.map((a, k) => (k === area ? { ...a, x: rect.x, z: rect.z } : a)), zones, pads, parking, ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}) },
+    open: { ...open, areas: open.areas.map((a, k) => (k === area ? { ...a, x: rect.x, z: rect.z } : a)), zones, pads, parking: parking.filter((p) => !byCut(p.x, p.z, 10)), ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}) },
   };
+  if (cut.size) next = removeLots(next, new Set(), cut);
   if (!linked || !reaches(next.roads, ownAt)) notes.push(`no road could be found to ${name}: draw one to it`);
-  return { draft: next, cleared: NOTHING, ...(notes.length ? { notes } : {}) };
+  return { draft: next, cleared: cut.size ? { lots: [], backdrop: [...cut].sort((a, b) => a - b) } : NOTHING, ...(notes.length ? { notes } : {}) };
 }
 
 // ---- removing -----------------------------------------------------------------------------------------
@@ -845,18 +898,28 @@ function removeOnce(draft: NeighbourhoodDraft, t: Templates, area: number): Edit
   );
   for (const i of draft.roads.keys()) if (!left.from.includes(i)) gone.add(i);
   if (!left.roads.some((r) => r.ends.includes('out')) || !reaches(left.roads, left.roads.flatMap((r, i) => (r.area === 0 ? [i] : [])))) return { refused: `without ${name} no road would lead out of the world` };
+  // The other areas' streets and lanes it leaves ending where it was, held to a court's length.
+  const capped = capCourts(draft, left.roads, left.from, lotsOnOf(draft, t, lots), name, area, `without ${name}`);
+  if ('refused' in capped) return capped;
+  left.notes.push(...capped.notes);
   // Its buildings (all of its area's: a farm's barn too), and those by a road that goes; the parking by its roads and theirs.
   const index = roadIndex(draft.roads);
   const byGone = (x: number, z: number, within: number) => {
     const near = index.nearest(x, z, within);
     return !!near && gone.has(near.road);
   };
+  // (And those by the stretch of a street cut back: `capCourts`.)
+  const byCut = (x: number, z: number, within: number) => {
+    const near = index.nearest(x, z, within);
+    const kept = near && capped.kept.get(near.road);
+    return !!kept && (near.s < kept[0] - 0.5 || near.s > kept[1] + 0.5);
+  };
   const backdrop = new Set(parts.backdrop);
-  (open.backdrop ?? []).forEach((b, i) => (b.area === area || byGone(...middleOfPoly(b.poly), 40)) && backdrop.add(i));
-  const parking = new Set(open.parking.flatMap((p, i) => (parts.parking.has(i) || byGone(p.x, p.z, 10) ? [i] : [])));
+  (open.backdrop ?? []).forEach((b, i) => (b.area === area || byGone(...middleOfPoly(b.poly), 40) || byCut(...middleOfPoly(b.poly), 40)) && backdrop.add(i));
+  const parking = new Set(open.parking.flatMap((p, i) => (parts.parking.has(i) || byGone(p.x, p.z, 10) || byCut(p.x, p.z, 10) ? [i] : [])));
   let next: NeighbourhoodDraft = {
     ...draft,
-    roads: left.roads,
+    roads: capped.roads,
     greens: draft.greens.filter((_, i) => !parts.greens.has(i)),
     open: { ...open, parking: open.parking.filter((_, i) => !parking.has(i)), zones: open.zones.filter((_, i) => !parts.orchards.has(i)) },
   };
