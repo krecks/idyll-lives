@@ -416,8 +416,13 @@ pub fn leave_for(sim: &crate::world::Sim, leave: u64, start: u64) -> u64 {
     }
 }
 
-/// The most a worker sets off before their way to work says they must (game minutes).
-const EARLY_MOST: f32 = 20.0;
+/// The most a worker sets off before their way to work says they must (game minutes). Off (0)
+/// for now: at the full fill the sample worlds' checks did better with everyone off at the last
+/// minute. With 20 minutes, seed bases 1, 3 and 4 failed where they passed without (a taxi
+/// turning round and the car behind it waiting for each other for good at Alder Mill, 84 cars
+/// held up behind them; visits ended within minutes at Stillwater and Stationgate), work taxis
+/// were no more on time, and more cars were held up in view, not fewer.
+const EARLY_MOST: f32 = 0.0;
 
 /// How much earlier than their way needs a household's workers set off for work (ticks, up to
 /// `EARLY_MOST`), by a hash of the household (all in its car go together): the same every day
