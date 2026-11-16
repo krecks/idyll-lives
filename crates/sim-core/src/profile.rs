@@ -93,13 +93,18 @@ mod disabled {
         f()
     }
 
-    /// No-op: the `profile` feature is off.
-    #[inline(always)]
-    pub fn start() {}
+    /// Nothing: the `profile` feature is off.
+    pub struct Start;
 
     /// No-op: the `profile` feature is off.
     #[inline(always)]
-    pub fn end(_name: &'static str, _start: ()) {}
+    pub fn start() -> Start {
+        Start
+    }
+
+    /// No-op: the `profile` feature is off.
+    #[inline(always)]
+    pub fn end(_name: &'static str, _start: Start) {}
 
     /// No-op: the `profile` feature is off.
     #[inline(always)]
