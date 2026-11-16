@@ -3,12 +3,14 @@
    * What can be done to what is picked (`editor.selected`):
    * - a home: another house, its garden, remove it; a public place: another of its size; a farm or
    *   an outdoor spot: remove it;
-   * - a street: rename it, remove it (what goes with it listed first), build it up or clear its
-   *   buildings (coming with build-up);
+   * - a street: rename it, remove it (what goes with it listed first), build it up with homes, the
+   *   town's other buildings or both (`buildup.ts`: both in the main town, homes elsewhere, unless
+   *   chosen; each press another seed), or clear the buildings fronting it;
    * - a building: a civic place made another the town hasn't got, remove it;
    * - a village: rename it (moving and removing it come with the Village tool);
    * - the main town: rename it (step 2's own name field, the two kept as one).
    */
+  import { areaOfRoad, buildingsOn, buildUp, clearBuildings, notBuilt, roadKey, type BuildMode } from '../../game/edit/buildup';
   import { anotherHouse, civicSwaps, publicChoices, removeLotsEdit, setGarden, swapCivic, swapPlace } from '../../game/edit/lots';
   import { removeRoad, rename, whatGoes } from '../../game/edit/streets';
   import type { GardenSize } from '../../game/housegen';
@@ -63,6 +65,27 @@
   const goes = $derived(picked?.kind === 'road' ? whatGoes(draft, t, picked.road) : null);
   const goesLines = $derived(goes && !('refused' in goes) && picked?.kind === 'road' ? whatGoesLine(draft, goes, picked.road) : []);
   const roadLength = $derived(road ? Math.round(lengths(road.points).at(-1) ?? 0) : 0);
+  const BUILD: readonly { value: BuildMode; label: string }[] = [
+    { value: 'homes', label: 'Homes' },
+    { value: 'buildings', label: 'Town buildings' },
+    { value: 'both', label: 'Both' },
+  ];
+  /** What building it up puts along it: as chosen for this road, else both in the main town and homes elsewhere. */
+  const roadId = $derived(road ? roadKey(road) : '');
+  let buildChosen = $state<{ road: string; mode: BuildMode } | null>(null);
+  const buildMode = $derived<BuildMode>(buildChosen?.road === roadId ? buildChosen.mode : picked?.kind === 'road' && areaOfRoad(draft, picked.road) === 0 ? 'both' : 'homes');
+  const buildNo = $derived(picked?.kind === 'road' ? notBuilt(draft, picked.road) : null);
+  const builtCount = $derived(picked?.kind === 'road' ? buildingsOn(draft, picked.road).length : 0);
+  /** What the last build-up of this road left out where the ground is too steep. */
+  let builtNote = $state<{ road: string; text: string } | null>(null);
+
+  function buildIt() {
+    if (picked?.kind !== 'road') return;
+    const e = buildUp(draft, t, editor.content, { road: picked.road, mode: buildMode, seed: editor.seed() });
+    const key = roadId;
+    if (!editor.apply(e) || !('draft' in e)) return;
+    builtNote = e.leftOut ? { road: key, text: `${count(e.leftOut, 'building was', 'buildings were')} left out where the ground is too steep.` } : null;
+  }
 
   // ---- a building ----
   const building = $derived(picked?.kind === 'building' ? draft.open?.backdrop?.[picked.building] : undefined);
@@ -128,11 +151,19 @@
       </div>
       <div class="option">
         <span class="eyebrow sub">Along it</span>
+        {#if buildNo}
+          <p class="hint warn">{sentence(buildNo)}</p>
+        {:else}
+          <Segmented fill label="Build it up with" value={buildMode} options={BUILD} onchange={(m) => (buildChosen = { road: roadId, mode: m })} />
+        {/if}
         <div class="row">
-          <button class="btn small" disabled title="Coming soon">Build up this street</button>
-          <button class="btn small" disabled title="Coming soon">Clear its buildings</button>
+          <button class="btn small" disabled={!!buildNo} title="Fills the free frontage; press again for another go" onclick={buildIt}><Icon name="icon.ui.home" size={14} /> Build up this street</button>
+          <button class="btn small danger-soft" disabled={!builtCount} onclick={() => picked.kind === 'road' && editor.apply(clearBuildings(draft, picked.road))}><Icon name="icon.ui.trash" size={14} /> Clear its buildings</button>
         </div>
-        <p class="hint">Coming soon: the town's own buildings along a street, or cleared from it.</p>
+        <p class="hint">
+          {builtCount ? `${count(builtCount, 'building')} front${builtCount === 1 ? 's' : ''} it.` : 'No buildings front it.'}
+          {#if builtNote?.road === roadId}{builtNote.text}{/if}
+        </p>
       </div>
     {:else if building && picked.kind === 'building'}
       <span class="eyebrow sub">{place ? 'Civic place' : 'Building'} · {USE[building.use] ?? building.use}, {count(building.storeys, 'storey')}</span>

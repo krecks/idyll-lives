@@ -22,12 +22,13 @@ import type { Picked } from '../src/ui/townedit/pick';
 import type { TownEditor } from '../src/ui/townedit/tools';
 
 // (The card and its runes are the page's: the tool reads its choices from a plain object here.)
-const choice = { kind: 'auto' as string, clear: true, along: 'homes' as string, shown: 'street' as string };
+const choice = { kind: 'auto' as string, clear: true, along: 'homes' as string, shown: 'street' as string, shownArea: -1 };
 mock.module('../src/ui/townedit/StreetCard.svelte', () => ({ default: {} }));
 mock.module('../src/ui/townedit/streetChoice.svelte', () => ({
   streetChoice: choice,
   strokeKind: (k: string) => (k === 'auto' ? 'street' : k),
-  fillsHomes: (a: string) => a === 'homes' || a === 'both',
+  alongFor: (a: string, area: number) => (a !== 'auto' ? a : area === 0 ? 'both' : 'homes'),
+  fillsHomes: (a: string) => a === 'homes',
 }));
 const { liveStreet, runsOf, unfinished, verdictOf } = await import('../src/ui/townedit/streetLive');
 const { StreetDrawing, startAt, streetGhosts, streetTool } = await import('../src/ui/townedit/streetTool');

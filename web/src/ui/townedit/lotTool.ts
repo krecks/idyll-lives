@@ -4,14 +4,20 @@
  * able to drive out). Its ghost follows the pointer, snapped to where it would go: blue where it
  * fits, red where it doesn't, with why under the tools. A click puts it down (`addLot`). A lot
  * dragged is moved (`moveLot`), keeping its house, garden and kind; one clicked is picked.
+ *
+ * A civic place is a building, not a lot: the one chosen of those the area under the pointer lacks
+ * (`civicChosen`), its footprint snapped along the nearest road as a home's is, laid as the
+ * generator lays one (`buildup.ts` `addCivic`). The ghost is its footprint's box.
  */
 
 import type { RoadSpot } from '../../game/edit/ground';
-import { addLot, canPlace, moveLot } from '../../game/edit/lots';
+import { addCivic, areaOfRoad } from '../../game/edit/buildup';
+import type { Edited } from '../../game/edit/edited';
+import { addLot, canPlace, CIVIC_PLACES, moveLot, type LotChoice } from '../../game/edit/lots';
 import type { TownGhosts } from '../../render/types';
-import { choiceOf, choiceSize } from './lotChoice.svelte';
+import { choiceOf, choiceSize, civicChosen, lotChoice } from './lotChoice.svelte';
 import LotCard from './LotCard.svelte';
-import { lotBox } from './ghosts';
+import { buildingBox, lotBox } from './ghosts';
 import { lotAtPoint, spotNear } from './pick';
 import type { TownEditor, TownTool } from './tools';
 import { sentence } from './words';
@@ -30,6 +36,8 @@ export const lotTool: TownTool = {
     /** A lot being dragged: which, where the press was, and where it would go now. */
     let drag: { slot: number; x0: number; y0: number; moved: boolean; at: RoadSpot | null; why: string | null } | null = null;
     let last: { x: number; y: number } | null = null;
+    /** Why the civic place can't go where the pointer last was. */
+    let civicWhy: string | null = null;
 
     /** A red box about the size of what is put down, at a ground point (where it can't go). */
     const badAt = (x: number, z: number): Partial<TownGhosts> => {
@@ -37,8 +45,32 @@ export const lotTool: TownTool = {
       return { lots: [{ x: x - w / 2, z: z - d / 2, w, d, tone: 'bad' }] };
     };
 
+    /** Where a civic place would go at ground point `g`: its ghost and line shown; the edit that puts it down, if it fits. */
+    const civicLook = (g: { x: number; z: number }): Edited | null => {
+      const draft = editor.draft;
+      const no = (why: string) => {
+        civicWhy = why;
+        editor.preview(badAt(g.x, g.z));
+        editor.hint(sentence(why));
+        return null;
+      };
+      const at = spotNear(draft, g.x, g.z);
+      if (!at) return no('a civic place goes along a street of the town or a village: come nearer one');
+      const area = areaOfRoad(draft, at.road);
+      if (area >= 0 && lotChoice.civicArea !== area) lotChoice.civicArea = area;
+      const civic = area < 0 ? -1 : civicChosen(draft, area);
+      if (civic < 0) return no(area < 0 ? 'a civic place goes along a street of the town or a village' : `${draft.open?.areas[area]?.name ?? 'the town'} has every civic place already`);
+      const e = addCivic(draft, editor.t, editor.content, { civic, road: at.road, s: at.s, side: at.side, seed });
+      if ('refused' in e) return no(e.refused);
+      civicWhy = null;
+      const b = e.draft.open!.backdrop!.at(-1)!;
+      editor.preview({ lots: [{ ...buildingBox(b), tone: 'new' }] });
+      editor.hint(`Click to put the ${CIVIC_PLACES[civic].label.toLowerCase()} down on ${draft.roads[at.road]?.name ?? 'this road'}.`);
+      return e;
+    };
+
     /** Where the new lot would go under (`x`, `y`): its ghost and line shown; what to put down where, if it fits. */
-    const look = (x: number, y: number) => {
+    const look = (x: number, y: number): { civic: Edited } | { at: RoadSpot; choice: LotChoice } | null => {
       last = { x, y };
       const draft = editor.draft;
       const t = editor.t;
@@ -57,10 +89,14 @@ export const lotTool: TownTool = {
         return null;
       }
       editor.hover(null);
+      if (lotChoice.group === 'civic') {
+        const e = civicLook(g);
+        return e ? { civic: e } : null;
+      }
       const choice = choiceOf(t);
       if (!choice) {
         editor.preview(null);
-        editor.hint('Placing a civic place by hand comes with building streets up.');
+        editor.hint(null);
         return null;
       }
       const at = spotNear(draft, g.x, g.z);
@@ -115,8 +151,10 @@ export const lotTool: TownTool = {
         }
         const placing = look(x, y);
         if (placing) {
-          if (editor.apply(addLot(editor.draft, editor.t, editor.content, placing.at, placing.choice, seed))) seed = editor.seed();
+          if (editor.apply('civic' in placing ? placing.civic : addLot(editor.draft, editor.t, editor.content, placing.at, placing.choice, seed))) seed = editor.seed();
           look(x, y);
+        } else if (lotChoice.group === 'civic') {
+          editor.refuse(civicWhy ?? 'nothing to put down');
         } else {
           const choice = choiceOf(editor.t);
           const at = spotNear(editor.draft, g.x, g.z);

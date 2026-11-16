@@ -4,8 +4,8 @@
 // homes there, a village's street a village's kinds; the homes the same whichever mode; undo gives
 // the draft's bytes back; a civic place offered until the town has it; a street built up until it is
 // full, then refused with why; its buildings cleared; on hilly land the settle takes every building
-// built (those that would break a slope limit left out first); and a town built up so has no hard problem it
-// hadn't (`edit/checked.ts` `editedProblems`).
+// built (those that would break a slope limit left out first); a street drawn with the town's buildings
+// along it in one edit; and a town built up so has no hard problem it hadn't (`edit/checked.ts` `editedProblems`).
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -35,7 +35,8 @@ describe('build-up', async () => {
   const { entriesOf, frontOf } = await import('../src/game/edit/ground');
   const { TownHistory } = await import('../src/game/edit/history');
   const { editedProblems } = await import('../src/game/edit/checked');
-  const { addCivic, areaOfRoad, buildingsOn, buildUp, clearBuildings, civicOffered } = await import('../src/game/edit/buildup');
+  const { addCivic, areaOfRoad, buildingsOn, builtAlong, buildUp, clearBuildings, civicOffered } = await import('../src/game/edit/buildup');
+  const { drawStreet, removeRoad } = await import('../src/game/edit/streets');
   type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
   type TownJob = import('../src/game/townJobs').TownJob;
@@ -64,7 +65,7 @@ describe('build-up', async () => {
   /** `draft` with road `road` stripped bare: its lots and the buildings fronting it gone. */
   const bare = (draft: NeighbourhoodDraft, road: number): NeighbourhoodDraft => {
     const e = entriesOf(draft, t);
-    const lots = new Set(draft.slots.filter((s, i) => e[i].road === road).map((s) => s.index));
+    const lots = new Set(draft.slots.filter((_, i) => e[i].road === road).map((s) => s.index));
     return removeLots(draft, lots, new Set(buildingsOn(draft, road)));
   };
   /** The roads of area `area` (streets and lanes) by length, longest first. */
@@ -244,6 +245,37 @@ describe('build-up', async () => {
     expect(built).toBeGreaterThan(10);
     console.log(`hilly: ${built} buildings, ${left} left out`);
   }, 120_000);
+
+  test('a street drawn with the town buildings along it is one edit: the street, its homes and its buildings', () => {
+    // A dead-end street of the main town taken up, and drawn again as the Street tool draws one.
+    let found: { gone: NeighbourhoodDraft; points: [number, number][]; drawn: Edited } | null = null;
+    for (const road of streetsOf(town, 0)) {
+      const r = town.roads[road];
+      if (r.ends[0] !== 'join' || r.ends[1] !== 'dead') continue;
+      const e = removeRoad(town, t, road);
+      if (!('draft' in e)) continue;
+      // (Its line again, or its ends and middle: drawn over, its curve is made again.)
+      const pts = r.points.map(([x, z]): [number, number] => [x, z]);
+      for (const points of [pts, [pts[0], pts[Math.floor(pts.length / 2)], pts[pts.length - 1]]]) {
+        const drawn = drawStreet(e.draft, t, content, { points, kind: 'street', clear: true, fill: false, seed: 6 });
+        if ('draft' in drawn) found = { gone: e.draft, points, drawn };
+        if (found) break;
+      }
+      if (found) break;
+    }
+    expect(found).not.toBeNull();
+    const { gone, points, drawn } = found!;
+    const d = made(builtAlong(gone, drawn, t, content, 'both', 6));
+    const road = d.roads.findIndex((r) => !gone.roads.includes(r));
+    expect(road).toBeGreaterThanOrEqual(0);
+    expect(areaOfRoad(d, road)).toBe(0);
+    expect(d.slots.length).toBeGreaterThan(gone.slots.length);
+    expect(buildingsOn(d, road).length).toBeGreaterThan(0);
+    expect(made(builtAlong(gone, drawn, t, content, 'both', 6))).toEqual(d);
+    // Homes alone: `drawStreet`'s own fill, no buildings.
+    const homes = made(drawStreet(gone, t, content, { points, kind: 'street', clear: true, fill: true, seed: 6 }));
+    expect(homes.open!.backdrop!.length).toBe(gone.open!.backdrop!.length);
+  });
 
   test('a town built up has no hard problem it had not', () => {
     const was = new Set(editedProblems(town, t, content).hard);

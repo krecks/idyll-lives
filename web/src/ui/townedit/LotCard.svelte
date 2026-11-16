@@ -2,11 +2,12 @@
   /**
    * The Lot tool's card: what it puts down (`lotChoice`). A home of a size, with a garden (or as the
    * world's homes have theirs); a farm; one of the public places a town's lot can be; an outdoor
-   * spot; or a civic place the town hasn't got (placed by hand once streets can be built up).
+   * spot; or a civic place the town or village under the pointer hasn't got, put down as its
+   * building along a street.
    */
   import { publicChoices } from '../../game/edit/lots';
   import Segmented from '../kit/Segmented.svelte';
-  import { civicLacking, lotChoice, outdoorChoices, type HomeSize, type LotGroup } from './lotChoice.svelte';
+  import { civicChosen, civicLacking, lotChoice, outdoorChoices, type HomeSize, type LotGroup } from './lotChoice.svelte';
   import type { TownEditor } from './tools';
 
   const { editor }: { editor: TownEditor } = $props();
@@ -34,7 +35,9 @@
   const nameOf = (id: string) => t.parks.find((p) => p.id === id)?.name ?? id;
   const places = $derived(publicChoices(t));
   const outdoors = $derived(outdoorChoices(t));
-  const civics = $derived((void editor.version, civicLacking(editor.draft)));
+  const civics = $derived((void editor.version, civicLacking(editor.draft, lotChoice.civicArea)));
+  const civicOn = $derived((void editor.version, civicChosen(editor.draft, lotChoice.civicArea)));
+  const civicWhere = $derived(editor.draft.open?.areas[lotChoice.civicArea]?.name ?? editor.townName);
 </script>
 
 <div class="lot-card">
@@ -65,15 +68,16 @@
     <p class="hint">A short footpath is laid to it from the road.</p>
   {:else}
     {#if civics.length}
-      <div class="choices" aria-label="Civic places the town has not got">
-        {#each civics as c (c.civic)}
-          <button class="chip" disabled title="Coming with building streets up">{c.label}</button>
+      <span class="eyebrow sub">What {civicWhere} hasn't got</span>
+      <div class="choices" role="radiogroup" aria-label="Civic places {civicWhere} has not got">
+        {#each civics as c, i (c.civic)}
+          <button role="radio" class="chip" aria-checked={civicOn === c.civic} class:on={civicOn === c.civic} tabindex={i === 0 ? 0 : -1} onclick={() => (lotChoice.civic = c.civic)}>{c.label}</button>
         {/each}
       </div>
+      <p class="hint">Put down along a street, facing it. The list follows the town or village under the pointer.</p>
     {:else}
-      <p class="hint">The town has every civic place already.</p>
+      <p class="hint">{civicWhere} has every civic place already.</p>
     {/if}
-    <p class="hint">Coming soon: a civic place put down by hand, with building streets up.</p>
   {/if}
 </div>
 

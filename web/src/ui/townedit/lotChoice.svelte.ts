@@ -5,6 +5,7 @@
  */
 
 import type { GardenSize } from '../../game/housegen';
+import { civicOffered } from '../../game/edit/buildup';
 import { CIVIC_PLACES, publicChoices, type LotChoice } from '../../game/edit/lots';
 import type { NeighbourhoodDraft, Templates } from '../../game/town';
 
@@ -19,23 +20,26 @@ export const lotChoice = $state({
   /** The public place's template and the outdoor spot's (empty: the first). */
   place: '',
   outdoor: '',
-  /** The civic place (an index into `CIVIC_PLACES`; -1: none chosen). */
+  /** The civic place (an index into `CIVIC_PLACES`; -1: none chosen, the first offered), and the area the pointer was last over (its choices: `civicLacking`). */
   civic: -1,
+  civicArea: 0,
 });
 
 /** The outdoor spots' templates. */
 export const outdoorChoices = (t: Templates): string[] => t.parks.filter((p) => p.kind === 'outdoor').map((p) => p.id);
 
-/** The civic places `draft`'s main town has not got (`CIVIC_PLACES`, by their places' kinds and names). */
-export function civicLacking(draft: NeighbourhoodDraft): { civic: number; label: string }[] {
-  const places = (draft.open?.places ?? []).filter((p) => p.area === 0);
-  return CIVIC_PLACES.flatMap((c, i) => (places.some((p) => p.kind === c.place && c.known.test(p.name)) ? [] : [{ civic: i, label: c.label }]));
+/** The civic places area `area` of `draft` has not got (`buildup.ts` `civicOffered`): what the Lot tool may put down there. */
+export function civicLacking(draft: NeighbourhoodDraft, area = lotChoice.civicArea): { civic: number; label: string }[] {
+  return civicOffered(draft, area);
 }
 
-/**
- * What `lotChoice` puts down (`lots.ts` `LotChoice`), or null where nothing can be put down yet:
- * a civic place (placing one by hand comes with build-up, `buildup.ts` `addCivic`).
- */
+/** The civic place the Lot tool puts down in area `area`: the one chosen if the area lacks it, else the first it lacks; -1: none. */
+export function civicChosen(draft: NeighbourhoodDraft, area = lotChoice.civicArea): number {
+  const offered = civicLacking(draft, area);
+  return offered.some((c) => c.civic === lotChoice.civic) ? lotChoice.civic : (offered[0]?.civic ?? -1);
+}
+
+/** What `lotChoice` puts down as a lot (`lots.ts` `LotChoice`), or null: a civic place, put down as a building (`buildup.ts` `addCivic`). */
 export function choiceOf(t: Templates): LotChoice | null {
   const c = lotChoice;
   switch (c.group) {
@@ -68,6 +72,10 @@ export function choiceSize(t: Templates): { w: number; d: number } {
         : c.group === 'outdoor'
           ? t.parks.find((p) => p.id === (c.outdoor || outdoorChoices(t)[0]))?.lot
           : undefined;
+  if (c.group === 'civic') {
+    const k = CIVIC_PLACES[c.civic]?.kind;
+    if (k) return { w: k.w[1], d: k.d[1] };
+  }
   const f = frame ?? t.plot;
   return { w: f.width, d: f.depth };
 }

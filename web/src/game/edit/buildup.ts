@@ -119,8 +119,8 @@ export function areaOfRoad(draft: NeighbourhoodDraft, road: number): number {
   return areas.length && inBox[best] >= (n + 1) * INSIDE_SHARE ? best : -1;
 }
 
-/** Why nothing may be built along road `road` at all, or null. */
-function notBuilt(draft: NeighbourhoodDraft, road: number): string | null {
+/** Why nothing may be built along road `road` of `draft` at all (a footpath, a bridge, a country road out of every town and village), or null. */
+export function notBuilt(draft: NeighbourhoodDraft, road: number): string | null {
   const r = draft.roads[road];
   if (!r) return 'there is no road there';
   const name = r.name ?? 'it';
@@ -366,4 +366,26 @@ function civicAt(draft: NeighbourhoodDraft, t: Templates, content: Content, op: 
 /** The civic places area `area` of `draft` may be given by hand (`civicChoices`): what each is called, by its index into `CIVIC`. */
 export function civicOffered(draft: NeighbourhoodDraft, area: number): { civic: number; label: string }[] {
   return area < 0 ? [] : civicChoices(draft, area).map((c) => ({ civic: c.index, label: c.name }));
+}
+
+/**
+ * A street just drawn (`drawn`, made by `streets.ts` `drawStreet` on `before`, with no homes of its
+ * own) built up as `mode` asks: each road it made (the pieces either side of its bridges; not a
+ * deck, nor a country road out of every town and village) built up by `buildUp`, its seed drawn from
+ * `seed`. One edit: what the street cleared out of its way stays in `cleared`, and `leftOut` counts
+ * the buildings left out along all of it. A piece nothing fits along is left as drawn.
+ */
+export function builtAlong(before: NeighbourhoodDraft, drawn: Edited, t: Templates, content: Content, mode: BuildMode, seed: number): Edited & { leftOut?: number } {
+  if ('refused' in drawn) return drawn;
+  const had = new Set(before.roads);
+  const fresh = drawn.draft.roads.flatMap((r, i) => (had.has(r) ? [] : [i]));
+  let draft = drawn.draft;
+  let leftOut = 0;
+  for (const [k, road] of fresh.entries()) {
+    const e = buildUp(draft, t, content, { road, mode, seed: (seed + k * 0x9e3779b1) >>> 0 });
+    if ('refused' in e) continue;
+    draft = e.draft;
+    leftOut += e.leftOut ?? 0;
+  }
+  return { draft, cleared: drawn.cleared, ...(leftOut ? { leftOut } : {}) };
 }

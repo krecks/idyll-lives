@@ -3,7 +3,9 @@
  * its card (`streetChoice`) asks. Clicks set its points, or a drag draws it freehand. It is drawn
  * as soon as it reaches a road (or the world's edge); Enter or a double click ends it where it is,
  * as a dead end. Backspace takes the last point back, Esc drops it. The street drawn is picked, so
- * its card shows.
+ * its card shows. What goes along it is the card's choice: homes from the lot mix (`drawStreet`'s
+ * fill), the town's other buildings, or both (`buildup.ts` `builtAlong`, in the same edit: one undo
+ * takes the street and what stands along it); by default both in the main town, homes elsewhere.
  *
  * As the pointer moves, the street it would make is drawn as a ghost (`streetLive.ts`): blue where
  * it may go, its bridges pale, red where it may not with why under the tools, a mark where it would
@@ -14,12 +16,13 @@
  */
 
 import type { Edited } from '../../game/edit/edited';
+import { builtAlong } from '../../game/edit/buildup';
 import { drawStreet, Meeting, streetWidth } from '../../game/edit/streets';
 import { lengths, pointAt, type Pt } from '../../game/roads';
 import type { TownGhosts } from '../../render/types';
 import { buildingBox, lotBox, roadGhost } from './ghosts';
 import StreetCard from './StreetCard.svelte';
-import { fillsHomes, streetChoice, strokeKind } from './streetChoice.svelte';
+import { alongFor, fillsHomes, streetChoice, strokeKind, type Along } from './streetChoice.svelte';
 import { liveStreet, newRoads, runsOf, unfinished, verdictOf, warmLive, type LiveStreet, type StrokeKind } from './streetLive';
 import type { TownEditor, TownTool } from './tools';
 import { sentence } from './words';
@@ -40,11 +43,12 @@ const MARK = 4.5;
 export interface StreetAsk {
   kind: StrokeKind;
   clear: boolean;
-  fill: boolean;
+  /** What goes along it, as the card asks (`auto`: by where it runs, `alongFor`). */
+  along: Along;
 }
 
 /** What the card asks for now. */
-export const askOf = (): StreetAsk => ({ kind: strokeKind(streetChoice.kind), clear: streetChoice.clear, fill: fillsHomes(streetChoice.along) });
+export const askOf = (): StreetAsk => ({ kind: strokeKind(streetChoice.kind), clear: streetChoice.clear, along: streetChoice.along });
 
 /**
  * A street being drawn: the points set, and where the pointer is (the line's last point while it
@@ -180,7 +184,10 @@ export const streetTool: TownTool = {
       const key = keyOf(pts, ask);
       if (shown?.key !== key) shown = { key, live: liveStreet(editor.draft, editor.t, pts, ask.kind, ask.clear), verdict: null };
       const { live, verdict } = shown;
-      if (live.kind && live.kind !== 'trail') streetChoice.shown = live.kind;
+      if (live.kind && live.kind !== 'trail') {
+        streetChoice.shown = live.kind;
+        streetChoice.shownArea = live.area;
+      }
       editor.preview(streetGhosts(editor, live, verdict));
       editor.hint(lineOf(live, verdict));
       // (`drawStreet` itself once the pointer rests: too slow for every move on a big town.)
@@ -225,8 +232,9 @@ export const streetTool: TownTool = {
         return false;
       }
       const before = editor.draft;
-      const edited = drawn(pts, ask);
+      const edited = drawn(pts, ask, alongFor(ask.along, live.area));
       if (!editor.apply(edited) || !('draft' in edited)) return false;
+      if ('leftOut' in edited && edited.leftOut) editor.refuse(`${edited.leftOut === 1 ? 'a building was' : `${edited.leftOut} buildings were`} left out along it, where the ground is too steep`);
       const [road] = newRoads(before, edited.draft);
       s.clear();
       shown = null;
@@ -237,7 +245,12 @@ export const streetTool: TownTool = {
       return true;
     };
 
-    const drawn = (pts: Pt[], ask: StreetAsk): Edited => drawStreet(editor.draft, editor.t, editor.content, { points: pts, kind: ask.kind, clear: ask.clear, fill: ask.fill, seed });
+    /** The street drawn, and what goes along it: homes by `drawStreet`'s own fill, the town's buildings (and homes with them) by build-up, in the one edit (one undo). */
+    const drawn = (pts: Pt[], ask: StreetAsk, along: Exclude<Along, 'auto'>): Edited & { leftOut?: number } => {
+      const before = editor.draft;
+      const e = drawStreet(before, editor.t, editor.content, { points: pts, kind: ask.kind, clear: ask.clear, fill: fillsHomes(along), seed });
+      return along === 'buildings' || along === 'both' ? builtAlong(before, e, editor.t, editor.content, along, seed) : e;
+    };
 
     /** The street being drawn dropped. */
     const drop = () => {
