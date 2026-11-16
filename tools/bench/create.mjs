@@ -24,6 +24,11 @@
  * on screen, a refused tight bend, a stretch too steep if the land has one on screen, and a street
  * being drawn taken back a point (Backspace) and dropped (Esc).
  *
+ * Then build-up (`--edit …,buildup`): a main-town street built up from its card (homes and the town's
+ * buildings), a village's street built up with both, its buildings cleared, a civic place the village
+ * lacks put down with the Lot tool, and a street drawn with the Street tool's "Along it" left as it
+ * is (both in the main town); each checked by what the plan gained or lost, and shot.
+ *
  * Besides the pictures it checks what it can by measure, and says so (`create: …`): the side panel,
  * the way on and the figures clear of the stream pill (if it is up) and of every lot tag shown; the arrow
  * key chose the place a row down and moved the focus there; step 2 says it is step 2; step 3 says it is
@@ -38,7 +43,7 @@
  *     --code river-mhs-k2x9q                 the world's code instead (the URL's `?code=`; a bare number: the land's seed)
  *     --shots 1,2,3                          the steps shot (the others only gone through); `edit`: step 2's edit session
  *     --edit-sizes 1920x1080,740x1000        the edit session's shots' sizes (it runs at the first)
- *     --edit lots,streets                    the edit session's parts: the lot and street edits above, the Street tool
+ *     --edit lots,streets,buildup            the edit session's parts: the lot and street edits above, the Street tool, build-up
  *     --keep-place                           no arrow key in step 1's place grid: the place asked for (`--code`) kept
  *     --headed                               in a window (default headless: the real GPU either way)
  *     --port 5184 | --url <u>                a dev server on the port (started if none answers), or one already running
@@ -77,7 +82,7 @@ const editSizes = flag('edit-sizes', '1920x1080,740x1000')
   .split(',')
   .map((s) => s.split('x').map(Number))
   .map(([width, height]) => ({ width, height }));
-const editParts = new Set(flag('edit', 'lots,streets').split(','));
+const editParts = new Set(flag('edit', 'lots,streets,buildup').split(','));
 const worldQuery = [made.world ? `world=${made.world}` : '', made.query ? `options=${made.query}` : '', code ? `code=${encodeURIComponent(code)}` : ''];
 const port = Number(flag('port', '5184'));
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
@@ -161,7 +166,7 @@ function overlaps() {
  */
 function benchHelpers() {
   return (async () => {
-    const [{ app }, { menuScene }, lots, streets, town, pickMod, live] = await Promise.all([
+    const [{ app }, { menuScene }, lots, streets, town, pickMod, live, buildup] = await Promise.all([
       import('/src/ui/app.svelte.ts'),
       import('/src/game/menuScene.ts'),
       import('/src/game/edit/lots.ts'),
@@ -169,6 +174,7 @@ function benchHelpers() {
       import('/src/game/town.ts'),
       import('/src/ui/townedit/pick.ts'),
       import('/src/ui/townedit/streetLive.ts'),
+      import('/src/game/edit/buildup.ts'),
     ]);
     const t = await town.loadTemplates();
     const ed = () => window.__townEditor;
@@ -257,10 +263,10 @@ function benchHelpers() {
       /**
        * A street for the Street tool to draw, off a road, square to it, on screen: `join` (across open land to another
        * road, nothing in its way, no bridge; `join-any`: clearing what is in its way), `bridge` (over the water on a bridge), `tight` (a bend tighter than 9 m)
-       * or `steep` (a stretch too steep, nothing else wrong). Its ground points and their screen points (the last on
+       * or `steep` (a stretch too steep, nothing else wrong); `area`: a street of that area only. Its ground points and their screen points (the last on
        * the road it reaches), and `drawStreet`'s own time on it.
        */
-      stroke(what, skip = 0) {
+      stroke(what, skip = 0, area) {
         const d = plan();
         /** Steep ones found, the reddest first (the likelier the settle refuses it). */
         const found = [];
@@ -270,6 +276,7 @@ function benchHelpers() {
         /** The live street through `pts` if it is what is wanted (`drawStreet`'s own time on it, `ms`, for a street drawn), else null. */
         const judge = (pts) => {
           const v = live.liveStreet(d, t, pts, 'street', true);
+          if (area !== undefined && v.area !== area) return null;
           if (what === 'tight') return v.why === 'it bends tighter than 9 m' ? v : null;
           if (what === 'steep') {
             // (One that may be drawn, a street to another road or a short dead end, for the settle to refuse.)
@@ -332,6 +339,70 @@ function benchHelpers() {
         }
         found.sort((a, b) => b.red - a.red);
         return found[skip] ?? null;
+      },
+      /**
+       * A road to build up on screen (`where`: `town`, the main town's; `village`, a village's): of the first few that
+       * may be built up, the one whose build-up (`mode`), once its buildings are cleared, adds the most buildings; its
+       * point, and what it would add.
+       */
+      buildable(where, mode) {
+        const d = plan();
+        let best = null;
+        let tried = 0;
+        for (const [i, r] of d.roads.entries()) {
+          const a = buildup.areaOfRoad(d, i);
+          if ((where === 'town' ? a !== 0 : a < 1) || buildup.notBuilt(d, i)) continue;
+          const L = length(r.points);
+          let at = null;
+          for (const f of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+            const g = pointAt(r.points, L * f);
+            const p = screen(...g);
+            const picked = p && pickMod.pick(d, t, ...g);
+            if (picked?.kind === 'road' && picked.road === i) {
+              at = p;
+              break;
+            }
+          }
+          if (!at) continue;
+          const c = buildup.clearBuildings(d, i);
+          const bare = 'draft' in c ? c.draft : d;
+          const e = buildup.buildUp(bare, t, ed().content, { road: i, mode, seed: 1 });
+          if ('refused' in e) continue;
+          const adds = { buildings: e.draft.open.backdrop.length - bare.open.backdrop.length, homes: e.draft.slots.length - bare.slots.length };
+          if (!best || adds.buildings > best.buildings) best = { road: i, name: r.name, area: a, ...adds, ...at };
+          if (++tried >= 14) break;
+        }
+        return best;
+      },
+      /** Points on screen along a village's streets where the Lot tool's civic place (the first the village lacks) may go: each with its village. */
+      civicSpots(most = 30) {
+        const d = plan();
+        const out = [];
+        for (const [i, r] of d.roads.entries()) {
+          const a = buildup.areaOfRoad(d, i);
+          if (a < 1 || buildup.notBuilt(d, i)) continue;
+          const [first] = buildup.civicOffered(d, a);
+          if (!first) continue;
+          const L = length(r.points);
+          for (let s = 10; s < L - 10 && out.length < most; s += 3) {
+            for (const side of [1, -1]) {
+              const e = buildup.addCivic(d, t, ed().content, { civic: first.civic, road: i, s, side, seed: 1 });
+              if ('refused' in e) continue;
+              const b = e.draft.open.backdrop[e.draft.open.backdrop.length - 1];
+              const c = b.poly.reduce((m, p) => [m[0] + p[0] / b.poly.length, m[1] + p[1] / b.poly.length], [0, 0]);
+              // (The pointer by the road, a little out from it on that side: where a home's ghost is aimed too.)
+              const g = pointAt(r.points, s);
+              const p = screen((g[0] + c[0]) / 2, (g[1] + c[1]) / 2);
+              if (p) out.push({ ...p, area: a, village: d.open.areas[a].name, civic: first.label });
+            }
+          }
+        }
+        return out;
+      },
+      /** How many backdrop buildings and places the plan has. */
+      built() {
+        const d = plan();
+        return { buildings: d.open?.backdrop?.length ?? 0, places: d.open?.places?.length ?? 0 };
       },
       /** The page's frames from now (their gaps, ms) until `stop`: the 50th, 95th percentiles and the longest. */
       startFrames() {
@@ -718,8 +789,108 @@ async function editSession(page, renderer, shootAs, setStep) {
     }
   };
 
+  /** Build-up (see the top of this file). */
+  const buildupEdits = async () => {
+    const counts = () => bench(() => window.__bench.built());
+    const card = (name) => page.locator('.card button', { hasText: name });
+    /** A street of `where` built up from its card with `mode`'s choice ('Both', or as the card has it). */
+    const buildFromCard = async (where, mode, label) => {
+      await tool('select');
+      const road = await bench(([w, m]) => window.__bench.buildable(w, m), [where, mode]);
+      if (!road) return fault(`${renderer} edit ${label}: no ${where} street on screen to build up`), null;
+      await click(road);
+      if ((await state()).selected?.kind !== 'road') return fault(`${renderer} edit ${label}: a click on ${road.name} picked ${JSON.stringify((await state()).selected)}`), null;
+      if (mode === 'both') await page.locator('.card [role="radio"]', { hasText: /^Both$/ }).click();
+      await page.waitForTimeout(150);
+      await shots(`${label}-card`);
+      // (A generated street is built up already: its buildings cleared first, then built up again.)
+      if (await card('Clear its buildings').isEnabled()) {
+        const full = await counts();
+        await card('Clear its buildings').click();
+        await page.waitForTimeout(300);
+        const now = await counts();
+        if (now.buildings >= full.buildings) fault(`${renderer} edit ${label}: ${road.name}'s buildings not cleared (${(await state()).note})`);
+        console.log(`create: ${renderer} edit ${label}: ${full.buildings - now.buildings} buildings and ${full.places - now.places} places cleared from ${road.name} first`);
+        await shots(`${label}-cleared`);
+      }
+      const had = await counts();
+      await card('Build up this street').click();
+      await page.waitForTimeout(300);
+      const now = await counts();
+      const s = await state();
+      if (now.buildings <= had.buildings) fault(`${renderer} edit ${label}: ${road.name} built up with no buildings (${s.note})`);
+      console.log(`create: ${renderer} edit ${label}: ${road.name} built up: ${now.buildings - had.buildings} buildings, ${now.places - had.places} places, ${s.slots} lots; card says "${await page.locator('.card .option').last().locator('.hint').last().textContent()}"`);
+      await shots(label);
+      await built(label);
+      await shots(`${label}-built`);
+      return road;
+    };
+
+    // 14. A main-town street built up from its card (both, the card's own choice there).
+    await buildFromCard('town', 'both', 'buildup-town');
+    // 15. A village's street built up with both (the card's choice for a village is homes).
+    const village = await buildFromCard('village', 'both', 'buildup-village');
+    // 16. What it was built up with cleared from its card again.
+    if (village) {
+      const had = await counts();
+      await card('Clear its buildings').click();
+      await page.waitForTimeout(300);
+      const now = await counts();
+      if (now.buildings >= had.buildings) fault(`${renderer} edit clear: ${village.name}'s buildings not cleared (${(await state()).note})`);
+      console.log(`create: ${renderer} edit clear: ${had.buildings - now.buildings} buildings and ${had.places - now.places} places cleared from ${village.name}`);
+      await shots('buildup-clear');
+      await built('clear a street');
+      await shots('buildup-clear-built');
+    }
+    // 17. A civic place a village lacks, with the Lot tool.
+    await page.keyboard.press('Escape');
+    await tool('lot');
+    await page.locator('.lot-card [role="radio"]', { hasText: /^Civic$/ }).click();
+    await page.waitForTimeout(150);
+    const spots = await bench(() => window.__bench.civicSpots());
+    let put = false;
+    for (const p of spots) {
+      await page.mouse.move(p.x, p.y, { steps: 4 });
+      await page.waitForTimeout(120);
+      const s = await state();
+      if (!/^Click to put/.test(s.hint ?? '')) continue;
+      await shots('civic-ghost');
+      const had = await counts();
+      await page.mouse.click(p.x, p.y);
+      await page.waitForTimeout(300);
+      const now = await counts();
+      if (now.buildings !== had.buildings + 1 || now.places !== had.places + 1) fault(`${renderer} edit civic: ${now.buildings - had.buildings} buildings and ${now.places - had.places} places added (${(await state()).note})`);
+      const named = await page.evaluate(() => window.__townEditor.draft.open.places.at(-1)?.name);
+      console.log(`create: ${renderer} edit civic: "${s.hint}" in ${p.village}: ${named}`);
+      await page.mouse.move(p.x + 200, p.y + 120, { steps: 3 });
+      await shots('civic');
+      await built('a civic place');
+      await shots('civic-built');
+      put = true;
+      break;
+    }
+    if (!put) fault(`${renderer} edit civic: no spot on screen where a village's civic place may go (${spots.length} tried)`);
+    // 18. A street drawn with "Along it" by where it runs: both in the main town.
+    await tool('street');
+    const by = page.locator('.street-card button.link', { hasText: 'By where it runs' });
+    for (const k of [0, 1]) if ((await by.count()) > k) await by.first().click();
+    const across = (await bench(() => window.__bench.stroke('join', 0, 0))) ?? (await bench(() => window.__bench.stroke('join-any', 0, 0)));
+    if (across) {
+      const had = await counts();
+      for (const p of across.screens) await click(p);
+      const now = await counts();
+      const s = await state();
+      if (s.selected?.kind !== 'road') fault(`${renderer} edit street-both: not drawn (${s.note ?? s.hint})`);
+      console.log(`create: ${renderer} edit street-both: off ${across.road}: ${now.buildings - had.buildings} buildings along it`);
+      await shots('buildup-street-both');
+      await built('a street drawn with both along it');
+      await shots('buildup-street-both-built');
+    } else fault(`${renderer} edit: no street on screen to draw with both along it`);
+  };
+
   if (editParts.has('lots')) await lotEdits();
   if (editParts.has('streets')) await streetEdits();
+  if (editParts.has('buildup')) await buildupEdits();
   const end = await state();
   console.log(`create: ${renderer} edit: ${end.edits} edits, ${end.slots} lots, ${end.roads} roads; problems: ${end.blocking.length} blocking${end.blocking.length ? ` (${end.blocking.join('; ')})` : ''}, ${end.warnings} warnings; edited: ${end.edited}`);
   await page.keyboard.press('Escape');
