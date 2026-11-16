@@ -1250,3 +1250,34 @@ fn rider_and_car_waiting_on_them_never_come_back_into_its_turn() {
     w.cars[0].on_foot.clear();
     assert_eq!(in_the_way(&w.cars, 1, body, at, step(-0.1)), None);
 }
+
+/// A car pulled over as far as the claims count on it passing one coming the other way there
+/// (`Route::pass_at`) may drive on so: the room `drive_on` lets it go on with is no less. (Where
+/// its room ran out between two points, a taxi was let through on the claims pulled over beside
+/// one standing the other way, pulled over standing, and was then held to pull back in first,
+/// which it couldn't beside that one: it waited for that one, which waited for the car behind
+/// it, which waited for it, for good, Clover Acres.)
+#[test]
+fn a_car_may_go_on_pulled_over_as_far_as_the_claims_count_on() {
+    let mut legs = Legs::default();
+    for k in 0..=20 {
+        let room = if k < 12 { 0.215 } else { 0.0 };
+        legs.push_lane([k as f32 * 2.0, 30.0], 5.0, room, LANE);
+    }
+    let mut route = legs.timed(true, true);
+    route.claim(4.6, 1.88, None);
+    let mut c = car([0.0, 10.0], 0.0, 30.0);
+    let ticks = route.ticks();
+    c.route = Some((false, route));
+    let route = &c.route.as_ref().unwrap().1;
+    // (Where the claims sample its way, `Route::pass`; so far along it, the room runs out.)
+    assert!(route.pass.iter().any(|&(_, p)| p > 0.2));
+    assert!(route.pass.iter().any(|&(t, p)| p == 0.0 && t < ticks));
+    for &(t, pass) in &route.pass {
+        assert!(
+            route_room(&c, t) >= pass - 1e-6,
+            "{t} ticks along: room {} to go on with, the claims count on {pass}",
+            route_room(&c, t),
+        );
+    }
+}

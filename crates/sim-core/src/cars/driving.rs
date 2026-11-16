@@ -828,10 +828,11 @@ pub(crate) fn back_off(w: &mut World, c: usize) -> bool {
     true
 }
 
-/// How far right of its lane car `car` has room to pull over `t` ticks along its route
-/// (`Route::room_at`).
+/// How far right of its lane car `car` has room to be pulled over `t` ticks along its route, as
+/// the claims count on it passing one coming the other way there (`Route::room_here`, their
+/// `pass`): up to the point where its room ends.
 pub(crate) fn route_room(car: &Car, t: f32) -> f32 {
-    car.route.as_ref().map_or(0.0, |(_, r)| r.room_at(t))
+    car.route.as_ref().map_or(0.0, |(_, r)| r.room_here(t))
 }
 
 /// How far car `car` can pull over `t` ticks along its route (`Route::pass_at`).
