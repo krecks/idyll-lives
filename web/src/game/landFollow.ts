@@ -11,6 +11,7 @@ import { DEFAULT_LANDSCAPE, type RoadPlan, type WorldStructure, type WorldZone }
 import { BRIDGE_CLEAR, builtSurfaceOf, CUT_MAX, CUT_MAX_MOUNTAIN_ROAD, GRADE, RETAIN_MAX, surfacePlots, type BuiltSurface, type SurfaceWorld } from '../render/shared/builtSurface';
 import { blankLand, COVER, COVER_CELL, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, type Land } from './land';
 import { APRON, builtOf, Protection } from './landEdit';
+import { removeLots } from './edit/lots';
 import { fbm, ridged, smoothstep } from './noise';
 import type { NeighbourhoodDraft } from './town';
 import { COURT, lengths, nearest, pointAt, RoadIndex, type Pt } from './roads';
@@ -256,6 +257,16 @@ export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, prev
   }
 }
 
+/**
+ * Step 2's settle: the town's plan draft (`plan`, on step 1's bare land) with its land settled
+ * under it as `settleLand` does, but giving nothing up: an edit whose built land breaks a slope
+ * limit that `before` (the land as the last settle measured it) kept is refused, with its reason
+ * (`op`: the edit's index in the batch). Only its shape is here so far.
+ */
+export function settleEdit<W extends FollowWorld>(_plan: NeighbourhoodDraft, _preview: (draft: NeighbourhoodDraft) => W, _before?: LandMeasure): { draft: NeighbourhoodDraft; world: W; refused: { op: number; why: string }[] } {
+  throw new Error('settleEdit: not built yet');
+}
+
 /** The dead ends (not trails') reaching past `COURT` m beyond the last road they meet: each road, its end, and how far along it the last meeting is. */
 function longCourts(roads: readonly RoadPlan[]): { road: number; end: 0 | 1; at: number }[] {
   const joins: number[][] = roads.map(() => []);
@@ -335,32 +346,10 @@ function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasur
     const area = open.backdrop?.[i]?.area ?? 0;
     given.backdropIn[area] = (given.backdropIn[area] ?? 0) + 1;
   }
-  // The slots left, numbered again; the pads, places and backdrop buildings that name them with them.
-  const kept = draft.slots.filter((s) => !lots.has(s.index));
-  const renumber = new Map(kept.map((s, i) => [s.index, i]));
-  const slots = kept.map((s, i) => ({ ...s, index: i }));
+  // The slots left, numbered again; the pads, places and backdrop buildings that name them with them (`edit/lots.ts`).
   const dropped = [...(draft.diagnostics?.dropped ?? []), ...draft.slots.filter((s) => lots.has(s.index)).map((s) => ({ name: s.name, kind: s.kind, ...(s.lot ? { lot: s.lot } : {}) }))];
-  const pads: Record<number, number> = {};
-  for (const [k, v] of Object.entries(open.pads)) if (renumber.has(Number(k))) pads[renumber.get(Number(k))!] = v;
-  const places = open.places ?? [];
-  const placeGone = new Set<number>();
-  places.forEach((q, i) => {
-    if (q.plot !== undefined && !renumber.has(q.plot)) placeGone.add(i);
-  });
-  (open.backdrop ?? []).forEach((b, i) => {
-    if (backdrop.has(i) && b.place !== undefined) placeGone.add(b.place);
-  });
-  const placeNumber = new Map<number, number>();
-  places.forEach((_, i) => !placeGone.has(i) && placeNumber.set(i, placeNumber.size));
-  const keptPlaces = places.filter((_, i) => !placeGone.has(i)).map((q) => (q.plot === undefined ? q : { ...q, plot: renumber.get(q.plot)! }));
-  const keptBackdrop = (open.backdrop ?? []).filter((_, i) => !backdrop.has(i)).map((b) => (b.place === undefined ? b : { ...b, place: placeNumber.get(b.place)! }));
-  return {
-    ...draft,
-    slots,
-    roads,
-    diagnostics: { ...(draft.diagnostics ?? { dropped: [] }), dropped },
-    open: { ...open, pads, ...(open.places ? { places: keptPlaces } : {}), ...(open.backdrop ? { backdrop: keptBackdrop } : {}) },
-  };
+  const removed = removeLots({ ...draft, roads }, lots, backdrop);
+  return { ...removed, diagnostics: { ...(draft.diagnostics ?? { dropped: [] }), dropped } };
 }
 
 /** Whether the roads but those `without` are one network (as the sim joins them) with a road out of the world on it. */
@@ -385,6 +374,24 @@ export function gradeLand(land: Land, world: SurfaceWorld): BuiltSurface {
   const surface = builtSurfaceOf(world, land);
   land.h.set(surface.graded());
   return surface;
+}
+
+/**
+ * A place's bare land (step 1), from its draft with no town on it (`macro.ts` `landDraft`): its
+ * heights, water and cover as `seedFollow` makes them, with no built land to fade in from or
+ * gentle ground under. Only its shape is here so far.
+ */
+export function seedBare(_draft: NeighbourhoodDraft): Land {
+  throw new Error('seedBare: not built yet');
+}
+
+/**
+ * Gentler ground under the towns, the villages and the lots out on their own of `world`, fitted
+ * into `land` (its heights changed in place) as `seedFollow` fits it: what `withLand` does before
+ * it grades a town laid on a bare land. Only its shape is here so far.
+ */
+export function gentleUnder(_land: Land, _world: FollowWorld): void {
+  throw new Error('gentleUnder: not built yet');
 }
 
 /**
