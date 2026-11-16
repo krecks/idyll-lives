@@ -29,7 +29,6 @@
   import LoadingScreen from './ui/screens/LoadingScreen.svelte';
   import MainMenu from './ui/screens/MainMenu.svelte';
   import MenuBackdrop from './ui/screens/MenuBackdrop.svelte';
-  import PlayHousehold from './ui/screens/PlayHousehold.svelte';
   import SettingsPanel from './ui/screens/SettingsPanel.svelte';
   import StreamIndicator from './ui/StreamIndicator.svelte';
   import Toasts from './ui/Toasts.svelte';
@@ -259,7 +258,7 @@
       services.items?.holdAhead(true);
       return;
     }
-    if (!['land', 'town', 'household', 'create', 'home', 'play'].includes(screen)) return;
+    if (!['land', 'town', 'household', 'create', 'home'].includes(screen)) return;
     services.items?.holdAhead(false);
     prefetchCatalog();
   });
@@ -346,8 +345,6 @@
     <CreateHousehold />
   {:else if app.screen === 'home'}
     <ChooseHome />
-  {:else if app.screen === 'play'}
-    <PlayHousehold />
   {:else}
     <MainMenu />
   {/if}

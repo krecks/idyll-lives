@@ -9,7 +9,10 @@
  * - town: "Lay out the town" to step 2's town laid on that land and built (its "Choose a household" enabled);
  * - inView, portraits: step 3 ("Choose a household") opened to the portraits in view in its list
  *   shown, and to every household's (`.households .face img`);
- * - entry: "Play" on a household to the game up (its interface there, the loading screen gone).
+ * - home: "Play" on a household to step 4 (Home) up, its own home chosen there;
+ * - entry: "Move in" in step 4 to the game up (its interface there, the loading screen gone), the rest
+ *   of the homes for sale filled on the way; then the residents in the game, the homes they live in,
+ *   and the homes the game shows for sale (a flow with no step 4 times entry from "Play").
  *
  * With `--back`, then the way back and in again: the long tasks in the 5 s after the entry (`entryLong`),
  * "Save and quit" from the menu shown to its picture on screen (`back`), Continue (once the latest save has been prepared behind the
@@ -187,16 +190,37 @@ async function visit(page, cdp) {
   const faces = await page.evaluate(() => document.querySelectorAll('.households .face').length);
   await page.waitForTimeout(500);
   const plays = page.locator('.households .btn.play');
-  const pressed = await now();
+  let pressed = await now();
   await plays.nth(Math.min(pick, (await plays.count()) - 1)).click();
-  await page.waitForFunction(() => !!document.querySelector('.hud-root') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 100 });
+  // Step 4 (Home), when the household goes there first: their home is chosen already, so on with Move in (the entry
+  // timed from that press: the rest of the town is filled on the way in).
+  const inGame = () => !!document.querySelector('.hud-root') && !document.querySelector('.loading');
+  await page.waitForFunction(() => (!!document.querySelector('.hud-root') && !document.querySelector('.loading')) || !!document.querySelector('.btn.move-in:not(:disabled)'), null, { timeout: 180_000, polling: 100 });
+  let home = null;
+  if (!(await page.evaluate(inGame))) {
+    home = (await now()) - pressed;
+    await page.waitForTimeout(500);
+    pressed = await now();
+    await page.locator('.btn.move-in').click();
+  }
+  await page.waitForFunction(inGame, null, { timeout: 180_000, polling: 100 });
   const entered = await now();
+  // Who lives in the town as the game starts (the player's household among them), and in how many homes.
+  // (And the homes the game shows for sale: its own list, as the town panel and the tags have it.)
+  const people = await page.evaluate(async () => {
+    const sims = window.__osw?.sims?.() ?? [];
+    const { game } = await import('/src/ui/state.svelte.ts');
+    const { homesForSale } = await import('/src/ui/town/places.ts');
+    const { services } = await import('/src/ui/services.ts');
+    const forSale = homesForSale(game.plots, game.households, services.content.economy.homePrice).length;
+    return { residents: sims.length, homes: new Set(sims.map((s) => s.plot)).size, forSale };
+  });
   const marks = { boot, newGame, made, layPressed, laid, opened, shown, pressed, entered };
   const more = back ? await backAndIn(page, cdp, now, marks) : {};
   clearInterval(polling);
   await keep();
   const report = { entries: [...entries.values()].sort((a, b) => a.start - b.start), marks };
-  return { boot, world: made - newGame, town: laid - layPressed, inView: inView - opened, portraits: shown - opened, faces, entry: entered - pressed, ...more, report };
+  return { boot, world: made - newGame, town: laid - layPressed, inView: inView - opened, portraits: shown - opened, faces, ...(home === null ? {} : { home }), entry: entered - pressed, ...people, ...more, report };
 }
 
 /** `--back`: from the game to the menu and in again (see the header), ms each. */
@@ -267,7 +291,7 @@ for (let r = 0; r < runs; r++) {
   }
   for (const [i, v] of visits.entries()) {
     const label = i === 0 ? 'first' : 'again';
-    console.log(`run ${r + 1} (${label}): boot ${v.boot.toFixed(0)} ms · land ${v.world.toFixed(0)} ms · town ${v.town.toFixed(0)} ms · step-3 portraits in view ${v.inView.toFixed(0)} ms, all ${v.portraits.toFixed(0)} ms (${v.faces}) · entry ${v.entry.toFixed(0)} ms`);
+    console.log(`run ${r + 1} (${label}): boot ${v.boot.toFixed(0)} ms · land ${v.world.toFixed(0)} ms · town ${v.town.toFixed(0)} ms · step-3 portraits in view ${v.inView.toFixed(0)} ms, all ${v.portraits.toFixed(0)} ms (${v.faces}) · ${v.home === undefined ? '' : `step 4 ${v.home.toFixed(0)} ms · `}entry ${v.entry.toFixed(0)} ms · ${v.residents} residents in ${v.homes} homes, ${v.forSale} for sale`);
     if (back) {
       const tasks = (xs) => (xs.length ? `${xs.length} long (max ${Math.max(...xs)} ms)` : 'no long tasks');
       console.log(`  after entry ${tasks(v.entryLong)} · back ${v.back.toFixed(0)} ms, ${tasks(v.backLong)} · continue ${v.continue.toFixed(0)} ms, then ${tasks(v.continueLong)} · heap ${v.heapMB.toFixed(0)} MB, buffers ${v.buffersMB.toFixed(0)} MB · again ${v.again.toFixed(0)} ms, ${tasks(v.againLong)}`);
@@ -295,7 +319,7 @@ for (const label of ['first', 'again']) {
   if (!list.length) continue;
   md.push(`## ${label === 'first' ? 'First visit' : 'Second visit'}`, '');
   md.push('| moment | median ms | runs |', '|---|---|---|');
-  for (const k of ['boot', 'world', 'town', 'inView', 'portraits', 'entry', ...(back ? ['back', 'continue', 'heapMB', 'buffersMB', 'again'] : [])]) md.push(`| ${k} | ${median(list.map((v) => v[k])).toFixed(0)} | ${list.map((v) => v[k].toFixed(0)).join(', ')} |`);
+  for (const k of ['boot', 'world', 'town', 'inView', 'portraits', ...(list.some((v) => v.home !== undefined) ? ['home'] : []), 'entry', 'residents', 'homes', 'forSale', ...(back ? ['back', 'continue', 'heapMB', 'buffersMB', 'again'] : [])]) md.push(`| ${k} | ${median(list.map((v) => v[k])).toFixed(0)} | ${list.map((v) => v[k].toFixed(0)).join(', ')} |`);
   // (`--back`: the longest task in each stretch.)
   if (back) for (const k of ['entryLong', 'backLong', 'continueLong', 'againLong']) md.push(`| ${k} (longest) | ${median(list.map((v) => Math.max(0, ...v[k]))).toFixed(0)} | ${list.map((v) => Math.max(0, ...v[k])).join(', ')} |`);
   md.push('', '| span | median ms (summed) | count |', '|---|---|---|');

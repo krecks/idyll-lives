@@ -112,26 +112,22 @@
   function next() {
     if (!town) return;
     keep();
+    app.playSlot = null;
     app.screen = 'create';
   }
 
-  /** The other path: take over a household that already lives here (the camera flies into their lot). */
+  /** The other path: a household that already lives here, to step 4 with their own home chosen (they may move). */
   function play(slot: number) {
     if (!town) return;
     keep();
     app.playSlot = slot;
-    const request = app.playRequest(slot);
-    if (!request) return;
-    menuScene.highlight({});
-    app.start(request);
+    app.homeSlot = slot;
+    app.screen = 'home';
   }
 
-  /** A closer look at a household before playing it (a click on its card): who they are, their home and neighbours. */
+  /** A closer look at a household before playing it (a click on its card): step 4 shows who they are, their home and neighbours. */
   function meet(slot: number) {
-    if (!town) return;
-    keep();
-    app.playSlot = slot;
-    app.screen = 'play';
+    play(slot);
   }
 
   /** The household on the lot in focus (offered to play from the 3D view). */
