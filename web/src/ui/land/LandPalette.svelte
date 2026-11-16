@@ -2,7 +2,7 @@
   import type { Snippet } from 'svelte';
   import type { LandTool } from '../../game/landBrush';
   import Icon from '../Icon.svelte';
-  import { groupOf, hasHeight, hasStrength, HEIGHTS, LAND_GROUPS, sizeOf, sizeRange, toolInfo, type BrushState } from './landTools';
+  import { groupOf, hasHeight, hasStrength, HEIGHTS, LAND_GROUPS, sizeAt, sizeOf, sizeRange, POINT, sizeText, sliderAt, stepSize, toolInfo, type BrushState } from './landTools';
 
   /**
    * The land brushes (step 1's Shape panel, Build mode's Land tab): the tools in four groups, the
@@ -55,6 +55,16 @@
 
   function setSize(v: number) {
     brush = { ...brush, sizes: { ...brush.sizes, [groupOf(brush.tool)]: v } };
+  }
+
+  /** The arrow and page keys on the size slider: a step on its log scale (the slider's own would be a thousandth of it). */
+  function sizeKey(e: KeyboardEvent) {
+    const dir = e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'PageUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'PageDown' ? -1 : 0;
+    if (!dir) return;
+    e.preventDefault();
+    let next = stepSize(size, dir, range);
+    if (e.key.startsWith('Page')) for (let k = 0; k < 4; k++) next = stepSize(next, dir, range);
+    setSize(next);
   }
 </script>
 
@@ -121,8 +131,18 @@
     <div class="sliders">
       <label class="slider">
         <span class="name">Size</span>
-        <input type="range" min={range.min} max={range.max} step="1" value={size} {disabled} oninput={(e) => setSize(Number(e.currentTarget.value))} />
-        <span class="value tabular">{size} m</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.001"
+          value={sliderAt(size, range)}
+          aria-valuetext="{size} m{size <= POINT ? ', one point' : ''}"
+          {disabled}
+          oninput={(e) => setSize(sizeAt(Number(e.currentTarget.value), range))}
+          onkeydown={sizeKey}
+        />
+        <span class="value tabular" title="{size} m across">{sizeText(size)}</span>
       </label>
       {#if hasHeight(brush.tool)}
         <label class="slider">
@@ -286,7 +306,7 @@
   }
   .slider {
     display: grid;
-    grid-template-columns: 62px minmax(0, 1fr) 46px;
+    grid-template-columns: 62px minmax(0, 1fr) 58px;
     align-items: center;
     gap: 8px;
     font-size: 12px;
@@ -302,6 +322,7 @@
   }
   .value {
     text-align: right;
+    white-space: nowrap;
     color: var(--text-muted);
     font-size: 11.5px;
   }

@@ -8,7 +8,7 @@
  */
 
 import { heightAt, LAND_CELL, type LandPatch, type LandRect } from '../../game/land';
-import type { Brush, MountainGhost } from '../../game/landBrush';
+import { aimOf, type Brush, type MountainGhost } from '../../game/landBrush';
 import type { LandEditor } from '../../game/landEdit';
 import type { LandCursor } from '../../render/types';
 import { cursorOf } from './landTools';
@@ -35,8 +35,8 @@ export interface StrokeHooks {
   stamped?(ms: number): void;
 }
 
-/** Whether `tool` would do nothing at (`x`, `z`): built land, or water where water may not go (`LandEditor.refuses`). */
-const refuses = (editor: LandEditor, brush: Brush, x: number, z: number) => editor.refuses(brush.tool, x, z);
+/** Whether `brush` would do nothing with the pointer at (`x`, `z`): built land, or water where water may not go (`LandEditor.refuses`), where it works (a point brush's grid point). */
+const refuses = (editor: LandEditor, brush: Brush, x: number, z: number) => editor.refuses(brush.tool, ...aimOf(brush, x, z));
 
 export class LandStroke {
   /** The pointer's last canvas position, while a stroke is held. */
