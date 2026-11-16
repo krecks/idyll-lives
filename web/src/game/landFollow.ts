@@ -527,6 +527,8 @@ function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasur
   const backdrop = new Set([...found.pads].filter((n) => n >= plots).map((n) => n - plots));
   let roads = draft.roads.map((r) => ({ ...r, points: r.points.slice() }));
   const gone = new Set<number>();
+  /** The dead ends cut back: per road, the stretch of it kept (m along it as it was). */
+  const kept = new Map<number, [number, number]>();
   // Country roads cut too deep (a way out of the world, a loop between places), where the rest is still one network with a way out.
   for (const r of [...found.roads].sort((a, b) => a - b)) {
     if (roads[r].kind !== 'country') continue;
@@ -549,24 +551,28 @@ function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasur
     // (Never one that leaves the roads in two.)
     if (!oneNetwork(trimmed, gone)) continue;
     roads = trimmed;
+    kept.set(c.road, [from, to]);
     given.courts++;
     // (The lots past the new end.)
     entries.forEach((p, n) => {
       if (n < plots && p.entry?.road === c.road && (p.entry.s < from - 0.5 || p.entry.s > to + 0.5)) lots.add(n);
     });
   }
-  // (The lots on a road left out, and the backdrop buildings by it or facing it: no road of their own left nearer.)
+  // (The lots on a road left out, and the backdrop buildings by it or facing it: no road of their
+  // own left nearer. And the backdrop buildings facing a dead end past where it was cut back to, as
+  // the lots there: the road they faced is gone from by them.)
   const facedGone = (x: number, z: number) => {
-    let best = { road: -1, dist: Infinity };
+    let best = { road: -1, dist: Infinity, s: 0 };
     draft.roads.forEach((r, i) => {
-      const d = nearest(r.points, x, z).dist;
-      if (d < best.dist) best = { road: i, dist: d };
+      const { dist, s } = nearest(r.points, x, z);
+      if (dist < best.dist) best = { road: i, dist, s };
     });
-    return gone.has(best.road);
+    const cut = kept.get(best.road);
+    return gone.has(best.road) || (!!cut && (best.s < cut[0] - 0.5 || best.s > cut[1] + 0.5));
   };
   entries.forEach((p, n) => {
     const [x, z] = [p.x + p.w / 2, p.z + p.d / 2];
-    if (n < plots ? p.entry && gone.has(p.entry.road) : gone.size && ([...gone].some((r) => nearest(draft.roads[r].points, x, z).dist < BY_ROAD) || facedGone(x, z))) (n < plots ? lots : backdrop).add(n < plots ? n : n - plots);
+    if (n < plots ? p.entry && gone.has(p.entry.road) : (gone.size && [...gone].some((r) => nearest(draft.roads[r].points, x, z).dist < BY_ROAD)) || ((gone.size || kept.size) && facedGone(x, z))) (n < plots ? lots : backdrop).add(n < plots ? n : n - plots);
   });
   if (!gone.size && !lots.size && !backdrop.size && roads.every((r, i) => r === draft.roads[i] || r.points.length === draft.roads[i].points.length)) return null;
   roads = roads.filter((_, i) => !gone.has(i));
