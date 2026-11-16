@@ -10,18 +10,13 @@
  */
 
 import type { RoadPlan } from '../core/protocol';
-import { deckTiles } from './macro';
+import { BRIDGE_IN, BRIDGE_SPAN, DECK_PAST, deckOf, deckTiles, ROAD_WIDTH } from './macro';
 import { connector, lengths, pointAt, type Pt } from './roads';
+
+/** The generator's bridge limits (`macro.ts`): its longest deck, how far before the bank it runs straight, how far past the water its deck reaches. */
+export { BRIDGE_IN, BRIDGE_SPAN, DECK_PAST };
 import type { Rect } from './town';
 
-/** The longest a bridge's deck may be (m), as the generator's (`macro.ts` `BRIDGE_SPAN`, copied: it is not exported). */
-export const BRIDGE_SPAN = 45;
-/** A bridge runs straight from this far before the bank to as far past the other (m: `macro.ts` `BRIDGE_IN`). */
-export const BRIDGE_IN = 12;
-/** A deck reaches this far past the water at each end (m: `macro.ts` `DECK_PAST`). */
-export const DECK_PAST = 2;
-/** A bridge's width (m): a country road's, as every road in a big world is (`macro.ts` `ROAD_WIDTH`). */
-const BRIDGE_WIDTH = 7;
 /** A line bent further than this off the straight between a bridge's ends (m) is not straightened into one. */
 const BEND_MOST = 4;
 /** Wet stretches closer than this (m) are one crossing (a sandbank in the middle of a river). */
@@ -116,7 +111,7 @@ export function bridgeable(points: readonly Pt[], span: readonly [number, number
   const [pa, pb] = [stretch[0], stretch[stretch.length - 1]];
   const off = Math.max(...stretch.map((p) => toSegment(p, pa, pb).dist));
   if (off > BEND_MOST) return `it bends where it crosses the water (${Math.round(off)} m off straight), and a bridge runs straight`;
-  const half = BRIDGE_WIDTH / 2;
+  const half = ROAD_WIDTH / 2;
   const xs = stretch.map((p) => p[0]);
   const zs = stretch.map((p) => p[1]);
   const box = [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)];
@@ -147,24 +142,6 @@ export function bridgeable(points: readonly Pt[], span: readonly [number, number
     }
   }
   return null;
-}
-
-/**
- * A bridge's or a causeway's deck over `water` (as the generator's `macro.ts` `deckOf`, copied: it
- * is not exported): its arc lengths from the first point over the water less `DECK_PAST` to the
- * last plus as much, the deck's tiles cleared in `walk` (the water the sim's walkers keep off).
- */
-function deckOf(road: RoadPlan, water: Uint8Array, walk: Uint8Array, W: number, D: number): [number, number] {
-  const ls = lengths(road.points);
-  const L = ls[ls.length - 1];
-  const wet = ([x, z]: Pt) => water[Math.min(D - 1, Math.max(0, Math.floor(z))) * W + Math.min(W - 1, Math.max(0, Math.floor(x)))] === 1;
-  const first = road.points.findIndex(wet);
-  if (first < 0) return [0, 0];
-  let last = first;
-  for (let i = first; i < road.points.length; i++) if (wet(road.points[i])) last = i;
-  const span: [number, number] = [round2(Math.max(0, ls[first] - DECK_PAST)), round2(Math.min(L, ls[last] + DECK_PAST))];
-  deckTiles(road, span, W, D, (tile) => (walk[tile] = 0));
-  return span;
 }
 
 /** A polyline with points every metre or so from `a` to `b`. */
@@ -208,7 +185,7 @@ export function withBridge(roads: readonly RoadPlan[], road: number, span: reado
   }
   const bridge: RoadPlan = {
     points: rounded(straight(pa, pb)),
-    width: Math.max(BRIDGE_WIDTH, r.width),
+    width: Math.max(ROAD_WIDTH, r.width),
     ends: [before ? 'join' : r.ends[0], after ? 'join' : r.ends[1]],
     kind: 'country',
     name: names?.bridge ?? `${(r.name ?? 'The').split(' ')[0]} Bridge`,
