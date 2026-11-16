@@ -1197,3 +1197,54 @@ fn a_car_faces_the_way_it_goes_round_a_corner() {
         worst.to_degrees()
     );
 }
+
+/// A rider and a car waiting for each other (Otter Weir, seed base 0: a car turning at a junction,
+/// its tail swinging out a tick on, waited for a cyclist beside it by name, `Car::on_foot`; their
+/// way ran through where the car stood, so they waited for it in turn). Stepped out of its way,
+/// the cyclist rode straight back towards it, into the ground it would turn through, and the two
+/// waited for each other for good, 27 residents on their bikes behind them for over two hours.
+/// Someone a car waits for by name doesn't come back into that ground (where it would be a tick
+/// on, `Car::next`), though they may step out of it, or on across it from inside it.
+#[test]
+fn rider_and_car_waiting_on_them_never_come_back_into_its_turn() {
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    let body = Body {
+        ahead: 1.2,
+        behind: 0.6,
+        side: 0.3,
+        yaw: 0.0,
+    };
+    let c = [30.0f32, 6.0];
+    // Turning tight: a tick on turned 1.1 rad further, its tail swinging out.
+    let (now, next) = (-0.4f32, 0.7f32);
+    let car = &mut w.cars[0];
+    car.state = CarState::Leaving;
+    car.shown = Some((c, now, true, 0));
+    car.next = Some((c, next));
+    car.on_foot = vec![1];
+    let (len, wid) = (car.len, car.wid);
+    // Beside its tail as it will be: a metre behind its middle, just out of its ground there.
+    let (h, n) = ([next.sin(), next.cos()], [next.cos(), -next.sin()]);
+    let across = -(wid / 2.0 + 1.2 + 0.1);
+    let at = [c[0] - h[0] + n[0] * across, c[1] - h[1] + n[1] * across];
+    let step = |d: f32| [at[0] + n[0] * d, at[1] + n[1] * d];
+    // (Nowhere near its body as it stands now: a step towards it was taken before.)
+    assert!(!walks_into(c, now, len, wid, 0.0, body, at, step(0.1)));
+    assert_eq!(
+        in_the_way(&w.cars, 1, body, at, step(0.1)),
+        Some(0),
+        "back towards its turn: they wait"
+    );
+    assert_eq!(
+        in_the_way(&w.cars, 1, body, at, step(-0.1)),
+        None,
+        "out of its way: on they go"
+    );
+    // Inside its ground, crossing it: on they go too.
+    let inside = [c[0] - h[0] * 3.0, c[1] - h[1] * 3.0];
+    let across_it = [inside[0] + n[0] * 0.1, inside[1] + n[1] * 0.1];
+    assert_eq!(in_the_way(&w.cars, 1, body, inside, across_it), None);
+    // One it doesn't wait for by name keeps clear as ever (`walks_into`, it and a tick on).
+    w.cars[0].on_foot.clear();
+    assert_eq!(in_the_way(&w.cars, 1, body, at, step(-0.1)), None);
+}

@@ -535,3 +535,71 @@ fn a_car_turning_tight_among_riders_beside_it_turns_and_they_ride_on() {
         }
     }
 }
+
+/// A rider and a car at a driveway's mouth: D's car pulls out of its driveway, turning out onto
+/// the lane, just as R rides by along it, on the way to work behind it (the car turning ahead of
+/// them) and on the way home towards it (riding at its nose), at a range of distances from it.
+/// The car waits for a rider in the ground it would turn through; the rider, their way running
+/// through where the car stands, waits for it to go on. Stepped out of its way, a rider who rode
+/// straight back into it held it up again, and the two waited for each other for good (Otter
+/// Weir, seed base 0: 27 residents on their bikes for over two hours, about 50 cars behind them).
+/// Neither waits on the other for good: within the hour the car is out of town and the rider at
+/// work or home off their bike.
+#[test]
+fn a_rider_and_car_at_a_driveway_never_wait_for_each_other_for_good() {
+    let end = clock::tick_at(2, 23.0 * 60.0).unwrap();
+    for home in [false, true] {
+        for d in [-3.0f32, 0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0] {
+            let mut w = lane_town(140, 200);
+            let car_x = w.cars[0].spot[0];
+            // (Off to work, R behind the car, riding east; home, R east of it, riding west.)
+            let at = |w: &World| {
+                let s = &w.sims[0];
+                let x = if home {
+                    s.pos[0] - car_x
+                } else {
+                    car_x - s.pos[0]
+                };
+                let towards = if home {
+                    s.yaw.sin() < 0.0
+                } else {
+                    s.yaw.sin() > 0.0
+                };
+                s.riding.is_some() && s.away_until.is_none() && s.pos[1] < 34.0 && towards && x <= d
+            };
+            while !at(&w) {
+                w.tick_once();
+                assert!(
+                    w.tick < end,
+                    "R never rode by D's driveway (home {home}, {d} m)"
+                );
+            }
+            drive_off(&mut w);
+            let by = w.tick + common::hours(1.0);
+            let done = |w: &World| {
+                let car_gone = w.cars[0].state == sim_core::cars::CarState::Away;
+                let rider = if home {
+                    w.sims[0].riding.is_none()
+                } else {
+                    w.sims[0].away_until.is_some()
+                };
+                car_gone && rider
+            };
+            while !done(&w) {
+                w.tick_once();
+                assert!(
+                    w.tick < by,
+                    "within the hour (home {home}, R {d} m from the car as it set off): the car {:?} at {:?}, R at {:?} {}",
+                    w.cars[0].state,
+                    w.cars[0].shown.map(|s| s.0),
+                    w.sims[0].pos,
+                    if w.sims[0].riding.is_some() {
+                        "riding"
+                    } else {
+                        "on foot"
+                    }
+                );
+            }
+        }
+    }
+}
