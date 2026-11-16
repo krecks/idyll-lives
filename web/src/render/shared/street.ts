@@ -505,6 +505,8 @@ interface PlotKey {
   variant: number;
   id: string;
   hash: number;
+  /** Who it is in a chunk's key: where it is and where the focus lot it depends on is (not their indexes, which a lot removed before them moves). */
+  key: string;
 }
 
 /** What a chunk's fences are planned from (`TownStreet.fenceKey`): its fences, those round it (for the posts) and a hash. */
@@ -1086,6 +1088,20 @@ export class TownStreet {
   }
   private byChunk: Map<number, PlotLayout[]> | null = null;
 
+  /**
+   * Plans, a part at a time with `pace` between, what `chunkIds` and the chunks' keys need of the whole town: the
+   * street's own (`staticParts`) and every road side's kerbside furniture. Without it they are planned when first
+   * asked for, all at once (a big town's in one stall of a few hundred milliseconds).
+   */
+  async prepare(pace?: () => Promise<void>): Promise<void> {
+    this.staticParts();
+    await pace?.();
+    for (const r of this.rows.keys()) {
+      this.kerbOf(r, NO_FOCUS);
+      await pace?.();
+    }
+  }
+
   /** Every chunk with something of the street in it. */
   chunkIds(): number[] {
     const ids = new Set<number>();
@@ -1130,8 +1146,14 @@ export class TownStreet {
     const deps = this.plotDeps(L);
     const variant = deps.some((d) => d.info.id === focus) ? focus : NO_FOCUS;
     const id = `${L.info.id}|${variant}`;
+    const at = this.byId.get(variant)?.info;
+    const key = `${placeOf(L.info)}|${at ? placeOf(at) : '-'}`;
     // What it's planned from: the plot, its neighbours' houses (their fronts), the things and garages round it, the openings on its house.
     let h = hashString(JSON.stringify([L.info.house, L.info.roof, L.info.storeys, L.info.public, this.sides.get(L)?.left?.info.house, this.sides.get(L)?.right?.info.house]));
+    // (And how it is laid out, its pad and whether the town has its own cars and garages: what a chunk planned for
+    // another town of the same lot here may differ by. Its place is in `key`.)
+    h = mix(h, hashString(JSON.stringify([L.turned, L.front, L.edge, L.door, L.path, L.drive, L.base, L.plot.x, L.plot.z, L.plot.w, L.plot.d, L.info.entry])));
+    h = mix(mix(h, Math.round(this.padOf(L) * 1000)), (this.world.cars ? 1 : 2) + (this.world.garages ? 4 : 8));
     h = this.blockersHash([{ x: L.info.x - 1, z: L.info.z - 1, w: L.info.w + 2, d: L.info.d + 2 }], variant, h);
     if (!this.world.garages && L.base === 'house') {
       const g = this.legacyGarage(L, variant);
@@ -1147,7 +1169,7 @@ export class TownStreet {
     // Indoors or out: the things on it, by the rooms under them.
     const W = this.W;
     for (const o of this.objectsByPlot.get(L.info.id) ?? []) h = mix(h, this.world.rooms[o.z * W + o.x] ? 1 : 0);
-    return { L, variant, id, hash: h };
+    return { L, variant, id, hash: h, key };
   }
 
   /** A plot's share as `plotKey` found it: the one kept, or planned now. */
@@ -1638,6 +1660,21 @@ export class TownStreet {
     return out;
   }
 
+  /** A hash of the street's own in chunk `id` (`staticParts`: what it looks like), or null if it has none. */
+  private staticSig(id: number): number | null {
+    const known = this.staticSigs.get(id);
+    if (known !== undefined) return known;
+    const st = this.staticParts().get(id);
+    let sig: number | null = null;
+    if (st) {
+      sig = hashNumbers(st.parts.walk.pos, st.parts.signature());
+      for (const geo of [st.road, st.trail, st.marks]) sig = hashNumbers(geo.pos, sig);
+    }
+    this.staticSigs.set(id, sig);
+    return sig;
+  }
+  private readonly staticSigs = new Map<number, number | null>();
+
   /**
    * Chunk `id` far off (the far LOD, past the chunks streamed in): its houses as boxes with their
    * roofs (`HousePlanner.farHouse`), the focus lot's left out, in one plain-finish geometry, with
@@ -1700,18 +1737,22 @@ export class TownStreet {
     const plots: PlotKey[] = [];
     for (const L of this.plotsByChunk().get(id) ?? []) {
       const k = this.plotKey(L, focus);
-      keys.push(`p${k.id}:${k.hash}`);
+      keys.push(`p${k.key}:${k.hash}`);
       plots.push(k);
     }
     const kerbs: Parts[] = [];
     for (const r of this.rows.keys()) {
       const c = this.kerbOf(r, focus).chunks.get(id);
       if (!c) continue;
-      keys.push(`k${r}:${c.sig}`);
+      // (By what it looks like, not by its road's index: a road removed before it moves that.)
+      keys.push(`k${c.sig}`);
       kerbs.push(c.parts);
     }
     const fence = this.fenceKey(id, focus);
     if (fence) keys.push(`e${id}:${fence.hash}`);
+    // The street's own in it (sidewalks, the road, fountains, bridges, parked cars), by what they look like.
+    const own = this.staticSig(id);
+    if (own !== null) keys.push(`s${own}`);
     // Ground layers: garden paths and fields off the focus lot (the lot draws its own, on its ground).
     const ground: GroundLayer[] = [];
     if (this.options.ground) {
@@ -1738,8 +1779,9 @@ export class TownStreet {
         keys.push(`${name}:${list.length}:${hashNumbers(list.flatMap((r) => [r.x, r.z, r.w, r.d]))}`);
       }
     }
-    // (On a land the town follows, how often the heights in it have moved: `BuiltSurface.version`.)
-    const moved = this.levels ? `|v${this.levels.surface.version(id)}` : '';
+    // (On a land the town follows, the heights in it: `BuiltSurface.chunkSig`. Not how often they moved, which a
+    // surface solved afresh for another town of the same land counts from nothing again.)
+    const moved = this.levels ? `|h${this.levels.surface.chunkSig(id)}` : '';
     return { key: `${id}|${this.options.lived}${moved}|${keys.join(';')}`, plots, kerbs, fence, ground };
   }
 
@@ -1780,6 +1822,11 @@ export class TownStreet {
   }
 }
 
+
+/** A lot's place (its rectangle), as chunk keys name it: the same lot in another town of the same layout is the same. */
+function placeOf(p: { x: number; z: number; w: number; d: number }): string {
+  return `${p.x},${p.z},${p.w},${p.d}`;
+}
 
 /** Geometry that goes into the chunk each polygon's middle is in. */
 class RoutedGeo extends Geo {

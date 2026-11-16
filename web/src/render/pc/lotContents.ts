@@ -316,6 +316,20 @@ export class LotContents {
         this.natures.set(key, (set = shaped));
       }
     }
+    // Another town on the same land as the one the overview shows (step 2's edits: a lot removed, a street drawn): its
+    // landscape taken on in place (`Landscape.relay`), only what changed drawn again; not one the game shows too.
+    let relaid: Promise<[number, number, number, number] | null> | null = null;
+    const shown = layer === 'town' ? this.natureIn.town : null;
+    if ((!set || set === shown) && shown && !shown.users.has('world') && shown.landscape.relayable(world) && !shown.landscape.sameLayout(world)) {
+      if (!set) {
+        this.natures.delete(shown.key);
+        shown.key = key;
+        this.natures.set(key, (set = shown));
+      }
+      const landscape = shown.landscape;
+      relaid = shown.ready.then(() => perfTimeAsync('nature: relay', () => landscape.relay(world, () => this.hooks.pace())));
+      shown.ready = relaid.then(() => {});
+    }
     if (!set) {
       const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod, this.quality.woodsCell, this.quality.grass, this.quality.openWorld);
       const created: NatureSet = { key, landscape, draws: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve(), refreshing: Promise.resolve() };
@@ -337,6 +351,9 @@ export class LotContents {
     set.pending++;
     try {
       await set.ready;
+      // (Its woods and flowers grown again where the town changed, swapped in once built.)
+      const box = await relaid;
+      if (box) await this.regrowNature(set.landscape, box, () => this.natures.get(set.key) !== set, () => this.hooks.pace());
     } finally {
       set.pending--;
     }
