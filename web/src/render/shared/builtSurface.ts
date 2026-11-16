@@ -1345,3 +1345,13 @@ export function builtSurfaceOf(world: SurfaceWorld, land: Land): BuiltSurface {
   const roads = world.meta?.roads ?? [];
   return new BuiltSurface(land, roads, surfacePlots(world), planJunctions(world.junctions ?? [], roads), bankOf(world));
 }
+
+/**
+ * The height a road of `kind` drawn along `points` would have on `land`, every `PROFILE_STEP` m
+ * along it (`s`, m): the land averaged over `PROFILE_REACH` m either way, its grade clamped to the
+ * kind's `GRADE` (`y`), and how far that is cut into the land or stands over it there (`cut`, m;
+ * the street tool tints a stretch past `CUT_MAX`). Only its shape is here so far.
+ */
+export function profileOf(_points: readonly (readonly [number, number])[], _kind: RoadKind, _land: Land): { s: number[]; y: number[]; cut: number[] } {
+  throw new Error('profileOf: not built yet');
+}

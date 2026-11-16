@@ -349,8 +349,22 @@ export interface LotHighlight {
   selected: number | null;
   /** Lots drawn as available (e.g. for sale). */
   marked: readonly number[];
+  /** Of those, the ones the household can't afford, drawn in a second tint (none: every marked lot alike). */
+  dear?: readonly number[];
   /** Faint outlines around every lot. */
   outlines: boolean;
+}
+
+/**
+ * Step 2's edits shown over the town before the town is built again with them: streets being
+ * drawn or just drawn (`roads`: their middle lines and widths; `bad` where they may not go, a
+ * `bridge` stretch over water), lots (`new` placed, `bad` where one may not go, `gone` to be
+ * removed, the building on it dimmed) and villages' boxes, all in world metres.
+ */
+export interface TownGhosts {
+  roads: { points: [number, number][]; width: number; tone: 'new' | 'bad' | 'bridge' }[];
+  lots: { x: number; z: number; w: number; d: number; tone: 'new' | 'bad' | 'gone' }[];
+  boxes: { x: number; z: number; w: number; d: number; tone: 'new' | 'bad' }[];
 }
 
 export interface RoomOverlayTile {
@@ -635,6 +649,8 @@ export interface Renderer {
   panTown(dx: number, dz: number): void;
   /** Which lots glow; they ease to it, or (`snap`) are so from the next frame (a picture taken). */
   setLotHighlight(highlight: LotHighlight, snap?: boolean): void;
+  /** Step 2's edits drawn over the town (`TownGhosts`) until the town is built again; null: none. */
+  setTownGhosts(ghosts: TownGhosts | null): void;
   /** Runs each overview frame after the camera moved, before drawing (to pin labels); null removes it. */
   onTownFrame(fn: (() => void) | null): void;
   /**

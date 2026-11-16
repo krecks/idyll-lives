@@ -8,8 +8,11 @@
 
 import type { TownSize, WorldOptions } from '../core/protocol';
 
+/** The options step 1 offers as a row of choices (the land's size is not among them: some of its choices may be ruled out, `world.ts` `townFits`). */
+export type ChoiceKey = Exclude<keyof WorldOptions, 'size'>;
+
 /** One option: what step 1 calls it, and its choices in order, each with its label. */
-export interface OptionField<K extends keyof WorldOptions = keyof WorldOptions> {
+export interface OptionField<K extends ChoiceKey = ChoiceKey> {
   key: K;
   label: string;
   choices: readonly { value: WorldOptions[K]; label: string }[];
