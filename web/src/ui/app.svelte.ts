@@ -6,7 +6,7 @@ import type { MenuStill } from '../game/menuStill';
 import type { Pt } from '../game/roads';
 import type { StartRequest } from '../game/session';
 import { EMPTY_LOT, withLot, type NeighbourhoodDraft } from '../game/town';
-import type { Chosen } from './newGame';
+import { peopleSeedOf, type Chosen } from './newGame';
 
 /**
  * New game, in four steps: land (step 1) → town (step 2) → household (step 3: choose one of the
@@ -73,11 +73,13 @@ class AppState {
   townName = $state<string | null>(null);
   /** Step 2's town (nobody living there yet). */
   world = $state.raw<LaidTown | null>(null);
-  /** Step 3's town with its neighbours, and the key of step 2's town it was filled from (`world.key`). */
+  /** Step 3's town with its neighbours, and what it was filled from: step 2's town and the people's seed (`newGame.ts` `peopleKey`). */
   town = $state.raw<NeighbourhoodDraft | null>(null);
   townOf = '';
   /** The households step 3 offers (their lots, in order); empty until step 3 offers a sample of the town's. */
   offer = $state.raw<readonly number[]>([]);
+  /** How many times step 3's "Show others" was pressed for `offer` (`newGame.ts` `offerPage`). */
+  offerPage = $state(0);
   household = $state.raw<HouseholdDraft | null>(null);
   /** Living (the residents earn the money) or Creative (building is free). */
   mode = $state<GameKind>('living');
@@ -87,7 +89,11 @@ class AppState {
   emptyLot = $state(false);
   /** House picked on the home screen (prepared in the background). */
   homeSlot = $state<number | null>(null);
-  /** Home of the neighbour household picked to play (prepared in the background). */
+  /**
+   * The household chosen in step 3 from those living in town, by its home's slot (step 4 opens on
+   * that home); null: the player's own from Creation (`household`). It wins over `household`: a
+   * household made in Creation is kept while the player looks through the town's.
+   */
   playSlot = $state<number | null>(null);
   /** A live 3D scene is rendering behind the menus. */
   liveBackdrop = $state(false);
@@ -111,11 +117,17 @@ class AppState {
     this.town = null;
     this.townOf = '';
     this.offer = [];
+    this.offerPage = 0;
     this.household = null;
     this.playSlot = null;
     this.homeSlot = null;
     this.emptyLot = false;
     this.screen = 'land';
+  }
+
+  /** The seed the town's people come from (the code's own, else drawn from the town's); undefined before step 1. */
+  get peopleSeed(): number | undefined {
+    return this.code ? peopleSeedOf(this.code) : undefined;
   }
 
   /** The town as the home screen shows it: the chosen lot cleared when starting on an empty lot. */
@@ -130,7 +142,7 @@ class AppState {
     const town = this.homeTown(slot);
     const household = this.household;
     if (!town || !household) return null;
-    return { kind: 'new', town, household, slot, mode: this.mode, lifespan: this.lifespan };
+    return { kind: 'new', town, household, slot, mode: this.mode, lifespan: this.lifespan, peopleSeed: this.peopleSeed };
   }
 
   /** The new game that takes over the household already living on `slot` (also prepared in the background). */
@@ -138,7 +150,7 @@ class AppState {
     const town = this.town;
     const household = town?.households.find((h) => h.slot === slot)?.household;
     if (!town || !household) return null;
-    return { kind: 'new', town, household, slot, existing: true, mode: this.mode, lifespan: this.lifespan };
+    return { kind: 'new', town, household, slot, existing: true, mode: this.mode, lifespan: this.lifespan, peopleSeed: this.peopleSeed };
   }
 
   start(request: StartRequest): void {

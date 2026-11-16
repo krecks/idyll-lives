@@ -5,12 +5,14 @@
  *
  * A step's draft carries the key of what it was made from. Step 1's land is keyed by its place,
  * size, hills, woods and seed, and by a fingerprint of the land as the player shaped it. Step 2's
- * town adds the town, the villages, the town's seed and where the player moved it. A step whose key
- * no longer matches is made again from the step before it.
+ * town adds the town, the villages, the town's seed and where the player moved it; step 3's people
+ * add the people's seed. A step whose key no longer matches is made again from the step before it.
  */
 
 import type { Rle, WorldOptions } from '../core/protocol';
 import { COVER, landHash, NONE, type Land } from '../game/land';
+import { hash } from '../game/noise';
+import { offered, type PeopleStreams } from '../game/people';
 import type { Pt } from '../game/roads';
 import type { NeighbourhoodDraft } from '../game/town';
 import { defaultsOf, LAND_SIZE, LEGACY_KINDS, placeOf, sizeFor, townFits, type WorldKind } from '../game/world';
@@ -93,6 +95,51 @@ export function landKey(code: WorldCode, shaped: Land | null | undefined): strin
 /** Step 2's town's key: the land's (`landKey`), its town and villages, its own seed, and where the player moved it (none: where the land has it). */
 export function townKey(land: string, code: Chosen, site: Pt | null): string {
   return `${land}|${code.town}:${code.villages}:${code.townSeed ?? ''}:${site ? `${Math.round(site[0])},${Math.round(site[1])}` : ''}`;
+}
+
+/** What the people's seed is drawn from when the code has none of its own (`peopleSeedOf`). */
+const PEOPLE_SALT = 0x9e0b1e;
+
+/**
+ * The seed `code`'s people are drawn from (`people.ts` `peopleStreams`): its own, once "New
+ * neighbours" rolled one or a code typed in gave one; else a mix of the town's seed (the land's
+ * while the town has none of its own), so a code without one still makes the same people.
+ */
+export function peopleSeedOf(code: WorldCode): number {
+  if (code.peopleSeed !== undefined) return code.peopleSeed >>> 0;
+  return Math.floor(hash(code.townSeed ?? code.seed, PEOPLE_SALT, 0x5eed) * 2 ** 32) >>> 0;
+}
+
+/** Step 3's key: step 2's town's (`townKey`) and the people's seed. The town is lived in again only when this changed. */
+export function peopleKey(town: string, seed: number): string {
+  return `${town}|${seed >>> 0}`;
+}
+
+/** Households left not yet offered, under which "Show others" starts the round again (or all of them, in a smaller town). */
+const FRESH_LEAST = 10;
+
+/**
+ * The households step 3 offers once "Show others" has been pressed `page` times: each offer is
+ * `offered` from one stream running on, among the households not offered yet, so every press shows
+ * others; once fewer than ten are left the round starts again from all of them. Page 0 is
+ * `offered(town, streams)` itself, so the same code offers the same households first.
+ */
+export function offerPage(town: NeighbourhoodDraft, streams: PeopleStreams, page: number): number[] {
+  const rand = streams.offer();
+  const running: PeopleStreams = { ...streams, offer: () => rand };
+  const all = town.households;
+  let shown = new Set<number>();
+  let offer: number[] = [];
+  for (let p = 0; p <= page; p++) {
+    let rest = all.filter((h) => !shown.has(h.slot));
+    if (rest.length < Math.min(FRESH_LEAST, all.length)) {
+      shown = new Set();
+      rest = all;
+    }
+    offer = offered({ ...town, households: rest }, running);
+    for (const slot of offer) shown.add(slot);
+  }
+  return offer;
 }
 
 /** Step 1's figures: the land's size (m), and the share of it under water and under woods (0..1). */

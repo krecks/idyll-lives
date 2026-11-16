@@ -37,6 +37,15 @@ const BIG_START = 118;
 /** Homes the first wave leaves for sale at the least, for the player to choose from (and a quarter of them if that is more). */
 const LEFT_TO_CHOOSE = 6;
 
+/**
+ * The most households the first wave moves into a town of `homes` homes: all of them but those it
+ * leaves for the player to choose from (a quarter, six at least). `populate` clamps a count to it,
+ * and step 3's Neighbours slider stops at it.
+ */
+export function householdsAtMost(homes: number): number {
+  return Math.max(0, homes - Math.min(homes, Math.max(LEFT_TO_CHOOSE, Math.ceil(homes / 4))));
+}
+
 /** Neighbours a world starts with once the player has moved in (`fillTown`): room left under the sim's 240 for the player's household, babies and newcomers. */
 export const START_CAP = 150;
 
@@ -137,8 +146,7 @@ export function populate(content: Content, assets: AssetRegistry, t: Templates, 
   // (A big world starts with about 120 residents unless asked for more, up to its cap.)
   const MAX_NEIGHBOURS = count === undefined ? BIG_START : NEIGHBOUR_CAP;
   const houses = town.slots.filter((s) => s.kind === 'house');
-  const left = Math.min(houses.length, Math.max(LEFT_TO_CHOOSE, Math.ceil(houses.length / 4)));
-  const wanted = Math.max(0, Math.min(count ?? houses.length, houses.length - left));
+  const wanted = Math.max(0, Math.min(count ?? houses.length, householdsAtMost(houses.length)));
   const price = new Map(houses.map((s) => [s.index, homePrice(content, t, s)]));
   const dearestFirst = (list: PlotSlot[]) => [...list].sort((a, b) => price.get(b.index)! - price.get(a.index)!);
   // The houses picked first; the others stand in for any of them nobody could buy. The town's

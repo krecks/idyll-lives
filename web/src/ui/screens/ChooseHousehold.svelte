@@ -1,70 +1,116 @@
 <script lang="ts">
   /**
-   * New game, step 3: the household. Play one of the households who live in step 2's town (its
-   * neighbours are made here the first time, and again whenever the town was laid out again), or make
-   * your own in Creation. The game's choices (Living or Creative, the lifespan) are made here too.
+   * New game, step 3: the household. The town's residents move in here (the first wave, from the
+   * world code's people seed), and some of their households are offered as cards: choose one to play
+   * (step 4 then opens on their home), or make your own in Creation. The game's choices (Living or
+   * Creative, the lifespan) and how many neighbours live here are in the side panel.
+   *
+   * The town is lived in again only when step 2's town or the people's seed changed (`peopleKey`):
+   * back and forth, the same households and the same cards stay, and a household made in Creation
+   * stays too.
    */
   import { onDestroy, onMount } from 'svelte';
-  import { lookAtAge, randomHousehold } from '../../game/household';
+  import { lookAtAge, type SimDraft } from '../../game/household';
   import { reducedMotion } from '../../game/host';
   import { menuScene } from '../../game/menuScene';
-  import { loadTemplates, NEIGHBOUR_CAP, populate, rehouse, vacantSlots, type NeighbourhoodDraft, type Templates } from '../../game/town';
+  import { householdsAtMost, peopleStreams, populate } from '../../game/people';
+  import { homePrice } from '../../game/price';
+  import { loadTemplates, vacantSlots, type NeighbourhoodDraft, type Templates } from '../../game/town';
   import { app } from '../app.svelte';
-  import { lifespanHint } from '../format';
+  import { lifespanHint, money } from '../format';
   import Icon from '../Icon.svelte';
+  import { offerPage, peopleKey, peopleSeedOf, startCode } from '../newGame';
   import Segmented from '../kit/Segmented.svelte';
   import SimPreview from '../kit/SimPreview.svelte';
   import TownStage, { type LotLabel } from '../kit/TownStage.svelte';
   import { services } from '../services';
+  import SetupShell from './SetupShell.svelte';
 
   const { content, assets } = services;
+  /** A new seed: other neighbours every time. */
+  const roll = () => (Math.random() * 2 ** 31) >>> 0;
+
   let templates = $state.raw<Templates | null>(null);
   let town = $state.raw<NeighbourhoodDraft | null>(app.town);
-  /** Lot under the pointer (3D or a household card) and the lot the camera is on. */
+  /** The lot under the pointer (3D, a tag or a card), and the card chosen (its home's lot): the camera goes to its area. */
   let hover = $state<number | null>(null);
-  let focus = $state<number | null>(null);
+  let focus = $state<number | null>(app.playSlot !== null && app.offer.includes(app.playSlot) ? app.playSlot : null);
   let hoverOff = 0;
-  let list = $state<HTMLElement>();
-  /** The household list is scrolled to its end: the fade at its foot (more below) goes away. */
-  let listEnd = $state(false);
+  let cards = $state<HTMLElement>();
 
+  const code = $derived(app.code ?? startCode('country', 0));
+  const streams = $derived(peopleStreams(peopleSeedOf(code)));
+  const offer = $derived(app.offer);
   const houseCount = $derived(town ? town.slots.filter((s) => s.kind === 'house').length : 0);
-  /** Households at most: a house for each but one, and no more than the world's neighbours (`NEIGHBOUR_CAP`). */
-  const mostHouseholds = $derived(Math.max(0, Math.min(houseCount - 1, NEIGHBOUR_CAP)));
-  const vacant = $derived(town ? vacantSlots(town).map((s) => s.index) : []);
+  /** The Neighbours slider's end: as many households as the first wave moves in at most (`populate` stops there too). */
+  const mostHouseholds = $derived(householdsAtMost(houseCount));
+  const forSale = $derived(town ? vacantSlots(town).length : 0);
   const population = $derived(town?.households.reduce((n, h) => n + h.household.members.length, 0) ?? 0);
-  /** Vacant lots up to this many are tagged on the map; more and none is (they are marked on it, and counted). */
-  const VACANT_TAGS = 10;
+  /** Every household is on the cards already: "Show others" has none to show. */
+  const allShown = $derived(!town || town.households.length <= offer.length);
+
+  /** The offered households, in the cards' order. */
+  const offeredHouseholds = $derived.by(() => {
+    const t = town;
+    if (!t) return [];
+    const bySlot = new Map(t.households.map((h) => [h.slot, h]));
+    return offer.flatMap((slot) => bySlot.get(slot) ?? []);
+  });
+  const chosen = $derived(focus === null ? undefined : offeredHouseholds.find((h) => h.slot === focus));
 
   /**
-   * The tags over the town. The households' first: they are what this step is for (`tagLayout.ts` ranks them over
-   * the places, and shows only the nearest few when the town is zoomed out). Public places only in the town itself:
-   * a big world's hamlets each have a shop or two of the same names ("The Grocer" three times over), tagged only
-   * while looked at, with the hamlet's name under them as on step 1.
+   * Each lived-in home's price band among the homes lived in: the cheapest third one coin, the
+   * dearest three. (Among them, not all the town's: the first wave moves into the dearer homes, so
+   * nearly all would be the dearest third of the town.) Worked out once a town.
    */
+  const bands = $derived.by(() => {
+    const t = town;
+    const map = new Map<number, { band: number; price: number }>();
+    if (!t || !templates) return map;
+    const prices = t.households.flatMap((h) => (t.slots[h.slot] ? [{ slot: h.slot, price: homePrice(content, templates!, t.slots[h.slot]) }] : []));
+    const sorted = prices.map((p) => p.price).sort((a, b) => a - b);
+    const at = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] ?? 0;
+    const [low, high] = [at(1 / 3), at(2 / 3)];
+    for (const p of prices) map.set(p.slot, { price: p.price, band: p.price < low ? 1 : p.price < high ? 2 : 3 });
+    return map;
+  });
+  const BAND_LABEL = ['', 'Modest home', 'Family home', 'Fine home'];
+  const currency = $derived(content.economy.currency ?? '$');
+
+  /** Where a home is: its street, and the town or the village it is in (a village says so). */
+  function whereOf(slot: number): { street: string; place: string; village: boolean } {
+    const s = town?.slots[slot];
+    const area = s?.area ?? 0;
+    const name = area === 0 ? (town?.name ?? '') : (town?.open?.areas[area]?.name ?? '');
+    return { street: s?.name ?? '', place: name, village: area !== 0 };
+  }
+
+  /** A resident in brief: "Ben, 34", and their first two traits. */
+  function about(m: SimDraft): { who: string; traits: string; all: string } {
+    const labels = m.traits.map((t) => content.trait(t)?.label).filter((l): l is string => !!l);
+    return { who: `${m.name}, ${m.age}`, traits: labels.slice(0, 2).join(', '), all: labels.join(', ') };
+  }
+
+  /** The tags over the town: the households offered (what this step is for), and the main town's public places. */
   const labels = $derived.by((): LotLabel[] => {
     const t = town;
     if (!t) return [];
+    const offered = new Map(offeredHouseholds.map((h) => [h.slot, h]));
     return t.slots.flatMap((s): LotLabel[] => {
-      const h = t.households.find((x) => x.slot === s.index);
       if (s.kind !== 'house') {
         const area = s.area ?? 0;
         if (area === 0) return [{ plot: s.index, title: s.name, kind: 'park' }];
         return s.index === hover || s.index === focus ? [{ plot: s.index, title: s.name, sub: t.open?.areas[area]?.name, kind: 'park' }] : [];
       }
-      if (h) return [{ plot: s.index, title: `The ${h.household.name}s`, sub: s.name, kind: 'home' }];
-      // A big world has more houses than a screen has room for tags: every vacant lot would be the same "For sale"
-      // pill, hiding the town under them, and one coming and going under the pointer wherever it went. They are
-      // marked on the map and counted in the stats instead (a small town, where they fit, tags them all).
-      if (vacant.length > VACANT_TAGS) return [];
-      return [{ plot: s.index, title: 'For sale', sub: s.name, kind: 'sale' }];
+      const h = offered.get(s.index);
+      return h ? [{ plot: s.index, title: `The ${h.household.name}s`, sub: s.name, kind: 'home' }] : [];
     });
   });
 
   /**
-   * A tag shown only while its lot is looked at (a hamlet's place, a household's past the nearest few) floats
-   * above the lot: crossing a little empty ground on the way to it should not drop the tag at once. Hovering
-   * something else changes at once.
+   * A tag shown only while its lot is looked at floats above the lot a moment after the pointer
+   * leaves: crossing a little empty ground on the way to it should not drop the tag at once.
+   * Hovering something else changes at once.
    */
   function setHover(plot: number | null): void {
     clearTimeout(hoverOff);
@@ -77,88 +123,81 @@
   onDestroy(() => clearTimeout(hoverOff));
 
   /** Step 2's town, nobody living there yet. */
-  const world = (): NeighbourhoodDraft | null => app.world?.draft ?? (town ? { ...town, households: [] } : null);
+  const empty = (): NeighbourhoodDraft | null => app.world?.draft ?? (town ? { ...town, households: [] } : null);
 
-  /** New neighbours in the same world (its streets and houses stay as they are). */
-  function generate(count?: number): void {
-    const empty = world();
-    if (!templates || !empty) return;
+  /** The town lived in from the people's seed (`count` households, else as many as the first wave takes), and its first offer. */
+  function populateTown(count?: number): void {
+    const bare = empty();
+    if (!templates || !bare) return;
     // No loading screen: that is only for starting a game. The cards draw their portraits as they come.
-    town = populate(content, assets, templates, empty, count);
+    town = populate(content, assets, templates, bare, count, streams);
+    app.offerPage = 0;
+    app.offer = offerPage(town, streams, 0);
+    focus = null;
+    keep();
   }
 
-  function rerollHousehold(i: number) {
+  /** Other neighbours: a people's seed of their own, in the code (so step 1's Copy carries it). */
+  function newNeighbours(): void {
+    app.code = { ...code, peopleSeed: roll() };
+    populateTown();
+  }
+
+  /** The next households from the offer's stream. */
+  function showOthers(): void {
     if (!town) return;
-    const households = [...town.households];
-    // (A name no other household here has.)
-    const taken = households.filter((_, j) => j !== i).map((h) => h.household.name);
-    // (One that can buy the home they live in.)
-    households[i] = { ...households[i], household: templates ? rehouse(content, assets, templates, town, households[i].slot, households[i].household.members.length, taken) : randomHousehold(content, assets, households[i].household.members.length, taken) };
-    town = { ...town, households };
+    app.offerPage += 1;
+    app.offer = offerPage(town, streams, app.offerPage);
+    focus = null;
+    cards?.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
   }
 
-  function removeHousehold(i: number) {
-    if (!town) return;
-    town = { ...town, households: town.households.filter((_, j) => j !== i) };
-  }
-
-  /** The town as the next steps should see it (and the town of step 2's it was filled from). */
-  function keep() {
+  /** The town as the next steps should see it, and what it was lived in from. */
+  function keep(): void {
     if (!town) return;
     app.town = town;
-    app.townOf = app.world?.key ?? app.townOf;
+    if (app.world) app.townOf = peopleKey(app.world.key, peopleSeedOf(code));
+    if (app.playSlot !== null && !town.households.some((h) => h.slot === app.playSlot)) app.playSlot = null;
   }
 
-  function next() {
+  /** Play `slot`'s household: on to step 4, which opens on their home. */
+  function choose(slot: number): void {
     if (!town) return;
     keep();
+    app.playSlot = slot;
+    menuScene.highlight({});
+    app.screen = 'home';
+  }
+
+  /** Make (or change) the player's own household in Creation. */
+  function create(): void {
+    keep();
+    app.playSlot = null;
     app.screen = 'create';
   }
 
-  /** The other path: take over a household that already lives here (the camera flies into their lot). */
-  function play(slot: number) {
-    if (!town) return;
+  /** The household made in Creation, on to step 4. */
+  function chooseOwn(): void {
+    if (!app.household) return;
     keep();
-    app.playSlot = slot;
-    const request = app.playRequest(slot);
-    if (!request) return;
+    app.playSlot = null;
     menuScene.highlight({});
-    app.start(request);
+    app.screen = 'home';
   }
 
-  /** A closer look at a household before playing it (a click on its card): who they are, their home and neighbours. */
-  function meet(slot: number) {
-    if (!town) return;
-    keep();
-    app.playSlot = slot;
-    app.screen = 'play';
-  }
-
-  /** The household on the lot in focus (offered to play from the 3D view). */
-  const focused = $derived(town && focus !== null ? town.households.find((h) => h.slot === focus) : undefined);
-
-  // A list that fits its panel needs no fade at the foot (it would dim the last card for nothing).
-  // Re-checked when the town changes and whenever the list's own box does: a taller window fits the
-  // list again, a shorter one (or a wrapped card) brings the fade back. Only the class changes on
-  // the outcome, and that moves no box, so the observer cannot feed itself.
-  const atEnd = (el: HTMLElement) => (listEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 4);
-  $effect(() => {
-    void town;
-    if (!list) return;
-    const el = list;
-    atEnd(el);
-    const observer = new ResizeObserver(() => atEnd(el));
-    observer.observe(el);
-    return () => observer.disconnect();
-  });
-
-  /** Click on a lot (3D, tag or card): the camera glides to it; again (or empty ground) back out. */
-  function select(plot: number | null) {
-    focus = plot === focus ? null : plot;
+  /** A card or its home picked (again: let go): the camera goes to its area, its card into view. */
+  function select(plot: number | null): void {
+    focus = plot !== null && plot !== focus && offer.includes(plot) ? plot : null;
     if (focus === null) return;
-    const i = town?.households.findIndex((h) => h.slot === focus) ?? -1;
-    if (i >= 0) list?.querySelectorAll('.household')[i]?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+    const card = cards?.querySelector(`[data-slot="${focus}"]`);
+    card?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
   }
+
+  /** What the camera frames: the area of the household chosen, else the whole world. */
+  const shot = $derived.by((): 'world' | { area: number } => {
+    const s = focus === null ? undefined : town?.slots[focus];
+    return s ? { area: s.area ?? 0 } : 'world';
+  });
 
   onMount(async () => {
     templates = await loadTemplates();
@@ -168,28 +207,29 @@
       app.screen = app.land ? 'town' : 'land';
       return;
     }
-    // The town its neighbours were made for, back and forth: they stay (under the name it has now).
-    // Another town (laid out again in step 2, or on another land): new neighbours.
-    if (town && app.townOf === laid.key) {
+    // The town its neighbours were made for, with the same people's seed: they stay (under the
+    // name it has now), and so do the cards. Else (another town, or other neighbours): lived in again.
+    if (town && app.townOf === peopleKey(laid.key, peopleSeedOf(code))) {
       if (town.name !== laid.draft.name) town = { ...town, name: laid.draft.name };
-    } else generate();
-    keep();
+      if (!app.offer.length) app.offer = offerPage(town, streams, app.offerPage);
+      keep();
+    } else populateTown();
   });
 
-  // The 3D town follows the draft. Only a new layout needs it rebuilt: rerolling or removing a
-  // household leaves the streets and houses as they are (the labels and markers follow separately).
+  // The 3D town follows the draft. Only a new layout needs it rebuilt: other neighbours leave the
+  // streets and houses as they are (the tags and the lit lots follow separately).
   let layout = '';
   $effect(() => {
     const key = town ? `${town.seed}:${town.width}x${town.depth}:${town.slots.map((s) => `${s.x},${s.z},${s.template}`).join(';')}` : '';
     if (key === layout) return;
     layout = key;
-    focus = null;
     hover = null;
     if (town) void menuScene.show(town);
   });
 
+  // The offered households' homes lit; the one under the pointer and the one chosen more so.
   $effect(() => {
-    menuScene.highlight({ hover, selected: focus, marked: vacant, outlines: true });
+    menuScene.highlight({ hover, selected: focus, marked: offer, outlines: true });
   });
   $effect(() => () => menuScene.highlight({}));
 
@@ -197,415 +237,345 @@
   const avoid = (el: HTMLElement) => ({ destroy: menuScene.avoid(el) });
 </script>
 
-<div class="screen scaled">
-  <div class="haze" aria-hidden="true"></div>
-  <header use:avoid>
-    <button class="btn ghost back" onclick={() => { keep(); app.screen = 'town'; }}><Icon name="icon.ui.back" size={18} /> Town</button>
-    <div class="title">
-      <span class="eyebrow">Step 3 of 4 · Household</span>
-      <h1 class="town-name">{town?.name ?? app.world?.draft.name ?? ''}</h1>
-      <p class="lede">Play one of the households who live here, or make your own in Creation.</p>
-    </div>
-    <div class="actions">
-      <button class="btn" onclick={() => generate()}><Icon name="icon.ui.dice" size={18} /> New neighbours</button>
-      <button class="btn primary" disabled={!town || vacant.length === 0} onclick={next}>Creation →</button>
-    </div>
-  </header>
+{#snippet head()}
+  <h1 class="town-name">{town?.name ?? app.world?.draft.name ?? ''}</h1>
+  <p class="lede">Play one of the households who live here, or make your own.</p>
+{/snippet}
 
-  <main>
-    <section class="view">
-      {#if town}
-        <TownStage {labels} {hover} selected={focus} {focus} onhover={setHover} onselect={select} />
-      {:else}
-        <div></div>
-      {/if}
-      {#if town && templates}
-        <div class="controls menu-glass" use:avoid>
-          <label class="control">
-            <span class="eyebrow">Neighbours · {town.households.length}</span>
-            <input
-              type="range"
-              min="0"
-              max={mostHouseholds}
-              value={town.households.length}
-              onchange={(e) => generate(Number((e.currentTarget as HTMLInputElement).value))}
-            />
-          </label>
-          <div class="stats" aria-label="Town summary">
-            <span><b>{houseCount}</b> homes</span>
-            <span><b>{town.households.length}</b> neighbour households</span>
-            <span><b>{population}</b> residents</span>
-            <span class="sale"><b>{vacant.length}</b> for sale</span>
-          </div>
-        </div>
-      {/if}
-      {#if focus !== null}
-        <div class="lot-actions" use:avoid>
-          <button class="btn" onclick={() => (focus = null)}><Icon name="icon.ui.town" size={16} /> Whole town</button>
-          {#if focused}
-            {#key focused.slot}
-              <button class="btn primary play-lot" onclick={() => play(focused.slot)}>Play the {focused.household.name}s →</button>
-            {/key}
-          {/if}
-        </div>
-      {/if}
-    </section>
+{#snippet panel()}
+  <section class="group" aria-labelledby="game-head">
+    <h2 class="eyebrow" id="game-head">Your game</h2>
+    <div class="options">
+      <div class="option">
+        <span class="eyebrow sub">Game</span>
+        <Segmented
+          fill
+          label="Game"
+          bind:value={app.mode}
+          options={[
+            { value: 'living', label: 'Living' },
+            { value: 'creative', label: 'Creative' },
+          ]}
+        />
+        <p class="hint">{app.mode === 'creative' ? 'Building is free. No rent or bills at home.' : 'Your residents earn the money to build with.'}</p>
+      </div>
+      <div class="option">
+        <span class="eyebrow sub">Lifespan</span>
+        <Segmented
+          fill
+          label="Lifespan"
+          bind:value={app.lifespan}
+          options={[
+            { value: 'off', label: 'Off' },
+            { value: 'short', label: 'Short' },
+            { value: 'normal', label: 'Normal' },
+            { value: 'long', label: 'Long' },
+          ]}
+        />
+        <p class="hint">{lifespanHint(app.lifespan)}</p>
+      </div>
+    </div>
+  </section>
+  <section class="group" aria-labelledby="neighbours-head">
+    <h2 class="eyebrow" id="neighbours-head">Neighbours</h2>
+    {#if town && templates}
+      <label class="option">
+        <span class="eyebrow sub">Households living here · {town.households.length}</span>
+        <input
+          type="range"
+          min="0"
+          max={mostHouseholds}
+          value={town.households.length}
+          aria-label="Households living here"
+          onchange={(e) => populateTown(Number((e.currentTarget as HTMLInputElement).value))}
+        />
+      </label>
+      <p class="hint">{population} residents in {town.households.length} households. More move into the homes left once you have chosen yours.</p>
+    {/if}
+    <div class="row">
+      <button class="btn" disabled={!templates || !town} onclick={newNeighbours}><Icon name="icon.ui.dice" size={16} /> New neighbours</button>
+    </div>
+  </section>
+{/snippet}
 
+{#snippet stage()}
+  <div class="split">
     {#if town}
-      <aside class="households menu-glass" use:avoid>
-        <!-- The game's choices: how it plays, and how fast its residents age. -->
-        <div class="game" aria-label="Your game">
-          <div class="choice">
-            <span class="eyebrow">Game</span>
-            <Segmented
-              fill
-              label="Game"
-              bind:value={app.mode}
-              options={[
-                { value: 'living', label: 'Living' },
-                { value: 'creative', label: 'Creative' },
-              ]}
-            />
-            <p class="hint">{app.mode === 'creative' ? 'Building is free. No rent or bills at home.' : 'Your residents earn the money to build with.'}</p>
-          </div>
-          <div class="choice">
-            <span class="eyebrow">Lifespan</span>
-            <Segmented
-              fill
-              label="Lifespan"
-              bind:value={app.lifespan}
-              options={[
-                { value: 'off', label: 'Off' },
-                { value: 'short', label: 'Short' },
-                { value: 'normal', label: 'Normal' },
-                { value: 'long', label: 'Long' },
-              ]}
-            />
-            <p class="hint">{lifespanHint(app.lifespan)}</p>
-          </div>
-        </div>
-        <header class="list-head">
-          <span class="eyebrow">Who lives here</span>
-          <span class="count">{town.households.length} {town.households.length === 1 ? 'household' : 'households'}</span>
+      <TownStage {labels} {hover} selected={focus} focus={null} {shot} selectable={(p) => offer.includes(p)} onhover={setHover} onselect={select} />
+    {:else}
+      <div></div>
+    {/if}
+    {#if town}
+      <section class="offer menu-glass" use:avoid aria-label="Households to play">
+        <header class="offer-head">
+          <span class="eyebrow">Who you could play</span>
+          <button class="btn ghost small" disabled={allShown} title={allShown ? 'Every household here is shown' : undefined} onclick={showOthers}>
+            <Icon name="icon.ui.dice" size={15} /> Show others
+          </button>
         </header>
-        <div
-          class="list"
-          class:list-end={listEnd}
-          bind:this={list}
-          onscroll={(e) => atEnd(e.currentTarget)}
-        >
-          {#each town.households as h, i (h.household.name + i)}
+        <div class="cards" bind:this={cards}>
+          <!-- The player's own household: made in Creation (or to be). -->
+          <article class="card own" class:made={!!app.household}>
+            {#if app.household}
+              {@const own = app.household}
+              <button class="pick" aria-label="Choose your own household, the {own.name}s" onclick={chooseOwn}>
+                <span class="faces">
+                  {#each own.members as m (m.uid)}
+                    <span class="face" style:--skin={m.appearance.skin} title={m.name}><SimPreview appearance={lookAtAge(content, assets, m.appearance, m.age)} gender={m.gender} size={36} /></span>
+                  {/each}
+                </span>
+                <span class="info">
+                  <b>The {own.name}s</b>
+                  <span class="where">Your own household</span>
+                  <span class="members">{own.members.map((m) => m.name).join(', ')}</span>
+                </span>
+              </button>
+              <div class="card-actions">
+                <button class="btn ghost small" onclick={create}>Change</button>
+                <button class="btn small go" onclick={chooseOwn}>Choose →</button>
+              </div>
+            {:else}
+              <button class="pick create" onclick={create}>
+                <span class="plus" aria-hidden="true"><Icon name="icon.ui.plus" size={22} /></span>
+                <span class="info">
+                  <b>Create your own</b>
+                  <span class="where">Make a household in Creation, then choose its home.</span>
+                </span>
+              </button>
+            {/if}
+          </article>
+
+          {#each offeredHouseholds as h (h.slot)}
+            {@const where = whereOf(h.slot)}
+            {@const band = bands.get(h.slot)}
             <article
-              class="household"
+              class="card"
+              data-slot={h.slot}
               class:hover={hover === h.slot}
               class:focus={focus === h.slot}
               onmouseenter={() => setHover(h.slot)}
               onmouseleave={() => setHover(null)}
             >
-              <button class="pick" aria-label="Meet the {h.household.name}s" onclick={() => meet(h.slot)}>
-                <span class="faces">
-                  {#each h.household.members as m (m.uid)}
-                    <span class="face" style:--skin={m.appearance.skin} title={m.name}><SimPreview appearance={lookAtAge(services.content, services.assets, m.appearance, m.age)} gender={m.gender} size={38} /></span>
-                  {/each}
+              <button class="pick" aria-label="Look at the {h.household.name}s' home" aria-pressed={focus === h.slot} onclick={() => select(h.slot)}>
+                <span class="top">
+                  <span class="faces">
+                    {#each h.household.members as m (m.uid)}
+                      <span class="face" style:--skin={m.appearance.skin} title={m.name}><SimPreview appearance={lookAtAge(content, assets, m.appearance, m.age)} gender={m.gender} size={36} /></span>
+                    {/each}
+                  </span>
+                  {#if band}
+                    <span class="band" title="{BAND_LABEL[band.band]} · {money(band.price)}" aria-label="{BAND_LABEL[band.band]}, {money(band.price)}">
+                      {#each [1, 2, 3] as n (n)}<span class:on={n <= band.band}>{currency}</span>{/each}
+                    </span>
+                  {/if}
                 </span>
                 <span class="info">
                   <b>The {h.household.name}s</b>
-                  <span class="addr">{town.slots[h.slot].name}</span>
+                  <span class="where">{where.street} · {where.place}{#if where.village}<em class="village">village</em>{/if}</span>
                   <span class="members">
                     {#each h.household.members as m (m.uid)}
-                      {@const traits = m.traits.map((t) => content.trait(t)?.label).join(', ')}
-                      <span class="member" title={traits ? `${m.name} · ${traits}` : m.name}>{m.name}{#if traits}<em> · {traits}</em>{/if}</span>
+                      {@const a = about(m)}
+                      <span class="member" title={a.all ? `${a.who} · ${a.all}` : a.who}>{a.who}{#if a.traits}<em>{` · ${a.traits}`}</em>{/if}</span>
                     {/each}
                   </span>
                 </span>
               </button>
-              <div class="row-actions">
-                <button class="btn play" aria-label="Play this household: the {h.household.name}s" title="Play the {h.household.name}s" onclick={() => play(h.slot)}>Play</button>
-                <button class="btn ghost" aria-label="Reroll the {h.household.name}s" onclick={() => rerollHousehold(i)}>
-                  <Icon name="icon.ui.dice" size={16} />
-                </button>
-                <button class="btn ghost" aria-label="Remove the {h.household.name}s" onclick={() => removeHousehold(i)}>
-                  <Icon name="icon.ui.trash" size={16} />
-                </button>
+              <div class="card-actions">
+                <button class="btn small go" aria-label="Play the {h.household.name}s" onclick={() => choose(h.slot)}>Play →</button>
               </div>
             </article>
           {:else}
-            <p class="empty">A quiet town — you'll be the first to move in.</p>
+            <p class="empty">Nobody lives here yet: you will be the first to move in.</p>
           {/each}
         </div>
-      </aside>
+      </section>
     {/if}
-  </main>
-</div>
+  </div>
+{/snippet}
+
+{#snippet figures()}
+  {#if town}
+    <span><b>{houseCount}</b> homes</span>
+    <span><b>{town.households.length}</b> households</span>
+    <span><b>{population}</b> residents</span>
+    <span><b>{forSale}</b> for sale</span>
+  {/if}
+{/snippet}
+
+{#snippet actions()}
+  {#if chosen}
+    {#key chosen.slot}
+      <button class="btn primary" onclick={() => choose(chosen.slot)}>Play the {chosen.household.name}s →</button>
+    {/key}
+  {:else if app.household}
+    <button class="btn primary" onclick={chooseOwn}>The {app.household.name}s: choose a home →</button>
+  {:else}
+    <button class="btn primary" disabled={!town} onclick={create}>Create your own →</button>
+  {/if}
+{/snippet}
+
+<SetupShell
+  label="Your household"
+  step="Step 3 of 4 · Household"
+  back={{
+    label: 'Town',
+    go: () => {
+      keep();
+      app.screen = 'town';
+    },
+  }}
+  {head}
+  {panel}
+  {stage}
+  stats={figures}
+  {actions}
+/>
 
 <style>
-  .screen {
-    position: relative;
-    /* (Viewport units count in the UI scale.) */
-    height: calc(100vh / var(--ui-scale));
-    container: setup / inline-size;
-    display: grid;
-    /* As wide as the screen, whatever the header's buttons would like. */
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 1fr;
-    padding: 20px 28px 24px;
-    gap: 14px;
+  .town-name {
+    margin: 2px 0 0;
+    font-size: 22px;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--text-strong);
   }
-  /* Light haze behind the header so its text reads on any part of the scene. */
-  .haze {
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 150px;
-    background: var(--scene-haze);
-    pointer-events: none;
-  }
-  header {
-    position: relative;
+  .row {
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 2px;
+  }
+  .row .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    gap: 8px;
+    height: 36px;
+    font-size: 13px;
+  }
+  input[type='range'] {
+    width: 100%;
+  }
+  /* The world beside the cards: the camera frames the world into the stage alone. */
+  .split {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(340px, 38%, 700px);
+    grid-template-rows: minmax(0, 1fr);
     gap: 20px;
   }
-  .back {
-    color: var(--text-strong);
-  }
-  .title {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .title .eyebrow {
-    color: #4a5163;
-  }
-  .town-name {
-    margin: 0;
-    font-size: 26px;
-    font-weight: 750;
-    letter-spacing: -0.025em;
-    line-height: 46px;
-    color: var(--text-strong);
-  }
-  .actions {
-    display: flex;
-    gap: 10px;
-  }
-  main {
-    position: relative;
-    min-height: 0;
-    display: grid;
-    grid-template-columns: 1fr minmax(400px, 480px);
-    /* One row as tall as the screen allows: a long side panel scrolls rather than stretching the town view. */
-    grid-template-rows: minmax(0, 1fr);
-    gap: 24px;
-  }
-  /* Too narrow for the town beside the panel (a small window or a large UI scale): the town on
-     top, the panel under it. */
-  @container setup (max-width: 760px) {
-    .screen > header {
-      flex-wrap: wrap;
-      row-gap: 10px;
-    }
-    /* The title keeps a readable width; the buttons take the next line when they must. */
-    .screen > header .title {
-      flex: 1 1 300px;
-    }
-    main {
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr);
-      gap: 14px;
-    }
-    .households {
-      align-self: stretch;
-    }
-  }
-  .view {
-    position: relative;
-    min-height: 0;
-    display: grid;
-    grid-template-rows: 1fr auto;
-    gap: 14px;
-    /* The stream pill floats at the window's bottom edge, centred (StreamIndicator): the controls
-       bar and the stats stay clear above it rather than under it. */
-    padding-bottom: calc(70px / var(--ui-scale));
-  }
-  .controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 14px 28px;
-    padding: 14px 20px;
-    justify-self: start;
-    animation: rise 520ms var(--ease) both;
-  }
-  .control {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-width: 200px;
-  }
-  .controls .eyebrow,
-  .list-head .eyebrow {
-    color: #4a5163;
-  }
-  .stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    color: #3b4254;
-    font-size: 13px;
-    font-weight: 550;
-  }
-  .stats span {
-    padding: 5px 10px;
-    border-radius: var(--radius-pill);
-    background: rgba(29, 34, 48, 0.06);
-  }
-  .stats b {
-    color: var(--text-strong);
-    font-weight: 750;
-  }
-  .stats .sale {
-    background: rgba(233, 162, 59, 0.16);
-  }
-  .lede {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 550;
-    color: #3b4254;
-  }
-  .lot-actions {
-    position: absolute;
-    top: 0;
-    left: 0;
-    display: flex;
-    gap: 10px;
-    animation: rise 320ms var(--ease) both;
-  }
-  .play-lot {
-    box-shadow: 0 10px 28px rgba(60, 90, 220, 0.35);
-    animation: rise 320ms var(--ease) both;
-  }
-  .households {
+  /* (Under the way on, which sits at the view's top right.) */
+  .offer {
+    margin-top: 56px;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    padding: 16px 12px 12px 16px;
-    align-self: start;
-    max-height: 100%;
+    padding: 12px 8px 8px 14px;
     animation: rise 520ms 80ms var(--ease) both;
   }
-  /* The game's choices, side by side over the list (one over the other in a narrow panel). */
-  .game {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px 16px;
-    padding: 0 6px 12px 2px;
-    margin-bottom: 10px;
-    border-bottom: 1px solid var(--hairline);
-  }
-  .choice {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-  }
-  .choice .eyebrow {
-    color: #4a5163;
-  }
-  .choice :global(.segmented) {
-    font-size: 12.5px;
-  }
-  .hint {
-    margin: 0;
-    font-size: 12px;
-    line-height: 1.35;
-    color: var(--text-muted);
-  }
-  @container setup (max-width: 520px) {
-    .game {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  }
-  .list-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    padding: 0 6px 10px 2px;
-    border-bottom: 1px solid var(--hairline);
-    margin-bottom: 8px;
-  }
-  .count {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-muted);
-  }
-  .list {
-    min-height: 0;
-    overflow: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding-right: 4px;
-    /* Room at the end so the last card is not sliced by the panel's edge. */
-    padding-bottom: 4px;
-    overscroll-behavior: contain;
-    /* More households below: the foot of the list fades out rather than cutting a card in half. */
-    mask-image: linear-gradient(to bottom, #000 calc(100% - 30px), transparent);
-  }
-  .list-end {
-    mask-image: none;
-  }
-  .household {
+  .offer-head {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 6px 10px 2px;
+  }
+  .offer-head .eyebrow {
+    color: #4a5163;
+  }
+  .offer-head .btn {
     gap: 6px;
-    padding: 4px 6px 4px 4px;
+  }
+  .cards {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    align-content: start;
+    gap: 8px;
+    padding: 2px 6px 6px 2px;
+  }
+  .card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
     border-radius: var(--radius-md);
-    border: 1px solid transparent;
+    background: color-mix(in srgb, var(--surface) 55%, transparent);
+    border: 1px solid var(--hairline);
     transition:
       background var(--fast) var(--ease),
-      border-color var(--fast) var(--ease);
+      border-color var(--fast) var(--ease),
+      box-shadow var(--fast) var(--ease);
   }
-  .household.hover {
-    background: rgba(255, 255, 255, 0.75);
+  .card.hover {
+    background: rgba(255, 255, 255, 0.85);
   }
-  .household.focus {
+  .card.focus {
     background: #fff;
     border-color: color-mix(in srgb, var(--accent) 55%, transparent);
     box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  /* "Create your own": first, and set apart by the accent. */
+  .card.own {
+    grid-column: 1 / -1;
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    background: color-mix(in srgb, var(--accent-soft) 60%, transparent);
+  }
+  .card.own.made {
+    flex-direction: row;
+    align-items: center;
+    border-style: solid;
+  }
+  .card.own.made .card-actions {
+    padding: 0 10px 0 0;
   }
   .pick {
     flex: 1;
     min-width: 0;
     display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 8px;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 10px 4px;
     text-align: left;
   }
-  /* Room for three overlapping faces, so every card's text lines up. */
+  .card.own .pick {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 12px;
+  }
+  .plus {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--accent);
+    color: var(--text-inverse);
+  }
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
   .faces {
     display: flex;
     flex: none;
-    width: 98px;
   }
-  /* Four is as many as a household gets (`maxHousehold`): the fourth widens its row rather than
-     spilling over the names. */
-  .faces:has(.face:nth-child(4)) {
-    width: 126px;
-  }
-  /* 42px across, 2px of it border: the portrait is drawn for the 38px hole it gets, not cropped
-     from 42 (which cut the shoulders and pushed the tinted rim out of sight). */
+  /* 40px across, 2px of it border: the portrait is drawn for the 36px hole it gets. */
   .face {
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     overflow: hidden;
-    /* A tint of the resident's own skin under the portrait, so a card whose 3D faces are still
-       streaming shows warm circles instead of empty grey ones. */
+    /* A tint of the resident's own skin under the portrait while it is still being drawn. */
     background: color-mix(in srgb, var(--skin, #d9c3b0) 26%, var(--surface-muted));
     border: 2px solid var(--surface);
-    margin-left: -14px;
+    margin-left: -12px;
     display: grid;
     place-items: start center;
     box-shadow: var(--shadow-sm);
@@ -613,25 +583,56 @@
   .face:first-child {
     margin-left: 0;
   }
+  .band {
+    display: flex;
+    gap: 1px;
+    padding: 3px 8px;
+    border-radius: var(--radius-pill);
+    background: rgba(29, 34, 48, 0.06);
+    font-size: 12px;
+    font-weight: 750;
+    color: var(--text-muted);
+  }
+  .band span:not(.on) {
+    opacity: 0.28;
+  }
+  .band .on {
+    color: #8a6a1f;
+  }
   .info {
-    flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 2px;
     color: var(--text-strong);
   }
-  .addr {
+  .where {
     color: var(--text-muted);
     font-size: 12px;
     font-weight: 550;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .card.own .where {
+    white-space: normal;
+  }
+  .village {
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: var(--radius-pill);
+    background: rgba(70, 140, 90, 0.14);
+    color: #2f6a3e;
+    font-style: normal;
+    font-size: 11px;
   }
   .members {
     display: flex;
     flex-direction: column;
-    font-size: 13px;
+    margin-top: 2px;
+    font-size: 12.5px;
   }
-  /* One line per resident; long trait lists end in an ellipsis (full text on hover). */
+  /* One line per resident; long trait lists end in an ellipsis (all of them on hover). */
   .member {
     overflow: hidden;
     white-space: nowrap;
@@ -641,36 +642,65 @@
     color: var(--text-muted);
     font-style: normal;
   }
-  .row-actions {
+  .card.own .members {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    display: block;
+  }
+  .card-actions {
     display: flex;
-    flex: none;
+    justify-content: flex-end;
+    gap: 4px;
+    padding: 0 8px 8px;
   }
-  .row-actions {
-    align-items: center;
-    gap: 2px;
+  .btn.small {
+    height: 30px;
+    padding: 0 11px;
+    font-size: 12.5px;
   }
-  .row-actions .btn {
-    padding: 0 10px;
-  }
-  .row-actions .play {
-    height: 34px;
-    padding: 0 14px;
-    margin-right: 4px;
+  .go {
     border-color: transparent;
     background: var(--accent-soft);
     color: var(--accent);
     box-shadow: none;
     font-weight: 700;
   }
-  .row-actions .play:hover,
-  .household.focus .play,
-  .play:focus-visible {
+  .go:hover,
+  .card.focus .go,
+  .go:focus-visible {
     background: var(--accent);
     color: var(--text-inverse);
   }
   .empty {
+    grid-column: 1 / -1;
     color: var(--text-muted);
     padding: 8px;
+    margin: 0;
+  }
+  /* Too narrow for the cards beside the world: the world over them. */
+  @container setup (max-width: 1000px) {
+    .split {
+      grid-template-columns: minmax(0, 1fr) clamp(280px, 46%, 420px);
+    }
+  }
+  @container setup (max-width: 760px) {
+    /* The cards are what this step is for: the world and its cards get more of the height than the
+       game's choices under them (step 1's and 2's frame shares it out evenly). */
+    :global(.setup .layout:has(> .view .split)) {
+      grid-template-rows: auto minmax(0, 1.8fr) minmax(0, 1fr);
+    }
+    .split {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(110px, 0.7fr) minmax(0, 1.3fr);
+      gap: 10px;
+    }
+    .offer {
+      margin-top: 0;
+    }
+    .cards {
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    }
   }
   @keyframes rise {
     from {
