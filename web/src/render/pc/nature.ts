@@ -438,12 +438,19 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return [k % count, Math.floor(k / count), x0 + (k % count) * TILE, z0 + Math.floor(k / count) * TILE];
   }
 
-  /** Tile `k`'s finest grid (x and z; y to be set), a ring of one past it for the normals: (col, row) from -1 to S + 1, row 0 at its far (max z) edge. */
+  /**
+   * Tile `k`'s finest grid (x and z; y to be set), a ring of one past it for the normals: (col, row) from -1 to S + 1,
+   * row 0 at its far (max z) edge. The last tiles across and down reach past the landscape's square (its side is
+   * seldom a whole number of tiles): their points past it are drawn in to its edge, so the ground stops there. Out
+   * there the rim kept climbing, and the menus' haze, which hangs over the land up to the square's edge, let a strip
+   * of it show above itself along the far sides.
+   */
   private tileGrid(k: number): Float32Array {
-    const { S, c, n } = this.tileFrame();
+    const { S, c, n, x0, z0, size } = this.tileFrame();
     const [, , tx, tz] = this.tileCorner(k);
+    const [x1, z1] = [x0 + size, z0 + size];
     const positions = new Float32Array(n * n * 3);
-    for (let row = -1, v = 0; row <= S + 1; row++) for (let col = -1; col <= S + 1; col++, v++) [positions[v * 3], positions[v * 3 + 2]] = [tx + col * c, tz + (S - row) * c];
+    for (let row = -1, v = 0; row <= S + 1; row++) for (let col = -1; col <= S + 1; col++, v++) [positions[v * 3], positions[v * 3 + 2]] = [Math.min(x1, tx + col * c), Math.min(z1, tz + (S - row) * c)];
     return positions;
   }
 

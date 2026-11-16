@@ -43,6 +43,8 @@
  *     --headed                 in a window (default headless: the real GPU either way)
  *     --port 5222 | --url <u>  a dev server on the port (started if none answers), or one already running
  *     --out <dir>              default bench-results/loading-<time>/
+ *     --shots                  also a picture of step 4 once its way on is enabled, and of the game 3 s
+ *                              after the entry (in `--out`, per run and renderer)
  */
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -73,6 +75,9 @@ const port = Number(flag('port', '5222'));
 const again = has('again');
 const back = has('back');
 const create = has('create');
+const shots = has('shots');
+/** The current visit's pictures' name: renderer, run and visit. */
+let shotName = '';
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
 const out = flag('out', join(ROOT, 'bench-results', `loading-${stamp}`));
 mkdirSync(out, { recursive: true });
@@ -210,6 +215,7 @@ async function visit(page, cdp) {
   await page.waitForFunction(() => !!document.querySelector('.btn.move-in:not(:disabled)'), null, { timeout: 120_000, polling: 100 });
   const home = (await now()) - toHome;
   await page.waitForTimeout(500);
+  if (shots) await page.screenshot({ path: join(out, `step4-${shotName}.png`) });
   const pressed = await now();
   await moveIn.click();
   // (Fewer beds than sleepers: step 4 asks first, and is answered.)
@@ -218,6 +224,10 @@ async function visit(page, cdp) {
   if (await page.evaluate(asked)) await page.getByRole('button', { name: 'Move in anyway' }).click();
   await page.waitForFunction(() => !!document.querySelector('.hud-root') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 100 });
   const entered = await now();
+  if (shots) {
+    await page.waitForTimeout(3000);
+    await page.screenshot({ path: join(out, `game-${shotName}.png`) });
+  }
   // Who lives in the town as the game starts (the player's household among them), and in how many homes.
   // (And the homes the game shows for sale: its own list, as the town panel and the tags have it.)
   const people = await page.evaluate(async () => {
@@ -291,7 +301,9 @@ for (let r = 0; r < runs; r++) {
   page.on('pageerror', (e) => console.error(`  page error: ${e.message}`));
   let visits;
   try {
+    shotName = `${renderer}-${r + 1}`;
     visits = [await visit(page, cdp)];
+    shotName = `${renderer}-${r + 1}-again`;
     if (again) visits.push(await visit(page, cdp));
   } catch (err) {
     // (Headless Chromium's page sometimes crashes on a load with others running: that run again, once.)
