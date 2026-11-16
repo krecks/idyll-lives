@@ -29,14 +29,15 @@ describe("step 2's villages", async () => {
   });
   const { Content } = await import('../src/content/content');
   const { objectInfos } = await import('../src/game/housegen');
-  const { useTownContent } = await import('../src/game/town');
+  const { plotRect, useTownContent } = await import('../src/game/town');
   const { runTownJob } = await import('../src/game/townJobs');
   const { canMoveVillage, canPlaceVillage, moveVillage, placeVillage, removeVillage, villageGoes } = await import('../src/game/edit/villages');
   const { addLot } = await import('../src/game/edit/lots');
   const { removeRoad } = await import('../src/game/edit/streets');
   const { townIssues } = await import('../src/ui/townedit/problems');
   const { editedProblems } = await import('../src/game/edit/checked');
-  const { lengths, nearest } = await import('../src/game/roads');
+  const { COURT, evenly, leftOf, lengths, nearest, pointAt, RoadIndex } = await import('../src/game/roads');
+  const { entryOf } = await import('../src/game/edit/ground');
   type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
   type TownJob = import('../src/game/townJobs').TownJob;
@@ -44,6 +45,7 @@ describe("step 2's villages", async () => {
   type WorldOptions = import('../src/game/world').WorldOptions;
   type Edited = import('../src/game/edit/edited').Edited;
   type Pt = import('../src/game/roads').Pt;
+  type RoadPlan = import('../src/core/protocol').RoadPlan;
   const content = await Content.load('http://localhost/content/base.json');
   useTownContent(content);
   const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
@@ -300,6 +302,77 @@ describe("step 2's villages", async () => {
       expect('refused' in e2 ? e2.refused : null).toBe(s.why);
     }
     console.log(`refused: "${wet!.why}"; "${near!.why}"`);
+  }, 120_000);
+
+  test("a village removed: another village's street left a long dead end where its road met it is cut back to a court, or refused with homes past one", () => {
+    // (Made by hand, so it doesn't hang on how the generator happens to lay the villages: a lane of
+    // another area 70 m out into open land, and a country road from its end to the village's
+    // nearest street. Removing the village takes the country road, leaving the lane a dead end.)
+    const coast = laid('coast', 3, { town: 'village', villages: 'few', size: 'large' });
+    const k = 1;
+    const rects = coast.slots.map((s) => plotRect(t, s));
+    const index = new RoadIndex(coast.roads);
+    const bounds = (poly: readonly Pt[]) => [Math.min(...poly.map((p) => p[0])), Math.min(...poly.map((p) => p[1])), Math.max(...poly.map((p) => p[0])), Math.max(...poly.map((p) => p[1]))];
+    const buildings = (coast.open!.backdrop ?? []).map((b) => bounds(b.poly));
+    // (Clear of the lots, the buildings and the other roads, the first 20 m but near its street.)
+    const free = (a: Pt, b: Pt) =>
+      evenly([a, b], 2).every(([x, z]) => {
+        const d = Math.hypot(x - a[0], z - a[1]);
+        const m = d < 20 ? 2 : 6;
+        if (rects.some((r) => x > r.x - m && x < r.x + r.w + m && z > r.z - m && z < r.z + r.d + m)) return false;
+        if (buildings.some(([x0, z0, x1, z1]) => x > x0 - m && x < x1 + m && z > z0 - m && z < z1 + m)) return false;
+        if (d > 10 && index.nearest(x, z, 10)) return false;
+        return x > 30 && z > 30 && x < coast.width - 30 && z < coast.depth - 30;
+      });
+    let site: { area: number; a: Pt; m: Pt } | null = null;
+    for (const r of coast.roads) {
+      if (site || r.area === undefined || r.area === k || r.kind === 'trail' || r.kind === 'country') continue;
+      const ls = lengths(r.points);
+      for (let s = 30; s < ls[ls.length - 1] - 30 && !site; s += 6) {
+        const { p, t: tg } = pointAt(r.points, s, ls);
+        const n = leftOf(tg);
+        for (const side of [1, -1]) {
+          const m: Pt = [p[0] + n[0] * side * 70, p[1] + n[1] * side * 70];
+          if (!site && free(p, m)) site = { area: r.area, a: p, m };
+        }
+      }
+    }
+    if (!site) throw new Error('no open land beside a street of another area');
+    const { a, m } = site;
+    let [to, best]: [Pt, number] = [[0, 0], Infinity];
+    for (const r of coast.roads.filter((o) => o.area === k && o.kind !== 'trail')) {
+      const at = nearest(r.points, m[0], m[1]);
+      if (at.dist < best) [to, best] = [pointAt(r.points, at.s).p, at.dist];
+    }
+    const lane: RoadPlan = { points: evenly([a, m], 4), width: 7, ends: ['join', 'join'], kind: 'lane', name: 'Test Lane', area: site.area };
+    const road: RoadPlan = { points: evenly([m, to], 4), width: 7, ends: ['join', 'join'], kind: 'country', name: 'Test Road' };
+    const d0: NeighbourhoodDraft = { ...coast, roads: [...coast.roads, lane, road] };
+    const e = done(removeVillage(d0, t, k));
+    const left = e.draft.roads.find((r) => r.name === 'Test Lane')!;
+    expect(e.draft.roads.some((r) => r.name === 'Test Road')).toBe(false);
+    expect(left.ends).toEqual(['join', 'dead']);
+    expect(lengths(left.points).at(-1)!).toBeLessThanOrEqual(COURT + 0.5);
+    expect(e.notes ?? []).toContain(`Test Lane is cut back to a dead end where ${coast.open!.areas[k].name} was`);
+    expect(hardNew(e.draft, d0)).toEqual([]);
+    // A home on the lane past a court's length: the removal is refused, with why.
+    const u: Pt = [(m[0] - a[0]) / 70, (m[1] - a[1]) / 70];
+    const n = leftOf(u);
+    const house = coast.slots.find((s) => s.kind === 'house')!;
+    const lanes = d0.roads.length - 2;
+    let home: NeighbourhoodDraft['slots'][number] | null = null;
+    for (const side of [1, -1]) {
+      for (const facing of [0, 1, 2, 3] as const) {
+        if (home) break;
+        const r0 = plotRect(t, { ...house, facing });
+        const off = 8 + Math.max(r0.w, r0.d) / 2;
+        const c: Pt = [a[0] + u[0] * 62 + n[0] * side * off, a[1] + u[1] * 62 + n[1] * side * off];
+        const s1 = { ...house, facing, x: Math.round(house.x + c[0] - (r0.x + r0.w / 2)), z: Math.round(house.z + c[1] - (r0.z + r0.d / 2)) };
+        if (entryOf(d0, t, s1).road === lanes) home = { ...s1, index: d0.slots.length, name: 'Test House', area: site.area };
+      }
+    }
+    if (!home) throw new Error('no home fits on the lane');
+    const refused = removeVillage({ ...d0, slots: [...d0.slots, home] }, t, k);
+    expect('refused' in refused ? refused.refused : null).toBe(`without ${coast.open!.areas[k].name}, Test Lane would end 70 m past the last road it meets, with homes on it past a dead end's ${COURT} m`);
   }, 120_000);
 
   test('on a small 640 m land no village fits, and placing one is refused cleanly', () => {
