@@ -639,6 +639,17 @@ impl ObjectInstance {
             .map(move |&(r, f)| (x + r * rx + f * fx, z + r * rz + f * fz))
     }
 
+    /// The tiles it stands on and reaches over (`tiles`, `overhang_tiles`) as a rectangle
+    /// `[x0, z0, x1, z1)`.
+    pub(crate) fn reach(&self, content: &Content) -> [i32; 4] {
+        let (w, d) = self.size(content);
+        let mut r = [self.x, self.z, self.x + w, self.z + d];
+        for (x, z) in self.overhang_tiles(content) {
+            r = [r[0].min(x), r[1].min(z), r[2].max(x + 1), r[3].max(z + 1)];
+        }
+        r
+    }
+
     /// Pairs of neighbouring tiles the arm to each `overhang_tiles` crosses (along the row, then
     /// the column): no wall may stand between them.
     pub(crate) fn overhang_edges(&self, content: &Content) -> Vec<((i32, i32), (i32, i32))> {
@@ -1807,6 +1818,11 @@ pub(crate) struct SimBrief {
     pub guest_at: Option<u32>,
     /// The seat they eat at, or are on their way to with something to eat (`cooking::company`).
     pub eats_at: Option<u32>,
+    /// Carried by someone (`Sim::carried_by`), and the use behind a shut door they're at
+    /// (`privacy::private_use`): for the rooms kept shut, found from the briefs rather than
+    /// from the whole of every resident again (`privacy::refresh`).
+    pub carried: bool,
+    pub private: Option<(u32, usize)>,
 }
 
 /// `World::broadcast`'s per-tick buffers, kept from tick to tick like `briefs`.
@@ -1920,15 +1936,15 @@ pub struct World {
     /// home.
     pub(crate) claimed_places: Vec<(u16, Vec<u32>)>,
     /// The people who have a place in each claimed room, with the fingerprint they were found
-    /// for (`privacy::refresh`), so a tick needn't look for them again while nothing changes. In
-    /// the rooms' order.
-    pub(crate) claimants_cache: Vec<(u16, u64, Vec<u32>)>,
+    /// for and the tick it was last checked in (`privacy::refresh`), so a tick needn't look for
+    /// them again while nothing changes. In the rooms' order.
+    pub(crate) claimants_cache: Vec<(u16, u64, std::sync::Arc<[u32]>, u64)>,
     /// What each household has to work on as the tick's step started (`work_waiting`), kept
     /// from tick to tick like `briefs`.
     work: Vec<u8>,
     /// Who goes first when the tick's searches run over budget (`tick_once`), kept from tick to
     /// tick like `briefs`.
-    first: Vec<bool>,
+    pub(crate) first: Vec<bool>,
     /// `broadcast`'s per-tick buffers, kept from tick to tick like `briefs`.
     broadcast_scratch: BroadcastScratch,
     /// Where Sims leave town for work.
@@ -2699,6 +2715,24 @@ impl World {
         rot: u8,
         layout: Layout,
     ) -> Result<ObjectInstance, Error> {
+        self.check_fit_among(def, x, z, rot, layout, None)
+    }
+
+    /// `check_fit`, looking for what's in the way only among `near` (in id order) when given:
+    /// every object whose tiles or overhang reach where it would go (`ObjectInstance::reach`),
+    /// found once for many tries over one plot (`find_spot`). Without it, those are found among
+    /// the whole town first: a check of each tile against every object in a full town, for every
+    /// spot a delivered bed was tried at, made the noon a newcomer or an adoption came half a
+    /// second long.
+    pub(crate) fn check_fit_among(
+        &self,
+        def: usize,
+        x: i32,
+        z: i32,
+        rot: u8,
+        layout: Layout,
+        near: Option<&[&ObjectInstance]>,
+    ) -> Result<ObjectInstance, Error> {
         let obj = ObjectInstance {
             id: self.objects.len() as u32,
             stable: 0,
@@ -2734,6 +2768,14 @@ impl World {
         if layer == Layer::Surface {
             return self.check_surface_fit(obj);
         }
+        let found;
+        let near = match near {
+            Some(near) => near,
+            None => {
+                found = self.objects_reaching(obj.reach(&self.content));
+                &found[..]
+            }
+        };
         let on = |o: &ObjectInstance, t: (i32, i32)| o.tiles(&self.content).any(|q| q == t);
         // (Reaching over it at head height: an arc lamp's shade.)
         let over =
@@ -2745,18 +2787,18 @@ impl World {
             // head height takes the floor from walking only: furniture goes under it.
             let floor = self.lot.in_bounds(tx, tz) && self.blocked[self.lot.tile_index(tx, tz)];
             let furniture = || {
-                self.objects
-                    .iter()
+                near.iter()
+                    .copied()
                     .any(|o| !self.content.objects[o.def].layer.mounted() && on(o, (tx, tz)))
             };
             let taken = if layer.mounted() {
-                self.objects
-                    .iter()
+                near.iter()
+                    .copied()
                     .any(|o| self.content.objects[o.def].layer == layer && on(o, (tx, tz)))
                     || (d.hangs_low && floor && !furniture())
             } else {
                 let hung = || {
-                    self.objects.iter().any(|o| {
+                    near.iter().copied().any(|o| {
                         ((self.content.objects[o.def].hangs_low
                             || self.content.objects[o.def].head_height)
                             && on(o, (tx, tz)))
@@ -2772,7 +2814,7 @@ impl World {
             }
             // Furniture as tall as the wall leaves no room on the wall or the ceiling over it; a
             // thing hanging low from the ceiling none under it.
-            let clash = self.objects.iter().find(|o| {
+            let clash = near.iter().copied().find(|o| {
                 let other = &self.content.objects[o.def];
                 on(o, (tx, tz))
                     && match (layer, other.layer) {
@@ -2785,8 +2827,8 @@ impl World {
             });
             // Nor under (or into) a lamp's shade reaching over from beside.
             let clash = clash.or_else(|| {
-                self.objects
-                    .iter()
+                near.iter()
+                    .copied()
                     .find(|o| over(o, (tx, tz)) && (d.fills_wall || d.hangs_low || d.head_height))
             });
             if let Some(o) = clash {
@@ -2830,7 +2872,7 @@ impl World {
                 (on(o, (tx, tz)) && (def.fills_wall || def.hangs_low || def.head_height))
                     || over(o, (tx, tz))
             };
-            if let Some(o) = self.objects.iter().find(|o| other(o)) {
+            if let Some(o) = near.iter().copied().find(|o| other(o)) {
                 return Err(Error::new(format!(
                     "'{name}' at {x},{z} would hang into the {}",
                     called(o)
@@ -2949,6 +2991,18 @@ impl World {
             stairs: &self.stairs,
             kept_off: &self.travel.junction_tiles,
         }
+    }
+
+    /// The objects whose tiles or overhang (`ObjectInstance::reach`) touch the tile rectangle
+    /// `[x0, z0, x1, z1)`, in id order: all a fit there needs to look at (`check_fit_among`).
+    pub(crate) fn objects_reaching(&self, [x0, z0, x1, z1]: [i32; 4]) -> Vec<&ObjectInstance> {
+        self.objects
+            .iter()
+            .filter(|o| {
+                let [a0, b0, a1, b1] = o.reach(&self.content);
+                a0 < x1 && x0 < a1 && b0 < z1 && z0 < b1
+            })
+            .collect()
     }
 
     /// What runs along the whole back edge of `obj`: None if not a wall (plain or with a window)
@@ -4511,12 +4565,12 @@ impl World {
             || self.rooms_things
             || self.rooms_rescore
         {
-            self.update_rooms();
+            crate::profile::phase("update_rooms", || self.update_rooms());
         } else if self.tick.is_multiple_of(ROOM_REFRESH_TICKS) {
-            self.rescore_rooms();
+            crate::profile::phase("rescore_rooms", || self.rescore_rooms());
         }
-        self.refresh_reach();
-        self.refresh_index();
+        crate::profile::phase("refresh_reach", || self.refresh_reach());
+        crate::profile::phase("refresh_index", || self.refresh_index());
         self.travel.note_doors(&self.plots);
         // A new game's first step: the player hears of anyone without a bed (told as the world was
         // made, it would be the story so far, which the view doesn't show as news).
@@ -4529,8 +4583,9 @@ impl World {
         let tick = self.tick;
         self.search_mark = crate::path::nodes_searched();
 
-        crate::partners::refresh(self);
-        crate::staff::update(self);
+        crate::profile::phase("partners::refresh", || crate::partners::refresh(self));
+        crate::profile::phase("staff::update", || crate::staff::update(self));
+        let briefs_start = crate::profile::start();
         let mut briefs = std::mem::take(&mut self.briefs);
         briefs.clear();
         for s in &self.sims {
@@ -4585,6 +4640,8 @@ impl World {
                     Some(TaskKind::Eat { seat, stage: 1, .. }) => seat,
                     _ => None,
                 },
+                carried: s.carried_by.is_some(),
+                private: crate::privacy::private_use(&self.content, &self.objects, s),
             });
         }
         // Who's in a conversation, and whose (for joining in).
@@ -4600,19 +4657,14 @@ impl World {
             }
         }
         self.briefs = briefs;
-        crate::privacy::refresh(self);
-        crate::lod::plan(self);
+        crate::profile::end("briefs", briefs_start);
+        crate::profile::phase("privacy::refresh", || crate::privacy::refresh(self));
+        crate::profile::phase("lod::plan", || crate::lod::plan(self));
+        let steps_start = crate::profile::start();
         // Those who go first when the tick's searches run over budget: the player's household
         // and whoever is watched (see `SEARCH_BUDGET`).
-        let mut first = std::mem::take(&mut self.first);
-        first.clear();
-        first.extend((0..self.sims.len()).map(|i| {
-            self.full_detail(i)
-                || self
-                    .households
-                    .get(self.sims[i].household as usize)
-                    .is_some_and(|h| h.player)
-        }));
+        // (At full detail, as `lod::plan` found them: the player's household always is.)
+        let first = std::mem::take(&mut self.first);
         let (search_mark, budget) = (self.search_mark, self.search_budget);
         let hour = crate::clock::hour(tick);
         let mut work = std::mem::take(&mut self.work);
@@ -4721,25 +4773,26 @@ impl World {
         }
         self.work = work;
         self.first = first;
-        crate::partners::update(self);
-        self.broadcast();
-        self.apply_messes();
-        crate::carry::after_step(self);
-        crate::setup::update(self);
-        self.wake_for_crying_babies();
-        conversation::update(self);
-        crate::privacy::after_step(self);
-        crate::hosting::update(self);
-        crate::phone::update(self);
-        crate::life::update(self);
-        crate::lifecycle::update(self);
-        crate::traffic::begin(self);
-        crate::cars::update(self);
-        crate::taxi::update(self);
-        crate::planner::update(self);
-        crate::cooking::after_step(self);
-        crate::lights::update(self);
-        crate::lights::update_while(self);
+        crate::profile::end("step_sim", steps_start);
+        crate::profile::phase("partners::update", || crate::partners::update(self));
+        crate::profile::phase("broadcast", || self.broadcast());
+        crate::profile::phase("apply_messes", || self.apply_messes());
+        crate::profile::phase("carry::after_step", || crate::carry::after_step(self));
+        crate::profile::phase("setup::update", || crate::setup::update(self));
+        crate::profile::phase("wake_for_crying_babies", || self.wake_for_crying_babies());
+        crate::profile::phase("conversation::update", || conversation::update(self));
+        crate::profile::phase("privacy::after_step", || crate::privacy::after_step(self));
+        crate::profile::phase("hosting::update", || crate::hosting::update(self));
+        crate::profile::phase("phone::update", || crate::phone::update(self));
+        crate::profile::phase("life::update", || crate::life::update(self));
+        crate::profile::phase("lifecycle::update", || crate::lifecycle::update(self));
+        crate::profile::phase("traffic::begin", || crate::traffic::begin(self));
+        crate::profile::phase("cars::update", || crate::cars::update(self));
+        crate::profile::phase("taxi::update", || crate::taxi::update(self));
+        crate::profile::phase("planner::update", || crate::planner::update(self));
+        crate::profile::phase("cooking::after_step", || crate::cooking::after_step(self));
+        crate::profile::phase("lights::update", || crate::lights::update(self));
+        crate::profile::phase("lights::update_while", || crate::lights::update_while(self));
         if self.tick.is_multiple_of(TICKS_PER_HOUR) {
             crate::rooms::opinions(self);
         }

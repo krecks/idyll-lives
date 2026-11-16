@@ -710,7 +710,8 @@ impl NavGrid<'_> {
                     }
                 }
             };
-            STATS.with_borrow_mut(|s| s.add(expanded));
+            let ok = matches!(found, Search::Found(_));
+            STATS.with_borrow_mut(|s| s.add(expanded, ok));
             found
         })
     }
@@ -1455,13 +1456,20 @@ pub struct SearchStats {
     /// Tiles expanded over all of them, and by the biggest one.
     pub nodes: u64,
     pub max_nodes: u64,
+    /// Of them, those that found no way or gave up at their cap, and the tiles they expanded.
+    pub failed: u64,
+    pub failed_nodes: u64,
 }
 
 impl SearchStats {
-    fn add(&mut self, nodes: u64) {
+    fn add(&mut self, nodes: u64, found: bool) {
         self.searches += 1;
         self.nodes += nodes;
         self.max_nodes = self.max_nodes.max(nodes);
+        if !found {
+            self.failed += 1;
+            self.failed_nodes += nodes;
+        }
         NODES.set(NODES.get() + nodes);
     }
 }
