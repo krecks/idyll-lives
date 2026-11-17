@@ -1,5 +1,6 @@
 // Held frames (`render/pc/heldFrames.ts`): a view standing still is drawn once and then held, drawn again when
-// it changes; the paused game's (`settleMs`) only once a while has passed since the last change. On the
+// it changes; the paused game's (`settleMs`) only once a while has passed since the last change; with water flowing
+// in view (`motionMs`) drawn again at that rate. On the
 // engine's null device: no GPU.
 import { afterAll, describe, expect, mock, test } from 'bun:test';
 import * as pc from '../src/render/pc/engine';
@@ -70,5 +71,23 @@ describe('held frames', () => {
     expect(frames(6).every(Boolean)).toBe(true);
     await Bun.sleep(80);
     expect(frames(2)).toEqual([false, false]);
+  });
+
+  test('water flowing in view: a held view is drawn again every `motionMs`, its clocks going on between', async () => {
+    const { held, frames } = view();
+    held.active = true;
+    frames(4);
+    expect(held.holding).toBe(true);
+    held.motionMs = 40;
+    // (The last drawn some frames ago: drawn now, then not until 40 ms on, not holding meanwhile.)
+    await Bun.sleep(45);
+    expect(frames(3)).toEqual([true, false, false]);
+    expect(held.holding).toBe(false);
+    await Bun.sleep(45);
+    expect(frames(2)).toEqual([true, false]);
+    // No water in view: held again.
+    held.motionMs = 0;
+    expect(frames(2)).toEqual([false, false]);
+    expect(held.holding).toBe(true);
   });
 });
