@@ -7,7 +7,7 @@
  *
  *   bun tools/bench/profile.mjs [options]
  *     --state family-check     a state in debug-states/ (dev server; `--url` for one already running)
- *     --speed 5                game speed (0 paused, 1..5)
+ *     --speed 3                game speed (0 paused, 1..3, 4 super speed in quiet hours only)
  *     --secs 60 --warmup 5     measured after the warm-up
  *     --preset medium          graphics preset (low, medium, high)
  *     --renderer webgl         WebGL2 instead of WebGPU
@@ -32,7 +32,7 @@ const flag = (name, fallback) => {
 const has = (name) => args.includes(`--${name}`);
 
 const state = flag('state', 'family-check');
-const speed = Number(flag('speed', '5'));
+const speed = Number(flag('speed', '3'));
 const secs = Number(flag('secs', '60'));
 const warmup = Number(flag('warmup', '5'));
 const preset = flag('preset', 'medium');

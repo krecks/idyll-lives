@@ -118,7 +118,7 @@ try {
   await page.waitForTimeout(2000);
   const minute = () => page.evaluate(() => window.__osw.snapshotMinute());
   // Fast to just before the hour, then at normal speed to it.
-  for (const [speed, until] of [[5, goal - 40], [1, goal]]) {
+  for (const [speed, until] of [[3, goal - 40], [1, goal]]) {
     await page.evaluate((s) => window.__osw.send({ type: 'setSpeed', speed: s }), speed);
     for (let i = 0; i < 1200 && (await minute()) < until; i++) await page.waitForTimeout(150);
   }

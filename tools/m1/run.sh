@@ -2,7 +2,7 @@
 # The M1 estimate, in one command (tools/m1/README.md): the sim's speed on the three city worlds at
 # each fill tier, measured on this machine natively, in the container, and in the container under
 # the M1's CPU quota, and as wasm under Node and Bun; then each scaled to an M1 and set against
-# the 3,600 ticks a second the fastest speed needs. The report goes to
+# the 600 ticks a second 10× needs (the fastest speed the player picks at any hour). The report goes to
 # bench-results/m1/<time>/report.md.
 #
 # Environment (and tools/bench/tiers.sh's): WATCH=320 (the camera's square, as the game runs it),

@@ -2,7 +2,8 @@
  * The M1 estimate's report (tools/m1/run.sh, README.md), from the run's logs: per tier and world,
  * the sim's ticks a second measured on this machine (natively, in the container, under the M1's
  * quota, and as wasm under Node and Bun), the M1's estimated from them, and the margin against
- * the 3,600 the fastest speed needs.
+ * the 600 that 10× needs (the fastest speed the player picks at any hour; super speed runs as fast
+ * as the machine can).
  *
  *   node tools/m1/table.mjs bench-results/m1/<time>   (markdown on stdout)
  *
@@ -20,9 +21,9 @@ const tiersDir = join(root, 'bench-results', 'tiers');
 /** The M1's single-core speed against the M3 Pro's (the plan's research): expected, and its band (sustained in a fanless Air, and at best). */
 const RATIO = 0.72;
 const BAND = [0.62, 0.78];
-/** Ticks a second the fastest speed needs (60 a step, 60 steps a second), and the tier rule's floor (`web/src/game/people.ts` `TIER_FOR`). */
-const NEED = 3600;
-const TIER_FLOOR = 4250;
+/** Ticks a second 10× needs (10 a step, 60 steps a second), and the tier rule's floor (`web/src/game/people.ts` `TIER_FOR`): the same. */
+const NEED = 600;
+const TIER_FLOOR = 600;
 
 const env = (name, fallback) => process.env[name] ?? fallback;
 const tiers = env('TIERS', 'full half near').split(/\s+/).filter(Boolean);
@@ -85,8 +86,8 @@ const say = (s = '') => lines.push(s);
 
 say(`# M1 estimate, ${basename(dir)}`);
 say();
-say(`The sim's ticks a second over ${hours} game hours, ${watch ? `the camera's ${watch}-tile square round the player's home at full detail at speed 5 (big_world's WATCH, simtick's --watch)` : "the view on the player's lot"}; best of ${env('ROUNDS', '1')} each.`);
-say(`The fastest speed needs ${n(NEED)}; a preset gets a tier when the estimated wasm rate on its slowest intended machine is at least ${n(TIER_FLOOR)}.`);
+say(`The sim's ticks a second over ${hours} game hours, ${watch ? `the camera's ${watch}-tile square round the player's home at full detail at 10× (big_world's WATCH, simtick's --watch)` : "the view on the player's lot"}; best of ${env('ROUNDS', '1')} each.`);
+say(`10× needs ${n(NEED)}; a preset gets a tier when the estimated wasm rate on its slowest intended machine is at least ${n(TIER_FLOOR)}.`);
 say();
 say('## Calibration');
 say();
@@ -106,7 +107,7 @@ say('## Ticks a second');
 say();
 say('Wasm: ticks a second by the wall clock, and (in brackets) of the process\'s CPU time, which leaves out the waits for a core on a busy machine; the M1 wasm estimate scales the latter.');
 say();
-say('| tier | world | residents | M3 native | container | under quota | wasm Node | wasm Bun | M1 native est. | M1 wasm est. (band) | margin vs 3,600 | slowest hour (M1 wasm est.) |');
+say('| tier | world | residents | M3 native | container | under quota | wasm Node | wasm Bun | M1 native est. | M1 wasm est. (band) | margin vs ${n(NEED)} | slowest hour (M1 wasm est.) |');
 say('|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
 const verdict = {};
 for (const t of tiers) {
