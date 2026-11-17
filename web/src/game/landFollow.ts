@@ -10,7 +10,7 @@
 
 import type { CareerCategory } from '../content/content';
 import { DEFAULT_LANDSCAPE, type RoadPlan, type TownPlace, type WorldStructure, type WorldZone } from '../core/protocol';
-import { BRIDGE_CLEAR, builtSurfaceOf, CUT_MAX, CUT_MAX_MOUNTAIN_ROAD, GRADE, profileOf, RETAIN_MAX, surfacePlots, type BuiltSurface, type SurfaceWorld } from '../render/shared/builtSurface';
+import { BRIDGE_CLEAR, builtSurfaceOf, CUT_MAX, CUT_MAX_MOUNTAIN_ROAD, GRADE, onPad, profileOf, RETAIN_MAX, surfacePlots, type BuiltSurface, type SurfaceWorld } from '../render/shared/builtSurface';
 import { blankLand, COVER, COVER_CELL, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, type Land } from './land';
 import { HOURS, hoursFor } from './backdrop';
 import { APRON, builtOf, landZones, Protection, wetTiles } from './landEdit';
@@ -185,7 +185,7 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
   const padNear = (x: number, z: number, skip: number, by = 0) => {
     for (const n of cells.get(Math.floor(x / PAD_CELL) * 65536 + Math.floor(z / PAD_CELL)) ?? []) {
       const q = all[n];
-      if (n !== skip && x >= q.x - by && x <= q.x + q.w + by && z >= q.z - by && z <= q.z + q.d + by) return n;
+      if (n !== skip && x >= q.x - by && x <= q.x + q.w + by && z >= q.z - by && z <= q.z + q.d + by && onPad(q, x, z, by)) return n;
     }
     return -1;
   };
