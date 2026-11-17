@@ -58,6 +58,7 @@
  *     --memtrace               large typed arrays by site (`?memtrace`)
  *     --no-dumps               no memory-infra dumps (they pause the processes for a moment)
  *     --lowmem                 the page as on an 8 GB machine (`?lowmem`)
+ *     --voices                 the residents' voices on (the setting; off by default)
  *     --prod                   a production build made for the benchmark (`VITE_BENCH_STATS=1`), served by `vite preview`
  *
  * Needs the dev server (the `?gpustats` hook is dev-only), so `--url` must point at one; or `--prod`.
@@ -97,6 +98,8 @@ const memtrace = has('memtrace');
 const dumps = !has('no-dumps');
 /** The page as on a machine of 8 GB or less (`?lowmem`). */
 const lowmem = has('lowmem');
+/** The residents' voices on (the player's setting, off by default). */
+const voices = has('voices');
 /** A production build (with the benchmark's hooks) rather than the dev server. */
 const prod = has('prod');
 const startupTimeout = Number(flag('startup-timeout', '120'));
@@ -121,6 +124,7 @@ if (has('help') || args.includes('-h')) {
   --memtrace               the page's typed arrays of 64 kB or more by site (?memtrace)
   --no-dumps               no memory-infra dumps at the boundaries
   --lowmem                 the page as on an 8 GB machine (?lowmem)
+  --voices                 the residents' voices on (the setting; off by default)
   --prod                   a production build with the benchmark's hooks (VITE_BENCH_STATS=1), served by vite preview
   --headed                 in a window (default headless: the real GPU either way)
   --port 5222 | --url <u>  a dev server on the port (started if none answers), or one already running
@@ -418,13 +422,14 @@ async function rawCdp(devtoolsPort) {
  * The page's workers, each with a session of its own (auto-attached, nested ones too), so their heaps
  * can be read (`heaps`): the sim's, the voice's, the language model's, the asset decoders'.
  */
-async function watchWorkers(raw, pageTargetId) {
+async function watchWorkers(raw, pageTargetId, onSeen = () => {}) {
   const workers = new Map();
   const auto = (sessionId) => raw.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, sessionId).catch(() => {});
   raw.on('Target.attachedToTarget', (p) => {
     const { sessionId, targetInfo } = p;
     if (!/worker/.test(targetInfo.type)) return;
     workers.set(sessionId, { type: targetInfo.type, url: targetInfo.url, title: targetInfo.title });
+    onSeen(workerName(targetInfo.url));
     void auto(sessionId);
   });
   raw.on('Target.detachedFromTarget', (p) => workers.delete(p.sessionId));
@@ -582,6 +587,8 @@ async function runOnce(n, chromium, executablePath) {
   let perf = null;
   let heapProfileRows = null;
   let entryHeapRows = null;
+  /** Each worker as it started: its name, the stage and when (ms from launch). */
+  const workersSeen = [];
   const entrySamples = [];
   let resources = [];
   let footprintStart = { available: false, reason: 'not taken' };
@@ -688,6 +695,16 @@ async function runOnce(n, chromium, executablePath) {
   await context.addInitScript(quiet);
   await context.addInitScript(seeded, seed);
   await context.addInitScript(frameRecorder);
+  if (voices) {
+    await context.addInitScript(() => {
+      const key = 'open-sims-wasm.settings';
+      let saved = {};
+      try {
+        saved = JSON.parse(localStorage.getItem(key) ?? '{}');
+      } catch {}
+      localStorage.setItem(key, JSON.stringify({ ...saved, voices: true }));
+    });
+  }
   const page = await context.newPage();
   page.on('pageerror', (e) => pageErrors.push(String(e.message ?? e)));
   page.on('crash', () => pageErrors.push('page crashed'));
@@ -696,7 +713,11 @@ async function runOnce(n, chromium, executablePath) {
   try {
     devtools = await rawCdp(devtoolsPort);
     const { targetInfo } = await cdp.send('Target.getTargetInfo');
-    workers = await watchWorkers(devtools, targetInfo.targetId);
+    workers = await watchWorkers(devtools, targetInfo.targetId, (name) => {
+      const at = since();
+      workersSeen.push({ worker: name, stage, at });
+      raw({ type: 'worker', worker: name, stage, at });
+    });
   } catch (err) {
     console.warn(`  (no second DevTools connection: workers and dumps not measured: ${String(err).split('\n')[0]})`);
     devtools?.close();
@@ -1158,6 +1179,7 @@ async function runOnce(n, chromium, executablePath) {
     memory,
     heapSites: heapProfileRows,
     entryHeapSites: entryHeapRows,
+    workersSeen,
     net: { perStage: perStageNet, total: net.length, external: external.length, externalUrls: external.map((r) => r.url), disk: { available: false, reason: 'macOS: per-process disk I/O needs root (fs_usage); not faked' } },
     perf: perf
       ? {
@@ -1222,6 +1244,8 @@ function attributionSections(summaries) {
     'Steady peaks: ' + summaries.map((x, i) => `run ${i + 1}: renderer ${f(x.memory.rendererPeakMB)} MB, JS external ${f(x.memory.backingPeakMB)} MB, JS heap ${f(x.memory.heapPeakMB)} MB, workers heap ${f(x.memory.workersHeapPeakMB)} MB, VRAM ${f(x.memory.vramPeakMB)} MB`).join('; ') + '.',
     '',
   );
+  const seenRows = summaries.flatMap((x, i) => (x.workersSeen ?? []).map((w) => `| run ${i + 1} | ${w.worker} | ${w.stage} | ${(w.at / 1000).toFixed(1)} |`));
+  if (seenRows.length) lines.push('## Workers started', '', '| run | worker | stage | at (s from launch) |', '| --- | --- | --- | --- |', ...seenRows, '');
   const workerRows = summaries.flatMap((x, i) => (x.memory.boundaries ?? []).flatMap((b) => (b.workers ?? []).map((w) => `| run ${i + 1} | ${b.stage} | ${w.worker} | ${w.usedMB} | ${w.totalMB} | ${w.backingMB} |`)));
   if (workerRows.length) {
     lines.push('## Workers', '', 'Each worker\'s own V8 heap (`Runtime.getHeapUsage` on its session); WASM linear memory is in its external bytes.', '', '| run | boundary | worker | heap used (MB) | heap total (MB) | external (MB) |', '| --- | --- | --- | --- | --- | --- |', ...workerRows, '');
@@ -1387,7 +1411,7 @@ const environment = {
   serverMode,
   serverReadyMs: serverReadyAt - STARTED,
   runType: warm ? 'warm' : 'cold',
-  flags: { runs, secs, seed, household: pick, preset, renderer, hud, warm, headed: has('headed'), startupTimeout, entryTimeout, steadyGrace, heapprofile: profileHeap, memtrace, dumps, lowmem, prod },
+  flags: { runs, secs, seed, household: pick, preset, renderer, hud, warm, headed: has('headed'), startupTimeout, entryTimeout, steadyGrace, heapprofile: profileHeap, memtrace, dumps, lowmem, voices, prod },
 };
 
 // ---------------------------------------------------------------- the runs
@@ -1501,7 +1525,7 @@ const md = [
   '## Command',
   '',
   '```',
-  `bun tools/bench/gameplay.mjs --runs ${runs} --secs ${secs} --seed ${seed} --preset ${preset} --renderer ${renderer} --hud ${hud}${warm ? ' --warm' : ''}${has('headed') ? ' --headed' : ''}${profileHeap ? ' --heapprofile' : ''}${memtrace ? ' --memtrace' : ''}${dumps ? '' : ' --no-dumps'}${lowmem ? ' --lowmem' : ''}${prod ? ' --prod' : ''}`,
+  `bun tools/bench/gameplay.mjs --runs ${runs} --secs ${secs} --seed ${seed} --preset ${preset} --renderer ${renderer} --hud ${hud}${warm ? ' --warm' : ''}${has('headed') ? ' --headed' : ''}${profileHeap ? ' --heapprofile' : ''}${memtrace ? ' --memtrace' : ''}${dumps ? '' : ' --no-dumps'}${lowmem ? ' --lowmem' : ''}${voices ? ' --voices' : ''}${prod ? ' --prod' : ''}`,
   '```',
   '',
   `Expected runtime: ~${Math.round((secs + 40) * runs / 60)} min (${secs} s steady + ~40 s startup/entry/shutdown per run).`,
