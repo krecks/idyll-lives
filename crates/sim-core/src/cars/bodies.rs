@@ -936,7 +936,8 @@ pub(crate) fn present(w: &World, c: usize) -> bool {
 /// of those getting in, and of those who just got in or out.
 pub(crate) fn poses(w: &mut World) {
     let mut doors = vec![0u8; w.cars.len()];
-    for s in &w.sims {
+    // (Only those bound for a car: the rest of the town needn't be looked at further.)
+    for s in w.sims.iter().filter(|s| s.bound_for_car.is_some()) {
         // Open from when they're at it until they're sat in (or out and stood up).
         let open = s.current().is_some_and(|a| match a.phase {
             Phase::Boarding { ticks } => ticks < DOOR_OPENS + STEP_IN,
