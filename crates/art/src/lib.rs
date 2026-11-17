@@ -448,6 +448,13 @@ pub fn main(argv: &[String]) -> i32 {
         let all: Vec<&str> = registry.iter().map(|(n, _)| *n).collect();
         return exit(format!("name a family ({}) or --all", all.join(", ")));
     }
+    if let Some(odd) = names
+        .iter()
+        .find(|n| !registry.iter().any(|(r, _)| r == *n) && !scripts.contains(n))
+    {
+        let all: Vec<&str> = registry.iter().map(|(n, _)| *n).collect();
+        return exit(format!("no family {odd:?} ({})", all.join(", ")));
+    }
     let options = Options {
         only: only
             .as_ref()
