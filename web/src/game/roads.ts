@@ -93,54 +93,90 @@ export function straightAround(pts: readonly Pt[], s: number, half: number, most
  */
 export function sideBySide(roads: readonly RoadPlan[], longest = 0, only?: RoadPlan['kind'], same = 0.1): { a: number; b: number; length: number; at: Pt }[] {
   const out: { a: number; b: number; length: number; at: Pt }[] = [];
-  const box = roads.map((r) => {
-    const xs = r.points.map((p) => p[0]);
-    const zs = r.points.map((p) => p[1]);
-    return [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)];
-  });
-  // Every metre along a polyline.
-  const metres = (pts: readonly Pt[]): Pt[] => {
-    const at: Pt[] = [];
-    for (let i = 1; i < pts.length; i++) {
-      const [a, b] = [pts[i - 1], pts[i]];
-      const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])));
-      for (let k = 0; k < n; k++) at.push([lerp(a[0], b[0], k / n), lerp(a[1], b[1], k / n)]);
-    }
-    at.push(pts[pts.length - 1]);
-    return at;
-  };
+  const box = roads.map(boxOf);
   roads.forEach((ra, i) => {
     if (ra.kind === 'trail') return;
     const A = metres(ra.points);
     roads.forEach((rb, j) => {
       if (j <= i || rb.kind === 'trail' || (only && ra.kind !== only && rb.kind !== only)) return;
-      const far = (ra.width + rb.width) / 2;
-      const [p, q] = [box[i], box[j]];
-      if (p[0] > q[2] + far || q[0] > p[2] + far || p[1] > q[3] + far || q[1] > p[3] + far) return;
+      if (apart(box[i], box[j], (ra.width + rb.width) / 2)) return;
       let [run, best, at] = [0, 0, A[0]];
-      A.forEach((pt, k) => {
-        // The nearest of the second's segments: how far, the way it runs, and whether it's past
-        // either end of it (beyond its end it isn't alongside it).
-        let [d, tx, tz, past] = [Infinity, 0, 0, false];
-        for (let s = 1; s < rb.points.length; s++) {
-          const [[ax, az], [bx, bz]] = [rb.points[s - 1], rb.points[s]];
-          const [dx, dz] = [bx - ax, bz - az];
-          const l2 = dx * dx + dz * dz || 1;
-          const f = Math.max(0, Math.min(1, ((pt[0] - ax) * dx + (pt[1] - az) * dz) / l2));
-          const e = Math.hypot(pt[0] - ax - f * dx, pt[1] - az - f * dz);
-          if (e < d) [d, tx, tz, past] = [e, dx / Math.sqrt(l2), dz / Math.sqrt(l2), (f === 0 && s === 1) || (f === 1 && s === rb.points.length - 1)];
-        }
-        const [u, v] = [A[Math.max(0, k - 1)], A[Math.min(A.length - 1, k + 1)]];
-        const l = Math.hypot(v[0] - u[0], v[1] - u[1]) || 1;
-        const along = Math.abs(((v[0] - u[0]) * tx + (v[1] - u[1]) * tz) / l) > 0.9;
-        run = d > same && d < far && along && !past ? run + 1 : 0;
+      besideMask(A, ra, rb, same).forEach((by, k) => {
+        run = by ? run + 1 : 0;
         // (A run of n points a metre apart is n - 1 m long.)
-        if (run - 1 > best) [best, at] = [run - 1, pt];
+        if (run - 1 > best) [best, at] = [run - 1, A[k]];
       });
       if (best > longest) out.push({ a: i, b: j, length: best, at });
     });
   });
   return out.sort((x, y) => y.length - x.length);
+}
+
+/**
+ * The longest stretch (m) of `road` that runs side by side with any of `others` (not trails), as
+ * `sideBySide` measures it against one: a stretch beside one road and then straight on beside the
+ * next counts whole.
+ */
+export function besideAny(road: RoadPlan, others: readonly RoadPlan[], same = 0.1): number {
+  const A = metres(road.points);
+  const box = boxOf(road);
+  const by = new Array<boolean>(A.length).fill(false);
+  for (const rb of others) {
+    if (rb.kind === 'trail' || apart(box, boxOf(rb), (road.width + rb.width) / 2)) continue;
+    besideMask(A, road, rb, same).forEach((b, k) => (by[k] ||= b));
+  }
+  let [run, best] = [0, 0];
+  for (const b of by) {
+    run = b ? run + 1 : 0;
+    best = Math.max(best, run - 1);
+  }
+  return best;
+}
+
+/** A polyline's bounds: least x, least z, most x, most z. */
+function boxOf(r: RoadPlan): [number, number, number, number] {
+  const xs = r.points.map((p) => p[0]);
+  const zs = r.points.map((p) => p[1]);
+  return [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)];
+}
+
+/** Whether two bounds are further apart than `far` m. */
+function apart(p: readonly number[], q: readonly number[], far: number): boolean {
+  return p[0] > q[2] + far || q[0] > p[2] + far || p[1] > q[3] + far || q[1] > p[3] + far;
+}
+
+/** Every metre along a polyline. */
+function metres(pts: readonly Pt[]): Pt[] {
+  const at: Pt[] = [];
+  for (let i = 1; i < pts.length; i++) {
+    const [a, b] = [pts[i - 1], pts[i]];
+    const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])));
+    for (let k = 0; k < n; k++) at.push([lerp(a[0], b[0], k / n), lerp(a[1], b[1], k / n)]);
+  }
+  at.push(pts[pts.length - 1]);
+  return at;
+}
+
+/** Per point of `A` (`ra`'s `metres`), whether it runs alongside `rb` there (`sideBySide`). */
+function besideMask(A: readonly Pt[], ra: RoadPlan, rb: RoadPlan, same: number): boolean[] {
+  const far = (ra.width + rb.width) / 2;
+  return A.map((pt, k) => {
+    // The nearest of the second's segments: how far, the way it runs, and whether it's past
+    // either end of it (beyond its end it isn't alongside it).
+    let [d, tx, tz, past] = [Infinity, 0, 0, false];
+    for (let s = 1; s < rb.points.length; s++) {
+      const [[ax, az], [bx, bz]] = [rb.points[s - 1], rb.points[s]];
+      const [dx, dz] = [bx - ax, bz - az];
+      const l2 = dx * dx + dz * dz || 1;
+      const f = Math.max(0, Math.min(1, ((pt[0] - ax) * dx + (pt[1] - az) * dz) / l2));
+      const e = Math.hypot(pt[0] - ax - f * dx, pt[1] - az - f * dz);
+      if (e < d) [d, tx, tz, past] = [e, dx / Math.sqrt(l2), dz / Math.sqrt(l2), (f === 0 && s === 1) || (f === 1 && s === rb.points.length - 1)];
+    }
+    const [u, v] = [A[Math.max(0, k - 1)], A[Math.min(A.length - 1, k + 1)]];
+    const l = Math.hypot(v[0] - u[0], v[1] - u[1]) || 1;
+    const along = Math.abs(((v[0] - u[0]) * tx + (v[1] - u[1]) * tz) / l) > 0.9;
+    return d > same && d < far && along && !past;
+  });
 }
 
 /**

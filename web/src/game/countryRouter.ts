@@ -13,7 +13,7 @@
 
 import type { RoadPlan } from '../core/protocol';
 import { simplify } from './landMasks';
-import { curve, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, sharpestTurn, sideBySide, tangent, type Pt } from './roads';
+import { curve, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, besideAny, sharpestTurn, tangent, type Pt } from './roads';
 import type { Rect } from './town';
 import type { WorldSpec } from './world';
 
@@ -52,10 +52,12 @@ const SHARED_GAP = 2;
 const SHARED_ANGLE = Math.PI / 4;
 /**
  * A country road laid whole rather than in such pieces (they would wind round) may not run
- * alongside another road a few metres off for longer than this (m: the town check's limit,
- * `townCheck.ts` `SIDE_BY_SIDE`): in pieces then, winding or not (`course`).
+ * alongside other roads a few metres off for longer than this (m), one after another counting as
+ * one stretch: in pieces then, winding or not (`course`). The town check's limit
+ * (`townCheck.ts` `SIDE_BY_SIDE`, 60 m) less a spare: the course is smoothed and settled into its
+ * land after this is measured, and a stretch measured at 60 m came out at 62.
  */
-const ALONGSIDE = 60;
+const ALONGSIDE = 45;
 /** A country road tries this many ways for one that doesn't wind round further than `WINDING` (radians) within `WINDING_OVER` m (a loop). */
 export const TRIES = 4;
 const WINDING = Math.PI;
@@ -780,9 +782,9 @@ export class CountryRouter {
     return { laid, first: !!parts[0]?.first, last: !!parts[parts.length - 1]?.last };
   }
 
-  /** Whether `road` would run alongside a road laid already (not a trail) a few metres off for more than `ALONGSIDE` m (`roads.ts` `sideBySide`). */
+  /** Whether `road` would run alongside roads laid already (not trails) a few metres off for more than `ALONGSIDE` m (`roads.ts` `besideAny`). */
   alongside(road: RoadPlan): boolean {
-    return this.roads.some((r) => r.kind !== 'trail' && sideBySide([road, r], ALONGSIDE).length > 0);
+    return besideAny(road, this.roads) > ALONGSIDE;
   }
 
   /**
