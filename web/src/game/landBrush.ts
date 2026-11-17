@@ -7,14 +7,15 @@
  * how far the sample may change (`free`: 0 on built land, 1 well clear of it). The water tools
  * also ask whether a sample may be wet (`wettable`): water keeps off lots and roads. After every
  * stamp the water settles (`settleWater`): a level stays only where it stands over its ground,
- * and dry ground lowered beside water under its level fills from it.
+ * and dry ground lowered beside water under its level fills from it. A river says which way it
+ * runs (`Land.flow`): along the drag; a lake, the sea pushed inland and water taken away say none.
  *
  * A brush `POINT` m across or narrower is a point brush: the falloff is left out, and a stamp
  * changes the one sample nearest the pointer (a cover tool, the one cover cell under it), so the
  * player can touch the land one point at a time.
  */
 
-import { COVER, COVER_CELL, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, wetAt, type Land, type LandRect } from './land';
+import { COVER, COVER_CELL, coverSpan, flowCode, flowOf, flowsOf, heightAt, LAND_CELL, NONE, SEA_CM, wetAt, type Land, type LandRect } from './land';
 import { ridged, smoothstep } from './noise';
 
 /**
@@ -101,6 +102,9 @@ export const BANK_RING = 2.5;
 export const DEPTH: [number, number] = [0.5, 4];
 /** `dry` fills a bed this far over its old water's level (m). */
 export const DRY_OVER = 0.05;
+/** A river's way along the drag: from the stamp this many back to the one now (a curve reads smoothly). */
+export const RIVER_WAY_STAMPS = 4;
+
 /** A mountain's height (m) when the brush gives none. */
 export const MOUNTAIN_HEIGHT = 40;
 
@@ -122,12 +126,19 @@ export interface StrokeState {
   touched: LandRect | null;
   /** Stamps so far. */
   stamps: number;
-  /** The heights and water levels before the stroke: a river reads the ground it cuts into from them, and meets the water there was. */
-  base: { h: Int16Array; wl: Int16Array } | null;
+  /**
+   * The heights, water levels and ways before the stroke: a river reads the ground it cuts into from them, and meets
+   * the water there was (a river's way there kept).
+   */
+  base: { h: Int16Array; wl: Int16Array; flow?: Uint8Array } | null;
   /** `flatten`: the height at the press (cm). */
   target?: number;
   /** `lake`, `river`: the water's level (cm), never rising along a river. */
   level?: number;
+  /** `river`: its way has been laid (from its second stamp on; the first stamps' water given it then). */
+  flowing?: boolean;
+  /** `lake`, `river`: begun in water there was (a river: the ways laid there before are kept, `riverFlow`). */
+  inWater?: boolean;
   /** `lake`: started on the sea, so it pushes the sea inland. */
   sea?: boolean;
   /** The points stamped (m): a range's line, a peak's last point. */
@@ -144,8 +155,8 @@ export interface StrokeState {
  * A new stroke of `brush`. `base`: the land before it (the editor passes its copy, kept anyway
  * for undo); a river with none copies `land`'s heights and water itself.
  */
-export function strokeOf(brush: Brush, land?: Land, base?: { h: Int16Array; wl: Int16Array }): StrokeState {
-  const own = !base && brush.tool === 'river' && land ? { h: land.h.slice(), wl: land.wl.slice() } : null;
+export function strokeOf(brush: Brush, land?: Land, base?: StrokeState['base']): StrokeState {
+  const own = !base && brush.tool === 'river' && land ? { h: land.h.slice(), wl: land.wl.slice(), ...(land.flow ? { flow: land.flow.slice() } : {}) } : null;
   return { brush, touched: null, stamps: 0, base: base ?? own, path: [], seed: 0 };
 }
 
@@ -311,7 +322,8 @@ function blend(land: Land, x: number, z: number, R: number, s: number, dt: numbe
  * A lake's level is the water's it began on (the sea's: the sea pushed inland), else the ground
  * at the press less `LAKE_BELOW`. A river's never rises: each stamp the lower of the last and the
  * ground under it (before the stroke) less `RIVER_BELOW`; meeting lower water it takes that
- * water's level; where it would stand more than `RIVER_CUT` m under the ground, it stops.
+ * water's level; where it would stand more than `RIVER_CUT` m under the ground, it stops. A river
+ * runs along the drag (`riverFlow`); a lake is still.
  */
 function water(land: Land, x: number, z: number, R: number, s: number, tool: 'lake' | 'river', stroke: StrokeState, free: Free, wettable?: Wettable): LandRect | null {
   const { cols, h, wl } = land;
@@ -319,7 +331,8 @@ function water(land: Land, x: number, z: number, R: number, s: number, tool: 'la
   const press = nearestSample(land, x, z);
   const wetBefore = (k: number) => base.wl[k] !== NONE && base.wl[k] > base.h[k];
   if (stroke.level === undefined) {
-    if (wetBefore(press)) {
+    stroke.inWater = wetBefore(press);
+    if (stroke.inWater) {
       stroke.level = base.wl[press];
       stroke.sea = tool === 'lake' && base.wl[press] === SEA_CM;
     } else stroke.level = cmOf(heightIn(land, base.h, x, z) * 100 - (tool === 'lake' ? LAKE_BELOW : RIVER_BELOW) * 100);
@@ -364,11 +377,71 @@ function water(land: Land, x: number, z: number, R: number, s: number, tool: 'la
         const bed = L - Math.round(Math.min(deepest, 0.22 * e + 0.004 * e * e) * 100);
         if (h[k] > bed) h[k] = cmOf(h[k] + (bed - h[k]) * fr);
         if (h[k] < L) wl[k] = L;
+        // (A lake, and the sea pushed inland, are still.)
+        if (tool === 'lake' && land.flow?.[k] && wl[k] !== NONE) {
+          land.flow[k] = 0;
+          any = true;
+        }
       } else if (!wetAt(land, i, j) && h[k] < L + BANK * 100) h[k] = cmOf(h[k] + (L + BANK * 100 - h[k]) * fr);
       if (h[k] !== h0 || wl[k] !== w0) any = true;
     }
   }
-  return any ? rect : null;
+  const ran = tool === 'river' ? riverFlow(land, x, z, R, stroke, free) : null;
+  return any ? unionRect(rect, ran) : ran;
+}
+
+/**
+ * A river's way laid on its water round its stamp at (`x`, `z`): along the drag, from the stamp `RIVER_WAY_STAMPS`
+ * back to this one, blended into the way already laid by the falloff (all of it at the middle), so a bend turns
+ * smoothly. The first stamps' water, laid before there was a way, is given it once there is one. The sea and a
+ * generated river (at the sea's level) stay as they were. A drawn river's way there before the stroke is laid again
+ * where a stroke begun on dry land runs over it (a river drawn back the other way turns it round), and kept by one
+ * begun in water (it runs on from there). Says the samples whose way changed (null: none).
+ */
+function riverFlow(land: Land, x: number, z: number, R: number, stroke: StrokeState, free: Free): LandRect | null {
+  const path = stroke.path;
+  const [bx, bz] = path[Math.max(0, path.length - 1 - RIVER_WAY_STAMPS)];
+  const [dx, dz] = [x - bx, z - bz];
+  const length = Math.hypot(dx, dz);
+  if (length < LAND_CELL / 2) return null;
+  const way: [number, number] = [dx / length, dz / length];
+  const flow = flowsOf(land);
+  const { cols, h, wl } = land;
+  const base = stroke.base;
+  const kept = (k: number) => !!base && base.wl[k] !== NONE && base.wl[k] > base.h[k] && (base.wl[k] === SEA_CM || (!!stroke.inWater && !!base.flow?.[k]));
+  let changed: LandRect | null = null;
+  const lay = (cx: number, cz: number, blend: boolean) => {
+    const rect = rectAround(land, cx, cz, R);
+    if (!rect) return;
+    for (let j = rect.j0; j < rect.j1; j++) {
+      for (let i = rect.i0; i < rect.i1; i++) {
+        const k = j * cols + i;
+        const r = Math.hypot(i * LAND_CELL - cx, j * LAND_CELL - cz);
+        if (r > R || wl[k] === NONE || wl[k] <= h[k] || free(i, j) <= 0 || kept(k)) continue;
+        let code: number;
+        // (A way this stroke hasn't laid yet, the one there before it, is replaced whole: only the stroke's own blend.)
+        const old = base?.flow && flow[k] === base.flow[k] ? null : flowOf(flow[k]);
+        if (!blend) {
+          if (old) continue;
+          code = flowCode(way[0], way[1]);
+        } else {
+          // (A point brush's one sample, at its middle, takes the way whole.)
+          const f = r <= LAND_CELL / 2 ? 1 : falloff(r, R);
+          code = old ? flowCode(old[0] * (1 - f) + way[0] * f, old[1] * (1 - f) + way[1] * f) || flowCode(way[0], way[1]) : flowCode(way[0], way[1]);
+        }
+        if (code !== flow[k]) {
+          flow[k] = code;
+          changed = unionRect(changed, { i0: i, j0: j, i1: i + 1, j1: j + 1 });
+        }
+      }
+    }
+  };
+  if (!stroke.flowing) {
+    stroke.flowing = true;
+    for (let n = 0; n + 1 < path.length; n++) lay(path[n][0], path[n][1], false);
+  }
+  lay(x, z, true);
+  return changed;
 }
 
 /** `dry`: the water within the radius gone, its bed filled to just over its old level. */
@@ -385,7 +458,10 @@ function dry(land: Land, x: number, z: number, R: number, free: Free): LandRect 
       if (fr <= 0) continue;
       const top = wl[k] + DRY_OVER * 100;
       if (h[k] < top) h[k] = cmOf(h[k] + (top - h[k]) * fr);
-      if (h[k] >= wl[k]) wl[k] = NONE;
+      if (h[k] >= wl[k]) {
+        wl[k] = NONE;
+        if (land.flow) land.flow[k] = 0;
+      }
       any = true;
     }
   }
@@ -435,12 +511,19 @@ export function coverCells(land: Land, rect: LandRect): LandRect {
  * The water in `rect` (and only there) settled after its ground changed: a level stays only where
  * it stands over its ground (raised sea or lake dries out), and dry ground under the level of the
  * water beside it fills from it (lowered by the sea, it becomes sea), spreading through the
- * rectangle and no further, and never onto ground `wettable` refuses. Returns `rect`.
+ * rectangle and no further, and never onto ground `wettable` refuses. Water gone takes its way
+ * (`Land.flow`) with it. Returns `rect`.
  */
 export function settleWater(land: Land, rect: LandRect, wettable?: Wettable): LandRect {
-  const { cols, rows, h, wl } = land;
+  const { cols, rows, h, wl, flow } = land;
   const { i0, j0, i1, j1 } = rect;
-  for (let j = j0; j < j1; j++) for (let k = j * cols + i0, end = j * cols + i1; k < end; k++) if (wl[k] !== NONE && wl[k] <= h[k]) wl[k] = NONE;
+  for (let j = j0; j < j1; j++) {
+    for (let k = j * cols + i0, end = j * cols + i1; k < end; k++) {
+      if (wl[k] === NONE || wl[k] > h[k]) continue;
+      wl[k] = NONE;
+      if (flow) flow[k] = 0;
+    }
+  }
   // From the wet samples in it and round it, into the dry ground in it lower than their water.
   const queue: number[] = [];
   for (let j = Math.max(0, j0 - 1); j < Math.min(rows, j1 + 1); j++) {

@@ -627,7 +627,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     if (a === world) return true;
     const land = (w: WorldStructure) => w.meta?.land;
     const [la, lb] = [land(a), land(world)];
-    if (la !== lb && (!la || !lb || la.cols !== lb.cols || la.rows !== lb.rows || la.h.join() !== lb.h.join() || la.wl.join() !== lb.wl.join() || la.cover.join() !== lb.cover.join())) return false;
+    if (la !== lb && (!la || !lb || la.cols !== lb.cols || la.rows !== lb.rows || la.h.join() !== lb.h.join() || la.wl.join() !== lb.wl.join() || (la.flow ?? []).join() !== (lb.flow ?? []).join() || la.cover.join() !== lb.cover.join())) return false;
     const rects = (w: WorldStructure) => w.plots.map((p) => `${p.x},${p.z},${p.w},${p.d}`).join(';');
     return a.plots.length === world.plots.length && rects(a) === rects(world) && JSON.stringify(a.meta?.roads ?? []) === JSON.stringify(world.meta?.roads ?? []) && JSON.stringify(a.meta?.backdrop ?? []) === JSON.stringify(world.meta?.backdrop ?? []);
   }

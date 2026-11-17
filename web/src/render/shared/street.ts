@@ -379,7 +379,8 @@ export interface StreetSource {
   fenceStyles?: readonly FenceStyleDef[];
   /**
    * Also the backdrop's buildings (`WorldMeta.backdrop`), dressed (`backdropDress.ts`), with their hedges and what they
-   * stand on (the game's street: far off the town view draws them, `pc/townView.ts`).
+   * stand on (its own ground layers, `ground` or not): the game's street (far off the town view draws them,
+   * `pc/townView.ts`) and the menus' (`pc/overview.ts`).
    */
   backdrop?: boolean;
   /**
@@ -2150,7 +2151,8 @@ export class TownStreet {
         yard.merge(o.yard);
         path.merge(o.path);
       }
-      if (this.options.ground) {
+      // (The menus' street too, which draws no ground of its own otherwise: the town's paths and fields are the overview's.)
+      {
         if (!court.empty) plan.ground.push({ name: 'backdropCourts', material: 'material.sidewalk', geo: court, toned: true });
         if (!yard.empty) plan.ground.push({ name: 'backdropYards', material: 'material.path', geo: yard, toned: true });
         if (!path.empty) plan.ground.push({ name: 'backdropPaths', material: 'material.path', geo: path });

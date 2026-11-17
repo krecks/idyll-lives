@@ -39,8 +39,9 @@ import type { Lighting } from '../shared/environment';
 import { GRASS, grassField, gustAt, gustNoise, markGrassPatches, recolourGrass, regroundGrass, type GrassQuality } from '../shared/grass';
 import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { pondQuads, rectBox } from '../shared/landBake';
+import { flowingWater, WaterFlowMap } from './water';
 import { padGeometry, padMask, padsOf } from '../shared/pads';
-import { LAND_CELL, type LandRect } from '../../game/land';
+import { LAND_CELL, type Land, type LandRect } from '../../game/land';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
 import { GROUND_TILE, groupInstances, hideLawn, keepBareTiles, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask, type LawnPlacement, type Woods } from '../shared/nature';
@@ -118,6 +119,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private woodsSector: ((x: number, z: number) => string) | null = null;
   /** The water's material and the library that adopted it (its own: it goes with the landscape). */
   private waterMaterial: { material: pc.StandardMaterial; lib: MaterialLibrary } | null = null;
+  /** The water's flow map (`pc/water.ts`), made with its material (none: `?diag=noflow`). */
+  private flowMap: WaterFlowMap | null = null;
 
   /** The land in the render data worker while `build` runs: the terrain's shading and the grass field are made there. */
   private offThread: OffThreadLand | null = null;
@@ -354,6 +357,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.waterMaterial.material.destroy();
       this.waterMaterial = null;
     }
+    this.flowMap?.destroy();
+    this.flowMap = null;
     this.grass?.dispose();
     this.grass = null;
     this.batches = [];
@@ -591,6 +596,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     });
     perfEnd(write);
     perfTime('land: stamp ponds', () => this.pondsIn(tiles));
+    perfTime('land: stamp flow', () => this.flowMap?.changed(rect, false));
     const grass = this.grass?.grassField;
     if (grass) {
       perfTime('land: stamp grass', () => {
@@ -729,7 +735,9 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   async landDone(rect: LandRect, pace?: () => Promise<void>): Promise<[number, number, number, number] | null> {
     if (!this.heightField || !this.host) return null;
     // (On a land its town follows, what the surface solved again moved too.)
-    const box = this.landBox(this.landChanged(rect), LAND_DONE_PAD);
+    const changed = this.landChanged(rect);
+    const box = this.landBox(changed, LAND_DONE_PAD);
+    perfTime('land: flow', () => this.flowMap?.changed(changed, true));
     for (const k of this.tilesIn(box)) {
       await pace?.();
       const t = this.tiles[k];
@@ -1056,7 +1064,37 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return drawOf(app, parent, 'water', mesh, this.waterMat(app));
   }
 
-  /** The water's material (the sheet's and a height field's ponds'), made once: its own, it goes with the landscape. */
+  /**
+   * Draws the land from `land` from now on (`LandscapeLayout.setLand`), its water flowing as the land has it (the
+   * flow map worked out whole).
+   */
+  override setLand(land: Land | null): void {
+    super.setLand(land);
+    this.flowMap?.setLand(this.heightField);
+  }
+
+  /**
+   * Whether its water moves in the view of `frustum` (world space): drawn (shown), flowing (not `?diag=noflow`), and a
+   * square of the land's water in view; with no height field, the sheet in view.
+   */
+  waterInView(frustum: pc.Frustum): boolean {
+    if (!this.flowMap || !this.host) return false;
+    let shown = !!this.sheet?.enabled;
+    for (const e of this.ponds.values()) shown ||= e.enabled;
+    if (!shown) return false;
+    const seen = this.flowMap.inView(frustum, this.host.parent.getWorldTransform());
+    if (seen !== null) return seen;
+    const aabb = this.sheet?.render?.meshInstances[0]?.aabb;
+    if (!aabb) return false;
+    waterSphere.center.copy(aabb.center);
+    waterSphere.radius = aabb.halfExtents.length();
+    return frustum.containsSphere(waterSphere) > 0;
+  }
+
+  /**
+   * The water's material (the sheet's and a height field's ponds'), made once: its own, it goes with the landscape.
+   * Flowing (`pc/water.ts`) as its height field has it.
+   */
   private waterMat(app: pc.AppBase): pc.StandardMaterial {
     if (this.waterMaterial) return this.waterMaterial.material;
     const mat = new pc.StandardMaterial();
@@ -1071,6 +1109,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     mat.blendType = pc.BLEND_NORMAL;
     const lib = MaterialLibrary.for(app);
     lib.adopt(mat);
+    if (flowingWater()) {
+      this.flowMap = new WaterFlowMap(app.graphicsDevice);
+      this.flowMap.use(mat);
+      perfTime('nature: water flow', () => this.flowMap!.setLand(this.heightField));
+    }
     mat.update();
     this.waterMaterial = { material: mat, lib };
     return mat;
@@ -1446,12 +1489,15 @@ function rewriteTileLevel(mesh: pc.Mesh, g: TileGrid, segs: number, heights: Flo
   return true;
 }
 
+/** `Landscape.waterInView`'s sphere round the sheet. */
+const waterSphere = new pc.BoundingSphere();
+
 /**
  * A tile's water above the sea's level (`pondQuads`) written into `into` where it fits (its buffers kept on the CPU,
  * room enough), else a mesh made for it with room to spare (a power of two), kept on the CPU: a brush's stamps over a
  * pond write into the one mesh.
  */
-function pondMeshOf(device: pc.GraphicsDevice, quads: { positions: Float32Array; indices: Uint32Array }, into: pc.Mesh | null): pc.Mesh {
+function pondMeshOf(device: pc.GraphicsDevice, quads: { positions: Float32Array; normals: Float32Array; indices: Uint32Array }, into: pc.Mesh | null): pc.Mesh {
   const verts = quads.positions.length / 3;
   const count = quads.indices.length;
   const vb = into?.vertexBuffer;
@@ -1475,9 +1521,9 @@ function pondMeshOf(device: pc.GraphicsDevice, quads: { positions: Float32Array;
     f[k * 6] = quads.positions[k * 3];
     f[k * 6 + 1] = quads.positions[k * 3 + 1];
     f[k * 6 + 2] = quads.positions[k * 3 + 2];
-    f[k * 6 + 3] = 0;
-    f[k * 6 + 4] = 1;
-    f[k * 6 + 5] = 0;
+    f[k * 6 + 3] = quads.normals[k * 3];
+    f[k * 6 + 4] = quads.normals[k * 3 + 1];
+    f[k * 6 + 5] = quads.normals[k * 3 + 2];
   }
   new Uint32Array(i.storage as ArrayBuffer).set(quads.indices);
   v.unlock(0, verts * 24);
@@ -1786,7 +1832,13 @@ registerShaderFeature(NATURE_WIND);
 interface WindState {
   time: number;
   strength: number;
+  /** The water's clock (s, `shaders/water.ts`), and how fast it goes (`WATER_CALM` with Reduce motion). */
+  water: number;
+  waterRate: number;
 }
+
+/** With Reduce motion the water runs at this share of its speed, and its second still layer doesn't drift. */
+const WATER_CALM = 0.25;
 
 const windStates = new WeakMap<pc.AppBase, WindState>();
 
@@ -1797,7 +1849,7 @@ const windStates = new WeakMap<pc.AppBase, WindState>();
  */
 export function installNature(app: pc.AppBase): void {
   if (windStates.has(app)) return;
-  const state: WindState = { time: 0, strength: 1 };
+  const state: WindState = { time: 0, strength: 1, water: 0, waterRate: 1 };
   windStates.set(app, state);
   daylightByDefault(app.graphicsDevice);
   MaterialLibrary.for(app).onCreate((key, material) => {
@@ -1812,14 +1864,26 @@ export function installNature(app: pc.AppBase): void {
   });
   const id = app.graphicsDevice.scope.resolve('game_wind');
   const value = new Float32Array([0, 1, WIND.dir[0], WIND.dir[1]]);
+  const waterId = app.graphicsDevice.scope.resolve('game_waterClock');
+  const water = new Float32Array(4);
   app.on('update', (dt: number) => {
     state.time += Math.min(0.1, dt);
+    state.water += Math.min(0.1, dt) * state.waterRate;
   });
   app.on('prerender', () => {
     value[0] = state.time;
     value[1] = state.strength;
     id.setValue(value);
+    water[0] = state.water;
+    water[1] = state.waterRate === 1 ? 1 : 0;
+    waterId.setValue(water);
   });
+}
+
+/** The water calmed (Reduce motion: `WATER_CALM` of its speed, one still layer drifting) or not. */
+export function setWaterCalm(app: pc.AppBase, calm: boolean): void {
+  const state = windStates.get(app);
+  if (state) state.waterRate = calm ? WATER_CALM : 1;
 }
 
 /** A draw of model mesh `m` (on a plant finish) bends without fluttering when it's a part grown from nothing (`ModelMesh.windStill`). */

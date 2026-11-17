@@ -52,6 +52,8 @@ export interface GameControls {
   goHome(): void;
   /** The camera goes to look at a world point (the town map's "look here"). */
   lookAt(x: number, z: number): void;
+  /** Shows another household's lot (or a public one) open, its rooms and things, until the camera settles elsewhere; null closes it up again. */
+  lookInside(plot: number | null): void;
   /** The selected Sim starts social interaction `social` with `target`. */
   socialize(target: number, social: number): void;
   /** The selected Sim uses their phone: `action` (content `phone.actions` index), with `contact` or on their own. */

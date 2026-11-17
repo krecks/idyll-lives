@@ -57,11 +57,21 @@ export function wetChanged(land: Land, patch: LandPatch): boolean {
   return false;
 }
 
+/** Whether a river's way (`Land.flow`) is laid anywhere in the patch's rectangle, before it or now. */
+export function flowTouched(land: Land, patch: LandPatch): boolean {
+  if (!patch.flow || !land.flow) return false;
+  if (patch.flow.some((v) => v !== 0)) return true;
+  const { rect } = patch;
+  for (let j = rect.j0; j < rect.j1; j++) for (let k = j * land.cols + rect.i0, end = j * land.cols + rect.i1; k < end; k++) if (land.flow[k]) return true;
+  return false;
+}
+
 /**
  * The `shapeLand` command for the change `patch` made to `land` (its old values; the land holds the
- * new): the tiles its rectangle reaches, or with `whole` (a world without `meta.land` yet) the whole
- * land with its header, since a tile not sent reads as flat and dry; the cover when it changed (or
- * with the header); `zones` and `water` as given (the editor's, when the cover or the water changed).
+ * new): the tiles its rectangle reaches (their rivers' ways too where a way was laid or taken away
+ * there, `flowTouched`), or with `whole` (a world without `meta.land` yet) the whole land with its
+ * header, since a tile not sent reads as flat and dry; the cover when it changed (or with the
+ * header); `zones` and `water` as given (the editor's, when the cover or the water changed).
  */
 export function landCommand(o: { land: Land; patch: LandPatch; whole: boolean; household: number; cost: number; zones?: WorldZone[]; water?: Rle }): ShapeLandCommand {
   const { land, patch } = o;
@@ -69,9 +79,10 @@ export function landCommand(o: { land: Land; patch: LandPatch; whole: boolean; h
   if (o.whole) {
     const file = encodeLand(land);
     const byTile = (codes: string[]) => Object.fromEntries(codes.map((c, t) => [t, c] as const));
-    meta = { ...file, h: byTile(file.h), wl: byTile(file.wl) };
+    meta = { ...file, h: byTile(file.h), wl: byTile(file.wl), ...(file.flow ? { flow: byTile(file.flow) } : {}) };
   } else {
-    meta = { ...encodeTiles(land, tilesOf(patch.rect, land.cols)), ...(patch.cover ? { cover: rle(land.cover) } : {}) };
+    const { flow, ...tiles } = encodeTiles(land, tilesOf(patch.rect, land.cols));
+    meta = { ...tiles, ...(flow && flowTouched(land, patch) ? { flow } : {}), ...(patch.cover ? { cover: rle(land.cover) } : {}) };
   }
   return { type: 'shapeLand', household: o.household, cost: o.cost, meta: { land: meta, ...(o.zones ? { zones: o.zones } : {}) }, ...(o.water ? { water: o.water } : {}) };
 }

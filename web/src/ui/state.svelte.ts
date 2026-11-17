@@ -218,6 +218,8 @@ class GameState {
   jobBoardOpen = $state(false);
   /** Plot currently shown. */
   viewPlot = $state<number | null>(null);
+  /** A lot not the household's shown open all the same, by the building card's "Look inside" (null: none). */
+  lookInside = $state<number | null>(null);
   /** Who acts on orders (a member of the player's household). */
   selected = $state(0);
   /** Resident whose panel is open (anyone; orders only for the player's household); null: just watching. */
@@ -288,6 +290,7 @@ class GameState {
     this.pauseMenu = false;
     this.townOpen = false;
     this.viewPlot = null;
+    this.lookInside = null;
     this.stats = null;
     this.threads = null;
     this.selected = 0;

@@ -83,7 +83,8 @@ import { setFogFrom } from './shaders/fog';
 import { LT_FIXTURE } from '../../debug/livingTown';
 import { applyLandFixture, LAND_FIXTURE } from '../landFixture';
 import { lotBuilding, MOVER_GROW, TownBuildings, TownMovers, townBackdrop, type Mover, type TownLotHouse } from './townView';
-import type { TownBuilding } from '../shared/townBuildings';
+import { STOREY as BACKDROP_STOREY, type TownBuilding } from '../shared/townBuildings';
+import { rayPrism, rectFootprint } from '../shared/buildingPick';
 import { surfaceOf } from '../shared/landSurface';
 import { TownGroundMap } from './groundTiles';
 import { LandHaze } from './landHaze';
@@ -127,6 +128,7 @@ import type {
   PorchPreview,
   PaintPreviewFace,
   PickResult,
+  BuildingHit,
   PlacementGhost,
   RenderFailure,
   RenderPassInfo,
@@ -197,6 +199,8 @@ const HOLD_FRAMES = 2;
  * shadows 15 a second on Low, the reflections 10).
  */
 const GAME_SETTLE_MS = 250;
+/** While water is in view, a view that would be held is drawn this often (ms: 30 a second) so it goes on flowing. */
+const WATER_FRAME_MS = 1000 / 30;
 /** Metres the sun's shadow square reaches past the viewed lot. */
 const SHADOW_MARGIN = 10;
 /** The game camera's target eases to the ground under it over this (s): `settleTarget`. */
@@ -207,6 +211,8 @@ const PIT_MARGIN = 0.3;
 const GATE_CELL = 8;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
 const ROOF_MIN_DISTANCE = 15;
+/** A roof's height (m) over a house's top storey, at most, for a click on it (`buildingAt`). */
+const PICK_ROOF = 4;
 /** Main-thread time (ms) a world build runs before the frames it runs behind get one (`pace`). */
 const BUILD_SLICE_MS = 8;
 /**
@@ -1229,21 +1235,30 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * Whether this frame may be held (`heldFrames.ts`): the menus' town standing still, nothing of it being built; the
    * game paused (residents, objects, birds and cars stand still then), nothing being built or streamed in. In the
    * game, what changes the picture in place is told (`pictureChanged`), and frames are drawn for `GAME_SETTLE_MS`
-   * after it (what is drawn at a rate of its own: the sun's map, the reflections, the lamps' shadows).
+   * after it (what is drawn at a rate of its own: the sun's map, the reflections, the lamps' shadows). With water in
+   * view, a held view goes on being drawn `WATER_FRAME_MS` apart, so the water goes on flowing.
    */
   private holdIfStill(): void {
     const held = this.held;
     if (this.townMode) {
       held.settleMs = 0;
       held.active = !this.flyingIn && !this.worldBuilding && this.townBuilds === 0; // (nor while the overview builds.)
+      held.motionMs = held.active && this.waterInView() ? WATER_FRAME_MS : 0;
       return;
     }
     held.settleMs = GAME_SETTLE_MS;
     held.active = this.gamePaused && !this.worldBuilding && !this.worldBuilds && !this.streaming && !this.streamDue && !this.warming;
+    held.motionMs = held.active && this.waterInView() ? WATER_FRAME_MS : 0;
     if (!held.active) return;
     // What moves in place while the game is paused: a resident posed (a voice's lips, a look changed), the thing in
     // hand and the build effects, a shadow map's redraw still to come.
     if (this.characters.posed || this.placing.animating || this.sunShadows.waiting) held.changed();
+  }
+
+  /** Whether the water of the land in view flows on screen (`Landscape.waterInView`): a held view goes on being drawn, slower. */
+  private waterInView(): boolean {
+    const camera = this.camera.camera;
+    return !!camera && !!this.landInView()?.scape.waterInView(camera.frustum);
   }
 
   /** Something in the game's picture changed that the held frame can't see (`heldFrames.ts`): it is drawn again. */
@@ -3647,6 +3662,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const step = Math.max(0.5, Math.abs(goal - this.townMinute) * Math.min(1, dt / 600));
       this.townMinute = Math.abs(goal - this.townMinute) <= step ? goal : this.townMinute + Math.sign(goal - this.townMinute) * step;
     }
+    // (The backdrop's windows the street drew again: the held frame too.)
+    if (this.overview?.frameLights()) this.held.changed();
     if (this.lastLightMinute !== this.townMinute) {
       this.applyLighting(this.townMinute);
       this.lastLightMinute = this.townMinute;
@@ -3685,6 +3702,38 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   pick(x: number, y: number): PickResult {
     return this.picker.pick(x, y);
+  }
+
+  buildingAt(x: number, y: number): BuildingHit | null {
+    const world = this.builtWorld;
+    if (!world || this.townMode) return null;
+    const { origin, dir } = this.landRay;
+    this.camera.ray(x, y, this.cssSize.width, this.cssSize.height, origin, dir);
+    const view = this.view;
+    let best = Infinity;
+    let hit: BuildingHit | null = null;
+    for (const p of world.plots) {
+      if (!p.house || (view && view.x === p.x && view.z === p.z)) continue;
+      const [x0, z0, x1, z1] = p.house;
+      const g = [this.groundY(x0, z0), this.groundY(x1, z0), this.groundY(x1, z1), this.groundY(x0, z1)];
+      const t = rayPrism(origin, dir, rectFootprint(x0, z0, x1, z1), Math.min(...g) - 0.5, Math.max(...g) + (p.storeys ?? 1) * WALL_HEIGHT + PICK_ROOF);
+      if (t < best) [best, hit] = [t, { kind: 'lot', plot: p.id }];
+    }
+    const backdrop = world.meta?.backdrop ?? [];
+    for (let i = 0; i < backdrop.length; i++) {
+      const b = backdrop[i];
+      const y0 = b.y - this.datum;
+      const t = rayPrism(origin, dir, b.poly, y0 - 0.5, y0 + b.storeys * BACKDROP_STOREY + PICK_ROOF);
+      if (t < best) [best, hit] = [t, { kind: 'building', index: i }];
+    }
+    // (The viewed lot's own ground, nearer than the building: what was meant is there.)
+    if (hit && view && dir.y < -1e-6) {
+      const t = -origin.y / dir.y;
+      const gx = origin.x + dir.x * t;
+      const gz = origin.z + dir.z * t;
+      if (t < best && gx >= view.x && gx <= view.x + view.w && gz >= view.z && gz <= view.z + view.d) return null;
+    }
+    return hit;
   }
 
   pickPlane(height: number): { x: number; z: number } | null {
