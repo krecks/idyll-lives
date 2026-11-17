@@ -140,8 +140,10 @@ describe("step 2's settle", async () => {
     expect(e.refused[0].why).toMatch(/would climb \d+ %|dug out or built up [\d.]+ m/);
     console.log(`refused: ${e.refused[0].why}`);
     // Where it is: the road refused, as drawn, for the editor to show red.
-    expect(e.refused[0].at).toEqual(found.road.points);
-    expect(e.refused[0].width).toBe(found.road.width);
+    // (The job's answer carries the settle's refusals as they are: `landFollow.ts` `EditRefusal`.)
+    const where = e.refused[0] as import('../src/game/landFollow').EditRefusal;
+    expect(where.at).toEqual(found.road.points);
+    expect(where.width).toBe(found.road.width);
     // The Street tool's live checks saw it coming, in the settle's words.
     const live = liveStreet(before, t, found.points, 'street');
     expect(live.steep).toBe(true);

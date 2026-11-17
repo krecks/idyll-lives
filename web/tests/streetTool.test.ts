@@ -458,7 +458,7 @@ describe('the climb, as measureLand measures it', () => {
     expect(editor.said.hints.at(-1)).toMatch(/^It would climb \d+ %.*Draw it another way/);
     tool.down(250, 142);
     tool.up();
-    expect(editor.said.refusals.at(-1)).toBe(live.slope);
+    expect(editor.said.refusals.at(-1)).toBe(live.slope!);
     expect(editor.draft.roads).toHaveLength(5);
     expect(tool.key!(key('Backspace'))).toBe(true);
   });
