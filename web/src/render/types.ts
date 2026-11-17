@@ -667,9 +667,11 @@ export interface Renderer {
   /**
    * Back to the game world (the overview and the town's landscape are let go a moment after, and
    * built again by the next `showTown`). With `glide` > 0 the camera
-   * first flies from the overview into the game's view (seconds); resolves when it is shown.
+   * first flies from the overview into the game's view (seconds); resolves when it is shown. With
+   * `letGo`, the town is let go of at once, and it resolves once it has been (a machine low on
+   * memory, before the game's world is built).
    */
-  hideTown(glide?: number): Promise<void>;
+  hideTown(glide?: number, letGo?: boolean): Promise<void>;
   /** Whether the overview is on screen. */
   readonly townShown: boolean;
   /** Overview camera: glides to (or with `cut`, jumps to) a shot. */
