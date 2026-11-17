@@ -528,6 +528,8 @@ export interface Renderer {
   onFocusLot(listener: ((plot: number) => boolean) | null): void;
   /** The ground rectangle (tiles x0, z0, x1, z1) the camera streams in, for the sim's full-detail area (the worker's `setWatch`); called when it changes. */
   onWatch(listener: ((rect: [number, number, number, number]) => void) | null): void;
+  /** At the fastest speeds (4 and 5), the full-detail area `onWatch` reports is only the streamed chunks round the camera's, so the sim keeps up; off, all of them. */
+  setDetailTight(tight: boolean): void;
   setHoverTile(tile: { x: number; z: number } | null): void;
   setSelectedSim(id: number | null): void;
   setWallMode(mode: WallMode): void;

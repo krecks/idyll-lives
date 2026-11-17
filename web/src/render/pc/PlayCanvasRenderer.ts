@@ -243,6 +243,13 @@ const NOON_SKY_LUMA = skyLuma(lightingAt(13 * 60, LOOK, createLighting()));
 const SIM_VIEW_MARGIN = 2;
 /** How far round the watch rectangle the sim keeps residents in full detail (m: sim-core `lod::VIEW_MARGIN`; `reportWatch`). */
 const DETAIL_MARGIN = 5;
+/**
+ * At the fastest speeds (`setDetailTight`), the sim's full-detail area is the streamed chunks within
+ * this many chunks of the one the camera looks at, not all of them: a resident out of it takes a
+ * turn every game minute, which at speed 4 or 5 is every step or two anyway, and the town ticks
+ * fast enough to keep up.
+ */
+const TIGHT_CHUNKS = 1;
 /** Residents further than this (m) from the camera's target, off the viewed lot, have no contact shadow. */
 const FAR_SHADOW = 40;
 /** `?residents=lot`: residents drawn only on the viewed lot, as before life on every lot. */
@@ -685,6 +692,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private focusAsked: { plot: number; at: number } | null = null;
   private readonly focusSwitches: number[] = [];
   private watchListener: ((rect: [number, number, number, number]) => void) | null = null;
+  /** The full-detail area kept to the chunks round the camera's (`setDetailTight`), and that chunk as last reported. */
+  private detailTight = false;
+  private detailChunk = '';
   /** The street building the chunks streamed in, between world builds; another stream change waits for it. */
   private streaming: Promise<void> | null = null;
   private streamDue = false;
@@ -1326,6 +1336,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.watchListener = listener;
   }
 
+  setDetailTight(tight: boolean): void {
+    if (tight === this.detailTight) return;
+    this.detailTight = tight;
+    this.reportWatch();
+  }
+
   /**
    * Each frame, after the camera's input: a flight under way, then the chunks round the camera
    * (streamed into the street) and the lot it has settled on (`onFocusLot`).
@@ -1371,6 +1387,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       }
       return taken;
     });
+    // (Kept to the chunks round the camera's: it moved to another.)
+    if (!changed && this.detailTight && this.detailChunk !== `${Math.floor(o.target.x / CHUNK)},${Math.floor(o.target.z / CHUNK)}`) this.reportWatch();
     if (!changed) return;
     this.pictureChanged();
     if (this.streamOn && this.street.setChunks(this.roam.chunks)) this.streamStreet();
@@ -1592,6 +1610,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       z0 = Math.min(z0, cz * CHUNK);
       x1 = Math.max(x1, (cx + 1) * CHUNK);
       z1 = Math.max(z1, (cz + 1) * CHUNK);
+    }
+    // (At the fastest speeds, only the chunks round the camera's: `TIGHT_CHUNKS`.)
+    const [cx, cz] = [Math.floor(this.orbit.target.x / CHUNK), Math.floor(this.orbit.target.z / CHUNK)];
+    this.detailChunk = `${cx},${cz}`;
+    if (this.detailTight) {
+      x0 = Math.max(x0, (cx - TIGHT_CHUNKS) * CHUNK);
+      z0 = Math.max(z0, (cz - TIGHT_CHUNKS) * CHUNK);
+      x1 = Math.max(x0, Math.min(x1, (cx + TIGHT_CHUNKS + 1) * CHUNK));
+      z1 = Math.max(z0, Math.min(z1, (cz + TIGHT_CHUNKS + 1) * CHUNK));
     }
     const d = groundDepth(world);
     const rect: [number, number, number, number] = [Math.max(0, x0), Math.max(0, z0), Math.min(world.width, x1), Math.min(d, z1)];
