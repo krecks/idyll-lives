@@ -412,8 +412,9 @@ function benchHelpers() {
             for (const side of [1, -1]) {
               const e = buildup.addCivic(d, t, ed().content, { civic: first.civic, road: i, s, side, seed: 1 });
               if ('refused' in e) continue;
-              const b = e.draft.open.backdrop[e.draft.open.backdrop.length - 1];
-              const c = b.poly.reduce((m, p) => [m[0] + p[0] / b.poly.length, m[1] + p[1] / b.poly.length], [0, 0]);
+              // (A civic place is a lot of its own: the last one.)
+              const lot = town.plotRect(t, e.draft.slots[e.draft.slots.length - 1]);
+              const c = [lot.x + lot.w / 2, lot.z + lot.d / 2];
               // (The pointer by the road, a little out from it on that side: where a home's ghost is aimed too.)
               const g = pointAt(r.points, s);
               const p = screen((g[0] + c[0]) / 2, (g[1] + c[1]) / 2);
@@ -530,7 +531,7 @@ function benchHelpers() {
       /** How many backdrop buildings and places the plan has. */
       built() {
         const d = plan();
-        return { buildings: d.open?.backdrop?.length ?? 0, places: d.open?.places?.length ?? 0 };
+        return { buildings: d.open?.backdrop?.length ?? 0, places: d.open?.places?.length ?? 0, lots: d.slots.length };
       },
       /** The page's frames from now (their gaps, ms) until `stop`: the 50th, 95th percentiles and the longest. */
       startFrames() {
@@ -997,7 +998,8 @@ async function editSession(page, renderer, shootAs, setStep, step, parts) {
       await page.mouse.click(p.x, p.y);
       await page.waitForTimeout(300);
       const now = await counts();
-      if (now.buildings !== had.buildings + 1 || now.places !== had.places + 1) fault(`${renderer} edit civic: ${now.buildings - had.buildings} buildings and ${now.places - had.places} places added (${(await state()).note})`);
+      // (A civic place is a lot of its own, and its place: no building.)
+      if (now.lots !== had.lots + 1 || now.places !== had.places + 1 || now.buildings !== had.buildings) fault(`${renderer} edit civic: ${now.lots - had.lots} lots, ${now.buildings - had.buildings} buildings and ${now.places - had.places} places added (${(await state()).note})`);
       const named = await page.evaluate(() => window.__townEditor.draft.open.places.at(-1)?.name);
       console.log(`create: ${renderer} edit civic: "${s.hint}" in ${p.village}: ${named}`);
       await page.mouse.move(p.x + 200, p.y + 120, { steps: 3 });
