@@ -445,17 +445,18 @@ describe("step 2's villages", async () => {
     }
   }, 120_000);
 
-  test('a village across a painted river gets a bridge; removed, the water under the bridge is water again', () => {
+  /** A village placed across a river `across` m wide carved straight into the land 180 m off the town's site: its bridge (`most` m of deck at most), and the water under it water again once it is removed. */
+  const acrossRiver = (across: number, most: number) => {
     const options: Partial<WorldOptions> = { town: 'village', villages: 'none', size: 'large' };
     const land = inWorker({ kind: 'land', world: 'country', seed: 11, options }).draft;
-    // A river 30 m across the land, its banks wavering as a painted one's do, 180 m off the town's site (carved straight into the land).
+    // A river across the land, its banks wavering as a painted one's do, 180 m off the town's site (carved straight into the land).
     const site = land.open!.plan!.site;
     const z0 = site[1] > land.depth / 2 ? site[1] - 180 : site[1] + 180;
     const was = land.open!.land!;
     const shaped = { ...was, h: was.h.slice(), wl: was.wl.slice(), cover: was.cover.slice(), edited: true };
     for (let j = 0; j < shaped.rows; j++) {
       for (let i = 0; i < shaped.cols; i++) {
-        if (Math.abs(j * 2 - z0 + 3 * Math.sin(i / 4)) >= 15) continue;
+        if (Math.abs(j * 2 - z0 + 3 * Math.sin(i / 4)) >= across / 2) continue;
         shaped.h[j * shaped.cols + i] = Math.min(shaped.h[j * shaped.cols + i], -150);
         shaped.wl[j * shaped.cols + i] = -40;
       }
@@ -478,10 +479,11 @@ describe("step 2's villages", async () => {
     expect(e.notes).toBeUndefined();
     const v = d.open!.areas.length - 1;
     const village = d.open!.areas[v].name;
-    // A bridge to it, of the generator's length at most, its deck walked dry.
+    // A bridge to it, its deck walked dry.
     const bridge = d.roads.find((r) => r.bridge && r.bridge[1] > r.bridge[0]);
     expect(bridge?.name).toBe(`${village} Bridge`);
-    expect(bridge!.bridge![1] - bridge!.bridge![0]).toBeLessThanOrEqual(45);
+    expect(bridge!.bridge![1] - bridge!.bridge![0]).toBeGreaterThan(across);
+    expect(bridge!.bridge![1] - bridge!.bridge![0]).toBeLessThanOrEqual(most);
     const W = d.width;
     const deck: number[] = [];
     deckTiles(bridge!, bridge!.bridge!, W, d.depth, (tile) => deck.push(tile));
@@ -498,7 +500,11 @@ describe("step 2's villages", async () => {
     expect(gone.roads.some((r) => r.bridge)).toBe(false);
     const walk = unrle(gone.open!.water, W * gone.depth);
     expect(under.every((tile) => walk[tile] === 1)).toBe(true);
-  }, 180_000);
+  };
+
+  test('a village across a painted river gets a bridge; removed, the water under the bridge is water again', () => acrossRiver(30, 45), 180_000);
+
+  test("a village across a 50 m painted river gets a bridge as a drawn street's (70 m of deck at most, not the generator's 45); removed, the water under it is water again", () => acrossRiver(50, 70), 180_000);
 
   test('on a small 640 m land no village fits, and placing one is refused cleanly', () => {
     const small = laid('country', 21, { town: 'village', villages: 'few', size: 'small' });

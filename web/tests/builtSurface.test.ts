@@ -290,3 +290,32 @@ describe('built land on a slope', () => {
     expect(Array.from(direct.conformed)).toEqual(Array.from(surface.conformed));
   });
 });
+
+describe("a deck carried on over dry land past its water (a drawn street's, over a river's dip)", () => {
+  // (A town 4 m up west of x 40, a meadow 0.4 m over the water from there to the channel at x 58..72 and past it, a
+  // street over it all with its deck from 12 m before the water to 2 m past it.)
+  const land = blankLand(W, D, 'follow');
+  for (let j = 0; j < land.rows; j++) {
+    for (let i = 0; i < land.cols; i++) {
+      const x = i * LAND_CELL;
+      const k = j * land.cols + i;
+      if (x >= 58 && x <= 72) [land.h[k], land.wl[k]] = [-150, 0];
+      else land.h[k] = x < 40 ? 400 : 40;
+    }
+  }
+  const deck: [number, number] = [46, 74];
+  const street = line([0, 60], [140, 60], 7, 'country', ['out', 'out'], deck);
+  const surface = builtSurfaceOf({ plots: [], meta: { roads: [street], world: { landscape: { slope: 0.4 } } } }, land);
+
+  test('the land under its dry reach lies under its stone, out to the stone’s edge', () => {
+    let checked = 0;
+    // (Its samples from the first inside the deck to 4 m before the water; out to its stone's edge, 5.5 m off its middle.)
+    for (let i = Math.ceil(deck[0] / LAND_CELL) + 1; i * LAND_CELL <= 58 - 4; i++) {
+      for (let j = Math.ceil((60 - 5.5) / LAND_CELL); j * LAND_CELL <= 60 + 5.5; j++) {
+        expect(surface.conformed[j * land.cols + i]).toBeLessThan(surface.roadY(0, i * LAND_CELL) - 0.6);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(10);
+  });
+});

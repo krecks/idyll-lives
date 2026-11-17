@@ -37,13 +37,13 @@
 
 import type { Content } from '../../content/content';
 import type { RoadPlan, TownArea } from '../../core/protocol';
-import { bridgeable, wetSpans, withoutDeck } from '../bridges';
+import { crossWater, DRAWN_SPAN, wetSpans, withoutDeck } from '../bridges';
 import { along, clearOfBoxes, CountryRouter, TRIES, type Cells, type Onward, type Port, type Way } from '../countryRouter';
 import { heightAt, type Land } from '../land';
 import { wetTiles } from '../landEdit';
 import { rle, unrle } from '../landMasks';
 import { bridgeSites, dryPieces } from '../landPieces';
-import { AREA_APART, BRIDGE_IN, BRIDGE_SPAN, cells8, cornersOf, DECK_PAST, deckOf, hamletFits, hamletLots, hamletOf, parkingFor, putHamlet, ROAD_WIDTH, type AreaPlan } from '../macro';
+import { AREA_APART, BRIDGE_IN, cells8, cornersOf, DECK_PAST, deckTiles, hamletFits, hamletLots, hamletOf, parkingFor, putHamlet, ROAD_WIDTH, type AreaPlan } from '../macro';
 import { mulberry32 } from '../noise';
 import { COURT, endDir, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, roadIndex, tangent, type Pt } from '../roads';
 import { boundsOf, frontageOf, LotPlacer, plotRect, type Facing, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';
@@ -84,6 +84,8 @@ const STUB_PAST = 10;
 const FEWEST_LOTS = 4;
 /** A bridge to a village the water cuts off is the first that serves of so many crossings, the nearest first (`bridgeOver`). */
 const BRIDGE_TRIES = 12;
+/** A crossing's line is carried on this far (m) past its ends, onto the dry land `bridgeSites` finds there, so its deck may reach on over a dip (`bridgeOver`). */
+const BRIDGE_REACH = 12;
 
 const NOTHING: { lots: number[]; backdrop: number[] } = { lots: [], backdrop: [] };
 const r2 = (v: number) => Math.round(v * 100) / 100;
@@ -562,14 +564,16 @@ function linkUp(draft: NeighbourhoodDraft, roads: RoadPlan[], areas: readonly Re
 /**
  * Where no road can be routed from a village to the network, its piece of dry land cut off by the
  * water (`landPieces.ts` `dryPieces`, over the router's cells): a bridge over the water to a piece a
- * country road is on, as the generator lays one between pieces (`macro.ts`). Of the crossings
- * (`bridgeSites`, their ends `BRIDGE_IN` m past the banks) from the village's piece to such a piece,
- * the nearest the village and that piece's country roads first, `BRIDGE_TRIES` of them: the first
- * that crosses one stretch of water (`wetSpans`) and may be bridged (`bridgeable`: no road nor lot
- * on it), with a country road from its far end to the network and from its near end into one of
- * the village's `ports` (`toNetwork`), neither over one of `things` (`clashes`). Changes `roads`
- * (the bridge and its roads added, named for `place`); the walkers' water (`walk`, as it was) with
- * its deck dry (`deckOf`), or null if no bridge was laid.
+ * country road is on. Placed by hand, it is laid as a street drawn over the water is (`bridges.ts`
+ * `crossWater`: its deck `DRAWN_SPAN` m at most, not the generator's `BRIDGE_SPAN`, and reaching on
+ * over the dip a river lies in). Of the crossings (`bridgeSites`, square to both banks, their ends
+ * `BRIDGE_IN` m past the banks) from the village's piece to such a piece, the nearest the village
+ * and that piece's country roads first, `BRIDGE_TRIES` of them: the first that crosses one stretch
+ * of water (`wetSpans`) and may be bridged there (`crossWater`, on its line carried `BRIDGE_REACH` m
+ * on past either end: no road nor lot on it), with a country road from its far end to the network
+ * and from its near end into one of the village's `ports` (`toNetwork`), neither over one of
+ * `things` (`clashes`). Changes `roads` (the bridge and its roads added, named for `place`); the
+ * walkers' water (`walk`, as it was) with its deck dry (`deckTiles`), or null if no bridge was laid.
  */
 function bridgeOver(draft: NeighbourhoodDraft, roads: RoadPlan[], router: CountryRouter, blocked: Uint8Array, clashes: (r: RoadPlan) => boolean, ports: readonly Port[], rect: Rect, place: string, taken: Set<string>, things: readonly Rect[], walk: () => Uint8Array): Uint8Array | null {
   const land = draft.open?.land;
@@ -583,7 +587,7 @@ function bridgeOver(draft: NeighbourhoodDraft, roads: RoadPlan[], router: Countr
   const water = wetTiles(land, W, D);
   const index = new RoadIndex(country);
   const toRoad = (p: Pt) => index.nearest(p[0], p[1], 4000)?.dist ?? 4000;
-  const sites = bridgeSites(water, W, D, BRIDGE_SPAN - 2 * DECK_PAST - 1)
+  const sites = bridgeSites(water, W, D, DRAWN_SPAN - 2 * DECK_PAST - 1)
     .flatMap((s) => {
       const a: Pt = [r2(s.a[0] - s.u[0] * BRIDGE_IN), r2(s.a[1] - s.u[1] * BRIDGE_IN)];
       const b: Pt = [r2(s.b[0] + s.u[0] * BRIDGE_IN), r2(s.b[1] + s.u[1] * BRIDGE_IN)];
@@ -594,10 +598,19 @@ function bridgeOver(draft: NeighbourhoodDraft, roads: RoadPlan[], router: Countr
     })
     .map((s) => ({ ...s, score: offRect(rect, s.near) + toRoad(s.far) }))
     .sort((x, y) => x.score - y.score);
-  for (const { near, far } of sites.slice(0, BRIDGE_TRIES)) {
-    const points = evenly([near, far], 1).map(([x, z]): Pt => [r2(x), r2(z)]);
-    const spans = wetSpans(points, water, W, D);
-    if (spans.length !== 1 || bridgeable(points, spans[0], roads, things)) continue;
+  for (const site of sites.slice(0, BRIDGE_TRIES)) {
+    const along: Pt = [(site.far[0] - site.near[0]) / dist(site.near, site.far), (site.far[1] - site.near[1]) / dist(site.near, site.far)];
+    const ends: [Pt, Pt] = [
+      [site.near[0] - along[0] * BRIDGE_REACH, site.near[1] - along[1] * BRIDGE_REACH],
+      [site.far[0] + along[0] * BRIDGE_REACH, site.far[1] + along[1] * BRIDGE_REACH],
+    ];
+    const line = evenly(ends, 1).map(([x, z]): Pt => [r2(x), r2(z)]);
+    const spans = wetSpans(line, water, W, D);
+    if (spans.length !== 1) continue;
+    const crossed = crossWater(line, ['join', 'join'], spans[0], { wet: water, W, D, roads, plots: things, land });
+    if (typeof crossed === 'string') continue;
+    const points = crossed.bridge;
+    const [near, far] = [points[0], points[points.length - 1]];
     const at = roads.length;
     const u: Pt = [(far[0] - near[0]) / dist(near, far), (far[1] - near[1]) / dist(near, far)];
     const town = toNetwork(router, { road: at, end: 1, area: -1, p: far, dir: u, used: false }, blocked);
@@ -605,9 +618,10 @@ function bridgeOver(draft: NeighbourhoodDraft, roads: RoadPlan[], router: Countr
     if (!town || !home) continue;
     const ways = [router.layOnward(home).laid, router.layOnward(town).laid];
     if (ways.some((laid) => laid.some(clashes))) continue;
-    const bridge: RoadPlan = { points, width: ROAD_WIDTH, ends: ['join', 'join'], kind: 'country', name: bridgeName(place, taken) };
+    const deck = crossed.fit.deck!;
+    const bridge: RoadPlan = { points, width: ROAD_WIDTH, ends: ['join', 'join'], kind: 'country', name: bridgeName(place, taken), bridge: [deck[0], deck[1]] };
     const out = walk().slice();
-    bridge.bridge = deckOf(bridge, water, out, W, D);
+    deckTiles(bridge, deck, W, D, (tile) => (out[tile] = 0));
     roads.push(bridge);
     for (const laid of ways) for (const r of laid) roads.push({ ...r, name: roadName(place, taken) });
     return out;

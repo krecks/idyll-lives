@@ -12,10 +12,12 @@
  * and where the line drawn won't make a bridge as it runs (it bends there, or only clips the water,
  * or the crossing is too long at its slant) the straight is laid through the water's middle, and
  * then turned up to 50° to cross squarer (`bridgeFits`). On a land with heights, its deck reaches
- * on over the dip a river lies in (`grownDeck`), so the road is not dug down into it nor built up.
+ * on over the dip a river lies in (`grownDeck`), so the road is not dug down into it nor built up,
+ * and as far over the low ground on the water's other side, so it stays centred on the water.
  */
 
 import type { RoadPlan } from '../core/protocol';
+import { BRIDGE_CLEAR } from '../render/shared/builtSurface';
 import { heightAt, LAND_CELL, NONE, type Land } from './land';
 import { BRIDGE_IN, BRIDGE_SPAN, DECK_PAST, deckOf, deckTiles, ROAD_WIDTH } from './macro';
 import { bends, connector, lengths, nearest, pointAt, type Pt } from './roads';
@@ -34,6 +36,8 @@ const DIP = 3;
 /** A grown deck leaves this much of its bridge straight before it either end (m), as the generator's leaves; and reaches this far onto the bank past the dip (m). */
 const APPROACH_KEEP = BRIDGE_IN - DECK_PAST;
 const ONTO = 6;
+/** A deck's stone reaches this far (m) under its road (`render/shared/street.ts` `BRIDGE.under`): a deck stands clear of land lying this far under its floor. */
+const SLAB = 0.6;
 
 /** A line bent further than this off the straight between a bridge's ends (m) is not straightened into one. */
 const BEND_MOST = 4;
@@ -243,11 +247,16 @@ export function deckSpanOf(points: readonly Pt[], wet: Uint8Array, W: number, D:
   return [round2(Math.max(0, ls[first] - DECK_PAST)), round2(Math.min(L, ls[last] + DECK_PAST))];
 }
 
-/** The land's height at (x, z) (m), its water's level where it is wet. */
-function groundAt(land: Land, x: number, z: number): number {
+/** The land's sample nearest (x, z). */
+function sampleAt(land: Land, x: number, z: number): number {
   const i = Math.min(land.cols - 1, Math.max(0, Math.round(x / LAND_CELL)));
   const j = Math.min(land.rows - 1, Math.max(0, Math.round(z / LAND_CELL)));
-  const k = j * land.cols + i;
+  return j * land.cols + i;
+}
+
+/** The land's height at (x, z) (m), its water's level where it is wet. */
+function groundAt(land: Land, x: number, z: number): number {
+  const k = sampleAt(land, x, z);
   return land.wl[k] !== NONE && land.wl[k] > land.h[k] ? land.wl[k] / 100 : heightAt(land, x, z);
 }
 
@@ -256,8 +265,11 @@ function groundAt(land: Land, x: number, z: number): number {
  * land past its end lies more than `DIP` m under the line between the land at the bridge's ends, a
  * metre at a time, and then `ONTO` m onto the bank past the dip (the road's height is worked out from
  * the land round it: `builtSurface.ts`), no longer than `most` m and leaving `APPROACH_KEEP` m of
- * straight before it either end. `short`: per end, whether it would have reached on past that (the
- * straight is too short for it).
+ * straight before it either end. Then, centred on its water: the end reaching less far past the water
+ * carried on as far as the other does, over land lying under the deck (`SLAB` m under its floor, the
+ * water's level and `BRIDGE_CLEAR`: a low bank, a meadow at the water's level), never over higher
+ * ground (a bank's top, a footpath along it), where it would lie on the land. `short`: per end,
+ * whether it would have reached on past that (the straight is too short for it).
  */
 export function grownDeck(points: readonly Pt[], deck: readonly [number, number], land: Land, most: number, ls = lengths(points)): { deck: [number, number]; short: [boolean, boolean] } {
   const L = ls[ls.length - 1];
@@ -286,6 +298,32 @@ export function grownDeck(points: readonly Pt[], deck: readonly [number, number]
     short[e] = !room(s) || onto !== end + step * ONTO;
     if (e) s1 = onto;
     else s0 = onto;
+  }
+  // Centred on its water: the end reaching less far past it carried on over the low ground there.
+  const past = [deck[0] - s0, s1 - deck[1]];
+  const e = past[0] < past[1] ? 0 : 1;
+  const want = Math.floor(Math.abs(past[1] - past[0]));
+  if (want >= 1) {
+    let level = -Infinity;
+    for (let s = deck[0]; s <= deck[1]; s += 1) {
+      const { p } = pointAt(points, s, ls);
+      const k = sampleAt(land, p[0], p[1]);
+      if (land.wl[k] !== NONE && land.wl[k] > land.h[k]) level = Math.max(level, land.wl[k] / 100);
+    }
+    const under = level + BRIDGE_CLEAR - SLAB;
+    const step = e ? 1 : -1;
+    let end = e ? s1 : s0;
+    for (let k = 0; k < want; k++) {
+      const s = end + step;
+      if (!(at(s) < under)) break;
+      if (s < lo || s > hi || (e ? s - s0 : s1 - s) > most) {
+        short[e] = true;
+        break;
+      }
+      end = s;
+    }
+    if (e) s1 = end;
+    else s0 = end;
   }
   return { deck: [round2(s0), round2(s1)], short };
 }
