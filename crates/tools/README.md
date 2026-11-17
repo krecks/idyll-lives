@@ -104,7 +104,8 @@ numbers match a crash stack from the site.
 | `tools/characters/check_clips.ts` | Reads the clip data that is generated into `web/src/render/shared/characters/clips/`. |
 | `tools/bench/*.mjs` | Playwright: they drive a real browser and time the render. What they do with the pictures afterwards is `cargo shots`. |
 | `tools/housegen/sample.ts`, `tools/worlds/sample.ts` | They run the game's own generators, which are TypeScript (`web/src/game`). |
-| `tools/audio/listen.ts`, `tools/characters/blend_analysis.ts` | They run the game's own sound synthesis and clips, which are TypeScript. |
+| `tools/audio/listen.ts` | It renders the sounds as the game plays them: made in Rust (`crates/sound`, through its wasm), but at the player's levels, in its rooms and from its camera distances, which are TypeScript (`web/src/audio/`). |
+| `tools/characters/blend_analysis.ts` | It runs the game's own clips, which are TypeScript. |
 | `tools/art/blender/` | Runs inside Blender, on its Python API (`bpy`); it reads no content or manifest of its own (`cargo art` hands it what it needs). |
 | `tools/ci-changes.sh` | CI's `changes` job checks out only this script and installs no Rust, and every job waits on it. |
 | `tools/ci-local.sh`, `tools/bench/tiers.sh`, `tools/m1/*.sh` | A few lines of shell each, running cargo, Bun and Docker. |

@@ -3,6 +3,7 @@ node_modules
 /web/dist
 /web/src/core/wasm-pkg
 /web/src/voice/wasm-pkg
+/web/src/audio/wasm-pkg
 /web/public/voice
 /web/public/llm
 .DS_Store

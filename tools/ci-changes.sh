@@ -18,6 +18,8 @@
 #          web/public/content files; the sim tests read web/public/content and web/public/assets
 #          (the manifests, and every model they name must be there).
 #   web    the clip check: tools/characters (check_clips.ts, transitions.ts, clip-baseline.json),
+#          the sounds' wasm the tests load (crates/sound, crates/sound-wasm, Cargo.*, .cargo/, the
+#          toolchain: `bun run sound`),
 #          web/src's clips, furniture.json and actions.ts, web/public/assets/characters/rig.json;
 #          the renderer tests: web/ (src, tests, public, package.json and bun.lock for
 #          `bun install`); doors, tickRates and snapshotLayout read crates/sim-core/src, the slow
@@ -45,9 +47,9 @@ JOBS="rust web tools"
 jobs_for() {
   case "$1" in
     .github/workflows/ci.yml | tools/ci-local.sh | tools/ci-changes.sh) J="rust web tools" ;;
-    rust-toolchain.toml | Cargo.toml | Cargo.lock | .cargo/*) J="rust tools" ;;
+    rust-toolchain.toml | Cargo.toml | Cargo.lock | .cargo/*) J="rust web tools" ;;
     crates/tools/README.md) J="" ;;
-    crates/sim-core/src/*) J="rust web tools" ;;
+    crates/sim-core/src/* | crates/sound/* | crates/sound-wasm/*) J="rust web tools" ;;
     crates/*) J="rust tools" ;;
     web/public/content/* | web/public/assets/*) J="rust web tools" ;;
     web/tests/*) J="web" ;;

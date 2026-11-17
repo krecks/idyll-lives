@@ -121,11 +121,11 @@ export interface InteractionDef {
   /**
    * What it sounds like while it lasts: a world sound by key (`audio/catalog.ts` `LOOPS`: `chop` for
    * a cheese board), or `none`; absent: by the object's `sounds`, else by `anim`. A sound played
-   * once (`audio/things.ts` `ONCE_THINGS`: `vendCan`) plays as it starts. Not for a `recipe`, whose
+   * once (`audio/kinds.ts` `ONCE_THINGS`: `vendCan`) plays as it starts. Not for a `recipe`, whose
    * steps sound by the station they're done at.
    */
   sound?: string;
-  /** A sound played once as it ends (`audio/water.ts` `ONCE`, `audio/things.ts` `ONCE_THINGS`: a toilet's `flush`, a microwave's `ping`). */
+  /** A sound played once as it ends (`audio/kinds.ts` `ONCE`, `ONCE_THINGS`: a toilet's `flush`, a microwave's `ping`). */
   endSound?: string;
 }
 

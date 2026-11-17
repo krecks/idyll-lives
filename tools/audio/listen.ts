@@ -2,7 +2,7 @@
 /**
  * Renders every synthesised sound of the game to a WAV, with the numbers that can be measured and
  * the ones only a listener can judge: the sounds are made
- * in code (`web/src/audio/`: `water.ts`, `things.ts`, `mono.ts`, `birdsong.ts`, `blips.ts`), so they
+ * in code (`crates/sound`, in Rust; here through its WebAssembly: `bun run sound` first), so they
  * can be made here, off the browser, and listened to on any player. `bun run sounds` (from `web/`), or
  * `bun tools/audio/listen.ts [--out <folder>]`.
  *
@@ -23,13 +23,14 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { everySound, GUARD, STEPS, type Group } from '../../web/src/audio/catalog';
 import { loudness as loudnessAt } from '../../web/src/audio/loudness';
 import { fft, spaced, type Hearing } from '../../web/src/audio/offline';
-import { OUTDOORS } from '../../web/src/audio/outdoors';
+import { ROOM_SIZES, ROOMS, STEP_VERSIONS, SURFACES, type Footwear, type Stereo, type Surface } from '../../web/src/audio/kinds';
 import { carSound, leavesLevel, nearness } from '../../web/src/audio/outside';
-import { ROOM_SIZES, ROOMS, roomResponse } from '../../web/src/audio/rooms';
-import { stepSamples, STEP_VERSIONS, SURFACES, type Footwear, type Surface } from '../../web/src/audio/steps';
-import { random } from '../../web/src/audio/water';
+import { random } from '../../web/src/audio/random';
+import { loadSynth, makeSound, roomResponse, stepSamples } from '../../web/src/audio/synth';
 
 const RATE = 48_000;
+// The sounds are made in Rust: its WebAssembly, built by `bun run sound` (from `web/`).
+await loadSynth(readFileSync(new URL('../../web/src/audio/wasm-pkg/sound_wasm_bg.wasm', import.meta.url)));
 /** The checkout. */
 const ROOT = resolve(import.meta.dir, '../..');
 /** Where the WAVs go: `--out <folder>` (from the checkout), else `bench-results/sounds`. */
@@ -259,8 +260,8 @@ function read(loop: Float32Array, at: number): number {
  * to right over `seconds`, as `outside.ts` plays it: its level by how near it is, its place by where it is.
  */
 function carPass(speed: number, aside: number, seconds: number): [Float32Array, Float32Array] {
-  const engine = OUTDOORS.carEngine(RATE);
-  const tyres = OUTDOORS.carTyres(RATE);
+  const engine = makeSound('carEngine', RATE) as Float32Array;
+  const tyres = makeSound('carTyres', RATE) as Float32Array;
   const left = new Float32Array(Math.round(seconds * RATE));
   const right = new Float32Array(left.length);
   const s = carSound(speed, 1);
@@ -278,7 +279,7 @@ function carPass(speed: number, aside: number, seconds: number): [Float32Array, 
 
 /** The wind in the leaves for `seconds` as gusts roll by (the gust rising and falling every few seconds), from the game's own zoom, outdoors. */
 function windy(seconds: number): [Float32Array, Float32Array] {
-  const loop = OUTDOORS.leaves(RATE);
+  const loop = makeSound('leaves', RATE) as Stereo;
   const left = new Float32Array(Math.round(seconds * RATE));
   const right = new Float32Array(left.length);
   for (let i = 0; i < left.length; i++) {

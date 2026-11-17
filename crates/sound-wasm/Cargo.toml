@@ -1,0 +1,13 @@
+[package]
+name = "sound-wasm"
+description = "Thin wasm-bindgen layer exposing the game's sound synthesis to the page and the sound worker."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+sound = { path = "../sound" }
+wasm-bindgen = "=0.2.130"

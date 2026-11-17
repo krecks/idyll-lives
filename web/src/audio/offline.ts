@@ -2,13 +2,13 @@
  * What the mix's space does to a sound (`space.ts`: a wall, a room's reverb, the camera's distance), worked
  * out on the samples off the browser: for the tools and the tests (`tools/audio/listen.ts`,
  * `web/tests/sounds.test.ts`), not something the game runs. The same arithmetic as the graph's nodes, so
- * what is measured here is what the browser plays (compared against Chromium's rendering of the graph).
+ * what is measured here is what the browser plays (compared against Chromium's rendering of the graph). The
+ * filters and the rooms' responses are the synthesis's (`synth.ts`: load it first).
  */
 
 import { distanceCutoff, distanceGain, muffled } from './acoustics';
-import { nodeFilter } from './mono';
-import { ROOMS, roomResponse, type RoomSize } from './rooms';
-import type { Stereo } from './water';
+import { ROOMS, type RoomSize, type Stereo } from './kinds';
+import { nodeFilter, roomResponse } from './synth';
 
 /** The DFT of `re` + i·`im`, in place (radix-2: the length a power of two); `inverse`: back again. */
 export function fft(re: Float64Array, im: Float64Array, inverse = false): void {
