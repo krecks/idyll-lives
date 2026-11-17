@@ -1,4 +1,4 @@
-//! `cargo check-glb [keys…] [--keys] [--preview]`: the gate for the game's glTF models
+//! `cargo check-glb [keys…] [--keys] [--preview] [--against <rev|dir>]`: the gate for the game's glTF models
 //! (docs/design/objects.md, "Validation"), was tools/art/blender/check_glb.py, and prints what it printed.
 //!
 //! It reads every `.glb` a model entry of the manifests uses (the base manifest and its packs, later ones
@@ -14,15 +14,19 @@
 //!                                          version (`validate`: Bun and web/'s `gltf-validator`)
 //!   cargo check-glb --update-baseline      first lowers tools/art/gate-baseline.json to what the counted checks
 //!                                          find (`COUNTED`; it only lowers counts and takes keys out)
+//!   cargo check-glb --against <rev|dir>    not the gate: whether this build of the models is that one (`against`)
 //!
 //! What it prints is check_glb.py's to the byte: JSON objects are read in file order, numbers as Python
 //! has them (an int stays an int), and formatted, `repr`'d and `math.hypot`'d as Python does (`py`); and
 //! since, the functional heights' warnings (`heights`: seats, tops, mattresses and lamps against the model).
 //! `measures` gives `cargo review` the same numbers.
 
+pub mod against;
 pub mod baseline;
+mod digest;
 pub(crate) mod glb;
 pub(crate) mod json;
+mod near;
 pub(crate) mod py;
 pub mod validate;
 
@@ -4534,8 +4538,12 @@ pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Meas
     Ok(Measures { models, objects })
 }
 
-/// `cargo check-glb [keys…] [--keys] [--preview] [--validate] [--update-baseline]`: the exit code.
+/// `cargo check-glb [keys…] [--keys] [--preview] [--validate] [--update-baseline]`, or `--against`
+/// (`against::main`): the exit code.
 pub fn main(args: &[String]) -> i32 {
+    if args.iter().any(|a| a == "--against") {
+        return against::main(args);
+    }
     let paths = Paths::repo();
     if args.iter().any(|a| a == "--keys") {
         return match known_keys(&paths) {
