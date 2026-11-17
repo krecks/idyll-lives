@@ -7,8 +7,8 @@
  *
  * Stages, each timed on the wall clock from just before the browser launch:
  * - `startup`: browser launch → the main menu shown (the loading screen gone);
- * - `entry`: "New game" → "Lay out the town" → "Choose a household" → that household's "Play" →
- *   step 4's "Move in" → the game interface up (`.hud-root`, the loading screen gone);
+ * - `entry`: "New game" → "Lay out the streets" → "Build the town" → "Choose a household" → that
+ *   household's "Play" → step 5's "Move in" → the game interface up (`.hud-root`, the loading screen gone);
  * - `steady`: `--secs` seconds from the entry (default 300), sampled every second.
  *
  * What is sampled:
@@ -787,10 +787,11 @@ async function runOnce(n, chromium, executablePath) {
     await boundary('startup');
     if (pageErrors.length) fail(`page error during startup: ${pageErrors.join('; ')}`);
 
-    // ---- entry: "New game" → step 1's land → "Lay out the town" → step 2's town → "Choose a household" →
-    // step 3's cards (their portraits drawn) → that household's "Play" → step 4's home → its way on
+    // ---- entry: "New game" → step 1's land → "Lay out the streets" → step 2's layout → "Build the town" →
+    // step 3's town → "Choose a household" → step 4's cards (their portraits drawn) → that household's
+    // "Play" → step 5's home → its way on
     // ("Move in", or "Play the …s" for a household staying in its own home) → the game up. The entry
-    // stage is timed from "New game"; `entryMs` from the way on pressed in step 4 to the game up.
+    // stage is timed from "New game"; `entryMs` from the way on pressed in step 5 to the game up.
     stage = 'entry';
     const entryFrom = Date.now();
     raw({ type: 'stage', stage: 'entry', event: 'begin', at: since() });
@@ -832,7 +833,7 @@ async function runOnce(n, chromium, executablePath) {
     const wait = { timeout: entryTimeout * 1000, polling: 100 };
     const enabled = (label) => page.waitForFunction((src) => [...document.querySelectorAll('button')].some((b) => new RegExp(src).test(b.textContent ?? '') && !b.disabled), label.source, wait);
     await page.getByText('New game', { exact: true }).click({ timeout: entryTimeout * 1000 });
-    for (const label of [/Lay out the town/, /Choose a household/]) {
+    for (const label of [/Lay out the streets/, /Build the town/, /Choose a household/]) {
       const button = page.getByRole('button', { name: label });
       await button.waitFor({ timeout: entryTimeout * 1000 });
       await enabled(label);
@@ -858,7 +859,7 @@ async function runOnce(n, chromium, executablePath) {
     await page.waitForTimeout(500);
     const pressedAt = Date.now();
     await moveIn.click();
-    // (Fewer beds than sleepers: step 4 asks first, and is answered.)
+    // (Fewer beds than sleepers: step 5 asks first, and is answered.)
     const asked = () => [...document.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Move in anyway');
     await page.waitForFunction(`(${asked})() || (!!document.querySelector('.hud-root') && !document.querySelector('.loading'))`, null, wait);
     if (await page.evaluate(asked)) await page.getByRole('button', { name: 'Move in anyway' }).click();

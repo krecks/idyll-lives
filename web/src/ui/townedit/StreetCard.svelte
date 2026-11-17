@@ -72,6 +72,8 @@
     <span>Clear what's in the way{#if !streetChoice.clear}<span class="sub-note"> (else it is refused there)</span>{/if}</span>
     <Toggle label="Clear what's in the way" bind:checked={streetChoice.clear} />
   </label>
+  <!-- (Step 2 has no "Along it": the zones beside a street decide what Build puts along it.) -->
+  {#if editor.step !== 'layout'}
   <div class="option" class:off={trail}>
     <span class="eyebrow sub">Along it</span>
     <Segmented fill label="Along it" value={along} options={ALONG} onchange={(v) => (streetChoice.along = v)} />
@@ -88,6 +90,7 @@
       {#if streetChoice.along !== 'auto'}<button class="link" onclick={() => (streetChoice.along = 'auto')}>By where it runs</button>{/if}
     </p>
   </div>
+  {/if}
   <p class="hint keys"><kbd>Enter</kbd> or a double click ends it (on a road just ahead, else as a dead end), <kbd>Backspace</kbd> takes a point back, <kbd>Esc</kbd> drops it.</p>
 </div>
 

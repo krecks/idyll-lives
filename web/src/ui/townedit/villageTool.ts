@@ -7,11 +7,15 @@
  * following (`moveVillage`); one clicked is picked. With a village to move from its card ("Move":
  * `villageChoice.moving`), the ghost is that village's box and a click puts it there.
  *
- * The main town is moved by step 2's "Move the town", which lays it again where it is put.
+ * In step 2 (the layout) a village is its streets and zones: the lots it would have are painted as
+ * the zones they stand for (`layoutApi.ts` `villageAsLayout`), and its zones move with it. The main
+ * town is moved by step 2's "Move the town", which lays it again where it is put.
  */
 
 import { canMoveVillage, canPlaceVillage, moveVillage, placeVillage, villageSize } from '../../game/edit/villages';
+import type { Edited } from '../../game/edit/edited';
 import type { TownGhosts } from '../../render/types';
+import { villageAsLayout, villageZonesMoved } from './layoutApi';
 import type { TownEditor, TownTool } from './tools';
 import { applyVillage, villageChoice } from './villageChoice.svelte';
 import VillageCard from './VillageCard.svelte';
@@ -26,6 +30,12 @@ type Box = { x: number; z: number; w: number; d: number };
 const boxGhost = (b: Box, ok: boolean): Partial<TownGhosts> => ({ boxes: [{ x: b.x, z: b.z, w: b.w, d: b.d, tone: ok ? 'new' : 'bad' }] });
 /** A box `w` × `d` round a ground point. */
 const around = (x: number, z: number, w: number, d: number): Box => ({ x: x - w / 2, z: z - d / 2, w, d });
+
+/** A village put down, as the step has it: step 2's its streets and zones, step 3's built. */
+const placed = (editor: TownEditor, made: Edited): Edited => (editor.step === 'layout' ? villageAsLayout(editor.draft, made, editor.t) : made);
+/** A village moved, as the step has it: in step 2 its zones go with it. */
+const moved = (editor: TownEditor, made: Edited, area: number, dx: number, dz: number): Edited =>
+  editor.step === 'layout' ? villageZonesMoved(editor.draft, made, area, dx, dz) : made;
 
 export const villageTool: TownTool = {
   id: 'village',
@@ -89,7 +99,7 @@ export const villageTool: TownTool = {
         return null;
       }
       editor.preview(boxGhost(fit, true));
-      editor.hint('Click to put a village down here: its streets, a road to the town and its homes.');
+      editor.hint(editor.step === 'layout' ? 'Click to put a village down here: its streets, a road to the town and its zones.' : 'Click to put a village down here: its streets, a road to the town and its homes.');
       return { place: { x: g.x, z: g.z } };
     };
 
@@ -129,11 +139,11 @@ export const villageTool: TownTool = {
         }
         if ('move' in act) {
           const { area, dx, dz } = act.move;
-          if (applyVillage(editor, moveVillage(draft, editor.t, area, dx, dz))) {
+          if (applyVillage(editor, moved(editor, moveVillage(draft, editor.t, area, dx, dz), area, dx, dz))) {
             villageChoice.moving = null;
             editor.select({ kind: 'village', area });
           }
-        } else if (applyVillage(editor, placeVillage(draft, editor.t, editor.content, { ...act.place, swap: villageChoice.swap, seed }))) {
+        } else if (applyVillage(editor, placed(editor, placeVillage(draft, editor.t, editor.content, { ...act.place, swap: villageChoice.swap, seed })))) {
           seed = editor.seed();
           editor.select({ kind: 'village', area: editor.draft.open!.areas.length - 1 });
         }
@@ -156,7 +166,7 @@ export const villageTool: TownTool = {
         if (!d) return;
         if (!d.moved) editor.select({ kind: 'village', area: d.area });
         else if (!d.why && (d.dx || d.dz)) {
-          if (applyVillage(editor, moveVillage(editor.draft, editor.t, d.area, d.dx, d.dz))) editor.select({ kind: 'village', area: d.area });
+          if (applyVillage(editor, moved(editor, moveVillage(editor.draft, editor.t, d.area, d.dx, d.dz), d.area, d.dx, d.dz))) editor.select({ kind: 'village', area: d.area });
         } else if (d.why) editor.refuse(d.why);
         editor.preview(null);
         if (last) look(last.x, last.y);

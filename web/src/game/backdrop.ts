@@ -667,7 +667,11 @@ export interface BackdropDraft {
   content: Content;
 }
 
-/** A building of a row along a road (`BackdropPass.rowsAlong`): its index, the road, how far along it its middle is and on which side, how far back from the road its back is, its zone. */
+/**
+ * A building of a row along a road (`BackdropPass.rowsAlong`): its index, the road, how far along it its middle is and
+ * on which side, how far back from the road its back is, its zone, and the kinds the row was limited to (if it was:
+ * the row behind it keeps to them too, `secondRow`).
+ */
 export interface Row {
   at: number;
   r: number;
@@ -675,6 +679,14 @@ export interface Row {
   side: 1 | -1;
   back: number;
   zone: Zone;
+  kinds?: readonly BackdropUse[];
+}
+
+/** Where along its road a row goes (m, `from` to `to`; the whole road if not given) and what its buildings may be (`kinds`: any of its zone's if not given). */
+export interface RowLimits {
+  from?: number;
+  to?: number;
+  kinds?: readonly BackdropUse[];
 }
 
 /** The buildings in each 24 m cell (`BackdropPass`'s overlap test). */
@@ -937,8 +949,13 @@ export class BackdropPass {
     return { c: add(p, n, road.width / 2 + back), t, n };
   }
 
-  private pickKind(zone: Zone, rand: Rand): Kind {
-    const list = KINDS[zone] as readonly (readonly [Kind, number])[];
+  /** A kind of `zone`'s drawn by its weight (`kinds`: of those only; null if the zone has none of them). */
+  private pickKind(zone: Zone, rand: Rand): Kind;
+  private pickKind(zone: Zone, rand: Rand, kinds: readonly BackdropUse[] | undefined): Kind | null;
+  private pickKind(zone: Zone, rand: Rand, kinds?: readonly BackdropUse[]): Kind | null {
+    const all = KINDS[zone] as readonly (readonly [Kind, number])[];
+    const list = kinds ? all.filter(([k]) => kinds.includes(k.use)) : all;
+    if (!list.length) return null;
     let r = rand() * list.reduce((n, [, w]) => n + w, 0);
     for (const [k, w] of list) if ((r -= w) <= 0) return k;
     return list[0][0];
@@ -981,17 +998,21 @@ export class BackdropPass {
    * A row of buildings along road `road` (of area `area`) on each of `sides`: the centre shoulder to
    * shoulder, the rest with gaps, each of its zone's kinds (`zone`: that zone all along; else the
    * centre's where it is in one, the main town's in area 0, a hamlet's elsewhere), smaller where it
-   * doesn't fit. The buildings of the row as laid.
+   * doesn't fit. `limits`: only from `from` to `to` m along the road (each building wholly within),
+   * and only of those `kinds` (`RowLimits`). The buildings of the row as laid.
    */
-  rowsAlong(area: number, road: number, sides: readonly (1 | -1)[], rand: Rand, zone?: Zone): Row[] {
+  rowsAlong(area: number, road: number, sides: readonly (1 | -1)[], rand: Rand, zone?: Zone, limits: RowLimits = {}): Row[] {
     const { roads, density } = this;
+    const { from, to, kinds } = limits;
     const r = road;
     const ls = lengths(roads[r].points);
     const L = ls[ls.length - 1];
+    const end = Math.min(L - 4, to ?? Infinity);
     const rows: Row[] = [];
     for (const side of sides) {
-      let s = 4 + rand() * 4;
-      while (s < L - 4) {
+      // (From 4 to 8 m along the road; from 0 to 1 m past `from`, if given, to make the most of a short stretch.)
+      let s = from === undefined ? 4 + rand() * 4 : Math.max(4, from + rand());
+      while (s < end) {
         const probe = this.frontAt(r, s, side, 6, ls).c;
         const z: Zone = zone ?? (this.centreAt(probe) ? 'centre' : area === 0 ? 'town' : 'hamlet');
         // (Now and then a gap: the more the further out.)
@@ -1000,17 +1021,23 @@ export class BackdropPass {
           s += range(rand, 6, 16);
           continue;
         }
-        const kind = this.pickKind(z, rand);
+        const kind = this.pickKind(z, rand, kinds);
+        if (!kind) {
+          s += 3;
+          continue;
+        }
         let done = false;
         // (Smaller where it doesn't fit: narrower, and shallower in front of what stands behind.)
         for (const shrink of [1, 0.75, 0.55]) {
           const w = Math.max(kind.w[0] * 0.6, range(rand, ...kind.w) * shrink);
           const d = Math.max(6, (range(rand, ...kind.d) * (shrink + 1)) / 2);
           const back = this.setback(z, rand);
+          // (Within the stretch asked for, if one was.)
+          if (to !== undefined && s + w > to) continue;
           const { c, t, n } = this.frontAt(r, s + w / 2, side, back, ls);
           const at = this.put(c, t, n, w, d, kind, rand);
           if (at < 0) continue;
-          rows.push({ at, r, s: s + w / 2, side, back: back + d, zone: z });
+          rows.push({ at, r, s: s + w / 2, side, back: back + d, zone: z, ...(kinds ? { kinds } : {}) });
           s += w + (z === 'centre' ? 0 : z === 'town' ? range(rand, 1, 4) : range(rand, 4, 12));
           done = true;
           break;
@@ -1021,12 +1048,13 @@ export class BackdropPass {
     return rows;
   }
 
-  /** A second row behind `rows` (the main towns' only): yards between, the road nearest still, more often the denser the town. */
+  /** A second row behind `rows` (the main towns' only): yards between, the road nearest still, more often the denser the town; of a row's own kinds if it was limited to some (`Row.kinds`). */
   secondRow(rows: readonly Row[], rand: Rand): void {
     const { density } = this;
     for (const row of rows) {
       if (row.zone === 'hamlet' || rand() > (row.zone === 'centre' ? 0.9 : 0.55 * density + 0.2)) continue;
-      const kind = this.pickKind(row.zone === 'centre' ? 'centre' : 'town', rand);
+      const kind = this.pickKind(row.zone === 'centre' ? 'centre' : 'town', rand, row.kinds);
+      if (!kind) continue;
       const w = range(rand, ...kind.w);
       const d = range(rand, ...kind.d);
       const { c, t, n } = this.frontAt(row.r, row.s, row.side, row.back + range(rand, 2, 5));

@@ -2,11 +2,12 @@
   /**
    * New game, step 1: the land. A place, its size, how hilly and wooded it is, and its seed (the
    * world's code: typed, pasted, copied or rolled), made with no town on it (the town job's `land`);
-   * then shaped by hand if the player likes (Shape the land). The town is laid on it in step 2.
+   * then shaped by hand if the player likes (Shape the land). Its streets are laid out on it in step 2.
    */
   import { onMount } from 'svelte';
   import { CODE_FLAG, WORLD_FLAG } from '../../debug/benchFlags';
   import { menuScene } from '../../game/menuScene';
+  import { OVERVIEW_CLOSE } from '../../render/shared/overviewCamera';
   import type { NeighbourhoodDraft } from '../../game/town';
   import { Superseded, townJob } from '../../game/townJobs';
   import { WORLD_KINDS, WORLDS, type WorldKind } from '../../game/world';
@@ -24,7 +25,7 @@
   import { installLandHook } from '../land/landHook';
   import { LandStroke, type LandSurface } from '../land/landStroke';
   import { brushOf, startBrush, type BrushState } from '../land/landTools';
-  import { codeFrom, firstCode, fitted, landKey, landStats, optionsOf, SIZE_CHOICES, startCode, withSeed, type Chosen } from '../newGame';
+  import { codeFrom, firstCode, fitted, landKey, landStats, optionsOf, SIZE_CHOICES, startCode, stepLabel, STEPS as FLOW, goesWords, whatGoes, withSeed, type Chosen } from '../newGame';
   import SetupConfirm from './SetupConfirm.svelte';
   import SetupShell, { type Making } from './SetupShell.svelte';
 
@@ -345,10 +346,11 @@
         app.land = { draft: chosen, key, waterKept: keptBefore && !editing?.changed().water };
         app.site = null;
       }
-      app.screen = 'town';
+      app.screen = 'streets';
     };
-    if (app.world?.edited && app.land && app.land.key !== key) {
-      confirming = { text: 'The land changed: the town is laid out on it again, and your changes to the town go.', yes: 'Lay it out again', keep: 'Keep my town', at: 'actions', go };
+    const ask = whatGoes('land', { layoutEdited: !!app.layout?.edited, townTweaked: !!app.world?.edited }).ask;
+    if (ask.length && app.land && app.land.key !== key) {
+      confirming = { text: `The land changed: the streets are laid out on it again, and ${goesWords(ask)} go.`, yes: 'Lay it out again', keep: 'Keep my town', at: 'actions', go };
       return;
     }
     go();
@@ -481,7 +483,7 @@
     <button class="btn ghost roll" aria-label="Another land" title="Another land" onclick={another}><Icon name="icon.ui.dice" size={18} /></button>
   </div>
   <p class="hint" id="code-hint">
-    {#if bad}Not a code: type a number, or paste a code such as <b>river-mhs-k2x9q</b>.{:else}A number or a code makes the world as generated, and its people. Your own changes to the land and the town are not in it.{/if}
+    {#if bad}Not a code: type a number, or paste a code such as <b>river-mhs-k2x9q</b>.{:else if app.beyondCode}A number or a code makes the world as generated, and its people. Your own streets, zones and changes are not in the code.{:else}A number or a code makes the world as generated, and its people. Your own changes to the land and the town are not in it.{/if}
   </p>
   {@render ask('code')}
   {#if draft?.world}
@@ -550,7 +552,7 @@
 
 {#snippet stage()}
   {#if draft}
-    <TownStage labels={[]} shot="world" tool={stageTool} {ghost} />
+    <TownStage labels={[]} shot="world" nearest={OVERVIEW_CLOSE} tool={stageTool} {ghost} />
   {:else}
     <div></div>
   {/if}
@@ -565,13 +567,13 @@
 {/snippet}
 
 {#snippet actions()}
-  <button class="btn primary" disabled={!draft || !!making || waiting} onclick={next}>Lay out the town →</button>
+  <button class="btn primary" disabled={!draft || !!making || waiting} onclick={next}>{FLOW[0].next}</button>
   {@render ask('actions')}
 {/snippet}
 
 <svelte:window onkeydown={onShapeKey} />
 
-<SetupShell label="A new land" step="Step 1 of 4 · Land" back={{ label: 'Menu', go: toMenu }} {head} {panel} {stage} stats={figures} {actions} making={progress} />
+<SetupShell label="A new land" step={stepLabel(1)} back={{ label: 'Menu', go: toMenu }} {head} {panel} {stage} stats={figures} {actions} making={progress} />
 
 <style>
   .code-label {

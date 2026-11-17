@@ -22,6 +22,7 @@
 
 import type { Edited } from '../../game/edit/edited';
 import { TownHistory } from '../../game/edit/history';
+import { withUses } from '../../game/edit/uses';
 import type { Pt } from '../../game/roads';
 import type { NeighbourhoodDraft } from '../../game/town';
 import type { TownGhosts } from '../../render/types';
@@ -64,6 +65,8 @@ export interface SessionHooks {
   settle(plan: NeighbourhoodDraft, ops: number, signal: AbortSignal, batch: Batch): Promise<Settled>;
   /** The settled town put on screen; resolves once it is. `plan`: what it was settled from. */
   show(settled: Settled, plan: NeighbourhoodDraft): Promise<void>;
+  /** The town on screen kept, with `plan`'s zones, for a plan that changed its zones alone (no settle, nothing to build again). */
+  kept?(settled: NeighbourhoodDraft, plan: NeighbourhoodDraft): void;
   /** Something the screens show changed (the plan, the town on screen, the problems, whether a settle runs). */
   changed(): void;
   /**
@@ -89,6 +92,20 @@ export interface SettleTiming {
 
 /** A refusal said: why, and that the change was taken back (the failure says so itself). */
 const said = (why: string) => (why === SETTLE_FAILED ? sentence(why) : `${sentence(why)} The change was taken back.`);
+
+/**
+ * Whether `b` is `a` but for its zones (`open.uses`): every other part the same object, as an edit of the zones
+ * alone (`uses.ts` `paintUses`) leaves them. What needs no settle.
+ */
+export function usesOnly(a: NeighbourhoodDraft, b: NeighbourhoodDraft): boolean {
+  if (a === b) return false;
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof NeighbourhoodDraft>;
+  for (const k of keys) if (k !== 'open' && a[k] !== b[k]) return false;
+  if (a.open === b.open || !a.open || !b.open) return a.open === b.open;
+  const open = new Set([...Object.keys(a.open), ...Object.keys(b.open)]) as Set<keyof NonNullable<NeighbourhoodDraft['open']>>;
+  for (const k of open) if (k !== 'uses' && a.open[k] !== b.open[k]) return false;
+  return true;
+}
 
 const realTimers: Timers = { set: (fn, ms) => setTimeout(fn, ms), clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>) };
 const NO_ISSUES: TownIssues = { blocking: [], warnings: [] };
@@ -281,9 +298,22 @@ export class EditSession {
   private take(draft: NeighbourhoodDraft, run = false): void {
     this.refusals = [];
     this.plan = draft;
+    this.lastEdit = this.now();
+    // A plan that differs from the one on screen by its zones alone (a stroke of the zone brush, its undo or
+    // redo: `uses.ts` `needsSettle`) needs no settle: the town on screen takes its zones (`withUses`), and
+    // nothing is asked of the worker. Not while a settle runs: its town is about to replace the one on screen.
+    if (!this.running && usesOnly(this.settledFrom, draft)) {
+      this.clearTimer();
+      [this.ops, this.taken] = [0, []];
+      this.settled = withUses(this.settled, draft);
+      this.settledFrom = draft;
+      this.hooks.kept?.(this.settled, draft);
+      this.hooks.changed();
+      this.recheck(false);
+      return;
+    }
     this.ops++;
     this.taken.push(draft);
-    this.lastEdit = this.now();
     this.hooks.changed();
     this.recheck(false);
     this.schedule(run ? this.quiet : this.quietOne);

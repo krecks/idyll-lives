@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
-   * Step 2's town editor, in the side panel under the town's options: the tools (`TOWN_TOOLS`, one in
-   * hand at a time; Esc puts it down), undo, redo and reset (Ctrl/⌘+Z, Shift for redo), the card of
+   * The town editor (steps 2 and 3), in the side panel under the town's options: the step's tools
+   * (`tools.ts` `toolsFor`, one in hand at a time; Esc puts it down), undo, redo and reset (Ctrl/⌘+Z, Shift for redo), the card of
    * the tool in hand and of what is picked, a line on what the tool would do where the pointer is,
    * and the Problems list (those that block the way on first; a click goes to where one is).
    *
@@ -12,7 +12,6 @@
   import type { TownEditorState } from './editor.svelte';
   import type { Issue } from './problems';
   import SelectCard from './SelectCard.svelte';
-  import { TOWN_TOOLS } from './tools';
 
   const { editor, disabled = false }: { editor: TownEditorState; disabled?: boolean } = $props();
 
@@ -20,11 +19,13 @@
   const issues = $derived(editor.issues);
   const off = $derived(disabled || !editor.ready);
   let resetting = $state(false);
+  const layout = $derived(editor.step === 'layout');
 
   function onkeydown(e: KeyboardEvent) {
     if (off) return;
     const t = e.target;
-    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return;
+    // (Typing in a field keeps its keys; a checkbox or a switch with the focus doesn't.)
+    if ((t instanceof HTMLInputElement && !['checkbox', 'radio', 'range', 'button'].includes(t.type)) || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return;
     // (The tool in hand first: Esc drops what it is drawing before it puts the tool down. A key the
     // town stage took already, Esc ending a drag, is done with.)
     if (e.defaultPrevented) return;
@@ -64,7 +65,7 @@
   </div>
 
   <div class="tools" role="radiogroup" aria-label="Town tools">
-    {#each TOWN_TOOLS as t (t.id)}
+    {#each editor.tools as t (t.id)}
       <button class="tool" role="radio" aria-checked={editor.toolId === t.id} class:on={editor.toolId === t.id} disabled={off} title={t.does} data-tool={t.id} onclick={() => editor.take(t.id)}>
         <Icon name={t.icon} size={16} />
         <span>{t.label}</span>
@@ -76,12 +77,12 @@
     <button class="btn ghost small" disabled={off || !editor.canUndo} title="Undo the last change (Ctrl+Z / ⌘Z)" onclick={() => editor.undo()}><Icon name="icon.ui.undo" size={14} /> Undo</button>
     <button class="btn ghost small" disabled={off || !editor.canRedo} title="Redo (Ctrl+Shift+Z / ⌘⇧Z)" onclick={() => editor.redo()}><span class="mirror"><Icon name="icon.ui.undo" size={14} /></span> Redo</button>
     {#if resetting}
-      <span class="confirm" role="group" aria-label="Put the town back as it was laid?">
+      <span class="confirm" role="group" aria-label={layout ? 'Put the layout back as it was proposed?' : 'Put the town back as it was built?'}>
         <button class="btn small danger" onclick={() => ((resetting = false), editor.reset())}>Reset all</button>
         <button class="btn ghost small" onclick={() => (resetting = false)}>Keep</button>
       </span>
     {:else}
-      <button class="btn ghost small reset" disabled={off || editor.edits === 0} title="Put the town back as it was laid" onclick={() => (resetting = true)}>Reset the town</button>
+      <button class="btn ghost small reset" disabled={off || editor.edits === 0} title={layout ? 'Put the layout back as it was proposed' : 'Put the town back as it was built'} onclick={() => (resetting = true)}>{layout ? 'Reset the layout' : 'Reset the town'}</button>
     {/if}
   </div>
 
@@ -97,13 +98,16 @@
         <Card {editor} />
       {/if}
     {:else}
-      <p class="hint does">Take a tool, or click a lot to see what can be done to it.</p>
+      <p class="hint does">{layout ? 'Take a tool, or click a street to see what can be done to it.' : 'Take a tool, or click a lot to see what can be done to it.'}</p>
       {#if editor.hintText}
         <p class="hint pointer" aria-live="polite">{editor.hintText}</p>
       {/if}
     {/if}
     {#if editor.note}
       <p class="hint warn" role="alert">{editor.note}</p>
+    {/if}
+    {#if editor.refusalLine}
+      <p class="hint warn refusal" role="alert">{editor.refusalLine}</p>
     {/if}
     {#if tool?.card !== SelectCard}
       <!-- (What is picked shows its card with any tool in hand: the Select tool's own card is it.) -->
@@ -120,7 +124,7 @@
     {/if}
   </div>
   {#if !issues.blocking.length && !issues.warnings.length}
-    <p class="hint">None: the town is ready for its households.</p>
+    <p class="hint">{layout ? 'None: the streets are ready for the town to be built.' : 'None: the town is ready for its households.'}</p>
   {:else}
     <ul>
       {#each issues.blocking as i, k (k)}

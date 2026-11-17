@@ -3,9 +3,9 @@
  * The land brushes as a player uses them, by script (`window.__land`, `?debug`): step 1's land made,
  * "Shape the land" chosen, then a mound flattened on top (a plateau), a pond on its top, a river from the hill down to the sea (or
  * the nearest water), woods painted and half cleared, and a peak, each a stroke a point a frame; the
- * frames' times during each stroke, and pictures before and after. Then "Lay out the town" (step 2's
- * town laid on the land as shaped), "Choose a household", a household played (step 3, with the game's
- * mode chosen there) and step 4's Move in: the step-1 pond is water to the simulation (where the town left it), someone is sent across it, and the
+ * frames' times during each stroke, and pictures before and after. Then "Lay out the streets" (step 2's
+ * layout proposed on the land as shaped), "Build the town" (step 3), "Choose a household", a household
+ * played (step 4, with the game's mode chosen there) and step 5's Move in: the step-1 pond is water to the simulation (where the town left it), someone is sent across it, and the
  * camera looks at it; then Build mode's Land tab: a mound by the home (paid in Living, free in
  * Creative; undo pays back, redo pays again) and a pond, a raise across the road by the home and a lower under the
  * home (built land), water across a country road (a bridge, undone and redone) and a raise by it, the terrain not drawn
@@ -21,7 +21,7 @@
  *     --world country --options …  step 1's place and options (`?world=`, `?options=`)
  *     --no-play                    step 1 only
  *     --plain                      no shaping in step 1: the game's world has no land of its own until its first stroke
- *     --mode living|creative       the game's mode (step 3's choice)
+ *     --mode living|creative       the game's mode (step 4's choice)
  *     --headed                     in a window
  *     --port 5186 | --url <u>      a dev server on the port (started if none answers), or one already running
  *     --out <dir>                  default bench-results/land-<time>/
@@ -606,7 +606,7 @@ try {
     await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 200 });
     await page.waitForTimeout(1500);
     await page.getByText('New game', { exact: true }).click();
-    await enabled(page, /Lay out the town/);
+    await enabled(page, /Lay out the streets/);
     await page.waitForTimeout(1500);
     const shot = async (name) => {
       const file = join(out, `${renderer}-${name}.png`);
@@ -805,12 +805,16 @@ try {
     }
 
     if (!has('no-play')) {
-      await page.getByRole('button', { name: /Lay out the town/ }).click();
-      await enabled(page, /Choose a household/);
+      await page.getByRole('button', { name: /Lay out the streets/ }).click();
+      await enabled(page, /Build the town/);
       await page.waitForTimeout(1500);
       await shot('10-step2');
+      await page.getByRole('button', { name: /Build the town/ }).click();
+      await enabled(page, /Choose a household/);
+      await page.waitForTimeout(1500);
+      await shot('11-step3');
       await page.getByRole('button', { name: /Choose a household/ }).click();
-      // Step 3's cards (their portraits drawn), a household's Play, then step 4's Move in (as gameplay.mjs goes).
+      // Step 4's cards (their portraits drawn), a household's Play, then step 5's Move in (as gameplay.mjs goes).
       await page.waitForFunction(() => {
         const faces = [...document.querySelectorAll('.offer .face')];
         return faces.length > 0 && faces.every((f) => f.querySelector('img'));
