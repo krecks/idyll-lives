@@ -154,7 +154,7 @@ export function townIssues(plan: NeighbourhoodDraft, t: Templates, content: Cont
   const had = new Set(base?.blocking.map((i) => i.text) ?? []);
   const out: TownIssues = { blocking: [], warnings: [] };
   for (const line of lines) {
-    if (GENERATED_ONLY.some((p) => p.test(line))) continue;
+    if (GENERATED_ONLY.some((p) => p.test(line)) || (layout && LAYOUT_LATER.some((p) => p.test(line)))) continue;
     const issue = issueOf(line, draft, t);
     if ((BLOCKING.some((p) => p.test(line)) || longCountryCourt(line, draft)) && !had.has(issue.text)) out.blocking.push(issue);
     else out.warnings.push(issue);

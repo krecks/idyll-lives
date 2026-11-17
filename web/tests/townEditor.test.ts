@@ -456,6 +456,11 @@ describe('the Problems list and picking, on a generated town', async () => {
     const layout = { ...bare, open: { ...bare.open, uses: packUses(new Uint8Array(cols * rows), cols, rows) } };
     expect(townIssues(layout, t, content).blocking.map((i) => i.text)).not.toContainEqual(expect.stringMatching(/fewer than two homes/i));
     expect(townIssues(bare, t, content).blocking.map((i) => i.text)).toContainEqual(expect.stringMatching(/fewer than two homes/i));
+    // (Nor does it list what only lots can mend: its villages' lots, the workplaces.)
+    const all = (i: ReturnType<typeof townIssues>) => [...i.blocking, ...i.warnings].map((x) => x.text);
+    expect(hamlet.open!.areas.length).toBeGreaterThan(1);
+    expect(all(townIssues(bare, t, content))).toContainEqual(expect.stringMatching(/has 0 lots/));
+    expect(all(townIssues(layout, t, content))).not.toContainEqual(expect.stringMatching(/ lots$|workers work/));
   });
 
   test('the laid town blocks nothing; a lot moved onto a road blocks the way on, named, with where it is', () => {

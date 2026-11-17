@@ -19,7 +19,7 @@
   import { rename } from '../../game/edit/streets';
   import { menuScene } from '../../game/menuScene';
   import { OVERVIEW_CLOSE } from '../../render/shared/overviewCamera';
-  import { NEIGHBOUR_CAP } from '../../game/town';
+  import { NEIGHBOUR_CAP, type NeighbourhoodDraft } from '../../game/town';
   import { keepHouses, Superseded, townJob } from '../../game/townJobs';
   import { specOf, worldName, type WorldStep } from '../../game/world';
   import { worldLine } from '../../game/worldOptions';
@@ -85,11 +85,21 @@
   let leaving = $state(false);
   const blocked = $derived(editor.issues.blocking.length > 0);
 
-  const homes = $derived(plan ? plan.slots.filter((s) => s.kind === 'house').length : 0);
-  const farms = $derived(plan ? plan.slots.filter((s) => s.lot === 'farm').length : 0);
-  const places = $derived(plan ? plan.slots.filter((s) => s.kind !== 'house').length : 0);
-  const roadCount = $derived(plan ? plan.roads.length : 0);
-  const villages = $derived(plan?.open ? Math.max(0, plan.open.areas.length - 1) : 0);
+  /**
+   * A figure of the town as step 4 will have it: the town on screen's (settled: what the settle gave up on a
+   * slope is not in it, as it isn't in step 4's town), with the edits it hasn't caught up with yet added (the plan's
+   * figure against the plan the town on screen was settled from).
+   */
+  const figure = (of: (d: NeighbourhoodDraft) => number): number => {
+    void editor.version;
+    if (!editor.ready) return town ? of(town) : 0;
+    return of(editor.shown) + of(editor.draft) - of(editor.shownFrom);
+  };
+  const homes = $derived(figure((d) => d.slots.filter((s) => s.kind === 'house').length));
+  const farms = $derived(figure((d) => d.slots.filter((s) => s.lot === 'farm').length));
+  const places = $derived(figure((d) => d.slots.filter((s) => s.kind !== 'house').length));
+  const roadCount = $derived(figure((d) => d.roads.length));
+  const villages = $derived(figure((d) => Math.max(0, (d.open?.areas.length ?? 1) - 1)));
   /** The town in a line: homes, its size, land, how many residents it holds. */
   const summary = $derived(plan ? worldLine({ homes, villages, width: plan.width, depth: plan.depth, town: code.town, cap: NEIGHBOUR_CAP }) : '');
 
