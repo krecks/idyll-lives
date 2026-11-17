@@ -106,6 +106,16 @@ export class TownEditorState implements TownEditor {
     return this.session?.plan ?? this.target?.draft ?? EMPTY;
   }
 
+  /** The town on screen (settled), and the plan it was settled from: the plan is ahead of it until edits pause. */
+  get shown(): NeighbourhoodDraft {
+    void this.version;
+    return this.session?.settled ?? this.target?.draft ?? EMPTY;
+  }
+  get shownFrom(): NeighbourhoodDraft {
+    void this.version;
+    return this.session?.settledFrom ?? this.target?.draft ?? EMPTY;
+  }
+
   /** The house templates; only asked for once they are loaded (`ready`). */
   get t(): Templates {
     if (!this.templates) throw new Error('The house templates are not loaded yet.');
