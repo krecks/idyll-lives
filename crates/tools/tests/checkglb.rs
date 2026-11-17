@@ -137,7 +137,7 @@ fn a_batch_check_is_judged_by_the_baseline() {
     // Not run (plain `cargo check-glb`): the baseline's entry is kept, and nothing fails.
     let r = gate(&paths, &keys);
     assert_eq!(r.failed, 0, "{}", r.text);
-    assert!(r.counts.is_empty());
+    assert!(!r.counts.contains_key("validator"));
     assert!(update_baseline(&paths, &[], &[]).unwrap().is_empty());
     // Fewer: stale until lowered.
     let one: &[(&'static str, BatchCheck)] = &[("validator", one_each)];
@@ -159,7 +159,7 @@ fn a_batch_check_is_judged_by_the_baseline() {
         r.text
     );
     assert_eq!(r.failed, 1);
-    assert!(r.counts.is_empty());
+    assert!(!r.counts.contains_key("validator"));
     std::fs::remove_dir_all(&dir).unwrap();
 }
 

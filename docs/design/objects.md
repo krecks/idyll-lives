@@ -132,6 +132,12 @@ instances, so these costs are per kind of object in view, plus the triangles of 
   what opens (food in a fridge, clothes in a wardrobe, tools in a drawer), the clutter that says who owns it.
 - **Triangles where they show:** silhouettes, edges, what a hand touches; hidden parts stay plain. Things placed
   many times (plants, street props, held and tabletop things, the ground) keep to half the target.
+- **Edges eased, textures at their size.** Nothing made is sharp to the millimetre: an edge of 5 cm or more that
+  shows gets a bevel (4 mm is one pixel at the play camera, the line of light a real edge catches; `bevel=`, shaded
+  with hardened normals), unless one of its faces is under 12 mm wide or its piece under 10 cm. A textured finish is
+  laid at 200 to 1600 px a metre, which UVs in metres give, not stretched over 2× nor with UVs of no area. The gate
+  counts both per model (`edges`, `texels`: tools/art/README.md, "The gate"); `cargo review edges <key>` lists a
+  model's edges with where they are, `cargo review texels` each finish as the models wear it.
 - **Shading baked in** at export (below, "Baked shading"): creases and gaps darken with no texture. Give a face
   that meets a crease an edge band, or its corners darken it all over.
 - **Judge it lit:** `cargo art <family> --preview --lit` renders as the game lights it (EEVEE, the finishes'

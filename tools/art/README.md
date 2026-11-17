@@ -43,7 +43,9 @@ runs it again in `ll-tools`' tests: the tree has 0 errors.
 | `mirror` | mirror glass is see-through or isn't flat |
 | `materials` | materials unmapped, double-sided, see-through (BLEND), glowing by day, or with UVs nothing reads |
 | `far` | a far version isn't the full model's size |
-| `validator`, `reference`, `edges`, `texels`, `pbr` | counted against the baseline (below); `validator` with `--validate` (errors, warnings and unused objects but the finishes' UVs: `checkglb/validate.rs`), the others names kept for checks not in the gate yet |
+| `edges` | hard edges of 5 cm or more show unbevelled at the play camera (a pixel there is 4 mm): convex, turning 60° or more, split in the file (a bevel with hardened normals passes, and a chamfer), both faces 12 mm or more wide, on a piece of 10 cm or more; not an underside, on the floor, covered by another part or seen from none of the camera's views; not leaves, bark, glass or what glows, a far version or a held `tool.*` (`crates/tools/src/edges.rs`; `cargo review edges <key>` lists a model's with where they are). Counted against the baseline (below) |
+| `texels` | a material on a textured finish (not the leaf cards) is laid outside 200 to 1600 px a metre (the play camera shows 250), stretched over 2× on more than 5 % of its area, or has UVs of no area on more than 1 % of it; not a far version (`crates/tools/src/texels.rs`; `cargo review texels` gives each finish as the models wear it). Counted against the baseline |
+| `validator`, `reference`, `pbr` | counted against the baseline; `validator` with `--validate` (errors, warnings and unused objects but the finishes' UVs: `checkglb/validate.rs`), the others names kept for checks not in the gate yet |
 
 **Accepting one.** A model that is right as it is takes `accept` in its pack entry: `{"<name>": "<why>"}`, set on its
 `Model` (`G.Model(..., accept={'footprint': 'why'})`, which writes it), or in the entry of a pack written by hand. The

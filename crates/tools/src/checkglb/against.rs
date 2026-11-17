@@ -2359,6 +2359,7 @@ mod tests {
         let fin = Finishes {
             plain: HashMap::new(),
             see_through: HashSet::new(),
+            textures: HashMap::new(),
         };
         let path = join(
             &super::super::repo_root(),
