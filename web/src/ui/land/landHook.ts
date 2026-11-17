@@ -16,7 +16,7 @@
  * - `simWet(x, z)` (in the game): whether the simulation walks round the 1 m tile there as water.
  * - `pan(dx, dz)`, `zoom(factor)` (step 1): the town's camera moved as the pointer moves it.
  * - `nearestRoad(x, z, kind?)`: the nearest point on a road (not a trail; of `kind` if given) to (`x`, `z`), its
- *   direction along it, the road and how far along it (m).
+ *   direction along it, the road, how far along it (m) and its width (m).
  */
 
 import { heightAt, LAND_CELL, wetAt, type LandPatch } from '../../game/land';
@@ -127,7 +127,7 @@ export function installLandHook(host: LandHookHost): () => void {
       return host.refusal?.() ?? null;
     },
     nearestRoad(x: number, z: number, kind?: string) {
-      let best: { at: [number, number]; along: [number, number]; road: number; dist: number; s: number; bridges: [number, number][] } | null = null;
+      let best: { at: [number, number]; along: [number, number]; road: number; dist: number; s: number; width: number; bridges: [number, number][] } | null = null;
       need().roads.forEach((r, road) => {
         if (r.kind === 'trail' || (kind && (r.kind ?? 'street') !== kind) || r.bridge) return;
         let s0 = 0;
@@ -138,7 +138,7 @@ export function installLandHook(host: LandHookHost): () => void {
           const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2));
           const [px, pz] = [ax + dx * t, az + dz * t];
           const dist = Math.hypot(x - px, z - pz);
-          if (!best || dist < best.dist) best = { at: [px, pz], along: [dx / Math.sqrt(l2), dz / Math.sqrt(l2)], road, dist, s: s0 + t * Math.sqrt(l2), bridges: r.bridges ?? [] };
+          if (!best || dist < best.dist) best = { at: [px, pz], along: [dx / Math.sqrt(l2), dz / Math.sqrt(l2)], road, dist, s: s0 + t * Math.sqrt(l2), width: r.width, bridges: r.bridges ?? [] };
         }
       });
       return best;

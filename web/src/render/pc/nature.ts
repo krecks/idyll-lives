@@ -36,7 +36,7 @@ import { LookedFrom } from '../shared/chunks';
 import { Geo } from '../shared/geometry';
 import { CountryRoads, ROAD_VERGE } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
-import { grassField, gustAt, gustNoise, markGrassPatches, recolourGrass, regroundGrass, type GrassQuality } from '../shared/grass';
+import { GRASS, grassField, gustAt, gustNoise, markGrassPatches, recolourGrass, regroundGrass, type GrassQuality } from '../shared/grass';
 import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { pondQuads, rectBox } from '../shared/landBake';
 import { padGeometry, padMask, padsOf } from '../shared/pads';
@@ -436,6 +436,36 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return { x0: this.w / 2 - size / 2, z0: this.d / 2 - size / 2, size, count: Math.ceil(size / TILE), S, c: TILE / S, n: S + 3 };
   }
 
+  /**
+   * The ground as drawn now at (`x`, `z`), for the benches: the terrain's height between the points of its tile's
+   * finest grid (null: no tile there), and the grass's ground there (null: no grass grows in that patch).
+   */
+  drawnAt(x: number, z: number): { terrain: number | null; grass: number | null } {
+    let terrain: number | null = null;
+    const { x0, z0, count, S, c, n } = this.tileFrame();
+    const [ti, tj] = [Math.floor((x - x0) / TILE), Math.floor((z - z0) / TILE)];
+    const h = ti >= 0 && tj >= 0 && ti < count && tj < count ? this.tiles[tj * count + ti]?.heights : undefined;
+    if (h) {
+      const [, , tx, tz] = this.tileCorner(tj * count + ti);
+      const [fc, fr] = [(x - tx) / c, S - (z - tz) / c];
+      const [c0, r0] = [Math.min(S - 1, Math.floor(fc)), Math.min(S - 1, Math.floor(fr))];
+      const [u, v] = [fc - c0, fr - r0];
+      const at = (cc: number, rr: number) => h[(rr + 1) * n + cc + 1];
+      terrain = (at(c0, r0) * (1 - u) + at(c0 + 1, r0) * u) * (1 - v) + (at(c0, r0 + 1) * (1 - u) + at(c0 + 1, r0 + 1) * u) * v;
+    }
+    let grass: number | null = null;
+    const g = this.grass?.grassField;
+    if (g) {
+      const p = GRASS.patch;
+      const [i, j] = [Math.floor((x - g.x0) / p), Math.floor((z - g.z0) / p)];
+      if (i >= 0 && j >= 0 && i < g.pw && j < g.pd && g.patches[j * g.pw + i]) {
+        const k = (j * g.pw + i) * 3;
+        grass = g.ground[k] + g.ground[k + 1] * (x - g.x0 - i * p) + g.ground[k + 2] * (z - g.z0 - j * p);
+      }
+    }
+    return { terrain, grass };
+  }
+
   /** Tile `k`'s place: across, down, and its corner (m). */
   private tileCorner(k: number): [number, number, number, number] {
     const { x0, z0, count } = this.tileFrame();
@@ -688,7 +718,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /**
    * A stroke of the brushes done over the samples in `rect`: the land's water, top and zones measured again
    * (`LandscapeLayout.landChanged`), then the ground tiles there shaded again (their colours too, and kept), the
-   * sheet as the water now needs it, and the grass's colours there, a tile or a strip of the grass at a time between
+   * sheet as the water now needs it, and the grass's colours and ground there, a tile or a strip of the grass at a time between
    * `pace`s. (The woods and flowers: `regrow`.) Says the box (m) it reached.
    */
   async landDone(rect: LandRect, pace?: () => Promise<void>): Promise<[number, number, number, number] | null> {
@@ -722,6 +752,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
         await pace?.();
         perfTime('land: grass strip', () => recolourGrass(grass, this, box[0], z, box[2], Math.min(box[3], z + LAND_GRASS_STRIP)), `${Math.round(box[2] - box[0])} m`);
       }
+      // (Its ground too: the stamps laid it on the field as the brush left it, but on a land its town follows the land
+      // is settled and graded round what is built at the stroke's end. Left there, the grass stood off the ground, by a
+      // road the land raised beside it some 0.3 m over its edge.)
+      await pace?.();
+      perfTime('land: grass ground', () => regroundGrass(grass, this, box[0], box[1], box[2], box[3]));
       perfTime('land: grass upload', () => this.grass?.landChanged(true));
     }
     return box;

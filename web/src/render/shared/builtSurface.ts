@@ -25,8 +25,10 @@
  * - **The land round them** is held between two cones from everything built, `bank` (the world's
  *   `LandscapeParams.slope`) steep: no higher than the built land nearest plus `bank` a metre away
  *   from it, no lower than it less as much. Under a road it is the road's height less `ROAD_SINK`
- *   out to its sidewalk's edge; inside a lot the pad's; beside a lot within `RETAIN_MAX` of the
- *   pad (the tallest a retaining edge stands). Water is left as it is.
+ *   out to its sidewalk's edge, and the road's height round the cells its edge crosses (the land
+ *   drawn between the samples meets the road under its edge, never over it); inside a lot the
+ *   pad's; beside a lot within `RETAIN_MAX` of the pad (the tallest a retaining edge stands).
+ *   Water is left as it is.
  *
  * The world's grain is the land's (`LAND_CELL` m samples). `at(x, z)` is the surface anything stands
  * on: a lot's pad, a road's height across it, else the graded land between its samples.
@@ -161,7 +163,7 @@ export class BuiltSurface {
   /** Each lot's neighbours: the pads within the land's grain of it. */
   private readonly touching: number[][];
   private nodes: Node[] = [];
-  /** Per sample: the built height there (NaN: nothing built), and what is built (0 nothing, 1 a road, 2 a lot, `BESIDE` a narrow way's land beside it). */
+  /** Per sample: the built height there (NaN: nothing built), and what is built (0 nothing, 1 a road, 2 a lot, `BESIDE` the land beside a road, at its height). */
   private builtY: Float32Array;
   private kind: Uint8Array;
   private readonly index: RoadIndex;
@@ -891,7 +893,8 @@ export class BuiltSurface {
       if (this.draped(road)) return;
       const ls = this.lens[road];
       const half = r.width / 2;
-      const reach = Math.max(half, c);
+      // (Beside it out to a cell's diagonal past its edge: every corner of a cell its edge crosses.)
+      const reach = half + c * Math.SQRT2;
       const spans = bridgeSpans(r);
       for (let k = 0; k + 1 < r.points.length; k++) {
         const a = r.points[k];
@@ -915,17 +918,23 @@ export class BuiltSurface {
             const oz = pz - dz * t;
             const d = Math.sqrt(ox * ox + oz * oz);
             const at = j * cols + i;
-            // (Under it; or, a narrow way's, a corner of a cell its middle crosses: graded to it, so its middle reads it back.)
+            // (Under it; or beside it, at its height, the samples past its edge round the cells it crosses: the land
+            // drawn between the samples meets it under its edge, not over it where the land beside stands higher (a
+            // cut), and a narrow way's middle reads it back. Beside it, never in place of a road's own sample or a
+            // deck's, nor of the nearer road's beside it.)
             const under = d <= half;
-            if (!under && (Math.max(Math.abs(ox), Math.abs(oz)) >= c || kind[at] === 1)) continue;
-            if (d >= near[at] && !(under && kind[at] === BESIDE)) continue;
+            if (under) {
+              if (d >= near[at] && kind[at] !== BESIDE) continue;
+            } else if (d > reach || (near[at] < Infinity && kind[at] !== BESIDE) || d >= near[at]) continue;
             const s = ls[k] + t * l;
-            near[at] = d;
             if (spans.some((span) => s >= span[0] && s <= span[1])) {
+              if (!under) continue;
+              near[at] = d;
               builtY[at] = NaN;
               kind[at] = 0;
               continue;
             }
+            near[at] = d;
             builtY[at] = this.roadY(road, s);
             kind[at] = under ? 1 : BESIDE;
           }
@@ -1019,7 +1028,7 @@ function cones(hi: Float32Array, lo: Float32Array, cols: number, rows: number, s
   }
 }
 
-/** A sample beside a way narrower than the land's grain, whose middle crosses its cell: graded to the way's height, not sunk (`solveLand`). */
+/** A sample beside a road (a corner of a cell its edge crosses): graded to the road's height, not sunk (`solveLand`). */
 const BESIDE = 3;
 
 /** [`from`, `to`] narrowed to [`lo`, `hi`] where they overlap (else as it was). */

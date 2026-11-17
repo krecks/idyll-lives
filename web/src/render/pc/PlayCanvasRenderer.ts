@@ -821,6 +821,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       (window as unknown as { __samplers?: () => unknown }).__samplers = () => check.report();
       // (The bridge decks the street draws now, and whether it stands on the game's landscape's surface: `land.mjs`.)
       (window as unknown as { __streetBridges?: () => unknown }).__streetBridges = () => ({ decks: this.street.layout?.bridgeCount() ?? 0, onLand: !!this.lot.landscape?.surface && this.street.layout?.standsOn(this.lot.landscape.surface) });
+      // (The game's ground as drawn at each point: what is built there (a road's height on a road), the terrain and the grass: `land.mjs`.)
+      (window as unknown as { __groundDrawn?: (points: [number, number][]) => unknown }).__groundDrawn = (points) => {
+        const scape = this.lot.landscape;
+        return points.map(([x, z]) => ({ built: scape?.surface?.at(x, z) ?? null, ...(scape?.drawnAt(x, z) ?? { terrain: null, grass: null }) }));
+      };
     }
     this.app = createApp(canvas, this.device);
     this.gpuTiming = new GpuTiming(this.device, this.passLabel);
@@ -2002,14 +2007,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     await this.pace();
     this.loadStep('Building the street', 0.35);
     // (A road the land's water bridged: the game's landscape solves its surface again with the new roads, the land under
-    // them drawn again, and the street, laid out again on them, stands on that surface.)
+    // them drawn again.)
     const shaped = this.lot.landscape;
     const bridged = shaped?.heightField ? shaped.takeRoads(world) : null;
     if (shaped && bridged) void this.queueLand('land: roads taken', async () => {
       await shaped.landDone(bridged, this.landPace);
     });
     await this.street.build(world, this.view, () => this.pace());
-    if (bridged && shaped?.surface && this.street.landMoved(shaped.surface)) this.streamStreet();
+    // (On land the brushes shaped, the street stands on the landscape's surface, one surface for the land and what
+    // stands on it: a street laid out again (roads bridged, a bridge undone or redone) stood on its own copy of the
+    // world's land, and the build that took the roads may have been overtaken by the next.)
+    if (shaped?.heightField && shaped.surface && !this.street.layout?.standsOn(shaped.surface) && this.street.landMoved(shaped.surface)) this.streamStreet();
     this.cars.build(world);
     this.buildTownView(world);
     this.loadStep('Furnishing the house', 0.45);

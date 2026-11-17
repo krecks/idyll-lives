@@ -4,7 +4,7 @@
 // trail, a footpath, on the land as it lies);
 // each junction one height over its arms; each pad within a short drive of its road where its way in
 // meets it, at the middle of the land under it where it may be, and near the pads beside it; the
-// bridge clear of its water; the land graded within the cones and the retaining edge; `update` after an
+// bridge clear of its water; the land graded within the cones and the retaining edge, and under a road's edges; `update` after an
 // edit the same as a surface made afresh, its chunks' versions moved; `at` without a jump along the
 // roads. `bun test tests/builtSurface.test.ts`.
 import { describe, expect, test } from 'bun:test';
@@ -185,6 +185,34 @@ describe('built land on a slope', () => {
       const at = surface.conformed[(z / LAND_CELL) * land.cols + 120 / LAND_CELL];
       expect(Math.abs(at - surface.roadY(0, 120))).toBeLessThanOrEqual(bank * (z - 40) + 1e-3);
     }
+  });
+
+  test("the land drawn between its samples stays under a road's edges, the land beside it higher or lower", () => {
+    // (Just inside each edge of every way for cars, off its decks and their ends, where it is that road's alone and no
+    // lot is within a sample (a pad is drawn as a slab of its own): the land there, between the samples round it, as
+    // the terrain draws it, no higher than the road. Where the land beside rose from a sample just past the edge, it
+    // stood over the road's last metre: a notch in its edges where a stroke raised the land beside it.)
+    const nearLot = (x: number, z: number) => plots.some((p) => x > p.x - LAND_CELL && x < p.x + p.w + LAND_CELL && z > p.z - LAND_CELL && z < p.z + p.d + LAND_CELL);
+    let worst = -Infinity;
+    let checked = 0;
+    roads.forEach((r, road) => {
+      if (r.kind === 'trail') return;
+      const ls = lengths(r.points);
+      const decks = bridgeSpans(r);
+      for (let s = 0; s <= ls[ls.length - 1]; s += 0.5) {
+        if (decks.some(([a, b]) => s >= a - 2 && s <= b + 2)) continue;
+        const { p, t } = pointAt(r.points, s, ls);
+        for (const side of [-1, 1]) {
+          const o = side * (r.width / 2 - 0.25);
+          const [x, z] = [p[0] - t[1] * o, p[1] + t[0] * o];
+          if (x < 0 || z < 0 || x > W - LAND_CELL || z > D - LAND_CELL || nearLot(x, z) || surface.roadAt(x, z)?.road !== road) continue;
+          worst = Math.max(worst, surface.landAt(x, z) - surface.at(x, z));
+          checked++;
+        }
+      }
+    });
+    expect(checked).toBeGreaterThan(500);
+    expect(worst).toBeLessThanOrEqual(0.005);
   });
 
   test('at() has no jump along a road', () => {
