@@ -116,9 +116,10 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    `M = G.Palette(body=('#F3F3F1', 'gloss'), handle=('#D0D3D6', 'chrome'))`.
    - The names become the material names in the file.
    - The finishes become the pack's `materials`, so they're declared only once.
-   - The finishes are the base manifest's `material.finish.*`: matte, satin, gloss, metal and chrome
-     (plain), plus fabric, leather, wood, bark and foliage (textured: one more draw call each), leafcards (a tree's
-     leaf cards, cut out of their atlas: `families/plants.py` `clad` puts them there) and glass.
+   - The finishes are the base manifest's `material.finish.*`: matte, satin, gloss, enamel, ceramic, plastic and
+     rubber, and the metals metal, chrome, brushed and iron (plain), plus fabric, velvet, leather, wood, lacquer, bark
+     and foliage (textured: one more draw call each), leafcards (a tree's leaf cards, cut out of their atlas:
+     `families/plants.py` `clad` puts them there) and glass.
    - Name the main part the player may colour `body`; list it first in `paint`, then any other parts
      worth colouring, each with what the player calls it. Leave details (drains, water, food) out.
    - Hardware (handles, knobs, pulls, latches, taps) takes a `metal` or `chrome` colour: chrome or
