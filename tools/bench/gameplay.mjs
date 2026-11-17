@@ -643,6 +643,17 @@ async function runOnce(n, chromium, executablePath) {
     try {
       traced = await page.evaluate(() => window.__memtrace?.(30) ?? null);
     } catch {}
+    // (With the voices on: whether the engine is up and has spoken, from its own module: dev server only.)
+    let voice = null;
+    if (voices) {
+      try {
+        voice = await page.evaluate(async () => {
+          const m = await import('/src/voice/service.svelte.ts');
+          const t = m.voiceThreadStats();
+          return { state: t.state, device: t.device, lines: t.lines, loadMs: Math.round(t.loadMs) };
+        });
+      } catch {}
+    }
     let dump = null;
     if (dumps && devtools) {
       try {
@@ -680,6 +691,7 @@ async function runOnce(n, chromium, executablePath) {
       workersBackingMB: workersSum(workerHeaps, 'backingMB'),
       census: renderCensus,
       memtrace: traced,
+      voice,
       dump,
     };
     boundaries.push(b);
@@ -1244,6 +1256,8 @@ function attributionSections(summaries) {
     'Steady peaks: ' + summaries.map((x, i) => `run ${i + 1}: renderer ${f(x.memory.rendererPeakMB)} MB, JS external ${f(x.memory.backingPeakMB)} MB, JS heap ${f(x.memory.heapPeakMB)} MB, workers heap ${f(x.memory.workersHeapPeakMB)} MB, VRAM ${f(x.memory.vramPeakMB)} MB`).join('; ') + '.',
     '',
   );
+  const voiceRows = summaries.flatMap((x, i) => (x.memory.boundaries ?? []).filter((b) => b.voice).map((b) => `| run ${i + 1} | ${b.stage} | ${b.voice.state} | ${b.voice.device ?? '—'} | ${b.voice.lines} | ${b.voice.loadMs} |`));
+  if (voiceRows.length) lines.push('## Voices', '', '| run | boundary | engine | device | lines made | load (ms) |', '| --- | --- | --- | --- | --- | --- |', ...voiceRows, '');
   const seenRows = summaries.flatMap((x, i) => (x.workersSeen ?? []).map((w) => `| run ${i + 1} | ${w.worker} | ${w.stage} | ${(w.at / 1000).toFixed(1)} |`));
   if (seenRows.length) lines.push('## Workers started', '', '| run | worker | stage | at (s from launch) |', '| --- | --- | --- | --- |', ...seenRows, '');
   const workerRows = summaries.flatMap((x, i) => (x.memory.boundaries ?? []).flatMap((b) => (b.workers ?? []).map((w) => `| run ${i + 1} | ${b.stage} | ${w.worker} | ${w.usedMB} | ${w.totalMB} | ${w.backingMB} |`)));
