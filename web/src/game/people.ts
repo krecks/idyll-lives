@@ -82,19 +82,18 @@ export function residentsMost(tier: FillTier = 'full'): number {
 }
 
 /**
- * The tier each graphics preset fills the town at (`render/quality.ts` `GraphicsPreset`). A preset
- * gets a tier when the sim's wasm build, with the camera's 320-tile square in full detail as the
- * game streams it, runs at least 4,250 ticks a second on the slowest machine the preset is for
- * (the fastest speed needs 3,600); with none that does, the smallest. Measured on 2026-11-17 on an
- * M3 Pro over a game day of the seaside, river and forest cities (`tools/m1/run.sh`,
- * `tools/bench/simtick.mjs` under Node), the wasm's slowest city ran about 3,100 ticks a second of
- * CPU time near, 2,200 half and 1,200 full (natively 4,500, 2,900 and 2,100); an M1, low and
- * medium's floor, at 0.72 of that about 2,250, 1,570 and 880. No tier reaches 4,250 on either
- * machine, so every preset fills the town near the player's home, and the fastest speed runs slow
- * on all of them (the machine was shared: a quiet run of `tools/m1/run.sh` may move these a little,
- * not past 4,250).
+ * The tier each graphics preset fills the town at (`render/quality.ts` `GraphicsPreset`): full on all
+ * of them. A preset gets a tier when the sim's wasm build, with the camera's 320-tile square in full
+ * detail as the game streams it, keeps up with the fastest speed the player picks at any hour, 10×
+ * (10 ticks a step, 600 ticks a second), on the slowest machine the preset is for. Measured on 2026-11-17 on an M3
+ * Pro over a game day of the seaside, river and forest cities (`tools/m1/run.sh`,
+ * `tools/bench/simtick.mjs` under Node), the wasm's slowest city ran about 1,220 ticks a second in
+ * full; an M1, low and medium's floor, at 0.72 of that about 880 (756 to 952 between a fanless Air
+ * held at its sustained speed and one at its best), so even the M1 has room at 10× with a full town.
+ * Super speed has no rate to keep up with: it runs as fast as the machine can, up to 60×, only in
+ * quiet hours.
  */
-const TIER_FOR: Record<string, FillTier> = { low: 'near', medium: 'near', high: 'near' };
+const TIER_FOR: Record<string, FillTier> = { low: 'full', medium: 'full', high: 'full' };
 
 /** The tier to fill the town at on a machine with the graphics preset `preset` (full for one this does not know). */
 export function tierFor(preset: string | undefined): FillTier {
