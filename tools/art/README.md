@@ -9,7 +9,7 @@ Run them from the repo root. The textures are generated, not downloaded.
 
 | Command | Purpose |
 |---|---|
-| `cargo tex synth [set…]` | Generate every `albedo/normal/arm` texture set (20 sets: bark, brick, floors, foliage, grass, paving, roof, sidewalk, walls and wood) from tileable height fields; no downloads |
+| `cargo tex synth [set…]` | Generate every `albedo/normal/arm` texture set (21 sets: bark, brick, floors, foliage, grass, paving, roof, sidewalk, walls and wood) from tileable height fields; no downloads |
 | `cargo tex materials` | Writes `materials.json` in the current directory: PBR material + environment entries |
 | `cargo tex clouds <out.png>` | Generates the procedural, tileable cloud layer (`textures/sky/clouds.png`) |
 | `blender/` | The Blender-built glTF models, every model in the game: `cargo art <family>` builds a family script from `blender/families/` on the `blender/gamekit/` toolkit, exports its `.glb` files with their moving parts, writes its pack and runs the gate. See [blender/README.md](blender/README.md), the guide for people and AI agents |
@@ -54,10 +54,14 @@ or moved at an even speed (a belt's slats: right if it looks the same), a part t
 clip over 3 s, over 3 draw calls or the triangle target, a far version over half the full model's triangles, a
 texture of its own, and the functional heights against the content (`docs/design/objects.md`). Read each one.
 
-Texture flow: `cargo tex synth` writes the 19 texture sets into `web/public/assets/textures/` and the sidewalk into
+Texture flow: `cargo tex synth` writes the 20 texture sets into `web/public/assets/textures/` and the sidewalk into
 `web/public/assets/street/sidewalk/` (fixed filenames and resolutions, so the manifest's material bindings stay the
 same). The one texture it doesn't make is the trees' leaf-card atlas, rendered by `cargo art --leafcards`. `cargo tex materials` writes the PBR material entries; `cargo tex clouds` regenerates the sky's cloud layer.
-All three are deterministic: the same source makes the same output.
+All three are deterministic: the same source makes the same output. The tools' tests hold the committed sets, under the
+manifest's materials, to a physically based standard (`crates/tools/src/tex/synth/standard.rs`: albedo, roughness,
+metalness, normals, ambient occlusion and texels a metre, with the breaks known today listed there), and
+`cargo review sizes` their patterns (a brick, a board, a tile) and the kerb to real sizes (`surfaces` in
+`docs/review/reference.json`).
 
 To look at the models without starting a game, run `bun run dev` and open `/gallery.html` (dev only): it draws models in
 a grid with the game's loader, finishes and plant shader (`?filter=garden`, `?keys=model.tree,model.pine`, `?cols=`,
