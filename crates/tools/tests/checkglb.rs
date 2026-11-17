@@ -55,8 +55,8 @@ fn the_known_keys_hold_every_checked_model() {
     }
 }
 
-/// The committed baseline is in the format `--update-baseline` writes, and holds only counted checks and, for those
-/// the gate runs, model keys a build may write.
+/// The committed baseline is in the format `--update-baseline` writes, and holds only counted checks (the models'
+/// and the built world's) and, for those the gate runs, model keys a build may write.
 #[test]
 fn the_committed_baseline_is_in_its_format() {
     let paths = Paths::repo();
@@ -65,6 +65,10 @@ fn the_committed_baseline_is_in_its_format() {
     assert_eq!(baseline.text(), text);
     let known = known_keys(&paths).unwrap();
     for check in baseline.checks() {
+        // (The built world's are by sample, held by `cargo check-glb --built`: tools/ci-local.sh `built`.)
+        if ll_tools::checkglb::built::CHECKS.contains(&check) {
+            continue;
+        }
         assert!(COUNTED.contains(&check), "{check}");
         // (`reference` is counted by `cargo review sizes`, by object.)
         if check != "reference" {
