@@ -27,6 +27,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "artkit"
+version = "0.8.3"
+dependencies = [
+ "libm",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
