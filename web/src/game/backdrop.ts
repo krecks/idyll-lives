@@ -928,7 +928,8 @@ export class BackdropPass {
       y: 0,
       storeys: between(rand, ...kind.storeys),
       roof,
-      ...(roof === 'gable' || roof === 'mansard' ? { ridge: Math.round(ridge * 1000) / 1000 } : {}),
+      // (Never -0, which a report or the town file reads back as 0.)
+      ...(roof === 'gable' || roof === 'mansard' ? { ridge: Math.round(ridge * 1000) / 1000 || 0 } : {}),
       use: kind.use,
       look: Math.floor(rand() * 1024),
       area: this.areaOf(centroidOf(poly)),
