@@ -1295,8 +1295,10 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const heart = centre ? (centre.square ? centroid(centre.square) : pointAt(worldRoads[centre.road].points, (centre.s0 + centre.s1) / 2).p) : plan.centre;
       const near = frontageOf(worldRoads, plan.roads, heart, placeRand);
       const street = centre ? near.filter((f) => f.road === centre.road && f.s >= centre.s0 && f.s <= centre.s1) : near;
+      // (Its civic places before its homes, nearest its heart; its other places before them only in its centre,
+      // which no home fronts: the rest once every home has found room.)
       const inTheCentre = near.filter(inCentre);
-      const others = namedLots(t, lots, worldRoads, a, spec.civic, true, near, street, spillOf(a), placeRand).filter((u) => !putPlace(lots, t, worldRoads, u, inTheCentre));
+      const others = namedLots(t, lots, worldRoads, a, spec.civic, true, near, street, placeRand).filter((u) => !putPlace(lots, t, worldRoads, u, inTheCentre));
       reserved = centre ? reserveCentre(centre, ground) : undefined;
       // (Out of room in the town: on along the country roads leaving it, where they run straight.)
       const countryWays = worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : []));
@@ -1340,8 +1342,13 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // a place of that one's then, as a home does. Then a farm shop by every farm.
   const homeless: Unplaced[] = [];
   for (const { units, near, a } of later) {
-    const rest = units ?? namedLots(t, lots, worldRoads, a, areaSize(spec.civic, a), false, near, near, spillOf(a), placeRand);
-    for (const u of rest) if (!putPlace(lots, t, worldRoads, u, near) && !putPlace(lots, t, worldRoads, u, spillOf(a)())) homeless.push(u);
+    const rest = units ?? namedLots(t, lots, worldRoads, a, areaSize(spec.civic, a), false, near, near, placeRand);
+    for (const u of rest) {
+      if (putPlace(lots, t, worldRoads, u, near) || putPlace(lots, t, worldRoads, u, spillOf(a)())) continue;
+      // (A civic place is its own area's.)
+      if ('civic' in (placeOfTemplate(u.template) ?? {})) lots.dropped.push({ name: u.name, kind: u.kind, lot: u.lot, place: true });
+      else homeless.push(u);
+    }
   }
   for (const u of homeless) {
     const from = plans[u.area ?? 0].centre;
@@ -1750,18 +1757,17 @@ export function putPlace(lots: LotPlacer, t: Templates, roads: readonly RoadPlan
 /**
  * Area `a`'s named places as lots (`placeLots.ts`), each a place of `size`'s (its layout and name), drawn
  * from `rand`: its civic places (`CIVIC`: a main town's, `main`, those of its size, `Civic.least`;
- * any other area's a hamlet's) put down along `near` (its frontage nearest its heart first), else
- * `spill` (`putPlaces`); and its other places (`ZONE`: of each kind as many as `ZONE.lots` has for a
- * main town of its size, `ZONE.around` for any other area), its shops and cafés in parades along
- * `street` where they fit (`paraded`). The other places not put down yet: they go one by one (`putPlaces`),
- * a restaurant first, then the shops and cafés, the offices, the workshops.
+ * any other area's a hamlet's) put down along `near` (its frontage nearest its heart first: `putPlace`),
+ * and its other places (`ZONE`: of each kind as many as `ZONE.lots` has for a main town of its size,
+ * `ZONE.around` for any other area), its shops and cafés in parades along `street` where they fit
+ * (`paraded`). Those not put down yet, to go one by one: the civic places first, then a restaurant, the
+ * shops and cafés, the offices, the workshops.
  */
-export function namedLots(t: Templates, lots: LotPlacer, roads: readonly RoadPlan[], a: number, size: TownSize, main: boolean, near: readonly Frontage[], street: readonly Frontage[], spill: () => readonly Frontage[], rand: Rand): Unplaced[] {
-  const civic = CIVIC.flatMap((c) => (civicTooBig(c, main ? size : 'hamlet') ? [] : [{ ...placeUnit(t, c, size, rand), area: a }]));
-  putPlaces(t, lots, roads, civic, near, spill);
+export function namedLots(t: Templates, lots: LotPlacer, roads: readonly RoadPlan[], a: number, size: TownSize, main: boolean, near: readonly Frontage[], street: readonly Frontage[], rand: Rand): Unplaced[] {
+  const civic = CIVIC.flatMap((c) => (civicTooBig(c, main ? size : 'hamlet') ? [] : [{ ...placeUnit(t, c, size, rand), area: a }])).filter((u) => !putPlace(lots, t, roads, u, near));
   const of = (k: ZoneKind) => Array.from({ length: between(rand, main ? ZONE[k].lots[size] : ZONE[k].around) }, (): Unplaced => ({ ...placeUnit(t, k, size, rand), area: a }));
   const [shops, cafes, restaurants, offices, workshops] = (['shop', 'cafe', 'restaurant', 'office', 'workshop'] as const).map(of);
-  return [...restaurants, ...paraded(lots, shuffled([...shops, ...cafes], rand), street, a, rand), ...offices, ...workshops];
+  return [...civic, ...restaurants, ...paraded(lots, shuffled([...shops, ...cafes], rand), street, a, rand), ...offices, ...workshops];
 }
 
 /**
@@ -1778,11 +1784,6 @@ export function paraded(lots: LotPlacer, units: readonly Unplaced[], street: rea
     left.splice(0, row.length);
   }
   return left;
-}
-
-/** Named places' lots `units` put down one by one (`putPlace`) along `near`, else `spill`; one with no room on either is listed in `lots.dropped`. */
-export function putPlaces(t: Templates, lots: LotPlacer, roads: readonly RoadPlan[], units: readonly Unplaced[], near: readonly Frontage[], spill: () => readonly Frontage[]): void {
-  for (const u of units) if (!putPlace(lots, t, roads, u, near) && !putPlace(lots, t, roads, u, spill())) lots.dropped.push({ name: u.name, kind: u.kind, lot: u.lot, place: true });
 }
 
 /**
