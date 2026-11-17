@@ -28,6 +28,10 @@ use std::f64::consts::FRAC_1_SQRT_2;
 use std::path::Path;
 
 mod built;
+#[cfg(test)]
+mod standard;
+
+pub use built::features;
 
 // --- periodic noise -------------------------------------------------------------------------------
 
@@ -409,6 +413,24 @@ pub struct Set {
     pub ao_base: f64,
 }
 
+impl Set {
+    /// Its maps' directory under `web/public/assets/`, as the manifest names them: `textures/<set>`, the
+    /// sidewalk's `street/sidewalk`.
+    pub fn dir(&self) -> String {
+        if self.name == "sidewalk" {
+            "street/sidewalk".into()
+        } else {
+            format!("textures/{}", self.name)
+        }
+    }
+}
+
+/// The set a manifest material's `texture` (`textures/brick/albedo.jpg`) is the albedo of.
+pub fn set_of_texture(texture: &str) -> Option<&'static Set> {
+    let dir = texture.strip_suffix("/albedo.jpg")?;
+    SETS.iter().find(|s| s.dir() == dir)
+}
+
 const fn set(
     name: &'static str,
     albedo: usize,
@@ -594,12 +616,12 @@ pub fn run(only: &[&str]) -> Result<(), String> {
             return Err(format!("unknown texture set: {name}"));
         }
     }
-    let root = content::root().join("web/public/assets/textures");
+    let assets = content::root().join("web/public/assets");
     for set in SETS {
         if !only.is_empty() && !only.contains(&set.name) {
             continue;
         }
-        write_set(&root, &set)?;
+        write_set(&assets, &set)?;
     }
     if only.contains(&"sky") {
         println!("sky: textures/sky/clouds.png is `cargo tex clouds`, unchanged");
@@ -607,7 +629,7 @@ pub fn run(only: &[&str]) -> Result<(), String> {
     Ok(())
 }
 
-fn write_set(root: &Path, set: &Set) -> Result<(), String> {
+fn write_set(assets: &Path, set: &Set) -> Result<(), String> {
     // The organic sets (`organic`) make their own albedo tone, AO and roughness.
     let (albedo, normal, arm) = match organic::generate(set.name, set.albedo) {
         Some(o) => o.maps(set),
@@ -635,11 +657,7 @@ fn write_set(root: &Path, set: &Set) -> Result<(), String> {
             (albedo, normal, arm)
         }
     };
-    let dir = if set.name == "sidewalk" {
-        root.join("../street/sidewalk")
-    } else {
-        root.join(set.name)
-    };
+    let dir = assets.join(set.dir());
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     albedo.save_jpeg(&dir.join("albedo.jpg"), 85, true)?;
     let normal = if set.normal == set.albedo {

@@ -370,9 +370,97 @@ const TILE_SIDEWALK: f64 = 1.0 / 0.556;
 const TILE_ROAD: f64 = 5.0;
 const TILE_LEATHER: f64 = 0.5;
 
+/// A set's tile in metres (the size it is drawn at: 1 / the manifest's `uvScale`), or `None` for one not made here.
+#[cfg(test)]
+pub fn tile(name: &str) -> Option<f64> {
+    Some(match name {
+        "brick" => TILE_BRICK,
+        "stone_foundation" => TILE_STONE,
+        "floor_tile" => TILE_FLOOR_TILE,
+        "path_hexpaving" => TILE_HEX,
+        "floor_wood" => TILE_FLOOR_WOOD,
+        "floor_laminate" => TILE_LAMINATE,
+        "siding_wood" => TILE_SIDING,
+        "roof_shingles" => TILE_ROOF,
+        "wall_plaster" => TILE_PLASTER,
+        "sidewalk" => TILE_SIDEWALK,
+        "road_asphalt" => TILE_ROAD,
+        "leather" => TILE_LEATHER,
+        _ => return None,
+    })
+}
+
+/// Brick courses and bricks along a tile, and half a mortar joint (m).
+const BRICK_COURSES: i64 = 16;
+const BRICK_ALONG: i64 = 5;
+const BRICK_HALF_JOINT: f64 = 0.005;
+/// Floor tiles across a tile, and half a grout joint (m).
+const FLOOR_TILES: i64 = 6;
+const FLOOR_TILE_HALF_JOINT: f64 = 0.0012;
+/// Hex pavers across and rows of them on a tile, and half the joint between two (m).
+const HEX_ACROSS: i64 = 7;
+const HEX_ROWS: i64 = 8;
+const HEX_HALF_JOINT: f64 = 0.0045;
+/// Rows of boards across a tile: floorboards, laminate planks, siding boards, roof courses.
+const FLOOR_WOOD_ROWS: i64 = 14;
+const LAMINATE_ROWS: i64 = 8;
+const SIDING_ROWS: i64 = 12;
+const ROOF_COURSES: i64 = 11;
+/// End joints in a row of laminate (one: each plank as long as the tile).
+const LAMINATE_JOINTS: usize = 1;
+/// Sidewalk slabs along and across a tile.
+const SIDEWALK_SLABS: (i64, i64) = (3, 6);
+
+/// The sizes of a set's pattern that real ones are held to (`docs/review/reference.json` `surfaces`, checked
+/// by `cargo review sizes`), as (name, size in UV units: a share of the tile); none for a set without one.
+/// The size in metres is the share over the manifest's `uvScale`.
+pub fn features(name: &str) -> Vec<(&'static str, f64)> {
+    let share = |metres: f64, tile: f64| metres / tile;
+    match name {
+        "brick" => vec![
+            (
+                "length",
+                1.0 / BRICK_ALONG as f64 - share(2.0 * BRICK_HALF_JOINT, TILE_BRICK),
+            ),
+            (
+                "height",
+                1.0 / BRICK_COURSES as f64 - share(2.0 * BRICK_HALF_JOINT, TILE_BRICK),
+            ),
+            ("joint", share(2.0 * BRICK_HALF_JOINT, TILE_BRICK)),
+        ],
+        "floor_tile" => vec![
+            (
+                "size",
+                1.0 / FLOOR_TILES as f64 - share(2.0 * FLOOR_TILE_HALF_JOINT, TILE_FLOOR_TILE),
+            ),
+            ("joint", share(2.0 * FLOOR_TILE_HALF_JOINT, TILE_FLOOR_TILE)),
+        ],
+        // Pointy-top hexes: across the flats is the spacing along a row, less the joint.
+        "path_hexpaving" => vec![
+            (
+                "across",
+                1.0 / HEX_ACROSS as f64 - share(2.0 * HEX_HALF_JOINT, TILE_HEX),
+            ),
+            ("joint", share(2.0 * HEX_HALF_JOINT, TILE_HEX)),
+        ],
+        "floor_wood" => vec![("width", 1.0 / FLOOR_WOOD_ROWS as f64)],
+        "floor_laminate" => vec![
+            ("width", 1.0 / LAMINATE_ROWS as f64),
+            ("length", 1.0 / LAMINATE_JOINTS as f64),
+        ],
+        "siding_wood" => vec![("exposure", 1.0 / SIDING_ROWS as f64)],
+        "roof_shingles" => vec![("exposure", 1.0 / ROOF_COURSES as f64)],
+        "sidewalk" => vec![
+            ("length", 1.0 / SIDEWALK_SLABS.0 as f64),
+            ("width", 1.0 / SIDEWALK_SLABS.1 as f64),
+        ],
+        _ => Vec::new(),
+    }
+}
+
 /// Common brick in running bond: 16 courses and 5 bricks a metre, 9 mm recessed mortar.
 fn brick(n: &Noise, size: usize) -> Surface {
-    let (rows, cols) = (16i64, 5i64);
+    let (rows, cols) = (BRICK_COURSES, BRICK_ALONG);
     let t = TILE_BRICK;
     let (bw, bh) = (t / cols as f64, t / rows as f64);
     let palette = [
@@ -408,7 +496,7 @@ fn brick(n: &Noise, size: usize) -> Surface {
             let r = |k: u32| n.rand(wi, wj, 20 + k);
             let x = (xx - col as f64) * bw;
             let y = (wv * rows as f64 - row as f64) * bh;
-            let joint = 0.005;
+            let joint = BRICK_HALF_JOINT;
             let (l, rr) = (joint + (r(0) - 0.5) * 0.002, joint + (r(1) - 0.5) * 0.002);
             let (tp, bt) = (joint + (r(2) - 0.5) * 0.0015, joint + (r(3) - 0.5) * 0.0015);
             let dx = (x - l).min(bw - rr - x);
@@ -673,7 +761,7 @@ fn stone(n: &Noise, size: usize) -> Surface {
 /// Honed travertine floor tiles, 33 cm, thin grout.
 fn floor_tile(n: &Noise, size: usize) -> Surface {
     let t = TILE_FLOOR_TILE;
-    let k = 6i64;
+    let k = FLOOR_TILES;
     let s = t / k as f64;
     let nc = n.layer(1);
     let np = n.layer(2);
@@ -689,7 +777,7 @@ fn floor_tile(n: &Noise, size: usize) -> Surface {
             let r = |q: u32| n.rand(wi, wj, 60 + q);
             let x = (u * k as f64 - ix as f64) * s;
             let y = (v * k as f64 - iy as f64) * s;
-            let g = 0.0012;
+            let g = FLOOR_TILE_HALF_JOINT;
             let d = rounded((x - g).min(s - g - x), (y - g).min(s - g - y), 0.0015);
             let face = smoothstep(0.0, 0.0015, d);
             // Bedding: each tile its own vein direction and clouds.
@@ -764,7 +852,7 @@ fn floor_tile(n: &Noise, size: usize) -> Surface {
 fn hexpaving(n: &Noise, size: usize) -> Surface {
     let t = TILE_HEX;
     // Pointy-top hexes: 7 across, 8 rows (rows must be even to wrap; 1% stretch).
-    let (cols, rows) = (7i64, 8i64);
+    let (cols, rows) = (HEX_ACROSS, HEX_ROWS);
     let (cw, rh) = (t / cols as f64, t / rows as f64);
     let nd = n.layer(1);
     let ng = n.layer(2);
@@ -804,7 +892,7 @@ fn hexpaving(n: &Noise, size: usize) -> Surface {
                 .abs()
                 .max((px * 0.5 + py * 0.866_025_4).abs())
                 .max((px * 0.5 - py * 0.866_025_4).abs());
-            let inr = cw * 0.5 - 0.0045;
+            let inr = cw * 0.5 - HEX_HALF_JOINT;
             let wear = fbm(&ng, u, v, 60, 60, 3) * 0.004;
             let d = inr - hexd + wear.min(0.001);
             let face = smoothstep(0.0, 0.002, d);
@@ -922,7 +1010,7 @@ fn board_at(
 /// Pine floorboards, 13.5 cm wide, running along v.
 fn floor_wood(n: &Noise, size: usize) -> Surface {
     let t = TILE_FLOOR_WOOD;
-    let rows = 14i64;
+    let rows = FLOOR_WOOD_ROWS;
     let bw = t / rows as f64;
     let px_m = t / size as f64;
     let ng = n.layer(1);
@@ -975,12 +1063,12 @@ fn floor_wood(n: &Noise, size: usize) -> Surface {
 /// Oak-print laminate: 23 cm planks running along u, micro-bevelled joints.
 fn laminate(n: &Noise, size: usize) -> Surface {
     let t = TILE_LAMINATE;
-    let rows = 8i64;
+    let rows = LAMINATE_ROWS;
     let bw = t / rows as f64;
     let px_m = t / size as f64;
     let ng = n.layer(1);
     paint(size, size, t, &[(0.002, 2.0)], false, |u, v| {
-        let b = board_at(n, u, v, rows, 1, 0.5, t, 90);
+        let b = board_at(n, u, v, rows, LAMINATE_JOINTS, 0.5, t, 90);
         let mut lg = log_for(n, b.row, b.seg, bw, b.len, 0.12, (0.004, 0.008));
         lg.z0 += 0.03;
         lg.slope *= 0.6;
@@ -1030,7 +1118,7 @@ fn laminate(n: &Noise, size: usize) -> Surface {
 /// top of its course in the image, the bottom on the wall), with a few butt joints.
 fn siding(n: &Noise, size: usize) -> Surface {
     let t = TILE_SIDING;
-    let rows = 12i64;
+    let rows = SIDING_ROWS;
     let bh = t / rows as f64;
     let px_m = t / size as f64;
     let ng = n.layer(1);
@@ -1071,7 +1159,7 @@ fn siding(n: &Noise, size: usize) -> Surface {
 /// Shingles / shakes (grey detail): 11 courses on 1.5 m, random widths, ragged butts.
 fn roof(n: &Noise, size: usize) -> Surface {
     let t = TILE_ROOF;
-    let rows = 11i64;
+    let rows = ROOF_COURSES;
     let ch = t / rows as f64;
     let ng = n.layer(1);
     let nb = n.layer(2);
@@ -1152,7 +1240,7 @@ fn plaster(n: &Noise, size: usize) -> Surface {
 /// Concrete sidewalk slabs (grey detail): 60 x 30 cm in running bond, pepper-speckled aggregate.
 fn sidewalk(n: &Noise, size: usize) -> Surface {
     let t = TILE_SIDEWALK;
-    let (cols, rows) = (3i64, 6i64);
+    let (cols, rows) = SIDEWALK_SLABS;
     let (sw, sh) = (t / cols as f64, t / rows as f64);
     let ng = n.layer(1);
     let nd = n.layer(2);
@@ -1308,4 +1396,43 @@ fn leather(n: &Noise, size: usize) -> Surface {
             r: 0.46 - 0.10 * worn - 0.02 * pebble + 0.03 * valley,
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tex::synth::SETS;
+    use crate::tex::synth::standard::materials;
+
+    /// A set draws its joints, boards and grains in metres at its tile: the manifest shows it at that size.
+    #[test]
+    fn the_manifest_shows_each_set_at_its_tile() {
+        let mut seen = 0;
+        for m in materials() {
+            if let Some(t) = tile(m.set.name) {
+                assert!(
+                    (t * m.uv_scale - 1.0).abs() < 0.001,
+                    "{}: {} is drawn at {t} m a tile, shown at {} m",
+                    m.key,
+                    m.set.name,
+                    1.0 / m.uv_scale
+                );
+                seen += 1;
+            }
+        }
+        assert!(seen >= 12, "{seen} materials draw the sets made here");
+    }
+
+    #[test]
+    fn features_are_a_share_of_the_tile() {
+        for set in SETS {
+            for (what, uv) in features(set.name) {
+                assert!(uv > 0.0 && uv <= 1.0, "{} {what}: {uv}", set.name);
+            }
+        }
+        // The brick: 190 x 52.5 mm with 10 mm joints at its 1 m tile.
+        let brick: Vec<f64> = features("brick").iter().map(|f| f.1).collect();
+        assert!((brick[0] - 0.19).abs() < 1e-12 && (brick[1] - 0.0525).abs() < 1e-12);
+        assert!((brick[2] - 0.01).abs() < 1e-12);
+    }
 }

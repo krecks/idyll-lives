@@ -3,7 +3,8 @@
 //!
 //!   cargo review sizes [--md <dir>]   each object's W x H x D and its seat, top and mattress heights against
 //!                                     docs/review/reference.json: the outliers per category (`--md`: every
-//!                                     object, `<dir>/sizes-<cat>.md`)
+//!                                     object, `<dir>/sizes-<cat>.md`); then the textures' patterns and the
+//!                                     kerb against its `surfaces` (`surfaces.rs`)
 //!   cargo review colours [--all]      every model's colours against what real surfaces reflect (`colours.rs`)
 //!   cargo review facets [--all]       every model's round parts whose outline shows its flat sides (`facets.rs`)
 //!   cargo review uses [--md <dir>]    each object's uses, poses, minutes, effects, skills, slots, approach,
@@ -18,6 +19,8 @@
 //! `motions`; the renderer's `ACTIONS` (render/shared/characters/actions.ts) and action sounds (audio/world.ts) are read from its
 //! source. A category is the object's buy category, or `packs` for a personality
 //! pack's objects.
+
+pub mod surfaces;
 
 use crate::checkglb::{self, Height, Measure, Paths};
 use regex::Regex;
@@ -57,6 +60,9 @@ pub struct Reference {
     /// Kinds where no use is expected (decor stays decor).
     #[serde(default)]
     pub decor: Vec<String>,
+    /// Real sizes of the surfaces' patterns and the kerb (`surfaces.rs`).
+    #[serde(default)]
+    pub surfaces: BTreeMap<String, surfaces::SurfaceKind>,
 }
 
 /// A kind of thing: its real-world ranges (m; each optional), uses, minutes per use and mechanisms' angles.
@@ -1366,11 +1372,17 @@ pub fn main(args: &[String]) -> i32 {
                     );
                     return Ok(2);
                 };
-                sizes(
+                let (mut text, files, code) = sizes(
                     &objects,
                     &checkglb::measures(&s.paths, &tops(&objects, &reference))?,
                     &reference,
-                )
+                );
+                let manifest = serde_json::from_str(&s.read(surfaces::MANIFEST)?)
+                    .map_err(|e| format!("{}: {e}", surfaces::MANIFEST))?;
+                let rows =
+                    surfaces::rows(&reference.surfaces, &manifest, &s.read(surfaces::ROADS)?)?;
+                text.push_str(&surfaces::report(&rows));
+                (text, files, code)
             }
             Some("uses") => {
                 let actions = action_keys(&s.read("web/src/render/shared/characters/actions.ts")?)

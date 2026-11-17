@@ -389,6 +389,75 @@
       "title": "National Sleep Foundation updated sleep duration recommendations (2015): adults 7-9 h",
       "url": "https://profiles.wustl.edu/en/publications/national-sleep-foundations-updated-sleep-duration-recommendations/"
     }
+,
+    "biaTn10": {
+      "title": "Brick Industry Association, Technical Note 10, Dimensioning and Estimating Brick Masonry (2009): modular brick 3 5/8 x 2 1/4 x 7 5/8 in, 3/8 or 1/2 in joints, three courses to 8 in",
+      "url": "https://39589251.fs1.hubspotusercontent-na1.net/hubfs/39589251/Education/BIA%20Tech%20Notes%2010-dimensioning-and-estimating-brick-masonry.pdf"
+    },
+    "biaTsd218": {
+      "title": "Brick Industry Association, Technical Services Digest 218, Summary of Clay Brick Standards (2014): ASTM C216 type FBS size tolerances, +-3/32 in up to 3 in, +-1/4 in from 6 to 8 in",
+      "url": "https://brick.com/wp-content/uploads/2025/01/technical_service_digest-218_0.pdf"
+    },
+    "malarkeyShingles": {
+      "title": "Malarkey, Architectural Laminate Shingle Installation Instructions: 5 5/8 in (143 mm) exposure to the weather",
+      "url": "https://www.malarkeyroofing.com/app/uploads/2021/05/architectural-laminate-shingles-installation-guide-malarkey.pdf"
+    },
+    "cssbRoof": {
+      "title": "Cedar Shake & Shingle Bureau, New Roof Construction Manual (2020): shingle exposures 3 3/4-5 in (16 in), 4 1/4-5 1/2 in (18 in), 5 3/4-7 1/2 in (24 in) by roof pitch",
+      "url": "https://www.cedarbureau.org/wp-content/uploads/2020/04/roof-manual-2020.pdf"
+    },
+    "realCedarBevel": {
+      "title": "Western Red Cedar Lumber Association, Bevel Siding: coverage table, 6 in boards 4 1/2 in exposed, 8 in 6 1/2 in, 10 in 8 1/2 in",
+      "url": "https://www.realcedar.com/siding/profiles/bevel-siding"
+    },
+    "hardiePlank": {
+      "title": "POCO Building Supplies, James Hardie siding: HardiePlank lap siding 5 1/4 in (4 in exposure) to 8 1/4 in (7 in exposure)",
+      "url": "https://www.pocobuildingsupplies.com/products/siding/james-hardie-siding/"
+    },
+    "nwfa": {
+      "title": "National Wood Flooring Association, Installation Guidelines (2025): strip under 3 in, plank 3-5 in, wide plank over 5 in; standard widths from 1 1/2 in",
+      "url": "https://nwfa.org/wp-content/uploads/2026/02/NWFA-Installation-Guidelines.pdf"
+    },
+    "czarWidePlank": {
+      "title": "Czar Floors, Wide Plank Wood Flooring: solid boards up to 8 in, wider engineered only",
+      "url": "https://www.czarfloors.com/plank-wood-floor.asp"
+    },
+    "quickStepImpressive": {
+      "title": "Travis Perkins, Quick-Step Impressive laminate: 1380 x 190 x 8 mm planks",
+      "url": "https://www.travisperkins.co.uk/laminate-flooring/quick-step-impressive-classic-oak-natural-laminate-flooring-1380-x-190-x-8mm-pack-size-1-835m2/p/936910"
+    },
+    "quickStepMajestic": {
+      "title": "M.J. Reck, Quick-Step Majestic laminate: 2050 x 240 mm planks",
+      "url": "https://www.mjreckflooring.com/quick-step-laminate/majestic"
+    },
+    "travertineSizes": {
+      "title": "Stone Mart, What size does travertine come in?: 12 x 12, 18 x 18 and 24 x 24 in the usual floor tiles in the USA",
+      "url": "https://stone-mart.com/travertine-floor-tile-sizes-popular-usa/"
+    },
+    "cbpTb85": {
+      "title": "Custom Building Products, TB85 Grout Joint Width: never under 1/16 in (ANSI A108.02 4.3.8); TCNA asks 1/8 in for rectified tile, 3/16 in for calibrated",
+      "url": "https://www.custombuildingproducts.com/media/60712312/tb85-grout-joint-width.pdf"
+    },
+    "hanoverHex": {
+      "title": "Hanover, Permeable Hexagonal Pavers: the 8 in paver 7 1/2 in across the flats",
+      "url": "https://hanoverpavers.com/permeable-hexagonal-pavers/"
+    },
+    "unilockHex": {
+      "title": "Unilock, Hex Paver: 8 in (200 mm) hexagon, 70 mm thick",
+      "url": "https://unilock.com/product/hex-paver-boston/"
+    },
+    "icpiTs2": {
+      "title": "ICPI Tech Spec 2, Construction of Interlocking Concrete Pavements: joints between pavers 1/16-3/16 in (2-5 mm)",
+      "url": "https://www.orco.com/wp-content/uploads/2022/08/ICPI-TechSpec2-ORCO.pdf"
+    },
+    "napaS4": {
+      "title": "City of Napa, Standard Detail S-4, Sidewalk Sections: score lines at 4 ft on residential sidewalk, 5 ft on commercial and on 5 1/2 ft walks",
+      "url": "https://www.cityofnapa.org/DocumentCenter/View/877/S-4--Standard-Details---Sidewalk-Sections"
+    },
+    "fhwaPddm9": {
+      "title": "FHWA Federal Lands, Project Development and Design Manual, ch. 9 Highway Design: vertical curbs typically 6 in (150 mm), sloping curbs 3-4 in (75-100 mm)",
+      "url": "https://highways.dot.gov/federal-lands/pddm/Chapter_09.pdf"
+    }
   },
   "kinds": {
     "fridge": {
@@ -12298,5 +12367,156 @@
     "kitchenShelf",
     "coatStand",
     "chickenCoop"
-  ]
+  ],
+  "surfaces": {
+    "brick": {
+      "label": "Modular face brick (US) in running bond: 7 5/8 x 2 1/4 in with ASTM C216 FBS tolerances, 3/8 to 1/2 in joints (three courses to 8 in)",
+      "of": [
+        "brick"
+      ],
+      "length": [
+        0.1873,
+        0.2
+      ],
+      "height": [
+        0.0548,
+        0.0595
+      ],
+      "joint": [
+        0.0095,
+        0.0127
+      ],
+      "sources": [
+        "biaTn10",
+        "biaTsd218"
+      ]
+    },
+    "roofShingles": {
+      "label": "Roof shingles, exposure to the weather: cedar 3 3/4-7 1/2 in by length and pitch; asphalt 5 5/8 in (metric)",
+      "of": [
+        "roof_shingles"
+      ],
+      "exposure": [
+        0.095,
+        0.191
+      ],
+      "sources": [
+        "cssbRoof",
+        "malarkeyShingles"
+      ]
+    },
+    "lapSiding": {
+      "label": "Lap siding, exposure: fibre-cement planks 4-7 in, cedar bevel boards 4 1/2-8 1/2 in (6-10 in boards)",
+      "of": [
+        "siding_wood"
+      ],
+      "exposure": [
+        0.1016,
+        0.2159
+      ],
+      "sources": [
+        "hardiePlank",
+        "realCedarBevel"
+      ]
+    },
+    "floorboards": {
+      "label": "Solid wood floorboards, face width: strip from 1 1/2 in to wide plank 8 in",
+      "of": [
+        "floor_wood"
+      ],
+      "width": [
+        0.038,
+        0.203
+      ],
+      "sources": [
+        "nwfa",
+        "czarWidePlank"
+      ]
+    },
+    "laminatePlanks": {
+      "label": "Laminate planks: 190 x 1380 mm (standard) to 240 x 2050 mm (wide and long)",
+      "of": [
+        "floor_laminate"
+      ],
+      "width": [
+        0.19,
+        0.24
+      ],
+      "length": [
+        1.38,
+        2.05
+      ],
+      "sources": [
+        "quickStepImpressive",
+        "quickStepMajestic"
+      ]
+    },
+    "floorTiles": {
+      "label": "Stone floor tiles (travertine), 12 to 24 in square; grout joints from 1/16 in (ANSI's least) to 1/4 in",
+      "of": [
+        "floor_tile"
+      ],
+      "size": [
+        0.305,
+        0.61
+      ],
+      "joint": [
+        0.0016,
+        0.0064
+      ],
+      "sources": [
+        "travertineSizes",
+        "cbpTb85"
+      ]
+    },
+    "hexPavers": {
+      "label": "8 in hexagonal concrete pavers, across the flats; joints 2-5 mm",
+      "of": [
+        "path_hexpaving"
+      ],
+      "across": [
+        0.19,
+        0.2
+      ],
+      "joint": [
+        0.002,
+        0.005
+      ],
+      "sources": [
+        "hanoverHex",
+        "unilockHex",
+        "icpiTs2"
+      ]
+    },
+    "sidewalk": {
+      "label": "Concrete sidewalk (US), panels between score lines 4-5 ft each way",
+      "of": [
+        "sidewalk"
+      ],
+      "length": [
+        1.22,
+        1.53
+      ],
+      "width": [
+        1.22,
+        1.53
+      ],
+      "sources": [
+        "napaS4"
+      ]
+    },
+    "kerb": {
+      "label": "Kerb face over the road: sloping 3-4 in to vertical 6 in",
+      "of": [
+        "street"
+      ],
+      "height": [
+        0.075,
+        0.15
+      ],
+      "sources": [
+        "fhwaPddm9"
+      ]
+    }
+  }
 }
