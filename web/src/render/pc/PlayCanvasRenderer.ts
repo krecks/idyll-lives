@@ -147,6 +147,7 @@ import type {
   WallMode,
 } from '../types';
 import { LAND_CELL, NONE, type Land, type LandRect } from '../../game/land';
+import type { UseLayer } from '../../game/uses';
 import { bakeLand, copyLand, fullRect, marchToGround, sameLand } from '../shared/landBake';
 import { OffThreadLand } from '../shared/renderData';
 import { LandCursorDraw } from './landCursor';
@@ -3263,6 +3264,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.ghosts = ghosts;
     this.drawGhosts();
   }
+
+  /** Step 2's painted uses over the town: not drawn yet (their overlay is still to come). */
+  setTownUses(_layer: UseLayer | null, _hatched?: Uint8Array | null): void {}
 
   /** Step 2's edits over the town (`setTownGhosts`), and their drawing (made the first time there are any). */
   private ghosts: TownGhosts | null = null;

@@ -69,8 +69,11 @@ export interface TownStageTool extends StageTool {
   key?(e: KeyboardEvent): boolean;
 }
 
+/** The tools' ids: today's five and the zone brush (`zones`, the streets and zones step's; not made yet). */
+export type TownToolId = 'select' | 'street' | 'lot' | 'village' | 'remove' | 'zones';
+
 export interface TownTool {
-  id: string;
+  id: TownToolId;
   label: string;
   /** Its icon's asset key (`Icon.svelte`). */
   icon: string;
@@ -84,3 +87,10 @@ export interface TownTool {
 
 /** The tools, in the order the palette shows them. */
 export const TOWN_TOOLS: readonly TownTool[] = [selectTool, streetTool, lotTool, villageTool, removeTool];
+
+/**
+ * The tools of the coming steps, by id, in the order their palettes are to show them (not used yet): the streets and
+ * zones step's, with the zone brush where the Lot tool is, and the Build step's, today's.
+ */
+export const LAYOUT_TOOLS: readonly TownToolId[] = ['select', 'street', 'zones', 'village', 'remove'];
+export const BUILD_TOOLS: readonly TownToolId[] = ['select', 'street', 'lot', 'village', 'remove'];

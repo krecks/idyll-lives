@@ -22,6 +22,24 @@ import { EMPTY_LOT, withLot, type NeighbourhoodDraft, type Templates } from '../
 import { defaultsOf, LAND_SIZE, LEGACY_KINDS, placeOf, sizeFor, townFits, type WorldKind } from '../game/world';
 import { readCode, type WorldCode } from '../game/worldCode';
 
+/**
+ * The new game's five steps, in order, as the screens are to name them (the four screens of today keep their own
+ * labels until the streets and zones step has its screen): each one's screen (`app.svelte.ts` `Screen`), its name,
+ * and its button on to the next (the household and home steps word theirs as the choice made has it).
+ */
+export const STEPS: readonly { id: 'land' | 'streets' | 'town' | 'household' | 'home'; label: string; next?: string }[] = [
+  { id: 'land', label: 'Land', next: 'Lay out the streets →' },
+  { id: 'streets', label: 'Streets & zones', next: 'Build the town →' },
+  { id: 'town', label: 'Build', next: 'Choose a household →' },
+  { id: 'household', label: 'Household' },
+  { id: 'home', label: 'Home' },
+];
+
+/** Step `n`'s eyebrow (from 1): "Step 2 of 5 · Streets & zones". */
+export function stepLabel(n: number): string {
+  return `Step ${n} of ${STEPS.length} · ${STEPS[n - 1]?.label ?? ''}`;
+}
+
 /** A world's code with every choice made: the town and the villages too (the place's own until step 2 changes them). */
 export type Chosen = WorldCode & Required<Pick<WorldCode, 'town' | 'villages'>>;
 
@@ -99,6 +117,17 @@ export function landKey(code: WorldCode, shaped: Land | null | undefined): strin
 /** Step 2's town's key: the land's (`landKey`), its town and villages, its own seed, and where the player moved it (none: where the land has it). */
 export function townKey(land: string, code: Chosen, site: Pt | null): string {
   return `${land}|${code.town}:${code.villages}:${code.townSeed ?? ''}:${site ? `${Math.round(site[0])},${Math.round(site[1])}` : ''}`;
+}
+
+/** A layout's fingerprint (`uses.ts`): what Build makes the town from. */
+export { layoutHash } from '../game/uses';
+
+/**
+ * The built town's key: the layout's (`layoutKey`, what its proposal was made from: the town's key, `townKey`), the
+ * layout as the player left it (`layoutHash` of its plan) and the build's own seed ("Build again" rolls another).
+ */
+export function buildKey(layoutKey: string, layoutHash: string, buildSeed: number): string {
+  return `${layoutKey}|${layoutHash}:${buildSeed >>> 0}`;
 }
 
 /** What the people's seed is drawn from when the code has none of its own (`peopleSeedOf`). */

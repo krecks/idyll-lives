@@ -271,6 +271,7 @@ describe('the Problems list and picking, on a generated town', async () => {
   const { checkedTown, townIssues } = await import('../src/ui/townedit/problems');
   const { find, keyOf, pick, spotNear } = await import('../src/ui/townedit/pick');
   const { editGhosts } = await import('../src/ui/townedit/ghosts');
+  const { packUses, useGrid } = await import('../src/game/uses');
   type Templates = import('../src/game/town').Templates;
   const content = await Content.load('http://localhost/content/base.json');
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
@@ -290,6 +291,14 @@ describe('the Problems list and picking, on a generated town', async () => {
     const whole = townProblems(file, undefined, { careers });
     const quick = townProblems(checkedTown(hamlet, t), undefined, { careers });
     expect(quick).toEqual(whole);
+  });
+
+  test("a draft's painted uses never go into its town file", () => {
+    const { cols, rows } = useGrid(hamlet.width, hamlet.depth);
+    const painted = packUses(new Uint8Array(cols * rows).map((_, k) => k % 6), cols, rows);
+    const file = (draft: NeighbourhoodDraft) => assembleTown(content, t, { ...draft, households: [] }, randomHousehold(content, assets, 2, [], {}, mulberry32(1)), vacantSlots(hamlet)[0].index, undefined, mulberry32(2));
+    const withUses = { ...hamlet, open: { ...hamlet.open!, uses: painted } };
+    expect(file(withUses)).toBe(file(hamlet));
   });
 
   test('the laid town blocks nothing; a lot moved onto a road blocks the way on, named, with where it is', () => {

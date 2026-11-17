@@ -5,7 +5,7 @@ import { describe, expect, test } from 'bun:test';
 import { blankLand, COVER, coverSpan } from '../src/game/land';
 import type { NeighbourhoodDraft } from '../src/game/town';
 import { townFits } from '../src/game/world';
-import { codeFrom, firstCode, fitted, landKey, landStats, startCode, townKey, withSeed } from '../src/ui/newGame';
+import { buildKey, codeFrom, firstCode, fitted, landKey, landStats, startCode, stepLabel, STEPS, townKey, withSeed } from '../src/ui/newGame';
 
 describe("the steps' keys", () => {
   const code = startCode('river', 1234);
@@ -43,6 +43,21 @@ describe("the steps' keys", () => {
 
   test("a new land seed lets the town's and the people's own seeds go", () => {
     expect(withSeed({ ...code, townSeed: 3, peopleSeed: 4 }, 99)).toEqual({ ...code, seed: 99 });
+  });
+});
+
+describe('the five steps', () => {
+  test('in order, each with its label, the first three with their buttons on', () => {
+    expect(STEPS.map((s) => s.id)).toEqual(['land', 'streets', 'town', 'household', 'home']);
+    expect(stepLabel(2)).toBe('Step 2 of 5 · Streets & zones');
+    expect(stepLabel(3)).toBe('Step 3 of 5 · Build');
+    expect(STEPS.slice(0, 3).map((s) => s.next)).toEqual(['Lay out the streets →', 'Build the town →', 'Choose a household →']);
+  });
+
+  test("the built town is keyed by the layout's key, the layout as left and the build's seed", () => {
+    const key = buildKey('L', 'h', 7);
+    expect(buildKey('L', 'h', 7)).toBe(key);
+    for (const other of [buildKey('M', 'h', 7), buildKey('L', 'i', 7), buildKey('L', 'h', 8)]) expect(other).not.toBe(key);
   });
 });
 

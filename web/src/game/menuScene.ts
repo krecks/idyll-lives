@@ -9,6 +9,7 @@ import { groundDepth, type WorldStructure } from '../core/protocol';
 import type { LandCursor, LotHighlight, Renderer, TownBuildStep, TownGhosts, TownShot } from '../render/types';
 import { areaFocus } from '../render/shared/overviewCamera';
 import type { Land, LandRect } from './land';
+import type { UseLayer } from './uses';
 import { settings } from '../settings/settings.svelte';
 import { services } from '../ui/services';
 import { host } from './host';
@@ -51,6 +52,9 @@ export type Shot =
    */
   | { kind: 'area'; area: number; frame: Frame };
 
+/** How far either side of a point (CSS px) `MenuScene.scale` measures the land. */
+const SCALE_SPAN = 4;
+
 const NO_HIGHLIGHT: LotHighlight = { hover: null, selected: null, marked: [], outlines: false };
 
 /** The menu's picture at most this wide (pixels); as the screen is, if smaller. */
@@ -85,6 +89,8 @@ class MenuScene {
   private readonly out = { x: 0, y: 0 };
   /** UI on top of the town that tags must keep clear of (buttons, hint bars). */
   private readonly obstacles = new Set<HTMLElement>();
+  /** The last scale `scale` found (m a CSS px). */
+  private lastScale = 1;
   /** Lots whose tags win when tags compete for space. */
   private focusPlots: [number | null, number | null] = [null, null];
   private readonly sizes = new ResizeObserver((entries) => {
@@ -294,6 +300,28 @@ class MenuScene {
    */
   ghosts(g: TownGhosts | null): void {
     this.live?.setTownGhosts(g);
+  }
+
+  /**
+   * Step 2's painted uses (`uses.ts`) drawn over the town; null: none. `hatched`: a byte per cell of `layer`, set
+   * where a zoned cell is too far from a street to be built on. Cheap enough for every stamp of a stroke.
+   */
+  setUses(layer: UseLayer | null, hatched?: Uint8Array | null): void {
+    this.live?.setTownUses(layer, hatched);
+  }
+
+  /**
+   * How many m a CSS px is on the land at screen point (`x`, `y`) (CSS pixels), across the screen: from where the land
+   * is under the points `SCALE_SPAN` px either side of it. Where there is no land under them (the sky, say), the last
+   * scale found (1 m before any).
+   */
+  scale(x: number, y: number): number {
+    const [a, b] = [this.landAt(x - SCALE_SPAN, y), this.landAt(x + SCALE_SPAN, y)];
+    if (a && b) {
+      const m = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / (2 * SCALE_SPAN);
+      if (m > 0 && Number.isFinite(m)) this.lastScale = m;
+    }
+    return this.lastScale;
   }
 
   /**

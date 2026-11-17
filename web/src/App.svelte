@@ -258,7 +258,7 @@
       services.items?.holdAhead(true);
       return;
     }
-    if (!['land', 'town', 'household', 'create', 'home'].includes(screen)) return;
+    if (!['land', 'streets', 'town', 'household', 'create', 'home'].includes(screen)) return;
     services.items?.holdAhead(false);
     prefetchCatalog();
   });
@@ -337,7 +337,7 @@
   {#if !app.liveBackdrop}<MenuBackdrop still={app.screen === 'menu' ? app.menuStill?.url : undefined} />{/if}
   {#if app.screen === 'land'}
     <CreateLand />
-  {:else if app.screen === 'town'}
+  {:else if app.screen === 'streets' || app.screen === 'town'}
     <CreateTown />
   {:else if app.screen === 'household'}
     <ChooseHousehold />
