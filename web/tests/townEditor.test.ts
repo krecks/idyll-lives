@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import type { RoadPlan } from '../src/core/protocol';
 import type { Edited } from '../src/game/edit/edited';
 import type { NeighbourhoodDraft } from '../src/game/town';
+import type { UseLayer } from '../src/game/uses';
 import { editGhosts as ghostsOf } from '../src/ui/townedit/ghosts';
 import { EditSession, CHECK_AFTER, QUIET, QUIET_ONE, REFUSED_SHOW, SETTLE_FAILED, type Timers } from '../src/ui/townedit/session';
 import type { Settled } from '../src/ui/townedit/settle';
@@ -74,6 +75,28 @@ function session(base = draft('base'), hold = false) {
 }
 
 describe('the edit session', () => {
+  test("an edit of the zones alone isn't settled: the town on screen takes the zones, and its undo too; one of the land after it is", async () => {
+    const layer = (n: number): UseLayer => ({ v: 1, cols: 1, rows: 1, cells: [1, n] });
+    const base = { name: 'base', slots: [], roads: [], open: { areas: [], uses: layer(0) } } as unknown as NeighbourhoodDraft;
+    const { s, c, settles, shown } = session(base);
+    const zoned = { ...base, open: { ...base.open!, uses: layer(1) } };
+    s.apply({ ...edit(zoned), needsSettle: false } as unknown as Edited);
+    await c.advance(QUIET * 2);
+    expect(settles).toEqual([]);
+    expect(shown).toEqual([]);
+    expect(s.pending).toBe(false);
+    expect(s.settled.open?.uses).toBe(zoned.open!.uses);
+    s.undo();
+    await c.advance(QUIET * 2);
+    expect(settles).toEqual([]);
+    expect(s.settled.open?.uses).toBe(base.open!.uses);
+    // (A road drawn after it: settled as ever, zones and all.)
+    const road = { ...zoned, roads: [{ points: [], width: 7, ends: ['out', 'out'] }] } as unknown as NeighbourhoodDraft;
+    s.apply(edit(road));
+    await c.advance(QUIET * 2);
+    expect(settles).toEqual([road]);
+  });
+
   test('an edit takes at once; the town is settled once edits have paused, once for several', async () => {
     const { s, c, settles, shown } = session();
     const a = draft('a');
@@ -425,6 +448,14 @@ describe('the Problems list and picking, on a generated town', async () => {
     const file = (draft: NeighbourhoodDraft) => assembleTown(content, t, { ...draft, households: [] }, randomHousehold(content, assets, 2, [], {}, mulberry32(1)), vacantSlots(hamlet)[0].index, undefined, mulberry32(2));
     const withUses = { ...hamlet, open: { ...hamlet.open!, uses: painted } };
     expect(file(withUses)).toBe(file(hamlet));
+  });
+
+  test("step 2's layout (no lots, its homes zones) isn't blocked for want of homes; a town with none is", () => {
+    const { cols, rows } = useGrid(hamlet.width, hamlet.depth);
+    const bare = { ...hamlet, slots: [], open: { ...hamlet.open!, pads: {}, places: [], backdrop: [] } };
+    const layout = { ...bare, open: { ...bare.open, uses: packUses(new Uint8Array(cols * rows), cols, rows) } };
+    expect(townIssues(layout, t, content).blocking.map((i) => i.text)).not.toContainEqual(expect.stringMatching(/fewer than two homes/i));
+    expect(townIssues(bare, t, content).blocking.map((i) => i.text)).toContainEqual(expect.stringMatching(/fewer than two homes/i));
   });
 
   test('the laid town blocks nothing; a lot moved onto a road blocks the way on, named, with where it is', () => {

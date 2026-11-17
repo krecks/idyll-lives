@@ -1,17 +1,17 @@
 /**
- * Step 2's town editor tools (Select, Street, Lot, Village, Remove): what each one registers so the
- * editor can offer it. A tool has an id, a label and an icon for the palette, gives the town stage
+ * The town editor's tools (Select, Street, Zones, Lot, Village, Remove): what each one registers so the
+ * editor can offer it. Step 2 (Streets & zones) offers `LAYOUT_TOOLS`, step 3 (Build) `BUILD_TOOLS`. A tool has an id, a label and an icon for the palette, gives the town stage
  * the pointer while it is in hand (`StageTool`), and may show a card beside the town (what can be
  * done to what it picked, what it is about to place). One tool is in hand at a time.
  *
- * Each tool lives in its own file here and adds one line to `TOWN_TOOLS`.
+ * Each tool lives in its own file here and adds one line to `TOWN_TOOLS`, and its id to the steps' lists.
  */
 
 import type { Component } from 'svelte';
 import type { Content } from '../../content/content';
 import type { Edited } from '../../game/edit/edited';
 import type { NeighbourhoodDraft, Templates } from '../../game/town';
-import type { TownGhosts } from '../../render/types';
+import type { LandCursor, TownGhosts } from '../../render/types';
 import type { StageTool } from '../kit/stageTool';
 import { lotTool } from './lotTool';
 import type { Picked, PickWhat } from './pick';
@@ -19,6 +19,10 @@ import { removeTool } from './removeTool';
 import { selectTool } from './selectTool';
 import { streetTool } from './streetTool';
 import { villageTool } from './villageTool';
+import { zoneTool } from './zoneTool';
+
+/** Which step the editor is in: step 2's layout (streets and zones, no lots yet) or step 3's built town. */
+export type EditStep = 'layout' | 'build';
 
 /**
  * What the editor gives a tool and a card (`editor.svelte.ts` `TownEditorState`). Everything works
@@ -27,6 +31,8 @@ import { villageTool } from './villageTool';
  * `ground`), never by the town on screen's indices.
  */
 export interface TownEditor {
+  /** Which step it edits (a tool may do otherwise in each: a village put down in step 2 is streets and zones). */
+  readonly step: EditStep;
   /** The town's plan draft as it stands. */
   readonly draft: NeighbourhoodDraft;
   /** The house templates (`town.ts`) and the game's content, for the edits (`game/edit/`). */
@@ -53,11 +59,17 @@ export interface TownEditor {
   preview(g: Partial<TownGhosts> | null): void;
   /** A line under the tools about what the tool would do where the pointer is (why it can't, say); null: none. */
   hint(text: string | null): void;
+  /** How many m a CSS px is on the land at a screen point (CSS pixels); none: the tool measures the ground itself. */
+  scale?(x: number, y: number): number;
+  /** A brush's ring over the land (the zone brush's); null: none. */
+  brush(cursor: LandCursor | null): void;
+  /** Step 2's zones as `plan` has them drawn over the town (a stroke not yet taken); null: the plan's own again. */
+  showUses(plan: NeighbourhoodDraft | null): void;
   /** The town's name, as step 2's own name field has it (the two kept as one). */
   townName: string;
   /** The tool in hand (its `TownTool.id`), and a tool taken in hand (the same one again puts it down; null: none), as a card's action may ("Move" a village). */
-  readonly toolId: string | null;
-  take(id: string | null): void;
+  readonly toolId: TownToolId | null;
+  take(id: TownToolId | null): void;
 }
 
 /**
@@ -69,7 +81,7 @@ export interface TownStageTool extends StageTool {
   key?(e: KeyboardEvent): boolean;
 }
 
-/** The tools' ids: today's five and the zone brush (`zones`, the streets and zones step's; not made yet). */
+/** The tools' ids. */
 export type TownToolId = 'select' | 'street' | 'lot' | 'village' | 'remove' | 'zones';
 
 export interface TownTool {
@@ -85,12 +97,17 @@ export interface TownTool {
   card?: Component<{ editor: TownEditor }>;
 }
 
-/** The tools, in the order the palette shows them. */
-export const TOWN_TOOLS: readonly TownTool[] = [selectTool, streetTool, lotTool, villageTool, removeTool];
+/** Every tool. */
+export const TOWN_TOOLS: readonly TownTool[] = [selectTool, streetTool, zoneTool, lotTool, villageTool, removeTool];
 
 /**
- * The tools of the coming steps, by id, in the order their palettes are to show them (not used yet): the streets and
- * zones step's, with the zone brush where the Lot tool is, and the Build step's, today's.
+ * The steps' tools, by id, in the order their palettes show them: the streets and zones step's, with the
+ * zone brush where the Lot tool is, and the Build step's.
  */
 export const LAYOUT_TOOLS: readonly TownToolId[] = ['select', 'street', 'zones', 'village', 'remove'];
 export const BUILD_TOOLS: readonly TownToolId[] = ['select', 'street', 'lot', 'village', 'remove'];
+
+/** Step `step`'s tools, in its palette's order. */
+export function toolsFor(step: EditStep): TownTool[] {
+  return (step === 'layout' ? LAYOUT_TOOLS : BUILD_TOOLS).map((id) => TOWN_TOOLS.find((t) => t.id === id)!);
+}

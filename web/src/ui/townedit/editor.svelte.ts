@@ -1,12 +1,14 @@
 /**
- * Step 2's town editor as the screens see it: the edit session (`session.ts`: the plan draft, the
- * settled town, undo, the Problems list) with what the tools and cards share besides: the tool in
- * hand, what is picked and what is under the pointer (kept by what they are, `pick.ts`), the
- * tools' own ghosts and a line of hint, all drawn over the town through `menuScene`.
+ * The town editor as the screens see it, in step 2 (Streets & zones: the layout) and step 3 (Build:
+ * the built town): the edit session (`session.ts`: the plan draft, the settled town, undo, the
+ * Problems list) with what the tools and cards share besides: the tool in hand, what is picked and
+ * what is under the pointer (kept by what they are, `pick.ts`), the tools' own ghosts, step 2's zones
+ * and a line of hint, all drawn over the town through `menuScene`.
  *
- * `CreateTown.svelte` makes one and gives it each town step 2 shows (`attach`); `TownEditor.svelte`
- * is its panel. What the edits make is kept in `app.world` (`plan`, `history`, `edited`; `draft`
- * is the settled town the next steps read), so going back and forth through the steps keeps them.
+ * `CreateLayout.svelte` and `CreateTown.svelte` each make one for their step and give it what they
+ * show (`attach`); `TownEditor.svelte` is its panel. What the edits make is kept in `app.layout` (step
+ * 2) or `app.world` (step 3) (`plan`, `history`, `edited`; `draft` is the settled town the next steps
+ * read), so going back and forth through the steps keeps them.
  */
 
 import type { Content } from '../../content/content';
@@ -15,22 +17,27 @@ import { lotKey, slotOf } from '../../game/edit/lots';
 import { menuScene } from '../../game/menuScene';
 import { holdTownWorker } from '../../game/townJobs';
 import { loadTemplates, type NeighbourhoodDraft, type Templates } from '../../game/town';
-import type { TownGhosts } from '../../render/types';
-import type { LaidTown } from '../app.svelte';
+import type { LandCursor, TownGhosts } from '../../render/types';
+import type { LaidTown, Layout } from '../app.svelte';
 import { app } from '../app.svelte';
 import { toast } from '../state.svelte';
 import { checkTown } from './checkJob';
 import { buildingBox, editGhosts, joinGhosts, lotBox, roadGhost } from './ghosts';
+import { hatched } from './layoutApi';
 import { find, keyOf, pick, type Picked, type PickWhat } from './pick';
 import type { Issue, TownIssues } from './problems';
 import { EditSession, type SettleTiming } from './session';
 import { settle, type Settled } from './settle';
-import { TOWN_TOOLS, type TownEditor, type TownStageTool, type TownTool } from './tools';
+import { toolsFor, type EditStep, type TownEditor, type TownStageTool, type TownTool, type TownToolId } from './tools';
 import { sentence } from './words';
 
-/** What the screen gives the editor: the town's name as step 2's field has it, and the camera's glide to a lot of the town on screen. */
+/** What the screen gives the editor: its step, the town's name as the step's field has it, and the camera's glide to a lot of the town on screen. */
 export interface EditorHooks {
   content: Content;
+  /** Step 2's layout (`app.layout`, its tools `LAYOUT_TOOLS`) or step 3's built town (`app.world`, `BUILD_TOOLS`). Step 3 if not said. */
+  step?: EditStep;
+  /** An edit was taken on: the plan before it and after (step 3's streets go into the layout too). */
+  edited?(before: NeighbourhoodDraft, after: NeighbourhoodDraft): void;
   /** The town's name as typed (step 2's own field), and a new one typed in the editor. */
   getName(): string;
   setName(name: string): void;
@@ -43,8 +50,11 @@ export class TownEditorState implements TownEditor {
   version = $state(0);
   /** The house templates (the tools can't run before they are loaded). */
   templates = $state.raw<Templates | null>(null);
-  /** The tool in hand (its `TownTool.id`), or none: the stage as step 2 has it, a click on a lot picks it. */
-  toolId = $state<string | null>(null);
+  /** The tool in hand (its `TownTool.id`), or none: the stage as the step has it, a click on a lot picks it. */
+  toolId = $state<TownToolId | null>(null);
+  /** The step edited, and its tools in palette order. */
+  readonly step: EditStep;
+  readonly tools: readonly TownTool[];
   /** What is picked (`keyOf`), and what is under the pointer (on the plan). */
   private pickedKey = $state<string | null>(null);
   hovered = $state.raw<Picked | null>(null);
@@ -62,8 +72,13 @@ export class TownEditorState implements TownEditor {
   /** What was drawn last: the edits' ghosts and the rest's (as JSON). */
   private drawn: { edits: TownGhosts | null; key: string } | null = null;
   private editGhostsOf: { settled: NeighbourhoodDraft; plan: NeighbourhoodDraft; ghosts: TownGhosts | null } | null = null;
+  /** Step 2's zones shown: a stroke's plan over the plan's own (`showUses`), and the plan whose zones are drawn. */
+  private strokeUses: NeighbourhoodDraft | null = null;
+  private usesDrawn: NeighbourhoodDraft | null | undefined = undefined;
 
   constructor(private readonly hooks: EditorHooks) {
+    this.step = hooks.step ?? 'build';
+    this.tools = toolsFor(this.step);
     // (The bench drives the editor and reads its settles' timings: `tools/bench/create.mjs`.)
     if (import.meta.env.DEV) Object.assign(globalThis, { __townEditor: this });
     void loadTemplates().then((t) => {
@@ -76,10 +91,19 @@ export class TownEditorState implements TownEditor {
     return this.hooks.content;
   }
 
+  /** What the step edits as `app` keeps it: step 2's layout, step 3's built town. */
+  private get target(): LaidTown | Layout | null {
+    return this.step === 'layout' ? app.layout : app.world;
+  }
+  private set target(v: LaidTown | Layout) {
+    if (this.step === 'layout') app.layout = v as Layout;
+    else app.world = v as LaidTown;
+  }
+
   /** The plan draft as the edits left it (the town as laid, before any). */
   get draft(): NeighbourhoodDraft {
     void this.version;
-    return this.session?.plan ?? app.world?.draft ?? EMPTY;
+    return this.session?.plan ?? this.target?.draft ?? EMPTY;
   }
 
   /** The house templates; only asked for once they are loaded (`ready`). */
@@ -113,7 +137,16 @@ export class TownEditorState implements TownEditor {
   }
   get issues(): TownIssues {
     void this.version;
-    return this.session?.issues ?? { blocking: [], warnings: [] };
+    const issues = this.session?.issues ?? { blocking: [], warnings: [] };
+    // (What the last settle took back is listed too, first among the warnings: it is undone already.)
+    const refused = this.session?.refusalIssues() ?? [];
+    return refused.length ? { blocking: issues.blocking, warnings: [...refused, ...issues.warnings] } : issues;
+  }
+
+  /** The line under the tools about what the last settle took back (null: nothing, or an edit made since). */
+  get refusalLine(): string | null {
+    void this.version;
+    return this.session?.refusalLine ?? null;
   }
   /** The Problems list is of the plan as it stands. */
   get checked(): boolean {
@@ -127,7 +160,7 @@ export class TownEditorState implements TownEditor {
 
   /** The tool in hand. */
   get tool(): TownTool | null {
-    return TOWN_TOOLS.find((t) => t.id === this.toolId) ?? null;
+    return this.tools.find((t) => t.id === this.toolId) ?? null;
   }
 
   /** What the town stage does with the pointer: the tool in hand's (one made per tool, kept: the stage keys on it). */
@@ -140,24 +173,25 @@ export class TownEditorState implements TownEditor {
   }
 
   /** A tool taken in hand (null: put down; the same one again puts it down). */
-  take(id: string | null): void {
-    // (What the tool put down was drawing is dropped with it.)
+  take(id: TownToolId | null): void {
+    // (What the tool put down was drawing is dropped with it; a tool this step hasn't is none.)
     const was = this.toolId;
-    this.toolId = id === this.toolId ? null : id;
+    this.toolId = id === this.toolId || !this.tools.some((t) => t.id === id) ? null : id;
     if (was && was !== this.toolId) this.stages.get(was)?.cancel();
     this.preview(null);
     this.hint(null);
     this.hover(null);
+    this.brush(null);
   }
 
   // ---- the town given ------------------------------------------------------------------------
 
   /**
-   * The town step 2 shows from now on (`app.world`): the session over it kept if it is the town
-   * already being edited (the editor's own writes to `app.world` come back here), else a new one,
-   * with the edits made before if the town has them. Null: none (the editor lets go).
+   * The town the step shows from now on (`app.layout` or `app.world`): the session over it kept if it
+   * is the town already being edited (the editor's own writes to `app` come back here), else a new
+   * one, with the edits made before if the town has them. Null: none (the editor lets go).
    */
-  attach(world: LaidTown | null): void {
+  attach(world: LaidTown | Layout | null): void {
     const s = this.session;
     if (s && world && (world.history ? world.history === s.history : s.history.base === (world.plan ?? world.draft) && s.edits === 0)) return;
     s?.dispose();
@@ -168,6 +202,7 @@ export class TownEditorState implements TownEditor {
     this.pickedKey = null;
     this.hovered = null;
     this.toolGhosts = null;
+    this.strokeUses = null;
     this.note = null;
     if (world) {
       // (The town worker kept while the town is edited: a fresh one would make every house again.)
@@ -177,6 +212,7 @@ export class TownEditorState implements TownEditor {
         {
           settle,
           show: (settled, plan) => this.show(session, settled, plan),
+          kept: (settled, plan) => this.kept(session, settled, plan),
           changed: () => this.changed(),
           check: (plan, base) => checkTown(this.hooks.content, plan, base),
           report: (why) => toast(sentence(why)),
@@ -189,32 +225,44 @@ export class TownEditorState implements TownEditor {
     this.changed();
   }
 
-  /** The editor let go (step 2 left): its ghosts and lights taken off the town. */
+  /** The editor let go (the step left): its ghosts, zones, brush and lights taken off the town. */
   dispose(): void {
     this.attach(null);
     clearTimeout(this.noteTimer);
     menuScene.ghosts(null);
+    menuScene.brush(null);
+    menuScene.setUses(null);
+    this.usesDrawn = undefined;
   }
 
-  /** The settled town put on screen, and kept as the town the next steps read (`app.world.draft`). */
+  /** The settled town put on screen, and kept as the town the next steps read (`draft`). */
   private async show(session: EditSession, settled: Settled, plan: NeighbourhoodDraft): Promise<void> {
     const { draft, preview, marks } = settled;
     menuScene.prepare(draft, preview);
     await menuScene.show(draft, null);
-    const w = app.world;
+    const w = this.target;
     // (Not if the town was laid again meanwhile: this session's edits are of the one before.)
     if (!w || this.session !== session) return;
     const { marks: _was, ...rest } = w;
-    app.world = { ...rest, draft, plan, history: session.history, edited: session.edits > 0, ...(marks ? { marks } : {}) };
+    this.target = { ...rest, draft, plan, history: session.history, edited: session.edits > 0, ...(marks ? { marks } : {}) };
+    // (The built town changed: its households are made again in step 4.)
+    if (this.step === 'build') app.townOf = '';
   }
 
-  /** Something changed: the panel told, the ghosts drawn again, `app.world` told of the edits. */
+  /** A plan that changed its zones alone, kept with the town on screen (no settle): kept as the town the next steps read. */
+  private kept(session: EditSession, draft: NeighbourhoodDraft, plan: NeighbourhoodDraft): void {
+    const w = this.target;
+    if (!w || this.session !== session) return;
+    this.target = { ...w, draft, plan, history: session.history, edited: session.edits > 0 };
+  }
+
+  /** Something changed: the panel told, the ghosts drawn again, `app` told of the edits. */
   private changed(): void {
     this.version++;
     const s = this.session;
-    const w = app.world;
+    const w = this.target;
     if (s && w && (w.plan !== s.plan || w.edited !== s.edits > 0) && (s.edits > 0 || w.history)) {
-      app.world = { ...w, plan: s.plan, history: s.history, edited: s.edits > 0 };
+      this.target = { ...w, plan: s.plan, history: s.history, edited: s.edits > 0 };
     }
     // What was picked may have gone with the edit.
     if (this.pickedKey && s && !find(s.plan, this.pickedKey)) this.pickedKey = null;
@@ -226,12 +274,14 @@ export class TownEditorState implements TownEditor {
   apply(edited: Edited, run = false): boolean {
     const s = this.session;
     if (!s) return false;
+    const before = s.plan;
     const why = s.apply(edited, run);
     if (why) {
       this.refuse(why);
       return false;
     }
     this.note = null;
+    if (s.plan !== before) this.hooks.edited?.(before, s.plan);
     return true;
   }
 
@@ -331,6 +381,32 @@ export class TownEditorState implements TownEditor {
     if (text !== this.hintText) this.hintText = text;
   }
 
+  /** How many m a CSS px is on the land at a screen point (the Street tool's magnet reaches by it). */
+  scale(x: number, y: number): number {
+    return menuScene.scale(x, y);
+  }
+
+  brush(cursor: LandCursor | null): void {
+    menuScene.brush(cursor);
+  }
+
+  showUses(plan: NeighbourhoodDraft | null): void {
+    this.strokeUses = plan;
+    this.drawUses();
+  }
+
+  /** Step 2's zones drawn over the town, as a stroke under way or the plan has them, hatched where nothing would be built (when they changed). */
+  private drawUses(): void {
+    const plan = this.step === 'layout' && this.session ? (this.strokeUses ?? this.session.plan) : null;
+    if (plan === this.usesDrawn) return;
+    const was = this.usesDrawn;
+    this.usesDrawn = plan;
+    // (An edit that left the zones and the roads as they were leaves the overlay as it is.)
+    if (plan && was && plan.open?.uses === was.open?.uses && plan.roads === was.roads) return;
+    const layer = plan?.open?.uses ?? null;
+    menuScene.setUses(layer, layer && plan ? hatched(plan) : null);
+  }
+
   /** The camera to where a problem is (the lot of the town on screen nearest it). */
   glide(issue: Issue): void {
     const s = this.session;
@@ -369,7 +445,8 @@ export class TownEditorState implements TownEditor {
     const out: TownGhosts = { roads: [], lots: [], boxes: [] };
     for (const p of [this.selected, this.hovered]) {
       if (!p) continue;
-      if (p.kind === 'road' && s.plan.roads[p.road]) out.roads.push(roadGhost(s.plan.roads[p.road], 'new'));
+      // (A road picked or pointed at is outlined: the road shows through, never a band over it.)
+      if (p.kind === 'road' && s.plan.roads[p.road]) out.roads.push(roadGhost(s.plan.roads[p.road], 'pick'));
       else if (p.kind === 'building' && s.plan.open?.backdrop?.[p.building]) out.lots.push({ ...buildingBox(s.plan.open.backdrop[p.building]), tone: 'new' });
       else if (p.kind === 'village' && s.plan.open?.areas[p.area]) {
         const a = s.plan.open.areas[p.area];
@@ -383,6 +460,7 @@ export class TownEditorState implements TownEditor {
   private redraw(): void {
     const s = this.session;
     const t = this.templates;
+    this.drawUses();
     if (!s || !t) {
       this.drawn = null;
       menuScene.ghosts(null);
@@ -391,7 +469,8 @@ export class TownEditorState implements TownEditor {
     if (!this.editGhostsOf || this.editGhostsOf.settled !== s.settled || this.editGhostsOf.plan !== s.plan) this.editGhostsOf = { settled: s.settled, plan: s.plan, ghosts: editGhosts(s.settled, s.plan, t) };
     // (Drawn again only when they changed: a new ghost makes the renderer draw a whole frame, and the
     // pointer moves many times over while a lot's ghost stays snapped where it is.)
-    const lit = this.litGhosts();
+    // (What the last settle took back shows red for a while, under what is picked and the tool's own.)
+    const lit = joinGhosts(s.refusalGhosts(), this.litGhosts());
     const key = JSON.stringify([lit, this.toolGhosts]);
     if (this.editGhostsOf.ghosts === this.drawn?.edits && key === this.drawn.key) return;
     this.drawn = { edits: this.editGhostsOf.ghosts, key };
