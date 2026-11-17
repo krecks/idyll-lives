@@ -36,7 +36,7 @@ Build a home and watch the people who live in it.
 |---|---|
 | Left-click | A resident: their panel · an object: what to do with it · the floor: walk there |
 | Left- or middle-drag / right-drag / wheel | Rotate / pan / zoom (arrow keys and + / − too, once the view has the focus) |
-| Space, 0–4 | Pause, game speed (4: super speed, in quiet hours) |
+| Space, 0–4 | Pause, game speed (4: super speed, 30×, 60× in quiet hours) |
 | L / B | Live / Build |
 | F · H · J · P · M | Follow · whole house · journal · planner · town map |
 | Tab, double-click a card | Look at the next resident, follow one |

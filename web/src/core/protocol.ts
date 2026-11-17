@@ -17,7 +17,7 @@ export type Command =
   | { type: 'setNeed'; sim: number; need: string; value: number }
   | { type: 'setBond'; a: number; b: number; friendship?: number; romance?: number; chemistry?: number; partners?: boolean }
   | { type: 'adopt'; household: number; child: boolean }
-  /** Super speed by itself: the game goes to super speed as the player's household all falls asleep or goes out. */
+  /** Super speed by itself: the game goes to super speed as the player's household all falls asleep or goes out, and back to the speed before it as that ends. */
   | { type: 'setAutoFast'; enabled: boolean }
   | { type: 'use'; sim: number; object: number; interaction: number }
   /** Eat a serving of food (an item), or clear it away to the sink. */
@@ -1235,10 +1235,10 @@ export interface UiUpdate {
   /** 0 = Monday. */
   weekday: number;
   minute: number;
-  /** 0 paused, 1 normal, 2 fast, 3 faster (10×), 4 super speed (`SUPER_SPEED`). */
+  /** 0 paused, 1 normal, 2 fast, 3 faster (10×), 4 super speed (`SUPER_SPEED`: up to 30×, up to 60× while `quiet`). */
   speed: number;
-  /** Whether super speed may run now: everyone at home asleep or out, nothing notable there for an hour (sim-core `World::calm`). */
-  superSpeed: boolean;
+  /** Whether it is quiet at home: everyone asleep or out, nothing notable there for an hour (sim-core `World::calm`); super speed runs up to 60× then. */
+  quiet: boolean;
   autonomy: boolean;
   /** How fast residents age. */
   lifespan: Lifespan;

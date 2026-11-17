@@ -90,8 +90,8 @@ export function residentsMost(tier: FillTier = 'full'): number {
  * `tools/bench/simtick.mjs` under Node), the wasm's slowest city ran about 1,220 ticks a second in
  * full; an M1, low and medium's floor, at 0.72 of that about 880 (756 to 952 between a fanless Air
  * held at its sustained speed and one at its best), so even the M1 has room at 10× with a full town.
- * Super speed has no rate to keep up with: it runs as fast as the machine can, up to 60×, only in
- * quiet hours.
+ * Super speed has no rate to keep up with: it runs as fast as the machine can, up to 30× (60× in quiet
+ * hours).
  */
 const TIER_FOR: Record<string, FillTier> = { low: 'full', medium: 'full', high: 'full' };
 

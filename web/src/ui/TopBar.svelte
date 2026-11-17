@@ -5,7 +5,7 @@
   import { MoneyFloats, moneyChange } from './moneyFloats.svelte';
   import { services } from './services';
   import { game, nextWallMode } from './state.svelte';
-  import { SUPER_SPEED, SUPER_SPEED_WAIT } from '../game/speed';
+  import { SUPER_SPEED } from '../game/speed';
   import { dayBar } from './town/dayBar';
 
   const speeds = [
@@ -13,10 +13,8 @@
     { value: 1, icon: 'icon.ui.speed1', label: 'Normal speed (1)' },
     { value: 2, icon: 'icon.ui.speed2', label: 'Fast (2)' },
     { value: 3, icon: 'icon.ui.speed3', label: 'Faster (3)' },
-    { value: SUPER_SPEED, icon: 'icon.ui.speed4', label: 'Super speed (4): as fast as it goes while everyone at home sleeps or is out' },
+    { value: SUPER_SPEED, icon: 'icon.ui.speed4', label: 'Super speed (4): up to 30×, and up to 60× while everyone at home sleeps or is out' },
   ];
-  /** Super speed is for quiet hours only (`UiUpdate.superSpeed`): greyed out, saying why, the rest of the time. */
-  const unavailable = (value: number) => value === SUPER_SPEED && !game.superSpeed && game.speed !== SUPER_SPEED;
   const modes = [
     { id: 'live', icon: 'icon.ui.live', label: 'Live', title: 'Live (L): the household and the world, in motion' },
     { id: 'build', icon: 'icon.ui.build', label: 'Build', title: 'Build (B): furnish, build, and see how the home is doing' },
@@ -81,8 +79,7 @@
     {#if game.mode === 'live'}
       <div class="segmented speeds">
         {#each speeds as s (s.value)}
-          {@const off = unavailable(s.value)}
-          <button class:active={game.speed === s.value} class:off aria-disabled={off} title={off ? `${SUPER_SPEED_WAIT}.` : s.label} aria-label={s.label} aria-pressed={game.speed === s.value} onclick={() => services.controls.setSpeed(s.value)}>
+          <button class:active={game.speed === s.value} title={s.label} aria-label={s.label} aria-pressed={game.speed === s.value} onclick={() => services.controls.setSpeed(s.value)}>
             <Icon name={s.icon} size={15} />
           </button>
         {/each}
@@ -252,11 +249,6 @@
     background: var(--surface);
     color: var(--accent);
     box-shadow: var(--shadow-sm);
-  }
-  /* (Not `disabled`: its tooltip still says why, and a click says it again.) */
-  .speeds button.off {
-    opacity: 0.35;
-    cursor: default;
   }
   .time {
     display: flex;

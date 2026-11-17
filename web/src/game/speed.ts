@@ -12,12 +12,11 @@
 export type SpeedHold = 'loading' | 'menu' | 'build';
 
 /**
- * Super speed (sim-core `clock::SUPER_SPEED`): as fast as the machine goes, up to 60×, only while the
- * household is all asleep or out. The simulation starts it on its own too (the setting) and ends it.
+ * Super speed (sim-core `clock::SUPER_SPEED`): as fast as the machine goes, up to 30×, and up to 60× while
+ * the household is all asleep or out. With the setting the simulation goes to it on its own as the household
+ * falls quiet, and back to the speed before it as that ends; picked by the player, it stays.
  */
 export const SUPER_SPEED = 4;
-/** Why super speed can't be had now (the button's tooltip, and what pressing 4 says). */
-export const SUPER_SPEED_WAIT = 'Super speed is for quiet hours: everyone at home asleep or out, and nothing happening there for an hour';
 /** How long after a speed is sent the simulation's views may still be from before it (ms). */
 const SETTLE_MS = 300;
 
@@ -56,8 +55,8 @@ export class GameSpeed {
   }
 
   /**
-   * The simulation changed speed on its own (`speed`, from its UI view): super speed started as the
-   * household fell quiet, or ended as someone woke or came home. The player's speed follows it without
+   * The simulation changed speed on its own (`speed`, from its UI view): super speed by itself started as
+   * the household fell quiet, or ended as someone woke or came home. The player's speed follows it without
    * sending it back; under a hold, the speed given back stays as it was (the simulation leaves super
    * speed itself if it isn't quiet then). Only super speed's comings and goings, and not just after a
    * speed was sent: any other difference is a view from before the player's last pick. `now`: ms.
