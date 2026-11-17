@@ -5,28 +5,32 @@
  * - A layout untouched (its `layoutHash` the proposal's) with the proposal's own seed (`PROPOSAL_SEED`)
  *   builds the generator's town as it is (`Proposal.built`): today's town and households.
  * - Else the town is built again where the layout changed: what stands on the changed cells (and 20 m
- *   round them) or fronts a road that is gone is cleared, and the frontage there is filled again road by
- *   road, side by side, stretch by stretch (`proposal.ts` `stretchesOf`: the use most of the land 6 to
- *   18 m behind the kerb is painted), each stretch from a stream of its own (the seed, the road, the use,
- *   the side and where the stretch begins), so a stretch the player didn't touch is filled the same way
- *   whatever else changed. With another seed ("Build again"), everything zoned is built again from it.
+ *   round them) or fronts a road that is gone is cleared, and the land it stood on and the changed land
+ *   is filled again. With another seed ("Build again"), everything zoned is built again from it.
  *
- * What goes along a stretch, by its use:
- * - homes: houses of the place's lot mix at its gaps (`LotPlacer`, as `fillStreet` fills a street);
- * - terraces and flats: rows of terraced houses on about half of it (`terraceRows`), then the backdrop's
- *   houses, terraces and flats in what they leave (`BackdropPass.rowsAlong`), a row behind (`secondRow`);
- * - shops and work: the backdrop's shops, cafés, restaurants, offices and workshops (the centre's inside
- *   the town centre), a row behind, and a shop lot for an area that has none;
- * - parks and green: a park, then a playground; a green with no frontage near a town or village becomes
- *   an outdoor spot, a trail to it from the area's streets (`trailTo`);
- * - public places: the civic places the area lacks, the most needed first (`civicChoices`, its size as
- *   its homes now make it), each nearest the area's middle (`BackdropPass.putCivic`).
- * A lot or a building goes only where `SHARE` of the cells under it are painted its use and none is a
- * green; unpainted frontage stays empty, and so does land zoned more than `BUILD_REACH` m from a road.
- * The areas are those the layout has, a street drawn by hand given to the nearest within 30 m (its box
- * grown to it) or a village of its own (`areasFor`). Each changed area's parking is laid again, the
- * houses numbered along their streets, and the places named. The land is settled under it all, giving up
- * only lots and backdrop buildings (`settleLand`'s `keepRoads`: the streets were judged in step 2).
+ * The land is filled as the generator lays a town, area by area (the main town first), each lot and
+ * building on land painted its use (`painted`: `SHARE` of the cells under it, none green, little public
+ * land but a civic place's), and each step from a stream of its own (the seed and the area, the road):
+ * - the public places the area had there and those its lot mix wants (`wantedLots`), a shop on shops and
+ *   work, a park or a playground on green; a park on each green the roads go round, one along each green
+ *   stretch (`stretchesOf`), and a shop lot for an area with shops and none;
+ * - terraced rows along terraces and flats (`rowHouse`, `LotPlacer.placeRow`), as many as the main town's
+ *   or as were cleared, and half the land newly painted holds;
+ * - houses of the place's lot mix along homes (`LotPlacer`, no gaps drawn: the land painted has them),
+ *   none in a town centre;
+ * - an outdoor spot on each green with no frontage and each patch of green the lots leave, sited as the
+ *   generator sites one (`siteIn`), a trail to it from the area's streets (`trailTo`);
+ * - the backdrop: the civic places the area lacks, the most needed first (`civicChoices`, its size as its
+ *   homes now make it), along the runs of public frontage nearest its heart, as wide and deep as the land
+ *   lets them be (`BackdropPass.putCivic`); rows along every road with land painted beside it, of the
+ *   kinds the land asks for (`BackdropPass.rowsAlong`'s `kindsAt`), a row behind (`secondRow`), and a
+ *   building on each patch of painted land still empty (`infillPoints`).
+ * Unpainted land stays empty, and so does land zoned more than `BUILD_REACH` m from a road. The areas
+ * are those the layout has, a street drawn by hand given to the nearest within 30 m (its box grown to
+ * it) or a village of its own (`areasFor`); a village left with fewer than `VILLAGE_LOTS` lots goes with
+ * the nearest area. Each changed area's parking is laid again, the houses numbered along their streets,
+ * and the places named. The land is settled under it all, giving up only lots and backdrop buildings
+ * (`settleLand`'s `keepRoads`: the streets were judged in step 2).
  */
 
 import type { Content } from '../content/content';
@@ -56,6 +60,8 @@ export const PROPOSAL_SEED = 0;
 
 /** A lot or a building goes where this share of the cells under it at least are painted its use (and none a green, but a green's). */
 export const SHARE = 0.6;
+/** The share of what is under a lot or a building that may be public land but a civic place's (the civic places go down after the lots). */
+const PUBLIC_TAKEN = 0.1;
 /** What stands within this many cells (20 m) of a changed cell is built again. */
 const DIRTY_GROW = 5;
 /** A street drawn by hand this near an area's box (m) is one of its streets; a stretch this near grows it. */
@@ -150,16 +156,17 @@ function polyCells(poly: readonly Pt[], cols: number, rows: number): number[] {
   return out;
 }
 
-/** Whether `cells` (of `codes`) are painted `kind` enough for a lot or a building of it: `SHARE` of them at least, none a green but a green's. */
+/** Whether `cells` (of `codes`) are painted `kind` enough for a lot or a building of it: `SHARE` of them at least, none a green but a green's, and little public land (`PUBLIC_TAKEN`) but a civic place's. */
 function painted(codes: Uint8Array, cells: readonly number[], kind: UseKind): boolean {
   if (!cells.length) return false;
-  const [code, green] = [USE_CODE[kind], USE_CODE.green];
-  let n = 0;
+  const [code, green, civic] = [USE_CODE[kind], USE_CODE.green, USE_CODE.public];
+  let [n, other] = [0, 0];
   for (const c of cells) {
     if (codes[c] === code) n++;
     else if (codes[c] === green) return false;
+    else if (codes[c] === civic) other++;
   }
-  return n >= SHARE * cells.length;
+  return n >= SHARE * cells.length && other <= PUBLIC_TAKEN * cells.length;
 }
 
 // ---- areas ------------------------------------------------------------------------------------------
@@ -461,7 +468,7 @@ function siteIn(place: PublicTemplate, cells: readonly number[], home: Pt, land:
       if (trees < 5) continue;
       score = -trees + land.slope(land.cell(c[0], c[1])) * 60;
     } else score = land.woods[land.cell(c[0], c[1])] * 4 + land.slope(land.cell(c[0], c[1])) * 60;
-    // (Nearer the patch's own middle the better, a little: a tie goes to the middle.)
+    // (Only a site that would score better is tested.)
     if (best && score >= best.score) continue;
     const facing = (Math.abs(n[1]) >= Math.abs(n[0]) ? (n[1] > 0 ? 0 : 2) : n[0] > 0 ? 1 : 3) as Facing;
     const [w, d] = facing % 2 ? [frame.depth, frame.width] : [frame.width, frame.depth];
@@ -535,11 +542,19 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   // ---- what of the proposal's town stays ----
   let draft: NeighbourhoodDraft = { ...plan, slots: [], households: [], open: { ...open, backdrop: [], places: [], parking: [], pads: {} }, diagnostics: { dropped: [], ...(plan.diagnostics?.roads ? { roads: plan.diagnostics.roads } : {}) } };
   const touched = new Set<number>();
+  /** The lots of the proposal's town cleared (their areas the layout's): what the frontage they stood on had, for the fill to go by. */
+  const cleared: PlotSlot[] = [];
   let roads = plan.roads;
   if (town?.open) {
     const areaMap = town.open.areas.map((a) => open.areas.findIndex((b) => b.name === a.name));
     const gone = clearedFor(town, plan, t, dirty, zoned, areaMap);
     for (const i of gone.lots) touched.add(areaMap[town.slots[i].area ?? 0]);
+    cleared.push(...[...gone.lots].map((i) => ({ ...town.slots[i], area: areaMap[town.slots[i].area ?? 0] })));
+    // (The land what was cleared stood on is built again too, all of it.)
+    if (!full) {
+      for (const i of gone.lots) for (const k of rectCells(plotRect(t, town.slots[i]), cols, rows)) dirty[k] = 1;
+      for (const i of gone.backdrop) for (const k of polyCells(town.open.backdrop![i].poly, cols, rows)) dirty[k] = 1;
+    }
     for (const i of gone.backdrop) touched.add(areaMap[town.open.backdrop![i].area]);
     const left = removeLots(town, gone.lots, gone.backdrop);
     const lo = left.open!;
@@ -643,7 +658,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   };
   const wanted = (a: number) => byArea[a].length > 0 && (full || touched.has(a));
 
-  // ---- the civic places: those each area lacks (`civicChoices`), the most needed first, nearest its heart, where painted public ----
+  // ---- where the civic places go (laid with the backdrop): along the public frontage nearest each area's heart ----
   // (The public frontage in runs along each road's side, m along it, each with the area it is nearest and what civic places take of it.)
   const publicRuns: { r: number; side: 1 | -1; s0: number; s1: number; mid: Pt; area: number; taken: [number, number][] }[] = [];
   for (const r of frontedRoads) {
@@ -667,7 +682,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
       if (s0 >= 0) close(L - RUN_STEP / 2);
     }
   }
-  /** The civic places area `a` of `from` lacks (`civicChoices`), the most needed first, each on the run of public frontage nearest the area's heart it fits snugly (else any it fits), as wide as the run lets it be. The buildings laid. */
+  /** The civic places area `a` of `from` lacks (`civicChoices`), the most needed first, each on the run of public frontage nearest the area's heart it fits along, as wide and deep as the land lets it be (`pass.putCivic`). The buildings laid. */
   const civicIn = (pass: BackdropPass, from: NeighbourhoodDraft, a: number): number[] => {
     const heart = heartOf(a);
     const runs = publicRuns.filter((q) => q.area === a).sort((x, y) => dist(x.mid, heart) - dist(y.mid, heart));
@@ -709,14 +724,6 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
     pass.allow = undefined;
     return laid;
   };
-  {
-    const pass = new BackdropPass({ draft, t, content, squares: 'outline' });
-    const laid = areas.flatMap((_, a) => (wanted(a) ? civicIn(pass, draft, a) : []));
-    if (laid.length) {
-      const places = pass.placesFor(laid, mulberry32(mix(seed, 'civic places')));
-      draft = { ...draft, open: { ...draft.open!, backdrop: pass.result().backdrop, places: [...(draft.open!.places ?? []), ...places] } };
-    }
-  }
 
   // ---- the lots, area by area as the generator lays them: the public places, the terraces, the houses ----
   const ground = townGround(draft, t);
@@ -755,12 +762,14 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
     placers.push(placer);
     const lots = fronts.filter(corners);
     const along = (kind: UseKind, list = lots) => list.filter((f) => behind(f.road, f.p, f.n, kind));
-    // The public places the area's lot mix wants (as `wantedLots` draws them for the main town or a village) and it hasn't: a shop on land painted shops, a park on green.
+    // The public places cleared from it and those the area's lot mix wants (as `wantedLots` draws them for the main town or a village) it hasn't: a shop on land painted shops, a park on green.
     const size: SizeSpec = a === 0 ? { ...spec.town, lots: 0, farms: [0, 0] } : { box: spec.hamlet.box, lots: 0, scale: spec.hamlet.scale, places: spec.hamlet.places, farms: [0, 0] };
     const has = new Set([...draft.slots, ...newSlots()].flatMap((s) => ((s.area ?? 0) === a && s.kind !== 'house' ? [s.template] : [])));
     if (greenParks.has(a)) has.add(GREEN_LOTS[0]);
     const [shops, greens] = [along('shops'), along('green')];
-    for (const u of wantedLots(content, t, spec, size, rand, a === 0 ? { park: true } : { park: false, avoid: ['market'] })) {
+    // (Those cleared first, then those its lot mix wants.)
+    const again = cleared.flatMap((s): Unplaced[] => (s.area === a && s.kind !== 'house' && s.kind !== 'outdoor' ? [publicLot(t, s.template, a)].filter((u): u is Unplaced => !!u) : []));
+    for (const u of [...again, ...wantedLots(content, t, spec, size, rand, a === 0 ? { park: true } : { park: false, avoid: ['market'] })]) {
       if (u.kind === 'house' || has.has(u.template)) continue;
       const kind: UseKind = u.kind === 'shop' || u.template === 'market' ? 'shops' : 'green';
       if (placePainted(placer, t, roads, [{ ...u, area: a }], kind === 'shops' ? shops : greens, mask, cols, rows, kind)) has.add(u.template);
@@ -777,13 +786,15 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
       if (u) placePainted(placer, t, roads, [u], greens.filter((f) => f.road === st.road && f.side === st.side && f.s >= st.s0 && f.s <= st.s1), mask, cols, rows, 'green');
     }
     // Terraces: rows of terraced houses along the land painted terraces and flats (off the centre), down to a pair,
-    // as many as the main town's terraces (`WorldSpec.terraces`) less those standing, and of the land newly painted
-    // terraces and flats as much again as half of it holds (the rest the backdrop's terraces and flats).
+    // as many as the main town's terraces (`WorldSpec.terraces`) less those standing (as many as were cleared, at
+    // least), and of the land newly painted terraces and flats as much again as half of it holds (the rest the
+    // backdrop's terraces and flats).
     const rowFronts = along('rows', fronts).filter((f) => !inCentre(draft, [f.p[0] + f.n[0] * 10, f.p[1] + f.n[1] * 10]));
     const rowSpec = { rows: spec.rows[1] >= 2 ? spec.rows : ([2, 4] as [number, number]) };
     const standing = draft.slots.filter((s) => s.lot === 'terrace' && (s.area ?? 0) === a).length;
     const drawn = a === 0 ? spec.terraces[0] + Math.floor(rand() * (spec.terraces[1] - spec.terraces[0] + 1)) : 0;
-    let left = Math.max(0, drawn - standing) + Math.round((freshRows[a] * USE_CELL * USE_CELL * TERRACE_SHARE) / TERRACE_LOT);
+    const gone = cleared.filter((s) => s.lot === 'terrace' && s.area === a).length;
+    let left = Math.max(0, drawn - standing, gone) + Math.round((freshRows[a] * USE_CELL * USE_CELL * TERRACE_SHARE) / TERRACE_LOT);
     for (let k = 0; k < 400 && left >= 2 && rowFronts.length; k++) {
       let n = rowSpec.rows[0] + Math.floor(rand() * (rowSpec.rows[1] - rowSpec.rows[0] + 1));
       n = Math.min(n, left - (left - n === 1 ? 1 : 0));
@@ -876,7 +887,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   // ---- the backdrop, as the generator lays it: rows along the roads, a row behind, the blocks filled in; each building on land painted its use ----
   const pass = new BackdropPass({ draft, t, content, squares: 'outline' });
   const from = pass.count;
-  // (Civic places the area's homes now make it big enough for, that it lacked before its lots went down.)
+  // (First the civic places, of the sizes the areas' homes make them.)
   for (const [a] of areas.entries()) if (wanted(a)) civicIn(pass, draft, a);
   pass.allow = (poly, use) => {
     const kind = USE_OF[use];

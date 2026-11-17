@@ -415,7 +415,7 @@ const ROW_HOME_FRONT = 17;
 const SHOP_CELLS = 14.5;
 const FIRST_PARK = 26;
 const CIVIC_SHORT = 0.8;
-const CIVIC_GAP = 2;
+const CIVIC_GAP = 5;
 /** How far behind the kerb (m) public land is read for a civic place: its front and its middle. */
 const CIVIC_DEEP = [6, 12];
 /** Of the terraces and flats away from the main town, the share terraced homes take (Build's `TERRACE_SHARE`). */

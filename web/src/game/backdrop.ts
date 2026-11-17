@@ -1030,13 +1030,13 @@ export class BackdropPass {
       while (s < end) {
         const probe = this.frontAt(r, s, side, 6, ls).c;
         // (The kinds the land asks for here, if it is asked: on along the road where it asks for none.)
-        let kinds = kindsAt ? kindsAt(this.frontAt(r, Math.min(s + 3, L), side, 6, ls).c) : limits.kinds;
+        let kinds = kindsAt ? kindsAt(this.frontAt(r, Math.min(s + 1, L), side, 6, ls).c) : limits.kinds;
         if (kinds === null) {
           s += 2;
           continue;
         }
-        if (kindsAt && (kinds !== runKinds || s + 3 >= runEnd)) {
-          let x = s + 3;
+        if (kindsAt && (kinds !== runKinds || s + 1 >= runEnd)) {
+          let x = s + 1;
           while (x + 2 <= L && kindsAt(this.frontAt(r, x + 2, side, 6, ls).c) === kinds) x += 2;
           [runKinds, runEnd] = [kinds, x + 1];
         }
