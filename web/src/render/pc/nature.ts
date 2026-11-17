@@ -39,7 +39,7 @@ import type { Lighting } from '../shared/environment';
 import { grassField, gustAt, gustNoise, markGrassPatches, recolourGrass, regroundGrass, type GrassQuality } from '../shared/grass';
 import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { pondQuads, rectBox } from '../shared/landBake';
-import { PAD_RECTS, padGeometry, padRects, padsOf } from '../shared/pads';
+import { padGeometry, padMask, padsOf } from '../shared/pads';
 import { LAND_CELL, type LandRect } from '../../game/land';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
@@ -330,6 +330,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     disposeTiles(this.tiles);
     this.tiles = [];
     this.groundMats = null;
+    this.padTexture?.destroy();
+    this.padTexture = null;
     this.slabMaterial = null;
     this.woodsSquares = [];
     this.flowerSquares = [];
@@ -967,12 +969,12 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private groundMaterial(app: pc.AppBase): pc.StandardMaterial {
     const material = MaterialLibrary.for(app).surface('material.ground', { vertexColors: true, variant: this.surface ? 'grassPads' : 'grass' });
     grassGround(app.graphicsDevice, material);
-    if (this.surface) padMasked(material);
+    if (this.surface) padMasked(app.graphicsDevice, material);
     return material;
   }
 
   /**
-   * On a land the town follows: the lots each terrain draw leaves out (`grounds`, by tile), and each lot's slab at its pad (the
+   * On a land the town follows: the lots the terrain leaves out (the pad mask, a byte a metre: `grounds`' material), and each lot's slab at its pad (the
    * ground's own material, its colours the terrain's there) and its retaining edges (the foundations' stone, tinted) in a draw
    * of each per ground tile.
    */
@@ -982,15 +984,16 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     const pads = padsOf(surface, this.world?.plots.length ?? 0);
     const { x0, z0, size } = this.tileFrame();
     const count = Math.ceil(size / TILE);
-    // Each ground tile's draw leaves out the lots on it (a little past it: its skirt, its coarser levels).
-    grounds.forEach((g, k) => {
+    // The terrain leaves out the lots: a byte a metre over the world.
+    const [w, d] = [Math.ceil(this.w), Math.ceil(this.d)];
+    this.padTexture?.destroy();
+    const mask = (this.padTexture = new pc.Texture(device, { name: 'padMask', width: w, height: d, format: pc.PIXELFORMAT_R8, mipmaps: false, minFilter: pc.FILTER_NEAREST, magFilter: pc.FILTER_NEAREST, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [padMask(pads, w, d)] }));
+    const area = new Float32Array([0, 0, w, d]);
+    for (const g of grounds) {
       const mi = g.render!.meshInstances[0];
-      const t = this.tiles[k];
-      const rects = new Float32Array(PAD_RECTS * 4);
-      const n = t ? padRects(pads, [t.x - TILE / 2 - 4, t.z - TILE / 2 - 4, t.x + TILE / 2 + 4, t.z + TILE / 2 + 4], rects) : 0;
-      mi.setParameter('game_padRects[0]', rects);
-      mi.setParameter('game_padCount', n);
-    });
+      mi.setParameter('game_padMask', mask);
+      mi.setParameter('game_padArea', area);
+    }
     const groupOf = (x: number, z: number) => Math.max(0, Math.min(count - 1, Math.floor((z - z0) / TILE))) * count + Math.max(0, Math.min(count - 1, Math.floor((x - x0) / TILE)));
     const geos = padGeometry(
       (x, z) => this.terrainAt(x, z),
@@ -1016,6 +1019,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   }
   /** The slabs' material (`padDraws`). */
   private slabMaterial: pc.StandardMaterial | null = null;
+  /** The pad mask (`padDraws`). */
+  private padTexture: pc.Texture | null = null;
   private groundMats: pc.StandardMaterial[] | null = null;
 
   /** Crown clusters gathered from the woods (for the report), 0 without them. */
@@ -1199,14 +1204,17 @@ function writeVertices(mesh: pc.Mesh, streams: Record<string, Float32Array>, cou
   return true;
 }
 
-/** The pad mask's define on the terrain's material (`padDraws` sets each draw's own lots): none until a draw has some. */
+/** The pad mask's define on the terrain's material (`padDraws` sets each draw's own mask): an empty one until a draw has one. */
 const padMasks = new WeakSet<pc.StandardMaterial>();
-function padMasked(material: pc.StandardMaterial): void {
+const noPads = new WeakMap<pc.GraphicsDevice, pc.Texture>();
+function padMasked(device: pc.GraphicsDevice, material: pc.StandardMaterial): void {
   if (padMasks.has(material)) return;
   padMasks.add(material);
+  let none = noPads.get(device);
+  if (!none) noPads.set(device, (none = new pc.Texture(device, { name: 'noPads', width: 1, height: 1, format: pc.PIXELFORMAT_R8, mipmaps: false, levels: [new Uint8Array(1)] })));
   material.setDefine('GAME_PAD_MASK', '');
-  material.setParameter('game_padRects[0]', new Float32Array(PAD_RECTS * 4));
-  material.setParameter('game_padCount', 0);
+  material.setParameter('game_padMask', none);
+  material.setParameter('game_padArea', new Float32Array(4));
   material.update();
 }
 

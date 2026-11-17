@@ -46,14 +46,13 @@
  * in game space, read `game_grassEye`).
  *
  * `GAME_PAD_MASK`, on the terrain of a land the town follows (`pc/nature.ts`): no ground is drawn inside a lot,
- * whose pad is a slab of its own at its level: each ground tile's draw has the lots on it as up to `PAD_RECTS`
- * rectangles (`game_padRects`: x0, z0, x1, z1 in game space; `game_padCount` of them; `shared/pads.ts` `padRects`).
- * (Not a texture: the ground's shader has every texture unit WebGL2 gives it already.)
+ * whose pad is a slab of its own at its level: `game_padMask` has a byte a metre (`shared/pads.ts` `padMask`) over
+ * `game_padArea` (its corner in game space and its size in metres), set inside a lot. (A texture unit WebGL2 has
+ * for it since the ground reads no room's masks, `GAME_OUTDOORS`.)
  */
 
 import { codeFor, float as f, type ShaderFeature } from './chunks';
 import { GRASS, GRASS_PUSHERS, GUST_ROTATION } from '../../shared/grass';
-import { PAD_RECTS } from '../../shared/pads';
 import { tuned } from '../../tune';
 
 /**
@@ -242,7 +241,6 @@ ${windDecl}
   /** Whether `t` (a point over the town's size) is in the town. */
   const inTown = (t: string) => (wgsl ? `all(${t} >= vec2f(0.0)) && all(${t} < vec2f(1.0))` : `all(greaterThanEqual(${t}, vec2(0.0))) && all(lessThan(${t}, vec2(1.0)))`);
   const loop = wgsl ? `for (var gi = 0; gi < ${GRASS_PUSHERS}; gi++)` : `for (int gi = 0; gi < ${GRASS_PUSHERS}; gi++)`;
-  const padLoop = wgsl ? `for (var pmI = 0; pmI < ${PAD_RECTS}; pmI++)` : `for (int pmI = 0; pmI < ${PAD_RECTS}; pmI++)`;
   const select = (a: string, b: string, cond: string) => (wgsl ? `select(${b}, ${a}, ${cond})` : `(${cond} ? ${a} : ${b})`);
 
   const vsLocal = `
@@ -359,8 +357,8 @@ ${windDecl}
 	varying vGameGrass: vec4f;
 #endif
 #if defined(GAME_PAD_MASK) && !defined(SHADOW_PASS)
-	uniform game_padRects: array<vec4f, ${PAD_RECTS}>;
-	uniform game_padCount: f32;
+	var game_padMask: texture_2d<f32>;
+	uniform game_padArea: vec4f;
 #endif
 #if defined(GAME_GRASS_GROUND) && !defined(SHADOW_PASS)
 ${windDecl}
@@ -383,8 +381,8 @@ ${windDecl}
 	varying vec4 vGameGrass;
 #endif
 #if defined(GAME_PAD_MASK) && !defined(SHADOW_PASS)
-	uniform vec4 game_padRects[${PAD_RECTS}];
-	uniform float game_padCount;
+	uniform highp sampler2D game_padMask;
+	uniform vec4 game_padArea;
 #endif
 #if defined(GAME_GRASS_GROUND) && !defined(SHADOW_PASS)
 ${windDecl}
@@ -403,14 +401,10 @@ ${windDecl}
 #if defined(GAME_PAD_MASK) && !defined(SHADOW_PASS)
 	{
 		// (Inside a lot the ground is its pad's slab.)
-		${d('pmQ', v2)} = gamePos(vPositionW).xz;
-		${d('pmIn', 'bool', true)} = false;
-		${padLoop} {
-			if (${wgsl ? 'f32' : 'float'}(pmI) >= ${u('game_padCount')}) { break; }
-			${d('pmR', v4)} = ${u('game_padRects')}[pmI];
-			if (pmQ.x > pmR.x && pmQ.y > pmR.y && pmQ.x < pmR.z && pmQ.y < pmR.w) { pmIn = true; break; }
+		${d('pmT', v2)} = floor(gamePos(vPositionW).xz - ${u('game_padArea')}.xy);
+		if (pmT.x >= 0.0 && pmT.y >= 0.0 && pmT.x < ${u('game_padArea')}.z && pmT.y < ${u('game_padArea')}.w) {
+			if (${wgsl ? 'textureLoad(game_padMask, vec2<i32>(pmT), 0)' : 'texelFetch(game_padMask, ivec2(pmT), 0)'}.r > 0.5) { discard; }
 		}
-		if (pmIn) { discard; }
 	}
 #endif
 #if defined(GAME_GRASS) && !defined(SHADOW_PASS)
