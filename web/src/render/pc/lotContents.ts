@@ -29,7 +29,7 @@ import { ItemLayer } from './items';
 import { shadowOnlyLayer } from './layers';
 import { MaterialLibrary } from './materials';
 import { ATLAS_TILE_SEMANTIC, installGameChunks } from './shaders/chunks';
-import { buildModel, disposeTemplate, glowByInstance, type MirrorSurface, type ModelTemplate } from './models';
+import { buildModel, disposeTemplate, glowByInstance, readMesh, type MirrorSurface, type ModelTemplate } from './models';
 import type { GrassPusher } from './grass';
 import { setDaylight } from './daylight';
 import { CloudShadows } from './cloudShadows';
@@ -1344,8 +1344,8 @@ export class LotContents {
     const m = pop.matrices.subarray(pop.index * 16, pop.index * 16 + 16);
     const all: number[] = [];
     for (const draw of pop.meshes) {
-      const v: number[] = [];
-      if (!draw.mesh.getPositions(v)) continue;
+      const v = readMesh(draw.mesh)?.positions;
+      if (!v) continue;
       const step = 3 * Math.max(1, Math.floor(v.length / 3 / max));
       for (let i = 0; i < v.length; i += step) {
         const [x, y, z] = [v[i], v[i + 1], v[i + 2]];

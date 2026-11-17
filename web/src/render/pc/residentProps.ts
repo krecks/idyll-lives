@@ -13,13 +13,13 @@
 
 import * as pc from './engine';
 import { Instances } from './instancing';
-import { buildModel, disposeTemplate, releaseTemplateFile, retellModelFileArrived, uploadData, type ModelMesh, type ModelTemplate } from './models';
+import { buildModel, disposeTemplate, readMesh, releaseTemplateFile, retellModelFileArrived, uploadData, type ModelMesh, type ModelTemplate } from './models';
 import type { AssetRegistry } from '../../assets/registry';
 import type { PartColors } from '../../core/protocol';
 import { partColors } from '../shared/characters/parts';
 import { invert } from '../shared/math';
 import { ITEM_STAND_IN, painted } from '../shared/modelEntry';
-import { bakeData, type VData } from '../shared/modelParts';
+import { bakeData } from '../shared/modelParts';
 import { TemplateCache } from '../shared/templateCache';
 
 export interface Prop {
@@ -140,7 +140,7 @@ export class ResidentProps {
     const local = invert(motion.rests[j], new Float32Array(16));
     const top: [number, number, number] = [0, -Infinity, 0];
     const meshes = keep.map((m) => {
-      const data = bakeData(readData(m.mesh), local);
+      const data = bakeData(readMesh(m.mesh) ?? { positions: new Float32Array(0), normals: null, indices: new Uint32Array(0) }, local);
       const p = data.positions;
       for (let v = 1; v < p.length; v += 3) if (p[v] > top[1]) [top[0], top[1], top[2]] = [p[v - 1], p[v], p[v + 1]];
       m.mesh.destroy();
@@ -156,23 +156,3 @@ function destroyProp(p: Prop): void {
   releaseTemplateFile(p.template);
 }
 
-/** A mesh's vertices back from it (as `uploadData` made it). */
-function readData(mesh: pc.Mesh): VData {
-  const n = mesh.vertexBuffer?.getNumVertices() ?? 0;
-  const positions = new Float32Array(n * 3);
-  mesh.getPositions(positions);
-  const normals = new Float32Array(n * 3);
-  const uvs = new Float32Array(n * 2);
-  const colors = new Float32Array(n * 4);
-  const tangents = new Float32Array(n * 4);
-  const indices: number[] = [];
-  mesh.getIndices(indices);
-  return {
-    positions,
-    normals: mesh.getNormals(normals) ? normals : null,
-    uvs: mesh.getUvs(0, uvs) ? uvs : null,
-    colors: mesh.getColors(colors) ? colors : null,
-    tangents: mesh.getVertexStream(pc.SEMANTIC_TANGENT, tangents) ? tangents : null,
-    indices: Uint32Array.from(indices),
-  };
-}

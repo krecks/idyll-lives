@@ -13,6 +13,7 @@
  */
 
 import * as pc from './engine';
+import { readMesh } from './models';
 import type { PopTarget } from './objectMotion';
 
 /** A body mesh to merge: its vertices (local), and its copies' matrices (game space, 16 floats each). */
@@ -39,6 +40,7 @@ interface Chunk {
 /** One body mesh's copies: its vertices, and for each copy the chunk it's in and the vertex it starts at there. */
 interface Part {
   pos: Float32Array;
+  idx: Uint32Array;
   matrices: Float32Array;
   count: number;
   chunk: Uint16Array;
@@ -51,6 +53,11 @@ export class ObjectShadows {
   /** Each body mesh's copies, by their matrix buffer (the one a `PopTarget` writes). */
   private readonly parts = new Map<Float32Array, Part[]>();
   private readonly material: pc.StandardMaterial;
+  /**
+   * Each body mesh's vertices and triangles as last read (`readMesh`: built again from its file, the
+   * mesh keeping no copy): read once, not at every build. By mesh, let go of with it.
+   */
+  private readonly read = new WeakMap<pc.Mesh, { pos: Float32Array; idx: Uint32Array }>();
 
   constructor(
     private readonly device: pc.GraphicsDevice,
@@ -69,16 +76,20 @@ export class ObjectShadows {
   build(sources: readonly ShadowSource[]): void {
     this.clear();
     // Each copy goes whole into the chunk being filled, or starts the next one.
-    const parts: (Part & { idx: number[] })[] = [];
+    const parts: Part[] = [];
     const sizes: { vertices: number; indices: number }[] = [];
     let open = { vertices: 0, indices: 0 };
     for (const { mesh, matrices, count } of sources) {
-      const pos: number[] = [];
-      const idx: number[] = [];
-      if (!count || !mesh.getPositions(pos) || !mesh.getIndices(idx) || !idx.length) continue;
+      let read = count ? this.read.get(mesh) : undefined;
+      if (count && !read) {
+        const data = readMesh(mesh);
+        if (data) this.read.set(mesh, (read = { pos: data.positions, idx: data.indices }));
+      }
+      if (!read || !read.idx.length) continue;
+      const { pos, idx } = read;
       const n = pos.length / 3;
       // (A mesh bigger than a chunk has chunks of its own, a copy each.)
-      const part = { pos: new Float32Array(pos), idx, matrices, count, chunk: new Uint16Array(count), first: new Uint32Array(count) };
+      const part = { pos, idx, matrices, count, chunk: new Uint16Array(count), first: new Uint32Array(count) };
       for (let i = 0; i < count; i++) {
         if (open.vertices && open.vertices + n > CHUNK_VERTICES) {
           sizes.push(open);

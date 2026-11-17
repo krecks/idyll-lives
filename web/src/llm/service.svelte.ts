@@ -12,6 +12,7 @@ import { inferenceSlot, settle, whenModelsMayStart } from '../ml/schedule.svelte
 import type { ChatMessage } from './chat';
 import type { GenParams, GenResult } from './generate';
 import { MODEL } from './models';
+import { LOW_MEMORY } from '../settings/lowMemory';
 import type { FromLlmWorker, ToLlmWorker } from './protocol';
 
 export type LlmState = 'off' | 'loading' | 'ready' | 'error';
@@ -125,6 +126,15 @@ export async function ensureLlm(): Promise<void> {
     post({ type: 'load', base: import.meta.env.BASE_URL, model: MODEL });
   }
   return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
+}
+
+/**
+ * A line wants writing and the model isn't up: on a machine low on memory, where it doesn't load as
+ * the game starts (`talk/talk.svelte.ts`), it starts now; the lines after this one are written once
+ * it's ready.
+ */
+export function wantLlm(): void {
+  if (LOW_MEMORY && llmStatus.state === 'off') void ensureLlm().catch(() => {});
 }
 
 /** Whether a reply can be started now. */

@@ -85,7 +85,7 @@ const options = { has: () => true, entry: () => undefined, lived: true, ground: 
 /** What a chunk draws, as text (vertex positions rounded, instances), to compare two plans of it. */
 function drawn(c: ChunkPlan): string {
   const r = (v: number) => (Math.round(v * 1000) / 1000 + 0).toFixed(3);
-  const geo = (pos: number[]) => pos.map(r).join(',');
+  const geo = (pos: ArrayLike<number>) => Array.from(pos, r).join(',');
   return JSON.stringify([
     c.silhouettes.parts.map((p) => [p.name, geo(p.geo.pos)]),
     c.silhouettes.homes.map((h) => geo(h.panes.pos)),

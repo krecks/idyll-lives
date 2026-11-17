@@ -12,7 +12,7 @@ import { GROUND_TILE, LandscapeLayout, WATER_Y } from '../src/render/shared/natu
 import { islandWorld, riverWorld, RIVER, SIDE } from './support/landFixtures';
 
 /** The bounds of a geometry's vertices (x, y, z), and the vertices themselves. */
-function bounds(pos: readonly number[]): { min: number[]; max: number[]; at: [number, number, number][] } {
+function bounds(pos: ArrayLike<number>): { min: number[]; max: number[]; at: [number, number, number][] } {
   const at: [number, number, number][] = [];
   for (let i = 0; i < pos.length; i += 3) at.push([pos[i], pos[i + 1], pos[i + 2]]);
   const min = [0, 1, 2].map((k) => Math.min(...at.map((p) => p[k])));

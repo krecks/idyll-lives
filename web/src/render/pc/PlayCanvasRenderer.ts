@@ -44,7 +44,8 @@ import { ENV_UNITS, SKY_UNITS, SUN_UNITS } from './lightUnits';
 import { MaterialLibrary, SUN_LIGHT_MASK } from './materials';
 import { drawMesh, meshFrom } from './meshes';
 import { Mirrors } from './mirrors';
-import { buildModel, fileImported, importAhead, modelFilesSettled, onModelFileArrived, type ModelTemplate } from './models';
+import { buildModel, fileImported, importAhead, modelFileCensus, modelFilesSettled, onModelFileArrived, type ModelTemplate } from './models';
+import { memoryCensus } from './memoryCensus';
 import { GameBirds } from './birds';
 import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming';
 import { SamplerCheck } from './samplerCheck';
@@ -133,6 +134,7 @@ import type {
   RendererDeps,
   RenderStats,
   RenderVram,
+  MemoryCensus,
   ResizeHandle,
   RoomOverlayTile,
   SeenBird,
@@ -3131,7 +3133,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return run;
   }
 
-  async hideTown(glide = 0): Promise<void> {
+  async hideTown(glide = 0, letGo = false): Promise<void> {
     // Let a pending overview build finish first, so it can't switch back to the overview later.
     this.townTicket++;
     await this.townQueue;
@@ -3149,7 +3151,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       });
       this.flyingIn = false;
     }
-    if (this.townMode) this.leaveTown();
+    if (this.townMode) this.leaveTown(letGo);
+    if (letGo) await this.townQueue;
   }
 
   setTownShot(shot: TownShot, cut = false): void {
@@ -3425,8 +3428,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lastLightMinute = -1;
   }
 
-  /** The game comes on screen again (the menus' town is let go a moment later: `releaseTown`). */
-  private leaveTown(): void {
+  /** The game comes on screen again (the menus' town is let go a moment later, or at once with `letGo`: `releaseTown`). */
+  private leaveTown(letGo = false): void {
     this.townMode = false;
     this.landHaze?.show(false);
     // (The game has no ghosts: drawn again over the town when it is shown again.)
@@ -3434,7 +3437,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     setDatum(this.root, this.lotRoot, this.datum);
     this.lot.datum = this.datum;
     const ticket = this.townTicket;
-    setTimeout(() => this.releaseTown(ticket), TOWN_RELEASE_MS);
+    if (letGo) this.releaseTown(ticket);
+    else setTimeout(() => this.releaseTown(ticket), TOWN_RELEASE_MS);
     this.shaderWatch.phase = 'game';
     this.birdLife.setTown(false);
     this.applyDig(); // (the basement and windowless rooms dark again.)
@@ -3648,6 +3652,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       residentsMs: this.characters?.updateMs ?? 0,
       vram: this.vram(),
     };
+  }
+
+  memoryCensus(): MemoryCensus | null {
+    return this.app ? memoryCensus(this.app, modelFileCensus(this.app)) : null;
   }
 
   /** The device's own GPU memory counters, bytes; null before the app exists. */

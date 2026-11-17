@@ -1963,7 +1963,8 @@ const CROWN = { leaf: '#4F6E33', birch: '#6E8A42', needle: '#36503C', fruit: '#5
 
 /** A crown cluster's mesh: a low dome over a trunk's gap (unit: radius 1, from 0.3 to 1 up), smooth-shaded; a conifer's a cone. */
 function crownMesh(cone: boolean): Geo {
-  const g = new Geo();
+  // (White at 0.45 alpha, the cutaway's keep-everything: what its vertices were given one by one.)
+  const g = new Geo().color('#FFFFFF', 0.45);
   const n = 10;
   // Rings up the crown (height, radius), and the dome's middle its normals point out from.
   const rings: [number, number][] = cone ? [[0.22, 0.6], [0.5, 0.42], [0.78, 0.2], [1, 0]] : [[0.3, 0.7], [0.48, 0.97], [0.7, 0.88], [0.88, 0.55], [1, 0]];
@@ -1971,12 +1972,7 @@ function crownMesh(cone: boolean): Geo {
   const squash = cone ? 0.5 : 1.4;
   const vertex = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => {
     const l = Math.hypot(nx, ny, nz) || 1;
-    g.pos.push(x, y, z);
-    g.nor.push(nx / l, ny / l, nz / l);
-    g.uv.push(0, 0);
-    g.col.push(1, 1, 1, 0.45);
-    g.cut.push(15, 0, 15, 0);
-    return g.pos.length / 3 - 1;
+    return g.point([x, y, z], [nx / l, ny / l, nz / l], 0, 0);
   };
   const ids = rings.map(([y, r]) =>
     Array.from({ length: n }, (_, k) => {
@@ -1989,13 +1985,13 @@ function crownMesh(cone: boolean): Geo {
   for (let i = 0; i + 1 < ids.length; i++) {
     for (let k = 0; k < n; k++) {
       const [a, b, c, d] = [ids[i][k], ids[i][(k + 1) % n], ids[i + 1][(k + 1) % n], ids[i + 1][k]];
-      g.idx.push(a, b, c, a, c, d);
+      g.face(a, b, c).face(a, c, d);
     }
   }
   // Its underside, flat.
   const [yb] = rings[0];
   const centre = vertex(0, yb, 0, 0, -1, 0);
-  for (let k = 0; k < n; k++) g.idx.push(centre, ids[0][(k + 1) % n], ids[0][k]);
+  for (let k = 0; k < n; k++) g.face(centre, ids[0][(k + 1) % n], ids[0][k]);
   return g;
 }
 

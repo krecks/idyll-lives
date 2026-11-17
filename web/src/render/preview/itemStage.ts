@@ -13,7 +13,7 @@
 import * as pc from '../pc/engine';
 import type { AssetRegistry } from '../../assets/registry';
 import { colorsKey, type PartColors } from '../../core/protocol';
-import { buildModel, disposeTemplate, type ModelTemplate } from '../pc/models';
+import { buildModel, disposeTemplate, readMesh, type ModelTemplate } from '../pc/models';
 import type { Instances } from '../pc/instancing';
 import { poseParts, type PopTarget } from '../pc/objectMotion';
 import { toEngine } from '../pc/space';
@@ -272,8 +272,8 @@ export class ItemStageController implements ItemStage {
       const pose = new Float32Array(16);
       const at = [0, 0, 0];
       meshes.forEach((m, i) => {
-        const positions: number[] = [];
-        if (parts[i] < 0 || !partPose(open, parts[i], pose) || !m.mesh.getPositions(positions)) return;
+        const positions = parts[i] < 0 || !partPose(open, parts[i], pose) ? null : readMesh(m.mesh)?.positions;
+        if (!positions) return;
         // Its vertices posed, not its box: a part grown from nothing (water, flames) lies flat at rest and its
         // pose grows it across the flat many times over, so a box's corners off the flat (a slanted shower's
         // rain, its flat turned) would land metres away, and the camera with them.
