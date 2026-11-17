@@ -3772,6 +3772,20 @@ fn time_leisure(w: &World, run: &mut Run) -> bool {
     true
 }
 
+/// Whether `sim` is out by leisure taxi (`book_leisure`): booked on one out or back, riding it,
+/// or at the place it took them to (`Taxis::out_at`). The taxi brings them home by the end of their
+/// stay, and they set off for work or school from there (`life::firm_leave`).
+pub(crate) fn out_by_taxi(taxis: &Taxis, sim: &crate::world::Sim) -> bool {
+    sim.taxi.is_some_and(|b| {
+        taxis
+            .runs
+            .iter()
+            .any(|r| r.id == b.run && r.place.is_some())
+    }) || sim
+        .visiting
+        .is_some_and(|v| taxis.out_at.contains(&(sim.id, v.plot)))
+}
+
 /// Whether `sim` waits at home for a leisure taxi out booked for them (`book_leisure`): they don't
 /// go off on another visit or an outing meanwhile (`world`'s choices); off on one, the taxi's
 /// time came while they were there, and it took them away twenty minutes in (Ottertarn).
@@ -4324,6 +4338,75 @@ mod leisure_leaving_tests {
             0,
             "the chair still held"
         );
+    }
+
+    #[test]
+    fn one_asked_over_gives_up_the_taxi_booked_out_to_a_place_of_their_own() {
+        // The guest, at home, is booked on a taxi out to the park in half an hour, an outing of
+        // their own; their friend next door phones to ask them over, and they say yes: they go
+        // round to the friend's, the taxi out given up. (Kept, it came for them all the same, took
+        // them to the place, and they were off to the friend's three minutes after getting
+        // there, Alder Mill.)
+        let content = CONTENT.replace(
+            r#""economy""#,
+            r#""bondPresets":{"friends":{"friendship":80}},"animations":["phone"],
+            "phone":{"anim":"phone","seatRange":0,"actions":[
+              {"id":"invite","label":"Invite over","minutes":5,"contact":true,"meet":"here","tags":["social"],
+               "acceptance":{"base":1.0},"needs":{"social":0.05},"success":{"friendship":1,"targetFriendship":1}}]},
+            "economy""#,
+        );
+        let mut w = World::from_json(&content, TOWN_PARK, 1).unwrap();
+        w.autonomy = false;
+        let (host, i) = (0usize, 1usize);
+        let tick = w.tick;
+        let out = tick + 30 * TICKS_PER_MINUTE;
+        w.taxis.runs.push(Run {
+            id: 9,
+            home: false,
+            place: Some(2),
+            directed: false,
+            group: (0, 0),
+            enter: out - 20 * TICKS_PER_MINUTE,
+            due_out: 0,
+            planned_out: 0,
+            depart: 0,
+            stops: vec![Stop {
+                sim: i as u32,
+                plot: 1,
+                due: out,
+                leave: out - 10 * TICKS_PER_MINUTE,
+                state: StopState::Booked,
+                halt: 0,
+            }],
+            next: 0,
+            progress: 0.0,
+            detour: None,
+            since: 0,
+            car: None,
+            at: Vec::new(),
+            kerbs: Vec::new(),
+            laid: None,
+        });
+        w.sims[i].taxi = Some(Booking { run: 9, stop: 0 });
+        let invite = w.content.phone.action_index("invite").expect("invite");
+        w.apply(crate::Command::Phone {
+            sim: host as u32,
+            action: invite,
+            contact: Some(i as u32),
+        })
+        .unwrap();
+        let mut asked = false;
+        for _ in 0..20 * TICKS_PER_MINUTE {
+            w.tick_once();
+            asked |= w.sims[i]
+                .queue
+                .iter()
+                .chain(w.sims[i].current.as_ref().map(|a| &a.task))
+                .any(|t| matches!(t.kind, TaskKind::Visit { plot: 0 }));
+        }
+        assert!(asked, "never asked over");
+        assert!(w.sims[i].taxi.is_none(), "still booked on the taxi out");
+        assert_eq!(w.taxis.runs[0].stops[0].state, StopState::Done);
     }
 
     /// A leisure rider the taxi goes on without is booked again once (`Taxis::left`), as the

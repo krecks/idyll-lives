@@ -772,6 +772,8 @@ pub(crate) fn update(w: &mut World) {
             *a = answer;
         }
     }
+    // (Those asked over who give up a taxi booked out to a place of their own: `taxi::release`.)
+    let mut unbook = Vec::new();
     for i in 0..w.sims.len() {
         let Some(h) = w.sims[i].hung_up.take() else {
             continue;
@@ -800,6 +802,7 @@ pub(crate) fn update(w: &mut World) {
             events,
             rng,
             households,
+            taxis,
             ..
         } = &mut *w;
         let act = &content.phone.actions[h.action];
@@ -869,6 +872,31 @@ pub(crate) fn update(w: &mut World) {
                 t.queue.retain(|q| {
                     q.directed || !matches!(q.kind, TaskKind::Visit { plot } if plot != home)
                 });
+                // (Nor one they're booked on a taxi for, or about to be: the taxi still came for
+                // them and took them to the place, and they were off to the caller's a few minutes
+                // after getting there, Alder Mill.)
+                if matches!(
+                    t.transition,
+                    Some(crate::life::Transition::Taxi { plot, directed: false }) if plot != home
+                ) {
+                    t.transition = None;
+                }
+                let elsewhere = |r: &crate::taxi::Run, stop: u8| {
+                    !r.home
+                        && !r.directed
+                        && r.place.is_some_and(|p| p != home)
+                        && r.stops.get(usize::from(stop)).is_some_and(|s| {
+                            s.sim == c as u32 && s.state != crate::taxi::StopState::Aboard
+                        })
+                };
+                if t.taxi.is_some_and(|b| {
+                    taxis
+                        .runs
+                        .iter()
+                        .any(|r| r.id == b.run && elsewhere(r, b.stop))
+                }) {
+                    unbook.push(c);
+                }
                 // (Not as well as a visit there already on its way: they went twice, knocking
                 // again just let in, Mirrorpool.)
                 let there = |k: &TaskKind| matches!(k, TaskKind::Visit { plot } if *plot == home);
@@ -903,6 +931,9 @@ pub(crate) fn update(w: &mut World) {
                 }
             }
         }
+    }
+    for c in unbook {
+        crate::taxi::release(w, c, false);
     }
 }
 

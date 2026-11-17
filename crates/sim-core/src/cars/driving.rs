@@ -922,8 +922,14 @@ pub(crate) fn pull_over(
             && !after(k)
     };
     let held = w.cars[c].pulled_for.is_some_and(waits_me);
-    let (mut want, mut whom) = pull_want(w, c, moving || held, &after);
-    if !(moving || held) && whom.is_some_and(waits_me) {
+    // (Stood a moment held up by nobody, its claim just granted, say: it goes on now, so it pulls
+    // over only as far as it can on its way, as on the move. Pulled over where it stood, further
+    // than the room it goes on with, it had to pull back in first, and couldn't beside the one
+    // it had pulled over for, standing the other way: it waited for that one to pass, which
+    // waited for the car behind it, which waited for it, for good, Clover Acres.)
+    let going = waited.is_none() && !w.traffic.waiting(me) && w.cars[c].zebra_wait == 0;
+    let (mut want, mut whom) = pull_want(w, c, moving || held || going, &after);
+    if !(moving || held || going) && whom.is_some_and(waits_me) {
         (want, whom) = pull_want(w, c, true, &after);
     }
     w.cars[c].pulled_for = whom;
