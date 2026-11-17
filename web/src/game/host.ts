@@ -19,6 +19,7 @@ import { installMemoryCensus } from '../debug/gameplayStats';
 import { LOW_MEMORY } from '../settings/lowMemory';
 import { game, toast } from '../ui/state.svelte';
 import { basicReport, within } from '../debug/report';
+import { newGameReport } from '../debug/newGameReport';
 import { plainState } from '../debug/snapshot.svelte';
 import { webGpuFailed } from '../render/shared/gpu';
 import type { HouseholdDraft } from './household';
@@ -364,8 +365,17 @@ class GameHost {
     location.reload();
   }
 
-  /** A debug report without asking a game (none runs, or it stopped): the log, settings, interface state and a picture. */
+  /**
+   * A debug report without asking a game (none runs, or it stopped): the log, settings, interface
+   * state and a picture, and on a New game step its state (`newGameReport.ts`).
+   */
   async basicReport(note: string): Promise<string> {
+    let newGame: string | null = null;
+    try {
+      newGame = newGameReport(app);
+    } catch (err) {
+      console.warn('[debug] the new game part of the report failed', err);
+    }
     const renderer = await this.renderer?.catch(() => null);
     const scale = Math.min(window.devicePixelRatio || 1, 2);
     const picture = renderer?.captureThumbnail(Math.round(this.canvas.clientWidth * scale), Math.round(this.canvas.clientHeight * scale));
@@ -374,6 +384,7 @@ class GameHost {
       ui: { screen: app.screen, crash: app.crash, fatal: app.fatal, ...plainState(game, ['catalog', 'threads']) },
       renderer: renderer?.stats() ?? null,
       screenshot: picture ? await within(picture, 4000, null) : null,
+      newGame,
     });
   }
 

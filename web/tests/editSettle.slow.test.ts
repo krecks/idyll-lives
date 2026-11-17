@@ -39,8 +39,8 @@ describe("step 2's settle", async () => {
   const { TownHistory } = await import('../src/game/edit/history');
   const { deckTiles } = await import('../src/game/macro');
   const { wetTiles } = await import('../src/game/landEdit');
-  const { unrle } = await import('../src/game/landMasks');
-  const { LAND_CELL, NONE } = await import('../src/game/land');
+  const { rle, unrle } = await import('../src/game/landMasks');
+  const { heightAt, LAND_CELL, NONE } = await import('../src/game/land');
   const { builtSurfaceOf } = await import('../src/render/shared/builtSurface');
   const { lengths, nearest, pointAt } = await import('../src/game/roads');
   type Templates = import('../src/game/town').Templates;
@@ -216,6 +216,91 @@ describe("step 2's settle", async () => {
       }
     }
     throw new Error('no street could be bridged over the river');
+  }, 300_000);
+
+  test("a street drawn from the town over a footpath and a river painted in a dip, out into the open, is bridged and kept once settled", () => {
+    // (The user's stroke: from a street of the town over its jetty trail by the bank and a 30 m river 40 m off the
+    // street, lying 11 m under the land (a river painted along a valley), a low shelf by it and its banks rising over
+    // 3 m, ending in open land past it. Its deck reaches over the dip and onto the banks, the bridge's straight carried
+    // on for it (`bridges.ts` `grownDeck`): with the deck over the water alone, the settle refuses it, the road dug
+    // 4.7 m into the bank.)
+    const plan = village.plan!;
+    const [W, D] = [plan.width, plan.depth];
+    const laidLand = plan.open!.land!;
+    /** `plan` with the river painted 40 to 70 m from `p` along `dir` (an axis), across 160 m; and a trail from `q` (on a road) to its near bank and along it past `p`'s way. */
+    const paint = (p: Pt, dir: Pt, q: Pt): NeighbourhoodDraft => {
+      const across: Pt = [Math.abs(dir[1]), Math.abs(dir[0])];
+      const along = (x: number, z: number) => (x - p[0]) * dir[0] + (z - p[1]) * dir[1];
+      const side = (x: number, z: number) => (x - p[0]) * across[0] + (z - p[1]) * across[1];
+      const land = { ...laidLand, h: laidLand.h.slice(), wl: laidLand.wl.slice() };
+      // (Its level 11 m under the lower of the land 10 m off either bank, by the land there before.)
+      const ground = (u: number, v: number) => heightAt(laidLand, p[0] + dir[0] * u + across[0] * v, p[1] + dir[1] * u + across[1] * v) * 100;
+      for (let j = 0; j < land.rows; j++) {
+        for (let i = 0; i < land.cols; i++) {
+          const [x, z] = [i * LAND_CELL, j * LAND_CELL];
+          const [u, v] = [along(x, z), side(x, z)];
+          if (u < 30 || u > 80 || Math.abs(v) > 80) continue;
+          const level = Math.round(Math.min(ground(30, v), ground(80, v)) - 1100);
+          const off = u < 40 ? 40 - u : u > 70 ? u - 70 : 0;
+          const k = j * land.cols + i;
+          if (!off) [land.h[k], land.wl[k]] = [level - 200, level];
+          else land.h[k] = Math.round(level + 25 + Math.max(0, Math.min(1, (off - 2) / 3)) * (land.h[k] - level - 25));
+        }
+      }
+      const walk = unrle(plan.open!.water, W * D);
+      const wet = wetTiles(land, W, D);
+      for (let k = 0; k < walk.length; k++) if (wet[k]) walk[k] = 1;
+      const at = (u: number, v: number): Pt => [p[0] + dir[0] * u + across[0] * v, p[1] + dir[1] * u + across[1] * v];
+      const river: Pt[] = [at(40, -80), at(40, 80), at(70, 80), at(70, -80)];
+      const vq = side(q[0], q[1]);
+      const bank = at(32, vq);
+      const down = Math.max(1, Math.ceil(Math.hypot(bank[0] - q[0], bank[1] - q[1])));
+      const points: Pt[] = [...Array.from({ length: down }, (_, k): Pt => [q[0] + ((bank[0] - q[0]) * k) / down, q[1] + ((bank[1] - q[1]) * k) / down]), ...Array.from({ length: Math.round(Math.abs(vq)) + 41 }, (_, k) => at(32, vq - k * Math.sign(vq)))];
+      const trail: RoadPlan = { points, width: 2, ends: ['join', 'dead'], kind: 'trail', area: 0, name: 'Ashmouth Fishing Jetty Trail' };
+      return { ...plan, roads: [...plan.roads, trail], open: { ...plan.open!, land, water: rle(walk), zones: [...plan.open!.zones, { kind: 'water', poly: river }] } };
+    };
+    // A street or a lane of the town's, drawn off it over the trail and the river to 60 m past it, where no road is.
+    let tried = 0;
+    for (const r of plan.roads) {
+      if ((r.kind !== 'street' && r.kind !== 'lane') || r.area !== 0) continue;
+      const ls = lengths(r.points);
+      for (let s = 10; s < ls[ls.length - 1] - 10; s += 9) {
+        const { p } = pointAt(r.points, s, ls);
+        for (const dir of [[0, 1], [0, -1], [1, 0], [-1, 0]] as Pt[]) {
+          const end: Pt = [p[0] + dir[0] * 130, p[1] + dir[1] * 130];
+          if (end[0] < 10 || end[1] < 10 || end[0] > W - 10 || end[1] > D - 10) continue;
+          // (No road within 100 m either side of its way from 20 m off the street to 150 m.)
+          const clear = !plan.roads.some((q) => q.points.some(([x, z]) => {
+            const u = (x - p[0]) * dir[0] + (z - p[1]) * dir[1];
+            const v = (x - p[0]) * dir[1] - (z - p[1]) * dir[0];
+            return u > 20 && u < 150 && Math.abs(v) < 100;
+          }));
+          if (!clear) continue;
+          const q = pointAt(r.points, s > 30 ? s - 25 : s + 25, ls).p;
+          const painted = paint(p, dir, q);
+          const points: Pt[] = [[p[0] + dir[0] * 6, p[1] + dir[1] * 6], end];
+          const e = drawStreet(painted, t, content, { points, kind: 'street', clear: true, fill: false, seed: 4 });
+          tried++;
+          if ('refused' in e) continue;
+          const deck = e.draft.roads.find((q) => q.bridge && !plan.roads.includes(q));
+          if (!deck || !e.made!.some((i) => e.draft.roads[i].ends.includes('dead'))) continue;
+          // (The trail cut by it, or passing under its deck whole.)
+          const trails = e.draft.roads.filter((q) => q.name?.startsWith('Ashmouth Fishing Jetty Trail'));
+          expect(trails.length === 2 || (trails.length === 1 && trails[0] === painted.roads[painted.roads.length - 1])).toBe(true);
+          // The live checks say as much.
+          const live = liveStreet(painted, t, points, 'street');
+          expect(live.why).toBeNull();
+          expect(live.open).toBeNull();
+          expect(live.excess).toBe(false);
+          const settled = settle([painted, e.draft]);
+          expect(settled.refused).toEqual([]);
+          keptAll(settled.draft, e.draft);
+          console.log(`bridged ${deck.name}: deck ${(deck.bridge![1] - deck.bridge![0]).toFixed(1)} m, ${e.made!.length} pieces, the trail ${trails.length === 2 ? 'cut' : 'under it'}, after ${tried} tries`);
+          return;
+        }
+      }
+    }
+    throw new Error(`no street of the town could be drawn over the river (${tried} tried)`);
   }, 300_000);
 
   test('the town job gives the marks its first settle finds; a lot removed moves the land only round itself, and no road', () => {

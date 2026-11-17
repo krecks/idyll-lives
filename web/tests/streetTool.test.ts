@@ -139,8 +139,23 @@ describe('the live checks agree with drawStreet', () => {
     expect(g.roads!.find((r) => r.tone === 'join')!.points).toEqual(draft.roads[2].points);
   });
 
+  test('over a footpath by the bank and the river into the open on the far side: a bridge, the footpath crossed, no reason against it, nothing left open', () => {
+    const draft = town();
+    draft.roads.push({ points: [...line(60, MAIN_Z + 3.5, 60, 192), ...line(60, 192, 200, 192).slice(1)], width: 2, ends: ['join', 'dead'], kind: 'trail', area: 0, name: 'Ashmouth Fishing Jetty Trail' });
+    const { live, drawn } = both(draft, [
+      [130, MAIN_Z + 8],
+      [126, 190],
+      [120, 265],
+    ]);
+    expect(live.why).toBeNull();
+    expect(live.open).toBeNull();
+    expect(live.bridges).toHaveLength(1);
+    expect(refusal(drawn)).toBeNull();
+    expect('draft' in drawn && drawn.draft.roads.filter((r) => r.name?.startsWith('Ashmouth')).length).toBe(2);
+  });
+
   test('a crossing too wide for a bridge: red over the water, the same reason', () => {
-    const { live, drawn } = both(town(60), [
+    const { live, drawn } = both(town(80), [
       [87, MAIN_Z + 8],
       [87, FAR_Z - 8],
     ]);
@@ -149,7 +164,7 @@ describe('the live checks agree with drawStreet', () => {
     const bad = live.stretches.find((s) => s.tone === 'bad')!;
     // (Its stretch: the water and the straight run onto it either side.)
     expect(bad.from).toBeLessThan(RIVER_Z - MAIN_Z);
-    expect(bad.to).toBeGreaterThan(RIVER_Z + 60 - MAIN_Z);
+    expect(bad.to).toBeGreaterThan(RIVER_Z + 80 - MAIN_Z - 10);
   });
 
   test('a tight bend: red where it bends, the same reason', () => {
@@ -211,15 +226,23 @@ describe('the live checks agree with drawStreet', () => {
     expect(refusal(drawn)).toBe(live.why);
   });
 
-  test("a dead end longer than a court is a street not finished yet: said, not red; drawStreet's refusal is of the same kind", () => {
-    const { live, drawn } = both(town(), [
+  test("a dead end longer than a court is drawn as it is; a bridge with no road beyond it is a street not finished yet: said, not red; drawStreet's refusal is of the same kind", () => {
+    const long = both(town(), [
       [250, MAIN_Z - 8],
       [250, 30],
     ]);
+    expect(long.live.why).toBeNull();
+    expect(long.live.open).toBeNull();
+    expect(refusal(long.drawn)).toBeNull();
+    // (Over the river and ending 5 m past it: the bridge has no road on beyond it yet.)
+    const { live, drawn } = both(town(), [
+      [87, MAIN_Z + 8],
+      [87, RIVER_Z + 35],
+    ]);
     expect(live.why).toBeNull();
     expect(live.reached).toBe(false);
-    expect(live.open).toMatch(/dead end reaches 45 m at most/);
-    expect(live.stretches).toEqual([]);
+    expect(live.open).toMatch(/^a bridge needs a road on at each end/);
+    expect(live.stretches.filter((x) => x.tone === 'bad')).toEqual([]);
     expect(unfinished(refusal(drawn)!)).toBe(true);
     // (A street joining no road is unfinished too; a tight bend is not.)
     expect(unfinished(refusal(drawStreet(town(), t, content, { points: [[250, 20], [250, 70]], kind: 'street', clear: true, fill: false, seed: 1 }))!)).toBe(true);
@@ -374,15 +397,15 @@ describe('the tool', () => {
     expect(editor.said.selected).toEqual({ kind: 'road', road: 4 });
   });
 
-  test('Enter on a dead end too long, or a street refused, keeps what was drawn and says why', () => {
+  test('Enter on a bridge with no road beyond it, or a street refused, keeps what was drawn and says why', () => {
     const editor = fakeEditor(town());
     const tool = streetTool.stage(editor);
-    tool.down(250, MAIN_Z - 8);
+    tool.down(87, MAIN_Z + 8);
     tool.up();
-    tool.down(250, 30);
+    tool.down(87, RIVER_Z + 35);
     tool.up();
     tool.key!(key('Enter'));
-    expect(editor.said.refusals.at(-1)).toMatch(/dead end reaches 45 m at most/);
+    expect(editor.said.refusals.at(-1)).toMatch(/a bridge needs a road on at each end/);
     expect(editor.draft.roads).toHaveLength(4);
     expect(tool.key!(key('Backspace'))).toBe(true);
   });
@@ -606,6 +629,7 @@ describe('on a generated world', async () => {
   const { objectInfos } = await import('../src/game/housegen');
   const { generateWorld, useTownContent } = await import('../src/game/town');
   const { mulberry32 } = await import('../src/game/noise');
+  const { townIssues } = await import('../src/ui/townedit/problems');
   const real = await RealContent.load('http://localhost/content/base.json');
   useTownContent(real);
   const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
@@ -615,8 +639,10 @@ describe('on a generated world', async () => {
   test('every live verdict is drawStreet’s, within the per-move budget', () => {
     const a0 = world.open!.areas[0];
     const rand = mulberry32(9);
-    let [agreed, refused, bridged] = [0, 0, 0];
+    let [agreed, refused, bridged, cut, checked] = [0, 0, 0, 0, 0];
     const left: string[] = [];
+    const blocking: string[] = [];
+    const base = townIssues(world, templates, real);
     const times: number[] = [];
     for (let k = 0; k < 400; k++) {
       const pts: Pt[] = [];
@@ -632,8 +658,17 @@ describe('on a generated world', async () => {
       const t0 = performance.now();
       const live = liveStreet(world, templates, pts, kind);
       times.push(performance.now() - t0);
-      const why = refusal(verdictOf(world, templates, real, pts, kind, true, 1));
+      const verdict = verdictOf(world, templates, real, pts, kind, true, 1);
+      const why = refusal(verdict);
       const liveWhy = live.why;
+      // (What it makes blocks nothing in the Problems list the town didn't have: every street bridged or cutting a footpath, and one in eight of the rest.)
+      const crossed = 'draft' in verdict && verdict.draft.roads.some((r, i) => r.kind === 'trail' && world.roads[i] !== r);
+      if (crossed) cut++;
+      if ('draft' in verdict && (k % 8 === 0 || crossed || verdict.draft.roads.some((r, i) => r.bridge && world.roads[i] !== r))) {
+        checked++;
+        const fresh = townIssues(verdict.draft, templates, real, base).blocking.map((i) => i.text);
+        if (fresh.length) blocking.push(`${JSON.stringify(pts.map(([x, z]) => [Math.round(x), Math.round(z)]))} ${kind}: ${fresh.join('; ')}`);
+      }
       if (live.bridges.length) bridged++;
       if (liveWhy) {
         refused++;
@@ -645,10 +680,11 @@ describe('on a generated world', async () => {
     times.sort((a, b) => a - b);
     const median = times[times.length >> 1];
     const p95 = times[Math.floor(times.length * 0.95)];
-    console.log(`streetTool: ${agreed} of 400 strokes judged alike (${refused} refused alike, ${bridged} bridged); left to drawStreet: ${left.length ? left.join('; ') : 'none'}; live checks ${median.toFixed(2)} ms median, ${p95.toFixed(2)} ms p95`);
-    // (What the live checks leave to drawStreet: the turns onto a bridge, the network.)
-    for (const why of left) expect(why).toMatch(/onto its bridge|over the water where it would not be a bridge|joins none/);
+    console.log(`streetTool: ${agreed} of 400 strokes judged alike (${refused} refused alike, ${bridged} bridged, ${cut} cutting a footpath; ${checked} drawn checked for problems); left to drawStreet: ${left.length ? left.join('; ') : 'none'}; live checks ${median.toFixed(2)} ms median, ${p95.toFixed(2)} ms p95`);
+    // (What the live checks leave to drawStreet: the network.)
+    for (const why of left) expect(why).toMatch(/joins none/);
     expect(agreed + left.length).toBe(400);
+    expect(blocking).toEqual([]);
     expect(median).toBeLessThan(5);
   });
 });
