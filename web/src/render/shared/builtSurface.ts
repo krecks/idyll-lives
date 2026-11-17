@@ -34,12 +34,11 @@
  * on: a lot's pad, a road's height across it, else the graded land between its samples.
  */
 
-import type { BackdropUse, JunctionInfo, RoadKind, RoadPlan } from '../../core/protocol';
+import type { JunctionInfo, RoadKind, RoadPlan } from '../../core/protocol';
 import { LAND_CELL, NONE, heightAt, type Land, type LandRect } from '../../game/land';
 import { bridgeSpans, lengths, nearest, pointAt, RoadIndex } from '../../game/roads';
 import { CHUNK, chunkAt, chunksIn } from './chunks';
 import { carriageway, CROSSWALK, KERB_RETURN, planJunctions, type JunctionPlan } from './junctions';
-import { AROUND, groundKindOf, roundOf } from './townBuildings';
 
 /** The steepest each kind of way climbs (rise per m); a trail's is a measure only (it lies on the land). */
 export const GRADE: Record<RoadKind, number> = { street: 0.08, lane: 0.08, country: 0.12, trail: 0.22 };
@@ -87,12 +86,14 @@ export interface SurfacePlot {
   /** Along its entry's road, the stretch its front faces (arc lengths, the lesser first); none for a backdrop building. */
   front?: [number, number];
   /**
-   * A backdrop building's ground, turned as the building is (its footprint and its forecourt, yard or garden
-   * round it; the box above is this one's): its pad is this, not its box, and gives way to a road (a building
-   * turned by a junction would otherwise lift its box's corner over the junction).
+   * A turned backdrop building's footprint (the box above is its box): its pad is this, not its box, and gives
+   * way to a road (a building turned by a junction would otherwise lift its box's corner over the junction).
    */
   poly?: readonly (readonly [number, number])[];
 }
+
+/** How far round a turned backdrop building's footprint its pad's land reaches (m): the widest of its forecourt, yard or garden (`townBuildings.ts` `AROUND`). */
+const GROUND_ROUND = 3.5;
 
 /** Whether (x, z) is on `p`'s pad (or within `by` m of it): in its box, and in its ground if it is turned (`SurfacePlot.poly`). */
 export function onPad(p: SurfacePlot, x: number, z: number, by = 0): boolean {
@@ -972,11 +973,11 @@ export class BuiltSurface {
         }
       }
     });
-    // Lots (the higher pad where two touch); a backdrop building's on its ground, and round it out to a cell's
-    // diagonal (every corner of a cell its turned edge crosses, as beside a road: the land drawn between the
-    // samples meets its ground under its edge), but not under a road.
+    // Lots (the higher pad where two touch); a turned backdrop building's on its footprint and round it, out over
+    // what it stands on (`GROUND_ROUND`) and a cell's diagonal past that (every corner of a cell its edge crosses,
+    // as beside a road: the land drawn between the samples meets its forecourt under its edge), but not under a road.
     plots.forEach((p, n) => {
-      const out = p.poly ? c * Math.SQRT2 : 0;
+      const out = p.poly ? GROUND_ROUND + c * Math.SQRT2 : 0;
       for (let j = Math.max(0, Math.ceil((p.z - out) / c)); j <= Math.min(rows - 1, Math.floor((p.z + p.d + out) / c)); j++) {
         for (let i = Math.max(0, Math.ceil((p.x - out) / c)); i <= Math.min(cols - 1, Math.floor((p.x + p.w + out) / c)); i++) {
           const at = j * cols + i;
@@ -1371,7 +1372,7 @@ export interface SurfaceWorld {
     roads?: RoadPlan[];
     paths?: { x: number; z: number; w: number; d: number }[];
     facing?: number[];
-    backdrop?: { poly: [number, number][]; use?: BackdropUse }[];
+    backdrop?: { poly: [number, number][] }[];
     world?: { landscape?: { slope?: number } };
   } | null;
   junctions?: JunctionInfo[];
@@ -1462,10 +1463,14 @@ export function surfacePlots(world: SurfaceWorld): SurfacePlot[] {
     return { x: p.x, z: p.z, w: p.w, d: p.d, entry, front: [Math.min(...ends), Math.max(...ends)] };
   });
   for (const b of world.meta?.backdrop ?? []) {
-    // (Its ground: its footprint, and round it what it stands on.)
-    const poly = b.poly.length >= 3 ? roundOf(b.poly, AROUND[groundKindOf(b.use ?? 'house')]) : null;
-    const xs = (poly ?? b.poly).map((q) => q[0]);
-    const zs = (poly ?? b.poly).map((q) => q[1]);
+    // (A turned one's pad is its footprint, not its box: a box along x and z is its footprint already.)
+    const turned = b.poly.length >= 3 && b.poly.some((q, k) => {
+      const n = b.poly[(k + 1) % b.poly.length];
+      return Math.abs(n[0] - q[0]) > 0.01 && Math.abs(n[1] - q[1]) > 0.01;
+    });
+    const poly = turned ? b.poly : null;
+    const xs = b.poly.map((q) => q[0]);
+    const zs = b.poly.map((q) => q[1]);
     const [x0, z0, x1, z1] = [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)];
     let entry: SurfacePlot['entry'] = null;
     const [cx, cz] = [(x0 + x1) / 2, (z0 + z1) / 2];
