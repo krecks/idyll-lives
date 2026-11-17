@@ -18,6 +18,8 @@ export const streetChoice = $state({
   /** What the street under the pointer would be (the card shows `auto` as it), and the area it is a street of (-1: none). */
   shown: 'street' as RoadKind,
   shownArea: -1,
+  /** The roads the last street drawn was made as (split at its bridges) and their names: the card lists them while the draft has them (`streetLive.ts` `drawnStretches`). */
+  drawn: [] as { road: number; name: string }[],
 });
 
 /** The kind `drawStreet` is asked for (`street` for `auto`: it makes a street a country road outside the town and villages). */

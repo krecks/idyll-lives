@@ -4,11 +4,13 @@
    * or village it runs in or a country road outside them unless a lane or a footpath is asked for;
    * whether what is in its way is cleared (else the street is refused there); and what is put along
    * it: homes, the town's other buildings, both, or nothing; by where it runs unless chosen (both in
-   * the main town, homes elsewhere).
+   * the main town, homes elsewhere). A street just drawn and split at its bridges lists its stretches,
+   * each picked by a click (the tool picks the one nearest where the street was finished).
    */
   import Segmented from '../kit/Segmented.svelte';
   import Toggle from '../kit/Toggle.svelte';
   import { alongFor, streetChoice, type Along, type StreetKindChoice } from './streetChoice.svelte';
+  import { drawnStretches } from './streetLive';
   import type { TownEditor } from './tools';
 
   const { editor }: { editor: TownEditor } = $props();
@@ -31,9 +33,23 @@
   const trail = $derived(streetChoice.kind === 'trail');
   /** `auto` shows as what goes along a street where the pointer is (both in the main town, homes elsewhere). */
   const along = $derived(alongFor(streetChoice.along, streetChoice.shownArea));
+  /** The street just drawn, split at its bridges: its stretches while the town has them. */
+  const stretches = $derived(drawnStretches(editor.draft, streetChoice.drawn));
+  const picked = $derived(editor.selected?.kind === 'road' ? editor.selected.road : -1);
 </script>
 
 <div class="street-card">
+  {#if stretches.length}
+    <div class="option">
+      <span class="eyebrow sub">The street drawn</span>
+      <div class="choices" role="radiogroup" aria-label="The street drawn, a stretch at a time">
+        {#each stretches as s (s.road)}
+          <button role="radio" class="chip" class:deck={s.deck} aria-checked={picked === s.road} class:on={picked === s.road} onclick={() => editor.select({ kind: 'road', road: s.road })}>{s.name || (s.deck ? 'The bridge' : 'A stretch')}</button>
+        {/each}
+      </div>
+      <p class="hint">Split at its {stretches.filter((s) => s.deck).length === 1 ? 'bridge' : 'bridges'}: each stretch is a road of its own, with its own card.</p>
+    </div>
+  {/if}
   <div class="option">
     <span class="eyebrow sub">Kind</span>
     <Segmented fill label="Kind of road" value={kind} options={KINDS} onchange={(v) => (streetChoice.kind = v)} />
@@ -85,6 +101,27 @@
   .option.off {
     opacity: 0.55;
     pointer-events: none;
+  }
+  .choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .chip {
+    height: 28px;
+    padding: 0 10px;
+    border-radius: var(--radius-pill);
+    background: var(--hairline);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .chip.deck {
+    font-style: italic;
+  }
+  .chip.on {
+    background: var(--accent);
+    color: #fff;
   }
   .row {
     display: flex;

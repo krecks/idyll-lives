@@ -391,3 +391,9 @@ export function runsOf(line: readonly Pt[], stretches: readonly Stretch[]): { po
   }
   return out;
 }
+
+/** The stretches the last street drawn was made as (`streetChoice.drawn`), while `draft` still has them all as they were named; none for a street not split. */
+export function drawnStretches(draft: Pick<NeighbourhoodDraft, 'roads'>, drawn: readonly { road: number; name: string }[]): { road: number; name: string; deck: boolean }[] {
+  if (drawn.length < 2 || drawn.some((d) => !draft.roads[d.road] || (draft.roads[d.road].name ?? '') !== d.name)) return [];
+  return drawn.map((d) => ({ ...d, deck: !!draft.roads[d.road].bridge }));
+}
