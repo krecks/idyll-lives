@@ -109,7 +109,8 @@ instances, so these costs are per kind of object in view, plus the triangles of 
   open while it is wound (families/decor.md). It is the one such model; nothing else should need it.
 - **Textures:** none by default; the finishes bring their own tiling textures. A texture of its
   own (a painting, a label) is one per object, at most 512 px a side (1024 for something over
-  2.5 m), PNG or JPEG in the file; the build turns it into KTX2.
+  2.5 m), PNG or JPEG in the file; `cargo assets` then leaves the whole file as it is (no KTX2, no
+  mesh compression), and the game loads it as exported.
 - **Download:** follows from the triangles: about 12 bytes a triangle after `cargo assets`
   (the six garden models: 445 KB as exported, 280 KB in the build). Untextured models export
   without UVs; textured ones carry them (below, "Export settings").
@@ -428,7 +429,8 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   model's size, a model below the floor, extensions the game can't read, skins, morph targets, a clip
   that animates anything but a node's transform or doesn't start at rest or at 0 s (the game holds it at
   rest until its first key: a pause each round of a loop), a `motions` clip the file doesn't have,
-  textures over 1024 px, a mapping to a finish that doesn't exist. Strict checks, errors too unless the
+  a texture of its own over 512 px a side (1024 for a model over 2.5 m), a mapping to a finish that
+  doesn't exist. Strict checks, errors too unless the
   pack entry `accept`s them with a reason (`"accept": {"footprint": "why"}`, `checkglb::STRICT`,
   tools/art/README.md "The gate"): a clip no use plays, a clip
   with cubic-spline keys (played as straight lines), faces over 1 cm² whose normals are turned against their winding

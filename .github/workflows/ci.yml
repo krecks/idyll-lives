@@ -258,8 +258,8 @@ jobs:
           key: ci-passed-web-${{ needs.changes.outputs.web-key }}
 
   # ll-tools' and the sounds' tests, pins, chunks, sizes, uses, models: crates/, Cargo.*, .cargo/, the toolchain,
-  # web/ but its tests, tools/pins, tools/render, tools/art/blender/centres.json,
-  # docs/review/reference.json.
+  # web/ but its tests, tools/pins, tools/render, tools/art/blender/centres.json, tools/art/gate-baseline.json,
+  # tools/art/validate.ts, docs/review/reference.json.
   tools:
     name: Tools, object sizes, uses and models
     needs: changes

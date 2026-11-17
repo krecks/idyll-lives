@@ -28,13 +28,15 @@
 #          web/tests: web/public (assets, content, the voice and LLM licences), web/src (the
 #          pinned regions, actions.ts, audio/world.ts, the patched shaders), web/package.json and
 #          bun.lock (the chunk check's PlayCanvas); tools/pins/pins.json (pinned files in web/src
-#          and crates/sim-core/src), tools/render/chunks.json, tools/art/blender/centres.json
-#          (check-glb), docs/review/reference.json (`review sizes` and `uses`).
+#          and crates/sim-core/src), tools/render/chunks.json, tools/art/blender/centres.json and
+#          tools/art/gate-baseline.json (check-glb), tools/art/validate.ts (`check-glb --validate`),
+#          docs/review/reference.json (`review sizes` and `uses`).
 # ci.yml itself (the jobs, bun-version, SLOW_TESTS), tools/ci-local.sh and this script run every
 # job. Read by no step (checked by grep), so no job: README.md, CHANGELOG.md (pages.yml's version
 # check reads it, on a tag), PLAN.md, plan/, LICENSE, docs/ but review/reference.json, .gitignore,
 # .git-blame-ignore-revs, pages.yml, crates/tools/README.md, tools/characters/README.md, tools/art/
-# but centres.json (only `cargo art` and `check-glb --preview` run Blender), and the tools no job
+# but centres.json, gate-baseline.json and validate.ts (only `cargo art` and `check-glb --preview` run
+# Blender), and the tools no job
 # runs: tools/bench, llm, voice, audio, and tools/housegen (only `generated`'s, which runs on a tag
 # or by hand, on everything).
 set -euo pipefail
@@ -56,7 +58,8 @@ jobs_for() {
     web/*) J="web tools" ;;
     tools/characters/README.md) J="" ;;
     tools/characters/* | tools/worlds/*) J="web" ;;
-    tools/pins/* | tools/render/* | tools/art/blender/centres.json | docs/review/reference.json) J="tools" ;;
+    tools/pins/* | tools/render/* | tools/art/blender/centres.json | tools/art/gate-baseline.json | \
+      tools/art/validate.ts | docs/review/reference.json) J="tools" ;;
     README.md | CHANGELOG.md | PLAN.md | LICENSE | plan/* | docs/* | .gitignore | .git-blame-ignore-revs | \
       .github/workflows/pages.yml | tools/art/* | tools/bench/* | tools/llm/* | \
       tools/voice/* | tools/audio/* | tools/housegen/*)
