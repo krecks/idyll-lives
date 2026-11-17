@@ -60,11 +60,32 @@ export function chaikin(poly: readonly Pt[]): Pt[] {
 const area2 = (poly: readonly Pt[]) => poly.reduce((n, p, i) => n + p[0] * poly[(i + 1) % poly.length][1] - poly[(i + 1) % poly.length][0] * p[1], 0);
 
 /**
+ * A closed polygon with every edge longer than twice `most` m given a point `most` m in from each end: cut by
+ * `chaikin` (a quarter of each edge), a corner then rounds over a quarter of that at most, however long its edges run.
+ */
+function cornersHeld(poly: readonly Pt[], most: number): Pt[] {
+  const out: Pt[] = [];
+  for (let i = 0; i < poly.length; i++) {
+    const [a, b] = [poly[i], poly[(i + 1) % poly.length]];
+    out.push(a);
+    const l = dist(a, b);
+    if (l <= 2 * most) continue;
+    const t = most / l;
+    out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], [b[0] - (b[0] - a[0]) * t, b[1] - (b[1] - a[1]) * t]);
+  }
+  return out;
+}
+
+/**
  * The outlines of a cell mask as polygons (m), smoothed: each piece of land one ring, its holes
  * joined to it by a seam (so filled even-odd, as `inside` does, the holes stay open). The mask is
- * `gw` × `gd` cells of `cell` m, row-major; pieces under `minCells` cells are left out.
+ * `gw` × `gd` cells of `cell` m, row-major; pieces under `minCells` cells are left out. Each straight
+ * run of the mask's edge is one edge, its corners rounded over a quarter of the edges either side of
+ * them; with `round`, over `round` m of them at most, so a corner between long straight runs stays
+ * within about 0.8 × `round` m of the mask's (with none, a straight cross of rivers 400 m long is rounded
+ * some 70 m into its dry corners).
  */
-export function outlines(mask: Uint8Array, gw: number, gd: number, minCells = 6, cell = MACRO_CELL): Pt[][] {
+export function outlines(mask: Uint8Array, gw: number, gd: number, minCells = 6, cell = MACRO_CELL, round = Infinity): Pt[][] {
   const on = (x: number, z: number) => x >= 0 && z >= 0 && x < gw && z < gd && mask[z * gw + x] === 1;
   // Edges round each set cell where its neighbour isn't, clockwise (z down the page): corner keys.
   const key = (x: number, z: number) => z * (gw + 1) + x;
@@ -104,7 +125,7 @@ export function outlines(mask: Uint8Array, gw: number, gd: number, minCells = 6,
         const [a, b] = [loop[(i + loop.length - 1) % loop.length], loop[(i + 1) % loop.length]];
         return (b[0] - p[0]) * (p[1] - a[1]) !== (b[1] - p[1]) * (p[0] - a[0]);
       });
-      if (corners.length >= 3 && Math.abs(area2(corners)) / 2 >= minCells * cell * cell) loops.push(chaikin(chaikin(corners)));
+      if (corners.length >= 3 && Math.abs(area2(corners)) / 2 >= minCells * cell * cell) loops.push(chaikin(chaikin(round < Infinity ? cornersHeld(corners, round * 4) : corners)));
     }
   }
   const outer = loops.filter((l) => area2(l) > 0).sort((a, b) => area2(a) - area2(b));
