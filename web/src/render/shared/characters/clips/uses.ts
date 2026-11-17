@@ -91,7 +91,7 @@ function eyepiecePose(fit: Fit): (p: number) => PoseSpec {
 }
 
 /**
- * The fruit trees' picked fruit (`trees.py`; the apple tree's `pick` clip shrinks its apple away 1.6 s into the
+ * The fruit trees' picked fruit (crates/art/nature/src/trees; the apple tree's `pick` clip shrinks its apple away 1.6 s into the
  * use, `PICK_DELAY` there, as the hand closes on it; the lemons all go once picked, `ripen`): m to the picker's
  * right (facing the tree), up (where the hand closes on it, `GRIP` over its bottom) and to the front of the trunk,
  * for each size of picker (`SHARES_177`: a grown-up, a teen, a child). The apple hangs from a low bough under the
@@ -106,7 +106,7 @@ const FRUIT = {
   lemon: [[-0.1, 1.62 + GRIP.lemon, 0.6], [-0.15, 1.42 + GRIP.lemon, 0.57], [0.12, 1.1 + GRIP.lemon, 0.4]],
 } as const;
 /**
- * The apples "Pick the apples" reaches up to, a size's each on the low boughs (`HARVEST` in `trees.py`: their bottoms
+ * The apples "Pick the apples" reaches up to, a size's each on the low boughs (`HARVEST` in the trees' apple.rs: their bottoms
  * 1.8, 1.5 and 1.24 m up), from the tile in front, 1 m out from the trunk, where the harvest is stood (not stepped in).
  */
 const HARVEST_APPLE = [[0.16, 1.75 + GRIP.apple, 0.62], [0.3, 1.45 + GRIP.apple, 0.62], [0.24, 1.12 + GRIP.apple, 0.78]] as const;

@@ -254,7 +254,7 @@ room has.
   woods too: a file's `far` (`families/plants.py`). Its parts on `foliage`, `leafcards` and `bark` take the nature
   shader's wind and tint.
 - **Leaf cards.** A broadleaved tree's crown is cut-out cards over dark cores, not lumpy balls (`families/plants.py`
-  `leaves`, `clad`; `trees.md`): each card a quad with a cluster of leaves from the one atlas they all share
+  `leaves`, `clad`; `crates/art/nature/src/trees/NOTES.md`): each card a quad with a cluster of leaves from the one atlas they all share
   (`textures/leafcards/albedo.png`, rendered from generated leaves by `cargo art --leafcards`; three clusters and a
   dense wall of leaves for the cores), lying as a spray does, turned up and out, so the camera that looks down on the
   tree never sees it edge-on, with the normals of the leaf mass it stands for, so the crown shades as a volume. The
@@ -263,7 +263,7 @@ room has.
   plain test on Low), drawn from both sides, and its shadow is its leaves'; `render/pc/shaders/cutout.ts` keeps the
   clusters from thinning far off, their edges a pixel wide, and leaves out of the lens (none within 1.2 m of the eye). Same triangles as the lumps, same two draw calls
   (bark, leaves: the cores are on the cards' finish). The far version keeps the lumps on `foliage`, and the cards'
-  colours are toned to it (`trees.py` `CARD_TONE`), so the near woods match the far. Clipped hedges, topiary, shrubs
+  colours are toned to it (`CARD_TONE`, artkit's `botany::skeleton`), so the near woods match the far. Clipped hedges, topiary, shrubs
   and conifers are not cards.
 
 ## Moving parts

@@ -9,8 +9,8 @@
  * The lawn's grass is built on the GPU (`grass.ts`), drawn near the eye; past it the ground
  * carries the lawn, its gusts too (`grassGround`), and on past the town into the landscape.
  *
- * Trees, bushes, hedges, the lawn's flowers and the garden catalog's plants are Blender-built files
- * (tools/art/blender/families/plants.py, trees.py): crowns on the leafy `foliage` finish over `bark`
+ * Trees, bushes, hedges, the lawn's flowers and the garden catalog's plants are built files
+ * (tools/art/blender/families/plants.py, crates/art/nature/src/trees): crowns on the leafy `foliage` finish over `bark`
  * limbs, each tree and shrub with a far version for the distant woods. `installNature` gives those
  * two finishes the wind (`NATURE_WIND`, the port of `NatureWindPlugin`) and the foliage its
  * per-instance tint.

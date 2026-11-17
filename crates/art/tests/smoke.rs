@@ -1,6 +1,6 @@
-//! `cargo art` from end to end on a model that needs no leaf cards: the Italian cypress (the port of
-//! families/trees.py's, kept with the kernel's tests), built by the runner under another root and compared with
-//! the files and the pack entry Blender wrote, which are the committed ones.
+//! `cargo art` from end to end on a model that needs no leaf cards: the Italian cypress (the kernel's own, kept
+//! with its tests), built by the runner under another root and compared with the committed files and pack entry,
+//! which the trees family built and which are Blender's triangle for triangle.
 #[path = "../../artkit/tests/common/cypress.rs"]
 mod cypress;
 
@@ -111,7 +111,7 @@ fn see(path: &str) -> Seen {
 }
 
 #[test]
-fn the_cypress_built_here_is_the_one_blender_built() {
+fn the_cypress_built_here_is_the_committed_one() {
     let repo = Paths::repo();
     let family = cypress::family();
     let root = std::env::temp_dir().join(format!("ll-art-smoke-{}", std::process::id()));

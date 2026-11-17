@@ -95,7 +95,7 @@ pub fn family() -> Option<Family> {
                     .motions(json!({"growth": "ripen"})),
             ),
         ],
-        "Blender-built trees (tools/art/blender/families/trees.py): the G5 garden trees, the woods' oaks, maples, \
+        "The trees (crates/art/nature/src/trees, built by cargo art): the G5 garden trees, the woods' oaks, maples, \
          birches, pines and spruces, and the potted lemon tree. Listed in the base manifest's packs. Leaves are on \
          `foliage` and trunks on `bark`, which the nature shader sways and tints. Each has a far version (`far`), \
          which the far woods and the town overview draw. Clips: an apple shrinks away while it is picked, the fruit \
