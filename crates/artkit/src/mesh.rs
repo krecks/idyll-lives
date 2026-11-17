@@ -115,9 +115,13 @@ impl Mesh {
         (0..self.faces.len()).map(|f| self.face_normal(f)).collect()
     }
 
-    /// `mesh.transform(matrix)`: every point through it, single precision; the corners' own normals (a
-    /// bevel's) turn with it.
+    /// `mesh.transform(matrix)`: every point through it, single precision; the corners' own normals (a bevel's)
+    /// turn with it. (A matrix that moves nothing is not gone through, as in Blender: a zero keeps its sign, which
+    /// a sum with zero would take.)
     pub fn transform(&mut self, m: &M4) {
+        if m.is_identity() {
+            return;
+        }
         for v in &mut self.verts {
             *v = mul_m4_v3(m, *v);
         }

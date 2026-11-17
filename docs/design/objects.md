@@ -132,25 +132,45 @@ instances, so these costs are per kind of object in view, plus the triangles of 
   what opens (food in a fridge, clothes in a wardrobe, tools in a drawer), the clutter that says who owns it.
 - **Triangles where they show:** silhouettes, edges, what a hand touches; hidden parts stay plain. Things placed
   many times (plants, street props, held and tabletop things, the ground) keep to half the target.
+- **Edges eased, textures at their size.** Nothing made is sharp to the millimetre: an edge of 5 cm or more that
+  shows gets a bevel (4 mm is one pixel at the play camera, the line of light a real edge catches; `bevel=`, shaded
+  with hardened normals), unless one of its faces is under 12 mm wide or its piece under 10 cm. A textured finish is
+  laid at 200 to 1600 px a metre, which UVs in metres give, not stretched over 2× nor with UVs of no area. The gate
+  counts both per model (`edges`, `texels`: tools/art/README.md, "The gate"); `cargo review edges <key>` lists a
+  model's edges with where they are, `cargo review texels` each finish as the models wear it.
 - **Shading baked in** at export (below, "Baked shading"): creases and gaps darken with no texture. Give a face
   that meets a crease an edge band, or its corners darken it all over.
 - **Judge it lit:** `cargo art <family> --preview --lit` renders as the game lights it (EEVEE, the finishes'
-  textures, the baked shading), beside the plain `--preview`; the game (`check.mjs gallery`, WebGPU and
-  `--renderer webgl`) is the last word.
+  textures, the baked shading), beside the plain `--preview`, for a family still built in Blender; the game
+  (`check.mjs gallery`, WebGPU and `--renderer webgl`) is the last word.
 
 ## Materials, finishes, tints, styles and quality
 
-The game's surfaces are a dozen finishes, the `material.finish.*` entries of the base manifest:
-`matte` (roughness 0.75), `satin` (0.42), `gloss` (0.12), `metal`, `chrome`, `skin`, `hair`
-(plain), `fabric`, `leather`, `wood`, `bark`, `foliage` (textured, tinted by the part's colour), `leafcards`
-(a tree's leaf cards: an atlas of leaf clusters, cut out by its alpha, tinted too) and `glass`
-(see-through). A model's parts are coloured per part; all the plain finishes of a model merge into
+The game's surfaces are its finishes, the `material.finish.*` entries of the base manifest, written by
+`cargo tex materials` in glTF's terms (`roughness`, `metallic`, and `clearcoat`, `clearcoatRoughness`, `sheenColor`,
+`sheenRoughness` for a layer): `matte` (roughness 0.75), `satin` (0.42), `gloss` (0.12), `enamel` (0.18), `ceramic`
+(0.1), `plastic` (0.4), `rubber` (0.9), the metals `metal` (0.32), `chrome` (0.1), `brushed` (0.4) and `iron`
+(0.65), `skin`, `hair` (plain), `fabric`, `velvet`, `leather`, `wood`, `lacquer`, `bark`, `foliage` (textured,
+tinted by the part's colour), `leafcards` (a tree's leaf cards: an atlas of leaf clusters, cut out by its
+alpha, tinted too) and `glass` (see-through). A model's parts are coloured per part; all the plain finishes of a model merge into
 one mesh, so a model costs one draw call for its plain parts plus one per textured or see-through
 finish it uses. The plain finishes carry their roughness and metalness in the vertex colour's alpha
 (`encodeFinish`, read by `PLAIN_FINISH` in `render/pc/shaders/surface.ts`). Metals mirror the sky just above the
 horizon where they would reflect the ground: the game looks down on everything, so anything upright
 and shiny (a handle, a steel fridge) would otherwise mirror the dark field of the sky map, which no
 room has.
+
+- **A finish is a surface there is.** `crates/tools/src/pbr.rs` has the ranges, and `cargo tex materials` and
+  its test refuse a finish outside them: `metallic` 0 or 1; a plain dielectric gloss (roughness up to 0.25),
+  satin (0.3–0.55) or matte (from 0.65), a plain metal chrome (up to 0.15), brushed (0.3–0.5) or cast (0.5–0.8),
+  nothing between two classes; a textured finish 0.3–1 by its own roughness times its map's mean; a clear coat
+  0 or 1, its roughness up to 0.3; a sheen's roughness 0.3–1; glass's `alpha` 0.1–0.5. `ior`, `specular` and
+  `transmission` are not taken. A metal's colour is what it reflects face on, at least 45 % (brass and copper
+  are `metal` in their colour); `cargo review colours` lists the metals darker than that (black iron, dull
+  brass: by the standard a dark `satin`, a brighter brass), a report until the palettes follow.
+- **Layers.** `fabric` and `velvet` have cloth's sheen and `lacquer` a clear coat, drawn on Medium and High
+  (`finishLayers` in `render/quality.ts`) and left out on Low. Velvet is the fabric's textures and lacquer the
+  wood's (no download): a draw call of its own only on a model that has both.
 
 - **Leather is `leather`.** Upholstery, a writing pad or a punch bag in leather takes the `leather` finish: a
   generated set (`cargo tex synth leather`) whose colour is all but even (the part's colour is the hide's, at
@@ -254,7 +274,7 @@ room has.
   woods too: a file's `far` (`families/plants.py`). Its parts on `foliage`, `leafcards` and `bark` take the nature
   shader's wind and tint.
 - **Leaf cards.** A broadleaved tree's crown is cut-out cards over dark cores, not lumpy balls (`families/plants.py`
-  `leaves`, `clad`; `trees.md`): each card a quad with a cluster of leaves from the one atlas they all share
+  `leaves`, `clad`; `crates/art/nature/src/trees/NOTES.md`): each card a quad with a cluster of leaves from the one atlas they all share
   (`textures/leafcards/albedo.png`, rendered from generated leaves by `cargo art --leafcards`; three clusters and a
   dense wall of leaves for the cores), lying as a spray does, turned up and out, so the camera that looks down on the
   tree never sees it edge-on, with the normals of the leaf mass it stands for, so the crown shades as a volume. The
@@ -263,7 +283,7 @@ room has.
   plain test on Low), drawn from both sides, and its shadow is its leaves'; `render/pc/shaders/cutout.ts` keeps the
   clusters from thinning far off, their edges a pixel wide, and leaves out of the lens (none within 1.2 m of the eye). Same triangles as the lumps, same two draw calls
   (bark, leaves: the cores are on the cards' finish). The far version keeps the lumps on `foliage`, and the cards'
-  colours are toned to it (`trees.py` `CARD_TONE`), so the near woods match the far. Clipped hedges, topiary, shrubs
+  colours are toned to it (`CARD_TONE`, artkit's `botany::skeleton`), so the near woods match the far. Clipped hedges, topiary, shrubs
   and conifers are not cards.
 
 ## Moving parts
@@ -455,8 +475,8 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   on a top (a vase, a duvet) or above it (a canopy, the upper bunk) isn't taken for it; the model is at
   rest (a yoga mat, rolled up, has nothing under its seat). No content fact says a thing
   stands against a wall, so one standing off it isn't caught. It needs no Blender, so CI runs it (in
-  `cargo test -p ll-tools`); `--preview` also has Blender re-import each file and render it. A
-  content file or manifest it can't read is a FAIL naming the file.
+  `cargo test -p ll-tools`); `--preview` also draws each file as read (`--blender`: Blender re-imports and
+  renders it). A content file or manifest it can't read is a FAIL naming the file.
 - **`cargo test -p sim-core --test sim shipped_content::`** (in CI) fails when an object or item has no
   model file, or no `far` file where its entry names one, once the manifests are stacked as the game
   stacks them, and on an empty `model`.

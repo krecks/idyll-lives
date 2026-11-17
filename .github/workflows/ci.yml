@@ -257,9 +257,9 @@ jobs:
           path: .ci-passed
           key: ci-passed-web-${{ needs.changes.outputs.web-key }}
 
-  # ll-tools' and the sounds' tests, pins, chunks, sizes, uses, models: crates/, Cargo.*, .cargo/, the toolchain,
-  # web/ but its tests, tools/pins, tools/render, tools/art/blender/centres.json, tools/art/gate-baseline.json,
-  # tools/art/validate.ts, docs/review/reference.json.
+  # ll-tools' and the sounds' tests, pins, chunks, sizes, uses, models, the built world: crates/, Cargo.*, .cargo/,
+  # the toolchain, web/ but its tests, tools/pins, tools/render, tools/art/blender/centres.json,
+  # tools/art/gate-baseline.json, tools/art/validate.ts, docs/review/reference.json, tools/built.
   tools:
     name: Tools, object sizes, uses and models
     needs: changes
@@ -337,6 +337,13 @@ jobs:
       - name: Models
         if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh models
+
+      # What the game builds as it runs (houses, the street, the backdrop, fences, cars) at the same gate: a fixed
+      # set of samples dumped by the game's own generators, then the models' rules over them. More findings than
+      # tools/art/gate-baseline.json holds for a sample fail here.
+      - name: Built world
+        if: steps.passed.outputs.cache-hit != 'true'
+        run: tools/ci-local.sh built
 
       - name: Remember the pass
         if: steps.passed.outputs.cache-hit != 'true' && needs.changes.outputs.tools-key != ''

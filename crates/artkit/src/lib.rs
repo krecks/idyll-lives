@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 pub mod bevel;
+pub mod botany;
 pub mod bvh;
 pub mod family;
 pub mod far;
@@ -20,11 +21,14 @@ pub mod normals;
 pub mod parts;
 pub mod perch;
 pub mod place;
+pub mod preview;
 pub mod py;
 pub mod rand;
+pub mod raster;
 pub mod scene;
 pub mod shade;
 pub mod shapes;
+pub mod soft;
 pub mod tri;
 pub mod uv;
 pub mod weld;

@@ -55,8 +55,8 @@ fn the_known_keys_hold_every_checked_model() {
     }
 }
 
-/// The committed baseline is in the format `--update-baseline` writes, and holds only counted checks and, for those
-/// the gate runs, model keys a build may write.
+/// The committed baseline is in the format `--update-baseline` writes, and holds only counted checks (the models'
+/// and the built world's) and, for those the gate runs, model keys a build may write.
 #[test]
 fn the_committed_baseline_is_in_its_format() {
     let paths = Paths::repo();
@@ -65,6 +65,10 @@ fn the_committed_baseline_is_in_its_format() {
     assert_eq!(baseline.text(), text);
     let known = known_keys(&paths).unwrap();
     for check in baseline.checks() {
+        // (The built world's are by sample, held by `cargo check-glb --built`: tools/ci-local.sh `built`.)
+        if ll_tools::checkglb::built::CHECKS.contains(&check) {
+            continue;
+        }
         assert!(COUNTED.contains(&check), "{check}");
         // (`reference` is counted by `cargo review sizes`, by object.)
         if check != "reference" {
@@ -137,7 +141,7 @@ fn a_batch_check_is_judged_by_the_baseline() {
     // Not run (plain `cargo check-glb`): the baseline's entry is kept, and nothing fails.
     let r = gate(&paths, &keys);
     assert_eq!(r.failed, 0, "{}", r.text);
-    assert!(r.counts.is_empty());
+    assert!(!r.counts.contains_key("validator"));
     assert!(update_baseline(&paths, &[], &[]).unwrap().is_empty());
     // Fewer: stale until lowered.
     let one: &[(&'static str, BatchCheck)] = &[("validator", one_each)];
@@ -159,7 +163,7 @@ fn a_batch_check_is_judged_by_the_baseline() {
         r.text
     );
     assert_eq!(r.failed, 1);
-    assert!(r.counts.is_empty());
+    assert!(!r.counts.contains_key("validator"));
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
@@ -269,7 +273,7 @@ fn every_object_is_measured() {
 }
 
 /// The birds the renderer flies (`packs/birds`, families/birds.py) carry their sizes, and the trees, shrubs and hedges
-/// where they sit carry their perches (families/trees.py, plants.py): 12-30 a tree, 3-8 a shrub or hedge segment, each
+/// where they sit carry their perches (crates/art/nature/src/trees, families/plants.py): 12-30 a tree, 3-8 a shrub or hedge segment, each
 /// three numbers, and their `habitat`. The gate checks both against the files.
 #[test]
 fn the_birds_and_their_perches_are_in_the_packs() {

@@ -54,7 +54,8 @@ game. Report what you checked, and anything you didn't.
 cargo art kitchen                  # build, export, register, check
 cargo art kitchen --only fridge    # one model
 cargo art garden_decor --preview   # previews/garden_decor/<id>.png (+ <id>@<clip>.png), no export
-cargo art living --preview --lit   # and <id>.lit.png: EEVEE, sun and sky, the finishes' textures (judge detail here)
+cargo art living --preview --lit   # and <id>.lit.png: EEVEE, sun and sky, the finishes' textures (judge detail here;
+                                   # a family built in Rust has no --lit: bun tools/bench/check.mjs gallery)
 cargo art kitchen --preview --sheet  # and <id>.sheet.png: four sides, the baked shading, each clip at 0/25/50/75/100 %
 cargo art kitchen --no-pack        # export without writing the pack
 cargo art --all                    # every family (not _template)
@@ -63,7 +64,7 @@ cargo art --centres                # centres.json from every family (runs Blende
 cargo art --leafcards              # the trees' leaf-card atlas (textures/leafcards/albedo.png), from leaves it generates
 cargo check-glb [model.fridge …]   # the gate alone (no Blender)
 cargo check-glb --keys             # the keys a build may write
-cargo check-glb --preview          # the gate, then Blender renders each file re-imported (<family>/rt_<name>.png)
+cargo check-glb --preview          # the gate, then each file drawn as read (<family>/rt_<name>.png; --blender: in Blender)
 ```
 
 `centres.json` holds each model's `centre` (key → `[x, depth]`; `[0, 0]`, the middle, for most): where
@@ -115,9 +116,10 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    `M = G.Palette(body=('#F3F3F1', 'gloss'), handle=('#D0D3D6', 'chrome'))`.
    - The names become the material names in the file.
    - The finishes become the pack's `materials`, so they're declared only once.
-   - The finishes are the base manifest's `material.finish.*`: matte, satin, gloss, metal and chrome
-     (plain), plus fabric, leather, wood, bark and foliage (textured: one more draw call each), leafcards (a tree's
-     leaf cards, cut out of their atlas: `families/plants.py` `clad` puts them there) and glass.
+   - The finishes are the base manifest's `material.finish.*`: matte, satin, gloss, enamel, ceramic, plastic and
+     rubber, and the metals metal, chrome, brushed and iron (plain), plus fabric, velvet, leather, wood, lacquer, bark
+     and foliage (textured: one more draw call each), leafcards (a tree's leaf cards, cut out of their atlas:
+     `families/plants.py` `clad` puts them there) and glass.
    - Name the main part the player may colour `body`; list it first in `paint`, then any other parts
      worth colouring, each with what the player calls it. Leave details (drains, water, food) out.
    - Hardware (handles, knobs, pulls, latches, taps) takes a `metal` or `chrome` colour: chrome or
@@ -185,7 +187,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    A count the family gives is kept as it is: `cargo review facets` lists what shows its flat sides (over 1.5 mm).
 
    Spend the triangles where they show (silhouettes, edges, what a hand touches) and keep hidden parts plain
-   (`families/living.py` armchair and sofa, `kitchen.py` fridge, `trees.py` oak). End with:
+   (`families/living.py` armchair and sofa, `kitchen.py` fridge). End with:
    - `G.join_all('<id>')` for a model with no moving parts;
    - one `G.join` per part for a model with moving parts (below);
    - then `G.settle()`, which stands it on the floor, centred, by moving it, never scaling.
@@ -212,12 +214,12 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      a far version leaves out (a flower's centre; moving parts, joined into one still part). Better than
      decimating small, separate parts (flowers, leaves, lumps, twine), which turns them into spikes and
      lifts the model off the floor. Draw every random number the full build draws, so the far version's
-     parts stand where the model's do (`families/plants.py`, `trees.py`). The gate fails a far version
+     parts stand where the model's do (`families/plants.py`). The gate fails a far version
      whose lowest point is more than 0.5 cm off the model's.
    - **Perches** (trees, shrubs, hedges): where the game's birds sit, the entry's `perches`. The build finds them
      on its own meshes (`G.perch.around`, lines in from outside; `G.perch.find`, where they meet the leaves, spread
      and kept) with random numbers of its own, so the meshes don't change. `G.settle` moves them with the
-     model (`families/trees.py`, `plants.py` `perches`). Its `Model` says what they are on, the entry's `habitat`
+     model (`families/plants.py` `perches`). Its `Model` says what they are on, the entry's `habitat`
      beside them: `habitat='tree'` (broadleaved and fruit trees), `'conifer'`, `'bush'` (shrubs) or `'hedge'`.
      `--preview` renders `<id>@perches.png` (and `.top`) with a red ball on each. A bird the game flies by code takes
      `bird={'length', 'wingspan', 'perchHeight', 'pitch'}` (`families/birds.py`, birds.md). The gate checks them all
@@ -507,5 +509,5 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `far.py` | `far_of` (a far version from the model's own build at low detail), `low`, `is_low` |
 | `perch.py` | `G.perch`: where birds sit on a model, found on its meshes (`around`; `find`: `surface`, `bare`, `spread`, `keep`), the entry's `perches` |
 | `runner.py` | talking to `cargo art`: `known_keys` (the keys a build may write, `$GAMEKIT_KNOWN`) and `report` (what the build made, `$GAMEKIT_RESULT`: the pack's entries, each model's clips and centre), which the runner checks and writes |
-| `review.py` | run by `cargo check-glb --preview`: re-imports each checked file (`key=file`, from the gate) and renders `previews/<family>/rt_<name>.png` |
+| `review.py` | run by `cargo check-glb --preview --blender`: re-imports each checked file (`key=file`, from the gate) and renders `previews/<family>/rt_<name>.png` |
 | `centres.py` | run by `cargo art --centres`: imports every family (no build) and hands back their centres, which the runner writes to centres.json |

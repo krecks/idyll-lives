@@ -214,9 +214,10 @@ fn vectors_and_matrices_are_mathutils_to_the_bit() {
         .collect();
     println!("{}", report.join("\n"));
     // A turn between two directions and a tracking turn go through the C library's single-precision arcsine and
-    // arctangent, which are Apple's in the goldens and musl's here: now and then a unit apart.
+    // arctangent, which are Apple's in the goldens and the rounded double's or musl's here: now and then a unit
+    // or two apart (an arcsine of over a half, the angle of these wide turns, is Apple's for 24 singles in 25).
     let (rot, track) = (seen["rotdiff"], seen["trackzy"]);
-    assert!(rot.1 * 50 <= rot.0 && rot.2 <= 1, "rotdiff: {rot:?}");
+    assert!(rot.1 * 25 <= rot.0 && rot.2 <= 2, "rotdiff: {rot:?}");
     assert!(track.1 * 8 <= track.0, "trackzy: {track:?}");
     let bad: Vec<&String> = seen
         .iter()

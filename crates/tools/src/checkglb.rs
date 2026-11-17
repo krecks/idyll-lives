@@ -1,5 +1,6 @@
-//! `cargo check-glb [keys…] [--keys] [--preview] [--against <rev|dir>]`: the gate for the game's glTF models
-//! (docs/design/objects.md, "Validation"), was tools/art/blender/check_glb.py, and prints what it printed.
+//! `cargo check-glb [keys…] [--keys] [--preview] [--against <rev|dir>] [--built <dir>]`: the gate for the game's
+//! glTF models (docs/design/objects.md, "Validation"), was tools/art/blender/check_glb.py, and prints what it
+//! printed.
 //!
 //! It reads every `.glb` a model entry of the manifests uses (the base manifest and its packs, later ones
 //! overriding) with that entry, checks what the game needs of it, and that every model the content draws
@@ -8,13 +9,17 @@
 //!   cargo check-glb                        every .glb the manifests use
 //!   cargo check-glb model.garden.gnome …   only these keys (model., item., tool.)
 //!   cargo check-glb --keys                 the keys a build may write (`known_keys`)
-//!   cargo check-glb --preview              also re-imports each file in Blender and renders it to
-//!                                          tools/art/blender/previews/<family>/rt_<name>.png (gamekit/review.py)
+//!   cargo check-glb --preview [--sheet]    also draws each file as read (`preview`) to
+//!                                          tools/art/blender/previews/<family>/rt_<name>.png, its clips, perches
+//!                                          and far version beside it (and its sheet); with --blender, Blender
+//!                                          re-imports and renders it instead (gamekit/review.py)
 //!   cargo check-glb --validate             also runs the Khronos glTF validator over each file and its far
 //!                                          version (`validate`: Bun and web/'s `gltf-validator`)
 //!   cargo check-glb --update-baseline      first lowers tools/art/gate-baseline.json to what the counted checks
 //!                                          find (`COUNTED`; it only lowers counts and takes keys out)
 //!   cargo check-glb --against <rev|dir>    not the gate: whether this build of the models is that one (`against`)
+//!   cargo check-glb --built <dir>          the same rules over what the game builds as it runs, dumped there by
+//!                                          tools/built/dump.ts (`built`)
 //!
 //! What it prints is check_glb.py's to the byte: JSON objects are read in file order, numbers as Python
 //! has them (an int stays an int), and formatted, `repr`'d and `math.hypot`'d as Python does (`py`); and
@@ -23,10 +28,13 @@
 
 pub mod against;
 pub mod baseline;
+pub mod built;
 mod digest;
 pub(crate) mod glb;
 pub(crate) mod json;
+pub mod meshes;
 mod near;
+pub mod preview;
 pub(crate) mod py;
 pub mod validate;
 
@@ -244,7 +252,7 @@ const BIRD_PARTS: [&str; 5] = ["body", "head", "tail", "wing.L", "wing.R"];
 const BIRD_FIT: f64 = 0.05;
 /// How far (m) a perch (`perches`: where the game's birds sit on a tree or a hedge) may be outside the model's box.
 const PERCH_OUT: f64 = 0.01;
-/// What a model with `perches` is, its entry's `habitat` (families/trees.py, plants.py): a broadleaved or fruit tree,
+/// What a model with `perches` is, its entry's `habitat` (crates/art/nature/src/trees, families/plants.py): a broadleaved or fruit tree,
 /// a conifer, a bush or shrub, or a hedge.
 const HABITATS: [&str; 4] = ["tree", "conifer", "bush", "hedge"];
 
@@ -548,6 +556,8 @@ fn content_objects(defs: &Content) -> R<HashMap<String, Vec<Facts>>> {
 struct Finishes {
     plain: HashMap<String, bool>,
     see_through: HashSet<String>,
+    /// The textured ones: {key: (its `uvScale`, its texture's file)}.
+    textures: HashMap<String, (f64, String)>,
 }
 
 impl Finishes {
@@ -3200,12 +3210,23 @@ fn in_hand(key: &str) -> bool {
     key.starts_with("tool.")
 }
 
+/// A model file as a counted check gets it: the model's key and entry, the file, the manifests' finishes, and
+/// whether it is the model's far version.
+struct ModelFile<'a> {
+    key: &'a str,
+    entry: &'a J,
+    glb: &'a Glb,
+    fin: &'a Finishes,
+    far: bool,
+}
+
 /// A counted check (`COUNTED`) run on each model file as the gate reads it, the full model's and its far
-/// version's (whose findings are the model's): what it finds in the file, given the model's entry.
-type FileCheck = fn(&Glb, &J) -> R<Found>;
+/// version's (whose findings are the model's): what it finds in the file.
+type FileCheck = fn(&ModelFile) -> R<Found>;
 
 /// The counted checks run on each model file, by name.
-const FILE_CHECKS: &[(&str, FileCheck)] = &[];
+const FILE_CHECKS: &[(&str, FileCheck)] =
+    &[("edges", meshes::hard_edges), ("texels", meshes::texels)];
 
 /// A counted check (`COUNTED`) run over every model file at once (an outside program, `--validate`) before the
 /// models are judged: given each model's key, its file and its far version's, what it found in each model it read.
@@ -3279,6 +3300,7 @@ fn check(
         fin,
         entry,
         path,
+        false,
         facts,
         centre,
         furniture,
@@ -3315,6 +3337,7 @@ fn check(
             fin,
             &far_entry,
             far,
+            true,
             None,
             None,
             None,
@@ -3418,15 +3441,16 @@ struct Checked {
     counts: Vec<(&'static str, u64)>,
 }
 
-/// (errors, warnings, numbers) for one model entry and a file of it; `facts`: those of each content object
-/// that draws it (`content_objects`), each checked; `centre`: where it's built centred (centres.json), or None;
-/// `counted`: the counted checks to run on it.
+/// (errors, warnings, numbers) for one model entry and a file of it (`far`: its far version); `facts`: those of
+/// each content object that draws it (`content_objects`), each checked; `centre`: where it's built centred
+/// (centres.json), or None; `counted`: the counted checks to run on it.
 #[allow(clippy::too_many_arguments)]
 fn check_file(
     entry_key: &str,
     fin: &Finishes,
     entry: &J,
     path: &str,
+    far: bool,
     facts: Option<&Vec<Facts>>,
     centre: Option<&J>,
     furniture: Option<&Furniture>,
@@ -4006,7 +4030,16 @@ fn check_file(
         moving: moved_nodes(gltf)?.len(),
         counted: counted
             .iter()
-            .map(|(c, run)| Ok((*c, run(&g, entry)?)))
+            .map(|(c, run)| {
+                let file = ModelFile {
+                    key: entry_key,
+                    entry,
+                    glb: &g,
+                    fin,
+                    far,
+                };
+                Ok((*c, run(&file)?))
+            })
             .collect::<R<_>>()?,
     };
     Ok((errors, warnings, info))
@@ -4229,6 +4262,10 @@ fn run_gate(
     let mut stale = Vec::new();
     let seen: HashSet<&str> = checked.iter().map(String::as_str).collect();
     for check in baseline.checks() {
+        // (The built world's sections are its own gate's: `built`.)
+        if built::CHECKS.contains(&check) {
+            continue;
+        }
         if !COUNTED.contains(&check) {
             stale.push(format!(
                 "{} is no counted check (one of {}): take it out",
@@ -4296,6 +4333,7 @@ fn model_entries(stack: &[(String, J)]) -> (BTreeMap<String, (J, String)>, Finis
     let mut fin = Finishes {
         plain: HashMap::new(),
         see_through: HashSet::new(),
+        textures: HashMap::new(),
     };
     for (path, m) in stack {
         for (k, entry) in m
@@ -4330,6 +4368,20 @@ fn model_entries(stack: &[(String, J)]) -> (BTreeMap<String, (J, String)>, Finis
                 );
                 if alpha < 1.0 {
                     fin.see_through.insert(k.clone());
+                }
+                match entry
+                    .get("texture")
+                    .and_then(J::str)
+                    .filter(|t| !t.is_empty())
+                {
+                    Some(texture) => {
+                        let scale = entry.get("uvScale").and_then(J::num).map_or(1.0, |s| s.f());
+                        let file = normpath(&join(&dirname(path), texture));
+                        fin.textures.insert(k.clone(), (scale, file));
+                    }
+                    None => {
+                        fin.textures.remove(k);
+                    }
                 }
             }
         }
@@ -4538,11 +4590,14 @@ pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Meas
     Ok(Measures { models, objects })
 }
 
-/// `cargo check-glb [keys…] [--keys] [--preview] [--validate] [--update-baseline]`, or `--against`
-/// (`against::main`): the exit code.
+/// `cargo check-glb [keys…] [--keys] [--preview [--sheet] [--blender]] [--validate] [--update-baseline]`, or
+/// `--against` (`against::main`), or `--built` (`built::main`): the exit code.
 pub fn main(args: &[String]) -> i32 {
     if args.iter().any(|a| a == "--against") {
         return against::main(args);
+    }
+    if args.iter().any(|a| a == "--built") {
+        return built::main(args);
     }
     let paths = Paths::repo();
     if args.iter().any(|a| a == "--keys") {
@@ -4589,9 +4644,15 @@ pub fn main(args: &[String]) -> i32 {
     let report = gate_with(&paths, &keys, &batch);
     print!("{}", report.text);
     let mut code = if report.failed > 0 { 1 } else { 0 };
-    if args.iter().any(|a| a == "--preview") && !report.checked.is_empty() {
-        // Re-imports each file in Blender and renders it to previews/<family>/rt_<name>.png, so export problems show:
-        // review.py takes `key=file` for each checked model whose file is there.
+    let has = |flag: &str| args.iter().any(|a| a == flag);
+    if has("--preview") && !has("--blender") && !report.checked.is_empty() {
+        // Draws each file as read to previews/<family>/rt_<name>.png, so export problems show.
+        if preview::review(&paths, &report.checked, &report.files, has("--sheet")) != 0 {
+            code = 1;
+        }
+    } else if has("--preview") && !report.checked.is_empty() {
+        // `--blender`: re-imports each file in Blender and renders it there instead: review.py takes `key=file`
+        // for each checked model whose file is there.
         let review = join(&paths.here, "gamekit/review.py");
         let pairs: Vec<String> = report
             .checked
@@ -5365,6 +5426,7 @@ mod tests {
         let fin = Finishes {
             plain: HashMap::new(),
             see_through: HashSet::new(),
+            textures: HashMap::new(),
         };
         let path = join(&repo_root(), "web/public/assets/models/held/coin.glb");
         let entry = j(r#"{"type": "model", "url": "coin.glb"}"#);
@@ -5472,8 +5534,9 @@ mod tests {
     }
 
     /// An example counted check, no rule of the gate's: a finding for each mesh of the file.
-    fn meshes(g: &Glb, _: &J) -> R<Found> {
-        let n = g
+    fn meshes(file: &ModelFile) -> R<Found> {
+        let n = file
+            .glb
             .gltf
             .get("meshes")
             .and_then(J::list)
@@ -5485,7 +5548,7 @@ mod tests {
     }
 
     /// An example counted check that finds nothing.
-    fn nothing(_: &Glb, _: &J) -> R<Found> {
+    fn nothing(_: &ModelFile) -> R<Found> {
         Ok(Found::default())
     }
 
@@ -5504,6 +5567,7 @@ mod tests {
         let fin = Finishes {
             plain: HashMap::new(),
             see_through: HashSet::new(),
+            textures: HashMap::new(),
         };
         let path = join(&repo_root(), "web/public/assets/models/held/coin.glb");
         let run = |base: &str,
@@ -5703,6 +5767,12 @@ mod tests {
             ]
         );
         assert_eq!(read(), "{}\n");
+        // The built world's sections are its own gate's to judge (`built::CHECKS`): left as they are.
+        set("{\"built.edges\": {\"house.cottage\": 3}}\n");
+        let r = run_gate(&paths, &[], none, &[]);
+        assert_eq!(r.failed, 0, "{}", r.text);
+        assert!(update_with(&paths, &[], none, &[]).unwrap().is_empty());
+        assert_eq!(read(), "{\"built.edges\": {\"house.cottage\": 3}}\n");
         // A baseline that can't be read fails the gate.
         set("{\"edges\": {\"model.fridge\": 0}}");
         assert!(

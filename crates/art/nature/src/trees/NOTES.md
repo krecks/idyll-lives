@@ -1,24 +1,43 @@
-# Trees — notes
+# Trees: notes
 
-`trees.py` builds the G5 trees into `web/public/assets/models/trees/` and their entries in
-`packs/trees/manifest.json`: the oak (`model.tree`), maple, silver birch, cherry blossom, apple, Japanese maple,
+This folder builds the G5 trees into `web/public/assets/models/trees/` and their entries in
+`packs/trees/manifest.json` (`cargo art trees`): the oak (`model.tree`), maple, silver birch, cherry blossom, apple, Japanese maple,
 magnolia and weeping willow (`model.tree.*`), the pine, blue spruce and Italian cypress (`model.pine`, `model.spruce`,
-`model.cypress`) and the potted lemon tree (`model.garden.lemonTree`). Built 2026-10-14; they sat in Validate › Trees until checked in play.
-Rebuilt with real skeletons 2026-10-22 (the oak first, by hand, then the rest in its way); the broadleaves' crowns
-drawn as leaf cards 2026-11-10 (below). The leaf masses and small helpers (`leaves`, `clad`, `lump`, `tube`, `pot`,
-`cupped`, `sprigs`, `far_of`) come from `plants.py`; the tree builders are in `trees.py` (plants.py is shared, so they
-stay out of it).
+`model.cypress`) and the potted lemon tree (`model.garden.lemonTree`). Built 2026-10-14; rebuilt with real skeletons 2026-10-22 (the oak first, by hand, then the rest in its way); the
+broadleaves' crowns drawn as leaf cards 2026-11-10 (below); built here, not in Blender, since 2026-11-17: the same
+triangles to the bit, the same perches and pack entries.
+
+A species is a module: its numbers as a `Species` (`artkit::botany::species`: its seeds, its colours, its bark and
+atlas tiles, and a spec a stage where it grows as the others do) and the stages that are its own. The stages run in
+the order a tree's random numbers are drawn: trunk, roots, crown, hearts, extras, then its perches are found and it
+is clad with its fruit hung. What the species share is in `artkit::botany`: the skeleton (`skeleton`: `_trunk`,
+`_roots`, `_branches`, `_mass`, `_hearts`, `_hang`, `_fruiting`), the conifers' whorls (`conifer`), and the leaf
+masses and small shapes the plants use too (`leaves`, `clad`, `lump`, `tube`, `pot`, `cupped`, `sprigs`).
+
+| Species | Trunk | Roots | Crown | Hearts | Extras | Fruit |
+|---|---|---|---|---|---|---|
+| oak | spec | own | own (limbs, forks, masses) | own | | |
+| maple | spec | spec | spec | spec | | |
+| birch | own (white stem, black foot, lenticels) | | spec | spec | | |
+| cherry | spec | spec | spec | spec | two green clumps | |
+| apple | spec | spec | spec | spec | the laden boughs | apples, the picked one |
+| Japanese maple | spec | spec | own (stems, layers) | | | the sprigs a trim takes |
+| magnolia | spec | spec | spec | spec | green clumps, blooms | |
+| willow | spec | spec | own (arching limbs, masses, curtains) | | | |
+| pine, spruce | spec | spec | own (`conifer`, the tip) | | | |
+| cypress | spec | | own (column, sprays) | | | |
+| lemon tree | own (pot, band, stem) | | spec | spec | | lemons |
 
 ## How a tree is made
 
 - **Trunks** (`_trunk`): one swept, tapering piece through a few points (a lean, a wave), its bark wobbled by noise
-  (`G.jitter`, not on a far version), flared on root buttresses (`_roots`) that run out to just above the ground.
+  (`jitter`, not on a far version), flared on root buttresses (`_roots`) that run out to just above the ground.
 - **Broadleaves** (`_branches`): bough tips spread evenly over the crown's ellipsoid (a golden-angle spiral), grouped
   by bearing onto a few limbs; each limb runs from the trunk to part way to its tips' middle, bowed up and wandering
   (`_bend`), and forks into a curving bough to each tip; tips over the middle go on a leader. At each tip a leaf
   mass (`_mass`): a clump on the tip and two round it, a little below and out, lighter towards the top, with gaps
   between the masses where the limbs show; a few dark ones close the crown's heart (`_hearts`). Each clump is drawn
-  as leaf cards (below). The oak is built the same way by hand. Its own shape per tree: the birch's slender white limbs up the stem and hanging masses,
+  as leaf cards (below). The oak is built the same way by hand (its own stages). Its own shape per tree: the birch's slender white limbs up the stem and hanging masses,
   the cherry's wide low limbs under flat blossom clouds, the apple's crooked trunk and gnarled limbs, the Japanese
   maple's six S-curved stems under flat layered clouds, the magnolia's upswept stems, the willow's five limbs
   rising and arching over with masses along their crests and curtains (`streamer`) hanging from them.
@@ -40,7 +59,7 @@ stay out of it).
   2026-10-21, 2.95 m and 1.95 m before). `trim` the Japanese maple's stray sprigs
   for `shape`. Each is one more draw call (the apple and lemon trees come to four; `check-glb` warns).
 - **Ripeness (G-68, 2026-10-21):** the fruit trees `grows` in content: their fruit over the crown is a moving part
-  (`_fruiting`) with the growth clip `ripen` (`motions.growth`, `G.stages`): in fruit at rest, gone (shrunk into the
+  (`_fruiting`) with the growth clip `ripen` (`motions.growth`, `motion::stages`): in fruit at rest, gone (shrunk into the
   crown's middle) when picked and while it fruits again; the apple's front apple follows it too. The lemon tree's
   lemons are all picked at once, so its front lemon is one with the rest (no `pick` clip): still four draws.
   Far versions: all one still part, in fruit.
@@ -63,10 +82,10 @@ stay out of it).
 ## Leaf cards (2026-11-10)
 
 A review found the crowns the least real thing on screen: lumpy balls with a leaf pattern tiled over them. A
-broadleaf's leaf masses are now cut-out cards over dark cores (`plants.py` `leaves`, `clad`, `Cards`):
+broadleaf's leaf masses are now cut-out cards over dark cores (`artkit::botany` `leaves`, `clad`, `Cards`):
 
 - **The atlas.** One texture for every tree, `textures/leafcards/albedo.png` (512², `cargo art --leafcards`,
-  `../leafcards.py`): three clusters of leaves on twigs, rendered from generated leaves and cut out by their alpha,
+  `tools/art/blender/leafcards.py`): three clusters of leaves on twigs, rendered from generated leaves and cut out by their alpha,
   and a dense, opaque wall of leaves for the cores. Pale, as the tiling foliage is: a card's colour tints it.
 - **A build** makes its masses as ever (`leaves`: the same lumps from the same random numbers) and keeps them out of
   the model (`join_still`) for what is found on them by casting rays: the perches, the apples and lemons (`_hang`),
@@ -78,18 +97,18 @@ broadleaf's leaf masses are now cut-out cards over dark cores (`plants.py` `leav
   never sees it edge-on on the crown's near side or at its outline. None faces the crown's middle or hangs
   underneath. Its normals are its mass's hull's, a quarter its own (`CARD_OWN`), so the crown shades as a volume and
   the sprays still differ. Its shading is written as it is laid (open on top and outside, darker inside and under:
-  `gamekit/shade.py` keeps it and leaves the cards out of the occlusion it casts).
+  `artkit::shade` keeps it and leaves the cards out of the occlusion it casts).
 - **The tree keeps its size.** A card is drawn in until its corners are within 1.1 of its mass's ellipsoid
   (`CARD_REACH`: as far as the lump's noise reached) and inside the box of all the lumps; one card lies level on
   each lump's highest point, so every mass keeps its height, and the card nearest each side of the box is moved out
-  to it (`Cards.fill`, a few centimetres). So the model's box is the lumps' to the millimetre, `G.settle` centres it
+  to it (`Cards::fill`, a few centimetres). So the model's box is the lumps' to the millimetre, `settle` centres it
   where it centred them, and the perches (found on the lumps before the cards are made) are the same points:
   the pack's `perches` didn't change, nor the sizes in the table below. (Short of that, a crown 20 cm lower left the
   birch's top perch outside its box, which the gate fails, and a box 3 cm narrower moved every perch by as much,
   which the recorded day of birds, `web/tests/birds.test.ts`, notices.) The lowest point farther than 0.85 m from
   the trunk is as high or higher on all but the Japanese maple, 6 cm lower at 2.29 m ("Walking past them", below).
 - **The willow.** Its crown is cards as the others'; each strand of its curtain is upright cards down its ribbon's
-  line (`strand`, `Cards.hang`: one every half metre, overlapping, turned a little off the next, the clusters drawn
+  line (`strand`, `Cards::hang`: one every half metre, overlapping, turned a little off the next, the clusters drawn
   long as hanging leaves), cut out, so whoever sits by the trunk shows through the leaves as well as between the
   strands. The ribbons are built as ever and stand in until then (`stand_in`): the curtain keeps their box.
 - **Blossom and fruit.** The cherry's and the magnolia's cards are their pinks (the same clusters, tinted), their
@@ -102,7 +121,7 @@ broadleaf's leaf masses are now cut-out cards over dark cores (`plants.py` `leav
 
 ## Far versions and the woods
 
-Each tree has a far version (`far_of`): the same build at low detail, every random number drawn in the same order:
+Each tree has a far version (`Model::far_low`): the same build at low detail, every random number drawn in the same order:
 no boughs, one lump a mass spanning its clumps (so the crown keeps its size), the trunk and limbs on fewer sides, the
 conifers' sprays on three-point paths with a wedge profile, the willow's outer curtain only (wedge ribbons, as its
 curtain was), half the magnolia's blooms. A far version keeps the lumps, on `foliage`: no cards. Its lumps' colours
@@ -169,18 +188,18 @@ As leaf cards (2026-11-10), by the same measure: Japanese maple 2.29 m, magnolia
 
 ## Perches (2026-10-22)
 
-Every tree's entry has `perches`: the places the game's birds (`birds.py`) sit on it. Each is `[x, y, z]` in the
+Every tree's entry has `perches`: the places the game's birds sit on it. Each is `[x, y, z]` in the
 model's game axes (x, height, depth: Blender (−x, z, −y)), in metres, at rest, before the entry's `scale` and the
-instance's turn. They are found on the tree as built (`gamekit/perch.py` `find`, `clump_aims`, `tier_aims`):
+instance's turn. They are found on the tree as built (`artkit::perch` `find`, `clump_aims`, `tier_aims`):
 
-- A broadleaf's crown: lines come in from outside towards each clump `crown` returns (out from the trunk ±50°,
+- A broadleaf's crown: lines come in from outside towards each clump of its crown (out from the trunk ±50°,
   10–55° up, steeper over the top). Where a line meets the leaves, the perch is 3 cm further in, on the outer twigs,
   so a bird's feet are among the leaves and its body shows. A perch is kept only where the leaves face up a little at
   least and nothing hangs over it within 25 cm. The rest are spread round the crown: the highest first, then each the
   farthest from those kept, 35–45 cm apart at least.
 - The willow's crown gets lines from above only (lower ones would meet the curtains). Then a few perches go on bare
   limbs: the birch has one, and the willow four under its crown inside the curtain. These are points on a limb's
-  top with nothing over it and not inside the leaves (`limb_tops`, `G.perch.bare`).
+  top with nothing over it and not inside the leaves (`limb_points`, `perch::bare`).
 - The conifers: the lines aim just over each tier's foot from a little above, so they meet the tier near its rim
   where its boughs end. The top (`TOP`) is a song post. The cypress's upright column takes upright leaves too.
 - The fruit trees, the Japanese maple and the lemon tree: found on the still part before the fruit and the sprigs are
@@ -189,12 +208,11 @@ instance's turn. They are found on the tree as built (`gamekit/perch.py` `find`,
 Finding them casts rays at the meshes and draws its own random numbers (each tree its own seed, 111–122), so the
 meshes and the far versions are what they were. The rebuild gave the same triangles and sizes as the table above,
 and the committed .glb files are unchanged: perches only add data. `cargo check-glb` fails a perch that isn't three
-numbers or lies over 1 cm outside the model's box. `--preview` renders `<id>@perches.png` and `<id>@perches.top.png`
-with a red ball where each bird would sit.
+numbers or lies over 1 cm outside the model's box.
 
 Beside them each entry says what they are on, `habitat` (the `Model`'s `habitat=`), so the game's birds needn't guess
 it from the key: `"conifer"` for the pine, spruce and cypress, `"tree"` for the rest (the fruit trees and the potted
-lemon tree too). The shrubs' and hedges' are `"bush"` and `"hedge"` (plants.md). `cargo check-glb` fails any other
+lemon tree too). The shrubs' and hedges' are `"bush"` and `"hedge"`. `cargo check-glb` fails any other
 value, and a `habitat` without `perches`. The manifest writes each perch on one line.
 
 | Model | Perches |
@@ -215,7 +233,7 @@ value, and a `habitat` without `perches`. The manifest writes each perch on one 
 (After the rebuild, 2026-10-22: the clumps are the masses' clumps (`_mass`), the willow's limb perches on its arching
 limbs (`limb_points`), the conifers' aims at each whorl's foot.)
 
-The shrubs and hedges in `plants.py` have 4–6 each, found the same way (`perches` there).
+The plants family's shrubs and hedges have 4–6 each, found the same way.
 
 ## Species review
 
@@ -250,6 +268,14 @@ pattern and the habit's likeness are judged by eye against the kind's sources, o
 ## Rebuild
 
 ```
-cargo art trees            # the .glb files, the pack, check-glb
-cargo art trees --preview  # previews/trees/<id>.png, <id>.far.png, <id>@<clip>.png, <id>@perches.png
+cargo art trees               # the .glb files, the pack, check-glb
+cargo art trees --only oak    # one of them
+cargo art trees --check       # nothing written: fails on any byte that differs from what is committed
 ```
+
+A build gives the same bytes every time. Against Blender 5.2's build of the script this folder replaced
+(2026-11-17, `cargo check-glb --against`): the perches and the pack entries to the letter, every triangle's points
+and UVs to the bit, and 19 of the 24 files the same in every bit of every corner. The other five: one normal of the
+cypress a ten-thousandth off; the apple's, the Japanese maple's and the lemon tree's clips' keys a unit in the last
+place; and the baked shading of the lemon tree's pot band, on the side of it buried in the pot, a grey or more off
+at 19 vertices (7 on its far version).

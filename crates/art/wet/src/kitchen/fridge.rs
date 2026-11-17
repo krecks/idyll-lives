@@ -2,7 +2,6 @@
 //! door: the game opens the fridge door while a resident takes food or a drink out (`motions`). At rest both
 //! are closed. Built to the old part's size, in its numbers: the parts are placed in game axes (`F`).
 
-use super::soft::soft;
 use super::{DOOR_SECONDS, F, FREEZER_ANGLE, FRIDGE_ANGLE, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
@@ -11,7 +10,7 @@ use artkit::motion::Ease;
 use artkit::parts::{hinged, join, new_parts, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
-use artkit::{fbox, fcone, fcyl, fextrude, fsphere, fsweep, loft, ring, swing};
+use artkit::{fbox, fcone, fcyl, fextrude, fsphere, fsweep, loft, ring, soft, swing};
 
 /// The cabinet as five panels, so the doors open onto a real interior instead of a solid block. The sides are
 /// rounded on their vertical edges, as a pressed-steel body is; the top's edges are rounded to meet them.
@@ -486,20 +485,19 @@ fn door(
     bins: &[f64],
 ) -> Obj {
     let parts = new_parts(|| {
-        soft(
+        soft!(
             F,
             name,
             0.728,
             h,
             0.04,
-            (0.0, y, 0.195),
+            (0, y, 0.195),
             M.body,
-            0.014,
-            None,
+            round = 0.014
         );
         handle(&format!("handle_{name}"), -0.3, handle_y0, handle_y1, 0.215);
         if badge {
-            soft(
+            soft!(
                 F,
                 "badge",
                 0.1,
@@ -507,8 +505,8 @@ fn door(
                 0.006,
                 (0.25, 1.74, 0.216),
                 M.trim,
-                0.003,
-                Some(1),
+                round = 0.003,
+                round_segments = 1
             );
         }
         let seal = rounded_rect(0.7, h - 0.024, 0.03, 2);

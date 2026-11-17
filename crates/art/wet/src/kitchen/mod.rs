@@ -9,7 +9,6 @@ use artkit::palette;
 use artkit::place::GameFrame;
 
 mod fridge;
-mod soft;
 
 palette! { M:
     body = ("#F3F3F1", gloss),       // white cabinet and doors; the main part the player colours (`paint`)

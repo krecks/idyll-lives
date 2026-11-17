@@ -22,7 +22,7 @@
  * - `res=1080` that resolution (720, 1080, 1440, 2160; `res=1` every line the window has); `res=auto` (default) the player's setting.
  * - `secs=20` measured after `warmup=5`; `cap=0` frames per second at most (0: every frame shown).
  * - `hud=0` hides the interface; `gpu=0` doesn't time the GPU; `label=…` is kept with the result.
- * - `diag=noshadows,noaa,nonature,nolamps,nomirrors,noglass,nonight,noao,noclouds,noflow,freeze`: features
+ * - `diag=noshadows,noaa,nonature,nolamps,nomirrors,noglass,nonight,noao,noclouds,nolayers,noflow,freeze`: features
  *   left out (to measure what each costs; `nowoods`, `nofarwoods`, `noflowers` and `nograss` leave out
  *   one part of the nature; `noflow` draws the water still and plain, as before it flowed); `freeze` stops
  *   time for screenshots (`at=<s>` along the path);

@@ -12,6 +12,10 @@
 //!         [--seed-baseline]           writes the section where the file has none (the day the check came in)
 //!   cargo review colours [--all]      every model's colours against what real surfaces reflect (`colours.rs`)
 //!   cargo review facets [--all]       every model's round parts whose outline shows its flat sides (`facets.rs`)
+//!   cargo review edges [--all] [keys] every model's hard edges that show unbevelled at the play camera (`edges.rs`)
+//!   cargo review texels [--all] [keys]
+//!                                     every model's textured finishes laid too sparse, dense, stretched or smeared
+//!                                     (`texels.rs`)
 //!   cargo review uses [--md <dir>]    each object's uses, poses, minutes, effects, skills, slots, approach,
 //!                                     motions and sounds, and what looks wrong there: a summary per category
 //!                                     (`--md`: every object, `<dir>/uses-<cat>.md`)
@@ -1639,7 +1643,7 @@ impl Sources {
     }
 }
 
-pub const USAGE: &str = "usage: cargo review sizes [--md <dir>] [--check] [--update-baseline] [--seed-baseline] | uses [--md <dir>] [--check] | colours [--all] [--check] | facets [--all] [--check]";
+pub const USAGE: &str = "usage: cargo review sizes [--md <dir>] [--check] [--update-baseline] [--seed-baseline] | uses [--md <dir>] [--check] | colours [--all] [--check] | facets [--all] [--check] | edges [--all] [--check] [keys] | texels [--all] [--check] [keys]";
 
 /// `cargo review <sizes|uses> [--md <dir>] [--check]`: the exit code (2: usage, or no reference for
 /// `sizes`; 1: an object of no kind, a `species` that isn't one, or `--check` found a row the baseline doesn't
@@ -1650,6 +1654,12 @@ pub fn main(args: &[String]) -> i32 {
     }
     if args.first().map(String::as_str) == Some("facets") {
         return crate::facets::main(&args[1..]);
+    }
+    if args.first().map(String::as_str) == Some("edges") {
+        return crate::edges::main(&args[1..]);
+    }
+    if args.first().map(String::as_str) == Some("texels") {
+        return crate::texels::main(&args[1..]);
     }
     let check = args.iter().any(|a| a == "--check");
     let md = match args.iter().position(|a| a == "--md") {

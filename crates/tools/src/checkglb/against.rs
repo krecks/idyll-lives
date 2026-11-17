@@ -1929,9 +1929,19 @@ impl Context {
     }
 }
 
-/// A manifest without its model entries: what the models' rows do not cover.
+/// A manifest without its model entries: what the models' rows do not cover. Nor its `$comment`, which says what
+/// builds the pack (a script, then a crate) and which the game does not read.
 fn rest_of(manifest: &J) -> J {
-    let mut out = manifest.clone();
+    let mut out = match manifest.entries() {
+        Some(fields) => J::Obj(
+            fields
+                .iter()
+                .filter(|(k, _)| k.as_str() != "$comment")
+                .cloned()
+                .collect(),
+        ),
+        None => manifest.clone(),
+    };
     if let Some(entries) = manifest.get("entries").and_then(J::entries) {
         out.set(
             "entries",
@@ -2359,6 +2369,7 @@ mod tests {
         let fin = Finishes {
             plain: HashMap::new(),
             see_through: HashSet::new(),
+            textures: HashMap::new(),
         };
         let path = join(
             &super::super::repo_root(),

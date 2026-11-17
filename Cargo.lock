@@ -454,6 +454,7 @@ dependencies = [
 name = "ll-tools"
 version = "0.8.3"
 dependencies = [
+ "artkit",
  "basisu_c_sys",
  "bytemuck",
  "flate2",

@@ -1,6 +1,6 @@
 [package]
 name = "artkit"
-description = "The kernel the game's item models are generated with: meshes, shapes, forms, shading, clips and the .glb writer. No file access, no threads: only what a build computes."
+description = "The kernel the game's item models are generated with: meshes, shapes, forms, shading, clips, the .glb writer and reader, and a rasteriser for its pictures. No file access, no threads: only what a build computes."
 edition.workspace = true
 version.workspace = true
 license.workspace = true

@@ -19,7 +19,7 @@
 //!   the atlas is today's (`Atlas::today`): three clusters of one oval leaf and the dense tile.
 //!
 //! Leaf size on screen, the bark's pattern and the habit's likeness stay a reviewer's judgement against the kind's
-//! sources (tools/art/blender/families/trees.md, "Species review").
+//! sources (crates/art/nature/src/trees/NOTES.md, "Species review").
 
 use crate::checkglb::glb::{Glb, accessor, key, parse_glb};
 use crate::checkglb::py::{J, Num};
@@ -282,7 +282,8 @@ pub fn plant(
             _ => [1.0; 3],
         };
         let luminance = match finishes.get(&format!("material.finish.{finish}")) {
-            Some(Finish::Skipped) => None,
+            // (A metal's colour is what it reflects, not a bark's or a petal's.)
+            Some(Finish::Skipped | Finish::Metal) => None,
             Some(Finish::Textured(t)) => Some(colours::luminance([
                 colour[0] * t[0],
                 colour[1] * t[1],

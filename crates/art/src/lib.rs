@@ -10,13 +10,16 @@
 //!   cargo art trees --check            build in memory and fail on any byte that differs from the committed
 //!                                      files, pack entries or centres
 //!   cargo art --centres                write centres.json from every family (no build)
+//!   cargo art trees --preview [--sheet]  build in memory and draw each model (`preview`) into
+//!                                      tools/art/blender/previews/trees/, writing nothing else
 //!
 //! A family ported to Rust (one of the group crates here: nature, wet, rooms, packs, outside, things) is built in
 //! this process by the kernel (`artkit`), a thread a model; any other is still a script run in Blender
-//! (`ll_tools::art`, which also keeps `--preview` and `--leafcards`). One being ported, in a group crate and
-//! its script still there, is Blender's too, but for `--out` and `--check`, which build the models it has here. Either way the content and the manifests
-//! are read here, the pack and centres.json written by the same code (`ll_tools::art::take_build`), and the gate
-//! (`cargo check-glb`) run on the keys built; the exit code is 1 if a build or the gate fails.
+//! (`ll_tools::art`, which also keeps its `--preview`, `--lit` and `--leafcards`). One being ported, in a group
+//! crate and its script still there, is Blender's too, but for `--out` and `--check`, which build the models it
+//! has here. Either way the content and the manifests are read here, the pack and centres.json written by the
+//! same code (`ll_tools::art::take_build`), and the gate (`cargo check-glb`) run on the keys built; the exit code
+//! is 1 if a build or the gate fails.
 
 use artkit::family::{Family, Output, build_model};
 use artkit::json::Json;
@@ -26,6 +29,8 @@ use ll_tools::art::{J, build_keys, take_build, write_centres};
 use ll_tools::checkglb::{self, Paths};
 use std::collections::BTreeSet;
 use std::path::Path;
+
+pub mod preview;
 
 /// Every family by its name on the command line, each once it is ported to Rust.
 pub fn registry() -> Vec<(&'static str, Option<Family>)> {
@@ -38,7 +43,7 @@ pub fn registry() -> Vec<(&'static str, Option<Family>)> {
     all
 }
 
-fn to_j(v: &Json) -> J {
+pub(crate) fn to_j(v: &Json) -> J {
     match v {
         Json::Null => J::Null,
         Json::Bool(b) => J::Bool(*b),
@@ -86,16 +91,16 @@ pub struct Options {
 }
 
 /// What a family's build made: each model's key, id and files, with what it said.
-struct Built {
-    key: String,
-    id: &'static str,
-    output: Result<Output, String>,
-    log: Vec<String>,
+pub(crate) struct Built {
+    pub(crate) key: String,
+    pub(crate) id: &'static str,
+    pub(crate) output: Result<Output, String>,
+    pub(crate) log: Vec<String>,
 }
 
 /// Builds `models` of `family`, a thread a model (each has a scene of its own), as many at once as there are
 /// processors.
-fn build_all(family: &Family, ids: &[usize], finishes: &Finishes) -> Vec<Built> {
+pub(crate) fn build_all(family: &Family, ids: &[usize], finishes: &Finishes) -> Vec<Built> {
     let at_once = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)
@@ -464,7 +469,6 @@ pub fn main(argv: &[String]) -> i32 {
         out,
         check: has("--check"),
     };
-    let preview = has("--preview");
     let (mut here, mut blender) = (Vec::new(), Vec::new());
     for name in &names {
         match registry.iter().find(|(n, _)| n == name) {
@@ -478,12 +482,25 @@ pub fn main(argv: &[String]) -> i32 {
             _ => blender.push(name.clone()),
         }
     }
-    if preview && !here.is_empty() {
-        let which: Vec<&str> = here.iter().map(|f| f.name).collect();
-        return exit(format!(
-            "{}: no previews of a family built here yet (bun tools/bench/check.mjs gallery, or the inspector)",
-            which.join(", ")
-        ));
+    let (mut keys, mut failed) = (Vec::new(), Vec::new());
+    if has("--preview") {
+        // Pictures only: the families built here are drawn (no file, pack or gate), Blender's render their own.
+        if has("--lit") && !here.is_empty() {
+            println!("{}", preview::LIT);
+        }
+        let into = std::path::PathBuf::from(ll_tools::checkglb::preview::folder(&repo));
+        for family in here.drain(..) {
+            if let Err(err) = preview::run(
+                &repo,
+                family,
+                options.only.as_deref(),
+                has("--sheet"),
+                &into,
+            ) {
+                println!("{err}");
+                failed.push(family.name.to_string());
+            }
+        }
     }
     if (options.check || options.out.is_some()) && !blender.is_empty() {
         if has("--all") {
@@ -499,7 +516,6 @@ pub fn main(argv: &[String]) -> i32 {
             ));
         }
     }
-    let (mut keys, mut failed) = (Vec::new(), Vec::new());
     for family in here {
         match run_family(&repo, family, &options) {
             Ok(built) => keys.extend(built),

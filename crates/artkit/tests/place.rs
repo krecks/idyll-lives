@@ -99,19 +99,19 @@ fn the_games_frame_places_parts_in_blenders_axes() {
     let (lo, hi) = artkit::parts::measure(&[s]);
     assert!((hi[2] - lo[2] - 1.74).abs() < 1e-6 && (hi[1] - lo[1] - 0.622).abs() < 1e-6);
     // depths redrawn: a box keeps its place between its mapped back and front, its bevel no wider than fits
-    const SHALLOW: GameFrame = GameFrame::new(0.0).depths(&[(-0.4, -0.3), (0.4, 0.3)]);
+    let shallow = GameFrame::with_depths(0.0, &[(-0.4, -0.3), (0.4, 0.3)]);
     assert_eq!(
         (
-            SHALLOW.depth(-0.5),
-            SHALLOW.depth(0.0),
-            SHALLOW.depth(0.2),
-            SHALLOW.depth(0.6)
+            shallow.depth(-0.5),
+            shallow.depth(0.0),
+            shallow.depth(0.2),
+            shallow.depth(0.6)
         ),
         (-0.4, 0.0, 0.15000000000000002, 0.4999999999999999)
     );
     scene::reset();
     let b = fbox!(
-        SHALLOW,
+        shallow,
         "thin",
         0.5,
         0.2,
