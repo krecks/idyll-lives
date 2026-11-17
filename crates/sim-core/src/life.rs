@@ -426,6 +426,16 @@ pub fn leave_for(sim: &crate::world::Sim, leave: u64, start: u64) -> u64 {
 /// turning round and the car behind it waiting for each other for good at Alder Mill, 84 cars
 /// held up behind them; visits ended within minutes at Stillwater and Stationgate), work taxis
 /// were no more on time, and more cars were held up in view, not fewer.
+///
+/// Tried again at 20 for 0.8.3 (2026-11-17), against 0, and still left at 0: those four worlds
+/// (Alder Mill and Foundryside of seed base 1, Stillwater of 3, Stationgate of 4) passed both ways,
+/// none held up for good or in view either way, but the work taxi's riders came a little later
+/// (0.04 minutes on average against 0.00, 316 rides against 331) and the queues at the ways out
+/// weren't measured, so it wasn't shown to keep every check. Its tick rate was the same on the
+/// seaside and forest cities filled in full (a game day's instructions -0.6 % and +0.7 %), but a
+/// quarter of 0's on the river city (Ashbourne, 104734): there everyone off at the last minute
+/// jams the morning's ways out, its slowest game hour at 07:00, a day's ticking four times the
+/// others'. Worth the try again with the queues counted.
 const EARLY_MOST: f32 = 0.0;
 
 /// How much earlier than their way needs a household's workers set off for work (ticks, up to
