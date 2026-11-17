@@ -116,6 +116,8 @@ const START_WATCH_MS = 2500;
 const FINE_TURN = 15;
 /** Fastest game speed (`clock::MAX_SPEED`). */
 const MAX_SPEED = 5;
+/** From this speed up the sim's full-detail area is only the chunks round the camera's (`Renderer.setDetailTight`). */
+const TIGHT_SPEED = 4;
 /** How long the interface stays after the mouse moves while it watches quietly. */
 const HUD_AWAKE_MS = 3000;
 /** How long a big moment plays at normal speed before the game speeds up again. */
@@ -491,6 +493,8 @@ async function openSession(
   const speed = new GameSpeed((running) => {
     bridge.send({ type: 'setSpeed', speed: running });
     game.speed = running;
+    // (At the fastest speeds the sim's full-detail area is the chunks round the camera's only.)
+    renderer.setDetailTight(running >= TIGHT_SPEED);
   }, bridge.savedSpeed);
   /**
    * The catalog's pictures are drawn ahead of time in Build and Create, not in Live's frames
@@ -2120,6 +2124,7 @@ async function openSession(
       townMap.source = {};
       renderer.onFocusLot(null);
       renderer.onWatch(null);
+      renderer.setDetailTight(false);
     },
   };
   session.applySettings(settings);

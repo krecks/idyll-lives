@@ -426,6 +426,16 @@ pub fn leave_for(sim: &crate::world::Sim, leave: u64, start: u64) -> u64 {
 /// turning round and the car behind it waiting for each other for good at Alder Mill, 84 cars
 /// held up behind them; visits ended within minutes at Stillwater and Stationgate), work taxis
 /// were no more on time, and more cars were held up in view, not fewer.
+///
+/// Tried again at 20 for 0.8.3 (2026-11-17), against 0, and still left at 0: those four worlds
+/// (Alder Mill and Foundryside of seed base 1, Stillwater of 3, Stationgate of 4) passed both ways,
+/// none held up for good or in view either way, but the work taxi's riders came a little later
+/// (0.04 minutes on average against 0.00, 316 rides against 331) and the queues at the ways out
+/// weren't measured, so it wasn't shown to keep every check. Its tick rate was the same on the
+/// seaside and forest cities filled in full (a game day's instructions -0.6 % and +0.7 %), but a
+/// quarter of 0's on the river city (Ashbourne, 104734): there everyone off at the last minute
+/// jams the morning's ways out, its slowest game hour at 07:00, a day's ticking four times the
+/// others'. Worth the try again with the queues counted.
 const EARLY_MOST: f32 = 0.0;
 
 /// How much earlier than their way needs a household's workers set off for work (ticks, up to
@@ -616,7 +626,19 @@ pub(crate) fn update(w: &mut World) {
     let day = clock::day(tick);
     let hour = clock::hour(tick);
     let mut refreshed = false;
-    for i in 0..w.sims.len() {
+    let residents = crate::profile::start();
+    // (Only those taking a turn: `World::turns`, unless someone came to town since.)
+    let turns = std::mem::take(&mut w.turns);
+    let fresh = w.turns_fresh;
+    debug_assert!(
+        !fresh
+            || (0..w.sims.len()).all(|i| turns.binary_search(&(i as u32)).is_ok()
+                || !w.sims[i].here()
+                || w.sims[i].steps == 0)
+    );
+    let all = if fresh { 0 } else { w.sims.len() };
+    let listed = if fresh { &turns[..] } else { &[] };
+    for i in listed.iter().map(|&i| i as usize).chain(0..all) {
         // (In lots nobody watches, on their turn; see `lod.rs`.)
         if !w.sims[i].here() || w.sims[i].steps == 0 {
             continue;
@@ -690,9 +712,13 @@ pub(crate) fn update(w: &mut World) {
         childcare(w, i);
         report_skill_ups(w, i);
     }
-    doors(w);
-    charge_rent(w, day);
-    job_market(w, day);
+    w.turns = turns;
+    crate::profile::end("life::update/residents", residents);
+    crate::profile::phase("life::update/doors", || doors(w));
+    crate::profile::phase("life::update/rent_and_jobs", || {
+        charge_rent(w, day);
+        job_market(w, day);
+    });
 }
 
 /// Once a day: unemployed residents with free will below the retirement age look for work, and
@@ -1053,7 +1079,8 @@ pub(crate) fn leaving_home(w: &World, s: &Sim) -> bool {
 /// Whether a grown-up of household `h` other than `except` is at home on `plot` to look after
 /// a baby (not on their way out: `leaving_home`; back from a visit once they're on the lot).
 fn carer_home(w: &World, h: usize, plot: u32, except: Option<usize>) -> bool {
-    w.sims.iter().enumerate().any(|(j, s)| {
+    let carer = |j: usize| {
+        let s = &w.sims[j];
         Some(j) != except
             && s.here()
             && s.household as usize == h
@@ -1061,7 +1088,10 @@ fn carer_home(w: &World, h: usize, plot: u32, except: Option<usize>) -> bool {
             && !leaving_home(w, s)
             && s.adult(&w.content)
             && w.plot_at(s.tile().0, s.tile().1) == Some(plot)
-    })
+    };
+    let found = w.household_sims(h as u32).any(carer);
+    debug_assert_eq!(found, (0..w.sims.len()).any(carer));
+    found
 }
 
 /// Who `i` would stay home for if they left for work now: a baby at home with no other
@@ -1142,13 +1172,28 @@ pub(crate) fn minding_baby(sim: &Sim, ctx: &Ctx) -> bool {
     let me = sim.id as usize;
     let at_home =
         |b: &SimBrief| b.here && !b.away && b.household == sim.household && b.plot == Some(home);
-    at_home(&ctx.briefs[me])
-        && ctx.briefs.iter().any(|b| b.baby && at_home(b))
-        && !ctx
-            .briefs
-            .iter()
-            .enumerate()
-            .any(|(j, b)| j != me && b.adult && !b.leaving && at_home(b))
+    // (Only their household's: `Ctx::members`.)
+    let theirs = ctx.members.of(sim.household);
+    let minding = at_home(&ctx.briefs[me])
+        && theirs.iter().any(|&j| {
+            let b = &ctx.briefs[j as usize];
+            b.baby && at_home(b)
+        })
+        && !theirs.iter().any(|&j| {
+            let b = &ctx.briefs[j as usize];
+            j as usize != me && b.adult && !b.leaving && at_home(b)
+        });
+    debug_assert_eq!(
+        minding,
+        at_home(&ctx.briefs[me])
+            && ctx.briefs.iter().any(|b| b.baby && at_home(b))
+            && !ctx
+                .briefs
+                .iter()
+                .enumerate()
+                .any(|(j, b)| j != me && b.adult && !b.leaving && at_home(b))
+    );
+    minding
 }
 
 /// A babysitter for baby `b` (content `life.childcare`): booked (and paid) for the day once

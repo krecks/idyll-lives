@@ -16,6 +16,7 @@ fn nav<'a>(lot: &'a Lot, blocked: &'a [bool]) -> NavGrid<'a> {
         blocked,
         stairs: &NO_STAIRS,
         kept_off: &[],
+        steps: None,
     }
 }
 

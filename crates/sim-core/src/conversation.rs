@@ -581,6 +581,7 @@ pub(crate) fn update(w: &mut World) {
         blocked,
         stairs,
         kept_off: &travel.junction_tiles,
+        steps: None,
     };
     // (Round other people's gardens, as for any walk.)
     let walk = |sim: &Sim, goal| grounds(tile_plot, plots, households, &nav, sim, goal);

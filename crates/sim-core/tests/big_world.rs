@@ -17,6 +17,17 @@
 //! `WORLDS=worlds.json` (a file of `tools/worlds/sample.ts`'s shape) runs a real Big town instead,
 //! the `WORLD`th in it (default 0), as it was made (`SIZE` and `RESIDENTS` don't apply), the view on
 //! the player's home.
+//!
+//! `WATCH=320` (or any side in tiles) runs it as the game does at its fastest instead: the camera's
+//! square of that side round the player's home is the full-detail area and what's drawn
+//! (`set_view` and `set_watch`, as the worker's `set_watch` sets both), the speed is 5, and each
+//! real-time step is `World::advance` and a snapshot written (`sim_core::snapshot::write`). It
+//! reports ticks a second, the 99th percentile of a step (60 ticks), the slowest game hour and how
+//! many residents are at full detail. (Its save hash is not the lot view's: the full-detail area
+//! changes what happens.)
+//!
+//! Both say the slowest game hour (its ticks a second), and print `bench:` lines a script reads
+//! (`tools/bench/tiers.sh`).
 
 #[path = "sim/common/mod.rs"]
 mod common;
@@ -139,14 +150,34 @@ fn big_world_benchmark() {
         mb(peak)
     );
 
-    // Ticking: lower detail on, the view on the first hamlet (where the player lives).
+    // Ticking: lower detail on, the view on the first hamlet (where the player lives); or (WATCH)
+    // the camera's square round it, as the game streams it.
     w.lod = true;
     let view = hamlets.first().copied().unwrap_or_else(|| {
         let home = w.households.iter().find(|h| h.player).and_then(|h| h.plot);
         let p = &w.plots[home.expect("a player household with a home") as usize];
         [p.x, p.z, p.x + p.w, p.z + p.d]
     });
-    w.set_view(Some(view));
+    let watch = std::env::var("WATCH")
+        .ok()
+        .and_then(|v| v.parse::<i32>().ok())
+        .map(|side| {
+            let (cx, cz) = ((view[0] + view[2]) / 2, (view[1] + view[3]) / 2);
+            let (w0, d0) = (w.lot.width as i32, w.storey_depth());
+            let x0 = (cx - side / 2).clamp(0, (w0 - side).max(0));
+            let z0 = (cz - side / 2).clamp(0, (d0 - side).max(0));
+            [x0, z0, (x0 + side).min(w0), (z0 + side).min(d0)]
+        });
+    match watch {
+        Some(rect) => {
+            w.set_view(Some(rect));
+            w.set_watch(Some(rect));
+            w.apply(sim_core::Command::SetSpeed { speed: 5 })
+                .expect("the fastest speed");
+            eprintln!("watch {rect:?} at speed 5, a step and a snapshot at a time");
+        }
+        None => w.set_view(Some(view)),
+    }
     sim_core::path::take_search_stats();
     // The first tick finds the rooms, the walkable regions and the indexes from scratch: part of
     // starting the game, timed on its own.
@@ -158,6 +189,7 @@ fn big_world_benchmark() {
         ms(load + t.elapsed())
     );
     let ticks = hours * 60 * sim_core::TICKS_PER_MINUTE;
+    let hour_ticks = 60 * sim_core::TICKS_PER_MINUTE;
     let mut times = Vec::with_capacity(ticks as usize);
     sim_core::profile::reset();
     // (The public parking spots taken, by cars on a trip there or on their way to one: the most at
@@ -165,16 +197,46 @@ fn big_world_benchmark() {
     let spots = w.travel.file.parking.len();
     let (mut most_parked, mut full_ticks) = (0, 0u64);
     let mut ticking = Duration::ZERO;
-    for _ in 0..ticks {
+    // (Each game hour's time, and with WATCH each step's and how many were at full detail.)
+    let mut hourly = vec![Duration::ZERO; hours as usize];
+    let mut steps: Vec<Duration> = Vec::new();
+    let (mut detail_sum, mut detail_most, mut detail_n) = (0usize, 0usize, 0usize);
+    let start_tick = w.tick;
+    let mut snapshot = vec![0f32; sim_core::snapshot::CAPACITY];
+    while w.tick - start_tick < ticks {
+        let before = w.tick;
         let t = Instant::now();
-        w.tick_once();
+        if watch.is_some() {
+            w.advance();
+            sim_core::snapshot::write(&w, &mut snapshot);
+        } else {
+            w.tick_once();
+        }
         let dt = t.elapsed();
         ticking += dt;
-        times.push(dt);
+        let ran = (w.tick - before).max(1);
+        if watch.is_some() {
+            steps.push(dt);
+            let full = (0..w.sims.len())
+                .filter(|&i| w.sims[i].here() && w.full_detail(i))
+                .count();
+            detail_sum += full;
+            detail_most = detail_most.max(full);
+            detail_n += 1;
+        }
+        // (A step's ticks, each its share of the step's time.)
+        for k in 0..ran {
+            times.push(dt / ran as u32);
+            let hour = ((before + k - start_tick) / hour_ticks) as usize;
+            if let Some(h) = hourly.get_mut(hour) {
+                *h += dt / ran as u32;
+            }
+        }
         let parked = w.cars.iter().filter(|c| c.trip.is_some()).count();
         most_parked = most_parked.max(parked);
-        full_ticks += u64::from(spots > 0 && parked * 10 >= spots * 9);
+        full_ticks += ran * u64::from(spots > 0 && parked * 10 >= spots * 9);
     }
+    let ticks = w.tick - start_tick;
     let total = ticking;
     let searches = sim_core::path::take_search_stats();
     let mut slowest: Vec<(Duration, usize)> = times.iter().copied().zip(0..).collect();
@@ -203,12 +265,47 @@ fn big_world_benchmark() {
     times.sort_unstable();
     let p99 = times[(times.len() * 99 / 100).min(times.len() - 1)];
     let max = *times.last().unwrap();
+    let rate = ticks as f64 / total.as_secs_f64();
     eprintln!(
-        "{ticks} ticks ({hours} game hours): {:.0} ticks/s, mean {:.3} ms, p99 {:.3} ms, max {:.3} ms",
-        ticks as f64 / total.as_secs_f64(),
+        "{ticks} ticks ({hours} game hours): {rate:.0} ticks/s, mean {:.3} ms, p99 {:.3} ms, max {:.3} ms",
         ms(total) / ticks as f64,
         ms(p99),
         ms(max),
+    );
+    // The slowest game hour, at its own rate (a hitch spreads over its hour; the rush hours are
+    // what the fastest speed must keep up with).
+    let (worst_hour, worst) = hourly
+        .iter()
+        .copied()
+        .enumerate()
+        .max_by_key(|&(_, d)| d)
+        .unwrap_or((0, Duration::ZERO));
+    let worst_rate = hour_ticks as f64 / worst.as_secs_f64().max(1e-9);
+    let worst_at = sim_core::clock::total_minutes(start_tick + worst_hour as u64 * hour_ticks)
+        as u32
+        % (24 * 60)
+        / 60;
+    eprintln!("slowest game hour {worst_at:02}:00: {worst_rate:.0} ticks/s");
+    let step_p99 = if steps.is_empty() {
+        0.0
+    } else {
+        steps.sort_unstable();
+        let at = (steps.len() * 99 / 100).min(steps.len() - 1);
+        eprintln!(
+            "{} steps of {} ticks: p99 {:.2} ms, max {:.2} ms (a step's budget at 60 a second: 16.7 ms); full detail {:.0} residents on average, {detail_most} at most",
+            steps.len(),
+            sim_core::clock::TICKS_PER_STEP[5],
+            ms(steps[at]),
+            ms(*steps.last().unwrap()),
+            detail_sum as f64 / detail_n.max(1) as f64,
+        );
+        ms(steps[at])
+    };
+    // (One line for scripts: ticks/s, the slowest hour's, its hour, a step's p99 ms, full detail on
+    // average and at most.)
+    eprintln!(
+        "bench: rate {rate:.0} worst_hour {worst_rate:.0} at {worst_at:02} step_p99 {step_p99:.2} full {:.0} full_most {detail_most}",
+        detail_sum as f64 / detail_n.max(1) as f64,
     );
     // (Where the ticks' time went, phase by phase: with `--features profile` only.)
     eprint!("{}", sim_core::profile::report());
@@ -247,6 +344,7 @@ fn big_world_benchmark() {
         ms(saved),
         ms(t.elapsed())
     );
+    eprintln!("bench: hash {hash:016x}");
 
     // One object placed in the player's garden (the rooms are scored again for it as it's
     // placed: `catch_up_rooms`), then what catching up costs: the walkable regions, the

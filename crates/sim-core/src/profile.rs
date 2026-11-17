@@ -7,6 +7,10 @@
 //! The numbers are wall-clock on the calling thread. Each phase costs one `Instant::now` pair
 //! (tens of nanoseconds), so a phase that runs every tick has a small, even overhead; the
 //! shares between phases are what matters.
+//!
+//! A phase whose name has a `/` in it is a part of another (`cars::update/reblock`), or a call
+//! made from many (`path/find_path_with`): it is listed after the phases, its share of the same
+//! whole, and left out of that whole (it is already in its phase's time).
 
 #[cfg(feature = "profile")]
 mod enabled {
@@ -51,13 +55,20 @@ mod enabled {
         PHASES.with(|p| p.borrow_mut().clear());
     }
 
-    /// One line per phase, heaviest first: total ms, share, ns a tick and calls a tick. Empty
-    /// before anything is measured.
+    /// One line per phase, heaviest first, then the parts (names with a `/`), heaviest first:
+    /// total ms, share of the phases' whole, ns a tick and calls a tick. Empty before anything is
+    /// measured.
     pub fn report() -> String {
         PHASES.with(|p| {
             let p = p.borrow();
-            let total: Duration = p.iter().map(|(_, d, _)| *d).sum();
-            let ticks = p.iter().map(|(_, _, c)| *c).max().unwrap_or(0);
+            let part = |name: &str| name.contains('/');
+            let total: Duration = p.iter().filter(|e| !part(e.0)).map(|e| e.1).sum();
+            let ticks = p
+                .iter()
+                .filter(|e| !part(e.0))
+                .map(|e| e.2)
+                .max()
+                .unwrap_or(0);
             let ms_total = total.as_secs_f64() * 1000.0;
             let mut rows: Vec<_> = p
                 .iter()
@@ -72,12 +83,17 @@ mod enabled {
                     (name, ms, share, ns, calls as f64 / ticks.max(1) as f64)
                 })
                 .collect();
-            rows.sort_by(|a, b| b.1.total_cmp(&a.1));
+            rows.sort_by(|a, b| part(a.0).cmp(&part(b.0)).then(b.1.total_cmp(&a.1)));
             let mut out = format!(
                 "{:>9} {:>6} {:>9} {:>6}  {}\n",
                 "ms", "%", "ns/tick", "calls", "phase"
             );
+            let mut parts = false;
             for (name, ms, share, ns, calls) in rows {
+                if part(name) && !parts {
+                    parts = true;
+                    out += "  (parts of the phases above, and calls made from many of them)\n";
+                }
                 out += &format!("{ms:9.1} {share:6.1} {ns:9.1} {calls:6.2}  {name}\n");
             }
             out

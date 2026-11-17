@@ -700,7 +700,8 @@ pub(crate) fn home_stations(ctx: &Ctx, household: u32, objects: &[ObjectInstance
 fn at_home<'a>(sim: &Sim, ctx: &'a Ctx) -> impl Iterator<Item = usize> + 'a {
     let home = ctx.households[sim.household as usize].plot;
     let household = sim.household;
-    ctx.briefs.iter().enumerate().filter_map(move |(j, b)| {
+    let found = move |j: usize| {
+        let b = &ctx.briefs[j];
         (b.here
             && !b.away
             && !b.baby
@@ -708,7 +709,19 @@ fn at_home<'a>(sim: &Sim, ctx: &'a Ctx) -> impl Iterator<Item = usize> + 'a {
             && home.is_some()
             && b.plot == home)
             .then_some(j)
-    })
+    };
+    // (Only the household's: `Ctx::members`.)
+    debug_assert!(
+        ctx.members
+            .of(household)
+            .iter()
+            .filter_map(|&j| found(j as usize))
+            .eq((0..ctx.briefs.len()).filter_map(found))
+    );
+    ctx.members
+        .of(household)
+        .iter()
+        .filter_map(move |&j| found(j as usize))
 }
 
 /// Housemates at home who'd be glad of a serving of `r`.
