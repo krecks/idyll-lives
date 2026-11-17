@@ -196,6 +196,8 @@ const HOLD_FRAMES = 2;
  * shadows 15 a second on Low, the reflections 10).
  */
 const GAME_SETTLE_MS = 250;
+/** While water is in view, a view that would be held is drawn this often (ms: 30 a second) so it goes on flowing. */
+const WATER_FRAME_MS = 1000 / 30;
 /** Metres the sun's shadow square reaches past the viewed lot. */
 const SHADOW_MARGIN = 10;
 /** The game camera's target eases to the ground under it over this (s): `settleTarget`. */
@@ -1216,21 +1218,30 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * Whether this frame may be held (`heldFrames.ts`): the menus' town standing still, nothing of it being built; the
    * game paused (residents, objects, birds and cars stand still then), nothing being built or streamed in. In the
    * game, what changes the picture in place is told (`pictureChanged`), and frames are drawn for `GAME_SETTLE_MS`
-   * after it (what is drawn at a rate of its own: the sun's map, the reflections, the lamps' shadows).
+   * after it (what is drawn at a rate of its own: the sun's map, the reflections, the lamps' shadows). With water in
+   * view, a held view goes on being drawn `WATER_FRAME_MS` apart, so the water goes on flowing.
    */
   private holdIfStill(): void {
     const held = this.held;
     if (this.townMode) {
       held.settleMs = 0;
       held.active = !this.flyingIn && !this.worldBuilding && this.townBuilds === 0; // (nor while the overview builds.)
+      held.motionMs = held.active && this.waterInView() ? WATER_FRAME_MS : 0;
       return;
     }
     held.settleMs = GAME_SETTLE_MS;
     held.active = this.gamePaused && !this.worldBuilding && !this.worldBuilds && !this.streaming && !this.streamDue && !this.warming;
+    held.motionMs = held.active && this.waterInView() ? WATER_FRAME_MS : 0;
     if (!held.active) return;
     // What moves in place while the game is paused: a resident posed (a voice's lips, a look changed), the thing in
     // hand and the build effects, a shadow map's redraw still to come.
     if (this.characters.posed || this.placing.animating || this.sunShadows.waiting) held.changed();
+  }
+
+  /** Whether the water of the land in view flows on screen (`Landscape.waterInView`): a held view goes on being drawn, slower. */
+  private waterInView(): boolean {
+    const camera = this.camera.camera;
+    return !!camera && !!this.landInView()?.scape.waterInView(camera.frustum);
   }
 
   /** Something in the game's picture changed that the held frame can't see (`heldFrames.ts`): it is drawn again. */

@@ -34,11 +34,11 @@ export const FLOW = {
   widthReach: 10,
   shore: 3,
   shoreSpeed: 0.15,
-  drop: [0.12, 0.7],
+  drop: [0.2, 0.8],
   rapidReach: 2,
   /** Foam where the water runs this fast and more, at most `fastFoam`. */
   fast: 0.9,
-  fastFoam: 0.12,
+  fastFoam: 0.02,
 } as const;
 
 /** How far round a rectangle (samples) `waterFlow` reads the land: the reach of everything it looks at, and room for the steps' ways. */

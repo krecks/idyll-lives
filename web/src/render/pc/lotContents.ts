@@ -34,7 +34,7 @@ import type { GrassPusher } from './grass';
 import { setDaylight } from './daylight';
 import { CloudShadows } from './cloudShadows';
 import { smoothstep } from '../../game/noise';
-import { installNature, Landscape, NATURE_DIAGS, setWind, Sky, windStill, type NatureRebuild, type NatureStep, type RoadBuilder } from './nature';
+import { installNature, Landscape, NATURE_DIAGS, setWaterCalm, setWind, Sky, windStill, type NatureRebuild, type NatureStep, type RoadBuilder } from './nature';
 import { ObjectMotion, writeInstance, type MovingObject, type PopTarget } from './objectMotion';
 import { ObjectShadows, type ShadowSource } from './objectShadows';
 import { toGame } from './space';
@@ -561,6 +561,7 @@ export class LotContents {
   setReducedMotion(on: boolean): void {
     this.reducedMotion = on;
     setWind(this.app, on ? 0 : 1);
+    setWaterCalm(this.app, on);
   }
 
   /** Each frame, game or overview, once the camera is placed: the sky round it, the clouds' drift (`dt` ms), the grass in view. */
