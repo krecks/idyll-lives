@@ -42,6 +42,8 @@
   const streams = $derived(peopleStreams(peopleSeedOf(code)));
   const offer = $derived(app.offer);
   const houseCount = $derived(town ? town.slots.filter((s) => s.kind === 'house').length : 0);
+  /** The homes as steps 2 and 3 count them, farms apart (a farm's house is lived in, so the slider above still counts it). */
+  const homeCount = $derived(town ? town.slots.filter((s) => s.kind === 'house' && s.lot !== 'farm').length : 0);
   /** The Neighbours slider's end: as many households as the first wave moves in at most (`populate` stops there too). */
   const mostHouseholds = $derived(householdsAtMost(houseCount));
   const forSale = $derived(town ? vacantSlots(town).length : 0);
@@ -395,7 +397,7 @@
 
 {#snippet figures()}
   {#if town}
-    <span><b>{houseCount}</b> homes</span>
+    <span><b>{homeCount}</b> homes</span>
     <span><b>{town.households.length}</b> households</span>
     <span><b>{population}</b> residents</span>
     <span><b>{forSale}</b> for sale</span>

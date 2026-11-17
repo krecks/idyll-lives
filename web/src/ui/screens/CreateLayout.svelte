@@ -70,8 +70,8 @@
   let leaving = $state(false);
   const blocked = $derived(editor.issues.blocking.length > 0);
 
-  /** What the zones would build, about (`usesSummary`), and in a line. */
-  const zoned = $derived(plan ? usesSummary(plan) : null);
+  /** What the zones would build (`usesSummary`): the proposal's own town exactly while the layout is untouched, else about. */
+  const zoned = $derived(plan ? usesSummary(plan, app.layout?.proposal) : null);
   /** Fewer than two homes to come: those the zones would build, about, and any lots the layout has already. */
   const fewHomes = $derived(!!zoned && !!plan && zoned.homes + plan.slots.filter((s) => s.kind === 'house').length < 2);
 

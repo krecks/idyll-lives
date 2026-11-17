@@ -95,7 +95,8 @@
     if (!editor.ready) return town ? of(town) : 0;
     return of(editor.shown) + of(editor.draft) - of(editor.shownFrom);
   };
-  const homes = $derived(figure((d) => d.slots.filter((s) => s.kind === 'house').length));
+  // (Homes as step 2's summary counts them: a farm's house is a farm, counted on its own.)
+  const homes = $derived(figure((d) => d.slots.filter((s) => s.kind === 'house' && s.lot !== 'farm').length));
   const farms = $derived(figure((d) => d.slots.filter((s) => s.lot === 'farm').length));
   const places = $derived(figure((d) => d.slots.filter((s) => s.kind !== 'house').length));
   const roadCount = $derived(figure((d) => d.roads.length));
