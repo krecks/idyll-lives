@@ -25,24 +25,6 @@ fn primitives_are_blenders_point_for_point() {
     let mut bad = 0;
     for g in golden_meshes("primitives.txt") {
         let m = build(&g.what);
-        if g.what.starts_with("ico") && !g.what.starts_with("ico 1") {
-            // the same points to rounding, in an order of its own
-            assert_eq!(m.verts.len(), g.verts.len(), "{}", g.what);
-            assert_eq!(m.faces.len(), g.faces.len(), "{}", g.what);
-            let far = g
-                .verts
-                .iter()
-                .map(|w| {
-                    m.verts
-                        .iter()
-                        .map(|v| (0..3).map(|i| (v[i] - w[i]).abs()).fold(0.0, f32::max))
-                        .fold(f32::MAX, f32::min)
-                })
-                .fold(0.0, f32::max);
-            report.push(format!("{}: its points within {far} of Blender's", g.what));
-            bad += (far > 1e-6) as usize;
-            continue;
-        }
         // the same points, to the bit
         let Some((map, inexact, far)) = pair_points(&m.verts, &g.verts, 0.0) else {
             report.push(format!("{}: not Blender's points", g.what));
@@ -57,7 +39,9 @@ fn primitives_are_blenders_point_for_point() {
         report.push(format!("{}: {inexact} of {} points another copy (within {far}), in order {in_order}, faces {same_faces}, triangles {same_tris}", g.what, g.verts.len()));
         // (a cone drawn to a point: which of its merged points is kept, and so their order, is the operator's own)
         let merged = g.what.starts_with("cone") && g.what.contains(" 0000000000000000 ");
-        bad += (!same_faces || !same_tris || (!merged && !in_order)) as usize;
+        // (a subdivided icosphere's triangles each start at a corner of bmesh's own; the same triangles)
+        let split = g.what.starts_with("ico") && !g.what.starts_with("ico 1");
+        bad += ((!same_faces && !split) || !same_tris || (!merged && !in_order)) as usize;
     }
     println!("{}", report.join("\n"));
     assert_eq!(bad, 0, "\n{}", report.join("\n"));

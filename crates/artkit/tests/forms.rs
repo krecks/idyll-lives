@@ -455,8 +455,8 @@ fn shapes_and_forms_are_gamekits_in_blender() {
         if way != way_want {
             fail(format!("uv way {way:?}"));
         }
-        // its points: Blender's to the bit (the icosphere's: within rounding of them)
-        let loose: f32 = if g.what == "boulder" { 2e-6 } else { 0.0 };
+        // its points: Blender's to the bit
+        let loose: f32 = 0.0;
         let exact = pair_points(&mesh.verts, &g.verts, 0.0);
         let Some((map, inexact, far)) =
             exact.or_else(|| pair_points(&mesh.verts, &g.verts, loose.max(3e-7)))
@@ -476,6 +476,7 @@ fn shapes_and_forms_are_gamekits_in_blender() {
         let faces: Vec<Vec<u32>> = (0..mesh.faces.len())
             .map(|f| mesh.corners(f).to_vec())
             .collect();
+        // (a subdivided icosphere's triangles each start at a corner of bmesh's own: its points are checked)
         if g.what != "boulder" {
             if sorted(&renamed(&faces, &map)) != sorted(&g.faces) {
                 fail(format!(
@@ -567,7 +568,7 @@ fn shapes_and_forms_are_gamekits_in_blender() {
             let w = &want_vn[map[i] as usize * 3..][..3];
             vn_off = vn_off.max((0..3).map(|k| (n[k] - w[k]).abs()).fold(0.0, f32::max));
         }
-        if vn_off > 2e-4 && g.what != "boulder" {
+        if vn_off > 2e-4 {
             fail(format!("vertex normals off by {vn_off}"));
         }
         report.push(format!(
