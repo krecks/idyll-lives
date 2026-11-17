@@ -149,7 +149,7 @@
       menuScene.prepare(made.draft, made.preview);
       app.layout = { draft: made.draft, key, proposal: made.proposal, edited: false, plan: made.plan ?? made.proposal.plan, ...(made.marks ? { marks: made.marks } : {}) };
       // (Pieces of dry land the water cut off with no bridge to them: no village there.)
-      const unreached = made.draft.diagnostics?.pieces ?? [];
+      const unreached = made.proposal.plan.diagnostics?.pieces ?? [];
       if (unreached.length) toast(unreached.length === 1 ? unreached[0] : `${unreached[0]} And ${unreached.length - 1} more such ${unreached.length === 2 ? 'piece' : 'pieces'}.`);
       // (A new proposal builds its town from the build's first seed: the code's own town.)
       app.buildSeed = 0;
