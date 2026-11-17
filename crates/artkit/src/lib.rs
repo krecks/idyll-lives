@@ -1,6 +1,7 @@
 //! The kernel the game's item models are generated with.
 #![forbid(unsafe_code)]
 
+pub mod bevel;
 pub mod botany;
 pub mod bvh;
 pub mod family;

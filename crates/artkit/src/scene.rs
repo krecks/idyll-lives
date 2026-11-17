@@ -28,6 +28,8 @@ pub struct Object {
     /// The moving part this one goes with (`attach`): its place, turn and scale are then in that part's frame.
     pub parent: Option<Obj>,
     pub uv: UvWay,
+    /// The bevel it is still to be given (`bevel::bevel_edges`), on its mesh as it is when it is joined or written.
+    pub bevel: Option<crate::bevel::Pending>,
     /// Its clips, one track a name.
     pub tracks: Vec<Track>,
     pub(crate) alive: bool,
@@ -48,6 +50,7 @@ impl Object {
             scale: v3(1, 1, 1),
             parent: None,
             uv: UvWay::Box,
+            bevel: None,
             tracks: Vec::new(),
             alive: true,
         }

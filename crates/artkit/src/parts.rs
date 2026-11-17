@@ -1,10 +1,10 @@
 //! Assembling a model from its parts: joining them into one mesh (or one per moving part), putting a moving
 //! part's origin on its hinge, standing the model on the floor and checking its size.
 
-use crate::math::{Axis, M4, P3, V3, mul_m4_m4m4, mul_m4_v3, radians, v3};
+use crate::math::{Axis, M4, P3, V3, mul_m4_m4m4, radians, v3};
 use crate::mesh::Mesh;
+use crate::perch;
 use crate::scene::{self, Obj, meshes};
-use crate::{perch, uv};
 
 /// What a model draws but isn't its own size: the chair at a desk, the picture on a chest of drawers, the blocks
 /// left out in front of a toy box. `aside` joins them into one node named `<what>_aside`; they are drawn and
@@ -35,7 +35,8 @@ pub fn join_all(name: &str) -> Obj {
 pub fn join(parts: &[Obj], name: &str, origin: Option<P3>) -> Obj {
     assert!(!parts.is_empty(), "{name}: nothing to join");
     let first = parts[0];
-    uv::ensure(parts); // each part's UVs in its own frame, before its frame is gone
+    // each part's UVs in its own frame, before its frame is gone, then the bevel it was to be given
+    crate::bevel::apply_all(parts);
     // the others go into the first in the order they were made
     let mut others: Vec<Obj> = parts[1..].iter().copied().filter(|&o| o != first).collect();
     others.sort();
@@ -80,9 +81,7 @@ pub(crate) fn join_into(first: Obj, others: &[Obj]) {
             let m = mul_m4_m4m4(&inverse, &other.matrix_world());
             let mut mesh = other.read(|o| o.mesh.clone());
             if !m.is_identity() {
-                for v in &mut mesh.verts {
-                    *v = mul_m4_v3(&m, *v);
-                }
+                mesh.transform(&m);
             }
             first.edit(|o| append(&mut o.mesh, &mesh));
             other.remove();
@@ -190,11 +189,22 @@ pub fn own(objs: &[Obj]) -> Vec<Obj> {
         .collect()
 }
 
-/// (lo, hi): the Blender world bounds of `objs`.
+/// (lo, hi): the Blender world bounds of `objs`, a bevel still to be given included.
 pub fn measure(objs: &[Obj]) -> ([f64; 3], [f64; 3]) {
     let (mut lo, mut hi) = ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]);
     for &o in objs {
-        for p in o.world_points() {
+        let points = if o.read(|p| p.bevel.is_some()) {
+            let m = o.matrix_world();
+            let local = crate::bevel::points(o);
+            if m.is_identity() {
+                local
+            } else {
+                local.iter().map(|&v| m * v).collect()
+            }
+        } else {
+            o.world_points()
+        };
+        for p in points {
             for i in 0..3 {
                 lo[i] = lo[i].min(p[i] as f64);
                 hi[i] = hi[i].max(p[i] as f64);

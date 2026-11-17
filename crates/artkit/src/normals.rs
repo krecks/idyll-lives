@@ -139,6 +139,13 @@ pub fn custom_from_verts(mesh: &Mesh, normals: &[V3]) -> Vec<V3> {
     fans(mesh, Keeps::Given(&given))
 }
 
+/// The normals a mesh has when Blender reads back what a tool stored for its corners, two angles of sixteen bits
+/// each (a bevel's hardened normals, stored in the frames of the mesh it was working on): each fan's corners share
+/// the mean of theirs, read in the fan's own frame.
+pub(crate) fn from_stored(mesh: &Mesh, stored: &[[i16; 2]]) -> Vec<V3> {
+    fans(mesh, Keeps::Stored(stored))
+}
+
 /// What a fan's normal is kept as.
 enum Keeps<'a> {
     /// As it is worked out.
@@ -147,6 +154,9 @@ enum Keeps<'a> {
     Frames,
     /// As these normals, one a vertex, come back out of the fan's frame.
     Given(&'a [V3]),
+    /// As what is stored for its corners (two angles of sixteen bits each, whatever frame they were stored in)
+    /// reads in the fan's frame: the mean of them.
+    Stored(&'a [[i16; 2]]),
 }
 
 /// A side at a vertex, as the faces on it join across it or not.
@@ -265,6 +275,16 @@ fn fans(mesh: &Mesh, keeps: Keeps) -> Vec<V3> {
                         }
                         frame.kept(crate::math::mul_v3_fl(mean, 1.0 / fan.len() as f32))
                     }
+                    Keeps::Stored(stored) => {
+                        let (mut a, mut b) = (0_i32, 0_i32);
+                        for &i in &fan {
+                            let s = stored[faces[i].corner as usize];
+                            a += s[0] as i32;
+                            b += s[1] as i32;
+                        }
+                        let n = fan.len() as i32;
+                        frame.read((a / n) as i16, (b / n) as i16)
+                    }
                     _ => frame.normal,
                 };
             }
@@ -351,6 +371,11 @@ impl Frame {
     /// frame's own in sixteen bits, and back.
     fn kept(&self, given: V3) -> V3 {
         let (a, b) = self.angles(given);
+        self.read(a, b)
+    }
+
+    /// The normal two stored angles stand for in the frame.
+    fn read(&self, a: i16, b: i16) -> V3 {
         if a == 0 || self.alpha == 0.0 || self.beta == 0.0 {
             return self.normal;
         }

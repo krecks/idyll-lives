@@ -365,9 +365,6 @@ fn clips_key_as_gamekits() {
     let mut by: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     let (mut bad, mut near) = (Vec::new(), Vec::new());
     for call in calls() {
-        if call.func == "swing" || call.func == "slide" {
-            continue;
-        }
         scene::reset();
         // (the rest of each part before the call; for one that keys nothing, its rest after it follows)
         let before = if call.curves.is_empty() && call.func != "flat" {
@@ -407,6 +404,30 @@ fn clips_key_as_gamekits() {
             }
             "attach" => {
                 motion::attach(obj("obj"), obj("parent"));
+            }
+            "swing" => {
+                motion::swing(
+                    obj("obj"),
+                    &clip,
+                    num("degrees", 0.0),
+                    motion::Swing {
+                        seconds: num("seconds", 1.0),
+                        axis: axis_of(arg("axis"), Axis::Z),
+                        ease: arg("ease").map_or(Ease::Smooth, |e| ease_named(e.str())),
+                        overshoot: num("overshoot", motion::OVERSHOOT),
+                    },
+                );
+            }
+            "slide" => {
+                motion::slide(
+                    obj("obj"),
+                    &clip,
+                    arg("offset").unwrap().p3(),
+                    motion::Slide {
+                        seconds: num("seconds", 1.0),
+                        ease: arg("ease").map_or(Ease::Smooth, |e| ease_named(e.str())),
+                    },
+                );
             }
             "grow" => {
                 motion::grow(
@@ -668,4 +689,104 @@ fn clips_key_as_gamekits() {
     println!("{}\nnear: {near:?}", report.join("\n"));
     assert!(bad.is_empty(), "{}", bad.join("\n"));
     assert!(near.len() <= 1, "{near:?}");
+}
+
+// A door and a drawer against the keys Blender sampled into the committed kitchen models (30 a second:
+// models/kitchen/fridge.glb's `freezer_open`, wineFridge.glb's `rack_out`).
+
+fn bare() -> Obj {
+    scene::reset();
+    scene::add("part", Mesh::default())
+}
+
+#[test]
+fn a_door_swings_past_open_and_settles_as_blenders_back_ease() {
+    // the fridge's freezer door: 118 degrees in 1.75 s, 4 % past open on the way
+    let door = motion::swing(
+        bare(),
+        "freezer_open",
+        -118.0,
+        motion::Swing {
+            seconds: 1.75,
+            ease: Ease::BackOut,
+            ..motion::Swing::default()
+        },
+    );
+    assert_eq!(
+        motion::clips(&[door]),
+        [(door, "freezer_open".to_string(), 54)]
+    );
+    let at = |frame: i32| {
+        -(motion::pose(door, Some("freezer_open"), frame as f64).1.z as f64).to_degrees()
+    };
+    for (frame, want) in [
+        (1, 0.0),
+        (2, 8.78166),
+        (3, 17.14637),
+        (4, 25.10379),
+        (5, 32.66357),
+        (9, 59.12061),
+        (54, 118.0),
+    ] {
+        assert!(
+            (at(frame) - want).abs() < 2e-4,
+            "frame {frame}: {} for {want}",
+            at(frame)
+        );
+    }
+    let widest = (1..=54).map(at).fold(0.0, f64::max);
+    assert!((122.2..122.73).contains(&widest), "{widest}");
+    assert!(motion::moves_away(door));
+    // about another axis, the default ease: slow out of rest and into the end
+    let lever = motion::swing(
+        bare(),
+        "lever",
+        -30.0,
+        motion::Swing {
+            seconds: 0.3,
+            axis: Axis::X,
+            ..motion::Swing::default()
+        },
+    );
+    assert_eq!(motion::clips(&[lever])[0].2, 10);
+    let turned = |frame: f64| (motion::pose(lever, Some("lever"), frame).1.x as f64).to_degrees();
+    assert!((turned(10.0) + 30.0).abs() < 1e-5 && (turned(5.5) + 15.0).abs() < 1e-5);
+    assert!(turned(2.0) > -1.5, "{}", turned(2.0));
+}
+
+#[test]
+fn a_drawer_slides_as_blenders_default_keys() {
+    // the wine fridge's rack: 15 cm to the front in 0.8 s, from where it rests
+    let rack = bare();
+    rack.set_location((-0.22, 0.140_214_1, 0.74));
+    motion::slide(
+        rack,
+        "rack_out",
+        (0.0, -0.15, 0.0),
+        motion::Slide {
+            seconds: 0.8,
+            ..motion::Slide::default()
+        },
+    );
+    assert_eq!(motion::clips(&[rack]), [(rack, "rack_out".to_string(), 25)]);
+    let at = |frame: i32| motion::pose(rack, Some("rack_out"), frame as f64).0;
+    for (frame, want) in [
+        (1, 0.140_214_1),
+        (2, 0.139_454_54),
+        (3, 0.137_262_72),
+        (4, 0.133_768_8),
+        (5, 0.129_102_99),
+        (25, -0.009_785_9),
+    ] {
+        assert!(
+            (at(frame).y - want).abs() < 2e-7,
+            "frame {frame}: {} for {want}",
+            at(frame).y
+        );
+    }
+    // only the way it moves is keyed
+    assert_eq!((at(12).x, at(12).z), (-0.22, 0.74));
+    let track = rack.read(|o| o.tracks[0].clone());
+    assert_eq!(track.channels.len(), 1);
+    assert!(motion::moves_away(rack));
 }

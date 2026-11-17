@@ -15,9 +15,11 @@
 //!
 //! A family ported to Rust (one of the group crates here: nature, wet, rooms, packs, outside, things) is built in
 //! this process by the kernel (`artkit`), a thread a model; any other is still a script run in Blender
-//! (`ll_tools::art`, which also keeps its `--preview`, `--lit` and `--leafcards`). Either way the content and the
-//! manifests are read here, the pack and centres.json written by the same code (`ll_tools::art::take_build`), and
-//! the gate (`cargo check-glb`) run on the keys built; the exit code is 1 if a build or the gate fails.
+//! (`ll_tools::art`, which also keeps its `--preview`, `--lit` and `--leafcards`). One being ported, in a group
+//! crate and its script still there, is Blender's too, but for `--out` and `--check`, which build the models it
+//! has here. Either way the content and the manifests are read here, the pack and centres.json written by the
+//! same code (`ll_tools::art::take_build`), and the gate (`cargo check-glb`) run on the keys built; the exit code
+//! is 1 if a build or the gate fails.
 
 use artkit::family::{Family, Output, build_model};
 use artkit::json::Json;
@@ -470,7 +472,13 @@ pub fn main(argv: &[String]) -> i32 {
     let (mut here, mut blender) = (Vec::new(), Vec::new());
     for name in &names {
         match registry.iter().find(|(n, _)| n == name) {
-            Some((_, Some(family))) => here.push(family),
+            // (a family being ported, its script still there, is Blender's but for --out and --check: only
+            // some of its models may be built here yet)
+            Some((_, Some(family)))
+                if options.check || options.out.is_some() || !scripts.contains(name) =>
+            {
+                here.push(family)
+            }
             _ => blender.push(name.clone()),
         }
     }

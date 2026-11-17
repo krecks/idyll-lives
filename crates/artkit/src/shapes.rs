@@ -1,14 +1,16 @@
 //! Primitives: every builder adds one mesh part centred on `at` (Blender axes, metres) with its material, and
 //! returns it. Sizes are full extents (a cube of size 0.4 is 0.4 m across), matching the game's `box`/`cylinder`
-//! parts. Sizes and scales go into the mesh itself. `rot` is in degrees.
+//! parts. Sizes and scales go into the mesh itself, so a `bevel` is in metres on every side. `rot` is in degrees.
 //!
 //! Shading: a smooth part is smooth across its edges up to `SHARP` degrees and sharp past them (a cylinder's
 //! rim, a box's corners), so a cap stays flat instead of shading into the side. Something round with few sides
-//! (a 6-sided leg) stays smooth round its sides (`round_angle`).
+//! (a 6-sided leg) stays smooth round its sides (`round_angle`). A `bevel` is shaded smooth with hardened
+//! normals: the faces either side stay flat and the bevel rounds the edge between them, for the same triangles.
 //!
 //! The meshes are Blender's own primitives point for point (the same sums in single precision, the same point of
 //! each merged pair kept), which the lumps, perches and far versions built on them depend on.
 
+use crate::bevel::{EdgeOrder, bevel_edges};
 use crate::far::is_low;
 use crate::materials::Mat;
 use crate::math::{
@@ -132,7 +134,8 @@ options! {
 pub fn cube(name: impl AsRef<str>, size: impl Into<Size>, o: Cube) -> Obj {
     let obj = scene::add(name.as_ref(), cube_mesh());
     scale_mesh(obj, size.into().0);
-    finish(obj, o.at, o.rot, o.material, o.smooth, o.bevel, SHARP)
+    let bevel = (o.bevel, o.bevel_segments, EdgeOrder::Faces);
+    finish(obj, o.at, o.rot, o.material, o.smooth, bevel, SHARP)
 }
 
 pub fn sphere(name: impl AsRef<str>, radius: f64, o: Sphere) -> Obj {
@@ -141,7 +144,8 @@ pub fn sphere(name: impl AsRef<str>, radius: f64, o: Sphere) -> Obj {
         uv_sphere_mesh(o.segments, o.rings, radius as f32),
     );
     scale_mesh(obj, o.scale);
-    finish(obj, o.at, o.rot, o.material, o.smooth, o.bevel, CLOSED)
+    let bevel = (o.bevel, o.bevel_segments, EdgeOrder::Faces);
+    finish(obj, o.at, o.rot, o.material, o.smooth, bevel, CLOSED)
 }
 
 /// A cylinder along z, `depth` long.
@@ -157,13 +161,26 @@ pub fn cone(name: impl AsRef<str>, r1: f64, r2: f64, depth: f64, o: Round) -> Ob
     );
     scale_mesh(obj, o.scale);
     obj.edit(|p| p.uv = UvWay::Round);
+    // (Blender numbers a cylinder's rims before its sides, the bottom's and the top's in turn: a rim's bevel
+    // starts from the rim)
+    let n = o.verts as u32;
+    let rims = if obj.read(|p| p.mesh.verts.len()) == 2 * o.verts {
+        // (the bottom's run on round, the top's back)
+        let rims = (0..n).flat_map(|i| {
+            let j = (i + 1) % n;
+            [(2 * i, 2 * j), (2 * j + 1, 2 * i + 1)]
+        });
+        EdgeOrder::Listed(rims.collect())
+    } else {
+        EdgeOrder::Faces
+    };
     finish(
         obj,
         o.at,
         o.rot,
         o.material,
         o.smooth,
-        o.bevel,
+        (o.bevel, o.bevel_segments, rims),
         round_angle(o.verts),
     )
 }
@@ -243,7 +260,8 @@ pub fn torus(name: impl AsRef<str>, major_radius: f64, minor_radius: f64, o: Tor
             o.minor_segments,
         ),
     );
-    finish(obj, o.at, o.rot, o.material, o.smooth, 0.0, CLOSED)
+    let none = (0.0, 2, EdgeOrder::Faces);
+    finish(obj, o.at, o.rot, o.material, o.smooth, none, CLOSED)
 }
 
 /// `shapes::torus` with its options by name, as the family scripts wrote them: `torus!(name, major, minor, key = value, ...)`.
@@ -263,7 +281,8 @@ pub fn boulder(name: impl AsRef<str>, radius: f64, o: Boulder) -> Obj {
         name.as_ref(),
         ico_sphere_mesh(o.subdivisions, radius as f32),
     );
-    finish(obj, o.at, o.rot, o.material, o.smooth, 0.0, CLOSED);
+    let none = (0.0, 2, EdgeOrder::Faces);
+    finish(obj, o.at, o.rot, o.material, o.smooth, none, CLOSED);
     obj.edit(|p| {
         for v in &mut p.mesh.verts {
             let n = crate::noise::noise(v3(
@@ -299,17 +318,15 @@ fn finish(
     rot: P3,
     material: Option<Mat>,
     smooth: bool,
-    bevel: f64,
+    (bevel, bevel_segments, order): (f64, usize, EdgeOrder),
     angle: f64,
 ) -> Obj {
-    assert!(
-        bevel == 0.0,
-        "{}: bevelled edges aren't built yet",
-        obj.name()
-    );
     obj.edit(|o| o.mesh.set_material(material));
     if smooth {
         shade(obj, true, angle);
+    }
+    if bevel != 0.0 {
+        bevel_edges(obj, bevel, bevel_segments, SHARP, &order);
     }
     obj.set_location(at).set_rotation(rot)
 }
