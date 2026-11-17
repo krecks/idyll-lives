@@ -62,9 +62,11 @@ function bench(label, t, k) {
 const wasmLog = logOf('wasm.log') ?? '';
 function wasm(engine, t, k) {
   let best = null;
-  for (const m of wasmLog.matchAll(/^(\w+) (\d+) simtick: engine (\w+) rate (\d+) worst_hour (\d+) at (\d+) step_p99 ([\d.]+)/gm)) {
+  for (const m of wasmLog.matchAll(/^(\w+) (\d+) simtick: engine (\w+) rate (\d+) worst_hour (\d+) at (\d+) step_p99 ([\d.]+)(?: ticks \d+ cpu_rate (\d+))?/gm)) {
     if (m[1] !== t || Number(m[2]) !== k || m[3] !== engine) continue;
-    if (!best || Number(m[4]) > best.rate) best = { rate: Number(m[4]), worst: Number(m[5]), at: m[6], p99: Number(m[7]) };
+    // (Ticks a second of CPU time: what it ran, not what it waited for a core on a busy machine.)
+    const cpu = m[8] ? Number(m[8]) : Number(m[4]);
+    if (!best || cpu > best.cpu) best = { rate: Number(m[4]), cpu, worst: Number(m[5]), at: m[6], p99: Number(m[7]) };
   }
   return best;
 }
@@ -102,6 +104,8 @@ if (limits) say(`The m1 container: ${limits.trim()}.`);
 say();
 say('## Ticks a second');
 say();
+say('Wasm: ticks a second by the wall clock, and (in brackets) of the process\'s CPU time, which leaves out the waits for a core on a busy machine; the M1 wasm estimate scales the latter.');
+say();
 say('| tier | world | residents | M3 native | container | under quota | wasm Node | wasm Bun | M1 native est. | M1 wasm est. (band) | margin vs 3,600 | slowest hour (M1 wasm est.) |');
 say('|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
 const verdict = {};
@@ -112,12 +116,13 @@ for (const t of tiers) {
     const quotaRun = bench('m1-ctr-m1', t, k);
     const node = wasm('node', t, k);
     const bun = wasm('bun', t, k);
-    const est = node ? node.rate * RATIO : null;
-    const band = node ? BAND.map((r) => node.rate * r) : null;
-    const worst = node ? node.worst * RATIO : null;
-    (verdict[t] ??= []).push({ est, low: band?.[0], m3: node?.rate });
+    const est = node ? node.cpu * RATIO : null;
+    const band = node ? BAND.map((r) => node.cpu * r) : null;
+    // (The slowest hour by the wall clock, scaled as the CPU time scaled the run.)
+    const worst = node ? node.worst * (node.cpu / node.rate) * RATIO : null;
+    (verdict[t] ??= []).push({ est, low: band?.[0], m3: node?.cpu });
     say(
-      `| ${t} | ${KINDS[k]} | ${native?.residents ?? '–'} | ${n(native?.rate)} | ${n(ctr?.rate)} | ${n(quotaRun?.rate)} | ${n(node?.rate)} | ${n(bun?.rate)} | ${n(native ? native.rate * RATIO : null)} | ${n(est)} (${band ? band.map(n).join('–') : '–'}) | ${pc(est == null ? null : est / NEED - 1)} | ${n(worst)} (${node?.at ?? '–'}:00) |`,
+      `| ${t} | ${KINDS[k]} | ${native?.residents ?? '–'} | ${n(native?.rate)} | ${n(ctr?.rate)} | ${n(quotaRun?.rate)} | ${n(node?.rate)} (${n(node?.cpu)}) | ${n(bun?.rate)} (${n(bun?.cpu)}) | ${n(native ? native.rate * RATIO : null)} | ${n(est)} (${band ? band.map(n).join('–') : '–'}) | ${pc(est == null ? null : est / NEED - 1)} | ${n(worst)} (${node?.at ?? '–'}:00) |`,
     );
   }
 }

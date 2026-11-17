@@ -65,7 +65,7 @@ fi
 # share the one core's 72 %.)
 if [[ $skip != *" quota "* ]]; then
   "${compose[@]}" run --rm -e WATCH -e HOURS -e ROUNDS -e PARALLEL=1 -e TIERS -e WORLDS_AT m1 tools/bench/tiers.sh m1-ctr-m1=/repo/bench-results/tiers/bins/m1-ctr-m3 | tee "$out/ctr-m1.log"
-  "${compose[@]}" run --rm m1 sh -c 'echo "memory limit $(cat /sys/fs/cgroup/memory.max) bytes, cpu.max $(cat /sys/fs/cgroup/cpu.max), $(nproc) cpus"' > "$out/limits.log" 2>&1 || true
+  "${compose[@]}" run --rm m1 sh -c 'echo "memory limit $(cat /sys/fs/cgroup/memory.max) bytes, cpu.max $(cat /sys/fs/cgroup/cpu.max), $(nproc) cpus"' > "$out/limits.log" 2>/dev/null || true
 fi
 
 node tools/m1/table.mjs "$out" > "$out/report.md"
