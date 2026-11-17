@@ -5,7 +5,10 @@
   import { BENCH } from './debug/benchFlags';
   import { watchLog } from './debug/log';
   import { perfEnd, perfPhase, perfStart, perfTimeAsync } from './debug/perf';
-  import { fetchState, loadDebugReport } from './debug/report';
+  import { fetchNewGameReport, fetchState, loadDebugReport } from './debug/report';
+  import { readNewGameReport } from './debug/newGameReport';
+  import { menuKey } from './game/input';
+  import { saveDebugReport } from './ui/debugReport';
   import { within } from './core/async';
   import { lookAtAge, lookFromSeed } from './game/household';
   import { FIRST_STILL, forgetShowcase, loadStill, type MenuStill } from './game/menuStill';
@@ -184,14 +187,30 @@
     root.classList.toggle('reduce-motion', settings.reducedMotion);
   });
 
-  /** `?debugReport=<name>` (dev server): starts straight into a saved debug report's game;
-   * `?state=<name>` into a state the simulation's tests wrote. */
+  /**
+   * `?debugReport=<name>` (dev server): starts straight into a saved debug report's game, or one taken
+   * in New game (its `newgame.json`) opens New game again at its step (land, else the streets) with its
+   * land and layout; `?state=<name>` into a state the simulation's tests wrote.
+   */
   async function openDebugReport() {
     const params = new URLSearchParams(location.search);
     const name = params.get('debugReport');
     const state = params.get('state');
     if ((!name && !state) || !import.meta.env.DEV) return;
     try {
+      const newGame = name ? await fetchNewGameReport(name) : null;
+      if (newGame) {
+        const restored = readNewGameReport(newGame);
+        app.newGame();
+        app.code = restored.code;
+        app.land = restored.land;
+        app.site = restored.site;
+        app.townName = restored.townName;
+        app.buildSeed = restored.buildSeed;
+        app.layout = restored.layout;
+        app.screen = restored.step;
+        return;
+      }
       app.start({ kind: 'load', saveId: name ? await loadDebugReport(name) : await fetchState(state!) });
     } catch (err) {
       console.error(err);
@@ -315,7 +334,17 @@
       clearTimeout(timer);
     };
   });
+
+  /** F8 off the game (the main menu, New game's steps): a debug report, with New game's state on its steps (the game's own keys have it in play). */
+  function onKey(e: KeyboardEvent) {
+    const action = menuKey(e, app.screen);
+    if (action === 'none') return;
+    e.preventDefault();
+    if (action === 'report') void saveDebugReport('', (note) => host.basicReport(note));
+  }
 </script>
+
+<svelte:window onkeydown={onKey} />
 
 <!-- The game canvas lives here permanently (engine and shaders survive between games). -->
 <div class="game-layer" class:hidden={app.screen !== 'game' && !app.liveBackdrop} bind:this={gameLayer}></div>

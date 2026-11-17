@@ -3,7 +3,7 @@
  * dialog or the pause menu open, with Ctrl, ⌘ or Alt held, and where Tab goes.
  */
 import { describe, expect, test } from 'bun:test';
-import { routeKey, type KeyContext, type KeyPress } from '../src/game/input';
+import { menuKey, routeKey, type KeyContext, type KeyPress } from '../src/game/input';
 
 const key = (k: string, mods: Partial<Omit<KeyPress, 'key'>> = {}): KeyPress => ({ key: k, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...mods });
 const scene: KeyContext = { paused: false, dialog: false, onScene: true };
@@ -52,5 +52,24 @@ describe('key routing', () => {
     expect(routeKey(key('Tab'), { ...scene, onScene: false })).toBe('none');
     // (Other keys work wherever the focus is.)
     expect(routeKey(key('m'), { ...scene, onScene: false })).toBe('game');
+  });
+});
+
+describe('F8 off the game', () => {
+  const f8 = { key: 'F8', repeat: false };
+
+  test('the main menu and every New game step save a report', () => {
+    for (const screen of ['menu', 'land', 'streets', 'town', 'household', 'create', 'home']) expect(menuKey(f8, screen)).toBe('report');
+  });
+
+  test("in the game it is the session's (`routeKey`), never handled twice", () => {
+    expect(menuKey(f8, 'game')).toBe('none');
+    expect(menuKey({ ...f8, repeat: true }, 'game')).toBe('none');
+    expect(routeKey(key('F8'), scene)).toBe('game');
+  });
+
+  test('a held key saves one report; other keys are not ours', () => {
+    expect(menuKey({ ...f8, repeat: true }, 'land')).toBe('held');
+    for (const k of ['F3', 'F7', 'Escape', 'z']) expect(menuKey({ key: k, repeat: false }, 'streets')).toBe('none');
   });
 });
