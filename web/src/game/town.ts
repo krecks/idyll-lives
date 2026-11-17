@@ -215,7 +215,8 @@ export interface NeighbourhoodDraft {
    * and (a big world) the country roads it found no way for (`roads`: which, and between what).
    */
   diagnostics?: {
-    dropped: { name: string; kind: PlotSlot['kind']; lot?: LotSize }[];
+    /** Lots with no room anywhere (`place`: a named place's, `macro.ts` `namedLots`). */
+    dropped: { name: string; kind: PlotSlot['kind']; lot?: LotSize; place?: true }[];
     roads?: string[];
     /** Among a place's mountains, the hamlets left out for want of a site a country road could reach (`macro.ts`), and the homes they would have brought. */
     villages?: { left: number; homes: number };

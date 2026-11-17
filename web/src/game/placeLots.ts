@@ -113,7 +113,7 @@ export function lotPlaceKind(s: Pick<PlotSlot, 'kind' | 'template'>): TownPlace[
  * place has (`namer.unique`): the lot's, else with the area's name before it (as a hamlet's café is
  * called by its hamlet's), else numbered.
  */
-export function slotPlace(draft: NeighbourhoodDraft, t: Templates, content: Content, slot: PlotSlot, namer?: Namer): TownPlace {
+export function slotPlace(draft: Pick<NeighbourhoodDraft, 'name'> & { open?: { areas: readonly { name: string }[] } }, t: Templates, content: Content, slot: PlotSlot, namer?: Namer): TownPlace {
   const kind = lotPlaceKind(slot);
   const what = placeOfTemplate(slot.template);
   const area = slot.area ?? 0;
