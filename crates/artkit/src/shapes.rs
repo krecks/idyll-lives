@@ -379,7 +379,17 @@ pub(crate) fn cone_mesh(segs: usize, r1: f32, r2: f32, depth: f32) -> Mesh {
     faces.push((0..n).map(|k| 2 * ((n + 1 - k) % n) + 1).collect());
     faces.push((0..n).map(|k| 2 * k).collect());
     let mut mesh = Mesh::from_pydata(verts, &faces);
-    mesh.remove_doubles(0.000001);
+    // an end drawn to a point is one point: the first of its ring at the bottom, the last of it at the top
+    if r1 == 0.0 || r2 == 0.0 {
+        let target: Vec<i32> = (0..2 * n as i32)
+            .map(|v| match (v % 2 == 0, r1 == 0.0, r2 == 0.0) {
+                (true, true, _) => 0,
+                (false, _, true) => 2 * n as i32 - 1,
+                _ => -1,
+            })
+            .collect();
+        mesh.weld(&target);
+    }
     mesh
 }
 

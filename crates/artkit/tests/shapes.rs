@@ -55,9 +55,7 @@ fn primitives_are_blenders_point_for_point() {
         let same_tris = as_set(&renamed(&m.triangle_verts(), &map)) == as_set(&g.tris);
         let in_order = map.iter().enumerate().all(|(i, &j)| i == j as usize);
         report.push(format!("{}: {inexact} of {} points another copy (within {far}), in order {in_order}, faces {same_faces}, triangles {same_tris}", g.what, g.verts.len()));
-        // (a cone drawn to a point: which of its merged points is kept, and so their order, is the operator's own)
-        let merged = g.what.starts_with("cone") && g.what.contains(" 0000000000000000 ");
-        bad += (!same_faces || !same_tris || (!merged && !in_order)) as usize;
+        bad += (!same_faces || !same_tris || !in_order) as usize;
     }
     println!("{}", report.join("\n"));
     assert_eq!(bad, 0, "\n{}", report.join("\n"));
