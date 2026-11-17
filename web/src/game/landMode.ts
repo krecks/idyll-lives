@@ -141,7 +141,7 @@ export class LandMode {
       if (built.width !== mask.width || built.depth !== mask.depth) console.warn(`[land] the water mask is ${mask.width} × ${mask.depth}, the world ${built.width} × ${built.depth}`);
       // (On a land the town follows, the earth tools shape built land too: the roads and lots move with it, the land
       // settled under them at the stroke's end.)
-      const settle = (rect: LandRect) => this.host.renderer.settleLand?.(rect) ?? null;
+      const settle = (rect: LandRect, before: Int16Array) => this.host.renderer.settleLand?.(rect, before) ?? null;
       const follow = land.seeded === 'follow' ? { earthOnBuilt: true, settle, bridges: true } : {};
       this.bridging = land.seeded === 'follow' ? { plots: built.plots.slice(), width: mask.width, depth: mask.depth } : null;
       const editor = LandEditor.forWorld(land, { ...built, width: mask.width, depth: mask.depth }, { water: mask.water, zones: world.meta?.zones ?? [] }, follow);
@@ -312,6 +312,7 @@ export class LandMode {
   /** Sends a stroke the editor has ended (`patch`: what `end` returned); refused, it is taken back. Resolves once answered. */
   commit(patch: LandPatch): Promise<void> {
     const e = this.editor!;
+    this.lastRefusal = null;
     const takeBack = () => {
       this.bridgesTo(patch, 'before');
       const back = e.undo();
@@ -324,7 +325,7 @@ export class LandMode {
       const made = bridgesOrWhy(e.roads, b.plots, unrle(e.water(), b.width * b.depth), b.width, b.depth);
       if ('refused' in made) {
         takeBack();
-        this.host.refused(made.refused);
+        this.refuse(made.refused);
         this.refresh();
         return Promise.resolve();
       }
@@ -363,7 +364,7 @@ export class LandMode {
       if (roads) command = { ...command, meta: { ...command.meta, roads } };
     } catch (err) {
       takeBack();
-      this.host.refused(err instanceof Error ? err.message : String(err));
+      this.refuse(err instanceof Error ? err.message : String(err));
       this.refresh();
       return Promise.resolve();
     }
@@ -377,7 +378,7 @@ export class LandMode {
         },
         (err: unknown) => {
           takeBack();
-          this.host.refused(refusal(err instanceof Error ? err.message : String(err)));
+          this.refuse(refusal(err instanceof Error ? err.message : String(err)));
         },
       )
       .finally(() => {
@@ -387,6 +388,15 @@ export class LandMode {
       });
     this.sending = run;
     return run;
+  }
+
+  /** Why the last command sent was refused (null: it wasn't), for `window.__land` (`?debug`). */
+  lastRefusal: string | null = null;
+
+  /** A refusal told to the player, and kept (`lastRefusal`). */
+  private refuse(why: string): void {
+    this.lastRefusal = why;
+    this.host.refused(why);
   }
 
   /** The palette's buttons and hint from the editor. */

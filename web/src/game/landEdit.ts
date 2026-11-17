@@ -262,7 +262,7 @@ export interface LandEditorOptions {
    * no road or lot cut or filled past its limits); returns the samples it changed besides (null: none), which the
    * stroke's patch takes in, so undo puts them back too.
    */
-  settle?: (rect: LandRect) => LandRect | null;
+  settle?: (rect: LandRect, before: Int16Array) => LandRect | null;
 }
 
 /** Every sample free: the earth tools on a land its town follows (`LandEditorOptions.earthOnBuilt`). */
@@ -273,6 +273,11 @@ interface Kept {
   tool: LandTool | 'reset';
   /** The patch takes the stroke back (it is on the redo stack): its cost is a refund. */
   refund: boolean;
+  /**
+   * An earth stroke on built land priced as the brush left it, before the land was settled under what is built
+   * (`settle`, free: the town's doing, not the player's): the samples it changed then, their heights after and before.
+   */
+  priced?: { rect: LandRect; h: Int16Array; was: Int16Array };
 }
 
 /** A stroke's stamps are this far apart along its path at least (m), a quarter of its radius on larger brushes. */
@@ -338,7 +343,7 @@ export class LandEditor {
   private readonly editedBefore: boolean;
   private readonly wettable?: Wettable;
   private readonly earthOnBuilt: boolean;
-  private readonly settle?: (rect: LandRect) => LandRect | null;
+  private readonly settle?: (rect: LandRect, before: Int16Array) => LandRect | null;
   private world: { width: number; depth: number; roads: readonly RoadPlan[] };
   /** The world's water tiles and zones as the generator laid them, if the editor was given them. */
   readonly generated: { water?: Rle; zones?: readonly WorldZone[] };
@@ -506,14 +511,16 @@ export class LandEditor {
     if (tool === 'peak' || tool === 'range') placeMountain(this.land, stroke, this.free, this.wettable);
     this.hint = stroke.stopped ?? stroke.hint ?? null;
     // (On built land, the land settled under what is built: what that changed is the stroke's too.)
+    let priced: Kept['priced'];
     if (this.settle && this.earthOnBuilt && TOOL_KIND[tool] === 'earth' && stroke.touched) {
-      const more = this.settle(stroke.touched);
+      priced = { rect: stroke.touched, h: cut(this.land.h, this.land.cols, stroke.touched), was: cut(this.shadow.h, this.land.cols, stroke.touched) };
+      const more = this.settle(stroke.touched, this.shadow.h);
       if (more) stroke.touched = unionRect(stroke.touched, more);
     }
     const patch = this.patchOf(stroke);
     if (!patch || !this.differ(patch)) return null;
     this.sync(patch.rect, patch.cover?.rect);
-    this.push(patch, tool);
+    this.push(patch, tool, priced);
     return patch;
   }
 
@@ -670,7 +677,11 @@ export class LandEditor {
     let total = 0;
     if (patch.h && (kind === 'earth' || kind === 'mountain' || kind === 'reset')) {
       let moved = 0;
-      for (let j = rect.j0; j < rect.j1; j++) for (let i = rect.i0; i < rect.i1; i++) moved += Math.abs(this.land.h[j * cols + i] - patch.h[(j - rect.j0) * w + (i - rect.i0)]);
+      const p = kept.priced;
+      if (p) {
+        // (As the brush left it, against the land before the stroke: the settling is free.)
+        for (let k = 0; k < p.h.length; k++) moved += Math.abs(p.h[k] - p.was[k]);
+      } else for (let j = rect.j0; j < rect.j1; j++) for (let i = rect.i0; i < rect.i1; i++) moved += Math.abs(this.land.h[j * cols + i] - patch.h[(j - rect.j0) * w + (i - rect.i0)]);
       total += (moved / 100) * LAND_CELL * LAND_CELL * (kind === 'earth' ? prices.earth : prices.mountain);
     }
     if (patch.h && patch.wl && (kind === 'water' || kind === 'reset')) {
@@ -777,8 +788,8 @@ export class LandEditor {
     if (patch.cover) swapRect(patch.cover.data, this.land.cover, this.shadow.cover, coverSpan(cols), patch.cover.rect);
   }
 
-  private push(patch: LandPatch, tool: LandTool | 'reset'): void {
-    this.kept.set(patch, { tool, refund: false });
+  private push(patch: LandPatch, tool: LandTool | 'reset', priced?: Kept['priced']): void {
+    this.kept.set(patch, { tool, refund: false, ...(priced ? { priced } : {}) });
     this.undone.push(patch);
     this.redone.length = 0;
     while (this.undone.length > 1 && (this.undone.length > UNDO_STROKES || this.bytes() > UNDO_BYTES)) this.undone.shift();

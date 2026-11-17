@@ -31,6 +31,8 @@ export interface LandHookHost {
   changed?(): void;
   /** A scripted stroke ended with `patch` (the game sends it; resolves once taken or refused). */
   ended?(patch: LandPatch): Promise<unknown>;
+  /** Why the last stroke sent was refused, if it was (told to the player, not thrown). */
+  refusal?(): string | null;
   undo(): Promise<unknown> | unknown;
   redo(): Promise<unknown> | unknown;
   /** Step 1's camera: panned (m over the ground) and zoomed (a factor). */
@@ -94,6 +96,7 @@ export function installLandHook(host: LandHookHost): () => void {
         } catch (err) {
           refused = err instanceof Error ? err.message : String(err);
         }
+        refused ??= host.refusal?.() ?? null;
       }
       return { changed: !!patch, rect: patch?.rect ?? null, hint: e.hint, refused, frames, stamps };
     },
@@ -118,6 +121,10 @@ export function installLandHook(host: LandHookHost): () => void {
     },
     heightAt(x: number, z: number) {
       return heightAt(need().land, x, z);
+    },
+    /** Why the last stroke sent was refused (null: it wasn't). */
+    refusal() {
+      return host.refusal?.() ?? null;
     },
     nearestRoad(x: number, z: number, kind?: string) {
       let best: { at: [number, number]; along: [number, number]; road: number; dist: number; s: number; bridges: [number, number][] } | null = null;

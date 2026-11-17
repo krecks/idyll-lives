@@ -352,11 +352,22 @@ async function builtStrokes(page, renderer, home, shot) {
   await shot('18-home-lowered');
   // Water across a country road away from the town: the road bridged there (its deck kept dry for walkers), or the
   // stroke refused with why; then undone (the bridge goes) and redone (it comes back).
+  // (On a straight stretch: the road runs the same way 25 m either side, as a bridge must.)
   let crossing = null;
-  for (const d of [140, 220, 320]) {
-    for (const [ax, az] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+  for (const d of [140, 220, 320, 420]) {
+    for (const [ax, az] of [[1, 0], [0, 1], [-1, 0], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]]) {
+      if (crossing) break;
       const c = await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [home[0] + ax * d, home[1] + az * d]);
-      if (c && c.dist < 40 && c.s > 30) crossing ??= c;
+      if (!c || c.dist > 60 || c.s < 40) continue;
+      const straight = await page.evaluate(
+        ([c]) =>
+          [-25, -12, 12, 25].every((k) => {
+            const o = window.__land.nearestRoad(c.at[0] + c.along[0] * k, c.at[1] + c.along[1] * k, 'country');
+            return o && o.road === c.road && o.dist < 0.6 && Math.abs(o.along[0] * c.along[0] + o.along[1] * c.along[1]) > 0.995;
+          }),
+        [c],
+      );
+      if (straight) crossing = c;
     }
   }
   if (crossing) {
@@ -380,6 +391,9 @@ async function builtStrokes(page, renderer, home, shot) {
       await page.evaluate(() => window.__land.undo());
       await page.waitForTimeout(2500);
       const undone = (await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [cx, cz]))?.bridges ?? [];
+      await settled(page);
+      await page.waitForTimeout(3000);
+      await shot('19c-bridge-undone');
       await page.evaluate(() => window.__land.redo());
       await page.waitForTimeout(2500);
       const redone = (await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [cx, cz]))?.bridges ?? [];
@@ -419,7 +433,7 @@ async function fundsRunOut(page, renderer, spot, shot) {
   const strokes = (await page.evaluate(() => window.__land.stats().undo)) - undo;
   await page.evaluate((amount) => window.__addFunds(amount), start - left);
   await page.waitForTimeout(600);
-  const out = { left, hint, strokes };
+  const out = { left, hint, strokes, refused: await page.evaluate(() => window.__land.refusal()) };
   console.log(`land: ${renderer} with $300: ${JSON.stringify(out)}`);
   if (!(left >= 0 && left < 300 && strokes === 1 && /Out of money/.test(hint))) fault(`${renderer} the stroke at the funds' end: ${JSON.stringify(out)}`);
   return out;

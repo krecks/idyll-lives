@@ -1962,7 +1962,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.placeRoomLights(world, view);
     await this.pace();
     this.loadStep('Building the street', 0.35);
+    // (A road the land's water bridged: the game's landscape solves its surface again with the new roads, the land under
+    // them drawn again, and the street, laid out again on them, stands on that surface.)
+    const shaped = this.lot.landscape;
+    const bridged = shaped?.heightField ? shaped.takeRoads(world) : null;
+    if (shaped && bridged) void this.queueLand('land: roads taken', async () => {
+      await shaped.landDone(bridged, this.landPace);
+    });
     await this.street.build(world, this.view, () => this.pace());
+    if (bridged && shaped?.surface && this.street.landMoved(shaped.surface)) this.streamStreet();
     this.cars.build(world);
     this.buildTownView(world);
     this.loadStep('Furnishing the house', 0.45);
@@ -3328,10 +3336,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     });
   }
 
-  settleLand(rect: LandRect): LandRect | null {
+  settleLand(rect: LandRect, before?: Int16Array): LandRect | null {
     const at = this.landInView();
     if (!at?.scape.heightField) return null;
-    return perfTime('land: settle', () => at.scape.settleLand(rect));
+    return perfTime('land: settle', () => at.scape.settleLand(rect, before));
   }
 
   /**

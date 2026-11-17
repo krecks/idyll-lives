@@ -725,13 +725,35 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   }
 
   /**
+   * The world's roads changed under a land the brushes shaped (a road the land's water bridged, `landBridges.ts`):
+   * the surface solved again with them, on the same land, so what stands on it follows them. Says the samples round
+   * the roads that changed (null: none did, or no surface).
+   */
+  takeRoads(world: WorldStructure): LandRect | null {
+    if (!this.field || !this.surface) return null;
+    const old = this.laidOut.meta?.roads ?? [];
+    const now = world.meta?.roads ?? [];
+    const changed = now.filter((r, i) => r !== old[i]);
+    if (!changed.length && old.length === now.length) return null;
+    this.laidOut = world;
+    this.adoptLand(this.field);
+    this.landVersion++;
+    let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const r of changed) for (const [x, z] of r.points) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
+    if (!(x1 >= x0)) return null;
+    const { cols, rows } = this.field;
+    const pad = 4;
+    return { i0: Math.max(0, Math.floor(x0 / LAND_CELL) - pad), j0: Math.max(0, Math.floor(z0 / LAND_CELL) - pad), i1: Math.min(cols, Math.ceil(x1 / LAND_CELL) + pad), j1: Math.min(rows, Math.ceil(z1 / LAND_CELL) + pad) };
+  }
+
+  /**
    * An earth stroke done over the samples in `rect`, on a land its town follows: the land settled under what is built
    * (`BuiltSurface.settleCuts`), its surface solved for it (kept for `landChanged`, which follows). Says the samples
    * it changed besides `rect`'s (null: none, or no town on the land).
    */
-  settleLand(rect: LandRect): LandRect | null {
+  settleLand(rect: LandRect, before?: Int16Array): LandRect | null {
     if (!this.field || !this.surface) return null;
-    const { rect: more, change } = this.surface.settleCuts(rect);
+    const { rect: more, change } = this.surface.settleCuts(rect, undefined, before);
     this.settled = change;
     return more;
   }
