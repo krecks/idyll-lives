@@ -1,8 +1,8 @@
 // Step 2's settle (`landFollow.ts` `settleEdit`, the town worker's `edit` job, `townJobs.ts`): the town's
 // plan draft settled on its land as laid, as the worker would (the job and its answer through a structured
 // clone). The town as laid settles again to what the `town` job gave; nothing is ever given up, however
-// steep the land; a street drawn up a 20 % slope is refused with its reason and the plan before it settled
-// instead; a street bridged over a river keeps its deck dry for walkers; undo settles to the same bytes; a
+// steep the land; a street drawn up a 20 % slope is refused with its reason and where it is, the plan before
+// it settled instead, and the Street tool's live checks forecast it; a street bridged over a river keeps its deck dry for walkers; undo settles to the same bytes; a
 // lot removed and added again settles like the original; a lot removed moves the land only round itself (the
 // planes the town was laid with kept: `open.gentle`) and no road; an edit's settle on the biggest worlds is timed.
 // `SLOW_TESTS=1 bun test tests/editSettle.slow.test.ts`.
@@ -33,6 +33,7 @@ describe("step 2's settle", async () => {
   const { settleLand } = await import('../src/game/landFollow');
   const { previewWorld } = await import('../src/game/townPreview');
   const { drawStreet } = await import('../src/game/edit/streets');
+  const { liveStreet } = await import('../src/ui/townedit/streetLive');
   const { addLot, moveLot, removeLotsEdit, lotKey } = await import('../src/game/edit/lots');
   const { entriesOf } = await import('../src/game/edit/ground');
   const { TownHistory } = await import('../src/game/edit/history');
@@ -97,7 +98,7 @@ describe("step 2's settle", async () => {
     const areas = plan.open!.areas;
     const off = ([x, z]: Pt) => Math.min(...areas.map((a) => Math.hypot(Math.max(a.x - x, 0, x - a.x - a.w), Math.max(a.z - z, 0, z - a.z - a.d))));
     // A country road well out of every village, and a street drawn from it square to it out of the world.
-    let found: { drawn: NeighbourhoodDraft; from: Pt; dir: Pt; road: RoadPlan } | null = null;
+    let found: { drawn: NeighbourhoodDraft; from: Pt; dir: Pt; road: RoadPlan; points: Pt[] } | null = null;
     for (const r of plan.roads) {
       if (r.kind !== 'country' || r.bridge || found) continue;
       const ls = lengths(r.points);
@@ -113,7 +114,7 @@ describe("step 2's settle", async () => {
           if ('refused' in e) continue;
           const road = e.draft.roads[e.draft.roads.length - 1];
           if (road.kind !== 'country' || road.ends[1] !== 'out' || nearest(road.points, ...p).dist > 6) continue;
-          found = { drawn: e.draft, from: p, dir, road };
+          found = { drawn: e.draft, from: p, dir, road, points };
           break;
         }
       }
@@ -138,6 +139,14 @@ describe("step 2's settle", async () => {
     expect(e.refused[0].why).toContain(found.road.name!);
     expect(e.refused[0].why).toMatch(/would climb \d+ %|dug out or built up [\d.]+ m/);
     console.log(`refused: ${e.refused[0].why}`);
+    // Where it is: the road refused, as drawn, for the editor to show red.
+    expect(e.refused[0].at).toEqual(found.road.points);
+    expect(e.refused[0].width).toBe(found.road.width);
+    // The Street tool's live checks saw it coming, in the settle's words.
+    const live = liveStreet(before, t, found.points, 'street');
+    expect(live.steep).toBe(true);
+    expect(live.slope).toMatch(/^it would climb \d+ %, more than a \w+ may \(\d+ %\)$|^the ground under it would have to be dug out or built up [\d.]+ m \([\d.]+ m at most\)$/);
+    console.log(`forecast: ${live.slope} (climb ${(live.climb * 100).toFixed(1)} %)`);
     // The plan before it settled instead, as the town on screen was.
     expect(e.step).toBe(0);
     expect(bytes(e.draft)).toBe(bytes(settle([before]).draft));
