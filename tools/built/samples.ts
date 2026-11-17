@@ -8,8 +8,8 @@
  * - **Houses**: each plan as the viewed lot's house (`house.<name>`: every storey, its doors shut, and the lot's
  *   garage and porch), as a neighbour's silhouette (`neighbour.<name>`), as the street's far house (`far.<name>`)
  *   and as the town view's box (`town.<name>`). The plans cover the roofs (gable, hip, flat; over a plain box, an L,
- *   a U and a ring), one and two storeys, a porch, a garage, diagonal walls, every wall and floor covering, and
- *   every door and window style.
+ *   a U and a ring), one and two storeys, a porch, a garage, diagonal walls, every wall covering, a floor covering
+ *   of each finish, and every door and window style.
  * - **The backdrop**: a building of each use dressed (`backdrop.<use>`) and as the town view's box
  *   (`backdropFar.<use>`).
  * - **A street** (`street.block`): two streets crossing, a lane with a bend to a dead end, a country road over a
@@ -207,7 +207,7 @@ interface Plan extends Floor {
   look: (s: HouseScheme, chimney: boolean) => boolean;
   /** The roof the player chose: a roof style's and a roof colour's id. */
   roof?: [string, string];
-  /** Every wall covering on its inside faces in turn, every floor covering a room, every door and window style in turn. */
+  /** Every wall covering on its inside faces in turn, a floor covering a room (every third: each finish comes up), every door and window style in turn. */
   each?: boolean;
   /** The wall covering (its id) the player painted its outside faces with. */
   painted?: string;
@@ -274,7 +274,7 @@ function plans(): Plan[] {
     },
     {
       name: 'finishes',
-      about: 'one storey, an L with diagonal walls: every wall covering inside, every floor covering, every door and window style; the roof chosen (steep gable, terracotta)',
+      about: 'one storey, an L with diagonal walls: every wall covering inside, a floor of each finish, every door and window style; the roof chosen (steep gable, terracotta)',
       lot: { width: 26, depth: 22 },
       walls: [
         ...([[3, 3, 14, 3], [3, 3, 3, 15], [3, 15, 9, 15], [9, 15, 9, 9], [9, 9, 14, 9], [15, 4, 15, 8]] as Seg[]),
@@ -469,7 +469,7 @@ function worldOf(plan: Plan, ox: number): WorldStructure {
     const look: [number, number] = [cover(of[0]), cover(of[1])];
     return { axis: g.axis, x: ox + g.x, z: g.z + rows(0), kind: g.kind, rooms: of, ...(look[0] || look[1] ? { faces: look } : {}), ...(plan.each && g.kind !== 'wall' ? { style: (i + 3) % (g.kind === 'door' ? base.doorStyles.length : base.windowStyles.length) } : {}) };
   });
-  // A floor covering a room, in turn, on a plan with `each`.
+  // A floor covering a room on a plan with `each`: every third of them, which takes in each finish.
   const floorOf = new Map<number, number>();
   const laid: [number, number, number][] = [];
   if (plan.each) {
