@@ -223,10 +223,10 @@ export class TownEditorState implements TownEditor {
 
   // ---- edits -----------------------------------------------------------------------------------
 
-  apply(edited: Edited): boolean {
+  apply(edited: Edited, run = false): boolean {
     const s = this.session;
     if (!s) return false;
-    const why = s.apply(edited);
+    const why = s.apply(edited, run);
     if (why) {
       this.refuse(why);
       return false;

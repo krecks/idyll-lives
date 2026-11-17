@@ -6,7 +6,7 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { Edited } from '../src/game/edit/edited';
 import type { NeighbourhoodDraft } from '../src/game/town';
-import { EditSession, CHECK_AFTER, QUIET, type Timers } from '../src/ui/townedit/session';
+import { EditSession, CHECK_AFTER, QUIET, QUIET_ONE, type Timers } from '../src/ui/townedit/session';
 import type { Settled } from '../src/ui/townedit/settle';
 
 /** Timers the test moves on by hand. */
@@ -74,11 +74,12 @@ describe('the edit session', () => {
     const { s, c, settles, shown } = session();
     const a = draft('a');
     const b = draft('b');
-    expect(s.apply(edit(a))).toBeNull();
+    // (Edits made in a run, as the Lot tool's homes: the longer pause.)
+    expect(s.apply(edit(a), true)).toBeNull();
     expect(s.plan).toBe(a);
     expect(s.pending).toBe(true);
     await c.advance(QUIET - 100);
-    expect(s.apply(edit(b))).toBeNull();
+    expect(s.apply(edit(b), true)).toBeNull();
     await c.advance(QUIET - 1);
     expect(settles).toEqual([]);
     await c.advance(1);
@@ -87,6 +88,36 @@ describe('the edit session', () => {
     expect(s.settled).toBe(b);
     expect(s.pending).toBe(false);
     expect(s.timings.length).toBe(1);
+  });
+
+  test('an edit on its own is settled after the short pause; the marks the town was laid with go to the first settle', async () => {
+    const c = clock();
+    const base = draft('base');
+    const asked: (readonly string[] | undefined)[] = [];
+    const s = new EditSession(
+      base,
+      {
+        timers: c.timers,
+        now: c.now,
+        settle: async (plan, ops, _signal, batch) => {
+          asked.push(batch.before);
+          return { draft: plan, preview: {}, refused: [], step: ops, marks: ['n'] } as unknown as Settled;
+        },
+        show: async () => {},
+        changed: () => {},
+      },
+      undefined,
+      undefined,
+      ['m'],
+    );
+    s.apply(edit(draft('a')));
+    await c.advance(QUIET_ONE - 1);
+    expect(asked).toEqual([]);
+    await c.advance(1);
+    expect(asked).toEqual([['m']]);
+    s.apply(edit(draft('b')));
+    await c.advance(QUIET_ONE);
+    expect(asked).toEqual([['m'], ['n']]);
   });
 
   test('an edit the settle refuses is undone, and the plan before it settled; the next settle has the batch and the marks', async () => {
