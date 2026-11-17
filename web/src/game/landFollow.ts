@@ -210,9 +210,11 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
       if (other >= 0) {
         slopes.retain.lot = Math.max(slopes.retain.lot, step);
         if (step > edgeMost) {
-          // (The backdrop building, else the later lot, gives way; but a lot gives way to a building that is a place, a shop or the like.)
+          // (The backdrop building, else a home's lot before a public one's (a named place's: a shop, a school), else
+          // the later lot, gives way; but a lot gives way to a building that is a place, as one set by hand may be.)
           const place = other >= world.plots.length && world.meta?.backdrop?.[other - world.plots.length]?.place !== undefined;
-          const gives = place ? n : other >= world.plots.length ? other : Math.max(n, other);
+          const homeFirst = other < world.plots.length && world.plots[n].public !== world.plots[other].public;
+          const gives = place ? n : other >= world.plots.length ? other : homeFirst ? (world.plots[n].public ? other : n) : Math.max(n, other);
           if (step > RETAIN_MAX + 0.01) {
             out.push(`lot ${n}'s edge stands ${step.toFixed(2)} m over the pad beside it (at most ${RETAIN_MAX})`);
             note(over.pads, gives, { what: 'edgePad', by: step, most: RETAIN_MAX });
@@ -271,7 +273,7 @@ const SETTLE_MARGIN = 0.15;
  * `withLand`, and the last resort: a place's world whose built land still breaks a slope limit
  * (`measureLand`, a little within it) gives up what breaks it and is graded again, round after
  * round (`SETTLE_ROUNDS` at most): a lot or a backdrop building cut too deep or whose edge stands
- * too tall (of two pads, the backdrop building, else the later lot; a lot before a building that is a place) is left out (`diagnostics.dropped`);
+ * too tall (of two pads, the backdrop building, else a home's lot before a public one's, else the later lot; a lot before a building that is a place) is left out (`diagnostics.dropped`);
  * a country road cut too deep (a way out, a loop between places) is left out, and the lots and
  * backdrop buildings on it (those by it, and those it was the nearest road to), where the roads left are still one network with a way out; a dead end reaching past `COURT` m beyond the last road it meets is
  * cut back to that, and the lots past it left out; a country road cut too deep that may not be
@@ -660,9 +662,9 @@ function giveUp(
 /**
  * The main town's places (`after`, area 0) given back the careers that worked there at places
  * given up (in `before`, not in `after`): each at a place of the kind it worked at (a garage's
- * mechanics at another workshop), else at the first backdrop office, as the generator gives an
- * office the careers no place took (`backdrop.ts` `places`); its hours widened to their shifts
- * (`hoursFor`). `after` as it was if no career lost its place (or none fits).
+ * mechanics at another workshop), else at its first office, as the generator gives an office the
+ * careers no place took (`backdrop.ts` `places`); its hours widened to their shifts (`hoursFor`).
+ * `after` as it was if no career lost its place (or none fits).
  */
 function rehome(before: readonly TownPlace[], after: TownPlace[], careers: readonly CareerCategory[]): TownPlace[] {
   const working = (list: readonly TownPlace[]) => new Set(list.flatMap((p) => (p.area === 0 ? (p.work ?? []) : [])));
@@ -672,7 +674,7 @@ function rehome(before: readonly TownPlace[], after: TownPlace[], careers: reado
   const out = after.slice();
   for (const id of lost) {
     const kind = before.find((p) => p.area === 0 && p.work?.includes(id))!.kind;
-    const at = [out.findIndex((p) => p.area === 0 && p.kind === kind), out.findIndex((p) => p.area === 0 && p.kind === 'office' && p.plot === undefined)].find((i) => i >= 0);
+    const at = [out.findIndex((p) => p.area === 0 && p.kind === kind), out.findIndex((p) => p.area === 0 && p.kind === 'office')].find((i) => i >= 0);
     if (at === undefined) continue;
     const p = out[at];
     const base = p.hours ?? (p.kind === 'park' || p.kind === 'outdoor' ? null : HOURS[p.kind]);

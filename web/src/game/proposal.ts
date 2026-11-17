@@ -11,6 +11,7 @@
  */
 
 import { civicChoices, civicOf } from './backdrop';
+import { placeOfTemplate } from './placeLots';
 import { inCentre } from './edit/ground';
 import { noUseCells, roadReach, usesOfDraft } from './edit/uses';
 import { BEND, BEND_MOST, cornersOf } from './macro';
@@ -63,15 +64,18 @@ function backdropUse(use: string, civic: boolean): UseKind | null {
   }
 }
 
+/** Whether a lot built from layout `template` is a civic place's (`placeLots.ts`). */
+const civicLot = (template: string) => 'civic' in (placeOfTemplate(template) ?? {});
+
 /** The order uses are painted in, the later over the earlier where two meet. */
 const PAINT_ORDER: readonly UseKind[] = ['green', 'homes', 'rows', 'shops', 'public'];
 
 /**
  * The uses a town built shows (`draft`, a big world's): its homes (house lots, the backdrop's houses),
  * its terraces and flats (terraced lots, the backdrop's terraces and flats), its shops and work (shop,
- * café and market lots, the backdrop's shops, offices and workshops), its parks and greens (parks,
- * playgrounds, outdoor spots and the greens the roads go round) and its public places (the civic places
- * and the backdrop's halls, churches and schools), each painted over the cells whose middles it covers;
+ * café and market lots, the other named places' lots, the backdrop's shops, offices and workshops), its
+ * parks and greens (parks, playgrounds, outdoor spots and the greens the roads go round) and its public
+ * places (the civic places' lots, `placeLots.ts`, and the backdrop's halls, churches and schools), each painted over the cells whose middles it covers;
  * farms none. Gaps of `CLOSE` cells or fewer between cells of one use are closed, the cells no use goes
  * on cleared (`noUseCells`: under roads and water), and so are those too far from a road to build on
  * (`BUILD_REACH`), but the greens that are outdoor spots (`greenSpots`).
@@ -84,7 +88,7 @@ export function usesOf(draft: NeighbourhoodDraft, t: Templates): UseLayer {
   const shapes: { kind: UseKind; rect?: Rect; poly?: readonly Pt[] }[] = [];
   for (const g of draft.greens) shapes.push({ kind: 'green', poly: g });
   for (const s of draft.slots) {
-    const kind: UseKind | null = s.kind === 'house' ? (s.lot === 'farm' ? null : s.lot === 'terrace' ? 'rows' : 'homes') : s.kind === 'shop' || s.template === 'market' ? 'shops' : 'green';
+    const kind: UseKind | null = s.kind === 'house' ? (s.lot === 'farm' ? null : s.lot === 'terrace' ? 'rows' : 'homes') : civicLot(s.template) ? 'public' : s.kind === 'shop' || s.template === 'market' ? 'shops' : 'green';
     if (kind) shapes.push({ kind, rect: plotRect(t, s) });
   }
   for (const b of open?.backdrop ?? []) {
@@ -426,17 +430,18 @@ const SHOP_KINDS: readonly string[] = ['shop', 'cafe', 'restaurant', 'office', '
 
 /**
  * What a town built has, counted as `usesSummary` estimates it: homes (house lots, terraced ones among
- * them, not farms), shops and workplaces (shop lots and the backdrop's shops, cafés, restaurants, offices
- * and workshops but the civic places), parks (parks, playgrounds, markets and outdoor spots), and civic
- * places (`civicOf`).
+ * them, not farms), shops and workplaces (shop lots, the other named places' among them, and the
+ * backdrop's shops, cafés, restaurants, offices and workshops, but the civic places), parks (parks,
+ * playgrounds, markets and outdoor spots), and civic places (their lots, `placeLots.ts`, and those of the
+ * backdrop: `civicOf`).
  */
 export function townSummary(draft: NeighbourhoodDraft): UsesSummary {
   const places = draft.open?.places ?? [];
   return {
     homes: draft.slots.filter((s) => s.kind === 'house' && s.lot !== 'farm').length,
-    shops: draft.slots.filter((s) => s.kind === 'shop').length + places.filter((q) => q.plot === undefined && SHOP_KINDS.includes(q.kind) && civicOf(q) < 0).length,
+    shops: draft.slots.filter((s) => s.kind === 'shop' && !civicLot(s.template)).length + places.filter((q) => q.plot === undefined && SHOP_KINDS.includes(q.kind) && civicOf(q) < 0).length,
     parks: draft.slots.filter((s) => s.kind === 'park' || s.kind === 'outdoor').length,
-    public: places.filter((q) => q.plot === undefined && civicOf(q) >= 0).length,
+    public: draft.slots.filter((s) => civicLot(s.template)).length + places.filter((q) => q.plot === undefined && civicOf(q) >= 0).length,
   };
 }
 

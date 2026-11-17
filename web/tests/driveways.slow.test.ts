@@ -146,12 +146,13 @@ describe('driveways', async () => {
   // Seed base 13's Snowdale: the driveway of plot 112 stopped where its line crossed a trail, 16 m
   // short of the lane its car drives onto, and the car drove over the grass between. Snowdale's
   // hamlets have other houses since the living town's terraces (2026-11-12), and whichever plot
-  // has such a driveway moves as the layout does: the first of these worlds with a car whose
-  // driveway's line crosses a trail on the way to its road has it paved across.
+  // has such a driveway moves as the layout does (the worlds below since the named places became
+  // lots, 2026-11-17): the first of these worlds with a car whose driveway's line crosses a trail on
+  // the way to its road has it paved across.
   const acrossTrail: [ClassicKind, number][] = [
-    ['mountain', 241142],
-    ['mountain', 207684],
-    ['mountain', 128494],
+    ['forest', 104735],
+    ['forest', 112654],
+    ['lakeside', 225304],
   ];
   test('a driveway across a trail is paved all the way to its road', () => {
     const crossing = (file: TownFile) =>

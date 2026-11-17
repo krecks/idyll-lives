@@ -4,7 +4,8 @@
 // named as its place; any public lot's place is the one the generator gives it, a civic one's with
 // its kind's hours; a layout's storey above goes on the town's next rows with stairs up to it; and the
 // town file carries the lots' looks (`meta.lotLooks`) and the places' hours (`plots[].hours`). The
-// generator draws none of these layouts for a town's own public places (`wantedLots`).
+// generator draws none of these layouts for a town's own public places (`wantedLots`), and puts down a
+// lot for its named places (`macro.ts` `namedLots`), each dressed and called as its place is.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -109,12 +110,19 @@ describe('named places as lots', async () => {
     expect(taken.has('Ashby School')).toBe(true);
   });
 
-  test("a public lot's place is the one the generator gives it", () => {
+  test("a public lot's place is the one the generator gives it, called as its lot is", () => {
     const publicLots = hamlet.slots.filter((s) => s.kind !== 'house');
     expect(publicLots.length).toBeGreaterThan(0);
+    // (But the main town's first office, which takes the careers no place there has, its hours widened to theirs.)
+    const office = hamlet.open!.places!.find((p) => p.area === 0 && p.kind === 'office')!;
     for (const s of publicLots) {
       const had = hamlet.open!.places!.find((p) => p.plot === s.index)!;
-      expect(slotPlace(hamlet, t, content, s)).toEqual({ ...had, name: s.name });
+      const made = slotPlace(hamlet, t, content, s);
+      if (had === office) {
+        expect(had.work!.slice(0, made.work?.length ?? 0)).toEqual(made.work ?? []);
+        expect(had.hours!.open).toBeLessThanOrEqual(made.hours!.open);
+      } else expect(made).toEqual({ ...had, name: s.name });
+      if (s.dress) expect(had.name).toBe(s.name);
       expect(lotPlaceKind(s)).toBe(had.kind);
     }
   });
@@ -151,20 +159,35 @@ describe('named places as lots', async () => {
     const withPlaces = { ...draft, open: { ...draft.open!, places } };
     const home = vacantSlots(withPlaces)[0].index;
     const file = JSON.parse(assembleTown(content, t, withPlaces, randomHousehold(content, assets, 2, [], {}, mulberry32(1)), home, undefined, mulberry32(2)));
-    expect(file.meta.lotLooks).toEqual({ [slot.index]: slot.dress });
+    expect(file.meta.lotLooks[slot.index]).toEqual(slot.dress);
+    expect(Object.keys(file.meta.lotLooks).map(Number)).toEqual(withPlaces.slots.flatMap((s, i) => (s.dress ? [i] : [])));
     for (const [i, s] of withPlaces.slots.entries()) {
       const p = places.find((q) => q.plot === i);
       expect(file.plots[i].hours, s.name).toEqual(p?.hours);
     }
     expect(file.plots[slot.index].storeys).toBe(2);
     // A town without named places' lots has no looks.
-    expect(JSON.parse(assembleTown(content, t, hamlet, randomHousehold(content, assets, 2, [], {}, mulberry32(1)), vacantSlots(hamlet)[0].index, undefined, mulberry32(2))).meta.lotLooks).toBeUndefined();
+    const bare = { ...hamlet, slots: hamlet.slots.map(({ dress: _, ...s }) => s) };
+    expect(JSON.parse(assembleTown(content, t, bare, randomHousehold(content, assets, 2, [], {}, mulberry32(1)), vacantSlots(bare)[0].index, undefined, mulberry32(2))).meta.lotLooks).toBeUndefined();
   });
 
-  test("a town's own public places are never a named place's layout", () => {
+  test("a town's own public places are never a named place's layout, and its named places' lots are dressed and named as their places", () => {
     for (const seed of [1, 2, 3]) {
       const world = generateWorld(content, t, 'country', seed, undefined, undefined, { town: 'town', villages: 'few' });
-      expect(world.slots.filter((s) => placeOfTemplate(s.template)).map((s) => s.template)).toEqual([]);
+      // Every lot built from a named place's layout is dressed as one (`placeUnit`), and no other is.
+      expect(world.slots.filter((s) => !!placeOfTemplate(s.template) !== !!s.dress).map((s) => s.template)).toEqual([]);
+      const named = world.slots.filter((s) => s.dress);
+      // Every civic place of a town in the main town; a hamlet's in every other area.
+      for (const c of CIVIC) expect(named.some((s) => !s.area && placeOfTemplate(s.template)?.civic === CIVIC.indexOf(c)), c.label).toBe(true);
+      for (let a = 1; a < world.open!.areas.length; a++) expect(named.filter((s) => s.area === a && 'civic' in (placeOfTemplate(s.template) ?? {})).length).toBeGreaterThan(0);
+      for (const s of named) {
+        const place = world.open!.places!.find((p) => p.plot === s.index)!;
+        expect(place.name).toBe(s.name);
+        expect(place.kind).toBe(lotPlaceKind(s));
+      }
+      expect(new Set(named.map((s) => s.name)).size).toBe(named.length);
+      // No backdrop building is a place.
+      expect(world.open!.backdrop!.filter((b) => b.place !== undefined)).toEqual([]);
     }
   });
 });

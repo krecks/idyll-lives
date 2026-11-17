@@ -61,6 +61,8 @@ export type CheckedTown = {
     backdrop?: BackdropBuilding[];
     places?: TownPlace[];
     centre?: { area: number; poly: Pt[] }[];
+    /** The named places' lots' looks, by plot (`placeLots.ts`): which plots are a named place's. */
+    lotLooks?: Record<number, unknown>;
   };
   parking?: { x: number; z: number; rot: number; area: number }[];
 };
@@ -334,12 +336,14 @@ const corners = (r: Rect, by = 0): Pt[] => [
 /**
  * The living town's world data (`game/backdrop.ts`): every
  * backdrop building a rectangle (4 to 8 corners, counter-clockwise seen from above), 1 to 6 storeys,
- * a roof (a ridge for a gable or mansard), a use, its area and its place; on no lot (and
+ * a roof (a ridge for a gable or mansard), a use and its area; on no lot (and
  * `LOT_CLEAR` m off one), road or trail with its sidewalks (more than half its width off its
  * middle: a junction's pad too), parking, water or other backdrop building; a side along the road
  * nearest it (`facesRoad`); as many as its size wants in the main town (`expect.mainLeast`) and `HAMLET_LEAST` in every hamlet,
- * the centre's open land built over more densely than the rest of the main town's box's. Every public lot a
- * place, every backdrop place a place of its kind; each place named (none twice), its hours within
+ * a named place's lot (`meta.lotLooks`) counted with them, the centre's open land built over (by
+ * them too) more densely than the rest of the main town's box's. Every public lot a place, and every
+ * place a lot's (`generated`: no backdrop building is a place; in a town edited by hand, a backdrop
+ * place is a building of its kind); each place named (none twice), its hours within
  * the day, its work careers that are, and (in a town or a city: `expect.careers`) every career a
  * resident may hold working somewhere in the main town. The main town has its centre.
  */
@@ -381,8 +385,9 @@ function livingProblems(town: CheckedTown, careers: readonly string[], expect: E
     if ((b.roof === 'gable' || b.roof === 'mansard') && b.ridge === undefined) say(i, 'has no ridge');
     if (!USES.includes(b.use)) say(i, 'has no use');
     if (!Number.isInteger(b.area) || b.area < 0 || b.area >= Math.max(1, areas.length)) say(i, `is in area ${b.area}`);
-    if (PLACE_KINDS.includes(b.use) !== (b.place !== undefined)) say(i, b.place === undefined ? 'is a place with no place' : 'has a place');
-    if (b.place !== undefined && places[b.place]?.kind !== b.use) say(i, `is place ${b.place}, a ${places[b.place]?.kind}`);
+    // (A generated town's named places are lots; one edited by hand may have a civic place's building.)
+    if (b.place !== undefined && (generated || !PLACE_KINDS.includes(b.use))) say(i, 'has a place');
+    else if (b.place !== undefined && places[b.place]?.kind !== b.use) say(i, `is place ${b.place}, a ${places[b.place]?.kind}`);
     for (const [k, lot] of lots.entries()) if (overlaps(poly, lot, 0)) say(i, `is within ${LOT_CLEAR} m of plot ${k}`);
     for (const [k, spot] of parking.entries()) if (overlaps(poly, spot, 0)) say(i, `is on parking space ${k}`);
     for (let k = 0; k < poly.length; k++) {
@@ -422,10 +427,12 @@ function livingProblems(town: CheckedTown, careers: readonly string[], expect: E
       }
     }
   });
+  const placeLots = Object.keys(town.meta.lotLooks ?? {}).map(Number);
   areas.forEach((a, k) => {
     // (A town checked with no expectations, one edited by hand: as many as it has.)
     if (!expect) return;
-    const n = backdrop.filter((b) => b.area === k).length;
+    // (A named place's lot is one of the town's buildings.)
+    const n = backdrop.filter((b) => b.area === k).length + placeLots.filter((p) => (town.plots[p]?.area ?? 0) === k).length;
     // (Less those the slope limits gave up there: `landFollow.ts` `settleLand`.)
     const least = (k === 0 ? expect.mainLeast : HAMLET_LEAST) - (given[k] ?? 0);
     if (n < least) out.push(`${a.name} has ${n} backdrop buildings (${least} or more)`);
@@ -439,11 +446,13 @@ function livingProblems(town: CheckedTown, careers: readonly string[], expect: E
   else if (areas[0]) {
     const box = areas[0];
     const taken = roadMask(roads.filter((r) => r.kind !== 'trail'), town.width, town.depth, 0);
-    for (const p of town.plots) fillPoly(corners(p), town.width, town.depth, (i) => (taken[i] = 1));
+    // (A named place's lot built over, as a building; the other lots no open land.)
+    const placed = new Set(placeLots);
+    town.plots.forEach((p, i) => placed.has(i) || fillPoly(corners(p), town.width, town.depth, (k) => (taken[k] = 1)));
     // (Nor the water: a lakeside town's high street runs along its shore.)
     if (water) for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
     for (const g of town.meta.greens ?? []) fillPoly(g, town.width, town.depth, (i) => (taken[i] = 1));
-    const { centre: inC, rest: inRest } = centreDensity(town.width, town.depth, taken, box, centre.poly, backdrop.map((b) => b.poly));
+    const { centre: inC, rest: inRest } = centreDensity(town.width, town.depth, taken, box, centre.poly, [...backdrop.map((b) => b.poly), ...placeLots.map((p) => corners(town.plots[p]))]);
     if (inC <= inRest) out.push(`the centre's open land is ${(inC * 100).toFixed(0)}% built over, the rest of the main town's ${(inRest * 100).toFixed(0)}% (the centre the densest)`);
   }
   // Places: every public lot one, named once, open within the day, careers that are.
@@ -458,7 +467,7 @@ function livingProblems(town: CheckedTown, careers: readonly string[], expect: E
     else if (names.has(p.name)) out.push(`two places called ${p.name}`);
     names.add(p.name);
     if (!PLACE_KINDS.includes(p.kind)) out.push(`place ${p.name} is a ${p.kind}`);
-    if (p.plot === undefined && !backdrop.some((b) => b.place === i)) out.push(`place ${p.name} is neither a lot nor a backdrop building`);
+    if (p.plot === undefined && (generated || !backdrop.some((b) => b.place === i))) out.push(generated ? `place ${p.name} has no lot` : `place ${p.name} is neither a lot nor a backdrop building`);
     if (p.hours && !(p.hours.open >= 0 && p.hours.open < p.hours.close && p.hours.close <= 1440 && p.hours.days > 0 && p.hours.days < 128)) out.push(`place ${p.name} is open ${JSON.stringify(p.hours)}`);
     if (!p.hours && p.kind !== 'park' && p.kind !== 'outdoor') out.push(`place ${p.name} (${p.kind}) has no hours`);
     for (const w of p.work ?? []) if (!careers.includes(w)) out.push(`place ${p.name}'s workers are ${w}, no career`);
