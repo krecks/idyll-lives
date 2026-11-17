@@ -470,11 +470,13 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
     expect(pullReach(0.1)).toBe(10);
     expect(pullReach(5)).toBe(40);
     const draft = town();
-    expect(pullAt(draft, [120, 80], 28, 'street')).toMatchObject({ at: [120, MAIN_Z], pull: { kind: 'road', road: 0 } });
+    const pulled = pullAt(draft, [120, 80], 28, 'street');
+    expect(pulled.pull).toMatchObject({ kind: 'road', road: 0 });
+    expect(pulled.at[1]).toBeCloseTo(MAIN_Z - 5.5, 6);
     expect(pullAt(draft, [120, 80], 10, 'street')).toEqual({ at: [120, 80], pull: null });
-    const first = pullAt(draft, [120, 92], 28, 'street');
-    expect(pullAt(draft, [125, 80], 28, 'street', { first: first.at, firstPull: first.pull }).pull).toBeNull();
-    expect(pullAt(draft, [160, 80], 28, 'street', { first: first.at, firstPull: first.pull }).pull?.road).toBe(0);
+    // (A street begun by the high street at x 120: not pulled back onto it within 30 m, but further along.)
+    expect(pullAt(draft, [125, 75], 28, 'street', [120, 92]).pull).toBeNull();
+    expect(pullAt(draft, [160, 75], 28, 'street', [120, 92]).pull?.road).toBe(0);
   });
 
   test('a click 20 m off a road starts the street on it; with the ground ten times nearer (zoomed in), not', () => {
@@ -495,6 +497,23 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
     const zoomed = streetTool.stage(near);
     zoomed.hover(120, 80);
     expect(near.said.hints.at(-1)).toMatch(/Click on a road to start a street off it/);
+  });
+
+  test('a corner set near a road stays where it is set when the street pulled there would be refused', () => {
+    choice.along = 'none';
+    const editor = fakeEditor(town());
+    const tool = streetTool.stage(editor);
+    tool.down(100, MAIN_Z - 8);
+    tool.up();
+    // (25 m north of the high street, 60 m along from where the street starts: pulled down onto it, the street would
+    // run alongside it; so it stays a corner.)
+    tool.down(160, 75);
+    tool.up();
+    expect(editor.draft.roads).toHaveLength(4);
+    expect(editor.said.refusals).toEqual([]);
+    // (The line as drawn ends at the corner, not on the high street.)
+    const ends = editor.said.ghosts!.roads!.map((r) => r.points[r.points.length - 1]);
+    expect(ends.some(([x, z]) => Math.hypot(x - 160, z - 75) < 1)).toBe(true);
   });
 
   test(`Enter carries a street ended short of a road on to it, within ${AUTO_JOIN} m; past that it ends as a dead end`, () => {

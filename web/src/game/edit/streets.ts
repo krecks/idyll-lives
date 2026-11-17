@@ -67,6 +67,8 @@ export type Named = { kind: 'road'; road: number } | { kind: 'place'; place: num
 
 /** An end of a drawn street snaps to a road, or a dead end, this near (m, from the road's edge; from the dead end's last point). */
 export const SNAP = 10;
+/** The Street tool's magnet pulls the pointer to this far past a road's edge (m), well within `SNAP`: where a click by the kerb would be. */
+const PULL_IN = 2;
 /** A street meets a road at `roads.ts` `MEET` at least, and is made square within this of it. Junctions on one road keep `ROOM` apart (`roomAt`). */
 const SQUARE = (15 * Math.PI) / 180;
 /** (`roads.ts` `ROOM`, for the street tool's live checks.) */
@@ -255,13 +257,14 @@ export class Meeting {
   }
 
   /**
-   * Where the pointer at `p` is pulled to (the Street tool's magnet), within `reach` m: the nearest point on the
-   * middle of a road it may join (off a bridge's deck), a dead end of its own kind (which wins over a road point less
-   * than `SNAP` m nearer, as `snap` prefers it), or the world's edge (`W` × `D` m); null: nothing so near. `keep`:
-   * whether a point on a road (-1: the edge) may pull at all (the tool leaves out the road a street starts on, near
-   * its start).
+   * Where the pointer at `p` is pulled to (the Street tool's magnet), within `reach` m: beside the nearest road it may
+   * join (off a bridge's deck), `PULL_IN` m past its edge, where a street's end snaps to it as one set there would
+   * (`snap`); a dead end of its own kind (which wins over a road less than `SNAP` m nearer, as `snap` prefers it); or
+   * the world's edge (`W` × `D` m). Null: nothing so near, or `p` snaps to a road already. `keep`: whether a point on
+   * a road (-1: the edge) may pull at all (the tool leaves out the road a street starts on, near its start).
    */
   magnet(p: Pt, reach: number, W: number, D: number, keep: (at: Pt, road: number) => boolean = () => true): Magnet | null {
+    if (this.snap(p).kind !== 'free') return null;
     let best: Magnet | null = null;
     let near = Infinity;
     const take = (at: Pt, road: number, kind: Magnet['kind'], d: number) => {
@@ -270,7 +273,10 @@ export class Meeting {
     for (const [r, m] of this.index.around(p[0], p[1], reach)) {
       const road = this.roads[r];
       if (!this.joinable(r) || (road.bridge && m.s > road.bridge[0] - BRIDGE_IN && m.s < road.bridge[1] + BRIDGE_IN)) continue;
-      take(pointAt(road.points, m.s).p, r, 'road', m.dist);
+      const q = pointAt(road.points, m.s).p;
+      const off = road.width / 2 + PULL_IN;
+      const k = m.dist > off ? off / m.dist : 1;
+      take([q[0] + (p[0] - q[0]) * k, q[1] + (p[1] - q[1]) * k], r, 'road', m.dist);
     }
     for (const [r, road] of this.roads.entries()) {
       if (!this.joinable(r) || road.bridge || (road.kind === 'trail') !== this.trail) continue;

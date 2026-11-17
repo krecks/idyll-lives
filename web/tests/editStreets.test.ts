@@ -192,20 +192,26 @@ describe('drawing a street', () => {
     expect(stub.joinTo(line(205, 340, 205, 304), 4)).toBe('it meets Stub too near its end');
   });
 
-  test("the magnet: the nearest point on a road's middle, a dead end over a road point less than 10 m nearer, the world's edge; nothing out of reach", () => {
+  test("the magnet: beside the nearest road (2 m past its edge), a dead end over a road less than 10 m nearer, the world's edge; nothing out of reach, nor where the point snaps already", () => {
     const draft = town();
     const meet = new Meeting(draft.roads, false, 7);
-    expect(meet.magnet([120, 80], 28, W, D)).toEqual({ at: [120, MAIN_Z], road: 0, kind: 'road' });
-    expect(meet.magnet([LANE_X + 3, 140], 28, W, D)).toEqual({ at: [LANE_X, 130], road: 1, kind: 'dead' });
+    const road = meet.magnet([120, 80], 28, W, D)!;
+    expect(road.kind).toBe('road');
+    expect(road.road).toBe(0);
+    expect(road.at[0]).toBeCloseTo(120, 6);
+    expect(road.at[1]).toBeCloseTo(MAIN_Z - 5.5, 6);
+    expect(meet.magnet([LANE_X + 3, 146], 28, W, D)).toEqual({ at: [LANE_X, 130], road: 1, kind: 'dead' });
     expect(meet.magnet([395, 30], 28, W, D)).toEqual({ at: [W, 30], road: -1, kind: 'edge' });
     expect(meet.magnet([250, 160], 28, W, D)).toBeNull();
     expect(meet.magnet([120, 80], 10, W, D)).toBeNull();
+    // (Within 10 m of the high street's edge a street's end snaps to it as it is.)
+    expect(meet.magnet([120, 88], 28, W, D)).toBeNull();
     // (What `keep` leaves out does not pull.)
-    expect(meet.magnet([120, 80], 28, W, D, (_, road) => road !== 0)).toBeNull();
+    expect(meet.magnet([120, 80], 28, W, D, (_, r) => r !== 0)).toBeNull();
     // (A footpath is pulled to a footpath's dead end, a street not.)
     const paths: RoadPlan[] = [...draft.roads, { points: line(250, 40, 250, 70), width: 2, ends: ['dead', 'dead'], kind: 'trail' }];
-    expect(new Meeting(paths, true, 2).magnet([252, 34], 28, W, D)?.kind).toBe('dead');
-    expect(new Meeting(paths, false, 7).magnet([252, 34], 28, W, D)?.kind).not.toBe('dead');
+    expect(new Meeting(paths, true, 2).magnet([253, 24], 28, W, D)?.kind).toBe('dead');
+    expect(new Meeting(paths, false, 7).magnet([253, 24], 28, W, D)?.kind).not.toBe('dead');
   });
 
   test('a street or a lane asked for stays one outside the town, with no area; by where it runs it is a country road there', () => {

@@ -2,7 +2,7 @@
  * The Street tool: draws a street, lane, country road or footpath (`streets.ts` `drawStreet`), as
  * its card (`streetChoice`) asks. Clicks set its points, or a drag draws it freehand. The pointer is
  * pulled to a road, a dead end or the world's edge within `PULL_PX` CSS px (`Meeting.magnet`, 10 to
- * 40 m). It is drawn as soon as it reaches a road (or the world's edge); Enter or a double click
+ * 40 m; once a street is begun, only where the street would not be refused there). It is drawn as soon as it reaches a road (or the world's edge); Enter or a double click
  * ends it where it is, carried on to a road within `AUTO_JOIN` m ahead (or nearby) if it may be
  * (`carryOn`), else as a dead end. Backspace takes the last point back, Esc drops it. The street
  * drawn is picked, so its card shows; one split at its bridges, the stretch nearest the last click (`stretchNear`), the
@@ -22,7 +22,7 @@
 
 import type { Edited } from '../../game/edit/edited';
 import { builtAlong } from '../../game/edit/buildup';
-import { drawStreet, Meeting, streetsBare, streetWidth, type Magnet } from '../../game/edit/streets';
+import { drawStreet, Meeting, SNAP, streetsBare, streetWidth, type Magnet } from '../../game/edit/streets';
 import { lengths, nearest, pointAt, type Pt } from '../../game/roads';
 import type { TownGhosts } from '../../render/types';
 import { buildingBox, lotBox, roadGhost } from './ghosts';
@@ -128,21 +128,18 @@ export function startAt(draft: Parameters<typeof liveStreet>[0], p: Pt, kind: St
   return { at: pointAt(r.points, meet.index.along(e.road, p[0], p[1]), ls).p, road: e.road, extend: false };
 }
 
-/** The street being drawn as the magnet sees it: its first point and what pulled it there (if anything). */
-export interface PullFrom {
-  first?: Pt;
-  firstPull?: Magnet | null;
-}
-
 /**
  * Where the pointer at `p` (on the ground) is pulled to by the magnet (`Meeting.magnet`) within `reach` m, for a
- * street of `kind`: a road, a dead end or the world's edge; else `p` itself. Not back to the road (or edge) the street
- * starts on within `PULL_FROM_START` m of its start.
+ * street of `kind`: beside a road, a dead end or the world's edge; else `p` itself. Once a street is begun (`first`,
+ * its first point), not back to the road it starts on (or the edge, if it starts by one) within `PULL_FROM_START` m
+ * of its start.
  */
-export function pullAt(draft: Parameters<typeof liveStreet>[0], p: Pt, reach: number, kind: StrokeKind, from: PullFrom = {}, meetings = new WeakMap<object, Meeting>()): { at: Pt; pull: Magnet | null } {
+export function pullAt(draft: Parameters<typeof liveStreet>[0], p: Pt, reach: number, kind: StrokeKind, first?: Pt, meetings = new WeakMap<object, Meeting>()): { at: Pt; pull: Magnet | null } {
   const meet = meetingOf(draft, kind, meetings);
   const apart = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-  const keep = (at: Pt, road: number) => !(from.first && from.firstPull && road === from.firstPull.road && apart(at, from.first) < PULL_FROM_START);
+  const on = first && meet.snap(first);
+  const from = on && (on.kind === 'join' || on.kind === 'extend') ? on.road : first && Math.min(first[0], first[1], draft.width - first[0], draft.depth - first[1]) <= SNAP ? -1 : null;
+  const keep = (at: Pt, road: number) => !(first && road === from && apart(at, first) < PULL_FROM_START);
   const pull = meet.magnet(p, reach, draft.width, draft.depth, keep);
   return { at: pull ? pull.at : p, pull };
 }
@@ -249,8 +246,7 @@ export const streetTool: TownTool = {
     let shown: { key: string; live: LiveStreet; verdict: Edited | null } | null = null;
     let rest: ReturnType<typeof setTimeout> | undefined;
     const meetings = new WeakMap<object, Meeting>();
-    /** What pulled the street's first point where it is (the magnet), and the last scale measured (m a CSS px). */
-    let firstPull: Magnet | null = null;
+    /** The last scale measured (m a CSS px). */
     let perPx = 1;
     // (What the live checks keep of the town made ahead of the first move, not on it.)
     setTimeout(() => warmLive(editor.draft, editor.t), 0);
@@ -267,9 +263,22 @@ export const streetTool: TownTool = {
       return perPx;
     };
 
-    /** The ground under (`x`, `y`) pulled by the magnet (`pullAt`), and what pulled it. */
-    const pulled = (x: number, y: number, g: Pt): { at: Pt; pull: Magnet | null } =>
-      pullAt(editor.draft, g, pullReach(scaleAt(x, y)), askOf().kind, s.drawing ? { first: s.points[0], firstPull } : {}, meetings);
+    /**
+     * The ground under (`x`, `y`) pulled by the magnet (`pullAt`), and what pulled it. A street's first point is pulled
+     * as it is; a later one only where the street through it would not be refused (`liveStreet`), so a corner set
+     * near a road stays where it is set rather than end the street there for nothing (its live checks kept for `show`).
+     */
+    const pulled = (x: number, y: number, g: Pt): { at: Pt; pull: Magnet | null } => {
+      const ask = askOf();
+      const p = pullAt(editor.draft, g, pullReach(scaleAt(x, y)), ask.kind, s.drawing ? s.points[0] : undefined, meetings);
+      if (!p.pull || !s.drawing) return p;
+      const pts = [...s.points, p.at];
+      const key = keyOf(pts, ask);
+      const live = shown?.key === key ? shown.live : liveStreet(editor.draft, editor.t, pts, ask.kind, ask.clear, ask.asked);
+      if (live.why) return { at: g, pull: null };
+      if (shown?.key !== key) shown = { key, live, verdict: null };
+      return p;
+    };
 
     /** The ghosts and the line under the tools for the street as it stands (`verdict`: `drawStreet`'s, once the pointer rested). */
     const show = () => {
@@ -373,7 +382,6 @@ export const streetTool: TownTool = {
       const road = stretchNear(edited.draft, made, pts[pts.length - 1]);
       s.clear();
       shown = null;
-      firstPull = null;
       seed = editor.seed();
       if (road !== undefined) editor.select({ kind: 'road', road });
       // (The card lists the stretches while the draft still has them, by name: `drawnStretches`.)
@@ -397,7 +405,6 @@ export const streetTool: TownTool = {
       lastClick = null;
       s.clear();
       shown = null;
-      firstPull = null;
       editor.preview(null);
       editor.hint(null);
     };
@@ -419,9 +426,7 @@ export const streetTool: TownTool = {
           return true;
         }
         press = { x, y, moved: false };
-        const p = pulled(x, y, g);
-        if (!s.drawing) firstPull = p.pull;
-        s.add(p.at);
+        s.add(pulled(x, y, g).at);
         s.cursor = null;
         show();
         return true;
