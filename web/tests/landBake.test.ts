@@ -9,7 +9,7 @@ import type { WorldStructure } from '../src/core/protocol';
 import { COVER, coverSpan, encodeLand, LAND_CELL, NONE, SEA_CM, type Land } from '../src/game/land';
 import { CountryRoads } from '../src/render/shared/countryRoads';
 import { landZones } from '../src/game/landEdit';
-import { bakeLand, copyLand, EDGE_DRY, EDGE_POND, EDGE_SEA, edgeWater, edgeWaterAt, marchToGround, pondQuads, wetDistance, wetEdgeAt } from '../src/render/shared/landBake';
+import { bakeLand, copyLand, EDGE_DRY, EDGE_POND, EDGE_SEA, edgeWater, edgeWaterAt, EXIT_MOST, landExits, marchToGround, pondQuads, wetDistance, wetEdgeAt } from '../src/render/shared/landBake';
 import { LAND_BLOCK, LandscapeLayout, WATER_Y, type Woods } from '../src/render/shared/nature';
 import { islandWorld, plainWorld, SIDE } from './support/landFixtures';
 
@@ -311,6 +311,67 @@ describe('past the edge only the sea runs on', () => {
     const island = layout(islandWorld());
     island.setLand(bakeLand(layout(islandWorld()), SIDE, SIDE));
     for (const [x, z] of [[-30, 256], [SIDE + 30, 100], [256, -60], [256, SIDE + 60]]) expect(island.waterEdge(x, z)).toBeGreaterThan(0);
+  });
+});
+
+describe("a river's way out opens into a valley past the edge", () => {
+  /**
+   * The plain world's land surveyed, with a river 20 m wide (rows 55..64) carved east out through its edge, at `level`
+   * cm, its banks graded at 30 % up to the land (as a generated river's are; the land past the edge follows its own).
+   */
+  const carved = (level: number) => {
+    const field = bakeLand(layout(plainWorld()), SIDE, SIDE);
+    for (let j = 45; j <= 74; j++) {
+      for (let i = 150; i < field.cols; i++) {
+        const k = j * field.cols + i;
+        const off = Math.max(0, Math.abs(j - 59.5) - 5) * LAND_CELL;
+        if (off === 0) [field.h[k], field.wl[k]] = [Math.min(field.h[k], level - 200), level];
+        else field.h[k] = Math.min(field.h[k], level - 200 + off * 30);
+      }
+    }
+    return field;
+  };
+  /** The steepest the ground rises (rise over run, either way) round (x, z), over 1 m. */
+  const steepness = (l: LandscapeLayout, x: number, z: number) => Math.hypot(l.ground(x + 0.5, z) - l.ground(x - 0.5, z), l.ground(x, z + 0.5) - l.ground(x, z - 0.5));
+  /** tan 35°: the steepest a valley's side may be. */
+  const LIMIT = Math.tan((35 * Math.PI) / 180);
+
+  test('a river at the sea\'s level: the channel widens out, the land beside it slopes back no steeper than 35°', () => {
+    const field = carved(SEA_CM);
+    const exits = landExits(field, EXIT_MOST);
+    expect(exits).toEqual([{ side: 1, at: 119, half: 10, sea: true, level: SEA_CM / 100 }]);
+    const drawn = layout(plainWorld());
+    drawn.setLand(field);
+    let steepest = 0;
+    for (let d = 4; d <= 300; d += 4) {
+      // (Across the river's way out and well beyond the valley's floor, either side.)
+      for (let a = -140 - d * 0.5; a <= 140 + d * 0.5; a += 3) steepest = Math.max(steepest, steepness(drawn, SIDE + d, 119 + a));
+      // Its water goes on, wider further out, under the sea's sheet.
+      expect(drawn.ground(SIDE + d, 119)).toBeLessThan(WATER_Y);
+      expect(drawn.waterEdge(SIDE + d, 119)).toBeGreaterThan(0);
+    }
+    expect(steepest).toBeLessThan(LIMIT);
+    const wet = (d: number) => [...Array(200).keys()].filter((k) => drawn.waterEdge(SIDE + d, 19 + k) > 0).length;
+    expect(wet(200)).toBeGreaterThan(wet(20) + 30);
+    // Beside the water a floor over the sea's level, not flooded; the hills come back further off.
+    expect(drawn.ground(SIDE + 150, 119 + 40)).toBeGreaterThan(WATER_Y + 0.3);
+    expect(drawn.ground(SIDE + 150, 119 + 40)).toBeLessThan(5);
+  });
+
+  test('a river above it (one drawn to the edge) ends behind its bank, the valley dry past it', () => {
+    const drawn = layout(plainWorld());
+    drawn.setLand(carved(50));
+    let steepest = 0;
+    for (let d = 4; d <= 300; d += 4) {
+      for (let a = -140 - d * 0.5; a <= 140 + d * 0.5; a += 3) steepest = Math.max(steepest, steepness(drawn, SIDE + d, 119 + a));
+      expect(drawn.ground(SIDE + d, 119)).toBeGreaterThanOrEqual(0.75 - 1e-6);
+      expect(drawn.waterEdge(SIDE + d, 119)).toBeLessThan(0);
+    }
+    expect(steepest).toBeLessThan(LIMIT);
+  });
+
+  test('a coast is no way out: the sea all round an island is left as it was', () => {
+    expect(landExits(bakeLand(layout(islandWorld()), SIDE, SIDE), EXIT_MOST)).toEqual([]);
   });
 });
 

@@ -11,7 +11,7 @@
 
 import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, type WorldStructure, type WorldZone } from '../../core/protocol';
 import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, NONE, SEA_CM, type Land, type LandRect } from '../../game/land';
-import { coverAt, EDGE_POND, edgeWater, edgeWaterAt, landTop, landWater, wetDistance, wetEdgeAt } from './landBake';
+import { coverAt, EDGE_POND, edgeWater, edgeWaterAt, EXIT_MOST, landExits, landTop, landWater, VALLEY_BANK, VALLEY_IN, valleyCap, wetDistance, wetEdgeAt, type LandExit } from './landBake';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
 import { onPad, type BuiltSurface, type SurfaceChange } from './builtSurface';
 import { surfaceOf } from './landSurface';
@@ -881,6 +881,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const land = this.field!;
     this.wetSd = wetDistance(land);
     this.edgeWet = edgeWater(land, END_REACH);
+    this.exits = landExits(land, EXIT_MOST);
     this.fieldWater = landWater(land);
     this.fieldTop = landTop(land);
     if (!this.built) return;
@@ -960,7 +961,17 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   waterEdge(x: number, z: number): number {
     // (A height field's: the edge of its water.)
-    return this.field ? wetEdgeAt(this.field, this.wetSd, x, z, this.edgeWet) : this.drawnWaterEdge(x, z);
+    if (!this.field) return this.drawnWaterEdge(x, z);
+    let e = wetEdgeAt(this.field, this.wetSd, x, z, this.edgeWet);
+    // (Past the edge, a sea river's channel widening down its valley: `valley`.)
+    if (x < 0 || z < 0 || x > this.w || z > this.d) {
+      for (const exit of this.exits) {
+        if (!exit.sea) continue;
+        const [d, a] = this.exitFrame(exit, x, z);
+        if (d > 0) e = Math.max(e, valleyCap(exit, d, a, WATER_Y, this.capped).wet);
+      }
+    }
+    return e;
   }
 
   /** `waterEdge` as the landscape lays it out (without a height field). */
@@ -1209,11 +1220,70 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const pond = edgeWaterAt(field, this.edgeWet, x, z) === EDGE_POND;
     const today = this.drawnGround(x, z, !pond);
     const fade = 1 - smoothstep(0, LAND_EDGE_FADE, Math.hypot(x - cx, z - cz));
-    if (fade <= 0) return today;
+    if (fade <= 0) return this.valley(x, z, today);
     const edge = pond ? this.endBank(field, cx, cz, this.fieldAt(cx, cz)) : this.fieldAt(cx, cz);
     const h = today + (edge - this.drawnGround(cx, cz, !pond)) * fade;
     // (By a pond's end, land over the sea's sheet: the landscape's own may lie lower there than at the edge.)
-    return pond ? Math.max(h, WATER_Y + END_BANK * fade) : h;
+    return this.valley(x, z, pond ? Math.max(h, WATER_Y + END_BANK * fade) : h);
+  }
+
+  /**
+   * The ground `h` past the land's edge at (x, z), opened into a valley where a river leaves the land (`landExits`,
+   * `valleyCap`): brought down to the valley's floor, its banks and its channel, where it stands over them, from the
+   * field's own at the edge to wholly by `VALLEY_IN` m out. Only ever lowered. Allocation-free.
+   */
+  private valley(x: number, z: number, h: number): number {
+    for (const e of this.exits) {
+      const [d, a] = this.exitFrame(e, x, z);
+      if (d <= 0) continue;
+      const { cap, wet } = valleyCap(e, d, a, WATER_Y, this.capped);
+      // (Its channel and the bank beside it wholly from the edge on, so the river runs out with no bar across it and
+      // no step beside it; the rest eased in. A river above the sea's level ends behind its bank: along its line and
+      // beside it the valley's floor is that bank's, raised to it as well, so no hollow is left beside it.)
+      const k = Math.max(smoothstep(0, VALLEY_IN, d), 1 - smoothstep(0, VALLEY_BANK, -wet));
+      if (h > cap || (!e.sea && wet > -VALLEY_BANK)) h += (cap - h) * k;
+    }
+    return h;
+  }
+
+  /**
+   * How far (m) (x, z) lies past the land's edge on `exit`'s side, and across from its middle along that side (into
+   * `frame`, no allocation).
+   */
+  private exitFrame(e: LandExit, x: number, z: number): [number, number] {
+    const f = this.frame;
+    const across = e.side === 0 || e.side === 2;
+    f[0] = e.side === 0 ? -z : e.side === 1 ? x - this.w : e.side === 2 ? z - this.d : -x;
+    f[1] = Math.abs((across ? x : z) - e.at);
+    return f;
+  }
+  /** `exitFrame`'s and `valleyCap`'s outs. */
+  private readonly frame: [number, number] = [0, 0];
+  private readonly capped = { cap: 0, wet: 0 };
+  /** Where water leaves the land in a run short enough to be a river's way out (`landExits`), measured with its water. */
+  private exits: LandExit[] = [];
+
+  /** The ways out as measured now (`landExits`): kept by a stroke's end to see whether its valleys moved (`valleysMoved`). */
+  get landExits(): readonly LandExit[] {
+    return this.exits;
+  }
+
+  /**
+   * The box (m) of the land past the edge on each side whose ways out are not the same as `before`'s (a river drawn to
+   * the edge or away from it, wider or narrower): the landscape's whole ring along those sides, where its valleys came,
+   * went or moved. Null: none did.
+   */
+  valleysMoved(before: readonly LandExit[]): [number, number, number, number] | null {
+    const sideKey = (list: readonly LandExit[], side: number) => JSON.stringify(list.filter((e) => e.side === side));
+    const { size } = this.terrainGrid();
+    const [x0, z0, x1, z1] = [this.w / 2 - size / 2, this.d / 2 - size / 2, this.w / 2 + size / 2, this.d / 2 + size / 2];
+    let box: [number, number, number, number] | null = null;
+    for (const side of [0, 1, 2, 3]) {
+      if (sideKey(before, side) === sideKey(this.exits, side)) continue;
+      const ring: [number, number, number, number] = side === 0 ? [x0, z0, x1, 0] : side === 1 ? [this.w, z0, x1, z1] : side === 2 ? [x0, this.d, x1, z1] : [x0, z0, 0, z1];
+      box = box ? [Math.min(box[0], ring[0]), Math.min(box[1], ring[1]), Math.max(box[2], ring[2]), Math.max(box[3], ring[3])] : ring;
+    }
+    return box;
   }
 
   /**
