@@ -13,10 +13,11 @@
 import { civicChoices, civicOf } from './backdrop';
 import { inCentre } from './edit/ground';
 import { noUseCells, roadReach, usesOfDraft } from './edit/uses';
-import { cornersOf } from './macro';
-import { inside, lengths, leftOf, pointAt, tangent, type Pt, type RoadPlan } from './roads';
+import { BEND, BEND_MOST, cornersOf } from './macro';
+import { inside, lengths, leftOf, pointAt, straightAround, tangent, type Pt, type RoadPlan } from './roads';
 import { plotRect, type Frontage, type NeighbourhoodDraft, type Rect, type Templates } from './town';
 import type { LaidTown, Proposal } from './townJobs';
+import { placeOf, specOf } from './world';
 import { layoutHash, NO_USE, packUses, unpackUses, USE_CELL, USE_CODE, useOfCode, type UseKind, type UseLayer } from './uses';
 
 /** How far behind the kerb a road's frontage is read for its use (m): the land a lot or a building fronting it stands on. */
@@ -403,77 +404,151 @@ export interface UsesSummary {
 }
 
 /**
- * How much frontage each thing takes, as Build fills a stretch (measured over the places' worlds, their
- * proposals built again and streets painted whole): a home along homes, a terraced home along terraces
- * and flats (m of frontage a lot may front: off the corners and bends, a home's out of a town centre);
- * the first shop or workplace (with the gaps either side) and each after it; the first park and each
- * after it (a green stretch); the gap between two civic places.
+ * How much each thing takes, as Build fills a layout (measured over the places' worlds, their proposals
+ * built again): a home along homes and a terraced home along terraces and flats (m of frontage a lot may
+ * front: out of a town centre, a home's off the corners and bends), a shop or workplace on shops and work
+ * (cells of it, not hatched), a park along a green stretch (m of it at least), and a civic place (a run
+ * of public frontage this share of its kind's narrowest at least, and the gap after it, m).
  */
-const HOME_FRONT = 23;
-const ROW_HOME_FRONT = 20;
-const FIRST_SHOP = 20;
-const SHOP_FRONT = 32;
-const FIRST_PARK = 18;
-const PARK_FRONT = 120;
-const CIVIC_GAP = 10;
-/** A civic place is counted where its stretch has this many times its width of public frontage left (Build seldom fits one snugger). */
-const CIVIC_ROOM = 1.3;
+const HOME_FRONT = 17.5;
+const ROW_HOME_FRONT = 17;
+const SHOP_CELLS = 14.5;
+const FIRST_PARK = 26;
+const CIVIC_SHORT = 0.8;
+const CIVIC_GAP = 2;
+/** How far behind the kerb (m) public land is read for a civic place: its front and its middle. */
+const CIVIC_DEEP = [6, 12];
+/** Of the terraces and flats away from the main town, the share terraced homes take (Build's `TERRACE_SHARE`). */
+const ROWS_AWAY = 0.5;
 
-/** Each set of roads' lot rule (`macro.ts` `cornersOf`: off the corners and tight bends), made once. */
+/** Each set of roads' lot rule (Build's: `macro.ts` `cornersOf` off the corners and tight bends of the areas' roads, and along a country road where it runs straight), made once. */
 const cornersFor = new WeakMap<readonly RoadPlan[], (f: Frontage) => boolean>();
 
 /**
- * How much `draft`'s layout would build, from its frontage (`stretchesOf`) and its greens with no
- * frontage (`greenSpots`): homes along its homes and its terraces and flats (by the frontage a lot may
- * front), shops and workplaces along its shops and work, parks and playgrounds along its greens and an
- * outdoor spot on each green spot, and as many of the civic places each town and village may have
- * (`civicChoices`, the most needed first) as fit along its public places. For step 2's live line
+ * How much `draft`'s layout would build, from its frontage (`stretchesOf`) and its land: homes along its homes, terraced homes along its terraces and flats (the
+ * main town's no more than its place has: `WorldSpec.terraces`), shops and workplaces on its shops and
+ * work, a park or a playground along each green stretch, an outdoor spot or a park on each patch of green
+ * big enough for one and with no stretch along it, and as many of
+ * the civic places each town and village may have
+ * (`civicChoices`, the most needed first) as its public land holds. For step 2's live line
  * ("Homes ≈ 84 · Shops ≈ 12 · Parks 3 · Public 5"); within about a quarter of what Build makes.
  */
 export function usesSummary(draft: NeighbourhoodDraft): UsesSummary {
   const { roads } = draft;
   let corners = cornersFor.get(roads);
-  if (!corners) cornersFor.set(roads, (corners = cornersOf(roads, roads.flatMap((r, i) => (fronted(r) ? [i] : [])))));
+  if (!corners) {
+    const fronts = roads.flatMap((r, i) => (fronted(r) ? [i] : []));
+    const off = cornersOf(roads, fronts.filter((r) => roads[r].kind !== 'country'));
+    cornersFor.set(roads, (corners = (f) => (roads[f.road].kind === 'country' ? straightAround(roads[f.road].points, f.s, BEND, BEND_MOST) : off(f))));
+  }
   const areas = areasOf(draft);
   const nearest = (p: Pt) => areas.reduce((k, a, i) => (offRect(a, p) < offRect(areas[k], p) ? i : k), 0);
-  let [homes, shops, parks] = [0, 0, 0];
-  const civic = new Map<number, number[]>();
+  let homes = 0;
+  const rows = areas.map(() => 0);
+  const greens: Stretch[] = [];
   for (const st of stretchesOf(draft)) {
-    const len = Math.max(0, st.s1 - st.s0);
     const r = roads[st.road];
-    if (st.kind === 'homes' || st.kind === 'rows' || st.kind === 'green') {
+    if (st.kind === 'homes' || st.kind === 'rows') {
       // (The frontage a lot may front, read every 2 m.)
       const ls = lengths(r.points);
       let usable = 0;
       for (let s = st.s0 + 1; s < st.s1; s += STEP) {
         const { p, t } = pointAt(r.points, s, ls);
         const n = leftOf(t).map((v) => v * st.side) as Pt;
-        if (!corners({ road: st.road, s, side: st.side, p, n, far: 0 })) continue;
-        if (st.kind === 'homes' && inCentre(draft, [p[0] + n[0] * (r.width / 2 + 10), p[1] + n[1] * (r.width / 2 + 10)])) continue;
+        if (st.kind !== 'rows' && !corners({ road: st.road, s, side: st.side, p, n, far: 0 })) continue;
+        if (inCentre(draft, [p[0] + n[0] * (r.width / 2 + 10), p[1] + n[1] * (r.width / 2 + 10)])) continue;
         usable += STEP;
       }
       if (st.kind === 'homes') homes += usable / HOME_FRONT;
-      else if (st.kind === 'rows') homes += usable / ROW_HOME_FRONT;
-      else if (usable >= FIRST_PARK) parks += 1 + (usable - FIRST_PARK) / PARK_FRONT;
-    } else if (st.kind === 'shops') {
-      if (len >= FIRST_SHOP) shops += 1 + (len - FIRST_SHOP) / SHOP_FRONT;
-    } else {
-      const a = r.area ?? nearest(st.mid);
-      civic.set(a, [...(civic.get(a) ?? []), len]);
+      else if (st.kind === 'rows') rows[r.area ?? nearest(st.mid)] += usable / ROW_HOME_FRONT;
+    } else if (st.kind === 'green') greens.push(st);
+  }
+  const spec = specOf(placeOf(draft.world?.kind ?? 'country'), draft.world?.options);
+  rows.forEach((n, a) => (homes += a === 0 ? Math.min(n, (spec.terraces[0] + spec.terraces[1]) / 2) : n * ROWS_AWAY));
+  // A park, a playground or an outdoor spot on each patch of green big enough for one (cells side by side; not hatched).
+  const layer = usesOfDraft(draft);
+  const codes = unpackUses(layer);
+  const far = hatched(draft);
+  // Shops and workplaces on its land painted shops and work (the backdrop's rows, a row behind, the blocks filled in; and its shop lots).
+  let shopCells = 0;
+  for (let k = 0; k < codes.length; k++) if (codes[k] === USE_CODE.shops && !far[k]) shopCells++;
+  const shops = shopCells / SHOP_CELLS;
+  const patches = greenPatches(codes, far, layer.cols, layer.rows);
+  const alongside = new Set<number>();
+  let parks = 0;
+  for (const st of greens) {
+    const r = roads[st.road];
+    const ls = lengths(r.points);
+    for (let s = st.s0 + 1; s < st.s1; s += STEP) {
+      const { p, t } = pointAt(r.points, s, ls);
+      const n = leftOf(t).map((v) => v * st.side);
+      for (const d of FRONT_PROBES) {
+        const [ci, cj] = [Math.floor((p[0] + n[0] * (r.width / 2 + d)) / USE_CELL), Math.floor((p[1] + n[1] * (r.width / 2 + d)) / USE_CELL)];
+        if (ci >= 0 && cj >= 0 && ci < layer.cols && cj < layer.rows && patches.of[cj * layer.cols + ci] >= 0) alongside.add(patches.of[cj * layer.cols + ci]);
+      }
+    }
+    if (st.s1 - st.s0 >= FIRST_PARK) parks++;
+  }
+  parks += patches.sizes.filter((n, k) => n >= SPOT_CELLS && !alongside.has(k)).length;
+  // The civic places each town and village lacks, the most needed first, as many as fit along its public land deep enough
+  // for one (`CIVIC_DEEP` m behind the kerb), each as wide as its kind is on the whole (as Build packs them along the runs of it).
+  const runs = areas.map((): number[] => []);
+  for (const r of roads) {
+    if (!fronted(r) || r.points.length < 2) continue;
+    const ls = lengths(r.points);
+    const L = ls[ls.length - 1];
+    for (const side of [1, -1] as const) {
+      let s0 = -1;
+      const close = (s1: number) => {
+        if (s1 - s0 >= STEP) runs[r.area ?? nearest(pointAt(r.points, (s0 + s1) / 2, ls).p)].push(s1 - s0);
+        s0 = -1;
+      };
+      for (let s = STEP; s <= L - STEP; s += STEP) {
+        const { p, t } = pointAt(r.points, s, ls);
+        const n = leftOf(t).map((v) => v * side);
+        const on = CIVIC_DEEP.every((d) => {
+          const [ci, cj] = [Math.floor((p[0] + n[0] * (r.width / 2 + d)) / USE_CELL), Math.floor((p[1] + n[1] * (r.width / 2 + d)) / USE_CELL)];
+          return ci >= 0 && cj >= 0 && ci < layer.cols && cj < layer.rows && codes[cj * layer.cols + ci] === USE_CODE.public && !far[cj * layer.cols + ci];
+        });
+        if (on && s0 < 0) s0 = s - STEP / 2;
+        else if (!on && s0 >= 0) close(s - STEP / 2);
+      }
+      if (s0 >= 0) close(L - STEP / 2);
     }
   }
-  parks += greenSpots(draft).length;
-  // The civic places each town and village lacks, the most needed first, each as wide as its kind is on the whole, packed along its public frontage.
   let publics = 0;
-  for (const [a, stretches] of civic) {
-    const left = [...stretches];
+  runs.forEach((left, a) => {
     for (const c of civicChoices(draft, a)) {
-      const w = (c.w[0] + c.w[1]) / 2;
-      const at = left.findIndex((l) => l >= CIVIC_ROOM * w);
+      const at = left.findIndex((len) => len >= CIVIC_SHORT * c.w[0]);
       if (at < 0) continue;
-      left[at] -= w + CIVIC_GAP;
+      left[at] -= Math.min(left[at], (c.w[0] + c.w[1]) / 2) + CIVIC_GAP;
       publics++;
     }
+  });
+  return { homes: Math.round(homes), shops: Math.round(shops), parks, public: publics };
+}
+
+/** The patches of green in `codes` (a grid `cols` × `rows`, cells side by side) but the cells of `far`: each one's size (cells), and which each cell is in (-1: none). */
+function greenPatches(codes: Uint8Array, far: Uint8Array, cols: number, rows: number): { sizes: number[]; of: Int32Array } {
+  const of = new Int32Array(codes.length).fill(-1);
+  const sizes: number[] = [];
+  const green = USE_CODE.green;
+  for (let k0 = 0; k0 < codes.length; k0++) {
+    if (far[k0] || of[k0] >= 0 || codes[k0] !== green) continue;
+    const at = sizes.push(0) - 1;
+    const stack = [k0];
+    of[k0] = at;
+    while (stack.length) {
+      const k = stack.pop()!;
+      sizes[at]++;
+      const [i, j] = [k % cols, Math.floor(k / cols)];
+      for (const [a, b] of [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]) {
+        const m = b * cols + a;
+        if (a < 0 || b < 0 || a >= cols || b >= rows || far[m] || of[m] >= 0 || codes[m] !== green) continue;
+        of[m] = at;
+        stack.push(m);
+      }
+    }
   }
-  return { homes: Math.round(homes), shops: Math.round(shops), parks: Math.round(parks), public: publics };
+  return { sizes, of };
 }

@@ -41,7 +41,7 @@ import { openUnderBuilt, settleLand } from './landFollow';
 import { unrle } from './landMasks';
 import { AREA_APART, BEND, BEND_MOST, cells8, cornersOf, grown, hamletOf, parkingFor, rowHouse, trailTo, type AreaPlan } from './macro';
 import { mulberry32 } from './noise';
-import { fronted, greenSpots, hatched, SPOT_NEAR, stretchesOf, type Stretch } from './proposal';
+import { fronted, greenSpots, hatched, SPOT_NEAR, SPOT_REACH, stretchesOf, type Stretch } from './proposal';
 import { inside, lengths, leftOf, pointAt, RoadIndex, straightAround, type Pt } from './roads';
 import { boundsOf, frontageOf, generatedHouses, Ground, lotAt, LotPlacer, plotRect, slotDims, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { previewWorld } from './townPreview';
@@ -80,6 +80,8 @@ const RUN_STEP = 2;
 /** A civic place goes on a run of public frontage this much of its kind's narrowest at least; as wide as a run no longer than `CIVIC_SNUG` times its kind's widest (no wider than that widest), else as wide as its kind is. */
 const CIVIC_SHORT = 0.8;
 const CIVIC_SNUG = 1.25;
+/** A civic place that doesn't fit at the end of its run is tried this far on along it (m), and on. */
+const CIVIC_STEP = 3;
 /** Of land newly painted terraces and flats, the share terraced lots take (the backdrop's terraces and flats the rest), and a terraced lot's ground, about (m²). */
 const TERRACE_SHARE = 0.5;
 const TERRACE_LOT = 220;
@@ -683,11 +685,13 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
           const len = u1 - u0;
           if (len < w0 * CIVIC_SHORT) continue;
           // (As wide as a run that just holds it; else as its kind is, at the run's end nearer the heart, as the generator packs them.)
-          // (Nudged along the run and made shallower and narrower where it doesn't quite fit: against a square, say.)
+          // (Nudged on along the run, `CIVIC_STEP` m at a time, and made shallower and narrower where it doesn't quite fit: against a square, a corner, say.)
           const w = len <= w1 * CIVIC_SNUG ? Math.min(w1, Math.max(w0 * CIVIC_SHORT, len - 1)) : w0 + (w1 - w0) * rand();
           const dir = near(u0 + w / 2) <= near(u1 - w / 2) ? 1 : -1;
+          const tries: [number, number][] = [[Math.max(w0 * CIVIC_SHORT, w - 2), 1]];
+          for (let shift = 0; shift + w <= len; shift += CIVIC_STEP) tries.splice(tries.length - 1, 0, [w, shift]);
           let s = 0;
-          for (const [ww, shift] of [[w, 0], [w, 2], [w, 4], [Math.max(w0 * CIVIC_SHORT, w - 2), 1]]) {
+          for (const [ww, shift] of tries) {
             if (at >= 0 || ww + shift > len) continue;
             s = dir > 0 ? u0 + shift + ww / 2 : u1 - shift - ww / 2;
             // (No deeper than the public land is there, as far as its kind allows.)
@@ -900,8 +904,10 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   const places = pass.placesFor(keep, mulberry32(mix(seed, 'places')));
   draft = { ...draft, open: { ...draft.open!, backdrop: pass.result().backdrop, places: [...(draft.open!.places ?? []), ...places] } };
 
-  // ---- parking in each area changed; a new village with too few lots goes with the nearest area ----
-  draft = foldSmallVillages(parkedAgain(draft, t, touched, seed), made.villages);
+  // ---- parking in each area changed; a village with too few lots goes with the nearest area ----
+  // (A village built again with too few lots, new or the layout's own, goes the same way.)
+  const villages = [...made.villages, ...[...touched].filter((a) => a > 0 && !made.villages.includes(a))].sort((a, b) => a - b);
+  draft = foldSmallVillages(parkedAgain(draft, t, touched, seed), villages, t);
 
   // ---- the houses numbered along every street ----
   return renumber(draft, t, roads.map((_, i) => i));
@@ -958,21 +964,29 @@ function freeOf(s0: number, s1: number, taken: readonly (readonly [number, numbe
 /** The middle of cell `k` of a grid `cols` wide (m). */
 const cellMid = (k: number, cols: number): Pt => [((k % cols) + 0.5) * USE_CELL, (Math.floor(k / cols) + 0.5) * USE_CELL];
 
-/** `draft` with each of `villages` (new areas, by index) that has fewer than `VILLAGE_LOTS` lots folded into the nearest other area (its streets, lots, buildings, places and parking), and gone. */
-function foldSmallVillages(draft: NeighbourhoodDraft, villages: readonly number[]): NeighbourhoodDraft {
-  const open = draft.open;
-  if (!open || !villages.length) return draft;
-  const small = villages.filter((v) => draft.slots.filter((s) => (s.area ?? 0) === v && s.kind !== 'outdoor').length < VILLAGE_LOTS);
+/**
+ * `draft` with each of `villages` (areas but the main town, by index) that has fewer than `VILLAGE_LOTS` lots
+ * (`townCheck.ts` wants so many of a village) folded into the nearest other area (its streets, lots, buildings,
+ * places and parking), and gone with its name; an outdoor spot of it further than `SPOT_REACH` from that area's box
+ * goes, and its trail.
+ */
+function foldSmallVillages(draft: NeighbourhoodDraft, villages: readonly number[], t: Templates): NeighbourhoodDraft {
+  if (!draft.open || !villages.length) return draft;
+  const small = villages.filter((v) => v > 0 && draft.slots.filter((s) => (s.area ?? 0) === v && s.kind !== 'outdoor').length < VILLAGE_LOTS);
   if (!small.length) return draft;
-  const areas = open.areas;
+  const areas = draft.open.areas;
   const keep = areas.flatMap((_, i) => (small.includes(i) ? [] : [i]));
-  const index = new Map(keep.map((a, k) => [a, k]));
-  const to = (a: number): number => {
-    if (index.has(a)) return index.get(a)!;
-    const m = middle(areas[a]);
-    const best = keep.reduce((k, b) => (dist(middle(areas[b]), m) < dist(middle(areas[k]), m) ? b : k), keep[0]);
-    return index.get(best)!;
-  };
+  /** The area (of `keep`) area `a` goes with: itself, else the one whose middle is nearest its middle. */
+  const into = (a: number) => (keep.includes(a) ? a : keep.reduce((k, b) => (dist(middle(areas[b]), middle(areas[a])) < dist(middle(areas[k]), middle(areas[a])) ? b : k), keep[0]));
+  // (Its outdoor spots too far from the area it goes with: gone, and their trails.)
+  const spots = new Set(draft.slots.flatMap((s) => (s.kind === 'outdoor' && small.includes(s.area ?? 0) && offRect(areas[into(s.area ?? 0)], middle(plotRect(t, s))) > SPOT_REACH ? [s.index] : [])));
+  if (spots.size) {
+    const trails = new Set([...spots].map((i) => ownTrail(draft.roads, t, draft.slots[i])).filter((r) => r >= 0));
+    draft = removeLots(draft, spots);
+    draft = { ...draft, roads: draft.roads.filter((_, i) => !trails.has(i)) };
+  }
+  const open = draft.open!;
+  const to = (a: number) => keep.indexOf(into(a));
   return {
     ...draft,
     roads: draft.roads.map((r) => (r.area === undefined ? r : { ...r, area: to(r.area) })),
