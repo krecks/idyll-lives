@@ -1,0 +1,2 @@
+1234 residents, grid 320×320
+bench: rate 5100 worst_hour 3900 at 08 step_p99 2.10 full 4000 full_most 12

@@ -68,6 +68,6 @@ if [[ $skip != *" quota "* ]]; then
   "${compose[@]}" run --rm m1 sh -c 'echo "memory limit $(cat /sys/fs/cgroup/memory.max) bytes, cpu.max $(cat /sys/fs/cgroup/cpu.max), $(nproc) cpus"' > "$out/limits.log" 2>/dev/null || true
 fi
 
-node tools/m1/table.mjs "$out" > "$out/report.md"
+cargo m1-table "$out" > "$out/report.md"
 cat "$out/report.md"
 echo "→ $out/report.md"

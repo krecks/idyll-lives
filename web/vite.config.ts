@@ -277,7 +277,7 @@ function runTool(args: string[]): string[] {
 }
 
 /**
- * The release WebAssembly: once the build has written the simulation's and the voice's wasm, they
+ * The release WebAssembly: once the build has written the simulation's, the sounds' and the voice's wasm, they
  * are optimised and stripped by binaryen's wasm-opt (`cargo wasm-opt`: -O3, no name or producers
  * sections; about a minute the first time, then cached). The dev server, and `bun run wasm` behind
  * it, keep them as built.
@@ -294,7 +294,7 @@ function releaseWasm(): Plugin {
     },
     async closeBundle() {
       const dir = join(outDir, 'assets');
-      const files = (await readdir(dir)).filter((f) => /^(sim|voice)_wasm_bg-[\w-]+\.wasm$/.test(f));
+      const files = (await readdir(dir)).filter((f) => /^(sim|voice|sound)_wasm_bg-[\w-]+\.wasm$/.test(f));
       if (!files.some((f) => f.startsWith('sim_'))) throw new Error(`release-wasm: no sim_wasm_bg-*.wasm in ${dir}`);
       for (const line of runTool(['wasm-opt', ...files.map((f) => join(dir, f))])) log(line);
     },

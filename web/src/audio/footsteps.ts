@@ -1,7 +1,8 @@
 /**
  * The residents' footsteps: each one in view walking, jogging or running is heard putting its feet down, on
  * what it walks on (`surfaces.ts`: a wooden floor, tiles, carpet, grass, paving) and in what it wears (shoes,
- * or barefoot when the renderer draws it without: asleep, off to the bath). The steps are made in `steps.ts`.
+ * or barefoot when the renderer draws it without: asleep, off to the bath). The steps are made in Rust
+ * (`synth.ts`; none before it has loaded).
  *
  * The renderer says how far through its stride a resident is and how fast it goes (`Renderer.simStride`: the
  * left heel strikes at 0, the right at 0.5). The world's sound looks ten times a second and starts the heel
@@ -19,9 +20,9 @@ import type { FrameState } from '../core/bridge';
 import type { Renderer, SimStride } from '../render/types';
 import { acoustics, distanceGain } from './acoustics';
 import { STEPS } from './catalog';
-import type { RoomSize } from './rooms';
+import { STEP_VERSIONS, type Footwear, type RoomSize, type Surface } from './kinds';
 import { Placed, type Space } from './space';
-import { stepSamples, STEP_VERSIONS, type Footwear, type Surface } from './steps';
+import { stepSamples, synthReady } from './synth';
 import { Ground, type GroundWorld } from './surfaces';
 
 /** A walker: when its last step was started for (the frames' clock, s), and on which look it was last seen. */
@@ -138,6 +139,8 @@ export class Footsteps {
 
   /** Starts one step at audio time `when` (it is `t` now); false if every voice is busy. */
   private step(ac: AudioContext, around: Space, t: number, when: number, surface: Surface, wear: Footwear, gear: number, foot: 0 | 1, pan: number, x: number, z: number): boolean {
+    // (Before the sounds can be made the step goes by unheard, as one too far off does.)
+    if (!synthReady()) return true;
     // (A voice whose last step has ended: it is moved to the new step's place at once.)
     let voice = this.voices.find((v) => v.until <= t);
     if (!voice) {

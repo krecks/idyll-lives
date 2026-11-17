@@ -7,11 +7,11 @@ import sys
 import bpy
 
 from . import motion, parts, perch
-from .export import export_glb, materials_used, stats, write_pack
+from .export import export_glb, materials_used, stats
 from .far import decimated
-from .manifest import known_keys, played, write_centres  # the keys, `motions` and centres as the gate reads them
 from .parts import check_size, join
 from .preview import lit, preview, preview_clips, preview_perches, sheet
+from .runner import known_keys, report
 from .shade import bake_ao
 from .scene import ASSETS, PREVIEWS, meshes, reset
 
@@ -150,18 +150,15 @@ class Family:
         models = [m for m in self.models if only is None or m.id in only]
         # A key the game wouldn't draw is a misspelt `key=`: refused before any model is built or exported, so
         # no file is written for an entry the pack then can't take. The keys it knows: the content's, the
-        # manifests' and this pack's own (listed in `packs` or not), read once and handed to write_pack.
-        known = None
+        # manifests' and every pack's own (listed in `packs` or not), from the runner (gamekit/runner.py), which
+        # checks them again as it writes the pack.
         if '--preview' not in args:
-            try:
-                known = known_keys(ASSETS, os.path.join(ASSETS, 'packs', self.pack, 'manifest.json'))
-            except ValueError as err:
-                sys.exit(f'{self.name}: cannot read the content or the manifests: {err}')
+            known = known_keys()
             unknown = sorted(self.key(m) for m in models if not m.code and self.key(m) not in known)
             if unknown:
                 sys.exit(f'{self.name}: no content object or item names {", ".join(unknown)} and no manifest has it: '
                          'a misspelt key=? (a model the game draws by code takes code=True)')
-        entries, centres = {}, {}
+        entries, centres, clip_names = {}, {}, {}
         for model in models:
             objs = self.make(model)
             perches = perch.game()                         # before a far version is built
@@ -188,7 +185,6 @@ class Family:
             clips = motion.clips(objs)
             path = export_glb(os.path.join(ASSETS, 'models', self.name, f'{model.id}.glb'), objs, clips=bool(clips),
                               ground=model.ground)
-            self._check_motions(model, clips)
             entry = {'url': f'../../models/{self.name}/{model.id}.glb',
                      'materials': self.palette.finishes(materials_used(objs))}
             if model.motions:
@@ -220,13 +216,16 @@ class Family:
                 print(f'[gamekit] built its far version -> {os.path.relpath(far, ASSETS)}')
             entries[self.key(model)] = entry
             centres[self.key(model)] = model.centre
+            # (The runner checks each clip `motions` plays is one of these.)
+            clip_names[self.key(model)] = sorted({name for _, name, _ in clips})
             print(f'[gamekit] built {self.key(model)} -> {os.path.relpath(path, ASSETS)}')
-        if centres:
-            # Where each file is centred, for the gate only: not in the pack the game downloads.
-            write_centres(centres)
-        if entries and '--no-pack' not in args:
-            path = write_pack(self.pack, entries, self.comment, code={self.key(m) for m in models if m.code}, known=known)
-            print(f'[gamekit] wrote {os.path.relpath(path, ASSETS)}')
+        if '--preview' not in args:
+            # The runner writes centres.json (where each file is centred, for the gate only: not in the pack the game
+            # downloads) and, unless --no-pack, the pack: its entries over the pack's, and the pack listed in the
+            # base manifest's `packs`. The game keeps the `vary` of the entry a pack entry overrides; the runner
+            # copies the entry's other fields from the manifests below the pack.
+            report({'pack': self.pack, 'comment': self.comment, 'code': sorted(self.key(m) for m in models if m.code),
+                    'entries': entries, 'centres': centres, 'clips': clip_names})
 
     def make_far(self, model, objs):
         """The far version of `model` (just built, its objects `objs`), in the scene: its objects."""
@@ -251,11 +250,6 @@ class Family:
         far.data.calc_loop_triangles()
         print(f'[gamekit] {model.id}.far: {len(far.data.loop_triangles)} triangles ({model.far:.0%} kept)')
         return [far]
-
-    def _check_motions(self, model, clips):
-        names = {name for _, name, _ in clips}
-        missing = sorted(set(played(model.motions or {})) - names)
-        assert not missing, f'{model.id}: `motions` plays {", ".join(missing)}, which it has no clip for'
 
 
 def paint_slots(paint, used):

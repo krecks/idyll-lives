@@ -1,14 +1,16 @@
-// Where a sound is heard from (`audio/acoustics.ts`, `audio/rooms.ts`, and what they do to the samples:
-// `audio/offline.ts`, the same arithmetic as the mix's graph in `audio/space.ts`): the camera's distance leaves a
-// sound alone at the game's own zoom and never silences it; a room's response is a quiet, short, wide tail of
-// energy 1; a sound in a room, behind a wall or far off stays within the mix.
+// Where a sound is heard from (`audio/acoustics.ts`, the rooms' sizes in `audio/kinds.ts`, and what they do to the
+// samples: `audio/offline.ts`, the same arithmetic as the mix's graph in `audio/space.ts`): the camera's distance
+// leaves a sound alone at the game's own zoom and never silences it; a room is quiet against the sound (its
+// response itself is tested in `crates/sound/src/rooms.rs`); a sound in a room, behind a wall or far off stays
+// within the mix.
 import { describe, expect, test } from 'bun:test';
+import './support/synth';
 import { Acoustics, DISTANCE, distanceCutoff, distanceGain, focus, muffled, OCCLUDE } from '../src/audio/acoustics';
 import { everySound, GUARD } from '../src/audio/catalog';
 import { loudness } from '../src/audio/loudness';
 import { convolve, spaced } from '../src/audio/offline';
-import { ROOM_SIZES, ROOMS, roomResponse, roomSize } from '../src/audio/rooms';
-import type { Stereo } from '../src/audio/water';
+import { ROOM_SIZES, ROOMS, roomSize, type Stereo } from '../src/audio/kinds';
+import { roomResponse } from '../src/audio/synth';
 import { DEFAULT_ORBIT, RADIUS_LIMITS, TOWN_FULL, TOWN_MAX } from '../src/render/shared/lens';
 
 const RATE = 48000;
@@ -123,33 +125,13 @@ describe('walls', () => {
 });
 
 describe('rooms', () => {
-  for (const size of ROOM_SIZES) {
-    test(`${size}: a short, wide tail of energy 1, the same every time`, () => {
-      const { left, right } = roomResponse(size, RATE);
-      expect(roomResponse(size, RATE).left).toEqual(left);
-      let energy = 0;
-      let cross = 0;
-      let late = 0;
-      for (let i = 0; i < left.length; i++) {
-        energy += left[i] ** 2 + right[i] ** 2;
-        cross += left[i] * right[i];
-        if (i > left.length * 0.75) late += left[i] ** 2 + right[i] ** 2;
-      }
-      expect(Number.isFinite(energy)).toBe(true);
-      expect(energy / 2).toBeCloseTo(1, 5);
-      // No longer than its decay says, nearly gone by its last quarter, nothing at its very end.
-      expect(left.length / RATE).toBeLessThan(0.8);
-      expect(late / energy).toBeLessThan(0.002);
-      expect(Math.abs(left[left.length - 1])).toBeLessThan(1e-3);
-      // The two sides differ (a wide room), and it holds no copy of the sound itself (nothing at time 0).
-      expect(Math.abs(cross) / (energy / 2)).toBeLessThan(0.1);
-      expect(left[0]).toBe(0);
-      expect(right[0]).toBe(0);
-      // Quiet against the sound: 13 to 15 dB under.
+  // (Each room's response itself: `crates/sound/src/rooms.rs`'s tests.)
+  test('as loud as each is, 13 to 15 dB under the sound', () => {
+    for (const size of ROOM_SIZES) {
       expect(db(ROOMS[size].send)).toBeLessThan(-12);
       expect(db(ROOMS[size].send)).toBeGreaterThan(-16);
-    });
-  }
+    }
+  });
 
   test('a click through a room comes back as the room\'s response', () => {
     const { left } = roomResponse('small', RATE);

@@ -16,8 +16,9 @@ previews/         renders from --preview, a folder per family (ignored by git)
 ```
 
 The runner and the gate are Rust (`crates/tools`): `cargo art` runs Blender on a family, then the gate;
-`cargo check-glb` (no Blender) checks every .glb the manifests use against its entry. The Python left
-here runs inside Blender (`gamekit/manifest.py` is plain Python, no bpy).
+`cargo check-glb` (no Blender) checks every .glb the manifests use against its entry. The Python
+here runs inside Blender and never reads the content or the manifests: `cargo art` hands it the keys a build may
+write and writes the pack and `centres.json` from what it hands back (`gamekit/runner.py`).
 
 ## Working as an agent: the loop
 
@@ -500,12 +501,12 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `place.py` | `GameFrame`: parts placed in game coordinates (`at`, `box`, `cyl`, `cone`, `sphere`); `depths=` redraws a thing's numbers at another depth (the kitchen counters' one depth) |
 | `parts.py` | `new_parts`, `join`, `join_all`, `set_origin`, `hinged`, `turn`, `settle`, `measure`, `game_size`, `check_size`; `fit` (third-party files only: it stretches) |
 | `motion.py` | the clips: `swing` (turn), `slide` (move), `grow` (appear from nothing), `squash` (scale), `spin` (whole turns home), `rock` (out, past rest and home), `turns` (parts out and back in turn), `scroll` (one repeat on, a belt), `path` (through keys), `stages` (a crop's growth); `clips` |
-| `export.py` | `export_glb` (the fixed export settings, the shading baked first), `write_pack`, `stats`, `materials_used` |
+| `export.py` | `export_glb` (the fixed export settings, the shading baked first), `stats`, `materials_used` |
 | `shade.py` | `bake_ao`: the creases' shading baked into a grey vertex colour (COLOR_0), which the game multiplies in; the floor shades the foot of a model on the ground (`Model(ground=)`); a tree's leaf cards keep the shading they were laid with |
 | `preview.py` | `preview` (front three-quarter, Workbench; or `view=` side, front, top), `lit` (EEVEE, as the game lights it: `--lit`), `preview_clips`, `preview_perches` |
 | `family.py` | `Model`, `Family` and its `run`: the command line every family script ends with |
 | `far.py` | `far_of` (a far version from the model's own build at low detail), `low`, `is_low` |
 | `perch.py` | `G.perch`: where birds sit on a model, found on its meshes (`around`; `find`: `surface`, `bare`, `spread`, `keep`), the entry's `perches` |
-| `manifest.py` | plain Python, no bpy: the manifests and content as the gate reads them (`manifests`, `known_keys`, `played`), and centres.json (`read_centres`, `write_centres`) |
-| `review.py` | run by `cargo check-glb --preview`: re-imports each checked file and renders `previews/<family>/rt_<name>.png` |
-| `centres.py` | run by `cargo art --centres`: imports every family (no build) and writes centres.json |
+| `runner.py` | talking to `cargo art`: `known_keys` (the keys a build may write, `$GAMEKIT_KNOWN`) and `report` (what the build made, `$GAMEKIT_RESULT`: the pack's entries, each model's clips and centre), which the runner checks and writes |
+| `review.py` | run by `cargo check-glb --preview`: re-imports each checked file (`key=file`, from the gate) and renders `previews/<family>/rt_<name>.png` |
+| `centres.py` | run by `cargo art --centres`: imports every family (no build) and hands back their centres, which the runner writes to centres.json |

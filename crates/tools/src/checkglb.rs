@@ -7,7 +7,7 @@
 //!
 //!   cargo check-glb                        every .glb the manifests use
 //!   cargo check-glb model.garden.gnome …   only these keys (model., item., tool.)
-//!   cargo check-glb --keys                 the keys a build may write (gamekit/manifest.py `known_keys`)
+//!   cargo check-glb --keys                 the keys a build may write (`known_keys`)
 //!   cargo check-glb --preview              also re-imports each file in Blender and renders it to
 //!                                          tools/art/blender/previews/<family>/rt_<name>.png (gamekit/review.py)
 //!
@@ -19,8 +19,8 @@
 //! `measures` gives `cargo review` the same numbers.
 
 mod glb;
-mod json;
-mod py;
+pub(crate) mod json;
+pub(crate) mod py;
 
 use glb::{Glb, R, accessor, first_value, image_size, index, item, key, parse_glb, values};
 use py::{
@@ -256,7 +256,7 @@ pub fn repo_root() -> String {
     normpath(&join(env!("CARGO_MANIFEST_DIR"), "../.."))
 }
 
-fn read_json(path: &str) -> Result<J, String> {
+pub(crate) fn read_json(path: &str) -> Result<J, String> {
     let data = std::fs::read(path).map_err(|e| py::os_error(&e, path))?;
     json::loads_text(&data)
 }
@@ -270,8 +270,8 @@ pub fn read_centres(path: &str) -> Result<J, String> {
     }
 }
 
-/// centres.json's text for `centres` ({key: (x, depth)}), as gamekit/manifest.py `write_centres` writes it:
-/// one key a line, sorted, each to 0.1 mm (`round(v, 4) + 0.0`: no -0.0).
+/// centres.json's text for `centres` ({key: (x, depth)}): one key a line, sorted, each to 0.1 mm
+/// (`round(v, 4) + 0.0`: no -0.0).
 pub fn centres_text(centres: &BTreeMap<String, [f64; 2]>) -> String {
     let round4 = |v: f64| format!("{v:.4}").parse::<f64>().unwrap() + 0.0;
     let lines: Vec<String> = centres
@@ -407,8 +407,8 @@ fn content_keys(defs: &Content) -> R<BTreeMap<String, String>> {
     Ok(keys)
 }
 
-/// The model keys a build may write (gamekit/manifest.py `known_keys`, without a pack of its own): every
-/// content object's and item's model, and every model entry of the manifests.
+/// The model keys the manifests and the content know: every content object's and item's model, and every
+/// model entry of the manifests (a build may also write its own pack's: `art::build_keys`).
 pub fn known_keys(paths: &Paths) -> Result<BTreeSet<String>, String> {
     let mut known: BTreeSet<String> = content_keys(&content(paths)?)?
         .into_keys()
@@ -1196,7 +1196,7 @@ fn uses(motions: &J) -> Vec<(String, J)> {
 /// {clip: what plays it} for an entry's `motions` (in the order they're first named): `uses`, `loops`,
 /// `open`, `idle`, `night`, `growth`, `ride` (the clip whose part carries its users), `running` (round and
 /// round while a machine runs on its own) and `clock` (`hour`, `minute`: hands set by the time).
-fn played(motions: &J) -> R<Vec<(J, String)>> {
+pub(crate) fn played(motions: &J) -> R<Vec<(J, String)>> {
     let mut out: Vec<(J, String)> = Vec::new();
     let mut add = |clip: &J, by: String| {
         if !out.iter().any(|(c, _)| c == clip) {
@@ -3851,10 +3851,12 @@ fn check_file(
     Ok((errors, warnings, info))
 }
 
-/// What the gate found: its text, the keys it checked (in order) and whether anything failed.
+/// What the gate found: its text, the keys it checked (in order), the model file of each, and whether
+/// anything failed.
 pub struct Report {
     pub text: String,
     pub checked: Vec<String>,
+    pub files: Vec<String>,
     pub failed: usize,
 }
 
@@ -3864,6 +3866,7 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
     let fail = |text: String| Report {
         text,
         checked: Vec::new(),
+        files: Vec::new(),
         failed: 1,
     };
     let read = || -> Result<_, String> {
@@ -3895,6 +3898,7 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
     };
     let mut failed = 0;
     let mut checked = Vec::new();
+    let mut files = Vec::new();
     // What can't be read at all: a model the content draws (or the command line names) that no manifest has,
     // or whose entry has no file once the packs are stacked (its pack missing from `packs`), and a file that
     // is no .glb. The game draws a box for each.
@@ -3980,6 +3984,7 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
         });
         failed += !errors.is_empty() as usize;
         checked.push(k.clone());
+        files.push(path.clone());
         text += &format!(
             "{} {k:28} {summary}\n",
             if errors.is_empty() { "ok  " } else { "FAIL" }
@@ -4002,6 +4007,7 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
     Report {
         text,
         checked,
+        files,
         failed,
     }
 }
@@ -4283,10 +4289,18 @@ pub fn main(args: &[String]) -> i32 {
     print!("{}", report.text);
     let mut code = if report.failed > 0 { 1 } else { 0 };
     if args.iter().any(|a| a == "--preview") && !report.checked.is_empty() {
-        // Re-imports each file in Blender and renders it to previews/<family>/rt_<name>.png, so export problems show.
+        // Re-imports each file in Blender and renders it to previews/<family>/rt_<name>.png, so export problems show:
+        // review.py takes `key=file` for each checked model whose file is there.
         let review = join(&paths.here, "gamekit/review.py");
+        let pairs: Vec<String> = report
+            .checked
+            .iter()
+            .zip(&report.files)
+            .filter(|(_, f)| std::path::Path::new(f).exists())
+            .map(|(k, f)| format!("{k}={f}"))
+            .collect();
         let ok = crate::art::blender()
-            .map(|exe| crate::art::echo(&crate::art::run(&exe, &review, &report.checked)));
+            .map(|exe| crate::art::echo(&crate::art::run(&exe, &review, &pairs, &[])));
         match ok {
             Ok(true) => {}
             Ok(false) => code = 1,
