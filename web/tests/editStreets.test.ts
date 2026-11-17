@@ -509,7 +509,7 @@ describe('removing a road', () => {
     expect(refusal(removeRoad(town(), t, 0))).toContain('no road would lead out of the world');
   });
 
-  test('a country road it leaves a dead end longer than a court becomes a street of no area, as a drawn one does (no taxi turns round in a country road)', () => {
+  test('refused if it would leave a country road a dead end longer than a court (no taxi turns round there)', () => {
     // A country road from the road round the river's end west to x 200, joined there by a road up from the high street.
     const all = town();
     const roads: RoadPlan[] = [
@@ -518,21 +518,13 @@ describe('removing a road', () => {
       { points: line(200, MAIN_Z + 3.5, 200, 153.5), width: 7, ends: ['join', 'join'], kind: 'country', name: 'West Road' },
     ];
     const linked = { ...all, roads };
-    const goes = whatGoes(linked, t, 5);
-    if ('refused' in goes) throw new Error(goes.refused);
-    expect(goes.streets).toEqual([4]);
-    const link = made(removeRoad(linked, t, 5)).draft.roads.find((r) => r.name === 'Link Road')!;
-    expect(link.kind).toBe('street');
-    expect(link.area).toBeUndefined();
-    expect(link.ends).toEqual(['join', 'dead']);
-    // A lane is left as it is (the sim turns round in any of a lane's dead ends).
+    expect(refusal(removeRoad(linked, t, 5))).toContain('Link Road would end 17');
+    // As a lane it may be left so (the Problems list says so).
     const lane = { ...linked, roads: roads.map((r, i) => (i === 4 ? { ...r, kind: 'lane' as const, area: 0 } : r)) };
-    const kept = whatGoes(lane, t, 5);
-    expect('streets' in kept && kept.streets).toEqual([]);
-    expect(made(removeRoad(lane, t, 5)).draft.roads.find((r) => r.name === 'Link Road')!.kind).toBe('lane');
+    expect('draft' in removeRoad(lane, t, 5)).toBe(true);
   });
 
-  test("the far stretch of a street drawn over the river to a dead end takes its bridge with it (a bridge leads somewhere); the stretch before stays", () => {
+  test("the far stretch of a street drawn over the river takes its bridge with it (a bridge leads somewhere); the stretch before stays, a street if it led onto it out of town", () => {
     const drawn = made(draw(town(), [[87, MAIN_Z + 8], [87, 260]])).draft;
     const bridge = drawn.roads.findIndex((r) => r.bridge);
     const far = drawn.roads.findIndex((r, i) => i >= 4 && !r.bridge && r.ends.includes('dead'));
@@ -550,6 +542,28 @@ describe('removing a road', () => {
     expect(unrle(after.open!.water, W * D)[215 * W + 87]).toBe(1);
     expect(after.roads[4].ends).toEqual(['join', 'dead']);
     expect(oneNetwork(after.roads)).toBe(true);
+    // Out of the town's box: a road from Far Lane south 51 m onto a bridge, and on to Low Road past it. The country road
+    // that led onto the bridge, left a long dead end, is made a street of no area, as a drawn one ending there is.
+    const south = town();
+    const lead = south.roads.length;
+    const [b, tail] = [lead + 1, lead + 2];
+    const across: NeighbourhoodDraft = {
+      ...south,
+      roads: [
+        ...south.roads,
+        { points: line(200, FAR_Z + 3.5, 200, 345), width: 7, ends: ['join', 'join'], kind: 'country', name: 'Ford Lane' },
+        { points: line(200, 345, 200, 380), width: 7, ends: ['join', 'join'], kind: 'country', name: 'Ford Bridge', bridge: [5, 30] },
+        { points: line(200, 380, 200, 390.5), width: 7, ends: ['join', 'join'], kind: 'country', name: 'Ford Row' },
+        { points: line(100, 394, 300, 394), width: 7, ends: ['dead', 'dead'], kind: 'country', name: 'Low Road' },
+      ],
+    };
+    const taken = whatGoes(across, t, tail);
+    if ('refused' in taken) throw new Error(taken.refused);
+    expect(taken.bridges).toEqual([b]);
+    expect(taken.streets).toEqual([lead]);
+    const left = made(removeRoad(across, t, tail)).draft.roads.find((r) => r.name === across.roads[lead].name)!;
+    expect(left).toMatchObject({ kind: 'street', ends: ['join', 'dead'] });
+    expect(left.area).toBeUndefined();
   });
 
   test("refused if it would take the town's last homes (as a lot removed on its own is)", () => {
