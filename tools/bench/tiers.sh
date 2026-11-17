@@ -52,6 +52,8 @@ for l in "${labels[@]}"; do
   name=${l%%=*}
   if [[ $l == *=* ]]; then
     bin=${l#*=}
+    # (Run from crates/sim-core: a path relative to the repo made absolute.)
+    [[ $bin == /* ]] || bin=$root/$bin
   else
     bin=$out/bins/$name
     echo "building the benchmark as $name"
