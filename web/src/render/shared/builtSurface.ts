@@ -976,15 +976,18 @@ export class BuiltSurface {
     // Lots (the higher pad where two touch); a turned backdrop building's on its footprint and round it, out over
     // what it stands on (`GROUND_ROUND`) and a cell's diagonal past that (every corner of a cell its edge crosses,
     // as beside a road: the land drawn between the samples meets its forecourt under its edge), but not under a road.
+    // (A lot's own samples are its pad's: what a turned building stands on round it stops at the lot.)
+    const onLot = new Uint8Array(cols * rows);
     plots.forEach((p, n) => {
       const out = p.poly ? GROUND_ROUND + c * Math.SQRT2 : 0;
       for (let j = Math.max(0, Math.ceil((p.z - out) / c)); j <= Math.min(rows - 1, Math.floor((p.z + p.d + out) / c)); j++) {
         for (let i = Math.max(0, Math.ceil((p.x - out) / c)); i <= Math.min(cols - 1, Math.floor((p.x + p.w + out) / c)); i++) {
           const at = j * cols + i;
           // (Beside a road, only where its pad is no higher: the land meets the sidewalk's edge under it, and its ground's.)
-          if (p.poly && (kind[at] === 1 || (kind[at] === BESIDE && pads[n] > builtY[at]) || !onPad(p, i * c, j * c, out))) continue;
+          if (p.poly && (onLot[at] || kind[at] === 1 || (kind[at] === BESIDE && pads[n] > builtY[at]) || !onPad(p, i * c, j * c, out))) continue;
           builtY[at] = kind[at] === 2 ? Math.max(builtY[at], pads[n]) : pads[n];
           kind[at] = 2;
+          if (!p.poly) onLot[at] = 1;
         }
       }
     });
