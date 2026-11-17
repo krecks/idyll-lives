@@ -1,10 +1,14 @@
 // Bridges over a wet mask (`game/bridges.ts`), as the street tool and the game's own bridges lay
 // them: where a line crosses the water, whether it may be bridged there (45 m of deck at most,
 // straight, no junction or lot on it), and the road split into the road before, a straight country
-// bridge with one deck, and the road after, the deck walked dry. `bun test`.
+// bridge with one deck, and the road after, the deck walked dry. A drawn street's (`crossWater`):
+// 70 m of deck, the straight through the water's middle and turned squarer where the line won't do,
+// its deck carried on over a river's dip. `bun test`.
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
-import { BRIDGE_IN, BRIDGE_SPAN, bridgeable, DECK_PAST, wetSpans, withBridge, withoutDeck } from '../src/game/bridges';
+import { BRIDGE_IN, BRIDGE_SPAN, bridgeable, bridgeFits, chordOf, crossWater, DECK_PAST, deckSpanOf, DRAWN_SPAN, wetSpans, withBridge, withoutDeck } from '../src/game/bridges';
+import { blankLand, LAND_CELL } from '../src/game/land';
+import { deckOf } from '../src/game/macro';
 import { lengths, type Pt } from '../src/game/roads';
 
 const W = 200;
@@ -121,5 +125,101 @@ describe('a road bridged', () => {
     expect(out[0].points[0]).toEqual([100, 195]);
     expect(out[0].name).toBe('Mill Bridge');
     expect(out[1].name).toBe('Mill Lane');
+  });
+});
+
+describe("a drawn street's bridges (`crossWater`)", () => {
+  /** A river `w` m wide across the world, its banks at 45° (z = x + `z0` to z = x + `z0` + w·√2). */
+  const diagonal = (z0: number, w: number) => {
+    const wet = new Uint8Array(W * D);
+    for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) if (z - x >= z0 && z - x < z0 + w * Math.SQRT2) wet[z * W + x] = 1;
+    return wet;
+  };
+
+  test('bridgeable takes a longer deck and a looser bend when asked; as it was otherwise', () => {
+    const across = line(100, 120, 100, 280);
+    const span = wetSpans(across, river(200, 260), W, D)[0];
+    expect(bridgeable(across, span, [], [])).toContain('the water is 60 m across');
+    expect(bridgeable(across, span, [], [], { most: DRAWN_SPAN })).toBeNull();
+    expect(bridgeable(across, wetSpans(across, river(200, 280), W, D)[0], [], [], { most: DRAWN_SPAN })).toContain(`spans ${DRAWN_SPAN - 2 * DECK_PAST} m of water at most`);
+    const bent: Pt[] = [...line(100, 120, 100, 205), ...line(100, 205, 120, 225).slice(1), ...line(120, 225, 120, 280).slice(1)];
+    expect(bridgeable(bent, wetSpans(bent, river(200, 230), W, D)[0], [], [], { bend: 20 })).toBeNull();
+  });
+
+  test('deckSpanOf finds the deck deckOf does, drying nothing', () => {
+    const wet = river(200, 230);
+    for (const pts of [line(100, 188, 100, 242), line(90, 188, 112, 243), line(100, 250, 100, 300)]) {
+      const r: RoadPlan = { ...road(pts), points: pts };
+      const walk = wet.slice();
+      expect(deckSpanOf(pts, wet, W, D)).toEqual(deckOf(r, wet, walk, W, D));
+    }
+    expect(deckSpanOf(line(100, 250, 100, 300), wet, W, D)).toEqual([0, 0]);
+  });
+
+  test('the fits tried: the chord first, then through the middle of the water, then turned either way', () => {
+    const wet = diagonal(100, 50);
+    const pts = line(100, 60, 100, 340);
+    const span = wetSpans(pts, wet, W, D)[0];
+    const fits = bridgeFits(pts, span, wet, W, D);
+    expect(fits[0]).toMatchObject(chordOf(pts, span));
+    expect(fits.length).toBeGreaterThan(5);
+    // (Each straight from 12 m before the water to 12 m after it, through the middle of the water on the line.)
+    for (const f of fits.slice(1)) {
+      const deck = f.deck!;
+      expect(deck[1]).toBeGreaterThan(deck[0]);
+      expect(f.a).toBeGreaterThan(0);
+      expect(f.b).toBeLessThan(lengths(pts).at(-1)!);
+    }
+    // (Turned squarer, the deck is shorter: about 50 m of water and 2 m either side when square.)
+    const shortest = Math.min(...fits.map((f) => f.deck![1] - f.deck![0]));
+    expect(shortest).toBeLessThan(60);
+    expect(fits[0].deck![1] - fits[0].deck![0]).toBeGreaterThan(DRAWN_SPAN);
+  });
+
+  test('a crossing too long at its slant is squared; one too wide either way refused with the chord’s reason', () => {
+    const pts = line(100, 60, 100, 340);
+    const wet = diagonal(100, 50);
+    const crossed = crossWater(pts, ['join', 'join'], wetSpans(pts, wet, W, D)[0], { wet, W, D, roads: [], plots: [] });
+    if (typeof crossed === 'string') throw new Error(crossed);
+    expect(crossed.fit.deck![1] - crossed.fit.deck![0]).toBeLessThanOrEqual(DRAWN_SPAN);
+    const [a, b] = [crossed.bridge[0], crossed.bridge.at(-1)!];
+    expect(Math.abs(Math.atan2(b[0] - a[0], b[1] - a[1]))).toBeGreaterThan(0.1);
+    // (The road onto it and off it joined end to end, nothing of it over the water.)
+    expect(crossed.before!.at(-1)).toEqual(a);
+    expect(crossed.after![0]).toEqual(b);
+    expect(wetSpans(crossed.before!, wet, W, D)).toEqual([]);
+    expect(wetSpans(crossed.after!, wet, W, D)).toEqual([]);
+    const wide = river(100, 180);
+    expect(crossWater(pts, ['join', 'join'], wetSpans(pts, wide, W, D)[0], { wet: wide, W, D, roads: [], plots: [] })).toContain('the water is 80 m across');
+    // (A straight drawn square across is the chord, as the generator's.)
+    const square = crossWater(pts, ['join', 'join'], wetSpans(pts, river(200, 230), W, D)[0], { wet: river(200, 230), W, D, roads: [], plots: [] });
+    if (typeof square === 'string') throw new Error(square);
+    expect(square.fit).toMatchObject(chordOf(pts, wetSpans(pts, river(200, 230), W, D)[0]));
+  });
+
+  test('over a dip the deck reaches on to where the land is within 3 m of the line between the bridge’s ends', () => {
+    const wet = river(200, 230);
+    const land = blankLand(W, D);
+    // (The land 10 m up, falling to 4 m within 6 m of the water; the water at 3 m.)
+    for (let j = 0; j < land.rows; j++) {
+      for (let i = 0; i < land.cols; i++) {
+        const z = j * LAND_CELL;
+        const off = z < 200 ? 200 - z : z >= 230 ? z - 229 : 0;
+        const k = j * land.cols + i;
+        if (!off) [land.h[k], land.wl[k]] = [100, 300];
+        else land.h[k] = off <= 6 ? 400 : 1000;
+      }
+    }
+    const pts = line(100, 120, 100, 280);
+    const span = wetSpans(pts, wet, W, D)[0];
+    const flat = crossWater(pts, ['join', 'join'], span, { wet, W, D, roads: [], plots: [] });
+    const dipped = crossWater(pts, ['join', 'join'], span, { wet, W, D, roads: [], plots: [], land });
+    if (typeof flat === 'string' || typeof dipped === 'string') throw new Error('not bridged');
+    const [f, d] = [flat.fit.deck!, dipped.fit.deck!];
+    expect(f[1] - f[0]).toBeCloseTo(33, 0);
+    expect(d[1] - d[0]).toBeGreaterThan(f[1] - f[0] + 6);
+    // (Its straight still runs on 10 m before it either end.)
+    expect(d[0]).toBeGreaterThanOrEqual(BRIDGE_IN - DECK_PAST - 0.01);
+    expect(lengths(dipped.bridge).at(-1)! - d[1]).toBeGreaterThanOrEqual(BRIDGE_IN - DECK_PAST - 0.01);
   });
 });
