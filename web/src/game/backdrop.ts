@@ -686,7 +686,7 @@ export interface Row {
 
 /**
  * Where along its road a row goes (m, `from` to `to`; the whole road if not given) and what its buildings may be
- * (`kinds`: any of its zone's if not given; `kindsAt`: those the land a few metres along and 6 m back from the
+ * (`kinds`: any of its zone's if not given; `kindsAt`: those the land a metre along and 6 m back from the
  * sidewalk asks for, none there if null, in place of `kinds`, with no gaps but where it asks for none).
  */
 export interface RowLimits {

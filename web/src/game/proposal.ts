@@ -421,6 +421,25 @@ const CIVIC_DEEP = [6, 12];
 /** Of the terraces and flats away from the main town, the share terraced homes take (Build's `TERRACE_SHARE`). */
 const ROWS_AWAY = 0.5;
 
+/** The backdrop's kinds that are shops and workplaces. */
+const SHOP_KINDS: readonly string[] = ['shop', 'cafe', 'restaurant', 'office', 'workshop'];
+
+/**
+ * What a town built has, counted as `usesSummary` estimates it: homes (house lots, terraced ones among
+ * them, not farms), shops and workplaces (shop lots and the backdrop's shops, cafés, restaurants, offices
+ * and workshops but the civic places), parks (parks, playgrounds, markets and outdoor spots), and civic
+ * places (`civicOf`).
+ */
+export function townSummary(draft: NeighbourhoodDraft): UsesSummary {
+  const places = draft.open?.places ?? [];
+  return {
+    homes: draft.slots.filter((s) => s.kind === 'house' && s.lot !== 'farm').length,
+    shops: draft.slots.filter((s) => s.kind === 'shop').length + places.filter((q) => q.plot === undefined && SHOP_KINDS.includes(q.kind) && civicOf(q) < 0).length,
+    parks: draft.slots.filter((s) => s.kind === 'park' || s.kind === 'outdoor').length,
+    public: places.filter((q) => q.plot === undefined && civicOf(q) >= 0).length,
+  };
+}
+
 /** Each set of roads' lot rule (Build's: `macro.ts` `cornersOf` off the corners and tight bends of the areas' roads, and along a country road where it runs straight), made once. */
 const cornersFor = new WeakMap<readonly RoadPlan[], (f: Frontage) => boolean>();
 
@@ -431,9 +450,13 @@ const cornersFor = new WeakMap<readonly RoadPlan[], (f: Frontage) => boolean>();
  * big enough for one and with no stretch along it, and as many of
  * the civic places each town and village may have
  * (`civicChoices`, the most needed first) as its public land holds. For step 2's live line
- * ("Homes ≈ 84 · Shops ≈ 12 · Parks 3 · Public 5"); within about a quarter of what Build makes.
+ * ("Homes ≈ 84 · Shops ≈ 12 · Parks 3 · Public 5"); within about a quarter of what Build makes, a sixth
+ * on the whole. Given the `proposal` the layout was laid out from and the layout untouched, what its town
+ * has, exactly (`townSummary`: what Build gives it).
  */
-export function usesSummary(draft: NeighbourhoodDraft): UsesSummary {
+export function usesSummary(draft: NeighbourhoodDraft, proposal?: Pick<Proposal, 'built' | 'hash'>): UsesSummary {
+  // (The layout untouched: what Build gives it, the proposal's own town.)
+  if (proposal && layoutHash(draft) === proposal.hash) return townSummary(proposal.built);
   const { roads } = draft;
   let corners = cornersFor.get(roads);
   if (!corners) {

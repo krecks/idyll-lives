@@ -2,9 +2,10 @@
 // and `build` jobs): the layout's roads are the town job's and it has no lots, the town built from an untouched
 // layout is the town job's town (and its households); a layout painted again (a block erased, a block made shops,
 // a street drawn again with homes along it, the villages and zones cleared and a small town painted) builds the same town
-// twice and no hard problem its layout hadn't, the rest of the town standing as it was; a cluster painted far
-// from every town along a street of its own is a village; the brush never paints water or a road; and step 2's
-// summary is within a quarter of what Build makes. `SLOW_TESTS=1 bun test tests/buildFromUses.slow.test.ts`.
+// twice and no hard problem its layout hadn't, the rest of the town standing as it was; an untouched layout built
+// again from another seed is about as dense as the generator's town, kind by kind (a table printed); a cluster
+// painted far from every town along a street of its own is a village; the brush never paints water or a road; and
+// step 2's summary is within a quarter of what Build makes (exactly it for an untouched layout). `SLOW_TESTS=1 bun test tests/buildFromUses.slow.test.ts`.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -29,7 +30,6 @@ describe('build from uses', async () => {
   const { objectInfos } = await import('../src/game/housegen');
   const { plotRect, populate, useTownContent } = await import('../src/game/town');
   const { runTownJob } = await import('../src/game/townJobs');
-  const { civicOf } = await import('../src/game/backdrop');
   const { editedProblems } = await import('../src/game/edit/checked');
   const { entriesOf } = await import('../src/game/edit/ground');
   const { lotKey } = await import('../src/game/edit/lots');
@@ -37,7 +37,7 @@ describe('build from uses', async () => {
   const { removeArea } = await import('../src/game/edit/villages');
   const { noUseCells, paintUses } = await import('../src/game/edit/uses');
   const { layOutUses, PROPOSAL_SEED } = await import('../src/game/build');
-  const { usesSummary } = await import('../src/game/proposal');
+  const { townSummary, usesSummary } = await import('../src/game/proposal');
   const { unrle } = await import('../src/game/landMasks');
   const { mulberry32 } = await import('../src/game/noise');
   const { leftOf, lengths, pointAt, RoadIndex } = await import('../src/game/roads');
@@ -79,15 +79,7 @@ describe('build from uses', async () => {
     return out;
   };
   /** What a town has, as step 2's summary counts it: homes, shops and workplaces, parks and outdoor spots, civic places. */
-  const counts = (d: NeighbourhoodDraft) => {
-    const places = d.open?.places ?? [];
-    return {
-      homes: d.slots.filter((s) => s.kind === 'house' && s.lot !== 'farm').length,
-      shops: d.slots.filter((s) => s.kind === 'shop').length + places.filter((q) => q.plot === undefined && ['shop', 'cafe', 'restaurant', 'office', 'workshop'].includes(q.kind) && civicOf(q) < 0).length,
-      parks: d.slots.filter((s) => s.kind === 'park' || s.kind === 'outdoor').length,
-      public: places.filter((q) => q.plot === undefined && civicOf(q) >= 0).length,
-    };
-  };
+  const counts = (d: NeighbourhoodDraft) => townSummary(d);
 
   const cases = [
     { world: 'country', seed: 7, options: { town: 'town', villages: 'few' } },
@@ -96,7 +88,7 @@ describe('build from uses', async () => {
   ] as const;
   /** Each case's land, its `town` and `layout` jobs (made once). */
   const made = new Map<string, { town: Extract<TownResult, { kind: 'town' }>; layout: Extract<TownResult, { kind: 'layout' }> }>();
-  const caseOf = (c: (typeof cases)[number]) => {
+  const caseOf = (c: { world: string; seed: number; options: Partial<import('../src/core/protocol').WorldOptions> }) => {
     const key = `${c.world} ${c.seed}`;
     let m = made.get(key);
     if (!m) {
@@ -246,6 +238,9 @@ describe('build from uses', async () => {
       { what: `${cases[0].world} painted`, proposal, plan: small },
       { what: `${cases[1].world} proposal`, proposal: caseOf(cases[1]).layout.proposal, plan: caseOf(cases[1]).layout.proposal.plan },
     ];
+    // (Untouched, given its proposal: what Build gives it, the proposal's town, exactly.)
+    expect(usesSummary(proposal.plan, proposal)).toEqual(townSummary(build(proposal, proposal.plan, PROPOSAL_SEED).draft));
+    expect(usesSummary(small, proposal)).toEqual(usesSummary(small));
     for (const p of plans) {
       // (Everything zoned built again: another seed.)
       const got = counts(layOutUses(p.proposal, p.plan, t, content, 9));
@@ -253,6 +248,39 @@ describe('build from uses', async () => {
       for (const k of ['homes', 'shops', 'parks', 'public'] as const) close(`${p.what} ${k}`, est[k], got[k]);
     }
   }, 120_000);
+
+  test("built again from another seed, an untouched layout is about as dense as the generator's town, kind by kind", () => {
+    // (The worlds above and a few more: a river town, a mountain town, a city.)
+    const worlds = [...cases, { world: 'river', seed: 5, options: { town: 'town', villages: 'few' } }, { world: 'mountain', seed: 8, options: { town: 'town', villages: 'few', hills: 'mountains' } }, { world: 'country', seed: 21, options: { town: 'city', villages: 'few' } }] as const;
+    const kinds = ['homes', 'terraces', 'shops', 'backdrop', 'parks', 'public'] as const;
+    /** What a town has of each kind: house lots (not terraced, not farms), terraced lots, shops and workplaces (lots and the backdrop's places), backdrop buildings (not a farm's), parks and outdoor spots, civic places. */
+    const density = (d: NeighbourhoodDraft): Record<(typeof kinds)[number], number> => ({
+      ...counts(d),
+      homes: d.slots.filter((s) => s.kind === 'house' && s.lot !== 'farm' && s.lot !== 'terrace').length,
+      terraces: d.slots.filter((s) => s.lot === 'terrace').length,
+      backdrop: (d.open?.backdrop ?? []).filter((b) => b.use !== 'farm' && b.use !== 'barn').length,
+    });
+    const seeds = [9, 23];
+    const total = Object.fromEntries(kinds.map((k) => [k, [0, 0]])) as Record<(typeof kinds)[number], [number, number]>;
+    const lines = [['world', ...kinds].map((h, i) => (i ? h.padStart(18) : h.padEnd(24))).join('')];
+    for (const c of worlds) {
+      const { town, layout } = caseOf(c);
+      const gen = density(town.draft);
+      const built = seeds.map((seed) => density(layOutUses(layout.proposal, layout.proposal.plan, t, content, seed)));
+      const cells = kinds.map((k) => {
+        const got = built.reduce((n, b) => n + b[k], 0) / built.length;
+        total[k][0] += gen[k];
+        total[k][1] += got;
+        return `${gen[k]} → ${got.toFixed(0)}${gen[k] ? ` (${Math.round((100 * got) / gen[k])}%)` : ''}`.padStart(18);
+      });
+      lines.push([`${c.world} ${c.seed} ${c.options.town}`.padEnd(24), ...cells].join(''));
+    }
+    lines.push(['all'.padEnd(24), ...kinds.map((k) => `${total[k][0]} → ${total[k][1].toFixed(0)} (${Math.round((100 * total[k][1]) / total[k][0])}%)`.padStart(18))].join(''));
+    console.log(`Generator's town → built again (mean of seeds ${seeds.join(', ')}):\n${lines.join('\n')}`);
+    // Over all the worlds, each kind within a sixth of the generator's (shops and parks, fewer and the most scattered, within a quarter).
+    const within = { homes: 0.15, terraces: 0.15, shops: 0.25, backdrop: 0.15, parks: 0.25, public: 0.15 };
+    for (const k of kinds) expect({ k, ok: Math.abs(total[k][1] / total[k][0] - 1) <= within[k] }).toEqual({ k, ok: true });
+  }, 300_000);
 
   test('a cluster painted along a street of no area, far from every town, is a village of its own', () => {
     const { layout } = caseOf(cases[0]);
