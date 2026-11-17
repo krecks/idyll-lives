@@ -4,8 +4,10 @@
  */
 
 import type { BackdropBuilding, BackdropUse, HouseholdInfo, PlotInfo, TownPlace } from '../../core/protocol';
+import { CIVIC, civicOf } from '../../game/backdrop';
 import type { BuildingHit } from '../../render/types';
 import { lotTitle } from '../place';
+import { openState, openText } from './places';
 import { whereabouts, type TagWorld } from './tags';
 import type { Chosen } from './townHud.svelte';
 
@@ -78,6 +80,25 @@ export function chosenOf(hit: BuildingHit, t: ChosenTown): Chosen | null {
   const place = b.place === undefined ? undefined : t.places[b.place];
   if (place && b.place !== undefined) return { kind: 'place', place: b.place, plot: place.plot ?? null, title: place.name, detail: '' };
   return { kind: 'building', building: hit.index, plot: null, title: USE_TITLE[b.use] ?? 'Building', detail: '' };
+}
+
+/**
+ * What a card calls a civic place (`game/backdrop.ts` `CIVIC`: "Fire station", "School"; a village's hall its
+ * "Village hall", as its name says), '' for any other: a shop's or a café's name says what it is.
+ */
+export function placeLabel(place: TownPlace | undefined): string {
+  const c = CIVIC[civicOf(place)];
+  if (!c || !place) return '';
+  const name = place.name.toLowerCase();
+  return Object.values(c.labels ?? {}).find((l) => name.includes(l.toLowerCase())) ?? c.label;
+}
+
+/**
+ * A place's card line: what it is (`placeLabel`) and whether it's open at `minute` of `weekday` with `hours` (its
+ * lot's: `places.ts` `lotHours`): "Fire station · open till 17:00", "School · closed · opens Mon 08:00", "open till 18:00".
+ */
+export function placeDetail(place: TownPlace | undefined, hours: TownPlace['hours'] | undefined, minute: number, weekday: number, time: (minute: number) => string, days: readonly string[]): string {
+  return [placeLabel(place), openText(openState(hours, minute, weekday), weekday, time, days)].filter(Boolean).join(' · ');
 }
 
 /** The choice's icon (`Icon` name). */

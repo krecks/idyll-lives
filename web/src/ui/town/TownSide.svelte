@@ -7,7 +7,7 @@
   import { townMap } from '../townMap.svelte';
   import { TAG_ORDER, type TagKind } from './kinds';
   import { lotInSentence } from '../place';
-  import { areaAt } from './places';
+  import { areaAt, closedWhy } from './places';
   import { eventText, nextEvents, waitText, type TodayMember } from './today';
   import { townHud } from './townHud.svelte';
   import { chosenView } from './chosenView.svelte';
@@ -46,13 +46,13 @@
   const chosen = $derived(game.mode === 'live' ? townHud.chosen : null);
   const me = $derived(game.selectedSim);
   const call = content.phoneActions.findIndex((a) => a.id === 'call');
-  /** Why the one selected can't visit there now, or null. */
+  /** Why the one selected can't visit there now (a place shut: "Closed · opens 08:00"), or null. */
   const visitWhy = $derived.by(() => {
     const plot = chosen?.plot ?? null;
     if (!me) return 'Nobody selected';
     if (plot === null) return 'Nowhere to visit';
     if (me.plot === plot) return `${me.name} is there`;
-    return me.homebound ?? null;
+    return closedWhy(chosenView.hours, game.minute, game.weekday, time, WEEKDAYS) ?? me.homebound ?? null;
   });
   const callWhy = $derived.by(() => {
     if (chosen?.kind !== 'person') return null;
