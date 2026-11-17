@@ -12,6 +12,7 @@ use crate::far::is_low;
 use crate::materials::{Mat, Palette};
 use crate::math::{self, P3, PI, TAU, V3, cos, pow, radians, sin, sqrt, v3};
 use crate::mesh::Mesh;
+use crate::normals::custom_from_verts;
 use crate::parts::{join, measure};
 use crate::py;
 use crate::rand::Random;
@@ -497,7 +498,8 @@ impl Cards {
             for face in &mut mesh.faces {
                 face.smooth = true;
             }
-            mesh.normals = Some(quads.iter().flat_map(|q| q.normals).collect());
+            let given: Vec<V3> = quads.iter().flat_map(|q| q.normals).collect();
+            mesh.normals = Some(custom_from_verts(&mesh, &given));
             mesh.uv_metres = true; // its UVs are the atlas's: `uv::ensure` leaves them
             mesh.set_material(Some(*material));
             out.push(scene::add(

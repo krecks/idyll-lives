@@ -602,12 +602,14 @@ fn words(line: &str) -> Vec<&str> {
     line.split(' ').filter(|w| !w.is_empty()).collect()
 }
 
-/// How far a built part is from the golden one, where it may be at all: the normals' farthest (on the cards and
-/// off them), and how many vertices' baked shading is a level out.
+/// How far a built part is from the golden one, where it may be at all: the normals' farthest and how many of the
+/// corners' aren't Blender's bits (in the kernel's own order of faces), and how many vertices' baked shading is a
+/// level out.
 #[derive(Default, Debug)]
 struct Off {
     normals: f32,
-    card_normals: f32,
+    corners: usize,
+    inexact: usize,
     ao: usize,
     ao_far: i64,
     vertices: usize,
@@ -710,19 +712,42 @@ fn same(case: &str, obj: Obj, g: &GoldenMesh, off: &mut Off) {
         ),
         None => assert!(card.is_none(), "{what}: no cards"),
     }
+    // The normals: Blender's to the bit where the order of the faces round a vertex is its own (a fan all the way
+    // round a vertex, and a vertex of a mesh smooth all over, sum their faces in the mesh's order, which for
+    // Blender's own primitives isn't the same from one run of it to the next); measured otherwise.
     let cn = g.f32s("cn");
-    let mine = normals::corner_normals(&mesh);
-    for (l, &c) in corner.iter().enumerate().filter(|_| !cn.is_empty()) {
-        let d = (0..3)
-            .map(|i| (mine[c][i] - cn[3 * l + i]).abs())
-            .fold(0.0, f32::max);
-        let on_card = card
-            .as_ref()
-            .is_some_and(|s| s[mesh.loops[c] as usize] > 0.0);
-        if on_card {
-            off.card_normals = off.card_normals.max(d);
-        } else {
+    if !cn.is_empty() {
+        let mine = normals::corner_normals(&mesh);
+        let mut in_its_order = artkit::mesh::Mesh::from_pydata(mesh.verts.clone(), &g.faces);
+        for (face, &f) in in_its_order.faces.iter_mut().zip(&of) {
+            face.smooth = mesh.faces[f].smooth;
+        }
+        in_its_order.sharp = mesh.sharp.clone();
+        let its = normals::corner_normals(&in_its_order);
+        for (l, &c) in corner.iter().enumerate() {
+            let want = &cn[3 * l..3 * l + 3];
+            let d = (0..3)
+                .map(|i| (mine[c][i] - want[i]).abs())
+                .fold(0.0, f32::max);
+            let on_card = card
+                .as_ref()
+                .is_some_and(|s| s[mesh.loops[c] as usize] > 0.0);
+            if on_card {
+                assert_eq!(
+                    bits(&mine[c].array()),
+                    bits(want),
+                    "{what}: a card's normal at corner {l}"
+                );
+            } else {
+                assert_eq!(
+                    bits(&its[l].array()),
+                    bits(want),
+                    "{what}: the normal at corner {l}"
+                );
+            }
             off.normals = off.normals.max(d);
+            off.corners += 1;
+            off.inexact += (bits(&mine[c].array()) != bits(want)) as usize;
         }
     }
     if let Some(ao) = g.lines.get("ao") {
@@ -781,7 +806,11 @@ fn the_shapes_are_blenders_at_full_detail_and_as_far_versions() {
         n += 1;
     }
     assert!(n >= 38, "{n} cases");
-    assert!(off.normals < 1e-3, "{off:?}");
+    // (in the kernel's own order of faces: a unit or two in the last place, at one corner in fifty)
+    assert!(
+        off.normals < 2.5e-7 && off.inexact * 20 < off.corners,
+        "{off:?}"
+    );
 }
 
 /// Builds the crown `name` and checks it against its golden: its size, its perches as found and as settled, the
@@ -861,8 +890,13 @@ fn a_crown_clad_in_cards_is_blenders_and_its_perches_stand_where_they_stood() {
     let mut off = Off::default();
     crown("crown1", crown1, None, &mut off);
     crown("crown2", crown2, None, &mut off);
-    assert!(off.normals < 1e-3 && off.card_normals < 2e-4, "{off:?}");
-    assert!(off.ao * 100 <= off.vertices && off.ao_far <= 2, "{off:?}");
+    // (the lumps' and cores' normals in the kernel's own order of faces: a unit or two in the last place; the
+    // cards' are Blender's to the bit, and the baked shading its level at every vertex)
+    assert!(
+        off.normals < 2.5e-7 && off.inexact * 10 < off.corners,
+        "{off:?}"
+    );
+    assert_eq!((off.ao, off.ao_far), (0, 0), "of {} vertices", off.vertices);
 }
 
 #[test]
