@@ -470,6 +470,12 @@ pub fn normal_tri(a: V3, b: V3, c: V3) -> V3 {
     normalize_v3((a - b).cross(b - c)).0
 }
 
+/// A polygon's normal by Newell's sum, whatever its corners (straight up for one of no area).
+pub fn normal_newell(p: &[V3]) -> V3 {
+    let (unit, len) = normalize_v3(newell(p));
+    if len == 0.0 { V3::Z } else { unit }
+}
+
 fn newell(p: &[V3]) -> V3 {
     let mut n = V3::ZERO;
     let mut prev = p[p.len() - 1];

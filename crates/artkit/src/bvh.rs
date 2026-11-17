@@ -272,7 +272,10 @@ impl Rays {
                         origin.y + dir.y * dist,
                         origin.z + dir.z * dist,
                     );
-                    let normal = normalize_v3(normal_tri(tri[0], tri[1], tri[2])).0;
+                    // (the triangle's normal, then made a unit vector once more as the scene hands it back: by division)
+                    let n = normal_tri(tri[0], tri[1], tri[2]);
+                    let len = crate::math::len_v3(n);
+                    let normal = V3::new(n.x / len, n.y / len, n.z / len);
                     out = Some(Hit {
                         at,
                         normal,

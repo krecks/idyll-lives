@@ -1,5 +1,6 @@
-//! Which points of a mesh sit on one another: Blender's search (a k-d tree, each point asked in its turn for the
-//! others within reach), so the same one of each cluster survives as in the meshes Blender made.
+//! Which points of a mesh sit on one another, and which of them stays: Blender 5.2's rule (`find_doubles`), so the
+//! same one of each cluster survives as in the meshes Blender made. A sphere's seam and poles are such clusters,
+//! their points a rounding apart, and the one kept is a vertex of every lump a build makes.
 
 use crate::math::V3;
 
@@ -76,48 +77,9 @@ fn swap_heads(nodes: &mut [Node], a: usize, b: usize) {
     nodes[b].index = na.index;
 }
 
-struct Search<'a> {
-    nodes: &'a [Node],
-    range: f32,
-    range_sq: f32,
-    target: Vec<i32>,
-    found: usize,
-}
-
-impl Search<'_> {
-    fn visit(&mut self, i: u32, search: u32, co: [f32; 3]) {
-        let node = self.nodes[i as usize];
-        if co[node.d] + self.range <= node.co[node.d] {
-            if node.left != UNSET {
-                self.visit(node.left, search, co);
-            }
-        } else if co[node.d] - self.range >= node.co[node.d] {
-            if node.right != UNSET {
-                self.visit(node.right, search, co);
-            }
-        } else {
-            if search != node.index && self.target[node.index as usize] == -1 {
-                let mut d = 0.0_f32;
-                for (a, b) in node.co.iter().zip(&co) {
-                    d += (a - b) * (a - b);
-                }
-                if d <= self.range_sq {
-                    self.target[node.index as usize] = search as i32;
-                    self.found += 1;
-                }
-            }
-            if node.left != UNSET {
-                self.visit(node.left, search, co);
-            }
-            if node.right != UNSET {
-                self.visit(node.right, search, co);
-            }
-        }
-    }
-}
-
-/// For each of `verts`: -1 (alone), itself (others merge into it) or the vertex it merges into. A cluster's
-/// points merge into the one of them nearest their middle.
+/// For each of `verts`: -1 (alone), itself (others merge into it) or the vertex it merges into. Each point in
+/// the tree's order gathers those in reach that no earlier one has, and they merge into the one of them nearest
+/// their middle (the gatherer weighing twice), the earliest of them where two are as near.
 pub fn doubles(verts: &[V3], dist: f32) -> Vec<i32> {
     let mut nodes: Vec<Node> = verts
         .iter()
@@ -131,56 +93,78 @@ pub fn doubles(verts: &[V3], dist: f32) -> Vec<i32> {
         })
         .collect();
     let root = balance(&mut nodes, 0, 0);
-    let mut s = Search {
-        nodes: &nodes,
-        range: dist,
-        range_sq: dist * dist,
-        target: vec![-1; verts.len()],
-        found: 0,
-    };
+    let mut target = vec![-1_i32; verts.len()];
     if root == UNSET {
-        return s.target;
+        return target;
     }
-    // each point in its turn gathers the others in reach that no earlier one has
-    for (index, v) in verts.iter().enumerate() {
-        let t = s.target[index];
-        if t == -1 || t == index as i32 {
-            let before = s.found;
-            s.visit(root, index as u32, v.array());
-            if s.found != before {
-                s.target[index] = index as i32;
+    let range_sq = dist * dist;
+    for at in 0..nodes.len() {
+        let seed = nodes[at].index as usize;
+        if target[seed] != -1 {
+            continue;
+        }
+        let co = nodes[at].co;
+        // the points in reach not yet taken (the gatherer among them), as the tree is walked
+        let mut found: Vec<usize> = Vec::new();
+        let mut stack = vec![root];
+        while let Some(i) = stack.pop() {
+            let node = nodes[i as usize];
+            let (lo, hi) = (
+                co[node.d] + dist <= node.co[node.d],
+                co[node.d] - dist >= node.co[node.d],
+            );
+            if lo {
+                if node.left != UNSET {
+                    stack.push(node.left);
+                }
+                continue;
+            }
+            if hi {
+                if node.right != UNSET {
+                    stack.push(node.right);
+                }
+                continue;
+            }
+            if target[node.index as usize] == -1 {
+                let mut d = 0.0_f32;
+                for (a, b) in node.co.iter().zip(&co) {
+                    d += (a - b) * (a - b);
+                }
+                if d <= range_sq {
+                    found.push(node.index as usize);
+                }
+            }
+            if node.right != UNSET {
+                stack.push(node.right);
+            }
+            if node.left != UNSET {
+                stack.push(node.left);
             }
         }
-    }
-    let mut clusters: std::collections::BTreeMap<i32, Vec<usize>> = Default::default();
-    for (i, &t) in s.target.iter().enumerate() {
-        if t >= 0 {
-            clusters.entry(t).or_default().push(i);
+        found.push(seed);
+        if found.len() == 2 {
+            continue;
         }
-    }
-    let mut target = vec![-1; verts.len()];
-    for members in clusters.values() {
         let mut mid = [0.0_f32; 3];
-        for &i in members {
+        for &i in &found {
             for (m, c) in mid.iter_mut().zip(verts[i].array()) {
                 *m += c;
             }
         }
-        let k = 1.0 / members.len() as f32;
-        let mid = mid.map(|m| m * k);
+        let mid = mid.map(|m| m / found.len() as f32);
         let far = |i: usize| {
             let v = verts[i].array();
-            (0..3)
-                .map(|d| (v[d] - mid[d]) * (v[d] - mid[d]))
-                .sum::<f32>()
+            (v[0] - mid[0]) * (v[0] - mid[0])
+                + (v[1] - mid[1]) * (v[1] - mid[1])
+                + (v[2] - mid[2]) * (v[2] - mid[2])
         };
-        let mut best = members[0];
-        for &i in members {
-            if far(i) < far(best) {
+        let mut best = seed;
+        for &i in &found[..found.len() - 1] {
+            if far(i) < far(best) || (far(i) == far(best) && i <= best) {
                 best = i;
             }
         }
-        for &i in members {
+        for &i in &found {
             target[i] = best as i32;
         }
     }

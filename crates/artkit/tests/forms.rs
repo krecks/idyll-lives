@@ -455,23 +455,8 @@ fn shapes_and_forms_are_gamekits_in_blender() {
         if way != way_want {
             fail(format!("uv way {way:?}"));
         }
-        // its points: Blender's, or (the spheres' merged seams, the icosphere) within rounding of them
-        let loose: f32 = if g.what == "boulder" {
-            2e-6
-        } else if [
-            "sphere",
-            "sphere_rot",
-            "lump",
-            "lump10",
-            "joined",
-            "joined_settled",
-        ]
-        .contains(&g.what.as_str())
-        {
-            6e-7
-        } else {
-            0.0
-        };
+        // its points: Blender's to the bit (the icosphere's: within rounding of them)
+        let loose: f32 = if g.what == "boulder" { 2e-6 } else { 0.0 };
         let exact = pair_points(&mesh.verts, &g.verts, 0.0);
         let Some((map, inexact, far)) =
             exact.or_else(|| pair_points(&mesh.verts, &g.verts, loose.max(3e-7)))

@@ -384,9 +384,7 @@ pub(crate) fn cone_mesh(segs: usize, r1: f32, r2: f32, depth: f32) -> Mesh {
 }
 
 /// `primitive_uv_sphere_add`: a meridian turned round the axis a segment at a time, each from the last, and
-/// the seam and the poles merged. (Its points are Blender's to the bit, but which of the copies merged at the
-/// seam and the poles is kept, and so the points' order: those differ from Blender's by its rounding as it turns,
-/// under a tenth of a micrometre a metre of radius.)
+/// the seam and the poles merged.
 pub(crate) fn uv_sphere_mesh(seg: usize, tot: usize, rad: f32) -> Mesh {
     let ring = tot + 1;
     let mut verts = Vec::with_capacity((seg + 1) * ring);

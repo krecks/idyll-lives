@@ -903,7 +903,7 @@ pub fn object_matrix_of(loc: V3, rot: [f64; 3], scale: [f64; 3]) -> M4 {
 }
 
 /// An object's matrix from where it is, how it is turned (Euler XYZ, radians as stored) and its scale.
-pub(crate) fn object_matrix(loc: V3, rot: V3, scale: V3) -> M4 {
+pub fn object_matrix(loc: V3, rot: V3, scale: V3) -> M4 {
     let (ti, tj, th) = (rot.x as f64, rot.y as f64, rot.z as f64);
     let (ci, cj, ch) = (cos(ti), cos(tj), cos(th));
     let (si, sj, sh) = (sin(ti), sin(tj), sin(th));

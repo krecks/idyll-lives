@@ -2,8 +2,10 @@
 #![forbid(unsafe_code)]
 
 pub mod bvh;
+pub mod family;
 pub mod far;
 pub mod forms;
+pub mod glb;
 pub mod json;
 mod macros;
 pub use macros::Arg;
@@ -19,6 +21,7 @@ pub mod perch;
 pub mod py;
 pub mod rand;
 pub mod scene;
+pub mod shade;
 pub mod shapes;
 pub mod tri;
 pub mod uv;

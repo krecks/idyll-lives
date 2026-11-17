@@ -43,11 +43,8 @@ fn primitives_are_blenders_point_for_point() {
             bad += (far > 1e-6) as usize;
             continue;
         }
-        // the same points (a sphere's merged seam and poles: one of Blender's copies, within its rounding)
-        let sphere = g.what.starts_with("uv_sphere");
-        let Some((map, inexact, far)) =
-            pair_points(&m.verts, &g.verts, if sphere { 4e-7 } else { 0.0 })
-        else {
+        // the same points, to the bit
+        let Some((map, inexact, far)) = pair_points(&m.verts, &g.verts, 0.0) else {
             report.push(format!("{}: not Blender's points", g.what));
             bad += 1;
             continue;
@@ -58,8 +55,8 @@ fn primitives_are_blenders_point_for_point() {
         let same_tris = as_set(&renamed(&m.triangle_verts(), &map)) == as_set(&g.tris);
         let in_order = map.iter().enumerate().all(|(i, &j)| i == j as usize);
         report.push(format!("{}: {inexact} of {} points another copy (within {far}), in order {in_order}, faces {same_faces}, triangles {same_tris}", g.what, g.verts.len()));
-        // (where points were merged, which copy is kept, and so the order, is Blender's own: `artkit::weld`)
-        let merged = sphere || g.what.contains(" 0000000000000000 ");
+        // (a cone drawn to a point: which of its merged points is kept, and so their order, is the operator's own)
+        let merged = g.what.starts_with("cone") && g.what.contains(" 0000000000000000 ");
         bad += (!same_faces || !same_tris || (!merged && !in_order)) as usize;
     }
     println!("{}", report.join("\n"));

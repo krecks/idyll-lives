@@ -28,8 +28,7 @@ fn the_same_point_of_each_cluster_survives_as_in_blender() {
             "case {cases}: {} points within {dist}: {off} targets differ",
             pts.len()
         );
-        // (the loose random clusters, where a point may be in reach of two: Blender chains them its own way)
-        bad += (off > 0 && cases < 6) as usize;
+        bad += (off > 0) as usize;
         cases += 1;
     }
     assert_eq!(bad, 0);
