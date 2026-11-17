@@ -3,7 +3,7 @@
  * its card (`streetChoice`) asks. Clicks set its points, or a drag draws it freehand. The pointer is
  * pulled to a road, a dead end or the world's edge within `PULL_PX` CSS px (`Meeting.magnet`, 10 to
  * 40 m; once a street is begun, only where the street would not be refused there). It is drawn as soon as it reaches a road (or the world's edge); Enter or a double click
- * ends it where it is, carried on to a road within `AUTO_JOIN` m ahead (or nearby) if it may be
+ * ends it where it is (Enter: where the pointer rests, as the hint says), carried on to a road within `AUTO_JOIN` m ahead (or nearby) if it may be
  * (`carryOn`), else as a dead end. Backspace takes the last point back, Esc drops it. The street
  * drawn is picked, so its card shows; one split at its bridges, the stretch nearest the last click (`stretchNear`), the
  * card listing the others (`streetChoice.drawn`). What goes along it is the card's choice: homes from the lot mix (`drawStreet`'s
@@ -347,11 +347,12 @@ export const streetTool: TownTool = {
 
     /**
      * The street drawn as it stands (`asDeadEnd`: ended where it is, carried on to a road nearby if it may be
-     * (`carryOn`), else only if it reached a road): true if it was.
+     * (`carryOn`), else only if it reached a road): true if it was. `atPointer`: ended where the pointer rests,
+     * not at the last point set (Enter: the line the hint spoke of, `s.line()`).
      */
-    const finish = (asDeadEnd: boolean): boolean => {
+    const finish = (asDeadEnd: boolean, atPointer = false): boolean => {
       clearTimeout(rest);
-      let pts = s.points;
+      let pts = atPointer ? s.line() : s.points;
       if (pts.length < 2) {
         if (asDeadEnd) editor.refuse('a street is drawn with two points or more');
         return false;
@@ -483,7 +484,8 @@ export const streetTool: TownTool = {
           return true;
         }
         if (e.key === 'Enter') {
-          if (!press) finish(true);
+          // (Where the pointer rests, as the hint said: "Enter … ends it here".)
+          if (!press) finish(true, true);
           return true;
         }
         return false;

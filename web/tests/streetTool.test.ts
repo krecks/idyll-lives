@@ -410,6 +410,25 @@ describe('the tool', () => {
     expect(tool.key!(key('Backspace'))).toBe(true);
   });
 
+  test('Enter ends the street where the pointer rests, as the hint says: the last click over the water, the pointer on the far bank', () => {
+    choice.along = 'none';
+    const editor = fakeEditor(town());
+    const tool = streetTool.stage(editor);
+    tool.down(87, MAIN_Z + 8);
+    tool.up();
+    tool.down(87, RIVER_Z + 15);
+    tool.up();
+    // (Ended at the last click, it would be a bridge with no road beyond it.)
+    tool.hover(87, RIVER_Z + 55);
+    expect(editor.said.hints.at(-1)).toMatch(/Enter or a double click ends it here as a dead end/);
+    tool.key!(key('Enter'));
+    expect(editor.said.refusals).toEqual([]);
+    const made = editor.draft.roads.slice(4);
+    expect(made.some((r) => r.bridge)).toBe(true);
+    const far = made.find((r) => r.ends.includes('dead'))!;
+    expect(far.points.at(-1)![1]).toBeCloseTo(RIVER_Z + 55, 0);
+  });
+
   test('a freehand drag from a road to another draws the street when let go', () => {
     const editor = fakeEditor(town());
     const tool = streetTool.stage(editor);
