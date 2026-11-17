@@ -1977,8 +1977,10 @@ pub(crate) fn unjam(w: &mut World) {
             .get((k & !(1 << 63)) as usize)
             .is_some_and(|x| x.standing || tick >= x.stall.1 + PASS_WAIT)
     };
+    // (Each car's ask looked up by key, not searched for: `waits_on_at`.)
+    let asks = crate::traffic::asks_by_key(w);
     for (c, car) in w.cars.iter().enumerate() {
-        let by = crate::traffic::waits_on(w, car_first(c));
+        let by = crate::traffic::waits_on_at(w, car_first(c), &asks);
         let waiting = matches!(car.state, CarState::Leaving | CarState::Arriving)
             && car.sight == Sight::Seen
             && !car.standing
@@ -2005,7 +2007,7 @@ pub(crate) fn unjam(w: &mut World) {
         }
         let (ring, ok, parked) = held_round(
             c,
-            |k| crate::traffic::waits_on(w, k),
+            |k| crate::traffic::waits_on_at(w, k, &asks),
             |k| crate::traffic::at_red(w, k),
             |o| {
                 if w.cars

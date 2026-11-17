@@ -2742,6 +2742,36 @@ pub(crate) fn behind(me: (&Rect, [f32; 2]), o: (&Rect, [f32; 2])) -> bool {
 /// claims it asks for and the earlier asks it waits for. For checks (the generated worlds': a car
 /// is stuck when nothing it waits for, however far round, goes on).
 pub fn waits_on(w: &World, key: u64) -> Vec<u64> {
+    waits_on_by(w, key, w.traffic.asks.iter().position(|a| a.key == key))
+}
+
+/// The asks by key as they are now: each key with the first of its asks, sorted (`waits_on_at`,
+/// for a pass asking about many).
+pub(crate) fn asks_by_key(w: &World) -> Vec<(u64, u32)> {
+    let mut ix: Vec<(u64, u32)> = w
+        .traffic
+        .asks
+        .iter()
+        .enumerate()
+        .map(|(i, a)| (a.key, i as u32))
+        .collect();
+    ix.sort_unstable();
+    ix.dedup_by_key(|e| e.0);
+    ix
+}
+
+/// `waits_on`, its ask found in `ix` (`asks_by_key`, made since the asks last changed).
+pub(crate) fn waits_on_at(w: &World, key: u64, ix: &[(u64, u32)]) -> Vec<u64> {
+    let ask = ix
+        .binary_search_by_key(&key, |e| e.0)
+        .ok()
+        .map(|k| ix[k].1 as usize);
+    debug_assert_eq!(ask, w.traffic.asks.iter().position(|a| a.key == key));
+    waits_on_by(w, key, ask)
+}
+
+/// `waits_on` with car `key`'s ask, the first of its in `Traffic::asks` (None: none).
+fn waits_on_by(w: &World, key: u64, ask: Option<usize>) -> Vec<u64> {
     let car = w.cars.get((key & !(1 << 63)) as usize);
     let mut out: Vec<u64> = car.and_then(|c| c.waits_for).into_iter().collect();
     // (Those on foot or on a bike in its way: their resident ids, no vehicle's key.)
@@ -2749,7 +2779,7 @@ pub fn waits_on(w: &World, key: u64) -> Vec<u64> {
         car.into_iter()
             .flat_map(|c| c.on_foot.iter().map(|&i| u64::from(i))),
     );
-    if let Some(a) = w.traffic.asks.iter().find(|a| a.key == key) {
+    if let Some(a) = ask.and_then(|i| w.traffic.asks.get(i)) {
         out.extend(a.by.iter().chain(&a.fifo));
     }
     out.sort_unstable();
