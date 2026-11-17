@@ -1677,6 +1677,18 @@ pub struct Plot {
     pub entry: Option<[f32; 2]>,
     /// The roof the player chose for the house on this plot (None: the town's own look).
     pub roof: Option<RoofLook>,
+    /// When the place on it is open (None: always, as a home, a park or a plot from an older file).
+    pub hours: Option<PlotHours>,
+}
+
+/// When a public place is open: minutes of the day `[open, close)` on the days in `days` (bit 0
+/// Monday), as the town file and saves carry it (`plots[].hours`, the page's `TownPlace.hours`).
+/// A `close` at or before `open` runs on past midnight into the next morning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlotHours {
+    pub open: u16,
+    pub close: u16,
+    pub days: u8,
 }
 
 impl Plot {
@@ -1689,6 +1701,22 @@ impl Plot {
             self.x as f32 + self.w as f32 / 2.0,
             self.z as f32 + self.d as f32 / 2.0,
         ])
+    }
+
+    /// Whether the place on it is open at `minute` of day `day` (`clock::day`, `clock::minute_of_day`):
+    /// always without hours. Hours past midnight count for the day they opened on.
+    pub fn open_at(&self, day: u32, minute: f32) -> bool {
+        let Some(h) = self.hours else {
+            return true;
+        };
+        let weekday = crate::clock::weekday(day);
+        let on = |wd: u32| h.days & (1 << wd) != 0;
+        let (open, close) = (f32::from(h.open), f32::from(h.close));
+        if open < close {
+            on(weekday) && minute >= open && minute < close
+        } else {
+            (on(weekday) && minute >= open) || (on((weekday + 6) % 7) && minute < close)
+        }
     }
 }
 
@@ -2299,6 +2327,7 @@ impl World {
                 public: p.public,
                 entry: p.entry,
                 roof: None,
+                hours: p.hours,
             })
             .collect();
         let starting_funds = world.content.starting_funds;

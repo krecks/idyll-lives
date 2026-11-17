@@ -139,6 +139,7 @@ mod tests {
             public,
             entry: None,
             roof: None,
+            hours: None,
         }
     }
 
