@@ -175,6 +175,11 @@ export class Protection {
 
 /** Samples past the world's edge a water outline is carried on (`landZones`): the sea and rivers run on out of the world, as the generator's do. */
 const WATER_PAST = 30;
+/**
+ * How far (m) along its edges a corner of the water's outline is rounded at most (`landMasks.ts` `outlines`): the
+ * outline within a metre or so of the land's water at a corner of a long straight bank, as a painted river's.
+ */
+const WATER_ROUND = 1.5;
 /** The smallest piece of each kind kept as a zone (cells: water 2 m, the cover 4 m). */
 const MIN_CELLS = { water: 4, woods: 6, meadow: 6, fields: 8 };
 
@@ -195,7 +200,8 @@ export function wetTiles(land: Land, W: number, D: number): Uint8Array {
 
 /**
  * The land's water and cover as `meta.zones` (`landMasks.ts` `outlines`): the water's outlines
- * from its 2 m samples (carried `WATER_PAST` samples on past the world's edge, as its edge stands),
+ * from its 2 m samples (carried `WATER_PAST` samples on past the world's edge, as its edge stands;
+ * their corners rounded `WATER_ROUND` m at most),
  * the fields, meadows and woods from the 4 m cover (not where it is wet). In the generator's
  * order: water, fields, meadow, woods.
  */
@@ -213,7 +219,7 @@ export function landZones(land: Land, which: { water?: boolean; cover?: boolean 
     for (let j = 0; j < gd; j++) for (let i = 0; i < gw; i++) if (wet(i - M, j - M)) mask[j * gw + i] = 1;
     // (A sample stands at its cell's corner, 2i m; its cell in the mask is the 2 m round it.)
     const shift = -M * LAND_CELL - LAND_CELL / 2;
-    for (const poly of outlines(mask, gw, gd, MIN_CELLS.water, LAND_CELL)) out.push({ kind: 'water', poly: poly.map(([x, z]): [number, number] => [x + shift, z + shift]) });
+    for (const poly of outlines(mask, gw, gd, MIN_CELLS.water, LAND_CELL, WATER_ROUND)) out.push({ kind: 'water', poly: poly.map(([x, z]): [number, number] => [x + shift, z + shift]) });
   }
   if (which.cover) {
     const [cw, cd] = [coverSpan(cols), coverSpan(rows)];

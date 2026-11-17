@@ -9,10 +9,11 @@ import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
 import { blankLand, COVER, coverSpan, flowOf, heightAt, LAND_CELL, NONE, SEA_CM, wetAt, type Land, type LandRect } from '../src/game/land';
 import { aimOf, isPoint, mountainGhost, POINT, settleWater, stamp, strokeOf, type Brush, type LandTool } from '../src/game/landBrush';
-import { applyLand, LandEditor, landZones, Protection, wetTiles, type BuiltLand, type LandPrices } from '../src/game/landEdit';
+import { applyLand, LandEditor, landZones, Protection, wetTile, wetTiles, type BuiltLand, type LandPrices } from '../src/game/landEdit';
 import { rle, unrle } from '../src/game/landMasks';
 import { fbm } from '../src/game/noise';
 import { inside } from '../src/game/roads';
+import { townProblems, type CheckedTown } from '../src/game/townCheck';
 
 const FREE = () => 1;
 const PRICES: LandPrices = { earth: 3, mountain: 0.02, water: 2, woods: 6, meadow: 1, fields: 2, clear: 1.5 };
@@ -456,6 +457,41 @@ describe('the built land', () => {
     const [shore] = landZones(sea, { water: true });
     expect(Math.min(...shore.poly.map((p) => p[0]))).toBeLessThan(-40);
     expect(wetTiles(sea, 256, 256)[100 * 256 + 10]).toBe(1);
+  });
+
+  test("a straight cross of rivers: the water's outline keeps to its tiles at the corners, and a road beside it is dry", () => {
+    // Two rivers 30 m across carved straight through the middle of a 512 m land.
+    const land = landOf(512, () => 3);
+    const wetAt2 = (x: number, z: number) => Math.abs(x - 256) < 15 || Math.abs(z - 256) < 15;
+    for (let j = 0; j < land.rows; j++) for (let i = 0; i < land.cols; i++) if (wetAt2(i * LAND_CELL, j * LAND_CELL)) [land.h[j * land.cols + i], land.wl[j * land.cols + i]] = [0, 150];
+    const water = landZones(land, { water: true }).map((z) => z.poly);
+    const tiles = wetTiles(land, 512, 512);
+    const inWater = (x: number, z: number) => water.some((poly) => inside(poly, x + 0.5, z + 0.5));
+    // Round each inner corner (the wet tiles' corners at 241 and 271), every tile 2 m or more from the other kind is
+    // on the outline's same side as it is on the land.
+    const near = (x: number, z: number, wet: number) => {
+      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (Math.hypot(dx, dz) <= 2 && tiles[(z + dz) * 512 + x + dx] === wet) return true;
+      return false;
+    };
+    let checked = 0;
+    for (const [cx, cz] of [[241, 241], [271, 241], [241, 271], [271, 271]]) {
+      for (let z = cz - 40; z < cz + 40; z++) {
+        for (let x = cx - 40; x < cx + 40; x++) {
+          const wet = tiles[z * 512 + x];
+          if (near(x, z, wet ? 0 : 1)) continue;
+          expect(inWater(x, z), `${x}, ${z}`).toBe(wet === 1);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(20000);
+    // A road 6 m off the bank, round the north-west corner: no water problem, read from the zones alone (as a town
+    // file's) or with the land's own water (as step 2's draft).
+    const road: RoadPlan = { kind: 'country', name: 'Bank Road', width: 6, ends: ['out', 'out'], points: [...Array.from({ length: 101 }, (_, k): [number, number] => [k * 2.35, 235]), ...Array.from({ length: 100 }, (_, k): [number, number] => [235, 235 - (k + 1) * 2.35])] };
+    const town: CheckedTown = { width: 512, depth: 512, plots: [], exits: [], sims: [], households: [], roads: [road], terrain: { water: rle(tiles) }, meta: { roads: [road], zones: water.map((poly) => ({ kind: 'water', poly })) } };
+    const watery = (t: CheckedTown) => townProblems(t, undefined, { generated: false }).hard.filter((line) => /water/.test(line));
+    expect(watery(town)).toEqual([]);
+    expect(watery({ ...town, landWet: (x, z) => wetTile(land, Math.floor(x), Math.floor(z)) })).toEqual([]);
   });
 
   test('a draft takes the land once it is shaped', () => {
