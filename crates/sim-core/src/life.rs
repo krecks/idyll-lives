@@ -617,7 +617,18 @@ pub(crate) fn update(w: &mut World) {
     let hour = clock::hour(tick);
     let mut refreshed = false;
     let residents = crate::profile::start();
-    for i in 0..w.sims.len() {
+    // (Only those taking a turn: `World::turns`, unless someone came to town since.)
+    let turns = std::mem::take(&mut w.turns);
+    let fresh = w.turns_fresh;
+    debug_assert!(
+        !fresh
+            || (0..w.sims.len()).all(|i| turns.binary_search(&(i as u32)).is_ok()
+                || !w.sims[i].here()
+                || w.sims[i].steps == 0)
+    );
+    let all = if fresh { 0 } else { w.sims.len() };
+    let listed = if fresh { &turns[..] } else { &[] };
+    for i in listed.iter().map(|&i| i as usize).chain(0..all) {
         // (In lots nobody watches, on their turn; see `lod.rs`.)
         if !w.sims[i].here() || w.sims[i].steps == 0 {
             continue;
@@ -691,6 +702,7 @@ pub(crate) fn update(w: &mut World) {
         childcare(w, i);
         report_skill_ups(w, i);
     }
+    w.turns = turns;
     crate::profile::end("life::update/residents", residents);
     crate::profile::phase("life::update/doors", || doors(w));
     crate::profile::phase("life::update/rent_and_jobs", || {

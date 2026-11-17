@@ -2006,6 +2006,11 @@ pub struct World {
     /// Who goes first when the tick's searches run over budget (`tick_once`), kept from tick to
     /// tick like `briefs`.
     pub(crate) first: Vec<bool>,
+    /// The residents taking a turn this tick (`Sim::steps` over 0 as `lod::plan` gave them), in
+    /// order: the passes after the step that are only for them go through these, not the town
+    /// (`life::update`). Not while `turns_fresh` is off: someone came to town since.
+    pub(crate) turns: Vec<u32>,
+    pub(crate) turns_fresh: bool,
     /// `broadcast`'s per-tick buffers, kept from tick to tick like `briefs`.
     broadcast_scratch: BroadcastScratch,
     /// Where Sims leave town for work.
@@ -2466,6 +2471,8 @@ impl World {
             claimants_cache: Vec::new(),
             work: Vec::new(),
             first: Vec::new(),
+            turns: Vec::new(),
+            turns_fresh: false,
             broadcast_scratch: BroadcastScratch::default(),
             exits: Vec::new(),
             travel: Default::default(),
@@ -3387,8 +3394,9 @@ impl World {
             self.relationships.grow(self.sims.len());
             self.generations.push(0);
         }
-        // (The household index no longer matches the residents: `household_sims`.)
+        // (The household index no longer matches the residents: `household_sims`; nor the turns.)
         self.members.moved = true;
+        self.turns_fresh = false;
         self.refresh_base_mods(id);
         Ok(id as u32)
     }

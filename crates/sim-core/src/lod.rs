@@ -118,6 +118,8 @@ pub(crate) fn plan(w: &mut World) {
     // budget, `World::first`.)
     let mut first = std::mem::take(&mut w.first);
     first.clear();
+    let mut turns = std::mem::take(&mut w.turns);
+    turns.clear();
     for i in 0..w.sims.len() {
         let full = w.full_detail(i);
         first.push(full);
@@ -141,12 +143,15 @@ pub(crate) fn plan(w: &mut World) {
         if turn {
             s.steps = s.owed + 1;
             s.owed = 0;
+            turns.push(i as u32);
         } else {
             s.steps = 0;
             s.owed += 1;
         }
     }
     w.first = first;
+    w.turns = turns;
+    w.turns_fresh = true;
 }
 
 #[cfg(test)]
