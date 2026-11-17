@@ -20,6 +20,7 @@ import { compose, quatAxisAngle } from './math';
 import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../game/noise';
 import { tuned } from '../tune';
 import { shareAt, ZONE_CELL, ZoneField, type ZoneKind } from './zones';
+import { layBackdropGrounds, wayCorners } from './townBuildings';
 
 /**
  * How far the landscape extends beyond the town (metres): towns of older code, and worlds (which
@@ -376,7 +377,8 @@ function bareTilesOf(world: WorldStructure, mask: LawnMask): Uint8Array {
 
 /**
  * Per tile of the town's ground (1), where no lawn grows at all: its roads (or streets), paths and
- * fields (the birds forage on the lawn). `any`: the tiles any of them reaches into; else only those
+ * fields, and what the backdrop's buildings stand on (their forecourts, yards and ways to the road, as the street lays
+ * them: `layBackdropGrounds`) (the birds forage on the lawn). `any`: the tiles any of them reaches into; else only those
  * whose middle they cover.
  */
 export function unlawned(world: WorldStructure, any = true): Uint8Array {
@@ -389,7 +391,57 @@ export function unlawned(world: WorldStructure, any = true): Uint8Array {
     const [[x0, x1], [z0, z1]] = [span(r.x, r.w, w), span(r.z, r.d, d)];
     for (let z = z0; z < z1; z++) out.fill(1, z * w + x0, z * w + Math.max(x0, x1));
   }
+  const backdrop = world.meta?.backdrop;
+  if (backdrop?.length) {
+    // (Not on the lots: their gardens are theirs, as the street lays it.)
+    const lots = new Uint8Array(w * d);
+    for (const p of world.plots) for (let z = Math.max(0, Math.floor(p.z)); z < Math.min(d, Math.ceil(p.z + p.d)); z++) lots.fill(1, z * w + Math.max(0, Math.floor(p.x)), z * w + Math.min(w, Math.ceil(p.x + p.w)));
+    const grounds = new Uint8Array(w * d);
+    const driven = (world.meta?.roads ?? []).filter((r) => r.kind !== 'trail');
+    for (const { court, way } of layBackdropGrounds(backdrop, driven, world.plots)) {
+      if (court) fillQuad(grounds, w, d, court, any);
+      if (way) fillQuad(grounds, w, d, wayCorners(way), any);
+    }
+    for (let i = 0; i < out.length; i++) if (grounds[i] && !lots[i]) out[i] = 1;
+  }
   return out;
+}
+
+/** Marks (1) the tiles of a `w` × `d` grid a convex quadrilateral `q` covers the middle of (`any`: reaches into at all). */
+function fillQuad(out: Uint8Array, w: number, d: number, q: readonly (readonly [number, number])[], any: boolean): void {
+  // (Its sides' signs: the same for every side at a point inside, whichever way round it is wound.)
+  const side = (k: number, x: number, z: number) => {
+    const [a, b] = [q[k], q[(k + 1) % q.length]];
+    return (b[0] - a[0]) * (z - a[1]) - (b[1] - a[1]) * (x - a[0]);
+  };
+  const inside = (x: number, z: number) => {
+    let pos = false;
+    let neg = false;
+    for (let k = 0; k < q.length; k++) {
+      const v = side(k, x, z);
+      if (v > 0) pos = true;
+      else if (v < 0) neg = true;
+    }
+    return !(pos && neg);
+  };
+  // (Reaching into a tile: its middle within half a tile's diagonal of the quad, near enough.)
+  const grow = any ? 0.71 : 0;
+  const xs = q.map((p) => p[0]);
+  const zs = q.map((p) => p[1]);
+  const [x0, x1] = [Math.max(0, Math.floor(Math.min(...xs) - grow)), Math.min(w - 1, Math.ceil(Math.max(...xs) + grow))];
+  const [z0, z1] = [Math.max(0, Math.floor(Math.min(...zs) - grow)), Math.min(d - 1, Math.ceil(Math.max(...zs) + grow))];
+  const [cx, cz] = [xs.reduce((a, v) => a + v, 0) / q.length, zs.reduce((a, v) => a + v, 0) / q.length];
+  for (let z = z0; z <= z1; z++) {
+    for (let x = x0; x <= x1; x++) {
+      let [px, pz] = [x + 0.5, z + 0.5];
+      // (Grown: the tile's middle pulled towards the quad's by up to `grow`.)
+      if (grow) {
+        const l = Math.hypot(cx - px, cz - pz);
+        if (l > 0) [px, pz] = [px + ((cx - px) / l) * Math.min(grow, l), pz + ((cz - pz) / l) * Math.min(grow, l)];
+      }
+      if (inside(px, pz)) out[z * w + x] = 1;
+    }
+  }
 }
 
 /** Where the lawn that grows is hidden now: the tiles indoors (or the half of a split tile that is) and under furniture. */
@@ -2094,7 +2146,7 @@ export function lawnInputs(world: WorldStructure): LawnInputs {
     things,
     defs: world.objects.map((o) => o.def).join(),
     edges: JSON.stringify([world.walls.length, world.diagonals, world.floors, world.walls.map((e) => `${e.axis}${e.x},${e.z}`).join(), lawnEdges(world)]),
-    meta: [world.meta?.paths, world.meta?.streets, world.meta?.roads, world.meta?.world?.fields],
+    meta: [world.meta?.paths, world.meta?.streets, world.meta?.roads, world.meta?.world?.fields, world.meta?.backdrop],
   };
 }
 
