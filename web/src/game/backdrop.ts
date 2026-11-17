@@ -743,9 +743,8 @@ const bucketKey = (cx: number, cz: number) => cx * 4096 + cz;
  * is the town's ground as the edits see it (`edit/ground.ts` `townGround`: its roads, water, lots,
  * parking, squares and trails) with every lot's margin and the land before it to its road marked,
  * and every building standing is in the overlap test (a new one may touch it, as the generator's
- * do). New buildings are added after those
- * (`rowsAlong`, `secondRow`, `put`, a civic place's building set by hand `putCivic`) and named by
- * `placesFor`; the town's own are not moved. A draft's pass has no centres to thin (`thin`).
+ * do). New buildings are added after those (`rowsAlong`, `secondRow`, `put`, `infillPoints`), none
+ * of them a place; the town's own are not moved. A draft's pass has no centres to thin (`thin`).
  */
 export class BackdropPass {
   private readonly content: Content;
@@ -774,12 +773,6 @@ export class BackdropPass {
   private readonly blocked: Uint8Array;
   private readonly built: BackdropBuilding[] = [];
   private readonly buckets = new Map<number, number[]>();
-  /** Where each building's door is: the middle of its front, on the road's side. */
-  private readonly doors: Pt[] = [];
-  /** The civic places laid, by building. */
-  private readonly civics: { at: number; c: Civic }[] = [];
-  /** The farm buildings' names, by building. */
-  private readonly farmNames: string[] = [];
   /** The places so far (a draft's, then those named since). */
   private readonly placeList: TownPlace[] = [];
   /** What else a building must be to go down (by hand only: Build keeps each to the land painted its use); anything if unset. */
@@ -864,11 +857,10 @@ export class BackdropPass {
         for (let step = 0; step < 14 && x >= 0 && z >= 0 && x < W && z < D && !roadTiles[z * W + x]; step++, x += dx, z += dz) blocked[z * W + x] = 1;
       }
     }
-    // (A draft's buildings standing: in the overlap test, their doors where their middles are.)
+    // (A draft's buildings standing: in the overlap test.)
     if ('draft' in input) {
       for (const b of input.draft.open?.backdrop ?? []) {
         const at = this.built.push(b) - 1;
-        this.doors.push(centroidOf(b.poly));
         this.bucket(b.poly, at);
       }
     }
@@ -967,23 +959,7 @@ export class BackdropPass {
       area: this.areaOf(centroidOf(poly)),
     };
     const at = this.built.push(b) - 1;
-    this.doors.push(add(c, n, -0.5));
     this.bucket(poly, at);
-    return at;
-  }
-
-  /**
-   * Civic place `civic` (an index into `CIVIC`) set by hand: its building fronting road `r` at `s`
-   * along it on `side`, set back as the civic places are, as big as `size` (else drawn from its
-   * kind's sizes), laid by `put` and named as a civic place by `placesFor`. Its index, else -1.
-   */
-  putCivic(civic: number, r: number, s: number, side: 1 | -1, rand: Rand, size?: { w: number; d: number }): number {
-    const c = CIVIC[civic];
-    if (!c) return -1;
-    const { c: mid, t, n } = this.frontAt(r, s, side, range(rand, 2.4, 4));
-    const [w, d] = size ? [size.w, size.d] : [range(rand, ...c.kind.w), range(rand, ...c.kind.d)];
-    const at = this.put(mid, t, n, w, d, c.kind, rand, c.endOn);
-    if (at >= 0) this.civics.push({ at, c });
     return at;
   }
 
@@ -1174,7 +1150,7 @@ export class BackdropPass {
    * built over: in a town whose centre is mostly its square, the rest is thinned.
    */
   thin(): void {
-    const { built, doors, roads, areas, slots, greens, water, W, D, least } = this;
+    const { built, roads, areas, slots, greens, water, W, D, least } = this;
     for (const c of this.centres) {
       const box = areas[c.area].rect;
       // (The roads' tiles as the ground has them, a little wider than the check's: `DENSEST` spares it.)
@@ -1215,12 +1191,8 @@ export class BackdropPass {
       }
       if (drop.size) {
         const keep = built.filter((_, i) => !drop.has(i));
-        const doorsKept = doors.filter((_, i) => !drop.has(i));
         built.length = 0;
         built.push(...keep);
-        doors.length = 0;
-        doors.push(...doorsKept);
-        this.civics.forEach((k) => (k.at -= [...drop].filter((j) => j < k.at).length));
         // (The buckets anew, by the buildings' new indices.)
         this.buckets.clear();
         built.forEach((b, at) => this.bucket(b.poly, at));
@@ -1255,7 +1227,8 @@ export class BackdropPass {
           const c = add(add(mid, front, -v * (depth / 2 + off + 7)), aside, u * (width / 2 + off + 9));
           const at = this.put(add(c, n, -d / 2), t, n, w, d, kind, rand);
           if (at < 0) continue;
-          if (made === 0) this.farmNames[at] = `${s.name} ${pick(rand, FARM_BUILDINGS)}`;
+          // (A farm building's name is still drawn, as when it was a place, so the draws after it stay as they were.)
+          if (made === 0) pick(rand, FARM_BUILDINGS);
           made++;
         }
       }
@@ -1268,19 +1241,6 @@ export class BackdropPass {
     const lastNames = this.content.names.last.length ? this.content.names.last : ['Smith'];
     const streets = areas[a].roads.map((r) => roads[r].name).filter((n): n is string => !!n && !/Trail|Path/.test(n));
     return namerFor(rand, areas[a].name, this.sizeOf(a), lastNames, streets, taken);
-  }
-
-  /** Building `i`'s place, if it is one (a civic place, a farm building, a shop, a café...): named (none of `taken`), its tag at its door, its hours and the careers working there. */
-  private placeOf(i: number, rand: Rand, taken: Set<string>, civicAt: ReadonlyMap<number, Civic>): TownPlace | null {
-    const b = this.built[i];
-    const kind = b.use as TownPlace['kind'];
-    if (!PLACE_KINDS.includes(kind)) return null;
-    const c = civicAt.get(i);
-    const n = this.namer(b.area, rand, taken);
-    const name = n.unique(() => (c ? c.name(n) : (this.farmNames[i] ?? placeName(kind, n))));
-    const work = c ? c.work : (KIND_WORK[kind] ?? []);
-    // (Its tag at its door: the middle of its front, on the street side.)
-    return { name, kind, x: r2(this.doors[i][0]), z: r2(this.doors[i][1]), hours: hoursFor(HOURS[kind as keyof typeof HOURS], work, this.content.careerCategories), ...(work.length ? { work: [...work] } : {}), area: b.area };
   }
 
   /**
@@ -1311,27 +1271,6 @@ export class BackdropPass {
         office.hours = hoursFor(office.hours ?? HOURS.office, [c.id], categories);
       }
     }
-  }
-
-  /**
-   * The places among `buildings` (new ones, by index: a draft's own have theirs), named after the
-   * town's other places and its lots (none twice), as `places` names them; each building given its
-   * place's index (after the town's). The new places, in the order of `buildings`.
-   */
-  placesFor(buildings: readonly number[], rand: Rand): TownPlace[] {
-    const taken = new Set<string>([...this.slots.map((s) => s.name), ...this.placeList.map((p) => p.name)]);
-    const civicAt = new Map(this.civics.map(({ at, c }) => [at, c]));
-    const made: TownPlace[] = [];
-    for (const i of buildings) {
-      const b = this.built[i];
-      if (!b || b.place !== undefined) continue;
-      const place = this.placeOf(i, rand, taken, civicAt);
-      if (!place) continue;
-      b.place = this.placeList.length;
-      this.placeList.push(place);
-      made.push(place);
-    }
-    return made;
   }
 
   /** The buildings (a draft's first, then the new) and the places. */
