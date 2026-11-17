@@ -1146,20 +1146,33 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   ground(x: number, z: number): number {
     const field = this.field;
     if (!field) return this.drawnGround(x, z);
-    if (x >= 0 && z >= 0 && x <= this.w && z <= this.d) return this.fieldAt(x, z);
+    if (x >= 0 && z >= 0 && x <= this.w && z <= this.d) {
+      // (Its last 2 m, past its last samples, hold their heights: a pond's end bank there already.)
+      const h = this.fieldAt(x, z);
+      return (x > (field.cols - 1) * LAND_CELL || z > (field.rows - 1) * LAND_CELL) && edgeWaterAt(field, this.edgeWet, x, z) === EDGE_POND ? this.endBank(field, x, z, h) : h;
+    }
     const cx = Math.min(this.w, Math.max(0, x));
     const cz = Math.min(this.d, Math.max(0, z));
     const pond = edgeWaterAt(field, this.edgeWet, x, z) === EDGE_POND;
     const today = this.drawnGround(x, z, !pond);
     const fade = 1 - smoothstep(0, LAND_EDGE_FADE, Math.hypot(x - cx, z - cz));
     if (fade <= 0) return today;
-    let edge = this.fieldAt(cx, cz);
-    if (pond) {
-      // (Its bank where the edge's sample is under it.)
-      const k = Math.min(field.rows - 1, Math.round(cz / LAND_CELL)) * field.cols + Math.min(field.cols - 1, Math.round(cx / LAND_CELL));
-      if (field.wl[k] !== NONE && field.wl[k] !== SEA_CM && field.wl[k] > field.h[k]) edge = Math.max(edge, field.wl[k] / 100 + END_BANK);
-    }
-    return today + (edge - this.drawnGround(cx, cz, !pond)) * fade;
+    const edge = pond ? this.endBank(field, cx, cz, this.fieldAt(cx, cz)) : this.fieldAt(cx, cz);
+    const h = today + (edge - this.drawnGround(cx, cz, !pond)) * fade;
+    // (By a pond's end, land over the sea's sheet: the landscape's own may lie lower there than at the edge.)
+    return pond ? Math.max(h, WATER_Y + END_BANK * fade) : h;
+  }
+
+  /**
+   * The ground `h` at (x, z), by the field's edge where a pond or a river reaches it (`EDGE_POND`), raised to the bank
+   * it ends behind (`END_BANK` over its level, or the sea's if that is higher) where the sample nearest is under it;
+   * else `h`.
+   */
+  private endBank(field: Land, x: number, z: number, h: number): number {
+    const k = Math.min(field.rows - 1, Math.max(0, Math.round(z / LAND_CELL))) * field.cols + Math.min(field.cols - 1, Math.max(0, Math.round(x / LAND_CELL)));
+    const level = field.wl[k];
+    // (Over the sea's sheet too: a river run down below the sea's level would end in it.)
+    return level !== NONE && level !== SEA_CM && level > field.h[k] ? Math.max(h, Math.max(level / 100, WATER_Y) + END_BANK) : h;
   }
 
   /** `ground` as the landscape lays it out (without a height field); `dig`: its water's bed and banks too. */
