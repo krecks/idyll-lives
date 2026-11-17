@@ -264,6 +264,25 @@ export class Geo {
     else this.face(a, c, b);
   }
 
+  /**
+   * Every vertex (and normal) turned so +x runs along (`ux`, `uz`) and +z along (−`uz`, `ux`) (a turn about +y: the
+   * winding stays), then moved by (`dx`, `dy`, `dz`): geometry built in a frame of its own put in place.
+   */
+  place(ux: number, uz: number, dx: number, dy: number, dz: number): this {
+    const p = this.p;
+    const n = this.n;
+    for (let i = 0; i < this.nv * 3; i += 3) {
+      const [x, z] = [p[i], p[i + 2]];
+      p[i] = x * ux - z * uz + dx;
+      p[i + 1] += dy;
+      p[i + 2] = x * uz + z * ux + dz;
+      const [nx, nz] = [n[i], n[i + 2]];
+      n[i] = nx * ux - nz * uz;
+      n[i + 2] = nx * uz + nz * ux;
+    }
+    return this;
+  }
+
   /** Every vertex lifted onto the ground: `ground(x, z)` m added to its height (a decal laid flat at 0, draped over a land that slopes). */
   drape(ground: (x: number, z: number) => number): this {
     const p = this.p;

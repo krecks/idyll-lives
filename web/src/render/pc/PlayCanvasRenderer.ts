@@ -83,6 +83,7 @@ import { setFogFrom } from './shaders/fog';
 import { LT_FIXTURE } from '../../debug/livingTown';
 import { applyLandFixture, LAND_FIXTURE } from '../landFixture';
 import { lotBuilding, MOVER_GROW, TownBuildings, TownMovers, townBackdrop, type Mover, type TownLotHouse } from './townView';
+import type { TownBuilding } from '../shared/townBuildings';
 import { surfaceOf } from '../shared/landSurface';
 import { TownGroundMap } from './groundTiles';
 import { LandHaze } from './landHaze';
@@ -561,6 +562,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * ground's colour map. What the far lots were chosen by (the chunks streamed in, the street's list of houses).
    */
   private townBuildings!: TownBuildings;
+  /**
+   * The backdrop's buildings (`WorldMeta.backdrop`) at every zoom, as the town view's boxes: those of the chunks the
+   * street doesn't draw (it draws the rest dressed, `backdropDress.ts`). Every one of them as laid out (`townBackdrop`),
+   * and what those drawn were chosen by.
+   */
+  private backdropBoxes!: TownBuildings;
+  private backdropAll: TownBuilding[] = [];
+  private backdropBy: { list: unknown; drawn: unknown } = { list: null, drawn: null };
   private townMovers!: TownMovers;
   private townGround!: TownGroundMap;
   private townLotsBy: { chunks: unknown; houses: readonly TownLotHouse[] | null; up: string } = { chunks: null, houses: null, up: '' };
@@ -927,10 +936,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       ground: true,
       fenceStyles: c.fenceStyles,
       farCull: this.quality.openWorld.farCull,
+      backdrop: true,
+      // (The landscape is built before the street is planned: `buildLot`.)
+      terrain: (x, z) => this.lot.landscape?.heightAt(x, z) ?? 0,
     });
     this.roam.streamScale = this.quality.openWorld.stream;
     this.cars = new Cars(this.app, this.root, this.quality.streetShadows);
     this.townBuildings = new TownBuildings(this.app, this.root);
+    this.backdropBoxes = new TownBuildings(this.app, this.root);
     this.townMovers = new TownMovers(this.app, this.root);
     this.townGround = new TownGroundMap(this.app.graphicsDevice);
     this.parkedRides = new ParkedRides(this.app, this.root, this.deps.assets, c, this.quality.streetShadows);
@@ -1443,7 +1456,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.townBackdropOf = backdrop;
       // (On a land the town follows, each on its pad: `townBackdrop`.)
       const surface = surfaceOf(world);
-      this.townBuildings.setBackdrop(townBackdrop(world, ground, surface ? (x, z) => surface.at(x, z) : null));
+      this.backdropAll = townBackdrop(world, ground, surface ? (x, z) => surface.at(x, z) : null);
     }
     this.townGround.bake(world, land ?? null);
     this.townLotsBy = { chunks: null, houses: null, up: '' };
@@ -1467,6 +1480,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.townGround.bake(this.builtWorld, this.lot.landscape);
     }
     if (mapped > 0 || this.townGround.active) this.townGround.apply(this.lot.landscape?.groundMaterials() ?? [], mapped);
+    // The backdrop's buildings at every zoom: the street draws those of the chunks it draws, dressed; these boxes the
+    // rest. Their windows lit by the hour, near and far alike.
+    const drawn = this.street.drawnChunks;
+    if (this.backdropBy.list !== this.backdropAll || this.backdropBy.drawn !== drawn) {
+      this.backdropBy = { list: this.backdropAll, drawn };
+      this.backdropBoxes.setBackdrop(this.backdropAll.filter((b) => b.chunk === undefined || !this.street.chunkDrawn(b.chunk)));
+    }
+    this.backdropBoxes.setTime(this.lastMinute, this.lastWeekday);
+    this.backdropBoxes.show(this.diag.has('notownbuildings') ? 0 : 1);
+    if (this.street.setTime(this.lastMinute, this.lastWeekday, this.lampsLevel > 0)) this.pictureChanged();
     if (blend <= 0) return;
     this.townBuildings.setTime(this.lastMinute, this.lastWeekday);
     const houses = this.street.townHouses();
@@ -3111,6 +3134,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lib.setEmissive(this.lib.surface('material.window.inner', { vertexColors: true, cutaway: true }), this.emissiveTmp.set(toLinear(c.r) * inner, toLinear(c.g) * inner, toLinear(c.b) * inner));
     this.street?.setNight(l.lamps, this.glowColor);
     this.townBuildings?.setNight(l.lamps, this.glowColor);
+    this.backdropBoxes?.setNight(l.lamps, this.glowColor);
     this.signals?.setNight(l.lamps); // (the traffic lights' lit lenses.)
     this.overview?.setNight(l.lamps, this.glowColor);
     this.applyGardenPools();
@@ -4192,6 +4216,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.landHaze?.destroy();
     this.street?.destroy();
     this.townBuildings?.destroy();
+    this.backdropBoxes?.destroy();
     this.townMovers?.destroy();
     this.townGround?.dispose();
     this.cars?.destroy();
