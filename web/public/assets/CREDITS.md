@@ -23,8 +23,11 @@ The lumps, boulders and bark of those models are pushed about by a smooth noise:
 noise as Blender computes it (`mathutils.noise.noise`). The models' generator in Rust (`crates/artkit`) computes the
 same noise, and takes the noise's two tables (a permutation of 256 and 256 unit gradients,
 `crates/artkit/src/noise_tables.rs`) from Blender as data: Blender Foundation and contributors, GPL-2.0-or-later
-(this project is GPL-3.0-or-later). No Blender code is used, and nothing of it ships: the tables only decide the
-shapes of the models built with them.
+(this project is GPL-3.0-or-later). The moving parts' curves (`crates/artkit/src/motion.rs`) follow Blender's
+F-curves to the bit, ported from its source (the auto-clamped handles and their smoothing pass, and the conversions
+between matrices, quaternions and Euler angles): Blender Foundation and contributors, GPL-2.0-or-later; the easings
+are Robert Penner's equations (BSD-3-Clause), as Blender has them. None of this ships with the game: it only decides
+the shapes and the clips of the models built with it.
 
 The garden decor (`models/garden/`, override pack `packs/gardenDecor/manifest.json`) is built in Blender by
 `tools/art/blender/families/garden_decor.py` on the shared `tools/art/blender/gamekit/` toolkit and exported as `.glb`

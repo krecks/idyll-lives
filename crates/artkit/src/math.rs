@@ -73,8 +73,11 @@ fn acosf(x: f32) -> f32 {
     }
     libm::acos(x as f64) as f32
 }
+/// (Blender's C library has an asinf of its own, not open: the rounded double is it but for one single in about
+/// 3,700 of [0, 1] (one in 25 over a half), each a unit out; a single-precision routine, such as the libm crate's,
+/// misses one in 500.)
 fn asinf(x: f32) -> f32 {
-    libm::asinf(x)
+    libm::asin(x as f64) as f32
 }
 fn atan2f(y: f32, x: f32) -> f32 {
     libm::atan2(y as f64, x as f64) as f32

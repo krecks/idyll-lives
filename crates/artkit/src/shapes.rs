@@ -120,6 +120,10 @@ options! {
     Revolve { at: P3 = P3::ZERO, material: Option<Mat> = None, segments: Option<usize> = None, scale: P3 = P3::ONE, rot: P3 = P3::ZERO, smooth: bool = true, angle: f64 = LATHE_SHARP }
 }
 options! {
+    /// `torus`'s options.
+    Torus { at: P3 = P3::ZERO, material: Option<Mat> = None, rot: P3 = P3::ZERO, major_segments: usize = 24, minor_segments: usize = 12, smooth: bool = true }
+}
+options! {
     /// `boulder`'s options.
     Boulder { at: P3 = P3::ZERO, material: Option<Mat> = None, scale: P3 = P3::ONE, rot: P3 = P3::ZERO, seed: f64 = 0.0, noise: f64 = 0.22, subdivisions: usize = 3, smooth: bool = true }
 }
@@ -228,6 +232,31 @@ pub fn revolve(name: impl AsRef<str>, profile: &[(f64, f64)], o: Revolve) -> Obj
         .set_scale(o.scale)
 }
 
+/// A ring lying in the xy plane.
+pub fn torus(name: impl AsRef<str>, major_radius: f64, minor_radius: f64, o: Torus) -> Obj {
+    let obj = scene::add(
+        name.as_ref(),
+        torus_mesh(
+            major_radius as f32,
+            minor_radius as f32,
+            o.major_segments,
+            o.minor_segments,
+        ),
+    );
+    finish(obj, o.at, o.rot, o.material, o.smooth, 0.0, CLOSED)
+}
+
+/// `shapes::torus` with its options by name, as the family scripts wrote them: `torus!(name, major, minor, key = value, ...)`.
+#[macro_export]
+macro_rules! torus {
+    ($name:expr, $major:expr, $minor:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::shapes::Torus::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::shapes::torus($name, $major, $minor, o)
+    }};
+}
+
 /// A lumpy, deterministic boulder: an icosphere displaced by noise, bottom on z = 0.
 pub fn boulder(name: impl AsRef<str>, radius: f64, o: Boulder) -> Obj {
     let obj = scene::add(
@@ -306,6 +335,10 @@ pub mod primitive {
     /// `primitive_ico_sphere_add(subdivisions, radius)`.
     pub fn ico_sphere(subdivisions: usize, radius: f32) -> Mesh {
         super::ico_sphere_mesh(subdivisions, radius)
+    }
+    /// `primitive_torus_add(major_radius, minor_radius, major_segments, minor_segments)`.
+    pub fn torus(major: f32, minor: f32, major_segments: usize, minor_segments: usize) -> Mesh {
+        super::torus_mesh(major, minor, major_segments, minor_segments)
     }
 }
 
@@ -427,6 +460,53 @@ pub(crate) fn uv_sphere_mesh(seg: usize, tot: usize, rad: f32) -> Mesh {
     mesh
 }
 
+/// `primitive_torus_add` (Blender's add_mesh_torus.py): rings of `minor_seg` points round the cross section, each
+/// ring turned about z by its share of the turn, the quads from each ring to the next; flat-shaded.
+pub(crate) fn torus_mesh(
+    major_rad: f32,
+    minor_rad: f32,
+    major_seg: usize,
+    minor_seg: usize,
+) -> Mesh {
+    let (major_rad, minor_rad) = (major_rad as f64, minor_rad as f64);
+    let pi_2 = PI * 2.0;
+    let mut verts = Vec::with_capacity(major_seg * minor_seg);
+    let mut faces: Vec<Vec<u32>> = Vec::with_capacity(major_seg * minor_seg);
+    let mut i1 = 0;
+    let tot_verts = major_seg * minor_seg;
+    for major_index in 0..major_seg {
+        let matrix = M3::rotation(
+            (major_index as f64 / major_seg as f64) * pi_2,
+            math::Axis::Z,
+        );
+        for minor_index in 0..minor_seg {
+            let angle = pi_2 * minor_index as f64 / minor_seg as f64;
+            verts.push(
+                matrix
+                    * v3(
+                        major_rad + (math::cos(angle) * minor_rad),
+                        0.0,
+                        math::sin(angle) * minor_rad,
+                    ),
+            );
+            let (mut i2, mut i3, mut i4) = if minor_index + 1 == minor_seg {
+                let i2 = major_index * minor_seg;
+                (i2, i1 + minor_seg, i2 + minor_seg)
+            } else {
+                (i1 + 1, i1 + minor_seg, i1 + minor_seg + 1)
+            };
+            for i in [&mut i2, &mut i3, &mut i4] {
+                if *i >= tot_verts {
+                    *i -= tot_verts;
+                }
+            }
+            faces.push(vec![i1 as u32, i3 as u32, i4 as u32, i2 as u32]);
+            i1 += 1;
+        }
+    }
+    Mesh::from_pydata(verts, &faces)
+}
+
 const ICO_VERTS: [[f32; 3]; 12] = [
     [0.0, 0.0, -200.0],
     [144.72, -105.144, -89.443],
@@ -464,89 +544,105 @@ const ICO_FACES: [[u32; 3]; 20] = [
     [10, 9, 11],
 ];
 
-/// `primitive_ico_sphere_add`: an icosahedron, each side cut into a grid of 2^(subdivisions - 1) a side and the
-/// grid's points pushed out onto the sphere. (The points are Blender's to rounding, in an order of their own.)
-#[allow(clippy::needless_range_loop)]
+/// `primitive_ico_sphere_add`: an icosahedron whose edges are cut and whose sides are filled with a grid, as Blender's
+/// `subdivide_edges` (grid fill, onto a sphere) does: the edges in the order the faces made them, each cut from its first
+/// point to its second, each cut a step of the way left on the edge; then the sides' inner points row by row
+/// between the cut points (pushed out onto the sphere already), the last side first. Every point is then pushed out
+/// onto the sphere.
 pub(crate) fn ico_sphere_mesh(subdivisions: usize, rad: f32) -> Mesh {
-    let k = rad / 200.0;
+    let rad_div = rad / 200.0;
     let base: Vec<V3> = ICO_VERTS
         .iter()
-        .map(|v| V3::new(k * v[0], k * v[1], k * v[2]))
+        .map(|v| V3::new(rad_div * v[0], rad_div * v[1], rad_div * v[2]))
         .collect();
-    let cuts = 1usize << subdivisions.saturating_sub(1);
-    if cuts == 1 {
-        return Mesh::from_pydata(base, &ICO_FACES.map(|f| f.to_vec()));
+    // (the operator's matrix, the identity, turns a negative zero positive)
+    let placed = |verts: Vec<V3>| -> Vec<V3> {
+        verts
+            .into_iter()
+            .map(|v| mul_m4_v3(&M4::IDENTITY, v))
+            .collect()
+    };
+    if subdivisions <= 1 {
+        return Mesh::from_pydata(placed(base), &ICO_FACES.map(|f| f.to_vec()));
     }
-    // (cut, every point is pushed out onto the sphere, the icosahedron's own too)
-    let mut verts: Vec<V3> = base
-        .iter()
-        .map(|v| on_sphere_of(rad, [v.x as f64, v.y as f64, v.z as f64]))
-        .collect();
-    let mut on_edge: std::collections::BTreeMap<(u32, u32, usize), u32> =
-        std::collections::BTreeMap::new();
-    let mut faces = Vec::new();
-    let on_sphere = |p: [f64; 3]| on_sphere_of(rad, p);
+    let cuts = (1usize << (subdivisions - 1)) - 1;
+    let onto = |p: V3| {
+        let d = crate::math::dot_v3(p, p);
+        if d > 1.0e-35 {
+            p * (rad / d.sqrt())
+        } else {
+            V3::ZERO
+        }
+    };
+    // a cut of the way from `a` to `b` (`BM_edge_split`)
+    let split = |a: V3, b: V3, fac: f32| {
+        let d = b - a;
+        V3::new(a.x + d.x * fac, a.y + d.y * fac, a.z + d.z * fac)
+    };
+    let mut verts: Vec<V3> = base.iter().map(|&v| onto(v)).collect();
+    // the edges, (first point, second point), in the order the faces made them, and the points cut on each
+    let mut edges: Vec<(u32, u32)> = Vec::new();
     for f in ICO_FACES {
-        let c: Vec<[f64; 3]> = f
-            .iter()
-            .map(|&i| {
-                let v = base[i as usize];
-                [v.x as f64, v.y as f64, v.z as f64]
-            })
-            .collect();
-        // the grid point i along the first side and j along the second, of `cuts`
-        let mut grid = vec![vec![0u32; cuts + 1]; cuts + 1];
-        for i in 0..=cuts {
-            for j in 0..=cuts - i {
-                let l = cuts - i - j;
-                let corner = [(l, f[0]), (i, f[1]), (j, f[2])];
-                let index = if let Some(&(_, v)) = corner.iter().find(|(w, _)| *w == cuts) {
-                    v
-                } else {
-                    let p = [0, 1, 2].map(|d| {
-                        (c[0][d] * l as f64 + c[1][d] * i as f64 + c[2][d] * j as f64) / cuts as f64
-                    });
-                    // a point on a side is shared with the face across it
-                    let side = if j == 0 {
-                        Some((f[0], f[1], i))
-                    } else if l == 0 {
-                        Some((f[1], f[2], j))
-                    } else if i == 0 {
-                        Some((f[2], f[0], l))
-                    } else {
-                        None
-                    };
-                    match side {
-                        Some((a, b, t)) => {
-                            let key = if a < b { (a, b, t) } else { (b, a, cuts - t) };
-                            *on_edge.entry(key).or_insert_with(|| {
-                                verts.push(on_sphere(p));
-                                verts.len() as u32 - 1
-                            })
-                        }
-                        None => {
-                            verts.push(on_sphere(p));
-                            verts.len() as u32 - 1
-                        }
-                    }
-                };
-                grid[i][j] = index;
+        // (each face makes its closing edge first: last corner to first, then round)
+        for k in 0..3 {
+            let (a, b) = (f[(k + 2) % 3], f[k]);
+            if !edges.contains(&(a, b)) && !edges.contains(&(b, a)) {
+                edges.push((a, b));
             }
         }
+    }
+    let mut cut: Vec<Vec<u32>> = Vec::with_capacity(edges.len());
+    for &(a, b) in &edges {
+        let (mut at, end) = (base[a as usize], base[b as usize]);
+        let mut points = Vec::with_capacity(cuts);
         for i in 0..cuts {
-            for j in 0..cuts - i {
-                faces.push(vec![grid[i][j], grid[i + 1][j], grid[i][j + 1]]);
-                if i + j + 1 < cuts {
-                    faces.push(vec![grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]]);
+            at = split(at, end, 1.0 / (cuts + 1 - i) as f32);
+            verts.push(onto(at));
+            points.push(verts.len() as u32 - 1);
+        }
+        cut.push(points);
+    }
+    // the points cut on the side from `a` to `b`, from `a` on
+    let side = |a: u32, b: u32| -> Vec<u32> {
+        match edges.iter().position(|&e| e == (a, b)) {
+            Some(e) => cut[e].clone(),
+            None => {
+                let e = edges.iter().position(|&e| e == (b, a)).unwrap_or(0);
+                cut[e].iter().rev().copied().collect()
+            }
+        }
+    };
+    let mut faces: Vec<Vec<u32>> = Vec::new();
+    for f in ICO_FACES.iter().rev() {
+        let (s0, s1, s2) = (side(f[0], f[1]), side(f[1], f[2]), side(f[2], f[0]));
+        // rows from the third corner down to the side from the first to the second, each from the side the first
+        // corner is on to the other
+        let mut lines: Vec<Vec<u32>> = vec![vec![f[2]]];
+        for i in 0..cuts {
+            let (a, b) = (s2[i], s1[cuts - 1 - i]);
+            let mut row = vec![a];
+            let (mut at, end) = (verts[a as usize], verts[b as usize]);
+            for j in 0..i {
+                at = split(at, end, 1.0 / (i + 1 - j) as f32);
+                verts.push(onto(at));
+                row.push(verts.len() as u32 - 1);
+            }
+            row.push(b);
+            lines.push(row);
+        }
+        let mut bottom = vec![f[0]];
+        bottom.extend(&s0);
+        bottom.push(f[1]);
+        lines.push(bottom);
+        for r in 0..lines.len() - 1 {
+            let (up, down) = (&lines[r], &lines[r + 1]);
+            for j in 0..up.len() {
+                faces.push(vec![up[j], down[j], down[j + 1]]);
+                if j + 1 < up.len() {
+                    faces.push(vec![up[j], down[j + 1], up[j + 1]]);
                 }
             }
         }
     }
-    Mesh::from_pydata(verts, &faces)
-}
-
-fn on_sphere_of(rad: f32, p: [f64; 3]) -> V3 {
-    let len = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
-    let r = rad as f64;
-    v3(p[0] / len * r, p[1] / len * r, p[2] / len * r)
+    Mesh::from_pydata(placed(verts), &faces)
 }
