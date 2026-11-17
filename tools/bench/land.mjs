@@ -376,6 +376,7 @@ async function builtStrokes(page, renderer, home, shot) {
     await aim(page, [cx, cz], 70);
     await shot('19a-before-river');
     const before = crossing.bridges.length;
+    const base = (await page.evaluate(() => window.__streetBridges?.()))?.decks ?? 0;
     // (A pond dug across it: on flat land a river with nowhere to run down to stands as a pond does.)
     const river = await page.evaluate((pts) => window.__land.stroke('lake', pts, 6, 0.6), Array.from({ length: 11 }, (_, k) => [cx - vz * (k * 2 - 10), cz + vx * (k * 2 - 10)]));
     await settled(page);
@@ -387,19 +388,44 @@ async function builtStrokes(page, renderer, home, shot) {
     if (!river.refused && after.length <= before) fault(`${renderer} the water across the road made no bridge`);
     if (!river.refused && walk) fault(`${renderer} the bridge's deck is water to the simulation`);
     await shot('19b-bridge');
+    // (The decks the street draws, waited for: the world comes back from the simulation, the street laid out again.)
+    const decksBecome = async (n) => {
+      const t0 = Date.now();
+      for (;;) {
+        const s = await page.evaluate(() => window.__streetBridges?.());
+        if ((s?.decks ?? -1) === n || Date.now() - t0 > 20_000) return { ...s, ms: Date.now() - t0 };
+        await page.waitForTimeout(250);
+      }
+    };
     if (!river.refused) {
+      const drawn = await decksBecome(base + after.length - before);
       await page.evaluate(() => window.__land.undo());
-      await page.waitForTimeout(2500);
-      const undone = (await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [cx, cz]))?.bridges ?? [];
+      const gone = await decksBecome(base);
       await settled(page);
       await page.waitForTimeout(3000);
       await shot('19c-bridge-undone');
+      const undone = (await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [cx, cz]))?.bridges ?? [];
       await page.evaluate(() => window.__land.redo());
-      await page.waitForTimeout(2500);
+      const back = await decksBecome(base + after.length - before);
+      await settled(page);
+      await page.waitForTimeout(3000);
+      await shot('19d-bridge-redone');
       const redone = (await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [cx, cz]))?.bridges ?? [];
-      out.bridge.undo = { undone: undone.length, redone: redone.length };
+      out.bridge.undo = { undone: undone.length, redone: redone.length, drawn, gone, back };
       if (undone.length !== before || redone.length !== after.length) fault(`${renderer} undo/redo of the bridge: ${JSON.stringify(out.bridge.undo)}`);
+      if (drawn.decks !== base + after.length - before || gone.decks !== base || back.decks !== base + after.length - before) fault(`${renderer} the street's decks (bridged, undone, redone): ${drawn.decks}, ${gone.decks}, ${back.decks}, not ${base + 1}, ${base}, ${base + 1}`);
+      // An earth stroke by the bridge after it: the street still on the landscape's surface, the road raised drawn on it.
+      const [ex, ez] = [cx + vx * 40, cz + vz * 40];
+      await aim(page, [ex, ez], 70);
+      const raised = await page.evaluate((pts) => window.__land.stroke('raise', pts, 10, 0.7), Array.from({ length: 11 }, (_, k) => [ex - vz * (k * 2 - 10), ez + vx * (k * 2 - 10)]));
+      await settled(page);
+      await page.waitForTimeout(3000);
+      const after2 = await page.evaluate(() => window.__streetBridges?.());
+      out.bridge.thenRaised = { refused: raised.refused, onLand: after2?.onLand, decks: after2?.decks };
+      if (raised.refused || !after2?.onLand) fault(`${renderer} a raise by the bridge: ${JSON.stringify(out.bridge.thenRaised)}`);
+      await shot('19e-raised-by-bridge');
     }
+    console.log(`land: ${renderer} the bridge's undo and redo: ${JSON.stringify(out.bridge.undo ?? null)} · then a raise: ${JSON.stringify(out.bridge.thenRaised ?? null)}`);
   } else console.log(`land: ${renderer} no country road near the town for water to cross`);
   return out;
 }

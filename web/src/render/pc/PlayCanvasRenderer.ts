@@ -107,7 +107,7 @@ import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
-import { groundDepth, lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type GarageInfo, type ItemPlacement, type ObjectPlacement, type StoreyLayout, type WorldStructure } from '../../core/protocol';
+import { groundDepth, lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type GarageInfo, type ItemPlacement, type ObjectPlacement, type RoadPlan, type StoreyLayout, type WorldStructure } from '../../core/protocol';
 import type { VisemeTrack } from '../../voice/visemes';
 import type {
   BuildEffect,
@@ -807,6 +807,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (import.meta.env.DEV) {
       const check = (this.samplerCheck = new SamplerCheck(this.device));
       (window as unknown as { __samplers?: () => unknown }).__samplers = () => check.report();
+      // (The bridge decks the street draws now, and whether it stands on the game's landscape's surface: `land.mjs`.)
+      (window as unknown as { __streetBridges?: () => unknown }).__streetBridges = () => ({ decks: this.street.layout?.bridgeCount() ?? 0, onLand: !!this.lot.landscape?.surface && this.street.layout?.standsOn(this.lot.landscape.surface) });
     }
     this.app = createApp(canvas, this.device);
     this.gpuTiming = new GpuTiming(this.device, this.passLabel);
@@ -1726,8 +1728,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!view && world.meta?.world?.size === 'big') view = this.view ?? this.nearestLot(world);
     // (Which traffic lights' poles get a pedestrians' head: those by a crosswalk.)
     this.signals.setWorld(world);
+    // (Its roads changed under the same town: a road the land's water bridged, or the bridge taken back. Built again:
+    // the street laid out on them, the landscape's surface solved with them, `buildWorld`; not patched.)
+    const was = this.builtWorld?.meta?.roads;
+    const now = world.meta?.roads;
+    const decks = (roads: readonly RoadPlan[]) => roads.map((r) => (r.bridges ? r.bridges.join(';') : '')).join('|');
+    const roadsChanged = !!was && !!now && now !== was && (now.length !== was.length || decks(now) !== decks(was));
     if (this.rebuildNext) this.rebuildNext = false;
-    else if (this.patchable(world, view)) {
+    else if (roadsChanged) {
+      // (Falls through to a whole build.)
+    } else if (this.patchable(world, view)) {
       this.patchWorld(world);
       return Promise.resolve();
     } else if (!this.worldBuilds && !this.unpatchable(world, view, false)) {

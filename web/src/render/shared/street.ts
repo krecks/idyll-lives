@@ -851,6 +851,16 @@ export class TownStreet {
     return true;
   }
 
+  /** Whether the street stands on `surface` (`landMoved`). */
+  standsOn(surface: BuiltSurface): boolean {
+    return this.levels?.surface === surface;
+  }
+
+  /** How many bridge decks the street draws (every road's spans, `bridgeSpans`): for the benches. */
+  bridgeCount(): number {
+    return [...this.roads, ...this.ways.country].reduce((n, r) => n + bridgeSpans(r).length, 0);
+  }
+
   /** Takes the world's things, houses and rooms as they are now (the layout stays: see `layoutKey`). */
   setWorld(world: WorldStructure): void {
     this.world = world;
