@@ -37,7 +37,7 @@ import type { BackdropBuilding, BackdropUse, TownPlace, TownSize } from '../core
 import { townGround } from './edit/ground';
 import { inside, leftOf, lengths, nearest, pointAt, RoadIndex, type Pt, type RoadPlan } from './roads';
 import { plotRect, type Ground, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from './town';
-import { placeOf, specOf } from './world';
+import { placeOf, sizeByHomes, specOf } from './world';
 
 type Rand = () => number;
 
@@ -574,11 +574,38 @@ export function areaSize(main: TownSize, area: number): TownSize {
 }
 
 /**
- * Whether civic place `c` is for a bigger place than area `area`, of `size` (`Civic.least`, `areaSize`): a village is
- * given a village's by hand. The main town may be given any (the player's own town: a hamlet may have its school).
+ * How big area `area` of `draft` is, for the civic places it is offered by hand and their names: a village as
+ * `areaSize` has it; the main town the bigger of its place's size (`draftSize`) and the size its homes make it
+ * (`world.ts` `sizeByHomes`), so a hamlet built out to a village's homes is offered a village's places.
  */
-export function civicTooBig(c: Civic, size: TownSize, area: number): boolean {
-  return area > 0 && SIZES.indexOf(c.least) > SIZES.indexOf(size);
+export function draftAreaSize(draft: NeighbourhoodDraft, area: number): TownSize {
+  const main = draftSize(draft);
+  if (area !== 0) return areaSize(main, area);
+  let homes = 0;
+  for (const s of draft.slots) if (s.kind === 'house' && (s.area ?? 0) === 0) homes++;
+  const grown = sizeByHomes(homes);
+  return SIZES.indexOf(grown) > SIZES.indexOf(main) ? grown : main;
+}
+
+/**
+ * Whether civic place `c` is for a bigger place than one of `size` (`Civic.least`, `draftAreaSize`): a village is given
+ * a village's by hand, and the main town its own size's (a hamlet has no police station until it has grown).
+ */
+export function civicTooBig(c: Civic, size: TownSize): boolean {
+  return SIZES.indexOf(c.least) > SIZES.indexOf(size);
+}
+
+/**
+ * The civic places `options` (indices into `CIVIC`) in the order they are offered to an area whose places employ
+ * `employed` careers: first those whose careers nobody there employs, then those with some of theirs nobody does,
+ * then the rest (a church employs nobody); each group in `CIVIC`'s order.
+ */
+export function byNeed(options: readonly number[], employed: ReadonlySet<string>): number[] {
+  const need = (i: number) => {
+    const free = CIVIC[i].work.filter((w) => !employed.has(w)).length;
+    return free && free === CIVIC[i].work.length ? 0 : free ? 1 : 2;
+  };
+  return [...options].sort((a, b) => need(a) - need(b));
 }
 
 /** Which civic place `place` is (an index into `CIVIC`), or -1: its kind, the careers it was made for first, and its name's look. */
@@ -588,14 +615,20 @@ export function civicOf(place: TownPlace | undefined): number {
 }
 
 /**
- * The civic places area `area` of `draft` (the main town unless given) does not have yet, a village's of a village's
- * size (`civicTooBig`: a village has no police station), for step 2's Lot tool to set by hand: each one's index into `CIVIC`, what it is
- * called on a card (`civicLabel`), and how big its building may be (m along the road, m deep).
+ * The civic places area `area` of `draft` (the main town unless given) does not have yet, of its size
+ * (`draftAreaSize`, `civicTooBig`: a village has no police station), for step 2's Lot tool to set by hand, those for
+ * careers nobody there employs first (`byNeed`): each one's index into `CIVIC`, what it is called on a card
+ * (`civicLabel`), and how big its building may be (m along the road, m deep).
  */
 export function civicChoices(draft: NeighbourhoodDraft, area = 0): { index: number; name: string; w: [number, number]; d: [number, number] }[] {
-  const has = new Set((draft.open?.places ?? []).filter((p) => p.area === area).map(civicOf));
-  const size = areaSize(draftSize(draft), area);
-  return CIVIC.flatMap((c, index) => (has.has(index) || civicTooBig(c, size, area) ? [] : [{ index, name: civicLabel(c, size), w: c.kind.w, d: c.kind.d }]));
+  const places = (draft.open?.places ?? []).filter((p) => p.area === area);
+  const has = new Set(places.map(civicOf));
+  const size = draftAreaSize(draft, area);
+  const open = CIVIC.flatMap((c, index) => (has.has(index) || civicTooBig(c, size) ? [] : [index]));
+  return byNeed(open, new Set(places.flatMap((p) => p.work ?? []))).map((index) => {
+    const c = CIVIC[index];
+    return { index, name: civicLabel(c, size), w: c.kind.w, d: c.kind.d };
+  });
 }
 
 /** How big `draft`'s main town is (its place's and options' `civic`). */
@@ -727,8 +760,8 @@ export class BackdropPass {
       this.density = spec.density;
       this.least = spec.mainLeast;
       this.size = spec.civic;
-      // (By hand, a village's civic place is named as a village's: its village hall.)
-      this.sizeOf = (a) => areaSize(spec.civic, a);
+      // (By hand, a village's civic place is named as a village's, its village hall; the main town's by its size now.)
+      this.sizeOf = (a) => draftAreaSize(draft, a);
       this.placeList.push(...(open?.places ?? []));
     } else {
       this.content = input.content;

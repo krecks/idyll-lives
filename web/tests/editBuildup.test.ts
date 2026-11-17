@@ -30,7 +30,8 @@ describe('build-up', async () => {
   const { plotRect, useTownContent } = await import('../src/game/town');
   const { runTownJob } = await import('../src/game/townJobs');
   const { inside, lengths, RoadIndex } = await import('../src/game/roads');
-  const { civicChoices, civicOf } = await import('../src/game/backdrop');
+  const { civicChoices, civicOf, draftAreaSize } = await import('../src/game/backdrop');
+  const { sizeByHomes } = await import('../src/game/world');
   const { removeLots } = await import('../src/game/edit/lots');
   const { entriesOf, frontOf } = await import('../src/game/edit/ground');
   const { TownHistory } = await import('../src/game/edit/history');
@@ -259,6 +260,31 @@ describe('build-up', async () => {
     // One a village is too small for is refused, and says so.
     const police = addCivic(town, t, content, { civic: 3, road: streetsOf(town, village)[0], s: 20, side: 1, seed: 1 });
     expect('refused' in police && police.refused).toMatch(/too small for a police station/);
+  });
+
+  test("the main town is offered its size's civic places, the bigger of its place's and its homes', those for careers nobody there employs first", () => {
+    // A main town's size by its homes (as the generator lays each size's).
+    expect([20, 40, 60, 110, 150, 210, 240].map(sizeByHomes)).toEqual(['hamlet', 'hamlet', 'village', 'village', 'town', 'town', 'city']);
+    // A hamlet is offered no police station, nor a village's school, until it has grown.
+    const hamlet = planOf('country', 11, { town: 'hamlet', villages: 'none', size: 'small' });
+    const homes = hamlet.slots.filter((s) => s.kind === 'house' && (s.area ?? 0) === 0);
+    expect(draftAreaSize(hamlet, 0)).toBe('hamlet');
+    expect(civicOffered(hamlet, 0).some((c) => /Police|Fire|Bank|Hotel|School/.test(c.label))).toBe(false);
+    const road = streetsOf(hamlet, 0)[0];
+    const police = addCivic(hamlet, t, content, { civic: 3, road, s: 20, side: 1, seed: 1 });
+    expect('refused' in police && police.refused).toMatch(/too small for a police station/);
+    const grown = { ...hamlet, slots: [...hamlet.slots, ...Array.from({ length: 140 - homes.length }, (_, k) => ({ ...homes[0], index: hamlet.slots.length + k }))] };
+    expect(draftAreaSize(grown, 0)).toBe('town');
+    expect(civicOffered(grown, 0).some((c) => c.label === 'Police station')).toBe(true);
+    // The town without its church and its police station: the police station (a detective's work, nobody else's)
+    // offered before the church (nobody's work).
+    const places = town.open!.places!;
+    const of = (civic: number) => town.open!.backdrop!.findIndex((b) => b.area === 0 && b.place !== undefined && civicOf(places[b.place]) === civic);
+    const without = removeLots(town, new Set(), new Set([of(1), of(3)]));
+    const order = civicOffered(without, 0).map((c) => c.civic);
+    expect(order).toContain(1);
+    expect(order).toContain(3);
+    expect(order.indexOf(3)).toBeLessThan(order.indexOf(1));
   });
 
   test('on hilly land the settle takes every building a street is built up with: those that would break a slope limit are left out first', () => {
