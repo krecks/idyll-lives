@@ -110,6 +110,21 @@ export function townFences(input: FenceInput): TownFence[] {
       }
     }
   }
+  // Paths and driveways the same way (a city's thousand of them, asked of at every edge), each
+  // driveway in the cells within its door room and a metre of it (`besideDrive` asks one cell).
+  const file = (into: Map<string, Rect[]>, r: Rect, m: number) => {
+    for (let cx = Math.floor((r.x - m) / 4); cx <= Math.floor((r.x + r.w + m) / 4); cx++) {
+      for (let cz = Math.floor((r.z - m) / 4); cz <= Math.floor((r.z + r.d + m) / 4); cz++) {
+        const list = into.get(`${cx}:${cz}`);
+        if (list) list.push(r);
+        else into.set(`${cx}:${cz}`, [r]);
+      }
+    }
+  };
+  const pathCells = new Map<string, Rect[]>();
+  for (const r of input.paths) file(pathCells, r, 0);
+  const driveCells = new Map<string, Rect[]>();
+  for (const { drive } of input.plots) if (drive) file(driveCells, drive, DOOR_ROOM + 1);
   /** Whether a thing stands across thin box `r` round an edge (on both sides of it), or beside it and residents use it. */
   const blockedNear = (r: Rect, axis: 'h' | 'v') => {
     const across = (b: Rect) => (axis === 'h' ? b.z < r.z + 0.05 && b.z + b.d > r.z + r.d - 0.05 : b.x < r.x + 0.05 && b.x + b.w > r.x + r.w - 0.05);
@@ -125,12 +140,13 @@ export function townFences(input: FenceInput): TownFence[] {
     const thin: Rect = axis === 'h' ? { x: x + 0.05, z: z - 0.1, w: 0.9, d: 0.2 } : { x: x - 0.1, z: z + 0.05, w: 0.2, d: 0.9 };
     if (blockedNear(thin, axis)) return false;
     const across = (r: Rect) => (axis === 'h' ? r.x < x + 1 && r.x + r.w > x && r.z < z - 0.01 && r.z + r.d > z + 0.01 : r.z < z + 1 && r.z + r.d > z && r.x < x - 0.01 && r.x + r.w > x + 0.01);
-    return !input.paths.some(across) && !besideDrive(axis, x, z);
+    const [x1, z1] = axis === 'h' ? [x + 1, z] : [x, z + 1];
+    for (let cx = Math.floor(x / 4); cx <= Math.floor(x1 / 4); cx++) for (let cz = Math.floor(z / 4); cz <= Math.floor(z1 / 4); cz++) if (pathCells.get(`${cx}:${cz}`)?.some(across)) return false;
+    return !besideDrive(axis, x, z);
   };
   /** Whether unit edge (axis, x, z) runs along a driveway's side within `DOOR_ROOM` of it: the car parked on it opens its doors there. */
   const besideDrive = (axis: 'h' | 'v', x: number, z: number) =>
-    input.plots.some(({ drive: r }) => {
-      if (!r) return false;
+    !!driveCells.get(`${Math.floor(x / 4)}:${Math.floor(z / 4)}`)?.some((r) => {
       // (Along its length: a driveway runs from the street into the plot, its longer way.)
       if (axis === 'v') return r.d >= r.w && z < r.z + r.d && z + 1 > r.z && (x <= r.x ? r.x - x : x - (r.x + r.w)) <= DOOR_ROOM;
       return r.w > r.d && x < r.x + r.w && x + 1 > r.x && (z <= r.z ? r.z - z : z - (r.z + r.d)) <= DOOR_ROOM;
@@ -368,23 +384,37 @@ function joinPockets(out: Map<string, TownFence>, plots: readonly FencePlot[], f
   };
   const label = new Int32Array(W * D).fill(-1);
   const regions: { first: number; plot: boolean; open: boolean }[] = [];
-  const stack: number[] = [];
+  // (The regions found as `look` would find them, written out: this runs over every tile of a big world.)
+  const stack = new Int32Array(W * D);
   for (let s = 0; s < W * D; s++) {
     if (label[s] >= 0 || solid[s]) continue;
     const id = regions.length;
     const region = { first: s, plot: false, open: false };
     regions.push(region);
     label[s] = id;
-    stack.push(s);
-    while (stack.length) {
-      const i = stack.pop()!;
-      region.plot ||= !!onPlot[i];
-      region.open ||= i % W === 0 || i < W;
-      look(i, (j, fenced) => {
-        if (fenced || label[j] >= 0 || solid[j]) return;
-        label[j] = id;
-        stack.push(j);
-      });
+    let top = 0;
+    stack[top++] = s;
+    while (top) {
+      const i = stack[--top];
+      if (onPlot[i]) region.plot = true;
+      const x = i % W;
+      if (x === 0 || i < W) region.open = true;
+      if (x > 0 && !v[i] && label[i - 1] < 0 && !solid[i - 1]) {
+        label[i - 1] = id;
+        stack[top++] = i - 1;
+      }
+      if (x < W - 1 && !v[i + 1] && label[i + 1] < 0 && !solid[i + 1]) {
+        label[i + 1] = id;
+        stack[top++] = i + 1;
+      }
+      if (i >= W && !h[i] && label[i - W] < 0 && !solid[i - W]) {
+        label[i - W] = id;
+        stack[top++] = i - W;
+      }
+      if (i + W < W * D && !h[i + W] && label[i + W] < 0 && !solid[i + W]) {
+        label[i + W] = id;
+        stack[top++] = i + W;
+      }
     }
   }
   regions.forEach((r, id) => {

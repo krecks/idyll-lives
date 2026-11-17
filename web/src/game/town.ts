@@ -1356,9 +1356,20 @@ function gardenFencesOf(
     if (z0 === z1) for (let x = Math.min(x0, x1); x < Math.max(x0, x1); x++) walls.add(`h:${x}:${z0}`);
     else for (let z = Math.min(z0, z1); z < Math.max(z0, z1); z++) walls.add(`v:${x0}:${z}`);
   }
+  // (The ground storey's walls by the 16 m cell their first corner is in: a plot looks only at those in its cells.)
+  const wallCells = new Map<number, (typeof layout.walls)[number][]>();
+  for (const w of layout.walls) {
+    if (Math.max(w[1], w[3]) > D) continue;
+    const k = Math.floor(Math.min(w[0], w[2]) / 16) * 65536 + Math.floor(Math.min(w[1], w[3]) / 16);
+    const list = wallCells.get(k);
+    if (list) list.push(w);
+    else wallCells.set(k, [w]);
+  }
   const houseIn = (r: Rect): [number, number, number, number] | null => {
     let box: [number, number, number, number] | null = null;
-    for (const [x0, z0, x1, z1] of layout.walls) {
+    const near: (typeof layout.walls)[number][] = [];
+    for (let cx = Math.floor(r.x / 16); cx <= Math.floor((r.x + r.w) / 16); cx++) for (let cz = Math.floor(r.z / 16); cz <= Math.floor((r.z + r.d) / 16); cz++) near.push(...(wallCells.get(cx * 65536 + cz) ?? []));
+    for (const [x0, z0, x1, z1] of near) {
       if (Math.max(z0, z1) > D || Math.min(x0, x1) < r.x || Math.max(x0, x1) > r.x + r.w || Math.min(z0, z1) < r.z || Math.max(z0, z1) > r.z + r.d) continue;
       const [ax, az, bx, bz] = [Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1)];
       box = box ? [Math.min(box[0], ax), Math.min(box[1], az), Math.max(box[2], bx), Math.max(box[3], bz)] : [ax, az, bx, bz];

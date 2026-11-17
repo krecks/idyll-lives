@@ -402,7 +402,7 @@ function settleOnce<W extends FollowWorld>(plan: NeighbourhoodDraft, preview: (d
   // The land eased and graded under the town, and measured (no margin: the limits themselves). Each
   // area's plane as the town was laid (`open.gentle`), so an edit changes the land only round itself;
   // a village put down or moved since gets one fitted afresh.
-  const gentle = gentleUnder(land, world, plan.slots.map((s) => s.area ?? 0), open.gentle);
+  const gentle = gentleUnder(land, world, plan.slots.map((s) => s.area ?? 0), { kept: open.gentle, dist: guard.dist, smooth: smoothOf(land) });
   const seeded: Land = { ...land, h: land.h.slice() };
   gradeLand(land, world);
   const over = overOf(plan, world, measureLand(world, land, seeded, 0, false));
@@ -828,6 +828,27 @@ function shoreClamp(h: Float32Array, wl: Int16Array, cols: number, rows: number,
 const SMOOTH_REACH = 8;
 const SMOOTH_PASSES = 3;
 
+/** The last land `smoothOf` smoothed (by its heights and water), and what it gave. */
+let smoothed: { cols: number; rows: number; h: Int16Array; wl: Int16Array; out: Float32Array } | null = null;
+
+/**
+ * `smoothHeights(land)`, the last land's kept: step 2's settles ease the same land as laid, settle
+ * after settle (a copy of it each time, sent to the town worker). Not to be written to.
+ */
+function smoothOf(land: Land): Float32Array {
+  const s = smoothed;
+  if (s && s.cols === land.cols && s.rows === land.rows && sameInts(s.h, land.h) && sameInts(s.wl, land.wl)) return s.out;
+  const out = smoothHeights(land);
+  smoothed = { cols: land.cols, rows: land.rows, h: land.h.slice(), wl: land.wl.slice(), out };
+  return out;
+}
+
+function sameInts(a: Int16Array, b: Int16Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return false;
+  return true;
+}
+
 /**
  * The land's dry heights (m) with its finer hills smoothed out (three box blurs of
  * `SMOOTH_REACH` samples either way, over the dry samples alone: a gaussian of about 17 m), its
@@ -883,14 +904,17 @@ export function smoothHeights(land: Land): Float32Array {
  * box, and each lot out of every box, gets a plane (`gentler`); then the land beside water is
  * kept to its shore again (`shoreClamp`). What `withLand` does before it grades the town in.
  * `kept`: planes fitted before (`open.gentle`), each used as it is for the area whose box it was
- * fitted to (an area with none, a village put down or moved since, gets one fitted afresh). The
- * areas' planes used, in their order (a plane per area that has built ground in its box).
+ * fitted to (an area with none, a village put down or moved since, gets one fitted afresh). `dist`
+ * and `smooth`: what is built's distances (`Protection.dist`) and `smoothHeights(land)`, if the
+ * caller has them already. The areas' planes used, in their order (a plane per area that has built
+ * ground in its box).
  */
-export function gentleUnder(land: Land, world: FollowWorld, areaOf: readonly number[] = [], kept: readonly GentlePlane[] = []): GentlePlane[] {
+export function gentleUnder(land: Land, world: FollowWorld, areaOf: readonly number[] = [], given: { kept?: readonly GentlePlane[]; dist?: Float32Array; smooth?: Float32Array } = {}): GentlePlane[] {
   const { cols, rows } = land;
   const look = { ...DEFAULT_LANDSCAPE, ...(world.meta?.world as { landscape?: Partial<typeof DEFAULT_LANDSCAPE> } | undefined)?.landscape };
-  const dist = new Protection(cols, rows, builtOf(world)).dist;
-  const smooth = smoothHeights(land);
+  const dist = given.dist ?? new Protection(cols, rows, builtOf(world)).dist;
+  const smooth = given.smooth ?? smoothHeights(land);
+  const kept = given.kept ?? [];
   const h = new Float32Array(cols * rows);
   const dry = (k: number) => land.wl[k] === NONE || land.wl[k] <= land.h[k];
   for (let k = 0; k < h.length; k++) {
