@@ -7,8 +7,9 @@
 #
 # Environment (and tools/bench/tiers.sh's): WATCH=320 (the camera's square, as the game runs it),
 # HOURS=24, ROUNDS=1 (best of), PARALLEL=3 (runs at once: the machine may be shared), TIERS,
-# WORLDS_AT, M1_QUOTA=7200 (of a 10,000 µs period), SKIP="native wasm container" (any of them,
-# to reuse the last run's numbers).
+# WORLDS_AT, M1_QUOTA=7200 (of a 10,000 µs period), SKIP="native wasm container quota" (any of
+# them, to reuse the last run's numbers: `container` is the build, the calibration and the runs in
+# `m3`, `quota` the runs in `m1`).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 root=$(pwd)
@@ -59,7 +60,11 @@ if [[ $skip != *" container "* ]]; then
   "${compose[@]}" run --rm m3 tools/m1/calibrate.sh 2>"$out/calibrate-m3.err" | tee "$out/calibrate-m3.log"
   "${compose[@]}" run --rm m1 tools/m1/calibrate.sh 2>"$out/calibrate-m1.err" | tee "$out/calibrate-m1.log"
   "${compose[@]}" run --rm -e WATCH -e HOURS -e ROUNDS -e PARALLEL -e TIERS -e WORLDS_AT m3 tools/bench/tiers.sh m1-ctr-m3 | tee "$out/ctr-m3.log"
-  "${compose[@]}" run --rm -e WATCH -e HOURS -e ROUNDS -e PARALLEL -e TIERS -e WORLDS_AT m1 tools/bench/tiers.sh m1-ctr-m1=/repo/bench-results/tiers/bins/m1-ctr-m3 | tee "$out/ctr-m1.log"
+fi
+# (One run at a time under the quota: it is the whole container's, so runs side by side would
+# share the one core's 72 %.)
+if [[ $skip != *" quota "* ]]; then
+  "${compose[@]}" run --rm -e WATCH -e HOURS -e ROUNDS -e PARALLEL=1 -e TIERS -e WORLDS_AT m1 tools/bench/tiers.sh m1-ctr-m1=/repo/bench-results/tiers/bins/m1-ctr-m3 | tee "$out/ctr-m1.log"
   "${compose[@]}" run --rm m1 sh -c 'echo "memory limit $(cat /sys/fs/cgroup/memory.max) bytes, cpu.max $(cat /sys/fs/cgroup/cpu.max), $(nproc) cpus"' > "$out/limits.log" 2>&1 || true
 fi
 
