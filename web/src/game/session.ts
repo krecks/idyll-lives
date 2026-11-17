@@ -31,6 +31,10 @@ import { prefetchCatalog, services, type GameControls } from '../ui/services';
 import { game, nextWallMode, toast } from '../ui/state.svelte';
 import { saveDebugReport } from '../ui/debugReport';
 import { lotInSentence } from '../ui/place';
+import { chosenOf } from '../ui/town/chosen';
+import { townPlaces } from '../ui/town/places';
+import { townHud } from '../ui/town/townHud.svelte';
+import { mayOpen } from './openLots';
 import { ideaToasts } from '../ui/planner/ideaToasts';
 import { aboutUs } from '../ui/story';
 import { BubbleLayer } from './bubbles';
@@ -412,6 +416,17 @@ async function openSession(
   /** Names of the player's household: a save's members (Load game lists them), not the whole town. */
   const householdNames = () => game.sims.filter((s) => game.households[s.household]?.player).map((s) => s.name);
   const homePlot = (): number | null => game.households.find((h) => h.player)?.plot ?? null;
+  /** Whether lot `plot` may be shown open now: the home, one of the household there, or looked inside (`openLots.ts`). */
+  const mayOpenNow = (plot: number) => mayOpen(plot, { home: homePlot(), lookInside: game.lookInside, sims: game.sims, mine: new Set(playerSims()) });
+  /**
+   * The lot in view closes up when nothing keeps it open any more (the household left it, the player looked away
+   * from it): the home is shown again, the camera left where it is. Not while following someone (their lot is shown).
+   */
+  function closeUp() {
+    const home = homePlot();
+    if (game.mode !== 'live' || game.follow !== null || viewPlot === null || home === null || mayOpenNow(viewPlot)) return;
+    showPlot(home, false);
+  }
 
   // --- Watching: after a while without input the director takes the camera ----------------
   const director = new Director({
@@ -674,6 +689,19 @@ async function openSession(
     goHome() {
       bridge.send({ type: 'goHome', sim: game.selected });
       game.townOpen = false;
+    },
+    lookInside(plot) {
+      if (plot === null) {
+        if (game.lookInside === null) return;
+        game.lookInside = null;
+        closeUp();
+        return;
+      }
+      if (game.mode !== 'live' || !world?.plots[plot]) return;
+      takeBack();
+      if (game.follow !== null) controls.follow(null);
+      game.lookInside = plot;
+      if (plot !== viewPlot) showPlot(plot);
     },
     lookAt(x, z) {
       // A flight across the world; the lot it settles on becomes the focus (`onFocusLot`).
@@ -1165,6 +1193,8 @@ async function openSession(
     const followed = game.follow === null ? null : game.sims.find((s) => s.id === game.follow);
     if (game.follow !== null && !followed) controls.follow(null);
     else if (followed?.plot != null && followed.plot !== viewPlot) showPlot(followed.plot);
+    // (Nobody followed: a lot the household has left closes up.)
+    closeUp();
     // New story events: the journal, the director, and the feed (only the first update's story is
     // history; a new game's is empty, and its first event is news).
     const events = ui.events ?? [];
@@ -1523,6 +1553,14 @@ async function openSession(
     // (The bench's tiled big world: a copy's lot is the town's own, `debug/tileWorld.ts`.)
     const plot = BENCH && BENCH.tile > 1 && world ? lot % world.plots.length : lot;
     if (game.mode !== 'live' || game.follow !== null || director.active || !world?.plots[plot]) return false;
+    // (Settled on another lot: the one looked inside closes up.)
+    if (game.lookInside !== null && plot !== game.lookInside) game.lookInside = null;
+    // Another household's lot (a shop none of yours is in) stays a closed house: only the home, a lot one of the
+    // household is on, or one looked inside opens.
+    if (!mayOpenNow(plot)) {
+      closeUp();
+      return false;
+    }
     if (plot !== viewPlot) showPlot(plot, false);
     return true;
   });
@@ -1677,6 +1715,13 @@ async function openSession(
       const hit = renderer.pick(x, y);
       if (hit.itemId != null) return openItemMenu(hit.itemId, x, y);
       if (hit.objectId !== null) return openMenu(hit.objectId, x, y);
+      // A house or a building past the lot in view: its card (what it is, who is inside) and its pin.
+      const building = world ? renderer.buildingAt(x, y) : null;
+      const chosen = building && world ? chosenOf(building, { places: townPlaces(world.meta, game.plots), backdrop: world.meta?.backdrop ?? [], plots: game.plots, households: game.households }) : null;
+      if (chosen) {
+        townHud.chosen = chosen;
+        return;
+      }
       // The floor (or the ground): a menu with "Walk here", as an object's has its uses.
       if (actor !== null && hit.ground && inLot(hit.ground.x, hit.ground.z)) {
         game.menu = { objectId: -1, ground: { x: hit.ground.x, z: hit.ground.z, sim: actor }, title: 'Here', x, y, items: [{ label: 'Walk here', index: 0 }] };

@@ -83,7 +83,8 @@ import { setFogFrom } from './shaders/fog';
 import { LT_FIXTURE } from '../../debug/livingTown';
 import { applyLandFixture, LAND_FIXTURE } from '../landFixture';
 import { lotBuilding, MOVER_GROW, TownBuildings, TownMovers, townBackdrop, type Mover, type TownLotHouse } from './townView';
-import type { TownBuilding } from '../shared/townBuildings';
+import { STOREY as BACKDROP_STOREY, type TownBuilding } from '../shared/townBuildings';
+import { rayPrism, rectFootprint } from '../shared/buildingPick';
 import { surfaceOf } from '../shared/landSurface';
 import { TownGroundMap } from './groundTiles';
 import { LandHaze } from './landHaze';
@@ -127,6 +128,7 @@ import type {
   PorchPreview,
   PaintPreviewFace,
   PickResult,
+  BuildingHit,
   PlacementGhost,
   RenderFailure,
   RenderPassInfo,
@@ -207,6 +209,8 @@ const PIT_MARGIN = 0.3;
 const GATE_CELL = 8;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
 const ROOF_MIN_DISTANCE = 15;
+/** A roof's height (m) over a house's top storey, at most, for a click on it (`buildingAt`). */
+const PICK_ROOF = 4;
 /** Main-thread time (ms) a world build runs before the frames it runs behind get one (`pace`). */
 const BUILD_SLICE_MS = 8;
 /**
@@ -3687,6 +3691,38 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   pick(x: number, y: number): PickResult {
     return this.picker.pick(x, y);
+  }
+
+  buildingAt(x: number, y: number): BuildingHit | null {
+    const world = this.builtWorld;
+    if (!world || this.townMode) return null;
+    const { origin, dir } = this.landRay;
+    this.camera.ray(x, y, this.cssSize.width, this.cssSize.height, origin, dir);
+    const view = this.view;
+    let best = Infinity;
+    let hit: BuildingHit | null = null;
+    for (const p of world.plots) {
+      if (!p.house || (view && view.x === p.x && view.z === p.z)) continue;
+      const [x0, z0, x1, z1] = p.house;
+      const g = [this.groundY(x0, z0), this.groundY(x1, z0), this.groundY(x1, z1), this.groundY(x0, z1)];
+      const t = rayPrism(origin, dir, rectFootprint(x0, z0, x1, z1), Math.min(...g) - 0.5, Math.max(...g) + (p.storeys ?? 1) * WALL_HEIGHT + PICK_ROOF);
+      if (t < best) [best, hit] = [t, { kind: 'lot', plot: p.id }];
+    }
+    const backdrop = world.meta?.backdrop ?? [];
+    for (let i = 0; i < backdrop.length; i++) {
+      const b = backdrop[i];
+      const y0 = b.y - this.datum;
+      const t = rayPrism(origin, dir, b.poly, y0 - 0.5, y0 + b.storeys * BACKDROP_STOREY + PICK_ROOF);
+      if (t < best) [best, hit] = [t, { kind: 'building', index: i }];
+    }
+    // (The viewed lot's own ground, nearer than the building: what was meant is there.)
+    if (hit && view && dir.y < -1e-6) {
+      const t = -origin.y / dir.y;
+      const gx = origin.x + dir.x * t;
+      const gz = origin.z + dir.z * t;
+      if (t < best && gx >= view.x && gx <= view.x + view.w && gz >= view.z && gz <= view.z + view.d) return null;
+    }
+    return hit;
   }
 
   pickPlane(height: number): { x: number; z: number } | null {
