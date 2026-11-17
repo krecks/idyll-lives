@@ -29,16 +29,27 @@ fi
 if [[ $skip != *" wasm "* ]]; then
   (cd web && bun run wasm) > "$out/wasm-build.log" 2>&1
   : > "$out/wasm.log"
+  # (Bun first, alone: it writes the merged content Node reads. Then PARALLEL at a time.)
+  bun tools/bench/simtick.mjs "bench-results/tiers/tier-$(set -- $TIERS; echo "$1").json" --hours 0 > /dev/null 2>&1 || true
+  jobs=0
   for engine in bun node; do
     for t in $TIERS; do
       for k in $WORLDS_AT; do
         for r in $(seq 1 "$ROUNDS"); do
-          line=$($engine tools/bench/simtick.mjs "bench-results/tiers/tier-$t.json" --world "$k" --hours "$HOURS" ${WATCH:+--watch $WATCH} 2>>"$out/wasm.log")
-          echo "$t $k $line" | tee -a "$out/wasm.log"
+          (
+            line=$($engine tools/bench/simtick.mjs "bench-results/tiers/tier-$t.json" --world "$k" --hours "$HOURS" ${WATCH:+--watch $WATCH} 2>>"$out/wasm.err")
+            echo "$t $k $line" | tee -a "$out/wasm.log"
+          ) &
+          jobs=$((jobs + 1))
+          if [ "$jobs" -ge "$PARALLEL" ]; then
+            wait
+            jobs=0
+          fi
         done
       done
     done
   done
+  wait
 fi
 
 # The container: its build and calibration (best of 3, with and without the quota), then the same
