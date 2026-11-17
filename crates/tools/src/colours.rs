@@ -6,8 +6,11 @@
 //! is a hole that no lamp lifts. This lists them: each model's materials as the game draws them (the file's
 //! colour, times its finish's texture where it has one), by their luminance in linear light.
 //!
-//! Left out: metals (their colour is their reflection), see-through finishes, materials that glow, and
-//! models the manifests don't name. A report, not a gate: `--check` makes it one once the palette is in range.
+//! A metal's colour is what it reflects face on, and no metal in use reflects less than 45 % (`pbr`): one
+//! darker is listed too, as a dark metal (black iron is an oxide: a dark satin, not a metal).
+//!
+//! Left out: see-through finishes, materials that glow, and models the manifests don't name. A report, not
+//! a gate: `--check` makes it one once the palette is in range.
 //!
 //! ```text
 //! cargo review colours [--all] [--check]
@@ -19,6 +22,8 @@ use std::path::{Path, PathBuf};
 
 /// The share of light a surface that isn't metal reflects, at least and at most (linear luminance).
 pub const RANGE: [f64; 2] = [0.02, 0.80];
+/// The least a metal reflects face on.
+pub const METAL_LEAST: f64 = crate::pbr::METAL_LUMINANCE_LEAST;
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -40,7 +45,9 @@ pub enum Finish {
     Plain,
     /// The colour times a tiling texture, of this mean (linear red, green, blue).
     Textured([f64; 3]),
-    /// Left out: a metal, see-through, or cut out by its texture's alpha.
+    /// A metal: the colour is what it reflects.
+    Metal,
+    /// Left out: see-through, or cut out by its texture's alpha.
     Skipped,
 }
 
@@ -55,11 +62,10 @@ pub fn finishes(manifest: &J, dir: &Path) -> BTreeMap<String, Finish> {
         .filter(|(k, _)| k.starts_with("material.finish."))
     {
         let number = |name: &str, default: f64| e.get(name).and_then(J::as_f64).unwrap_or(default);
-        let finish = if number("metallic", 0.0) >= 0.5
-            || number("alpha", 1.0) < 1.0
-            || e.get("cutout").is_some()
-        {
+        let finish = if number("alpha", 1.0) < 1.0 || e.get("cutout").is_some() {
             Finish::Skipped
+        } else if number("metallic", 0.0) >= 0.5 {
+            Finish::Metal
         } else if let Some(texture) = e.get("texture").and_then(J::as_str) {
             match image::open(dir.join(texture)) {
                 Ok(image) => {
@@ -110,17 +116,20 @@ pub struct Found {
     pub material: String,
     pub finish: String,
     pub luminance: f64,
+    /// A metal under `METAL_LEAST` (the others are out of `RANGE`).
+    pub metal: bool,
 }
 
-/// A model's materials out of range: `materials` is its manifest entry's map, `gltf` its file's JSON.
+/// A model's materials out of range: how many that aren't metal were looked at, how many metals, and those
+/// found. `materials` is its manifest entry's map, `gltf` its file's JSON.
 pub fn of_model(
     key: &str,
     family: &str,
     materials: Option<&J>,
     gltf: &J,
     finishes: &BTreeMap<String, Finish>,
-) -> (usize, Vec<Found>) {
-    let mut checked = 0;
+) -> ([usize; 2], Vec<Found>) {
+    let mut checked = [0; 2];
     let mut found = Vec::new();
     let list = gltf
         .get("materials")
@@ -137,22 +146,22 @@ pub fn of_model(
             .or_else(|| named_finish(name));
         let pbr = m.get("pbrMetallicRoughness");
         let number = |o: Option<&J>, name: &str| o.and_then(|o| o.get(name)).and_then(J::as_f64);
-        // A colour's own metal (the palette's `metallic`), or the file's where nothing maps the material.
-        let metal = number(mapped, "metallic").unwrap_or(if finish_key.is_some() {
-            0.0
-        } else {
-            number(pbr, "metallicFactor").unwrap_or(1.0)
-        });
-        let glows = mapped.is_some_and(|o| o.get("glow").is_some())
-            || m.get("emissiveFactor")
-                .and_then(J::as_array)
-                .is_some_and(|e| e.iter().any(|v| v.as_f64().unwrap_or(0.0) > 0.0));
         let finish = match &finish_key {
             Some(k) => finishes.get(k).cloned().unwrap_or(Finish::Plain),
             None => Finish::Plain,
         };
-        if metal >= 0.5
-            || glows
+        // A colour's own metal (the palette's `metallic`), else its finish's, or the file's where nothing maps
+        // the material.
+        let metal = number(mapped, "metallic").unwrap_or(if finish_key.is_some() {
+            f64::from(finish == Finish::Metal)
+        } else {
+            number(pbr, "metallicFactor").unwrap_or(1.0)
+        }) >= 0.5;
+        let glows = mapped.is_some_and(|o| o.get("glow").is_some())
+            || m.get("emissiveFactor")
+                .and_then(J::as_array)
+                .is_some_and(|e| e.iter().any(|v| v.as_f64().unwrap_or(0.0) > 0.0));
+        if glows
             || finish == Finish::Skipped
             || m.get("alphaMode").and_then(J::as_str) == Some("BLEND")
         {
@@ -168,8 +177,12 @@ pub fn of_model(
             _ => [1.0; 3],
         };
         let l = luminance([base[0] * tint[0], base[1] * tint[1], base[2] * tint[2]]);
-        checked += 1;
-        if l < RANGE[0] || l > RANGE[1] {
+        checked[usize::from(metal)] += 1;
+        if if metal {
+            l < METAL_LEAST
+        } else {
+            l < RANGE[0] || l > RANGE[1]
+        } {
             found.push(Found {
                 key: key.to_string(),
                 family: family.to_string(),
@@ -178,6 +191,7 @@ pub fn of_model(
                     k.trim_start_matches("material.finish.").to_string()
                 }),
                 luminance: l,
+                metal,
             });
         }
     }
@@ -200,8 +214,9 @@ pub(crate) fn manifests(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Every named model's materials: how many were looked at, and those out of range.
-pub fn survey(assets: &Path) -> Result<(usize, usize, Vec<Found>), String> {
+/// Every named model's materials: how many models, how many colours were looked at (those that aren't
+/// metal, then the metals), and those out of range.
+pub fn survey(assets: &Path) -> Result<(usize, [usize; 2], Vec<Found>), String> {
     let read = |path: &Path| -> Result<J, String> {
         serde_json::from_slice(
             &std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?,
@@ -211,7 +226,7 @@ pub fn survey(assets: &Path) -> Result<(usize, usize, Vec<Found>), String> {
     let finishes = finishes(&read(&assets.join("manifest.json"))?, assets);
     let mut files = Vec::new();
     manifests(assets, &mut files);
-    let (mut models, mut checked, mut found) = (0, 0, Vec::new());
+    let (mut models, mut checked, mut found) = (0, [0; 2], Vec::new());
     for file in files {
         let manifest = read(&file)?;
         let dir = file.parent().unwrap_or(assets);
@@ -239,7 +254,8 @@ pub fn survey(assets: &Path) -> Result<(usize, usize, Vec<Found>), String> {
                 &finishes,
             );
             models += 1;
-            checked += n;
+            checked[0] += n[0];
+            checked[1] += n[1];
             found.append(&mut out);
         }
     }
@@ -259,20 +275,34 @@ pub fn main(args: &[String]) -> i32 {
             return 1;
         }
     };
-    let light = found.iter().filter(|f| f.luminance > RANGE[1]).count();
-    let dark = found.len() - light;
-    println!(
-        "{models} models, {checked} colours that aren't metal, glass or glowing: {light} reflect more than {:.0} %, {dark} less than {:.0} %\n",
-        RANGE[1] * 100.0,
-        RANGE[0] * 100.0
-    );
-    let mut families: BTreeMap<&str, [usize; 2]> = BTreeMap::new();
+    // What a finding is: too light, too dark, or a dark metal.
+    let kind = |f: &Found| {
+        if f.metal {
+            2
+        } else {
+            usize::from(f.luminance < RANGE[0])
+        }
+    };
+    let mut families: BTreeMap<&str, [usize; 3]> = BTreeMap::new();
+    let mut totals = [0; 3];
     for f in &found {
-        families.entry(&f.family).or_default()[usize::from(f.luminance < RANGE[0])] += 1;
+        families.entry(&f.family).or_default()[kind(f)] += 1;
+        totals[kind(f)] += 1;
     }
-    println!("| family | too light | too dark |\n|---|---|---|");
-    for (family, [light, dark]) in &families {
-        println!("| {family} | {light} | {dark} |");
+    println!(
+        "{models} models, {} colours that aren't metal, glass or glowing: {} reflect more than {:.0} %, {} less than {:.0} %; {} metals: {} reflect less than {:.0} %\n",
+        checked[0],
+        totals[0],
+        RANGE[1] * 100.0,
+        totals[1],
+        RANGE[0] * 100.0,
+        checked[1],
+        totals[2],
+        METAL_LEAST * 100.0
+    );
+    println!("| family | too light | too dark | dark metal |\n|---|---|---|---|");
+    for (family, [light, dark, metal]) in &families {
+        println!("| {family} | {light} | {dark} | {metal} |");
     }
     found.sort_by(|a, b| b.luminance.total_cmp(&a.luminance));
     let show = |title: &str, rows: &[&Found]| {
@@ -287,12 +317,9 @@ pub fn main(args: &[String]) -> i32 {
             );
         }
     };
-    let lights: Vec<&Found> = found.iter().filter(|f| f.luminance > RANGE[1]).collect();
-    let darks: Vec<&Found> = found
-        .iter()
-        .rev()
-        .filter(|f| f.luminance < RANGE[0])
-        .collect();
+    let lights: Vec<&Found> = found.iter().filter(|f| kind(f) == 0).collect();
+    let darks: Vec<&Found> = found.iter().rev().filter(|f| kind(f) == 1).collect();
+    let metals: Vec<&Found> = found.iter().rev().filter(|f| kind(f) == 2).collect();
     let n = if all { usize::MAX } else { 15 };
     show(
         &format!(
@@ -306,6 +333,10 @@ pub fn main(args: &[String]) -> i32 {
         &lights[..lights.len().min(n)],
     );
     show("The darkest:", &darks[..darks.len().min(n)]);
+    show(
+        "The darkest metals (a metal's colour is what it reflects; darker, it is a dielectric):",
+        &metals[..metals.len().min(n)],
+    );
     i32::from(check && !found.is_empty())
 }
 
@@ -318,7 +349,7 @@ mod tests {
     fn a_model_s_colours_in_and_out_of_range() {
         let mut finishes = BTreeMap::new();
         finishes.insert("material.finish.matte".to_string(), Finish::Plain);
-        finishes.insert("material.finish.metal".to_string(), Finish::Skipped);
+        finishes.insert("material.finish.metal".to_string(), Finish::Metal);
         finishes.insert(
             "material.finish.wood".to_string(),
             Finish::Textured([0.5, 0.5, 0.5]),
@@ -336,12 +367,37 @@ mod tests {
             "brass": { "finish": "material.finish.matte", "metallic": 1.0 },
         });
         let (checked, found) = of_model("model.x", "kitchen", Some(&materials), &gltf, &finishes);
-        // (Steel, the lamp and the brass are left out; the wood's 0.9 is 0.45 under its texture.)
-        assert_eq!(checked, 5);
+        // (The lamp is left out; steel and brass are metals; the wood's 0.9 is 0.45 under its texture.)
+        assert_eq!(checked, [5, 2]);
         let names: Vec<&str> = found.iter().map(|f| f.material.as_str()).collect();
         assert_eq!(names, ["white", "soot", "raw"]);
         assert_eq!(found[2].finish, "unmapped");
         assert!((found[0].luminance - 0.9).abs() < 1e-9);
+        assert!(found.iter().all(|f| !f.metal));
+    }
+
+    #[test]
+    fn a_dark_metal_is_found() {
+        let mut finishes = BTreeMap::new();
+        finishes.insert("material.finish.matte".to_string(), Finish::Plain);
+        finishes.insert("material.finish.metal".to_string(), Finish::Metal);
+        let colour = |name: &str, v: f64| json!({ "name": name, "pbrMetallicRoughness": { "baseColorFactor": [v, v, v, 1.0] } });
+        let gltf = json!({ "materials": [
+            colour("steel", 0.6), colour("iron", 0.05), colour("gunmetal", 0.2), colour("painted", 0.05),
+            colour("grate", 0.44),
+        ] });
+        let materials = json!({
+            "steel": { "finish": "material.finish.metal" }, "iron": { "finish": "material.finish.metal" },
+            "gunmetal": { "finish": "material.finish.matte", "metallic": 1 },
+            "painted": { "finish": "material.finish.metal", "metallic": 0 },
+            "grate": { "finish": "material.finish.metal" },
+        });
+        let (checked, found) = of_model("model.x", "kitchen", Some(&materials), &gltf, &finishes);
+        // (Painted over, the metal finish's colour is a dielectric's: 5 % is in range.)
+        assert_eq!(checked, [1, 4]);
+        let names: Vec<&str> = found.iter().map(|f| f.material.as_str()).collect();
+        assert_eq!(names, ["iron", "gunmetal", "grate"]);
+        assert!(found.iter().all(|f| f.metal));
     }
 
     #[test]
@@ -361,8 +417,8 @@ mod tests {
     fn the_shipped_models_are_read() {
         let (models, checked, found) = survey(&root().join("web/public/assets")).unwrap();
         assert!(models > 600, "{models} models");
-        assert!(checked > 2000, "{checked} colours");
+        assert!(checked[0] > 2000 && checked[1] > 300, "{checked:?} colours");
         // (A report for now: how many are out of range is what the palette pass brings down.)
-        assert!(found.len() < checked);
+        assert!(found.len() < checked[0] + checked[1]);
     }
 }

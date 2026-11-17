@@ -10,7 +10,7 @@ Run them from the repo root. The textures are generated, not downloaded.
 | Command | Purpose |
 |---|---|
 | `cargo tex synth [set…]` | Generate every `albedo/normal/arm` texture set (21 sets: bark, brick, floors, foliage, grass, paving, roof, sidewalk, walls and wood) from tileable height fields; no downloads |
-| `cargo tex materials` | Writes `materials.json` in the current directory: PBR material + environment entries |
+| `cargo tex materials` | Writes `materials.json` in the current directory: PBR material + environment entries (the finishes in glTF's terms; refused when one is outside the ranges of `crates/tools/src/pbr.rs`) |
 | `cargo tex clouds <out.png>` | Generates the procedural, tileable cloud layer (`textures/sky/clouds.png`) |
 | `blender/` | The Blender-built glTF models, every model in the game: `cargo art <family>` builds a family script from `blender/families/` on the `blender/gamekit/` toolkit, exports its `.glb` files with their moving parts, writes its pack and runs the gate. See [blender/README.md](blender/README.md), the guide for people and AI agents |
 | `cargo art --leafcards` | Renders the trees' leaf-card atlas (`textures/leafcards/albedo.png`: three cut-out clusters of leaves and a dense wall of them) in Blender from leaves `blender/leafcards.py` generates; the `leafcards` finish every broadleaved tree's crown is cut from (`blender/families/trees.md`) |

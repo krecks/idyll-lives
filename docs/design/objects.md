@@ -140,17 +140,31 @@ instances, so these costs are per kind of object in view, plus the triangles of 
 
 ## Materials, finishes, tints, styles and quality
 
-The game's surfaces are a dozen finishes, the `material.finish.*` entries of the base manifest:
-`matte` (roughness 0.75), `satin` (0.42), `gloss` (0.12), `metal`, `chrome`, `skin`, `hair`
-(plain), `fabric`, `leather`, `wood`, `bark`, `foliage` (textured, tinted by the part's colour), `leafcards`
-(a tree's leaf cards: an atlas of leaf clusters, cut out by its alpha, tinted too) and `glass`
-(see-through). A model's parts are coloured per part; all the plain finishes of a model merge into
+The game's surfaces are its finishes, the `material.finish.*` entries of the base manifest, written by
+`cargo tex materials` in glTF's terms (`roughness`, `metallic`, and `clearcoat`, `clearcoatRoughness`, `sheenColor`,
+`sheenRoughness` for a layer): `matte` (roughness 0.75), `satin` (0.42), `gloss` (0.12), `enamel` (0.18), `ceramic`
+(0.1), `plastic` (0.4), `rubber` (0.9), the metals `metal` (0.32), `chrome` (0.1), `brushed` (0.4) and `iron`
+(0.65), `skin`, `hair` (plain), `fabric`, `velvet`, `leather`, `wood`, `lacquer`, `bark`, `foliage` (textured,
+tinted by the part's colour), `leafcards` (a tree's leaf cards: an atlas of leaf clusters, cut out by its
+alpha, tinted too) and `glass` (see-through). A model's parts are coloured per part; all the plain finishes of a model merge into
 one mesh, so a model costs one draw call for its plain parts plus one per textured or see-through
 finish it uses. The plain finishes carry their roughness and metalness in the vertex colour's alpha
 (`encodeFinish`, read by `PLAIN_FINISH` in `render/pc/shaders/surface.ts`). Metals mirror the sky just above the
 horizon where they would reflect the ground: the game looks down on everything, so anything upright
 and shiny (a handle, a steel fridge) would otherwise mirror the dark field of the sky map, which no
 room has.
+
+- **A finish is a surface there is.** `crates/tools/src/pbr.rs` has the ranges, and `cargo tex materials` and
+  its test refuse a finish outside them: `metallic` 0 or 1; a plain dielectric gloss (roughness up to 0.25),
+  satin (0.3–0.55) or matte (from 0.65), a plain metal chrome (up to 0.15), brushed (0.3–0.5) or cast (0.5–0.8),
+  nothing between two classes; a textured finish 0.3–1 by its own roughness times its map's mean; a clear coat
+  0 or 1, its roughness up to 0.3; a sheen's roughness 0.3–1; glass's `alpha` 0.1–0.5. `ior`, `specular` and
+  `transmission` are not taken. A metal's colour is what it reflects face on, at least 45 % (brass and copper
+  are `metal` in their colour); `cargo review colours` lists the metals darker than that (black iron, dull
+  brass: by the standard a dark `satin`, a brighter brass), a report until the palettes follow.
+- **Layers.** `fabric` and `velvet` have cloth's sheen and `lacquer` a clear coat, drawn on Medium and High
+  (`finishLayers` in `render/quality.ts`) and left out on Low. Velvet is the fabric's textures and lacquer the
+  wood's (no download): a draw call of its own only on a model that has both.
 
 - **Leather is `leather`.** Upholstery, a writing pad or a punch bag in leather takes the `leather` finish: a
   generated set (`cargo tex synth leather`) whose colour is all but even (the part's colour is the hide's, at

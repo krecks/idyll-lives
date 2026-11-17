@@ -151,6 +151,11 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ),
     (
         "normal flat",
+        "material.finish.lacquer",
+        "steepest 1 % at 1.3°: the wood's maps under a clear coat",
+    ),
+    (
+        "normal flat",
         "material.trim",
         "steepest 1 % at 1.2° at strength 0.6: the painted wood's relief is under its storage's rounding",
     ),
