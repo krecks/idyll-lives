@@ -40,7 +40,7 @@ import type { BackdropBuilding, BackdropUse, TownPlace, TownSize } from '../core
 import { townGround } from './edit/ground';
 import { inside, leftOf, lengths, nearest, pointAt, RoadIndex, type Pt, type RoadPlan } from './roads';
 import { plotRect, type Ground, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from './town';
-import { slotPlace } from './placeLots';
+import { placeOfTemplate, slotPlace } from './placeLots';
 import { placeOf, sizeByHomes, specOf } from './world';
 
 type Rand = () => number;
@@ -649,7 +649,12 @@ export function civicOf(place: TownPlace | undefined): number {
  */
 export function civicChoices(draft: NeighbourhoodDraft, area = 0): { index: number; name: string; w: [number, number]; d: [number, number] }[] {
   const places = (draft.open?.places ?? []).filter((p) => p.area === area);
+  // (Its places' and its lots': a civic place's lot is known by its layout, `placeOfTemplate`.)
   const has = new Set(places.map(civicOf));
+  for (const s of draft.slots) {
+    const what = (s.area ?? 0) === area && s.kind === 'shop' ? placeOfTemplate(s.template) : null;
+    if (what && 'civic' in what) has.add(what.civic);
+  }
   const size = draftAreaSize(draft, area);
   const open = CIVIC.flatMap((c, index) => (has.has(index) || civicTooBig(c, size) ? [] : [index]));
   return byNeed(open, new Set(places.flatMap((p) => p.work ?? []))).map((index) => {

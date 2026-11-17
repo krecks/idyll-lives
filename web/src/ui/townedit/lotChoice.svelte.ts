@@ -6,7 +6,9 @@
 
 import type { GardenSize } from '../../game/housegen';
 import { civicOffered } from '../../game/edit/buildup';
+import { draftAreaSize } from '../../game/backdrop';
 import { CIVIC_PLACES, publicChoices, type LotChoice } from '../../game/edit/lots';
+import { placeTemplate } from '../../game/placeLots';
 import type { NeighbourhoodDraft, Templates } from '../../game/town';
 
 export type LotGroup = 'home' | 'farm' | 'public' | 'outdoor' | 'civic';
@@ -39,7 +41,7 @@ export function civicChosen(draft: NeighbourhoodDraft, area = lotChoice.civicAre
   return offered.some((c) => c.civic === lotChoice.civic) ? lotChoice.civic : (offered[0]?.civic ?? -1);
 }
 
-/** What `lotChoice` puts down as a lot (`lots.ts` `LotChoice`), or null: a civic place, put down as a building (`buildup.ts` `addCivic`). */
+/** What `lotChoice` puts down as a lot (`lots.ts` `LotChoice`), or null: a civic place, put down by `buildup.ts` `addCivic` (which of them the area under the pointer lacks: `civicChosen`). */
 export function choiceOf(t: Templates): LotChoice | null {
   const c = lotChoice;
   switch (c.group) {
@@ -61,8 +63,8 @@ export function choiceOf(t: Templates): LotChoice | null {
   }
 }
 
-/** The size of the lot `lotChoice` puts down (m), about: for its ghost where it can't go. */
-export function choiceSize(t: Templates): { w: number; d: number } {
+/** The size of the lot `lotChoice` puts down (m), about: for its ghost where it can't go (a civic place's its layout's lot in `draft`'s area under the pointer). */
+export function choiceSize(t: Templates, draft?: NeighbourhoodDraft): { w: number; d: number } {
   const c = lotChoice;
   const frame =
     c.group === 'home'
@@ -72,9 +74,10 @@ export function choiceSize(t: Templates): { w: number; d: number } {
         : c.group === 'outdoor'
           ? t.parks.find((p) => p.id === (c.outdoor || outdoorChoices(t)[0]))?.lot
           : undefined;
-  if (c.group === 'civic') {
-    const k = CIVIC_PLACES[c.civic]?.kind;
-    if (k) return { w: k.w[1], d: k.d[1] };
+  if (c.group === 'civic' && draft) {
+    const what = CIVIC_PLACES[civicChosen(draft)];
+    const lot = what && t.parks.find((p) => p.id === placeTemplate(what, draftAreaSize(draft, c.civicArea), () => 0))?.lot;
+    if (lot) return { w: lot.width, d: lot.depth };
   }
   const f = frame ?? t.plot;
   return { w: f.width, d: f.depth };
