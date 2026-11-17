@@ -23,7 +23,7 @@ import { app } from '../app.svelte';
 import { toast } from '../state.svelte';
 import { checkTown } from './checkJob';
 import { buildingBox, editGhosts, joinGhosts, lotBox, roadGhost } from './ghosts';
-import { hatchedUses } from './layoutApi';
+import { hatched } from './layoutApi';
 import { find, keyOf, pick, type Picked, type PickWhat } from './pick';
 import type { Issue, TownIssues } from './problems';
 import { EditSession, type SettleTiming } from './session';
@@ -212,6 +212,7 @@ export class TownEditorState implements TownEditor {
         {
           settle,
           show: (settled, plan) => this.show(session, settled, plan),
+          kept: (settled, plan) => this.kept(session, settled, plan),
           changed: () => this.changed(),
           check: (plan, base) => checkTown(this.hooks.content, plan, base),
           report: (why) => toast(sentence(why)),
@@ -246,6 +247,13 @@ export class TownEditorState implements TownEditor {
     this.target = { ...rest, draft, plan, history: session.history, edited: session.edits > 0, ...(marks ? { marks } : {}) };
     // (The built town changed: its households are made again in step 4.)
     if (this.step === 'build') app.townOf = '';
+  }
+
+  /** A plan that changed its zones alone, kept with the town on screen (no settle): kept as the town the next steps read. */
+  private kept(session: EditSession, draft: NeighbourhoodDraft, plan: NeighbourhoodDraft): void {
+    const w = this.target;
+    if (!w || this.session !== session) return;
+    this.target = { ...w, draft, plan, history: session.history, edited: session.edits > 0 };
   }
 
   /** Something changed: the panel told, the ghosts drawn again, `app` told of the edits. */
@@ -396,7 +404,7 @@ export class TownEditorState implements TownEditor {
     // (An edit that left the zones and the roads as they were leaves the overlay as it is.)
     if (plan && was && plan.open?.uses === was.open?.uses && plan.roads === was.roads) return;
     const layer = plan?.open?.uses ?? null;
-    menuScene.setUses(layer, layer && plan ? hatchedUses(plan) : null);
+    menuScene.setUses(layer, layer && plan ? hatched(plan) : null);
   }
 
   /** The camera to where a problem is (the lot of the town on screen nearest it). */

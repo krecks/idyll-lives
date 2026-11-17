@@ -1,18 +1,16 @@
 <script lang="ts">
   /**
    * The zone brush's card: the five uses as chips in their colours (`uses.ts`), Erase, the brush's
-   * size and "Beside streets only" (`zoneChoice`). Under them, what the zones would build, about.
+   * size and "Beside streets only" (`zoneChoice`). (What the zones would build is the panel's summary line.)
    */
   import Segmented from '../kit/Segmented.svelte';
   import { USE_COLORS, USE_KINDS, USE_LABELS } from '../../game/uses';
-  import { summaryLine, usesSummary } from './layoutApi';
   import type { TownEditor } from './tools';
   import { ZONE_SIZES, zoneChoice } from './zoneChoice.svelte';
 
-  const { editor }: { editor: TownEditor } = $props();
+  const { editor: _editor }: { editor: TownEditor } = $props();
 
   const SIZES = ZONE_SIZES.map((value) => ({ value: String(value), label: `${value} m` }));
-  const line = $derived((void editor.version, summaryLine(usesSummary(editor.draft))));
 </script>
 
 <div class="zone-card">
@@ -33,7 +31,6 @@
     <span>Beside streets only <span class="sub">(within 40 m of a road)</span></span>
   </label>
   <p class="hint">Paint where homes, shops, parks and public places go; Build puts them along the streets. Zones far from a street are hatched: nothing is built there until a street reaches them.</p>
-  <p class="hint summary" aria-live="polite">{line}</p>
 </div>
 
 <style>
@@ -93,9 +90,5 @@
   }
   .hint {
     margin: 0;
-  }
-  .summary {
-    color: var(--text);
-    font-weight: 600;
   }
 </style>

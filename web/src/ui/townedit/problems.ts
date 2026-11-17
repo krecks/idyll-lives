@@ -21,6 +21,7 @@
 import type { Content } from '../../content/content';
 import type { RoadPlan } from '../../core/protocol';
 import { pointAt, lengths } from '../../game/roads';
+import { areasFor } from '../../game/build';
 import { checkedTown } from '../../game/edit/checked';
 import { townProblems } from '../../game/townCheck';
 import { plotRect, type NeighbourhoodDraft, type Templates } from '../../game/town';
@@ -134,7 +135,11 @@ export function issueOf(line: string, draft: NeighbourhoodDraft, t: Templates): 
  * What is wrong with `draft` (see the top of this file). `base`: the town as it was laid (its
  * problems, if any, are the generator's: they warn rather than block, the player having made none of them).
  */
-export function townIssues(draft: NeighbourhoodDraft, t: Templates, content: Content, base?: TownIssues): TownIssues {
+export function townIssues(plan: NeighbourhoodDraft, t: Templates, content: Content, base?: TownIssues): TownIssues {
+  // (Step 2's layout has no lots yet: its homes are zones, and the way on counts them itself. Its roads are judged as
+  // Build will have them: a street drawn by hand only gets its area, and its village's limits, at Build.)
+  const layout = !plan.slots.length && !!plan.open?.uses;
+  const draft = layout ? areasFor(plan, content).draft : plan;
   const careers = content.careerCategories.map((c) => c.id);
   const size = draft.world?.options?.town;
   // (Only the main town's careers are expected, in a town or a city; nothing about how filled it is.)
@@ -142,8 +147,6 @@ export function townIssues(draft: NeighbourhoodDraft, t: Templates, content: Con
   const found = townProblems(checkedTown(draft, t), expect, { river: false, careers, generated: false });
   const homes = draft.slots.filter((s) => s.kind === 'house').length;
   const lines = [...found.hard];
-  // (Step 2's layout has no lots yet: its homes are zones, and the way on counts them itself.)
-  const layout = !draft.slots.length && !!draft.open?.uses;
   if (homes < 2 && !layout) lines.push(`fewer than two homes (${homes})`);
   const had = new Set(base?.blocking.map((i) => i.text) ?? []);
   const out: TownIssues = { blocking: [], warnings: [] };

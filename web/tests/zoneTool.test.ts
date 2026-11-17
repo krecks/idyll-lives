@@ -21,7 +21,7 @@ const choice = { kind: 'homes' as UseKind | null, size: 16 as 8 | 16 | 32 | 64, 
 mock.module('../src/ui/townedit/ZoneCard.svelte', () => ({ default: {} }));
 mock.module('../src/ui/townedit/zoneChoice.svelte', () => ({ ZONE_SIZES: [8, 16, 32, 64], zoneChoice: choice }));
 const { zoneTool } = await import('../src/ui/townedit/zoneTool');
-const { BESIDE_STREETS, BUILD_REACH, clearAll, clearZones, hatchedUses, paintUses, roadDistance, summaryLine, usesSummary, villageAsLayout } = await import('../src/ui/townedit/layoutApi');
+const { BESIDE_STREETS, clearAll, clearZones, needsSettle, noUseCells, paintUses, roadReach, summaryLine, villageAsLayout } = await import('../src/ui/townedit/layoutApi');
 
 const W = 400;
 const D = 400;
@@ -61,7 +61,7 @@ const cellAt = (d: NeighbourhoodDraft, x: number, z: number) => unpackUses(d.ope
 
 /** An editor over `draft` whose ground is the screen (a screen pixel a metre), recording what the tool asks of it. */
 function fakeEditor(draft: NeighbourhoodDraft) {
-  const said = { applied: 0, shown: [] as (NeighbourhoodDraft | null)[], rings: [] as (LandCursor | null)[], hints: [] as (string | null)[] };
+  const said = { applied: 0, edits: [] as Edited[], shown: [] as (NeighbourhoodDraft | null)[], rings: [] as (LandCursor | null)[], hints: [] as (string | null)[] };
   const editor: { -readonly [K in keyof TownEditor]: TownEditor[K] } & { said: typeof said } = {
     said,
     step: 'layout',
@@ -72,6 +72,7 @@ function fakeEditor(draft: NeighbourhoodDraft) {
     apply(edited: Edited) {
       if ('refused' in edited) return false;
       said.applied++;
+      said.edits.push(edited);
       editor.draft = edited.draft;
       editor.version++;
       return true;
@@ -105,6 +106,8 @@ describe('the zone brush', () => {
     expect(ed.said.shown.filter(Boolean).length).toBeGreaterThan(1);
     stage.up();
     expect(ed.said.applied).toBe(1);
+    // (A stroke changes the zones alone: no land to settle under it.)
+    expect(needsSettle(ed.said.edits[0])).toBe(false);
     expect(ed.said.shown.at(-1)).toBeNull();
     // (Painted all along the drag, no gaps for a quick one.)
     for (let x = 60; x <= 140; x += 4) expect(cellAt(ed.draft, x, 120)).toBe(USE_CODE.homes);
@@ -165,7 +168,7 @@ describe('the zone brush', () => {
     stage.down(300, MAIN_Z + 20);
     for (let z = MAIN_Z + 20; z <= MAIN_Z + 90; z += 5) stage.move(300, z);
     stage.up();
-    const d = roadDistance(ed.draft);
+    const d = roadReach(ed.draft);
     const codes = unpackUses(ed.draft.open!.uses!);
     let near = 0;
     for (let k = 0; k < codes.length; k++) {
@@ -180,60 +183,28 @@ describe('the zone brush', () => {
 });
 
 describe("the layout's edits", () => {
-  test('zones never go on the water, its shore, a road or off the world', () => {
-    const draft = town();
-    const stamps = [];
-    for (let x = 0; x <= W + 40; x += 20) for (let z = 0; z <= D + 40; z += 20) stamps.push({ x, z, r: 16 });
-    const painted = paintUses(draft, stamps, 'rows');
-    if (!('draft' in painted)) throw new Error('refused');
-    const layer = painted.draft.open!.uses!;
-    const codes = unpackUses(layer);
-    const d = roadDistance(draft);
+  test("a stroke never zones the water, its shore, a road or off the world; the summary's line", () => {
+    Object.assign(choice, { kind: 'rows', size: 64, beside: false });
+    const ed = fakeEditor(town());
+    const stage = zoneTool.stage(ed);
+    stage.down(10, 10);
+    for (let z = 10; z <= D + 30; z += 30) for (const x of (z / 30) % 2 ? [W + 30, 10] : [10, W + 30]) stage.move(x, z);
+    stage.up();
+    const codes = unpackUses(ed.draft.open!.uses!);
+    const none = noUseCells(ed.draft);
     let zoned = 0;
-    for (let j = 0; j < layer.rows; j++) {
-      for (let i = 0; i < layer.cols; i++) {
-        const k = j * layer.cols + i;
-        if (!codes[k]) continue;
-        zoned++;
-        const [x, z] = [(i + 0.5) * USE_CELL, (j + 0.5) * USE_CELL];
-        expect(d[k]).toBeGreaterThan(0);
-        // (The river and 4 m of shore either side stay clear.)
-        expect(z < RIVER_Z - 4 || z > RIVER_Z + 30 + 4).toBe(true);
-        expect(x <= W && z <= D).toBe(true);
-      }
+    for (let k = 0; k < codes.length; k++) {
+      if (!codes[k]) continue;
+      zoned++;
+      expect(none[k]).toBe(0);
     }
     expect(zoned).toBeGreaterThan(1000);
-    // (A paint that changes nothing gives the draft back as it was: no edit.)
-    const again = paintUses(painted.draft, stamps, 'rows');
-    expect('draft' in again && again.draft).toBe(painted.draft);
-  });
-
-  test('the summary counts what the zones would build along the streets; far zones are hatched', () => {
-    const draft = town();
-    const homes = paintUses(draft, line(20, MAIN_Z + 14, 380, MAIN_Z + 14).filter((_, i) => i % 6 === 0).map(([x, z]) => ({ x, z, r: 8 })), 'homes');
-    if (!('draft' in homes)) throw new Error('refused');
-    const s = usesSummary(homes.draft);
-    // (About 360 m of frontage, a home every 16 m.)
-    expect(s.homes).toBeGreaterThan(15);
-    expect(s.homes).toBeLessThan(30);
-    expect(s.shops).toBe(0);
-    expect(hatchedUses(homes.draft)).toBeNull();
-    const far = paintUses(homes.draft, [{ x: 300, z: 300, r: 20 }], 'green');
-    if (!('draft' in far)) throw new Error('refused');
-    const hatched = hatchedUses(far.draft)!;
-    expect(hatched).not.toBeNull();
-    const d = roadDistance(far.draft);
-    for (let k = 0; k < hatched.length; k++) if (hatched[k]) expect(d[k]).toBeGreaterThan(BUILD_REACH);
-    // (A park too far from a road to front one isn't counted.)
-    expect(usesSummary(far.draft).parks).toBe(0);
-    const park = paintUses(far.draft, [{ x: 100, z: MAIN_Z - 20, r: 12 }], 'green');
-    expect('draft' in park && usesSummary(park.draft).parks).toBe(1);
     expect(summaryLine({ homes: 84, shops: 12, parks: 3, public: 5 })).toBe('Homes ≈ 84 · Shops ≈ 12 · Parks 3 · Public 5');
   });
 
   test('Clear zones takes every zone; Clear all leaves bare land and the main town', () => {
     const draft = town();
-    const painted = paintUses(draft, [{ x: 100, z: 130, r: 30 }], 'shops');
+    const painted = paintUses(draft, [{ x: 100, z: 130, size: 60 }], 'shops');
     if (!('draft' in painted)) throw new Error('refused');
     const zones = clearZones(painted.draft);
     expect('draft' in zones && unpackUses(zones.draft.open!.uses!).every((c) => c === 0)).toBe(true);

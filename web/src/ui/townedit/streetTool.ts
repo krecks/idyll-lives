@@ -392,7 +392,9 @@ export const streetTool: TownTool = {
     };
 
     /** The street drawn, and what goes along it: homes by `drawStreet`'s own fill, the town's buildings (and homes with them) by build-up, in the one edit (one undo). */
-    const drawn = (pts: Pt[], ask: StreetAsk, along: Exclude<Along, 'auto'>): Edited & { leftOut?: number } => {
+    const drawn = (pts: Pt[], ask: StreetAsk, asked: Exclude<Along, 'auto'>): Edited & { leftOut?: number } => {
+      // (In step 2 nothing goes along a street: its zones decide what Build puts there.)
+      const along = editor.step === 'layout' ? 'none' : asked;
       const before = editor.draft;
       const e = drawStreet(before, editor.t, editor.content, { points: pts, kind: ask.kind, asked: ask.asked, clear: ask.clear, fill: fillsHomes(along), seed });
       return along === 'buildings' || along === 'both' ? builtAlong(before, e, editor.t, editor.content, along, seed) : e;

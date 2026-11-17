@@ -479,12 +479,12 @@ function benchHelpers() {
        */
       zoneStroke(kind, off = 14, far = 46) {
         const d = plan();
-        const dist = layoutApi.roadDistance(d);
+        const dist = layoutApi.roadReach(d);
         const layer = layoutApi.layerOf(d);
         const cells = uses.unpackUses(layer);
         const cellOf = (x, z) => Math.floor(z / uses.USE_CELL) * layer.cols + Math.floor(x / uses.USE_CELL);
         // (Dry and off the roads: a dab there paints its cell.)
-        const dry = (x, z) => layoutApi.paintUses(d, [{ x, z, r: 3 }], 'homes').draft !== d;
+        const dry = (x, z) => 'draft' in layoutApi.paintUses(d, [{ x, z, size: 4 }], 'homes');
         if (kind === 'beside') {
           const order = d.roads.map((r, i) => i).sort((a, b) => ((d.roads[a].area ?? 9) === 0 ? 0 : 1) - ((d.roads[b].area ?? 9) === 0 ? 0 : 1));
           for (const i of order) {
@@ -524,7 +524,7 @@ function benchHelpers() {
         const cells = d.open?.uses ? uses.unpackUses(d.open.uses) : new Uint8Array(0);
         const count = [0, 0, 0, 0, 0, 0];
         for (const c of cells) count[c]++;
-        const hatched = layoutApi.hatchedUses(d);
+        const hatched = layoutApi.hatched(d);
         return { zoned: count.slice(1).reduce((a, b) => a + b, 0), homes: count[1], hatched: hatched ? hatched.reduce((a, b) => a + b, 0) : 0, summary: layoutApi.summaryLine(layoutApi.usesSummary(d)), hash: uses.usesHash(d.open?.uses) };
       },
       /** How many backdrop buildings and places the plan has. */

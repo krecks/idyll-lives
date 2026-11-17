@@ -4,13 +4,14 @@
  * goes (the overlay shows the stroke before it is taken), and the stroke is one edit, one step of
  * undo, taken when the button is let go. The brush's ring follows the pointer in the use's colour.
  *
- * Zones never go on the water, its shore, a road or off the world (`layoutApi.ts` `paintUses`); with
- * "Beside streets only" the brush paints only near a road. Painting needs no land settled under it.
+ * Zones never go on the water, its shore, a road or off the world (`game/edit/uses.ts` `paintUses`);
+ * with "Beside streets only" the brush paints only near a road. Painting needs no land settled under it
+ * (`needsSettle`): the session shows the town as it is with the new zones.
  */
 
 import type { NeighbourhoodDraft } from '../../game/town';
 import { USE_LABELS } from '../../game/uses';
-import { besideStreets, paintUses, type UseStamp } from './layoutApi';
+import { BESIDE_STREETS, paintUses, type UseStamp } from './layoutApi';
 import type { TownEditor, TownTool } from './tools';
 import ZoneCard from './ZoneCard.svelte';
 import { ZONE_SIZES, zoneChoice } from './zoneChoice.svelte';
@@ -26,10 +27,12 @@ export const zoneTool: TownTool = {
   icon: 'icon.ui.floor',
   does: 'Paint where homes, shops, parks and public places go.',
   stage(editor: TownEditor) {
-    /** The stroke under way: the plan it is painted on, its dabs, where the last was, and the plan with it painted so far. */
-    let stroke: { base: NeighbourhoodDraft; stamps: UseStamp[]; last: { x: number; z: number }; painted: NeighbourhoodDraft } | null = null;
+    /** The stroke under way: the plan it is painted on, its dabs, and the plan with it painted so far. */
+    let stroke: { base: NeighbourhoodDraft; stamps: UseStamp[]; painted: NeighbourhoodDraft } | null = null;
 
     const radius = () => zoneChoice.size / 2;
+    /** Erasing goes anywhere; painting with "Beside streets only" only within reach of a road. */
+    const besideOf = () => (zoneChoice.kind && zoneChoice.beside ? { beside: BESIDE_STREETS } : {});
     const tone = () => zoneChoice.kind ?? 'erase';
 
     /** The brush's ring at ground point `g` (none: off the land). */
@@ -42,30 +45,18 @@ export const zoneTool: TownTool = {
       editor.hint(`Drag to ${what}${zoneChoice.kind && zoneChoice.beside ? ' beside the streets' : ''}. One stroke is one undo.`);
     };
 
-    /** Dabs from the last one to `g`, no further apart than `SPACING` of the radius, painted on the stroke so far. */
+    /** A dab at `g`, painted on the stroke so far as the line on from the last (`paintUses` paints along it): shown on the overlay. */
     const dab = (g: { x: number; z: number }) => {
       const s = stroke;
       if (!s) return;
-      const r = radius();
-      const gap = Math.max(1, r * SPACING);
-      const far = Math.hypot(g.x - s.last.x, g.z - s.last.z);
-      const n = Math.max(1, Math.ceil(far / gap));
-      const fresh: UseStamp[] = [];
-      for (let k = 1; k <= n; k++) fresh.push({ x: s.last.x + ((g.x - s.last.x) * k) / n, z: s.last.z + ((g.z - s.last.z) * k) / n, r });
-      paint(fresh);
-      s.last = g;
-    };
-
-    /** `fresh` dabs added to the stroke: the plan as painted so far shown on the overlay. */
-    const paint = (fresh: UseStamp[]) => {
-      const s = stroke;
-      if (!s) return;
-      s.stamps.push(...fresh);
-      const made = paintUses(s.painted, fresh, zoneChoice.kind);
+      const last = s.stamps[s.stamps.length - 1];
+      if (last && Math.hypot(g.x - last.x, g.z - last.z) < Math.max(1, radius() * SPACING)) return;
+      const stamp: UseStamp = { x: g.x, z: g.z, size: zoneChoice.size };
+      s.stamps.push(stamp);
+      const made = paintUses(s.painted, last ? [last, stamp] : [stamp], zoneChoice.kind, besideOf());
+      // (A dab that changes nothing is refused: the stroke goes on.)
       if (!('draft' in made)) return;
-      const kept = zoneChoice.kind && zoneChoice.beside ? besideStreets(s.base, made) : made;
-      if (!('draft' in kept)) return;
-      s.painted = kept.draft;
+      s.painted = made.draft;
       editor.showUses(s.painted);
     };
 
@@ -74,8 +65,8 @@ export const zoneTool: TownTool = {
         const g = editor.ground(x, y);
         if (!g) return false;
         const base = editor.draft;
-        stroke = { base, stamps: [], last: g, painted: base };
-        paint([{ x: g.x, z: g.z, r: radius() }]);
+        stroke = { base, stamps: [], painted: base };
+        dab(g);
         ring(g);
         return true;
       },
@@ -88,7 +79,9 @@ export const zoneTool: TownTool = {
         const s = stroke;
         stroke = null;
         if (!s) return;
-        if (s.painted !== s.base && editor.draft === s.base) editor.apply({ draft: s.painted, cleared: { lots: [], backdrop: [] } });
+        // (The stroke as one edit: every dab painted on the plan it began on, as one line.)
+        const made = s.painted !== s.base ? paintUses(s.base, s.stamps, zoneChoice.kind, besideOf()) : null;
+        if (made && 'draft' in made && editor.draft === s.base) editor.apply(made);
         editor.showUses(null);
       },
       hover(x, y) {
