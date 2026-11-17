@@ -73,8 +73,42 @@ fn acosf(x: f32) -> f32 {
     }
     libm::acos(x as f64) as f32
 }
+/// The arc sine as Blender's C library (Apple's) works it out, which is not always the nearest single: in double,
+/// a polynomial in x squared up to a half and in 1 - |x| over it, each step fused, then rounded. (Its code, read
+/// from the library; every single from -1 to 1 gives the library's bits.)
 fn asinf(x: f32) -> f32 {
-    libm::asinf(x)
+    let (a, k) = (x.abs(), f64::from_bits);
+    if a >= 1.0 {
+        return if a == 1.0 {
+            (k(0x3ff9_21fb_4400_0000) as f32).copysign(x)
+        } else {
+            f32::NAN
+        };
+    }
+    if a > 0.5 {
+        let t = (1.0 - a) as f64;
+        let root = t.sqrt();
+        let p3 = libm::fma(t, k(0x3f5e_e93c_b295_7053), k(0x3f61_4018_6da8_6810));
+        let p5 = libm::fma(t, k(0x3f80_7e5f_a0a3_5d8b), k(0x3f9b_21ec_14e8_2132));
+        let p7 = libm::fma(t, k(0x3fbe_2b8c_c317_3f9e), k(0x3ff6_a09e_64c7_c6e1));
+        let t2 = t * t;
+        let p5 = libm::fma(t2, p3, p5);
+        let p7 = libm::fma(t2, p5, p7);
+        return (libm::fma(-p7, root, k(0x3ff9_21fb_5444_2d18)) as f32).copysign(x);
+    }
+    if a >= f32::from_bits(0x3200_0000) {
+        let xd = x as f64;
+        let z = xd * xd;
+        let p3 = libm::fma(z, k(0x3fa1_5e1a_450e_8b98), k(0x3f91_69f7_6663_7e01));
+        let p5 = libm::fma(z, k(0x3f9f_e10b_ae95_83ba), k(0x3fa6_d55e_6da5_eec2));
+        let p7 = libm::fma(z, k(0x3fb3_3344_81d0_bc2f), k(0x3fc5_5555_4d58_f2f9));
+        let z2 = z * z;
+        let p5 = libm::fma(z2, p3, p5);
+        let p7 = libm::fma(z2, p5, p7);
+        return libm::fma(xd, z * p7, xd) as f32;
+    }
+    // (under 2^-27 it is the number itself)
+    libm::fmaf(x, f32::from_bits(0x4d00_0000), x) * f32::from_bits(0x3200_0000)
 }
 fn atan2f(y: f32, x: f32) -> f32 {
     libm::atan2(y as f64, x as f64) as f32
@@ -929,4 +963,36 @@ pub fn object_matrix(loc: V3, rot: V3, scale: V3) -> M4 {
     let mut m = mul_m3_m3m3(&rmat, &smat).to_4x4();
     m.0[3] = [loc.x, loc.y, loc.z, 1.0];
     m
+}
+
+#[cfg(test)]
+mod tests {
+    use super::asinf;
+
+    #[test]
+    fn the_arc_sine_is_the_c_librarys_where_it_isnt_the_nearest_single() {
+        // (number, its arc sine) as bits, from the library: twelve the nearest single isn't, then the ends
+        let pairs: [(u32, u32); 17] = [
+            (0x3ed2_bd22, 0x3ed9_31ce),
+            (0x3f19_1eec, 0x3f24_2347),
+            (0xbf0c_511d, 0xbf14_81d5),
+            (0x3f07_91bc, 0x3f0e_df06),
+            (0xbf00_1edd, 0xbf06_2e37),
+            (0x3f43_6e01, 0x3f5e_59b6),
+            (0x3f62_a526, 0x3f8b_29a7),
+            (0x3f3d_93df, 0x3f55_7880),
+            (0x3f1e_bde4, 0x3f2b_39d3),
+            (0x3f24_8edd, 0x3f32_ba3e),
+            (0x3f32_6871, 0x3f45_6521),
+            (0x3f70_fc51, 0x3f9d_0187),
+            (0x3f80_0000, 0x3fc9_0fda),
+            (0xbf80_0000, 0xbfc9_0fda),
+            (0x3f00_0000, 0x3f06_0a92),
+            (0x3100_0000, 0x3100_0000),
+            (0x0000_0000, 0x0000_0000),
+        ];
+        for (x, want) in pairs {
+            assert_eq!(asinf(f32::from_bits(x)).to_bits(), want, "asinf of {x:08x}");
+        }
+    }
 }
