@@ -1211,7 +1211,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const p = this.townPose;
       // (The menus' town has the full town view's planes, sky and haze at any distance: `applyTownCamera`.)
       const flat = Math.sin(p.beta) * p.radius;
-      this.applyTownCamera(p.radius, p.alpha, p.beta, p.target.x + Math.cos(p.alpha) * flat, p.target.y + Math.cos(p.beta) * p.radius, p.target.z + Math.sin(p.alpha) * flat, true);
+      const [ex, ey, ez] = [p.target.x + Math.cos(p.alpha) * flat, p.target.y + Math.cos(p.beta) * p.radius, p.target.z + Math.sin(p.alpha) * flat];
+      this.applyTownCamera(p.radius, p.alpha, p.beta, ex, ey, ez, true);
+      // (The land's veil moved for the eye: each of its points over the land it is for, as seen from here.)
+      if (this.landHaze?.view(ex, ey, ez)) this.held?.changed();
       this.camera.setPose(p.alpha, p.beta, p.radius, p.target.x, p.target.y, p.target.z, p.targetScreenOffset.x, p.targetScreenOffset.y);
     } else {
       const o = this.orbit;

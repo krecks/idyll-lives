@@ -9,6 +9,11 @@
  * the land goes into the haze, and past it there is only the haze, the same colour as the dome behind it. It hangs
  * `LIFT` m over the highest land under it, so the trees on the ring's hills stay under it. It shows from
  * `SHOW_FROM` m out (`strength`): nearer, the play camera's and the area shots' haze is their own.
+ *
+ * Hung over the land, the veil was seen against land nearer the camera than the land under it: on the far side the
+ * land's last metres showed through its clearer part, and its edge stood hard against the haze past it. So each of
+ * its points is moved along the line from the eye to the land it is for (`view`), to where that line is at its
+ * height: from wherever the camera is, the land is seen through the veil meant for it, and fades the same on every side.
  */
 
 import * as pc from './engine';
@@ -45,6 +50,14 @@ export class LandHaze {
   private mesh: pc.Mesh | null = null;
   private key = '';
   private shown = -1;
+  /** Per vertex: the point on the land it is for (x, height, z; past the edge, the edge's height), and its height. */
+  private ground = new Float32Array(0);
+  private height = new Float32Array(0);
+  private positions = new Float32Array(0);
+  private colors = new Float32Array(0);
+  private indices = new Uint32Array(0);
+  /** The eye the veil was last moved for (`view`). */
+  private readonly eye = { x: NaN, y: NaN, z: NaN };
 
   constructor(
     private readonly app: pc.AppBase,
@@ -141,12 +154,17 @@ export class LandHaze {
       const t = Math.min(1, p.along / EASE);
       return Math.max(sides[i], corner + (sides[i] - corner) * t * t * (3 - 2 * t)) + LIFT;
     });
-    const positions: number[] = [];
+    const ground: number[] = [];
+    const heights: number[] = [];
     const colors: number[] = [];
+    const clampX = (x: number) => Math.min(box.x1, Math.max(box.x0, x));
+    const clampZ = (z: number) => Math.min(box.z1, Math.max(box.z0, z));
     for (const [d, a] of RINGS) {
       const o = Math.max(0, inset - d);
       stations.forEach((p, i) => {
-        positions.push(p.x + p.nx * o, lift[i], p.z + p.nz * o);
+        const [x, z] = [p.x + p.nx * o, p.z + p.nz * o];
+        ground.push(x, Math.min(lift[i], height(clampX(x), clampZ(z))), z);
+        heights.push(lift[i]);
         colors.push(1, 1, 1, a);
       });
     }
@@ -159,16 +177,60 @@ export class LandHaze {
         else indices.push(a, b, e, a, e, c);
       }
     }
+    this.ground = new Float32Array(ground);
+    this.height = new Float32Array(heights);
+    this.colors = new Float32Array(colors);
+    this.indices = new Uint32Array(indices);
+    this.positions = new Float32Array(ground.length);
+    // (Hung straight over its land until `view` has an eye: written again in place as the camera moves.)
+    for (let v = 0; v < heights.length; v++) this.positions.set([ground[v * 3], heights[v], ground[v * 3 + 2]], v * 3);
+    this.eye.x = NaN;
     // (The old mesh goes with its mesh instance.)
     if (this.entity.render) this.entity.removeComponent('render');
     const mesh = (this.mesh = new pc.Mesh(this.app.graphicsDevice));
-    mesh.setPositions(positions);
-    mesh.setColors(colors);
-    mesh.setIndices(indices);
-    mesh.update(pc.PRIMITIVE_TRIANGLES);
+    mesh.clear(true, false);
+    this.write();
     const mi = new pc.MeshInstance(mesh, this.material);
     mi.cull = false;
     this.entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: false, layers: [layer] });
+  }
+
+  /** The mesh written from the arrays (its positions as `view` left them). */
+  private write(): void {
+    const mesh = this.mesh!;
+    mesh.setPositions(this.positions);
+    mesh.setColors(this.colors);
+    mesh.setIndices(this.indices);
+    mesh.update(pc.PRIMITIVE_TRIANGLES, false);
+  }
+
+  /**
+   * The eye where the camera is (game space, as the veil is): each point of the veil moved along the line from the eye
+   * to the land it is for, to where that line is at the veil's height, so that land is seen through it. Only while it
+   * shows, and when the eye moved; true if it was moved (the frame is to be drawn again). Allocation-free.
+   */
+  view(x: number, y: number, z: number): boolean {
+    if (!this.mesh || this.shown <= 0) return false;
+    const e = this.eye;
+    if (Math.abs(x - e.x) + Math.abs(y - e.y) + Math.abs(z - e.z) < 0.5) return false;
+    e.x = x;
+    e.y = y;
+    e.z = z;
+    const g = this.ground;
+    const h = this.height;
+    const out = this.positions;
+    for (let v = 0; v < h.length; v++) {
+      const gx = g[v * 3];
+      const gy = g[v * 3 + 1];
+      const gz = g[v * 3 + 2];
+      // (How far from the land towards the eye the line reaches the veil's height; an eye under it: as far as it goes.)
+      const t = y - gy > 1 ? Math.min(0.95, (h[v] - gy) / (y - gy)) : 0.95;
+      out[v * 3] = gx + (x - gx) * t;
+      out[v * 3 + 1] = h[v];
+      out[v * 3 + 2] = gz + (z - gz) * t;
+    }
+    this.write();
+    return true;
   }
 
   /** Its colour: the haze's (`scene.fog.color`, as PlayCanvas takes a colour: the sky's dome comes out the same). */
