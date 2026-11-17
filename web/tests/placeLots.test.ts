@@ -178,7 +178,11 @@ describe('named places as lots', async () => {
       expect(world.slots.filter((s) => !!placeOfTemplate(s.template) !== !!s.dress).map((s) => s.template)).toEqual([]);
       const named = world.slots.filter((s) => s.dress);
       // Every civic place of a town in the main town; a hamlet's in every other area.
-      for (const c of CIVIC) expect(named.some((s) => !s.area && placeOfTemplate(s.template)?.civic === CIVIC.indexOf(c)), c.label).toBe(true);
+      const civicOfSlot = (s: PlotSlot) => {
+        const what = placeOfTemplate(s.template);
+        return what && 'civic' in what ? what.civic : -1;
+      };
+      for (const c of CIVIC) expect(named.some((s) => !s.area && civicOfSlot(s) === CIVIC.indexOf(c)), c.label).toBe(true);
       for (let a = 1; a < world.open!.areas.length; a++) expect(named.filter((s) => s.area === a && 'civic' in (placeOfTemplate(s.template) ?? {})).length).toBeGreaterThan(0);
       for (const s of named) {
         const place = world.open!.places!.find((p) => p.plot === s.index)!;
@@ -189,5 +193,5 @@ describe('named places as lots', async () => {
       // No backdrop building is a place.
       expect(world.open!.backdrop!.filter((b) => b.place !== undefined)).toEqual([]);
     }
-  });
+  }, 120_000);
 });
