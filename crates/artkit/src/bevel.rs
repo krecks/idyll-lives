@@ -1200,8 +1200,10 @@ impl Work<'_> {
         if in_plane != corner.edges.len() - 3 {
             return false;
         }
+        // (with other edges lying in its faces too, a slab's corner where its face's triangles meet: Blender
+        // tells such a corner apart, and gives it the cube corner's patch all the same)
         let off = (total.abs() - 3.0 * std::f32::consts::FRAC_PI_2).abs();
-        off <= std::f32::consts::FRAC_PI_4 && corner.edges.len() == 3
+        off <= std::f32::consts::FRAC_PI_4
     }
 
     /// The points of the patch where three or more bevelled edges meet, by (bound, ring, step).
