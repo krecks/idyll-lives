@@ -143,7 +143,7 @@ function furnish(content: Content, t: Templates, town: NeighbourhoodDraft, house
 
 /** A town just laid (`laid`) with its land settled under it (`settleLand`), its preview, its houses and its plan (`LaidTown.plan`). */
 function laidOut(content: Content, t: Templates, laid: NeighbourhoodDraft, step?: (done: WorldStep) => void): LaidTown {
-  const settled = settleLand(laid, (d) => previewWorld(content, t, d, null));
+  const settled = settleLand(laid, (d) => previewWorld(content, t, d, null), undefined, content.careerCategories);
   const draft = settled.draft;
   const preview = settled.world;
   if (draft.open?.land && draft !== laid) preview.meta = { ...preview.meta, land: encodeLand(draft.open.land) };
