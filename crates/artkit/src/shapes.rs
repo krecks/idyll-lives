@@ -157,11 +157,16 @@ pub fn cone(name: impl AsRef<str>, r1: f64, r2: f64, depth: f64, o: Round) -> Ob
     );
     scale_mesh(obj, o.scale);
     obj.edit(|p| p.uv = UvWay::Round);
-    // (Blender numbers a cylinder's rims before its sides: a rim's bevel starts from the rim)
+    // (Blender numbers a cylinder's rims before its sides, the bottom's and the top's in turn: a rim's bevel
+    // starts from the rim)
     let n = o.verts as u32;
     let rims = if obj.read(|p| p.mesh.verts.len()) == 2 * o.verts {
-        let ring = |top: u32| (0..n).map(move |i| (2 * i + top, 2 * ((i + 1) % n) + top));
-        EdgeOrder::Listed(ring(0).chain(ring(1)).collect())
+        // (the bottom's run on round, the top's back)
+        let rims = (0..n).flat_map(|i| {
+            let j = (i + 1) % n;
+            [(2 * i, 2 * j), (2 * j + 1, 2 * i + 1)]
+        });
+        EdgeOrder::Listed(rims.collect())
     } else {
         EdgeOrder::Faces
     };

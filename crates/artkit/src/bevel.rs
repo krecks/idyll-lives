@@ -18,9 +18,11 @@
 //!
 //! The normals are hardened: the faces the bevel joins stay flat, and each strip's corners take the normal of
 //! the face they touch (or of the strips either side, between two), so the bevel shades as a rounded edge.
-//! Where the corners of one vertex that shade as one are given unlike normals, they share their mean; Blender
-//! takes that mean in the angles it stores normals as, which is not reproduced: such corners (round a hollow
-//! corner of a slab, where a point slid) can be turned from Blender's.
+//! Where the corners of one vertex that shade as one are given unlike normals, they share the mean of what
+//! Blender stores for them (two angles in the fan's own frame, in 16 bits each), which is not the mean of the
+//! normals: round a profile's middle point it leans to one side, the side the fan's first corner decides. On a
+//! slab's far face that corner is not always Blender's (its faces there are in an order of its own), so a
+//! middle point's normal can lean the other way (10 to 30 degrees, on a strip a few millimetres wide).
 //!
 //! What isn't built says so: an edge whose bevel ends at a vertex no other bevelled edge reaches, and a patch of
 //! five segments or more.
@@ -41,14 +43,17 @@ const GOOD_ANGLE: f32 = 0.1;
 /// How far towards the corner a patch's middle stands, by its segments (a round profile).
 const FULLNESS: [f32; 4] = [0.0, 0.559, 0.642, 0.551];
 
-/// How a mesh's edges are numbered, which decides the edge a corner's new points start from.
+/// How a mesh's edges are numbered and which way each runs, which decides the edge a corner's new points start
+/// from and the corner each strip starts at.
 #[derive(Clone, Debug)]
 pub enum EdgeOrder {
-    /// As the faces' corners name them, each face from its first side (a mesh made of points and faces).
+    /// As the faces' corners name them, each face from its first side, each from its lower vertex to its higher
+    /// (a mesh made of points and faces).
     Corners,
-    /// Each face's closing side first, then its others (a primitive of Blender's own).
+    /// Each face's closing side first, then its others, each the way that face runs it (a primitive of Blender's
+    /// own).
     Faces,
-    /// These first, in this order (an outline's rims, a cylinder's).
+    /// These first, in this order, each from its first vertex to its second (an outline's rims, a cylinder's).
     Listed(Vec<(u32, u32)>),
 }
 
@@ -736,19 +741,28 @@ pub fn bevelled(
     }
     // the edges in the order the mesh numbers them
     let mut rank: BTreeMap<(u32, u32), usize> = BTreeMap::new();
-    let mut number = |a: u32, b: u32| {
+    // (and the way each runs)
+    let mut runs: BTreeMap<(u32, u32), (u32, u32)> = BTreeMap::new();
+    let mut number = |a: u32, b: u32, way: (u32, u32)| {
         let at = rank.len();
         rank.entry(edge(a, b)).or_insert(at);
+        runs.entry(edge(a, b)).or_insert(way);
     };
     if let EdgeOrder::Listed(list) = order {
-        list.iter().for_each(|&(a, b)| number(a, b));
+        list.iter().for_each(|&(a, b)| number(a, b, (a, b)));
     }
     for f in 0..nf {
         let c = mesh.corners(f);
         let n = c.len();
         match order {
-            EdgeOrder::Faces => (0..n).for_each(|i| number(c[(i + n - 1) % n], c[i])),
-            _ => (0..n).for_each(|i| number(c[i], c[(i + 1) % n])),
+            EdgeOrder::Faces => (0..n).for_each(|i| {
+                let (a, b) = (c[(i + n - 1) % n], c[i]);
+                number(a, b, (a, b))
+            }),
+            _ => (0..n).for_each(|i| {
+                let (a, b) = (c[i], c[(i + 1) % n]);
+                number(a, b, edge(a, b))
+            }),
         }
     }
     // the edges to bevel: between two faces that turn more than the angle
@@ -997,7 +1011,8 @@ pub fn bevelled(
     // a strip along each bevelled edge, in the mesh's order of them
     let mut by_rank: Vec<(u32, u32)> = bev.iter().copied().collect();
     by_rank.sort_by_key(|e| rank[e]);
-    for (a, b) in by_rank {
+    for e in by_rank {
+        let (a, b) = runs[&e];
         let (c1, c2) = (&work.corners[&a], &work.corners[&b]);
         let (h1, h2) = (&c1.edges[c1.half_to(b)], &c2.edges[c2.half_to(a)]);
         let (i1, i2) = (h1.left, h2.left);
@@ -1643,42 +1658,320 @@ fn harden(out: &mut Mesh, kinds: &[Kind], long: &BTreeSet<(u32, u32)>, old: &Mes
             given[l] = Some(pnorm.filter(|p| dot_v3(*p, *p) > 0.0));
         }
     }
-    // The corners of one vertex that shade as one (joined across smooth edges) keep one normal between them:
-    // where they were given different ones, the mean of them as Blender stores them, by their angle from the
-    // corners' own normal and their direction round it.
-    let mut fans: BTreeMap<(u32, [u32; 3]), Vec<usize>> = BTreeMap::new();
-    for l in 0..out.loops.len() {
-        if given[l].is_some() {
-            fans.entry((out.loops[l], normals[l].array().map(f32::to_bits)))
-                .or_default()
-                .push(l);
-        }
-    }
-    for ((_, _), fan) in fans {
-        let own = normals[fan[0]];
-        let of = |l: usize| given[l].flatten().unwrap_or(own);
-        let first = of(fan[0]);
-        if fan.iter().all(|&l| len_v3(of(l) - first) < 1e-4) {
-            fan.iter().for_each(|&l| normals[l] = first);
+    // The corners of one vertex that shade as one (a fan: joined across smooth edges) keep one normal between
+    // them, as Blender stores it: two angles in the fan's own frame (from the fan's normal, and round it from
+    // the edge the fan starts at), each as a share of the frame's own angle in 16 bits. Where a fan's corners
+    // were given unlike normals it keeps the mean of what was stored.
+    for fan in fans(out, &face_normals) {
+        if !fan.corners.iter().any(|&l| given[l].flatten().is_some()) {
+            fan.corners.iter().for_each(|&l| normals[l] = fan.normal);
             continue;
         }
-        let (mut alpha, mut round) = (0.0_f32, V3::ZERO);
-        for &l in &fan {
-            let p = of(l);
-            let cos = dot_v3(own, p);
-            alpha += libm::acos((cos as f64).clamp(-1.0, 1.0)) as f32;
-            round += normalize_v3(madd(p, own, -cos)).0;
+        let space = Space::new(&fan);
+        let stored: Vec<[i32; 2]> = fan
+            .corners
+            .iter()
+            .map(|&l| given[l].flatten().map_or([0, 0], |p| space.store(p)))
+            .collect();
+        let mut kept = stored[0];
+        if stored.iter().any(|s| *s != stored[0]) {
+            let n = stored.len() as i32;
+            kept = [
+                stored.iter().map(|s| s[0]).sum::<i32>() / n,
+                stored.iter().map(|s| s[1]).sum::<i32>() / n,
+            ];
         }
-        let alpha = alpha / fan.len() as f32;
-        let (round, len) = normalize_v3(round);
-        let mean = if len > 0.0 {
-            normalize_v3(madd(mul_v3_fl(own, cosf(alpha)), round, sinf(alpha))).0
-        } else {
-            own
-        };
-        fan.iter().for_each(|&l| normals[l] = mean);
+        let normal = space.read(kept);
+        fan.corners.iter().for_each(|&l| normals[l] = normal);
     }
     out.normals = Some(normals);
+}
+
+fn acos_clamped(x: f32) -> f32 {
+    if x <= -1.0 {
+        // (the single just under pi, as Blender's C library has it)
+        f32::from_bits(0x4049_0fda)
+    } else if x >= 1.0 {
+        0.0
+    } else {
+        libm::acos(x as f64) as f32
+    }
+}
+
+/// The corners of one vertex that shade as one, in the order Blender walks them round the vertex.
+struct Fan {
+    corners: Vec<usize>,
+    /// The fan's own normal: its faces' weighed by their angles at the vertex.
+    normal: V3,
+    /// The directions of the edges it crosses, from the one it starts at to the one it ends at.
+    edges: Vec<V3>,
+    /// A corner with a sharp edge either side: its frame is its own two sides'.
+    single: bool,
+}
+
+/// The fans of `mesh`'s corners: round each vertex from a sharp edge to the next (or all the way round, if none
+/// is sharp), started as Blender starts them.
+fn fans(mesh: &Mesh, face_normals: &[V3]) -> Vec<Fan> {
+    let nl = mesh.loops.len();
+    let mut face_of = vec![0usize; nl];
+    let mut on_edge: BTreeMap<(u32, u32), Vec<usize>> = BTreeMap::new();
+    for f in 0..mesh.faces.len() {
+        let face = mesh.faces[f];
+        for i in 0..face.len {
+            let l = (face.start + i) as usize;
+            face_of[l] = f;
+            let (a, b) = (
+                mesh.loops[l],
+                mesh.loops[(face.start + (i + 1) % face.len) as usize],
+            );
+            on_edge.entry(edge(a, b)).or_default().push(l);
+        }
+    }
+    let next = |l: usize| {
+        let face = mesh.faces[face_of[l]];
+        (face.start + (l as u32 - face.start + 1) % face.len) as usize
+    };
+    let prev = |l: usize| {
+        let face = mesh.faces[face_of[l]];
+        (face.start + (l as u32 - face.start + face.len - 1) % face.len) as usize
+    };
+    // a corner's edge: from its vertex to the next corner's
+    let edge_of = |l: usize| edge(mesh.loops[l], mesh.loops[next(l)]);
+    let sharp = |e: (u32, u32)| {
+        let on = &on_edge[&e];
+        on.len() != 2
+            || mesh.sharp.contains(&e)
+            || !mesh.faces[face_of[on[0]]].smooth
+            || !mesh.faces[face_of[on[1]]].smooth
+            || mesh.loops[on[0]] == mesh.loops[on[1]]
+    };
+    let dir = |pivot: u32, e: (u32, u32)| {
+        let other = if e.0 == pivot { e.1 } else { e.0 };
+        normalize_v3(mesh.verts[other as usize] - mesh.verts[pivot as usize]).0
+    };
+    // from the corner whose edge comes into the vertex (`curr`) and the vertex's own corner, to the same in the
+    // next face round
+    let step = |curr: usize, pivot: u32| -> (usize, usize) {
+        let on = &on_edge[&edge_of(curr)];
+        let other = if on[0] == curr { on[1] } else { on[0] };
+        let (orig, across) = (mesh.loops[curr], mesh.loops[other]);
+        if (orig == across && orig == pivot) || (orig != across && orig != pivot) {
+            (prev(other), other)
+        } else {
+            (next(other), next(other))
+        }
+    };
+    let mut skip = vec![false; nl];
+    let mut out = Vec::new();
+    for l in 0..nl {
+        let (e_curr, e_prev) = (edge_of(l), edge_of(prev(l)));
+        let pivot = mesh.loops[l];
+        if !sharp(e_curr) {
+            // all smooth round the vertex? then the fan starts at its first corner; else at its sharp edge
+            if skip[l] || sharp(e_prev) {
+                continue;
+            }
+            skip[l] = true;
+            let mut curr = prev(l);
+            let whole = loop {
+                let (across, vert) = step(curr, pivot);
+                curr = across;
+                if sharp(edge_of(curr)) {
+                    break false;
+                }
+                if skip[vert] {
+                    break vert == l;
+                }
+                skip[vert] = true;
+            };
+            if !whole {
+                continue;
+            }
+        }
+        if sharp(e_curr) && sharp(e_prev) {
+            out.push(Fan {
+                corners: vec![l],
+                normal: face_normals[face_of[l]],
+                edges: vec![dir(pivot, e_curr), dir(pivot, e_prev)],
+                single: true,
+            });
+            continue;
+        }
+        let vec_org = dir(pivot, e_curr);
+        let mut fan = Fan {
+            corners: Vec::new(),
+            normal: V3::ZERO,
+            edges: vec![vec_org],
+            single: false,
+        };
+        let (mut curr, mut vert) = (prev(l), l);
+        let mut vec_prev = vec_org;
+        loop {
+            let e = edge_of(curr);
+            let vec_curr = dir(pivot, e);
+            let k = acos_clamped(dot_v3(vec_curr, vec_prev));
+            fan.normal = madd(fan.normal, face_normals[face_of[curr]], k);
+            fan.corners.push(vert);
+            if e != e_curr {
+                fan.edges.push(vec_curr);
+            }
+            if sharp(e) || e == e_curr {
+                if e == e_curr {
+                    // (all the way round: it ends at the edge it started at)
+                    fan.edges.push(vec_curr);
+                }
+                break;
+            }
+            vec_prev = vec_curr;
+            (curr, vert) = step(curr, pivot);
+            if fan.corners.len() > nl {
+                break;
+            }
+        }
+        let (unit, len) = normalize_v3(fan.normal);
+        fan.normal = if len == 0.0 {
+            face_normals[face_of[l]]
+        } else {
+            unit
+        };
+        out.push(fan);
+    }
+    out
+}
+
+/// A fan's frame for the normals stored in it, as Blender defines it.
+struct Space {
+    lnor: V3,
+    vec_ref: V3,
+    vec_ortho: V3,
+    ref_alpha: f32,
+    ref_beta: f32,
+}
+
+impl Space {
+    const TRIGO: f32 = 0.9999;
+    const TWO_PI: f32 = std::f32::consts::TAU;
+
+    fn new(fan: &Fan) -> Space {
+        let lnor = fan.normal;
+        let (vec_ref, vec_other) = (fan.edges[0], fan.edges[fan.edges.len() - 1]);
+        let (dtp_ref, dtp_other) = (dot_v3(vec_ref, lnor), dot_v3(vec_other, lnor));
+        if dtp_ref.abs() >= Space::TRIGO || dtp_other.abs() >= Space::TRIGO {
+            // (an edge along the normal: no frame, the normal as it is)
+            return Space {
+                lnor,
+                vec_ref: V3::ZERO,
+                vec_ortho: V3::ZERO,
+                ref_alpha: 0.0,
+                ref_beta: 0.0,
+            };
+        }
+        let ref_alpha = if fan.single {
+            (acos_clamped(dtp_ref) + acos_clamped(dtp_other)) / 2.0
+        } else {
+            // (the first edge again at the end of a fan all the way round is not counted twice)
+            let whole = fan.edges.len() > 2 && fan.edges[0] == fan.edges[fan.edges.len() - 1];
+            let counted = if whole {
+                &fan.edges[..fan.edges.len() - 1]
+            } else {
+                &fan.edges[..]
+            };
+            let sum: f32 = counted
+                .iter()
+                .fold(0.0, |s, &v| s + acos_clamped(dot_v3(v, lnor)));
+            sum / counted.len() as f32
+        };
+        let (vec_ref, _) = normalize_v3(vec_ref - mul_v3_fl(lnor, dtp_ref));
+        let (vec_ortho, _) = normalize_v3(lnor.cross(vec_ref));
+        let (other, _) = normalize_v3(vec_other - mul_v3_fl(lnor, dtp_other));
+        let dtp = dot_v3(vec_ref, other);
+        let ref_beta = if dtp < Space::TRIGO {
+            let beta = acos_clamped(dtp);
+            if dot_v3(vec_ortho, other) < 0.0 {
+                Space::TWO_PI - beta
+            } else {
+                beta
+            }
+        } else {
+            Space::TWO_PI
+        };
+        Space {
+            lnor,
+            vec_ref,
+            vec_ortho,
+            ref_alpha,
+            ref_beta,
+        }
+    }
+
+    fn short(val: f32) -> i32 {
+        if val >= 1.0 {
+            32767
+        } else if val <= -1.0 {
+            -32768
+        } else {
+            (val * 32767.0).round() as i32
+        }
+    }
+
+    /// A normal as the two shares stored for it.
+    fn store(&self, custom: V3) -> [i32; 2] {
+        let close = (0..3).all(|i| (self.lnor[i] - custom[i]).abs() <= 1e-4);
+        if dot_v3(custom, custom) == 0.0 || close {
+            return [0, 0];
+        }
+        let cos_alpha = dot_v3(self.lnor, custom);
+        let alpha = acos_clamped(cos_alpha);
+        let a = if alpha > self.ref_alpha {
+            Space::short(-(Space::TWO_PI - alpha) / (Space::TWO_PI - self.ref_alpha))
+        } else {
+            Space::short(alpha / self.ref_alpha)
+        };
+        let (vec, _) = normalize_v3(mul_v3_fl(self.lnor, -cos_alpha) + custom);
+        let cos_beta = dot_v3(self.vec_ref, vec);
+        let b = if cos_beta < Space::TRIGO {
+            let mut beta = acos_clamped(cos_beta);
+            if dot_v3(self.vec_ortho, vec) < 0.0 {
+                beta = Space::TWO_PI - beta;
+            }
+            if beta > self.ref_beta {
+                Space::short(-(Space::TWO_PI - beta) / (Space::TWO_PI - self.ref_beta))
+            } else {
+                Space::short(beta / self.ref_beta)
+            }
+        } else {
+            0
+        };
+        [a, b]
+    }
+
+    /// The normal two stored shares stand for.
+    fn read(&self, data: [i32; 2]) -> V3 {
+        if data[0] == 0 || self.ref_alpha == 0.0 || self.ref_beta == 0.0 {
+            return self.lnor;
+        }
+        let alphafac = data[0] as f32 / 32767.0;
+        let alpha = if alphafac > 0.0 {
+            self.ref_alpha
+        } else {
+            Space::TWO_PI - self.ref_alpha
+        } * alphafac;
+        let betafac = data[1] as f32 / 32767.0;
+        let mut out = mul_v3_fl(self.lnor, cosf(alpha));
+        if betafac == 0.0 {
+            out = madd(out, self.vec_ref, sinf(alpha));
+        } else {
+            let sinalpha = sinf(alpha);
+            let beta = if betafac > 0.0 {
+                self.ref_beta
+            } else {
+                Space::TWO_PI - self.ref_beta
+            } * betafac;
+            out = madd(out, self.vec_ref, sinalpha * cosf(beta));
+            out = madd(out, self.vec_ortho, sinalpha * sinf(beta));
+        }
+        out
+    }
 }
 
 /// Rounds `obj`'s edges turning more than `angle` degrees by `width` (metres), in `segments` strips, shaded

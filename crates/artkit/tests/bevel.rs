@@ -81,8 +81,11 @@ impl Rec {
             "cube" => EdgeOrder::Faces,
             "cylinder" => {
                 let n: u32 = self.kv["verts"].parse().unwrap();
-                let ring = |top: u32| (0..n).map(move |i| (2 * i + top, 2 * ((i + 1) % n) + top));
-                EdgeOrder::Listed(ring(0).chain(ring(1)).collect())
+                let rims = (0..n).flat_map(|i| {
+                    let j = (i + 1) % n;
+                    [(2 * i, 2 * j), (2 * j + 1, 2 * i + 1)]
+                });
+                EdgeOrder::Listed(rims.collect())
             }
             _ => EdgeOrder::Corners,
         }
@@ -229,12 +232,13 @@ fn a_bevel_cuts_blenders_mesh_as_blender_does() {
         assert_eq!(made.kinds.len(), made.mesh.faces.len());
         assert_eq!(made.source.len(), made.mesh.loops.len());
         report.push(format!("{} {kind} {} segments: points within {far:e}, normals within {turned:.3} degrees, {missing} faces not Blender's", r.name, r.segments()));
-        // Where the corners of one vertex that shade as one are given unlike normals (round a hollow corner, or
-        // where a point slid along a cut), Blender keeps their mean as it stores normals, in angles about the
-        // corner's own; the mean taken here is the plain one, and differs: the cedar chest's plinth by up to a
-        // right angle at the ends of its arch, the bookshelf's top by 21 degrees, the sink's face frame by 3.
+        // Where the corners of one vertex that shade as one are given unlike normals, Blender keeps the mean of
+        // what it stored for them, two angles in a frame that starts at the fan's first corner; which corner is
+        // first hangs on the order of the faces round it, which on a slab's far face (given here as Blender had
+        // it, without the way its edges ran) isn't known: there the mean can come out on the other side of the
+        // middle (the bookshelf's top by 21 degrees round four of its profiles' middle points, the sink's face
+        // frame by 3).
         let turn = match r.name.rsplit('/').next().unwrap() {
-            "plinth_x-1" => 90.0,
             "top" => 21.0,
             "face_frame" => 3.0,
             _ => 0.1,
