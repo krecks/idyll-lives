@@ -16,7 +16,7 @@ import { aimOf, coverCells, coverSamples, isPoint, mountainGhost, mountainOf, pl
 import { outlines, rle, unrle } from './landMasks';
 import { deckTiles } from './macro';
 import { smoothstep } from './noise';
-import { inside, type Pt } from './roads';
+import { bridgeSpans, inside, type Pt } from './roads';
 
 /** Strokes kept to undo, and the most their old values may hold (bytes). */
 export const UNDO_STROKES = 32;
@@ -753,7 +753,7 @@ export class LandEditor {
     if (this.decks) return this.decks;
     const set = new Set<number>();
     const { width: W, depth: D, roads } = this.world;
-    for (const r of roads) if (r.bridge && r.bridge[1] > r.bridge[0]) deckTiles(r, r.bridge, W, D, (t) => set.add(t));
+    for (const r of roads) for (const span of bridgeSpans(r)) deckTiles(r, span, W, D, (t) => set.add(t));
     return (this.decks = set);
   }
 }

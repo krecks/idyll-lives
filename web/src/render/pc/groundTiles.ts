@@ -8,7 +8,7 @@ import * as pc from './engine';
 import { groundDepth, type RoadPlan, type WorldStructure, type WorldZone } from '../../core/protocol';
 import { carriageway, hasSidewalks } from '../shared/junctions';
 import { backdropGround } from '../shared/townBuildings';
-import { bridgeDeck } from '../shared/roads';
+import { bridgeSpans, stretchOf } from '../shared/roads';
 import { BRIDGE } from '../shared/street';
 
 /**
@@ -211,10 +211,7 @@ export class TownGroundMap {
     // parapets are lost, the deck over the water isn't.
     // (Square at its ends: the banks are where its stone stops.)
     g.lineCap = 'butt';
-    for (const r of roads) {
-      const deck = bridgeDeck(r);
-      if (deck) stroke({ ...r, points: deck }, r.width + 2 * BRIDGE.apron, MAP.pavement);
-    }
+    for (const r of roads) for (const [s0, s1] of bridgeSpans(r)) stroke({ ...r, points: stretchOf(r, s0, s1) }, r.width + 2 * BRIDGE.apron, MAP.pavement);
     g.lineCap = 'round';
     for (const r of roads) if (r.kind === 'trail') stroke(r, r.width, MAP.path);
     for (const r of roads) if (r.kind !== 'trail') stroke(r, carriageway(r), MAP.asphalt);

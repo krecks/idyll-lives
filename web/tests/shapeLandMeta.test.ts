@@ -31,6 +31,18 @@ describe('mergeShapeLand', () => {
     expect(decodeLand(merged.land!).h[land.cols * 70 + 40]).toBe(1234);
   });
 
+  test("a stroke's bridges replace its roads' lists (as the simulation merges them), the other roads the same objects", () => {
+    const street = { points: [[0, 0], [100, 0]] as [number, number][], width: 7, ends: ['join', 'join'] as const, kind: 'street' as const };
+    const other = { ...street, points: [[0, 50], [100, 50]] as [number, number][], bridge: [10, 20] as [number, number] };
+    const meta: WorldMeta = { name: 'Elmbury', roads: [{ ...street, ends: ['join', 'join'] }, { ...other, ends: ['join', 'join'] }] };
+    const bridged = mergeShapeLand(meta, { roads: { 0: { bridges: [[40, 60]] } } })!;
+    expect(bridged.roads![0].bridges).toEqual([[40, 60]]);
+    expect(bridged.roads![1]).toBe(meta.roads![1]);
+    expect(meta.roads![0].bridges).toBeUndefined();
+    const gone = mergeShapeLand(bridged, { roads: { 0: { bridges: [] } } })!;
+    expect('bridges' in gone.roads![0]).toBe(false);
+  });
+
   test('nothing to merge leaves meta as it is', () => {
     const meta: WorldMeta = { name: 'Elmbury' };
     expect(mergeShapeLand(meta, {})).toBe(meta);

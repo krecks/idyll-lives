@@ -312,3 +312,55 @@ fn the_page_reads_the_water_mask_and_sends_it_back_changed() {
     shape(&mut w, 0, json!({}), Some(both)).unwrap();
     assert!(wet_now(&w, 28, 7) && wet_now(&w, 40, 26));
 }
+
+#[test]
+fn a_strokes_bridges_merge_into_its_roads() {
+    let mut w = world();
+    w.meta = json!({"roads": [
+        {"points": [[0, 20], [48, 20]], "width": 6, "kind": "street"},
+        {"points": [[20, 0], [20, 20]], "width": 6, "kind": "street", "bridge": [2, 8]}
+    ]});
+    // Water across the street (x 30..36), the deck's tiles (x 28..38, z 15..25) left dry: the street bridged there.
+    let wet = water(|x, z| (30..36).contains(&x) && !(15..25).contains(&z));
+    shape(
+        &mut w,
+        0,
+        json!({"roads": {"0": {"bridges": [[28, 38]]}}}),
+        Some(wet.clone()),
+    )
+    .unwrap();
+    assert_eq!(w.meta["roads"][0]["bridges"], json!([[28, 38]]));
+    // The other road and its old deck as they were.
+    assert_eq!(w.meta["roads"][1]["bridge"], json!([2, 8]));
+    assert!(w.meta["roads"][1].get("bridges").is_none());
+    assert!(wet_now(&w, 32, 5) && !wet_now(&w, 32, 20));
+    // A second span joins the first (the page sends the road's whole list); none takes them away.
+    shape(
+        &mut w,
+        0,
+        json!({"roads": {"0": {"bridges": [[4, 9], [28, 38]]}}}),
+        None,
+    )
+    .unwrap();
+    assert_eq!(w.meta["roads"][0]["bridges"], json!([[4, 9], [28, 38]]));
+    shape(&mut w, 0, json!({"roads": {"0": {"bridges": []}}}), None).unwrap();
+    assert!(w.meta["roads"][0].get("bridges").is_none());
+    // A road that isn't there, or spans that aren't, are refused and change nothing.
+    let err = shape(
+        &mut w,
+        0,
+        json!({"roads": {"5": {"bridges": [[1, 2]]}}}),
+        None,
+    )
+    .unwrap_err();
+    assert!(err.contains("no road 5"), "{err}");
+    let err = shape(
+        &mut w,
+        0,
+        json!({"roads": {"0": {"bridges": [[9, 2]]}}}),
+        None,
+    )
+    .unwrap_err();
+    assert!(err.contains("spans"), "{err}");
+    assert!(w.meta["roads"][0].get("bridges").is_none());
+}

@@ -34,7 +34,7 @@
 
 import type { JunctionInfo, RoadKind, RoadPlan } from '../../core/protocol';
 import { LAND_CELL, NONE, heightAt, type Land, type LandRect } from '../../game/land';
-import { lengths, nearest, pointAt, RoadIndex } from '../../game/roads';
+import { bridgeSpans, lengths, nearest, pointAt, RoadIndex } from '../../game/roads';
 import { CHUNK, chunkAt, chunksIn } from './chunks';
 import { carriageway, CROSSWALK, KERB_RETURN, planJunctions, type JunctionPlan } from './junctions';
 
@@ -658,8 +658,7 @@ export class BuiltSurface {
       }
       groundOf(p, land);
       // A bridge's deck clear of its water, a little higher in its middle.
-      const span = roads[road].bridge;
-      if (span && span[1] > span[0]) {
+      for (const span of bridgeSpans(roads[road])) {
         let level = -Infinity;
         for (let i = 0; i < n; i++) if (p.s[i] >= span[0] && p.s[i] <= span[1]) level = Math.max(level, waterAt(land, p.x[i], p.z[i]));
         if (level > -Infinity) {
@@ -837,7 +836,7 @@ export class BuiltSurface {
       const ls = this.lens[road];
       const half = r.width / 2;
       const reach = Math.max(half, c);
-      const span = r.bridge && r.bridge[1] > r.bridge[0] ? r.bridge : null;
+      const spans = bridgeSpans(r);
       for (let k = 0; k + 1 < r.points.length; k++) {
         const a = r.points[k];
         const b = r.points[k + 1];
@@ -866,7 +865,7 @@ export class BuiltSurface {
             if (d >= near[at] && !(under && kind[at] === BESIDE)) continue;
             const s = ls[k] + t * l;
             near[at] = d;
-            if (span && s >= span[0] && s <= span[1]) {
+            if (spans.some((span) => s >= span[0] && s <= span[1])) {
               builtY[at] = NaN;
               kind[at] = 0;
               continue;

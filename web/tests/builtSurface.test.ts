@@ -10,7 +10,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
 import { blankLand, heightAt, LAND_CELL, type Land } from '../src/game/land';
-import { lengths, pointAt, type Pt } from '../src/game/roads';
+import { bridgeSpans, lengths, pointAt, type Pt } from '../src/game/roads';
 import { BRIDGE_CLEAR, BuiltSurface, builtSurfaceOf, ENTRY_MAX, GRADE, RETAIN_MAX, ROAD_SINK, surfacePlots, type SurfaceWorld } from '../src/render/shared/builtSurface';
 import { chunkAt } from '../src/render/shared/chunks';
 
@@ -224,6 +224,16 @@ describe('built land on a slope', () => {
     const again = before.update(rect);
     expect(again).toEqual({ roads: [], plots: [], rect: null });
     expect(before.version(chunkAt(30, 80))).toBe(1);
+  });
+
+  test("a road's list of bridges (the land's brushes') is solved as its own bridge is, the old one read as one", () => {
+    const listed = roads.map((r, i) => (i === 0 ? { ...r, bridge: undefined, bridges: [r.bridge!] } : r));
+    const other = builtSurfaceOf({ ...world, meta: { ...world.meta, roads: listed } }, land);
+    expect(Array.from(other.profile(0).y)).toEqual(Array.from(surface.profile(0).y));
+    expect(Array.from(other.conformed)).toEqual(Array.from(surface.conformed));
+    // Two spans: each its own deck, the road between them on the land.
+    expect(bridgeSpans({ ...roads[0], bridges: [[100, 110], [10, 5]] })).toEqual([[5, 10], [66, 88], [100, 110]]);
+    expect(bridgeSpans({ ...roads[0], bridge: undefined, bridges: [[120, 200]] })).toEqual([[120, 130]]);
   });
 
   test('a surface made directly is the one a world gives', () => {
