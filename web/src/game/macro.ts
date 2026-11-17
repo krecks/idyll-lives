@@ -38,6 +38,7 @@ import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEd
 import { GENTLE_TILT, seedBare, smoothHeights, type GentlePlane } from './landFollow';
 import { chaikin, outlines, rasterize, rle, simplify, simplifyRing, unrle } from './landMasks';
 import { fbm } from './noise';
+import type { UseLayer } from './uses';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_TURN, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
 import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, straightAround, type Box, type Pt, type RoadPlan } from './roads';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, LotPlacer, plotRect, settleRoads, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
@@ -92,6 +93,11 @@ export interface OpenWorldDraft {
    * in the town file nor the world's code.
    */
   gentle?: GentlePlane[];
+  /**
+   * What the player painted the land to be used for in step 2 (`uses.ts`), while the new game is set
+   * up: Build makes the town from it. Not in the town file nor the world's code.
+   */
+  uses?: UseLayer;
 }
 
 /**
