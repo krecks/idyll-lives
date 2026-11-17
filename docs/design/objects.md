@@ -25,7 +25,7 @@ gate below, so the review does.
 3. Stay in budget: 1–3 draw calls (finish groups), triangles for the size class below.
 4. Build with `cargo art <family>` (Blender 5.2 LTS): it exports, and
 5. registers the model in the family's pack with `url` and `materials`, then
-6. runs the gate, `cargo check-glb` (no errors). Run the Khronos glTF validator too (no errors or warnings).
+6. runs the gate, `cargo check-glb`, with the Khronos glTF validator (no errors).
 7. Look at it in the gallery, on a lot by day and at night, on WebGPU and WebGL2, and in the catalog. Credit it. Commit only the files you changed.
 
 ## Tools and folders
@@ -472,9 +472,12 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   length and the worst per family and per model, and what is over 4 mm (a pixel at 6 m) apart; leaves
   (`foliage`, `leafcards`: lumps and cards, not round things) are counted apart. What it lists that is not a
   round thing drawn too coarsely: bark and boulders (jittered by hand), and a cloth's folds.
-- **The Khronos glTF validator**: no errors and no warnings. It is on npm as `gltf-validator`
-  (Apache-2.0); install it outside the repo and run `validateBytes` over the files, or drop them on
-  the validator's web page.
+- **`cargo check-glb --validate`** (`crates/tools/src/checkglb/validate.rs`) also runs the Khronos glTF validator
+  (`gltf-validator` in web/package.json, under Bun: `tools/art/validate.ts`) over each file and its far version:
+  `cargo art` over the files it writes, CI over every model. Every error and warning fails, as the strict check
+  `validator`, and so does an unused object (bytes downloaded for nothing), but for UVs on a material with no
+  texture in the file: the finish it maps to draws with them, and the gate finds UVs nothing reads. An empty node
+  and a buffer view without a target pass.
 - **Looking at it** (headless Chrome for Testing on the real GPU, as the benchmark runner (`tools/bench/render.mjs`); not
   `chrome-headless-shell`, which draws in software):
   - `/gallery.html?keys=model.<family>.<id>` (WebGPU), and the same with `&renderer=webgl`.
@@ -527,7 +530,7 @@ licence in CREDITS.md, and go through the same gate. Blender's licence doesn't e
 - [ ] Inside its footprint; heights and tops agree with the content (`seat`, `surface`, `light`, `slots`).
 - [ ] Every material mapped to a finish; 1–3 draw calls; triangles within the target for its size (half for things placed many times).
 - [ ] No emissive, no see-through except `glass`, no textures of its own unless needed (then ≤ 512 px).
-- [ ] `cargo check-glb` passes; the Khronos validator reports nothing.
+- [ ] `cargo check-glb --validate` passes.
 - [ ] Gallery; a lot by day and at night; WebGPU and WebGL2; the catalog picture; turned four ways.
 - [ ] Parts the player may colour named in `paint` (`body`), the rest in materials of their own.
 - [ ] Pack entry with `url` and `materials` (written by the build); base manifest lists the pack.

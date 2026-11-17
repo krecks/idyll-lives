@@ -10,10 +10,10 @@
 //!   cargo check-glb --keys                 the keys a build may write (`known_keys`)
 //!   cargo check-glb --preview              also re-imports each file in Blender and renders it to
 //!                                          tools/art/blender/previews/<family>/rt_<name>.png (gamekit/review.py)
+//!   cargo check-glb --validate             also runs the Khronos glTF validator over each file and its far
+//!                                          version (`validate`: Bun and web/'s `gltf-validator`)
 //!   cargo check-glb --update-baseline      first lowers tools/art/gate-baseline.json to what the counted checks
 //!                                          find (`COUNTED`; it only lowers counts and takes keys out)
-//!
-//! Run the Khronos glTF validator too (the standard says how); this checks the game's own rules.
 //!
 //! What it prints is check_glb.py's to the byte: JSON objects are read in file order, numbers as Python
 //! has them (an int stays an int), and formatted, `repr`'d and `math.hypot`'d as Python does (`py`); and
@@ -24,6 +24,7 @@ pub mod baseline;
 mod glb;
 pub(crate) mod json;
 pub(crate) mod py;
+pub mod validate;
 
 use baseline::{Baseline, Counts, Found, Verdict};
 use glb::{Glb, R, accessor, first_value, image_size, index, item, key, parse_glb, values};
@@ -4533,7 +4534,7 @@ pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Meas
     Ok(Measures { models, objects })
 }
 
-/// `cargo check-glb [keys…] [--keys] [--preview] [--update-baseline]`: the exit code.
+/// `cargo check-glb [keys…] [--keys] [--preview] [--validate] [--update-baseline]`: the exit code.
 pub fn main(args: &[String]) -> i32 {
     let paths = Paths::repo();
     if args.iter().any(|a| a == "--keys") {
@@ -4559,7 +4560,10 @@ pub fn main(args: &[String]) -> i32 {
         .cloned()
         .collect();
     // The counted checks run over every file at once (`BatchCheck`), by name.
-    let batch: Vec<(&'static str, BatchCheck)> = Vec::new();
+    let mut batch: Vec<(&'static str, BatchCheck)> = Vec::new();
+    if args.iter().any(|a| a == "--validate") {
+        batch.push(("validator", validate::check));
+    }
     if args.iter().any(|a| a == "--update-baseline") {
         match update_baseline(&paths, &keys, &batch) {
             Ok(changes) if changes.is_empty() => println!("{}: nothing to lower", baseline::FILE),
