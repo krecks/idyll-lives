@@ -1,4 +1,5 @@
 {
+  "manifest.json": {"pack": "the base manifest gained the standard's finishes (enamel, ceramic, plastic, rubber, brushed, iron, velvet, lacquer) and the fabric's sheen after the reference was tagged"},
   "model.bakeryCase far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.basketballHoop far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.busStop far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
