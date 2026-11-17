@@ -39,8 +39,9 @@ import type { Lighting } from '../shared/environment';
 import { GRASS, grassField, gustAt, gustNoise, markGrassPatches, recolourGrass, regroundGrass, type GrassQuality } from '../shared/grass';
 import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { pondQuads, rectBox } from '../shared/landBake';
+import { flowingWater, WaterFlowMap } from './water';
 import { padGeometry, padMask, padsOf } from '../shared/pads';
-import { LAND_CELL, type LandRect } from '../../game/land';
+import { LAND_CELL, type Land, type LandRect } from '../../game/land';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
 import { GROUND_TILE, groupInstances, hideLawn, keepBareTiles, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, smoothstep, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask, type LawnPlacement, type Woods } from '../shared/nature';
@@ -118,6 +119,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private woodsSector: ((x: number, z: number) => string) | null = null;
   /** The water's material and the library that adopted it (its own: it goes with the landscape). */
   private waterMaterial: { material: pc.StandardMaterial; lib: MaterialLibrary } | null = null;
+  /** The water's flow map (`pc/water.ts`), made with its material (none: `?diag=noflow`). */
+  private flowMap: WaterFlowMap | null = null;
 
   /** The land in the render data worker while `build` runs: the terrain's shading and the grass field are made there. */
   private offThread: OffThreadLand | null = null;
@@ -354,6 +357,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.waterMaterial.material.destroy();
       this.waterMaterial = null;
     }
+    this.flowMap?.destroy();
+    this.flowMap = null;
     this.grass?.dispose();
     this.grass = null;
     this.batches = [];
@@ -591,6 +596,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     });
     perfEnd(write);
     perfTime('land: stamp ponds', () => this.pondsIn(tiles));
+    perfTime('land: stamp flow', () => this.flowMap?.changed(rect, false));
     const grass = this.grass?.grassField;
     if (grass) {
       perfTime('land: stamp grass', () => {
@@ -729,7 +735,9 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   async landDone(rect: LandRect, pace?: () => Promise<void>): Promise<[number, number, number, number] | null> {
     if (!this.heightField || !this.host) return null;
     // (On a land its town follows, what the surface solved again moved too.)
-    const box = this.landBox(this.landChanged(rect), LAND_DONE_PAD);
+    const changed = this.landChanged(rect);
+    const box = this.landBox(changed, LAND_DONE_PAD);
+    perfTime('land: flow', () => this.flowMap?.changed(changed, true));
     for (const k of this.tilesIn(box)) {
       await pace?.();
       const t = this.tiles[k];
@@ -1056,7 +1064,19 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return drawOf(app, parent, 'water', mesh, this.waterMat(app));
   }
 
-  /** The water's material (the sheet's and a height field's ponds'), made once: its own, it goes with the landscape. */
+  /**
+   * Draws the land from `land` from now on (`LandscapeLayout.setLand`), its water flowing as the land has it (the
+   * flow map worked out whole).
+   */
+  override setLand(land: Land | null): void {
+    super.setLand(land);
+    this.flowMap?.setLand(this.heightField);
+  }
+
+  /**
+   * The water's material (the sheet's and a height field's ponds'), made once: its own, it goes with the landscape.
+   * Flowing (`pc/water.ts`) as its height field has it.
+   */
   private waterMat(app: pc.AppBase): pc.StandardMaterial {
     if (this.waterMaterial) return this.waterMaterial.material;
     const mat = new pc.StandardMaterial();
@@ -1071,6 +1091,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     mat.blendType = pc.BLEND_NORMAL;
     const lib = MaterialLibrary.for(app);
     lib.adopt(mat);
+    if (flowingWater()) {
+      this.flowMap = new WaterFlowMap(app.graphicsDevice);
+      this.flowMap.use(mat, false);
+      perfTime('nature: water flow', () => this.flowMap!.setLand(this.heightField));
+    }
     mat.update();
     this.waterMaterial = { material: mat, lib };
     return mat;

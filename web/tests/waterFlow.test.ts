@@ -106,14 +106,14 @@ describe('still water', () => {
 });
 
 describe('a step', () => {
-  // A channel 12 m wide along x: level 1.0 m west of x 100, 0.6 m east of it (no way drawn).
+  // A channel 12 m wide along x: level 1.2 m west of x 100, 0.6 m east of it (no way drawn).
   const land = flat(256);
   for (let j = 0; j < land.rows; j++) {
     for (let i = 0; i < land.cols; i++) {
       const [x, z] = [i * LAND_CELL, j * LAND_CELL];
       if (Math.abs(z - 128) > 6 || x < 20 || x > 236) continue;
       const k = j * land.cols + i;
-      land.wl[k] = x < 100 ? 100 : 60;
+      land.wl[k] = x < 100 ? 120 : 60;
       land.h[k] = -50;
     }
   }

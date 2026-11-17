@@ -22,8 +22,10 @@ import { flowOf, LAND_CELL, NONE, SEA_CM, type Land, type LandRect } from '../..
 /**
  * How the speed is worked out: `narrow`, the half-width (m) at and under which water with a way runs at full speed
  * (wider, slower: as `narrow / half-width`), never under `slowest`; `widthReach`, how far (samples) round a sample
- * the water's half-width is looked for; at the shore it slows to `shoreSpeed` of itself over `shore` m; a drop of
- * `drop` m between neighbours is a full rapid, felt `rapidReach` samples up and down from it.
+ * the water's half-width is looked for; at the shore it slows to `shoreSpeed` of itself over `shore` m; a drop between
+ * neighbours from `drop[0]` m is a rapid, a full one from `drop[1]` (a river drawn down a slope steps down a little
+ * every few metres: it runs fast there, and foams only where it falls further), felt `rapidReach` samples up and
+ * down from it.
  */
 export const FLOW = {
   narrow: 6,
@@ -31,11 +33,11 @@ export const FLOW = {
   widthReach: 10,
   shore: 3,
   shoreSpeed: 0.15,
-  drop: 0.3,
+  drop: [0.12, 0.7],
   rapidReach: 2,
   /** Foam where the water runs this fast and more, at most `fastFoam`. */
-  fast: 0.75,
-  fastFoam: 0.35,
+  fast: 0.9,
+  fastFoam: 0.12,
 } as const;
 
 /** How far round a rectangle (samples) `waterFlow` reads the land: the reach of everything it looks at, and room for the steps' ways. */
@@ -286,7 +288,7 @@ export function waterFlow(land: Land, course: RiverCourse | null, rect?: LandRec
       near(q, i, j, (p) => {
         drop = Math.max(drop, Math.abs(level[q] - level[p]) / 100);
       });
-      rapid[q] = clamp01(drop / FLOW.drop);
+      rapid[q] = smoothstep(FLOW.drop[0], FLOW.drop[1], drop);
     }
   }
   const rapids = spread(rapid, wet, w, d, FLOW.rapidReach);
