@@ -45,7 +45,7 @@ import type { TemplateCache } from '../shared/templateCache';
 export { EXPRESSIONS, FRIENDLY, STANCE, type StageDirection } from '../shared/characters/expressions';
 export type { Face } from '../shared/characters/face';
 export { MAX_CHARACTERS } from '../shared/characters/rig';
-export { PLAYBACK_RATE, QUIET_SPEED } from '../shared/gameSpeed';
+export { PLAYBACK_RATE, SUPER_SPEED } from '../shared/gameSpeed';
 
 /** The selection ring's glow (sRGB). */
 const RING_COLOR = '#7BE38A';

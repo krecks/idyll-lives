@@ -56,7 +56,7 @@ import { peopleStreams, tierFor } from './people';
 import { compileSim, loadGameData } from './gameData';
 import { townJob } from './townJobs';
 import { gameAssetPlan, parseAheadFiles, streamRanks } from './streamPlan';
-import { GameSpeed } from './speed';
+import { GameSpeed, SUPER_SPEED, SUPER_SPEED_WAIT } from './speed';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
@@ -114,10 +114,8 @@ const FEED_SIZE = 3;
 const START_WATCH_MS = 2500;
 /** Shift+R turns things that turn freely by this many degrees. */
 const FINE_TURN = 15;
-/** Fastest game speed (`clock::MAX_SPEED`). */
-const MAX_SPEED = 5;
-/** From this speed up the sim's full-detail area is only the chunks round the camera's (`Renderer.setDetailTight`). */
-const TIGHT_SPEED = 4;
+/** At super speed the sim's full-detail area is only the chunks round the camera's (`Renderer.setDetailTight`). */
+const TIGHT_SPEED = SUPER_SPEED;
 /** How long the interface stays after the mouse moves while it watches quietly. */
 const HUD_AWAKE_MS = 3000;
 /** How long a big moment plays at normal speed before the game speeds up again. */
@@ -493,7 +491,7 @@ async function openSession(
   const speed = new GameSpeed((running) => {
     bridge.send({ type: 'setSpeed', speed: running });
     game.speed = running;
-    // (At the fastest speeds the sim's full-detail area is the chunks round the camera's only.)
+    // (At super speed the sim's full-detail area is the chunks round the camera's only.)
     renderer.setDetailTight(running >= TIGHT_SPEED);
   }, bridge.savedSpeed);
   /**
@@ -535,8 +533,11 @@ async function openSession(
       // Time stands still in Build and Create.
       if (game.mode !== 'live') return;
       slowedFrom = null;
+      to = Math.max(0, Math.min(SUPER_SPEED, to));
+      // Super speed only in quiet hours (the simulation would keep the speed it has).
+      if (to === SUPER_SPEED && !game.superSpeed) return toast(SUPER_SPEED_WAIT);
       // (Under a menu: the speed it gives back.)
-      speed.choose(Math.max(0, Math.min(MAX_SPEED, to)));
+      speed.choose(to);
     },
     togglePause() {
       controls.setSpeed(game.speed === 0 ? speed.last : 0);
@@ -1131,10 +1132,14 @@ async function openSession(
     // Updates carry changes only: lists are replaced when something in them changed, keeping
     // the objects of everything that didn't.
     const changed = mirror.apply(ui);
+    game.superSpeed = ui.superSpeed;
+    // Super speed starts and ends on its own: the speed shown, and the one given back after a menu, follow it.
+    speed.follow(ui.speed);
+    if (ui.speed !== game.speed) renderer.setDetailTight(ui.speed >= TIGHT_SPEED);
+    game.speed = ui.speed;
     if (!changed) return;
     game.day = ui.day;
     game.minute = ui.minute;
-    game.speed = ui.speed;
     game.lifespan = ui.lifespan;
     game.playerMoves = ui.playerMoves;
     if (changed.sims) game.sims = changed.sims;
@@ -1441,7 +1446,8 @@ async function openSession(
     // Big moments at home are worth seeing at normal speed.
     const big = fresh.find((e) => e.importance >= 2 && aboutUs(e));
     if (big && liveSettings.autoSlow && game.mode === 'live' && game.speed >= 3) {
-      const from = game.speed;
+      // (Super speed wouldn't come back so soon after it: 10×.)
+      const from = Math.min(game.speed, 3);
       controls.setSpeed(1);
       slowedFrom = from;
       slowUntil = performance.now() + SLOW_MS;
@@ -1784,7 +1790,6 @@ async function openSession(
       case '2':
       case '3':
       case '4':
-      case '5':
         return controls.setSpeed(Number(e.key));
       case 'PageUp':
       case 'PageDown':
@@ -1915,7 +1920,7 @@ async function openSession(
           render: renderSample(s, liveSettings.resolution),
           main: { busy: +t.main.busy.toFixed(3), longTasks: t.main.longTasks, longestTaskMs: Math.round(t.main.longestTaskMs), heapMB: t.main.heapBytes === null ? null : Math.round(t.main.heapBytes / 2 ** 20) },
           sim: t.sim
-            ? { stepsPerS: Math.round(t.sim.stepsPerSecond), targetPerS: Math.round(t.sim.targetPerSecond), stepMs: +t.sim.stepMs.toFixed(3), stepMaxMs: +t.sim.stepMaxMs.toFixed(2), busy: +t.sim.busy.toFixed(3), wasmMB: Math.round(t.sim.memoryBytes / 2 ** 20) }
+            ? { stepsPerS: Math.round(t.sim.stepsPerSecond), targetPerS: Math.round(t.sim.targetPerSecond), ticksPerS: Math.round(t.sim.ticksPerSecond), stepMs: +t.sim.stepMs.toFixed(3), stepMaxMs: +t.sim.stepMaxMs.toFixed(2), busy: +t.sim.busy.toFixed(3), wasmMB: Math.round(t.sim.memoryBytes / 2 ** 20) }
             : null,
           residents: game.sims.length,
         });

@@ -116,7 +116,7 @@ function parse(): BenchFlags | null {
     warmup: num('warmup', 5, 0, 120),
     cap: num('cap', 0, 0, 1000),
     // Build mode stands still; the dusk run hurries through the evening; a frozen picture doesn't move.
-    speed: frozen || camera === 'build' ? 0 : num('speed', camera === 'dusk' ? 5 : 1, 0, 5),
+    speed: frozen || camera === 'build' ? 0 : num('speed', camera === 'dusk' ? 3 : 1, 0, 4),
     hud: params.get('hud') !== '0',
     summary: params.get('hud') !== '0' && params.get('hud') !== 'game',
     gpu: params.get('gpu') !== '0',

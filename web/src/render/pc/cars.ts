@@ -31,7 +31,7 @@ import { CARS, CAR_PAINT, TAXI_PAINT, carDoor, carriedAlong, carRowIsTaxi, DOORS
 import { lerpAngle } from '../shared/characters/rig';
 import { DOOR_SWING, ease } from '../shared/doors';
 import { Geo } from '../shared/geometry';
-import { PLAYBACK_RATE } from '../shared/gameSpeed';
+import { playbackRate } from '../shared/gameSpeed';
 import { compose, quatYawPitchRoll } from '../shared/math';
 import { Painter } from '../shared/street';
 
@@ -151,7 +151,7 @@ export class Cars extends Vehicles {
     const { curr, layout } = frame;
     const f = layout.car;
     // (Doors swing in the sim's real time, as it has them: faster at higher speeds, still while paused.)
-    const rate = PLAYBACK_RATE[curr[layout.header.speed] | 0] ?? 1;
+    const rate = playbackRate(curr, layout.header);
     const real = Math.min(0.1, Math.max(0, (frame.now - this.lastNow) / 1000));
     const dt = real * rate;
     // (Seconds of drive time a real second: the cars go on the traffic's clock.)
