@@ -37,15 +37,19 @@ fn corner_angles(mesh: &Mesh, approx: bool) -> Vec<f32> {
     out
 }
 
-/// A normal a vertex: its faces' normals weighed by their angles at it (a vertex of no face: its direction).
+/// A normal a vertex: its faces' normals (or its corners' own, where the mesh has them) weighed by their angles
+/// at it (a vertex of no face: its direction).
 pub fn vertex_normals(mesh: &Mesh) -> Vec<V3> {
     let face_normals = mesh.face_normals();
     let angles = corner_angles(mesh, true);
+    // (a mesh with normals of its own at its corners, a bevel's: Blender means those round each vertex instead)
+    let own = mesh.normals.as_ref();
     let mut sum = vec![V3::ZERO; mesh.verts.len()];
     let mut at = 0;
     for (f, normal) in face_normals.iter().enumerate() {
         for &v in mesh.corners(f) {
             let k = angles[at];
+            let normal = own.map_or(*normal, |n| n[at]);
             let s = &mut sum[v as usize];
             *s = V3::new(s.x + normal.x * k, s.y + normal.y * k, s.z + normal.z * k);
             at += 1;
