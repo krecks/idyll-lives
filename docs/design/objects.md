@@ -135,8 +135,8 @@ instances, so these costs are per kind of object in view, plus the triangles of 
 - **Shading baked in** at export (below, "Baked shading"): creases and gaps darken with no texture. Give a face
   that meets a crease an edge band, or its corners darken it all over.
 - **Judge it lit:** `cargo art <family> --preview --lit` renders as the game lights it (EEVEE, the finishes'
-  textures, the baked shading), beside the plain `--preview`; the game (`check.mjs gallery`, WebGPU and
-  `--renderer webgl`) is the last word.
+  textures, the baked shading), beside the plain `--preview`, for a family still built in Blender; the game
+  (`check.mjs gallery`, WebGPU and `--renderer webgl`) is the last word.
 
 ## Materials, finishes, tints, styles and quality
 

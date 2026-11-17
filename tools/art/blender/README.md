@@ -54,7 +54,8 @@ game. Report what you checked, and anything you didn't.
 cargo art kitchen                  # build, export, register, check
 cargo art kitchen --only fridge    # one model
 cargo art garden_decor --preview   # previews/garden_decor/<id>.png (+ <id>@<clip>.png), no export
-cargo art living --preview --lit   # and <id>.lit.png: EEVEE, sun and sky, the finishes' textures (judge detail here)
+cargo art living --preview --lit   # and <id>.lit.png: EEVEE, sun and sky, the finishes' textures (judge detail here;
+                                   # a family built in Rust has no --lit: bun tools/bench/check.mjs gallery)
 cargo art kitchen --preview --sheet  # and <id>.sheet.png: four sides, the baked shading, each clip at 0/25/50/75/100 %
 cargo art kitchen --no-pack        # export without writing the pack
 cargo art --all                    # every family (not _template)
