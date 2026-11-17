@@ -364,10 +364,12 @@ pub(crate) fn cube_mesh() -> Mesh {
 pub(crate) fn cone_mesh(segs: usize, r1: f32, r2: f32, depth: f32) -> Mesh {
     let half = 0.5 * depth;
     let mut verts = Vec::with_capacity(segs * 2);
+    // (each point through the operator's matrix, which moves nothing: a zero comes out of it without its sign)
+    let placed = |x: f32, y: f32, z: f32| mul_m4_v3(&M4::IDENTITY, V3::new(x, y, z));
     for i in 0..segs {
         let (s, c) = sin_cos_from_fraction(i as i32, segs as i32);
-        verts.push(V3::new(r1 * s, r1 * c, -half));
-        verts.push(V3::new(r2 * s, r2 * c, half));
+        verts.push(placed(r1 * s, r1 * c, -half));
+        verts.push(placed(r2 * s, r2 * c, half));
     }
     let n = segs as u32;
     let mut faces: Vec<Vec<u32>> = Vec::with_capacity(segs + 2);
