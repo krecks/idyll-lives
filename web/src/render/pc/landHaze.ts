@@ -15,7 +15,10 @@ import * as pc from './engine';
 
 /** How far in from the landscape's edge the veil begins (m), and its share of the way across where it is whole. */
 const FADE = 240;
-/** The veil's rings, in from the landscape's edge (m; negative: past it), and how clear it is at each (its alpha). */
+/**
+ * The veil's rings, in from the landscape's edge (m; negative: past it), and how clear it is at each (its alpha):
+ * along a side; round a corner each the same distance from the rectangle `FADE` m in (`set`).
+ */
 const RINGS: readonly [number, number][] = [
   [FADE, 0],
   [FADE * 0.6, 0.3],
@@ -28,6 +31,10 @@ const RINGS: readonly [number, number][] = [
 const LIFT = 35;
 /** The land under the veil is sampled every this far along its edge (m). */
 const STEP = 40;
+/** Each corner's fan of ways out: this many pieces (even: the fan split mirrored about its middle). */
+const ARC = 16;
+/** A side's height eases to its corner's over this far from it (m). */
+const EASE = 160;
 /** The camera's distance (m) the veil fades in over. */
 const SHOW_FROM = 650;
 const SHOW_FULL = 1050;
@@ -70,41 +77,76 @@ export class LandHaze {
     const full = `${box.x0},${box.z0},${box.x1},${box.z1}|${key}|${layer}`;
     if (full === this.key) return;
     this.key = full;
-    // Each ring a rectangle, its points the same way round each (a side's count the outer edge's), so they join up.
-    const sides: [number, number, number, number][] = [
-      [box.x0, box.z0, box.x1, box.z0],
-      [box.x1, box.z0, box.x1, box.z1],
-      [box.x1, box.z1, box.x0, box.z1],
-      [box.x0, box.z1, box.x0, box.z0],
+    // The veil's rings are the rectangle `FADE` m in from the landscape's edge grown outwards: straight along its sides
+    // and round at its corners, so each ring is the same distance from where the veil begins all the way round, and
+    // its clearness goes by ring alone. (A ring as a rectangle `d` m in from the edge was a corner's way out, the
+    // diagonal, stretched by √2; and its quads split all one way, a seam down the bisector of every corner.)
+    const inset = Math.max(0, Math.min(FADE, (box.x1 - box.x0) / 2, (box.z1 - box.z0) / 2));
+    const corners: [number, number][] = [
+      [box.x0 + inset, box.z0 + inset],
+      [box.x1 - inset, box.z0 + inset],
+      [box.x1 - inset, box.z1 - inset],
+      [box.x0 + inset, box.z1 - inset],
     ];
-    // (Each side's way in: down, left, up, right; a corner's both of its sides'.)
-    const ins: [number, number][] = [
-      [0, 1],
-      [-1, 0],
-      [0, -1],
-      [1, 0],
-    ];
-    /** Edge points, each with the way in from it (a rectangle `d` m in has its points at `d` times it). */
-    const edge: [number, number, number, number][] = [];
-    sides.forEach(([ax, az, bx, bz], k) => {
-      const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / STEP));
-      const [prev, own] = [ins[(k + 3) % 4], ins[k]];
-      for (let i = 0; i < n; i++) edge.push([ax + ((bx - ax) * i) / n, az + ((bz - az) * i) / n, own[0] + (i ? 0 : prev[0]), own[1] + (i ? 0 : prev[1])]);
-    });
-    const at = ([x, z, nx, nz]: readonly number[], d: number): [number, number] => [x + nx * d, z + nz * d];
-    // Each column's height: over the highest land along it, from where the veil begins to the edge.
-    const lift = edge.map((p) => {
+    // Round the inner rectangle: at each corner a fan of `ARC` ways out, then the side from it to the next corner.
+    // Each station is a point on the inner rectangle and its way out; a quad runs from one station to the next,
+    // split one way in the first half of its piece (a fan or a side) and the other way in the second, so each corner
+    // is drawn the same either side of its bisector.
+    const stations: { x: number; z: number; nx: number; nz: number; corner: number; side: number; along: number }[] = [];
+    // (`corner`: a fan's corner, else the corner nearest the side's station; `side`: -1 in a fan; `along`: m from that corner.)
+    const late: boolean[] = [];
+    for (let k = 0; k < 4; k++) {
+      const [cx, cz] = corners[k];
+      const [ex, ez] = corners[(k + 1) % 4];
+      // (Side k's way out: side 0, along z0, looks towards -z; each next one a quarter turn on.)
+      const out = -Math.PI / 2 + (k * Math.PI) / 2;
+      for (let j = 0; j < ARC; j++) {
+        const a = out - Math.PI / 2 + ((Math.PI / 2) * j) / ARC;
+        stations.push({ x: cx, z: cz, nx: Math.cos(a), nz: Math.sin(a), corner: k, side: -1, along: 0 });
+        late.push(j >= ARC / 2);
+      }
+      const len = Math.hypot(ex - cx, ez - cz);
+      const n = 2 * Math.max(1, Math.ceil(len / (2 * STEP)));
+      for (let i = 0; i < n; i++) {
+        const t = i / n;
+        stations.push({ x: cx + (ex - cx) * t, z: cz + (ez - cz) * t, nx: Math.cos(out), nz: Math.sin(out), corner: t < 0.5 ? k : (k + 1) % 4, side: k, along: Math.min(t, 1 - t) * len });
+        late.push(i >= n / 2);
+      }
+    }
+    const n = stations.length;
+    // Each side station's height: over the highest land across the strip the veil fades over, and its neighbours'
+    // (so nothing between two stations stands through it).
+    const strip = stations.map((p) => {
+      if (p.side < 0) return -Infinity;
       let top = -Infinity;
-      for (let d = 0; d <= FADE; d += STEP / 2) top = Math.max(top, height(...at(p, d)));
-      return top + LIFT;
+      for (let d = 0; d <= inset; d += STEP / 2) top = Math.max(top, height(p.x + p.nx * d, p.z + p.nz * d));
+      return top;
+    });
+    const sides = strip.map((h, i) => (stations[i].side < 0 ? h : Math.max(h, strip[(i + n - 1) % n], strip[(i + 1) % n])));
+    // One height for each corner's fan: over the land in the corner's square and its sides' ends.
+    const cornerTop = corners.map(([cx, cz], k) => {
+      const [sx, sz] = [k === 1 || k === 2 ? 1 : -1, k >= 2 ? 1 : -1];
+      let top = -Infinity;
+      for (let u = 0; u <= inset; u += STEP / 2) for (let v = 0; v <= inset; v += STEP / 2) top = Math.max(top, height(cx + sx * u, cz + sz * v));
+      return top;
+    });
+    // (The side stations next to a corner raise it: the fan meets them level.)
+    stations.forEach((p, i) => {
+      if (p.side >= 0 && p.along <= STEP + 1e-6) cornerTop[p.corner] = Math.max(cornerTop[p.corner], sides[i]);
+    });
+    // Towards a corner a side eases up to its corner's height over `EASE` m, so the veil has no step where they meet.
+    const lift = stations.map((p, i) => {
+      const corner = cornerTop[p.corner];
+      if (p.side < 0) return corner + LIFT;
+      const t = Math.min(1, p.along / EASE);
+      return Math.max(sides[i], corner + (sides[i] - corner) * t * t * (3 - 2 * t)) + LIFT;
     });
     const positions: number[] = [];
     const colors: number[] = [];
-    const n = edge.length;
     for (const [d, a] of RINGS) {
-      edge.forEach((p, i) => {
-        const [px, pz] = at(p, d);
-        positions.push(px, lift[i], pz);
+      const o = Math.max(0, inset - d);
+      stations.forEach((p, i) => {
+        positions.push(p.x + p.nx * o, lift[i], p.z + p.nz * o);
         colors.push(1, 1, 1, a);
       });
     }
@@ -113,7 +155,8 @@ export class LandHaze {
       for (let i = 0; i < n; i++) {
         const [a, b] = [r * n + i, r * n + ((i + 1) % n)];
         const [c, e] = [a + n, b + n];
-        indices.push(a, b, e, a, e, c);
+        if (late[i]) indices.push(a, b, c, b, e, c);
+        else indices.push(a, b, e, a, e, c);
       }
     }
     // (The old mesh goes with its mesh instance.)
