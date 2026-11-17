@@ -42,7 +42,7 @@ gate below, so the review does.
 | What | Where | Name |
 |---|---|---|
 | Shared toolkit | `tools/art/blender/gamekit/` | `import gamekit as G` |
-| The runner | `crates/tools/src/art.rs` | `cargo art <family> [--only <id>] [--preview]` |
+| The runner | `crates/art` (`crates/tools/src/art.rs` for the families still built in Blender) | `cargo art <family> [--only <id>] [--preview]` |
 | A family's script | `tools/art/blender/families/<family>.py` | `garden_decor.py` builds `model.garden.*`; `_template.py` to copy |
 | The models | `web/public/assets/models/<family>/<id>.glb` | the key's last part: `model.garden.gnome` → `garden/gnome.glb` |
 | Their manifest entries | `web/public/assets/packs/<family>/manifest.json`, listed in the base manifest's `packs` | |

@@ -9,7 +9,7 @@ rustflags = ["-C", "target-feature=+simd128"]
 # cost minutes of compiling. The rest build in the `tools` profile (Cargo.toml: release without fat
 # LTO), as their tests do.
 [alias]
-art = "run -q -p ll-tools --profile tools --bin art --"
+art = "run -q -p ll-art --profile tools --bin art --"
 assets = "run -q -p ll-tools --profile tools --bin assets --"
 characters = "run -q -p ll-tools --profile tools --bin characters --"
 check-chunks = "run -q -p ll-tools --profile tools --bin check-chunks --"
