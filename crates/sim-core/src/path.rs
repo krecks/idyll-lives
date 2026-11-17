@@ -512,7 +512,9 @@ impl NavGrid<'_> {
 
     /// Whether a single step from `a` to the neighbouring tile `b` is allowed.
     pub fn can_step(&self, ax: i32, az: i32, bx: i32, bz: i32) -> bool {
-        self.tile_free(bx, bz) && self.stairs_allow(ax, az, bx, bz) && self.walls_allow(ax, az, bx, bz)
+        self.tile_free(bx, bz)
+            && self.stairs_allow(ax, az, bx, bz)
+            && self.walls_allow(ax, az, bx, bz)
     }
 
     /// `can_step`'s stairs: a stair is walked straight up and down, entered at its foot (any other
@@ -707,9 +709,7 @@ impl NavGrid<'_> {
                     .filter(|&(lx, lz)| self.tile_free(lx, lz));
                 let here = grounds.and_then(|gr| gr.plot(self, x, z));
                 // (The tile's steps as its walkable regions have them, when they're up to date.)
-                let known = self
-                    .steps
-                    .and_then(|r| r.steps_at(lot.chunk_at(x, z), i));
+                let known = self.steps.and_then(|r| r.steps_at(lot.chunk_at(x, z), i));
                 for (d, (dx, dz)) in NEIGHBOURS
                     .into_iter()
                     .chain(link.map(|(lx, lz)| (lx - x, lz - z)))

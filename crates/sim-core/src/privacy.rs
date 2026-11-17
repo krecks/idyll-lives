@@ -327,7 +327,8 @@ pub(crate) fn kept_for_couple(
     let in_one = |j: u32| beds.iter().any(|o| o.slot_of(j).is_some());
     let couple = |&a: &usize| {
         housemate(a)
-            && partner_here(a as u32).is_some_and(|b| b > a && !in_one(a as u32) && !in_one(b as u32))
+            && partner_here(a as u32)
+                .is_some_and(|b| b > a && !in_one(a as u32) && !in_one(b as u32))
     };
     // (Only the household's: `Ctx::members`.)
     let couples = ctx
@@ -867,11 +868,7 @@ pub(crate) fn bed_for(
             && rooms
                 .iter()
                 .any(|r| !r.garden && r.id == room && r.doors > 0);
-        if !walled
-            || in_room(shut, room)
-                .iter()
-                .any(|s| s.by != a && s.by != b)
-            || others_in(room)
+        if !walled || in_room(shut, room).iter().any(|s| s.by != a && s.by != b) || others_in(room)
         {
             continue;
         }
