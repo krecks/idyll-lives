@@ -77,6 +77,23 @@ export function openText(state: OpenState, weekday: number, time: (minute: numbe
   return `closed · opens ${day}${time(state.opens.minute)}`;
 }
 
+/**
+ * The hours lot `plot` keeps: the simulation's (`PlotInfo.hours`, what a visit there is held to), else those of the
+ * place on it (the town file's); undefined for no lot, or one that keeps none.
+ */
+export function lotHours(plot: number | null | undefined, plots: readonly Pick<PlotInfo, 'hours'>[], places: readonly Pick<TownPlace, 'plot' | 'hours'>[]): TownPlace['hours'] | undefined {
+  if (plot == null) return undefined;
+  return plots[plot]?.hours ?? places.find((p) => p.plot === plot)?.hours;
+}
+
+/** Why nobody can visit a place with `hours` at `minute` of `weekday`: "Closed · opens 08:00", "Closed · opens Mon 08:00"; null while it's open. */
+export function closedWhy(hours: TownPlace['hours'] | undefined, minute: number, weekday: number, time: (minute: number) => string, days: readonly string[]): string | null {
+  const state = openState(hours, minute, weekday);
+  if (state.open) return null;
+  const text = openText(state, weekday, time, days);
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 /** A home for sale: its lot, what it costs and how big it is. */
 export interface HomeForSale {
   plot: number;

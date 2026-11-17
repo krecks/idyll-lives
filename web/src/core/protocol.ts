@@ -781,6 +781,11 @@ export interface PlotInfo {
   roof?: [number, number];
   /** Storeys the house on it has (absent: one). */
   storeys?: number;
+  /**
+   * The hours the place on it keeps (sim-core `world::PlotHours`, `Plot::open_at`): minutes of the day [open, close)
+   * and the days (bit 0 = Monday), a `close` at or before `open` running past midnight. Absent: always open.
+   */
+  hours?: { open: number; close: number; days: number };
 }
 
 /** Sent when walls or objects change (rare). */
