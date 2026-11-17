@@ -391,8 +391,8 @@ function water(land: Land, x: number, z: number, R: number, s: number, tool: 'la
  * A river's way laid on its water round its stamp at (`x`, `z`): along the drag, from the stamp `RIVER_WAY_STAMPS`
  * back to this one, blended into the way already laid by the falloff (all of it at the middle), so a bend turns
  * smoothly. The first stamps' water, laid before there was a way, is given it once there is one. Water there was
- * before the stroke that already ran some way keeps it: a river drawn into another runs on into it. Says the samples
- * whose way changed (null: none).
+ * before the stroke that already ran some way keeps it, and the sea and a generated river (at the sea's level) stay
+ * as they were: a river drawn into another runs on into it. Says the samples whose way changed (null: none).
  */
 function riverFlow(land: Land, x: number, z: number, R: number, stroke: StrokeState, free: Free): LandRect | null {
   const path = stroke.path;
@@ -404,7 +404,7 @@ function riverFlow(land: Land, x: number, z: number, R: number, stroke: StrokeSt
   const flow = flowsOf(land);
   const { cols, h, wl } = land;
   const base = stroke.base;
-  const kept = (k: number) => !!base?.flow?.[k] && base.wl[k] !== NONE && base.wl[k] > base.h[k];
+  const kept = (k: number) => !!base && base.wl[k] !== NONE && base.wl[k] > base.h[k] && (!!base.flow?.[k] || base.wl[k] === SEA_CM);
   let changed: LandRect | null = null;
   const lay = (cx: number, cz: number, blend: boolean) => {
     const rect = rectAround(land, cx, cz, R);

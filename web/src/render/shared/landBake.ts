@@ -107,7 +107,7 @@ export function wetDistance(land: Land): Float32Array | null {
 }
 
 /** Distance (m) from each sample to the nearest whose `mask` is `value` (two chamfer passes). */
-function chamfer(mask: Uint8Array, gw: number, gd: number, value: 0 | 1): Float32Array {
+export function chamfer(mask: Uint8Array, gw: number, gd: number, value: 0 | 1): Float32Array {
   const dist = new Float32Array(gw * gd);
   const far = (gw + gd) * LAND_CELL;
   for (let i = 0; i < dist.length; i++) dist[i] = mask[i] === value ? 0 : far;
