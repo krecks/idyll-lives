@@ -1,5 +1,6 @@
-# `cargo art --centres`, inside Blender: writes centres.json (where each model is centred at rest, for the
-# gate) from every family script's models, as a build writes it for the models it builds. It imports the
+# `cargo art --centres`, inside Blender: hands the runner (gamekit/runner.py) every family script's models'
+# centres (where each model is centred at rest, for the gate), which it writes to centres.json in place of
+# what is there, as a build hands back the centres of the models it builds. It imports the
 # family scripts without building anything (a family builds only when run as the script), so it takes a few
 # seconds. The runner starts it as
 #   Blender --background --factory-startup --python-exit-code 1 --python tools/art/blender/gamekit/centres.py
@@ -14,7 +15,7 @@ FAMILIES = os.path.join(HERE, 'families')
 sys.path[:0] = [FAMILIES, HERE]
 
 import gamekit as G  # noqa: E402
-from gamekit.manifest import CENTRES, write_centres  # noqa: E402
+from gamekit.runner import report  # noqa: E402
 
 
 def families():
@@ -24,7 +25,7 @@ def families():
 
 
 def centres():
-    """Writes centres.json from every family script's models."""
+    """Hands the runner every family script's models' centres."""
     found, by = {}, {}
     for name in families():
         spec = importlib.util.spec_from_file_location(name, os.path.join(FAMILIES, f'{name}.py'))
@@ -37,9 +38,7 @@ def centres():
                 if key in found and by[key] != family.name:
                     sys.exit(f'{key}: built by both {by[key]} and {family.name}')
                 found[key], by[key] = model.centre, family.name
-    write_centres(found, replace=True)
-    off = sum(1 for c in found.values() if tuple(c) != (0, 0))
-    print(f'[gamekit] wrote {os.path.relpath(CENTRES)}: {len(found)} models of {len(set(by.values()))} families ({off} off the middle)')
+    report({'centres': found, 'families': len(set(by.values()))})
 
 
 if __name__ == '__main__':
