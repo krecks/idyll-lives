@@ -28,6 +28,8 @@ export interface GroundTile {
    */
   kept?: Uint8Array;
   heights?: Float32Array;
+  /** The levels (a bit each) a brush changed the heights of while another was drawn: written again when next drawn. */
+  stale: number;
   /** How the roads level the land at each point of its grid (`Landscape.roadLevels`), once a brush has reached it. */
   levels?: Float32Array;
 }
