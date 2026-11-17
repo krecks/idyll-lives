@@ -221,6 +221,9 @@ export function streetGhosts(editor: Pick<TownEditor, 'draft' | 't'>, live: Live
   return ghosts;
 }
 
+/** A street ended with Enter carried on to a road just ahead (`carryOn`): its live checks, and `drawStreet`'s verdict on it. */
+type Carried = { live: LiveStreet; verdict: Edited };
+
 /**
  * What the street under the pointer would be, in words ("A street of Ashby", "A country road with a 30 m bridge"). Once
  * `drawStreet` has had its say (`verdict`), as it makes it: a country road whose dead-end stretch it makes a street
@@ -255,7 +258,7 @@ export const streetTool: TownTool = {
     /** The seed of the street's homes and names (a new one after each street drawn). */
     let seed = editor.seed();
     /** What was last worked out, for which line, and `drawStreet`'s verdict on it once the pointer rested. */
-    let shown: { key: string; live: LiveStreet; verdict: Edited | null } | null = null;
+    let shown: { key: string; live: LiveStreet; verdict: Edited | null; carried?: Carried | null } | null = null;
     let rest: ReturnType<typeof setTimeout> | undefined;
     const meetings = new WeakMap<object, Meeting>();
     /** The last scale measured (m a CSS px). */
@@ -328,7 +331,7 @@ export const streetTool: TownTool = {
         streetChoice.shownArea = live.area;
       }
       editor.preview(streetGhosts(editor, live, verdict));
-      editor.hint(lineOf(live, verdict));
+      editor.hint(lineOf(live, verdict, shown.carried));
       // (`drawStreet` itself once the pointer rests: too slow for every move on a big town.)
       if (!verdict && !live.why) rest = setTimeout(() => settle(key, pts, ask), REST);
     };
@@ -337,12 +340,16 @@ export const streetTool: TownTool = {
     const settle = (key: string, pts: Pt[], ask: StreetAsk) => {
       if (shown?.key !== key) return;
       shown.verdict = verdictOf(editor.draft, editor.t, editor.content, pts, ask.kind, ask.clear, seed, ask.asked);
+      // (What Enter would make of it: carried on to a road just ahead, if it may be, as `finish` carries it.)
+      const on = shown.live.reached ? null : carryOn(editor.draft, editor.t, pts, ask, meetings);
+      const carried = on && verdictOf(editor.draft, editor.t, editor.content, on.points, ask.kind, ask.clear, seed, ask.asked);
+      shown.carried = on && carried && 'draft' in carried ? { live: on.live, verdict: carried } : null;
       editor.preview(streetGhosts(editor, shown.live, shown.verdict));
-      editor.hint(lineOf(shown.live, shown.verdict));
+      editor.hint(lineOf(shown.live, shown.verdict, shown.carried));
     };
 
-    /** The line under the tools: why it may not go, or what it is and what a click would do. */
-    const lineOf = (live: LiveStreet, verdict: Edited | null): string => {
+    /** The line under the tools: why it may not go, or what it is and what a click would do (`carried`: what Enter makes of it, carried on to a road just ahead). */
+    const lineOf = (live: LiveStreet, verdict: Edited | null, carried: Carried | null = null): string => {
       if (live.why) return sentence(live.why);
       if (verdict && 'refused' in verdict && !unfinished(verdict.refused)) return sentence(verdict.refused);
       // (Clearly too steep: refused when ended. A little too steep is the settle's to judge: said, and the street may still be drawn for it to.)
@@ -353,6 +360,12 @@ export const streetTool: TownTool = {
       const also = clears ? `, clearing ${clears === 1 ? 'a lot or building' : `${clears} lots and buildings`} out of its way` : '';
       const joins = live.finishOn >= 0 ? editor.draft.roads[live.finishOn]?.name : undefined;
       if (live.reached) return joins ? `${what}${also}. Joins ${joins} — ${press ? 'let go' : 'click'} to finish.` : `${what}${also}. ${press ? 'Let go' : 'Click'} to draw it.`;
+      if (carried && 'draft' in carried.verdict) {
+        const onto = editor.draft.roads[carried.live.finishOn]?.name ?? 'the road';
+        const n = carried.verdict.cleared.lots.length + carried.verdict.cleared.backdrop.length;
+        const clearing = n ? `, clearing ${n === 1 ? 'a lot or building' : `${n} lots and buildings`} out of its way` : '';
+        return `${kindLine(editor.draft, carried.live, carried.verdict)}${clearing}. Click to set a point; Enter or a double click carries it on to ${onto} just ahead.`;
+      }
       const open = live.open ?? (verdict && 'refused' in verdict ? verdict.refused : null);
       return open ? `${what}${also}. ${sentence(open)}` : `${what}${also}. Click to set a point; Enter or a double click ends it here as a dead end, or on a road just ahead.`;
     };

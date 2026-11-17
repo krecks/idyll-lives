@@ -586,7 +586,7 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
     expect(ends.some(([x, z]) => Math.hypot(x - 160, z - 75) < 1)).toBe(true);
   });
 
-  test(`Enter carries a street ended short of a road on to it, within ${AUTO_JOIN} m; past that it ends as a dead end`, () => {
+  test(`Enter carries a street ended short of a road on to it, within ${AUTO_JOIN} m; past that it ends as a dead end`, async () => {
     choice.along = 'none';
     const ask = { kind: 'street' as const, asked: false, clear: true };
     // (From Far Lane north towards the high street, ended 20 m short of its middle.)
@@ -606,6 +606,10 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
       tool.up();
     }
     expect(editor.draft.roads).toHaveLength(4);
+    // (Once the pointer rests there, the hint says what Enter does: carries it on.)
+    tool.hover(pts[1][0], pts[1][1]);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(editor.said.hints.at(-1)).toMatch(/Enter or a double click carries it on to High Street just ahead\.$/);
     tool.key!(key('Enter'));
     expect(editor.said.refusals).toEqual([]);
     const made = editor.draft.roads.slice(4);
