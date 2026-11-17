@@ -10,15 +10,30 @@ pub fn wrap_angle(a: f32) -> f32 {
 }
 
 /// What `sim` may use where they are: on the plot they're a guest at, else at home and the
-/// public things (within `autonomy.reach` in an open-world town).
+/// public things (within `autonomy.reach` in an open-world town). Nothing of a place shut now
+/// (its hours, `Plot::open_at`): its guests go home (`life::end_visit_if_due`), and those going
+/// by leave it be.
 pub(crate) fn usable_here<'a>(sim: &Sim, ctx: &Ctx<'a>) -> std::borrow::Cow<'a, [u32]> {
+    let shut = |plot: u32| {
+        ctx.plots
+            .get(plot as usize)
+            .is_some_and(|p| p.hours.is_some() && !p.open_at(ctx.day, ctx.minute))
+    };
     match sim.visiting {
+        Some(visit) if shut(visit.plot) => std::borrow::Cow::Borrowed(&[]),
         Some(visit) => std::borrow::Cow::Borrowed(ctx.index.on(visit.plot)),
-        None => ctx.index.usable_near(
-            ctx.households[sim.household as usize].plot,
-            sim.pos,
-            ctx.content.autonomy.reach,
-        ),
+        None => {
+            let mut near = ctx.index.usable_near(
+                ctx.households[sim.household as usize].plot,
+                sim.pos,
+                ctx.content.autonomy.reach,
+            );
+            let closed = |o: &u32| ctx.object_plot[*o as usize].is_some_and(shut);
+            if near.iter().any(closed) {
+                near.to_mut().retain(|o| !closed(o));
+            }
+            near
+        }
     }
 }
 

@@ -367,8 +367,9 @@ pub fn plan(w: &World) -> Staff {
                 let first = &w.objects[posts[lead].0 as usize];
                 let (post, _) = place(content, first).unwrap_or(([0.0; 2], 0.0));
                 // In at the door of the lot, as a visitor comes in; before work they're there
-                // (gone), facing the way in.
-                let home = w.plots[posts[lead].1 as usize].arrival_point();
+                // (gone), facing the way in. At a post upstairs, in at the top of the stairs.
+                let home = upstairs_in(w, posts[lead].1, post)
+                    .unwrap_or_else(|| w.plots[posts[lead].1 as usize].arrival_point());
                 let yaw = (post[0] - home[0]).atan2(post[1] - home[1]);
                 servers.push(Server {
                     posts: vec![posts[lead].0],
@@ -396,6 +397,28 @@ pub fn plan(w: &World) -> Staff {
         servers,
         of,
     }
+}
+
+/// Where a server comes in to and goes home from at `post` (where they stand) on a storey of
+/// `plot` other than the ground's: the landing of the stairs up to it on the plot nearest them
+/// (they walk straight to it, as from the door downstairs). None: on the ground, or no stairs.
+fn upstairs_in(w: &World, plot: u32, post: [f32; 2]) -> Option<[f32; 2]> {
+    let storey = w.storey_of(post[1].floor() as i32);
+    if storey == 0 {
+        return None;
+    }
+    w.stair_map()
+        .stairs
+        .iter()
+        .map(|s| [s.landing.0 as f32 + 0.5, s.landing.1 as f32 + 0.5])
+        .filter(|l| {
+            let (x, z) = (l[0].floor() as i32, l[1].floor() as i32);
+            w.storey_of(z) == storey && w.plot_at(x, z) == Some(plot)
+        })
+        .min_by(|a, b| {
+            let d = |l: &[f32; 2]| (l[0] - post[0]).hypot(l[1] - post[1]);
+            d(a).total_cmp(&d(b))
+        })
 }
 
 /// Where the server of `o`, a post on `plot`, stands, if there's room for them: a public lot, their
