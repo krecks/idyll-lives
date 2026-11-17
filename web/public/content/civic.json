@@ -1,10 +1,10 @@
 {
-  "$comment": "Fittings for the town's named places (the town hall, the school, the hotel, the fire station and the rest: houses.json `parks` of kind `place`), in the `community` buy category. Each points at a stand-in model until its own is built (tools/art/blender/families/civic.py, pack assets/packs/civic). Desks and counters with `staff` have someone behind them in their hours.",
+  "$comment": "Fittings for the town's named places (the town hall, the school, the hotel, the fire station and the rest: houses.json `parks` of kind `place`), in the `community` buy category. Their models are built in tools/art/blender/families/civic.py (pack assets/packs/civic). Desks and counters with `staff` have someone behind them in their hours.",
   "objects": [
     {
       "id": "receptionDesk",
       "name": "Reception desk",
-      "model": "model.deskExecutive",
+      "model": "model.receptionDesk",
       "footprint": [
         2,
         1
@@ -48,7 +48,7 @@
     {
       "id": "hotelReception",
       "name": "Hotel reception",
-      "model": "model.deskExecutive",
+      "model": "model.hotelReception",
       "footprint": [
         2,
         1
@@ -92,7 +92,7 @@
     {
       "id": "dutyDesk",
       "name": "Duty desk",
-      "model": "model.deskExecutive",
+      "model": "model.dutyDesk",
       "footprint": [
         2,
         1
@@ -136,7 +136,7 @@
     {
       "id": "tellerCounter",
       "name": "Teller counter",
-      "model": "model.consoleTable",
+      "model": "model.tellerCounter",
       "footprint": [
         2,
         1
@@ -179,7 +179,7 @@
     {
       "id": "teacherDesk",
       "name": "Teacher's desk",
-      "model": "model.deskSimple",
+      "model": "model.teacherDesk",
       "footprint": [
         2,
         1
@@ -205,7 +205,7 @@
     {
       "id": "lectern",
       "name": "Lectern",
-      "model": "model.sideTable",
+      "model": "model.lectern",
       "footprint": [
         1,
         1
@@ -231,7 +231,7 @@
     {
       "id": "barCounter",
       "name": "Bar counter",
-      "model": "model.consoleTable",
+      "model": "model.barCounter",
       "footprint": [
         2,
         1
@@ -283,7 +283,7 @@
     {
       "id": "schoolDesk",
       "name": "School desk",
-      "model": "model.kidsTable",
+      "model": "model.schoolDesk",
       "footprint": [
         1,
         1
@@ -320,7 +320,7 @@
     {
       "id": "pew",
       "name": "Pew",
-      "model": "model.parkBench",
+      "model": "model.pew",
       "footprint": [
         3,
         1
@@ -368,7 +368,7 @@
     {
       "id": "waitingBench",
       "name": "Waiting-room bench",
-      "model": "model.parkBench",
+      "model": "model.waitingBench",
       "footprint": [
         3,
         1
@@ -415,7 +415,7 @@
     {
       "id": "examCouch",
       "name": "Examination couch",
-      "model": "model.bedDaybed",
+      "model": "model.examCouch",
       "footprint": [
         1,
         2
@@ -443,7 +443,7 @@
     {
       "id": "clothesRack",
       "name": "Clothes rail",
-      "model": "model.groceryShelf",
+      "model": "model.clothesRack",
       "footprint": [
         2,
         1
@@ -471,7 +471,7 @@
     {
       "id": "plantTable",
       "name": "Plant table",
-      "model": "model.coffeeTableLong",
+      "model": "model.plantTable",
       "footprint": [
         2,
         1
@@ -500,7 +500,7 @@
     {
       "id": "atm",
       "name": "Cash machine",
-      "model": "model.cubeShelf",
+      "model": "model.atm",
       "footprint": [
         1,
         1
@@ -527,7 +527,7 @@
     {
       "id": "wallBars",
       "name": "Wall bars",
-      "model": "model.printFramed",
+      "model": "model.wallBars",
       "footprint": [
         1,
         1
@@ -561,7 +561,7 @@
     {
       "id": "altar",
       "name": "Altar",
-      "model": "model.consoleTable",
+      "model": "model.altar",
       "footprint": [
         2,
         1
@@ -576,7 +576,7 @@
     {
       "id": "lockerRow",
       "name": "Lockers",
-      "model": "model.groceryShelf",
+      "model": "model.lockerRow",
       "footprint": [
         2,
         1
@@ -590,7 +590,7 @@
     {
       "id": "mannequin",
       "name": "Mannequin",
-      "model": "model.coatRack",
+      "model": "model.mannequin",
       "footprint": [
         1,
         1
@@ -605,7 +605,7 @@
     {
       "id": "luggageTrolley",
       "name": "Luggage trolley",
-      "model": "model.sideTableRound",
+      "model": "model.luggageTrolley",
       "footprint": [
         1,
         1
@@ -620,7 +620,7 @@
     {
       "id": "vaultDoor",
       "name": "Vault door",
-      "model": "model.canvasAbstract",
+      "model": "model.vaultDoor",
       "footprint": [
         2,
         1

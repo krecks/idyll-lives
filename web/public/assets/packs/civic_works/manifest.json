@@ -1,5 +1,557 @@
 {
-  "$comment": "Blender-built big working things for the town's named places (tools/art/blender/families/civic_works.py; content/civicWorks.json). Listed in the base manifest's packs. Empty until the models are built: civicWorks.json's things are drawn with stand-in models meanwhile.",
+  "$comment": "Blender-built big working things for the town's named places (tools/art/blender/families/civic_works.py; content/civicWorks.json): the fire engine, fire pole and hose rack, the two-post car lift, tyre rack and tool chest, the printing press, the server rack, the timber stack, cement mixer and flagpole. Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The fire engine, the car lift and the outdoor things have far versions for the town overview. The press's plate and blanket cylinders turn while a resident watches it run (`rollers`); the server rack's LEDs blink (`blink`) and the flag sways at the top of its pole (`flutter`), both ambient; the server rack's LEDs and its UPS's screen glow at night.",
   "version": 1,
-  "entries": {}
+  "entries": {
+    "model.fireEngine": {
+      "type": "model",
+      "url": "../../models/civic_works/fireEngine.glb",
+      "materials": {
+        "amber": {
+          "finish": "material.finish.gloss"
+        },
+        "blue_lens": {
+          "finish": "material.finish.gloss"
+        },
+        "body": {
+          "finish": "material.finish.gloss"
+        },
+        "brass": {
+          "finish": "material.finish.metal",
+          "roughness": 0.2
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "ladder": {
+          "finish": "material.finish.metal"
+        },
+        "lamp": {
+          "finish": "material.finish.gloss"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        },
+        "red_lens": {
+          "finish": "material.finish.gloss"
+        },
+        "rubber": {
+          "finish": "material.finish.matte"
+        },
+        "shutter": {
+          "finish": "material.finish.metal"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "stripe": {
+          "finish": "material.finish.gloss"
+        },
+        "tinted": {
+          "finish": "material.finish.gloss"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        },
+        "yellow": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Paint"
+        },
+        {
+          "material": "shutter",
+          "label": "Lockers"
+        },
+        {
+          "material": "stripe",
+          "label": "Stripes"
+        },
+        {
+          "material": "ladder",
+          "label": "Ladders"
+        }
+      ],
+      "far": "../../models/civic_works/fireEngine.far.glb"
+    },
+    "model.carLift": {
+      "type": "model",
+      "url": "../../models/civic_works/carLift.glb",
+      "materials": {
+        "alloy": {
+          "finish": "material.finish.metal"
+        },
+        "body": {
+          "finish": "material.finish.gloss"
+        },
+        "car": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "go": {
+          "finish": "material.finish.gloss"
+        },
+        "ink": {
+          "finish": "material.finish.matte"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "lamp": {
+          "finish": "material.finish.gloss"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        },
+        "red_lens": {
+          "finish": "material.finish.gloss"
+        },
+        "rubber": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tinted": {
+          "finish": "material.finish.gloss"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        },
+        "yellow": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Lift"
+        },
+        {
+          "material": "car",
+          "label": "Car"
+        },
+        {
+          "material": "alloy",
+          "label": "Wheels"
+        }
+      ],
+      "far": "../../models/civic_works/carLift.far.glb"
+    },
+    "model.printingPress": {
+      "type": "model",
+      "url": "../../models/civic_works/printingPress.glb",
+      "materials": {
+        "amber": {
+          "finish": "material.finish.gloss"
+        },
+        "blanket": {
+          "finish": "material.finish.matte"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "go": {
+          "finish": "material.finish.gloss"
+        },
+        "ink": {
+          "finish": "material.finish.matte"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        },
+        "plate": {
+          "finish": "material.finish.metal"
+        },
+        "red_lens": {
+          "finish": "material.finish.gloss"
+        },
+        "roller": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "type": {
+          "finish": "material.finish.matte"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "loops": {
+          "watch": "rollers"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Press"
+        }
+      ]
+    },
+    "model.firePole": {
+      "type": "model",
+      "url": "../../models/civic_works/firePole.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.metal",
+          "roughness": 0.16
+        },
+        "brass": {
+          "finish": "material.finish.metal",
+          "roughness": 0.2
+        },
+        "mat": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pole"
+        },
+        {
+          "material": "mat",
+          "label": "Mat"
+        }
+      ]
+    },
+    "model.hoseRack": {
+      "type": "model",
+      "url": "../../models/civic_works/hoseRack.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.gloss"
+        },
+        "brass": {
+          "finish": "material.finish.metal",
+          "roughness": 0.2
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "hose": {
+          "finish": "material.finish.satin"
+        },
+        "hose2": {
+          "finish": "material.finish.satin"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Rack"
+        },
+        {
+          "material": "hose",
+          "label": "Hose"
+        },
+        {
+          "material": "hose2",
+          "label": "Second hose"
+        }
+      ]
+    },
+    "model.serverRack": {
+      "type": "model",
+      "url": "../../models/civic_works/serverRack.glb",
+      "materials": {
+        "bay": {
+          "finish": "material.finish.satin"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "cable_blue": {
+          "finish": "material.finish.satin"
+        },
+        "cable_red": {
+          "finish": "material.finish.satin"
+        },
+        "cable_yellow": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "led_amber": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFC25A"
+        },
+        "led_blue": {
+          "finish": "material.finish.gloss",
+          "glow": "#6FA4FF"
+        },
+        "led_green": {
+          "finish": "material.finish.gloss",
+          "glow": "#5CFF8A"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        },
+        "screen": {
+          "finish": "material.finish.gloss",
+          "glow": "#7FC8FF"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "unit": {
+          "finish": "material.finish.satin"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "idle": "blink"
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Cabinet"
+        },
+        {
+          "material": "unit",
+          "label": "Servers"
+        }
+      ]
+    },
+    "model.tyreRack": {
+      "type": "model",
+      "url": "../../models/civic_works/tyreRack.glb",
+      "materials": {
+        "beam": {
+          "finish": "material.finish.metal"
+        },
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "label": {
+          "finish": "material.finish.gloss"
+        },
+        "label2": {
+          "finish": "material.finish.gloss"
+        },
+        "label3": {
+          "finish": "material.finish.gloss"
+        },
+        "rubber": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Frame"
+        },
+        {
+          "material": "beam",
+          "label": "Beams"
+        }
+      ]
+    },
+    "model.toolChest": {
+      "type": "model",
+      "url": "../../models/civic_works/toolChest.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "foam": {
+          "finish": "material.finish.matte"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        },
+        "red_lens": {
+          "finish": "material.finish.gloss"
+        },
+        "rubber": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Chest"
+        }
+      ]
+    },
+    "model.timberStack": {
+      "type": "model",
+      "url": "../../models/civic_works/timberStack.glb",
+      "materials": {
+        "bearer": {
+          "finish": "material.finish.wood"
+        },
+        "body": {
+          "finish": "material.finish.fabric"
+        },
+        "rope": {
+          "finish": "material.finish.matte"
+        },
+        "rubber": {
+          "finish": "material.finish.matte"
+        },
+        "timber": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Tarpaulin"
+        },
+        {
+          "material": "timber",
+          "label": "Timber"
+        }
+      ],
+      "far": "../../models/civic_works/timberStack.far.glb"
+    },
+    "model.cementMixer": {
+      "type": "model",
+      "url": "../../models/civic_works/cementMixer.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.gloss"
+        },
+        "crust": {
+          "finish": "material.finish.matte"
+        },
+        "dark": {
+          "finish": "material.finish.matte"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "plastic": {
+          "finish": "material.finish.satin"
+        },
+        "red_lens": {
+          "finish": "material.finish.gloss"
+        },
+        "rubber": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "yellow": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Mixer"
+        },
+        {
+          "material": "frame",
+          "label": "Stand"
+        }
+      ],
+      "far": "../../models/civic_works/cementMixer.far.glb"
+    },
+    "model.flagPole": {
+      "type": "model",
+      "url": "../../models/civic_works/flagPole.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.gloss"
+        },
+        "brass": {
+          "finish": "material.finish.metal",
+          "roughness": 0.2
+        },
+        "concrete": {
+          "finish": "material.finish.matte"
+        },
+        "flag": {
+          "finish": "material.finish.fabric"
+        },
+        "flag2": {
+          "finish": "material.finish.fabric"
+        },
+        "flag3": {
+          "finish": "material.finish.fabric"
+        },
+        "rope": {
+          "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "idle": "flutter"
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Pole"
+        },
+        {
+          "material": "flag",
+          "label": "Flag"
+        }
+      ],
+      "far": "../../models/civic_works/flagPole.far.glb"
+    }
+  }
 }
