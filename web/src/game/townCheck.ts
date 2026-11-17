@@ -44,6 +44,12 @@ export type CheckedTown = {
   roads?: RoadPlan[];
   areas?: { name: string; x: number; z: number; w: number; d: number }[];
   terrain?: { water?: number[] };
+  /**
+   * Whether the land itself is under water at (x, z) (a step 2 draft's, `edit/checked.ts`; none in a town file). A
+   * bridge the Street tool lays over the water as the land has it (its tiles) may cross a pond or a corner of a shore
+   * the water zones' outlines leave out (pieces under 4 samples dropped, corners rounded): its deck is over water.
+   */
+  landWet?: (x: number, z: number) => boolean;
   meta: {
     roads?: RoadPlan[];
     paths?: Rect[];
@@ -299,7 +305,7 @@ function bridgeProblems(town: CheckedTown, roads: readonly RoadPlan[], river: bo
     }
     const off = r.points.findIndex(([x, z], k) => wet(x, z) && (ls[k] < s0 || ls[k] > s1));
     if (off >= 0) out.push(`${name} runs over the water off its deck at ${r.points[off][0].toFixed(0)}, ${r.points[off][1].toFixed(0)}`);
-    if (!r.points.some(([x, z], k) => ls[k] >= s0 && ls[k] <= s1 && wet(x, z))) out.push(`${name}'s deck is over no water`);
+    if (!r.points.some(([x, z], k) => ls[k] >= s0 && ls[k] <= s1 && (wet(x, z) || !!town.landWet?.(x, z)))) out.push(`${name}'s deck is over no water`);
     const most = r.ends.includes('out') ? CAUSEWAY : SPAN;
     if (s1 - s0 > most) out.push(`${name}'s deck is ${(s1 - s0).toFixed(0)} m long (${most} m at most)`);
     const turn = Math.abs(headingAt(r.points, s1, ls) - headingAt(r.points, s0, ls));

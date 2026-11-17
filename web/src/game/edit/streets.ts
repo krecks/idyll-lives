@@ -669,6 +669,8 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
       [next, walk] = [bridged.roads, bridged.walk];
       for (let k = had; k < next.length; k++) pieces.push(k);
       const deck = next[a > 0 ? had : at].bridge!;
+      // (Made straight, the bridge may miss a wet tile the line drawn only clipped: then it would be a deck over no water.)
+      if (!(deck[1] > deck[0])) return refused('it only clips the edge of the water: draw it clear of the water, or on across it');
       if (deck[1] - deck[0] > BRIDGE_SPAN) return refused(`its bridge would be ${Math.round(deck[1] - deck[0])} m long (${BRIDGE_SPAN} m at most)`);
     }
     // Nothing of it over the water but its decks, and onto and off them no tighter than it may bend.

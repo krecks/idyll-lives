@@ -8,6 +8,7 @@
  */
 
 import type { Content } from '../../content/content';
+import { wetTile } from '../landEdit';
 import { roadExits } from '../roads';
 import { plotRect, type NeighbourhoodDraft, type Templates } from '../town';
 import { townProblems, type CheckedTown } from '../townCheck';
@@ -23,6 +24,7 @@ export function checkedTown(draft: NeighbourhoodDraft, t: Templates): CheckedTow
   const open = draft.open;
   const W = draft.width;
   const D = draft.depth;
+  const land = open?.land;
   const plots = draft.slots.map((s) => ({ ...plotRect(t, s), public: s.kind !== 'house', area: s.area ?? 0, kind: plotKind(s) }));
   // (A place's ways out are where its roads, not its footpaths, leave the world; a classic town's, any road's.)
   const exits = open ? roadExits(draft.roads.filter((r) => r.kind !== 'trail'), W, D).map(([x, z]) => ({ x, z, kind: 'road' as const })) : roadExits(draft.roads, W, D);
@@ -36,6 +38,8 @@ export function checkedTown(draft: NeighbourhoodDraft, t: Templates): CheckedTow
     households: [],
     roads: draft.roads,
     ...(open ? { areas: open.areas, terrain: { water: open.water }, parking: open.parking } : {}),
+    // (The water as the land has it, which the Street tool bridges: `CheckedTown.landWet`.)
+    ...(land ? { landWet: (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < D && wetTile(land, Math.floor(x), Math.floor(z)) } : {}),
     meta: {
       roads: draft.roads,
       greens: draft.greens,
