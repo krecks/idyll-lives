@@ -301,7 +301,7 @@ describe('a backdrop building turned by a road', () => {
   // A square turned 45°, its top corner by the street's end, its side 8 m from the junction's middle (80, 60): its box's corner covers the street.
   const [cx, cz, r] = [70, 41, 19];
   const poly: [number, number][] = [[cx, cz - r], [cx + r, cz], [cx, cz + r], [cx - r, cz]];
-  const turned: SurfaceWorld = { plots: [], meta: { roads: [street, lane], backdrop: [{ poly, use: 'school' }] } };
+  const turned: SurfaceWorld = { plots: [], meta: { roads: [street, lane], backdrop: [{ poly }] } };
   const surface = builtSurfaceOf(turned, land);
   const [box] = surfacePlots(turned);
 
