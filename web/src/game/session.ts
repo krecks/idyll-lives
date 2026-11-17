@@ -11,6 +11,7 @@ import { groundDepth, lowestStorey } from '../core/protocol';
 import { townMap } from '../ui/townMap.svelte';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
+import { GAMEPLAY_STATS, installGameplayStats } from '../debug/gameplayStats';
 import { tileWorld } from '../debug/tileWorld';
 import { benchBigWorld } from '../debug/bigTown';
 import { recentLog } from '../debug/log';
@@ -1851,9 +1852,17 @@ async function openSession(
     }
   };
 
+  // The gameplay benchmark (`tools/bench/gameplay.mjs`): the renderer's numbers on demand, with GPU
+  // time measured for the whole session (`?gpustats`, dev only; nothing is installed without it).
+  installGameplayStats(() => ({
+    ...renderer.stats(),
+    gpuPasses: renderer.gpuPasses(),
+    simMemoryBytes: bridge.threadStats?.memoryBytes ?? null,
+  }));
+
   const statsTimer = setInterval(() => {
-    // GPU timing costs a little, so it runs only while the overlay is open.
-    renderer.measureGpu(game.perfOpen);
+    // GPU timing costs a little, so it runs only while the overlay is open (or the benchmark asks).
+    renderer.measureGpu(game.perfOpen || GAMEPLAY_STATS);
     if (!game.perfOpen) return;
     game.stats = renderer.stats();
     game.threads = threadStats(game.stats, bridge.threadStats, voices.stats());
