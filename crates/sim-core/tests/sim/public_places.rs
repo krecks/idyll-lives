@@ -185,6 +185,17 @@ fn every_public_place_loads_on_either_side_of_the_street() {
             let world = World::from_json(&merged, &lot.to_string(), 1)
                 .unwrap_or_else(|e| panic!("{id}: {e}"));
             assert_eq!(world.objects.len(), objects.len(), "{id}");
+            // Garden things stand outside: none under the place's roof.
+            for o in &world.objects {
+                let def = &world.content.objects[o.def];
+                assert!(
+                    !def.outdoors || world.lot.room_at(o.x, o.z) == sim_core::lot::OUTDOORS,
+                    "{id}: the {} at {},{} is indoors",
+                    def.name,
+                    o.x,
+                    o.z
+                );
+            }
             for (o, raw) in world.objects.iter().zip(&objects) {
                 assert_eq!(
                     o.turn as i64,
