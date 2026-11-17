@@ -339,7 +339,7 @@ pub fn jitter(obj: Obj, amount: f64, o: Jitter) -> Obj {
 // ---- objects ------------------------------------------------------------------------------------------
 
 /// A part of the points `vs` and `faces`, its faces turned to look outwards, shaded.
-fn object(
+pub(crate) fn object(
     name: &str,
     vs: Vec<V3>,
     faces: &[Vec<u32>],

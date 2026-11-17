@@ -40,6 +40,26 @@ pub fn join(parts: &[Obj], name: &str, origin: Option<P3>) -> Obj {
     let mut others: Vec<Obj> = parts[1..].iter().copied().filter(|&o| o != first).collect();
     others.sort();
     others.dedup();
+    join_into(first, &others);
+    // rotation and scale into the mesh
+    first.edit(|o| {
+        if o.rot != V3::ZERO || o.scale != v3(1, 1, 1) || o.quat.is_some() {
+            let mut m = o.matrix_basis();
+            m.0[3] = [0.0, 0.0, 0.0, 1.0];
+            o.mesh.transform(&m);
+            (o.rot, o.scale, o.quat) = (V3::ZERO, v3(1, 1, 1), None);
+        }
+        o.name = name.to_string();
+    });
+    if let Some(origin) = origin {
+        set_origin(first, origin);
+    }
+    first
+}
+
+/// `bpy.ops.object.join()` with `first` the active part: the meshes of `others` go into its own, in its frame, in the
+/// order given, and leave the scene. `first` keeps its place, turn and scale.
+pub(crate) fn join_into(first: Obj, others: &[Obj]) {
     if !others.is_empty() {
         let world = first.matrix_world();
         let (loc, plain) = first.read(|o| {
@@ -56,7 +76,7 @@ pub fn join(parts: &[Obj], name: &str, origin: Option<P3>) -> Obj {
         } else {
             world.inverted().unwrap_or(M4::IDENTITY)
         };
-        for other in others {
+        for &other in others {
             let m = mul_m4_m4m4(&inverse, &other.matrix_world());
             let mut mesh = other.read(|o| o.mesh.clone());
             if !m.is_identity() {
@@ -68,20 +88,6 @@ pub fn join(parts: &[Obj], name: &str, origin: Option<P3>) -> Obj {
             other.remove();
         }
     }
-    // rotation and scale into the mesh
-    first.edit(|o| {
-        if o.rot != V3::ZERO || o.scale != v3(1, 1, 1) || o.quat.is_some() {
-            let mut m = o.matrix_basis();
-            m.0[3] = [0.0, 0.0, 0.0, 1.0];
-            o.mesh.transform(&m);
-            (o.rot, o.scale, o.quat) = (V3::ZERO, v3(1, 1, 1), None);
-        }
-        o.name = name.to_string();
-    });
-    if let Some(origin) = origin {
-        set_origin(first, origin);
-    }
-    first
 }
 
 /// `b`'s points, faces and materials added to `a`.
