@@ -10,6 +10,7 @@
  */
 
 import type { WorldStructure } from '../../core/protocol';
+import type { EditRefusal } from '../../game/landFollow';
 import { editTown, keepHouses } from '../../game/townJobs';
 import type { NeighbourhoodDraft } from '../../game/town';
 import { services } from '../services';
@@ -23,7 +24,8 @@ import { services } from '../services';
 export interface Settled {
   draft: NeighbourhoodDraft;
   preview: WorldStructure;
-  refused?: { op: number; why: string }[];
+  /** (Each with where it is, when the town worker's answer has it: `landFollow.ts` `EditRefusal`.) */
+  refused?: EditRefusal[];
   step?: number;
   marks?: readonly string[];
 }

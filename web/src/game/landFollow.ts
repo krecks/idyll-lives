@@ -315,12 +315,23 @@ export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, prev
 export interface EditSettled<W> {
   draft: NeighbourhoodDraft;
   world: W;
-  /** The edits refused (`op`: an edit's index in the batch, from 0), each with why: in words, as a clause ("Mill Lane would climb 21 %, …"). */
-  refused: { op: number; why: string }[];
+  /**
+   * The edits refused (`op`: an edit's index in the batch, from 0), each with why: in words, as a clause ("Mill Lane
+   * would climb 21 %, …"), and where (`at`: a road's points and its `width`, else a lot's or a building's corners).
+   */
+  refused: EditRefusal[];
   /** What in the settled town is over a slope limit (`settleKeys`): the next settle's `before`. */
   marks: string[];
   /** The plan settled: its index in the batch's `steps` (the last, unless an edit was refused: then the one that edit was made on). */
   step: number;
+}
+
+/** An edit `settleEdit` refused: see `EditSettled.refused`. */
+export interface EditRefusal {
+  op: number;
+  why: string;
+  at?: Pt[];
+  width?: number;
 }
 
 /**
@@ -350,7 +361,7 @@ export function settleEdit<W extends FollowWorld>(plan: NeighbourhoodDraft, prev
   const path = steps && steps.length > 1 ? [...steps.slice(0, -1), plan] : [plan];
   let at = path.length - 1;
   let settled = settleOnce(plan, preview);
-  const refused: { op: number; why: string }[] = [];
+  const refused: EditRefusal[] = [];
   if (at > 0) {
     let first: Settle<W> | null = null;
     const had = new Set(before ?? (first = settleOnce(path[0], preview)).over.keys());
@@ -360,12 +371,12 @@ export function settleEdit<W extends FollowWorld>(plan: NeighbourhoodDraft, prev
       const fresh = [...settled.over].filter(([key]) => !had.has(key));
       if (!fresh.length || at === 0) break;
       // (Each edit's reason: the first of what it brought in itself, else the first of what it broke nearby.)
-      const blamed = new Map<number, { why: string; own: boolean }>();
+      const blamed = new Map<number, { why: string; own: boolean; at: Pt[]; width?: number }>();
       for (const [key, o] of fresh) {
         const { op, own } = blame(key, o.at, things.slice(0, at + 1));
-        if (!blamed.has(op) || (own && !blamed.get(op)!.own)) blamed.set(op, { why: o.why, own });
+        if (!blamed.has(op) || (own && !blamed.get(op)!.own)) blamed.set(op, { why: o.why, own, at: o.at, ...(o.width ? { width: o.width } : {}) });
       }
-      for (const [op, { why }] of blamed) if (!refused.some((r) => r.op === op)) refused.push({ op, why });
+      for (const [op, { why, at: where, width }] of blamed) if (!refused.some((r) => r.op === op)) refused.push({ op, why, at: where, ...(width ? { width } : {}) });
       at = Math.min(...blamed.keys());
       settled = at === 0 && first ? first : settleOnce(path[at], preview);
     }
@@ -378,7 +389,7 @@ export function settleEdit<W extends FollowWorld>(plan: NeighbourhoodDraft, prev
 interface Settle<W> {
   draft: NeighbourhoodDraft;
   world: W;
-  over: Map<string, { at: Pt[]; why: string }>;
+  over: Map<string, { at: Pt[]; why: string; width?: number }>;
 }
 
 /** `plan` settled as `settleEdit` settles it, giving nothing up: see there. */
@@ -410,11 +421,11 @@ function settleOnce<W extends FollowWorld>(plan: NeighbourhoodDraft, preview: (d
 }
 
 /** What `found` (measured on `plan`'s preview, `world`) says is over a slope limit itself, by its key (`roadKey`, `slotKey`, `buildingKey`): where it is, and why in words. */
-function overOf(plan: NeighbourhoodDraft, world: FollowWorld, found: LandMeasure): Map<string, { at: Pt[]; why: string }> {
-  const over = new Map<string, { at: Pt[]; why: string }>();
+function overOf(plan: NeighbourhoodDraft, world: FollowWorld, found: LandMeasure): Map<string, { at: Pt[]; why: string; width?: number }> {
+  const over = new Map<string, { at: Pt[]; why: string; width?: number }>();
   for (const [i, o] of found.over.roads) {
     const r = plan.roads[i];
-    over.set(roadKey(r), { at: r.points, why: overWords(o, r.name ?? `the ${r.kind ?? 'street'}`, r.kind ?? 'street') });
+    over.set(roadKey(r), { at: r.points, why: overWords(o, r.name ?? `the ${r.kind ?? 'street'}`, r.kind ?? 'street'), width: r.width });
   }
   const plots = world.plots.length;
   const building = surfacePlots(world);
@@ -427,8 +438,8 @@ function overOf(plan: NeighbourhoodDraft, world: FollowWorld, found: LandMeasure
   return over;
 }
 
-/** How `o` breaks a slope limit, in words, of `name` (a road of `kind`, a lot or a building). */
-function overWords(o: Over, name: string, kind: string): string {
+/** How `o` breaks a slope limit, in words, of `name` (a road of `kind`, a lot or a building). The Street tool says it in the same words. */
+export function overWords(o: Over, name: string, kind: string): string {
   const m = (v: number) => `${v.toFixed(1)} m`;
   switch (o.what) {
     case 'climb':

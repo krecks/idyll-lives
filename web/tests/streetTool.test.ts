@@ -6,17 +6,20 @@
 // generated river world every live verdict is `drawStreet`'s, within the per-move budget. (The slope is
 // the settle's to judge, through the town worker: `editSettle.slow.test.ts`; here only its forecast.) The tool
 // itself, driven as the town stage drives it: clicks, a freehand drag, Backspace, Esc and Enter, the
-// street drawn picked. `bun test`.
+// street drawn picked; the magnet; Enter carrying a street on to a road nearby; a street clearly too
+// steep refused up front, its climb measured as `measureLand` measures it; the hint on bare land. `bun test`.
 import { afterAll, describe, expect, mock, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { Content } from '../src/content/content';
 import type { RoadPlan } from '../src/core/protocol';
 import type { Edited } from '../src/game/edit/edited';
 import { drawStreet } from '../src/game/edit/streets';
-import { blankLand, type Land } from '../src/game/land';
+import { blankLand, LAND_CELL, type Land } from '../src/game/land';
+import { measureLand, type FollowWorld } from '../src/game/landFollow';
 import { rle } from '../src/game/landMasks';
 import type { Pt } from '../src/game/roads';
 import type { NeighbourhoodDraft, PlotSlot, Templates } from '../src/game/town';
+import { GRADE, profileOf } from '../src/render/shared/builtSurface';
 import type { TownGhosts } from '../src/render/types';
 import type { Picked } from '../src/ui/townedit/pick';
 import type { TownEditor } from '../src/ui/townedit/tools';
@@ -30,8 +33,8 @@ mock.module('../src/ui/townedit/streetChoice.svelte', () => ({
   alongFor: (a: string, area: number) => (a !== 'auto' ? a : area === 0 ? 'both' : 'homes'),
   fillsHomes: (a: string) => a === 'homes',
 }));
-const { drawnStretches, liveStreet, runsOf, unfinished, verdictOf } = await import('../src/ui/townedit/streetLive');
-const { StreetDrawing, startAt, streetGhosts, streetTool, stretchNear } = await import('../src/ui/townedit/streetTool');
+const { climbOf, drawnStretches, liveStreet, runsOf, unfinished, verdictOf } = await import('../src/ui/townedit/streetLive');
+const { AUTO_JOIN, carryOn, FIRST_STREET, pullAt, pullReach, StreetDrawing, startAt, streetGhosts, streetTool, stretchNear } = await import('../src/ui/townedit/streetTool');
 
 const W = 400;
 const D = 400;
@@ -128,9 +131,12 @@ describe('the live checks agree with drawStreet', () => {
     expect(live.stretches.filter((s) => s.tone === 'bridge')).toHaveLength(1);
     expect(runsOf(live.line, live.stretches).map((r) => r.tone)).toEqual(['new', 'bridge', 'new']);
     expect(refusal(drawn)).toBeNull();
-    // Once drawStreet has had its say, the ghosts are the roads it makes: the bridge pale.
+    // Once drawStreet has had its say, the ghosts are the roads it makes: the bridge pale; and Far Lane, which it
+    // finishes on, green.
+    expect(live.finishOn).toBe(2);
     const g = streetGhosts({ draft, t }, live, drawn);
-    expect(g.roads!.map((r) => r.tone).sort()).toEqual(['bridge', 'new', 'new']);
+    expect(g.roads!.map((r) => r.tone).sort()).toEqual(['bridge', 'join', 'new', 'new']);
+    expect(g.roads!.find((r) => r.tone === 'join')!.points).toEqual(draft.roads[2].points);
   });
 
   test('a crossing too wide for a bridge: red over the water, the same reason', () => {
@@ -158,10 +164,23 @@ describe('the live checks agree with drawStreet', () => {
     expect(live.stretches.some((s) => s.tone === 'bad' && s.to - s.from < 40)).toBe(true);
   });
 
-  test('a junction within 14 m of another: its mark red, the same reason', () => {
-    const { live, drawn } = both(town(), [
+  test('a junction within 14 m of another slides along the road (16 m at most) to where there is room; with none either side, its mark red, the same reason', () => {
+    const slid = both(town(), [
       [LANE_X + 6, MAIN_Z - 8],
-      [LANE_X + 6, 50],
+      [LANE_X + 6, 62],
+    ]);
+    expect(slid.live.why).toBeNull();
+    expect(refusal(slid.drawn)).toBeNull();
+    expect(slid.live.joins).toHaveLength(1);
+    // (Off the high street 6 m from Mill Lane: slid 8 m on, 14 m from it.)
+    expect(slid.live.joins[0].at[0]).toBeCloseTo(LANE_X + 14, 0);
+    expect(slid.live.joins[0].at[1]).toBeCloseTo(MAIN_Z, 1);
+    // (Bell Lane north of the high street 24 m from Mill Lane: 16 m either way is too near one or the other.)
+    const crowded = town();
+    crowded.roads.push({ points: line(LANE_X + 24, MAIN_Z - 2.15, LANE_X + 24, 70), width: 7, ends: ['join', 'dead'], kind: 'lane', area: 0, name: 'Bell Lane' });
+    const { live, drawn } = both(crowded, [
+      [LANE_X + 10, MAIN_Z - 8],
+      [LANE_X + 10, 62],
     ]);
     expect(live.why).toMatch(/within 14 m of another junction/);
     expect(refusal(drawn)).toBe(live.why);
@@ -221,7 +240,9 @@ describe('the live checks agree with drawStreet', () => {
     draft.open!.areas[0] = { ...draft.open!.areas[0], z: MAIN_Z - 5, d: 150 };
     const live = liveStreet(draft, t, up, 'street');
     expect(live.steep).toBe(true);
-    expect(live.slope).toMatch(/too steep here/);
+    // (In the settle's own words: `landFollow.ts` `overWords`.)
+    expect(live.slope).toMatch(/^the ground under it would have to be dug out or built up [\d.]+ m \(4\.0 m at most\)$/);
+    expect(live.excess).toBe(true);
     expect(live.why).toBeNull();
     expect(live.stretches.some((s) => s.tone === 'bad')).toBe(true);
     const flat = liveStreet(town(30, blankLand(W, D)), t, up, 'street');
@@ -289,7 +310,7 @@ describe('the tool', () => {
     // (Not on a road yet: still drawing, nothing drawn.)
     expect(editor.draft.roads).toHaveLength(4);
     tool.hover(87, FAR_Z - 3);
-    expect(editor.said.hints.at(-1)).toMatch(/with a 30 m bridge\. Click to draw it/);
+    expect(editor.said.hints.at(-1)).toMatch(/with a 30 m bridge\. Joins Far Lane — click to finish/);
     tool.down(87, FAR_Z - 3);
     tool.up();
     expect(editor.said.refusals).toEqual([]);
@@ -380,6 +401,184 @@ describe('the tool', () => {
     expect(editor.said.refusals).toEqual([]);
     expect(editor.draft.roads.some((r) => r.bridge)).toBe(true);
     expect(editor.said.selected?.kind).toBe('road');
+  });
+});
+
+/** The town with Hill Road east-west at z 140 (joining Round Road), the land 12 m up from z 125 north of the high street, and the town's box moved west out of the way. */
+function hillTown(): NeighbourhoodDraft {
+  const land = blankLand(W, D);
+  for (let j = 0; j < land.rows; j++) for (let i = 0; i < land.cols; i++) land.h[j * land.cols + i] = j * LAND_CELL >= 125 ? 1200 : 0;
+  const draft = town(30, land);
+  draft.roads.push({ points: line(200, 140, 380, 140), width: 7, ends: ['dead', 'join'], kind: 'country', name: 'Hill Road' });
+  draft.open!.areas[0] = { ...draft.open!.areas[0], x: 50, z: 20, w: 150, d: 60 };
+  return draft;
+}
+
+describe('the climb, as measureLand measures it', () => {
+  test("a road's steepest climb from its profile is measureLand's, over a gentle slope and a steep one, a street and a country road", () => {
+    for (const rise of [0.05, 0.1, 0.2]) {
+      for (const kind of ['street', 'country'] as const) {
+        const land = blankLand(W, D);
+        for (let j = 0; j < land.rows; j++) for (let i = 0; i < land.cols; i++) land.h[j * land.cols + i] = Math.round(Math.max(0, Math.min(120, i * LAND_CELL) - 100) * rise * 100);
+        const points = Array.from({ length: 151 }, (_, k): Pt => [60 + k, 200 + Math.sin(k / 20) * 10]);
+        const world = { width: W, depth: D, plots: [], meta: { roads: [{ points, width: 7, ends: ['dead', 'dead'], kind }] } } as unknown as FollowWorld;
+        const measured = measureLand(world, land, land, 0, false);
+        const live = climbOf(profileOf(points, kind, land), kind);
+        expect(live.steepest).toBeCloseTo(measured.slopes.grade[kind], 6);
+        expect(live.over.length > 0).toBe(measured.over.roads.has(0));
+        expect(live.steepest).toBeLessThanOrEqual(GRADE[kind] + 1e-4);
+      }
+    }
+  });
+
+  test("a street between two roads at different heights: red, said in the settle's words, clearly too steep; the tool refuses it", () => {
+    const draft = hillTown();
+    const up: Pt[] = [
+      [250, MAIN_Z - 8],
+      [250, 142],
+    ];
+    const live = liveStreet(draft, t, up, 'street');
+    expect(live.why).toBeNull();
+    expect(live.reached).toBe(true);
+    expect(live.kind).toBe('country');
+    expect(live.climb).toBeGreaterThan(GRADE.country + 0.01 + 0.03);
+    expect(live.slope).toMatch(/^it would climb \d+ %, more than a country may \(12 %\)$/);
+    expect(live.excess).toBe(true);
+    expect(live.stretches.some((x) => x.tone === 'bad')).toBe(true);
+    // The same street on flat land is not.
+    const flat = hillTown();
+    flat.open!.land = blankLand(W, D);
+    expect(liveStreet(flat, t, up, 'street')).toMatchObject({ steep: false, excess: false, slope: null });
+    // The tool refuses it when it reaches Hill Road, and keeps drawing.
+    const editor = fakeEditor(draft);
+    const tool = streetTool.stage(editor);
+    tool.down(250, MAIN_Z - 8);
+    tool.up();
+    tool.hover(250, 142);
+    expect(editor.said.hints.at(-1)).toMatch(/^It would climb \d+ %.*Draw it another way/);
+    tool.down(250, 142);
+    tool.up();
+    expect(editor.said.refusals.at(-1)).toBe(live.slope!);
+    expect(editor.draft.roads).toHaveLength(5);
+    expect(tool.key!(key('Backspace'))).toBe(true);
+  });
+});
+
+describe('the magnet, Enter carrying a street on, the kind asked for, bare land', () => {
+  test('the pointer is pulled to a road, a dead end or the edge within 28 px (10 to 40 m), not back to the road it starts on near its start', () => {
+    expect(pullReach(1)).toBe(28);
+    expect(pullReach(0.1)).toBe(10);
+    expect(pullReach(5)).toBe(40);
+    const draft = town();
+    const pulled = pullAt(draft, [120, 80], 28, 'street');
+    expect(pulled.pull).toMatchObject({ kind: 'road', road: 0 });
+    expect(pulled.at[1]).toBeCloseTo(MAIN_Z - 5.5, 6);
+    expect(pullAt(draft, [120, 80], 10, 'street')).toEqual({ at: [120, 80], pull: null });
+    // (A street begun by the high street at x 120: not pulled back onto it within 30 m, but further along.)
+    expect(pullAt(draft, [125, 75], 28, 'street', [120, 92]).pull).toBeNull();
+    expect(pullAt(draft, [160, 75], 28, 'street', [120, 92]).pull?.road).toBe(0);
+  });
+
+  test('a click 20 m off a road starts the street on it; with the ground ten times nearer (zoomed in), not', () => {
+    choice.along = 'none';
+    const editor = fakeEditor(town());
+    const tool = streetTool.stage(editor);
+    tool.hover(120, 80);
+    expect(editor.said.hints.at(-1)).toMatch(/Click to start a street off High Street/);
+    tool.down(120, 80);
+    tool.up();
+    tool.down(120, 62);
+    tool.up();
+    tool.key!(key('Enter'));
+    expect(editor.said.refusals).toEqual([]);
+    expect(editor.draft.roads[4].ends).toEqual(['join', 'dead']);
+    // (The editor's own scale: 0.1 m a px, so the magnet reaches its least, 10 m.)
+    const near = Object.assign(fakeEditor(town()), { scale: () => 0.1 });
+    const zoomed = streetTool.stage(near);
+    zoomed.hover(120, 80);
+    expect(near.said.hints.at(-1)).toMatch(/Click on a road to start a street off it/);
+  });
+
+  test('a corner set near a road stays where it is set when the street pulled there would be refused', () => {
+    choice.along = 'none';
+    const editor = fakeEditor(town());
+    const tool = streetTool.stage(editor);
+    tool.down(100, MAIN_Z - 8);
+    tool.up();
+    // (25 m north of the high street, 60 m along from where the street starts: pulled down onto it, the street would
+    // run alongside it; so it stays a corner.)
+    tool.down(160, 75);
+    tool.up();
+    expect(editor.draft.roads).toHaveLength(4);
+    expect(editor.said.refusals).toEqual([]);
+    // (The line as drawn ends at the corner, not on the high street.)
+    const ends = editor.said.ghosts!.roads!.map((r) => r.points[r.points.length - 1]);
+    expect(ends.some(([x, z]) => Math.hypot(x - 160, z - 75) < 1)).toBe(true);
+  });
+
+  test(`Enter carries a street ended short of a road on to it, within ${AUTO_JOIN} m; past that it ends as a dead end`, () => {
+    choice.along = 'none';
+    const ask = { kind: 'street' as const, asked: false, clear: true };
+    // (From Far Lane north towards the high street, ended 20 m short of its middle.)
+    const pts: Pt[] = [
+      [350, FAR_Z],
+      [350, 120],
+    ];
+    const on = carryOn(town(), t, pts, ask)!;
+    expect(on.points.at(-1)![1]).toBeCloseTo(MAIN_Z, 0);
+    expect(on.live.finishOn).toBe(0);
+    expect(carryOn(town(), t, [[350, FAR_Z], [350, 150]], ask)).toBeNull();
+    // The tool, zoomed in so the click is not pulled there itself.
+    const editor = Object.assign(fakeEditor(town()), { scale: () => 0.1 });
+    const tool = streetTool.stage(editor);
+    for (const [x, y] of pts) {
+      tool.down(x, y);
+      tool.up();
+    }
+    expect(editor.draft.roads).toHaveLength(4);
+    tool.key!(key('Enter'));
+    expect(editor.said.refusals).toEqual([]);
+    const made = editor.draft.roads.slice(4);
+    expect(made.length).toBeGreaterThan(0);
+    expect(made.every((r) => r.ends.every((e) => e === 'join'))).toBe(true);
+  });
+
+  test('a street asked for on the card stays a street out of town, with no area', () => {
+    choice.along = 'none';
+    const draft = hillTown();
+    draft.open!.land = blankLand(W, D);
+    const editor = fakeEditor(draft);
+    const tool = streetTool.stage(editor);
+    choice.kind = 'street';
+    try {
+      tool.down(250, MAIN_Z - 8);
+      tool.up();
+      tool.down(250, 142);
+      tool.up();
+    } finally {
+      choice.kind = 'auto';
+    }
+    expect(editor.said.refusals).toEqual([]);
+    const road = editor.draft.roads[5];
+    expect(road.kind).toBe('street');
+    expect(road.area).toBeUndefined();
+  });
+
+  test('on bare land (after Clear all) the hint says the first street runs from road to road', () => {
+    const bare = { ...town(), roads: [], slots: [] };
+    const editor = fakeEditor(bare);
+    const tool = streetTool.stage(editor);
+    tool.hover(200, 150);
+    expect(editor.said.hints.at(-1)).toBe(FIRST_STREET);
+    tool.leave();
+    expect(editor.said.hints.at(-1)).toBeNull();
+    // From the edge to the edge: drawn, a way out at both ends.
+    tool.down(5, 150);
+    tool.up();
+    tool.down(395, 150);
+    tool.up();
+    expect(editor.said.refusals).toEqual([]);
+    expect(editor.draft.roads.map((r) => r.ends)).toEqual([['out', 'out']]);
   });
 });
 

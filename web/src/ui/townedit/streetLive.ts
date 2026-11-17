@@ -12,12 +12,16 @@
  * - running into or alongside another road, or across a green, where it does;
  * - a crossing of the water: a bridge stretch, or red where it is too wide, bends, or a road or a
  *   lot is on it, as `bridgeable` says;
- * - a stretch the land would need more than `CUT_MAX` m of cut or fill under (`profileOf`, on the
- *   plan's land as the settle measures against it: the land as laid with its finer hills smoothed
- *   out, as `gentleUnder` smooths them under anything built), "too steep here". This one is a
- *   forecast, not a refusal (`slope`, apart from `why`): the settle is the judge (decision 11) and
- *   refuses the street with its own reason. Inside a town's or a village's box the settle lays the
- *   land to the area's plane first, so stretches there are not judged.
+ * - a stretch that climbs more steeply than its kind may, or that the land would need more than
+ *   `CUT_MAX` m of cut or fill under (`profileOf`, on the plan's land as the settle measures against
+ *   it: the land as laid with its finer hills smoothed out, as `gentleUnder` smooths them under
+ *   anything built). The climb is measured as `landFollow.ts` `measureLand` measures it (`climbOf`:
+ *   steeper than `GRADE` by more than 1 %), and both are said in the settle's own words
+ *   (`overWords`). This one is a forecast, not a refusal (`slope`, apart from `why`): the settle is
+ *   the judge (decision 11) and refuses the street with its own reason; but a clear excess
+ *   (`excess`: `CLEAR_CLIMB` or `CLEAR_CUT` past the limit) the tool refuses up front. Inside a
+ *   town's or a village's box the settle lays the land to the area's plane first, so stretches there
+ *   are not judged.
  *
  * What it leaves to `drawStreet` itself, run when the pointer rests and when the street is ended
  * (`verdictOf`): what is in the way, how far a dead end reaches past the roads it carries on, the
@@ -29,16 +33,20 @@
 import type { RoadKind, RoadPlan } from '../../core/protocol';
 import { bridgeable, bridgeStretch, wetSpans } from '../../game/bridges';
 import type { Edited } from '../../game/edit/edited';
-import { areaOf, drawStreet, Meeting, ONE_CROSSING, ROOM, streetCourse, streetLine, streetWidth, TRAIL_APART, type End, type StreetLine } from '../../game/edit/streets';
+import { drawStreet, madeKind, Meeting, ONE_CROSSING, ROOM, streetCourse, streetLine, streetWidth, TRAIL_APART, type End, type StreetLine } from '../../game/edit/streets';
 import { heightAt, NONE, type Land } from '../../game/land';
-import { smoothHeights } from '../../game/landFollow';
+import { overWords, smoothHeights } from '../../game/landFollow';
 import { unrle } from '../../game/landMasks';
 import { bends, clearOf, COURT, inside, lengths, pointAt, roomAt, tangent, type Fit, type Pt } from '../../game/roads';
 import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '../../game/town';
-import { CUT_MAX, CUT_MAX_MOUNTAIN_ROAD, profileOf } from '../../render/shared/builtSurface';
+import { CUT_MAX, CUT_MAX_MOUNTAIN_ROAD, GRADE, profileOf } from '../../render/shared/builtSurface';
 
-/** What the player asks the street to be: as `drawStreet` takes it (`street`: a street of the area it runs in, else a country road). */
+/** What the player asks the street to be: as `drawStreet` takes it (`street`: a street of the area it runs in, else a country road, unless asked for). */
 export type StrokeKind = RoadKind;
+
+/** A climb this much (rise per m) past what `measureLand` allows, or cut or fill `CLEAR_CUT` m past it, is a clear excess: the tool refuses the street up front rather than leave it to the settle. */
+export const CLEAR_CLIMB = 0.03;
+export const CLEAR_CUT = 1;
 
 /** A stretch along a live street's line (arc lengths, m) drawn otherwise than as a new street: refused, or a bridge. */
 export interface Stretch {
@@ -67,10 +75,16 @@ export interface LiveStreet {
   /** Some of it looks too steep (red), and what the settle would say of it: a forecast, not a refusal (see the top of this file). */
   steep: boolean;
   slope: string | null;
+  /** The steepest it would climb (rise per m, as `measureLand` measures it), out of the town's and the villages' boxes. */
+  climb: number;
+  /** It is clearly too steep (`CLEAR_CLIMB`, `CLEAR_CUT`): the tool refuses it with `slope`. */
+  excess: boolean;
   /** Why it can't be ended where it ends yet, though nothing is wrong with it so far: it joins no road, or is a dead end longer than a court. */
   open: string | null;
   /** It ends on a road, or at the world's edge: it is finished there. */
   reached: boolean;
+  /** The road its far end (by the last point drawn) joins or carries on; -1: none (the edge, or the open). */
+  finishOn: number;
   /** Its bridges' lengths over the water (m), those it may have. */
   bridges: number[];
 }
@@ -223,14 +237,15 @@ const heightOn = (land: Land, p: Pt) => heightAt(land, p[0], p[1]);
 /** A live street that can't be made at all: the line as drawn (or shaped), red, and why. */
 function cannot(line: Pt[], width: number, why: string): LiveStreet {
   const L = line.length > 1 ? lengths(line)[line.length - 1] : 0;
-  return { line, width, kind: null, area: -1, start: null, end: null, joins: [], stretches: L > 0 ? [{ from: 0, to: L, tone: 'bad' }] : [], why, steep: false, slope: null, open: null, reached: false, bridges: [] };
+  return { line, width, kind: null, area: -1, start: null, end: null, joins: [], stretches: L > 0 ? [{ from: 0, to: L, tone: 'bad' }] : [], why, steep: false, slope: null, climb: 0, excess: false, open: null, reached: false, finishOn: -1, bridges: [] };
 }
 
 /**
  * The street drawn through `points` on `draft` as the live checks see it (see the top of this file):
- * of `kind` (as `drawStreet` takes it), clearing what is in its way (`clear`) or not.
+ * of `kind` (as `drawStreet` takes it, `asked` too: `StreetStroke.asked`), clearing what is in its
+ * way (`clear`) or not.
  */
-export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: readonly Pt[], kind: StrokeKind, clear = true): LiveStreet {
+export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: readonly Pt[], kind: StrokeKind, clear = true, asked = false): LiveStreet {
   const c = contextOf(draft, t);
   const trail = kind === 'trail';
   const width = streetWidth(kind);
@@ -284,15 +299,9 @@ export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: read
   }
 
   // ---- what it would be ----
-  let made: RoadKind = 'trail';
-  let area = -1;
-  if (start.kind === 'extend') {
-    made = roads[start.road].kind ?? 'street';
-    area = roads[start.road].area ?? -1;
-  } else if (!trail) {
-    area = areaOf(draft, part);
-    made = area < 0 ? 'country' : kind === 'lane' ? 'lane' : 'street';
-  }
+  const it = start.kind === 'extend' ? { kind: roads[start.road].kind ?? 'street', area: roads[start.road].area } : madeKind(draft, part, kind, asked);
+  const made: RoadKind = it.kind ?? 'street';
+  const area = it.area ?? -1;
 
   // ---- the water: a bridge over each crossing (the last first, as drawStreet bridges them) ----
   const bridges: number[] = [];
@@ -326,23 +335,29 @@ export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: read
     }
   }
 
-  // ---- the land: no more cut or fill under it than the settle allows ----
+  // ---- the land: no steeper than its kind may climb, and no more cut or fill under it than the settle allows ----
   let slope: string | null = null;
+  let [climb, excess] = [0, false];
   if (c.land && made !== 'trail') {
     const most = c.mountains && made === 'country' ? CUT_MAX_MOUNTAIN_ROAD : CUT_MAX;
     const held = (e: End, p: Pt) => (e.kind === 'join' || e.kind === 'extend' ? heightOn(c.land!, p) : undefined);
     const profile = profileOf(part, made, c.land, { start: held(start, part[0]), end: held(end, part[part.length - 1]) });
     const boxes = draft.open?.areas ?? [];
-    const where: Stretch[] = [];
+    const judged = profile.s.map((_, i) => !boxes.some((b) => profile.x[i] >= b.x && profile.x[i] <= b.x + b.w && profile.z[i] >= b.z && profile.z[i] <= b.z + b.d));
+    const climbs = climbOf(profile, made, judged);
+    climb = climbs.steepest;
+    const where: Stretch[] = climbs.over.map(([from, to]) => ({ from, to, tone: 'bad' as const }));
+    let cut = 0;
     for (let i = 0; i < profile.s.length; i++) {
-      const [s, x, z] = [profile.s[i], profile.x[i], profile.z[i]];
-      if (Math.abs(profile.cut[i]) <= most || decks.some((d) => s >= d.from && s <= d.to) || boxes.some((b) => x >= b.x && x <= b.x + b.w && z >= b.z && z <= b.z + b.d)) continue;
+      const s = profile.s[i];
+      if (!judged[i] || Math.abs(profile.cut[i]) <= most || decks.some((d) => s >= d.from && s <= d.to)) continue;
+      cut = Math.max(cut, Math.abs(profile.cut[i]));
       where.push({ from: s - 1.5, to: s + 1.5, tone: 'bad' });
     }
-    if (where.length) {
-      slope = `it is too steep here: the land would need more than ${most} m of cut or fill under it`;
-      list.push(...where);
-    }
+    if (climbs.over.length) slope = overWords({ what: 'climb', by: climb, most: GRADE[made] }, 'it', made);
+    else if (cut > 0) slope = overWords({ what: 'cut', by: cut, most }, 'it', made);
+    excess = climb > GRADE[made] + 0.01 + CLEAR_CLIMB || cut > most + CLEAR_CUT;
+    list.push(...where);
   }
 
   // ---- whether it may end where it ends ----
@@ -352,13 +367,34 @@ export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: read
   else if (!trail && (!onRoad(start) || !onRoad(end)) && start.kind !== 'extend' && L > COURT + 0.5) open = `a dead end reaches ${COURT} m at most: carry it on to a road`;
   // (Its far end is the one nearest the last point drawn: a dead end it carries on is its start, whichever end the player drew it from.)
   const last = points[points.length - 1];
-  const reached = onRoad(near(last) === 0 ? start : end);
-  return { line: part, width, kind: made, area, start, end, joins, stretches: merged(list, L), why, steep: slope !== null, slope, open, reached, bridges };
+  const far = near(last) === 0 ? start : end;
+  const reached = onRoad(far);
+  const finishOn = far.kind === 'join' || far.kind === 'extend' ? far.road : -1;
+  return { line: part, width, kind: made, area, start, end, joins, stretches: merged(list, L), why, steep: slope !== null, slope, climb, excess, open, reached, finishOn, bridges };
+}
+
+/**
+ * How steeply a road's profile (`s`, `y`: arc lengths and heights) climbs, as `landFollow.ts` `measureLand` measures
+ * a road of `kind`: the steepest rise per m between samples more than half a metre apart, and the stretches between
+ * them steeper than `GRADE[kind]` by more than 1 % (arc lengths). `judged`: per sample, whether it counts (a step
+ * counts where both its samples do; all, if not given).
+ */
+export function climbOf(profile: { s: ArrayLike<number>; y: ArrayLike<number> }, kind: RoadKind, judged?: readonly boolean[]): { steepest: number; over: [number, number][] } {
+  const { s, y } = profile;
+  let steepest = 0;
+  const over: [number, number][] = [];
+  for (let k = 0; k + 1 < s.length; k++) {
+    if (s[k + 1] - s[k] <= 0.5 || (judged && !(judged[k] && judged[k + 1]))) continue;
+    const g = Math.abs(y[k + 1] - y[k]) / (s[k + 1] - s[k]);
+    steepest = Math.max(steepest, g);
+    if (g > GRADE[kind] + 0.01) over.push([s[k], s[k + 1]]);
+  }
+  return { steepest, over };
 }
 
 /** `drawStreet`'s own verdict on the street drawn through `points` (no homes along it: what it would be, not what it fills). */
-export function verdictOf(draft: NeighbourhoodDraft, t: Templates, content: Parameters<typeof drawStreet>[2], points: readonly Pt[], kind: StrokeKind, clear: boolean, seed: number): Edited {
-  return drawStreet(draft, t, content, { points, kind, clear, fill: false, seed });
+export function verdictOf(draft: NeighbourhoodDraft, t: Templates, content: Parameters<typeof drawStreet>[2], points: readonly Pt[], kind: StrokeKind, clear: boolean, seed: number, asked = false): Edited {
+  return drawStreet(draft, t, content, { points, kind, clear, fill: false, seed, asked });
 }
 
 /** The roads of `after` that `before` hasn't (by the road itself: the edits keep the roads they leave as they were). */
