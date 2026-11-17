@@ -35,18 +35,14 @@ import { townView } from '../render/shared/townView';
 import { birdActivity, STOREY_HEIGHT, type Renderer, type ViewRect } from '../render/types';
 import { game } from '../ui/state.svelte';
 import { acoustics } from './acoustics';
-import { songSamples, SPECIES, VERSIONS, type Species, type Voice } from './birdsong';
+import { MONO, SPECIES, VERSIONS, WATER, type MadeKind, type MonoKind, type MusicKind, type RoomSize, type Species, type Voice, type WorkerKind } from './kinds';
 import { Footsteps } from './footsteps';
 import { AMBIENCE, LOOPS, ONCE_KINDS, ONCE_LEVEL, pieceAt, type LoopKind, type OnceKind, type SoundKind } from './catalog';
 import { audioContext, bus, space, updateVolumes } from './mixer';
-import { MONO, type MonoKind } from './mono';
-import type { MusicKind } from './music';
 import { Outside } from './outside';
-import type { RoomSize } from './rooms';
 import { Placed, type Place, type Space } from './space';
-import { makeSound, type WorkerKind } from './made';
-import type { MadeKind } from './things';
-import { random, WATER } from './water';
+import { random } from './random';
+import { makeSound, monoSamples, songSamples, synthReady } from './synth';
 import type { SoundReply, SoundRequest } from './water.worker';
 
 const TICK_MS = 100;
@@ -296,10 +292,17 @@ export class WorldSound {
     const hour = (minute / 60) % 24;
     const day = daylight(hour);
     const night = 1 - smooth(4.5, 6, hour) * (1 - smooth(19.5, 21, hour));
-    this.bed ??= this.loop(ac, out, mono(ac, 'bed'));
-    this.crickets ??= this.loop(ac, out, mono(ac, 'crickets'));
-    fadeTo(this.bed.gain, quiet ? 0 : AMBIENCE.bed.night + AMBIENCE.bed.day * day, t);
-    fadeTo(this.crickets.gain, quiet ? 0 : AMBIENCE.crickets * night, t);
+    // (Each from when the sounds can be made: `synth.ts`.)
+    if (!this.bed) {
+      const bed = mono(ac, 'bed');
+      if (bed) this.bed = this.loop(ac, out, bed);
+    }
+    if (!this.crickets) {
+      const crickets = mono(ac, 'crickets');
+      if (crickets) this.crickets = this.loop(ac, out, crickets);
+    }
+    if (this.bed) fadeTo(this.bed.gain, quiet ? 0 : AMBIENCE.bed.night + AMBIENCE.bed.day * day, t);
+    if (this.crickets) fadeTo(this.crickets.gain, quiet ? 0 : AMBIENCE.crickets * night, t);
     this.birds.update(ac, out, now, hour, quiet, this.renderer);
     // The street and the weather: the cars passing, the town from above, the wind in the leaves.
     this.outside.update(ac, out, around, frame, t, { quiet, still: game.speed === 0 || game.townOpen, day });
@@ -359,7 +362,8 @@ export class WorldSound {
       if (tag === 'knock') {
         seen.add(id);
         const next = this.knocking.get(id) ?? 0;
-        if (!quiet && !paused && now >= next) play(ac, around, mono(ac, 'knock'), AMBIENCE.knock, placeAt(pan, sx, sz));
+        const knock = !quiet && !paused && now >= next ? mono(ac, 'knock') : null;
+        if (knock) play(ac, around, knock, AMBIENCE.knock, placeAt(pan, sx, sz));
         if (now >= next) this.knocking.set(id, now + 2600 + Math.random() * 1200);
         continue;
       }
@@ -421,7 +425,7 @@ export class WorldSound {
       }
       if (!loop) {
         if (target === 0 || !u) continue;
-        const made = piece ? this.made.sound(piece, ac.sampleRate) : kind in MONO ? mono(ac, kind as MonoKind) : this.made.sound(kind as WorkerKind, ac.sampleRate);
+        const made = piece ? this.made.sound(piece, ac.sampleRate) : isMono(kind) ? mono(ac, kind) : this.made.sound(kind as WorkerKind, ac.sampleRate);
         // Still being made: it starts when it's ready.
         if (!made) continue;
         loop = this.placedLoop(ac, around, made, placeOf(u));
@@ -526,13 +530,14 @@ export class WorkerSounds {
     this.at(rate);
     let b = this.ready.get(kind);
     if (!b && !this.worker) {
+      if (!synthReady()) return null;
       b = soundBuffer(makeSound(kind, rate), rate);
       this.ready.set(kind, b);
-    } else if (!b && kind in WATER && !this.waterAsked) {
+    } else if (!b && isWater(kind) && !this.waterAsked) {
       this.waterAsked = true;
-      const kinds = Object.keys(WATER) as MadeKind[];
+      const kinds: MadeKind[] = [...WATER];
       for (const k of [kind, ...kinds.filter((k) => k !== kind)]) this.worker!.postMessage({ kind: k, rate } satisfies SoundRequest);
-    } else if (!b && !(kind in WATER) && !this.asked.has(kind)) {
+    } else if (!b && !isWater(kind) && !this.asked.has(kind)) {
       this.asked.add(kind);
       this.worker!.postMessage({ kind, rate } satisfies SoundRequest);
     }
@@ -545,6 +550,7 @@ export class WorkerSounds {
     const key = songKey(bird, version);
     let b = this.songs.get(key);
     if (!b && !this.worker) {
+      if (!synthReady()) return null;
       b = monoBuffer(songSamples(bird, version, rate), rate);
       this.songs.set(key, b);
     } else if (b === undefined) {
@@ -582,6 +588,9 @@ export class WorkerSounds {
     this.worker.onerror = () => this.dispose();
   }
 }
+
+const isMono = (kind: string): kind is MonoKind => (MONO as readonly string[]).includes(kind);
+const isWater = (kind: string): boolean => (WATER as readonly string[]).includes(kind);
 
 const songKey = (bird: Voice, version: number) => `${bird.seed}:${version}`;
 
@@ -866,10 +875,12 @@ function placeOf(u: Users): Place {
 /** The sounds of one channel (`mono.ts`) as audio buffers, made once per sample rate. */
 const monos = new Map<MonoKind, AudioBuffer>();
 
-function mono(ac: AudioContext, kind: MonoKind): AudioBuffer {
+/** A sound of one channel as an audio buffer; null until the sounds can be made (`synth.ts`). */
+function mono(ac: AudioContext, kind: MonoKind): AudioBuffer | null {
   let b = monos.get(kind);
   if (!b || b.sampleRate !== ac.sampleRate) {
-    b = monoBuffer(MONO[kind](ac.sampleRate), ac.sampleRate);
+    if (!synthReady()) return null;
+    b = monoBuffer(monoSamples(kind, ac.sampleRate), ac.sampleRate);
     monos.set(kind, b);
   }
   return b;

@@ -125,7 +125,11 @@ pub struct Stereo {
 impl Stereo {
     /// A channel by number (0 left, 1 right).
     pub fn ch(&mut self, c: usize) -> &mut Vec<f32> {
-        if c == 0 { &mut self.left } else { &mut self.right }
+        if c == 0 {
+            &mut self.left
+        } else {
+            &mut self.right
+        }
     }
 }
 
@@ -149,7 +153,11 @@ pub struct Track {
 
 impl Track {
     pub fn ch(&mut self, c: usize) -> &mut Vec<f32> {
-        if c == 0 { &mut self.left } else { &mut self.right }
+        if c == 0 {
+            &mut self.left
+        } else {
+            &mut self.right
+        }
     }
 }
 
@@ -202,7 +210,9 @@ pub fn stream(out: &mut Track, r: &mut Rng, o: StreamOpts) {
                 jet.set(Filter::Bandpass, o.centre * pow(2.0, 0.35 * g), o.q);
             }
             let w = 0.6 * shared.next(r) + 0.75 * own.next(r);
-            ch[i] = (jet.run(w) * (1.0 + 0.3 * g) * 1.3 + fizz.run(w) * 0.12 + rumble.run(deep.next(r)) * o.rumble) as f32;
+            ch[i] = (jet.run(w) * (1.0 + 0.3 * g) * 1.3
+                + fizz.run(w) * 0.12
+                + rumble.run(deep.next(r)) * o.rumble) as f32;
         }
         let pan = if c == 1 { 1.0 } else { -1.0 };
         let mut t = r.next() * 0.01;
@@ -257,15 +267,31 @@ pub fn tick(d: &mut [f32], rate: f64, at: f64, amp: f64) {
     let n = len as usize;
     for j in 0..n {
         s = (s as u64 * 1_664_525 + 1_013_904_223) as u32;
-        add(d, start as usize + j, amp * (s as f64 / 2_147_483_648.0 - 1.0) * (1.0 - j as f64 / len));
+        add(
+            d,
+            start as usize + j,
+            amp * (s as f64 / 2_147_483_648.0 - 1.0) * (1.0 - j as f64 / len),
+        );
     }
 }
 
 /// Water lapping or swished about: a swell of low, filtered noise with a few big bubbles in it.
 #[allow(clippy::too_many_arguments)]
-pub fn slosh(out: &mut Track, rate: f64, r: &mut Rng, at: f64, seconds: f64, amp: f64, pan: f64, cutoff: f64) {
+pub fn slosh(
+    out: &mut Track,
+    rate: f64,
+    r: &mut Rng,
+    at: f64,
+    seconds: f64,
+    amp: f64,
+    pan: f64,
+    cutoff: f64,
+) {
     let start = js_round(at * rate);
-    let len = min(out.left.len() as f64 - start, js_round(seconds * 1.6 * rate));
+    let len = min(
+        out.left.len() as f64 - start,
+        js_round(seconds * 1.6 * rate),
+    );
     if len <= 0.0 {
         return;
     }
@@ -276,10 +302,15 @@ pub fn slosh(out: &mut Track, rate: f64, r: &mut Rng, at: f64, seconds: f64, amp
     let mut hp = Biquad::new(rate);
     hp.set(Filter::Highpass, 140.0, 0.7);
     let shape = wander(r, len, rate, 0.04);
-    for j in 0..len {
+    for (j, &wobble) in shape.iter().enumerate() {
         let t = j as f64 / rate / seconds;
-        let env = if t < 0.3 { pow(sin(((t / 0.3) * PI) / 2.0), 2.0) } else { exp(-(t - 0.3) * 3.2) };
-        let v = hp.run(lp.run(r.next() * 2.0 - 1.0)) * amp * 1.4 * env * (1.0 + 0.5 * shape[j] as f64);
+        let env = if t < 0.3 {
+            pow(sin(((t / 0.3) * PI) / 2.0), 2.0)
+        } else {
+            exp(-(t - 0.3) * 3.2)
+        };
+        let v =
+            hp.run(lp.run(r.next() * 2.0 - 1.0)) * amp * 1.4 * env * (1.0 + 0.5 * wobble as f64);
         add(&mut out.left, start + j, v * l);
         add(&mut out.right, start + j, v * rr);
     }
@@ -300,7 +331,17 @@ pub fn slosh(out: &mut Track, rate: f64, r: &mut Rng, at: f64, seconds: f64, amp
 /// A dish or a fork knocking another: a few inharmonic partials ringing out after a click; under water,
 /// duller and shorter.
 #[allow(clippy::too_many_arguments)]
-pub fn clink(out: &mut Track, rate: f64, at: f64, f0: f64, amp: f64, pan: f64, ratios: &[f64], ring: f64, under: bool) {
+pub fn clink(
+    out: &mut Track,
+    rate: f64,
+    at: f64,
+    f0: f64,
+    amp: f64,
+    pan: f64,
+    ratios: &[f64],
+    ring: f64,
+    under: bool,
+) {
     let start = js_round(at * rate);
     let (l, rr) = gains(pan);
     let mut s = to_u32(start * 40503.0 + 7.0);
@@ -320,6 +361,8 @@ pub fn clink(out: &mut Track, rate: f64, at: f64, f0: f64, amp: f64, pan: f64, r
         let f = f0 * k * (0.97 + 0.06 * rnd());
         let a = (if under { 0.6 } else { 1.0 }) / (1.0 + i * if under { 3.0 } else { 0.9 });
         let tau = (ring * if under { 0.35 } else { 1.0 }) / (1.0 + i * 0.8);
+        // (6.28 as the TypeScript has it, not 2π: the phases are what they were.)
+        #[allow(clippy::approx_constant)]
         let phase = rnd() * 6.28;
         if f < if under { 2500.0 } else { 16000.0 } {
             partials.push(Partial { f, a, tau, phase });
@@ -387,7 +430,17 @@ pub fn roll(out: &mut Track, rate: f64, r: &mut Rng, at: f64, seconds: f64, pan:
         t += 0.03 + r.next() * 0.03;
     }
     let f = 900.0 + 300.0 * r.next();
-    clink(out, rate, at + seconds, f, 0.25, pan, &[1.0, 2.76, 5.4], 0.05, false);
+    clink(
+        out,
+        rate,
+        at + seconds,
+        f,
+        0.25,
+        pan,
+        &[1.0, 2.76, 5.4],
+        0.05,
+        false,
+    );
 }
 
 /// 0 before `a`, 1 after `b`, a smooth step between.
@@ -416,11 +469,18 @@ pub fn room(d: &mut [f32], rate: f64, delays: &[f64], feedback: f64, damping: f6
     }
     let mut combs: Vec<Comb> = delays
         .iter()
-        .map(|ms| Comb { buf: vec![0.0; round_usize((ms / 1000.0) * rate)], i: 0, lp: 0.0 })
+        .map(|ms| Comb {
+            buf: vec![0.0; round_usize((ms / 1000.0) * rate)],
+            i: 0,
+            lp: 0.0,
+        })
         .collect();
     let mut passes: Vec<Pass> = [5.1, 1.7]
         .iter()
-        .map(|ms| Pass { buf: vec![0.0; round_usize((ms / 1000.0) * rate)], i: 0 })
+        .map(|ms| Pass {
+            buf: vec![0.0; round_usize((ms / 1000.0) * rate)],
+            i: 0,
+        })
         .collect();
     let count = combs.len() as f64;
     for s in d.iter_mut() {
@@ -460,11 +520,15 @@ pub fn fold(t: Track) -> Stereo {
         let mut dst = src[..n].to_vec();
         for i in 0..f {
             let x = i as f64 / f as f64;
-            dst[i] = (src[i] as f64 * sin((x * PI) / 2.0) + src[n + i] as f64 * cos((x * PI) / 2.0)) as f32;
+            dst[i] = (src[i] as f64 * sin((x * PI) / 2.0) + src[n + i] as f64 * cos((x * PI) / 2.0))
+                as f32;
         }
         dst
     };
-    Stereo { left: one(&t.left), right: one(&t.right) }
+    Stereo {
+        left: one(&t.left),
+        right: one(&t.right),
+    }
 }
 
 /// Sets the level, as `finish`.
@@ -480,12 +544,20 @@ pub fn set_level(mut result: Stereo, rms: f64, peak: f64) -> Stereo {
         }
     }
     let or1 = |x: f64| if x == 0.0 || x.is_nan() { 1.0 } else { x };
-    let scale = if rms > 0.0 { rms / or1(sqrt(sum / (2.0 * n as f64))) } else { peak / or1(top) };
+    let scale = if rms > 0.0 {
+        rms / or1(sqrt(sum / (2.0 * n as f64)))
+    } else {
+        peak / or1(top)
+    };
     for d in [&mut result.left, &mut result.right] {
         for v in d.iter_mut().take(n) {
             let x = *v as f64 * scale;
             let a = x.abs();
-            *v = (if a <= 0.7 { x } else { sign(x) * (0.7 + 0.3 * tanh((a - 0.7) / 0.3)) }) as f32;
+            *v = (if a <= 0.7 {
+                x
+            } else {
+                sign(x) * (0.7 + 0.3 * tanh((a - 0.7) / 0.3))
+            }) as f32;
         }
     }
     result
@@ -555,7 +627,18 @@ pub struct Biquad {
 
 impl Biquad {
     pub fn new(rate: f64) -> Biquad {
-        Biquad { rate, b0: 1.0, b1: 0.0, b2: 0.0, a1: 0.0, a2: 0.0, x1: 0.0, x2: 0.0, y1: 0.0, y2: 0.0 }
+        Biquad {
+            rate,
+            b0: 1.0,
+            b1: 0.0,
+            b2: 0.0,
+            a1: 0.0,
+            a2: 0.0,
+            x1: 0.0,
+            x2: 0.0,
+            y1: 0.0,
+            y2: 0.0,
+        }
     }
 
     /// A new filter already set (`new Biquad(rate).set(type, frequency, q)`).
@@ -575,7 +658,11 @@ impl Biquad {
             self.b1 = 0.0;
             self.b2 = -alpha / a0;
         } else {
-            let k = if kind == Filter::Lowpass { 1.0 - c } else { 1.0 + c };
+            let k = if kind == Filter::Lowpass {
+                1.0 - c
+            } else {
+                1.0 + c
+            };
             self.b0 = k / 2.0 / a0;
             self.b2 = self.b0;
             self.b1 = (if kind == Filter::Lowpass { k } else { -k }) / a0;
@@ -586,7 +673,9 @@ impl Biquad {
     }
 
     pub fn run(&mut self, x: f64) -> f64 {
-        let y = self.b0 * x + self.b1 * self.x1 + self.b2 * self.x2 - self.a1 * self.y1 - self.a2 * self.y2;
+        let y = self.b0 * x + self.b1 * self.x1 + self.b2 * self.x2
+            - self.a1 * self.y1
+            - self.a2 * self.y2;
         self.x2 = self.x1;
         self.x1 = x;
         self.y2 = self.y1;
@@ -623,7 +712,11 @@ pub fn raw(rate: f64, seconds: f64, fill: impl FnOnce(&mut [f32])) -> Vec<f32> {
 pub fn sweep(values: &[f64], times: &[f64], t: f64) -> f64 {
     for k in 1..values.len() {
         if t < times[k] {
-            return values[k - 1] * pow(values[k] / values[k - 1], (t - times[k - 1]) / (times[k] - times[k - 1]));
+            return values[k - 1]
+                * pow(
+                    values[k] / values[k - 1],
+                    (t - times[k - 1]) / (times[k] - times[k - 1]),
+                );
         }
     }
     values[values.len() - 1]
@@ -632,19 +725,44 @@ pub fn sweep(values: &[f64], times: &[f64], t: f64) -> f64 {
 /// `x` through a two-pole filter as a Web Audio `BiquadFilterNode` computes it (its `Q` in dB for a low-pass
 /// and a high-pass, a plain quality factor for a band-pass). `looped`: `x` is a loop, and the filter has run
 /// over its end before its start, so the result loops as smoothly as `x` did.
-pub fn node_filter(x: &[f32], rate: f64, kind: Filter, frequency: f64, q: f64, looped: bool) -> Vec<f32> {
+pub fn node_filter(
+    x: &[f32],
+    rate: f64,
+    kind: Filter,
+    frequency: f64,
+    q: f64,
+    looped: bool,
+) -> Vec<f32> {
     let w = (2.0 * PI * min(frequency, rate / 2.0)) / rate;
     let c = cos(w);
-    let alpha = sin(w) / (2.0 * if kind == Filter::Bandpass { q } else { pow(10.0, q / 20.0) });
+    let alpha = sin(w)
+        / (2.0
+            * if kind == Filter::Bandpass {
+                q
+            } else {
+                pow(10.0, q / 20.0)
+            });
     let a0 = 1.0 + alpha;
-    let edge = if kind == Filter::Lowpass { (1.0 - c) / 2.0 } else { (1.0 + c) / 2.0 };
-    let b0 = (if kind == Filter::Bandpass { alpha } else { edge }) / a0;
+    let edge = if kind == Filter::Lowpass {
+        (1.0 - c) / 2.0
+    } else {
+        (1.0 + c) / 2.0
+    };
+    let b0 = (if kind == Filter::Bandpass {
+        alpha
+    } else {
+        edge
+    }) / a0;
     let b1 = (match kind {
         Filter::Bandpass => 0.0,
         Filter::Lowpass => 2.0 * edge,
         Filter::Highpass => -2.0 * edge,
     }) / a0;
-    let b2 = (if kind == Filter::Bandpass { -alpha } else { edge }) / a0;
+    let b2 = (if kind == Filter::Bandpass {
+        -alpha
+    } else {
+        edge
+    }) / a0;
     let a1 = (-2.0 * c) / a0;
     let a2 = (1.0 - alpha) / a0;
     let n = x.len() as i64;
@@ -674,7 +792,14 @@ mod tests {
         // random(11)'s first numbers, as the TypeScript gives them.
         let mut r = Rng::new(11.0);
         let first: Vec<f64> = (0..3).map(|_| r.next()).collect();
-        assert_eq!(first, [0.0006924520712345839, 0.1720386769156903, 0.07115283189341426]);
+        assert_eq!(
+            first,
+            [
+                0.0006924520712345839,
+                0.1720386769156903,
+                0.07115283189341426
+            ]
+        );
         assert_eq!(Rng::new(0.0).next(), Rng::new(1.0).next());
         assert_eq!(Rng::new(-1.0).0, u32::MAX);
     }

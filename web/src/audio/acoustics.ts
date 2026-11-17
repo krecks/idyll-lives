@@ -14,7 +14,7 @@
  */
 
 import { DEFAULT_ORBIT, RADIUS_LIMITS, townBlend } from '../render/shared/lens';
-import { roomSize, type RoomSize } from './rooms';
+import { roomSize, type RoomSize } from './kinds';
 
 /**
  * The camera's distance: full level up to `near` m; the least left at the play camera's farthest (`floor`)

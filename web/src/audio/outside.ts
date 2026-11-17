@@ -17,7 +17,7 @@ import { townView } from '../render/shared/townView';
 import type { Renderer } from '../render/types';
 import { acoustics } from './acoustics';
 import { OUTSIDE } from './catalog';
-import type { WorkerKind } from './made';
+import type { WorkerKind } from './kinds';
 import { Placed, type Space } from './space';
 
 /** Seconds for a loop here to fade to a new level. */

@@ -4,8 +4,9 @@
  * "Sound effects" setting. Played through the mixer (`audio/mixer.ts`).
  */
 
-import { blipSamples, type Blip } from '../audio/blips';
+import type { Blip } from '../audio/kinds';
 import { audioContext, bus } from '../audio/mixer';
+import { blipSamples, synthReady } from '../audio/synth';
 import { settings } from '../settings/settings.svelte';
 
 export type Sound = Blip;
@@ -27,6 +28,8 @@ export function play(sound: Sound): void {
   if (!ac || !out) return;
   let buffer = made.get(sound);
   if (!buffer || buffer.sampleRate !== ac.sampleRate) {
+    // (Not before the sounds can be made: the page loads them as the game boots, `synth.ts`.)
+    if (!synthReady()) return;
     const samples = blipSamples(sound, ac.sampleRate);
     buffer = new AudioBuffer({ numberOfChannels: 1, length: samples.length, sampleRate: ac.sampleRate });
     buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);

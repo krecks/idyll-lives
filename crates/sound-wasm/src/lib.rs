@@ -49,7 +49,10 @@ impl Sound {
 fn sound(made: Made) -> Sound {
     match made {
         Made::Mono(left) => Sound { left, right: None },
-        Made::Stereo(s) => Sound { left: s.left, right: Some(s.right) },
+        Made::Stereo(s) => Sound {
+            left: s.left,
+            right: Some(s.right),
+        },
     }
 }
 
@@ -80,8 +83,22 @@ pub fn step(surface: &str, wear: &str, version: u32, rate: f64) -> Option<Vec<f3
 /// One version of a bird's song (its voice: species, seed, pitch, pace and nearness).
 #[allow(clippy::too_many_arguments)]
 #[wasm_bindgen]
-pub fn song(species: &str, seed: f64, pitch: f64, pace: f64, near: f64, version: u32, rate: f64) -> Vec<f32> {
-    let voice = birdsong::Voice { species: species.to_string(), seed, pitch, pace, near };
+pub fn song(
+    species: &str,
+    seed: f64,
+    pitch: f64,
+    pace: f64,
+    near: f64,
+    version: u32,
+    rate: f64,
+) -> Vec<f32> {
+    let voice = birdsong::Voice {
+        species: species.to_string(),
+        seed,
+        pitch,
+        pace,
+        near,
+    };
     birdsong::song(&voice, version, rate)
 }
 

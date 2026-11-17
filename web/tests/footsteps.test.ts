@@ -1,72 +1,14 @@
-// Footsteps (`audio/steps.ts`, `audio/footsteps.ts`, `audio/surfaces.ts`): a step is the same every time, each
-// surface its own (carpet dull, tiles bright), bare feet duller than shoes; a walker's steps start as its heels
+// Footsteps (`audio/footsteps.ts`, `audio/surfaces.ts`; the steps themselves are made in Rust,
+// `crates/sound/src/steps.rs`, and tested there): bare feet quieter than shoes; a walker's steps start as its heels
 // strike, one a strike, however the looks at its stride fall; and what is underfoot is read from the world as the
 // house and the street draw it.
 import { describe, expect, test } from 'bun:test';
 import { STEPS } from '../src/audio/catalog';
 import { nextStrike, stepDue, type Walker } from '../src/audio/footsteps';
-import { FOOTWEAR, stepSamples, STEP_VERSIONS, SURFACES, type Footwear, type Surface } from '../src/audio/steps';
+import { SURFACES } from '../src/audio/kinds';
 import { Ground, type GroundWorld } from '../src/audio/surfaces';
 
-const RATE = 48000;
-
-/** How bright a sound is: the root mean square of its sample-to-sample change over that of its samples, as a frequency (Hz). */
-function brightness(d: Float32Array): number {
-  let change = 0;
-  let level = 0;
-  for (let i = 1; i < d.length; i++) {
-    change += (d[i] - d[i - 1]) ** 2;
-    level += d[i] ** 2;
-  }
-  return (Math.sqrt(change / level) * RATE) / (2 * Math.PI);
-}
-
-const bright = (surface: Surface, wear: Footwear) => {
-  let sum = 0;
-  for (let v = 0; v < STEP_VERSIONS; v++) sum += brightness(stepSamples(surface, wear, v, RATE));
-  return sum / STEP_VERSIONS;
-};
-
 describe('a step', () => {
-  test('is whole, short, starts and ends at nothing, and is the same every time', () => {
-    for (const surface of SURFACES) {
-      for (const wear of FOOTWEAR) {
-        for (let v = 0; v < STEP_VERSIONS; v++) {
-          const d = stepSamples(surface, wear, v, RATE);
-          expect(stepSamples(surface, wear, v, RATE)).toEqual(d);
-          expect(d.length / RATE).toBeLessThanOrEqual(0.3);
-          let peak = 0;
-          let sum = 0;
-          for (const x of d) {
-            peak = Math.max(peak, Math.abs(x));
-            sum += x * x;
-          }
-          expect(Number.isFinite(sum)).toBe(true);
-          expect(peak).toBeCloseTo(1, 5);
-          expect(Math.abs(d[0])).toBeLessThan(0.01);
-          expect(Math.abs(d[d.length - 1])).toBeLessThan(0.001);
-          // Most of it is over in the first 0.2 s.
-          let late = 0;
-          for (let i = Math.round(0.2 * RATE); i < d.length; i++) late += d[i] * d[i];
-          expect(late / sum).toBeLessThan(0.02);
-        }
-        // The versions differ.
-        expect(stepSamples(surface, wear, 0, RATE)).not.toEqual(stepSamples(surface, wear, 1, RATE));
-      }
-    }
-  });
-
-  test('each surface sounds its own: carpet dull, a board a knock, paving gritty, tiles a click, grass a rustle', () => {
-    const shoe = Object.fromEntries(SURFACES.map((s) => [s, bright(s, 'shoe')])) as Record<Surface, number>;
-    expect(shoe.carpet).toBeLessThan(400);
-    expect(shoe.wood).toBeGreaterThan(shoe.carpet * 2);
-    expect(shoe.paving).toBeGreaterThan(shoe.wood * 2);
-    expect(shoe.tile).toBeGreaterThan(shoe.paving);
-    expect(shoe.grass).toBeGreaterThan(3000);
-    // Bare feet have no sole to click: duller on every hard floor.
-    for (const s of ['wood', 'tile', 'paving'] as const) expect(bright(s, 'bare')).toBeLessThan(shoe[s] * 0.6);
-  });
-
   test('levels: tiles in shoes the loudest, bare feet under shoes everywhere', () => {
     for (const s of SURFACES) {
       expect(STEPS.level[s].bare).toBeLessThan(STEPS.level[s].shoe);

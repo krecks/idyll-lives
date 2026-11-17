@@ -14,7 +14,9 @@ fn main() {
     let names = parse(&manifest);
     let noise = |rate: f64| {
         let mut r = sound::dsp::Rng::new(99.0);
-        (0..rate as usize).map(|_| (r.next() * 2.0 - 1.0) as f32).collect::<Vec<f32>>()
+        (0..rate as usize)
+            .map(|_| (r.next() * 2.0 - 1.0) as f32)
+            .collect::<Vec<f32>>()
     };
     let (mut bad, mut checked) = (0, 0);
     for (name, channels, length) in names {
@@ -22,7 +24,12 @@ fn main() {
             continue;
         }
         let bytes = std::fs::read(format!("{dir}/{}.f32", name.replace('/', "__"))).unwrap();
-        let want: Vec<f32> = bytes.chunks_exact(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
+        let want: Vec<f32> = bytes
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|b| f32::from_le_bytes(*b))
+            .collect();
         let p: Vec<&str> = name.split('/').collect();
         let rate: f64 = p[1].parse().unwrap();
         let t = std::time::Instant::now();
@@ -35,7 +42,13 @@ fn main() {
             "blip" => blips::make(p[2], rate).map(|x| vec![x]),
             "step" => steps::make(p[2], p[3], p[4].parse().unwrap(), rate).map(|x| vec![x]),
             "song" => {
-                let v = birdsong::Voice { species: p[2].into(), seed: p[3].parse().unwrap(), pitch: p[4].parse().unwrap(), pace: p[5].parse().unwrap(), near: p[6].parse().unwrap() };
+                let v = birdsong::Voice {
+                    species: p[2].into(),
+                    seed: p[3].parse().unwrap(),
+                    pitch: p[4].parse().unwrap(),
+                    pace: p[5].parse().unwrap(),
+                    near: p[6].parse().unwrap(),
+                };
                 Some(vec![birdsong::song(&v, p[7].parse().unwrap(), rate)])
             }
             "room" => rooms::response(p[2], rate).map(|s| vec![s.left, s.right]),
@@ -45,7 +58,14 @@ fn main() {
                     "highpass" => Filter::Highpass,
                     _ => Filter::Bandpass,
                 };
-                Some(vec![sound::node_filter(&noise(rate), rate, kind, p[3].parse().unwrap(), p[4].parse().unwrap(), p[5] == "true")])
+                Some(vec![sound::node_filter(
+                    &noise(rate),
+                    rate,
+                    kind,
+                    p[3].parse().unwrap(),
+                    p[4].parse().unwrap(),
+                    p[5] == "true",
+                )])
             }
             _ => None,
         };
@@ -57,7 +77,11 @@ fn main() {
             continue;
         };
         if got.len() != channels || got.iter().any(|c| c.len() != length) {
-            println!("SHAPE   {name}: {} channels of {:?}, want {channels} of {length}", got.len(), got.iter().map(Vec::len).collect::<Vec<_>>());
+            println!(
+                "SHAPE   {name}: {} channels of {:?}, want {channels} of {length}",
+                got.len(),
+                got.iter().map(Vec::len).collect::<Vec<_>>()
+            );
             bad += 1;
             continue;
         }
@@ -74,7 +98,11 @@ fn main() {
         }
         let ok = worst <= tolerance;
         bad += !ok as usize;
-        println!("{} {name}: largest difference {worst:.3e}, {differ} of {} samples differ (first at {first:?}), {ms} ms", if ok { "ok     " } else { "DIFFERS" }, want.len());
+        println!(
+            "{} {name}: largest difference {worst:.3e}, {differ} of {} samples differ (first at {first:?}), {ms} ms",
+            if ok { "ok     " } else { "DIFFERS" },
+            want.len()
+        );
     }
     println!("{checked} sounds, {bad} not within {tolerance:e}");
     std::process::exit(if bad > 0 || checked == 0 { 1 } else { 0 });
@@ -93,6 +121,12 @@ fn parse(text: &str) -> Vec<(String, usize, usize)> {
     };
     text.split('{')
         .skip(1)
-        .map(|obj| (field(obj, "name"), field(obj, "channels").parse().unwrap(), field(obj, "length").parse().unwrap()))
+        .map(|obj| {
+            (
+                field(obj, "name"),
+                field(obj, "channels").parse().unwrap(),
+                field(obj, "length").parse().unwrap(),
+            )
+        })
         .collect()
 }
