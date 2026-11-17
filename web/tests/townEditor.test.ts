@@ -1,12 +1,16 @@
 // Step 2's town editor as state (`ui/townedit/`): an edit taken at once and the town settled once
-// edits pause (one settle at a time, the latest plan), undo, redo and reset; the Problems list read
+// edits pause (one settle at a time, the latest plan), undo, redo and reset; what a settle refused
+// shown (red for a while, a line, a Problems entry); a settle that fails taking its edits back, so no
+// ghost stays; a town settled but not shown still recorded; the Problems list read
 // from a draft as the checks read a whole town file (`problems.ts` `checkedTown`), sorted into what
 // blocks the way on and what only warns; what is picked found again after an edit; the edits' ghosts.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
+import type { RoadPlan } from '../src/core/protocol';
 import type { Edited } from '../src/game/edit/edited';
 import type { NeighbourhoodDraft } from '../src/game/town';
-import { EditSession, CHECK_AFTER, QUIET, QUIET_ONE, type Timers } from '../src/ui/townedit/session';
+import { editGhosts as ghostsOf } from '../src/ui/townedit/ghosts';
+import { EditSession, CHECK_AFTER, QUIET, QUIET_ONE, REFUSED_SHOW, SETTLE_FAILED, type Timers } from '../src/ui/townedit/session';
 import type { Settled } from '../src/ui/townedit/settle';
 
 /** Timers the test moves on by hand. */
@@ -236,6 +240,128 @@ describe('the edit session', () => {
     expect(settles).toEqual([a]);
   });
 
+  test('a settle that fails takes every edit since the town on screen back, so no ghost of them stays; tried again only after the next edit', async () => {
+    const c = clock();
+    const base = draft('base');
+    // (Each edit a street more, so the plan has ghosts over the town on screen.)
+    const street = (x: number): RoadPlan => ({ points: [[x, 0], [x, 50]], width: 7, ends: ['join', 'dead'], kind: 'street' });
+    const a = { ...draft('a'), roads: [street(10)] } as NeighbourhoodDraft;
+    const b = { ...draft('b'), roads: [street(10), street(40)] } as NeighbourhoodDraft;
+    const told: string[] = [];
+    let changed = 0;
+    let fail = true;
+    const settles: NeighbourhoodDraft[] = [];
+    const s = new EditSession(base, {
+      timers: c.timers,
+      now: c.now,
+      settle: async (plan) => {
+        settles.push(plan);
+        if (fail) throw new Error('the worker fell over');
+        return { draft: plan, preview: {} } as unknown as Settled;
+      },
+      show: async () => {},
+      changed: () => void changed++,
+      report: (why) => void told.push(why),
+    });
+    const t0 = {} as Parameters<typeof ghostsOf>[2];
+    s.apply(edit(a));
+    s.apply(edit(b));
+    expect(ghostsOf(s.settled, s.plan, t0)).not.toBeNull();
+    const before = changed;
+    await c.advance(QUIET);
+    expect(settles).toEqual([b]);
+    expect(told).toEqual([SETTLE_FAILED]);
+    expect(s.plan).toBe(base);
+    expect(s.settledFrom).toBe(base);
+    expect(s.pending).toBe(false);
+    expect(s.edits).toBe(0);
+    expect(s.canRedo).toBe(false);
+    expect(changed).toBeGreaterThan(before);
+    // (The town on screen and the plan are one again: no ghosts.)
+    expect(ghostsOf(s.settled, s.plan, t0)).toBeNull();
+    expect(s.refusalLine).toMatch(/^The town could not be built again with your changes, so they were taken back\.$/);
+    expect(s.refusalGhosts()).toBeNull();
+    await c.advance(QUIET * 3);
+    expect(settles).toEqual([b]);
+    // The next edit settles again, and clears the line.
+    fail = false;
+    s.apply(edit(a));
+    expect(s.refusalLine).toBeNull();
+    await c.advance(QUIET);
+    expect(s.settledFrom).toBe(a);
+    expect(s.pending).toBe(false);
+  });
+
+  test('a town settled well but not put on screen is still the one settled', async () => {
+    const c = clock();
+    const base = draft('base');
+    const a = draft('a');
+    const settledA = draft('settled a');
+    const s = new EditSession(base, {
+      timers: c.timers,
+      now: c.now,
+      settle: async () => ({ draft: settledA, preview: {}, marks: ['m'] }) as unknown as Settled,
+      show: async () => {
+        throw new Error('the renderer fell over');
+      },
+      changed: () => {},
+    });
+    s.apply(edit(a));
+    await c.advance(QUIET);
+    expect(s.settled).toBe(settledA);
+    expect(s.settledFrom).toBe(a);
+    expect(s.pending).toBe(false);
+    expect(s.plan).toBe(a);
+  });
+
+  test('what a settle refused: red over the town for a few seconds, a line and a Problems entry until the next edit', async () => {
+    const c = clock();
+    const base = draft('base');
+    const [a, b] = [draft('a'), draft('b')];
+    let changed = 0;
+    const road: [number, number][] = [
+      [10, 10],
+      [30, 10],
+      [50, 10],
+    ];
+    const s = new EditSession(base, {
+      timers: c.timers,
+      now: c.now,
+      settle: async () =>
+        ({
+          draft: a,
+          preview: {},
+          refused: [
+            { op: 1, why: 'Mill Lane would climb 21 %, more than a street may (8 %)', at: road, width: 7 },
+            { op: 2, why: 'the ground under 3 Mill Lane would have to be dug out or built up 5.0 m (4.0 m at most)', at: [[0, 0], [10, 20]] },
+          ],
+          step: 1,
+        }) as unknown as Settled,
+      show: async () => {},
+      changed: () => void changed++,
+    });
+    s.apply(edit(a));
+    s.apply(edit(b));
+    await c.advance(QUIET);
+    expect(s.plan).toBe(a);
+    expect(s.refusalLine).toBe('Mill Lane would climb 21 %, more than a street may (8 %). The change was taken back.');
+    expect(s.refusalGhosts()).toEqual({ roads: [{ points: road, width: 7, tone: 'bad' }], lots: [{ x: 0, z: 0, w: 10, d: 20, tone: 'bad' }], boxes: [] });
+    expect(s.refusalIssues()).toEqual([
+      { text: 'Mill Lane would climb 21 %, more than a street may (8 %). The change was taken back.', at: { x: 30, z: 10 } },
+      { text: 'The ground under 3 Mill Lane would have to be dug out or built up 5.0 m (4.0 m at most). The change was taken back.', at: { x: 5, z: 10 } },
+    ]);
+    // The red goes after a few seconds (the editor told, to draw again); the line and the entry stay.
+    const before = changed;
+    await c.advance(REFUSED_SHOW);
+    expect(changed).toBeGreaterThan(before);
+    expect(s.refusalGhosts()).toBeNull();
+    expect(s.refusalLine).not.toBeNull();
+    // The next edit clears them.
+    s.apply(edit(b));
+    expect(s.refusalLine).toBeNull();
+    expect(s.refusalIssues()).toEqual([]);
+  });
+
   test('a disposed session settles nothing more', async () => {
     const { s, c, settles } = session();
     s.apply(edit(draft('a')));
@@ -355,6 +481,10 @@ describe('the Problems list and picking, on a generated town', async () => {
       expect(r.roads.some((q) => q.tone === 'bad')).toBe(true);
     }
     expect(editGhosts(hamlet, { ...hamlet, name: 'Elsewhere' }, t)).toBeNull();
+    // A road drawn shows as the road it will be at once (laid), its deck as a bridge.
+    const drawn = { points: [[10, 10], [60, 10]] as [number, number][], width: 7, ends: ['join', 'dead'] as RoadPlan['ends'], kind: 'street' as const };
+    const added = editGhosts(hamlet, { ...hamlet, roads: [...hamlet.roads, drawn, { ...drawn, points: [[60, 10], [90, 10]], bridge: [0, 30] as [number, number] }] }, t)!;
+    expect(added.roads.map((r) => r.tone)).toEqual(['laid', 'bridge']);
   });
 
   // (A city's checks take seconds, which is why they run in their own worker, `checkJob.ts`: printed here to keep an eye on.)
