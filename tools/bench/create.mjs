@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
 /**
- * Pictures of a new game's first three steps as a player gets there: the main menu, "New game", step 1's
+ * Pictures of a new game's first four steps as a player gets there: the main menu, "New game", step 1's
  * land made and built, then shot at each size (`--sizes`) on each renderer (`--renderers`): the land's
  * view, the side panel, the way on and the figures. At the narrowest size, also the panel scrolled to
  * its end. Then, at the first size, an arrow key in the place grid (down a row: another place) and the
- * making panel while that land is made. Then "Lay out the town →": step 2's town laid on that land
- * (its making panel shot meanwhile), shot at each size the same way. Then "Choose a household →":
- * step 3's households offered as cards, shot at each size once the portraits in view are drawn (the
+ * making panel while that land is made. Then "Lay out the streets →": step 2's proposed layout on that
+ * land (its making panel shot meanwhile), shot at each size the same way. Then "Build the town →": step
+ * 3's town built from the layout, shot at each size, and "Build again". Then "Choose a household →":
+ * step 4's households offered as cards, shot at each size once the portraits in view are drawn (the
  * narrowest with its cards scrolled to their end), then at the first size with a card chosen (the
  * camera on its area) and after "Show others".
  *
@@ -14,7 +15,12 @@
  * town, then taken down again before the shot: the shots show the page's own (none once the game's data has all come),
  * and each says how far the page's own stream is (`stream n/m`), so a stream that stops short shows in the log.
  *
- * With `--shots …,edit`, between steps 2 and 3, a scripted edit session in step 2's town editor
+ * With `--shots …,layout`, in step 2, a scripted session in the layout editor (`--layout zones,streets`): the zone
+ * brush (`zones`: a stroke of homes beside a street, the frames meanwhile, undone and painted again; zones painted
+ * far from any street, hatched; a stroke erased; Clear zones and its undo), then the Street tool (`streets`, below):
+ * a street drawn shows as a road at once, a refused bend says why. Each step shot at the edit sizes.
+ *
+ * With `--shots …,edit`, between steps 3 and 4, a scripted edit session in step 3's town editor
  * (`web/src/ui/townedit/`), each step shot at the edit sizes (`--edit-sizes`): a lot picked, removed,
  * the removal undone, a home put down, a lot dragged elsewhere, a park made another public place, a
  * street renamed, then a street removed with its lots. It measures the frames while the Lot tool's
@@ -31,12 +37,13 @@
  * lacks put down with the Lot tool, and a street drawn with the Street tool's "Along it" left as it
  * is (both in the main town); each checked by what the plan gained or lost, and shot.
  * Then villages (`--edit …,villages`): a village put down with the Village tool, dragged elsewhere,
- * removed from its card and the removal undone (`villageSession`).
+ * removed from its card and the removal undone (`villageSession`). After it, back to step 2 and on again: the town
+ * as tweaked kept (its edits and its key the same).
  *
  * Besides the pictures it checks what it can by measure, and says so (`create: …`): the side panel,
  * the way on and the figures clear of the stream pill (if it is up) and of every lot tag shown; the arrow
- * key chose the place a row down and moved the focus there; step 2 says it is step 2; step 3 says it is
- * step 3, offers 10 to 30 households (all of them in a smaller town), draws every portrait (how long
+ * key chose the place a row down and moved the focus there; each step says it is that step of 5; step 4
+ * offers 10 to 30 households (all of them in a smaller town), draws every portrait (how long
  * that took, and how many), and "Show others" offers others.
  *
  *   bun tools/bench/create.mjs [options]
@@ -45,11 +52,14 @@
  *     --seed 7                               the page's Math.random seed (the same world in every run)
  *     --world country --options town=city    step 1's place and options (the URL's `?world=`, `?options=`)
  *     --code river-mhs-k2x9q                 the world's code instead (the URL's `?code=`; a bare number: the land's seed)
- *     --shots 1,2,3                          the steps shot (the others only gone through); `edit`: step 2's edit session
+ *     --shots 1,2,3,4                        the steps shot (the others only gone through); `layout`: step 2's layout
+ *                                            session; `edit`: step 3's edit session
  *     --stay                                 step 1's place kept as given (no arrow key down the place grid: a place's
  *                                            own options would replace `--options`; the village edits want a large land)
  *     --edit-sizes 1920x1080,740x1000        the edit session's shots' sizes (it runs at the first)
- *     --edit lots,streets,buildup            the edit session's parts: the lot and street edits above, the Street tool, build-up
+ *     --layout zones,streets                 the layout session's parts: the zone brush, the Street tool
+ *     --edit lots,buildup,villages           the edit session's parts: the lot edits above, build-up, villages (`streets`:
+ *                                            the Street tool there too)
  *     --keep-place                           no arrow key in step 1's place grid: the place asked for (`--code`) kept
  *     --headed                               in a window (default headless: the real GPU either way)
  *     --port 5184 | --url <u>                a dev server on the port (started if none answers), or one already running
@@ -83,12 +93,13 @@ const seed = Number(flag('seed', '7'));
 // (None given: step 1 as a player gets it, the URL without them.)
 const made = worldFlags(flag, null);
 const code = flag('code', null);
-const shots = new Set(flag('shots', '1,2,3').split(','));
+const shots = new Set(flag('shots', '1,2,3,4').split(','));
 const editSizes = flag('edit-sizes', '1920x1080,740x1000')
   .split(',')
   .map((s) => s.split('x').map(Number))
   .map(([width, height]) => ({ width, height }));
-const editParts = new Set(flag('edit', 'lots,streets,buildup,villages').split(','));
+const editParts = new Set(flag('edit', 'lots,buildup,villages').split(','));
+const layoutParts = new Set(flag('layout', 'zones,streets').split(','));
 const worldQuery = [made.world ? `world=${made.world}` : '', made.query ? `options=${made.query}` : '', code ? `code=${encodeURIComponent(code)}` : ''];
 const port = Number(flag('port', '5184'));
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
@@ -136,10 +147,14 @@ function seeded(n) {
 
 /** A step's world made and built: its way on (`label`, a pattern) can be pressed. */
 const enabled = (page, label) => page.waitForFunction((src) => [...document.querySelectorAll('button')].some((b) => new RegExp(src).test(b.textContent ?? '') && !b.disabled), label.source, { timeout: 120_000, polling: 100 });
-/** Step 1's land made and built: "Lay out the town" can be pressed. */
-const ready = (page) => enabled(page, /Lay out the town/);
-/** Step 2's town laid and built: "Choose a household" can be pressed. */
+/** Step 1's land made and built: "Lay out the streets" can be pressed. */
+const ready = (page) => enabled(page, /Lay out the streets/);
+/** Step 2's layout proposed and shown: "Build the town" can be pressed. */
+const layoutReady = (page) => enabled(page, /Build the town/);
+/** Step 3's town built and shown: "Choose a household" can be pressed. */
 const townReady = (page) => enabled(page, /Choose a household/);
+/** The step's eyebrow ("Step 2 of 5 · Streets & zones"). */
+const eyebrowOf = (page) => page.evaluate(() => document.querySelector('.side .head .eyebrow')?.textContent ?? '');
 
 /**
  * What overlaps on screen now: the UI over the town (the side panel, or its two parts when narrow; the
@@ -172,7 +187,7 @@ function overlaps() {
  */
 function benchHelpers() {
   return (async () => {
-    const [{ app }, { menuScene }, lots, streets, town, pickMod, live, buildup, villages] = await Promise.all([
+    const [{ app }, { menuScene }, lots, streets, town, pickMod, live, buildup, villages, layoutApi, uses] = await Promise.all([
       import('/src/ui/app.svelte.ts'),
       import('/src/game/menuScene.ts'),
       import('/src/game/edit/lots.ts'),
@@ -182,6 +197,8 @@ function benchHelpers() {
       import('/src/ui/townedit/streetLive.ts'),
       import('/src/game/edit/buildup.ts'),
       import('/src/game/edit/villages.ts'),
+      import('/src/ui/townedit/layoutApi.ts'),
+      import('/src/game/uses.ts'),
     ]);
     const t = await town.loadTemplates();
     const ed = () => window.__townEditor;
@@ -456,6 +473,59 @@ function benchHelpers() {
         }
         return out;
       },
+      /**
+       * A stroke for the zone brush on screen: along a main-town road's side (`beside`, `off` m from its kerb), else
+       * out in the open, at least `far` m from every road (dry land, no zone there yet). Its ground and screen points.
+       */
+      zoneStroke(kind, off = 14, far = 70) {
+        const d = plan();
+        const dist = layoutApi.roadDistance(d);
+        const layer = layoutApi.layerOf(d);
+        const cells = uses.unpackUses(layer);
+        const cellOf = (x, z) => Math.floor(z / uses.USE_CELL) * layer.cols + Math.floor(x / uses.USE_CELL);
+        const dry = (x, z) => layoutApi.paintUses(d, [{ x, z, r: 2 }], 'homes').draft !== d;
+        if (kind === 'beside') {
+          const order = d.roads.map((r, i) => i).sort((a, b) => ((d.roads[a].area ?? 9) === 0 ? 0 : 1) - ((d.roads[b].area ?? 9) === 0 ? 0 : 1));
+          for (const i of order) {
+            const r = d.roads[i];
+            if (r.kind === 'trail' || r.bridge) continue;
+            const L = length(r.points);
+            for (let s = 20; s + 60 < L; s += 15) {
+              for (const side of [1, -1]) {
+                const ground = [0, 20, 40, 60].map((k) => {
+                  const p = pointAt(r.points, s + k);
+                  const q = pointAt(r.points, s + k + 1);
+                  const l = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+                  const o = r.width / 2 + off;
+                  return [p[0] - ((q[1] - p[1]) / l) * o * side, p[1] + ((q[0] - p[0]) / l) * o * side];
+                });
+                if (ground.some(([x, z]) => cells[cellOf(x, z)] || dist[cellOf(x, z)] > 30 || !dry(x, z))) continue;
+                const screens = ground.map(([x, z]) => screen(x, z));
+                if (screens.every(Boolean)) return { road: r.name, ground, screens };
+              }
+            }
+          }
+          return null;
+        }
+        for (let z = 40; z < d.depth - 40; z += 12) {
+          for (let x = 40; x < d.width - 80; x += 12) {
+            const ground = [0, 15, 30].map((k) => [x + k, z]);
+            if (ground.some(([gx, gz]) => dist[cellOf(gx, gz)] < far || cells[cellOf(gx, gz)] || !dry(gx, gz))) continue;
+            const screens = ground.map(([gx, gz]) => screen(gx, gz));
+            if (screens.every(Boolean)) return { ground, screens };
+          }
+        }
+        return null;
+      },
+      /** The plan's zones: cells of each use, the cells hatched (too far from a street), the summary. */
+      zones() {
+        const d = plan();
+        const cells = d.open?.uses ? uses.unpackUses(d.open.uses) : new Uint8Array(0);
+        const count = [0, 0, 0, 0, 0, 0];
+        for (const c of cells) count[c]++;
+        const hatched = layoutApi.hatchedUses(d);
+        return { zoned: count.slice(1).reduce((a, b) => a + b, 0), homes: count[1], hatched: hatched ? hatched.reduce((a, b) => a + b, 0) : 0, summary: layoutApi.summaryLine(layoutApi.usesSummary(d)), hash: uses.usesHash(d.open?.uses) };
+      },
       /** How many backdrop buildings and places the plan has. */
       built() {
         const d = plan();
@@ -483,8 +553,9 @@ function benchHelpers() {
       state() {
         const e = ed();
         const areas = e.draft.open?.areas ?? [];
-        const shown = app.world?.draft?.open?.areas ?? [];
-        return { hint: e.hintText, note: e.note, settling: e.settling, timings: [...e.timings], blocking: e.issues.blocking.map((i) => i.text), warnings: e.issues.warnings.length, edits: e.edits, selected: e.selected, slots: e.draft.slots.length, roads: e.draft.roads.length, areas: areas.map((a) => ({ name: a.name, x: a.x, z: a.z })), shownAreas: shown.length, edited: app.world?.edited };
+        const target = e.step === 'layout' ? app.layout : app.world;
+        const shown = target?.draft?.open?.areas ?? [];
+        return { step: e.step, hint: e.hintText, note: e.note, settling: e.settling, timings: [...e.timings], blocking: e.issues.blocking.map((i) => i.text), warnings: e.issues.warnings.length, edits: e.edits, selected: e.selected, slots: e.draft.slots.length, roads: e.draft.roads.length, areas: areas.map((a) => ({ name: a.name, x: a.x, z: a.z })), shownAreas: shown.length, edited: target?.edited, worldKey: app.world?.key ?? null };
       },
     };
     return true;
@@ -492,11 +563,12 @@ function benchHelpers() {
 }
 
 /**
- * Step 2's edit session (see the top of this file): each step shot at every edit size, each edit's way to the town
- * built again measured, the frames while the Lot tool's ghost follows the pointer.
+ * A scripted session in the step's editor (see the top of this file): step 2's layout (`step` 'layout': the zone
+ * brush and the Street tool) or step 3's built town ('edit': lots, build-up, villages). Each step shot at every edit
+ * size, each edit's way to the town settled again measured, the frames while a tool's ghost follows the pointer.
  */
-async function editSession(page, renderer, shootAs, setStep) {
-  setStep('edit');
+async function editSession(page, renderer, shootAs, setStep, step, parts) {
+  setStep(step);
   const [first] = editSizes;
   await page.setViewportSize(first);
   await page.waitForTimeout(2500);
@@ -520,7 +592,7 @@ async function editSession(page, renderer, shootAs, setStep) {
       await page.waitForTimeout(2200);
     }
   };
-  /** The town built again with the edits (the editor no longer settling); its settle's timing said. */
+  /** The town (or the layout) settled again with the edits (the editor no longer settling); its settle's timing said. */
   const built = async (what) => {
     const t0 = Date.now();
     await page.waitForFunction(() => !window.__townEditor.settling, null, { timeout: 60_000, polling: 50 }).catch(() => fault(`${renderer} edit: ${what}: the town not built again within 60 s`));
@@ -682,7 +754,9 @@ async function editSession(page, renderer, shootAs, setStep) {
   /** The Street tool (see the top of this file). */
   const streetEdits = async () => {
     await tool('street');
-    await page.locator('.street-card [role="radio"]', { hasText: 'Nothing' }).first().click();
+    // (Step 3's card asks what goes along a new street: nothing here. Step 2's streets are zoned instead.)
+    const nothing = page.locator('.street-card [role="radio"]', { hasText: 'Nothing' });
+    if (await nothing.count()) await nothing.first().click();
     await page.waitForTimeout(100);
     const line = (f) => `${f.frames} frames, p50 ${f.p50.toFixed(1)} ms, p95 ${f.p95.toFixed(1)} ms, longest ${f.max.toFixed(1)} ms`;
     /** The pointer from `a` to `b` (screen points) in `steps`, the frames meanwhile. */
@@ -736,6 +810,9 @@ async function editSession(page, renderer, shootAs, setStep) {
       const after = await state();
       if (after.roads <= had) fault(`${renderer} edit ${label}: not drawn (${after.note ?? after.hint})`);
       else if (after.selected?.kind !== 'road') fault(`${renderer} edit ${label}: drawn, but ${JSON.stringify(after.selected)} picked, not the street`);
+      // (Drawn, it shows as the road it will be, picked with an outline: the pointer moved off it for the shot.)
+      await page.mouse.move(to.x + 160, to.y + 90, { steps: 3 });
+      await page.waitForTimeout(150);
       await shots(label);
       await built(label);
       await shots(`${label}-built`);
@@ -948,18 +1025,101 @@ async function editSession(page, renderer, shootAs, setStep) {
     } else fault(`${renderer} edit: no street on screen to draw with both along it`);
   };
 
-  if (editParts.has('lots')) await lotEdits();
-  if (editParts.has('streets')) await streetEdits();
-  if (editParts.has('buildup')) await buildupEdits();
-  if (editParts.has('villages')) await villageSession(page, renderer, { bench, state, shots, built, tool, click });
+  /** The zone brush (step 2; see the top of this file). */
+  const zoneEdits = async () => {
+    const zones = () => bench(() => window.__bench.zones());
+    const chip = (use) => page.locator(`.zone-card [data-use="${use}"]`).click();
+    const beside = async (on) => {
+      const box = page.locator('.zone-card .beside input');
+      if ((await box.isChecked()) !== on) await box.click();
+    };
+    /** A drag along `screens` (one stroke), the frames meanwhile. */
+    const stroke = async (screens) => {
+      await page.mouse.move(screens[0].x, screens[0].y, { steps: 3 });
+      await page.waitForTimeout(80);
+      await bench(() => window.__bench.startFrames());
+      await page.mouse.down();
+      for (const p of screens.slice(1)) await page.mouse.move(p.x, p.y, { steps: 12 });
+      await page.mouse.up();
+      const f = await bench(() => window.__bench.stopFrames());
+      await page.waitForTimeout(250);
+      return f;
+    };
+    const line = (f) => `${f.frames} frames, p50 ${f.p50.toFixed(1)} ms, p95 ${f.p95.toFixed(1)} ms, longest ${f.max.toFixed(1)} ms`;
+    await tool('zones');
+    await shots('zones-card');
+
+    // 1. Homes beside a street: one stroke, one edit; the summary follows.
+    await chip('homes');
+    await page.locator('.zone-card [role="radio"]', { hasText: /^32 m$/ }).click();
+    await beside(true);
+    const along = await bench(() => window.__bench.zoneStroke('beside'));
+    if (!along) return fault(`${renderer} layout: no street side on screen free to zone`);
+    const had = await zones();
+    const edits = (await state()).edits;
+    const f = await stroke(along.screens);
+    const now = await zones();
+    const s = await state();
+    if (s.edits !== edits + 1) fault(`${renderer} layout zones: a stroke made ${s.edits - edits} edits (wanted 1)`);
+    if (now.homes <= had.homes) fault(`${renderer} layout zones: the stroke painted no homes`);
+    console.log(`create: ${renderer} layout zones: a stroke of homes along ${along.road}: ${now.homes - had.homes} cells; frames while painting: ${line(f)}; "${had.summary}" → "${now.summary}"`);
+    await shots('zones-stroke');
+    // Undone and redone: one step each.
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z');
+    await page.waitForTimeout(200);
+    if ((await zones()).hash !== had.hash) fault(`${renderer} layout zones: undo left the zones changed`);
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Shift+z' : 'Control+Shift+z');
+    await page.waitForTimeout(200);
+    if ((await zones()).hash !== now.hash) fault(`${renderer} layout zones: redo didn't bring the stroke back`);
+    await built('a zone stroke');
+
+    // 2. Zones far from any street: hatched (nothing is built there until a street reaches them).
+    await beside(false);
+    await chip('green');
+    const open = await bench(() => window.__bench.zoneStroke('far'));
+    if (open) {
+      await stroke(open.screens);
+      const z = await zones();
+      if (!z.hatched) fault(`${renderer} layout zones: parks painted out in the open, none hatched`);
+      console.log(`create: ${renderer} layout zones: ${z.hatched} cells hatched, too far from a street`);
+      await page.mouse.move(open.screens[0].x + 200, open.screens[0].y + 100, { steps: 3 });
+      await shots('zones-hatch');
+      await built('zones far from a street');
+    } else console.log(`create: ${renderer} layout zones: no open land on screen far from the streets`);
+
+    // 3. Erased, the stroke of homes taken off again.
+    await chip('erase');
+    const before = await zones();
+    await stroke(along.screens);
+    const erased = await zones();
+    if (erased.homes >= before.homes) fault(`${renderer} layout zones: Erase took no homes off`);
+    await shots('zones-erase');
+
+    // 4. Clear zones, then undone.
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: /Clear zones/ }).click();
+    await page.waitForTimeout(250);
+    if ((await zones()).zoned) fault(`${renderer} layout zones: Clear zones left ${(await zones()).zoned} cells`);
+    await shots('zones-cleared');
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z');
+    await page.waitForTimeout(250);
+    if ((await zones()).hash !== erased.hash) fault(`${renderer} layout zones: undoing Clear zones didn't bring them back`);
+    await built('Clear zones undone');
+  };
+
+  if (parts.has('zones')) await zoneEdits();
+  if (parts.has('lots')) await lotEdits();
+  if (parts.has('streets')) await streetEdits();
+  if (parts.has('buildup')) await buildupEdits();
+  if (parts.has('villages')) await villageSession(page, renderer, { bench, state, shots, built, tool, click });
   const end = await state();
-  console.log(`create: ${renderer} edit: ${end.edits} edits, ${end.slots} lots, ${end.roads} roads; problems: ${end.blocking.length} blocking${end.blocking.length ? ` (${end.blocking.join('; ')})` : ''}, ${end.warnings} warnings; edited: ${end.edited}`);
+  console.log(`create: ${renderer} ${step}: ${end.edits} edits, ${end.slots} lots, ${end.roads} roads; problems: ${end.blocking.length} blocking${end.blocking.length ? ` (${end.blocking.join('; ')})` : ''}, ${end.warnings} warnings; edited: ${end.edited}`);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
 }
 
 /**
- * Step 2's villages (part of the edit session): a village put down with the Village tool (its ghost shot where it may go
+ * Step 3's villages (part of the edit session): a village put down with the Village tool (its ghost shot where it may go
  * and over the main town, where it may not), the town built again with it (the real `edit` job's settle: what it took,
  * what it refused); dragged elsewhere and built again; picked and removed from its card (what goes listed first); the
  * removal undone. Each step shot; the settles' timings and the Problems list said.
@@ -1162,24 +1322,68 @@ try {
     await page.waitForTimeout(1200);
     if (!has('keep-place') && !has('stay')) await anotherPlace(page, renderer, shoot);
 
-    // Step 2: the town laid on that land (its making panel shot while it is laid), then at every size.
-    await page.getByRole('button', { name: /Lay out the town/ }).click();
+    // Step 2: the layout proposed on that land (its making panel shot while it is made), then at every size.
+    await page.getByRole('button', { name: /Lay out the streets/ }).click();
     stepName = 'step2';
-    await page.waitForFunction(() => !!document.querySelector('.making'), null, { timeout: 10_000, polling: 50 }).catch(() => fault(`${renderer}: no making panel while the town is laid out`));
+    await page.waitForFunction(() => !!document.querySelector('.making'), null, { timeout: 10_000, polling: 50 }).catch(() => fault(`${renderer}: no making panel while the streets are laid out`));
     await page.waitForTimeout(700);
     if (shots.has('2')) await shoot(`${sizes[0].width}x${sizes[0].height}-making`);
-    await townReady(page);
-    const eyebrow = await page.evaluate(() => document.querySelector('.side .head .eyebrow')?.textContent ?? '');
-    if (!/Step 2 of 4 · Town/.test(eyebrow)) fault(`${renderer}: step 2 says "${eyebrow}"`);
+    await layoutReady(page);
+    const eyebrow2 = await eyebrowOf(page);
+    if (!/Step 2 of 5 · Streets & zones/.test(eyebrow2)) fault(`${renderer}: step 2 says "${eyebrow2}"`);
     if (shots.has('2')) await everySize();
+    if (shots.has('layout')) {
+      await editSession(page, renderer, (name) => shoot(name), (name) => (stepName = name), 'layout', layoutParts);
+      await layoutReady(page);
+    }
 
-    if (shots.has('edit')) await editSession(page, renderer, (name) => shoot(name), (name) => (stepName = name));
-
+    // Step 3: the town built from the layout (its making panel shot meanwhile), then at every size, then Build again.
+    await page.setViewportSize(sizes[0]);
+    await page.waitForTimeout(800);
+    await page.getByRole('button', { name: /Build the town/ }).click();
+    stepName = 'step3';
+    await page.waitForFunction(() => !!document.querySelector('.making'), null, { timeout: 10_000, polling: 50 }).catch(() => console.log(`create: ${renderer}: no making panel while the town is built (built at once)`));
+    await page.waitForTimeout(400);
+    if (shots.has('3')) await shoot(`${sizes[0].width}x${sizes[0].height}-making`);
+    await townReady(page);
+    const eyebrow3 = await eyebrowOf(page);
+    if (!/Step 3 of 5 · Build/.test(eyebrow3)) fault(`${renderer}: step 3 says "${eyebrow3}"`);
     if (shots.has('3')) {
-      // Step 3: the town lived in, its households offered as cards; shot once the portraits in view are drawn.
+      await everySize();
       await page.setViewportSize(sizes[0]);
       await page.waitForTimeout(800);
-      stepName = 'step3';
+      const t0 = Date.now();
+      await page.getByRole('button', { name: /Build again/ }).click();
+      await page.waitForTimeout(300);
+      // (Nothing tweaked yet: built again without asking.)
+      if (await page.locator('[role="alertdialog"]').count()) fault(`${renderer}: Build again asked first with nothing tweaked`);
+      await townReady(page);
+      console.log(`create: ${renderer} step 3: built again in ${Date.now() - t0} ms`);
+      await page.waitForTimeout(1500);
+      await shoot(`${sizes[0].width}x${sizes[0].height}-built-again`);
+    }
+
+    if (shots.has('edit')) {
+      await editSession(page, renderer, (name) => shoot(name), (name) => (stepName = name), 'edit', editParts);
+      // Back to step 2 and on again, the layout unchanged: the town as tweaked is kept.
+      await page.waitForFunction(() => !window.__townEditor.settling, null, { timeout: 60_000, polling: 50 });
+      const tweaked = await page.evaluate(() => window.__bench.state());
+      await page.locator('.side .head .back').click();
+      await layoutReady(page);
+      await page.waitForTimeout(800);
+      await page.getByRole('button', { name: /Build the town/ }).click();
+      await townReady(page);
+      await page.waitForTimeout(800);
+      const kept = await page.evaluate(() => window.__bench.state());
+      if (kept.worldKey !== tweaked.worldKey || !kept.edited || kept.edits !== tweaked.edits) fault(`${renderer}: back to step 2 and on again, the town not kept as tweaked (${tweaked.edits} edits, key ${tweaked.worldKey} → ${kept.edits} edits, edited ${kept.edited}, key ${kept.worldKey})`);
+      else console.log(`create: ${renderer}: back to step 2 and on again: the town kept with its ${kept.edits} edits`);
+    }
+
+    if (shots.has('4')) {
+      // Step 4: the town lived in, its households offered as cards; shot once the portraits in view are drawn.
+      await page.setViewportSize(sizes[0]);
+      await page.waitForTimeout(800);
+      stepName = 'step4';
       const opened = Date.now();
       await page.getByRole('button', { name: /Choose a household/ }).click();
       await page.waitForFunction(() => document.querySelectorAll('.offer .card').length > 0, null, { timeout: 60_000, polling: 50 });
@@ -1202,12 +1406,12 @@ try {
             null,
             { timeout: 60_000, polling: 50 },
           )
-          .catch(() => fault(`${renderer}: step 3's portraits in view not drawn within 60 s`));
+          .catch(() => fault(`${renderer}: step 4's portraits in view not drawn within 60 s`));
       await inView();
       const viewAt = Date.now() - opened;
       await page
         .waitForFunction(() => [...document.querySelectorAll('.offer .face')].every((f) => f.querySelector('img')), null, { timeout: 120_000, polling: 100 })
-        .catch(() => fault(`${renderer}: step 3's portraits not all drawn within 120 s`));
+        .catch(() => fault(`${renderer}: step 4's portraits not all drawn within 120 s`));
       const allAt = Date.now() - opened;
       const offer = await page.evaluate(() => ({
         step: document.querySelector('.side .head .eyebrow')?.textContent ?? '',
@@ -1215,9 +1419,9 @@ try {
         faces: document.querySelectorAll('.offer .face').length,
         households: Number(/(\d+) households/.exec(document.querySelector('.view .stats')?.textContent ?? '')?.[1] ?? NaN),
       }));
-      console.log(`create: ${renderer} step 3: ${offer.cards.length} cards of ${offer.households} households, ${offer.faces} portraits; cards ${cardsAt} ms, portraits in view ${viewAt} ms, all ${allAt} ms`);
-      if (!/Step 3 of 4 · Household/.test(offer.step)) fault(`${renderer}: step 3 says "${offer.step}"`);
-      if (offer.cards.length > 30 || offer.cards.length < Math.min(10, offer.households)) fault(`${renderer}: step 3 offers ${offer.cards.length} of ${offer.households} households`);
+      console.log(`create: ${renderer} step 4: ${offer.cards.length} cards of ${offer.households} households, ${offer.faces} portraits; cards ${cardsAt} ms, portraits in view ${viewAt} ms, all ${allAt} ms`);
+      if (!/Step 4 of 5 · Household/.test(offer.step)) fault(`${renderer}: step 4 says "${offer.step}"`);
+      if (offer.cards.length > 30 || offer.cards.length < Math.min(10, offer.households)) fault(`${renderer}: step 4 offers ${offer.cards.length} of ${offer.households} households`);
       await everySize('.offer .cards', inView);
 
       // A card chosen: its home lit, the camera on its area, the way on naming them.
@@ -1235,7 +1439,7 @@ try {
       await page.waitForTimeout(1500);
       const others = await page.evaluate(() => [...document.querySelectorAll('.offer .card[data-slot]')].map((c) => Number(c.getAttribute('data-slot'))));
       const again = others.filter((s) => offer.cards.includes(s)).length;
-      console.log(`create: ${renderer} step 3: Show others offers ${others.length}, ${again} of them shown before`);
+      console.log(`create: ${renderer} step 4: Show others offers ${others.length}, ${again} of them shown before`);
       if (offer.households > offer.cards.length + 10 && again) fault(`${renderer}: Show others offered ${again} households again`);
       await shoot(`${sizes[0].width}x${sizes[0].height}-others`);
     }

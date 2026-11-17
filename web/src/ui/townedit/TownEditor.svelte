@@ -24,7 +24,8 @@
   function onkeydown(e: KeyboardEvent) {
     if (off) return;
     const t = e.target;
-    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return;
+    // (Typing in a field keeps its keys; a checkbox or a switch with the focus doesn't.)
+    if ((t instanceof HTMLInputElement && !['checkbox', 'radio', 'range', 'button'].includes(t.type)) || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return;
     // (The tool in hand first: Esc drops what it is drawing before it puts the tool down. A key the
     // town stage took already, Esc ending a drag, is done with.)
     if (e.defaultPrevented) return;

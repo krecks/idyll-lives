@@ -3,17 +3,19 @@
  * Times the three waits a new player has before playing, through the menus as a player goes:
  *
  * - boot: the page opened to the main menu (the loading screen gone, its picture shown);
- * - world: "New game" to step 1's land made and built (its "Lay out the town" enabled), in the
+ * - world: "New game" to step 1's land made and built (its "Lay out the streets" enabled), in the
  *   countryside with its own options, as a new player gets it, unless `--world` and `--options` (or
  *   `--code`) say otherwise (the page's `?world=`, `?options=`, `?code=`);
- * - town: "Lay out the town" to step 2's town laid on that land and built (its "Choose a household" enabled);
- * - inView, portraits: step 3 ("Choose a household") opened to the portraits in view on its cards
+ * - layout: "Lay out the streets" to step 2's layout proposed on that land and shown (its "Build the
+ *   town" enabled);
+ * - town: "Build the town" to step 3's town built from that layout and shown (its "Choose a household" enabled);
+ * - inView, portraits: step 4 ("Choose a household") opened to the portraits in view on its cards
  *   shown, and to every card's (`.offer .face img`);
- * - home: "Play" on a household's card (or Creation's "Choose a home", `--create`) to step 4's way on
+ * - home: "Play" on a household's card (or Creation's "Choose a home", `--create`) to step 5's way on
  *   enabled (a household of the town's has its own home chosen there);
- * - entry: step 4's "Move in" (or, for a household of the town's staying in its home, "Play the …s")
+ * - entry: step 5's "Move in" (or, for a household of the town's staying in its home, "Play the …s")
  *   to the game up (its interface there, the loading screen gone), the rest of the homes for sale
- *   filled on the way. Step 4 is reached by "Play" on a household's card, or with `--create` through
+ *   filled on the way. Step 5 is reached by "Play" on a household's card, or with `--create` through
  *   Creation (its household as it comes, "Choose a home"), and its home as it opens. Then the residents
  *   in the game, the homes they live in, and the homes the game shows for sale.
  *
@@ -38,12 +40,12 @@
  *     --options town=city,villages=many   step 1's options (the place's own where not given)
  *     --code river-mhs-k2x9q   the world's code instead (a bare number: the land's seed)
  *     --household 0            which household's Play is pressed (its card's index)
- *     --create                 step 4 through Creation instead
+ *     --create                 step 5 through Creation instead
  *     --renderer webgpu        or webgl
  *     --headed                 in a window (default headless: the real GPU either way)
  *     --port 5222 | --url <u>  a dev server on the port (started if none answers), or one already running
  *     --out <dir>              default bench-results/loading-<time>/
- *     --shots                  also a picture of step 4 once its way on is enabled, and of the game 3 s
+ *     --shots                  also a picture of step 5 once its way on is enabled, and of the game 3 s
  *                              after the entry (in `--out`, per run and renderer)
  *     --lowmem                 the page as on an 8 GB machine (`?lowmem`: the menus' town let go of at the
  *                              loading screen, the game faded in)
@@ -142,7 +144,7 @@ function longTasks() {
 /** A step's way on (`label`, a pattern) enabled: its world made and built. */
 const enabled = (page, label) => page.waitForFunction((src) => [...document.querySelectorAll('button')].some((b) => new RegExp(src).test(b.textContent ?? '') && !b.disabled), label.source, { timeout: 120_000, polling: 100 });
 
-/** One visit: boot, step 1's land, step 2's town, step 3's portraits, a household's entry (ms each), and the page's spans. */
+/** One visit: boot, step 1's land, step 2's layout, step 3's town, step 4's portraits, a household's entry (ms each), and the page's spans. */
 async function visit(page, cdp) {
   const now = () => page.evaluate(() => performance.now());
   // (The page keeps its last 500 spans: read them after each moment, so none is lost.)
@@ -159,10 +161,17 @@ async function visit(page, cdp) {
   await page.waitForTimeout(1500);
   const newGame = await now();
   await page.getByText('New game', { exact: true }).click();
-  const toTown = page.getByRole('button', { name: /Lay out the town/ });
-  await toTown.waitFor({ timeout: 60_000 });
-  await enabled(page, /Lay out the town/);
+  const toLayout = page.getByRole('button', { name: /Lay out the streets/ });
+  await toLayout.waitFor({ timeout: 60_000 });
+  await enabled(page, /Lay out the streets/);
   const made = await now();
+  await page.waitForTimeout(500);
+  const proposePressed = await now();
+  await toLayout.click();
+  const toTown = page.getByRole('button', { name: /Build the town/ });
+  await toTown.waitFor({ timeout: 60_000 });
+  await enabled(page, /Build the town/);
+  const proposed = await now();
   await page.waitForTimeout(500);
   const layPressed = await now();
   await toTown.click();
@@ -212,7 +221,7 @@ async function visit(page, cdp) {
     const plays = page.locator('.offer .card[data-slot] .go');
     await plays.nth(Math.min(pick, (await plays.count()) - 1)).click();
   }
-  // (Step 4's way on: "Move in", or "Play the …s" for a household of the town's staying in its home.)
+  // (Step 5's way on: "Move in", or "Play the …s" for a household of the town's staying in its home.)
   const moveIn = page.locator('.btn.move-in');
   await moveIn.waitFor({ timeout: 60_000 });
   await page.waitForFunction(() => !!document.querySelector('.btn.move-in:not(:disabled)'), null, { timeout: 120_000, polling: 100 });
@@ -221,7 +230,7 @@ async function visit(page, cdp) {
   if (shots) await page.screenshot({ path: join(out, `step4-${shotName}.png`) });
   const pressed = await now();
   await moveIn.click();
-  // (Fewer beds than sleepers: step 4 asks first, and is answered.)
+  // (Fewer beds than sleepers: step 5 asks first, and is answered.)
   const asked = () => [...document.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Move in anyway');
   await page.waitForFunction(`(${asked})() || (!!document.querySelector('.hud-root') && !document.querySelector('.loading'))`, null, { timeout: 180_000, polling: 100 });
   if (await page.evaluate(asked)) await page.getByRole('button', { name: 'Move in anyway' }).click();
@@ -241,12 +250,12 @@ async function visit(page, cdp) {
     const forSale = homesForSale(game.plots, game.households, services.content.economy.homePrice).length;
     return { residents: sims.length, homes: new Set(sims.map((s) => s.plot)).size, forSale };
   });
-  const marks = { boot, newGame, made, layPressed, laid, opened, shown, pressed, entered };
+  const marks = { boot, newGame, made, proposePressed, proposed, layPressed, laid, opened, shown, pressed, entered };
   const more = back ? await backAndIn(page, cdp, now, marks) : {};
   clearInterval(polling);
   await keep();
   const report = { entries: [...entries.values()].sort((a, b) => a.start - b.start), marks };
-  return { boot, world: made - newGame, town: laid - layPressed, inView: inView - opened, portraits: shown - opened, faces, home, entry: entered - pressed, ...people, ...more, report };
+  return { boot, world: made - newGame, layout: proposed - proposePressed, town: laid - layPressed, inView: inView - opened, portraits: shown - opened, faces, home, entry: entered - pressed, ...people, ...more, report };
 }
 
 /** `--back`: from the game to the menu and in again (see the header), ms each. */
@@ -319,7 +328,7 @@ for (let r = 0; r < runs; r++) {
   }
   for (const [i, v] of visits.entries()) {
     const label = i === 0 ? 'first' : 'again';
-    console.log(`run ${r + 1} (${label}): boot ${v.boot.toFixed(0)} ms · land ${v.world.toFixed(0)} ms · town ${v.town.toFixed(0)} ms · step-3 portraits in view ${v.inView.toFixed(0)} ms, all ${v.portraits.toFixed(0)} ms (${v.faces}) · step 4 ${v.home.toFixed(0)} ms · entry ${v.entry.toFixed(0)} ms · ${v.residents} residents in ${v.homes} homes, ${v.forSale} for sale`);
+    console.log(`run ${r + 1} (${label}): boot ${v.boot.toFixed(0)} ms · land ${v.world.toFixed(0)} ms · layout ${v.layout.toFixed(0)} ms · town ${v.town.toFixed(0)} ms · step-4 portraits in view ${v.inView.toFixed(0)} ms, all ${v.portraits.toFixed(0)} ms (${v.faces}) · step 5 ${v.home.toFixed(0)} ms · entry ${v.entry.toFixed(0)} ms · ${v.residents} residents in ${v.homes} homes, ${v.forSale} for sale`);
     if (back) {
       const tasks = (xs) => (xs.length ? `${xs.length} long (max ${Math.max(...xs)} ms)` : 'no long tasks');
       console.log(`  after entry ${tasks(v.entryLong)} · back ${v.back.toFixed(0)} ms, ${tasks(v.backLong)} · continue ${v.continue.toFixed(0)} ms, then ${tasks(v.continueLong)} · heap ${v.heapMB.toFixed(0)} MB, buffers ${v.buffersMB.toFixed(0)} MB · again ${v.again.toFixed(0)} ms, ${tasks(v.againLong)}`);
@@ -347,7 +356,7 @@ for (const label of ['first', 'again']) {
   if (!list.length) continue;
   md.push(`## ${label === 'first' ? 'First visit' : 'Second visit'}`, '');
   md.push('| moment | median ms | runs |', '|---|---|---|');
-  for (const k of ['boot', 'world', 'town', 'inView', 'portraits', 'home', 'entry', 'residents', 'homes', 'forSale', ...(back ? ['back', 'continue', 'heapMB', 'buffersMB', 'again'] : [])]) md.push(`| ${k} | ${median(list.map((v) => v[k])).toFixed(0)} | ${list.map((v) => v[k].toFixed(0)).join(', ')} |`);
+  for (const k of ['boot', 'world', 'layout', 'town', 'inView', 'portraits', 'home', 'entry', 'residents', 'homes', 'forSale', ...(back ? ['back', 'continue', 'heapMB', 'buffersMB', 'again'] : [])]) md.push(`| ${k} | ${median(list.map((v) => v[k])).toFixed(0)} | ${list.map((v) => v[k].toFixed(0)).join(', ')} |`);
   // (`--back`: the longest task in each stretch.)
   if (back) for (const k of ['entryLong', 'backLong', 'continueLong', 'againLong']) md.push(`| ${k} (longest) | ${median(list.map((v) => Math.max(0, ...v[k]))).toFixed(0)} | ${list.map((v) => Math.max(0, ...v[k])).join(', ')} |`);
   md.push('', '| span | median ms (summed) | count |', '|---|---|---|');
