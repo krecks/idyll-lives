@@ -23,7 +23,7 @@
 
 <div class="village-card">
   {#if moving}
-    <p class="hint"><b>Moving {moving.name}.</b> Click where it goes; its streets, homes and buildings go with it, and a road to the town is laid again.</p>
+    <p class="hint"><b>Moving {moving.name}.</b> Click where it goes; its streets, {editor.step === 'layout' ? 'zones' : 'homes and buildings'} go with it, and a road to the town is laid again.</p>
     <div class="row">
       <button class="btn small ghost" onclick={() => (villageChoice.moving = null)}>Stop moving it</button>
     </div>
@@ -32,7 +32,11 @@
       <span class="eyebrow sub">Its streets</span>
       <Segmented fill label="How the village lies" value={villageChoice.swap ? 'across' : 'along'} options={SHAPES} onchange={(v) => (villageChoice.swap = v === 'across')} />
     </div>
-    <p class="hint">A village of this place's own kind: its streets, a road to the town and its homes. A village put down by hand has no town buildings. The main town moves with Move the town.</p>
+    {#if editor.step === 'layout'}
+      <p class="hint">A village of this place's own kind: its streets, a road to the town and its zones, built in the next step. The main town moves with Move the town.</p>
+    {:else}
+      <p class="hint">A village of this place's own kind: its streets, a road to the town and its homes. A village put down by hand has no town buildings. The main town moves with Move the town.</p>
+    {/if}
   {/if}
 </div>
 

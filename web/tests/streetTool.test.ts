@@ -240,6 +240,7 @@ function fakeEditor(draft: NeighbourhoodDraft) {
   let seed = 1;
   const editor: { -readonly [K in keyof TownEditor]: TownEditor[K] } & { said: typeof said } = {
     said,
+    step: 'build',
     draft,
     t,
     content,
@@ -264,6 +265,8 @@ function fakeEditor(draft: NeighbourhoodDraft) {
     hover: () => {},
     preview: (g) => void (said.ghosts = g),
     hint: (text) => void said.hints.push(text),
+    brush: () => {},
+    showUses: () => {},
     townName: 'Ashby',
     toolId: 'street',
     take: () => {},

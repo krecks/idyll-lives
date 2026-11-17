@@ -11,11 +11,11 @@ import { EMPTY_LOT, withLot, type NeighbourhoodDraft } from '../game/town';
 import { moveInRequest, peopleSeedOf, type Chosen } from './newGame';
 
 /**
- * New game, in four steps: land (step 1) → town (step 2) → household (step 3: choose one of the
- * town's, or make your own in Creation, `create`) → home (step 4, on the whole world: a household
- * of the town's has its own home chosen, and may move) → game. `streets`: the coming step between
- * land and town, the streets laid out and the land zoned (shown as the town's step until it has its
- * own screen; `newGame.ts` `STEPS` has the five).
+ * New game, in five steps (`newGame.ts` `STEPS`): land (step 1) → streets and zones (step 2, `streets`:
+ * the layout, the streets laid out and the land zoned) → build (step 3, `town`: the town built from the
+ * layout, to tweak) → household (step 4: choose one of the town's, or make your own in Creation,
+ * `create`) → home (step 5, on the whole world: a household of the town's has its own home chosen, and
+ * may move) → game.
  */
 export type Screen = 'menu' | 'land' | 'streets' | 'town' | 'household' | 'create' | 'home' | 'game';
 
@@ -31,8 +31,8 @@ export interface MadeLand extends Keyed {
 }
 
 /**
- * Step 2's town, nobody living there yet: `draft` is the town settled from the player's edits (the
- * town the next steps read). `edited`: changed by hand (the editor's tools): what lays it out again
+ * Step 3's built town, nobody living there yet: `draft` is the town settled from the player's edits (the
+ * town the next steps read). `edited`: tweaked by hand (the editor's tools): what builds it again
  * asks first. Once edited, the editor keeps its `plan` (the draft its edits made, which `draft` is
  * settled from: ahead of it until edits pause) and its undo `history` here, so going back and forth
  * through the steps keeps them.
@@ -46,10 +46,10 @@ export interface LaidTown extends Keyed {
 }
 
 /**
- * The streets and zones step's layout (not used yet): the proposal it started from (`townJobs.ts` `Proposal`), the
- * layout settled from the player's edits (`draft`, keyed by what the proposal was made from), and, once edited (what
- * proposes again asks first), the plan the edits made, their undo `history` and the settle's `marks`, as `LaidTown`
- * keeps them for the town.
+ * Step 2's layout: the proposal it started from (`townJobs.ts` `Proposal`), the layout settled from the player's
+ * edits (`draft`: its streets on the land, keyed by what the proposal was made from, `newGame.ts` `townKey`), and,
+ * once edited (what proposes again asks first), the plan the edits made, their undo `history` and the settle's
+ * `marks`, as `LaidTown` keeps them for the town. Build makes the town from `newGame.ts` `layoutPlan`.
  */
 export interface Layout extends Keyed {
   proposal: Proposal;
@@ -98,13 +98,15 @@ class AppState {
   land = $state.raw<MadeLand | null>(null);
   /** Where the player moved the town (its box's corner, m; step 2's "Move the town"); null: where the land has it. */
   site = $state.raw<Pt | null>(null);
-  /** The town's name as typed or rolled in step 2; null: the one it was laid with. */
+  /** The town's name as typed or rolled in steps 2 and 3; null: the one it was laid with. */
   townName = $state<string | null>(null);
-  /** The streets and zones step's layout (not used yet: `Layout`). */
+  /** Step 2's layout (`Layout`). */
   layout = $state.raw<Layout | null>(null);
-  /** Step 2's town (nobody living there yet). */
+  /** Step 3's build's own seed ("Build again" rolls another; 0 until then): in the built town's key, not in the world's code. */
+  buildSeed = $state(0);
+  /** Step 3's built town (nobody living there yet). */
   world = $state.raw<LaidTown | null>(null);
-  /** Step 3's town with its neighbours, and what it was filled from: step 2's town and the people's seed (`newGame.ts` `peopleKey`). */
+  /** Step 4's town with its neighbours, and what it was filled from: step 3's town and the people's seed (`newGame.ts` `peopleKey`). */
   town = $state.raw<NeighbourhoodDraft | null>(null);
   townOf = '';
   /** The households step 3 offers (their lots, in order); empty until step 3 offers a sample of the town's. */
@@ -145,6 +147,7 @@ class AppState {
     this.site = null;
     this.townName = null;
     this.layout = null;
+    this.buildSeed = 0;
     this.world = null;
     this.town = null;
     this.townOf = '';
@@ -155,6 +158,11 @@ class AppState {
     this.homeSlot = null;
     this.emptyLot = false;
     this.screen = 'land';
+  }
+
+  /** The player's own work that the world's code doesn't carry: the layout edited, the built town tweaked or built again. */
+  get beyondCode(): boolean {
+    return !!this.layout?.edited || !!this.world?.edited || this.buildSeed !== 0;
   }
 
   /** The seed the town's people come from (the code's own, else drawn from the town's); undefined before step 1. */

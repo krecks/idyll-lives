@@ -1,17 +1,22 @@
 /**
- * The new game's four steps (Land, Town, Household, Home) as `app` keeps them: the world's code as
- * the player has chosen it so far, the keys that tell a later step whether what it made still
- * stands, and step 1's figures for the land. Pure, so the flow's rules can be tested without a page.
+ * The new game's five steps (Land, Streets & zones, Build, Household, Home) as `app` keeps them: the
+ * world's code as the player has chosen it so far, the keys that tell a later step whether what it
+ * made still stands, and step 1's figures for the land. Pure, so the flow's rules can be tested
+ * without a page.
  *
  * A step's draft carries the key of what it was made from. Step 1's land is keyed by its place,
  * size, hills, woods and seed, and by a fingerprint of the land as the player shaped it. Step 2's
- * town adds the town, the villages, the town's seed and where the player moved it; step 3's people
- * add the people's seed. A step whose key no longer matches is made again from the step before it.
+ * layout (`townKey`) adds the town, the villages, the town's seed and where the player moved it.
+ * Step 3's built town (`buildKey`) adds the layout as the player left it and the build's own seed;
+ * step 4's people add the people's seed (`peopleKey`). A step whose key no longer matches is made
+ * again from the step before it.
  */
 
 import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
 import type { GameKind, Lifespan, Rle, WorldOptions } from '../core/protocol';
+import type { RoadPlan } from '../core/protocol';
+import type { TownHistory } from '../game/edit/history';
 import type { HouseholdDraft } from '../game/household';
 import { COVER, landHash, NONE, type Land } from '../game/land';
 import { hash } from '../game/noise';
@@ -21,11 +26,12 @@ import type { StartRequest } from '../game/session';
 import { EMPTY_LOT, withLot, type NeighbourhoodDraft, type Templates } from '../game/town';
 import { defaultsOf, LAND_SIZE, LEGACY_KINDS, placeOf, sizeFor, townFits, type WorldKind } from '../game/world';
 import { readCode, type WorldCode } from '../game/worldCode';
+import { layoutHash } from '../game/uses';
+import type { Proposal } from '../game/townJobs';
 
 /**
- * The new game's five steps, in order, as the screens are to name them (the four screens of today keep their own
- * labels until the streets and zones step has its screen): each one's screen (`app.svelte.ts` `Screen`), its name,
- * and its button on to the next (the household and home steps word theirs as the choice made has it).
+ * The new game's five steps, in order, as the screens name them: each one's screen (`app.svelte.ts` `Screen`), its
+ * name, and its button on to the next (the household and home steps word theirs as the choice made has it).
  */
 export const STEPS: readonly { id: 'land' | 'streets' | 'town' | 'household' | 'home'; label: string; next?: string }[] = [
   { id: 'land', label: 'Land', next: 'Lay out the streets →' },
@@ -114,13 +120,13 @@ export function landKey(code: WorldCode, shaped: Land | null | undefined): strin
   return `${code.kind}:${code.size}:${code.hills}:${code.woods}:${code.seed >>> 0}:${shaped?.edited ? landHash(shaped) : ''}`;
 }
 
-/** Step 2's town's key: the land's (`landKey`), its town and villages, its own seed, and where the player moved it (none: where the land has it). */
+/** Step 2's layout's key (what its proposal is made from): the land's (`landKey`), its town and villages, its own seed, and where the player moved it (none: where the land has it). */
 export function townKey(land: string, code: Chosen, site: Pt | null): string {
   return `${land}|${code.town}:${code.villages}:${code.townSeed ?? ''}:${site ? `${Math.round(site[0])},${Math.round(site[1])}` : ''}`;
 }
 
 /** A layout's fingerprint (`uses.ts`): what Build makes the town from. */
-export { layoutHash } from '../game/uses';
+export { layoutHash };
 
 /**
  * The built town's key: the layout's (`layoutKey`, what its proposal was made from: the town's key, `townKey`), the
@@ -128,6 +134,84 @@ export { layoutHash } from '../game/uses';
  */
 export function buildKey(layoutKey: string, layoutHash: string, buildSeed: number): string {
   return `${layoutKey}|${layoutHash}:${buildSeed >>> 0}`;
+}
+
+/** What `app.svelte.ts` keeps of step 2's layout that the rules below read. */
+export interface LayoutLike {
+  key: string;
+  proposal: Pick<Proposal, 'plan'>;
+  plan?: NeighbourhoodDraft;
+  history?: Pick<TownHistory, 'draft'>;
+}
+
+/** The layout as the player left it (what Build makes the town from): the edits' plan, else the proposal's. */
+export function layoutPlan(layout: LayoutLike): NeighbourhoodDraft {
+  return layout.history?.draft ?? layout.plan ?? layout.proposal.plan;
+}
+
+/** Step 3's key for `layout` built with `buildSeed` (`buildKey`). */
+export function worldKeyOf(layout: LayoutLike, buildSeed: number): string {
+  return buildKey(layout.key, layoutHash(layoutPlan(layout)), buildSeed);
+}
+
+/**
+ * What a change asks of the steps after it, as the flow has it: a change to the land, the town, the villages, the
+ * town's seed or its site proposes the layout again (`propose`); a change to the layout or the build's seed builds
+ * the town again (`build`); a change to the built town makes its households again (`people`). Each asks first when
+ * it throws away the player's own work: `ask` names what goes (the layout's edits, the built town's tweaks).
+ */
+export function whatGoes(change: 'land' | 'propose' | 'layout' | 'build', state: { layoutEdited: boolean; townTweaked: boolean }): { remake: ('layout' | 'town' | 'people')[]; ask: ('layout' | 'town')[] } {
+  const remake: ('layout' | 'town' | 'people')[] = change === 'land' || change === 'propose' ? ['layout', 'town', 'people'] : ['town', 'people'];
+  const ask: ('layout' | 'town')[] = [];
+  if (remake.includes('layout') && state.layoutEdited) ask.push('layout');
+  if (state.townTweaked) ask.push('town');
+  return { remake, ask };
+}
+
+/** The player's changes to a town, in words for a question: "your change", "your 3 changes" ("your changes" when not counted). */
+export function changesWord(n: number): string {
+  return n === 1 ? 'your change' : n > 1 ? `your ${n} changes` : 'your changes';
+}
+
+/** A road as `addedStreets` tells roads apart: its kind, width and line (its name and area left out, which Build gives again). */
+const roadSig = (r: RoadPlan) => `${r.kind ?? 'street'}|${r.width}|${r.points.map(([x, z]) => `${x.toFixed(1)},${z.toFixed(1)}`).join(';')}`;
+
+/**
+ * Step 3's streets put into the layout too, so they don't make the town be built again: the roads `after` (the
+ * built town's plan after an edit) has that `before` hadn't, added to `layout`'s roads (each once), and those
+ * `before` had that `after` hasn't (a road split or bent by the new one's junction) taken out where the layout has
+ * them. The layout itself when no road changed.
+ */
+export function addedStreets(layout: NeighbourhoodDraft, before: NeighbourhoodDraft, after: NeighbourhoodDraft): NeighbourhoodDraft {
+  if (before.roads === after.roads) return layout;
+  const was = new Set(before.roads.map(roadSig));
+  const now = new Set(after.roads.map(roadSig));
+  const fresh = after.roads.filter((r) => !was.has(roadSig(r)));
+  // (Only an edit that drew a road changes the layout: one that only took roads away leaves it.)
+  if (!fresh.length) return layout;
+  const goneRoads = before.roads.filter((r) => !now.has(roadSig(r)));
+  const had = new Set(layout.roads.map(roadSig));
+  // (A piece of a road split by the new one's junction goes in only where the layout had that road, in its place.)
+  const inLayout = goneRoads.filter((g) => had.has(roadSig(g)));
+  const pieceOf = (r: RoadPlan) => goneRoads.find((g) => r.points.every((p) => onLine(p, g.points)));
+  const added = fresh.filter((r) => {
+    const whole = pieceOf(r);
+    return !had.has(roadSig(r)) && (!whole || inLayout.includes(whole));
+  });
+  const out = new Set(inLayout.map(roadSig));
+  return { ...layout, roads: [...layout.roads.filter((r) => !out.has(roadSig(r))), ...added] };
+}
+
+/** Whether point `p` is on the line through `pts` (within half a metre). */
+function onLine(p: readonly [number, number], pts: readonly (readonly [number, number])[]): boolean {
+  for (let k = 1; k < pts.length; k++) {
+    const [a, b] = [pts[k - 1], pts[k]];
+    const [dx, dz] = [b[0] - a[0], b[1] - a[1]];
+    const len2 = dx * dx + dz * dz;
+    const u = len2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / len2)) : 0;
+    if (Math.hypot(a[0] + u * dx - p[0], a[1] + u * dz - p[1]) <= 0.5) return true;
+  }
+  return false;
 }
 
 /** What the people's seed is drawn from when the code has none of its own (`peopleSeedOf`). */
@@ -143,7 +227,7 @@ export function peopleSeedOf(code: WorldCode): number {
   return Math.floor(hash(code.townSeed ?? code.seed, PEOPLE_SALT, 0x5eed) * 2 ** 32) >>> 0;
 }
 
-/** Step 3's key: step 2's town's (`townKey`) and the people's seed. The town is lived in again only when this changed. */
+/** Step 4's key: step 3's built town's (`buildKey`) and the people's seed. The town is lived in again only when this changed. */
 export function peopleKey(town: string, seed: number): string {
   return `${town}|${seed >>> 0}`;
 }

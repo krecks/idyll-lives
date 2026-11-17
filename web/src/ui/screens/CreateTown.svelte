@@ -1,31 +1,34 @@
 <script lang="ts">
   /**
-   * New game, step 2: the town, laid on step 1's land (the town job's `town`). Its name, how big it
-   * is and how many villages lie round it (choices the land is too small for are ruled out), another
-   * town from a new seed, and the town moved by a click on the land. The editor's tools (UE) come
-   * into the panel's slot for them; what lays the town out again asks first once it has the
-   * player's own changes (`app.world.edited`).
+   * New game, step 3: Build. The town built from step 2's layout (the `build` job: an untouched layout
+   * builds the proposal's own town), for the player to tweak with the editor's `BUILD_TOOLS` (today's
+   * tools: Select, Street, Lot, Village, Remove, with Build up and Civic on the cards). "Build again"
+   * builds it from the same layout with another build seed, asked first once the town has the
+   * player's own changes (`app.world.edited`: "your N changes go").
+   *
+   * Going back to step 2 and on again without changing the layout keeps the tweaks (the built town's
+   * key, `buildKey`, is the layout's and the build seed's). A street drawn here goes into the layout
+   * too (`newGame.ts` `addedStreets`), so it doesn't make the town be built again.
    *
    * The editor (`townedit/`) works on the town's plan draft and shows its edits as ghosts until the
    * town is built again with them; the way on waits for that, and for its Problems list, and is
    * shut while a problem blocks it.
    */
   import { onMount, untrack } from 'svelte';
+  import { TownHistory } from '../../game/edit/history';
   import { rename } from '../../game/edit/streets';
   import { menuScene } from '../../game/menuScene';
-  import type { Pt } from '../../game/roads';
-  import { NEIGHBOUR_CAP, type NeighbourhoodDraft } from '../../game/town';
+  import { NEIGHBOUR_CAP } from '../../game/town';
   import { keepHouses, Superseded, townJob } from '../../game/townJobs';
-  import { LAND_SIZE, specOf, townFits, worldName, type WorldStep } from '../../game/world';
-  import { OPTION_FIELDS, worldLine } from '../../game/worldOptions';
+  import { specOf, worldName, type WorldStep } from '../../game/world';
+  import { worldLine } from '../../game/worldOptions';
   import type { TownBuildStep } from '../../render/types';
   import { app } from '../app.svelte';
   import { toast } from '../state.svelte';
   import Icon from '../Icon.svelte';
-  import Segmented from '../kit/Segmented.svelte';
-  import TownStage, { type LotLabel, type StageTool } from '../kit/TownStage.svelte';
+  import TownStage, { type LotLabel } from '../kit/TownStage.svelte';
   import { services } from '../services';
-  import { fitted, optionsOf, SIZE_CHOICES, startCode, townKey, type Chosen } from '../newGame';
+  import { addedStreets, changesWord, layoutPlan, optionsOf, startCode, stepLabel, STEPS, worldKeyOf } from '../newGame';
   import SetupConfirm from './SetupConfirm.svelte';
   import SetupShell, { type Making } from './SetupShell.svelte';
   import { TownEditorState } from '../townedit/editor.svelte';
@@ -33,25 +36,41 @@
 
   const { content } = services;
   /** A new seed: a different town every time. */
-  const roll = () => (Math.random() * 2 ** 31) >>> 0;
+  const roll = () => ((Math.random() * 2 ** 31) >>> 0) || 1;
 
   const code = $derived(app.code ?? startCode('country', 0));
-  /** The town shown (nobody living there yet): step 2's from before, else the one laid now. */
+  /** The town shown (nobody living there yet): step 3's from before, else the one built now. */
   const town = $derived(app.world?.draft ?? null);
-  /** The town's name as typed or rolled here, else the one it was laid with. */
-  let name = $state(app.townName ?? app.world?.draft.name ?? '');
+  /** The town's name as typed or rolled here (or in step 2), else the one it was laid with. */
+  let name = $state(app.townName ?? app.world?.draft.name ?? app.layout?.draft.name ?? '');
   let hover = $state<number | null>(null);
   let focus = $state<number | null>(null);
 
   /** The town editor (its tools, cards, undo and Problems list), over the town shown. */
   const editor = new TownEditorState({
     content,
+    step: 'build',
     getName: () => name,
     setName(typed) {
       name = typed;
       app.townName = typed.trim() || null;
     },
     glide: (plot) => (focus = plot),
+    // A street drawn on the built town goes into the layout as well, and the built town is keyed by the layout as it
+    // is now: going back to step 2 and on again keeps the town as tweaked.
+    edited(before, after) {
+      const l = app.layout;
+      const w = app.world;
+      if (!l || !w) return;
+      const was = layoutPlan(l);
+      const now = addedStreets(was, before, after);
+      if (now === was) return;
+      const from = l.plan ?? l.proposal.plan;
+      const history = l.history ?? new TownHistory(from);
+      history.push(now);
+      app.layout = { ...l, plan: from, history, edited: true };
+      app.world = { ...w, key: worldKeyOf(app.layout, app.buildSeed) };
+    },
   });
   // (The editor's own writes to `app.world` come back here: it keeps its session over them.)
   $effect(() => {
@@ -61,20 +80,9 @@
   $effect(() => () => editor.dispose());
   /** The town as the edits left it (the figures follow the edits at once; the town shown follows once they pause). */
   const plan = $derived(editor.ready ? editor.draft : town);
-  /** On to step 3 asked for: waiting for the town to be brought up to date with the edits, and checked. */
+  /** On to step 4 asked for: waiting for the town to be brought up to date with the edits, and checked. */
   let leaving = $state(false);
   const blocked = $derived(editor.issues.blocking.length > 0);
-
-  /** The town's own options (the land's are step 1's). */
-  const TOWN_FIELDS = OPTION_FIELDS.filter((f) => f.key === 'town' || f.key === 'villages') as readonly { key: 'town' | 'villages'; label: string; choices: readonly { value: string; label: string }[] }[];
-  /** A choice the land is too small for, ruled out: a town too big even with no villages, villages too many for the town chosen. */
-  const fits = (key: 'town' | 'villages', value: string) =>
-    key === 'town' ? townFits(code.size, value as Chosen['town'], 'none') : townFits(code.size, code.town, value as Chosen['villages']);
-  /** What the land has no room for, said in a line ("a city or many villages"); empty: room for every choice. */
-  const ruledOut = $derived(
-    TOWN_FIELDS.flatMap((f) => f.choices.filter((c) => !fits(f.key, c.value)).map((c) => (f.key === 'town' ? `a ${c.label.toLowerCase()}` : `${c.label.toLowerCase()} villages`))).join(' or '),
-  );
-  const sizeLabel = $derived(SIZE_CHOICES.find((s) => s.value === code.size)?.label.toLowerCase() ?? code.size);
 
   const homes = $derived(plan ? plan.slots.filter((s) => s.kind === 'house').length : 0);
   const farms = $derived(plan ? plan.slots.filter((s) => s.lot === 'farm').length : 0);
@@ -89,7 +97,7 @@
   // says which village it is in (the town's own needs no saying).
   const labels = $derived.by((): LotLabel[] => {
     const w = town;
-    if (!w || moving) return [];
+    if (!w) return [];
     const shown = w.slots.filter((s) => s.kind !== 'house' || s.lot === 'farm');
     const times = new Map<string, number>();
     for (const s of shown) times.set(s.name, (times.get(s.name) ?? 0) + 1);
@@ -100,10 +108,10 @@
   });
 
   /**
-   * Laying out the town, as the progress panel lists it: laid out in the town worker (`WorldStep`, in
-   * turn), then built in 3D (`TownBuildStep`, side by side: they tick off in any order).
+   * Building the town, as the progress panel lists it: in the town worker (`WorldStep`, in turn), then
+   * built in 3D (`TownBuildStep`, side by side: they tick off in any order).
    */
-  const STEPS: readonly { key: WorldStep | TownBuildStep; label: string }[] = [
+  const MAKING: readonly { key: WorldStep | TownBuildStep; label: string }[] = [
     { key: 'roads', label: 'Laying the roads' },
     { key: 'homes', label: 'Placing the homes' },
     { key: 'houses', label: 'Building the houses' },
@@ -113,47 +121,38 @@
     { key: 'grass', label: 'Sowing the grass' },
   ];
 
-  /** The town being laid (in the town worker, then built); a newer one replaces it. */
+  /** The town being built (in the town worker, then shown); a newer one replaces it. */
   let job: AbortController | null = null;
-  /** The progress panel's title while a town is laid or built (null: none is). */
+  /** The progress panel's title while a town is built or shown (null: none is). */
   let making = $state<string | null>(null);
-  /** An option changed: the town is laid again once they settle; meanwhile it can't be taken on. */
-  let settling: ReturnType<typeof setTimeout> | undefined;
-  let waiting = $state(false);
   let done = $state.raw<ReadonlySet<string>>(new Set());
-  const progress = $derived<Making | null>(making ? { title: making, steps: STEPS, done } : null);
+  const progress = $derived<Making | null>(making ? { title: making, steps: MAKING, done } : null);
   const tick = (control: AbortController) => (step: string) => {
     if (job === control) done = new Set([...done, step]);
   };
 
-  /** The town for the land and the code as they are now, laid and built; the one being laid meanwhile is dropped. */
-  async function lay() {
-    clearTimeout(settling);
-    waiting = false;
-    const land = app.land;
-    if (!land) return;
+  /** The town built from the layout as it is now with the build seed, and shown; the one being built meanwhile is dropped. */
+  async function build() {
+    const layout = app.layout;
+    if (!layout) return;
     job?.abort();
     const control = (job = new AbortController());
     // (The editor lets go of the town being replaced: no edit of it is settled over the new one.)
     editor.attach(null);
-    const asked = code;
-    const site = app.site;
-    const key = townKey(land.key, asked, site);
-    making = app.world ? 'Another town' : 'Laying out the town';
+    const seed = app.buildSeed;
+    const key = worldKeyOf(layout, seed);
+    making = app.world ? 'Building it again' : 'Building the town';
     done = new Set();
     const step = tick(control);
     try {
-      const made = await townJob(
-        content,
-        { kind: 'town', land: land.draft, seed: asked.townSeed ?? asked.seed, name: app.townName ?? undefined, options: optionsOf(asked), ...(site ? { site } : {}), waterKept: land.waterKept },
-        control.signal,
-        step,
-      );
+      const made = await townJob(content, { kind: 'build', plan: layoutPlan(layout), proposal: layout.proposal, seed }, control.signal, step);
       if (job !== control) return;
       // Its houses and preview come with it: the menu draws it without making them again.
       keepHouses(made);
       menuScene.prepare(made.draft, made.preview);
       app.world = { draft: made.draft, key, edited: false, ...(made.plan ? { plan: made.plan } : {}), ...(made.marks ? { marks: made.marks } : {}) };
+      // (Another town: its households are made again in step 4.)
+      app.townOf = '';
       name = app.townName ?? made.draft.name;
       focus = null;
       hover = null;
@@ -161,9 +160,8 @@
       await menuScene.show(made.draft, null, step);
     } catch (err) {
       if (err instanceof Superseded) return;
-      console.error('[town] laying out the town failed:', err);
-      // (On a shaped land the generator says why it couldn't: no dry land big enough.)
-      toast(err instanceof Error && err.message && app.land?.draft.open?.land?.edited ? err.message : 'That town could not be laid out. Try another.');
+      console.error('[build] building the town failed:', err);
+      toast('The town could not be built from that layout. Change it in step 2, or build again.');
     } finally {
       if (job === control) {
         job = null;
@@ -172,44 +170,24 @@
       }
     }
   }
-  $effect(() => () => {
-    clearTimeout(settling);
-    job?.abort();
-  });
+  $effect(() => () => job?.abort());
 
-  /** Asked first if the town has the player's own changes (laying it out again throws them away). */
-  function unlessEdited(text: string, yes: string, go: () => void) {
-    if (app.world?.edited) confirming = { text, yes, go };
-    else go();
-  }
   let confirming = $state<{ text: string; yes: string; go: () => void } | null>(null);
-  /** Bumped when a choice is not made after all (the switches show the choice as it was). */
-  let unasked = $state(0);
   function answer(yes: boolean) {
     const c = confirming;
     confirming = null;
     if (yes) c?.go();
-    else unasked++;
   }
 
-  /** The town or the villages changed: the town laid again with them, on the same seed (once the options have stood for 300 ms). */
-  function setOption(key: 'town' | 'villages', value: string) {
-    if (code[key] === value) return;
-    const label = key === 'town' ? 'town' : 'villages';
-    unlessEdited(`Changing the ${label} lays the town out again: your changes to it go.`, `Change the ${label}`, () => {
-      app.code = fitted({ ...code, [key]: value } as Chosen);
-      clearTimeout(settling);
-      waiting = true;
-      settling = setTimeout(() => void lay(), 300);
-    });
-  }
-
-  /** Another town on the same land: a seed of its own. */
-  function another() {
-    unlessEdited('Another town leaves your changes to this one behind.', 'Another town', () => {
-      app.code = { ...code, townSeed: roll() };
-      void lay();
-    });
+  /** Build again: another build seed on the same layout, asked first if the town has the player's own changes. */
+  function buildAgain() {
+    const go = () => {
+      app.buildSeed = roll();
+      void build();
+    };
+    const w = app.world;
+    if (w?.edited) confirming = { text: `Building the town again from the same layout: ${changesWord(editor.edits)} to it go.`, yes: 'Build again', go };
+    else go();
   }
 
   function rollName() {
@@ -217,98 +195,10 @@
     app.townName = name;
   }
 
-  // ---- Moving the town (a click on the land) ---------------------------------------------------
-
-  /** "Move the town" is in hand: a click on the land puts the town's box there. */
-  let moving = $state(false);
-  /** The town's box where it would go, while the pointer is over the land (SVG path data, screen pixels). */
-  let ghost = $state('');
-
-  /** The main town's box (m): the one laid, else about a town's. */
-  function boxOf(w: NeighbourhoodDraft | null): { w: number; d: number } {
-    const a = w?.open?.areas[0];
-    return a ? { w: a.w, d: a.d } : { w: 220, d: 180 };
-  }
-
-  /** The box's corner for the town centred on (`x`, `z`), kept on the land. */
-  function siteAt(x: number, z: number): Pt {
-    const box = boxOf(town);
-    const W = app.land?.draft.width ?? LAND_SIZE[code.size];
-    const D = app.land?.draft.depth ?? LAND_SIZE[code.size];
-    const clamp = (v: number, hi: number) => Math.round(Math.max(0, Math.min(hi, v)));
-    return [clamp(x - box.w / 2, W - box.w), clamp(z - box.d / 2, D - box.d)];
-  }
-
-  /** The box at `site`, on screen (at the land's height under the pointer `y`). */
-  function boxGhost(site: Pt, y: number): string {
-    const box = boxOf(town);
-    const out = { x: 0, y: 0 };
-    const corners: [number, number][] = [
-      [site[0], site[1]],
-      [site[0] + box.w, site[1]],
-      [site[0] + box.w, site[1] + box.d],
-      [site[0], site[1] + box.d],
-    ];
-    const points: string[] = [];
-    for (const [x, z] of corners) {
-      if (!menuScene.project(x, y, z, out)) return '';
-      points.push(`${out.x.toFixed(1)} ${out.y.toFixed(1)}`);
-    }
-    return `M${points.join('L')}Z`;
-  }
-
-  const moveTool: StageTool = {
-    down(x, y) {
-      const p = menuScene.landAt(x, y);
-      if (!p) return false;
-      const site = siteAt(p.x, p.z);
-      unlessEdited('Moving the town lays it out again: your changes to it go.', 'Move the town', () => {
-        app.site = site;
-        moving = false;
-        ghost = '';
-        void lay();
-      });
-      return true;
-    },
-    move: () => {},
-    up: () => {},
-    hover(x, y) {
-      const p = menuScene.landAt(x, y);
-      ghost = p ? boxGhost(siteAt(p.x, p.z), p.y) : '';
-    },
-    leave: () => (ghost = ''),
-    cancel() {
-      ghost = '';
-      moving = false;
-    },
-  };
-  const stageTool = $derived(making ? null : moving ? moveTool : editor.stageTool);
-
-  function toggleMove() {
-    moving = !moving;
-    ghost = '';
-    if (moving) {
-      focus = null;
-      hover = null;
-      editor.take(null);
-    }
-  }
-  // (An editor tool taken up puts "Move the town" down.)
-  $effect(() => {
-    if (editor.toolId) untrack(() => (moving = false));
-  });
-
-  function onKey(e: KeyboardEvent) {
-    if (e.key === 'Escape' && moving) {
-      moving = false;
-      ghost = '';
-    }
-  }
-
   // ---- On and back -----------------------------------------------------------------------------
 
   /**
-   * On to step 3 with the town as named here (its neighbours are made there, or kept if it is the
+   * On to step 4 with the town as named here (its neighbours are made there, or kept if it is the
    * town they live in): once the town is up to date with the edits and checked, unless a problem blocks it.
    */
   async function next() {
@@ -331,26 +221,26 @@
   }
 
   function back() {
-    clearTimeout(settling);
     job?.abort();
-    app.screen = 'land';
+    app.screen = 'streets';
   }
 
   onMount(async () => {
-    if (!app.land) {
-      // No land made yet: that is the first step.
-      app.screen = 'land';
+    const layout = app.layout;
+    if (!app.land || !layout) {
+      // No layout yet: that is step 2 (or step 1, with no land either).
+      app.screen = app.land ? 'streets' : 'land';
       return;
     }
-    // The town laid before on this land, as it was: shown again. Else (another land, or new choices) laid now.
-    if (app.world && app.world.key === townKey(app.land.key, code, app.site)) {
+    // The town built before from this layout with this seed, as it was left: shown again. Else built now.
+    if (app.world && app.world.key === worldKeyOf(layout, app.buildSeed)) {
       const control = (job = new AbortController());
       making = 'The town';
       done = new Set(['roads', 'homes', 'houses']);
       try {
         await menuScene.show(app.world.draft, null, tick(control));
       } catch (err) {
-        console.warn('[town] showing the town failed', err);
+        console.warn('[build] showing the town failed', err);
       } finally {
         if (job === control) {
           job = null;
@@ -359,11 +249,11 @@
       }
       return;
     }
-    await lay();
+    await build();
   });
 
   $effect(() => {
-    menuScene.highlight({ hover: stageTool ? editor.hoverPlot : hover, selected: editor.selectedPlot ?? focus, marked: [], outlines: true });
+    menuScene.highlight({ hover: editor.stageTool ? editor.hoverPlot : hover, selected: editor.selectedPlot ?? focus, marked: [], outlines: true });
   });
   $effect(() => () => menuScene.highlight({}));
 </script>
@@ -384,36 +274,20 @@
   {/if}
   <section class="group" aria-labelledby="town-head">
     <h2 class="eyebrow" id="town-head">Your town</h2>
-    <p class="hint summary">{summary || ' '}</p>
-    <div class="options">
-      {#key unasked}
-        {#each TOWN_FIELDS as f (f.key)}
-          <div class="option">
-            <span class="eyebrow sub">{f.label}</span>
-            <Segmented fill label={f.label} value={code[f.key] as string} options={f.choices.map((c) => ({ ...c, disabled: !fits(f.key, c.value) }))} onchange={(v) => setOption(f.key, v)} />
-          </div>
-        {/each}
-      {/key}
-    </div>
-    {#if ruledOut}
-      <p class="hint">A {sizeLabel} land has no room for {ruledOut}: choose a larger one in step 1.</p>
-    {/if}
+    <p class="hint summary">{summary || ' '}</p>
     <div class="row">
-      <button class="btn" disabled={!app.land} onclick={another}><Icon name="icon.ui.dice" size={16} /> Another town</button>
-      <button class="btn" class:on={moving} aria-pressed={moving} disabled={!town || !!making} onclick={toggleMove}><Icon name="icon.ui.move" size={16} /> Move the town</button>
+      <button class="btn" disabled={!app.layout || !!making} title="The same layout built with other houses and places" onclick={buildAgain}><Icon name="icon.ui.dice" size={16} /> Build again</button>
     </div>
-    {#if moving}
-      <p class="hint" role="status">Click the land where the town should go. <kbd>Esc</kbd> leaves it where it is.</p>
-    {/if}
+    <p class="hint">Built from your streets and zones. Change the layout in step 2; tweak the town here.</p>
   </section>
 
   <!--
-    The town editor's slot (UE): its tool palette (`townedit/tools.ts` `TOWN_TOOLS`, one in hand at a
+    The town editor's slot: its tool palette (`townedit/tools.ts` `BUILD_TOOLS`, one in hand at a
     time through the stage's `tool`), the card of the tool in hand, rename, undo and the Problems list.
-    An edit marks the town as the player's own (`app.world.edited`): what lays it out again then asks first.
+    An edit marks the town as the player's own (`app.world.edited`): what builds it again then asks first.
   -->
   <div class="editor-slot" data-slot="town-editor">
-    <TownEditor {editor} disabled={!town || !!making || moving} />
+    <TownEditor {editor} disabled={!town || !!making} />
   </div>
 {/snippet}
 
@@ -425,8 +299,7 @@
       selected={editor.selectedPlot ?? focus}
       {focus}
       shot="world"
-      tool={stageTool}
-      {ghost}
+      tool={making ? null : editor.stageTool}
       onhover={(p) => (hover = p)}
       onselect={(p) => {
         focus = null;
@@ -452,12 +325,10 @@
   {#if blocked}
     <span class="blocked" role="status">A problem in the list keeps the town from its households</span>
   {/if}
-  <button class="btn primary" disabled={!town || !!making || waiting || blocked || leaving} title={blocked ? 'Mend the problems in red first' : undefined} onclick={next}>{leaving ? 'Bringing the town up to date…' : 'Choose a household →'}</button>
+  <button class="btn primary" disabled={!town || !!making || blocked || leaving} title={blocked ? 'Mend the problems in red first' : undefined} onclick={next}>{leaving ? 'Bringing the town up to date…' : STEPS[2].next}</button>
 {/snippet}
 
-<svelte:window onkeydown={onKey} />
-
-<SetupShell label="The town" step="Step 2 of 4 · Town" back={{ label: 'Land', go: back }} {head} {panel} {stage} stats={figures} {actions} making={progress} />
+<SetupShell label="The town" step={stepLabel(3)} back={{ label: 'Streets & zones', go: back }} {head} {panel} {stage} stats={figures} {actions} making={progress} />
 
 <style>
   .asked {
@@ -480,18 +351,6 @@
     gap: 8px;
     height: 36px;
     font-size: 13px;
-  }
-  .row .btn.on {
-    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
-    color: var(--accent);
-  }
-  kbd {
-    padding: 0 5px;
-    border-radius: 4px;
-    background: var(--hairline);
-    font-family: inherit;
-    font-size: 11px;
   }
   .editor-slot {
     display: contents;
