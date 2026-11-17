@@ -3,7 +3,7 @@
 // the height between samples is bilinear and held past the edge, and a 1024 m land of hills, a town and a lake codes
 // to a size the town file can carry (printed). `bun test tests/land.test.ts`.
 import { describe, expect, test } from 'bun:test';
-import { blankLand, COVER, coverSpan, decodeLand, encodeLand, encodeTiles, heightAt, NONE, SEA_CM, TILE, tilesOf, wetAt, type Land } from '../src/game/land';
+import { blankLand, COVER, coverSpan, decodeLand, encodeLand, encodeTiles, flowCode, flowOf, FLOW_WAYS, heightAt, landHash, NONE, SEA_CM, TILE, tilesOf, wetAt, type Land } from '../src/game/land';
 import { fbm, mulberry32 } from '../src/game/noise';
 
 /** A land of `cols` × `rows` samples, its heights, water levels and cover from `fill`. */
@@ -48,6 +48,43 @@ describe('coding', () => {
       return [v, rand() < 0.5 ? NONE : SEA_CM, rand() < 0.95 ? 0 : 1];
     });
     same(stepped, roundTrip(stepped));
+  });
+
+  test("a river's way codes by tile and reads back the same; a land with none carries no flow at all", () => {
+    const rand = mulberry32(19);
+    const land = landOf(150, 97, () => [Math.floor(rand() * 2000), rand() < 0.5 ? NONE : 1500, 0]);
+    // No way anywhere: no `flow` in the file, nor in what a stroke sends, and the hash as it was.
+    const hash = landHash(land);
+    expect(encodeLand(land).flow).toBeUndefined();
+    expect(encodeTiles(land, [0, 1]).flow).toBeUndefined();
+    land.flow = new Uint8Array(land.cols * land.rows);
+    expect(encodeLand(land).flow).toBeUndefined();
+    expect(landHash(land)).toBe(hash);
+    // A river's way in tiles 0 and 4 only (the rest of the file's flow '').
+    for (let j = 10; j < 90; j++) for (let i = 5; i < 60; i++) land.flow[j * land.cols + i] = 1 + Math.floor(rand() * FLOW_WAYS);
+    const file = encodeLand(land);
+    expect(file.flow!.map((t) => t !== '')).toEqual([true, false, false, true, false, false]);
+    const back = roundTrip(land);
+    same(land, back);
+    expect(Buffer.from(back.flow!).equals(Buffer.from(land.flow))).toBe(true);
+    expect(landHash(land)).not.toBe(hash);
+    // Tiles on their own: the way where it is, '' where there is none.
+    expect(encodeTiles(land, [0, 2]).flow).toEqual({ 0: file.flow![0], 2: '' });
+    // A file without flow reads back still.
+    const { flow: _flow, ...still } = file;
+    expect(decodeLand(still).flow).toBeUndefined();
+  });
+
+  test('a way codes to within half a step of itself, all round', () => {
+    expect(flowCode(0, 0)).toBe(0);
+    expect(flowOf(0)).toBeNull();
+    for (let a = -Math.PI; a < Math.PI; a += 0.013) {
+      const code = flowCode(Math.cos(a) * 3, Math.sin(a) * 3);
+      expect(code).toBeGreaterThanOrEqual(1);
+      expect(code).toBeLessThanOrEqual(FLOW_WAYS);
+      const [x, z] = flowOf(code)!;
+      expect(Math.acos(Math.min(1, x * Math.cos(a) + z * Math.sin(a)))).toBeLessThanOrEqual(Math.PI / FLOW_WAYS + 1e-9);
+    }
   });
 
   test('no water anywhere codes every tile of it as nothing', () => {

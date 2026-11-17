@@ -40,13 +40,13 @@ export function bakeLand(layout: BakeSource, w: number, d: number): Land {
 
 /** A copy of `land` (its arrays its own). */
 export function copyLand(land: Land): Land {
-  return { ...land, h: land.h.slice(), wl: land.wl.slice(), cover: land.cover.slice() };
+  return { ...land, h: land.h.slice(), wl: land.wl.slice(), cover: land.cover.slice(), ...(land.flow ? { flow: land.flow.slice() } : {}) };
 }
 
-/** Whether two lands hold the same heights, water and cover. */
+/** Whether two lands hold the same heights, water, rivers' ways (none and all still alike) and cover. */
 export function sameLand(a: Land, b: Land): boolean {
   if (a.cols !== b.cols || a.rows !== b.rows || a.cover.length !== b.cover.length) return false;
-  for (let k = 0; k < a.h.length; k++) if (a.h[k] !== b.h[k] || a.wl[k] !== b.wl[k]) return false;
+  for (let k = 0; k < a.h.length; k++) if (a.h[k] !== b.h[k] || a.wl[k] !== b.wl[k] || (a.flow?.[k] ?? 0) !== (b.flow?.[k] ?? 0)) return false;
   for (let k = 0; k < a.cover.length; k++) if (a.cover[k] !== b.cover[k]) return false;
   return true;
 }

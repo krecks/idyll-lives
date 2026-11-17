@@ -23,6 +23,19 @@ describe('mergeShapeLand', () => {
     expect(first.land!.h[5]).toBe('BBB');
   });
 
+  test("a river's way merges by tile once there is one; a land without leaves none", () => {
+    const header = { v: 1 as const, cell: 2 as const, cols: 200, rows: 100, tile: 64 as const, cover: [5000, 0], seeded: 'drawn' as const };
+    const first = mergeShapeLand(null, { land: { ...header, h: { 0: 'AAA' }, wl: {} } })!;
+    expect(first.land!.flow).toBeUndefined();
+    const ran = mergeShapeLand(first, { land: { wl: { 2: 'WWW' }, flow: { 2: 'FFF' } } })!;
+    expect(ran.land!.flow).toEqual(['', '', 'FFF', '', '', '', '', '']);
+    const kept = mergeShapeLand(ran, { land: { h: { 3: 'GGG' } } })!;
+    expect(kept.land!.flow).toEqual(['', '', 'FFF', '', '', '', '', '']);
+    const moved = mergeShapeLand(kept, { land: { flow: { 2: '', 6: 'HHH' } } })!;
+    expect(moved.land!.flow).toEqual(['', '', '', '', '', '', 'HHH', '']);
+    expect(ran.land!.flow![2]).toBe('FFF');
+  });
+
   test('tiles coded by encodeTiles decode from the merged land', () => {
     const land = blankLand(256, 256);
     land.h[land.cols * 70 + 40] = 1234;

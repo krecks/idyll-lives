@@ -181,6 +181,25 @@ describe('the command for a change', () => {
     expect(LAND_CELL).toBe(2);
   });
 
+  test("a river's way goes with its tiles where it was laid or taken away, and not otherwise", () => {
+    const land = blankLand(W, W);
+    land.flow = new Uint8Array(land.cols * land.rows);
+    const rect = { i0: 70, j0: 10, i1: 80, j1: 20 };
+    const patch = () => ({ rect, h: new Int16Array(100), wl: new Int16Array(100), flow: new Uint8Array(100) });
+    // Still before and after: no flow sent (a world's meta gains none for an earth stroke).
+    expect(landCommand({ land, patch: patch(), whole: false, household: 0, cost: 0 }).meta.land!.flow).toBeUndefined();
+    // Laid now: the tile's way.
+    land.flow[15 * land.cols + 75] = 9;
+    const laid = landCommand({ land, patch: patch(), whole: false, household: 0, cost: 0 }).meta.land!.flow!;
+    expect(Object.keys(laid)).toEqual(['1']);
+    expect(laid[1]).not.toBe('');
+    // Taken away (it was there before the change): the tile sent still.
+    land.flow[15 * land.cols + 75] = 0;
+    const before = patch();
+    before.flow[55] = 9;
+    expect(landCommand({ land, patch: before, whole: false, household: 0, cost: 0 }).meta.land!.flow).toEqual({ 1: '' });
+  });
+
   test("the simulation's reasons as the player reads them", () => {
     expect(refusal('not enough money: shaping the land costs $12345')).toBe('Not enough money: that would cost $12,345.');
     expect(refusal("water can't go on a lot (Home)")).toBe("Water can't go on a lot (Home).");
