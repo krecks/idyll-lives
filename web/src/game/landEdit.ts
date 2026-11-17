@@ -243,7 +243,22 @@ export interface LandEditorOptions {
   /** The generator's water tiles (`Rle`) and zones: what the land's changes are laid over (`water`, `zonesOf`). */
   water?: Rle;
   zones?: readonly WorldZone[];
+  /**
+   * The earth tools (raise, lower, smooth, flatten) work on built land too: its town follows the land (its roads and
+   * lots stand on a surface solved from it, `builtSurface.ts`), so they move with it. The water and cover tools, and
+   * the mountains, keep off it as ever.
+   */
+  earthOnBuilt?: boolean;
+  /**
+   * At the end of an earth stroke, the land that changed (`rect`) settled under what is built (`Renderer.settleLand`:
+   * no road or lot cut or filled past its limits); returns the samples it changed besides (null: none), which the
+   * stroke's patch takes in, so undo puts them back too.
+   */
+  settle?: (rect: LandRect) => LandRect | null;
 }
+
+/** Every sample free: the earth tools on a land its town follows (`LandEditorOptions.earthOnBuilt`). */
+const ALL_FREE: Free = () => 1;
 
 /** What a stroke (or a reset) on the undo or redo stack is, for its price. */
 interface Kept {
@@ -314,6 +329,8 @@ export class LandEditor {
   /** The land had been shaped before the editor had it (read from a world's `meta.land`). */
   private readonly editedBefore: boolean;
   private readonly wettable?: Wettable;
+  private readonly earthOnBuilt: boolean;
+  private readonly settle?: (rect: LandRect) => LandRect | null;
   private readonly world: { width: number; depth: number; roads: readonly RoadPlan[] };
   /** The world's water tiles and zones as the generator laid them, if the editor was given them. */
   readonly generated: { water?: Rle; zones?: readonly WorldZone[] };
@@ -339,6 +356,8 @@ export class LandEditor {
     this.shadow = { h: land.h.slice(), wl: land.wl.slice(), cover: land.cover.slice() };
     this.editedBefore = land.edited;
     this.wettable = options.wettable;
+    this.earthOnBuilt = !!options.earthOnBuilt;
+    this.settle = options.settle;
     this.world = { width: options.world?.width ?? land.cols * LAND_CELL, depth: options.world?.depth ?? land.rows * LAND_CELL, roads: options.world?.roads ?? [] };
     this.generated = { water: options.water, zones: options.zones };
   }
@@ -348,9 +367,19 @@ export class LandEditor {
    * bridge decks dry; `generated`: the world's water tiles and zones as the generator laid them
    * (a draft's `open.water` and `open.zones`, or the game's), for `water` and `zonesOf`.
    */
-  static forWorld(land: Land, built: BuiltLand, generated: { water?: Rle; zones?: readonly WorldZone[] } = {}): LandEditor {
+  static forWorld(land: Land, built: BuiltLand, generated: { water?: Rle; zones?: readonly WorldZone[] } = {}, follow: Pick<LandEditorOptions, 'earthOnBuilt' | 'settle'> = {}): LandEditor {
     const guard = new Protection(land.cols, land.rows, built);
-    return new LandEditor(land, guard.free, { wettable: guard.wettable, world: { width: built.width, depth: built.depth, roads: built.roads }, ...generated });
+    return new LandEditor(land, guard.free, { wettable: guard.wettable, world: { width: built.width, depth: built.depth, roads: built.roads }, ...generated, ...follow });
+  }
+
+  /** How far sample (i, j) may change under `tool`: `free`, but every sample for the earth tools on a land its town follows. */
+  freeFor(tool: LandTool): Free {
+    return this.earthOnBuilt && TOOL_KIND[tool] === 'earth' ? ALL_FREE : this.free;
+  }
+
+  /** The world's roads the editor knows (their bridges' decks kept dry). */
+  get roads(): readonly RoadPlan[] {
+    return this.world.roads;
   }
 
   /** The stroke under way, or null. */
@@ -457,6 +486,11 @@ export class LandEditor {
     const tool = stroke.brush.tool;
     if (tool === 'peak' || tool === 'range') placeMountain(this.land, stroke, this.free, this.wettable);
     this.hint = stroke.stopped ?? stroke.hint ?? null;
+    // (On built land, the land settled under what is built: what that changed is the stroke's too.)
+    if (this.settle && this.earthOnBuilt && TOOL_KIND[tool] === 'earth' && stroke.touched) {
+      const more = this.settle(stroke.touched);
+      if (more) stroke.touched = unionRect(stroke.touched, more);
+    }
     const patch = this.patchOf(stroke);
     if (!patch || !this.differ(patch)) return null;
     this.sync(patch.rect, patch.cover?.rect);
@@ -489,7 +523,7 @@ export class LandEditor {
     const { cols, rows } = this.land;
     const i = Math.min(cols - 1, Math.max(0, Math.round(x / LAND_CELL)));
     const j = Math.min(rows - 1, Math.max(0, Math.round(z / LAND_CELL)));
-    if (this.free(i, j) <= 0) return true;
+    if (this.freeFor(tool)(i, j) <= 0) return true;
     return (tool === 'lake' || tool === 'river') && !!this.wettable && !this.wettable(i, j);
   }
 
@@ -693,7 +727,7 @@ export class LandEditor {
 
   private stampAt(x: number, z: number, dt: number): LandRect | null {
     const stroke = this.active!;
-    return stamp(this.land, stroke.brush, { x, z, dt }, stroke, this.free, this.wettable);
+    return stamp(this.land, stroke.brush, { x, z, dt }, stroke, this.freeFor(stroke.brush.tool), this.wettable);
   }
 
   /** Whether the land differs from `patch`'s old values anywhere in it. */

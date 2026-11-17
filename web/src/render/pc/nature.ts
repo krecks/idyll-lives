@@ -709,6 +709,13 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.redrawTile(t, positions, colors);
     }
     this.sheetAsNeeded();
+    // (Roads or lots the land moved: the pads and the country roads drawn again on them.)
+    if (this.builtMoved) {
+      this.builtMoved = false;
+      await pace?.();
+      if (!this.host) return null;
+      perfTime('land: pads and roads', () => this.redrawBuilt());
+    }
     const grass = this.grass?.grassField;
     if (grass) {
       for (let z = box[1]; z < box[3]; z += LAND_GRASS_STRIP) {
@@ -718,6 +725,20 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       perfTime('land: grass upload', () => this.grass?.landChanged(true));
     }
     return box;
+  }
+
+  /** The pads and the country roads drawn again, whole, on the surface as it is now (the land moved them: `landDone`). */
+  private redrawBuilt(): void {
+    if (!this.host || !this.surface) return;
+    const { app, parent } = this.host;
+    const old = [...this.pads.slabs, ...this.pads.edges, ...this.roadDraws];
+    const pads = (this.pads = this.padDraws(app, parent, this.grounds));
+    this.roadDraws = this.roadBuilder ? this.roadBuilder(this.roads, parent) : [];
+    const fresh = [...pads.slabs, ...pads.edges, ...this.roadDraws];
+    const gone = new Set(old);
+    this.others = [...this.others.filter((e) => !gone.has(e)), ...fresh];
+    this.drawsChanged(fresh, old);
+    this.grass?.onGround([...this.grounds, ...pads.slabs].map((g) => g.render!.meshInstances[0]));
   }
 
   /**

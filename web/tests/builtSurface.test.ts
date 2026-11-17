@@ -9,9 +9,9 @@
 // roads. `bun test tests/builtSurface.test.ts`.
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
-import { blankLand, heightAt, LAND_CELL, type Land } from '../src/game/land';
+import { blankLand, heightAt, LAND_CELL, NONE, type Land } from '../src/game/land';
 import { bridgeSpans, lengths, pointAt, type Pt } from '../src/game/roads';
-import { BRIDGE_CLEAR, BuiltSurface, builtSurfaceOf, ENTRY_MAX, GRADE, RETAIN_MAX, ROAD_SINK, surfacePlots, type SurfaceWorld } from '../src/render/shared/builtSurface';
+import { BRIDGE_CLEAR, BuiltSurface, builtSurfaceOf, CUT_MAX, ENTRY_MAX, GRADE, RETAIN_MAX, ROAD_SINK, surfacePlots, type SurfaceWorld } from '../src/render/shared/builtSurface';
 import { chunkAt } from '../src/render/shared/chunks';
 
 const [W, D] = [160, 120];
@@ -234,6 +234,27 @@ describe('built land on a slope', () => {
     // Two spans: each its own deck, the road between them on the land.
     expect(bridgeSpans({ ...roads[0], bridges: [[100, 110], [10, 5]] })).toEqual([[5, 10], [66, 88], [100, 110]]);
     expect(bridgeSpans({ ...roads[0], bridge: undefined, bridges: [[120, 200]] })).toEqual([[120, 130]]);
+  });
+
+  test('the land raised under a street is settled within a cut of it and a retaining edge of a lot, in a few passes', () => {
+    const edited = makeLand();
+    const s = builtSurfaceOf(world, edited);
+    // A 12 m hill under the street west of the channel and the first lot's front.
+    const rect = { i0: 5, j0: 12, i1: 20, j1: 24 };
+    for (let j = rect.j0; j < rect.j1; j++) for (let i = rect.i0; i < rect.i1; i++) edited.h[j * edited.cols + i] += 1200;
+    const before = edited.h.slice();
+    const { rect: more, change } = s.settleCuts(rect);
+    expect(more).not.toBeNull();
+    expect(change.roads).toContain(0);
+    // (Settled: solved again, the land everywhere within a cut or a fill of the land graded to what is built.)
+    const fresh = builtSurfaceOf(world, edited);
+    const off = (sf: BuiltSurface, l: Land, k: number) => (l.wl[k] !== NONE && l.wl[k] > l.h[k] ? 0 : Math.abs(l.h[k] / 100 - sf.conformed[k]));
+    let worst = 0;
+    for (let j = rect.j0 - 4; j < rect.j1 + 4; j++) for (let i = rect.i0 - 4; i < rect.i1 + 4; i++) worst = Math.max(worst, off(fresh, edited, j * edited.cols + i));
+    expect(worst).toBeLessThanOrEqual(CUT_MAX + 0.02);
+    // Only round the hill: the land far off as it was.
+    const far = (40 / LAND_CELL) * edited.cols + 140 / LAND_CELL;
+    expect(edited.h[far]).toBe(before[far]);
   });
 
   test('a surface made directly is the one a world gives', () => {

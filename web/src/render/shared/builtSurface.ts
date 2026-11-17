@@ -420,6 +420,60 @@ export class BuiltSurface {
     return { roads, plots, rect };
   }
 
+  /**
+   * The land under and round what is built kept within reach of it after the earth brushes changed it in `rect` (a
+   * land its town follows, shaped in the game: its roads and lots move with it, within their grades): the surface
+   * solved again (`update`), then round the stroke where the land is cut into or filled over by more than `CUT_MAX`
+   * (a road's cut, a lot's pad) or stands more than `RETAIN_MAX` off a lot's pad beside it, the land itself is brought
+   * back within that, and solved again; `passes` times at most. Changes `land` in place. Says the samples it changed (null: none) and
+   * what moved in all (`update`'s change, the passes' together).
+   */
+  settleCuts(rect: LandRect, passes = SETTLE_PASSES): { rect: LandRect | null; change: SurfaceChange } {
+    const { cols, rows, land, kind, conformed } = this;
+    let changed: LandRect | null = null;
+    let window = rect;
+    const roads = new Set<number>();
+    const plots = new Set<number>();
+    let moved: LandRect | null = null;
+    const join = (a: LandRect | null, b: LandRect | null): LandRect | null => (!a ? b : !b ? a : { i0: Math.min(a.i0, b.i0), j0: Math.min(a.j0, b.j0), i1: Math.max(a.i1, b.i1), j1: Math.max(a.j1, b.j1) });
+    for (let pass = 0; pass <= passes; pass++) {
+      const change = this.update(window);
+      change.roads.forEach((r) => roads.add(r));
+      change.plots.forEach((p) => plots.add(p));
+      moved = join(moved, change.rect);
+      if (pass === passes) break;
+      // (Round the stroke, a margin past it: not wherever the roads it moved run.)
+      const w = window;
+      const [i0, j0, i1, j1] = [Math.max(0, w.i0 - SETTLE_MARGIN), Math.max(0, w.j0 - SETTLE_MARGIN), Math.min(cols, w.i1 + SETTLE_MARGIN), Math.min(rows, w.j1 + SETTLE_MARGIN)];
+      let clamped: LandRect | null = null;
+      for (let j = j0; j < j1; j++) {
+        for (let i = i0; i < i1; i++) {
+          const k = j * cols + i;
+          if (wet(land, k)) continue;
+          // (Beside a lot: within a retaining edge of the land graded to its pad; elsewhere within a cut or a fill.)
+          let reach = CUT_MAX;
+          if (!kind[k]) {
+            for (let n = 0; n < 8 && reach > RETAIN_MAX; n++) {
+              const [ni, nj] = [i + NEAR8[n][0], j + NEAR8[n][1]];
+              if (ni >= 0 && nj >= 0 && ni < cols && nj < rows && kind[nj * cols + ni] === 2) reach = RETAIN_MAX;
+            }
+          }
+          const g = conformed[k];
+          const h = land.h[k] / 100;
+          if (h <= g + reach + 0.005 && h >= g - reach - 0.005) continue;
+          // (Brought back short of the limit: solved again, what is built comes some way after it.)
+          const to = reach * SETTLE_SHORT;
+          land.h[k] = cm(Math.min(g + to, Math.max(g - to, h)));
+          clamped = join(clamped, { i0: i, j0: j, i1: i + 1, j1: j + 1 });
+        }
+      }
+      if (!clamped) break;
+      changed = join(changed, clamped);
+      window = join(window, clamped)!;
+    }
+    return { rect: changed, change: { roads: [...roads].sort((a, b) => a - b), plots: [...plots].sort((a, b) => a - b), rect: moved } };
+  }
+
   // ---- solving ------------------------------------------------------------------------------
 
   /** The roads, the pads and the graded land, from the land as it is. */
@@ -971,6 +1025,14 @@ function narrowed(from: number, to: number, lo: number, hi: number): [number, nu
   const [a, b] = [Math.max(from, lo), Math.min(to, hi)];
   return a <= b ? [a, b] : [from, to];
 }
+
+/** The land settled under what is built this many times at most after a stroke (`settleCuts`), this many samples round what changed. */
+const SETTLE_PASSES = 3;
+const SETTLE_MARGIN = 6;
+/** How far within its limit (a share of it) a sample past it is brought back. */
+const SETTLE_SHORT = 0.4;
+/** A sample's eight neighbours. */
+const NEAR8: readonly [number, number][] = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
 
 /** Lots are filed for `at` by cells this wide (m). */
 const LOT_CELL = 16;

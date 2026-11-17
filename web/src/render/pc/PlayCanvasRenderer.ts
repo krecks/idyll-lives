@@ -3311,7 +3311,19 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       if (!box) return;
       await this.lot.regrowNature(scape, box, () => this.disposed, this.landPace);
       this.landMapped(scape);
+      // (The game's land: what stands on it drawn again on its surface as the world comes back from the stroke, the
+      // backdrop's buildings too; the sun's shadows of the still casters taken again.)
+      if (scape === this.lot.landscape) {
+        this.townBackdropOf = null;
+        this.sunShadows.moved();
+      }
     });
+  }
+
+  settleLand(rect: LandRect): LandRect | null {
+    const at = this.landInView();
+    if (!at?.scape.heightField) return null;
+    return perfTime('land: settle', () => at.scape.settleLand(rect));
   }
 
   pickLand(x: number, y: number): { x: number; y: number; z: number } | null {

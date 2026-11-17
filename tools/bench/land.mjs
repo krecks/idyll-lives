@@ -5,9 +5,10 @@
  * the nearest water), woods painted and half cleared, and a peak, each a stroke a point a frame; the
  * frames' times during each stroke, and pictures before and after. Then "Lay out the town" (step 2's
  * town laid on the land as shaped), "Choose a household", a household played (step 3, with the game's
- * mode chosen there): the step-1 pond is water to the simulation (where the town left it), someone is sent across it, and the
+ * mode chosen there) and step 4's Move in: the step-1 pond is water to the simulation (where the town left it), someone is sent across it, and the
  * camera looks at it; then Build mode's Land tab: a mound by the home (paid in Living, free in
- * Creative; undo pays back, redo pays again) and a pond; saved, continued from the menu, and the
+ * Creative; undo pays back, redo pays again) and a pond, a raise across the road by the home and a lower under the
+ * home (built land); saved, continued from the menu, and the
  * land and the water are still there. In step 1 too, the ends of the size range: 120 m raise, smooth
  * and lake strokes timed, a 1 m point stroke (one sample changed at each point it crosses), the
  * palette at 1 m and at 120 m, and the 1 m cursor close up.
@@ -275,6 +276,10 @@ async function landTabInPlay(page, renderer, stepOne, shot) {
   // By hand, in Living: a stroke dragged with the pointer while the funds run low stops short of them, and is paid.
   if (mode === 'living') r.short = await fundsRunOut(page, renderer, spot, shot);
 
+  // Built land: a raise across the street in front of the home and a lower under the home itself (the shots say what
+  // the land, the road and the lot do; the earth tools keep off built land in the game for now).
+  r.built = await builtStrokes(page, renderer, home, shot);
+
   // Saved, continued from the menu: the land and the water as they were.
   await page.evaluate(() => window.__osw.save('land-check'));
   await page.waitForTimeout(1000);
@@ -305,6 +310,46 @@ async function landTabInPlay(page, renderer, stepOne, shot) {
   await aim(page, [spot[0] + 15, spot[1]], 75);
   await shot('16-continued');
   return r;
+}
+
+/**
+ * Strokes on built land in play: a 12 m raise across the road nearest the home, then a lower under the home's lot.
+ * Each is sent and taken (not refused); the heights at the road and the home before and after are told, and the
+ * shots show the road and the lot on the land after (`17-…`, `18-…`).
+ */
+async function builtStrokes(page, renderer, home, shot) {
+  const out = {};
+  const road = await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z), home);
+  if (!road) return out;
+  const [rx, rz] = road.at;
+  const [ux, uz] = road.along;
+  await page.evaluate(() => window.__addFunds(200000));
+  await aim(page, [rx, rz], 60);
+  await shot('17a-road-before');
+  const h0 = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), [rx, rz]);
+  // (Across the road: from one side to the other, back and forth.)
+  const across = [];
+  for (let k = 0; k < 6; k++) for (const s of k % 2 ? [-12, 12] : [12, -12]) across.push([rx - uz * s + ux * k, rz + ux * s + uz * k]);
+  const raised = await page.evaluate((pts) => window.__land.stroke('raise', pts, 12, 0.7), across);
+  await settled(page);
+  await page.waitForTimeout(2500);
+  const h1 = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), [rx, rz]);
+  out.road = { at: [Math.round(rx), Math.round(rz)], rose: +(h1 - h0).toFixed(2), refused: raised.refused, stamps: spread(raised.stamps) };
+  console.log(`land: ${renderer} a raise across the road: ${JSON.stringify(out.road)}`);
+  if (raised.refused) fault(`${renderer} the raise across the road was refused: ${raised.refused}`);
+  await shot('17b-road-raised');
+  // Under the home.
+  const g0 = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), home);
+  const under = await page.evaluate(([x, z]) => window.__land.stroke('lower', Array.from({ length: 30 }, (_, k) => [x + Math.cos(k / 4) * 3, z + Math.sin(k / 4) * 3]), 10, 0.5), home);
+  await settled(page);
+  await page.waitForTimeout(2500);
+  const g1 = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), home);
+  out.home = { fell: +(g0 - g1).toFixed(2), refused: under.refused };
+  console.log(`land: ${renderer} a lower under the home: ${JSON.stringify(out.home)}`);
+  if (under.refused) fault(`${renderer} the lower under the home was refused: ${under.refused}`);
+  await aim(page, home, 45);
+  await shot('18-home-lowered');
+  return out;
 }
 
 /**
@@ -642,11 +687,21 @@ try {
       await page.waitForTimeout(1500);
       await shot('10-step2');
       await page.getByRole('button', { name: /Choose a household/ }).click();
-      await page.waitForSelector('.households .btn.play', { timeout: 120_000 });
+      // Step 3's cards (their portraits drawn), a household's Play, then step 4's Move in (as gameplay.mjs goes).
+      await page.waitForFunction(() => {
+        const faces = [...document.querySelectorAll('.offer .face')];
+        return faces.length > 0 && faces.every((f) => f.querySelector('img'));
+      }, null, { timeout: 180_000, polling: 100 });
       if (mode === 'creative') await page.getByRole('radio', { name: 'Creative' }).click();
       await page.waitForTimeout(1500);
       await shot('10-step3');
-      await page.locator('.households .btn.play').first().click();
+      await page.locator('.offer .card[data-slot] .go').first().click();
+      await page.waitForFunction(() => !!document.querySelector('.btn.move-in:not(:disabled)'), null, { timeout: 180_000, polling: 100 });
+      await page.waitForTimeout(500);
+      await page.locator('.btn.move-in').click();
+      const asked = () => [...document.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Move in anyway');
+      await page.waitForFunction(`(${asked})() || (!!document.querySelector('.hud-root') && !document.querySelector('.loading'))`, null, { timeout: 180_000, polling: 100 });
+      if (await page.evaluate(asked)) await page.getByRole('button', { name: 'Move in anyway' }).click();
       await inGame(page);
       await page.waitForTimeout(4000);
       await shot('11-play');
