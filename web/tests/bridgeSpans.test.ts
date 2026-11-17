@@ -222,4 +222,59 @@ describe("a drawn street's bridges (`crossWater`)", () => {
     expect(d[0]).toBeGreaterThanOrEqual(BRIDGE_IN - DECK_PAST - 0.01);
     expect(lengths(dipped.bridge).at(-1)! - d[1]).toBeGreaterThanOrEqual(BRIDGE_IN - DECK_PAST - 0.01);
   });
+
+  /** How far (m) the middle of a crossing's deck is from the middle of the water under it, along its bridge. */
+  const offCentre = (crossed: ReturnType<typeof crossWater>, wet: Uint8Array) => {
+    if (typeof crossed === 'string') throw new Error(crossed);
+    const [w0, w1] = wetSpans(crossed.bridge, wet, W, D)[0];
+    const [d0, d1] = crossed.fit.deck!;
+    return Math.abs((d0 + d1) / 2 - (w0 + w1) / 2);
+  };
+
+  test('a river under a hill, a low bank in its dip on one side and a meadow at its level on the other: the deck centred on the water', () => {
+    const wet = river(200, 230);
+    const land = blankLand(W, D);
+    // (The water at 3 m; north of it a meadow 0.4 m over it; south a shelf 6 m wide just over it, then the hill's
+    // side rising to 10 m over 4 m.)
+    for (let j = 0; j < land.rows; j++) {
+      for (let i = 0; i < land.cols; i++) {
+        const z = j * LAND_CELL;
+        const k = j * land.cols + i;
+        if (z >= 200 && z < 230) [land.h[k], land.wl[k]] = [100, 300];
+        else if (z < 200) land.h[k] = 340;
+        else land.h[k] = Math.round(325 + Math.max(0, Math.min(1, (z - 236) / 4)) * 675);
+      }
+    }
+    const pts = line(100, 120, 100, 280);
+    const span = wetSpans(pts, wet, W, D)[0];
+    const crossed = crossWater(pts, ['join', 'join'], span, { wet, W, D, roads: [], plots: [], land });
+    if (typeof crossed === 'string') throw new Error(crossed);
+    const deck = crossed.fit.deck!;
+    const z0 = crossed.bridge[0][1];
+    // Over the shelf and onto the hill (past z 240), as far over the meadow; no longer than a drawn deck may be.
+    expect(z0 + deck[1]).toBeGreaterThan(240);
+    expect(offCentre(crossed, wet)).toBeLessThan(2);
+    expect(deck[1] - deck[0]).toBeLessThanOrEqual(DRAWN_SPAN);
+  });
+
+  test('on flat land, and under a high bank on one side with the other low, the deck stays where the water is', () => {
+    const wet = river(200, 230);
+    const pts = line(100, 120, 100, 280);
+    const span = wetSpans(pts, wet, W, D)[0];
+    for (const north of [340, 340, 700]) {
+      const land = blankLand(W, D);
+      for (let j = 0; j < land.rows; j++) {
+        for (let i = 0; i < land.cols; i++) {
+          const z = j * LAND_CELL;
+          const k = j * land.cols + i;
+          if (z >= 200 && z < 230) [land.h[k], land.wl[k]] = [100, 300];
+          else land.h[k] = z < 200 ? north : 340;
+        }
+      }
+      const crossed = crossWater(pts, ['join', 'join'], span, { wet, W, D, roads: [], plots: [], land });
+      if (typeof crossed === 'string') throw new Error(crossed);
+      expect(offCentre(crossed, wet)).toBeLessThan(2);
+      expect(crossed.fit.deck![1] - crossed.fit.deck![0]).toBeLessThan(30 + 2 * DECK_PAST + 2);
+    }
+  });
 });
