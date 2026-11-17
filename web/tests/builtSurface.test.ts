@@ -362,3 +362,40 @@ describe('a backdrop building turned by a road', () => {
     expect(surface.at(x, z)).toBe(surface.landAt(x, z));
   });
 });
+
+describe("a turned backdrop building's ground", () => {
+  // A lot on low land and, 4 m past its edge, a building turned a little on land 4 m higher: its ground (its
+  // forecourt) reaches into the lot's box and past its edge, but gives way to it (a lot's pad is its own, and the
+  // land beside it stays within a retaining edge of it); and one standing wholly in a pond (a river painted over
+  // it) levels nothing round it.
+  const land = blankLand(W, D, 'follow');
+  for (let j = 0; j < land.rows; j++) {
+    for (let i = 0; i < land.cols; i++) {
+      const [x, z] = [i * LAND_CELL, j * LAND_CELL];
+      const k = j * land.cols + i;
+      if (x >= 100 && x <= 124 && z >= 30 && z <= 70) [land.h[k], land.wl[k]] = [-900, -500];
+      else land.h[k] = x < 50 ? 0 : x < 100 ? 400 : 0;
+    }
+  }
+  const lot = { x: 30, z: 40, w: 18, d: 20 };
+  const above: [number, number][] = [[52, 42], [64, 41], [65, 53], [53, 54]];
+  const afloat: [number, number][] = [[103, 42], [115, 41], [116, 53], [104, 54]];
+  const surface = builtSurfaceOf({ plots: [lot], meta: { backdrop: [{ poly: above }, { poly: afloat }] } }, land);
+  const without = builtSurfaceOf({ plots: [lot], meta: { backdrop: [{ poly: above }] } }, land);
+
+  test('beside a lot it gives way: the lot is its pad, its edge within a retaining edge of the land beside it', () => {
+    const [pad, high] = [surface.padY(0), surface.padY(1)];
+    expect(high - pad).toBeGreaterThan(RETAIN_MAX + 1);
+    for (let j = Math.ceil(lot.z / LAND_CELL); j * LAND_CELL <= lot.z + lot.d; j++) {
+      for (let i = Math.ceil(lot.x / LAND_CELL); i * LAND_CELL <= lot.x + lot.w; i++) expect(surface.conformed[j * land.cols + i]).toBeCloseTo(pad, 6);
+      expect(Math.abs(surface.at(lot.x + lot.w + 0.3, j * LAND_CELL) - pad)).toBeLessThanOrEqual(RETAIN_MAX + 0.01);
+    }
+    // (Its forecourt elsewhere at its pad.)
+    expect(surface.at(67, 47)).toBeCloseTo(high, 6);
+  });
+
+  test('one standing in water levels nothing round it, its bank as it was', () => {
+    expect(surface.at(98, 47)).toBeGreaterThan(3);
+    expect(surface.conformed).toEqual(without.conformed);
+  });
+});

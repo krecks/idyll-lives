@@ -200,6 +200,8 @@ export class BuiltSurface {
   private held: Float32Array;
   private profiles: Profile[] = [];
   private pads: Float64Array;
+  /** Each turned backdrop building's standing in water (none of its footprint dry, its middle wet): it grades no ground (`solveLand`). */
+  private afloat: Uint8Array;
   /** Each lot's road's height at its entry (NaN: none). */
   private entries: Float64Array;
   /** Each lot's neighbours: the pads within the land's grain of it. */
@@ -246,6 +248,7 @@ export class BuiltSurface {
       }
     });
     this.pads = new Float64Array(plots.length);
+    this.afloat = new Uint8Array(plots.length);
     this.entries = new Float64Array(plots.length);
     this.touching = plots.map((p, i) => {
       const out = new Set<number>();
@@ -553,6 +556,8 @@ export class BuiltSurface {
         }
       }
       middle[i] = lo <= hi ? (lo + hi) / 200 : heightAt(land, p.x + p.w / 2, p.z + p.d / 2);
+      // (A turned one in water, a river painted over it: its pad is the water's bed, no forecourt for the land round it.)
+      this.afloat[i] = p.poly && lo > hi && wet(land, Math.min(rows - 1, Math.max(0, Math.round((p.z + p.d / 2) / c))) * cols + Math.min(cols - 1, Math.max(0, Math.round((p.x + p.w / 2) / c)))) ? 1 : 0;
       let [from, to] = [-Infinity, Infinity];
       entries[i] = NaN;
       if (p.entry) {
@@ -1005,16 +1010,30 @@ export class BuiltSurface {
     });
     // Lots (the higher pad where two touch); a turned backdrop building's on its footprint and round it, out over
     // what it stands on (`GROUND_ROUND`) and a cell's diagonal past that (every corner of a cell its edge crosses,
-    // as beside a road: the land drawn between the samples meets its forecourt under its edge), but not under a road.
+    // as beside a road: the land drawn between the samples meets its forecourt under its edge), but not under a road,
+    // and past its footprint not in a box nor beside one whose pad is more than a retaining edge from its own (a lot's
+    // pad is its own and the land beside it within `RETAIN_MAX` of it: its ground gives way to it as to a road); one
+    // standing in water none (`afloat`: its pad the water's bed, it would dig the banks round it out to that).
+    const boxed = new Uint8Array(cols * rows);
+    /** Whether sample (i, j) is in a box (a lot's, or a backdrop building's along x and z), or beside one whose pad is more than a retaining edge from `y`. */
+    const byBox = (i: number, j: number, y: number) => {
+      if (boxed[j * cols + i]) return true;
+      for (let nj = Math.max(0, j - 1); nj <= Math.min(rows - 1, j + 1); nj++) {
+        for (let ni = Math.max(0, i - 1); ni <= Math.min(cols - 1, i + 1); ni++) if (boxed[nj * cols + ni] && Math.abs(builtY[nj * cols + ni] - y) > RETAIN_MAX) return true;
+      }
+      return false;
+    };
     plots.forEach((p, n) => {
+      if (this.afloat[n]) return;
       const out = p.poly ? GROUND_ROUND + c * Math.SQRT2 : 0;
       for (let j = Math.max(0, Math.ceil((p.z - out) / c)); j <= Math.min(rows - 1, Math.floor((p.z + p.d + out) / c)); j++) {
         for (let i = Math.max(0, Math.ceil((p.x - out) / c)); i <= Math.min(cols - 1, Math.floor((p.x + p.w + out) / c)); i++) {
           const at = j * cols + i;
           // (Beside a road, only where its pad is no higher: the land meets the sidewalk's edge under it, and its ground's.)
-          if (p.poly && (kind[at] === 1 || (kind[at] === BESIDE && pads[n] > builtY[at]) || !onPad(p, i * c, j * c, out))) continue;
+          if (p.poly && (kind[at] === 1 || (kind[at] === BESIDE && pads[n] > builtY[at]) || !onPad(p, i * c, j * c, out) || (!onPad(p, i * c, j * c) && byBox(i, j, pads[n])))) continue;
           builtY[at] = kind[at] === 2 ? Math.max(builtY[at], pads[n]) : pads[n];
           kind[at] = 2;
+          if (!p.poly) boxed[at] = 1;
         }
       }
     });
