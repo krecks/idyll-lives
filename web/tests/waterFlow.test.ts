@@ -141,6 +141,16 @@ describe('a step', () => {
     const still = at(land, 180, 128);
     expect([texels[still * 4], texels[still * 4 + 1], texels[still * 4 + 2]]).toEqual([128, 128, 0]);
   });
+
+  test('with a still border round the land (nothing flows past it), each sample one texel in and down, the border left as it was', () => {
+    const across = land.cols + 2;
+    const texels = new Uint8Array(across * (land.rows + 2) * 4);
+    flowTexels(flow, { i0: 0, j0: 0, i1: land.cols, j1: land.rows }, texels, 1);
+    const [i, j] = [Math.round(98 / LAND_CELL), Math.round(128 / LAND_CELL)];
+    expect(texels[((j + 1) * across + i + 1) * 4]).toBeGreaterThan(240);
+    for (let t = 0; t < across; t++) expect(texels[t * 4 + 3]).toBe(0);
+    for (let r = 0; r < land.rows + 2; r++) expect(texels[(r * across + across - 1) * 4 + 3]).toBe(0);
+  });
 });
 
 describe('a lake a river runs out of', () => {

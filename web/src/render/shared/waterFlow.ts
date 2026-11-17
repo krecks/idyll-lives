@@ -427,19 +427,22 @@ function spread(field: Float32Array, wet: Uint8Array, w: number, d: number, reac
 }
 
 /**
- * The flow of `rect` (samples) as texels of the flow map (`pc/water.ts`), RGBA8 row-major over the whole land into
- * `into`: R and G the way times the speed (x and z, 128 still), B the foam, A 255.
+ * The flow of `rect` (samples) as texels of the flow map (`pc/water.ts`), RGBA8 row-major into `into`: R and G the way
+ * times the speed (x and z, 128 still), B the foam, A 255. `border` texels of still water round the land (the map is
+ * `cols + 2 border` across): read clamped at its edge, the map has no flow past the land.
  */
-export function flowTexels(flow: WaterFlow, rect: LandRect, into: Uint8Array): void {
+export function flowTexels(flow: WaterFlow, rect: LandRect, into: Uint8Array, border = 0): void {
   const { cols } = flow;
+  const across = cols + 2 * border;
   for (let j = Math.max(0, rect.j0); j < Math.min(flow.rows, rect.j1); j++) {
     for (let i = Math.max(0, rect.i0); i < Math.min(cols, rect.i1); i++) {
       const k = j * cols + i;
+      const t = ((j + border) * across + i + border) * 4;
       const s = flow.speed[k];
-      into[k * 4] = Math.round(128 + 127 * flow.wx[k] * s);
-      into[k * 4 + 1] = Math.round(128 + 127 * flow.wz[k] * s);
-      into[k * 4 + 2] = Math.round(255 * flow.foam[k]);
-      into[k * 4 + 3] = 255;
+      into[t] = Math.round(128 + 127 * flow.wx[k] * s);
+      into[t + 1] = Math.round(128 + 127 * flow.wz[k] * s);
+      into[t + 2] = Math.round(255 * flow.foam[k]);
+      into[t + 3] = 255;
     }
   }
 }

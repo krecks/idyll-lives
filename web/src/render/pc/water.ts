@@ -1,8 +1,9 @@
 /**
  * The landscape's water flowing (`shaders/water.ts`): the ripples' texture (made at run time, one per device) and a
- * landscape's flow map, a texel a sample of its height field (`shared/waterFlow.ts`), worked out again where the land
- * changes (a brush's stamp, a stroke done) and sent up whole. A landscape with no height field has a still map (its
- * sea, its lake, only ripple).
+ * landscape's flow map, a texel a sample of its height field (`shared/waterFlow.ts`) and a still one round it (read
+ * clamped, nothing flows past the land: only the still sea goes on there), worked out again where the land changes (a
+ * brush's stamp, a stroke done) and sent up whole. A landscape with no height field has a still map (its sea, its
+ * lake, only ripple).
  */
 
 import * as pc from './engine';
@@ -12,6 +13,11 @@ import { LAND_CELL, type Land, type LandRect } from '../../game/land';
 import { mulberry32 } from '../../game/noise';
 import { sameLand } from '../shared/landBake';
 import { flowReach, flowTexels, riverCourse, stillFlow, waterFlow, type RiverCourse, type WaterFlow } from '../shared/waterFlow';
+
+/** The still texels round the flow map. */
+const BORDER = 1;
+/** A still texel. */
+const STILL = [128, 128, 0, 255];
 
 /** The ripples' texture: texels a side (one repeat), and how many waves make it. */
 const RIPPLE_SIZE = 128;
@@ -92,7 +98,7 @@ export class WaterFlowMap {
   private readonly materials = new Set<pc.StandardMaterial>();
 
   constructor(private readonly device: pc.GraphicsDevice) {
-    this.texels = Uint8Array.from([128, 128, 0, 255]);
+    this.texels = Uint8Array.from(STILL);
     this.texture = this.made(1, 1);
   }
 
@@ -119,14 +125,14 @@ export class WaterFlowMap {
       this.flow = null;
       this.course = null;
       this.resize(1, 1);
-      this.texels.set([128, 128, 0, 255]);
+      for (let t = 0; t < this.texels.length; t += 4) this.texels.set(STILL, t);
       this.upload();
       return;
     }
     this.course = riverCourse(land);
     this.flow = waterFlow(land, this.course, undefined, stillFlow(land.cols, land.rows));
     this.resize(land.cols, land.rows);
-    flowTexels(this.flow, { i0: 0, j0: 0, i1: land.cols, j1: land.rows }, this.texels);
+    flowTexels(this.flow, { i0: 0, j0: 0, i1: land.cols, j1: land.rows }, this.texels, BORDER);
     this.upload();
   }
 
@@ -143,7 +149,7 @@ export class WaterFlowMap {
     if (done) this.course = riverCourse(land);
     const reach = flowReach(land, rect);
     waterFlow(land, this.course, reach, this.flow);
-    flowTexels(this.flow, reach, this.texels);
+    flowTexels(this.flow, reach, this.texels, BORDER);
     this.upload();
   }
 
@@ -156,13 +162,16 @@ export class WaterFlowMap {
     return new pc.Texture(this.device, { name: 'waterFlow', width, height, format: pc.PIXELFORMAT_RGBA8, mipmaps: false, minFilter: pc.FILTER_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [this.texels] });
   }
 
-  /** The map at `cols` × `rows` texels (a new texture if its size changed), on every material using it. */
+  /** The map for `cols` × `rows` samples, its still border round them (a new texture if its size changed), on every material using it. */
   private resize(cols: number, rows: number): void {
-    this.area.set([1 / (cols * LAND_CELL), 1 / (rows * LAND_CELL), 0.5 / cols, 0.5 / rows]);
-    if (this.texture.width !== cols || this.texture.height !== rows) {
-      this.texels = new Uint8Array(cols * rows * 4);
+    const [w, h] = [cols + 2 * BORDER, rows + 2 * BORDER];
+    // (Sample i at x = i × LAND_CELL is texel i + BORDER: its middle at (i + BORDER + 0.5) / w.)
+    this.area.set([1 / (w * LAND_CELL), 1 / (h * LAND_CELL), (BORDER + 0.5) / w, (BORDER + 0.5) / h]);
+    if (this.texture.width !== w || this.texture.height !== h) {
+      this.texels = new Uint8Array(w * h * 4);
+      for (let t = 0; t < this.texels.length; t += 4) this.texels.set(STILL, t);
       const old = this.texture;
-      this.texture = this.made(cols, rows);
+      this.texture = this.made(w, h);
       old.destroy();
     }
     for (const m of this.materials) this.bind(m);
