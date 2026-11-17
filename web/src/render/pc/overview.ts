@@ -193,7 +193,7 @@ export class TownOverview {
     parent.addChild(this.root);
     this.templates = new TemplateCache(app);
     this.street = new Street(app, this.root, assets, house, { layers: this.layers, fenceStyles: content.fenceStyles });
-    this.buildings = new TownBuildings(app, this.root, this.layers);
+    this.buildings = new TownBuildings(app, this.root, { layers: this.layers, castShadows: true });
     // Unlit: the output is the vertex colour times the instance colour (`glowByInstance`), added by its alpha.
     const mat = new pc.StandardMaterial();
     mat.name = 'lotGlow';

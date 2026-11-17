@@ -86,8 +86,9 @@ function code(lang: Language): ShaderFeature['glsl'] {
 
   // The colour picked and toned (the vertex colour linear already: PlayCanvas converts it), and the
   // face's own metres: along it (x or z by its normal) and up from the floor.
+  // (Not in the shadow pass, which has no vertex colour: the menus' town casts shadows, `TownBuildings`' `castShadows`.)
   const vsEnd = `
-#ifdef GAME_TOWN_BUILDING
+#if defined(GAME_TOWN_BUILDING) && !defined(SHADOW_PASS)
 	{
 		${let_('tvc', v4)} = ${out('vVertexColor')};
 		${let_('tWall', v3)} = pow(max(game_townWall.rgb, ${v3}(0.0)), ${v3}(2.2));
