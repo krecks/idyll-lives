@@ -25,7 +25,8 @@
  * - `albedo`, `opacity`, `metalness`, `gloss`, `reflDir`, `emissive`: after `getAlbedo`, `getOpacity`,
  *   `getMetalness`, `getGlossiness`, `getReflDir`, `getEmission` (`diffusePS`, `opacityPS`,
  *   `metalnessPS`, `glossPS`, `reflDirPS`, `emissivePS`).
- * - `combine`: `combineColor` (`combinePS`): the engine's is `combineColorEngine`.
+ * - `combine`: `combineColor` (`combinePS`): the engine's is `combineColorEngine`. One feature returns from it (the
+ *   soft look, last); one before it may only change the light it combines (the water's sun highlight).
  * - `end`: replaces `endPS` (the colour, fog, tone mapping and gamma) where its defines say so.
  * - `fogPS`: the game's haze in its materials (`fog.ts`); `reflectionEnvPS`, `reflectionEnvHQPS`:
  *   the sky's reflection rising at a slant, and `fresnelSchlickPS`: the full Schlick term for the
@@ -95,7 +96,7 @@ export interface FeatureCode {
   gloss?: string;
   reflDir?: string;
   emissive?: string;
-  /** The body of `combineColor` (one feature at most: the soft look). */
+  /** The body of `combineColor` (one feature returns from it: the soft look; one before it may change the light it combines: the water). */
   combine?: string;
   /** `endPS`'s replacement where the feature's defines are set (one feature at most: the diag view). */
   end?: { when: string; code: string };

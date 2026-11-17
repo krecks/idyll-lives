@@ -6,6 +6,10 @@
  * The town file and saves carry it as `meta.land` (`LandFile`): `encodeLand` cuts it into tiles of
  * `TILE` × `TILE` samples, each a short base64 string, so a stroke of the land brushes sends only
  * the tiles it touched (`tilesOf`), and `decodeLand` reads it back.
+ *
+ * Where a river was drawn (the River brush), each of its samples says which way the water runs
+ * (`Land.flow`, `flowOf`): the renderer's flowing water (`render/shared/waterFlow.ts`) reads it, and
+ * works the rest out (a generated river, water stepping down from one level to the next).
  */
 
 import type { LandFile } from '../core/protocol';
@@ -36,6 +40,11 @@ export interface Land {
   wl: Int16Array;
   /** What covers the ground (`COVER`), `coverSpan(cols)` × `coverSpan(rows)` cells of `COVER_CELL` m. */
   cover: Uint8Array;
+  /**
+   * Which way the water runs where a river was drawn: 0 none (still, or not said), else the way as an angle
+   * (`flowCode`, `flowOf`). Missing: none anywhere (a land no river was drawn on, a generated one).
+   */
+  flow?: Uint8Array;
   /** How it was first filled (`LandFile.seeded`). */
   seeded: 'drawn' | 'follow';
   /** Shaped since it was made or read. */
@@ -55,7 +64,30 @@ export interface LandPatch {
   rect: LandRect;
   h?: Int16Array;
   wl?: Int16Array;
+  flow?: Uint8Array;
   cover?: { rect: LandRect; data: Uint8Array };
+}
+
+/** How many ways `Land.flow` tells apart: codes 1 to `FLOW_WAYS`, a full turn. */
+export const FLOW_WAYS = 255;
+
+/** The code (`Land.flow`) of the way (`dx`, `dz`) (game space; any length but 0: 0, no way). */
+export function flowCode(dx: number, dz: number): number {
+  if (!dx && !dz) return 0;
+  const turn = Math.atan2(dz, dx) / (2 * Math.PI);
+  return 1 + (Math.round((turn - Math.floor(turn)) * FLOW_WAYS) % FLOW_WAYS);
+}
+
+/** The way (a unit vector, game space) `code` says, or null for 0. */
+export function flowOf(code: number): [number, number] | null {
+  if (!code) return null;
+  const a = ((code - 1) / FLOW_WAYS) * 2 * Math.PI;
+  return [Math.cos(a), Math.sin(a)];
+}
+
+/** `land.flow`, made (all still) if it had none. */
+export function flowsOf(land: Land): Uint8Array {
+  return (land.flow ??= new Uint8Array(land.cols * land.rows));
 }
 
 /** The cover cells over `samples` samples of the height field. */
@@ -98,6 +130,14 @@ export function landHash(land: Land | null | undefined): string {
   for (let k = 0; k < land.h.length; k++) mix(land.h[k]);
   for (let k = 0; k < land.wl.length; k++) mix(land.wl[k]);
   for (let k = 0; k < land.cover.length; k++) mix(land.cover[k]);
+  // (Only where a river says which way it runs: a land with none hashes as it did before there was flow.)
+  if (land.flow) {
+    for (let k = 0; k < land.flow.length; k++) {
+      if (!land.flow[k]) continue;
+      mix(k);
+      mix(land.flow[k]);
+    }
+  }
   return `${land.cols}x${land.rows}:${(a >>> 0).toString(36)}${(b >>> 0).toString(36)}`;
 }
 
@@ -118,34 +158,44 @@ export function tilesOf(rect: LandRect, cols: number): number[] {
   return out;
 }
 
-/** The land as the town file carries it. With `only`, `h` and `wl` hold just those tiles (the rest of each array left holes); the cover is always whole. */
+/**
+ * The land as the town file carries it. With `only`, `h`, `wl` and `flow` hold just those tiles (the rest of each
+ * array left holes); the cover is always whole. `flow` only when some sample of the land has a way (none: the file
+ * as it was before rivers ran).
+ */
 export function encodeLand(land: Land, only?: ReadonlySet<number>): LandFile {
   const count = Math.ceil(land.cols / TILE) * Math.ceil(land.rows / TILE);
   const h: string[] = [];
   const wl: string[] = [];
+  const flows = !!land.flow?.some((v) => v !== 0);
+  const flow: string[] = [];
   for (let t = 0; t < count; t++) {
     if (only && !only.has(t)) continue;
     h[t] = codeTile(land.h, land.cols, land.rows, t);
     wl[t] = hasWater(land, t) ? codeTile(land.wl, land.cols, land.rows, t) : '';
+    if (flows) flow[t] = flowTile(land, t);
   }
-  return { v: 1, cell: LAND_CELL, cols: land.cols, rows: land.rows, tile: TILE, h, wl, cover: rle(land.cover), seeded: land.seeded };
+  return { v: 1, cell: LAND_CELL, cols: land.cols, rows: land.rows, tile: TILE, h, wl, ...(flows ? { flow } : {}), cover: rle(land.cover), seeded: land.seeded };
 }
 
 /**
  * `tiles` of the land, coded as `encodeLand` codes them, by tile index: what a `shapeLand` command
- * sends (`ShapeLandMeta.land`).
+ * sends (`ShapeLandMeta.land`). `flow` only on a land that has one (`Land.flow`): a tile with no way
+ * anywhere in it '' (the way it had taken away).
  */
-export function encodeTiles(land: Land, tiles: Iterable<number>): { h: Record<number, string>; wl: Record<number, string> } {
+export function encodeTiles(land: Land, tiles: Iterable<number>): { h: Record<number, string>; wl: Record<number, string>; flow?: Record<number, string> } {
   const h: Record<number, string> = {};
   const wl: Record<number, string> = {};
+  const flow: Record<number, string> | undefined = land.flow ? {} : undefined;
   for (const t of tiles) {
     h[t] = codeTile(land.h, land.cols, land.rows, t);
     wl[t] = hasWater(land, t) ? codeTile(land.wl, land.cols, land.rows, t) : '';
+    if (flow) flow[t] = flowTile(land, t);
   }
-  return { h, wl };
+  return flow ? { h, wl, flow } : { h, wl };
 }
 
-/** The land a town file carried (a tile missing from `h` reads as flat at 0, from `wl` as dry). */
+/** The land a town file carried (a tile missing from `h` reads as flat at 0, from `wl` as dry, from `flow` as still). */
 export function decodeLand(file: LandFile): Land {
   const { cols, rows } = file;
   const land: Land = { cols, rows, h: new Int16Array(cols * rows), wl: new Int16Array(cols * rows).fill(NONE), cover: new Uint8Array(coverSpan(cols) * coverSpan(rows)), seeded: file.seeded, edited: false };
@@ -153,6 +203,7 @@ export function decodeLand(file: LandFile): Land {
   for (let t = 0; t < count; t++) {
     if (file.h[t]) readTile(file.h[t], land.h, cols, rows, t);
     if (file.wl[t]) readTile(file.wl[t], land.wl, cols, rows, t);
+    if (file.flow?.[t]) readTile(file.flow[t], flowsOf(land), cols, rows, t);
   }
   let at = 0;
   for (let k = 0; k + 1 < file.cover.length; k += 2) {
@@ -172,6 +223,15 @@ function tileBox(cols: number, rows: number, t: number): [number, number, number
   return [i0, j0, Math.min(TILE, cols - i0), Math.min(TILE, rows - j0)];
 }
 
+/** Tile `t` of `land.flow` coded, or '' with no way anywhere in it. */
+function flowTile(land: Land, t: number): string {
+  const flow = land.flow;
+  if (!flow) return '';
+  const [i0, j0, w, d] = tileBox(land.cols, land.rows, t);
+  for (let j = j0; j < j0 + d; j++) for (let k = j * land.cols + i0, end = k + w; k < end; k++) if (flow[k]) return codeTile(flow, land.cols, land.rows, t);
+  return '';
+}
+
 /** Whether any sample in tile `t` has a water level. */
 function hasWater(land: Land, t: number): boolean {
   const [i0, j0, w, d] = tileBox(land.cols, land.rows, t);
@@ -183,7 +243,7 @@ function hasWater(land: Land, t: number): boolean {
  * Each sample of the tile less the one before it: the one left of it, or for the first of a row,
  * the first of the row above (the tile's first sample less 0). A flat tile is all zeros but one.
  */
-function deltas(values: Int16Array, cols: number, rows: number, t: number, each: (d: number) => void): void {
+function deltas(values: Int16Array | Uint8Array, cols: number, rows: number, t: number, each: (d: number) => void): void {
   const [i0, j0, w, d] = tileBox(cols, rows, t);
   let first = 0;
   for (let j = j0; j < j0 + d; j++) {
@@ -198,7 +258,7 @@ function deltas(values: Int16Array, cols: number, rows: number, t: number, each:
 let scratch = new Uint8Array(TILE * TILE * 3 + 8);
 
 /** Tile `t` of `values`: zigzag varints of its deltas (`deltas`), a run of zeros as 0x00 then the run's length, in base64. */
-function codeTile(values: Int16Array, cols: number, rows: number, t: number): string {
+function codeTile(values: Int16Array | Uint8Array, cols: number, rows: number, t: number): string {
   let n = 0;
   let zeros = 0;
   const varint = (v: number) => {
@@ -229,7 +289,7 @@ function codeTile(values: Int16Array, cols: number, rows: number, t: number): st
 }
 
 /** Tile `t` of `values` read back from `codeTile`'s string. */
-function readTile(code: string, values: Int16Array, cols: number, rows: number, t: number): void {
+function readTile(code: string, values: Int16Array | Uint8Array, cols: number, rows: number, t: number): void {
   const text = atob(code);
   if (scratch.length < text.length) scratch = new Uint8Array(text.length);
   for (let k = 0; k < text.length; k++) scratch[k] = text.charCodeAt(k);

@@ -11,7 +11,7 @@
 
 import type { NeighbourhoodDraft, Rect } from './town';
 import type { Rle, RoadPlan, WorldStructure, WorldZone } from '../core/protocol';
-import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, SEA_CM, type Land, type LandPatch, type LandRect } from './land';
+import { COVER, COVER_CELL, coverSpan, flowsOf, LAND_CELL, NONE, SEA_CM, type Land, type LandPatch, type LandRect } from './land';
 import { aimOf, coverCells, coverSamples, isPoint, mountainGhost, mountainOf, placeMountain, pointGrid, stamp, strokeOf, TOOL_KIND, unionRect, type Brush, type Free, type LandTool, type MountainGhost, type StrokeState, type Wettable } from './landBrush';
 import { outlines, rle, unrle } from './landMasks';
 import { deckTiles } from './macro';
@@ -313,7 +313,7 @@ function swapRect(patch: Int16Array | Uint8Array, land: Int16Array | Uint8Array,
   }
 }
 
-const patchBytes = (p: LandPatch) => (p.h?.byteLength ?? 0) + (p.wl?.byteLength ?? 0) + (p.cover?.data.byteLength ?? 0);
+const patchBytes = (p: LandPatch) => (p.h?.byteLength ?? 0) + (p.wl?.byteLength ?? 0) + (p.flow?.byteLength ?? 0) + (p.cover?.data.byteLength ?? 0);
 
 /** The smallest rectangle of a `cols` × `rows` grid where `a` and `b` differ; null if they don't. */
 function differs(a: ArrayLike<number>, b: ArrayLike<number>, cols: number, rows: number): LandRect | null {
@@ -337,8 +337,8 @@ export class LandEditor {
   /** What each patch on the stacks is. */
   private readonly kept = new WeakMap<LandPatch, Kept>();
   /** The land as first surveyed, and as it was before the stroke under way. */
-  private readonly original: { h: Int16Array; wl: Int16Array; cover: Uint8Array };
-  private readonly shadow: { h: Int16Array; wl: Int16Array; cover: Uint8Array };
+  private readonly original: { h: Int16Array; wl: Int16Array; flow: Uint8Array; cover: Uint8Array };
+  private readonly shadow: { h: Int16Array; wl: Int16Array; flow: Uint8Array; cover: Uint8Array };
   /** The land had been shaped before the editor had it (read from a world's `meta.land`). */
   private readonly editedBefore: boolean;
   private readonly wettable?: Wettable;
@@ -357,16 +357,18 @@ export class LandEditor {
   hint: string | null = null;
 
   /**
-   * `land` is changed in place. `free(i, j)` is how far sample (i, j) may change: 0 on built land,
-   * rising to 1 clear of it (the protection mask: `Protection`, or `LandEditor.forWorld`).
+   * `land` is changed in place (given its `flow`, all still, if it had none). `free(i, j)` is how far
+   * sample (i, j) may change: 0 on built land, rising to 1 clear of it (the protection mask:
+   * `Protection`, or `LandEditor.forWorld`).
    */
   constructor(
     readonly land: Land,
     readonly free: Free,
     options: LandEditorOptions = {},
   ) {
-    this.original = { h: land.h.slice(), wl: land.wl.slice(), cover: land.cover.slice() };
-    this.shadow = { h: land.h.slice(), wl: land.wl.slice(), cover: land.cover.slice() };
+    const flow = flowsOf(land);
+    this.original = { h: land.h.slice(), wl: land.wl.slice(), flow: flow.slice(), cover: land.cover.slice() };
+    this.shadow = { h: land.h.slice(), wl: land.wl.slice(), flow: flow.slice(), cover: land.cover.slice() };
     this.editedBefore = land.edited;
     this.wettable = options.wettable;
     this.earthOnBuilt = !!options.earthOnBuilt;
@@ -422,7 +424,7 @@ export class LandEditor {
   /** Starts a stroke of `brush` at world point (`x`, `z`); returns the samples it changed. */
   begin(brush: Brush, x: number, z: number): LandRect | null {
     if (this.active) this.end();
-    this.active = strokeOf({ ...brush }, this.land, { h: this.shadow.h, wl: this.shadow.wl });
+    this.active = strokeOf({ ...brush }, this.land, { h: this.shadow.h, wl: this.shadow.wl, flow: this.shadow.flow });
     this.hint = null;
     this.last = aimOf(brush, x, z);
     this.pending = 0;
@@ -575,12 +577,15 @@ export class LandEditor {
     const { cols, rows } = this.land;
     const [cw, cd] = [coverSpan(cols), coverSpan(rows)];
     const cells = differs(this.land.cover, this.original.cover, cw, cd);
-    const rect = unionRect(unionRect(differs(this.land.h, this.original.h, cols, rows), differs(this.land.wl, this.original.wl, cols, rows)), cells && coverSamples(this.land, cells));
+    const flow = flowsOf(this.land);
+    const samples = unionRect(unionRect(differs(this.land.h, this.original.h, cols, rows), differs(this.land.wl, this.original.wl, cols, rows)), differs(flow, this.original.flow, cols, rows));
+    const rect = unionRect(samples, cells && coverSamples(this.land, cells));
     if (!rect) return null;
     const coverRect = coverCells(this.land, rect);
-    const patch: LandPatch = { rect, h: cut(this.land.h, cols, rect), wl: cut(this.land.wl, cols, rect), cover: { rect: coverRect, data: cut(this.land.cover, cw, coverRect) } };
+    const patch: LandPatch = { rect, h: cut(this.land.h, cols, rect), wl: cut(this.land.wl, cols, rect), flow: cut(flow, cols, rect), cover: { rect: coverRect, data: cut(this.land.cover, cw, coverRect) } };
     copyRect(this.original.h, this.land.h, cols, rect);
     copyRect(this.original.wl, this.land.wl, cols, rect);
+    copyRect(this.original.flow, flow, cols, rect);
     copyRect(this.original.cover, this.land.cover, cw, coverRect);
     this.sync(rect, coverRect);
     this.push(patch, 'reset');
@@ -721,7 +726,7 @@ export class LandEditor {
       const cells = coverCells(this.land, rect);
       return { rect, cover: { rect: cells, data: cut(this.shadow.cover, coverSpan(cols), cells) } };
     }
-    return { rect, h: cut(this.shadow.h, cols, rect), wl: cut(this.shadow.wl, cols, rect) };
+    return { rect, h: cut(this.shadow.h, cols, rect), wl: cut(this.shadow.wl, cols, rect), flow: cut(this.shadow.flow, cols, rect) };
   }
 
   /**
@@ -770,6 +775,7 @@ export class LandEditor {
     };
     if (patch.h && !same(patch.h, this.land.h, cols, patch.rect)) return true;
     if (patch.wl && !same(patch.wl, this.land.wl, cols, patch.rect)) return true;
+    if (patch.flow && !same(patch.flow, flowsOf(this.land), cols, patch.rect)) return true;
     return !!patch.cover && !same(patch.cover.data, this.land.cover, coverSpan(cols), patch.cover.rect);
   }
 
@@ -778,6 +784,7 @@ export class LandEditor {
     const { cols } = this.land;
     copyRect(this.land.h, this.shadow.h, cols, rect);
     copyRect(this.land.wl, this.shadow.wl, cols, rect);
+    copyRect(flowsOf(this.land), this.shadow.flow, cols, rect);
     copyRect(this.land.cover, this.shadow.cover, coverSpan(cols), cells ?? coverCells(this.land, rect));
   }
 
@@ -785,6 +792,7 @@ export class LandEditor {
     const { cols } = this.land;
     if (patch.h) swapRect(patch.h, this.land.h, this.shadow.h, cols, patch.rect);
     if (patch.wl) swapRect(patch.wl, this.land.wl, this.shadow.wl, cols, patch.rect);
+    if (patch.flow) swapRect(patch.flow, flowsOf(this.land), this.shadow.flow, cols, patch.rect);
     if (patch.cover) swapRect(patch.cover.data, this.land.cover, this.shadow.cover, coverSpan(cols), patch.cover.rect);
   }
 
@@ -806,9 +814,10 @@ export class LandEditor {
   /** `land.edited`: shaped before the editor had it, or differing now from how it was surveyed. */
   private markEdited(): void {
     const { h, wl, cover } = this.land;
+    const flow = flowsOf(this.land);
     const o = this.original;
     let differs = this.editedBefore;
-    for (let k = 0; k < h.length && !differs; k++) if (h[k] !== o.h[k] || wl[k] !== o.wl[k]) differs = true;
+    for (let k = 0; k < h.length && !differs; k++) if (h[k] !== o.h[k] || wl[k] !== o.wl[k] || flow[k] !== o.flow[k]) differs = true;
     for (let k = 0; k < cover.length && !differs; k++) if (cover[k] !== o.cover[k]) differs = true;
     this.land.edited = differs;
   }

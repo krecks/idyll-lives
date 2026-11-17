@@ -7,7 +7,7 @@
 // within it, an unbroken trail when dragged); and a stamp's time (printed). `bun test tests/landBrush.test.ts`.
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
-import { blankLand, COVER, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, wetAt, type Land, type LandRect } from '../src/game/land';
+import { blankLand, COVER, coverSpan, flowOf, heightAt, LAND_CELL, NONE, SEA_CM, wetAt, type Land, type LandRect } from '../src/game/land';
 import { aimOf, isPoint, mountainGhost, POINT, settleWater, stamp, strokeOf, type Brush, type LandTool } from '../src/game/landBrush';
 import { applyLand, LandEditor, landZones, Protection, wetTiles, type BuiltLand, type LandPrices } from '../src/game/landEdit';
 import { rle, unrle } from '../src/game/landMasks';
@@ -148,6 +148,63 @@ describe('water tools', () => {
     expect(land.h[at(land, 128, 128)]).toBeGreaterThanOrEqual(490);
   });
 
+  test('a river runs along the drag, round a bend too; a lake, dry and raised ground take its way away', () => {
+    const land = landOf(256, () => 3);
+    const editor = new LandEditor(land, FREE);
+    // East along z 64, then a bend south (z rising) down x 200.
+    const path = [...line([30, 64], [200, 64], 60), ...line([200, 64], [200, 200], 50).slice(1)];
+    stroke(editor, { tool: 'river', radius: 6, strength: 0.4 }, path);
+    const way = (x: number, z: number) => flowOf(land.flow![at(land, x, z)]);
+    // Every wet sample of the river says some way; along the straight it is east, down the leg south.
+    for (let k = 0; k < land.h.length; k++) if (wetAt(land, k % land.cols, Math.floor(k / land.cols))) expect(land.flow![k]).not.toBe(0);
+    for (const x of [40, 80, 120, 160]) for (const dz of [-4, 0, 4]) expect(way(x, 64 + dz)![0]).toBeGreaterThan(0.95);
+    for (const z of [110, 150, 190]) for (const dx of [-4, 0, 4]) expect(way(200 + dx, z)![1]).toBeGreaterThan(0.95);
+    // Round the bend it turns: between east and south.
+    const bend = way(196, 68)!;
+    expect(bend[0]).toBeGreaterThan(0.1);
+    expect(bend[1]).toBeGreaterThan(0.1);
+    // Dry ground keeps none.
+    for (let k = 0; k < land.h.length; k++) if (land.wl[k] === NONE) expect(land.flow![k]).toBe(0);
+
+    // A lake over part of it stills it there; dry takes another part (and its way) away; so does raised ground.
+    stroke(editor, { tool: 'lake', radius: 10, strength: 0.4 }, [[80, 64]]);
+    expect(land.flow![at(land, 80, 64)]).toBe(0);
+    expect(way(140, 64)![0]).toBeGreaterThan(0.95);
+    stroke(editor, { tool: 'dry', radius: 8, strength: 1 }, [[140, 64]]);
+    expect(land.wl[at(land, 140, 64)]).toBe(NONE);
+    expect(land.flow![at(land, 140, 64)]).toBe(0);
+    stroke(editor, { tool: 'raise', radius: 8, strength: 1 }, hold([200, 150], 1));
+    expect(land.wl[at(land, 200, 150)]).toBe(NONE);
+    expect(land.flow![at(land, 200, 150)]).toBe(0);
+  });
+
+  test('a river drawn into another runs on into it, and the other keeps its way', () => {
+    const land = landOf(256, () => 3);
+    const editor = new LandEditor(land, FREE);
+    // The main river east along z 128; a stream from the north (z 20) down to its bank at x 128.
+    stroke(editor, { tool: 'river', radius: 6, strength: 0.4 }, line([20, 128], [236, 128], 80));
+    stroke(editor, { tool: 'river', radius: 4, strength: 0.4 }, line([128, 20], [128, 118], 50));
+    const way = (x: number, z: number) => flowOf(land.flow![at(land, x, z)])!;
+    // The stream runs south all the way down to the river, which still runs east where they meet.
+    for (const z of [40, 80, 110, 118]) expect(way(128, z)[1]).toBeGreaterThan(0.9);
+    for (const x of [100, 124, 128, 132, 160]) expect(way(x, 128)[0]).toBeGreaterThan(0.95);
+  });
+
+  test('a river drawn back over another from dry land turns it round; one begun in its water leaves its way', () => {
+    const land = landOf(256, () => 3);
+    const editor = new LandEditor(land, FREE);
+    // East along z 128, from x 30 to 226.
+    stroke(editor, { tool: 'river', radius: 6, strength: 0.4 }, line([30, 128], [226, 128], 80));
+    const way = (x: number, z: number) => flowOf(land.flow![at(land, x, z)])!;
+    for (const x of [60, 128, 200]) expect(way(x, 128)[0]).toBeGreaterThan(0.95);
+    // Begun in its water (x 128), dragged west to x 40: it keeps running east there.
+    stroke(editor, { tool: 'river', radius: 6, strength: 0.4 }, line([128, 128], [40, 128], 40));
+    for (const x of [60, 100]) for (const dz of [-4, 0, 4]) expect(way(x, 128 + dz)[0]).toBeGreaterThan(0.95);
+    // Begun on dry land past its east end (x 240), dragged west over it to x 40: it runs west now, banks and all.
+    stroke(editor, { tool: 'river', radius: 6, strength: 0.4 }, line([240, 128], [40, 128], 90));
+    for (const x of [60, 100, 160, 200]) for (const dz of [-4, 0, 4]) expect(way(x, 128 + dz)[0]).toBeLessThan(-0.95);
+  });
+
   test('the water settles: raised sea dries out, ground lowered by the sea fills from it', () => {
     const land = landOf(128, (x) => (x < 40 ? -2 : 0.2));
     for (let k = 0; k < land.h.length; k++) if (land.h[k] < SEA_CM) land.wl[k] = SEA_CM;
@@ -212,6 +269,29 @@ describe('cover and mountains', () => {
 });
 
 describe('undo', () => {
+  test("undo and redo give back a river's way byte for byte; reset stills it", () => {
+    const land = landOf(256, (x, z) => 4 + fbm(x / 30, z / 30, 9, 3) * 3);
+    const editor = new LandEditor(land, FREE);
+    const before = land.flow!.slice();
+    stroke(editor, { tool: 'river', radius: 8, strength: 0.5 }, line([20, 40], [230, 200], 90));
+    const after = land.flow!.slice();
+    expect(after.some((v) => v !== 0)).toBe(true);
+    stroke(editor, { tool: 'river', radius: 5, strength: 0.5 }, line([20, 220], [120, 120], 50));
+    const twice = land.flow!.slice();
+    editor.undo();
+    expect(Buffer.from(land.flow!).equals(Buffer.from(after))).toBe(true);
+    editor.undo();
+    expect(Buffer.from(land.flow!).equals(Buffer.from(before))).toBe(true);
+    editor.redo();
+    editor.redo();
+    expect(Buffer.from(land.flow!).equals(Buffer.from(twice))).toBe(true);
+    // (A stroke that changed only the way, none of the heights or water, is still a stroke: it is undone too.)
+    editor.reset();
+    expect(land.flow!.every((v) => v === 0)).toBe(true);
+    editor.undo();
+    expect(Buffer.from(land.flow!).equals(Buffer.from(twice))).toBe(true);
+  });
+
   test('undo gives back every byte, redo puts the stroke back byte for byte, reset goes back to the survey', () => {
     const land = landOf(512, (x, z) => fbm(x / 80, z / 80, 9, 3) * 20);
     for (let k = 0; k < land.h.length; k++) if (land.h[k] < 600) land.wl[k] = 600;

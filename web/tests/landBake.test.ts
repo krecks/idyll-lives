@@ -2,8 +2,8 @@
 // (`LandscapeLayout.setLand`): the survey stands where the land stood, to the centimetre at every sample; drawn from
 // it, the ground is the field's inside the world and the landscape's past it (moved by the edge's difference,
 // fading out); the water's edge is the field's; its water above the sea's level is drawn as quads at its level,
-// the sea's left to the sheet; a stroke grows again only the woods of the squares it reached; a ray finds the
-// ground. `bun test`.
+// sloping where a river steps down and meeting with no gap, the sea's left to the sheet; a stroke grows again only the
+// woods of the squares it reached; a ray finds the ground. `bun test`.
 import { describe, expect, test } from 'bun:test';
 import type { WorldStructure } from '../src/core/protocol';
 import { COVER, coverSpan, encodeLand, LAND_CELL, NONE, SEA_CM, type Land } from '../src/game/land';
@@ -149,6 +149,66 @@ describe("the field's water", () => {
     land.wl.fill(NONE, 0, 40 * 64);
     land.wl[5] = 400;
     expect(pondQuads(land, 0, 0, 128, 70)).toBeNull();
+  });
+
+  test('a river stepping down slopes between its levels (a rapid), and its cells meet with no gap', () => {
+    // A channel along x over land 2 m up, its bed at 0: the water at 1.2 m west of x 60, 0.8 m east of it (a step
+    // between neighbouring samples), then at the sea's level east of x 100 (the sea's own samples left to the sheet).
+    const land = flat();
+    land.h.fill(200);
+    for (let j = 28; j < 36; j++) {
+      for (let i = 4; i < 60; i++) {
+        const k = j * 64 + i;
+        land.h[k] = i < 50 ? 0 : -100;
+        land.wl[k] = i * 2 < 60 ? 120 : i * 2 < 100 ? 80 : SEA_CM;
+      }
+    }
+    const quads = pondQuads(land, 0, 0, 128, 128)!;
+    const { positions: p, normals: n, indices } = quads;
+    // Across the step, the water slopes from one level down to the next over the cell between them, its normal
+    // leaning downstream; flat (straight up) away from it.
+    let [rapid, flatUp] = [0, 0];
+    for (let v = 0; v < p.length; v += 3) {
+      const [x, y] = [p[v], p[v + 1]];
+      expect(y).toBeGreaterThanOrEqual(SEA_CM / 100 - 1e-6);
+      expect(y).toBeLessThanOrEqual(1.2 + 1e-6);
+      // (The cells from x 58 to 60: their points at 1.2 m on the west side and down to 0.8 m on the east, leaning east.)
+      if (x >= 58 && x <= 60 && n[v] > 0.1) {
+        if (x === 58) expect(y).toBeCloseTo(1.2, 6);
+        if (x === 60 && Math.abs(y - 0.8) < 1e-6) rapid++;
+      }
+      if (x < 50 && x > 20) {
+        expect(y).toBeCloseTo(1.2, 6);
+        expect(n[v + 1]).toBe(1);
+        flatUp++;
+      }
+    }
+    expect(rapid).toBeGreaterThan(0);
+    expect(flatUp).toBeGreaterThan(0);
+    // No gap: every edge only one triangle has lies on the shore (the water there within a lap of the ground), never
+    // out in the water between two cells (but where it meets the sea's sheet).
+    const key = (a: number) => `${p[a * 3].toFixed(4)},${p[a * 3 + 1].toFixed(4)},${p[a * 3 + 2].toFixed(4)}`;
+    const edges = new Map<string, number>();
+    for (let t = 0; t < indices.length; t += 3) {
+      for (const [a, b] of [[indices[t], indices[t + 1]], [indices[t + 1], indices[t + 2]], [indices[t + 2], indices[t]]]) {
+        const id = [key(a), key(b)].sort().join('|');
+        edges.set(id, (edges.get(id) ?? 0) + 1);
+      }
+    }
+    let open = 0;
+    for (const [id, count] of edges) {
+      if (count !== 1) continue;
+      open++;
+      const [a, b] = id.split('|').map((s) => s.split(',').map(Number));
+      // (Where the river meets the sea: the sheet goes on from there.)
+      if (a[1] === SEA_CM / 100 && b[1] === SEA_CM / 100) continue;
+      const [mx, my, mz] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+      const [i, j] = [Math.floor(mx / LAND_CELL), Math.floor(mz / LAND_CELL)];
+      const [u, v] = [mx / LAND_CELL - i, mz / LAND_CELL - j];
+      const g = ((land.h[j * 64 + i] * (1 - u) + land.h[j * 64 + i + 1] * u) * (1 - v) + (land.h[(j + 1) * 64 + i] * (1 - u) + land.h[(j + 1) * 64 + i + 1] * u) * v) / 100;
+      expect(Math.abs(my - g)).toBeLessThan(0.6);
+    }
+    expect(open).toBeGreaterThan(0);
   });
 
   test('an island’s survey: its sea at the sea’s level all round', () => {
