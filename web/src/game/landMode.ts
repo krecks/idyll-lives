@@ -14,10 +14,12 @@ import { groundDepth, type Rle, type ShapeLandCommand, type ShapeLandMeta, type 
 import type { Renderer } from '../render/types';
 import { costLabel, NO_LAND, stopsAtFunds, type LandState } from '../ui/land/landTools';
 import { LandStroke, type LandSurface } from '../ui/land/landStroke';
-import { encodeLand, encodeTiles, NONE, tilesOf, type Land, type LandPatch } from './land';
+import { encodeLand, encodeTiles, NONE, tilesOf, type Land, type LandPatch, type LandRect } from './land';
 import type { Brush } from './landBrush';
+import { bridgesMeta, bridgesOrWhy, withBridges, type BridgeChange } from './landBridges';
 import { builtOf, LandEditor, type LandPrices } from './landEdit';
-import { rle } from './landMasks';
+import { rle, unrle } from './landMasks';
+import type { Rect } from './town';
 
 /** What the Land tab needs of the game. */
 export interface LandModeHost {
@@ -91,6 +93,12 @@ export class LandMode {
   private stroke: LandStroke | null = null;
   /** The world's `meta.land` holds the whole land (sent once, with the first stroke, in a world that had none). */
   private whole = false;
+  /**
+   * On a land the town follows: its lots (what a bridge may not stand on) and the water mask's size; each stroke's
+   * bridges (`landBridges.ts`), by its patch, for undo and redo.
+   */
+  private bridging: { plots: Rect[]; width: number; depth: number } | null = null;
+  private readonly bridged = new WeakMap<LandPatch, BridgeChange[]>();
   /** The command on its way, and the one after it waiting (none: free). */
   private sending: Promise<void> | null = null;
   private state: LandState = { ...NO_LAND };
@@ -131,7 +139,12 @@ export class LandMode {
       // (The ground storey's rows: a world with storeys stacks them under its depth.)
       const built = builtOf({ ...world, depth: groundDepth(world) });
       if (built.width !== mask.width || built.depth !== mask.depth) console.warn(`[land] the water mask is ${mask.width} × ${mask.depth}, the world ${built.width} × ${built.depth}`);
-      const editor = LandEditor.forWorld(land, { ...built, width: mask.width, depth: mask.depth }, { water: mask.water, zones: world.meta?.zones ?? [] });
+      // (On a land the town follows, the earth tools shape built land too: the roads and lots move with it, the land
+      // settled under them at the stroke's end.)
+      const settle = (rect: LandRect, before: Int16Array) => this.host.renderer.settleLand?.(rect, before) ?? null;
+      const follow = land.seeded === 'follow' ? { earthOnBuilt: true, settle, bridges: true } : {};
+      this.bridging = land.seeded === 'follow' ? { plots: built.plots.slice(), width: mask.width, depth: mask.depth } : null;
+      const editor = LandEditor.forWorld(land, { ...built, width: mask.width, depth: mask.depth }, { water: mask.water, zones: world.meta?.zones ?? [] }, follow);
       this.whole = !!world.meta?.land;
       this.host.renderer.setLand(land);
       this.editor = editor;
@@ -214,11 +227,17 @@ export class LandMode {
     const e = this.editor;
     const patch = e?.undo();
     if (!e || !patch) return;
+    const bridges = this.bridgesTo(patch, 'before');
     this.surface.changed(patch.rect, true);
-    await this.send(patch, () => {
-      const back = e.redo();
-      if (back) this.surface.changed(back.rect, true);
-    });
+    await this.send(
+      patch,
+      () => {
+        this.bridgesTo(patch, 'after');
+        const back = e.redo();
+        if (back) this.surface.changed(back.rect, true);
+      },
+      bridges,
+    );
   }
 
   async redo(): Promise<void> {
@@ -226,11 +245,25 @@ export class LandMode {
     const e = this.editor;
     const patch = e?.redo();
     if (!e || !patch) return;
+    const bridges = this.bridgesTo(patch, 'after');
     this.surface.changed(patch.rect, true);
-    await this.send(patch, () => {
-      const back = e.undo();
-      if (back) this.surface.changed(back.rect, true);
-    });
+    await this.send(
+      patch,
+      () => {
+        this.bridgesTo(patch, 'before');
+        const back = e.undo();
+        if (back) this.surface.changed(back.rect, true);
+      },
+      bridges,
+    );
+  }
+
+  /** The editor's roads with `patch`'s bridges as they were (`before`) or as it made them (`after`); the command's `meta.roads` for it (none if it made none). */
+  private bridgesTo(patch: LandPatch, side: 'before' | 'after'): ShapeLandMeta['roads'] {
+    const changes = this.bridged.get(patch);
+    if (!changes || !this.editor) return undefined;
+    this.editor.setRoads(withBridges(this.editor.roads, changes, side));
+    return bridgesMeta(changes, side);
   }
 
   /** The land put back as it was surveyed (one more stroke: undone as one). */
@@ -279,23 +312,43 @@ export class LandMode {
   /** Sends a stroke the editor has ended (`patch`: what `end` returned); refused, it is taken back. Resolves once answered. */
   commit(patch: LandPatch): Promise<void> {
     const e = this.editor!;
-    return this.send(patch, () => {
+    this.lastRefusal = null;
+    const takeBack = () => {
+      this.bridgesTo(patch, 'before');
       const back = e.undo();
       e.dropRedo();
       if (back) this.surface.changed(back.rect, true);
-    });
+    };
+    // Water across a road: the road bridged there, or the stroke refused (`landBridges.ts`).
+    const b = this.bridging;
+    if (b && wetChanged(e.land, patch)) {
+      const made = bridgesOrWhy(e.roads, b.plots, unrle(e.water(), b.width * b.depth), b.width, b.depth);
+      if ('refused' in made) {
+        takeBack();
+        this.refuse(made.refused);
+        this.refresh();
+        return Promise.resolve();
+      }
+      if (made.changes.length) {
+        this.bridged.set(patch, made.changes);
+        e.setRoads(made.roads);
+        return this.send(patch, takeBack, bridgesMeta(made.changes, 'after'));
+      }
+    }
+    return this.send(patch, takeBack);
   }
 
   /**
    * Sends the change `patch` holds the old values of (a stroke, an undo, a redo) at its price, and
    * waits for the answer; refused, `takeBack` puts the editor back as it was and the reason is told.
    */
-  private send(patch: LandPatch, takeBack: () => void): Promise<void> {
+  private send(patch: LandPatch, takeBack: () => void, roads?: ShapeLandMeta['roads']): Promise<void> {
     const e = this.editor!;
     const prices = this.host.prices();
     const cost = prices && !this.host.creative() ? e.cost(patch, prices) : 0;
     const cover = !!patch.cover;
-    const water = wetChanged(e.land, patch);
+    // (A stroke that bridged a road sends the water with its decks dry, whether or not the rest changed.)
+    const water = wetChanged(e.land, patch) || !!roads;
     const whole = !this.whole;
     let command: ShapeLandCommand;
     try {
@@ -308,9 +361,10 @@ export class LandMode {
         ...(cover || water ? { zones: e.zonesOf() } : {}),
         ...(water ? { water: e.water() } : {}),
       });
+      if (roads) command = { ...command, meta: { ...command.meta, roads } };
     } catch (err) {
       takeBack();
-      this.host.refused(err instanceof Error ? err.message : String(err));
+      this.refuse(err instanceof Error ? err.message : String(err));
       this.refresh();
       return Promise.resolve();
     }
@@ -324,7 +378,7 @@ export class LandMode {
         },
         (err: unknown) => {
           takeBack();
-          this.host.refused(refusal(err instanceof Error ? err.message : String(err)));
+          this.refuse(refusal(err instanceof Error ? err.message : String(err)));
         },
       )
       .finally(() => {
@@ -334,6 +388,15 @@ export class LandMode {
       });
     this.sending = run;
     return run;
+  }
+
+  /** Why the last command sent was refused (null: it wasn't), for `window.__land` (`?debug`). */
+  lastRefusal: string | null = null;
+
+  /** A refusal told to the player, and kept (`lastRefusal`). */
+  private refuse(why: string): void {
+    this.lastRefusal = why;
+    this.host.refused(why);
   }
 
   /** The palette's buttons and hint from the editor. */

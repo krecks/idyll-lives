@@ -424,11 +424,11 @@ export class BuiltSurface {
    * The land under and round what is built kept within reach of it after the earth brushes changed it in `rect` (a
    * land its town follows, shaped in the game: its roads and lots move with it, within their grades): the surface
    * solved again (`update`), then round the stroke where the land is cut into or filled over by more than `CUT_MAX`
-   * (a road's cut, a lot's pad) or stands more than `RETAIN_MAX` off a lot's pad beside it, the land itself is brought
+   * (a road's cut, a lot's pad) or stands more than `RETAIN_MAX` off a lot's pad beside it (or than it did `before` the stroke, if more), the land itself is brought
    * back within that, and solved again; `passes` times at most. Changes `land` in place. Says the samples it changed (null: none) and
    * what moved in all (`update`'s change, the passes' together).
    */
-  settleCuts(rect: LandRect, passes = SETTLE_PASSES): { rect: LandRect | null; change: SurfaceChange } {
+  settleCuts(rect: LandRect, passes = SETTLE_PASSES, before?: Int16Array): { rect: LandRect | null; change: SurfaceChange } {
     const { cols, rows, land, kind, conformed } = this;
     let changed: LandRect | null = null;
     let window = rect;
@@ -460,9 +460,11 @@ export class BuiltSurface {
           }
           const g = conformed[k];
           const h = land.h[k] / 100;
-          if (h <= g + reach + 0.005 && h >= g - reach - 0.005) continue;
+          // (A cut or fill the land had before the stroke (`before`) is left as it was, not made good: never past it.)
+          const had = before ? Math.abs(before[k] / 100 - g) : 0;
+          if (h <= g + Math.max(reach, had) + 0.005 && h >= g - Math.max(reach, had) - 0.005) continue;
           // (Brought back short of the limit: solved again, what is built comes some way after it.)
-          const to = reach * SETTLE_SHORT;
+          const to = Math.max(reach * SETTLE_SHORT, had);
           land.h[k] = cm(Math.min(g + to, Math.max(g - to, h)));
           clamped = join(clamped, { i0: i, j0: j, i1: i + 1, j1: j + 1 });
         }

@@ -43,6 +43,7 @@ import { chunkAt, chunkCoords, distanceToRect, groupOf, LookedFrom, SUPERCHUNK }
 import { groupInstances } from '../shared/nature';
 import { castsShadow, FOLIAGE, instanceMatrix, NO_FOCUS, TownStreet, type ChunkPlan, type GroundLayer, type Inst, type ObjectLook } from '../shared/street';
 import { surfaceOf } from '../shared/landSurface';
+import type { BuiltSurface } from '../shared/builtSurface';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
 
 export interface StreetOptions {
@@ -692,6 +693,11 @@ export class Street {
     return this.townHousesOf.list;
   }
   private townHousesOf: { key: string; list: TownLotHouse[] } | null = null;
+
+  /** The land under the town moved: the street stands on `surface` (the game's landscape's) and plans again the chunks that moved, at the next `build` (`TownStreet.landMoved`). */
+  landMoved(surface: BuiltSurface): boolean {
+    return this.town?.landMoved(surface) ?? false;
+  }
 
   /** Whether chunk `id` is drawn in full (streamed in, or every chunk is), so the far LOD leaves its houses out. */
   chunkDrawn(id: number): boolean {

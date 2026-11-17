@@ -689,7 +689,7 @@ export interface Renderer {
    * land settled under what is built (no road or lot cut or filled past its limits; `BuiltSurface.settleCuts`),
    * changed in place; says the samples it changed besides (null: none, or no town on it).
    */
-  settleLand?(rect: LandRect): LandRect | null;
+  settleLand?(rect: LandRect, before?: Int16Array): LandRect | null;
   /** Where the ray through canvas CSS pixel (`x`, `y`) meets the land (a town point and its height, m), or null if it doesn't. */
   pickLand(x: number, y: number): { x: number; y: number; z: number } | null;
   /** Shows the land brush's cursor (null hides it). Cheap; call on every pointer move. */
