@@ -378,9 +378,10 @@ fn merged_roads(old: Option<&Value>, patch: &Value) -> Result<Value, Error> {
 }
 
 /// `meta.land` (`old`, if there is one) with a stroke's `patch` merged in: its `h` and `wl`, tiles
-/// by index (a JSON object's keys), over the old ones; any other field it has over the old one
-/// (`cover` whole). With no land yet, the patch must say the land's size (`cols`, `rows`): the
-/// tiles it doesn't send are left empty (flat at 0 and dry, as `decodeLand` reads them).
+/// by index (a JSON object's keys), over the old ones, and its `flow` (the way a river runs) so too,
+/// once either has one (a land no river was drawn on carries none); any other field it has over the
+/// old one (`cover` whole). With no land yet, the patch must say the land's size (`cols`, `rows`):
+/// the tiles it doesn't send are left empty (flat at 0, dry and still, as `decodeLand` reads them).
 fn merged_land(old: Option<&Value>, patch: &Value) -> Result<Value, Error> {
     let Some(patch) = patch.as_object() else {
         return Err(Error::new("meta.land must be an object"));
@@ -396,7 +397,10 @@ fn merged_land(old: Option<&Value>, patch: &Value) -> Result<Value, Error> {
             serde_json::Map::new()
         }
     };
-    for (k, v) in patch.iter().filter(|(k, _)| *k != "h" && *k != "wl") {
+    for (k, v) in patch
+        .iter()
+        .filter(|(k, _)| !matches!(k.as_str(), "h" | "wl" | "flow"))
+    {
         land.insert(k.clone(), v.clone());
     }
     let count = |key: &str, or: Option<u64>| {
@@ -417,7 +421,11 @@ fn merged_land(old: Option<&Value>, patch: &Value) -> Result<Value, Error> {
             "meta.land has {tiles} tiles, more than {MOST_LAND_TILES}"
         )));
     }
-    for key in ["h", "wl"] {
+    let flows = land.contains_key("flow") || patch.get("flow").is_some_and(|f| !f.is_null());
+    for key in ["h", "wl", "flow"] {
+        if key == "flow" && !flows {
+            continue;
+        }
         // (Holes in an array the page coded with some tiles only come as nulls: empty tiles.)
         let mut codes: Vec<Value> = match land.remove(key) {
             Some(Value::Array(a)) => a

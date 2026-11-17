@@ -102,7 +102,7 @@ export type Command =
  * the bridges its water made (`roads`: by road index, each road's whole list, `RoadPlan.bridges`; an empty one none).
  */
 export interface ShapeLandMeta {
-  land?: Partial<Omit<LandFile, 'h' | 'wl'>> & { h?: Record<number, string>; wl?: Record<number, string> };
+  land?: Partial<Omit<LandFile, 'h' | 'wl' | 'flow'>> & { h?: Record<number, string>; wl?: Record<number, string>; flow?: Record<number, string> };
   zones?: WorldZone[];
   roads?: Record<number, { bridges: [number, number][] }>;
 }
@@ -117,8 +117,8 @@ export interface ShapeLandMeta {
 export type ShapeLandCommand = Extract<Command, { type: 'shapeLand' }>;
 
 /**
- * `meta` with a `shapeLand` stroke's `patch` merged in as the simulation merges it: `land.h` and
- * `land.wl` tile by tile, the land's other fields and `zones` replaced, a road's `bridges` replaced
+ * `meta` with a `shapeLand` stroke's `patch` merged in as the simulation merges it: `land.h`,
+ * `land.wl` and `land.flow` (once either has one) tile by tile, the land's other fields and `zones` replaced, a road's `bridges` replaced
  * (none: taken away). A new object (and a new `land`, new `roads` and new road objects where they
  * changed), `meta` left as it is; null with nothing to merge.
  */
@@ -126,7 +126,7 @@ export function mergeShapeLand(meta: WorldMeta | null, patch: ShapeLandMeta): Wo
   if (!patch.land && !patch.zones && !patch.roads) return meta;
   const out: WorldMeta = { ...(meta ?? {}) };
   if (patch.land) {
-    const { h, wl, ...header } = patch.land;
+    const { h, wl, flow, ...header } = patch.land;
     const land = { ...out.land, ...header } as LandFile;
     const tiles = Math.ceil(land.cols / (land.tile ?? 64)) * Math.ceil(land.rows / (land.tile ?? 64));
     const merged = (old: string[] | undefined, by: Record<number, string> | undefined) => {
@@ -136,6 +136,7 @@ export function mergeShapeLand(meta: WorldMeta | null, patch: ShapeLandMeta): Wo
     };
     land.h = merged(out.land?.h, h);
     land.wl = merged(out.land?.wl, wl);
+    if (out.land?.flow || flow) land.flow = merged(out.land?.flow, flow);
     out.land = land;
   }
   if (patch.zones) out.zones = patch.zones;
@@ -607,6 +608,11 @@ export interface LandFile {
   h: string[];
   /** The water levels (cm; `NONE` where dry) by tile, coded as `h`; '' for a tile with no water. */
   wl: string[];
+  /**
+   * Which way a drawn river runs (`Land.flow`: 0 still, else an angle) by tile, coded as `h`; '' for a tile with
+   * none. Missing on a land no river was drawn on.
+   */
+  flow?: string[];
   /** The cover every 4 m (row-major), run-length `[run, value, ...]`: 0 open, 1 woods, 2 meadow, 3 fields. */
   cover: number[];
   /** How the field was first filled: `drawn` from the land as the renderer drew it, `follow` with the town on its slopes. */

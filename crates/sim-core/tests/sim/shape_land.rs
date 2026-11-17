@@ -229,6 +229,8 @@ fn the_lands_tiles_merge_and_the_zones_are_replaced() {
     let land = &w.meta["land"];
     assert_eq!(land["h"], json!(["AAA", "", "", "", "", "CCC", "", "DDD"]));
     assert_eq!(land["wl"], json!(["", "", "", "", "", "", "", ""]));
+    // No river drawn yet: no flow.
+    assert!(land.get("flow").is_none());
     assert_eq!(land["cover"], json!([5000, 1]));
     assert_eq!(land["seeded"], "drawn");
     assert_eq!(w.meta["zones"], json!([]));
@@ -236,6 +238,36 @@ fn the_lands_tiles_merge_and_the_zones_are_replaced() {
     let err = shape(&mut w, 0, json!({"land": {"h": {"8": "EEE"}}}), None).unwrap_err();
     assert!(err.contains("no tile 8"), "{err}");
     assert_eq!(w.meta["land"]["h"][7], "DDD");
+    // A river's flow merges by tile as the water does, and stays once there is some.
+    shape(
+        &mut w,
+        0,
+        json!({"land": {"wl": {"2": "WWW"}, "flow": {"2": "FFF"}}}),
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        w.meta["land"]["flow"],
+        json!(["", "", "FFF", "", "", "", "", ""])
+    );
+    shape(&mut w, 0, json!({"land": {"h": {"3": "GGG"}}}), None).unwrap();
+    assert_eq!(
+        w.meta["land"]["flow"],
+        json!(["", "", "FFF", "", "", "", "", ""])
+    );
+    shape(
+        &mut w,
+        0,
+        json!({"land": {"flow": {"2": "", "6": "HHH"}}}),
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        w.meta["land"]["flow"],
+        json!(["", "", "", "", "", "", "HHH", ""])
+    );
+    let err = shape(&mut w, 0, json!({"land": {"flow": {"9": "III"}}}), None).unwrap_err();
+    assert!(err.contains("no tile 9"), "{err}");
 }
 
 #[test]
