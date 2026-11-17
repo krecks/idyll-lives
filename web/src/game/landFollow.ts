@@ -282,8 +282,18 @@ const SETTLE_MARGIN = 0.15;
  * `preview`: the world as the menus' preview has it (its lots' paths: `previewWorld`; asked of the
  * draft without its land). The draft, that world, and what in it is still over a slope limit itself
  * (`marks`, as `settleEdit` keys them: what it couldn't give up).
+ *
+ * `keepRoads`: no road is given up nor cut back (a town built from the player's layout, whose streets
+ * were judged as they were drawn: `build.ts`); only lots and backdrop buildings go, and a country road
+ * cut too deep has the land along it eased to it instead, as one that may not be left out.
  */
-export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, preview: (draft: NeighbourhoodDraft) => W, seeded?: (land: Land) => void, careers: readonly CareerCategory[] = []): { draft: NeighbourhoodDraft; world: W; marks: string[] } {
+export function settleLand<W extends FollowWorld>(
+  laid: NeighbourhoodDraft,
+  preview: (draft: NeighbourhoodDraft) => W,
+  seeded?: (land: Land) => void,
+  careers: readonly CareerCategory[] = [],
+  { keepRoads = false }: { keepRoads?: boolean } = {},
+): { draft: NeighbourhoodDraft; world: W; marks: string[] } {
   let draft = laid;
   const given = { lots: 0, backdrop: 0, roads: 0, courts: 0, backdropIn: {} as Record<number, number> };
   /** The country roads whose land is eased along them (`roadKey`). */
@@ -294,9 +304,9 @@ export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, prev
     const graded = withLand(draft, world, (l) => (first = l), ease.size ? draft.roads.filter((r) => ease.has(roadKey(r))) : []);
     const land = graded.open?.land;
     if (!land || !first) return { draft: graded, world, marks: [] };
-    const courts = longCourts(draft.roads);
+    const courts = keepRoads ? [] : longCourts(draft.roads);
     const found = round < SETTLE_ROUNDS ? measureLand(world, land, first, SETTLE_MARGIN, false) : null;
-    const next = found ? giveUp(draft, world, found, courts, given, careers, ease) : null;
+    const next = found ? giveUp(draft, world, found, courts, given, careers, ease, keepRoads) : null;
     if (!next) {
       seeded?.(first);
       const total = given.lots + given.backdrop + given.roads + given.courts;
@@ -388,13 +398,7 @@ function settleOnce<W extends FollowWorld>(plan: NeighbourhoodDraft, preview: (d
   if (!open || !laid || laid.seeded !== 'follow') return { draft: plan, world: preview(plan), over: new Map() };
   const world = preview(unlanded(plan));
   const land: Land = { ...laid, h: laid.h.slice(), wl: laid.wl.slice(), cover: laid.cover.slice() };
-  // The cover open under and by what is built (`macro.ts` `settleTown`), and the zones' woods, meadows and fields from it.
-  const guard = new Protection(land.cols, land.rows, builtOf(world));
-  const cw = coverSpan(land.cols);
-  const c = COVER_CELL / LAND_CELL;
-  for (let r = 0; r < coverSpan(land.rows); r++) for (let q = 0; q < cw; q++) if (guard.dist[Math.min(land.rows - 1, r * c + 1) * land.cols + Math.min(land.cols - 1, q * c + 1)] <= 2) land.cover[r * cw + q] = COVER.open;
-  const cover = landZones(land, { cover: true });
-  const zones = (['water', 'hill', 'fields', 'meadow', 'woods', 'orchard'] as const).flatMap((kind) => (kind === 'fields' || kind === 'meadow' || kind === 'woods' ? cover : open.zones).filter((z) => z.kind === kind));
+  const { guard, zones } = openUnderBuilt(land, world, open.zones);
   // The walkers' water: the plan's (else the land's), every bridge's deck dry.
   const [W, D] = [plan.width, plan.depth];
   const walk = open.water ? unrle(open.water, W * D) : wetTiles(land, W, D);
@@ -407,6 +411,20 @@ function settleOnce<W extends FollowWorld>(plan: NeighbourhoodDraft, preview: (d
   gradeLand(land, world);
   const over = overOf(plan, world, measureLand(world, land, seeded, 0, false));
   return { draft: { ...plan, open: { ...open, land, zones, water: rle(walk), gentle } }, world, over };
+}
+
+/**
+ * The cover of `land` (changed in place) opened under and by what `world` builds (within 2 m: as
+ * `macro.ts` `settleTown` opens it), and `zones` with their woods, meadows and fields made again from
+ * it (the water, hills and orchards kept). The guard measured from what is built, for the gentle ground.
+ */
+export function openUnderBuilt(land: Land, world: FollowWorld, zones: readonly WorldZone[]): { guard: Protection; zones: WorldZone[] } {
+  const guard = new Protection(land.cols, land.rows, builtOf(world));
+  const cw = coverSpan(land.cols);
+  const c = COVER_CELL / LAND_CELL;
+  for (let r = 0; r < coverSpan(land.rows); r++) for (let q = 0; q < cw; q++) if (guard.dist[Math.min(land.rows - 1, r * c + 1) * land.cols + Math.min(land.cols - 1, q * c + 1)] <= 2) land.cover[r * cw + q] = COVER.open;
+  const cover = landZones(land, { cover: true });
+  return { guard, zones: (['water', 'hill', 'fields', 'meadow', 'woods', 'orchard'] as const).flatMap((kind) => (kind === 'fields' || kind === 'meadow' || kind === 'woods' ? cover : zones).filter((z) => z.kind === kind)) };
 }
 
 /** What `found` (measured on `plan`'s preview, `world`) says is over a slope limit itself, by its key (`roadKey`, `slotKey`, `buildingKey`): where it is, and why in words. */
@@ -539,9 +557,18 @@ function longCourts(roads: readonly RoadPlan[]): { road: number; end: 0 | 1; at:
  * `draft` without what `found` and `courts` say breaks the limits (see `settleLand`), counted in
  * `given`; null if it gives up nothing (all that breaks them is what it may not give up) and eases
  * no road it didn't already (`ease`, keys added to: a country road cut too deep that it may not
- * give up).
+ * give up; with `keepRoads`, every country road is one of those).
  */
-function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasure, courts: ReturnType<typeof longCourts>, given: { lots: number; backdrop: number; roads: number; courts: number; backdropIn: Record<number, number> }, careers: readonly CareerCategory[], ease: Set<string>): NeighbourhoodDraft | null {
+function giveUp(
+  draft: NeighbourhoodDraft,
+  world: FollowWorld,
+  found: LandMeasure,
+  courts: ReturnType<typeof longCourts>,
+  given: { lots: number; backdrop: number; roads: number; courts: number; backdropIn: Record<number, number> },
+  careers: readonly CareerCategory[],
+  ease: Set<string>,
+  keepRoads = false,
+): NeighbourhoodDraft | null {
   const open = draft.open;
   if (!open) return null;
   const plots = world.plots.length;
@@ -559,7 +586,7 @@ function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasur
   for (const r of [...found.roads].sort((a, b) => a - b)) {
     if (roads[r].kind !== 'country') continue;
     const without = new Set([...gone, r]);
-    if (!oneNetwork(roads, without)) {
+    if (keepRoads || !oneNetwork(roads, without)) {
       const key = roadKey(roads[r]);
       if (found.over.roads.get(r)?.what === 'cut' && !ease.has(key)) [eased] = [true, ease.add(key)];
       continue;
