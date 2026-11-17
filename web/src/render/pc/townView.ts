@@ -121,11 +121,19 @@ export class TownBuildings {
 
   /**
    * The hour's lights: each backdrop building's share of lit windows at `minute` of the day on `weekday` (`litAt`: a
-   * place's while it is open, a home's by the hour). The copies are written again only when a share changed.
+   * place's while it is open, a home's by the hour), and a named place's lot's by its hours (`lotLookBuilding`). The
+   * copies are written again only when a share changed.
    */
   setTime(minute: number, weekday: number): void {
     let changed = false;
     for (const b of this.backdrop) {
+      const now = litAt(b, minute, weekday);
+      if (now === b.now) continue;
+      b.now = now;
+      changed = true;
+    }
+    for (const b of this.lots) {
+      if (!b.hours) continue;
       const now = litAt(b, minute, weekday);
       if (now === b.now) continue;
       b.now = now;
@@ -136,7 +144,7 @@ export class TownBuildings {
     if (this.shown) this.upload();
   }
 
-  /** The far lots' houses (as the chunks streamed in change, and as their people get up and go to bed). */
+  /** The far lots' houses (as the chunks streamed in change, and as their people get up and go to bed); a named place's lot's lit by its hours (`setTime`). */
   setLots(list: TownBuilding[]): void {
     this.lots = list;
     this.due = true;
