@@ -1,5 +1,5 @@
 /**
- * Little interface sounds, synthesised (no sound files; `audio/blips.ts` makes them): picking things
+ * Little interface sounds, synthesised (no sound files; `crates/sound/src/blips.rs` makes them, through `audio/synth.ts`): picking things
  * up, putting them down, money changing hands, walls going up. Quiet by design, and off with the
  * "Sound effects" setting. Played through the mixer (`audio/mixer.ts`).
  */

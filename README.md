@@ -55,24 +55,26 @@ rustup toolchain install       # in the repo: the pinned toolchain, as CI does
 cargo install wasm-bindgen-cli --version 0.2.130
 cd web
 bun install
-bun run dev      # builds both WASM modules, fetches the voice and language models, then starts Vite on http://localhost:5173
+bun run dev      # builds the WASM modules, fetches the voice and language models, then starts Vite on http://localhost:5173
 ```
 
 The first `bun run dev` or `bun run build` downloads the voice model (398 MB as published, its weights stored in 8 bits as 87 MB) and the language model (294 MB of weights as published, repacked to 228 MB without changing what it computes, stored gzipped as 196 MB) into `web/public/voice/` and `web/public/llm/` (not in git). Every file is pinned and checked by SHA-256, and files already there are kept.
 
 | Command (in `web/`) | What it does |
 |---|---|
-| `bun run dev` | `wasm`, `voice` and `llm`, then the dev server |
+| `bun run dev` | `wasm`, `sound`, `voice` and `llm`, then the dev server |
 | `bun run build` / `bun run preview` | Production build / serve it |
 | `bun run wasm` | Build the simulation's WASM (release, `--locked`) |
+| `bun run sound` | Build the sounds' WASM (`crates/sound`: every sound the game makes; the tests that make sounds need it too) |
 | `bun run voice` | Build the voice WASM and fetch the voice model and dictionary (`cargo fetch-voice`) |
 | `bun run llm` | Fetch the language model (`cargo fetch-llm`) |
 | `bun run check` | Type-check TypeScript and Svelte |
 | `bun run lint` | Lint the web code |
 | `bun run test` | The renderer's engine-neutral tests (`web/tests`, `bun test`) |
 | `bun run check:chunks` | Check that the PlayCanvas internals the renderer patches or reads are still there (`cargo check-chunks` over the list in `tools/render/chunks.json`; run it after a PlayCanvas upgrade) |
-| `bun run sounds` | Render every synthesised sound of the game (things in use, the outdoors, the interface) to a WAV with its length, level, loudness and spectral centroid, and the content that sounds it (`tools/audio/listen.ts`; for listening to them, `G-53`) |
+| `bun run sounds` | (After `bun run sound`.) Render every synthesised sound of the game (things in use, the outdoors, the interface) to a WAV with its length, level, loudness and spectral centroid, and the content that sounds it (`tools/audio/listen.ts`; for listening to them, `G-53`) |
 | `bun run test:sim` | Run the Rust simulation tests |
+| `bun run test:sound` | Run the sound crate's tests (each sound made and held to what it should be) |
 | `bun run test:voice` | Run the voice crate's tests (needs `bun run voice` for the dictionary) |
 | `bun run check:voice` | Check the voices in Bun against golden hashes (`tools/voice/check.mjs`) |
 | `bun run check:llm` | Check the language model's prompts, cleaning and golden lines in Bun (`tools/llm/check.mjs`; several minutes). Run it by hand when a prompt, a cleaning rule or the model changes, not on every release |

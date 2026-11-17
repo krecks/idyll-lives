@@ -6,12 +6,12 @@
  *   zooms out, the wind in the leaves by the gusts the grass shows;
  * - things in use on the lot being looked at: a sizzling pan, a shower, a tap, washing up, a bath, the
  *   washing machine and the dryer, the dishwasher being loaded, a TV, music, drums, and the machines,
- *   games and tools of `things.ts` (a treadmill, a blender, darts, a cello...). One loop per kind of
- *   sound, louder the more residents make it, placed left or right like voices; the water sounds are
- *   made in `water.ts`, the things' in `things.ts`, those of one channel (a pan, a knife, the TV,
- *   drums, the outdoor bed, crickets, the knock) in `mono.ts`, the music's pieces in `music.ts`
- *   (a folk tune by day, a slow one in the evening, a dance while someone dances); the level of each is in
- *   `catalog.ts`. What a use sounds like comes from the thing
+ *   games and tools (a treadmill, a blender, darts, a cello...). One loop per kind of sound, louder the
+ *   more residents make it, placed left or right like voices; every sound is made in Rust (`crates/sound`,
+ *   through `synth.ts`: the water's, the things', the outdoors' and the music in the sound worker,
+ *   `water.worker.ts`; those of one channel, a pan, a knife, the TV, drums, the outdoor bed, crickets, the
+ *   knock, here), the music a folk tune by day, a slow one in the evening, a dance while someone dances; the
+ *   level of each is in `catalog.ts`. What a use sounds like comes from the thing
  *   (content `sound` and `sounds`), else from its animation (`ACTION_SOUNDS`);
  * - things that sound by themselves (content `ambient`: a fountain; a machine running on its own, its
  *   `runs.sound`: the washer loaded, nobody at it), while their lot is looked at, some only while a use
@@ -125,7 +125,7 @@ function unknownSound(key: string): undefined {
 interface Heard {
   loops: Partial<Record<LoopKind, number>>;
   places: Partial<Record<LoopKind, Place>>;
-  /** The piece of music playing or last played (`music.ts`). */
+  /** The piece of music playing or last played (`catalog.ts` `pieceAt`). */
   piece: string | null;
   once: { kind: OnceKind; at: number }[];
   radius: number;
@@ -872,7 +872,7 @@ function placeOf(u: Users): Place {
   return { pan: u.pan, muffle: u.muffle, rooms: { small: u.rooms.small / u.n, medium: u.rooms.medium / u.n, large: u.rooms.large / u.n } };
 }
 
-/** The sounds of one channel (`mono.ts`) as audio buffers, made once per sample rate. */
+/** The sounds of one channel (`crates/sound/src/mono.rs`) as audio buffers, made once per sample rate. */
 const monos = new Map<MonoKind, AudioBuffer>();
 
 /** A sound of one channel as an audio buffer; null until the sounds can be made (`synth.ts`). */

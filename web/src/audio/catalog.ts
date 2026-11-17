@@ -5,7 +5,7 @@
  * (`synth.ts`: `everySound`'s `heard` needs it loaded).
  *
  * The level is a plain gain on the sound as made (the water's and the things' are made to an average
- * level each, `water.ts` `setLevel`; the others to a peak of 1). A sound of one channel goes through a
+ * level each, `crates/sound` `set_level`; the others to a peak of 1). A sound of one channel goes through a
  * stereo panner, which in the middle of the picture gives each side 0.71 of it: `heard` is what comes
  * out there, so one sound against another reads here as it does in the game.
  */
@@ -82,7 +82,7 @@ export const LOOPS: Record<LoopKind, LoopDef> = {
 };
 
 /**
- * Which piece the music is (`music.ts`): a dance while someone dances; else a slow one from `evening` o'clock
+ * Which piece the music is (`crates/sound/src/music.rs` makes them): a dance while someone dances; else a slow one from `evening` o'clock
  * to `morning`, and a folk tune by day.
  */
 export const PLAYLIST = { evening: 20, morning: 6 };
@@ -129,7 +129,7 @@ export const STEPS = {
 };
 
 /**
- * The street and the weather (`outside.ts`, the loops of `outdoors.ts`).
+ * The street and the weather (`outside.ts`, the loops of `crates/sound/src/outdoors.rs`).
  * - `car`: a car driving past: its engine's and its tyres' level right by the middle of the picture at `full` m/s
  *   on screen or more (a street's 32 km/h on the traffic's clock, four times as fast as real time: 35 m/s; stood at a light the engine idles at `idle` of that, the tyres are silent); how near it
  *   counts as (`reach` of the camera's distance, `least` m at least: half the level that far from where the

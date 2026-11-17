@@ -1,5 +1,5 @@
 /**
- * The street and the weather as the camera has them (the loops are made in `outdoors.ts`):
+ * The street and the weather as the camera has them (the loops are made in `crates/sound/src/outdoors.rs`):
  * - the cars driving near where the camera looks (the households' and the work taxi: the snapshot's car rows):
  *   each an engine and its tyres, higher and louder the faster it goes on screen, louder the nearer it passes
  *   the middle of the picture, left or right by where it is, the nearest few at once;

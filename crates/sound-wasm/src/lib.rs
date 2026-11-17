@@ -62,7 +62,7 @@ pub fn make(kind: &str, rate: f64) -> Option<Sound> {
     sound::make(kind, rate).map(sound)
 }
 
-/// A sound of one channel by name (`mono.ts`'s `MONO` once); none: no such sound.
+/// A sound of one channel by name (`sound::mono`); none: no such sound.
 #[wasm_bindgen]
 pub fn mono(kind: &str, rate: f64) -> Option<Vec<f32>> {
     mono::make(kind, rate)

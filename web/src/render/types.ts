@@ -43,7 +43,7 @@ export function birdActivity(hour: number): number {
 /** A garden bird as the renderer draws it (`Renderer.birds`). */
 export interface SeenBird {
   id: number;
-  /** Its song (`audio/birdsong.ts` species name). */
+  /** Its song (`audio/kinds.ts` `SPECIES` name). */
   song: string;
   x: number;
   y: number;
