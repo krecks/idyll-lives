@@ -137,7 +137,21 @@ export class TownEditorState implements TownEditor {
   }
   get issues(): TownIssues {
     void this.version;
-    return this.session?.issues ?? { blocking: [], warnings: [] };
+    const issues = this.session?.issues ?? { blocking: [], warnings: [] };
+    // (What the last settle took back is listed too, first among the warnings: it is undone already.)
+    const refused = this.refusals?.refusalIssues?.() ?? [];
+    return refused.length ? { blocking: issues.blocking, warnings: [...refused, ...issues.warnings] } : issues;
+  }
+
+  /** The line under the tools about what the last settle took back (null: nothing, or an edit made since). */
+  get refusalLine(): string | null {
+    void this.version;
+    return this.refusals?.refusalLine ?? null;
+  }
+
+  /** The session's account of what its last settle took back, where the session keeps one. */
+  private get refusals(): RefusalAccount | null {
+    return this.session as RefusalAccount | null;
   }
   /** The Problems list is of the plan as it stands. */
   get checked(): boolean {
@@ -447,13 +461,16 @@ export class TownEditorState implements TownEditor {
     if (!this.editGhostsOf || this.editGhostsOf.settled !== s.settled || this.editGhostsOf.plan !== s.plan) this.editGhostsOf = { settled: s.settled, plan: s.plan, ghosts: editGhosts(s.settled, s.plan, t) };
     // (Drawn again only when they changed: a new ghost makes the renderer draw a whole frame, and the
     // pointer moves many times over while a lot's ghost stays snapped where it is.)
-    const lit = this.litGhosts();
+    const lit = joinGhosts(this.refusals?.refusalGhosts?.() ?? null, this.litGhosts());
     const key = JSON.stringify([lit, this.toolGhosts]);
     if (this.editGhostsOf.ghosts === this.drawn?.edits && key === this.drawn.key) return;
     this.drawn = { edits: this.editGhostsOf.ghosts, key };
     menuScene.ghosts(joinGhosts(joinGhosts(this.editGhostsOf.ghosts, lit), this.toolGhosts));
   }
 }
+
+/** What a session says of what its last settle took back: the line, the red over the town, the Problems entries. */
+type RefusalAccount = Partial<{ refusalLine: string | null; refusalGhosts(): TownGhosts | null; refusalIssues(): Issue[] }>;
 
 /** No town (the editor has none to edit yet). */
 const EMPTY = { name: '', width: 0, depth: 0, slots: [], roads: [], greens: [], households: [] } as unknown as NeighbourhoodDraft;

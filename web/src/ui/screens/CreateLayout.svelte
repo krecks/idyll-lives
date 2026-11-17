@@ -424,13 +424,13 @@
       <button class="btn" class:on={moving} aria-pressed={moving} disabled={!town || !!making} onclick={toggleMove}><Icon name="icon.ui.move" size={16} /> Move the town</button>
     </div>
     <div class="row">
-      <button class="btn" disabled={!editor.ready || !!making} title="Every street, village and zone gone: bare land, the roads out kept" onclick={clearEverything}><Icon name="icon.ui.trash" size={16} /> Clear all</button>
+      <button class="btn" disabled={!editor.ready || !!making} title="Every road, village and zone gone: bare land" onclick={clearEverything}><Icon name="icon.ui.trash" size={16} /> Clear all</button>
       <button class="btn" disabled={!editor.ready || !!making || !plan?.open?.uses} title="Every zone gone, the streets kept" onclick={() => editor.apply(clearZones(editor.draft))}><Icon name="icon.ui.eraser" size={16} /> Clear zones</button>
     </div>
     {#if moving}
       <p class="hint" role="status">Click the land where the town should go. <kbd>Esc</kbd> leaves it where it is.</p>
     {:else if cleared}
-      <p class="hint" role="status">Bare land: draw the first street from one road to another with the Street tool, then paint zones beside it.</p>
+      <p class="hint" role="status">Bare land: take the Street tool and draw the first street in from the edge of the world, then paint zones beside it.</p>
     {/if}
   </section>
 

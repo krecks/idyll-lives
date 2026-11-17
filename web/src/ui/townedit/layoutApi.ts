@@ -324,22 +324,18 @@ export function clearZones(draft: NeighbourhoodDraft): Edited {
 
 /**
  * Clear all: bare land to lay out from scratch. The main town's area is kept (where its centre is to
- * be); every street, lane and trail goes, every village, lot, building, place, parking space and zone.
- * The roads out of the world are kept, ending where they used to meet the streets, for the first
- * street to run from one to another.
+ * be); every road goes, every village, lot, building, place, parking space and zone. The first street
+ * is then drawn in from the edge of the world (the Street tool says so while the land is bare).
  */
 export function clearAll(draft: NeighbourhoodDraft): Edited {
   const open = draft.open;
   if (!open) return { refused: 'this town has no land to clear' };
-  const roads = draft.roads
-    .filter((r) => r.kind === 'country' && r.ends.includes('out'))
-    .map((r): RoadPlan => ({ ...r, ends: [r.ends[0] === 'out' ? 'out' : 'dead', r.ends[1] === 'out' ? 'out' : 'dead'], area: undefined }));
   const lots = new Set(draft.slots.map((s) => s.index));
   const bare = removeLots(draft, lots, new Set((open.backdrop ?? []).map((_, i) => i)));
   const areas = open.areas.slice(0, 1);
   const cleared: NeighbourhoodDraft = {
     ...bare,
-    roads,
+    roads: [],
     greens: [],
     open: { ...bare.open!, areas, parking: [], pads: {}, backdrop: [], places: [], centre: [], squares: [], uses: usesFor(draft) },
   };

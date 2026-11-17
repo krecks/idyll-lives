@@ -231,7 +231,7 @@ describe("the layout's edits", () => {
     expect(summaryLine({ homes: 84, shops: 12, parks: 3, public: 5 })).toBe('Homes ≈ 84 · Shops ≈ 12 · Parks 3 · Public 5');
   });
 
-  test('Clear zones takes every zone; Clear all leaves bare land with the roads out and the main town', () => {
+  test('Clear zones takes every zone; Clear all leaves bare land and the main town', () => {
     const draft = town();
     const painted = paintUses(draft, [{ x: 100, z: 130, r: 30 }], 'shops');
     if (!('draft' in painted)) throw new Error('refused');
@@ -239,7 +239,7 @@ describe("the layout's edits", () => {
     expect('draft' in zones && unpackUses(zones.draft.open!.uses!).every((c) => c === 0)).toBe(true);
     const all = clearAll(painted.draft);
     if (!('draft' in all)) throw new Error('refused');
-    expect(all.draft.roads.map((r) => r.name)).toEqual(['High Street']);
+    expect(all.draft.roads).toEqual([]);
     expect(all.draft.slots).toEqual([]);
     expect(all.draft.open!.areas.map((a) => a.name)).toEqual(['Ashby']);
     expect(unpackUses(all.draft.open!.uses!).every((c) => c === 0)).toBe(true);

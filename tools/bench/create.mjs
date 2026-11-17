@@ -477,7 +477,7 @@ function benchHelpers() {
        * A stroke for the zone brush on screen: along a main-town road's side (`beside`, `off` m from its kerb), else
        * out in the open, at least `far` m from every road (dry land, no zone there yet). Its ground and screen points.
        */
-      zoneStroke(kind, off = 14, far = 70) {
+      zoneStroke(kind, off = 14, far = 46) {
         const d = plan();
         const dist = layoutApi.roadDistance(d);
         const layer = layoutApi.layerOf(d);
@@ -1095,8 +1095,9 @@ async function editSession(page, renderer, shootAs, setStep, step, parts) {
     if (erased.homes >= before.homes) fault(`${renderer} layout zones: Erase took no homes off`);
     await shots('zones-erase');
 
-    // 4. Clear zones, then undone.
+    // 4. Clear zones, then undone (when there are zones left to clear).
     await page.keyboard.press('Escape');
+    if (!erased.zoned) return console.log(`create: ${renderer} layout zones: none left for Clear zones to clear`);
     await page.getByRole('button', { name: /Clear zones/ }).click();
     await page.waitForTimeout(250);
     if ((await zones()).zoned) fault(`${renderer} layout zones: Clear zones left ${(await zones()).zoned} cells`);
