@@ -815,16 +815,32 @@ function trailBetween(pts: readonly Pt[], a: number, b: number, ls: number[]): P
   return out.map(([x, z]): Pt => [Math.round(x * 100) / 100, Math.round(z * 100) / 100]);
 }
 
+/** What removing a road takes with it (`whatGoes`). */
+export interface Goes {
+  /** The roads that go (the road itself among them): those left joined to no way out of the world, and the bridges left leading nowhere (`bridges`). */
+  roads: number[];
+  /** Of `roads`, the bridges that go because they would be left ending in a dead end: a deck to nowhere. */
+  bridges: number[];
+  /** The country roads that led onto a bridge that goes, left ending there in a dead end longer than `COURT`: made streets of no area (as a drawn one is: `drawStreet`). */
+  streets: number[];
+  lots: number[];
+  backdrop: number[];
+  parking: number[];
+}
+
 /**
- * What removing road `road` from `draft` takes with it: the roads left joined to no way out of the
- * world (`roads`, with `road` itself), the lots whose way in is on one of them and the outdoor
- * places at a gone trail's end (`lots`, slot indices), the backdrop buildings fronting them
- * (`backdrop`), the parking by them (`parking`); or why it may not go: no road out of the world
- * would be left, the roads left would be two networks each with its own way out, a country road
- * it met would be left a dead end longer than `COURT`, or its lots are the town's last homes or its
- * last park (`lots.ts` `removalRefused`).
+ * What removing road `road` from `draft` takes with it (`Goes`): the roads left joined to no way out
+ * of the world (with `road` itself), and a bridge left ending in a dead end (it led onto `road`: a
+ * bridge has a road on at each end, as a drawn one must), the lots whose way in is on one of them and
+ * the outdoor places at a gone trail's end (slot indices), the backdrop buildings fronting them, the
+ * parking by them; and the country roads that led onto such a bridge, left ending there more than
+ * `COURT` m past the last road they meet, which become streets of no area (no taxi turns round in a
+ * country road: the rule a drawn one is made by, `drawStreet`; the Build step gives each an area). Or
+ * why it may not go: no road out of the world would be left, the roads left would be two networks
+ * each with its own way out, another country road would be left a dead end longer than `COURT`, or
+ * its lots are the town's last homes or its last park (`lots.ts` `removalRefused`).
  */
-export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number): { roads: number[]; lots: number[]; backdrop: number[]; parking: number[] } | { refused: string } {
+export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number): Goes | { refused: string } {
   const roads = draft.roads;
   if (!Number.isInteger(road) || road < 0 || road >= roads.length) return { refused: 'there is no such road' };
   const nets = networks(roads, new Set([road]));
@@ -832,12 +848,34 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
   if (!leaves.size) return { refused: `without ${roads[road].name ?? 'it'} no road would lead out of the world` };
   if (leaves.size > 1) return { refused: `without ${roads[road].name ?? 'it'} the roads would be cut in two` };
   const gone = new Set([road, ...[...nets.entries()].filter(([, n]) => !leaves.has(n)).map(([i]) => i)]);
-  // (A country road it leaves ending in a dead end reaches no further past the last road it meets
-  // than a drawn one may: no taxi turns round in a country road. A street or a lane may be left
-  // longer, the sim turning round in any of theirs; the Problems list says so.)
-  const left = withoutRoads(roads, gone);
-  const court = longestCourt(left.roads, left.ended.filter((i) => left.roads[i].kind === 'country'));
-  if (court && court.stub > COURT + 0.5) return { refused: `without ${roads[road].name ?? 'it'}, ${left.roads[court.road].name ?? 'a road'} would end ${Math.round(court.stub)} m past the last road it meets (a dead end reaches ${COURT} m at most)` };
+  // A bridge it leaves ending in a dead end goes too, and so on (a bridge has a road on at each end).
+  const bridges: number[] = [];
+  let left = withoutRoads(roads, gone);
+  for (;;) {
+    const dangling = left.ended.filter((i) => left.roads[i].bridge && left.roads[i].ends.includes('dead')).map((i) => left.from[i]);
+    if (!dangling.length) break;
+    for (const i of dangling) {
+      gone.add(i);
+      bridges.push(i);
+    }
+    left = withoutRoads(roads, gone);
+  }
+  // A country road it leaves ending in a dead end past a court: refused (no taxi turns round in a country road), but one
+  // that led onto a bridge that goes with it, which is made a street of no area, as a drawn one ending there would be
+  // (the stretch of a street drawn over the water before its bridge). A street or a lane may be left so, the sim
+  // turning round in any of theirs. (Not every country road made a street: one taken up and drawn again would not be
+  // a country road again.)
+  const bridgeEnds = bridges.flatMap((i) => [roads[i].points[0], roads[i].points[roads[i].points.length - 1]]);
+  const atBridge = (r: RoadPlan) => r.ends.some((e, k) => e === 'dead' && bridgeEnds.some(([x, z]) => Math.hypot(x - r.points[k ? r.points.length - 1 : 0][0], z - r.points[k ? r.points.length - 1 : 0][1]) <= r.width / 2 + 1));
+  const streets: number[] = [];
+  for (const i of left.ended) {
+    const r = left.roads[i];
+    if (r.kind !== 'country' || r.bridge) continue;
+    const court = longestCourt(left.roads, [i]);
+    if (!court || court.stub <= COURT + 0.5) continue;
+    if (!atBridge(r)) return { refused: `without ${roads[road].name ?? 'it'}, ${r.name ?? 'a road'} would end ${Math.round(court.stub)} m past the last road it meets (a dead end reaches ${COURT} m at most)` };
+    streets.push(left.from[i]);
+  }
   const open = draft.open;
   const rects = draft.slots.map((s) => plotRect(t, s));
   const entries = surfacePlots({ plots: rects, meta: { roads, facing: draft.slots.map((s) => s.facing), backdrop: open?.backdrop ?? [] } });
@@ -855,12 +893,13 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
     const near = index.nearest(p.x, p.z, ROAD_WIDTH / 2 + 6);
     return near && gone.has(near.road) ? [i] : [];
   });
-  return { roads: [...gone].sort((a, b) => a - b), lots, backdrop, parking };
+  return { roads: [...gone].sort((a, b) => a - b), bridges: bridges.sort((a, b) => a - b), streets: streets.sort((a, b) => a - b), lots, backdrop, parking };
 }
 
-/** `roads` without those in `gone`; a join left with nothing to join is a dead end (`ended`: those roads, by their index in what is left). */
-function withoutRoads(roads: readonly RoadPlan[], gone: ReadonlySet<number>): { roads: RoadPlan[]; ended: number[] } {
-  const kept = roads.filter((_, i) => !gone.has(i));
+/** `roads` without those in `gone`; a join left with nothing to join is a dead end (`ended`: those roads, by their index in what is left; `from`: each road's index in `roads`). */
+function withoutRoads(roads: readonly RoadPlan[], gone: ReadonlySet<number>): { roads: RoadPlan[]; ended: number[]; from: number[] } {
+  const from = roads.flatMap((_, i) => (gone.has(i) ? [] : [i]));
+  const kept = from.map((i) => roads[i]);
   const ended: number[] = [];
   const left = kept.map((r, i) => {
     const ends = r.ends.map((e, k) => {
@@ -872,19 +911,27 @@ function withoutRoads(roads: readonly RoadPlan[], gone: ReadonlySet<number>): { 
     ended.push(i);
     return { ...r, ends };
   });
-  return { roads: left, ended };
+  return { roads: left, ended, from };
 }
 
 /**
  * `draft` without road `road`, its lots and parking, and any road it leaves joined to nothing; refused
  * if no road out of the world would be left, or it would take the town's last home or park (see `whatGoes`). A road that met it in a T and stays
- * now ends there in a dead end; the water under a bridge that goes is water again; a village left with
+ * now ends there in a dead end (a bridge left so goes too; a country road that led onto it, left so past a court, is
+ * made a street of no area); the water under a bridge that goes is water again; a village left with
  * no road and no lot goes too (`villages.ts` `withoutEmptyAreas`).
  */
 export function removeRoad(draft: NeighbourhoodDraft, t: Templates, road: number): Edited {
   const goes = whatGoes(draft, t, road);
   if ('refused' in goes) return goes;
-  const { roads } = withoutRoads(draft.roads, new Set(goes.roads));
+  // (A country road left a long dead end, a street of no area: see `whatGoes`.)
+  const made = new Set(goes.streets);
+  const { roads: left, from } = withoutRoads(draft.roads, new Set(goes.roads));
+  const roads = left.map((r, i) => {
+    if (!made.has(from[i])) return r;
+    const { area: _area, ...rest } = r;
+    return { ...rest, kind: 'street' as const };
+  });
   const open = draft.open;
   let next: NeighbourhoodDraft = { ...draft, roads };
   if (open) {

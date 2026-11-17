@@ -452,12 +452,50 @@ const cornersFor = new WeakMap<readonly RoadPlan[], (f: Frontage) => boolean>();
  * the civic places each town and village may have
  * (`civicChoices`, the most needed first) as its public land holds. For step 2's live line
  * ("Homes ≈ 84 · Shops ≈ 12 · Parks 3 · Public 5"); within about a quarter of what Build makes, a sixth
- * on the whole. Given the `proposal` the layout was laid out from and the layout untouched, what its town
- * has, exactly (`townSummary`: what Build gives it).
+ * on the whole. Given the `proposal` the layout was laid out from: the layout untouched, what its town
+ * has, exactly (`townSummary`: what Build gives it); edited, the estimate scaled towards the proposal's
+ * town as far as its zones are as they were (`anchored`), so an edit moves it by what it changes.
  */
-export function usesSummary(draft: NeighbourhoodDraft, proposal?: Pick<Proposal, 'built' | 'hash'>): UsesSummary {
+export function usesSummary(draft: NeighbourhoodDraft, proposal?: Pick<Proposal, 'built' | 'hash'> & Partial<Pick<Proposal, 'plan'>>): UsesSummary {
   // (The layout untouched: what Build gives it, the proposal's own town.)
   if (proposal && layoutHash(draft) === proposal.hash) return townSummary(proposal.built);
+  const est = estimated(draft);
+  return proposal?.plan ? anchored(est, draft, { built: proposal.built, plan: proposal.plan }) : est;
+}
+
+/** What `anchored` keeps of a proposal: its town's counts, the estimate of its layout, and its layout's zones. */
+const anchors = new WeakMap<NeighbourhoodDraft, { built: UsesSummary; est: UsesSummary; codes: Uint8Array }>();
+
+/**
+ * `est` (of the edited layout `draft`) scaled, kind by kind, by how much more or less the proposal's own town has than
+ * its layout is estimated to (`ratio`), as far as the proposal's zones are kept in `draft` (`kept`: the share of its
+ * zoned cells painted the same): Build keeps the proposal's town where the layout is as it was and builds the rest
+ * from the zones (`build.ts`). An edit that leaves the zones be (a street drawn) moves the figures by what it adds or
+ * takes, not by the estimate's own error on the whole town (a town's 34 shops read ≈ 25 once a dead end was drawn
+ * out into the open, and Build made 33); zones cleared or painted afresh, the estimate as it is.
+ */
+function anchored(est: UsesSummary, draft: NeighbourhoodDraft, proposal: Pick<Proposal, 'built' | 'plan'>): UsesSummary {
+  let a = anchors.get(proposal.plan);
+  if (!a) anchors.set(proposal.plan, (a = { built: townSummary(proposal.built), est: estimated(proposal.plan), codes: unpackUses(usesOfDraft(proposal.plan)) }));
+  const now = unpackUses(usesOfDraft(draft));
+  let [zoned, same] = [0, 0];
+  if (now.length === a.codes.length) {
+    for (let k = 0; k < now.length; k++) {
+      if (!a.codes[k]) continue;
+      zoned++;
+      if (now[k] === a.codes[k]) same++;
+    }
+  }
+  const kept = zoned ? same / zoned : 0;
+  const scaled = (k: keyof UsesSummary) => {
+    const ratio = a.est[k] > 0 ? a.built[k] / a.est[k] : 1;
+    return Math.round(est[k] * (1 + (ratio - 1) * kept));
+  };
+  return { homes: scaled('homes'), shops: scaled('shops'), parks: scaled('parks'), public: scaled('public') };
+}
+
+/** `usesSummary`'s estimate of `draft` on its own (see there). */
+function estimated(draft: NeighbourhoodDraft): UsesSummary {
   const { roads } = draft;
   let corners = cornersFor.get(roads);
   if (!corners) {

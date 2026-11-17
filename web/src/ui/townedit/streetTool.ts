@@ -3,7 +3,7 @@
  * its card (`streetChoice`) asks. Clicks set its points, or a drag draws it freehand. The pointer is
  * pulled to a road, a dead end or the world's edge within `PULL_PX` CSS px (`Meeting.magnet`, 10 to
  * 40 m; once a street is begun, only where the street would not be refused there). It is drawn as soon as it reaches a road (or the world's edge); Enter or a double click
- * ends it where it is, carried on to a road within `AUTO_JOIN` m ahead (or nearby) if it may be
+ * ends it where it is (Enter: where the pointer rests, as the hint says), carried on to a road within `AUTO_JOIN` m ahead (or nearby) if it may be
  * (`carryOn`), else as a dead end. Backspace takes the last point back, Esc drops it. The street
  * drawn is picked, so its card shows; one split at its bridges, the stretch nearest the last click (`stretchNear`), the
  * card listing the others (`streetChoice.drawn`). What goes along it is the card's choice: homes from the lot mix (`drawStreet`'s
@@ -221,12 +221,27 @@ export function streetGhosts(editor: Pick<TownEditor, 'draft' | 't'>, live: Live
   return ghosts;
 }
 
-/** What the street under the pointer would be, in words ("A street of Ashby", "A country road with a 30 m bridge"). */
-export function kindLine(draft: Parameters<typeof liveStreet>[0], live: LiveStreet): string {
+/** A street ended with Enter carried on to a road just ahead (`carryOn`): its live checks, and `drawStreet`'s verdict on it. */
+type Carried = { live: LiveStreet; verdict: Edited };
+
+/**
+ * What the street under the pointer would be, in words ("A street of Ashby", "A country road with a 30 m bridge"). Once
+ * `drawStreet` has had its say (`verdict`), as it makes it: a country road whose dead-end stretch it makes a street
+ * (past a court: no taxi turns round in a country road) is "a street", or "… then a street to its dead end".
+ */
+export function kindLine(draft: Parameters<typeof liveStreet>[0], live: LiveStreet, verdict: Edited | null = null): string {
   const area = live.area >= 0 ? draft.open?.areas[live.area]?.name : undefined;
-  const what = live.kind === 'trail' ? 'A footpath' : live.kind === 'country' ? 'A country road' : `A ${live.kind === 'lane' ? 'lane' : 'street'}${area ? ` of ${area}` : ''}`;
+  let what = live.kind === 'trail' ? 'A footpath' : live.kind === 'country' ? 'A country road' : `A ${live.kind === 'lane' ? 'lane' : 'street'}${area ? ` of ${area}` : ''}`;
   const bridges = live.bridges.length ? ` with ${live.bridges.length === 1 ? `a ${live.bridges[0]} m bridge` : `${live.bridges.length} bridges`}` : '';
-  return `${what}${bridges}`;
+  let then = '';
+  if (live.kind === 'country' && verdict && 'draft' in verdict) {
+    const kinds = newRoads(draft, verdict).flatMap((i) => (verdict.draft.roads[i]?.bridge ? [] : [verdict.draft.roads[i]?.kind]));
+    if (kinds.includes('street')) {
+      if (kinds.every((k) => k === 'street')) what = 'A street';
+      else then = ', then a street to its dead end';
+    }
+  }
+  return `${what}${bridges}${then}`;
 }
 
 export const streetTool: TownTool = {
@@ -243,7 +258,7 @@ export const streetTool: TownTool = {
     /** The seed of the street's homes and names (a new one after each street drawn). */
     let seed = editor.seed();
     /** What was last worked out, for which line, and `drawStreet`'s verdict on it once the pointer rested. */
-    let shown: { key: string; live: LiveStreet; verdict: Edited | null } | null = null;
+    let shown: { key: string; live: LiveStreet; verdict: Edited | null; carried?: Carried | null } | null = null;
     let rest: ReturnType<typeof setTimeout> | undefined;
     const meetings = new WeakMap<object, Meeting>();
     /** The last scale measured (m a CSS px). */
@@ -316,7 +331,7 @@ export const streetTool: TownTool = {
         streetChoice.shownArea = live.area;
       }
       editor.preview(streetGhosts(editor, live, verdict));
-      editor.hint(lineOf(live, verdict));
+      editor.hint(lineOf(live, verdict, shown.carried));
       // (`drawStreet` itself once the pointer rests: too slow for every move on a big town.)
       if (!verdict && !live.why) rest = setTimeout(() => settle(key, pts, ask), REST);
     };
@@ -325,33 +340,44 @@ export const streetTool: TownTool = {
     const settle = (key: string, pts: Pt[], ask: StreetAsk) => {
       if (shown?.key !== key) return;
       shown.verdict = verdictOf(editor.draft, editor.t, editor.content, pts, ask.kind, ask.clear, seed, ask.asked);
+      // (What Enter would make of it: carried on to a road just ahead, if it may be, as `finish` carries it.)
+      const on = shown.live.reached ? null : carryOn(editor.draft, editor.t, pts, ask, meetings);
+      const carried = on && verdictOf(editor.draft, editor.t, editor.content, on.points, ask.kind, ask.clear, seed, ask.asked);
+      shown.carried = on && carried && 'draft' in carried ? { live: on.live, verdict: carried } : null;
       editor.preview(streetGhosts(editor, shown.live, shown.verdict));
-      editor.hint(lineOf(shown.live, shown.verdict));
+      editor.hint(lineOf(shown.live, shown.verdict, shown.carried));
     };
 
-    /** The line under the tools: why it may not go, or what it is and what a click would do. */
-    const lineOf = (live: LiveStreet, verdict: Edited | null): string => {
+    /** The line under the tools: why it may not go, or what it is and what a click would do (`carried`: what Enter makes of it, carried on to a road just ahead). */
+    const lineOf = (live: LiveStreet, verdict: Edited | null, carried: Carried | null = null): string => {
       if (live.why) return sentence(live.why);
       if (verdict && 'refused' in verdict && !unfinished(verdict.refused)) return sentence(verdict.refused);
       // (Clearly too steep: refused when ended. A little too steep is the settle's to judge: said, and the street may still be drawn for it to.)
       if (live.excess) return `${sentence(live.slope!)} Draw it another way, where the land is gentler.`;
       if (live.slope) return `${sentence(live.slope)} The town would refuse it once brought up to date.`;
-      const what = kindLine(editor.draft, live);
+      const what = kindLine(editor.draft, live, verdict);
       const clears = verdict && 'draft' in verdict ? verdict.cleared.lots.length + verdict.cleared.backdrop.length : 0;
       const also = clears ? `, clearing ${clears === 1 ? 'a lot or building' : `${clears} lots and buildings`} out of its way` : '';
       const joins = live.finishOn >= 0 ? editor.draft.roads[live.finishOn]?.name : undefined;
       if (live.reached) return joins ? `${what}${also}. Joins ${joins} — ${press ? 'let go' : 'click'} to finish.` : `${what}${also}. ${press ? 'Let go' : 'Click'} to draw it.`;
+      if (carried && 'draft' in carried.verdict) {
+        const onto = editor.draft.roads[carried.live.finishOn]?.name ?? 'the road';
+        const n = carried.verdict.cleared.lots.length + carried.verdict.cleared.backdrop.length;
+        const clearing = n ? `, clearing ${n === 1 ? 'a lot or building' : `${n} lots and buildings`} out of its way` : '';
+        return `${kindLine(editor.draft, carried.live, carried.verdict)}${clearing}. Click to set a point; Enter or a double click carries it on to ${onto} just ahead.`;
+      }
       const open = live.open ?? (verdict && 'refused' in verdict ? verdict.refused : null);
       return open ? `${what}${also}. ${sentence(open)}` : `${what}${also}. Click to set a point; Enter or a double click ends it here as a dead end, or on a road just ahead.`;
     };
 
     /**
      * The street drawn as it stands (`asDeadEnd`: ended where it is, carried on to a road nearby if it may be
-     * (`carryOn`), else only if it reached a road): true if it was.
+     * (`carryOn`), else only if it reached a road): true if it was. `atPointer`: ended where the pointer rests,
+     * not at the last point set (Enter: the line the hint spoke of, `s.line()`).
      */
-    const finish = (asDeadEnd: boolean): boolean => {
+    const finish = (asDeadEnd: boolean, atPointer = false): boolean => {
       clearTimeout(rest);
-      let pts = s.points;
+      let pts = atPointer ? s.line() : s.points;
       if (pts.length < 2) {
         if (asDeadEnd) editor.refuse('a street is drawn with two points or more');
         return false;
@@ -483,7 +509,8 @@ export const streetTool: TownTool = {
           return true;
         }
         if (e.key === 'Enter') {
-          if (!press) finish(true);
+          // (Where the pointer rests, as the hint said: "Enter … ends it here".)
+          if (!press) finish(true, true);
           return true;
         }
         return false;

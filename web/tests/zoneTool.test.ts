@@ -21,7 +21,7 @@ const choice = { kind: 'homes' as UseKind | null, size: 16 as 8 | 16 | 32 | 64, 
 mock.module('../src/ui/townedit/ZoneCard.svelte', () => ({ default: {} }));
 mock.module('../src/ui/townedit/zoneChoice.svelte', () => ({ ZONE_SIZES: [8, 16, 32, 64], zoneChoice: choice }));
 const { zoneTool } = await import('../src/ui/townedit/zoneTool');
-const { BESIDE_STREETS, clearAll, clearZones, needsSettle, noUseCells, paintUses, roadReach, summaryLine, villageAsLayout } = await import('../src/ui/townedit/layoutApi');
+const { BESIDE_STREETS, clearAll, clearZones, needsSettle, noUseCells, paintUses, roadReach, shownUses, summaryLine, villageAsLayout } = await import('../src/ui/townedit/layoutApi');
 
 const W = 400;
 const D = 400;
@@ -200,6 +200,23 @@ describe("the layout's edits", () => {
     }
     expect(zoned).toBeGreaterThan(1000);
     expect(summaryLine({ homes: 84, shops: 12, parks: 3, public: 5 })).toBe('Homes ≈ 84 · Shops ≈ 12 · Parks 3 · Public 5');
+  });
+
+  test('a street drawn across zones: the overlay draws none under it, the zones kept beside it (and under it, to come back should it go)', () => {
+    const e = paintUses(town(), [{ x: 120, z: 140, size: 32 }], 'homes');
+    if (!('draft' in e)) throw new Error(e.refused);
+    const zoned = e.draft;
+    expect(shownUses(zoned)).toBe(zoned.open!.uses!);
+    // (A street across the zone, as a drawn one leaves it: the cells under it still painted.)
+    const crossed: NeighbourhoodDraft = { ...zoned, roads: [...zoned.roads, { points: line(100, 140, 140, 140), width: 7, ends: ['dead', 'dead'], kind: 'street', area: 0, name: 'New Street' }] };
+    expect(cellAt(crossed, 120, 140)).toBe(USE_CODE.homes);
+    const drawn = shownUses(crossed)!;
+    expect(shownUses(crossed)).toBe(drawn);
+    const shownAt = (x: number, z: number) => unpackUses(drawn)[Math.floor(z / USE_CELL) * drawn.cols + Math.floor(x / USE_CELL)];
+    expect(shownAt(120, 140)).toBe(0);
+    expect(shownAt(120, 130)).toBe(USE_CODE.homes);
+    expect(shownAt(120, 150)).toBe(USE_CODE.homes);
+    expect(shownUses({ ...crossed, open: { ...crossed.open!, uses: undefined } })).toBeNull();
   });
 
   test('Clear zones takes every zone; Clear all leaves bare land and the main town', () => {

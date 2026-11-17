@@ -34,7 +34,7 @@ mock.module('../src/ui/townedit/streetChoice.svelte', () => ({
   fillsHomes: (a: string) => a === 'homes',
 }));
 const { climbOf, drawnStretches, liveStreet, runsOf, unfinished, verdictOf } = await import('../src/ui/townedit/streetLive');
-const { AUTO_JOIN, carryOn, FIRST_STREET, pullAt, pullReach, StreetDrawing, startAt, streetGhosts, streetTool, stretchNear } = await import('../src/ui/townedit/streetTool');
+const { AUTO_JOIN, carryOn, FIRST_STREET, kindLine, pullAt, pullReach, StreetDrawing, startAt, streetGhosts, streetTool, stretchNear } = await import('../src/ui/townedit/streetTool');
 
 const W = 400;
 const D = 400;
@@ -320,6 +320,31 @@ function fakeEditor(draft: NeighbourhoodDraft) {
 
 const key = (k: string) => ({ key: k }) as KeyboardEvent;
 
+describe('the hint names what the street will be', () => {
+  test("a country road whose dead-end stretch drawStreet makes a street (past a court) says so, once drawStreet has had its say", () => {
+    const draft = town();
+    // (South off Far Lane, out of the town's box: a country road as the live checks have it; drawn, a street of no area.)
+    const pts: Pt[] = [
+      [200, FAR_Z + 6],
+      [200, 380],
+    ];
+    const live = liveStreet(draft, t, pts, 'street', true);
+    expect(live.kind).toBe('country');
+    expect(kindLine(draft, live)).toBe('A country road');
+    expect(kindLine(draft, live, verdictOf(draft, t, content, pts, 'street', true, 7))).toBe('A street');
+    // (A short one stays a country road.)
+    const short: Pt[] = [
+      [200, FAR_Z + 6],
+      [200, FAR_Z + 40],
+    ];
+    expect(kindLine(draft, liveStreet(draft, t, short, 'street', true), verdictOf(draft, t, content, short, 'street', true, 7))).toBe('A country road');
+    // Split at a bridge, the stretch before it a country road and the one past it made a street.
+    const road = (kind: RoadPlan['kind'], bridge?: [number, number]): RoadPlan => ({ points: line(0, 0, 0, 40), width: 7, ends: ['join', 'join'], kind, ...(bridge ? { bridge } : {}) });
+    const split = { draft: { ...draft, roads: [...draft.roads, road('country'), road('country', [5, 30]), road('street')] }, cleared: { lots: [], backdrop: [] }, made: [4, 5, 6] } as Edited;
+    expect(kindLine(draft, { ...live, bridges: [24] }, split)).toBe('A country road with a 24 m bridge, then a street to its dead end');
+  });
+});
+
 describe('the tool', () => {
   test('clicks set points; the one on a road ends the street, which is drawn and picked', () => {
     choice.along = 'none';
@@ -408,6 +433,25 @@ describe('the tool', () => {
     expect(editor.said.refusals.at(-1)).toMatch(/a bridge needs a road on at each end/);
     expect(editor.draft.roads).toHaveLength(4);
     expect(tool.key!(key('Backspace'))).toBe(true);
+  });
+
+  test('Enter ends the street where the pointer rests, as the hint says: the last click over the water, the pointer on the far bank', () => {
+    choice.along = 'none';
+    const editor = fakeEditor(town());
+    const tool = streetTool.stage(editor);
+    tool.down(87, MAIN_Z + 8);
+    tool.up();
+    tool.down(87, RIVER_Z + 15);
+    tool.up();
+    // (Ended at the last click, it would be a bridge with no road beyond it.)
+    tool.hover(87, RIVER_Z + 55);
+    expect(editor.said.hints.at(-1)).toMatch(/Enter or a double click ends it here as a dead end/);
+    tool.key!(key('Enter'));
+    expect(editor.said.refusals).toEqual([]);
+    const made = editor.draft.roads.slice(4);
+    expect(made.some((r) => r.bridge)).toBe(true);
+    const far = made.find((r) => r.ends.includes('dead'))!;
+    expect(far.points.at(-1)![1]).toBeCloseTo(RIVER_Z + 55, 0);
   });
 
   test('a freehand drag from a road to another draws the street when let go', () => {
@@ -542,7 +586,7 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
     expect(ends.some(([x, z]) => Math.hypot(x - 160, z - 75) < 1)).toBe(true);
   });
 
-  test(`Enter carries a street ended short of a road on to it, within ${AUTO_JOIN} m; past that it ends as a dead end`, () => {
+  test(`Enter carries a street ended short of a road on to it, within ${AUTO_JOIN} m; past that it ends as a dead end`, async () => {
     choice.along = 'none';
     const ask = { kind: 'street' as const, asked: false, clear: true };
     // (From Far Lane north towards the high street, ended 20 m short of its middle.)
@@ -562,6 +606,10 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
       tool.up();
     }
     expect(editor.draft.roads).toHaveLength(4);
+    // (Once the pointer rests there, the hint says what Enter does: carries it on.)
+    tool.hover(pts[1][0], pts[1][1]);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(editor.said.hints.at(-1)).toMatch(/Enter or a double click carries it on to High Street just ahead\.$/);
     tool.key!(key('Enter'));
     expect(editor.said.refusals).toEqual([]);
     const made = editor.draft.roads.slice(4);
