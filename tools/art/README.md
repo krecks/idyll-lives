@@ -14,13 +14,13 @@ Run them from the repo root. The textures are generated, not downloaded.
 | `cargo tex clouds <out.png>` | Generates the procedural, tileable cloud layer (`textures/sky/clouds.png`) |
 | `blender/` | The Blender-built glTF models, every model in the game: `cargo art <family>` builds a family script from `blender/families/` on the `blender/gamekit/` toolkit, exports its `.glb` files with their moving parts, writes its pack and runs the gate. See [blender/README.md](blender/README.md), the guide for people and AI agents |
 | `cargo art --leafcards` | Renders the trees' leaf-card atlas (`textures/leafcards/albedo.png`: three cut-out clusters of leaves and a dense wall of them) in Blender from leaves `blender/leafcards.py` generates; the `leafcards` finish every broadleaved tree's crown is cut from (`blender/families/trees.md`) |
-| `cargo check-glb` | The gate for glTF models (`crates/tools/src/checkglb.rs`, no Blender): checks that every model the content draws has a `.glb`, and every `.glb` the manifests use against its entry and its content (origin on the floor and at its `centre`, the wall's face, the footprint, a top's `radius`, triangles and draw calls against the budgets, materials mapped to finishes, one-sided, no unused UVs, extensions the game reads, texture sizes) and exits 1 on an error ("The gate" below). `--preview` also has Blender re-import each file and render it to `blender/previews/<family>/rt_<name>.png` |
+| `cargo check-glb` | The gate for glTF models (`crates/tools/src/checkglb.rs`, no Blender): checks that every model the content draws has a `.glb`, and every `.glb` the manifests use against its entry and its content (origin on the floor and at its `centre`, the wall's face, the footprint, a top's `radius`, triangles and draw calls against the budgets, materials mapped to finishes, one-sided, no unused UVs, extensions the game reads, texture sizes) and exits 1 on an error ("The gate" below). `--validate` also runs the Khronos glTF validator over each file and its far version (`tools/art/validate.ts`, under Bun: `bun install` in `web/` first). `--preview` also has Blender re-import each file and render it to `blender/previews/<family>/rt_<name>.png` |
 
 ## The gate
 
 `cargo check-glb` (and `cargo art`, which runs it) prints `ok` or `FAIL` per model, then its errors, warnings and
-accepted findings, and exits 1 if any model fails. `tools/ci-local.sh models` runs it, and `tools` runs it again in
-`ll-tools`' tests: the tree has 0 errors.
+accepted findings, and exits 1 if any model fails. `tools/ci-local.sh models` runs it with `--validate`, and `tools`
+runs it again in `ll-tools`' tests: the tree has 0 errors.
 
 **Strict checks** have one right answer, so they are errors, not warnings that pile up unread
 (`checkglb::STRICT`, by name):
@@ -42,7 +42,7 @@ accepted findings, and exits 1 if any model fails. `tools/ci-local.sh models` ru
 | `mirror` | mirror glass is see-through or isn't flat |
 | `materials` | materials unmapped, double-sided, see-through (BLEND), glowing by day, or with UVs nothing reads |
 | `far` | a far version isn't the full model's size |
-| `validator`, `reference`, `edges`, `texels`, `pbr` | counted against the baseline (below); names kept for checks not in the gate yet |
+| `validator`, `reference`, `edges`, `texels`, `pbr` | counted against the baseline (below); `validator` with `--validate` (errors, warnings and unused objects but the finishes' UVs: `checkglb/validate.rs`), the others names kept for checks not in the gate yet |
 
 **Accepting one.** A model that is right as it is takes `accept` in its pack entry: `{"<name>": "<why>"}`, set on its
 `Model` (`G.Model(..., accept={'footprint': 'why'})`, which writes it), or in the entry of a pack written by hand. The

@@ -32,15 +32,14 @@ write and writes the pack and `centres.json` from what it hands back (`gamekit/r
 3. **Build and look.** Run `cargo art <family> --preview`, then open the PNGs in `previews/<family>/` (you can read
    images). Iterate until it looks right from the front and each clip looks right open.
 4. **Export.** Run `cargo art <family>`, which exports, writes the pack and runs the gate
-   (`cargo check-glb`). It must say `0 failed`; read every warning. A model that is right to fail a strict
-   check takes `accept={'<check>': '<why>'}` on its `Model` (tools/art/README.md, "The gate").
-5. **Validate.** Install the Khronos validator in a scratch directory (`npm i gltf-validator`), outside
-   the repo, and run `validateBytes` on the file: 0 errors, 0 warnings.
-6. **Wire it in** outside this folder when the object is new (below). Run
+   (`cargo check-glb`, with the Khronos glTF validator over the files it wrote). It must say `0 failed`;
+   read every warning. A model that is right to fail a strict check takes `accept={'<check>': '<why>'}` on
+   its `Model` (tools/art/README.md, "The gate").
+5. **Wire it in** outside this folder when the object is new (below). Run
    `cargo test -p sim-core --test sim shipped_content::`, and `cargo test -p sim-core` if you touched the sim.
-7. **Look in the game.** Start your own dev server and drive it headless (below). Check WebGPU and
+6. **Look in the game.** Start your own dev server and drive it headless (below). Check WebGPU and
    `&renderer=webgl`, at rest and with each clip playing.
-8. **Finish up.**
+7. **Finish up.**
    - Add a line to `web/public/assets/CREDITS.md`.
    - Commit only the `.glb` files you meant to change. Re-exports aren't byte-for-byte repeatable, so
      `git checkout` the rest.
