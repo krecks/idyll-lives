@@ -39,7 +39,7 @@ import { pavedRects } from '../shared/paving';
 import { townRoadMesh, townRoads, type RoadMeshData } from '../shared/roads';
 import { surfaceOf } from '../shared/landSurface';
 import type { BuiltSurface } from '../shared/builtSurface';
-import { hashString } from '../shared/chunks';
+import { hashNumbers, hashString } from '../shared/chunks';
 import { townRoadMeshOffThread } from '../shared/renderData';
 import { fieldLayers } from '../shared/street';
 import type { TownBuilding } from '../shared/townBuildings';
@@ -122,6 +122,9 @@ export function townLayer(app: pc.AppBase): pc.Layer {
 interface Placed {
   template: ModelTemplate;
   draws: Instances[];
+  /** What its draws' matrices were last written from (`buildObjects`'s hash of the placements), and how many. */
+  sig?: number;
+  count?: number;
 }
 
 /** One of the four highlight draws (ring, fill, wall, wash): an instance per plot. */
@@ -288,15 +291,23 @@ export class TownOverview {
     this.buildings.setBackdrop(backdrop);
     this.buildings.show(1);
     this.templatesInUse.clear();
-    for (const [k, { template, matrices }] of objects) {
+    for (const [k, { template, matrices, sig }] of objects) {
       this.templatesInUse.add(k);
       const p = this.placedOf(k, template);
-      const count = matrices.length / 16;
+      // (The same things where they were: the draws as they are, shown again.)
+      if (!matrices && p.sig === sig) {
+        for (const d of p.draws) d.enabled = (p.count ?? 0) > 0;
+        this.templates.hideStale(k);
+        continue;
+      }
+      const m = matrices ?? new Float32Array(0);
+      const count = m.length / 16;
       for (const d of p.draws) {
-        d.setMatrices(matrices, count);
+        d.setMatrices(m, count);
         d.update();
         d.enabled = count > 0;
       }
+      Object.assign(p, { sig: matrices ? sig : undefined, count });
       // (In place of a box set aside for a file that came, if there was one: never both at once.)
       this.templates.hideStale(k);
     }
@@ -476,14 +487,18 @@ export class TownOverview {
   }
 
   /** Outdoor objects of every lot (garden and park trees, benches, flower beds), one template per model, and their matrices. */
-  private async buildObjects(world: WorldStructure, pace?: () => Promise<void>): Promise<Map<string, { template: ModelTemplate; matrices: Float32Array }>> {
+  /**
+   * Its matrices are null for a model whose things are as the town before had them (`sig`, a hash of their placements,
+   * the same, and its template too): its draws are kept as they are.
+   */
+  private async buildObjects(world: WorldStructure, pace?: () => Promise<void>): Promise<Map<string, { template: ModelTemplate; matrices: Float32Array | null; sig: number }>> {
     const W = world.width;
     const outdoor = (o: ObjectPlacement) => {
       for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) if (world.rooms[z * W + x]) return false;
       return true;
     };
     const groups = Map.groupBy(world.objects.filter(outdoor), (o) => this.content.object(o.def)?.model ?? `model.${o.def}`);
-    const out = new Map<string, { template: ModelTemplate; matrices: Float32Array }>();
+    const out = new Map<string, { template: ModelTemplate; matrices: Float32Array | null; sig: number }>();
     for (const [key, list] of groups) {
       await pace?.();
       const template = await this.templates.get(key, () => {
@@ -491,15 +506,21 @@ export class TownOverview {
         // Seen from afar: a file's far version; without a file, the box the lot draws.
         return buildModel(this.app, `town:${key}`, this.assets.get(key, 'model'), def?.footprint ?? [1, 1], { far: true, standIn: standInOf(this.content, def) });
       });
-      const matrices = new Float32Array(list.length * 16);
       const vary = this.assets.get(key, 'model')?.vary ?? 0;
+      const sig = hashNumbers(list.flatMap((o) => [o.x, o.z, o.w, o.d, o.rot, o.turn ?? 0, o.offset?.[0] ?? 0, o.offset?.[1] ?? 0]), Math.round(vary * 1e6));
+      const had = this.placed.get(key);
+      if (had && had.template === template && had.sig === sig) {
+        out.set(key, { template, matrices: null, sig });
+        continue;
+      }
+      const matrices = new Float32Array(list.length * 16);
       list.forEach((o, i) => {
         const { turn, size } = placementVariation(vary, o.x, o.z);
         const centre = objectCentre(o);
         compose(size, size, size, quatYawPitchRoll((o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn, 0, 0, this.q), centre.x, 0, centre.z, this.m);
         matrices.set(this.m, i * 16);
       });
-      out.set(key, { template, matrices });
+      out.set(key, { template, matrices, sig });
       await pace?.();
     }
     return out;

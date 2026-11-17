@@ -79,47 +79,62 @@ export function updateGroundShade(world: WorldStructure, n: number, out: Uint8Ar
   if (!before || before.n !== n || before.W !== W || out.length !== W * D) return { shade: groundShade(world, n, out), changed: null };
   const stamps = shadeStamps(world);
   const old = before.stamps;
-  // The stamps gone and the new ones: past those the two lists start and end with alike, by what they are
-  // (the others' order is the same).
+  // The stamps gone and the new ones, by what they are: each old one matched to a new one alike (by a hash of its
+  // numbers, then all of them), the rest changed. (A lot removed takes its walls, its fences and its things from
+  // three places in the list: the others keep their order.)
+  const hashOf = (list: Float64Array, k: number): number => {
+    let h = 0x811c9dc5;
+    for (let c = 0; c < STAMP; c++) h = Math.imul(h ^ Math.round(list[k + c] * 1000), 16777619);
+    return h;
+  };
   const same = (k: number, j: number): boolean => {
     for (let c = 0; c < STAMP; c++) if (stamps[k + c] !== old[j + c]) return false;
     return true;
   };
-  let start = 0;
-  while (start < stamps.length && start < old.length && same(start, start)) start += STAMP;
-  let end = 0;
-  while (end < stamps.length - start && end < old.length - start && same(stamps.length - end - STAMP, old.length - end - STAMP)) end += STAMP;
-  if (stamps.length - start - end > MOST_CHANGED * 16 * STAMP || old.length - start - end > MOST_CHANGED * 16 * STAMP) return { shade: groundShade(world, n, out), changed: null };
-  const key = (list: Float64Array, k: number) => list.subarray(k, k + STAMP).join();
-  const count = new Map<string, number>();
-  for (let k = start; k < old.length - end; k += STAMP) {
-    const s = key(old, k);
-    count.set(s, (count.get(s) ?? 0) + 1);
+  const olds = new Map<number, number[]>();
+  for (let j = 0; j < old.length; j += STAMP) {
+    const h = hashOf(old, j);
+    const list = olds.get(h);
+    if (list) list.push(j);
+    else olds.set(h, [j]);
   }
   const rects: TexelRect[] = [];
-  for (let k = start; k < stamps.length - end; k += STAMP) {
-    const s = key(stamps, k);
-    const c = count.get(s) ?? 0;
-    if (c > 0) count.set(s, c - 1);
+  for (let k = 0; k < stamps.length; k += STAMP) {
+    const list = olds.get(hashOf(stamps, k));
+    const at = list ? list.findIndex((j) => same(k, j)) : -1;
+    if (at >= 0) list!.splice(at, 1);
     else rects.push(reachOf(stamps, k, W, D, n));
   }
-  for (let k = start; k < old.length - end; k += STAMP) {
-    const s = key(old, k);
-    const c = count.get(s) ?? 0;
-    if (c > 0) {
-      count.set(s, c - 1);
-      rects.push(reachOf(old, k, W, D, n));
-    }
-  }
-  if (rects.length > MOST_CHANGED) return { shade: groundShade(world, n, out), changed: null };
+  for (const list of olds.values()) for (const j of list) rects.push(reachOf(old, j, W, D, n));
+  // (Those near each other as one: a house's walls are tens of stamps side by side.)
+  const merged = mergeRects(rects.filter((r) => r[0] <= r[2] && r[1] <= r[3]), n * 2);
+  if (merged.length > MOST_CHANGED) return { shade: groundShade(world, n, out), changed: null };
+  const changed = merged;
   // Each changed stamp's reach made again: cleared, and every stamp over it laid again in order.
-  const changed = rects.filter((r) => r[0] <= r[2] && r[1] <= r[3]);
   for (const r of changed) {
     for (let j = r[1]; j <= r[3]; j++) out.fill(0, j * W + r[0], j * W + r[2] + 1);
     for (let k = 0; k < stamps.length; k += STAMP) stamp(out, W, D, n, stamps, k, r);
   }
   madeFrom.set(out, { n, W, stamps });
   return { shade: out, changed };
+}
+
+/** `rects` with those within `gap` texels of each other merged into the rectangle round them. */
+function mergeRects(rects: TexelRect[], gap: number): TexelRect[] {
+  const out = rects.map((r): TexelRect => [...r]);
+  for (let again = true; again; ) {
+    again = false;
+    for (let a = 0; a < out.length; a++) {
+      for (let b = out.length - 1; b > a; b--) {
+        const [p, q] = [out[a], out[b]];
+        if (p[0] > q[2] + gap || q[0] > p[2] + gap || p[1] > q[3] + gap || q[1] > p[3] + gap) continue;
+        out[a] = [Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[2], q[2]), Math.max(p[3], q[3])];
+        out.splice(b, 1);
+        again = true;
+      }
+    }
+  }
+  return out;
 }
 
 /** The texels stamp `k` of `stamps` reaches (`[i0, j0, i1, j1]`, empty where `i0 > i1` or `j0 > j1`). */
