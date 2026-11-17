@@ -15,7 +15,7 @@
 
 <script lang="ts">
   /**
-   * The new game's first two steps (Land, Town) share this frame: one slim panel down the left (a
+   * The new game's first three steps (Land, Streets & zones, Build) share this frame: one slim panel down the left (a
    * head with the way back, the step and what names the world, then its choices, scrolling when
    * they don't fit), the world in the rest of the screen, the way on at its top right, the world in
    * figures at its top left, and the making panel over it while a world is made.
@@ -41,7 +41,7 @@
   }: {
     /** The panel's name for assistive technology ("A new world"). */
     label: string;
-    /** "Step 1 of 4 · Land". */
+    /** "Step 1 of 5 · Land" (`newGame.ts` `stepLabel`). */
     step: string;
     back: { label: string; go: () => void };
     head?: Snippet;

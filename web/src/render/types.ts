@@ -9,6 +9,7 @@ import type { FrameState } from '../core/bridge';
 import type { ItemPlacement, PartColors, WorldStructure } from '../core/protocol';
 import type { Appearance } from '../game/household';
 import type { Land, LandRect } from '../game/land';
+import type { UseKind, UseLayer } from '../game/uses';
 import type { Resolution } from './shared/resolution';
 import type { VisemeTrack } from '../voice/visemes';
 
@@ -385,13 +386,19 @@ export interface LotHighlight {
 }
 
 /**
+ * A street's ghost's tone: new, where it may not go, a bridge stretch, a new street drawn as the road it will be
+ * (`laid`), the road picked (`pick`, outlined only), the road a street being drawn will join (`join`).
+ */
+export type GhostRoadTone = 'new' | 'bad' | 'bridge' | 'laid' | 'pick' | 'join';
+
+/**
  * Step 2's edits shown over the town before the town is built again with them: streets being
  * drawn or just drawn (`roads`: their middle lines and widths; `bad` where they may not go, a
  * `bridge` stretch over water), lots (`new` placed, `bad` where one may not go, `gone` to be
  * removed, the building on it dimmed) and villages' boxes, all in world metres.
  */
 export interface TownGhosts {
-  roads: { points: [number, number][]; width: number; tone: 'new' | 'bad' | 'bridge' }[];
+  roads: { points: [number, number][]; width: number; tone: GhostRoadTone }[];
   lots: { x: number; z: number; w: number; d: number; tone: 'new' | 'bad' | 'gone' }[];
   boxes: { x: number; z: number; w: number; d: number; tone: 'new' | 'bad' }[];
 }
@@ -452,7 +459,8 @@ export interface LandCursor {
   z: number;
   radius: number;
   inner: number;
-  tone: 'up' | 'down' | 'water' | 'cover' | 'bad';
+  /** What the brush does: step 1's land brushes (`up` to `cover`), step 2's zone brush (a use, `uses.ts`, or `erase`), or `bad` where it can't. */
+  tone: 'up' | 'down' | 'water' | 'cover' | 'bad' | UseKind | 'erase';
 }
 
 export interface Renderer {
@@ -678,10 +686,18 @@ export interface Renderer {
   readonly townShown: boolean;
   /** Overview camera: glides to (or with `cut`, jumps to) a shot. */
   setTownShot(shot: TownShot, cut?: boolean): void;
-  /** Overview camera: user orbit (radians) and zoom factor on top of the shot. */
-  nudgeTown(dAlpha: number, zoom: number): void;
+  /** Overview camera: user orbit (radians), zoom factor and tilt (radians, more is lower; 0.15–1.35 in all) on top of the shot. */
+  nudgeTown(dAlpha: number, zoom: number, dBeta?: number): void;
+  /** Overview camera: the player's zoom by `zoom` towards the land under canvas CSS pixel (`x`, `y`) (it stays under it). */
+  zoomTownAt(x: number, y: number, zoom: number): void;
   /** Overview camera: the player's pan, the target moved (`dx`, `dz`) m over the ground on top of the shot; it stays over the land. */
   panTown(dx: number, dz: number): void;
+  /** Overview camera: the player's pan along the view, `right` m to the picture's right and `forward` m into it. */
+  panTownView(right: number, forward: number): void;
+  /** Overview camera: how near (m from its target) the player's zoom comes in (`OVERVIEW_NEAREST` unless set). */
+  setTownNearest(metres: number): void;
+  /** Overview camera: how far (m) it is from its target now. */
+  readonly townDistance: number;
   /**
    * Overview camera: the player's pan by a drag from canvas CSS pixel (`x0`, `y0`) to (`x1`, `y1`): the land under
    * the pointer follows it (over the sky, the level of the land in view does). Any button, any step, no tool needed.
@@ -693,6 +709,11 @@ export interface Renderer {
   setLotHighlight(highlight: LotHighlight, snap?: boolean): void;
   /** Step 2's edits drawn over the town (`TownGhosts`) until the town is built again; null: none. */
   setTownGhosts(ghosts: TownGhosts | null): void;
+  /**
+   * Step 2's painted uses (`uses.ts`) drawn over the town in their colours; null: none. `hatched`: a byte per cell
+   * of `layer` (row-major), set where the cell is zoned but too far from a street to be built on, drawn hatched.
+   */
+  setTownUses(layer: UseLayer | null, hatched?: Uint8Array | null): void;
   /** Runs each overview frame after the camera moved, before drawing (to pin labels); null removes it. */
   onTownFrame(fn: (() => void) | null): void;
   /**

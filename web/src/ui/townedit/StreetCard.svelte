@@ -1,7 +1,8 @@
 <script lang="ts">
   /**
    * The Street tool's card: what it draws (`streetChoice`). The kind, which is a street of the town
-   * or village it runs in or a country road outside them unless a lane or a footpath is asked for;
+   * or village it runs in or a country road outside them unless a street, a lane or a footpath is
+   * asked for (a street or a lane asked for stays one out of town, given an area when it is built);
    * whether what is in its way is cleared (else the street is refused there); and what is put along
    * it: homes, the town's other buildings, both, or nothing; by where it runs unless chosen (both in
    * the main town, homes elsewhere). A street just drawn and split at its bridges lists its stretches,
@@ -57,7 +58,10 @@
       {#if streetChoice.kind === 'trail'}
         No cars and nothing along it; it does not cross the water.
       {:else if streetChoice.kind === 'lane'}
-        A narrow lane in {editor.townName || 'the town'} or a village; a country road outside them.
+        A narrow lane, in {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
+      {:else if streetChoice.kind === 'street'}
+        A street, in {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
+        <button class="link" onclick={() => (streetChoice.kind = 'auto')}>By where it runs</button>
       {:else}
         A street in {editor.townName || 'the town'} or a village, a country road outside them.
         {#if streetChoice.kind !== 'auto'}<button class="link" onclick={() => (streetChoice.kind = 'auto')}>By where it runs</button>{/if}
@@ -68,6 +72,8 @@
     <span>Clear what's in the way{#if !streetChoice.clear}<span class="sub-note"> (else it is refused there)</span>{/if}</span>
     <Toggle label="Clear what's in the way" bind:checked={streetChoice.clear} />
   </label>
+  <!-- (Step 2 has no "Along it": the zones beside a street decide what Build puts along it.) -->
+  {#if editor.step !== 'layout'}
   <div class="option" class:off={trail}>
     <span class="eyebrow sub">Along it</span>
     <Segmented fill label="Along it" value={along} options={ALONG} onchange={(v) => (streetChoice.along = v)} />
@@ -84,7 +90,8 @@
       {#if streetChoice.along !== 'auto'}<button class="link" onclick={() => (streetChoice.along = 'auto')}>By where it runs</button>{/if}
     </p>
   </div>
-  <p class="hint keys"><kbd>Enter</kbd> or a double click ends it as a dead end, <kbd>Backspace</kbd> takes a point back, <kbd>Esc</kbd> drops it.</p>
+  {/if}
+  <p class="hint keys"><kbd>Enter</kbd> or a double click ends it (on a road just ahead, else as a dead end), <kbd>Backspace</kbd> takes a point back, <kbd>Esc</kbd> drops it.</p>
 </div>
 
 <style>

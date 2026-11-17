@@ -11,13 +11,24 @@
  * `settle`) and the town built again from it (`show`); edits made meanwhile wait for the next pause. One settle at a
  * time: a pause that comes while one runs is taken once it is done. `flush` settles now (the way on
  * to step 3 takes the town as it stands).
+ *
+ * An edit the settle refuses (a road too steep, say) is taken back, with every edit after it; what it
+ * was and why stays for the editor to show (`refusals`): the road or lot red for `REFUSED_SHOW` ms
+ * (`refusalGhosts`), a line under the tools (`refusalLine`) and an entry for the Problems list
+ * (`refusalIssues`), these two until the next edit. A settle that fails outright takes back every
+ * edit since the town on screen was settled, so nothing is left as a ghost over it; a town settled
+ * well but not put on screen is still the one settled.
  */
 
 import type { Edited } from '../../game/edit/edited';
 import { TownHistory } from '../../game/edit/history';
+import { withUses } from '../../game/edit/uses';
+import type { Pt } from '../../game/roads';
 import type { NeighbourhoodDraft } from '../../game/town';
-import type { TownIssues } from './problems';
+import type { TownGhosts } from '../../render/types';
+import type { Issue, TownIssues } from './problems';
 import type { Batch, Settled } from './settle';
+import { sentence } from './words';
 
 /** How long edits pause (ms) after one made in a run (`apply`'s `run`) before the town is settled and built again with them. */
 export const QUIET = 1200;
@@ -25,6 +36,22 @@ export const QUIET = 1200;
 export const QUIET_ONE = 250;
 /** How long after an edit (ms) the Problems list is checked again (the ghosts first). */
 export const CHECK_AFTER = 40;
+/** How long (ms) what a settle refused stays red over the town. */
+export const REFUSED_SHOW = 4000;
+/** Why every edit since the last settle was taken back when the settle failed outright. */
+export const SETTLE_FAILED = 'the town could not be built again with your changes, so they were taken back';
+
+/**
+ * An edit the settle took back (`landFollow.ts` `EditRefusal`), as the editor shows it: why, in words (a clause),
+ * where (`at`: a road's points with its `width`, else a lot's or a building's corners; none if not known), and
+ * until when (`now()` ms) it stays red.
+ */
+export interface SettleRefusal {
+  why: string;
+  at?: Pt[];
+  width?: number;
+  until: number;
+}
 
 /** Timers, as `setTimeout`'s (the tests' are their own). */
 export interface Timers {
@@ -38,6 +65,8 @@ export interface SessionHooks {
   settle(plan: NeighbourhoodDraft, ops: number, signal: AbortSignal, batch: Batch): Promise<Settled>;
   /** The settled town put on screen; resolves once it is. `plan`: what it was settled from. */
   show(settled: Settled, plan: NeighbourhoodDraft): Promise<void>;
+  /** The town on screen kept, with `plan`'s zones, for a plan that changed its zones alone (no settle, nothing to build again). */
+  kept?(settled: NeighbourhoodDraft, plan: NeighbourhoodDraft): void;
   /** Something the screens show changed (the plan, the town on screen, the problems, whether a settle runs). */
   changed(): void;
   /**
@@ -59,6 +88,23 @@ export interface SettleTiming {
   settle: number;
   show: number;
   fromEdit: number;
+}
+
+/** A refusal said: why, and that the change was taken back (the failure says so itself). */
+const said = (why: string) => (why === SETTLE_FAILED ? sentence(why) : `${sentence(why)} The change was taken back.`);
+
+/**
+ * Whether `b` is `a` but for its zones (`open.uses`): every other part the same object, as an edit of the zones
+ * alone (`uses.ts` `paintUses`) leaves them. What needs no settle.
+ */
+export function usesOnly(a: NeighbourhoodDraft, b: NeighbourhoodDraft): boolean {
+  if (a === b) return false;
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof NeighbourhoodDraft>;
+  for (const k of keys) if (k !== 'open' && a[k] !== b[k]) return false;
+  if (a.open === b.open || !a.open || !b.open) return a.open === b.open;
+  const open = new Set([...Object.keys(a.open), ...Object.keys(b.open)]) as Set<keyof NonNullable<NeighbourhoodDraft['open']>>;
+  for (const k of open) if (k !== 'uses' && a.open[k] !== b.open[k]) return false;
+  return true;
 }
 
 const realTimers: Timers = { set: (fn, ms) => setTimeout(fn, ms), clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>) };
@@ -97,6 +143,9 @@ export class EditSession {
   /** What is over a slope limit in the town on screen (its settle's `marks`), once known. */
   private marks: readonly string[] | undefined;
   private disposed = false;
+  /** What the last settle took back (see the top of this file); none once an edit is made. */
+  refusals: readonly SettleRefusal[] = [];
+  private refusalTimer: unknown = null;
 
   /**
    * `settled`: the town on screen (as laid, or settled before); `history`: the edits made before (kept
@@ -199,14 +248,72 @@ export class EditSession {
     this.disposed = true;
     this.clearTimer();
     if (this.checkTimer !== null) this.timers.clear(this.checkTimer);
+    if (this.refusalTimer !== null) this.timers.clear(this.refusalTimer);
     this.control?.abort();
   }
 
+  /** The line under the tools about what the last settle took back (the first, if several), as a sentence; null: nothing, or an edit made since. */
+  get refusalLine(): string | null {
+    const first = this.refusals[0];
+    return first ? said(first.why) : null;
+  }
+
+  /** What the last settle took back, red over the town for `REFUSED_SHOW` ms after: a road as a `bad` road, a lot or building as a `bad` box. Null: nothing. */
+  refusalGhosts(): TownGhosts | null {
+    const now = this.now();
+    const out: TownGhosts = { roads: [], lots: [], boxes: [] };
+    for (const r of this.refusals) {
+      if (now >= r.until || !r.at?.length) continue;
+      if (r.width) out.roads.push({ points: r.at.map(([x, z]): [number, number] => [x, z]), width: r.width, tone: 'bad' });
+      else {
+        const xs = r.at.map((p) => p[0]);
+        const zs = r.at.map((p) => p[1]);
+        const [x, z] = [Math.min(...xs), Math.min(...zs)];
+        out.lots.push({ x, z, w: Math.max(...xs) - x, d: Math.max(...zs) - z, tone: 'bad' });
+      }
+    }
+    return out.roads.length || out.lots.length ? out : null;
+  }
+
+  /** What the last settle took back, as Problems list entries (where each is: its middle); none once an edit is made. */
+  refusalIssues(): Issue[] {
+    return this.refusals.map((r) => {
+      const at = r.at?.length ? r.at[Math.floor(r.at.length / 2)] : null;
+      const mid = at && r.at!.length === 2 && !r.width ? [(r.at![0][0] + r.at![1][0]) / 2, (r.at![0][1] + r.at![1][1]) / 2] : at;
+      return { text: said(r.why), ...(mid ? { at: { x: mid[0], z: mid[1] } } : {}) };
+    });
+  }
+
+  /** What a settle took back, kept for the editor to show (see `refusals`); the editor told again once the red is due to go. */
+  private refused(list: readonly Omit<SettleRefusal, 'until'>[]): void {
+    const until = this.now() + REFUSED_SHOW;
+    this.refusals = list.map((r) => ({ ...r, until }));
+    if (this.refusalTimer !== null) this.timers.clear(this.refusalTimer);
+    this.refusalTimer = this.timers.set(() => {
+      this.refusalTimer = null;
+      if (!this.disposed) this.hooks.changed();
+    }, REFUSED_SHOW);
+  }
+
   private take(draft: NeighbourhoodDraft, run = false): void {
+    this.refusals = [];
     this.plan = draft;
+    this.lastEdit = this.now();
+    // A plan that differs from the one on screen by its zones alone (a stroke of the zone brush, its undo or
+    // redo: `uses.ts` `needsSettle`) needs no settle: the town on screen takes its zones (`withUses`), and
+    // nothing is asked of the worker. Not while a settle runs: its town is about to replace the one on screen.
+    if (!this.running && usesOnly(this.settledFrom, draft)) {
+      this.clearTimer();
+      [this.ops, this.taken] = [0, []];
+      this.settled = withUses(this.settled, draft);
+      this.settledFrom = draft;
+      this.hooks.kept?.(this.settled, draft);
+      this.hooks.changed();
+      this.recheck(false);
+      return;
+    }
     this.ops++;
     this.taken.push(draft);
-    this.lastEdit = this.now();
     this.hooks.changed();
     this.recheck(false);
     this.schedule(run ? this.quiet : this.quietOne);
@@ -290,10 +397,17 @@ export class EditSession {
           this.history.revert(back);
           this.plan = back;
           this.again = false;
+          this.refused(s.refused!.map(({ why, at, width }) => ({ why, ...(at ? { at } : {}), ...(width ? { width } : {}) })));
           this.hooks.changed();
           this.recheck(true);
         }
-        await this.hooks.show(s, back ?? plan);
+        // (Settled well but not shown: still the town settled, so its ghosts don't stay over it for good.)
+        try {
+          await this.hooks.show(s, back ?? plan);
+        } catch (err) {
+          if (control.signal.aborted || (err instanceof Error && err.name === 'Superseded')) throw err;
+          console.error('[town] showing the settled town failed:', err);
+        }
         if (this.disposed) return;
         this.settled = s.draft;
         this.settledFrom = back ?? plan;
@@ -309,13 +423,19 @@ export class EditSession {
       } catch (err) {
         if (control.signal.aborted || (err instanceof Error && err.name === 'Superseded')) return;
         console.error('[town] settling the edited town failed:', err);
-        this.hooks.report?.('The town could not be built again with your changes.');
-        // (Not tried again until the next edit: the same plan would fail the same way.)
+        if (this.disposed) return;
+        this.hooks.report?.(SETTLE_FAILED);
+        // (Every edit since the town on screen was settled taken back, those made meanwhile too: the
+        // plan is the town on screen's again, so no ghost of them stays over it, and nothing is tried
+        // again until the next edit.)
         this.again = false;
-        this.settledFrom = plan;
-        this.marks = undefined;
-        this.ops -= ops;
-        this.taken = this.taken.slice(ops);
+        const back = this.settledFrom;
+        this.history.revert(back);
+        this.plan = back;
+        [this.ops, this.taken] = [0, []];
+        this.refused([{ why: SETTLE_FAILED }]);
+        this.hooks.changed();
+        this.recheck(true);
       }
     })();
     this.running = work.finally(() => {

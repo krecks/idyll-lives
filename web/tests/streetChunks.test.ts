@@ -491,4 +491,78 @@ describe('the street in chunks', async () => {
       expect(b.chunkKey(id, NO_FOCUS)).toBe(a.chunkKey(id, NO_FOCUS));
     }
   });
+
+  /**
+   * `town`'s lots on open land 400 by 200 m, the road running on past them to x 390; `country`: with a country road
+   * off it at x 320, south across the open land (a T, no lot along it: as step 2's Street tool draws one out of town).
+   */
+  const withCountry = (country: boolean): WorldStructure => {
+    const base = town(objects);
+    const [w, d] = [400, 200];
+    const main = { points: [[-10, 23], [390, 23]], width: 6, ends: ['out', 'out'] };
+    const out = { points: [[320, 26], [320, 110], [330, 190]], width: 5, ends: ['join', 'out'], kind: 'country' };
+    return { ...base, width: w, depth: d, rooms: new Array(w * d).fill(0), meta: { ...base.meta!, roads: country ? [main, out] : [main] } } as unknown as WorldStructure;
+  };
+
+  test('a country road drawn out of town has its own chunks, the chunks away from it as they were, a street handed on as a fresh one', async () => {
+    const { roadKey, townKey } = await import('../src/render/shared/overviewKeys');
+    for (const land of [false, true]) {
+      const [was, now] = [withCountry(false), withCountry(true)].map((w) => (land ? onLand(w) : w));
+      // The menus' town builds again for it: no lot came or went, its roads did.
+      expect(roadKey(now)).not.toBe(roadKey(was));
+      expect(townKey(now)).not.toBe(townKey(was));
+      for (const ground of [false, true]) {
+        const opts = { ...options, ground };
+        const before = new TownStreet(new HousePlanner(), was, opts, 'town');
+        for (const id of before.chunkIds()) before.chunkKey(id, NO_FOCUS);
+        const fresh = new TownStreet(new HousePlanner(), now, opts, 'town');
+        const handed = new TownStreet(new HousePlanner(), now, opts, 'town', before);
+        // (The roads changed: the street's own is planned again, not taken over.)
+        expect(handed.handedOn.statics).toBe(false);
+        expect(handed.chunkIds()).toEqual(fresh.chunkIds());
+        for (const id of fresh.chunkIds()) {
+          expect(handed.chunkKey(id, NO_FOCUS)).toBe(fresh.chunkKey(id, NO_FOCUS));
+          expect(drawn(handed.chunk(id, NO_FOCUS))).toBe(drawn(fresh.chunk(id, NO_FOCUS)));
+        }
+        // The game's street paves it (its surface in every chunk it crosses), and the road it leaves stays paved.
+        if (ground) {
+          for (const z of [60, 110, 170]) {
+            const id = chunkAt(322, z);
+            expect(fresh.chunkIds()).toContain(id);
+            expect(fresh.chunk(id, NO_FOCUS).ground.some((g) => g.name === 'streets' && !g.geo.empty)).toBe(true);
+          }
+          const streetsIn = (s: InstanceType<typeof TownStreet>, id: number) => s.chunk(id, NO_FOCUS).ground.find((g) => g.name === 'streets')?.geo.pos.length ?? 0;
+          for (const x of [100, 200, 290, 360]) expect(streetsIn(fresh, chunkAt(x, 23))).toBeGreaterThan(0);
+        }
+        // Nothing goes missing anywhere else: the paving (seen from above) in every 20 m along the road away from the
+        // junction as it was, and sidewalks wherever they were. (Those are laid out between the roads that stop them,
+        // and one more stops them far off: their slabs and the ranks along them come a little otherwise.)
+        const areas = (street: InstanceType<typeof TownStreet>) => {
+          const out = new Map<string, number>();
+          const add = (what: string, geo: { pos: ArrayLike<number>; idx: ArrayLike<number> }) => {
+            const { pos, idx } = geo;
+            for (let t = 0; t < idx.length; t += 3) {
+              const [i, j, k] = [idx[t] * 3, idx[t + 1] * 3, idx[t + 2] * 3];
+              const area = Math.abs((pos[j] - pos[i]) * (pos[k + 2] - pos[i + 2]) - (pos[k] - pos[i]) * (pos[j + 2] - pos[i + 2])) / 2;
+              const key = `${what}|${Math.floor((pos[i] + pos[j] + pos[k]) / 3 / 20)}`;
+              out.set(key, (out.get(key) ?? 0) + area);
+            }
+          };
+          for (const id of street.chunkIds()) {
+            const c = street.chunk(id, NO_FOCUS);
+            add('walk', c.walk);
+            for (const g of c.ground) if (g.name === 'streets') add('road', g.geo);
+          }
+          return out;
+        };
+        const [had, has] = [areas(before), areas(fresh)];
+        for (const [key, area] of had) {
+          const x = Number(key.split('|')[1]) * 20;
+          if (x > 280 && x < 340) continue;
+          if (key.startsWith('walk')) expect(has.get(key) ?? 0).toBeGreaterThan(area / 2);
+          else expect(Math.abs((has.get(key) ?? 0) - area)).toBeLessThan(area * 0.02 + 0.5);
+        }
+      }
+    }
+  });
 });

@@ -14,7 +14,7 @@
 
 import * as pc from './engine';
 import { GAME_FRONT_FACE } from './materials';
-import type { TownGhosts } from '../types';
+import type { GhostRoadTone, TownGhosts } from '../types';
 import type { WorldStructure } from '../../core/protocol';
 
 /** How high over the ground the ghosts hang (m). */
@@ -46,13 +46,20 @@ const SCALE_FROM = 0.1;
 const STOREY = 3;
 const ROOF = 3.2;
 
-/** The tones (sRGB) and their strengths: a fill's alpha and an edge's. */
+/**
+ * The tones (sRGB) and their strengths: a fill's alpha and an edge's (a fill of 0 is left out). `laid`: a new street
+ * drawn as the road it will be, near asphalt; `pick`: the road picked, its outline only; `join`: the road a street
+ * being drawn will join.
+ */
 const TONES = {
   new: { rgb: [143, 211, 255], fill: 0.28, edge: 0.95 },
   bad: { rgb: [239, 83, 80], fill: 0.34, edge: 1 },
   bridge: { rgb: [242, 226, 184], fill: 0.4, edge: 1 },
   gone: { rgb: [150, 156, 166], fill: 0.42, edge: 0.85 },
-} as const;
+  laid: { rgb: [78, 82, 88], fill: 0.88, edge: 0.95 },
+  pick: { rgb: [143, 211, 255], fill: 0, edge: 1 },
+  join: { rgb: [93, 187, 99], fill: 0.3, edge: 1 },
+} as const satisfies Record<GhostRoadTone | TownGhosts['lots'][number]['tone'], unknown>;
 type Tone = keyof typeof TONES;
 /** The veil over a building to be removed: dark, half see-through. */
 const VEIL = { rgb: [24, 27, 32], alpha: 0.55 } as const;
@@ -305,14 +312,14 @@ export class TownGhostDraw {
   }
 
   /** A street: its fill between two bright edges; a bridge's with planks across it too. */
-  private road(points: readonly (readonly [number, number])[], width: number, tone: 'new' | 'bad' | 'bridge', drape: Drape): void {
+  private road(points: readonly (readonly [number, number])[], width: number, tone: GhostRoadTone, drape: Drape): void {
     if (points.length < 2) return;
     const t = TONES[tone];
     const path = resample(points, STEP);
     const ns = normals(path, false);
     const half = this.least(width / 2, MIN_HALF_PX);
     const edge = Math.min(this.least(EDGE, MIN_LINE_PX), half / 2);
-    this.band(path, ns, -half + edge, half - edge, t.rgb, t.fill, drape, false);
+    if (t.fill > 0) this.band(path, ns, -half + edge, half - edge, t.rgb, t.fill, drape, false);
     this.band(path, ns, -half, -half + edge, t.rgb, t.edge, drape, false);
     this.band(path, ns, half - edge, half, t.rgb, t.edge, drape, false);
     if (tone !== 'bridge') return;

@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * New game, step 4: the home, chosen on the whole world. The camera opens on the whole land; the
+   * New game, step 5: the home, chosen on the whole world. The camera opens on the whole land; the
    * chips under it glide to the main town or a village, and "Whole world" back out. The homes for
    * sale the household can afford are lit; two chips beside the legend add the rest ("All for sale"),
    * as a faint stone ring, or leave them out ("Within savings", where a Living game opens). In a
@@ -9,7 +9,7 @@
    * and what the chosen home is; under it the homes for sale as a list, for the keyboard, and the
    * main control on a narrow screen.
    *
-   * A household of the town's (chosen in step 3, `app.playSlot`) has its own home chosen already:
+   * A household of the town's (chosen in step 4, `app.playSlot`) has its own home chosen already:
    * it may stay (the game takes it over as it is) or move to a home for sale, its old home then for
    * sale too. On Move in the rest of the homes for sale are filled (`newGame.ts` `moveInRequest`).
    */
@@ -23,7 +23,7 @@
   import { settings } from '../../settings/settings.svelte';
   import { tierFor } from '../../game/people';
   import { furnishAhead } from '../../game/townJobs';
-  import { householdsAhead } from '../newGame';
+  import { householdsAhead, stepLabel } from '../newGame';
   import { app } from '../app.svelte';
   import { money } from '../format';
   import Icon from '../Icon.svelte';
@@ -39,7 +39,7 @@
   let templates = $state.raw<Templates | null>(null);
   /** Changes when a lot's garden is made bigger or smaller (the lots along the street move). */
   const town = $derived(app.town!);
-  /** The home of the town's household chosen in step 3 (null: a household made in Creation). */
+  /** The home of the town's household chosen in step 4 (null: a household made in Creation). */
   const from = app.residentSlot;
   const household = app.mover!;
   const name = household.name;
@@ -583,7 +583,7 @@
   </button>
 {/snippet}
 
-<SetupShell label="The home" step="Step 4 of 4 · Home" back={{ label: 'Household', go: back }} {head} {panel} {stage} stats={figures} {actions} />
+<SetupShell label="The home" step={stepLabel(5)} back={{ label: 'Household', go: back }} {head} {panel} {stage} stats={figures} {actions} />
 
 {#if confirming && shortage}
   <Modal title="Not enough beds" onclose={() => (confirming = false)} width={460}>

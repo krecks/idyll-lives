@@ -15,6 +15,8 @@ import { assembleTown, generatedHouses, generateWorld, houseTemplate, loadTempla
 import { previewWorld } from './townPreview';
 import { landDraft, layOn } from './macro';
 import type { Pt } from './roads';
+import { proposalOf } from './proposal';
+import { buildFromUses } from './build';
 import type { WorldStep } from './world';
 import { LazyWorker, Superseded, type WorkerAnswer, type WorkerAsk } from '../core/lazyWorker';
 import { mulberry32 } from './noise';
@@ -34,6 +36,17 @@ export type TownJob =
    * laid). `macro.ts` `layOn`.
    */
   | { kind: 'town'; land: NeighbourhoodDraft; seed: number; name?: string; options: Partial<WorldOptions>; site?: Pt; waterKept: boolean }
+  /**
+   * Step 2's proposed layout, from what the `town` job is given: the generator's town laid and settled as that job
+   * lays it (`built`), and the layout step 2 starts from (`plan`: its roads, areas, centre and uses, with no lots,
+   * backdrop, places or parking). The result's town (`LaidTown`) is what step 2 shows: the plan's streets settled.
+   */
+  | { kind: 'layout'; land: NeighbourhoodDraft; seed: number; name?: string; options: Partial<WorldOptions>; site?: Pt; waterKept: boolean }
+  /**
+   * Step 3's town built from step 2's layout (`plan`, as the player left it) with `seed` (the build's own, which
+   * "Build again" changes): a layout whose hash is `proposal`'s builds the proposal's town as it is.
+   */
+  | { kind: 'build'; plan: NeighbourhoodDraft; proposal: Proposal; seed: number }
   /**
    * Step 2's edits made: the town's plan draft (`game/edit/`; its land the land as laid, not graded:
    * `LaidTown.plan`) settled on its land (`landFollow.ts` `settleEdit`), after `ops` edits. `steps`:
@@ -79,6 +92,20 @@ export interface LaidTown {
 }
 
 /**
+ * Step 2's proposed layout (the `layout` job's): the layout it starts from (`plan`: the generator's roads, areas,
+ * centre and uses, with no lots, backdrop, places or parking), the town the generator built for it (`built`, with its
+ * uses: what Build gives for the layout untouched) and the plan's `layoutHash` (`hash`). `builtPlan` and `builtMarks`:
+ * the built town's own `LaidTown.plan` and `marks`, which step 3's edits start from.
+ */
+export interface Proposal {
+  plan: NeighbourhoodDraft;
+  built: NeighbourhoodDraft;
+  hash: string;
+  builtPlan?: NeighbourhoodDraft;
+  builtMarks?: string[];
+}
+
+/**
  * Step 2's edits settled (`edit`): the town settled (`draft`, its `preview`; `houses`: those its lots
  * use that the first step's didn't, all of them without steps); the plan that was settled (`step`: its
  * index in the job's `steps`, the last unless an edit was refused); the edits refused (`op`: an edit's
@@ -95,6 +122,8 @@ export interface EditedTown extends Omit<LaidTown, 'plan' | 'marks'> {
 export type TownResult =
   | { kind: 'land'; draft: NeighbourhoodDraft; preview: WorldStructure }
   | ({ kind: 'town' } & LaidTown)
+  | ({ kind: 'layout'; proposal: Proposal } & LaidTown)
+  | ({ kind: 'build' } & LaidTown)
   | ({ kind: 'edit' } & EditedTown)
   | ({ kind: 'world' } & LaidTown)
   | { kind: 'assemble'; lot: string }
@@ -122,6 +151,10 @@ export function runTownJob(content: Content, t: Templates, job: TownJob, step?: 
       const lay = { townSeed: job.seed, waterKept: job.waterKept, ...(job.site ? { site: job.site } : {}) };
       return { kind: 'town', ...laidOut(content, t, layOn(content, t, job.land, job.options, lay, job.name ?? job.land.name, step), step) };
     }
+    case 'layout':
+      return { kind: 'layout', ...proposed(content, t, job, step) };
+    case 'build':
+      return { kind: 'build', ...built(content, t, job) };
     case 'edit':
       return { kind: 'edit', ...edited(content, t, job) };
     case 'assemble':
@@ -155,6 +188,31 @@ function laidOut(content: Content, t: Templates, laid: NeighbourhoodDraft, step?
   const land = laid.open?.land;
   const plan = draft.open && land?.seeded === 'follow' && draft.open.land !== land ? { ...draft, open: { ...draft.open, land } } : undefined;
   return { draft, preview, houses, ...(plan ? { plan, marks: settled.marks } : {}) };
+}
+
+/**
+ * Step 2's proposed layout (`layout`): the town laid and settled as the `town` job lays it, its proposal
+ * (`proposal.ts` `proposalOf`: the town built and the layout step 2 starts from), and that layout's streets
+ * settled on the land as an edit is (`settleEdit`, giving nothing up): what step 2 shows, with no lots and so
+ * no houses (Build's job has the town's). Its `plan` is the layout, `marks` what in it is over a slope limit.
+ */
+function proposed(content: Content, t: Templates, job: Extract<TownJob, { kind: 'layout' }>, step?: (done: WorldStep) => void): { proposal: Proposal } & LaidTown {
+  const lay = { townSeed: job.seed, waterKept: job.waterKept, ...(job.site ? { site: job.site } : {}) };
+  const town = laidOut(content, t, layOn(content, t, job.land, job.options, lay, job.name ?? job.land.name, step), step);
+  const proposal = proposalOf(town, t);
+  const settled = settleEdit(proposal.plan, (d) => previewWorld(content, t, d, null));
+  const { draft, world: preview } = settled;
+  if (draft.open?.land && draft !== proposal.plan) preview.meta = { ...preview.meta, zones: draft.open.zones, land: encodeLand(draft.open.land) };
+  return { proposal, draft, preview, houses: [], plan: proposal.plan, marks: settled.marks };
+}
+
+/**
+ * Step 3's town built from a layout (`build`: `build.ts` `buildFromUses`): the proposal's town as it is for an
+ * untouched layout and the proposal's seed, else built again from the layout's streets and uses; its preview,
+ * houses, plan and marks.
+ */
+function built(content: Content, t: Templates, job: Extract<TownJob, { kind: 'build' }>): LaidTown {
+  return buildFromUses(job.proposal, job.plan, t, content, job.seed);
 }
 
 /** Step 2's edits settled (`EditedTown`): `settleEdit`, the settled land coded into the preview as `laidOut` codes it, the new houses, the checks. */

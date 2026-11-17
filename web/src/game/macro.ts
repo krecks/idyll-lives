@@ -38,6 +38,7 @@ import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEd
 import { GENTLE_TILT, seedBare, smoothHeights, type GentlePlane } from './landFollow';
 import { chaikin, outlines, rasterize, rle, simplify, simplifyRing, unrle } from './landMasks';
 import { fbm } from './noise';
+import type { UseLayer } from './uses';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_TURN, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
 import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, straightAround, type Box, type Pt, type RoadPlan } from './roads';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, LotPlacer, plotRect, settleRoads, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
@@ -92,6 +93,11 @@ export interface OpenWorldDraft {
    * in the town file nor the world's code.
    */
   gentle?: GentlePlane[];
+  /**
+   * What the player painted the land to be used for in step 2 (`uses.ts`), while the new game is set
+   * up: Build makes the town from it. Not in the town file nor the world's code.
+   */
+  uses?: UseLayer;
 }
 
 /**
@@ -2335,7 +2341,7 @@ function heightsOf(land: Cells, built: readonly Rect[], roads: readonly RoadPlan
  * tried shorter, down to a pair. Their houses are drawn from `rand` (the world's own draws are left as
  * they were). The rows placed.
  */
-function terraceRows(t: Templates, lots: LotPlacer, frontages: readonly (readonly Frontage[])[], spec: Pick<WorldSpec, 'terraces' | 'rows'>, rand: Rand): PlotSlot[][] {
+export function terraceRows(t: Templates, lots: LotPlacer, frontages: readonly (readonly Frontage[])[], spec: Pick<WorldSpec, 'terraces' | 'rows'>, rand: Rand): PlotSlot[][] {
   const out: PlotSlot[][] = [];
   let left = between(rand, spec.terraces);
   // (The longest row that went down last: one longer fits nowhere.)
@@ -2366,7 +2372,7 @@ function terraceRows(t: Templates, lots: LotPlacer, frontages: readonly (readonl
  * hundred lays none out; `houseFor` would put a fixed layout, too wide for the lot, in its place).
  * Null: none in 40 draws.
  */
-function rowHouse(t: Templates, rand: Rand): ReturnType<typeof houseFor> | null {
+export function rowHouse(t: Templates, rand: Rand): ReturnType<typeof houseFor> | null {
   for (let k = 0; k < 40; k++) {
     const h = houseFor(t, 'terrace', 'snug', rand);
     if (h.template.startsWith('gen:')) return h;
@@ -2383,7 +2389,7 @@ const straight = (pts: readonly Pt[], s: number, ls: number[]) => straightAround
  * and yard) every `every` m of road (150 to 200 in the classic worlds), each clear of the areas,
  * the water and steep land, and of the area it is nearest. The farmsteads placed.
  */
-function alongCountryRoads(content: Content, t: Templates, lots: LotPlacer, plans: readonly AreaPlan[], roads: readonly RoadPlan[], land: Cells, every: [number, number], rand: Rand, steepest = STEEP): PlotSlot[] {
+export function alongCountryRoads(content: Content, t: Templates, lots: LotPlacer, plans: readonly AreaPlan[], roads: readonly RoadPlan[], land: Cells, every: [number, number], rand: Rand, steepest = STEEP): PlotSlot[] {
   const country = roads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : []));
   const byRoad = new Map<number, Frontage[]>();
   const lens = new Map(country.map((r) => [r, lengths(roads[r].points)]));
@@ -2476,7 +2482,7 @@ function alongCountryRoads(content: Content, t: Templates, lots: LotPlacer, plan
  * takes, no further than `reach` from the area's box. Its rectangle and which way it faces
  * (towards the area: its trail comes from there).
  */
-function siteFor(place: PublicTemplate, plan: AreaPlan, land: Cells, ground: Ground, water: Uint8Array, t: Templates, rand: Rand, W: number, D: number, reach = Infinity): { x: number; z: number; facing: Facing; w: number; d: number } | null {
+export function siteFor(place: PublicTemplate, plan: AreaPlan, land: Cells, ground: Ground, water: Uint8Array, t: Templates, rand: Rand, W: number, D: number, reach = Infinity): { x: number; z: number; facing: Facing; w: number; d: number } | null {
   const frame = place.lot ?? t.plot;
   let best: { at: { x: number; z: number; facing: Facing; w: number; d: number }; score: number } | null = null;
   const wetAt = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < D && water[Math.floor(z) * W + Math.floor(x)] === 1;
@@ -2524,7 +2530,7 @@ const TRAIL_CELL = 2;
  * water: A* on a 2 m grid from every road cell of the area to the place's front, smoothed where
  * that keeps it off the lots. Null if there's no way.
  */
-function trailTo(slot: PlotSlot, plan: AreaPlan, roads: readonly RoadPlan[], slots: readonly PlotSlot[], water: Uint8Array, land: Cells, t: Templates, W: number, D: number): RoadPlan | null {
+export function trailTo(slot: PlotSlot, plan: AreaPlan, roads: readonly RoadPlan[], slots: readonly PlotSlot[], water: Uint8Array, land: Cells, t: Templates, W: number, D: number): RoadPlan | null {
   const rect = plotRect(t, slot);
   const { width, depth } = slotDims(t, slot);
   const turn = turner(slot.x, slot.z, width, depth, slot.facing);

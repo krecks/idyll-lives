@@ -5,7 +5,30 @@ import { describe, expect, test } from 'bun:test';
 import { blankLand, COVER, coverSpan } from '../src/game/land';
 import type { NeighbourhoodDraft } from '../src/game/town';
 import { townFits } from '../src/game/world';
-import { codeFrom, firstCode, fitted, landKey, landStats, startCode, townKey, withSeed } from '../src/ui/newGame';
+import type { RoadPlan } from '../src/core/protocol';
+import { TownHistory } from '../src/game/edit/history';
+import { usesEmpty } from '../src/game/uses';
+import {
+  addedStreets,
+  buildKey,
+  changesWord,
+  codeFrom,
+  firstCode,
+  fitted,
+  goesWords,
+  landKey,
+  landStats,
+  layoutHash,
+  layoutPlan,
+  peopleKey,
+  startCode,
+  stepLabel,
+  STEPS,
+  townKey,
+  whatGoes,
+  withSeed,
+  worldKeyOf,
+} from '../src/ui/newGame';
 
 describe("the steps' keys", () => {
   const code = startCode('river', 1234);
@@ -43,6 +66,93 @@ describe("the steps' keys", () => {
 
   test("a new land seed lets the town's and the people's own seeds go", () => {
     expect(withSeed({ ...code, townSeed: 3, peopleSeed: 4 }, 99)).toEqual({ ...code, seed: 99 });
+  });
+});
+
+describe('the five steps', () => {
+  test('in order, each with its label, the first three with their buttons on', () => {
+    expect(STEPS.map((s) => s.id)).toEqual(['land', 'streets', 'town', 'household', 'home']);
+    expect(stepLabel(2)).toBe('Step 2 of 5 · Streets & zones');
+    expect(stepLabel(3)).toBe('Step 3 of 5 · Build');
+    expect(STEPS.slice(0, 3).map((s) => s.next)).toEqual(['Lay out the streets →', 'Build the town →', 'Choose a household →']);
+  });
+
+  test("the built town is keyed by the layout's key, the layout as left and the build's seed", () => {
+    const key = buildKey('L', 'h', 7);
+    expect(buildKey('L', 'h', 7)).toBe(key);
+    for (const other of [buildKey('M', 'h', 7), buildKey('L', 'i', 7), buildKey('L', 'h', 8)]) expect(other).not.toBe(key);
+  });
+});
+
+describe('step 2 and step 3: the layout, the built town and what each one remakes', () => {
+  const road = (x0: number, z0: number, x1: number, z1: number, name?: string): RoadPlan => ({
+    points: [
+      [x0, z0],
+      [(x0 + x1) / 2, (z0 + z1) / 2],
+      [x1, z1],
+    ],
+    width: 7,
+    ends: ['out', 'out'],
+    kind: 'street',
+    ...(name ? { name } : {}),
+  });
+  const plan = (roads: RoadPlan[]) => ({ name: 'Ashby', width: 400, depth: 400, slots: [], roads, greens: [], households: [], open: { areas: [], uses: usesEmpty(100, 100) } }) as unknown as NeighbourhoodDraft;
+  const proposed = plan([road(0, 100, 400, 100, 'High Street')]);
+  const layout = { key: 'L', proposal: { plan: proposed } };
+
+  test("Build makes the town from the layout as left: the edits' plan, else the proposal's", () => {
+    expect(layoutPlan(layout)).toBe(proposed);
+    const history = new TownHistory(proposed);
+    const drawn = plan([...proposed.roads, road(200, 100, 200, 300)]);
+    history.push(drawn);
+    expect(layoutPlan({ ...layout, plan: proposed, history })).toBe(drawn);
+  });
+
+  test("the built town's key follows the layout's key, the layout as left and the build's seed; its people's follow it", () => {
+    const key = worldKeyOf(layout, 0);
+    expect(key).toBe(buildKey('L', layoutHash(proposed), 0));
+    // (Back and forth with nothing changed: the same key, the tweaks and the households kept.)
+    expect(worldKeyOf({ ...layout, proposal: { plan: structuredClone(proposed) } }, 0)).toBe(key);
+    // (A street drawn in step 2, the build seed rolled, another proposal: built again, lived in again.)
+    const history = new TownHistory(proposed);
+    history.push(plan([...proposed.roads, road(200, 100, 200, 300)]));
+    for (const other of [worldKeyOf({ ...layout, history }, 0), worldKeyOf(layout, 9), worldKeyOf({ ...layout, key: 'M' }, 0)]) {
+      expect(other).not.toBe(key);
+      expect(peopleKey(other, 5)).not.toBe(peopleKey(key, 5));
+    }
+  });
+
+  test('what each change remakes, and what it asks about first', () => {
+    const none = { layoutEdited: false, townTweaked: false };
+    expect(whatGoes('land', none)).toEqual({ remake: ['layout', 'town', 'people'], ask: [] });
+    expect(whatGoes('propose', { layoutEdited: true, townTweaked: false }).ask).toEqual(['layout']);
+    expect(whatGoes('propose', { layoutEdited: true, townTweaked: true }).ask).toEqual(['layout', 'town']);
+    // (A layout change or Build again keeps the layout: only the built town's tweaks are asked about.)
+    expect(whatGoes('layout', { layoutEdited: true, townTweaked: false })).toEqual({ remake: ['town', 'people'], ask: [] });
+    expect(whatGoes('build', { layoutEdited: true, townTweaked: true }).ask).toEqual(['town']);
+    expect(goesWords(['layout', 'town'])).toBe('your streets and zones, and your changes to the built town');
+    expect([changesWord(1), changesWord(4), changesWord(0)]).toEqual(['your change', 'your 4 changes', 'your changes']);
+  });
+
+  test("a street drawn in step 3 goes into the layout; one split by its junction is replaced by its pieces", () => {
+    const built = plan([road(0, 100, 400, 100, '1 High Street')]);
+    const side = road(200, 100, 200, 300, 'New Road');
+    // (The built town names its roads its own way: the layout's are matched by their line.)
+    const after = { ...built, roads: [...built.roads, side] };
+    const added = addedStreets(proposed, built, after);
+    expect(added.roads.map((r) => r.name)).toEqual(['High Street', 'New Road']);
+    expect(addedStreets(added, built, after)).toEqual(added);
+    // (Nothing drawn: the layout as it was.)
+    expect(addedStreets(proposed, built, { ...built })).toBe(proposed);
+    expect(addedStreets(proposed, after, built)).toBe(proposed);
+    // (The high street split where the new street meets it.)
+    const west = road(0, 100, 200, 100);
+    const east = road(200, 100, 400, 100);
+    const split = addedStreets(proposed, built, { ...built, roads: [west, east, side] });
+    expect(split.roads.map((r) => r.points[0][0] + ',' + r.points.at(-1)![0])).toEqual(['0,200', '200,400', '200,200']);
+    // (A piece of a road the layout hasn't got stays out.)
+    const other = plan([road(0, 50, 400, 50, 'Back Lane')]);
+    expect(addedStreets(other, built, { ...built, roads: [west, east, side] }).roads.map((r) => r.name)).toEqual(['Back Lane', 'New Road']);
   });
 });
 

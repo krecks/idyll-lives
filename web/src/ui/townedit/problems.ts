@@ -1,6 +1,7 @@
 /**
- * Step 2's Problems list: what is wrong with the town as the player has edited it, read by the same
- * checks the sample tool runs over every generated world (`townCheck.ts` `townProblems`).
+ * The Problems list (steps 2 and 3): what is wrong with the layout or the town as the player has edited
+ * it, read by the same checks the sample tool runs over every generated world (`townCheck.ts`
+ * `townProblems`). Step 2's layout has no lots: its problems are its roads'.
  *
  * Those checks read a town file (`CheckedTown`, what `assembleTown` writes), and assembling one
  * means furnishing every house: far too slow after every edit. `checkedTown` writes the part of a
@@ -20,6 +21,7 @@
 import type { Content } from '../../content/content';
 import type { RoadPlan } from '../../core/protocol';
 import { pointAt, lengths } from '../../game/roads';
+import { areasFor } from '../../game/build';
 import { checkedTown } from '../../game/edit/checked';
 import { townProblems } from '../../game/townCheck';
 import { plotRect, type NeighbourhoodDraft, type Templates } from '../../game/town';
@@ -81,6 +83,9 @@ function longCountryCourt(line: string, draft: NeighbourhoodDraft): boolean {
   return !road || road.kind === 'country';
 }
 
+/** The checks of a town's lots, which step 2's layout (no lots yet) can't keep. */
+const LAYOUT_LATER: readonly RegExp[] = [/^hamlet .* has \d+ lots$/];
+
 /** The checks of how the generator fills a town, which an edited town needn't keep (see the top of this file). */
 const GENERATED_ONLY: readonly RegExp[] = [/ has \d+ backdrop buildings \(\d+ or more\)$/, /^the centre's open land is /, /^the main town has no centre$/];
 
@@ -133,24 +138,29 @@ export function issueOf(line: string, draft: NeighbourhoodDraft, t: Templates): 
  * What is wrong with `draft` (see the top of this file). `base`: the town as it was laid (its
  * problems, if any, are the generator's: they warn rather than block, the player having made none of them).
  */
-export function townIssues(draft: NeighbourhoodDraft, t: Templates, content: Content, base?: TownIssues): TownIssues {
+export function townIssues(plan: NeighbourhoodDraft, t: Templates, content: Content, base?: TownIssues): TownIssues {
+  // (Step 2's layout has no lots yet: its homes are zones, and the way on counts them itself. Its roads are judged as
+  // Build will have them: a street drawn by hand only gets its area, and its village's limits, at Build.)
+  const layout = !plan.slots.length && !!plan.open?.uses;
+  const draft = layout ? areasFor(plan, content).draft : plan;
   const careers = content.careerCategories.map((c) => c.id);
   const size = draft.world?.options?.town;
   // (Only the main town's careers are expected, in a town or a city; nothing about how filled it is.)
-  const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, mainLeast: 0, careers: size === 'town' || size === 'city', exits: null };
+  const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, mainLeast: 0, careers: !layout && (size === 'town' || size === 'city'), exits: null };
   const found = townProblems(checkedTown(draft, t), expect, { river: false, careers, generated: false });
   const homes = draft.slots.filter((s) => s.kind === 'house').length;
   const lines = [...found.hard];
-  if (homes < 2) lines.push(`fewer than two homes (${homes})`);
+  if (homes < 2 && !layout) lines.push(`fewer than two homes (${homes})`);
   const had = new Set(base?.blocking.map((i) => i.text) ?? []);
   const out: TownIssues = { blocking: [], warnings: [] };
   for (const line of lines) {
-    if (GENERATED_ONLY.some((p) => p.test(line))) continue;
+    if (GENERATED_ONLY.some((p) => p.test(line)) || (layout && LAYOUT_LATER.some((p) => p.test(line)))) continue;
     const issue = issueOf(line, draft, t);
     if ((BLOCKING.some((p) => p.test(line)) || longCountryCourt(line, draft)) && !had.has(issue.text)) out.blocking.push(issue);
     else out.warnings.push(issue);
   }
-  for (const line of found.soft) out.warnings.push(issueOf(line, draft, t));
+  // (A layout's villages have no lots yet: their zones are built at Build.)
+  for (const line of found.soft) if (!(layout && LAYOUT_LATER.some((p) => p.test(line)))) out.warnings.push(issueOf(line, draft, t));
   out.warnings.push(...countryDeadEnds(draft));
   return out;
 }

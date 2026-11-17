@@ -36,10 +36,11 @@ import { Geo, type V3 } from '../shared/geometry';
 import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
 import { placementVariation, standInOf } from '../shared/modelEntry';
 import { pavedRects } from '../shared/paving';
-import { townRoadMesh, townRoads, type RoadMeshData } from '../shared/roads';
+import { townRoadMesh, type RoadMeshData } from '../shared/roads';
+import { backdropKey, roadKey, townKey } from '../shared/overviewKeys';
 import { surfaceOf } from '../shared/landSurface';
 import type { BuiltSurface } from '../shared/builtSurface';
-import { hashNumbers, hashString } from '../shared/chunks';
+import { hashNumbers } from '../shared/chunks';
 import { townRoadMeshOffThread } from '../shared/renderData';
 import { fieldLayers } from '../shared/street';
 import type { TownBuilding } from '../shared/townBuildings';
@@ -260,7 +261,8 @@ export class TownOverview {
 
   /** Builds the overview of `world` (kept when it is the same town); the previous one stays until it is done. True when it was built. */
   async build(world: WorldStructure, pace?: () => Promise<void>): Promise<boolean> {
-    const key = townKey(world);
+    const roadsKey = roadKey(world);
+    const key = townKey(world, roadsKey);
     const drawn = backdropKey(world);
     if (key === this.key && drawn === this.backdropKey) return false;
     if (key === this.key) {
@@ -273,7 +275,6 @@ export class TownOverview {
     }
     // (Asked for first: the render data worker makes the town's road mesh while the street is planned. Not for
     // another town with the same roads at the same heights: a lot removed keeps it.)
-    const roadsKey = roadKey(world);
     const roads = this.ground.get('townStreets')?.key === roadsKey ? null : townRoadMeshOffThread(world);
     await this.street.build(world, null, pace);
     const ground = await this.buildGround(world, pace, roads, roadsKey);
@@ -686,34 +687,6 @@ export class TownOverview {
 }
 
 const ZERO = [0, 0, 0, 0];
-
-/** What the town's road mesh is made from (`townRoadMesh`): its roads and junctions, and on a land the town follows their heights. */
-function roadKey(world: WorldStructure): string {
-  const surface = surfaceOf(world);
-  return `${hashString(JSON.stringify([townRoads(world), world.junctions ?? null]))}|${surface ? surface.roadsSig() : '-'}`;
-}
-
-/** Identity of a town layout: the overview builds again only when it changes. */
-function townKey(world: WorldStructure): string {
-  return [
-    world.meta?.seed ?? 0,
-    world.width,
-    world.depth,
-    world.plots.map((p) => `${p.house?.join(',') ?? '-'}`).join(';'),
-    world.openings.length,
-    world.objects.length,
-    world.objects.reduce((a, o) => a + o.x * 31 + o.z * 7 + o.rot, 0),
-    (world.meta?.paths ?? []).map((r) => `${r.x},${r.z},${r.w}`).join(';'),
-    JSON.stringify(world.meta?.world ?? null),
-    world.meta?.home ?? '-',
-  ].join('|');
-}
-
-/** What a town's backdrop buildings are drawn from (`townBackdrop`): its buildings, its places' hours, and on a land it follows the surface's roads (as the road mesh is keyed: `roadKey`). */
-function backdropKey(world: WorldStructure): string {
-  const surface = surfaceOf(world);
-  return `${hashString(JSON.stringify([world.meta?.backdrop ?? null, (world.meta?.places ?? []).map((p) => p.hours ?? null)]))}|${surface ? surface.roadsSig() : '-'}`;
-}
 
 /** A highlight's colour (into `out`): the states mixed by intensity (an added glow, alpha its strength). */
 function writeColor(out: Float32Array, outline: number, hover: number, selected: number, marked: number, dear: number): Float32Array {
