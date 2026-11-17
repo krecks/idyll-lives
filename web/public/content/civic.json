@@ -424,6 +424,7 @@
       "category": "community",
       "group": "shops",
       "description": "A padded couch with a paper sheet, in the consulting room.",
+      "seat": { "height": 0.45, "forward": -0.12, "legs": "out" },
       "interactions": [
         {
           "id": "rest",
