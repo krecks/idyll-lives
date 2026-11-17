@@ -82,13 +82,18 @@ export function residentsMost(tier: FillTier = 'full'): number {
 }
 
 /**
- * The tier each graphics preset fills the town at (`render/quality.ts` `GraphicsPreset`). Measured
- * natively on an M3 Pro over a game day, a full town runs 3,800–4,300 ticks a second, short of the
- * 5,400 the fastest speed needs; half runs 5,500–6,000 and near 8,000–9,400. A slower machine picks
- * a lower preset, so it gets the smaller town that keeps up; on high the town is full and the
- * fastest speed runs a little slow.
+ * The tier each graphics preset fills the town at (`render/quality.ts` `GraphicsPreset`). A preset
+ * gets a tier when the sim's wasm build, with the camera's 320-tile square in full detail as the
+ * game streams it, runs at least 4,250 ticks a second on the slowest machine the preset is for
+ * (the fastest speed needs 3,600); with none that does, the smallest. Measured on 2026-11-17 on an
+ * M3 Pro over a game day of the seaside, river and forest cities (`tools/m1/run.sh`,
+ * `tools/bench/simtick.mjs`, Node), the wasm ran at most about 2,800 ticks a second of CPU time
+ * near, 1,100 half and 800 full; an M1 (low and medium's floor) at 0.72 of that is about 2,000,
+ * 800 and 580. No tier reaches 4,250 on either machine, so every preset fills the town near the
+ * player's home; the fastest speed runs slow on all of them, the full town most (the machine was
+ * shared and busy: a quiet run of `tools/m1/run.sh` may move these, not past 4,250).
  */
-const TIER_FOR: Record<string, FillTier> = { low: 'near', medium: 'half', high: 'full' };
+const TIER_FOR: Record<string, FillTier> = { low: 'near', medium: 'near', high: 'near' };
 
 /** The tier to fill the town at on a machine with the graphics preset `preset` (full for one this does not know). */
 export function tierFor(preset: string | undefined): FillTier {
