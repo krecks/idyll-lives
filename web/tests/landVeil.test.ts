@@ -1,11 +1,12 @@
 /**
  * The menus' land's haze at its edge (`render/shared/landVeil.ts`, `render/pc/landHaze.ts`): the veil clear at the
  * rectangle `VEIL_FADE` m in from the landscape's edge and whole at the edge and past it, by distance from that
- * rectangle alone (round at its corners), as the old veil's rings had it, and clear near the eye; and both shader
- * languages' haze taking the veil in.
+ * rectangle alone (round at its corners), as the old veil's rings had it, and clear near the eye; the curtain closing
+ * the landscape's cut edge, over the ground there (the ground tiles' coarser levels too) and under it and the sea's
+ * sheet; and both shader languages' haze taking the veil in.
  */
 import { describe, expect, test } from 'bun:test';
-import { VEIL_FADE, VEIL_NEAR, veilAt, veilRect } from '../src/render/shared/landVeil';
+import { curtain, VEIL_FADE, VEIL_NEAR, veilAt, veilRect } from '../src/render/shared/landVeil';
 import { gameFog } from '../src/render/pc/shaders/fog';
 
 /** A medium land's landscape: 832 m and its 260 m ring each way. */
@@ -62,6 +63,48 @@ describe('the veil', () => {
     expect(small.fade).toBe(100);
     expect(veilAt(small, 150, 100)).toBe(0);
     expect(veilAt(small, 0, 100)).toBe(1);
+  });
+});
+
+describe('the curtain', () => {
+  // Rolling ground rising to a rim at the edge, with a notch (a river's way out) on one side.
+  const ground = (x: number, z: number) => 60 + 40 * Math.sin(x * 0.013) * Math.cos(z * 0.021) - (Math.abs(z - 420) < 12 && x > 1000 ? 64 : 0);
+  const { positions, indices } = curtain(BOX, ground, -0.35);
+  const n = positions.length / 6;
+
+  test('a closed band just past the edge, all the way round', () => {
+    expect(indices.length).toBe(n * 6);
+    expect(Math.max(...indices)).toBe(2 * n - 1);
+    for (let i = 0; i < 2 * n; i++) {
+      const [x, z] = [positions[i * 3], positions[i * 3 + 2]];
+      const out = Math.max(BOX.x0 - x, x - BOX.x1, BOX.z0 - z, z - BOX.z1);
+      expect(out).toBeCloseTo(0.5, 6);
+    }
+  });
+
+  test('its top over the ground along the edge, the ground tiles coarsest level (straight every 8 m) too', () => {
+    let lowest = Infinity;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const [ax, at, az] = [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]];
+      const [bx, bt, bz] = [positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]];
+      // (Each metre between two samples, on the edge itself.)
+      const len = Math.hypot(bx - ax, bz - az);
+      for (let s = 0; s <= len; s += 1) {
+        const t = len > 0 ? s / len : 0;
+        const [x, z] = [Math.min(BOX.x1, Math.max(BOX.x0, ax + (bx - ax) * t)), Math.min(BOX.z1, Math.max(BOX.z0, az + (bz - az) * t))];
+        const top = at + (bt - at) * t;
+        // The ground as the coarsest level draws it: straight between its points every 8 m from the box's corner.
+        const along = Math.abs(z - BOX.z0) < 1e-6 || Math.abs(z - BOX.z1) < 1e-6 ? x - BOX.x0 : z - BOX.z0;
+        const [p0, p1] = [Math.floor(along / 8) * 8, Math.floor(along / 8) * 8 + 8];
+        const point = (a: number) => (Math.abs(z - BOX.z0) < 1e-6 || Math.abs(z - BOX.z1) < 1e-6 ? ground(BOX.x0 + a, z) : ground(x, BOX.z0 + a));
+        const coarse = point(p0) + ((point(p1) - point(p0)) * (along - p0)) / 8;
+        expect(top).toBeGreaterThan(Math.max(ground(x, z), coarse) - 1e-6);
+        lowest = Math.min(lowest, ground(x, z));
+      }
+    }
+    // Its foot well under the lowest ground at the edge and under the sea's sheet.
+    for (let i = n; i < 2 * n; i++) expect(positions[i * 3 + 1]).toBeLessThan(Math.min(lowest, -0.35) - 10);
   });
 });
 

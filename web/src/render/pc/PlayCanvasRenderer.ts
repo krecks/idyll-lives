@@ -504,7 +504,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * are on (`showLayers`).
    */
   private overview: TownOverview | null = null;
-  /** The haze the menus' land fades into at its edge (`landHaze.ts`); made with the first town shown. */
+  /** The haze the menus' land fades into at its edge, and the curtain closing its cut (`landHaze.ts`); made with the first town shown. */
   private landHaze: LandHaze | null = null;
   private townShot: TownShot | null = null;
   private townHighlight: LotHighlight | null = null;
@@ -3129,6 +3129,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // given: linear.
     const c = l.clearColor;
     this.app.scene.fog.color.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
+    this.landHaze?.setColour(this.app.scene.fog.color);
     this.camera.camera.clearColor = this.colorTmp.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
     // The look's exposure for the hour and the moonlight grade (`post.ts`: uniforms).
     if (this.post) this.post.exposure = l.exposure * LOOK.exposure;
@@ -3198,7 +3199,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         this.townRig.ground = (x, z) => nature.landscape.heightAt(x, z);
         // (The land faded into the haze past its landscape's edge, from far out.)
         const haze = (this.landHaze ??= new LandHaze(this.app, this.root));
-        haze.set(this.townReach, `${landscapeId(nature.landscape)}|${nature.landscape.landVersion}`);
+        haze.set(this.townReach, (x, z) => nature.landscape.heightAt(x, z), townLayer(this.app).id, `${landscapeId(nature.landscape)}|${nature.landscape.landVersion}`);
+        haze.setColour(this.app.scene.fog.color);
       } finally {
         this.townBuilds--;
       }
