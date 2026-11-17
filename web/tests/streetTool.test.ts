@@ -34,7 +34,7 @@ mock.module('../src/ui/townedit/streetChoice.svelte', () => ({
   fillsHomes: (a: string) => a === 'homes',
 }));
 const { climbOf, drawnStretches, liveStreet, runsOf, unfinished, verdictOf } = await import('../src/ui/townedit/streetLive');
-const { AUTO_JOIN, carryOn, FIRST_STREET, pullAt, pullReach, StreetDrawing, startAt, streetGhosts, streetTool, stretchNear } = await import('../src/ui/townedit/streetTool');
+const { AUTO_JOIN, carryOn, FIRST_STREET, kindLine, pullAt, pullReach, StreetDrawing, startAt, streetGhosts, streetTool, stretchNear } = await import('../src/ui/townedit/streetTool');
 
 const W = 400;
 const D = 400;
@@ -319,6 +319,31 @@ function fakeEditor(draft: NeighbourhoodDraft) {
 }
 
 const key = (k: string) => ({ key: k }) as KeyboardEvent;
+
+describe('the hint names what the street will be', () => {
+  test("a country road whose dead-end stretch drawStreet makes a street (past a court) says so, once drawStreet has had its say", () => {
+    const draft = town();
+    // (South off Far Lane, out of the town's box: a country road as the live checks have it; drawn, a street of no area.)
+    const pts: Pt[] = [
+      [200, FAR_Z + 6],
+      [200, 380],
+    ];
+    const live = liveStreet(draft, t, pts, 'street', true);
+    expect(live.kind).toBe('country');
+    expect(kindLine(draft, live)).toBe('A country road');
+    expect(kindLine(draft, live, verdictOf(draft, t, content, pts, 'street', true, 7))).toBe('A street');
+    // (A short one stays a country road.)
+    const short: Pt[] = [
+      [200, FAR_Z + 6],
+      [200, FAR_Z + 40],
+    ];
+    expect(kindLine(draft, liveStreet(draft, t, short, 'street', true), verdictOf(draft, t, content, short, 'street', true, 7))).toBe('A country road');
+    // Split at a bridge, the stretch before it a country road and the one past it made a street.
+    const road = (kind: RoadPlan['kind'], bridge?: [number, number]): RoadPlan => ({ points: line(0, 0, 0, 40), width: 7, ends: ['join', 'join'], kind, ...(bridge ? { bridge } : {}) });
+    const split = { draft: { ...draft, roads: [...draft.roads, road('country'), road('country', [5, 30]), road('street')] }, cleared: { lots: [], backdrop: [] }, made: [4, 5, 6] } as Edited;
+    expect(kindLine(draft, { ...live, bridges: [24] }, split)).toBe('A country road with a 24 m bridge, then a street to its dead end');
+  });
+});
 
 describe('the tool', () => {
   test('clicks set points; the one on a road ends the street, which is drawn and picked', () => {

@@ -221,12 +221,24 @@ export function streetGhosts(editor: Pick<TownEditor, 'draft' | 't'>, live: Live
   return ghosts;
 }
 
-/** What the street under the pointer would be, in words ("A street of Ashby", "A country road with a 30 m bridge"). */
-export function kindLine(draft: Parameters<typeof liveStreet>[0], live: LiveStreet): string {
+/**
+ * What the street under the pointer would be, in words ("A street of Ashby", "A country road with a 30 m bridge"). Once
+ * `drawStreet` has had its say (`verdict`), as it makes it: a country road whose dead-end stretch it makes a street
+ * (past a court: no taxi turns round in a country road) is "a street", or "… then a street to its dead end".
+ */
+export function kindLine(draft: Parameters<typeof liveStreet>[0], live: LiveStreet, verdict: Edited | null = null): string {
   const area = live.area >= 0 ? draft.open?.areas[live.area]?.name : undefined;
-  const what = live.kind === 'trail' ? 'A footpath' : live.kind === 'country' ? 'A country road' : `A ${live.kind === 'lane' ? 'lane' : 'street'}${area ? ` of ${area}` : ''}`;
+  let what = live.kind === 'trail' ? 'A footpath' : live.kind === 'country' ? 'A country road' : `A ${live.kind === 'lane' ? 'lane' : 'street'}${area ? ` of ${area}` : ''}`;
   const bridges = live.bridges.length ? ` with ${live.bridges.length === 1 ? `a ${live.bridges[0]} m bridge` : `${live.bridges.length} bridges`}` : '';
-  return `${what}${bridges}`;
+  let then = '';
+  if (live.kind === 'country' && verdict && 'draft' in verdict) {
+    const kinds = newRoads(draft, verdict).flatMap((i) => (verdict.draft.roads[i]?.bridge ? [] : [verdict.draft.roads[i]?.kind]));
+    if (kinds.includes('street')) {
+      if (kinds.every((k) => k === 'street')) what = 'A street';
+      else then = ', then a street to its dead end';
+    }
+  }
+  return `${what}${bridges}${then}`;
 }
 
 export const streetTool: TownTool = {
@@ -336,7 +348,7 @@ export const streetTool: TownTool = {
       // (Clearly too steep: refused when ended. A little too steep is the settle's to judge: said, and the street may still be drawn for it to.)
       if (live.excess) return `${sentence(live.slope!)} Draw it another way, where the land is gentler.`;
       if (live.slope) return `${sentence(live.slope)} The town would refuse it once brought up to date.`;
-      const what = kindLine(editor.draft, live);
+      const what = kindLine(editor.draft, live, verdict);
       const clears = verdict && 'draft' in verdict ? verdict.cleared.lots.length + verdict.cleared.backdrop.length : 0;
       const also = clears ? `, clearing ${clears === 1 ? 'a lot or building' : `${clears} lots and buildings`} out of its way` : '';
       const joins = live.finishOn >= 0 ? editor.draft.roads[live.finishOn]?.name : undefined;
