@@ -8,7 +8,8 @@
  * also ask whether a sample may be wet (`wettable`): water keeps off lots and roads. After every
  * stamp the water settles (`settleWater`): a level stays only where it stands over its ground,
  * and dry ground lowered beside water under its level fills from it. A river says which way it
- * runs (`Land.flow`): along the drag; a lake, the sea pushed inland and water taken away say none.
+ * runs (`Land.flow`): along the drag, or back against it where it was dragged uphill; a lake, the sea
+ * pushed inland and water taken away say none.
  *
  * A brush `POINT` m across or narrower is a point brush: the falloff is left out, and a stamp
  * changes the one sample nearest the pointer (a cover tool, the one cover cell under it), so the
@@ -93,8 +94,15 @@ export const RATE: [number, number] = [0.5, 8];
 export const LAKE_BELOW = 0.1;
 /** A river's level: never above the ground under it less this (m). */
 export const RIVER_BELOW = 0.4;
-/** A river stops where keeping its level would cut deeper into the land than this (m). */
+/** A river dragged uphill keeps its level through this much of a rise (m); past it, it steps up with the land. */
+export const RIVER_CLIMB = 1;
+/**
+ * A river dragged into a ridge keeps its level through it, a gorge this deep at most (m), if the land past it falls
+ * back to the water within `RIDGE_REACH` m along the drag; higher ground, or ground that goes on rising, it climbs.
+ */
 export const RIVER_CUT = 6;
+/** How far ahead along the drag (m) a river looks for the far side of a ridge (`RIVER_CUT`). */
+export const RIDGE_REACH = 40;
 /** A lake's or a river's bank: dry ground round its water is raised this far over its level (m), in a ring this wide (m, at least; a quarter of the radius on wide ones). */
 export const BANK = 0.25;
 export const BANK_RING = 2.5;
@@ -111,14 +119,13 @@ export const MOUNTAIN_HEIGHT = 40;
 /** Why a stroke couldn't do something, for the palette's hint line. */
 export const HINTS = {
   water: 'Water keeps 3 m off lots and clear of roads.',
-  river: `The river would cut more than ${RIVER_CUT} m into the land, so it stops here.`,
 } as const;
 
 /**
  * What a stroke keeps from one stamp to the next (`strokeOf` makes one; `stamp` fills it in).
  * `touched` is the samples changed so far; `level` the water's level (cm) for `lake` and
  * `river`; `target` the height at the press (cm) for `flatten`; `path` the stamps' points (the
- * dragged line of `range`); `stopped` and `hint` say why it stopped or left something out.
+ * dragged line of `range`); `hint` says why it left something out.
  */
 export interface StrokeState {
   brush: Brush;
@@ -133,18 +140,22 @@ export interface StrokeState {
   base: { h: Int16Array; wl: Int16Array; flow?: Uint8Array } | null;
   /** `flatten`: the height at the press (cm). */
   target?: number;
-  /** `lake`, `river`: the water's level (cm), never rising along a river. */
+  /** `lake`, `river`: the water's level (cm); a river's at its last stamp (down with the land, up where it climbs). */
   level?: number;
   /** `river`: its way has been laid (from its second stamp on; the first stamps' water given it then). */
   flowing?: boolean;
+  /**
+   * `river`: its level last rose along the drag (it was dragged uphill), so it runs back against the drag; unset while
+   * its level hasn't changed. `turn`: it first rose at this stamp, so the water it laid before runs back too.
+   */
+  against?: boolean;
+  turn?: boolean;
   /** `lake`, `river`: begun in water there was (a river: the ways laid there before are kept, `riverFlow`). */
   inWater?: boolean;
   /** `lake`: started on the sea, so it pushes the sea inland. */
   sea?: boolean;
   /** The points stamped (m): a range's line, a peak's last point. */
   path: [number, number][];
-  /** Set once the stroke goes no further (a river cut too deep), with why. */
-  stopped?: string;
   /** Something the stroke refused (water by a lot or a road), with why. */
   hint?: string;
   /** The mountains' ridged noise seed, from where the stroke began. */
@@ -203,7 +214,6 @@ function heightIn(land: Land, h: Int16Array, x: number, z: number): number {
  * point nearest `at` (`aimOf`), on that one sample or cover cell at full strength.
  */
 export function stamp(land: Land, brush: Brush, at: Stamp, stroke: StrokeState, free: Free, wettable?: Wettable): LandRect | null {
-  if (stroke.stopped) return null;
   const [x, z] = aimOf(brush, at.x, at.z);
   if (!stroke.stamps) stroke.seed = (Math.imul(Math.round(x), 73856093) ^ Math.imul(Math.round(z), 19349663)) >>> 0;
   stroke.stamps++;
@@ -320,10 +330,12 @@ function blend(land: Land, x: number, z: number, R: number, s: number, dt: numbe
  * sheet's is (deeper the further from the shore: `0.22e + 0.004e²` m, `e` m in, down to the
  * strength's depth), and a low bank raised round it where the ground falls away below its level.
  * A lake's level is the water's it began on (the sea's: the sea pushed inland), else the ground
- * at the press less `LAKE_BELOW`. A river's never rises: each stamp the lower of the last and the
- * ground under it (before the stroke) less `RIVER_BELOW`; meeting lower water it takes that
- * water's level; where it would stand more than `RIVER_CUT` m under the ground, it stops. A river
- * runs along the drag (`riverFlow`); a lake is still.
+ * at the press less `LAKE_BELOW`. A river's follows the land (`riverLevel`): down with it at once,
+ * up with it only past a rise of `RIVER_CLIMB` (a gorge through a ridge, `RIVER_CUT`), so it
+ * steps down the land in rapids whichever way it was dragged; meeting lower water it takes that
+ * water's level, and it never raises water already there (its own laid lower up a slope it
+ * climbs). A river runs along the drag, or back against it where it climbs (`riverFlow`); a lake
+ * is still.
  */
 function water(land: Land, x: number, z: number, R: number, s: number, tool: 'lake' | 'river', stroke: StrokeState, free: Free, wettable?: Wettable): LandRect | null {
   const { cols, h, wl } = land;
@@ -341,9 +353,7 @@ function water(land: Land, x: number, z: number, R: number, s: number, tool: 'la
   const rect = rectAround(land, x, z, R + ring);
   if (!rect) return null;
   if (tool === 'river') {
-    // (Over water there was, no lower than its level; over dry land, under the ground.)
-    const ground = Math.round(heightIn(land, base.h, x, z) * 100);
-    let level = Math.min(stroke.level, wetBefore(press) ? base.wl[press] : ground - RIVER_BELOW * 100);
+    let level = riverLevel(land, base.h, x, z, stroke, wetBefore(press) ? base.wl[press] : null);
     // (Water there was, lower than the river, within it: the river runs into it at its level.)
     for (let j = rect.j0; j < rect.j1; j++) {
       for (let i = rect.i0; i < rect.i1; i++) {
@@ -351,9 +361,9 @@ function water(land: Land, x: number, z: number, R: number, s: number, tool: 'la
         if (wetBefore(k) && base.wl[k] < level && Math.hypot(i * LAND_CELL - x, j * LAND_CELL - z) <= R) level = base.wl[k];
       }
     }
-    if (!wetBefore(press) && ground - level > RIVER_CUT * 100) {
-      stroke.stopped = HINTS.river;
-      return null;
+    if (level !== stroke.level) {
+      stroke.turn = stroke.against === undefined && level > stroke.level;
+      stroke.against = level > stroke.level;
     }
     stroke.level = level;
   }
@@ -376,7 +386,8 @@ function water(land: Land, x: number, z: number, R: number, s: number, tool: 'la
         const e = R - r;
         const bed = L - Math.round(Math.min(deepest, 0.22 * e + 0.004 * e * e) * 100);
         if (h[k] > bed) h[k] = cmOf(h[k] + (bed - h[k]) * fr);
-        if (h[k] < L) wl[k] = L;
+        // (A river leaves lower water as it is: up a slope, what it laid a stamp ago stays under its ground.)
+        if (h[k] < L && !(tool === 'river' && wl[k] !== NONE && wl[k] > h[k] && wl[k] < L)) wl[k] = L;
         // (A lake, and the sea pushed inland, are still.)
         if (tool === 'lake' && land.flow?.[k] && wl[k] !== NONE) {
           land.flow[k] = 0;
@@ -391,20 +402,64 @@ function water(land: Land, x: number, z: number, R: number, s: number, tool: 'la
 }
 
 /**
- * A river's way laid on its water round its stamp at (`x`, `z`): along the drag, from the stamp `RIVER_WAY_STAMPS`
- * back to this one, blended into the way already laid by the falloff (all of it at the middle), so a bend turns
- * smoothly. The first stamps' water, laid before there was a way, is given it once there is one. The sea and a
+ * A river's level at its stamp at (`x`, `z`) (cm), from the stroke's last (`stroke.level`) and the land before the
+ * stroke (`h`): over water there was (`wet`, its level) or dry ground (the ground less `RIVER_BELOW`), down to it at
+ * once; up to it past a rise of `RIVER_CLIMB`, or past a ridge's `RIVER_CUT` where the land along the drag falls back
+ * to the water within `RIDGE_REACH` m (`ridgeAhead`); else the level kept, cut into the land.
+ */
+function riverLevel(land: Land, h: Int16Array, x: number, z: number, stroke: StrokeState, wet: number | null): number {
+  const was = stroke.level!;
+  const ref = wet ?? Math.round(heightIn(land, h, x, z) * 100) - RIVER_BELOW * 100;
+  if (ref <= was) return ref;
+  const rise = ref - was;
+  if (rise <= RIVER_CLIMB * 100) return was;
+  if (wet === null && rise <= RIVER_CUT * 100 && ridgeAhead(land, h, x, z, stroke)) return was;
+  return ref;
+}
+
+/**
+ * Whether the land before the stroke (`h`) ahead of a river's stamp at (`x`, `z`), along the drag, falls back to
+ * within `RIVER_CLIMB` of its level within `RIDGE_REACH` m, rising no more than `RIVER_CUT` over it before then: a
+ * ridge the river cuts through.
+ */
+function ridgeAhead(land: Land, h: Int16Array, x: number, z: number, stroke: StrokeState): boolean {
+  const way = dragOf(stroke, x, z);
+  if (!way) return false;
+  const level = stroke.level!;
+  for (let t = LAND_CELL; t <= RIDGE_REACH; t += LAND_CELL) {
+    const [px, pz] = [x + way[0] * t, z + way[1] * t];
+    if (px < 0 || pz < 0 || px > (land.cols - 1) * LAND_CELL || pz > (land.rows - 1) * LAND_CELL) return false;
+    const over = heightIn(land, h, px, pz) * 100 - RIVER_BELOW * 100 - level;
+    if (over > RIVER_CUT * 100) return false;
+    if (over <= RIVER_CLIMB * 100) return true;
+  }
+  return false;
+}
+
+/** Which way a stroke is dragged at (`x`, `z`) (a unit vector): from the stamp `RIVER_WAY_STAMPS` back; null before it has gone half a sample. */
+function dragOf(stroke: StrokeState, x: number, z: number): [number, number] | null {
+  const path = stroke.path;
+  const [bx, bz] = path[Math.max(0, path.length - 1 - RIVER_WAY_STAMPS)];
+  const [dx, dz] = [x - bx, z - bz];
+  const length = Math.hypot(dx, dz);
+  return length < LAND_CELL / 2 ? null : [dx / length, dz / length];
+}
+
+/**
+ * A river's way laid on its water round its stamp at (`x`, `z`): along the drag (back against it while the river
+ * climbs: `StrokeState.against`), from the stamp `RIVER_WAY_STAMPS` back to this one, blended into the way already
+ * laid by the falloff (all of it at the middle), so a bend turns smoothly. The first stamps' water, laid before there
+ * was a way, is given it once there is one; if the river first climbs once it has a way, the way it laid till then is
+ * turned round (it runs down to where it began). The sea and a
  * generated river (at the sea's level) stay as they were. A drawn river's way there before the stroke is laid again
  * where a stroke begun on dry land runs over it (a river drawn back the other way turns it round), and kept by one
  * begun in water (it runs on from there). Says the samples whose way changed (null: none).
  */
 function riverFlow(land: Land, x: number, z: number, R: number, stroke: StrokeState, free: Free): LandRect | null {
   const path = stroke.path;
-  const [bx, bz] = path[Math.max(0, path.length - 1 - RIVER_WAY_STAMPS)];
-  const [dx, dz] = [x - bx, z - bz];
-  const length = Math.hypot(dx, dz);
-  if (length < LAND_CELL / 2) return null;
-  const way: [number, number] = [dx / length, dz / length];
+  const drag = dragOf(stroke, x, z);
+  if (!drag) return null;
+  const way: [number, number] = stroke.against ? [-drag[0], -drag[1]] : drag;
   const flow = flowsOf(land);
   const { cols, h, wl } = land;
   const base = stroke.base;
@@ -439,7 +494,19 @@ function riverFlow(land: Land, x: number, z: number, R: number, stroke: StrokeSt
   if (!stroke.flowing) {
     stroke.flowing = true;
     for (let n = 0; n + 1 < path.length; n++) lay(path[n][0], path[n][1], false);
+  } else if (stroke.turn && stroke.touched) {
+    const t = stroke.touched;
+    for (let j = t.j0; j < t.j1; j++) {
+      for (let i = t.i0; i < t.i1; i++) {
+        const k = j * cols + i;
+        const v = flowOf(flow[k]);
+        if (!v || flow[k] === (base?.flow?.[k] ?? 0) || wl[k] === NONE || wl[k] <= h[k] || kept(k)) continue;
+        flow[k] = flowCode(-v[0], -v[1]);
+        changed = unionRect(changed, { i0: i, j0: j, i1: i + 1, j1: j + 1 });
+      }
+    }
   }
+  stroke.turn = false;
   lay(x, z, true);
   return changed;
 }

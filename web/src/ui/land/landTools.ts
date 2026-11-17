@@ -56,7 +56,7 @@ export const LAND_GROUPS: readonly { id: LandGroup; label: string; tools: readon
     label: 'Water',
     tools: [
       { id: 'lake', label: 'Lake', does: 'Paint a pond or a lake. Start on the sea to push the coast back.' },
-      { id: 'river', label: 'River', does: 'Drag a river downhill. It never runs uphill.' },
+      { id: 'river', label: 'River', does: 'Drag a river across the land. It runs downhill, in rapids where the land falls.' },
       { id: 'dry', label: 'Dry', does: 'Drag over water to fill it in.' },
     ],
   },
