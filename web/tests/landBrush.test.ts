@@ -7,7 +7,7 @@
 // within it, an unbroken trail when dragged); and a stamp's time (printed). `bun test tests/landBrush.test.ts`.
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
-import { blankLand, COVER, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, wetAt, type Land } from '../src/game/land';
+import { blankLand, COVER, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, wetAt, type Land, type LandRect } from '../src/game/land';
 import { aimOf, isPoint, mountainGhost, POINT, settleWater, stamp, strokeOf, type Brush, type LandTool } from '../src/game/landBrush';
 import { applyLand, LandEditor, landZones, Protection, wetTiles, type BuiltLand, type LandPrices } from '../src/game/landEdit';
 import { rle, unrle } from '../src/game/landMasks';
@@ -282,6 +282,32 @@ describe('the built land', () => {
     const guard = new Protection(land.cols, land.rows, built);
     expect(guard.free(62, 57)).toBe(0);
     expect(guard.free(Math.round(136 / 2), Math.round(115 / 2))).toBe(1);
+  });
+
+  test('on a land its town follows the earth tools shape built land too, settled at the end into the same patch', () => {
+    const land = landOf(256);
+    const settled: LandRect[] = [];
+    // (The settling stands in for the renderer's: it lowers one sample past the stroke, which the patch takes in.)
+    const settle = (rect: LandRect) => {
+      settled.push(rect);
+      land.h[at(land, 200, 20)] -= 50;
+      return { i0: 100, j0: 10, i1: 101, j1: 11 };
+    };
+    const editor = LandEditor.forWorld(land, built, {}, { earthOnBuilt: true, settle });
+    const patch = stroke(editor, { tool: 'raise', radius: 40, strength: 1 }, hold([110, 115], 1))!;
+    expect(land.h[at(land, 110, 115)]).toBeGreaterThan(0);
+    expect(settled.length).toBe(1);
+    expect(patch.rect.i1).toBeGreaterThanOrEqual(101);
+    expect(patch.rect.j0).toBeLessThanOrEqual(10);
+    // Undone: the settled sample back too.
+    editor.undo();
+    expect(land.h[at(land, 200, 20)]).toBe(0);
+    expect(land.h[at(land, 110, 115)]).toBe(0);
+    // Water and cover keep off built land as ever; no settling for them.
+    expect(editor.refuses('raise', 110, 115)).toBe(false);
+    expect(editor.refuses('woods', 110, 115)).toBe(true);
+    stroke(editor, { tool: 'woods', radius: 10, strength: 1 }, hold([110, 115], 1));
+    expect(settled.length).toBe(1);
   });
 
   test("water keeps 3 m off a lot and clear of a road, and says why", () => {

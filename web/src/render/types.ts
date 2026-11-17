@@ -684,6 +684,12 @@ export interface Renderer {
    * again now, and once the stroke is `done`, the rest (shading, grass, woods, zones) over frames.
    */
   landChanged(rect: LandRect, done: boolean): void;
+  /**
+   * At the end of an earth stroke on a land its town follows (the land given to `setLand`, changed in `rect`): the
+   * land settled under what is built (no road or lot cut or filled past its limits; `BuiltSurface.settleCuts`),
+   * changed in place; says the samples it changed besides (null: none, or no town on it).
+   */
+  settleLand?(rect: LandRect): LandRect | null;
   /** Where the ray through canvas CSS pixel (`x`, `y`) meets the land (a town point and its height, m), or null if it doesn't. */
   pickLand(x: number, y: number): { x: number; y: number; z: number } | null;
   /** Shows the land brush's cursor (null hides it). Cheap; call on every pointer move. */

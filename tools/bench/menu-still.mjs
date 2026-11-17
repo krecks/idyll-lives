@@ -6,6 +6,10 @@
  * golden hour), once every model and texture has come. Prints the town's name: `FIRST_STILL.name` is it.
  *
  *   bun tools/bench/menu-still.mjs [--world country] [--options town=city,villages=many] [--seed 2098028765] [--width 1920 --height 1080] [--port 5223]
+ *     [--renderer webgl] [--out <file.jpg>]
+ *
+ * `--renderer webgl`: on WebGL2 (WebGPU otherwise). `--out`: written there instead of the shipped picture (to look at a
+ * change without replacing it). Console errors (a shader that doesn't compile) are printed.
  *
  * `--world`: a place (default the countryside, as a new player's step 1 makes it), `--options` the
  * player's options (the place's own where not given; `worldFlags.mjs`).
@@ -17,7 +21,7 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { quiet } from './quiet.mjs';
 import { worldFlags } from './worldFlags.mjs';
@@ -34,6 +38,8 @@ const width = Number(flag('width', '1920'));
 const height = Number(flag('height', '1080'));
 const port = Number(flag('port', '5223'));
 const base = flag('url', null) ?? `http://localhost:${port}`;
+const renderer = flag('renderer', null);
+const out = flag('out', null);
 
 async function playwright() {
   if (process.env.PLAYWRIGHT) return import(process.env.PLAYWRIGHT);
@@ -56,7 +62,8 @@ try {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   await page.addInitScript(quiet);
   page.on('pageerror', (e) => console.error(`page error: ${e.message}`));
-  await page.goto(`${base}/?debug`);
+  page.on('console', (m) => m.type() === 'error' && console.error(`console error: ${m.text().slice(0, 400)}`));
+  await page.goto(`${base}/?debug${renderer ? `&renderer=${renderer}` : ''}`);
   // (Dev server modules, imported by their paths: the same instances the game uses.)
   await page.waitForFunction(async () => !(await import('/src/ui/app.svelte.ts')).app.booting, null, { timeout: 120_000, polling: 500 });
   // Every model and texture there, so none is drawn as its stand-in (the stream indicator goes once all have come).
@@ -83,9 +90,8 @@ try {
     },
     { kind: world, seed, options },
   );
-  const dir = join(WEB, 'public/menu');
-  mkdirSync(dir, { recursive: true });
-  const file = join(dir, 'still.jpg');
+  const file = out ?? join(WEB, 'public/menu/still.jpg');
+  mkdirSync(dirname(file), { recursive: true });
   const data = Buffer.from(taken.data, 'base64');
   writeFileSync(file, data);
   console.log(`menu-still: ${file}, ${(data.length / 1024).toFixed(0)} KB, the town ${JSON.stringify(taken.name)} (FIRST_STILL.name)`);

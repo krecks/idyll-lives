@@ -877,3 +877,31 @@ export function roadEnds(roads: readonly RoadPlan[]): { x: number; z: number; dx
 export function roadExits(roads: readonly RoadPlan[], w: number, d: number): Pt[] {
   return roadEnds(roads).map(({ x, z }): Pt => [Math.max(0.5, Math.min(w - 0.5, x)), Math.max(0.5, Math.min(d - 0.5, z))]);
 }
+
+/**
+ * A road's decks over water (arc lengths, m, from where each begins to where it ends, in order along it, kept within
+ * the road, a centimetre long at least): its own bridge's (`RoadPlan.bridge`, a road that is a bridge or a causeway)
+ * and the bridges the land's brushes made on it (`RoadPlan.bridges`).
+ */
+export function bridgeSpans(road: RoadPlan): [number, number][] {
+  if (road.points.length < 2 || (!road.bridge && !road.bridges?.length)) return [];
+  const ls = lengths(road.points);
+  const total = ls[ls.length - 1];
+  const out: [number, number][] = [];
+  for (const span of road.bridge ? [road.bridge, ...(road.bridges ?? [])] : road.bridges!) {
+    const s0 = Math.max(0, Math.min(total, Math.min(...span)));
+    const s1 = Math.max(0, Math.min(total, Math.max(...span)));
+    if (s1 - s0 >= 0.01) out.push([s0, s1]);
+  }
+  return out.sort((a, b) => a[0] - b[0]);
+}
+
+/** The stretch of `road` between arc lengths `s0` and `s1` (m), as points along its middle. */
+export function stretchOf(road: RoadPlan, s0: number, s1: number): [number, number][] {
+  const pts = road.points;
+  const ls = lengths(pts);
+  const out: [number, number][] = [pointAt(pts, s0, ls).p];
+  for (let i = 1; i < pts.length - 1; i++) if (ls[i] > s0 && ls[i] < s1) out.push([pts[i][0], pts[i][1]]);
+  out.push(pointAt(pts, s1, ls).p);
+  return out;
+}

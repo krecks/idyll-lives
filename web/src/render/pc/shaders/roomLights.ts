@@ -46,6 +46,12 @@
 import type { Language, ShaderFeature } from './chunks';
 import { WALL_HALF } from '../../shared/walls';
 
+/**
+ * The lot's masks (`RoomLightState.mask`, `game_lotMasks`): the rooms' rows (a lot is at most 256 tiles deep, and up
+ * to four storeys are shown), then from this row the windowless rooms' (`DigState`, `underground.ts`).
+ */
+export const WINDOWLESS_ROW = 256 * 4;
+
 /** Rooms with a light of their own (`RoomLightState.light`, a texel each): the mask's first, far more than a lot has. */
 export const ROOM_LIGHT_ROOMS = 256;
 
@@ -80,27 +86,35 @@ export const ROOM_LIGHTS: ShaderFeature = {
   priority: 205,
   glsl: {
     psDecl: `
+#if defined(GAME_LOOK) || defined(GAME_UNDERGROUND)
+	// The lot's masks (\`RoomLightState.mask\`): the rooms' rows, then the windowless rooms' (\`underground.ts\`).
+	uniform highp sampler2D game_lotMasks;
+#endif
 #ifdef GAME_LOOK
 	uniform vec4 game_roomLightArea;
 	uniform vec4 game_roomLightBand;
-	uniform highp sampler2D game_roomLightMask;
 	// A texel per room of the mask (\`RoomLightState.light\`): r its lamps' bounce, a the sky's share.
 	uniform sampler2D game_roomLight;
 	float gameRoomHere = -1.0;
-	// The room at a point (PlayCanvas space) as the mask has it: 0 unknown, 1 outdoors, 2 and up a room.
+	// The room at a point (PlayCanvas space) as the mask has it: 0 unknown, 1 outdoors, 2 and up a room. (Out of
+	// doors, \`GAME_OUTDOORS\`: the ground, never in a room, reads none of the masks.)
 	float gameRoomOf(vec3 at) {
+		#ifdef GAME_OUTDOORS
+			return 0.0;
+		#else
 		if (game_roomLightBand.w < 0.5) return 0.0;
 		vec3 p = gamePos(at);
 		float k = floor(p.y / game_roomLightBand.z) - game_roomLightBand.x;
 		vec2 u = p.xz - game_roomLightArea.xy;
 		vec2 t = floor(u);
 		if (k < 0.0 || k >= game_roomLightBand.y || t.x < 0.0 || t.y < 0.0 || t.x >= game_roomLightArea.z || t.y >= game_roomLightArea.w) return 0.0;
-		vec4 v = floor(texelFetch(game_roomLightMask, ivec2(int(t.x), int(k * game_roomLightArea.w + t.y)), 0) * 255.0 + 0.5);
+		vec4 v = floor(texelFetch(game_lotMasks, ivec2(int(t.x), int(k * game_roomLightArea.w + t.y)), 0) * 255.0 + 0.5);
 		if (v.a >= 128.0) {
 			vec2 f = u - t;
 			if (mod(v.a, 128.0) >= 64.0 ? f.x + f.y > 1.0 : f.y > f.x) return v.b + mod(v.a, 64.0) * 256.0;
 		}
 		return v.r + v.g * 256.0;
+		#endif
 	}
 	// The room whose own light (\`RoomLightState.light\`: its share of the sky, its lamps' bounce) the fragment at pos
 	// (normal n) has: its own (\`gameRoomHere\`), but for what is outdoors by the mask and inside an outside wall (the
@@ -134,25 +148,31 @@ export const ROOM_LIGHTS: ShaderFeature = {
   },
   wgsl: {
     psDecl: `
+#if defined(GAME_LOOK) || defined(GAME_UNDERGROUND)
+	var game_lotMasks: texture_2d<f32>;
+#endif
 #ifdef GAME_LOOK
 	uniform game_roomLightArea: vec4f;
 	uniform game_roomLightBand: vec4f;
-	var game_roomLightMask: texture_2d<f32>;
 	var game_roomLight: texture_2d<f32>;
 	var<private> gameRoomHere: f32 = -1.0;
 	fn gameRoomOf(at: vec3f) -> f32 {
+		#ifdef GAME_OUTDOORS
+			return 0.0;
+		#else
 		if (uniform.game_roomLightBand.w < 0.5) { return 0.0; }
 		let p = gamePos(at);
 		let k = floor(p.y / uniform.game_roomLightBand.z) - uniform.game_roomLightBand.x;
 		let u = p.xz - uniform.game_roomLightArea.xy;
 		let t = floor(u);
 		if (k < 0.0 || k >= uniform.game_roomLightBand.y || t.x < 0.0 || t.y < 0.0 || t.x >= uniform.game_roomLightArea.z || t.y >= uniform.game_roomLightArea.w) { return 0.0; }
-		let v = floor(textureLoad(game_roomLightMask, vec2<i32>(i32(t.x), i32(k * uniform.game_roomLightArea.w + t.y)), 0) * 255.0 + 0.5);
+		let v = floor(textureLoad(game_lotMasks, vec2<i32>(i32(t.x), i32(k * uniform.game_roomLightArea.w + t.y)), 0) * 255.0 + 0.5);
 		if (v.a >= 128.0) {
 			let f = u - t;
 			if (select(f.y > f.x, f.x + f.y > 1.0, v.a % 128.0 >= 64.0)) { return v.b + (v.a % 64.0) * 256.0; }
 		}
 		return v.r + v.g * 256.0;
+		#endif
 	}
 	var<private> gameRoomLit: f32 = -1.0;
 	fn gameRoomLitAt(pos: vec3f, n: vec3f) -> f32 {

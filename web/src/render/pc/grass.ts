@@ -71,6 +71,9 @@ export function grassGround(device: pc.GraphicsDevice, material: pc.StandardMate
     noGrass.set(device, (none = { colour: blank('noGrass', pc.PIXELFORMAT_RGBA8, [0, 0, 0, 0]), town: blank('noTownGrass', pc.PIXELFORMAT_RG8, [0, 0]), lawn: blank('noLawn', pc.PIXELFORMAT_RGBA8, [128, 128, 0, 255]) }));
   }
   material.setDefine('GAME_GRASS_GROUND', '');
+  // Out of doors: no room's light or windowless mask read (`roomLights.ts`, `underground.ts`): texture units WebGL2
+  // hasn't to spare for the ground (`samplerCheck.ts`).
+  material.setDefine('GAME_OUTDOORS', '');
   // No contact shading under the blades (`post.ts`): they would shade the ground in blotches.
   withoutContact(material);
   material.setParameter('game_grassGust', gustTexture(device));

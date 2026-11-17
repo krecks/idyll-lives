@@ -387,6 +387,8 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 		// lamps' light comes off the walls and the floor from every side (\`RoomLightState.light\`, a texel per room:
 		// r the bounce, a the sky's share). The room is the one whose light the fragment has (\`gameRoomLitAt\`,
 		// \`roomLights.ts\`: what is inside an outside wall has the wall's room's).
+		// (Not out of doors, \`GAME_OUTDOORS\`: the ground is in no room, and reads neither texture.)
+		#ifndef GAME_OUTDOORS
 		float gameLit = gameRoomLitAt(vPositionW, litArgs_worldNormal);
 		if (gameLit > 1.5 && gameLit < ${ROOM_LIGHT_ROOMS}.0) {
 			vec4 gameRoom = texelFetch(game_roomLight, ivec2(int(gameLit + 0.5), 0), 0);
@@ -394,6 +396,7 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 			gameAmbient *= gameRoomSky;
 			dDiffuseLight = dDiffuseLight * gameRoomSky + game_roomBounce * gameRoom.r;
 		}
+		#endif
 		#ifdef LIT_SSAO
 			gameContact = texture2DLod(ssaoTexture, gl_FragCoord.xy * ssaoTextureSizeInv, 0.0).r;
 			dDiffuseLight *= gameContact / mix(1.0, gameContact, ${CONTACT_DIRECT});
@@ -417,6 +420,7 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 	#if defined(GAME_LOOK) && defined(LIT_NEEDS_NORMAL)
 		gameAmbient = dDiffuseLight;
 		dDiffuseLight = gameHemi(litArgs_worldNormal);
+		#ifndef GAME_OUTDOORS
 		let gameLit = gameRoomLitAt(vPositionW, litArgs_worldNormal);
 		if (gameLit > 1.5 && gameLit < ${ROOM_LIGHT_ROOMS}.0) {
 			let gameRoom = textureLoad(game_roomLight, vec2<i32>(i32(gameLit + 0.5), 0), 0);
@@ -424,6 +428,7 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 			gameAmbient = gameAmbient * gameRoomSky;
 			dDiffuseLight = dDiffuseLight * gameRoomSky + uniform.game_roomBounce * gameRoom.r;
 		}
+		#endif
 		#ifdef LIT_SSAO
 			gameContact = textureSampleLevel(ssaoTexture, ssaoTextureSampler, pcPosition.xy * uniform.ssaoTextureSizeInv, 0.0).r;
 			dDiffuseLight = dDiffuseLight * (gameContact / mix(1.0, gameContact, ${CONTACT_DIRECT}));

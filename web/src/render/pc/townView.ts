@@ -63,13 +63,22 @@ export class TownBuildings {
   private shown = false;
   private readonly glow = new Float32Array(3);
 
-  /** `layers`: the layers its draws are on (none given: the world's; the menus' town has its own, `overview.ts`). */
+  private readonly layers?: number[];
+  private readonly castShadows: boolean;
+
+  /**
+   * `layers`: the layers its draws are on (none given: the world's; the menus' town has its own, `overview.ts`).
+   * `castShadows`: whether its buildings cast the sun's shadows. The menus' town does (its buildings are all there is of
+   * it); the game's town view doesn't (the near drawing casts its own, and the far ones are too small to matter).
+   */
   constructor(
     private readonly app: pc.AppBase,
     private readonly parent: pc.Entity,
-    private readonly layers?: number[],
+    options: { layers?: number[]; castShadows?: boolean } = {},
   ) {
     this.lib = MaterialLibrary.for(app);
+    this.layers = options.layers;
+    this.castShadows = options.castShadows ?? false;
   }
 
   /**
@@ -93,7 +102,7 @@ export class TownBuildings {
       const mesh = meshFrom(app.graphicsDevice, units[key].meshData({ colors: true }))!;
       mesh.incRefCount();
       this.meshes.push(mesh);
-      const draw = new Instances(app.graphicsDevice, parent, mesh, mat, { name: `town.${key}`, streams: [TOWN_WALL, TOWN_ROOF, TOWN_INFO], castShadows: false, receiveShadows: true, capacity: 256, ...(this.layers ? { layers: this.layers } : {}) });
+      const draw = new Instances(app.graphicsDevice, parent, mesh, mat, { name: `town.${key}`, streams: [TOWN_WALL, TOWN_ROOF, TOWN_INFO], castShadows: this.castShadows, receiveShadows: true, capacity: 256, ...(this.layers ? { layers: this.layers } : {}) });
       draw.meshInstance.setParameter('game_townPart', key === 'walls' ? 0 : 1);
       lib.excludeFromLights([], [draw.meshInstance]);
       draw.enabled = false;

@@ -47,6 +47,7 @@ import { Mirrors } from './mirrors';
 import { buildModel, fileImported, importAhead, modelFilesSettled, onModelFileArrived, type ModelTemplate } from './models';
 import { GameBirds } from './birds';
 import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming';
+import { SamplerCheck } from './samplerCheck';
 import { steadyShaderKeys } from './shaderKeys';
 import { natureDecor, windGust, windStill } from './nature';
 import { PETALS } from '../shared/nature';
@@ -757,6 +758,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private gpuTiming!: GpuTiming;
   private drawCounts!: DrawCounts;
   private shaderWatch!: ShaderWatch;
+  /** In dev, WebGL2's texture units each program uses (`samplerCheck.ts`; `window.__samplers()`). */
+  private samplerCheck: SamplerCheck | null = null;
   /** The warm-up's frame, drawn next (`warmGame`). */
   private warmNext = false;
   /** The loading screen's listener (`onLoadStep`); the warm-up's own world builds (its lots) don't report. */
@@ -801,6 +804,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     steadyShaderKeys();
     // Before anything compiles: every shader and pipeline is counted (`?diag=shaders` logs them).
     this.shaderWatch = new ShaderWatch(this.device, this.diag.has('shaders'));
+    if (import.meta.env.DEV) {
+      const check = (this.samplerCheck = new SamplerCheck(this.device));
+      (window as unknown as { __samplers?: () => unknown }).__samplers = () => check.report();
+    }
     this.app = createApp(canvas, this.device);
     this.gpuTiming = new GpuTiming(this.device, this.passLabel);
     this.drawCounts = new DrawCounts(this.device);
@@ -3315,7 +3322,19 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       if (!box) return;
       await this.lot.regrowNature(scape, box, () => this.disposed, this.landPace);
       this.landMapped(scape);
+      // (The game's land: what stands on it drawn again on its surface as the world comes back from the stroke, the
+      // backdrop's buildings too; the sun's shadows of the still casters taken again.)
+      if (scape === this.lot.landscape) {
+        this.townBackdropOf = null;
+        this.sunShadows.moved();
+      }
     });
+  }
+
+  settleLand(rect: LandRect): LandRect | null {
+    const at = this.landInView();
+    if (!at?.scape.heightField) return null;
+    return perfTime('land: settle', () => at.scape.settleLand(rect));
   }
 
   pickLand(x: number, y: number): { x: number; y: number; z: number } | null {
@@ -4040,6 +4059,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.post = null;
     this.drawCounts?.remove();
     this.gpuTiming?.destroy();
+    this.samplerCheck?.destroy();
     this.shaderWatch?.destroy();
     if (this.app) destroyApp(this.app);
   }

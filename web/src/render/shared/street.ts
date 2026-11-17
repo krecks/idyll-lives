@@ -57,7 +57,7 @@ import { wallCorners, writeFences } from './fences';
 import { shownFences } from './shownFences';
 import { centroid } from '../../game/roads';
 import { pavedRects } from './paving';
-import { bridgeDeck, Kerb, KERB, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
+import { bridgeSpans, Kerb, KERB, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, stretchOf, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
 import { JunctionCuts, junctionsOf, type JunctionPlan } from './junctions';
 import { levelsOf, type Levels } from './landSurface';
 
@@ -1644,13 +1644,14 @@ export class TownStreet {
         P.plants.flowers.push(lifted(flower, y));
       }
     }
-    // Bridges and causeways: a stone deck under each one's span over the water, parapets along it.
-    for (const road of this.ways.country) {
-      const deck = bridgeDeck(road);
-      // (On a land the town follows, its deck as the road climbs over it, its piers down to the bed.)
-      const s0 = road.bridge ? Math.max(0, Math.min(...road.bridge)) : 0;
-      const heights = levels && deck ? { deck: (u: number) => levels.road(road, s0 + u), bed: (x: number, z: number) => levels.surface.landAt(x, z) } : undefined;
-      if (deck) bridge(deck, road.width, (x, z) => at(x, z).parts.props, heights);
+    // Bridges and causeways: a stone deck under each span over the water, parapets along it (a country road that is
+    // a bridge, and the bridges the land's brushes made on any road).
+    for (const road of [...this.roads, ...this.ways.country]) {
+      for (const [s0, s1] of bridgeSpans(road)) {
+        // (On a land the town follows, its deck as the road climbs over it, its piers down to the bed.)
+        const heights = levels ? { deck: (u: number) => levels.road(road, s0 + u), bed: (x: number, z: number) => levels.surface.landAt(x, z) } : undefined;
+        bridge(stretchOf(road, s0, s1), road.width, (x, z) => at(x, z).parts.props, heights);
+      }
     }
     // The world's own cars, parked, in the menus' town (the game draws them coming and going: `pc/cars.ts`).
     if (this.world.cars && this.mode === 'town') {
@@ -1701,15 +1702,20 @@ export class TownStreet {
   private readonly far = new Map<number, { key: string; geo: Geo }>();
 
   /**
-   * Every lot's house the far LOD draws (`farChunk`'s, the focus lot's left out), with the chunk it is planned in:
-   * the town view draws them all at once (`pc/townView.ts`), those of the chunks not streamed in.
+   * Every lot's house the far LOD draws (`farChunk`'s, the focus lot's left out), with the chunk it is planned in and
+   * its pad: the town view draws them all at once (`pc/townView.ts`), those of the chunks not streamed in.
    */
-  townHouses(focus: number): { chunk: number; plot: PlotInfo }[] {
-    const out: { chunk: number; plot: PlotInfo }[] = [];
+  townHouses(focus: number): { chunk: number; plot: PlotInfo; pad: number }[] {
+    const out: { chunk: number; plot: PlotInfo; pad: number }[] = [];
     for (const [chunk, list] of this.plotsByChunk()) {
-      for (const L of list) if (L.info.house && L.info.id !== focus && (L.base === 'house' || L.base === 'shop')) out.push({ chunk, plot: L.info });
+      for (const L of list) if (L.info.house && L.info.id !== focus && (L.base === 'house' || L.base === 'shop')) out.push({ chunk, plot: L.info, pad: this.padOf(L) });
     }
     return out;
+  }
+
+  /** How many times the land under the town has moved its roads or pads (`BuiltSurface.moves`; 0 on flat land). */
+  get surfaceMoves(): number {
+    return this.levels?.surface.moves ?? 0;
   }
 
   /** What chunk `id` is planned from with lot `focus` in view (`ChunkPlan.key`), without planning it. */

@@ -31,7 +31,7 @@ import * as pc from './engine';
 import { skyLighting, type SkyLighting } from './env';
 import { INSTANCE_COLOR_SEMANTIC, installGameChunks, patchEngineChunks, WALL_CUT_SEMANTIC } from './shaders/chunks';
 import { DIAG_VIEW_DEFINE } from './shaders/diagView';
-import { ROOM_LIGHT_ROOMS } from './shaders/roomLights';
+import { ROOM_LIGHT_ROOMS, WINDOWLESS_ROW } from './shaders/roomLights';
 import { softLookWanted } from './shaders/softLook';
 import { withBuild } from '../../assets/build';
 import { materialTextures, optimizedUrl, type AssetRegistry } from '../../assets/registry';
@@ -131,33 +131,17 @@ export class DigState {
   under = false;
   readonly lit = new pc.Vec4(0, 0.1, 0.1, 0);
   /**
-   * Rooms without windows on the storey in view, as dark as the basement by day: `mask` has a
-   * byte per tile of `area` (x0, z0 in metres, then w, d in tiles; `WINDOWLESS_BITS`) in its
-   * corner, `band` the heights it reaches (y0, y1; nowhere while both are 0). One texture of a
-   * fixed size, never swapped.
+   * Rooms without windows on the storey in view, as dark as the basement by day: the lot's masks
+   * (`RoomLightState.mask`, shared: a texture unit fewer, WebGL2 has 16) have a byte per tile of
+   * `area` (x0, z0 in metres, then w, d in tiles; `WINDOWLESS_BITS`) in the red of their rows from
+   * `WINDOWLESS_ROW`, `band` the heights it reaches (y0, y1; nowhere while both are 0).
    */
-  readonly mask: pc.Texture;
   readonly area = new pc.Vec4(0, 0, 0, 0);
   readonly band = new pc.Vec4(0, 0, 0, 0);
-  /** What `mask` holds (uploaded only when that changes), and its bytes as uploaded. */
+  /** What the mask holds (uploaded only when that changes). */
   private shown: DarkTiles | null = null;
-  private readonly bytes = new Uint8Array(MASK_SIZE * MASK_SIZE);
 
-  constructor(device: pc.GraphicsDevice) {
-    // One byte per tile, read whole (no filtering between tiles, no mipmaps).
-    this.mask = new pc.Texture(device, {
-      name: 'windowlessMask',
-      width: MASK_SIZE,
-      height: MASK_SIZE,
-      format: pc.PIXELFORMAT_R8,
-      mipmaps: false,
-      minFilter: pc.FILTER_NEAREST,
-      magFilter: pc.FILTER_NEAREST,
-      addressU: pc.ADDRESS_CLAMP_TO_EDGE,
-      addressV: pc.ADDRESS_CLAMP_TO_EDGE,
-      levels: [this.bytes],
-    });
-  }
+  constructor(private readonly masks: RoomLightState) {}
 
   /**
    * Keeps daylight out of the tiles `dark` marks, or out of nowhere (null). Returns whether that
@@ -170,11 +154,13 @@ export class DigState {
     if (!dark) return changed;
     const was = this.shown;
     if (was !== dark && (!was || was.w !== dark.w || was.d !== dark.d || dark.tiles.some((t, i) => t !== was.tiles[i]))) {
-      this.bytes.fill(0);
-      for (let z = 0; z < Math.min(dark.d, MASK_SIZE); z++) this.bytes.set(dark.tiles.subarray(z * dark.w, z * dark.w + Math.min(dark.w, MASK_SIZE)), z * MASK_SIZE);
-      const level = this.mask.lock();
-      (level as Uint8Array).set(this.bytes);
-      this.mask.unlock();
+      const bytes = this.masks.bytes;
+      const base = WINDOWLESS_ROW * ROOM_MASK_W * 4;
+      bytes.fill(0, base);
+      for (let z = 0; z < Math.min(dark.d, MASK_SIZE); z++) {
+        for (let x = 0; x < Math.min(dark.w, MASK_SIZE); x++) bytes[base + (z * ROOM_MASK_W + x) * 4] = dark.tiles[z * dark.w + x];
+      }
+      this.masks.upload();
       this.shown = dark;
       changed = true;
     }
@@ -210,14 +196,16 @@ export const ROOM_SPLIT_DN = 0x4000;
 
 /** The room mask's size in texels: a lot is at most 256 tiles each way, and up to four storeys are shown. */
 const ROOM_MASK_W = 256;
-const ROOM_MASK_H = 256 * 4;
+const ROOM_MASK_H = WINDOWLESS_ROW;
 
 /**
  * Which room each tile of the lot in view is in, so lamps light only their own (the test is in the
  * lights' code, `shaders/roomLights.ts`): `mask` has four bytes per tile in its corner (the room,
  * low and high byte, and a split tile's half 1's, `RoomMask`), `area` the lot (x0, z0 in metres,
  * then w, d in tiles), `band` its storeys (the lowest, how many, the storey height, and 1 while
- * masking: nothing is masked at 0). Uniforms only: masking costs no shader of its own.
+ * masking: nothing is masked at 0). Uniforms only: masking costs no shader of its own. Below its
+ * storeys, from `WINDOWLESS_ROW`, the same texture holds the windowless rooms' mask (`DigState`):
+ * one texture unit for both.
  */
 export class RoomLightState {
   /** Masking is on (`lamps.ts`; `?roomlights=0` turns it off). */
@@ -225,7 +213,8 @@ export class RoomLightState {
   readonly mask: pc.Texture;
   readonly area = new pc.Vec4(0, 0, 0, 0);
   readonly band = new pc.Vec4(0, 0, WALL_HEIGHT, 0);
-  private readonly bytes = new Uint8Array(ROOM_MASK_W * ROOM_MASK_H * 4);
+  /** The texture's bytes as uploaded (the rooms' rows, then the windowless rooms', `DigState`). */
+  readonly bytes = new Uint8Array(ROOM_MASK_W * (ROOM_MASK_H + MASK_SIZE) * 4);
   private shown: RoomMask | null = null;
   /**
    * The light of each room of the mask, a texel per room at its number there (`ROOM_LIGHT_ROOMS` of them): r how far
@@ -250,9 +239,9 @@ export class RoomLightState {
       levels: [this.lightBytes.slice()],
     });
     this.mask = new pc.Texture(device, {
-      name: 'roomLightMask',
+      name: 'lotMasks',
       width: ROOM_MASK_W,
-      height: ROOM_MASK_H,
+      height: ROOM_MASK_H + MASK_SIZE,
       format: pc.PIXELFORMAT_RGBA8,
       mipmaps: false,
       minFilter: pc.FILTER_NEAREST,
@@ -301,7 +290,7 @@ export class RoomLightState {
     const w = Math.min(rooms.w, ROOM_MASK_W);
     const rows = Math.min(rooms.d * rooms.storeys, ROOM_MASK_H);
     const bytes = this.bytes;
-    bytes.fill(0);
+    bytes.fill(0, 0, ROOM_MASK_W * ROOM_MASK_H * 4);
     for (let z = 0; z < rows; z++) {
       for (let x = 0; x < w; x++) {
         const v = rooms.tiles[z * rooms.w + x];
@@ -313,12 +302,16 @@ export class RoomLightState {
         bytes[at + 3] = h >> 8;
       }
     }
-    const level = this.mask.lock();
-    (level as Uint8Array).set(bytes);
-    this.mask.unlock();
+    this.upload();
     this.area.set(rooms.x0, rooms.z0, w, rooms.d);
     this.band.set(rooms.storey, Math.min(rooms.storeys, Math.floor(ROOM_MASK_H / Math.max(1, rooms.d))), WALL_HEIGHT, 1);
     return true;
+  }
+
+  /** The texture sent up again from `bytes` (the rooms' rows or the windowless rooms' changed). */
+  upload(): void {
+    (this.mask.lock() as Uint8Array).set(this.bytes);
+    this.mask.unlock();
   }
 }
 
@@ -404,15 +397,14 @@ export class MaterialLibrary {
   private readonly skyDir = new Float32Array(3);
   /** The shader features' state as global uniforms (`pushUniforms`). */
   private readonly uniforms: { id: pc.ScopeId; value: Float32Array; fill: (out: Float32Array) => void }[];
-  private readonly mask: pc.ScopeId;
-  private readonly roomMask: pc.ScopeId;
+  private readonly lotMasks: pc.ScopeId;
   private readonly roomLight: pc.ScopeId;
 
   private constructor(readonly app: pc.AppBase) {
     const device = (this.device = app.graphicsDevice);
     patchEngineChunks(device);
-    this.dig = new DigState(device);
     this.rooms = new RoomLightState(device);
+    this.dig = new DigState(this.rooms);
     const scope = device.scope;
     this.setSkyDirection(SKY_FILL_DIRECTION);
     const dig = this.dig;
@@ -458,8 +450,7 @@ export class MaterialLibrary {
       ['game_roomLightBand', 4, vec4(this.rooms.band)],
     ];
     this.uniforms = table.map(([name, size, fill]) => ({ id: scope.resolve(name), value: new Float32Array(size), fill }));
-    this.mask = scope.resolve('game_windowlessMask');
-    this.roomMask = scope.resolve('game_roomLightMask');
+    this.lotMasks = scope.resolve('game_lotMasks');
     this.roomLight = scope.resolve('game_roomLight');
     this.pushUniforms();
     // The state as it is now, before every frame (a few uniforms: cheaper than tracking changes, no allocations).
@@ -471,8 +462,7 @@ export class MaterialLibrary {
       u.fill(u.value);
       u.id.setValue(u.value);
     }
-    this.mask.setValue(this.dig.mask);
-    this.roomMask.setValue(this.rooms.mask);
+    this.lotMasks.setValue(this.rooms.mask);
     this.roomLight.setValue(this.rooms.light);
   }
 
