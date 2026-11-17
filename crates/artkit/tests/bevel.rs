@@ -233,15 +233,12 @@ fn a_bevel_cuts_blenders_mesh_as_blender_does() {
         assert_eq!(made.kinds.len(), made.mesh.faces.len());
         assert_eq!(made.source.len(), made.mesh.loops.len());
         report.push(format!("{} {kind} {} segments: points within {far:e}, normals within {turned:.3} degrees, {missing} faces not Blender's", r.name, r.segments()));
-        // Where the corners of one vertex that shade as one are given unlike normals, Blender keeps the mean of
-        // what it stored for them, two angles in a frame that starts at the fan's first corner; which corner is
-        // first hangs on the order of the faces round it, which on a slab's far face (given here as Blender had
-        // it, without the way its edges ran) isn't known: there the mean can come out on the other side of the
-        // middle (the bookshelf's top by 21 degrees round four of its profiles' middle points, the sink's face
-        // frame by 3).
+        // Blender reads the normals back in the fans of the mesh it leaves, the mean of what was stored where a
+        // fan's corners were given unlike ones. On a slab given here as Blender had it, without the way its edges
+        // ran, a fan can start elsewhere than Blender's, and that mean then reads on the other side of the middle
+        // (the bookshelf's top, by 21 degrees round four of its profiles' middle points).
         let turn = match r.name.rsplit('/').next().unwrap() {
             "top" => 21.0,
-            "face_frame" => 3.0,
             _ => 0.1,
         };
         bad += (far > 2.5e-7 || turned > turn || missing > 0) as usize;

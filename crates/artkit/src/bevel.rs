@@ -18,11 +18,11 @@
 //!
 //! The normals are hardened: the faces the bevel joins stay flat, and each strip's corners take the normal of
 //! the face they touch (or of the strips either side, between two), so the bevel shades as a rounded edge.
-//! Where the corners of one vertex that shade as one are given unlike normals, they share the mean of what
-//! Blender stores for them (two angles in the fan's own frame, in 16 bits each), which is not the mean of the
-//! normals: round a profile's middle point it leans to one side, the side the fan's first corner decides. On a
-//! slab's far face that corner is not always Blender's (its faces there are in an order of its own), so a
-//! middle point's normal can lean the other way (10 to 30 degrees, on a strip a few millimetres wide).
+//! Blender stores each of those normals in the frame of its corner's fan on the mesh the bevel was working on (two
+//! angles, 16 bits each) and the mesh it leaves reads them back in its own fans' frames, the mean of them where
+//! a fan's corners were given unlike ones: so are they here, which is why a normal is now and then not the one
+//! given (round a profile's middle point it leans to one side). On a slab's far face the fans are not always
+//! Blender's (its faces there are in an order of its own).
 //!
 //! A bevel is asked for (`bevel_edges`, a builder's `bevel`) and given later, as Blender's modifier is: the part
 //! keeps its mesh, which a build can still push about, scale or cut, and is rounded as it is when it is joined
@@ -1623,7 +1623,6 @@ fn harden(out: &mut Mesh, kinds: &[Kind], long: &BTreeSet<(u32, u32)>, old: &Mes
         }
     }
     out.normals = None;
-    let mut normals = crate::normals::corner_normals(out);
     let face_normals = out.face_normals();
     // a vertex's normal: its faces' weighed by their angles at it
     let mut vertex_normals = vec![V3::ZERO; out.verts.len()];
@@ -1715,33 +1714,26 @@ fn harden(out: &mut Mesh, kinds: &[Kind], long: &BTreeSet<(u32, u32)>, old: &Mes
             given[l] = Some(pnorm.filter(|p| dot_v3(*p, *p) > 0.0));
         }
     }
-    // The corners of one vertex that shade as one (a fan: joined across smooth edges) keep one normal between
-    // them, as Blender stores it: two angles in the fan's own frame (from the fan's normal, and round it from
-    // the edge the fan starts at), each as a share of the frame's own angle in 16 bits. Where a fan's corners
-    // were given unlike normals it keeps the mean of what was stored.
+    // Blender's bevel stores each given normal in the frame of its corner's fan on the mesh it is working on (a
+    // fan: the corners of one vertex joined across smooth edges; two angles, from the fan's normal and round it
+    // from the edge the fan starts at, each as a share of the frame's own angle in 16 bits). The mesh it leaves
+    // reads them back in its own fans' frames (`normals::from_stored`), which start elsewhere now and then, and
+    // where a fan's corners were given unlike normals it reads the mean of what was stored: the normals are
+    // Blender's, not always the ones given.
+    let mut stored = vec![[0_i16; 2]; out.loops.len()];
     for fan in fans(out, &face_normals) {
         if !fan.corners.iter().any(|&l| given[l].flatten().is_some()) {
-            fan.corners.iter().for_each(|&l| normals[l] = fan.normal);
             continue;
         }
         let space = Space::new(&fan);
-        let stored: Vec<[i32; 2]> = fan
-            .corners
-            .iter()
-            .map(|&l| given[l].flatten().map_or([0, 0], |p| space.store(p)))
-            .collect();
-        let mut kept = stored[0];
-        if stored.iter().any(|s| *s != stored[0]) {
-            let n = stored.len() as i32;
-            kept = [
-                stored.iter().map(|s| s[0]).sum::<i32>() / n,
-                stored.iter().map(|s| s[1]).sum::<i32>() / n,
-            ];
+        for &l in &fan.corners {
+            if let Some(p) = given[l].flatten() {
+                let s = space.store(p);
+                stored[l] = [s[0] as i16, s[1] as i16];
+            }
         }
-        let normal = space.read(kept);
-        fan.corners.iter().for_each(|&l| normals[l] = normal);
     }
-    out.normals = Some(normals);
+    out.normals = Some(crate::normals::from_stored(out, &stored));
 }
 
 fn acos_clamped(x: f32) -> f32 {
@@ -2000,34 +1992,6 @@ impl Space {
             0
         };
         [a, b]
-    }
-
-    /// The normal two stored shares stand for.
-    fn read(&self, data: [i32; 2]) -> V3 {
-        if data[0] == 0 || self.ref_alpha == 0.0 || self.ref_beta == 0.0 {
-            return self.lnor;
-        }
-        let alphafac = data[0] as f32 / 32767.0;
-        let alpha = if alphafac > 0.0 {
-            self.ref_alpha
-        } else {
-            Space::TWO_PI - self.ref_alpha
-        } * alphafac;
-        let betafac = data[1] as f32 / 32767.0;
-        let mut out = mul_v3_fl(self.lnor, cosf(alpha));
-        if betafac == 0.0 {
-            out = madd(out, self.vec_ref, sinf(alpha));
-        } else {
-            let sinalpha = sinf(alpha);
-            let beta = if betafac > 0.0 {
-                self.ref_beta
-            } else {
-                Space::TWO_PI - self.ref_beta
-            } * betafac;
-            out = madd(out, self.vec_ref, sinalpha * cosf(beta));
-            out = madd(out, self.vec_ortho, sinalpha * sinf(beta));
-        }
-        out
     }
 }
 
