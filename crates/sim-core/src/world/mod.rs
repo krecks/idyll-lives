@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::f32::consts::FRAC_PI_2;
 
-use crate::clock::{MAX_SPEED, SUPER_SPEED, TICKS_PER_STEP};
+use crate::clock::{MAX_SPEED, SUPER_BUSY, SUPER_SPEED, TICKS_PER_STEP};
 use crate::content::{
     Content, HabitTime, Layer, MAX_NEEDS, MAX_SKILLS, MAX_SLOTS, Modifiers, Pose, TagMask, stage_in,
 };
@@ -1936,9 +1936,12 @@ pub struct World {
     pub tick: u64,
     /// The game's speed (`clock::TICKS_PER_STEP`'s index): 0 paused .. `SUPER_SPEED`.
     pub speed: u8,
-    /// The speed below super speed last chosen (1 to 3): super speed drops back to it when
-    /// the household stops being quiet.
+    /// The speed below super speed last chosen (1 to 3): super speed gone to by itself drops back
+    /// to it when the household stops being quiet.
     pub resume_speed: u8,
+    /// Whether the game went to super speed by itself (`auto_fast`) rather than the player picking
+    /// it: only then does it drop back as the quiet ends.
+    pub(crate) auto_super: bool,
     /// Whether it was quiet at home (`calm`) at the last step: super speed by itself starts as
     /// it falls quiet, so a speed the player picks while it is quiet holds.
     pub(crate) was_calm: bool,
@@ -2455,6 +2458,7 @@ impl World {
             speed: 1,
             resume_speed: 1,
             was_calm: false,
+            auto_super: false,
             step_ticks: 0,
             autonomy: true,
             lifespan: Default::default(),
@@ -3704,27 +3708,29 @@ impl World {
     }
 
     /// Advances one real-time step (1 / TICKS_PER_SECOND s) at the current speed; at super
-    /// speed, all of its most ticks while it stays quiet at home.
+    /// speed, all of its most ticks (60 while it stays quiet at home, else `SUPER_BUSY`).
     pub fn advance(&mut self) {
         self.start_step();
         while self.advance_more() {}
     }
 
     /// Starts a real-time step: the speed's ticks, or at super speed none yet (`advance_more`
-    /// runs them, as many as the caller has time for). Super speed drops back to the speed
-    /// chosen before it once it isn't quiet at home; with `auto_fast` on, the game goes to it
-    /// as the household falls quiet. The ticks it ran.
+    /// runs them, as many as the caller has time for). With `auto_fast` on, the game goes to super
+    /// speed as the household falls quiet, and drops back to the speed chosen before it once it
+    /// isn't quiet at home (a super speed the player picked stays). The ticks it ran.
     pub fn start_step(&mut self) -> u32 {
         self.step_ticks = 0;
         if self.speed == 0 {
             return 0;
         }
         let calm = self.calm();
-        if self.speed == SUPER_SPEED && !calm {
+        if self.speed == SUPER_SPEED && self.auto_super && !calm {
             self.speed = self.resume_speed;
+            self.auto_super = false;
         } else if self.auto_fast && calm && !self.was_calm && self.speed < SUPER_SPEED {
             self.resume_speed = self.speed;
             self.speed = SUPER_SPEED;
+            self.auto_super = true;
         }
         self.was_calm = calm;
         if self.speed == SUPER_SPEED {
@@ -3738,14 +3744,18 @@ impl World {
         ticks
     }
 
-    /// One more tick of a super-speed step, if the game is at super speed, it is still quiet at
-    /// home and the step hasn't run its most (`TICKS_PER_STEP[SUPER_SPEED]`). Whether it ran.
+    /// One more tick of a super-speed step, if the game is at super speed and the step hasn't run
+    /// its most: `TICKS_PER_STEP[SUPER_SPEED]` while it's quiet at home, else `SUPER_BUSY` (none
+    /// more once the quiet ends, for a super speed gone to by itself: it drops back at the next
+    /// step). Whether it ran.
     pub fn advance_more(&mut self) -> bool {
         if self.speed != SUPER_SPEED || self.step_ticks >= TICKS_PER_STEP[SUPER_SPEED as usize] {
             return false;
         }
-        // (The step's start found it quiet before its first tick.)
-        if self.step_ticks > 0 && !self.calm() {
+        // (The step's start looked before its first tick; under 30 a step there is nothing to ask.)
+        if (self.step_ticks >= SUPER_BUSY || (self.auto_super && self.step_ticks > 0))
+            && !self.calm()
+        {
             return false;
         }
         self.tick_once();
@@ -5247,12 +5257,9 @@ impl World {
                 if speed > MAX_SPEED {
                     return Err(Error::new(format!("speed must be 0..={MAX_SPEED}")));
                 }
-                // Super speed only while it's quiet at home: else the speed chosen before it.
-                self.speed = if speed == SUPER_SPEED && !self.calm() {
-                    self.resume_speed
-                } else {
-                    speed
-                };
+                // (The player's pick, super speed too: it stays when the quiet ends.)
+                self.speed = speed;
+                self.auto_super = false;
                 if (1..SUPER_SPEED).contains(&self.speed) {
                     self.resume_speed = self.speed;
                 }

@@ -1,8 +1,8 @@
 //! `cargo m1-table <run>`: the M1 estimate's report (tools/m1/run.sh, README.md), from the run's logs, as
 //! markdown on stdout: per tier and world, the sim's ticks a second measured on this machine (natively, in the
 //! container, under the M1's quota, and as wasm under Node and Bun), the M1's estimated from them, and the
-//! margin against the 600 that 10× needs (the fastest speed the player picks at any hour; super speed runs as
-//! fast as the machine can).
+//! margin against the 600 that 10× needs (the fastest fixed speed; super speed runs as fast as the machine
+//! can).
 //!
 //!   cargo m1-table bench-results/m1/<time>
 //!

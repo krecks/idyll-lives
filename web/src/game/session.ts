@@ -60,7 +60,7 @@ import { peopleStreams, tierFor } from './people';
 import { compileSim, loadGameData } from './gameData';
 import { townJob } from './townJobs';
 import { gameAssetPlan, parseAheadFiles, streamRanks } from './streamPlan';
-import { GameSpeed, SUPER_SPEED, SUPER_SPEED_WAIT } from './speed';
+import { GameSpeed, SUPER_SPEED } from './speed';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 
@@ -549,8 +549,6 @@ async function openSession(
       if (game.mode !== 'live') return;
       slowedFrom = null;
       to = Math.max(0, Math.min(SUPER_SPEED, to));
-      // Super speed only in quiet hours (the simulation would keep the speed it has).
-      if (to === SUPER_SPEED && !game.superSpeed) return toast(SUPER_SPEED_WAIT);
       // (Under a menu: the speed it gives back.)
       speed.choose(to);
     },
@@ -1160,8 +1158,8 @@ async function openSession(
     // Updates carry changes only: lists are replaced when something in them changed, keeping
     // the objects of everything that didn't.
     const changed = mirror.apply(ui);
-    game.superSpeed = ui.superSpeed;
-    // Super speed starts and ends on its own: the speed shown, and the one given back after a menu, follow it.
+    game.quiet = ui.quiet;
+    // Super speed by itself starts and ends on its own: the speed shown, and the one given back after a menu, follow it.
     speed.follow(ui.speed);
     if (ui.speed !== game.speed) renderer.setDetailTight(ui.speed >= TIGHT_SPEED);
     game.speed = ui.speed;

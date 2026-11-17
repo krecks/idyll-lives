@@ -133,7 +133,7 @@ describe('game speed', () => {
     s.hold('menu', false);
     s.follow(4, performance.now() + 1000);
     expect(s.chosen).toBe(4);
-    // Pausing at super speed resumes at it (the simulation drops back itself if it's no longer quiet).
+    // Pausing at super speed resumes at it.
     s.choose(0);
     expect(s.last).toBe(4);
   });

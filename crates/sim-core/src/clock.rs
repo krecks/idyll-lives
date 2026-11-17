@@ -15,12 +15,17 @@ const START_TICKS: u64 = START_MINUTE * TICKS_PER_MINUTE;
 
 /// Ticks simulated per real step (one step = 1 / TICKS_PER_SECOND seconds) for each speed:
 /// paused, normal, fast, faster, and super speed's most. Super speed runs as many ticks of a
-/// step as the machine has time for, up to its most (`World::advance_more`).
+/// step as the machine has time for, up to its most (`World::advance_more`): 60 while it's quiet
+/// at home, `SUPER_BUSY` the rest of the time.
 pub const TICKS_PER_STEP: [u32; 5] = [0, 1, 3, 10, 60];
 pub const MAX_SPEED: u8 = 4;
-/// Super speed: only while the player's household is all asleep or out (`World::calm`); when
-/// that ends, the game drops back to the speed chosen before it (`World::resume_speed`).
+/// Super speed: up to 30× (`SUPER_BUSY`), and up to 60× while the player's household is all
+/// asleep or out with nothing to see to (`World::calm`). Gone to by itself as the household falls
+/// quiet (`World::auto_fast`), it drops back to the speed chosen before it when that ends
+/// (`World::resume_speed`); picked by the player, it stays.
 pub const SUPER_SPEED: u8 = 4;
+/// Super speed's most ticks a step while there is something to do at home (30×).
+pub const SUPER_BUSY: u32 = 30;
 
 /// Ticks since the midnight before day 1.
 pub(crate) fn since_midnight(tick: u64) -> u64 {
