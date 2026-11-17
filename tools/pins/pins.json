@@ -65,16 +65,16 @@
     {
       "name": "sim-cooking",
       "file": "crates/sim-core/src/cooking.rs",
-      "sha256": "1d82c57a3f54db44c0ef7b3c5ec7a6f0efde365e3b389ef3ba80cfab2eacbb17",
-      "by": "chore/rust-1.100",
-      "reason": "no behaviour change: the skills loop over the gains themselves, for clippy 1.100's needless_range_loop"
+      "sha256": "dd7f8dd5cee744167104868e08b4a35b3e5fce57c0558f670fd90a0aa72f581a",
+      "by": "release/0.8.3",
+      "reason": "no behaviour change: housemates at home are looked up in the household index (Ctx::members), checked against the old scan of every resident in debug builds"
     },
     {
       "name": "sim-social",
       "file": "crates/sim-core/src/social.rs",
-      "sha256": "e6f7a26273e6060bd87cbfad481065b8aa3fc159fa6eab5f063d7b081a9e2f75",
-      "by": "setup",
-      "reason": "household behaviour: not this run's to change"
+      "sha256": "b450892bebe9e1e337acd03cd550f702ab906b884321f7c9922971b78b3c4eca",
+      "by": "release/0.8.3",
+      "reason": "no behaviour change: the relationship matrix makes room 64 residents at a time (its rows a stride long) instead of being copied whole for each one moving in"
     },
     {
       "name": "sim-partners",
@@ -93,9 +93,9 @@
     {
       "name": "sim-lifecycle",
       "file": "crates/sim-core/src/lifecycle.rs",
-      "sha256": "a8714a881d13c5eac474c117cc3e9b91f9c2baffadad0375e6864f999ed989d8",
-      "by": "docs/cleanup",
-      "reason": "comments only: the pointer to a deleted design doc (docs/design/) is gone"
+      "sha256": "7d7f95be344da33316ef1b86fbc5cfeb1167029c7e8037e99697e7971b99f01c",
+      "by": "release/0.8.3",
+      "reason": "the town holds World::residents_most (768, or fewer where a town file says residentsMost) instead of MAX_SIMS; a move between households marks the household index stale"
     },
     {
       "name": "sim-hosting",
@@ -114,9 +114,9 @@
     {
       "name": "sim-privacy",
       "file": "crates/sim-core/src/privacy.rs",
-      "sha256": "74837017377b4c3770fe178fb79f0ed781c6b3a237f2e603f8630dc61954ce2e",
-      "by": "setup",
-      "reason": "household behaviour: not this run's to change"
+      "sha256": "6fa2606c5848c1b0c3f2c135b751cf1ecbf6903d81fcd9afd570313cc18f0644",
+      "by": "release/0.8.3",
+      "reason": "speed for a full town: the rooms kept shut found once a tick, sorted by room with a per-resident bit, and a bedroom's people looked for among its plot's, not the whole town"
     },
     {
       "name": "living-town-lens",
