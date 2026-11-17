@@ -174,11 +174,19 @@ fn speed_controls_tick_rate() {
     w.apply(Command::SetSpeed { speed: 3 }).unwrap();
     w.advance();
     assert_eq!(w.tick, TICKS_PER_STEP[3] as u64);
-    assert!(w.apply(Command::SetSpeed { speed: 9 }).is_err());
+    assert_eq!(w.step_rate(), TICKS_PER_STEP[3]);
+    assert!(w.apply(Command::SetSpeed { speed: 5 }).is_err());
+    // Ada is up: super speed isn't to be had, and the game stays at the speed chosen before it.
+    w.apply(Command::SetSpeed { speed: 2 }).unwrap();
+    w.apply(Command::SetSpeed { speed: SUPER_SPEED }).unwrap();
+    assert_eq!(w.speed, 2);
+    w.apply(Command::SetSpeed { speed: 0 }).unwrap();
+    w.apply(Command::SetSpeed { speed: SUPER_SPEED }).unwrap();
+    assert_eq!(w.speed, 2, "from a pause: the speed chosen before");
 }
 
-#[test]
-fn quiet_hours_skip_ahead() {
+/// A world whose bed is for sleeping, with Ada asleep in it (at `speed`, `auto` super speed).
+fn asleep_world(speed: u8, auto: bool) -> World {
     let content = CONTENT
         .replace(r#""pose":"lie","#, r#""pose":"lie","tags":["sleep"],"#)
         .replace(
@@ -186,10 +194,14 @@ fn quiet_hours_skip_ahead() {
             r#""dayRhythm":{"sleepTags":["sleep"]},"needs":["#,
         );
     let mut w = World::from_json(&content, LOT, 7).unwrap();
-    w.apply(Command::SetSpeed { speed: 1 }).unwrap();
-    w.apply(Command::SetAutoFast { enabled: true }).unwrap();
+    w.apply(Command::SetSpeed { speed }).unwrap();
+    w.apply(Command::SetAutoFast { enabled: auto }).unwrap();
     w.advance();
-    assert_eq!(w.tick, 1, "awake: normal speed");
+    assert_eq!(
+        w.tick, TICKS_PER_STEP[speed as usize] as u64,
+        "awake: the speed chosen"
+    );
+    assert_eq!(w.speed, speed);
     w.sims[0].needs[1] = 0.0;
     w.apply(Command::Use {
         sim: 0,
@@ -200,13 +212,58 @@ fn quiet_hours_skip_ahead() {
     while !w.sims[0].asleep(&w.content) {
         w.tick_once();
     }
+    w
+}
+
+#[test]
+fn super_speed_by_itself_while_the_household_sleeps() {
+    let mut w = asleep_world(2, true);
     let before = w.tick;
     w.advance();
-    let fast = TICKS_PER_STEP[AUTO_FAST_SPEED as usize] as u64;
-    assert_eq!(w.tick, before + fast, "asleep: time-lapse");
-    w.apply(Command::SetSpeed { speed: 0 }).unwrap();
+    let most = TICKS_PER_STEP[SUPER_SPEED as usize] as u64;
+    assert_eq!(w.speed, SUPER_SPEED, "asleep: super speed");
+    assert_eq!(w.tick, before + most);
+    assert_eq!(w.step_rate(), most as u32);
+    // A step the worker had time for only part of.
+    let before = w.tick;
+    w.start_step();
+    for _ in 0..5 {
+        assert!(w.advance_more());
+    }
+    assert_eq!(w.tick, before + 5);
+    assert_eq!(w.step_rate(), 5);
+    // The player picks normal speed while she sleeps: it holds.
+    w.apply(Command::SetSpeed { speed: 1 }).unwrap();
+    let before = w.tick;
     w.advance();
-    assert_eq!(w.tick, before + fast, "paused stays paused");
+    assert_eq!((w.speed, w.tick), (1, before + 1));
+    // And pressed again, super speed comes back.
+    w.apply(Command::SetSpeed { speed: SUPER_SPEED }).unwrap();
+    assert_eq!(w.speed, SUPER_SPEED);
+    w.apply(Command::SetSpeed { speed: 0 }).unwrap();
+    let before = w.tick;
+    w.advance();
+    assert_eq!(w.tick, before, "paused stays paused");
+}
+
+#[test]
+fn super_speed_drops_back_as_someone_wakes() {
+    let mut w = asleep_world(3, false);
+    let before = w.tick;
+    w.advance();
+    assert_eq!(
+        (w.speed, w.tick),
+        (3, before + 10),
+        "without the setting: 10×"
+    );
+    w.apply(Command::SetSpeed { speed: SUPER_SPEED }).unwrap();
+    assert_eq!(w.speed, SUPER_SPEED);
+    w.advance();
+    // She wakes: no more super-speed ticks, and the next step is at 10× again.
+    w.sims[0].current = None;
+    w.start_step();
+    assert!(!w.advance_more());
+    assert_eq!(w.speed, 3);
 }
 
 #[test]

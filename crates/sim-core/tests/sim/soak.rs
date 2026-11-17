@@ -547,7 +547,7 @@ impl Player {
                     self.apply(w, "undo", Command::Undo { household: h });
                 }
             }
-            let speed = 1 + self.rng.below(5) as u8;
+            let speed = 1 + self.rng.below(4) as u8;
             self.apply(w, "speed", Command::SetSpeed { speed });
         } else {
             // Live mode: orders for the household.
@@ -643,11 +643,15 @@ impl Player {
                     self.apply(w, "cancel", Command::Cancel { sim, index });
                 } else {
                     let enabled = self.chance(0.5);
-                    self.apply(w, "skip quiet hours", Command::SetAutoFast { enabled });
+                    self.apply(
+                        w,
+                        "super speed when quiet",
+                        Command::SetAutoFast { enabled },
+                    );
                 }
             }
             if self.chance(0.3) {
-                let speed = 1 + self.rng.below(5) as u8;
+                let speed = 1 + self.rng.below(4) as u8;
                 self.apply(w, "speed", Command::SetSpeed { speed });
             }
         }

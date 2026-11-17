@@ -169,9 +169,28 @@ impl Game {
         panic!("{why}");
     }
 
-    /// Runs one real-time step and refreshes the snapshot.
+    /// Runs one real-time step and refreshes the snapshot (at super speed, all of its most
+    /// ticks while it stays quiet at home).
     pub fn advance(&mut self) {
         self.world.advance();
+        snapshot::write(&self.world, &mut self.snapshot);
+    }
+
+    /// Starts a real-time step (`World::start_step`): the speed's ticks, or at super speed
+    /// none yet (`advance_more`). The ticks it ran. The snapshot waits for `end_step`.
+    pub fn start_step(&mut self) -> u32 {
+        self.world.start_step()
+    }
+
+    /// One more tick of a super-speed step (`World::advance_more`), while the worker has time
+    /// for it: whether it ran (not at super speed, no longer quiet at home, or the step's most
+    /// run: no).
+    pub fn advance_more(&mut self) -> bool {
+        self.world.advance_more()
+    }
+
+    /// Ends a step begun with `start_step`: refreshes the snapshot.
+    pub fn end_step(&mut self) {
         snapshot::write(&self.world, &mut self.snapshot);
     }
 

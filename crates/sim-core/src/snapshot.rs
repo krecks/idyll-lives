@@ -34,8 +34,9 @@ pub mod header {
     pub const SPEED: usize = 3;
     pub const SIM_COUNT: usize = 4;
     pub const STRUCTURE_VERSION: usize = 5;
-    /// 1 while time skips ahead because it's quiet at home (`World::calm`), else 0.
-    pub const CALM: usize = 6;
+    /// Ticks a real step runs now (`World::step_rate`): the speed's, at super speed what the
+    /// last step ran (as many as the machine had time for); 0 paused.
+    pub const RATE: usize = 6;
     /// Id of the latest milestone event (importance 2) modulo 2^24, 0 if none yet.
     pub const MAJOR_EVENT: usize = 7;
     /// `Items::version` modulo 2^24: food and dishes changed (fetch `items` again).
@@ -713,7 +714,7 @@ pub fn write(world: &World, out: &mut [f32]) {
     out[header::SPEED] = world.speed as f32;
     out[header::SIM_COUNT] = world.sims.len() as f32;
     out[header::STRUCTURE_VERSION] = world.structure_version() as f32;
-    out[header::CALM] = (world.auto_fast && world.speed > 0 && world.calm()) as u8 as f32;
+    out[header::RATE] = world.step_rate() as f32;
     out[header::MAJOR_EVENT] = world
         .events
         .iter()
@@ -991,7 +992,7 @@ pub fn layout_json(content: &Content) -> String {
             "tick": header::TICK, "day": header::DAY, "minute": header::MINUTE,
             "speed": header::SPEED, "simCount": header::SIM_COUNT,
             "structureVersion": header::STRUCTURE_VERSION,
-            "calm": header::CALM, "majorEvent": header::MAJOR_EVENT,
+            "rate": header::RATE, "majorEvent": header::MAJOR_EVENT,
             "itemsVersion": header::ITEMS_VERSION, "staffCount": header::STAFF_COUNT,
         },
         "sim": {
