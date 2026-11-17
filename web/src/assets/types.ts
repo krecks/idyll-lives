@@ -105,6 +105,19 @@ export interface MaterialEntry {
   /** Opacity below 1 makes the surface see-through (glass). Default 1. */
   alpha?: number;
   /**
+   * A clear coat over the surface (glTF `KHR_materials_clearcoat`): 0 or 1, and the coat's own
+   * roughness (default 0, a mirror). Lacquered wood. A layer: drawn where the graphics preset has
+   * the finishes' layers (`QualitySettings.finishLayers`), left out on Low.
+   */
+  clearcoat?: number;
+  clearcoatRoughness?: number;
+  /**
+   * Cloth's sheen (glTF `KHR_materials_sheen`): its colour (sRGB, as `color`) and its roughness
+   * (1 a wide haze, 0.3 a rim at the silhouette), both or neither. A layer, as the clear coat.
+   */
+  sheenColor?: string;
+  sheenRoughness?: number;
+  /**
    * The texture's alpha cuts the surface out where it is under this (a tree's leaf cards): an alpha
    * test, never blended, softened by alpha to coverage where the picture is multisampled; drawn from
    * both sides and lit by the mesh's normals on either (a card's are its crown's). The texture is an

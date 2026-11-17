@@ -2,7 +2,8 @@
 //!
 //! - `clouds <out.png>`: the sky's tileable cloud layer (`clouds.py`).
 //! - `synth [set...]`: the procedural albedo/normal/arm maps (`synth.rs`); no downloads.
-//! - `materials`: writes `materials.json` in the current directory (`materials.py`).
+//! - `materials`: writes `materials.json` in the current directory (`materials.py`), its finishes held to the
+//!   ranges real surfaces fall in (`pbr.rs`).
 //!
 //! The numbers follow numpy and Pillow step by step (float64 as numpy evaluates it, numpy's pairwise sums and
 //! Python's compensated `sum()`, Pillow's fixed-point resampling and box blur, libjpeg-turbo's decoder and
@@ -26,8 +27,19 @@ pub fn main_with(args: &[String]) -> i32 {
     let res = match a.as_slice() {
         ["clouds", out] => clouds(Path::new(out)),
         ["synth", only @ ..] => synth::run(only),
-        ["materials"] => std::fs::write("materials.json", materials_json())
-            .map_err(|e| format!("materials.json: {e}")),
+        ["materials"] => {
+            finish_faults(&crate::content::root().join("web/public/assets")).and_then(|faults| {
+                if faults.is_empty() {
+                    std::fs::write("materials.json", materials_json())
+                        .map_err(|e| format!("materials.json: {e}"))
+                } else {
+                    Err(format!(
+                        "no surface is like that\n  {}",
+                        faults.join("\n  ")
+                    ))
+                }
+            })
+        }
         ["-h" | "--help" | "help", ..] => {
             println!("{USAGE}");
             return 0;
@@ -411,7 +423,12 @@ fn plain(color: &'static str, kw: &[(&'static str, J)]) -> J {
     J::Obj(e)
 }
 
-/// materials.py's entries, in its order.
+/// A sheen's colour (sRGB, as the manifests' colours) and roughness: woven cloth's is faint, a pile's
+/// (velvet) bright. Both wide: from the play camera a narrower one (0.4) is a dotted line along every seam.
+const FABRIC_SHEEN: (&str, f64) = ("#595959", 0.5);
+const VELVET_SHEEN: (&str, f64) = ("#A6A6A6", 0.55);
+
+/// materials.py's entries, in its order, and the finishes added since.
 pub fn materials() -> J {
     let f = J::Float;
     let i = J::Int;
@@ -501,13 +518,60 @@ pub fn materials() -> J {
             "material.finish.chrome",
             plain("#FFFFFF", &[("roughness", f(0.1)), ("metallic", i(1))]),
         ),
+        // What a plain thing is made of: the same shared draw as the five above (a plain finish's roughness and
+        // metalness go in the vertex colour). Brass and copper are `metal` in their colour.
+        (
+            "material.finish.enamel",
+            plain("#FFFFFF", &[("roughness", f(0.18))]),
+        ),
+        (
+            "material.finish.ceramic",
+            plain("#FFFFFF", &[("roughness", f(0.1))]),
+        ),
+        (
+            "material.finish.plastic",
+            plain("#FFFFFF", &[("roughness", f(0.4))]),
+        ),
+        (
+            "material.finish.rubber",
+            plain("#FFFFFF", &[("roughness", f(0.9))]),
+        ),
+        (
+            "material.finish.brushed",
+            plain("#FFFFFF", &[("roughness", f(0.4)), ("metallic", i(1))]),
+        ),
+        (
+            "material.finish.iron",
+            plain("#FFFFFF", &[("roughness", f(0.65)), ("metallic", i(1))]),
+        ),
+        // Cloth has a sheen: its fibres catch the light where the surface turns away (`KHR_materials_sheen`).
         (
             "material.finish.fabric",
             surf(
                 "#FFFFFF",
                 "fabric_linen",
                 2.5,
-                &[("roughness", i(1)), ("metallic", i(0))],
+                &[
+                    ("roughness", i(1)),
+                    ("metallic", i(0)),
+                    ("sheenColor", s(FABRIC_SHEEN.0)),
+                    ("sheenRoughness", f(FABRIC_SHEEN.1)),
+                ],
+            ),
+        ),
+        // Velvet is the fabric's maps under a pile's sheen: no download, a draw where a model has both.
+        (
+            "material.finish.velvet",
+            surf(
+                "#FFFFFF",
+                "fabric_linen",
+                2.5,
+                &[
+                    ("roughness", i(1)),
+                    ("metallic", i(0)),
+                    ("sheenColor", s(VELVET_SHEEN.0)),
+                    ("sheenRoughness", f(VELVET_SHEEN.1)),
+                ],
             ),
         ),
         (
@@ -526,6 +590,21 @@ pub fn materials() -> J {
                 "wood_oak",
                 1.2,
                 &[("roughness", f(0.8)), ("metallic", i(0))],
+            ),
+        ),
+        // Lacquered wood is the wood's maps under a clear coat (`KHR_materials_clearcoat`): a piano, a polished table.
+        (
+            "material.finish.lacquer",
+            surf(
+                "#FFFFFF",
+                "wood_oak",
+                1.2,
+                &[
+                    ("roughness", f(0.8)),
+                    ("metallic", i(0)),
+                    ("clearcoat", i(1)),
+                    ("clearcoatRoughness", f(0.1)),
+                ],
             ),
         ),
         (
@@ -688,6 +767,32 @@ pub fn materials_json() -> String {
     out
 }
 
+/// What is wrong with the finishes `materials` writes (`material.finish.*`, `pbr::finish_faults`), each
+/// with its key; `assets` has their maps.
+pub fn finish_faults(assets: &Path) -> Result<Vec<String>, String> {
+    let entries: serde_json::Value =
+        serde_json::from_str(&materials_json()).map_err(|e| format!("materials: {e}"))?;
+    let mut out = Vec::new();
+    for (key, entry) in entries.as_object().into_iter().flatten() {
+        if !key.starts_with("material.finish.") {
+            continue;
+        }
+        let text = |name: &str| entry.get(name).and_then(serde_json::Value::as_str);
+        let arm = match (text("texture"), text("arm")) {
+            (Some(texture), Some(arm)) => Some(crate::pbr::arm_mean(
+                &assets.join(texture).with_file_name(arm),
+            )?),
+            _ => None,
+        };
+        out.extend(
+            crate::pbr::finish_faults(entry, arm)
+                .into_iter()
+                .map(|fault| format!("{key}: {fault}")),
+        );
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -726,7 +831,8 @@ mod tests {
     }
 
     /// `tests/fixtures/tex/materials.json` is what materials.py wrote (but for the sky's URL, since `cargo envconv`'s `.pcenv`,
-    /// and the trees' leaf cards' and the leather finish, added since).
+    /// and the finishes added since: the trees' leaf cards, leather, the plain ones a thing is made of, velvet,
+    /// lacquer and cloth's sheen).
     #[test]
     fn materials_bytes() {
         assert_eq!(
@@ -735,6 +841,77 @@ mod tests {
         );
         assert_eq!(py_float(0.667), "0.667");
         assert_eq!(py_float(2.0), "2.0");
+    }
+
+    /// Every finish the tool writes is a surface there is (`pbr`), and the plain ones are of the class
+    /// their names say.
+    #[test]
+    fn finishes_are_plausible() {
+        let faults = finish_faults(&crate::content::root().join("web/public/assets")).unwrap();
+        assert!(faults.is_empty(), "{}", faults.join("\n"));
+        let entries: serde_json::Value = serde_json::from_str(&materials_json()).unwrap();
+        for (finish, metal, class) in [
+            ("matte", false, "matte"),
+            ("satin", false, "satin"),
+            ("gloss", false, "gloss"),
+            ("metal", true, "brushed"),
+            ("chrome", true, "chrome"),
+            ("enamel", false, "gloss"),
+            ("ceramic", false, "gloss"),
+            ("plastic", false, "satin"),
+            ("rubber", false, "matte"),
+            ("brushed", true, "brushed"),
+            ("iron", true, "cast"),
+            ("skin", false, "satin"),
+            ("hair", false, "satin"),
+            ("glass", false, "gloss"),
+        ] {
+            let entry = &entries[format!("material.finish.{finish}")];
+            assert_eq!(entry["metallic"].as_f64().unwrap_or(0.0) == 1.0, metal);
+            assert_eq!(
+                crate::pbr::class(entry["roughness"].as_f64().unwrap(), metal),
+                Some(class),
+                "{finish}"
+            );
+        }
+        // The layers are on the finishes that have them, and only there.
+        let layered = |name: &str| -> Vec<&str> {
+            entries
+                .as_object()
+                .unwrap()
+                .iter()
+                .filter(|(_, e)| e.get(name).is_some())
+                .map(|(k, _)| k.as_str())
+                .collect()
+        };
+        assert_eq!(
+            layered("sheenColor"),
+            ["material.finish.fabric", "material.finish.velvet"]
+        );
+        assert_eq!(layered("clearcoat"), ["material.finish.lacquer"]);
+    }
+
+    /// The base manifest's finishes are the ones the tool writes, as it writes them (never edited by hand).
+    #[test]
+    fn the_manifest_has_these_finishes() {
+        let read = |text: &str| -> serde_json::Value { serde_json::from_str(text).unwrap() };
+        let ours = read(&materials_json());
+        let manifest = read(
+            &std::fs::read_to_string(
+                crate::content::root().join("web/public/assets/manifest.json"),
+            )
+            .unwrap(),
+        );
+        let finishes = |entries: &serde_json::Value| -> Vec<(String, serde_json::Value)> {
+            entries
+                .as_object()
+                .unwrap()
+                .iter()
+                .filter(|(k, _)| k.starts_with("material.finish."))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect()
+        };
+        assert_eq!(finishes(&manifest["entries"]), finishes(&ours));
     }
 
     /// clouds.py made the committed cloud layer; the port makes the same pixels.
