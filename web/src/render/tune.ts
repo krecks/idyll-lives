@@ -10,7 +10,8 @@
  * `shared/groundShade.ts`; `clouds` (the clouds' shadows) in `pc/cloudShadows.ts`; `house` (the walls' tops, the tone of
  * walls and floors over a room) in `shared/house.ts`; `street` (worn asphalt, the pavement and its kerb, paving's sides) in
  * `shared/paving.ts`; `leaves` (the plants' leaves from above and from plant to plant) in `pc/nature.ts`; `room` (a lamplit
- * room's own light) in `shared/roomLight.ts`; `lampShadows` (the lamps' shadows) in `pc/lampShadows.ts`.
+ * room's own light) in `shared/roomLight.ts`; `lampShadows` (the lamps' shadows) in `pc/lampShadows.ts`; `water` (the water's ripples, flow and foam) in
+ * `pc/shaders/water.ts`.
  */
 
 /** `a.b:1;c.d:x` as path → value, both as written. */

@@ -96,10 +96,9 @@ export class WaterFlowMap {
     this.texture = this.made(1, 1);
   }
 
-  /** Draws `material` (the water's) flowing, from this map; `still`: ripples only (the Low preset). */
-  use(material: pc.StandardMaterial, still: boolean): void {
+  /** Draws `material` (the water's) flowing, from this map. */
+  use(material: pc.StandardMaterial): void {
     material.setDefine('GAME_WATER', '');
-    if (still) material.setDefine('GAME_WATER_STILL', '');
     // Out of doors: no room's light or windowless mask read (texture units, `samplerCheck.ts`).
     material.setDefine('GAME_OUTDOORS', '');
     material.setParameter('game_waterRipple', rippleTexture(this.device));

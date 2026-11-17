@@ -1093,7 +1093,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     lib.adopt(mat);
     if (flowingWater()) {
       this.flowMap = new WaterFlowMap(app.graphicsDevice);
-      this.flowMap.use(mat, false);
+      this.flowMap.use(mat);
       perfTime('nature: water flow', () => this.flowMap!.setLand(this.heightField));
     }
     mat.update();

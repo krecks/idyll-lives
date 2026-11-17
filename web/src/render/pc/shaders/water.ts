@@ -11,9 +11,10 @@
  *   again, so the ripples run on downstream without the pattern ever stretching away.
  *
  * The slope tilts the normal (the sky's reflection and the sun's highlight break up in it); the foam (where the flow
- * map has it, broken up by the ripples' height) lightens the water, makes it opaque and rough. `GAME_WATER_STILL`
- * (the Low preset, `?diag=noflow` with the material's plain look kept apart) reads one layer of still ripples and no
- * flow. Time is the wind's clock (`game_wind.x`, `pc/nature.ts`).
+ * map has it, broken up by the ripples' height) lightens the water, makes it opaque and rough. Five reads a pixel of
+ * water: what it costs was under what the frame's time wanders by on every preset and both backends (the river filling
+ * the play camera's view, M3 Pro, 2026-11-17), so Low has it too. Time is the wind's clock (`game_wind.x`,
+ * `pc/nature.ts`): it stands still while a frame is held (`heldFrames.ts`), as the wind does.
  *
  * Uniforms: `game_waterArea` (1 / the flow map's size in metres along x and z, then half a texel along each: the
  * map's uv at a game-space point), and the look (`WATER`).
@@ -99,11 +100,6 @@ function code(lang: Language): ShaderFeature['glsl'] {
 		${decl('gwS', 'float')} = clamp(length(gwV), 0.0, 1.0);
 		// Still water: two layers drifting two ways.
 		${decl('gwA', v4)} = ${tex('game_waterRipple', `gwP / ${f(WATER.still)} + ${v2c(WATER.drift)} * (gwT / ${f(WATER.still)})`)};
-	#ifdef GAME_WATER_STILL
-		${decl('gwSlope', v2, true)} = (gwA.rg * 2.0 - ${v2}(1.0)) * ${f(WATER.stillSlope * 1.4)};
-		${decl('gwH', 'float', true)} = gwA.b;
-		${decl('gwTone', 'float')} = ${f(WATER.tone)};
-	#else
 		${decl('gwB', v4)} = ${tex('game_waterRipple', `gwP / ${f(WATER.stillSmall)} + ${v2c(WATER.driftSmall)} * (gwT / ${f(WATER.stillSmall)}) + ${v2}(0.37, 0.71)`)};
 		${decl('gwSlope', v2, true)} = (gwA.rg * 2.0 - ${v2}(1.0) + (gwB.rg * 2.0 - ${v2}(1.0)) * 0.6) * ${f(WATER.stillSlope)};
 		// Running water: the ripples carried along the flow, two phases half a cycle apart.
@@ -118,7 +114,6 @@ function code(lang: Language): ShaderFeature['glsl'] {
 		gwSlope = mix(gwSlope, (gwE.rg * 2.0 - ${v2}(1.0)) * (${f(WATER.runSlope)} + ${f(WATER.runFast)} * gwS), gwRun);
 		${decl('gwH', 'float', true)} = mix(gwA.b * 0.5 + gwB.b * 0.5, gwE.b, gwRun);
 		${decl('gwTone', 'float')} = mix(${f(WATER.tone)}, ${f(WATER.runTone)}, gwRun);
-	#endif
 		gameWaterSlope = gwSlope;
 		gameWaterTone = 1.0 + (gwH - 0.5) * gwTone;
 		// The foam, broken up by the ripples: solid where there is most, in streaks and flecks where there is less.
