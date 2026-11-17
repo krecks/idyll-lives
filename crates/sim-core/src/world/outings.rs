@@ -584,5 +584,5 @@ pub(crate) fn could_conceive(ctx: &Ctx, a: usize, b: usize) -> bool {
         && y.household == x.household
         && ctx.households[h].expecting.is_none()
         && members < ctx.content.rules.max_household
-        && ctx.briefs.iter().filter(|s| s.here).count() < MAX_SIMS
+        && ctx.room_in_town
 }

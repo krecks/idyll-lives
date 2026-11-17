@@ -295,19 +295,34 @@ export function lane(ctrl: readonly Pt[], ends: [RoadEnd, RoadEnd], width = LANE
   return { points: curve(ctrl), width, ends };
 }
 
+/**
+ * A polyline with points put in along its longer stretches, none longer than `most` m: what
+ * `curve` makes of it keeps to it (a long stretch beside a short one swings the curve out past
+ * the short one's end and back, a kink).
+ */
+export function evenly(pts: readonly Pt[], most: number): Pt[] {
+  const out: Pt[] = pts.length ? [pts[0]] : [];
+  for (let i = 1; i < pts.length; i++) {
+    const n = Math.ceil(Math.hypot(pts[i - 1][0] - pts[i][0], pts[i - 1][1] - pts[i][1]) / most);
+    for (let k = 1; k < n; k++) out.push([pts[i - 1][0] + ((pts[i][0] - pts[i - 1][0]) * k) / n, pts[i - 1][1] + ((pts[i][1] - pts[i - 1][1]) * k) / n]);
+    out.push(pts[i]);
+  }
+  return out;
+}
+
 // ---- joining the roads up ------------------------------------------------------------------
 
 /** A lane left with a dead end (a court) reaches at most this far past the last road it meets (m). */
 export const COURT = 45;
 /** Roads running alongside each other keep this far apart (m, from the other's edge to the middle). */
-const APART = 18;
+export const APART = 18;
 /** Cross streets keep further from the roads they run alongside (room for a lot between, m). */
 const STREETS_APART = 30;
 /** Where a road meets another, no third comes within this of it (m). */
-const ROOM = 14;
+export const ROOM = 14;
 /** The tightest bend a new stretch of road takes (m, to its middle), and the least angle it meets a road at. */
 const TIGHTEST = 9;
-const MEET = (35 * Math.PI) / 180;
+export const MEET = (35 * Math.PI) / 180;
 /** How far a dead end looks for a road to go on to (m). */
 const REACH = 120;
 
@@ -329,7 +344,7 @@ const dot = (a: Pt, b: Pt) => a[0] * b[0] + a[1] * b[1];
 const angleTo = (a: Pt, b: Pt) => Math.atan2(a[0] * b[1] - a[1] * b[0], dot(a, b));
 
 /** The way a road leaves at its last point (a unit direction, from 3 m back). */
-function endDir(pts: readonly Pt[]): Pt {
+export function endDir(pts: readonly Pt[]): Pt {
   const ls = lengths(pts);
   const back = pointAt(pts, ls[ls.length - 1] - 3, ls).p;
   const e = pts[pts.length - 1];

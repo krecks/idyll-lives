@@ -461,14 +461,23 @@ export type RoadKind = 'street' | 'lane' | 'country' | 'trail';
 export type TownSize = 'hamlet' | 'village' | 'town' | 'city';
 
 /**
+ * How much land a new world has, both ways (`game/world.ts` `LAND_SIZE`): small, medium or large.
+ * The bigger towns and more villages need the bigger lands (`townFits`).
+ */
+export type LandSize = 'small' | 'medium' | 'large';
+
+/**
  * What the player chose for a world besides its place (`game/world.ts` `WorldKind`): how big its
- * main town is, how many villages round it, how hilly and how wooded its land.
+ * main town is, how many villages round it, how hilly and how wooded its land, and (`size`) how
+ * much land it has (none: the place's own, or for another town and villages the smallest land they
+ * fit on: `world.ts` `optionsFor`, `sizeFor`).
  */
 export interface WorldOptions {
   town: TownSize;
   villages: 'none' | 'few' | 'many';
   hills: 'flat' | 'rolling' | 'hilly' | 'mountains';
   woods: 'open' | 'some' | 'wooded';
+  size?: LandSize;
 }
 
 /** How big a world is: every world is a Big one (cosy and normal were dropped in 0.8.0; a save that still says so reads as `big`). */
@@ -648,6 +657,14 @@ export interface WorldLook {
   options?: WorldOptions;
   /** Tilled fields on farm lots (town tiles): drawn as soil, fenced in. */
   fields?: { x: number; z: number; w: number; d: number }[];
+  /** The seed its town was laid from, where it differs from the land's (`game/worldCode.ts`). */
+  townSeed?: number;
+  /** The seed its people were drawn from (`game/people.ts` `peopleStreams`). */
+  peopleSeed?: number;
+  /** Its land was shaped by hand (step 1's brushes): the world code no longer makes it. */
+  shaped?: true;
+  /** Its town was edited by hand (step 2's tools): the world code no longer makes it. */
+  edited?: true;
 }
 
 /**

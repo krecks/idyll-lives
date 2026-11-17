@@ -58,6 +58,7 @@ export const LAYOUT = {
   headerLen: HEADER_LEN,
   simStride: SIM_STRIDE,
   maxSims: MAX_SIMS,
+  maxStaff: MAX_STAFF,
   ...TICK_RATES,
   header: {
     tick: constant('TICK', 'header'),

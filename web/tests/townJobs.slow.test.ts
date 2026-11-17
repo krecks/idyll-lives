@@ -75,7 +75,7 @@ describe('town jobs', async () => {
   test('a world tells its steps in turn, and is the same world for it', () => {
     const steps: string[] = [];
     const made = runTownJob(content, t, { kind: 'world', world: 'country', seed: 909 }, (step) => steps.push(step));
-    expect(steps).toEqual(['land', 'roads', 'homes', 'houses']);
+    expect(steps).toEqual(['land', 'roads', 'homes', 'grade', 'houses']);
     if (made.kind !== 'world') throw new Error('not a world');
     const laid = generateWorld(content, t, 'country', 909);
     expect(made.draft).toEqual(settleLand(laid, (d) => previewWorld(content, t, d, null)).draft);

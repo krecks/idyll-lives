@@ -15,7 +15,9 @@
  * `?world=<place>` (and `?options=town:city,villages:many`, `game/worldOptions.ts`) works without
  * `?bench` too: step 1 of a new game makes its first world there, with those options (`WORLD_FLAG`;
  * the timing tools' worlds). `?bench=bigworld` draws a Big world of `big=<place>` (default the
- * countryside), with `options=` as well.
+ * countryside), with `options=` as well. `?code=<world code>` (`game/worldCode.ts`; a bare number is
+ * the land's seed) does the same with the world's code, over `?world=` and `?options=` (`CODE_FLAG`).
+ * (`?seed=` is the simulation's own dice: `game/session.ts`.)
  */
 
 import type { WorldOptions } from '../core/protocol';
@@ -138,3 +140,10 @@ export const BENCH: BenchFlags | null = parse();
  * countryside, as a player gets it. Unknown options are left out.
  */
 export const WORLD_FLAG: { kind: string; options: Partial<WorldOptions> } | null = params.has('world') ? { kind: params.get('world') ?? '', options: parseOptions(params.get('options')) } : null;
+
+/**
+ * `?code=`: the world's code step 1 of a new game opens with (`game/worldCode.ts` `readCode`: a
+ * whole code, or a bare number for the land's seed), as written; null: none. Read by step 1, which
+ * says nothing of a code it can't read and makes its own world.
+ */
+export const CODE_FLAG: string | null = params.get('code');

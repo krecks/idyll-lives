@@ -3,11 +3,12 @@
 // rises and stops where it would cut too deep, dry; the cover tools; a peak and a range placed on release);
 // undo and redo give back the bytes exactly; the built land is held off and water kept off lots and roads;
 // what the land makes of the world (the sim's water tiles with the bridge decks dry, the zones); the price
-// of a stroke; and a stamp's time (printed). `bun test tests/landBrush.test.ts`.
+// of a stroke; the point brush (4 m and under: one sample, or one cover cell, wherever the pointer is
+// within it, an unbroken trail when dragged); and a stamp's time (printed). `bun test tests/landBrush.test.ts`.
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
 import { blankLand, COVER, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, wetAt, type Land } from '../src/game/land';
-import { mountainGhost, settleWater, stamp, strokeOf, type Brush } from '../src/game/landBrush';
+import { aimOf, isPoint, mountainGhost, POINT, settleWater, stamp, strokeOf, type Brush, type LandTool } from '../src/game/landBrush';
 import { applyLand, LandEditor, landZones, Protection, wetTiles, type BuiltLand, type LandPrices } from '../src/game/landEdit';
 import { rle, unrle } from '../src/game/landMasks';
 import { fbm } from '../src/game/noise';
@@ -392,6 +393,170 @@ describe('cost', () => {
     expect(Math.abs(editor.cost(peak, PRICES) - ghost)).toBeLessThanOrEqual(2);
     expect(editor.cost(peak, PRICES)).toBeGreaterThan(0);
     expect(editor.cost(peak, PRICES)).toBeLessThan(editor.cost(raised, PRICES));
+  });
+});
+
+describe('the point brush', () => {
+  /** Where the samples of `land` differ from `before`'s heights, water levels and cover (sample and cover cell indices). */
+  const changes = (land: Land, before: ReturnType<typeof bytes>) => ({
+    h: [...land.h.keys()].filter((k) => land.h[k] !== before.h[k] || land.wl[k] !== before.wl[k]),
+    wet: [...land.wl.keys()].filter((k) => (land.wl[k] !== NONE) !== (before.wl[k] !== NONE)),
+    cover: [...land.cover.keys()].filter((k) => land.cover[k] !== before.cover[k]),
+  });
+  /** The pointer a little way off a sample (and off a cover cell's middle), every way. */
+  const OFFSETS: [number, number][] = [
+    [0, 0],
+    [0.3, 0],
+    [-0.7, 0.4],
+    [0.99, -0.99],
+    [-0.49, 0.95],
+    [0.6, 0.6],
+  ];
+
+  test('4 m and under is a point brush; it aims at the nearest sample, a cover tool at the cell under the pointer', () => {
+    expect(isPoint({ radius: POINT / 2 })).toBe(true);
+    expect(isPoint({ radius: POINT / 2 + 0.01 })).toBe(false);
+    expect(aimOf({ tool: 'raise', radius: 0.5, strength: 1 }, 101, 98.9)).toEqual([102, 98]);
+    expect(aimOf({ tool: 'woods', radius: 2, strength: 1 }, 101, 99.9)).toEqual([102, 98]);
+    expect(aimOf({ tool: 'woods', radius: 2, strength: 1 }, 100.1, 100.1)).toEqual([102, 102]);
+    expect(aimOf({ tool: 'raise', radius: 3, strength: 1 }, 101, 98.9)).toEqual([101, 98.9]);
+  });
+
+  test('a shape tool at 1 to 4 m changes exactly the sample nearest the pointer, at full strength, wherever it is pointed', () => {
+    const rough = (x: number, z: number) => fbm(x / 6, z / 6, 3, 3) * 4;
+    for (const tool of ['raise', 'lower', 'smooth', 'flatten'] as LandTool[]) {
+      for (const size of [1, 2, 3, 4]) {
+        for (const [dx, dz] of OFFSETS) {
+          const land = landOf(128, rough);
+          // (Flatten pulls towards the height at the press: pressed beside, then dragged on.)
+          const press: [number, number] = tool === 'flatten' ? [60 + dx, 64 + dz] : [64 + dx, 64 + dz];
+          const editor = new LandEditor(land, FREE);
+          editor.begin({ tool, radius: size / 2, strength: 1 }, ...press);
+          const before = bytes(land);
+          const target = [64 + dx, 64 + dz] as const;
+          editor.move(...target, 0.05);
+          editor.move(...target, 0.05);
+          editor.end();
+          const changed = changes(land, before).h;
+          if (tool === 'flatten') {
+            // (Each sample on the way to it changed, each brought to the height pressed: 60, 62, 64.)
+            expect(changed).toEqual([at(land, 62, 64), at(land, 64, 64)]);
+            continue;
+          }
+          expect(changed).toEqual([at(land, 64, 64)]);
+        }
+      }
+    }
+    // Raised at full strength for a second: 8 m, all of it on that one sample.
+    const land = landOf(128);
+    stroke(new LandEditor(land, FREE), { tool: 'raise', radius: 0.5, strength: 1 }, hold([64.6, 63.5], 1));
+    expect(land.h[at(land, 64, 64)]).toBeGreaterThan(700);
+    expect(land.h.filter((v) => v !== 0).length).toBe(1);
+  });
+
+  test('a 2 m lake is one sample of water (its bank round it); dry at 2 m takes one away', () => {
+    for (const [dx, dz] of OFFSETS) {
+      const land = landOf(128, () => 3);
+      const before = bytes(land);
+      stroke(new LandEditor(land, FREE), { tool: 'lake', radius: 1, strength: 0.5 }, [[64 + dx, 64 + dz]]);
+      const { h, wet } = changes(land, before);
+      expect(wet).toEqual([at(land, 64, 64)]);
+      expect(land.wl[at(land, 64, 64)]).toBe(290);
+      expect(land.h[at(land, 64, 64)]).toBeLessThan(290);
+      // (Its bank: the eight samples round it, raised to the level and a little over.)
+      expect(h.length).toBe(9);
+      for (const k of h) if (k !== at(land, 64, 64)) expect(land.h[k]).toBe(315);
+    }
+    const land = landOf(128, () => 3);
+    const editor = new LandEditor(land, FREE);
+    stroke(editor, { tool: 'lake', radius: 12, strength: 0.5 }, [[64, 64]]);
+    const before = bytes(land);
+    stroke(editor, { tool: 'dry', radius: 1, strength: 1 }, [[63.2, 64.9]]);
+    expect(changes(land, before).wet).toEqual([at(land, 64, 64)]);
+  });
+
+  test('cover at 4 m paints the one 4 m cell under the pointer; a little over 4 m never paints nothing', () => {
+    const cw = coverSpan(64);
+    for (const [dx, dz] of [...OFFSETS, [1.9, 1.9], [-1.9, -1.9]] as [number, number][]) {
+      const land = landOf(128);
+      const before = bytes(land);
+      // (The cell from 64 to 68 m, its middle at 66.)
+      stroke(new LandEditor(land, FREE), { tool: 'woods', radius: 2, strength: 1 }, [[66 + dx, 66 + dz]]);
+      expect(changes(land, before).cover).toEqual([16 * cw + 16]);
+      expect(land.cover[16 * cw + 16]).toBe(COVER.woods);
+    }
+    // 5 m across, pointed at a cell's corner (no cell's middle within reach of a half): the cell under the pointer still.
+    const land = landOf(128);
+    stroke(new LandEditor(land, FREE), { tool: 'meadow', radius: 2.5, strength: 1 }, [[64.1, 64.1]]);
+    expect(land.cover[16 * cw + 16]).toBe(COVER.meadow);
+  });
+
+  test('dragged, it stamps each sample it crosses once, side by side so the trail is unbroken; held still, it goes on', () => {
+    const land = landOf(128);
+    const editor = new LandEditor(land, FREE);
+    // A diagonal, a frame a long way at a time.
+    editor.begin({ tool: 'lake', radius: 1, strength: 0.5 }, 20.3, 20.4);
+    editor.move(60.2, 40.1, 1 / 60);
+    editor.move(100.9, 61, 1 / 60);
+    const s = editor.current!;
+    // (From sample (10, 10) to (50, 31): 40 across and 21 along, one stamp each, after the press.)
+    expect(s.stamps).toBe(1 + 40 + 21);
+    const points = s.path.map(([x, z]) => `${x},${z}`);
+    expect(new Set(points).size).toBe(points.length);
+    for (let k = 1; k < s.path.length; k++) expect(Math.abs(s.path[k][0] - s.path[k - 1][0]) + Math.abs(s.path[k][1] - s.path[k - 1][1])).toBe(LAND_CELL);
+    editor.end();
+    // (The water joins up side to side all the way.)
+    const wet = new Set([...land.wl.keys()].filter((k) => land.wl[k] !== NONE));
+    expect(wet.size).toBe(62);
+    const seen = new Set([at(land, 20, 20)]);
+    for (const k of seen) for (const n of [k - 1, k + 1, k - land.cols, k + land.cols]) if (wet.has(n) && !seen.has(n)) seen.add(n);
+    expect(seen.size).toBe(62);
+
+    // A cover point brush steps cell to cell.
+    const covered = landOf(128);
+    const e2 = new LandEditor(covered, FREE);
+    e2.begin({ tool: 'woods', radius: 2, strength: 1 }, 10, 10);
+    e2.move(50, 10, 1 / 60);
+    expect(e2.current!.stamps).toBe(1 + 10);
+    e2.end();
+    expect(covered.cover.filter((c) => c === COVER.woods).length).toBe(11);
+
+    // Held still, a raise keeps raising the one sample.
+    const held = landOf(128);
+    const e3 = new LandEditor(held, FREE);
+    e3.begin({ tool: 'raise', radius: 0.5, strength: 0 }, 64, 64);
+    for (let k = 0; k < 30; k++) e3.move(64.4, 63.8, 1 / 30);
+    e3.end();
+    expect(held.h[at(held, 64, 64)]).toBeGreaterThan(40);
+    expect(held.h.filter((v) => v !== 0).length).toBe(1);
+  });
+
+  test('undo gives back every byte of point strokes', () => {
+    const land = landOf(256, (x, z) => fbm(x / 40, z / 40, 9, 3) * 10);
+    for (let k = 0; k < land.h.length; k++) if (land.h[k] < 300) land.wl[k] = 300;
+    const editor = new LandEditor(land, FREE);
+    const states = [bytes(land)];
+    const strokes: [Brush, [number, number][]][] = [
+      [{ tool: 'raise', radius: 0.5, strength: 1 }, line([30.3, 40.7], [90.1, 70.2], 30)],
+      [{ tool: 'lower', radius: 2, strength: 0.4 }, line([50.5, 50.5], [52, 90], 10)],
+      [{ tool: 'smooth', radius: 1.5, strength: 1 }, line([30, 30], [120, 120], 20)],
+      [{ tool: 'lake', radius: 1, strength: 0.5 }, line([140.4, 140.6], [180.3, 150.9], 12)],
+      [{ tool: 'river', radius: 2, strength: 0.5 }, line([200, 40], [120, 200], 50)],
+      [{ tool: 'dry', radius: 1, strength: 1 }, line([140.4, 140.6], [160, 146], 8)],
+      [{ tool: 'fields', radius: 2, strength: 1 }, line([10, 200], [90, 230], 20)],
+    ];
+    for (const [brush, points] of strokes) {
+      stroke(editor, brush, points);
+      states.push(bytes(land));
+    }
+    for (let n = strokes.length - 1; n >= 0; n--) {
+      editor.undo();
+      sameBytes(land, states[n]);
+    }
+    for (let n = 1; n <= strokes.length; n++) {
+      editor.redo();
+      sameBytes(land, states[n]);
+    }
   });
 });
 

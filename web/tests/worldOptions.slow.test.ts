@@ -1,6 +1,6 @@
 // A place's world follows its options (`world.ts` `specOf`, `macro.ts` `generateFromSpec`): the same
 // place, seed and options make the same world twice; each option changes it, the way it says (the
-// main town's size, how many villages, how high the land stands, how much of it is wooded) while
+// main town's size, how many villages, how much land, how high it stands, how much of it is wooded) while
 // the world keeps its name and its look; the options are kept with it, in the draft and the town
 // file; the land's relief comes with it; a river's bridges and an island's causeways span their
 // water, their decks dry to walk on; and the kinds from before places (small, medium, dense) are
@@ -67,12 +67,17 @@ describe('world options', async () => {
   test('each option changes the world, which keeps its name and its look', () => {
     const base = world();
     const changed: [Partial<WorldOptions>, (d: Draft) => void][] = [
-      // A village: more lots in a bigger main town, a bigger world.
+      // A village: more lots in a bigger main town (on as much land: a village alone fits a small land too).
       [{ town: 'village' }, (d) => {
         expect(d.slots.filter((s) => s.area === 0).length).toBeGreaterThan(base.slots.filter((s) => s.area === 0).length);
-        expect(d.width).toBeGreaterThan(base.width);
+        expect(d.width).toBe(base.width);
       }],
-      // Villages round it: more areas, a bigger world.
+      // A bigger land, chosen: the same town on more of it.
+      [{ size: 'large' }, (d) => {
+        expect(d.width).toBeGreaterThan(base.width);
+        expect(d.world!.options!.size).toBe('large');
+      }],
+      // Villages round it: more areas, a bigger world (they want a medium land).
       [{ villages: 'few' }, (d) => {
         expect(d.open!.areas.length).toBeGreaterThan(1);
         expect(d.width).toBeGreaterThan(base.width);
@@ -104,7 +109,7 @@ describe('world options', async () => {
 
   test('the options are kept with the world, and the relief with its land', () => {
     const d = world({ hills: 'hilly' });
-    expect(d.world!.options).toEqual({ ...defaultsOf('heath'), ...SMALL, hills: 'hilly' });
+    expect(d.world!.options).toEqual({ ...defaultsOf('heath'), ...SMALL, hills: 'hilly', size: 'small' });
     const relief = d.open!.relief!;
     expect(relief.cell).toBe(16);
     expect(relief.cols).toBe(Math.ceil(d.width / 16));

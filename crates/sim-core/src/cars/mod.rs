@@ -99,8 +99,10 @@ use crate::world::{
 };
 use crate::{DRIVE_TICKS_PER_SECOND, drive_secs, drive_ticks, secs};
 
-/// Most cars in a town (the snapshot's rows).
-pub const MAX_CARS: usize = 128;
+/// Most cars in a town (the snapshot's rows): the households' and the work taxis'. A full city
+/// world's households have a car in about one home in three (some 110 to 130), well inside it;
+/// past it, cars are dropped as the town loads and no taxi is made.
+pub const MAX_CARS: usize = 384;
 /// Doors: 0 front left (the driver's), 1 front right, 2 back left, 3 back right.
 pub const DOORS: usize = 4;
 /// How long the driver waits in the car for the others setting off at the same time.
@@ -123,6 +125,12 @@ const SWING: f32 = 1.2;
 /// While a car drives, the ground ahead of it it keeps clear of people (m): it waits for anyone
 /// there (`drive_on`); and how close to its sides and ends their bodies come (m, `Body`).
 pub(crate) const AHEAD: f32 = 2.2;
+
+/// The ground a car driving forwards keeps clear: `AHEAD` in front of it, none behind
+/// (`Car::next_ground`).
+fn forward_ground() -> [f32; 2] {
+    [AHEAD, 0.0]
+}
 pub(crate) const BESIDE: f32 = 0.1;
 /// How close someone steps to a car driving by (m, `walks_into`): further off than it
 /// keeps from them, so one it held up doesn't hold it up in turn as it moves on past them.
@@ -519,6 +527,11 @@ pub struct Car {
     /// (`go_on`); turning tight, it swings round further than it is now. Not saved.
     #[serde(skip)]
     next: Option<([f32; 2], f32)>,
+    /// The ground it keeps clear there in front of it and behind it (m: `Driving::ahead` and
+    /// `behind`, as `go_on` waits for those in it), for those it waits for by name, who don't come
+    /// back into it (`in_the_way`). Not saved.
+    #[serde(skip, default = "forward_ground")]
+    next_ground: [f32; 2],
     /// How far right of its lane it's pulled over (m) to pass one coming the other way on a lane
     /// too narrow for both in their lanes (`pull_over`). Not saved.
     #[serde(skip)]
@@ -755,6 +768,7 @@ impl Car {
             at_red: false,
             shown: None,
             next: None,
+            next_ground: forward_ground(),
             shift: 0.0,
             waits_for: None,
             moved: false,
@@ -905,6 +919,7 @@ impl Car {
             at_red: false,
             shown: self.shown,
             next: None,
+            next_ground: forward_ground(),
             shift: 0.0,
             waits_for: None,
             moved: false,

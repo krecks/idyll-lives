@@ -6,7 +6,9 @@
  */
 
 import type { LandCursor } from '../../render/types';
-import { MOUNTAIN_HEIGHT, TOOL_KIND, type Brush, type LandTool } from '../../game/landBrush';
+import { aimOf, isPoint, MOUNTAIN_HEIGHT, POINT, pointGrid, TOOL_KIND, type Brush, type LandTool } from '../../game/landBrush';
+
+export { POINT };
 
 export type LandGroup = 'shape' | 'water' | 'cover' | 'mountains';
 
@@ -87,15 +89,19 @@ export function toolInfo(tool: LandTool): LandToolInfo & { group: LandGroup } {
 
 export const groupOf = (tool: LandTool): LandGroup => toolInfo(tool).group;
 
-/** The brush's size (its width across, m) each group allows, and a group's size to begin with. */
+/**
+ * The brush's size (its width across, m) each group allows, and a group's size to begin with: down
+ * to one sample for the shape tools, a pond of one sample, one cover cell (`POINT` and under is a
+ * point brush).
+ */
 export const SIZES: Record<LandGroup, { min: number; max: number; start: number }> = {
-  shape: { min: 6, max: 120, start: 30 },
-  water: { min: 6, max: 120, start: 24 },
-  cover: { min: 8, max: 160, start: 40 },
+  shape: { min: 1, max: 120, start: 30 },
+  water: { min: 2, max: 120, start: 24 },
+  cover: { min: 4, max: 120, start: 40 },
   mountains: { min: 60, max: 400, start: 180 },
 };
-/** A river is a line 6 to 30 m wide. */
-const RIVER_SIZE = { min: 6, max: 30 };
+/** A river is a line 4 to 30 m wide. */
+const RIVER_SIZE = { min: 4, max: 30 };
 /** The mountains' height (m) the slider allows. */
 export const HEIGHTS = { min: 10, max: 120 };
 
@@ -103,6 +109,31 @@ export const HEIGHTS = { min: 10, max: 120 };
 export function sizeRange(tool: LandTool): { min: number; max: number } {
   return tool === 'river' ? RIVER_SIZE : SIZES[groupOf(tool)];
 }
+
+/**
+ * The size (whole m across) at slider position `t` (0..1) over `range`, on a log scale: each step
+ * along the slider makes the brush the same share bigger, so the small sizes get as much of it as
+ * the large ones. `sliderAt` is the other way: `sizeAt(sliderAt(size))` is `size` for every whole
+ * size in the range.
+ */
+export function sizeAt(t: number, range: { min: number; max: number }): number {
+  const size = Math.round(range.min * (range.max / range.min) ** Math.min(1, Math.max(0, t)));
+  return Math.min(range.max, Math.max(range.min, size));
+}
+
+export function sliderAt(size: number, range: { min: number; max: number }): number {
+  const s = Math.min(range.max, Math.max(range.min, size));
+  return range.max > range.min ? Math.log(s / range.min) / Math.log(range.max / range.min) : 0;
+}
+
+/** A size step from the keyboard (`dir` up or down): about a tenth bigger or smaller, and at least a metre, within `range`. */
+export function stepSize(size: number, dir: 1 | -1, range: { min: number; max: number }): number {
+  const next = dir > 0 ? Math.max(size + 1, Math.round(size * 1.1)) : Math.min(size - 1, Math.round(size / 1.1));
+  return Math.min(range.max, Math.max(range.min, next));
+}
+
+/** The size as the palette writes it: "one point" for a point brush, else whole metres ("120 m"). */
+export const sizeText = (size: number) => (size <= POINT ? 'one point' : `${Math.round(size)} m`);
 
 /** The brush in hand, as the palette sets it: the tool, and each group's size (m across), the strength (0..1), the mountains' height (m). */
 export interface BrushState {
@@ -151,9 +182,16 @@ export function toneOf(tool: LandTool, refused: boolean): LandCursor['tone'] {
   }
 }
 
-/** The cursor for a brush at town point (`x`, `z`). */
+/**
+ * The cursor for a brush with the pointer at town point (`x`, `z`). A point brush's sits on the
+ * grid point it would change (`aimOf`), a ring as wide as that sample (a cover tool's: that cell),
+ * with no inner ring: the whole of it works at full strength.
+ */
 export function cursorOf(brush: Brush, x: number, z: number, refused: boolean): LandCursor {
-  return { x, z, radius: brush.radius, inner: brush.radius * INNER, tone: toneOf(brush.tool, refused) };
+  const tone = toneOf(brush.tool, refused);
+  if (!isPoint(brush)) return { x, z, radius: brush.radius, inner: brush.radius * INNER, tone };
+  const [px, pz] = aimOf(brush, x, z);
+  return { x: px, z: pz, radius: pointGrid(brush.tool).unit / 2, inner: 0, tone };
 }
 
 /** Whole dollars ($1,234). */

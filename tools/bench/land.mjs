@@ -1,13 +1,16 @@
 #!/usr/bin/env bun
 /**
- * The land brushes as a player uses them, by script (`window.__land`, `?debug`): step 1's world made,
+ * The land brushes as a player uses them, by script (`window.__land`, `?debug`): step 1's land made,
  * "Shape the land" chosen, then a mound, a pond on its top, a river from the hill down to the sea (or
  * the nearest water), woods painted and half cleared, and a peak, each a stroke a point a frame; the
- * frames' times during each stroke, and pictures before and after. Then "Choose a household", a
- * household played: the step-1 pond is water to the simulation, someone is sent across it, and the
+ * frames' times during each stroke, and pictures before and after. Then "Lay out the town" (step 2's
+ * town laid on the land as shaped), "Choose a household", a household played (step 3, with the game's
+ * mode chosen there): the step-1 pond is water to the simulation (where the town left it), someone is sent across it, and the
  * camera looks at it; then Build mode's Land tab: a mound by the home (paid in Living, free in
  * Creative; undo pays back, redo pays again) and a pond; saved, continued from the menu, and the
- * land and the water are still there.
+ * land and the water are still there. In step 1 too, the ends of the size range: 120 m raise, smooth
+ * and lake strokes timed, a 1 m point stroke (one sample changed at each point it crosses), the
+ * palette at 1 m and at 120 m, and the 1 m cursor close up.
  *
  *   bun tools/bench/land.mjs [options]
  *     --renderers webgpu,webgl     the page's renderer (`?renderer=webgl`)
@@ -16,7 +19,7 @@
  *     --world country --options …  step 1's place and options (`?world=`, `?options=`)
  *     --no-play                    step 1 only
  *     --plain                      no shaping in step 1: the game's world has no land of its own until its first stroke
- *     --mode living|creative       the game's mode (step 1's choice)
+ *     --mode living|creative       the game's mode (step 3's choice)
  *     --headed                     in a window
  *     --port 5186 | --url <u>      a dev server on the port (started if none answers), or one already running
  *     --out <dir>                  default bench-results/land-<time>/
@@ -339,6 +342,89 @@ async function fundsRunOut(page, renderer, spot, shot) {
   return out;
 }
 
+/**
+ * The ends of the brush's size range in step 1: 120 m raise, smooth and lake strokes on free land
+ * (their frames timed: the stamp budget is 8 ms), a 1 m raise dragged across (each sample it
+ * crosses changed, nothing else), the palette at 1 m ("one point") and at 120 m set with the
+ * slider's Home and End keys, and the 1 m cursor close up, a 2 m ring on its sample.
+ */
+async function sizeEnds(page, renderer, mound, shot, stroke) {
+  const r = {};
+  const wide = await page.evaluate(([x, z]) => window.__land.findFree(70, [x + 40, z - 160]), mound);
+  if (wide) {
+    await lookAt(page, wide[0], wide[1], 0.8);
+    r.wide = {};
+    for (const [tool, strength] of [['raise', 0.5], ['smooth', 1], ['lake', 0.5]]) {
+      const res = await stroke(`${tool} 120 m`, tool, line([wide[0] - 30, wide[1] - 10], [wide[0] + 30, wide[1] + 10], 1.5), 60, strength);
+      r.wide[tool] = { frames: spread(res.frames.slice(1)), stamps: spread(res.stamps) };
+      // (Noted, not a fault: the time is mostly the land drawn again, and was over before the range changed.)
+      if (r.wide[tool].stamps.p95 > 8) console.log(`land: ${renderer} a 120 m ${tool} stamps and redraws at ${r.wide[tool].stamps.p95} ms (p95), over the 8 ms budget`);
+    }
+    await settled(page);
+    await shot('9e-120m-strokes');
+  } else console.log(`land: ${renderer} no free land 140 m across for the 120 m strokes`);
+
+  // A 1 m raise dragged 40 m on the slant: one sample at each grid point it crosses, side to side.
+  const spot = await page.evaluate(([x, z]) => window.__land.findFree(24, [x + 60, z + 60]), mound);
+  if (!spot) {
+    fault(`${renderer} no free land for the 1 m stroke`);
+    return r;
+  }
+  const [a, b] = [[spot[0] - 20.3, spot[1] - 10.6], [spot[0] + 19.7, spot[1] + 9.4]];
+  const grid = (p) => [Math.round(p[0] / 2), Math.round(p[1] / 2)];
+  const heights = (p) =>
+    page.evaluate(([[i0, j0]]) => {
+      const out = [];
+      for (let j = j0 - 14; j <= j0 + 14; j++) for (let i = i0 - 24; i <= i0 + 24; i++) out.push(window.__land.heightAt(i * 2, j * 2));
+      return out;
+    }, [p]);
+  const centre = grid(spot);
+  const before = await heights(centre);
+  const res = await stroke('raise 1 m', 'raise', line(a, b, 0.7), 0.5, 1);
+  const after = await heights(centre);
+  const changed = after.filter((h, k) => h !== before[k]).length;
+  const [ga, gb] = [grid(a), grid(b)];
+  const crossed = Math.abs(gb[0] - ga[0]) + Math.abs(gb[1] - ga[1]) + 1;
+  r.point = { frames: spread(res.frames.slice(1)), stamps: spread(res.stamps), changed, crossed };
+  console.log(`land: ${renderer} a 1 m raise across ${crossed} grid points changed ${changed} samples`);
+  if (changed !== crossed) fault(`${renderer} a 1 m raise across ${crossed} grid points changed ${changed} samples`);
+
+  // The palette at both ends of the shape slider, set from the keyboard.
+  await page.getByRole('radio', { name: 'Raise' }).click();
+  const slider = page.locator('.palette .slider input[type=range]').first();
+  const palette = page.locator('.palette').first();
+  const ends = {};
+  for (const [key, name] of [['End', '120m'], ['Home', '1m']]) {
+    await slider.focus();
+    await page.keyboard.press(key);
+    await page.waitForTimeout(200);
+    ends[name] = await page.evaluate(() => document.querySelector('.palette .slider .value')?.textContent?.trim());
+    const file = join(out, `${renderer}-palette-${name}.png`);
+    const box = await palette.boundingBox();
+    await page.screenshot({ path: file, clip: { x: box.x - 8, y: box.y - 8, width: box.width + 16, height: box.height + 16 } });
+    console.log(`land: ${file}`);
+  }
+  r.palette = ends;
+  if (ends['120m'] !== '120 m' || ends['1m'] !== 'one point') fault(`${renderer} the palette says ${JSON.stringify(ends)}`);
+
+  // The 1 m cursor close up, beside the stroke, on the pointer off its sample.
+  await lookAt(page, spot[0] + 0.7, spot[1] - 6.6, 30);
+  const v = await page.evaluate(() => {
+    const r = document.querySelector('.view').getBoundingClientRect();
+    return { x: r.left + r.width * 0.5, y: r.top + r.height * 0.5 };
+  });
+  await page.mouse.move(v.x - 3, v.y + 2);
+  await page.waitForTimeout(600);
+  await shot('9f-cursor-1m');
+  const file = join(out, `${renderer}-9g-cursor-1m-close.png`);
+  await page.screenshot({ path: file, clip: { x: v.x - 360, y: v.y - 220, width: 720, height: 440 } });
+  console.log(`land: ${file}`);
+  return r;
+}
+
+/** A step's way on (`label`, a pattern) enabled: its world made and built. */
+const enabled = (page, label) => page.waitForFunction((src) => [...document.querySelectorAll('button')].some((b) => new RegExp(src).test(b.textContent ?? '') && !b.disabled), label.source, { timeout: 120_000, polling: 100 });
+
 try {
   for (const renderer of renderers) {
     const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
@@ -352,8 +438,7 @@ try {
     await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 200 });
     await page.waitForTimeout(1500);
     await page.getByText('New game', { exact: true }).click();
-    await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => /Choose a household/.test(b.textContent ?? '') && !b.disabled), null, { timeout: 120_000, polling: 100 });
-    if (mode === 'creative') await page.getByRole('radio', { name: 'Creative' }).click();
+    await enabled(page, /Lay out the town/);
     await page.waitForTimeout(1500);
     const shot = async (name) => {
       const file = join(out, `${renderer}-${name}.png`);
@@ -535,16 +620,24 @@ try {
     await page.mouse.up({ button: 'right' });
     await page.waitForTimeout(1500);
     await shot('9d-turned');
+
+    // The ends of the size range (last in step 1: it leaves the camera close in).
+    r.sizes = await sizeEnds(page, renderer, mound, shot, stroke);
     const stats = await page.evaluate(() => window.__land.stats());
     r.stats = stats;
     console.log(`land: ${renderer} stats ${JSON.stringify(stats)} · panned ${r.panned} m`);
     }
 
     if (!has('no-play')) {
-      await page.getByRole('button', { name: /Choose a household/ }).click();
-      await page.waitForSelector('.households .btn.play', { timeout: 120_000 });
+      await page.getByRole('button', { name: /Lay out the town/ }).click();
+      await enabled(page, /Choose a household/);
       await page.waitForTimeout(1500);
       await shot('10-step2');
+      await page.getByRole('button', { name: /Choose a household/ }).click();
+      await page.waitForSelector('.households .btn.play', { timeout: 120_000 });
+      if (mode === 'creative') await page.getByRole('radio', { name: 'Creative' }).click();
+      await page.waitForTimeout(1500);
+      await shot('10-step3');
       await page.locator('.households .btn.play').first().click();
       await inGame(page);
       await page.waitForTimeout(4000);

@@ -2,7 +2,8 @@
 // reach, two dead ends facing each other become one lane, and every generated world (each kind,
 // a few seeds) is one road network as the sim joins its roads (an end within half the
 // wider road's width and a metre of the other's middle; sim-core `travel.rs` `Graph::build`),
-// with no more courts than its areas may keep, none reaching more than `COURT` m.
+// with no more courts than its areas may keep, none reaching more than `COURT` m once its land is
+// settled under it as a new game's is (`landFollow.ts` `settleLand` cuts a longer one back).
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { RoadPlan } from '../src/core/protocol';
@@ -86,6 +87,8 @@ describe('generated worlds are one network', async () => {
   const { objectInfos } = await import('../src/game/housegen');
   const { BIG_COURTS, COURTS, generateWorld, useTownContent } = await import('../src/game/town');
   const { WORLD_KINDS } = await import('../src/game/world');
+  const { settleLand } = await import('../src/game/landFollow');
+  const { previewWorld } = await import('../src/game/townPreview');
   type Templates = import('../src/game/town').Templates;
   const content = await Content.load('http://localhost/content/base.json');
   useTownContent(content);
@@ -97,7 +100,7 @@ describe('generated worlds are one network', async () => {
     () => {
       for (const kind of WORLD_KINDS) {
         for (const seed of [7, 3141, 271828]) {
-          const town = generateWorld(content, t, kind, seed);
+          const town = settleLand(generateWorld(content, t, kind, seed), (d) => previewWorld(content, t, d, null)).draft;
           const tag = `${kind} ${seed}`;
           const { net, joins } = networks(town.roads);
           expect(new Set(net).size, `${tag}: networks`).toBe(1);

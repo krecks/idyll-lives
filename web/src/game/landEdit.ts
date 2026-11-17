@@ -12,7 +12,7 @@
 import type { NeighbourhoodDraft, Rect } from './town';
 import type { Rle, RoadPlan, WorldStructure, WorldZone } from '../core/protocol';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, SEA_CM, type Land, type LandPatch, type LandRect } from './land';
-import { coverCells, coverSamples, mountainGhost, mountainOf, placeMountain, stamp, strokeOf, TOOL_KIND, unionRect, type Brush, type Free, type LandTool, type MountainGhost, type StrokeState, type Wettable } from './landBrush';
+import { aimOf, coverCells, coverSamples, isPoint, mountainGhost, mountainOf, placeMountain, pointGrid, stamp, strokeOf, TOOL_KIND, unionRect, type Brush, type Free, type LandTool, type MountainGhost, type StrokeState, type Wettable } from './landBrush';
 import { outlines, rle, unrle } from './landMasks';
 import { deckTiles } from './macro';
 import { smoothstep } from './noise';
@@ -371,7 +371,7 @@ export class LandEditor {
     if (this.active) this.end();
     this.active = strokeOf({ ...brush }, this.land, { h: this.shadow.h, wl: this.shadow.wl });
     this.hint = null;
-    this.last = [x, z];
+    this.last = aimOf(brush, x, z);
     this.pending = 0;
     return this.stampAt(x, z, FIRST_DT);
   }
@@ -379,12 +379,14 @@ export class LandEditor {
   /**
    * The stroke dragged on to (`x`, `z`), `dt` seconds later; returns the samples it changed. It
    * stamps every quarter of the brush's radius along the way (the time shared between them), and
-   * held still, again every `HOLD_EVERY` s.
+   * held still, again every `HOLD_EVERY` s. A point brush stamps once on each grid point it
+   * crosses (`pointsTo`).
    */
   move(x: number, z: number, dt: number): LandRect | null {
     const stroke = this.active;
     if (!stroke) return null;
     this.pending += Math.max(0, dt);
+    if (isPoint(stroke.brush)) return this.pointsTo(stroke, x, z);
     const spacing = Math.max(SPACING_MIN, stroke.brush.radius / 4);
     const [px, pz] = this.last;
     const d = Math.hypot(x - px, z - pz);
@@ -656,6 +658,37 @@ export class LandEditor {
       return { rect, cover: { rect: cells, data: cut(this.shadow.cover, coverSpan(cols), cells) } };
     }
     return { rect, h: cut(this.shadow.h, cols, rect), wl: cut(this.shadow.wl, cols, rect) };
+  }
+
+  /**
+   * A point brush dragged on to (`x`, `z`): a stamp on each grid point from the last one to the one
+   * nearest (`x`, `z`), stepping a point across or along at a time, so the trail it leaves is
+   * unbroken side to side (water runs along it) and no point is stamped twice in a frame; the time
+   * is shared between them. On the same point, held still, as a larger brush.
+   */
+  private pointsTo(stroke: StrokeState, x: number, z: number): LandRect | null {
+    const { unit, offset } = pointGrid(stroke.brush.tool);
+    const index = (v: number) => Math.round((v - offset) / unit);
+    const [ia, ja] = [index(this.last[0]), index(this.last[1])];
+    const [ib, jb] = [index(x), index(z)];
+    const [n, m] = [Math.abs(ib - ia), Math.abs(jb - ja)];
+    if (!n && !m) {
+      if (this.pending < HOLD_EVERY || (TOOL_KIND[stroke.brush.tool] !== 'earth' && stroke.brush.tool !== 'level')) return null;
+      const rect = this.stampAt(this.last[0], this.last[1], this.pending);
+      this.pending = 0;
+      return rect;
+    }
+    const each = this.pending / (n + m);
+    let out: LandRect | null = null;
+    // (Each step across or along, whichever the straight line from the last point meets first.)
+    for (let a = 0, b = 0; a < n || b < m; ) {
+      if ((a + 0.5) / n < (b + 0.5) / m) a++;
+      else b++;
+      this.last = [offset + (ia + Math.sign(ib - ia) * a) * unit, offset + (ja + Math.sign(jb - ja) * b) * unit];
+      out = unionRect(out, this.stampAt(this.last[0], this.last[1], each));
+    }
+    this.pending = 0;
+    return out;
   }
 
   private stampAt(x: number, z: number, dt: number): LandRect | null {

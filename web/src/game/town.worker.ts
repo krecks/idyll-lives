@@ -1,6 +1,6 @@
 /**
- * Makes worlds and town files off the main thread (`townJobs.ts`): loads the game's content and
- * house templates itself once, then runs the jobs it is sent in turn.
+ * Makes lands, towns, worlds and town files off the main thread (`townJobs.ts` `TownJob`): loads
+ * the game's content and house templates itself once, then runs the jobs it is sent in turn.
  */
 
 import { Content } from '../content/content';

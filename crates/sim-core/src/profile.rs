@@ -22,6 +22,17 @@ mod enabled {
     pub fn phase<R>(name: &'static str, f: impl FnOnce() -> R) -> R {
         let start = Instant::now();
         let out = f();
+        end(name, start);
+        out
+    }
+
+    /// The start of a phase not run as a closure (`end`).
+    pub fn start() -> Instant {
+        Instant::now()
+    }
+
+    /// Adds the time since `start` to the phase `name`.
+    pub fn end(name: &'static str, start: Instant) {
         let dt = start.elapsed();
         PHASES.with(|p| {
             let mut p = p.borrow_mut();
@@ -33,7 +44,6 @@ mod enabled {
                 None => p.push((name, dt, 1)),
             }
         });
-        out
     }
 
     /// Forgets every phase so far (start a fresh measurement).
@@ -83,6 +93,19 @@ mod disabled {
         f()
     }
 
+    /// Nothing: the `profile` feature is off.
+    pub struct Start;
+
+    /// No-op: the `profile` feature is off.
+    #[inline(always)]
+    pub fn start() -> Start {
+        Start
+    }
+
+    /// No-op: the `profile` feature is off.
+    #[inline(always)]
+    pub fn end(_name: &'static str, _start: Start) {}
+
     /// No-op: the `profile` feature is off.
     #[inline(always)]
     pub fn reset() {}
@@ -94,6 +117,6 @@ mod disabled {
 }
 
 #[cfg(not(feature = "profile"))]
-pub use disabled::{phase, report, reset};
+pub use disabled::{end, phase, report, reset, start};
 #[cfg(feature = "profile")]
-pub use enabled::{phase, report, reset};
+pub use enabled::{end, phase, report, reset, start};

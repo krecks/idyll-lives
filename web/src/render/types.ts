@@ -349,8 +349,22 @@ export interface LotHighlight {
   selected: number | null;
   /** Lots drawn as available (e.g. for sale). */
   marked: readonly number[];
+  /** Of those, the ones the household can't afford, drawn in a second tint (none: every marked lot alike). */
+  dear?: readonly number[];
   /** Faint outlines around every lot. */
   outlines: boolean;
+}
+
+/**
+ * Step 2's edits shown over the town before the town is built again with them: streets being
+ * drawn or just drawn (`roads`: their middle lines and widths; `bad` where they may not go, a
+ * `bridge` stretch over water), lots (`new` placed, `bad` where one may not go, `gone` to be
+ * removed, the building on it dimmed) and villages' boxes, all in world metres.
+ */
+export interface TownGhosts {
+  roads: { points: [number, number][]; width: number; tone: 'new' | 'bad' | 'bridge' }[];
+  lots: { x: number; z: number; w: number; d: number; tone: 'new' | 'bad' | 'gone' }[];
+  boxes: { x: number; z: number; w: number; d: number; tone: 'new' | 'bad' }[];
 }
 
 export interface RoomOverlayTile {
@@ -631,10 +645,19 @@ export interface Renderer {
   setTownShot(shot: TownShot, cut?: boolean): void;
   /** Overview camera: user orbit (radians) and zoom factor on top of the shot. */
   nudgeTown(dAlpha: number, zoom: number): void;
-  /** Overview camera: the player's pan, the target moved (`dx`, `dz`) m over the ground on top of the shot. */
+  /** Overview camera: the player's pan, the target moved (`dx`, `dz`) m over the ground on top of the shot; it stays over the land. */
   panTown(dx: number, dz: number): void;
+  /**
+   * Overview camera: the player's pan by a drag from canvas CSS pixel (`x0`, `y0`) to (`x1`, `y1`): the land under
+   * the pointer follows it (over the sky, the level of the land in view does). Any button, any step, no tool needed.
+   */
+  dragTown(x0: number, y0: number, x1: number, y1: number): void;
+  /** Overview camera: the player's orbit, zoom and pan let go, back to the shot as framed (`seconds`, default 1.2; 0 cuts). */
+  reframeTown(seconds?: number): void;
   /** Which lots glow; they ease to it, or (`snap`) are so from the next frame (a picture taken). */
   setLotHighlight(highlight: LotHighlight, snap?: boolean): void;
+  /** Step 2's edits drawn over the town (`TownGhosts`) until the town is built again; null: none. */
+  setTownGhosts(ghosts: TownGhosts | null): void;
   /** Runs each overview frame after the camera moved, before drawing (to pin labels); null removes it. */
   onTownFrame(fn: (() => void) | null): void;
   /**

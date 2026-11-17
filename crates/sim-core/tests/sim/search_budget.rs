@@ -30,6 +30,11 @@ fn over_budget_they_wait_a_tick_and_the_player_goes_first() {
         .unwrap();
     }
     w.tick_once();
+    // (No shift to set off for meanwhile: off to work a little early, `life::early`, one walked
+    // off there instead.)
+    for s in &mut w.sims {
+        s.job = None;
+    }
     // Everyone off to the far end of the other hamlet at once (a long walk by road each).
     let mut sent = Vec::new();
     for i in 0..w.sims.len() {

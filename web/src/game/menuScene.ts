@@ -6,7 +6,8 @@
  */
 
 import { groundDepth, type WorldStructure } from '../core/protocol';
-import type { LandCursor, LotHighlight, Renderer, TownBuildStep, TownShot } from '../render/types';
+import type { LandCursor, LotHighlight, Renderer, TownBuildStep, TownGhosts, TownShot } from '../render/types';
+import { areaFocus } from '../render/shared/overviewCamera';
 import type { Land, LandRect } from './land';
 import { settings } from '../settings/settings.svelte';
 import { services } from '../ui/services';
@@ -16,6 +17,7 @@ import { keepStill, type MenuStill } from './menuStill';
 import { previewWorld } from './townPreview';
 import { perfPhase, perfTime, perfTimeAsync } from '../debug/perf';
 import { layoutTags, type Box, type TagSpot } from './tagLayout';
+import { roadIndex } from './roads';
 
 /** Golden hour on the title screen: low warm sun, long shadows, no lamps yet. */
 export const MENU_MINUTE = 18 * 60 + 20;
@@ -40,7 +42,14 @@ export type Shot =
   /** The whole neighbourhood from above, framed into `frame`. */
   | { kind: 'overview'; frame: Frame }
   /** One lot as the game will first show it, framed into `frame`. */
-  | { kind: 'lot'; plot: number; frame: Frame };
+  | { kind: 'lot'; plot: number; frame: Frame }
+  /** The whole land from above, framed into `frame` (the new game's land, town and home steps), with or without a town on it. */
+  | { kind: 'world'; frame: Frame }
+  /**
+   * One area (`OpenWorldDraft.areas` index: 0 the main town, then the villages) from above, framed into `frame`: its
+   * lots, or its box while it has none. An area the world doesn't have frames the whole land.
+   */
+  | { kind: 'area'; area: number; frame: Frame };
 
 const NO_HIGHLIGHT: LotHighlight = { hover: null, selected: null, marked: [], outlines: false };
 
@@ -180,12 +189,16 @@ class MenuScene {
     const renderer = this.live;
     if (!world || !renderer || !this.wanted) return;
     const { shot, duration, cut } = this.wanted;
-    this.bounds = shot.kind === 'overview' || shot.kind === 'lot' ? shot.frame : null;
+    this.bounds = 'frame' in shot ? shot.frame : null;
     const townShot = this.townShot(shot, world, duration);
     // What the camera frames is the town as far as the tags go (see `positionLabels`); before the key
     // check, since a new world of the same size and shot can leave the key unchanged.
-    this.framed = shot.kind === 'overview' || shot.kind === 'lot' ? townShot.focus : null;
-    const key = `${JSON.stringify(shot)}|${world.width}x${groundDepth(world)}|${window.innerWidth}x${window.innerHeight}`;
+    this.framed = 'frame' in shot ? townShot.focus : null;
+    // (An area's shot is framed again when its box changes, a village moved or a town laid on a bare land; not for
+    // a lot more or less in it, which would take the player's pan away at every edit.)
+    const box = shot.kind === 'area' ? world.meta?.areas?.[shot.area] : undefined;
+    const area = box ? `|${box.x},${box.z},${box.w},${box.d}` : '';
+    const key = `${JSON.stringify(shot)}|${world.width}x${groundDepth(world)}${area}|${window.innerWidth}x${window.innerHeight}`;
     if (key === this.shotKey) return;
     const first = this.shotKey === '' || !!cut;
     this.shotKey = key;
@@ -220,9 +233,23 @@ class MenuScene {
     this.live?.nudgeTown(dAlpha, zoom);
   }
 
-  /** The player's pan: the camera's target moved (`dx`, `dz`) m over the ground. */
+  /** The player's pan: the camera's target moved (`dx`, `dz`) m over the ground (kept over the land). */
   pan(dx: number, dz: number): void {
     this.live?.panTown(dx, dz);
+  }
+
+  /**
+   * The player's pan by a drag from screen point (`x0`, `y0`) to (`x1`, `y1`) (CSS pixels, a pointer's last and new
+   * place): the land under the pointer follows it, also from over the sky. For a middle-button or Space drag in any
+   * step, with or without a tool. The camera stays over the land.
+   */
+  drag(x0: number, y0: number, x1: number, y1: number): void {
+    this.live?.dragTown(x0, y0, x1, y1);
+  }
+
+  /** The player's orbit, zoom and pan let go: the camera glides back to the shot (`seconds`; 0 cuts). */
+  reframe(seconds = 1.2): void {
+    this.live?.reframeTown(seconds);
   }
 
   /** The preview of the town shown (its built land: `landEdit.ts` `builtOf`), once it is shown. */
@@ -258,6 +285,35 @@ class MenuScene {
   /** Shows the land brush's cursor (null hides it). */
   brush(cursor: LandCursor | null): void {
     if (this.live?.townShown || !cursor) this.live?.setLandBrush(cursor);
+  }
+
+  /**
+   * Step 2's edits drawn over the town (`TownGhosts`: streets being drawn, lots placed or to be removed, villages'
+   * boxes) until the town is built again with them; null: none. Cheap: every pointer move. They stay drawn while the
+   * town is built again (`show`) and over the new one: the editor takes them away once it shows what they were.
+   */
+  ghosts(g: TownGhosts | null): void {
+    this.live?.setTownGhosts(g);
+  }
+
+  /**
+   * The road under a screen point (CSS pixels), if any: its index in the town shown (`NeighbourhoodDraft.roads`, the
+   * preview's `meta.roads`) and how far along it (m) the point is. On a road's surface out to its sidewalks, or within
+   * `ROAD_PICK` m of a narrow one (a trail); of those, the one whose middle is nearest. As precise as `landAt`.
+   */
+  roadAt(x: number, y: number): { road: number; s: number } | null {
+    const at = this.landAt(x, y);
+    const roads = this.world?.meta?.roads;
+    if (!at || !roads?.length) return null;
+    const index = roadIndex(roads);
+    let reach = ROAD_PICK;
+    for (const r of roads) reach = Math.max(reach, r.width / 2);
+    let best: { road: number; s: number; dist: number } | null = null;
+    for (const [road, m] of index.around(at.x, at.z, reach)) {
+      if (m.dist > Math.max(roads[road].width / 2, ROAD_PICK) || (best && best.dist <= m.dist)) continue;
+      best = { road, s: m.s, dist: m.dist };
+    }
+    return best && { road: best.road, s: best.s };
   }
 
   /** Projects a town point onto the screen (CSS pixels); false when it is behind the camera. */
@@ -347,6 +403,15 @@ class MenuScene {
         return { focus: plots, frame: { left: W * 0.36, top: H * 0.12, right: W * 0.99, bottom: H * 0.96 }, beta: 1.32, alpha: 0.55, zoom: 1.55, sway: 0.32, duration, minute: MENU_MINUTE };
       case 'create':
         return { focus: plots, frame: { left: W * 0.12, top: H * 0.1, right: W * 0.88, bottom: H * 0.98 }, beta: 1.3, alpha: 0.9, zoom: 1.8, sway: 0.25, duration, minute: CREATE_MINUTE };
+      case 'world':
+        // The whole land, from higher up than an area's shot (a map of it, the brushes' and the homes' ground), looking
+        // north: square to the picture, the land fills the stage and the landscape's ring is seen at its sides only.
+        // An area's shot looks the same way, so from one to the other the camera only comes down.
+        return { focus: { x: 0, z: 0, w: world.width, d: groundDepth(world) }, frame: shot.frame, beta: WORLD_BETA, alpha: MAP_ALPHA, zoom: 1, drift: 0, duration, minute: OVERVIEW_MINUTE };
+      case 'area': {
+        const focus = areaFocus(world, shot.area);
+        return { focus, frame: shot.frame, beta: AREA_BETA, alpha: MAP_ALPHA, zoom: 1, drift: 0, duration, minute: OVERVIEW_MINUTE };
+      }
       case 'overview':
         // Among mountains, lower: the peaks round the valley in the picture too.
         return world.meta?.world?.landscape.mountains
@@ -442,6 +507,14 @@ class MenuScene {
   };
 }
 
+/** The whole land's and an area's way round (as the camera's alpha): looking north, as a map. */
+const MAP_ALPHA = -Math.PI / 2;
+/** The tilt of the whole land's shot (from straight down): steep, so the far side is not lost in the distance. */
+const WORLD_BETA = 0.62;
+/** The tilt of an area's shot: the overview's, a little steeper (a village's houses stand clear of each other). */
+const AREA_BETA = 0.74;
+/** A road narrower than twice this (a trail) is picked within this (m) of its middle (`roadAt`). */
+const ROAD_PICK = 1.5;
 /** Height of a tag's stem below its body (see TownStage). */
 const STEM = 10;
 /** How far (m) outside the town a shot frames a lot may be and still have its tag (a lot or two around it). */
