@@ -372,16 +372,9 @@ fn hz(midi: i64) -> f64 {
     440.0 * exp2((midi - 69) as f64 / 12.0)
 }
 
-/// `2 ** y` as the TypeScript's sounds were made (`tools/audio/dump.ts` under Bun: JavaScriptCore's `Math.pow`,
-/// which is correctly rounded here where `libm`'s `pow` is a last bit off for a third of the notes, and takes
-/// `y` = ±0.5 as `sqrt`, `1 / sqrt`). Worked in double-double precision: 2^k times exp(r ln 2) by its series.
+/// `2 ** y`, correctly rounded (`libm`'s `pow` is a last bit off for a third of the notes, where the pitches the
+/// TypeScript played were right): worked in double-double precision, 2^k times exp(r ln 2) by its series.
 fn exp2(y: f64) -> f64 {
-    if y == 0.5 {
-        return sqrt(2.0);
-    }
-    if y == -0.5 {
-        return 1.0 / sqrt(2.0);
-    }
     // ln 2, as a double and what it leaves over.
     const LN2: (f64, f64) = (core::f64::consts::LN_2, 2.3190468138462996e-17);
     let fast = |a: f64, b: f64| {
@@ -711,7 +704,6 @@ mod tests {
         // `2 ** ((midi - 69) / 12)` as Bun gave it, where libm's pow is a last bit off (79, 80) and at -0.5 (63).
         assert_eq!(exp2(10.0 / 12.0), 1.7817974362806785);
         assert_eq!(hz(79), 783.9908719634985);
-        assert_eq!(exp2(-0.5), 0.7071067811865475);
         assert_eq!(exp2(11.0 / 12.0), 1.8877486253633868);
         assert_eq!(exp2(-2.0), 0.25);
     }

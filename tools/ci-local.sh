@@ -20,7 +20,7 @@
 #                                have them, as does this script run with no step.
 #
 # Steps: pins fmt clippy sim generated clips web tools chunks sizes uses models, and types (the web's types and
-# lint over fresh wasm builds of the sim and the voice: not in CI's job, which builds no wasm, so run
+# lint over fresh wasm builds of the sim, the sounds and the voice: not in CI's job, which builds no wasm, so run
 # only here).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -73,10 +73,11 @@ step() {
     clips) (cd web && "${bun_ci[@]}" run check:clips) ;;
     # The renderer's engine-neutral tests.
     # (The town-building files, `*.slow.test.ts`, only with SLOW_TESTS.)
-    web) (cd web && "${bun_ci[@]}" install --frozen-lockfile && "${bun_ci[@]}" run test && if [[ -n "${SLOW_TESTS:-}" ]]; then "${bun_ci[@]}" run test:slow; fi) ;;
+    # (The tests that make sounds load the sounds' wasm: `bun run sound` builds it.)
+    web) (cd web && "${bun_ci[@]}" install --frozen-lockfile && "${bun_ci[@]}" run sound && "${bun_ci[@]}" run test && if [[ -n "${SLOW_TESTS:-}" ]]; then "${bun_ci[@]}" run test:slow; fi) ;;
     # The character build, the object gate and the content and texture tools, in the build the
     # aliases above and below run (Cargo.toml's `tools` profile).
-    tools) cargo test -p ll-tools --profile tools --locked ;;
+    tools) cargo test -p ll-tools -p sound --profile tools --locked ;;
     # The PlayCanvas shader chunks' anchors and private names the renderer relies on (tools/render/chunks.json),
     # in the release build the game imports: its package, then the tools' check.
     chunks) (cd web && "${bun_ci[@]}" install --frozen-lockfile) && cargo check-chunks ;;
@@ -84,7 +85,7 @@ step() {
     sizes) cargo review sizes ;;
     uses) cargo review uses --check ;;
     models) cargo check-glb ;;
-    types) (cd web && bun run wasm && bun run voice:wasm && "${bun_ci[@]}" run check && "${bun_ci[@]}" run lint) ;;
+    types) (cd web && bun run wasm && bun run sound && bun run voice:wasm && "${bun_ci[@]}" run check && "${bun_ci[@]}" run lint) ;;
     *)
       echo "unknown step: $1 (steps: ${all[*]})" >&2
       return 2
