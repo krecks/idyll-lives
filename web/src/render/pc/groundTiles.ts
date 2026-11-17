@@ -11,20 +11,23 @@ import { backdropGround } from '../shared/townBuildings';
 import { bridgeDeck } from '../shared/roads';
 import { BRIDGE } from '../shared/street';
 
-/** A ground tile as `terrainTiles` builds it: its draw, its meshes by level, where its middle is and the level drawn. */
+/**
+ * A ground tile as `terrainTiles` builds it: its draw, its meshes by level (the finest only while it is near enough to
+ * draw it: null otherwise), where its middle is and the level drawn.
+ */
 export interface GroundTile {
   mi: pc.MeshInstance;
-  meshes: pc.Mesh[];
+  meshes: (pc.Mesh | null)[];
   x: number;
   z: number;
   lod: number;
   /**
-   * Its finest grid's colours as shaded (RGBA bytes, sRGB, its ring too): the meshes keep none on the CPU, and a
-   * height field's brushes draw its levels again with them (`Landscape.reground`) until it's shaded again.
+   * Its finest grid's colours as shaded (RGBA bytes, sRGB, its ring too) and its heights (m): the levels are made from
+   * them (`Landscape.tileLevel`), and a height field's brushes draw them again with the colours (`Landscape.reground`)
+   * until it's shaded again.
    */
   kept?: Uint8Array;
-  /** Its meshes keep their vertices on the CPU and are written into when it's drawn again (a brush has reached it). */
-  live?: boolean;
+  heights?: Float32Array;
   /** How the roads level the land at each point of its grid (`Landscape.roadLevels`), once a brush has reached it. */
   levels?: Float32Array;
 }
@@ -34,7 +37,7 @@ export interface GroundTile {
  * entity): left to themselves, about 40 MB of a big world's vertex buffers with every new game or load.
  */
 export function disposeTiles(tiles: readonly GroundTile[]): void {
-  for (const t of tiles) for (const m of t.meshes) if (m !== t.mi.mesh) m.destroy();
+  for (const t of tiles) for (const m of t.meshes) if (m && m !== t.mi.mesh) m.destroy();
 }
 
 // ---- the town view's colour map (a ground colour map at altitude) ----

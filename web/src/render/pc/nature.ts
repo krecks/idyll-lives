@@ -392,11 +392,12 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   }
 
   /**
-   * A big world's ground: the landscape's square in `TILE` m tiles, each with three meshes (64, 32
+   * A big world's ground: the landscape's square in `TILE` m tiles, each with three levels (64, 32
    * and 16 quads across) and a skirt hanging from its edges (no cracks where neighbours differ), one
-   * draw each, the mesh it draws chosen by distance from the camera's target (`frameTiles`). Only
-   * the finest grid is shaded (heights and colours, a ring past the tile for its normals); the
-   * coarser take every second and fourth of its points.
+   * draw each, the level it draws chosen by distance from the camera's target (`frameTiles`). Only
+   * the finest grid is shaded (heights and colours, a ring past the tile for its normals; both kept,
+   * the colours as bytes); the coarser take every second and fourth of its points. The finest level
+   * is made only for the tiles near enough to draw it (`frameTiles`), and let go again far off.
    */
   private async terrainTiles(app: pc.AppBase, parent: pc.Entity, pace?: () => Promise<void>): Promise<pc.Entity[]> {
     const { count } = this.tileFrame();
@@ -414,15 +415,16 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       }
       const { positions, colors } = await shading.shift()!;
       const [i, j, tx, tz] = this.tileCorner(k);
-      const meshes = this.tileMeshes(app, positions, colors);
-      const mi = new pc.MeshInstance(meshes[1], material);
+      const t: GroundTile = { mi: null!, meshes: [null, null, null], x: tx + TILE / 2, z: tz + TILE / 2, lod: 1, kept: bytesOf(colors), heights: heightsOf(positions) };
+      t.meshes[1] = this.tileLevel(t, k, 1, false);
+      t.meshes[2] = this.tileLevel(t, k, 2, false);
+      const mi = (t.mi = new pc.MeshInstance(t.meshes[1]!, material));
       const entity = new pc.Entity(`terrain${i},${j}`, app);
       entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: true });
       entity.enabled = false;
       parent.addChild(entity);
       out.push(entity);
-      // (Its colours kept as bytes: the meshes keep none on the CPU, and a height field's brushes draw it again with them.)
-      this.tiles.push({ mi, meshes, x: tx + TILE / 2, z: tz + TILE / 2, lod: 1, kept: bytesOf(colors) });
+      this.tiles.push(t);
     }
     return out;
   }
@@ -456,28 +458,42 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return positions;
   }
 
-  /** A tile's three levels from its finest grid's shaded points (`tileMesh`). */
-  private tileMeshes(app: pc.AppBase, positions: Float32Array, colors: Float32Array): pc.Mesh[] {
+  /** Tile `k`'s finest grid as `writeTileLevel` reads it. */
+  private gridOf(k: number): TileGrid {
     const { S, c, n, x0, z0, size } = this.tileFrame();
-    return TILE_LODS.map((segs) => tileMesh(app, positions, colors, n, segs, S / segs, c, x0, z0, size));
+    const [, , tx, tz] = this.tileCorner(k);
+    return { S, c, n, tx, tz, x1: x0 + size, z1: z0 + size };
+  }
+
+  /** Tile `t`'s (`k`'s) level `q` made from its heights and colours as kept (`live`: to be written into). */
+  private tileLevel(t: GroundTile, k: number, q: number, live: boolean): pc.Mesh {
+    return tileLevelMesh(this.host!.app.graphicsDevice, this.gridOf(k), TILE_LODS[q], t.heights!, t.kept!, live);
   }
 
   /**
-   * A tile's levels drawn from its finest grid's shaded points again: written into its own meshes once it has been
-   * drawn so (`live`: they keep their vertices on the CPU, to be written into), else made anew (live from now on) and
-   * the old ones destroyed. A brush's stamps draw the same tiles again and again: no new buffers each time.
+   * Tile `t`'s (`k`'s) level `q` from its heights and colours as kept now: written into its mesh where it keeps its
+   * vertices, else made anew (live: a brush has reached the tile, it will be written into again) and the old one
+   * destroyed; where the tile draws it, drawn.
+   */
+  private refreshLevel(t: GroundTile, k: number, q: number): void {
+    const mesh = t.meshes[q];
+    if (mesh && rewriteTileLevel(mesh, this.gridOf(k), TILE_LODS[q], t.heights!, t.kept!)) return;
+    const made = this.tileLevel(t, k, q, true);
+    t.meshes[q] = made;
+    if (t.lod === q) t.mi.mesh = made;
+    if (mesh) mesh.destroy();
+  }
+
+  /**
+   * A tile's grid shaded again (`positions` with their heights, `colors`): its heights and colours kept, and its
+   * levels drawn again from them (the finest only if it has one).
    */
   private redrawTile(t: GroundTile, positions: Float32Array, colors: Float32Array): void {
     if (!this.host) return;
-    const { app } = this.host;
-    const { S, c, n, x0, z0, size } = this.tileFrame();
-    if (t.live) {
-      TILE_LODS.forEach((segs, q) => tileMesh(app, positions, colors, n, segs, S / segs, c, x0, z0, size, t.meshes[q]));
-      return;
-    }
-    const meshes = TILE_LODS.map((segs) => tileMesh(app, positions, colors, n, segs, S / segs, c, x0, z0, size, 'live'));
-    t.live = true;
-    this.swapTile(t, meshes);
+    const k = this.tiles.indexOf(t);
+    t.kept = bytesOf(colors);
+    t.heights = heightsOf(positions, t.heights);
+    for (let q = 0; q < TILE_LODS.length; q++) if (t.meshes[q]) this.refreshLevel(t, k, q);
   }
 
   /**
@@ -517,24 +533,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.landStamped(rect);
     const box = this.landBox(rect, LAND_CELL);
     const tiles = this.tilesIn(box);
-    const { n } = this.tileFrame();
-    const colors = new Float32Array(n * n * 4);
     for (const k of tiles) {
       const t = this.tiles[k];
       if (!t?.kept) continue;
-      const positions = this.tileGrid(k);
-      // (`heightAt`, the roads' levelling kept by point: the roads don't move as the land is shaped.)
-      if (this.surface) {
-        for (let v = 1; v < positions.length; v += 3) positions[v] = this.terrainAt(positions[v - 1], positions[v + 1]);
-      } else {
-        const levels = (t.levels ??= this.roadLevels(positions));
-        for (let v = 1, q = 0; v < positions.length; v += 3, q += 2) {
-          const g = this.ground(positions[v - 1], positions[v + 1]);
-          positions[v] = g + (levels[q + 1] - g) * levels[q];
-        }
-      }
-      for (let q = 0; q < colors.length; q++) colors[q] = t.kept[q] / 255;
-      this.redrawTile(t, positions, colors);
+      this.tileHeights(k, box);
+      for (let q = 0; q < TILE_LODS.length; q++) if (t.meshes[q]) this.refreshLevel(t, k, q);
     }
     this.pondsIn(tiles);
     const grass = this.grass?.grassField;
@@ -543,6 +546,39 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.grass?.landChanged(false);
     }
     return tiles.length;
+  }
+
+  /**
+   * Tile `k`'s heights at the points of its finest grid in `box` (m) worked out again from the land as it is (all of
+   * them the first time).
+   */
+  private tileHeights(k: number, box: readonly [number, number, number, number]): void {
+    const t = this.tiles[k];
+    const { S, c, n, tx, tz, x1, z1 } = this.gridOf(k);
+    let [c0, c1, r0, r1] = [-1, S + 1, -1, S + 1];
+    if (t.heights) {
+      // (A point past the landscape's square stands on its edge: in the box if the edge is.)
+      c0 = Math.max(-1, Math.ceil((box[0] - tx) / c));
+      c1 = box[2] >= x1 ? S + 1 : Math.min(S + 1, Math.floor((box[2] - tx) / c));
+      r0 = box[3] >= z1 ? -1 : Math.max(-1, Math.ceil(S - (box[3] - tz) / c));
+      r1 = Math.min(S + 1, Math.floor(S - (box[1] - tz) / c));
+    } else t.heights = new Float32Array(n * n);
+    if (c1 < c0 || r1 < r0) return;
+    const h = t.heights;
+    // (`heightAt`, the roads' levelling kept by point: the roads don't move as the land is shaped.)
+    const levels = this.surface ? null : (t.levels ??= this.roadLevels(this.tileGrid(k)));
+    for (let row = r0; row <= r1; row++) {
+      const z = Math.min(z1, tz + (S - row) * c);
+      for (let col = c0; col <= c1; col++) {
+        const x = Math.min(x1, tx + col * c);
+        const p = (row + 1) * n + col + 1;
+        if (!levels) h[p] = this.terrainAt(x, z);
+        else {
+          const g = this.ground(x, z);
+          h[p] = g + (levels[p * 2 + 1] - g) * levels[p * 2];
+        }
+      }
+    }
   }
 
   /**
@@ -558,14 +594,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       out[q + 1] = road.h - 0.02;
     }
     return out;
-  }
-
-  /** A tile's levels drawn from `meshes` now (its level kept), the old ones destroyed. */
-  private swapTile(t: GroundTile, meshes: pc.Mesh[]): void {
-    const old = t.meshes;
-    t.meshes = meshes;
-    t.mi.mesh = meshes[t.lod];
-    for (const m of old) m.destroy();
   }
 
   /** The water above the sea's level of the tiles `tiles` drawn again (`pond`), the owner told what came and went. */
@@ -685,7 +713,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   async redrawLand(pace?: () => Promise<void>): Promise<void> {
     const world = this.world;
     if (!world || !this.host || !this.tiles.length) return;
-    const { app } = this.host;
     const off = OffThreadLand.open(world);
     off?.setField(this.heightField);
     this.offThread = off;
@@ -704,9 +731,16 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
         const t = this.tiles[k];
         if (!t || !this.host) return;
         t.kept = bytesOf(colors);
+        t.heights = heightsOf(positions, t.heights);
         // (Made anew, kept off the CPU: most of them no brush will reach.)
-        t.live = false;
-        this.swapTile(t, this.tileMeshes(app, positions, colors));
+        for (let q = 0; q < TILE_LODS.length; q++) {
+          const old = t.meshes[q];
+          if (!old) continue;
+          const made = this.tileLevel(t, k, q, false);
+          t.meshes[q] = made;
+          if (t.lod === q) t.mi.mesh = made;
+          old.destroy();
+        }
       }
       this.pondsIn([...this.tiles.keys()]);
       this.sheetAsNeeded();
@@ -861,13 +895,19 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     }
     for (const f of this.flowerSquares) f.mi.visible = Math.hypot(f.x - x, f.z - z) < flowersFar;
     const lift = town * radius;
-    for (const t of this.tiles) {
+    this.tiles.forEach((t, k) => {
       const d = town > 0 ? Math.hypot(t.x - x, t.z - z, lift) : Math.hypot(t.x - x, t.z - z);
       const lod = d < near ? 0 : d < mid ? 1 : 2;
-      if (lod === t.lod) continue;
+      if (lod === t.lod) return;
       t.lod = lod;
-      t.mi.mesh = t.meshes[lod];
-    }
+      // (Its finest level made as it comes near, and let go once it is far off.)
+      if (!t.meshes[lod] && t.heights && t.kept) t.meshes[lod] = this.tileLevel(t, k, lod, false);
+      t.mi.mesh = t.meshes[lod] ?? t.mi.mesh;
+      if (lod === 2 && t.meshes[0]) {
+        t.meshes[0].destroy();
+        t.meshes[0] = null;
+      }
+    });
   }
 
   /** The ground: a regular grid over the landscape's square, lifted to the land and coloured. */
@@ -1080,6 +1120,13 @@ const LAND_GRASS_STRIP = 12;
 /** How far past the world's edge a height field's edge carries (`LandscapeLayout.ground`). */
 const LAND_EDGE_FADE_M = 60;
 
+/** A grid's heights (the y of its `positions`), into `into` if it is the size. */
+function heightsOf(positions: Float32Array, into?: Float32Array): Float32Array {
+  const out = into && into.length === positions.length / 3 ? into : new Float32Array(positions.length / 3);
+  for (let v = 0; v < out.length; v++) out[v] = positions[v * 3 + 1];
+  return out;
+}
+
 /** Colours 0..1 as bytes (a ground tile's kept colours: 18 KB a tile, not the 72 of floats). */
 function bytesOf(colors: Float32Array): Uint8Array {
   const out = new Uint8Array(colors.length);
@@ -1088,45 +1135,60 @@ function bytesOf(colors: Float32Array): Uint8Array {
 }
 
 /**
- * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`
- * and `colors`, `c` m apart): every `step`th of them, `segs` quads across, normals from the
- * finest heights round each point, and a skirt down from the edges. UVs as the one-mesh ground's
- * (over the landscape's square from `x0`, `z0`, `size` across).
+ * Where a ground tile's finest grid lies (`Landscape.tileFrame`, `tileCorner`): `S` quads across, `c` m apart, `n`
+ * points across with the ring of one past it, its corner (`tx`, `tz`), and the landscape's square's far edges (`x1`,
+ * `z1`), where its points stop (`tileGrid`). Point (col, row), each from -1, is `(row + 1) * n + col + 1`; row 0 at the
+ * tile's far (max z) edge.
  */
-function tileMesh(app: pc.AppBase, positions: Float32Array, colors: Float32Array, n: number, segs: number, step: number, c: number, x0: number, z0: number, size: number, into: pc.Mesh | 'live' | null = null): pc.Mesh {
-  const m = segs + 1;
-  // (Point (col, row) of the finest grid, from -1: `(row + 1) * n + col + 1`.)
-  // (The grid's points, then each edge's again for the skirt: written straight into arrays of their size.)
-  const count = m * m + 4 * m;
-  const pos = new Float32Array(count * 3);
-  const nor = new Float32Array(count * 3);
-  const uv = new Float32Array(count * 2);
-  const col = new Float32Array(count * 4);
-  const idx = count > 65535 ? new Uint32Array(segs * segs * 6 + 4 * segs * 12) : new Uint16Array(segs * segs * 6 + 4 * segs * 12);
-  let v = 0;
-  let k = 0;
-  for (let row = 0; row < m; row++) {
-    for (let cc = 0; cc < m; cc++, v++) {
-      const p = (row * step + 1) * n + cc * step + 1;
-      const [p3, v3, v2, v4, p4] = [p * 3, v * 3, v * 2, v * 4, p * 4];
-      pos[v3] = positions[p3];
-      pos[v3 + 1] = positions[p3 + 1];
-      pos[v3 + 2] = positions[p3 + 2];
-      uv[v2] = (pos[v3] - x0) / size;
-      uv[v2 + 1] = (pos[v3 + 2] - z0) / size;
-      col[v4] = colors[p4];
-      col[v4 + 1] = colors[p4 + 1];
-      col[v4 + 2] = colors[p4 + 2];
-      col[v4 + 3] = colors[p4 + 3];
-      // Normals from the finest heights round each point. (Rows run towards -z: the slope along z is the other way round.)
-      const dx = (positions[p3 + 4] - positions[p3 - 2]) / (2 * c);
-      const dz = (positions[p3 - n * 3 + 1] - positions[p3 + n * 3 + 1]) / (2 * c);
-      const l = Math.sqrt(dx * dx + 1 + dz * dz);
-      nor[v3] = -dx / l;
-      nor[v3 + 1] = 1 / l;
-      nor[v3 + 2] = -dz / l;
-    }
+interface TileGrid {
+  S: number;
+  c: number;
+  n: number;
+  tx: number;
+  tz: number;
+  x1: number;
+  z1: number;
+}
+
+/**
+ * A ground tile level's vertices, interleaved: position and normal (floats), colour (RGBA bytes, sRGB, as shaded) and
+ * four bytes of nothing for the texture coordinates, 32 bytes a vertex. The ground's material lays its textures from
+ * the position (`GAME_PLANAR_UV`), but its shader still declares the coordinates: without the stream WebGPU drew it
+ * otherwise.
+ */
+const tileFormats = new WeakMap<pc.GraphicsDevice, pc.VertexFormat>();
+function tileFormat(device: pc.GraphicsDevice): pc.VertexFormat {
+  let format = tileFormats.get(device);
+  if (!format) {
+    format = new pc.VertexFormat(device, [
+      { semantic: pc.SEMANTIC_POSITION, components: 3, type: pc.TYPE_FLOAT32 },
+      { semantic: pc.SEMANTIC_NORMAL, components: 3, type: pc.TYPE_FLOAT32 },
+      { semantic: pc.SEMANTIC_COLOR, components: 4, type: pc.TYPE_UINT8, normalize: true },
+      { semantic: pc.SEMANTIC_TEXCOORD0, components: 4, type: pc.TYPE_UINT8, normalize: true },
+    ]);
+    tileFormats.set(device, format);
   }
+  return format;
+}
+
+/** A level `segs` quads across: its grid's points and then each edge's again for the skirt. */
+const levelVertices = (segs: number) => (segs + 1) * (segs + 1) + 4 * (segs + 1);
+const levelIndices = (segs: number) => segs * segs * 6 + 4 * segs * 12;
+
+/**
+ * The indices of a level `segs` quads across (the same for every tile): one buffer per level and device, shared by
+ * every tile's mesh of it, so never destroyed with one (however it goes: a level let go, a tile's draw with its
+ * entity); kept for the device's life.
+ */
+const tileIndices = new WeakMap<pc.GraphicsDevice, Map<number, pc.IndexBuffer>>();
+function tileIndexBuffer(device: pc.GraphicsDevice, segs: number): pc.IndexBuffer {
+  let byLevel = tileIndices.get(device);
+  if (!byLevel) tileIndices.set(device, (byLevel = new Map()));
+  let ib = byLevel.get(segs);
+  if (ib) return ib;
+  const m = segs + 1;
+  const idx = new Uint16Array(levelIndices(segs));
+  let k = 0;
   for (let row = 0; row < segs; row++) {
     for (let cc = 0; cc < segs; cc++) {
       idx[k++] = cc + 1 + (row + 1) * m;
@@ -1137,70 +1199,118 @@ function tileMesh(app: pc.AppBase, positions: Float32Array, colors: Float32Array
       idx[k++] = cc + row * m;
     }
   }
-  // The skirt: each edge's points again, a cell and a metre lower, joined to the edge both ways round.
-  const drop = c * step + 1;
+  // The skirt: each edge's points again (from `m * m`, an edge after another), joined to the edge both ways round.
   const edges = [(q: number) => q, (q: number) => segs * m + q, (q: number) => q * m, (q: number) => q * m + segs];
-  for (const edge of edges) {
-    const low = v;
-    for (let q = 0; q < m; q++, v++) {
-      const e = edge(q);
-      pos[v * 3] = pos[e * 3];
-      pos[v * 3 + 1] = pos[e * 3 + 1] - drop;
-      pos[v * 3 + 2] = pos[e * 3 + 2];
-      uv[v * 2] = uv[e * 2];
-      uv[v * 2 + 1] = uv[e * 2 + 1];
-      col.copyWithin(v * 4, e * 4, e * 4 + 4);
-      nor.copyWithin(v * 3, e * 3, e * 3 + 3);
-    }
+  edges.forEach((edge, e) => {
+    const low = m * m + e * m;
     for (let q = 0; q + 1 < m; q++) {
       const [a, b, la, lb] = [edge(q), edge(q + 1), low + q, low + q + 1];
-      idx[k++] = a;
-      idx[k++] = b;
-      idx[k++] = lb;
-      idx[k++] = a;
-      idx[k++] = lb;
-      idx[k++] = la;
-      idx[k++] = a;
-      idx[k++] = lb;
-      idx[k++] = b;
-      idx[k++] = a;
-      idx[k++] = la;
-      idx[k++] = lb;
+      idx.set([a, b, lb, a, lb, la, a, lb, b, a, la, lb], k);
+      k += 12;
     }
-  }
-  // (A tile of a height field drawn again, `Landscape.redrawTile`: written into `into`'s buffers as they are, its
-  // indices kept; or made `live`, its vertices kept on the CPU to be written into.)
-  const again = into instanceof pc.Mesh;
-  if (again && writeVertices(into, { [pc.SEMANTIC_POSITION]: pos, [pc.SEMANTIC_NORMAL]: nor, [pc.SEMANTIC_TEXCOORD0]: uv, [pc.SEMANTIC_COLOR]: col }, count)) return into;
-  const mesh = again ? into : new pc.Mesh(app.graphicsDevice);
-  if (into === 'live') mesh.clear(true, false);
-  mesh.setPositions(pos);
-  mesh.setNormals(nor);
-  mesh.setUvs(0, uv);
-  mesh.setColors(col);
-  if (!again) mesh.setIndices(idx);
-  mesh.update(pc.PRIMITIVE_TRIANGLES);
-  return into ? mesh : gpuOnly(mesh);
+  });
+  ib = new pc.IndexBuffer(device, pc.INDEXFORMAT_UINT16, idx.length, pc.BUFFER_STATIC, idx.buffer);
+  ib.destroy = () => {};
+  byLevel.set(segs, ib);
+  return ib;
 }
 
 /**
- * Writes `streams` (by semantic, floats) straight into `mesh`'s vertex buffer as it is laid out (one block a stream,
- * as `Mesh.update` lays out its own), up to the GPU, and its box again: what `Mesh.update` does element by element,
- * a block at a time. False (nothing written) where the buffer isn't laid out so or keeps no copy to write into.
+ * Writes level `segs` of a tile (every `S / segs`th point of its finest grid `g`, its `heights` and its `colours`)
+ * into `data` (its vertex buffer's bytes, `tileFormat`), then its skirt, a cell and a metre down from its edges.
+ * Normals from the finest heights round each point.
  */
-function writeVertices(mesh: pc.Mesh, streams: Record<string, Float32Array>, count: number): boolean {
-  const vb = mesh.vertexBuffer;
-  if (!vb || vb.numVertices !== count || vb.format.interleaved || !vb.storage?.byteLength) return false;
-  const elements = vb.format.elements;
-  if (elements.length !== Object.keys(streams).length) return false;
-  for (const el of elements) if (!streams[el.name] || el.dataType !== pc.TYPE_FLOAT32 || el.numComponents * count !== streams[el.name].length) return false;
-  const locked = vb.lock();
-  const [data, base] = locked instanceof ArrayBuffer ? [locked, 0] : [locked.buffer, locked.byteOffset];
-  for (const el of elements) new Float32Array(data, base + el.offset, el.numComponents * count).set(streams[el.name]);
-  vb.unlock();
+function writeTileLevel(data: ArrayBuffer, g: TileGrid, segs: number, heights: Float32Array, colours: Uint8Array): void {
+  const { S, c, n, tx, tz, x1, z1 } = g;
+  const step = S / segs;
+  const m = segs + 1;
+  const f = new Float32Array(data);
+  const b = new Uint8Array(data);
+  const inv = 1 / (2 * c);
+  const write = (v: number, p: number, x: number, y: number, z: number) => {
+    const o = v * 8;
+    f[o] = x;
+    f[o + 1] = y;
+    f[o + 2] = z;
+    // (Rows run towards -z: the slope along z is the other way round.)
+    const dx = (heights[p + 1] - heights[p - 1]) * inv;
+    const dz = (heights[p - n] - heights[p + n]) * inv;
+    const l = 1 / Math.sqrt(dx * dx + 1 + dz * dz);
+    f[o + 3] = -dx * l;
+    f[o + 4] = l;
+    f[o + 5] = -dz * l;
+    const cb = v * 32 + 24;
+    const p4 = p * 4;
+    b[cb] = colours[p4];
+    b[cb + 1] = colours[p4 + 1];
+    b[cb + 2] = colours[p4 + 2];
+    b[cb + 3] = colours[p4 + 3];
+  };
+  for (let row = 0; row <= segs; row++) {
+    const fr = row * step;
+    const z = Math.min(z1, tz + (S - fr) * c);
+    for (let cc = 0, v = row * m; cc < m; cc++, v++) {
+      const fc = cc * step;
+      write(v, (fr + 1) * n + fc + 1, Math.min(x1, tx + fc * c), heights[(fr + 1) * n + fc + 1], z);
+    }
+  }
+  // The skirt: each edge's points again, lower.
+  const drop = c * step + 1;
+  const edges = [(q: number) => q, (q: number) => segs * m + q, (q: number) => q * m, (q: number) => q * m + segs];
+  edges.forEach((edge, e) => {
+    for (let q = 0, v = m * m + e * m; q < m; q++, v++) {
+      const o = edge(q) * 8;
+      f.copyWithin(v * 8, o, o + 6);
+      f[v * 8 + 1] -= drop;
+      b.copyWithin(v * 32 + 24, o * 4 + 24, o * 4 + 28);
+    }
+  });
+}
+
+/** A tile level's box: its square, from its lowest height less the skirt's drop to its highest. */
+function tileBox(g: TileGrid, segs: number, heights: Float32Array): pc.BoundingBox {
+  let [lo, hi] = [Infinity, -Infinity];
+  for (let k = 0; k < heights.length; k++) {
+    const h = heights[k];
+    if (h < lo) lo = h;
+    if (h > hi) hi = h;
+  }
+  lo -= g.c * (g.S / segs) + 1;
+  const [x0, x1] = [g.tx, Math.min(g.x1, g.tx + g.S * g.c)];
+  const [z0, z1] = [g.tz, Math.min(g.z1, g.tz + g.S * g.c)];
   const box = new pc.BoundingBox();
-  box.compute(streams[pc.SEMANTIC_POSITION], count);
-  mesh.aabb = box;
+  box.setMinMax(new pc.Vec3(x0, lo, z0), new pc.Vec3(x1, hi, z1));
+  return box;
+}
+
+/**
+ * Level `segs` of a ground tile as a mesh (`writeTileLevel`), its indices the level's shared ones. `live`: its vertex
+ * buffer keeps its bytes on the CPU, to be written into (`rewriteTileLevel`); else they go once uploaded (`gpuOnly`).
+ */
+function tileLevelMesh(device: pc.GraphicsDevice, g: TileGrid, segs: number, heights: Float32Array, colours: Uint8Array, live: boolean): pc.Mesh {
+  const count = levelVertices(segs);
+  const data = new ArrayBuffer(count * 32);
+  writeTileLevel(data, g, segs, heights, colours);
+  const vb = new pc.VertexBuffer(device, tileFormat(device), count, { usage: live ? pc.BUFFER_DYNAMIC : pc.BUFFER_STATIC, data });
+  const mesh = new pc.Mesh(device);
+  mesh.vertexBuffer = vb;
+  mesh.indexBuffer[0] = tileIndexBuffer(device, segs);
+  mesh.primitive[0] = { type: pc.PRIMITIVE_TRIANGLES, base: 0, baseVertex: 0, count: levelIndices(segs), indexed: true };
+  mesh.aabb = tileBox(g, segs, heights);
+  return live ? mesh : gpuOnly(mesh);
+}
+
+/**
+ * Writes level `segs` of a ground tile into its live `mesh` (`tileLevelMesh`). False (nothing written) if its vertices
+ * aren't kept on the CPU.
+ */
+function rewriteTileLevel(mesh: pc.Mesh, g: TileGrid, segs: number, heights: Float32Array, colours: Uint8Array): boolean {
+  const vb = mesh.vertexBuffer;
+  const data = vb?.storage;
+  if (!vb || !(data instanceof ArrayBuffer) || data.byteLength !== levelVertices(segs) * 32) return false;
+  writeTileLevel(data, g, segs, heights, colours);
+  vb.unlock();
+  mesh.aabb = tileBox(g, segs, heights);
   return true;
 }
 
