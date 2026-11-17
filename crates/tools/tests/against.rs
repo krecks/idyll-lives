@@ -913,26 +913,27 @@ fn what_is_accepted_passes_with_its_reason_and_what_need_not_be_is_an_error() {
     }
 }
 
-/// A far version Blender decimated cannot be made again by anything else: accepted as `decimated` it is held to
-/// its size and 2 cm.
+/// A far version Blender decimated is another on every run of Blender: listed as `decimated` it is held to its
+/// size, its model's floor, its triangles and 6 cm.
 #[test]
 fn a_decimated_far_version_is_held_to_its_own_rule() {
     let (old, new) = (Checkout::new("far-old"), Checkout::new("far-new"));
-    // Rebuilt coarser, its sides a centimetre in at their middles.
-    let rebuilt = |dent: f32| {
+    // Made again: each face `n` squares a side, its sides `dent` in at their middles, the whole `lift`ed and
+    // `wider`.
+    let made = |n: u32, dent: f32, lift: f32, wider: f32| {
         let mut model = far();
-        model.nodes[0].prims = vec![Prim::new(0).boxed([-0.3, 0.0, -0.2], [0.3, 0.8, 0.22], 2)];
+        model.nodes[0].prims = vec![Prim::new(0).boxed([-0.3, 0.0, -0.2], [0.3, 0.8, 0.22], n)];
         for p in &mut model.nodes[0].prims[0].positions {
             if p[1] == 0.4 && p[0].abs() == 0.3 {
                 p[0] -= dent * p[0].signum();
             }
+            p[0] *= wider;
+            p[1] += lift;
         }
         glb(&model)
     };
-    new.write(
-        "web/public/assets/models/fixture/cupboard_far.glb",
-        &rebuilt(0.01),
-    );
+    let far_file = "web/public/assets/models/fixture/cupboard_far.glb";
+    new.write(far_file, &made(2, 0.01, 0.0, 1.0));
     let outcome = new.against(&old, "{}");
     assert!(
         found(&outcome, "model.cupboard far").contains(&"surface"),
@@ -940,39 +941,81 @@ fn a_decimated_far_version_is_held_to_its_own_rule() {
         outcome.text
     );
 
-    let accepted =
-        r#"{"model.cupboard far": {"decimated": "Blender's decimate, rebuilt at low detail"}}"#;
-    let outcome = new.against(&old, accepted);
+    let listed = r#"{"model.cupboard far": {"decimated": "decimated by Blender"}}"#;
+    let outcome = new.against(&old, listed);
     assert!(!outcome.failed(), "{}", outcome.text);
     assert_eq!(row(&outcome, "model.cupboard far").class, Class::Near);
     assert!(
-        outcome.text.contains("accepted: decimated: held to the decimated far versions' rule (Blender's decimate, rebuilt at low detail)"),
+        outcome.text.contains(
+            "accepted: decimated: held to the decimated far versions' rule (decimated by Blender)"
+        ),
         "{}",
         outcome.text
     );
 
-    // Three centimetres in is over it; the same file needs no rule.
-    new.write(
-        "web/public/assets/models/fixture/cupboard_far.glb",
-        &rebuilt(0.03),
-    );
-    let outcome = new.against(&old, accepted);
-    assert_eq!(
-        found(&outcome, "model.cupboard far"),
-        ["surface"],
+    // Over the rule: 7 cm in, 3 % wider, a centimetre off the model's floor, and over a tenth more triangles.
+    for (file, metric) in [
+        (made(2, 0.07, 0.0, 1.0), "surface"),
+        (made(2, 0.01, 0.0, 1.03), "size"),
+        (made(2, 0.01, 0.01, 1.0), "bounds"),
+        (made(3, 0.0, 0.0, 1.0), "triangles"),
+    ] {
+        new.write(far_file, &file);
+        let outcome = new.against(&old, listed);
+        assert!(
+            found(&outcome, "model.cupboard far").contains(&metric),
+            "{metric}: {}",
+            outcome.text
+        );
+    }
+    // The same file, or one within the other rows, passes without the rule: no error, it says what the file is.
+    new.write(far_file, &glb(&far()));
+    let outcome = new.against(&old, listed);
+    assert!(
+        !outcome.failed() && outcome.errors.is_empty(),
         "{}",
         outcome.text
     );
-    new.write(
-        "web/public/assets/models/fixture/cupboard_far.glb",
-        &glb(&far()),
+    assert_eq!(row(&outcome, "model.cupboard far").class, Class::Same);
+    // It is a far version's.
+    let outcome = new.against(
+        &old,
+        r#"{"model.cupboard": {"decimated": "decimated by Blender"}}"#,
     );
-    let outcome = new.against(&old, accepted);
     assert!(
-        outcome.errors[0].starts_with(
-            "model.cupboard far: decimated is accepted, but the row passes without it"
-        )
+        outcome.errors[0].starts_with("model.cupboard: decimated is a far version's"),
+        "{:?}",
+        outcome.errors
     );
+}
+
+/// The list in the repo names far versions the manifests have, each with its reason.
+#[test]
+fn the_repo_s_list_names_far_versions() {
+    let root = ll_tools::checkglb::repo_root();
+    let list: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(format!("{root}/tools/art/port-accepted.json")).unwrap(),
+    )
+    .unwrap();
+    let report = ll_tools::checkglb::gate(&ll_tools::checkglb::Paths::repo(), &[]);
+    for (name, metrics) in list.as_object().unwrap() {
+        for (metric, why) in metrics.as_object().unwrap() {
+            assert!(!why.as_str().unwrap().trim().is_empty(), "{name}: {metric}");
+            if metric == "decimated" {
+                let key = name
+                    .strip_suffix(" far")
+                    .unwrap_or_else(|| panic!("{name}"));
+                let line = report
+                    .text
+                    .lines()
+                    .find(|l| l.split_whitespace().nth(1) == Some(key));
+                assert!(
+                    line.is_some_and(|l| l.contains("(far: ")),
+                    "{name} has no far version"
+                );
+            }
+        }
+    }
 }
 
 /// A build of some models (no manifest of its own) is compared in the working tree's place, for what it has.

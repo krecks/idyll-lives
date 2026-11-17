@@ -24,6 +24,8 @@
 //! A row that is right as it is takes a line in tools/art/port-accepted.json, `{"<key>": {"<metric>": "<why>"}}`
 //! (a far version's key is `<key> far`, a manifest's its path under the assets), and is then printed as
 //! `accepted`. As with the gate's `accept`, one that names no row, gives no reason or is not needed is an error.
+//! But `decimated`, which says what a far version is (Blender's decimate made it, and makes another on every
+//! run): where the rows fail it, it is held to that rule in their place (`METRICS`); where they pass, it passes.
 
 use super::digest;
 use super::glb::{Glb, R, parse_glb};
@@ -94,17 +96,29 @@ pub const AREA: f64 = 0.01;
 pub const TEXELS: f64 = 0.02;
 /// A texture coordinate may be this far off, measured on the surface (m): half a pixel at the play camera.
 pub const UV_OFF: f64 = 0.002;
-/// The share of a part's surface whose texture must be within `UV_OFF`: all but its seams.
-pub const UV_SHARE: f64 = 0.99;
+/// The share of a part's surface whose texture must be within `UV_OFF`: all but its seams and its bevels' bands.
+/// Two Blender builds of one script differ on up to 3.9 % of a part (measured 2026-11-17, the porch swing's frame:
+/// a face at 45° between two sides takes its texture from either), so 5 % may be off.
+pub const UV_SHARE: f64 = 0.95;
 /// The baked shading is rounded to this many greys (gamekit/shade.py `LEVELS`).
 pub const SHADE_LEVELS: f64 = 32.0;
-/// A part's shading may differ by this many greys on average: one step of the rounding.
-pub const SHADE_MEAN: f64 = 1.0;
-/// 95 % of a part's surface must be within this many greys.
-pub const SHADE_MOST: f64 = 2.0;
-/// A far version held to `decimated` may be this far from the old one, in size and anywhere on its surface (m):
-/// a pixel at 80 m, where a far version is drawn from.
-pub const DECIMATED: f64 = 0.02;
+/// A part's shading may differ by this many greys on average. Two Blender builds of one script differ by up to
+/// 1.36 (measured 2026-11-17, the pizza oven's cup: a vertex's rays hit or miss by a hair), so 2.
+pub const SHADE_MEAN: f64 = 2.0;
+/// 95 % of a part's surface must be within this many greys. Two Blender builds differ by up to 8.6 there (the
+/// same cup), so 10.
+pub const SHADE_MOST: f64 = 10.0;
+/// A far version held to `decimated` may differ from the old one's size by this share a side: the gate's own
+/// rule for a far version against its model is 5 %.
+pub const DECIMATED_SIZE: f64 = 0.02;
+/// Its lowest point may be this far from the full model's (m): the gate's own rule, a far version stands where
+/// its model stands.
+pub const DECIMATED_FLOOR: f64 = 0.005;
+/// It may have this share more triangles than the old one: a far version is there to be cheap.
+pub const DECIMATED_TRIANGLES: f64 = 0.10;
+/// No point of it may be further than this from the old one's surface (m). Two Blender builds of one script
+/// were up to 55 mm apart (measured 2026-11-17, the ping-pong table's far version), so 60 mm.
+pub const DECIMATED_SURFACE: f64 = 0.06;
 
 /// What is compared, by the name a finding and a line of port-accepted.json have.
 pub const METRICS: &[(&str, &str)] = &[
@@ -153,8 +167,9 @@ pub const METRICS: &[(&str, &str)] = &[
     ("shading", "the baked shading at the nearest points"),
     (
         "decimated",
-        "a far version Blender's decimate made, which no other generator can repeat: held to its own rule \
-         (the old size and surface within 2 cm, no more triangles) in place of the rows above",
+        "a far version Blender's decimate made, which not even Blender repeats: where the rows above fail it is \
+         held to its own rule in their place (the old size within 2 %, its lowest point within 0.5 cm of the \
+         model's, at most a tenth more triangles, its surface within 6 cm of the old one's)",
     ),
 ];
 
@@ -247,19 +262,26 @@ pub struct Compared {
 /// Compares two `.glb` files' bytes: `same` if their digests are equal, else every row of `METRICS` a file alone
 /// answers (the pack, the centre and the gate's rows need its entry: `against`).
 pub fn compare(old: &[u8], new: &[u8]) -> Compared {
-    compare_by(old, new, measure)
+    compare_by(old, new, &measure)
 }
 
-/// `compare` for a far version held to `decimated`: its size, its surface within `DECIMATED`, no more triangles.
-pub fn compare_decimated(old: &[u8], new: &[u8]) -> Compared {
-    compare_by(old, new, measure_decimated)
+/// `compare` for a far version held to `decimated` (the `DECIMATED_` limits); `model` is the new build's full
+/// model, whose lowest point the far version's is held to (None: not held to it).
+pub fn compare_decimated(old: &[u8], new: &[u8], model: Option<&[u8]>) -> Compared {
+    let floor = model
+        .and_then(|data| parse_glb(data).ok())
+        .and_then(|g| whole(&g).ok())
+        .and_then(|part| part.bounds())
+        .map(|(lo, _)| lo[1]);
+    compare_by(old, new, &|o, n, out, numbers| {
+        measure_decimated(o, n, floor, out, numbers)
+    })
 }
 
-fn compare_by(
-    old: &[u8],
-    new: &[u8],
-    measure: fn(&Glb, &Glb, &mut Vec<Finding>, &mut Numbers) -> R<()>,
-) -> Compared {
+/// What two files that are not the same are measured by: their findings and numbers.
+type Measure<'a> = &'a dyn Fn(&Glb, &Glb, &mut Vec<Finding>, &mut Numbers) -> R<()>;
+
+fn compare_by(old: &[u8], new: &[u8], measure: Measure) -> Compared {
     let mut out = Compared::default();
     if old == new {
         out.same = true;
@@ -952,67 +974,85 @@ fn parts_differ(old: &Model, new: &Model, out: &mut Vec<Finding>, numbers: &mut 
     }
 }
 
-/// A far version held to `decimated`: the whole model at rest as one surface, its box and every point of it
-/// within `DECIMATED` of the old one's, with no more triangles.
-fn measure_decimated(o: &Glb, n: &Glb, out: &mut Vec<Finding>, numbers: &mut Numbers) -> R<()> {
-    let whole = |g: &Glb| -> R<Part> {
-        let r = read(g)?;
-        let worlds = near::worlds(&r.tree, &r.rests);
-        let mut all = Part {
-            node: 0,
-            path: String::new(),
-            material: String::new(),
-            positions: Vec::new(),
-            normals: Some(Vec::new()),
-            uvs: None,
-            greys: None,
-            triangles: Vec::new(),
-        };
-        for p in r.parts {
-            let world = worlds[p.node];
-            let p = p.placed(&world);
-            let base = all.positions.len() as u32;
-            all.triangles
-                .extend(p.triangles.iter().map(|t| t.map(|i| i + base)));
-            match (all.normals.as_mut(), p.normals) {
-                (Some(have), Some(more)) => have.extend(more),
-                _ => all.normals = None,
-            }
-            all.positions.extend(p.positions);
-        }
-        Ok(all)
+/// A model at rest as one part: every node's triangles where the node stands.
+fn whole(g: &Glb) -> R<Part> {
+    let r = read(g)?;
+    let worlds = near::worlds(&r.tree, &r.rests);
+    let mut all = Part {
+        node: 0,
+        path: String::new(),
+        material: String::new(),
+        positions: Vec::new(),
+        normals: Some(Vec::new()),
+        uvs: None,
+        greys: None,
+        triangles: Vec::new(),
     };
-    let (a, b) = (whole(o)?, whole(n)?);
-    if b.triangles.len() > a.triangles.len() {
-        out.push(found(
-            "triangles",
-            format!(
-                "{} triangles, the decimated one had {}: no more",
-                b.triangles.len(),
-                a.triangles.len()
-            ),
-        ));
+    for p in r.parts {
+        let world = worlds[p.node];
+        let p = p.placed(&world);
+        let base = all.positions.len() as u32;
+        all.triangles
+            .extend(p.triangles.iter().map(|t| t.map(|i| i + base)));
+        match (all.normals.as_mut(), p.normals) {
+            (Some(have), Some(more)) => have.extend(more),
+            _ => all.normals = None,
+        }
+        all.positions.extend(p.positions);
     }
+    Ok(all)
+}
+
+/// A far version held to `decimated`, the whole of it at rest as one surface: each side of its box within
+/// `DECIMATED_SIZE` of the old one's, its lowest point within `DECIMATED_FLOOR` of `floor` (the full model's),
+/// at most `DECIMATED_TRIANGLES` more triangles, and every point of it within `DECIMATED_SURFACE` of the old one.
+fn measure_decimated(
+    o: &Glb,
+    n: &Glb,
+    floor: Option<f64>,
+    out: &mut Vec<Finding>,
+    numbers: &mut Numbers,
+) -> R<()> {
+    let (a, b) = (whole(o)?, whole(n)?);
     numbers.triangles = if a.triangles.is_empty() {
         0.0
     } else {
         b.triangles.len() as f64 / a.triangles.len() as f64 - 1.0
     };
+    if b.triangles.len() as f64 > a.triangles.len() as f64 * (1.0 + DECIMATED_TRIANGLES) {
+        out.push(found(
+            "triangles",
+            format!(
+                "{} triangles, the decimated one had {} ({:+.1} %, at most {:+.0} %)",
+                b.triangles.len(),
+                a.triangles.len(),
+                numbers.triangles * 100.0,
+                DECIMATED_TRIANGLES * 100.0
+            ),
+        ));
+    }
     if let (Some((alo, ahi)), Some((blo, bhi))) = (a.bounds(), b.bounds()) {
-        let off = (0..3)
-            .map(|k| (alo[k] - blo[k]).abs().max((ahi[k] - bhi[k]).abs()))
-            .fold(0.0, f64::max);
-        if off > DECIMATED {
+        let size = |lo: P3, hi: P3| -> P3 { std::array::from_fn(|k| hi[k] - lo[k]) };
+        let (was, is) = (size(alo, ahi), size(blo, bhi));
+        if (0..3).any(|k| (was[k] - is[k]).abs() > DECIMATED_SIZE * was[k] + 1e-6) {
+            let text = |s: P3| format!("{:.4} x {:.4} x {:.4} m", s[0], s[1], s[2]);
+            out.push(found(
+                "size",
+                format!(
+                    "{}, the decimated one was {} (each side within {})",
+                    text(is),
+                    text(was),
+                    share(DECIMATED_SIZE)
+                ),
+            ));
+        }
+        if let Some(floor) = floor.filter(|floor| (blo[1] - floor).abs() > DECIMATED_FLOOR) {
             out.push(found(
                 "bounds",
                 format!(
-                    "its box {} to {} was {} to {} ({} off, at most {})",
-                    point(blo),
-                    point(bhi),
-                    point(alo),
-                    point(ahi),
-                    mm(off),
-                    mm(DECIMATED)
+                    "its lowest point is at {:.4} m, the model's at {floor:.4} (at most {} apart)",
+                    blo[1],
+                    mm(DECIMATED_FLOOR)
                 ),
             ));
         }
@@ -1025,14 +1065,14 @@ fn measure_decimated(o: &Glb, n: &Glb, out: &mut Vec<Finding>, numbers: &mut Num
     };
     numbers.surface_mean = ab.mean.max(ba.mean);
     numbers.surface_max = max;
-    if max > DECIMATED {
+    if max > DECIMATED_SURFACE {
         out.push(found(
             "surface",
             format!(
                 "the {of} file's point {} is {} from the {from} surface, at most {}",
                 point(at),
                 mm(max),
-                mm(DECIMATED)
+                mm(DECIMATED_SURFACE)
             ),
         ));
     }
@@ -1736,7 +1776,13 @@ impl Context {
     }
 
     /// Two files of a row compared, by path: one side without the file is a finding.
-    fn files(&self, old: Option<&String>, new: Option<&String>, decimated: bool) -> Compared {
+    /// With `decimated`, as a far version held to that rule, its lowest point to the model's (the file `model`).
+    fn files(
+        &self,
+        old: Option<&String>,
+        new: Option<&String>,
+        decimated: Option<Option<&String>>,
+    ) -> Compared {
         let read = |path: Option<&String>, which: &str| -> Result<Vec<u8>, Finding> {
             let path =
                 path.ok_or_else(|| found("file", format!("the {which} entry names no file")))?;
@@ -1751,13 +1797,13 @@ impl Context {
             })
         };
         match (read(old, "old"), read(new, "new")) {
-            (Ok(a), Ok(b)) => {
-                if decimated {
-                    compare_decimated(&a, &b)
-                } else {
-                    compare(&a, &b)
+            (Ok(a), Ok(b)) => match decimated {
+                Some(model) => {
+                    let model = model.and_then(|path| std::fs::read(path).ok());
+                    compare_decimated(&a, &b, model.as_deref())
                 }
-            }
+                None => compare(&a, &b),
+            },
             (a, b) => Compared {
                 same: false,
                 findings: a.err().into_iter().chain(b.err()).collect(),
@@ -1802,19 +1848,23 @@ impl Context {
                 ..Compared::default()
             }
         } else {
-            self.files(old.as_ref(), new.as_ref(), false)
+            self.files(old.as_ref(), new.as_ref(), None)
         };
+        let model = new;
         let far_name = format!("{key} far");
         let (old, new) = file("far");
         let far = (old.is_some() || new.is_some()).then(|| {
-            let found = self.files(old.as_ref(), new.as_ref(), false);
-            // A far version accepted as decimated is held to its own rule, if the rows it is not held to fail.
+            let found = self.files(old.as_ref(), new.as_ref(), None);
+            // A far version listed as decimated is held to its own rule, if the rows it is not held to fail.
             let decimated = self
                 .accepted
                 .get(&far_name)
                 .is_some_and(|a| a.contains_key("decimated"));
             if decimated && !found.same && !found.findings.is_empty() {
-                (self.files(old.as_ref(), new.as_ref(), true), true)
+                (
+                    self.files(old.as_ref(), new.as_ref(), Some(model.as_ref())),
+                    true,
+                )
             } else {
                 (found, false)
             }
@@ -1920,6 +1970,8 @@ fn accepted(path: &str) -> (BTreeMap<String, BTreeMap<String, String>>, Vec<Stri
                 errors.push(format!(
                     "{row}: {metric} needs its reason: why the new build is right as it is"
                 ));
+            } else if metric == "decimated" && !row.ends_with(" far") {
+                errors.push(format!("{row}: decimated is a far version's (`{row} far`)"));
             } else {
                 out.entry(row.clone())
                     .or_insert_with(BTreeMap::new)
@@ -2126,7 +2178,8 @@ pub fn against(opts: &Options) -> Result<Outcome, String> {
             }
             continue;
         };
-        for metric in metrics.keys() {
+        // (But `decimated`: what the far version is, whether this build needs its rule or not.)
+        for metric in metrics.keys().filter(|m| *m != "decimated") {
             if !row.accepted.iter().any(|(f, _)| f.metric == metric) {
                 errors.push(format!(
                     "{name}: {metric} is accepted, but the row passes without it: take it out"
