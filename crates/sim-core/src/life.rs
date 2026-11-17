@@ -1946,7 +1946,15 @@ fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
             .any(|(d, &n)| !d.room && n < least)
     };
     let tired = below(LOW_NEED);
-    let late = !(6.0..22.0).contains(&hour) || hosts_out;
+    // The place shut (its hours, `Plot::open_at`): time to go for one with nothing on there, and
+    // for everyone by last orders (`staff::LAST_ORDERS`) after; one on the way there by then
+    // turns back.
+    let place = &w.plots[visit.plot as usize];
+    let shut = place.hours.is_some()
+        && !place.open_at_tick(tick)
+        && (idle > 0
+            || !place.open_at_tick(tick.saturating_sub(ticks(crate::staff::LAST_ORDERS * 60.0))));
+    let late = !(6.0..22.0).contains(&hour) || hosts_out || shut;
     // (On the way there, and just there for `visits.leastMinutes`: they stay, unless a need is
     // about to run out, it's late or the hosts have gone; not for a low one the place can't see
     // to, nor for being bored.)

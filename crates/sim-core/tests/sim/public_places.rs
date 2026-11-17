@@ -368,6 +368,35 @@ fn a_places_hours_load_and_are_saved() {
     // Open on Sundays from 18:00 into Monday's small hours.
     assert!(inn.open_at(7, 1200.0) && inn.open_at(8, 60.0));
     assert!(!inn.open_at(8, 1200.0) && !inn.open_at(7, 60.0) && !inn.open_at(8, 120.0));
+    // How long it stays open, and when it next opens.
+    assert_eq!(shop.open_for(1, 600.0), 480.0, "open till 18:00");
+    assert_eq!(shop.open_for(1, 500.0), 0.0, "shut before 9:00");
+    assert_eq!(
+        inn.open_for(7, 1200.0),
+        360.0,
+        "open from 20:00 on Sunday till 2:00"
+    );
+    assert_eq!(inn.open_for(8, 60.0), 60.0, "and an hour more at 1:00");
+    assert_eq!(home.open_for(1, 0.0), f32::INFINITY);
+    assert_eq!(
+        shop.opens_next(1, 100.0),
+        Some((1, 540)),
+        "on Monday at 9:00"
+    );
+    assert_eq!(
+        shop.opens_next(5, 1100.0),
+        Some((8, 540)),
+        "Friday evening: Monday next"
+    );
+    assert_eq!(inn.opens_next(1, 0.0), Some((7, 1080)), "on Sunday");
+    assert_eq!(home.opens_next(1, 0.0), None);
+    // The web's view of the plots has them: absent for a home.
+    let view: Value = serde_json::from_str(&sim_core::view::structure_json(&world)).unwrap();
+    assert!(view["plots"][0].get("hours").is_none(), "none for a home");
+    assert_eq!(
+        view["plots"][1]["hours"],
+        json!({"open": 540, "close": 1080, "days": 31})
+    );
     let saved: Value = serde_json::from_str(&world.save_json()).unwrap();
     assert!(
         saved["plots"][0].get("hours").is_none(),
@@ -432,16 +461,26 @@ fn town_beside_with(id: &str, n: usize) -> (World, u32) {
 fn town_beside_edited(id: &str, n: usize, edit: impl Fn(&mut Value)) -> (World, u32) {
     let mut edited: Value = serde_json::from_str(&common::content()).unwrap();
     edit(&mut edited);
-    let merged = edited.to_string();
-    let content: Value = serde_json::from_str(&merged).unwrap();
-    let houses = houses();
-    let (w, d) = plot_size(&houses);
-    let market = houses["parks"]
+    town_beside_place(&edited.to_string(), &place(id), n, None)
+}
+
+/// The place `id` of `houses.json`.
+fn place(id: &str) -> Value {
+    houses()["parks"]
         .as_array()
         .unwrap()
         .iter()
         .find(|p| p["id"] == id)
-        .unwrap_or_else(|| panic!("a place '{id}'"));
+        .unwrap_or_else(|| panic!("a place '{id}'"))
+        .clone()
+}
+
+/// An empty house with `market` (a place as `houses.json` has them) next door, open in `hours`
+/// (the town file's `plots[].hours`; None: always), `n` residents at home, on content `merged`.
+fn town_beside_place(merged: &str, market: &Value, n: usize, hours: Option<Value>) -> (World, u32) {
+    let content: Value = serde_json::from_str(merged).unwrap();
+    let houses = houses();
+    let (w, d) = plot_size(&houses);
     // (The place on its own lot beside the home's, the town as deep as the deeper.)
     let (pw, pd) = frame(&houses, market);
     let depth = d.max(pd);
@@ -452,14 +491,17 @@ fn town_beside_edited(id: &str, n: usize, edit: impl Fn(&mut Value)) -> (World, 
         .enumerate()
         .map(|(i, name)| json!({"name": name, "traits": ["cheerful"], "x": w as f64 / 2.0 + i as f64, "z": 3.5}))
         .collect();
-    let lot = json!({
+    let mut lot = json!({
         "width": w + pw, "depth": depth, "storeys": storeys(market), "walls": walls, "doors": doors, "windows": windows, "objects": objects,
         "plots": [{"name": "Home", "x": 0, "z": 0, "w": w, "d": d, "entry": [w as f64 / 2.0, 1.5]},
                   {"name": market["name"], "x": w, "z": 0, "w": pw, "d": pd, "public": true, "entry": entry}],
         "households": [{"name": "Ada's", "plot": 0, "player": true, "funds": 500}],
         "sims": sims,
     });
-    let world = World::from_json(&merged, &lot.to_string(), 7).unwrap();
+    if let Some(hours) = hours {
+        lot["plots"][1]["hours"] = hours;
+    }
+    let world = World::from_json(merged, &lot.to_string(), 7).unwrap();
     (world, 1)
 }
 
@@ -1400,5 +1442,301 @@ fn an_older_towns_counters_move_out_from_the_wall_for_their_server() {
     assert!(
         moved >= 6,
         "the café's and the bakery's (both sides of the street): {moved}"
+    );
+}
+
+/// `id`'s frame as `houses.json` has it (its lot, the four walls round it with its front door, its
+/// stairs and its storey above), with nothing in it but the stairs and `upstairs` on the storey
+/// above: what a test puts there, whatever the place is furnished with.
+fn bare_with_upstairs(id: &str, upstairs: Value) -> Value {
+    let mut p = place(id);
+    let n = |v: &Value| v.as_i64().unwrap();
+    let walls = p["walls"].as_array().unwrap().clone();
+    let (x0, z0, x1, z1) = walls.iter().fold((i64::MAX, i64::MAX, 0, 0), |b, c| {
+        (
+            b.0.min(n(&c[0]).min(n(&c[2]))),
+            b.1.min(n(&c[1]).min(n(&c[3]))),
+            b.2.max(n(&c[0]).max(n(&c[2]))),
+            b.3.max(n(&c[1]).max(n(&c[3]))),
+        )
+    });
+    let outer = json!([
+        [x0, z0, x1, z0],
+        [x0, z1, x1, z1],
+        [x0, z0, x0, z1],
+        [x1, z0, x1, z1]
+    ]);
+    let stairs: Vec<Value> = p["objects"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|o| o["def"].as_str().is_some_and(|d| d.starts_with("stairs")))
+        .cloned()
+        .collect();
+    assert!(!stairs.is_empty(), "{id}: stairs up");
+    p["walls"] = outer.clone();
+    p["objects"] = json!(stairs);
+    p["upper"] = json!({"walls": outer, "doors": [], "windows": [], "objects": upstairs});
+    p
+}
+
+/// Upstairs at the hotel (its storey above, `upper`): a guest sent to the bar there goes in at the
+/// door and up the stairs to it, and is served there; its landlord comes in at the top of the
+/// stairs, and goes again there at closing.
+#[test]
+fn a_guest_goes_up_the_stairs_to_the_bar_and_is_served_there() {
+    let hotel = bare_with_upstairs(
+        "hotel",
+        json!([{"def": "barCounter", "x": 14, "z": 12, "rot": 2}]),
+    );
+    let (mut w, plot) = town_beside_place(&common::content(), &hotel, 1, None);
+    w.autonomy = false;
+    until(&mut w, 13.0);
+    let bar = object(&w, "barCounter");
+    let o = &w.objects[bar as usize];
+    assert_eq!(
+        (w.storey_of(o.z), w.plot_at(o.x, o.z)),
+        (1, Some(plot)),
+        "the bar upstairs at the hotel"
+    );
+    let k = w
+        .staff
+        .server_of(bar)
+        .expect("someone serves at the bar upstairs");
+    let home = w.staff.servers[k].home;
+    let (hx, hz) = (home[0].floor() as i32, home[1].floor() as i32);
+    assert_eq!(
+        (w.storey_of(hz), w.plot_at(hx, hz)),
+        (1, Some(plot)),
+        "the landlord comes in at the top of the stairs, not at the door ({home:?})"
+    );
+    let post = sim_core::staff::place(&w.content, &w.objects[bar as usize])
+        .unwrap()
+        .0;
+    let funds = w.households[0].funds;
+    w.apply(Command::Use {
+        sim: 0,
+        object: bar,
+        interaction: interaction(&w, bar, "drink"),
+    })
+    .unwrap();
+    let (mut climbed, mut up, mut served) = (false, false, false);
+    for _ in 0..120 * TICKS_PER_MINUTE {
+        w.tick_once();
+        let (x, z) = w.sims[0].tile();
+        climbed |= w.stair_map().step(x, z).is_some();
+        up |= w.storey_of(z) == 1 && w.plot_at(x, z) == Some(plot);
+        served |= w.staff.servers[k].serving == Some(0) && w.staff.servers[k].pos == post;
+    }
+    assert!(
+        climbed && up,
+        "Ada went up the stairs ({climbed}) to the bar ({up})"
+    );
+    assert!(served, "and the landlord served her there");
+    assert!(w.households[0].funds < funds, "and she paid for her drink");
+    until(&mut w, 23.5);
+    assert!(
+        !w.staff.servers[k].present && w.staff.servers[k].pos == home,
+        "the landlord gone again at the top of the stairs at closing"
+    );
+}
+
+/// A place's hours (the town file's `plots[].hours`): `days` from Monday, a bit each.
+fn hours(open: u16, close: u16, days: u8) -> Value {
+    json!({"open": open, "close": close, "days": days})
+}
+
+/// A place shut (its hours, `Plot::open_at`) can't be visited: sent there, the answer says when it
+/// opens; open, it can.
+#[test]
+fn a_visit_to_a_closed_place_is_refused_with_when_it_opens() {
+    let (mut w, cafe) = town_beside_place(
+        &common::content(),
+        &place("cafe"),
+        1,
+        Some(hours(20 * 60, 22 * 60, 0b1111111)),
+    );
+    w.autonomy = false;
+    let name = w.plots[cafe as usize].name.clone();
+    assert!(sim_core::clock::hour(w.tick) < 20.0);
+    let err = w
+        .apply(Command::Visit { sim: 0, plot: cafe })
+        .unwrap_err()
+        .to_string();
+    assert_eq!(err, format!("{name} is closed (opens at 20:00)"));
+    until(&mut w, 22.5);
+    let err = w
+        .apply(Command::Visit { sim: 0, plot: cafe })
+        .unwrap_err()
+        .to_string();
+    assert_eq!(err, format!("{name} is closed (opens tomorrow at 20:00)"));
+    // (Day 1 a Monday: shut at the weekend, open from Monday again.)
+    w.plots[cafe as usize].hours = Some(sim_core::world::PlotHours {
+        open: 20 * 60,
+        close: 22 * 60,
+        days: 0b0011100,
+    });
+    let err = w
+        .apply(Command::Visit { sim: 0, plot: cafe })
+        .unwrap_err()
+        .to_string();
+    assert_eq!(
+        err,
+        format!("{name} is closed (opens on Wednesday at 20:00)")
+    );
+    w.plots[cafe as usize].hours = None;
+    w.apply(Command::Visit { sim: 0, plot: cafe })
+        .expect("open at any hour without hours");
+}
+
+/// Guests at a place go home when it shuts: one with nothing on at once, and all of them by last
+/// orders (`staff::LAST_ORDERS`) after it.
+#[test]
+fn guests_go_home_when_a_place_closes() {
+    let start = sim_core::clock::minute_of_day(town_beside("cafe").0.tick) as u16;
+    let close = start + 60;
+    let (mut w, cafe) = town_beside_place(
+        &common::content(),
+        &place("cafe"),
+        1,
+        Some(hours(0, close, 0b1111111)),
+    );
+    w.autonomy = false;
+    w.apply(Command::Visit { sim: 0, plot: cafe }).unwrap();
+    let on_plot = |w: &World| {
+        let (x, z) = w.sims[0].tile();
+        w.plot_at(x, z) == Some(cafe)
+    };
+    let mut there = false;
+    while sim_core::clock::minute_of_day(w.tick) < f32::from(close) - 1.0 {
+        w.tick_once();
+        there |= on_plot(&w);
+    }
+    assert!(there, "Ada got there");
+    assert!(
+        w.sims[0].visiting.is_some_and(|v| v.plot == cafe) && on_plot(&w),
+        "and stays there while it's open (a directed visit lasts hours)"
+    );
+    let shut = w.tick + common::mins(1.0);
+    let mut left = None;
+    for _ in 0..40 * TICKS_PER_MINUTE {
+        w.tick_once();
+        let s = &w.sims[0];
+        let going = s.visiting.is_none()
+            || s.current()
+                .is_some_and(|a| matches!(a.task.kind, TaskKind::GoHome));
+        if left.is_none() && going {
+            left = Some(w.tick);
+        }
+    }
+    let left = left.expect("Ada set off home once the café shut");
+    assert!(left >= shut, "not before it shut");
+    assert!(
+        left <= shut + common::mins(2.0),
+        "with nothing on there, she set off home as it shut: {} minutes after",
+        (left - shut) / u64::from(TICKS_PER_MINUTE)
+    );
+    assert!(
+        w.sims[0].visiting.is_none() && !on_plot(&w),
+        "and is home again"
+    );
+}
+
+/// Things at a place shut (its hours) aren't for those going by: a hungry resident with nothing to
+/// eat at home doesn't go out to the market next door while it's shut, as they do while it's open.
+#[test]
+fn nobody_uses_a_closed_places_things() {
+    let (mut w, market) = town_beside_place(
+        &common::content(),
+        &place("market"),
+        1,
+        Some(hours(9 * 60, 17 * 60, 0)),
+    );
+    let hunger = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "hunger")
+        .unwrap();
+    w.sims[0].needs[hunger] = 0.15;
+    let mut used = Vec::new();
+    for _ in 0..180 {
+        minutes(&mut w, 1);
+        if let Some(a) = w.sims[0].current()
+            && let TaskKind::Use { object, .. } = a.task.kind
+        {
+            let o = &w.objects[object as usize];
+            if w.plot_at(o.x, o.z) == Some(market) {
+                used.push(w.content.objects[o.def].id.clone());
+            }
+        }
+    }
+    assert!(used.is_empty(), "used at the shut market: {used:?}");
+}
+
+/// More posts in town than servers (`staff::MAX_STAFF`), as a city whose every named place is a lot
+/// may have: the first posts (by object, as the town file lists them) get a server each, the rest
+/// none and are self-serve; the snapshot and the views carry on, and a resident at a post past them
+/// helps themselves and pays.
+#[test]
+fn past_the_most_servers_the_other_posts_are_self_serve() {
+    let merged = common::content();
+    let (cols, rows) = (12, 12);
+    let objects: Vec<Value> = (0..rows)
+        .flat_map(|r| {
+            (0..cols).map(
+                move |c| json!({"def": "shopCounter", "x": 28 + 5 * c, "z": 2 + 4 * r, "rot": 0}),
+            )
+        })
+        .collect();
+    assert!(objects.len() > sim_core::staff::MAX_STAFF);
+    let lot = json!({
+        "width": 90, "depth": 52, "objects": objects,
+        "plots": [{"name": "Home", "x": 0, "z": 0, "w": 26, "d": 22, "entry": [13.0, 1.5]},
+                  {"name": "Arcade", "x": 26, "z": 0, "w": 64, "d": 52, "public": true, "entry": [27.5, 1.5]}],
+        "households": [{"name": "Ada's", "plot": 0, "player": true, "funds": 500}],
+        "sims": [{"name": "Ada", "traits": ["cheerful"], "x": 13.0, "z": 3.5}],
+    });
+    let mut w = World::from_json(&merged, &lot.to_string(), 7).unwrap();
+    w.autonomy = false;
+    until(&mut w, 10.0);
+    let staffed: Vec<u32> = w
+        .objects
+        .iter()
+        .filter(|o| w.staff.server_of(o.id).is_some())
+        .map(|o| o.id)
+        .collect();
+    assert_eq!(w.staff.servers.len(), sim_core::staff::MAX_STAFF);
+    assert_eq!(
+        staffed,
+        (0..sim_core::staff::MAX_STAFF as u32).collect::<Vec<_>>(),
+        "the first posts have a server each"
+    );
+    let mut out = vec![0.0; snapshot::CAPACITY];
+    snapshot::write(&w, &mut out);
+    sim_core::view::structure_json(&w);
+    let last = w.objects.last().unwrap().id;
+    assert_eq!(w.staff.server_of(last), None, "the last one has none");
+    let funds = w.households[0].funds;
+    w.apply(Command::Use {
+        sim: 0,
+        object: last,
+        interaction: interaction(&w, last, "treat"),
+    })
+    .unwrap();
+    let mut used = false;
+    for _ in 0..120 * TICKS_PER_MINUTE {
+        w.tick_once();
+        used |= w.sims[0].current().is_some_and(|a| {
+            matches!((a.task.kind, &a.phase), (TaskKind::Use { object, .. }, Phase::Using { .. }) if object == last)
+        });
+    }
+    assert!(used, "Ada helped herself at the last counter");
+    assert!(w.households[0].funds < funds, "and paid");
+    // The same posts staffed when the town is loaded again.
+    let again = World::from_json(&merged, &lot.to_string(), 7).unwrap();
+    let staff = sim_core::staff::plan(&again);
+    assert!(
+        staffed.iter().all(|&o| staff.server_of(o).is_some()) && staff.server_of(last).is_none()
     );
 }

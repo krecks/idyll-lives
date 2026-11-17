@@ -1684,7 +1684,7 @@ pub struct Plot {
 /// When a public place is open: minutes of the day `[open, close)` on the days in `days` (bit 0
 /// Monday), as the town file and saves carry it (`plots[].hours`, the page's `TownPlace.hours`).
 /// A `close` at or before `open` runs on past midnight into the next morning.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PlotHours {
     pub open: u16,
     pub close: u16,
@@ -1718,7 +1718,70 @@ impl Plot {
             (on(weekday) && minute >= open) || (on((weekday + 6) % 7) && minute < close)
         }
     }
+
+    /// `open_at` at `tick`.
+    pub fn open_at_tick(&self, tick: u64) -> bool {
+        self.hours.is_none()
+            || self.open_at(crate::clock::day(tick), crate::clock::minute_of_day(tick))
+    }
+
+    /// How many minutes from `minute` of day `day` the place stays open: 0 if it's shut then,
+    /// unending without hours (or open round the clock). One opening running into the next (to
+    /// midnight, and from it on the next day) counts as one.
+    pub fn open_for(&self, day: u32, minute: f32) -> f32 {
+        let Some(h) = self.hours else {
+            return f32::INFINITY;
+        };
+        let (open, close) = (f32::from(h.open), f32::from(h.close));
+        let (mut day, mut minute, mut total) = (day, minute, 0.0);
+        // (A week of openings back to back: open all the time.)
+        for _ in 0..8 {
+            if !self.open_at(day, minute) {
+                return total;
+            }
+            // To the close of the opening it's in: today's, or (past midnight) the one that
+            // began the day before.
+            let left = if open < close || minute < close {
+                close - minute
+            } else {
+                MINUTES_PER_DAY - minute + close
+            };
+            total += left;
+            let end = minute + left;
+            day += (end / MINUTES_PER_DAY).floor() as u32;
+            minute = end.rem_euclid(MINUTES_PER_DAY);
+        }
+        f32::INFINITY
+    }
+
+    /// When the place next opens after `minute` of day `day`: the day and the minute of it. None
+    /// without hours, or with no day it opens on.
+    pub fn opens_next(&self, day: u32, minute: f32) -> Option<(u32, u16)> {
+        let h = self.hours?;
+        (0..8u32)
+            .map(|k| day + k)
+            .find(|&d| {
+                h.days & (1 << crate::clock::weekday(d)) != 0
+                    && (d > day || f32::from(h.open) > minute)
+            })
+            .map(|d| (d, h.open))
+    }
 }
+
+/// Minutes in a day (`Plot::open_for`).
+const MINUTES_PER_DAY: f32 = 24.0 * 60.0;
+
+/// The days of the week from Monday (`clock::weekday`), as a place shut till another day says when
+/// it opens.
+const WEEKDAYS: [&str; 7] = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+];
 
 /// How a game treats money for building: chosen once per game.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -2723,8 +2786,74 @@ impl World {
     /// `free_before_work`), and a household living there isn't all off to work or school before
     /// they could stay `visits.leastMinutes` (`hosts_about_till`).
     pub(crate) fn visit_fits_now(&self, i: usize, plot: u32) -> bool {
-        let (Some(sim), Some(p)) = (self.sims.get(i), self.plots.get(plot as usize)) else {
+        let Some(eta) = self.leisure_eta_now(i, plot) else {
             return false;
+        };
+        let stay = crate::mins(eta + self.content.visits.least_minutes);
+        // (With time for it before they leave for work or school, as a visit they'd choose for
+        // themselves: invited round, a guest let in was off to work 39 minutes on, Brightton.)
+        let ctx = self.ctx();
+        visit_fits(
+            &self.content,
+            eta,
+            ctx.hour,
+            free_before_work(&self.sims[i], &ctx),
+        ) && self
+            .households
+            .iter()
+            .find(|h| h.plot == Some(plot))
+            .is_none_or(|h| hosts_about_till(&ctx, h.id) >= self.tick + stay)
+    }
+
+    /// Why resident `i` can't be sent to `plot` now for its hours (`Plot::open_at`): it's shut,
+    /// or it shuts before they could get there (the way they'd go, `leisure_eta_now`). Ok: open
+    /// for them (or a place with no hours).
+    fn check_open(&self, i: usize, plot: u32) -> Result<(), Error> {
+        let p = &self.plots[plot as usize];
+        if p.hours.is_none() {
+            return Ok(());
+        }
+        let (day, minute) = (
+            crate::clock::day(self.tick),
+            crate::clock::minute_of_day(self.tick),
+        );
+        let clock = |m: u16| format!("{:02}:{:02}", m / 60 % 24, m % 60);
+        if !p.open_at(day, minute) {
+            let when = p.opens_next(day, minute).map(|(d, m)| match d - day {
+                0 => format!(" (opens at {})", clock(m)),
+                1 => format!(" (opens tomorrow at {})", clock(m)),
+                _ => format!(
+                    " (opens on {} at {})",
+                    WEEKDAYS[crate::clock::weekday(d) as usize],
+                    clock(m)
+                ),
+            });
+            return Err(Error::new(format!(
+                "{} is closed{}",
+                p.name,
+                when.unwrap_or_default()
+            )));
+        }
+        let open = p.open_for(day, minute);
+        if let Some(eta) = self.leisure_eta_now(i, plot)
+            && open < eta
+        {
+            let shuts = (minute + open).round() as u16;
+            return Err(Error::new(format!(
+                "{} closes at {}, before {} could get there",
+                p.name,
+                clock(shuts % (24 * 60)),
+                self.sims[i].name
+            )));
+        }
+        Ok(())
+    }
+
+    /// About how many minutes resident `i` would take to get to `plot` from where they are now,
+    /// the way they'd go (`leisure_way`: the car, a bike of theirs, the taxi, else on foot).
+    fn leisure_eta_now(&self, i: usize, plot: u32) -> Option<f32> {
+        let (Some(sim), Some(p)) = (self.sims.get(i), self.plots.get(plot as usize)) else {
+            return None;
         };
         let pos = self.nav().stairs.ground_pos(sim.pos);
         let goer = Goer {
@@ -2764,16 +2893,7 @@ impl World {
             taxi,
             &mut [None, None],
         );
-        let stay = crate::mins(eta + self.content.visits.least_minutes);
-        // (With time for it before they leave for work or school, as a visit they'd choose for
-        // themselves: invited round, a guest let in was off to work 39 minutes on, Brightton.)
-        let ctx = self.ctx();
-        visit_fits(&self.content, eta, ctx.hour, free_before_work(sim, &ctx))
-            && self
-                .households
-                .iter()
-                .find(|h| h.plot == Some(plot))
-                .is_none_or(|h| hosts_about_till(&ctx, h.id) >= self.tick + stay)
+        Some(eta)
     }
 
     /// The plot a tile is on (on any storey).
@@ -5902,6 +6022,8 @@ impl World {
                 if plot as usize >= self.plots.len() {
                     return Err(Error::new(format!("unknown plot {plot}")));
                 }
+                self.sim(sim)?;
+                self.check_open(sim as usize, plot)?;
                 // Not leaving a baby home alone with no money for a babysitter.
                 crate::life::check_cover_at(self, sim as usize, Some(plot))?;
                 self.enqueue(sim, TaskKind::Visit { plot })?;

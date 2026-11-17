@@ -2144,6 +2144,10 @@ struct PlotView<'a> {
     roof: Option<[u8; 2]>,
     /// Storeys with walls on this plot (for silhouettes).
     storeys: u8,
+    /// When the place on it is open (`world::PlotHours`: `{open, close, days}`, minutes of the day
+    /// and the days from Monday a bit each); absent: always (a home, a park).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hours: Option<crate::world::PlotHours>,
 }
 
 /// Bounding box of all wall/door edges (and diagonal walls) inside a plot. A wall on the plot's own
@@ -2586,6 +2590,7 @@ fn plot_views(world: &World) -> Vec<PlotView<'_>> {
                         house_bounds(world, p.x, p.z + up, p.x + p.w, p.z + p.d + up).is_some()
                     })
                     .count() as u8,
+            hours: p.hours,
         })
         .collect()
 }
@@ -2885,6 +2890,7 @@ fn plots_json<'a>(cached: &'a mut Option<(u64, u64, String)>, world: &World) -> 
         (p.id, &p.name, p.x, p.z, p.w, p.d, p.public).hash(&mut h);
         p.entry.map(|e| e.map(f32::to_bits)).hash(&mut h);
         p.roof.map(|r| [r.style, r.color]).hash(&mut h);
+        p.hours.hash(&mut h);
     }
     let key = h.finish();
     if cached.as_ref().is_none_or(|c| c.0 != key) {
