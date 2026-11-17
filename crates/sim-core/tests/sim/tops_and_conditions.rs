@@ -181,6 +181,7 @@ fn with_the_front_taken_it_is_used_from_beside_the_top() {
             blocked: w.blocked(),
             stairs: w.stair_map(),
             kept_off: &[],
+            steps: None,
         },
     );
     assert_eq!(

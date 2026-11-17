@@ -432,6 +432,7 @@ fn walk(w: &World, from: (i32, i32), to: (i32, i32)) -> Option<Vec<(i32, i32)>> 
         blocked: w.blocked(),
         stairs: w.stair_map(),
         kept_off: &[],
+        steps: None,
     }
     .find_path(from, to)
 }

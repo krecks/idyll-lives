@@ -1484,6 +1484,7 @@ fn a_lit_junction_keeps_those_on_foot_off_its_box_but_never_cuts_ground_off() {
         blocked: w.blocked(),
         stairs: w.stair_map(),
         kept_off: &[],
+        steps: None,
     };
     assert!(
         nav.find_path((x0, z0), (150, 150)).is_some(),

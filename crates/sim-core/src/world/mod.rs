@@ -3074,6 +3074,8 @@ impl World {
             blocked: &self.blocked,
             stairs: &self.stairs,
             kept_off: &self.travel.junction_tiles,
+            // (Each chunk's steps only while they're as the lot is: `Reach::steps`.)
+            steps: Some(&self.reach),
         }
     }
 
@@ -4052,6 +4054,7 @@ impl World {
                 blocked: &self.blocked,
                 stairs: &self.stairs,
                 kept_off: &self.travel.junction_tiles,
+                steps: None,
             };
             self.object_index.links =
                 crate::surface::Links::new(&self.content, &self.objects, &nav);
@@ -4118,6 +4121,7 @@ impl World {
             blocked: &self.blocked,
             stairs: &self.stairs,
             kept_off: &self.travel.junction_tiles,
+            steps: None,
         };
         self.reach.refresh(&nav);
         self.reach_version = self.nav_version;
@@ -4801,6 +4805,7 @@ impl World {
                     blocked,
                     stairs,
                     kept_off: &travel.junction_tiles,
+                    steps: Some(reach),
                 },
                 reach,
                 nav_version: *nav_version,

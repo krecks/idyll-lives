@@ -529,6 +529,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         blocked,
         stairs,
         kept_off: &[],
+        steps: None,
     };
     let mut progress = t;
     let held_up = go_on(

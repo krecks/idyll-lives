@@ -198,6 +198,7 @@ fn livable_at_start(
             blocked: w.blocked(),
             stairs: w.stair_map(),
             kept_off: &[],
+            steps: None,
         };
         let mut walks = Walks::new(&nav);
         let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
@@ -1195,6 +1196,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
                 blocked: w.blocked(),
                 stairs: w.stair_map(),
                 kept_off: &[],
+                steps: None,
             };
             let shut = car.door(&nav, 0).is_none();
             if shut && fenced_in(&w, car) {

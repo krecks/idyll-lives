@@ -427,6 +427,10 @@ pub struct NavGrid<'a> {
     /// indices; `Travel::junction_tiles`, a lit junction's box and carriageway): one standing on
     /// one is walked off them by the nearest way (`way_out`), never left there. Empty: none.
     pub kept_off: &'a [usize],
+    /// The walkable regions, with each tile's steps (`Reach::steps`), when they were refreshed
+    /// for this grid (the world's own: `World::nav`): a search reads a tile's steps from them
+    /// rather than working each out. None: every step is worked out (`can_step`).
+    pub steps: Option<&'a Reach>,
 }
 
 impl NavGrid<'_> {
@@ -508,11 +512,13 @@ impl NavGrid<'_> {
 
     /// Whether a single step from `a` to the neighbouring tile `b` is allowed.
     pub fn can_step(&self, ax: i32, az: i32, bx: i32, bz: i32) -> bool {
+        self.tile_free(bx, bz) && self.stairs_allow(ax, az, bx, bz) && self.walls_allow(ax, az, bx, bz)
+    }
+
+    /// `can_step`'s stairs: a stair is walked straight up and down, entered at its foot (any other
+    /// step: allowed).
+    fn stairs_allow(&self, ax: i32, az: i32, bx: i32, bz: i32) -> bool {
         let (dx, dz) = (bx - ax, bz - az);
-        if !self.tile_free(bx, bz) {
-            return false;
-        }
-        // Stairs are walked straight up and down, entered at the foot.
         if !self.stairs.stairs.is_empty() {
             let from = self.stairs.step(ax, az);
             let to = self.stairs.step(bx, bz);
@@ -546,6 +552,18 @@ impl NavGrid<'_> {
                 }
             }
         }
+        true
+    }
+
+    /// `can_step` but for the stairs: `b` free and nothing built in the way (`Reach::steps`
+    /// keeps it per tile).
+    fn step_open(&self, ax: i32, az: i32, bx: i32, bz: i32) -> bool {
+        self.tile_free(bx, bz) && self.walls_allow(ax, az, bx, bz)
+    }
+
+    /// `can_step`'s walls, fences, diagonals and furniture between `a` and `b`.
+    fn walls_allow(&self, ax: i32, az: i32, bx: i32, bz: i32) -> bool {
+        let (dx, dz) = (bx - ax, bz - az);
         if dx == 0 || dz == 0 {
             return self.lot.edge_walkable(ax, az, bx, bz);
         }
@@ -688,13 +706,26 @@ impl NavGrid<'_> {
                     .link(x, z)
                     .filter(|&(lx, lz)| self.tile_free(lx, lz));
                 let here = grounds.and_then(|gr| gr.plot(self, x, z));
-                for (dx, dz) in NEIGHBOURS
+                // (The tile's steps as its walkable regions have them, when they're up to date.)
+                let known = self
+                    .steps
+                    .and_then(|r| r.steps_at(lot.chunk_at(x, z), i));
+                for (d, (dx, dz)) in NEIGHBOURS
                     .into_iter()
                     .chain(link.map(|(lx, lz)| (lx - x, lz - z)))
+                    .enumerate()
                 {
                     let (nx, nz) = (x + dx, z + dz);
                     let linked = Some((nx, nz)) == link;
-                    if !linked && ((dx.abs() > 1 || dz.abs() > 1) || !self.can_step(x, z, nx, nz)) {
+                    let step = |d: usize| match known {
+                        Some(steps) if d < NEIGHBOURS.len() => {
+                            let can = steps & (1 << d) != 0 && self.stairs_allow(x, z, nx, nz);
+                            debug_assert_eq!(can, self.can_step(x, z, nx, nz));
+                            can
+                        }
+                        _ => self.can_step(x, z, nx, nz),
+                    };
+                    if !linked && ((dx.abs() > 1 || dz.abs() > 1) || !step(d)) {
                         continue;
                     }
                     if corridor.is_some_and(|c| !c[lot.chunk_at(nx, nz)]) {
@@ -956,6 +987,12 @@ pub struct Reach {
     /// Chunks to label again (`mark`), and whether all of them are.
     dirty: Vec<u32>,
     all_dirty: bool,
+    /// Per slot: the steps open from the tile to each of `NEIGHBOURS` (bit `k`), stairs aside
+    /// (`NavGrid::step_open`): worked out with the labels, so a search reads them rather than
+    /// working each step out. Only for chunks `stepped` says are up to date.
+    steps: Vec<u8>,
+    /// Per chunk: its tiles' `steps` are as the lot is (labelled since anything near changed).
+    stepped: Vec<bool>,
 }
 
 const NO_PART: u16 = u16::MAX;
@@ -982,9 +1019,48 @@ impl Reach {
         let c = |v: i32, n: usize| (v.max(0) as usize / CHUNK).min(n - 1);
         for cz in c(z0 - 1, rows)..=c(z1, rows) {
             for cx in c(x0 - 1, cols)..=c(x1, cols) {
-                self.dirty.push((cz * cols + cx) as u32);
+                let k = cz * cols + cx;
+                self.dirty.push(k as u32);
+                if let Some(s) = self.stepped.get_mut(k) {
+                    *s = false;
+                }
             }
         }
+    }
+
+    /// The steps open from slot `s` (a tile of chunk `c`) to each of `NEIGHBOURS` (bit `k`),
+    /// stairs aside, if its chunk's are up to date (`steps`).
+    fn steps_at(&self, c: usize, s: usize) -> Option<u8> {
+        if self.all_dirty || !self.stepped.get(c).copied().unwrap_or(false) {
+            return None;
+        }
+        self.steps.get(s).copied()
+    }
+
+    /// Works out the steps from every tile of chunk `c` (`steps`), labelled just before: on plain
+    /// ground (`plain`) every step inside the chunk is open, so only its rim's are worked out.
+    fn step_chunk(&mut self, nav: &NavGrid, c: usize) {
+        let lot = nav.lot;
+        let open_at = |x: i32, z: i32| {
+            NEIGHBOURS
+                .into_iter()
+                .enumerate()
+                .filter(|&(_, (dx, dz))| nav.step_open(x, z, x + dx, z + dz))
+                .fold(0u8, |m, (k, _)| m | 1 << k)
+        };
+        if self.plain[c] {
+            for (_, _, s) in lot.chunk_tiles(c) {
+                self.steps[s] = u8::MAX;
+            }
+            for (x, z) in lot.chunk_rim(c) {
+                self.steps[lot.tile_index(x, z)] = open_at(x, z);
+            }
+        } else {
+            for (x, z, s) in lot.chunk_tiles(c) {
+                self.steps[s] = open_at(x, z);
+            }
+        }
+        self.stepped[c] = true;
     }
 
     /// Notes that walking may have changed anywhere.
@@ -1007,6 +1083,8 @@ impl Reach {
             self.all_dirty = true;
         }
         self.part.resize(lot.tile_slots(), NO_PART);
+        self.steps.resize(lot.tile_slots(), 0);
+        self.stepped.resize(chunks, false);
         // Chunks a flight of stairs is in (steps, feet, tops and landings): never plain.
         let mut stairs: Vec<u32> = nav
             .stairs
@@ -1025,6 +1103,7 @@ impl Reach {
             self.part.fill(NO_PART);
             for c in 0..chunks {
                 self.label(nav, c, &stairs);
+                self.step_chunk(nav, c);
             }
             for c in 0..chunks {
                 self.join(nav, c);
@@ -1035,6 +1114,7 @@ impl Reach {
             dirty.dedup();
             for &c in &dirty {
                 self.label(nav, c as usize, &stairs);
+                self.step_chunk(nav, c as usize);
             }
             // The joins out of the chunks labelled again, and into them from round about.
             let (cols, rows) = grid;
@@ -1574,6 +1654,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         let reach = Reach::build(&nav);
         assert_eq!(reach.regions(), 2, "the room is sealed off");
@@ -1588,6 +1669,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         assert!(reach.reaches(&nav, (2, 2), (3, 3)));
         assert!(!reach.reaches(&nav, (2, 2), (8, 8)));
@@ -1602,6 +1684,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         let reach = Reach::build(&nav);
         assert_eq!(reach.regions(), 1);
@@ -1618,6 +1701,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         let path = nav.find_path((2, 2), (7, 2)).expect("path exists");
         assert!(
@@ -1638,6 +1722,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         let path = nav.find_path((2, 2), (7, 2)).unwrap();
         let smooth = nav.smooth(&path);
@@ -1690,6 +1775,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         assert!(!nav.tile_free(4, 2), "nobody stands on a diagonal wall");
         // Orthogonal steps into the wall tile are refused from both halves.
@@ -1723,6 +1809,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         // From the lower-right side (below the wall) to the upper-left side.
         let path = nav.find_path((6, 1), (2, 4)).expect("path around the end");
@@ -1746,6 +1833,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         assert!(nav.tile_free(5, 3), "a doorway can be walked");
         let path = nav.find_path((6, 2), (4, 4)).expect("through the door");
@@ -1779,6 +1867,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         assert!(nav.can_step(1, 0, 2, 1), "along the corridor");
         assert!(nav.can_step(2, 1, 3, 2));
@@ -1798,6 +1887,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         assert!(nav.find_path((0, 0), (3, 3)).is_none());
     }
@@ -1832,6 +1922,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         // Without plots to mind, straight across the middle garden.
         let direct = nav.find_path((5, 8), (25, 8)).unwrap();
@@ -1884,6 +1975,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         // From their own garden to the neighbours' (both open to them: they're going there), the
         // two side by side: out at the front, along the street and in at the neighbours' front.
@@ -1936,6 +2028,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         let grounds = Grounds {
             tile_plot: &tile_plot,
@@ -1980,6 +2073,7 @@ mod tests {
             blocked: &blocked,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         take_search_stats();
         let before = nodes_searched();
@@ -2051,6 +2145,7 @@ mod tests {
             blocked: &blocked,
             stairs: &map,
             kept_off: &[],
+            steps: None,
         };
         // Onto the bottom step from any side, and round in order.
         assert!(nav.can_step(2, 5, 3, 5));
@@ -2083,6 +2178,7 @@ mod tests {
             blocked: &blocked,
             stairs: &map,
             kept_off: &[],
+            steps: None,
         };
         assert!(nav.can_step(3, 6, 3, 5));
         assert!(!nav.can_step(2, 5, 3, 5));
@@ -2104,12 +2200,14 @@ mod tests {
             blocked: &bs,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         let up = NavGrid {
             lot: &tall,
             blocked: &bt,
             stairs: &NO_STAIRS,
             kept_off: &[],
+            steps: None,
         };
         let first = flat.find_path((2, 2), (7, 2)).unwrap();
         assert!(

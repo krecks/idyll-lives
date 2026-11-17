@@ -211,6 +211,7 @@ fn sensible_on(w: &World, plot: u32) {
         blocked: w.blocked(),
         stairs: w.stair_map(),
         kept_off: &[],
+        steps: None,
     };
     for s in &w.sims {
         let (x, z) = s.tile();
