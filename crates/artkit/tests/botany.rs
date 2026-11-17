@@ -1,6 +1,7 @@
 //! The botany (leaves, tubes, pots, lumps, leaf cards) against what Blender 5.2 made of families/plants.py's
 //! (tests/golden/botany.txt: each shape at full detail and as a far version, and two little crowns built, their
-//! perches found and their leaves clad in cards, as the trees do it).
+//! perches found and their leaves clad in cards, as the trees do it; captured with plants.py and trees.py as they
+//! were when the botany was ported, d8038732).
 mod common;
 
 use artkit::botany::{self, CARD_OF, Cards, Tiles, card_of, join_still, stand_in};
@@ -602,6 +603,39 @@ fn words(line: &str) -> Vec<&str> {
     line.split(' ').filter(|w| !w.is_empty()).collect()
 }
 
+/// Each golden face's own among a built mesh's (the faces are the same, in an order of Blender's), and each golden
+/// corner's.
+fn its_order(mesh: &artkit::mesh::Mesh, faces: &[Vec<u32>]) -> (Vec<usize>, Vec<usize>) {
+    let at: BTreeMap<&[u32], usize> = (0..mesh.faces.len())
+        .map(|f| (mesh.corners(f), f))
+        .collect();
+    let of: Vec<usize> = faces.iter().map(|f| at[f.as_slice()]).collect();
+    let corner = faces
+        .iter()
+        .zip(&of)
+        .flat_map(|(f, &mine)| {
+            let start = mesh.faces[mine].start as usize;
+            (0..f.len()).map(move |i| start + i)
+        })
+        .collect();
+    (of, corner)
+}
+
+/// Checks the part's UVs against the golden's, to the bit.
+fn same_uvs(what: &str, mesh: &artkit::mesh::Mesh, g: &GoldenMesh) {
+    assert_eq!(mesh.faces.len(), g.faces.len(), "{what}: faces");
+    let (_, corner) = its_order(mesh, &g.faces);
+    let want = g.f32s("uv");
+    assert_eq!(want.len(), 2 * mesh.loops.len(), "{what}: a UV a corner");
+    let uvs = mesh.uvs.as_ref().expect("its UVs");
+    let wrong = corner
+        .iter()
+        .enumerate()
+        .filter(|&(l, &mine)| bits(&uvs[mine]) != bits(&want[2 * l..2 * l + 2]))
+        .count();
+    assert_eq!(wrong, 0, "{what}: UVs differ, of {}", corner.len());
+}
+
 /// How far a built part is from the golden one, where it may be at all: the normals' farthest and how many of the
 /// corners' aren't Blender's bits (in the kernel's own order of faces), and how many vertices' baked shading is a
 /// level out.
@@ -643,18 +677,7 @@ fn same(case: &str, obj: Obj, g: &GoldenMesh, off: &mut Off) {
     if !g.lines.contains_key("s") {
         return;
     }
-    // each golden face's own among the built ones, and each golden corner's
-    let at: BTreeMap<&[u32], usize> = (0..faces.len()).map(|f| (mesh.corners(f), f)).collect();
-    let of: Vec<usize> = g.faces.iter().map(|f| at[f.as_slice()]).collect();
-    let corner: Vec<usize> = g
-        .faces
-        .iter()
-        .zip(&of)
-        .flat_map(|(f, &mine)| {
-            let start = mesh.faces[mine].start as usize;
-            (0..f.len()).map(move |i| start + i)
-        })
-        .collect();
+    let (of, corner) = its_order(&mesh, &g.faces);
     let smooth: String = of
         .iter()
         .map(|&f| if mesh.faces[f].smooth { '1' } else { '0' })
@@ -688,15 +711,8 @@ fn same(case: &str, obj: Obj, g: &GoldenMesh, off: &mut Off) {
         sharp,
         "{what}: sharp edges"
     );
-    if let Some(uv) = g.lines.get("uv").filter(|_| mesh.uvs.is_some()) {
-        let want = f32s(&words(uv));
-        let uvs = mesh.uvs.as_ref().unwrap();
-        let wrong = corner
-            .iter()
-            .enumerate()
-            .filter(|&(l, &mine)| bits(&uvs[mine]) != bits(&want[2 * l..2 * l + 2]))
-            .count();
-        assert_eq!(wrong, 0, "{what}: UVs differ, of {}", corner.len());
+    if g.lines.contains_key("uv") && mesh.uvs.is_some() {
+        same_uvs(&what, &mesh, g);
         assert_eq!(
             mesh.uv_metres,
             g.lines["uvm"].starts_with('1'),
@@ -819,10 +835,26 @@ fn crown(name: &str, build: fn() -> Vec<Obj>, tiles: Option<Tiles>, off: &mut Of
     let all = cases();
     for far in [false, true] {
         let case = format!("{name}{}", if far { ".far" } else { "" });
-        let Some((_, meshes)) = all.iter().find(|(n, _)| *n == case) else {
-            assert!(tiles.is_some() && far, "no golden for {case}");
-            continue;
+        let found = all.iter().find(|(n, _)| *n == case);
+        // (a crown with tiles of its own is the crown but for its UVs, which are all its golden has, with its faces
+        // in the order Blender had them that time)
+        let mut own_uvs: Option<&Vec<GoldenMesh>> = None;
+        let meshes: Vec<GoldenMesh> = match (&tiles, found) {
+            (None, Some((_, meshes))) => meshes.clone(),
+            (Some(_), Some((_, own))) => {
+                own_uvs = Some(own);
+                let plain = name.split('.').next().unwrap_or(name);
+                let (_, meshes) = all.iter().find(|(n, _)| n == plain).expect("its crown");
+                let mut meshes = meshes.clone();
+                for mesh in &mut meshes {
+                    mesh.lines.remove("uv");
+                }
+                meshes
+            }
+            (Some(_), None) if far => continue,
+            _ => panic!("no golden for {case}"),
         };
+        let meshes = &meshes;
         scene::reset();
         perch::clear();
         botany::clear();
@@ -881,6 +913,9 @@ fn crown(name: &str, build: fn() -> Vec<Obj>, tiles: Option<Tiles>, off: &mut Of
             assert_eq!(obj.name(), g.name, "{case}");
             same(&case, obj, g, off);
         }
+        for (&obj, g) in objs.iter().zip(own_uvs.into_iter().flatten()) {
+            same_uvs(&case, &obj.read(|o| o.mesh.clone()), g);
+        }
     }
 }
 
@@ -902,8 +937,9 @@ fn a_crown_clad_in_cards_is_blenders_and_its_perches_stand_where_they_stood() {
 #[test]
 fn a_species_own_tiles_move_only_the_cards_and_cores_pictures() {
     scene::set_finishes(finishes());
+    // (as many tiles as the shared atlas has: a card draws its tile, so with more or fewer the cards fall otherwise)
     let tiles = Tiles {
-        cards: vec![(0.5, 0.0), (0.0, 0.0)],
+        cards: vec![(0.5, 0.0), (0.0, 0.0), (0.5, 0.5)],
         core: (0.0, 0.5),
     };
     crown("crown1.tiles", crown1, Some(tiles), &mut Off::default());

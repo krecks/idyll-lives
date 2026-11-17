@@ -58,7 +58,9 @@ pub fn card_of(leaf: &str) -> &'static str {
 }
 
 /// Where the cards' and the cores' pictures are in the atlas: each cluster's corner (u, v from the bottom, 0.5
-/// across) and the dense tile's. The shared atlas's by default; a species may carry its own.
+/// across) and the dense tile's. The shared atlas's by default; a species may carry its own. (A card draws its
+/// tile: with as many clusters as the shared atlas has, a tree's cards lie as they lay; with more or fewer they
+/// fall otherwise.)
 #[derive(Clone, Debug, PartialEq)]
 pub struct Tiles {
     pub cards: Vec<(f64, f64)>,
@@ -473,7 +475,8 @@ impl Cards {
         }
     }
 
-    /// One mesh a material: four corners a card, their normals, UVs and shading as given.
+    /// One mesh a material: four corners a card, their UVs and shading as given, their normals as Blender keeps the
+    /// ones given (`normals::custom_from_verts`).
     pub fn build(&self) -> Vec<Obj> {
         let mut out = Vec::new();
         for (material, quads) in &self.by {
