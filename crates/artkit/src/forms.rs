@@ -500,6 +500,7 @@ pub fn extrude(name: impl AsRef<str>, outline: &[(f64, f64)], depth: f64, o: Ext
         .copied()
         .chain(rims.iter().map(|&(a, b)| (a + n, b + n)))
         .collect();
+    let sides_from = faces.len() - rims.len();
     let mut mesh = Mesh::from_pydata(verts, &faces);
     mesh.set_material(o.material);
     mesh.recalc_normals();
@@ -513,6 +514,11 @@ pub fn extrude(name: impl AsRef<str>, outline: &[(f64, f64)], depth: f64, o: Ext
             30.0,
             &EdgeOrder::Listed(order),
         );
+        obj.edit(|part| {
+            if let Some(bevel) = &mut part.bevel {
+                bevel.sides_from = Some(sides_from);
+            }
+        });
     }
     obj.set_location(o.at).set_rotation(o.rot)
 }
@@ -539,6 +545,10 @@ pub fn bisect(obj: Obj, co: impl Into<P3>, no: impl Into<P3>, cap: bool) -> Obj 
     let (co, no): (V3, V3) = (co.into().into(), no.into().into());
     let no = no.normalized();
     obj.edit(|part| {
+        // (a bevel still to be given rounds the cut mesh, whose points are numbered anew)
+        if let Some(bevel) = &mut part.bevel {
+            (bevel.order, bevel.sides_from) = (EdgeOrder::Corners, None);
+        }
         let old = &part.mesh;
         let dist = 0.0001_f32;
         // which side of the plane each point is on: -1 behind (kept), 0 on it, 1 in front
@@ -687,7 +697,7 @@ pub fn jitter(obj: Obj, amount: f64, o: Jitter) -> Obj {
 /// A copy of `obj` mirrored across the world's plane through the origin normal to `axis` (the model's middle): build
 /// one side, mirror it for the other. `name`: by default the part's own with `_mirror`.
 pub fn mirrored(obj: Obj, axis: Axis, name: Option<&str>) -> Obj {
-    let (mesh, way) = obj.read(|o| (o.mesh.clone(), o.uv));
+    let (mesh, way, bevel) = obj.read(|o| (o.mesh.clone(), o.uv, o.bevel.clone()));
     let name = name.map_or_else(|| format!("{}_mirror", obj.name()), str::to_string);
     let copy = scene::add(&name, mesh);
     let mut k = [1.0_f32; 3];
@@ -701,7 +711,8 @@ pub fn mirrored(obj: Obj, axis: Axis, name: Option<&str>) -> Obj {
     // matrix set to the identity, taken apart as Blender takes it (its turn about y a negative zero)
     let (loc, rot, scale) = crate::motion::decompose(&M4::IDENTITY);
     copy.edit(|o| {
-        o.uv = way;
+        // (the copy has the bevel the part is still to be given, as it had its modifiers)
+        (o.uv, o.bevel) = (way, bevel);
         o.mesh.transform(&mw);
         o.mesh.flip_normals();
         (o.loc, o.rot, o.scale) = (loc, rot, scale);

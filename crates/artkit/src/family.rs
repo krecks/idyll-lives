@@ -237,6 +237,8 @@ pub fn make(model: &Model) -> Result<Vec<Obj>, String> {
     let built = (model.build)();
     scene::with(|s| s.centre = [0.0, 0.0]);
     let objs = if built.is_empty() { meshes() } else { built };
+    // (a part never joined is given its UVs and its bevel here, as Blender's export applied its modifiers)
+    crate::bevel::apply_all(&objs);
     let (_, line) = check_size(
         model.size,
         model.tolerance,
@@ -258,6 +260,7 @@ pub fn make_far(model: &Model, far_build: Far) -> Result<Vec<Obj>, String> {
         Far::Own(build) => build(),
     };
     let objs = if built.is_empty() { meshes() } else { built };
+    crate::bevel::apply_all(&objs);
     let name = format!("{}.far", model.id);
     let tolerance = Tolerance(model.tolerance.0.map(|t| t.max(0.05)));
     let (_, line) = check_size(

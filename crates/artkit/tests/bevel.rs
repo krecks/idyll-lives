@@ -1,8 +1,9 @@
 //! Bevels, slabs and their fills against Blender 5.2's (tests/golden/bevel.txt: parts of the families as the bevel
-//! modifier and `forms.extrude` made them, captured as each family was built).
+//! modifier and `forms.extrude` made them, captured as each family was built; two as they were once joined, changed
+//! after their bevel was asked for).
 mod common;
 
-use artkit::bevel::{EdgeOrder, Kind, bevelled};
+use artkit::bevel::{EdgeOrder, Kind, apply, bevelled, carried};
 use artkit::forms::{Extrude, Holes, Plane, extrude};
 use artkit::math::V3;
 use artkit::mesh::Mesh;
@@ -288,7 +289,7 @@ fn a_bevelled_box_and_cylinder_are_blenders_point_for_point() {
             }
             _ => continue,
         };
-        let got = obj.read(|o| o.mesh.clone());
+        let got = apply(obj).read(|o| o.mesh.clone());
         let far = in_order(&got.verts, &r.points("ov"));
         assert!(
             got.faces.iter().all(|f| f.smooth),
@@ -334,7 +335,7 @@ fn a_slab_is_blenders_cut_for_cut() {
                 ..Extrude::default()
             },
         );
-        let got = obj.read(|o| o.mesh.clone());
+        let got = apply(obj).read(|o| o.mesh.clone());
         let bevelled = r.width() != 0.0;
         let want = r.points(if bevelled { "ov" } else { "bv" });
         let (map, far) = paired(&got.verts, &want);
@@ -381,7 +382,9 @@ fn a_bevel_keeps_flat_faces_flat_and_rounds_between_them() {
             ..Cube::default()
         },
     );
-    let mesh = obj.read(|o| o.mesh.clone());
+    // (asked for, the bevel is still to be given: the part keeps its mesh until it is joined or written)
+    assert_eq!(obj.read(|o| o.mesh.verts.len()), 8);
+    let mesh = apply(obj).read(|o| o.mesh.clone());
     assert_eq!((mesh.verts.len(), mesh.faces.len()), (24, 26));
     let made = bevelled(
         &artkit::shapes::primitive::cube(),
@@ -483,4 +486,194 @@ fn a_turned_bevelled_part_keeps_its_normals_on_its_faces() {
         }
     }
     assert_eq!(checked, 6);
+}
+
+#[test]
+fn a_bevel_rounds_the_part_as_it_is_when_it_is_joined() {
+    use artkit::math::{TAU, cosd, sind, v3};
+    use artkit::noise::noise;
+    let records = records();
+    let rec = |name: &str| records.iter().find(|r| r.name == name).unwrap();
+    let mat = artkit::materials::Mat::new("pit", "#8C867E", "matte");
+    // the fire pit's first stone (outdoor.py): a bevelled box turned to face the fire, then pushed about by noise
+    // (the script's own `_jitter`). Blender's modifier rounded the pushed box.
+    scene::reset();
+    let f = artkit::place::GameFrame::new(0.0);
+    let (a, w) = (0.0_f64, TAU * 0.39 / 11.0 - 0.012);
+    let stone = artkit::fbox!(
+        f,
+        "stone0_0",
+        w,
+        0.14 - 0.008,
+        0.1,
+        (0.39 * cosd(a), 0.07, 0.39 * sind(a)),
+        mat,
+        rot = (0, 0, a - 90.0),
+        bevel = 0.018,
+        bevel_segments = 1
+    );
+    let (amount, size, seed) = (0.008, 0.07, 0.0);
+    let world = stone.world_points();
+    stone.edit(|part| {
+        for (v, p) in part.mesh.verts.iter_mut().zip(&world) {
+            let q = v3(
+                p.x as f64 / size + seed,
+                p.y as f64 / size - seed,
+                p.z as f64 / size + seed * 0.5,
+            );
+            let n = [
+                noise(q),
+                noise(q + v3(31.4, 0, 0)),
+                noise(q + v3(0, 47.1, 0)),
+            ];
+            *v += v3(n[0], n[1], n[2]) * amount;
+        }
+    });
+    let r = rec("outdoor/firePit/stone0_0@joined");
+    let pushed = stone.read(|o| o.mesh.verts.clone());
+    assert_eq!(in_order(&pushed, &r.points("bv")), 0.0, "the pushed box");
+    let got = apply(stone).read(|o| o.mesh.clone());
+    assert_eq!(in_order(&got.verts, &r.points("ov")), 0.0, "the stone");
+    let (map, _) = paired(&got.verts, &r.points("ov"));
+    let (turned, missing) = normals_off(&got, &map, r);
+    assert!(turned < 0.1 && missing == 0, "{turned} {missing}");
+    let joined = artkit::parts::join(&[stone], "joined", None);
+    let got = joined.read(|o| o.mesh.verts.clone());
+    assert_eq!(in_order(&got, &r.points("jv")), 0.0, "the stone, joined");
+
+    // the farmhouse table's brace (dining.py's `_board`): a bevelled box whose part is then turned, by a matrix
+    // that leaves its scale a unit in the last place off one. The modifier rounds the box in its own frame; the
+    // join takes the rounded box through the part's matrix.
+    let r = rec("dining/tableFarmhouse6/brace-1.15-1@joined");
+    let s = r.f64s("size");
+    scene::reset();
+    let brace = cube(
+        "brace",
+        (s[0], s[1], s[2]),
+        Cube {
+            bevel: r.width(),
+            ..Cube::default()
+        },
+    );
+    // (its place, turn and scale as Blender took the matrix apart)
+    let lrs = r.points("lrs");
+    brace.edit(|o| (o.loc, o.rot, o.scale) = (lrs[0], lrs[1], lrs[2]));
+    assert!(lrs[2].x != 1.0);
+    let joined = artkit::parts::join(&[brace], "joined", None);
+    let got = joined.read(|o| o.mesh.verts.clone());
+    assert_eq!(got.len(), r.points("jv").len());
+    assert_eq!(in_order(&got, &r.points("jv")), 0.0, "the brace, joined");
+    assert_eq!(joined.read(|o| o.loc), r.points("jl")[0]);
+}
+
+#[test]
+fn a_bevels_corners_take_their_texture_from_the_face_blender_takes_it_from() {
+    // each face of a box and of a 12-sided cylinder numbered in its UVs: the number each new corner comes out with
+    let text = golden("bevel_uv.txt");
+    let mut recs: Vec<(String, BTreeMap<String, String>)> = Vec::new();
+    for line in text.lines().filter(|l| !l.starts_with('#')) {
+        let (key, rest) = line.split_once(' ').unwrap_or((line, ""));
+        if key == "rec" {
+            recs.push((rest.to_string(), BTreeMap::new()));
+        } else {
+            recs.last_mut()
+                .unwrap()
+                .1
+                .insert(key.to_string(), rest.to_string());
+        }
+    }
+    let points = |hex: &str| -> Vec<V3> {
+        let x: Vec<f32> = (0..hex.len() / 8)
+            .map(|i| f32::from_bits(u32::from_str_radix(&hex[8 * i..8 * i + 8], 16).unwrap()))
+            .collect();
+        x.chunks(3).map(|c| V3::new(c[0], c[1], c[2])).collect()
+    };
+    let faces = |s: &str| -> Vec<Vec<u32>> {
+        s.split(' ')
+            .map(|f| f.split(',').map(|v| v.parse().unwrap()).collect())
+            .collect()
+    };
+    let mut report = Vec::new();
+    for (name, lines) in &recs {
+        let base = {
+            let mut m = Mesh::from_pydata(points(&lines["bv"]), &faces(&lines["bf"]));
+            m.shade_smooth(40.0);
+            m
+        };
+        let segments: usize = name[name.len() - 1..].parse().unwrap();
+        let (width, order) = if name.starts_with("cube") {
+            (0.02, EdgeOrder::Faces)
+        } else {
+            let n = 12;
+            let rims = (0..n).flat_map(|i| {
+                let j = (i + 1) % n;
+                [(2 * i, 2 * j), (2 * j + 1, 2 * i + 1)]
+            });
+            (0.01, EdgeOrder::Listed(rims.collect()))
+        };
+        let made = bevelled(&base, width, segments, 40.0, &order).unwrap();
+        let uvs: Vec<[f32; 2]> = (0..base.faces.len())
+            .flat_map(|f| std::iter::repeat_n([f as f32, 0.0], base.faces[f].len as usize))
+            .collect();
+        let got = carried(&base, &uvs, &made.mesh, &made, None);
+        let want_points = points(&lines["ov"]);
+        let (map, far) = paired(&made.mesh.verts, &want_points);
+        assert!(far < 1e-6, "{name}: {far}");
+        let want: BTreeMap<Vec<u32>, Vec<f32>> = faces(&lines["of"])
+            .into_iter()
+            .zip(lines["src"].split(' '))
+            .map(|(mut f, s)| {
+                f.sort();
+                let mut s: Vec<f32> = s.split(',').map(|x| x.parse().unwrap()).collect();
+                s.sort_by(f32::total_cmp);
+                s.dedup();
+                (f, s)
+            })
+            .collect();
+        let mut off = [0; 4];
+        let mut all = [0; 4];
+        for f in 0..made.mesh.faces.len() {
+            let face = made.mesh.faces[f];
+            let mut key: Vec<u32> = made
+                .mesh
+                .corners(f)
+                .iter()
+                .map(|&v| map[v as usize])
+                .collect();
+            key.sort();
+            let mut mine: Vec<f32> = (face.start..face.start + face.len)
+                .map(|l| got[l as usize][0])
+                .collect();
+            mine.sort_by(f32::total_cmp);
+            mine.dedup();
+            let kind = match made.kinds[f] {
+                Kind::Kept => 0,
+                Kind::Cut => 1,
+                Kind::Strip => 2,
+                Kind::Corner => 3,
+            };
+            all[kind] += 1;
+            if want.get(&key) != Some(&mine) {
+                off[kind] += 1;
+            }
+        }
+        report.push(format!(
+            "{name}: faces whose texture isn't from Blender's face: {} of {} cut, {} of {} strips, {} of {} of the corners'",
+            off[1], all[1], off[2], all[2], off[3], all[3]
+        ));
+        // the faces themselves and the strips, always; a corner's polygon and its patch of two segments too (of
+        // three, the patch's faces across its middle are not Blender's: 12 of a box's 56)
+        assert_eq!(
+            (off[0], off[1], off[2]),
+            (0, 0, 0),
+            "{}",
+            report.last().unwrap()
+        );
+        assert!(
+            off[3] <= if segments > 2 { 12 } else { 0 },
+            "{}",
+            report.last().unwrap()
+        );
+    }
+    println!("{}", report.join("\n"));
 }

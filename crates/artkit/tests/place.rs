@@ -73,7 +73,9 @@ fn the_games_frame_places_parts_in_blenders_axes() {
         .map(|i| ((hi[i] - lo[i]) * 1e6).round() / 1e6)
         .collect();
     assert_eq!(size, [0.74, 0.622, 0.03]);
-    assert_eq!(b.read(|o| o.mesh.verts.len()), 56);
+    // (measured with the bevel it is still to be given; rounded when it is joined or written)
+    assert_eq!(b.read(|o| o.mesh.verts.len()), 8);
+    assert_eq!(artkit::bevel::apply(b).read(|o| o.mesh.verts.len()), 56);
     let c = fcyl!(
         F,
         "jar",
@@ -85,7 +87,10 @@ fn the_games_frame_places_parts_in_blenders_axes() {
         bevel = 0.004,
         bevel_segments = 1
     );
-    assert_eq!(c.read(|o| (o.mesh.verts.len(), o.loc.z)), (40, 0.605));
+    assert_eq!(
+        artkit::bevel::apply(c).read(|o| (o.mesh.verts.len(), o.loc.z)),
+        (40, 0.605)
+    );
     // a slab lying flat: its outline's x and depth mirrored into Blender's x and y
     let s = fextrude!(
         F,

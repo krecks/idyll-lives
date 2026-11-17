@@ -26,8 +26,13 @@ same noise, and takes the noise's two tables (a permutation of 256 and 256 unit 
 (this project is GPL-3.0-or-later). The moving parts' curves (`crates/artkit/src/motion.rs`) follow Blender's
 F-curves to the bit, ported from its source (the auto-clamped handles and their smoothing pass, and the conversions
 between matrices, quaternions and Euler angles): Blender Foundation and contributors, GPL-2.0-or-later; the easings
-are Robert Penner's equations (BSD-3-Clause), as Blender has them. None of this ships with the game: it only decides
-the shapes and the clips of the models built with it.
+are Robert Penner's equations (BSD-3-Clause), as Blender has them. The bevelled edges (`crates/artkit/src/bevel.rs`)
+follow Blender's bevel (`bmesh_bevel.cc`: its offsets and their limit, the points that slide and the evening of their
+widths, the corner patches, the hardened normals), and the triangles a slab's faces are cut into
+(`crates/artkit/src/tri.rs`, `fill`) follow its fill (the `BLI_scanfill` sweep and the beauty pass of
+`BLI_polyfill_beautify`), worked through again in Rust so that a bevel comes out point for point as its modifier's:
+Blender Foundation and contributors, GPL-2.0-or-later. None of this ships with the game: it only decides the shapes
+and the clips of the models built with it.
 
 The garden decor (`models/garden/`, override pack `packs/gardenDecor/manifest.json`) is built in Blender by
 `tools/art/blender/families/garden_decor.py` on the shared `tools/art/blender/gamekit/` toolkit and exported as `.glb`

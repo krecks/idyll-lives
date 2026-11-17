@@ -24,6 +24,11 @@
 //! slab's far face that corner is not always Blender's (its faces there are in an order of its own), so a
 //! middle point's normal can lean the other way (10 to 30 degrees, on a strip a few millimetres wide).
 //!
+//! A bevel is asked for (`bevel_edges`, a builder's `bevel`) and given later, as Blender's modifier is: the part
+//! keeps its mesh, which a build can still push about, scale or cut, and is rounded as it is when it is joined
+//! (`parts::join`), measured or written. A textured part's UVs are made on the mesh as it is then and carried
+//! onto the bevel as Blender carries them (`carried`).
+//!
 //! What isn't built says so: an edge whose bevel ends at a vertex no other bevelled edge reaches, and a patch of
 //! five segments or more.
 
@@ -70,13 +75,37 @@ pub enum Kind {
     Corner,
 }
 
+/// A new face whose texture hangs on the old mesh's UVs (`carried`): which old face's it takes is settled once
+/// they are known.
+#[derive(Clone, Debug)]
+pub enum Pick {
+    /// A strip's quad (its first corner's place among the new mesh's), step `k` of the strips along the old edge
+    /// `edge` from the face `faces.0`, which its first two corners are nearer, to `faces.1`.
+    Strip {
+        at: usize,
+        edge: (u32, u32),
+        faces: (u32, u32),
+        k: usize,
+    },
+    /// A corner's polygon at the old vertex `vert`: the face each of its corners lies on, and round the vertex
+    /// each bevelled edge's other end with the faces before and after it.
+    Corner {
+        at: usize,
+        vert: u32,
+        on: Vec<u32>,
+        edges: Vec<(u32, u32, u32)>,
+    },
+}
+
 /// A mesh with its edges bevelled.
 #[derive(Clone, Debug)]
 pub struct Bevelled {
     pub mesh: Mesh,
     pub kinds: Vec<Kind>,
-    /// For each corner of the new mesh, the face of the old one whose texture it takes.
+    /// For each corner of the new mesh, the face of the old one whose texture it takes (but for `picks`).
     pub source: Vec<u32>,
+    pub picks: Vec<Pick>,
+    pub segments: usize,
     /// The offset the edges were cut back by: the width, or less where the mesh has no room for it.
     pub offset: f32,
 }
@@ -184,6 +213,12 @@ struct Corner {
     edges: Vec<Half>,
     bounds: Vec<Bound>,
 }
+
+/// A face a corner makes: its corners, each one's source face, its material and, for the corner's polygon, the vertex.
+type CornerFace = (Vec<u32>, Vec<u32>, u16, Option<u32>);
+
+/// Each edge's faces, with the places of its two ends among the mesh's corners.
+type Sides = BTreeMap<(u32, u32), Vec<(u32, usize, usize)>>;
 
 /// A vertex's new points' numbers by (bound, ring, step).
 type Numbers = BTreeMap<(usize, usize, usize), u32>;
@@ -792,6 +827,8 @@ pub fn bevelled(
             source: (0..nf)
                 .flat_map(|f| std::iter::repeat_n(f as u32, mesh.faces[f].len as usize))
                 .collect(),
+            picks: Vec::new(),
+            segments,
             offset: 0.0,
         });
     }
@@ -903,7 +940,9 @@ pub fn bevelled(
     let mut kinds = Vec::new();
     let mut source = Vec::new();
     let mut long: BTreeSet<(u32, u32)> = BTreeSet::new(); // (face, corner) whose side runs along a bevelled edge
-    let mut corner_faces: Vec<(Vec<u32>, Vec<u32>, u16)> = Vec::new(); // (corners, each one's source face, material)
+    // (corners, each one's source face, material, the vertex of a corner's polygon)
+    let mut corner_faces: Vec<CornerFace> = Vec::new();
+    let mut picks = Vec::new();
     let mut grids: BTreeMap<u32, Numbers> = BTreeMap::new();
     for &v in &keys {
         let corner = &work.corners[&v];
@@ -978,19 +1017,19 @@ pub fn bevelled(
                             at(i, j + 1, k),
                         ];
                         let f = if 2 * k + 1 < ns { f1 } else { f2 };
-                        corner_faces.push((quad, vec![f; 4], mat));
+                        corner_faces.push((quad, vec![f; 4], mat, None));
                     }
                 }
             }
             if odd == 1 {
                 let ring: Vec<u32> = (0..n).map(|i| at(i, ns2, ns2)).collect();
                 let from: Vec<u32> = (0..n).map(|i| corner.bounds[i].face).collect();
-                corner_faces.push((ring, from, mat));
+                corner_faces.push((ring, from, mat, Some(v)));
             }
         } else if n >= 3 {
             let ring: Vec<u32> = (0..n).map(|i| grid[&(i, 0, 0)]).collect();
             let from: Vec<u32> = (0..n).map(|i| corner.bounds[i].face).collect();
-            corner_faces.push((ring, from, mat));
+            corner_faces.push((ring, from, mat, Some(v)));
         }
         grids.insert(v, grid);
     }
@@ -1003,7 +1042,20 @@ pub fn bevelled(
             source.extend(std::iter::repeat_n(f as u32, c.len()));
         }
     }
-    for (c, from, mat) in corner_faces {
+    for (c, from, mat, vert) in corner_faces {
+        if let Some(vert) = vert {
+            let halves = &work.corners[&vert].edges;
+            let n = halves.len();
+            picks.push(Pick::Corner {
+                at: out.loops.len(),
+                vert,
+                on: from.clone(),
+                edges: (0..n)
+                    .filter(|&i| halves[i].bev)
+                    .map(|i| (halves[i].to, halves[(i + n - 1) % n].fnext, halves[i].fnext))
+                    .collect(),
+            });
+        }
         out.push_face(&c, mat, true);
         kinds.push(Kind::Corner);
         source.extend(from);
@@ -1016,26 +1068,29 @@ pub fn bevelled(
         let (c1, c2) = (&work.corners[&a], &work.corners[&b]);
         let (h1, h2) = (&c1.edges[c1.half_to(b)], &c2.edges[c2.half_to(a)]);
         let (i1, i2) = (h1.left, h2.left);
-        let (f1, f2) = (c1.bounds[h1.left].face, c1.bounds[h1.right].face);
-        let mat = mesh.faces[f1 as usize].mat;
+        // (the faces before and after the edge round its first end: its left point is on the one before)
+        let at = c1.half_to(b);
+        let (f1, f2) = (
+            c1.edges[(at + c1.edges.len() - 1) % c1.edges.len()].fnext,
+            h1.fnext,
+        );
+        let mat = mesh.faces[c1.bounds[h1.left].face as usize].mat;
         let at1 = |k: usize| grids[&a][&(i1, 0, k)];
         let at2 = |k: usize| grids[&b][&(i2, 0, k)];
         for k in 1..=ns {
             let quad = [at1(k - 1), at2(ns - k + 1), at2(ns - k), at1(k)];
             let face = out.faces.len() as u32;
+            picks.push(Pick::Strip {
+                at: out.loops.len(),
+                edge: (a, b),
+                faces: (f1, f2),
+                k,
+            });
             out.push_face(&quad, mat, true);
             kinds.push(Kind::Strip);
             long.insert((face, 0));
             long.insert((face, 2));
-            // (the middle strip of an odd number takes one side's texture: the lower-numbered face's)
-            let from = if 2 * k == ns + 1 {
-                f1.min(f2)
-            } else if 2 * k <= ns {
-                f1
-            } else {
-                f2
-            };
-            source.extend([from; 4]);
+            source.extend([if 2 * k <= ns { f1 } else { f2 }; 4]);
         }
     }
     // the mesh's faces round the bevelled vertices, each corner now the new point on it
@@ -1077,6 +1132,8 @@ pub fn bevelled(
         mesh: out,
         kinds,
         source,
+        picks,
+        segments: ns,
         offset: each,
     })
 }
@@ -1974,12 +2031,60 @@ impl Space {
     }
 }
 
+/// A bevel a part is to be given: Blender's modifier, which rounds the mesh as it is when the part is joined,
+/// measured or written, not as it was when the bevel was asked for.
+#[derive(Clone, Debug)]
+pub struct Pending {
+    pub width: f64,
+    pub segments: usize,
+    pub angle: f64,
+    pub order: EdgeOrder,
+    /// A slab's side faces, from this one on: Blender numbers them by where its memory put their edges, an
+    /// order that can't be told from here (`Charts::groups` reads it for the textures).
+    pub sides_from: Option<usize>,
+}
+
 /// Rounds `obj`'s edges turning more than `angle` degrees by `width` (metres), in `segments` strips, shaded
 /// smooth with hardened normals, so the faces it joins stay flat and the bevel reads as a rounded edge, not a
-/// facet. The mesh is bevelled as it is now: a build that moves a part's points does so first.
+/// facet. As Blender's modifier, it is only asked for here: the part keeps its mesh, which a build can still move,
+/// scale or cut, and is rounded when it is joined (`parts::join`), measured or written (`apply`).
 pub fn bevel_edges(obj: Obj, width: f64, segments: usize, angle: f64, order: &EdgeOrder) -> Obj {
     if obj.read(|o| o.mesh.faces.first().is_none_or(|f| !f.smooth)) {
         shade(obj, true, SHARP);
+    }
+    // (a second bevel rounds what the first made)
+    apply(obj);
+    obj.edit(|o| {
+        o.bevel = Some(Pending {
+            width,
+            segments,
+            angle,
+            order: order.clone(),
+            sides_from: None,
+        })
+    });
+    obj
+}
+
+/// The mesh of `obj` with the bevel it was to be given (`None`: it was to be given none), and what each of its
+/// faces came from.
+fn rounded(o: &crate::scene::Object) -> Option<Bevelled> {
+    let p = o.bevel.as_ref()?;
+    match bevelled(&o.mesh, p.width, p.segments, p.angle, &p.order) {
+        Ok(made) => Some(made),
+        Err(why) => panic!("{}: {why}", o.name),
+    }
+}
+
+/// The points of `obj` as it will be written: with its bevel, if it is still to be given one.
+pub fn points(obj: Obj) -> Vec<V3> {
+    obj.read(|o| rounded(o).map_or_else(|| o.mesh.verts.clone(), |made| made.mesh.verts))
+}
+
+/// Gives `obj` the bevel it was to be given, on its mesh as it is now (once: nothing is left to give after).
+pub fn apply(obj: Obj) -> Obj {
+    if obj.read(|o| o.bevel.is_none()) {
+        return obj;
     }
     let textured = crate::uv::textured(obj);
     obj.edit(|o| {
@@ -1991,22 +2096,261 @@ pub fn bevel_edges(obj: Obj, width: f64, segments: usize, angle: f64, order: &Ed
                 crate::mesh::UvWay::Done => {}
             }
         }
-        let made = match bevelled(&o.mesh, width, segments, angle, order) {
-            Ok(made) => made,
-            Err(why) => panic!("{}: {why}", o.name),
-        };
-        let mut mesh = made.mesh;
+        let Some(made) = rounded(o) else { return };
+        let mut made = made;
         if textured && let Some(uvs) = &o.mesh.uvs {
-            mesh.uvs = Some(carried(&o.mesh, uvs, &mesh, &made.source));
-            mesh.uv_metres = o.mesh.uv_metres;
+            let sides_from = o.bevel.as_ref().and_then(|b| b.sides_from);
+            made.mesh.uvs = Some(carried(&o.mesh, uvs, &made.mesh, &made, sides_from));
+            made.mesh.uv_metres = o.mesh.uv_metres;
         }
-        o.mesh = mesh;
+        o.mesh = made.mesh;
+        o.bevel = None;
     });
     obj
 }
 
-/// Each new corner's UV: its source face's own way across the face, at the corner's point.
-fn carried(old: &Mesh, uvs: &[[f32; 2]], new: &Mesh, source: &[u32]) -> Vec<[f32; 2]> {
+/// Gives each of `objs` (parts about to be joined, or a model's as written) its UVs and then its bevel, as Blender
+/// applies a part's modifiers.
+pub fn apply_all(objs: &[Obj]) {
+    crate::uv::ensure(objs);
+    for &o in objs {
+        apply(o);
+    }
+}
+
+/// Which old face a strip or a corner's polygon takes its texture from where the faces round it don't share one
+/// (Blender's `choose_rep_face`): each old face's number among the groups of faces whose UVs run on across their
+/// shared edges, its material and its middle.
+struct Charts<'a> {
+    old: &'a Mesh,
+    uvs: &'a [[f32; 2]],
+    /// (Only for an odd number of strips, as in Blender; none otherwise.)
+    group: Option<Vec<u32>>,
+    sides: Sides,
+}
+
+impl<'a> Charts<'a> {
+    fn new(old: &'a Mesh, uvs: &'a [[f32; 2]], odd: bool, sides_from: Option<usize>) -> Charts<'a> {
+        let mut sides = Sides::new();
+        for f in 0..old.faces.len() {
+            let c = old.corners(f);
+            let at = old.faces[f].start as usize;
+            for i in 0..c.len() {
+                let j = (i + 1) % c.len();
+                let (a, b) = if c[i] < c[j] { (i, j) } else { (j, i) };
+                sides
+                    .entry(edge(c[i], c[j]))
+                    .or_default()
+                    .push((f as u32, at + a, at + b));
+            }
+        }
+        let mut charts = Charts {
+            old,
+            uvs,
+            group: None,
+            sides,
+        };
+        if odd {
+            charts.group = Some(charts.groups(sides_from));
+        }
+        charts
+    }
+
+    /// Whether the UVs run on from face `f` to face `g` across the edge `e` they share: the same at both its ends.
+    fn runs_on(&self, e: (u32, u32), f: u32, g: u32) -> bool {
+        let Some(faces) = self.sides.get(&edge(e.0, e.1)) else {
+            return false;
+        };
+        if faces.len() != 2 {
+            return false;
+        }
+        let of = |face: u32| faces.iter().find(|s| s.0 == face);
+        match (of(f), of(g)) {
+            (Some(a), Some(b)) if f != g => {
+                self.uvs[a.1] == self.uvs[b.1] && self.uvs[a.2] == self.uvs[b.2]
+            }
+            _ => false,
+        }
+    }
+
+    /// The middle of a face's bounds.
+    fn middle(&self, f: u32) -> V3 {
+        let c = self.old.corners(f as usize);
+        let (mut lo, mut hi) = (self.old.verts[c[0] as usize], self.old.verts[c[0] as usize]);
+        for &v in c {
+            let p = self.old.verts[v as usize];
+            lo = V3::new(lo.x.min(p.x), lo.y.min(p.y), lo.z.min(p.z));
+            hi = V3::new(hi.x.max(p.x), hi.y.max(p.y), hi.z.max(p.z));
+        }
+        V3::new(
+            0.5 * (lo.x + hi.x),
+            0.5 * (lo.y + hi.y),
+            0.5 * (lo.z + hi.z),
+        )
+    }
+
+    /// Each face's group, numbered in the order the faces come to them; then the topmost face's group takes the
+    /// first face's number and the bottom-most's the second's, as Blender has it. The groups that start among a
+    /// slab's side faces (`sides_from`) come in an order of Blender's that can't be told: they are numbered the
+    /// larger first, which is the likelier (a group of more faces is likelier to hold the first of them).
+    fn groups(&self, sides_from: Option<usize>) -> Vec<u32> {
+        let nf = self.old.faces.len();
+        let mut group = vec![u32::MAX; nf];
+        let mut count = 0;
+        for start in 0..nf {
+            if group[start] != u32::MAX {
+                continue;
+            }
+            let mut stack = vec![start as u32];
+            while let Some(f) = stack.pop() {
+                if group[f as usize] != u32::MAX {
+                    continue;
+                }
+                group[f as usize] = count;
+                let c = self.old.corners(f as usize);
+                for i in 0..c.len() {
+                    let e = (c[i], c[(i + 1) % c.len()]);
+                    for &(g, _, _) in &self.sides[&edge(e.0, e.1)] {
+                        if g != f && group[g as usize] == u32::MAX && self.runs_on(e, f, g) {
+                            stack.push(g);
+                        }
+                    }
+                }
+            }
+            count += 1;
+        }
+        if let Some(from) = sides_from {
+            let mut first = vec![usize::MAX; count as usize];
+            let mut size = vec![0_usize; count as usize];
+            for (f, &g) in group.iter().enumerate() {
+                first[g as usize] = first[g as usize].min(f);
+                size[g as usize] += 1;
+            }
+            let fixed = first.iter().filter(|&&f| f < from).count();
+            let mut loose: Vec<usize> = (0..count as usize).filter(|&g| first[g] >= from).collect();
+            loose.sort_by_key(|&g| (std::cmp::Reverse(size[g]), first[g]));
+            let mut renumbered = vec![0_u32; count as usize];
+            let mut next = 0;
+            for g in 0..count as usize {
+                if first[g] < from {
+                    renumbered[g] = next;
+                    next += 1;
+                }
+            }
+            debug_assert_eq!(next as usize, fixed);
+            for (i, &g) in loose.iter().enumerate() {
+                renumbered[g] = (fixed + i) as u32;
+            }
+            for g in group.iter_mut() {
+                *g = renumbered[*g as usize];
+            }
+        }
+        if count <= 1 {
+            return group;
+        }
+        let (mut top, mut bottom) = ((f32::MIN, 0), (f32::MAX, 0));
+        for (f, &g) in group.iter().enumerate() {
+            let z = self.middle(f as u32).z;
+            if z > top.0 {
+                top = (z, g);
+            }
+            if z < bottom.0 {
+                bottom = (z, g);
+            }
+        }
+        let swap = |group: &mut Vec<u32>, a: u32, b: u32| {
+            for g in group.iter_mut() {
+                *g = if *g == a {
+                    b
+                } else if *g == b {
+                    a
+                } else {
+                    *g
+                };
+            }
+        };
+        let first = group[0];
+        swap(&mut group, first, top.1);
+        if bottom.1 != top.1 {
+            // (the first face's group, if it was the bottom-most, has the topmost's number now)
+            let lowest = if bottom.1 == 0 { top.1 } else { bottom.1 };
+            let second = group[1.min(nf - 1)];
+            swap(&mut group, second, lowest);
+        }
+        group
+    }
+
+    /// The one of `faces` a texture is taken from: the lowest group, then material, then middle (z, x, y), the
+    /// first of them where all are alike.
+    fn pick(&self, faces: &[u32]) -> u32 {
+        let values: Vec<[f32; 5]> = faces
+            .iter()
+            .map(|&f| {
+                let m = self.middle(f);
+                [
+                    self.group.as_ref().map_or(0.0, |g| g[f as usize] as f32),
+                    self.old.faces[f as usize].mat as f32,
+                    m.z,
+                    m.x,
+                    m.y,
+                ]
+            })
+            .collect();
+        let mut viable = vec![true; faces.len()];
+        let mut left = faces.len();
+        let mut best: Option<usize> = None;
+        for value in 0..5 {
+            if left <= 1 {
+                break;
+            }
+            for f in 0..faces.len() {
+                if !viable[f] || Some(f) == best {
+                    continue;
+                }
+                let Some(b) = best else {
+                    best = Some(f);
+                    continue;
+                };
+                if values[f][value] < values[b][value] {
+                    best = Some(f);
+                    for earlier in viable.iter_mut().take(f) {
+                        if std::mem::replace(earlier, false) {
+                            left -= 1;
+                        }
+                    }
+                } else if values[f][value] > values[b][value] {
+                    viable[f] = false;
+                    left -= 1;
+                }
+            }
+        }
+        faces[best.unwrap_or(0)]
+    }
+}
+
+/// The point of the segment a-b nearest to `p`.
+fn on_segment(p: V3, a: V3, b: V3) -> V3 {
+    let d = b - a;
+    let length = dot_v3(d, d);
+    if length == 0.0 {
+        return a;
+    }
+    let t = (dot_v3(p - a, d) / length).clamp(0.0, 1.0);
+    V3::new(a.x + d.x * t, a.y + d.y * t, a.z + d.z * t)
+}
+
+/// Each new corner's UV, as Blender's bevel carries them: its source face's own way across the face, at the
+/// corner's point. A strip between two faces whose UVs don't run on across the edge takes one face's texture
+/// (the middle strip of an odd number; of an even number, half the strips each), its points beyond that face
+/// read on the old edge; so does a corner's polygon, its points off the face read on the face's nearer edge at
+/// the vertex.
+pub fn carried(
+    old: &Mesh,
+    uvs: &[[f32; 2]],
+    new: &Mesh,
+    made: &Bevelled,
+    sides_from: Option<usize>,
+) -> Vec<[f32; 2]> {
     /// A face's UVs as a point of it, two of its sides and how the UV changes along each.
     struct Frame {
         p0: V3,
@@ -2045,10 +2389,94 @@ fn carried(old: &Mesh, uvs: &[[f32; 2]], new: &Mesh, source: &[u32]) -> Vec<[f32
             })
         })
         .collect();
+    let ns = made.segments;
+    let (odd, half) = (ns % 2 == 1, ns / 2);
+    let charts = Charts::new(old, uvs, odd, sides_from);
+    let mut source = made.source.clone();
+    let mut read_at: Vec<Option<(u32, u32)>> = vec![None; source.len()];
+    for pick in &made.picks {
+        match pick {
+            Pick::Strip { at, edge, faces, k } => {
+                let (f1, f2) = *faces;
+                // (corners 0 and 1 are the nearer to f1, 2 and 3 to f2)
+                let (from, far): (u32, &[usize]) = if odd && *k == half + 1 {
+                    if charts.runs_on(*edge, f1, f2) {
+                        source[*at..*at + 2].fill(f1);
+                        source[*at + 2..*at + 4].fill(f2);
+                        continue;
+                    }
+                    let from = charts.pick(&[f1, f2]);
+                    (from, if from == f1 { &[2, 3] } else { &[0, 1] })
+                } else if !odd && *k == half {
+                    (f1, &[2, 3])
+                } else if !odd && *k == half + 1 {
+                    (f2, &[0, 1])
+                } else {
+                    (if *k <= half { f1 } else { f2 }, &[])
+                };
+                source[*at..*at + 4].fill(from);
+                for &i in far {
+                    read_at[*at + i] = Some(*edge);
+                }
+            }
+            Pick::Corner {
+                at,
+                vert,
+                on,
+                edges,
+            } => {
+                if edges
+                    .iter()
+                    .all(|&(to, before, after)| charts.runs_on((*vert, to), before, after))
+                {
+                    continue;
+                }
+                let mut choices: Vec<u32> = Vec::new();
+                for &(_, before, after) in edges {
+                    let f = charts.pick(&[before, after]);
+                    if !choices.contains(&f) {
+                        choices.push(f);
+                    }
+                }
+                let from = charts.pick(&choices);
+                // the face's two sides at the vertex, in the face's order of them
+                let c = old.corners(from as usize);
+                let Some(p) = c.iter().position(|&v| v == *vert) else {
+                    continue;
+                };
+                let n = c.len();
+                let sides = if p == 0 {
+                    [(c[0], c[1]), (c[n - 1], c[0])]
+                } else {
+                    [(c[p - 1], c[p]), (c[p], c[(p + 1) % n])]
+                };
+                for (i, &face) in on.iter().enumerate() {
+                    source[*at + i] = from;
+                    if face != from {
+                        let point = new.verts[new.loops[*at + i] as usize];
+                        let apart = |s: (u32, u32)| {
+                            let q =
+                                on_segment(point, old.verts[s.0 as usize], old.verts[s.1 as usize]);
+                            dot_v3(point - q, point - q)
+                        };
+                        read_at[*at + i] = Some(if apart(sides[1]) < apart(sides[0]) {
+                            sides[1]
+                        } else {
+                            sides[0]
+                        });
+                    }
+                }
+            }
+        }
+    }
     let mut out = vec![[0.0_f32; 2]; new.loops.len()];
     for (l, &f) in source.iter().enumerate() {
         if let Some(frame) = &frames[f as usize] {
-            let d = new.verts[new.loops[l] as usize] - frame.p0;
+            let mut point = new.verts[new.loops[l] as usize];
+            if let Some((a, b)) = read_at[l] {
+                point = on_segment(point, old.verts[a as usize], old.verts[b as usize]);
+            }
+            let d = point - frame.p0;
             let (x, y) = (d.dot(frame.sides[0]), d.dot(frame.sides[1]));
             let a = frame.inverse[0] * x + frame.inverse[1] * y;
             let b = frame.inverse[1] * x + frame.inverse[2] * y;
