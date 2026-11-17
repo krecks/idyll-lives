@@ -192,6 +192,9 @@ export class LandHaze {
     this.write();
     const mi = new pc.MeshInstance(mesh, this.material);
     mi.cull = false;
+    // (Drawn after the other blended draws of its bucket, the water's among them: by its box's middle, the land's,
+    // water nearer the camera than that sorted after it and showed through the haze, past the land, from some sides.)
+    mi.calculateSortDistance = () => -1e8;
     this.entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: false, layers: [layer] });
   }
 
