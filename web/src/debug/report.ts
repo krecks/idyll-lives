@@ -2,7 +2,8 @@
  * Debug reports: a screenshot, the full game state (a regular save) and the context needed to
  * reproduce a problem. With the dev server they are written to `debug-reports/<name>/` in the
  * project (see the `debugReports` plugin in vite.config.ts); otherwise they download as one file.
- * `?debugReport=<name>` (dev server only) loads a report's game state with its camera.
+ * `?debugReport=<name>` (dev server only) loads a report's game state with its camera, or a report
+ * taken in New game opens New game again at its step (`newGameReport.ts`).
  */
 
 import type { CameraPose } from '../render/types';
@@ -42,6 +43,8 @@ export interface DebugPayload {
   save: string | null;
   /** JPEG data URL of the 3D view, or null if capture failed. */
   screenshot: string | null;
+  /** The new game's state (`newGameReport.ts`, JSON) when the report was taken on one of its steps; the dev server writes it as `newgame.json`. */
+  newGame?: string | null;
 }
 
 export { within };
@@ -50,7 +53,7 @@ export { within };
  * A report without a game to ask (the crash screen when no game runs, or game data that didn't
  * load): the log, the settings, the interface state and a picture if one could be taken.
  */
-export async function basicReport(note: string, parts: { settings: unknown; ui: unknown; renderer: unknown; screenshot: string | null }): Promise<string> {
+export async function basicReport(note: string, parts: { settings: unknown; ui: unknown; renderer: unknown; screenshot: string | null; newGame?: string | null }): Promise<string> {
   const report: DebugReport = {
     note,
     version: __APP_VERSION__,
@@ -68,7 +71,7 @@ export async function basicReport(note: string, parts: { settings: unknown; ui: 
     log: recentLog(),
     saveMeta: { id: 'debug', name: 'Debug report', household: '', members: [], day: 0, minute: 0, savedAt: Date.now(), autosave: false },
   };
-  return deliverReport({ report, save: null, screenshot: parts.screenshot });
+  return deliverReport({ report, save: null, screenshot: parts.screenshot, ...(parts.newGame ? { newGame: parts.newGame } : {}) });
 }
 
 /** Adapter details for the report (WebGPU only; empty when unavailable). */
@@ -114,6 +117,12 @@ export function takePendingPose(): CameraPose | null {
   const pose = pendingPose;
   pendingPose = null;
   return pose;
+}
+
+/** Report `name`'s new game part from the dev server (`newgame.json`); null: it has none (it was taken in a game, or on the main menu). */
+export async function fetchNewGameReport(name: string): Promise<string | null> {
+  const res = await fetch(`/__debug/reports/${encodeURIComponent(name)}/newgame.json`);
+  return res.ok ? res.text() : null;
 }
 
 /**
