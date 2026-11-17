@@ -99,6 +99,23 @@ export interface RenderStats {
   vram: RenderVram | null;
 }
 
+/**
+ * Where the renderer's bytes are (`Renderer.memoryCensus`, the gameplay benchmark's): what PlayCanvas
+ * keeps on the CPU of what is on the GPU, the model files' decoded pieces, and the scene's geometry by
+ * owner. Bytes throughout.
+ */
+export interface MemoryCensus {
+  /** Every buffer the device holds, by kind: its CPU copy (`storage`), its GPU size, how many let their copy go. */
+  storage: Record<string, { count: number; bytes: number; released: number; gpuBytes: number }>;
+  /** Textures' levels kept on the CPU as typed arrays, and how many textures keep any. */
+  textureLevels: number;
+  texturesWithLevels: number;
+  /** The model files read and kept (`ModelFiles`): their pieces' vertices, and how many files. */
+  modelFiles: { files: number; pieceBytes: number; clipBytes: number };
+  /** The scene's vertex and index buffers by who draws them (entity names three levels under the root), and those nothing draws. */
+  owners: Record<string, { meshes: number; gpuBytes: number; cpuBytes: number }>;
+}
+
 /** GPU memory the renderer holds, bytes (PlayCanvas's own counters, `app.stats.vram`). */
 export interface RenderVram {
   /** Textures: the assets' and the render targets' (shadow maps, the mirror, post). */
@@ -580,6 +597,8 @@ export interface Renderer {
   /** Build/buy mode: plays a placement, upgrade, sale or construction effect (after `setWorld` showed the change). */
   buildEffect(fx: BuildEffect): void;
   stats(): RenderStats;
+  /** Benchmark: where the renderer's bytes are (a walk of the whole scene: on demand, never per frame). */
+  memoryCensus(): MemoryCensus | null;
   /** Benchmark: hooks around every drawn frame (null: none). */
   setFrameProbe(probe: FrameProbe | null): void;
   /** Measures GPU time (`RenderStats.gpuMs`) while the overlay or the benchmark asks for it. */
@@ -648,9 +667,11 @@ export interface Renderer {
   /**
    * Back to the game world (the overview and the town's landscape are let go a moment after, and
    * built again by the next `showTown`). With `glide` > 0 the camera
-   * first flies from the overview into the game's view (seconds); resolves when it is shown.
+   * first flies from the overview into the game's view (seconds); resolves when it is shown. With
+   * `letGo`, the town is let go of at once, and it resolves once it has been (a machine low on
+   * memory, before the game's world is built).
    */
-  hideTown(glide?: number): Promise<void>;
+  hideTown(glide?: number, letGo?: boolean): Promise<void>;
   /** Whether the overview is on screen. */
   readonly townShown: boolean;
   /** Overview camera: glides to (or with `cut`, jumps to) a shot. */
@@ -689,7 +710,7 @@ export interface Renderer {
    * land settled under what is built (no road or lot cut or filled past its limits; `BuiltSurface.settleCuts`),
    * changed in place; says the samples it changed besides (null: none, or no town on it).
    */
-  settleLand?(rect: LandRect): LandRect | null;
+  settleLand?(rect: LandRect, before?: Int16Array): LandRect | null;
   /** Where the ray through canvas CSS pixel (`x`, `y`) meets the land (a town point and its height, m), or null if it doesn't. */
   pickLand(x: number, y: number): { x: number; y: number; z: number } | null;
   /** Shows the land brush's cursor (null hides it). Cheap; call on every pointer move. */

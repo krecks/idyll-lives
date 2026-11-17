@@ -15,7 +15,8 @@
  * - `findWater(near?)`: the nearest water to `near`.
  * - `simWet(x, z)` (in the game): whether the simulation walks round the 1 m tile there as water.
  * - `pan(dx, dz)`, `zoom(factor)` (step 1): the town's camera moved as the pointer moves it.
- * - `nearestRoad(x, z)`: the nearest point on a road (not a trail) to (`x`, `z`), its direction along it and the road.
+ * - `nearestRoad(x, z, kind?)`: the nearest point on a road (not a trail; of `kind` if given) to (`x`, `z`), its
+ *   direction along it, the road and how far along it (m).
  */
 
 import { heightAt, LAND_CELL, wetAt, type LandPatch } from '../../game/land';
@@ -30,6 +31,8 @@ export interface LandHookHost {
   changed?(): void;
   /** A scripted stroke ended with `patch` (the game sends it; resolves once taken or refused). */
   ended?(patch: LandPatch): Promise<unknown>;
+  /** Why the last stroke sent was refused, if it was (told to the player, not thrown). */
+  refusal?(): string | null;
   undo(): Promise<unknown> | unknown;
   redo(): Promise<unknown> | unknown;
   /** Step 1's camera: panned (m over the ground) and zoomed (a factor). */
@@ -93,6 +96,7 @@ export function installLandHook(host: LandHookHost): () => void {
         } catch (err) {
           refused = err instanceof Error ? err.message : String(err);
         }
+        refused ??= host.refusal?.() ?? null;
       }
       return { changed: !!patch, rect: patch?.rect ?? null, hint: e.hint, refused, frames, stamps };
     },
@@ -118,18 +122,23 @@ export function installLandHook(host: LandHookHost): () => void {
     heightAt(x: number, z: number) {
       return heightAt(need().land, x, z);
     },
-    nearestRoad(x: number, z: number) {
-      let best: { at: [number, number]; along: [number, number]; road: number; dist: number } | null = null;
+    /** Why the last stroke sent was refused (null: it wasn't). */
+    refusal() {
+      return host.refusal?.() ?? null;
+    },
+    nearestRoad(x: number, z: number, kind?: string) {
+      let best: { at: [number, number]; along: [number, number]; road: number; dist: number; s: number; bridges: [number, number][] } | null = null;
       need().roads.forEach((r, road) => {
-        if (r.kind === 'trail') return;
-        for (let k = 0; k + 1 < r.points.length; k++) {
+        if (r.kind === 'trail' || (kind && (r.kind ?? 'street') !== kind) || r.bridge) return;
+        let s0 = 0;
+        for (let k = 0; k + 1 < r.points.length; k++, s0 += Math.hypot(r.points[k][0] - r.points[k - 1][0], r.points[k][1] - r.points[k - 1][1])) {
           const [[ax, az], [bx, bz]] = [r.points[k], r.points[k + 1]];
           const [dx, dz] = [bx - ax, bz - az];
           const l2 = dx * dx + dz * dz || 1;
           const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2));
           const [px, pz] = [ax + dx * t, az + dz * t];
           const dist = Math.hypot(x - px, z - pz);
-          if (!best || dist < best.dist) best = { at: [px, pz], along: [dx / Math.sqrt(l2), dz / Math.sqrt(l2)], road, dist };
+          if (!best || dist < best.dist) best = { at: [px, pz], along: [dx / Math.sqrt(l2), dz / Math.sqrt(l2)], road, dist, s: s0 + t * Math.sqrt(l2), bridges: r.bridges ?? [] };
         }
       });
       return best;

@@ -44,7 +44,8 @@ import { ENV_UNITS, SKY_UNITS, SUN_UNITS } from './lightUnits';
 import { MaterialLibrary, SUN_LIGHT_MASK } from './materials';
 import { drawMesh, meshFrom } from './meshes';
 import { Mirrors } from './mirrors';
-import { buildModel, fileImported, importAhead, modelFilesSettled, onModelFileArrived, type ModelTemplate } from './models';
+import { buildModel, fileImported, importAhead, modelFileCensus, modelFilesSettled, onModelFileArrived, type ModelTemplate } from './models';
+import { memoryCensus } from './memoryCensus';
 import { GameBirds } from './birds';
 import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming';
 import { SamplerCheck } from './samplerCheck';
@@ -107,7 +108,7 @@ import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
-import { groundDepth, lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type GarageInfo, type ItemPlacement, type ObjectPlacement, type StoreyLayout, type WorldStructure } from '../../core/protocol';
+import { groundDepth, lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type GarageInfo, type ItemPlacement, type ObjectPlacement, type RoadPlan, type StoreyLayout, type WorldStructure } from '../../core/protocol';
 import type { VisemeTrack } from '../../voice/visemes';
 import type {
   BuildEffect,
@@ -133,6 +134,7 @@ import type {
   RendererDeps,
   RenderStats,
   RenderVram,
+  MemoryCensus,
   ResizeHandle,
   RoomOverlayTile,
   SeenBird,
@@ -815,6 +817,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (import.meta.env.DEV) {
       const check = (this.samplerCheck = new SamplerCheck(this.device));
       (window as unknown as { __samplers?: () => unknown }).__samplers = () => check.report();
+      // (The bridge decks the street draws now, and whether it stands on the game's landscape's surface: `land.mjs`.)
+      (window as unknown as { __streetBridges?: () => unknown }).__streetBridges = () => ({ decks: this.street.layout?.bridgeCount() ?? 0, onLand: !!this.lot.landscape?.surface && this.street.layout?.standsOn(this.lot.landscape.surface) });
     }
     this.app = createApp(canvas, this.device);
     this.gpuTiming = new GpuTiming(this.device, this.passLabel);
@@ -1734,8 +1738,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!view && world.meta?.world?.size === 'big') view = this.view ?? this.nearestLot(world);
     // (Which traffic lights' poles get a pedestrians' head: those by a crosswalk.)
     this.signals.setWorld(world);
+    // (Its roads changed under the same town: a road the land's water bridged, or the bridge taken back. Built again:
+    // the street laid out on them, the landscape's surface solved with them, `buildWorld`; not patched.)
+    const was = this.builtWorld?.meta?.roads;
+    const now = world.meta?.roads;
+    const decks = (roads: readonly RoadPlan[]) => roads.map((r) => (r.bridges ? r.bridges.join(';') : '')).join('|');
+    const roadsChanged = !!was && !!now && now !== was && (now.length !== was.length || decks(now) !== decks(was));
     if (this.rebuildNext) this.rebuildNext = false;
-    else if (this.patchable(world, view)) {
+    else if (roadsChanged) {
+      // (Falls through to a whole build.)
+    } else if (this.patchable(world, view)) {
       this.patchWorld(world);
       return Promise.resolve();
     } else if (!this.worldBuilds && !this.unpatchable(world, view, false)) {
@@ -1970,7 +1982,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.placeRoomLights(world, view);
     await this.pace();
     this.loadStep('Building the street', 0.35);
+    // (A road the land's water bridged: the game's landscape solves its surface again with the new roads, the land under
+    // them drawn again, and the street, laid out again on them, stands on that surface.)
+    const shaped = this.lot.landscape;
+    const bridged = shaped?.heightField ? shaped.takeRoads(world) : null;
+    if (shaped && bridged) void this.queueLand('land: roads taken', async () => {
+      await shaped.landDone(bridged, this.landPace);
+    });
     await this.street.build(world, this.view, () => this.pace());
+    if (bridged && shaped?.surface && this.street.landMoved(shaped.surface)) this.streamStreet();
     this.cars.build(world);
     this.buildTownView(world);
     this.loadStep('Furnishing the house', 0.45);
@@ -3123,7 +3143,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return run;
   }
 
-  async hideTown(glide = 0): Promise<void> {
+  async hideTown(glide = 0, letGo = false): Promise<void> {
     // Let a pending overview build finish first, so it can't switch back to the overview later.
     this.townTicket++;
     await this.townQueue;
@@ -3141,7 +3161,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       });
       this.flyingIn = false;
     }
-    if (this.townMode) this.leaveTown();
+    if (this.townMode) this.leaveTown(letGo);
+    if (letGo) await this.townQueue;
   }
 
   setTownShot(shot: TownShot, cut = false): void {
@@ -3334,17 +3355,34 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.landMapped(scape);
       // (The game's land: what stands on it drawn again on its surface as the world comes back from the stroke, the
       // backdrop's buildings too; the sun's shadows of the still casters taken again.)
-      if (scape === this.lot.landscape) {
-        this.townBackdropOf = null;
-        this.sunShadows.moved();
-      }
+      if (scape === this.lot.landscape) this.landUnderTown(scape);
     });
   }
 
-  settleLand(rect: LandRect): LandRect | null {
+  settleLand(rect: LandRect, before?: Int16Array): LandRect | null {
     const at = this.landInView();
     if (!at?.scape.heightField) return null;
-    return perfTime('land: settle', () => at.scape.settleLand(rect));
+    return perfTime('land: settle', () => at.scape.settleLand(rect, before));
+  }
+
+  /**
+   * The game's land shaped (a stroke done, undone or redone): the street stands on the landscape's surface (one surface
+   * for the land and what stands on it) and plans again the chunks whose roads or lots moved; the viewed lot follows its
+   * pad (the datum); the backdrop's buildings are put on the land again with the town view; the still casters' shadows
+   * are taken again.
+   */
+  private landUnderTown(scape: Landscape): void {
+    const surface = scape.surface;
+    this.townBackdropOf = null;
+    this.sunShadows.moved();
+    if (!surface || !this.builtWorld) return;
+    if (this.street.landMoved(surface)) this.streamStreet();
+    const view = this.view;
+    const at = view ? this.builtWorld.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
+    if (at < 0) return;
+    const datum = surface.padY(at);
+    this.applyDatum(datum);
+    this.street.setLotY(datum);
   }
 
   pickLand(x: number, y: number): { x: number; y: number; z: number } | null {
@@ -3400,8 +3438,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lastLightMinute = -1;
   }
 
-  /** The game comes on screen again (the menus' town is let go a moment later: `releaseTown`). */
-  private leaveTown(): void {
+  /** The game comes on screen again (the menus' town is let go a moment later, or at once with `letGo`: `releaseTown`). */
+  private leaveTown(letGo = false): void {
     this.townMode = false;
     this.landHaze?.show(false);
     // (The game has no ghosts: drawn again over the town when it is shown again.)
@@ -3409,7 +3447,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     setDatum(this.root, this.lotRoot, this.datum);
     this.lot.datum = this.datum;
     const ticket = this.townTicket;
-    setTimeout(() => this.releaseTown(ticket), TOWN_RELEASE_MS);
+    if (letGo) this.releaseTown(ticket);
+    else setTimeout(() => this.releaseTown(ticket), TOWN_RELEASE_MS);
     this.shaderWatch.phase = 'game';
     this.birdLife.setTown(false);
     this.applyDig(); // (the basement and windowless rooms dark again.)
@@ -3623,6 +3662,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       residentsMs: this.characters?.updateMs ?? 0,
       vram: this.vram(),
     };
+  }
+
+  memoryCensus(): MemoryCensus | null {
+    return this.app ? memoryCensus(this.app, modelFileCensus(this.app)) : null;
   }
 
   /** The device's own GPU memory counters, bytes; null before the app exists. */

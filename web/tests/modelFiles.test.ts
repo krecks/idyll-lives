@@ -1,7 +1,8 @@
 /**
  * A renderer's model files (`render/shared/modelFiles.ts`): each imported once; one nothing built
  * uses is kept among the last few such files and then let go of (`evict`), never while a model built
- * from it is about, and imported again when it's wanted again; `settled` waits for the imports.
+ * from it is about, and imported again when it's wanted again; `settled` waits for the imports; a few
+ * are imported at a time, those a build waits for first.
  */
 import { describe, expect, test } from 'bun:test';
 import { ModelFiles } from '../src/render/shared/modelFiles';
@@ -94,5 +95,40 @@ describe('model files', () => {
     finish();
     await settled;
     expect(done).toBe(true);
+  });
+
+  test('a few files are imported at a time, the ones a build waits for first', async () => {
+    const started: string[] = [];
+    const finish = new Map<string, () => void>();
+    const f = new ModelFiles<string>(
+      (url) =>
+        new Promise((resolve) => {
+          started.push(url);
+          finish.set(url, () => resolve(url));
+        }),
+      () => false,
+      null,
+      96,
+      2,
+    );
+    const loads = [f.load('a'), f.load('b'), f.load('later', false), f.load('c'), f.load('d')];
+    await settle();
+    expect(started).toEqual(['a', 'b']);
+    finish.get('a')!();
+    await settle();
+    // (A build's file before the one read ahead of time.)
+    expect(started).toEqual(['a', 'b', 'c']);
+    finish.get('b')!();
+    finish.get('c')!();
+    await settle();
+    expect(started).toEqual(['a', 'b', 'c', 'd', 'later']);
+    finish.get('d')!();
+    finish.get('later')!();
+    expect(await Promise.all(loads)).toEqual(['a', 'b', 'later', 'c', 'd']);
+    // Only the given number at once, whatever failed: a failure passes its turn on too.
+    const g = new ModelFiles<string>(async (url) => (url === 'x' ? Promise.reject(new Error('no')) : url), () => false, null, 96, 1);
+    const [x, y] = await Promise.allSettled([g.load('x'), g.load('y')]);
+    expect(x.status).toBe('rejected');
+    expect(y).toEqual({ status: 'fulfilled', value: 'y' });
   });
 });

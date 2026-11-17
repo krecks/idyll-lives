@@ -74,7 +74,7 @@ export function hashString(s: string, h = 0x811c9dc5): number {
 }
 
 /** 32-bit FNV-1a over numbers (rounded to millimetres), for what a chunk drew. */
-export function hashNumbers(values: readonly number[], h = 0x811c9dc5): number {
+export function hashNumbers(values: ArrayLike<number>, h = 0x811c9dc5): number {
   for (let i = 0; i < values.length; i++) h = Math.imul(h ^ Math.round(values[i] * 1000), 16777619);
   return h >>> 0;
 }

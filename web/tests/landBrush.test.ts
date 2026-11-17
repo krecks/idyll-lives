@@ -299,8 +299,15 @@ describe('the built land', () => {
     expect(settled.length).toBe(1);
     expect(patch.rect.i1).toBeGreaterThanOrEqual(101);
     expect(patch.rect.j0).toBeLessThanOrEqual(10);
+    // Priced as the brush left it: the settled sample is free, and the refund is as much.
+    const prices = { earth: 3, mountain: 0.02, water: 2, woods: 6, meadow: 1, fields: 2, clear: 1.5 };
+    const paid = editor.cost(patch, prices);
+    land.h[at(land, 200, 20)] -= 1000;
+    expect(editor.cost(patch, prices)).toBe(paid);
+    land.h[at(land, 200, 20)] += 1000;
     // Undone: the settled sample back too.
     editor.undo();
+    expect(editor.cost(patch, prices)).toBe(-paid);
     expect(land.h[at(land, 200, 20)]).toBe(0);
     expect(land.h[at(land, 110, 115)]).toBe(0);
     // Water and cover keep off built land as ever; no settling for them.

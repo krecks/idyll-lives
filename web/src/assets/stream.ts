@@ -18,6 +18,8 @@ const BACKGROUND_PARALLEL = 2;
 const FOREGROUND_PARALLEL = 8;
 /** A download that receives nothing for this long (ms) is given up on, and tried once more. */
 const STALL_MS = 20_000;
+/** The buffer a download reads into, over and over (bytes): nothing of a file is kept, only the cache is filled. */
+const READ_BYTES = 256 * 1024;
 /** Tries per file in one load (`load`): the first, and one more after a stall or a network error. */
 const TRIES = 2;
 
@@ -106,11 +108,30 @@ async function download(url: string, priority: 'high' | 'low'): Promise<void> {
   try {
     const res = await fetch(withBuild(url), { priority, signal: abort.signal });
     if (!res.ok) throw new HttpError(`${url}: ${res.status}`);
-    const reader = res.body?.getReader();
-    if (!reader) {
+    const body = res.body;
+    if (!body) {
       await res.arrayBuffer();
       return;
     }
+    // Read into one buffer, over and over (a byte reader's): the file only fills the browser's cache,
+    // which its loader reads it from later, so its bytes aren't made into arrays here as well, a new
+    // one for every chunk. A browser without byte readers reads it chunk by chunk.
+    let bytes: ReadableStreamBYOBReader | null = null;
+    try {
+      bytes = body.getReader({ mode: 'byob' });
+    } catch {
+      bytes = null;
+    }
+    if (bytes) {
+      let into = new Uint8Array(READ_BYTES);
+      for (;;) {
+        const { done, value } = await bytes.read(into);
+        if (done) return;
+        into = new Uint8Array(value.buffer);
+        alive();
+      }
+    }
+    const reader = body.getReader();
     for (;;) {
       const { done } = await reader.read();
       if (done) return;

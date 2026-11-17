@@ -92,8 +92,8 @@ test('the shader sends a hidden vertex to one point, in GLSL and WGSL alike (not
   }
 });
 
-/** A vertex colour (0..1) as the hex it was set from. */
-const hex = (col: readonly number[], v: number) => `#${[0, 1, 2].map((k) => Math.round(col[v * 4 + k] * 255).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
+/** A vertex colour (a byte a channel) as the hex it was set from. */
+const hex = (col: ArrayLike<number>, v: number) => `#${[0, 1, 2].map((k) => col[v * 4 + k].toString(16).padStart(2, '0')).join('')}`.toUpperCase();
 
 test("what lies flat on a cut wall is in the cut wall's tone: the tops of a door's side boards and of the corner boards too", () => {
   const stray: string[] = [];

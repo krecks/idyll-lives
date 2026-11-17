@@ -766,7 +766,7 @@ async function openSession(
       // (The land surveyed the first time the tab comes up.)
       if (tab === 'land') {
         void landMode.ready();
-        landHook ??= installLandHook({ editor: () => landMode.current, surface: () => landMode.surface, ended: (patch) => landMode.commit(patch), undo: () => landMode.undo(), redo: () => landMode.redo(), simWater: () => bridge.waterMask() });
+        landHook ??= installLandHook({ editor: () => landMode.current, surface: () => landMode.surface, ended: (patch) => landMode.commit(patch), refusal: () => landMode.lastRefusal, undo: () => landMode.undo(), redo: () => landMode.redo(), simWater: () => bridge.waterMask() });
       }
       game.buildStart = null;
       buildBuy.clearPreviews();

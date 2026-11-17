@@ -11,4 +11,4 @@
 export type { ChatMessage } from './chat';
 export type { GenParams, GenResult } from './generate';
 export { downloadMb, MODEL, type ModelSpec } from './models';
-export { ensureLlm, generateText, llmReady, llmStats, llmStatus, unloadLlm, type LlmState, type LlmStats } from './service.svelte';
+export { ensureLlm, generateText, llmReady, llmStats, llmStatus, unloadLlm, wantLlm, type LlmState, type LlmStats } from './service.svelte';

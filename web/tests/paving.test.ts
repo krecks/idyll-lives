@@ -13,7 +13,7 @@ function redAt(g: Geo, x: number, z: number): number {
     const d = Math.hypot(g.pos[i * 3] - x, g.pos[i * 3 + 2] - z);
     if (d < best) [best, at] = [d, i];
   }
-  return g.col[at * 4];
+  return g.col[at * 4] / 255;
 }
 
 describe('paving', () => {
@@ -29,7 +29,8 @@ describe('paving', () => {
     expect(g.col[i * 4]).toBeLessThan(g.col[i * 4 + 1]);
     // The end, at a door or the pavement, is as its middle is.
     expect(redAt(g, 4.5, 2)).toBeGreaterThan(0.88);
-    for (const c of g.col) expect(c).toBeLessThanOrEqual(1);
+    // (A byte a channel: 255 is 1.)
+    for (const c of g.col) expect(c).toBeLessThanOrEqual(255);
   });
 
   test('a side another path goes on from is not an edge', () => {
@@ -81,8 +82,8 @@ describe('paving', () => {
     const span = (g: Geo, k: number) => [Math.min(...g.pos.filter((_, i) => i % 3 === k)), Math.max(...g.pos.filter((_, i) => i % 3 === k))];
     expect(span(worn, 0)).toEqual(span(plain, 0));
     expect(span(worn, 2)).toEqual(span(plain, 2));
-    expect(plain.col.every((c) => c === 1)).toBe(true);
-    expect(worn.col.some((c) => c < 0.9)).toBe(true);
+    expect(plain.col.every((c) => c === 255)).toBe(true);
+    expect(worn.col.some((c) => c < 0.9 * 255)).toBe(true);
     expect(worn.idx.length).toBeGreaterThan(plain.idx.length);
   });
 });
