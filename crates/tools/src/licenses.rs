@@ -4,8 +4,9 @@
 //!
 //! - The npm packages bundled into its JavaScript, as the bundler saw them (the page and its
 //!   workers), with the licence files from each package.
-//! - The Rust crates compiled into the simulation's and the voice's WebAssembly: `cargo metadata`
-//!   for the dependencies of sim-wasm and voice-wasm, the licence files from Cargo's sources.
+//! - The Rust crates compiled into the simulation's, the sounds' and the voice's WebAssembly: `cargo
+//!   metadata` for the dependencies of sim-wasm, sound-wasm and voice-wasm, the licence files from Cargo's
+//!   sources.
 //! - Files shipped as they are (the Inter font, the Basis Universal transcoder), work adapted into
 //!   the game's own code (the parts of Babylon.js ported into the renderer, with Babylon's notice;
 //!   TalkingHead's expressions), and the licences that came with the voice model, the dictionary
@@ -265,7 +266,7 @@ fn github_url(raw: &str) -> String {
     url.strip_suffix(".git").unwrap_or(&url).to_string()
 }
 
-/// The crates (not ours) that sim-wasm and voice-wasm depend on, as built for wasm32.
+/// The crates (not ours) that sim-wasm, sound-wasm and voice-wasm depend on, as built for wasm32.
 fn rust_crates(root: &Path) -> Result<Vec<Package>, String> {
     let metadata = |offline: bool| {
         let mut args = vec!["metadata", "--format-version", "1", "--locked"];
@@ -281,7 +282,7 @@ fn rust_crates(root: &Path) -> Result<Vec<Package>, String> {
     };
     // Without the network, as everything a build needs is on the machine by now: but for a crate only
     // wasm32 would use under one of the tools' own (the Basis encoder's libc++ for the browser, which no
-    // native build fetches; cargo lists the whole workspace's, not the two crates asked about here). Then
+    // native build fetches; cargo lists the whole workspace's, not the three crates asked about here). Then
     // once more with it: the crate's source comes down once, and is never built.
     let mut out = metadata(true)?;
     if !out.status.success() && String::from_utf8_lossy(&out.stderr).contains("--offline") {
@@ -316,11 +317,16 @@ fn rust_crates(root: &Path) -> Result<Vec<Package>, String> {
     }
     let mut stack: Vec<String> = packages
         .iter()
-        .filter(|p| matches!(p["name"].as_str(), Some("sim-wasm" | "voice-wasm")))
+        .filter(|p| {
+            matches!(
+                p["name"].as_str(),
+                Some("sim-wasm" | "sound-wasm" | "voice-wasm")
+            )
+        })
         .filter_map(|p| p["id"].as_str().map(str::to_string))
         .collect();
-    if stack.len() != 2 {
-        return Err("sim-wasm or voice-wasm missing from cargo metadata".into());
+    if stack.len() != 3 {
+        return Err("sim-wasm, sound-wasm or voice-wasm missing from cargo metadata".into());
     }
     let mut seen: Vec<String> = Vec::new();
     while let Some(id) = stack.pop() {
@@ -501,7 +507,7 @@ pub fn third_party_licenses(
     )?;
     section(
         &mut out,
-        "Rust crates compiled into assets/sim_wasm_bg-*.wasm and voice_wasm_bg-*.wasm",
+        "Rust crates compiled into assets/sim_wasm_bg-*.wasm, sound_wasm_bg-*.wasm and voice_wasm_bg-*.wasm",
         &rust,
     )?;
     section(&mut out, "Files shipped as they are", &shipped)?;

@@ -458,7 +458,7 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 - **`cargo test -p sim-core --test sim shipped_content::`** (in CI) fails when an object or item has no
   model file, or no `far` file where its entry names one, once the manifests are stacked as the game
   stacks them, and on an empty `model`.
-- **The build** (`Family.run`, before it builds anything; `write_pack` again as a backstop) refuses a
+- **The build** (`Family.run`, before it builds anything; `cargo art` again as it writes the pack) refuses a
   `key=` that no content object or item names and no manifest has, unless its `Model` has
   `code=True` (a model the game draws by code: a held `tool.*`, a street prop).
 - **`cargo review facets`** (`crates/tools/src/facets.rs`; a report, `--check` makes it a gate, `--all` lists
@@ -498,8 +498,8 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   "model.garden.gnome": { "type": "model", "url": "../../models/garden/gnome.glb", "materials": { "*": { "finish": "material.finish.satin" } } }
   ```
   A pack's entry replaces the base entry, keeping its `vary` unless it gives its own (registry.ts
-  `extended`); the base entry's other fields are copied in. The family script writes its pack from the
-  manifests at export time (`G.write_pack`, called by the build), never by hand. `scale`, `rotationY`,
+  `extended`); the base entry's other fields are copied in. `cargo art` writes the family's pack from the
+  manifests at export time (`crates/tools/src/art.rs` `write_pack`, from what the build hands back), never by hand. `scale`, `rotationY`,
   `offset` and `fit` are for
   third-party files; a model built to this standard needs none of them. `parts` adds primitive
   parts drawn with the file.

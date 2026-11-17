@@ -15,7 +15,10 @@ import './talk';
 import { startModelsAfter } from './ml/schedule.svelte';
 import { app } from './ui/app.svelte';
 import { watchForDevLog } from './debug/devlogWatch.svelte';
+import { loadSynth } from './audio/synth';
 
+// The sounds' synthesis (`audio/synth.ts`, a small WebAssembly): from the start, so the first click has its blip.
+loadSynth().catch((err: unknown) => console.warn('The sounds could not load; the game is silent.', err));
 // The dev play log (dev server only, `debug/devlog.ts`).
 watchForDevLog();
 // No browser right-click menu over the game, except in text fields.

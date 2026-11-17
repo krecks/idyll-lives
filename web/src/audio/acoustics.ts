@@ -7,14 +7,14 @@
  *   was made. Further out it falls as a sound does over distance (half the level at twice as far) and
  *   loses its highs, down to a floor at the play camera's farthest so nothing goes silent; out in the
  *   town view the home's sounds sink further, to a murmur.
- * - Rooms: a sound made indoors goes to the reverb of a room its size (`rooms.ts`); outdoors it stays dry.
+ * - Rooms: a sound made indoors goes to the reverb of a room its size (`kinds.ts` `roomSize`; made in `crates/sound/src/rooms.rs`); outdoors it stays dry.
  * - Walls: zoomed in on a room, the sounds of the other rooms (another storey, the garden from indoors,
  *   indoors from the garden) come through the walls, duller and quieter (`OCCLUDE`). From the game's own
  *   zoom out the whole house is in view and nothing is muffled.
  */
 
 import { DEFAULT_ORBIT, RADIUS_LIMITS, townBlend } from '../render/shared/lens';
-import { roomSize, type RoomSize } from './rooms';
+import { roomSize, type RoomSize } from './kinds';
 
 /**
  * The camera's distance: full level up to `near` m; the least left at the play camera's farthest (`floor`)

@@ -19,6 +19,16 @@ pub enum J {
 }
 
 impl J {
+    /// `d[key] = v` on an object: a key it has keeps its place, a new one goes last (a Python dict).
+    pub fn set(&mut self, key: &str, v: J) {
+        if let J::Obj(m) = self {
+            match m.iter_mut().find(|(k, _)| k == key) {
+                Some(slot) => slot.1 = v,
+                None => m.push((key.to_string(), v)),
+            }
+        }
+    }
+
     /// `d.get(key)` (None for a missing key, or when this is no object).
     pub fn get(&self, key: &str) -> Option<&J> {
         match self {
@@ -331,6 +341,58 @@ pub fn num_str(n: Num) -> String {
         Num::I(i) => i.to_string(),
         Num::F(f) => float_repr(f),
     }
+}
+
+/// `json.dumps(v, indent=2)`: one item a line, two spaces a level, `ensure_ascii`, floats as `repr` writes them.
+pub fn dumps_indent(v: &J) -> String {
+    fn write(v: &J, out: &mut String, depth: usize) {
+        let pad = |out: &mut String, d: usize| {
+            out.push('\n');
+            out.push_str(&"  ".repeat(d));
+        };
+        match v {
+            J::Null => out.push_str("null"),
+            J::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+            J::Int(i) => out.push_str(&i.to_string()),
+            J::Float(f) if f.is_nan() => out.push_str("NaN"),
+            J::Float(f) if f.is_infinite() => {
+                out.push_str(if *f > 0.0 { "Infinity" } else { "-Infinity" })
+            }
+            J::Float(f) => out.push_str(&float_repr(*f)),
+            J::Str(s) => out.push_str(&json_str(s)),
+            J::Arr(l) if l.is_empty() => out.push_str("[]"),
+            J::Obj(m) if m.is_empty() => out.push_str("{}"),
+            J::Arr(l) => {
+                out.push('[');
+                for (i, x) in l.iter().enumerate() {
+                    if i > 0 {
+                        out.push(',');
+                    }
+                    pad(out, depth + 1);
+                    write(x, out, depth + 1);
+                }
+                pad(out, depth);
+                out.push(']');
+            }
+            J::Obj(m) => {
+                out.push('{');
+                for (i, (k, x)) in m.iter().enumerate() {
+                    if i > 0 {
+                        out.push(',');
+                    }
+                    pad(out, depth + 1);
+                    out.push_str(&json_str(k));
+                    out.push_str(": ");
+                    write(x, out, depth + 1);
+                }
+                pad(out, depth);
+                out.push('}');
+            }
+        }
+    }
+    let mut out = String::new();
+    write(v, &mut out, 0);
+    out
 }
 
 /// `json.dumps(s)` of a string (ASCII only, as Python writes it).

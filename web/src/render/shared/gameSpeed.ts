@@ -12,7 +12,7 @@
  * snapshot says (`playbackRate`).
  */
 export const PLAYBACK_RATE = [0, 1, 3, 10, 60];
-/** Super speed (`clock::SUPER_SPEED`): only while everyone at home sleeps or is out. */
+/** Super speed (`clock::SUPER_SPEED`): up to 30×, up to 60× while everyone at home sleeps or is out. */
 export const SUPER_SPEED = 4;
 
 /**

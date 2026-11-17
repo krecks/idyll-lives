@@ -6,8 +6,8 @@
  *   sound → [wall: low-pass, level] → panner ─┬──────────────────────────────→ [distance: low-pass, level] → bus
  *                                             └→ send → room reverb (by size) ─┘
  *
- * A room's reverb is a `ConvolverNode` with a response made in code (`rooms.ts`), one per size, made the
- * first time a sound is heard in a room that size. What goes into it is the sound's two sides added
+ * A room's reverb is a `ConvolverNode` with a response made in code (`synth.ts`, in Rust), one per size, made the
+ * first time a sound is heard in a room that size (none until the sounds can be made: the sound is dry till then). What goes into it is the sound's two sides added
  * (one channel), what comes out is wide (the response's two channels differ), so the room is all round
  * whichever side the sound is on. It joins the bus before the distance, so a far room is far too.
  *
@@ -15,7 +15,8 @@
  */
 
 import { DISTANCE, distanceCutoff, distanceGain, muffled } from './acoustics';
-import { ROOM_SIZES, ROOMS, roomResponse, type RoomSize } from './rooms';
+import { ROOM_SIZES, ROOMS, type RoomSize } from './kinds';
+import { roomResponse, synthReady } from './synth';
 
 /** Seconds for a place, a wall or the distance to ease to a new value (a third of it is the time constant). */
 const EASE = 0.3;
@@ -48,10 +49,11 @@ export class Space {
     this.dry = this.dull ?? this.level;
   }
 
-  /** The way into the reverb of a room this size (made the first time). */
-  room(size: RoomSize): AudioNode {
+  /** The way into the reverb of a room this size (made the first time); null until the sounds can be made. */
+  room(size: RoomSize): AudioNode | null {
     let send = this.rooms.get(size);
     if (!send) {
+      if (!synthReady()) return null;
       const { left, right } = roomResponse(size, this.ac.sampleRate);
       const response = this.ac.createBuffer(2, left.length, this.ac.sampleRate);
       response.copyToChannel(left as Float32Array<ArrayBuffer>, 0);
@@ -132,10 +134,11 @@ export class Placed {
       const share = place.rooms?.[size] ?? 0;
       let send = this.sends.get(size);
       if (!send) {
-        if (share <= 0) continue;
+        const room = share > 0 ? this.space.room(size) : null;
+        if (!room) continue;
         send = this.ac.createGain();
         send.gain.value = now ? share : 0;
-        this.panner.connect(send).connect(this.space.room(size));
+        this.panner.connect(send).connect(room);
         this.sends.set(size, send);
       }
       if (now) send.gain.value = share;

@@ -116,7 +116,7 @@ const GAIT: Record<'hop' | 'run' | 'walk', Gait> = {
 /** How a species looks and behaves. Times in the birds' seconds, distances in metres, angles in radians. */
 interface Species {
   id: BirdSpecies;
-  /** Its song (`audio/birdsong.ts` species). */
+  /** Its song (`audio/kinds.ts` `SPECIES` name). */
   song: string;
   /**
    * Drawn this much larger than life: at real size a tit is 5 px and a blackbird 10 px from the

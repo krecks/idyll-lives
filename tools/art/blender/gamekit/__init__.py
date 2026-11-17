@@ -4,7 +4,7 @@
 # Conventions, matching the game: 1 unit = 1 metre, origin at the footprint centre on the floor (z = 0),
 # front facing -Y in Blender. The glTF exporter's +Y up turns Blender -Y into the game's +Z front, and
 # Blender +X into the game's -X: Blender (x, y, z) is the game's (-x, z, -y). `GameFrame` converts.
-from .export import export_glb, materials_used, stats, write_pack
+from .export import export_glb, materials_used, stats
 from .family import Family, Model
 from .far import decimated, far_of, is_low, low
 from .forms import circle, cut, extrude, jitter, loft, mirrored, ring, rounded_rect, smooth_outline, soft_box, sweep
@@ -25,5 +25,4 @@ __all__ = [
     'circle', 'cone', 'cosd', 'cut', 'extrude', 'cube', 'cylinder', 'decimated', 'export_glb', 'far_of', 'fit', 'flat', 'game_size', 'grow', 'grow_in_turn', 'hinged', 'is_low', 'jitter', 'join',
     'join_all', 'kit', 'loft', 'low', 'mat', 'materials_used', 'measure', 'meshes', 'mirrored', 'new_parts', 'path', 'perch', 'preview', 'preview_clips', 'preview_perches', 'reset', 'revolve', 'ring', 'rock', 'rounded_rect',
     'rod', 'scroll', 'set_origin', 'settle', 'sides', 'sind', 'slide', 'smooth_outline', 'soft_box', 'sphere', 'spin', 'squash', 'stages', 'stats', 'sweep', 'swing', 'torus', 'turn', 'turns', 'keys', 'wobble',
-    'write_pack',
 ]

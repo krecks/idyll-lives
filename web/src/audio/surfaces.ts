@@ -11,7 +11,7 @@
 import { groundDepth, type WorldStructure } from '../core/protocol';
 import { ROOM_FURNITURE } from '../render/shared/house';
 import { roadTiles, townRoads } from '../render/shared/roads';
-import type { Surface } from './steps';
+import type { Surface } from './kinds';
 
 /** What a floor covering's finish (content `floorCoverings`) sounds like underfoot. */
 const FINISH: Record<string, Surface> = { wood: 'wood', whitewash: 'wood', tile: 'tile', carpet: 'carpet', stone: 'paving' };
