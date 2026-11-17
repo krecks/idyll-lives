@@ -1474,6 +1474,25 @@ fn bare_with_upstairs(id: &str, upstairs: Value) -> Value {
         .cloned()
         .collect();
     assert!(!stairs.is_empty(), "{id}: stairs up");
+    // (Only the doors and windows on the outer walls: the inner walls are gone.)
+    let on_outer = |o: &Value| {
+        let (x, z) = (n(&o["x"]), n(&o["z"]));
+        if o["axis"] == "z" {
+            x == x0 || x == x1
+        } else {
+            z == z0 || z == z1
+        }
+    };
+    for key in ["doors", "windows"] {
+        if let Some(list) = p[key].as_array() {
+            p[key] = json!(
+                list.iter()
+                    .filter(|o| on_outer(o))
+                    .cloned()
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
     p["walls"] = outer.clone();
     p["objects"] = json!(stairs);
     p["upper"] = json!({"walls": outer, "doors": [], "windows": [], "objects": upstairs});
