@@ -342,8 +342,8 @@ const corners = (r: Rect, by = 0): Pt[] => [
  * nearest it (`facesRoad`); as many as its size wants in the main town (`expect.mainLeast`) and `HAMLET_LEAST` in every hamlet,
  * a named place's lot (`meta.lotLooks`) counted with them, the centre's open land built over (by
  * them too) more densely than the rest of the main town's box's. Every public lot a place, and every
- * place a lot's (`generated`: no backdrop building is a place; in a town edited by hand, a backdrop
- * place is a building of its kind); each place named (none twice), its hours within
+ * place a lot's, in a town edited by hand too (no backdrop building is a place); each place named (none
+ * twice), its hours within
  * the day, its work careers that are, and (in a town or a city: `expect.careers`) every career a
  * resident may hold working somewhere in the main town. The main town has its centre.
  */
@@ -385,9 +385,8 @@ function livingProblems(town: CheckedTown, careers: readonly string[], expect: E
     if ((b.roof === 'gable' || b.roof === 'mansard') && b.ridge === undefined) say(i, 'has no ridge');
     if (!USES.includes(b.use)) say(i, 'has no use');
     if (!Number.isInteger(b.area) || b.area < 0 || b.area >= Math.max(1, areas.length)) say(i, `is in area ${b.area}`);
-    // (A generated town's named places are lots; one edited by hand may have a civic place's building.)
-    if (b.place !== undefined && (generated || !PLACE_KINDS.includes(b.use))) say(i, 'has a place');
-    else if (b.place !== undefined && places[b.place]?.kind !== b.use) say(i, `is place ${b.place}, a ${places[b.place]?.kind}`);
+    // (The named places are lots, in a town edited by hand too.)
+    if (b.place !== undefined) say(i, 'has a place');
     for (const [k, lot] of lots.entries()) if (overlaps(poly, lot, 0)) say(i, `is within ${LOT_CLEAR} m of plot ${k}`);
     for (const [k, spot] of parking.entries()) if (overlaps(poly, spot, 0)) say(i, `is on parking space ${k}`);
     for (let k = 0; k < poly.length; k++) {
@@ -467,7 +466,7 @@ function livingProblems(town: CheckedTown, careers: readonly string[], expect: E
     else if (names.has(p.name)) out.push(`two places called ${p.name}`);
     names.add(p.name);
     if (!PLACE_KINDS.includes(p.kind)) out.push(`place ${p.name} is a ${p.kind}`);
-    if (p.plot === undefined && (generated || !backdrop.some((b) => b.place === i))) out.push(generated ? `place ${p.name} has no lot` : `place ${p.name} is neither a lot nor a backdrop building`);
+    if (p.plot === undefined) out.push(`place ${p.name} has no lot`);
     if (p.hours && !(p.hours.open >= 0 && p.hours.open < p.hours.close && p.hours.close <= 1440 && p.hours.days > 0 && p.hours.days < 128)) out.push(`place ${p.name} is open ${JSON.stringify(p.hours)}`);
     if (!p.hours && p.kind !== 'park' && p.kind !== 'outdoor') out.push(`place ${p.name} (${p.kind}) has no hours`);
     for (const w of p.work ?? []) if (!careers.includes(w)) out.push(`place ${p.name}'s workers are ${w}, no career`);

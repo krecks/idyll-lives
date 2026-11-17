@@ -5,9 +5,9 @@
  * fits, red where it doesn't, with why under the tools. A click puts it down (`addLot`). A lot
  * dragged is moved (`moveLot`), keeping its house, garden and kind; one clicked is picked.
  *
- * A civic place is a building, not a lot: the one chosen of those the area under the pointer lacks
- * (`civicChosen`), its footprint snapped along the nearest road as a home's is, laid as the
- * generator lays one (`buildup.ts` `addCivic`). The ghost is its footprint's box.
+ * A civic place is a lot of its own, of its layout's size: the one chosen of those the area under the
+ * pointer lacks (`civicChosen`), snapped along the nearest road as the generator puts one
+ * (`buildup.ts` `addCivic`). The ghost is its lot.
  */
 
 import type { RoadSpot } from '../../game/edit/ground';
@@ -18,7 +18,7 @@ import { civicLabel, draftAreaSize } from '../../game/backdrop';
 import type { TownGhosts } from '../../render/types';
 import { choiceOf, choiceSize, civicChosen, lotChoice } from './lotChoice.svelte';
 import LotCard from './LotCard.svelte';
-import { buildingBox, lotBox } from './ghosts';
+import { lotBox } from './ghosts';
 import { lotAtPoint, spotNear } from './pick';
 import type { TownEditor, TownTool } from './tools';
 import { sentence } from './words';
@@ -42,7 +42,7 @@ export const lotTool: TownTool = {
 
     /** A red box about the size of what is put down, at a ground point (where it can't go). */
     const badAt = (x: number, z: number): Partial<TownGhosts> => {
-      const { w, d } = choiceSize(editor.t);
+      const { w, d } = choiceSize(editor.t, editor.draft);
       return { lots: [{ x: x - w / 2, z: z - d / 2, w, d, tone: 'bad' }] };
     };
 
@@ -64,8 +64,7 @@ export const lotTool: TownTool = {
       const e = addCivic(draft, editor.t, editor.content, { civic, road: at.road, s: at.s, side: at.side, seed });
       if ('refused' in e) return no(e.refused);
       civicWhy = null;
-      const b = e.draft.open!.backdrop!.at(-1)!;
-      editor.preview({ lots: [{ ...buildingBox(b), tone: 'new' }] });
+      editor.preview({ lots: [{ ...lotBox(editor.t, e.draft.slots.at(-1)!), tone: 'new' }] });
       editor.hint(`Click to put the ${civicLabel(CIVIC_PLACES[civic], draftAreaSize(draft, area)).toLowerCase()} down on ${draft.roads[at.road]?.name ?? 'this road'}.`);
       return e;
     };

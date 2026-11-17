@@ -1,18 +1,19 @@
 <script lang="ts">
   /**
    * What can be done to what is picked (`editor.selected`):
-   * - a home: another house, its garden, remove it; a public place: another of its size; a farm or
-   *   an outdoor spot: remove it;
+   * - a home: another house, its garden, remove it; a public place: another of its size; a civic
+   *   place's lot: another civic place the area hasn't got (`lots.ts` `swapCivic`); any lot: remove it;
    * - a street: rename it, remove it (what goes with it listed first), build it up with homes, the
    *   town's other buildings or both (`buildup.ts`: both in the main town, homes elsewhere, unless
    *   chosen; each press another seed), or clear the buildings fronting it;
-   * - a building: a civic place made another the town hasn't got, remove it;
+   * - a building (none is a place: the named places are lots): remove it;
    * - a village: rename it, move it (the Village tool taken in hand for it), remove it (what goes with
    *   it listed first);
    * - the main town: rename it (step 2's own name field, the two kept as one).
    */
   import { areaOfRoad, buildingsOn, buildUp, clearBuildings, notBuilt, roadKey, type BuildMode } from '../../game/edit/buildup';
-  import { anotherHouse, civicSwaps, publicChoices, removeLotsEdit, setGarden, swapCivic, swapPlace } from '../../game/edit/lots';
+  import { anotherHouse, civicSwaps, lotKey, publicChoices, removeLotsEdit, setGarden, swapCivic, swapPlace } from '../../game/edit/lots';
+  import { placeOfTemplate } from '../../game/placeLots';
   import { removeRoad, rename, whatGoes } from '../../game/edit/streets';
   import { removeVillage, villageGoes } from '../../game/edit/villages';
   import type { GardenSize } from '../../game/housegen';
@@ -48,7 +49,20 @@
     return { size: size as LotSize, garden: (garden ?? lot.garden ?? 'roomy') as GardenSize };
   });
   const homeLike = $derived(!!lot && lot.kind === 'house' && lot.lot !== 'farm' && lot.lot !== 'terrace');
-  const swaps = $derived(lot && (lot.kind === 'park' || lot.kind === 'shop') ? publicChoices(t, slotDims(t, lot)) : []);
+  const swaps = $derived(lot && (lot.kind === 'park' || lot.kind === 'shop') && !placeOfTemplate(lot.template) ? publicChoices(t, slotDims(t, lot)) : []);
+  /** A civic place's lot: the civic places it may become. */
+  const civics = $derived(picked?.kind === 'lot' ? civicSwaps(draft, picked.slot) : []);
+  let civicPick = $state(-1);
+
+  /** The civic place's lot made civic place `civic`; one built on a lot of another size is a new lot, picked in its stead. */
+  function swapTo(civic: number) {
+    if (picked?.kind !== 'lot' || !lot) return;
+    civicPick = civic;
+    const e = swapCivic(draft, t, editor.content, picked.slot, civic, editor.seed());
+    if (!editor.apply(e) || !('draft' in e)) return;
+    const same = e.draft.slots[picked.slot];
+    if (!same || lotKey(same) !== lotKey(lot)) editor.select({ kind: 'lot', slot: e.draft.slots.length - 1 });
+  }
   const nameOf = (id: string) => t.parks.find((p) => p.id === id)?.name ?? id;
 
   /** Another generated house of the same size and garden on the lot: the first of a few new ones that fits. */
@@ -92,9 +106,6 @@
 
   // ---- a building ----
   const building = $derived(picked?.kind === 'building' ? draft.open?.backdrop?.[picked.building] : undefined);
-  const place = $derived(building?.place === undefined ? undefined : draft.open?.places?.[building.place]);
-  const civics = $derived(picked?.kind === 'building' ? civicSwaps(draft, picked.building) : []);
-  let civicPick = $state(-1);
 
   // ---- a village ----
   const area = $derived(picked?.kind === 'village' ? draft.open?.areas[picked.area] : undefined);
@@ -129,7 +140,7 @@
   <div class="card" aria-live="polite" use:shown={JSON.stringify(picked)}>
     <button class="close btn ghost" aria-label="Put it down" title="Put it down (Esc)" onclick={() => editor.select(null)}><Icon name="icon.ui.close" size={14} /></button>
     {#if lot && picked.kind === 'lot'}
-      <span class="eyebrow sub">{lotKind(lot)}</span>
+      <span class="eyebrow sub">{lotKind(lot, draft)}</span>
       <h3>{lot.name}</h3>
       {#if homeLike && gen}
         <div class="row">
@@ -148,6 +159,17 @@
               <button role="radio" class="chip" aria-checked={lot.template === id} class:on={lot.template === id} onclick={() => lot.template !== id && editor.apply(swapPlace(draft, t, editor.content, picked.slot, id))}>{nameOf(id)}</button>
             {/each}
           </div>
+        </div>
+      {/if}
+      {#if civics.length}
+        <div class="option">
+          <span class="eyebrow sub">Make it</span>
+          <div class="choices" aria-label="Another civic place">
+            {#each civics as c (c.civic)}
+              <button class="chip" class:on={civicPick === c.civic} onclick={() => swapTo(c.civic)}>{c.label}</button>
+            {/each}
+          </div>
+          <p class="hint">The places the town hasn't got. One of another size takes a lot of its own where this one meets its road.</p>
         </div>
       {/if}
       <div class="row">
@@ -188,19 +210,8 @@
       </div>
       {/if}
     {:else if building && picked.kind === 'building'}
-      <span class="eyebrow sub">{place ? 'Civic place' : 'Building'} · {USE[building.use] ?? building.use}, {count(building.storeys, 'storey')}</span>
-      <h3>{place?.name ?? 'A building'}</h3>
-      {#if civics.length}
-        <div class="option">
-          <span class="eyebrow sub">Make it</span>
-          <div class="choices" aria-label="Another civic place">
-            {#each civics as c (c.civic)}
-              <button class="chip" class:on={civicPick === c.civic} onclick={() => ((civicPick = c.civic), editor.apply(swapCivic(draft, picked.building, c.civic, editor.content, editor.seed())))}>{c.label}</button>
-            {/each}
-          </div>
-          <p class="hint">The places the town hasn't got. Its footprint stays.</p>
-        </div>
-      {/if}
+      <span class="eyebrow sub">Building · {USE[building.use] ?? building.use}, {count(building.storeys, 'storey')}</span>
+      <h3>A building</h3>
       <div class="row">
         <button class="btn small danger-soft" onclick={() => editor.apply(removeLotsEdit(draft, new Set(), new Set([picked.building])))}><Icon name="icon.ui.trash" size={14} /> Remove</button>
       </div>

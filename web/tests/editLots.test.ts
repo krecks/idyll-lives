@@ -2,7 +2,7 @@
 // the world's lot mix, a lot added only where the generator would put one (it fits, and a car can
 // turn out of its driveway onto the road), a lot moved with its house, the houses along the streets
 // touched numbered again, the town's last home and last park kept, the same seed the same houses,
-// the pointer's check cheap, the garden, house, public place and civic place changed; and a town
+// the pointer's check cheap, the garden, house, public place and a civic place's lot changed; and a town
 // edited so has no problem the generated town hadn't (`townCheck.ts` `townProblems`).
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
@@ -257,7 +257,7 @@ describe('lot edits', async () => {
     if (!('refused' in c)) expect(c.draft.slots.at(-1)!.template).not.toBe(a.slots.at(-1)!.template);
   });
 
-  test("a lot's garden, house, public place and a civic building's use changed", () => {
+  test("a lot's garden, house, public place and a civic place's lot changed", () => {
     // The garden: the same house, its lot cut again with its front where it was.
     const home = hamlet.slots.find((s) => s.kind === 'house' && s.template.startsWith('gen:') && s.lot !== 'farm' && s.lot !== 'terrace' && s.garden !== 'snug')!;
     const snug = made(lots.setGarden(hamlet, t, home.index, 'snug'));
@@ -279,33 +279,56 @@ describe('lot edits', async () => {
     expect(bakery.slots[market.index]).toMatchObject({ kind: 'shop', template: 'bakery', name: 'The Bakery' });
     expect(bakery.open!.places!.find((p) => p.plot === market.index)).toMatchObject({ name: 'The Bakery', kind: 'shop', work: ['culinary', 'retail'] });
     expect(lots.swapPlace(hamlet, t, content, market.index, 'lookout')).toHaveProperty('refused');
-    // A civic building: its use and place, its footprint kept; one a town has already refused.
+    // A civic place is a lot of its own (no backdrop building is a place): the hamlet's hall, its parish hall.
     const places = hamlet.open!.places!;
-    const hall = hamlet.open!.backdrop!.findIndex((b) => b.place !== undefined && / (Parish|Village|Town) Hall$/.test(places[b.place].name));
-    expect(hall).toBeGreaterThanOrEqual(0);
+    expect(hamlet.open!.backdrop!.every((b) => b.place === undefined)).toBe(true);
+    const hall = hamlet.slots.find((s) => lots.civicOfLot(s) === 0)!;
+    expect(hall).toBeDefined();
+    expect(hall.template).toBe('parishHall');
+    const hallPlace = places.find((p) => p.plot === hall.index)!;
+    expect(hallPlace.name).toBe(`${hamlet.open!.areas[0].name} Parish Hall`);
+    expect(hall.name).toBe(hallPlace.name);
+    // Not another public place: its lot is built for it.
+    expect(lots.swapPlace(hamlet, t, content, hall.index, 'bakery')).toHaveProperty('refused');
     // A hamlet is offered a hamlet's (no school, a village's) until it has a village's homes.
     const school = lots.CIVIC_PLACES.findIndex((c) => c.label === 'School');
-    expect(lots.civicSwaps(hamlet, hall).some((c) => c.label === 'School')).toBe(false);
-    expect(lots.swapCivic(hamlet, hall, school, content, 1)).toHaveProperty('refused');
+    expect(lots.civicSwaps(hamlet, hall.index).some((c) => c.label === 'School')).toBe(false);
+    expect(lots.swapCivic(hamlet, t, content, hall.index, school, 1)).toHaveProperty('refused');
     const grown = { ...hamlet, slots: [...hamlet.slots, ...Array.from({ length: 60 }, (_, k) => ({ ...home, index: hamlet.slots.length + k }))] };
-    const choices = lots.civicSwaps(grown, hall);
+    const choices = lots.civicSwaps(grown, hall.index);
     expect(choices.some((c) => c.label === 'School')).toBe(true);
     expect(choices.some((c) => c.label === 'Church')).toBe(false);
-    const town = made(lots.swapCivic(grown, hall, school, content, 1));
-    const b = town.open!.backdrop![hall];
-    expect(b.use).toBe('school');
-    expect(b.poly).toEqual(hamlet.open!.backdrop![hall].poly);
-    const p = town.open!.places![b.place!];
-    expect(p.kind).toBe('school');
-    expect(p.name).toBe(`${hamlet.open!.areas[0].name} School`);
-    // (The careers the hall took on for the town go with it.)
-    expect(p.work![0]).toBe('education');
-    expect(p.work).toContain('law');
-    expect(p.work).not.toContain('politics');
+    // The school's layout is on a much bigger lot than the hall's: by the square, it has no room there.
+    expect(lots.swapCivic(grown, t, content, hall.index, school, 1)).toEqual({ refused: 'There is no room for the school here.' });
+    // The inn made a garage, a layout on a lot of another size: the inn taken up, the garage a lot of its own where it met its road.
+    const inn = hamlet.slots.find((s) => s.template === 'inn')!;
+    const innPlace = places.find((p) => p.plot === inn.index)!;
+    const garage = lots.CIVIC_PLACES.findIndex((c) => c.label === 'Garage');
+    expect(lots.civicSwaps(grown, inn.index).some((c) => c.civic === garage)).toBe(true);
+    const toGarage = lots.swapCivic(grown, t, content, inn.index, garage, 1);
+    const town = made(toGarage);
+    expect(toGarage).toHaveProperty('cleared', { lots: [inn.index], backdrop: [] });
+    expect(town.slots.length).toBe(grown.slots.length);
+    expect(town.slots.some((s) => s.template === 'inn')).toBe(false);
+    const lot = town.slots.at(-1)!;
+    expect(lot).toMatchObject({ kind: 'shop', template: 'garage', area: 0, index: town.slots.length - 1 });
+    expect(lot.dress).toBeDefined();
+    expect(entriesOf(town, t).at(-1)!.road).toBe(entriesOf(grown, t)[inn.index].road);
+    for (const s of town.slots.slice(0, -1)) if (s.kind !== 'house' || s.lot === 'farm') expect(overlap(plotRect(t, s), plotRect(t, lot))).toBe(false);
+    const p = town.open!.places!.find((q) => q.plot === lot.index)!;
+    expect(p.kind).toBe('workshop');
+    expect(p.name).toMatch(/'s Garage$/);
+    expect(lot.name).toBe(p.name);
+    expect(town.open!.places!.filter((q) => q.plot === undefined)).toEqual([]);
+    expect(town.open!.places!.some((q) => q.name === innPlace.name)).toBe(false);
+    // (The careers the inn took on for the town, if any, go with it.)
+    const extra = (innPlace.work ?? []).filter((w) => !lots.CIVIC_PLACES[lots.civicOfLot(inn)].work.includes(w));
+    expect(p.work!.slice(0, 2)).toEqual(['mechanics', 'transport']);
+    for (const w of extra) expect(p.work).toContain(w);
+    expect(p.work).not.toContain('music');
     const church = lots.CIVIC_PLACES.findIndex((c) => c.label === 'Church');
-    expect(lots.swapCivic(hamlet, hall, church, content)).toHaveProperty('refused');
-    const shop = hamlet.open!.backdrop!.findIndex((q) => q.place !== undefined && places[q.place].name.endsWith('Hardware'));
-    expect(lots.swapCivic(hamlet, shop, school, content)).toEqual({ refused: 'That is not a civic building.' });
+    expect(lots.swapCivic(hamlet, t, content, hall.index, church)).toHaveProperty('refused');
+    expect(lots.swapCivic(hamlet, t, content, market.index, school)).toEqual({ refused: 'That is not a civic place.' });
   });
 
   test('the check on every pointer move is under 5 ms', () => {

@@ -1,28 +1,32 @@
 /**
- * Step 2's lot edits: a lot added along a road (a home, a farm, a public place, an outdoor spot),
- * moved, a new street filled with homes, a lot's house, garden or public place changed, a civic
- * building's use swapped, lots removed, and the houses along streets numbered again. Each is a pure
+ * Step 2's lot edits: a lot added along a road (a home, a farm, a public place, an outdoor spot, a
+ * named place: a civic place, a shop, an office...), moved, a new street filled with homes, a lot's
+ * house, garden or public place changed, a civic place's lot made another civic place, lots removed,
+ * and the houses along streets numbered again. Each is a pure
  * function from draft to draft and keeps the generator's own rules: a lot goes where `town.ts`
  * `lotAt` puts it on the town's ground (`ground.ts` `townGround`), its middle off the corners and
  * tight bends as `macro.ts` keeps an area's lots, no home in a town centre, and only where a car can
- * turn out of its driveway onto the road (`LotPlacer`'s driveway test). A street is filled by
+ * turn out of its driveway onto the road (`LotPlacer`'s driveway test); a named place's lot, which
+ * has no driveway, as `macro.ts` `putPlace` puts one (its front by the road). A street is filled by
  * `LotPlacer.place` from the world's lot mix (`wantedLots`), a garden cut again as `withGarden` cuts it.
  *
  * A lot is known by where it stands (`lotKey`), to the whole metre, as the people's streams key
  * its household (`people.ts` `peopleStreams`): its slot index changes as lots before it go.
  *
  * The generator's own pieces are used as it uses them: the corner and bend limits (`macro.ts`), the
- * driveway test (`town.ts` `drivesOut`), the public lots' hours and careers and the civic places
- * (`backdrop.ts` `LOT_HOURS`, `LOT_WORK`, `HOURS`, `CIVIC` and the names it draws: `namerFor`).
+ * driveway test (`town.ts` `drivesOut`), the named places' lots and every public lot's place
+ * (`placeLots.ts`: `placeUnit`, `lotName`, `slotPlace`), the civic places (`backdrop.ts` `CIVIC` and
+ * the names it draws: `namerFor`).
  */
 
 import type { Content } from '../../content/content';
-import type { BackdropBuilding, RoadPlan, TownPlace } from '../../core/protocol';
-import { byNeed, CIVIC, civicLabel, civicOf, civicTooBig, draftAreaSize, HOURS, hoursFor, LOT_HOURS, LOT_WORK, namerFor } from '../backdrop';
+import type { RoadPlan, TownPlace } from '../../core/protocol';
+import { byNeed, CIVIC, civicLabel, civicOf, civicTooBig, draftAreaSize, hoursFor, namerFor } from '../backdrop';
 import { weighted, type GardenSize } from '../housegen';
 import { heightAt } from '../land';
-import { BEND, BEND_MOST, CORNER, TIGHT_BEND, TRAIL_WIDTH } from '../macro';
+import { BEND, BEND_MOST, CORNER, placeReaches, TIGHT_BEND, TRAIL_WIDTH } from '../macro';
 import { mulberry32 } from '../noise';
+import { lotName, lotPlaceKind, placeOfTemplate, placeUnit, slotPlace, type PlaceWhat } from '../placeLots';
 import { evenly, leftOf, lengths, pointAt, roadIndex, straightAround, tangent, type Pt } from '../roads';
 import {
   drivesOut as drivesOutOn,
@@ -54,8 +58,13 @@ import { entriesOf, frontOf, groundOf, inCentre, townGround, type RoadSpot } fro
 
 type Rand = () => number;
 
-/** What goes on a lot being added: a home of a size (with a garden), a farm, or a public place or outdoor spot (its template). */
-export type LotChoice = { kind: 'house'; size: Exclude<LotSize, 'farm' | 'terrace'>; garden?: GardenSize } | { kind: 'farm' } | { kind: 'park' | 'shop' | 'outdoor'; template: string };
+/**
+ * What goes on a lot being added: a home of a size (with a garden), a farm, a public place or outdoor
+ * spot (its template), or a named place (a civic place, an index into `CIVIC`, or a place of another
+ * kind: `placeLots.ts` `PlaceWhat`) of area `area` (its layout and name as a place of that area's size:
+ * `draftAreaSize`).
+ */
+export type LotChoice = { kind: 'house'; size: Exclude<LotSize, 'farm' | 'terrace'>; garden?: GardenSize } | { kind: 'farm' } | { kind: 'park' | 'shop' | 'outdoor'; template: string } | { kind: 'place'; what: PlaceWhat; area: number };
 
 /** Where a lot would go (`canPlace`): its rectangle on the town and the way it faces. */
 export interface LotFit extends Rect {
@@ -147,20 +156,29 @@ function frontageAt(roads: readonly RoadPlan[], at: RoadSpot): Frontage | string
   return { road: at.road, s: ls[i], side: at.side, p: road.points[i], n, far: 0 };
 }
 
+/** Whether lot `u` is a named place's (`placeLots.ts`: built from a place's own layout, on a lot of its size). */
+function isPlaceLot(u: Pick<Unplaced, 'kind' | 'template'>): boolean {
+  return u.kind === 'shop' && placeOfTemplate(u.template) !== null;
+}
+
 /**
  * Where lot `u` goes if it fronts road spot `at` on `draft` (`except`: that lot left off the
  * ground: the one being moved), as the generator would put it there: off the corners, no home in
- * a town centre, snapped by `lotAt` onto free ground, a car able to drive out. Or why not.
+ * a town centre, snapped by `lotAt` onto free ground, a car able to drive out. A named place's lot
+ * (no driveway) as `macro.ts` `putPlace` puts one: by a corner too, not snug, the middle of its
+ * front by the road (`placeReaches`). Or why not.
  */
 function fitAt(draft: NeighbourhoodDraft, t: Templates, at: RoadSpot, u: Unplaced, except = -1): (LotFit & { anchor: number; f: Frontage }) | { refused: string } {
   const f = frontageAt(draft.roads, at);
   if (typeof f === 'string') return { refused: f };
-  if (!offCorners(draft.roads, f.road, f.s)) return { refused: 'Too near a corner or a bend.' };
+  const place = isPlaceLot(u);
+  if (!place && !offCorners(draft.roads, f.road, f.s)) return { refused: 'Too near a corner or a bend.' };
   if (u.kind === 'house' && inCentre(draft, [f.p[0] + f.n[0] * 10, f.p[1] + f.n[1] * 10])) return { refused: "The town centre's frontage is kept for its shops and buildings, not homes." };
   const { width, depth } = slotDims(t, u);
-  const lot = lotAt(groundOf(draft, t, except), draft.roads[f.road], f, width, depth, true);
+  const lot = lotAt(groundOf(draft, t, except), draft.roads[f.road], f, width, depth, !place);
   if (!lot) return { refused: 'There is no room for it here.' };
-  if (!drivesOut(draft.roads, t, u, lot)) return { refused: 'A car could not turn out of its driveway onto the road here.' };
+  if (place && !placeReaches(t, draft.roads[f.road], u, lot)) return { refused: 'It would stand too far back from the road here.' };
+  if (!place && !drivesOut(draft.roads, t, u, lot)) return { refused: 'A car could not turn out of its driveway onto the road here.' };
   const r = plotRect(t, { ...u, ...lot });
   return { ...r, facing: lot.facing, anchor: lot.anchor, f };
 }
@@ -206,49 +224,46 @@ function middleOf(draft: NeighbourhoodDraft, a: number): Pt {
   return area ? [area.x + area.w / 2, area.z + area.d / 2] : [draft.width / 2, draft.depth / 2];
 }
 
-/** What kind of place a public lot is (as `backdrop.ts` `layBackdrop` names them): a market is a shop, a café a café. */
-function placeKindOf(s: Pick<PlotSlot, 'kind' | 'template'>): TownPlace['kind'] {
-  return s.kind === 'outdoor' ? 'outdoor' : s.kind === 'park' ? (s.template === 'market' ? 'shop' : 'park') : s.template === 'cafe' ? 'cafe' : 'shop';
-}
-
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
-/** A name not among `taken`: `name`, else the area's name before it, else numbered (as `layBackdrop` names a hamlet's café). */
-function freeName(name: string, taken: ReadonlySet<string>, area: string): string {
-  if (!taken.has(name)) return name;
-  let out = `${area} ${name.replace(/^The /, '')}`;
-  for (let k = 2; taken.has(out); k++) out = `${name} ${k}`;
-  return out;
+/**
+ * The names for places in area `area` of `draft` (`namerFor`: of a place of its size, its streets'
+ * words), drawn from `rand`, none of `taken`.
+ */
+function namerIn(draft: NeighbourhoodDraft, content: Content, area: number, rand: Rand, taken: Set<string>) {
+  const lastNames = content.names.last.length ? content.names.last : ['Smith'];
+  const streets = draft.roads.filter((r) => r.area === area && r.name && !/Trail|Path/.test(r.name)).map((r) => r.name!);
+  return namerFor(rand, draft.open?.areas[area]?.name ?? draft.name, draftAreaSize(draft, area), lastNames, streets, taken);
 }
 
-/** The place public lot `s` is (as `layBackdrop` makes one): its kind, its name (none twice), its tag at its door or in its middle, hours and the careers working there. */
-function lotPlace(draft: NeighbourhoodDraft, t: Templates, content: Content, s: PlotSlot, keep?: TownPlace): TownPlace {
-  const kind = placeKindOf(s);
-  const area = s.area ?? 0;
-  const taken = new Set((draft.open?.places ?? []).filter((q) => q !== keep).map((q) => q.name));
-  const name = freeName(s.name, taken, draft.open?.areas[area]?.name ?? draft.name);
-  const r = plotRect(t, s);
-  const front = ([[0.5, 0], [0, 0.5], [0.5, 1], [1, 0.5]] as const)[s.facing];
-  const [x, z] = kind === 'park' || kind === 'outdoor' ? [r.x + r.w / 2, r.z + r.d / 2] : [r.x + r.w * front[0], r.z + r.d * front[1]];
-  const work = LOT_WORK[s.template] ?? [];
-  return {
-    name,
-    kind,
-    x: r2(x),
-    z: r2(z),
-    plot: s.index,
-    ...(kind === 'park' || kind === 'outdoor' ? {} : { hours: hoursFor(LOT_HOURS, work, content.careerCategories) }),
-    ...(work.length ? { work } : {}),
-    area,
-  };
+/**
+ * `draft` with named place lot `slot` (`placeLots.ts`) called as its place is (`lotName`: "Ashby School";
+ * a farm shop keeps its farm's name), drawn from `rand`: no other lot's name nor another place's. A lot
+ * that is no named place's is left as it is.
+ */
+export function withPlaceName(draft: NeighbourhoodDraft, content: Content, slot: number, rand: Rand): NeighbourhoodDraft {
+  const s = draft.slots[slot];
+  const what = s && isPlaceLot(s) ? placeOfTemplate(s.template) : null;
+  if (!what) return draft;
+  const taken = new Set([...(draft.open?.places ?? []).filter((q) => q.plot !== slot).map((q) => q.name), ...draft.slots.filter((q) => q.index !== slot).map((q) => q.name)]);
+  const namer = namerIn(draft, content, s.area ?? 0, rand, taken);
+  const name = 'zone' in what && what.zone === 'farm' ? namer.unique(() => s.name) : (lotName(s, namer) ?? s.name);
+  return name === s.name ? draft : { ...draft, slots: draft.slots.map((q) => (q.index === slot ? { ...q, name } : q)) };
 }
 
-/** `draft` with the place of public lot `slot` (`lotPlace`) put in, in place of the one it had (a village placed by hand gives its public lots theirs: `villages.ts`). */
+/**
+ * `draft` with the place of public lot `slot` (`placeLots.ts` `slotPlace`: its kind, name, tag, hours and
+ * careers) put in, in place of the one it had (a village placed by hand gives its public lots theirs:
+ * `villages.ts`). Its name is the lot's, else, if another place has it, with its area's name before it,
+ * else numbered.
+ */
 export function withLotPlace(draft: NeighbourhoodDraft, t: Templates, content: Content, slot: number): NeighbourhoodDraft {
   const open = draft.open;
   if (!open?.places) return draft;
   const had = open.places.findIndex((q) => q.plot === slot);
-  const place = lotPlace(draft, t, content, draft.slots[slot], open.places[had]);
+  const s = draft.slots[slot];
+  const taken = new Set(open.places.filter((_, i) => i !== had).map((q) => q.name));
+  const place = slotPlace(draft, t, content, s, namerIn(draft, content, s.area ?? 0, mulberry32(0), taken));
   const places = had < 0 ? [...open.places, place] : open.places.map((q, i) => (i === had ? place : q));
   return { ...draft, open: { ...open, places } };
 }
@@ -328,6 +343,12 @@ function unplacedOf(draft: NeighbourhoodDraft, t: Templates, choice: LotChoice, 
   const garden = (): GardenSize => (weighted(rand, specFor(draft).gardens as Record<string, number>) ?? 'roomy') as GardenSize;
   if (choice.kind === 'house') return { kind: 'house', name: '', lot: choice.size, ...houseFor(t, choice.size, choice.garden ?? garden(), rand) };
   if (choice.kind === 'farm') return t.lotSizes?.farm ? { kind: 'house', name: '', lot: 'farm', ...houseFor(t, 'farm', garden(), rand) } : 'This world has no farm lots.';
+  // (A named place on its layout's own lot, as `macro.ts` lays one: `placeUnit`.)
+  if (choice.kind === 'place') {
+    const what = 'civic' in choice.what ? CIVIC[choice.what.civic] : choice.what.zone;
+    if (!what) return 'There is no such place.';
+    return { ...placeUnit(t, what, draftAreaSize(draft, choice.area), rand), area: choice.area };
+  }
   const p = t.parks.find((q) => q.id === choice.template);
   if (!p) return `There is no public place "${choice.template}".`;
   const kind = p.kind === 'outdoor' ? 'outdoor' : p.kind === 'shop' ? 'shop' : 'park';
@@ -375,8 +396,9 @@ export function canPlace(draft: NeighbourhoodDraft, t: Templates, at: RoadSpot, 
 /**
  * `draft` with a lot of `choice` at `at`, its house drawn from `seed` (the same seed, the same
  * house): where `canPlace` says it fits. A home is numbered along its road (`renumber`), a farm gets
- * its fields and farmyard (`LotPlacer`) and a name, a public place its place (named, with hours), an
- * outdoor spot its place, its level and a short trail into it from the road.
+ * its fields and farmyard (`LotPlacer`) and a name, a public place its place (named, with hours), a
+ * named place's lot its area (`choice.area`), its name as its place's (`withPlaceName`) and its
+ * place, an outdoor spot its place, its level and a short trail into it from the road.
  */
 export function addLot(draft: NeighbourhoodDraft, t: Templates, content: Content, at: RoadSpot, choice: LotChoice, seed: number): Edited {
   const u0 = unplacedOf(draft, t, choice, seed);
@@ -384,12 +406,12 @@ export function addLot(draft: NeighbourhoodDraft, t: Templates, content: Content
   const fit = fitAt(draft, t, at, u0);
   if ('refused' in fit) return fit;
   const rand = mulberry32((seed ^ 0x5bd1e995) >>> 0);
-  const area = areaAt(draft, at.road, fit.f.p);
+  const area = choice.kind === 'place' ? choice.area : areaAt(draft, at.road, fit.f.p);
   const u: Unplaced = { ...u0, area, ...(u0.lot === 'farm' ? { name: farmName(draft, content, rand) } : {}), ...(u0.kind === 'outdoor' ? { name: `${draft.open?.areas[area]?.name ?? draft.name} ${u0.name}` } : {}) };
   // (Put down by the generator's own placer: a farm's fields and farmyard drawn round its house.)
   const placer = new LotPlacer(content, t, townGround(draft, t), draft.roads, [0, 0], rand, true);
   const slot: PlotSlot = { ...placer.put(u, { x: fit.x, z: fit.z, facing: fit.facing, anchor: fit.anchor }, fit.f), index: draft.slots.length };
-  let next: NeighbourhoodDraft = { ...draft, slots: [...draft.slots, slot] };
+  let next: NeighbourhoodDraft = withPlaceName({ ...draft, slots: [...draft.slots, slot] }, content, slot.index, rand);
   if (slot.kind !== 'house') next = withLotPlace(next, t, content, slot.index);
   if (slot.kind === 'outdoor' && next.open) next = { ...next, roads: [...next.roads, trailInto(next, t, slot, fit.f)], open: { ...next.open, pads: { ...next.open.pads, [slot.index]: padOf(next, t, slot) } } };
   if (slot.kind === 'house') next = renumber(next, t, [at.road]);
@@ -531,7 +553,7 @@ export function withGardenId(template: string, garden: GardenSize): string {
 }
 
 /** Whether a lot is a park (its place one: the town park, a playground; not a market). */
-const isPark = (s: Pick<PlotSlot, 'kind' | 'template'>) => s.kind === 'park' && placeKindOf(s) === 'park';
+const isPark = (s: Pick<PlotSlot, 'kind' | 'template'>) => s.kind === 'park' && lotPlaceKind(s) === 'park';
 
 /**
  * `draft` with the public lot on `slot` made another public place of its size (`template`, one of
@@ -541,6 +563,7 @@ const isPark = (s: Pick<PlotSlot, 'kind' | 'template'>) => s.kind === 'park' && 
 export function swapPlace(draft: NeighbourhoodDraft, t: Templates, content: Content, slot: number, template: string): Edited {
   const old = draft.slots[slot];
   if (!old || (old.kind !== 'park' && old.kind !== 'shop')) return { refused: 'That is not a public place.' };
+  if (isPlaceLot(old)) return { refused: "A named place's lot is built for it." };
   if (old.template === template) return { refused: 'It is that place already.' };
   const p = t.parks.find((q) => q.id === template);
   if (!p || !publicChoices(t, slotDims(t, old)).includes(template)) return { refused: 'That place does not go on a lot of this size.' };
@@ -559,76 +582,97 @@ export function swapPlace(draft: NeighbourhoodDraft, t: Templates, content: Cont
  */
 export { CIVIC as CIVIC_PLACES } from '../backdrop';
 
+/** A civic place's lot made one of another size is tried this far apart (m) along its road from where it met it. */
+const SWAP_STEP = 2;
+
+/** Which civic place lot `s` is (an index into `CIVIC`: its layout's, `placeOfTemplate`), or -1. */
+export function civicOfLot(s: Pick<PlotSlot, 'kind' | 'template'> | undefined): number {
+  const what = s && isPlaceLot(s) ? placeOfTemplate(s.template) : null;
+  return what && 'civic' in what ? what.civic : -1;
+}
+
 /**
- * The civic places a civic building (`building`, in `open.backdrop`) may become: those its area doesn't have yet, of
- * its area's size and called as one of that size (a village's hall its village hall: `draftAreaSize`, `civicTooBig`,
- * `civicLabel`), those for careers no other place there employs first (`byNeed`).
+ * The civic places civic place lot `slot` may become: those its area doesn't have yet (its lots' and its
+ * places'), of its area's size and called as one of that size (a village's hall its village hall:
+ * `draftAreaSize`, `civicTooBig`, `civicLabel`), those for careers no other place there employs first
+ * (`byNeed`).
  */
-export function civicSwaps(draft: NeighbourhoodDraft, building: number): { civic: number; label: string }[] {
-  const b = draft.open?.backdrop?.[building];
-  const places = draft.open?.places ?? [];
-  if (!b || civicOf(places[b.place ?? -1]) < 0) return [];
-  const others = places.filter((p, i) => p.area === b.area && i !== b.place);
-  const has = new Set([...others, places[b.place!]].map(civicOf));
-  const size = draftAreaSize(draft, b.area);
+export function civicSwaps(draft: NeighbourhoodDraft, slot: number): { civic: number; label: string }[] {
+  const s = draft.slots[slot];
+  const was = civicOfLot(s);
+  if (was < 0) return [];
+  const area = s.area ?? 0;
+  const others = (draft.open?.places ?? []).filter((p) => p.area === area && p.plot !== slot);
+  const has = new Set([was, ...others.map(civicOf), ...draft.slots.filter((q) => (q.area ?? 0) === area && q.index !== slot).map(civicOfLot)]);
+  const size = draftAreaSize(draft, area);
   const open = CIVIC.flatMap((c, i) => (has.has(i) || civicTooBig(c, size) ? [] : [i]));
   return byNeed(open, new Set(others.flatMap((p) => p.work ?? []))).map((civic) => ({ civic, label: civicLabel(CIVIC[civic], size) }));
 }
 
 /**
- * `draft` with civic building `building` (its index in `open.backdrop`) made civic place `civic`
- * (an index into `CIVIC_PLACES`): its use, storeys and roof as that kind's (its footprint kept), and its
- * place's kind, name (drawn from `seed`, none twice), hours and careers. Careers the old place
- * took on beyond its own (the main town's catch-all office) go with it. Refused for a building that
- * is no civic place, or a civic place its area already has.
+ * `draft` with civic place lot `slot` made civic place `civic` (an index into `CIVIC_PLACES`): built
+ * from that place's layout (`placeUnit`: how it looks from outside drawn from `seed`), named as one
+ * (none twice) and given its place (hours and careers: `slotPlace`). A layout on a lot of the same size
+ * goes on the same lot; another is put down where the old lot met its road, as `addLot` puts one,
+ * the old lot taken up first, else as near there along the road as it fits (refused where it has no
+ * room within half its width). Careers the old place took on
+ * beyond its own (the main town's catch-all office) go with it. Refused for a lot that is no civic
+ * place's, or a civic place its area has already or is too small for.
  */
-export function swapCivic(draft: NeighbourhoodDraft, building: number, civic: number, content: Content, seed = 0): Edited {
-  const open = draft.open;
-  const b = open?.backdrop?.[building];
+export function swapCivic(draft: NeighbourhoodDraft, t: Templates, content: Content, slot: number, civic: number, seed = 0): Edited {
+  const old = draft.slots[slot];
+  const was = civicOfLot(old);
+  if (was < 0) return { refused: 'That is not a civic place.' };
   const c = CIVIC[civic];
-  if (!open?.backdrop || !open.places || !b || b.place === undefined) return { refused: 'That is not a civic building.' };
   if (!c) return { refused: 'There is no such civic place.' };
-  const old = open.places[b.place];
-  const was = civicOf(old);
-  if (was < 0) return { refused: 'That is not a civic building.' };
   // (Named and offered by its area's size: a village's.)
-  const size = draftAreaSize(draft, b.area);
+  const area = old.area ?? 0;
+  const size = draftAreaSize(draft, area);
   const label = civicLabel(c, size).toLowerCase();
   if (was === civic) return { refused: `It is a ${label} already.` };
-  const area = open.areas[b.area];
-  if (civicTooBig(c, size)) return { refused: `${area?.name ?? draft.name} is too small for a ${label}.` };
-  if (open.places.some((p, i) => i !== b.place && p.area === b.area && civicOf(p) === civic)) return { refused: `${area?.name ?? draft.name} has a ${label} already.` };
-  // A name as the generator names one, none twice in the world (the lots' names among them).
+  const where = draft.open?.areas[area]?.name ?? draft.name;
+  if (civicTooBig(c, size)) return { refused: `${where} is too small for a ${label}.` };
+  if (!civicSwaps(draft, slot).some((k) => k.civic === civic)) return { refused: `${where} has a ${label} already.` };
   const rand = mulberry32(seed);
-  const lastNames = content.names.last.length ? content.names.last : ['Smith'];
-  const streets = draft.roads.filter((r) => r.area === b.area && r.name && !/Trail|Path/.test(r.name)).map((r) => r.name!);
-  const taken = new Set([...open.places.filter((_, i) => i !== b.place).map((p) => p.name), ...draft.slots.map((s) => s.name)]);
-  const namer = namerFor(rand, area?.name ?? draft.name, size, lastNames, streets, taken);
-  const name = namer.unique(() => c.name(namer));
-  const extra = (old.work ?? []).filter((w) => !CIVIC[was].work.includes(w));
-  const work = [...c.work, ...extra.filter((w) => !c.work.includes(w))];
-  const place: TownPlace = { name, kind: c.place, x: old.x, z: old.z, hours: hoursFor(HOURS[c.place as keyof typeof HOURS], work, content.careerCategories), ...(work.length ? { work } : {}), area: b.area };
-  // The footprint stays; the storeys and the roof are the new kind's (a ridge along the footprint's longest side if the roof wants one and had none).
-  const { use, storeys: [fewest, most], roofs } = c.kind;
-  const storeys = Math.min(most, Math.max(fewest, b.storeys));
-  const roof = roofs.includes(b.roof) ? b.roof : roofs[0];
-  const ridged = roof === 'gable' || roof === 'mansard';
-  const built: BackdropBuilding = { ...b, use, storeys, roof, ...(ridged ? { ridge: b.ridge ?? ridgeOf(b.poly) } : {}) };
-  if (!ridged) delete built.ridge;
-  const backdrop = open.backdrop.map((q, i) => (i === building ? built : q));
-  const places = open.places.map((p, i) => (i === b.place ? place : p));
-  return { draft: { ...draft, open: { ...open, backdrop, places } }, cleared: NOTHING };
-}
-
-/** A ridge along a footprint's longest side (rad: a turn round +y, running along (cos r, -sin r)). */
-function ridgeOf(poly: readonly [number, number][]): number {
-  let [best, long] = [0, -1];
-  poly.forEach((a, i) => {
-    const b = poly[(i + 1) % poly.length];
-    const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    if (l > long) [best, long] = [Math.atan2(-(b[1] - a[1]), b[0] - a[0]), l];
-  });
-  return Math.round(best * 1e4) / 1e4;
+  const u: Unplaced = { ...placeUnit(t, c, size, rand), area };
+  const oldPlace = draft.open?.places?.find((p) => p.plot === slot);
+  const extra = (oldPlace?.work ?? []).filter((w) => !CIVIC[was].work.includes(w));
+  const [a, b] = [slotDims(t, old), slotDims(t, u)];
+  let next: NeighbourhoodDraft;
+  let at = slot;
+  let cleared = NOTHING;
+  if (a.width === b.width && a.depth === b.depth) {
+    // The same lot, built from the other layout.
+    const s: PlotSlot = { ...old, template: u.template, name: u.name, ...(u.dress ? { dress: u.dress } : {}) };
+    next = { ...draft, slots: draft.slots.map((q) => (q.index === slot ? s : q)) };
+  } else {
+    // Taken up, and put down where it met its road, else as near there along it as it fits (half its width either way at most).
+    const spot = entriesOf(draft, t)[slot];
+    const without = removeLots(draft, new Set([slot]));
+    let fit: ReturnType<typeof fitAt> | null = null;
+    for (let k = 0; spot.road >= 0 && k <= b.width / 2 && (!fit || 'refused' in fit); k += SWAP_STEP) {
+      for (const s of k ? [spot.s + k, spot.s - k] : [spot.s]) {
+        fit = fitAt(without, t, { ...spot, s }, u);
+        if (!('refused' in fit)) break;
+      }
+    }
+    if (!fit || 'refused' in fit) return { refused: `There is no room for the ${label} here.` };
+    const placer = new LotPlacer(content, t, townGround(without, t), without.roads, [0, 0], rand, true);
+    const s: PlotSlot = { ...placer.put(u, { x: fit.x, z: fit.z, facing: fit.facing, anchor: fit.anchor }, fit.f), index: without.slots.length };
+    next = { ...without, slots: [...without.slots, s] };
+    at = s.index;
+    cleared = { lots: [slot], backdrop: [] };
+  }
+  next = withLotPlace(withPlaceName(next, content, at, rand), t, content, at);
+  if (extra.length && next.open?.places) {
+    const places = next.open.places.map((p): TownPlace => {
+      if (p.plot !== at) return p;
+      const work = [...(p.work ?? []), ...extra.filter((w) => !(p.work ?? []).includes(w))];
+      return { ...p, work, ...(p.hours ? { hours: hoursFor(p.hours, extra, content.careerCategories) } : {}) };
+    });
+    next = { ...next, open: { ...next.open, places } };
+  }
+  return { draft: next, cleared };
 }
 
 // ---- numbering and removal -------------------------------------------------------------------------

@@ -1,9 +1,10 @@
 /**
  * Step 2's build-up: a street built up with the town's other buildings (shops, offices, terraces,
- * flats, civic places nobody lives in), its buildings cleared again, and a civic place put down by
- * hand. Each is a pure function from draft to draft, laid by the generator's own backdrop pass
- * (`backdrop.ts` `BackdropPass`, made from the draft: everything standing is kept clear of, nothing
- * standing moves) and its own lot fill (`lots.ts` `fillStreet`).
+ * flats nobody lives in), its buildings cleared again, and a civic place put down by hand (a lot of
+ * its own: `lots.ts` `addLot`). Each is a pure function from draft to draft, laid by the generator's
+ * own backdrop pass (`backdrop.ts` `BackdropPass`, made from the draft: everything standing is kept
+ * clear of, nothing standing moves) and its own lot fill (`lots.ts` `fillStreet`). The buildings are
+ * the backdrop's, none of them a place: the town's named places are lots (`placeLots.ts`).
  *
  * A street is built up as the generator builds one, its lots first and the backdrop in what they
  * leave, the zone set stretch by stretch: inside the town centre's outline the centre's kinds
@@ -31,7 +32,7 @@ import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '..
 import { placeOf, specOf } from '../world';
 import type { Edited } from './edited';
 import { frontOf, inCentre } from './ground';
-import { fillStreet, removeLotsEdit, renumber } from './lots';
+import { addLot, fillStreet, removeLotsEdit, renumber } from './lots';
 
 /** What goes along a street built up: homes from the lot mix, the town's other buildings, or both. */
 export type BuildMode = 'homes' | 'buildings' | 'both';
@@ -43,7 +44,7 @@ export interface BuildUpOp {
   seed: number;
 }
 
-/** A civic place put down by hand: which (an index into `CIVIC`), along which road, how far along it (m) and on which side, and the seed its size, look and name are drawn from. */
+/** A civic place put down by hand: which (an index into `CIVIC`), along which road, how far along it (m) and on which side, and the seed its look and name are drawn from. */
 export interface CivicOp {
   civic: number;
   road: number;
@@ -233,7 +234,7 @@ function landOf(draft: NeighbourhoodDraft): Land | null {
  * `draft` with road `op.road` built up (see the top of this file): homes from the lot mix
  * (`op.mode` `homes`, `both`: `fillStreet`, a share of the frontage in the main town outside its
  * centre for `both`), the town's other buildings in what they leave (`buildings`, `both`: rows
- * along it, a second row behind), and the new buildings' places named. `leftOut`: how many
+ * along it, a second row behind; none of them a place). `leftOut`: how many
  * buildings were left out where the ground would break a slope limit. Refused where nothing is
  * built along the road, or nothing more fits along it.
  */
@@ -287,15 +288,10 @@ export function buildUp(draft: NeighbourhoodDraft, t: Templates, content: Conten
   const kept = judge ? fronting.filter((f) => judge.keep(f.b.poly)) : fronting;
   const leftOut = fronting.length - kept.length;
   if (!homes && !kept.length) return { refused: leftOut ? `the ground along ${name} is too steep for anything more to be built there` : `nothing more fits along ${name}` };
-  const places = pass.placesFor(
-    kept.map((f) => f.at),
-    rand,
-  );
   const open = next.open!;
-  const before = open.backdrop ?? [];
-  const backdrop = [...before, ...kept.map((f) => f.b)];
+  const backdrop = [...(open.backdrop ?? []), ...kept.map((f) => f.b)];
   return {
-    draft: { ...next, open: { ...open, backdrop, places: [...(open.places ?? []), ...places] } },
+    draft: { ...next, open: { ...open, backdrop } },
     cleared: { lots: [], backdrop: [] },
     ...(leftOut ? { leftOut } : {}),
   };
@@ -309,7 +305,7 @@ export function buildingsOn(draft: NeighbourhoodDraft, road: number): number[] {
   return backdrop.flatMap((_, i) => (entries[i]?.entry?.road === road ? [i] : []));
 }
 
-/** `draft` without the backdrop buildings fronting road `road` (`buildingsOn`), their places with them. Refused if none fronts it. */
+/** `draft` without the backdrop buildings fronting road `road` (`buildingsOn`); the lots along it stay (the named places' among them). Refused if none fronts it. */
 export function clearBuildings(draft: NeighbourhoodDraft, road: number): Edited {
   const r = draft.roads[road];
   if (!r) return { refused: 'there is no road there' };
@@ -323,11 +319,12 @@ const civicMade = new WeakMap<NeighbourhoodDraft, Map<string, Edited>>();
 
 /**
  * `draft` with civic place `op.civic` (an index into `CIVIC`) put down by hand fronting road
- * `op.road` at `op.s` along it (to the metre) on `op.side`: its building laid as the generator lays
- * a civic place (`BackdropPass.putCivic`: set back as they are, clear of everything standing,
- * facing its road), of a size drawn from `op.seed` (else its kind's smallest), and named as one.
- * Only one its area lacks (`civicChoices`), on a road of a town or a village. Kept per draft, so
- * asking again on the same draft is cheap. The settle judges its slopes, as any placement's.
+ * `op.road` at `op.s` along it (to the metre) on `op.side`: a lot of its own, built from its layout
+ * for its area's size (a village's hall the parish hall's, a town's the town hall's: `placeLots.ts`
+ * `placeUnit`), put down as `lots.ts` `addLot` puts a named place's (its front by the road, on free
+ * ground), its look drawn from `op.seed`, named as one and given its place. Only one its area lacks
+ * (`civicChoices`), on a road of a town or a village. Kept per draft, so asking again on the same
+ * draft is cheap. The settle judges its slopes, as any placement's.
  */
 export function addCivic(draft: NeighbourhoodDraft, t: Templates, content: Content, op: CivicOp): Edited {
   const s = Math.round(op.s);
@@ -356,15 +353,9 @@ function civicAt(draft: NeighbourhoodDraft, t: Templates, content: Content, op: 
   const where = draft.open?.areas[area]?.name ?? draft.name;
   if (civicTooBig(c, size)) return { refused: `${where} is too small for a ${label}` };
   if (!civicChoices(draft, area).some((k) => k.index === op.civic)) return { refused: `${where} has a ${label} already` };
-  const rand = mulberry32(mix(op.seed, roadKey(r), 'civic', String(op.civic)));
-  const pass = new BackdropPass({ draft, t, content });
-  let at = pass.putCivic(op.civic, op.road, op.s, op.side, rand);
-  if (at < 0) at = pass.putCivic(op.civic, op.road, op.s, op.side, rand, { w: c.kind.w[0], d: c.kind.d[0] });
-  if (at < 0) return { refused: `there is no room for the ${label} here` };
-  const places = pass.placesFor([at], rand);
-  const open = draft.open!;
-  const building = pass.result().backdrop[at];
-  return { draft: { ...draft, open: { ...open, backdrop: [...(open.backdrop ?? []), building], places: [...(open.places ?? []), ...places] } }, cleared: { lots: [], backdrop: [] } };
+  const e = addLot(draft, t, content, { road: op.road, s: op.s, side: op.side }, { kind: 'place', what: { civic: op.civic }, area }, mix(op.seed, roadKey(r), 'civic', String(op.civic)));
+  if ('refused' in e) return { refused: e.refused === 'There is no room for it here.' ? `there is no room for the ${label} here` : e.refused };
+  return e;
 }
 
 /** The civic places area `area` of `draft` may be given by hand (`civicChoices`): what each is called, by its index into `CIVIC`. */

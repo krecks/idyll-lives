@@ -324,6 +324,13 @@ const PLACES = 0x706c6163;
 const PLACE_NAMES = 0x6e616d65;
 /** A named place's lot stands with the middle of its front no further than this from its road's edge (m): as far as a lot's path reaches across the verge to its road (`layoutTown`). */
 const PLACE_REACH = 12;
+
+/** Whether named place lot `u` at `at` (`lotAt`, facing `road`) has the middle of its front within `PLACE_REACH` m of the road's edge (it has no driveway: its path crosses the verge). */
+export function placeReaches(t: Templates, road: RoadPlan, u: Unplaced, at: { x: number; z: number; facing: Facing }): boolean {
+  const r = plotRect(t, { ...u, ...at });
+  const [mx, mz] = ([[r.x + r.w / 2, r.z], [r.x, r.z + r.d / 2], [r.x + r.w / 2, r.z + r.d], [r.x + r.w, r.z + r.d / 2]] as const)[at.facing];
+  return nearest(road.points, mx, mz).dist - road.width / 2 <= PLACE_REACH;
+}
 /** A farm shop goes along its farmstead's road within about this of the farm's middle (m). */
 const FARM_SHOP_REACH = 90;
 /** A river's width (m), how far its meanders swing (m), how far its mountains stand back from it (m). */
@@ -1741,10 +1748,8 @@ export function putPlace(lots: LotPlacer, t: Templates, roads: readonly RoadPlan
   for (const f of frontage) {
     const road = roads[f.road];
     const at = lotAt(lots.ground, road, f, width, depth);
-    if (!at) continue;
+    if (!at || !placeReaches(t, road, u, at)) continue;
     const r = plotRect(t, { ...u, ...at });
-    const [mx, mz] = ([[r.x + r.w / 2, r.z], [r.x, r.z + r.d / 2], [r.x + r.w / 2, r.z + r.d], [r.x + r.w, r.z + r.d / 2]] as const)[at.facing];
-    if (nearest(road.points, mx, mz).dist - road.width / 2 > PLACE_REACH) continue;
     const slot: PlotSlot = { ...u, index: lots.slots.length, ...at };
     lots.slots.push(slot);
     lots.placed.set(slot, f);

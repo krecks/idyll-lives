@@ -10,7 +10,7 @@
  * step 2 hatches (`hatched`); and how much a layout would build (`usesSummary`, step 2's live line).
  */
 
-import { civicChoices, civicOf } from './backdrop';
+import { CIVIC, civicChoices, civicOf, civicTooBig } from './backdrop';
 import { placeOfTemplate } from './placeLots';
 import { inCentre } from './edit/ground';
 import { noUseCells, roadReach, usesOfDraft } from './edit/uses';
@@ -411,15 +411,19 @@ export interface UsesSummary {
  * How much each thing takes, as Build fills a layout (measured over the places' worlds, their proposals
  * built again): a home along homes and a terraced home along terraces and flats (m of frontage a lot may
  * front: out of a town centre, a home's off the corners and bends), a shop or workplace on shops and work
- * (cells of it, not hatched), a park along a green stretch (m of it at least), and a civic place (a run
- * of public frontage this share of its kind's narrowest at least, and the gap after it, m).
+ * (cells of it, not hatched: a named place's lot or one of the sim's shops, the backdrop's buildings in what
+ * they leave being no places), a park along a green stretch (m of it at least), and a civic place (a run of
+ * public frontage this share of its lot's narrowest at least, its kind's building and `CIVIC_LOT` wide, and
+ * the gap after it, m).
  */
 const HOME_FRONT = 17.5;
 const ROW_HOME_FRONT = 17;
-const SHOP_CELLS = 14.5;
+const SHOP_CELLS = 35;
 const FIRST_PARK = 26;
 const CIVIC_SHORT = 0.8;
 const CIVIC_GAP = 5;
+/** How much wider a civic place's lot is than its kind's building (m): its forecourt and sides (`placeLots.ts`). */
+const CIVIC_LOT = 10;
 /** How far behind the kerb (m) public land is read for a civic place: its front and its middle. */
 const CIVIC_DEEP = [6, 12];
 /** Of the terraces and flats away from the main town, the share terraced homes take (Build's `TERRACE_SHARE`). */
@@ -454,7 +458,7 @@ const cornersFor = new WeakMap<readonly RoadPlan[], (f: Frontage) => boolean>();
  * work, a park or a playground along each green stretch, an outdoor spot or a park on each patch of green
  * big enough for one and with no stretch along it, and as many of
  * the civic places each town and village may have
- * (`civicChoices`, the most needed first) as its public land holds. For step 2's live line
+ * (`civicChoices`: a village a hamlet's, in `CIVIC`'s order, as Build puts them) as its public land holds. For step 2's live line
  * ("Homes ≈ 84 · Shops ≈ 12 · Parks 3 · Public 5"); within about a quarter of what Build makes, a sixth
  * on the whole. Given the `proposal` the layout was laid out from and the layout untouched, what its town
  * has, exactly (`townSummary`: what Build gives it).
@@ -497,7 +501,7 @@ export function usesSummary(draft: NeighbourhoodDraft, proposal?: Pick<Proposal,
   const layer = usesOfDraft(draft);
   const codes = unpackUses(layer);
   const far = hatched(draft);
-  // Shops and workplaces on its land painted shops and work (the backdrop's rows, a row behind, the blocks filled in; and its shop lots).
+  // Shops and workplaces on its land painted shops and work (the named places' lots and its shop lots; the backdrop's buildings there are no places).
   let shopCells = 0;
   for (let k = 0; k < codes.length; k++) if (codes[k] === USE_CODE.shops && !far[k]) shopCells++;
   const shops = shopCells / SHOP_CELLS;
@@ -546,10 +550,13 @@ export function usesSummary(draft: NeighbourhoodDraft, proposal?: Pick<Proposal,
   }
   let publics = 0;
   runs.forEach((left, a) => {
-    for (const c of civicChoices(draft, a)) {
-      const at = left.findIndex((len) => len >= CIVIC_SHORT * c.w[0]);
+    // (A village a hamlet's, in `CIVIC`'s order, as Build puts them.)
+    for (const c of civicChoices(draft, a)
+      .filter((k) => a === 0 || !civicTooBig(CIVIC[k.index], 'hamlet'))
+      .sort((x, y) => x.index - y.index)) {
+      const at = left.findIndex((len) => len >= CIVIC_SHORT * (c.w[0] + CIVIC_LOT));
       if (at < 0) continue;
-      left[at] -= Math.min(left[at], (c.w[0] + c.w[1]) / 2) + CIVIC_GAP;
+      left[at] -= Math.min(left[at], (c.w[0] + c.w[1]) / 2 + CIVIC_LOT) + CIVIC_GAP;
       publics++;
     }
   });
