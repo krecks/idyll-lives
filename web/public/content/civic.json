@@ -22,7 +22,8 @@
         "hours": [
           8,
           18
-        ]
+        ],
+        "uniform": "office"
       },
       "interactions": [
         {
@@ -65,7 +66,8 @@
         "hours": [
           7,
           23
-        ]
+        ],
+        "uniform": "suit"
       },
       "interactions": [
         {
@@ -108,7 +110,8 @@
         "hours": [
           6,
           22
-        ]
+        ],
+        "uniform": "service"
       },
       "interactions": [
         {
@@ -151,7 +154,8 @@
         "hours": [
           9,
           17
-        ]
+        ],
+        "uniform": "suit"
       },
       "interactions": [
         {
@@ -193,7 +197,8 @@
         "hours": [
           8,
           16
-        ]
+        ],
+        "uniform": "teacher"
       },
       "interactions": []
     },
@@ -218,7 +223,8 @@
         "hours": [
           9,
           18
-        ]
+        ],
+        "uniform": "clergy"
       },
       "interactions": []
     },
@@ -244,7 +250,8 @@
         "hours": [
           12,
           23
-        ]
+        ],
+        "uniform": "bar"
       },
       "interactions": [
         {

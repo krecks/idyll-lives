@@ -257,9 +257,10 @@ export interface ObjectDef {
   provides?: string[];
   /**
    * Someone serves here on a public lot (sim-core `staff.rs`, `game/staff.ts`): where they stand, metres off the
-   * footprint's middle to its right and front (behind it: a negative front), and the hours it's open.
+   * footprint's middle to its right and front (behind it: a negative front), the hours it's open, and what they wear
+   * (`game/staff.ts` `UNIFORMS`; absent: a shop's apron).
    */
-  staff?: { at: [number, number]; hours: [number, number] };
+  staff?: { at: [number, number]; hours: [number, number]; uniform?: string };
   /**
    * Something to ride (sim-core `ride.rs`): a bike, sat on and pedalled, or an e-scooter, stood on; `speed` times
    * as fast as walking, by those of `stages` (absent: everyone), for ways longer than `minRide` m; `roadsOnly`:
