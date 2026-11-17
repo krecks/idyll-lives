@@ -181,13 +181,28 @@ describe('water tools', () => {
   test('a river drawn into another runs on into it, and the other keeps its way', () => {
     const land = landOf(256, () => 3);
     const editor = new LandEditor(land, FREE);
-    // The main river east along z 128; a stream from the north (z 20) down into it at x 128.
+    // The main river east along z 128; a stream from the north (z 20) down to its bank at x 128.
     stroke(editor, { tool: 'river', radius: 6, strength: 0.4 }, line([20, 128], [236, 128], 80));
-    stroke(editor, { tool: 'river', radius: 4, strength: 0.4 }, line([128, 20], [128, 128], 50));
+    stroke(editor, { tool: 'river', radius: 4, strength: 0.4 }, line([128, 20], [128, 118], 50));
     const way = (x: number, z: number) => flowOf(land.flow![at(land, x, z)])!;
     // The stream runs south all the way down to the river, which still runs east where they meet.
     for (const z of [40, 80, 110, 118]) expect(way(128, z)[1]).toBeGreaterThan(0.9);
     for (const x of [100, 124, 128, 132, 160]) expect(way(x, 128)[0]).toBeGreaterThan(0.95);
+  });
+
+  test('a river drawn back over another from dry land turns it round; one begun in its water leaves its way', () => {
+    const land = landOf(256, () => 3);
+    const editor = new LandEditor(land, FREE);
+    // East along z 128, from x 30 to 226.
+    stroke(editor, { tool: 'river', radius: 6, strength: 0.4 }, line([30, 128], [226, 128], 80));
+    const way = (x: number, z: number) => flowOf(land.flow![at(land, x, z)])!;
+    for (const x of [60, 128, 200]) expect(way(x, 128)[0]).toBeGreaterThan(0.95);
+    // Begun in its water (x 128), dragged west to x 40: it keeps running east there.
+    stroke(editor, { tool: 'river', radius: 6, strength: 0.4 }, line([128, 128], [40, 128], 40));
+    for (const x of [60, 100]) for (const dz of [-4, 0, 4]) expect(way(x, 128 + dz)[0]).toBeGreaterThan(0.95);
+    // Begun on dry land past its east end (x 240), dragged west over it to x 40: it runs west now, banks and all.
+    stroke(editor, { tool: 'river', radius: 6, strength: 0.4 }, line([240, 128], [40, 128], 90));
+    for (const x of [60, 100, 160, 200]) for (const dz of [-4, 0, 4]) expect(way(x, 128 + dz)[0]).toBeLessThan(-0.95);
   });
 
   test('the water settles: raised sea dries out, ground lowered by the sea fills from it', () => {
