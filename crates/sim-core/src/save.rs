@@ -134,6 +134,11 @@
 //! sets sized by the limit (`world::SimSet`) and the snapshot's layout are not saved. A town may
 //! say the most residents it grows to (`residentsMost`, optional): saved with the town when it
 //! does, and a file without it (every file before it) grows to the limit.
+//! 40 = four speeds: 0 paused, 1 normal, 2 fast, 3 faster (10×) and 4 super speed (as fast as
+//! the machine goes, up to 60×, only while the player's household is all asleep or out), with
+//! the speed super speed drops back to (`resumeSpeed`). A file before it had 4 and 5 for 30×
+//! and 60×: it loads at super speed with 3 to drop back to, which the first step leaves if
+//! someone at home is up.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -149,10 +154,10 @@ use crate::social::{self, Relationship};
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{
     DRIVE_TICKS_PER_SECOND, Error, MINUTES_PER_TICK, TICKS_PER_MINUTE, TICKS_PER_SECOND,
-    clock::MAX_SPEED,
+    clock::{MAX_SPEED, SUPER_SPEED},
 };
 
-pub const SAVE_VERSION: u32 = 39;
+pub const SAVE_VERSION: u32 = 40;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -166,6 +171,10 @@ pub struct SaveFile {
     pub dirt: Vec<[u16; 3]>,
     pub tick: u64,
     pub speed: u8,
+    /// The speed super speed drops back to (absent before v40: 1, or 3 for a file saved at 30×
+    /// or 60×).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume_speed: Option<u8>,
     pub autonomy: bool,
     /// How fast residents age (absent before v13: off).
     #[serde(default)]
@@ -999,6 +1008,7 @@ impl World {
                 .collect(),
             tick: self.tick,
             speed: self.speed,
+            resume_speed: Some(self.resume_speed),
             autonomy: self.autonomy,
             lifespan: Some(self.lifespan),
             storeys: Some(self.storeys),
@@ -1206,7 +1216,20 @@ impl World {
         // timed in real seconds.)
         let ticks = Rescale::of(save.version);
         world.tick = ticks.tick(save.tick);
-        world.speed = save.speed.min(MAX_SPEED);
+        // (Before v40, 4 and 5 were 30× and 60×: super speed now, dropping back to 10×.)
+        let (speed, resume) = if save.version < 40 && save.speed > 3 {
+            (SUPER_SPEED, Some(3))
+        } else {
+            (save.speed.min(MAX_SPEED), save.resume_speed)
+        };
+        world.speed = speed;
+        world.resume_speed = resume
+            .unwrap_or(if (1..SUPER_SPEED).contains(&speed) {
+                speed
+            } else {
+                1
+            })
+            .clamp(1, SUPER_SPEED - 1);
         // Before v8 the one free-will switch was the player's setting; now each household has one.
         let legacy_free_will = save.version < 8;
         world.autonomy = save.autonomy || legacy_free_will;
@@ -2956,6 +2979,32 @@ mod tests {
         let w = World::from_save_json(CONTENT, v1).unwrap();
         assert_eq!(w.sims[0].gender, "female", "defaults to the first gender");
         assert_eq!(w.sims[0].attracted_to.len(), 2);
+    }
+
+    #[test]
+    fn the_speeds_of_older_saves() {
+        // Before v40, 4 and 5 were 30× and 60×: super speed now, dropping back to 10× (at once,
+        // with Old awake), and the speed super speed drops back to is saved.
+        for (version, speed, now, back) in
+            [(39, 5, 4, 3), (39, 4, 4, 3), (39, 2, 2, 2), (40, 4, 4, 1)]
+        {
+            let file = format!(
+                r#"{{"version":{version},"tick":10,"speed":{speed},"autonomy":true,"rng":5,
+                "lot":{{"width":4,"depth":4,"hEdges":"00000000000000000000","vEdges":"00000000000000000000"}},
+                "objects":[],"sims":[{{"name":"Old","appearance":null,"traits":[],"perks":[],"pos":[1.5,1.5],"yaw":0,
+                  "needs":{{"hunger":0.5}},"tasks":[]}}]}}"#
+            );
+            let mut w = World::from_save_json(CONTENT, &file).unwrap();
+            assert_eq!(
+                (w.speed, w.resume_speed),
+                (now, back),
+                "v{version} at {speed}"
+            );
+            let again = World::from_save_json(CONTENT, &w.save_json()).unwrap();
+            assert_eq!((again.speed, again.resume_speed), (now, back));
+            w.advance();
+            assert_eq!(w.speed, back, "Old is up: back to {back}");
+        }
     }
 
     #[test]

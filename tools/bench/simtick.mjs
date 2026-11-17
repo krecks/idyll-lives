@@ -1,6 +1,6 @@
 /**
  * The sim's speed as the game runs it: the wasm build (`web/src/core/wasm-pkg`, `bun run wasm`)
- * ticking a town under Node or Bun, step by step as the worker does (`Game.advance` at speed 5,
+ * ticking a town under Node or Bun, step by step as the worker does (`Game.advance` at 10×, speed 3,
  * the snapshot written each step), with no renderer. What the browser's sim worker would manage on
  * this machine, give or take the browser's own engine (Chrome's is Node's, V8).
  *
@@ -88,7 +88,7 @@ for (let run = 0; run < runs; run++) {
   const game = new wasm.Game(content, lot, 7);
   game.set_view(...view);
   if (watch) game.set_watch(...watch);
-  game.command(JSON.stringify({ type: 'setSpeed', speed: 5 }));
+  game.command(JSON.stringify({ type: 'setSpeed', speed: 3 }));
   // (The first step finds the rooms and the walkable regions from scratch: starting the game.)
   game.advance();
   const snap = () => new Float32Array(memory.buffer, game.snapshot_ptr(), game.snapshot_len());

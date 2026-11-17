@@ -17,7 +17,7 @@
 #   ROUNDS=2                runs of each, the best kept (the machine is shared: the fastest run is
 #                           the one least slowed by others)
 #   WATCH=                  empty: the view on the player's lot, as the bench always ran; a side in
-#                           tiles (320, 780): the camera's square at speed 5, as the game runs
+#                           tiles (320, 780): the camera's square at 10× (speed 3), as the game runs
 #   FEATURES=               cargo features for the build (`profile`: where the time went, slower)
 #   PARALLEL=1              runs at once (the machine is shared with others: keep it low)
 #   TABLE_ONLY=1            only the table, from the runs already logged
@@ -102,7 +102,7 @@ set +e +o pipefail
 table=$out/$(IFS=-; echo "${names[*]}")$suffix.md
 kinds=(seaside river forest)
 {
-  echo "# Sim ticks/s, ${hours} game hours, best of $rounds${watch:+, WATCH=$watch at speed 5}"
+  echo "# Sim ticks/s, ${hours} game hours, best of $rounds${watch:+, WATCH=$watch at 10×}"
   echo
   printf '| tier | world | residents |'
   for n in "${names[@]}"; do printf ' %s ticks/s | slowest hour |%s hash |' "$n" "${watch:+ step p99 ms | full detail |}"; done

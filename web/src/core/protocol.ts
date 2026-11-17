@@ -17,7 +17,7 @@ export type Command =
   | { type: 'setNeed'; sim: number; need: string; value: number }
   | { type: 'setBond'; a: number; b: number; friendship?: number; romance?: number; chemistry?: number; partners?: boolean }
   | { type: 'adopt'; household: number; child: boolean }
-  /** "Skip quiet hours": time-lapse while the player's household sleeps or is at work. */
+  /** Super speed by itself: the game goes to super speed as the player's household all falls asleep or goes out. */
   | { type: 'setAutoFast'; enabled: boolean }
   | { type: 'use'; sim: number; object: number; interaction: number }
   /** Eat a serving of food (an item), or clear it away to the sink. */
@@ -1229,7 +1229,10 @@ export interface UiUpdate {
   /** 0 = Monday. */
   weekday: number;
   minute: number;
+  /** 0 paused, 1 normal, 2 fast, 3 faster (10×), 4 super speed (`SUPER_SPEED`). */
   speed: number;
+  /** Whether super speed may run now: everyone at home asleep or out, nothing notable there for an hour (sim-core `World::calm`). */
+  superSpeed: boolean;
   autonomy: boolean;
   /** How fast residents age. */
   lifespan: Lifespan;
@@ -1342,6 +1345,8 @@ export interface SimThreadStats {
   /** Steps run in the last second, and the rate the sim aims for. */
   stepsPerSecond: number;
   targetPerSecond: number;
+  /** Ticks run in the last second (at super speed, as many as fitted in the steps' time). */
+  ticksPerSecond: number;
   /** Time per step (advance, snapshot, UI view), average and worst, ms. */
   stepMs: number;
   stepMaxMs: number;

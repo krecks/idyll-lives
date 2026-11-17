@@ -100,6 +100,8 @@ class GameState {
   day = $state(1);
   minute = $state(480);
   speed = $state(1);
+  /** Whether super speed may run now (the household all asleep or out: `UiUpdate.superSpeed`). */
+  superSpeed = $state(false);
   /** How fast residents age in this game. */
   lifespan = $state<Lifespan>('normal');
   /** Whether the player's residents move on their own in this game. */
