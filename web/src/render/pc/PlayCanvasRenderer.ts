@@ -3210,9 +3210,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         // The camera keeps a clear view over the hills (and out of the mountains).
         this.townRig.ground = (x, z) => nature.landscape.heightAt(x, z);
         // (The land faded into the haze past its landscape's edge, from far out.)
-        const haze = (this.landHaze ??= new LandHaze(this.app, this.root));
-        haze.set(this.townReach, (x, z) => nature.landscape.heightAt(x, z), townLayer(this.app).id, `${landscapeId(nature.landscape)}|${nature.landscape.landVersion}`);
-        haze.setColour(this.app.scene.fog.color);
+        (this.landHaze ??= new LandHaze(this.app, this.root)).setColour(this.app.scene.fog.color);
+        this.hazeLand(nature.landscape);
       } finally {
         this.townBuilds--;
       }
@@ -3430,9 +3429,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return this.landQueue;
   }
 
-  /** The game world's ground map at altitude to be made again (its farmland follows the land's cover: `TownGroundMap`), the next time the town view draws it. */
+  /**
+   * The game world's ground map at altitude to be made again (its farmland follows the land's cover: `TownGroundMap`),
+   * the next time the town view draws it; the menus' land's haze and curtain fitted to the land as it now is.
+   */
   private landMapped(scape: Landscape): void {
     if (scape === this.lot.landscape) this.townGroundStale = true;
+    if (scape === this.lot.landscapeOf('town')) this.hazeLand(scape);
+  }
+
+  /**
+   * The menus' land's haze and the curtain closing its cut edge (`landHaze.ts`) for `scape` as it is now: made again
+   * when its land changed (a stroke that raised the edge, or opened a valley past it, `landVersion`).
+   */
+  private hazeLand(scape: Landscape): void {
+    this.landHaze?.set(this.townReach, (x, z) => scape.heightAt(x, z), townLayer(this.app).id, `${landscapeId(scape)}|${scape.landVersion}`);
   }
   private townGroundStale = false;
 
