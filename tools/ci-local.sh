@@ -19,13 +19,13 @@
 #                                A pull request's CI leaves them out; a tag's and a run by hand
 #                                have them, as does this script run with no step.
 #
-# Steps: pins fmt clippy sim generated clips web tools chunks sizes uses models, and types (the web's types and
-# lint over fresh wasm builds of the sim, the sounds and the voice: not in CI's job, which builds no wasm, so run
+# Steps: pins fmt clippy sim generated clips web tools chunks sizes uses models built, and types (the web's types
+# and lint over fresh wasm builds of the sim, the sounds and the voice: not in CI's job, which builds no wasm, so run
 # only here).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-all=(pins fmt clippy sim generated clips web tools chunks sizes uses models types)
+all=(pins fmt clippy sim generated clips web tools chunks sizes uses models built types)
 quick=(pins fmt clippy sim clips web chunks types)
 
 pinned=$(sed -nE 's/^ *bun-version: *([0-9.]+).*/\1/p' .github/workflows/ci.yml | head -1)
@@ -87,6 +87,10 @@ step() {
     sizes) cargo review sizes --check ;;
     uses) cargo review uses --check ;;
     models) (cd web && "${bun_ci[@]}" install --frozen-lockfile) && cargo check-glb --validate ;;
+    # What the game builds as it runs (houses near and far, the backdrop, a street, fences, cars) at the models'
+    # gate: a fixed set of samples dumped by the game's own generators (about 2 s; no browser, no wasm, no
+    # packages), then held to the same rules, what they find today by tools/art/gate-baseline.json (about 12 s).
+    built) "${bun_ci[@]}" tools/built/dump.ts target/built && cargo check-glb --built target/built ;;
     types) (cd web && bun run wasm && bun run sound && bun run voice:wasm && "${bun_ci[@]}" run check && "${bun_ci[@]}" run lint) ;;
     *)
       echo "unknown step: $1 (steps: ${all[*]})" >&2
