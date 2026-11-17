@@ -1,4 +1,4 @@
-//! `cargo check-glb [keys…] [--keys] [--preview]`: the gate for the game's glTF models
+//! `cargo check-glb [keys…] [--keys] [--preview] [--against <rev|dir>]`: the gate for the game's glTF models
 //! (docs/design/objects.md, "Validation"), was tools/art/blender/check_glb.py, and prints what it printed.
 //!
 //! It reads every `.glb` a model entry of the manifests uses (the base manifest and its packs, later ones
@@ -10,6 +10,7 @@
 //!   cargo check-glb --keys                 the keys a build may write (`known_keys`)
 //!   cargo check-glb --preview              also re-imports each file in Blender and renders it to
 //!                                          tools/art/blender/previews/<family>/rt_<name>.png (gamekit/review.py)
+//!   cargo check-glb --against <rev|dir>    not the gate: whether this build of the models is that one (`against`)
 //!
 //! Run the Khronos glTF validator too (the standard says how); this checks the game's own rules.
 //!
@@ -18,8 +19,11 @@
 //! since, the functional heights' warnings (`heights`: seats, tops, mattresses and lamps against the model).
 //! `measures` gives `cargo review` the same numbers.
 
+pub mod against;
+mod digest;
 mod glb;
 pub(crate) mod json;
+mod near;
 pub(crate) mod py;
 
 use glb::{Glb, R, accessor, first_value, image_size, index, item, key, parse_glb, values};
@@ -4260,8 +4264,11 @@ pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Meas
     Ok(Measures { models, objects })
 }
 
-/// `cargo check-glb [keys…] [--keys] [--preview]`: the exit code.
+/// `cargo check-glb [keys…] [--keys] [--preview]`, or `--against` (`against::main`): the exit code.
 pub fn main(args: &[String]) -> i32 {
+    if args.iter().any(|a| a == "--against") {
+        return against::main(args);
+    }
     let paths = Paths::repo();
     if args.iter().any(|a| a == "--keys") {
         return match known_keys(&paths) {
