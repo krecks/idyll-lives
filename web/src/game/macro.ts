@@ -679,7 +679,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const links: { a: Pt; b: Pt; pieces: [number, number] }[] = [];
   /** The pieces of dry land with an area on them (the main town's first): those the rest of the villages may go on. */
   const linked = new Set<number>();
-  /** The pieces big enough for a village that no bridge could reach (`diagnostics.pieces`). */
+  /** The pieces big enough for a village that got none: no bridge could reach them, or no site on them could be reached (`diagnostics.pieces`). */
   const unreached: string[] = [];
   if (dry) linked.add(dry.of([ox + box.w / 2, oz + box.d / 2]));
   /**
@@ -750,10 +750,11 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       linked.add(id);
       n++;
     }
-    // (Pieces big enough that no crossing of `PIECE_SPAN` m reaches from a piece with an area.)
+    // (Pieces big enough that no crossing of `PIECE_SPAN` m reaches from a piece with an area, or with no site on them a village could take.)
     for (const id of pieces.bySize) {
-      if (linked.has(id) || tried.has(id) || pieces.sizes[id] < least) continue;
-      unreached.push(`No village on ${Math.round((pieces.sizes[id] * CELL * CELL) / 10000)} ha of dry land: no bridge of ${PIECE_SPAN} m or less reaches it.`);
+      if (linked.has(id) || pieces.sizes[id] < least) continue;
+      const why = tried.has(id) ? 'no site on it for a village a bridge could reach' : `no bridge of ${PIECE_SPAN} m or less reaches it`;
+      unreached.push(`No village on ${Math.round((pieces.sizes[id] * CELL * CELL) / 10000)} ha of dry land: ${why}.`);
     }
     return n;
   }
@@ -1841,8 +1842,8 @@ export interface HamletSite {
 
 /**
  * Whether a hamlet's box `bw` × `bd` round `p` may go there, as the generator tests a site: in the
- * world by `EDGE`, clear of the other areas' boxes by `BOX_GAP`, dry (and on a piece of dry land it
- * may go on, `site.region`), 50 m clear of the bridges and causeways, and no steeper than 0.35 anywhere
+ * world by `EDGE`, clear of the other areas' boxes by `BOX_GAP`, dry (on a land whose water was
+ * changed, 24 m from any of it and on a piece of dry land it may go on: `site.region`), 50 m clear of the bridges and causeways, and no steeper than 0.35 anywhere
  * in it (unless `site.relax`). Its box (whole metres) and its steepest slope; null if it may not.
  */
 export function hamletFits(land: Cells, p: Pt, [bw, bd]: readonly [number, number], site: HamletSite): { rect: Rect; steep: number } | null {
@@ -1851,8 +1852,8 @@ export function hamletFits(land: Cells, p: Pt, [bw, bd]: readonly [number, numbe
   const rect = { x: Math.round(p[0] - bw / 2), z: Math.round(p[1] - bd / 2), w: bw, d: bd };
   if (rect.x < EDGE || rect.z < EDGE || rect.x + bw > W - EDGE || rect.z + bd > D - EDGE) return null;
   if (site.boxes.some((a) => rect.x < a.x + a.w + BOX_GAP && a.x < rect.x + rect.w + BOX_GAP && rect.z < a.z + a.d + BOX_GAP && a.z < rect.z + rect.d + BOX_GAP)) return null;
-  if (site.water === 'river' || site.water === 'island' ? land.wetNear(rect, 24) : land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 30)) return null;
-  if (site.region && (land.wetNear(rect, 24) || !site.region.holds(rect, 24))) return null;
+  // (On a land whose water was changed, its water is the land's own, a pond as much as a river: 24 m from the box.)
+  if (site.region ? land.wetNear(rect, 24) || !site.region.holds(rect, 24) : site.water === 'river' || site.water === 'island' ? land.wetNear(rect, 24) : land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 30)) return null;
   // (Clear of the bridges and causeways.)
   if ((site.crossings ?? []).some(([a, b]) => evenly([a, b], 4).some((q) => offRect(rect, q) < 50))) return null;
   let steep = 0;

@@ -210,7 +210,7 @@ export interface NeighbourhoodDraft {
     roads?: string[];
     /** Among a place's mountains, the hamlets left out for want of a site a country road could reach (`macro.ts`), and the homes they would have brought. */
     villages?: { left: number; homes: number };
-    /** On a shaped land cut into pieces by its water, the pieces big enough for a village that no bridge could reach (`macro.ts`): a line about each. */
+    /** On a shaped land cut into pieces by its water, the pieces big enough for a village that got none (no bridge reaches them, or no site on them a bridge could): a line about each (`macro.ts`). */
     pieces?: string[];
     /** Lots and backdrop buildings, roads out and courts given up so the world's built land keeps within its slope limits (`landFollow.ts` `settleLand`). */
     slopes?: { lots: number; backdrop: number; roads: number; courts: number; backdropIn?: Record<number, number> };

@@ -158,6 +158,7 @@ describe('the land first, then the town', async () => {
     const { draft } = townOn(land, { waterKept: false });
     const areas = draft.open!.areas;
     expect(new Set(areas.map((a) => quarterOf(draft, a))).size).toBe(4);
+    expect(draft.diagnostics?.pieces).toBeUndefined();
     const decks = draft.roads.filter((r) => r.bridge && r.bridge[1] > r.bridge[0]);
     expect(decks.length).toBeGreaterThanOrEqual(3);
     for (const r of decks) expect(r.bridge![1] - r.bridge![0], r.name).toBeLessThanOrEqual(45);
