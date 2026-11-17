@@ -61,7 +61,7 @@ export function checkedTown(draft: NeighbourhoodDraft, t: Templates): CheckedTow
 export function editedProblems(draft: NeighbourhoodDraft, t: Templates, content: Content): { hard: string[]; soft: string[] } {
   const size = draft.world?.options?.town;
   const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, mainLeast: 0, careers: size === 'town' || size === 'city', exits: null };
-  const found = townProblems(checkedTown(draft, t), expect, { river: false, careers: content.careerCategories.map((c) => c.id) });
+  const found = townProblems(checkedTown(draft, t), expect, { river: false, careers: content.careerCategories.map((c) => c.id), generated: false });
   const homes = draft.slots.filter((s) => s.kind === 'house').length;
   // (How the generator fills a town, which an edited one needn't keep: a village placed by hand has no backdrop, decision 15.)
   const hard = found.hard.filter((line) => !GENERATED_ONLY.some((p) => p.test(line)));
