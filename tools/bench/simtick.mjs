@@ -19,8 +19,9 @@
  * once first).
  *
  * Prints one line a script reads:
- * `simtick: engine node rate 4100 worst_hour 2100 at 08 step_p99 31.2 ticks 108000`
- * (ticks a second over the run, the slowest game hour's, a step's 99th percentile in ms).
+ * `simtick: engine node rate 4100 worst_hour 2100 at 08 step_p99 31.2 ticks 108000 cpu_rate 4300`
+ * (ticks a second over the run, the slowest game hour's, a step's 99th percentile in ms, and ticks a
+ * second of the process's CPU time: the GC's and compiler's threads count, waiting for a core doesn't).
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -97,6 +98,9 @@ for (let run = 0; run < runs; run++) {
   const firstHour = Math.floor(snap()[2] / 60);
   let ticks = 0;
   let total = 0;
+  // (The process's CPU time over the run too: on a busy machine the wall clock counts the time it
+  // waited for a core, the CPU time only what it ran.)
+  const cpu0 = process.cpuUsage();
   const steps = [];
   const hourly = new Array(hours).fill(0);
   while (ticks < wanted) {
@@ -112,6 +116,7 @@ for (let run = 0; run < runs; run++) {
     total += dt;
     steps.push(dt);
   }
+  const cpu = process.cpuUsage(cpu0);
   steps.sort((a, b) => a - b);
   const worstAt = hourly.indexOf(Math.max(...hourly));
   const result = {
@@ -120,6 +125,7 @@ for (let run = 0; run < runs; run++) {
     at: (firstHour + worstAt) % 24,
     p99: steps[Math.min(steps.length - 1, Math.floor((steps.length * 99) / 100))],
     ticks,
+    cpuRate: ticks / ((cpu.user + cpu.system) / 1e6),
   };
   game.free();
   if (!best || result.rate > best.rate) best = result;
@@ -127,5 +133,5 @@ for (let run = 0; run < runs; run++) {
 const made = worlds[world];
 console.error(`${made.kind} ${made.seed}: ${town.sims.length} residents, ${watch ? `watch ${watch.join(',')}` : `view ${view.join(',')}`}, ${hours} game hours under ${engine}`);
 console.log(
-  `simtick: engine ${engine} rate ${best.rate.toFixed(0)} worst_hour ${best.worst.toFixed(0)} at ${String(best.at).padStart(2, '0')} step_p99 ${best.p99.toFixed(2)} ticks ${best.ticks}`,
+  `simtick: engine ${engine} rate ${best.rate.toFixed(0)} worst_hour ${best.worst.toFixed(0)} at ${String(best.at).padStart(2, '0')} step_p99 ${best.p99.toFixed(2)} ticks ${best.ticks} cpu_rate ${best.cpuRate.toFixed(0)}`,
 );
