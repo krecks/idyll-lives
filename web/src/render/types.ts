@@ -9,6 +9,7 @@ import type { FrameState } from '../core/bridge';
 import type { ItemPlacement, PartColors, WorldStructure } from '../core/protocol';
 import type { Appearance } from '../game/household';
 import type { Land, LandRect } from '../game/land';
+import type { UseKind, UseLayer } from '../game/uses';
 import type { Resolution } from './shared/resolution';
 import type { VisemeTrack } from '../voice/visemes';
 
@@ -385,13 +386,19 @@ export interface LotHighlight {
 }
 
 /**
+ * A street's ghost's tone: new, where it may not go, a bridge stretch, a new street drawn as the road it will be
+ * (`laid`), the road picked (`pick`, outlined only), the road a street being drawn will join (`join`).
+ */
+export type GhostRoadTone = 'new' | 'bad' | 'bridge' | 'laid' | 'pick' | 'join';
+
+/**
  * Step 2's edits shown over the town before the town is built again with them: streets being
  * drawn or just drawn (`roads`: their middle lines and widths; `bad` where they may not go, a
  * `bridge` stretch over water), lots (`new` placed, `bad` where one may not go, `gone` to be
  * removed, the building on it dimmed) and villages' boxes, all in world metres.
  */
 export interface TownGhosts {
-  roads: { points: [number, number][]; width: number; tone: 'new' | 'bad' | 'bridge' }[];
+  roads: { points: [number, number][]; width: number; tone: GhostRoadTone }[];
   lots: { x: number; z: number; w: number; d: number; tone: 'new' | 'bad' | 'gone' }[];
   boxes: { x: number; z: number; w: number; d: number; tone: 'new' | 'bad' }[];
 }
@@ -452,7 +459,8 @@ export interface LandCursor {
   z: number;
   radius: number;
   inner: number;
-  tone: 'up' | 'down' | 'water' | 'cover' | 'bad';
+  /** What the brush does: step 1's land brushes (`up` to `cover`), step 2's zone brush (a use, `uses.ts`, or `erase`), or `bad` where it can't. */
+  tone: 'up' | 'down' | 'water' | 'cover' | 'bad' | UseKind | 'erase';
 }
 
 export interface Renderer {
@@ -693,6 +701,11 @@ export interface Renderer {
   setLotHighlight(highlight: LotHighlight, snap?: boolean): void;
   /** Step 2's edits drawn over the town (`TownGhosts`) until the town is built again; null: none. */
   setTownGhosts(ghosts: TownGhosts | null): void;
+  /**
+   * Step 2's painted uses (`uses.ts`) drawn over the town in their colours; null: none. `hatched`: a byte per cell
+   * of `layer` (row-major), set where the cell is zoned but too far from a street to be built on, drawn hatched.
+   */
+  setTownUses(layer: UseLayer | null, hatched?: Uint8Array | null): void;
   /** Runs each overview frame after the camera moved, before drawing (to pin labels); null removes it. */
   onTownFrame(fn: (() => void) | null): void;
   /**

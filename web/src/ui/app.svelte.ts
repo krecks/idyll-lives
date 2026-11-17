@@ -4,6 +4,7 @@ import type { GameKind, Lifespan } from '../core/protocol';
 import type { TownHistory } from '../game/edit/history';
 import type { HouseholdDraft } from '../game/household';
 import type { MenuStill } from '../game/menuStill';
+import type { Proposal } from '../game/townJobs';
 import type { Pt } from '../game/roads';
 import type { StartRequest } from '../game/session';
 import { EMPTY_LOT, withLot, type NeighbourhoodDraft } from '../game/town';
@@ -12,9 +13,11 @@ import { moveInRequest, peopleSeedOf, type Chosen } from './newGame';
 /**
  * New game, in four steps: land (step 1) → town (step 2) → household (step 3: choose one of the
  * town's, or make your own in Creation, `create`) → home (step 4, on the whole world: a household
- * of the town's has its own home chosen, and may move) → game.
+ * of the town's has its own home chosen, and may move) → game. `streets`: the coming step between
+ * land and town, the streets laid out and the land zoned (shown as the town's step until it has its
+ * own screen; `newGame.ts` `STEPS` has the five).
  */
-export type Screen = 'menu' | 'land' | 'town' | 'household' | 'create' | 'home' | 'game';
+export type Screen = 'menu' | 'land' | 'streets' | 'town' | 'household' | 'create' | 'home' | 'game';
 
 /** A step's draft and the key of what it was made from (`newGame.ts` `landKey`, `townKey`): a later step whose key no longer matches is made again. */
 export interface Keyed {
@@ -41,6 +44,21 @@ export interface LaidTown extends Keyed {
   /** What in `draft` is over a slope limit (the town job's, then each settle's `marks`): step 2's next settle's `before`. */
   marks?: readonly string[];
 }
+
+/**
+ * The streets and zones step's layout (not used yet): the proposal it started from (`townJobs.ts` `Proposal`), the
+ * layout settled from the player's edits (`draft`, keyed by what the proposal was made from), and, once edited (what
+ * proposes again asks first), the plan the edits made, their undo `history` and the settle's `marks`, as `LaidTown`
+ * keeps them for the town.
+ */
+export interface Layout extends Keyed {
+  proposal: Proposal;
+  edited: boolean;
+  plan?: NeighbourhoodDraft;
+  history?: TownHistory;
+  marks?: readonly string[];
+}
+
 export type Overlay = 'settings' | 'load' | 'credits' | null;
 /** A loading step and the overall progress, 0..1. */
 export interface Progress {
@@ -82,6 +100,8 @@ class AppState {
   site = $state.raw<Pt | null>(null);
   /** The town's name as typed or rolled in step 2; null: the one it was laid with. */
   townName = $state<string | null>(null);
+  /** The streets and zones step's layout (not used yet: `Layout`). */
+  layout = $state.raw<Layout | null>(null);
   /** Step 2's town (nobody living there yet). */
   world = $state.raw<LaidTown | null>(null);
   /** Step 3's town with its neighbours, and what it was filled from: step 2's town and the people's seed (`newGame.ts` `peopleKey`). */
@@ -124,6 +144,7 @@ class AppState {
     this.land = null;
     this.site = null;
     this.townName = null;
+    this.layout = null;
     this.world = null;
     this.town = null;
     this.townOf = '';

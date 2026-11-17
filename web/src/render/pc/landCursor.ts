@@ -8,6 +8,7 @@
 
 import * as pc from './engine';
 import { GAME_FRONT_FACE } from './materials';
+import { USE_COLORS } from '../../game/uses';
 import type { LandCursor } from '../types';
 
 /** Segments a ring. */
@@ -19,13 +20,15 @@ const CURSOR_Y = 0.15;
  * under 2 m in radius (a point brush's), so it still reads as a ring round its one sample.
  */
 const BAND = { share: 0.025, min: 0.25, max: 3, thin: 0.12 };
-/** The colours (sRGB) of what the brush does. */
+/** The colours (sRGB) of what the brush does: step 2's zone brush in its use's colour, a near white to erase. */
 const TONES: Record<LandCursor['tone'], string> = {
   up: '#FFD166',
   down: '#B39DDB',
   water: '#4FC3F7',
   cover: '#8BD48B',
   bad: '#EF5350',
+  ...USE_COLORS,
+  erase: '#ECEFF1',
 };
 
 /** Vertices of a ring's band: its inner and outer edge, the first pair again at the end. */
