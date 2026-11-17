@@ -4,8 +4,8 @@
  * pulled to a road, a dead end or the world's edge within `PULL_PX` CSS px (`Meeting.magnet`, 10 to
  * 40 m). It is drawn as soon as it reaches a road (or the world's edge); Enter or a double click
  * ends it where it is, carried on to a road within `AUTO_JOIN` m ahead (or nearby) if it may be
- * (`carryOn`), else as a dead end. Backspace takes the last point back, Esc drops it. The street drawn is picked, so
- * its card shows; one split at its bridges, the stretch nearest the last click (`stretchNear`), the
+ * (`carryOn`), else as a dead end. Backspace takes the last point back, Esc drops it. The street
+ * drawn is picked, so its card shows; one split at its bridges, the stretch nearest the last click (`stretchNear`), the
  * card listing the others (`streetChoice.drawn`). What goes along it is the card's choice: homes from the lot mix (`drawStreet`'s
  * fill), the town's other buildings, or both (`buildup.ts` `builtAlong`, in the same edit: one undo
  * takes the street and what stands along it); by default both in the main town, homes elsewhere.
@@ -162,10 +162,11 @@ export function carryOn(draft: Parameters<typeof liveStreet>[0], t: Parameters<t
   const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
   const dir: Pt = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
   const tries: Pt[] = [];
+  const half = draft.roads.reduce((w, o) => Math.max(w, o.width), 0) / 2;
   // (Along its way: the first point ahead on a road it may join, at that road's middle.)
   ahead: for (let d = 1; d <= AUTO_JOIN; d++) {
     const q: Pt = [b[0] + dir[0] * d, b[1] + dir[1] * d];
-    for (const [r, m] of meet.index.around(q[0], q[1], draft.roads.reduce((w, o) => Math.max(w, o.width), 0) / 2)) {
+    for (const [r, m] of meet.index.around(q[0], q[1], half)) {
       if (!meet.joinable(r) || m.dist > draft.roads[r].width / 2) continue;
       tries.push(pointAt(draft.roads[r].points, m.s).p);
       break ahead;
@@ -332,7 +333,7 @@ export const streetTool: TownTool = {
       const joins = live.finishOn >= 0 ? editor.draft.roads[live.finishOn]?.name : undefined;
       if (live.reached) return joins ? `${what}${also}. Joins ${joins} — ${press ? 'let go' : 'click'} to finish.` : `${what}${also}. ${press ? 'Let go' : 'Click'} to draw it.`;
       const open = live.open ?? (verdict && 'refused' in verdict ? verdict.refused : null);
-      return open ? `${what}${also}. ${sentence(open)}` : `${what}${also}. Click to set a point; Enter or a double click ends it here as a dead end.`;
+      return open ? `${what}${also}. ${sentence(open)}` : `${what}${also}. Click to set a point; Enter or a double click ends it here as a dead end, or on a road just ahead.`;
     };
 
     /**
