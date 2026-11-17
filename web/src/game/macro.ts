@@ -1268,6 +1268,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // country roads leaving it, where they run straight over gentle land.
   const placeRand = random(((lay?.townSeed ?? seed) ^ PLACES) >>> 0);
   const ways = worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : []));
+  const wayLengths = new Map<number, number[]>();
+  const lengthsOf = (r: number) => wayLengths.get(r) ?? wayLengths.set(r, lengths(worldRoads[r].points)).get(r)!;
   /**
    * Each area's named places to go down on what its homes leave once every home has found room: the main
    * town's that went in no parade nor its centre (`units`), every other area's (`namedLots`); along its
@@ -1276,7 +1278,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const later: { units?: Unplaced[]; near: readonly Frontage[]; a: number }[] = [];
   const spillOf = (a: number) => {
     let list: Frontage[] | undefined;
-    return () => (list ??= frontageOf(worldRoads, ways, plans[a].centre, placeRand).filter((f) => offRect(plans[a].rect, f.p) < TERRACE_SPILL && straight(worldRoads[f.road].points, f.s, lengths(worldRoads[f.road].points)) && gentleBy(f.p)));
+    return () => (list ??= frontageOf(worldRoads, ways, plans[a].centre, placeRand).filter((f) => offRect(plans[a].rect, f.p) < TERRACE_SPILL && straight(worldRoads[f.road].points, f.s, lengthsOf(f.road)) && gentleBy(f.p)));
   };
   for (const [a, plan] of plans.entries()) {
     if (a === 0) {
@@ -1293,7 +1295,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const heart = centre ? (centre.square ? centroid(centre.square) : pointAt(worldRoads[centre.road].points, (centre.s0 + centre.s1) / 2).p) : plan.centre;
       const near = frontageOf(worldRoads, plan.roads, heart, placeRand);
       const street = centre ? near.filter((f) => f.road === centre.road && f.s >= centre.s0 && f.s <= centre.s1) : near;
-      const others = namedLots(t, lots, worldRoads, a, spec.civic, true, near, street, spillOf(a), placeRand).filter((u) => !putPlace(lots, t, worldRoads, u, near.filter(inCentre)));
+      const inTheCentre = near.filter(inCentre);
+      const others = namedLots(t, lots, worldRoads, a, spec.civic, true, near, street, spillOf(a), placeRand).filter((u) => !putPlace(lots, t, worldRoads, u, inTheCentre));
       reserved = centre ? reserveCentre(centre, ground) : undefined;
       // (Out of room in the town: on along the country roads leaving it, where they run straight.)
       const countryWays = worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : []));
