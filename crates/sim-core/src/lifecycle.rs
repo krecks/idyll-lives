@@ -460,6 +460,8 @@ fn move_to(w: &mut World, i: usize, to: usize) {
     let arrive = w.households[to]
         .plot
         .map(|p| w.plots[p as usize].arrival_point());
+    // (The household index no longer matches the residents: `World::household_sims`.)
+    w.members.moved = true;
     let sim = &mut w.sims[i];
     sim.household = to as u32;
     sim.clear_activity();

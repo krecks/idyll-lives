@@ -325,12 +325,19 @@ pub(crate) fn kept_for_couple(
         .filter(|o| !o.broken() && couples_bed(&ctx.content.objects[o.def]))
         .collect();
     let in_one = |j: u32| beds.iter().any(|o| o.slot_of(j).is_some());
-    let couples = (0..ctx.briefs.len())
-        .filter(|&a| housemate(a))
-        .filter(|&a| {
-            partner_here(a as u32).is_some_and(|b| b > a && !in_one(a as u32) && !in_one(b as u32))
-        })
+    let couple = |&a: &usize| {
+        housemate(a)
+            && partner_here(a as u32).is_some_and(|b| b > a && !in_one(a as u32) && !in_one(b as u32))
+    };
+    // (Only the household's: `Ctx::members`.)
+    let couples = ctx
+        .members
+        .of(sim.household)
+        .iter()
+        .map(|&a| a as usize)
+        .filter(couple)
         .count();
+    debug_assert_eq!(couples, (0..ctx.briefs.len()).filter(couple).count());
     couples > 0 && beds.iter().filter(|o| !o.in_use()).count() <= couples
 }
 

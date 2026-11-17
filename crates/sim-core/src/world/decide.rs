@@ -711,13 +711,26 @@ pub(crate) fn pick_autonomous(
             let Some(plot) = other.plot else { continue };
             // The best friend of theirs at home, and someone to open the door: a grown-up at
             // home, up and about, not on their way out (`life::opens_door`).
+            // (Only theirs: `Ctx::members`.)
             let mut friendship = f32::NEG_INFINITY;
             let mut opener = false;
-            for (j, b) in ctx.briefs.iter().enumerate() {
+            for &j in ctx.members.of(other.id) {
+                let b = &ctx.briefs[j as usize];
                 if b.household == other.id && b.plot == Some(plot) && !b.away {
-                    friendship = friendship.max(ctx.rels.get(me, j).friendship);
+                    friendship = friendship.max(ctx.rels.get(me, j as usize).friendship);
                     opener = opener || crate::life::opens_door(b, other.id, plot);
                 }
+            }
+            #[cfg(debug_assertions)]
+            {
+                let (mut was, mut opens) = (f32::NEG_INFINITY, false);
+                for (j, b) in ctx.briefs.iter().enumerate() {
+                    if b.household == other.id && b.plot == Some(plot) && !b.away {
+                        was = was.max(ctx.rels.get(me, j).friendship);
+                        opens = opens || crate::life::opens_door(b, other.id, plot);
+                    }
+                }
+                debug_assert!(was.to_bits() == friendship.to_bits() && opens == opener);
             }
             if friendship < visits.min_friendship || !opener {
                 continue;

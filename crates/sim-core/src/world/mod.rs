@@ -1825,6 +1825,63 @@ pub(crate) struct SimBrief {
     pub private: Option<(u32, usize)>,
 }
 
+/// Who belongs to each household by the tick's briefs (`SimBrief::household`), built with them:
+/// a look through one household's people needn't go through the whole town's. Each household's
+/// in the residents' order, as a look through the briefs finds them, so what it finds is the same.
+#[derive(Debug, Default)]
+pub(crate) struct Members {
+    /// Where each household's run starts in `list` (one more entry than households: the end).
+    start: Vec<u32>,
+    list: Vec<u32>,
+    /// A resident moved house or came to town since (`lifecycle::move_to`, `World::spawn_at`):
+    /// the residents as they are now no longer match it (`World::household_sims`).
+    pub moved: bool,
+}
+
+impl Members {
+    /// Sorts the briefs' residents by household (a counting sort, so each household keeps the
+    /// residents' order).
+    pub(crate) fn build(&mut self, briefs: &[SimBrief]) {
+        let n = briefs
+            .iter()
+            .map(|b| b.household as usize + 1)
+            .max()
+            .unwrap_or(0);
+        self.start.clear();
+        self.start.resize(n + 1, 0);
+        for b in briefs {
+            self.start[b.household as usize + 1] += 1;
+        }
+        for h in 0..n {
+            self.start[h + 1] += self.start[h];
+        }
+        self.list.clear();
+        self.list.resize(briefs.len(), 0);
+        // (Each household's next free place, counted up from its start and back after.)
+        for (j, b) in briefs.iter().enumerate() {
+            let h = b.household as usize;
+            self.list[self.start[h] as usize] = j as u32;
+            self.start[h] += 1;
+        }
+        for h in (1..=n).rev() {
+            self.start[h] = self.start[h - 1];
+        }
+        if let Some(first) = self.start.first_mut() {
+            *first = 0;
+        }
+        self.moved = false;
+    }
+
+    /// The residents of household `h` by the briefs (here or not), in the residents' order.
+    pub(crate) fn of(&self, h: u32) -> &[u32] {
+        let h = h as usize;
+        if h + 1 >= self.start.len() {
+            return &[];
+        }
+        &self.list[self.start[h] as usize..self.start[h + 1] as usize]
+    }
+}
+
 /// `World::broadcast`'s per-tick buffers, kept from tick to tick like `briefs`.
 #[derive(Default)]
 struct BroadcastScratch {
@@ -1922,6 +1979,8 @@ pub struct World {
     /// not when only objects, residents or households do: views can then leave the lot out.
     pub(crate) lot_version: u32,
     pub(crate) briefs: Vec<SimBrief>,
+    /// The briefs' residents by household (`Members`), built with them.
+    pub(crate) members: Members,
     /// Rooms kept shut as the tick's step started (`privacy::refresh`), kept from tick to tick
     /// like `briefs`.
     pub(crate) shut: Vec<crate::privacy::Shut>,
@@ -2060,6 +2119,8 @@ pub(crate) struct Ctx<'a> {
     pub nav_log: &'a crate::path::NavLog,
     pub rels: &'a Relationships,
     pub briefs: &'a [SimBrief],
+    /// The briefs' residents by household (`World::members`).
+    pub members: &'a Members,
     pub households: &'a [Household],
     pub plots: &'a [Plot],
     /// Plot per ground tile (`World::tile_plot`).
@@ -2394,6 +2455,7 @@ impl World {
             reach_version: 0,
             lot_version: 1,
             briefs: Vec::new(),
+            members: Members::default(),
             shut: Vec::new(),
             private_rooms: Vec::new(),
             claimed_rooms: Vec::new(),
@@ -2546,6 +2608,24 @@ impl World {
         conversation::in_sight(&self.nav(), a, b)
     }
 
+    /// Who to look through for the residents of household `h` as they are now (here or not; a
+    /// caller still asks each's household): its members by the tick's briefs (`Members`) while
+    /// nobody has moved house or come to town since, else everyone.
+    pub(crate) fn household_sims(&self, h: u32) -> impl Iterator<Item = usize> + '_ {
+        let fresh = !self.members.moved && self.members_cover();
+        let (list, all) = if fresh {
+            (self.members.of(h), 0..0)
+        } else {
+            (&[][..], 0..self.sims.len())
+        };
+        list.iter().map(|&j| j as usize).chain(all)
+    }
+
+    /// Whether the briefs (and `members`) cover every resident.
+    fn members_cover(&self) -> bool {
+        self.briefs.len() == self.sims.len()
+    }
+
     /// The context a resident's update has (`Ctx`), outside the residents' updates: everyone
     /// else as they are now.
     pub(crate) fn ctx(&self) -> Ctx<'_> {
@@ -2558,6 +2638,7 @@ impl World {
             nav_log: &self.nav_log,
             rels: &self.relationships,
             briefs: &self.briefs,
+            members: &self.members,
             households: &self.households,
             plots: &self.plots,
             tile_plot: &self.tile_plot,
@@ -3301,6 +3382,8 @@ impl World {
             self.relationships.grow(self.sims.len());
             self.generations.push(0);
         }
+        // (The household index no longer matches the residents: `household_sims`.)
+        self.members.moved = true;
         self.refresh_base_mods(id);
         Ok(id as u32)
     }
@@ -4656,6 +4739,7 @@ impl World {
                 briefs[i].conversing = briefs[l as usize].conversing.filter(|c| c.0 == l);
             }
         }
+        self.members.build(&briefs);
         self.briefs = briefs;
         crate::profile::end("briefs", briefs_start);
         crate::profile::phase("privacy::refresh", || crate::privacy::refresh(self));
@@ -4681,6 +4765,7 @@ impl World {
                 rng,
                 relationships,
                 briefs,
+                members,
                 autonomy,
                 households,
                 plots,
@@ -4719,6 +4804,7 @@ impl World {
                 nav_log,
                 rels: relationships,
                 briefs,
+                members,
                 households,
                 plots,
                 tile_plot,

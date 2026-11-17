@@ -1057,7 +1057,8 @@ pub(crate) fn leaving_home(w: &World, s: &Sim) -> bool {
 /// Whether a grown-up of household `h` other than `except` is at home on `plot` to look after
 /// a baby (not on their way out: `leaving_home`; back from a visit once they're on the lot).
 fn carer_home(w: &World, h: usize, plot: u32, except: Option<usize>) -> bool {
-    w.sims.iter().enumerate().any(|(j, s)| {
+    let carer = |j: usize| {
+        let s = &w.sims[j];
         Some(j) != except
             && s.here()
             && s.household as usize == h
@@ -1065,7 +1066,10 @@ fn carer_home(w: &World, h: usize, plot: u32, except: Option<usize>) -> bool {
             && !leaving_home(w, s)
             && s.adult(&w.content)
             && w.plot_at(s.tile().0, s.tile().1) == Some(plot)
-    })
+    };
+    let found = w.household_sims(h as u32).any(carer);
+    debug_assert_eq!(found, (0..w.sims.len()).any(carer));
+    found
 }
 
 /// Who `i` would stay home for if they left for work now: a baby at home with no other
@@ -1146,13 +1150,28 @@ pub(crate) fn minding_baby(sim: &Sim, ctx: &Ctx) -> bool {
     let me = sim.id as usize;
     let at_home =
         |b: &SimBrief| b.here && !b.away && b.household == sim.household && b.plot == Some(home);
-    at_home(&ctx.briefs[me])
-        && ctx.briefs.iter().any(|b| b.baby && at_home(b))
-        && !ctx
-            .briefs
-            .iter()
-            .enumerate()
-            .any(|(j, b)| j != me && b.adult && !b.leaving && at_home(b))
+    // (Only their household's: `Ctx::members`.)
+    let theirs = ctx.members.of(sim.household);
+    let minding = at_home(&ctx.briefs[me])
+        && theirs.iter().any(|&j| {
+            let b = &ctx.briefs[j as usize];
+            b.baby && at_home(b)
+        })
+        && !theirs.iter().any(|&j| {
+            let b = &ctx.briefs[j as usize];
+            j as usize != me && b.adult && !b.leaving && at_home(b)
+        });
+    debug_assert_eq!(
+        minding,
+        at_home(&ctx.briefs[me])
+            && ctx.briefs.iter().any(|b| b.baby && at_home(b))
+            && !ctx
+                .briefs
+                .iter()
+                .enumerate()
+                .any(|(j, b)| j != me && b.adult && !b.leaving && at_home(b))
+    );
+    minding
 }
 
 /// A babysitter for baby `b` (content `life.childcare`): booked (and paid) for the day once
