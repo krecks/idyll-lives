@@ -22,7 +22,7 @@ import type { Picked } from '../src/ui/townedit/pick';
 import type { TownEditor } from '../src/ui/townedit/tools';
 
 // (The card and its runes are the page's: the tool reads its choices from a plain object here.)
-const choice = { kind: 'auto' as string, clear: true, along: 'homes' as string, shown: 'street' as string, shownArea: -1 };
+const choice = { kind: 'auto' as string, clear: true, along: 'homes' as string, shown: 'street' as string, shownArea: -1, drawn: [] as { road: number; name: string }[] };
 mock.module('../src/ui/townedit/StreetCard.svelte', () => ({ default: {} }));
 mock.module('../src/ui/townedit/streetChoice.svelte', () => ({
   streetChoice: choice,
@@ -30,8 +30,8 @@ mock.module('../src/ui/townedit/streetChoice.svelte', () => ({
   alongFor: (a: string, area: number) => (a !== 'auto' ? a : area === 0 ? 'both' : 'homes'),
   fillsHomes: (a: string) => a === 'homes',
 }));
-const { liveStreet, runsOf, unfinished, verdictOf } = await import('../src/ui/townedit/streetLive');
-const { StreetDrawing, startAt, streetGhosts, streetTool } = await import('../src/ui/townedit/streetTool');
+const { drawnStretches, liveStreet, runsOf, unfinished, verdictOf } = await import('../src/ui/townedit/streetLive');
+const { StreetDrawing, startAt, streetGhosts, streetTool, stretchNear } = await import('../src/ui/townedit/streetTool');
 
 const W = 400;
 const D = 400;
@@ -294,9 +294,34 @@ describe('the tool', () => {
     tool.up();
     expect(editor.said.refusals).toEqual([]);
     expect(editor.draft.roads.some((r) => r.bridge)).toBe(true);
-    expect(editor.said.selected).toEqual({ kind: 'road', road: 4 });
+    // Split at its bridge: the stretch picked is the one nearest the last click (on to Far Lane), not the deck nor
+    // the stretch before the bridge; the card lists all three.
+    const stretches = drawnStretches(editor.draft, choice.drawn);
+    expect(stretches.map((x) => x.deck)).toEqual([false, true, false]);
+    const picked = editor.said.selected as { kind: 'road'; road: number };
+    expect(picked.kind).toBe('road');
+    expect(stretches.map((x) => x.road)).toContain(picked.road);
+    const road = editor.draft.roads[picked.road];
+    expect(road.bridge).toBeUndefined();
+    expect(Math.max(...road.points.map((p) => p[1]))).toBeGreaterThan(FAR_Z - 10);
     // Nothing left being drawn: a key goes to the editor (Esc puts the tool down).
     expect(tool.key!(key('Escape'))).toBe(false);
+  });
+
+  test('the stretch picked after a split: the nearest the point given, a deck only when nothing else is near', () => {
+    const r = (points: Pt[], bridge?: [number, number]): RoadPlan => ({ points, width: 7, ends: ['join', 'join'], kind: 'street', ...(bridge ? { bridge } : {}) });
+    const draft = { roads: [r(line(0, 0, 0, 50)), r(line(0, 50, 0, 80), [0, 30]), r(line(0, 80, 0, 140))] } as unknown as NeighbourhoodDraft;
+    expect(stretchNear(draft, [0, 1, 2], [2, 130])).toBe(2);
+    expect(stretchNear(draft, [0, 1, 2], [2, 10])).toBe(0);
+    // (On the deck itself, the stretch it leads onto from the nearer bank.)
+    expect(stretchNear(draft, [0, 1, 2], [0, 70])).toBe(2);
+    expect(stretchNear(draft, [1], [0, 70])).toBe(1);
+    expect(stretchNear(draft, [], [0, 70])).toBeUndefined();
+    // The card lists them while the draft has them as named; not once one is gone or renamed.
+    const named = draft.roads.map((r, road) => ({ road, name: r.name ?? '' }));
+    expect(drawnStretches(draft, named).map((x) => x.deck)).toEqual([false, true, false]);
+    expect(drawnStretches(draft, [{ ...named[0], name: 'Other Road' }, ...named.slice(1)])).toEqual([]);
+    expect(drawnStretches(draft, named.slice(0, 1))).toEqual([]);
   });
 
   test('Backspace takes the last point back, Esc drops the street, Enter ends it as a dead end', () => {

@@ -3,7 +3,8 @@
  * its card (`streetChoice`) asks. Clicks set its points, or a drag draws it freehand. It is drawn
  * as soon as it reaches a road (or the world's edge); Enter or a double click ends it where it is,
  * as a dead end. Backspace takes the last point back, Esc drops it. The street drawn is picked, so
- * its card shows. What goes along it is the card's choice: homes from the lot mix (`drawStreet`'s
+ * its card shows; one split at its bridges, the stretch nearest the last click (`stretchNear`), the
+ * card listing the others (`streetChoice.drawn`). What goes along it is the card's choice: homes from the lot mix (`drawStreet`'s
  * fill), the town's other buildings, or both (`buildup.ts` `builtAlong`, in the same edit: one undo
  * takes the street and what stands along it); by default both in the main town, homes elsewhere.
  *
@@ -18,7 +19,7 @@
 import type { Edited } from '../../game/edit/edited';
 import { builtAlong } from '../../game/edit/buildup';
 import { drawStreet, Meeting, streetWidth } from '../../game/edit/streets';
-import { lengths, pointAt, type Pt } from '../../game/roads';
+import { lengths, nearest, pointAt, type Pt } from '../../game/roads';
 import type { TownGhosts } from '../../render/types';
 import { buildingBox, lotBox, roadGhost } from './ghosts';
 import StreetCard from './StreetCard.svelte';
@@ -100,6 +101,23 @@ export function startAt(draft: Parameters<typeof liveStreet>[0], p: Pt, kind: St
   const r = draft.roads[e.road];
   const ls = lengths(r.points);
   return { at: pointAt(r.points, meet.index.along(e.road, p[0], p[1]), ls).p, road: e.road, extend: false };
+}
+
+/**
+ * Of the roads a street was drawn as (`made`: split at its bridges), the one to pick: the nearest `at` (the last
+ * click) that isn't a bridge's deck, else the nearest deck. (The first was the stretch before the first bridge,
+ * wherever the street was finished.)
+ */
+export function stretchNear(draft: Pick<Parameters<typeof liveStreet>[0], 'roads'>, made: readonly number[], at: Pt): number | undefined {
+  let best: { road: number; deck: boolean; dist: number } | undefined;
+  for (const road of made) {
+    const r = draft.roads[road];
+    if (!r) continue;
+    const deck = !!r.bridge;
+    const dist = nearest(r.points, at[0], at[1]).dist;
+    if (!best || (best.deck && !deck) || (best.deck === deck && dist < best.dist)) best = { road, deck, dist };
+  }
+  return best?.road;
 }
 
 /** The ghosts of a live street: its line in runs (new, bridge, red), its joins' marks; and, from `drawStreet`'s verdict when it is in, the roads it makes and what it clears. */
@@ -235,11 +253,14 @@ export const streetTool: TownTool = {
       const edited = drawn(pts, ask, alongFor(ask.along, live.area));
       if (!editor.apply(edited) || !('draft' in edited)) return false;
       if ('leftOut' in edited && edited.leftOut) editor.refuse(`${edited.leftOut === 1 ? 'a building was' : `${edited.leftOut} buildings were`} left out along it, where the ground is too steep`);
-      const [road] = newRoads(before, edited.draft);
+      const made = newRoads(before, edited.draft);
+      const road = stretchNear(edited.draft, made, pts[pts.length - 1]);
       s.clear();
       shown = null;
       seed = editor.seed();
       if (road !== undefined) editor.select({ kind: 'road', road });
+      // (The card lists the stretches while the draft still has them, by name: `drawnStretches`.)
+      streetChoice.drawn = made.map((road) => ({ road, name: edited.draft.roads[road].name ?? '' }));
       editor.preview(null);
       editor.hint(null);
       return true;

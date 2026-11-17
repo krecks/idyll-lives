@@ -23,7 +23,7 @@
 import type { Content } from '../../content/content';
 import type { BackdropBuilding, RoadPlan } from '../../core/protocol';
 import { CUT_MAX, ENTRY_MAX, RETAIN_MAX, surfacePlots } from '../../render/shared/builtSurface';
-import { areaSize, BackdropPass, CIVIC, civicChoices, civicLabel, civicTooBig, draftSize, type Row } from '../backdrop';
+import { BackdropPass, CIVIC, civicChoices, civicLabel, civicTooBig, draftAreaSize, type Row } from '../backdrop';
 import { heightAt, LAND_CELL, type Land } from '../land';
 import { mulberry32 } from '../noise';
 import { lengths, pointAt, RoadIndex, type Pt } from '../roads';
@@ -351,10 +351,10 @@ function civicAt(draft: NeighbourhoodDraft, t: Templates, content: Content, op: 
   const r = draft.roads[op.road];
   if (r.lots && r.lots !== op.side) return { refused: 'that side of the road looks out over the water' };
   const area = areaOfRoad(draft, op.road);
-  const size = areaSize(draftSize(draft), area);
+  const size = draftAreaSize(draft, area);
   const label = civicLabel(c, size).toLowerCase();
   const where = draft.open?.areas[area]?.name ?? draft.name;
-  if (civicTooBig(c, size, area)) return { refused: `${where} is too small for a ${label}` };
+  if (civicTooBig(c, size)) return { refused: `${where} is too small for a ${label}` };
   if (!civicChoices(draft, area).some((k) => k.index === op.civic)) return { refused: `${where} has a ${label} already` };
   const rand = mulberry32(mix(op.seed, roadKey(r), 'civic', String(op.civic)));
   const pass = new BackdropPass({ draft, t, content });

@@ -64,14 +64,15 @@ const HEADROOM_SRGB = 1 / Math.pow(GLOW_HEADROOM, 1 / 2.2);
 
 /**
  * The highlights' colours (sRGB): outline, hover, selected, marked (a home for sale) and dear (one for sale the
- * household can't afford: a dusky rose, apart from the marked amber and the selected blue, and drawn fainter).
+ * household can't afford: a pale stone, no colour of its own beside the marked amber and the selected blue, and
+ * drawn faint).
  */
 const COLORS: Record<'outline' | 'hover' | 'selected' | 'marked' | 'dear', RGB> = {
   outline: { r: 1, g: 0.97, b: 0.9 },
   hover: { r: 1, g: 0.98, b: 0.92 },
   selected: { r: 0.42, g: 0.62, b: 1.25 },
   marked: { r: 1.0, g: 0.78, b: 0.38 },
-  dear: { r: 0.95, g: 0.42, b: 0.5 },
+  dear: { r: 0.84, g: 0.82, b: 0.77 },
 };
 /** Intensities a plot eases between: outline, hover, selected, marked, dear. */
 const STATES = 5;
@@ -85,11 +86,17 @@ const WASH_FULL = 900;
 /**
  * How strongly a home for sale (`MARKED`) and one the household can't afford (`DEAR`) are lit: their ring and the glow
  * inside it (added), and their wash (laid over the lot: `washMaterial`) near and from `WASH_FULL` out. A dear one is
- * washed a little up close as well, so its rose reads beside the amber; neither near enough to hide the houses, which
- * stand over the wash.
+ * only a faint ring, and barely washed from far out: there to be found, not to draw the eye from the homes they can
+ * have. Neither is washed near enough to hide the houses, which stand over the wash.
  */
 const MARKED = { ring: 0.75, fill: 0.08, near: 0, far: 0.5 } as const;
-const DEAR = { ring: 0.85, fill: 0.14, near: 0.2, far: 0.5 } as const;
+const DEAR = { ring: 0.3, fill: 0, near: 0, far: 0.1 } as const;
+/**
+ * The marked homes' far wash by how many of the homes are lit: `MARKED.far` while a quarter or fewer are, easing to
+ * `CROWDED_FAR` once three quarters are. With most of the town lit, a strong wash over every lot turned the whole
+ * town amber and picked out nothing.
+ */
+const CROWDED_FAR = 0.18;
 
 const townLayers = new WeakMap<pc.AppBase, pc.Layer>();
 
@@ -175,6 +182,8 @@ export class TownOverview {
   private time = 0;
   /** How far into the wash the camera's distance is (0 near, 1 from `WASH_FULL`: `setReach`). */
   private far = 0;
+  /** The marked homes' wash from far out, by the share of the homes lit (`CROWDED_FAR`: `updateTargets`). */
+  private markedFar: number = MARKED.far;
   private readonly rgba = new Float32Array(4);
   private readonly m = new Float32Array(16);
   private readonly q: Quat = [0, 0, 0, 1];
@@ -376,7 +385,7 @@ export class TownOverview {
       ring.draw.set(INSTANCE_COLOR, i, writeColor(c, outline * 0.32, hover * 1.15, sel * 1.1, marked * MARKED.ring, dear * DEAR.ring));
       fill.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.4, sel * 0.34, marked * MARKED.fill, dear * DEAR.fill));
       wall.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.2, sel * 0.32, 0, 0));
-      wash.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.3 * far, sel * 0.32 * far, marked * (MARKED.near + (MARKED.far - MARKED.near) * far), dear * (DEAR.near + (DEAR.far - DEAR.near) * far)));
+      wash.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.3 * far, sel * 0.32 * far, marked * (MARKED.near + (this.markedFar - MARKED.near) * far), dear * (DEAR.near + (DEAR.far - DEAR.near) * far)));
     }
     for (const h of this.hl) h.draw.update(false);
     return true;
@@ -632,6 +641,7 @@ export class TownOverview {
     const { hover, selected, outlines } = this.state;
     const marked = new Set(this.state.marked);
     const dear = new Set(this.state.dear);
+    let [shown, homes] = [0, 0];
     for (let i = 0; i < n; i++) {
       const id = this.plots[i].id;
       const at = i * STATES;
@@ -642,6 +652,14 @@ export class TownOverview {
       // (A dear lot is one of the marked, in its own tint; one dear but not marked is lit as dear all the same.)
       this.target[at + 3] = marked.has(id) && !dear.has(id) && !lit ? 1 : 0;
       this.target[at + 4] = dear.has(id) && !lit ? 1 : 0;
+      if (!this.plots[i].public) homes++;
+      if (marked.has(id) && !dear.has(id)) shown++;
+    }
+    const t = Math.min(1, Math.max(0, (shown / Math.max(1, homes) - 0.25) / 0.5));
+    const markedFar = MARKED.far + (CROWDED_FAR - MARKED.far) * t * t * (3 - 2 * t);
+    if (markedFar !== this.markedFar) {
+      this.markedFar = markedFar;
+      this.dirty = true;
     }
   }
 }

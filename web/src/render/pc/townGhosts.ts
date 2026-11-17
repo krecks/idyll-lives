@@ -6,6 +6,10 @@
  * over water, where a bridge would be) `LIFT` m up, unlit and clear of the fog, in one mesh written again in place
  * on every call: a few thousand vertices, well under 2 ms. An entity under the world root (game space), on the
  * layer the camera draws the town with.
+ *
+ * From far out (the whole world's shot, a metre or so a pixel) a street's ghost was under a pixel or two across and its
+ * edges and a lot's outline less: they are drawn no thinner on screen than `MIN_HALF_PX` and `MIN_LINE_PX`, by the
+ * scale the camera gives (`setScale`), in steps so a zoom draws them again only now and then.
  */
 
 import * as pc from './engine';
@@ -32,6 +36,12 @@ const DASH = 6;
 /** A bridge's planks: one every this far (m) along it, this wide. */
 const PLANK_EVERY = 3;
 const PLANK = 0.5;
+/** The fewest CSS px a street's ghost is across either side of its middle, and an edge, outline or band is wide. */
+const MIN_HALF_PX = 5;
+const MIN_LINE_PX = 1.5;
+/** The scale (m a CSS px) goes in steps of this ratio, rounded up, and under `SCALE_FROM` is none (nothing near that thin). */
+const SCALE_STEP = Math.SQRT2;
+const SCALE_FROM = 0.1;
 /** A storey's height (m), and a roof's over the top storey, for the veil over a building to be removed. */
 const STOREY = 3;
 const ROOF = 3.2;
@@ -151,6 +161,8 @@ export class TownGhostDraw {
   private readonly buf = new Buffers();
   /** Its buffers are made for 32-bit indices. */
   private wide = false;
+  /** M a CSS px where the camera looks, in `SCALE_STEP` steps (0: near enough that no ghost is drawn wider for it). */
+  private scale = 0;
 
   constructor(app: pc.AppBase, parent: pc.Entity) {
     const mesh = (this.mesh = new pc.Mesh(app.graphicsDevice));
@@ -188,6 +200,22 @@ export class TownGhostDraw {
     this.entity.addComponent('render', { meshInstances: [this.mi], castShadows: false, receiveShadows: false });
     this.entity.enabled = false;
     parent.addChild(this.entity);
+  }
+
+  /**
+   * How many m a CSS px is where the camera looks (from its distance, lens and the canvas's height). True if that
+   * crossed a step: the ghosts are to be drawn again (`set`) for their least widths on screen.
+   */
+  setScale(metresPerPx: number): boolean {
+    const scale = metresPerPx < SCALE_FROM ? 0 : SCALE_STEP ** Math.ceil(Math.log(metresPerPx) / Math.log(SCALE_STEP) - 1e-9);
+    if (scale === this.scale) return false;
+    this.scale = scale;
+    return true;
+  }
+
+  /** A width (m) no less than `px` CSS px on screen. */
+  private least(m: number, px: number): number {
+    return Math.max(m, px * this.scale);
   }
 
   /**
@@ -282,8 +310,8 @@ export class TownGhostDraw {
     const t = TONES[tone];
     const path = resample(points, STEP);
     const ns = normals(path, false);
-    const half = width / 2;
-    const edge = Math.min(EDGE, half / 2);
+    const half = this.least(width / 2, MIN_HALF_PX);
+    const edge = Math.min(this.least(EDGE, MIN_LINE_PX), half / 2);
     this.band(path, ns, -half + edge, half - edge, t.rgb, t.fill, drape, false);
     this.band(path, ns, -half, -half + edge, t.rgb, t.edge, drape, false);
     this.band(path, ns, half - edge, half, t.rgb, t.edge, drape, false);
@@ -333,7 +361,8 @@ export class TownGhostDraw {
       STEP,
       true,
     );
-    this.band(path, normals(path, true), -LOT_LINE / 2, LOT_LINE / 2, t.rgb, t.edge, drape, true);
+    const line = this.least(LOT_LINE, MIN_LINE_PX);
+    this.band(path, normals(path, true), -line / 2, line / 2, t.rgb, t.edge, drape, true);
   }
 
   /** A village's box: a dashed band round it over the faintest fill. */
@@ -354,7 +383,8 @@ export class TownGhostDraw {
     const lengthsAt: number[] = [0];
     for (let i = 1; i < path.length; i++) lengthsAt.push(lengthsAt[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
     const gap = (i: number) => Math.floor(lengthsAt[i] / DASH) % 2 === 1;
-    this.band(path, normals(path, true), -BOX_LINE / 2, BOX_LINE / 2, t.rgb, t.edge, drape, true, gap);
+    const line = this.least(BOX_LINE, MIN_LINE_PX);
+    this.band(path, normals(path, true), -line / 2, line / 2, t.rgb, t.edge, drape, true, gap);
   }
 
   /** The building on a lot (or a backdrop building) to be removed, under a dark veil: a box round it up to its roof. */

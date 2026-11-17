@@ -361,7 +361,7 @@ export interface LotHighlight {
   selected: number | null;
   /** Lots drawn as available (e.g. for sale). */
   marked: readonly number[];
-  /** Of those, the ones the household can't afford, drawn in a second tint (none: every marked lot alike). */
+  /** Of those, the ones the household can't afford, drawn as a faint stone ring (none: every marked lot alike). */
   dear?: readonly number[];
   /** Faint outlines around every lot. */
   outlines: boolean;

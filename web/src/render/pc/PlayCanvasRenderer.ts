@@ -1211,7 +1211,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const p = this.townPose;
       // (The menus' town has the full town view's planes, sky and haze at any distance: `applyTownCamera`.)
       const flat = Math.sin(p.beta) * p.radius;
-      this.applyTownCamera(p.radius, p.alpha, p.beta, p.target.x + Math.cos(p.alpha) * flat, p.target.y + Math.cos(p.beta) * p.radius, p.target.z + Math.sin(p.alpha) * flat, true);
+      const [ex, ey, ez] = [p.target.x + Math.cos(p.alpha) * flat, p.target.y + Math.cos(p.beta) * p.radius, p.target.z + Math.sin(p.alpha) * flat];
+      this.applyTownCamera(p.radius, p.alpha, p.beta, ex, ey, ez, true);
+      // (The land's veil moved for the eye: each of its points over the land it is for, as seen from here.)
+      if (this.landHaze?.view(ex, ey, ez)) this.held?.changed();
       this.camera.setPose(p.alpha, p.beta, p.radius, p.target.x, p.target.y, p.target.z, p.targetScreenOffset.x, p.targetScreenOffset.y);
     } else {
       const o = this.orbit;
@@ -3197,10 +3200,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const at = this.townMode || !this.lot.landscape ? this.landInView() : null;
     const ghosts = at ? this.ghosts : null;
     if (!ghosts && !this.ghostDraw) return;
-    this.ghostDraw ??= new TownGhostDraw(this.app, this.root);
+    if (!this.ghostDraw) {
+      this.ghostDraw = new TownGhostDraw(this.app, this.root);
+      this.ghostDraw.setScale(this.townMetresPerPx());
+    }
     const layer = this.lot.townLayer ?? pc.LAYERID_WORLD;
     this.ghostDraw.set(ghosts, at ? groundOrWater(at.scape) : () => 0, layer, this.townWorld);
     this.held?.changed();
+  }
+
+  /** How many m a CSS px is where the overview's camera looks: its distance, lens and the canvas's height. */
+  private townMetresPerPx(): number {
+    return (2 * this.townPose.radius * Math.tan(this.townPose.fov / 2)) / (this.cssSize.height || 1);
   }
 
   onTownFrame(fn: (() => void) | null): void {
@@ -3444,6 +3455,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // lit lots are washed over whole.)
     this.overview?.setReach(this.townPose.radius);
     this.landHaze?.show(this.townPose.radius);
+    // (Step 2's ghosts drawn again when the zoom crosses a step of their least widths on screen.)
+    if (this.ghostDraw?.setScale(this.townMetresPerPx()) && this.ghosts) this.drawGhosts();
     if (this.overview?.frame(secs)) this.held.changed();
     // The light eases between the screens' hours (about two seconds).
     const goal = this.townMinuteGoal;
