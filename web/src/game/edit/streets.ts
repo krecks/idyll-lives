@@ -12,34 +12,38 @@
  *   the road's ends than `NEAR_END` m and slid along it where another junction is too near; or at a
  *   dead end within `SNAP` m, which it then carries on; or at the world's edge (a way out), or in a
  *   dead end of its own;
- * - ends at the first road it reaches (no crossroads: the player goes on from 14 m along);
+ * - ends at the first road it reaches (no crossroads: the player goes on from 14 m along), but a
+ *   street runs across a footpath (`Meeting.crossable`), which it cuts (`cutTrails`);
  * - is a lane or a street of an area where it runs inside its box or within `NEAR_AREA` m of it,
  *   else a country road, unless the player asked for a street or a lane (`StreetStroke.asked`), which
  *   it then stays, its area given at the Build step; a footpath is a trail;
  * - is refused, with the reason, where it bends tighter than 9 m, runs closer than 18 m alongside
  *   another road (`clearOf`), leaves the world other than by its end, meets a road within 14 m of
- *   another junction (`roomAt`), joins no road, or leaves a dead end reaching more than `COURT` m
- *   past the last road it meets;
- * - crosses water on a bridge (`bridges.ts`: straight, one deck, the street split round it) where
- *   it may, and is refused where it may not;
+ *   another junction (`roomAt`), or joins no road;
+ * - crosses water on a bridge (`bridges.ts` `crossWater`: straight, one deck of `DRAWN_SPAN` m at
+ *   most, laid through the water's middle and turned squarer where the line drawn won't make one,
+ *   its deck carried on over the dip a river lies in, the street split round it) where it may, and
+ *   is refused where it may not;
  * - clears the lots and backdrop buildings under it (`clear`; else it is refused), and the parking;
  * - is named, and the roads it is split into at its bridges, with names nobody in town has.
  *
- * The dead ends: a drawn dead end is held to `COURT` m past the last road it meets, as the
- * generator's are. The sim would drive a longer one in a street or a lane (the renderer paves a
+ * The dead ends (the player's choice): a drawn dead end may reach as far past the last road it
+ * meets as it is drawn. The sim drives a long one in a street or a lane (the renderer paves a
  * turning circle at every dead end and the taxis turn round in any of a street's or a lane's,
- * `sim-core taxi.rs` `dead_end`), but not in a country road (no taxi turns round there), and the
- * town's checks (`townCheck.ts`) hold every court to `COURT`.
+ * `sim-core taxi.rs` `dead_end`), but no taxi turns round in a country road: a drawn country road's
+ * piece that ends more than `COURT` m past the last road it meets is made a street of no area (the
+ * Build step gives it one). The town's checks of an edited town (`townCheck.ts`, not `generated`)
+ * leave a street's or a lane's courts be.
  */
 
 import type { Content } from '../../content/content';
 import type { RoadKind, RoadPlan } from '../../core/protocol';
 import { surfacePlots } from '../../render/shared/builtSurface';
-import { bridgeable, bridgeStretch, wetSpans, withBridge, withoutDeck } from '../bridges';
+import { crossWater, DRAWN_SPAN, wetSpans, withBridge, withoutDeck } from '../bridges';
 import { CTRL_APART } from '../countryRouter';
 import { rle, simplify, unrle } from '../landMasks';
 import { mulberry32 } from '../noise';
-import { BRIDGE_IN, BRIDGE_SPAN, ROAD_WIDTH, TRAIL_WIDTH } from '../macro';
+import { BRIDGE_IN, ROAD_WIDTH, TRAIL_WIDTH } from '../macro';
 import { bends, clearOf, connector, COURT, cropRoads, curve, endDir, evenly, inside, leftOf, lengths, MEET, nearest, pointAt, RoadIndex, ROOM, roomAt, trimJoins, type Fit, type Pt } from '../roads';
 import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '../town';
 import { placeOf, specOf, streetNames } from '../world';
@@ -251,6 +255,14 @@ export class Meeting {
     return !road.island && (this.trail || road.kind !== 'trail');
   }
 
+  /** Whether the street runs across road `r` rather than meeting it: a footpath, for a street (`cutTrails` cuts it there). */
+  crossable(r: number): boolean {
+    return !this.trail && this.roads[r].kind === 'trail';
+  }
+
+  /** `crossable`, as `roads.ts` `clearOf` and `roomAt` take it (the roads they leave out). */
+  readonly skip = (r: number): boolean => this.crossable(r);
+
   /** How near a road's middle the street's middle comes where it touches it (m: `clearOf`'s). */
   touch(r: number): number {
     return this.roads[r].width / 2 + this.width / 2 + 1;
@@ -319,13 +331,13 @@ export class Meeting {
     return best;
   }
 
-  /** The first point of `line` (its index) that touches a road, not counting road `from` near the line's start (`free` m); and that road. */
+  /** The first point of `line` (its index) that touches a road, not counting road `from` near the line's start (`free` m) nor a road it crosses (`crossable`); and that road. */
   contact(line: readonly Pt[], from: number): { i: number; road: number } | null {
     const ls = lengths(line);
     const free = from < 0 ? 0 : this.touch(from) * 1.8 + 1 + SNAP;
     for (let i = 0; i < line.length; i++) {
       for (const [r, m] of this.index.around(line[i][0], line[i][1], this.widest / 2 + this.width / 2 + 1)) {
-        if (m.dist >= this.touch(r) || (r === from && ls[i] < free)) continue;
+        if (m.dist >= this.touch(r) || (r === from && ls[i] < free) || this.crossable(r)) continue;
         return { i, road: r };
       }
     }
@@ -354,7 +366,7 @@ export class Meeting {
     const onDeck = (s: number) => !!o.bridge && s > o.bridge[0] - BRIDGE_IN && s < o.bridge[1] + BRIDGE_IN;
     if (onDeck(sT)) return `it meets ${name} on its bridge`;
     const first = this.meetAt(line, r, sT, APPROACH, lo);
-    if (roomAt(this.index, first.at, [r])) return first;
+    if (roomAt(this.index, first.at, [r], this.skip)) return first;
     const loop = o.ends[0] === 'loop';
     const slid = SLIDES.flatMap((d) => [sT - d, sT + d])
       .map((s) => (loop ? ((s % Lo) + Lo) % Lo : s))
@@ -362,7 +374,7 @@ export class Meeting {
     for (const s of slid) {
       const shift = Math.abs(s - sT);
       const tried = this.meetAt(line, r, s, APPROACH + shift, lo);
-      if (roomAt(this.index, tried.at, [r]) && !bends(tried.pts.slice(-2 * (APPROACH + shift))).tight) return tried;
+      if (roomAt(this.index, tried.at, [r], this.skip) && !bends(tried.pts.slice(-2 * (APPROACH + shift))).tight) return tried;
     }
     return first;
   }
@@ -535,7 +547,7 @@ export function streetCourse(meet: Meeting, shaped: StreetLine): StreetCourse | 
   const hit = meet.contact(line, start.kind === 'join' || start.kind === 'extend' ? start.road : -1);
   let end: End;
   if (hit) {
-    if (!meet.joinable(hit.road)) return roads[hit.road].island ? 'it runs into the roundabout' : `it crosses ${roads[hit.road].name ?? 'a footpath'}`;
+    if (!meet.joinable(hit.road)) return 'it runs into the roundabout';
     line = line.slice(0, hit.i + 1);
     const snapped = meet.snap(line[line.length - 1]);
     end = snapped.kind === 'free' ? { kind: 'join', road: hit.road } : snapped;
@@ -604,15 +616,15 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
   const toRoad = end.kind === 'join' || end.kind === 'extend' ? end.road : -1;
   // (Its bends with a little of the roads it carries on.)
   if (bends([...head.slice(-20, -1), ...part, ...foot.slice(1, 20)]).tight) return refused('it bends tighter than 9 m');
-  for (const j of junctions) if (!roomAt(meet.index, j.at, [j.road])) return refused(`it meets ${named(j.road)} within ${ROOM} m of another junction`);
+  for (const j of junctions) if (!roomAt(meet.index, j.at, [j.road], meet.skip)) return refused(`it meets ${named(j.road)} within ${ROOM} m of another junction`);
   if (junctions.length === 2 && Math.hypot(junctions[0].at[0] - junctions[1].at[0], junctions[0].at[1] - junctions[1].at[1]) < ROOM) return refused(`its two junctions are within ${ROOM} m of each other`);
   const fit: Fit = { box: { w: W, d: D }, margin: -0.5, greens: draft.greens };
   const apart = trail ? TRAIL_APART : undefined;
-  if (!clearOf(part, width, roads, meet.index, fit, fromRoad, toRoad, apart)) {
+  if (!clearOf(part, width, roads, meet.index, fit, fromRoad, toRoad, apart, meet.skip)) {
     const ls = lengths(part);
     const L = ls[ls.length - 1];
     if (part.some(([x, z], i) => ls[i] > 4 && L - ls[i] > 4 && draft.greens.some((g) => inside(g, x, z)))) return refused('it runs across a green');
-    if (!clearOf(part, width, roads, meet.index, fit, fromRoad, toRoad, 0)) return refused('it runs into another road');
+    if (!clearOf(part, width, roads, meet.index, fit, fromRoad, toRoad, 0, meet.skip)) return refused('it runs into another road');
     return refused(`it runs closer than ${apart ?? 18} m alongside another road`);
   }
 
@@ -648,30 +660,17 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
     const wet = unrle(open.water, W * D);
     const spans = wetSpans(laid.points, wet, W, D);
     if (spans.length && trail) return refused('a footpath does not cross the water');
-    // (Crossings close together are one bridge.)
-    const crossings: [number, number][] = [];
-    for (const s of spans) {
-      const last = crossings[crossings.length - 1];
-      if (last && s[0] - last[1] < ONE_CROSSING) last[1] = s[1];
-      else crossings.push([s[0], s[1]]);
-    }
-    const others = roads.filter((_, i) => i !== base && i !== merged);
-    for (const span of crossings.reverse()) {
+    // (Not the footpaths: one it crosses passes under its deck or is cut, `cutTrails`.)
+    const others = roads.filter((_, i) => i !== base && i !== merged && !meet.crossable(i));
+    for (const span of crossingsOf(spans).reverse()) {
       const r = next[at];
-      const why = bridgeable(r.points, span, others, plots);
-      if (why) return refused(why);
-      const L = lengthOf(r.points);
-      const [a, b] = bridgeStretch(L, span);
-      if ((a === 0 && r.ends[0] !== 'join') || (b === L && r.ends[1] !== 'join')) return refused('a bridge needs a road on at each end: carry it on past the water');
-      const [after] = b < L ? freshNames(draft, content, rand, 1, taken, areaName) : [undefined];
+      const crossed = crossWater(r.points, r.ends, span, { wet, W, D, roads: others, plots, land: open.land, most: DRAWN_SPAN });
+      if (typeof crossed === 'string') return refused(crossed);
+      const [after] = crossed.after ? freshNames(draft, content, rand, 1, taken, areaName) : [undefined];
       const had = next.length;
-      const bridged = withBridge(next, at, span, walk ?? wet, W, D, { bridge: bridgeName(name, taken), after });
+      const bridged = withBridge(next, at, span, walk ?? wet, W, D, { bridge: bridgeName(name, taken), after }, crossed.fit);
       [next, walk] = [bridged.roads, bridged.walk];
       for (let k = had; k < next.length; k++) pieces.push(k);
-      const deck = next[a > 0 ? had : at].bridge!;
-      // (Made straight, the bridge may miss a wet tile the line drawn only clipped: then it would be a deck over no water.)
-      if (!(deck[1] > deck[0])) return refused('it only clips the edge of the water: draw it clear of the water, or on across it');
-      if (deck[1] - deck[0] > BRIDGE_SPAN) return refused(`its bridge would be ${Math.round(deck[1] - deck[0])} m long (${BRIDGE_SPAN} m at most)`);
     }
     // Nothing of it over the water but its decks, and onto and off them no tighter than it may bend.
     for (const i of pieces) {
@@ -683,10 +682,23 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
   if (merged >= 0) next = next.filter((_, i) => i !== merged);
   const fresh = pieces.map((i) => (merged >= 0 && i > merged ? i - 1 : i));
 
-  // ---- a court no longer than the generator's, and one network ----
-  const court = longestCourt(next, fresh);
-  if (court && court.stub > COURT + 0.5) return refused(`it ends ${Math.round(court.stub)} m past the last road it meets: a dead end reaches ${COURT} m at most, so end it on a road`);
+  // ---- a dead end anywhere: a street's or a lane's as it is (the sim turns round in any of theirs); a country road's past a court a street of no area (no taxi turns round in a country road) ----
+  for (const i of fresh) {
+    const r = next[i];
+    if (r.kind !== 'country' || r.bridge) continue;
+    const court = longestCourt(next, [i]);
+    if (court && court.stub > COURT + 0.5) {
+      const { area: _area, ...rest } = r;
+      next[i] = { ...rest, kind: 'street' };
+    }
+  }
   if (!oneNetwork(next, new Set())) return refused('it joins none of the roads');
+
+  // ---- the footpaths it crosses, cut to meet it in a T either side (one it crosses on a bridge's deck passes under it) ----
+  if (!trail) {
+    const kept = draft.slots.filter((s) => !gone.has(s.index) && s.kind === 'outdoor').map((s) => plotRect(t, s));
+    next = cutTrails(next, fresh, kept, taken);
+  }
 
   // ---- the town with it ----
   const parkingGone = new Set(way.parking);
@@ -704,7 +716,103 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
       if ('draft' in filled) drawn = filled.draft;
     }
   }
-  return { draft: drawn, cleared: { lots: way.lots, backdrop: way.backdrop } };
+  return { draft: drawn, cleared: { lots: way.lots, backdrop: way.backdrop }, made: fresh };
+}
+
+/** A line's wet stretches (`wetSpans`) as the crossings bridged: those closer than `ONE_CROSSING` m one. */
+export function crossingsOf(spans: readonly (readonly [number, number])[]): [number, number][] {
+  const out: [number, number][] = [];
+  for (const s of spans) {
+    const last = out[out.length - 1];
+    if (last && s[0] - last[1] < ONE_CROSSING) last[1] = s[1];
+    else out.push([s[0], s[1]]);
+  }
+  return out;
+}
+
+/** A footpath cut by a street ends this far (m) inside the street's edge (where the sim joins it: within a metre of its edge); a piece of it shorter than `TRAIL_LEAST` m goes, but the one at an outdoor place. */
+const TRAIL_IN = 0.5;
+const TRAIL_LEAST = 4;
+/** A footpath is looked at every this far (m) along it for where a street runs over it. */
+const TRAIL_STEP = 0.25;
+
+/**
+ * `roads` with each footpath that the roads `made` (a street just drawn, its pieces) run over cut
+ * there: split into pieces, each ending `TRAIL_IN` m inside the street's edge (a T: the sim joins it
+ * there), a piece shorter than `TRAIL_LEAST` m left out unless an outdoor place (`outdoor`, their
+ * rectangles) is at its end. The piece with the footpath's last point (its outdoor place's end) keeps
+ * its index and name; the others go at the end of the list, named after it with a number nobody in
+ * town has (`taken`, added to). Where the street crosses it on a bridge's deck it passes under it, whole.
+ */
+export function cutTrails(roads: readonly RoadPlan[], made: readonly number[], outdoor: readonly Rect[], taken: Set<string>): RoadPlan[] {
+  const streets = made.map((i) => roads[i]).filter((r) => r.kind !== 'trail');
+  if (!streets.length) return [...roads];
+  const index = new RoadIndex(streets);
+  const reach = Math.max(...streets.map((r) => r.width)) / 2;
+  const out = [...roads];
+  const isMade = new Set(made);
+  roads.forEach((r, j) => {
+    if (r.kind !== 'trail' || isMade.has(j) || r.points.length < 2) return;
+    const ls = lengths(r.points);
+    const L = ls[ls.length - 1];
+    // Where along it a street runs over it (within its width less `TRAIL_IN`), and whether on a deck.
+    const runs: { from: number; to: number; deck: boolean; closest: number }[] = [];
+    for (let s = 0; s <= L + 1e-6; s += TRAIL_STEP) {
+      const p = pointAt(r.points, Math.min(s, L), ls).p;
+      let hit: { dist: number; deck: boolean } | null = null;
+      for (const [k, m] of index.around(p[0], p[1], reach)) {
+        const st = streets[k];
+        if (m.dist >= st.width / 2 - TRAIL_IN || (hit && hit.dist <= m.dist)) continue;
+        hit = { dist: m.dist, deck: !!st.bridge && m.s >= st.bridge[0] && m.s <= st.bridge[1] };
+      }
+      if (!hit) continue;
+      const last = runs[runs.length - 1];
+      if (last && s - last.to <= TRAIL_STEP * 1.5) {
+        last.to = s;
+        if (hit.dist < last.closest) [last.closest, last.deck] = [hit.dist, hit.deck];
+      } else runs.push({ from: s, to: s, deck: hit.deck, closest: hit.dist });
+    }
+    const cuts = runs.filter((c) => !c.deck);
+    if (!cuts.length) return;
+    // The pieces between the cuts, each end at a cut a join.
+    const end = r.points[r.points.length - 1];
+    const atPlace = outdoor.some((q) => Math.hypot(Math.max(q.x - end[0], 0, end[0] - q.x - q.w), Math.max(q.z - end[1], 0, end[1] - q.z - q.d)) <= TRAIL_END);
+    const bounds: [number, number][] = [];
+    let from = 0;
+    for (const c of cuts) {
+      bounds.push([from, Math.max(0, c.from - TRAIL_STEP)]);
+      from = Math.min(L, c.to + TRAIL_STEP);
+    }
+    bounds.push([from, L]);
+    const pieces = bounds
+      .map(([a, b], k) => ({ a, b, k }))
+      .filter(({ a, b }) => b - a >= TRAIL_LEAST || (b >= L - 1e-6 && b > a && atPlace));
+    if (!pieces.length) return;
+    const lastPiece = pieces[pieces.length - 1];
+    const cut: RoadPlan[] = pieces.map(({ a, b, k }) => {
+      const pts = trailBetween(r.points, a, b, ls);
+      const ends: RoadPlan['ends'] = [k === 0 ? r.ends[0] : 'join', k === bounds.length - 1 ? r.ends[1] : 'join'];
+      return { ...r, points: pts, ends };
+    });
+    out[j] = cut[pieces.indexOf(lastPiece)];
+    let n = 2;
+    for (const piece of cut) {
+      if (piece === out[j]) continue;
+      while (taken.has(`${r.name ?? 'Footpath'} ${n}`)) n++;
+      const name = `${r.name ?? 'Footpath'} ${n}`;
+      taken.add(name);
+      out.push({ ...piece, name });
+    }
+  });
+  return out;
+}
+
+/** The points of a footpath (`pts`) between arc lengths `a` and `b`, rounded as a drawn road's are. */
+function trailBetween(pts: readonly Pt[], a: number, b: number, ls: number[]): Pt[] {
+  const out: Pt[] = [pointAt(pts, a, ls).p];
+  for (let i = 0; i < pts.length; i++) if (ls[i] > a + 0.01 && ls[i] < b - 0.01) out.push(pts[i]);
+  out.push(pointAt(pts, b, ls).p);
+  return out.map(([x, z]): Pt => [Math.round(x * 100) / 100, Math.round(z * 100) / 100]);
 }
 
 /**

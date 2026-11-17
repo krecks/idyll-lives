@@ -462,9 +462,10 @@ export function bends(pts: readonly Pt[]): { left: number; right: number; tight:
 /**
  * Whether a new stretch of road (`pts`, `width` wide) fits among `roads`: inside the box and off
  * the greens, touching no road but road `from` at its start and road `to` at its end (-1: none),
- * and nowhere running alongside another nearer than `apart` (m, from its edge).
+ * and nowhere running alongside another nearer than `apart` (m, from its edge). `skip`: roads it
+ * may cross (step 2's street over a footpath, which it then cuts: `edit/streets.ts`); none, else.
  */
-export function clearOf(pts: readonly Pt[], width: number, roads: readonly RoadPlan[], index: RoadIndex, fit: Fit, from: number, to: number, apart = APART): boolean {
+export function clearOf(pts: readonly Pt[], width: number, roads: readonly RoadPlan[], index: RoadIndex, fit: Fit, from: number, to: number, apart = APART, skip?: (road: number) => boolean): boolean {
   const m = fit.margin ?? 14;
   if (pts.some(([x, z]) => x < m || z < m || x > fit.box.w - m || z > fit.box.d - m)) return false;
   const ls = lengths(pts);
@@ -477,6 +478,7 @@ export function clearOf(pts: readonly Pt[], width: number, roads: readonly RoadP
     if (s > 4 && u > 4 && greens.some((g) => inside(g, x, z))) return false;
     const t = tangent(pts, i);
     for (const [r, near] of index.around(x, z, widest / 2 + apart)) {
+      if (skip?.(r)) continue;
       const clear = roads[r].width / 2 + width / 2 + 1;
       // (Where it leaves its road and where it meets the other, it comes in at 35° or more.)
       const free = clear * 1.8 + 1;
@@ -491,9 +493,9 @@ export function clearOf(pts: readonly Pt[], width: number, roads: readonly RoadP
   return true;
 }
 
-/** Whether no road but `except` comes within `ROOM` m of `p` (room for a junction there). */
-export function roomAt(index: RoadIndex, p: Pt, except: readonly number[]): boolean {
-  for (const r of index.around(p[0], p[1], ROOM).keys()) if (!except.includes(r)) return false;
+/** Whether no road but `except` (nor one `skip` says, as `clearOf`'s) comes within `ROOM` m of `p` (room for a junction there). */
+export function roomAt(index: RoadIndex, p: Pt, except: readonly number[], skip?: (road: number) => boolean): boolean {
+  for (const r of index.around(p[0], p[1], ROOM).keys()) if (!except.includes(r) && !skip?.(r)) return false;
   return true;
 }
 

@@ -206,7 +206,7 @@ export function streetGhosts(editor: Pick<TownEditor, 'draft' | 't'>, live: Live
   if (live.reached && live.finishOn >= 0 && draft.roads[live.finishOn] && !live.why) ghosts.roads.push(roadGhost(draft.roads[live.finishOn], 'join'));
   if (made && !live.slope) {
     // What it makes, as `drawStreet` makes it (cut at the kerbs, split at its bridges).
-    for (const i of newRoads(draft, made.draft)) ghosts.roads.push(roadGhost(made.draft.roads[i], 'new'));
+    for (const i of newRoads(draft, made)) ghosts.roads.push(roadGhost(made.draft.roads[i], 'new'));
   } else {
     // (The line as the live checks have it: where it is refused, or looks too steep, red.)
     const whole = refused && !live.why ? [{ from: 0, to: Infinity, tone: 'bad' as const }] : live.stretches;
@@ -378,7 +378,7 @@ export const streetTool: TownTool = {
       edited ??= drawn(pts, ask, alongFor(ask.along, live.area));
       if (!editor.apply(edited) || !('draft' in edited)) return false;
       if ('leftOut' in edited && edited.leftOut) editor.refuse(`${edited.leftOut === 1 ? 'a building was' : `${edited.leftOut} buildings were`} left out along it, where the ground is too steep`);
-      const made = newRoads(before, edited.draft);
+      const made = newRoads(before, edited);
       const road = stretchNear(edited.draft, made, pts[pts.length - 1]);
       s.clear();
       shown = null;
