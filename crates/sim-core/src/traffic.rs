@@ -1631,6 +1631,8 @@ pub struct Traffic {
     /// it (`Light`), and since when.
     pub(crate) lights: Vec<Light>,
     movers: Vec<Mover>,
+    /// `movers` by key: each key and the first of them with it, sorted (`mover`).
+    mover_ix: Vec<(u64, u32)>,
     /// Where each vehicle on its way to the start of its next claim, not yet there, will wait for
     /// it (its key, the claim's first sample: `may_go`, this tick).
     starts: Vec<(u64, Sample)>,
@@ -1786,7 +1788,20 @@ impl Traffic {
     }
 
     fn mover(&self, key: u64) -> Option<&Mover> {
-        self.movers.iter().find(|m| m.key == key)
+        let found = self
+            .mover_ix
+            .binary_search_by_key(&key, |e| e.0)
+            .ok()
+            .map(|k| &self.movers[self.mover_ix[k].1 as usize]);
+        debug_assert!(
+            found.map(|m| m as *const Mover)
+                == self
+                    .movers
+                    .iter()
+                    .find(|m| m.key == key)
+                    .map(|m| m as *const Mover)
+        );
+        found
     }
 
     /// Whether `key`, `t` ticks along its route of `claims` (tagged `route`), may drive on to `to`:
@@ -2260,12 +2275,38 @@ impl Traffic {
     ) {
         self.tick = tick;
         self.movers = movers;
-        self.starts.clear();
-        let place = |key: u64, route: u32| {
-            places
+        // (Looked up by key from here on: `mover`, the first with each key.)
+        self.mover_ix.clear();
+        self.mover_ix.extend(
+            self.movers
                 .iter()
-                .find(|p| p.0 == key && p.1 == route)
-                .map(|p| p.2)
+                .enumerate()
+                .map(|(i, m)| (m.key, i as u32)),
+        );
+        self.mover_ix.sort_by_key(|&(key, i)| (key, i));
+        self.mover_ix.dedup_by_key(|e| e.0);
+        self.starts.clear();
+        // (Where each holder or asker is, by key and route: the first place given for them.)
+        let mut at: Vec<(u64, u32, usize)> = places
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (p.0, p.1, i))
+            .collect();
+        at.sort_unstable();
+        at.dedup_by_key(|e| (e.0, e.1));
+        let place = |key: u64, route: u32| {
+            let found = at
+                .binary_search_by_key(&(key, route), |e| (e.0, e.1))
+                .ok()
+                .map(|k| places[at[k].2].2);
+            debug_assert_eq!(
+                found.map(f32::to_bits),
+                places
+                    .iter()
+                    .find(|p| p.0 == key && p.1 == route)
+                    .map(|p| p.2.to_bits())
+            );
+            found
         };
         self.holds.retain_mut(|h| match place(h.key, h.tag >> 16) {
             Some(t) if t < h.claim.to => {
@@ -2314,7 +2355,7 @@ impl Traffic {
             graph.entry(m.key).or_default().extend(m.waits);
         }
         // (Who waits for whose body on the road, however far round: the asks' waits left out.)
-        let on_road = graph.clone();
+        let on_road = Reaches::new(graph.clone());
         for a in &self.asks {
             // (Not those only coming into its way: they keep clear of it, `blocked`, and are no
             // reason for it to let them go first.)
@@ -2326,6 +2367,10 @@ impl Traffic {
                     .copied(),
             );
         }
+        // (Neither changes from here on: whom each waits for however far round is worked out
+        // once for each, `Reaches`.)
+        let waits_round = Reaches::new(graph);
+        let graph = &waits_round.graph;
         // (Earlier asks with parts not granted, and whose bodies they wait for.)
         let mut pending: Vec<(usize, Vec<u64>)> = Vec::new();
         let mut waits: Vec<(usize, Vec<u64>)> = Vec::new();
@@ -2380,28 +2425,33 @@ impl Traffic {
                     // for the body of one that does, and so on, as in a queue behind it: it's to go
                     // on first; but for its way through crossing where that one stands.)
                     let holder = self.mover(h.key);
-                    let through = holder.is_some_and(|m| {
-                        let body = Sample {
-                            t: 0.0,
-                            d: 0.0,
-                            rect: m.rect,
-                            way: m.way,
-                            pass: m.pass,
-                        };
-                        next.iter().any(|c| {
-                            in_bounds(c, &m.rect)
-                                && c.samples.iter().any(|s| conflict(s, &body, true))
+                    let through = || {
+                        holder.is_some_and(|m| {
+                            let body = Sample {
+                                t: 0.0,
+                                d: 0.0,
+                                rect: m.rect,
+                                way: m.way,
+                                pass: m.pass,
+                            };
+                            next.iter().any(|c| {
+                                in_bounds(c, &m.rect)
+                                    && c.samples.iter().any(|s| conflict(s, &body, true))
+                            })
                         })
-                    });
-                    let waits = !through
-                        && (holder.is_some_and(|m| m.waits == Some(a.key))
-                            || reaches(&on_road, h.key, a.key));
+                    };
+                    let waits = || {
+                        !through()
+                            && (holder.is_some_and(|m| m.waits == Some(a.key))
+                                || on_road.reaches(h.key, a.key))
+                    };
+                    // (Whether it's in the way at all first: the rest only for those that are.)
                     h.key != a.key
-                        && !waits
-                        && !self.passing.contains(&(a.key, h.key))
                         && next
                             .iter()
                             .any(|c| overlaps((c, &c.samples[mine(c, h.key)]), (&h.claim, rest)))
+                        && !self.passing.contains(&(a.key, h.key))
+                        && !waits()
                 })
                 .map(|h| h.key)
                 .collect();
@@ -2415,17 +2465,19 @@ impl Traffic {
                 // alone. No stream of others waiting their turn after it round about holds it up
                 // for good, and no ring of them either.)
                 let old = tick > e.tick + OLD_ASK;
-                let first = if old {
-                    reaches(&graph, e.key, a.key)
-                } else {
-                    bodies_of.contains(&a.key) || reaches(&graph, e.key, a.key)
+                let first = || {
+                    if old {
+                        waits_round.reaches(e.key, a.key)
+                    } else {
+                        bodies_of.contains(&a.key) || waits_round.reaches(e.key, a.key)
+                    }
                 };
-                !first
-                    && next.iter().any(|c| {
-                        e.parts.iter().any(|(_, o)| {
-                            overlaps((c, &c.samples[mine(c, e.key)]), (o, &o.samples))
-                        })
-                    })
+                // (Whether it's in the way at all first: who goes first only for those that are.)
+                next.iter().any(|c| {
+                    e.parts
+                        .iter()
+                        .any(|(_, o)| overlaps((c, &c.samples[mine(c, e.key)]), (o, &o.samples)))
+                }) && !first()
             };
             fifo.push((
                 i,
@@ -2452,6 +2504,16 @@ impl Traffic {
             let mut bodies = Vec::new();
             let mut coming = Vec::new();
             for m in &self.movers {
+                // (Nowhere near any of its parts, nor on the move or backing up into them: it's in
+                // no way of this one, `hit` below finding nothing.)
+                let turning = self.turning.iter().find(|t| t.0 == m.key);
+                let near = |r: &Rect| next.iter().any(|c| in_bounds(c, r));
+                if !near(&m.rect)
+                    && !m.ahead.iter().any(near)
+                    && !turning.is_some_and(|(_, path)| path.iter().any(near))
+                {
+                    continue;
+                }
                 if m.key == a.key
                     || m.parked
                     || behind_me(m.key)
@@ -2478,7 +2540,7 @@ impl Traffic {
                 };
                 // (Not one that waits for this one, however far round: it's to go on first; but
                 // for one standing where its way goes through, as for a claim's holder (rule 1).)
-                if reaches(&graph, m.key, a.key) && !hit(&m.rect, true) {
+                if waits_round.reaches(m.key, a.key) && !hit(&m.rect, true) {
                     continue;
                 }
                 let inside = hit(&m.rect, strict);
@@ -2487,12 +2549,8 @@ impl Traffic {
                 // it has the way there (`cars::drive_on`). Let into a narrow stretch whose far end
                 // that was, one came up nose to nose with it there, the one turning round waiting
                 // for its claim and that one for its body, for good, Mirrorshore.)
-                let backs_in = !inside
-                    && self
-                        .turning
-                        .iter()
-                        .find(|t| t.0 == m.key)
-                        .is_some_and(|(_, path)| path.iter().any(|r| hit(r, true)));
+                let backs_in =
+                    !inside && turning.is_some_and(|(_, path)| path.iter().any(|r| hit(r, true)));
                 let on_into = backs_in || m.moving && m.ahead.iter().any(|r| hit(r, false));
                 if !inside && on_into {
                     coming.push(m.key);
@@ -2564,6 +2622,42 @@ impl Traffic {
             self.asks[i].reach = reach;
         }
         self.asks.retain(|a| !a.parts.is_empty());
+    }
+}
+
+/// Who waits for whom (`graph`), and whom each waits for however far round, worked out once for
+/// each asked about (`reaches`).
+struct Reaches {
+    graph: std::collections::BTreeMap<u64, Vec<u64>>,
+    found: std::cell::RefCell<std::collections::HashMap<u64, std::collections::HashSet<u64>>>,
+}
+
+impl Reaches {
+    fn new(graph: std::collections::BTreeMap<u64, Vec<u64>>) -> Reaches {
+        Reaches {
+            graph,
+            found: Default::default(),
+        }
+    }
+
+    /// Whether `from` waits for `to`, however far round (`reaches`).
+    fn reaches(&self, from: u64, to: u64) -> bool {
+        let mut found = self.found.borrow_mut();
+        let round = found.entry(from).or_insert_with(|| {
+            let mut seen = std::collections::HashSet::new();
+            let mut todo = vec![from];
+            while let Some(k) = todo.pop() {
+                for &x in self.graph.get(&k).into_iter().flatten() {
+                    if seen.insert(x) {
+                        todo.push(x);
+                    }
+                }
+            }
+            seen
+        });
+        let out = round.contains(&to);
+        debug_assert_eq!(out, reaches(&self.graph, from, to));
+        out
     }
 }
 
