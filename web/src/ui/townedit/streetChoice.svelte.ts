@@ -6,7 +6,10 @@
 
 import type { RoadKind } from '../../core/protocol';
 
-/** The kind asked for; `auto`: as `drawStreet` chooses by where it runs (a street of the town or village it runs in, else a country road). */
+/**
+ * The kind asked for; `auto`: as `drawStreet` chooses by where it runs (a street of the town or village it runs in,
+ * else a country road). A street or a lane asked for stays one out of town too (`StreetStroke.asked`).
+ */
 export type StreetKindChoice = 'auto' | 'street' | 'lane' | 'country' | 'trail';
 /** What goes along a new street: homes from the area's lot mix, the town's other buildings, both, or nothing; `auto`: by where it runs (`alongFor`). */
 export type Along = 'auto' | 'homes' | 'buildings' | 'both' | 'none';
