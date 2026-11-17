@@ -148,6 +148,9 @@
       keepHouses(made);
       menuScene.prepare(made.draft, made.preview);
       app.layout = { draft: made.draft, key, proposal: made.proposal, edited: false, plan: made.plan ?? made.proposal.plan, ...(made.marks ? { marks: made.marks } : {}) };
+      // (Pieces of dry land the water cut off with no bridge to them: no village there.)
+      const unreached = made.proposal.plan.diagnostics?.pieces ?? [];
+      if (unreached.length) toast(unreached.length === 1 ? unreached[0] : `${unreached[0]} And ${unreached.length - 1} more such ${unreached.length === 2 ? 'piece' : 'pieces'}.`);
       // (A new proposal builds its town from the build's first seed: the code's own town.)
       app.buildSeed = 0;
       name = app.townName ?? made.draft.name;
@@ -158,6 +161,8 @@
     } catch (err) {
       if (err instanceof Superseded) return;
       console.error('[layout] laying out the streets failed:', err);
+      // (A layout laid on another land is no layout for this one.)
+      if (app.layout && !app.layout.key.startsWith(`${land.key}|`)) app.layout = null;
       // (On a shaped land the generator says why it couldn't: no dry land big enough.)
       toast(err instanceof Error && err.message && app.land?.draft.open?.land?.edited ? err.message : 'The streets could not be laid out. Try another layout.');
     } finally {
@@ -236,24 +241,25 @@
     return a ? { w: a.w, d: a.d } : { w: 220, d: 180 };
   }
 
-  /** The box's corner for the town centred on (`x`, `z`), kept on the land. */
+  /** The middle of the town's box centred on (`x`, `z`), kept so the box is on the land (the generator's `site`: `macro.ts` `LayOptions`). */
   function siteAt(x: number, z: number): Pt {
     const box = boxOf(town);
     const W = app.land?.draft.width ?? LAND_SIZE[code.size];
     const D = app.land?.draft.depth ?? LAND_SIZE[code.size];
-    const clamp = (v: number, hi: number) => Math.round(Math.max(0, Math.min(hi, v)));
-    return [clamp(x - box.w / 2, W - box.w), clamp(z - box.d / 2, D - box.d)];
+    const clamp = (v: number, half: number, size: number) => Math.round(Math.max(half, Math.min(size - half, v)));
+    return [clamp(x, box.w / 2, W), clamp(z, box.d / 2, D)];
   }
 
-  /** The box at `site`, on screen (at the land's height under the pointer `y`). */
+  /** The box round `site` (its middle), on screen (at the land's height under the pointer `y`). */
   function boxGhost(site: Pt, y: number): string {
     const box = boxOf(town);
     const out = { x: 0, y: 0 };
+    const [x0, z0] = [site[0] - box.w / 2, site[1] - box.d / 2];
     const corners: [number, number][] = [
-      [site[0], site[1]],
-      [site[0] + box.w, site[1]],
-      [site[0] + box.w, site[1] + box.d],
-      [site[0], site[1] + box.d],
+      [x0, z0],
+      [x0 + box.w, z0],
+      [x0 + box.w, z0 + box.d],
+      [x0, z0 + box.d],
     ];
     const points: string[] = [];
     for (const [x, z] of corners) {

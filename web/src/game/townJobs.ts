@@ -32,8 +32,8 @@ export type TownJob =
    * by default) with `options` over the land's own, its land settled under it as a new world's is
    * (the `world` job's); named `name`, else as the land is. `site`: the middle of its main town
    * (else the plan's site); `waterKept`: the land's water is as its plan has it (its river is
-   * bridged as a new world's; else the town goes on the largest piece of dry land and no bridge is
-   * laid). `macro.ts` `layOn`.
+   * bridged as a new world's; else the town goes on a piece of dry land and, with villages, a village
+   * on every other piece a bridge could reach, bridged to it). `macro.ts` `layOn`.
    */
   | { kind: 'town'; land: NeighbourhoodDraft; seed: number; name?: string; options: Partial<WorldOptions>; site?: Pt; waterKept: boolean }
   /**

@@ -5,8 +5,9 @@
 // it was, said in the edit's notes and the Problems list; the village removed, and a generated one,
 // with the area indexes on everything else numbered again and nothing left naming one that is gone;
 // a village's only road removed taking its empty area with it; a site in the water or too near another
-// area refused, and a small 640 m land refusing every site cleanly. The settle (the `edit` job) takes
-// the village placed and moved.
+// area refused, and a small 640 m land refusing every site cleanly; a village across a river painted over the
+// land bridged to the town, the water under its bridge water again once it is removed. The settle (the `edit`
+// job) takes the village placed and moved.
 // `SLOW_TESTS=1 bun test tests/editVillages.slow.test.ts`.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
@@ -38,6 +39,9 @@ describe("step 2's villages", async () => {
   const { editedProblems } = await import('../src/game/edit/checked');
   const { COURT, evenly, leftOf, lengths, nearest, pointAt, RoadIndex } = await import('../src/game/roads');
   const { entryOf } = await import('../src/game/edit/ground');
+  const { deckTiles } = await import('../src/game/macro');
+  const { unrle } = await import('../src/game/landMasks');
+  const { wetTile } = await import('../src/game/landEdit');
   type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
   type TownJob = import('../src/game/townJobs').TownJob;
@@ -440,6 +444,61 @@ describe("step 2's villages", async () => {
       expect('refused' in refused ? refused.refused : null).toBe(`with ${name} moved, Test Lane would end 70 m past the last road it meets, with homes on it past a dead end's ${COURT} m`);
     }
   }, 120_000);
+
+  test('a village across a painted river gets a bridge; removed, the water under the bridge is water again', () => {
+    const options: Partial<WorldOptions> = { town: 'village', villages: 'none', size: 'large' };
+    const land = inWorker({ kind: 'land', world: 'country', seed: 11, options }).draft;
+    // A river 30 m across the land, its banks wavering as a painted one's do, 180 m off the town's site (carved straight into the land).
+    const site = land.open!.plan!.site;
+    const z0 = site[1] > land.depth / 2 ? site[1] - 180 : site[1] + 180;
+    const was = land.open!.land!;
+    const shaped = { ...was, h: was.h.slice(), wl: was.wl.slice(), cover: was.cover.slice(), edited: true };
+    for (let j = 0; j < shaped.rows; j++) {
+      for (let i = 0; i < shaped.cols; i++) {
+        if (Math.abs(j * 2 - z0 + 3 * Math.sin(i / 4)) >= 15) continue;
+        shaped.h[j * shaped.cols + i] = Math.min(shaped.h[j * shaped.cols + i], -150);
+        shaped.wl[j * shaped.cols + i] = -40;
+      }
+    }
+    const town = inWorker({ kind: 'town', land: { ...land, open: { ...land.open!, land: shaped } }, seed: 11, options, waterKept: false });
+    const base = town.plan!;
+    expect(base.open!.areas.length).toBe(1);
+    expect(base.roads.some((r) => r.bridge)).toBe(false);
+    // A site across the river from the town (the nearest the river first).
+    const far = (z: number) => (z < z0) !== (site[1] < z0);
+    let at: Pt | null = null;
+    for (let d = 140; d < base.depth && !at; d += 20) {
+      const z = site[1] < z0 ? z0 + d : z0 - d;
+      if (z < 60 || z > base.depth - 60) break;
+      for (let x = 100; x < base.width - 100 && !at; x += 20) if (far(z) && !('refused' in canPlaceVillage(base, t, { x, z, swap: false }))) at = [x, z];
+    }
+    expect(at).not.toBeNull();
+    const e = done(placeVillage(base, t, content, { x: at![0], z: at![1], swap: false, seed: 3 }));
+    const d = e.draft;
+    expect(e.notes).toBeUndefined();
+    const v = d.open!.areas.length - 1;
+    const village = d.open!.areas[v].name;
+    // A bridge to it, of the generator's length at most, its deck walked dry.
+    const bridge = d.roads.find((r) => r.bridge && r.bridge[1] > r.bridge[0]);
+    expect(bridge?.name).toBe(`${village} Bridge`);
+    expect(bridge!.bridge![1] - bridge!.bridge![0]).toBeLessThanOrEqual(45);
+    const W = d.width;
+    const deck: number[] = [];
+    deckTiles(bridge!, bridge!.bridge!, W, d.depth, (tile) => deck.push(tile));
+    const wetLand = (tile: number) => wetTile(d.open!.land!, tile % W, Math.floor(tile / W));
+    const under = deck.filter(wetLand);
+    expect(under.length).toBeGreaterThan(50);
+    const dry = unrle(d.open!.water, W * d.depth);
+    expect(under.every((tile) => dry[tile] === 0)).toBe(true);
+    // One network, the village on it; nothing new about bridges, decks or networks among the town's checks.
+    expect(hardNew(d, base).filter((line) => /bridge|deck|network|no road/i.test(line))).toEqual([]);
+    expect(blocking(d, base)).toEqual([]);
+    // Removed: its bridge with it, the water under it water again.
+    const gone = done(removeVillage(d, t, v)).draft;
+    expect(gone.roads.some((r) => r.bridge)).toBe(false);
+    const walk = unrle(gone.open!.water, W * gone.depth);
+    expect(under.every((tile) => walk[tile] === 1)).toBe(true);
+  }, 180_000);
 
   test('on a small 640 m land no village fits, and placing one is refused cleanly', () => {
     const small = laid('country', 21, { town: 'village', villages: 'few', size: 'small' });

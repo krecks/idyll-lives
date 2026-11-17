@@ -178,12 +178,13 @@ export function proposalOf(town: Pick<LaidTown, 'draft' | 'plan' | 'marks'>, t: 
   const built = withLayer(town.draft, layer);
   const from = town.plan ?? town.draft;
   const roadsFailed = from.diagnostics?.roads;
+  const pieces = from.diagnostics?.pieces;
   const plan: NeighbourhoodDraft = {
     ...from,
     slots: [],
     households: [],
     ...(from.open ? { open: { ...from.open, backdrop: [], places: [], parking: [], pads: {}, uses: layer } } : {}),
-    diagnostics: { dropped: [], ...(roadsFailed ? { roads: roadsFailed } : {}) },
+    diagnostics: { dropped: [], ...(roadsFailed ? { roads: roadsFailed } : {}), ...(pieces ? { pieces } : {}) },
   };
   return { plan, built, hash: layoutHash(plan), ...(town.plan ? { builtPlan: town.plan, builtMarks: town.marks ?? [] } : {}) };
 }
