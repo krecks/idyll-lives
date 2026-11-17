@@ -16,7 +16,13 @@ pub fn place(forward: f64) {
         -(lo[0] + hi[0]) / 2.0,
         -(lo[1] + hi[1]) / 2.0
     ));
-    settle_with(&meshes(), Settle { centre: false, floor: true });
+    settle_with(
+        &meshes(),
+        Settle {
+            centre: false,
+            floor: true,
+        },
+    );
 }
 
 /// A heart's outline round (cx, cy), about `r` across from its middle.
@@ -35,6 +41,8 @@ pub fn heart(cx: f64, cy: f64, r: f64, n: usize) -> Vec<(f64, f64)> {
 /// gamekit's `kit.fillet`, until the kit has it: the path through `points` (any axes) with each inner corner
 /// rounded to about `radius` (`steps` points round it, on a curve that never overshoots, however uneven the
 /// spacing). For handles, bent rails and draped cloth swept with `resolution` 1.
+// (3.1415 is the script's own limit for a straight corner, not pi.)
+#[allow(clippy::approx_constant)]
 pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
     let pts: Vec<V3> = points.iter().map(|&p| V3::from(p)).collect();
     let mut out = vec![pts[0]];
@@ -55,5 +63,7 @@ pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64
         }
     }
     out.push(pts[pts.len() - 1]);
-    out.iter().map(|p| (p.x as f64, p.y as f64, p.z as f64)).collect()
+    out.iter()
+        .map(|p| (p.x as f64, p.y as f64, p.z as f64))
+        .collect()
 }
