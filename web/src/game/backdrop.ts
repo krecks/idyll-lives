@@ -446,6 +446,8 @@ export interface Civic {
   name: (n: Namer) => string;
   work: string[];
   least: TownSize;
+  /** The layout its lot is built from (`houses.json` `parks` of kind `place`) in a place of each size: `placeLots.ts` `placeTemplate`. */
+  templates: Partial<Record<TownSize, string>>;
   /** What a card calls it in a smaller place than a town (a village's hall is its village hall): `civicLabel`. */
   labels?: Partial<Record<TownSize, string>>;
   /** Its gable end to the road (a church): deeper than wide, the ridge running back from the road. */
@@ -454,29 +456,46 @@ export interface Civic {
 }
 /** The town sizes, smallest first. */
 const SIZES: readonly TownSize[] = ['hamlet', 'village', 'town', 'city'];
+/** The same layout in a place of any size (`Civic.templates`). */
+const every = (id: string): Record<TownSize, string> => ({ hamlet: id, village: id, town: id, city: id });
 /** The civic places, in the order a main town lays them (an index into this is a civic place's in step 2's choices: `civicChoices`). */
 export const CIVIC: readonly Civic[] = [
   // (A hamlet's hall is its parish's, a village's its own: the careers no other place takes work there.)
-  { label: 'Town hall', kind: K('office', [16, 20], [12, 14], [3, 3], ['hip', 'mansard']), place: 'office', name: (n) => `${n.town} ${{ hamlet: 'Parish Hall', village: 'Village Hall', town: 'Town Hall', city: 'Town Hall' }[n.size]}`, work: ['politics'], least: 'hamlet', labels: { hamlet: 'Parish hall', village: 'Village hall' }, known: / (Parish|Village|Town) Hall$/ },
-  { label: 'Church', kind: K('church', [11, 13], [22, 28], [3, 3], ['gable']), place: 'church', name: (n) => `St ${pick(n.rand, SAINTS)}'s Church`, work: [], least: 'hamlet', endOn: true, known: /^St .+'s Church$/ },
-  { label: 'School', kind: K('school', [28, 36], [14, 18], [2, 2], ['hip', 'flat']), place: 'school', name: (n) => `${n.town} School`, work: ['education'], least: 'village', known: / School$/ },
-  { label: 'Police station', kind: K('office', [12, 16], [11, 13], [2, 3], ['flat', 'hip']), place: 'office', name: (n) => `${n.town} Police Station`, work: ['detective'], least: 'town', known: / Police Station$/ },
-  { label: 'Fire station', kind: K('workshop', [16, 20], [14, 16], [2, 2], ['flat']), place: 'workshop', name: (n) => `${n.town} Fire Station`, work: ['firefighter'], least: 'town', known: / Fire Station$/ },
-  { label: 'Medical centre', kind: K('office', [14, 18], [11, 13], [2, 2], ['flat', 'hip']), place: 'office', name: (n) => `${n.street()} Medical Centre`, work: ['medicine'], least: 'town', known: / Medical Centre$/ },
-  { label: 'Leisure centre', kind: K('workshop', [22, 28], [16, 20], [2, 2], ['flat']), place: 'workshop', name: (n) => `${n.town} Leisure Centre`, work: ['sports'], least: 'town', known: / Leisure Centre$/ },
-  { label: 'Bank', kind: K('office', [12, 16], [11, 13], [3, 4], ['flat', 'mansard']), place: 'office', name: (n) => `${n.last()} Bank`, work: ['finance', 'business'], least: 'town', known: / Bank$/ },
-  { label: 'Newspaper', kind: K('office', [12, 16], [11, 13], [3, 4], ['flat']), place: 'office', name: (n) => `The ${n.town} Gazette`, work: ['journalism', 'tv', 'influencer'], least: 'town', known: /^The .+ Gazette$/ },
-  { label: 'Works', kind: K('office', [16, 22], [12, 15], [3, 5], ['flat']), place: 'office', name: (n) => `${n.street()} Works`, work: ['it', 'science'], least: 'town', known: / Works$/ },
-  { label: 'Solicitors', kind: K('office', [9, 12], [10, 12], [3, 3], ['mansard', 'gable']), place: 'office', name: (n) => `${n.last()} & ${n.last()} Solicitors`, work: ['law'], least: 'town', known: / Solicitors$/ },
-  { label: 'Army reserve centre', kind: K('office', [12, 16], [11, 13], [2, 2], ['flat']), place: 'office', name: () => 'Army Reserve Centre', work: ['military'], least: 'town', known: /^Army Reserve Centre/ },
-  { label: 'Garage', kind: K('workshop', [14, 18], [12, 14], [1, 2], ['flat', 'gable']), place: 'workshop', name: (n) => `${n.last()}'s Garage`, work: ['mechanics', 'transport'], least: 'village', known: /'s Garage$/ },
-  { label: 'Builders', kind: K('workshop', [14, 18], [12, 14], [1, 2], ['gable']), place: 'workshop', name: (n) => `${n.last()} Builders`, work: ['trades'], least: 'village', known: / Builders$/ },
-  { label: 'Studios', kind: K('workshop', [10, 14], [10, 12], [2, 2], ['gable']), place: 'workshop', name: (n) => `${n.street()} Studios`, work: ['arts'], least: 'village', known: / Studios$/ },
-  { label: 'Inn', kind: K('restaurant', [12, 16], [12, 14], [2, 3], ['gable', 'hip']), place: 'restaurant', name: (n) => n.inn(), work: ['culinary', 'hospitality', 'music'], least: 'hamlet', known: /^The \S+ \S+$/ },
-  { label: 'Hotel', kind: K('restaurant', [16, 22], [12, 14], [3, 4], ['mansard', 'hip']), place: 'restaurant', name: (n) => `The ${n.town} Hotel`, work: ['hospitality'], least: 'town', known: / Hotel$/ },
-  { label: 'Boutique', kind: K('shop', [8, 10], [10, 12], [2, 3], ['gable', 'mansard']), place: 'shop', name: (n) => (n.size === 'hamlet' ? `${n.last()}'s Village Shop` : `${n.last()}'s Boutique`), work: ['fashion', 'retail'], least: 'hamlet', labels: { hamlet: 'Village shop' }, known: /'s (Village Shop|Boutique)$/ },
-  { label: 'Garden centre', kind: K('shop', [14, 20], [12, 16], [1, 1], ['flat', 'gable']), place: 'shop', name: (n) => `${n.town} Garden Centre`, work: ['nature', 'retail'], least: 'village', known: / Garden Centre$/ },
+  { label: 'Town hall', kind: K('office', [16, 20], [12, 14], [3, 3], ['hip', 'mansard']), place: 'office', name: (n) => `${n.town} ${{ hamlet: 'Parish Hall', village: 'Village Hall', town: 'Town Hall', city: 'Town Hall' }[n.size]}`, work: ['politics'], least: 'hamlet', templates: { hamlet: 'parishHall', village: 'parishHall', town: 'townHall', city: 'townHall' }, labels: { hamlet: 'Parish hall', village: 'Village hall' }, known: / (Parish|Village|Town) Hall$/ },
+  { label: 'Church', kind: K('church', [11, 13], [22, 28], [3, 3], ['gable']), place: 'church', name: (n) => `St ${pick(n.rand, SAINTS)}'s Church`, work: [], least: 'hamlet', templates: every('church'), endOn: true, known: /^St .+'s Church$/ },
+  { label: 'School', kind: K('school', [28, 36], [14, 18], [2, 2], ['hip', 'flat']), place: 'school', name: (n) => `${n.town} School`, work: ['education'], least: 'village', templates: every('school'), known: / School$/ },
+  { label: 'Police station', kind: K('office', [12, 16], [11, 13], [2, 3], ['flat', 'hip']), place: 'office', name: (n) => `${n.town} Police Station`, work: ['detective'], least: 'town', templates: every('police'), known: / Police Station$/ },
+  { label: 'Fire station', kind: K('workshop', [16, 20], [14, 16], [2, 2], ['flat']), place: 'workshop', name: (n) => `${n.town} Fire Station`, work: ['firefighter'], least: 'town', templates: every('fireStation'), known: / Fire Station$/ },
+  { label: 'Medical centre', kind: K('office', [14, 18], [11, 13], [2, 2], ['flat', 'hip']), place: 'office', name: (n) => `${n.street()} Medical Centre`, work: ['medicine'], least: 'town', templates: every('medical'), known: / Medical Centre$/ },
+  { label: 'Leisure centre', kind: K('workshop', [22, 28], [16, 20], [2, 2], ['flat']), place: 'workshop', name: (n) => `${n.town} Leisure Centre`, work: ['sports'], least: 'town', templates: every('leisure'), known: / Leisure Centre$/ },
+  { label: 'Bank', kind: K('office', [12, 16], [11, 13], [3, 4], ['flat', 'mansard']), place: 'office', name: (n) => `${n.last()} Bank`, work: ['finance', 'business'], least: 'town', templates: every('bank'), known: / Bank$/ },
+  { label: 'Newspaper', kind: K('office', [12, 16], [11, 13], [3, 4], ['flat']), place: 'office', name: (n) => `The ${n.town} Gazette`, work: ['journalism', 'tv', 'influencer'], least: 'town', templates: every('newspaper'), known: /^The .+ Gazette$/ },
+  { label: 'Works', kind: K('office', [16, 22], [12, 15], [3, 5], ['flat']), place: 'office', name: (n) => `${n.street()} Works`, work: ['it', 'science'], least: 'town', templates: every('works'), known: / Works$/ },
+  { label: 'Solicitors', kind: K('office', [9, 12], [10, 12], [3, 3], ['mansard', 'gable']), place: 'office', name: (n) => `${n.last()} & ${n.last()} Solicitors`, work: ['law'], least: 'town', templates: every('solicitors'), known: / Solicitors$/ },
+  { label: 'Army reserve centre', kind: K('office', [12, 16], [11, 13], [2, 2], ['flat']), place: 'office', name: () => 'Army Reserve Centre', work: ['military'], least: 'town', templates: every('armyReserve'), known: /^Army Reserve Centre/ },
+  { label: 'Garage', kind: K('workshop', [14, 18], [12, 14], [1, 2], ['flat', 'gable']), place: 'workshop', name: (n) => `${n.last()}'s Garage`, work: ['mechanics', 'transport'], least: 'village', templates: every('garage'), known: /'s Garage$/ },
+  { label: 'Builders', kind: K('workshop', [14, 18], [12, 14], [1, 2], ['gable']), place: 'workshop', name: (n) => `${n.last()} Builders`, work: ['trades'], least: 'village', templates: every('builders'), known: / Builders$/ },
+  { label: 'Studios', kind: K('workshop', [10, 14], [10, 12], [2, 2], ['gable']), place: 'workshop', name: (n) => `${n.street()} Studios`, work: ['arts'], least: 'village', templates: every('studios'), known: / Studios$/ },
+  { label: 'Inn', kind: K('restaurant', [12, 16], [12, 14], [2, 3], ['gable', 'hip']), place: 'restaurant', name: (n) => n.inn(), work: ['culinary', 'hospitality', 'music'], least: 'hamlet', templates: every('inn'), known: /^The \S+ \S+$/ },
+  { label: 'Hotel', kind: K('restaurant', [16, 22], [12, 14], [3, 4], ['mansard', 'hip']), place: 'restaurant', name: (n) => `The ${n.town} Hotel`, work: ['hospitality'], least: 'town', templates: every('hotel'), known: / Hotel$/ },
+  { label: 'Boutique', kind: K('shop', [8, 10], [10, 12], [2, 3], ['gable', 'mansard']), place: 'shop', name: (n) => (n.size === 'hamlet' ? `${n.last()}'s Village Shop` : `${n.last()}'s Boutique`), work: ['fashion', 'retail'], least: 'hamlet', templates: { hamlet: 'villageShop', village: 'boutique', town: 'boutique', city: 'boutique' }, labels: { hamlet: 'Village shop' }, known: /'s (Village Shop|Boutique)$/ },
+  { label: 'Garden centre', kind: K('shop', [14, 20], [12, 16], [1, 1], ['flat', 'gable']), place: 'shop', name: (n) => `${n.town} Garden Centre`, work: ['nature', 'retail'], least: 'village', templates: every('gardenCentre'), known: / Garden Centre$/ },
 ];
+/** What a named place of the other kinds is (a backdrop place that is no civic one: `placeOf`). */
+export type ZoneKind = 'shop' | 'cafe' | 'restaurant' | 'office' | 'workshop' | 'farm';
+/**
+ * The named places besides the civic ones, by kind, as lots (`placeLots.ts`): the layouts a lot of
+ * the kind is built from (`houses.json` `parks` of kind `place`, one drawn for each), and the kind of
+ * building it looks like from outside (its storeys and roof: `LotLook`).
+ */
+export const ZONE: Record<ZoneKind, { templates: readonly string[]; kind: Kind }> = {
+  shop: { templates: ['shopSmall', 'shopGoods'], kind: K('shop', [10, 12], [10, 12], [2, 3], ['gable', 'flat', 'mansard']) },
+  cafe: { templates: ['cafeSmall'], kind: K('cafe', [10, 12], [10, 12], [2, 3], ['gable', 'mansard']) },
+  restaurant: { templates: ['restaurant'], kind: K('restaurant', [13, 15], [12, 14], [2, 3], ['gable', 'hip']) },
+  office: { templates: ['officeSuite'], kind: K('office', [15, 17], [12, 14], [2, 4], ['flat', 'mansard', 'hip']) },
+  workshop: { templates: ['workshopUnit'], kind: K('workshop', [15, 17], [12, 14], [1, 2], ['gable', 'flat']) },
+  farm: { templates: ['farmShop'], kind: K('farm', [9, 11], [9, 11], [1, 2], ['gable']) },
+};
 const SAINTS = ['Mary', 'John', 'Peter', 'Michael', 'Andrew', 'James', 'Anne', 'Catherine', 'Luke', 'Margaret', 'Martin', 'Nicholas'];
 const SHOPS = ['Bakery', 'Butcher', 'Greengrocer', 'Bookshop', 'Hardware', 'Chemist', 'Florist', 'Newsagent', 'Toy Shop', 'Deli', 'Tailor', 'Cobbler', 'Fishmonger', 'Gift Shop', 'Bike Shop', 'Record Shop', 'Sweet Shop', 'Wool Shop', 'Antiques', 'Opticians'];
 const CAFES = ['Tea Rooms', 'Coffee House', 'Café', 'Kitchen', 'Espresso Bar', 'Tea Shop'];
@@ -502,7 +521,7 @@ export const LOT_HOURS: NonNullable<TownPlace['hours']> = { open: 7 * 60, close:
 /** The careers working at the sim's public places, by template. */
 export const LOT_WORK: Record<string, string[]> = { cafe: ['culinary', 'hospitality'], grocer: ['retail'], bakery: ['culinary', 'retail'], market: ['retail', 'nature'] };
 /** The careers working at a backdrop place of a kind besides the civic ones. */
-const KIND_WORK: Partial<Record<TownPlace['kind'], string[]>> = { shop: ['retail'], cafe: ['culinary', 'hospitality'], restaurant: ['culinary', 'hospitality'], office: ['business'], workshop: ['trades'], farm: ['nature'] };
+export const KIND_WORK: Partial<Record<TownPlace['kind'], string[]>> = { shop: ['retail'], cafe: ['culinary', 'hospitality'], restaurant: ['culinary', 'hospitality'], office: ['business'], workshop: ['trades'], farm: ['nature'] };
 const PLACE_KINDS: readonly TownPlace['kind'][] = ['shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'workshop', 'farm'];
 
 /** Opening hours for a place of `kind` where `work`'s careers work: the kind's, widened to every shift of theirs (a career's own and its tracks'). */
@@ -1373,7 +1392,7 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
 }
 
 /** A backdrop place's name (not a civic one's). */
-function placeName(kind: TownPlace['kind'], n: Namer): string {
+export function placeName(kind: TownPlace['kind'], n: Namer): string {
   switch (kind) {
     case 'shop':
       return n.rand() < 0.5 ? `${n.last()}'s ${pick(n.rand, SHOPS)}` : `${n.street()} ${pick(n.rand, SHOPS)}`;

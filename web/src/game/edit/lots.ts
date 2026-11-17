@@ -317,9 +317,9 @@ function moveBase(draft: NeighbourhoodDraft, t: Templates, slot: number): { base
 
 // ---- what goes on a new lot ----------------------------------------------------------------------
 
-/** The public places (not the outdoor ones) a lot of `frame` can be: the six that share one lot in the shipped content. */
+/** The public places (not the outdoor ones, nor the named places' buildings: `placeLots.ts`) a lot of `frame` can be: the six that share one lot in the shipped content. */
 export function publicChoices(t: Templates, frame: { width: number; depth: number } = t.plot): string[] {
-  return t.parks.filter((p) => p.kind !== 'outdoor' && (p.lot ?? t.plot).width === frame.width && (p.lot ?? t.plot).depth === frame.depth).map((p) => p.id);
+  return t.parks.filter((p) => p.kind !== 'outdoor' && p.kind !== 'place' && (p.lot ?? t.plot).width === frame.width && (p.lot ?? t.plot).depth === frame.depth).map((p) => p.id);
 }
 
 /** What `choice` puts on a new lot, drawn from `seed` (the same seed, the same house), or why it can't be. Its name comes later (`addLot`). */
