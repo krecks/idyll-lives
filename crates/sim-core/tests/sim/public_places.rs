@@ -1673,3 +1673,70 @@ fn nobody_uses_a_closed_places_things() {
     }
     assert!(used.is_empty(), "used at the shut market: {used:?}");
 }
+
+/// More posts in town than servers (`staff::MAX_STAFF`), as a city whose every named place is a lot
+/// may have: the first posts (by object, as the town file lists them) get a server each, the rest
+/// none and are self-serve; the snapshot and the views carry on, and a resident at a post past them
+/// helps themselves and pays.
+#[test]
+fn past_the_most_servers_the_other_posts_are_self_serve() {
+    let merged = common::content();
+    let (cols, rows) = (12, 12);
+    let objects: Vec<Value> = (0..rows)
+        .flat_map(|r| {
+            (0..cols).map(
+                move |c| json!({"def": "shopCounter", "x": 28 + 5 * c, "z": 2 + 4 * r, "rot": 0}),
+            )
+        })
+        .collect();
+    assert!(objects.len() > sim_core::staff::MAX_STAFF);
+    let lot = json!({
+        "width": 90, "depth": 52, "objects": objects,
+        "plots": [{"name": "Home", "x": 0, "z": 0, "w": 26, "d": 22, "entry": [13.0, 1.5]},
+                  {"name": "Arcade", "x": 26, "z": 0, "w": 64, "d": 52, "public": true, "entry": [27.5, 1.5]}],
+        "households": [{"name": "Ada's", "plot": 0, "player": true, "funds": 500}],
+        "sims": [{"name": "Ada", "traits": ["cheerful"], "x": 13.0, "z": 3.5}],
+    });
+    let mut w = World::from_json(&merged, &lot.to_string(), 7).unwrap();
+    w.autonomy = false;
+    until(&mut w, 10.0);
+    let staffed: Vec<u32> = w
+        .objects
+        .iter()
+        .filter(|o| w.staff.server_of(o.id).is_some())
+        .map(|o| o.id)
+        .collect();
+    assert_eq!(w.staff.servers.len(), sim_core::staff::MAX_STAFF);
+    assert_eq!(
+        staffed,
+        (0..sim_core::staff::MAX_STAFF as u32).collect::<Vec<_>>(),
+        "the first posts have a server each"
+    );
+    let mut out = vec![0.0; snapshot::CAPACITY];
+    snapshot::write(&w, &mut out);
+    sim_core::view::structure_json(&w);
+    let last = w.objects.last().unwrap().id;
+    assert_eq!(w.staff.server_of(last), None, "the last one has none");
+    let funds = w.households[0].funds;
+    w.apply(Command::Use {
+        sim: 0,
+        object: last,
+        interaction: interaction(&w, last, "treat"),
+    })
+    .unwrap();
+    let mut used = false;
+    for _ in 0..120 * TICKS_PER_MINUTE {
+        w.tick_once();
+        used |= w.sims[0].current().is_some_and(|a| {
+            matches!((a.task.kind, &a.phase), (TaskKind::Use { object, .. }, Phase::Using { .. }) if object == last)
+        });
+    }
+    assert!(used, "Ada helped herself at the last counter");
+    assert!(w.households[0].funds < funds, "and paid");
+    // The same posts staffed when the town is loaded again.
+    let again = World::from_json(&merged, &lot.to_string(), 7).unwrap();
+    let staff = sim_core::staff::plan(&again);
+    assert!(
+        staffed.iter().all(|&o| staff.server_of(o).is_some()) && staff.server_of(last).is_none()
+    );
+}
