@@ -41,7 +41,7 @@ import { openUnderBuilt, settleLand } from './landFollow';
 import { unrle } from './landMasks';
 import { AREA_APART, cells8, cornersOf, grown, hamletOf, parkingFor, terraceRows, trailTo, type AreaPlan } from './macro';
 import { mulberry32 } from './noise';
-import { BUILD_REACH, fronted, greenSpots, stretchesOf, type Stretch } from './proposal';
+import { BUILD_REACH, fronted, greenSpots, hatched, stretchesOf, type Stretch } from './proposal';
 import { inside, lengths, leftOf, pointAt, RoadIndex, type Pt } from './roads';
 import { boundsOf, frontageOf, generatedHouses, Ground, lotAt, LotPlacer, plotRect, slotDims, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates, type Unplaced } from './town';
 import { previewWorld } from './townPreview';
@@ -420,7 +420,11 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   const [W, D] = [plan.width, plan.depth];
   const layer = usesOfDraft(plan);
   const { cols, rows } = layer;
-  const codes = unpackUses(layer);
+  const painted0 = unpackUses(layer);
+  // (Land zoned too far from a road builds nothing, as step 2 hatches it: but a green that becomes an outdoor spot.)
+  const codes = painted0.slice();
+  const far = hatched(plan);
+  for (let k = 0; k < codes.length; k++) if (far[k]) codes[k] = 0;
   const full = !base || seed !== PROPOSAL_SEED;
   const town = base ? withoutUses(base.builtPlan ?? base.built) : null;
 
@@ -430,10 +434,10 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   if (full) {
     dirty.fill(1);
     zoned = new Uint8Array(codes.length);
-    for (let k = 0; k < codes.length; k++) zoned[k] = codes[k] ? 1 : 0;
+    for (let k = 0; k < codes.length; k++) zoned[k] = painted0[k] ? 1 : 0;
   } else {
     const was = unpackUses(usesOfDraft(base!.plan));
-    for (let k = 0; k < codes.length; k++) if (codes[k] !== was[k]) dirty[k] = 1;
+    for (let k = 0; k < codes.length; k++) if (painted0[k] !== was[k]) dirty[k] = 1;
     dirty = grown(dirty, cols, rows, DIRTY_GROW);
   }
 
