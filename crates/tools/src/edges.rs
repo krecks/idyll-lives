@@ -661,10 +661,17 @@ impl Solid {
     }
 
     /// Whether an edge's point `p` shows, `out` the way between its faces: pushed `OUT` that way it is seen from
-    /// two or more of the play camera's `views` on its side, and neither of its faces (normal, the way into it from
+    /// two or more of the play camera's `views` on its side (of those `from` takes), and neither of its faces (normal, the way into it from
     /// the edge) is covered: `OUT` in from the edge another face lies on it or within `OUT` in front of it, or it
     /// goes into something before it is `WIDTH` wide.
-    fn shows(&self, p: V3, out: V3, faces: [(V3, V3); 2], last: &mut Hid) -> bool {
+    fn shows(
+        &self,
+        p: V3,
+        out: V3,
+        faces: [(V3, V3); 2],
+        last: &mut Hid,
+        from: &(dyn Fn(V3) -> bool + Sync),
+    ) -> bool {
         if faces
             .iter()
             .any(|&(n, into)| self.near(add(p, mul(into, OUT)), n, OUT))
@@ -677,7 +684,7 @@ impl Solid {
             .iter()
             .enumerate()
             .map(|(i, way)| (dot(*way, out), i))
-            .filter(|(facing, _)| *facing > 0.0)
+            .filter(|(facing, i)| *facing > 0.0 && from(views()[*i]))
             .collect();
         ways.sort_by(|a, b| b.0.total_cmp(&a.0));
         let seen = ways
@@ -743,6 +750,12 @@ fn spread<T: Send, K>(
 
 /// The hard edges of a shape that show unbevelled (the module's rule), the longest first.
 pub fn hard_edges(meshes: &[Mesh]) -> Vec<Edge> {
+    hard_edges_from(meshes, &|_| true)
+}
+
+/// `hard_edges` where only the play camera's views `from` takes (each by the way to it) see the shape: a house
+/// with the walls on one side cut away is what the cameras on that side see, and no other.
+pub fn hard_edges_from(meshes: &[Mesh], from: &(dyn Fn(V3) -> bool + Sync)) -> Vec<Edge> {
     let shape = Shape::new(meshes);
     let mut pieces: Option<Vec<f64>> = None;
     let mut hard: Vec<Hard> = Vec::new();
@@ -852,7 +865,7 @@ pub fn hard_edges(meshes: &[Mesh]) -> Vec<Edge> {
                 let seen = (0..n)
                     .filter(|&k| {
                         let p = add(p0, mul(along, (k as f64 + 0.5) / n as f64));
-                        solid.shows(p, out_of(h), faces, last)
+                        solid.shows(p, out_of(h), faces, last, from)
                     })
                     .count();
                 h.length * seen as f64 / n as f64
