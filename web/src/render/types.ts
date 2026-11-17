@@ -463,6 +463,9 @@ export interface LandCursor {
   tone: 'up' | 'down' | 'water' | 'cover' | 'bad' | UseKind | 'erase';
 }
 
+/** What `Renderer.buildingAt` found. */
+export type BuildingHit = { kind: 'lot'; plot: number } | { kind: 'building'; index: number };
+
 export interface Renderer {
   init(canvas: HTMLCanvasElement): Promise<void>;
   /**
@@ -512,6 +515,12 @@ export interface Renderer {
   prepareAsset(key: string, kind: 'model' | 'wall' | 'floor'): void;
   /** Canvas-relative CSS pixel coordinates. */
   pick(x: number, y: number): PickResult;
+  /**
+   * The house or building the ray through canvas CSS pixel (`x`, `y`) meets first, other than the
+   * viewed lot's: a lot's house (`plot`) or a backdrop building (`WorldMeta.backdrop` index). Null
+   * when it meets none, or the viewed lot's ground first.
+   */
+  buildingAt(x: number, y: number): BuildingHit | null;
   /**
    * Where the ray of the last `pick` meets the level `height` metres above the floor in view (a
    * table top), in the lot's rows like `PickResult.ground`; null if it doesn't.

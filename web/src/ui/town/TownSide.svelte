@@ -10,6 +10,8 @@
   import { areaAt } from './places';
   import { eventText, nextEvents, waitText, type TodayMember } from './today';
   import { townHud } from './townHud.svelte';
+  import { chosenView } from './chosenView.svelte';
+  import { insideText } from './chosen';
 
   /**
    * The town view's left column: the tag the player clicked (one of your people, to
@@ -68,6 +70,15 @@
   });
   /** Why the buttons are greyed out, in a line. */
   const why = $derived([chosen?.plot != null && visitWhy ? `Visit: ${visitWhy}` : '', callWhy ? `Call: ${callWhy}` : ''].filter(Boolean).join(' · '));
+  /** The lot of the choice, to look inside (a house, a public place's lot); and whether it is shown open now, by "Look inside". */
+  const lookPlot = $derived(chosen?.kind === 'home' || chosen?.kind === 'place' ? chosen.plot : null);
+  const looking = $derived(lookPlot !== null && game.lookInside === lookPlot && game.viewPlot === lookPlot);
+  const detail = $derived(chosenView.detail);
+  const inside = $derived(chosenView.inside ? insideText(chosenView.inside) : '');
+  function close() {
+    townHud.chosen = null;
+    if (game.lookInside !== null) services.controls.lookInside(null);
+  }
   function visit() {
     if (chosen?.plot != null) services.controls.visit(chosen.plot);
     townHud.chosen = null;
@@ -83,14 +94,25 @@
     {#if chosen}
       <section class="card glass chosen" aria-label={chosen.title}>
         <header>
+          {#if chosenView.icon && chosen.kind !== 'person'}<span class="kind"><Icon name={chosenView.icon} size={15} /></span>{/if}
           <b>{chosen.title}</b>
-          <button class="close" aria-label="Close" onclick={() => (townHud.chosen = null)}><Icon name="icon.ui.close" size={13} /></button>
+          <button class="close" aria-label="Close" onclick={close}><Icon name="icon.ui.close" size={13} /></button>
         </header>
-        {#if chosen.detail}<p class="muted">{chosen.detail}</p>{/if}
+        {#if detail}<p class="muted">{detail}</p>{/if}
+        {#if inside}<p class="inside"><Icon name="icon.need.social" size={13} />{inside}</p>{/if}
         <div class="actions">
-          {#if chosen.plot !== null}
+          {#if chosen.plot !== null && chosen.plot !== home?.id}
             <button class="btn small primary" disabled={!!visitWhy} title={visitWhy ?? `${me?.name} goes to ${visitTo}`} onclick={visit}>
               <Icon name="icon.ui.home" size={14} />{me ? `${me.name}: visit` : 'Visit'}
+            </button>
+          {/if}
+          {#if looking}
+            <button class="btn small" title="Close the house up again" onclick={() => services.controls.lookInside(null)}>
+              <Icon name="icon.ui.wallsUp" size={14} />Close up
+            </button>
+          {:else if lookPlot !== null && game.viewPlot !== lookPlot}
+            <button class="btn small" title="Show the rooms inside" onclick={() => services.controls.lookInside(lookPlot)}>
+              <Icon name="icon.ui.wallsDown" size={14} />Look inside
             </button>
           {/if}
           {#if chosen.kind === 'person'}
@@ -165,6 +187,21 @@
   .chosen header b {
     flex: 1;
     font-size: 14px;
+  }
+  .kind {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    flex: none;
+    background: var(--accent);
+    color: #fff;
+  }
+  .inside {
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
   .close {
     display: grid;
