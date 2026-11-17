@@ -122,6 +122,15 @@ test('a rim one tile wide is a ridge, not a flat shelf at the eaves', () => {
   expect(Math.min(...mid)).toBeGreaterThan(corner[0] + 0.2);
 });
 
+test('no slope of it comes down under its eaves (each eave\'s slope went on past the eave\'s own ends, down through the rooms)', () => {
+  const roof = ring().parts.find((p) => p.name === 'roof');
+  const { pos } = roof!.geo;
+  let low = Infinity;
+  for (let i = 1; i < pos.length; i += 3) low = Math.min(low, pos[i]);
+  // The top of the roof at its eave line: WALL_HEIGHT (2.8) less OVERHANG (0.4) at PITCH (34°), and ROOF_THICKNESS (0.14).
+  expect(low).toBeCloseTo(2.8 - 0.4 * Math.tan((34 * Math.PI) / 180) + 0.14, 4);
+});
+
 test('a plain rectangle keeps the classic roof (a handful of faces, not a tile at a time)', () => {
   const world = twoStoreys();
   const plan = new HousePlanner().build(world, { x: 0, z: DEPTH, w: W, d: DEPTH }, { upper: true, covered: () => false });

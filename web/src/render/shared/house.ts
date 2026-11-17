@@ -2871,11 +2871,14 @@ interface RoofEdge {
 }
 
 /**
- * One hip roof over a roofed area that isn't a single rectangle: an L, a U, or the ring round a
- * storey that stands on this one. Every side of it is an eave, and the underside height is the
- * nearest eave's plus `pitch` × the distance to it, so the facets meet in hips, ridges and
- * valleys instead of butting together as separate roofs at every corner. An area is hipped even
- * where the style is a gable: it has no end to put a gable on.
+ * One hip roof over a roofed area that isn't a single rectangle: an L, a U, a house round a
+ * courtyard, or the ring round a storey that stands on this one. Every side of it is an eave, and
+ * the underside is the eave's height plus `pitch` × how far in a point is from the nearest eave,
+ * measured square to the walls (half the side of the largest square about it that stays inside
+ * the eaves). So two slopes meet in a hip over an outer corner, in a valley that runs up from an
+ * inner one and in a ridge between two eaves that face away from each other, and no slope comes
+ * down under its own eave. An area is hipped even where the style is a gable: it has no end to
+ * put a gable on.
  */
 function addRoofArea(
   inArea: (x: number, z: number) => boolean,
@@ -2894,78 +2897,88 @@ function addRoofArea(
   const slope = Math.sqrt(1 + pitch * pitch);
   const ye = base - overhang * pitch; // underside height at the eaves
   const d = T + overhang; // how far the eave line stands out from the area's edge
+  const roofed = (x: number, z: number) => x >= x0 && x < x1 && z >= z0 && z < z1 && inArea(x, z);
   // Every side of a roofed tile that doesn't face another roofed tile is an eave.
   const edges: RoofEdge[] = [];
   for (let z = z0; z < z1; z++) {
     for (let x = x0; x < x1; x++) {
-      if (!inArea(x, z)) continue;
-      if (!inArea(x, z - 1)) edges.push({ a: [x, z], b: [x + 1, z], nx: 0, nz: -1 });
-      if (!inArea(x + 1, z)) edges.push({ a: [x + 1, z], b: [x + 1, z + 1], nx: 1, nz: 0 });
-      if (!inArea(x, z + 1)) edges.push({ a: [x, z + 1], b: [x + 1, z + 1], nx: 0, nz: 1 });
-      if (!inArea(x - 1, z)) edges.push({ a: [x, z], b: [x, z + 1], nx: -1, nz: 0 });
+      if (!roofed(x, z)) continue;
+      if (!roofed(x, z - 1)) edges.push({ a: [x, z], b: [x + 1, z], nx: 0, nz: -1 });
+      if (!roofed(x + 1, z)) edges.push({ a: [x + 1, z], b: [x + 1, z + 1], nx: 1, nz: 0 });
+      if (!roofed(x, z + 1)) edges.push({ a: [x, z + 1], b: [x + 1, z + 1], nx: 0, nz: 1 });
+      if (!roofed(x - 1, z)) edges.push({ a: [x, z], b: [x, z + 1], nx: -1, nz: 0 });
     }
   }
   if (!edges.length) return;
-  // Each eave's line, `d` out from the area's edge; `away` from it is how high the roof is there.
-  const lines = edges.map((e) => {
-    const [ax, az] = [e.a[0] + e.nx * d, e.a[1] + e.nz * d];
-    return { nx: e.nx, nz: e.nz, c: e.nx * ax + e.nz * az, ex: e.b[0] - e.a[0], ez: e.b[1] - e.a[1], len: Math.hypot(e.b[0] - e.a[0], e.b[1] - e.a[1]) };
-  });
-  /** How far (x, z) is in from eave `i`'s line. */
-  const away = (i: number, x: number, z: number) => {
-    const l = lines[i];
-    return l.c - l.nx * x - l.nz * z;
+  // How far in from the area's edge each point of the half-tile grid is, in half tiles: nought
+  // where it touches a tile that isn't roofed, else one more than the least of its eight
+  // neighbours (two sweeps). The slopes are square to the walls and the tiles whole, so every hip
+  // and valley lies on a tile's diagonal and every ridge on a tile's edge or middle line: the
+  // roof's corners are all points of this grid, and it is flat between them.
+  const [gw, gd] = [2 * (x1 - x0) + 1, 2 * (z1 - z0) + 1];
+  const far = new Int32Array(gw * gd);
+  for (let j = 1; j < gd - 1; j++) {
+    for (let i = 1; i < gw - 1; i++) {
+      const [tx, tz] = [x0 + ((i - 1) >> 1), z0 + ((j - 1) >> 1)];
+      const [mx, mz] = [x0 + (i >> 1), z0 + (j >> 1)];
+      if (roofed(tx, tz) && roofed(mx, tz) && roofed(tx, mz) && roofed(mx, mz)) far[j * gw + i] = gw + gd;
+    }
+  }
+  const nearer = (at: number, ...from: number[]) => {
+    for (const o of from) far[at] = Math.min(far[at], far[at + o] + 1);
   };
-  /** A point of eave `i`'s plane, `th` over its underside, and its shingle UV (u along the eave, v up-slope). */
-  const onPlane = (i: number, x: number, z: number): [V3, [number, number]] => {
-    const l = lines[i];
-    const a = away(i, x, z);
-    return [[x, ye + pitch * a + th, z], [(x * l.ex + z * l.ez) / l.len, a * slope]];
-  };
+  for (let at = gw + 1; at < gw * (gd - 1) - 1; at++) if (far[at]) nearer(at, -1, -gw - 1, -gw, -gw + 1);
+  for (let at = gw * (gd - 1) - 2; at > gw; at--) if (far[at]) nearer(at, 1, gw + 1, gw, gw - 1);
+  /** A grid point on the roof, `th` over its underside. */
+  const on = (i: number, j: number): V3 => [x0 + i / 2, ye + pitch * (d + far[j * gw + i] / 2) + th, z0 + j / 2];
   /** The same faces, `th` down: soffits and the underside of the roof. */
   const down = (pts: V3[]): V3[] => pts.map((p) => [p[0], p[1] - th, p[2]] as V3);
-  const tri = (pts: V3[], uvs: [number, number][]) => {
-    const n = facing(pts[0], pts[1], pts[2], [0, 1, 0]);
-    roof.poly(pts, n, uvs);
-    trim.poly(down(pts), [-n[0], -n[1], -n[2]]);
+  /** A facet over grid points (cut into a fan from the first of them), its slope falling along x (`alongX`) or along z. */
+  const facet = (pts: P2[], alongX: boolean) => {
+    const top = pts.map(([i, j]) => on(i, j));
+    // Shingles: u along the eave the slope comes down to, v up the slope from it.
+    const uvs = pts.map(([i, j]): [number, number] => [alongX ? z0 + j / 2 : x0 + i / 2, (d + far[j * gw + i] / 2) * slope]);
+    const n = facing(top[0], top[1], top[2], [0, 1, 0]);
+    roof.poly(top, n, uvs);
+    trim.poly(down(top), [-n[0], -n[1], -n[2]]);
   };
-  /** `poly` cut to where `a x + b z + c` is not above nought: a convex polygon stays convex. */
-  const cut = (poly: P2[], a: number, b: number, c: number): P2[] => {
-    const out: P2[] = [];
-    for (let k = 0; k < poly.length; k++) {
-      const [p, q] = [poly[k], poly[(k + 1) % poly.length]];
-      const [fp, fq] = [a * p[0] + b * p[1] + c, a * q[0] + b * q[1] + c];
-      const [pIn, qIn] = [fp <= 0, fq <= 0];
-      if (pIn) out.push(p);
-      if (pIn !== qIn) out.push([p[0] + ((q[0] - p[0]) * fp) / (fp - fq), p[1] + ((q[1] - p[1]) * fp) / (fp - fq)]);
-    }
-    return out;
-  };
-  // The roof: every eave's plane over the tiles where it is the lowest of them, a tile at a time.
-  // Where two of them cross is a hip, a ridge or a valley, so every facet is flat, as a roof's are.
-  const square: P2[] = [[0, 0], [1, 0], [1, 1], [0, 1]];
-  // The eaves are square to the walls, so a plane that is lowest anywhere in a tile is lowest at
-  // its corners, the middles of its sides, or its middle: those nine find every plane to try.
-  const probes: P2[] = [...square, [0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5], [0.5, 0.5]];
+  // The roof, a tile at a time: its middle and the eight points round it make eight triangles, each
+  // of one slope. Those of the same slope are one facet: the whole tile, or a part between a hip, a
+  // valley or a ridge through its middle.
+  const ring: P2[] = [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]];
   for (let z = z0; z < z1; z++) {
     for (let x = x0; x < x1; x++) {
-      if (!inArea(x, z)) continue;
-      const lowest = new Set(probes.map(([dx, dz]) => {
-        let k = 0;
-        for (let i = 1; i < lines.length; i++) if (away(i, x + dx, z + dz) < away(k, x + dx, z + dz)) k = i;
-        return k;
-      }));
-      for (const i of lowest) {
-        let poly = square.map(([dx, dz]) => [x + dx, z + dz] as P2);
-        for (let j = 0; j < lines.length && poly.length; j++) {
-          // eave i's plane under eave j's: (nx_j - nx_i) x + (nz_j - nz_i) z + c_i - c_j <= 0.
-          if (j !== i) poly = cut(poly, lines[j].nx - lines[i].nx, lines[j].nz - lines[i].nz, lines[i].c - lines[j].c);
-        }
-        let area = 0;
-        for (let k = 0; k < poly.length; k++) area += poly[k][0] * poly[(k + 1) % poly.length][1] - poly[(k + 1) % poly.length][0] * poly[k][1];
-        if (poly.length < 3 || Math.abs(area) < 1e-6) continue;
-        const v = poly.map(([px, pz]) => onPlane(i, px, pz));
-        for (let k = 1; k < v.length - 1; k++) tri([v[0][0], v[k][0], v[k + 1][0]], [v[0][1], v[k][1], v[k + 1][1]]);
+      if (!roofed(x, z)) continue;
+      const [i0, j0] = [2 * (x - x0), 2 * (z - z0)];
+      const at = (k: number): P2 => [i0 + ring[k & 7][0], j0 + ring[k & 7][1]];
+      const h = (k: number) => far[(j0 + ring[k & 7][1]) * gw + i0 + ring[k & 7][0]];
+      const mid = far[(j0 + 1) * gw + i0 + 1];
+      // Each triangle's slope: how much the roof rises over it a step along x and a step along z (along one
+      // of them: nought along the other), and how high it stands at the grid's origin. Two triangles with the
+      // same are in one plane.
+      const slopes = ring.map((_, k) => {
+        // (Of its two points on the tile's rim, one is a corner and the other the middle of a side.)
+        const [c, m] = k % 2 === 0 ? [k, k + 1] : [k + 1, k];
+        const [ci, cj] = ring[c & 7];
+        const [mi, mj] = ring[m & 7];
+        const [gx, gz] = [(mi - ci) * (h(m) - h(c)) + (1 - mi) * (mid - h(m)), (mj - cj) * (h(m) - h(c)) + (1 - mj) * (mid - h(m))];
+        return { gx, key: `${gx},${gz},${mid - gx * (i0 + 1) - gz * (j0 + 1)}` };
+      });
+      // The middle of a side is a corner of the roof only where a ridge crosses the side.
+      const kept = (k: number) => k % 2 === 0 || h(k - 1) + h(k + 1) !== 2 * h(k);
+      const first = ring.findIndex((_, k) => slopes[k].key !== slopes[(k + 7) & 7].key);
+      if (first < 0) {
+        facet(ring.flatMap((_, k) => (kept(k) ? [at(k)] : [])), slopes[0].gx !== 0);
+        continue;
+      }
+      for (let k = first; k < first + 8; ) {
+        let end = k + 1;
+        while (end < first + 8 && slopes[end & 7].key === slopes[k & 7].key) end++;
+        const pts: P2[] = [[i0 + 1, j0 + 1], at(k)];
+        for (let m = k + 1; m < end; m++) if (kept(m)) pts.push(at(m));
+        pts.push(at(end));
+        facet(pts, slopes[k & 7].gx !== 0);
+        k = end;
       }
     }
   }
@@ -2989,10 +3002,11 @@ function addRoofArea(
     }
     return [p[0] + nx * d, ye, p[1] + nz * d];
   };
-  for (const [i, e] of edges.entries()) {
+  const yw = ye + pitch * d + th; // the roof's top over the area's edge
+  for (const e of edges) {
     const oa = corner(e.a);
     const ob = corner(e.b);
-    const top = [onPlane(i, e.a[0], e.a[1])[0], onPlane(i, e.b[0], e.b[1])[0], [ob[0], ob[1] + th, ob[2]], [oa[0], oa[1] + th, oa[2]]] as V3[];
+    const top: V3[] = [[e.a[0], yw, e.a[1]], [e.b[0], yw, e.b[1]], [ob[0], ob[1] + th, ob[2]], [oa[0], oa[1] + th, oa[2]]];
     const n = facing(top[0], top[1], top[2], [e.nx, 0, e.nz]);
     roof.poly(top, n);
     trim.poly(down(top), [-n[0], -n[1], -n[2]]);
