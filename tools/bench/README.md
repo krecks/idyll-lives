@@ -5,6 +5,7 @@ The game has a rendering benchmark built in: open it with `?bench=<scene>` (`web
 | Script | Does |
 |---|---|
 | `render.mjs` | Starts Vite (or uses `--url`), opens `?bench=` in Chromium on the real GPU at 1920×1080 and device pixel ratio 1, once per preset × backend × scenario × CPU slow-down × diagnostic, and writes JSON and a markdown table to `bench-results/<time>/` (medians with `--runs`). `--shots <dir>` takes reference screenshots of 9 fixed poses (`--pages` the dev pages', held still: the gallery, clips, residents, poses and previews); `--compare <dirA> <dirB>` counts the pixels that differ (`cargo shots compare`). `looks.mjs` shoots the pages (and poses) once in the soft look and once in classic PBR and tiles each pair into one sheet (`--pair <dirA> <dirB>` tiles any two shot folders: before and after). `play.mjs` shoots the play set (`--poses play`: the home lot from the play camera by day with the sun behind and ahead, at dusk and by night, the same with the walls up, from 80 m, from across its street, and the menus' town) on medium/webgpu and low/webgl, the pictures a change to the look is judged by; `play.mjs --poses day` shoots the day set (the play camera over three homes of the scene in the morning, at midday and in the late afternoon, and the home with its walls up: where a change to the daytime look has to show); `--poses close` the close set (the play camera zoomed all the way in, 6 m, over the home from two sides by day, at dusk and by night, over a fuller house, and the garden by night from 12 m: where a finish's texture, an edge and a soft thing's shape show; the pages `gallery-soft`, `gallery-drape`, `gallery-wood`, `gallery-plain`, `gallery-shrubs`, `gallery-conifers` and `previews-catalogue` are the same kinds of thing on their own and as Buy mode pictures them); `cargo shots stats <dirA> [<dirB>]` (crates/tools/src/shots.rs) measures shot folders (brightness percentiles, clipping, saturation, how much of the frame is one tone, contrast at four sizes), and `cargo shots steady <dirA> <dirB>` how much pictures change when the camera moves a quarter of a pixel (`--extra 'tx=0.004&tz=0.004'`), which is what shimmers in play. `play.mjs --sheet <group>` shoots one build in the variants of `play-variants.json` (each a `?tune=…`, dev server only: `web/src/render/tune.ts`) and tiles them side by side under their names. `--jobs <file.json>` runs a list of command lines in one invocation (see below). |
+| `gameplay.mjs` | The end-to-end gameplay baseline: from process start (it starts its own Vite, `--port 5222`, or uses `--url`) it launches Chromium, goes boot → New game → the town laid out → a household's Play → step 4's Move in, then plays at 1× for `--secs` (default 300) and shuts down cleanly. Every second it records CDP `Performance.getMetrics` deltas (main-thread task/script/layout busy %), the browser process tree's RSS, CPU % and GPU-process CPU % (`ps`), the page's JS heap and DOM nodes, and the renderer's own `stats()` through the dev-only `?gpustats` hook (`window.__gameStats()`: GPU ms, draw calls, renderer frame ms); every animation frame's gap is kept raw. CDP network events give every request's bytes, cache and timing, and the resource timing entries the asset bytes per stage. Writes `raw.jsonl`, `summary.json` and `report.md` (stage timeline, per-metric min/mean/median/p95/p99/max, memory over time, network/disk, run 1 vs run 2 stability) to `bench-results/gameplay-<time>/`. A stage timeout, a page error or a short steady window fails the run with a non-zero exit. |
 | `scene.mjs` | Makes a scene, `web/public/bench/<name>.json.gz`: a new game as the menus make one (in the place `--world`, default the countryside, with `--options town=village,…`), with a household of four in the first home for sale, played at full speed to `--hour` on day 1, paused and saved. |
 | `profile.mjs` | Profiles the **real game** instead of the bench scene: opens `?state=<name>&profile&debug&quality=<preset>` on the dev server (or `--build` for `vite preview`, where only `?bench=` exists), presses `--speed`, records its own animation-frame gaps for `--secs`, then reads `window.__perfReport()`. Writes `frames.json`, `perf.json` and `report.md` (gap p50/p95/p99/max, counts over 20/33/50/100 ms, dropped frames and long tasks by phase, worst frames, slowest spans) to `bench-results/profile-<time>/`. A server already answering on `--port` is reused. |
 | `loading.mjs` | Times what a new player waits for, through the menus as a player goes, in a new browser context per run: the page to the main menu and its picture (`boot`), New game to step 1's land made and built (`world`; the countryside as a new player gets it, or `--world <place> --options town=city,villages=many`, or `--code <world code>`), "Lay out the town" to step 2's town laid and built (`town`), step 3 opened to the portraits in view and to every card's portrait shown (`inView`, `portraits`), and step 4's Move in to the game up (`entry`; step 4 reached by Play on a household's card, `--household <n>`, or through Creation, `--create`). The page's `Math.random` is seeded (`--seed`), so step 1's world and its households are the same in every run and every build measured; `--again` opens the page a second time in the same context (what the browser kept between visits); `--back` then goes back to the menu and in again (Save and quit to the menu's picture on screen, Continue to the game up, the heap in that game, Quit without saving to the menu's picture again, and the long tasks after each). Medians of `--runs`, and each run's `?profile` spans (the dev play log's `perf` lines), to `bench-results/loading-<time>/`. |
@@ -57,6 +58,39 @@ bun tools/bench/profile.mjs --state readme-village --speed 5 --secs 90 --preset 
 The options are documented at the top of each script. To compare two builds, measure them back to back on the same machine, with nothing else running, and take medians of at least 3 runs; GPU times on Apple hardware vary by about ±1 ms between runs. Shots of two runs of the same build taken in a window differed by at most 1 of 255 in a few pixels, apart from a far road's lane markings (P1-17 in the release review); headless ones in at most 0.12 % of their pixels (above).
 
 On a laptop without the repo, open the deployed game instead, e.g. `https://krecks.github.io/idyll-lives/?bench=village&quality=low&hour=13&res=1` (add `&renderer=webgl` for WebGL2), and press "Copy result" when it's done.
+
+# The gameplay baseline (cold, from process start)
+
+`gameplay.mjs` measures what a player actually gets: the menus, the load into a household, and five
+minutes of play at 1× speed, with the frame times, CPU, GPU, memory and I/O of that session.
+
+```sh
+# Two cold runs of five minutes each (about 12 minutes in all), WebGPU, Medium
+bun tools/bench/gameplay.mjs --runs 2 --secs 300
+
+# One warm run: the same browser context and its cache kept from the run before
+bun tools/bench/gameplay.mjs --warm
+
+# WebGL2, Low, a fixed seed and household, a shorter window
+bun tools/bench/gameplay.mjs --renderer webgl --preset low --seed 7 --household 2 --secs 60
+```
+
+The stages are timed from the process starting: the dev server (started here unless one answers on the
+port), the browser launch, the main menu (`.main-menu` up, `.loading` gone), step 4's Move in
+(`.hud-root` up), then the steady window, which fails unless it covers `--secs` and the samples do too.
+Memory is reported per process as well as summed: the renderer (the tab running the game) is the number
+to read, the tree sum is a ceiling (shared pages count once per process), and the renderer's
+`phys_footprint` at the edges of the window is what Activity Monitor would show. Every renderer process
+is counted (`renderers RSS`), because a worker can be a process of its own. Two more numbers come from the
+page itself: `GPU memory` (PlayCanvas's own counter for what the device holds, textures and buffers) and
+`sim WASM` (the simulation worker's linear memory, as the worker reports it once a second — the main
+thread cannot read another thread's memory). `--heapprofile` samples the JS heap through the steady
+window and reports the 20 call sites that kept the most (writes `heapprofile.json`). `--help` lists every
+option.
+The hook it reads, `window.__gameStats()`, exists only under `?gpustats` on a dev build
+(`web/src/debug/gameplayStats.ts`): it hands back the renderer's own `stats()` with the GPU timer on, and
+is absent from a production build. `--profile` isn't needed for it and the interface stays off
+(`--hud 0` hides it) if you want a quieter frame.
 
 # Checking things in the browser
 

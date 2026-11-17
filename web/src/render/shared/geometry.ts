@@ -100,31 +100,56 @@ export class Geo {
   append(other: Geo): this {
     const base = this.pos.length / 3;
     const n = other.pos.length / 3;
-    this.pos.push(...other.pos);
-    this.nor.push(...other.nor);
-    this.uv.push(...other.uv);
-    this.cut.push(...other.cut);
-    for (let i = 0; i < n; i++) this.col.push(this.r, this.g, this.b, this.a);
-    for (const i of other.idx) this.idx.push(base + i);
+    this.copy(this.pos, other.pos);
+    this.copy(this.nor, other.nor);
+    this.copy(this.uv, other.uv);
+    this.copy(this.cut, other.cut);
+    this.grow(this.col, n * 4);
+    const colAt = this.col.length - n * 4;
+    for (let i = 0; i < n; i++) {
+      const at = colAt + i * 4;
+      this.col[at] = this.r;
+      this.col[at + 1] = this.g;
+      this.col[at + 2] = this.b;
+      this.col[at + 3] = this.a;
+    }
+    this.grow(this.idx, other.idx.length);
+    const idxAt = this.idx.length - other.idx.length;
+    for (let i = 0; i < other.idx.length; i++) this.idx[idxAt + i] = base + other.idx[i];
     return this;
   }
 
   /** Adds `other`'s geometry as it is, its own colours and cutaway data (`append` paints it in this one's colour), `dy` m higher. */
   merge(other: Geo, dy = 0): this {
     const base = this.pos.length / 3;
-    const push = (to: number[], from: readonly number[]) => {
-      for (let i = 0; i < from.length; i++) to.push(from[i]);
-    };
     if (dy) {
       const from = other.pos;
-      for (let i = 0; i < from.length; i += 3) this.pos.push(from[i], from[i + 1] + dy, from[i + 2]);
-    } else push(this.pos, other.pos);
-    push(this.nor, other.nor);
-    push(this.uv, other.uv);
-    push(this.col, other.col);
-    push(this.cut, other.cut);
-    for (let i = 0; i < other.idx.length; i++) this.idx.push(base + other.idx[i]);
+      const at = this.pos.length;
+      this.grow(this.pos, from.length);
+      for (let i = 0; i < from.length; i += 3) {
+        this.pos[at + i] = from[i];
+        this.pos[at + i + 1] = from[i + 1] + dy;
+        this.pos[at + i + 2] = from[i + 2];
+      }
+    } else this.copy(this.pos, other.pos);
+    this.copy(this.nor, other.nor);
+    this.copy(this.uv, other.uv);
+    this.copy(this.col, other.col);
+    this.copy(this.cut, other.cut);
+    this.grow(this.idx, other.idx.length);
+    const idxAt = this.idx.length - other.idx.length;
+    for (let i = 0; i < other.idx.length; i++) this.idx[idxAt + i] = base + other.idx[i];
     return this;
+  }
+
+  /** Adds `from`'s numbers to the end of `to`, one by one (a spread would overflow the stack on a big mesh). */
+  private copy(to: number[], from: readonly number[]): void {
+    for (let i = 0; i < from.length; i++) to.push(from[i]);
+  }
+
+  /** Makes `to` `n` numbers longer, the new ones 0, for the caller to fill in place. (Pushed, not a longer `length`: that would leave the array with holes, which V8 keeps slower for good.) */
+  private grow(to: number[], n: number): void {
+    for (let i = 0; i < n; i++) to.push(0);
   }
 
   /** Axis-aligned box; `skip` lists faces to omit ('px', 'nx', 'py', 'ny', 'pz', 'nz'). */
@@ -166,14 +191,27 @@ export class Geo {
 
   /** The geometry's arrays, with its colours and its cutaway attribute if asked for. */
   meshData(options: { colors?: boolean; cut?: boolean } = {}): MeshData {
+    // One pass for the colours, which are a byte a channel: `Uint8Array.from(col, fn)` calls
+    // back per number and allocates a wrapper per call, and the alpha scan was a second pass.
+    let colors: Uint8Array | undefined;
+    let vertexAlpha = false;
+    if (options.colors) {
+      const col = this.col;
+      colors = new Uint8Array(col.length);
+      for (let i = 0; i < col.length; i++) {
+        const v = col[i];
+        colors[i] = v <= 0 ? 0 : v >= 1 ? 255 : (v * 255 + 0.5) | 0;
+        if ((i & 3) === 3 && v < 1) vertexAlpha = true;
+      }
+    }
     return {
       positions: new Float32Array(this.pos),
       normals: new Float32Array(this.nor),
       uvs: new Float32Array(this.uv),
       indices: this.pos.length / 3 > 65535 ? new Uint32Array(this.idx) : new Uint16Array(this.idx),
-      colors: options.colors ? Uint8Array.from(this.col, (v) => Math.min(255, Math.max(0, Math.round(v * 255)))) : undefined,
+      colors,
       cut: options.cut ? new Uint8Array(this.cut) : undefined,
-      vertexAlpha: !!options.colors && this.col.some((v, i) => i % 4 === 3 && v < 1),
+      vertexAlpha,
     };
   }
 }

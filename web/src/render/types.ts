@@ -95,6 +95,18 @@ export interface RenderStats {
   gpuMs: number | null;
   /** Main-thread time posing the residents per frame, smoothed (ms). */
   residentsMs: number;
+  /** GPU memory the device holds; null when it can't say (before the app exists). */
+  vram: RenderVram | null;
+}
+
+/** GPU memory the renderer holds, bytes (PlayCanvas's own counters, `app.stats.vram`). */
+export interface RenderVram {
+  /** Textures: the assets' and the render targets' (shadow maps, the mirror, post). */
+  tex: number;
+  /** Vertex and index buffers. */
+  geom: number;
+  /** Everything the device holds: textures, geometry, uniform and storage buffers. */
+  total: number;
 }
 
 /** Benchmark hooks around every drawn frame (`debug/bench.ts`). */

@@ -131,6 +131,7 @@ import type {
   RendererDebugHooks,
   RendererDeps,
   RenderStats,
+  RenderVram,
   ResizeHandle,
   RoomOverlayTile,
   SeenBird,
@@ -3578,7 +3579,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       refreshDivisor: this.pacer.divisor,
       gpuMs: this.gpuWanted.size ? this.gpuTiming.recentMs : null,
       residentsMs: this.characters?.updateMs ?? 0,
+      vram: this.vram(),
     };
+  }
+
+  /** The device's own GPU memory counters, bytes; null before the app exists. */
+  private vram(): RenderVram | null {
+    // (The engine tracks them on the device (`_vram`); its types leave `app.stats.vram` undeclared.)
+    const v = (this.app?.stats as { vram?: Partial<Record<'tex' | 'vb' | 'ib' | 'ub' | 'sb', number>> } | undefined)?.vram;
+    if (!v) return null;
+    const tex = v.tex ?? 0;
+    const geom = (v.vb ?? 0) + (v.ib ?? 0);
+    return { tex, geom, total: tex + geom + (v.ub ?? 0) + (v.sb ?? 0) };
   }
 
   setFrameProbe(probe: FrameProbe | null): void {
