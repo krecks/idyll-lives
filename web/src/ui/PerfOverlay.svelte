@@ -51,6 +51,7 @@
       {#if t.sim}
         {@const m = t.sim}
         <div><span>Steps</span><b>{m.stepsPerSecond.toFixed(0)} / {m.targetPerSecond.toFixed(0)} per s</b></div>
+        <div><span>Ticks</span><b>{m.ticksPerSecond.toFixed(0)} per s</b></div>
         <div><span>Step</span><b>{m.stepMs.toFixed(2)} ms · max {m.stepMaxMs.toFixed(1)}</b></div>
         <div><span>Busy</span><b>{pct(m.busy)}</b></div>
         <div><span>WASM memory</span><b>{mb(m.memoryBytes)}</b></div>

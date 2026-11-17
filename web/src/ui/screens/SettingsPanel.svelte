@@ -200,7 +200,8 @@
       title: 'Time',
       keys: [
         [['Space'], 'Pause / resume'],
-        [['1', '–', '5'], 'Game speed'],
+        [['1', '–', '3'], 'Game speed'],
+        [['4'], 'Super speed (quiet hours)'],
         [['0'], 'Pause'],
       ],
     },
@@ -432,8 +433,8 @@
         <SettingRow title="Slow down for big moments" hint="A first kiss, a new job or a fight at home plays at normal speed.">
           <Toggle label="Slow down for big moments" bind:checked={settings.autoSlow} />
         </SettingRow>
-        <SettingRow title="Skip quiet hours" hint="Time-lapse while everyone at home sleeps or is at work.">
-          <Toggle label="Skip quiet hours" bind:checked={settings.skipQuietHours} />
+        <SettingRow title="Super speed when quiet" hint="Super speed by itself while everyone at home sleeps or is out." details="Back to your speed when someone wakes or comes home.">
+          <Toggle label="Super speed when quiet" bind:checked={settings.skipQuietHours} />
         </SettingRow>
         <SettingRow title="Pause when the window loses focus" hint="Time stands still while you're in another window, and goes on when you're back.">
           <Toggle label="Pause when the window loses focus" bind:checked={settings.pauseOnBlur} />

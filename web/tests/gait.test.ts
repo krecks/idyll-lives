@@ -35,7 +35,7 @@ describe('gaits', () => {
     const table: string[] = [];
     let worst = 0;
     for (const { who, legs: l } of legs) {
-      const row = [1, 2, 3, 4, 5].map((s) => gaitSlide(WALK * PLAYBACK_RATE[s], l, speedOf));
+      const row = [1, 2, 3, 4].map((s) => gaitSlide(WALK * PLAYBACK_RATE[s], l, speedOf));
       // (What the run's old cap, the same four strides a second on every leg, left.)
       const before = (v: number) => {
         const { gear, rate } = gaitFor(v, l, -1, speedOf);

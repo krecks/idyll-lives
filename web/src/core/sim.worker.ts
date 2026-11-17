@@ -38,6 +38,12 @@ const START_PROGRESS_MS = 500;
  * speed (the debug overlay's steps per second say so).
  */
 const MAX_BACKLOG_MS = 50;
+/**
+ * At super speed, the share of a step's time its ticks may take: a step runs as many as fit (up to
+ * sim-core's most, 60), the rest is left for the snapshot, the UI view and the main thread's messages,
+ * so the game answers the player at once however slow the machine.
+ */
+const SUPER_SHARE = 0.8;
 
 let game: Game | null = null;
 let memory: WebAssembly.Memory;
@@ -238,15 +244,22 @@ function runLoop(stepMs: number): void {
   let lastUi = 0;
   let lastStats = performance.now();
   let steps = 0;
+  let ticks = 0;
   let busyMs = 0;
   let maxMs = 0;
+  const superMs = stepMs * SUPER_SHARE;
   const step = () => {
     if (stopped) return;
     const start = performance.now();
     let now: number;
     try {
       if (panicNext) game!.debugPanic('a panic on purpose (__crash)');
-      game!.advance();
+      const g = game!;
+      // The speed's ticks; at super speed as many as fit in the step's share of time (none
+      // when it isn't super speed, or no longer quiet at home).
+      ticks += g.start_step();
+      while (performance.now() - start < superMs && g.advance_more()) ticks++;
+      g.end_step();
       simSteps++;
       publish();
       now = performance.now();
@@ -269,6 +282,7 @@ function runLoop(stepMs: number): void {
         stats: {
           stepsPerSecond: (steps * 1000) / span,
           targetPerSecond: 1000 / stepMs,
+          ticksPerSecond: (ticks * 1000) / span,
           stepMs: busyMs / steps,
           stepMaxMs: maxMs,
           busy: busyMs / span,
@@ -276,7 +290,7 @@ function runLoop(stepMs: number): void {
         },
       });
       lastStats = now;
-      steps = busyMs = maxMs = 0;
+      steps = ticks = busyMs = maxMs = 0;
     }
     next += stepMs;
     // (Steps due by now run at once: those of at most MAX_BACKLOG_MS.)

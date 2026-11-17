@@ -33,8 +33,11 @@ export interface SnapshotLayout {
     speed: number;
     simCount: number;
     structureVersion: number;
-    /** 1 while time skips ahead because it's quiet at home (missing in older layouts). */
-    calm?: number;
+    /**
+     * Ticks a real step runs now: the speed's, at super speed what the last step ran (as many as the
+     * machine had time for; missing in older layouts: `PLAYBACK_RATE`'s for the speed).
+     */
+    rate?: number;
     /** Id of the latest milestone event modulo 2^24 (missing in older layouts). */
     majorEvent?: number;
     /** Food and dishes changed (`Items::version` modulo 2^24; missing in older layouts). */

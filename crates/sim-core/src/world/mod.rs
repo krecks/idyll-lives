@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::f32::consts::FRAC_PI_2;
 
-use crate::clock::{AUTO_FAST_SPEED, MAX_SPEED, TICKS_PER_STEP};
+use crate::clock::{MAX_SPEED, SUPER_SPEED, TICKS_PER_STEP};
 use crate::content::{
     Content, HabitTime, Layer, MAX_NEEDS, MAX_SKILLS, MAX_SLOTS, Modifiers, Pose, TagMask, stage_in,
 };
@@ -1934,7 +1934,16 @@ pub struct World {
     pub events: EventLog,
     pub(crate) blocked: Vec<bool>,
     pub tick: u64,
+    /// The game's speed (`clock::TICKS_PER_STEP`'s index): 0 paused .. `SUPER_SPEED`.
     pub speed: u8,
+    /// The speed below super speed last chosen (1 to 3): super speed drops back to it when
+    /// the household stops being quiet.
+    pub resume_speed: u8,
+    /// Whether it was quiet at home (`calm`) at the last step: super speed by itself starts as
+    /// it falls quiet, so a speed the player picks while it is quiet holds.
+    pub(crate) was_calm: bool,
+    /// Ticks the last step ran (the snapshot's `RATE` at super speed).
+    pub(crate) step_ticks: u32,
     /// Master switch for "free will" in the whole town (each household also has its own,
     /// `Household::free_will`). Off is mainly for tests.
     pub autonomy: bool,
@@ -2050,8 +2059,8 @@ pub struct World {
     pub(crate) undo: Vec<crate::home::HomeSnapshot>,
     /// Edits taken back that can be made again, latest last (see `World::redo`).
     pub(crate) redo: Vec<crate::home::HomeSnapshot>,
-    /// "Skip quiet hours": run at `AUTO_FAST_SPEED` while the player's household is asleep
-    /// or out and nothing notable happened at home in the last hour (see `World::calm`).
+    /// Super speed by itself: the game goes to `SUPER_SPEED` as the player's household falls
+    /// asleep or goes out with nothing notable at home in the last hour (`World::calm`).
     pub auto_fast: bool,
     /// What each household's home (plus public places) offers, for planned activities;
     /// recomputed when the structure changes.
@@ -2444,6 +2453,9 @@ impl World {
             blocked: vec![false; tiles],
             tick: 0,
             speed: 1,
+            resume_speed: 1,
+            was_calm: false,
+            step_ticks: 0,
             autonomy: true,
             lifespan: Default::default(),
             player_moves: true,
@@ -3691,20 +3703,62 @@ impl World {
         Ok(())
     }
 
-    /// Advances one real-time step (1 / TICKS_PER_SECOND s) at the current speed, faster
-    /// while it's calm at home and `auto_fast` is on.
+    /// Advances one real-time step (1 / TICKS_PER_SECOND s) at the current speed; at super
+    /// speed, all of its most ticks while it stays quiet at home.
     pub fn advance(&mut self) {
-        let normal = TICKS_PER_STEP[self.speed as usize];
-        let most = if self.auto_fast && normal > 0 {
-            normal.max(TICKS_PER_STEP[AUTO_FAST_SPEED as usize])
-        } else {
-            normal
-        };
-        for i in 0..most {
-            if i >= normal && !self.calm() {
-                break;
-            }
+        self.start_step();
+        while self.advance_more() {}
+    }
+
+    /// Starts a real-time step: the speed's ticks, or at super speed none yet (`advance_more`
+    /// runs them, as many as the caller has time for). Super speed drops back to the speed
+    /// chosen before it once it isn't quiet at home; with `auto_fast` on, the game goes to it
+    /// as the household falls quiet. The ticks it ran.
+    pub fn start_step(&mut self) -> u32 {
+        self.step_ticks = 0;
+        if self.speed == 0 {
+            return 0;
+        }
+        let calm = self.calm();
+        if self.speed == SUPER_SPEED && !calm {
+            self.speed = self.resume_speed;
+        } else if self.auto_fast && calm && !self.was_calm && self.speed < SUPER_SPEED {
+            self.resume_speed = self.speed;
+            self.speed = SUPER_SPEED;
+        }
+        self.was_calm = calm;
+        if self.speed == SUPER_SPEED {
+            return 0;
+        }
+        let ticks = TICKS_PER_STEP[self.speed as usize];
+        for _ in 0..ticks {
             self.tick_once();
+        }
+        self.step_ticks = ticks;
+        ticks
+    }
+
+    /// One more tick of a super-speed step, if the game is at super speed, it is still quiet at
+    /// home and the step hasn't run its most (`TICKS_PER_STEP[SUPER_SPEED]`). Whether it ran.
+    pub fn advance_more(&mut self) -> bool {
+        if self.speed != SUPER_SPEED || self.step_ticks >= TICKS_PER_STEP[SUPER_SPEED as usize] {
+            return false;
+        }
+        // (The step's start found it quiet before its first tick.)
+        if self.step_ticks > 0 && !self.calm() {
+            return false;
+        }
+        self.tick_once();
+        self.step_ticks += 1;
+        true
+    }
+
+    /// Ticks a real step runs now: the speed's, or at super speed what its last step ran.
+    pub fn step_rate(&self) -> u32 {
+        if self.speed == SUPER_SPEED {
+            self.step_ticks.max(1)
+        } else {
+            TICKS_PER_STEP[self.speed as usize]
         }
     }
 
@@ -5193,9 +5247,23 @@ impl World {
                 if speed > MAX_SPEED {
                     return Err(Error::new(format!("speed must be 0..={MAX_SPEED}")));
                 }
-                self.speed = speed;
+                // Super speed only while it's quiet at home: else the speed chosen before it.
+                self.speed = if speed == SUPER_SPEED && !self.calm() {
+                    self.resume_speed
+                } else {
+                    speed
+                };
+                if (1..SUPER_SPEED).contains(&self.speed) {
+                    self.resume_speed = self.speed;
+                }
             }
-            Command::SetAutoFast { enabled } => self.auto_fast = enabled,
+            Command::SetAutoFast { enabled } => {
+                // (Turned on while it's quiet: super speed starts at the next step.)
+                if enabled && !self.auto_fast {
+                    self.was_calm = false;
+                }
+                self.auto_fast = enabled;
+            }
             Command::SetRoutines { sim, routines } => {
                 let routines = crate::planner::routines_from(&self.content, &routines)?;
                 let s = self.sim_mut(sim)?;

@@ -174,7 +174,7 @@ export class GameBirds {
   }
 
   /**
-   * The birds a frame on, with the game's clock (`dt` ms; calm hours at speed 4), the hour of `minute`,
+   * The birds a frame on, with the game's clock (`dt` ms), the hour of `minute`,
    * the camera and the residents' heads (`count` of them, the ones drawn as `visible` says), and the seed they scatter.
    */
   update(state: FrameState, minute: number, dt: number, residents: { heads: Float32Array; visible: Uint8Array; seed: Float32Array; seedCount: number }, count: number): boolean {
@@ -182,12 +182,11 @@ export class GameBirds {
     if (this.town) return false;
     const { curr, layout } = state;
     const h = layout.header;
-    const calmHours = h.calm !== undefined && curr[h.calm] > 0;
     this.storey = this.host.storey();
     this.applyVisible();
     const f = this.frame;
     f.dt = dt / 1000;
-    f.speed = calmHours ? 4 : curr[h.speed] | 0;
+    f.speed = curr[h.speed] | 0;
     f.hour = (minute / 60) % 24;
     this.host.eye(this.eye);
     f.residents = residents.heads;

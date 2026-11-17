@@ -133,10 +133,6 @@
       "type": "icon",
       "url": "icons/speed4.svg"
     },
-    "icon.ui.speed5": {
-      "type": "icon",
-      "url": "icons/speed5.svg"
-    },
     "icon.ui.watch": {
       "type": "icon",
       "url": "icons/eye.svg"

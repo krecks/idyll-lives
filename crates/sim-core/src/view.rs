@@ -956,6 +956,8 @@ impl UiSync {
         o.field("weekday", &clock::weekday(day));
         o.field("minute", &clock::minute_of_day(world.tick));
         o.field("speed", &world.speed);
+        // (Super speed may run: everyone at home asleep or out, `World::calm`.)
+        o.field("superSpeed", &world.calm());
         o.field("autonomy", &world.autonomy);
         o.field("lifespan", &world.lifespan);
         o.field("playerMoves", &world.player_moves);
