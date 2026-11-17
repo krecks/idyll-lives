@@ -7,7 +7,7 @@
 
 import { groundDepth, type WorldStructure } from '../core/protocol';
 import type { LandCursor, LotHighlight, Renderer, TownBuildStep, TownGhosts, TownShot } from '../render/types';
-import { areaFocus } from '../render/shared/overviewCamera';
+import { areaFocus, OVERVIEW_NEAREST } from '../render/shared/overviewCamera';
 import type { Land, LandRect } from './land';
 import type { UseLayer } from './uses';
 import { settings } from '../settings/settings.svelte';
@@ -91,6 +91,10 @@ class MenuScene {
   private readonly obstacles = new Set<HTMLElement>();
   /** The last scale `scale` found (m a CSS px). */
   private lastScale = 1;
+  /** The painted uses shown (`setUses`), kept for a renderer made again. */
+  private uses: { layer: UseLayer; hatched: Uint8Array | null } | null = null;
+  /** How near the player's zoom comes in (`setNearest`), kept for a renderer made again. */
+  private nearest = OVERVIEW_NEAREST;
   /** Lots whose tags win when tags compete for space. */
   private focusPlots: [number | null, number | null] = [null, null];
   private readonly sizes = new ResizeObserver((entries) => {
@@ -234,14 +238,42 @@ class MenuScene {
     return () => this.obstacles.delete(el);
   }
 
-  /** Orbit / zoom from the player's drag and wheel on the town. */
-  nudge(dAlpha: number, zoom: number): void {
-    this.live?.nudgeTown(dAlpha, zoom);
+  /**
+   * The player's orbit (radians), zoom (a factor) and tilt (radians: more looks from lower down, within
+   * `TILT_MIN`–`TILT_MAX` in all) on top of the shot. The camera's drift and sway stop once the player moves it.
+   */
+  nudge(dAlpha: number, zoom: number, dBeta = 0): void {
+    this.live?.nudgeTown(dAlpha, zoom, dBeta);
+  }
+
+  /** The player's zoom by `zoom` (a factor) towards the land under screen point (`x`, `y`) (CSS pixels): it stays under the pointer. */
+  zoomAt(x: number, y: number, zoom: number): void {
+    this.live?.zoomTownAt(x, y, zoom);
   }
 
   /** The player's pan: the camera's target moved (`dx`, `dz`) m over the ground (kept over the land). */
   pan(dx: number, dz: number): void {
     this.live?.panTown(dx, dz);
+  }
+
+  /** The player's pan along the view: `right` m to the picture's right and `forward` m into it (kept over the land). */
+  panView(right: number, forward: number): void {
+    this.live?.panTownView(right, forward);
+  }
+
+  /** How far (m) the camera is from what it looks at (the keys pan by a share of it a second); 0 with no town shown. */
+  get distance(): number {
+    const r = this.live;
+    return r?.townShown ? r.townDistance : 0;
+  }
+
+  /**
+   * How near (m from what it looks at) the player's zoom comes in: `OVERVIEW_CLOSE` (10 m) in the new game's land,
+   * streets and build steps, `OVERVIEW_NEAREST` (50 m) elsewhere (`TownStage`'s `nearest`).
+   */
+  setNearest(metres: number): void {
+    this.nearest = metres;
+    this.live?.setTownNearest(metres);
   }
 
   /**
@@ -307,6 +339,7 @@ class MenuScene {
    * where a zoned cell is too far from a street to be built on. Cheap enough for every stamp of a stroke.
    */
   setUses(layer: UseLayer | null, hatched?: Uint8Array | null): void {
+    this.uses = layer ? { layer, hatched: hatched ?? null } : null;
     this.live?.setTownUses(layer, hatched);
   }
 
@@ -462,6 +495,8 @@ class MenuScene {
     this.live?.onTownFrame(null);
     this.renderer = new WeakRef(renderer);
     this.shotKey = '';
+    renderer.setTownNearest(this.nearest);
+    if (this.uses) renderer.setTownUses(this.uses.layer, this.uses.hatched);
     renderer.onTownFrame(this.positionLabels);
   }
 

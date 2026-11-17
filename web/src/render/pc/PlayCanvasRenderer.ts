@@ -152,6 +152,7 @@ import { bakeLand, copyLand, fullRect, marchToGround, sameLand } from '../shared
 import { OffThreadLand } from '../shared/renderData';
 import { LandCursorDraw } from './landCursor';
 import { TownGhostDraw, type Drape } from './townGhosts';
+import { UseOverlayDraw } from './useOverlay';
 import { installLandDebug } from './landDebug';
 import type { Landscape } from './nature';
 
@@ -3166,13 +3167,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       } finally {
         this.townBuilds--;
       }
-      // (Step 2's ghosts over the land as it is built now.)
-      if (ticket === this.townTicket && !this.disposed) this.drawGhosts();
+      // (Step 2's ghosts and painted uses over the land as it is built now.)
+      if (ticket === this.townTicket && !this.disposed) {
+        this.drawGhosts();
+        this.drawUses();
+      }
       if (ticket !== this.townTicket || this.disposed || this.townMode) return;
       // Entering from the game (or at start-up): the shot's hour at once.
       this.townMinute = this.townMinuteGoal = this.townShot?.minute ?? minute;
       this.enterTown();
       this.drawGhosts();
+      this.drawUses();
     });
     this.townQueue = run.catch(() => {});
     return run;
@@ -3209,12 +3214,32 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
   }
 
-  nudgeTown(dAlpha: number, zoom: number): void {
-    if (this.townMode) this.townRig.nudge(dAlpha, zoom);
+  nudgeTown(dAlpha: number, zoom: number, dBeta = 0): void {
+    if (this.townMode) this.townRig.nudge(dAlpha, zoom, dBeta);
+  }
+
+  zoomTownAt(x: number, y: number, zoom: number): void {
+    if (!this.townMode) return;
+    // (Over the sky, towards the camera's target: a plain zoom.)
+    const at = this.pickLand(x, y);
+    if (at) this.townRig.zoomAt(at.x, at.z, zoom);
+    else this.townRig.nudge(0, zoom);
   }
 
   panTown(dx: number, dz: number): void {
     if (this.townMode) this.townRig.pan(dx, dz);
+  }
+
+  panTownView(right: number, forward: number): void {
+    if (this.townMode) this.townRig.panView(right, forward);
+  }
+
+  setTownNearest(metres: number): void {
+    this.townRig.setNearest(metres);
+  }
+
+  get townDistance(): number {
+    return this.townPose.radius;
   }
 
   dragTown(x0: number, y0: number, x1: number, y1: number): void {
@@ -3264,8 +3289,34 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.drawGhosts();
   }
 
-  /** Step 2's painted uses over the town: not drawn yet (their overlay is still to come). */
-  setTownUses(_layer: UseLayer | null, _hatched?: Uint8Array | null): void {}
+  setTownUses(layer: UseLayer | null, hatched?: Uint8Array | null): void {
+    this.uses = layer;
+    this.usesHatched = hatched ?? null;
+    this.drawUses();
+  }
+
+  /** Step 2's painted uses (`setTownUses`), and their overlay (made the first time there are any). */
+  private uses: UseLayer | null = null;
+  private usesHatched: Uint8Array | null = null;
+  private useDraw: UseOverlayDraw | null = null;
+
+  /**
+   * The uses drawn over the menus' town (only there): the cells changed since the last time, or all of them over
+   * another land (a new landscape, or the land drawn again) or at another least width of their edges on screen.
+   */
+  private drawUses(): void {
+    const at = this.townMode || !this.lot.landscape ? this.landInView() : null;
+    const uses = at ? this.uses : null;
+    if (!uses && !this.useDraw) return;
+    if (!this.useDraw) {
+      this.useDraw = new UseOverlayDraw(this.app, this.root);
+      this.useDraw.setScale(this.townMetresPerPx());
+    }
+    const layer = this.lot.townLayer ?? pc.LAYERID_WORLD;
+    const land = at ? `${landscapeId(at.scape)}|${at.scape.landVersion}` : null;
+    this.useDraw.set(uses, this.usesHatched, at ? groundOrWater(at.scape) : () => 0, layer, land);
+    this.held?.changed();
+  }
 
   /** Step 2's edits over the town (`setTownGhosts`), and their drawing (made the first time there are any). */
   private ghosts: TownGhosts | null = null;
@@ -3480,8 +3531,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private leaveTown(letGo = false): void {
     this.townMode = false;
     this.landHaze?.show(false);
-    // (The game has no ghosts: drawn again over the town when it is shown again.)
+    // (The game has no ghosts nor painted uses: drawn again over the town when it is shown again.)
     this.ghostDraw?.set(null, () => 0, 0, null);
+    this.useDraw?.clear();
     setDatum(this.root, this.lotRoot, this.datum);
     this.lot.datum = this.datum;
     const ticket = this.townTicket;
@@ -3563,6 +3615,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.landHaze?.show(this.townPose.radius);
     // (Step 2's ghosts drawn again when the zoom crosses a step of their least widths on screen.)
     if (this.ghostDraw?.setScale(this.townMetresPerPx()) && this.ghosts) this.drawGhosts();
+    if (this.useDraw?.setScale(this.townMetresPerPx()) && this.uses) this.drawUses();
     if (this.overview?.frame(secs)) this.held.changed();
     // The light eases between the screens' hours (about two seconds).
     const goal = this.townMinuteGoal;
@@ -4107,6 +4160,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.handles?.destroy();
     this.hoverTile?.destroy();
     this.landCursor?.destroy();
+    this.useDraw?.destroy();
     this.ghostDraw?.destroy();
     this.previews?.destroy();
     this.placing?.dispose();
