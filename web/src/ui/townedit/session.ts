@@ -6,8 +6,9 @@
  *
  * Editing is two-layer (decision 10). An edit takes at once: the plan changes, and the screen shows
  * the change as ghosts over the town (`ghosts.ts` `editGhosts`, the plan against the town on
- * screen). Once edits have paused for `QUIET` ms the plan is settled (`settle.ts` `settle`) and the
- * town built again from it (`show`); edits made meanwhile wait for the next pause. One settle at a
+ * screen). Once edits have paused (`QUIET` ms after one made in a run, as the Lot tool's homes put
+ * down click after click; `QUIET_ONE` after one on its own) the plan is settled (`settle.ts`
+ * `settle`) and the town built again from it (`show`); edits made meanwhile wait for the next pause. One settle at a
  * time: a pause that comes while one runs is taken once it is done. `flush` settles now (the way on
  * to step 3 takes the town as it stands).
  */
@@ -18,8 +19,10 @@ import type { NeighbourhoodDraft } from '../../game/town';
 import type { TownIssues } from './problems';
 import type { Batch, Settled } from './settle';
 
-/** How long edits pause (ms) before the town is settled and built again with them. */
+/** How long edits pause (ms) after one made in a run (`apply`'s `run`) before the town is settled and built again with them. */
 export const QUIET = 1200;
+/** The same after an edit made on its own (a button, a drag let go, an undo): the town is built again soon after. */
+export const QUIET_ONE = 250;
 /** How long after an edit (ms) the Problems list is checked again (the ghosts first). */
 export const CHECK_AFTER = 40;
 
@@ -46,7 +49,9 @@ export interface SessionHooks {
   report?(why: string): void;
   timers?: Timers;
   now?: () => number;
+  /** The pauses (ms) after an edit made in a run and after one on its own (`QUIET`, `QUIET_ONE`). */
   quiet?: number;
+  quietOne?: number;
 }
 
 /** One settle's timing (ms): the settle itself, putting the town on screen, and from the last edit before it to the town on screen. */
@@ -75,6 +80,7 @@ export class EditSession {
   private readonly timers: Timers;
   private readonly now: () => number;
   private readonly quiet: number;
+  private readonly quietOne: number;
   private timer: unknown = null;
   /** The Problems list's next check, waiting for its moment; the checks under way. */
   private checkTimer: unknown = null;
@@ -95,13 +101,15 @@ export class EditSession {
   /**
    * `settled`: the town on screen (as laid, or settled before); `history`: the edits made before (kept
    * while the player goes back and forth through the steps), else none; `from`: the plan `settled`
-   * came from (else `settled` itself). A plan past it is settled after the first pause.
+   * came from (else `settled` itself). A plan past it is settled after the first pause. `marks`: what
+   * in `settled` is over a slope limit (`Settled.marks`), if known: the first settle need not find it.
    */
   constructor(
     settled: NeighbourhoodDraft,
     private readonly hooks: SessionHooks,
     history?: TownHistory,
     from?: NeighbourhoodDraft,
+    marks?: readonly string[],
   ) {
     this.history = history ?? new TownHistory(from ?? settled);
     this.plan = this.history.draft;
@@ -110,9 +118,11 @@ export class EditSession {
     this.timers = hooks.timers ?? realTimers;
     this.now = hooks.now ?? (() => performance.now());
     this.quiet = hooks.quiet ?? QUIET;
+    this.quietOne = hooks.quietOne ?? QUIET_ONE;
+    this.marks = marks;
     this.lastEdit = this.now();
     this.recheck(true);
-    if (this.pending) this.schedule();
+    if (this.pending) this.schedule(this.quietOne);
   }
 
   /** The Problems list is of the plan as it stands. */
@@ -134,12 +144,16 @@ export class EditSession {
     return this.history.canRedo;
   }
 
-  /** An edit made (`game/edit/`): taken on (null), or why it was refused. An edit that changes nothing is not one. */
-  apply(edited: Edited): string | null {
+  /**
+   * An edit made (`game/edit/`): taken on (null), or why it was refused. An edit that changes nothing
+   * is not one. `run`: one of a run of edits (more are likely to follow it soon): the town is built
+   * again once they pause for longer.
+   */
+  apply(edited: Edited, run = false): string | null {
     if ('refused' in edited) return edited.refused;
     if (edited.draft === this.plan) return null;
     this.history.push(edited.draft);
-    this.take(edited.draft);
+    this.take(edited.draft, run);
     return null;
   }
 
@@ -188,14 +202,14 @@ export class EditSession {
     this.control?.abort();
   }
 
-  private take(draft: NeighbourhoodDraft): void {
+  private take(draft: NeighbourhoodDraft, run = false): void {
     this.plan = draft;
     this.ops++;
     this.taken.push(draft);
     this.lastEdit = this.now();
     this.hooks.changed();
     this.recheck(false);
-    this.schedule();
+    this.schedule(run ? this.quiet : this.quietOne);
   }
 
   /** The Problems list checked again: now (`now`), else shortly (so the edit's ghosts show first). A check under way takes the new plan up when it is done. */
@@ -243,14 +257,14 @@ export class EditSession {
     this.timer = null;
   }
 
-  private schedule(): void {
+  private schedule(ms: number): void {
     this.clearTimer();
     if (this.disposed) return;
     this.timer = this.timers.set(() => {
       this.timer = null;
       if (this.running) this.again = true;
       else void this.run();
-    }, this.quiet);
+    }, ms);
   }
 
   /** The plan settled and put on screen (one at a time: see `flush` and `schedule`). */

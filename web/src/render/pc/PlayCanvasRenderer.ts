@@ -222,6 +222,12 @@ const ROAM_SLICE_MS = 4;
  */
 const COVERED_SLICE_MS = 40;
 /**
+ * The same while the menus' town is built again over the one on screen (step 2's edits): the old
+ * town stays drawn and the camera still, so a frame given up now and then shows nothing, and at 8 ms
+ * a slice an edit's town took twice as long to come.
+ */
+const AGAIN_SLICE_MS = 32;
+/**
  * Daylight doesn't reach under the ground or into a room without windows: no sun, only this much
  * of the sky fill and the environment (as seen, intensity times exposure: the same by day and by
  * night). A windowless room up here keeps that little, so its lamps tell. The basement in view
@@ -498,6 +504,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private townTicket = 0;
   private townQueue: Promise<void> = Promise.resolve();
   private townBuilds = 0;
+  /** The town being built replaces one on screen (`showTown` while in the town's mode): see `AGAIN_SLICE_MS`. */
+  private townAgain = false;
   private gameLayers: { camera: number[]; sun: number[] } | null = null;
   /** The surfaces, the look and the environment lighting (`materials.ts`). */
   private lib!: MaterialLibrary;
@@ -2108,7 +2116,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private async pace(): Promise<void> {
     // (Shorter slices once the camera roams: the frames go on moving behind the build, and one it takes shows.)
     // (Longer ones behind the loading screen: nothing is seen, and nothing roams.)
-    const slice = this.loadingCover || this.warming ? COVERED_SLICE_MS : this.townBuilds === 0 && (this.streamOn || this.roamedTo !== null) ? ROAM_SLICE_MS : BUILD_SLICE_MS;
+    const slice = this.loadingCover || this.warming ? COVERED_SLICE_MS : this.townBuilds === 0 && (this.streamOn || this.roamedTo !== null) ? ROAM_SLICE_MS : this.townBuilds > 0 && this.townAgain && !this.worldBuilding ? AGAIN_SLICE_MS : BUILD_SLICE_MS;
     if ((!this.worldBuilding && this.townBuilds === 0) || performance.now() - this.sliceStart < slice) return;
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     this.sliceStart = performance.now();
@@ -3136,6 +3144,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // (The player's pan keeps the camera over the land, the town or none.)
       this.townRig.setBounds({ x0: 0, z0: 0, x1: world.width, z1: groundDepth(world) });
       if (this.townBuilds++ === 0 && !this.worldBuilding) this.sliceStart = performance.now();
+      // (A town on screen already, built again: longer slices, `AGAIN_SLICE_MS`.)
+      this.townAgain = this.townMode;
       try {
         // The landscape on the town layer (the game's, when it's the same town). Same seed and size
         // can still be a new layout ("New neighbours"): the lawn fitted again to its houses.

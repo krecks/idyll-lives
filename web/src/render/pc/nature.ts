@@ -244,17 +244,19 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.world = world;
     await pace?.();
     if (!this.host) return null;
-    // The pads and the country roads, whole (a few draws; the pads are the lots').
-    const old = [...this.pads.slabs, ...this.pads.edges, ...this.roadDraws];
-    const pads = perfTime('nature: pads', () => this.padDraws(app, parent, this.grounds));
+    // The pads, in the ground tiles where a lot came, went or moved, or the land changed (the rest kept as drawn),
+    // and the country roads, whole (a few draws).
+    const dirty = this.padsChanged(changed?.rect ?? null);
+    const pads = perfTime('nature: pads', () => this.padDraws(app, parent, this.grounds, dirty), dirty ? `${dirty.size} tiles` : 'all');
+    const old = [...pads.gone, ...this.roadDraws];
     this.pads = pads;
     await pace?.();
     if (!this.host) {
-      for (const e of [...pads.slabs, ...pads.edges]) e.destroy();
+      for (const e of pads.made) e.destroy();
       return null;
     }
     this.roadDraws = this.roadBuilder ? perfTime('nature: roads', () => this.roadBuilder!(this.roads, parent)) : [];
-    const fresh = [...pads.slabs, ...pads.edges, ...this.roadDraws];
+    const fresh = [...pads.made, ...this.roadDraws];
     const gone = new Set(old);
     this.others = [...this.others.filter((e) => !gone.has(e)), ...fresh];
     this.drawsChanged(fresh, old);
@@ -338,6 +340,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     for (const e of this.others) e.destroy();
     this.grounds = [];
     this.pads = { slabs: [], edges: [] };
+    this.padGroups.clear();
+    this.padList = [];
     this.roadDraws = [];
     for (const e of this.ponds.values()) e.destroy();
     this.ponds.clear();
@@ -382,13 +386,14 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   refreshLawn(world: WorldStructure): void {
     this.world = world;
     // (A world message that changed nothing the lawn grows round, a focus lot shown: nothing to do.)
-    const inputs = lawnInputs(world);
+    const inputs = perfTime('lawn: inputs', () => lawnInputs(world));
     if (this.lawnInputs && sameLawnInputs(this.lawnInputs, inputs)) return;
     this.lawnInputs = inputs;
-    this.lawnMask = lawnMask(world);
-    hideLawn(this.lawn, this.lawnMask, uploadLawn);
+    const mask = (this.lawnMask = perfTime('lawn: mask', () => lawnMask(world)));
+    perfTime('lawn: flowers', () => hideLawn(this.lawn, mask, uploadLawn));
     // (Its bare tiles kept for the birds, who ask next.)
-    this.grass?.refresh(world, this.lawnMask, keepBareTiles(world, inputs, this.lawnMask));
+    const bare = perfTime('lawn: bare tiles', () => keepBareTiles(world, inputs, mask));
+    perfTime('lawn: grass', () => this.grass?.refresh(world, mask, bare));
   }
 
   /**
@@ -1093,16 +1098,44 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    * ground's own material, its colours the terrain's there) and its retaining edges (the foundations' stone, tinted) in a draw
    * of each per ground tile.
    */
-  private padDraws(app: pc.AppBase, parent: pc.Entity, grounds: readonly pc.Entity[]): { slabs: pc.Entity[]; edges: pc.Entity[] } {
+  /**
+   * The ground tiles whose pads are to be drawn again for the surface as it is now (`relay`): those within reach of
+   * a lot whose pad came, went or moved since they were drawn, and those over `land` (land rect: where the land
+   * changed). Null: all of them (none drawn yet).
+   */
+  private padsChanged(land: LandRect | null): Set<number> | null {
+    if (!this.padGroups.size || !this.surface) return null;
+    const pads = padsOf(this.surface, this.world?.plots.length ?? 0);
+    const key = (p: { x: number; z: number; w: number; d: number; y: number }) => `${p.x},${p.z},${p.w},${p.d},${p.y}`;
+    const [now, was] = [new Set(pads.map(key)), new Set(this.padList.map(key))];
+    // (A lot's retaining edges are drawn by the higher of two lots side by side: a pad moved changes its neighbours' too.)
+    const reach = 2 + Math.max(0, ...pads.map((p) => Math.max(p.w, p.d)));
+    const out = new Set<number>();
+    for (const p of [...pads.filter((q) => !was.has(key(q))), ...this.padList.filter((q) => !now.has(key(q)))]) {
+      for (const k of this.tilesIn([p.x - reach, p.z - reach, p.x + p.w + reach, p.z + p.d + reach])) out.add(k);
+    }
+    if (land) for (const k of this.tilesIn(this.landBox(land, LAND_DONE_PAD))) out.add(k);
+    return out;
+  }
+  /** The pads as last drawn (`padDraws`), and each ground tile's draws of them. */
+  private padList: ReturnType<typeof padsOf> = [];
+  private readonly padGroups = new Map<number, { slab: pc.Entity | null; edge: pc.Entity | null }>();
+
+  /**
+   * The pads' draws: the slabs and the edges (all of them), those made now and those they replace (`gone`, not yet
+   * destroyed). `dirty`: only the ground tiles to draw again (`padsChanged`), the others' kept; null: all.
+   */
+  private padDraws(app: pc.AppBase, parent: pc.Entity, grounds: readonly pc.Entity[], dirty: Set<number> | null = null): { slabs: pc.Entity[]; edges: pc.Entity[]; made: pc.Entity[]; gone: pc.Entity[] } {
     const surface = this.surface!;
     const device = app.graphicsDevice;
-    const pads = padsOf(surface, this.world?.plots.length ?? 0);
+    const all = padsOf(surface, this.world?.plots.length ?? 0);
+    this.padList = all;
     const { x0, z0, size } = this.tileFrame();
     const count = Math.ceil(size / TILE);
     // The terrain leaves out the lots: a byte a metre over the world.
     const [w, d] = [Math.ceil(this.w), Math.ceil(this.d)];
     this.padTexture?.destroy();
-    const mask = (this.padTexture = new pc.Texture(device, { name: 'padMask', width: w, height: d, format: pc.PIXELFORMAT_R8, mipmaps: false, minFilter: pc.FILTER_NEAREST, magFilter: pc.FILTER_NEAREST, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [padMask(pads, w, d)] }));
+    const mask = (this.padTexture = new pc.Texture(device, { name: 'padMask', width: w, height: d, format: pc.PIXELFORMAT_R8, mipmaps: false, minFilter: pc.FILTER_NEAREST, magFilter: pc.FILTER_NEAREST, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [padMask(all, w, d)] }));
     const area = new Float32Array([0, 0, w, d]);
     for (const g of grounds) {
       const mi = g.render!.meshInstances[0];
@@ -1110,6 +1143,13 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       mi.setParameter('game_padArea', area);
     }
     const groupOf = (x: number, z: number) => Math.max(0, Math.min(count - 1, Math.floor((z - z0) / TILE))) * count + Math.max(0, Math.min(count - 1, Math.floor((x - x0) / TILE)));
+    // (For some tiles: the pads within reach of them, whose slabs, edges and neighbours' edges may fall in them.)
+    let pads = all;
+    if (dirty) {
+      const reach = 2 + Math.max(0, ...all.map((p) => Math.max(p.w, p.d)));
+      const boxes = [...dirty].map((k) => this.tileCorner(k)).map(([, , tx, tz]) => [tx - reach, tz - reach, tx + TILE + reach, tz + TILE + reach]);
+      pads = all.filter((p) => boxes.some(([bx0, bz0, bx1, bz1]) => p.x < bx1 && p.x + p.w > bx0 && p.z < bz1 && p.z + p.d > bz0));
+    }
     const geos = padGeometry(
       (x, z) => this.terrainAt(x, z),
       pads,
@@ -1123,14 +1163,22 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     // (The retaining edges in the houses' foundation stone: the soil's and the paving's textures are laid along xz,
     // in streaks up a wall.)
     const stone = lib.surface('material.wall.stone', { vertexColors: true, doubleSided: true });
-    const out = { slabs: [] as pc.Entity[], edges: [] as pc.Entity[] };
-    for (const [k, g] of geos) {
+    const made: pc.Entity[] = [];
+    const gone: pc.Entity[] = [];
+    for (const k of dirty ?? [...this.padGroups.keys(), ...geos.keys()]) {
+      const had = this.padGroups.get(k);
+      if (had) for (const e of [had.slab, had.edge]) if (e) gone.push(e);
+      this.padGroups.delete(k);
+      const g = geos.get(k);
+      if (!g) continue;
       const slabs = meshFrom(device, g.slabs.meshData({ colors: true }));
-      if (slabs) out.slabs.push(drawOf(app, parent, `pads${k}`, slabs, slab));
       const edges = meshFrom(device, g.edges.meshData({ colors: true }));
-      if (edges) out.edges.push(drawOf(app, parent, `padEdges${k}`, edges, stone));
+      const drawn = { slab: slabs ? drawOf(app, parent, `pads${k}`, slabs, slab) : null, edge: edges ? drawOf(app, parent, `padEdges${k}`, edges, stone) : null };
+      for (const e of [drawn.slab, drawn.edge]) if (e) made.push(e);
+      this.padGroups.set(k, drawn);
     }
-    return out;
+    const groups = [...this.padGroups.entries()].sort((a, b) => a[0] - b[0]).map(([, d]) => d);
+    return { slabs: groups.flatMap((d) => (d.slab ? [d.slab] : [])), edges: groups.flatMap((d) => (d.edge ? [d.edge] : [])), made, gone };
   }
   /** The slabs' material (`padDraws`). */
   private slabMaterial: pc.StandardMaterial | null = null;

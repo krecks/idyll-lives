@@ -153,7 +153,7 @@
       // Its houses and preview come with it: the menu draws it without making them again.
       keepHouses(made);
       menuScene.prepare(made.draft, made.preview);
-      app.world = { draft: made.draft, key, edited: false, ...(made.plan ? { plan: made.plan } : {}) };
+      app.world = { draft: made.draft, key, edited: false, ...(made.plan ? { plan: made.plan } : {}), ...(made.marks ? { marks: made.marks } : {}) };
       name = app.townName ?? made.draft.name;
       focus = null;
       hover = null;

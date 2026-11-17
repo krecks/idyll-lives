@@ -92,4 +92,13 @@ describe('the lawn’s map', () => {
     expect(again).toEqual(lawnMap(town(), none));
     expect(again).not.toEqual(a);
   });
+
+  test('into the same map with plots removed, added and moved (step 2’s edits): as a map made afresh', () => {
+    const plots = (list: [number, number, number, number][]): WorldStructure => ({ ...town(), plots: list.map(([x, z, w, d], id) => ({ id, name: `${id}`, x, z, w, d, public: false, entry: null, house: null })) });
+    const first = plots([[1, 1, 6, 5], [8, 1, 6, 5], [1, 7, 6, 6], [8, 7, 7, 6]]);
+    const map = lawnMap(first, none);
+    for (const next of [plots([[1, 1, 6, 5], [1, 7, 6, 6], [8, 7, 7, 6]]), plots([[1, 1, 6, 5], [9, 2, 5, 4], [1, 7, 6, 6], [8, 7, 7, 6]]), plots([[2, 1, 8, 6], [1, 7, 6, 6]]), first]) {
+      expect(lawnMap(next, none, map)).toEqual(lawnMap(next, none));
+    }
+  });
 });

@@ -140,22 +140,25 @@ function measureFill(town: CheckedTown, meadow: boolean): { built: number; empty
 }
 
 /** What's wrong with how a town's roads join up, its areas, water, bridges, trails and names (the open-world checks), and how filled it is (`expect`, if given). */
-function openProblems(town: CheckedTown, expect: Expected | undefined, river: boolean): string[] {
+function openProblems(town: CheckedTown, expect: Expected | undefined, river: boolean, index: RoadIndex): string[] {
   const out: string[] = [];
-  const roads = town.roads ?? town.meta.roads ?? [];
+  const roads = index.roads;
   // Joined as the sim joins them (travel.rs `Graph::build`): an end within half the wider road's width and a metre of the other's middle.
   const parent = roads.map((_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
   /** Per road, where along it the other roads' ends meet it (m). */
   const joins: number[][] = roads.map(() => []);
+  const widest = Math.max(0, ...roads.map((r) => r.width));
   roads.forEach((r, i) => {
     for (const end of [r.points[0], r.points[r.points.length - 1]]) {
-      roads.forEach((o, j) => {
+      // (Only the roads passing near the end: those further can't meet it.)
+      for (const j of index.roadsNear(end[0], end[1], Math.max(widest, r.width) / 2 + 1.01)) {
+        const o = roads[j];
         const near = j === i ? null : nearest(o.points, end[0], end[1]);
-        if (!near || near.dist > Math.max(o.width, r.width) / 2 + 1) return;
+        if (!near || near.dist > Math.max(o.width, r.width) / 2 + 1) continue;
         parent[find(i)] = find(j);
         joins[j].push(near.s);
-      });
+      }
     }
   });
   const leaves = new Set(roads.flatMap((r, i) => (r.ends.includes('out') ? [find(i)] : [])));
@@ -243,11 +246,14 @@ function openProblems(town: CheckedTown, expect: Expected | undefined, river: bo
     const deg = (a: number) => ((a * 180) / Math.PI).toFixed(0);
     if (angle > COUNTRY_TURN + 1e-3) out.push(`country road ${r.name} turns ${deg(angle)}° over 40 m at ${x.toFixed(0)}, ${z.toFixed(0)} (${deg(COUNTRY_TURN)}° at most)`);
   }
-  if (expect) {
+  // (How filled it is only where something is wanted of it: an edited town's checks ask nothing.)
+  if (expect && (expect.built > 0 || expect.empty !== null)) {
     const fill = fillOf(town, expect.meadow);
     const pc = (v: number) => `${(v * 100).toFixed(0)}%`;
     if (fill.built < expect.built) out.push(`${pc(fill.built)} of the land built and farmed (${pc(expect.built)} or more wanted)`);
     if (expect.empty !== null && fill.empty > expect.empty) out.push(`${pc(fill.empty)} of its 100 m squares hold nothing (${pc(expect.empty)} at most)`);
+  }
+  if (expect) {
     // Spread over the whole world: each quarter of it an area's middle, or a farmstead or cottage out in the country.
     const inArea = (p: Rect) => areas.some((a) => offRect(a, p.x + p.w / 2, p.z + p.d / 2) === 0);
     const country = town.plots.filter((p) => (p.kind === 'home' || p.kind === 'farm') && !inArea(p)).map((p): Pt => [p.x + p.w / 2, p.z + p.d / 2]);
@@ -331,14 +337,31 @@ const corners = (r: Rect, by = 0): Pt[] => [
  * the day, its work careers that are, and (in a town or a city: `expect.careers`) every career a
  * resident may hold working somewhere in the main town. The main town has its centre.
  */
-function livingProblems(town: CheckedTown, careers: readonly string[], expect: Expected | undefined, given: Record<number, number>, soft: string[]): string[] {
+function livingProblems(town: CheckedTown, careers: readonly string[], expect: Expected | undefined, given: Record<number, number>, soft: string[], index: RoadIndex, generated: boolean): string[] {
   const out: string[] = [];
   const backdrop = town.meta.backdrop;
   const places = town.meta.places;
   if (!backdrop || !places) return ['no backdrop or places'];
   const areas = town.areas ?? [];
-  const roads = town.roads ?? town.meta.roads ?? [];
-  const index = new RoadIndex(roads);
+  const roads = index.roads;
+  // (The roads' points by the 16 m cell they are in: a building looks only at those round it.)
+  const points = new Map<number, Pt[]>();
+  for (const r of roads) {
+    for (const p of r.points) {
+      const k = Math.floor(p[0] / 16) * 65536 + Math.floor(p[1] / 16);
+      const list = points.get(k);
+      if (list) list.push(p);
+      else points.set(k, [p]);
+    }
+  }
+  const pointsIn = (poly: readonly Pt[]) => {
+    const xs = poly.map((p) => p[0]);
+    const zs = poly.map((p) => p[1]);
+    for (let cz = Math.floor(Math.min(...zs) / 16); cz <= Math.floor(Math.max(...zs) / 16); cz++) {
+      for (let cx = Math.floor(Math.min(...xs) / 16); cx <= Math.floor(Math.max(...xs) / 16); cx++) if (points.get(cx * 65536 + cz)?.some(([x, z]) => inside(poly, x, z))) return true;
+    }
+    return false;
+  };
   const water = town.terrain?.water ? unrle(town.terrain.water, town.width * town.depth) : null;
   const lots = town.plots.map((p) => corners(p, LOT_CLEAR - 0.01));
   const parking = (town.parking ?? []).map((p) => corners(p.rot % 2 ? { x: p.x - 3, z: p.z - 1.5, w: 6, d: 3 } : { x: p.x - 1.5, z: p.z - 3, w: 3, d: 6 }));
@@ -368,7 +391,7 @@ function livingProblems(town: CheckedTown, careers: readonly string[], expect: E
         }
       }
     }
-    if (roads.some((r) => r.points.some(([x, z]) => inside(poly, x, z)))) say(i, 'has a road through it');
+    if (pointsIn(poly)) say(i, 'has a road through it');
     if (water) {
       const xs = poly.map((p) => p[0]);
       const zs = poly.map((p) => p[1]);
@@ -402,9 +425,11 @@ function livingProblems(town: CheckedTown, careers: readonly string[], expect: E
     if (n < least) out.push(`${a.name} has ${n} backdrop buildings (${least} or more)`);
   });
   // The centre: the main town's, its open land (not a road, a lot, a green or water) built over more
-  // densely than the rest of its box's.
+  // densely than the rest of its box's (how the generator fills a town: not asked of an edited one).
   const centre = town.meta.centre?.find((c) => c.area === 0);
-  if (!centre || centre.poly.length < 3) out.push('the main town has no centre');
+  if (!generated) {
+    // (Not checked.)
+  } else if (!centre || centre.poly.length < 3) out.push('the main town has no centre');
   else if (areas[0]) {
     const box = areas[0];
     const taken = roadMask(roads.filter((r) => r.kind !== 'trail'), town.width, town.depth, 0);
@@ -443,11 +468,15 @@ function livingProblems(town: CheckedTown, careers: readonly string[], expect: E
  * same way for longer share it.
  */
 const SIDE_BY_SIDE = 60;
-function layoutProblems(town: CheckedTown, expect: Expected | undefined, river: boolean): string[] {
-  const out: string[] = openProblems(town, expect, river);
+function layoutProblems(town: CheckedTown, expect: Expected | undefined, river: boolean, index: RoadIndex): string[] {
+  const out: string[] = openProblems(town, expect, river, index);
   // (Trails are on foot, between the lots: `openProblems` checks they keep off them.)
   const roads = (town.meta.roads ?? []).filter((r) => r.kind !== 'trail');
   const mask = roadMask(roads, town.width, town.depth, 0);
+  // (The roads near a lot's front, found through the index when it is of the same roads.)
+  const ways = index.roads === town.meta.roads ? (town.meta.roads ?? []).flatMap((r, i) => (r.kind !== 'trail' ? [i] : [])) : null;
+  const wayOf = ways && new Map(ways.map((i, k) => [i, k]));
+  const widest = Math.max(0, ...roads.map((r) => r.width));
   town.plots.forEach((p, i) => {
     if (p.x < 0 || p.z < 0 || p.x + p.w > town.width || p.z + p.d > town.depth) out.push(`plot ${i} off the town`);
     for (const [j, q] of town.plots.entries()) if (j > i && p.x < q.x + q.w && q.x < p.x + p.w && p.z < q.z + q.d && q.z < p.z + p.d) out.push(`plots ${i} and ${j} overlap`);
@@ -459,7 +488,10 @@ function layoutProblems(town: CheckedTown, expect: Expected | undefined, river: 
     // The lot's width along its street and its depth (turned a quarter, it lies across).
     const [lw, ld] = f % 2 ? [p.d, p.w] : [p.w, p.d];
     const [fx, fz] = turner(p.x, p.z, lw, ld, f).point([lw / 2, 0]);
-    const gap = Math.min(...roads.map((r) => nearest(r.points, fx, fz).dist - r.width / 2));
+    // (The roads near it first: one within 13 m of it settles it; else every road, for how far it is.)
+    const gapOf = (list: readonly RoadPlan[]) => Math.min(...list.map((r) => nearest(r.points, fx, fz).dist - r.width / 2));
+    let gap = wayOf ? gapOf(index.roadsNear(fx, fz, 13 + widest / 2 + 0.01).flatMap((i) => (wayOf.has(i) ? [roads[wayOf.get(i)!]] : []))) : Infinity;
+    if (!(gap <= 13)) gap = gapOf(roads);
     // (A park may stand in the middle of a green.)
     if (roads.length && gap > 13 && !p.public) out.push(`plot ${i} ${gap.toFixed(1)} m from its road`);
   });
@@ -476,10 +508,13 @@ function layoutProblems(town: CheckedTown, expect: Expected | undefined, river: 
 /**
  * What is wrong with `town` (see the top of this file): `river`, a river world's (it wants a bridge);
  * `careers`, the careers a resident may hold; `given`, per area, the backdrop buildings the slope
- * limits gave up there (`landFollow.ts` `settleLand`: fewer are wanted).
+ * limits gave up there (`landFollow.ts` `settleLand`: fewer are wanted); `generated` false: not the
+ * checks of how the generator fills a town (the centre the densest), which an edited town needn't keep.
  */
-export function townProblems(town: CheckedTown, expect?: Expected, { river = false, careers = [], given = {} }: { river?: boolean; careers?: readonly string[]; given?: Record<number, number> } = {}): { hard: string[]; soft: string[] } {
+export function townProblems(town: CheckedTown, expect?: Expected, { river = false, careers = [], given = {}, generated = true }: { river?: boolean; careers?: readonly string[]; given?: Record<number, number>; generated?: boolean } = {}): { hard: string[]; soft: string[] } {
   const soft: string[] = [];
-  const hard = [...layoutProblems(town, expect, river), ...livingProblems(town, careers, expect, given, soft)];
+  // (One index of the roads for every check that asks which are near a point.)
+  const index = new RoadIndex(town.roads ?? town.meta.roads ?? []);
+  const hard = [...layoutProblems(town, expect, river, index), ...livingProblems(town, careers, expect, given, soft, index, generated)];
   return { hard, soft };
 }

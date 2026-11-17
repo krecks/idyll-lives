@@ -94,6 +94,7 @@ export function straightAround(pts: readonly Pt[], s: number, half: number, most
 export function sideBySide(roads: readonly RoadPlan[], longest = 0, only?: RoadPlan['kind'], same = 0.1): { a: number; b: number; length: number; at: Pt }[] {
   const out: { a: number; b: number; length: number; at: Pt }[] = [];
   const box = roads.map(boxOf);
+  const grids: (SegmentGrid | undefined)[] = [];
   roads.forEach((ra, i) => {
     if (ra.kind === 'trail') return;
     const A = metres(ra.points);
@@ -101,7 +102,7 @@ export function sideBySide(roads: readonly RoadPlan[], longest = 0, only?: RoadP
       if (j <= i || rb.kind === 'trail' || (only && ra.kind !== only && rb.kind !== only)) return;
       if (apart(box[i], box[j], (ra.width + rb.width) / 2)) return;
       let [run, best, at] = [0, 0, A[0]];
-      besideMask(A, ra, rb, same).forEach((by, k) => {
+      besideMask(A, ra, rb, same, (grids[j] ??= segmentGrid(rb.points))).forEach((by, k) => {
         run = by ? run + 1 : 0;
         // (A run of n points a metre apart is n - 1 m long.)
         if (run - 1 > best) [best, at] = [run - 1, A[k]];
@@ -157,14 +158,47 @@ function metres(pts: readonly Pt[]): Pt[] {
   return at;
 }
 
-/** Per point of `A` (`ra`'s `metres`), whether it runs alongside `rb` there (`sideBySide`). */
-function besideMask(A: readonly Pt[], ra: RoadPlan, rb: RoadPlan, same: number): boolean[] {
+/** A polyline's segments (by their end's index, from 1) filed by the `SEG_CELL` m cells their bounds cover. */
+type SegmentGrid = Map<number, number[]>;
+const SEG_CELL = 16;
+function segmentGrid(pts: readonly Pt[]): SegmentGrid {
+  const grid: SegmentGrid = new Map();
+  for (let s = 1; s < pts.length; s++) {
+    const [[ax, az], [bx, bz]] = [pts[s - 1], pts[s]];
+    for (let cz = Math.floor(Math.min(az, bz) / SEG_CELL); cz <= Math.floor(Math.max(az, bz) / SEG_CELL); cz++) {
+      for (let cx = Math.floor(Math.min(ax, bx) / SEG_CELL); cx <= Math.floor(Math.max(ax, bx) / SEG_CELL); cx++) {
+        const list = grid.get(cx * 65536 + cz);
+        if (list) list.push(s);
+        else grid.set(cx * 65536 + cz, [s]);
+      }
+    }
+  }
+  return grid;
+}
+
+/**
+ * Per point of `A` (`ra`'s `metres`), whether it runs alongside `rb` there (`sideBySide`). `grid`:
+ * `rb`'s segments filed (`segmentGrid`): only those within reach of a point are looked at (the
+ * nearest is one of them whenever it is near enough to count), in the same order.
+ */
+function besideMask(A: readonly Pt[], ra: RoadPlan, rb: RoadPlan, same: number, grid?: SegmentGrid): boolean[] {
   const far = (ra.width + rb.width) / 2;
+  const all = grid ? null : Array.from({ length: Math.max(0, rb.points.length - 1) }, (_, k) => k + 1);
   return A.map((pt, k) => {
     // The nearest of the second's segments: how far, the way it runs, and whether it's past
     // either end of it (beyond its end it isn't alongside it).
     let [d, tx, tz, past] = [Infinity, 0, 0, false];
-    for (let s = 1; s < rb.points.length; s++) {
+    let segs = all;
+    if (grid) {
+      const near = new Set<number>();
+      for (let cz = Math.floor((pt[1] - far) / SEG_CELL); cz <= Math.floor((pt[1] + far) / SEG_CELL); cz++) {
+        for (let cx = Math.floor((pt[0] - far) / SEG_CELL); cx <= Math.floor((pt[0] + far) / SEG_CELL); cx++) for (const s of grid.get(cx * 65536 + cz) ?? []) near.add(s);
+      }
+      // (None within reach: not alongside, whichever is nearest.)
+      if (!near.size) return false;
+      segs = [...near].sort((a, b) => a - b);
+    }
+    for (const s of segs!) {
       const [[ax, az], [bx, bz]] = [rb.points[s - 1], rb.points[s]];
       const [dx, dz] = [bx - ax, bz - az];
       const l2 = dx * dx + dz * dz || 1;
@@ -743,6 +777,13 @@ export class RoadIndex {
       }
     }
     return false;
+  }
+
+  /** The roads with a segment filed within `r` m of (x, z), in their order: every road whose middle passes within `r` m of it, and maybe a few more. */
+  roadsNear(x: number, z: number, r: number): number[] {
+    const out = new Set<number>();
+    this.near(x, z, r, (id) => void out.add(this.segs[id].road));
+    return [...out].sort((a, b) => a - b);
   }
 
   /** Distance from (x, z) to segment `id`, the arc length there and the side (+1: the road's left). */

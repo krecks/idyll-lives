@@ -328,6 +328,7 @@ export class Street {
     const layoutKey = TownStreet.layoutKey(world, mode);
     const span = perfStart('street: plan');
     let layoutMs = 0;
+    let handed = '';
     if (!this.town || layoutKey !== this.layoutKey) {
       const t0 = performance.now();
       // (Another layout keeps the chunks built: each is planned again only where its key, what it is planned from,
@@ -342,12 +343,16 @@ export class Street {
       await pace?.();
       if (stale()) return;
       const t1 = performance.now();
-      const town = new TownStreet(this.house.planner, world, { has: (k) => this.assets.has(k, 'model'), entry, lived: this.lived, look: this.look, ground: this.ground, fenceStyles: this.fenceStyles }, mode);
+      // (The town before handing on what this one plans just as it did: its street's own, the kerbs of the rows an edit
+      // left alone. The town view's only: a game's street is laid out again for a garage built, and keeps its chunks.)
+      const previous = mode === 'town' && this.town?.mode === 'town' ? this.town : null;
+      const town = new TownStreet(this.house.planner, world, { has: (k) => this.assets.has(k, 'model'), entry, lived: this.lived, look: this.look, ground: this.ground, fenceStyles: this.fenceStyles }, mode, previous);
       layoutMs += performance.now() - t1;
       await pace?.();
       if (stale()) return;
       await town.prepare(pace);
       if (stale()) return;
+      if (previous) handed = `, handed on: ${town.handedOn.statics ? 'its own' : 'not its own'}, ${town.handedOn.kerbs} kerbs`;
       this.town = town;
       this.layoutKey = layoutKey;
       this.townWorld = world;
@@ -409,7 +414,7 @@ export class Street {
     // (The plots' and fences' planned parts are kept for the chunks drawn: what a focus moving next
     // door or a thing moved plans again. Every other chunk keeps its vertex arrays alone.)
     town.keepUnits(this.wanted ? wantedSet : null, focus);
-    perfEnd(span, `layout ${Math.round(layoutMs)}, keys ${Math.round(keyMs)}, ${planned} of ${wanted.length} chunks planned ${Math.round(planMs)}`);
+    perfEnd(span, `layout ${Math.round(layoutMs)}, keys ${Math.round(keyMs)}, ${planned} of ${wanted.length} chunks planned ${Math.round(planMs)}${handed}`);
     if (planned || dirty.size) this.instancesDue = true;
 
     const meshesSpan = perfStart('street: meshes');

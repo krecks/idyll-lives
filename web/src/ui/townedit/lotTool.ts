@@ -152,7 +152,8 @@ export const lotTool: TownTool = {
         }
         const placing = look(x, y);
         if (placing) {
-          if (editor.apply('civic' in placing ? placing.civic : addLot(editor.draft, editor.t, editor.content, placing.at, placing.choice, seed))) seed = editor.seed();
+          // (Homes are put down click after click: the town is built again once the clicks pause.)
+          if (editor.apply('civic' in placing ? placing.civic : addLot(editor.draft, editor.t, editor.content, placing.at, placing.choice, seed), true)) seed = editor.seed();
           look(x, y);
         } else if (lotChoice.group === 'civic') {
           editor.refuse(civicWhy ?? 'nothing to put down');

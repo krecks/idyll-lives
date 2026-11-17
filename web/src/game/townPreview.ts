@@ -76,7 +76,9 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     if (z > 0 && !h[z * W + x]) visit(x, z - 1);
     if (z < D - 1 && !h[(z + 1) * W + x]) visit(x, z + 1);
   }
-  const rooms = Array.from(outdoor, (o) => (o ? 0 : 1));
+  // (A typed array: a city's is near a million tiles, and the town worker hands it over rather than copying it.)
+  const rooms = new Uint16Array(W * D);
+  for (let i = 0; i < rooms.length; i++) rooms[i] = outdoor[i] ? 0 : 1;
 
   const plots: PlotInfo[] = layout.plots.map((p, id) => {
     // Bounding box of the walls on the plot (sim-core `house_bounds`): a wall on the plot's own edge only where the

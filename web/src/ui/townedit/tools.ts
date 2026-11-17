@@ -34,8 +34,8 @@ export interface TownEditor {
   readonly content: Content;
   /** Bumped whenever the plan, what is picked or the town on screen changes (a card reads it to follow along). */
   readonly version: number;
-  /** Makes an edit: a draft taken on (true), or a refusal shown with its reason (false). */
-  apply(edited: Edited): boolean;
+  /** Makes an edit: a draft taken on (true), or a refusal shown with its reason (false). `run`: one of a run of edits (`EditSession.apply`). */
+  apply(edited: Edited, run?: boolean): boolean;
   /** A refusal shown: under the tools for a while, and as a toast. Written as the edits write them ("it bends tighter than 9 m"). */
   refuse(why: string): void;
   /** A fresh seed for an edit's dice (a new house, a name): the same seed, the same result. */
