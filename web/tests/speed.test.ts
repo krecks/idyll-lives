@@ -104,4 +104,37 @@ describe('game speed', () => {
     expect(s.chosen).toBe(0);
     expect(s.last).toBe(4);
   });
+
+  test('super speed starting and ending on its own: the speed shown follows, nothing is sent back', () => {
+    const { speed: s, sent } = speed();
+    s.choose(2);
+    s.hold('loading', false);
+    // (A view from just after the speed was sent is from before it: not followed.)
+    s.follow(4, performance.now());
+    expect(s.chosen).toBe(2);
+    s.follow(4, performance.now() + 1000);
+    expect(s.chosen).toBe(4);
+    s.follow(2, performance.now() + 2000);
+    expect(s.chosen).toBe(2);
+    expect(sent).toEqual([2]);
+  });
+
+  test("only super speed's comings and goings are followed, and not under a hold", () => {
+    const { speed: s } = speed();
+    s.choose(3);
+    s.hold('loading', false);
+    const later = performance.now() + 1000;
+    // (Another speed than the player's: a view from before their pick.)
+    s.follow(1, later);
+    expect(s.chosen).toBe(3);
+    s.hold('menu', true);
+    s.follow(4, later);
+    expect(s.chosen).toBe(3);
+    s.hold('menu', false);
+    s.follow(4, performance.now() + 1000);
+    expect(s.chosen).toBe(4);
+    // Pausing at super speed resumes at it (the simulation drops back itself if it's no longer quiet).
+    s.choose(0);
+    expect(s.last).toBe(4);
+  });
 });

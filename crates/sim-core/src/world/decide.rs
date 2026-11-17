@@ -15,6 +15,8 @@ pub(crate) fn pick_autonomous(
     from_seat: Option<f32>,
 ) -> Option<Task> {
     let content = ctx.content;
+    // (Each part's time, with the `profile` feature: `pick_autonomous/...`.)
+    let mut part = crate::profile::start();
     let needs = &sim.needs[..content.needs.len()];
     // How hard each need pulls (more below the level they like to keep it at).
     let felt = ai::felt(needs, &content.needs, &content.autonomy);
@@ -104,6 +106,8 @@ pub(crate) fn pick_autonomous(
     let elsewhere = std::cell::OnceCell::new();
     let elsewhere =
         || *elsewhere.get_or_init(|| bedded || has_bed(sim, ctx, objects, usable, true));
+    crate::profile::end("pick_autonomous/setup", part);
+    part = crate::profile::start();
     for obj in usable
         .iter()
         .map(|&o| &objects[o as usize])
@@ -357,6 +361,8 @@ pub(crate) fn pick_autonomous(
         }
     }
 
+    crate::profile::end("pick_autonomous/objects", part);
+    part = crate::profile::start();
     // About to drop (or burst): no time to talk, as a chat would break off at once and leave the
     // other one's activity dropped for nothing (`available_for_social` asks the same of them).
     let pressed = sim.pressed(content);
@@ -523,6 +529,8 @@ pub(crate) fn pick_autonomous(
         }
     }
 
+    crate::profile::end("pick_autonomous/socials", part);
+    part = crate::profile::start();
     // Tidying up: the dirtiest spot at home, if it's dirty enough. The worse their surroundings
     // feel, the keener they are; traits and planned chores do the rest.
     let home = ctx.households[sim.household as usize].plot;
@@ -644,6 +652,8 @@ pub(crate) fn pick_autonomous(
         }
     }
 
+    crate::profile::end("pick_autonomous/home", part);
+    part = crate::profile::start();
     // The phone: texting, calling or inviting people who aren't here, scrolling (`phone.rs`).
     // (Nor a call or a text, pressed.)
     for (s, action, contact) in crate::phone::candidates(sim, ctx, &felt, &feel) {
@@ -652,6 +662,8 @@ pub(crate) fn pick_autonomous(
         }
     }
 
+    crate::profile::end("pick_autonomous/phone", part);
+    part = crate::profile::start();
     // Residents visit friends who are home, or go out. (Not from a seat: only a word from it,
     // below.)
     let household = &ctx.households[sim.household as usize];
@@ -699,13 +711,26 @@ pub(crate) fn pick_autonomous(
             let Some(plot) = other.plot else { continue };
             // The best friend of theirs at home, and someone to open the door: a grown-up at
             // home, up and about, not on their way out (`life::opens_door`).
+            // (Only theirs: `Ctx::members`.)
             let mut friendship = f32::NEG_INFINITY;
             let mut opener = false;
-            for (j, b) in ctx.briefs.iter().enumerate() {
+            for &j in ctx.members.of(other.id) {
+                let b = &ctx.briefs[j as usize];
                 if b.household == other.id && b.plot == Some(plot) && !b.away {
-                    friendship = friendship.max(ctx.rels.get(me, j).friendship);
+                    friendship = friendship.max(ctx.rels.get(me, j as usize).friendship);
                     opener = opener || crate::life::opens_door(b, other.id, plot);
                 }
+            }
+            #[cfg(debug_assertions)]
+            {
+                let (mut was, mut opens) = (f32::NEG_INFINITY, false);
+                for (j, b) in ctx.briefs.iter().enumerate() {
+                    if b.household == other.id && b.plot == Some(plot) && !b.away {
+                        was = was.max(ctx.rels.get(me, j).friendship);
+                        opens = opens || crate::life::opens_door(b, other.id, plot);
+                    }
+                }
+                debug_assert!(was.to_bits() == friendship.to_bits() && opens == opener);
             }
             if friendship < visits.min_friendship || !opener {
                 continue;
@@ -814,6 +839,7 @@ pub(crate) fn pick_autonomous(
         }
     }
 
+    crate::profile::end("pick_autonomous/visits", part);
     // Not what they couldn't get to a moment ago (and would try again and again, each time
     // looking for a way there).
     for kind in sim.unreachable_now(ctx.tick) {

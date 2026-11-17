@@ -1,13 +1,15 @@
 <script lang="ts">
   /**
-   * New game, step 4: the home, chosen on the whole world. The camera opens on the whole land; the
-   * chips under it glide to the main town or a village, and "Whole world" back out. Homes for sale
-   * are lit, those the household can't afford in a rose tint of their own; a home under the pointer
-   * says its price and bedrooms, and a click chooses it and glides in. The panel says who is moving
+   * New game, step 5: the home, chosen on the whole world. The camera opens on the whole land; the
+   * chips under it glide to the main town or a village, and "Whole world" back out. The homes for
+   * sale the household can afford are lit; two chips beside the legend add the rest ("All for sale"),
+   * as a faint stone ring, or leave them out ("Within savings", where a Living game opens). In a
+   * Creative game every home for sale is lit. A home under the pointer says its price and bedrooms,
+   * and a click chooses it and glides in. The panel says who is moving
    * and what the chosen home is; under it the homes for sale as a list, for the keyboard, and the
    * main control on a narrow screen.
    *
-   * A household of the town's (chosen in step 3, `app.playSlot`) has its own home chosen already:
+   * A household of the town's (chosen in step 4, `app.playSlot`) has its own home chosen already:
    * it may stay (the game takes it over as it is) or move to a home for sale, its old home then for
    * sale too. On Move in the rest of the homes for sale are filled (`newGame.ts` `moveInRequest`).
    */
@@ -21,7 +23,7 @@
   import { settings } from '../../settings/settings.svelte';
   import { tierFor } from '../../game/people';
   import { furnishAhead } from '../../game/townJobs';
-  import { householdsAhead } from '../newGame';
+  import { householdsAhead, stepLabel } from '../newGame';
   import { app } from '../app.svelte';
   import { money } from '../format';
   import Icon from '../Icon.svelte';
@@ -37,7 +39,7 @@
   let templates = $state.raw<Templates | null>(null);
   /** Changes when a lot's garden is made bigger or smaller (the lots along the street move). */
   const town = $derived(app.town!);
-  /** The home of the town's household chosen in step 3 (null: a household made in Creation). */
+  /** The home of the town's household chosen in step 4 (null: a household made in Creation). */
   const from = app.residentSlot;
   const household = app.mover!;
   const name = household.name;
@@ -115,9 +117,15 @@
   const savings = savingsOf(content, household);
   /** Each home's price as it stands, by lot (their own home's too: what they paid). */
   const prices = $derived(templates ? new Map([...choosable].map((i) => [i, homePrice(content, templates!, town.slots[i])])) : null);
-  /** More than the household has saved (Living): still there to look at, lit in a tint of its own. */
+  /** More than the household has saved (Living): still there to look at, as a faint ring once "All for sale" is chosen. */
   const dear = (plot: number) => !creative && plot !== from && (prices?.get(plot) ?? 0) > savings;
   const dearIds = $derived(prices ? vacantIds.filter(dear) : []);
+  /** Which homes for sale the map lights (Living, with some too dear): those within their savings, or all of them, the rest faint. */
+  let lit = $state<'within' | 'all'>('within');
+  /** There is a choice to make: a Living game, the prices known, and some homes beyond their savings. */
+  const litChoice = $derived(!creative && dearIds.length > 0);
+  const showAll = $derived(!litChoice || lit === 'all');
+  const litIds = $derived(showAll ? vacantIds : vacantIds.filter((i) => !dear(i)));
   /** Bought as an empty lot: chosen so, or no house stands on it (as `assembleTown` sees it: money to build with besides). */
   const emptyLot = $derived(!staying && (lot === 'empty' || (!!templates && !!selected && !house)));
   /** The chosen home's price (an empty lot: the land alone), and what it's made of. */
@@ -143,8 +151,8 @@
 
   const areas = $derived(town.open?.areas ?? []);
   const areaName = (s: PlotSlot) => areas[s.area ?? 0]?.name || town.name;
-  /** Homes for sale in each area. */
-  const forSaleIn = $derived(areas.map((_, k) => vacant.filter((s) => (s.area ?? 0) === k).length));
+  /** Homes lit in each area (for sale; within their savings while only those are lit). */
+  const forSaleIn = $derived(areas.map((_, k) => vacant.filter((s) => (s.area ?? 0) === k && (showAll || !dear(s.index))).length));
   /** What the camera frames with no home in focus: the whole world, or one of its areas. */
   let shot = $state<'world' | { area: number }>('world');
   /** The camera is on the chosen home (false: on `shot`). */
@@ -327,7 +335,7 @@
     if (shown) void menuScene.show(shown, plot ?? from);
   });
   $effect(() => {
-    menuScene.highlight({ hover, selected: selected?.index ?? null, marked: vacantIds, dear: dearIds, outlines: false });
+    menuScene.highlight({ hover, selected: selected?.index ?? null, marked: litIds, dear: litChoice && showAll ? dearIds : [], outlines: false });
   });
   $effect(() => () => menuScene.highlight({}));
 
@@ -537,15 +545,28 @@
         {@const on = !close && typeof shot === 'object' && shot.area === k}
         <button class="chip" class:on aria-pressed={on} onclick={() => jump(k)}>
           {a.name || town.name}
-          {#if forSaleIn[k]}<span class="n" title="{forSaleIn[k]} for sale">{forSaleIn[k]}</span>{/if}
+          {#if forSaleIn[k]}<span class="n" title="{forSaleIn[k]} {showAll ? 'for sale' : 'within their savings'}">{forSaleIn[k]}</span>{/if}
         </button>
       {/each}
     </div>
-    <div class="legend menu-glass" aria-hidden="true">
-      <span class="swatch sale"></span> For sale
-      {#if dearIds.length}<span class="swatch dear"></span> More than they have{/if}
-      <span class="sep"></span>
-      Click a home to look closer · drag to turn · scroll to zoom · middle-drag to pan
+    <div class="key">
+      {#if litChoice}
+        <div class="jump" role="radiogroup" aria-label="Homes lit on the map">
+          <button class="chip" class:on={lit === 'within'} role="radio" aria-checked={lit === 'within'} onclick={() => (lit = 'within')}>
+            Within savings <span class="n">{vacant.length - dearIds.length}</span>
+          </button>
+          <button class="chip" class:on={lit === 'all'} role="radio" aria-checked={lit === 'all'} onclick={() => (lit = 'all')}>
+            All for sale <span class="n">{vacant.length}</span>
+          </button>
+        </div>
+      {/if}
+      <div class="legend menu-glass" aria-hidden="true">
+        <span class="swatch sale"></span>
+        {litChoice ? 'Within their savings' : 'For sale'}
+        {#if litChoice && showAll}<span class="swatch dear"></span> More than they have{/if}
+        <span class="sep"></span>
+        Click a home to look closer · drag to turn · scroll to zoom · middle-drag to pan
+      </div>
     </div>
   </div>
 {/snippet}
@@ -562,7 +583,7 @@
   </button>
 {/snippet}
 
-<SetupShell label="The home" step="Step 4 of 4 · Home" back={{ label: 'Household', go: back }} {head} {panel} {stage} stats={figures} {actions} />
+<SetupShell label="The home" step={stepLabel(5)} back={{ label: 'Household', go: back }} {head} {panel} {stage} stats={figures} {actions} />
 
 {#if confirming && shortage}
   <Modal title="Not enough beds" onclose={() => (confirming = false)} width={460}>
@@ -797,7 +818,8 @@
     background: rgb(255, 199, 97);
   }
   .homes li.dear .dot {
-    background: rgb(242, 107, 128);
+    background: none;
+    box-shadow: inset 0 0 0 1.5px rgb(170, 164, 152);
   }
   .homes li.own .dot {
     background: var(--tag-home);
@@ -893,6 +915,12 @@
   .chip.on .n {
     background: rgba(255, 255, 255, 0.25);
   }
+  .key {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
   .legend {
     display: flex;
     flex-wrap: wrap;
@@ -910,9 +938,11 @@
     border-radius: 50%;
     background: rgb(255, 199, 97);
   }
+  /* The faint stone ring the map draws round a home they can't afford. */
   .swatch.dear {
     margin-left: 6px;
-    background: rgb(242, 107, 128);
+    background: none;
+    box-shadow: inset 0 0 0 1.5px rgb(170, 164, 152);
   }
   .sep {
     width: 1px;

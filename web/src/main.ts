@@ -1,5 +1,7 @@
 // First: errors are captured for debug reports from the start (see `debug/capture.ts`).
 import './debug/capture';
+// `?memtrace` (dev only): the page's large typed arrays by site, from as early as can be (`debug/memtrace.ts`).
+import './debug/memtrace';
 import '@fontsource-variable/inter';
 import './ui/theme.css';
 import { mount } from 'svelte';

@@ -18,7 +18,7 @@
 
 import type { Content } from '../../content/content';
 import type { BackdropBuilding, RoadPlan, TownPlace } from '../../core/protocol';
-import { areaSize, CIVIC, civicLabel, civicOf, civicTooBig, draftSize, HOURS, hoursFor, LOT_HOURS, LOT_WORK, namerFor } from '../backdrop';
+import { byNeed, CIVIC, civicLabel, civicOf, civicTooBig, draftAreaSize, HOURS, hoursFor, LOT_HOURS, LOT_WORK, namerFor } from '../backdrop';
 import { weighted, type GardenSize } from '../housegen';
 import { heightAt } from '../land';
 import { BEND, BEND_MOST, CORNER, TIGHT_BEND, TRAIL_WIDTH } from '../macro';
@@ -559,14 +559,20 @@ export function swapPlace(draft: NeighbourhoodDraft, t: Templates, content: Cont
  */
 export { CIVIC as CIVIC_PLACES } from '../backdrop';
 
-/** The civic places a civic building (`building`, in `open.backdrop`) may become: those its area doesn't have yet, a village's of a village's size and called as a village's (its hall its village hall: `civicTooBig`, `civicLabel`). */
+/**
+ * The civic places a civic building (`building`, in `open.backdrop`) may become: those its area doesn't have yet, of
+ * its area's size and called as one of that size (a village's hall its village hall: `draftAreaSize`, `civicTooBig`,
+ * `civicLabel`), those for careers no other place there employs first (`byNeed`).
+ */
 export function civicSwaps(draft: NeighbourhoodDraft, building: number): { civic: number; label: string }[] {
   const b = draft.open?.backdrop?.[building];
   const places = draft.open?.places ?? [];
   if (!b || civicOf(places[b.place ?? -1]) < 0) return [];
-  const has = new Set(places.filter((p) => p.area === b.area).map(civicOf));
-  const size = areaSize(draftSize(draft), b.area);
-  return CIVIC.flatMap((c, i) => (has.has(i) || civicTooBig(c, size, b.area) ? [] : [{ civic: i, label: civicLabel(c, size) }]));
+  const others = places.filter((p, i) => p.area === b.area && i !== b.place);
+  const has = new Set([...others, places[b.place!]].map(civicOf));
+  const size = draftAreaSize(draft, b.area);
+  const open = CIVIC.flatMap((c, i) => (has.has(i) || civicTooBig(c, size) ? [] : [i]));
+  return byNeed(open, new Set(others.flatMap((p) => p.work ?? []))).map((civic) => ({ civic, label: civicLabel(CIVIC[civic], size) }));
 }
 
 /**
@@ -586,11 +592,11 @@ export function swapCivic(draft: NeighbourhoodDraft, building: number, civic: nu
   const was = civicOf(old);
   if (was < 0) return { refused: 'That is not a civic building.' };
   // (Named and offered by its area's size: a village's.)
-  const size = areaSize(draftSize(draft), b.area);
+  const size = draftAreaSize(draft, b.area);
   const label = civicLabel(c, size).toLowerCase();
   if (was === civic) return { refused: `It is a ${label} already.` };
   const area = open.areas[b.area];
-  if (civicTooBig(c, size, b.area)) return { refused: `${area?.name ?? draft.name} is too small for a ${label}.` };
+  if (civicTooBig(c, size)) return { refused: `${area?.name ?? draft.name} is too small for a ${label}.` };
   if (open.places.some((p, i) => i !== b.place && p.area === b.area && civicOf(p) === civic)) return { refused: `${area?.name ?? draft.name} has a ${label} already.` };
   // A name as the generator names one, none twice in the world (the lots' names among them).
   const rand = mulberry32(seed);

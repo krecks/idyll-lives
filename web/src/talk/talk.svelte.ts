@@ -1,12 +1,14 @@
 /**
  * Following the settings: whether residents' lines are the model's (only once the device test
  * found it usable on this computer; the test runs on its own when needed), and the model loaded
- * from the start while they are (unloaded when they aren't).
+ * from the start while they are (on a machine low on memory, when the first line wants it;
+ * unloaded when they aren't).
  */
 
 import { untrack } from 'svelte';
 import { ensureLlm, llmStatus, unloadLlm } from '../llm';
 import { settings } from '../settings/settings.svelte';
+import { LOW_MEMORY } from '../settings/lowMemory';
 import { applyReport, deviceTest, report, runDeviceTest, usableHere, type DeviceReport } from './devices.svelte';
 import { loadTalk } from './text';
 
@@ -46,7 +48,8 @@ $effect.root(() => {
     untrack(() => {
       if (running) return;
       if (chosen && !tested && !stopped) void testDevices().catch(() => {});
-      else if (writes && llmStatus.state === 'off') void ensureLlm().catch(() => {});
+      // (Low on memory, it loads when the first line wants it: `wantLlm`.)
+      else if (writes && llmStatus.state === 'off' && !LOW_MEMORY) void ensureLlm().catch(() => {});
       else if (!writes && llmStatus.state !== 'off') unloadLlm();
     });
   });

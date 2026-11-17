@@ -27,13 +27,26 @@ export const OVERVIEW_TOWN_HEIGHT = 7;
 
 /** How near (radians, and parts of the radius) a settled camera comes to its goal before it's put there. */
 const SNAP = 1e-4;
-/** The player's zoom comes in as near as this (m from the target), however far out the shot is. */
+/** The player's zoom comes in as near as this (m from the target), however far out the shot is: the menus' own. */
 export const OVERVIEW_NEAREST = 50;
+/** The nearest of the new game's land, streets and build steps (`OverviewCamera.setNearest`): down among the houses. */
+export const OVERVIEW_CLOSE = 10;
+/** The player's tilt (`nudge`'s `dBeta`) stays within these (radians from straight down). */
+export const TILT_MIN = 0.15;
+export const TILT_MAX = 1.35;
+/**
+ * The camera's target is lifted onto the land under it as the camera comes in: not at all from this far out (m)
+ * (a shot is framed about the land's datum), wholly from `LIFT_NEAR` in (a close look on a hill).
+ */
+const LIFT_FAR = 260;
+const LIFT_NEAR = 80;
 /**
  * No shot is framed from further out than this (m from the target), and the player's zoom goes out no further: the
  * whole of the largest land (960 m) fits the narrowest stage beside the side panel well within it.
  */
 export const OVERVIEW_FARTHEST = 2400;
+/** Where along the way from the camera (0) to its target (1) `hidden` looks for the land in the way. */
+const HIDDEN_AT = [0, 0.12, 0.25, 0.4, 0.55, 0.7] as const;
 /** How far (m) the player may pan the camera off the shot's focus when no land is given to keep it over (`bounds`). */
 const PAN_REACH = 1500;
 
@@ -77,6 +90,10 @@ export class OverviewCamera {
   /** User orbit and zoom on top of the shot. */
   private userAlpha = 0;
   private userZoom = 1;
+  /** The player's tilt (radians from straight down) in place of the shot's; null: the shot's own. */
+  private tilt: number | null = null;
+  /** How near (m) the player's zoom comes in (`setNearest`). */
+  private nearest = OVERVIEW_NEAREST;
   /** The player's pan (m) on top of the shot's focus. */
   private panX = 0;
   private panZ = 0;
@@ -121,11 +138,21 @@ export class OverviewCamera {
     this.clampPan();
   }
 
+  /**
+   * How near (m from the target) the player's zoom comes in from now on: `OVERVIEW_NEAREST` in the menus,
+   * `OVERVIEW_CLOSE` in the new game's steps that shape the town. A zoom already nearer is pulled back out.
+   */
+  setNearest(metres: number): void {
+    this.nearest = Math.max(1, metres);
+    this.nudge(0, 1);
+  }
+
   /** Frames `shot`; with `duration` 0 (or `cut`) it jumps there. */
   setShot(shot: TownShot, cut = false): void {
     const alphaChanged = shot.alpha !== undefined && shot.alpha !== this.shot?.alpha;
     if (alphaChanged) this.userAlpha = 0;
     if (shot.zoom !== this.shot?.zoom || alphaChanged) this.userZoom = 1;
+    if ((shot.beta ?? 0.9) !== (this.shot?.beta ?? 0.9) || alphaChanged) this.tilt = null;
     // (Another part of the world framed: the player's pan is let go.)
     const f = this.shot?.focus;
     if (!f || f.x !== shot.focus.x || f.z !== shot.focus.z || f.w !== shot.focus.w || f.d !== shot.focus.d) this.panX = this.panZ = 0;
@@ -144,7 +171,12 @@ export class OverviewCamera {
     if (!this.shot) return;
     this.userAlpha = 0;
     this.userZoom = 1;
+    this.tilt = null;
     this.panX = this.panZ = 0;
+    // (The shot's drift and sway back, from the way the camera faces now.)
+    this.drift = this.shot.drift ?? 0;
+    this.sway = this.shot.sway ?? 0;
+    this.swayTime = 0;
     this.startGlide(seconds);
   }
 
@@ -155,18 +187,38 @@ export class OverviewCamera {
     this.sway = 0;
     this.userAlpha = 0;
     this.userZoom = 1;
+    this.tilt = null;
     this.panX = this.panZ = 0;
     Object.assign(this.goal, { alpha: target.alpha, beta: target.beta, radius: target.radius, tx: target.x, tz: target.z, ox: 0, oy: 0 });
     this.onArrive = done;
     this.startGlide(seconds);
   }
 
-  /** The player's orbit (radians) and zoom (a factor) on top of the shot; the zoom comes in to `OVERVIEW_NEAREST` m at most. */
-  nudge(dAlpha: number, zoom: number): void {
+  /**
+   * The player's orbit (radians), zoom (a factor) and tilt (radians, more is lower) on top of the shot. The zoom comes
+   * in to the nearest (`setNearest`) at most; the tilt stays within `TILT_MIN`–`TILT_MAX`. Says by how much the zoom
+   * changed (a factor: 1 where it was already at its limit).
+   */
+  nudge(dAlpha: number, zoom: number, dBeta = 0): number {
+    if (dAlpha || dBeta || zoom !== 1) this.taken();
     this.userAlpha += dAlpha;
+    if (dBeta) this.tilt = Math.min(TILT_MAX, Math.max(TILT_MIN, (this.tilt ?? this.goal.beta) + dBeta));
     // (Out to the shot's distance over 0.6, and never past `OVERVIEW_FARTHEST`.)
     const out = Math.min(1, Math.max(0.6, this.goal.radius / OVERVIEW_FARTHEST));
-    this.userZoom = Math.min(Math.max(2.6, this.goal.radius / OVERVIEW_NEAREST), Math.max(out, this.userZoom * zoom));
+    const before = this.userZoom;
+    this.userZoom = Math.min(Math.max(2.6, this.goal.radius / this.nearest), Math.max(out, this.userZoom * zoom));
+    return this.userZoom / before;
+  }
+
+  /**
+   * The player's zoom by `zoom` towards the ground point (`x`, `z`) (the one under the pointer): the camera's target
+   * moves towards it as the camera comes in, so it stays under the pointer.
+   */
+  zoomAt(x: number, z: number, zoom: number): void {
+    const k = this.nudge(0, zoom);
+    if (k === 1) return;
+    const [tx, tz] = [this.goal.tx + this.panX, this.goal.tz + this.panZ];
+    this.pan((x - tx) * (1 - 1 / k), (z - tz) * (1 - 1 / k));
   }
 
   /**
@@ -174,9 +226,24 @@ export class OverviewCamera {
    * over the land (`setBounds`), or within `PAN_REACH` of the focus without one.
    */
   pan(dx: number, dz: number): void {
+    if (dx || dz) this.taken();
     this.panX += dx;
     this.panZ += dz;
     this.clampPan();
+  }
+
+  /** The player's pan along the view: `right` m to the picture's right and `forward` m into it, over the ground. */
+  panView(right: number, forward: number): void {
+    // (The view's right and its way into the picture, flat on the ground: as `fitGoal`'s basis.)
+    const [ca, sa] = [Math.cos(this.cur.alpha), Math.sin(this.cur.alpha)];
+    this.pan(-sa * right - ca * forward, ca * right - sa * forward);
+  }
+
+  /** The player moved the camera: the shot's drift and sway stop where they are (until the shot is framed again). */
+  private taken(): void {
+    if (!this.drift && !this.sway) return;
+    this.swayBase = this.goal.alpha;
+    this.drift = this.sway = 0;
   }
 
   /** The player's pan pulled in so the target (the shot's, moved by it) stays over the land. */
@@ -212,13 +279,14 @@ export class OverviewCamera {
     const c = this.cur;
     const zoom = this.userZoom;
     const ga = g.alpha + this.userAlpha;
+    const gb = this.tilt ?? g.beta;
     const [gx, gz] = [g.tx + this.panX, g.tz + this.panZ];
     if (this.t < this.duration) {
       this.t = Math.min(this.duration, this.t + dt);
       const k = ease(this.t / this.duration);
       const f = this.from;
       c.alpha = f.alpha + angleDelta(f.alpha, ga) * k;
-      c.beta = f.beta + (g.beta - f.beta) * k;
+      c.beta = f.beta + (gb - f.beta) * k;
       // Zooms glide in log space (a long pull-back doesn't rush at the start).
       c.radius = Math.exp(Math.log(f.radius) + (Math.log(g.radius / zoom) - Math.log(f.radius)) * k);
       c.tx = f.tx + (gx - f.tx) * k;
@@ -234,16 +302,16 @@ export class OverviewCamera {
       // Settled: follow drift and nudges smoothly.
       const k = 1 - Math.exp(-dt / 0.25);
       c.alpha += angleDelta(c.alpha, ga) * k;
-      c.beta += (g.beta - c.beta) * k;
+      c.beta += (gb - c.beta) * k;
       c.radius += (g.radius / zoom - c.radius) * k;
       c.tx += (gx - c.tx) * k;
       c.tz += (gz - c.tz) * k;
       c.ox += ((g.ox * c.radius) / g.radius - c.ox) * k;
       c.oy += ((g.oy * c.radius) / g.radius - c.oy) * k;
       // Within a hair of the goal: there (a camera that keeps creeping is never still: held frames).
-      if (Math.abs(angleDelta(c.alpha, ga)) + Math.abs(g.beta - c.beta) < SNAP && Math.abs(g.radius / zoom - c.radius) + Math.abs(gx - c.tx) + Math.abs(gz - c.tz) < SNAP * c.radius) {
+      if (Math.abs(angleDelta(c.alpha, ga)) + Math.abs(gb - c.beta) < SNAP && Math.abs(g.radius / zoom - c.radius) + Math.abs(gx - c.tx) + Math.abs(gz - c.tz) < SNAP * c.radius) {
         c.alpha = ga;
-        c.beta = g.beta;
+        c.beta = gb;
         c.radius = g.radius / zoom;
         c.tx = gx;
         c.tz = gz;
@@ -259,26 +327,35 @@ export class OverviewCamera {
     const cam = this.camera;
     const c = this.cur;
     cam.alpha = c.alpha;
+    // (Near, the target on the land under it: on a hill the camera would be in it otherwise.)
+    const lift = Math.min(1, Math.max(0, (LIFT_FAR - c.radius) / (LIFT_FAR - LIFT_NEAR)));
+    const ty = lift > 0 && this.ground ? this.ground(c.tx, c.tz) * lift : 0;
     // Looking from higher up while the land (a mountain) would stand in the way.
     let beta = c.beta;
-    for (let k = 0; k < 20 && beta > 0.2 && this.hidden(c.alpha, beta, c.radius, c.tx, c.tz); k++) beta -= 0.04;
+    for (let k = 0; k < 30 && beta > 0.2 && this.hidden(c.alpha, beta, c.radius, c.tx, ty, c.tz); k++) beta -= 0.04;
     cam.beta = beta;
     cam.radius = c.radius;
     cam.target.x = c.tx;
-    cam.target.y = 0;
+    cam.target.y = ty;
     cam.target.z = c.tz;
     cam.targetScreenOffset.x = c.ox;
     cam.targetScreenOffset.y = c.oy;
   }
 
-  /** Whether the camera at this pose is in the ground or has the land between it and the target. */
-  private hidden(alpha: number, beta: number, radius: number, tx: number, tz: number): boolean {
+  /**
+   * Whether the camera at this pose (its target at height `ty`) is in the ground or has the land between it and the
+   * target. It keeps `min(12, radius × 0.35)` m over the land, and the line to the target clear of the treetops (14 m)
+   * or by `radius × 0.35` for its share of the way, the less (so a camera come in close may still look low along a
+   * flat street).
+   */
+  private hidden(alpha: number, beta: number, radius: number, tx: number, ty: number, tz: number): boolean {
     if (!this.ground) return false;
     const [dx, dy, dz] = [Math.cos(alpha) * Math.sin(beta) * radius, Math.cos(beta) * radius, Math.sin(alpha) * Math.sin(beta) * radius];
-    for (const t of [0, 0.12, 0.25, 0.4, 0.55, 0.7]) {
-      const [x, y, z] = [tx + dx * (1 - t), dy * (1 - t), tz + dz * (1 - t)];
+    const clear = Math.min(12, radius * 0.35);
+    for (const t of HIDDEN_AT) {
+      const [x, y, z] = [tx + dx * (1 - t), ty + dy * (1 - t), tz + dz * (1 - t)];
       // Clear of the treetops too.
-      if (y < this.ground(x, z) + (t === 0 ? 12 : 14)) return true;
+      if (y < this.ground(x, z) + (t === 0 ? clear : Math.min(14, radius * 0.35 * (1 - t)))) return true;
     }
     return false;
   }

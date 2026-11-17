@@ -40,7 +40,7 @@ export interface Settings {
   hideHudWhileWatching: boolean;
   /** Slow down to normal speed for big moments (a first kiss, a new job, a fight at home). */
   autoSlow: boolean;
-  /** Time-lapse while everyone at home sleeps or is at work. */
+  /** Super speed by itself while everyone at home sleeps or is out (the name is the setting's from before super speed). */
   skipQuietHours: boolean;
   /** The game pauses while another window has focus (and plays on when it's back). */
   pauseOnBlur: boolean;

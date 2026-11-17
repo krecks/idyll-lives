@@ -36,10 +36,10 @@ import { LookedFrom } from '../shared/chunks';
 import { Geo } from '../shared/geometry';
 import { CountryRoads, ROAD_VERGE } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
-import { grassField, gustAt, gustNoise, markGrassPatches, recolourGrass, regroundGrass, type GrassQuality } from '../shared/grass';
+import { GRASS, grassField, gustAt, gustNoise, markGrassPatches, recolourGrass, regroundGrass, type GrassQuality } from '../shared/grass';
 import { OffThreadLand, withTownGrass } from '../shared/renderData';
 import { pondQuads, rectBox } from '../shared/landBake';
-import { PAD_RECTS, padGeometry, padRects, padsOf } from '../shared/pads';
+import { padGeometry, padMask, padsOf } from '../shared/pads';
 import { LAND_CELL, type LandRect } from '../../game/land';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
@@ -244,17 +244,19 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.world = world;
     await pace?.();
     if (!this.host) return null;
-    // The pads and the country roads, whole (a few draws; the pads are the lots').
-    const old = [...this.pads.slabs, ...this.pads.edges, ...this.roadDraws];
-    const pads = perfTime('nature: pads', () => this.padDraws(app, parent, this.grounds));
+    // The pads, in the ground tiles where a lot came, went or moved, or the land changed (the rest kept as drawn),
+    // and the country roads, whole (a few draws).
+    const dirty = this.padsChanged(changed?.rect ?? null);
+    const pads = perfTime('nature: pads', () => this.padDraws(app, parent, this.grounds, dirty), dirty ? `${dirty.size} tiles` : 'all');
+    const old = [...pads.gone, ...this.roadDraws];
     this.pads = pads;
     await pace?.();
     if (!this.host) {
-      for (const e of [...pads.slabs, ...pads.edges]) e.destroy();
+      for (const e of pads.made) e.destroy();
       return null;
     }
     this.roadDraws = this.roadBuilder ? perfTime('nature: roads', () => this.roadBuilder!(this.roads, parent)) : [];
-    const fresh = [...pads.slabs, ...pads.edges, ...this.roadDraws];
+    const fresh = [...pads.made, ...this.roadDraws];
     const gone = new Set(old);
     this.others = [...this.others.filter((e) => !gone.has(e)), ...fresh];
     this.drawsChanged(fresh, old);
@@ -330,12 +332,16 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     disposeTiles(this.tiles);
     this.tiles = [];
     this.groundMats = null;
+    this.padTexture?.destroy();
+    this.padTexture = null;
     this.slabMaterial = null;
     this.woodsSquares = [];
     this.flowerSquares = [];
     for (const e of this.others) e.destroy();
     this.grounds = [];
     this.pads = { slabs: [], edges: [] };
+    this.padGroups.clear();
+    this.padList = [];
     this.roadDraws = [];
     for (const e of this.ponds.values()) e.destroy();
     this.ponds.clear();
@@ -380,21 +386,23 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   refreshLawn(world: WorldStructure): void {
     this.world = world;
     // (A world message that changed nothing the lawn grows round, a focus lot shown: nothing to do.)
-    const inputs = lawnInputs(world);
+    const inputs = perfTime('lawn: inputs', () => lawnInputs(world));
     if (this.lawnInputs && sameLawnInputs(this.lawnInputs, inputs)) return;
     this.lawnInputs = inputs;
-    this.lawnMask = lawnMask(world);
-    hideLawn(this.lawn, this.lawnMask, uploadLawn);
+    const mask = (this.lawnMask = perfTime('lawn: mask', () => lawnMask(world)));
+    perfTime('lawn: flowers', () => hideLawn(this.lawn, mask, uploadLawn));
     // (Its bare tiles kept for the birds, who ask next.)
-    this.grass?.refresh(world, this.lawnMask, keepBareTiles(world, inputs, this.lawnMask));
+    const bare = perfTime('lawn: bare tiles', () => keepBareTiles(world, inputs, mask));
+    perfTime('lawn: grass', () => this.grass?.refresh(world, mask, bare));
   }
 
   /**
-   * A big world's ground: the landscape's square in `TILE` m tiles, each with three meshes (64, 32
+   * A big world's ground: the landscape's square in `TILE` m tiles, each with three levels (64, 32
    * and 16 quads across) and a skirt hanging from its edges (no cracks where neighbours differ), one
-   * draw each, the mesh it draws chosen by distance from the camera's target (`frameTiles`). Only
-   * the finest grid is shaded (heights and colours, a ring past the tile for its normals); the
-   * coarser take every second and fourth of its points.
+   * draw each, the level it draws chosen by distance from the camera's target (`frameTiles`). Only
+   * the finest grid is shaded (heights and colours, a ring past the tile for its normals; both kept,
+   * the colours as bytes); the coarser take every second and fourth of its points. The finest level
+   * is made only for the tiles near enough to draw it (`frameTiles`), and let go again far off.
    */
   private async terrainTiles(app: pc.AppBase, parent: pc.Entity, pace?: () => Promise<void>): Promise<pc.Entity[]> {
     const { count } = this.tileFrame();
@@ -412,15 +420,16 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       }
       const { positions, colors } = await shading.shift()!;
       const [i, j, tx, tz] = this.tileCorner(k);
-      const meshes = this.tileMeshes(app, positions, colors);
-      const mi = new pc.MeshInstance(meshes[1], material);
+      const t: GroundTile = { mi: null!, meshes: [null, null, null], x: tx + TILE / 2, z: tz + TILE / 2, lod: 1, kept: bytesOf(colors), heights: heightsOf(positions), stale: 0 };
+      t.meshes[1] = this.tileLevel(t, k, 1, false);
+      t.meshes[2] = this.tileLevel(t, k, 2, false);
+      const mi = (t.mi = new pc.MeshInstance(t.meshes[1]!, material));
       const entity = new pc.Entity(`terrain${i},${j}`, app);
       entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: true });
       entity.enabled = false;
       parent.addChild(entity);
       out.push(entity);
-      // (Its colours kept as bytes: the meshes keep none on the CPU, and a height field's brushes draw it again with them.)
-      this.tiles.push({ mi, meshes, x: tx + TILE / 2, z: tz + TILE / 2, lod: 1, kept: bytesOf(colors) });
+      this.tiles.push(t);
     }
     return out;
   }
@@ -430,6 +439,36 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     const { size } = this.terrainGrid();
     const S = TILE_LODS[0];
     return { x0: this.w / 2 - size / 2, z0: this.d / 2 - size / 2, size, count: Math.ceil(size / TILE), S, c: TILE / S, n: S + 3 };
+  }
+
+  /**
+   * The ground as drawn now at (`x`, `z`), for the benches: the terrain's height between the points of its tile's
+   * finest grid (null: no tile there), and the grass's ground there (null: no grass grows in that patch).
+   */
+  drawnAt(x: number, z: number): { terrain: number | null; grass: number | null } {
+    let terrain: number | null = null;
+    const { x0, z0, count, S, c, n } = this.tileFrame();
+    const [ti, tj] = [Math.floor((x - x0) / TILE), Math.floor((z - z0) / TILE)];
+    const h = ti >= 0 && tj >= 0 && ti < count && tj < count ? this.tiles[tj * count + ti]?.heights : undefined;
+    if (h) {
+      const [, , tx, tz] = this.tileCorner(tj * count + ti);
+      const [fc, fr] = [(x - tx) / c, S - (z - tz) / c];
+      const [c0, r0] = [Math.min(S - 1, Math.floor(fc)), Math.min(S - 1, Math.floor(fr))];
+      const [u, v] = [fc - c0, fr - r0];
+      const at = (cc: number, rr: number) => h[(rr + 1) * n + cc + 1];
+      terrain = (at(c0, r0) * (1 - u) + at(c0 + 1, r0) * u) * (1 - v) + (at(c0, r0 + 1) * (1 - u) + at(c0 + 1, r0 + 1) * u) * v;
+    }
+    let grass: number | null = null;
+    const g = this.grass?.grassField;
+    if (g) {
+      const p = GRASS.patch;
+      const [i, j] = [Math.floor((x - g.x0) / p), Math.floor((z - g.z0) / p)];
+      if (i >= 0 && j >= 0 && i < g.pw && j < g.pd && g.patches[j * g.pw + i]) {
+        const k = (j * g.pw + i) * 3;
+        grass = g.ground[k] + g.ground[k + 1] * (x - g.x0 - i * p) + g.ground[k + 2] * (z - g.z0 - j * p);
+      }
+    }
+    return { terrain, grass };
   }
 
   /** Tile `k`'s place: across, down, and its corner (m). */
@@ -454,28 +493,43 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return positions;
   }
 
-  /** A tile's three levels from its finest grid's shaded points (`tileMesh`). */
-  private tileMeshes(app: pc.AppBase, positions: Float32Array, colors: Float32Array): pc.Mesh[] {
+  /** Tile `k`'s finest grid as `writeTileLevel` reads it. */
+  private gridOf(k: number): TileGrid {
     const { S, c, n, x0, z0, size } = this.tileFrame();
-    return TILE_LODS.map((segs) => tileMesh(app, positions, colors, n, segs, S / segs, c, x0, z0, size));
+    const [, , tx, tz] = this.tileCorner(k);
+    return { S, c, n, tx, tz, x1: x0 + size, z1: z0 + size };
+  }
+
+  /** Tile `t`'s (`k`'s) level `q` made from its heights and colours as kept (`live`: to be written into). */
+  private tileLevel(t: GroundTile, k: number, q: number, live: boolean): pc.Mesh {
+    return tileLevelMesh(this.host!.app.graphicsDevice, this.gridOf(k), TILE_LODS[q], t.heights!, t.kept!, live);
   }
 
   /**
-   * A tile's levels drawn from its finest grid's shaded points again: written into its own meshes once it has been
-   * drawn so (`live`: they keep their vertices on the CPU, to be written into), else made anew (live from now on) and
-   * the old ones destroyed. A brush's stamps draw the same tiles again and again: no new buffers each time.
+   * Tile `t`'s (`k`'s) level `q` from its heights and colours as kept now: written into its mesh where it keeps its
+   * vertices, else made anew (live: a brush has reached the tile, it will be written into again) and the old one
+   * destroyed; where the tile draws it, drawn.
+   */
+  private refreshLevel(t: GroundTile, k: number, q: number): void {
+    const mesh = t.meshes[q];
+    t.stale &= ~(1 << q);
+    if (mesh && rewriteTileLevel(mesh, this.gridOf(k), TILE_LODS[q], t.heights!, t.kept!)) return;
+    const made = this.tileLevel(t, k, q, true);
+    t.meshes[q] = made;
+    if (t.lod === q) t.mi.mesh = made;
+    if (mesh) mesh.destroy();
+  }
+
+  /**
+   * A tile's grid shaded again (`positions` with their heights, `colors`): its heights and colours kept, and its
+   * levels drawn again from them (the finest only if it has one).
    */
   private redrawTile(t: GroundTile, positions: Float32Array, colors: Float32Array): void {
     if (!this.host) return;
-    const { app } = this.host;
-    const { S, c, n, x0, z0, size } = this.tileFrame();
-    if (t.live) {
-      TILE_LODS.forEach((segs, q) => tileMesh(app, positions, colors, n, segs, S / segs, c, x0, z0, size, t.meshes[q]));
-      return;
-    }
-    const meshes = TILE_LODS.map((segs) => tileMesh(app, positions, colors, n, segs, S / segs, c, x0, z0, size, 'live'));
-    t.live = true;
-    this.swapTile(t, meshes);
+    const k = this.tiles.indexOf(t);
+    t.kept = bytesOf(colors);
+    t.heights = heightsOf(positions, t.heights);
+    for (let q = 0; q < TILE_LODS.length; q++) if (t.meshes[q]) this.refreshLevel(t, k, q);
   }
 
   /**
@@ -507,7 +561,10 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /**
    * A height field's samples in `rect` changed (a brush's stamp): the ground tiles there drawn again from it, with the
    * colours they had (`kept`; shaded again once the stroke is done, `landDone`), the grass's heights there and the
-   * water above the sea's level. Cheap: every stamp. Says how many tiles it drew again.
+   * water above the sea's level. Cheap, every stamp: only the heights of the tiles' points in the stamp's box are
+   * worked out again (each tile keeps its own), and only the level each tile draws is written, the rows of it they
+   * are in (the others are written when the tile next draws them, `frameTiles`, or when the stroke is done). Says how
+   * many tiles it drew again.
    */
   reground(rect: LandRect): number {
     if (!this.heightField || !this.host) return 0;
@@ -515,32 +572,67 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.landStamped(rect);
     const box = this.landBox(rect, LAND_CELL);
     const tiles = this.tilesIn(box);
-    const { n } = this.tileFrame();
-    const colors = new Float32Array(n * n * 4);
-    for (const k of tiles) {
+    const span = perfStart('land: stamp heights');
+    const rows: [number, number][] = [];
+    for (const k of tiles) rows.push(this.tileHeights(k, box));
+    perfEnd(span);
+    const write = perfStart('land: stamp meshes');
+    tiles.forEach((k, at) => {
       const t = this.tiles[k];
-      if (!t?.kept) continue;
-      const positions = this.tileGrid(k);
-      // (`heightAt`, the roads' levelling kept by point: the roads don't move as the land is shaped.)
-      if (this.surface) {
-        for (let v = 1; v < positions.length; v += 3) positions[v] = this.terrainAt(positions[v - 1], positions[v + 1]);
-      } else {
-        const levels = (t.levels ??= this.roadLevels(positions));
-        for (let v = 1, q = 0; v < positions.length; v += 3, q += 2) {
-          const g = this.ground(positions[v - 1], positions[v + 1]);
-          positions[v] = g + (levels[q + 1] - g) * levels[q];
-        }
-      }
-      for (let q = 0; q < colors.length; q++) colors[q] = t.kept[q] / 255;
-      this.redrawTile(t, positions, colors);
-    }
-    this.pondsIn(tiles);
+      if (!t?.kept || !t.heights) return;
+      // (The rows of the level drawn whose points, or their neighbours for the normals, moved.)
+      const step = TILE_LODS[0] / TILE_LODS[t.lod];
+      const [r0, r1] = rows[at];
+      const lo = Math.max(0, Math.ceil((r0 - 1) / step));
+      const hi = Math.min(TILE_LODS[t.lod], Math.floor((r1 + 1) / step));
+      const mesh = t.meshes[t.lod];
+      if (!mesh || hi < lo || !rewriteTileLevel(mesh, this.gridOf(k), TILE_LODS[t.lod], t.heights, null, lo, hi)) this.refreshLevel(t, k, t.lod);
+      for (let q = 0; q < TILE_LODS.length; q++) if (q !== t.lod && t.meshes[q]) t.stale |= 1 << q;
+    });
+    perfEnd(write);
+    perfTime('land: stamp ponds', () => this.pondsIn(tiles));
     const grass = this.grass?.grassField;
     if (grass) {
-      regroundGrass(grass, this, box[0], box[1], box[2], box[3]);
-      this.grass?.landChanged(false);
+      perfTime('land: stamp grass', () => {
+        regroundGrass(grass, this, box[0], box[1], box[2], box[3]);
+        this.grass?.landChanged(false);
+      });
     }
     return tiles.length;
+  }
+
+  /**
+   * Tile `k`'s heights at the points of its finest grid in `box` (m) worked out again from the land as it is (all of
+   * them the first time); says the rows of its grid (from 0, its ring's -1 to `S + 1`) they are in.
+   */
+  private tileHeights(k: number, box: readonly [number, number, number, number]): [number, number] {
+    const t = this.tiles[k];
+    const { S, c, n, tx, tz, x1, z1 } = this.gridOf(k);
+    let [c0, c1, r0, r1] = [-1, S + 1, -1, S + 1];
+    if (t.heights) {
+      // (A point past the landscape's square stands on its edge: in the box if the edge is.)
+      c0 = Math.max(-1, Math.ceil((box[0] - tx) / c));
+      c1 = box[2] >= x1 ? S + 1 : Math.min(S + 1, Math.floor((box[2] - tx) / c));
+      r0 = box[3] >= z1 ? -1 : Math.max(-1, Math.ceil(S - (box[3] - tz) / c));
+      r1 = Math.min(S + 1, Math.floor(S - (box[1] - tz) / c));
+    } else t.heights = new Float32Array(n * n);
+    if (c1 < c0 || r1 < r0) return [1, 0];
+    const h = t.heights;
+    // (`heightAt`, the roads' levelling kept by point: the roads don't move as the land is shaped.)
+    const levels = this.surface ? null : (t.levels ??= this.roadLevels(this.tileGrid(k)));
+    for (let row = r0; row <= r1; row++) {
+      const z = Math.min(z1, tz + (S - row) * c);
+      for (let col = c0; col <= c1; col++) {
+        const x = Math.min(x1, tx + col * c);
+        const p = (row + 1) * n + col + 1;
+        if (!levels) h[p] = this.terrainAt(x, z);
+        else {
+          const g = this.ground(x, z);
+          h[p] = g + (levels[p * 2 + 1] - g) * levels[p * 2];
+        }
+      }
+    }
+    return [r0 + 1, r1 + 1];
   }
 
   /**
@@ -556,14 +648,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       out[q + 1] = road.h - 0.02;
     }
     return out;
-  }
-
-  /** A tile's levels drawn from `meshes` now (its level kept), the old ones destroyed. */
-  private swapTile(t: GroundTile, meshes: pc.Mesh[]): void {
-    const old = t.meshes;
-    t.meshes = meshes;
-    t.mi.mesh = meshes[t.lod];
-    for (const m of old) m.destroy();
   }
 
   /** The water above the sea's level of the tiles `tiles` drawn again (`pond`), the owner told what came and went. */
@@ -588,29 +672,25 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     for (const e of removed) e.destroy();
   }
 
-  /** Tile `k`'s water above the sea's level as a mesh (`pondQuads`), or null without any. */
-  private pondData(k: number): pc.Mesh | null {
+  /** Tile `k`'s water above the sea's level (`pondQuads`) written into `into` where it fits (`pondMeshOf`), or null without any. */
+  private pondData(k: number, into: pc.Mesh | null = null): pc.Mesh | null {
     const field = this.heightField;
     if (!field || !this.host) return null;
     const [, , tx, tz] = this.tileCorner(k);
     const quads = pondQuads(field, tx, tz, tx + TILE, tz + TILE);
-    if (!quads) return null;
-    const mesh = new pc.Mesh(this.host.app.graphicsDevice);
-    mesh.setPositions(quads.positions);
-    mesh.setNormals(new Float32Array(quads.positions.length).map((_, q) => (q % 3 === 1 ? 1 : 0)));
-    mesh.setIndices(quads.indices);
-    mesh.update(pc.PRIMITIVE_TRIANGLES);
-    return mesh;
+    return quads ? pondMeshOf(this.host.app.graphicsDevice, quads, into) : null;
   }
 
-  /** Tile `k`'s water drawn again by its draw `entity` (its old mesh destroyed); false if it has none now. */
+  /** Tile `k`'s water drawn again by its draw `entity` (into its mesh where it fits, else a new one and the old destroyed); false if it has none now. */
   private pondMesh(k: number, entity: pc.Entity): boolean {
-    const mesh = this.pondData(k);
-    if (!mesh) return false;
     const mi = entity.render!.meshInstances[0];
     const old = mi.mesh;
-    mi.mesh = mesh;
-    old?.destroy();
+    const mesh = this.pondData(k, old);
+    if (!mesh) return false;
+    if (mesh !== old) {
+      mi.mesh = mesh;
+      old?.destroy();
+    }
     return true;
   }
 
@@ -643,7 +723,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /**
    * A stroke of the brushes done over the samples in `rect`: the land's water, top and zones measured again
    * (`LandscapeLayout.landChanged`), then the ground tiles there shaded again (their colours too, and kept), the
-   * sheet as the water now needs it, and the grass's colours there, a tile or a strip of the grass at a time between
+   * sheet as the water now needs it, and the grass's colours and ground there, a tile or a strip of the grass at a time between
    * `pace`s. (The woods and flowers: `regrow`.) Says the box (m) it reached.
    */
   async landDone(rect: LandRect, pace?: () => Promise<void>): Promise<[number, number, number, number] | null> {
@@ -664,15 +744,41 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.redrawTile(t, positions, colors);
     }
     this.sheetAsNeeded();
+    // (Roads or lots the land moved: the pads and the country roads drawn again on them.)
+    if (this.builtMoved) {
+      this.builtMoved = false;
+      await pace?.();
+      if (!this.host) return null;
+      perfTime('land: pads and roads', () => this.redrawBuilt());
+    }
     const grass = this.grass?.grassField;
     if (grass) {
       for (let z = box[1]; z < box[3]; z += LAND_GRASS_STRIP) {
         await pace?.();
         perfTime('land: grass strip', () => recolourGrass(grass, this, box[0], z, box[2], Math.min(box[3], z + LAND_GRASS_STRIP)), `${Math.round(box[2] - box[0])} m`);
       }
+      // (Its ground too: the stamps laid it on the field as the brush left it, but on a land its town follows the land
+      // is settled and graded round what is built at the stroke's end. Left there, the grass stood off the ground, by a
+      // road the land raised beside it some 0.3 m over its edge.)
+      await pace?.();
+      perfTime('land: grass ground', () => regroundGrass(grass, this, box[0], box[1], box[2], box[3]));
       perfTime('land: grass upload', () => this.grass?.landChanged(true));
     }
     return box;
+  }
+
+  /** The pads and the country roads drawn again, whole, on the surface as it is now (the land moved them: `landDone`). */
+  private redrawBuilt(): void {
+    if (!this.host || !this.surface) return;
+    const { app, parent } = this.host;
+    const old = [...this.pads.slabs, ...this.pads.edges, ...this.roadDraws];
+    const pads = (this.pads = this.padDraws(app, parent, this.grounds));
+    this.roadDraws = this.roadBuilder ? this.roadBuilder(this.roads, parent) : [];
+    const fresh = [...pads.slabs, ...pads.edges, ...this.roadDraws];
+    const gone = new Set(old);
+    this.others = [...this.others.filter((e) => !gone.has(e)), ...fresh];
+    this.drawsChanged(fresh, old);
+    this.grass?.onGround([...this.grounds, ...pads.slabs].map((g) => g.render!.meshInstances[0]));
   }
 
   /**
@@ -683,7 +789,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   async redrawLand(pace?: () => Promise<void>): Promise<void> {
     const world = this.world;
     if (!world || !this.host || !this.tiles.length) return;
-    const { app } = this.host;
     const off = OffThreadLand.open(world);
     off?.setField(this.heightField);
     this.offThread = off;
@@ -702,9 +807,17 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
         const t = this.tiles[k];
         if (!t || !this.host) return;
         t.kept = bytesOf(colors);
+        t.heights = heightsOf(positions, t.heights);
+        t.stale = 0;
         // (Made anew, kept off the CPU: most of them no brush will reach.)
-        t.live = false;
-        this.swapTile(t, this.tileMeshes(app, positions, colors));
+        for (let q = 0; q < TILE_LODS.length; q++) {
+          const old = t.meshes[q];
+          if (!old) continue;
+          const made = this.tileLevel(t, k, q, false);
+          t.meshes[q] = made;
+          if (t.lod === q) t.mi.mesh = made;
+          old.destroy();
+        }
       }
       this.pondsIn([...this.tiles.keys()]);
       this.sheetAsNeeded();
@@ -859,13 +972,22 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     }
     for (const f of this.flowerSquares) f.mi.visible = Math.hypot(f.x - x, f.z - z) < flowersFar;
     const lift = town * radius;
-    for (const t of this.tiles) {
+    this.tiles.forEach((t, k) => {
       const d = town > 0 ? Math.hypot(t.x - x, t.z - z, lift) : Math.hypot(t.x - x, t.z - z);
       const lod = d < near ? 0 : d < mid ? 1 : 2;
-      if (lod === t.lod) continue;
+      if (lod === t.lod) return;
       t.lod = lod;
-      t.mi.mesh = t.meshes[lod];
-    }
+      // (Its finest level made as it comes near, and let go once it is far off; a level a brush changed while
+      // another was drawn, written again.)
+      if (!t.meshes[lod] && t.heights && t.kept) t.meshes[lod] = this.tileLevel(t, k, lod, false);
+      else if (t.stale & (1 << lod)) this.refreshLevel(t, k, lod);
+      t.mi.mesh = t.meshes[lod] ?? t.mi.mesh;
+      if (lod === 2 && t.meshes[0]) {
+        t.meshes[0].destroy();
+        t.meshes[0] = null;
+        t.stale &= ~1;
+      }
+    });
   }
 
   /** The ground: a regular grid over the landscape's square, lifted to the land and coloured. */
@@ -967,31 +1089,67 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private groundMaterial(app: pc.AppBase): pc.StandardMaterial {
     const material = MaterialLibrary.for(app).surface('material.ground', { vertexColors: true, variant: this.surface ? 'grassPads' : 'grass' });
     grassGround(app.graphicsDevice, material);
-    if (this.surface) padMasked(material);
+    if (this.surface) padMasked(app.graphicsDevice, material);
     return material;
   }
 
   /**
-   * On a land the town follows: the lots each terrain draw leaves out (`grounds`, by tile), and each lot's slab at its pad (the
+   * On a land the town follows: the lots the terrain leaves out (the pad mask, a byte a metre: `grounds`' material), and each lot's slab at its pad (the
    * ground's own material, its colours the terrain's there) and its retaining edges (the foundations' stone, tinted) in a draw
    * of each per ground tile.
    */
-  private padDraws(app: pc.AppBase, parent: pc.Entity, grounds: readonly pc.Entity[]): { slabs: pc.Entity[]; edges: pc.Entity[] } {
+  /**
+   * The ground tiles whose pads are to be drawn again for the surface as it is now (`relay`): those within reach of
+   * a lot whose pad came, went or moved since they were drawn, and those over `land` (land rect: where the land
+   * changed). Null: all of them (none drawn yet).
+   */
+  private padsChanged(land: LandRect | null): Set<number> | null {
+    if (!this.padGroups.size || !this.surface) return null;
+    const pads = padsOf(this.surface, this.world?.plots.length ?? 0);
+    const key = (p: { x: number; z: number; w: number; d: number; y: number }) => `${p.x},${p.z},${p.w},${p.d},${p.y}`;
+    const [now, was] = [new Set(pads.map(key)), new Set(this.padList.map(key))];
+    // (A lot's retaining edges are drawn by the higher of two lots side by side: a pad moved changes its neighbours' too.)
+    const reach = 2 + Math.max(0, ...pads.map((p) => Math.max(p.w, p.d)));
+    const out = new Set<number>();
+    for (const p of [...pads.filter((q) => !was.has(key(q))), ...this.padList.filter((q) => !now.has(key(q)))]) {
+      for (const k of this.tilesIn([p.x - reach, p.z - reach, p.x + p.w + reach, p.z + p.d + reach])) out.add(k);
+    }
+    if (land) for (const k of this.tilesIn(this.landBox(land, LAND_DONE_PAD))) out.add(k);
+    return out;
+  }
+  /** The pads as last drawn (`padDraws`), and each ground tile's draws of them. */
+  private padList: ReturnType<typeof padsOf> = [];
+  private readonly padGroups = new Map<number, { slab: pc.Entity | null; edge: pc.Entity | null }>();
+
+  /**
+   * The pads' draws: the slabs and the edges (all of them), those made now and those they replace (`gone`, not yet
+   * destroyed). `dirty`: only the ground tiles to draw again (`padsChanged`), the others' kept; null: all.
+   */
+  private padDraws(app: pc.AppBase, parent: pc.Entity, grounds: readonly pc.Entity[], dirty: Set<number> | null = null): { slabs: pc.Entity[]; edges: pc.Entity[]; made: pc.Entity[]; gone: pc.Entity[] } {
     const surface = this.surface!;
     const device = app.graphicsDevice;
-    const pads = padsOf(surface, this.world?.plots.length ?? 0);
+    const all = padsOf(surface, this.world?.plots.length ?? 0);
+    this.padList = all;
     const { x0, z0, size } = this.tileFrame();
     const count = Math.ceil(size / TILE);
-    // Each ground tile's draw leaves out the lots on it (a little past it: its skirt, its coarser levels).
-    grounds.forEach((g, k) => {
+    // The terrain leaves out the lots: a byte a metre over the world.
+    const [w, d] = [Math.ceil(this.w), Math.ceil(this.d)];
+    this.padTexture?.destroy();
+    const mask = (this.padTexture = new pc.Texture(device, { name: 'padMask', width: w, height: d, format: pc.PIXELFORMAT_R8, mipmaps: false, minFilter: pc.FILTER_NEAREST, magFilter: pc.FILTER_NEAREST, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [padMask(all, w, d)] }));
+    const area = new Float32Array([0, 0, w, d]);
+    for (const g of grounds) {
       const mi = g.render!.meshInstances[0];
-      const t = this.tiles[k];
-      const rects = new Float32Array(PAD_RECTS * 4);
-      const n = t ? padRects(pads, [t.x - TILE / 2 - 4, t.z - TILE / 2 - 4, t.x + TILE / 2 + 4, t.z + TILE / 2 + 4], rects) : 0;
-      mi.setParameter('game_padRects[0]', rects);
-      mi.setParameter('game_padCount', n);
-    });
+      mi.setParameter('game_padMask', mask);
+      mi.setParameter('game_padArea', area);
+    }
     const groupOf = (x: number, z: number) => Math.max(0, Math.min(count - 1, Math.floor((z - z0) / TILE))) * count + Math.max(0, Math.min(count - 1, Math.floor((x - x0) / TILE)));
+    // (For some tiles: the pads within reach of them, whose slabs, edges and neighbours' edges may fall in them.)
+    let pads = all;
+    if (dirty) {
+      const reach = 2 + Math.max(0, ...all.map((p) => Math.max(p.w, p.d)));
+      const boxes = [...dirty].map((k) => this.tileCorner(k)).map(([, , tx, tz]) => [tx - reach, tz - reach, tx + TILE + reach, tz + TILE + reach]);
+      pads = all.filter((p) => boxes.some(([bx0, bz0, bx1, bz1]) => p.x < bx1 && p.x + p.w > bx0 && p.z < bz1 && p.z + p.d > bz0));
+    }
     const geos = padGeometry(
       (x, z) => this.terrainAt(x, z),
       pads,
@@ -1005,17 +1163,27 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     // (The retaining edges in the houses' foundation stone: the soil's and the paving's textures are laid along xz,
     // in streaks up a wall.)
     const stone = lib.surface('material.wall.stone', { vertexColors: true, doubleSided: true });
-    const out = { slabs: [] as pc.Entity[], edges: [] as pc.Entity[] };
-    for (const [k, g] of geos) {
+    const made: pc.Entity[] = [];
+    const gone: pc.Entity[] = [];
+    for (const k of dirty ?? [...this.padGroups.keys(), ...geos.keys()]) {
+      const had = this.padGroups.get(k);
+      if (had) for (const e of [had.slab, had.edge]) if (e) gone.push(e);
+      this.padGroups.delete(k);
+      const g = geos.get(k);
+      if (!g) continue;
       const slabs = meshFrom(device, g.slabs.meshData({ colors: true }));
-      if (slabs) out.slabs.push(drawOf(app, parent, `pads${k}`, slabs, slab));
       const edges = meshFrom(device, g.edges.meshData({ colors: true }));
-      if (edges) out.edges.push(drawOf(app, parent, `padEdges${k}`, edges, stone));
+      const drawn = { slab: slabs ? drawOf(app, parent, `pads${k}`, slabs, slab) : null, edge: edges ? drawOf(app, parent, `padEdges${k}`, edges, stone) : null };
+      for (const e of [drawn.slab, drawn.edge]) if (e) made.push(e);
+      this.padGroups.set(k, drawn);
     }
-    return out;
+    const groups = [...this.padGroups.entries()].sort((a, b) => a[0] - b[0]).map(([, d]) => d);
+    return { slabs: groups.flatMap((d) => (d.slab ? [d.slab] : [])), edges: groups.flatMap((d) => (d.edge ? [d.edge] : [])), made, gone };
   }
   /** The slabs' material (`padDraws`). */
   private slabMaterial: pc.StandardMaterial | null = null;
+  /** The pad mask (`padDraws`). */
+  private padTexture: pc.Texture | null = null;
   private groundMats: pc.StandardMaterial[] | null = null;
 
   /** Crown clusters gathered from the woods (for the report), 0 without them. */
@@ -1075,6 +1243,13 @@ const LAND_GRASS_STRIP = 12;
 /** How far past the world's edge a height field's edge carries (`LandscapeLayout.ground`). */
 const LAND_EDGE_FADE_M = 60;
 
+/** A grid's heights (the y of its `positions`), into `into` if it is the size. */
+function heightsOf(positions: Float32Array, into?: Float32Array): Float32Array {
+  const out = into && into.length === positions.length / 3 ? into : new Float32Array(positions.length / 3);
+  for (let v = 0; v < out.length; v++) out[v] = positions[v * 3 + 1];
+  return out;
+}
+
 /** Colours 0..1 as bytes (a ground tile's kept colours: 18 KB a tile, not the 72 of floats). */
 function bytesOf(colors: Float32Array): Uint8Array {
   const out = new Uint8Array(colors.length);
@@ -1083,45 +1258,60 @@ function bytesOf(colors: Float32Array): Uint8Array {
 }
 
 /**
- * One level of a ground tile from the finest level's shaded points (`at(col, row)` into `positions`
- * and `colors`, `c` m apart): every `step`th of them, `segs` quads across, normals from the
- * finest heights round each point, and a skirt down from the edges. UVs as the one-mesh ground's
- * (over the landscape's square from `x0`, `z0`, `size` across).
+ * Where a ground tile's finest grid lies (`Landscape.tileFrame`, `tileCorner`): `S` quads across, `c` m apart, `n`
+ * points across with the ring of one past it, its corner (`tx`, `tz`), and the landscape's square's far edges (`x1`,
+ * `z1`), where its points stop (`tileGrid`). Point (col, row), each from -1, is `(row + 1) * n + col + 1`; row 0 at the
+ * tile's far (max z) edge.
  */
-function tileMesh(app: pc.AppBase, positions: Float32Array, colors: Float32Array, n: number, segs: number, step: number, c: number, x0: number, z0: number, size: number, into: pc.Mesh | 'live' | null = null): pc.Mesh {
-  const m = segs + 1;
-  // (Point (col, row) of the finest grid, from -1: `(row + 1) * n + col + 1`.)
-  // (The grid's points, then each edge's again for the skirt: written straight into arrays of their size.)
-  const count = m * m + 4 * m;
-  const pos = new Float32Array(count * 3);
-  const nor = new Float32Array(count * 3);
-  const uv = new Float32Array(count * 2);
-  const col = new Float32Array(count * 4);
-  const idx = count > 65535 ? new Uint32Array(segs * segs * 6 + 4 * segs * 12) : new Uint16Array(segs * segs * 6 + 4 * segs * 12);
-  let v = 0;
-  let k = 0;
-  for (let row = 0; row < m; row++) {
-    for (let cc = 0; cc < m; cc++, v++) {
-      const p = (row * step + 1) * n + cc * step + 1;
-      const [p3, v3, v2, v4, p4] = [p * 3, v * 3, v * 2, v * 4, p * 4];
-      pos[v3] = positions[p3];
-      pos[v3 + 1] = positions[p3 + 1];
-      pos[v3 + 2] = positions[p3 + 2];
-      uv[v2] = (pos[v3] - x0) / size;
-      uv[v2 + 1] = (pos[v3 + 2] - z0) / size;
-      col[v4] = colors[p4];
-      col[v4 + 1] = colors[p4 + 1];
-      col[v4 + 2] = colors[p4 + 2];
-      col[v4 + 3] = colors[p4 + 3];
-      // Normals from the finest heights round each point. (Rows run towards -z: the slope along z is the other way round.)
-      const dx = (positions[p3 + 4] - positions[p3 - 2]) / (2 * c);
-      const dz = (positions[p3 - n * 3 + 1] - positions[p3 + n * 3 + 1]) / (2 * c);
-      const l = Math.sqrt(dx * dx + 1 + dz * dz);
-      nor[v3] = -dx / l;
-      nor[v3 + 1] = 1 / l;
-      nor[v3 + 2] = -dz / l;
-    }
+interface TileGrid {
+  S: number;
+  c: number;
+  n: number;
+  tx: number;
+  tz: number;
+  x1: number;
+  z1: number;
+}
+
+/**
+ * A ground tile level's vertices, interleaved: position and normal (floats), colour (RGBA bytes, sRGB, as shaded) and
+ * four bytes of nothing for the texture coordinates, 32 bytes a vertex. The ground's material lays its textures from
+ * the position (`GAME_PLANAR_UV`), but its shader still declares the coordinates: without the stream WebGPU drew it
+ * otherwise.
+ */
+const tileFormats = new WeakMap<pc.GraphicsDevice, pc.VertexFormat>();
+function tileFormat(device: pc.GraphicsDevice): pc.VertexFormat {
+  let format = tileFormats.get(device);
+  if (!format) {
+    format = new pc.VertexFormat(device, [
+      { semantic: pc.SEMANTIC_POSITION, components: 3, type: pc.TYPE_FLOAT32 },
+      { semantic: pc.SEMANTIC_NORMAL, components: 3, type: pc.TYPE_FLOAT32 },
+      { semantic: pc.SEMANTIC_COLOR, components: 4, type: pc.TYPE_UINT8, normalize: true },
+      { semantic: pc.SEMANTIC_TEXCOORD0, components: 4, type: pc.TYPE_UINT8, normalize: true },
+    ]);
+    tileFormats.set(device, format);
   }
+  return format;
+}
+
+/** A level `segs` quads across: its grid's points and then each edge's again for the skirt. */
+const levelVertices = (segs: number) => (segs + 1) * (segs + 1) + 4 * (segs + 1);
+const levelIndices = (segs: number) => segs * segs * 6 + 4 * segs * 12;
+
+/**
+ * The indices of a level `segs` quads across (the same for every tile): one buffer per level and device, shared by
+ * every tile's mesh of it, so never destroyed with one (however it goes: a level let go, a tile's draw with its
+ * entity); kept for the device's life.
+ */
+const tileIndices = new WeakMap<pc.GraphicsDevice, Map<number, pc.IndexBuffer>>();
+function tileIndexBuffer(device: pc.GraphicsDevice, segs: number): pc.IndexBuffer {
+  let byLevel = tileIndices.get(device);
+  if (!byLevel) tileIndices.set(device, (byLevel = new Map()));
+  let ib = byLevel.get(segs);
+  if (ib) return ib;
+  const m = segs + 1;
+  const idx = new Uint16Array(levelIndices(segs));
+  let k = 0;
   for (let row = 0; row < segs; row++) {
     for (let cc = 0; cc < segs; cc++) {
       idx[k++] = cc + 1 + (row + 1) * m;
@@ -1132,81 +1322,185 @@ function tileMesh(app: pc.AppBase, positions: Float32Array, colors: Float32Array
       idx[k++] = cc + row * m;
     }
   }
-  // The skirt: each edge's points again, a cell and a metre lower, joined to the edge both ways round.
-  const drop = c * step + 1;
+  // The skirt: each edge's points again (from `m * m`, an edge after another), joined to the edge both ways round.
   const edges = [(q: number) => q, (q: number) => segs * m + q, (q: number) => q * m, (q: number) => q * m + segs];
-  for (const edge of edges) {
-    const low = v;
-    for (let q = 0; q < m; q++, v++) {
-      const e = edge(q);
-      pos[v * 3] = pos[e * 3];
-      pos[v * 3 + 1] = pos[e * 3 + 1] - drop;
-      pos[v * 3 + 2] = pos[e * 3 + 2];
-      uv[v * 2] = uv[e * 2];
-      uv[v * 2 + 1] = uv[e * 2 + 1];
-      col.copyWithin(v * 4, e * 4, e * 4 + 4);
-      nor.copyWithin(v * 3, e * 3, e * 3 + 3);
-    }
+  edges.forEach((edge, e) => {
+    const low = m * m + e * m;
     for (let q = 0; q + 1 < m; q++) {
       const [a, b, la, lb] = [edge(q), edge(q + 1), low + q, low + q + 1];
-      idx[k++] = a;
-      idx[k++] = b;
-      idx[k++] = lb;
-      idx[k++] = a;
-      idx[k++] = lb;
-      idx[k++] = la;
-      idx[k++] = a;
-      idx[k++] = lb;
-      idx[k++] = b;
-      idx[k++] = a;
-      idx[k++] = la;
-      idx[k++] = lb;
+      idx.set([a, b, lb, a, lb, la, a, lb, b, a, la, lb], k);
+      k += 12;
     }
-  }
-  // (A tile of a height field drawn again, `Landscape.redrawTile`: written into `into`'s buffers as they are, its
-  // indices kept; or made `live`, its vertices kept on the CPU to be written into.)
-  const again = into instanceof pc.Mesh;
-  if (again && writeVertices(into, { [pc.SEMANTIC_POSITION]: pos, [pc.SEMANTIC_NORMAL]: nor, [pc.SEMANTIC_TEXCOORD0]: uv, [pc.SEMANTIC_COLOR]: col }, count)) return into;
-  const mesh = again ? into : new pc.Mesh(app.graphicsDevice);
-  if (into === 'live') mesh.clear(true, false);
-  mesh.setPositions(pos);
-  mesh.setNormals(nor);
-  mesh.setUvs(0, uv);
-  mesh.setColors(col);
-  if (!again) mesh.setIndices(idx);
-  mesh.update(pc.PRIMITIVE_TRIANGLES);
-  return into ? mesh : gpuOnly(mesh);
+  });
+  ib = new pc.IndexBuffer(device, pc.INDEXFORMAT_UINT16, idx.length, pc.BUFFER_STATIC, idx.buffer);
+  ib.destroy = () => {};
+  byLevel.set(segs, ib);
+  return ib;
 }
 
 /**
- * Writes `streams` (by semantic, floats) straight into `mesh`'s vertex buffer as it is laid out (one block a stream,
- * as `Mesh.update` lays out its own), up to the GPU, and its box again: what `Mesh.update` does element by element,
- * a block at a time. False (nothing written) where the buffer isn't laid out so or keeps no copy to write into.
+ * Writes level `segs` of a tile (every `S / segs`th point of its finest grid `g`, its `heights` and its `colours`)
+ * into `data` (its vertex buffer's bytes, `tileFormat`): the rows of its grid from `r0` to `r1` (all, by default),
+ * then its skirt, a cell and a metre down from its edges. Normals from the finest heights round each point. Colours
+ * only with `colours` (else the buffer's kept).
  */
-function writeVertices(mesh: pc.Mesh, streams: Record<string, Float32Array>, count: number): boolean {
-  const vb = mesh.vertexBuffer;
-  if (!vb || vb.numVertices !== count || vb.format.interleaved || !vb.storage?.byteLength) return false;
-  const elements = vb.format.elements;
-  if (elements.length !== Object.keys(streams).length) return false;
-  for (const el of elements) if (!streams[el.name] || el.dataType !== pc.TYPE_FLOAT32 || el.numComponents * count !== streams[el.name].length) return false;
-  const locked = vb.lock();
-  const [data, base] = locked instanceof ArrayBuffer ? [locked, 0] : [locked.buffer, locked.byteOffset];
-  for (const el of elements) new Float32Array(data, base + el.offset, el.numComponents * count).set(streams[el.name]);
-  vb.unlock();
+function writeTileLevel(data: ArrayBuffer, g: TileGrid, segs: number, heights: Float32Array, colours: Uint8Array | null, r0 = 0, r1 = segs): void {
+  const { S, c, n, tx, tz, x1, z1 } = g;
+  const step = S / segs;
+  const m = segs + 1;
+  const f = new Float32Array(data);
+  const b = new Uint8Array(data);
+  const inv = 1 / (2 * c);
+  const write = (v: number, p: number, x: number, y: number, z: number) => {
+    const o = v * 8;
+    f[o] = x;
+    f[o + 1] = y;
+    f[o + 2] = z;
+    // (Rows run towards -z: the slope along z is the other way round.)
+    const dx = (heights[p + 1] - heights[p - 1]) * inv;
+    const dz = (heights[p - n] - heights[p + n]) * inv;
+    const l = 1 / Math.sqrt(dx * dx + 1 + dz * dz);
+    f[o + 3] = -dx * l;
+    f[o + 4] = l;
+    f[o + 5] = -dz * l;
+    if (colours) {
+      const cb = v * 32 + 24;
+      const p4 = p * 4;
+      b[cb] = colours[p4];
+      b[cb + 1] = colours[p4 + 1];
+      b[cb + 2] = colours[p4 + 2];
+      b[cb + 3] = colours[p4 + 3];
+    }
+  };
+  for (let row = r0; row <= r1; row++) {
+    const fr = row * step;
+    const z = Math.min(z1, tz + (S - fr) * c);
+    for (let cc = 0, v = row * m; cc < m; cc++, v++) {
+      const fc = cc * step;
+      write(v, (fr + 1) * n + fc + 1, Math.min(x1, tx + fc * c), heights[(fr + 1) * n + fc + 1], z);
+    }
+  }
+  // The skirt: each edge's points again, lower.
+  const drop = c * step + 1;
+  const edges = [(q: number) => q, (q: number) => segs * m + q, (q: number) => q * m, (q: number) => q * m + segs];
+  edges.forEach((edge, e) => {
+    for (let q = 0, v = m * m + e * m; q < m; q++, v++) {
+      const o = edge(q) * 8;
+      f.copyWithin(v * 8, o, o + 6);
+      f[v * 8 + 1] -= drop;
+      b.copyWithin(v * 32 + 24, o * 4 + 24, o * 4 + 28);
+    }
+  });
+}
+
+/** A tile level's box: its square, from its lowest height less the skirt's drop to its highest. */
+function tileBox(g: TileGrid, segs: number, heights: Float32Array): pc.BoundingBox {
+  let [lo, hi] = [Infinity, -Infinity];
+  for (let k = 0; k < heights.length; k++) {
+    const h = heights[k];
+    if (h < lo) lo = h;
+    if (h > hi) hi = h;
+  }
+  lo -= g.c * (g.S / segs) + 1;
+  const [x0, x1] = [g.tx, Math.min(g.x1, g.tx + g.S * g.c)];
+  const [z0, z1] = [g.tz, Math.min(g.z1, g.tz + g.S * g.c)];
   const box = new pc.BoundingBox();
-  box.compute(streams[pc.SEMANTIC_POSITION], count);
-  mesh.aabb = box;
+  box.setMinMax(new pc.Vec3(x0, lo, z0), new pc.Vec3(x1, hi, z1));
+  return box;
+}
+
+/**
+ * Level `segs` of a ground tile as a mesh (`writeTileLevel`), its indices the level's shared ones. `live`: its vertex
+ * buffer keeps its bytes on the CPU, to be written into (`rewriteTileLevel`); else they go once uploaded (`gpuOnly`).
+ */
+function tileLevelMesh(device: pc.GraphicsDevice, g: TileGrid, segs: number, heights: Float32Array, colours: Uint8Array, live: boolean): pc.Mesh {
+  const count = levelVertices(segs);
+  const data = new ArrayBuffer(count * 32);
+  writeTileLevel(data, g, segs, heights, colours);
+  const vb = new pc.VertexBuffer(device, tileFormat(device), count, { usage: live ? pc.BUFFER_DYNAMIC : pc.BUFFER_STATIC, data });
+  const mesh = new pc.Mesh(device);
+  mesh.vertexBuffer = vb;
+  mesh.indexBuffer[0] = tileIndexBuffer(device, segs);
+  mesh.primitive[0] = { type: pc.PRIMITIVE_TRIANGLES, base: 0, baseVertex: 0, count: levelIndices(segs), indexed: true };
+  mesh.aabb = tileBox(g, segs, heights);
+  return live ? mesh : gpuOnly(mesh);
+}
+
+/**
+ * Writes level `segs` of a ground tile into its live `mesh` (`tileLevelMesh`): the rows `r0` to `r1` of its grid and
+ * its skirt (colours too with `colours`), only those bytes sent up. False (nothing written) if its vertices aren't
+ * kept on the CPU.
+ */
+function rewriteTileLevel(mesh: pc.Mesh, g: TileGrid, segs: number, heights: Float32Array, colours: Uint8Array | null, r0 = 0, r1 = segs): boolean {
+  const vb = mesh.vertexBuffer;
+  const data = vb?.storage;
+  if (!vb || !(data instanceof ArrayBuffer) || data.byteLength !== levelVertices(segs) * 32) return false;
+  writeTileLevel(data, g, segs, heights, colours, r0, r1);
+  const m = segs + 1;
+  if (r0 === 0 && r1 === segs) vb.unlock();
+  else {
+    vb.unlock(r0 * m * 32, (r1 - r0 + 1) * m * 32);
+    vb.unlock(m * m * 32, 4 * m * 32);
+  }
+  mesh.aabb = tileBox(g, segs, heights);
   return true;
 }
 
-/** The pad mask's define on the terrain's material (`padDraws` sets each draw's own lots): none until a draw has some. */
+/**
+ * A tile's water above the sea's level (`pondQuads`) written into `into` where it fits (its buffers kept on the CPU,
+ * room enough), else a mesh made for it with room to spare (a power of two), kept on the CPU: a brush's stamps over a
+ * pond write into the one mesh.
+ */
+function pondMeshOf(device: pc.GraphicsDevice, quads: { positions: Float32Array; indices: Uint32Array }, into: pc.Mesh | null): pc.Mesh {
+  const verts = quads.positions.length / 3;
+  const count = quads.indices.length;
+  const vb = into?.vertexBuffer;
+  const ib = into?.indexBuffer[0];
+  let mesh = into;
+  if (!mesh || !vb || !ib || !(vb.storage instanceof ArrayBuffer) || !(ib.storage instanceof ArrayBuffer) || vb.numVertices < verts || ib.numIndices < count) {
+    const room = (k: number) => 2 ** Math.ceil(Math.log2(Math.max(64, k)));
+    const format = pondFormats.get(device) ?? new pc.VertexFormat(device, [
+      { semantic: pc.SEMANTIC_POSITION, components: 3, type: pc.TYPE_FLOAT32 },
+      { semantic: pc.SEMANTIC_NORMAL, components: 3, type: pc.TYPE_FLOAT32 },
+    ]);
+    pondFormats.set(device, format);
+    mesh = new pc.Mesh(device);
+    mesh.vertexBuffer = new pc.VertexBuffer(device, format, room(verts), { usage: pc.BUFFER_DYNAMIC });
+    mesh.indexBuffer[0] = new pc.IndexBuffer(device, pc.INDEXFORMAT_UINT32, room(count), pc.BUFFER_DYNAMIC);
+  }
+  const v = mesh.vertexBuffer!;
+  const i = mesh.indexBuffer[0]!;
+  const f = new Float32Array(v.storage as ArrayBuffer);
+  for (let k = 0; k < verts; k++) {
+    f[k * 6] = quads.positions[k * 3];
+    f[k * 6 + 1] = quads.positions[k * 3 + 1];
+    f[k * 6 + 2] = quads.positions[k * 3 + 2];
+    f[k * 6 + 3] = 0;
+    f[k * 6 + 4] = 1;
+    f[k * 6 + 5] = 0;
+  }
+  new Uint32Array(i.storage as ArrayBuffer).set(quads.indices);
+  v.unlock(0, verts * 24);
+  i.unlock(0, count * 4);
+  mesh.primitive[0] = { type: pc.PRIMITIVE_TRIANGLES, base: 0, baseVertex: 0, count, indexed: true };
+  const box = new pc.BoundingBox();
+  box.compute(quads.positions, verts);
+  mesh.aabb = box;
+  return mesh;
+}
+const pondFormats = new WeakMap<pc.GraphicsDevice, pc.VertexFormat>();
+
+/** The pad mask's define on the terrain's material (`padDraws` sets each draw's own mask): an empty one until a draw has one. */
 const padMasks = new WeakSet<pc.StandardMaterial>();
-function padMasked(material: pc.StandardMaterial): void {
+const noPads = new WeakMap<pc.GraphicsDevice, pc.Texture>();
+function padMasked(device: pc.GraphicsDevice, material: pc.StandardMaterial): void {
   if (padMasks.has(material)) return;
   padMasks.add(material);
+  let none = noPads.get(device);
+  if (!none) noPads.set(device, (none = new pc.Texture(device, { name: 'noPads', width: 1, height: 1, format: pc.PIXELFORMAT_R8, mipmaps: false, levels: [new Uint8Array(1)] })));
   material.setDefine('GAME_PAD_MASK', '');
-  material.setParameter('game_padRects[0]', new Float32Array(PAD_RECTS * 4));
-  material.setParameter('game_padCount', 0);
+  material.setParameter('game_padMask', none);
+  material.setParameter('game_padArea', new Float32Array(4));
   material.update();
 }
 
@@ -1752,7 +2046,8 @@ const CROWN = { leaf: '#4F6E33', birch: '#6E8A42', needle: '#36503C', fruit: '#5
 
 /** A crown cluster's mesh: a low dome over a trunk's gap (unit: radius 1, from 0.3 to 1 up), smooth-shaded; a conifer's a cone. */
 function crownMesh(cone: boolean): Geo {
-  const g = new Geo();
+  // (White at 0.45 alpha, the cutaway's keep-everything: what its vertices were given one by one.)
+  const g = new Geo().color('#FFFFFF', 0.45);
   const n = 10;
   // Rings up the crown (height, radius), and the dome's middle its normals point out from.
   const rings: [number, number][] = cone ? [[0.22, 0.6], [0.5, 0.42], [0.78, 0.2], [1, 0]] : [[0.3, 0.7], [0.48, 0.97], [0.7, 0.88], [0.88, 0.55], [1, 0]];
@@ -1760,12 +2055,7 @@ function crownMesh(cone: boolean): Geo {
   const squash = cone ? 0.5 : 1.4;
   const vertex = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => {
     const l = Math.hypot(nx, ny, nz) || 1;
-    g.pos.push(x, y, z);
-    g.nor.push(nx / l, ny / l, nz / l);
-    g.uv.push(0, 0);
-    g.col.push(1, 1, 1, 0.45);
-    g.cut.push(15, 0, 15, 0);
-    return g.pos.length / 3 - 1;
+    return g.point([x, y, z], [nx / l, ny / l, nz / l], 0, 0);
   };
   const ids = rings.map(([y, r]) =>
     Array.from({ length: n }, (_, k) => {
@@ -1778,13 +2068,13 @@ function crownMesh(cone: boolean): Geo {
   for (let i = 0; i + 1 < ids.length; i++) {
     for (let k = 0; k < n; k++) {
       const [a, b, c, d] = [ids[i][k], ids[i][(k + 1) % n], ids[i + 1][(k + 1) % n], ids[i + 1][k]];
-      g.idx.push(a, b, c, a, c, d);
+      g.face(a, b, c).face(a, c, d);
     }
   }
   // Its underside, flat.
   const [yb] = rings[0];
   const centre = vertex(0, yb, 0, 0, -1, 0);
-  for (let k = 0; k < n; k++) g.idx.push(centre, ids[0][(k + 1) % n], ids[0][k]);
+  for (let k = 0; k < n; k++) g.face(centre, ids[0][(k + 1) % n], ids[0][k]);
   return g;
 }
 

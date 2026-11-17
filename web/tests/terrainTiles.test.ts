@@ -1,8 +1,8 @@
 // A big world's ground tiles (`render/pc/groundTiles.ts`, built by `nature.ts`): each has three levels of detail and draws one;
-// taking the landscape down destroys the two not drawn too (the one drawn goes with its entity), or about
+// taking the landscape down destroys the ones not drawn too (the one drawn goes with its entity), or about
 // 40 MB of vertex buffers stay behind with every new game or load. A land drawn from a height field draws again, at a
 // brush's stamp, only the tiles round the samples it changed (and past the world's edge where it reaches it), with the
-// colours they had. On the engine's null device: no GPU.
+// colours they had, and of each only the level it draws (the others when next drawn). On the engine's null device: no GPU.
 import { afterAll, describe, expect, mock, spyOn, test } from 'bun:test';
 import * as pc from '../src/render/pc/engine';
 import { disposeTiles, type GroundTile } from '../src/render/pc/groundTiles';
@@ -24,7 +24,7 @@ describe("a big world's ground tiles", () => {
     mi.mesh = meshes[2];
     mi.mesh = meshes[0];
     const destroyed = meshes.map((m) => spyOn(m, 'destroy'));
-    disposeTiles([{ mi, meshes, x: 64, z: 64, lod: 0 }]);
+    disposeTiles([{ mi, meshes, x: 64, z: 64, lod: 0, stale: 0 }]);
     expect(destroyed.map((s) => s.mock.calls.length)).toEqual([0, 1, 1]);
     // Its draw's going (with its entity) takes the one drawn.
     mi.destroy();
@@ -62,44 +62,73 @@ describe("a land drawn from a height field: a stamp's tiles", async () => {
     const kept = new Uint8Array(67 * 67 * 4).fill(200);
     inner.tiles = Array.from({ length: count * count }, () => {
       const meshes = [0, 1, 2].map(() => pc.Mesh.fromGeometry(d, new pc.PlaneGeometry()));
-      return { mi: new pc.MeshInstance(meshes[1], new pc.StandardMaterial()), meshes, x: 0, z: 0, lod: 1, kept };
+      return { mi: new pc.MeshInstance(meshes[1], new pc.StandardMaterial()), meshes, x: 0, z: 0, lod: 1, kept, stale: 0 };
     });
     return { scape, field, tiles: inner.tiles, count };
   }
 
   /** What each tile draws now: its meshes and how often each was made or written (a tile drawn again changes it). */
-  const drawn = (tiles: readonly GroundTile[]) => tiles.map((t) => t.meshes.map((m) => `${m.id}:${(m as unknown as { _aabbVer: number })._aabbVer}`).join());
+  const drawn = (tiles: readonly GroundTile[]) => tiles.map((t) => t.meshes.map((m) => (m ? `${m.id}:${(m as unknown as { _aabbVer: number })._aabbVer}` : '-')).join());
   const changed = (before: string[], after: string[]) => after.map((v, k) => (v !== before[k] ? k : -1)).filter((k) => k >= 0);
 
   test('only the tiles round the changed samples are drawn again, at the land as it is now', () => {
     const { scape, field, tiles, count } = shaped();
-    const before = tiles.map((t) => t.meshes);
+    const before = tiles.map((t) => [...t.meshes]);
     // A mound round (180, 180): samples 70..110.
     for (let j = 70; j < 110; j++) for (let i = 70; i < 110; i++) field.h[j * field.cols + i] += 300;
     const count2 = scape.reground({ i0: 70, j0: 70, i1: 110, j1: 110 });
-    const again = tiles.map((t, k) => t.meshes !== before[k]);
+    const again = tiles.map((t, k) => t.mi.mesh !== before[k][1]);
     // (The landscape's square from -260, 9 tiles across: the samples' box, 136..222 m with their neighbours and the
     // grids' rings, is in tile 3 (124..252 m) each way.)
     expect(count2).toBe(1);
     expect(again.filter(Boolean).length).toBe(1);
     expect(again[3 * count + 3]).toBe(true);
-    // The tile drawn again stands on the new land; the old levels destroyed, the level drawn kept.
+    // The tile drawn again stands on the new land: the level it draws made anew (the old one destroyed), the others
+    // left as they were until they are drawn.
     const t = tiles[3 * count + 3];
     expect(t.mi.mesh).toBe(t.meshes[1]);
+    expect(before[3 * count + 3][1]!.vertexBuffer === null).toBe(true);
+    expect([t.meshes[0], t.meshes[2]]).toEqual([before[3 * count + 3][0], before[3 * count + 3][2]]);
+    expect(t.stale).toBe(0b101);
     const ps: number[] = [];
-    t.meshes[0].getPositions(ps);
+    t.meshes[1]!.getPositions(ps);
     const at = [...Array(ps.length / 3).keys()].find((v) => ps[v * 3] === 180 && ps[v * 3 + 2] === 180)!;
     expect(ps[at * 3 + 1]).toBeCloseTo(scape.heightAt(180, 180), 5);
     expect(scape.heightAt(180, 180)).toBeCloseTo(field.h[90 * field.cols + 90] / 100, 5);
-    expect(before[3 * count + 3].every((m) => m.vertexBuffer === null || m.refCount === 0)).toBe(true);
-    // Stamped again: written into the same meshes (kept on the CPU for it), no new ones.
-    const live = t.meshes;
+    // Stamped again: written into the same mesh (kept on the CPU for it), no new one.
+    const live = t.meshes[1];
     const was = drawn(tiles);
     field.h[90 * field.cols + 90] += 100;
     scape.reground({ i0: 90, j0: 90, i1: 91, j1: 91 });
-    expect(t.meshes).toBe(live);
+    expect(t.meshes[1]).toBe(live);
     expect(changed(was, drawn(tiles))).toEqual([3 * count + 3]);
-    t.meshes[0].getPositions(ps);
+    t.meshes[1]!.getPositions(ps);
+    expect(ps[at * 3 + 1]).toBeCloseTo(scape.heightAt(180, 180), 5);
+  });
+
+  test('a level a stamp left stale is written as the tile comes to draw it; the finest is let go far off', () => {
+    const { scape, field, tiles, count } = shaped();
+    for (let j = 70; j < 110; j++) for (let i = 70; i < 110; i++) field.h[j * field.cols + i] += 300;
+    scape.reground({ i0: 70, j0: 70, i1: 110, j1: 110 });
+    const t = tiles[3 * count + 3];
+    expect(t.stale & 1).toBe(1);
+    // (Every fixture tile's middle at 0, 0: the camera there draws them all at their finest.)
+    scape.frameTiles(0, 0);
+    expect(t.lod).toBe(0);
+    expect(t.mi.mesh).toBe(t.meshes[0]);
+    expect(t.stale & 1).toBe(0);
+    const ps: number[] = [];
+    t.meshes[0]!.getPositions(ps);
+    const at = [...Array(ps.length / 3).keys()].find((v) => ps[v * 3] === 180 && ps[v * 3 + 2] === 180)!;
+    expect(ps[at * 3 + 1]).toBeCloseTo(scape.heightAt(180, 180), 5);
+    // Far off: its coarsest drawn, its finest gone.
+    scape.frameTiles(5000, 5000);
+    expect(t.lod).toBe(2);
+    expect(t.meshes[0]).toBe(null);
+    expect(t.mi.mesh).toBe(t.meshes[2]);
+    // Near again: made again from its heights.
+    scape.frameTiles(0, 0);
+    t.meshes[0]!.getPositions(ps);
     expect(ps[at * 3 + 1]).toBeCloseTo(scape.heightAt(180, 180), 5);
   });
 

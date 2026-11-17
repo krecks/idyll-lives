@@ -7,8 +7,8 @@
  *
  * Stages, each timed on the wall clock from just before the browser launch:
  * - `startup`: browser launch → the main menu shown (the loading screen gone);
- * - `entry`: "New game" → "Lay out the town" → "Choose a household" → that household's "Play" →
- *   step 4's "Move in" → the game interface up (`.hud-root`, the loading screen gone);
+ * - `entry`: "New game" → "Lay out the streets" → "Build the town" → "Choose a household" → that
+ *   household's "Play" → step 5's "Move in" → the game interface up (`.hud-root`, the loading screen gone);
  * - `steady`: `--secs` seconds from the entry (default 300), sampled every second.
  *
  * What is sampled:
@@ -26,6 +26,20 @@
  *   external (non-localhost) requests, which the game should make none of at runtime. Per-process
  *   disk bytes need root on macOS (fs_usage), so they are reported unavailable, not faked.
  *
+ * Memory attribution (where the bytes go, not only how many):
+ * - the workers' JS heaps (the sim, voice, language model and asset workers), each through its own CDP
+ *   session (auto-attached, flattened, over a second DevTools connection: Playwright's sessions can't
+ *   address a worker's), at 1 Hz and at the boundaries;
+ * - Chrome's memory-infra dump (`Tracing.requestMemoryDump`) at the menu, the entry and the steady
+ *   end: each process's allocators (V8, PartitionAlloc's ArrayBuffer partition, malloc, the GPU's) and
+ *   its private footprint;
+ * - the entry's peak: the renderer's RSS and the page's and workers' heaps twice a second through it;
+ * - the renderer's census (`window.__memCensus()`): CPU copies of GPU buffers, typed-array texture
+ *   levels, the model files' decoded pieces, the scene's geometry by owner;
+ * - `--heapprofile`: V8's sampling heap profile from "New game" to the entry (collected objects
+ *   included: what the entry allocated), then through the steady window (what it kept);
+ * - `--memtrace`: the page's typed arrays of 64 KB or more by allocation site (`?memtrace`, dev only).
+ *
  *   bun tools/bench/gameplay.mjs [options]
  *     --runs 2                 full runs (each in a fresh context), compared at the end
  *     --secs 300               steady state after the household is entered
@@ -40,10 +54,17 @@
  *     --startup-timeout 120    seconds for startup, --entry-timeout 180 for the entry
  *     --steady-grace 30        seconds the steady state may overrun `--secs` before it fails
  *     --out <dir>              default bench-results/gameplay-<time>/
+ *     --heapprofile            V8's sampling heap profile (entry: allocated; steady: kept)
+ *     --memtrace               large typed arrays by site (`?memtrace`)
+ *     --no-dumps               no memory-infra dumps (they pause the processes for a moment)
+ *     --lowmem                 the page as on an 8 GB machine (`?lowmem`)
+ *     --voices                 the residents' voices on (the setting; off by default)
+ *     --prod                   a production build made for the benchmark (`VITE_BENCH_STATS=1`), served by `vite preview`
  *
- * Needs the dev server (the `?gpustats` hook is dev-only), so `--url` must point at one.
+ * Needs the dev server (the `?gpustats` hook is dev-only), so `--url` must point at one; or `--prod`.
  */
 import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:net';
 import { appendFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { homedir, cpus } from 'node:os';
 import { createRequire } from 'node:module';
@@ -69,8 +90,18 @@ const preset = flag('preset', 'medium');
 const renderer = flag('renderer', 'webgpu');
 const hud = flag('hud', '1');
 const warm = has('warm');
-/** Sample the JS heap through the steady window (writes `heapprofile.json`, reports the biggest sites). */
+/** Sample the JS heap from "New game" (writes `heapprofile-entry.json` and `heapprofile.json`, reports the biggest sites). */
 const profileHeap = has('heapprofile');
+/** The page's large typed arrays by site (`?memtrace`). */
+const memtrace = has('memtrace');
+/** Chrome's memory-infra dumps at the boundaries. */
+const dumps = !has('no-dumps');
+/** The page as on a machine of 8 GB or less (`?lowmem`). */
+const lowmem = has('lowmem');
+/** The residents' voices on (the player's setting, off by default). */
+const voices = has('voices');
+/** A production build (with the benchmark's hooks) rather than the dev server. */
+const prod = has('prod');
 const startupTimeout = Number(flag('startup-timeout', '120'));
 const entryTimeout = Number(flag('entry-timeout', '180'));
 const steadyGrace = Number(flag('steady-grace', '30'));
@@ -89,7 +120,12 @@ if (has('help') || args.includes('-h')) {
   --renderer webgpu        or webgl
   --hud 1                  the interface shown (0 hides it)
   --warm                   prime the context with a first load (default: cold)
-  --heapprofile            sample the JS heap through the steady state (heapprofile.json, top sites in the report)
+  --heapprofile            sample the JS heap from New game (entry: allocated, steady: kept; top sites in the report)
+  --memtrace               the page's typed arrays of 64 kB or more by site (?memtrace)
+  --no-dumps               no memory-infra dumps at the boundaries
+  --lowmem                 the page as on an 8 GB machine (?lowmem)
+  --voices                 the residents' voices on (the setting; off by default)
+  --prod                   a production build with the benchmark's hooks (VITE_BENCH_STATS=1), served by vite preview
   --headed                 in a window (default headless: the real GPU either way)
   --port 5222 | --url <u>  a dev server on the port (started if none answers), or one already running
   --startup-timeout 120    seconds for startup, --entry-timeout 180 for the entry
@@ -173,7 +209,23 @@ let server = null;
 let serverMode = 'reused';
 const base = flag('url', null) ?? `http://localhost:${port}`;
 let serverReadyAt = STARTED;
-if (!flag('url', null) && !(await running(base))) {
+if (prod) {
+  // A build of this tree with the benchmark's hooks kept (`VITE_BENCH_STATS=1`), served as a release is.
+  const dist = join(out, 'dist');
+  console.log(`building for --prod into ${dist} …`);
+  const built = spawnSync(`${WEB}node_modules/.bin/vite`, ['build', '--outDir', dist, '--emptyOutDir'], { cwd: WEB, stdio: 'inherit', env: { ...process.env, VITE_BENCH_STATS: '1' } });
+  if (built.status !== 0) bad('the --prod build failed');
+  if (await running(base)) bad(`--prod: something already answers on ${base} (pick a free --port)`);
+  serverMode = 'preview';
+  server = spawn(`${WEB}node_modules/.bin/vite`, ['preview', '--outDir', dist, '--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
+  process.on('exit', () => server?.kill());
+  await new Promise((resolve, reject) => {
+    server.stdout.on('data', (d) => String(d).includes('Local') && resolve());
+    server.on('exit', (code) => reject(new Error(`vite preview exited (${code})`)));
+    setTimeout(() => reject(new Error('vite preview did not report "Local" in 120 s')), 120_000);
+  });
+  serverReadyAt = Date.now();
+} else if (!flag('url', null) && !(await running(base))) {
   serverMode = 'started';
   server = spawn(`${WEB}node_modules/.bin/vite`, ['--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
   process.on('exit', () => server?.kill());
@@ -296,6 +348,162 @@ async function heapUsage(cdp) {
   }
 }
 
+// ---------------------------------------------------------------- a second DevTools connection
+
+/** A free TCP port on this machine (the browser's DevTools port). */
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const srv = createServer();
+    srv.unref();
+    srv.on('error', reject);
+    srv.listen(0, '127.0.0.1', () => {
+      const { port: p } = srv.address();
+      srv.close(() => resolve(p));
+    });
+  });
+}
+
+/**
+ * A plain CDP client on the browser's DevTools socket: flattened sessions (each message names its
+ * session), which Playwright's own CDP sessions can't address, so the workers' heaps and the browser's
+ * tracing are reached through it.
+ */
+async function rawCdp(devtoolsPort) {
+  const version = await (await fetch(`http://127.0.0.1:${devtoolsPort}/json/version`)).json();
+  const ws = new WebSocket(version.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => {
+    ws.onopen = resolve;
+    ws.onerror = () => reject(new Error('the DevTools socket did not open'));
+  });
+  let id = 0;
+  const waiting = new Map();
+  const listeners = new Map();
+  ws.onmessage = (m) => {
+    const msg = JSON.parse(String(m.data));
+    if (msg.id !== undefined) {
+      const w = waiting.get(msg.id);
+      waiting.delete(msg.id);
+      if (!w) return;
+      if (msg.error) w.reject(new Error(`${w.method}: ${msg.error.message}`));
+      else w.resolve(msg.result);
+      return;
+    }
+    for (const fn of listeners.get(msg.method) ?? []) fn(msg.params, msg.sessionId);
+  };
+  const client = {
+    send(method, params = {}, sessionId) {
+      const n = ++id;
+      ws.send(JSON.stringify({ id: n, method, params, ...(sessionId ? { sessionId } : {}) }));
+      return new Promise((resolve, reject) => waiting.set(n, { resolve, reject, method }));
+    },
+    on(method, fn) {
+      if (!listeners.has(method)) listeners.set(method, new Set());
+      listeners.get(method).add(fn);
+      return () => listeners.get(method).delete(fn);
+    },
+    once(method) {
+      return new Promise((resolve) => {
+        const off = client.on(method, (p) => {
+          off();
+          resolve(p);
+        });
+      });
+    },
+    close() {
+      for (const w of waiting.values()) w.reject(new Error('closed'));
+      waiting.clear();
+      ws.close();
+    },
+  };
+  return client;
+}
+
+/**
+ * The page's workers, each with a session of its own (auto-attached, nested ones too), so their heaps
+ * can be read (`heaps`): the sim's, the voice's, the language model's, the asset decoders'.
+ */
+async function watchWorkers(raw, pageTargetId, onSeen = () => {}) {
+  const workers = new Map();
+  const auto = (sessionId) => raw.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, sessionId).catch(() => {});
+  raw.on('Target.attachedToTarget', (p) => {
+    const { sessionId, targetInfo } = p;
+    if (!/worker/.test(targetInfo.type)) return;
+    workers.set(sessionId, { type: targetInfo.type, url: targetInfo.url, title: targetInfo.title });
+    onSeen(workerName(targetInfo.url));
+    void auto(sessionId);
+  });
+  raw.on('Target.detachedFromTarget', (p) => workers.delete(p.sessionId));
+  const { sessionId } = await raw.send('Target.attachToTarget', { targetId: pageTargetId, flatten: true });
+  await auto(sessionId);
+  return {
+    /** Each worker's heap (MB): used, total, and the ArrayBuffers' backing store. */
+    async heaps() {
+      const out = [];
+      for (const [sid, w] of workers) {
+        const u = await Promise.race([raw.send('Runtime.getHeapUsage', {}, sid).catch(() => null), sleep(2000).then(() => null)]);
+        if (!u) continue;
+        out.push({ worker: workerName(w.url), usedMB: mb(u.usedSize), totalMB: mb(u.totalSize), backingMB: mb(u.backingStorageSize ?? 0) });
+      }
+      return out;
+    },
+  };
+}
+
+/** A worker's short name, from its script's URL. */
+const workerName = (url) => {
+  try {
+    return new URL(url).pathname.split('/').pop().replace(/\?.*$/, '').replace(/-[\w-]{8}\.js$/, '.js') || url;
+  } catch {
+    return String(url).slice(0, 60);
+  }
+};
+
+/** The workers' heaps summed (MB). */
+const workersSum = (heaps, key) => (heaps?.length ? +heaps.reduce((a, w) => a + (w[key] ?? 0), 0).toFixed(1) : null);
+
+/**
+ * Chrome's memory-infra dump of every process (tracing on for the dump alone): each process's
+ * allocators (the top level and their main parts, MB) and its totals (RSS, private footprint). Takes a
+ * second or two and pauses each process briefly while it is dumped.
+ */
+async function memoryDump(raw) {
+  await raw.send('Tracing.start', {
+    traceConfig: { includedCategories: ['disabled-by-default-memory-infra'], excludedCategories: ['*'], memoryDumpConfig: { triggers: [] } },
+    transferMode: 'ReturnAsStream',
+    streamFormat: 'json',
+  });
+  const dumped = await raw.send('Tracing.requestMemoryDump', { deterministic: false, levelOfDetail: 'detailed' });
+  const complete = raw.once('Tracing.tracingComplete');
+  await raw.send('Tracing.end');
+  const { stream } = await complete;
+  const chunks = [];
+  for (;;) {
+    const c = await raw.send('IO.read', { handle: stream, size: 4 << 20 });
+    chunks.push(c.base64Encoded ? Buffer.from(c.data, 'base64').toString('utf8') : c.data);
+    if (c.eof) break;
+  }
+  await raw.send('IO.close', { handle: stream }).catch(() => {});
+  const trace = JSON.parse(chunks.join(''));
+  const events = Array.isArray(trace) ? trace : (trace.traceEvents ?? []);
+  const hex = (v) => (typeof v === 'string' ? parseInt(v, 16) : Number(v ?? 0));
+  const processes = {};
+  for (const e of events) {
+    if (e.ph !== 'v' || !e.args?.dumps) continue;
+    // (A process's totals and its allocators come in events of their own.)
+    const d = e.args.dumps;
+    const proc = (processes[e.pid] ??= { residentMB: null, privateFootprintMB: null, allocators: {} });
+    for (const [name, a] of Object.entries(d.allocators ?? {})) {
+      const size = hex(a.attrs?.size?.value);
+      // (The top level and two levels down, where they are big enough to matter.)
+      if (name.split('/').length <= 3 && size >= 1 << 20) proc.allocators[name] = mb(size);
+    }
+    const totals = d.process_totals;
+    if (totals?.resident_set_bytes) proc.residentMB = mb(hex(totals.resident_set_bytes));
+    if (totals?.private_footprint_bytes) proc.privateFootprintMB = mb(hex(totals.private_footprint_bytes));
+  }
+  return { success: dumped.success, processes };
+}
+
 /** Every `<canvas>` on the page, and the RGBA bytes its backing store implies (the GPU may hold more). */
 async function canvasCensus(page) {
   try {
@@ -378,10 +586,15 @@ async function runOnce(n, chromium, executablePath) {
 
   let perf = null;
   let heapProfileRows = null;
+  let entryHeapRows = null;
+  /** Each worker as it started: its name, the stage and when (ms from launch). */
+  const workersSeen = [];
+  const entrySamples = [];
   let resources = [];
   let footprintStart = { available: false, reason: 'not taken' };
   let footprintEnd = { available: false, reason: 'not taken' };
   const launchAt = Date.now();
+  const devtoolsPort = await freePort();
   const browser = await chromium.launch({
     headless: !has('headed'),
     ...(executablePath ? { executablePath } : { channel: 'chromium' }),
@@ -391,12 +604,16 @@ async function runOnce(n, chromium, executablePath) {
       '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding',
       '--disable-background-timer-throttling',
+      `--remote-debugging-port=${devtoolsPort}`,
     ],
   });
   timeline.launchMs = Date.now() - launchAt;
   const browserVersion = browser.version();
   let browserPid = null;
   const boundaries = [];
+  /** The second DevTools connection (workers, tracing) and the page's workers through it. */
+  let devtools = null;
+  let workers = null;
   /** Memory and CPU-time at a stage boundary: taken at the edges, never per frame. */
   const boundary = async (name) => {
     let metrics = {};
@@ -417,6 +634,36 @@ async function runOnce(n, chromium, executablePath) {
       game = null;
     }
     const census = await canvasCensus(page);
+    const workerHeaps = workers ? await workers.heaps().catch(() => null) : null;
+    let renderCensus = null;
+    try {
+      renderCensus = await page.evaluate(() => window.__memCensus?.() ?? null);
+    } catch {}
+    let traced = null;
+    try {
+      traced = await page.evaluate(() => window.__memtrace?.(30) ?? null);
+    } catch {}
+    // (With the voices on: whether the engine is up and has spoken, from its own module: dev server only.)
+    let voice = null;
+    if (voices) {
+      try {
+        voice = await page.evaluate(async () => {
+          const m = await import('/src/voice/service.svelte.ts');
+          const t = m.voiceThreadStats();
+          return { state: t.state, device: t.device, lines: t.lines, loadMs: Math.round(t.loadMs) };
+        });
+      } catch {}
+    }
+    let dump = null;
+    if (dumps && devtools) {
+      try {
+        const d = await memoryDump(devtools);
+        const pick = (r) => (r ? (d.processes[r.pid] ?? null) : null);
+        dump = { success: d.success, renderer: pick(role.renderer), gpu: pick(role.gpu), browser: pick(role.browser) };
+      } catch (err) {
+        dump = { error: String(err).split('\n')[0] };
+      }
+    }
     const b = {
       type: 'boundary',
       stage: name,
@@ -439,6 +686,13 @@ async function runOnce(n, chromium, executablePath) {
       domNodes: metrics.Nodes ?? null,
       procs: tree.length,
       treeCpuS: tree.length ? +tree.reduce((a, r) => a + r.cpuS, 0).toFixed(2) : null,
+      workers: workerHeaps,
+      workersHeapMB: workersSum(workerHeaps, 'usedMB'),
+      workersBackingMB: workersSum(workerHeaps, 'backingMB'),
+      census: renderCensus,
+      memtrace: traced,
+      voice,
+      dump,
     };
     boundaries.push(b);
     raw(b);
@@ -453,11 +707,34 @@ async function runOnce(n, chromium, executablePath) {
   await context.addInitScript(quiet);
   await context.addInitScript(seeded, seed);
   await context.addInitScript(frameRecorder);
+  if (voices) {
+    await context.addInitScript(() => {
+      const key = 'open-sims-wasm.settings';
+      let saved = {};
+      try {
+        saved = JSON.parse(localStorage.getItem(key) ?? '{}');
+      } catch {}
+      localStorage.setItem(key, JSON.stringify({ ...saved, voices: true }));
+    });
+  }
   const page = await context.newPage();
   page.on('pageerror', (e) => pageErrors.push(String(e.message ?? e)));
   page.on('crash', () => pageErrors.push('page crashed'));
   const cdp = await context.newCDPSession(page);
   await cdp.send('Performance.enable');
+  try {
+    devtools = await rawCdp(devtoolsPort);
+    const { targetInfo } = await cdp.send('Target.getTargetInfo');
+    workers = await watchWorkers(devtools, targetInfo.targetId, (name) => {
+      const at = since();
+      workersSeen.push({ worker: name, stage, at });
+      raw({ type: 'worker', worker: name, stage, at });
+    });
+  } catch (err) {
+    console.warn(`  (no second DevTools connection: workers and dumps not measured: ${String(err).split('\n')[0]})`);
+    devtools?.close();
+    devtools = null;
+  }
   await cdp.send('Network.enable', { maxTotalBufferSize: 50_000_000, maxResourceBufferSize: 10_000_000 });
 
   cdp.on('Network.requestWillBeSent', (e) => {
@@ -488,7 +765,7 @@ async function runOnce(n, chromium, executablePath) {
     raw({ type: 'net', ...r, failed: e.errorText });
   });
 
-  const query = ['profile', 'gpustats', `quality=${preset}`, `hud=${hud}`, renderer === 'webgl' ? 'renderer=webgl' : ''].filter(Boolean).join('&');
+  const query = ['profile', 'gpustats', `quality=${preset}`, `hud=${hud}`, renderer === 'webgl' ? 'renderer=webgl' : '', memtrace ? 'memtrace' : '', lowmem ? 'lowmem' : ''].filter(Boolean).join('&');
   const url = `${base}/?${query}`;
   const menuUp = () => page.waitForFunction(() => !!document.querySelector('.main-menu, .menu') && !document.querySelector('.loading'), null, { timeout: startupTimeout * 1000, polling: 100 });
 
@@ -510,17 +787,53 @@ async function runOnce(n, chromium, executablePath) {
     await boundary('startup');
     if (pageErrors.length) fail(`page error during startup: ${pageErrors.join('; ')}`);
 
-    // ---- entry: "New game" → step 1's land → "Lay out the town" → step 2's town → "Choose a household" →
-    // step 3's cards (their portraits drawn) → that household's "Play" → step 4's home → its way on
+    // ---- entry: "New game" → step 1's land → "Lay out the streets" → step 2's layout → "Build the town" →
+    // step 3's town → "Choose a household" → step 4's cards (their portraits drawn) → that household's
+    // "Play" → step 5's home → its way on
     // ("Move in", or "Play the …s" for a household staying in its own home) → the game up. The entry
-    // stage is timed from "New game"; `entryMs` from the way on pressed in step 4 to the game up.
+    // stage is timed from "New game"; `entryMs` from the way on pressed in step 5 to the game up.
     stage = 'entry';
     const entryFrom = Date.now();
     raw({ type: 'stage', stage: 'entry', event: 'begin', at: since() });
+    if (profileHeap) {
+      // (From "New game" on, the objects collected meanwhile too: what the entry allocated, not what it kept.)
+      try {
+        await cdp.send('HeapProfiler.enable');
+        await cdp.send('HeapProfiler.startSampling', { samplingInterval: 32768, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
+      } catch (err) {
+        raw({ type: 'heapprofile', stage: 'entry', error: String(err).split('\n')[0] });
+      }
+    }
+    // The entry's peaks: the renderer's RSS and the heaps, twice a second until the game is up.
+    let sampling = true;
+    const sampler = (async () => {
+      while (sampling) {
+        const t0 = Date.now();
+        try {
+          const role = byRole(processTree(psTable(), browserPid ?? browserRootPid(psTable(), null) ?? 0));
+          const usage = await heapUsage(cdp);
+          const wh = workers ? await workers.heaps().catch(() => null) : null;
+          const e = {
+            type: 'entrySample',
+            t: +((t0 - entryFrom) / 1000).toFixed(2),
+            rendererMB: rssMB(role.renderer),
+            renderersMB: role.renderers.length ? rssSumMB(role.renderers) : null,
+            gpuMB: rssMB(role.gpu),
+            heapMB: mb(usage?.usedSize),
+            backingMB: mb(usage?.backingStorageSize),
+            workersHeapMB: workersSum(wh, 'usedMB'),
+            workersBackingMB: workersSum(wh, 'backingMB'),
+          };
+          entrySamples.push(e);
+          raw(e);
+        } catch {}
+        await sleep(Math.max(0, 500 - (Date.now() - t0)));
+      }
+    })();
     const wait = { timeout: entryTimeout * 1000, polling: 100 };
     const enabled = (label) => page.waitForFunction((src) => [...document.querySelectorAll('button')].some((b) => new RegExp(src).test(b.textContent ?? '') && !b.disabled), label.source, wait);
     await page.getByText('New game', { exact: true }).click({ timeout: entryTimeout * 1000 });
-    for (const label of [/Lay out the town/, /Choose a household/]) {
+    for (const label of [/Lay out the streets/, /Build the town/, /Choose a household/]) {
       const button = page.getByRole('button', { name: label });
       await button.waitFor({ timeout: entryTimeout * 1000 });
       await enabled(label);
@@ -546,12 +859,24 @@ async function runOnce(n, chromium, executablePath) {
     await page.waitForTimeout(500);
     const pressedAt = Date.now();
     await moveIn.click();
-    // (Fewer beds than sleepers: step 4 asks first, and is answered.)
+    // (Fewer beds than sleepers: step 5 asks first, and is answered.)
     const asked = () => [...document.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Move in anyway');
     await page.waitForFunction(`(${asked})() || (!!document.querySelector('.hud-root') && !document.querySelector('.loading'))`, null, wait);
     if (await page.evaluate(asked)) await page.getByRole('button', { name: 'Move in anyway' }).click();
     await page.waitForFunction(() => !!document.querySelector('.hud-root') && !document.querySelector('.loading'), null, wait);
     const enteredAt = Date.now();
+    sampling = false;
+    await sampler;
+    if (profileHeap) {
+      try {
+        const { profile } = await cdp.send('HeapProfiler.stopSampling');
+        writeFileSync(join(dir, 'heapprofile-entry.json'), JSON.stringify(profile));
+        entryHeapRows = topAllocations(profile);
+        raw({ type: 'heapprofile', stage: 'entry', rows: entryHeapRows });
+      } catch (err) {
+        raw({ type: 'heapprofile', stage: 'entry', error: String(err).split('\n')[0] });
+      }
+    }
     timeline.entryMs = enteredAt - pressedAt;
     timeline.entryStageMs = enteredAt - entryFrom;
     timeline.pageMarks.entered = await page.evaluate(() => performance.now());
@@ -563,7 +888,8 @@ async function runOnce(n, chromium, executablePath) {
 
     // ---- steady: `secs` seconds of play, sampled every second.
     stage = 'steady';
-    const steadyFrom = enteredAt;
+    // (From after the entry's boundary: its memory dump pauses the processes for a moment.)
+    const steadyFrom = Date.now();
     raw({ type: 'stage', stage: 'steady', event: 'begin', at: since(), pageT: await page.evaluate(() => performance.now()) });
     if (profileHeap) {
       try {
@@ -598,6 +924,7 @@ async function runOnce(n, chromium, executablePath) {
       if (!gameStats) fail('window.__gameStats() is missing: the page is not the dev server with ?gpustats, or the game is not up');
       const rows = psTable();
       const usage = await heapUsage(cdp);
+      const wh = workers ? await workers.heaps().catch(() => null) : null;
       if (!browserPid) browserPid = browserRootPid(rows, null);
       if (!browserPid) fail('could not find the browser process in `ps` (no Chromium child of this process)');
       const tree = processTree(rows, browserPid);
@@ -618,6 +945,8 @@ async function runOnce(n, chromium, executablePath) {
           heapMB: +(metrics.JSHeapUsedSize / 1048576).toFixed(2),
           backingMB: mb(usage?.backingStorageSize),
           heapTotalMB: mb(usage?.totalSize),
+          workersHeapMB: workersSum(wh, 'usedMB'),
+          workersBackingMB: workersSum(wh, 'backingMB'),
           domNodes: metrics.Nodes ?? null,
           documents: metrics.Documents ?? null,
           // (The sum counts each process's RSS whole, so shared pages are counted once per process:
@@ -697,6 +1026,7 @@ async function runOnce(n, chromium, executablePath) {
     raw({ type: 'perf', report: perf });
     raw({ type: 'resources', entries: resources });
   } finally {
+    devtools?.close();
     await context.close().catch(() => {});
     await browser.close().catch(() => {});
   }
@@ -726,8 +1056,10 @@ async function runOnce(n, chromium, executablePath) {
       rssGpuMB: stats(own.map((x) => x.metrics.rssGpuMB)),
       rssBrowserMB: stats(own.map((x) => x.metrics.rssBrowserMB)),
       heapMB: stats(own.map((x) => x.metrics.heapMB)),
-    backingMB: stats(own.map((x) => x.metrics.backingMB)),
-    heapTotalMB: stats(own.map((x) => x.metrics.heapTotalMB)),
+      backingMB: stats(own.map((x) => x.metrics.backingMB)),
+      heapTotalMB: stats(own.map((x) => x.metrics.heapTotalMB)),
+      workersHeapMB: stats(own.map((x) => x.metrics.workersHeapMB)),
+      workersBackingMB: stats(own.map((x) => x.metrics.workersBackingMB)),
       vramMB: stats(own.map((x) => x.metrics.vramMB)),
       vramTexMB: stats(own.map((x) => x.metrics.vramTexMB)),
       vramGeomMB: stats(own.map((x) => x.metrics.vramGeomMB)),
@@ -749,6 +1081,8 @@ async function runOnce(n, chromium, executablePath) {
     heapMB: s.metrics.heapMB,
     backingMB: s.metrics.backingMB,
     heapTotalMB: s.metrics.heapTotalMB,
+    workersHeapMB: s.metrics.workersHeapMB,
+    workersBackingMB: s.metrics.workersBackingMB,
     vramMB: s.metrics.vramMB,
     vramTexMB: s.metrics.vramTexMB,
     vramGeomMB: s.metrics.vramGeomMB,
@@ -764,8 +1098,16 @@ async function runOnce(n, chromium, executablePath) {
     const values = series.map((s) => s[key]).filter((x) => x != null);
     return values.length ? Math.max(...values) : null;
   };
+  const entryPeak = (key) => {
+    const values = entrySamples.map((e) => e[key]).filter((x) => x != null);
+    return values.length ? Math.max(...values) : null;
+  };
   const memory = {
     series,
+    entrySamples: entrySamples.length,
+    entryPeak: Object.fromEntries(['rendererMB', 'renderersMB', 'gpuMB', 'heapMB', 'backingMB', 'workersHeapMB', 'workersBackingMB'].map((k) => [k, entryPeak(k)])),
+    workersHeapPeakMB: peak('workersHeapMB'),
+    workersBackingPeakMB: peak('workersBackingMB'),
     rendererStartMB: series[0]?.rendererMB ?? null,
     rendererEndMB: series[series.length - 1]?.rendererMB ?? null,
     rendererPeakMB: series.length ? peak('rendererMB') : null,
@@ -849,6 +1191,8 @@ async function runOnce(n, chromium, executablePath) {
     stages: perStage,
     memory,
     heapSites: heapProfileRows,
+    entryHeapSites: entryHeapRows,
+    workersSeen,
     net: { perStage: perStageNet, total: net.length, external: external.length, externalUrls: external.map((r) => r.url), disk: { available: false, reason: 'macOS: per-process disk I/O needs root (fs_usage); not faked' } },
     perf: perf
       ? {
@@ -892,6 +1236,109 @@ function censusSection(summaries) {
     ...rows,
     '',
   ];
+}
+
+/** The memory attribution: the entry's peaks, the workers, Chrome's dumps, the renderer's census, the tracer's sites. */
+function attributionSections(summaries) {
+  const lines = [];
+  const f = (x) => (x == null ? '—' : x);
+  lines.push(
+    '## Entry peak',
+    '',
+    'Sampled twice a second from "New game" to the game up (`ps` and `Runtime.getHeapUsage`): the highest each reached.',
+    '',
+    '| run | samples | renderer RSS | renderers RSS | GPU proc RSS | JS heap | JS external | workers heap | workers external | entry (ms) |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+    ...summaries.map((x, i) => {
+      const p = x.memory.entryPeak ?? {};
+      return `| run ${i + 1} | ${x.memory.entrySamples ?? 0} | ${f(p.rendererMB)} | ${f(p.renderersMB)} | ${f(p.gpuMB)} | ${f(p.heapMB)} | ${f(p.backingMB)} | ${f(p.workersHeapMB)} | ${f(p.workersBackingMB)} | ${x.timeline.entryMs} |`;
+    }),
+    '',
+    'Steady peaks: ' + summaries.map((x, i) => `run ${i + 1}: renderer ${f(x.memory.rendererPeakMB)} MB, JS external ${f(x.memory.backingPeakMB)} MB, JS heap ${f(x.memory.heapPeakMB)} MB, workers heap ${f(x.memory.workersHeapPeakMB)} MB, VRAM ${f(x.memory.vramPeakMB)} MB`).join('; ') + '.',
+    '',
+  );
+  const voiceRows = summaries.flatMap((x, i) => (x.memory.boundaries ?? []).filter((b) => b.voice).map((b) => `| run ${i + 1} | ${b.stage} | ${b.voice.state} | ${b.voice.device ?? '—'} | ${b.voice.lines} | ${b.voice.loadMs} |`));
+  if (voiceRows.length) lines.push('## Voices', '', '| run | boundary | engine | device | lines made | load (ms) |', '| --- | --- | --- | --- | --- | --- |', ...voiceRows, '');
+  const seenRows = summaries.flatMap((x, i) => (x.workersSeen ?? []).map((w) => `| run ${i + 1} | ${w.worker} | ${w.stage} | ${(w.at / 1000).toFixed(1)} |`));
+  if (seenRows.length) lines.push('## Workers started', '', '| run | worker | stage | at (s from launch) |', '| --- | --- | --- | --- |', ...seenRows, '');
+  const workerRows = summaries.flatMap((x, i) => (x.memory.boundaries ?? []).flatMap((b) => (b.workers ?? []).map((w) => `| run ${i + 1} | ${b.stage} | ${w.worker} | ${w.usedMB} | ${w.totalMB} | ${w.backingMB} |`)));
+  if (workerRows.length) {
+    lines.push('## Workers', '', 'Each worker\'s own V8 heap (`Runtime.getHeapUsage` on its session); WASM linear memory is in its external bytes.', '', '| run | boundary | worker | heap used (MB) | heap total (MB) | external (MB) |', '| --- | --- | --- | --- | --- | --- |', ...workerRows, '');
+  }
+  const dumpRows = [];
+  for (const [i, x] of summaries.entries()) {
+    for (const b of x.memory.boundaries ?? []) {
+      for (const who of ['renderer', 'gpu', 'browser']) {
+        const d = b.dump?.[who];
+        if (!d) continue;
+        const top = Object.entries(d.allocators)
+          .filter(([n, v]) => (!n.includes('/') && v >= 5) || /partitions\/(array_buffer|buffer|fast_malloc)$|^v8\/(main|workers)$|^gpu\/(gl|dawn|shared_images)$/.test(n))
+          .sort((a, b2) => b2[1] - a[1])
+          .slice(0, 12)
+          .map(([n, v]) => `${n} ${v}`)
+          .join(', ');
+        dumpRows.push(`| run ${i + 1} | ${b.stage} | ${who} | ${f(d.privateFootprintMB)} | ${f(d.residentMB)} | ${top} |`);
+      }
+    }
+  }
+  if (dumpRows.length) {
+    lines.push(
+      '## Chrome memory-infra dumps',
+      '',
+      'Per process at each boundary (`Tracing.requestMemoryDump`, detailed, no forced GC): its private footprint and RSS, and its allocators (MB; a child is part of its parent, and the top levels overlap where one allocates from another).',
+      '',
+      '| run | boundary | process | private footprint | RSS | allocators (MB) |',
+      '| --- | --- | --- | --- | --- | --- |',
+      ...dumpRows,
+      '',
+    );
+  }
+  const censusRows = [];
+  for (const [i, x] of summaries.entries()) {
+    for (const b of x.memory.boundaries ?? []) {
+      const c = b.census;
+      if (!c) continue;
+      const st = Object.entries(c.storage).map(([k, v]) => `${k}: ${v.count} (${mb(v.bytes)} CPU / ${mb(v.gpuBytes)} GPU, ${v.released} let go)`).join('; ');
+      const owners = Object.entries(c.owners).sort((a, b2) => b2[1].gpuBytes - a[1].gpuBytes).slice(0, 8).map(([k, v]) => `${k} ${mb(v.gpuBytes)}/${mb(v.cpuBytes)}`).join(', ');
+      censusRows.push(`| run ${i + 1} | ${b.stage} | ${st} | ${mb(c.textureLevels)} (${c.texturesWithLevels}) | ${c.modelFiles.files} files, ${mb(c.modelFiles.pieceBytes)} pieces, ${mb(c.modelFiles.clipBytes)} clips | ${owners} |`);
+    }
+  }
+  if (censusRows.length) {
+    lines.push(
+      '## Renderer census',
+      '',
+      '`window.__memCensus()`: every buffer the device holds and its CPU copy (`storage`), textures\' typed-array levels kept on the CPU, the model files read and kept, and the scene\'s geometry by owner (GPU MB / CPU-copy MB).',
+      '',
+      '| run | boundary | buffers (MB) | texture levels MB (textures) | model files | geometry by owner |',
+      '| --- | --- | --- | --- | --- | --- |',
+      ...censusRows,
+      '',
+    );
+  }
+  const traceRows = summaries.flatMap((x, i) =>
+    (x.memory.boundaries ?? [])
+      .filter((b) => b.memtrace)
+      .flatMap((b) => [
+        `| run ${i + 1} | ${b.stage} | **all** | ${mb(b.memtrace.bytes)} | ${mb(b.memtrace.live)} | ${b.memtrace.count} |`,
+        ...b.memtrace.sites.slice(0, 15).map((t) => `| run ${i + 1} | ${b.stage} | \`${t.stack.slice(0, 220)}\` | ${mb(t.bytes)} | ${mb(t.live)} | ${t.count} |`),
+      ]),
+  );
+  if (traceRows.length) {
+    lines.push('## Large typed arrays by site (`--memtrace`)', '', 'Made since the page loaded (64 kB or more each), and still alive at the boundary.', '', '| run | boundary | site | made (MB) | alive (MB) | count |', '| --- | --- | --- | --- | --- | --- |', ...traceRows, '');
+  }
+  if (summaries.some((x) => x.entryHeapSites?.length)) {
+    lines.push(
+      '## Heap profile of the entry (allocated, collected included)',
+      '',
+      'Sampled at 32 kB from "New game" to the game up, with the objects collected meanwhile: the JS heap the entry allocated, by site (typed arrays\' contents are outside it).',
+      '',
+      '| run | site | MB |',
+      '| --- | --- | --- |',
+      ...summaries.flatMap((x, i) => (x.entryHeapSites ?? []).map((r) => `| run ${i + 1} | \`${r.site}\` | ${r.mb} |`)),
+      '',
+    );
+  }
+  return lines;
 }
 
 function topAllocations(profile) {
@@ -979,7 +1426,7 @@ const environment = {
   serverMode,
   serverReadyMs: serverReadyAt - STARTED,
   runType: warm ? 'warm' : 'cold',
-  flags: { runs, secs, seed, household: pick, preset, renderer, hud, warm, headed: has('headed'), startupTimeout, entryTimeout, steadyGrace },
+  flags: { runs, secs, seed, household: pick, preset, renderer, hud, warm, headed: has('headed'), startupTimeout, entryTimeout, steadyGrace, heapprofile: profileHeap, memtrace, dumps, lowmem, voices, prod },
 };
 
 // ---------------------------------------------------------------- the runs
@@ -1029,6 +1476,8 @@ const metricOrder = [
   ['heapMB', 'JS heap', 'MB'],
   ['backingMB', 'JS external (ArrayBuffers)', 'MB'],
   ['heapTotalMB', 'V8 heap total', 'MB'],
+  ['workersHeapMB', 'workers JS heap', 'MB'],
+  ['workersBackingMB', 'workers JS external', 'MB'],
   ['vramMB', 'GPU memory (VRAM)', 'MB'],
   ['vramTexMB', 'GPU memory: textures', 'MB'],
   ['simMemoryMB', 'sim WASM memory', 'MB'],
@@ -1091,7 +1540,7 @@ const md = [
   '## Command',
   '',
   '```',
-  `bun tools/bench/gameplay.mjs --runs ${runs} --secs ${secs} --seed ${seed} --preset ${preset} --renderer ${renderer} --hud ${hud}${warm ? ' --warm' : ''}${has('headed') ? ' --headed' : ''}`,
+  `bun tools/bench/gameplay.mjs --runs ${runs} --secs ${secs} --seed ${seed} --preset ${preset} --renderer ${renderer} --hud ${hud}${warm ? ' --warm' : ''}${has('headed') ? ' --headed' : ''}${profileHeap ? ' --heapprofile' : ''}${memtrace ? ' --memtrace' : ''}${dumps ? '' : ' --no-dumps'}${lowmem ? ' --lowmem' : ''}${voices ? ' --voices' : ''}${prod ? ' --prod' : ''}`,
   '```',
   '',
   `Expected runtime: ~${Math.round((secs + 40) * runs / 60)} min (${secs} s steady + ~40 s startup/entry/shutdown per run).`,
@@ -1181,6 +1630,7 @@ const md = [
         '',
       ]
     : []),
+  ...attributionSections(summaries),
   '## Disk and network',
   '',
   '| run | stage | requests | encoded | decoded | from cache | external |',

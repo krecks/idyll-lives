@@ -861,6 +861,27 @@ const SIZES: Record<TownSize, SizeTable> = {
 };
 /** The town sizes, smallest first. */
 export const TOWN_SIZES: readonly TownSize[] = ['hamlet', 'village', 'town', 'city'];
+/** A main town at town size has its place's lots, between these (`mainTown`). */
+const TOWN_LOTS: [number, number] = [66, 84];
+
+/**
+ * How big a main town of `homes` homes is: the biggest size whose fewest homes it has, a size's fewest halfway
+ * between the most the size below it lays (its lots and terraced houses: `SIZES`) and the fewest it lays itself.
+ * (Laid by the generator, a main town of each size measured 11–38, 57–78, 122–179 and 193–230 homes over three
+ * places and two seeds, 2026-11-17: each its own size or below.)
+ */
+export function sizeByHomes(homes: number): TownSize {
+  const span = (size: TownSize): [number, number] => {
+    const [lots, terraces] = [SIZES[size].lots ?? TOWN_LOTS, SIZES[size].terraces];
+    return [lots[0] + terraces[0], lots[1] + terraces[1]];
+  };
+  let out: TownSize = 'hamlet';
+  for (let k = 1; k < TOWN_SIZES.length; k++) {
+    const least = (span(TOWN_SIZES[k - 1])[1] + span(TOWN_SIZES[k])[0]) / 2;
+    if (homes >= least) out = TOWN_SIZES[k];
+  }
+  return out;
+}
 
 /** The land a new world has (m, both ways) by its size (`WorldOptions.size`). */
 export const LAND_SIZE: Record<LandSize, number> = { small: 640, medium: 832, large: 960 };
@@ -1043,7 +1064,7 @@ function mainTown(base: SizeSpec, size: TownSize, farms?: [number, number]): Siz
   const s = SIZES[size];
   if (!s.area || !s.lots) return farms ? { ...base, farms } : base;
   const w = Math.round(Math.sqrt((s.area * base.box.w) / base.box.d));
-  const k = Math.max(0, Math.min(1, (base.lots - 66) / (84 - 66)));
+  const k = Math.max(0, Math.min(1, (base.lots - TOWN_LOTS[0]) / (TOWN_LOTS[1] - TOWN_LOTS[0])));
   return {
     box: { w, d: Math.round(s.area / w) },
     lots: Math.round(s.lots[0] + (s.lots[1] - s.lots[0]) * k),

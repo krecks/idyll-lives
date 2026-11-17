@@ -8,7 +8,7 @@
  * - `quality=low|medium|high`: the graphics presets (`render/quality.ts`); without it, the player's setting.
  * - `hour=13|21`: the lighting held at that hour; without it, the game's clock (the scene's evening).
  * - `cam=orbit` (24 m round the home lot, a turn in 40 s), `wide` (80 m, 90 s), `build` (orbit in
- *   Build mode, paused), `dusk` (orbit at speed 5 from the scene's 18:00, the light changing every frame),
+ *   Build mode, paused), `dusk` (orbit at 10×, speed 3, from the scene's 18:00, the light changing every frame),
  *   `mirror` (the home lot's first mirror from 4.4 m, from over its room with the walls up, the camera
  *   swinging round the glass every 20 s), `mirror-still` (the same, held still in the swing's middle),
  *   `street` (the home lot from across its street, low: the house's front, the pavement, the road),

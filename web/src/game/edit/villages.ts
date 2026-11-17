@@ -847,7 +847,7 @@ export function moveVillage(draft: NeighbourhoodDraft, t: Templates, area: numbe
     roads: deadEnds(capped.roads),
     slots,
     greens,
-    open: { ...open, areas: open.areas.map((a, k) => (k === area ? { ...a, x: rect.x, z: rect.z } : a)), zones, pads, parking: parking.filter((p) => !byCut(p.x, p.z, 10)), ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}) },
+    open: { ...open, areas: open.areas.map((a, k) => (k === area ? { ...a, x: rect.x, z: rect.z } : a)), zones, pads, parking: parking.filter((p) => !byCut(p.x, p.z, 10)), ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...gentleWithout(open, open.areas[area]) },
   };
   if (cut.size) next = removeLots(next, new Set(), cut);
   if (!linked || !reaches(next.roads, ownAt)) notes.push(`no road could be found to ${name}: draw one to it`);
@@ -977,7 +977,12 @@ export function removeArea(draft: NeighbourhoodDraft, area: number): Neighbourho
   const places = open.places?.map((p) => (p.area < area ? p : { ...p, area: to(p.area, () => [p.x, p.z]) }));
   const parking = open.parking.map((p) => (p.area < area ? p : { ...p, area: to(p.area, () => [p.x, p.z]) }));
   const centre = open.centre?.map((c) => (c.area < area ? c : { ...c, area: to(c.area, () => c.poly[0]) }));
-  return { ...draft, slots, roads, open: { ...open, areas, parking, ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...(centre ? { centre } : {}) } };
+  return { ...draft, slots, roads, open: { ...open, areas, parking, ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...(centre ? { centre } : {}), ...gentleWithout(open, open.areas[area]) } };
+}
+
+/** The town's gentle ground (`OpenWorldDraft.gentle`) without area `a`'s plane: a village moved or removed has its ground fitted afresh where it goes. */
+function gentleWithout(open: NonNullable<NeighbourhoodDraft['open']>, a: Rect): Pick<NonNullable<NeighbourhoodDraft['open']>, 'gentle'> {
+  return open.gentle ? { gentle: open.gentle.filter((g) => g.area.x !== a.x || g.area.z !== a.z || g.area.w !== a.w || g.area.d !== a.d) } : {};
 }
 
 /** `draft` without the villages (areas past the main town) left with no road and no lot of their own (what removing a village's last road leaves), the last first. */

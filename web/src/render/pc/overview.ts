@@ -36,10 +36,11 @@ import { Geo, type V3 } from '../shared/geometry';
 import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
 import { placementVariation, standInOf } from '../shared/modelEntry';
 import { pavedRects } from '../shared/paving';
-import { townRoadMesh, townRoads, type RoadMeshData } from '../shared/roads';
+import { townRoadMesh, type RoadMeshData } from '../shared/roads';
+import { backdropKey, roadKey, townKey } from '../shared/overviewKeys';
 import { surfaceOf } from '../shared/landSurface';
 import type { BuiltSurface } from '../shared/builtSurface';
-import { hashString } from '../shared/chunks';
+import { hashNumbers } from '../shared/chunks';
 import { townRoadMeshOffThread } from '../shared/renderData';
 import { fieldLayers } from '../shared/street';
 import type { TownBuilding } from '../shared/townBuildings';
@@ -64,14 +65,15 @@ const HEADROOM_SRGB = 1 / Math.pow(GLOW_HEADROOM, 1 / 2.2);
 
 /**
  * The highlights' colours (sRGB): outline, hover, selected, marked (a home for sale) and dear (one for sale the
- * household can't afford: a dusky rose, apart from the marked amber and the selected blue, and drawn fainter).
+ * household can't afford: a pale stone, no colour of its own beside the marked amber and the selected blue, and
+ * drawn faint).
  */
 const COLORS: Record<'outline' | 'hover' | 'selected' | 'marked' | 'dear', RGB> = {
   outline: { r: 1, g: 0.97, b: 0.9 },
   hover: { r: 1, g: 0.98, b: 0.92 },
   selected: { r: 0.42, g: 0.62, b: 1.25 },
   marked: { r: 1.0, g: 0.78, b: 0.38 },
-  dear: { r: 0.95, g: 0.42, b: 0.5 },
+  dear: { r: 0.84, g: 0.82, b: 0.77 },
 };
 /** Intensities a plot eases between: outline, hover, selected, marked, dear. */
 const STATES = 5;
@@ -85,11 +87,17 @@ const WASH_FULL = 900;
 /**
  * How strongly a home for sale (`MARKED`) and one the household can't afford (`DEAR`) are lit: their ring and the glow
  * inside it (added), and their wash (laid over the lot: `washMaterial`) near and from `WASH_FULL` out. A dear one is
- * washed a little up close as well, so its rose reads beside the amber; neither near enough to hide the houses, which
- * stand over the wash.
+ * only a faint ring, and barely washed from far out: there to be found, not to draw the eye from the homes they can
+ * have. Neither is washed near enough to hide the houses, which stand over the wash.
  */
 const MARKED = { ring: 0.75, fill: 0.08, near: 0, far: 0.5 } as const;
-const DEAR = { ring: 0.85, fill: 0.14, near: 0.2, far: 0.5 } as const;
+const DEAR = { ring: 0.3, fill: 0, near: 0, far: 0.1 } as const;
+/**
+ * The marked homes' far wash by how many of the homes are lit: `MARKED.far` while a quarter or fewer are, easing to
+ * `CROWDED_FAR` once three quarters are. With most of the town lit, a strong wash over every lot turned the whole
+ * town amber and picked out nothing.
+ */
+const CROWDED_FAR = 0.18;
 
 const townLayers = new WeakMap<pc.AppBase, pc.Layer>();
 
@@ -115,6 +123,9 @@ export function townLayer(app: pc.AppBase): pc.Layer {
 interface Placed {
   template: ModelTemplate;
   draws: Instances[];
+  /** What its draws' matrices were last written from (`buildObjects`'s hash of the placements), and how many. */
+  sig?: number;
+  count?: number;
 }
 
 /** One of the four highlight draws (ring, fill, wall, wash): an instance per plot. */
@@ -175,6 +186,8 @@ export class TownOverview {
   private time = 0;
   /** How far into the wash the camera's distance is (0 near, 1 from `WASH_FULL`: `setReach`). */
   private far = 0;
+  /** The marked homes' wash from far out, by the share of the homes lit (`CROWDED_FAR`: `updateTargets`). */
+  private markedFar: number = MARKED.far;
   private readonly rgba = new Float32Array(4);
   private readonly m = new Float32Array(16);
   private readonly q: Quat = [0, 0, 0, 1];
@@ -193,7 +206,7 @@ export class TownOverview {
     parent.addChild(this.root);
     this.templates = new TemplateCache(app);
     this.street = new Street(app, this.root, assets, house, { layers: this.layers, fenceStyles: content.fenceStyles });
-    this.buildings = new TownBuildings(app, this.root, this.layers);
+    this.buildings = new TownBuildings(app, this.root, { layers: this.layers, castShadows: true });
     // Unlit: the output is the vertex colour times the instance colour (`glowByInstance`), added by its alpha.
     const mat = new pc.StandardMaterial();
     mat.name = 'lotGlow';
@@ -248,7 +261,8 @@ export class TownOverview {
 
   /** Builds the overview of `world` (kept when it is the same town); the previous one stays until it is done. True when it was built. */
   async build(world: WorldStructure, pace?: () => Promise<void>): Promise<boolean> {
-    const key = townKey(world);
+    const roadsKey = roadKey(world);
+    const key = townKey(world, roadsKey);
     const drawn = backdropKey(world);
     if (key === this.key && drawn === this.backdropKey) return false;
     if (key === this.key) {
@@ -261,7 +275,6 @@ export class TownOverview {
     }
     // (Asked for first: the render data worker makes the town's road mesh while the street is planned. Not for
     // another town with the same roads at the same heights: a lot removed keeps it.)
-    const roadsKey = roadKey(world);
     const roads = this.ground.get('townStreets')?.key === roadsKey ? null : townRoadMeshOffThread(world);
     await this.street.build(world, null, pace);
     const ground = await this.buildGround(world, pace, roads, roadsKey);
@@ -279,15 +292,23 @@ export class TownOverview {
     this.buildings.setBackdrop(backdrop);
     this.buildings.show(1);
     this.templatesInUse.clear();
-    for (const [k, { template, matrices }] of objects) {
+    for (const [k, { template, matrices, sig }] of objects) {
       this.templatesInUse.add(k);
       const p = this.placedOf(k, template);
-      const count = matrices.length / 16;
+      // (The same things where they were: the draws as they are, shown again.)
+      if (!matrices && p.sig === sig) {
+        for (const d of p.draws) d.enabled = (p.count ?? 0) > 0;
+        this.templates.hideStale(k);
+        continue;
+      }
+      const m = matrices ?? new Float32Array(0);
+      const count = m.length / 16;
       for (const d of p.draws) {
-        d.setMatrices(matrices, count);
+        d.setMatrices(m, count);
         d.update();
         d.enabled = count > 0;
       }
+      Object.assign(p, { sig: matrices ? sig : undefined, count });
       // (In place of a box set aside for a file that came, if there was one: never both at once.)
       this.templates.hideStale(k);
     }
@@ -376,7 +397,7 @@ export class TownOverview {
       ring.draw.set(INSTANCE_COLOR, i, writeColor(c, outline * 0.32, hover * 1.15, sel * 1.1, marked * MARKED.ring, dear * DEAR.ring));
       fill.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.4, sel * 0.34, marked * MARKED.fill, dear * DEAR.fill));
       wall.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.2, sel * 0.32, 0, 0));
-      wash.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.3 * far, sel * 0.32 * far, marked * (MARKED.near + (MARKED.far - MARKED.near) * far), dear * (DEAR.near + (DEAR.far - DEAR.near) * far)));
+      wash.draw.set(INSTANCE_COLOR, i, writeColor(c, 0, hover * 0.3 * far, sel * 0.32 * far, marked * (MARKED.near + (this.markedFar - MARKED.near) * far), dear * (DEAR.near + (DEAR.far - DEAR.near) * far)));
     }
     for (const h of this.hl) h.draw.update(false);
     return true;
@@ -467,14 +488,18 @@ export class TownOverview {
   }
 
   /** Outdoor objects of every lot (garden and park trees, benches, flower beds), one template per model, and their matrices. */
-  private async buildObjects(world: WorldStructure, pace?: () => Promise<void>): Promise<Map<string, { template: ModelTemplate; matrices: Float32Array }>> {
+  /**
+   * Its matrices are null for a model whose things are as the town before had them (`sig`, a hash of their placements,
+   * the same, and its template too): its draws are kept as they are.
+   */
+  private async buildObjects(world: WorldStructure, pace?: () => Promise<void>): Promise<Map<string, { template: ModelTemplate; matrices: Float32Array | null; sig: number }>> {
     const W = world.width;
     const outdoor = (o: ObjectPlacement) => {
       for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) if (world.rooms[z * W + x]) return false;
       return true;
     };
     const groups = Map.groupBy(world.objects.filter(outdoor), (o) => this.content.object(o.def)?.model ?? `model.${o.def}`);
-    const out = new Map<string, { template: ModelTemplate; matrices: Float32Array }>();
+    const out = new Map<string, { template: ModelTemplate; matrices: Float32Array | null; sig: number }>();
     for (const [key, list] of groups) {
       await pace?.();
       const template = await this.templates.get(key, () => {
@@ -482,15 +507,21 @@ export class TownOverview {
         // Seen from afar: a file's far version; without a file, the box the lot draws.
         return buildModel(this.app, `town:${key}`, this.assets.get(key, 'model'), def?.footprint ?? [1, 1], { far: true, standIn: standInOf(this.content, def) });
       });
-      const matrices = new Float32Array(list.length * 16);
       const vary = this.assets.get(key, 'model')?.vary ?? 0;
+      const sig = hashNumbers(list.flatMap((o) => [o.x, o.z, o.w, o.d, o.rot, o.turn ?? 0, o.offset?.[0] ?? 0, o.offset?.[1] ?? 0]), Math.round(vary * 1e6));
+      const had = this.placed.get(key);
+      if (had && had.template === template && had.sig === sig) {
+        out.set(key, { template, matrices: null, sig });
+        continue;
+      }
+      const matrices = new Float32Array(list.length * 16);
       list.forEach((o, i) => {
         const { turn, size } = placementVariation(vary, o.x, o.z);
         const centre = objectCentre(o);
         compose(size, size, size, quatYawPitchRoll((o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn, 0, 0, this.q), centre.x, 0, centre.z, this.m);
         matrices.set(this.m, i * 16);
       });
-      out.set(key, { template, matrices });
+      out.set(key, { template, matrices, sig });
       await pace?.();
     }
     return out;
@@ -632,6 +663,7 @@ export class TownOverview {
     const { hover, selected, outlines } = this.state;
     const marked = new Set(this.state.marked);
     const dear = new Set(this.state.dear);
+    let [shown, homes] = [0, 0];
     for (let i = 0; i < n; i++) {
       const id = this.plots[i].id;
       const at = i * STATES;
@@ -642,39 +674,19 @@ export class TownOverview {
       // (A dear lot is one of the marked, in its own tint; one dear but not marked is lit as dear all the same.)
       this.target[at + 3] = marked.has(id) && !dear.has(id) && !lit ? 1 : 0;
       this.target[at + 4] = dear.has(id) && !lit ? 1 : 0;
+      if (!this.plots[i].public) homes++;
+      if (marked.has(id) && !dear.has(id)) shown++;
+    }
+    const t = Math.min(1, Math.max(0, (shown / Math.max(1, homes) - 0.25) / 0.5));
+    const markedFar = MARKED.far + (CROWDED_FAR - MARKED.far) * t * t * (3 - 2 * t);
+    if (markedFar !== this.markedFar) {
+      this.markedFar = markedFar;
+      this.dirty = true;
     }
   }
 }
 
 const ZERO = [0, 0, 0, 0];
-
-/** What the town's road mesh is made from (`townRoadMesh`): its roads and junctions, and on a land the town follows their heights. */
-function roadKey(world: WorldStructure): string {
-  const surface = surfaceOf(world);
-  return `${hashString(JSON.stringify([townRoads(world), world.junctions ?? null]))}|${surface ? surface.roadsSig() : '-'}`;
-}
-
-/** Identity of a town layout: the overview builds again only when it changes. */
-function townKey(world: WorldStructure): string {
-  return [
-    world.meta?.seed ?? 0,
-    world.width,
-    world.depth,
-    world.plots.map((p) => `${p.house?.join(',') ?? '-'}`).join(';'),
-    world.openings.length,
-    world.objects.length,
-    world.objects.reduce((a, o) => a + o.x * 31 + o.z * 7 + o.rot, 0),
-    (world.meta?.paths ?? []).map((r) => `${r.x},${r.z},${r.w}`).join(';'),
-    JSON.stringify(world.meta?.world ?? null),
-    world.meta?.home ?? '-',
-  ].join('|');
-}
-
-/** What a town's backdrop buildings are drawn from (`townBackdrop`): its buildings, its places' hours, and on a land it follows the surface's roads (as the road mesh is keyed: `roadKey`). */
-function backdropKey(world: WorldStructure): string {
-  const surface = surfaceOf(world);
-  return `${hashString(JSON.stringify([world.meta?.backdrop ?? null, (world.meta?.places ?? []).map((p) => p.hours ?? null)]))}|${surface ? surface.roadsSig() : '-'}`;
-}
 
 /** A highlight's colour (into `out`): the states mixed by intensity (an added glow, alpha its strength). */
 function writeColor(out: Float32Array, outline: number, hover: number, selected: number, marked: number, dear: number): Float32Array {

@@ -1,14 +1,17 @@
 <script lang="ts">
   /**
    * The Street tool's card: what it draws (`streetChoice`). The kind, which is a street of the town
-   * or village it runs in or a country road outside them unless a lane or a footpath is asked for;
+   * or village it runs in or a country road outside them unless a street, a lane or a footpath is
+   * asked for (a street or a lane asked for stays one out of town, given an area when it is built);
    * whether what is in its way is cleared (else the street is refused there); and what is put along
    * it: homes, the town's other buildings, both, or nothing; by where it runs unless chosen (both in
-   * the main town, homes elsewhere).
+   * the main town, homes elsewhere). A street just drawn and split at its bridges lists its stretches,
+   * each picked by a click (the tool picks the one nearest where the street was finished).
    */
   import Segmented from '../kit/Segmented.svelte';
   import Toggle from '../kit/Toggle.svelte';
   import { alongFor, streetChoice, type Along, type StreetKindChoice } from './streetChoice.svelte';
+  import { drawnStretches } from './streetLive';
   import type { TownEditor } from './tools';
 
   const { editor }: { editor: TownEditor } = $props();
@@ -31,9 +34,23 @@
   const trail = $derived(streetChoice.kind === 'trail');
   /** `auto` shows as what goes along a street where the pointer is (both in the main town, homes elsewhere). */
   const along = $derived(alongFor(streetChoice.along, streetChoice.shownArea));
+  /** The street just drawn, split at its bridges: its stretches while the town has them. */
+  const stretches = $derived(drawnStretches(editor.draft, streetChoice.drawn));
+  const picked = $derived(editor.selected?.kind === 'road' ? editor.selected.road : -1);
 </script>
 
 <div class="street-card">
+  {#if stretches.length}
+    <div class="option">
+      <span class="eyebrow sub">The street drawn</span>
+      <div class="choices" role="radiogroup" aria-label="The street drawn, a stretch at a time">
+        {#each stretches as s (s.road)}
+          <button role="radio" class="chip" class:deck={s.deck} aria-checked={picked === s.road} class:on={picked === s.road} onclick={() => editor.select({ kind: 'road', road: s.road })}>{s.name || (s.deck ? 'The bridge' : 'A stretch')}</button>
+        {/each}
+      </div>
+      <p class="hint">Split at its {stretches.filter((s) => s.deck).length === 1 ? 'bridge' : 'bridges'}: each stretch is a road of its own, with its own card.</p>
+    </div>
+  {/if}
   <div class="option">
     <span class="eyebrow sub">Kind</span>
     <Segmented fill label="Kind of road" value={kind} options={KINDS} onchange={(v) => (streetChoice.kind = v)} />
@@ -41,7 +58,10 @@
       {#if streetChoice.kind === 'trail'}
         No cars and nothing along it; it does not cross the water.
       {:else if streetChoice.kind === 'lane'}
-        A narrow lane in {editor.townName || 'the town'} or a village; a country road outside them.
+        A narrow lane, in {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
+      {:else if streetChoice.kind === 'street'}
+        A street, in {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
+        <button class="link" onclick={() => (streetChoice.kind = 'auto')}>By where it runs</button>
       {:else}
         A street in {editor.townName || 'the town'} or a village, a country road outside them.
         {#if streetChoice.kind !== 'auto'}<button class="link" onclick={() => (streetChoice.kind = 'auto')}>By where it runs</button>{/if}
@@ -52,6 +72,8 @@
     <span>Clear what's in the way{#if !streetChoice.clear}<span class="sub-note"> (else it is refused there)</span>{/if}</span>
     <Toggle label="Clear what's in the way" bind:checked={streetChoice.clear} />
   </label>
+  <!-- (Step 2 has no "Along it": the zones beside a street decide what Build puts along it.) -->
+  {#if editor.step !== 'layout'}
   <div class="option" class:off={trail}>
     <span class="eyebrow sub">Along it</span>
     <Segmented fill label="Along it" value={along} options={ALONG} onchange={(v) => (streetChoice.along = v)} />
@@ -68,7 +90,8 @@
       {#if streetChoice.along !== 'auto'}<button class="link" onclick={() => (streetChoice.along = 'auto')}>By where it runs</button>{/if}
     </p>
   </div>
-  <p class="hint keys"><kbd>Enter</kbd> or a double click ends it as a dead end, <kbd>Backspace</kbd> takes a point back, <kbd>Esc</kbd> drops it.</p>
+  {/if}
+  <p class="hint keys"><kbd>Enter</kbd> or a double click ends it (on a road just ahead, else as a dead end), <kbd>Backspace</kbd> takes a point back, <kbd>Esc</kbd> drops it.</p>
 </div>
 
 <style>
@@ -85,6 +108,27 @@
   .option.off {
     opacity: 0.55;
     pointer-events: none;
+  }
+  .choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .chip {
+    height: 28px;
+    padding: 0 10px;
+    border-radius: var(--radius-pill);
+    background: var(--hairline);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .chip.deck {
+    font-style: italic;
+  }
+  .chip.on {
+    background: var(--accent);
+    color: #fff;
   }
   .row {
     display: flex;

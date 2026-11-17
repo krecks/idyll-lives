@@ -1,13 +1,15 @@
 #!/usr/bin/env bun
 /**
  * The land brushes as a player uses them, by script (`window.__land`, `?debug`): step 1's land made,
- * "Shape the land" chosen, then a mound, a pond on its top, a river from the hill down to the sea (or
+ * "Shape the land" chosen, then a mound flattened on top (a plateau), a pond on its top, a river from the hill down to the sea (or
  * the nearest water), woods painted and half cleared, and a peak, each a stroke a point a frame; the
- * frames' times during each stroke, and pictures before and after. Then "Lay out the town" (step 2's
- * town laid on the land as shaped), "Choose a household", a household played (step 3, with the game's
- * mode chosen there): the step-1 pond is water to the simulation (where the town left it), someone is sent across it, and the
+ * frames' times during each stroke, and pictures before and after. Then "Lay out the streets" (step 2's
+ * layout proposed on the land as shaped), "Build the town" (step 3), "Choose a household", a household
+ * played (step 4, with the game's mode chosen there) and step 5's Move in: the step-1 pond is water to the simulation (where the town left it), someone is sent across it, and the
  * camera looks at it; then Build mode's Land tab: a mound by the home (paid in Living, free in
- * Creative; undo pays back, redo pays again) and a pond; saved, continued from the menu, and the
+ * Creative; undo pays back, redo pays again) and a pond, a raise across the road by the home and a lower under the
+ * home (built land), water across a country road (a bridge, undone and redone) and a raise by it, the terrain not drawn
+ * over the raised roads' edges (`roadCovered`); saved, continued from the menu, and the
  * land and the water are still there. In step 1 too, the ends of the size range: 120 m raise, smooth
  * and lake strokes timed, a 1 m point stroke (one sample changed at each point it crosses), the
  * palette at 1 m and at 120 m, and the 1 m cursor close up.
@@ -19,7 +21,7 @@
  *     --world country --options …  step 1's place and options (`?world=`, `?options=`)
  *     --no-play                    step 1 only
  *     --plain                      no shaping in step 1: the game's world has no land of its own until its first stroke
- *     --mode living|creative       the game's mode (step 3's choice)
+ *     --mode living|creative       the game's mode (step 4's choice)
  *     --headed                     in a window
  *     --port 5186 | --url <u>      a dev server on the port (started if none answers), or one already running
  *     --out <dir>                  default bench-results/land-<time>/
@@ -181,24 +183,59 @@ async function aim(page, at, radius) {
 }
 
 /**
+ * How far the ground is drawn over a road's surface along its edges, `span` m either side of town point `at` (the road
+ * nearest it, every metre): the terrain just inside each edge and the grass's ground there, above the road's height
+ * (`__groundDrawn`), the most (m) of each and where. The terrain over the road shows as a notch in its edges; the
+ * grass's is told only (a patch reaching over a kerb grows no blades on the road, its ground there a plane's).
+ */
+async function roadCovered(page, at, span, kind) {
+  return page.evaluate(
+    ([[x, z], span, kind]) => {
+      const first = window.__land.nearestRoad(x, z, kind);
+      if (!first) return null;
+      const points = [];
+      for (let k = -span; k <= span; k++) {
+        const r = window.__land.nearestRoad(x + first.along[0] * k, z + first.along[1] * k, kind);
+        if (!r || r.road !== first.road) continue;
+        for (const o of [-1, 1]) {
+          const d = o * (r.width / 2 - 0.25);
+          points.push([r.at[0] - r.along[1] * d, r.at[1] + r.along[0] * d]);
+        }
+      }
+      const drawn = window.__groundDrawn(points);
+      const worst = { terrain: { over: -Infinity, at: null }, grass: { over: -Infinity, at: null } };
+      drawn.forEach((g, i) => {
+        if (g.built === null) return;
+        for (const by of ['terrain', 'grass']) if (g[by] !== null && g[by] - g.built > worst[by].over) worst[by] = { over: g[by] - g.built, at: points[i].map(Math.round) };
+      });
+      for (const w of Object.values(worst)) w.over = Number.isFinite(w.over) ? +w.over.toFixed(3) : null;
+      return { points: points.length, ...worst };
+    },
+    [at, span, kind],
+  );
+}
+/** The most (m) the terrain may be drawn over a road's edge (`roadCovered`): under a road it lies `ROAD_SINK` (6 cm) below it. */
+const COVER_MOST = 0.03;
+
+/**
  * In play: the pond made in step 1 is water the residents walk round (someone sent across it, the
  * camera on it); then the Land tab: a mound by the home (paid in Living, free in Creative; undo pays
  * back, redo pays again) and a pond; saved, continued from the menu, and the land and water still there.
  */
-async function play(page, renderer, mound, shot) {
+async function play(page, renderer, pond, shot) {
   const r = {};
-  if (mound) await stepOnePond(page, renderer, mound, shot, r);
-  return { ...r, ...(await landTabInPlay(page, renderer, mound, shot)) };
+  if (pond) await stepOnePond(page, renderer, pond, shot, r);
+  return { ...r, ...(await landTabInPlay(page, renderer, pond, shot)) };
 }
 
 /** The pond made in step 1 in play: water to the simulation, someone sent across it, the camera on it. */
-async function stepOnePond(page, renderer, mound, shot, r) {
+async function stepOnePond(page, renderer, pond, shot, r) {
   r.stepOnePond = await page.evaluate(async ([x, z]) => {
     window.__controls.setMode('build');
     window.__controls.setBuildTab('land');
     for (let k = 0; k < 100 && !(() => { try { return window.__land.stats(); } catch { return null; } })(); k++) await new Promise((res) => setTimeout(res, 100));
     return window.__land.simWet(x, z);
-  }, mound);
+  }, pond);
   if (!r.stepOnePond) fault(`${renderer} the pond made in step 1 isn't water in the game`);
   // Someone sent across the pond: the camera on them as they go round it.
   await page.evaluate(async ([x, z]) => {
@@ -206,11 +243,11 @@ async function stepOnePond(page, renderer, mound, shot, r) {
     const sim = window.__osw.sims()[0];
     window.__controls.walkTo(sim.id, x + 14, z + 2);
     window.__controls.follow(sim.id);
-  }, mound);
+  }, pond);
   await page.waitForTimeout(9000);
   await shot('12-walking-to-the-pond');
   await page.evaluate(() => window.__controls.follow(null));
-  await aim(page, mound, 70);
+  await aim(page, pond, 70);
   await shot('13-pond-in-play');
 }
 
@@ -219,7 +256,7 @@ async function stepOnePond(page, renderer, mound, shot, r) {
  * back, redo pays again) and a pond; saved, continued from the menu, and the land and the water
  * still there, the land away from the strokes too (the whole land went with the first stroke).
  */
-async function landTabInPlay(page, renderer, mound, shot) {
+async function landTabInPlay(page, renderer, stepOne, shot) {
   const r = {};
 
   // The Land tab by the home.
@@ -275,7 +312,13 @@ async function landTabInPlay(page, renderer, mound, shot) {
   // By hand, in Living: a stroke dragged with the pointer while the funds run low stops short of them, and is paid.
   if (mode === 'living') r.short = await fundsRunOut(page, renderer, spot, shot);
 
-  // Saved, continued from the menu: the land and the water as they were.
+  // Built land: a raise across the street in front of the home and a lower under the home itself (the shots say what
+  // the land, the road and the lot do; the earth tools keep off built land in the game for now).
+  r.built = await builtStrokes(page, renderer, home, shot);
+
+  // Saved, continued from the menu: the land and the water as they were. (The mound as it is when saved: a stroke on
+  // built land after it settles the land round what it moved, which may reach it.)
+  const saved = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), spot);
   await page.evaluate(() => window.__osw.save('land-check'));
   await page.waitForTimeout(1000);
   await page.reload();
@@ -287,24 +330,149 @@ async function landTabInPlay(page, renderer, mound, shot) {
   await page.evaluate(() => window.__controls.setMode('live'));
   await landTab(page);
   const kept = await page.evaluate(
-    async ([[x, z], pond, mound]) => ({
+    async ([[x, z], pond, stepOne]) => ({
       height: window.__land.heightAt(x, z),
       pond: pond ? await window.__land.simWet(pond[0], pond[1]) : null,
       pondDrawn: pond ? window.__land.wet(pond[0], pond[1]) : null,
-      stepOnePond: mound ? await window.__land.simWet(mound[0], mound[1]) : null,
+      stepOnePond: stepOne ? await window.__land.simWet(stepOne[0], stepOne[1]) : null,
     }),
-    [spot, pondAt, mound],
+    [spot, pondAt, stepOne],
   );
   const away = await page.evaluate((grid) => grid.filter(([x, z, h, wet]) => Math.abs(window.__land.heightAt(x, z) - h) > 0.02 || window.__land.wet(x, z) !== wet).length, grid);
   kept.awayChanged = away;
   if (away) fault(`${renderer} after continuing, ${away} of ${grid.length} points away from the strokes differ`);
   r.reloaded = kept;
-  console.log(`land: ${renderer} after save and continue: ${JSON.stringify(kept)} (the mound was ${h1.toFixed(2)} m)`);
-  if (Math.abs(kept.height - h1) > 0.05) fault(`${renderer} the mound came back at ${kept.height.toFixed(2)} m, not ${h1.toFixed(2)}`);
+  console.log(`land: ${renderer} after save and continue: ${JSON.stringify(kept)} (the mound was ${h1.toFixed(2)} m, ${saved.toFixed(2)} m when saved)`);
+  if (Math.abs(kept.height - saved) > 0.05) fault(`${renderer} the mound came back at ${kept.height.toFixed(2)} m, not ${saved.toFixed(2)}`);
   if (pondAt && !(kept.pond && kept.pondDrawn)) fault(`${renderer} the pond didn't come back (sim ${kept.pond}, drawn ${kept.pondDrawn})`);
   await aim(page, [spot[0] + 15, spot[1]], 75);
   await shot('16-continued');
   return r;
+}
+
+/**
+ * Strokes on built land in play: a 12 m raise across the road nearest the home, then a lower under the home's lot.
+ * Each is sent and taken (not refused); the heights at the road and the home before and after are told, and the
+ * shots show the road and the lot on the land after (`17-…`, `18-…`).
+ */
+async function builtStrokes(page, renderer, home, shot) {
+  const out = {};
+  const road = await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z), home);
+  if (!road) return out;
+  const [rx, rz] = road.at;
+  const [ux, uz] = road.along;
+  await page.evaluate(() => window.__addFunds(200000));
+  await aim(page, [rx, rz], 60);
+  await shot('17a-road-before');
+  const h0 = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), [rx, rz]);
+  // (Across the road: from one side to the other, back and forth.)
+  const across = [];
+  for (let k = 0; k < 6; k++) for (const s of k % 2 ? [-12, 12] : [12, -12]) across.push([rx - uz * s + ux * k, rz + ux * s + uz * k]);
+  const raised = await page.evaluate((pts) => window.__land.stroke('raise', pts, 12, 0.7), across);
+  await settled(page);
+  await page.waitForTimeout(2500);
+  const h1 = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), [rx, rz]);
+  // (`end`: the frame the stroke ended in, ms: its settling under the town and the surface solved again.)
+  out.road = { at: [Math.round(rx), Math.round(rz)], rose: +(h1 - h0).toFixed(2), refused: raised.refused, stamps: spread(raised.stamps), end: Math.round(raised.frames.at(-1)) };
+  out.road.covered = await roadCovered(page, [rx, rz], 20);
+  console.log(`land: ${renderer} a raise across the road: ${JSON.stringify(out.road)}`);
+  if (raised.refused) fault(`${renderer} the raise across the road was refused: ${raised.refused}`);
+  if ((out.road.covered?.terrain.over ?? 0) > COVER_MOST) fault(`${renderer} the terrain is drawn over the raised road's edge: ${JSON.stringify(out.road.covered)}`);
+  await shot('17b-road-raised');
+  // Under the home.
+  const g0 = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), home);
+  const under = await page.evaluate(([x, z]) => window.__land.stroke('lower', Array.from({ length: 30 }, (_, k) => [x + Math.cos(k / 4) * 3, z + Math.sin(k / 4) * 3]), 10, 0.5), home);
+  await settled(page);
+  await page.waitForTimeout(2500);
+  const g1 = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), home);
+  out.home = { fell: +(g0 - g1).toFixed(2), refused: under.refused, end: Math.round(under.frames.at(-1)) };
+  console.log(`land: ${renderer} a lower under the home: ${JSON.stringify(out.home)}`);
+  if (under.refused) fault(`${renderer} the lower under the home was refused: ${under.refused}`);
+  await aim(page, home, 45);
+  await shot('18-home-lowered');
+  // Water across a country road away from the town: the road bridged there (its deck kept dry for walkers), or the
+  // stroke refused with why; then undone (the bridge goes) and redone (it comes back).
+  // (On a straight stretch: the road runs the same way 25 m either side, as a bridge must.)
+  let crossing = null;
+  for (const d of [140, 220, 320, 420]) {
+    for (const [ax, az] of [[1, 0], [0, 1], [-1, 0], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]]) {
+      if (crossing) break;
+      const c = await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [home[0] + ax * d, home[1] + az * d]);
+      if (!c || c.dist > 60 || c.s < 40) continue;
+      const straight = await page.evaluate(
+        ([c]) =>
+          [-25, -12, 12, 25].every((k) => {
+            const o = window.__land.nearestRoad(c.at[0] + c.along[0] * k, c.at[1] + c.along[1] * k, 'country');
+            return o && o.road === c.road && o.dist < 0.6 && Math.abs(o.along[0] * c.along[0] + o.along[1] * c.along[1]) > 0.995;
+          }),
+        [c],
+      );
+      if (straight) crossing = c;
+    }
+  }
+  if (crossing) {
+    const [cx, cz] = crossing.at;
+    const [vx, vz] = crossing.along;
+    await aim(page, [cx, cz], 70);
+    await shot('19a-before-river');
+    const before = crossing.bridges.length;
+    const base = (await page.evaluate(() => window.__streetBridges?.()))?.decks ?? 0;
+    // (A pond dug across it: on flat land a river with nowhere to run down to stands as a pond does.)
+    const river = await page.evaluate((pts) => window.__land.stroke('lake', pts, 6, 0.6), Array.from({ length: 11 }, (_, k) => [cx - vz * (k * 2 - 10), cz + vx * (k * 2 - 10)]));
+    await settled(page);
+    await page.waitForTimeout(4000);
+    const after = (await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [cx, cz]))?.bridges ?? [];
+    const walk = await page.evaluate(([x, z]) => window.__land.simWet(x, z), [cx, cz]);
+    out.bridge = { at: [Math.round(cx), Math.round(cz)], refused: river.refused, bridges: after, deckWalkable: !walk };
+    console.log(`land: ${renderer} water across a country road: ${JSON.stringify(out.bridge)}`);
+    if (!river.refused && after.length <= before) fault(`${renderer} the water across the road made no bridge`);
+    if (!river.refused && walk) fault(`${renderer} the bridge's deck is water to the simulation`);
+    await shot('19b-bridge');
+    // (The decks the street draws, waited for: the world comes back from the simulation, the street laid out again.)
+    const decksBecome = async (n) => {
+      const t0 = Date.now();
+      for (;;) {
+        const s = await page.evaluate(() => window.__streetBridges?.());
+        if ((s?.decks ?? -1) === n || Date.now() - t0 > 20_000) return { ...s, ms: Date.now() - t0 };
+        await page.waitForTimeout(250);
+      }
+    };
+    if (!river.refused) {
+      const drawn = await decksBecome(base + after.length - before);
+      await page.evaluate(() => window.__land.undo());
+      const gone = await decksBecome(base);
+      await settled(page);
+      await page.waitForTimeout(3000);
+      await shot('19c-bridge-undone');
+      const undone = (await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [cx, cz]))?.bridges ?? [];
+      await page.evaluate(() => window.__land.redo());
+      const back = await decksBecome(base + after.length - before);
+      await settled(page);
+      await page.waitForTimeout(3000);
+      await shot('19d-bridge-redone');
+      // (Once the world has come back: the street on the landscape's surface again, not a copy of its own.)
+      const settledBack = await page.evaluate(() => window.__streetBridges?.());
+      const redone = (await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [cx, cz]))?.bridges ?? [];
+      out.bridge.undo = { undone: undone.length, redone: redone.length, drawn, gone, back, settled: settledBack?.onLand };
+      if (!settledBack?.onLand) fault(`${renderer} the street after the bridge's redo isn't on the landscape's surface`);
+      if (undone.length !== before || redone.length !== after.length) fault(`${renderer} undo/redo of the bridge: ${JSON.stringify(out.bridge.undo)}`);
+      if (drawn.decks !== base + after.length - before || gone.decks !== base || back.decks !== base + after.length - before) fault(`${renderer} the street's decks (bridged, undone, redone): ${drawn.decks}, ${gone.decks}, ${back.decks}, not ${base + 1}, ${base}, ${base + 1}`);
+      // An earth stroke by the bridge after it: the street still on the landscape's surface, the road raised drawn on it.
+      const [ex, ez] = [cx + vx * 40, cz + vz * 40];
+      await aim(page, [ex, ez], 70);
+      const raised = await page.evaluate((pts) => window.__land.stroke('raise', pts, 10, 0.7), Array.from({ length: 11 }, (_, k) => [ex - vz * (k * 2 - 10), ez + vx * (k * 2 - 10)]));
+      await settled(page);
+      await page.waitForTimeout(3000);
+      const after2 = await page.evaluate(() => window.__streetBridges?.());
+      const covered = await roadCovered(page, [ex, ez], 20, 'country');
+      out.bridge.thenRaised = { refused: raised.refused, onLand: after2?.onLand, decks: after2?.decks, covered };
+      if ((covered?.terrain.over ?? 0) > COVER_MOST) fault(`${renderer} the terrain is drawn over the road's edge by the bridge: ${JSON.stringify(covered)}`);
+      if (raised.refused || !after2?.onLand) fault(`${renderer} a raise by the bridge: ${JSON.stringify(out.bridge.thenRaised)}`);
+      await shot('19e-raised-by-bridge');
+    }
+    console.log(`land: ${renderer} the bridge's undo and redo: ${JSON.stringify(out.bridge.undo ?? null)} · then a raise: ${JSON.stringify(out.bridge.thenRaised ?? null)}`);
+  } else console.log(`land: ${renderer} no country road near the town for water to cross`);
+  return out;
 }
 
 /**
@@ -336,7 +504,7 @@ async function fundsRunOut(page, renderer, spot, shot) {
   const strokes = (await page.evaluate(() => window.__land.stats().undo)) - undo;
   await page.evaluate((amount) => window.__addFunds(amount), start - left);
   await page.waitForTimeout(600);
-  const out = { left, hint, strokes };
+  const out = { left, hint, strokes, refused: await page.evaluate(() => window.__land.refusal()) };
   console.log(`land: ${renderer} with $300: ${JSON.stringify(out)}`);
   if (!(left >= 0 && left < 300 && strokes === 1 && /Out of money/.test(hint))) fault(`${renderer} the stroke at the funds' end: ${JSON.stringify(out)}`);
   return out;
@@ -438,7 +606,7 @@ try {
     await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 200 });
     await page.waitForTimeout(1500);
     await page.getByText('New game', { exact: true }).click();
-    await enabled(page, /Lay out the town/);
+    await enabled(page, /Lay out the streets/);
     await page.waitForTimeout(1500);
     const shot = async (name) => {
       const file = join(out, `${renderer}-${name}.png`);
@@ -449,6 +617,7 @@ try {
     const r = { strokes: {} };
     report[renderer] = r;
     let mound = null;
+    let pond = null;
 
     if (!plain) {
     // Shape the land: surveyed behind a spinner, then drawn from the field.
@@ -475,34 +644,41 @@ try {
       return res;
     };
 
-    // A mound on free land near the middle of the town's view.
+    // A mound on free land near the middle of the town's view: raised, then its top flattened (a plateau, the pond's
+    // ground: on a dome the pond cut into its side).
     const view = await page.evaluate(() => {
       const v = document.querySelector('.view').getBoundingClientRect();
       return window.__land.pick(v.left + v.width * 0.5, v.top + v.height * 0.55);
     });
-    mound = await page.evaluate(([x, z]) => window.__land.findFree(34, [x, z]), [view?.x ?? 0, view?.z ?? 0]);
+    mound = await page.evaluate(([x, z]) => window.__land.findFree(38, [x, z]), [view?.x ?? 0, view?.z ?? 0]);
     if (!mound) throw new Error('no free land for the mound');
     await lookAt(page, mound[0], mound[1], 2.2);
     await shot('3-before');
     const before = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), mound);
-    for (let k = 0; k < 3; k++) await stroke(`mound ${k + 1}`, 'raise', ring(mound[0], mound[1], 4, 40), 22, 0.3);
+    for (let k = 0; k < 3; k++) await stroke(`mound ${k + 1}`, 'raise', ring(mound[0], mound[1], 4, 40), 14, 0.3);
+    // (Flattened to the height at its middle, the stroke's first point: the land round the top brought up to it.)
+    for (let k = 0; k < 2; k++) await stroke(`plateau ${k + 1}`, 'flatten', [mound, ...ring(mound[0], mound[1], 5, 40)], 12, 1);
     const top = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), mound);
-    r.mound = { at: mound, rose: +(top - before).toFixed(2) };
+    // (How flat its top is: the spread of the heights 6 m out round it.)
+    const rim = await page.evaluate(([x, z]) => Array.from({ length: 12 }, (_, k) => window.__land.heightAt(x + Math.cos((k / 12) * Math.PI * 2) * 6, z + Math.sin((k / 12) * Math.PI * 2) * 6)), mound);
+    r.mound = { at: mound, rose: +(top - before).toFixed(2), rim: +(Math.max(...rim) - Math.min(...rim)).toFixed(2), rimBelow: +(top - Math.min(...rim)).toFixed(2) };
+    console.log(`land: ${renderer} the plateau: ${JSON.stringify(r.mound)}`);
     console.log(`land: ${renderer} the mound rose ${(top - before).toFixed(1)} m`);
     if (top - before < 2) fault(`${renderer} the mound rose only ${(top - before).toFixed(1)} m`);
     await settled(page);
     await shot('4-mound');
 
-    // A pond on its top, at its own level.
-    await stroke('pond', 'lake', ring(mound[0], mound[1], 2, 12), 8, 0.4);
-    const wet = await page.evaluate(([x, z]) => window.__land.wet(x, z), mound);
+    // A pond on its top, at its own level, inside the plateau.
+    pond = [...mound];
+    await stroke('pond', 'lake', ring(pond[0], pond[1], 2, 12), 6, 0.4);
+    const wet = await page.evaluate(([x, z]) => window.__land.wet(x, z), pond);
     if (!wet) fault(`${renderer} no pond on the mound`);
     await settled(page);
     await shot('5-pond');
 
     // A river down to the nearest water: from as far up the land towards the mound as a river can
     // start and still run down to it (no more than a few metres over the water, never rising on the way).
-    const water = await page.evaluate(([x, z]) => window.__land.findWater([x, z]), mound);
+    const water = await page.evaluate(([x, z]) => window.__land.findWater([x, z]), pond);
     if (water) {
       // (The longest straight run in to some shore over free land that only falls on the way, from
       // the shores nearest the mound first.)
@@ -536,7 +712,7 @@ try {
           }
           return null;
         },
-        mound,
+        pond,
       );
       const from = run?.from;
       if (run) water.splice(0, 2, ...run.to);
@@ -629,20 +805,34 @@ try {
     }
 
     if (!has('no-play')) {
-      await page.getByRole('button', { name: /Lay out the town/ }).click();
-      await enabled(page, /Choose a household/);
+      await page.getByRole('button', { name: /Lay out the streets/ }).click();
+      await enabled(page, /Build the town/);
       await page.waitForTimeout(1500);
       await shot('10-step2');
+      await page.getByRole('button', { name: /Build the town/ }).click();
+      await enabled(page, /Choose a household/);
+      await page.waitForTimeout(1500);
+      await shot('11-step3');
       await page.getByRole('button', { name: /Choose a household/ }).click();
-      await page.waitForSelector('.households .btn.play', { timeout: 120_000 });
+      // Step 4's cards (their portraits drawn), a household's Play, then step 5's Move in (as gameplay.mjs goes).
+      await page.waitForFunction(() => {
+        const faces = [...document.querySelectorAll('.offer .face')];
+        return faces.length > 0 && faces.every((f) => f.querySelector('img'));
+      }, null, { timeout: 180_000, polling: 100 });
       if (mode === 'creative') await page.getByRole('radio', { name: 'Creative' }).click();
       await page.waitForTimeout(1500);
       await shot('10-step3');
-      await page.locator('.households .btn.play').first().click();
+      await page.locator('.offer .card[data-slot] .go').first().click();
+      await page.waitForFunction(() => !!document.querySelector('.btn.move-in:not(:disabled)'), null, { timeout: 180_000, polling: 100 });
+      await page.waitForTimeout(500);
+      await page.locator('.btn.move-in').click();
+      const asked = () => [...document.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Move in anyway');
+      await page.waitForFunction(`(${asked})() || (!!document.querySelector('.hud-root') && !document.querySelector('.loading'))`, null, { timeout: 180_000, polling: 100 });
+      if (await page.evaluate(asked)) await page.getByRole('button', { name: 'Move in anyway' }).click();
       await inGame(page);
       await page.waitForTimeout(4000);
       await shot('11-play');
-      r.play = await play(page, renderer, mound, shot);
+      r.play = await play(page, renderer, pond, shot);
     }
     await context.close();
   }

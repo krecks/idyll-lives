@@ -254,7 +254,7 @@ describe('porches and looks', async () => {
   const DEPTH = 12;
   const W = 12;
   /** The sRGB colour (`#rrggbb`) of a Geo's first vertex. */
-  const colour = (g: Geo) => `#${[g.col[0], g.col[1], g.col[2]].map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+  const colour = (g: Geo) => `#${[g.col[0], g.col[1], g.col[2]].map((c) => c.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
 
   /** A box house 6 × 5 from (ox + 2, 2) on both storeys of a lot at (ox, 0), front door on its z 2 side; `roof`: the player's choice. */
   function twoStoreys(ox: number, roof?: [number, number]): WorldStructure {

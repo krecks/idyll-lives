@@ -359,6 +359,7 @@ fn a_neighbour_climbs_the_stairs_at_lower_detail() {
             blocked: w.blocked(),
             stairs: w.stair_map(),
             kept_off: &[],
+            steps: None,
         }
         .tile_free(x, z)
     };

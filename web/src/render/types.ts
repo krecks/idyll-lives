@@ -9,6 +9,7 @@ import type { FrameState } from '../core/bridge';
 import type { ItemPlacement, PartColors, WorldStructure } from '../core/protocol';
 import type { Appearance } from '../game/household';
 import type { Land, LandRect } from '../game/land';
+import type { UseKind, UseLayer } from '../game/uses';
 import type { Resolution } from './shared/resolution';
 import type { VisemeTrack } from '../voice/visemes';
 
@@ -97,6 +98,23 @@ export interface RenderStats {
   residentsMs: number;
   /** GPU memory the device holds; null when it can't say (before the app exists). */
   vram: RenderVram | null;
+}
+
+/**
+ * Where the renderer's bytes are (`Renderer.memoryCensus`, the gameplay benchmark's): what PlayCanvas
+ * keeps on the CPU of what is on the GPU, the model files' decoded pieces, and the scene's geometry by
+ * owner. Bytes throughout.
+ */
+export interface MemoryCensus {
+  /** Every buffer the device holds, by kind: its CPU copy (`storage`), its GPU size, how many let their copy go. */
+  storage: Record<string, { count: number; bytes: number; released: number; gpuBytes: number }>;
+  /** Textures' levels kept on the CPU as typed arrays, and how many textures keep any. */
+  textureLevels: number;
+  texturesWithLevels: number;
+  /** The model files read and kept (`ModelFiles`): their pieces' vertices, and how many files. */
+  modelFiles: { files: number; pieceBytes: number; clipBytes: number };
+  /** The scene's vertex and index buffers by who draws them (entity names three levels under the root), and those nothing draws. */
+  owners: Record<string, { meshes: number; gpuBytes: number; cpuBytes: number }>;
 }
 
 /** GPU memory the renderer holds, bytes (PlayCanvas's own counters, `app.stats.vram`). */
@@ -361,11 +379,17 @@ export interface LotHighlight {
   selected: number | null;
   /** Lots drawn as available (e.g. for sale). */
   marked: readonly number[];
-  /** Of those, the ones the household can't afford, drawn in a second tint (none: every marked lot alike). */
+  /** Of those, the ones the household can't afford, drawn as a faint stone ring (none: every marked lot alike). */
   dear?: readonly number[];
   /** Faint outlines around every lot. */
   outlines: boolean;
 }
+
+/**
+ * A street's ghost's tone: new, where it may not go, a bridge stretch, a new street drawn as the road it will be
+ * (`laid`), the road picked (`pick`, outlined only), the road a street being drawn will join (`join`).
+ */
+export type GhostRoadTone = 'new' | 'bad' | 'bridge' | 'laid' | 'pick' | 'join';
 
 /**
  * Step 2's edits shown over the town before the town is built again with them: streets being
@@ -374,7 +398,7 @@ export interface LotHighlight {
  * removed, the building on it dimmed) and villages' boxes, all in world metres.
  */
 export interface TownGhosts {
-  roads: { points: [number, number][]; width: number; tone: 'new' | 'bad' | 'bridge' }[];
+  roads: { points: [number, number][]; width: number; tone: GhostRoadTone }[];
   lots: { x: number; z: number; w: number; d: number; tone: 'new' | 'bad' | 'gone' }[];
   boxes: { x: number; z: number; w: number; d: number; tone: 'new' | 'bad' }[];
 }
@@ -435,7 +459,8 @@ export interface LandCursor {
   z: number;
   radius: number;
   inner: number;
-  tone: 'up' | 'down' | 'water' | 'cover' | 'bad';
+  /** What the brush does: step 1's land brushes (`up` to `cover`), step 2's zone brush (a use, `uses.ts`, or `erase`), or `bad` where it can't. */
+  tone: 'up' | 'down' | 'water' | 'cover' | 'bad' | UseKind | 'erase';
 }
 
 export interface Renderer {
@@ -528,6 +553,8 @@ export interface Renderer {
   onFocusLot(listener: ((plot: number) => boolean) | null): void;
   /** The ground rectangle (tiles x0, z0, x1, z1) the camera streams in, for the sim's full-detail area (the worker's `setWatch`); called when it changes. */
   onWatch(listener: ((rect: [number, number, number, number]) => void) | null): void;
+  /** At super speed, the full-detail area `onWatch` reports is only the streamed chunks round the camera's, so the sim keeps up; off, all of them. */
+  setDetailTight(tight: boolean): void;
   setHoverTile(tile: { x: number; z: number } | null): void;
   setSelectedSim(id: number | null): void;
   setWallMode(mode: WallMode): void;
@@ -580,6 +607,8 @@ export interface Renderer {
   /** Build/buy mode: plays a placement, upgrade, sale or construction effect (after `setWorld` showed the change). */
   buildEffect(fx: BuildEffect): void;
   stats(): RenderStats;
+  /** Benchmark: where the renderer's bytes are (a walk of the whole scene: on demand, never per frame). */
+  memoryCensus(): MemoryCensus | null;
   /** Benchmark: hooks around every drawn frame (null: none). */
   setFrameProbe(probe: FrameProbe | null): void;
   /** Measures GPU time (`RenderStats.gpuMs`) while the overlay or the benchmark asks for it. */
@@ -648,17 +677,27 @@ export interface Renderer {
   /**
    * Back to the game world (the overview and the town's landscape are let go a moment after, and
    * built again by the next `showTown`). With `glide` > 0 the camera
-   * first flies from the overview into the game's view (seconds); resolves when it is shown.
+   * first flies from the overview into the game's view (seconds); resolves when it is shown. With
+   * `letGo`, the town is let go of at once, and it resolves once it has been (a machine low on
+   * memory, before the game's world is built).
    */
-  hideTown(glide?: number): Promise<void>;
+  hideTown(glide?: number, letGo?: boolean): Promise<void>;
   /** Whether the overview is on screen. */
   readonly townShown: boolean;
   /** Overview camera: glides to (or with `cut`, jumps to) a shot. */
   setTownShot(shot: TownShot, cut?: boolean): void;
-  /** Overview camera: user orbit (radians) and zoom factor on top of the shot. */
-  nudgeTown(dAlpha: number, zoom: number): void;
+  /** Overview camera: user orbit (radians), zoom factor and tilt (radians, more is lower; 0.15–1.35 in all) on top of the shot. */
+  nudgeTown(dAlpha: number, zoom: number, dBeta?: number): void;
+  /** Overview camera: the player's zoom by `zoom` towards the land under canvas CSS pixel (`x`, `y`) (it stays under it). */
+  zoomTownAt(x: number, y: number, zoom: number): void;
   /** Overview camera: the player's pan, the target moved (`dx`, `dz`) m over the ground on top of the shot; it stays over the land. */
   panTown(dx: number, dz: number): void;
+  /** Overview camera: the player's pan along the view, `right` m to the picture's right and `forward` m into it. */
+  panTownView(right: number, forward: number): void;
+  /** Overview camera: how near (m from its target) the player's zoom comes in (`OVERVIEW_NEAREST` unless set). */
+  setTownNearest(metres: number): void;
+  /** Overview camera: how far (m) it is from its target now. */
+  readonly townDistance: number;
   /**
    * Overview camera: the player's pan by a drag from canvas CSS pixel (`x0`, `y0`) to (`x1`, `y1`): the land under
    * the pointer follows it (over the sky, the level of the land in view does). Any button, any step, no tool needed.
@@ -670,6 +709,11 @@ export interface Renderer {
   setLotHighlight(highlight: LotHighlight, snap?: boolean): void;
   /** Step 2's edits drawn over the town (`TownGhosts`) until the town is built again; null: none. */
   setTownGhosts(ghosts: TownGhosts | null): void;
+  /**
+   * Step 2's painted uses (`uses.ts`) drawn over the town in their colours; null: none. `hatched`: a byte per cell
+   * of `layer` (row-major), set where the cell is zoned but too far from a street to be built on, drawn hatched.
+   */
+  setTownUses(layer: UseLayer | null, hatched?: Uint8Array | null): void;
   /** Runs each overview frame after the camera moved, before drawing (to pin labels); null removes it. */
   onTownFrame(fn: (() => void) | null): void;
   /**
@@ -684,6 +728,12 @@ export interface Renderer {
    * again now, and once the stroke is `done`, the rest (shading, grass, woods, zones) over frames.
    */
   landChanged(rect: LandRect, done: boolean): void;
+  /**
+   * At the end of an earth stroke on a land its town follows (the land given to `setLand`, changed in `rect`): the
+   * land settled under what is built (no road or lot cut or filled past its limits; `BuiltSurface.settleCuts`),
+   * changed in place; says the samples it changed besides (null: none, or no town on it).
+   */
+  settleLand?(rect: LandRect, before?: Int16Array): LandRect | null;
   /** Where the ray through canvas CSS pixel (`x`, `y`) meets the land (a town point and its height, m), or null if it doesn't. */
   pickLand(x: number, y: number): { x: number; y: number; z: number } | null;
   /** Shows the land brush's cursor (null hides it). Cheap; call on every pointer move. */

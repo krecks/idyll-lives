@@ -15,6 +15,8 @@ import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Setti
 import { app, type Progress } from '../ui/app.svelte';
 import { perfTime, perfTimeAsync } from '../debug/perf';
 import { DEVLOG, devlog, devlogPause, renderSample, SAMPLE_MS } from '../debug/devlog';
+import { installMemoryCensus } from '../debug/gameplayStats';
+import { LOW_MEMORY } from '../settings/lowMemory';
 import { game, toast } from '../ui/state.svelte';
 import { basicReport, within } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
@@ -42,6 +44,8 @@ const FLY_IN = 1.3;
 const VEIL_MS = 260;
 /** The loading bar's share before the warm-up, for a session prepared without it (the warm-up comes once it's started). */
 const BEFORE_WARM = 0.9;
+/** The longest the menus' town is kept for its picture (`keepTownUntil`) on a machine low on memory before it goes anyway (ms). */
+const KEEP_TOWN_MS = 5000;
 
 /**
  * The session's code (`session.ts`, with Build mode's and the game's input): a script chunk of its
@@ -77,6 +81,8 @@ interface Entry {
   warming?: Promise<GameSession>;
   /** The session, once it exists. */
   instance?: GameSession;
+  /** The menus' town was let go of before the session's world was built (low on memory): the game fades in. */
+  townGone?: boolean;
 }
 
 class GameHost {
@@ -103,6 +109,8 @@ class GameHost {
   };
   /** A full-screen menu covers the view (see `cover`). */
   private covered = false;
+  /** What the menus' town is still wanted for once a game starts (its picture for the main menu, `keepTownUntil`). */
+  private townKept: Promise<unknown> = Promise.resolve();
 
   constructor() {
     // The dev play log (`debug/devlog.ts`): while only the menus use the renderer, what it draws every few
@@ -227,6 +235,15 @@ class GameHost {
       // One session at a time on the shared renderer: a replaced one must finish clearing it first.
       await previous;
       if (this.current !== entry) throw new Error('Replaced by another game.');
+      // Low on memory: the menus' town goes while the loading screen covers it (its picture for the
+      // main menu taken first), before the game's world is built, so the two are never held at once.
+      if (LOW_MEMORY && entry.live && renderer.townShown) {
+        await Promise.race([this.townKept, new Promise((resolve) => setTimeout(resolve, KEEP_TOWN_MS))]);
+        if (this.current !== entry) throw new Error('Replaced by another game.');
+        await perfTimeAsync('host: let the town go', () => renderer.hideTown(0, true));
+        entry.townGone = true;
+        this.town = null;
+      }
       this.syncActive(renderer);
       const { startSession } = await loadSessionCode();
       if (this.current !== entry) throw new Error('Replaced by another game.');
@@ -274,12 +291,18 @@ class GameHost {
       if (!entry.ready) app.loading = entry.progress;
     }
     const session = await perfTimeAsync('host: prepare (start)', () => pending);
+    // The menus' town went before the game was built (low on memory): it fades in from behind the
+    // veil, put up under the loading screen.
+    let veiled = !!entry?.townGone && !reducedMotion();
+    if (veiled) await this.setVeil(true);
     if (this.current === entry) app.loading = null;
     const renderer = await this.renderer;
-    if (!renderer || this.current !== entry) return session;
+    if (!renderer || this.current !== entry) {
+      if (veiled) void this.setVeil(false);
+      return session;
+    }
     this.played = session;
     renderer.setActive(true);
-    let veiled = false;
     if (renderer.townShown) {
       // The menus showed this very town (choosing a home or a household to play): fly into the lot. Otherwise fade.
       const meta = this.town?.world.meta;
@@ -299,6 +322,15 @@ class GameHost {
     perfTime('host: reveal', () => session.reveal());
     if (veiled) void this.setVeil(false);
     return session;
+  }
+
+  /**
+   * The menus' town is still wanted until `work` settles (its picture for the main menu being taken,
+   * behind the loading screen): on a machine low on memory, it's let go of before the game is built,
+   * but not before that.
+   */
+  keepTownUntil(work: Promise<unknown>): void {
+    this.townKept = work.catch(() => {});
   }
 
   /** Ends the current session (if any); the renderer stays for the next one. */
@@ -389,6 +421,7 @@ class GameHost {
       // reset, "Graphics were reset") offers to save and reload.
       renderer.onFailure = this.onRendererFailure;
       await renderer.init(this.canvas);
+      installMemoryCensus(() => renderer.memoryCensus());
       devlog('renderer', { backend: renderer.stats().backend, preset: renderer.stats().preset, webGpuFailed: webGpuFailed() });
       renderer.hold(this.covered);
       if (webGpuFailed() && settings.renderer !== 'webgl' && !this.toldFallback) {

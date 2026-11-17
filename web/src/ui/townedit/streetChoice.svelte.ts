@@ -6,7 +6,10 @@
 
 import type { RoadKind } from '../../core/protocol';
 
-/** The kind asked for; `auto`: as `drawStreet` chooses by where it runs (a street of the town or village it runs in, else a country road). */
+/**
+ * The kind asked for; `auto`: as `drawStreet` chooses by where it runs (a street of the town or village it runs in,
+ * else a country road). A street or a lane asked for stays one out of town too (`StreetStroke.asked`).
+ */
 export type StreetKindChoice = 'auto' | 'street' | 'lane' | 'country' | 'trail';
 /** What goes along a new street: homes from the area's lot mix, the town's other buildings, both, or nothing; `auto`: by where it runs (`alongFor`). */
 export type Along = 'auto' | 'homes' | 'buildings' | 'both' | 'none';
@@ -18,6 +21,8 @@ export const streetChoice = $state({
   /** What the street under the pointer would be (the card shows `auto` as it), and the area it is a street of (-1: none). */
   shown: 'street' as RoadKind,
   shownArea: -1,
+  /** The roads the last street drawn was made as (split at its bridges) and their names: the card lists them while the draft has them (`streetLive.ts` `drawnStretches`). */
+  drawn: [] as { road: number; name: string }[],
 });
 
 /** The kind `drawStreet` is asked for (`street` for `auto`: it makes a street a country road outside the town and villages). */

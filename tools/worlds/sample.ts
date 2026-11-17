@@ -33,7 +33,10 @@
  * `--seed-base n` (or WORLDS_SEED_BASE; default 0, the worlds CI checks) draws other worlds: the
  * release gate runs the checks over five (`tools/ci-local.sh`, SEED_BASE).
  *
- * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--kinds farm,forest] [--options town=city,...] [--no-extremes] [--seed-base n] [--no-timing]
+ * `--tier full|half|near`: the second wave fills the town at that tier (`people.ts` `FillTier`; default
+ * full), as a machine on a lower graphics preset has it: what the sim's speed benches run.
+ *
+ * Run: bun tools/worlds/sample.ts worlds.json [worlds per kind] [--kinds farm,forest] [--options town=city,...] [--no-extremes] [--seed-base n] [--no-timing] [--tier full]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -112,6 +115,8 @@ const SEED_STEP = 7919;
 /** `--no-timing`: the layout's and the file's time not checked against their budgets (a run beside others, on a slow runner: `web/tests/sampleWorlds.slow.test.ts`). */
 const timing = !process.argv.includes('--no-timing');
 if (!timing) process.argv.splice(process.argv.indexOf('--no-timing'), 1);
+const tier = (flag('--tier') ?? 'full') as import('../../web/src/game/people.ts').FillTier;
+if (!['full', 'half', 'near'].includes(tier)) throw new Error(`no tier ${tier}`);
 const kinds = (flag('--kinds')?.split(',') ?? [...WORLD_KINDS]) as (typeof WORLD_KINDS)[number][];
 for (const kind of kinds) if (!WORLD_KINDS.includes(kind)) throw new Error(`no kind ${kind}`);
 /** `--options town=city,villages=many`: every place with these options (else its own). */
@@ -194,7 +199,7 @@ for (const { kind, seed, options } of runs) {
   // The land graded under the town, as the town job does it (from the preview of the world, giving up what still breaks the slope limits).
   let seeded: Land | null = null;
   t0 = performance.now();
-  const world = settleLand(laid, (d) => previewWorld(content, templates, d, null), (l) => (seeded = l)).draft;
+  const world = settleLand(laid, (d) => previewWorld(content, templates, d, null), (l) => (seeded = l), content.careerCategories).draft;
   const landMs = performance.now() - t0;
   // (Among mountains, the fill a hamlet left out for want of a site a road could reach, and a lot given up to the slope limits, would have brought.)
   const left = world.diagnostics?.villages;
@@ -208,9 +213,9 @@ for (const { kind, seed, options } of runs) {
   const first = populate(content, assets, templates, world, undefined, people);
   const home = vacantSlots(first)[0];
   if (!home) throw new Error(`${tag}: no empty house`);
-  const ahead = runTownJob(content, templates, { kind: 'furnish', town: first, households: [...first.households, ...fillPlan(content, assets, templates, first, undefined, people, { tier: 'full' })] });
+  const ahead = runTownJob(content, templates, { kind: 'furnish', town: first, households: [...first.households, ...fillPlan(content, assets, templates, first, undefined, people, { tier })] });
   const furnished = ahead.kind === 'furnish' ? ahead : { houses: 0, ms: 0 };
-  const town = fillTown(content, assets, templates, first, home.index, people, { tier: 'full' });
+  const town = fillTown(content, assets, templates, first, home.index, people, { tier });
   const player = randomHousehold(content, assets, 2);
   t0 = performance.now();
   const text = assembleTown(content, templates, town, player, home.index, undefined, mulberry32(people.bonds));

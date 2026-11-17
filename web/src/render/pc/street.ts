@@ -43,6 +43,7 @@ import { chunkAt, chunkCoords, distanceToRect, groupOf, LookedFrom, SUPERCHUNK }
 import { groupInstances } from '../shared/nature';
 import { castsShadow, FOLIAGE, instanceMatrix, NO_FOCUS, TownStreet, type ChunkPlan, type GroundLayer, type Inst, type ObjectLook } from '../shared/street';
 import { surfaceOf } from '../shared/landSurface';
+import type { BuiltSurface } from '../shared/builtSurface';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
 
 export interface StreetOptions {
@@ -327,6 +328,7 @@ export class Street {
     const layoutKey = TownStreet.layoutKey(world, mode);
     const span = perfStart('street: plan');
     let layoutMs = 0;
+    let handed = '';
     if (!this.town || layoutKey !== this.layoutKey) {
       const t0 = performance.now();
       // (Another layout keeps the chunks built: each is planned again only where its key, what it is planned from,
@@ -341,12 +343,16 @@ export class Street {
       await pace?.();
       if (stale()) return;
       const t1 = performance.now();
-      const town = new TownStreet(this.house.planner, world, { has: (k) => this.assets.has(k, 'model'), entry, lived: this.lived, look: this.look, ground: this.ground, fenceStyles: this.fenceStyles }, mode);
+      // (The town before handing on what this one plans just as it did: its street's own, the kerbs of the rows an edit
+      // left alone. The town view's only: a game's street is laid out again for a garage built, and keeps its chunks.)
+      const previous = mode === 'town' && this.town?.mode === 'town' ? this.town : null;
+      const town = new TownStreet(this.house.planner, world, { has: (k) => this.assets.has(k, 'model'), entry, lived: this.lived, look: this.look, ground: this.ground, fenceStyles: this.fenceStyles }, mode, previous);
       layoutMs += performance.now() - t1;
       await pace?.();
       if (stale()) return;
       await town.prepare(pace);
       if (stale()) return;
+      if (previous) handed = `, handed on: ${town.handedOn.statics ? 'its own' : 'not its own'}, ${town.handedOn.kerbs} kerbs`;
       this.town = town;
       this.layoutKey = layoutKey;
       this.townWorld = world;
@@ -408,7 +414,7 @@ export class Street {
     // (The plots' and fences' planned parts are kept for the chunks drawn: what a focus moving next
     // door or a thing moved plans again. Every other chunk keeps its vertex arrays alone.)
     town.keepUnits(this.wanted ? wantedSet : null, focus);
-    perfEnd(span, `layout ${Math.round(layoutMs)}, keys ${Math.round(keyMs)}, ${planned} of ${wanted.length} chunks planned ${Math.round(planMs)}`);
+    perfEnd(span, `layout ${Math.round(layoutMs)}, keys ${Math.round(keyMs)}, ${planned} of ${wanted.length} chunks planned ${Math.round(planMs)}${handed}`);
     if (planned || dirty.size) this.instancesDue = true;
 
     const meshesSpan = perfStart('street: meshes');
@@ -676,20 +682,27 @@ export class Street {
 
   /**
    * The lots' houses the far LOD draws, each with the chunk it is in and how it looks (the town view's,
-   * `townView.ts` `lotBuilding`); the focus lot's left out. Made again only when the town or the focus changes.
+   * `townView.ts` `lotBuilding`), each on its pad; the focus lot's left out. Made again only when the town, the focus
+   * or the land under them (its pads) changes.
    */
   townHouses(): readonly TownLotHouse[] {
     const town = this.town;
     if (!town) return [];
-    const key = `${this.layoutKey}|${this.focus}`;
+    // (The land shaped under the town moves its pads: `surfaceMoves`.)
+    const key = `${this.layoutKey}|${this.focus}|${town.surfaceMoves}`;
     if (this.townHousesOf?.key !== key) {
       const planner = this.house.planner;
-      const list = town.townHouses(this.focus).map(({ chunk, plot }): TownLotHouse => ({ id: plot.id, chunk, storeys: plot.storeys ?? 1, ...planner.farLook({ x: plot.x, z: plot.z, house: plot.house!, roof: plot.roof, storeys: plot.storeys }) }));
+      const list = town.townHouses(this.focus).map(({ chunk, plot, pad }): TownLotHouse => ({ id: plot.id, chunk, storeys: plot.storeys ?? 1, pad, ...planner.farLook({ x: plot.x, z: plot.z, house: plot.house!, roof: plot.roof, storeys: plot.storeys }) }));
       this.townHousesOf = { key, list };
     }
     return this.townHousesOf.list;
   }
   private townHousesOf: { key: string; list: TownLotHouse[] } | null = null;
+
+  /** The land under the town moved: the street stands on `surface` (the game's landscape's) and plans again the chunks that moved, at the next `build` (`TownStreet.landMoved`). */
+  landMoved(surface: BuiltSurface): boolean {
+    return this.town?.landMoved(surface) ?? false;
+  }
 
   /** Whether chunk `id` is drawn in full (streamed in, or every chunk is), so the far LOD leaves its houses out. */
   chunkDrawn(id: number): boolean {

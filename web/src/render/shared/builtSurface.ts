@@ -25,8 +25,10 @@
  * - **The land round them** is held between two cones from everything built, `bank` (the world's
  *   `LandscapeParams.slope`) steep: no higher than the built land nearest plus `bank` a metre away
  *   from it, no lower than it less as much. Under a road it is the road's height less `ROAD_SINK`
- *   out to its sidewalk's edge; inside a lot the pad's; beside a lot within `RETAIN_MAX` of the
- *   pad (the tallest a retaining edge stands). Water is left as it is.
+ *   out to its sidewalk's edge, and the road's height round the cells its edge crosses (the land
+ *   drawn between the samples meets the road under its edge, never over it); inside a lot the
+ *   pad's; beside a lot within `RETAIN_MAX` of the pad (the tallest a retaining edge stands).
+ *   Water is left as it is.
  *
  * The world's grain is the land's (`LAND_CELL` m samples). `at(x, z)` is the surface anything stands
  * on: a lot's pad, a road's height across it, else the graded land between its samples.
@@ -34,7 +36,7 @@
 
 import type { JunctionInfo, RoadKind, RoadPlan } from '../../core/protocol';
 import { LAND_CELL, NONE, heightAt, type Land, type LandRect } from '../../game/land';
-import { lengths, nearest, pointAt, RoadIndex } from '../../game/roads';
+import { bridgeSpans, lengths, nearest, pointAt, RoadIndex } from '../../game/roads';
 import { CHUNK, chunkAt, chunksIn } from './chunks';
 import { carriageway, CROSSWALK, KERB_RETURN, planJunctions, type JunctionPlan } from './junctions';
 
@@ -161,7 +163,7 @@ export class BuiltSurface {
   /** Each lot's neighbours: the pads within the land's grain of it. */
   private readonly touching: number[][];
   private nodes: Node[] = [];
-  /** Per sample: the built height there (NaN: nothing built), and what is built (0 nothing, 1 a road, 2 a lot, `BESIDE` a narrow way's land beside it). */
+  /** Per sample: the built height there (NaN: nothing built), and what is built (0 nothing, 1 a road, 2 a lot, `BESIDE` the land beside a road, at its height). */
   private builtY: Float32Array;
   private kind: Uint8Array;
   private readonly index: RoadIndex;
@@ -305,6 +307,12 @@ export class BuiltSurface {
     return { s: p.s, y: p.y };
   }
 
+  /** How many updates have moved a road or a pad (`update`): what a list of every lot's pad is kept by. */
+  get moves(): number {
+    return this.moved;
+  }
+  private moved = 0;
+
   /** How many times the roads or the pads in street chunk `chunk` (`chunks.ts` `chunkId`) have moved (`update`): a part of its key. */
   version(chunk: number): number {
     return this.versions.get(chunk) ?? 0;
@@ -404,6 +412,7 @@ export class BuiltSurface {
       for (const c of chunksIn(p.x, p.z, p.x + p.w, p.z + p.d)) bumped.add(c);
     });
     for (const c of bumped) this.versions.set(c, this.version(c) + 1);
+    if (roads.length || plots.length) this.moved++;
     let rect: LandRect | null = null;
     for (let k = 0; k < oldLand.length; k++) {
       if (Math.abs(oldLand[k] - this.conformed[k]) <= MOVED) continue;
@@ -411,6 +420,62 @@ export class BuiltSurface {
       rect = rect ? { i0: Math.min(rect.i0, i), j0: Math.min(rect.j0, j), i1: Math.max(rect.i1, i + 1), j1: Math.max(rect.j1, j + 1) } : { i0: i, j0: j, i1: i + 1, j1: j + 1 };
     }
     return { roads, plots, rect };
+  }
+
+  /**
+   * The land under and round what is built kept within reach of it after the earth brushes changed it in `rect` (a
+   * land its town follows, shaped in the game: its roads and lots move with it, within their grades): the surface
+   * solved again (`update`), then round the stroke where the land is cut into or filled over by more than `CUT_MAX`
+   * (a road's cut, a lot's pad) or stands more than `RETAIN_MAX` off a lot's pad beside it (or than it did `before` the stroke, if more), the land itself is brought
+   * back within that, and solved again; `passes` times at most. Changes `land` in place. Says the samples it changed (null: none) and
+   * what moved in all (`update`'s change, the passes' together).
+   */
+  settleCuts(rect: LandRect, passes = SETTLE_PASSES, before?: Int16Array): { rect: LandRect | null; change: SurfaceChange } {
+    const { cols, rows, land, kind, conformed } = this;
+    let changed: LandRect | null = null;
+    let window = rect;
+    const roads = new Set<number>();
+    const plots = new Set<number>();
+    let moved: LandRect | null = null;
+    const join = (a: LandRect | null, b: LandRect | null): LandRect | null => (!a ? b : !b ? a : { i0: Math.min(a.i0, b.i0), j0: Math.min(a.j0, b.j0), i1: Math.max(a.i1, b.i1), j1: Math.max(a.j1, b.j1) });
+    for (let pass = 0; pass <= passes; pass++) {
+      const change = this.update(window);
+      change.roads.forEach((r) => roads.add(r));
+      change.plots.forEach((p) => plots.add(p));
+      moved = join(moved, change.rect);
+      if (pass === passes) break;
+      // (Round the stroke, a margin past it: not wherever the roads it moved run.)
+      const w = window;
+      const [i0, j0, i1, j1] = [Math.max(0, w.i0 - SETTLE_MARGIN), Math.max(0, w.j0 - SETTLE_MARGIN), Math.min(cols, w.i1 + SETTLE_MARGIN), Math.min(rows, w.j1 + SETTLE_MARGIN)];
+      let clamped: LandRect | null = null;
+      for (let j = j0; j < j1; j++) {
+        for (let i = i0; i < i1; i++) {
+          const k = j * cols + i;
+          if (wet(land, k)) continue;
+          // (Beside a lot: within a retaining edge of the land graded to its pad; elsewhere within a cut or a fill.)
+          let reach = CUT_MAX;
+          if (!kind[k]) {
+            for (let n = 0; n < 8 && reach > RETAIN_MAX; n++) {
+              const [ni, nj] = [i + NEAR8[n][0], j + NEAR8[n][1]];
+              if (ni >= 0 && nj >= 0 && ni < cols && nj < rows && kind[nj * cols + ni] === 2) reach = RETAIN_MAX;
+            }
+          }
+          const g = conformed[k];
+          const h = land.h[k] / 100;
+          // (A cut or fill the land had before the stroke (`before`) is left as it was, not made good: never past it.)
+          const had = before ? Math.abs(before[k] / 100 - g) : 0;
+          if (h <= g + Math.max(reach, had) + 0.005 && h >= g - Math.max(reach, had) - 0.005) continue;
+          // (Brought back short of the limit: solved again, what is built comes some way after it.)
+          const to = Math.max(reach * SETTLE_SHORT, had);
+          land.h[k] = cm(Math.min(g + to, Math.max(g - to, h)));
+          clamped = join(clamped, { i0: i, j0: j, i1: i + 1, j1: j + 1 });
+        }
+      }
+      if (!clamped) break;
+      changed = join(changed, clamped);
+      window = join(window, clamped)!;
+    }
+    return { rect: changed, change: { roads: [...roads].sort((a, b) => a - b), plots: [...plots].sort((a, b) => a - b), rect: moved } };
   }
 
   // ---- solving ------------------------------------------------------------------------------
@@ -651,8 +716,7 @@ export class BuiltSurface {
       }
       groundOf(p, land);
       // A bridge's deck clear of its water, a little higher in its middle.
-      const span = roads[road].bridge;
-      if (span && span[1] > span[0]) {
+      for (const span of bridgeSpans(roads[road])) {
         let level = -Infinity;
         for (let i = 0; i < n; i++) if (p.s[i] >= span[0] && p.s[i] <= span[1]) level = Math.max(level, waterAt(land, p.x[i], p.z[i]));
         if (level > -Infinity) {
@@ -829,8 +893,9 @@ export class BuiltSurface {
       if (this.draped(road)) return;
       const ls = this.lens[road];
       const half = r.width / 2;
-      const reach = Math.max(half, c);
-      const span = r.bridge && r.bridge[1] > r.bridge[0] ? r.bridge : null;
+      // (Beside it out to a cell's diagonal past its edge: every corner of a cell its edge crosses.)
+      const reach = half + c * Math.SQRT2;
+      const spans = bridgeSpans(r);
       for (let k = 0; k + 1 < r.points.length; k++) {
         const a = r.points[k];
         const b = r.points[k + 1];
@@ -853,17 +918,23 @@ export class BuiltSurface {
             const oz = pz - dz * t;
             const d = Math.sqrt(ox * ox + oz * oz);
             const at = j * cols + i;
-            // (Under it; or, a narrow way's, a corner of a cell its middle crosses: graded to it, so its middle reads it back.)
+            // (Under it; or beside it, at its height, the samples past its edge round the cells it crosses: the land
+            // drawn between the samples meets it under its edge, not over it where the land beside stands higher (a
+            // cut), and a narrow way's middle reads it back. Beside it, never in place of a road's own sample or a
+            // deck's, nor of the nearer road's beside it.)
             const under = d <= half;
-            if (!under && (Math.max(Math.abs(ox), Math.abs(oz)) >= c || kind[at] === 1)) continue;
-            if (d >= near[at] && !(under && kind[at] === BESIDE)) continue;
+            if (under) {
+              if (d >= near[at] && kind[at] !== BESIDE) continue;
+            } else if (d > reach || (near[at] < Infinity && kind[at] !== BESIDE) || d >= near[at]) continue;
             const s = ls[k] + t * l;
-            near[at] = d;
-            if (span && s >= span[0] && s <= span[1]) {
+            if (spans.some((span) => s >= span[0] && s <= span[1])) {
+              if (!under) continue;
+              near[at] = d;
               builtY[at] = NaN;
               kind[at] = 0;
               continue;
             }
+            near[at] = d;
             builtY[at] = this.roadY(road, s);
             kind[at] = under ? 1 : BESIDE;
           }
@@ -957,7 +1028,7 @@ function cones(hi: Float32Array, lo: Float32Array, cols: number, rows: number, s
   }
 }
 
-/** A sample beside a way narrower than the land's grain, whose middle crosses its cell: graded to the way's height, not sunk (`solveLand`). */
+/** A sample beside a road (a corner of a cell its edge crosses): graded to the road's height, not sunk (`solveLand`). */
 const BESIDE = 3;
 
 /** [`from`, `to`] narrowed to [`lo`, `hi`] where they overlap (else as it was). */
@@ -965,6 +1036,14 @@ function narrowed(from: number, to: number, lo: number, hi: number): [number, nu
   const [a, b] = [Math.max(from, lo), Math.min(to, hi)];
   return a <= b ? [a, b] : [from, to];
 }
+
+/** The land settled under what is built this many times at most after a stroke (`settleCuts`), this many samples round what changed. */
+const SETTLE_PASSES = 3;
+const SETTLE_MARGIN = 6;
+/** How far within its limit (a share of it) a sample past it is brought back. */
+const SETTLE_SHORT = 0.4;
+/** A sample's eight neighbours. */
+const NEAR8: readonly [number, number][] = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
 
 /** Lots are filed for `at` by cells this wide (m). */
 const LOT_CELL = 16;

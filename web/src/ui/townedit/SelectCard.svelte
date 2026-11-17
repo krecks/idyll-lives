@@ -167,6 +167,9 @@
           <button class="btn small danger-soft" disabled={!goes || 'refused' in goes} onclick={() => editor.apply(removeRoad(draft, t, picked.road))}><Icon name="icon.ui.trash" size={14} /> Remove {road.name ?? 'it'}</button>
         </div>
       </div>
+      {#if editor.step === 'layout'}
+        <p class="hint">Zone its sides with the Zones tool: Build puts homes, shops and parks along it.</p>
+      {:else}
       <div class="option">
         <span class="eyebrow sub">Along it</span>
         {#if buildNo}
@@ -183,6 +186,7 @@
           {#if builtNote?.road === roadId}{builtNote.text}{/if}
         </p>
       </div>
+      {/if}
     {:else if building && picked.kind === 'building'}
       <span class="eyebrow sub">{place ? 'Civic place' : 'Building'} · {USE[building.use] ?? building.use}, {count(building.storeys, 'storey')}</span>
       <h3>{place?.name ?? 'A building'}</h3>

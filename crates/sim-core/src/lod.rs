@@ -28,6 +28,7 @@ pub const LOD_TICKS: u64 = crate::TICKS_PER_MINUTE;
 /// the country): three game minutes.
 pub const FAR_TICKS: u64 = 3 * crate::TICKS_PER_MINUTE;
 pub const FAR: f32 = 300.0;
+const _: () = assert!(FAR_TICKS.is_multiple_of(LOD_TICKS));
 /// Residents this close to the view (in tiles) are at full detail too: the renderer draws them
 /// a little past the lot's edge, and nobody should see them take turns or catch up.
 const VIEW_MARGIN: f32 = 5.0;
@@ -117,27 +118,40 @@ pub(crate) fn plan(w: &mut World) {
     // budget, `World::first`.)
     let mut first = std::mem::take(&mut w.first);
     first.clear();
+    let mut turns = std::mem::take(&mut w.turns);
+    turns.clear();
     for i in 0..w.sims.len() {
         let full = w.full_detail(i);
         first.push(full);
-        let every = if !full && w.far_away(i) {
-            FAR_TICKS
-        } else {
-            LOD_TICKS
+        // (A turn every `LOD_TICKS`, or every `FAR_TICKS` far away: as `FAR_TICKS` is a whole
+        // number of `LOD_TICKS`, how far they are is asked only on a tick that is one of their
+        // turns nearby.)
+        let due = |w: &World| {
+            let at = tick + i as u64;
+            at.is_multiple_of(LOD_TICKS) && (at.is_multiple_of(FAR_TICKS) || !w.far_away(i))
         };
-        let s = &mut w.sims[i];
+        debug_assert_eq!(
+            due(w),
+            (tick + i as u64).is_multiple_of(if w.far_away(i) { FAR_TICKS } else { LOD_TICKS })
+        );
+        let s = &w.sims[i];
         // Off to work or school (or told to do something): no waiting for their turn. Nor for
         // one whose turn last tick waited for this one (`Sim::deferred`).
         let called = s.queue.front().is_some_and(|t| t.directed) || s.deferred;
-        if full || called || (tick + i as u64).is_multiple_of(every) {
+        let turn = full || called || due(w);
+        let s = &mut w.sims[i];
+        if turn {
             s.steps = s.owed + 1;
             s.owed = 0;
+            turns.push(i as u32);
         } else {
             s.steps = 0;
             s.owed += 1;
         }
     }
     w.first = first;
+    w.turns = turns;
+    w.turns_fresh = true;
 }
 
 #[cfg(test)]

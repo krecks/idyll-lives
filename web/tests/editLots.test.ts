@@ -283,11 +283,15 @@ describe('lot edits', async () => {
     const places = hamlet.open!.places!;
     const hall = hamlet.open!.backdrop!.findIndex((b) => b.place !== undefined && / (Parish|Village|Town) Hall$/.test(places[b.place].name));
     expect(hall).toBeGreaterThanOrEqual(0);
-    const choices = lots.civicSwaps(hamlet, hall);
+    // A hamlet is offered a hamlet's (no school, a village's) until it has a village's homes.
+    const school = lots.CIVIC_PLACES.findIndex((c) => c.label === 'School');
+    expect(lots.civicSwaps(hamlet, hall).some((c) => c.label === 'School')).toBe(false);
+    expect(lots.swapCivic(hamlet, hall, school, content, 1)).toHaveProperty('refused');
+    const grown = { ...hamlet, slots: [...hamlet.slots, ...Array.from({ length: 60 }, (_, k) => ({ ...home, index: hamlet.slots.length + k }))] };
+    const choices = lots.civicSwaps(grown, hall);
     expect(choices.some((c) => c.label === 'School')).toBe(true);
     expect(choices.some((c) => c.label === 'Church')).toBe(false);
-    const school = lots.CIVIC_PLACES.findIndex((c) => c.label === 'School');
-    const town = made(lots.swapCivic(hamlet, hall, school, content, 1));
+    const town = made(lots.swapCivic(grown, hall, school, content, 1));
     const b = town.open!.backdrop![hall];
     expect(b.use).toBe('school');
     expect(b.poly).toEqual(hamlet.open!.backdrop![hall].poly);

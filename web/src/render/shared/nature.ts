@@ -13,7 +13,7 @@ import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, ty
 import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, type Land, type LandRect } from '../../game/land';
 import { coverAt, landTop, landWater, wetDistance, wetEdgeAt } from './landBake';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
-import type { BuiltSurface } from './builtSurface';
+import type { BuiltSurface, SurfaceChange } from './builtSurface';
 import { surfaceOf } from './landSurface';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
@@ -710,7 +710,11 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     if (!this.field) return rect;
     let out = rect;
     if (this.surface) {
-      const moved = this.surface.update(rect).rect;
+      // (Solved already where the stroke settled the land under the town, `settleLand`.)
+      const change = this.settled ?? this.surface.update(rect);
+      this.settled = null;
+      this.builtMoved = change.roads.length > 0 || change.plots.length > 0;
+      const moved = change.rect;
       this.stale = null;
       this.terrainField = lotsFilled(this.surface, this.laidOut.plots.length);
       if (moved) out = { i0: Math.min(rect.i0, moved.i0), j0: Math.min(rect.j0, moved.j0), i1: Math.max(rect.i1, moved.i1), j1: Math.max(rect.j1, moved.j1) };
@@ -719,6 +723,44 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.landVersion++;
     return out;
   }
+
+  /**
+   * The world's roads changed under a land the brushes shaped (a road the land's water bridged, `landBridges.ts`):
+   * the surface solved again with them, on the same land, so what stands on it follows them. Says the samples round
+   * the roads that changed (null: none did, or no surface).
+   */
+  takeRoads(world: WorldStructure): LandRect | null {
+    if (!this.field || !this.surface) return null;
+    const old = this.laidOut.meta?.roads ?? [];
+    const now = world.meta?.roads ?? [];
+    const changed = now.filter((r, i) => r !== old[i]);
+    if (!changed.length && old.length === now.length) return null;
+    this.laidOut = world;
+    this.adoptLand(this.field);
+    this.landVersion++;
+    let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const r of changed) for (const [x, z] of r.points) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
+    if (!(x1 >= x0)) return null;
+    const { cols, rows } = this.field;
+    const pad = 4;
+    return { i0: Math.max(0, Math.floor(x0 / LAND_CELL) - pad), j0: Math.max(0, Math.floor(z0 / LAND_CELL) - pad), i1: Math.min(cols, Math.ceil(x1 / LAND_CELL) + pad), j1: Math.min(rows, Math.ceil(z1 / LAND_CELL) + pad) };
+  }
+
+  /**
+   * An earth stroke done over the samples in `rect`, on a land its town follows: the land settled under what is built
+   * (`BuiltSurface.settleCuts`), its surface solved for it (kept for `landChanged`, which follows). Says the samples
+   * it changed besides `rect`'s (null: none, or no town on the land).
+   */
+  settleLand(rect: LandRect, before?: Int16Array): LandRect | null {
+    if (!this.field || !this.surface) return null;
+    const { rect: more, change } = this.surface.settleCuts(rect, undefined, before);
+    this.settled = change;
+    return more;
+  }
+  /** What `settleLand` solved, for the `landChanged` after it. */
+  private settled: SurfaceChange | null = null;
+  /** The last `landChanged` moved a road or a lot's pad (what stands on them is to be drawn again). */
+  protected builtMoved = false;
 
   /**
    * The samples in `rect` changed under a stroke still going (a brush's stamp): drawn from the field as it is there

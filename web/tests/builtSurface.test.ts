@@ -4,14 +4,14 @@
 // trail, a footpath, on the land as it lies);
 // each junction one height over its arms; each pad within a short drive of its road where its way in
 // meets it, at the middle of the land under it where it may be, and near the pads beside it; the
-// bridge clear of its water; the land graded within the cones and the retaining edge; `update` after an
+// bridge clear of its water; the land graded within the cones and the retaining edge, and under a road's edges; `update` after an
 // edit the same as a surface made afresh, its chunks' versions moved; `at` without a jump along the
 // roads. `bun test tests/builtSurface.test.ts`.
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
-import { blankLand, heightAt, LAND_CELL, type Land } from '../src/game/land';
-import { lengths, pointAt, type Pt } from '../src/game/roads';
-import { BRIDGE_CLEAR, BuiltSurface, builtSurfaceOf, ENTRY_MAX, GRADE, RETAIN_MAX, ROAD_SINK, surfacePlots, type SurfaceWorld } from '../src/render/shared/builtSurface';
+import { blankLand, heightAt, LAND_CELL, NONE, type Land } from '../src/game/land';
+import { bridgeSpans, lengths, pointAt, type Pt } from '../src/game/roads';
+import { BRIDGE_CLEAR, BuiltSurface, builtSurfaceOf, CUT_MAX, ENTRY_MAX, GRADE, RETAIN_MAX, ROAD_SINK, surfacePlots, type SurfaceWorld } from '../src/render/shared/builtSurface';
 import { chunkAt } from '../src/render/shared/chunks';
 
 const [W, D] = [160, 120];
@@ -187,6 +187,34 @@ describe('built land on a slope', () => {
     }
   });
 
+  test("the land drawn between its samples stays under a road's edges, the land beside it higher or lower", () => {
+    // (Just inside each edge of every way for cars, off its decks and their ends, where it is that road's alone and no
+    // lot is within a sample (a pad is drawn as a slab of its own): the land there, between the samples round it, as
+    // the terrain draws it, no higher than the road. Where the land beside rose from a sample just past the edge, it
+    // stood over the road's last metre: a notch in its edges where a stroke raised the land beside it.)
+    const nearLot = (x: number, z: number) => plots.some((p) => x > p.x - LAND_CELL && x < p.x + p.w + LAND_CELL && z > p.z - LAND_CELL && z < p.z + p.d + LAND_CELL);
+    let worst = -Infinity;
+    let checked = 0;
+    roads.forEach((r, road) => {
+      if (r.kind === 'trail') return;
+      const ls = lengths(r.points);
+      const decks = bridgeSpans(r);
+      for (let s = 0; s <= ls[ls.length - 1]; s += 0.5) {
+        if (decks.some(([a, b]) => s >= a - 2 && s <= b + 2)) continue;
+        const { p, t } = pointAt(r.points, s, ls);
+        for (const side of [-1, 1]) {
+          const o = side * (r.width / 2 - 0.25);
+          const [x, z] = [p[0] - t[1] * o, p[1] + t[0] * o];
+          if (x < 0 || z < 0 || x > W - LAND_CELL || z > D - LAND_CELL || nearLot(x, z) || surface.roadAt(x, z)?.road !== road) continue;
+          worst = Math.max(worst, surface.landAt(x, z) - surface.at(x, z));
+          checked++;
+        }
+      }
+    });
+    expect(checked).toBeGreaterThan(500);
+    expect(worst).toBeLessThanOrEqual(0.005);
+  });
+
   test('at() has no jump along a road', () => {
     roads.forEach((r) => {
       if (r.kind === 'trail') return;
@@ -224,6 +252,37 @@ describe('built land on a slope', () => {
     const again = before.update(rect);
     expect(again).toEqual({ roads: [], plots: [], rect: null });
     expect(before.version(chunkAt(30, 80))).toBe(1);
+  });
+
+  test("a road's list of bridges (the land's brushes') is solved as its own bridge is, the old one read as one", () => {
+    const listed = roads.map((r, i) => (i === 0 ? { ...r, bridge: undefined, bridges: [r.bridge!] } : r));
+    const other = builtSurfaceOf({ ...world, meta: { ...world.meta, roads: listed } }, land);
+    expect(Array.from(other.profile(0).y)).toEqual(Array.from(surface.profile(0).y));
+    expect(Array.from(other.conformed)).toEqual(Array.from(surface.conformed));
+    // Two spans: each its own deck, the road between them on the land.
+    expect(bridgeSpans({ ...roads[0], bridges: [[100, 110], [10, 5]] })).toEqual([[5, 10], [66, 88], [100, 110]]);
+    expect(bridgeSpans({ ...roads[0], bridge: undefined, bridges: [[120, 200]] })).toEqual([[120, 130]]);
+  });
+
+  test('the land raised under a street is settled within a cut of it and a retaining edge of a lot, in a few passes', () => {
+    const edited = makeLand();
+    const s = builtSurfaceOf(world, edited);
+    // A 12 m hill under the street west of the channel and the first lot's front.
+    const rect = { i0: 5, j0: 12, i1: 20, j1: 24 };
+    for (let j = rect.j0; j < rect.j1; j++) for (let i = rect.i0; i < rect.i1; i++) edited.h[j * edited.cols + i] += 1200;
+    const before = edited.h.slice();
+    const { rect: more, change } = s.settleCuts(rect);
+    expect(more).not.toBeNull();
+    expect(change.roads).toContain(0);
+    // (Settled: solved again, the land everywhere within a cut or a fill of the land graded to what is built.)
+    const fresh = builtSurfaceOf(world, edited);
+    const off = (sf: BuiltSurface, l: Land, k: number) => (l.wl[k] !== NONE && l.wl[k] > l.h[k] ? 0 : Math.abs(l.h[k] / 100 - sf.conformed[k]));
+    let worst = 0;
+    for (let j = rect.j0 - 4; j < rect.j1 + 4; j++) for (let i = rect.i0 - 4; i < rect.i1 + 4; i++) worst = Math.max(worst, off(fresh, edited, j * edited.cols + i));
+    expect(worst).toBeLessThanOrEqual(CUT_MAX + 0.02);
+    // Only round the hill: the land far off as it was.
+    const far = (40 / LAND_CELL) * edited.cols + 140 / LAND_CELL;
+    expect(edited.h[far]).toBe(before[far]);
   });
 
   test('a surface made directly is the one a world gives', () => {

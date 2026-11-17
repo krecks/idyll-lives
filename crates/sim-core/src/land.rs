@@ -17,6 +17,10 @@
 //! undo, which sends the reverse stroke). It isn't a home edit, so it leaves the home edits kept
 //! for undo as they are, but for what it changed under them (`World::keep_land_in_edits`).
 //!
+//! A stroke whose water crosses a road bridges it there (the page's automatic bridges): `meta.roads`
+//! sends each such road's deck spans by its index, merged into `meta.roads[i].bridges`; the deck's
+//! tiles stay dry in the water mask, so the road's check below holds.
+//!
 //! Both `meta.land` and the water mask are saved as they are (`save.rs`, still 39).
 
 use serde_json::Value;
@@ -60,7 +64,13 @@ impl World {
             _ => None,
         };
         let zones = meta.get("zones").filter(|z| !z.is_null()).cloned();
-        if (land.is_some() || zones.is_some()) && !(self.meta.is_object() || self.meta.is_null()) {
+        let roads = match meta.get("roads") {
+            Some(patch) if !patch.is_null() => Some(merged_roads(self.meta.get("roads"), patch)?),
+            _ => None,
+        };
+        if (land.is_some() || zones.is_some() || roads.is_some())
+            && !(self.meta.is_object() || self.meta.is_null())
+        {
             return Err(Error::new("the town's meta isn't an object"));
         }
         let water = water.map(|rle| self.water_change(rle)).transpose()?;
@@ -70,7 +80,7 @@ impl World {
 
         self.pay(h, cost);
         let paid = self.build_price(cost);
-        if land.is_some() || zones.is_some() {
+        if land.is_some() || zones.is_some() || roads.is_some() {
             if self.meta.is_null() {
                 self.meta = Value::Object(Default::default());
             }
@@ -80,6 +90,9 @@ impl World {
             }
             if let Some(zones) = zones {
                 m.insert("zones".into(), zones);
+            }
+            if let Some(roads) = roads {
+                m.insert("roads".into(), roads);
             }
         }
         let (wet, dried) = match water {
@@ -318,6 +331,50 @@ fn rle_mask(rle: Option<&[u32]>, size: usize) -> Vec<bool> {
         at = end;
     }
     out
+}
+
+/// `meta.roads` (`old`) with a stroke's bridges merged in: `patch` has, by road index (a JSON
+/// object's keys), `{"bridges": [[from, to], ...]}`, each road's deck spans (arc lengths, m, from
+/// before to after); they replace the road's `bridges`, and none (an empty list) takes it away.
+fn merged_roads(old: Option<&Value>, patch: &Value) -> Result<Value, Error> {
+    let Some(patch) = patch.as_object() else {
+        return Err(Error::new("meta.roads must be an object of roads by index"));
+    };
+    let mut roads = match old {
+        Some(Value::Array(a)) => a.clone(),
+        _ => Vec::new(),
+    };
+    for (i, change) in patch {
+        let road = i
+            .parse::<usize>()
+            .ok()
+            .and_then(|i| roads.get_mut(i))
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| Error::new(format!("meta.roads: no road {i}")))?;
+        let spans = change
+            .get("bridges")
+            .and_then(Value::as_array)
+            .filter(|spans| {
+                spans.iter().all(|span| {
+                    span.as_array().is_some_and(|p| {
+                        p.len() == 2
+                            && p.iter().all(|v| v.as_f64().is_some_and(f64::is_finite))
+                            && p[0].as_f64() <= p[1].as_f64()
+                    })
+                })
+            })
+            .ok_or_else(|| {
+                Error::new(format!(
+                    "meta.roads[{i}].bridges must be a list of [from, to] spans"
+                ))
+            })?;
+        if spans.is_empty() {
+            road.remove("bridges");
+        } else {
+            road.insert("bridges".into(), Value::Array(spans.clone()));
+        }
+    }
+    Ok(Value::Array(roads))
 }
 
 /// `meta.land` (`old`, if there is one) with a stroke's `patch` merged in: its `h` and `wl`, tiles

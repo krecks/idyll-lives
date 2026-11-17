@@ -22,6 +22,7 @@
   import ChooseHousehold from './ui/screens/ChooseHousehold.svelte';
   import CreateHousehold from './ui/screens/CreateHousehold.svelte';
   import CreateLand from './ui/screens/CreateLand.svelte';
+  import CreateLayout from './ui/screens/CreateLayout.svelte';
   import CreateTown from './ui/screens/CreateTown.svelte';
   import CrashScreen from './ui/screens/CrashScreen.svelte';
   import Credits from './ui/screens/Credits.svelte';
@@ -258,7 +259,7 @@
       services.items?.holdAhead(true);
       return;
     }
-    if (!['land', 'town', 'household', 'create', 'home'].includes(screen)) return;
+    if (!['land', 'streets', 'town', 'household', 'create', 'home'].includes(screen)) return;
     services.items?.holdAhead(false);
     prefetchCatalog();
   });
@@ -337,6 +338,8 @@
   {#if !app.liveBackdrop}<MenuBackdrop still={app.screen === 'menu' ? app.menuStill?.url : undefined} />{/if}
   {#if app.screen === 'land'}
     <CreateLand />
+  {:else if app.screen === 'streets'}
+    <CreateLayout />
   {:else if app.screen === 'town'}
     <CreateTown />
   {:else if app.screen === 'household'}

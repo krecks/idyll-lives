@@ -16,8 +16,9 @@ pub(crate) fn update(w: &mut World) {
     if w.cars_nav != w.nav_version {
         w.cars_nav = w.nav_version;
         w.cars_parked = None;
-        refresh(w);
+        crate::profile::phase("cars::update/refresh", || refresh(w));
     }
+    let cars_start = crate::profile::start();
     // Someone who set off for a car and turned to using something instead isn't coming: the car
     // doesn't wait for them, nor is it kept from the others.
     for s in &mut w.sims {
@@ -74,7 +75,7 @@ pub(crate) fn update(w: &mut World) {
             continue;
         }
         if w.cars[c].trip.is_some() {
-            trip_update(w, c);
+            crate::profile::phase("cars::update/trip_update", || trip_update(w, c));
             continue;
         }
         let state = w.cars[c].state;
@@ -188,8 +189,9 @@ pub(crate) fn update(w: &mut World) {
             }
         }
     }
-    reblock(w);
-    poses(w);
+    crate::profile::end("cars::update/cars", cars_start);
+    crate::profile::phase("cars::update/reblock", || reblock(w));
+    crate::profile::phase("cars::update/poses", || poses(w));
 }
 
 /// Ticks car `c`'s drive out of town or (`home`) back takes.
@@ -527,6 +529,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         blocked,
         stairs,
         kept_off: &[],
+        steps: None,
     };
     let mut progress = t;
     let held_up = go_on(
@@ -1974,8 +1977,10 @@ pub(crate) fn unjam(w: &mut World) {
             .get((k & !(1 << 63)) as usize)
             .is_some_and(|x| x.standing || tick >= x.stall.1 + PASS_WAIT)
     };
+    // (Each car's ask looked up by key, not searched for: `waits_on_at`.)
+    let asks = crate::traffic::asks_by_key(w);
     for (c, car) in w.cars.iter().enumerate() {
-        let by = crate::traffic::waits_on(w, car_first(c));
+        let by = crate::traffic::waits_on_at(w, car_first(c), &asks);
         let waiting = matches!(car.state, CarState::Leaving | CarState::Arriving)
             && car.sight == Sight::Seen
             && !car.standing
@@ -2002,7 +2007,7 @@ pub(crate) fn unjam(w: &mut World) {
         }
         let (ring, ok, parked) = held_round(
             c,
-            |k| crate::traffic::waits_on(w, k),
+            |k| crate::traffic::waits_on_at(w, k, &asks),
             |k| crate::traffic::at_red(w, k),
             |o| {
                 if w.cars

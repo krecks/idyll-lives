@@ -6,9 +6,10 @@
  * The two drafts are compared by what each thing is, not by its index (indices move as lots and
  * roads go): a lot by its rectangle, house and kind, a road by its line, a backdrop building by its
  * footprint and use. A lot or building the plan has and the town on screen hasn't is `new`; one it
- * no longer has is `gone` (its building dimmed). A road the plan has anew is `new` (`bridge` for a
- * deck); one it no longer has is drawn `bad`, red, as the street tool draws where one may not go:
- * the renderer has no dimmed road.
+ * no longer has is `gone` (its building dimmed). A road the plan has anew is `laid`, drawn as the road
+ * it will be (near asphalt) so a street drawn shows as a road at once (`bridge` for a deck); one it no
+ * longer has is drawn `bad`, red, as the street tool draws where one may not go: the renderer has no
+ * dimmed road.
  */
 
 import type { BackdropBuilding, RoadPlan } from '../../core/protocol';
@@ -32,9 +33,9 @@ export function buildingBox(b: Pick<BackdropBuilding, 'poly'>): Box {
   return { x: x0, z: z0, w: x1 - x0, d: z1 - z0 };
 }
 
-/** A road as a ghost ribbon (its deck's stretch, if it has one, as the bridge's own). */
+/** A road as a ghost ribbon (a new or laid one with a deck as the bridge's own). */
 export function roadGhost(r: RoadPlan, tone: RoadGhost['tone']): RoadGhost {
-  return { points: r.points.map(([x, z]): [number, number] => [x, z]), width: r.width, tone: r.bridge && tone === 'new' ? 'bridge' : tone };
+  return { points: r.points.map(([x, z]): [number, number] => [x, z]), width: r.width, tone: r.bridge && (tone === 'new' || tone === 'laid') ? 'bridge' : tone };
 }
 
 const lotSig = (t: Templates, s: PlotSlot) => {
@@ -73,7 +74,7 @@ export function editGhosts(shown: NeighbourhoodDraft, plan: NeighbourhoodDraft, 
   if (shown.roads !== plan.roads) {
     const before = new Set(shown.roads.map(roadSig));
     const after = new Set(plan.roads.map(roadSig));
-    for (const r of plan.roads) if (!before.has(roadSig(r))) roads.push(roadGhost(r, 'new'));
+    for (const r of plan.roads) if (!before.has(roadSig(r))) roads.push(roadGhost(r, 'laid'));
     for (const r of shown.roads) if (!after.has(roadSig(r))) roads.push(roadGhost(r, 'bad'));
   }
   const was = shown.open?.backdrop ?? [];

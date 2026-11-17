@@ -44,9 +44,11 @@ import { ENV_UNITS, SKY_UNITS, SUN_UNITS } from './lightUnits';
 import { MaterialLibrary, SUN_LIGHT_MASK } from './materials';
 import { drawMesh, meshFrom } from './meshes';
 import { Mirrors } from './mirrors';
-import { buildModel, fileImported, importAhead, modelFilesSettled, onModelFileArrived, type ModelTemplate } from './models';
+import { buildModel, fileImported, importAhead, modelFileCensus, modelFilesSettled, onModelFileArrived, type ModelTemplate } from './models';
+import { memoryCensus } from './memoryCensus';
 import { GameBirds } from './birds';
 import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming';
+import { SamplerCheck } from './samplerCheck';
 import { steadyShaderKeys } from './shaderKeys';
 import { natureDecor, windGust, windStill } from './nature';
 import { PETALS } from '../shared/nature';
@@ -87,7 +89,7 @@ import { LandHaze } from './landHaze';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
 import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
-import { PLAYBACK_RATE } from '../shared/gameSpeed';
+import { playbackRate } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
 import { pavedRects } from '../shared/paving';
 import { GrassPush } from '../shared/grass';
@@ -106,7 +108,7 @@ import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
-import { groundDepth, lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type GarageInfo, type ItemPlacement, type ObjectPlacement, type StoreyLayout, type WorldStructure } from '../../core/protocol';
+import { groundDepth, lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type GarageInfo, type ItemPlacement, type ObjectPlacement, type RoadPlan, type StoreyLayout, type WorldStructure } from '../../core/protocol';
 import type { VisemeTrack } from '../../voice/visemes';
 import type {
   BuildEffect,
@@ -132,6 +134,7 @@ import type {
   RendererDeps,
   RenderStats,
   RenderVram,
+  MemoryCensus,
   ResizeHandle,
   RoomOverlayTile,
   SeenBird,
@@ -144,10 +147,12 @@ import type {
   WallMode,
 } from '../types';
 import { LAND_CELL, NONE, type Land, type LandRect } from '../../game/land';
+import type { UseLayer } from '../../game/uses';
 import { bakeLand, copyLand, fullRect, marchToGround, sameLand } from '../shared/landBake';
 import { OffThreadLand } from '../shared/renderData';
 import { LandCursorDraw } from './landCursor';
 import { TownGhostDraw, type Drape } from './townGhosts';
+import { UseOverlayDraw } from './useOverlay';
 import { installLandDebug } from './landDebug';
 import type { Landscape } from './nature';
 
@@ -219,6 +224,12 @@ const ROAM_SLICE_MS = 4;
  */
 const COVERED_SLICE_MS = 40;
 /**
+ * The same while the menus' town is built again over the one on screen (step 2's edits): the old
+ * town stays drawn and the camera still, so a frame given up now and then shows nothing, and at 8 ms
+ * a slice an edit's town took twice as long to come.
+ */
+const AGAIN_SLICE_MS = 32;
+/**
  * Daylight doesn't reach under the ground or into a room without windows: no sun, only this much
  * of the sky fill and the environment (as seen, intensity times exposure: the same by day and by
  * night). A windowless room up here keeps that little, so its lamps tell. The basement in view
@@ -243,6 +254,12 @@ const NOON_SKY_LUMA = skyLuma(lightingAt(13 * 60, LOOK, createLighting()));
 const SIM_VIEW_MARGIN = 2;
 /** How far round the watch rectangle the sim keeps residents in full detail (m: sim-core `lod::VIEW_MARGIN`; `reportWatch`). */
 const DETAIL_MARGIN = 5;
+/**
+ * At super speed (`setDetailTight`), the sim's full-detail area is the streamed chunks within this
+ * many chunks of the one the camera looks at, not all of them: a resident out of it takes a turn
+ * every game minute, which at super speed is every step or two anyway, and the town ticks faster.
+ */
+const TIGHT_CHUNKS = 1;
 /** Residents further than this (m) from the camera's target, off the viewed lot, have no contact shadow. */
 const FAR_SHADOW = 40;
 /** `?residents=lot`: residents drawn only on the viewed lot, as before life on every lot. */
@@ -488,6 +505,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private townTicket = 0;
   private townQueue: Promise<void> = Promise.resolve();
   private townBuilds = 0;
+  /** The town being built replaces one on screen (`showTown` while in the town's mode): see `AGAIN_SLICE_MS`. */
+  private townAgain = false;
   private gameLayers: { camera: number[]; sun: number[] } | null = null;
   /** The surfaces, the look and the environment lighting (`materials.ts`). */
   private lib!: MaterialLibrary;
@@ -685,6 +704,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private focusAsked: { plot: number; at: number } | null = null;
   private readonly focusSwitches: number[] = [];
   private watchListener: ((rect: [number, number, number, number]) => void) | null = null;
+  /** The full-detail area kept to the chunks round the camera's (`setDetailTight`), and that chunk as last reported. */
+  private detailTight = false;
+  private detailChunk = '';
   /** The street building the chunks streamed in, between world builds; another stream change waits for it. */
   private streaming: Promise<void> | null = null;
   private streamDue = false;
@@ -757,6 +779,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private gpuTiming!: GpuTiming;
   private drawCounts!: DrawCounts;
   private shaderWatch!: ShaderWatch;
+  /** In dev, WebGL2's texture units each program uses (`samplerCheck.ts`; `window.__samplers()`). */
+  private samplerCheck: SamplerCheck | null = null;
   /** The warm-up's frame, drawn next (`warmGame`). */
   private warmNext = false;
   /** The loading screen's listener (`onLoadStep`); the warm-up's own world builds (its lots) don't report. */
@@ -801,6 +825,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     steadyShaderKeys();
     // Before anything compiles: every shader and pipeline is counted (`?diag=shaders` logs them).
     this.shaderWatch = new ShaderWatch(this.device, this.diag.has('shaders'));
+    if (import.meta.env.DEV) {
+      const check = (this.samplerCheck = new SamplerCheck(this.device));
+      (window as unknown as { __samplers?: () => unknown }).__samplers = () => check.report();
+      // (The bridge decks the street draws now, and whether it stands on the game's landscape's surface: `land.mjs`.)
+      (window as unknown as { __streetBridges?: () => unknown }).__streetBridges = () => ({ decks: this.street.layout?.bridgeCount() ?? 0, onLand: !!this.lot.landscape?.surface && this.street.layout?.standsOn(this.lot.landscape.surface) });
+      // (The game's ground as drawn at each point: what is built there (a road's height on a road), the terrain and the grass: `land.mjs`.)
+      (window as unknown as { __groundDrawn?: (points: [number, number][]) => unknown }).__groundDrawn = (points) => {
+        const scape = this.lot.landscape;
+        return points.map(([x, z]) => ({ built: scape?.surface?.at(x, z) ?? null, ...(scape?.drawnAt(x, z) ?? { terrain: null, grass: null }) }));
+      };
+    }
     this.app = createApp(canvas, this.device);
     this.gpuTiming = new GpuTiming(this.device, this.passLabel);
     this.drawCounts = new DrawCounts(this.device);
@@ -1211,7 +1246,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const p = this.townPose;
       // (The menus' town has the full town view's planes, sky and haze at any distance: `applyTownCamera`.)
       const flat = Math.sin(p.beta) * p.radius;
-      this.applyTownCamera(p.radius, p.alpha, p.beta, p.target.x + Math.cos(p.alpha) * flat, p.target.y + Math.cos(p.beta) * p.radius, p.target.z + Math.sin(p.alpha) * flat, true);
+      const [ex, ey, ez] = [p.target.x + Math.cos(p.alpha) * flat, p.target.y + Math.cos(p.beta) * p.radius, p.target.z + Math.sin(p.alpha) * flat];
+      this.applyTownCamera(p.radius, p.alpha, p.beta, ex, ey, ez, true);
+      // (The land's veil moved for the eye: each of its points over the land it is for, as seen from here.)
+      if (this.landHaze?.view(ex, ey, ez)) this.held?.changed();
       this.camera.setPose(p.alpha, p.beta, p.radius, p.target.x, p.target.y, p.target.z, p.targetScreenOffset.x, p.targetScreenOffset.y);
     } else {
       const o = this.orbit;
@@ -1326,6 +1364,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.watchListener = listener;
   }
 
+  setDetailTight(tight: boolean): void {
+    if (tight === this.detailTight) return;
+    this.detailTight = tight;
+    this.reportWatch();
+  }
+
   /**
    * Each frame, after the camera's input: a flight under way, then the chunks round the camera
    * (streamed into the street) and the lot it has settled on (`onFocusLot`).
@@ -1371,6 +1415,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       }
       return taken;
     });
+    // (Kept to the chunks round the camera's: it moved to another.)
+    if (!changed && this.detailTight && this.detailChunk !== `${Math.floor(o.target.x / CHUNK)},${Math.floor(o.target.z / CHUNK)}`) this.reportWatch();
     if (!changed) return;
     this.pictureChanged();
     if (this.streamOn && this.street.setChunks(this.roam.chunks)) this.streamStreet();
@@ -1593,6 +1639,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       x1 = Math.max(x1, (cx + 1) * CHUNK);
       z1 = Math.max(z1, (cz + 1) * CHUNK);
     }
+    // (At super speed, only the chunks round the camera's: `TIGHT_CHUNKS`.)
+    const [cx, cz] = [Math.floor(this.orbit.target.x / CHUNK), Math.floor(this.orbit.target.z / CHUNK)];
+    this.detailChunk = `${cx},${cz}`;
+    if (this.detailTight) {
+      x0 = Math.max(x0, (cx - TIGHT_CHUNKS) * CHUNK);
+      z0 = Math.max(z0, (cz - TIGHT_CHUNKS) * CHUNK);
+      x1 = Math.max(x0, Math.min(x1, (cx + TIGHT_CHUNKS + 1) * CHUNK));
+      z1 = Math.max(z0, Math.min(z1, (cz + TIGHT_CHUNKS + 1) * CHUNK));
+    }
     const d = groundDepth(world);
     const rect: [number, number, number, number] = [Math.max(0, x0), Math.max(0, z0), Math.min(world.width, x1), Math.min(d, z1)];
     this.watchListener(rect);
@@ -1716,8 +1771,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!view && world.meta?.world?.size === 'big') view = this.view ?? this.nearestLot(world);
     // (Which traffic lights' poles get a pedestrians' head: those by a crosswalk.)
     this.signals.setWorld(world);
+    // (Its roads changed under the same town: a road the land's water bridged, or the bridge taken back. Built again:
+    // the street laid out on them, the landscape's surface solved with them, `buildWorld`; not patched.)
+    const was = this.builtWorld?.meta?.roads;
+    const now = world.meta?.roads;
+    const decks = (roads: readonly RoadPlan[]) => roads.map((r) => (r.bridges ? r.bridges.join(';') : '')).join('|');
+    const roadsChanged = !!was && !!now && now !== was && (now.length !== was.length || decks(now) !== decks(was));
     if (this.rebuildNext) this.rebuildNext = false;
-    else if (this.patchable(world, view)) {
+    else if (roadsChanged) {
+      // (Falls through to a whole build.)
+    } else if (this.patchable(world, view)) {
       this.patchWorld(world);
       return Promise.resolve();
     } else if (!this.worldBuilds && !this.unpatchable(world, view, false)) {
@@ -1952,7 +2015,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.placeRoomLights(world, view);
     await this.pace();
     this.loadStep('Building the street', 0.35);
+    // (A road the land's water bridged: the game's landscape solves its surface again with the new roads, the land under
+    // them drawn again.)
+    const shaped = this.lot.landscape;
+    const bridged = shaped?.heightField ? shaped.takeRoads(world) : null;
+    if (shaped && bridged) void this.queueLand('land: roads taken', async () => {
+      await shaped.landDone(bridged, this.landPace);
+    });
     await this.street.build(world, this.view, () => this.pace());
+    // (On land the brushes shaped, the street stands on the landscape's surface, one surface for the land and what
+    // stands on it: a street laid out again (roads bridged, a bridge undone or redone) stood on its own copy of the
+    // world's land, and the build that took the roads may have been overtaken by the next.)
+    if (shaped?.heightField && shaped.surface && !this.street.layout?.standsOn(shaped.surface) && this.street.landMoved(shaped.surface)) this.streamStreet();
     this.cars.build(world);
     this.buildTownView(world);
     this.loadStep('Furnishing the house', 0.45);
@@ -2043,7 +2117,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private async pace(): Promise<void> {
     // (Shorter slices once the camera roams: the frames go on moving behind the build, and one it takes shows.)
     // (Longer ones behind the loading screen: nothing is seen, and nothing roams.)
-    const slice = this.loadingCover || this.warming ? COVERED_SLICE_MS : this.townBuilds === 0 && (this.streamOn || this.roamedTo !== null) ? ROAM_SLICE_MS : BUILD_SLICE_MS;
+    const slice = this.loadingCover || this.warming ? COVERED_SLICE_MS : this.townBuilds === 0 && (this.streamOn || this.roamedTo !== null) ? ROAM_SLICE_MS : this.townBuilds > 0 && this.townAgain && !this.worldBuilding ? AGAIN_SLICE_MS : BUILD_SLICE_MS;
     if ((!this.worldBuilding && this.townBuilds === 0) || performance.now() - this.sliceStart < slice) return;
     await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     this.sliceStart = performance.now();
@@ -2615,7 +2689,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * bathroom someone's in), and swings back once they're through. It opens at the hand: the leaf starts when the walker's hand
    * could be on its handle (`doorLead`: a hand's reach, or as far ahead as the swing needs at this
    * game speed, so it's open by the time they are), and the resident's arm goes out with it
-   * (`doorHand`, `residents.ts`). `rate`: how fast the game runs (`PLAYBACK_RATE`).
+   * (`doorHand`, `residents.ts`). `rate`: how fast the game runs (`playbackRate`).
    */
   private swingDoors(rate: number): void {
     const hand = this.doorHand;
@@ -2681,8 +2755,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.townMode) return;
     const h = layout.header;
     this.gamePaused = (curr[h.speed] | 0) === 0;
-    // At speed 3 and up, and in quiet hours, the preset's step (Low's ten minutes: each update re-colours the sun, sky and lamps).
-    const fast = curr[h.speed] >= 3 || (h.calm !== undefined && curr[h.calm] > 0);
+    // At 10× and super speed, the preset's step (Low's ten minutes: each update re-colours the sun, sky and lamps).
+    const fast = curr[h.speed] >= 3;
     const step = fast ? Math.max(LIGHT_STEP, this.quality.lightingStep) : LIGHT_STEP;
     const due = this.lastLightMinute < 0 || frame.now - this.lastLightAt >= LIGHT_MIN_MS;
     if (due && Math.abs(minute - this.lastLightMinute) >= step) {
@@ -2693,7 +2767,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // Who is where: doors open for those going through, neighbours' windows glow while someone is up.
     this.findDarkRooms(frame);
     this.lamps.frame(this.frameDt / 1000, this.darkRooms, this.awakeRooms, this.orbit.target.x, this.orbit.target.z); // (lamps and glows fading, which cast shadows, `lamps.ts`.)
-    this.swingDoors(PLAYBACK_RATE[curr[h.speed] | 0] ?? 1);
+    this.swingDoors(playbackRate(curr, h));
     this.steerCamera(this.frameDt / 1000);
     this.settleTarget(this.frameDt / 1000);
     this.keepCameraClear();
@@ -3071,6 +3145,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // (The player's pan keeps the camera over the land, the town or none.)
       this.townRig.setBounds({ x0: 0, z0: 0, x1: world.width, z1: groundDepth(world) });
       if (this.townBuilds++ === 0 && !this.worldBuilding) this.sliceStart = performance.now();
+      // (A town on screen already, built again: longer slices, `AGAIN_SLICE_MS`.)
+      this.townAgain = this.townMode;
       try {
         // The landscape on the town layer (the game's, when it's the same town). Same seed and size
         // can still be a new layout ("New neighbours"): the lawn fitted again to its houses.
@@ -3091,19 +3167,23 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       } finally {
         this.townBuilds--;
       }
-      // (Step 2's ghosts over the land as it is built now.)
-      if (ticket === this.townTicket && !this.disposed) this.drawGhosts();
+      // (Step 2's ghosts and painted uses over the land as it is built now.)
+      if (ticket === this.townTicket && !this.disposed) {
+        this.drawGhosts();
+        this.drawUses();
+      }
       if (ticket !== this.townTicket || this.disposed || this.townMode) return;
       // Entering from the game (or at start-up): the shot's hour at once.
       this.townMinute = this.townMinuteGoal = this.townShot?.minute ?? minute;
       this.enterTown();
       this.drawGhosts();
+      this.drawUses();
     });
     this.townQueue = run.catch(() => {});
     return run;
   }
 
-  async hideTown(glide = 0): Promise<void> {
+  async hideTown(glide = 0, letGo = false): Promise<void> {
     // Let a pending overview build finish first, so it can't switch back to the overview later.
     this.townTicket++;
     await this.townQueue;
@@ -3121,7 +3201,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       });
       this.flyingIn = false;
     }
-    if (this.townMode) this.leaveTown();
+    if (this.townMode) this.leaveTown(letGo);
+    if (letGo) await this.townQueue;
   }
 
   setTownShot(shot: TownShot, cut = false): void {
@@ -3133,12 +3214,32 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
   }
 
-  nudgeTown(dAlpha: number, zoom: number): void {
-    if (this.townMode) this.townRig.nudge(dAlpha, zoom);
+  nudgeTown(dAlpha: number, zoom: number, dBeta = 0): void {
+    if (this.townMode) this.townRig.nudge(dAlpha, zoom, dBeta);
+  }
+
+  zoomTownAt(x: number, y: number, zoom: number): void {
+    if (!this.townMode) return;
+    // (Over the sky, towards the camera's target: a plain zoom.)
+    const at = this.pickLand(x, y);
+    if (at) this.townRig.zoomAt(at.x, at.z, zoom);
+    else this.townRig.nudge(0, zoom);
   }
 
   panTown(dx: number, dz: number): void {
     if (this.townMode) this.townRig.pan(dx, dz);
+  }
+
+  panTownView(right: number, forward: number): void {
+    if (this.townMode) this.townRig.panView(right, forward);
+  }
+
+  setTownNearest(metres: number): void {
+    this.townRig.setNearest(metres);
+  }
+
+  get townDistance(): number {
+    return this.townPose.radius;
   }
 
   dragTown(x0: number, y0: number, x1: number, y1: number): void {
@@ -3188,6 +3289,35 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.drawGhosts();
   }
 
+  setTownUses(layer: UseLayer | null, hatched?: Uint8Array | null): void {
+    this.uses = layer;
+    this.usesHatched = hatched ?? null;
+    this.drawUses();
+  }
+
+  /** Step 2's painted uses (`setTownUses`), and their overlay (made the first time there are any). */
+  private uses: UseLayer | null = null;
+  private usesHatched: Uint8Array | null = null;
+  private useDraw: UseOverlayDraw | null = null;
+
+  /**
+   * The uses drawn over the menus' town (only there): the cells changed since the last time, or all of them over
+   * another land (a new landscape, or the land drawn again) or at another least width of their edges on screen.
+   */
+  private drawUses(): void {
+    const at = this.townMode || !this.lot.landscape ? this.landInView() : null;
+    const uses = at ? this.uses : null;
+    if (!uses && !this.useDraw) return;
+    if (!this.useDraw) {
+      this.useDraw = new UseOverlayDraw(this.app, this.root);
+      this.useDraw.setScale(this.townMetresPerPx());
+    }
+    const layer = this.lot.townLayer ?? pc.LAYERID_WORLD;
+    const land = at ? `${landscapeId(at.scape)}|${at.scape.landVersion}` : null;
+    this.useDraw.set(uses, this.usesHatched, at ? groundOrWater(at.scape) : () => 0, layer, land);
+    this.held?.changed();
+  }
+
   /** Step 2's edits over the town (`setTownGhosts`), and their drawing (made the first time there are any). */
   private ghosts: TownGhosts | null = null;
   private ghostDraw: TownGhostDraw | null = null;
@@ -3197,10 +3327,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const at = this.townMode || !this.lot.landscape ? this.landInView() : null;
     const ghosts = at ? this.ghosts : null;
     if (!ghosts && !this.ghostDraw) return;
-    this.ghostDraw ??= new TownGhostDraw(this.app, this.root);
+    if (!this.ghostDraw) {
+      this.ghostDraw = new TownGhostDraw(this.app, this.root);
+      this.ghostDraw.setScale(this.townMetresPerPx());
+    }
     const layer = this.lot.townLayer ?? pc.LAYERID_WORLD;
     this.ghostDraw.set(ghosts, at ? groundOrWater(at.scape) : () => 0, layer, this.townWorld);
     this.held?.changed();
+  }
+
+  /** How many m a CSS px is where the overview's camera looks: its distance, lens and the canvas's height. */
+  private townMetresPerPx(): number {
+    return (2 * this.townPose.radius * Math.tan(this.townPose.fov / 2)) / (this.cssSize.height || 1);
   }
 
   onTownFrame(fn: (() => void) | null): void {
@@ -3304,7 +3442,36 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       if (!box) return;
       await this.lot.regrowNature(scape, box, () => this.disposed, this.landPace);
       this.landMapped(scape);
+      // (The game's land: what stands on it drawn again on its surface as the world comes back from the stroke, the
+      // backdrop's buildings too; the sun's shadows of the still casters taken again.)
+      if (scape === this.lot.landscape) this.landUnderTown(scape);
     });
+  }
+
+  settleLand(rect: LandRect, before?: Int16Array): LandRect | null {
+    const at = this.landInView();
+    if (!at?.scape.heightField) return null;
+    return perfTime('land: settle', () => at.scape.settleLand(rect, before));
+  }
+
+  /**
+   * The game's land shaped (a stroke done, undone or redone): the street stands on the landscape's surface (one surface
+   * for the land and what stands on it) and plans again the chunks whose roads or lots moved; the viewed lot follows its
+   * pad (the datum); the backdrop's buildings are put on the land again with the town view; the still casters' shadows
+   * are taken again.
+   */
+  private landUnderTown(scape: Landscape): void {
+    const surface = scape.surface;
+    this.townBackdropOf = null;
+    this.sunShadows.moved();
+    if (!surface || !this.builtWorld) return;
+    if (this.street.landMoved(surface)) this.streamStreet();
+    const view = this.view;
+    const at = view ? this.builtWorld.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
+    if (at < 0) return;
+    const datum = surface.padY(at);
+    this.applyDatum(datum);
+    this.street.setLotY(datum);
   }
 
   pickLand(x: number, y: number): { x: number; y: number; z: number } | null {
@@ -3360,16 +3527,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lastLightMinute = -1;
   }
 
-  /** The game comes on screen again (the menus' town is let go a moment later: `releaseTown`). */
-  private leaveTown(): void {
+  /** The game comes on screen again (the menus' town is let go a moment later, or at once with `letGo`: `releaseTown`). */
+  private leaveTown(letGo = false): void {
     this.townMode = false;
     this.landHaze?.show(false);
-    // (The game has no ghosts: drawn again over the town when it is shown again.)
+    // (The game has no ghosts nor painted uses: drawn again over the town when it is shown again.)
     this.ghostDraw?.set(null, () => 0, 0, null);
+    this.useDraw?.clear();
     setDatum(this.root, this.lotRoot, this.datum);
     this.lot.datum = this.datum;
     const ticket = this.townTicket;
-    setTimeout(() => this.releaseTown(ticket), TOWN_RELEASE_MS);
+    if (letGo) this.releaseTown(ticket);
+    else setTimeout(() => this.releaseTown(ticket), TOWN_RELEASE_MS);
     this.shaderWatch.phase = 'game';
     this.birdLife.setTown(false);
     this.applyDig(); // (the basement and windowless rooms dark again.)
@@ -3444,6 +3613,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // lit lots are washed over whole.)
     this.overview?.setReach(this.townPose.radius);
     this.landHaze?.show(this.townPose.radius);
+    // (Step 2's ghosts drawn again when the zoom crosses a step of their least widths on screen.)
+    if (this.ghostDraw?.setScale(this.townMetresPerPx()) && this.ghosts) this.drawGhosts();
+    if (this.useDraw?.setScale(this.townMetresPerPx()) && this.uses) this.drawUses();
     if (this.overview?.frame(secs)) this.held.changed();
     // The light eases between the screens' hours (about two seconds).
     const goal = this.townMinuteGoal;
@@ -3581,6 +3753,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       residentsMs: this.characters?.updateMs ?? 0,
       vram: this.vram(),
     };
+  }
+
+  memoryCensus(): MemoryCensus | null {
+    return this.app ? memoryCensus(this.app, modelFileCensus(this.app)) : null;
   }
 
   /** The device's own GPU memory counters, bytes; null before the app exists. */
@@ -3984,6 +4160,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.handles?.destroy();
     this.hoverTile?.destroy();
     this.landCursor?.destroy();
+    this.useDraw?.destroy();
     this.ghostDraw?.destroy();
     this.previews?.destroy();
     this.placing?.dispose();
@@ -4027,6 +4204,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.post = null;
     this.drawCounts?.remove();
     this.gpuTiming?.destroy();
+    this.samplerCheck?.destroy();
     this.shaderWatch?.destroy();
     if (this.app) destroyApp(this.app);
   }

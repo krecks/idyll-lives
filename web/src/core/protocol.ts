@@ -17,7 +17,7 @@ export type Command =
   | { type: 'setNeed'; sim: number; need: string; value: number }
   | { type: 'setBond'; a: number; b: number; friendship?: number; romance?: number; chemistry?: number; partners?: boolean }
   | { type: 'adopt'; household: number; child: boolean }
-  /** "Skip quiet hours": time-lapse while the player's household sleeps or is at work. */
+  /** Super speed by itself: the game goes to super speed as the player's household all falls asleep or goes out. */
   | { type: 'setAutoFast'; enabled: boolean }
   | { type: 'use'; sim: number; object: number; interaction: number }
   /** Eat a serving of food (an item), or clear it away to the sink. */
@@ -97,10 +97,14 @@ export type Command =
    */
   | { type: 'shapeLand'; household: number; cost: number; meta: ShapeLandMeta; water?: Rle };
 
-/** What a `shapeLand` command changes in the world's `meta`: the land's touched tiles, and the zones derived from it. */
+/**
+ * What a `shapeLand` command changes in the world's `meta`: the land's touched tiles, the zones derived from it, and
+ * the bridges its water made (`roads`: by road index, each road's whole list, `RoadPlan.bridges`; an empty one none).
+ */
 export interface ShapeLandMeta {
   land?: Partial<Omit<LandFile, 'h' | 'wl'>> & { h?: Record<number, string>; wl?: Record<number, string> };
   zones?: WorldZone[];
+  roads?: Record<number, { bridges: [number, number][] }>;
 }
 
 /**
@@ -114,11 +118,12 @@ export type ShapeLandCommand = Extract<Command, { type: 'shapeLand' }>;
 
 /**
  * `meta` with a `shapeLand` stroke's `patch` merged in as the simulation merges it: `land.h` and
- * `land.wl` tile by tile, the land's other fields and `zones` replaced. A new object (and a new
- * `land`), `meta` left as it is; null with no land and no zones to merge.
+ * `land.wl` tile by tile, the land's other fields and `zones` replaced, a road's `bridges` replaced
+ * (none: taken away). A new object (and a new `land`, new `roads` and new road objects where they
+ * changed), `meta` left as it is; null with nothing to merge.
  */
 export function mergeShapeLand(meta: WorldMeta | null, patch: ShapeLandMeta): WorldMeta | null {
-  if (!patch.land && !patch.zones) return meta;
+  if (!patch.land && !patch.zones && !patch.roads) return meta;
   const out: WorldMeta = { ...(meta ?? {}) };
   if (patch.land) {
     const { h, wl, ...header } = patch.land;
@@ -134,6 +139,16 @@ export function mergeShapeLand(meta: WorldMeta | null, patch: ShapeLandMeta): Wo
     out.land = land;
   }
   if (patch.zones) out.zones = patch.zones;
+  if (patch.roads && out.roads) {
+    const roads = out.roads.slice();
+    for (const [i, { bridges }] of Object.entries(patch.roads)) {
+      const road = roads[Number(i)];
+      if (!road) continue;
+      const { bridges: _old, ...rest } = road;
+      roads[Number(i)] = bridges.length ? { ...rest, bridges } : rest;
+    }
+    out.roads = roads;
+  }
   return out;
 }
 
@@ -452,6 +467,12 @@ export interface RoadPlan {
   area?: number;
   /** A bridge or a causeway: the arc lengths (m) along it where its deck over the water begins and ends. */
   bridge?: [number, number];
+  /**
+   * Bridges the land's brushes made where water came across it (Build mode's Land tab: `game/landBridges.ts`), each
+   * as `bridge`, along the road as it is (not made straight nor split); the simulation keeps them
+   * (`Command::ShapeLand`'s `meta.roads`). A road's decks are both (`render/shared/roads.ts` `bridgeSpans`).
+   */
+  bridges?: [number, number][];
 }
 
 /** `street` (default) · `lane` · `country` (between areas) · `trail` (2 m, on foot only). */
@@ -1208,7 +1229,10 @@ export interface UiUpdate {
   /** 0 = Monday. */
   weekday: number;
   minute: number;
+  /** 0 paused, 1 normal, 2 fast, 3 faster (10×), 4 super speed (`SUPER_SPEED`). */
   speed: number;
+  /** Whether super speed may run now: everyone at home asleep or out, nothing notable there for an hour (sim-core `World::calm`). */
+  superSpeed: boolean;
   autonomy: boolean;
   /** How fast residents age. */
   lifespan: Lifespan;
@@ -1321,6 +1345,8 @@ export interface SimThreadStats {
   /** Steps run in the last second, and the rate the sim aims for. */
   stepsPerSecond: number;
   targetPerSecond: number;
+  /** Ticks run in the last second (at super speed, as many as fitted in the steps' time). */
+  ticksPerSecond: number;
   /** Time per step (advance, snapshot, UI view), average and worst, ms. */
   stepMs: number;
   stepMaxMs: number;

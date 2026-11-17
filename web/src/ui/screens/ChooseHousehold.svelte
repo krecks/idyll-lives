@@ -1,11 +1,11 @@
 <script lang="ts">
   /**
-   * New game, step 3: the household. The town's residents move in here (the first wave, from the
+   * New game, step 4: the household. The town's residents move in here (the first wave, from the
    * world code's people seed), and some of their households are offered as cards: choose one to play
-   * (step 4 then opens on their home), or make your own in Creation. The game's choices (Living or
+   * (step 5 then opens on their home), or make your own in Creation. The game's choices (Living or
    * Creative, the lifespan) and how many neighbours live here are in the side panel.
    *
-   * The town is lived in again only when step 2's town or the people's seed changed (`peopleKey`):
+   * The town is lived in again only when step 3's built town or the people's seed changed (`peopleKey`):
    * back and forth, the same households and the same cards stay, and a household made in Creation
    * stays too.
    */
@@ -19,7 +19,7 @@
   import { app } from '../app.svelte';
   import { lifespanHint, money } from '../format';
   import Icon from '../Icon.svelte';
-  import { offerPage, peopleKey, peopleSeedOf, startCode } from '../newGame';
+  import { offerPage, peopleKey, peopleSeedOf, startCode, stepLabel } from '../newGame';
   import Segmented from '../kit/Segmented.svelte';
   import SimPreview from '../kit/SimPreview.svelte';
   import TownStage, { type LotLabel } from '../kit/TownStage.svelte';
@@ -42,6 +42,8 @@
   const streams = $derived(peopleStreams(peopleSeedOf(code)));
   const offer = $derived(app.offer);
   const houseCount = $derived(town ? town.slots.filter((s) => s.kind === 'house').length : 0);
+  /** The homes as steps 2 and 3 count them, farms apart (a farm's house is lived in, so the slider above still counts it). */
+  const homeCount = $derived(town ? town.slots.filter((s) => s.kind === 'house' && s.lot !== 'farm').length : 0);
   /** The Neighbours slider's end: as many households as the first wave moves in at most (`populate` stops there too). */
   const mostHouseholds = $derived(householdsAtMost(houseCount));
   const forSale = $derived(town ? vacantSlots(town).length : 0);
@@ -122,7 +124,7 @@
   }
   onDestroy(() => clearTimeout(hoverOff));
 
-  /** Step 2's town, nobody living there yet. */
+  /** Step 3's built town, nobody living there yet. */
   const empty = (): NeighbourhoodDraft | null => app.world?.draft ?? (town ? { ...town, households: [] } : null);
 
   /** The town lived in from the people's seed (`count` households, else as many as the first wave takes), and its first offer. */
@@ -160,7 +162,7 @@
     if (app.playSlot !== null && !town.households.some((h) => h.slot === app.playSlot)) app.playSlot = null;
   }
 
-  /** Play `slot`'s household: on to step 4, which opens on their home. */
+  /** Play `slot`'s household: on to step 5, which opens on their home. */
   function choose(slot: number): void {
     if (!town) return;
     keep();
@@ -176,7 +178,7 @@
     app.screen = 'create';
   }
 
-  /** The household made in Creation, on to step 4. */
+  /** The household made in Creation, on to step 5. */
   function chooseOwn(): void {
     if (!app.household) return;
     keep();
@@ -203,8 +205,8 @@
     templates = await loadTemplates();
     const laid = app.world;
     if (!laid) {
-      // No town laid yet: that is step 2 (or step 1, with no land either).
-      app.screen = app.land ? 'town' : 'land';
+      // No town built yet: that is step 3 (or step 2 or 1, with no layout or land either).
+      app.screen = app.layout ? 'town' : app.land ? 'streets' : 'land';
       return;
     }
     // The town its neighbours were made for, with the same people's seed: they stay (under the
@@ -395,7 +397,7 @@
 
 {#snippet figures()}
   {#if town}
-    <span><b>{houseCount}</b> homes</span>
+    <span><b>{homeCount}</b> homes</span>
     <span><b>{town.households.length}</b> households</span>
     <span><b>{population}</b> residents</span>
     <span><b>{forSale}</b> for sale</span>
@@ -416,9 +418,9 @@
 
 <SetupShell
   label="Your household"
-  step="Step 3 of 4 · Household"
+  step={stepLabel(4)}
   back={{
-    label: 'Town',
+    label: 'Build',
     go: () => {
       keep();
       app.screen = 'town';

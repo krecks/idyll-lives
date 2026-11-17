@@ -8,12 +8,14 @@
  * - is the player's points simplified (`SIMPLIFY` m), its corners rounded (`rounded`), and made a
  *   curve as country roads are (`curve(evenly(...))`);
  * - begins and ends on a road within `SNAP` m of its ends, in a T that begins at that road's kerb
- *   (`trimJoins`), meeting it at 35° or more and square if it comes within 15° of square; or at a
+ *   (`trimJoins`), meeting it at 35° or more and square if it comes within 15° of square, no nearer
+ *   the road's ends than `NEAR_END` m and slid along it where another junction is too near; or at a
  *   dead end within `SNAP` m, which it then carries on; or at the world's edge (a way out), or in a
  *   dead end of its own;
  * - ends at the first road it reaches (no crossroads: the player goes on from 14 m along);
  * - is a lane or a street of an area where it runs inside its box or within `NEAR_AREA` m of it,
- *   else a country road; a footpath is a trail;
+ *   else a country road, unless the player asked for a street or a lane (`StreetStroke.asked`), which
+ *   it then stays, its area given at the Build step; a footpath is a trail;
  * - is refused, with the reason, where it bends tighter than 9 m, runs closer than 18 m alongside
  *   another road (`clearOf`), leaves the world other than by its end, meets a road within 14 m of
  *   another junction (`roomAt`), joins no road, or leaves a dead end reaching more than `COURT` m
@@ -45,10 +47,16 @@ import type { Edited } from './edited';
 import { fillStreet, removalRefused, removeLots } from './lots';
 import { withoutEmptyAreas } from './villages';
 
-/** A street being drawn: its points as the player set them, its kind, whether what is in its way is cleared (else it is refused there) and whether it is filled with homes, and the seed its homes and names are drawn from. */
+/**
+ * A street being drawn: its points as the player set them, its kind, whether what is in its way is cleared (else it
+ * is refused there) and whether it is filled with homes, and the seed its homes and names are drawn from. `asked`:
+ * the kind is the player's own choice, so a street or a lane stays one outside the town's and the villages' boxes
+ * (with no area: the Build step gives it one); else it is a country road there.
+ */
 export interface StreetStroke {
   points: readonly Pt[];
   kind: RoadKind;
+  asked?: boolean;
   clear: boolean;
   fill: boolean;
   seed: number;
@@ -59,6 +67,8 @@ export type Named = { kind: 'road'; road: number } | { kind: 'place'; place: num
 
 /** An end of a drawn street snaps to a road, or a dead end, this near (m, from the road's edge; from the dead end's last point). */
 export const SNAP = 10;
+/** The Street tool's magnet pulls the pointer to this far past a road's edge (m), well within `SNAP`: where a click by the kerb would be. */
+const PULL_IN = 2;
 /** A street meets a road at `roads.ts` `MEET` at least, and is made square within this of it. Junctions on one road keep `ROOM` apart (`roomAt`). */
 const SQUARE = (15 * Math.PI) / 180;
 /** (`roads.ts` `ROOM`, for the street tool's live checks.) */
@@ -77,8 +87,10 @@ const STRAIGHT_IN = 4;
 const SHORTEST = 16;
 /** Lots, buildings and parking keep this far from a new road's edge (m), else they are in its way. */
 const CORRIDOR = 1.5;
-/** A street joins a road no nearer its end than this (m). */
+/** A street joins a road no nearer its end than this (m): one drawn nearer meets it this far in. */
 const NEAR_END = 6;
+/** A junction with another within `ROOM` m of it slides along its road by the least of these (m) that leaves room, either way. */
+const SLIDES = [4, 8, 12, 16];
 /** Wet stretches of a line closer than this (m) are crossed on one bridge (each bridge's straight approaches and the road's turns onto them would overlap). */
 export const ONE_CROSSING = 56;
 /** An outdoor place stands this near the end of its trail (m: `townCheck.ts` checks 6). */
@@ -191,6 +203,32 @@ export type End = { kind: 'free' } | { kind: 'out' } | { kind: 'join'; road: num
 const endKind = (e: End): RoadPlan['ends'][0] => (e.kind === 'free' ? 'dead' : e.kind === 'out' ? 'out' : 'join');
 const reversed = (pts: readonly Pt[]): Pt[] => [...pts].reverse();
 
+/** What the Street tool's magnet pulls the pointer to (`Meeting.magnet`): a point on a road's middle, a road's dead end, or the world's edge (`road` -1). */
+export interface Magnet {
+  at: Pt;
+  road: number;
+  kind: 'road' | 'dead' | 'edge';
+}
+
+/**
+ * Whether `draft` has no road a car drives (none at all, or footpaths only), as after Clear all: the first street
+ * drawn then has to make the town's way out on its own, from the world's edge to the world's edge (or to a dead end
+ * no longer than a court), and the streets after it run from road to road.
+ */
+export const streetsBare = (draft: Pick<NeighbourhoodDraft, 'roads'>): boolean => !draft.roads.some((r) => r.kind !== 'trail');
+
+/**
+ * What a street drawn along `line` is made, of the kind asked (`kind`, `asked`: see `StreetStroke`), not carrying a
+ * dead end on: a footpath; a street or a lane of the area it runs in (`areaOf`); outside them a country road, or the
+ * street or lane asked for with no area.
+ */
+export function madeKind(draft: NeighbourhoodDraft, line: readonly Pt[], kind: RoadKind, asked = false): Pick<RoadPlan, 'kind' | 'area'> {
+  if (kind === 'trail') return { kind: 'trail' };
+  const area = areaOf(draft, line);
+  if (area >= 0) return { kind: kind === 'lane' ? 'lane' : 'street', area };
+  return asked && (kind === 'street' || kind === 'lane') ? { kind } : { kind: 'country' };
+}
+
 /**
  * The town's roads as a drawn street meets them: what it may join (a car's road a car's road, a
  * footpath any; never a roundabout) and what its ends snap to.
@@ -216,6 +254,47 @@ export class Meeting {
   /** How near a road's middle the street's middle comes where it touches it (m: `clearOf`'s). */
   touch(r: number): number {
     return this.roads[r].width / 2 + this.width / 2 + 1;
+  }
+
+  /**
+   * Where the pointer at `p` is pulled to (the Street tool's magnet), within `reach` m: beside the nearest road it may
+   * join (off a bridge's deck), `PULL_IN` m past its edge, where a street's end snaps to it as one set there would
+   * (`snap`); a dead end of its own kind (which wins over a road less than `SNAP` m nearer, as `snap` prefers it); or
+   * the world's edge (`W` × `D` m). Null: nothing so near, or `p` snaps to a road already. `keep`: whether a point on
+   * a road (-1: the edge) may pull at all (the tool leaves out the road a street starts on, near its start).
+   */
+  magnet(p: Pt, reach: number, W: number, D: number, keep: (at: Pt, road: number) => boolean = () => true): Magnet | null {
+    if (this.snap(p).kind !== 'free') return null;
+    let best: Magnet | null = null;
+    let near = Infinity;
+    const take = (at: Pt, road: number, kind: Magnet['kind'], d: number) => {
+      if (d < near && keep(at, road)) [best, near] = [{ at, road, kind }, d];
+    };
+    for (const [r, m] of this.index.around(p[0], p[1], reach)) {
+      const road = this.roads[r];
+      if (!this.joinable(r) || (road.bridge && m.s > road.bridge[0] - BRIDGE_IN && m.s < road.bridge[1] + BRIDGE_IN)) continue;
+      const q = pointAt(road.points, m.s).p;
+      const off = road.width / 2 + PULL_IN;
+      const k = m.dist > off ? off / m.dist : 1;
+      take([q[0] + (p[0] - q[0]) * k, q[1] + (p[1] - q[1]) * k], r, 'road', m.dist);
+    }
+    for (const [r, road] of this.roads.entries()) {
+      if (!this.joinable(r) || road.bridge || (road.kind === 'trail') !== this.trail) continue;
+      for (const e of [0, 1] as const) {
+        if (road.ends[e] !== 'dead') continue;
+        const q = e ? road.points[road.points.length - 1] : road.points[0];
+        const d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+        if (d <= reach) take([q[0], q[1]], r, 'dead', d - SNAP);
+      }
+    }
+    const edges: [number, Pt][] = [
+      [p[0], [0, p[1]]],
+      [W - p[0], [W, p[1]]],
+      [p[1], [p[0], 0]],
+      [D - p[1], [p[0], D]],
+    ];
+    for (const [d, at] of edges) if (d >= 0 && d <= reach) take([Math.max(0, Math.min(W, at[0])), Math.max(0, Math.min(D, at[1]))], -1, 'edge', d);
+    return best;
   }
 
   /** What the end `p` of a line snaps to: a dead end of a road of its own kind within `SNAP` m, else a road it may join within `SNAP` m of its edge, else nothing. */
@@ -255,8 +334,11 @@ export class Meeting {
 
   /**
    * `line` with its last stretch turned to meet road `r` in a T: on the road's middle, nearest
-   * where the line ends, at 35° or more (square within 15° of it), over the last `APPROACH` m;
-   * the junction too (`at`); or why not.
+   * where the line ends (but no nearer its ends than `NEAR_END` m), at 35° or more (square within
+   * 15° of it), over the last `APPROACH` m; the junction too (`at`); or why not. Where another
+   * junction is within `ROOM` m of it, the junction slides along the road, the least of `SLIDES`
+   * (16 m at most) either way, over a longer approach, that leaves room and has the line turn no
+   * tighter than it may; else it stays, and `drawStreet` refuses it for the room.
    */
   joinTo(line: readonly Pt[], r: number): { pts: Pt[]; at: Pt } | string {
     const o = this.roads[r];
@@ -264,13 +346,34 @@ export class Meeting {
     const lo = lengths(o.points);
     const Lo = lo[lo.length - 1];
     const E = line[line.length - 1];
-    const sT = this.index.along(r, E[0], E[1]);
-    if (o.ends[0] !== 'loop' && (sT < NEAR_END || Lo - sT < NEAR_END)) return `it meets ${name} too near its end`;
-    if (o.bridge && sT > o.bridge[0] - BRIDGE_IN && sT < o.bridge[1] + BRIDGE_IN) return `it meets ${name} on its bridge`;
+    let sT = this.index.along(r, E[0], E[1]);
+    if (o.ends[0] !== 'loop') {
+      if (Lo < NEAR_END * 2) return `it meets ${name} too near its end`;
+      sT = Math.max(NEAR_END, Math.min(Lo - NEAR_END, sT));
+    }
+    const onDeck = (s: number) => !!o.bridge && s > o.bridge[0] - BRIDGE_IN && s < o.bridge[1] + BRIDGE_IN;
+    if (onDeck(sT)) return `it meets ${name} on its bridge`;
+    const first = this.meetAt(line, r, sT, APPROACH, lo);
+    if (roomAt(this.index, first.at, [r])) return first;
+    const loop = o.ends[0] === 'loop';
+    const slid = SLIDES.flatMap((d) => [sT - d, sT + d])
+      .map((s) => (loop ? ((s % Lo) + Lo) % Lo : s))
+      .filter((s) => (loop || (s >= NEAR_END && s <= Lo - NEAR_END)) && !onDeck(s));
+    for (const s of slid) {
+      const shift = Math.abs(s - sT);
+      const tried = this.meetAt(line, r, s, APPROACH + shift, lo);
+      if (roomAt(this.index, tried.at, [r]) && !bends(tried.pts.slice(-2 * (APPROACH + shift))).tight) return tried;
+    }
+    return first;
+  }
+
+  /** `line` turned to meet road `r` at `sT` m along it (`lo`: its arc lengths) over its last `approach` m (at most 40 % of it; 60 % for a slid junction): see `joinTo`. */
+  private meetAt(line: readonly Pt[], r: number, sT: number, approach: number, lo: number[]): { pts: Pt[]; at: Pt } {
+    const o = this.roads[r];
     const { p: T, t: tq } = pointAt(o.points, sT, lo);
     const ls = lengths(line);
     const L = ls[ls.length - 1];
-    const R = Math.min(APPROACH, L * 0.4);
+    const R = Math.min(approach, L * (approach > APPROACH ? 0.6 : 0.4));
     const back = pointAt(line, L - R, ls);
     const n = leftOf(tq);
     const sgn = dot([back.p[0] - T[0], back.p[1] - T[1]], n) >= 0 ? 1 : -1;
@@ -516,12 +619,7 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
   // ---- the road it makes: its kind, its area and its name ----
   const was = base >= 0 ? roads[base] : null;
   const merged = start.kind === 'extend' && end.kind === 'extend' ? end.road : -1;
-  let kind: Pick<RoadPlan, 'kind' | 'area'> = { kind: 'trail' };
-  if (was) kind = { kind: was.kind ?? 'street', ...(was.area === undefined ? {} : { area: was.area }) };
-  else if (!trail) {
-    const area = areaOf(draft, part);
-    kind = area < 0 ? { kind: 'country' } : { kind: stroke.kind === 'lane' ? 'lane' : 'street', area };
-  }
+  const kind: Pick<RoadPlan, 'kind' | 'area'> = was ? { kind: was.kind ?? 'street', ...(was.area === undefined ? {} : { area: was.area }) } : madeKind(draft, part, stroke.kind, stroke.asked);
   const taken = namesIn(draft);
   const rand = mulberry32(stroke.seed);
   const areaName = kind.area === undefined ? undefined : draft.open?.areas[kind.area]?.name;
@@ -571,6 +669,8 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
       [next, walk] = [bridged.roads, bridged.walk];
       for (let k = had; k < next.length; k++) pieces.push(k);
       const deck = next[a > 0 ? had : at].bridge!;
+      // (Made straight, the bridge may miss a wet tile the line drawn only clipped: then it would be a deck over no water.)
+      if (!(deck[1] > deck[0])) return refused('it only clips the edge of the water: draw it clear of the water, or on across it');
       if (deck[1] - deck[0] > BRIDGE_SPAN) return refused(`its bridge would be ${Math.round(deck[1] - deck[0])} m long (${BRIDGE_SPAN} m at most)`);
     }
     // Nothing of it over the water but its decks, and onto and off them no tighter than it may bend.

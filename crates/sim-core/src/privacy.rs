@@ -325,12 +325,20 @@ pub(crate) fn kept_for_couple(
         .filter(|o| !o.broken() && couples_bed(&ctx.content.objects[o.def]))
         .collect();
     let in_one = |j: u32| beds.iter().any(|o| o.slot_of(j).is_some());
-    let couples = (0..ctx.briefs.len())
-        .filter(|&a| housemate(a))
-        .filter(|&a| {
-            partner_here(a as u32).is_some_and(|b| b > a && !in_one(a as u32) && !in_one(b as u32))
-        })
+    let couple = |&a: &usize| {
+        housemate(a)
+            && partner_here(a as u32)
+                .is_some_and(|b| b > a && !in_one(a as u32) && !in_one(b as u32))
+    };
+    // (Only the household's: `Ctx::members`.)
+    let couples = ctx
+        .members
+        .of(sim.household)
+        .iter()
+        .map(|&a| a as usize)
+        .filter(couple)
         .count();
+    debug_assert_eq!(couples, (0..ctx.briefs.len()).filter(couple).count());
     couples > 0 && beds.iter().filter(|o| !o.in_use()).count() <= couples
 }
 
@@ -590,21 +598,27 @@ pub(crate) fn refresh(w: &mut World) {
                 let k = match cache.binary_search_by_key(&room, |c| c.0) {
                     Ok(k) if cache[k].3 == tick => k,
                     found => {
+                        let hashed = crate::profile::start();
                         let presence = *presence.get_or_insert_with(|| presence_hash(w));
                         let hash = room_hash(w, room, presence);
+                        crate::profile::end("privacy::refresh/hashes", hashed);
                         match found {
                             Ok(k) => {
                                 if cache[k].1 != hash {
+                                    let found = crate::profile::start();
                                     let by = by_plot.get_or_insert_with(|| living_by_plot(w));
                                     cache[k].1 = hash;
                                     cache[k].2 = room_claimants(w, room, by).into();
+                                    crate::profile::end("privacy::refresh/claimants", found);
                                 }
                                 cache[k].3 = tick;
                                 k
                             }
                             Err(k) => {
+                                let found = crate::profile::start();
                                 let by = by_plot.get_or_insert_with(|| living_by_plot(w));
                                 let people = room_claimants(w, room, by).into();
+                                crate::profile::end("privacy::refresh/claimants", found);
                                 cache.insert(k, (room, hash, people, tick));
                                 k
                             }
@@ -624,34 +638,57 @@ pub(crate) fn refresh(w: &mut World) {
             });
         }
     }
+    // (By room, each room's in the residents' order: those asking about a room look at its own,
+    // `in_room`; and whether each resident keeps one shut, `keeps_shut`.)
+    shut.sort_by_key(|s| s.room);
+    let mut shut_by = std::mem::take(&mut w.shut_by);
+    shut_by.clear();
+    shut_by.resize(w.sims.len(), false);
+    for s in &shut {
+        if let Some(b) = shut_by.get_mut(s.by as usize) {
+            *b = true;
+        }
+    }
+    w.shut_by = shut_by;
     w.shut = shut;
     w.claimants_cache = cache;
+}
+
+/// The rooms kept shut (`World::shut`, sorted by room) that are `room`.
+fn in_room(shut: &[Shut], room: u16) -> &[Shut] {
+    let from = shut.partition_point(|s| s.room < room);
+    let to = from + shut[from..].partition_point(|s| s.room == room);
+    &shut[from..to]
 }
 
 /// Whether `room` is kept shut to resident `me` (doing private use `mine`, if any): by someone
 /// else in it, not at the same use, and not one of the room's own people (`claimants`) if it's a
 /// claimed room.
 pub(crate) fn shut_to(shut: &[Shut], me: u32, mine: Option<(u32, usize)>, room: u16) -> bool {
-    room != OUTDOORS
-        && shut.iter().any(|s| {
-            s.room == room
-                && s.by != me
-                && (s.doing.is_none() || s.doing != mine)
-                && !s.claimants.contains(&me)
-        })
+    let shut_by = |s: &Shut| {
+        s.room == room
+            && s.by != me
+            && (s.doing.is_none() || s.doing != mine)
+            && !s.claimants.contains(&me)
+    };
+    let found = room != OUTDOORS && in_room(shut, room).iter().any(shut_by);
+    debug_assert_eq!(found, room != OUTDOORS && shut.iter().any(shut_by));
+    found
 }
 
 /// Whether `room`, kept shut, may be walked through to a room beyond: a bedroom (claimed), unless
 /// someone in it is at a use behind its door (trying for a baby).
 fn passable(shut: &[Shut], room: u16) -> bool {
-    shut.iter()
-        .filter(|s| s.room == room)
+    in_room(shut, room)
+        .iter()
         .all(|s| s.claimed && s.doing.is_none())
 }
 
 /// Whether `sim` keeps a room shut now.
 pub fn keeps_shut(world: &World, sim: u32) -> bool {
-    world.shut.iter().any(|s| s.by == sim)
+    let keeps = world.shut_by.get(sim as usize).copied().unwrap_or(false);
+    debug_assert_eq!(keeps, world.shut.iter().any(|s| s.by == sim));
+    keeps
 }
 
 /// Whether the thing at tile `at` (where it's used from) is in a room kept shut to `sim` by
@@ -831,11 +868,7 @@ pub(crate) fn bed_for(
             && rooms
                 .iter()
                 .any(|r| !r.garden && r.id == room && r.doors > 0);
-        if !walled
-            || shut
-                .iter()
-                .any(|s| s.room == room && s.by != a && s.by != b)
-            || others_in(room)
+        if !walled || in_room(shut, room).iter().any(|s| s.by != a && s.by != b) || others_in(room)
         {
             continue;
         }

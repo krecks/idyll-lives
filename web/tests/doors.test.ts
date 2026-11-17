@@ -46,7 +46,7 @@ describe('doors', () => {
   });
 
   test('at every game speed the swing finishes before the walker arrives', () => {
-    for (const s of [1, 2, 3, 4, 5]) {
+    for (const s of [1, 2, 3, 4]) {
       const rate = PLAYBACK_RATE[s];
       const l = doorLead(rate);
       const arrive = l / (PACE * rate);

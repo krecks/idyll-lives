@@ -22,6 +22,14 @@ const RETRY_AFTER_MS = [5_000, 30_000, 120_000];
 /** Files kept that no built model uses (the most recently wanted). */
 const IDLE_FILES = 96;
 
+/**
+ * Files imported at once at most: each holds its download, its decoded views and the vertices read
+ * from them until it's read, so a world's hundreds of files all asked for together (the town's
+ * entry) would hold them all at the same moment. The rest wait their turn, the ones a build waits
+ * for (`now`) before background ones.
+ */
+const IMPORTS_AT_ONCE = 3;
+
 export class ModelFiles<F> {
   /** Imported (or being imported), by URL. A failed one is dropped, so the next build tries it again. */
   private readonly files = new Map<string, Promise<F>>();
@@ -33,10 +41,15 @@ export class ModelFiles<F> {
   private readonly users = new Map<string, number>();
   /** Files loaded that nothing uses, the least recently wanted first. */
   private readonly idle = new Set<string>();
+  /** The files imported and kept, as they came (`each`). */
+  private readonly loaded = new Map<string, F>();
   /** Imports under way (`settled`). */
   private readonly loading = new Set<Promise<F>>();
   /** A `trim` is due (after the builds waiting for files that just came have taken them). */
   private trimDue = false;
+  /** Imports running now (`limited`), and those waiting their turn: a build's first, then background ones. */
+  private importing = 0;
+  private readonly turns: { now: (() => void)[]; later: (() => void)[] } = { now: [], later: [] };
 
   /**
    * `importFile` imports a file (`now`: a build waits for it; else a background try, in the slot it
@@ -48,6 +61,7 @@ export class ModelFiles<F> {
     private readonly gone: () => boolean,
     private evict: ((file: F, url: string) => void) | null = null,
     private readonly idleLimit = IDLE_FILES,
+    private readonly atOnce = IMPORTS_AT_ONCE,
   ) {
     // (The page's, or a worker's; none where the global has no events, a test's stand-in page.)
     globalThis.addEventListener?.('online', this.online);
@@ -81,14 +95,16 @@ export class ModelFiles<F> {
   load(url: string, now = true): Promise<F> {
     let file = this.files.get(url);
     if (!file) {
-      const loading = this.importFile(url, now);
+      const loading = this.limited(url, now);
       this.files.set(url, (file = loading));
       this.loading.add(loading);
       // (Both outcomes are handled here; whoever asked handles the rejection it's given.)
       loading.then(
-        () => {
+        (f) => {
           this.loading.delete(loading);
-          if (this.files.get(url) === loading) this.fileArrived(url);
+          if (this.files.get(url) !== loading) return;
+          this.loaded.set(url, f);
+          this.fileArrived(url);
         },
         () => {
           this.loading.delete(loading);
@@ -105,9 +121,28 @@ export class ModelFiles<F> {
     return file;
   }
 
+  /** `importFile`, in its turn: at most `atOnce` at a time (`IMPORTS_AT_ONCE`). */
+  private async limited(url: string, now: boolean): Promise<F> {
+    if (this.importing >= this.atOnce) await new Promise<void>((go) => (now ? this.turns.now : this.turns.later).push(go));
+    else this.importing++;
+    try {
+      return await this.importFile(url, now);
+    } finally {
+      // (The turn passes straight to the next waiting, so the count stays as it is.)
+      const next = this.turns.now.shift() ?? this.turns.later.shift();
+      if (next) next();
+      else this.importing--;
+    }
+  }
+
   /** Resolves once no import is under way (those started meanwhile too); failures count as done. */
   async settled(): Promise<void> {
     while (this.loading.size) await Promise.allSettled([...this.loading]);
+  }
+
+  /** Each file imported and kept (the memory census's count of them). */
+  each(): IterableIterator<F> {
+    return this.loaded.values();
   }
 
   /** Whether the file at `url` is imported (or being imported) and kept. */
@@ -153,6 +188,7 @@ export class ModelFiles<F> {
       this.idle.delete(url);
       const file = this.files.get(url);
       this.files.delete(url);
+      this.loaded.delete(url);
       // (Its import has settled: only one that loaded is idle.)
       void file?.then(
         (f) => this.evict?.(f, url),

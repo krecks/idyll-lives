@@ -159,6 +159,8 @@ export interface TownLotHouse {
   shape: 'gable' | 'hip' | 'flat';
   /** Its roof's rise over the walls (m). */
   rise: number;
+  /** Its lot's pad (m): the level its floor stands at (`TownStreet.padOf`; 0 on flat land). */
+  pad: number;
 }
 
 const hex = (h: string): [number, number, number] => {
@@ -300,8 +302,9 @@ export function townBackdrop(
 const LOT_LIT = 0.5;
 
 /**
- * A far lot's house as drawn: its walls' box on the ground at (`ground`), the street's far LOD's look. `up`: someone
- * is up in it (its windows glow at night only then, as the neighbours' near the camera do).
+ * A far lot's house as drawn: its walls' box on its lot's pad, from under the lowest corner's ground (`ground`), the
+ * street's far LOD's look. `up`: someone is up in it (its windows glow at night only then, as the neighbours' near the
+ * camera do).
  */
 export function lotBuilding(h: TownLotHouse, ground: (x: number, z: number) => number, up = true): TownBuilding {
   const [x0, z0, x1, z1] = h.box;
@@ -310,7 +313,7 @@ export function lotBuilding(h: TownLotHouse, ground: (x: number, z: number) => n
   const cx = (x0 + x1) / 2;
   const cz = (z0 + z1) / 2;
   const lowest = Math.min(ground(x0, z0), ground(x1, z0), ground(x0, z1), ground(x1, z1));
-  const top = h.storeys * STOREY;
+  const top = h.pad + h.storeys * STOREY;
   return {
     roof: h.shape,
     cx,
@@ -319,12 +322,12 @@ export function lotBuilding(h: TownLotHouse, ground: (x: number, z: number) => n
     uz: along ? 0 : 1,
     w,
     d,
-    base: Math.min(0, lowest) - SINK,
+    base: Math.min(h.pad, lowest) - SINK,
     top,
     rise: h.shape === 'flat' ? 0.25 : h.rise,
     wall: hex(h.wall),
     roofColor: hex(h.roof),
-    floor: 0,
+    floor: h.pad,
     style: TOWN_STYLE.house,
     lit: up ? LOT_LIT : 0,
     seed: hash2(h.id, 11),

@@ -169,12 +169,19 @@ pub(crate) fn owners(w: &mut World, c: usize) {
     });
     if w.cars[c].owners.is_empty() {
         let content = &w.content;
+        let heir = |s: &&Sim| s.here() && s.household == household && s.adult(content);
+        // (Only the household's: `World::household_sims`. A car whose household has no
+        // grown-up left asks every tick.)
         let heirs: Vec<u32> = w
-            .sims
-            .iter()
-            .filter(|s| s.here() && s.household == household && s.adult(content))
+            .household_sims(household)
+            .map(|j| &w.sims[j])
+            .filter(heir)
             .map(|s| s.id)
             .collect();
+        debug_assert_eq!(
+            heirs,
+            w.sims.iter().filter(heir).map(|s| s.id).collect::<Vec<_>>()
+        );
         w.cars[c].owners = heirs;
     }
 }

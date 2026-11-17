@@ -8,23 +8,28 @@ import * as pc from './engine';
 import { groundDepth, type RoadPlan, type WorldStructure, type WorldZone } from '../../core/protocol';
 import { carriageway, hasSidewalks } from '../shared/junctions';
 import { backdropGround } from '../shared/townBuildings';
-import { bridgeDeck } from '../shared/roads';
+import { bridgeSpans, stretchOf } from '../shared/roads';
 import { BRIDGE } from '../shared/street';
 
-/** A ground tile as `terrainTiles` builds it: its draw, its meshes by level, where its middle is and the level drawn. */
+/**
+ * A ground tile as `terrainTiles` builds it: its draw, its meshes by level (the finest only while it is near enough to
+ * draw it: null otherwise), where its middle is and the level drawn.
+ */
 export interface GroundTile {
   mi: pc.MeshInstance;
-  meshes: pc.Mesh[];
+  meshes: (pc.Mesh | null)[];
   x: number;
   z: number;
   lod: number;
   /**
-   * Its finest grid's colours as shaded (RGBA bytes, sRGB, its ring too): the meshes keep none on the CPU, and a
-   * height field's brushes draw its levels again with them (`Landscape.reground`) until it's shaded again.
+   * Its finest grid's colours as shaded (RGBA bytes, sRGB, its ring too) and its heights (m): the levels are made from
+   * them (`Landscape.tileLevel`), and a height field's brushes draw them again with the colours (`Landscape.reground`)
+   * until it's shaded again.
    */
   kept?: Uint8Array;
-  /** Its meshes keep their vertices on the CPU and are written into when it's drawn again (a brush has reached it). */
-  live?: boolean;
+  heights?: Float32Array;
+  /** The levels (a bit each) a brush changed the heights of while another was drawn: written again when next drawn. */
+  stale: number;
   /** How the roads level the land at each point of its grid (`Landscape.roadLevels`), once a brush has reached it. */
   levels?: Float32Array;
 }
@@ -34,7 +39,7 @@ export interface GroundTile {
  * entity): left to themselves, about 40 MB of a big world's vertex buffers with every new game or load.
  */
 export function disposeTiles(tiles: readonly GroundTile[]): void {
-  for (const t of tiles) for (const m of t.meshes) if (m !== t.mi.mesh) m.destroy();
+  for (const t of tiles) for (const m of t.meshes) if (m && m !== t.mi.mesh) m.destroy();
 }
 
 // ---- the town view's colour map (a ground colour map at altitude) ----
@@ -206,10 +211,7 @@ export class TownGroundMap {
     // parapets are lost, the deck over the water isn't.
     // (Square at its ends: the banks are where its stone stops.)
     g.lineCap = 'butt';
-    for (const r of roads) {
-      const deck = bridgeDeck(r);
-      if (deck) stroke({ ...r, points: deck }, r.width + 2 * BRIDGE.apron, MAP.pavement);
-    }
+    for (const r of roads) for (const [s0, s1] of bridgeSpans(r)) stroke({ ...r, points: stretchOf(r, s0, s1) }, r.width + 2 * BRIDGE.apron, MAP.pavement);
     g.lineCap = 'round';
     for (const r of roads) if (r.kind === 'trail') stroke(r, r.width, MAP.path);
     for (const r of roads) if (r.kind !== 'trail') stroke(r, carriageway(r), MAP.asphalt);

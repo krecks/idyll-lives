@@ -223,14 +223,32 @@ pub(crate) fn park_walk(
 /// (A baby, or a child, home all day is no host: counted, a guest stayed on with the baby once
 /// the one grown-up left for work.)
 pub(crate) fn hosts_about_till(ctx: &Ctx, h: u32) -> u64 {
-    ctx.briefs
+    // (Only the household's: `Ctx::members`.)
+    let till = ctx
+        .members
+        .of(h)
         .iter()
-        .enumerate()
-        .filter(|(_, b)| b.household == h && b.here && !b.away && b.adult)
-        .filter_map(|(j, _)| ctx.others.get(j))
+        .map(|&j| j as usize)
+        .filter(|&j| {
+            let b = &ctx.briefs[j];
+            b.household == h && b.here && !b.away && b.adult
+        })
+        .filter_map(|j| ctx.others.get(j))
         .map(|s| leaves_for_work(s, ctx).unwrap_or(u64::MAX))
         .max()
-        .unwrap_or(0)
+        .unwrap_or(0);
+    debug_assert_eq!(
+        till,
+        ctx.briefs
+            .iter()
+            .enumerate()
+            .filter(|(_, b)| b.household == h && b.here && !b.away && b.adult)
+            .filter_map(|(j, _)| ctx.others.get(j))
+            .map(|s| leaves_for_work(s, ctx).unwrap_or(u64::MAX))
+            .max()
+            .unwrap_or(0)
+    );
+    till
 }
 
 /// Whether a visit `eta` minutes away is one to make at `hour`, with `free` minutes before

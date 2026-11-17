@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::f32::consts::FRAC_PI_2;
 
-use crate::clock::{AUTO_FAST_SPEED, MAX_SPEED, TICKS_PER_STEP};
+use crate::clock::{MAX_SPEED, SUPER_SPEED, TICKS_PER_STEP};
 use crate::content::{
     Content, HabitTime, Layer, MAX_NEEDS, MAX_SKILLS, MAX_SLOTS, Modifiers, Pose, TagMask, stage_in,
 };
@@ -1825,6 +1825,63 @@ pub(crate) struct SimBrief {
     pub private: Option<(u32, usize)>,
 }
 
+/// Who belongs to each household by the tick's briefs (`SimBrief::household`), built with them:
+/// a look through one household's people needn't go through the whole town's. Each household's
+/// in the residents' order, as a look through the briefs finds them, so what it finds is the same.
+#[derive(Debug, Default)]
+pub(crate) struct Members {
+    /// Where each household's run starts in `list` (one more entry than households: the end).
+    start: Vec<u32>,
+    list: Vec<u32>,
+    /// A resident moved house or came to town since (`lifecycle::move_to`, `World::spawn_at`):
+    /// the residents as they are now no longer match it (`World::household_sims`).
+    pub moved: bool,
+}
+
+impl Members {
+    /// Sorts the briefs' residents by household (a counting sort, so each household keeps the
+    /// residents' order).
+    pub(crate) fn build(&mut self, briefs: &[SimBrief]) {
+        let n = briefs
+            .iter()
+            .map(|b| b.household as usize + 1)
+            .max()
+            .unwrap_or(0);
+        self.start.clear();
+        self.start.resize(n + 1, 0);
+        for b in briefs {
+            self.start[b.household as usize + 1] += 1;
+        }
+        for h in 0..n {
+            self.start[h + 1] += self.start[h];
+        }
+        self.list.clear();
+        self.list.resize(briefs.len(), 0);
+        // (Each household's next free place, counted up from its start and back after.)
+        for (j, b) in briefs.iter().enumerate() {
+            let h = b.household as usize;
+            self.list[self.start[h] as usize] = j as u32;
+            self.start[h] += 1;
+        }
+        for h in (1..=n).rev() {
+            self.start[h] = self.start[h - 1];
+        }
+        if let Some(first) = self.start.first_mut() {
+            *first = 0;
+        }
+        self.moved = false;
+    }
+
+    /// The residents of household `h` by the briefs (here or not), in the residents' order.
+    pub(crate) fn of(&self, h: u32) -> &[u32] {
+        let h = h as usize;
+        if h + 1 >= self.start.len() {
+            return &[];
+        }
+        &self.list[self.start[h] as usize..self.start[h + 1] as usize]
+    }
+}
+
 /// `World::broadcast`'s per-tick buffers, kept from tick to tick like `briefs`.
 #[derive(Default)]
 struct BroadcastScratch {
@@ -1877,7 +1934,16 @@ pub struct World {
     pub events: EventLog,
     pub(crate) blocked: Vec<bool>,
     pub tick: u64,
+    /// The game's speed (`clock::TICKS_PER_STEP`'s index): 0 paused .. `SUPER_SPEED`.
     pub speed: u8,
+    /// The speed below super speed last chosen (1 to 3): super speed drops back to it when
+    /// the household stops being quiet.
+    pub resume_speed: u8,
+    /// Whether it was quiet at home (`calm`) at the last step: super speed by itself starts as
+    /// it falls quiet, so a speed the player picks while it is quiet holds.
+    pub(crate) was_calm: bool,
+    /// Ticks the last step ran (the snapshot's `RATE` at super speed).
+    pub(crate) step_ticks: u32,
     /// Master switch for "free will" in the whole town (each household also has its own,
     /// `Household::free_will`). Off is mainly for tests.
     pub autonomy: bool,
@@ -1922,9 +1988,13 @@ pub struct World {
     /// not when only objects, residents or households do: views can then leave the lot out.
     pub(crate) lot_version: u32,
     pub(crate) briefs: Vec<SimBrief>,
+    /// The briefs' residents by household (`Members`), built with them.
+    pub(crate) members: Members,
     /// Rooms kept shut as the tick's step started (`privacy::refresh`), kept from tick to tick
     /// like `briefs`.
     pub(crate) shut: Vec<crate::privacy::Shut>,
+    /// Per resident: whether they keep a room in `shut` shut (`privacy::keeps_shut`).
+    pub(crate) shut_by: Vec<bool>,
     /// The rooms kept shut while anyone is in them (`privacy::private_room`), sorted; found
     /// with the rooms (`refresh_rooms`).
     pub(crate) private_rooms: Vec<u16>,
@@ -1945,6 +2015,11 @@ pub struct World {
     /// Who goes first when the tick's searches run over budget (`tick_once`), kept from tick to
     /// tick like `briefs`.
     pub(crate) first: Vec<bool>,
+    /// The residents taking a turn this tick (`Sim::steps` over 0 as `lod::plan` gave them), in
+    /// order: the passes after the step that are only for them go through these, not the town
+    /// (`life::update`). Not while `turns_fresh` is off: someone came to town since.
+    pub(crate) turns: Vec<u32>,
+    pub(crate) turns_fresh: bool,
     /// `broadcast`'s per-tick buffers, kept from tick to tick like `briefs`.
     broadcast_scratch: BroadcastScratch,
     /// Where Sims leave town for work.
@@ -1984,8 +2059,8 @@ pub struct World {
     pub(crate) undo: Vec<crate::home::HomeSnapshot>,
     /// Edits taken back that can be made again, latest last (see `World::redo`).
     pub(crate) redo: Vec<crate::home::HomeSnapshot>,
-    /// "Skip quiet hours": run at `AUTO_FAST_SPEED` while the player's household is asleep
-    /// or out and nothing notable happened at home in the last hour (see `World::calm`).
+    /// Super speed by itself: the game goes to `SUPER_SPEED` as the player's household falls
+    /// asleep or goes out with nothing notable at home in the last hour (`World::calm`).
     pub auto_fast: bool,
     /// What each household's home (plus public places) offers, for planned activities;
     /// recomputed when the structure changes.
@@ -2060,6 +2135,8 @@ pub(crate) struct Ctx<'a> {
     pub nav_log: &'a crate::path::NavLog,
     pub rels: &'a Relationships,
     pub briefs: &'a [SimBrief],
+    /// The briefs' residents by household (`World::members`).
+    pub members: &'a Members,
     pub households: &'a [Household],
     pub plots: &'a [Plot],
     /// Plot per ground tile (`World::tile_plot`).
@@ -2376,6 +2453,9 @@ impl World {
             blocked: vec![false; tiles],
             tick: 0,
             speed: 1,
+            resume_speed: 1,
+            was_calm: false,
+            step_ticks: 0,
             autonomy: true,
             lifespan: Default::default(),
             player_moves: true,
@@ -2394,13 +2474,17 @@ impl World {
             reach_version: 0,
             lot_version: 1,
             briefs: Vec::new(),
+            members: Members::default(),
             shut: Vec::new(),
+            shut_by: Vec::new(),
             private_rooms: Vec::new(),
             claimed_rooms: Vec::new(),
             claimed_places: Vec::new(),
             claimants_cache: Vec::new(),
             work: Vec::new(),
             first: Vec::new(),
+            turns: Vec::new(),
+            turns_fresh: false,
             broadcast_scratch: BroadcastScratch::default(),
             exits: Vec::new(),
             travel: Default::default(),
@@ -2546,6 +2630,24 @@ impl World {
         conversation::in_sight(&self.nav(), a, b)
     }
 
+    /// Who to look through for the residents of household `h` as they are now (here or not; a
+    /// caller still asks each's household): its members by the tick's briefs (`Members`) while
+    /// nobody has moved house or come to town since, else everyone.
+    pub(crate) fn household_sims(&self, h: u32) -> impl Iterator<Item = usize> + '_ {
+        let fresh = !self.members.moved && self.members_cover();
+        let (list, all) = if fresh {
+            (self.members.of(h), 0..0)
+        } else {
+            (&[][..], 0..self.sims.len())
+        };
+        list.iter().map(|&j| j as usize).chain(all)
+    }
+
+    /// Whether the briefs (and `members`) cover every resident.
+    fn members_cover(&self) -> bool {
+        self.briefs.len() == self.sims.len()
+    }
+
     /// The context a resident's update has (`Ctx`), outside the residents' updates: everyone
     /// else as they are now.
     pub(crate) fn ctx(&self) -> Ctx<'_> {
@@ -2558,6 +2660,7 @@ impl World {
             nav_log: &self.nav_log,
             rels: &self.relationships,
             briefs: &self.briefs,
+            members: &self.members,
             households: &self.households,
             plots: &self.plots,
             tile_plot: &self.tile_plot,
@@ -2990,6 +3093,8 @@ impl World {
             blocked: &self.blocked,
             stairs: &self.stairs,
             kept_off: &self.travel.junction_tiles,
+            // (Each chunk's steps only while they're as the lot is: `Reach::steps`.)
+            steps: Some(&self.reach),
         }
     }
 
@@ -3301,6 +3406,9 @@ impl World {
             self.relationships.grow(self.sims.len());
             self.generations.push(0);
         }
+        // (The household index no longer matches the residents: `household_sims`; nor the turns.)
+        self.members.moved = true;
+        self.turns_fresh = false;
         self.refresh_base_mods(id);
         Ok(id as u32)
     }
@@ -3595,20 +3703,62 @@ impl World {
         Ok(())
     }
 
-    /// Advances one real-time step (1 / TICKS_PER_SECOND s) at the current speed, faster
-    /// while it's calm at home and `auto_fast` is on.
+    /// Advances one real-time step (1 / TICKS_PER_SECOND s) at the current speed; at super
+    /// speed, all of its most ticks while it stays quiet at home.
     pub fn advance(&mut self) {
-        let normal = TICKS_PER_STEP[self.speed as usize];
-        let most = if self.auto_fast && normal > 0 {
-            normal.max(TICKS_PER_STEP[AUTO_FAST_SPEED as usize])
-        } else {
-            normal
-        };
-        for i in 0..most {
-            if i >= normal && !self.calm() {
-                break;
-            }
+        self.start_step();
+        while self.advance_more() {}
+    }
+
+    /// Starts a real-time step: the speed's ticks, or at super speed none yet (`advance_more`
+    /// runs them, as many as the caller has time for). Super speed drops back to the speed
+    /// chosen before it once it isn't quiet at home; with `auto_fast` on, the game goes to it
+    /// as the household falls quiet. The ticks it ran.
+    pub fn start_step(&mut self) -> u32 {
+        self.step_ticks = 0;
+        if self.speed == 0 {
+            return 0;
+        }
+        let calm = self.calm();
+        if self.speed == SUPER_SPEED && !calm {
+            self.speed = self.resume_speed;
+        } else if self.auto_fast && calm && !self.was_calm && self.speed < SUPER_SPEED {
+            self.resume_speed = self.speed;
+            self.speed = SUPER_SPEED;
+        }
+        self.was_calm = calm;
+        if self.speed == SUPER_SPEED {
+            return 0;
+        }
+        let ticks = TICKS_PER_STEP[self.speed as usize];
+        for _ in 0..ticks {
             self.tick_once();
+        }
+        self.step_ticks = ticks;
+        ticks
+    }
+
+    /// One more tick of a super-speed step, if the game is at super speed, it is still quiet at
+    /// home and the step hasn't run its most (`TICKS_PER_STEP[SUPER_SPEED]`). Whether it ran.
+    pub fn advance_more(&mut self) -> bool {
+        if self.speed != SUPER_SPEED || self.step_ticks >= TICKS_PER_STEP[SUPER_SPEED as usize] {
+            return false;
+        }
+        // (The step's start found it quiet before its first tick.)
+        if self.step_ticks > 0 && !self.calm() {
+            return false;
+        }
+        self.tick_once();
+        self.step_ticks += 1;
+        true
+    }
+
+    /// Ticks a real step runs now: the speed's, or at super speed what its last step ran.
+    pub fn step_rate(&self) -> u32 {
+        if self.speed == SUPER_SPEED {
+            self.step_ticks.max(1)
+        } else {
+            TICKS_PER_STEP[self.speed as usize]
         }
     }
 
@@ -3966,6 +4116,7 @@ impl World {
                 blocked: &self.blocked,
                 stairs: &self.stairs,
                 kept_off: &self.travel.junction_tiles,
+                steps: None,
             };
             self.object_index.links =
                 crate::surface::Links::new(&self.content, &self.objects, &nav);
@@ -4032,6 +4183,7 @@ impl World {
             blocked: &self.blocked,
             stairs: &self.stairs,
             kept_off: &self.travel.junction_tiles,
+            steps: None,
         };
         self.reach.refresh(&nav);
         self.reach_version = self.nav_version;
@@ -4656,6 +4808,7 @@ impl World {
                 briefs[i].conversing = briefs[l as usize].conversing.filter(|c| c.0 == l);
             }
         }
+        self.members.build(&briefs);
         self.briefs = briefs;
         crate::profile::end("briefs", briefs_start);
         crate::profile::phase("privacy::refresh", || crate::privacy::refresh(self));
@@ -4681,6 +4834,7 @@ impl World {
                 rng,
                 relationships,
                 briefs,
+                members,
                 autonomy,
                 households,
                 plots,
@@ -4713,12 +4867,14 @@ impl World {
                     blocked,
                     stairs,
                     kept_off: &travel.junction_tiles,
+                    steps: Some(reach),
                 },
                 reach,
                 nav_version: *nav_version,
                 nav_log,
                 rels: relationships,
                 briefs,
+                members,
                 households,
                 plots,
                 tile_plot,
@@ -5091,9 +5247,23 @@ impl World {
                 if speed > MAX_SPEED {
                     return Err(Error::new(format!("speed must be 0..={MAX_SPEED}")));
                 }
-                self.speed = speed;
+                // Super speed only while it's quiet at home: else the speed chosen before it.
+                self.speed = if speed == SUPER_SPEED && !self.calm() {
+                    self.resume_speed
+                } else {
+                    speed
+                };
+                if (1..SUPER_SPEED).contains(&self.speed) {
+                    self.resume_speed = self.speed;
+                }
             }
-            Command::SetAutoFast { enabled } => self.auto_fast = enabled,
+            Command::SetAutoFast { enabled } => {
+                // (Turned on while it's quiet: super speed starts at the next step.)
+                if enabled && !self.auto_fast {
+                    self.was_calm = false;
+                }
+                self.auto_fast = enabled;
+            }
             Command::SetRoutines { sim, routines } => {
                 let routines = crate::planner::routines_from(&self.content, &routines)?;
                 let s = self.sim_mut(sim)?;

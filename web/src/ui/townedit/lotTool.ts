@@ -14,7 +14,7 @@ import type { RoadSpot } from '../../game/edit/ground';
 import { addCivic, areaOfRoad } from '../../game/edit/buildup';
 import type { Edited } from '../../game/edit/edited';
 import { addLot, canPlace, CIVIC_PLACES, moveLot, type LotChoice } from '../../game/edit/lots';
-import { areaSize, civicLabel, draftSize } from '../../game/backdrop';
+import { civicLabel, draftAreaSize } from '../../game/backdrop';
 import type { TownGhosts } from '../../render/types';
 import { choiceOf, choiceSize, civicChosen, lotChoice } from './lotChoice.svelte';
 import LotCard from './LotCard.svelte';
@@ -66,7 +66,7 @@ export const lotTool: TownTool = {
       civicWhy = null;
       const b = e.draft.open!.backdrop!.at(-1)!;
       editor.preview({ lots: [{ ...buildingBox(b), tone: 'new' }] });
-      editor.hint(`Click to put the ${civicLabel(CIVIC_PLACES[civic], areaSize(draftSize(draft), area)).toLowerCase()} down on ${draft.roads[at.road]?.name ?? 'this road'}.`);
+      editor.hint(`Click to put the ${civicLabel(CIVIC_PLACES[civic], draftAreaSize(draft, area)).toLowerCase()} down on ${draft.roads[at.road]?.name ?? 'this road'}.`);
       return e;
     };
 
@@ -152,7 +152,8 @@ export const lotTool: TownTool = {
         }
         const placing = look(x, y);
         if (placing) {
-          if (editor.apply('civic' in placing ? placing.civic : addLot(editor.draft, editor.t, editor.content, placing.at, placing.choice, seed))) seed = editor.seed();
+          // (Homes are put down click after click: the town is built again once the clicks pause.)
+          if (editor.apply('civic' in placing ? placing.civic : addLot(editor.draft, editor.t, editor.content, placing.at, placing.choice, seed), true)) seed = editor.seed();
           look(x, y);
         } else if (lotChoice.group === 'civic') {
           editor.refuse(civicWhy ?? 'nothing to put down');

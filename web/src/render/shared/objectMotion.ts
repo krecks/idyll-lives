@@ -28,7 +28,7 @@
  * (its slots), and the moving parts' poses at rest.
  */
 
-import { PLAYBACK_RATE, QUIET_SPEED } from './gameSpeed';
+import { playbackRate } from './gameSpeed';
 import { invert, multiply } from './math';
 import { partPose, type ModelClip } from './modelClips';
 import type { Motions } from './modelEntry';
@@ -377,11 +377,7 @@ export class ObjectMotion<D> {
     const result = this.result;
     result.moved = result.ambient = false;
     if (!this.objects.size) return result;
-    const speed = curr[layout.header.speed] | 0;
-    const quiet = layout.header.calm !== undefined && curr[layout.header.calm] > 0;
-    const gameSpeed = quiet ? Math.max(speed, QUIET_SPEED) : speed;
-    if (gameSpeed === 0) dt = 0;
-    dt *= Math.min(PLAYBACK_RATE[gameSpeed] ?? 1, 2.5);
+    dt *= Math.min(playbackRate(curr, layout.header), 2.5);
     this.clock += dt;
 
     this.findUses(frame, actionTags);
