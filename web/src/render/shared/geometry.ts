@@ -142,10 +142,14 @@ export class Geo {
     return this;
   }
 
+  /** Adds `from`'s numbers to the end of `to`, one by one (a spread would overflow the stack on a big mesh). */
   private copy(to: number[], from: readonly number[]): void {
-    const at = to.length;
-    to.length = at + from.length;
-    for (let i = 0; i < from.length; i++) to[at + i] = from[i];
+    for (let i = 0; i < from.length; i++) to.push(from[i]);
+  }
+
+  /** Makes `to` `n` numbers longer, the new ones 0, for the caller to fill in place. (Pushed, not a longer `length`: that would leave the array with holes, which V8 keeps slower for good.) */
+  private grow(to: number[], n: number): void {
+    for (let i = 0; i < n; i++) to.push(0);
   }
 
   /** Axis-aligned box; `skip` lists faces to omit ('px', 'nx', 'py', 'ny', 'pz', 'nz'). */
