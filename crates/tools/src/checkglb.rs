@@ -1,5 +1,6 @@
-//! `cargo check-glb [keys…] [--keys] [--preview] [--against <rev|dir>]`: the gate for the game's glTF models
-//! (docs/design/objects.md, "Validation"), was tools/art/blender/check_glb.py, and prints what it printed.
+//! `cargo check-glb [keys…] [--keys] [--preview] [--against <rev|dir>] [--built <dir>]`: the gate for the game's
+//! glTF models (docs/design/objects.md, "Validation"), was tools/art/blender/check_glb.py, and prints what it
+//! printed.
 //!
 //! It reads every `.glb` a model entry of the manifests uses (the base manifest and its packs, later ones
 //! overriding) with that entry, checks what the game needs of it, and that every model the content draws
@@ -17,6 +18,8 @@
 //!   cargo check-glb --update-baseline      first lowers tools/art/gate-baseline.json to what the counted checks
 //!                                          find (`COUNTED`; it only lowers counts and takes keys out)
 //!   cargo check-glb --against <rev|dir>    not the gate: whether this build of the models is that one (`against`)
+//!   cargo check-glb --built <dir>          the same rules over what the game builds as it runs, dumped there by
+//!                                          tools/built/dump.ts (`built`)
 //!
 //! What it prints is check_glb.py's to the byte: JSON objects are read in file order, numbers as Python
 //! has them (an int stays an int), and formatted, `repr`'d and `math.hypot`'d as Python does (`py`); and
@@ -25,6 +28,7 @@
 
 pub mod against;
 pub mod baseline;
+pub mod built;
 mod digest;
 pub(crate) mod glb;
 pub(crate) mod json;
@@ -4258,6 +4262,10 @@ fn run_gate(
     let mut stale = Vec::new();
     let seen: HashSet<&str> = checked.iter().map(String::as_str).collect();
     for check in baseline.checks() {
+        // (The built world's sections are its own gate's: `built`.)
+        if built::CHECKS.contains(&check) {
+            continue;
+        }
         if !COUNTED.contains(&check) {
             stale.push(format!(
                 "{} is no counted check (one of {}): take it out",
@@ -4583,10 +4591,13 @@ pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Meas
 }
 
 /// `cargo check-glb [keys…] [--keys] [--preview [--sheet] [--blender]] [--validate] [--update-baseline]`, or
-/// `--against` (`against::main`): the exit code.
+/// `--against` (`against::main`), or `--built` (`built::main`): the exit code.
 pub fn main(args: &[String]) -> i32 {
     if args.iter().any(|a| a == "--against") {
         return against::main(args);
+    }
+    if args.iter().any(|a| a == "--built") {
+        return built::main(args);
     }
     let paths = Paths::repo();
     if args.iter().any(|a| a == "--keys") {
@@ -5756,6 +5767,12 @@ mod tests {
             ]
         );
         assert_eq!(read(), "{}\n");
+        // The built world's sections are its own gate's to judge (`built::CHECKS`): left as they are.
+        set("{\"built.edges\": {\"house.cottage\": 3}}\n");
+        let r = run_gate(&paths, &[], none, &[]);
+        assert_eq!(r.failed, 0, "{}", r.text);
+        assert!(update_with(&paths, &[], none, &[]).unwrap().is_empty());
+        assert_eq!(read(), "{\"built.edges\": {\"house.cottage\": 3}}\n");
         // A baseline that can't be read fails the gate.
         set("{\"edges\": {\"model.fridge\": 0}}");
         assert!(

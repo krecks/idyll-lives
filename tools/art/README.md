@@ -17,6 +17,8 @@ Run them from the repo root. The textures are generated, not downloaded.
 | `cargo check-glb` | The gate for glTF models (`crates/tools/src/checkglb.rs`, no Blender): checks that every model the content draws has a `.glb`, and every `.glb` the manifests use against its entry and its content (origin on the floor and at its `centre`, the wall's face, the footprint, a top's `radius`, triangles and draw calls against the budgets, materials mapped to finishes, one-sided, no unused UVs, extensions the game reads, texture sizes) and exits 1 on an error ("The gate" below). `--validate` also runs the Khronos glTF validator over each file and its far version (`tools/art/validate.ts`, under Bun: `bun install` in `web/` first). `--preview` also draws each file as read (`artkit`'s rasteriser) to `blender/previews/<family>/rt_<name>.png`, with its clips, perches and far version (`--sheet`: its sheet; `--blender`: Blender re-imports and renders it instead) |
 | `cargo check-glb --against <rev\|dir> [keys… \| --family <f>] [--dir <built>]` | Whether a build of the models is the build of a git revision (or of a directory: a checkout, or an assets root) (`crates/tools/src/checkglb/against.rs`; it reads only the `.glb` files, the packs and `centres.json`, so it holds for any generator). Each model and far version of the working tree, or of `--dir` (a build of some models compares those), is `same` (the same nodes, materials, triangles and clips to the bit, in whatever order the file has them), `near` (every metric within its limit: origins, clips sampled at 60 Hz, perches, the surfaces' distance both ways, normals, texture, baked shading, triangles, no new finding of the gate; the limits open the file) or `CHANGED`, printed with its metric, part, value, limit and worst point; exits 1 on any. One that is right as it is takes a line with its reason in `port-accepted.json` (`{"<key>": {"<metric>": "<why>"}}`, a far version's key `<key> far`); one that is not needed is an error. It lists the far versions Blender's decimate made as `decimated`: no two builds of those are alike, so they are held to a rule of their own (size within 2 %, on the model's floor, at most a tenth more triangles, within 6 cm) |
 
+| `cargo check-glb --built <dir>` | The same gate over what the game builds as it runs (houses, the street, the backdrop, fences, cars: "The built world" below), from the samples `bun tools/built/dump.ts <dir>` writes there with the game's own generators |
+
 ## The gate
 
 `cargo check-glb` (and `cargo art`, which runs it) prints `ok` or `FAIL` per model, then its errors, warnings and
@@ -66,6 +68,31 @@ file may keep none for it. `reference` is `cargo review sizes --check`'s, by obj
 or moved at an even speed (a belt's slats: right if it looks the same), a part turning over 12° in 1/60 s, a use's
 clip over 3 s, over 3 draw calls or the triangle target, a far version over half the full model's triangles, a
 texture of its own, and the functional heights against the content (`docs/design/objects.md`). Read each one.
+
+## The built world
+
+Houses, the neighbours' and the far houses, the backdrop's buildings, roads, sidewalks, junctions, bridges, fences and
+cars are no model files: the game builds them as it runs (`web/src/render/shared`). They are held to the models' rules
+all the same. `bun tools/built/dump.ts target/built` writes a fixed set of samples (`tools/built/samples.ts`: house
+plans, each as the viewed house, as the neighbour's silhouette, as the street's far house and as the town view's box; a
+backdrop building of each use, dressed and as its box; a street's block; each fence style; each car), a `.glb` a sample,
+made by those generators with no browser, and the same bytes on every machine. `cargo check-glb --built target/built`
+(`crates/tools/src/checkglb/built.rs`) reads them and counts, per sample, against the baseline's sections of these
+names:
+
+| Name | Counts |
+|---|---|
+| `built.edges` | the models' `edges`. A house is judged as the play camera sees it: whole with its roof on (it shows from 15 m out), and nearer, a storey at a time without roofs, with its walls standing and with them cut away each of the eight ways the cutaway stands, each by the views that make it stand so; an edge counts once however many of those show it |
+| `built.texels` | the models' `texels`, over each part on a textured material (a material projected from above has x and z for UVs) |
+| `built.farNear` | where a far version is off what it is the far version of: what its roofs cover by over 10 % or 1.5 m, its top by over 0.5 m, its roof's kind or its pitch by over 4°, a chimney on one of them only, most of its walls or of its roof another colour as drawn (the vertex colour times the material's and its texture's mean) by over 28 of 255 in a channel |
+
+Far versions are judged by `built.farNear` alone. `tools/ci-local.sh built` runs both commands (about 15 s);
+`--report` prints what was measured as tables (each sample's triangles and draw calls, where the edges are, how each
+material's texture is laid, each far version's look beside its near one's, and what the houses have of bevels,
+mouldings, gutters and cap shingles). A sample's file opens in any glTF viewer, in its vertex colours, as PlayCanvas
+draws it (the game's z mirrored). `--update-baseline` lowers the sections; `--seed-baseline` writes one the file has
+none of. A new sample, or a change to a generator, that brings findings fails until they are fixed, or until its
+section is taken out and seeded again with the reason in the commit.
 
 Texture flow: `cargo tex synth` writes the 20 texture sets into `web/public/assets/textures/` and the sidewalk into
 `web/public/assets/street/sidewalk/` (fixed filenames and resolutions, so the manifest's material bindings stay the
