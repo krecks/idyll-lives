@@ -23,7 +23,7 @@
   import RenameField from './RenameField.svelte';
   import type { TownEditor } from './tools';
   import { applyVillage, moveWithTool } from './villageChoice.svelte';
-  import { count, listed, lotKind, sentence, whatGoesLine } from './words';
+  import { count, listed, lotKind, madeStreetsLine, sentence, whatGoesLine } from './words';
 
   const { editor }: { editor: TownEditor } = $props();
 
@@ -67,6 +67,7 @@
   const road = $derived(picked?.kind === 'road' ? draft.roads[picked.road] : undefined);
   const goes = $derived(picked?.kind === 'road' ? whatGoes(draft, t, picked.road) : null);
   const goesLines = $derived(goes && !('refused' in goes) && picked?.kind === 'road' ? whatGoesLine(draft, goes, picked.road) : []);
+  const madeStreets = $derived(goes && !('refused' in goes) ? madeStreetsLine(draft, goes) : null);
   const roadLength = $derived(road ? Math.round(lengths(road.points).at(-1) ?? 0) : 0);
   const BUILD: readonly { value: BuildMode; label: string }[] = [
     { value: 'homes', label: 'Homes' },
@@ -161,7 +162,7 @@
         {#if goes && 'refused' in goes}
           <p class="hint warn">{sentence(goes.refused)}</p>
         {:else}
-          <p class="hint">{goesLines.length ? `It takes with it ${listed(goesLines)}.` : 'Nothing else goes with it.'}</p>
+          <p class="hint">{goesLines.length ? `It takes with it ${listed(goesLines)}.` : 'Nothing else goes with it.'}{madeStreets ? ` ${madeStreets}` : ''}</p>
         {/if}
         <div class="row">
           <button class="btn small danger-soft" disabled={!goes || 'refused' in goes} onclick={() => editor.apply(removeRoad(draft, t, picked.road))}><Icon name="icon.ui.trash" size={14} /> Remove {road.name ?? 'it'}</button>

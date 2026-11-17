@@ -20,6 +20,7 @@ import { blankLand, LAND_CELL } from '../src/game/land';
 import { wetTile, wetTiles } from '../src/game/landEdit';
 import { rle, unrle } from '../src/game/landMasks';
 import { townProblems } from '../src/game/townCheck';
+import { whatGoesLine } from '../src/ui/townedit/words';
 import { lengths, nearest, pointAt, type Pt } from '../src/game/roads';
 import type { NeighbourhoodDraft, PlotSlot, Templates } from '../src/game/town';
 
@@ -508,7 +509,7 @@ describe('removing a road', () => {
     expect(refusal(removeRoad(town(), t, 0))).toContain('no road would lead out of the world');
   });
 
-  test('refused if it would leave a country road a dead end longer than a court (no taxi turns round there)', () => {
+  test('a country road it leaves a dead end longer than a court becomes a street of no area, as a drawn one does (no taxi turns round in a country road)', () => {
     // A country road from the road round the river's end west to x 200, joined there by a road up from the high street.
     const all = town();
     const roads: RoadPlan[] = [
@@ -517,10 +518,38 @@ describe('removing a road', () => {
       { points: line(200, MAIN_Z + 3.5, 200, 153.5), width: 7, ends: ['join', 'join'], kind: 'country', name: 'West Road' },
     ];
     const linked = { ...all, roads };
-    expect(refusal(removeRoad(linked, t, 5))).toContain('Link Road would end 17');
-    // As a lane it may be left so (the Problems list says so).
+    const goes = whatGoes(linked, t, 5);
+    if ('refused' in goes) throw new Error(goes.refused);
+    expect(goes.streets).toEqual([4]);
+    const link = made(removeRoad(linked, t, 5)).draft.roads.find((r) => r.name === 'Link Road')!;
+    expect(link.kind).toBe('street');
+    expect(link.area).toBeUndefined();
+    expect(link.ends).toEqual(['join', 'dead']);
+    // A lane is left as it is (the sim turns round in any of a lane's dead ends).
     const lane = { ...linked, roads: roads.map((r, i) => (i === 4 ? { ...r, kind: 'lane' as const, area: 0 } : r)) };
-    expect('draft' in removeRoad(lane, t, 5)).toBe(true);
+    const kept = whatGoes(lane, t, 5);
+    expect('streets' in kept && kept.streets).toEqual([]);
+    expect(made(removeRoad(lane, t, 5)).draft.roads.find((r) => r.name === 'Link Road')!.kind).toBe('lane');
+  });
+
+  test("the far stretch of a street drawn over the river to a dead end takes its bridge with it (a bridge leads somewhere); the stretch before stays", () => {
+    const drawn = made(draw(town(), [[87, MAIN_Z + 8], [87, 260]])).draft;
+    const bridge = drawn.roads.findIndex((r) => r.bridge);
+    const far = drawn.roads.findIndex((r, i) => i >= 4 && !r.bridge && r.ends.includes('dead'));
+    expect(bridge).toBeGreaterThan(3);
+    expect(far).toBeGreaterThan(3);
+    const goes = whatGoes(drawn, t, far);
+    if ('refused' in goes) throw new Error(goes.refused);
+    expect(goes.roads).toEqual([bridge, far].sort((a, b) => a - b));
+    expect(goes.bridges).toEqual([bridge]);
+    expect(whatGoesLine(drawn, goes, far)).toEqual([`1 bridge left leading nowhere (${drawn.roads[bridge].name})`]);
+    const after = made(removeRoad(drawn, t, far)).draft;
+    expect(after.roads.some((r) => r.bridge)).toBe(false);
+    expect(after.roads).toHaveLength(5);
+    // The river is wet again where the deck was; the stretch from the high street ends by the bank.
+    expect(unrle(after.open!.water, W * D)[215 * W + 87]).toBe(1);
+    expect(after.roads[4].ends).toEqual(['join', 'dead']);
+    expect(oneNetwork(after.roads)).toBe(true);
   });
 
   test("refused if it would take the town's last homes (as a lot removed on its own is)", () => {
@@ -536,7 +565,7 @@ describe('removing a road', () => {
 
   test('its parking goes; a road joined to it ends there in a dead end; the water under a bridge is water again', () => {
     const goes = whatGoes(town(), t, 1);
-    expect(goes).toEqual({ roads: [1], lots: [], backdrop: [], parking: [0] });
+    expect(goes).toEqual({ roads: [1], bridges: [], streets: [], lots: [], backdrop: [], parking: [0] });
     const { draft } = made(removeRoad(town(), t, 1));
     expect(draft.roads.length).toBe(3);
     expect(draft.open!.parking).toEqual([]);

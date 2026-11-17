@@ -12,7 +12,7 @@ import type { TownGhosts } from '../../render/types';
 import { buildingBox, lotBox, roadGhost } from './ghosts';
 import type { Picked } from './pick';
 import type { TownEditor, TownTool } from './tools';
-import { listed, sentence, whatGoesLine } from './words';
+import { listed, madeStreetsLine, sentence, whatGoesLine } from './words';
 
 /** What removing `p` would do: its ghosts, and a line saying it (or why it may not go: `refused`). */
 function removal(editor: TownEditor, p: Picked): { ghosts: Partial<TownGhosts>; line: string; refused: boolean } | null {
@@ -36,12 +36,13 @@ function removal(editor: TownEditor, p: Picked): { ghosts: Partial<TownGhosts>; 
     const goes = goesOf(editor, p.road);
     if ('refused' in goes) return { ghosts: { roads: [roadGhost(r, 'bad')] }, line: sentence(goes.refused), refused: true };
     const also = whatGoesLine(draft, goes, p.road);
+    const streets = madeStreetsLine(draft, goes);
     return {
       ghosts: {
         roads: goes.roads.map((i) => roadGhost(draft.roads[i], 'bad')),
         lots: [...goes.lots.map((i) => ({ ...lotBox(t, draft.slots[i]), tone: 'gone' as const })), ...goes.backdrop.map((i) => ({ ...buildingBox(draft.open!.backdrop![i]), tone: 'gone' as const }))],
       },
-      line: `Removes ${r.name ?? 'this road'}${also.length ? `, and with it ${listed(also)}` : ''}.`,
+      line: `Removes ${r.name ?? 'this road'}${also.length ? `, and with it ${listed(also)}` : ''}.${streets ? ` ${streets}` : ''}`,
       refused: false,
     };
   }
