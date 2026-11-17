@@ -1,6 +1,6 @@
 // The land brushes and their editor (`game/landBrush.ts`, `game/landEdit.ts`): each tool does what it says
-// (raise, lower, smooth, flatten, level; a lake that sits level, the sea pushed inland, a river that never
-// rises and stops where it would cut too deep, dry; the cover tools; a peak and a range placed on release);
+// (raise, lower, smooth, flatten, level; a lake that sits level, the sea pushed inland, a river that steps down
+// the land whichever way it is dragged, cutting a gorge through a narrow ridge and climbing a high one, dry; the cover tools; a peak and a range placed on release);
 // undo and redo give back the bytes exactly; the built land is held off and water kept off lots and roads;
 // what the land makes of the world (the sim's water tiles with the bridge decks dry, the zones); the price
 // of a stroke; the point brush (4 m and under: one sample, or one cover cell, wherever the pointer is
@@ -113,7 +113,7 @@ describe('water tools', () => {
     expect(land.wl[at(land, 90, 128)]).toBe(SEA_CM);
   });
 
-  test("a river never rises, takes the sea's level where it meets it, and stops where it would cut more than 6 m", () => {
+  test("a river dragged downhill steps down with the land and takes the sea's level where it meets it", () => {
     // Down a hill to the sea at x < 40.
     const land = landOf(512, (x) => (x < 40 ? -3 : 0.5 + (x - 40) / 30 + fbm(x / 20, 3, 5, 2) * 2));
     for (let k = 0; k < land.h.length; k++) if (land.h[k] < SEA_CM) land.wl[k] = SEA_CM;
@@ -129,14 +129,74 @@ describe('water tools', () => {
     }
     expect(last).toBe(SEA_CM);
     expect(editor.hint).toBeNull();
+  });
 
-    // Up the hill: it stops once the hill stands more than 6 m over it, and says so.
+  test('a river dragged uphill is made all the way: it steps up with the land, under its ground, and runs back down', () => {
     const up = landOf(512, (x) => x / 10);
-    const climb = new LandEditor(up, FREE);
-    stroke(climb, { tool: 'river', radius: 6, strength: 0.4 }, line([100, 256], [300, 256], 80));
-    expect(climb.hint).toContain('6 m');
-    expect(up.wl[at(up, 120, 256)]).not.toBe(NONE);
-    expect(up.wl[at(up, 200, 256)]).toBe(NONE);
+    const was = up.h.slice();
+    const editor = new LandEditor(up, FREE);
+    stroke(editor, { tool: 'river', radius: 6, strength: 0.4 }, line([100, 256], [300, 256], 80));
+    expect(editor.hint).toBeNull();
+    let last = up.wl[at(up, 100, 256)];
+    for (let x = 100; x <= 300; x += 2) {
+      const k = at(up, x, 256);
+      expect(up.wl[k], `${x}`).not.toBe(NONE);
+      // Up with the land, a metre and a bit at a time (a rapid), never over the ground it was cut into less 40 cm.
+      expect(up.wl[k]).toBeGreaterThanOrEqual(last);
+      expect(up.wl[k] - last).toBeLessThanOrEqual(130);
+      expect(up.wl[k]).toBeLessThanOrEqual(was[k] - 40);
+      last = up.wl[k];
+      // Its way down the slope, back against the drag, from where it began.
+      expect(flowOf(up.flow![k])![0], `${x}`).toBeLessThan(-0.9);
+    }
+    expect(last).toBeGreaterThan(2700);
+  });
+
+  test('a river cuts a gorge through a narrow ridge, its level kept; over a high one it climbs and runs down both sides', () => {
+    const level = (x: number, land: Land) => land.wl[at(land, x, 256)];
+    // A ridge 4 m high and 24 m across on flat land at 5 m: cut through, the water level all the way.
+    const low = landOf(512, (x) => 5 + 4 * Math.max(0, 1 - Math.abs(x - 200) / 12));
+    stroke(new LandEditor(low, FREE), { tool: 'river', radius: 6, strength: 0.4 }, line([60, 256], [340, 256], 100));
+    for (let x = 60; x <= 340; x += 2) expect(level(x, low), `${x}`).toBe(460);
+    expect(low.h[at(low, 200, 256)]).toBeLessThan(460);
+    // One 20 m high and 60 m across: the river goes over it, down from its top both ways (the flat it was drawn along
+    // before the ridge too: its level first rose there, so it runs back to where it began).
+    const high = landOf(512, (x) => 5 + 20 * Math.max(0, 1 - Math.abs(x - 200) / 30));
+    stroke(new LandEditor(high, FREE), { tool: 'river', radius: 6, strength: 0.4 }, line([60, 256], [340, 256], 100));
+    for (let x = 60; x <= 340; x += 2) expect(level(x, high), `${x}`).not.toBe(NONE);
+    expect(level(200, high)).toBeGreaterThan(1500);
+    const way = (x: number) => flowOf(high.flow![at(high, x, 256)])![0];
+    for (const x of [180, 190]) expect(way(x)).toBeLessThan(-0.9);
+    for (const x of [210, 220]) expect(way(x)).toBeGreaterThan(0.9);
+    expect(way(100)).toBeLessThan(-0.9);
+    expect(way(300)).toBeGreaterThan(0.9);
+  });
+
+  test('a river cross on hilly land: both rivers made from edge to edge, the way down the land wherever it falls', () => {
+    const hills = landOf(512, (x, z) => 20 + fbm(x / 90, z / 90, 11, 3) * 40);
+    const was = hills.h.slice();
+    const editor = new LandEditor(hills, FREE);
+    stroke(editor, { tool: 'river', radius: 12, strength: 0.5 }, line([4, 256], [508, 256], 250));
+    stroke(editor, { tool: 'river', radius: 12, strength: 0.5 }, line([256, 4], [256, 508], 250));
+    expect(editor.hint).toBeNull();
+    for (let s = 4; s <= 508; s += 2) for (const [x, z] of [[s, 256], [256, s]]) expect(wetAt(hills, x / LAND_CELL, z / LAND_CELL), `${x}, ${z}`).toBe(true);
+    // No cut deeper than a ridge's gorge, and where the water falls along a river, its way goes down it.
+    let downhill = 0;
+    let uphill = 0;
+    for (let s = 20; s <= 490; s += 2) {
+      for (const [x, z, ax] of [[s, 256, 0], [256, s, 1]] as const) {
+        const [k, k2] = [at(hills, x, z), at(hills, x + (ax ? 0 : 6), z + (ax ? 6 : 0))];
+        expect(was[k] - hills.wl[k], `${x}, ${z}`).toBeLessThanOrEqual(600 + 300);
+        if (Math.abs(x - 256) < 30 && Math.abs(z - 256) < 30) continue;
+        const fall = hills.wl[k] - hills.wl[k2];
+        if (Math.abs(fall) < 20) continue;
+        const v = flowOf(hills.flow![k])![ax];
+        if (fall > 0 ? v > 0.5 : v < -0.5) downhill++;
+        else uphill++;
+      }
+    }
+    expect(downhill).toBeGreaterThan(50);
+    expect(uphill).toBeLessThan(downhill * 0.1);
   });
 
   test('dry takes the water away and fills its bed', () => {
@@ -270,19 +330,23 @@ describe('cover and mountains', () => {
 });
 
 describe('undo', () => {
-  test("undo and redo give back a river's way byte for byte; reset stills it", () => {
-    const land = landOf(256, (x, z) => 4 + fbm(x / 30, z / 30, 9, 3) * 3);
+  test("undo and redo give back a river's way byte for byte, over a hill it climbs too; reset stills it", () => {
+    // (A hill 14 m high on the first river's way: it climbs it, running back down from its top.)
+    const land = landOf(256, (x, z) => 4 + fbm(x / 30, z / 30, 9, 3) * 3 + Math.max(0, 14 - Math.hypot(x - 125, z - 120) / 4));
     const editor = new LandEditor(land, FREE);
-    const before = land.flow!.slice();
+    const before = { h: land.h.slice(), wl: land.wl.slice(), flow: land.flow!.slice() };
     stroke(editor, { tool: 'river', radius: 8, strength: 0.5 }, line([20, 40], [230, 200], 90));
     const after = land.flow!.slice();
     expect(after.some((v) => v !== 0)).toBe(true);
+    expect([...after].some((v) => v && flowOf(v)![0] < -0.5)).toBe(true);
     stroke(editor, { tool: 'river', radius: 5, strength: 0.5 }, line([20, 220], [120, 120], 50));
     const twice = land.flow!.slice();
     editor.undo();
     expect(Buffer.from(land.flow!).equals(Buffer.from(after))).toBe(true);
     editor.undo();
-    expect(Buffer.from(land.flow!).equals(Buffer.from(before))).toBe(true);
+    expect(Buffer.from(land.flow!).equals(Buffer.from(before.flow))).toBe(true);
+    expect(Buffer.from(land.h.buffer).equals(Buffer.from(before.h.buffer))).toBe(true);
+    expect(Buffer.from(land.wl.buffer).equals(Buffer.from(before.wl.buffer))).toBe(true);
     editor.redo();
     editor.redo();
     expect(Buffer.from(land.flow!).equals(Buffer.from(twice))).toBe(true);

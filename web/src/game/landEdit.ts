@@ -517,7 +517,7 @@ export class LandEditor {
     this.active = null;
     const tool = stroke.brush.tool;
     if (tool === 'peak' || tool === 'range') placeMountain(this.land, stroke, this.free, this.wettable);
-    this.hint = stroke.stopped ?? stroke.hint ?? null;
+    this.hint = stroke.hint ?? null;
     // (On built land, the land settled under what is built: what that changed is the stroke's too.)
     let priced: Kept['priced'];
     if (this.settle && this.earthOnBuilt && TOOL_KIND[tool] === 'earth' && stroke.touched) {
