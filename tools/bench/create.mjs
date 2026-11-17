@@ -483,7 +483,8 @@ function benchHelpers() {
         const layer = layoutApi.layerOf(d);
         const cells = uses.unpackUses(layer);
         const cellOf = (x, z) => Math.floor(z / uses.USE_CELL) * layer.cols + Math.floor(x / uses.USE_CELL);
-        const dry = (x, z) => layoutApi.paintUses(d, [{ x, z, r: 2 }], 'homes').draft !== d;
+        // (Dry and off the roads: a dab there paints its cell.)
+        const dry = (x, z) => layoutApi.paintUses(d, [{ x, z, r: 3 }], 'homes').draft !== d;
         if (kind === 'beside') {
           const order = d.roads.map((r, i) => i).sort((a, b) => ((d.roads[a].area ?? 9) === 0 ? 0 : 1) - ((d.roads[b].area ?? 9) === 0 ? 0 : 1));
           for (const i of order) {
@@ -1335,7 +1336,18 @@ try {
     if (shots.has('2')) await everySize();
     if (shots.has('layout')) {
       await editSession(page, renderer, (name) => shoot(name), (name) => (stepName = name), 'layout', layoutParts);
-      await layoutReady(page);
+      // (A problem the session's streets left blocks the way on: said, and the layout put back as proposed to go on.)
+      const blocked = await layoutReady(page).then(
+        () => false,
+        () => true,
+      );
+      if (blocked) {
+        const s = await page.evaluate(() => window.__bench.state());
+        fault(`${renderer} layout: the way on shut after the session (${s.blocking.join('; ') || 'no blocking problem listed'}): the layout reset to go on`);
+        await page.getByRole('button', { name: /Reset the layout/ }).click();
+        await page.getByRole('button', { name: /Reset all/ }).click();
+        await layoutReady(page);
+      }
     }
 
     // Step 3: the town built from the layout (its making panel shot meanwhile), then at every size, then Build again.
