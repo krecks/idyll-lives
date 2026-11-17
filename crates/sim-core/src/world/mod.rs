@@ -1984,6 +1984,8 @@ pub struct World {
     /// Rooms kept shut as the tick's step started (`privacy::refresh`), kept from tick to tick
     /// like `briefs`.
     pub(crate) shut: Vec<crate::privacy::Shut>,
+    /// Per resident: whether they keep a room in `shut` shut (`privacy::keeps_shut`).
+    pub(crate) shut_by: Vec<bool>,
     /// The rooms kept shut while anyone is in them (`privacy::private_room`), sorted; found
     /// with the rooms (`refresh_rooms`).
     pub(crate) private_rooms: Vec<u16>,
@@ -2457,6 +2459,7 @@ impl World {
             briefs: Vec::new(),
             members: Members::default(),
             shut: Vec::new(),
+            shut_by: Vec::new(),
             private_rooms: Vec::new(),
             claimed_rooms: Vec::new(),
             claimed_places: Vec::new(),

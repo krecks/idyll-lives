@@ -637,34 +637,57 @@ pub(crate) fn refresh(w: &mut World) {
             });
         }
     }
+    // (By room, each room's in the residents' order: those asking about a room look at its own,
+    // `in_room`; and whether each resident keeps one shut, `keeps_shut`.)
+    shut.sort_by_key(|s| s.room);
+    let mut shut_by = std::mem::take(&mut w.shut_by);
+    shut_by.clear();
+    shut_by.resize(w.sims.len(), false);
+    for s in &shut {
+        if let Some(b) = shut_by.get_mut(s.by as usize) {
+            *b = true;
+        }
+    }
+    w.shut_by = shut_by;
     w.shut = shut;
     w.claimants_cache = cache;
+}
+
+/// The rooms kept shut (`World::shut`, sorted by room) that are `room`.
+fn in_room(shut: &[Shut], room: u16) -> &[Shut] {
+    let from = shut.partition_point(|s| s.room < room);
+    let to = from + shut[from..].partition_point(|s| s.room == room);
+    &shut[from..to]
 }
 
 /// Whether `room` is kept shut to resident `me` (doing private use `mine`, if any): by someone
 /// else in it, not at the same use, and not one of the room's own people (`claimants`) if it's a
 /// claimed room.
 pub(crate) fn shut_to(shut: &[Shut], me: u32, mine: Option<(u32, usize)>, room: u16) -> bool {
-    room != OUTDOORS
-        && shut.iter().any(|s| {
-            s.room == room
-                && s.by != me
-                && (s.doing.is_none() || s.doing != mine)
-                && !s.claimants.contains(&me)
-        })
+    let shut_by = |s: &Shut| {
+        s.room == room
+            && s.by != me
+            && (s.doing.is_none() || s.doing != mine)
+            && !s.claimants.contains(&me)
+    };
+    let found = room != OUTDOORS && in_room(shut, room).iter().any(shut_by);
+    debug_assert_eq!(found, room != OUTDOORS && shut.iter().any(shut_by));
+    found
 }
 
 /// Whether `room`, kept shut, may be walked through to a room beyond: a bedroom (claimed), unless
 /// someone in it is at a use behind its door (trying for a baby).
 fn passable(shut: &[Shut], room: u16) -> bool {
-    shut.iter()
-        .filter(|s| s.room == room)
+    in_room(shut, room)
+        .iter()
         .all(|s| s.claimed && s.doing.is_none())
 }
 
 /// Whether `sim` keeps a room shut now.
 pub fn keeps_shut(world: &World, sim: u32) -> bool {
-    world.shut.iter().any(|s| s.by == sim)
+    let keeps = world.shut_by.get(sim as usize).copied().unwrap_or(false);
+    debug_assert_eq!(keeps, world.shut.iter().any(|s| s.by == sim));
+    keeps
 }
 
 /// Whether the thing at tile `at` (where it's used from) is in a room kept shut to `sim` by
@@ -845,9 +868,9 @@ pub(crate) fn bed_for(
                 .iter()
                 .any(|r| !r.garden && r.id == room && r.doors > 0);
         if !walled
-            || shut
+            || in_room(shut, room)
                 .iter()
-                .any(|s| s.room == room && s.by != a && s.by != b)
+                .any(|s| s.by != a && s.by != b)
             || others_in(room)
         {
             continue;
