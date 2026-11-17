@@ -9,7 +9,8 @@
  *   the same water with no way of its own takes its neighbours' (a bank the water filled after the river was drawn).
  *   Lakes and the sea have none: they only ripple.
  * - The speed (0..1): fast where the water is narrow and where its level drops (a rapid), slower in wide water, near
- *   nothing at the shore. None without a way.
+ *   nothing at the shore. None without a way; a river's never under `FLOW.slowest`, but water whose way is only
+ *   its steps' (a lake with a river running out of it) slows to nearly nothing where it is wide.
  * - The foam (0..1): where the level drops between neighbouring samples, and a little where the water runs fast.
  *
  * `waterFlow` works out a rectangle of samples (a brush's stamp, a stroke) from the land within `FLOW_MARGIN`
@@ -222,7 +223,7 @@ export function waterFlow(land: Land, course: RiverCourse | null, rect?: LandRec
   const shore = chamfer(wet, w, d, 0);
   const half = widest(shore, wet, w, d, FLOW.widthReach);
 
-  // The ways: a drawn river's, a generated river's, then the steps'.
+  // The ways (`has`: 1 a river's, a drawn one's or a generated one's; 2 only the steps').
   const wx = new Float32Array(n);
   const wz = new Float32Array(n);
   const has = new Uint8Array(n);
@@ -250,16 +251,18 @@ export function waterFlow(land: Land, course: RiverCourse | null, rect?: LandRec
       for (let i = 0; i < w; i++) {
         const q = j * w + i;
         if (!wet[q] || has[q]) continue;
-        let [sx, sz] = [0, 0];
+        let [sx, sz, kind] = [0, 0, 2];
         near(q, i, j, (p) => {
-          if (has[p] && level[p] === level[q]) [sx, sz] = [sx + wx[p], sz + wz[p]];
+          if (!has[p] || level[p] !== level[q]) return;
+          [sx, sz] = [sx + wx[p], sz + wz[p]];
+          kind = Math.min(kind, has[p]);
         });
         const l = Math.hypot(sx, sz);
-        if (l > 1e-3) take.push(q, sx / l, sz / l);
+        if (l > 1e-3) take.push(q, sx / l, sz / l, kind);
       }
     }
     if (!take.length) break;
-    for (let t = 0; t < take.length; t += 3) [has[take[t]], wx[take[t]], wz[take[t]]] = [1, take[t + 1], take[t + 2]];
+    for (let t = 0; t < take.length; t += 4) [wx[take[t]], wz[take[t]], has[take[t]]] = [take[t + 1], take[t + 2], take[t + 3]];
   }
   // Smoothed a little (a drawn way's steps, the steps' corners), through the same water.
   for (let pass = 0; pass < 2; pass++) {
@@ -305,7 +308,8 @@ export function waterFlow(land: Land, course: RiverCourse | null, rect?: LandRec
       const rp = rapids[q];
       let speed = 0;
       if (has[q]) {
-        speed = Math.max(FLOW.slowest, Math.min(1, FLOW.narrow / Math.max(0.1, half[q])));
+        const narrow = Math.min(1, FLOW.narrow / Math.max(0.1, half[q]));
+        speed = has[q] === 1 ? Math.max(FLOW.slowest, narrow) : narrow * narrow;
         speed *= FLOW.shoreSpeed + (1 - FLOW.shoreSpeed) * smoothstep(0, FLOW.shore, shore[q] - LAND_CELL / 2);
         if (rp > 0) speed = Math.max(speed, 0.5 + 0.5 * rp);
       }

@@ -143,6 +143,25 @@ describe('a step', () => {
   });
 });
 
+describe('a lake a river runs out of', () => {
+  test('runs towards the river, but slows to nearly nothing out in the lake', () => {
+    // A lake 50 m across at 1.2 m, a channel 8 m wide out of its east side at 0.6 m.
+    const land = flat(256);
+    for (let j = 0; j < land.rows; j++) {
+      for (let i = 0; i < land.cols; i++) {
+        const [x, z] = [i * LAND_CELL, j * LAND_CELL];
+        const k = j * land.cols + i;
+        if (Math.hypot(x - 80, z - 128) < 25) [land.h[k], land.wl[k]] = [-50, 120];
+        else if (x >= 104 && x < 230 && Math.abs(z - 128) <= 4) [land.h[k], land.wl[k]] = [-50, 60];
+      }
+    }
+    const flow = waterFlow(land, null);
+    expect(flow.wx[at(land, 100, 128)]).toBeGreaterThan(0.9);
+    expect(flow.speed[at(land, 100, 128)]).toBeGreaterThan(0.5);
+    expect(flow.speed[at(land, 70, 128)]).toBeLessThan(0.1);
+  });
+});
+
 describe('a drawn river', () => {
   test('runs along the drag, faster where narrow than where wide, slower at the shore', () => {
     const land = flat(512);
