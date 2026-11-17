@@ -260,8 +260,23 @@ impl Rays {
         let mut depth = distance;
         let mut out = None;
         for (obj, bvh, faces) in &self.parts {
-            // (each part takes the ray into its own frame, and makes it a unit vector again)
-            let (dir, scale) = normalize_v3(direction);
+            // each part takes the ray into its own frame, and makes it a unit vector again
+            // (by division, as the code that casts it does: the kernel's own normalising, as Blender's, multiplies by
+            // the reciprocal, which is now and then a unit in the last place off it)
+            let squared = crate::math::dot_v3(direction, direction);
+            let (dir, scale) = if squared > 1.0e-35 {
+                let length = squared.sqrt();
+                (
+                    V3::new(
+                        direction.x / length,
+                        direction.y / length,
+                        direction.z / length,
+                    ),
+                    length,
+                )
+            } else {
+                (V3::ZERO, 0.0)
+            };
             if let Some((t, dist)) = bvh.ray_cast(origin, dir, depth * scale) {
                 let far = dist / scale;
                 if far <= depth {
