@@ -3324,10 +3324,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.landMapped(scape);
       // (The game's land: what stands on it drawn again on its surface as the world comes back from the stroke, the
       // backdrop's buildings too; the sun's shadows of the still casters taken again.)
-      if (scape === this.lot.landscape) {
-        this.townBackdropOf = null;
-        this.sunShadows.moved();
-      }
+      if (scape === this.lot.landscape) this.landUnderTown(scape);
     });
   }
 
@@ -3335,6 +3332,26 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const at = this.landInView();
     if (!at?.scape.heightField) return null;
     return perfTime('land: settle', () => at.scape.settleLand(rect));
+  }
+
+  /**
+   * The game's land shaped (a stroke done, undone or redone): the street stands on the landscape's surface (one surface
+   * for the land and what stands on it) and plans again the chunks whose roads or lots moved; the viewed lot follows its
+   * pad (the datum); the backdrop's buildings are put on the land again with the town view; the still casters' shadows
+   * are taken again.
+   */
+  private landUnderTown(scape: Landscape): void {
+    const surface = scape.surface;
+    this.townBackdropOf = null;
+    this.sunShadows.moved();
+    if (!surface || !this.builtWorld) return;
+    if (this.street.landMoved(surface)) this.streamStreet();
+    const view = this.view;
+    const at = view ? this.builtWorld.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
+    if (at < 0) return;
+    const datum = surface.padY(at);
+    this.applyDatum(datum);
+    this.street.setLotY(datum);
   }
 
   pickLand(x: number, y: number): { x: number; y: number; z: number } | null {

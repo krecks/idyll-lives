@@ -74,6 +74,8 @@ export class Protection {
   readonly dist: Float32Array;
   /** 1 where water is refused. */
   readonly dry: Uint8Array;
+  /** 1 where water is refused but for the roads (a lot, a building and their shores): where water may bridge a road. */
+  readonly dryLots: Uint8Array;
 
   constructor(
     readonly cols: number,
@@ -82,6 +84,7 @@ export class Protection {
   ) {
     this.dist = new Float32Array(cols * rows).fill(1e9);
     this.dry = new Uint8Array(cols * rows);
+    this.dryLots = new Uint8Array(cols * rows);
     if (built) this.survey(built);
   }
 
@@ -93,6 +96,9 @@ export class Protection {
 
   /** Whether sample (i, j) may be under water. */
   readonly wettable: Wettable = (i, j) => !this.dry[j * this.cols + i];
+
+  /** Whether sample (i, j) may be under water if the roads there are bridged (`landBridges.ts`): off lots and buildings. */
+  readonly bridgeable: Wettable = (i, j) => !this.dryLots[j * this.cols + i];
 
   private survey(built: BuiltLand): void {
     const { cols, rows, dist, dry } = this;
@@ -106,6 +112,7 @@ export class Protection {
     for (const p of built.plots) {
       mark(dist, 0, p.x, p.z, p.x + p.w, p.z + p.d);
       mark(dry, 1, p.x - LOT_SHORE, p.z - LOT_SHORE, p.x + p.w + LOT_SHORE, p.z + p.d + LOT_SHORE);
+      mark(this.dryLots, 1, p.x - LOT_SHORE, p.z - LOT_SHORE, p.x + p.w + LOT_SHORE, p.z + p.d + LOT_SHORE);
     }
     for (const b of built.backdrop ?? []) {
       const xs = b.poly.map((q) => q[0]);
@@ -113,6 +120,7 @@ export class Protection {
       const [x0, z0, x1, z1] = [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)];
       mark(dist, 0, x0 - 1, z0 - 1, x1 + 1, z1 + 1);
       mark(dry, 1, x0 - LOT_SHORE, z0 - LOT_SHORE, x1 + LOT_SHORE, z1 + LOT_SHORE);
+      mark(this.dryLots, 1, x0 - LOT_SHORE, z0 - LOT_SHORE, x1 + LOT_SHORE, z1 + LOT_SHORE);
     }
     // A road: every sample within its half-width and the verge (built), or the shore (dry), of its middle line.
     for (const r of built.roads) {
@@ -331,7 +339,7 @@ export class LandEditor {
   private readonly wettable?: Wettable;
   private readonly earthOnBuilt: boolean;
   private readonly settle?: (rect: LandRect) => LandRect | null;
-  private readonly world: { width: number; depth: number; roads: readonly RoadPlan[] };
+  private world: { width: number; depth: number; roads: readonly RoadPlan[] };
   /** The world's water tiles and zones as the generator laid them, if the editor was given them. */
   readonly generated: { water?: Rle; zones?: readonly WorldZone[] };
   /** The bridge decks' tiles (the water under them stays dry to walk on), made when first asked for. */
@@ -367,19 +375,30 @@ export class LandEditor {
    * bridge decks dry; `generated`: the world's water tiles and zones as the generator laid them
    * (a draft's `open.water` and `open.zones`, or the game's), for `water` and `zonesOf`.
    */
-  static forWorld(land: Land, built: BuiltLand, generated: { water?: Rle; zones?: readonly WorldZone[] } = {}, follow: Pick<LandEditorOptions, 'earthOnBuilt' | 'settle'> = {}): LandEditor {
+  static forWorld(land: Land, built: BuiltLand, generated: { water?: Rle; zones?: readonly WorldZone[] } = {}, follow: Pick<LandEditorOptions, 'earthOnBuilt' | 'settle'> & { bridges?: boolean } = {}): LandEditor {
     const guard = new Protection(land.cols, land.rows, built);
-    return new LandEditor(land, guard.free, { wettable: guard.wettable, world: { width: built.width, depth: built.depth, roads: built.roads }, ...generated, ...follow });
+    // (`bridges`: water may cross a road, which is bridged there or the stroke refused: `landBridges.ts`.)
+    const { bridges, ...rest } = follow;
+    return new LandEditor(land, guard.free, { wettable: bridges ? guard.bridgeable : guard.wettable, world: { width: built.width, depth: built.depth, roads: built.roads }, ...generated, ...rest });
   }
 
-  /** How far sample (i, j) may change under `tool`: `free`, but every sample for the earth tools on a land its town follows. */
+  /**
+   * How far sample (i, j) may change under `tool`: `free`, but every sample for the earth and water tools on a land its
+   * town follows (the water still kept off lots by `wettable`; across a road it is bridged, `landBridges.ts`).
+   */
   freeFor(tool: LandTool): Free {
-    return this.earthOnBuilt && TOOL_KIND[tool] === 'earth' ? ALL_FREE : this.free;
+    return this.earthOnBuilt && (TOOL_KIND[tool] === 'earth' || TOOL_KIND[tool] === 'water') ? ALL_FREE : this.free;
   }
 
   /** The world's roads the editor knows (their bridges' decks kept dry). */
   get roads(): readonly RoadPlan[] {
     return this.world.roads;
+  }
+
+  /** The world's roads as they are now (bridges made or taken away: `landBridges.ts`): their decks kept dry from now on. */
+  setRoads(roads: readonly RoadPlan[]): void {
+    this.world = { ...this.world, roads };
+    this.decks = null;
   }
 
   /** The stroke under way, or null. */

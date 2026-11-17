@@ -334,7 +334,8 @@ async function builtStrokes(page, renderer, home, shot) {
   await settled(page);
   await page.waitForTimeout(2500);
   const h1 = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), [rx, rz]);
-  out.road = { at: [Math.round(rx), Math.round(rz)], rose: +(h1 - h0).toFixed(2), refused: raised.refused, stamps: spread(raised.stamps) };
+  // (`end`: the frame the stroke ended in, ms: its settling under the town and the surface solved again.)
+  out.road = { at: [Math.round(rx), Math.round(rz)], rose: +(h1 - h0).toFixed(2), refused: raised.refused, stamps: spread(raised.stamps), end: Math.round(raised.frames.at(-1)) };
   console.log(`land: ${renderer} a raise across the road: ${JSON.stringify(out.road)}`);
   if (raised.refused) fault(`${renderer} the raise across the road was refused: ${raised.refused}`);
   await shot('17b-road-raised');
@@ -344,11 +345,48 @@ async function builtStrokes(page, renderer, home, shot) {
   await settled(page);
   await page.waitForTimeout(2500);
   const g1 = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), home);
-  out.home = { fell: +(g0 - g1).toFixed(2), refused: under.refused };
+  out.home = { fell: +(g0 - g1).toFixed(2), refused: under.refused, end: Math.round(under.frames.at(-1)) };
   console.log(`land: ${renderer} a lower under the home: ${JSON.stringify(out.home)}`);
   if (under.refused) fault(`${renderer} the lower under the home was refused: ${under.refused}`);
   await aim(page, home, 45);
   await shot('18-home-lowered');
+  // Water across a country road away from the town: the road bridged there (its deck kept dry for walkers), or the
+  // stroke refused with why; then undone (the bridge goes) and redone (it comes back).
+  let crossing = null;
+  for (const d of [140, 220, 320]) {
+    for (const [ax, az] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+      const c = await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [home[0] + ax * d, home[1] + az * d]);
+      if (c && c.dist < 40 && c.s > 30) crossing ??= c;
+    }
+  }
+  if (crossing) {
+    const [cx, cz] = crossing.at;
+    const [vx, vz] = crossing.along;
+    await aim(page, [cx, cz], 70);
+    await shot('19a-before-river');
+    const before = crossing.bridges.length;
+    // (A pond dug across it: on flat land a river with nowhere to run down to stands as a pond does.)
+    const river = await page.evaluate((pts) => window.__land.stroke('lake', pts, 6, 0.6), Array.from({ length: 11 }, (_, k) => [cx - vz * (k * 2 - 10), cz + vx * (k * 2 - 10)]));
+    await settled(page);
+    await page.waitForTimeout(4000);
+    const after = (await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [cx, cz]))?.bridges ?? [];
+    const walk = await page.evaluate(([x, z]) => window.__land.simWet(x, z), [cx, cz]);
+    out.bridge = { at: [Math.round(cx), Math.round(cz)], refused: river.refused, bridges: after, deckWalkable: !walk };
+    console.log(`land: ${renderer} water across a country road: ${JSON.stringify(out.bridge)}`);
+    if (!river.refused && after.length <= before) fault(`${renderer} the water across the road made no bridge`);
+    if (!river.refused && walk) fault(`${renderer} the bridge's deck is water to the simulation`);
+    await shot('19b-bridge');
+    if (!river.refused) {
+      await page.evaluate(() => window.__land.undo());
+      await page.waitForTimeout(2500);
+      const undone = (await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [cx, cz]))?.bridges ?? [];
+      await page.evaluate(() => window.__land.redo());
+      await page.waitForTimeout(2500);
+      const redone = (await page.evaluate(([x, z]) => window.__land.nearestRoad(x, z, 'country'), [cx, cz]))?.bridges ?? [];
+      out.bridge.undo = { undone: undone.length, redone: redone.length };
+      if (undone.length !== before || redone.length !== after.length) fault(`${renderer} undo/redo of the bridge: ${JSON.stringify(out.bridge.undo)}`);
+    }
+  } else console.log(`land: ${renderer} no country road near the town for water to cross`);
   return out;
 }
 

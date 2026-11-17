@@ -59,7 +59,8 @@ import { centroid } from '../../game/roads';
 import { pavedRects } from './paving';
 import { bridgeSpans, Kerb, KERB, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, stretchOf, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
 import { JunctionCuts, junctionsOf, type JunctionPlan } from './junctions';
-import { levelsOf, type Levels } from './landSurface';
+import { Levels, levelsOf } from './landSurface';
+import type { BuiltSurface } from './builtSurface';
 
 /** Vertex-colour alpha for the plain finish, as the material libraries' `encodeFinish`: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. */
 function encodeFinish(roughness: number, metallic: number): number {
@@ -609,7 +610,9 @@ export class TownStreet {
    * On a land the town follows, the heights everything stands at (`landSurface.ts`): the roads climbing, each
    * lot's share on its pad, the kerbside things on the sidewalk. Null: everything at 0, as ever.
    */
-  private readonly levels: Levels | null;
+  private levels: Levels | null;
+  /** Every road of the town as laid out (what `levels` finds them by). */
+  private readonly allRoads: RoadPlan[];
   /** Each plot's index among the world's (its pad's, `BuiltSurface.padY`), by id. */
   private readonly plotIndex = new Map<number, number>();
   private readonly cuts: JunctionCuts;
@@ -681,6 +684,7 @@ export class TownStreet {
     this.junctions = junctionsOf(world, all);
     this.cuts = JunctionCuts.of(this.junctions);
     this.levels = levelsOf(world, all);
+    this.allRoads = all;
     world.plots.forEach((p, i) => this.plotIndex.set(p.id, i));
     this.paths = world.meta?.paths ?? [];
     this.fields = world.meta?.world?.fields ?? [];
@@ -829,6 +833,22 @@ export class TownStreet {
       world.junctions ? keyOf(world.junctions, () => JSON.stringify(world.junctions)) : '-',
       keyOf(world.plots, () => JSON.stringify(world.plots.map((p) => [p.id, p.x, p.z, p.w, p.d, p.public, p.entry]))),
     ].join('|');
+  }
+
+  /**
+   * The land under the town moved (the game's land shaped by the brushes): stands on `surface` from now on, the one its
+   * landscape solves (one surface for the land and what stands on it). Each chunk's key is worked out again; the next
+   * build plans again only the chunks whose heights moved (`chunkSig`). False on a town on flat land (no surface).
+   */
+  landMoved(surface: BuiltSurface): boolean {
+    if (!this.levels) return false;
+    // (Not one solved for other roads: a road the land's water bridged, which the world brought back laid out again.)
+    if (surface.roads.length !== this.allRoads.length || surface.roads.some((r, i) => r !== this.allRoads[i])) return false;
+    if (this.levels.surface !== surface) this.levels = new Levels(surface, this.allRoads);
+    this.ground_ = null;
+    this.statics = null;
+    this.version++;
+    return true;
   }
 
   /** Takes the world's things, houses and rooms as they are now (the layout stays: see `layoutKey`). */
