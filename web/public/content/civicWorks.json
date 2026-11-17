@@ -1,0 +1,215 @@
+{
+  "$comment": "Big working things for the town's named places (the fire station's engines, the garage's lift, the newspaper's press, the builders' yard), in the `community` buy category. Each points at a stand-in model until its own is built (tools/art/blender/families/civic_works.py, pack assets/packs/civic_works). Footprints stay within 6 × 6 tiles (sim-core `world::MAX_SIZE`).",
+  "objects": [
+    {
+      "id": "fireEngine",
+      "name": "Fire engine",
+      "model": "model.farm.tractor",
+      "footprint": [
+        3,
+        6
+      ],
+      "price": 25000,
+      "category": "community",
+      "group": "street",
+      "approach": "around",
+      "decor": 0.8,
+      "description": "A red fire engine with its ladder on the roof, polished and ready to go.",
+      "interactions": [
+        {
+          "id": "admire",
+          "label": "Admire the fire engine",
+          "anim": "admire",
+          "minutes": 10,
+          "effects": {
+            "fun": 0.25
+          },
+          "tags": [
+            "entertainment"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "carLift",
+      "name": "Car lift",
+      "model": "model.farm.tractor",
+      "footprint": [
+        3,
+        5
+      ],
+      "price": 8000,
+      "category": "community",
+      "group": "street",
+      "approach": "around",
+      "decor": 0.2,
+      "description": "A two-post lift with a car up on it, its wheels off.",
+      "interactions": [
+        {
+          "id": "admire",
+          "label": "Look at the car on the lift",
+          "anim": "admire",
+          "minutes": 8,
+          "effects": {
+            "fun": 0.1
+          },
+          "tags": [
+            "entertainment"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "printingPress",
+      "name": "Printing press",
+      "model": "model.deskCorner",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 6000,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.3,
+      "description": "The newspaper's press, rolling out tomorrow's pages.",
+      "interactions": [
+        {
+          "id": "watch",
+          "label": "Watch the press run",
+          "anim": "look",
+          "minutes": 10,
+          "effects": {
+            "fun": 0.12
+          },
+          "tags": [
+            "entertainment"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "firePole",
+      "name": "Fire pole",
+      "model": "model.floorLampSimple",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 400,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.2,
+      "description": "A brass pole down from the watch room.",
+      "interactions": []
+    },
+    {
+      "id": "hoseRack",
+      "name": "Hose rack",
+      "model": "model.spiceRack",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 300,
+      "category": "community",
+      "group": "shops",
+      "layer": "wall",
+      "decor": 0.2,
+      "description": "Coiled hoses on a rack on the wall.",
+      "interactions": []
+    },
+    {
+      "id": "serverRack",
+      "name": "Server rack",
+      "model": "model.ladderShelf",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 3000,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.1,
+      "description": "A tall cabinet of humming computers with blinking lights.",
+      "interactions": []
+    },
+    {
+      "id": "tyreRack",
+      "name": "Tyre rack",
+      "model": "model.shelvingIndustrial",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 400,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.1,
+      "description": "Steel shelves of new tyres.",
+      "interactions": []
+    },
+    {
+      "id": "toolChest",
+      "name": "Tool chest",
+      "model": "model.nightstand",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 350,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.1,
+      "description": "A red chest of drawers full of spanners.",
+      "interactions": []
+    },
+    {
+      "id": "timberStack",
+      "name": "Timber stack",
+      "model": "model.farm.hayStack",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 300,
+      "category": "community",
+      "group": "street",
+      "outdoors": true,
+      "decor": 0.1,
+      "description": "Planks and posts stacked under a tarpaulin.",
+      "interactions": []
+    },
+    {
+      "id": "cementMixer",
+      "name": "Cement mixer",
+      "model": "model.planterBox",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 600,
+      "category": "community",
+      "group": "street",
+      "outdoors": true,
+      "decor": 0.1,
+      "description": "A small orange mixer, its drum crusted grey.",
+      "interactions": []
+    },
+    {
+      "id": "flagPole",
+      "name": "Flagpole",
+      "model": "model.lampPost",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 500,
+      "category": "community",
+      "group": "street",
+      "outdoors": true,
+      "decor": 0.3,
+      "description": "A white pole with the town flag at the top.",
+      "interactions": []
+    }
+  ]
+}

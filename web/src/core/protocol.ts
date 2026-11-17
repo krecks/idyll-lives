@@ -576,6 +576,8 @@ export interface WorldMeta {
   places?: TownPlace[];
   /** Living town: each main town's centre, the square and the high street. */
   centre?: { area: number; poly: [number, number][] }[];
+  /** Living town: how the lots of the town's named places look from outside, by plot index (`PlotSlot.dress`). */
+  lotLooks?: Record<number, LotLook>;
   // pin:living-town-meta end
   /**
    * Big worlds: how high the land stands over the level the towns are built at, a grid of `cell` m
@@ -671,6 +673,18 @@ export interface TownPlace {
   /** Career categories (`JobView.category`) whose workers are shown as working here. */
   work?: string[];
   area: number;
+}
+
+/**
+ * How a named place's lot (a town hall, a school, a shop on the high street: `game/placeLots.ts`) looks
+ * from outside, as a backdrop building of its kind would: its use, storeys (3 m each, the ground floor
+ * the only real one inside unless its layout has a storey above), roof and colours (`BackdropBuilding`'s).
+ */
+export interface LotLook {
+  use: BackdropUse;
+  storeys: number;
+  roof: BackdropBuilding['roof'];
+  look: number;
 }
 // pin:living-town-types end
 

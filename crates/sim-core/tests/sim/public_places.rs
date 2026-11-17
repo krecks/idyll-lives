@@ -36,50 +36,27 @@ fn footprint(content: &Value, def: &str) -> (i64, i64) {
 /// What `stamp` gives: walls, doors, windows, objects, and where visitors arrive.
 type Stamped = (Vec<Value>, Vec<Value>, Vec<Value>, Vec<Value>, [f64; 2]);
 
-/// A public place stamped on a plot at `(x0, 0)` of a medium lot's size, turned round (the south
-/// side of the street) like `town.ts` does it: walls, doors, windows, objects (turns kept,
-/// offsets the other way) and where visitors arrive.
-fn stamp(content: &Value, place: &Value, (w, d): (i64, i64), x0: i64, rotated: bool) -> Stamped {
-    let n = |v: &Value| v.as_i64().unwrap();
-    let list = |k: &str| place[k].as_array().cloned().unwrap_or_default();
-    let walls = list("walls")
-        .iter()
-        .map(|c| {
-            let c: Vec<i64> = c.as_array().unwrap().iter().map(n).collect();
-            if rotated {
-                json!([x0 + w - c[0], d - c[1], x0 + w - c[2], d - c[3]])
-            } else {
-                json!([x0 + c[0], c[1], x0 + c[2], c[3]])
-            }
-        })
-        .collect();
-    let edge = |e: &Value| {
-        let (x, z, axis) = (n(&e["x"]), n(&e["z"]), e["axis"].as_str().unwrap());
-        match (rotated, axis) {
-            (false, _) => json!({"x": x0 + x, "z": z, "axis": axis}),
-            (true, "x") => json!({"x": x0 + w - 1 - x, "z": d - z, "axis": "x"}),
-            (true, _) => json!({"x": x0 + w - x, "z": d - 1 - z, "axis": "z"}),
-        }
-    };
-    let doors = list("doors").iter().map(edge).collect();
-    let windows = list("windows").iter().map(edge).collect();
-    let objects = list("objects")
-        .iter()
-        .map(|o| {
-            let def = o["def"].as_str().unwrap();
-            let (fw, fd) = footprint(content, def);
-            let rot = n(&o["rot"]);
-            let (ow, od) = if rot % 2 == 0 { (fw, fd) } else { (fd, fw) };
-            let offset = o["offset"].as_array().map(|v| [n(&v[0]), n(&v[1])]).unwrap_or([0, 0]);
-            if rotated {
-                json!({"def": def, "x": x0 + w - n(&o["x"]) - ow, "z": d - n(&o["z"]) - od, "rot": (rot + 2) % 4,
-                       "turn": o["turn"].as_i64().unwrap_or(0), "offset": [-offset[0], -offset[1]]})
-            } else {
-                json!({"def": def, "x": x0 + n(&o["x"]), "z": n(&o["z"]), "rot": rot,
-                       "turn": o["turn"].as_i64().unwrap_or(0), "offset": offset})
-            }
-        })
-        .collect();
+/// A public place stamped on a plot at `(x0, 0)` of its lot's size (`frame`), turned round (the
+/// south side of the street) like `town.ts` does it: walls, doors, windows, objects (turns kept,
+/// offsets the other way) and where visitors arrive. Its storey above (`upper`), if it has one, goes
+/// `rows` further on (the lot's depth: its next block of rows), as `layoutTown` lifts it by the town's.
+fn stamp(
+    content: &Value,
+    place: &Value,
+    (w, d): (i64, i64),
+    x0: i64,
+    rotated: bool,
+    rows: i64,
+) -> Stamped {
+    let (mut walls, mut doors, mut windows, mut objects) =
+        stamp_floor(content, place, (w, d), x0, rotated, 0);
+    if place["upper"].is_object() {
+        let up = stamp_floor(content, &place["upper"], (w, d), x0, rotated, rows);
+        walls.extend(up.0);
+        doors.extend(up.1);
+        windows.extend(up.2);
+        objects.extend(up.3);
+    }
     let e = place["entry"]
         .as_array()
         .map_or([w as f64 / 2.0, 1.5], |e| {
@@ -93,6 +70,63 @@ fn stamp(content: &Value, place: &Value, (w, d): (i64, i64), x0: i64, rotated: b
     (walls, doors, windows, objects, entry)
 }
 
+/// One floor of a place stamped as `stamp` does it, `lift` rows further on: walls, doors, windows, objects.
+fn stamp_floor(
+    content: &Value,
+    floor: &Value,
+    (w, d): (i64, i64),
+    x0: i64,
+    rotated: bool,
+    lift: i64,
+) -> (Vec<Value>, Vec<Value>, Vec<Value>, Vec<Value>) {
+    let n = |v: &Value| v.as_i64().unwrap();
+    let list = |k: &str| floor[k].as_array().cloned().unwrap_or_default();
+    let walls = list("walls")
+        .iter()
+        .map(|c| {
+            let c: Vec<i64> = c.as_array().unwrap().iter().map(n).collect();
+            if rotated {
+                json!([
+                    x0 + w - c[0],
+                    d - c[1] + lift,
+                    x0 + w - c[2],
+                    d - c[3] + lift
+                ])
+            } else {
+                json!([x0 + c[0], c[1] + lift, x0 + c[2], c[3] + lift])
+            }
+        })
+        .collect();
+    let edge = |e: &Value| {
+        let (x, z, axis) = (n(&e["x"]), n(&e["z"]), e["axis"].as_str().unwrap());
+        match (rotated, axis) {
+            (false, _) => json!({"x": x0 + x, "z": z + lift, "axis": axis}),
+            (true, "x") => json!({"x": x0 + w - 1 - x, "z": d - z + lift, "axis": "x"}),
+            (true, _) => json!({"x": x0 + w - x, "z": d - 1 - z + lift, "axis": "z"}),
+        }
+    };
+    let doors = list("doors").iter().map(edge).collect();
+    let windows = list("windows").iter().map(edge).collect();
+    let objects = list("objects")
+        .iter()
+        .map(|o| {
+            let def = o["def"].as_str().unwrap();
+            let (fw, fd) = footprint(content, def);
+            let rot = n(&o["rot"]);
+            let (ow, od) = if rot % 2 == 0 { (fw, fd) } else { (fd, fw) };
+            let offset = o["offset"].as_array().map(|v| [n(&v[0]), n(&v[1])]).unwrap_or([0, 0]);
+            if rotated {
+                json!({"def": def, "x": x0 + w - n(&o["x"]) - ow, "z": d - n(&o["z"]) - od + lift, "rot": (rot + 2) % 4,
+                       "turn": o["turn"].as_i64().unwrap_or(0), "offset": [-offset[0], -offset[1]]})
+            } else {
+                json!({"def": def, "x": x0 + n(&o["x"]), "z": n(&o["z"]) + lift, "rot": rot,
+                       "turn": o["turn"].as_i64().unwrap_or(0), "offset": offset})
+            }
+        })
+        .collect();
+    (walls, doors, windows, objects)
+}
+
 fn plot_size(houses: &Value) -> (i64, i64) {
     (
         houses["plot"]["width"].as_i64().unwrap(),
@@ -100,14 +134,33 @@ fn plot_size(houses: &Value) -> (i64, i64) {
     )
 }
 
-/// Every place, on either side of the street, loads with all its things where the layout put
-/// them, and every thing someone can use is within reach of where visitors arrive.
+/// The lot a place is stamped on here: a named place's own (`kind: place`, its `lot`), else the medium
+/// lot (`plot`; an outdoor place, smaller, stands in its corner with room in front of its things).
+fn frame(houses: &Value, place: &Value) -> (i64, i64) {
+    let lot = &place["lot"];
+    if place["kind"] == "place" {
+        (
+            lot["width"].as_i64().unwrap(),
+            lot["depth"].as_i64().unwrap(),
+        )
+    } else {
+        plot_size(houses)
+    }
+}
+
+/// Storeys a place's lot has: two with a storey above (`upper`), as `layoutTown` sets them.
+fn storeys(place: &Value) -> i64 {
+    if place["upper"].is_object() { 2 } else { 1 }
+}
+
+/// Every place, on its own lot and on either side of the street, loads with all its things where
+/// the layout put them (a storey above on the lot's next rows), and every thing someone can use is
+/// within reach of where visitors arrive, upstairs by the stairs.
 #[test]
 fn every_public_place_loads_on_either_side_of_the_street() {
     let merged = common::content();
     let content: Value = serde_json::from_str(&merged).unwrap();
     let houses = houses();
-    let (w, d) = plot_size(&houses);
     let places = houses["parks"].as_array().unwrap();
     assert!(
         places.len() >= 6,
@@ -120,12 +173,13 @@ fn every_public_place_loads_on_either_side_of_the_street() {
         "shops are shells with walls"
     );
     for place in places {
+        let (w, d) = frame(&houses, place);
         for rotated in [false, true] {
             let id = format!("{}{}", place["id"], if rotated { " (turned)" } else { "" });
             let (walls, doors, windows, objects, entry) =
-                stamp(&content, place, (w, d), 0, rotated);
+                stamp(&content, place, (w, d), 0, rotated, d);
             let lot = json!({
-                "width": w, "depth": d, "walls": walls, "doors": doors, "windows": windows, "objects": objects,
+                "width": w, "depth": d, "storeys": storeys(place), "walls": walls, "doors": doors, "windows": windows, "objects": objects,
                 "plots": [{"name": place["name"], "x": 0, "z": 0, "w": w, "d": d, "public": true, "entry": entry}],
             });
             let world = World::from_json(&merged, &lot.to_string(), 1)
@@ -155,11 +209,30 @@ fn every_public_place_loads_on_either_side_of_the_street() {
             let mut seen = BTreeSet::from([start]);
             let mut open = VecDeque::from([start]);
             while let Some((x, z)) = open.pop_front() {
-                for (nx, nz) in [(x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1)] {
-                    if nav.can_step(x, z, nx, nz) && seen.insert((nx, nz)) {
-                        open.push_back((nx, nz));
+                let steps = [(x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1)]
+                    .into_iter()
+                    .filter(|&(nx, nz)| nav.can_step(x, z, nx, nz));
+                // Up or down the stairs: from the top step to the landing above, and back.
+                let stairs = world
+                    .stair_map()
+                    .link(x, z)
+                    .filter(|&(lx, lz)| nav.tile_free(lx, lz));
+                for next in steps.chain(stairs) {
+                    if seen.insert(next) {
+                        open.push_back(next);
                     }
                 }
+            }
+            if place["upper"].is_object() {
+                assert_eq!(
+                    world.storey_of(d as i32),
+                    1,
+                    "{id}: its storey above on the lot's next rows"
+                );
+                assert!(
+                    seen.iter().any(|&(_, z)| world.storey_of(z) == 1),
+                    "{id}: the stairs lead up to the storey above"
+                );
             }
             for o in &world.objects {
                 let def = &world.content.objects[o.def];
@@ -188,6 +261,127 @@ fn every_public_place_loads_on_either_side_of_the_street() {
     }
 }
 
+/// The places a town's named places stand on (`kind: place`): each on a lot of its own, entered by
+/// a door in the front of its walls with visitors arriving in front of it; the hotel, the school and
+/// the town hall with a storey above and stairs up to it.
+#[test]
+fn named_places_have_their_own_lot_and_a_front_door() {
+    let houses = houses();
+    let places: Vec<&Value> = houses["parks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|p| p["kind"] == "place")
+        .collect();
+    assert!(places.len() >= 28, "{} places", places.len());
+    for place in places {
+        let id = &place["id"];
+        let (w, d) = frame(&houses, place);
+        assert!(place["lot"].is_object(), "{id}: a lot of its own");
+        let walls: Vec<Vec<i64>> = place["walls"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{id}: walls"))
+            .iter()
+            .map(|c| {
+                c.as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_i64().unwrap())
+                    .collect()
+            })
+            .collect();
+        let front = walls.iter().map(|c| c[1].min(c[3])).min().unwrap();
+        let (x0, x1) = (
+            walls.iter().map(|c| c[0].min(c[2])).min().unwrap(),
+            walls.iter().map(|c| c[0].max(c[2])).max().unwrap(),
+        );
+        let back = walls.iter().map(|c| c[1].max(c[3])).max().unwrap();
+        assert!(
+            x0 >= 1 && x1 < w && back <= d - 2,
+            "{id}: its walls on its lot"
+        );
+        let door = &place["doors"][0];
+        assert_eq!(
+            door["axis"], "x",
+            "{id}: its door in a wall along the street"
+        );
+        assert_eq!(
+            door["z"].as_i64(),
+            Some(front),
+            "{id}: its door in its front wall"
+        );
+        let entry = place["entry"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{id}: entry"));
+        assert!(
+            entry[1].as_f64().unwrap() < front as f64,
+            "{id}: visitors arrive in front of it"
+        );
+        assert!(
+            place["windows"].as_array().is_some_and(|w| !w.is_empty()),
+            "{id}: windows"
+        );
+        let upper = ["hotel", "school", "townHall"].contains(&id.as_str().unwrap());
+        assert_eq!(place["upper"].is_object(), upper, "{id}: a storey above");
+        if upper {
+            assert!(
+                place["objects"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|o| o["def"].as_str().is_some_and(|d| d.starts_with("stairs"))),
+                "{id}: stairs up"
+            );
+        }
+    }
+}
+
+/// A place's plot may say when it is open (the town file's `plots[].hours`): the plot knows it,
+/// the save keeps it, and a plot without hours is open at any hour and saves none.
+#[test]
+fn a_places_hours_load_and_are_saved() {
+    let merged = common::content();
+    let lot = json!({
+        "width": 52, "depth": 44,
+        "plots": [{"name": "Home", "x": 0, "z": 0, "w": 26, "d": 22, "entry": [13.0, 1.5]},
+                  {"name": "Shop", "x": 26, "z": 0, "w": 26, "d": 22, "public": true, "entry": [39.0, 1.5],
+                   "hours": {"open": 540, "close": 1080, "days": 0b0011111}},
+                  {"name": "Inn", "x": 0, "z": 22, "w": 26, "d": 22, "public": true,
+                   "hours": {"open": 1080, "close": 120, "days": 0b1000000}}],
+        "households": [{"name": "Ada's", "plot": 0, "player": true}],
+        "sims": [{"name": "Ada", "traits": ["cheerful"], "x": 13.0, "z": 3.5}],
+    });
+    let world = World::from_json(&merged, &lot.to_string(), 1).unwrap();
+    let (home, shop, inn) = (&world.plots[0], &world.plots[1], &world.plots[2]);
+    assert_eq!(home.hours, None);
+    assert!(home.open_at(1, 0.0), "a home is always open");
+    // Day 1 is a Monday; days are bits from Monday.
+    assert!(shop.open_at(1, 540.0) && shop.open_at(5, 1079.0));
+    assert!(
+        !shop.open_at(1, 539.0) && !shop.open_at(1, 1080.0),
+        "closed out of hours"
+    );
+    assert!(
+        !shop.open_at(6, 600.0) && !shop.open_at(7, 600.0),
+        "closed at the weekend"
+    );
+    // Open on Sundays from 18:00 into Monday's small hours.
+    assert!(inn.open_at(7, 1200.0) && inn.open_at(8, 60.0));
+    assert!(!inn.open_at(8, 1200.0) && !inn.open_at(7, 60.0) && !inn.open_at(8, 120.0));
+    let saved: Value = serde_json::from_str(&world.save_json()).unwrap();
+    assert!(
+        saved["plots"][0].get("hours").is_none(),
+        "none saved for a home"
+    );
+    assert_eq!(
+        saved["plots"][1]["hours"],
+        json!({"open": 540, "close": 1080, "days": 31})
+    );
+    let loaded = World::from_save_json(&merged, &saved.to_string()).unwrap();
+    assert_eq!(loaded.plots[1].hours, world.plots[1].hours);
+    assert_eq!(loaded.plots[2].hours, world.plots[2].hours);
+}
+
 /// Houses and places only use things the content has.
 #[test]
 fn houses_and_places_use_known_things() {
@@ -204,7 +398,7 @@ fn houses_and_places_use_known_things() {
                 .as_array()
                 .unwrap()
                 .iter()
-                .map(|p| &p["objects"]),
+                .flat_map(|p| [&p["objects"], &p["upper"]["objects"]]),
         );
     let mut n = 0;
     for o in lists.flat_map(|l| l.as_array().into_iter().flatten()) {
@@ -248,16 +442,20 @@ fn town_beside_edited(id: &str, n: usize, edit: impl Fn(&mut Value)) -> (World, 
         .iter()
         .find(|p| p["id"] == id)
         .unwrap_or_else(|| panic!("a place '{id}'"));
-    let (walls, doors, windows, objects, entry) = stamp(&content, market, (w, d), w, false);
+    // (The place on its own lot beside the home's, the town as deep as the deeper.)
+    let (pw, pd) = frame(&houses, market);
+    let depth = d.max(pd);
+    let (walls, doors, windows, objects, entry) =
+        stamp(&content, market, (pw, pd), w, false, depth);
     let sims: Vec<Value> = ["Ada", "Bo", "Cy"][..n]
         .iter()
         .enumerate()
         .map(|(i, name)| json!({"name": name, "traits": ["cheerful"], "x": w as f64 / 2.0 + i as f64, "z": 3.5}))
         .collect();
     let lot = json!({
-        "width": w * 2, "depth": d, "walls": walls, "doors": doors, "windows": windows, "objects": objects,
+        "width": w + pw, "depth": depth, "storeys": storeys(market), "walls": walls, "doors": doors, "windows": windows, "objects": objects,
         "plots": [{"name": "Home", "x": 0, "z": 0, "w": w, "d": d, "entry": [w as f64 / 2.0, 1.5]},
-                  {"name": market["name"], "x": w, "z": 0, "w": w, "d": d, "public": true, "entry": entry}],
+                  {"name": market["name"], "x": w, "z": 0, "w": pw, "d": pd, "public": true, "entry": entry}],
         "households": [{"name": "Ada's", "plot": 0, "player": true, "funds": 500}],
         "sims": sims,
     });
@@ -563,16 +761,16 @@ fn every_post_in_town_has_someone_behind_it() {
     let merged = common::content();
     let content: Value = serde_json::from_str(&merged).unwrap();
     let houses = houses();
-    let (w, d) = plot_size(&houses);
     let mut most = 0;
     for place in houses["parks"].as_array().unwrap() {
+        let (w, d) = frame(&houses, place);
         let mut counts = vec![];
         for rotated in [false, true] {
             let id = format!("{}{}", place["id"], if rotated { " (turned)" } else { "" });
             let (walls, doors, windows, objects, entry) =
-                stamp(&content, place, (w, d), 0, rotated);
+                stamp(&content, place, (w, d), 0, rotated, d);
             let lot = json!({
-                "width": w, "depth": d, "walls": walls, "doors": doors, "windows": windows, "objects": objects,
+                "width": w, "depth": d, "storeys": storeys(place), "walls": walls, "doors": doors, "windows": windows, "objects": objects,
                 "plots": [{"name": place["name"], "x": 0, "z": 0, "w": w, "d": d, "public": true, "entry": entry}],
             });
             let world = World::from_json(&merged, &lot.to_string(), 1).unwrap();
@@ -1122,9 +1320,9 @@ fn an_older_towns_counters_move_out_from_the_wall_for_their_server() {
     let merged = common::content();
     let content: Value = serde_json::from_str(&merged).unwrap();
     let houses = houses();
-    let (w, d) = plot_size(&houses);
     let mut moved = 0;
     for place in houses["parks"].as_array().unwrap() {
+        let (w, d) = frame(&houses, place);
         let mut old = place.clone();
         let mut back = 0;
         for o in old["objects"].as_array_mut().unwrap() {
@@ -1142,9 +1340,10 @@ fn an_older_towns_counters_move_out_from_the_wall_for_their_server() {
         }
         for rotated in [false, true] {
             let id = format!("{}{}", place["id"], if rotated { " (turned)" } else { "" });
-            let (walls, doors, windows, objects, entry) = stamp(&content, &old, (w, d), 0, rotated);
+            let (walls, doors, windows, objects, entry) =
+                stamp(&content, &old, (w, d), 0, rotated, d);
             let lot = json!({
-                "width": w, "depth": d, "walls": walls, "doors": doors, "windows": windows, "objects": objects,
+                "width": w, "depth": d, "storeys": storeys(place), "walls": walls, "doors": doors, "windows": windows, "objects": objects,
                 "plots": [{"name": place["name"], "x": 0, "z": 0, "w": w, "d": d, "public": true, "entry": entry}],
             });
             let world = World::from_json(&merged, &lot.to_string(), 1).unwrap();

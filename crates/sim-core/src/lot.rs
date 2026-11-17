@@ -248,6 +248,10 @@ pub struct PlotRaw {
     pub area: Option<u32>,
     #[serde(default)]
     pub kind: Option<crate::travel::PlotKind>,
+    /// When a public place is open (`world::PlotHours`, as its place's `TownPlace.hours` on the
+    /// page); absent: always.
+    #[serde(default)]
+    pub hours: Option<crate::world::PlotHours>,
 }
 
 #[derive(Debug, Deserialize)]

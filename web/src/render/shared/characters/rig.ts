@@ -21,7 +21,7 @@ import type { Stride } from './stride';
 
 /**
  * Rows in the pose texture: the town's residents, then its vendors and shopkeepers, as many as the snapshot layout holds
- * (`maxSims` + `maxStaff`: 768 + 48; 240 + 48 before 0.8.3). Kept with the layout (`core/snapshot.ts`), which refuses
+ * (`maxSims` + `maxStaff`: 768 + 128; 768 + 48 and 240 + 48 before). Kept with the layout (`core/snapshot.ts`), which refuses
  * one that would not fit.
  */
 export { MAX_CHARACTERS } from '../../../core/snapshot';

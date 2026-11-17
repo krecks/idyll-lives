@@ -13,7 +13,7 @@
  */
 
 import type { Content } from '../content/content';
-import type { GameKind, LandscapeParams, Lifespan, PorchInfo, TownArea, TownExit, WorldLook, WorldMeta, WorldOptions, WorldSize } from '../core/protocol';
+import type { GameKind, LandscapeParams, Lifespan, LotLook, PorchInfo, TownArea, TownExit, TownPlace, WorldLook, WorldMeta, WorldOptions, WorldSize } from '../core/protocol';
 import { fetchText } from '../content/content';
 import { householdBonds, householdSpawns, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { homePrice } from './price';
@@ -89,8 +89,13 @@ export interface PublicTemplate {
   id: string;
   name: string;
   description: string;
-  /** `park` (default), `shop` (labels, and which ones a town gets) or `outdoor`: a place out in the countryside of a big world, reached by a trail (`macro.ts`). */
-  kind?: 'park' | 'shop' | 'outdoor';
+  /**
+   * `park` (default), `shop` (labels, and which ones a town gets), `outdoor`: a place out in the
+   * countryside of a big world, reached by a trail (`macro.ts`), or `place`: the building of one of
+   * the town's named places (a town hall, a school, a shop on the high street: `placeLots.ts`), on a
+   * lot of its own size, never drawn among the places a town's lot mix wants (`wantedLots`).
+   */
+  kind?: 'park' | 'shop' | 'outdoor' | 'place';
   /** Outdoor places: the land they go on (by the water, up a hill, in the woods, in a meadow). */
   site?: 'water' | 'hill' | 'woods' | 'meadow';
   /** The lot it is drawn for, if not `Templates.plot` (outdoor places: their own, smaller). */
@@ -103,6 +108,8 @@ export interface PublicTemplate {
   paths?: Rect[];
   /** Where visitors arrive (plot coordinates); default: the middle of the street front. */
   entry?: [number, number];
+  /** The storey above (a hotel's rooms, a school's classrooms), laid out like the ground: stamped on the town's next rows, as a house's is (`layoutTown`). */
+  upper?: { walls: Wall[]; doors: Door[]; windows?: Door[]; objects: Placement[] };
 }
 
 /**
@@ -138,7 +145,7 @@ export type OldTownSize = 'small' | 'medium' | 'large';
 
 export interface PlotSlot {
   index: number;
-  /** `park`, `shop` and `outdoor` are public places (see `PublicTemplate`). */
+  /** `park`, `shop` and `outdoor` are public places (see `PublicTemplate`); a named place's lot is a `shop` (`placeLots.ts`). */
   kind: 'house' | 'park' | 'shop' | 'outdoor';
   /** The area of a big world it is in (`OpenWorldDraft.areas`; missing: the town, area 0). */
   area?: number;
@@ -160,6 +167,8 @@ export interface PlotSlot {
   anchor?: number;
   /** A farm lot's fields and farmyard, in plot coordinates like the house layout. */
   farm?: { objects: Placement[]; fields: Rect[] };
+  /** A named place's lot (`placeLots.ts`): how it looks from outside (the town file's `meta.lotLooks`). */
+  dress?: LotLook;
 }
 
 /**
@@ -256,6 +265,7 @@ export interface TownMeta {
   backdrop?: WorldMeta['backdrop'];
   places?: WorldMeta['places'];
   centre?: WorldMeta['centre'];
+  lotLooks?: WorldMeta['lotLooks'];
 }
 
 /** Open land round a town's lots (m). */
@@ -424,19 +434,22 @@ export function onLot(t: Templates, h: HouseTemplate, s: Pick<PlotSlot, 'lot' | 
   return { ...move(h), spawns: h.spawns.map(([x, z]) => [x + dx, z]), upper: h.upper && move(h.upper), basement: h.basement && move(h.basement) };
 }
 
-/** A public place moved onto plot `s`'s lot like a house layout (`onLot`): centred across it, front kept at the street. */
+/** A public place moved onto plot `s`'s lot like a house layout (`onLot`): centred across it, front kept at the street, its storey above with it. */
 export function placeOnLot(t: Templates, p: PublicTemplate, s: Pick<PlotSlot, 'lot' | 'w' | 'd'>): PublicTemplate {
   const dx = Math.floor((slotDims(t, s).width - (p.lot ?? t.plot).width) / 2);
   if (dx === 0) return p;
   const door = (d: Door): Door => ({ ...d, x: d.x + dx });
+  const wall = ([x0, z0, x1, z1]: Wall): Wall => [x0 + dx, z0, x1 + dx, z1];
+  const thing = (o: Placement): Placement => ({ ...o, x: o.x + dx });
   return {
     ...p,
-    walls: p.walls?.map(([x0, z0, x1, z1]) => [x0 + dx, z0, x1 + dx, z1]),
+    walls: p.walls?.map(wall),
     doors: p.doors?.map(door),
     windows: p.windows?.map(door),
-    objects: p.objects.map((o) => ({ ...o, x: o.x + dx })),
+    objects: p.objects.map(thing),
     paths: p.paths?.map((r) => ({ ...r, x: r.x + dx })),
     entry: p.entry && [p.entry[0] + dx, p.entry[1]],
+    upper: p.upper && { walls: p.upper.walls.map(wall), doors: p.upper.doors.map(door), windows: p.upper.windows?.map(door), objects: p.upper.objects.map(thing) },
   };
 }
 
@@ -705,10 +718,11 @@ export type Unplaced = Omit<PlotSlot, 'index' | 'x' | 'z' | 'facing'>;
 export function wantedLots(content: Content, t: Templates, mix: LotMix, spec: SizeSpec, rand: Rand, { park = true, avoid = [] as readonly string[] } = {}): Unplaced[] {
   const [fewest, most] = spec.places ?? mix.places;
   const count = fewest + Math.floor(rand() * (most - fewest + 1));
-  // The places this world would rather have first, in no particular order, then the rest.
+  // The places this world would rather have first, in no particular order, then the rest (not the
+  // countryside's, nor the named places' buildings: `placeLots.ts` puts those down).
   const prefer = mix.prefer ?? [];
   const others = shuffled(
-    t.parks.slice(1).filter((p) => p.kind !== 'outdoor'),
+    t.parks.slice(1).filter((p) => p.kind !== 'outdoor' && p.kind !== 'place'),
     rand,
   )
     .sort((a, b) => Number(!prefer.includes(a.id)) - Number(!prefer.includes(b.id)) || Number(avoid.includes(a.id)) - Number(avoid.includes(b.id)))
@@ -1148,7 +1162,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     // Visitors arrive in front of the door (the first spawn point of the house layout).
     const spawn = layoutOf(s)?.spawns[0] ?? placeOf(s)?.entry;
     const entry = turnOnto(t, s).point(spawn ?? [slotDims(t, s).width / 2, 1.5]);
-    return { name: s.name, ...plotRect(t, s), public: s.kind !== 'house', entry, storeys: layoutOf(s)?.upper ? 2 : 1 };
+    return { name: s.name, ...plotRect(t, s), public: s.kind !== 'house', entry, storeys: (layoutOf(s) ?? placeOf(s))?.upper ? 2 : 1 };
   });
   const storeys = Math.max(1, ...plots.map((p) => p.storeys));
   let basement = false;
@@ -1161,6 +1175,11 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       if (!place) continue;
       shell(s, place);
       placeAll(s, place.objects);
+      // The storey above (a named place's), on its own rows of the lot as a house's.
+      if (place.upper) {
+        shell(s, place.upper, town.depth);
+        placeAll(s, place.upper.objects, town.depth);
+      }
       if (place.doors?.[0]) {
         pathTo(s, place.doors[0]);
         porchOver(s, place, place.doors[0]);
@@ -1486,10 +1505,19 @@ export function assembleTown(
   const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (rand() * 2 ** 31) >>> 0, world: worldLook(town, fields), gardenFences: true };
   const open = openWorldFields(town, drives, cars);
   if (open.meta) Object.assign(meta, open.meta);
+  // How the named places' lots look from outside, by plot (`PlotSlot.dress`).
+  const lotLooks: Record<number, LotLook> = {};
+  town.slots.forEach((s, i) => {
+    if (s.dress) lotLooks[i] = s.dress;
+  });
+  if (Object.keys(lotLooks).length) meta.lotLooks = lotLooks;
   // Residents leave town (for work) where its roads lead out of it.
   const exits = open.exits ?? roadExits(town.roads, town.width, town.depth);
   const plotKinds = town.slots.map((s): PlotKind => (s.kind === 'house' ? (s.lot === 'farm' ? 'farm' : 'home') : s.kind === 'shop' ? 'shop' : s.kind === 'outdoor' ? 'countryside' : 'public'));
-  const filed = plots.map((p, i) => ({ ...p, area: town.slots[i].area ?? 0, kind: plotKinds[i] }));
+  // A public lot's opening hours, as its place has them (`TownPlace.hours`; sim-core `Plot::open_at`).
+  const hours = new Map<number, NonNullable<TownPlace['hours']>>();
+  for (const p of town.open?.places ?? []) if (p.plot !== undefined && p.hours) hours.set(p.plot, p.hours);
+  const filed = plots.map((p, i) => ({ ...p, area: town.slots[i].area ?? 0, kind: plotKinds[i], ...(hours.has(i) ? { hours: hours.get(i) } : {}) }));
   return JSON.stringify({
     mode,
     lifespan,

@@ -1448,6 +1448,943 @@
     {"def": "bench", "x": 6, "z": 11, "rot": 0},
     {"def": "garden.fern", "x": 8, "z": 1, "rot": 0}
    ]
+  },
+  {
+   "id": "townHall",
+   "name": "Town Hall",
+   "description": "The town council meets here; the registry, the mayor's office and the council chamber upstairs.",
+   "kind": "place",
+   "lot": {"width": 30, "depth": 24},
+   "walls": [
+    [5, 4, 25, 4],
+    [5, 17, 25, 17],
+    [5, 4, 5, 17],
+    [25, 4, 25, 17]
+   ],
+   "doors": [
+    {"x": 15, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 7, "z": 4, "axis": "x"},
+    {"x": 22, "z": 4, "axis": "x"},
+    {"x": 23, "z": 4, "axis": "x"},
+    {"x": 5, "z": 9, "axis": "z"},
+    {"x": 5, "z": 10, "axis": "z"},
+    {"x": 25, "z": 9, "axis": "z"},
+    {"x": 25, "z": 10, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 5, "z": 1, "w": 20, "d": 3}
+   ],
+   "entry": [15.5, 2.5],
+   "objects": [
+    {"def": "stairs", "x": 6, "z": 5, "rot": 0}
+   ],
+   "upper": {
+    "walls": [
+     [5, 4, 25, 4],
+     [5, 17, 25, 17],
+     [5, 4, 5, 17],
+     [25, 4, 25, 17]
+    ],
+    "doors": [],
+    "windows": [
+     {"x": 6, "z": 4, "axis": "x"},
+     {"x": 7, "z": 4, "axis": "x"},
+     {"x": 22, "z": 4, "axis": "x"},
+     {"x": 23, "z": 4, "axis": "x"},
+     {"x": 15, "z": 4, "axis": "x"},
+     {"x": 5, "z": 9, "axis": "z"},
+     {"x": 5, "z": 10, "axis": "z"},
+     {"x": 25, "z": 9, "axis": "z"},
+     {"x": 25, "z": 10, "axis": "z"}
+    ],
+    "objects": []
+   }
+  },
+  {
+   "id": "parishHall",
+   "name": "Parish Hall",
+   "description": "A hall for the parish: meetings, jumble sales and the Tuesday choir, with a kitchen for the tea.",
+   "kind": "place",
+   "lot": {"width": 22, "depth": 20},
+   "walls": [
+    [5, 4, 17, 4],
+    [5, 14, 17, 14],
+    [5, 4, 5, 14],
+    [17, 4, 17, 14]
+   ],
+   "doors": [
+    {"x": 11, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 7, "z": 4, "axis": "x"},
+    {"x": 14, "z": 4, "axis": "x"},
+    {"x": 15, "z": 4, "axis": "x"},
+    {"x": 5, "z": 8, "axis": "z"},
+    {"x": 5, "z": 9, "axis": "z"},
+    {"x": 17, "z": 8, "axis": "z"},
+    {"x": 17, "z": 9, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 5, "z": 1, "w": 12, "d": 3}
+   ],
+   "entry": [11.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "church",
+   "name": "Church",
+   "description": "A stone church with a nave, a chancel and a vestry; open to all for a quiet moment.",
+   "kind": "place",
+   "lot": {"width": 22, "depth": 34},
+   "walls": [
+    [5, 4, 17, 4],
+    [5, 30, 17, 30],
+    [5, 4, 5, 30],
+    [17, 4, 17, 30]
+   ],
+   "doors": [
+    {"x": 11, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 7, "z": 4, "axis": "x"},
+    {"x": 14, "z": 4, "axis": "x"},
+    {"x": 15, "z": 4, "axis": "x"},
+    {"x": 5, "z": 16, "axis": "z"},
+    {"x": 5, "z": 17, "axis": "z"},
+    {"x": 17, "z": 16, "axis": "z"},
+    {"x": 17, "z": 17, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 5, "z": 1, "w": 12, "d": 3}
+   ],
+   "entry": [11.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "school",
+   "name": "School",
+   "description": "Classrooms, a hall that is the canteen at lunchtime, a staff room and a playground.",
+   "kind": "place",
+   "lot": {"width": 44, "depth": 30},
+   "walls": [
+    [5, 4, 39, 4],
+    [5, 20, 39, 20],
+    [5, 4, 5, 20],
+    [39, 4, 39, 20]
+   ],
+   "doors": [
+    {"x": 22, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 7, "z": 4, "axis": "x"},
+    {"x": 36, "z": 4, "axis": "x"},
+    {"x": 37, "z": 4, "axis": "x"},
+    {"x": 5, "z": 11, "axis": "z"},
+    {"x": 5, "z": 12, "axis": "z"},
+    {"x": 39, "z": 11, "axis": "z"},
+    {"x": 39, "z": 12, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 5, "z": 1, "w": 34, "d": 3}
+   ],
+   "entry": [22.5, 2.5],
+   "objects": [
+    {"def": "stairs", "x": 6, "z": 5, "rot": 0}
+   ],
+   "upper": {
+    "walls": [
+     [5, 4, 39, 4],
+     [5, 20, 39, 20],
+     [5, 4, 5, 20],
+     [39, 4, 39, 20]
+    ],
+    "doors": [],
+    "windows": [
+     {"x": 6, "z": 4, "axis": "x"},
+     {"x": 7, "z": 4, "axis": "x"},
+     {"x": 36, "z": 4, "axis": "x"},
+     {"x": 37, "z": 4, "axis": "x"},
+     {"x": 22, "z": 4, "axis": "x"},
+     {"x": 5, "z": 11, "axis": "z"},
+     {"x": 5, "z": 12, "axis": "z"},
+     {"x": 39, "z": 11, "axis": "z"},
+     {"x": 39, "z": 12, "axis": "z"}
+    ],
+    "objects": []
+   }
+  },
+  {
+   "id": "police",
+   "name": "Police Station",
+   "description": "A front desk, offices, an interview room and two cells, mostly empty.",
+   "kind": "place",
+   "lot": {"width": 24, "depth": 22},
+   "walls": [
+    [4, 4, 19, 4],
+    [4, 16, 19, 16],
+    [4, 4, 4, 16],
+    [19, 4, 19, 16]
+   ],
+   "doors": [
+    {"x": 11, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 16, "z": 4, "axis": "x"},
+    {"x": 17, "z": 4, "axis": "x"},
+    {"x": 4, "z": 9, "axis": "z"},
+    {"x": 4, "z": 10, "axis": "z"},
+    {"x": 19, "z": 9, "axis": "z"},
+    {"x": 19, "z": 10, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 4, "z": 1, "w": 15, "d": 3}
+   ],
+   "entry": [11.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "fireStation",
+   "name": "Fire Station",
+   "description": "An engine bay with the engines ready to go, a watch room, a day room and the lockers.",
+   "kind": "place",
+   "lot": {"width": 28, "depth": 26},
+   "walls": [
+    [4, 4, 23, 4],
+    [4, 19, 23, 19],
+    [4, 4, 4, 19],
+    [23, 4, 23, 19]
+   ],
+   "doors": [
+    {"x": 13, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 20, "z": 4, "axis": "x"},
+    {"x": 21, "z": 4, "axis": "x"},
+    {"x": 4, "z": 10, "axis": "z"},
+    {"x": 4, "z": 11, "axis": "z"},
+    {"x": 23, "z": 10, "axis": "z"},
+    {"x": 23, "z": 11, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 4, "z": 1, "w": 19, "d": 3}
+   ],
+   "entry": [13.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "medical",
+   "name": "Medical Centre",
+   "description": "A waiting room, consulting rooms and a pharmacy counter.",
+   "kind": "place",
+   "lot": {"width": 26, "depth": 22},
+   "walls": [
+    [4, 4, 21, 4],
+    [4, 16, 21, 16],
+    [4, 4, 4, 16],
+    [21, 4, 21, 16]
+   ],
+   "doors": [
+    {"x": 12, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 18, "z": 4, "axis": "x"},
+    {"x": 19, "z": 4, "axis": "x"},
+    {"x": 4, "z": 9, "axis": "z"},
+    {"x": 4, "z": 10, "axis": "z"},
+    {"x": 21, "z": 9, "axis": "z"},
+    {"x": 21, "z": 10, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 4, "z": 1, "w": 17, "d": 3}
+   ],
+   "entry": [12.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "leisure",
+   "name": "Leisure Centre",
+   "description": "A gym, a sports hall and changing rooms with showers.",
+   "kind": "place",
+   "lot": {"width": 36, "depth": 30},
+   "walls": [
+    [4, 4, 31, 4],
+    [4, 23, 31, 23],
+    [4, 4, 4, 23],
+    [31, 4, 31, 23]
+   ],
+   "doors": [
+    {"x": 17, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 28, "z": 4, "axis": "x"},
+    {"x": 29, "z": 4, "axis": "x"},
+    {"x": 4, "z": 12, "axis": "z"},
+    {"x": 4, "z": 13, "axis": "z"},
+    {"x": 31, "z": 12, "axis": "z"},
+    {"x": 31, "z": 13, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 4, "z": 1, "w": 27, "d": 3}
+   ],
+   "entry": [17.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "bank",
+   "name": "Bank",
+   "description": "A banking hall with tellers, the manager's office and the vault.",
+   "kind": "place",
+   "lot": {"width": 24, "depth": 22},
+   "walls": [
+    [4, 4, 19, 4],
+    [4, 16, 19, 16],
+    [4, 4, 4, 16],
+    [19, 4, 19, 16]
+   ],
+   "doors": [
+    {"x": 11, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 16, "z": 4, "axis": "x"},
+    {"x": 17, "z": 4, "axis": "x"},
+    {"x": 4, "z": 9, "axis": "z"},
+    {"x": 4, "z": 10, "axis": "z"},
+    {"x": 19, "z": 9, "axis": "z"},
+    {"x": 19, "z": 10, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 4, "z": 1, "w": 15, "d": 3}
+   ],
+   "entry": [11.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "newspaper",
+   "name": "Newspaper",
+   "description": "The newsroom, the editor's office and the print room of the local paper.",
+   "kind": "place",
+   "lot": {"width": 24, "depth": 22},
+   "walls": [
+    [4, 4, 19, 4],
+    [4, 16, 19, 16],
+    [4, 4, 4, 16],
+    [19, 4, 19, 16]
+   ],
+   "doors": [
+    {"x": 11, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 16, "z": 4, "axis": "x"},
+    {"x": 17, "z": 4, "axis": "x"},
+    {"x": 4, "z": 9, "axis": "z"},
+    {"x": 4, "z": 10, "axis": "z"},
+    {"x": 19, "z": 9, "axis": "z"},
+    {"x": 19, "z": 10, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 4, "z": 1, "w": 15, "d": 3}
+   ],
+   "entry": [11.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "works",
+   "name": "Works",
+   "description": "Open-plan offices, a lab, a server room and a meeting room.",
+   "kind": "place",
+   "lot": {"width": 30, "depth": 24},
+   "walls": [
+    [4, 4, 25, 4],
+    [4, 18, 25, 18],
+    [4, 4, 4, 18],
+    [25, 4, 25, 18]
+   ],
+   "doors": [
+    {"x": 14, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 22, "z": 4, "axis": "x"},
+    {"x": 23, "z": 4, "axis": "x"},
+    {"x": 4, "z": 10, "axis": "z"},
+    {"x": 4, "z": 11, "axis": "z"},
+    {"x": 25, "z": 10, "axis": "z"},
+    {"x": 25, "z": 11, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 4, "z": 1, "w": 21, "d": 3}
+   ],
+   "entry": [14.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "solicitors",
+   "name": "Solicitors",
+   "description": "A reception, two offices and a library of law books.",
+   "kind": "place",
+   "lot": {"width": 20, "depth": 22},
+   "walls": [
+    [4, 4, 15, 4],
+    [4, 15, 15, 15],
+    [4, 4, 4, 15],
+    [15, 4, 15, 15]
+   ],
+   "doors": [
+    {"x": 9, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 12, "z": 4, "axis": "x"},
+    {"x": 13, "z": 4, "axis": "x"},
+    {"x": 4, "z": 8, "axis": "z"},
+    {"x": 4, "z": 9, "axis": "z"},
+    {"x": 15, "z": 8, "axis": "z"},
+    {"x": 15, "z": 9, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 4, "z": 1, "w": 11, "d": 3}
+   ],
+   "entry": [9.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "armyReserve",
+   "name": "Army Reserve Centre",
+   "description": "A drill hall, a briefing room and the stores.",
+   "kind": "place",
+   "lot": {"width": 24, "depth": 22},
+   "walls": [
+    [4, 4, 19, 4],
+    [4, 16, 19, 16],
+    [4, 4, 4, 16],
+    [19, 4, 19, 16]
+   ],
+   "doors": [
+    {"x": 11, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 16, "z": 4, "axis": "x"},
+    {"x": 17, "z": 4, "axis": "x"},
+    {"x": 4, "z": 9, "axis": "z"},
+    {"x": 4, "z": 10, "axis": "z"},
+    {"x": 19, "z": 9, "axis": "z"},
+    {"x": 19, "z": 10, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 4, "z": 1, "w": 15, "d": 3}
+   ],
+   "entry": [11.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "garage",
+   "name": "Garage",
+   "description": "A workshop bay with a car up on the lift, a parts store and an office.",
+   "kind": "place",
+   "lot": {"width": 26, "depth": 24},
+   "walls": [
+    [4, 4, 21, 4],
+    [4, 17, 21, 17],
+    [4, 4, 4, 17],
+    [21, 4, 21, 17]
+   ],
+   "doors": [
+    {"x": 12, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 18, "z": 4, "axis": "x"},
+    {"x": 19, "z": 4, "axis": "x"},
+    {"x": 4, "z": 9, "axis": "z"},
+    {"x": 4, "z": 10, "axis": "z"},
+    {"x": 21, "z": 9, "axis": "z"},
+    {"x": 21, "z": 10, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 4, "z": 1, "w": 17, "d": 3}
+   ],
+   "entry": [12.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "builders",
+   "name": "Builders",
+   "description": "A workshop and an office, with a yard of timber and sand.",
+   "kind": "place",
+   "lot": {"width": 26, "depth": 24},
+   "walls": [
+    [5, 4, 20, 4],
+    [5, 15, 20, 15],
+    [5, 4, 5, 15],
+    [20, 4, 20, 15]
+   ],
+   "doors": [
+    {"x": 12, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 7, "z": 4, "axis": "x"},
+    {"x": 17, "z": 4, "axis": "x"},
+    {"x": 18, "z": 4, "axis": "x"},
+    {"x": 5, "z": 8, "axis": "z"},
+    {"x": 5, "z": 9, "axis": "z"},
+    {"x": 20, "z": 8, "axis": "z"},
+    {"x": 20, "z": 9, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 5, "z": 1, "w": 15, "d": 3}
+   ],
+   "entry": [12.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "studios",
+   "name": "Studios",
+   "description": "Studios for painting, pottery and music, and a small gallery.",
+   "kind": "place",
+   "lot": {"width": 22, "depth": 22},
+   "walls": [
+    [4, 4, 17, 4],
+    [4, 15, 17, 15],
+    [4, 4, 4, 15],
+    [17, 4, 17, 15]
+   ],
+   "doors": [
+    {"x": 10, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 14, "z": 4, "axis": "x"},
+    {"x": 15, "z": 4, "axis": "x"},
+    {"x": 4, "z": 8, "axis": "z"},
+    {"x": 4, "z": 9, "axis": "z"},
+    {"x": 17, "z": 8, "axis": "z"},
+    {"x": 17, "z": 9, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 4, "z": 1, "w": 13, "d": 3}
+   ],
+   "entry": [10.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "inn",
+   "name": "Inn",
+   "description": "A bar, a dining room and the kitchen behind it.",
+   "kind": "place",
+   "lot": {"width": 24, "depth": 24},
+   "walls": [
+    [4, 4, 19, 4],
+    [4, 17, 19, 17],
+    [4, 4, 4, 17],
+    [19, 4, 19, 17]
+   ],
+   "doors": [
+    {"x": 11, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 16, "z": 4, "axis": "x"},
+    {"x": 17, "z": 4, "axis": "x"},
+    {"x": 4, "z": 9, "axis": "z"},
+    {"x": 4, "z": 10, "axis": "z"},
+    {"x": 19, "z": 9, "axis": "z"},
+    {"x": 19, "z": 10, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 4, "z": 1, "w": 15, "d": 3}
+   ],
+   "entry": [11.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "hotel",
+   "name": "Hotel",
+   "description": "A lobby, a lounge, a restaurant and rooms upstairs, each with its own bathroom.",
+   "kind": "place",
+   "lot": {"width": 30, "depth": 24},
+   "walls": [
+    [4, 4, 25, 4],
+    [4, 17, 25, 17],
+    [4, 4, 4, 17],
+    [25, 4, 25, 17]
+   ],
+   "doors": [
+    {"x": 14, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 22, "z": 4, "axis": "x"},
+    {"x": 23, "z": 4, "axis": "x"},
+    {"x": 4, "z": 9, "axis": "z"},
+    {"x": 4, "z": 10, "axis": "z"},
+    {"x": 25, "z": 9, "axis": "z"},
+    {"x": 25, "z": 10, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 4, "z": 1, "w": 21, "d": 3}
+   ],
+   "entry": [14.5, 2.5],
+   "objects": [
+    {"def": "stairs", "x": 5, "z": 5, "rot": 0}
+   ],
+   "upper": {
+    "walls": [
+     [4, 4, 25, 4],
+     [4, 17, 25, 17],
+     [4, 4, 4, 17],
+     [25, 4, 25, 17]
+    ],
+    "doors": [],
+    "windows": [
+     {"x": 5, "z": 4, "axis": "x"},
+     {"x": 6, "z": 4, "axis": "x"},
+     {"x": 22, "z": 4, "axis": "x"},
+     {"x": 23, "z": 4, "axis": "x"},
+     {"x": 14, "z": 4, "axis": "x"},
+     {"x": 4, "z": 9, "axis": "z"},
+     {"x": 4, "z": 10, "axis": "z"},
+     {"x": 25, "z": 9, "axis": "z"},
+     {"x": 25, "z": 10, "axis": "z"}
+    ],
+    "objects": []
+   }
+  },
+  {
+   "id": "boutique",
+   "name": "Boutique",
+   "description": "A shop floor of clothes on rails, and a stock room behind.",
+   "kind": "place",
+   "lot": {"width": 16, "depth": 22},
+   "walls": [
+    [3, 4, 12, 4],
+    [3, 15, 12, 15],
+    [3, 4, 3, 15],
+    [12, 4, 12, 15]
+   ],
+   "doors": [
+    {"x": 7, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 4, "z": 4, "axis": "x"},
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 9, "z": 4, "axis": "x"},
+    {"x": 10, "z": 4, "axis": "x"},
+    {"x": 3, "z": 8, "axis": "z"},
+    {"x": 3, "z": 9, "axis": "z"},
+    {"x": 12, "z": 8, "axis": "z"},
+    {"x": 12, "z": 9, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 3, "z": 1, "w": 9, "d": 3}
+   ],
+   "entry": [7.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "villageShop",
+   "name": "Village Shop",
+   "description": "Everything a village needs on a few shelves, and the post besides.",
+   "kind": "place",
+   "lot": {"width": 16, "depth": 22},
+   "walls": [
+    [3, 4, 12, 4],
+    [3, 15, 12, 15],
+    [3, 4, 3, 15],
+    [12, 4, 12, 15]
+   ],
+   "doors": [
+    {"x": 7, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 4, "z": 4, "axis": "x"},
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 9, "z": 4, "axis": "x"},
+    {"x": 10, "z": 4, "axis": "x"},
+    {"x": 3, "z": 8, "axis": "z"},
+    {"x": 3, "z": 9, "axis": "z"},
+    {"x": 12, "z": 8, "axis": "z"},
+    {"x": 12, "z": 9, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 3, "z": 1, "w": 9, "d": 3}
+   ],
+   "entry": [7.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "gardenCentre",
+   "name": "Garden Centre",
+   "description": "A shop, a glasshouse and a yard of plants in pots.",
+   "kind": "place",
+   "lot": {"width": 28, "depth": 24},
+   "walls": [
+    [5, 4, 22, 4],
+    [5, 16, 22, 16],
+    [5, 4, 5, 16],
+    [22, 4, 22, 16]
+   ],
+   "doors": [
+    {"x": 13, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 6, "z": 4, "axis": "x"},
+    {"x": 7, "z": 4, "axis": "x"},
+    {"x": 19, "z": 4, "axis": "x"},
+    {"x": 20, "z": 4, "axis": "x"},
+    {"x": 5, "z": 9, "axis": "z"},
+    {"x": 5, "z": 10, "axis": "z"},
+    {"x": 22, "z": 9, "axis": "z"},
+    {"x": 22, "z": 10, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 5, "z": 1, "w": 17, "d": 3}
+   ],
+   "entry": [13.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "shopSmall",
+   "name": "Corner Shop",
+   "description": "A small shop on the high street.",
+   "kind": "place",
+   "lot": {"width": 12, "depth": 20},
+   "walls": [
+    [1, 4, 11, 4],
+    [1, 14, 11, 14],
+    [1, 4, 1, 14],
+    [11, 4, 11, 14]
+   ],
+   "doors": [
+    {"x": 6, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 2, "z": 4, "axis": "x"},
+    {"x": 3, "z": 4, "axis": "x"},
+    {"x": 8, "z": 4, "axis": "x"},
+    {"x": 9, "z": 4, "axis": "x"},
+    {"x": 1, "z": 8, "axis": "z"},
+    {"x": 1, "z": 9, "axis": "z"},
+    {"x": 11, "z": 8, "axis": "z"},
+    {"x": 11, "z": 9, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 1, "z": 1, "w": 10, "d": 3}
+   ],
+   "entry": [6.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "shopGoods",
+   "name": "High Street Shop",
+   "description": "A small shop with goods on its shelves and in its window.",
+   "kind": "place",
+   "lot": {"width": 12, "depth": 20},
+   "walls": [
+    [1, 4, 11, 4],
+    [1, 14, 11, 14],
+    [1, 4, 1, 14],
+    [11, 4, 11, 14]
+   ],
+   "doors": [
+    {"x": 6, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 2, "z": 4, "axis": "x"},
+    {"x": 3, "z": 4, "axis": "x"},
+    {"x": 8, "z": 4, "axis": "x"},
+    {"x": 9, "z": 4, "axis": "x"},
+    {"x": 1, "z": 8, "axis": "z"},
+    {"x": 1, "z": 9, "axis": "z"},
+    {"x": 11, "z": 8, "axis": "z"},
+    {"x": 11, "z": 9, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 1, "z": 1, "w": 10, "d": 3}
+   ],
+   "entry": [6.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "cafeSmall",
+   "name": "Café",
+   "description": "A small café with a counter, a coffee machine and a few tables.",
+   "kind": "place",
+   "lot": {"width": 12, "depth": 20},
+   "walls": [
+    [1, 4, 11, 4],
+    [1, 14, 11, 14],
+    [1, 4, 1, 14],
+    [11, 4, 11, 14]
+   ],
+   "doors": [
+    {"x": 6, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 2, "z": 4, "axis": "x"},
+    {"x": 3, "z": 4, "axis": "x"},
+    {"x": 8, "z": 4, "axis": "x"},
+    {"x": 9, "z": 4, "axis": "x"},
+    {"x": 1, "z": 8, "axis": "z"},
+    {"x": 1, "z": 9, "axis": "z"},
+    {"x": 11, "z": 8, "axis": "z"},
+    {"x": 11, "z": 9, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 1, "z": 1, "w": 10, "d": 3}
+   ],
+   "entry": [6.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "restaurant",
+   "name": "Restaurant",
+   "description": "A dining room and a kitchen.",
+   "kind": "place",
+   "lot": {"width": 16, "depth": 22},
+   "walls": [
+    [1, 4, 14, 4],
+    [1, 16, 14, 16],
+    [1, 4, 1, 16],
+    [14, 4, 14, 16]
+   ],
+   "doors": [
+    {"x": 7, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 2, "z": 4, "axis": "x"},
+    {"x": 3, "z": 4, "axis": "x"},
+    {"x": 11, "z": 4, "axis": "x"},
+    {"x": 12, "z": 4, "axis": "x"},
+    {"x": 1, "z": 9, "axis": "z"},
+    {"x": 1, "z": 10, "axis": "z"},
+    {"x": 14, "z": 9, "axis": "z"},
+    {"x": 14, "z": 10, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 1, "z": 1, "w": 13, "d": 3}
+   ],
+   "entry": [7.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "officeSuite",
+   "name": "Offices",
+   "description": "A reception, an open-plan office and a meeting room.",
+   "kind": "place",
+   "lot": {"width": 18, "depth": 22},
+   "walls": [
+    [1, 4, 16, 4],
+    [1, 16, 16, 16],
+    [1, 4, 1, 16],
+    [16, 4, 16, 16]
+   ],
+   "doors": [
+    {"x": 8, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 2, "z": 4, "axis": "x"},
+    {"x": 3, "z": 4, "axis": "x"},
+    {"x": 13, "z": 4, "axis": "x"},
+    {"x": 14, "z": 4, "axis": "x"},
+    {"x": 1, "z": 9, "axis": "z"},
+    {"x": 1, "z": 10, "axis": "z"},
+    {"x": 16, "z": 9, "axis": "z"},
+    {"x": 16, "z": 10, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 1, "z": 1, "w": 15, "d": 3}
+   ],
+   "entry": [8.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "workshopUnit",
+   "name": "Workshop",
+   "description": "A workshop and a store.",
+   "kind": "place",
+   "lot": {"width": 18, "depth": 22},
+   "walls": [
+    [1, 4, 16, 4],
+    [1, 16, 16, 16],
+    [1, 4, 1, 16],
+    [16, 4, 16, 16]
+   ],
+   "doors": [
+    {"x": 8, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 2, "z": 4, "axis": "x"},
+    {"x": 3, "z": 4, "axis": "x"},
+    {"x": 13, "z": 4, "axis": "x"},
+    {"x": 14, "z": 4, "axis": "x"},
+    {"x": 1, "z": 9, "axis": "z"},
+    {"x": 1, "z": 10, "axis": "z"},
+    {"x": 16, "z": 9, "axis": "z"},
+    {"x": 16, "z": 10, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 1, "z": 1, "w": 15, "d": 3}
+   ],
+   "entry": [8.5, 2.5],
+   "objects": []
+  },
+  {
+   "id": "farmShop",
+   "name": "Farm Shop",
+   "description": "The farm's own produce on a counter and in crates.",
+   "kind": "place",
+   "lot": {"width": 16, "depth": 20},
+   "walls": [
+    [3, 4, 12, 4],
+    [3, 13, 12, 13],
+    [3, 4, 3, 13],
+    [12, 4, 12, 13]
+   ],
+   "doors": [
+    {"x": 7, "z": 4, "axis": "x"}
+   ],
+   "windows": [
+    {"x": 4, "z": 4, "axis": "x"},
+    {"x": 5, "z": 4, "axis": "x"},
+    {"x": 9, "z": 4, "axis": "x"},
+    {"x": 10, "z": 4, "axis": "x"},
+    {"x": 3, "z": 7, "axis": "z"},
+    {"x": 3, "z": 8, "axis": "z"},
+    {"x": 12, "z": 7, "axis": "z"},
+    {"x": 12, "z": 8, "axis": "z"}
+   ],
+   "paths": [
+    {"x": 3, "z": 1, "w": 9, "d": 3}
+   ],
+   "entry": [7.5, 2.5],
+   "objects": []
   }
  ]
 }
