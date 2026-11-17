@@ -15,6 +15,7 @@ import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Setti
 import { app, type Progress } from '../ui/app.svelte';
 import { perfTime, perfTimeAsync } from '../debug/perf';
 import { DEVLOG, devlog, devlogPause, renderSample, SAMPLE_MS } from '../debug/devlog';
+import { installMemoryCensus } from '../debug/gameplayStats';
 import { game, toast } from '../ui/state.svelte';
 import { basicReport, within } from '../debug/report';
 import { plainState } from '../debug/snapshot.svelte';
@@ -389,6 +390,7 @@ class GameHost {
       // reset, "Graphics were reset") offers to save and reload.
       renderer.onFailure = this.onRendererFailure;
       await renderer.init(this.canvas);
+      installMemoryCensus(() => renderer.memoryCensus());
       devlog('renderer', { backend: renderer.stats().backend, preset: renderer.stats().preset, webGpuFailed: webGpuFailed() });
       renderer.hold(this.covered);
       if (webGpuFailed() && settings.renderer !== 'webgl' && !this.toldFallback) {

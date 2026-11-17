@@ -44,7 +44,8 @@ import { ENV_UNITS, SKY_UNITS, SUN_UNITS } from './lightUnits';
 import { MaterialLibrary, SUN_LIGHT_MASK } from './materials';
 import { drawMesh, meshFrom } from './meshes';
 import { Mirrors } from './mirrors';
-import { buildModel, fileImported, importAhead, modelFilesSettled, onModelFileArrived, type ModelTemplate } from './models';
+import { buildModel, fileImported, importAhead, modelFileCensus, modelFilesSettled, onModelFileArrived, type ModelTemplate } from './models';
+import { memoryCensus } from './memoryCensus';
 import { GameBirds } from './birds';
 import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming';
 import { steadyShaderKeys } from './shaderKeys';
@@ -132,6 +133,7 @@ import type {
   RendererDeps,
   RenderStats,
   RenderVram,
+  MemoryCensus,
   ResizeHandle,
   RoomOverlayTile,
   SeenBird,
@@ -3581,6 +3583,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       residentsMs: this.characters?.updateMs ?? 0,
       vram: this.vram(),
     };
+  }
+
+  memoryCensus(): MemoryCensus | null {
+    return this.app ? memoryCensus(this.app, modelFileCensus(this.app)) : null;
   }
 
   /** The device's own GPU memory counters, bytes; null before the app exists. */

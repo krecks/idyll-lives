@@ -491,6 +491,25 @@ export function fileImported(app: pc.AppBase, url: string): boolean {
   return appFiles.get(app)?.has(url) ?? false;
 }
 
+/** Bytes of a piece's vertex arrays. */
+function dataBytes(d: VData | undefined): number {
+  if (!d) return 0;
+  return [d.positions, d.normals, d.uvs, d.colors, d.tangents, d.indices].reduce((a, x) => a + (x?.byteLength ?? 0), 0);
+}
+
+/** The model files kept for `app` and the bytes of their decoded pieces and clips (the memory census). */
+export function modelFileCensus(app: pc.AppBase): { files: number; pieceBytes: number; clipBytes: number } {
+  let files = 0;
+  let pieceBytes = 0;
+  let clipBytes = 0;
+  for (const f of appFiles.get(app)?.each() ?? []) {
+    files++;
+    for (const p of f.pieces) pieceBytes += dataBytes(p.data) + dataBytes(p.full);
+    for (const clip of f.clips.values()) for (const t of clip.tracks) clipBytes += t.poses.byteLength;
+  }
+  return { files, pieceBytes, clipBytes };
+}
+
 /** Resolves once no model file is being imported for `app` (with its textures: a container loads with them). */
 export function modelFilesSettled(app: pc.AppBase): Promise<void> {
   return appFiles.get(app)?.settled() ?? Promise.resolve();

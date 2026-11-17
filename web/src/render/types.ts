@@ -99,6 +99,23 @@ export interface RenderStats {
   vram: RenderVram | null;
 }
 
+/**
+ * Where the renderer's bytes are (`Renderer.memoryCensus`, the gameplay benchmark's): what PlayCanvas
+ * keeps on the CPU of what is on the GPU, the model files' decoded pieces, and the scene's geometry by
+ * owner. Bytes throughout.
+ */
+export interface MemoryCensus {
+  /** Every buffer the device holds, by kind: its CPU copy (`storage`), its GPU size, how many let their copy go. */
+  storage: Record<string, { count: number; bytes: number; released: number; gpuBytes: number }>;
+  /** Textures' levels kept on the CPU as typed arrays, and how many textures keep any. */
+  textureLevels: number;
+  texturesWithLevels: number;
+  /** The model files read and kept (`ModelFiles`): their pieces' vertices, and how many files. */
+  modelFiles: { files: number; pieceBytes: number; clipBytes: number };
+  /** The scene's vertex and index buffers by who draws them (entity names three levels under the root), and those nothing draws. */
+  owners: Record<string, { meshes: number; gpuBytes: number; cpuBytes: number }>;
+}
+
 /** GPU memory the renderer holds, bytes (PlayCanvas's own counters, `app.stats.vram`). */
 export interface RenderVram {
   /** Textures: the assets' and the render targets' (shadow maps, the mirror, post). */
@@ -580,6 +597,8 @@ export interface Renderer {
   /** Build/buy mode: plays a placement, upgrade, sale or construction effect (after `setWorld` showed the change). */
   buildEffect(fx: BuildEffect): void;
   stats(): RenderStats;
+  /** Benchmark: where the renderer's bytes are (a walk of the whole scene: on demand, never per frame). */
+  memoryCensus(): MemoryCensus | null;
   /** Benchmark: hooks around every drawn frame (null: none). */
   setFrameProbe(probe: FrameProbe | null): void;
   /** Measures GPU time (`RenderStats.gpuMs`) while the overlay or the benchmark asks for it. */

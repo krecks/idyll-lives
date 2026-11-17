@@ -33,6 +33,8 @@ export class ModelFiles<F> {
   private readonly users = new Map<string, number>();
   /** Files loaded that nothing uses, the least recently wanted first. */
   private readonly idle = new Set<string>();
+  /** The files imported and kept, as they came (`each`). */
+  private readonly loaded = new Map<string, F>();
   /** Imports under way (`settled`). */
   private readonly loading = new Set<Promise<F>>();
   /** A `trim` is due (after the builds waiting for files that just came have taken them). */
@@ -86,9 +88,11 @@ export class ModelFiles<F> {
       this.loading.add(loading);
       // (Both outcomes are handled here; whoever asked handles the rejection it's given.)
       loading.then(
-        () => {
+        (f) => {
           this.loading.delete(loading);
-          if (this.files.get(url) === loading) this.fileArrived(url);
+          if (this.files.get(url) !== loading) return;
+          this.loaded.set(url, f);
+          this.fileArrived(url);
         },
         () => {
           this.loading.delete(loading);
@@ -108,6 +112,11 @@ export class ModelFiles<F> {
   /** Resolves once no import is under way (those started meanwhile too); failures count as done. */
   async settled(): Promise<void> {
     while (this.loading.size) await Promise.allSettled([...this.loading]);
+  }
+
+  /** Each file imported and kept (the memory census's count of them). */
+  each(): IterableIterator<F> {
+    return this.loaded.values();
   }
 
   /** Whether the file at `url` is imported (or being imported) and kept. */
@@ -153,6 +162,7 @@ export class ModelFiles<F> {
       this.idle.delete(url);
       const file = this.files.get(url);
       this.files.delete(url);
+      this.loaded.delete(url);
       // (Its import has settled: only one that loaded is idle.)
       void file?.then(
         (f) => this.evict?.(f, url),
