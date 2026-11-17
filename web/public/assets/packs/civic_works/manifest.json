@@ -1,0 +1,5 @@
+{
+  "$comment": "Blender-built big working things for the town's named places (tools/art/blender/families/civic_works.py; content/civicWorks.json). Listed in the base manifest's packs. Empty until the models are built: civicWorks.json's things are drawn with stand-in models meanwhile.",
+  "version": 1,
+  "entries": {}
+}
