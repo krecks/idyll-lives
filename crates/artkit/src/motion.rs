@@ -495,6 +495,7 @@ fn eval(b: &[Bez], time: f32) -> f32 {
                 None => 0.0,
             }
         }
+        // (the easings are Robert Penner's equations, BSD-3-Clause, as Blender's easing.cc has them)
         Ease::Linear => change * t / duration + begin,
         Ease::In => {
             let t = t / duration;
@@ -1149,7 +1150,7 @@ pub fn attach(obj: Obj, parent: Obj) -> Obj {
 
 /// A matrix's place, Euler XYZ turn and scale (`mat4_to_loc_rot_size` and the turn through a quaternion, as an
 /// object's are).
-fn decompose(m: &M4) -> (V3, V3, V3) {
+pub(crate) fn decompose(m: &M4) -> (V3, V3, V3) {
     let col = |c: usize| V3::new(m.0[c][0], m.0[c][1], m.0[c][2]);
     let (mut rot, mut size) = ([V3::ZERO; 3], [0.0_f32; 3]);
     for c in 0..3 {

@@ -1,13 +1,13 @@
 //! Forms: the shapes the primitives can't make, each one mesh part (Blender axes, metres), deterministic, with its
 //! material, as the shapes' builders are. A profile swept along a path (`sweep`: rails, piping, bent tube, a
 //! cabriole leg, a branch), rings lofted into a body (`loft`, `ring`: a bottle, a lamp base, a rounded cabinet),
-//! and what is done to a part after (`jitter`).
+//! outlines (`rounded_rect`, `smooth_outline`, `circle`), and what is done to a part after (`mirrored`, `jitter`).
 //!
 //! Smooth forms are shaded smooth with their edges over `angle` degrees kept sharp, so a cap or a square
 //! profile stays crisp without a bevel.
 
 use crate::materials::Mat;
-use crate::math::{self, Num, P3, TAU, V3, v3};
+use crate::math::{self, Axis, M4, Num, P3, TAU, V3, v3};
 use crate::mesh::{Mesh, UvWay};
 use crate::noise::noise;
 use crate::scene::{self, Obj};
@@ -27,6 +27,71 @@ pub fn circle(r: f64, verts: usize) -> Vec<(f64, f64)> {
             )
         })
         .collect()
+}
+
+/// A w × h rectangle with corners of radius `r` (`corner` segments each), centred, anticlockwise.
+pub fn rounded_rect(w: f64, h: f64, r: f64, corner: usize) -> Vec<(f64, f64)> {
+    let min = |a: f64, b: f64| if b < a { b } else { a };
+    let r = min(min(r, w / 2.0), h / 2.0);
+    let mut out = Vec::with_capacity(4 * (corner + 1));
+    for (cx, cy, a0) in [
+        (w / 2.0 - r, h / 2.0 - r, 0.0),
+        (-w / 2.0 + r, h / 2.0 - r, 90.0),
+        (-w / 2.0 + r, -h / 2.0 + r, 180.0),
+        (w / 2.0 - r, -h / 2.0 + r, 270.0),
+    ] {
+        for i in 0..=corner {
+            let a = math::radians(a0 + 90.0 * i as f64 / corner as f64);
+            out.push((cx + r * math::cos(a), cy + r * math::sin(a)));
+        }
+    }
+    dedupe(&out, 1e-7)
+}
+
+/// Chaikin's corner cutting: each pass replaces every corner by two points a quarter in, rounding it.
+pub fn smooth_outline(points: &[(f64, f64)], passes: usize, closed: bool) -> Vec<(f64, f64)> {
+    let mut pts = points.to_vec();
+    // (each point as a 2D Vector: single precision)
+    let f = |p: (f64, f64)| (p.0 as f32, p.1 as f32);
+    for _ in 0..passes {
+        let mut out = if closed { Vec::new() } else { vec![pts[0]] };
+        let n = pts.len();
+        for i in 0..if closed { n } else { n - 1 } {
+            let (a, b) = (f(pts[i]), f(pts[(i + 1) % n]));
+            out.push((
+                (a.0 * 0.75 + b.0 * 0.25) as f64,
+                (a.1 * 0.75 + b.1 * 0.25) as f64,
+            ));
+            out.push((
+                (a.0 * 0.25 + b.0 * 0.75) as f64,
+                (a.1 * 0.25 + b.1 * 0.75) as f64,
+            ));
+        }
+        if !closed {
+            out.push(pts[n - 1]);
+        }
+        pts = out;
+    }
+    pts
+}
+
+/// An outline without a point on the one before it (within `eps`), nor a last point on the first.
+pub fn dedupe(pts: &[(f64, f64)], eps: f64) -> Vec<(f64, f64)> {
+    // (the distance as a 2D Vector's: the differences single, their squares summed in double from the last)
+    let apart = |a: (f64, f64), b: (f64, f64)| {
+        let (dx, dy) = (a.0 as f32 - b.0 as f32, a.1 as f32 - b.1 as f32);
+        ((dy * dy) as f64 + (dx * dx) as f64).sqrt()
+    };
+    let mut out: Vec<(f64, f64)> = Vec::with_capacity(pts.len());
+    for &p in pts {
+        if out.last().is_none_or(|&l| apart(p, l) > eps) {
+            out.push(p);
+        }
+    }
+    if out.len() > 2 && apart(out[0], out[out.len() - 1]) <= eps {
+        out.pop();
+    }
+    out
 }
 
 // ---- paths --------------------------------------------------------------------------------------------
@@ -334,6 +399,31 @@ pub fn jitter(obj: Obj, amount: f64, o: Jitter) -> Obj {
         }
     });
     obj
+}
+
+/// A copy of `obj` mirrored across the world's plane through the origin normal to `axis` (the model's middle): build
+/// one side, mirror it for the other. `name`: by default the part's own with `_mirror`.
+pub fn mirrored(obj: Obj, axis: Axis, name: Option<&str>) -> Obj {
+    let (mesh, way) = obj.read(|o| (o.mesh.clone(), o.uv));
+    let name = name.map_or_else(|| format!("{}_mirror", obj.name()), str::to_string);
+    let copy = scene::add(&name, mesh);
+    let mut k = [1.0_f32; 3];
+    k[axis.index()] = -1.0;
+    let flip = M4::diagonal(V3::new(k[0], k[1], k[2]));
+    // set as the copy's world matrix, Blender takes it apart into a place, a turn and a scale (the mirror a
+    // negative scale) and puts it back together
+    let (loc, rot, scale) = crate::motion::decompose(&(flip * obj.matrix_world()));
+    let mw = math::object_matrix(loc, rot, scale);
+    // a mirroring matrix turns the faces inside out: bake it into the mesh and turn them back; the copy's world
+    // matrix set to the identity, taken apart as Blender takes it (its turn about y a negative zero)
+    let (loc, rot, scale) = crate::motion::decompose(&M4::IDENTITY);
+    copy.edit(|o| {
+        o.uv = way;
+        o.mesh.transform(&mw);
+        o.mesh.flip_normals();
+        (o.loc, o.rot, o.scale) = (loc, rot, scale);
+    });
+    copy
 }
 
 // ---- objects ------------------------------------------------------------------------------------------

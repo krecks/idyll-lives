@@ -120,6 +120,10 @@ options! {
     Revolve { at: P3 = P3::ZERO, material: Option<Mat> = None, segments: Option<usize> = None, scale: P3 = P3::ONE, rot: P3 = P3::ZERO, smooth: bool = true, angle: f64 = LATHE_SHARP }
 }
 options! {
+    /// `torus`'s options.
+    Torus { at: P3 = P3::ZERO, material: Option<Mat> = None, rot: P3 = P3::ZERO, major_segments: usize = 24, minor_segments: usize = 12, smooth: bool = true }
+}
+options! {
     /// `boulder`'s options.
     Boulder { at: P3 = P3::ZERO, material: Option<Mat> = None, scale: P3 = P3::ONE, rot: P3 = P3::ZERO, seed: f64 = 0.0, noise: f64 = 0.22, subdivisions: usize = 3, smooth: bool = true }
 }
@@ -228,6 +232,31 @@ pub fn revolve(name: impl AsRef<str>, profile: &[(f64, f64)], o: Revolve) -> Obj
         .set_scale(o.scale)
 }
 
+/// A ring lying in the xy plane.
+pub fn torus(name: impl AsRef<str>, major_radius: f64, minor_radius: f64, o: Torus) -> Obj {
+    let obj = scene::add(
+        name.as_ref(),
+        torus_mesh(
+            major_radius as f32,
+            minor_radius as f32,
+            o.major_segments,
+            o.minor_segments,
+        ),
+    );
+    finish(obj, o.at, o.rot, o.material, o.smooth, 0.0, CLOSED)
+}
+
+/// `shapes::torus` with its options by name, as the family scripts wrote them: `torus!(name, major, minor, key = value, ...)`.
+#[macro_export]
+macro_rules! torus {
+    ($name:expr, $major:expr, $minor:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::shapes::Torus::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::shapes::torus($name, $major, $minor, o)
+    }};
+}
+
 /// A lumpy, deterministic boulder: an icosphere displaced by noise, bottom on z = 0.
 pub fn boulder(name: impl AsRef<str>, radius: f64, o: Boulder) -> Obj {
     let obj = scene::add(
@@ -306,6 +335,10 @@ pub mod primitive {
     /// `primitive_ico_sphere_add(subdivisions, radius)`.
     pub fn ico_sphere(subdivisions: usize, radius: f32) -> Mesh {
         super::ico_sphere_mesh(subdivisions, radius)
+    }
+    /// `primitive_torus_add(major_radius, minor_radius, major_segments, minor_segments)`.
+    pub fn torus(major: f32, minor: f32, major_segments: usize, minor_segments: usize) -> Mesh {
+        super::torus_mesh(major, minor, major_segments, minor_segments)
     }
 }
 
@@ -425,6 +458,53 @@ pub(crate) fn uv_sphere_mesh(seg: usize, tot: usize, rad: f32) -> Mesh {
     let target = weld::doubles(&mesh.verts, len.min(len2) / 3.0);
     mesh.weld(&target);
     mesh
+}
+
+/// `primitive_torus_add` (Blender's add_mesh_torus.py): rings of `minor_seg` points round the cross section, each
+/// ring turned about z by its share of the turn, the quads from each ring to the next; flat-shaded.
+pub(crate) fn torus_mesh(
+    major_rad: f32,
+    minor_rad: f32,
+    major_seg: usize,
+    minor_seg: usize,
+) -> Mesh {
+    let (major_rad, minor_rad) = (major_rad as f64, minor_rad as f64);
+    let pi_2 = PI * 2.0;
+    let mut verts = Vec::with_capacity(major_seg * minor_seg);
+    let mut faces: Vec<Vec<u32>> = Vec::with_capacity(major_seg * minor_seg);
+    let mut i1 = 0;
+    let tot_verts = major_seg * minor_seg;
+    for major_index in 0..major_seg {
+        let matrix = M3::rotation(
+            (major_index as f64 / major_seg as f64) * pi_2,
+            math::Axis::Z,
+        );
+        for minor_index in 0..minor_seg {
+            let angle = pi_2 * minor_index as f64 / minor_seg as f64;
+            verts.push(
+                matrix
+                    * v3(
+                        major_rad + (math::cos(angle) * minor_rad),
+                        0.0,
+                        math::sin(angle) * minor_rad,
+                    ),
+            );
+            let (mut i2, mut i3, mut i4) = if minor_index + 1 == minor_seg {
+                let i2 = major_index * minor_seg;
+                (i2, i1 + minor_seg, i2 + minor_seg)
+            } else {
+                (i1 + 1, i1 + minor_seg, i1 + minor_seg + 1)
+            };
+            for i in [&mut i2, &mut i3, &mut i4] {
+                if *i >= tot_verts {
+                    *i -= tot_verts;
+                }
+            }
+            faces.push(vec![i1 as u32, i3 as u32, i4 as u32, i2 as u32]);
+            i1 += 1;
+        }
+    }
+    Mesh::from_pydata(verts, &faces)
 }
 
 const ICO_VERTS: [[f32; 3]; 12] = [
