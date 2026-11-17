@@ -44,6 +44,7 @@ import { entrySpace, namedFinish, tintInName, type BoneName, type MaterialOverri
 import { contactShape, type ContactShape } from '../shared/contactShadow';
 import { ModelFiles } from '../shared/modelFiles';
 import { deviceDestroyed } from './device';
+import { gpuOnly } from './meshes';
 import {
   computeNormals,
   copyData,
@@ -64,6 +65,7 @@ import {
   restNormals,
   restyledData,
   transformData,
+  type Floats,
   type MirrorFace,
   type VData,
 } from '../shared/modelParts';
@@ -320,7 +322,11 @@ class PartGroups {
   height = 0;
   bottom = Infinity;
 
-  constructor(private readonly app: pc.AppBase) {
+  /** `upload`: how a group's merged vertices become a mesh (a build from a file's: let go of on the CPU, `uploadModel`). */
+  constructor(
+    app: pc.AppBase,
+    private readonly upload: Upload = (data) => uploadData(app.graphicsDevice, data),
+  ) {
     this.lib = MaterialLibrary.for(app);
   }
 
@@ -360,7 +366,7 @@ class PartGroups {
       const suffix = finish === PLAIN ? '' : `@${finish.replace('material.finish.', '')}`;
       built.meshes.push({
         name: `${name}${tint ? `:${tint}` : ''}${bone ? `#${bone}` : ''}${suffix}`,
-        mesh: uploadData(this.app.graphicsDevice, mergeData(data)),
+        mesh: this.upload(mergeData(data)),
         material: finish === PLAIN ? this.lib.plainFinish() : this.lib.finish(finish),
       });
       built.tints.push(tint);
@@ -387,6 +393,74 @@ export function uploadData(device: pc.GraphicsDevice, data: VData): pc.Mesh {
   mesh.update(pc.PRIMITIVE_TRIANGLES);
   return mesh;
 }
+
+/** How a build's vertices become a mesh (`PartGroups`, `buildFromFile`): uploaded, or only noted (`readMesh`'s build again). */
+type Upload = (data: VData) => pc.Mesh;
+
+/**
+ * Where the vertices of a mesh that keeps no copy on the CPU come from again (`readMesh`): a model
+ * built from a file, its build run again without uploading. By mesh, so a reader holding only the
+ * mesh (an instanced draw's) finds them.
+ */
+const meshSources = new WeakMap<pc.Mesh, () => VData>();
+
+/**
+ * Uploads `data` and lets go of PlayCanvas's copy of it on the CPU (`gpuOnly`): a model's meshes are
+ * drawn as made. `source` makes the same vertices again, for the few that read them (`readMesh`).
+ */
+function uploadModel(device: pc.GraphicsDevice, data: VData, source: () => VData): pc.Mesh {
+  const mesh = gpuOnly(uploadData(device, data));
+  meshSources.set(mesh, source);
+  return mesh;
+}
+
+/** A mesh's vertices as uploaded (`readMesh`): 32-bit floats throughout, as the GPU has them. */
+export interface MeshVertices extends VData {
+  positions: Float32Array;
+  normals: Float32Array | null;
+  uvs: Float32Array | null;
+  colors: Float32Array | null;
+  tangents: Float32Array | null;
+}
+
+/** Floats as the GPU has them (a builder's 64-bit ones rounded to 32), copied: the reader may change them. */
+const f32 = (a: Floats | null | undefined): Float32Array | null => (a ? Float32Array.from(a) : null);
+
+/**
+ * The vertices of a model's mesh as they were uploaded (positions, normals, UVs, colours, tangents as
+ * 32-bit floats, as the GPU has them, and the triangles): from its build run again where the mesh
+ * keeps no copy on the CPU (`uploadModel`), else from the mesh's own copy. For the few that read a
+ * model's vertices (a resident's prop, the selection marker, the merged shadows, a table's tuck, the
+ * item stage's framing, the dev tools); null for a mesh with none.
+ */
+export function readMesh(mesh: pc.Mesh): MeshVertices | null {
+  const source = meshSources.get(mesh);
+  if (source) {
+    const d = source();
+    return { positions: f32(d.positions)!, normals: f32(d.normals), uvs: f32(d.uvs), colors: f32(d.colors), tangents: f32(d.tangents), indices: d.indices.slice() };
+  }
+  const n = mesh.vertexBuffer?.getNumVertices() ?? 0;
+  if (!n) return null;
+  const positions = new Float32Array(n * 3);
+  if (!mesh.getPositions(positions)) return null;
+  const normals = new Float32Array(n * 3);
+  const uvs = new Float32Array(n * 2);
+  const colors = new Float32Array(n * 4);
+  const tangents = new Float32Array(n * 4);
+  const indices: number[] = [];
+  mesh.getIndices(indices);
+  return {
+    positions,
+    normals: mesh.getNormals(normals) ? normals : null,
+    uvs: mesh.getUvs(0, uvs) ? uvs : null,
+    colors: mesh.getColors(colors) ? colors : null,
+    tangents: mesh.getVertexStream(pc.SEMANTIC_TANGENT, tangents) ? tangents : null,
+    indices: Uint32Array.from(indices),
+  };
+}
+
+/** The last build run again for `readMesh` (its uploads' vertices, in order), kept for the rest of the task: its other meshes are read next. */
+let readBack: { build: object; data: VData[] } | null = null;
 
 // ---- files --------------------------------------------------------------------------
 
@@ -998,16 +1072,38 @@ function fileMaterial(app: pc.AppBase, lib: MaterialLibrary, material: pc.Standa
 /** A template from a file read (`filesOf`); throws if the build fails, having let go of what it made. */
 function buildGltf(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], options: BuildOptions): ModelTemplate {
   const made: pc.Mesh[] = [];
+  // Each mesh's vertices come back from the build run again (the same file, entry and options make
+  // the same uploads in the same order), not from a copy kept on the CPU.
+  const build = {};
+  const again = (k: number) => (): VData => {
+    if (readBack?.build !== build) {
+      const data: VData[] = [];
+      buildFromFile(app, name, entry, file, footprint, options, [], (d) => {
+        data.push(d);
+        return NOT_UPLOADED;
+      });
+      readBack = { build, data };
+      setTimeout(() => {
+        if (readBack?.build === build) readBack = null;
+      }, 0);
+    }
+    return readBack.data[k];
+  };
+  const device = app.graphicsDevice;
+  const upload: Upload = (data) => uploadModel(device, data, again(made.length));
   try {
-    return buildFromFile(app, name, entry, file, footprint, options, made);
+    return buildFromFile(app, name, entry, file, footprint, options, made, upload);
   } catch (err) {
     for (const mesh of made) mesh.destroy();
     throw err;
   }
 }
 
-/** `buildGltf`'s build; what it uploads goes into `made`. */
-function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], { resize, contact, glowApart }: BuildOptions, made: pc.Mesh[]): ModelTemplate {
+/** A build run again only for its vertices (`readMesh`) uploads nothing: its meshes stand for none. */
+const NOT_UPLOADED = null as unknown as pc.Mesh;
+
+/** `buildGltf`'s build; `upload` makes each mesh (in the order `readMesh`'s run again counts on), and what it made goes into `made`. */
+function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], { resize, contact, glowApart }: BuildOptions, made: pc.Mesh[], uploadMesh: Upload): ModelTemplate {
   const extras = entry as ModelEntry & ModelExtras;
   const fit = extras.fit;
   const [ox, oy, oz] = entry.offset ?? [0, 0, 0];
@@ -1016,9 +1112,8 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
   const overrides = extras.materials ?? {};
   const lib = MaterialLibrary.for(app);
   const overrideFor = (p: FilePiece): MaterialOverride | undefined => overrides[p.materialName] ?? namedFinish(p.materialName, lib) ?? overrides['*'];
-  const device = app.graphicsDevice;
-  const upload = (data: VData) => {
-    const mesh = uploadData(device, data);
+  const upload: Upload = (data) => {
+    const mesh = uploadMesh(data);
     made.push(mesh);
     return mesh;
   };
@@ -1045,7 +1140,7 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
   let bottom = Infinity;
   for (let part = -1; part < file.parts.length; part++) {
     const meshName = part < 0 ? name : `${name}|${file.parts[part].name}`;
-    const groups = new PartGroups(app);
+    const groups = new PartGroups(app, upload);
     // The file's own materials, a mesh per material (glTF files often split a model into several nodes).
     const kept = new Map<pc.StandardMaterial, VData[]>();
     pieces.forEach(({ source, data, full, part: of }, i) => {
@@ -1073,7 +1168,6 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
     }
     const merged = [...kept].map(([material, list]): ModelMesh => ({ name: meshName, mesh: upload(mergeData(list)), material }));
     const restyled = groups.build(meshName);
-    made.push(...restyled.meshes.map((m) => m.mesh));
     // A part grown from nothing lies flat where it hides at rest: leaf flutter would lift it into view (nature).
     if (pieces.some((p) => p.part === part && p.full)) for (const mesh of restyled.meshes) mesh.windStill = true;
     meshes.push(...merged, ...restyled.meshes);
