@@ -2204,14 +2204,19 @@ pub fn main(args: &[String]) -> i32 {
                 .ok_or_else(|| format!("{arg} takes {what}"))
         };
         let taken = match arg.as_str() {
-            "--against" => value("a revision or a directory").map(|v| {
+            "--against" => value("a revision or a directory").and_then(|v| {
                 held = true;
                 // (A revision first: a directory of a revision's name is written ./name.)
                 opts.old = if is_rev(&root, &v) {
                     Source::Rev(v)
-                } else {
+                } else if Path::new(&v).is_dir() {
                     Source::Dir(v)
+                } else {
+                    return Err(format!(
+                        "{v} is neither a revision git knows nor a directory"
+                    ));
                 };
+                Ok(())
             }),
             "--dir" => value("a directory").map(|v| opts.new = Source::Dir(v)),
             "--family" => value("a family").map(|v| opts.family = Some(v)),
