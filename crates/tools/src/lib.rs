@@ -17,6 +17,7 @@ pub mod int8;
 pub mod licenses;
 pub mod llmfetch;
 pub mod llmslim;
+pub mod m1table;
 pub mod pcg64;
 pub mod pins;
 pub mod review;
