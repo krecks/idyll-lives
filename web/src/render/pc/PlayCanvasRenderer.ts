@@ -3647,6 +3647,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const step = Math.max(0.5, Math.abs(goal - this.townMinute) * Math.min(1, dt / 600));
       this.townMinute = Math.abs(goal - this.townMinute) <= step ? goal : this.townMinute + Math.sign(goal - this.townMinute) * step;
     }
+    // (The backdrop's windows the street drew again: the held frame too.)
+    if (this.overview?.frameLights()) this.held.changed();
     if (this.lastLightMinute !== this.townMinute) {
       this.applyLighting(this.townMinute);
       this.lastLightMinute = this.townMinute;
