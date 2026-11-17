@@ -15,6 +15,7 @@
    */
   import { onMount, untrack } from 'svelte';
   import { menuScene } from '../../game/menuScene';
+  import { OVERVIEW_CLOSE } from '../../render/shared/overviewCamera';
   import type { Pt } from '../../game/roads';
   import type { NeighbourhoodDraft } from '../../game/town';
   import { keepHouses, Superseded, townJob } from '../../game/townJobs';
@@ -71,7 +72,8 @@
 
   /** What the zones would build, about (`usesSummary`), and in a line. */
   const zoned = $derived(plan ? usesSummary(plan) : null);
-  const fewHomes = $derived(!!zoned && zoned.homes < 2);
+  /** Fewer than two homes to come: those the zones would build, about, and any lots the layout has already. */
+  const fewHomes = $derived(!!zoned && !!plan && zoned.homes + plan.slots.filter((s) => s.kind === 'house').length < 2);
 
   /** The town's own options (the land's are step 1's). */
   const TOWN_FIELDS = OPTION_FIELDS.filter((f) => f.key === 'town' || f.key === 'villages') as readonly { key: 'town' | 'villages'; label: string; choices: readonly { value: string; label: string }[] }[];
@@ -446,6 +448,7 @@
       selected={editor.selectedPlot ?? focus}
       {focus}
       shot="world"
+      nearest={OVERVIEW_CLOSE}
       tool={stageTool}
       {ghost}
       onhover={(p) => (hover = p)}

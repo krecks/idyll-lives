@@ -7,6 +7,7 @@
   import { onMount } from 'svelte';
   import { CODE_FLAG, WORLD_FLAG } from '../../debug/benchFlags';
   import { menuScene } from '../../game/menuScene';
+  import { OVERVIEW_CLOSE } from '../../render/shared/overviewCamera';
   import type { NeighbourhoodDraft } from '../../game/town';
   import { Superseded, townJob } from '../../game/townJobs';
   import { WORLD_KINDS, WORLDS, type WorldKind } from '../../game/world';
@@ -551,7 +552,7 @@
 
 {#snippet stage()}
   {#if draft}
-    <TownStage labels={[]} shot="world" tool={stageTool} {ghost} />
+    <TownStage labels={[]} shot="world" nearest={OVERVIEW_CLOSE} tool={stageTool} {ghost} />
   {:else}
     <div></div>
   {/if}

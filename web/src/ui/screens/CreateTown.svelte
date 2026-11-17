@@ -18,6 +18,7 @@
   import { TownHistory } from '../../game/edit/history';
   import { rename } from '../../game/edit/streets';
   import { menuScene } from '../../game/menuScene';
+  import { OVERVIEW_CLOSE } from '../../render/shared/overviewCamera';
   import { NEIGHBOUR_CAP } from '../../game/town';
   import { keepHouses, Superseded, townJob } from '../../game/townJobs';
   import { specOf, worldName, type WorldStep } from '../../game/world';
@@ -298,6 +299,7 @@
       selected={editor.selectedPlot ?? focus}
       {focus}
       shot="world"
+      nearest={OVERVIEW_CLOSE}
       tool={making ? null : editor.stageTool}
       onhover={(p) => (hover = p)}
       onselect={(p) => {
