@@ -194,7 +194,7 @@ for (const { kind, seed, options } of runs) {
   // The land graded under the town, as the town job does it (from the preview of the world, giving up what still breaks the slope limits).
   let seeded: Land | null = null;
   t0 = performance.now();
-  const world = settleLand(laid, (d) => previewWorld(content, templates, d, null), (l) => (seeded = l)).draft;
+  const world = settleLand(laid, (d) => previewWorld(content, templates, d, null), (l) => (seeded = l), content.careerCategories).draft;
   const landMs = performance.now() - t0;
   // (Among mountains, the fill a hamlet left out for want of a site a road could reach, and a lot given up to the slope limits, would have brought.)
   const left = world.diagnostics?.villages;

@@ -8,9 +8,11 @@
  * its heights and is eased and graded the same way under the town laid on it.
  */
 
-import { DEFAULT_LANDSCAPE, type RoadPlan, type WorldStructure, type WorldZone } from '../core/protocol';
+import type { CareerCategory } from '../content/content';
+import { DEFAULT_LANDSCAPE, type RoadPlan, type TownPlace, type WorldStructure, type WorldZone } from '../core/protocol';
 import { BRIDGE_CLEAR, builtSurfaceOf, CUT_MAX, CUT_MAX_MOUNTAIN_ROAD, GRADE, RETAIN_MAX, surfacePlots, type BuiltSurface, type SurfaceWorld } from '../render/shared/builtSurface';
 import { blankLand, COVER, COVER_CELL, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, type Land } from './land';
+import { HOURS, hoursFor } from './backdrop';
 import { APRON, builtOf, landZones, Protection, wetTiles } from './landEdit';
 import { lotKey, removeLots } from './edit/lots';
 import { rle, unrle } from './landMasks';
@@ -269,11 +271,13 @@ const SETTLE_MARGIN = 0.15;
  * too tall (of two pads, the backdrop building, else the later lot; a lot before a building that is a place) is left out (`diagnostics.dropped`);
  * a country road cut too deep (a way out, a loop between places) is left out, and the lots and
  * backdrop buildings on it (those by it, and those it was the nearest road to), where the roads left are still one network with a way out; a dead end reaching past `COURT` m beyond the last road it meets is
- * cut back to that, and the lots past it left out. What it gave up: `diagnostics.slopes`.
+ * cut back to that, and the lots past it left out. What it gave up: `diagnostics.slopes`. A career
+ * that worked in the main town only at places given up works on there (`rehome`: `careers`, the
+ * content's career categories; none given, it doesn't).
  * `preview`: the world as the menus' preview has it (its lots' paths: `previewWorld`; asked of the
  * draft without its land). The draft and that world.
  */
-export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, preview: (draft: NeighbourhoodDraft) => W, seeded?: (land: Land) => void): { draft: NeighbourhoodDraft; world: W } {
+export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, preview: (draft: NeighbourhoodDraft) => W, seeded?: (land: Land) => void, careers: readonly CareerCategory[] = []): { draft: NeighbourhoodDraft; world: W } {
   let draft = laid;
   const given = { lots: 0, backdrop: 0, roads: 0, courts: 0, backdropIn: {} as Record<number, number> };
   for (let round = 0; ; round++) {
@@ -284,7 +288,7 @@ export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, prev
     if (!land || !first) return { draft: graded, world };
     const courts = longCourts(draft.roads);
     const found = round < SETTLE_ROUNDS ? measureLand(world, land, first, SETTLE_MARGIN, false) : null;
-    const next = found ? giveUp(draft, world, found, courts, given) : null;
+    const next = found ? giveUp(draft, world, found, courts, given, careers) : null;
     if (!next) {
       seeded?.(first);
       const total = given.lots + given.backdrop + given.roads + given.courts;
@@ -518,7 +522,7 @@ function longCourts(roads: readonly RoadPlan[]): { road: number; end: 0 | 1; at:
  * `draft` without what `found` and `courts` say breaks the limits (see `settleLand`), counted in
  * `given`; null if it gives up nothing (all that breaks them is what it may not give up).
  */
-function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasure, courts: ReturnType<typeof longCourts>, given: { lots: number; backdrop: number; roads: number; courts: number; backdropIn: Record<number, number> }): NeighbourhoodDraft | null {
+function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasure, courts: ReturnType<typeof longCourts>, given: { lots: number; backdrop: number; roads: number; courts: number; backdropIn: Record<number, number> }, careers: readonly CareerCategory[]): NeighbourhoodDraft | null {
   const open = draft.open;
   if (!open) return null;
   const plots = world.plots.length;
@@ -585,7 +589,32 @@ function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasur
   // The slots left, numbered again; the pads, places and backdrop buildings that name them with them (`edit/lots.ts`).
   const dropped = [...(draft.diagnostics?.dropped ?? []), ...draft.slots.filter((s) => lots.has(s.index)).map((s) => ({ name: s.name, kind: s.kind, ...(s.lot ? { lot: s.lot } : {}) }))];
   const removed = removeLots({ ...draft, roads }, lots, backdrop);
-  return { ...removed, diagnostics: { ...(draft.diagnostics ?? { dropped: [] }), dropped } };
+  const places = removed.open?.places && rehome(open.places ?? [], removed.open.places, careers);
+  return { ...removed, ...(removed.open && places !== removed.open.places ? { open: { ...removed.open, places } } : {}), diagnostics: { ...(draft.diagnostics ?? { dropped: [] }), dropped } };
+}
+
+/**
+ * The main town's places (`after`, area 0) given back the careers that worked there at places
+ * given up (in `before`, not in `after`): each at a place of the kind it worked at (a garage's
+ * mechanics at another workshop), else at the first backdrop office, as the generator gives an
+ * office the careers no place took (`backdrop.ts` `places`); its hours widened to their shifts
+ * (`hoursFor`). `after` as it was if no career lost its place (or none fits).
+ */
+function rehome(before: readonly TownPlace[], after: TownPlace[], careers: readonly CareerCategory[]): TownPlace[] {
+  const working = (list: readonly TownPlace[]) => new Set(list.flatMap((p) => (p.area === 0 ? (p.work ?? []) : [])));
+  const [had, still] = [working(before), working(after)];
+  const lost = careers.map((c) => c.id).filter((id) => had.has(id) && !still.has(id));
+  if (!lost.length) return after;
+  const out = after.slice();
+  for (const id of lost) {
+    const kind = before.find((p) => p.area === 0 && p.work?.includes(id))!.kind;
+    const at = [out.findIndex((p) => p.area === 0 && p.kind === kind), out.findIndex((p) => p.area === 0 && p.kind === 'office' && p.plot === undefined)].find((i) => i >= 0);
+    if (at === undefined) continue;
+    const p = out[at];
+    const base = p.hours ?? (p.kind === 'park' || p.kind === 'outdoor' ? null : HOURS[p.kind]);
+    out[at] = { ...p, work: [...(p.work ?? []), id], ...(base ? { hours: hoursFor(base, [id], careers) } : {}) };
+  }
+  return out;
 }
 
 /** Whether the roads but those `without` are one network (as the sim joins them) with a road out of the world on it. */

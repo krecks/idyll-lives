@@ -57,7 +57,7 @@ describe('town jobs', async () => {
         const made = inWorker({ kind: 'world', world: w.kind, seed: w.seed, name, options });
         if (made.kind !== 'world') throw new Error('not a world');
         const laid = generateWorld(content, t, w.kind, w.seed, name, undefined, options);
-        const draft = settleLand(laid, (d) => previewWorld(content, t, d, null)).draft;
+        const draft = settleLand(laid, (d) => previewWorld(content, t, d, null), undefined, content.careerCategories).draft;
         expect(draft.open?.land?.seeded).toBe('follow');
         expect(made.draft).toEqual(draft);
         // (Its options kept with it: the place's own, but for those chosen.)
@@ -78,7 +78,7 @@ describe('town jobs', async () => {
     expect(steps).toEqual(['land', 'roads', 'homes', 'grade', 'houses']);
     if (made.kind !== 'world') throw new Error('not a world');
     const laid = generateWorld(content, t, 'country', 909);
-    expect(made.draft).toEqual(settleLand(laid, (d) => previewWorld(content, t, d, null)).draft);
+    expect(made.draft).toEqual(settleLand(laid, (d) => previewWorld(content, t, d, null), undefined, content.careerCategories).draft);
   }, 30_000);
 
   test('the worker\'s town file is the page\'s, its dice from the job\'s seed', () => {
