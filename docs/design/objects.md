@@ -141,8 +141,8 @@ instances, so these costs are per kind of object in view, plus the triangles of 
 - **Shading baked in** at export (below, "Baked shading"): creases and gaps darken with no texture. Give a face
   that meets a crease an edge band, or its corners darken it all over.
 - **Judge it lit:** `cargo art <family> --preview --lit` renders as the game lights it (EEVEE, the finishes'
-  textures, the baked shading), beside the plain `--preview`; the game (`check.mjs gallery`, WebGPU and
-  `--renderer webgl`) is the last word.
+  textures, the baked shading), beside the plain `--preview`, for a family still built in Blender; the game
+  (`check.mjs gallery`, WebGPU and `--renderer webgl`) is the last word.
 
 ## Materials, finishes, tints, styles and quality
 
@@ -475,8 +475,8 @@ are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
   on a top (a vase, a duvet) or above it (a canopy, the upper bunk) isn't taken for it; the model is at
   rest (a yoga mat, rolled up, has nothing under its seat). No content fact says a thing
   stands against a wall, so one standing off it isn't caught. It needs no Blender, so CI runs it (in
-  `cargo test -p ll-tools`); `--preview` also has Blender re-import each file and render it. A
-  content file or manifest it can't read is a FAIL naming the file.
+  `cargo test -p ll-tools`); `--preview` also draws each file as read (`--blender`: Blender re-imports and
+  renders it). A content file or manifest it can't read is a FAIL naming the file.
 - **`cargo test -p sim-core --test sim shipped_content::`** (in CI) fails when an object or item has no
   model file, or no `far` file where its entry names one, once the manifests are stacked as the game
   stacks them, and on an empty `model`.

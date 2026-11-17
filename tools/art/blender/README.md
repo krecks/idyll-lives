@@ -54,7 +54,8 @@ game. Report what you checked, and anything you didn't.
 cargo art kitchen                  # build, export, register, check
 cargo art kitchen --only fridge    # one model
 cargo art garden_decor --preview   # previews/garden_decor/<id>.png (+ <id>@<clip>.png), no export
-cargo art living --preview --lit   # and <id>.lit.png: EEVEE, sun and sky, the finishes' textures (judge detail here)
+cargo art living --preview --lit   # and <id>.lit.png: EEVEE, sun and sky, the finishes' textures (judge detail here;
+                                   # a family built in Rust has no --lit: bun tools/bench/check.mjs gallery)
 cargo art kitchen --preview --sheet  # and <id>.sheet.png: four sides, the baked shading, each clip at 0/25/50/75/100 %
 cargo art kitchen --no-pack        # export without writing the pack
 cargo art --all                    # every family (not _template)
@@ -63,7 +64,7 @@ cargo art --centres                # centres.json from every family (runs Blende
 cargo art --leafcards              # the trees' leaf-card atlas (textures/leafcards/albedo.png), from leaves it generates
 cargo check-glb [model.fridge …]   # the gate alone (no Blender)
 cargo check-glb --keys             # the keys a build may write
-cargo check-glb --preview          # the gate, then Blender renders each file re-imported (<family>/rt_<name>.png)
+cargo check-glb --preview          # the gate, then each file drawn as read (<family>/rt_<name>.png; --blender: in Blender)
 ```
 
 `centres.json` holds each model's `centre` (key → `[x, depth]`; `[0, 0]`, the middle, for most): where
@@ -508,5 +509,5 @@ never one that's already running) and drive Playwright headless with full Chrome
 | `far.py` | `far_of` (a far version from the model's own build at low detail), `low`, `is_low` |
 | `perch.py` | `G.perch`: where birds sit on a model, found on its meshes (`around`; `find`: `surface`, `bare`, `spread`, `keep`), the entry's `perches` |
 | `runner.py` | talking to `cargo art`: `known_keys` (the keys a build may write, `$GAMEKIT_KNOWN`) and `report` (what the build made, `$GAMEKIT_RESULT`: the pack's entries, each model's clips and centre), which the runner checks and writes |
-| `review.py` | run by `cargo check-glb --preview`: re-imports each checked file (`key=file`, from the gate) and renders `previews/<family>/rt_<name>.png` |
+| `review.py` | run by `cargo check-glb --preview --blender`: re-imports each checked file (`key=file`, from the gate) and renders `previews/<family>/rt_<name>.png` |
 | `centres.py` | run by `cargo art --centres`: imports every family (no build) and hands back their centres, which the runner writes to centres.json |

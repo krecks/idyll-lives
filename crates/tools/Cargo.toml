@@ -9,6 +9,8 @@ publish = false
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+# The models' kernel: `cargo check-glb --preview` reads each file and draws it with its rasteriser.
+artkit = { path = "../artkit" }
 # `cargo assets`' two encoders, C++ underneath: the Basis Universal encoder (KTX2 textures) and transcoder, which
 # `cc` builds and `bindgen` makes bindings for (it needs libclang), and meshoptimizer (EXT_meshopt_compression).
 basisu_c_sys = { version = "0.9.1", features = ["encoder", "extra"] }

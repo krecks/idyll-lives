@@ -8,8 +8,10 @@
 //!   cargo check-glb                        every .glb the manifests use
 //!   cargo check-glb model.garden.gnome …   only these keys (model., item., tool.)
 //!   cargo check-glb --keys                 the keys a build may write (`known_keys`)
-//!   cargo check-glb --preview              also re-imports each file in Blender and renders it to
-//!                                          tools/art/blender/previews/<family>/rt_<name>.png (gamekit/review.py)
+//!   cargo check-glb --preview [--sheet]    also draws each file as read (`preview`) to
+//!                                          tools/art/blender/previews/<family>/rt_<name>.png, its clips, perches
+//!                                          and far version beside it (and its sheet); with --blender, Blender
+//!                                          re-imports and renders it instead (gamekit/review.py)
 //!   cargo check-glb --validate             also runs the Khronos glTF validator over each file and its far
 //!                                          version (`validate`: Bun and web/'s `gltf-validator`)
 //!   cargo check-glb --update-baseline      first lowers tools/art/gate-baseline.json to what the counted checks
@@ -28,6 +30,7 @@ pub(crate) mod glb;
 pub(crate) mod json;
 pub mod meshes;
 mod near;
+pub mod preview;
 pub(crate) mod py;
 pub mod validate;
 
@@ -4579,8 +4582,8 @@ pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Meas
     Ok(Measures { models, objects })
 }
 
-/// `cargo check-glb [keys…] [--keys] [--preview] [--validate] [--update-baseline]`, or `--against`
-/// (`against::main`): the exit code.
+/// `cargo check-glb [keys…] [--keys] [--preview [--sheet] [--blender]] [--validate] [--update-baseline]`, or
+/// `--against` (`against::main`): the exit code.
 pub fn main(args: &[String]) -> i32 {
     if args.iter().any(|a| a == "--against") {
         return against::main(args);
@@ -4630,9 +4633,15 @@ pub fn main(args: &[String]) -> i32 {
     let report = gate_with(&paths, &keys, &batch);
     print!("{}", report.text);
     let mut code = if report.failed > 0 { 1 } else { 0 };
-    if args.iter().any(|a| a == "--preview") && !report.checked.is_empty() {
-        // Re-imports each file in Blender and renders it to previews/<family>/rt_<name>.png, so export problems show:
-        // review.py takes `key=file` for each checked model whose file is there.
+    let has = |flag: &str| args.iter().any(|a| a == flag);
+    if has("--preview") && !has("--blender") && !report.checked.is_empty() {
+        // Draws each file as read to previews/<family>/rt_<name>.png, so export problems show.
+        if preview::review(&paths, &report.checked, &report.files, has("--sheet")) != 0 {
+            code = 1;
+        }
+    } else if has("--preview") && !report.checked.is_empty() {
+        // `--blender`: re-imports each file in Blender and renders it there instead: review.py takes `key=file`
+        // for each checked model whose file is there.
         let review = join(&paths.here, "gamekit/review.py");
         let pairs: Vec<String> = report
             .checked
