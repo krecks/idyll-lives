@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * The land brushes as a player uses them, by script (`window.__land`, `?debug`): step 1's land made,
- * "Shape the land" chosen, then a mound, a pond on its top, a river from the hill down to the sea (or
+ * "Shape the land" chosen, then a mound flattened on top (a plateau), a pond on its top, a river from the hill down to the sea (or
  * the nearest water), woods painted and half cleared, and a peak, each a stroke a point a frame; the
  * frames' times during each stroke, and pictures before and after. Then "Lay out the town" (step 2's
  * town laid on the land as shaped), "Choose a household", a household played (step 3, with the game's
@@ -185,20 +185,20 @@ async function aim(page, at, radius) {
  * camera on it); then the Land tab: a mound by the home (paid in Living, free in Creative; undo pays
  * back, redo pays again) and a pond; saved, continued from the menu, and the land and water still there.
  */
-async function play(page, renderer, mound, shot) {
+async function play(page, renderer, pond, shot) {
   const r = {};
-  if (mound) await stepOnePond(page, renderer, mound, shot, r);
-  return { ...r, ...(await landTabInPlay(page, renderer, mound, shot)) };
+  if (pond) await stepOnePond(page, renderer, pond, shot, r);
+  return { ...r, ...(await landTabInPlay(page, renderer, pond, shot)) };
 }
 
 /** The pond made in step 1 in play: water to the simulation, someone sent across it, the camera on it. */
-async function stepOnePond(page, renderer, mound, shot, r) {
+async function stepOnePond(page, renderer, pond, shot, r) {
   r.stepOnePond = await page.evaluate(async ([x, z]) => {
     window.__controls.setMode('build');
     window.__controls.setBuildTab('land');
     for (let k = 0; k < 100 && !(() => { try { return window.__land.stats(); } catch { return null; } })(); k++) await new Promise((res) => setTimeout(res, 100));
     return window.__land.simWet(x, z);
-  }, mound);
+  }, pond);
   if (!r.stepOnePond) fault(`${renderer} the pond made in step 1 isn't water in the game`);
   // Someone sent across the pond: the camera on them as they go round it.
   await page.evaluate(async ([x, z]) => {
@@ -206,11 +206,11 @@ async function stepOnePond(page, renderer, mound, shot, r) {
     const sim = window.__osw.sims()[0];
     window.__controls.walkTo(sim.id, x + 14, z + 2);
     window.__controls.follow(sim.id);
-  }, mound);
+  }, pond);
   await page.waitForTimeout(9000);
   await shot('12-walking-to-the-pond');
   await page.evaluate(() => window.__controls.follow(null));
-  await aim(page, mound, 70);
+  await aim(page, pond, 70);
   await shot('13-pond-in-play');
 }
 
@@ -219,7 +219,7 @@ async function stepOnePond(page, renderer, mound, shot, r) {
  * back, redo pays again) and a pond; saved, continued from the menu, and the land and the water
  * still there, the land away from the strokes too (the whole land went with the first stroke).
  */
-async function landTabInPlay(page, renderer, mound, shot) {
+async function landTabInPlay(page, renderer, stepOne, shot) {
   const r = {};
 
   // The Land tab by the home.
@@ -287,13 +287,13 @@ async function landTabInPlay(page, renderer, mound, shot) {
   await page.evaluate(() => window.__controls.setMode('live'));
   await landTab(page);
   const kept = await page.evaluate(
-    async ([[x, z], pond, mound]) => ({
+    async ([[x, z], pond, stepOne]) => ({
       height: window.__land.heightAt(x, z),
       pond: pond ? await window.__land.simWet(pond[0], pond[1]) : null,
       pondDrawn: pond ? window.__land.wet(pond[0], pond[1]) : null,
-      stepOnePond: mound ? await window.__land.simWet(mound[0], mound[1]) : null,
+      stepOnePond: stepOne ? await window.__land.simWet(stepOne[0], stepOne[1]) : null,
     }),
-    [spot, pondAt, mound],
+    [spot, pondAt, stepOne],
   );
   const away = await page.evaluate((grid) => grid.filter(([x, z, h, wet]) => Math.abs(window.__land.heightAt(x, z) - h) > 0.02 || window.__land.wet(x, z) !== wet).length, grid);
   kept.awayChanged = away;
@@ -449,6 +449,7 @@ try {
     const r = { strokes: {} };
     report[renderer] = r;
     let mound = null;
+    let pond = null;
 
     if (!plain) {
     // Shape the land: surveyed behind a spinner, then drawn from the field.
@@ -475,34 +476,41 @@ try {
       return res;
     };
 
-    // A mound on free land near the middle of the town's view.
+    // A mound on free land near the middle of the town's view: raised, then its top flattened (a plateau, the pond's
+    // ground: on a dome the pond cut into its side).
     const view = await page.evaluate(() => {
       const v = document.querySelector('.view').getBoundingClientRect();
       return window.__land.pick(v.left + v.width * 0.5, v.top + v.height * 0.55);
     });
-    mound = await page.evaluate(([x, z]) => window.__land.findFree(34, [x, z]), [view?.x ?? 0, view?.z ?? 0]);
+    mound = await page.evaluate(([x, z]) => window.__land.findFree(38, [x, z]), [view?.x ?? 0, view?.z ?? 0]);
     if (!mound) throw new Error('no free land for the mound');
     await lookAt(page, mound[0], mound[1], 2.2);
     await shot('3-before');
     const before = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), mound);
-    for (let k = 0; k < 3; k++) await stroke(`mound ${k + 1}`, 'raise', ring(mound[0], mound[1], 4, 40), 22, 0.3);
+    for (let k = 0; k < 3; k++) await stroke(`mound ${k + 1}`, 'raise', ring(mound[0], mound[1], 4, 40), 14, 0.3);
+    // (Flattened to the height at its middle, the stroke's first point: the land round the top brought up to it.)
+    for (let k = 0; k < 2; k++) await stroke(`plateau ${k + 1}`, 'flatten', [mound, ...ring(mound[0], mound[1], 5, 40)], 12, 1);
     const top = await page.evaluate(([x, z]) => window.__land.heightAt(x, z), mound);
-    r.mound = { at: mound, rose: +(top - before).toFixed(2) };
+    // (How flat its top is: the spread of the heights 6 m out round it.)
+    const rim = await page.evaluate(([x, z]) => Array.from({ length: 12 }, (_, k) => window.__land.heightAt(x + Math.cos((k / 12) * Math.PI * 2) * 6, z + Math.sin((k / 12) * Math.PI * 2) * 6)), mound);
+    r.mound = { at: mound, rose: +(top - before).toFixed(2), rim: +(Math.max(...rim) - Math.min(...rim)).toFixed(2), rimBelow: +(top - Math.min(...rim)).toFixed(2) };
+    console.log(`land: ${renderer} the plateau: ${JSON.stringify(r.mound)}`);
     console.log(`land: ${renderer} the mound rose ${(top - before).toFixed(1)} m`);
     if (top - before < 2) fault(`${renderer} the mound rose only ${(top - before).toFixed(1)} m`);
     await settled(page);
     await shot('4-mound');
 
-    // A pond on its top, at its own level.
-    await stroke('pond', 'lake', ring(mound[0], mound[1], 2, 12), 8, 0.4);
-    const wet = await page.evaluate(([x, z]) => window.__land.wet(x, z), mound);
+    // A pond on its top, at its own level, inside the plateau.
+    pond = [...mound];
+    await stroke('pond', 'lake', ring(pond[0], pond[1], 2, 12), 6, 0.4);
+    const wet = await page.evaluate(([x, z]) => window.__land.wet(x, z), pond);
     if (!wet) fault(`${renderer} no pond on the mound`);
     await settled(page);
     await shot('5-pond');
 
     // A river down to the nearest water: from as far up the land towards the mound as a river can
     // start and still run down to it (no more than a few metres over the water, never rising on the way).
-    const water = await page.evaluate(([x, z]) => window.__land.findWater([x, z]), mound);
+    const water = await page.evaluate(([x, z]) => window.__land.findWater([x, z]), pond);
     if (water) {
       // (The longest straight run in to some shore over free land that only falls on the way, from
       // the shores nearest the mound first.)
@@ -536,7 +544,7 @@ try {
           }
           return null;
         },
-        mound,
+        pond,
       );
       const from = run?.from;
       if (run) water.splice(0, 2, ...run.to);
@@ -642,7 +650,7 @@ try {
       await inGame(page);
       await page.waitForTimeout(4000);
       await shot('11-play');
-      r.play = await play(page, renderer, mound, shot);
+      r.play = await play(page, renderer, pond, shot);
     }
     await context.close();
   }
