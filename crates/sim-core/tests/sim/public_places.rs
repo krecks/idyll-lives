@@ -148,6 +148,28 @@ fn frame(houses: &Value, place: &Value) -> (i64, i64) {
     }
 }
 
+/// The porch `layoutTown` puts over a place's front door (`frontPorch`): its first door, in a wall
+/// along x at the front of the box of its walls, stamped as `stamp` does it.
+fn front_porch(place: &Value, (w, d): (i64, i64), rotated: bool) -> Option<Value> {
+    let door = place["doors"].as_array()?.first()?;
+    let walls: Vec<Vec<i64>> = place["walls"]
+        .as_array()?
+        .iter()
+        .map(|c| c.as_array().unwrap().iter().map(|v| v.as_i64().unwrap()).collect())
+        .collect();
+    let (x, z) = (door["x"].as_i64()?, door["z"].as_i64()?);
+    let xs = || walls.iter().flat_map(|c| [c[0], c[2]]);
+    let front = walls.iter().flat_map(|c| [c[1], c[3]]).min()?;
+    if door["axis"] != "x" || z != front || x < xs().min()? || x >= xs().max()? {
+        return None;
+    }
+    Some(if rotated {
+        json!({"plot": 0, "axis": "h", "x": w - 1 - x, "z": d - z, "out": 1})
+    } else {
+        json!({"plot": 0, "axis": "h", "x": x, "z": z, "out": -1})
+    })
+}
+
 /// Storeys a place's lot has: two with a storey above (`upper`), as `layoutTown` sets them.
 fn storeys(place: &Value) -> i64 {
     if place["upper"].is_object() { 2 } else { 1 }
@@ -178,9 +200,11 @@ fn every_public_place_loads_on_either_side_of_the_street() {
             let id = format!("{}{}", place["id"], if rotated { " (turned)" } else { "" });
             let (walls, doors, windows, objects, entry) =
                 stamp(&content, place, (w, d), 0, rotated, d);
+            let porches: Vec<Value> = front_porch(place, (w, d), rotated).into_iter().collect();
             let lot = json!({
                 "width": w, "depth": d, "storeys": storeys(place), "walls": walls, "doors": doors, "windows": windows, "objects": objects,
                 "plots": [{"name": place["name"], "x": 0, "z": 0, "w": w, "d": d, "public": true, "entry": entry}],
+                "porches": porches,
             });
             let world = World::from_json(&merged, &lot.to_string(), 1)
                 .unwrap_or_else(|e| panic!("{id}: {e}"));
@@ -822,9 +846,11 @@ fn every_post_in_town_has_someone_behind_it() {
             let id = format!("{}{}", place["id"], if rotated { " (turned)" } else { "" });
             let (walls, doors, windows, objects, entry) =
                 stamp(&content, place, (w, d), 0, rotated, d);
+            let porches: Vec<Value> = front_porch(place, (w, d), rotated).into_iter().collect();
             let lot = json!({
                 "width": w, "depth": d, "storeys": storeys(place), "walls": walls, "doors": doors, "windows": windows, "objects": objects,
                 "plots": [{"name": place["name"], "x": 0, "z": 0, "w": w, "d": d, "public": true, "entry": entry}],
+                "porches": porches,
             });
             let world = World::from_json(&merged, &lot.to_string(), 1).unwrap();
             let staff = sim_core::staff::plan(&world);
