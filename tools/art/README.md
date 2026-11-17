@@ -42,12 +42,22 @@ accepted findings, and exits 1 if any model fails. `tools/ci-local.sh models` ru
 | `mirror` | mirror glass is see-through or isn't flat |
 | `materials` | materials unmapped, double-sided, see-through (BLEND), glowing by day, or with UVs nothing reads |
 | `far` | a far version isn't the full model's size |
+| `validator`, `reference`, `edges`, `texels`, `pbr` | counted against the baseline (below); names kept for checks not in the gate yet |
 
 **Accepting one.** A model that is right as it is takes `accept` in its pack entry: `{"<name>": "<why>"}`, set on its
 `Model` (`G.Model(..., accept={'footprint': 'why'})`, which writes it), or in the entry of a pack written by hand. The
 gate then prints the finding as `accepted: … (<name>: <why>)`. An `accept` that names no strict check, gives no
-reason, or that the model no longer needs is an error, so stale ones don't hide the next finding. The curtains take
+reason, or that the model no longer needs is an error, so stale ones don't hide the next finding (a counted
+check's only where it ran). The curtains take
 `footprint`: the rail runs past the window so the open curtains stack beside the glass (`blender/families/decor.md`).
+
+**The baseline.** A strict check that came in after the models it finds (`checkglb::COUNTED`) counts its findings
+per model against `gate-baseline.json`, `{"<check>": {"<model key>": <count>}}` (`checkglb/baseline.rs`). A model at
+its count gets its findings as warnings; more, or any in a model the file doesn't have, fail as strict findings, so
+new models are strict from the start. Fewer fail as stale until `cargo check-glb --update-baseline` lowers the
+entry: it only lowers counts and takes keys out, never raises or adds, so the file only shrinks. A check with no
+section is strict for every model. An entry that `accept`s a counted check takes its findings instead, and the
+file may keep none for it.
 
 **Warnings** are what only an eye can judge, and the budgets' aims: a loop that ends turned (a fan a quarter round)
 or moved at an even speed (a belt's slats: right if it looks the same), a part turning over 12° in 1/60 s, a use's
