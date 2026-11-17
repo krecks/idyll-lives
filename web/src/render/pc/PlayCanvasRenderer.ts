@@ -76,7 +76,7 @@ import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
 import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS, TOWN_FROM, townBlend } from '../shared/lens';
-import { edgeFog, landEdge, menuFog, menuFogFrom, TOWN_RADIUS_LIMITS, townArrival, townFar, townFog, townFogFrom, townNear, townOrbit } from '../shared/townCamera';
+import { edgeFog, landEdge, menuFog, menuFogFrom, TOWN_RADIUS_LIMITS, townArrival, townClearance, townFar, townFog, townFogFrom, townNear, townOrbit } from '../shared/townCamera';
 import { townView } from '../shared/townView';
 import { landscapeRing, WATER_Y } from '../shared/nature';
 import { setFogFrom } from './shaders/fog';
@@ -102,7 +102,7 @@ import { OrbitControls } from '../shared/orbit';
 import { Flight, panBounds, Roam, WARM_LOTS, warmLots, type FocusPlot } from '../shared/focus';
 import { CHUNK, chunkCoords, distanceToRect, RectGrid } from '../shared/chunks';
 import { ModelRefresh } from '../shared/modelRefresh';
-import { OverviewCamera } from '../shared/overviewCamera';
+import { OverviewCamera, viewShift } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
 import { DEFAULT_RESOLUTION, renderScale, watchPixelRatio } from '../shared/resolution';
@@ -1268,6 +1268,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   // --- the camera ----------------------------------------------------------------------
 
+  /** The menus' camera's view offset in game space (`viewShift`), worked out in place. */
+  private readonly townShift: [number, number, number] = [0, 0, 0];
+
+  /** The menus' land's height at a point (0 before it has one): for the camera's planes (`applyTownCamera`). */
+  private readonly townHeight = (x: number, z: number): number => this.lot.landscapeOf('town')?.heightAt(x, z) ?? 0;
+
   /** Puts the camera where the game (or the overview) has it this frame. */
   private applyCamera(): void {
     if (this.townMode) {
@@ -1275,7 +1281,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // (The menus' town has the full town view's planes, sky and haze at any distance: `applyTownCamera`.)
       const flat = Math.sin(p.beta) * p.radius;
       const [ex, ey, ez] = [p.target.x + Math.cos(p.alpha) * flat, p.target.y + Math.cos(p.beta) * p.radius, p.target.z + Math.sin(p.alpha) * flat];
-      this.applyTownCamera(p.radius, p.alpha, p.beta, ex, ey, ez, true);
+      // (Where the camera is drawn from: moved by the view offset, tens of metres from far out. The near plane's
+      // clearance and the land's veil go by it.)
+      const shift = viewShift(p.alpha, p.beta, p.targetScreenOffset.x, p.targetScreenOffset.y, this.townShift);
+      this.applyTownCamera(p.radius, p.alpha, p.beta, ex, ey, ez, true, shift);
+      this.landHaze?.show(p.radius, ex + shift[0], ez + shift[2]);
       this.camera.setPose(p.alpha, p.beta, p.radius, p.target.x, p.target.y, p.target.z, p.targetScreenOffset.x, p.targetScreenOffset.y);
     } else {
       const o = this.orbit;
@@ -1303,13 +1313,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * from the main menu's low shot, and from the new-game screens zoomed out the whole picture was the dome's flat
    * underside, the lots' tags floating on grey.
    */
-  private applyTownCamera(radius: number, alpha: number, beta: number, ex: number, ey: number, ez: number, menus: boolean): void {
+  private applyTownCamera(radius: number, alpha: number, beta: number, ex: number, ey: number, ez: number, menus: boolean, shift?: readonly [number, number, number]): void {
     const blend = menus ? 1 : townBlend(radius);
     const r = menus ? this.townReach : this.worldReach;
     if (blend > 0) {
-      const land = menus ? (this.lot.landscapeOf('town')?.heightAt(ex, ez) ?? 0) : this.groundY(ex, ez);
+      // (The menus' land round the eye too, as far as the near plane reaches, from where the camera is drawn (`shift`):
+      // `townClearance`.)
+      const clearance = menus ? townClearance(ex + (shift?.[0] ?? 0), ey + (shift?.[1] ?? 0), ez + (shift?.[2] ?? 0), radius, this.townHeight) : ey - this.groundY(ex, ez);
       const far = townFar(radius, this.playFar, ex, ey, ez, r.x0, r.z0, r.x1, r.z1, blend);
-      this.camera.setPlanes(townNear(radius, ey - land, blend), far);
+      this.camera.setPlanes(townNear(radius, clearance, blend), far);
       this.lot.skyReach(far, blend);
     } else if (this.townBlendDrawn > 0) {
       this.camera.setPlanes(0, this.playFar);
@@ -3648,11 +3660,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.townRig.frame(secs, w / h);
     // (Its highlights' colours are written in place: the held frame is drawn again, `heldFrames.ts`. From far out the
     // lit lots are washed over whole.)
-    const p = this.townPose;
-    this.overview?.setReach(p.radius);
-    // (The land's veil by the camera's distance, and where its eye is: past the land's edge, in the haze.)
-    const flat = Math.sin(p.beta) * p.radius;
-    this.landHaze?.show(p.radius, p.target.x + Math.cos(p.alpha) * flat, p.target.z + Math.sin(p.alpha) * flat);
+    this.overview?.setReach(this.townPose.radius);
     // (Step 2's ghosts drawn again when the zoom crosses a step of their least widths on screen.)
     if (this.ghostDraw?.setScale(this.townMetresPerPx()) && this.ghosts) this.drawGhosts();
     if (this.useDraw?.setScale(this.townMetresPerPx()) && this.uses) this.drawUses();

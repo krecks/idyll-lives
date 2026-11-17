@@ -5,7 +5,7 @@
  * framed again when asked.
  */
 import { describe, expect, test } from 'bun:test';
-import { areaFocus, OVERVIEW_CLOSE, OVERVIEW_FARTHEST, OVERVIEW_NEAREST, OverviewCamera, TILT_MAX, TILT_MIN, type AreaWorld } from '../src/render/shared/overviewCamera';
+import { areaFocus, OVERVIEW_CLOSE, OVERVIEW_FARTHEST, OVERVIEW_NEAREST, OverviewCamera, TILT_MAX, TILT_MIN, viewShift, type AreaWorld } from '../src/render/shared/overviewCamera';
 import { LENS } from '../src/render/shared/lens';
 import type { TownShot } from '../src/render/types';
 
@@ -206,6 +206,38 @@ describe("the player's free camera", () => {
     rig.reframe(0);
     rig.frame(0, W / H);
     expect(pose.target.y).toBe(0);
+  });
+
+  test('not down a gorge: low along one, the eye rises over the land round it', () => {
+    const { rig, pose } = camera();
+    // A slot 18 m wide and 104 m deep along x through high ground (a river's way out past a river valley's edge).
+    const gorge = (_x: number, z: number) => (Math.abs(z - 480) < 9 ? -4 : 100);
+    rig.ground = gorge;
+    rig.setShot(whole(960), true);
+    settle(rig);
+    // Looking along it (the eye off along x), low, 300 m out, the target in it.
+    rig.nudge(-pose.alpha, 1, TILT_MAX);
+    rig.nudge(0, pose.radius / 300);
+    rig.pan(480 - pose.target.x, 480 - pose.target.z);
+    settle(rig);
+    expect(pose.radius).toBeCloseTo(300, 3);
+    const flat = Math.sin(pose.beta) * pose.radius;
+    const eye = [pose.target.x + Math.cos(pose.alpha) * flat, pose.target.y + Math.cos(pose.beta) * pose.radius, pose.target.z + Math.sin(pose.alpha) * flat];
+    expect(Math.abs(eye[2] - 480)).toBeLessThan(9);
+    // (In the gorge, 65 m up, before: its sides over it on both hands.)
+    expect(eye[1]).toBeGreaterThan(100);
+    expect(pose.beta).toBeLessThan(TILT_MAX);
+    // The camera as drawn, moved by the shot's view offset (here tens of metres), over the land round it as well.
+    const [sx, sy, sz] = viewShift(pose.alpha, pose.beta, pose.targetScreenOffset.x, pose.targetScreenOffset.y, [0, 0, 0]);
+    expect(Math.hypot(sx, sy, sz)).toBeGreaterThan(10);
+    for (const [ax, az] of [
+      [0, 0],
+      [12, 0],
+      [-12, 0],
+      [0, 12],
+      [0, -12],
+    ])
+      expect(eye[1] + sy).toBeGreaterThanOrEqual(gorge(eye[0] + sx + ax, eye[2] + sz + az));
   });
 
   test("pans along the view: right is the picture's right, forward is into it", () => {

@@ -10,6 +10,28 @@ import { groundDepth } from '../../core/protocol';
 import type { TownShot } from '../types';
 import { angleDelta, ease } from './angles';
 
+/**
+ * How far (m, game space) a view offset (`ox`, `oy`: the picture moved by that much to the right and up, as
+ * `targetScreenOffset` has it) moves an orbit camera at `alpha`, `beta` and its target: along the view's right and up
+ * (a left-handed look-at, up y), into `out`. The camera is drawn from there (`pc/camera.ts` `setPose`), so what keeps
+ * it clear of the land looks from there too.
+ */
+export function viewShift(alpha: number, beta: number, ox: number, oy: number, out: [number, number, number]): [number, number, number] {
+  if (ox === 0 && oy === 0) {
+    out[0] = out[1] = out[2] = 0;
+    return out;
+  }
+  const [sa, ca, sb, cb] = [Math.sin(alpha), Math.cos(alpha), Math.sin(beta), Math.cos(beta)];
+  const [fx, fy, fz] = [-ca * sb, -cb, -sa * sb];
+  const rl = Math.hypot(fz, fx) || 1;
+  const [rx, rz] = [fz / rl, -fx / rl];
+  const [ux, uy, uz] = [fy * rz, fz * rx - fx * rz, -fy * rx];
+  out[0] = -(ox * rx + oy * ux);
+  out[1] = -(oy * uy);
+  out[2] = -(ox * rz + oy * uz);
+  return out;
+}
+
 /** The camera the overview drives: any with these fields. */
 export interface OverviewCameraTarget {
   alpha: number;
@@ -47,6 +69,13 @@ const LIFT_NEAR = 80;
 export const OVERVIEW_FARTHEST = 2400;
 /** Where along the way from the camera (0) to its target (1) `hidden` looks for the land in the way. */
 const HIDDEN_AT = [0, 0.12, 0.25, 0.4, 0.55, 0.7] as const;
+/** The ways round the eye `hidden` looks for land over it (`clear` m off each way). */
+const AROUND = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const;
 /** How far (m) the player may pan the camera off the shot's focus when no land is given to keep it over (`bounds`). */
 const PAN_REACH = 1500;
 
@@ -106,6 +135,8 @@ export class OverviewCamera {
   ground: ((x: number, z: number) => number) | null = null;
   /** The land the player's pan keeps the camera's target over (null: within `PAN_REACH` of the shot's focus). */
   private bounds: OverviewBounds | null = null;
+  /** `hidden`'s view offset, worked out in place. */
+  private readonly shift: [number, number, number] = [0, 0, 0];
 
   constructor(private readonly camera: OverviewCameraTarget) {}
 
@@ -332,7 +363,7 @@ export class OverviewCamera {
     const ty = lift > 0 && this.ground ? this.ground(c.tx, c.tz) * lift : 0;
     // Looking from higher up while the land (a mountain) would stand in the way.
     let beta = c.beta;
-    for (let k = 0; k < 30 && beta > 0.2 && this.hidden(c.alpha, beta, c.radius, c.tx, ty, c.tz); k++) beta -= 0.04;
+    for (let k = 0; k < 30 && beta > 0.2 && this.hidden(c.alpha, beta, c.radius, c.tx, ty, c.tz, c.ox, c.oy); k++) beta -= 0.04;
     cam.beta = beta;
     cam.radius = c.radius;
     cam.target.x = c.tx;
@@ -344,11 +375,12 @@ export class OverviewCamera {
 
   /**
    * Whether the camera at this pose (its target at height `ty`) is in the ground or has the land between it and the
-   * target. It keeps `min(12, radius × 0.35)` m over the land, and the line to the target clear of the treetops (14 m)
-   * or by `radius × 0.35` for its share of the way, the less (so a camera come in close may still look low along a
-   * flat street).
+   * target. It keeps `min(12, radius × 0.35)` m over the land (and, as drawn, moved by the view offset `ox`, `oy`, over
+   * the land under it and that far round it), and the line to the target clear of the treetops (14 m) or by
+   * `radius × 0.35` for its share of the way, the less (so a camera come in close may still look low along a flat
+   * street).
    */
-  private hidden(alpha: number, beta: number, radius: number, tx: number, ty: number, tz: number): boolean {
+  private hidden(alpha: number, beta: number, radius: number, tx: number, ty: number, tz: number, ox: number, oy: number): boolean {
     if (!this.ground) return false;
     const [dx, dy, dz] = [Math.cos(alpha) * Math.sin(beta) * radius, Math.cos(beta) * radius, Math.sin(alpha) * Math.sin(beta) * radius];
     const clear = Math.min(12, radius * 0.35);
@@ -357,6 +389,13 @@ export class OverviewCamera {
       // Clear of the treetops too.
       if (y < this.ground(x, z) + (t === 0 ? clear : Math.min(14, radius * 0.35 * (1 - t)))) return true;
     }
+    // The camera as it is drawn, moved by the view offset (tens of metres from far out: `viewShift`), over the land
+    // under it and `clear` m round it either way: not in the ground, nor down a cutting or a gorge under its sides (as
+    // past the land's edge, where a river runs out between the hills).
+    const [sx, sy, sz] = viewShift(alpha, beta, ox, oy, this.shift);
+    const [ex, ey, ez] = [tx + dx + sx, ty + dy + sy, tz + dz + sz];
+    if (ey < this.ground(ex, ez)) return true;
+    for (const [ax, az] of AROUND) if (ey < this.ground(ex + ax * clear, ez + az * clear)) return true;
     return false;
   }
 
