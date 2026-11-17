@@ -164,6 +164,27 @@ interface Frame {
 }
 
 /**
+ * Where along `road` (arc lengths, m, from its start) its surface's heights are taken on a land its town follows
+ * (`leveledFrames`): at its points, and evenly between two further apart than `LEVEL_STEP`. Between two the surface
+ * runs straight; a bridge's deck is cut at them (`street.ts` `bridge`), so it follows the road and never stands over it.
+ */
+export function levelStops(road: RoadPlan): number[] {
+  const out: number[] = [];
+  const pts = road.points;
+  let s = 0;
+  for (let i = 0; i < pts.length; i++) {
+    if (i > 0) {
+      const len = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      const n = Math.ceil(len / LEVEL_STEP - 1e-6);
+      for (let k = 1; k < n; k++) out.push(s + (len * k) / n);
+      s += len;
+    }
+    out.push(s);
+  }
+  return out;
+}
+
+/**
  * `road`'s frames (`framesOf`), and on a land its town follows (`levels`) one at least every `LEVEL_STEP` m
  * between them (the same line, more points: its heights are taken at each), with the road's height at each.
  */
