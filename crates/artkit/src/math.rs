@@ -60,11 +60,115 @@ pub fn sind(a: f64) -> f64 {
 
 // Single-precision functions: the double one rounded, which is the nearest single (what Blender's C library
 // gives), where a single-precision routine is often one unit out.
+
+/// The sine and cosine of `x` as Blender's C library (Apple's) works both out at once, which is what Blender's
+/// code gets wherever it takes the two of one angle: not always the nearest singles (one in a few thousand is a
+/// unit in the last place off). In double: the angle in quarter turns, less the nearest whole one, then for each
+/// a product of two quadratics in its square, each fused, rounded. (Its code, read from the library; twelve
+/// million angles under 120 radians give the library's bits. Over that, where the library takes more care over
+/// the quarter turns, the nearest singles.)
+pub(crate) fn sincosf(x: f32) -> (f32, f32) {
+    let k = f64::from_bits;
+    let a = x.abs();
+    if a.is_nan() || a >= 120.0 {
+        return (libm::sin(x as f64) as f32, libm::cos(x as f64) as f32);
+    }
+    if a < f32::from_bits(0x3980_0000) {
+        // (under 2^-12 the sine is the number itself and the cosine 1, but for their rounding)
+        let (big, small) = (f32::from_bits(0x4c80_0000), f32::from_bits(0x3280_0000));
+        return (libm::fmaf(x, big, x) * small, (big - a) * small);
+    }
+    let turns = x as f64 * k(0x3fe4_5f30_6dc9_c883);
+    let whole = libm::rint(turns);
+    let r = turns - whole;
+    let r2 = r * r;
+    let s = (r * k(0x3f24_bc89_9499_342c))
+        * libm::fma(r2, r2 + k(0xc02c_3d3e_e4f8_713f), k(0x4044_4921_a30f_0d80))
+        * libm::fma(r2, r2 + k(0xc02e_f09a_b49e_3a5b), k(0x406e_9726_4e36_bd93));
+    let c = k(0x3f4d_9c36_4e97_21d5)
+        * libm::fma(r2, r2 + k(0xc020_bc03_9654_0c13), k(0x401d_7821_2789_bc11))
+        * libm::fma(r2, r2 + k(0xc02d_6f5a_de6c_8c37), k(0x4062_c6b9_c7f8_8fa0));
+    let (mut s, mut c) = (s as f32, c as f32);
+    let quarter = whole as i64;
+    if quarter & 2 != 0 {
+        (s, c) = (-s, -c);
+    }
+    if quarter & 1 != 0 { (c, -s) } else { (s, c) }
+}
 pub(crate) fn sinf(x: f32) -> f32 {
-    libm::sin(x as f64) as f32
+    sincosf(x).0
 }
 pub(crate) fn cosf(x: f32) -> f32 {
-    libm::cos(x as f64) as f32
+    sincosf(x).1
+}
+
+/// The quarter turns in an angle, of `sinf_alone` and `cosf_alone`.
+const QUARTERS: u64 = 0x3fe4_5f30_6dc9_c883;
+
+/// A sine or a cosine from the angle left once `whole` quarter turns are taken off `x`, for the quarter `quarter`.
+fn of_quarter(x: f64, whole: f64, quarter: i64) -> f32 {
+    let k = f64::from_bits;
+    let r = libm::fma(-whole, k(0x3ff9_21fb_5444_2d18), x);
+    let v = if quarter & 1 != 0 {
+        cosine_near(r)
+    } else {
+        sine_near(r)
+    };
+    (if quarter & 2 != 0 { -v } else { v }) as f32
+}
+
+/// The cosine of an angle within an eighth of a turn of none, in double, as the library's own polynomial has it.
+fn cosine_near(r: f64) -> f64 {
+    let k = f64::from_bits;
+    let z = r * r;
+    let a = libm::fma(z, k(0x3ef9_9169_fc93_8f4a), k(0xbf56_c07f_1694_5df4));
+    let b = libm::fma(z, k(0x3fa5_5553_c789_9699), k(0xbfdf_ffff_fcb8_2e97));
+    libm::fma(z, libm::fma(z * z, a, b), 1.0)
+}
+
+/// The sine of such an angle.
+fn sine_near(r: f64) -> f64 {
+    let k = f64::from_bits;
+    let z = r * r;
+    let r3 = r * z;
+    let a = libm::fma(z, k(0xbf29_943e_0fc4_818f), k(0x3f81_1073_afd1_45eb));
+    let b = libm::fma(r3, k(0xbfc5_5554_5268_a02a), r);
+    libm::fma(z * r3, a, b)
+}
+
+/// The sine of `x` as Blender's C library (Apple's) works it out when it is asked for alone: another routine than
+/// the one that gives a sine and a cosine at once, and a few in a hundred of its results are a unit in the last
+/// place off that one's. (Its code, read from the library; twelve million angles under 120 radians give the
+/// library's bits; over that, the nearest single.)
+pub(crate) fn sinf_alone(x: f32) -> f32 {
+    let a = x.abs();
+    if a.is_nan() || a >= 120.0 {
+        return libm::sin(x as f64) as f32;
+    }
+    if a < f32::from_bits(0x3980_0000) {
+        return libm::fmaf(x, f32::from_bits(0x4c80_0000), x) * f32::from_bits(0x3280_0000);
+    }
+    if a < f32::from_bits(0x3f49_0fdb) {
+        return sine_near(x as f64) as f32;
+    }
+    let whole = libm::rint(x as f64 * f64::from_bits(QUARTERS));
+    of_quarter(x as f64, whole, whole as i64)
+}
+
+/// The cosine of `x` as that library works it out when it is asked for alone (`sinf_alone`).
+pub(crate) fn cosf_alone(x: f32) -> f32 {
+    let a = x.abs();
+    if a.is_nan() || a >= 120.0 {
+        return libm::cos(x as f64) as f32;
+    }
+    if a < f32::from_bits(0x3980_0000) {
+        return (f32::from_bits(0x4c80_0000) - a) * f32::from_bits(0x3280_0000);
+    }
+    if a < f32::from_bits(0x3f49_0fdb) {
+        return cosine_near(a as f64) as f32;
+    }
+    let whole = libm::rint(a as f64 * f64::from_bits(QUARTERS));
+    of_quarter(a as f64, whole, whole as i64 + 1)
 }
 /// (Of -1 it is the single just under pi, as Blender's C library has it: no angle over a half turn.)
 fn acosf(x: f32) -> f32 {
@@ -993,6 +1097,68 @@ mod tests {
         ];
         for (x, want) in pairs {
             assert_eq!(asinf(f32::from_bits(x)).to_bits(), want, "asinf of {x:08x}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod sines {
+    use super::{cosf_alone, sincosf, sinf_alone};
+
+    #[test]
+    fn sines_and_cosines_are_the_c_librarys_where_they_arent_the_nearest_singles() {
+        // (angle, sine, cosine) as bits, from the library's routine for the two at once: six where one of them isn't
+        // the nearest single, then the ends
+        let both: [(u32, u32, u32); 18] = [
+            (0x3e55_95a1, 0x3e54_0a08, 0x3f7a_7397),
+            (0xbf3c_b831, 0xbf2c_15c0, 0x3f3d_8874),
+            (0x4050_3362, 0xbde3_f7ba, 0xbf7e_68b9),
+            (0x41d9_7ed4, 0x3f62_ab2a, 0xbeed_f81f),
+            (0xc208_9987, 0xbeca_f4af, 0xbf6b_0735),
+            (0x42ef_216c, 0x3e3c_1dad, 0x3f7b_a4a6),
+            (0x0000_0000, 0x0000_0000, 0x3f80_0000),
+            (0x8000_0000, 0x8000_0000, 0x3f80_0000),
+            (0x3727_c5ac, 0x3727_c5ac, 0x3f80_0000),
+            (0xb951_b717, 0xb951_b717, 0x3f80_0000),
+            (0x3980_0000, 0x3980_0000, 0x3f7f_ffff),
+            (0x3f00_0000, 0x3ef5_7744, 0x3f60_a940),
+            (0x3fc9_0fdb, 0x3f80_0000, 0xb33b_bd2e),
+            (0x4049_0fdb, 0xb3bb_bd2e, 0xbf80_0000),
+            (0xc096_cbe4, 0x3f80_0000, 0x324c_de2e),
+            (0x40c9_0fdb, 0x343b_bd2e, 0x3f80_0000),
+            (0x42c8_0000, 0xbf01_a12e, 0x3f5c_c0ee),
+            (0x42ef_ffff, 0x3f14_a287, 0x3f50_6e74),
+        ];
+        for (x, sin, cos) in both {
+            let (s, c) = sincosf(f32::from_bits(x));
+            assert_eq!((s.to_bits(), c.to_bits()), (sin, cos), "of {x:08x}");
+        }
+        // and from its routines for one alone
+        let alone: [(u32, u32, u32); 16] = [
+            (0x3e55_95a1, 0x3e54_0a08, 0x3f7a_7397),
+            (0xbf3c_b831, 0xbf2c_15c0, 0x3f3d_8874),
+            (0x4050_3362, 0xbde3_f7ba, 0xbf7e_68ba),
+            (0x41d9_7ed4, 0x3f62_ab2a, 0xbeed_f81f),
+            (0xc208_9987, 0xbeca_f4af, 0xbf6b_0735),
+            (0x42ef_216c, 0x3e3c_1dad, 0x3f7b_a4a6),
+            (0x0000_0000, 0x0000_0000, 0x3f80_0000),
+            (0x8000_0000, 0x8000_0000, 0x3f80_0000),
+            (0x3727_c5ac, 0x3727_c5ac, 0x3f80_0000),
+            (0x3980_0000, 0x3980_0000, 0x3f80_0000),
+            (0x3f00_0000, 0x3ef5_7744, 0x3f60_a940),
+            (0x3f49_0fdb, 0x3f35_04f3, 0x3f35_04f3),
+            (0x3fc9_0fdb, 0x3f80_0000, 0xb33b_bd2e),
+            (0x4049_0fdb, 0xb3bb_bd2e, 0xbf80_0000),
+            (0xc096_cbe4, 0x3f80_0000, 0x324c_de2e),
+            (0x42ef_ffff, 0x3f14_a287, 0x3f50_6e74),
+        ];
+        for (x, sin, cos) in alone {
+            let x = f32::from_bits(x);
+            assert_eq!(
+                (sinf_alone(x).to_bits(), cosf_alone(x).to_bits()),
+                (sin, cos),
+                "of {x:?} alone"
+            );
         }
     }
 }
