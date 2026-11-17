@@ -616,6 +616,7 @@ pub(crate) fn update(w: &mut World) {
     let day = clock::day(tick);
     let hour = clock::hour(tick);
     let mut refreshed = false;
+    let residents = crate::profile::start();
     for i in 0..w.sims.len() {
         // (In lots nobody watches, on their turn; see `lod.rs`.)
         if !w.sims[i].here() || w.sims[i].steps == 0 {
@@ -690,9 +691,12 @@ pub(crate) fn update(w: &mut World) {
         childcare(w, i);
         report_skill_ups(w, i);
     }
-    doors(w);
-    charge_rent(w, day);
-    job_market(w, day);
+    crate::profile::end("life::update/residents", residents);
+    crate::profile::phase("life::update/doors", || doors(w));
+    crate::profile::phase("life::update/rent_and_jobs", || {
+        charge_rent(w, day);
+        job_market(w, day);
+    });
 }
 
 /// Once a day: unemployed residents with free will below the retirement age look for work, and

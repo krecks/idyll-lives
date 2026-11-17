@@ -587,6 +587,18 @@ impl NavGrid<'_> {
         goal: (i32, i32),
         grounds: Option<&Grounds>,
     ) -> Option<Vec<(i32, i32)>> {
+        crate::profile::phase("path/find_path_with", || {
+            self.find_path_timed(start, goal, grounds)
+        })
+    }
+
+    /// `find_path_with`'s work (timed as a whole there, with the `profile` feature).
+    fn find_path_timed(
+        &self,
+        start: (i32, i32),
+        goal: (i32, i32),
+        grounds: Option<&Grounds>,
+    ) -> Option<Vec<(i32, i32)>> {
         let lot = self.lot;
         if !lot.in_bounds(start.0, start.1) || !self.tile_free(goal.0, goal.1) {
             return None;
@@ -599,7 +611,7 @@ impl NavGrid<'_> {
             && let Some(mut way) = self.way_out(start)
         {
             let off = way.pop()?;
-            way.extend(self.find_path_with(off, goal, grounds)?);
+            way.extend(self.find_path_timed(off, goal, grounds)?);
             return Some(way);
         }
         match self.search(start, goal, grounds, NODE_CAP, None) {

@@ -474,20 +474,23 @@ pub(crate) fn update(w: &mut World) {
     if w.travel.graph.is_empty() {
         return;
     }
-    note_still(w);
+    crate::profile::phase("taxi::update/note_still", || note_still(w));
     if w.tick.is_multiple_of(TICKS_PER_MINUTE) {
-        plan(w);
+        crate::profile::phase("taxi::update/plan", || plan(w));
+        let booking = crate::profile::start();
         close_home_runs(w);
         leisure_leaving(w);
         bring_backs_forward(w);
         book_backs(w);
+        crate::profile::end("taxi::update/home_runs", booking);
         if w.tick.is_multiple_of(60 * TICKS_PER_MINUTE) {
             w.taxis.no_leisure.clear();
             w.taxis.left.clear();
             w.taxis.early.clear();
         }
     }
-    seat_riders(w);
+    crate::profile::phase("taxi::update/seat_riders", || seat_riders(w));
+    let running = crate::profile::start();
     let mut k = 0;
     while k < w.taxis.runs.len() {
         if !run_on(w, k) {
@@ -497,6 +500,7 @@ pub(crate) fn update(w: &mut World) {
         }
         k += 1;
     }
+    crate::profile::end("taxi::update/runs", running);
 }
 
 /// The start of resident `i`'s work (or school) a taxi would take them to: today's still to come,

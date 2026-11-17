@@ -590,21 +590,27 @@ pub(crate) fn refresh(w: &mut World) {
                 let k = match cache.binary_search_by_key(&room, |c| c.0) {
                     Ok(k) if cache[k].3 == tick => k,
                     found => {
+                        let hashed = crate::profile::start();
                         let presence = *presence.get_or_insert_with(|| presence_hash(w));
                         let hash = room_hash(w, room, presence);
+                        crate::profile::end("privacy::refresh/hashes", hashed);
                         match found {
                             Ok(k) => {
                                 if cache[k].1 != hash {
+                                    let found = crate::profile::start();
                                     let by = by_plot.get_or_insert_with(|| living_by_plot(w));
                                     cache[k].1 = hash;
                                     cache[k].2 = room_claimants(w, room, by).into();
+                                    crate::profile::end("privacy::refresh/claimants", found);
                                 }
                                 cache[k].3 = tick;
                                 k
                             }
                             Err(k) => {
+                                let found = crate::profile::start();
                                 let by = by_plot.get_or_insert_with(|| living_by_plot(w));
                                 let people = room_claimants(w, room, by).into();
+                                crate::profile::end("privacy::refresh/claimants", found);
                                 cache.insert(k, (room, hash, people, tick));
                                 k
                             }

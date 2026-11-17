@@ -3282,6 +3282,7 @@ pub(crate) fn begin(w: &mut World) {
     // this tick (`lod.rs`) only if they waited this tick, the others as on their last turn. Gone
     // on, or off doing something else, they no longer ask for the walk: a request standing for a
     // turn's length after brought round walk phases nobody waited for.)
+    let walking = crate::profile::start();
     let mut walkers = std::mem::take(&mut w.traffic.walkers);
     walkers.clear();
     if !w.travel.signals.is_empty() {
@@ -3301,19 +3302,24 @@ pub(crate) fn begin(w: &mut World) {
         walkers.dedup();
     }
     w.traffic.walkers = walkers;
-    on_crossings(w);
-    crate::cars::track_stall(w);
-    crate::cars::sight(w);
-    crate::cars::pass_stands(w);
-    crate::cars::unjam(w);
+    crate::profile::end("traffic::begin/walkers", walking);
+    crate::profile::phase("traffic::begin/on_crossings", || on_crossings(w));
+    crate::profile::phase("traffic::begin/track_stall", || crate::cars::track_stall(w));
+    crate::profile::phase("traffic::begin/sight", || crate::cars::sight(w));
+    crate::profile::phase("traffic::begin/pass_stands", || crate::cars::pass_stands(w));
+    crate::profile::phase("traffic::begin/unjam", || crate::cars::unjam(w));
+    let moving = crate::profile::start();
     let mut movers = Vec::new();
     let mut places = Vec::new();
     let mut approaching = std::mem::take(&mut w.traffic.approaching);
     approaching.clear();
     crate::cars::movers(w, &mut movers, &mut places, &mut approaching);
     w.traffic.approaching = approaching;
+    crate::profile::end("traffic::begin/movers", moving);
     let tick = w.tick;
-    w.traffic.begin(tick, movers, &places, &w.travel.signals);
+    crate::profile::phase("traffic::begin/claims", || {
+        w.traffic.begin(tick, movers, &places, &w.travel.signals)
+    });
 }
 
 #[cfg(test)]
