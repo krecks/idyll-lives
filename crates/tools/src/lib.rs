@@ -22,6 +22,7 @@ pub mod pcg64;
 pub mod pins;
 pub mod review;
 pub mod shots;
+pub mod species;
 pub mod tex;
 pub mod version;
 pub mod voicefetch;

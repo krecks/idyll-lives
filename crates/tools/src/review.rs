@@ -3,8 +3,13 @@
 //!
 //!   cargo review sizes [--md <dir>]   each object's W x H x D and its seat, top and mattress heights against
 //!                                     docs/review/reference.json: the outliers per category (`--md`: every
-//!                                     object, `<dir>/sizes-<cat>.md`); then the textures' patterns and the
-//!                                     kerb against its `surfaces` (`surfaces.rs`)
+//!                                     object, `<dir>/sizes-<cat>.md`); a plant against its kind's `species`
+//!                                     (`species.rs`); then the textures' patterns and the kerb against its
+//!                                     `surfaces` (`surfaces.rs`)
+//!         [--check]                   fails on a row with more outside its range than tools/art/gate-baseline.json
+//!                                     holds for it (`reference`, by id), or fewer (stale)
+//!         [--update-baseline]         first lowers that section to what it finds (only lowers, takes ids out)
+//!         [--seed-baseline]           writes the section where the file has none (the day the check came in)
 //!   cargo review colours [--all]      every model's colours against what real surfaces reflect (`colours.rs`)
 //!   cargo review facets [--all]       every model's round parts whose outline shows its flat sides (`facets.rs`)
 //!   cargo review uses [--md <dir>]    each object's uses, poses, minutes, effects, skills, slots, approach,
@@ -22,7 +27,9 @@
 
 pub mod surfaces;
 
+use crate::checkglb::baseline::{Baseline, Counts, Verdict};
 use crate::checkglb::{self, Height, Measure, Paths};
+use crate::species::{self, Atlas, Shape, Species};
 use regex::Regex;
 use serde::Deserialize;
 use serde_json::Value;
@@ -84,6 +91,9 @@ pub struct Kind {
     pub mechanisms: BTreeMap<String, [f64; 2]>,
     #[serde(default)]
     pub sources: Vec<String>,
+    /// What a plant's kind is of (`species`): its W and H are then its crown width and height, checked strictly
+    /// from its model with the rest of the block, in place of the overall W × H × D.
+    pub species: Option<Species>,
 }
 
 impl Reference {
@@ -722,6 +732,8 @@ pub struct SizeRow {
     pub id: String,
     pub name: String,
     pub page: String,
+    /// The model it draws.
+    pub model: String,
     pub kind: Option<String>,
     /// W x H x D (m, game axes: across its front, up, front to back).
     pub size: Option<[f64; 3]>,
@@ -736,7 +748,9 @@ pub struct SizeRow {
     pub h: Option<(&'static str, f64)>,
     /// A stair's steps: how many, and the rise of each (m).
     pub steps: Option<(usize, f64)>,
-    /// What is outside its kind's ranges.
+    /// Its plant as measured against its kind's `species` (`species_row`).
+    pub species: Option<Shape>,
+    /// What is outside its kind's ranges: each a finding the baseline counts (`--check`).
     pub outside: Vec<String>,
     /// Why it couldn't be checked (no kind, a kind `kinds` doesn't have, an unreadable model).
     pub problem: Option<String>,
@@ -790,6 +804,7 @@ pub fn size_row(
         id: object.id.clone(),
         name: object.name.clone(),
         page: object.page.clone(),
+        model: object.model.clone(),
         ..SizeRow::default()
     };
     let measured = measure.and_then(|m| m.as_ref().ok());
@@ -820,9 +835,15 @@ pub fn size_row(
             Some((by, h)) => (format!("H ({by})"), h),
             None => ("H".into(), size[1]),
         };
+        // A plant's W and H are its crown's and its own, strictly (`species_row`).
+        let (w, h_range) = if k.species.is_some() {
+            (None, None)
+        } else {
+            (k.w, k.h)
+        };
         for (name, v, range) in [
-            ("W", size[0], k.w),
-            (h_name.as_str(), h, k.h),
+            ("W", size[0], w),
+            (h_name.as_str(), h, h_range),
             ("D", size[2], k.d),
         ] {
             if let Some(range) = range.filter(|r| !within(v, *r, reference.tolerance)) {
@@ -991,12 +1012,12 @@ pub fn tops(objects: &[Object], reference: &Reference) -> BTreeMap<String, [f64;
         .collect()
 }
 
-/// `cargo review sizes`: (stdout, the files for `--md`, exit code: 1 if an object maps to no kind).
-pub fn sizes(
+/// Every object's size row (`size_row`), and one for each model key in `ids` that no object draws.
+pub fn size_rows(
     objects: &[Object],
     measures: &checkglb::Measures,
     reference: &Reference,
-) -> (String, BTreeMap<String, String>, i32) {
+) -> Vec<SizeRow> {
     let mut rows: Vec<SizeRow> = objects
         .iter()
         .map(|o| size_row(o, measures.objects.get(&o.id), reference))
@@ -1007,6 +1028,48 @@ pub fn sizes(
     }) {
         rows.push(model_row(key, &measures.models[key], reference));
     }
+    rows
+}
+
+/// A plant's `row` (its kind's `species` in `reference`) with its model measured (`species::measure`): what is
+/// outside the block, or the kind's `h` and `w` strictly, joins its findings; a model that can't be read is its
+/// problem. A row of no such kind is left as it is.
+pub fn species_row(
+    row: &mut SizeRow,
+    reference: &Reference,
+    shape: Result<Shape, String>,
+    atlas: &Atlas,
+) {
+    let Some(k) = row.kind.as_deref().and_then(|k| reference.kind(k)) else {
+        return;
+    };
+    let Some(sp) = &k.species else { return };
+    match shape {
+        Ok(shape) => {
+            row.outside
+                .extend(species::findings(sp, k.h, k.w, &shape, atlas));
+            row.species = Some(shape);
+        }
+        Err(e) => row.problem = Some(format!("unmeasured: {e}")),
+    }
+}
+
+/// `cargo review sizes` over `objects` (`size_rows`, no plant measured): (stdout, the files for `--md`, exit
+/// code: 1 if an object maps to no kind or a kind's `species` isn't one).
+pub fn sizes(
+    objects: &[Object],
+    measures: &checkglb::Measures,
+    reference: &Reference,
+) -> (String, BTreeMap<String, String>, i32) {
+    report(objects, &size_rows(objects, measures, reference), reference)
+}
+
+/// `sizes`'s report of `rows`.
+pub fn report(
+    objects: &[Object],
+    rows: &[SizeRow],
+    reference: &Reference,
+) -> (String, BTreeMap<String, String>, i32) {
     let mut out = format!(
         "# Sizes against {REFERENCE}\n\nOverall W × H × D within ±{:.0} % of the kind's range (H: a stair's top step; a table's or a desk's without the seats its model carries); seat, top and mattress (slot 0's) heights (the model's, where it has one; a top the content hasn't, the model's near the range) strictly within it.\n",
         reference.tolerance * 100.0
@@ -1039,7 +1102,19 @@ pub fn sizes(
         }
         files.insert(format!("sizes-{page}.md"), md);
     }
-    let problems: Vec<&SizeRow> = rows
+    let plants: Vec<&SizeRow> = rows.iter().filter(|r| r.species.is_some()).collect();
+    if !plants.is_empty() {
+        let _ = write!(
+            out,
+            "\n## Species: {} of {} plants outside\n\nEach against its kind's `species` and its `h` and `w`, strictly (`species.rs`): the plant's H (from the foot of its trunk or stems), its crown's widest, crown W/H, the clear trunk under the leaves (of H), the bark's luminance, the colours on it that aren't a leaf's green and the leaf cards' triangles by the atlas tile they are on.\n\n{SPECIES_HEAD}\n",
+            plants.iter().filter(|r| !r.outside.is_empty()).count(),
+            plants.len()
+        );
+        for r in &plants {
+            let _ = writeln!(out, "{}", species_cells(r, reference));
+        }
+    }
+    let mut problems: Vec<&SizeRow> = rows
         .iter()
         .filter(|r| {
             r.problem
@@ -1047,6 +1122,7 @@ pub fn sizes(
                 .is_some_and(|p| !p.starts_with("unmeasured"))
         })
         .collect();
+    problems.sort_by_key(|r| r.page != "models");
     let unmeasured: Vec<&SizeRow> = rows
         .iter()
         .filter(|r| {
@@ -1086,7 +1162,83 @@ pub fn sizes(
             );
         }
     }
-    (out, files, if problems.is_empty() { 0 } else { 1 })
+    let bad: Vec<String> = reference
+        .kinds
+        .iter()
+        .filter_map(|(name, k)| Some((name, k.species.as_ref()?.problems())))
+        .flat_map(|(name, p)| p.into_iter().map(move |p| format!("- `{name}`: {p}")))
+        .collect();
+    if !bad.is_empty() {
+        let _ = write!(
+            out,
+            "\n## Error: {} `species` entries aren't what a species is\n\n{}\n",
+            bad.len(),
+            bad.join("\n")
+        );
+    }
+    (
+        out,
+        files,
+        if problems.is_empty() && bad.is_empty() {
+            0
+        } else {
+            1
+        },
+    )
+}
+
+const SPECIES_HEAD: &str = "| Object | Kind | Species | Plant H | Crown W | Crown W/H | Clear trunk | Bark | Colours | Leaf cards | Outside |\n|---|---|---|---|---|---|---|---|---|---|---|";
+
+/// A plant's row of the species table: each measure with its range.
+fn species_cells(r: &SizeRow, reference: &Reference) -> String {
+    let k = r.kind.as_deref().and_then(|k| reference.kind(k));
+    let sp = k.and_then(|k| k.species.as_ref());
+    let Some(s) = &r.species else {
+        return String::new();
+    };
+    let cell = |v: Option<f64>, range: Option<[f64; 2]>, digits: usize| match (v, range) {
+        (None, _) => "—".to_string(),
+        (Some(v), None) => format!("{v:.digits$}"),
+        (Some(v), Some([lo, hi])) => format!("{v:.digits$} ({lo:.digits$}–{hi:.digits$})"),
+    };
+    let ratio = s.crown.filter(|_| s.height > 0.0).map(|c| c / s.height);
+    let colours = if s.colours.is_empty() {
+        "—".to_string()
+    } else {
+        s.colours
+            .iter()
+            .map(|c| format!("{} {:.0}°", c.material, c.hue))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let tiles = if s.tiles.is_empty() {
+        "—".to_string()
+    } else {
+        s.tiles
+            .iter()
+            .map(|(class, n)| {
+                let class = if class.is_empty() { "none" } else { class };
+                format!("{n} {class}")
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    format!(
+        "| `{}` | {} | {} | {} | {} | {} | {} | {} | {colours} | {tiles} | {} |",
+        r.id,
+        r.kind.as_deref().unwrap_or("—"),
+        sp.map_or("—".into(), |sp| format!("*{}*", sp.latin)),
+        cell(Some(s.height), k.and_then(|k| k.h), 2),
+        cell(s.crown, k.and_then(|k| k.w), 2),
+        cell(ratio, sp.and_then(|sp| sp.crown), 2),
+        cell(s.clear, sp.and_then(|sp| sp.clear), 2),
+        cell(s.bark, sp.and_then(|sp| sp.bark.as_ref()?.luminance), 3),
+        if r.outside.is_empty() {
+            "ok".to_string()
+        } else {
+            r.outside.join("; ")
+        }
+    )
 }
 
 fn short(v: f32) -> String {
@@ -1314,6 +1466,159 @@ fn write_md(dir: &Path, files: &BTreeMap<String, String>) -> Result<(), String> 
     Ok(())
 }
 
+/// The baseline's section (tools/art/gate-baseline.json) `cargo review sizes --check` judges by: how many
+/// findings each measured row has (its `outside`), by its id (an object's, or a model key no object draws).
+pub const CHECK: &str = "reference";
+
+/// Each measured row's findings, by its id (a row that couldn't be measured is left out).
+pub fn counts(rows: &[SizeRow]) -> BTreeMap<String, u64> {
+    rows.iter()
+        .filter(|r| r.problem.is_none())
+        .map(|r| (r.id.clone(), r.outside.len() as u64))
+        .collect()
+}
+
+/// What `--check` fails on, against `baseline`'s `reference` section: a row with more findings than it holds, or
+/// any where it holds none (new objects are strict); one with fewer (stale: `--update-baseline` lowers it); and an
+/// id it holds that no row has.
+pub fn judged(rows: &[SizeRow], baseline: &Baseline) -> Vec<String> {
+    let mut out = Vec::new();
+    for r in rows.iter().filter(|r| r.problem.is_none()) {
+        let count = r.outside.len() as u64;
+        let what = r.outside.join("; ");
+        match baseline.judge(CHECK, &r.id, count) {
+            Verdict::Clean | Verdict::Held(_) => {}
+            Verdict::New(n) => out.push(format!(
+                "`{}`: {n} outside its kind's range, none in the baseline: {what}",
+                r.id
+            )),
+            Verdict::Over { base, count } => out.push(format!(
+                "`{}`: {count} outside its kind's range, {base} in the baseline: fix the new ones: {what}",
+                r.id
+            )),
+            Verdict::Stale { base, count } => out.push(format!(
+                "`{}`: {count} outside its kind's range, {base} in the baseline: lower it (`cargo review sizes --update-baseline`)",
+                r.id
+            )),
+        }
+    }
+    let ids: HashSet<&str> = rows.iter().map(|r| r.id.as_str()).collect();
+    for key in baseline.keys(CHECK).filter(|k| !ids.contains(k)) {
+        out.push(format!(
+            "`{key}`: in the baseline, but no object or model the review measured: take it out (`cargo review sizes --update-baseline`)"
+        ));
+    }
+    out
+}
+
+/// `baseline` lowered to what `rows` found (`Baseline::lowered`): never raised, nothing added; an id no row
+/// has goes, one whose row couldn't be measured stays. (The baseline, a line for each change.)
+pub fn lowered(rows: &[SizeRow], baseline: &Baseline) -> (Baseline, Vec<String>) {
+    let mut found = counts(rows);
+    let ids: HashSet<&str> = rows.iter().map(|r| r.id.as_str()).collect();
+    for key in baseline.keys(CHECK).filter(|k| !ids.contains(k)) {
+        found.insert(key.to_string(), 0);
+    }
+    baseline.lowered(&Counts::from([(CHECK.to_string(), found)]))
+}
+
+/// `baseline` with a `reference` section of what `rows` found, the day the check comes in: refused where it has
+/// one (only `--update-baseline` changes it then, and only down).
+pub fn seeded(rows: &[SizeRow], baseline: &Baseline) -> Result<Baseline, String> {
+    if baseline.checks().any(|c| c == CHECK) {
+        return Err(format!(
+            "it has a `{CHECK}` section already: `--update-baseline` lowers it"
+        ));
+    }
+    let mut all: Value = serde_json::from_str(&baseline.text()).map_err(|e| e.to_string())?;
+    let section: serde_json::Map<String, Value> = counts(rows)
+        .into_iter()
+        .filter(|(_, n)| *n > 0)
+        .map(|(id, n)| (id, Value::from(n)))
+        .collect();
+    if let Some(all) = all.as_object_mut().filter(|_| !section.is_empty()) {
+        all.insert(CHECK.into(), Value::Object(section));
+    }
+    Baseline::parse(&all.to_string())
+}
+
+/// `sizes`'s baseline flags over `rows`: `--seed-baseline` writes the section (`seeded`), `--update-baseline`
+/// lowers it (`lowered`), then `--check` judges by it (`judged`). The exit code: 1 if `--check` found something.
+fn baselined(paths: &Paths, rows: &[SizeRow], args: &[String]) -> Result<i32, String> {
+    use crate::checkglb::baseline::FILE;
+    let has = |flag: &str| args.iter().any(|a| a == flag);
+    let mut baseline = Baseline::read(&paths.baseline)?;
+    if has("--seed-baseline") {
+        baseline = seeded(rows, &baseline).map_err(|e| format!("{FILE}: {e}"))?;
+        baseline.write(&paths.baseline)?;
+        eprintln!(
+            "{FILE}: `{CHECK}` holds {} rows",
+            baseline.keys(CHECK).count()
+        );
+    }
+    if has("--update-baseline") {
+        let (low, changes) = lowered(rows, &baseline);
+        if changes.is_empty() {
+            eprintln!("{FILE}: nothing to lower");
+        } else {
+            low.write(&paths.baseline)?;
+            for c in &changes {
+                eprintln!("{FILE}: {c}");
+            }
+        }
+        baseline = low;
+    }
+    if !has("--check") {
+        return Ok(0);
+    }
+    let errors = judged(rows, &baseline);
+    let held = baseline.keys(CHECK).count();
+    if errors.is_empty() {
+        eprintln!(
+            "review sizes: every row within its kind's range or held by {FILE} ({held} held)"
+        );
+        return Ok(0);
+    }
+    eprintln!(
+        "review sizes: {} rows against {FILE} ({held} held):",
+        errors.len()
+    );
+    for e in &errors {
+        eprintln!("  {e}");
+    }
+    Ok(1)
+}
+
+/// Measures each row whose kind has a `species` from its model (`species::read`) and adds what is off
+/// (`species_row`).
+fn measure_plants(s: &Sources, rows: &mut [SizeRow], reference: &Reference) -> Result<(), String> {
+    let plant = |r: &SizeRow| {
+        r.kind
+            .as_deref()
+            .and_then(|k| reference.kind(k))
+            .is_some_and(|k| k.species.is_some())
+            && r.problem.is_none()
+    };
+    if !rows.iter().any(plant) {
+        return Ok(());
+    }
+    let files = species::model_files(&s.paths)?;
+    let assets = Path::new(&s.paths.assets);
+    let base: Value = serde_json::from_str(&s.read("web/public/assets/manifest.json")?)
+        .map_err(|e| format!("manifest.json: {e}"))?;
+    let finishes = crate::colours::finishes(&base, assets);
+    let atlas = Atlas::read(&s.root.to_string_lossy())?;
+    for r in rows.iter_mut().filter(|r| plant(r)) {
+        let shape = match files.get(&r.model) {
+            Some((path, entry)) => species::read(path, entry.get("materials"), &finishes)
+                .map(|p| species::measure(&p, &atlas)),
+            None => Err(format!("no manifest has a model file for {}", r.model)),
+        };
+        species_row(r, reference, shape, &atlas);
+    }
+    Ok(())
+}
+
 /// The checkout's files the review reads.
 struct Sources {
     root: PathBuf,
@@ -1334,10 +1639,11 @@ impl Sources {
     }
 }
 
-pub const USAGE: &str = "usage: cargo review sizes [--md <dir>] | uses [--md <dir>] [--check] | colours [--all] [--check] | facets [--all] [--check]";
+pub const USAGE: &str = "usage: cargo review sizes [--md <dir>] [--check] [--update-baseline] [--seed-baseline] | uses [--md <dir>] [--check] | colours [--all] [--check] | facets [--all] [--check]";
 
 /// `cargo review <sizes|uses> [--md <dir>] [--check]`: the exit code (2: usage, or no reference for
-/// `sizes`; 1: `--check` found a hard flag, a use the renderer can't play).
+/// `sizes`; 1: an object of no kind, a `species` that isn't one, or `--check` found a row the baseline doesn't
+/// hold or a hard flag, a use the renderer can't play).
 pub fn main(args: &[String]) -> i32 {
     if args.first().map(String::as_str) == Some("colours") {
         return crate::colours::main(&args[1..]);
@@ -1372,17 +1678,16 @@ pub fn main(args: &[String]) -> i32 {
                     );
                     return Ok(2);
                 };
-                let (mut text, files, code) = sizes(
-                    &objects,
-                    &checkglb::measures(&s.paths, &tops(&objects, &reference))?,
-                    &reference,
-                );
+                let measures = checkglb::measures(&s.paths, &tops(&objects, &reference))?;
+                let mut rows = size_rows(&objects, &measures, &reference);
+                measure_plants(&s, &mut rows, &reference)?;
+                let (mut text, files, code) = report(&objects, &rows, &reference);
                 let manifest = serde_json::from_str(&s.read(surfaces::MANIFEST)?)
                     .map_err(|e| format!("{}: {e}", surfaces::MANIFEST))?;
-                let rows =
+                let surface_rows =
                     surfaces::rows(&reference.surfaces, &manifest, &s.read(surfaces::ROADS)?)?;
-                text.push_str(&surfaces::report(&rows));
-                (text, files, code)
+                text.push_str(&surfaces::report(&surface_rows));
+                (text, files, code.max(baselined(&s.paths, &rows, args)?))
             }
             Some("uses") => {
                 let actions = action_keys(&s.read("web/src/render/shared/characters/actions.ts")?)
@@ -1423,4 +1728,128 @@ pub fn main(args: &[String]) -> i32 {
         eprintln!("review: {e}");
         1
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(id: &str, outside: usize, problem: Option<&str>) -> SizeRow {
+        SizeRow {
+            id: id.into(),
+            outside: (0..outside).map(|i| format!("finding {i}")).collect(),
+            problem: problem.map(String::from),
+            ..SizeRow::default()
+        }
+    }
+
+    fn base(text: &str) -> Baseline {
+        Baseline::parse(text).unwrap()
+    }
+
+    #[test]
+    fn check_judges_each_measured_row_by_the_baseline() {
+        let b = base(r#"{"reference": {"a": 2, "c": 3, "gone": 1}, "edges": {"model.x": 4}}"#);
+        let rows = [
+            row("a", 2, None),
+            row("b", 0, None),
+            row("c", 0, Some("unmeasured: cannot read it")),
+        ];
+        assert_eq!(
+            counts(&rows),
+            BTreeMap::from([("a".to_string(), 2), ("b".to_string(), 0)])
+        );
+        // At its count: held; none and none held: clean; unmeasured: not judged; an id no row has: stale.
+        assert_eq!(
+            judged(&rows, &b),
+            [
+                "`gone`: in the baseline, but no object or model the review measured: take it out (`cargo review sizes --update-baseline`)"
+            ]
+        );
+        let rows = [
+            row("a", 3, None),
+            row("b", 1, None),
+            row("c", 0, Some("unmeasured: x")),
+            row("gone", 0, None),
+        ];
+        let errors = judged(&rows, &b);
+        assert_eq!(errors.len(), 3, "{errors:?}");
+        assert!(errors[0].starts_with(
+            "`a`: 3 outside its kind's range, 2 in the baseline: fix the new ones: finding 0; "
+        ));
+        assert!(
+            errors[1]
+                .starts_with("`b`: 1 outside its kind's range, none in the baseline: finding 0")
+        );
+        assert!(
+            errors[2]
+                .starts_with("`gone`: 0 outside its kind's range, 1 in the baseline: lower it")
+        );
+    }
+
+    #[test]
+    fn update_only_lowers_and_seed_only_starts() {
+        let b = base(r#"{"reference": {"a": 2, "c": 3, "gone": 1}, "edges": {"model.x": 4}}"#);
+        let rows = [
+            row("a", 1, None),
+            row("c", 0, Some("unmeasured: x")),
+            row("new", 5, None),
+        ];
+        let (low, changes) = lowered(&rows, &b);
+        // a lowered, gone out, c (unmeasured) kept, new not added, the gate's section untouched.
+        assert_eq!(
+            low,
+            base(r#"{"reference": {"a": 1, "c": 3}, "edges": {"model.x": 4}}"#)
+        );
+        assert_eq!(
+            changes,
+            ["reference: a 2 -> 1", "reference: gone out (was 1)"]
+        );
+        assert!(seeded(&rows, &b).unwrap_err().contains("--update-baseline"));
+        let start = seeded(&rows, &base(r#"{"edges": {"model.x": 4}}"#)).unwrap();
+        assert_eq!(
+            start,
+            base(r#"{"edges": {"model.x": 4}, "reference": {"a": 1, "new": 5}}"#)
+        );
+        // Nothing found: no section (every row strict).
+        let clean = seeded(&[row("a", 0, None)], &Baseline::default()).unwrap();
+        assert_eq!(clean, Baseline::default());
+    }
+
+    #[test]
+    fn the_shipped_reference_names_its_sources_and_its_species_are_species() {
+        let root = checkglb::repo_root();
+        let text = std::fs::read_to_string(format!("{root}/{REFERENCE}")).unwrap();
+        let r = Reference::parse(&text).unwrap();
+        for (name, k) in &r.kinds {
+            for s in &k.sources {
+                assert!(r.sources.contains_key(s), "{name}: no source `{s}`");
+            }
+            if let Some(sp) = &k.species {
+                assert!(sp.problems().is_empty(), "{name}: {:?}", sp.problems());
+                assert!(k.h.is_some(), "{name}: a species' kind has its height");
+            }
+        }
+        for (id, kind) in &r.ids {
+            assert!(r.kinds.contains_key(kind), "{id}: no kind `{kind}`");
+        }
+        // The game's twelve trees are a species each.
+        for id in [
+            "tree",
+            "garden.maple",
+            "garden.birch",
+            "garden.cherry",
+            "garden.apple",
+            "garden.japaneseMaple",
+            "garden.magnolia",
+            "garden.willow",
+            "pine",
+            "garden.spruce",
+            "garden.cypress",
+            "garden.lemonTree",
+        ] {
+            let kind = r.ids.get(id).and_then(|k| r.kind(k));
+            assert!(kind.is_some_and(|k| k.species.is_some()), "{id}");
+        }
+    }
 }

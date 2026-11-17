@@ -81,9 +81,10 @@ step() {
     # The PlayCanvas shader chunks' anchors and private names the renderer relies on (tools/render/chunks.json),
     # in the release build the game imports: its package, then the tools' check.
     chunks) (cd web && "${bun_ci[@]}" install --frozen-lockfile) && cargo check-chunks ;;
-    # Every shipped model against the reference's kinds; every use the renderer can play; every model at the gate,
-    # with the Khronos glTF validator (web/'s package, about 10 s).
-    sizes) cargo review sizes ;;
+    # Every shipped model against the reference's kinds (what is outside held by tools/art/gate-baseline.json);
+    # every use the renderer can play; every model at the gate, with the Khronos glTF validator (web/'s package,
+    # about 10 s).
+    sizes) cargo review sizes --check ;;
     uses) cargo review uses --check ;;
     models) (cd web && "${bun_ci[@]}" install --frozen-lockfile) && cargo check-glb --validate ;;
     types) (cd web && bun run wasm && bun run sound && bun run voice:wasm && "${bun_ci[@]}" run check && "${bun_ci[@]}" run lint) ;;

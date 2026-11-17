@@ -21,7 +21,7 @@
 //! `measures` gives `cargo review` the same numbers.
 
 pub mod baseline;
-mod glb;
+pub(crate) mod glb;
 pub(crate) mod json;
 pub(crate) mod py;
 pub mod validate;
@@ -576,7 +576,7 @@ fn apply(m: &Matrix, v: &[Num]) -> [Num; 3] {
     ]
 }
 
-fn applied(m: &Matrix, v: &[Num]) -> [f64; 3] {
+pub(crate) fn applied(m: &Matrix, v: &[Num]) -> [f64; 3] {
     apply(m, v).map(Num::f)
 }
 
@@ -626,9 +626,9 @@ fn node_name(nodes: &J, i: usize) -> String {
 
 /// A mesh node of the default scene: its mesh, its world matrix, its moving part (the nearest node above
 /// it, or itself, that an animation moves; None: the still body) and the node.
-struct Placed {
-    mesh: J,
-    m: Matrix,
+pub(crate) struct Placed {
+    pub(crate) mesh: J,
+    pub(crate) m: Matrix,
     part: Option<usize>,
     node: usize,
 }
@@ -639,7 +639,7 @@ type Pose = HashMap<(usize, &'static str), Vec<Num>>;
 
 /// The mesh nodes of the default scene (`Placed`), their parts where `pose` puts them; `worlds`, if given,
 /// gets every node's world matrix.
-fn node_matrices(
+pub(crate) fn node_matrices(
     gltf: &J,
     pose: Option<&Pose>,
     worlds: Option<&mut HashMap<usize, Matrix>>,
@@ -1064,7 +1064,7 @@ fn habitat_errors(entry: &J) -> Vec<String> {
 }
 
 /// The primitives of a mesh (`gltf['meshes'][i]['primitives']`).
-fn primitives<'a>(gltf: &'a J, mesh: &J) -> R<&'a [J]> {
+pub(crate) fn primitives<'a>(gltf: &'a J, mesh: &J) -> R<&'a [J]> {
     Ok(key(item(gltf, "meshes", mesh)?, "primitives")?
         .list()
         .unwrap_or(&[]))

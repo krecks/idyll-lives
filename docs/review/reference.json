@@ -388,6 +388,426 @@
     "nsf": {
       "title": "National Sleep Foundation updated sleep duration recommendations (2015): adults 7-9 h",
       "url": "https://profiles.wustl.edu/en/publications/national-sleep-foundations-updated-sleep-duration-recommendations/"
+    },
+    "utd2016": {
+      "title": "McPherson, van Doorn & Peper, Urban Tree Database (USDA Forest Service RDS-2016-0005, 2020 errata): measured height and crown diameter of street and park trees 15-30 years after planting, 10th-90th percentiles (TS3_Raw_tree_data.csv)",
+      "url": "https://www.fs.usda.gov/rds/archive/catalog/RDS-2016-0005"
+    },
+    "cssColours": {
+      "title": "W3C CSS Color Module Level 4, named colours: a colour word's hue range is the sRGB hues of the named colours of that word, split halfway between neighbours (red 345-12°, orange 12-40°, yellow 40-65°, blue 195-245°, purple 255-305°, pink 320-355°)",
+      "url": "https://www.w3.org/TR/css-color-4/#named-colors"
+    },
+    "rhsQuercusRobur": {
+      "title": "RHS Quercus robur",
+      "url": "https://www.rhs.org.uk/plants/14294/quercus-robur/details"
+    },
+    "rhsAcerPlatanoides": {
+      "title": "RHS Acer platanoides",
+      "url": "https://www.rhs.org.uk/plants/246/acer-platanoides/details"
+    },
+    "rhsBetulaPendula": {
+      "title": "RHS Betula pendula",
+      "url": "https://www.rhs.org.uk/plants/2261/betula-pendula/details"
+    },
+    "rhsPrunusKanzan": {
+      "title": "RHS Prunus 'Kanzan'",
+      "url": "https://www.rhs.org.uk/plants/99553/prunus-kanzan-d/details"
+    },
+    "rhsMagnolia": {
+      "title": "RHS Magnolia × soulangeana",
+      "url": "https://www.rhs.org.uk/plants/60020/magnolia-x-soulangeana/details"
+    },
+    "rhsSalixChrysocoma": {
+      "title": "RHS Salix × sepulcralis var. chrysocoma",
+      "url": "https://www.rhs.org.uk/plants/81798/salix-sepulcralis-var-chrysocoma/details"
+    },
+    "rhsPinusSylvestris": {
+      "title": "RHS Pinus sylvestris",
+      "url": "https://www.rhs.org.uk/plants/13141/pinus-sylvestris/details"
+    },
+    "rhsPiceaPungensGlauca": {
+      "title": "RHS Picea pungens Glauca Group",
+      "url": "https://rhs.org.uk/plants/141134/picea-pungens-glauca-group/details"
+    },
+    "rhsCupressusStricta": {
+      "title": "RHS Cupressus sempervirens Stricta Group",
+      "url": "https://www.rhs.org.uk/plants/133025/cupressus-sempervirens-stricta-group/details"
+    },
+    "rhsCitrusMeyer": {
+      "title": "RHS Citrus × limon 'Meyer'",
+      "url": "https://www.rhs.org.uk/plants/29386/citrus-limon-meyer-f/details"
+    },
+    "rhsAcerPalmatum": {
+      "title": "RHS Acer palmatum",
+      "url": "https://www.rhs.org.uk/plants/225/acer-palmatum/details"
+    },
+    "rhsMalusDiscovery": {
+      "title": "RHS Malus domestica 'Discovery'",
+      "url": "https://www.rhs.org.uk/plants/70631/malus-domestica-discovery-d/details"
+    },
+    "rhsFruitForms": {
+      "title": "RHS Fruit trees: choosing the best",
+      "url": "https://www.rhs.org.uk/fruit/fruit-trees/choosing-the-best"
+    },
+    "rhsCitrusGuide": {
+      "title": "RHS How to grow citrus",
+      "url": "https://www.rhs.org.uk/fruit/citrus/grow-your-own"
+    },
+    "ncsuQuercusRobur": {
+      "title": "NC State Plant Toolbox Quercus robur",
+      "url": "https://plants.ces.ncsu.edu/plants/quercus-robur/"
+    },
+    "ncsuAcerPlatanoides": {
+      "title": "NC State Acer platanoides",
+      "url": "https://plants.ces.ncsu.edu/plants/acer-platanoides/"
+    },
+    "ncsuBetulaPendula": {
+      "title": "NC State Betula pendula",
+      "url": "https://plants.ces.ncsu.edu/plants/betula-pendula/"
+    },
+    "ncsuPrunusKanzan": {
+      "title": "NC State Prunus 'Kanzan'",
+      "url": "https://plants.ces.ncsu.edu/plants/prunus-serrulata-kwanzan/"
+    },
+    "ncsuMalusDomestica": {
+      "title": "NC State Malus domestica",
+      "url": "https://plants.ces.ncsu.edu/plants/malus-domestica/"
+    },
+    "ncsuAcerPalmatum": {
+      "title": "NC State Acer palmatum",
+      "url": "https://plants.ces.ncsu.edu/plants/acer-palmatum/"
+    },
+    "ncsuMagnolia": {
+      "title": "NC State Magnolia x soulangeana",
+      "url": "https://plants.ces.ncsu.edu/plants/magnolia-x-soulangeana/"
+    },
+    "ncsuSalixBabylonica": {
+      "title": "NC State Salix babylonica",
+      "url": "https://plants.ces.ncsu.edu/plants/salix-babylonica/"
+    },
+    "ncsuPinusSylvestris": {
+      "title": "NC State Pinus sylvestris",
+      "url": "https://plants.ces.ncsu.edu/plants/pinus-sylvestris/"
+    },
+    "ncsuPiceaPungensGlauca": {
+      "title": "NC State Picea pungens 'Glauca'",
+      "url": "https://plants.ces.ncsu.edu/plants/picea-pungens-glauca/"
+    },
+    "ncsuCupressus": {
+      "title": "NC State Cupressus sempervirens",
+      "url": "https://plants.ces.ncsu.edu/plants/cupressus-sempervirens/"
+    },
+    "ncsuCitrusMeyer": {
+      "title": "NC State Citrus x limon 'Meyer'",
+      "url": "https://plants.ces.ncsu.edu/plants/citrus-x-limon-meyer"
+    },
+    "mbgQuercusRobur": {
+      "title": "MBG Plant Finder Quercus robur f. fastigiata (species text used)",
+      "url": "https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?kempercode=c138"
+    },
+    "mbgAcerPlatanoides": {
+      "title": "MBG Acer platanoides",
+      "url": "https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?taxonid=275380"
+    },
+    "mbgBetulaPendula": {
+      "title": "MBG Betula pendula",
+      "url": "https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?taxonid=277818"
+    },
+    "mbgPrunusKanzan": {
+      "title": "MBG Prunus 'Kanzan'",
+      "url": "https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?kempercode=c128"
+    },
+    "mbgMagnolia": {
+      "title": "MBG Magnolia × soulangeana",
+      "url": "https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?kempercode=a885"
+    },
+    "mbgSalixBabylonica": {
+      "title": "MBG Salix babylonica",
+      "url": "https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?kempercode=c148"
+    },
+    "mbgPinusSylvestris": {
+      "title": "MBG Pinus sylvestris",
+      "url": "https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?kempercode=c229"
+    },
+    "mbgPiceaPungens": {
+      "title": "MBG Picea pungens 'Glauca Globosa' (species text used)",
+      "url": "https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?kempercode=c825"
+    },
+    "mbgCupressus": {
+      "title": "MBG Cupressus sempervirens",
+      "url": "https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?taxonid=279588"
+    },
+    "mbgCitrusMeyeri": {
+      "title": "MBG Citrus × meyeri",
+      "url": "https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?kempercode=d391"
+    },
+    "mbgAcerPalmatum": {
+      "title": "MBG Acer palmatum",
+      "url": "https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?taxonid=275408"
+    },
+    "mbgMalus": {
+      "title": "MBG Malus domestica GOLDRUSH (genus/rootstock text used)",
+      "url": "https://www.missouribotanicalgarden.org/PlantFinder/PlantFinderDetails.aspx?taxonid=265825"
+    },
+    "ashridgeKanzan": {
+      "title": "Ashridge Trees Kanzan Cherry Blossom Trees",
+      "url": "https://www.ashridgetrees.co.uk/products/kanzan-japanese-cherry-blossom-trees-prunus-serrulata"
+    },
+    "provenderForms": {
+      "title": "Provender Nurseries factsheet: Tree Forms, Shapes & Sizes",
+      "url": "https://www.provendernurseries.co.uk/files/files/trees-3-tree-forms-shapes-and-sizes-pruned-630751c594de3.pdf"
+    },
+    "barchamOak": {
+      "title": "Barcham Trees Quercus robur",
+      "url": "https://www.barcham.co.uk/products/quercus-robur"
+    },
+    "woodlandTrustSilverBirch": {
+      "title": "Woodland Trust silver birch",
+      "url": "https://www.woodlandtrust.org.uk/trees-woods-and-wildlife/british-trees/a-z-of-british-trees/silver-birch/"
+    },
+    "juola2022": {
+      "title": "Juola, Hovi & Rautiainen 2022, A spectral analysis of stem bark for boreal and temperate tree species, Ecology and Evolution 12(3) e8718",
+      "url": "https://acris.aalto.fi/ws/portalfiles/portal/81740507/Ecology_and_Evolution_2022_Juola_A_spectral_analysis_of_stem_bark_for_boreal_and_temperate_tree_species.pdf"
+    },
+    "juola2022Data": {
+      "title": "Juola, Hovi & Rautiainen, stem bark reflectance spectra (Mendeley Data V2, doi 10.17632/pwfxgzz5fj.2): luminance as the CIE 1931 Y-weighted reflectance over 400-700 nm, 10th-90th percentile of the 20 trees of each species (oak, Norway maple, silver birch, Scots pine; Norway spruce for blue spruce, aspen for willow, Norway maple for Japanese maple)",
+      "url": "https://data.mendeley.com/datasets/pwfxgzz5fj/2"
+    },
+    "ncsuHyd": {
+      "title": "NCSU Plant Toolbox: Hydrangea macrophylla",
+      "url": "https://plants.ces.ncsu.edu/plants/hydrangea-macrophylla/"
+    },
+    "rhsHyd": {
+      "title": "RHS: Hydrangea macrophylla 'Heinrich Seidel' (H)",
+      "url": "https://www.rhs.org.uk/plants/98641/hydrangea-macrophylla-heinrich-seidel-h/details"
+    },
+    "ncsuRosa": {
+      "title": "NCSU Plant Toolbox: Rosa",
+      "url": "https://plants.ces.ncsu.edu/plants/rosa/"
+    },
+    "rhsMunstead": {
+      "title": "RHS: Rosa Munstead Wood ('Ausbernard') (S)",
+      "url": "https://www.rhs.org.uk/plants/258239/rosa-munstead-wood-ausbernard-pbr-s/details"
+    },
+    "rhsEnglandsrose": {
+      "title": "RHS: Rosa England's Rose ('Ausrace') (S)",
+      "url": "https://www.rhs.org.uk/plants/159329/rosa-englands-rose-ausrace-s/details"
+    },
+    "rhsAzuma": {
+      "title": "RHS: Rhododendron 'Azuma-kagami' (Kurume) (EA)",
+      "url": "https://www.rhs.org.uk/plants/58180/rhododendron-azuma-kagami-kurume-ea/details"
+    },
+    "ncsuCoralbells": {
+      "title": "NCSU Plant Toolbox: Rhododendron indicum 'Coral Bells' (Kurume hybrid)",
+      "url": "https://plants.ces.ncsu.edu/plants/rhododendron-indicum-coral-bells/"
+    },
+    "purdueHino": {
+      "title": "Purdue Arboretum: Rhododendron 'Hino-red' (Kurume Hybrid Group)",
+      "url": "https://www.arboretum.purdue.edu/explorer/plants/21324/"
+    },
+    "ncsuLav": {
+      "title": "NCSU Plant Toolbox: Lavandula angustifolia",
+      "url": "https://plants.ces.ncsu.edu/plants/lavandula-angustifolia/"
+    },
+    "rhsHidcote": {
+      "title": "RHS: Lavandula angustifolia 'Hidcote'",
+      "url": "https://www.rhs.org.uk/plants/96353/lavandula-angustifolia-hidcote/details"
+    },
+    "ncsuHosta": {
+      "title": "NCSU Plant Toolbox: Hosta",
+      "url": "https://plants.ces.ncsu.edu/plants/hosta/"
+    },
+    "rhsHalcyon": {
+      "title": "RHS: Hosta (Tardiana Group) 'Halcyon'",
+      "url": "https://www.rhs.org.uk/plants/91303/hosta-tardiana-group-halcyon/details"
+    },
+    "ncsuSyng": {
+      "title": "NCSU Plant Toolbox: Syngonium podophyllum",
+      "url": "https://plants.ces.ncsu.edu/plants/syngonium-podophyllum/"
+    },
+    "rhsSyng": {
+      "title": "RHS: Syngonium podophyllum",
+      "url": "https://www.rhs.org.uk/plants/17899/syngonium-podophyllum/details"
+    },
+    "ncsuMon": {
+      "title": "NCSU Plant Toolbox: Monstera deliciosa",
+      "url": "https://plants.ces.ncsu.edu/plants/monstera-deliciosa/"
+    },
+    "rhsMon": {
+      "title": "RHS: Monstera deliciosa (F)",
+      "url": "https://www.rhs.org.uk/plants/11192/monstera-deliciosa-f/details"
+    },
+    "rhsMonGuide": {
+      "title": "RHS: How to grow Swiss cheese plants",
+      "url": "https://www.rhs.org.uk/plants/swiss-cheese-plants/how-to-grow-swiss-cheese-plants"
+    },
+    "ncsuFic": {
+      "title": "NCSU Plant Toolbox: Ficus lyrata",
+      "url": "https://plants.ces.ncsu.edu/plants/ficus-lyrata/"
+    },
+    "rhsFic": {
+      "title": "RHS: Ficus lyrata",
+      "url": "https://www.rhs.org.uk/plants/7207/ficus-lyrata/details"
+    },
+    "ncsuDrac": {
+      "title": "NCSU Plant Toolbox: Dracaena trifasciata",
+      "url": "https://plants.ces.ncsu.edu/plants/dracaena-trifasciata/"
+    },
+    "rhsSans": {
+      "title": "RHS: Sansevieria trifasciata",
+      "url": "https://www.rhs.org.uk/plants/16430/sansevieria-trifasciata/details"
+    },
+    "ncsuNeph": {
+      "title": "NCSU Plant Toolbox: Nephrolepis exaltata",
+      "url": "https://plants.ces.ncsu.edu/plants/nephrolepis-exaltata/"
+    },
+    "rhsBoston": {
+      "title": "RHS: Nephrolepis exaltata 'Bostoniensis'",
+      "url": "https://www.rhs.org.uk/plants/58296/nephrolepis-exaltata-bostoniensis/details"
+    },
+    "ncsuCham": {
+      "title": "NCSU Plant Toolbox: Chamaedorea elegans",
+      "url": "https://plants.ces.ncsu.edu/plants/chamaedorea-elegans/"
+    },
+    "rhsCham": {
+      "title": "RHS: Chamaedorea elegans",
+      "url": "https://www.rhs.org.uk/plants/29185/chamaedorea-elegans/details"
+    },
+    "ncsuPhal": {
+      "title": "NCSU Plant Toolbox: Phalaenopsis",
+      "url": "https://plants.ces.ncsu.edu/plants/phalaenopsis/"
+    },
+    "rhsPhal": {
+      "title": "RHS: Phalaenopsis",
+      "url": "https://www.rhs.org.uk/plants/12596/phalaenopsis/details"
+    },
+    "rhsPhalGuide": {
+      "title": "RHS: How to grow Phalaenopsis",
+      "url": "https://www.rhs.org.uk/plants/phalaenopsis/growing-guide"
+    },
+    "ncsuTulipa": {
+      "title": "NCSU Plant Toolbox: Tulipa",
+      "url": "https://plants.ces.ncsu.edu/plants/tulipa/"
+    },
+    "rhsApeldoorn": {
+      "title": "RHS: Tulipa 'Apeldoorn' (4)",
+      "url": "https://www.rhs.org.uk/plants/62287/tulipa-apeldoorn-4/details"
+    },
+    "rhsGesneriana": {
+      "title": "RHS: Tulipa gesneriana",
+      "url": "https://www.rhs.org.uk/plants/18512/tulipa-gesneriana/details"
+    },
+    "ncsuNarc": {
+      "title": "NCSU Plant Toolbox: Narcissus",
+      "url": "https://plants.ces.ncsu.edu/plants/narcissus/"
+    },
+    "rhsCarlton": {
+      "title": "RHS: Narcissus 'Carlton' (2)",
+      "url": "https://www.rhs.org.uk/plants/92158/narcissus-carlton-2/details"
+    },
+    "ncsuBellis": {
+      "title": "NCSU Plant Toolbox: Bellis perennis",
+      "url": "https://plants.ces.ncsu.edu/plants/bellis-perennis/"
+    },
+    "rhsBellis": {
+      "title": "RHS: Bellis perennis",
+      "url": "https://www.rhs.org.uk/plants/94326/bellis-perennis/details"
+    },
+    "wtDaisy": {
+      "title": "Wildlife Trusts: Common daisy",
+      "url": "https://www.wildlifetrusts.org/wildlife-explorer/wildflowers/common-daisy"
+    },
+    "ncsuHelian": {
+      "title": "NCSU Plant Toolbox: Helianthus annuus",
+      "url": "https://plants.ces.ncsu.edu/plants/helianthus-annuus/"
+    },
+    "rhsHelian": {
+      "title": "RHS: Helianthus annuus",
+      "url": "https://www.rhs.org.uk/plants/105515/helianthus-annuus/details"
+    },
+    "ncsuPoppy": {
+      "title": "NCSU Plant Toolbox: Papaver rhoeas",
+      "url": "https://plants.ces.ncsu.edu/plants/papaver-rhoeas/"
+    },
+    "rhsPoppy": {
+      "title": "RHS: Papaver rhoeas",
+      "url": "https://www.rhs.org.uk/plants/56687/papaver-rhoeas/details"
+    },
+    "wtPoppy": {
+      "title": "Wildlife Trusts: Common poppy",
+      "url": "https://www.wildlifetrusts.org/wildlife-explorer/wildflowers/common-poppy"
+    },
+    "ncsuTag": {
+      "title": "NCSU Plant Toolbox: Tagetes patula",
+      "url": "https://plants.ces.ncsu.edu/plants/tagetes-patula/"
+    },
+    "rhsTag": {
+      "title": "RHS: Tagetes patula",
+      "url": "https://www.rhs.org.uk/plants/105531/tagetes-patula/details"
+    },
+    "ncsuViola": {
+      "title": "NCSU Plant Toolbox: Viola x wittrockiana",
+      "url": "https://plants.ces.ncsu.edu/plants/viola-x-wittrockiana/"
+    },
+    "rhsPax": {
+      "title": "RHS: Viola × wittrockiana 'Yellow with Blotch' (Pax Series)",
+      "url": "https://www.rhs.org.uk/plants/281511/viola-x-wittrockiana-yellow-with-blotch-pax-series/details"
+    },
+    "ncsuLilium": {
+      "title": "NCSU Plant Toolbox: Lilium",
+      "url": "https://plants.ces.ncsu.edu/plants/lilium/"
+    },
+    "rhsAsiatic": {
+      "title": "RHS: Lilium Asiatic hybrids (I)",
+      "url": "https://www.rhs.org.uk/plants/70679/lilium-asiatic-hybrids-i/details"
+    },
+    "ncsuLupinus": {
+      "title": "NCSU Plant Toolbox: Lupinus",
+      "url": "https://plants.ces.ncsu.edu/plants/lupinus/"
+    },
+    "rhsNobles": {
+      "title": "RHS: Lupinus Band of Nobles Series",
+      "url": "https://www.rhs.org.uk/plants/52142/lupinus-band-of-nobles-series/details"
+    },
+    "rhsLupsp": {
+      "title": "RHS: Lupinus polyphyllus",
+      "url": "https://www.rhs.org.uk/plants/10573/lupinus-polyphyllus/details"
+    },
+    "ncsuMyo": {
+      "title": "NCSU Plant Toolbox: Myosotis sylvatica",
+      "url": "https://plants.ces.ncsu.edu/plants/myosotis-sylvatica/"
+    },
+    "rhsMyo": {
+      "title": "RHS: Myosotis sylvatica",
+      "url": "https://www.rhs.org.uk/plants/41558/myosotis-sylvatica/details"
+    },
+    "wtFmn": {
+      "title": "Wildlife Trusts: Wood forget-me-not",
+      "url": "https://www.wildlifetrusts.org/wildlife-explorer/wildflowers/wood-forget-me-not"
+    },
+    "ncsuCosmos": {
+      "title": "NCSU Plant Toolbox: Cosmos bipinnatus",
+      "url": "https://plants.ces.ncsu.edu/plants/cosmos-bipinnatus/"
+    },
+    "rhsCosmos": {
+      "title": "RHS: Cosmos bipinnatus",
+      "url": "https://www.rhs.org.uk/plants/30717/cosmos-bipinnatus/details"
+    },
+    "rhsPel": {
+      "title": "RHS: Pelargonium × hortorum",
+      "url": "https://www.rhs.org.uk/plants/160286/pelargonium-x-hortorum/details"
+    },
+    "ncsuPel": {
+      "title": "NCSU Plant Toolbox: Pelargonium",
+      "url": "https://plants.ces.ncsu.edu/plants/pelargonium/"
+    },
+    "nzfloraPel": {
+      "title": "NZ Flora: Pelargonium ×hortorum",
+      "url": "https://nzflora.info/factsheet/Taxon/Pelargonium-xhortorum.html"
+    },
+    "vicPel": {
+      "title": "HortFlora (RBG Victoria): Zonal Pelargonium",
+      "url": "https://hortflora.rbg.vic.gov.au/taxon/ada6519c-5340-11e7-b82b-005056b0018f"
     }
 ,
     "biaTn10": {
@@ -8763,19 +9183,15 @@
         "neufert"
       ]
     },
-    "shadeTree": {
-      "label": "Broad deciduous garden tree (oak, maple, birch, willow, magnolia), garden age",
+    "treeOak": {
+      "label": "English oak (Quercus robur), 15–30 years planted: H and W of urban oaks of that age (Quercus rubra: no Q. robur measured)",
       "w": [
-        2,
-        10
+        7.44,
+        16.64
       ],
       "h": [
-        4,
-        20
-      ],
-      "d": [
-        2,
-        10
+        9.6,
+        17.7
       ],
       "uses": [
         "sit in the shade",
@@ -8787,24 +9203,165 @@
           60
         ]
       },
+      "species": {
+        "latin": "Quercus robur",
+        "habit": "broad-spreading rounded crown on a short trunk",
+        "crown": [
+          0.59,
+          1.08
+        ],
+        "clear": [
+          0.1,
+          0.21
+        ],
+        "leaf": {
+          "shape": "lobed",
+          "length": [
+            0.076,
+            0.127
+          ]
+        },
+        "bark": {
+          "class": "fissured",
+          "luminance": [
+            0.13,
+            0.19
+          ]
+        }
+      },
       "sources": [
-        "birch",
-        "rhsPlants"
+        "utd2016",
+        "ncsuQuercusRobur",
+        "rhsQuercusRobur",
+        "provenderForms",
+        "juola2022Data",
+        "mbgQuercusRobur",
+        "barchamOak",
+        "juola2022"
       ]
     },
-    "smallTree": {
-      "label": "Small ornamental tree (cherry, Japanese maple)",
+    "treeMaple": {
+      "label": "Norway maple (Acer platanoides), 15–30 years planted",
       "w": [
-        1.5,
-        8
+        7.5,
+        12.5
       ],
       "h": [
-        2,
-        8
+        9,
+        15
       ],
-      "d": [
-        1.5,
-        8
+      "uses": [
+        "sit in the shade",
+        "rake the leaves"
+      ],
+      "minutes": {
+        "shade": [
+          10,
+          60
+        ]
+      },
+      "species": {
+        "latin": "Acer platanoides",
+        "habit": "dense, symmetrical, rounded crown",
+        "crown": [
+          0.66,
+          1.04
+        ],
+        "clear": [
+          0.12,
+          0.22
+        ],
+        "leaf": {
+          "shape": "palmate",
+          "length": [
+            0.15,
+            0.18
+          ]
+        },
+        "bark": {
+          "class": "fissured",
+          "luminance": [
+            0.1,
+            0.16
+          ]
+        }
+      },
+      "sources": [
+        "utd2016",
+        "ncsuAcerPlatanoides",
+        "mbgAcerPlatanoides",
+        "provenderForms",
+        "juola2022Data",
+        "rhsAcerPlatanoides",
+        "juola2022"
+      ]
+    },
+    "treeBirch": {
+      "label": "Silver birch (Betula pendula), 15–30 years planted",
+      "w": [
+        5.15,
+        9.3
+      ],
+      "h": [
+        8.75,
+        20.5
+      ],
+      "uses": [
+        "sit in the shade",
+        "rake the leaves"
+      ],
+      "minutes": {
+        "shade": [
+          10,
+          60
+        ]
+      },
+      "species": {
+        "latin": "Betula pendula",
+        "habit": "narrowly conical to oval crown, slender drooping twigs",
+        "crown": [
+          0.38,
+          0.76
+        ],
+        "clear": [
+          0.09,
+          0.23
+        ],
+        "leaf": {
+          "shape": "serrate-small",
+          "length": [
+            0.025,
+            0.064
+          ]
+        },
+        "bark": {
+          "class": "papery-white",
+          "luminance": [
+            0.1,
+            0.33
+          ]
+        }
+      },
+      "sources": [
+        "utd2016",
+        "ncsuBetulaPendula",
+        "rhsBetulaPendula",
+        "provenderForms",
+        "juola2022Data",
+        "mbgBetulaPendula",
+        "woodlandTrustSilverBirch",
+        "juola2022"
+      ]
+    },
+    "treeCherry": {
+      "label": "Japanese flowering cherry (Prunus 'Kanzan'), 15–30 years planted",
+      "w": [
+        4.62,
+        11.66
+      ],
+      "h": [
+        5.3,
+        12
       ],
       "uses": [
         "admire the blossom or the colour",
@@ -8816,24 +9373,55 @@
           5
         ]
       },
+      "species": {
+        "latin": "Prunus serrulata 'Kanzan'",
+        "habit": "stiffly vase-shaped when young, later spreading-rounded crown",
+        "crown": [
+          0.85,
+          1.22
+        ],
+        "clear": [
+          0.1,
+          0.42
+        ],
+        "leaf": {
+          "shape": "oval",
+          "length": [
+            0.076,
+            0.152
+          ]
+        },
+        "bark": {
+          "class": "smooth"
+        },
+        "blossom": {
+          "colour": "purplish-pink",
+          "hue": [
+            [
+              320,
+              355
+            ]
+          ],
+          "months": [
+            4,
+            4
+          ]
+        }
+      },
       "sources": [
-        "acerPalmatum",
-        "rhsPlants"
+        "utd2016",
+        "rhsPrunusKanzan",
+        "mbgPrunusKanzan",
+        "ashridgeKanzan",
+        "cssColours",
+        "ncsuPrunusKanzan"
       ]
     },
-    "fruitTree": {
-      "label": "Garden apple tree (on M9-MM106 rootstock)",
-      "w": [
-        1.5,
-        5
-      ],
+    "treeApple": {
+      "label": "Garden apple (Malus domestica) on MM106, a bush tree",
       "h": [
-        1.5,
-        5.5
-      ],
-      "d": [
-        1.5,
-        5
+        3,
+        4
       ],
       "uses": [
         "pick fruit",
@@ -8845,64 +9433,364 @@
           30
         ]
       },
+      "species": {
+        "latin": "Malus domestica",
+        "habit": "open-centred bush tree on a short trunk",
+        "crown": [
+          1,
+          1.33
+        ],
+        "clear": [
+          0.19,
+          0.25
+        ],
+        "leaf": {
+          "shape": "oval",
+          "length": [
+            0.076,
+            0.152
+          ]
+        },
+        "bark": {
+          "class": "smooth"
+        },
+        "blossom": {
+          "colour": "white",
+          "months": [
+            4,
+            4
+          ]
+        },
+        "fruit": {
+          "colour": "red over green ('Discovery')",
+          "hue": [
+            [
+              345,
+              12
+            ]
+          ],
+          "months": [
+            8,
+            9
+          ]
+        }
+      },
       "sources": [
-        "rhsRootstocks"
+        "rhsRootstocks",
+        "rhsFruitForms",
+        "rhsMalusDiscovery",
+        "ncsuMalusDomestica",
+        "mbgMalus",
+        "cssColours"
       ]
     },
-    "conifer": {
-      "label": "Conifer (pine, spruce), garden age",
+    "treeJapaneseMaple": {
+      "label": "Japanese maple (Acer palmatum), 15–30 years planted",
       "w": [
-        1.5,
+        3.06,
+        7.84
+      ],
+      "h": [
+        3.54,
+        8.16
+      ],
+      "uses": [
+        "admire the blossom or the colour",
+        "shape it"
+      ],
+      "minutes": {
+        "admire": [
+          1,
+          5
+        ]
+      },
+      "species": {
+        "latin": "Acer palmatum",
+        "habit": "rounded to broad-rounded small tree, often branched low",
+        "crown": [
+          0.67,
+          1.15
+        ],
+        "leaf": {
+          "shape": "palmate",
+          "length": [
+            0.051,
+            0.127
+          ],
+          "hue": [
+            [
+              12,
+              40
+            ],
+            [
+              345,
+              12
+            ]
+          ]
+        },
+        "bark": {
+          "class": "smooth",
+          "luminance": [
+            0.1,
+            0.16
+          ]
+        }
+      },
+      "sources": [
+        "utd2016",
+        "rhsAcerPalmatum",
+        "ncsuAcerPalmatum",
+        "mbgAcerPalmatum",
+        "juola2022Data",
+        "juola2022",
+        "cssColours"
+      ]
+    },
+    "treeMagnolia": {
+      "label": "Saucer magnolia (Magnolia × soulangeana): full size in 10–20 years",
+      "w": [
+        4,
         8
       ],
       "h": [
-        3,
-        20
-      ],
-      "d": [
-        1.5,
+        4,
         8
+      ],
+      "uses": [
+        "sit in the shade",
+        "rake the leaves"
+      ],
+      "minutes": {
+        "shade": [
+          10,
+          60
+        ]
+      },
+      "species": {
+        "latin": "Magnolia × soulangeana",
+        "habit": "broad shrub or small tree with a rounded crown, often multi-trunked",
+        "crown": [
+          0.76,
+          1
+        ],
+        "leaf": {
+          "shape": "obovate-large",
+          "length": [
+            0.076,
+            0.2
+          ]
+        },
+        "bark": {
+          "class": "smooth"
+        },
+        "blossom": {
+          "colour": "white flushed pink to purple",
+          "hue": [
+            [
+              255,
+              305
+            ],
+            [
+              320,
+              355
+            ]
+          ],
+          "months": [
+            4,
+            5
+          ]
+        }
+      },
+      "sources": [
+        "rhsMagnolia",
+        "mbgMagnolia",
+        "ncsuMagnolia",
+        "cssColours"
+      ]
+    },
+    "treeWillow": {
+      "label": "Golden weeping willow (Salix × sepulcralis var. chrysocoma): full size in 10–20 years",
+      "w": [
+        8,
+        15
+      ],
+      "h": [
+        12,
+        15
+      ],
+      "uses": [
+        "sit in the shade",
+        "rake the leaves"
+      ],
+      "minutes": {
+        "shade": [
+          10,
+          60
+        ]
+      },
+      "species": {
+        "latin": "Salix × sepulcralis var. chrysocoma",
+        "habit": "stout trunk under a broad-rounded crown whose branches sweep down to the ground",
+        "crown": [
+          0.53,
+          1.25
+        ],
+        "leaf": {
+          "shape": "lance",
+          "length": [
+            0.076,
+            0.152
+          ]
+        },
+        "bark": {
+          "class": "fissured",
+          "luminance": [
+            0.09,
+            0.13
+          ]
+        }
+      },
+      "sources": [
+        "rhsSalixChrysocoma",
+        "mbgSalixBabylonica",
+        "ncsuSalixBabylonica",
+        "juola2022Data",
+        "juola2022"
+      ]
+    },
+    "treePine": {
+      "label": "Scots pine (Pinus sylvestris), 15–30 years planted",
+      "w": [
+        3.3,
+        8.32
+      ],
+      "h": [
+        4.95,
+        10
       ],
       "uses": [
         "give year-round green and shelter"
       ],
+      "species": {
+        "latin": "Pinus sylvestris",
+        "habit": "conical when young, then an open, rounded, irregular crown",
+        "crown": [
+          0.51,
+          1.07
+        ],
+        "leaf": {
+          "shape": "needle",
+          "length": [
+            0.038,
+            0.089
+          ]
+        },
+        "bark": {
+          "class": "scaly",
+          "luminance": [
+            0.11,
+            0.14
+          ]
+        }
+      },
       "sources": [
-        "rhsPlants"
+        "utd2016",
+        "ncsuPinusSylvestris",
+        "mbgPinusSylvestris",
+        "juola2022Data",
+        "rhsPinusSylvestris",
+        "juola2022"
       ]
     },
-    "columnarConifer": {
-      "label": "Italian cypress (slim column)",
+    "treeSpruce": {
+      "label": "Colorado blue spruce (Picea pungens Glauca Group), 15–30 years planted",
       "w": [
-        0.5,
-        1.5
+        4.14,
+        8.52
       ],
       "h": [
-        3,
-        15
+        5.9,
+        18.1
       ],
-      "d": [
-        0.5,
-        1.5
+      "uses": [
+        "give year-round green and shelter"
+      ],
+      "species": {
+        "latin": "Picea pungens Glauca Group",
+        "habit": "narrow, dense pyramid with horizontal branches to the ground",
+        "crown": [
+          0.48,
+          0.96
+        ],
+        "clear": [
+          0,
+          0.05
+        ],
+        "leaf": {
+          "shape": "needle",
+          "length": [
+            0.019,
+            0.038
+          ]
+        },
+        "bark": {
+          "class": "fissured",
+          "luminance": [
+            0.09,
+            0.17
+          ]
+        }
+      },
+      "sources": [
+        "utd2016",
+        "ncsuPiceaPungensGlauca",
+        "mbgPiceaPungens",
+        "juola2022Data",
+        "rhsPiceaPungensGlauca",
+        "juola2022"
+      ]
+    },
+    "treeCypress": {
+      "label": "Italian cypress (Cupressus sempervirens Stricta Group): full size in 10–20 years",
+      "w": [
+        0.9,
+        4
+      ],
+      "h": [
+        12,
+        18.3
       ],
       "uses": [
         "line a path"
       ],
+      "species": {
+        "latin": "Cupressus sempervirens Stricta Group",
+        "habit": "narrow column of upright branches",
+        "crown": [
+          0.08,
+          0.33
+        ],
+        "leaf": {
+          "shape": "scale",
+          "length": [
+            0.025,
+            0.076
+          ]
+        },
+        "bark": {
+          "class": "smooth"
+        }
+      },
       "sources": [
-        "rhsPlants"
+        "rhsCupressusStricta",
+        "mbgCupressus",
+        "ncsuCupressus"
       ]
     },
-    "pottedTree": {
-      "label": "Potted citrus or patio tree",
-      "w": [
-        0.5,
-        1.5
-      ],
+    "treeLemon": {
+      "label": "Lemon tree (Citrus × limon 'Meyer') in a container",
       "h": [
-        0.8,
-        2
-      ],
-      "d": [
-        0.5,
+        1,
         1.5
       ],
       "uses": [
@@ -8919,8 +9807,1326 @@
           10
         ]
       },
+      "species": {
+        "latin": "Citrus × limon 'Meyer'",
+        "habit": "compact, spiny, bushy evergreen shrub or small tree",
+        "crown": [
+          0.6,
+          0.8
+        ],
+        "leaf": {
+          "shape": "oval",
+          "length": [
+            0.076,
+            0.152
+          ]
+        },
+        "bark": {
+          "class": "smooth"
+        },
+        "blossom": {
+          "colour": "white",
+          "months": [
+            3,
+            8
+          ]
+        },
+        "fruit": {
+          "colour": "orange and yellow",
+          "hue": [
+            [
+              12,
+              40
+            ],
+            [
+              40,
+              65
+            ]
+          ],
+          "months": [
+            6,
+            11
+          ]
+        }
+      },
       "sources": [
+        "rhsCitrusGuide",
+        "rhsCitrusMeyer",
+        "ncsuCitrusMeyer",
+        "mbgCitrusMeyeri",
+        "cssColours"
+      ]
+    },
+    "shrubHydrangea": {
+      "label": "Mophead hydrangea (Hydrangea macrophylla)",
+      "w": [
+        0.9,
+        1.5
+      ],
+      "h": [
+        0.9,
+        1.5
+      ],
+      "uses": [
+        "smell the flowers",
+        "prune and deadhead",
+        "water it"
+      ],
+      "minutes": {
+        "smell": [
+          0,
+          2
+        ],
+        "prune": [
+          10,
+          40
+        ]
+      },
+      "species": {
+        "latin": "Hydrangea macrophylla (mophead / Hortensia group)",
+        "habit": "rounded, multi-stemmed deciduous shrub",
+        "leaf": {
+          "shape": "oval",
+          "length": [
+            0.08,
+            0.2
+          ]
+        },
+        "blossom": {
+          "colour": "blue",
+          "hue": [
+            [
+              195,
+              245
+            ]
+          ],
+          "months": [
+            6,
+            9
+          ]
+        }
+      },
+      "sources": [
+        "ncsuHyd",
+        "rhsHyd",
+        "cssColours"
+      ]
+    },
+    "shrubRose": {
+      "label": "English shrub rose (Rosa)",
+      "w": [
+        0.5,
+        1
+      ],
+      "h": [
+        1,
+        1.5
+      ],
+      "uses": [
+        "smell the flowers",
+        "prune and deadhead",
+        "water it"
+      ],
+      "minutes": {
+        "smell": [
+          0,
+          2
+        ],
+        "prune": [
+          10,
+          40
+        ]
+      },
+      "species": {
+        "latin": "Rosa (English shrub rose, e.g. 'Munstead Wood'); genus-level model",
+        "habit": "bushy, broad deciduous shrub",
+        "leaf": {
+          "shape": "pinnate"
+        },
+        "blossom": {
+          "colour": "red (crimson)",
+          "hue": [
+            [
+              345,
+              12
+            ]
+          ],
+          "months": [
+            6,
+            10
+          ]
+        }
+      },
+      "sources": [
+        "rhsMunstead",
+        "rhsEnglandsrose",
+        "ncsuRosa",
+        "cssColours"
+      ]
+    },
+    "shrubAzalea": {
+      "label": "Japanese evergreen azalea (Rhododendron, Kurume group)",
+      "w": [
+        0.9,
+        1.5
+      ],
+      "h": [
+        0.6,
+        1.2
+      ],
+      "uses": [
+        "smell the flowers",
+        "prune and deadhead",
+        "water it"
+      ],
+      "minutes": {
+        "smell": [
+          0,
+          2
+        ],
+        "prune": [
+          10,
+          40
+        ]
+      },
+      "species": {
+        "latin": "Rhododendron (Japanese evergreen azalea, Kurume group)",
+        "habit": "low, dense, spreading evergreen mound",
+        "leaf": {
+          "shape": "oval",
+          "length": [
+            0.013,
+            0.032
+          ]
+        },
+        "blossom": {
+          "colour": "pink",
+          "hue": [
+            [
+              320,
+              355
+            ]
+          ],
+          "months": [
+            4,
+            5
+          ]
+        }
+      },
+      "sources": [
+        "purdueHino",
+        "rhsAzuma",
+        "ncsuCoralbells",
+        "cssColours"
+      ]
+    },
+    "plantLavender": {
+      "label": "English lavender (Lavandula angustifolia)",
+      "w": [
+        0.5,
+        0.9
+      ],
+      "h": [
+        0.3,
+        0.6
+      ],
+      "uses": [
+        "water it",
+        "cut it back",
+        "smell the lavender"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          5
+        ],
+        "cut": [
+          5,
+          20
+        ]
+      },
+      "species": {
+        "latin": "Lavandula angustifolia",
+        "habit": "broadly mounded evergreen sub-shrub, grey-silver",
+        "leaf": {
+          "shape": "linear",
+          "length": [
+            0.01,
+            0.025
+          ]
+        },
+        "blossom": {
+          "colour": "purple",
+          "hue": [
+            [
+              255,
+              305
+            ]
+          ],
+          "months": [
+            6,
+            8
+          ]
+        }
+      },
+      "sources": [
+        "ncsuLav",
+        "rhsHidcote",
+        "cssColours"
+      ]
+    },
+    "plantHosta": {
+      "label": "Hosta, a medium one",
+      "w": [
+        0.5,
+        1
+      ],
+      "h": [
+        0.3,
+        0.5
+      ],
+      "uses": [
+        "water it",
+        "cut it back",
+        "smell the lavender"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          5
+        ],
+        "cut": [
+          5,
+          20
+        ]
+      },
+      "species": {
+        "latin": "Hosta (genus; medium, e.g. 'Halcyon')",
+        "habit": "clump-forming foliage mound",
+        "leaf": {
+          "shape": "cordate",
+          "length": [
+            0.08,
+            0.2
+          ]
+        },
+        "blossom": {
+          "colour": "lilac (pale greyish-lavender)",
+          "hue": [
+            [
+              255,
+              305
+            ]
+          ],
+          "months": [
+            6,
+            8
+          ]
+        }
+      },
+      "sources": [
+        "rhsHalcyon",
+        "ncsuHosta",
+        "cssColours"
+      ]
+    },
+    "houseplantArrowhead": {
+      "label": "Arrowhead plant (Syngonium podophyllum), in a pot",
+      "w": [
+        0.3,
+        0.6
+      ],
+      "h": [
+        0.9,
+        1.8
+      ],
+      "uses": [
+        "water it",
+        "talk to it",
+        "wipe the leaves"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          5
+        ],
+        "talk": [
+          1,
+          10
+        ]
+      },
+      "species": {
+        "latin": "Syngonium podophyllum",
+        "habit": "bushy when young, later climbing/trailing",
+        "leaf": {
+          "shape": "cordate"
+        }
+      },
+      "sources": [
+        "ncsuSyng",
+        "rhsSyng"
+      ]
+    },
+    "houseplantMonstera": {
+      "label": "Swiss cheese plant (Monstera deliciosa) as sold, in a pot",
+      "h": [
+        0.3,
+        0.9
+      ],
+      "uses": [
+        "water it",
+        "talk to it",
+        "wipe the leaves"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          5
+        ],
+        "talk": [
+          1,
+          10
+        ]
+      },
+      "species": {
+        "latin": "Monstera deliciosa",
+        "habit": "climbing evergreen, split/holed leaves",
+        "leaf": {
+          "shape": "split",
+          "length": [
+            0.15,
+            0.9
+          ]
+        }
+      },
+      "sources": [
+        "rhsMonGuide",
+        "rhsMon",
+        "ncsuMon"
+      ]
+    },
+    "houseplantFiddleFig": {
+      "label": "Fiddle-leaf fig (Ficus lyrata) indoors, in a pot",
+      "h": [
+        0.6,
+        3
+      ],
+      "uses": [
+        "water it",
+        "talk to it",
+        "wipe the leaves"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          5
+        ],
+        "talk": [
+          1,
+          10
+        ]
+      },
+      "species": {
+        "latin": "Ficus lyrata",
+        "habit": "erect, vase-shaped tree",
+        "leaf": {
+          "shape": "obovate-large",
+          "length": [
+            0.2,
+            0.45
+          ]
+        }
+      },
+      "sources": [
+        "ncsuFic",
+        "rhsFic"
+      ]
+    },
+    "houseplantSnakePlant": {
+      "label": "Snake plant (Dracaena trifasciata), in a pot",
+      "w": [
+        0.1,
+        0.5
+      ],
+      "h": [
+        1,
+        1.5
+      ],
+      "uses": [
+        "water it",
+        "talk to it",
+        "wipe the leaves"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          5
+        ],
+        "talk": [
+          1,
+          10
+        ]
+      },
+      "species": {
+        "latin": "Dracaena trifasciata (syn. Sansevieria trifasciata)",
+        "habit": "clump of stiff upright sword-shaped leaves",
+        "leaf": {
+          "shape": "lance",
+          "length": [
+            0.15,
+            1.2
+          ]
+        }
+      },
+      "sources": [
+        "ncsuDrac",
+        "rhsSans"
+      ]
+    },
+    "houseplantBostonFern": {
+      "label": "Boston fern (Nephrolepis exaltata 'Bostoniensis'), in a pot",
+      "w": [
+        0.6,
+        0.9
+      ],
+      "h": [
+        0.6,
+        0.9
+      ],
+      "uses": [
+        "water it",
+        "talk to it",
+        "wipe the leaves"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          5
+        ],
+        "talk": [
+          1,
+          10
+        ]
+      },
+      "species": {
+        "latin": "Nephrolepis exaltata 'Bostoniensis'",
+        "habit": "upright then arching/weeping fronds",
+        "leaf": {
+          "shape": "pinnate",
+          "length": [
+            0.6,
+            0.9
+          ]
+        }
+      },
+      "sources": [
+        "ncsuNeph",
+        "rhsBoston"
+      ]
+    },
+    "houseplantParlourPalm": {
+      "label": "Parlour palm (Chamaedorea elegans), in a pot",
+      "w": [
+        0.6,
+        0.9
+      ],
+      "h": [
+        0.6,
+        2.3
+      ],
+      "uses": [
+        "water it",
+        "talk to it",
+        "wipe the leaves"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          5
+        ],
+        "talk": [
+          1,
+          10
+        ]
+      },
+      "species": {
+        "latin": "Chamaedorea elegans",
+        "habit": "erect, multi-stemmed small palm",
+        "leaf": {
+          "shape": "pinnate",
+          "length": [
+            0.15,
+            0.6
+          ]
+        }
+      },
+      "sources": [
+        "ncsuCham",
+        "rhsCham"
+      ]
+    },
+    "houseplantMothOrchid": {
+      "label": "Moth orchid (Phalaenopsis) in flower, in a pot",
+      "w": [
+        0.15,
+        0.61
+      ],
+      "h": [
+        0.46,
+        0.61
+      ],
+      "uses": [
+        "water it",
+        "talk to it",
+        "wipe the leaves"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          5
+        ],
+        "talk": [
+          1,
+          10
+        ]
+      },
+      "species": {
+        "latin": "Phalaenopsis (genus; moth orchid hybrids)",
+        "habit": "short-stemmed rosette of 6-10 fleshy leaves, upright/arching flower spike",
+        "leaf": {
+          "shape": "obovate-large",
+          "length": [
+            0.076,
+            0.25
+          ]
+        },
+        "blossom": {
+          "colour": "white or pink",
+          "hue": [
+            [
+              320,
+              355
+            ]
+          ],
+          "months": [
+            1,
+            12
+          ]
+        }
+      },
+      "sources": [
+        "ncsuPhal",
+        "rhsPhalGuide",
+        "cssColours",
+        "rhsPhal"
+      ]
+    },
+    "bedTulips": {
+      "label": "Tulips (Tulipa garden hybrids): a bed of them, H their flowering height",
+      "w": [
+        0.5,
+        1.2
+      ],
+      "h": [
+        0.1,
+        0.71
+      ],
+      "d": [
+        0.5,
+        1.2
+      ],
+      "uses": [
+        "water the flowers",
+        "smell them",
+        "pick a few"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          10
+        ],
+        "smell": [
+          0,
+          2
+        ]
+      },
+      "species": {
+        "latin": "Tulipa (garden hybrids; e.g. Darwin hybrid 'Apeldoorn')",
+        "habit": "erect single stem, broad lance leaves at base",
+        "leaf": {
+          "shape": "lance"
+        },
+        "blossom": {
+          "colour": "red (any)",
+          "hue": [
+            [
+              345,
+              12
+            ],
+            [
+              320,
+              355
+            ],
+            [
+              12,
+              40
+            ],
+            [
+              40,
+              65
+            ],
+            [
+              255,
+              305
+            ]
+          ],
+          "months": [
+            4,
+            5
+          ]
+        }
+      },
+      "sources": [
+        "ncsuTulipa",
+        "rhsApeldoorn",
+        "rhsGesneriana",
+        "cssColours",
         "rhsPlants"
+      ]
+    },
+    "bedDaffodils": {
+      "label": "Daffodils (Narcissus, large-cupped): a bed of them, H their flowering height",
+      "w": [
+        0.5,
+        1.2
+      ],
+      "h": [
+        0.2,
+        0.5
+      ],
+      "d": [
+        0.5,
+        1.2
+      ],
+      "uses": [
+        "water the flowers",
+        "smell them",
+        "pick a few"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          10
+        ],
+        "smell": [
+          0,
+          2
+        ]
+      },
+      "species": {
+        "latin": "Narcissus (Division 2 large-cupped, e.g. 'Carlton')",
+        "habit": "clump of strap leaves, erect stems",
+        "leaf": {
+          "shape": "linear",
+          "length": [
+            0.076,
+            0.15
+          ]
+        },
+        "blossom": {
+          "colour": "yellow",
+          "hue": [
+            [
+              40,
+              65
+            ]
+          ],
+          "months": [
+            3,
+            5
+          ]
+        }
+      },
+      "sources": [
+        "ncsuNarc",
+        "rhsCarlton",
+        "cssColours",
+        "rhsPlants"
+      ]
+    },
+    "bedDaisies": {
+      "label": "Daisies (Bellis perennis): a bed of them, H their flowering height",
+      "w": [
+        0.5,
+        1.2
+      ],
+      "h": [
+        0.076,
+        0.15
+      ],
+      "d": [
+        0.5,
+        1.2
+      ],
+      "uses": [
+        "water the flowers",
+        "smell them",
+        "pick a few"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          10
+        ],
+        "smell": [
+          0,
+          2
+        ]
+      },
+      "species": {
+        "latin": "Bellis perennis",
+        "habit": "mat-forming rosette",
+        "leaf": {
+          "shape": "oval",
+          "length": [
+            0.076,
+            0.15
+          ]
+        },
+        "blossom": {
+          "colour": "white (pink-tipped) with yellow centre",
+          "hue": [
+            [
+              40,
+              65
+            ]
+          ],
+          "months": [
+            3,
+            9
+          ]
+        }
+      },
+      "sources": [
+        "ncsuBellis",
+        "rhsBellis",
+        "wtDaisy",
+        "cssColours",
+        "rhsPlants"
+      ]
+    },
+    "bedPoppies": {
+      "label": "Corn poppies (Papaver rhoeas): a bed of them, H their flowering height",
+      "w": [
+        0.5,
+        1.2
+      ],
+      "h": [
+        0.23,
+        0.9
+      ],
+      "d": [
+        0.5,
+        1.2
+      ],
+      "uses": [
+        "water the flowers",
+        "smell them",
+        "pick a few"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          10
+        ],
+        "smell": [
+          0,
+          2
+        ]
+      },
+      "species": {
+        "latin": "Papaver rhoeas",
+        "habit": "erect annual, wiry stems",
+        "leaf": {
+          "shape": "lobed",
+          "length": [
+            0.076,
+            0.15
+          ]
+        },
+        "blossom": {
+          "colour": "red (scarlet)",
+          "hue": [
+            [
+              345,
+              12
+            ]
+          ],
+          "months": [
+            6,
+            8
+          ]
+        }
+      },
+      "sources": [
+        "ncsuPoppy",
+        "rhsPoppy",
+        "wtPoppy",
+        "cssColours",
+        "rhsPlants"
+      ]
+    },
+    "bedMarigolds": {
+      "label": "French marigolds (Tagetes patula): a bed of them",
+      "w": [
+        0.5,
+        1.2
+      ],
+      "h": [
+        0.15,
+        0.3
+      ],
+      "d": [
+        0.5,
+        1.2
+      ],
+      "uses": [
+        "water the flowers",
+        "smell them",
+        "pick a few"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          10
+        ],
+        "smell": [
+          0,
+          2
+        ]
+      },
+      "species": {
+        "latin": "Tagetes patula",
+        "habit": "compact bushy annual",
+        "leaf": {
+          "shape": "pinnate",
+          "length": [
+            0.025,
+            0.15
+          ]
+        },
+        "blossom": {
+          "colour": "orange and yellow",
+          "hue": [
+            [
+              12,
+              40
+            ],
+            [
+              40,
+              65
+            ]
+          ],
+          "months": [
+            6,
+            9
+          ]
+        }
+      },
+      "sources": [
+        "ncsuTag",
+        "rhsTag",
+        "cssColours",
+        "rhsPlants"
+      ]
+    },
+    "bedPansies": {
+      "label": "Pansies (Viola × wittrockiana): a bed of them",
+      "w": [
+        0.5,
+        1.2
+      ],
+      "h": [
+        0.15,
+        0.23
+      ],
+      "d": [
+        0.5,
+        1.2
+      ],
+      "uses": [
+        "water the flowers",
+        "smell them",
+        "pick a few"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          10
+        ],
+        "smell": [
+          0,
+          2
+        ]
+      },
+      "species": {
+        "latin": "Viola × wittrockiana",
+        "habit": "low mounding/spreading",
+        "leaf": {
+          "shape": "oval",
+          "length": [
+            0.025,
+            0.038
+          ]
+        },
+        "blossom": {
+          "colour": "mixed (blue, yellow, purple, red, white)",
+          "hue": [
+            [
+              195,
+              245
+            ],
+            [
+              40,
+              65
+            ],
+            [
+              255,
+              305
+            ],
+            [
+              345,
+              12
+            ]
+          ],
+          "months": [
+            12,
+            5
+          ]
+        }
+      },
+      "sources": [
+        "ncsuViola",
+        "rhsPax",
+        "cssColours",
+        "rhsPlants"
+      ]
+    },
+    "bedLilies": {
+      "label": "Asiatic lilies (Lilium): a bed of them, H their flowering height",
+      "w": [
+        0.5,
+        1.2
+      ],
+      "h": [
+        1,
+        1.5
+      ],
+      "d": [
+        0.5,
+        1.2
+      ],
+      "uses": [
+        "water the flowers",
+        "smell them",
+        "pick a few"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          10
+        ],
+        "smell": [
+          0,
+          2
+        ]
+      },
+      "species": {
+        "latin": "Lilium (Asiatic hybrids)",
+        "habit": "erect, columnar single stems",
+        "leaf": {
+          "shape": "lance",
+          "length": [
+            0.076,
+            0.15
+          ]
+        },
+        "blossom": {
+          "colour": "orange/red/yellow",
+          "hue": [
+            [
+              12,
+              40
+            ],
+            [
+              345,
+              12
+            ],
+            [
+              40,
+              65
+            ]
+          ],
+          "months": [
+            6,
+            8
+          ]
+        }
+      },
+      "sources": [
+        "rhsAsiatic",
+        "ncsuLilium",
+        "cssColours",
+        "rhsPlants"
+      ]
+    },
+    "bedLupins": {
+      "label": "Lupins (Lupinus polyphyllus hybrids): a bed of them, H their flowering height",
+      "w": [
+        0.5,
+        1.2
+      ],
+      "h": [
+        0.9,
+        1.5
+      ],
+      "d": [
+        0.5,
+        1.2
+      ],
+      "uses": [
+        "water the flowers",
+        "smell them",
+        "pick a few"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          10
+        ],
+        "smell": [
+          0,
+          2
+        ]
+      },
+      "species": {
+        "latin": "Lupinus polyphyllus hybrids (Russell / Band of Nobles)",
+        "habit": "clump with erect columnar flower spikes",
+        "leaf": {
+          "shape": "palmate"
+        },
+        "blossom": {
+          "colour": "mixed (blue, purple, pink, red, cream, yellow)",
+          "hue": [
+            [
+              195,
+              245
+            ],
+            [
+              255,
+              305
+            ],
+            [
+              320,
+              355
+            ],
+            [
+              345,
+              12
+            ],
+            [
+              40,
+              65
+            ]
+          ],
+          "months": [
+            5,
+            6
+          ]
+        }
+      },
+      "sources": [
+        "rhsNobles",
+        "ncsuLupinus",
+        "rhsLupsp",
+        "cssColours",
+        "rhsPlants"
+      ]
+    },
+    "bedForgetMeNots": {
+      "label": "Forget-me-nots (Myosotis sylvatica): a bed of them",
+      "w": [
+        0.5,
+        1.2
+      ],
+      "h": [
+        0.15,
+        0.3
+      ],
+      "d": [
+        0.5,
+        1.2
+      ],
+      "uses": [
+        "water the flowers",
+        "smell them",
+        "pick a few"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          10
+        ],
+        "smell": [
+          0,
+          2
+        ]
+      },
+      "species": {
+        "latin": "Myosotis sylvatica",
+        "habit": "tufted, spreading biennial",
+        "leaf": {
+          "shape": "lance",
+          "length": [
+            0.025,
+            0.11
+          ]
+        },
+        "blossom": {
+          "colour": "blue, yellow/white eye",
+          "hue": [
+            [
+              195,
+              245
+            ],
+            [
+              40,
+              65
+            ]
+          ],
+          "months": [
+            4,
+            6
+          ]
+        }
+      },
+      "sources": [
+        "ncsuMyo",
+        "rhsMyo",
+        "wtFmn",
+        "cssColours",
+        "rhsPlants"
+      ]
+    },
+    "bedCosmos": {
+      "label": "Cosmos (Cosmos bipinnatus): a bed of them, H their flowering height",
+      "w": [
+        0.5,
+        1.2
+      ],
+      "h": [
+        0.6,
+        1.2
+      ],
+      "d": [
+        0.5,
+        1.2
+      ],
+      "uses": [
+        "water the flowers",
+        "smell them",
+        "pick a few"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          10
+        ],
+        "smell": [
+          0,
+          2
+        ]
+      },
+      "species": {
+        "latin": "Cosmos bipinnatus",
+        "habit": "tall, airy, clumping annual",
+        "leaf": {
+          "shape": "pinnate",
+          "length": [
+            0.076,
+            0.15
+          ]
+        },
+        "blossom": {
+          "colour": "pink/white",
+          "hue": [
+            [
+              320,
+              355
+            ]
+          ],
+          "months": [
+            8,
+            10
+          ]
+        }
+      },
+      "sources": [
+        "ncsuCosmos",
+        "rhsCosmos",
+        "cssColours",
+        "rhsPlants"
+      ]
+    },
+    "potGeraniums": {
+      "label": "Zonal geraniums (Pelargonium × hortorum) in a pot",
+      "w": [
+        0.3,
+        0.5
+      ],
+      "h": [
+        0.3,
+        0.5
+      ],
+      "uses": [
+        "water and tend the plants"
+      ],
+      "minutes": {
+        "water": [
+          1,
+          10
+        ],
+        "tend": [
+          10,
+          30
+        ]
+      },
+      "species": {
+        "latin": "Pelargonium × hortorum (zonal)",
+        "habit": "bushy, compact tender perennial",
+        "leaf": {
+          "shape": "cordate"
+        },
+        "blossom": {
+          "colour": "red (scarlet)",
+          "hue": [
+            [
+              345,
+              12
+            ]
+          ],
+          "months": [
+            6,
+            8
+          ]
+        }
+      },
+      "sources": [
+        "rhsPel",
+        "ncsuPel",
+        "vicPel",
+        "nzfloraPel",
+        "cssColours"
       ]
     },
     "clippedShrub": {
@@ -9073,8 +11279,39 @@
           10
         ]
       },
+      "species": {
+        "latin": "Helianthus annuus",
+        "habit": "single tall erect stem",
+        "leaf": {
+          "shape": "cordate",
+          "length": [
+            0.1,
+            0.4
+          ]
+        },
+        "blossom": {
+          "colour": "yellow petals round a dark disc",
+          "hue": [
+            [
+              12,
+              40
+            ],
+            [
+              40,
+              65
+            ]
+          ],
+          "months": [
+            7,
+            10
+          ]
+        }
+      },
       "sources": [
-        "sunflower"
+        "sunflower",
+        "ncsuHelian",
+        "rhsHelian",
+        "cssColours"
       ]
     },
     "vegPlot": {
@@ -9103,39 +11340,6 @@
         "harvest": [
           10,
           30
-        ]
-      },
-      "sources": [
-        "rhsPlants"
-      ]
-    },
-    "houseplantFloor": {
-      "label": "Large floor houseplant (monstera, fig, palm, fern on stand)",
-      "w": [
-        0.4,
-        1.2
-      ],
-      "h": [
-        0.5,
-        2
-      ],
-      "d": [
-        0.4,
-        1.2
-      ],
-      "uses": [
-        "water it",
-        "talk to it",
-        "wipe the leaves"
-      ],
-      "minutes": {
-        "water": [
-          1,
-          5
-        ],
-        "talk": [
-          1,
-          10
         ]
       },
       "sources": [
@@ -12109,7 +14313,7 @@
     "garden.wheelbarrow": "planter",
     "model.street.flowerTub": "planter",
     "model.street.pot": "planter",
-    "garden.geraniums": "planter",
+    "garden.geraniums": "potGeraniums",
     "garden.herbs": "planter",
     "raisedBed": "raisedVegBed",
     "natureLover.veggieBed": "raisedVegBed",
@@ -12137,56 +14341,56 @@
     "countryside.trailhead": "noticeBoard",
     "garden.boulder": "boulders",
     "model.rock": "boulders",
-    "tree": "shadeTree",
-    "garden.maple": "shadeTree",
-    "garden.birch": "shadeTree",
-    "garden.willow": "shadeTree",
-    "garden.magnolia": "shadeTree",
-    "garden.cherry": "smallTree",
-    "garden.japaneseMaple": "smallTree",
-    "garden.apple": "fruitTree",
-    "pine": "conifer",
-    "garden.spruce": "conifer",
-    "garden.cypress": "columnarConifer",
-    "garden.lemonTree": "pottedTree",
+    "tree": "treeOak",
+    "garden.maple": "treeMaple",
+    "garden.birch": "treeBirch",
+    "garden.willow": "treeWillow",
+    "garden.magnolia": "treeMagnolia",
+    "garden.cherry": "treeCherry",
+    "garden.japaneseMaple": "treeJapaneseMaple",
+    "garden.apple": "treeApple",
+    "pine": "treePine",
+    "garden.spruce": "treeSpruce",
+    "garden.cypress": "treeCypress",
+    "garden.lemonTree": "treeLemon",
     "bush": "clippedShrub",
     "garden.boxwood": "clippedShrub",
     "garden.topiary": "clippedShrub",
     "garden.hedge": "clippedShrub",
     "model.hedge": "clippedShrub",
     "model.bush.small": "clippedShrub",
-    "garden.hydrangea": "floweringShrub",
-    "garden.roses": "floweringShrub",
-    "garden.azalea": "floweringShrub",
+    "garden.hydrangea": "shrubHydrangea",
+    "garden.roses": "shrubRose",
+    "garden.azalea": "shrubAzalea",
     "model.bush.flowering": "floweringShrub",
-    "garden.lavender": "perennial",
+    "garden.lavender": "plantLavender",
     "garden.fern": "perennial",
     "garden.grass": "perennial",
-    "garden.hosta": "perennial",
+    "garden.hosta": "plantHosta",
     "model.street.flowers": "perennial",
-    "garden.tulips": "flowerBed",
-    "garden.daffodils": "flowerBed",
-    "garden.daisies": "flowerBed",
-    "garden.poppies": "flowerBed",
-    "garden.marigolds": "flowerBed",
-    "garden.pansies": "flowerBed",
-    "garden.lilies": "flowerBed",
-    "garden.lupins": "flowerBed",
-    "garden.forgetMeNots": "flowerBed",
-    "garden.cosmos": "flowerBed",
+    "garden.tulips": "bedTulips",
+    "garden.daffodils": "bedDaffodils",
+    "garden.daisies": "bedDaisies",
+    "garden.poppies": "bedPoppies",
+    "garden.marigolds": "bedMarigolds",
+    "garden.pansies": "bedPansies",
+    "garden.lilies": "bedLilies",
+    "garden.lupins": "bedLupins",
+    "garden.forgetMeNots": "bedForgetMeNots",
+    "garden.cosmos": "bedCosmos",
     "garden.meadow": "flowerBed",
     "garden.sunflowers": "sunflowers",
     "garden.vegPatch": "vegPlot",
     "garden.tomatoes": "vegPlot",
     "garden.strawberries": "vegPlot",
     "garden.pumpkins": "vegPlot",
-    "plant": "houseplantFloor",
-    "garden.monstera": "houseplantFloor",
-    "garden.fiddleFig": "houseplantFloor",
-    "garden.snakePlant": "houseplantFloor",
-    "garden.palm": "houseplantFloor",
-    "garden.bostonFern": "houseplantFloor",
-    "garden.orchid": "houseplantFloor",
+    "plant": "houseplantArrowhead",
+    "garden.monstera": "houseplantMonstera",
+    "garden.fiddleFig": "houseplantFiddleFig",
+    "garden.snakePlant": "houseplantSnakePlant",
+    "garden.palm": "houseplantParlourPalm",
+    "garden.bostonFern": "houseplantBostonFern",
+    "garden.orchid": "houseplantMothOrchid",
     "garden.cacti": "houseplantSmall",
     "garden.succulents": "houseplantSmall",
     "garden.bonsai": "houseplantSmall",
@@ -12344,8 +14548,9 @@
     "grassTuft",
     "wildflower",
     "treePlanter",
-    "conifer",
-    "columnarConifer",
+    "treePine",
+    "treeSpruce",
+    "treeCypress",
     "knifeBlock",
     "utensilPot",
     "spiceJars",
