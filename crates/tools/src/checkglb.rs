@@ -23,6 +23,7 @@
 pub mod baseline;
 mod glb;
 pub(crate) mod json;
+pub mod meshes;
 pub(crate) mod py;
 pub mod validate;
 
@@ -544,6 +545,8 @@ fn content_objects(defs: &Content) -> R<HashMap<String, Vec<Facts>>> {
 struct Finishes {
     plain: HashMap<String, bool>,
     see_through: HashSet<String>,
+    /// The textured ones: {key: (its `uvScale`, its texture's file)}.
+    textures: HashMap<String, (f64, String)>,
 }
 
 impl Finishes {
@@ -3196,12 +3199,23 @@ fn in_hand(key: &str) -> bool {
     key.starts_with("tool.")
 }
 
+/// A model file as a counted check gets it: the model's key and entry, the file, the manifests' finishes, and
+/// whether it is the model's far version.
+struct ModelFile<'a> {
+    key: &'a str,
+    entry: &'a J,
+    glb: &'a Glb,
+    fin: &'a Finishes,
+    far: bool,
+}
+
 /// A counted check (`COUNTED`) run on each model file as the gate reads it, the full model's and its far
-/// version's (whose findings are the model's): what it finds in the file, given the model's entry.
-type FileCheck = fn(&Glb, &J) -> R<Found>;
+/// version's (whose findings are the model's): what it finds in the file.
+type FileCheck = fn(&ModelFile) -> R<Found>;
 
 /// The counted checks run on each model file, by name.
-const FILE_CHECKS: &[(&str, FileCheck)] = &[];
+const FILE_CHECKS: &[(&str, FileCheck)] =
+    &[("edges", meshes::hard_edges), ("texels", meshes::texels)];
 
 /// A counted check (`COUNTED`) run over every model file at once (an outside program, `--validate`) before the
 /// models are judged: given each model's key, its file and its far version's, what it found in each model it read.
@@ -3275,6 +3289,7 @@ fn check(
         fin,
         entry,
         path,
+        false,
         facts,
         centre,
         furniture,
@@ -3311,6 +3326,7 @@ fn check(
             fin,
             &far_entry,
             far,
+            true,
             None,
             None,
             None,
@@ -3414,15 +3430,16 @@ struct Checked {
     counts: Vec<(&'static str, u64)>,
 }
 
-/// (errors, warnings, numbers) for one model entry and a file of it; `facts`: those of each content object
-/// that draws it (`content_objects`), each checked; `centre`: where it's built centred (centres.json), or None;
-/// `counted`: the counted checks to run on it.
+/// (errors, warnings, numbers) for one model entry and a file of it (`far`: its far version); `facts`: those of
+/// each content object that draws it (`content_objects`), each checked; `centre`: where it's built centred
+/// (centres.json), or None; `counted`: the counted checks to run on it.
 #[allow(clippy::too_many_arguments)]
 fn check_file(
     entry_key: &str,
     fin: &Finishes,
     entry: &J,
     path: &str,
+    far: bool,
     facts: Option<&Vec<Facts>>,
     centre: Option<&J>,
     furniture: Option<&Furniture>,
@@ -4002,7 +4019,16 @@ fn check_file(
         moving: moved_nodes(gltf)?.len(),
         counted: counted
             .iter()
-            .map(|(c, run)| Ok((*c, run(&g, entry)?)))
+            .map(|(c, run)| {
+                let file = ModelFile {
+                    key: entry_key,
+                    entry,
+                    glb: &g,
+                    fin,
+                    far,
+                };
+                Ok((*c, run(&file)?))
+            })
             .collect::<R<_>>()?,
     };
     Ok((errors, warnings, info))
@@ -4292,6 +4318,7 @@ fn model_entries(stack: &[(String, J)]) -> (BTreeMap<String, (J, String)>, Finis
     let mut fin = Finishes {
         plain: HashMap::new(),
         see_through: HashSet::new(),
+        textures: HashMap::new(),
     };
     for (path, m) in stack {
         for (k, entry) in m
@@ -4326,6 +4353,20 @@ fn model_entries(stack: &[(String, J)]) -> (BTreeMap<String, (J, String)>, Finis
                 );
                 if alpha < 1.0 {
                     fin.see_through.insert(k.clone());
+                }
+                match entry
+                    .get("texture")
+                    .and_then(J::str)
+                    .filter(|t| !t.is_empty())
+                {
+                    Some(texture) => {
+                        let scale = entry.get("uvScale").and_then(J::num).map_or(1.0, |s| s.f());
+                        let file = normpath(&join(&dirname(path), texture));
+                        fin.textures.insert(k.clone(), (scale, file));
+                    }
+                    None => {
+                        fin.textures.remove(k);
+                    }
                 }
             }
         }
@@ -5357,6 +5398,7 @@ mod tests {
         let fin = Finishes {
             plain: HashMap::new(),
             see_through: HashSet::new(),
+            textures: HashMap::new(),
         };
         let path = join(&repo_root(), "web/public/assets/models/held/coin.glb");
         let entry = j(r#"{"type": "model", "url": "coin.glb"}"#);
@@ -5464,8 +5506,9 @@ mod tests {
     }
 
     /// An example counted check, no rule of the gate's: a finding for each mesh of the file.
-    fn meshes(g: &Glb, _: &J) -> R<Found> {
-        let n = g
+    fn meshes(file: &ModelFile) -> R<Found> {
+        let n = file
+            .glb
             .gltf
             .get("meshes")
             .and_then(J::list)
@@ -5477,7 +5520,7 @@ mod tests {
     }
 
     /// An example counted check that finds nothing.
-    fn nothing(_: &Glb, _: &J) -> R<Found> {
+    fn nothing(_: &ModelFile) -> R<Found> {
         Ok(Found::default())
     }
 
@@ -5496,6 +5539,7 @@ mod tests {
         let fin = Finishes {
             plain: HashMap::new(),
             see_through: HashSet::new(),
+            textures: HashMap::new(),
         };
         let path = join(&repo_root(), "web/public/assets/models/held/coin.glb");
         let run = |base: &str,
