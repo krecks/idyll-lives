@@ -33,7 +33,8 @@ import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry } from '../../assets/types';
 import type { FenceStyleDef } from '../../content/content';
 import type { WorldStructure } from '../../core/protocol';
-import type { TownLotHouse } from '../shared/townBuildings';
+import { litAt, type TownBuilding, type TownLotHouse } from '../shared/townBuildings';
+import { PANE_SETS, paneSetLit } from '../shared/backdropDress';
 import type { ViewRect } from '../types';
 import type { RGB } from '../shared/environment';
 import type { Geo, MeshData } from '../shared/geometry';
@@ -63,6 +64,10 @@ export interface StreetOptions {
   fenceStyles?: readonly FenceStyleDef[];
   /** The far LOD's houses past this (m) from the camera's target aren't drawn (`OpenWorldQuality.farCull`; default 650). */
   farCull?: number;
+  /** Also draws the backdrop's buildings, dressed, in the chunks drawn (`StreetSource.backdrop`; the game's street): far off the town view's boxes stand in. */
+  backdrop?: boolean;
+  /** The ground as the landscape draws it, for what the backdrop's buildings stand on (`StreetSource.terrain`). */
+  terrain?: (x: number, z: number) => number;
 }
 
 /**
@@ -136,6 +141,7 @@ interface ChunkShape {
   parts: Omit<HousePart, 'geo'>[];
   ground: Omit<GroundLayer, 'geo'>[];
   homes: SilhouettePlan['homes'];
+  backdrop: ChunkPlan['backdrop'];
   lot: ChunkPlan['lot'];
   batches: ChunkPlan['batches'];
 }
@@ -145,6 +151,14 @@ interface Home {
   box: [number, number, number, number];
   panes: Geo;
   up: boolean;
+  group: number;
+}
+
+/** A backdrop building's window glass (`ChunkPlan.backdrop`): its sets, which of them are lit now (`litAt`), its group. */
+interface Lights {
+  t: TownBuilding;
+  panes: Geo[];
+  on: boolean[];
   group: number;
 }
 
@@ -217,6 +231,9 @@ export class Street {
   private readonly glow: RGB = { r: 1, g: 0.8, b: 0.5 };
   /** Neighbours' houses (wall box, grid lines) and their window glass, lit while someone is `up` in there. */
   private homes: Home[] = [];
+  /** The backdrop's buildings' window glass over every chunk drawn, lit by the hour (`setTime`), and the hour it was last lit for. */
+  private lights: Lights[] = [];
+  private lightsAt = { minute: 12 * 60, weekday: 0, key: -1 };
   private boxes: (readonly [number, number, number, number])[] = [];
   private windowsDrawn = 0;
   private windowsDue = false;
@@ -234,6 +251,8 @@ export class Street {
   private readonly ground: boolean;
   private readonly fenceStyles: readonly FenceStyleDef[];
   private readonly farCull: number;
+  private readonly backdrop: boolean;
+  private readonly terrain?: (x: number, z: number) => number;
   /** Where `frame` last chose what is drawn. */
   private readonly framedAt = new LookedFrom();
   /** The streetlights' pools are drawn (at night: `setNight`). */
@@ -246,8 +265,10 @@ export class Street {
     parent: pc.Entity,
     private readonly assets: AssetRegistry,
     private readonly house: HouseBuilder,
-    { layers, lived = false, look, lod = 0, shadows = true, ground = false, fenceStyles = [], farCull = FAR_CULL }: StreetOptions = {},
+    { layers, lived = false, look, lod = 0, shadows = true, ground = false, fenceStyles = [], farCull = FAR_CULL, backdrop = false, terrain }: StreetOptions = {},
   ) {
+    this.backdrop = backdrop;
+    this.terrain = terrain;
     this.fenceStyles = fenceStyles;
     this.farCull = farCull;
     this.layers = layers;
@@ -346,7 +367,7 @@ export class Street {
       // (The town before handing on what this one plans just as it did: its street's own, the kerbs of the rows an edit
       // left alone. The town view's only: a game's street is laid out again for a garage built, and keeps its chunks.)
       const previous = mode === 'town' && this.town?.mode === 'town' ? this.town : null;
-      const town = new TownStreet(this.house.planner, world, { has: (k) => this.assets.has(k, 'model'), entry, lived: this.lived, look: this.look, ground: this.ground, fenceStyles: this.fenceStyles }, mode, previous);
+      const town = new TownStreet(this.house.planner, world, { has: (k) => this.assets.has(k, 'model'), entry, lived: this.lived, look: this.look, ground: this.ground, fenceStyles: this.fenceStyles, backdrop: this.backdrop, terrain: this.terrain }, mode, previous);
       layoutMs += performance.now() - t1;
       await pace?.();
       if (stale()) return;
@@ -611,6 +632,38 @@ export class Street {
       const g = this.groups.get(h.group);
       if (g) g.windowsDue = true;
     }
+    return this.flushWindows();
+  }
+
+  /**
+   * The hour (`minute` of the day, on `weekday`, 0 Monday): the backdrop's buildings' windows lit as the town view lights
+   * them (`litAt`: a place's while it is open, a home's by the hour), a set of panes at a time (`paneSetLit`). Looked at
+   * once a game minute; redrawn as `setUp` redraws, at most once a second. By day (not `night`: the lamps are out) every
+   * pane is in the lit glass, as the neighbours' are. True when they were.
+   */
+  setTime(minute: number, weekday: number, night: boolean): boolean {
+    const key = night ? Math.floor(minute) * 7 + weekday : -2;
+    if (key === this.lightsAt.key) return this.windowsDue ? this.flushWindows() : false;
+    this.lightsAt = { minute, weekday, key };
+    for (const l of this.lights) this.light(l);
+    return this.flushWindows();
+  }
+
+  /** A backdrop building's sets of panes lit as the hour has them; its group's windows to be drawn again if that changed. */
+  private light(l: Lights): void {
+    const share = this.lightsAt.key === -2 ? 1 : litAt(l.t, this.lightsAt.minute, this.lightsAt.weekday);
+    for (let k = 0; k < PANE_SETS; k++) {
+      const on = paneSetLit(k, share);
+      if (l.on[k] === on) continue;
+      l.on[k] = on;
+      this.windowsDue = true;
+      const g = this.groups.get(l.group);
+      if (g) g.windowsDue = true;
+    }
+  }
+
+  /** The groups' window glass drawn again where it changed, at most once a second (`WINDOWS_EVERY_MS`); true when it was. */
+  private flushWindows(): boolean {
     if (!this.windowsDue || performance.now() - this.windowsDrawn < WINDOWS_EVERY_MS) return false;
     this.windowsDrawn = performance.now();
     this.windowsDue = false;
@@ -707,6 +760,11 @@ export class Street {
   /** Whether chunk `id` is drawn in full (streamed in, or every chunk is), so the far LOD leaves its houses out. */
   chunkDrawn(id: number): boolean {
     return !this.wanted || this.wanted.has(id);
+  }
+
+  /** The chunks drawn in full (null: all of them), as last given (`setChunks`): a new set whenever that changes. */
+  get drawnChunks(): ReadonlySet<number> | null {
+    return this.wanted;
   }
 
   /** The chunks drawn in full (null: all), as a key: what the town view's far lots were last chosen by. */
@@ -843,6 +901,16 @@ export class Street {
     }
     this.homes = homes;
     this.boxes = homes.map((h) => h.box);
+    // The backdrop's lit as the hour has them (each building's sets as they were, if it was drawn before).
+    const was = new Map(this.lights.map((l) => [l.t, l.on]));
+    this.lights = [];
+    for (const id of [...this.chunks.keys()].sort((a, b) => a - b)) {
+      for (const { t, panes } of this.chunks.get(id)!.shape.backdrop) {
+        const l: Lights = { t, panes, on: was.get(t) ?? new Array<boolean>(PANE_SETS).fill(false), group: groupOf(id) };
+        this.light(l);
+        this.lights.push(l);
+      }
+    }
     for (const [gid, g] of this.groups) if (g.windowsDue) this.drawWindows(gid, g);
     this.windowsDrawn = performance.now();
   }
@@ -853,8 +921,10 @@ export class Street {
     g.windows = [];
     g.windowsDue = false;
     const mine = this.homes.filter((h) => h.group === id);
+    const lights = this.lights.filter((l) => l.group === id);
     for (const lit of [true, false]) {
       const panes = mine.filter((h) => h.up === lit).map((h) => h.panes);
+      for (const l of lights) for (let k = 0; k < PANE_SETS; k++) if (l.on[k] === lit && !l.panes[k].empty) panes.push(l.panes[k]);
       const m = panes.length ? this.house.neighbourWindows(panes, lit, this.root) : null;
       if (!m) continue;
       this.dress(m.entity, false);
@@ -881,6 +951,7 @@ export class Street {
     this.lotPorches = [];
     this.lotKey = '';
     this.homes = [];
+    this.lights = [];
     this.boxes = [];
     this.instancesDue = true;
   }
@@ -1056,6 +1127,7 @@ function shapeOf(plan: ChunkPlan): ChunkShape {
     parts: plan.silhouettes.parts.map(({ geo: _, ...part }) => part),
     ground: plan.ground.map(({ geo: _, ...layer }) => layer),
     homes: plan.silhouettes.homes,
+    backdrop: plan.backdrop,
     lot: plan.lot,
     batches: plan.batches,
   };

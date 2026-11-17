@@ -45,12 +45,12 @@
 
 import type { ModelEntry } from '../../assets/types';
 import type { FenceStyleDef } from '../../content/content';
-import { groundDepth, objectCentre, storeyOfRow, storeyRow, type FenceEdge, type GarageInfo, type ObjectPlacement, type Opening, type PlotInfo, type RoadPlan, type WorldStructure } from '../../core/protocol';
+import { groundDepth, objectCentre, storeyOfRow, storeyRow, type BackdropBuilding, type FenceEdge, type GarageInfo, type ObjectPlacement, type Opening, type PlotInfo, type RoadPlan, type TownPlace, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
 import { CARS, CAR_PAINT, garageAt, garageFor, hash, paintCar, parkCar, pick, type CarBody } from './cars';
 import { chunkAt, chunkCoords, chunkId, distanceToRect, hashNumbers, hashString, RectGrid } from './chunks';
-import { canopyBack, type HousePlanner, type SilhouettePlan, type SilhouetteSpec } from './house';
+import { canopyBack, type HousePart, type HousePlanner, type SilhouettePlan, type SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
 import { wallCorners, writeFences } from './fences';
@@ -61,6 +61,8 @@ import { bridgeSpans, Kerb, KERB, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, stret
 import { JunctionCuts, junctionsOf, type JunctionPlan } from './junctions';
 import { Levels, levelsOf } from './landSurface';
 import type { BuiltSurface } from './builtSurface';
+import { dressBackdrop } from './backdropDress';
+import { backdropBuilding, drawnKey, footprintSeed, hedgeSides, layBackdropGrounds, middleOf, wayCorners, type BackdropLaid, type HedgeSide, type TownBuilding } from './townBuildings';
 
 /** Vertex-colour alpha for the plain finish, as the material libraries' `encodeFinish`: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. */
 function encodeFinish(roughness: number, metallic: number): number {
@@ -375,6 +377,16 @@ export interface StreetSource {
   ground?: boolean;
   /** The content's fence styles, for the fences on other lots (`WorldStructure.fences`). */
   fenceStyles?: readonly FenceStyleDef[];
+  /**
+   * Also the backdrop's buildings (`WorldMeta.backdrop`), dressed (`backdropDress.ts`), with their hedges and what they
+   * stand on (the game's street: far off the town view draws them, `pc/townView.ts`).
+   */
+  backdrop?: boolean;
+  /**
+   * The ground (m) as the landscape draws it (`Landscape.heightAt`): what the backdrop's forecourts, yards and ways lie
+   * on. None: the surface's (`groundAt`), else 0.
+   */
+  terrain?: (x: number, z: number) => number;
 }
 
 /** The street as laid out, to be drawn. */
@@ -428,6 +440,8 @@ export interface ChunkPlan extends Omit<StreetPlan, 'batches' | 'footprints' | '
   batches: Map<string, Inst[]>;
   /** Road surface, garden paths and fields off the focus lot (game only). */
   ground: GroundLayer[];
+  /** The backdrop's buildings in it (`StreetSource.backdrop`): each as the town view has it (its lights, `litAt`), and its window glass by set (`PANE_SETS`). */
+  backdrop: { t: TownBuilding; panes: Geo[] }[];
 }
 
 /** Whether a model the street instances casts the sun's shadows (as `StreetPlan.batches`). */
@@ -484,6 +498,41 @@ interface PlotOut {
   spec: SilhouetteSpec | null;
   lot: StreetPlan['lot'];
 }
+
+/** A backdrop building as the street takes it (`TownStreet.layBackdrop`): what it is drawn from, what it stands on, its hedges' sides and its way to the road. */
+interface BackdropItem {
+  b: BackdropBuilding;
+  /** What it is drawn from (`drawnKey`): its share of a chunk's key. */
+  draw: string;
+  /** What it stands on: its forecourt or yard, its way to the road (`layBackdropGrounds`). */
+  laid: BackdropLaid;
+  hedges: HedgeSide[];
+}
+
+/** A backdrop building's share of the street (`TownStreet.backdropOut`): dressed, its window glass by set, its hedges, what it stands on. */
+interface BackdropOut {
+  t: TownBuilding;
+  parts: HousePart[];
+  panes: Geo[];
+  hedges: Inst[];
+  /** A forecourt (and its way) paved, a yard (and its way) bare, a garden's path. */
+  court: Geo;
+  yard: Geo;
+  path: Geo;
+  chunk: number;
+}
+
+/**
+ * A backdrop building's ground (m over the land as the landscape draws it), and the cells it is cut into to lie on a
+ * land that slopes (m: the land's own samples, `LAND_CELL`). Over the land by a hand's width: the ground's tiles are
+ * quads of 2 m and more (`pc/nature.ts` `TILE_LODS`), between whose corners the land (`heightAt`) dips and rises by
+ * several centimetres; a few centimetres up, the land showed through in patches. Still under the pavement (`WALK_Y` and
+ * its kerb).
+ */
+const BACKDROP_GROUND_Y = 0.1;
+const BACKDROP_GROUND_CELL = 2;
+/** The hedge model's length along its run at scale 1 (`fences.ts`). */
+const HEDGE_RUN = 1.05;
 
 /** A road side's kerbside furniture, by chunk, with what each chunk's share looks like (`Parts.signature`). */
 interface KerbOut {
@@ -653,6 +702,11 @@ export class TownStreet {
   /** The edges walls (and the doors and windows in them) stand on, `axis:x:z`, made when first asked for after the walls or openings changed (`walled`). */
   private wallEdges: Set<string> | null = null;
   private readonly fenceUnits = new Map<number, { hash: number; out: Parts }>();
+  /** The backdrop's buildings and places as last taken (`setWorld`; `StreetSource.backdrop`), the buildings by the chunk their middle is in, and each one's share as planned (by what it is drawn from and the land under it). */
+  private backdropOf: BackdropBuilding[] | undefined = undefined;
+  private placesOf: TownPlace[] | undefined = undefined;
+  private backdropByChunk = new Map<number, BackdropItem[]>();
+  private readonly backdropUnits = new Map<string, BackdropOut>();
 
   /** The street's own: sidewalks, the road's surface, fountains, bridges (by chunk); and what it was planned from (`staticKey`). */
   private statics: Map<number, { parts: Parts; road: Geo; trail: Geo; marks: Geo }> | null = null;
@@ -949,6 +1003,14 @@ export class TownStreet {
   /** Takes the world's things, houses and rooms as they are now (the layout stays: see `layoutKey`). */
   setWorld(world: WorldStructure): void {
     this.world = world;
+    // The backdrop's buildings (a street built up or cleared in step 2, a place's hours): found again by chunk; each
+    // chunk's key has what its own are drawn from (`gather`).
+    if (this.options.backdrop && (world.meta?.backdrop !== this.backdropOf || world.meta?.places !== this.placesOf)) {
+      this.backdropOf = world.meta?.backdrop;
+      this.placesOf = world.meta?.places;
+      this.backdropByChunk = this.layBackdrop(world);
+      this.version++;
+    }
     // Fences (one put up or taken down): found again by chunk; each chunk's share notices its own (`fenceKey`).
     const fences = shownFences(world, this.options.fenceStyles ?? []);
     if (fences !== this.fencesOf) {
@@ -1226,6 +1288,7 @@ export class TownStreet {
     for (const r of this.rows.keys()) for (const id of this.kerbOf(r, NO_FOCUS).chunks.keys()) ids.add(id);
     for (const f of this.fields) ids.add(chunkAt(f.x + f.w / 2, f.z + f.d / 2));
     for (const id of this.fencesByChunk.keys()) ids.add(id);
+    for (const id of this.backdropByChunk.keys()) ids.add(id);
     if (this.options.ground) for (const [, rects] of this.groundRects()) for (const r of rects) ids.add(chunkAt(r.x + r.w / 2, r.z + r.d / 2));
     return [...ids].sort((a, b) => a - b);
   }
@@ -1307,6 +1370,7 @@ export class TownStreet {
   keepUnits(chunks: ReadonlySet<number> | null, focus: number): void {
     for (const [id, u] of this.plotUnits) if ((chunks && !chunks.has(u.chunk)) || (u.variant !== NO_FOCUS && u.variant !== focus)) this.plotUnits.delete(id);
     if (chunks) for (const id of this.fenceUnits.keys()) if (!chunks.has(id)) this.fenceUnits.delete(id);
+    if (chunks) for (const [key, u] of this.backdropUnits) if (!chunks.has(u.chunk)) this.backdropUnits.delete(key);
   }
 
   /** A plot's share of the street with lot `focus` in view (see the rules at the top). */
@@ -1811,6 +1875,104 @@ export class TownStreet {
   private readonly staticSigs = new Map<number, number | null>();
 
   /**
+   * The backdrop's buildings by the chunk their middle is in: what each is drawn from, what it stands on
+   * (`backdropGround`), its garden's hedges (`hedgeSides`, as the town view's) and its way to the road, stopped at the
+   * road's edge (the pavement's, a street's) and left out where it would cross a lot (the lots' gardens are theirs).
+   */
+  private layBackdrop(world: WorldStructure): Map<number, BackdropItem[]> {
+    const list = world.meta?.backdrop ?? [];
+    const places = world.meta?.places ?? [];
+    const driven = (world.meta?.roads ?? []).filter((r) => r.kind !== 'trail');
+    const laid = layBackdropGrounds(list, driven, world.plots);
+    const sides = new Map<number, HedgeSide[]>();
+    for (const side of hedgeSides(list, laid.map((l) => l.ground), world.plots, driven)) {
+      let mine = sides.get(side.of);
+      if (!mine) sides.set(side.of, (mine = []));
+      mine.push(side);
+    }
+    const out = new Map<number, BackdropItem[]>();
+    list.forEach((b, i) => {
+      if (b.poly.length < 3) return;
+      const id = chunkAt(...middleOf(b.poly));
+      let mine = out.get(id);
+      if (!mine) out.set(id, (mine = []));
+      mine.push({ b, draw: drawnKey(b, places), laid: laid[i], hedges: sides.get(i) ?? [] });
+    });
+    return out;
+  }
+
+  /** Whether (`x`, `z`) is on a lot (inside its rectangle). */
+  private onLot(x: number, z: number): boolean {
+    return this.plotGrid.near({ x, z, w: 0, d: 0 }, 0).some(({ L }) => x > L.info.x && x < L.info.x + L.info.w && z > L.info.z && z < L.info.z + L.info.d);
+  }
+
+  /**
+   * A backdrop building's share of the street: dressed (`dressBackdrop`) on the box the town view draws it as
+   * (`backdropBuilding`; on a land the town follows, on its pad, its walls down to the land round it), its garden's
+   * hedges (the street's hedge model along each side), its forecourt or yard and its way to the road laid on the
+   * ground. Kept by what it is drawn from and the land under it.
+   */
+  private backdropOut(item: BackdropItem): BackdropOut {
+    const levels = this.levels;
+    const { b } = item;
+    const [mx, mz] = middleOf(b.poly);
+    const floor = levels ? levels.at(mx, mz) : b.y;
+    const land = levels ? (x: number, z: number) => levels.surface.landAt(x, z) : () => 0;
+    let lowest = Infinity;
+    for (const [x, z] of b.poly) lowest = Math.min(lowest, land(x, z));
+    const way = item.laid.way;
+    // (The land round it as drawn too: shaped, the chunk's heights move, `chunkSig`.)
+    const key = `${item.draw}|${Math.round(floor * 100)}|${Math.round(lowest * 100)}|${levels ? levels.surface.chunkSig(chunkAt(mx, mz)) : '-'}|${way ? [...way.from, ...way.to].map((v) => Math.round(v * 10)).join(',') : '-'}|${item.hedges.length}`;
+    const known = this.backdropUnits.get(key);
+    if (known) return known;
+    const chunk = chunkAt(mx, mz);
+    const t: TownBuilding = { ...backdropBuilding(levels ? { ...b, y: floor } : b, footprintSeed(b), land, this.world.meta?.places ?? []), chunk };
+    const dress = dressBackdrop(t, b.use, item.laid.ground.to);
+    // (What its ground lies on: the land as the landscape draws it, which beside a lot isn't the surface's slope to the
+    // lot's pad, `nature.ts` `lotsFilled`.)
+    const at = this.options.terrain ?? this.groundAt;
+    // Its hedges: the hedge model along each side, a little over a metre a plant.
+    const hedges: Inst[] = [];
+    for (const { a, c } of item.hedges) {
+      const l = Math.hypot(c[0] - a[0], c[1] - a[1]);
+      const n = Math.max(1, Math.round(l));
+      const s = (l / n / HEDGE_RUN) * 1.04;
+      const yaw = Math.atan2(-(c[1] - a[1]), c[0] - a[0]);
+      for (let k = 0; k < n; k++) {
+        const [x, z] = [a[0] + ((c[0] - a[0]) * (k + 0.5)) / n, a[1] + ((c[1] - a[1]) * (k + 0.5)) / n];
+        const y = at ? at(x, z) : 0;
+        hedges.push(y ? [x, z, s, 1, yaw, y] : [x, z, s, 1, yaw]);
+      }
+    }
+    // What it stands on: its forecourt or yard round it (its rectangle's, as wide as the town view's map has it), and its way.
+    const [court, yard, path] = [new Geo().color('#ECE8E0'), new Geo().color('#C4B7A0'), new Geo()];
+    const kind = item.laid.ground.kind;
+    const y = BACKDROP_GROUND_Y;
+    /**
+     * A rectangle (its corners in order), `dy` m up; on a land the town follows cut into cells
+     * (`BACKDROP_GROUND_CELL`), so draped it lies on the land between its corners too.
+     */
+    const lay = (g: Geo, q: readonly (readonly [number, number])[], dy: number) => {
+      // (Cut into cells everywhere: a cell on a lot is left out, as the town view's map leaves the lots theirs.)
+      const [nu, nv] = [Math.max(1, Math.ceil(Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]) / BACKDROP_GROUND_CELL)), Math.max(1, Math.ceil(Math.hypot(q[3][0] - q[0][0], q[3][1] - q[0][1]) / BACKDROP_GROUND_CELL))];
+      const P = (u: number, v: number): V3 => [q[0][0] + (q[1][0] - q[0][0]) * u + (q[3][0] - q[0][0]) * v, dy, q[0][1] + (q[1][1] - q[0][1]) * u + (q[3][1] - q[0][1]) * v];
+      for (let i = 0; i < nu; i++) {
+        for (let j = 0; j < nv; j++) {
+          const [x, , z] = P((i + 0.5) / nu, (j + 0.5) / nv);
+          if (this.onLot(x, z)) continue;
+          g.poly([P(i / nu, j / nv), P((i + 1) / nu, j / nv), P((i + 1) / nu, (j + 1) / nv), P(i / nu, (j + 1) / nv)], [0, 1, 0]);
+        }
+      }
+    };
+    if (item.laid.court) lay(kind === 'forecourt' ? court : yard, item.laid.court, y);
+    if (way) lay(kind === 'forecourt' ? court : kind === 'yard' ? yard : path, wayCorners(way), y + 0.002);
+    if (at) for (const g of [court, yard, path]) g.drape(at);
+    const out: BackdropOut = { t, parts: dress.parts, panes: dress.panes, hedges, court, yard, path, chunk };
+    this.backdropUnits.set(key, out);
+    return out;
+  }
+
+  /**
    * Chunk `id` far off (the far LOD, past the chunks streamed in): its houses as boxes with their
    * roofs (`HousePlanner.farHouse`), the focus lot's left out, in one plain-finish geometry, with
    * what it was made from. Null when it has none.
@@ -1890,6 +2052,8 @@ export class TownStreet {
     }
     const fence = this.fenceKey(id, focus);
     if (fence) keys.push(`e${id}:${fence.hash}`);
+    // The backdrop's buildings in it, by what each is drawn from (`drawnKey`; its land: `moved` below).
+    for (const item of this.backdropByChunk.get(id) ?? []) keys.push(`b${hashString(item.draw)}:${item.hedges.length}:${item.laid.way ? 'w' : '-'}`);
     // The street's own in it (sidewalks, the road, fountains, bridges, parked cars), by what they look like.
     const own = this.staticSig(id);
     if (own !== null) keys.push(`s${own}`);
@@ -1953,6 +2117,7 @@ export class TownStreet {
       lot: null,
       batches: new Map((Object.keys(FOLIAGE) as FoliageKind[]).map((k) => [FOLIAGE[k], []])),
       ground: g.ground(),
+      backdrop: [],
     };
     const st = this.staticParts().get(id);
     if (st) mergeParts(plan, st.parts);
@@ -1970,6 +2135,26 @@ export class TownStreet {
     }
     for (const p of g.kerbs) mergeParts(plan, p);
     if (g.fence) mergeParts(plan, this.fenceOut(g.fence));
+    // The backdrop's buildings, their hedges, and what they stand on.
+    const items = this.backdropByChunk.get(id);
+    if (items?.length) {
+      const [court, yard, path] = [new Geo(), new Geo(), new Geo()];
+      const hedges = plan.batches.get(FOLIAGE.hedge)!;
+      for (const item of items) {
+        const o = this.backdropOut(item);
+        mergeSilhouettes(plan.silhouettes, { parts: o.parts, homes: [], lamps: [] });
+        plan.backdrop.push({ t: o.t, panes: o.panes });
+        hedges.push(...o.hedges);
+        court.merge(o.court);
+        yard.merge(o.yard);
+        path.merge(o.path);
+      }
+      if (this.options.ground) {
+        if (!court.empty) plan.ground.push({ name: 'backdropCourts', material: 'material.sidewalk', geo: court, toned: true });
+        if (!yard.empty) plan.ground.push({ name: 'backdropYards', material: 'material.path', geo: yard, toned: true });
+        if (!path.empty) plan.ground.push({ name: 'backdropPaths', material: 'material.path', geo: path });
+      }
+    }
     return plan;
   }
 }

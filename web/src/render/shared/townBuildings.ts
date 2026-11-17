@@ -6,6 +6,7 @@
  */
 
 import type { BackdropBuilding, BackdropUse, RoadPlan, TownPlace } from '../../core/protocol';
+import { chunkAt } from './chunks';
 import { Geo, facing, type V3 } from './geometry';
 
 /** Window styles: none (a barn), a house's, a shop's (a shopfront on the ground floor), flats' and offices' (closer bays). */
@@ -16,11 +17,11 @@ export const ROOFS = ['gable', 'hip', 'flat', 'mansard'] as const;
 export type RoofKind = (typeof ROOFS)[number];
 
 /** A storey (m), as the contract has it. */
-const STOREY = 3;
+export const STOREY = 3;
 /** A pitched roof's pitch (as the game's houses: 34°), a mansard's rise at most (m), a flat roof's parapet (m). */
-const PITCH = Math.tan((34 * Math.PI) / 180);
+export const PITCH = Math.tan((34 * Math.PI) / 180);
 const MANSARD_RISE = 3.2;
-const PARAPET = 0.7;
+export const PARAPET = 0.7;
 /** How far walls go under the lowest corner's ground (m): no gap under a building on a slope. */
 const SINK = 0.4;
 
@@ -64,7 +65,7 @@ const ROOF_TONE = 0.72;
  * A building's window style by what it is, and the share of its windows lit at night: a place's while it is open
  * (`litAt`: an open shop's front is lit, the windows over it half as often), a home's in the evening (`homeLights`).
  */
-const STYLE: Record<BackdropUse, [number, number]> = {
+export const STYLE: Record<BackdropUse, [number, number]> = {
   house: [TOWN_STYLE.house, 0.45],
   terrace: [TOWN_STYLE.house, 0.48],
   flats: [TOWN_STYLE.flats, 0.5],
@@ -144,6 +145,11 @@ export interface TownBuilding {
   seed: number;
   /** A number of its own (0..1) for its shopfront's fascia. */
   accent: number;
+  /**
+   * A backdrop building's (or its garden hedge's) street chunk (`shared/chunks.ts`, by its footprint's middle): where
+   * the game's street draws it dressed (`backdropDress.ts`) while that chunk is streamed in. None: a far lot's house.
+   */
+  chunk?: number;
 }
 
 /** A far lot's house as the street has it (`Street.townHouses`) and how it looks (`HousePlanner.farLook`). */
@@ -255,13 +261,13 @@ export function footprintSeed(b: { poly: readonly (readonly [number, number])[] 
 }
 
 /** What a backdrop building is drawn from, besides the land under it: its key among those drawn last (`townBackdrop`'s `kept`). */
-function drawnKey(b: BackdropBuilding, places: readonly TownPlace[]): string {
+export function drawnKey(b: BackdropBuilding, places: readonly TownPlace[]): string {
   const hours = b.place === undefined ? undefined : places[b.place]?.hours;
   return `${b.poly.map(([x, z]) => `${Math.round(x * 100)},${Math.round(z * 100)}`).join(' ')}|${b.storeys}|${b.roof}|${b.ridge ?? '-'}|${b.use}|${b.look}|${hours ? `${hours.open},${hours.close},${hours.days}` : '-'}`;
 }
 
 /** The middle of a footprint (its corners' mean). */
-function middleOf(p: readonly (readonly [number, number])[]): [number, number] {
+export function middleOf(p: readonly (readonly [number, number])[]): [number, number] {
   const n = Math.max(1, p.length);
   return [p.reduce((a, q) => a + q[0], 0) / n, p.reduce((a, q) => a + q[1], 0) / n];
 }
@@ -290,7 +296,7 @@ export function townBackdrop(
     let lowest = Infinity;
     for (const [x, z] of b.poly) lowest = Math.min(lowest, ground(x, z));
     const key = `${drawnKey(b, places)}|${Math.round(floor * 100)}|${Math.round(lowest * 100)}`;
-    const made = was?.get(key) ?? backdropBuilding(floorAt ? { ...b, y: floor } : b, footprintSeed(b), ground, places);
+    const made = was?.get(key) ?? { ...backdropBuilding(floorAt ? { ...b, y: floor } : b, footprintSeed(b), ground, places), chunk: chunkAt(...middleOf(b.poly)) };
     kept?.set(key, made);
     return made;
   });
@@ -342,13 +348,13 @@ export function lotBuilding(h: TownLotHouse, ground: (x: number, z: number) => n
  * or a barn on a bare yard, a house in a garden with a hedge round it.
  */
 export type GroundKind = 'forecourt' | 'yard' | 'garden';
-const FORECOURT: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['flats', 'shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'hall']);
+export const FORECOURT: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['flats', 'shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'hall']);
 const YARD: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['workshop', 'barn']);
 /** How far round its walls a building's ground goes (m), and how far off a road its way to it goes at most. */
-const AROUND: Record<GroundKind, number> = { forecourt: 2, yard: 2.5, garden: 3.5 };
+export const AROUND: Record<GroundKind, number> = { forecourt: 2, yard: 2.5, garden: 3.5 };
 const WAY_MOST = 45;
 /** A garden's hedge: how high and how thick (m), its greens (sRGB), and how near a road's edge it may stand (m). */
-const HEDGE = { height: 1.05, thick: 0.7, colours: ['#3B6331', '#36602F', '#426A37'], clear: 1 } as const;
+export const HEDGE = { height: 1.05, thick: 0.7, colours: ['#3B6331', '#36602F', '#426A37'], clear: 1 } as const;
 
 export interface BackdropGround {
   kind: GroundKind;
@@ -410,18 +416,87 @@ export function backdropGround(b: BackdropBuilding, roads: readonly RoadPlan[]):
   return { kind, from: [cx, cz], round, to: nearestOnRoads(roads, cx, cz, WAY_MOST) };
 }
 
+/** A backdrop building's way to the road is this wide (m), as the town view's map draws it (`groundTiles.ts`). */
+export const WAY_WIDE: Record<GroundKind, number> = { forecourt: 3, yard: 3, garden: 1.4 };
+
 /**
- * The gardens' hedges as the town view draws them, low boxes among its buildings: along each side of a garden but
- * the one its path leaves by (the side nearest the road), and but those that would stand on a lot, on a road or its
- * pavement, against another building, or in the garden next door (there the two gardens are one).
+ * What a backdrop building stands on as the game lays it near (the street's ground, `shared/street.ts`; no lawn there,
+ * `nature.ts` `unlawned`): its forecourt or yard round its walls (its rectangle's, `AROUND` out; none for a garden),
+ * and its way from its middle to the road's edge (the pavement's, a street's), `half` wide each side; none where it
+ * would cross a lot (the lots' gardens are theirs) or there is no road near.
  */
-export function gardenHedges(
+export interface BackdropLaid {
+  ground: BackdropGround;
+  court: [number, number][] | null;
+  way: { from: [number, number]; to: [number, number]; half: number } | null;
+}
+
+/** `layBackdropGrounds`' answers by backdrop, for the roads and lots they were laid among. */
+const laidOf = new WeakMap<readonly BackdropBuilding[], { roads: readonly RoadPlan[]; plots: readonly unknown[]; laid: BackdropLaid[] }>();
+
+/** What each of `backdrop` stands on (`BackdropLaid`), among `roads` (the town's driven ones) and `plots`; kept for the same lists. */
+export function layBackdropGrounds(backdrop: readonly BackdropBuilding[], roads: readonly RoadPlan[], plots: readonly { x: number; z: number; w: number; d: number }[]): BackdropLaid[] {
+  const known = laidOf.get(backdrop);
+  if (known && known.plots === plots && known.roads.length === roads.length && known.roads.every((r, i) => r === roads[i])) return known.laid;
+  const inLot = (x: number, z: number) => plots.some((p) => x > p.x && x < p.x + p.w && z > p.z && z < p.z + p.d);
+  const laid = backdrop.map((b): BackdropLaid => {
+    const ground = backdropGround(b, roads);
+    let court: BackdropLaid['court'] = null;
+    if (ground.kind !== 'garden' && b.poly.length >= 3) {
+      const t = backdropBuilding(b, 0, () => 0);
+      const [W, D] = [t.w / 2 + AROUND[ground.kind], t.d / 2 + AROUND[ground.kind]];
+      const P = (u: number, v: number): [number, number] => [t.cx + u * t.ux - v * t.uz, t.cz + u * t.uz + v * t.ux];
+      court = [P(-W, -D), P(W, -D), P(W, D), P(-W, D)];
+    }
+    let way: BackdropLaid['way'] = null;
+    if (ground.to) {
+      const [fx, fz] = ground.from;
+      const [tx, tz] = ground.to;
+      const road = roads.find((r) => nearestOnRoads([r], tx, tz, 0.01) !== null);
+      const len = Math.hypot(tx - fx, tz - fz);
+      const reach = len - (road ? road.width / 2 : 0);
+      if (reach > 0.5) {
+        const [ex, ez] = [fx + ((tx - fx) * reach) / len, fz + ((tz - fz) * reach) / len];
+        // (Not across a lot: looked at every metre.)
+        const steps = Math.ceil(reach);
+        let crosses = false;
+        for (let k = 0; k <= steps && !crosses; k++) crosses = inLot(fx + ((ex - fx) * k) / steps, fz + ((ez - fz) * k) / steps);
+        if (!crosses) way = { from: [fx, fz], to: [ex, ez], half: WAY_WIDE[ground.kind] / 2 };
+      }
+    }
+    return { ground, court, way };
+  });
+  laidOf.set(backdrop, { roads, plots, laid });
+  return laid;
+}
+
+/** The corners of a backdrop building's way (`BackdropLaid.way`) as a rectangle round it. */
+export function wayCorners(way: NonNullable<BackdropLaid['way']>): [number, number][] {
+  const [[fx, fz], [ex, ez]] = [way.from, way.to];
+  const l = Math.hypot(ex - fx, ez - fz) || 1;
+  const [nx, nz] = [(-(ez - fz) / l) * way.half, ((ex - fx) / l) * way.half];
+  return [[fx + nx, fz + nz], [ex + nx, ez + nz], [ex - nx, ez - nz], [fx - nx, fz - nz]];
+}
+
+/** A side of a backdrop garden its hedge runs along: the building's index in the backdrop, the side's ends (x, z). */
+export interface HedgeSide {
+  of: number;
+  a: [number, number];
+  c: [number, number];
+}
+
+/**
+ * The sides of the gardens a hedge runs along (`gardenHedges` the town view's, the game's street near: `backdropDress`):
+ * each side of a garden but the one its path leaves by (the side nearest the road), and but those that would stand on
+ * a lot, on a road or its pavement, against another building, or in the garden next door (there the two gardens are
+ * one).
+ */
+export function hedgeSides(
   backdrop: readonly BackdropBuilding[],
   grounds: readonly BackdropGround[],
   plots: readonly { x: number; z: number; w: number; d: number }[],
   roads: readonly RoadPlan[],
-  ground: (x: number, z: number) => number,
-): TownBuilding[] {
+): HedgeSide[] {
   type Box = readonly [number, number, number, number];
   const box = (p: readonly (readonly [number, number])[], grow = 0): Box => {
     let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
@@ -434,7 +509,7 @@ export function gardenHedges(
   const gardens = grounds.map((g) => box(g.round));
   // (On no road, nor its pavement.)
   const onRoad = (x: number, z: number) => roads.some((r) => nearestOnRoads([r], x, z, r.width / 2 + HEDGE.clear) !== null);
-  const out: TownBuilding[] = [];
+  const out: HedgeSide[] = [];
   grounds.forEach((g, i) => {
     if (g.kind !== 'garden' || g.round.length < 3) return;
     const sides = g.round.map((a, k) => [a, g.round[(k + 1) % g.round.length]] as const);
@@ -456,13 +531,39 @@ export function gardenHedges(
       if (lots.some((p) => meet(side, p)) || walls.some((o, j) => j !== i && meet(side, o))) return;
       if (gardens.some((o, j) => j !== i && grounds[j].kind === 'garden' && mid[0] > o[0] && mid[0] < o[2] && mid[1] > o[1] && mid[1] < o[3])) return;
       if (onRoad(a[0], a[1]) || onRoad(c[0], c[1]) || onRoad(mid[0], mid[1])) return;
-      const [ya, yc] = [ground(a[0], a[1]), ground(c[0], c[1])];
-      const top = Math.max(ya, yc) + HEDGE.height;
-      const green = vary(hex(HEDGE.colours[(i + k) % HEDGE.colours.length]), hash2(i, k), hash2(k, i + 3), 0.06);
-      out.push({ roof: 'flat', cx: mid[0], cz: mid[1], ux: (c[0] - a[0]) / l, uz: (c[1] - a[1]) / l, w: l + HEDGE.thick, d: HEDGE.thick, base: Math.min(ya, yc) - SINK, top, rise: 0.06, wall: green, roofColor: green, floor: top, style: TOWN_STYLE.none, lit: 0, seed: 0, accent: 0 });
+      out.push({ of: i, a: [a[0], a[1]], c: [c[0], c[1]] });
     });
   });
   return out;
+}
+
+/**
+ * The gardens' hedges as the town view draws them, low boxes among its buildings, along `hedgeSides`; each in its
+ * building's chunk (`TownBuilding.chunk`).
+ */
+export function gardenHedges(
+  backdrop: readonly BackdropBuilding[],
+  grounds: readonly BackdropGround[],
+  plots: readonly { x: number; z: number; w: number; d: number }[],
+  roads: readonly RoadPlan[],
+  ground: (x: number, z: number) => number,
+): TownBuilding[] {
+  return hedgeSides(backdrop, grounds, plots, roads).map(({ of: i, a, c }) => {
+    // (Its greens by its garden and its side, as ever.)
+    const k = sideIndex(grounds[i].round, a);
+    const l = Math.hypot(c[0] - a[0], c[1] - a[1]);
+    const mid: [number, number] = [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2];
+    const [ya, yc] = [ground(a[0], a[1]), ground(c[0], c[1])];
+    const top = Math.max(ya, yc) + HEDGE.height;
+    const green = vary(hex(HEDGE.colours[(i + k) % HEDGE.colours.length]), hash2(i, k), hash2(k, i + 3), 0.06);
+    return { roof: 'flat', cx: mid[0], cz: mid[1], ux: (c[0] - a[0]) / l, uz: (c[1] - a[1]) / l, w: l + HEDGE.thick, d: HEDGE.thick, base: Math.min(ya, yc) - SINK, top, rise: 0.06, wall: green, roofColor: green, floor: top, style: TOWN_STYLE.none, lit: 0, seed: 0, accent: 0, chunk: chunkAt(...middleOf(backdrop[i].poly)) } satisfies TownBuilding;
+  });
+}
+
+/** Which side of `round` starts at `a` (its corner's index). */
+function sideIndex(round: readonly (readonly [number, number])[], a: readonly [number, number]): number {
+  const k = round.findIndex((q) => q[0] === a[0] && q[1] === a[1]);
+  return k < 0 ? 0 : k;
 }
 
 // ---- the unit meshes ------------------------------------------------------------------------
@@ -472,11 +573,11 @@ const part = (wall: boolean, tone = 1) => `#${wall ? 'FF' : '00'}${Math.round(to
 /** The plain finish's rough, not metal (`farHouse`'s). */
 export const FINISH = 0.4;
 /** A roof's overhang (unit: a share of the footprint's side). */
-const EAVE = 0.035;
+export const EAVE = 0.035;
 /** A hip's ridge end and a mansard's break, a share of the side in from the eaves. */
 const HIP_RIDGE = 0.2;
-const MANSARD_IN = 0.13;
-const MANSARD_BREAK = 0.72;
+export const MANSARD_IN = 0.13;
+export const MANSARD_BREAK = 0.72;
 
 /**
  * The unit meshes (`walls` and each roof): a footprint from -0.5 to 0.5 in x (along the ridge) and z,
