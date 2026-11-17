@@ -138,12 +138,12 @@ fn append(a: &mut Mesh, b: &Mesh) {
             let mut own = a.clone();
             own.loops.truncate(l0);
             own.faces.truncate(own.faces.len() - b.faces.len());
-            crate::normals::corner_normals(&own)
+            crate::normals::joined_normals(&own)
         });
         out.extend(
             b.normals
                 .clone()
-                .unwrap_or_else(|| crate::normals::corner_normals(b)),
+                .unwrap_or_else(|| crate::normals::joined_normals(b)),
         );
         a.normals = Some(out);
     }

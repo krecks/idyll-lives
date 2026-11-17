@@ -1,18 +1,18 @@
-//! The Italian cypress as families/trees.py builds it (with the few helpers of trees.py and plants.py it needs),
-//! line for line: the kernel's proof from end to end on a model that needs no leaf cards.
+//! The Italian cypress as families/trees.py builds it (with the helper of trees.py it needs), line for line: the
+//! kernel's proof from end to end on a model that needs no leaf cards.
 #![allow(dead_code)]
 
+use artkit::botany::noise_at;
 use artkit::family::{Family, Model};
 use artkit::far::{is_low, low};
-use artkit::materials::{Finish, Finishes, Mat};
-use artkit::math::{P3, PI, TAU, V3, cos, p3, pow, sin, v3};
-use artkit::noise::noise_at;
+use artkit::materials::{Finish, Finishes};
+use artkit::math::{P3, PI, TAU, cos, p3, pow, sin, v3};
 use artkit::parts::{join_all, settle};
 use artkit::perch;
 use artkit::py;
 use artkit::rand::Random;
 use artkit::scene::Obj;
-use artkit::{find, jitter, loft, palette, sphere, sweep};
+use artkit::{find, jitter, loft, lump, palette, sweep};
 
 palette! { M: bark = ("#8E7A6A", bark), leaf = ("#2E5034", foliage), leaf2 = ("#385C3A", foliage), leaf3 = ("#426842", foliage), leaf4 = ("#4C744A", foliage) }
 
@@ -52,50 +52,6 @@ fn trunk(
         jitter!(stem, wobble, size = 0.45, seed = seed, up = 0.0);
     }
     stem
-}
-
-/// A soft, lumpy ball (a leafy clump): a smooth sphere pushed about by noise, its bottom at `at`.
-#[allow(clippy::too_many_arguments)]
-pub fn lump(
-    name: &str,
-    r: f64,
-    at: (f64, f64, f64),
-    material: Mat,
-    scale: (f64, f64, f64),
-    seed: f64,
-    noise: f64,
-    segments: usize,
-    rings: usize,
-) -> Obj {
-    let segments = low(segments, 6.max(py::round(segments as f64 * 0.6) as usize));
-    let rings = low(rings, 3.max(py::round(rings as f64 * 0.6) as usize));
-    let obj = sphere!(
-        name,
-        r,
-        material = material,
-        segments = segments,
-        rings = rings,
-        scale = scale
-    );
-    obj.edit(|o| {
-        for v in &mut o.mesh.verts {
-            let p = *v;
-            let n = noise_at(
-                p.x as f64 / r * 1.3 + seed,
-                p.y as f64 / r * 1.3 - seed,
-                p.z as f64 / r * 1.3 + seed * 0.5,
-            );
-            *v = p * (1.0 + noise * n);
-        }
-        let bottom = o
-            .mesh
-            .verts
-            .iter()
-            .map(|v| v.z)
-            .fold(f32::INFINITY, f32::min);
-        o.mesh.translate(V3::from(at) - v3(0, 0, bottom));
-    });
-    obj
 }
 
 /// Italian cypress: a pencil of dark leaves about a metre across and eight tall, a lofted flame of foliage covered
@@ -159,16 +115,16 @@ pub fn cypress() -> Vec<Obj> {
         let col = cols[3.min(py::int((z - 1.0) / 6.2 * 3.0 + rng.uniform(0.0, 1.2)) as usize)];
         let seed = i as f64 * 2.1 + rng.random();
         if full || i % 3 == 0 {
-            lump(
-                &format!("spray{i}"),
+            lump!(
+                format!("spray{i}"),
                 size * low(1.0, 1.3),
                 (r * 0.82 * cos(a), r * 0.82 * sin(a), z - size * 1.2),
                 col,
-                (1.0, 1.0, 2.6),
-                seed,
-                0.25,
-                6,
-                5,
+                scale = (1, 1, 2.6),
+                noise = 0.25,
+                seed = seed,
+                segments = 6,
+                rings = 5
             );
         }
     }

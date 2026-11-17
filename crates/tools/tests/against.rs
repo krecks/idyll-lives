@@ -851,10 +851,20 @@ fn the_pack_entry_the_centre_and_the_rest_of_a_manifest_are_compared() {
         "tools/art/blender/centres.json",
         br#"{"model.cupboard": [0.0, 0.0]}"#,
     );
+    // (its `$comment` says what builds the pack: the game does not read it, and it is no finding)
     new.write(
         "web/public/assets/packs/fixture/manifest.json",
         format!(
             r#"{{"$comment": "another", "version": 1, "entries": {{"model.cupboard": {ENTRY}}}}}"#
+        )
+        .as_bytes(),
+    );
+    let outcome = new.against(&old, "{}");
+    assert!(found(&outcome, "packs/fixture/manifest.json").is_empty());
+    new.write(
+        "web/public/assets/packs/fixture/manifest.json",
+        format!(
+            r#"{{"$comment": "another", "version": 2, "entries": {{"model.cupboard": {ENTRY}}}}}"#
         )
         .as_bytes(),
     );

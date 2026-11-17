@@ -248,7 +248,7 @@ const BIRD_PARTS: [&str; 5] = ["body", "head", "tail", "wing.L", "wing.R"];
 const BIRD_FIT: f64 = 0.05;
 /// How far (m) a perch (`perches`: where the game's birds sit on a tree or a hedge) may be outside the model's box.
 const PERCH_OUT: f64 = 0.01;
-/// What a model with `perches` is, its entry's `habitat` (families/trees.py, plants.py): a broadleaved or fruit tree,
+/// What a model with `perches` is, its entry's `habitat` (crates/art/nature/src/trees, families/plants.py): a broadleaved or fruit tree,
 /// a conifer, a bush or shrub, or a hedge.
 const HABITATS: [&str; 4] = ["tree", "conifer", "bush", "hedge"];
 

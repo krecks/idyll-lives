@@ -101,11 +101,14 @@ fn y_up(v: V3) -> [f32; 3] {
 }
 
 /// A normal as the files carry them: to four decimals, then a unit vector again (corners that all but agree
-/// share a vertex).
+/// share a vertex), and only then turned +Y up, as Blender's exporter does it (its squares are summed x, y, z as
+/// Blender has them: summed as the file has them, one normal in nine comes out a unit in the last place off).
 fn rounded_normal(n: V3) -> [f32; 3] {
-    let r = y_up(n).map(|x| (x * 10000.0).round_ties_even() / 10000.0);
+    let r = n.array().map(|x| (x * 10000.0).round_ties_even() / 10000.0);
     let len = (r[0] * r[0] + r[1] * r[1] + r[2] * r[2]).sqrt();
-    if len == 0.0 { r } else { r.map(|x| x / len) }
+    let unit = if len == 0.0 { r } else { r.map(|x| x / len) };
+    // (no zero in a file of Blender's is a negative one)
+    y_up(V3::new(unit[0], unit[1], unit[2])).map(|x| x + 0.0)
 }
 
 /// A turn (Euler XYZ, radians) as the file's quaternion (x, y, z, w), +Y up.

@@ -187,7 +187,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    A count the family gives is kept as it is: `cargo review facets` lists what shows its flat sides (over 1.5 mm).
 
    Spend the triangles where they show (silhouettes, edges, what a hand touches) and keep hidden parts plain
-   (`families/living.py` armchair and sofa, `kitchen.py` fridge, `trees.py` oak). End with:
+   (`families/living.py` armchair and sofa, `kitchen.py` fridge). End with:
    - `G.join_all('<id>')` for a model with no moving parts;
    - one `G.join` per part for a model with moving parts (below);
    - then `G.settle()`, which stands it on the floor, centred, by moving it, never scaling.
@@ -214,12 +214,12 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      a far version leaves out (a flower's centre; moving parts, joined into one still part). Better than
      decimating small, separate parts (flowers, leaves, lumps, twine), which turns them into spikes and
      lifts the model off the floor. Draw every random number the full build draws, so the far version's
-     parts stand where the model's do (`families/plants.py`, `trees.py`). The gate fails a far version
+     parts stand where the model's do (`families/plants.py`). The gate fails a far version
      whose lowest point is more than 0.5 cm off the model's.
    - **Perches** (trees, shrubs, hedges): where the game's birds sit, the entry's `perches`. The build finds them
      on its own meshes (`G.perch.around`, lines in from outside; `G.perch.find`, where they meet the leaves, spread
      and kept) with random numbers of its own, so the meshes don't change. `G.settle` moves them with the
-     model (`families/trees.py`, `plants.py` `perches`). Its `Model` says what they are on, the entry's `habitat`
+     model (`families/plants.py` `perches`). Its `Model` says what they are on, the entry's `habitat`
      beside them: `habitat='tree'` (broadleaved and fruit trees), `'conifer'`, `'bush'` (shrubs) or `'hedge'`.
      `--preview` renders `<id>@perches.png` (and `.top`) with a red ball on each. A bird the game flies by code takes
      `bird={'length', 'wingspan', 'perchHeight', 'pitch'}` (`families/birds.py`, birds.md). The gate checks them all
