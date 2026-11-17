@@ -290,3 +290,43 @@ describe('built land on a slope', () => {
     expect(Array.from(direct.conformed)).toEqual(Array.from(surface.conformed));
   });
 });
+
+describe('a backdrop building turned by a road', () => {
+  // A school turned 45° whose box reaches over a street at a junction: its pad stands on its own ground (its
+  // footprint and forecourt), never on the road its box's corner covers.
+  const land = blankLand(W, D, 'follow');
+  for (let j = 0; j < land.rows; j++) for (let i = 0; i < land.cols; i++) land.h[j * land.cols + i] = Math.round((0.04 * i * LAND_CELL + 0.03 * j * LAND_CELL) * 100);
+  const street = line([0, 60], [159, 60], 7, 'street', ['out', 'out']);
+  const lane = line([80, 63.5], [80, 110], 7, 'lane', ['join', 'dead']);
+  // A square 24 m a side turned 45°, its nearest corner 6.5 m from the junction's middle (80, 60): its box covers the street there.
+  const [cx, cz, r] = [70, 40, 17];
+  const poly: [number, number][] = [[cx, cz - r], [cx + r, cz], [cx, cz + r], [cx - r, cz]];
+  const turned: SurfaceWorld = { plots: [], meta: { roads: [street, lane], backdrop: [{ poly, use: 'school' }] } };
+  const surface = builtSurfaceOf(turned, land);
+  const [box] = surfacePlots(turned);
+
+  test("its box covers the street, but the street's own height is the surface there", () => {
+    expect(box.poly).toBeDefined();
+    expect(box.x + box.w).toBeGreaterThan(80);
+    expect(box.z + box.d).toBeGreaterThan(56.5);
+    for (const [x, z] of [[84, 59], [80, 59.5], [86, 58.5], [75, 57.5]] as Pt[]) {
+      expect(x <= box.x + box.w && z <= box.z + box.d).toBe(true);
+      const on = surface.roadAt(x, z)!;
+      expect(on).not.toBeNull();
+      expect(surface.at(x, z)).toBeCloseTo(surface.roadY(on.road, on.s), 6);
+      // (The land under it a little below it, not the pad's.)
+      const k = Math.round(z / LAND_CELL) * land.cols + Math.round(x / LAND_CELL);
+      expect(surface.conformed[k]).toBeLessThan(surface.at(x, z));
+    }
+  });
+
+  test('its pad is on its ground, and the corner of its box off it is the graded land', () => {
+    const pad = surface.padY(0);
+    expect(surface.at(cx, cz)).toBe(pad);
+    expect(surface.at(cx + r + 1.5, cz)).toBe(pad);
+    // (In its box, off its ground and off the road: the land, not the pad.)
+    const [x, z] = [cx + r - 2, cz + r - 2];
+    expect(surface.roadAt(x, z)).toBeNull();
+    expect(surface.at(x, z)).toBe(surface.landAt(x, z));
+  });
+});

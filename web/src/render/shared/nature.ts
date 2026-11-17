@@ -13,7 +13,7 @@ import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, ty
 import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, type Land, type LandRect } from '../../game/land';
 import { coverAt, landTop, landWater, wetDistance, wetEdgeAt } from './landBake';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
-import type { BuiltSurface, SurfaceChange } from './builtSurface';
+import { onPad, type BuiltSurface, type SurfaceChange } from './builtSurface';
 import { surfaceOf } from './landSurface';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
@@ -1114,7 +1114,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         let best: number | null = null;
         for (const i of grid.get(Math.floor(x / PAD_CELL) * 65536 + Math.floor(z / PAD_CELL)) ?? []) {
           const p = surface.plots[i];
-          if (x < p.x || x > p.x + p.w || z < p.z || z > p.z + p.d) continue;
+          // (A backdrop building's on its ground only, and not on a road: `BuiltSurface.at`.)
+          if (!onPad(p, x, z) || (p.poly && surface.roadAt(x, z))) continue;
           const y = surface.padY(i);
           if (best === null || y > best) best = y;
         }

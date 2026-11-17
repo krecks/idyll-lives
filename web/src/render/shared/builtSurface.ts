@@ -34,11 +34,12 @@
  * on: a lot's pad, a road's height across it, else the graded land between its samples.
  */
 
-import type { JunctionInfo, RoadKind, RoadPlan } from '../../core/protocol';
+import type { BackdropUse, JunctionInfo, RoadKind, RoadPlan } from '../../core/protocol';
 import { LAND_CELL, NONE, heightAt, type Land, type LandRect } from '../../game/land';
 import { bridgeSpans, lengths, nearest, pointAt, RoadIndex } from '../../game/roads';
 import { CHUNK, chunkAt, chunksIn } from './chunks';
 import { carriageway, CROSSWALK, KERB_RETURN, planJunctions, type JunctionPlan } from './junctions';
+import { AROUND, groundKindOf, roundOf } from './townBuildings';
 
 /** The steepest each kind of way climbs (rise per m); a trail's is a measure only (it lies on the land). */
 export const GRADE: Record<RoadKind, number> = { street: 0.08, lane: 0.08, country: 0.12, trail: 0.22 };
@@ -85,6 +86,33 @@ export interface SurfacePlot {
   entry: { road: number; s: number } | null;
   /** Along its entry's road, the stretch its front faces (arc lengths, the lesser first); none for a backdrop building. */
   front?: [number, number];
+  /**
+   * A backdrop building's ground, turned as the building is (its footprint and its forecourt, yard or garden
+   * round it; the box above is this one's): its pad is this, not its box, and gives way to a road (a building
+   * turned by a junction would otherwise lift its box's corner over the junction).
+   */
+  poly?: readonly (readonly [number, number])[];
+}
+
+/** Whether (x, z) is on `p`'s pad (or within `by` m of it): in its box, and in its ground if it is turned (`SurfacePlot.poly`). */
+export function onPad(p: SurfacePlot, x: number, z: number, by = 0): boolean {
+  if (x < p.x - by || x > p.x + p.w + by || z < p.z - by || z > p.z + p.d + by) return false;
+  if (!p.poly) return true;
+  let inside = false;
+  let near = Infinity;
+  const q = p.poly;
+  for (let i = 0, j = q.length - 1; i < q.length; j = i++) {
+    const [xi, zi] = q[i];
+    const [xj, zj] = q[j];
+    if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+    if (by > 0) {
+      const [dx, dz] = [xj - xi, zj - zi];
+      const l2 = dx * dx + dz * dz;
+      const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - xi) * dx + (z - zi) * dz) / l2)) : 0;
+      near = Math.min(near, Math.hypot(x - xi - dx * t, z - zi - dz * t));
+    }
+  }
+  return inside || near <= by;
 }
 
 /** A pad stands no further than this (m) above or below its road at its entry (a short drive, a few steps). */
@@ -252,16 +280,19 @@ export class BuiltSurface {
     return Number.isFinite(e) ? e : this.padY(plot);
   }
 
-  /** The surface (m) at (`x`, `z`): a lot's pad in a lot (the highest where two touch), a road's height on a road (its deck on a bridge), else the graded land. */
+  /** The surface (m) at (`x`, `z`): a lot's pad in a lot (the highest where two touch), a road's height on a road (its deck on a bridge), a backdrop building's pad on its ground, else the graded land. */
   at(x: number, z: number): number {
-    let pad = -Infinity;
+    let [pad, ground] = [-Infinity, -Infinity];
     for (const i of this.lotGrid.get(Math.floor(x / LOT_CELL) * 65536 + Math.floor(z / LOT_CELL)) ?? []) {
       const p = this.plots[i];
-      if (x >= p.x && x <= p.x + p.w && z >= p.z && z <= p.z + p.d) pad = Math.max(pad, this.pads[i]);
+      if (!onPad(p, x, z)) continue;
+      if (p.poly) ground = Math.max(ground, this.pads[i]);
+      else pad = Math.max(pad, this.pads[i]);
     }
     if (pad > -Infinity) return pad;
     const on = this.roadAt(x, z);
     if (on) return this.roadY(on.road, on.s);
+    if (ground > -Infinity) return ground;
     return this.landAt(x, z);
   }
 
@@ -500,7 +531,7 @@ export class BuiltSurface {
       let [lo, hi] = [Infinity, -Infinity];
       for (let j = Math.max(0, Math.floor(p.z / c) + 1); j <= Math.min(rows - 1, Math.ceil((p.z + p.d) / c) - 1); j++) {
         for (let k = j * cols + Math.max(0, Math.floor(p.x / c) + 1), end = j * cols + Math.min(cols - 1, Math.ceil((p.x + p.w) / c) - 1); k <= end; k++) {
-          if (wet(land, k)) continue;
+          if (wet(land, k) || (p.poly && !onPad(p, (k - j * cols) * c, j * c))) continue;
           lo = Math.min(lo, land.h[k]);
           hi = Math.max(hi, land.h[k]);
         }
@@ -941,11 +972,16 @@ export class BuiltSurface {
         }
       }
     });
-    // Lots (the higher pad where two touch).
+    // Lots (the higher pad where two touch); a backdrop building's on its ground, and round it out to a cell's
+    // diagonal (every corner of a cell its turned edge crosses, as beside a road: the land drawn between the
+    // samples meets its ground under its edge), but not under a road.
     plots.forEach((p, n) => {
-      for (let j = Math.max(0, Math.ceil(p.z / c)); j <= Math.min(rows - 1, Math.floor((p.z + p.d) / c)); j++) {
-        for (let i = Math.max(0, Math.ceil(p.x / c)); i <= Math.min(cols - 1, Math.floor((p.x + p.w) / c)); i++) {
+      const out = p.poly ? c * Math.SQRT2 : 0;
+      for (let j = Math.max(0, Math.ceil((p.z - out) / c)); j <= Math.min(rows - 1, Math.floor((p.z + p.d + out) / c)); j++) {
+        for (let i = Math.max(0, Math.ceil((p.x - out) / c)); i <= Math.min(cols - 1, Math.floor((p.x + p.w + out) / c)); i++) {
           const at = j * cols + i;
+          // (Beside a road, only where its pad is no higher: the land meets the sidewalk's edge under it, and its ground's.)
+          if (p.poly && (kind[at] === 1 || (kind[at] === BESIDE && pads[n] > builtY[at]) || !onPad(p, i * c, j * c, out))) continue;
           builtY[at] = kind[at] === 2 ? Math.max(builtY[at], pads[n]) : pads[n];
           kind[at] = 2;
         }
@@ -1335,7 +1371,7 @@ export interface SurfaceWorld {
     roads?: RoadPlan[];
     paths?: { x: number; z: number; w: number; d: number }[];
     facing?: number[];
-    backdrop?: { poly: [number, number][] }[];
+    backdrop?: { poly: [number, number][]; use?: BackdropUse }[];
     world?: { landscape?: { slope?: number } };
   } | null;
   junctions?: JunctionInfo[];
@@ -1426,8 +1462,10 @@ export function surfacePlots(world: SurfaceWorld): SurfacePlot[] {
     return { x: p.x, z: p.z, w: p.w, d: p.d, entry, front: [Math.min(...ends), Math.max(...ends)] };
   });
   for (const b of world.meta?.backdrop ?? []) {
-    const xs = b.poly.map((q) => q[0]);
-    const zs = b.poly.map((q) => q[1]);
+    // (Its ground: its footprint, and round it what it stands on.)
+    const poly = b.poly.length >= 3 ? roundOf(b.poly, AROUND[groundKindOf(b.use ?? 'house')]) : null;
+    const xs = (poly ?? b.poly).map((q) => q[0]);
+    const zs = (poly ?? b.poly).map((q) => q[1]);
     const [x0, z0, x1, z1] = [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)];
     let entry: SurfacePlot['entry'] = null;
     const [cx, cz] = [(x0 + x1) / 2, (z0 + z1) / 2];
@@ -1443,7 +1481,7 @@ export function surfacePlots(world: SurfaceWorld): SurfacePlot[] {
         entry = { road, s: m.s };
       }
     }
-    out.push({ x: x0, z: z0, w: x1 - x0, d: z1 - z0, entry });
+    out.push({ x: x0, z: z0, w: x1 - x0, d: z1 - z0, entry, ...(poly ? { poly } : {}) });
   }
   return out;
 }

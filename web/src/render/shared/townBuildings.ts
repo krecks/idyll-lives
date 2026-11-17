@@ -352,6 +352,8 @@ export const FORECOURT: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['flats'
 const YARD: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['workshop', 'barn']);
 /** How far round its walls a building's ground goes (m), and how far off a road its way to it goes at most. */
 export const AROUND: Record<GroundKind, number> = { forecourt: 2, yard: 2.5, garden: 3.5 };
+/** What a building of `use` stands on. */
+export const groundKindOf = (use: BackdropUse): GroundKind => (FORECOURT.has(use) ? 'forecourt' : YARD.has(use) ? 'yard' : 'garden');
 const WAY_MOST = 45;
 /** A garden's hedge: how high and how thick (m), its greens (sRGB), and how near a road's edge it may stand (m). */
 export const HEDGE = { height: 1.05, thick: 0.7, colours: ['#3B6331', '#36602F', '#426A37'], clear: 1 } as const;
@@ -406,14 +408,20 @@ export function backdropGround(b: BackdropBuilding, roads: readonly RoadPlan[]):
   const n = Math.max(1, b.poly.length);
   const cx = b.poly.reduce((a, q) => a + q[0], 0) / n;
   const cz = b.poly.reduce((a, q) => a + q[1], 0) / n;
-  const kind: GroundKind = FORECOURT.has(b.use) ? 'forecourt' : YARD.has(b.use) ? 'yard' : 'garden';
-  // (Each corner out from the middle: a rectangle's sides move out by about `AROUND`.)
-  const k = AROUND[kind] * Math.SQRT2;
-  const round = b.poly.map(([x, z]): [number, number] => {
+  const kind = groundKindOf(b.use);
+  return { kind, from: [cx, cz], round: roundOf(b.poly, AROUND[kind]), to: nearestOnRoads(roads, cx, cz, WAY_MOST) };
+}
+
+/** A footprint `poly` with each corner moved out from its middle so a rectangle's sides move out by about `by` m. */
+export function roundOf(poly: readonly (readonly [number, number])[], by: number): [number, number][] {
+  const n = Math.max(1, poly.length);
+  const cx = poly.reduce((a, q) => a + q[0], 0) / n;
+  const cz = poly.reduce((a, q) => a + q[1], 0) / n;
+  const k = by * Math.SQRT2;
+  return poly.map(([x, z]): [number, number] => {
     const l = Math.hypot(x - cx, z - cz) || 1;
     return [x + ((x - cx) / l) * k, z + ((z - cz) / l) * k];
   });
-  return { kind, from: [cx, cz], round, to: nearestOnRoads(roads, cx, cz, WAY_MOST) };
 }
 
 /** A backdrop building's way to the road is this wide (m), as the town view's map draws it (`groundTiles.ts`). */
