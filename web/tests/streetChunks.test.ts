@@ -448,6 +448,37 @@ describe('the street in chunks', async () => {
     expect(a.chunkKey(chunkAt(lot.x + lot.w / 2, lot.z + lot.d / 2), NO_FOCUS)).not.toBe(b.chunkKey(chunkAt(lot.x + lot.w / 2, lot.z + lot.d / 2), NO_FOCUS));
   });
 
+  test('a street handed on from the town before a lot was removed plans as a fresh one, the street’s own and most kerbs taken over', () => {
+    // (The menus' parked cars: one on each driveway, the removed lot's going with it.)
+    const parked = (w: WorldStructure, gone = -1): WorldStructure => ({ ...w, cars: w.plots.flatMap((p, i) => (i === gone || p.public ? [] : [{ plot: i, x: p.x + 16, z: p.z + 10, yaw: 0, body: i % 3, paint: i % 4 }])) });
+    for (const world of [town(objects), onLand(town(objects)), parked(onLand(town(objects)))]) {
+      for (const ground of [false, true]) {
+        const opts = { ...options, ground };
+        const gone = 13;
+        const before = new TownStreet(new HousePlanner(), world, opts, 'town');
+        // (Planned as the overview plans it: every chunk's key, every road side's kerbs.)
+        for (const id of before.chunkIds()) before.chunkKey(id, NO_FOCUS);
+        const after = world.cars ? parked(without(world, gone), gone) : without(world, gone);
+        const fresh = new TownStreet(new HousePlanner(), after, opts, 'town');
+        const handed = new TownStreet(new HousePlanner(), after, opts, 'town', before);
+        expect(handed.handedOn.statics).toBe(true);
+        expect(handed.handedOn.kerbs).toBeGreaterThan(0);
+        expect(handed.chunkIds()).toEqual(fresh.chunkIds());
+        for (const id of fresh.chunkIds()) {
+          expect(handed.chunkKey(id, NO_FOCUS)).toBe(fresh.chunkKey(id, NO_FOCUS));
+          expect(drawn(handed.chunk(id, NO_FOCUS))).toBe(drawn(fresh.chunk(id, NO_FOCUS)));
+        }
+      }
+    }
+    // Another road: nothing handed on.
+    const one = streets([23]);
+    const two = streets([23, 120]);
+    const a = new TownStreet(new HousePlanner(), one, options, 'town');
+    for (const id of a.chunkIds()) a.chunkKey(id, NO_FOCUS);
+    const b = new TownStreet(new HousePlanner(), two, options, 'town', a);
+    expect(b.handedOn).toEqual({ statics: false, kerbs: 0 });
+  });
+
   test('another town with a road added: the chunks it does not reach keep their keys (the menus’ street, which draws no road surface)', () => {
     const one = streets([23]);
     const two = streets([23, 120]);

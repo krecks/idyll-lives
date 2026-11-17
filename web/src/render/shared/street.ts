@@ -55,7 +55,7 @@ import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
 import { wallCorners, writeFences } from './fences';
 import { shownFences } from './shownFences';
-import { centroid } from '../../game/roads';
+import { centroid, lengths, pointAt } from '../../game/roads';
 import { pavedRects } from './paving';
 import { bridgeSpans, Kerb, KERB, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, stretchOf, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
 import { JunctionCuts, junctionsOf, type JunctionPlan } from './junctions';
@@ -638,7 +638,7 @@ export class TownStreet {
   private garages = new Map<number, SilhouetteSpec['garage']>();
   /** Things on no plot's ground (on the street, on lots not laid out). */
   private readonly plotUnits = new Map<string, { hash: number; out: PlotOut; chunk: number; variant: number }>();
-  private readonly kerbUnits = new Map<string, { hash: number; out: KerbOut }>();
+  private readonly kerbUnits = new Map<string, { hash: number; out: KerbOut; carry: string }>();
   /** The world's fences by the chunk their middle is in, as last taken (`setWorld`), and each chunk's share of the street. */
   private fencesOf: FenceEdge[] | null = null;
   private fencesByChunk = new Map<number, FenceEdge[]>();
@@ -651,8 +651,13 @@ export class TownStreet {
   private wallEdges: Set<string> | null = null;
   private readonly fenceUnits = new Map<number, { hash: number; out: Parts }>();
 
-  /** The street's own: sidewalks, the road's surface, fountains, the menus' parked cars (by chunk). */
+  /** The street's own: sidewalks, the road's surface, fountains, bridges (by chunk); and what it was planned from (`staticKey`). */
   private statics: Map<number, { parts: Parts; road: Geo; trail: Geo; marks: Geo }> | null = null;
+  private staticKey: string | null = null;
+  /** The menus' parked cars, by chunk (`carParts`): apart from `statics`, which a lot edit (and the car it takes) keeps. */
+  private cars: Map<number, Parts> | null = null;
+  /** What the kerbs are planned from beyond their own row (`carryKey`): the same, a street of the town before may hand its kerbs on. */
+  private kerbsKey: string | null = null;
   /** Kerbs by road side, and which plots front each. */
   private readonly rows = new Map<string, number[]>();
   /**
@@ -663,11 +668,16 @@ export class TownStreet {
   readonly footprints = new Map<string, [number, number]>();
   readonly standIns = new Map<string, StandIn>();
 
+  /**
+   * `previous`: the street of the town shown before (step 2's town before an edit), if it is of the same mode: what of
+   * it this town plans just as it did is taken over (`inherit`), not planned again.
+   */
   constructor(
     private readonly planner: HousePlanner,
     world: WorldStructure,
     private readonly options: StreetSource,
     readonly mode: 'game' | 'town',
+    previous?: TownStreet | null,
   ) {
     this.world = world;
     const streets = (world.meta?.streets ?? []).filter((s) => s.w >= s.d);
@@ -726,7 +736,82 @@ export class TownStreet {
     });
     this.setWorld(world);
     this.ranks = this.chooseRanks(world);
+    if (previous && previous.mode === mode) this.inherit(previous);
   }
+
+  /**
+   * Takes over from `previous` (the street of the town shown before) what this one would plan just as it did: the
+   * street's own (`staticParts`), when the roads, their junctions and heights and the bridges' beds are the same; and
+   * each road side's kerbside furniture (`kerbOf`), when the roads are the same, the side's row of lots too, and the
+   * heights in every chunk it stands in (`BuiltSurface.chunkSig`). (What the kerbs checked of the things and garages
+   * round them is checked again as ever: `kerbOf`.) A lot removed, added or changed then plans only its own row's.
+   */
+  private inherit(previous: TownStreet): void {
+    if (previous.statics && previous.staticKeyOf() === this.staticKeyOf()) {
+      this.statics = previous.statics;
+      for (const [id, sig] of previous.staticSigs) this.staticSigs.set(id, sig);
+      this.handedOn.statics = true;
+    }
+    if (previous.kerbsKeyOf() !== this.kerbsKeyOf()) return;
+    const [was, now] = [previous.levels?.surface, this.levels?.surface];
+    for (const [id, unit] of previous.kerbUnits) {
+      const [r, side, variant] = id.split('|');
+      const rowKey = `${r}|${side}`;
+      if (!this.rows.has(rowKey) || unit.carry !== this.rowCarry(rowKey, Number(variant))) continue;
+      if ([...unit.out.chunks.keys()].some((c) => (was?.chunkSig(c) ?? 0) !== (now?.chunkSig(c) ?? 0))) continue;
+      this.kerbUnits.set(id, unit);
+      this.handedOn.kerbs++;
+    }
+  }
+
+  /** What the street before handed on (`inherit`): its street's own, and how many road sides' kerbs (for the perf log and the tests). */
+  readonly handedOn = { statics: false, kerbs: 0 };
+
+  /** What every kerb and the street's own are planned from beyond their own row: the roads, their junctions, the lights' poles, the lanes cars pull over on, the world's size and whether it has cars. */
+  private kerbsKeyOf(): string {
+    const w = this.world;
+    return (this.kerbsKey ??= hashString(JSON.stringify([this.walkStops.roads, this.ways, this.junctions, w.lightPoles ?? null, w.pullOverStreets ?? null, !!w.cars, this.W, this.D, !!this.options.ground, this.options.has(PROP.fountain)])).toString(36));
+  }
+
+  /** What the street's own is planned from (`staticParts`): what the kerbs are, and the heights it stands at (`levelsKey`). */
+  private staticKeyOf(): string {
+    return (this.staticKey ??= `${this.kerbsKeyOf()}|${this.levelsKey()}`);
+  }
+
+  /** The heights the street's own stands at: the roads' (`roadsSig`), the junctions', and the beds under the bridges (every 2 m). */
+  private levelsKey(): string {
+    const levels = this.levels;
+    if (!levels) return '-';
+    const beds: number[] = [];
+    for (const road of [...this.roads, ...this.ways.country]) {
+      for (const [s0, s1] of bridgeSpans(road)) {
+        const ls = lengths(road.points);
+        for (let u = s0; u <= s1; u += 2) {
+          const { p } = pointAt(road.points, u, ls);
+          beds.push(Math.round(levels.surface.landAt(p[0], p[1]) * 1000));
+        }
+      }
+    }
+    return `${levels.surface.roadsSig()}|${hashString(JSON.stringify(levels.surface.junctionHeights))}|${hashNumbers(beds)}`;
+  }
+
+  /** What road side `rowKey`'s kerbside furniture is planned from of its own (with lot `focus` in view): its row of lots, as each fronts it, the paths and driveways meeting it, and its taxi rank. */
+  private rowCarry(rowKey: string, focus: number): string {
+    const row = (this.rows.get(rowKey) ?? []).map((i) => {
+      const { L } = this.fronting[i]!;
+      return [L.plot.x, L.plot.z, L.plot.w, L.plot.d, L.turned, L.edge, L.door, L.drive, this.kindOf(L, focus)];
+    });
+    if (!this.mouths) {
+      this.mouths = new Map();
+      for (const { p, road, side } of this.meeting) {
+        const k = `${road}|${side}`;
+        this.mouths.set(k, `${this.mouths.get(k) ?? ''}${p.x},${p.z},${p.w},${p.d};`);
+      }
+    }
+    return `${hashString(JSON.stringify(row))}|${hashString(this.mouths.get(rowKey) ?? '')}|${this.ranks.get(rowKey)?.join(',') ?? '-'}`;
+  }
+  /** The paths and driveways meeting each road side (`meeting`), written out for `rowCarry`. */
+  private mouths: Map<string, string> | null = null;
 
   /** The taxi ranks at the rows' ends, where they stand (x, z): for checks. */
   rankSpots(): [number, number][] {
@@ -1107,6 +1192,7 @@ export class TownStreet {
     const ids = new Set<number>();
     for (const L of this.plots) ids.add(this.plotChunk(L));
     for (const id of this.staticParts().keys()) ids.add(id);
+    for (const id of this.carParts().keys()) ids.add(id);
     for (const r of this.rows.keys()) for (const id of this.kerbOf(r, NO_FOCUS).chunks.keys()) ids.add(id);
     for (const f of this.fields) ids.add(chunkAt(f.x + f.w / 2, f.z + f.d / 2));
     for (const id of this.fencesByChunk.keys()) ids.add(id);
@@ -1347,7 +1433,7 @@ export class TownStreet {
       if (cached && cached.hash === hashOf(cached.out)) return cached.out;
       const [r, side] = rowKey.split('|').map(Number) as [number, 1 | -1];
       const out = this.planKerb(r, side, row, variant);
-      this.kerbUnits.set(id, { hash: hashOf(out), out });
+      this.kerbUnits.set(id, { hash: hashOf(out), out, carry: this.rowCarry(rowKey, variant) });
       return out;
     };
     // Planned for no focus first: what it checks says which focus lots it depends on.
@@ -1653,18 +1739,30 @@ export class TownStreet {
         bridge(stretchOf(road, s0, s1), road.width, (x, z) => at(x, z).parts.props, heights);
       }
     }
-    // The world's own cars, parked, in the menus' town (the game draws them coming and going: `pc/cars.ts`).
-    if (this.world.cars && this.mode === 'town') {
-      for (const c of this.world.cars) parked(at(c.x, c.z).parts, c.x, c.z, c.yaw, CARS[c.body % CARS.length], CAR_PAINT[c.paint % CAR_PAINT.length], levels ? levels.at(c.x, c.z) : 0);
-    }
     this.statics = out;
     return out;
+  }
+
+  /** The world's own cars, parked, in the menus' town (the game draws them coming and going: `pc/cars.ts`), by chunk. */
+  private carParts(): Map<number, Parts> {
+    if (this.cars) return this.cars;
+    const out = new Map<number, Parts>();
+    const levels = this.levels;
+    if (this.world.cars && this.mode === 'town') {
+      for (const c of this.world.cars) {
+        const id = chunkAt(c.x, c.z);
+        let P = out.get(id);
+        if (!P) out.set(id, (P = new Parts(this.options.has)));
+        parked(P, c.x, c.z, c.yaw, CARS[c.body % CARS.length], CAR_PAINT[c.paint % CAR_PAINT.length], levels ? levels.at(c.x, c.z) : 0);
+      }
+    }
+    return (this.cars = out);
   }
 
   /** A hash of the street's own in chunk `id` (`staticParts`: what it looks like), or null if it has none. */
   private staticSig(id: number): number | null {
     const known = this.staticSigs.get(id);
-    if (known !== undefined) return known;
+    if (known !== undefined) return this.withCars(id, known);
     const st = this.staticParts().get(id);
     let sig: number | null = null;
     if (st) {
@@ -1672,7 +1770,13 @@ export class TownStreet {
       for (const geo of [st.road, st.trail, st.marks]) sig = hashNumbers(geo.pos, sig);
     }
     this.staticSigs.set(id, sig);
-    return sig;
+    return this.withCars(id, sig);
+  }
+
+  /** `sig` with chunk `id`'s parked cars in it (none: as it is). */
+  private withCars(id: number, sig: number | null): number | null {
+    const cars = this.carParts().get(id);
+    return cars ? cars.signature() ^ (sig ?? 0x5bd1e995) : sig;
   }
   private readonly staticSigs = new Map<number, number | null>();
 
@@ -1738,7 +1842,7 @@ export class TownStreet {
   /** Moved on whenever `setWorld` takes a world that changes anything the street is planned from. */
   private version = 0;
 
-  private gather(id: number, focus: number): { key: string; plots: PlotKey[]; kerbs: Parts[]; fence: FenceKey | null; ground: GroundLayer[] } {
+  private gather(id: number, focus: number): { key: string; plots: PlotKey[]; kerbs: Parts[]; fence: FenceKey | null; ground: () => GroundLayer[] } {
     const keys: string[] = [];
     const plots: PlotKey[] = [];
     for (const L of this.plotsByChunk().get(id) ?? []) {
@@ -1759,32 +1863,42 @@ export class TownStreet {
     // The street's own in it (sidewalks, the road, fountains, bridges, parked cars), by what they look like.
     const own = this.staticSig(id);
     if (own !== null) keys.push(`s${own}`);
-    // Ground layers: garden paths and fields off the focus lot (the lot draws its own, on its ground).
-    const ground: GroundLayer[] = [];
+    // Ground layers: garden paths and fields off the focus lot (the lot draws its own, on its ground). Their key now,
+    // their geometry only when the chunk is planned (`chunk`): most keys are asked for to find the chunk unchanged.
+    const layers: [string, Rect[], string, number][] = [];
     if (this.options.ground) {
       const F = this.mode === 'game' ? this.byId.get(focus)?.info : undefined;
       const onLot = (r: Rect) => !!F && r.x >= F.x && r.z >= F.z && r.x + r.w <= F.x + F.w && r.z + r.d <= F.z + F.d;
       const mine = (r: Rect) => chunkAt(r.x + r.w / 2, r.z + r.d / 2) === id && !onLot(r);
-      const road = this.staticParts().get(id)?.road;
-      if (road && !road.empty) ground.push({ name: 'streets', material: 'material.road', geo: road, toned: true });
-      const trail = this.staticParts().get(id)?.trail;
-      if (trail && !trail.empty) ground.push({ name: 'trails', material: 'material.path', geo: trail });
-      const marks = this.staticParts().get(id)?.marks;
-      if (marks && !marks.empty) ground.push({ name: 'roadMarks', material: 'paint', geo: marks, paint: true });
       for (const [name, all, material, y] of this.groundRects()) {
         const list = all.filter(mine);
         if (!list.length) continue;
+        layers.push([name, list, material, y]);
+        keys.push(`${name}:${list.length}:${hashNumbers(list.flatMap((r) => [r.x, r.z, r.w, r.d]))}`);
+      }
+    }
+    const ground = (): GroundLayer[] => {
+      const out: GroundLayer[] = [];
+      if (!this.options.ground) return out;
+      const road = this.staticParts().get(id)?.road;
+      if (road && !road.empty) out.push({ name: 'streets', material: 'material.road', geo: road, toned: true });
+      const trail = this.staticParts().get(id)?.trail;
+      if (trail && !trail.empty) out.push({ name: 'trails', material: 'material.path', geo: trail });
+      const marks = this.staticParts().get(id)?.marks;
+      if (marks && !marks.empty) out.push({ name: 'roadMarks', material: 'paint', geo: marks, paint: true });
+      const all = new Map(this.groundRects().map(([name, rects]) => [name, rects]));
+      for (const [name, list, material, y] of layers) {
         const geo = new Geo();
         const toned = name === 'paths';
-        if (toned) pavedRects(geo, list, all, y);
+        if (toned) pavedRects(geo, list, all.get(name)!, y);
         else for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
         // (On a land the town follows, laid over the ground: a path on its lot's pad, across the verge from it to
         // its road's height where it meets it, a field on its farm's pad.)
         if (this.groundAt) geo.drape(this.groundAt);
-        ground.push({ name, material, geo, toned });
-        keys.push(`${name}:${list.length}:${hashNumbers(list.flatMap((r) => [r.x, r.z, r.w, r.d]))}`);
+        out.push({ name, material, geo, toned });
       }
-    }
+      return out;
+    };
     // (On a land the town follows, the heights in it: `BuiltSurface.chunkSig`. Not how often they moved, which a
     // surface solved afresh for another town of the same land counts from nothing again.)
     const moved = this.levels ? `|h${this.levels.surface.chunkSig(id)}` : '';
@@ -1808,10 +1922,12 @@ export class TownStreet {
       shadows: new Geo(),
       lot: null,
       batches: new Map((Object.keys(FOLIAGE) as FoliageKind[]).map((k) => [FOLIAGE[k], []])),
-      ground: g.ground,
+      ground: g.ground(),
     };
     const st = this.staticParts().get(id);
     if (st) mergeParts(plan, st.parts);
+    const cars = this.carParts().get(id);
+    if (cars) mergeParts(plan, cars);
     for (const k of g.plots) {
       const p = this.plotOut(k);
       // (On a land the town follows, each lot's share on its pad; the viewed lot's own, `lot`, stays where the game
