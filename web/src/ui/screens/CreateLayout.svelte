@@ -150,7 +150,6 @@
       app.layout = { draft: made.draft, key, proposal: made.proposal, edited: false, plan: made.plan ?? made.proposal.plan, ...(made.marks ? { marks: made.marks } : {}) };
       // (A new proposal builds its town from the build's first seed: the code's own town.)
       app.buildSeed = 0;
-      cleared = false;
       name = app.townName ?? made.draft.name;
       focus = null;
       hover = null;
@@ -213,20 +212,11 @@
     });
   }
 
-  /** Clear all was pressed: the hint for the first street shows until a street is drawn. */
-  let cleared = $state(false);
-  let clearRoads = 0;
+  /** Clear all: bare land, the Street tool taken up (its hint says how the first street goes: `streetTool.ts` `FIRST_STREET`). */
   function clearEverything() {
     if (!editor.ready) return;
-    const before = editor.draft;
-    if (editor.apply(clearAll(before))) {
-      cleared = true;
-      clearRoads = editor.draft.roads.length;
-    }
+    if (editor.apply(clearAll(editor.draft)) && editor.toolId !== 'street') editor.take('street');
   }
-  $effect(() => {
-    if (cleared && plan && plan.roads.length > clearRoads) untrack(() => (cleared = false));
-  });
 
   function rollName() {
     name = worldName(content, specOf(code.kind, optionsOf(code)).names, Math.random);
@@ -429,8 +419,6 @@
     </div>
     {#if moving}
       <p class="hint" role="status">Click the land where the town should go. <kbd>Esc</kbd> leaves it where it is.</p>
-    {:else if cleared}
-      <p class="hint" role="status">Bare land: take the Street tool and draw the first street in from the edge of the world, then paint zones beside it.</p>
     {/if}
   </section>
 

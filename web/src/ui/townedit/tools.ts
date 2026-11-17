@@ -59,6 +59,8 @@ export interface TownEditor {
   preview(g: Partial<TownGhosts> | null): void;
   /** A line under the tools about what the tool would do where the pointer is (why it can't, say); null: none. */
   hint(text: string | null): void;
+  /** How many m a CSS px is on the land at a screen point (CSS pixels); none: the tool measures the ground itself. */
+  scale?(x: number, y: number): number;
   /** A brush's ring over the land (the zone brush's); null: none. */
   brush(cursor: LandCursor | null): void;
   /** Step 2's zones as `plan` has them drawn over the town (a stroke not yet taken); null: the plan's own again. */
