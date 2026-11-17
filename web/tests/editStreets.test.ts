@@ -13,7 +13,11 @@ import type { Content } from '../src/content/content';
 import type { RoadPlan } from '../src/core/protocol';
 import { drawStreet, madeKind, Meeting, removeRoad, rename, streetsBare, whatGoes } from '../src/game/edit/streets';
 import type { Edited } from '../src/game/edit/edited';
+import { checkedTown } from '../src/game/edit/checked';
+import { blankLand } from '../src/game/land';
+import { wetTile } from '../src/game/landEdit';
 import { rle, unrle } from '../src/game/landMasks';
+import { townProblems } from '../src/game/townCheck';
 import { lengths, nearest, pointAt, type Pt } from '../src/game/roads';
 import type { NeighbourhoodDraft, PlotSlot, Templates } from '../src/game/town';
 
@@ -286,6 +290,43 @@ describe('drawing a street', () => {
     expect(new Set(names).size).toBe(names.length);
     expect(bridge.name).toMatch(/Bridge$/);
     expect(oneNetwork(draft.roads)).toBe(true);
+  });
+
+  test('a pond too small for the water zones is bridged over water the checks see (the land’s)', () => {
+    // A 4 m pond south of the high street at x 120: on the land (two samples by two) and in the water's tiles made from
+    // it, but under the 4 samples a water zone needs (`landZones`), so in no zone, as on a generated land.
+    const before = town(30);
+    const land = blankLand(W, D, 'follow');
+    for (let j = 68; j <= 69; j++) for (let i = 60; i <= 61; i++) land.wl[j * land.cols + i] = 50;
+    const water = unrle(before.open!.water, W * D);
+    for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) if (wetTile(land, x, z)) water[z * W + x] = 1;
+    const ponded: NeighbourhoodDraft = { ...before, open: { ...before.open!, land, water: rle(water) } };
+    const { draft } = made(draw(ponded, [[120, MAIN_Z + 6], [120, FAR_Z - 6]]));
+    const decks = draft.roads.filter((r) => r.bridge);
+    expect(decks.length).toBe(2);
+    const deckLines = (town: NeighbourhoodDraft) => townProblems(checkedTown(town, t)).hard.filter((h) => /deck|water/.test(h));
+    expect(deckLines(draft)).toEqual([]);
+    // (Checked against the water zones alone, the pond's deck was over no water: what blocked the way on.)
+    expect(deckLines({ ...draft, open: { ...draft.open!, land: undefined } })).toEqual([`${decks.find((r) => r.points.every((q) => q[1] < 180))!.name}'s deck is over no water`]);
+  });
+
+  test('a line that only clips the water, missed by its bridge made straight, is refused', () => {
+    // One wet tile by the line drawn from the high street to the far lane (north of the river's reach of one bridge),
+    // tried round the line: where its bridge made straight would miss it (no deck), the street is refused, not drawn.
+    const before = town(30);
+    const said = new Map<string, number>();
+    for (let z = 135; z <= 142; z++) {
+      for (let x = 122; x <= 132; x++) {
+        const water = unrle(before.open!.water, W * D);
+        water[z * W + x] = 1;
+        const e = draw({ ...before, open: { ...before.open!, water: rle(water) } }, [[120, MAIN_Z + 6], [160, FAR_Z - 6]]);
+        const k = 'refused' in e ? e.refused : 'drawn';
+        said.set(k, (said.get(k) ?? 0) + 1);
+        if (!('refused' in e)) for (const r of e.draft.roads) if (r.bridge) expect(r.bridge[1]).toBeGreaterThan(r.bridge[0]);
+      }
+    }
+    expect(said.get('it only clips the edge of the water: draw it clear of the water, or on across it')).toBeGreaterThan(0);
+    expect(said.get('drawn')).toBeGreaterThan(0);
   });
 
   test('a 60 m crossing is refused', () => {
