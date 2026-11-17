@@ -15,7 +15,8 @@ import { assembleTown, generatedHouses, generateWorld, houseTemplate, loadTempla
 import { previewWorld } from './townPreview';
 import { landDraft, layOn } from './macro';
 import type { Pt } from './roads';
-import { layoutHash } from './uses';
+import { proposalOf } from './proposal';
+import { buildFromUses } from './build';
 import type { WorldStep } from './world';
 import { LazyWorker, Superseded, type WorkerAnswer, type WorkerAsk } from '../core/lazyWorker';
 import { mulberry32 } from './noise';
@@ -190,24 +191,28 @@ function laidOut(content: Content, t: Templates, laid: NeighbourhoodDraft, step?
 }
 
 /**
- * Step 2's proposed layout (`layout`). For now the town job's town, shown whole, and a proposal whose plan is that
- * town too (lots and all): the steps are as they were until the layout is made apart from the town.
+ * Step 2's proposed layout (`layout`): the town laid and settled as the `town` job lays it, its proposal
+ * (`proposal.ts` `proposalOf`: the town built and the layout step 2 starts from), and that layout's streets
+ * settled on the land as an edit is (`settleEdit`, giving nothing up): what step 2 shows, with no lots and so
+ * no houses (Build's job has the town's). Its `plan` is the layout, `marks` what in it is over a slope limit.
  */
 function proposed(content: Content, t: Templates, job: Extract<TownJob, { kind: 'layout' }>, step?: (done: WorldStep) => void): { proposal: Proposal } & LaidTown {
   const lay = { townSeed: job.seed, waterKept: job.waterKept, ...(job.site ? { site: job.site } : {}) };
   const town = laidOut(content, t, layOn(content, t, job.land, job.options, lay, job.name ?? job.land.name, step), step);
-  const proposal: Proposal = { plan: town.draft, built: town.draft, hash: layoutHash(town.draft), ...(town.plan ? { builtPlan: town.plan, builtMarks: town.marks } : {}) };
-  return { proposal, ...town };
+  const proposal = proposalOf(town, t);
+  const settled = settleEdit(proposal.plan, (d) => previewWorld(content, t, d, null));
+  const { draft, world: preview } = settled;
+  if (draft.open?.land && draft !== proposal.plan) preview.meta = { ...preview.meta, zones: draft.open.zones, land: encodeLand(draft.open.land) };
+  return { proposal, draft, preview, houses: [], plan: proposal.plan, marks: settled.marks };
 }
 
 /**
- * Step 3's town built from a layout (`build`). For now always the proposal's town as it is (what an untouched layout
- * builds), with its preview and houses.
+ * Step 3's town built from a layout (`build`: `build.ts` `buildFromUses`): the proposal's town as it is for an
+ * untouched layout and the proposal's seed, else built again from the layout's streets and uses; its preview,
+ * houses, plan and marks.
  */
 function built(content: Content, t: Templates, job: Extract<TownJob, { kind: 'build' }>): LaidTown {
-  const { built: draft, builtPlan, builtMarks } = job.proposal;
-  const houses = generatedHouses(t, draft.slots.map((s) => s.template));
-  return { draft, preview: previewWorld(content, t, draft, null), houses, ...(builtPlan ? { plan: builtPlan, marks: builtMarks ?? [] } : {}) };
+  return buildFromUses(job.proposal, job.plan, t, content, job.seed);
 }
 
 /** Step 2's edits settled (`EditedTown`): `settleEdit`, the settled land coded into the preview as `laidOut` codes it, the new houses, the checks. */
