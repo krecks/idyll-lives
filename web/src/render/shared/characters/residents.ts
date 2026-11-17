@@ -52,7 +52,7 @@ import { gameMinutesPerSecond, Pose } from '../../../core/snapshot';
 import { PACE } from '../doors';
 import { seatsItself } from '../../../game/surfaces';
 import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
-import { PLAYBACK_RATE, QUIET_SPEED } from '../gameSpeed';
+import { playbackRate } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
 import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GLIDE_SECONDS, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_SLACK, WALK_WAIT, biteOf, eatClip, SET_DOWN_SPOTS, spotOn, type StationSpot } from './actions';
@@ -87,7 +87,7 @@ import { WALL_HEIGHT } from '../walls';
 import { MOST_CADENCE, MOUNT_SECONDS, MOUNTS, type Mount, mountNodes } from './vehicles';
 import type { ResidentProp, ResidentView } from './view';
 
-export { PLAYBACK_RATE, QUIET_SPEED } from '../gameSpeed';
+export { PLAYBACK_RATE, SUPER_SPEED } from '../gameSpeed';
 
 /** The key suffix of a body's quilt draped over it curled up (`blankets`). */
 const CURL = ':curl';
@@ -1751,20 +1751,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const stalled = dt > STALL;
     if (dt > 0.1) dt = 0.1;
     if (dt < 0) dt = 0;
-    const speed = curr[layout.header.speed] | 0;
-    const quiet = layout.header.calm !== undefined && curr[layout.header.calm] > 0;
-    const gameSpeed = quiet ? Math.max(speed, QUIET_SPEED) : speed;
-    const playRate = PLAYBACK_RATE[gameSpeed] ?? 1;
-    // How far a walker can get from `prev` to `curr` (at the faster of their speeds, over the steps between them):
+    // (At super speed, the ticks its steps ran: as many as the machine had time for.)
+    const playRate = playbackRate(curr, layout.header);
+    // How far a walker can get from `prev` to `curr` (at the faster of their rates, over the steps between them):
     // `world::WALK_SPEED` a tick, times the fastest walkers' factors and some slack.
-    const prevSpeed = prev[layout.header.speed] | 0;
-    const prevGameSpeed = layout.header.calm !== undefined && prev[layout.header.calm] > 0 ? Math.max(prevSpeed, QUIET_SPEED) : prevSpeed;
-    const stride = (PACE / layout.ticksPerSecond) * WALK_FASTEST * WALK_SLACK * Math.max(playRate, PLAYBACK_RATE[prevGameSpeed] ?? 1) * frame.steps;
+    const stride = (PACE / layout.ticksPerSecond) * WALK_FASTEST * WALK_SLACK * Math.max(playRate, playbackRate(prev, layout.header)) * frame.steps;
     const reach = Math.max(SNAP_DISTANCE, stride);
     const animRate = this.debugRate ?? Math.min(playRate, 2.5);
     // Paused (the pause button, Buy and Build mode, menus): everyone freezes mid-motion, walk
     // cycles, breathing, blinks and glances included.
-    if (gameSpeed === 0 && this.debugRate === null) dt = 0;
+    if (playRate === 0 && this.debugRate === null) dt = 0;
     this.clock += dt;
     const time = this.clock;
     const frameDt = dt;

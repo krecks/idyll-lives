@@ -15,7 +15,8 @@ pub enum Command {
     SetSpeed {
         speed: u8,
     },
-    /// "Skip quiet hours": speed up while the player's household sleeps or is at work.
+    /// Super speed by itself: the game goes to super speed as the player's household falls
+    /// quiet (all asleep or out, `World::calm`).
     SetAutoFast {
         enabled: bool,
     },

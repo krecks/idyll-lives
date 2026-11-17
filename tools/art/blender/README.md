@@ -422,7 +422,7 @@ never one that's already running) and drive Playwright headless with full Chrome
   - Frame it: `__controls.follow(0, {radius: 6, beta: 0.9, y: 1.4})` follows the resident from that
     distance, angle and height; `__camera({alpha, beta, radius, target: [x, y, z]})` puts the camera
     anywhere (`__camera()` reads it). Either stops the camera watching on its own.
-  - `{type: 'setSpeed', speed: 0..5}` pauses or speeds up time.
+  - `{type: 'setSpeed', speed: 0..4}` pauses or speeds up time.
   - Click the object to see its pie menu.
   - `Escape` closes a menu, but opens the pause menu when none is open.
 - **Renderers.** Add `&renderer=webgl` to check WebGL2 as well as WebGPU.

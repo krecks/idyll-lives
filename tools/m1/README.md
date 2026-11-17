@@ -1,14 +1,15 @@
 # The M1 estimate
 
 The game's floor is an 8 GB Apple M1 (2020). This estimates how fast the simulation runs on one,
-from a faster Mac (an M3 Pro), and whether it keeps up with the fastest speed: 60 ticks a step,
-60 steps a second, so 3,600 ticks a second.
+from a faster Mac (an M3 Pro), and whether it keeps up with 10×, the fastest speed the player
+picks at any hour: 10 ticks a step, 60 steps a second, so 600 ticks a second. (Super speed, in
+quiet hours only, runs as fast as the machine can.)
 
     tools/m1/run.sh
 
 It runs the three city worlds (seaside, river, forest at `town=city,villages=many`) at each fill
 tier (`web/src/game/people.ts` `FillTier`), each over a game day with the camera's 320-tile square
-at full detail at speed 5, as the game runs (`crates/sim-core/tests/big_world.rs` WATCH,
+at full detail at 10×, as the game runs (`crates/sim-core/tests/big_world.rs` WATCH,
 `tools/bench/simtick.mjs --watch`):
 
 - **natively** on this machine (`tools/bench/tiers.sh`);
@@ -21,8 +22,8 @@ of three, in both containers. Their ratio should come out near 0.72, the M1's si
 against the M3 Pro's.
 
 The report (`bench-results/m1/<time>/report.md`) scales this machine's numbers by 0.72, with a band
-of 0.62 (a fanless Air under a sustained load) to 0.78, and sets the wasm estimate against 3,600
-and against 4,250, the floor a graphics preset's tier must clear on its slowest intended machine.
+of 0.62 (a fanless Air under a sustained load) to 0.78, and sets the wasm estimate against 600,
+which is also the floor a graphics preset's tier must clear on its slowest intended machine.
 
 `SKIP="native wasm container"` (any of them) reuses the last run's numbers for those parts;
 `HOURS`, `ROUNDS`, `PARALLEL`, `TIERS`, `WORLDS_AT` and `WATCH` are `tools/bench/tiers.sh`'s.

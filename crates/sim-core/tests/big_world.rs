@@ -18,12 +18,12 @@
 //! the `WORLD`th in it (default 0), as it was made (`SIZE` and `RESIDENTS` don't apply), the view on
 //! the player's home.
 //!
-//! `WATCH=320` (or any side in tiles) runs it as the game does at its fastest instead: the camera's
-//! square of that side round the player's home is the full-detail area and what's drawn
-//! (`set_view` and `set_watch`, as the worker's `set_watch` sets both), the speed is 5, and each
-//! real-time step is `World::advance` and a snapshot written (`sim_core::snapshot::write`). It
-//! reports ticks a second, the 99th percentile of a step (60 ticks), the slowest game hour and how
-//! many residents are at full detail. (Its save hash is not the lot view's: the full-detail area
+//! `WATCH=320` (or any side in tiles) runs it as the game does at 10× (speed 3, the fastest the
+//! player picks at any hour) instead: the camera's square of that side round the player's home is
+//! the full-detail area and what's drawn (`set_view` and `set_watch`, as the worker's `set_watch`
+//! sets both), and each real-time step is `World::advance` and a snapshot written
+//! (`sim_core::snapshot::write`). It reports ticks a second, the 99th percentile of a step (10
+//! ticks), the slowest game hour and how many residents are at full detail. (Its save hash is not the lot view's: the full-detail area
 //! changes what happens.)
 //!
 //! Both say the slowest game hour (its ticks a second), and print `bench:` lines a script reads
@@ -172,9 +172,9 @@ fn big_world_benchmark() {
         Some(rect) => {
             w.set_view(Some(rect));
             w.set_watch(Some(rect));
-            w.apply(sim_core::Command::SetSpeed { speed: 5 })
-                .expect("the fastest speed");
-            eprintln!("watch {rect:?} at speed 5, a step and a snapshot at a time");
+            w.apply(sim_core::Command::SetSpeed { speed: 3 })
+                .expect("10×");
+            eprintln!("watch {rect:?} at speed 3 (10×), a step and a snapshot at a time");
         }
         None => w.set_view(Some(view)),
     }
@@ -273,7 +273,7 @@ fn big_world_benchmark() {
         ms(max),
     );
     // The slowest game hour, at its own rate (a hitch spreads over its hour; the rush hours are
-    // what the fastest speed must keep up with).
+    // what 10× must keep up with).
     let (worst_hour, worst) = hourly
         .iter()
         .copied()
@@ -294,7 +294,7 @@ fn big_world_benchmark() {
         eprintln!(
             "{} steps of {} ticks: p99 {:.2} ms, max {:.2} ms (a step's budget at 60 a second: 16.7 ms); full detail {:.0} residents on average, {detail_most} at most",
             steps.len(),
-            sim_core::clock::TICKS_PER_STEP[5],
+            sim_core::clock::TICKS_PER_STEP[3],
             ms(steps[at]),
             ms(*steps.last().unwrap()),
             detail_sum as f64 / detail_n.max(1) as f64,

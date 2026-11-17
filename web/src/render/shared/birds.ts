@@ -198,9 +198,9 @@ export const BIRD_MODELS: readonly string[] = SPECIES.map((sp) => `model.bird.${
 
 /**
  * How much faster the birds' clock runs at each game speed (`PLAYBACK_RATE`'s index): they keep to the
- * game (still while it's paused) but don't go frantic in a time-lapse.
+ * game (still while it's paused) but don't go frantic at super speed.
  */
-const RATE = [0, 1, 1.25, 1.5, 1.75, 1.75];
+const RATE = [0, 1, 1.25, 1.5, 1.75];
 /** Longest step of the birds' clock in a frame (s). */
 const MAX_STEP = 0.1;
 /** Clearance kept over roofs and walls in flight (m), and round them (m). */

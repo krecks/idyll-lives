@@ -89,7 +89,7 @@ import { LandHaze } from './landHaze';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
 import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
-import { PLAYBACK_RATE } from '../shared/gameSpeed';
+import { playbackRate } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
 import { pavedRects } from '../shared/paving';
 import { GrassPush } from '../shared/grass';
@@ -254,10 +254,9 @@ const SIM_VIEW_MARGIN = 2;
 /** How far round the watch rectangle the sim keeps residents in full detail (m: sim-core `lod::VIEW_MARGIN`; `reportWatch`). */
 const DETAIL_MARGIN = 5;
 /**
- * At the fastest speeds (`setDetailTight`), the sim's full-detail area is the streamed chunks within
- * this many chunks of the one the camera looks at, not all of them: a resident out of it takes a
- * turn every game minute, which at speed 4 or 5 is every step or two anyway, and the town ticks
- * fast enough to keep up.
+ * At super speed (`setDetailTight`), the sim's full-detail area is the streamed chunks within this
+ * many chunks of the one the camera looks at, not all of them: a resident out of it takes a turn
+ * every game minute, which at super speed is every step or two anyway, and the town ticks faster.
  */
 const TIGHT_CHUNKS = 1;
 /** Residents further than this (m) from the camera's target, off the viewed lot, have no contact shadow. */
@@ -1639,7 +1638,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       x1 = Math.max(x1, (cx + 1) * CHUNK);
       z1 = Math.max(z1, (cz + 1) * CHUNK);
     }
-    // (At the fastest speeds, only the chunks round the camera's: `TIGHT_CHUNKS`.)
+    // (At super speed, only the chunks round the camera's: `TIGHT_CHUNKS`.)
     const [cx, cz] = [Math.floor(this.orbit.target.x / CHUNK), Math.floor(this.orbit.target.z / CHUNK)];
     this.detailChunk = `${cx},${cz}`;
     if (this.detailTight) {
@@ -2689,7 +2688,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * bathroom someone's in), and swings back once they're through. It opens at the hand: the leaf starts when the walker's hand
    * could be on its handle (`doorLead`: a hand's reach, or as far ahead as the swing needs at this
    * game speed, so it's open by the time they are), and the resident's arm goes out with it
-   * (`doorHand`, `residents.ts`). `rate`: how fast the game runs (`PLAYBACK_RATE`).
+   * (`doorHand`, `residents.ts`). `rate`: how fast the game runs (`playbackRate`).
    */
   private swingDoors(rate: number): void {
     const hand = this.doorHand;
@@ -2755,8 +2754,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.townMode) return;
     const h = layout.header;
     this.gamePaused = (curr[h.speed] | 0) === 0;
-    // At speed 3 and up, and in quiet hours, the preset's step (Low's ten minutes: each update re-colours the sun, sky and lamps).
-    const fast = curr[h.speed] >= 3 || (h.calm !== undefined && curr[h.calm] > 0);
+    // At 10× and super speed, the preset's step (Low's ten minutes: each update re-colours the sun, sky and lamps).
+    const fast = curr[h.speed] >= 3;
     const step = fast ? Math.max(LIGHT_STEP, this.quality.lightingStep) : LIGHT_STEP;
     const due = this.lastLightMinute < 0 || frame.now - this.lastLightAt >= LIGHT_MIN_MS;
     if (due && Math.abs(minute - this.lastLightMinute) >= step) {
@@ -2767,7 +2766,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // Who is where: doors open for those going through, neighbours' windows glow while someone is up.
     this.findDarkRooms(frame);
     this.lamps.frame(this.frameDt / 1000, this.darkRooms, this.awakeRooms, this.orbit.target.x, this.orbit.target.z); // (lamps and glows fading, which cast shadows, `lamps.ts`.)
-    this.swingDoors(PLAYBACK_RATE[curr[h.speed] | 0] ?? 1);
+    this.swingDoors(playbackRate(curr, h));
     this.steerCamera(this.frameDt / 1000);
     this.settleTarget(this.frameDt / 1000);
     this.keepCameraClear();
