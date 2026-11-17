@@ -53,8 +53,8 @@ const EXTENSIONS: [&str; 7] = [
     "KHR_materials_ior",
     "KHR_materials_specular",
 ];
-/// Largest texture side (px).
-const TEXTURE_MAX: u32 = 1024;
+/// Largest side (px) of a texture of a model's own by the model's largest side (m): (up to, most).
+const TEXTURE_MAX: [(f64, u32); 2] = [(2.5, 512), (f64::INFINITY, 1024)];
 /// The wall's face lies this far into a footprint's back tile (m): a wall-standing thing's back is there.
 const WALL: f64 = 0.07;
 /// A house's floor is drawn 1 cm up: a flat part on the floor must reach this high (m) to show over it.
@@ -3768,6 +3768,7 @@ fn check_file(
         .find(|(up, _, _)| side.f() <= *up)
         .map(|(_, t, m)| (*t, *m))
         .ok_or("StopIteration")?;
+    let texture_most = texture_most(side.f());
     if tris > most {
         errors.push(format!(
             "{tris} triangles, at most {most} for a model {} m across (aim for {target})",
@@ -3819,10 +3820,11 @@ fn check_file(
             None => None,
         };
         if let Some((w, h)) = wh
-            && w.max(h) > TEXTURE_MAX
+            && w.max(h) > texture_most
         {
             errors.push(format!(
-                "texture {i} is {w}x{h}, at most {TEXTURE_MAX} px a side"
+                "texture {i} is {w}x{h}, at most {texture_most} px a side for a model {} m across",
+                fixed(side.f(), 2)
             ));
         }
         let label = img
@@ -3849,6 +3851,14 @@ fn check_file(
         moving: moved_nodes(gltf)?.len(),
     };
     Ok((errors, warnings, info))
+}
+
+/// The largest side (px) of a texture of its own for a model `side` m across (`TEXTURE_MAX`).
+fn texture_most(side: f64) -> u32 {
+    TEXTURE_MAX
+        .iter()
+        .find(|(up, _)| side <= *up)
+        .map_or(TEXTURE_MAX[1].1, |(_, most)| *most)
 }
 
 /// What the gate found: its text, the keys it checked (in order), the model file of each, and whether
@@ -5146,6 +5156,14 @@ mod tests {
                 "`habitat` 'Tree' is none of tree, conifer, bush, hedge",
                 "`habitat` without `perches`: it says what the perches are on",
             ]
+        );
+    }
+
+    #[test]
+    fn a_texture_of_its_own_is_512_px_or_1024_over_2_5_m() {
+        assert_eq!(
+            [0.3, 2.5, 2.51, 10.0].map(texture_most),
+            [512, 512, 1024, 1024]
         );
     }
 }
