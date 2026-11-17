@@ -317,7 +317,12 @@ fn rust_crates(root: &Path) -> Result<Vec<Package>, String> {
     }
     let mut stack: Vec<String> = packages
         .iter()
-        .filter(|p| matches!(p["name"].as_str(), Some("sim-wasm" | "sound-wasm" | "voice-wasm")))
+        .filter(|p| {
+            matches!(
+                p["name"].as_str(),
+                Some("sim-wasm" | "sound-wasm" | "voice-wasm")
+            )
+        })
         .filter_map(|p| p["id"].as_str().map(str::to_string))
         .collect();
     if stack.len() != 3 {
