@@ -1075,13 +1075,14 @@ async function editSession(page, renderer, shootAs, setStep, step, parts) {
     await built('a zone stroke');
 
     // 2. Zones far from any street: hatched (nothing is built there until a street reaches them).
+    // (Homes, not parks: a green with no street near becomes an outdoor spot, and is not hatched.)
     await beside(false);
-    await chip('green');
+    await chip('homes');
     const open = await bench(() => window.__bench.zoneStroke('far'));
     if (open) {
       await stroke(open.screens);
       const z = await zones();
-      if (!z.hatched) fault(`${renderer} layout zones: parks painted out in the open, none hatched`);
+      if (!z.hatched) fault(`${renderer} layout zones: homes painted out in the open, none hatched`);
       console.log(`create: ${renderer} layout zones: ${z.hatched} cells hatched, too far from a street`);
       await page.mouse.move(open.screens[0].x + 200, open.screens[0].y + 100, { steps: 3 });
       await shots('zones-hatch');

@@ -83,6 +83,9 @@ function longCountryCourt(line: string, draft: NeighbourhoodDraft): boolean {
   return !road || road.kind === 'country';
 }
 
+/** The checks of a town's lots, which step 2's layout (no lots yet) can't keep. */
+const LAYOUT_LATER: readonly RegExp[] = [/^hamlet .* has \d+ lots$/];
+
 /** The checks of how the generator fills a town, which an edited town needn't keep (see the top of this file). */
 const GENERATED_ONLY: readonly RegExp[] = [/ has \d+ backdrop buildings \(\d+ or more\)$/, /^the centre's open land is /, /^the main town has no centre$/];
 
@@ -143,7 +146,7 @@ export function townIssues(plan: NeighbourhoodDraft, t: Templates, content: Cont
   const careers = content.careerCategories.map((c) => c.id);
   const size = draft.world?.options?.town;
   // (Only the main town's careers are expected, in a town or a city; nothing about how filled it is.)
-  const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, mainLeast: 0, careers: size === 'town' || size === 'city', exits: null };
+  const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, mainLeast: 0, careers: !layout && (size === 'town' || size === 'city'), exits: null };
   const found = townProblems(checkedTown(draft, t), expect, { river: false, careers, generated: false });
   const homes = draft.slots.filter((s) => s.kind === 'house').length;
   const lines = [...found.hard];
@@ -156,7 +159,8 @@ export function townIssues(plan: NeighbourhoodDraft, t: Templates, content: Cont
     if ((BLOCKING.some((p) => p.test(line)) || longCountryCourt(line, draft)) && !had.has(issue.text)) out.blocking.push(issue);
     else out.warnings.push(issue);
   }
-  for (const line of found.soft) out.warnings.push(issueOf(line, draft, t));
+  // (A layout's villages have no lots yet: their zones are built at Build.)
+  for (const line of found.soft) if (!(layout && LAYOUT_LATER.some((p) => p.test(line)))) out.warnings.push(issueOf(line, draft, t));
   out.warnings.push(...countryDeadEnds(draft));
   return out;
 }
