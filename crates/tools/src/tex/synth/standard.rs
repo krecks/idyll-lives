@@ -30,154 +30,29 @@ const KNOWN: &[(&str, &str, &str)] = &[
         "mean 0.57: shingles, asphalt (mineral granules) or weathered wood, are 0.7 and up",
     ),
     (
-        "metal",
-        "material.floor.carpet",
-        "15 % of texels over 5 % metal (up to 22 %): the arm JPEG's 4:2:0 chroma leaks into blue, read as metal where the manifest leaves `metallic` at 1",
-    ),
-    (
-        "metal",
-        "material.furrow",
-        "16 % over 5 % metal (up to 18 %): the arm JPEG's 4:2:0 chroma leaks into blue, read as metal where the manifest leaves `metallic` at 1",
-    ),
-    (
-        "metal",
-        "material.ground",
-        "5 % over 5 % metal (up to 12 %): the arm JPEG's 4:2:0 chroma leaks into blue, read as metal where the manifest leaves `metallic` at 1",
-    ),
-    (
-        "metal",
-        "material.roof",
-        "3.4 % over 5 % metal (up to 16 %): the arm JPEG's 4:2:0 chroma leaks into blue, read as metal where the manifest leaves `metallic` at 1",
-    ),
-    (
-        "metal",
-        "material.soil",
-        "16 % over 5 % metal (up to 18 %): the arm JPEG's 4:2:0 chroma leaks into blue, read as metal where the manifest leaves `metallic` at 1",
-    ),
-    (
-        "metal",
-        "material.wall.siding",
-        "1.0 % over 5 % metal (up to 10 %): the arm JPEG's 4:2:0 chroma leaks into blue, read as metal where the manifest leaves `metallic` at 1",
-    ),
-    (
-        "metal",
+        "normal steep",
         "material.wall.stone",
-        "0.7 % over 5 % metal (up to 11 %): the arm JPEG's 4:2:0 chroma leaks into blue, read as metal where the manifest leaves `metallic` at 1",
-    ),
-    (
-        "normal unit",
-        "bark",
-        "84 % of texels within 10 %: the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal unit",
-        "carpet",
-        "58 %: the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal unit",
-        "foliage",
-        "60 %: the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal unit",
-        "grass",
-        "76 %: the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal unit",
-        "grass_lush",
-        "52 %: the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal unit",
-        "road_asphalt",
-        "74 %: the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal unit",
-        "roof_shingles",
-        "91 %: the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal unit",
-        "stone_foundation",
-        "87 %: the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal unit",
-        "wallpaper",
-        "84 %: the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal level",
-        "carpet",
-        "mean slope (-0.035, -0.039): the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal level",
-        "foliage",
-        "(-0.048, -0.057): the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal level",
-        "grass_lush",
-        "(-0.055, -0.062): the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal level",
-        "roof_shingles",
-        "(-0.013, -0.021): the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal level",
-        "siding_wood",
-        "(-0.033, -0.113), the wall lit as if tilted 6°: the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
-    ),
-    (
-        "normal level",
-        "stone_foundation",
-        "(-0.015, -0.035): the JPEG (q88, 4:2:0 chroma) bends fine relief: the generated normals are unit length and level",
+        "18 % of texels over 45°: the deep joints between thin stones",
     ),
     (
         "normal steep",
-        "material.wall.stone",
-        "17 % of texels over 45°: the deep joints between thin stones",
-    ),
-    (
-        "normal flat",
-        "material.finish.wood",
-        "steepest 1 % at 1.3°: the oak's relief is under its storage's rounding",
-    ),
-    (
-        "normal flat",
-        "material.finish.lacquer",
-        "steepest 1 % at 1.3°: the wood's maps under a clear coat",
+        "material.finish.foliage",
+        "18 % of texels over 45°: the leaves' edges as generated",
     ),
     (
         "normal flat",
         "material.trim",
-        "steepest 1 % at 1.2° at strength 0.6: the painted wood's relief is under its storage's rounding",
-    ),
-    (
-        "ao open",
-        "grass_lush",
-        "most open 1 % at 0.89: the lawn's own shade",
+        "steepest 1 % at 1.49° at strength 0.6: the painted wood's relief is at its storage's rounding",
     ),
     (
         "ao open",
         "road_asphalt",
-        "most open 1 % at 0.77 (`ao_base` 0.8)",
-    ),
-    (
-        "ao open",
-        "roof_shingles",
-        "most open 1 % at 0.86 (`ao_base` 0.845)",
+        "most open 1 % at 0.84 (`ao_base` 0.8)",
     ),
     (
         "ao open",
         "sidewalk",
-        "most open 1 % at 0.84 (`ao_base` 0.82)",
+        "most open 1 % at 0.85 (`ao_base` 0.82)",
     ),
     (
         "density",

@@ -10,7 +10,8 @@
     "normal": "normal.jpg",
     "arm": "arm.jpg",
     "uvScale": 0.5,
-    "normalStrength": 0.7
+    "normalStrength": 0.7,
+    "metallic": 0
   },
   "material.floor": {
     "type": "material",
@@ -18,7 +19,8 @@
     "texture": "textures/floor_laminate/albedo.jpg",
     "normal": "normal.jpg",
     "arm": "arm.jpg",
-    "uvScale": 0.55
+    "uvScale": 0.55,
+    "metallic": 0
   },
   "material.ground": {
     "type": "material",
@@ -29,6 +31,7 @@
     "uvScale": 0.5,
     "normalStrength": 0.8,
     "projection": "xz",
+    "metallic": 0,
     "sideColor": "#C9B391"
   },
   "material.road": {
@@ -38,7 +41,8 @@
     "normal": "normal.jpg",
     "arm": "arm.jpg",
     "uvScale": 0.2,
-    "projection": "xz"
+    "projection": "xz",
+    "metallic": 0
   },
   "material.path": {
     "type": "material",
@@ -47,7 +51,8 @@
     "normal": "normal.jpg",
     "arm": "arm.jpg",
     "uvScale": 0.7,
-    "projection": "xz"
+    "projection": "xz",
+    "metallic": 0
   },
   "material.soil": {
     "type": "material",
@@ -57,7 +62,8 @@
     "arm": "arm.jpg",
     "uvScale": 0.5,
     "projection": "xz",
-    "roughness": 1
+    "roughness": 1,
+    "metallic": 0
   },
   "material.furrow": {
     "type": "material",
@@ -67,7 +73,8 @@
     "arm": "arm.jpg",
     "uvScale": 0.5,
     "projection": "xz",
-    "roughness": 1
+    "roughness": 1,
+    "metallic": 0
   },
   "material.finish.matte": {
     "type": "material",
@@ -231,6 +238,7 @@
     "arm": "arm.jpg",
     "uvScale": 0.4,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 1
   },
   "material.wall.brick": {
@@ -241,6 +249,7 @@
     "arm": "arm.jpg",
     "uvScale": 1.0,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 1
   },
   "material.roof": {
@@ -251,6 +260,7 @@
     "arm": "arm.jpg",
     "uvScale": 0.667,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 1
   },
   "material.wall.stone": {
@@ -261,6 +271,7 @@
     "arm": "arm.jpg",
     "uvScale": 0.667,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 1
   },
   "material.floor.wood": {
@@ -271,6 +282,7 @@
     "arm": "arm.jpg",
     "uvScale": 0.53,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 0.8
   },
   "material.floor.tile": {
@@ -281,6 +293,7 @@
     "arm": "arm.jpg",
     "uvScale": 0.5,
     "roughness": 0.7,
+    "metallic": 0,
     "normalStrength": 1
   },
   "material.floor.carpet": {
@@ -291,6 +304,7 @@
     "arm": "arm.jpg",
     "uvScale": 1.0,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 0.8
   },
   "material.wall.interior": {
@@ -301,6 +315,7 @@
     "arm": "arm.jpg",
     "uvScale": 0.5,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 0.5
   },
   "material.trim": {
@@ -311,6 +326,7 @@
     "arm": "arm.jpg",
     "uvScale": 1.0,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 0.6
   },
   "material.finish.hair": {
