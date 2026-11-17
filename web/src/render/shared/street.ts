@@ -1701,15 +1701,20 @@ export class TownStreet {
   private readonly far = new Map<number, { key: string; geo: Geo }>();
 
   /**
-   * Every lot's house the far LOD draws (`farChunk`'s, the focus lot's left out), with the chunk it is planned in:
-   * the town view draws them all at once (`pc/townView.ts`), those of the chunks not streamed in.
+   * Every lot's house the far LOD draws (`farChunk`'s, the focus lot's left out), with the chunk it is planned in and
+   * its pad: the town view draws them all at once (`pc/townView.ts`), those of the chunks not streamed in.
    */
-  townHouses(focus: number): { chunk: number; plot: PlotInfo }[] {
-    const out: { chunk: number; plot: PlotInfo }[] = [];
+  townHouses(focus: number): { chunk: number; plot: PlotInfo; pad: number }[] {
+    const out: { chunk: number; plot: PlotInfo; pad: number }[] = [];
     for (const [chunk, list] of this.plotsByChunk()) {
-      for (const L of list) if (L.info.house && L.info.id !== focus && (L.base === 'house' || L.base === 'shop')) out.push({ chunk, plot: L.info });
+      for (const L of list) if (L.info.house && L.info.id !== focus && (L.base === 'house' || L.base === 'shop')) out.push({ chunk, plot: L.info, pad: this.padOf(L) });
     }
     return out;
+  }
+
+  /** How many times the land under the town has moved its roads or pads (`BuiltSurface.moves`; 0 on flat land). */
+  get surfaceMoves(): number {
+    return this.levels?.surface.moves ?? 0;
   }
 
   /** What chunk `id` is planned from with lot `focus` in view (`ChunkPlan.key`), without planning it. */

@@ -676,15 +676,17 @@ export class Street {
 
   /**
    * The lots' houses the far LOD draws, each with the chunk it is in and how it looks (the town view's,
-   * `townView.ts` `lotBuilding`); the focus lot's left out. Made again only when the town or the focus changes.
+   * `townView.ts` `lotBuilding`), each on its pad; the focus lot's left out. Made again only when the town, the focus
+   * or the land under them (its pads) changes.
    */
   townHouses(): readonly TownLotHouse[] {
     const town = this.town;
     if (!town) return [];
-    const key = `${this.layoutKey}|${this.focus}`;
+    // (The land shaped under the town moves its pads: `surfaceMoves`.)
+    const key = `${this.layoutKey}|${this.focus}|${town.surfaceMoves}`;
     if (this.townHousesOf?.key !== key) {
       const planner = this.house.planner;
-      const list = town.townHouses(this.focus).map(({ chunk, plot }): TownLotHouse => ({ id: plot.id, chunk, storeys: plot.storeys ?? 1, ...planner.farLook({ x: plot.x, z: plot.z, house: plot.house!, roof: plot.roof, storeys: plot.storeys }) }));
+      const list = town.townHouses(this.focus).map(({ chunk, plot, pad }): TownLotHouse => ({ id: plot.id, chunk, storeys: plot.storeys ?? 1, pad, ...planner.farLook({ x: plot.x, z: plot.z, house: plot.house!, roof: plot.roof, storeys: plot.storeys }) }));
       this.townHousesOf = { key, list };
     }
     return this.townHousesOf.list;

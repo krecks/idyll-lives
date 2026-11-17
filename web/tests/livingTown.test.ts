@@ -51,9 +51,22 @@ describe("the town view's buildings", () => {
   });
 
   test("a far lot's house keeps its own look and box", () => {
-    const t = lotBuilding({ id: 3, chunk: 0, box: [10, 20, 18, 30], storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip', rise: 2.4 }, flat);
+    const t = lotBuilding({ id: 3, chunk: 0, box: [10, 20, 18, 30], storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip', rise: 2.4, pad: 0 }, flat);
     expect([t.cx, t.cz, t.w, t.d, t.top, t.rise, t.roof]).toEqual([14, 25, 10, 8, 6, 2.4, 'hip']);
     expect(t.uz).toBe(1);
+  });
+
+  test("a far lot's house on a hill stands on its pad, its walls from under its lowest corner", () => {
+    // (The land rising 0.5 m a metre in x: its corners from 5 to 9 m; the pad at 7.2 m.)
+    const slope = (x: number) => x * 0.5;
+    const t = lotBuilding({ id: 3, chunk: 0, box: [10, 20, 18, 30], storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip', rise: 2.4, pad: 7.2 }, slope);
+    expect(t.floor).toBe(7.2);
+    expect(t.top).toBeCloseTo(13.2, 6);
+    expect(t.base).toBeCloseTo(5 - 0.4, 6);
+    // A pad under the lowest corner (cut into the hill): the walls from under the pad.
+    const cut = lotBuilding({ id: 3, chunk: 0, box: [10, 20, 18, 30], storeys: 1, wall: '#ECE6D8', roof: '#5C626A', shape: 'gable', rise: 2, pad: 4 }, slope);
+    expect([cut.floor, cut.top]).toEqual([4, 7]);
+    expect(cut.base).toBeCloseTo(4 - 0.4, 6);
   });
 
   test('lights go by the life there: a shop’s while it is open, a home’s by the hour, a lot’s house’s while someone is up', () => {
@@ -90,7 +103,7 @@ describe("the town view's buildings", () => {
     const hall = backdropBuilding({ ...shop, use: 'hall', place: undefined }, 2, flat);
     expect(litAt(hall, 2 * 60, 0)).toBe(hall.lit);
     // A lot's house far off: lit only while someone is up in it.
-    const lot = { id: 3, chunk: 0, box: [10, 20, 18, 30] as const, storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip' as const, rise: 2.4 };
+    const lot = { id: 3, chunk: 0, box: [10, 20, 18, 30] as const, storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip' as const, rise: 2.4, pad: 0 };
     expect(lotBuilding(lot, flat, true).lit).toBeGreaterThan(0.3);
     expect(lotBuilding(lot, flat, false).lit).toBe(0);
   });

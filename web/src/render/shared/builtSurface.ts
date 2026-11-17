@@ -305,6 +305,12 @@ export class BuiltSurface {
     return { s: p.s, y: p.y };
   }
 
+  /** How many updates have moved a road or a pad (`update`): what a list of every lot's pad is kept by. */
+  get moves(): number {
+    return this.moved;
+  }
+  private moved = 0;
+
   /** How many times the roads or the pads in street chunk `chunk` (`chunks.ts` `chunkId`) have moved (`update`): a part of its key. */
   version(chunk: number): number {
     return this.versions.get(chunk) ?? 0;
@@ -404,6 +410,7 @@ export class BuiltSurface {
       for (const c of chunksIn(p.x, p.z, p.x + p.w, p.z + p.d)) bumped.add(c);
     });
     for (const c of bumped) this.versions.set(c, this.version(c) + 1);
+    if (roads.length || plots.length) this.moved++;
     let rect: LandRect | null = null;
     for (let k = 0; k < oldLand.length; k++) {
       if (Math.abs(oldLand[k] - this.conformed[k]) <= MOVED) continue;
