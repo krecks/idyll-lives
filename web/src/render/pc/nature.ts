@@ -1451,7 +1451,7 @@ function rewriteTileLevel(mesh: pc.Mesh, g: TileGrid, segs: number, heights: Flo
  * room enough), else a mesh made for it with room to spare (a power of two), kept on the CPU: a brush's stamps over a
  * pond write into the one mesh.
  */
-function pondMeshOf(device: pc.GraphicsDevice, quads: { positions: Float32Array; indices: Uint32Array }, into: pc.Mesh | null): pc.Mesh {
+function pondMeshOf(device: pc.GraphicsDevice, quads: { positions: Float32Array; normals: Float32Array; indices: Uint32Array }, into: pc.Mesh | null): pc.Mesh {
   const verts = quads.positions.length / 3;
   const count = quads.indices.length;
   const vb = into?.vertexBuffer;
@@ -1475,9 +1475,9 @@ function pondMeshOf(device: pc.GraphicsDevice, quads: { positions: Float32Array;
     f[k * 6] = quads.positions[k * 3];
     f[k * 6 + 1] = quads.positions[k * 3 + 1];
     f[k * 6 + 2] = quads.positions[k * 3 + 2];
-    f[k * 6 + 3] = 0;
-    f[k * 6 + 4] = 1;
-    f[k * 6 + 5] = 0;
+    f[k * 6 + 3] = quads.normals[k * 3];
+    f[k * 6 + 4] = quads.normals[k * 3 + 1];
+    f[k * 6 + 5] = quads.normals[k * 3 + 2];
   }
   new Uint32Array(i.storage as ArrayBuffer).set(quads.indices);
   v.unlock(0, verts * 24);
