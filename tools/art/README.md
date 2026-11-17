@@ -57,7 +57,7 @@ its count gets its findings as warnings; more, or any in a model the file doesn'
 new models are strict from the start. Fewer fail as stale until `cargo check-glb --update-baseline` lowers the
 entry: it only lowers counts and takes keys out, never raises or adds, so the file only shrinks. A check with no
 section is strict for every model. An entry that `accept`s a counted check takes its findings instead, and the
-file may keep none for it.
+file may keep none for it. `reference` is `cargo review sizes --check`'s, by object id (its own `--update-baseline`).
 
 **Warnings** are what only an eye can judge, and the budgets' aims: a loop that ends turned (a fan a quarter round)
 or moved at an even speed (a belt's slats: right if it looks the same), a part turning over 12° in 1/60 s, a use's

@@ -217,6 +217,36 @@ limbs (`limb_points`), the conifers' aims at each whorl's foot.)
 
 The shrubs and hedges in `plants.py` have 4–6 each, found the same way (`perches` there).
 
+## Species review
+
+`cargo review sizes` measures each tree against its species in `docs/review/reference.json` (`crates/tools/src/species.rs`:
+height, crown width and ratio, clear trunk, bark luminance, blossom and fruit hue, leaf-card tile class); what is off
+is held in `tools/art/gate-baseline.json` (`reference`) until a rebuild fixes it. Leaf size on screen, the bark's
+pattern and the habit's likeness are judged by eye against the kind's sources, one dated line per species:
+
+- `model.tree` (Quercus robur), 2026-11-17, from the 2026-11-02 previews (before the leaf cards): an upright oval
+  crown on a long clear trunk; an English oak's is broad and spreading on a short trunk with heavy low limbs. Not like.
+- `model.tree.maple` (Acer platanoides), 2026-11-17, same previews: a dense round dome on a straight trunk, like;
+  the trunk clear for half the height.
+- `model.tree.birch` (Betula pendula), 2026-11-17, same previews: white stem dark at the base, like; the crown small
+  and high, without the hanging twigs.
+- `model.tree.blossom` (Prunus 'Kanzan'), 2026-11-17, same previews: a broad spreading crown in pink, like.
+- `model.tree.fruit` (Malus domestica on MM106), 2026-11-17, same previews: a round bush tree on a short crooked
+  trunk with red fruit, like.
+- `model.tree.japaneseMaple` (Acer palmatum), 2026-11-17, same previews: layered crown on several stems, red as in
+  autumn, like.
+- `model.tree.magnolia` (Magnolia × soulangeana), 2026-11-17, same previews: upright crown with pale pink-white
+  goblets, like.
+- `model.tree.willow` (Salix × sepulcralis var. chrysocoma), 2026-11-17, same previews: curtains to near the
+  ground, like; the crown above them flat-topped, where a weeping willow's is a dome.
+- `model.pine` (Pinus sylvestris), 2026-11-17, same previews: a dense, regular, tiered cone, a fir's or a spruce's;
+  a Scots pine's is open and irregular, its upper bark orange. Not like.
+- `model.spruce` (Picea pungens Glauca Group), 2026-11-17, same previews: a dense blue-green pyramid, like; limbed
+  up to 2.2 m, where the species branches to the ground (the walking-past rule, above).
+- `model.cypress` (Cupressus sempervirens Stricta Group), 2026-11-17, same previews: a slim dark column, like.
+- `model.garden.lemonTree` (Citrus × limon 'Meyer'), 2026-11-17, same previews: a round head on a clear stem in a
+  terracotta pot, yellow fruit, like.
+
 ## Rebuild
 
 ```
