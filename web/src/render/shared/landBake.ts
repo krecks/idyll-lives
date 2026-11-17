@@ -142,11 +142,67 @@ export function chamfer(mask: Uint8Array, gw: number, gd: number, value: 0 | 1):
   return dist;
 }
 
+/** `edgeWater`'s kinds: no water near, the sea's (at `SEA_CM`), water above the sea's level (a pond, a river). */
+export const EDGE_DRY = 0;
+export const EDGE_SEA = 1;
+export const EDGE_POND = 2;
+
+/** The place round the land's edge of boundary sample (`i`, `j`): from the corner (0, 0) along z = 0, then up x = max, back along z = max, down x = 0. */
+function ringAt(cols: number, rows: number, i: number, j: number): number {
+  if (j === 0) return i;
+  if (i === cols - 1) return cols - 1 + j;
+  if (j === rows - 1) return cols - 1 + rows - 1 + (cols - 1 - i);
+  return 2 * (cols - 1) + rows - 1 + (rows - 1 - j);
+}
+
+/**
+ * The water round the land's edge, for the land past it (`LandscapeLayout.ground`): for each edge sample, in order
+ * round the edge (`ringAt`), the kind of the nearest water on the edge within `reach` m of it along the edge (round
+ * the corners too): `EDGE_SEA`, `EDGE_POND` or `EDGE_DRY`. Past the edge only the sea runs on; a pond or a river ends
+ * there. Null on a land too small to have a ring.
+ */
+export function edgeWater(land: Land, reach: number): Uint8Array | null {
+  const { cols, rows, h, wl } = land;
+  if (cols < 2 || rows < 2) return null;
+  const n = 2 * (cols - 1) + 2 * (rows - 1);
+  const kind = new Uint8Array(n);
+  const mark = (i: number, j: number) => {
+    const k = j * cols + i;
+    if (wl[k] !== NONE && wl[k] > h[k]) kind[ringAt(cols, rows, i, j)] = wl[k] === SEA_CM ? EDGE_SEA : EDGE_POND;
+  };
+  for (let i = 0; i < cols; i++) [mark(i, 0), mark(i, rows - 1)];
+  for (let j = 1; j < rows - 1; j++) [mark(0, j), mark(cols - 1, j)];
+  const out = new Uint8Array(n);
+  const r = Math.min(Math.floor(n / 2), Math.ceil(reach / LAND_CELL));
+  for (let p = 0; p < n; p++) {
+    for (let d = 0; d <= r; d++) {
+      const v = kind[(p + d) % n] || kind[(p - d + n) % n];
+      if (v) {
+        out[p] = v;
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/** `edgeWater`'s kind at the edge sample nearest (x, z), a point past the land's edge; `EDGE_DRY` inside it. */
+export function edgeWaterAt(land: Land, edge: Uint8Array | null, x: number, z: number): number {
+  if (!edge) return EDGE_DRY;
+  const { cols, rows } = land;
+  const [fx, fz] = [x / LAND_CELL, z / LAND_CELL];
+  if (fx >= 0 && fz >= 0 && fx <= cols - 1 && fz <= rows - 1) return EDGE_DRY;
+  // (The sample the point is past, on the edge: in a corner's square, the corner.)
+  return edge[ringAt(cols, rows, Math.min(cols - 1, Math.max(0, Math.round(fx))), Math.min(rows - 1, Math.max(0, Math.round(fz))))];
+}
+
 /**
  * `wetDistance`'s field at (x, z): read between the samples, and past the land's edge the edge's carried on out
- * (deeper in water that reaches it, further from water that doesn't). -Infinity without water.
+ * (deeper in water that reaches it, further from water that doesn't). -Infinity without water. With `edge`
+ * (`edgeWater`), only the sea runs on past it: other water reaching the edge ends there, the land past it as far from
+ * the water as it is from the edge.
  */
-export function wetEdgeAt(land: Land, sd: Float32Array | null, x: number, z: number): number {
+export function wetEdgeAt(land: Land, sd: Float32Array | null, x: number, z: number, edge: Uint8Array | null = null): number {
   if (!sd) return -Infinity;
   const { cols, rows } = land;
   const fx = x / LAND_CELL;
@@ -159,6 +215,7 @@ export function wetEdgeAt(land: Land, sd: Float32Array | null, x: number, z: num
   const [u, v] = [cx - i, cz - j];
   const [i1, j1] = [Math.min(i + 1, cols - 1), Math.min(j + 1, rows - 1)];
   const e = (sd[j * cols + i] * (1 - u) + sd[j * cols + i1] * u) * (1 - v) + (sd[j1 * cols + i] * (1 - u) + sd[j1 * cols + i1] * u) * v;
+  if (e > 0 && out > 0 && edgeWaterAt(land, edge, x, z) === EDGE_POND) return -out;
   return e > 0 ? e + out : e - out;
 }
 

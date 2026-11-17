@@ -14,7 +14,8 @@
   import { writeCode } from '../../game/worldCode';
   import { OPTION_FIELDS } from '../../game/worldOptions';
   import type { TownBuildStep } from '../../render/types';
-  import { app } from '../app.svelte';
+  import { app, type MadeLand } from '../app.svelte';
+  import { reportShownLand } from '../../debug/newGameReport';
   import { toast } from '../state.svelte';
   import Icon from '../Icon.svelte';
   import Segmented from '../kit/Segmented.svelte';
@@ -329,27 +330,40 @@
   }
 
   /**
+   * The land as Next takes it on: as shaped (`applyLand`: in its town file, the water walked round,
+   * the zones); the one taken on before if it is the same land (back and forth, nothing changed).
+   */
+  function taken(): MadeLand | null {
+    if (!draft) return null;
+    const editing = editor && editorOf === draft ? editor : null;
+    const chosen = editing ? applyLand(draft, editing) : draft;
+    const key = landKey(code, chosen.open?.land);
+    if (app.land?.key === key) return app.land;
+    // (Water shaped by hand, now or before step 2, leaves the town laid on it to find its own bridges.)
+    const keptBefore = draft === app.land?.draft ? app.land.waterKept : true;
+    return { draft: chosen, key, waterKept: keptBefore && !editing?.changed().water };
+  }
+  // A debug report (F8) taken here carries the land as on screen.
+  $effect(() => reportShownLand(taken));
+
+  /**
    * On to step 2 with the land as shaped (`applyLand`: in its town file, the water walked round, the
    * zones). The same land as before (back and forth, nothing changed) keeps its town; another one
    * lays the town again there, asked first if the town has the player's own changes.
    */
   function next() {
-    if (!draft) return;
     stroke?.cancel();
-    const editing = editor && editorOf === draft ? editor : null;
-    const chosen = editing ? applyLand(draft, editing) : draft;
-    const key = landKey(code, chosen.open?.land);
+    const land = taken();
+    if (!land) return;
     const go = () => {
-      if (app.land?.key !== key) {
-        // (Water shaped by hand, now or before step 2, leaves the town laid on it to find its own bridges.)
-        const keptBefore = draft === app.land?.draft ? app.land.waterKept : true;
-        app.land = { draft: chosen, key, waterKept: keptBefore && !editing?.changed().water };
+      if (app.land !== land) {
+        app.land = land;
         app.site = null;
       }
       app.screen = 'streets';
     };
     const ask = whatGoes('land', { layoutEdited: !!app.layout?.edited, townTweaked: !!app.world?.edited }).ask;
-    if (ask.length && app.land && app.land.key !== key) {
+    if (ask.length && app.land && app.land.key !== land.key) {
       confirming = { text: `The land changed: the streets are laid out on it again, and ${goesWords(ask)} go.`, yes: 'Lay it out again', keep: 'Keep my town', at: 'actions', go };
       return;
     }

@@ -35,6 +35,7 @@ import { chooseCentre, layBackdrop, reserveCentre } from './backdrop';
 import { random } from './housegen';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, type Land as LandField } from './land';
 import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEdit';
+import { bridgeSites, dryPieces, type Bounds } from './landPieces';
 import { GENTLE_TILT, seedBare, smoothHeights, type GentlePlane } from './landFollow';
 import { chaikin, outlines, rasterize, rle, simplify, simplifyRing, unrle } from './landMasks';
 import { fbm } from './noise';
@@ -333,6 +334,14 @@ export const DECK_PAST = 2;
 export const BRIDGE_SPAN = 45;
 const BRIDGE_APART = 220;
 const BRIDGE_CLEAR = 30;
+/**
+ * On a shaped land cut into pieces by its water (`landPieces.ts`): a bridge between two crosses this
+ * much water at most (m: its deck, with `DECK_PAST` either side, within `BRIDGE_SPAN`), is chosen
+ * from the best so many crossings to each piece, and keeps this far (m, their middles) from the others.
+ */
+const PIECE_SPAN = BRIDGE_SPAN - 2 * DECK_PAST - 1;
+const PIECE_TRIES = 12;
+const PIECE_BRIDGES_APART = 80;
 /** The world's edges (north, east, south, west): which way is out over each, and their names. */
 const EDGE_OUT: readonly Pt[] = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 const EDGE_NAMES = ['North', 'East', 'South', 'West'];
@@ -352,9 +361,12 @@ const WORDS = ['no', 'one', 'two', 'three', 'four'];
  * site (or `lay.site`), against the shore if the shore is near, its shape turned over to face its
  * water (`mirrored`), and from its own seed (`lay.townSeed`; the land's noise and look stay the
  * land's). Where the land's water is as planned (`lay.waterKept`), the plan's river is bridged as
- * ever; else (and on a land with no plan: one the player shaped, laid again by the `world` job) no
- * bridge is laid over a river and the areas go only on the largest piece of dry land
- * (`dryRegion`). The draft carries a copy of the land (`open.land`; flat under what is built if it
+ * ever; else (and on a land with no plan: one the player shaped, laid again by the `world` job) the
+ * water cuts the land into pieces of dry land (`landPieces.ts` `dryPieces`): the main town goes on
+ * the piece under its site (else the largest that holds it), and, with villages, a village goes on
+ * every other piece big enough that a bridge of `PIECE_SPAN` m could reach (`bridgeSites`), joined
+ * to the town's by a country road over it; the pieces no bridge reaches are told of
+ * (`diagnostics.pieces`). The draft carries a copy of the land (`open.land`; flat under what is built if it
  * was drawn so, its cover cleared there and round the town, its farmland on it: `townCover`), its
  * plan and its site, and its water and zones come from it. A classic world is laid as it always was.
  */
@@ -390,8 +402,13 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     if (valley && spec.classic) h += massif * clamp01((Math.abs(z - valleyZ(x)) - MASSIF_FLAT) / MASSIF_RISE) ** 1.4;
     land.height[i] = h;
   }
-  /** On a shaped land (its water not as planned), its largest piece of dry land (the areas go only there), with a test that a box stands on it. */
-  const region = shaped && !kept ? dryRegion(land) : null;
+  /**
+   * On a shaped land (its water not as planned), its pieces of dry land (`landPieces.ts`): the main
+   * town on one, a village on every other big enough with a bridge to it (`linked`), the country
+   * roads within each piece and over those bridges between them. Null otherwise (a classic world,
+   * a land whose water is as planned): nothing here is laid as it was before.
+   */
+  const dry = shaped && !kept ? dryPieces(land) : null;
   /** The plan's river, on a land whose water is as planned. */
   const planRiver = kept && plan?.river ? riverOf(plan.river, W, (plan.seed % 100000) + 17) : null;
   /** Where the main town goes on a planned land: round the site asked for, else the plan's. */
@@ -497,8 +514,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const bank = (p: Pt) => (river ? (p[1] < river.z(p[0]) ? -1 : 1) : 0);
   if (siteAt) {
     // On a planned land: round its site, its water side against the shore if the shore is near
-    // (looking for the water from the site), then as near that as it stands on dry land (on the
-    // largest piece of it if the water was changed).
+    // (looking for the water from the site), then as near that as it stands on dry land (if the
+    // water was changed, on the piece under it if that piece holds it, else on whichever does nearest).
     if (spec.water === 'sea' || spec.water === 'lake' || spec.water === 'river' || spec.water === 'island') {
       const dir = waterSide === 'zmax' ? 1 : -1;
       const from = Math.max(0, Math.min(D - 1, siteAt[1]));
@@ -506,14 +523,20 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       if (Number.isFinite(shore) && Math.abs(shore - from) <= SNAP_REACH) oz = Math.round(dir > 0 ? shore - 4 - box.d : shore + 4);
     }
     oz = Math.max(EDGE / 2, Math.min(D - EDGE / 2 - box.d, oz));
-    const bounds: [number, number, number, number] = [EDGE, EDGE / 2, W - EDGE - box.w, D - EDGE / 2 - box.d];
-    const at = (region ?? dryRegion(land, true)).nearest({ x: ox, z: oz, w: box.w, d: box.d }, bounds, region ? CELL : 0);
-    if (!at) throw new Error('There is no dry land big enough for the town.');
+    const bounds: Bounds = [EDGE, EDGE / 2, W - EDGE - box.w, D - EDGE / 2 - box.d];
+    const want = { x: ox, z: oz, w: box.w, d: box.d };
+    // (Its water changed: on the piece of dry land under the box's middle if that piece holds it, else as near as it fits on any.)
+    const under = dry ? dry.of([ox + box.w / 2, oz + box.d / 2]) : -1;
+    const at = dry ? ((under >= 0 ? dry.nearest(under, want, bounds) : null) ?? dry.nearestAny(want, bounds)?.at ?? null) : dryLand(land).nearest(want, bounds, 0);
+    if (!at) throw new Error(dry ? noRoom(box) : 'There is no dry land big enough for the town.');
     [ox, oz] = at;
-  } else if (region) {
-    // On a shaped land: as near where it would go as it fits on the largest piece of dry land.
-    const at = region.nearest({ x: ox, z: oz, w: box.w, d: box.d }, [EDGE, EDGE / 2, W - EDGE - box.w, D - EDGE / 2 - box.d]);
-    if (!at) throw new Error('There is no dry land big enough for the town.');
+  } else if (dry) {
+    // On a shaped land: as near where it would go as it fits on the largest piece of dry land that holds it.
+    const want = { x: ox, z: oz, w: box.w, d: box.d };
+    const bounds: Bounds = [EDGE, EDGE / 2, W - EDGE - box.w, D - EDGE / 2 - box.d];
+    let at: Pt | null = null;
+    for (const id of dry.bySize) if (dry.sizes[id] * CELL * CELL >= box.w * box.d && (at = dry.nearest(id, want, bounds))) break;
+    if (!at) throw new Error(noRoom(box));
     [ox, oz] = at;
   } else if (spec.water === 'sea' || spec.water === 'lake' || spec.water === 'river' || spec.water === 'island') {
     // Its water side on the shore (its first road runs along it): looking for the water from the land beyond the town.
@@ -522,7 +545,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     const shore = shoreAt(ox, ox + box.w, dir, from);
     if (Number.isFinite(shore)) oz = Math.round(dir > 0 ? shore - 4 - box.d : shore + 4);
   } else if (valley) oz = Math.round(valleyZ(ox + box.w / 2) - box.d / 2);
-  if (!region && !siteAt) oz = Math.max(EDGE / 2, Math.min(D - EDGE / 2 - box.d, oz));
+  if (!dry && !siteAt) oz = Math.max(EDGE / 2, Math.min(D - EDGE / 2 - box.d, oz));
 
   const roads: RoadPlan[] = [];
   const plans: AreaPlan[] = [];
@@ -647,13 +670,104 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const candidates: Pt[] = Array.from({ length: 700 }, (): Pt => [range(rand, EDGE + 80, W - EDGE - 80), range(rand, EDGE + 60, D - EDGE - 60)]);
   /** Which quarter of the world a point is in: the hamlets go first to those without an area. */
   const quarter = (p: Pt) => (p[0] < W / 2 ? 0 : 1) + (p[1] < D / 2 ? 0 : 2);
-  for (let n = 0, relax = 0; n < hamlets; n++) {
+  // A shaped land cut into pieces by its water (`dry`): with villages, one first on every piece big
+  // enough that a bridge could reach from a piece with an area on it, the largest first
+  // (`villagePerPiece`); then the rest of them, on the pieces with an area (`onLinked`).
+  /** The land's water (1 m tiles), on a shaped land cut into pieces: where its bridges could go; also its lots' (`waterMask`). */
+  const wet1m = dry ? wetTiles(shaped!, W, D) : null;
+  /** Where a bridge could cross between two pieces of dry land (`bridgeSites`): its ends `BRIDGE_IN` m past the banks, the piece each is on. */
+  const links: { a: Pt; b: Pt; pieces: [number, number] }[] = [];
+  /** The pieces of dry land with an area on them (the main town's first): those the rest of the villages may go on. */
+  const linked = new Set<number>();
+  /** The pieces big enough for a village that got none: no bridge could reach them, or no site on them could be reached (`diagnostics.pieces`). */
+  const unreached: string[] = [];
+  if (dry) linked.add(dry.of([ox + box.w / 2, oz + box.d / 2]));
+  /**
+   * A village on every piece of dry land big enough for one (its box and 24 m round it) that a
+   * crossing (`links`) reaches from a piece with an area on it, the largest first: its site the best
+   * of a 16 m lattice over the piece by how flat and low it is and how near a crossing to it, which
+   * stays `BRIDGE_CLEAR` m clear of its box; `AREA_APART` m from the other areas (but not within
+   * `AREA_REACH`: the bridge is its way in), and the mountains' and the gentle ground's rules as the
+   * other villages keep them. How many it put down.
+   */
+  function villagePerPiece(): number {
+    const pieces = dry!;
+    for (const s of bridgeSites(wet1m!, W, D, PIECE_SPAN)) {
+      const a: Pt = [round2(s.a[0] - s.u[0] * BRIDGE_IN), round2(s.a[1] - s.u[1] * BRIDGE_IN)];
+      const b: Pt = [round2(s.b[0] + s.u[0] * BRIDGE_IN), round2(s.b[1] + s.u[1] * BRIDGE_IN)];
+      const [pa, pb] = [pieces.of(a), pieces.of(b)];
+      if (pa >= 0 && pb >= 0 && pa !== pb) links.push({ a, b, pieces: [pa, pb] });
+    }
+    const hb = spec.hamlet.box;
+    // (A piece with fewer cells than a village's box and the land round it can't hold one.)
+    const least = Math.ceil((hb.w + 48) / CELL) * Math.ceil((hb.d + 48) / CELL);
+    const reaches = (id: number) => links.filter((l) => (l.pieces[0] === id && linked.has(l.pieces[1])) || (l.pieces[1] === id && linked.has(l.pieces[0])));
+    const tried = new Set<number>();
+    let n = 0;
+    for (;;) {
+      const id = pieces.bySize.find((k) => !tried.has(k) && !linked.has(k) && pieces.sizes[k] >= least && reaches(k).length > 0);
+      if (id === undefined) break;
+      tried.add(id);
+      const ends = reaches(id).map((l) => ({ near: l.pieces[0] === id ? l.a : l.b, line: evenly([l.a, l.b], 4) }));
+      const site: HamletSite = { water: spec.water, boxes: plans.map((a) => a.rect), region: { holds: (r, by) => pieces.holds(id, r, by) }, crossings };
+      const first = rand() < 0.35;
+      let best = null as { p: Pt; swap: boolean; score: number } | null;
+      for (const swap of [first, !first]) {
+        const [bw, bd] = swap ? [hb.d, hb.w] : [hb.w, hb.d];
+        for (let z = EDGE + bd / 2; z <= D - EDGE - bd / 2; z += 16) {
+          for (let x = EDGE + bw / 2; x <= W - EDGE - bw / 2; x += 16) {
+            const p: Pt = [x, z];
+            if (pieces.of(p) !== id || !pieces.holds(id, { x: Math.round(x - bw / 2), z: Math.round(z - bd / 2), w: bw, d: bd }, 24)) continue;
+            if (Math.min(...plans.map((a) => dist(a.centre, p))) < AREA_APART) continue;
+            const fit = hamletFits(land, p, [bw, bd], site);
+            if (!fit) continue;
+            const { rect, steep } = fit;
+            // (A bridge to it kept clear of its box.)
+            const clear = ends.filter((e) => e.line.every((q) => offRect(rect, q) >= BRIDGE_CLEAR));
+            if (!clear.length) continue;
+            // (Among mountains, the area it joins reachable; and every area's gentle ground met within a road's climb.)
+            if (reachable) {
+              const joins = plans.reduce((a, b) => (dist(b.centre, p) < dist(a.centre, p) ? b : a));
+              if (Math.abs(boxHeight(rect) - boxHeight(joins.rect)) > REACHABLE * COUNTRY_GRADE * rectGap(rect, joins.rect)) continue;
+            }
+            const own = planeOf(rect);
+            const apart = plans.some((o, k) => {
+              const [pa, pb] = facingPts(rect, o.rect);
+              return Math.abs(own(pa) - (planes[k] ??= planeOf(o.rect))(pb)) > REACHABLE * COUNTRY_GRADE * rectGap(rect, o.rect) + PLANE_SLACK;
+            });
+            if (apart) continue;
+            // Flat, low, and near where a bridge would come to it.
+            const score = steep * 40 + land.at(x, z) * (reachable ? MOUNTAIN_LOW : 0.02) + Math.min(...clear.map((e) => offRect(rect, e.near))) / 40;
+            if (!best || score < best.score) best = { p, swap, score };
+          }
+        }
+        if (best) break;
+      }
+      if (!best) continue;
+      const [bw, bd] = best.swap ? [hb.d, hb.w] : [hb.w, hb.d];
+      const hamlet = hamletOf(content, spec, rand, plans.length - 1, plans.map((a) => a.name));
+      putHamlet(laying, hamlet, Math.round(best.p[0] - bw / 2), Math.round(best.p[1] - bd / 2), best.swap);
+      linked.add(id);
+      n++;
+    }
+    // (Pieces big enough that no crossing of `PIECE_SPAN` m reaches from a piece with an area, or with no site on them a village could take.)
+    for (const id of pieces.bySize) {
+      if (linked.has(id) || pieces.sizes[id] < least) continue;
+      const why = tried.has(id) ? 'no site on it for a village a bridge could reach' : `no bridge of ${PIECE_SPAN} m or less reaches it`;
+      unreached.push(`No village on ${Math.round((pieces.sizes[id] * CELL * CELL) / 10000)} ha of dry land: ${why}.`);
+    }
+    return n;
+  }
+  const placed = dry && spec.hamlets[1] > 0 ? villagePerPiece() : 0;
+  /** The rest of the villages' land on a shaped land cut into pieces: any piece with an area on it. */
+  const onLinked = dry ? { holds: (r: Rect, by: number) => [...linked].some((id) => dry.holds(id, r, by)) } : null;
+  for (let n = placed, relax = 0; n < (dry ? Math.max(hamlets, placed) : hamlets); n++) {
     const held = new Set(plans.map((a) => quarter(a.centre)));
     const swap = rand() < 0.35;
     const hb = spec.hamlet.box;
     const [bw, bd] = swap ? [hb.d, hb.w] : [hb.w, hb.d];
     let best: { p: Pt; score: number } | null = null;
-    const site: HamletSite = { water: spec.water, boxes: plans.map((a) => a.rect), region, crossings, relax };
+    const site: HamletSite = { water: spec.water, boxes: plans.map((a) => a.rect), region: onLinked, crossings, relax };
     // (No room where it should be: a little further, on steeper land.)
     for (const p of relax ? [...candidates].reverse() : candidates) {
       const near = Math.min(...plans.map((a) => dist(a.centre, p)));
@@ -888,13 +1002,21 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // (Two areas' streets meeting end to end: their ports are a way on already, kept as they are.)
   for (const q of plans.flatMap((plan) => plan.ports)) if (continued(q)) q.used = true;
   // Prim's tree over the areas, then the shortest edge it left out. (Across a river only the main
-  // town and an area on the other bank: over its bridge.)
-  const apart = (a: number, b: number) => (river && a && b && bank(plans[a].centre) !== bank(plans[b].centre) ? Infinity : dist(plans[a].centre, plans[b].centre));
+  // town and an area on the other bank: over its bridge. On a shaped land cut into pieces, a tree
+  // on each piece: the bridges between them come after.)
+  /** Each area's piece of dry land (`dry`). */
+  const areaPiece = dry ? plans.map((a) => dry.of(a.centre)) : [];
+  const apart = (a: number, b: number) => ((river && a && b && bank(plans[a].centre) !== bank(plans[b].centre)) || (dry && areaPiece[a] !== areaPiece[b]) ? Infinity : dist(plans[a].centre, plans[b].centre));
   const inTree = [0];
   const edges: [number, number][] = [];
   while (inTree.length < plans.length) {
     let best: [number, number, number] | null = null;
     for (const a of inTree) for (let b = 0; b < plans.length; b++) if (!inTree.includes(b) && (!best || apart(a, b) < best[2])) best = [a, b, apart(a, b)];
+    // (Only areas on other pieces left: the next tree begins.)
+    if (dry && best![2] === Infinity) {
+      inTree.push(best![1]);
+      continue;
+    }
     edges.push([best![0], best![1]]);
     inTree.push(best![1]);
   }
@@ -987,6 +1109,116 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     // (Its ends' ports, where a piece of it leaves them.)
     if (first && made.pa.port) made.pa.port.used = true;
     if (last && made.pb.port) made.pb.port.used = true;
+  }
+  if (dry && links.length) bridgePieces();
+  /**
+   * A shaped land cut into pieces (`dry`): a bridge to each piece with an area on it from the main
+   * town's, Prim's tree over them (the nearest first). For each piece, the best of `PIECE_TRIES`
+   * crossings (`links`) to one joined already, by how far their ends are from the areas either
+   * side: `BRIDGE_CLEAR` m clear of the areas' boxes (else, all of them failing, 12 m), with no road
+   * within 12 m and `PIECE_BRIDGES_APART` m from the other bridges. A bridge is laid only with a
+   * country road from each end to the nearest area on its piece (`approach`).
+   */
+  function bridgePieces(): void {
+    const populated = new Set(areaPiece);
+    const joined = new Set([areaPiece[0]]);
+    const lost = new Set<number>();
+    const mid = ([a, b]: readonly Pt[]): Pt => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    /** The areas on piece `id`, the nearest `p` first. */
+    const areasOn = (id: number, p: Pt) => plans.flatMap((_, k) => (areaPiece[k] === id ? [k] : [])).sort((x, y) => offRect(plans[x].rect, p) - offRect(plans[y].rect, p));
+    /** A link from a joined piece (`a` its end there) to one not joined yet (`b`), and how far its ends are from the areas. */
+    const oriented = () =>
+      links.flatMap((l) => {
+        const [ja, jb] = [joined.has(l.pieces[0]), joined.has(l.pieces[1])];
+        if (ja === jb) return [];
+        const [a, b, from, to] = ja ? [l.a, l.b, l.pieces[0], l.pieces[1]] : [l.b, l.a, l.pieces[1], l.pieces[0]];
+        if (!populated.has(to) || lost.has(to)) return [];
+        return [{ a, b, from, to, score: offRect(plans[areasOn(from, a)[0]].rect, a) + offRect(plans[areasOn(to, b)[0]].rect, b) }];
+      });
+    for (;;) {
+      const index = new RoadIndex(roads);
+      const open = (l: { a: Pt; b: Pt }, clear: number) => {
+        const pts = evenly([l.a, l.b], 4);
+        return pts.every((q) => plans.every((plan) => offRect(plan.rect, q) >= clear) && !index.nearest(q[0], q[1], 12)) && crossings.every((c) => dist(mid(c), mid([l.a, l.b])) >= PIECE_BRIDGES_APART);
+      };
+      const all = oriented().sort((x, y) => x.score - y.score);
+      if (!all.length) break;
+      const to = (all.find((l) => open(l, BRIDGE_CLEAR)) ?? all.find((l) => open(l, 12)) ?? all[0]).to;
+      const village = plans[areasOn(to, all.find((l) => l.to === to)!.b)[0]].name;
+      let done = false;
+      for (const clear of [BRIDGE_CLEAR, 12]) {
+        for (const l of all.filter((o) => o.to === to && open(o, clear)).slice(0, PIECE_TRIES)) {
+          const at = roads.length;
+          const u: Pt = [(l.b[0] - l.a[0]) / dist(l.a, l.b), (l.b[1] - l.a[1]) / dist(l.a, l.b)];
+          const ka = areasOn(l.from, l.a)[0];
+          const kb = areasOn(l.to, l.b)[0];
+          const ma = approach({ road: at, end: 0, area: -1, p: l.a, dir: [-u[0], -u[1]], used: false }, ka);
+          const mb = ma && approach({ road: at, end: 1, area: -1, p: l.b, dir: u, used: false }, kb);
+          if (!ma || !mb) continue;
+          roads.push(crossing(l.a, l.b, ['join', 'join'], uniqueName(`${village} Bridge`, `${village} Old Bridge`)));
+          crossings.push([l.a, l.b]);
+          for (const [made, place] of [
+            [ma, plans[kb].name],
+            [mb, plans[ka].name],
+          ] as const) {
+            const name = () => uniqueName(`${place} Road`, `${place} Lane`);
+            const { laid, last } = router.course(made.road, made.pa, made.cells, made.pb);
+            for (const road of laid) roads.push({ ...router.settle(road), name: name() });
+            if (last && made.pb.port) made.pb.port.used = true;
+          }
+          done = true;
+          break;
+        }
+        if (done) break;
+      }
+      if (done) joined.add(to);
+      else {
+        lost.add(to);
+        failed.push(`no bridge to ${village}`);
+      }
+    }
+  }
+  /**
+   * A country road from port `q` (a bridge's end, heading off it) to area `k`: straight on to one
+   * of its streets if it comes to one (`straightOn`), else routed into it as the country roads
+   * between the areas are (their tries); null if there is no way (or only over the water).
+   */
+  function approach(q: Port, k: number): { road: RoadPlan; pa: Way; pb: Way; bad: number; cells?: number[] } | null {
+    const w: Way = { p: q.p, dir: q.dir, port: q };
+    const hit = straightOn(w, k);
+    if (hit) return { road: { points: curve(evenly([w.p, hit.p], CTRL_APART)), width: COUNTRY_WIDTH, ends: ['join', 'join'], kind: 'country', name: '' }, pa: w, pb: { p: hit.p, dir: [-w.dir[0], -w.dir[1]] }, bad: 0 };
+    let outs = [w];
+    let ins = waysOut(k, w.p).slice(0, WAYS);
+    let made = null as { road: RoadPlan; pa: Way; pb: Way; bad: number; cells?: number[] } | null;
+    for (let tries = 0; tries < TRIES && outs.length && ins.length && (!made || made.bad > 0); tries++) {
+      const ends = [...outs, ...ins].flatMap((v) => (v.port ? [v.port.p, v.p] : []));
+      const goals = ins.map((v) => ({ w: v, cell: router.outCell(v), into: router.into(v), extra: router.wayCost(v) }));
+      const goal = (i: number, h?: number, loose?: boolean) => {
+        let best = -1;
+        for (const o of goals) if (o.cell === i && o.into(h, loose) && (best < 0 || o.extra < best)) best = o.extra;
+        return best;
+      };
+      const goalAt = goals.map((o) => land.centre(o.cell));
+      const guess = (i: number) => {
+        const c = land.centre(i);
+        let near = Infinity;
+        for (const e of goalAt) near = Math.min(near, dist(c, e));
+        return near / CELL;
+      };
+      const span = dist(w.p, plans[k].centre) || 1;
+      const found = router.route(outs, goal, guess, [(plans[k].centre[0] - w.p[0]) / span, (plans[k].centre[1] - w.p[1]) / span], router.costs(ends));
+      if (!found) break;
+      const end = found.cells[found.cells.length - 1];
+      const pb = goals.filter((o) => o.cell === end && o.into(found.h, true)).sort((x, y) => x.extra - y.extra)[0]?.w ?? goals.find((o) => o.cell === end)!.w;
+      const road = router.road(w, found.cells, pb, ['join', 'join'], '');
+      const bad = router.fault(road);
+      if (!made || bad < made.bad) made = { road, pa: w, pb, bad, cells: found.cells };
+      if (!bad || !found.steered) break;
+      if (tries % 2 === 0) ins = ins.filter((v) => v !== pb);
+      else outs = outs.filter((v) => v !== w);
+    }
+    // (Not over the water.)
+    return made && made.bad < 3 ? made : null;
   }
   // Ways out of the world (two or three in the classic worlds): from the ports left over (else any), to the nearest edge.
   // (An island's ways out are its causeways: the country roads to them are laid below.)
@@ -1220,7 +1452,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // (A shaped land's water is its own: its tiles, its outlines; but a river or a coast as planned is the plan's, as it seeded the land.)
   const keptWater = kept && planRiver ? [planRiver.poly] : kept && plan?.coast ? [islandSea(plan.coast, W, D)] : [];
   const waterPolys = shaped ? keptWater : river ? [river.poly] : coast.length ? [islandSea(coast, W, D)] : outlines(land.water, gw, gd, 2);
-  const waterMask = shaped && !keptWater.length ? wetTiles(shaped, W, D) : rasterize(waterPolys, W, D);
+  const waterMask = shaped && !keptWater.length ? (wet1m ?? wetTiles(shaped, W, D)) : rasterize(waterPolys, W, D);
   // Woods: the most wooded share of the land by noise, not on the areas, the water or the roads.
   const woodsNoise = new Float32Array(gw * gd);
   for (let i = 0; i < gw * gd; i++) {
@@ -1491,7 +1723,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       ...(lay?.townSeed !== undefined && lay.townSeed !== seed ? { townSeed: lay.townSeed } : {}),
       ...(shaped?.edited ? { shaped: true as const } : {}),
     },
-    diagnostics: { dropped: lots.dropped, ...(failed.length ? { roads: failed } : {}), ...(reachable && missing > 0 ? { villages: { left: missing, homes: missing * spec.hamlet.lots[0] } } : {}) },
+    diagnostics: { dropped: lots.dropped, ...(failed.length ? { roads: failed } : {}), ...(reachable && missing > 0 ? { villages: { left: missing, homes: missing * spec.hamlet.lots[0] } } : {}), ...(unreached.length ? { pieces: unreached } : {}) },
     open: {
       areas,
       zones,
@@ -1596,9 +1828,9 @@ export function putHamlet(laying: Laying, h: Hamlet, x: number, z: number, swap:
 
 /**
  * What a hamlet's site is tested against (`hamletFits`): the world's water (a river's or an
- * island's keeps it 24 m from its box), the other areas' boxes, the largest piece of dry land on a
- * land whose water was changed (`region`), the bridges' and causeways' ends (`crossings`), and how
- * far the generator has given up on a flat site (`relax`).
+ * island's keeps it 24 m from its box), the other areas' boxes, the pieces of dry land it may go on
+ * on a land whose water was changed (`region`: `landPieces.ts`), the bridges' and causeways' ends
+ * (`crossings`), and how far the generator has given up on a flat site (`relax`).
  */
 export interface HamletSite {
   water: WorldSpec['water'];
@@ -1610,8 +1842,8 @@ export interface HamletSite {
 
 /**
  * Whether a hamlet's box `bw` × `bd` round `p` may go there, as the generator tests a site: in the
- * world by `EDGE`, clear of the other areas' boxes by `BOX_GAP`, dry (and on the dry land's largest
- * piece, `site.region`), 50 m clear of the bridges and causeways, and no steeper than 0.35 anywhere
+ * world by `EDGE`, clear of the other areas' boxes by `BOX_GAP`, dry (on a land whose water was
+ * changed, 24 m from any of it and on a piece of dry land it may go on: `site.region`), 50 m clear of the bridges and causeways, and no steeper than 0.35 anywhere
  * in it (unless `site.relax`). Its box (whole metres) and its steepest slope; null if it may not.
  */
 export function hamletFits(land: Cells, p: Pt, [bw, bd]: readonly [number, number], site: HamletSite): { rect: Rect; steep: number } | null {
@@ -1620,8 +1852,8 @@ export function hamletFits(land: Cells, p: Pt, [bw, bd]: readonly [number, numbe
   const rect = { x: Math.round(p[0] - bw / 2), z: Math.round(p[1] - bd / 2), w: bw, d: bd };
   if (rect.x < EDGE || rect.z < EDGE || rect.x + bw > W - EDGE || rect.z + bd > D - EDGE) return null;
   if (site.boxes.some((a) => rect.x < a.x + a.w + BOX_GAP && a.x < rect.x + rect.w + BOX_GAP && rect.z < a.z + a.d + BOX_GAP && a.z < rect.z + rect.d + BOX_GAP)) return null;
-  if (site.water === 'river' || site.water === 'island' ? land.wetNear(rect, 24) : land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 30)) return null;
-  if (site.region && (land.wetNear(rect, 24) || !site.region.holds(rect, 24))) return null;
+  // (On a land whose water was changed, its water is the land's own, a pond as much as a river: 24 m from the box.)
+  if (site.region ? land.wetNear(rect, 24) || !site.region.holds(rect, 24) : site.water === 'river' || site.water === 'island' ? land.wetNear(rect, 24) : land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 30)) return null;
   // (Clear of the bridges and causeways.)
   if ((site.crossings ?? []).some(([a, b]) => evenly([a, b], 4).some((q) => offRect(rect, q) < 50))) return null;
   let steep = 0;
@@ -1715,52 +1947,32 @@ function fillFrom(land: Cells, field: LandField): void {
   }
 }
 
+/** Why a town can't be laid on a shaped land cut into pieces by its water (`dry`): no piece holds its box. */
+const noRoom = (box: Box) => `There is no dry land big enough for the town: it needs ${box.w} × ${box.d} m in one piece.`;
+
 /**
- * A shaped land's largest piece of dry land (8 m cells joined side to side), the areas' to go on
- * (`anyDry`: any dry land): whether a box and the land `by` m round it stand all on it (`holds`),
- * and the place nearest a box's (8 m steps) where it does with `by` m round it (a cell if not
- * given), within bounds (`nearest`: [x0, z0, x1, z1] of its corner).
+ * A land's dry land (8 m cells), for a town on a land whose water is as planned: the place nearest
+ * a box's (8 m steps) where it and the land `by` m round it stand all on dry land, within bounds
+ * (`nearest`: [x0, z0, x1, z1] of its corner). (A land whose water was changed: `landPieces.ts`.)
  */
-function dryRegion(land: Cells, anyDry = false): { holds: (r: Rect, by: number) => boolean; nearest: (r: Rect, bounds: [number, number, number, number], by?: number) => Pt | null } {
+function dryLand(land: Cells): { nearest: (r: Rect, bounds: Bounds, by?: number) => Pt | null } {
   const { gw, gd } = land;
-  const piece = new Int32Array(gw * gd).fill(-1);
-  const sizes: number[] = [];
-  for (let start = 0; start < gw * gd && !anyDry; start++) {
-    if (land.water[start] || piece[start] >= 0) continue;
-    const id = sizes.length;
-    const stack = [start];
-    piece[start] = id;
-    let n = 0;
-    while (stack.length) {
-      const i = stack.pop()!;
-      n++;
-      const [x, z] = [i % gw, Math.floor(i / gw)];
-      for (const [nx, nz] of [[x - 1, z], [x + 1, z], [x, z - 1], [x, z + 1]] as const) {
-        const j = nz * gw + nx;
-        if (nx < 0 || nz < 0 || nx >= gw || nz >= gd || land.water[j] || piece[j] >= 0) continue;
-        piece[j] = id;
-        stack.push(j);
-      }
-    }
-    sizes.push(n);
-  }
-  const main = anyDry ? 0 : sizes.indexOf(Math.max(-1, ...sizes));
-  // Cells off it, summed from the corner.
+  // Wet cells, summed from the corner.
   const sat = new Int32Array((gw + 1) * (gd + 1));
   for (let z = 0; z < gd; z++) {
     let row = 0;
     for (let x = 0; x < gw; x++) {
-      row += (anyDry ? !land.water[z * gw + x] : piece[z * gw + x] === main) ? 0 : 1;
+      row += land.water[z * gw + x] ? 1 : 0;
       sat[(z + 1) * (gw + 1) + x + 1] = sat[z * (gw + 1) + x + 1] + row;
     }
   }
   const holds = (r: Rect, by: number) => {
     const [x0, z0] = [Math.floor((r.x - by) / CELL), Math.floor((r.z - by) / CELL)];
     const [x1, z1] = [Math.floor((r.x + r.w + by) / CELL) + 1, Math.floor((r.z + r.d + by) / CELL) + 1];
-    if (main < 0 || x0 < 0 || z0 < 0 || x1 > gw || z1 > gd) return false;
+    if (x0 < 0 || z0 < 0 || x1 > gw || z1 > gd) return false;
     return sat[z1 * (gw + 1) + x1] - sat[z0 * (gw + 1) + x1] - sat[z1 * (gw + 1) + x0] + sat[z0 * (gw + 1) + x0] === 0;
   };
-  const nearest = (r: Rect, [bx0, bz0, bx1, bz1]: [number, number, number, number], by = CELL): Pt | null => {
+  const nearest = (r: Rect, [bx0, bz0, bx1, bz1]: Bounds, by = CELL): Pt | null => {
     // (Where it is, if it stands there.)
     if (r.x >= bx0 && r.z >= bz0 && r.x <= bx1 && r.z <= bz1 && holds(r, by)) return [Math.round(r.x), Math.round(r.z)];
     let best: Pt | null = null;
@@ -1774,7 +1986,7 @@ function dryRegion(land: Cells, anyDry = false): { holds: (r: Rect, by: number) 
     }
     return best;
   };
-  return { holds, nearest };
+  return { nearest };
 }
 
 /** The ground round what is built rises back to a shaped land's own height over this far (m) past the flat apron. */

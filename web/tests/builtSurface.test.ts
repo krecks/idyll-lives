@@ -291,6 +291,35 @@ describe('built land on a slope', () => {
   });
 });
 
+describe("a deck carried on over dry land past its water (a drawn street's, over a river's dip)", () => {
+  // (A town 4 m up west of x 40, a meadow 0.4 m over the water from there to the channel at x 58..72 and past it, a
+  // street over it all with its deck from 12 m before the water to 2 m past it.)
+  const land = blankLand(W, D, 'follow');
+  for (let j = 0; j < land.rows; j++) {
+    for (let i = 0; i < land.cols; i++) {
+      const x = i * LAND_CELL;
+      const k = j * land.cols + i;
+      if (x >= 58 && x <= 72) [land.h[k], land.wl[k]] = [-150, 0];
+      else land.h[k] = x < 40 ? 400 : 40;
+    }
+  }
+  const deck: [number, number] = [46, 74];
+  const street = line([0, 60], [140, 60], 7, 'country', ['out', 'out'], deck);
+  const surface = builtSurfaceOf({ plots: [], meta: { roads: [street], world: { landscape: { slope: 0.4 } } } }, land);
+
+  test('the land under its dry reach lies under its stone, out to the stone’s edge', () => {
+    let checked = 0;
+    // (Its samples from the first inside the deck to 4 m before the water; out to its stone's edge, 5.5 m off its middle.)
+    for (let i = Math.ceil(deck[0] / LAND_CELL) + 1; i * LAND_CELL <= 58 - 4; i++) {
+      for (let j = Math.ceil((60 - 5.5) / LAND_CELL); j * LAND_CELL <= 60 + 5.5; j++) {
+        expect(surface.conformed[j * land.cols + i]).toBeLessThan(surface.roadY(0, i * LAND_CELL) - 0.6);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(10);
+  });
+});
+
 describe('a backdrop building turned by a road', () => {
   // A school turned 45° whose box reaches over a street at a junction: its pad stands on its footprint, never
   // on the road its box's corner covers.
@@ -331,5 +360,42 @@ describe('a backdrop building turned by a road', () => {
     const [x, z] = [85, 52];
     expect(surface.roadAt(x, z)).toBeNull();
     expect(surface.at(x, z)).toBe(surface.landAt(x, z));
+  });
+});
+
+describe("a turned backdrop building's ground", () => {
+  // A lot on low land and, 4 m past its edge, a building turned a little on land 4 m higher: its ground (its
+  // forecourt) reaches into the lot's box and past its edge, but gives way to it (a lot's pad is its own, and the
+  // land beside it stays within a retaining edge of it); and one standing wholly in a pond (a river painted over
+  // it) levels nothing round it.
+  const land = blankLand(W, D, 'follow');
+  for (let j = 0; j < land.rows; j++) {
+    for (let i = 0; i < land.cols; i++) {
+      const [x, z] = [i * LAND_CELL, j * LAND_CELL];
+      const k = j * land.cols + i;
+      if (x >= 100 && x <= 124 && z >= 30 && z <= 70) [land.h[k], land.wl[k]] = [-900, -500];
+      else land.h[k] = x < 50 ? 0 : x < 100 ? 400 : 0;
+    }
+  }
+  const lot = { x: 30, z: 40, w: 18, d: 20 };
+  const above: [number, number][] = [[52, 42], [64, 41], [65, 53], [53, 54]];
+  const afloat: [number, number][] = [[103, 42], [115, 41], [116, 53], [104, 54]];
+  const surface = builtSurfaceOf({ plots: [lot], meta: { backdrop: [{ poly: above }, { poly: afloat }] } }, land);
+  const without = builtSurfaceOf({ plots: [lot], meta: { backdrop: [{ poly: above }] } }, land);
+
+  test('beside a lot it gives way: the lot is its pad, its edge within a retaining edge of the land beside it', () => {
+    const [pad, high] = [surface.padY(0), surface.padY(1)];
+    expect(high - pad).toBeGreaterThan(RETAIN_MAX + 1);
+    for (let j = Math.ceil(lot.z / LAND_CELL); j * LAND_CELL <= lot.z + lot.d; j++) {
+      for (let i = Math.ceil(lot.x / LAND_CELL); i * LAND_CELL <= lot.x + lot.w; i++) expect(surface.conformed[j * land.cols + i]).toBeCloseTo(pad, 6);
+      expect(Math.abs(surface.at(lot.x + lot.w + 0.3, j * LAND_CELL) - pad)).toBeLessThanOrEqual(RETAIN_MAX + 0.01);
+    }
+    // (Its forecourt elsewhere at its pad.)
+    expect(surface.at(67, 47)).toBeCloseTo(high, 6);
+  });
+
+  test('one standing in water levels nothing round it, its bank as it was', () => {
+    expect(surface.at(98, 47)).toBeGreaterThan(3);
+    expect(surface.conformed).toEqual(without.conformed);
   });
 });

@@ -10,8 +10,8 @@
  */
 
 import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, type WorldStructure, type WorldZone } from '../../core/protocol';
-import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, type Land, type LandRect } from '../../game/land';
-import { coverAt, landTop, landWater, wetDistance, wetEdgeAt } from './landBake';
+import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, NONE, SEA_CM, type Land, type LandRect } from '../../game/land';
+import { coverAt, EDGE_POND, edgeWater, edgeWaterAt, landTop, landWater, wetDistance, wetEdgeAt } from './landBake';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
 import { onPad, type BuiltSurface, type SurfaceChange } from './builtSurface';
 import { surfaceOf } from './landSurface';
@@ -57,6 +57,14 @@ const SHADOW_RANGE = 28;
  * moved by how far the field's edge stands off it there, the move fading out over this far (m).
  */
 const LAND_EDGE_FADE = 60;
+/**
+ * Past the world's edge only a height field's sea runs on: its other water (a pond, a river) reaching the edge ends
+ * there, behind a bank this far over its level (m, as the brushes' `BANK`), and the landscape's water past the edge is
+ * left out within this far (m) along the edge of it (its sandy bank reaches `BEACH * 1.5` from its shore, give or take
+ * the zones' wandering edge).
+ */
+const END_BANK = 0.25;
+const END_REACH = 20;
 /** Lots are filed for `padAt` by cells this wide (m). */
 const PAD_CELL = 16;
 
@@ -747,6 +755,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.surface = null;
     this.stale = null;
     this.wetSd = null;
+    this.edgeWet = null;
     this.coverSeen = null;
     this.zones = this.zonesToday;
     if (land || this.metaLand) this.adoptLand(land);
@@ -871,6 +880,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   private measureLand(rect: LandRect | null): void {
     const land = this.field!;
     this.wetSd = wetDistance(land);
+    this.edgeWet = edgeWater(land, END_REACH);
     this.fieldWater = landWater(land);
     this.fieldTop = landTop(land);
     if (!this.built) return;
@@ -950,7 +960,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   waterEdge(x: number, z: number): number {
     // (A height field's: the edge of its water.)
-    return this.field ? wetEdgeAt(this.field, this.wetSd, x, z) : this.drawnWaterEdge(x, z);
+    return this.field ? wetEdgeAt(this.field, this.wetSd, x, z, this.edgeWet) : this.drawnWaterEdge(x, z);
   }
 
   /** `waterEdge` as the landscape lays it out (without a height field). */
@@ -1008,6 +1018,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   private metaLand: LandFile | undefined;
   /** The field's water: the signed distance from its edge (`wetDistance`), whether it has any and any at the sea's level, and its highest sample. */
   private wetSd: Float32Array | null = null;
+  /** The field's water round its edge (`edgeWater`): past the edge only its sea runs on. */
+  private edgeWet: Uint8Array | null = null;
   private fieldWater = { any: false, sea: false };
   private fieldTop = 0;
   /** The field's cover as its zones were last made from it (`landChanged`: only the kinds that changed again). */
@@ -1181,21 +1193,43 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   /**
    * Height of the land before the roads are cut in. With a height field (`setLand`): the field's inside the world;
    * past its edge the landscape's own, moved by how far the field's edge stands off it there, that fading out over
-   * `LAND_EDGE_FADE` m (no shore bank of the landscape's: the field has its own).
+   * `LAND_EDGE_FADE` m (no shore bank of the landscape's: the field has its own). Past where the field's water other
+   * than its sea reaches the edge, that water ends behind a low bank (`END_BANK`) and the landscape's digs no bed.
    */
   ground(x: number, z: number): number {
     const field = this.field;
     if (!field) return this.drawnGround(x, z);
-    if (x >= 0 && z >= 0 && x <= this.w && z <= this.d) return this.fieldAt(x, z);
+    if (x >= 0 && z >= 0 && x <= this.w && z <= this.d) {
+      // (Its last 2 m, past its last samples, hold their heights: a pond's end bank there already.)
+      const h = this.fieldAt(x, z);
+      return (x > (field.cols - 1) * LAND_CELL || z > (field.rows - 1) * LAND_CELL) && edgeWaterAt(field, this.edgeWet, x, z) === EDGE_POND ? this.endBank(field, x, z, h) : h;
+    }
     const cx = Math.min(this.w, Math.max(0, x));
     const cz = Math.min(this.d, Math.max(0, z));
-    const today = this.drawnGround(x, z);
+    const pond = edgeWaterAt(field, this.edgeWet, x, z) === EDGE_POND;
+    const today = this.drawnGround(x, z, !pond);
     const fade = 1 - smoothstep(0, LAND_EDGE_FADE, Math.hypot(x - cx, z - cz));
-    return fade > 0 ? today + (this.fieldAt(cx, cz) - this.drawnGround(cx, cz)) * fade : today;
+    if (fade <= 0) return today;
+    const edge = pond ? this.endBank(field, cx, cz, this.fieldAt(cx, cz)) : this.fieldAt(cx, cz);
+    const h = today + (edge - this.drawnGround(cx, cz, !pond)) * fade;
+    // (By a pond's end, land over the sea's sheet: the landscape's own may lie lower there than at the edge.)
+    return pond ? Math.max(h, WATER_Y + END_BANK * fade) : h;
   }
 
-  /** `ground` as the landscape lays it out (without a height field). */
-  private drawnGround(x: number, z: number): number {
+  /**
+   * The ground `h` at (x, z), by the field's edge where a pond or a river reaches it (`EDGE_POND`), raised to the bank
+   * it ends behind (`END_BANK` over its level, or the sea's if that is higher) where the sample nearest is under it;
+   * else `h`.
+   */
+  private endBank(field: Land, x: number, z: number, h: number): number {
+    const k = Math.min(field.rows - 1, Math.max(0, Math.round(z / LAND_CELL))) * field.cols + Math.min(field.cols - 1, Math.max(0, Math.round(x / LAND_CELL)));
+    const level = field.wl[k];
+    // (Over the sea's sheet too: a river run down below the sea's level would end in it.)
+    return level !== NONE && level !== SEA_CM && level > field.h[k] ? Math.max(h, Math.max(level / 100, WATER_Y) + END_BANK) : h;
+  }
+
+  /** `ground` as the landscape lays it out (without a height field); `dig`: its water's bed and banks too. */
+  private drawnGround(x: number, z: number, dig = true): number {
     const dist = this.distanceToTown(x, z);
     const L = this.land;
     const water = this.drawnWatered;
@@ -1219,7 +1253,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         h = Math.max(water ? 0 : -0.4, rise * (hills + zoned) + rim) + this.mountain(x, z, dist);
       }
     }
-    if (!water || dist === 0) return h;
+    if (!water || dist === 0 || !dig) return h;
     // Down a sandy bank to the shore, then under the water.
     const e = this.drawnWaterEdge(x, z);
     const beach = this.beach;

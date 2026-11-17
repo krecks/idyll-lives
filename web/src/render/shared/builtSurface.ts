@@ -28,7 +28,8 @@
  *   out to its sidewalk's edge, and the road's height round the cells its edge crosses (the land
  *   drawn between the samples meets the road under its edge, never over it); inside a lot the
  *   pad's; beside a lot within `RETAIN_MAX` of the pad (the tallest a retaining edge stands).
- *   Water is left as it is.
+ *   Under a deck carried on over dry land well past its water, it is drawn `DECK_UNDER` under the
+ *   deck's road at least (stored as graded: `graded`). Water is left as it is.
  *
  * The world's grain is the land's (`LAND_CELL` m samples). `at(x, z)` is the surface anything stands
  * on: a lot's pad, a road's height across it, else the graded land between its samples.
@@ -51,6 +52,16 @@ export const CUT_MAX_MOUNTAIN_ROAD = 10;
 export const ROAD_SINK = 0.06;
 /** A bridge's deck stands at least this far over its water (m). */
 export const BRIDGE_CLEAR = 1.2;
+/**
+ * Under a deck carried on over dry land past its water (a drawn street's, over a river's dip: `bridges.ts`
+ * `grownDeck`; further than `DECK_DRY` m past the water, so never the generator's, whose deck ends `DECK_PAST`
+ * m past it), out to its stone's edge (`DECK_APRON` m past the road's: `street.ts` `BRIDGE.apron`), the land
+ * lies at least `DECK_UNDER` m under its road: under its stone (`BRIDGE.under`, 0.6 m), the bank going down
+ * under the bridge as at an abutment, not graded up to the road the deck leaves.
+ */
+export const DECK_UNDER = 0.8;
+const DECK_DRY = 4;
+const DECK_APRON = 2;
 
 /** A road's height is solved every this far along it (m). */
 export const PROFILE_STEP = 2;
@@ -185,8 +196,12 @@ export class BuiltSurface {
   readonly rows: number;
   /** The graded land (m) at every sample: what the terrain is drawn from. */
   conformed: Float32Array;
+  /** Under a deck's dry reach, the graded land held down under its stone (`DECK_UNDER`) was this (m; NaN elsewhere): what is stored (`graded`), so the roads are solved from the land as it was graded. */
+  private held: Float32Array;
   private profiles: Profile[] = [];
   private pads: Float64Array;
+  /** Each turned backdrop building's standing in water (none of its footprint dry, its middle wet): it grades no ground (`solveLand`). */
+  private afloat: Uint8Array;
   /** Each lot's road's height at its entry (NaN: none). */
   private entries: Float64Array;
   /** Each lot's neighbours: the pads within the land's grain of it. */
@@ -233,6 +248,7 @@ export class BuiltSurface {
       }
     });
     this.pads = new Float64Array(plots.length);
+    this.afloat = new Uint8Array(plots.length);
     this.entries = new Float64Array(plots.length);
     this.touching = plots.map((p, i) => {
       const out = new Set<number>();
@@ -249,6 +265,7 @@ export class BuiltSurface {
     this.builtY = new Float32Array(this.cols * this.rows);
     this.kind = new Uint8Array(this.cols * this.rows);
     this.conformed = new Float32Array(this.cols * this.rows);
+    this.held = new Float32Array(this.cols * this.rows).fill(NaN);
     this.solve();
   }
 
@@ -405,10 +422,10 @@ export class BuiltSurface {
    */
   graded(): Int16Array {
     const out = new Int16Array(this.cols * this.rows);
-    const { land, builtY, kind, conformed } = this;
+    const { land, builtY, kind, conformed, held } = this;
     for (let k = 0; k < out.length; k++) {
       if (wet(land, k)) out[k] = land.h[k];
-      else out[k] = cm(kind[k] ? builtY[k] : conformed[k]);
+      else out[k] = cm(kind[k] ? builtY[k] : Number.isNaN(held[k]) ? conformed[k] : held[k]);
     }
     return out;
   }
@@ -463,7 +480,7 @@ export class BuiltSurface {
    * what moved in all (`update`'s change, the passes' together).
    */
   settleCuts(rect: LandRect, passes = SETTLE_PASSES, before?: Int16Array): { rect: LandRect | null; change: SurfaceChange } {
-    const { cols, rows, land, kind, conformed } = this;
+    const { cols, rows, land, kind, conformed, held } = this;
     let changed: LandRect | null = null;
     let window = rect;
     const roads = new Set<number>();
@@ -492,7 +509,8 @@ export class BuiltSurface {
               if (ni >= 0 && nj >= 0 && ni < cols && nj < rows && kind[nj * cols + ni] === 2) reach = RETAIN_MAX;
             }
           }
-          const g = conformed[k];
+          // (Under a deck's dry reach, the land as graded, not as held down under its stone.)
+          const g = Number.isNaN(held[k]) ? conformed[k] : held[k];
           const h = land.h[k] / 100;
           // (A cut or fill the land had before the stroke (`before`) is left as it was, not made good: never past it.)
           const had = before ? Math.abs(before[k] / 100 - g) : 0;
@@ -538,6 +556,8 @@ export class BuiltSurface {
         }
       }
       middle[i] = lo <= hi ? (lo + hi) / 200 : heightAt(land, p.x + p.w / 2, p.z + p.d / 2);
+      // (A turned one in water, a river painted over it: its pad is the water's bed, no forecourt for the land round it.)
+      this.afloat[i] = p.poly && lo > hi && wet(land, Math.min(rows - 1, Math.max(0, Math.round((p.z + p.d / 2) / c))) * cols + Math.min(cols - 1, Math.max(0, Math.round((p.x + p.w / 2) / c)))) ? 1 : 0;
       let [from, to] = [-Infinity, Infinity];
       entries[i] = NaN;
       if (p.entry) {
@@ -919,6 +939,8 @@ export class BuiltSurface {
     builtY.fill(NaN);
     kind.fill(0);
     const near = new Float32Array(cols * rows).fill(Infinity);
+    // (The least the land lies under a deck carried on over dry land: `DECK_UNDER`.)
+    const ceiling = new Float32Array(cols * rows).fill(Infinity);
     const c = LAND_CELL;
     // Roads, out to their sidewalks' edges (where two overlap, the one whose middle is nearer); a bridge's deck is not on the land.
     roads.forEach((r, road) => {
@@ -928,6 +950,16 @@ export class BuiltSurface {
       // (Beside it out to a cell's diagonal past its edge: every corner of a cell its edge crosses.)
       const reach = half + c * Math.SQRT2;
       const spans = bridgeSpans(r);
+      // Each deck's water along it: its dry reach past that is further than `DECK_DRY` m from it.
+      const waters = spans.map((span): [number, number] => {
+        let [from, to] = [Infinity, -Infinity];
+        for (let s = span[0]; s <= span[1]; s += 1) {
+          const { p } = pointAt(r.points, s, ls);
+          const k = Math.min(rows - 1, Math.max(0, Math.round(p[1] / c))) * cols + Math.min(cols - 1, Math.max(0, Math.round(p[0] / c)));
+          if (wet(land, k)) [from, to] = [Math.min(from, s), Math.max(to, s)];
+        }
+        return from <= to ? [from - DECK_DRY, to + DECK_DRY] : [-Infinity, Infinity];
+      });
       for (let k = 0; k + 1 < r.points.length; k++) {
         const a = r.points[k];
         const b = r.points[k + 1];
@@ -960,6 +992,9 @@ export class BuiltSurface {
             } else if (d > reach || (near[at] < Infinity && kind[at] !== BESIDE) || d >= near[at]) continue;
             const s = ls[k] + t * l;
             if (spans.some((span) => s >= span[0] && s <= span[1])) {
+              if (d <= half + DECK_APRON && spans.some((span, n) => s >= span[0] && s <= span[1] && (s < waters[n][0] || s > waters[n][1]))) {
+                ceiling[at] = Math.min(ceiling[at], this.roadY(road, s) - DECK_UNDER);
+              }
               if (!under) continue;
               near[at] = d;
               builtY[at] = NaN;
@@ -975,16 +1010,30 @@ export class BuiltSurface {
     });
     // Lots (the higher pad where two touch); a turned backdrop building's on its footprint and round it, out over
     // what it stands on (`GROUND_ROUND`) and a cell's diagonal past that (every corner of a cell its edge crosses,
-    // as beside a road: the land drawn between the samples meets its forecourt under its edge), but not under a road.
+    // as beside a road: the land drawn between the samples meets its forecourt under its edge), but not under a road,
+    // and past its footprint not in a box nor beside one whose pad is more than a retaining edge from its own (a lot's
+    // pad is its own and the land beside it within `RETAIN_MAX` of it: its ground gives way to it as to a road); one
+    // standing in water none (`afloat`: its pad the water's bed, it would dig the banks round it out to that).
+    const boxed = new Uint8Array(cols * rows);
+    /** Whether sample (i, j) is in a box (a lot's, or a backdrop building's along x and z), or beside one whose pad is more than a retaining edge from `y`. */
+    const byBox = (i: number, j: number, y: number) => {
+      if (boxed[j * cols + i]) return true;
+      for (let nj = Math.max(0, j - 1); nj <= Math.min(rows - 1, j + 1); nj++) {
+        for (let ni = Math.max(0, i - 1); ni <= Math.min(cols - 1, i + 1); ni++) if (boxed[nj * cols + ni] && Math.abs(builtY[nj * cols + ni] - y) > RETAIN_MAX) return true;
+      }
+      return false;
+    };
     plots.forEach((p, n) => {
+      if (this.afloat[n]) return;
       const out = p.poly ? GROUND_ROUND + c * Math.SQRT2 : 0;
       for (let j = Math.max(0, Math.ceil((p.z - out) / c)); j <= Math.min(rows - 1, Math.floor((p.z + p.d + out) / c)); j++) {
         for (let i = Math.max(0, Math.ceil((p.x - out) / c)); i <= Math.min(cols - 1, Math.floor((p.x + p.w + out) / c)); i++) {
           const at = j * cols + i;
           // (Beside a road, only where its pad is no higher: the land meets the sidewalk's edge under it, and its ground's.)
-          if (p.poly && (kind[at] === 1 || (kind[at] === BESIDE && pads[n] > builtY[at]) || !onPad(p, i * c, j * c, out))) continue;
+          if (p.poly && (kind[at] === 1 || (kind[at] === BESIDE && pads[n] > builtY[at]) || !onPad(p, i * c, j * c, out) || (!onPad(p, i * c, j * c) && byBox(i, j, pads[n])))) continue;
           builtY[at] = kind[at] === 2 ? Math.max(builtY[at], pads[n]) : pads[n];
           kind[at] = 2;
+          if (!p.poly) boxed[at] = 1;
         }
       }
     });
@@ -1016,6 +1065,7 @@ export class BuiltSurface {
       }
     }
     const out = this.conformed;
+    const held = this.held;
     const { h: heights, wl } = land;
     for (let k = 0; k < out.length; k++) {
       const h = heights[k] / 100;
@@ -1024,6 +1074,12 @@ export class BuiltSurface {
       else if (kind[k]) out[k] = builtY[k];
       else if (lo[k] > hi[k]) out[k] = (lo[k] + hi[k]) / 2;
       else out[k] = Math.min(hi[k], Math.max(lo[k], h));
+      // (Under a deck's dry reach, under its stone; a sample beside the road it leaves too. Drawn so, not stored: `graded`.)
+      held[k] = NaN;
+      if ((kind[k] === 0 || kind[k] === BESIDE) && out[k] > ceiling[k] && !wet(land, k)) {
+        held[k] = out[k];
+        out[k] = ceiling[k];
+      }
     }
   }
 }

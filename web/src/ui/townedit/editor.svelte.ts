@@ -23,7 +23,7 @@ import { app } from '../app.svelte';
 import { toast } from '../state.svelte';
 import { checkTown } from './checkJob';
 import { buildingBox, editGhosts, joinGhosts, lotBox, roadGhost } from './ghosts';
-import { hatched } from './layoutApi';
+import { hatched, shownUses } from './layoutApi';
 import { find, keyOf, pick, type Picked, type PickWhat } from './pick';
 import type { Issue, TownIssues } from './problems';
 import { EditSession, type SettleTiming } from './session';
@@ -413,7 +413,8 @@ export class TownEditorState implements TownEditor {
     this.usesDrawn = plan;
     // (An edit that left the zones and the roads as they were leaves the overlay as it is.)
     if (plan && was && plan.open?.uses === was.open?.uses && plan.roads === was.roads) return;
-    const layer = plan?.open?.uses ?? null;
+    // (None on a road: a street drawn across zones leaves the cells under it painted.)
+    const layer = plan ? shownUses(plan) : null;
     menuScene.setUses(layer, layer && plan ? hatched(plan) : null);
   }
 

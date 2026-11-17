@@ -110,7 +110,7 @@ function modelWatch(): Plugin {
 
 /**
  * Dev server endpoints for debug reports (see src/debug/report.ts):
- * POST /__debug/report writes report.json, save.txt and screenshot.jpg into a new folder;
+ * POST /__debug/report writes report.json, save.txt, screenshot.jpg and newgame.json (a report taken in New game) into a new folder;
  * GET /__debug/reports/<name>/<file> reads them back (`?debugReport=<name>` loads one);
  * GET /__debug/states/<name> reads a game state the tests wrote (`?state=<name>` loads one);
  * POST /__debug/bench writes a benchmark's result to `bench-results/`;
@@ -144,10 +144,11 @@ function debugReports(): Plugin {
         try {
           const chunks: Buffer[] = [];
           for await (const chunk of req) chunks.push(chunk as Buffer);
-          const { report, save, screenshot } = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+          const { report, save, screenshot, newGame } = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
             report: { createdAt: string; note: string };
             save: string | null;
             screenshot: string | null;
+            newGame?: string | null;
           };
           const slug = report.note.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
           const name = report.createdAt.replace(/\.\d+Z$/, '').replace(/[:T]/g, '-') + (slug ? `-${slug}` : '');
@@ -157,6 +158,8 @@ function debugReports(): Plugin {
           // No save when the game had stopped (or none ran): the report alone.
           if (save !== null) await writeFile(join(dir, 'save.txt'), save);
           if (screenshot) await writeFile(join(dir, 'screenshot.jpg'), Buffer.from(screenshot.slice(screenshot.indexOf(',') + 1), 'base64'));
+          // (New game's state: `?debugReport=<name>` opens New game again at its step.)
+          if (typeof newGame === 'string') await writeFile(join(dir, 'newgame.json'), newGame);
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ path: `debug-reports/${name}` }));
           server.config.logger.info(`[debug] report saved to debug-reports/${name}`, { timestamp: true });
@@ -196,7 +199,7 @@ function debugReports(): Plugin {
       });
       server.middlewares.use('/__debug/reports/', async (req, res) => {
         const [name, file] = decodeURIComponent((req.url ?? '').split('?')[0]).replace(/^\//, '').split('/');
-        if (!name || !file || name.includes('..') || !['report.json', 'save.txt', 'screenshot.jpg'].includes(file)) {
+        if (!name || !file || name.includes('..') || !['report.json', 'save.txt', 'screenshot.jpg', 'newgame.json'].includes(file)) {
           return void ((res.statusCode = 404), res.end());
         }
         try {

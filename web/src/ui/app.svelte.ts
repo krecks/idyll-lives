@@ -96,7 +96,7 @@ class AppState {
   code = $state.raw<Chosen | null>(null);
   /** Step 1's land (with the player's shaping). */
   land = $state.raw<MadeLand | null>(null);
-  /** Where the player moved the town (its box's corner, m; step 2's "Move the town"); null: where the land has it. */
+  /** Where the player moved the town (its box's middle, m; step 2's "Move the town"); null: where the land has it. */
   site = $state.raw<Pt | null>(null);
   /** The town's name as typed or rolled in steps 2 and 3; null: the one it was laid with. */
   townName = $state<string | null>(null);
