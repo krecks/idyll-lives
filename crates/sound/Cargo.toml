@@ -1,0 +1,10 @@
+[package]
+name = "sound"
+description = "The game's sounds, synthesised: loops, music, birdsong, footsteps, blips and the rooms' reverb."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+# fdlibm's sin, exp, pow…: the same results natively and in wasm (and as V8's Math gave them).
+libm = "0.2"
