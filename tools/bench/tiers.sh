@@ -20,6 +20,7 @@
 #                           tiles (320, 780): the camera's square at speed 5, as the game runs
 #   FEATURES=               cargo features for the build (`profile`: where the time went, slower)
 #   PARALLEL=1              runs at once (the machine is shared with others: keep it low)
+#   TABLE_ONLY=1            only the table, from the runs already logged
 #
 # The worlds are made once into bench-results/tiers/tier-<tier>.json (`tools/worlds/sample.ts
 # --tier`); delete them to make them again (after a change to the generator). Each run's log goes
@@ -69,7 +70,11 @@ done
 
 suffix=${watch:+-w$watch}
 jobs=0
-for round in $(seq 1 "$rounds"); do
+# (TABLE_ONLY=1: the table of the runs already logged, none run.)
+if [ -n "${TABLE_ONLY:-}" ]; then rounds=0; fi
+round=0
+while [ "$round" -lt "$rounds" ]; do
+  round=$((round + 1))
   for i in "${!names[@]}"; do
     for t in $tiers; do
       for k in $at; do
@@ -90,6 +95,8 @@ for round in $(seq 1 "$rounds"); do
 done
 wait
 
+# (A run that failed or was cut short has no numbers: the table goes on without them.)
+set +e +o pipefail
 # The table: per tier and world, each label's best run (its ticks/s; the slowest hour's and its
 # hour; with WATCH, a step's p99 and how many were at full detail) and its save hash.
 table=$out/$(IFS=-; echo "${names[*]}")$suffix.md
