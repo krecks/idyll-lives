@@ -24,7 +24,7 @@
   import { installLandHook } from '../land/landHook';
   import { LandStroke, type LandSurface } from '../land/landStroke';
   import { brushOf, startBrush, type BrushState } from '../land/landTools';
-  import { codeFrom, firstCode, fitted, landKey, landStats, optionsOf, SIZE_CHOICES, startCode, stepLabel, STEPS as FLOW, withSeed, type Chosen } from '../newGame';
+  import { codeFrom, firstCode, fitted, landKey, landStats, optionsOf, SIZE_CHOICES, startCode, stepLabel, STEPS as FLOW, goesWords, whatGoes, withSeed, type Chosen } from '../newGame';
   import SetupConfirm from './SetupConfirm.svelte';
   import SetupShell, { type Making } from './SetupShell.svelte';
 
@@ -347,8 +347,9 @@
       }
       app.screen = 'streets';
     };
-    if ((app.layout?.edited || app.world?.edited) && app.land && app.land.key !== key) {
-      confirming = { text: 'The land changed: the streets are laid out on it again, and your changes to the layout and the town go.', yes: 'Lay it out again', keep: 'Keep my town', at: 'actions', go };
+    const ask = whatGoes('land', { layoutEdited: !!app.layout?.edited, townTweaked: !!app.world?.edited }).ask;
+    if (ask.length && app.land && app.land.key !== key) {
+      confirming = { text: `The land changed: the streets are laid out on it again, and ${goesWords(ask)} go.`, yes: 'Lay it out again', keep: 'Keep my town', at: 'actions', go };
       return;
     }
     go();

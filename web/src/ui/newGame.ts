@@ -168,6 +168,12 @@ export function whatGoes(change: 'land' | 'propose' | 'layout' | 'build', state:
   return { remake, ask };
 }
 
+/** What `whatGoes` asks about, in words for the question: "your streets and zones, and your changes to the built town". */
+export function goesWords(ask: readonly ('layout' | 'town')[]): string {
+  const words = ask.map((a) => (a === 'layout' ? 'your streets and zones' : 'your changes to the built town'));
+  return words.join(', and ');
+}
+
 /** The player's changes to a town, in words for a question: "your change", "your 3 changes" ("your changes" when not counted). */
 export function changesWord(n: number): string {
   return n === 1 ? 'your change' : n > 1 ? `your ${n} changes` : 'your changes';

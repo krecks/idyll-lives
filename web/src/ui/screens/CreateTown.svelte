@@ -28,7 +28,7 @@
   import Icon from '../Icon.svelte';
   import TownStage, { type LotLabel } from '../kit/TownStage.svelte';
   import { services } from '../services';
-  import { addedStreets, changesWord, layoutPlan, optionsOf, startCode, stepLabel, STEPS, worldKeyOf } from '../newGame';
+  import { addedStreets, changesWord, layoutPlan, optionsOf, startCode, stepLabel, STEPS, whatGoes, worldKeyOf } from '../newGame';
   import SetupConfirm from './SetupConfirm.svelte';
   import SetupShell, { type Making } from './SetupShell.svelte';
   import { TownEditorState } from '../townedit/editor.svelte';
@@ -185,8 +185,7 @@
       app.buildSeed = roll();
       void build();
     };
-    const w = app.world;
-    if (w?.edited) confirming = { text: `Building the town again from the same layout: ${changesWord(editor.edits)} to it go.`, yes: 'Build again', go };
+    if (whatGoes('build', { layoutEdited: !!app.layout?.edited, townTweaked: !!app.world?.edited }).ask.length) confirming = { text: `Building the town again from the same layout: ${changesWord(editor.edits)} to it go.`, yes: 'Build again', go };
     else go();
   }
 

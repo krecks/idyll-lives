@@ -27,7 +27,7 @@
   import Segmented from '../kit/Segmented.svelte';
   import TownStage, { type LotLabel, type StageTool } from '../kit/TownStage.svelte';
   import { services } from '../services';
-  import { changesWord, fitted, optionsOf, SIZE_CHOICES, startCode, stepLabel, STEPS, townKey, worldKeyOf, type Chosen } from '../newGame';
+  import { changesWord, fitted, goesWords, optionsOf, SIZE_CHOICES, startCode, stepLabel, STEPS, townKey, whatGoes, worldKeyOf, type Chosen } from '../newGame';
   import SetupConfirm from './SetupConfirm.svelte';
   import SetupShell, { type Making } from './SetupShell.svelte';
   import { TownEditorState } from '../townedit/editor.svelte';
@@ -172,9 +172,11 @@
     job?.abort();
   });
 
+  /** What proposing again asks about (`whatGoes`): the layout's edits, the built town's tweaks. */
+  const asks = () => whatGoes('propose', { layoutEdited: !!app.layout?.edited, townTweaked: !!app.world?.edited }).ask;
   /** Asked first if the layout has the player's own changes, or the town built from it was tweaked (proposing again throws them away). */
   function unlessEdited(text: string, yes: string, go: () => void) {
-    if (app.layout?.edited || app.world?.edited) confirming = { text, yes, no: 'Keep my layout', go };
+    if (asks().length) confirming = { text, yes, no: 'Keep my layout', go };
     else go();
   }
   let confirming = $state<{ text: string; yes: string; no: string; go: () => void } | null>(null);
@@ -187,7 +189,7 @@
     else unasked++;
   }
   /** What proposing again throws away, said for the question. */
-  const yourWork = () => (app.layout?.edited && app.world?.edited ? 'your streets and zones, and your changes to the built town, go' : app.layout?.edited ? 'your streets and zones go' : 'your changes to the built town go');
+  const yourWork = () => `${goesWords(asks())} go`;
 
   /** The town or the villages changed: the layout proposed again with them, on the same seed (once the options have stood for 300 ms). */
   function setOption(key: 'town' | 'villages', value: string) {

@@ -1,6 +1,7 @@
 /**
- * Step 2's Problems list: what is wrong with the town as the player has edited it, read by the same
- * checks the sample tool runs over every generated world (`townCheck.ts` `townProblems`).
+ * The Problems list (steps 2 and 3): what is wrong with the layout or the town as the player has edited
+ * it, read by the same checks the sample tool runs over every generated world (`townCheck.ts`
+ * `townProblems`). Step 2's layout has no lots: its problems are its roads'.
  *
  * Those checks read a town file (`CheckedTown`, what `assembleTown` writes), and assembling one
  * means furnishing every house: far too slow after every edit. `checkedTown` writes the part of a
@@ -141,7 +142,9 @@ export function townIssues(draft: NeighbourhoodDraft, t: Templates, content: Con
   const found = townProblems(checkedTown(draft, t), expect, { river: false, careers, generated: false });
   const homes = draft.slots.filter((s) => s.kind === 'house').length;
   const lines = [...found.hard];
-  if (homes < 2) lines.push(`fewer than two homes (${homes})`);
+  // (Step 2's layout has no lots yet: its homes are zones, and the way on counts them itself.)
+  const layout = !draft.slots.length && !!draft.open?.uses;
+  if (homes < 2 && !layout) lines.push(`fewer than two homes (${homes})`);
   const had = new Set(base?.blocking.map((i) => i.text) ?? []);
   const out: TownIssues = { blocking: [], warnings: [] };
   for (const line of lines) {

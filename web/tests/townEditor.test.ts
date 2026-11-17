@@ -301,6 +301,14 @@ describe('the Problems list and picking, on a generated town', async () => {
     expect(file(withUses)).toBe(file(hamlet));
   });
 
+  test("step 2's layout (no lots, its homes zones) isn't blocked for want of homes; a town with none is", () => {
+    const { cols, rows } = useGrid(hamlet.width, hamlet.depth);
+    const bare = { ...hamlet, slots: [], open: { ...hamlet.open!, pads: {}, places: [], backdrop: [] } };
+    const layout = { ...bare, open: { ...bare.open, uses: packUses(new Uint8Array(cols * rows), cols, rows) } };
+    expect(townIssues(layout, t, content).blocking.map((i) => i.text)).not.toContainEqual(expect.stringMatching(/fewer than two homes/i));
+    expect(townIssues(bare, t, content).blocking.map((i) => i.text)).toContainEqual(expect.stringMatching(/fewer than two homes/i));
+  });
+
   test('the laid town blocks nothing; a lot moved onto a road blocks the way on, named, with where it is', () => {
     const base = townIssues(hamlet, t, content);
     expect(base.blocking).toEqual([]);
