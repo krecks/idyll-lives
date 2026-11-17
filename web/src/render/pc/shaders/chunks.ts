@@ -55,7 +55,7 @@ import { CUTOUT } from './cutout';
 import { DIAG_VIEW } from './diagView';
 import { gameNormalMap } from './bump';
 import { gameFresnel, gameReflection } from './envBrdf';
-import { gameFog, setFogFrom } from './fog';
+import { gameFog, setFogFrom, setLandVeil } from './fog';
 import { CONTACT_DIRECT, SOFT_LOOK } from './softLook';
 import { ROOM_LIGHT_CODE, ROOM_LIGHT_ROOMS, ROOM_LIGHTS } from './roomLights';
 import { PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
@@ -239,8 +239,9 @@ export function gameChunks(device: pc.GraphicsDevice): Record<Language, Record<s
   let chunks = cache.get(device);
   if (!chunks) {
     cache.set(device, (chunks = { glsl: build(device, 'glsl'), wgsl: build(device, 'wgsl') }));
-    // (The haze from the eye until the renderer says otherwise: the gallery and the previews never do.)
+    // (The haze from the eye, and no land's veil, until the renderer says otherwise: the gallery and the previews never do.)
     setFogFrom(device, 0);
+    setLandVeil(device, 0, 0, 0, 0, 1, 0, 1);
   }
   return chunks;
 }

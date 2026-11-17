@@ -504,7 +504,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * are on (`showLayers`).
    */
   private overview: TownOverview | null = null;
-  /** The haze the menus' land fades into past its edge, from far out (`landHaze.ts`); made with the first town shown. */
+  /** The haze the menus' land fades into at its edge (`landHaze.ts`); made with the first town shown. */
   private landHaze: LandHaze | null = null;
   private townShot: TownShot | null = null;
   private townHighlight: LotHighlight | null = null;
@@ -1276,8 +1276,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const flat = Math.sin(p.beta) * p.radius;
       const [ex, ey, ez] = [p.target.x + Math.cos(p.alpha) * flat, p.target.y + Math.cos(p.beta) * p.radius, p.target.z + Math.sin(p.alpha) * flat];
       this.applyTownCamera(p.radius, p.alpha, p.beta, ex, ey, ez, true);
-      // (The land's veil moved for the eye: each of its points over the land it is for, as seen from here.)
-      if (this.landHaze?.view(ex, ey, ez)) this.held?.changed();
       this.camera.setPose(p.alpha, p.beta, p.radius, p.target.x, p.target.y, p.target.z, p.targetScreenOffset.x, p.targetScreenOffset.y);
     } else {
       const o = this.orbit;
@@ -3131,7 +3129,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // given: linear.
     const c = l.clearColor;
     this.app.scene.fog.color.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
-    this.landHaze?.setColour(this.app.scene.fog.color);
     this.camera.camera.clearColor = this.colorTmp.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
     // The look's exposure for the hour and the moonlight grade (`post.ts`: uniforms).
     if (this.post) this.post.exposure = l.exposure * LOOK.exposure;
@@ -3201,8 +3198,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         this.townRig.ground = (x, z) => nature.landscape.heightAt(x, z);
         // (The land faded into the haze past its landscape's edge, from far out.)
         const haze = (this.landHaze ??= new LandHaze(this.app, this.root));
-        haze.set(this.townReach, (x, z) => nature.landscape.heightAt(x, z), townLayer(this.app).id, `${landscapeId(nature.landscape)}|${nature.landscape.landVersion}`);
-        haze.setColour(this.app.scene.fog.color);
+        haze.set(this.townReach, `${landscapeId(nature.landscape)}|${nature.landscape.landVersion}`);
       } finally {
         this.townBuilds--;
       }
@@ -3650,8 +3646,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.townRig.frame(secs, w / h);
     // (Its highlights' colours are written in place: the held frame is drawn again, `heldFrames.ts`. From far out the
     // lit lots are washed over whole.)
-    this.overview?.setReach(this.townPose.radius);
-    this.landHaze?.show(this.townPose.radius);
+    const p = this.townPose;
+    this.overview?.setReach(p.radius);
+    // (The land's veil by the camera's distance, and where its eye is: past the land's edge, in the haze.)
+    const flat = Math.sin(p.beta) * p.radius;
+    this.landHaze?.show(p.radius, p.target.x + Math.cos(p.alpha) * flat, p.target.z + Math.sin(p.alpha) * flat);
     // (Step 2's ghosts drawn again when the zoom crosses a step of their least widths on screen.)
     if (this.ghostDraw?.setScale(this.townMetresPerPx()) && this.ghosts) this.drawGhosts();
     if (this.useDraw?.setScale(this.townMetresPerPx()) && this.uses) this.drawUses();

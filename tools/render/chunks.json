@@ -718,7 +718,7 @@
       ]
     },
     {
-      "for": "render/pc/shaders/fog.ts: the game's haze (the eye's distance, the factor linearised).",
+      "for": "render/pc/shaders/fog.ts: the game's haze (the eye's distance, the factor linearised, the menus' land's veil by where a thing stands).",
       "anchors": [
         {
           "chunk": "common/frag/fog.js",
