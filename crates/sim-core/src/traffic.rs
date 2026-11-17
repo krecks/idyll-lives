@@ -21,7 +21,8 @@
 //! 1. none of it is in the way (`conflict`) of what's left of a part another holds,
 //! 2. nor of an earlier ask still waiting,
 //! 3. and nobody not holding a part is in it now, nor anyone at all on its far side ("don't block
-//!    the box"), nor anyone on the move into it in the next second or so (`LOOK`).
+//!    the box"), nor anyone on the move into it in the next second or so (`LOOK`), nor one turning
+//!    round backing into it, however slowly (`Traffic::turning`).
 //!
 //! Two bodies are in each other's way (`conflict`) when they overlap or come within `CLEAR`; going
 //! the same way (one following the other through, each keeping behind the one in front:
@@ -2481,10 +2482,22 @@ impl Traffic {
                     continue;
                 }
                 let inside = hit(&m.rect, strict);
-                if !inside && m.moving && m.ahead.iter().any(|r| hit(r, false)) {
+                // (One turning round (`cars::unjam`) is on its way into the ground it still backs
+                // up over, however slowly, and stands at its end till it's on its way out of it:
+                // it has the way there (`cars::drive_on`). Let into a narrow stretch whose far end
+                // that was, one came up nose to nose with it there, the one turning round waiting
+                // for its claim and that one for its body, for good, Mirrorshore.)
+                let backs_in = !inside
+                    && self
+                        .turning
+                        .iter()
+                        .find(|t| t.0 == m.key)
+                        .is_some_and(|(_, path)| path.iter().any(|r| hit(r, true)));
+                let on_into = backs_in || m.moving && m.ahead.iter().any(|r| hit(r, false));
+                if !inside && on_into {
                     coming.push(m.key);
                 }
-                if inside || m.moving && m.ahead.iter().any(|r| hit(r, false)) {
+                if inside || on_into {
                     bodies.push(m.key);
                 }
             }
@@ -3830,5 +3843,55 @@ mod tests {
             traffic.blocked(coming, &now, &next, [0.0, 1.0], 0.7, false),
             None
         );
+    }
+
+    #[test]
+    fn one_isnt_let_into_a_stretch_whose_far_end_one_turning_round_still_backs_into() {
+        // (Mirrorshore's: a taxi let into a narrow bend while a car turning round backed into its
+        // far end, slowly, those on bikes about it; there the two came nose to nose, the taxi
+        // waiting for the car's body and the car for the taxi's claim to drive on out, for good.)
+        let (coming, turning) = (1 << 63 | 69, 1 << 63 | 15);
+        let stretch = claim(&[
+            [0.0, -12.0],
+            [0.0, -6.0],
+            [0.0, 0.0],
+            [0.0, 6.0],
+            [0.0, 12.0],
+        ]);
+        // (Facing +z, backing towards -z: as yet well clear of the stretch, standing a while.)
+        let back = |z: f32| rect([0.0, z], 0.0);
+        let mover = Mover {
+            way: [0.0, -1.0],
+            ..standing(turning, [0.0, 25.0], 0.0)
+        };
+        let mut traffic = Traffic {
+            turning: vec![(
+                turning,
+                (0..=20).map(|k| back(25.0 - k as f32 * 0.5)).collect(),
+            )],
+            ..Default::default()
+        };
+        traffic.may_go(1, coming, 0, std::slice::from_ref(&stretch), 9.5, 10.5);
+        traffic.begin(
+            2,
+            vec![standing(coming, [0.0, -15.0], 0.0), mover],
+            &[(coming, 0, 9.5)],
+            &[],
+        );
+        assert!(!traffic.holding(coming), "it waits short of the stretch");
+        assert!(traffic.waits_for(coming).contains(&turning));
+        // (Turned round, gone on, the ground clear: it's let in.)
+        let mut traffic = Traffic::default();
+        traffic.may_go(1, coming, 0, std::slice::from_ref(&stretch), 9.5, 10.5);
+        traffic.begin(
+            2,
+            vec![
+                standing(coming, [0.0, -15.0], 0.0),
+                standing(turning, [0.0, 25.0], 0.0),
+            ],
+            &[(coming, 0, 9.5)],
+            &[],
+        );
+        assert!(traffic.holding(coming));
     }
 }

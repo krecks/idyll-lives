@@ -14,8 +14,11 @@ import type { LandCursor } from '../types';
 const SEGMENTS = 64;
 /** How high over the ground the rings hang (m). */
 const CURSOR_Y = 0.15;
-/** The bands' width: this share of the brush's reach, between these (m). */
-const BAND = { share: 0.025, min: 0.25, max: 3 };
+/**
+ * The bands' width: this share of the brush's reach, between these (m); down to `thin` on a ring
+ * under 2 m in radius (a point brush's), so it still reads as a ring round its one sample.
+ */
+const BAND = { share: 0.025, min: 0.25, max: 3, thin: 0.12 };
 /** The colours (sRGB) of what the brush does. */
 const TONES: Record<LandCursor['tone'], string> = {
   up: '#FFD166',
@@ -86,7 +89,7 @@ export class LandCursorDraw {
       this.entity.enabled = false;
       return;
     }
-    const band = Math.min(BAND.max, Math.max(BAND.min, cursor.radius * BAND.share));
+    const band = Math.min(BAND.max, Math.max(cursor.radius < 2 ? BAND.thin : BAND.min, cursor.radius * BAND.share));
     const p = this.positions;
     const inner = cursor.inner > 0 && cursor.inner < cursor.radius - band ? cursor.inner : 0;
     for (const [ring, r] of [

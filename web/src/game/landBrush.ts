@@ -8,6 +8,10 @@
  * also ask whether a sample may be wet (`wettable`): water keeps off lots and roads. After every
  * stamp the water settles (`settleWater`): a level stays only where it stands over its ground,
  * and dry ground lowered beside water under its level fills from it.
+ *
+ * A brush `POINT` m across or narrower is a point brush: the falloff is left out, and a stamp
+ * changes the one sample nearest the pointer (a cover tool, the one cover cell under it), so the
+ * player can touch the land one point at a time.
  */
 
 import { COVER, COVER_CELL, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, wetAt, type Land, type LandRect } from './land';
@@ -26,6 +30,27 @@ export interface Brush {
   radius: number;
   strength: number;
   height?: number;
+}
+
+/** A brush this wide (m across, twice its radius) or narrower is a point brush. */
+export const POINT = 4;
+
+/** Whether `brush` is a point brush (`POINT`). */
+export const isPoint = (brush: Pick<Brush, 'radius'>) => brush.radius * 2 <= POINT;
+
+/**
+ * The grid a point brush of `tool` snaps to: the samples (every `LAND_CELL` m from 0) for most
+ * tools, the cover cells' middles (every `COVER_CELL` m from half a cell in) for the cover tools.
+ */
+export function pointGrid(tool: LandTool): { unit: number; offset: number } {
+  return TOOL_KIND[tool] === 'cover' ? { unit: COVER_CELL, offset: COVER_CELL / 2 } : { unit: LAND_CELL, offset: 0 };
+}
+
+/** Where `brush` works with the pointer at (`x`, `z`): a point brush's grid point nearest it, else the pointer itself. */
+export function aimOf(brush: Brush, x: number, z: number): [number, number] {
+  if (!isPoint(brush)) return [x, z];
+  const { unit, offset } = pointGrid(brush.tool);
+  return [offset + Math.round((x - offset) / unit) * unit, offset + Math.round((z - offset) / unit) * unit];
 }
 
 /** One stamp along a stroke: where (world m) and the seconds since the last one. */
@@ -163,16 +188,19 @@ function heightIn(land: Land, h: Int16Array, x: number, z: number): number {
  * samples it changed (null: none). `free(i, j)` is how far sample (i, j) may change (0 on built
  * land, 1 well clear of it); `wettable(i, j)` whether it may be under water (every sample if not
  * given). `peak` and `range` only note the point here: they are raised once, on release
- * (`placeMountain`), with `mountainGhost` to draw while dragging.
+ * (`placeMountain`), with `mountainGhost` to draw while dragging. A point brush works at its grid
+ * point nearest `at` (`aimOf`), on that one sample or cover cell at full strength.
  */
 export function stamp(land: Land, brush: Brush, at: Stamp, stroke: StrokeState, free: Free, wettable?: Wettable): LandRect | null {
   if (stroke.stopped) return null;
-  const { x, z } = at;
+  const [x, z] = aimOf(brush, at.x, at.z);
   if (!stroke.stamps) stroke.seed = (Math.imul(Math.round(x), 73856093) ^ Math.imul(Math.round(z), 19349663)) >>> 0;
   stroke.stamps++;
   stroke.path.push([x, z]);
   const tool = brush.tool;
-  const R = Math.max(LAND_CELL, brush.radius);
+  // (A point brush's reach is half a sample, so the one sample at its middle is all it finds, at
+  // a falloff of 1; a cover tool's paints the cell under it alone.)
+  const R = isPoint(brush) ? LAND_CELL / 2 : Math.max(LAND_CELL, brush.radius);
   const s = clamp01(brush.strength);
   let changed: LandRect | null;
   switch (tool) {
@@ -196,7 +224,7 @@ export function stamp(land: Land, brush: Brush, at: Stamp, stroke: StrokeState, 
     case 'range':
       return null;
     default:
-      return paint(land, x, z, R, COVER_OF[tool] ?? COVER.open, stroke, free);
+      return paint(land, x, z, isPoint(brush) ? 0 : R, COVER_OF[tool] ?? COVER.open, stroke, free);
   }
   if (!changed) return null;
   settleWater(land, changed, wettable);
@@ -364,18 +392,23 @@ function dry(land: Land, x: number, z: number, R: number, free: Free): LandRect 
   return any ? rect : null;
 }
 
-/** The cover tools: `cover` on every cover cell where the falloff is over a half and the land is free to change. */
+/**
+ * The cover tools: `cover` on every cover cell where the falloff is over a half, and always on the
+ * cell under the brush's middle (so a small brush never paints nothing; `R` 0 paints that cell
+ * alone), where the land is free to change.
+ */
 function paint(land: Land, x: number, z: number, R: number, cover: number, stroke: StrokeState, free: Free): LandRect | null {
   const [cw, cd] = [coverSpan(land.cols), coverSpan(land.rows)];
-  const c0 = Math.max(0, Math.floor((x - R) / COVER_CELL));
-  const r0 = Math.max(0, Math.floor((z - R) / COVER_CELL));
-  const c1 = Math.min(cw, Math.ceil((x + R) / COVER_CELL));
-  const r1 = Math.min(cd, Math.ceil((z + R) / COVER_CELL));
+  const [mc, mr] = [Math.floor(x / COVER_CELL), Math.floor(z / COVER_CELL)];
+  const c0 = Math.max(0, Math.min(mc, Math.floor((x - R) / COVER_CELL)));
+  const r0 = Math.max(0, Math.min(mr, Math.floor((z - R) / COVER_CELL)));
+  const c1 = Math.min(cw, Math.max(mc + 1, Math.ceil((x + R) / COVER_CELL)));
+  const r1 = Math.min(cd, Math.max(mr + 1, Math.ceil((z + R) / COVER_CELL)));
   let out: LandRect | null = null;
   for (let r = r0; r < r1; r++) {
     for (let c = c0; c < c1; c++) {
       const [cx, cz] = [(c + 0.5) * COVER_CELL, (r + 0.5) * COVER_CELL];
-      if (falloff(Math.hypot(cx - x, cz - z), R) <= 0.5) continue;
+      if ((c !== mc || r !== mr) && falloff(Math.hypot(cx - x, cz - z), R) <= 0.5) continue;
       const [i, j] = [Math.min(land.cols - 1, Math.round(cx / LAND_CELL)), Math.min(land.rows - 1, Math.round(cz / LAND_CELL))];
       if (free(i, j) <= 0.5 || land.cover[r * cw + c] === cover) continue;
       land.cover[r * cw + c] = cover;

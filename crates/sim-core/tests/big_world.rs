@@ -9,9 +9,11 @@
 //!
 //! Timing depends on the machine, so it is opt-in and prints its numbers:
 //! `cargo test --release -p sim-core --test big_world -- --ignored --nocapture`
-//! with `SIZE=1024` (default 256), `RESIDENTS=160` (default: as many as a town holds) and
+//! with `SIZE=1024` (default 256), `RESIDENTS=640` (default: as many as a town holds; the hamlets
+//! of a 1024 world have homes for about 580) and
 //! `HOURS=6` (game hours to run, default 4) in the environment. The world is a town with roads and
 //! areas; `OPEN=0` makes it one without them (as the first baseline was measured on).
+//! `--features profile` adds where the ticks' time went, phase by phase (`profile.rs`).
 //! `WORLDS=worlds.json` (a file of `tools/worlds/sample.ts`'s shape) runs a real Big town instead,
 //! the `WORLD`th in it (default 0), as it was made (`SIZE` and `RESIDENTS` don't apply), the view on
 //! the player's home.
@@ -157,13 +159,23 @@ fn big_world_benchmark() {
     );
     let ticks = hours * 60 * sim_core::TICKS_PER_MINUTE;
     let mut times = Vec::with_capacity(ticks as usize);
-    let run = Instant::now();
+    sim_core::profile::reset();
+    // (The public parking spots taken, by cars on a trip there or on their way to one: the most at
+    // once, and the ticks nine in ten or more were taken; outside the timing.)
+    let spots = w.travel.file.parking.len();
+    let (mut most_parked, mut full_ticks) = (0, 0u64);
+    let mut ticking = Duration::ZERO;
     for _ in 0..ticks {
         let t = Instant::now();
         w.tick_once();
-        times.push(t.elapsed());
+        let dt = t.elapsed();
+        ticking += dt;
+        times.push(dt);
+        let parked = w.cars.iter().filter(|c| c.trip.is_some()).count();
+        most_parked = most_parked.max(parked);
+        full_ticks += u64::from(spots > 0 && parked * 10 >= spots * 9);
     }
-    let total = run.elapsed();
+    let total = ticking;
     let searches = sim_core::path::take_search_stats();
     let mut slowest: Vec<(Duration, usize)> = times.iter().copied().zip(0..).collect();
     slowest.sort_unstable_by(|a, b| b.cmp(a));
@@ -198,16 +210,26 @@ fn big_world_benchmark() {
         ms(p99),
         ms(max),
     );
+    // (Where the ticks' time went, phase by phase: with `--features profile` only.)
+    eprint!("{}", sim_core::profile::report());
     eprintln!(
-        "A*: {} searches, {:.0} tiles each on average, {} at most",
+        "A*: {} searches, {:.0} tiles each on average, {} at most; {} found no way or gave up, {:.0} tiles each",
         searches.searches,
         searches.nodes as f64 / searches.searches.max(1) as f64,
-        searches.max_nodes
+        searches.max_nodes,
+        searches.failed,
+        searches.failed_nodes as f64 / searches.failed.max(1) as f64,
     );
     eprintln!(
-        "heap {:.1} MB held after ticking ({:.1} MB at most)",
+        "parking: {spots} public spots, at most {most_parked} taken at once, nine in ten or more taken {:.1} game hours of {hours}",
+        full_ticks as f64 / (60 * sim_core::TICKS_PER_MINUTE) as f64
+    );
+    eprintln!(
+        "heap {:.1} MB held after ticking ({:.1} MB at most), {} residents and {} cars by then",
         mb(HELD.load(Ordering::Relaxed) - before),
-        mb(PEAK.load(Ordering::Relaxed) - before)
+        mb(PEAK.load(Ordering::Relaxed) - before),
+        w.sims.iter().filter(|s| s.here()).count(),
+        w.cars.len(),
     );
 
     let t = Instant::now();

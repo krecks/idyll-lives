@@ -34,8 +34,10 @@
 
 import type { CareerCategory, Content } from '../content/content';
 import type { BackdropBuilding, BackdropUse, TownPlace, TownSize } from '../core/protocol';
+import { townGround } from './edit/ground';
 import { inside, leftOf, lengths, nearest, pointAt, RoadIndex, type Pt, type RoadPlan } from './roads';
-import type { Ground, PlotSlot, Rect } from './town';
+import { plotRect, type Ground, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from './town';
+import { placeOf, specOf } from './world';
 
 type Rand = () => number;
 
@@ -389,7 +391,7 @@ export function fillPoly(poly: readonly Pt[], W: number, D: number, fn: (i: numb
 }
 
 /** What a backdrop building is, and how big a kind of it is: along the road (m), deep (m), storeys, roofs. */
-interface Kind {
+export interface Kind {
   use: BackdropUse;
   w: [number, number];
   d: [number, number];
@@ -429,44 +431,51 @@ const KINDS = {
     [K('hall', [12, 15], [9, 12], [1, 2], ['gable']), 3],
   ],
 } as const satisfies Record<string, readonly (readonly [Kind, number])[]>;
-type Zone = keyof typeof KINDS;
+/** Where a backdrop building stands, which sets its kinds, gaps and setback: a main town's centre, the rest of a main town, a hamlet. */
+export type Zone = keyof typeof KINDS;
 
 /**
- * A main town's civic places, laid first, nearest its square (its high street's middle): what, its
- * kind, how big, its name, the careers working there, and the smallest town that has it.
+ * A main town's civic places, laid first, nearest its square (its high street's middle): what it
+ * is called on a card, its kind, how big, its name, the careers working there, and the smallest
+ * town that has it; and what its name looks like (to know one in a town: `civicOf`).
  */
-interface Civic {
+export interface Civic {
+  label: string;
   kind: Kind;
   place: TownPlace['kind'];
   name: (n: Namer) => string;
   work: string[];
   least: TownSize;
+  /** What a card calls it in a smaller place than a town (a village's hall is its village hall): `civicLabel`. */
+  labels?: Partial<Record<TownSize, string>>;
   /** Its gable end to the road (a church): deeper than wide, the ridge running back from the road. */
   endOn?: boolean;
+  known: RegExp;
 }
 /** The town sizes, smallest first. */
 const SIZES: readonly TownSize[] = ['hamlet', 'village', 'town', 'city'];
-const CIVIC: readonly Civic[] = [
+/** The civic places, in the order a main town lays them (an index into this is a civic place's in step 2's choices: `civicChoices`). */
+export const CIVIC: readonly Civic[] = [
   // (A hamlet's hall is its parish's, a village's its own: the careers no other place takes work there.)
-  { kind: K('office', [16, 20], [12, 14], [3, 3], ['hip', 'mansard']), place: 'office', name: (n) => `${n.town} ${{ hamlet: 'Parish Hall', village: 'Village Hall', town: 'Town Hall', city: 'Town Hall' }[n.size]}`, work: ['politics'], least: 'hamlet' },
-  { kind: K('church', [11, 13], [22, 28], [3, 3], ['gable']), place: 'church', name: (n) => `St ${pick(n.rand, SAINTS)}'s Church`, work: [], least: 'hamlet', endOn: true },
-  { kind: K('school', [28, 36], [14, 18], [2, 2], ['hip', 'flat']), place: 'school', name: (n) => `${n.town} School`, work: ['education'], least: 'village' },
-  { kind: K('office', [12, 16], [11, 13], [2, 3], ['flat', 'hip']), place: 'office', name: (n) => `${n.town} Police Station`, work: ['detective'], least: 'town' },
-  { kind: K('workshop', [16, 20], [14, 16], [2, 2], ['flat']), place: 'workshop', name: (n) => `${n.town} Fire Station`, work: ['firefighter'], least: 'town' },
-  { kind: K('office', [14, 18], [11, 13], [2, 2], ['flat', 'hip']), place: 'office', name: (n) => `${n.street()} Medical Centre`, work: ['medicine'], least: 'town' },
-  { kind: K('workshop', [22, 28], [16, 20], [2, 2], ['flat']), place: 'workshop', name: (n) => `${n.town} Leisure Centre`, work: ['sports'], least: 'town' },
-  { kind: K('office', [12, 16], [11, 13], [3, 4], ['flat', 'mansard']), place: 'office', name: (n) => `${n.last()} Bank`, work: ['finance', 'business'], least: 'town' },
-  { kind: K('office', [12, 16], [11, 13], [3, 4], ['flat']), place: 'office', name: (n) => `The ${n.town} Gazette`, work: ['journalism', 'tv', 'influencer'], least: 'town' },
-  { kind: K('office', [16, 22], [12, 15], [3, 5], ['flat']), place: 'office', name: (n) => `${n.street()} Works`, work: ['it', 'science'], least: 'town' },
-  { kind: K('office', [9, 12], [10, 12], [3, 3], ['mansard', 'gable']), place: 'office', name: (n) => `${n.last()} & ${n.last()} Solicitors`, work: ['law'], least: 'town' },
-  { kind: K('office', [12, 16], [11, 13], [2, 2], ['flat']), place: 'office', name: () => 'Army Reserve Centre', work: ['military'], least: 'town' },
-  { kind: K('workshop', [14, 18], [12, 14], [1, 2], ['flat', 'gable']), place: 'workshop', name: (n) => `${n.last()}'s Garage`, work: ['mechanics', 'transport'], least: 'village' },
-  { kind: K('workshop', [14, 18], [12, 14], [1, 2], ['gable']), place: 'workshop', name: (n) => `${n.last()} Builders`, work: ['trades'], least: 'village' },
-  { kind: K('workshop', [10, 14], [10, 12], [2, 2], ['gable']), place: 'workshop', name: (n) => `${n.street()} Studios`, work: ['arts'], least: 'village' },
-  { kind: K('restaurant', [12, 16], [12, 14], [2, 3], ['gable', 'hip']), place: 'restaurant', name: (n) => n.inn(), work: ['culinary', 'hospitality', 'music'], least: 'hamlet' },
-  { kind: K('restaurant', [16, 22], [12, 14], [3, 4], ['mansard', 'hip']), place: 'restaurant', name: (n) => `The ${n.town} Hotel`, work: ['hospitality'], least: 'town' },
-  { kind: K('shop', [8, 10], [10, 12], [2, 3], ['gable', 'mansard']), place: 'shop', name: (n) => (n.size === 'hamlet' ? `${n.last()}'s Village Shop` : `${n.last()}'s Boutique`), work: ['fashion', 'retail'], least: 'hamlet' },
-  { kind: K('shop', [14, 20], [12, 16], [1, 1], ['flat', 'gable']), place: 'shop', name: (n) => `${n.town} Garden Centre`, work: ['nature', 'retail'], least: 'village' },
+  { label: 'Town hall', kind: K('office', [16, 20], [12, 14], [3, 3], ['hip', 'mansard']), place: 'office', name: (n) => `${n.town} ${{ hamlet: 'Parish Hall', village: 'Village Hall', town: 'Town Hall', city: 'Town Hall' }[n.size]}`, work: ['politics'], least: 'hamlet', labels: { hamlet: 'Parish hall', village: 'Village hall' }, known: / (Parish|Village|Town) Hall$/ },
+  { label: 'Church', kind: K('church', [11, 13], [22, 28], [3, 3], ['gable']), place: 'church', name: (n) => `St ${pick(n.rand, SAINTS)}'s Church`, work: [], least: 'hamlet', endOn: true, known: /^St .+'s Church$/ },
+  { label: 'School', kind: K('school', [28, 36], [14, 18], [2, 2], ['hip', 'flat']), place: 'school', name: (n) => `${n.town} School`, work: ['education'], least: 'village', known: / School$/ },
+  { label: 'Police station', kind: K('office', [12, 16], [11, 13], [2, 3], ['flat', 'hip']), place: 'office', name: (n) => `${n.town} Police Station`, work: ['detective'], least: 'town', known: / Police Station$/ },
+  { label: 'Fire station', kind: K('workshop', [16, 20], [14, 16], [2, 2], ['flat']), place: 'workshop', name: (n) => `${n.town} Fire Station`, work: ['firefighter'], least: 'town', known: / Fire Station$/ },
+  { label: 'Medical centre', kind: K('office', [14, 18], [11, 13], [2, 2], ['flat', 'hip']), place: 'office', name: (n) => `${n.street()} Medical Centre`, work: ['medicine'], least: 'town', known: / Medical Centre$/ },
+  { label: 'Leisure centre', kind: K('workshop', [22, 28], [16, 20], [2, 2], ['flat']), place: 'workshop', name: (n) => `${n.town} Leisure Centre`, work: ['sports'], least: 'town', known: / Leisure Centre$/ },
+  { label: 'Bank', kind: K('office', [12, 16], [11, 13], [3, 4], ['flat', 'mansard']), place: 'office', name: (n) => `${n.last()} Bank`, work: ['finance', 'business'], least: 'town', known: / Bank$/ },
+  { label: 'Newspaper', kind: K('office', [12, 16], [11, 13], [3, 4], ['flat']), place: 'office', name: (n) => `The ${n.town} Gazette`, work: ['journalism', 'tv', 'influencer'], least: 'town', known: /^The .+ Gazette$/ },
+  { label: 'Works', kind: K('office', [16, 22], [12, 15], [3, 5], ['flat']), place: 'office', name: (n) => `${n.street()} Works`, work: ['it', 'science'], least: 'town', known: / Works$/ },
+  { label: 'Solicitors', kind: K('office', [9, 12], [10, 12], [3, 3], ['mansard', 'gable']), place: 'office', name: (n) => `${n.last()} & ${n.last()} Solicitors`, work: ['law'], least: 'town', known: / Solicitors$/ },
+  { label: 'Army reserve centre', kind: K('office', [12, 16], [11, 13], [2, 2], ['flat']), place: 'office', name: () => 'Army Reserve Centre', work: ['military'], least: 'town', known: /^Army Reserve Centre/ },
+  { label: 'Garage', kind: K('workshop', [14, 18], [12, 14], [1, 2], ['flat', 'gable']), place: 'workshop', name: (n) => `${n.last()}'s Garage`, work: ['mechanics', 'transport'], least: 'village', known: /'s Garage$/ },
+  { label: 'Builders', kind: K('workshop', [14, 18], [12, 14], [1, 2], ['gable']), place: 'workshop', name: (n) => `${n.last()} Builders`, work: ['trades'], least: 'village', known: / Builders$/ },
+  { label: 'Studios', kind: K('workshop', [10, 14], [10, 12], [2, 2], ['gable']), place: 'workshop', name: (n) => `${n.street()} Studios`, work: ['arts'], least: 'village', known: / Studios$/ },
+  { label: 'Inn', kind: K('restaurant', [12, 16], [12, 14], [2, 3], ['gable', 'hip']), place: 'restaurant', name: (n) => n.inn(), work: ['culinary', 'hospitality', 'music'], least: 'hamlet', known: /^The \S+ \S+$/ },
+  { label: 'Hotel', kind: K('restaurant', [16, 22], [12, 14], [3, 4], ['mansard', 'hip']), place: 'restaurant', name: (n) => `The ${n.town} Hotel`, work: ['hospitality'], least: 'town', known: / Hotel$/ },
+  { label: 'Boutique', kind: K('shop', [8, 10], [10, 12], [2, 3], ['gable', 'mansard']), place: 'shop', name: (n) => (n.size === 'hamlet' ? `${n.last()}'s Village Shop` : `${n.last()}'s Boutique`), work: ['fashion', 'retail'], least: 'hamlet', labels: { hamlet: 'Village shop' }, known: /'s (Village Shop|Boutique)$/ },
+  { label: 'Garden centre', kind: K('shop', [14, 20], [12, 16], [1, 1], ['flat', 'gable']), place: 'shop', name: (n) => `${n.town} Garden Centre`, work: ['nature', 'retail'], least: 'village', known: / Garden Centre$/ },
 ];
 const SAINTS = ['Mary', 'John', 'Peter', 'Michael', 'Andrew', 'James', 'Anne', 'Catherine', 'Luke', 'Margaret', 'Martin', 'Nicholas'];
 const SHOPS = ['Bakery', 'Butcher', 'Greengrocer', 'Bookshop', 'Hardware', 'Chemist', 'Florist', 'Newsagent', 'Toy Shop', 'Deli', 'Tailor', 'Cobbler', 'Fishmonger', 'Gift Shop', 'Bike Shop', 'Record Shop', 'Sweet Shop', 'Wool Shop', 'Antiques', 'Opticians'];
@@ -478,7 +487,7 @@ const WORKSHOPS = ['Joinery', 'Pottery', 'Forge', 'Printworks', 'Upholstery', 'G
 const FARM_BUILDINGS = ['Dairy', 'Stables', 'Farm Shop', 'Creamery', 'Granary'];
 
 /** What a kind of place is open (minutes of the day, [open, close)) and on which days (bit 0 Monday) before its workers' shifts widen it. */
-const HOURS: Record<Exclude<TownPlace['kind'], 'park' | 'outdoor'>, NonNullable<TownPlace['hours']>> = {
+export const HOURS: Record<Exclude<TownPlace['kind'], 'park' | 'outdoor'>, NonNullable<TownPlace['hours']>> = {
   shop: { open: 9 * 60, close: 18 * 60, days: 0b0111111 },
   cafe: { open: 7 * 60 + 30, close: 18 * 60, days: 0b1111111 },
   restaurant: { open: 12 * 60, close: 23 * 60, days: 0b1111111 },
@@ -489,9 +498,9 @@ const HOURS: Record<Exclude<TownPlace['kind'], 'park' | 'outdoor'>, NonNullable<
   farm: { open: 6 * 60, close: 20 * 60, days: 0b1111111 },
 };
 /** The sim's own shops (public lots): open as long as an outing may go there (content `visits.outingHomeBy`, 23:00). */
-const LOT_HOURS: NonNullable<TownPlace['hours']> = { open: 7 * 60, close: 23 * 60, days: 0b1111111 };
+export const LOT_HOURS: NonNullable<TownPlace['hours']> = { open: 7 * 60, close: 23 * 60, days: 0b1111111 };
 /** The careers working at the sim's public places, by template. */
-const LOT_WORK: Record<string, string[]> = { cafe: ['culinary', 'hospitality'], grocer: ['retail'], bakery: ['culinary', 'retail'], market: ['retail', 'nature'] };
+export const LOT_WORK: Record<string, string[]> = { cafe: ['culinary', 'hospitality'], grocer: ['retail'], bakery: ['culinary', 'retail'], market: ['retail', 'nature'] };
 /** The careers working at a backdrop place of a kind besides the civic ones. */
 const KIND_WORK: Partial<Record<TownPlace['kind'], string[]>> = { shop: ['retail'], cafe: ['culinary', 'hospitality'], restaurant: ['culinary', 'hospitality'], office: ['business'], workshop: ['trades'], farm: ['nature'] };
 const PLACE_KINDS: readonly TownPlace['kind'][] = ['shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'workshop', 'farm'];
@@ -512,7 +521,7 @@ export function hoursFor(base: NonNullable<TownPlace['hours']>, work: readonly s
 }
 
 /** Names for places, none twice. */
-interface Namer {
+export interface Namer {
   rand: Rand;
   town: string;
   /** How big the main town is (a hamlet's area: as its main town). */
@@ -522,6 +531,76 @@ interface Namer {
   inn(): string;
   /** A name `draw` gives that no place has yet. */
   unique(draw: () => string): string;
+}
+
+/**
+ * The names for places in `town` (an area's name), drawn from `rand`: a family name of `lastNames`,
+ * a street's own word ("Mill" of "Mill Lane, Ashby": one of `streets`, else the town's name), an
+ * inn's, and a name nobody in `taken` has (drawn again a few times, then numbered; then taken).
+ */
+export function namerFor(rand: Rand, town: string, size: TownSize, lastNames: readonly string[], streets: readonly string[], taken: Set<string>): Namer {
+  return {
+    rand,
+    town,
+    size,
+    last: () => pick(rand, lastNames),
+    // (A street's own word: "Mill" of "Mill Lane, Ashby".)
+    street: () => (streets.length ? pick(rand, streets).split(',')[0].replace(/ (Street|Road|Lane|Way|Avenue|Row|Close|Drive|Hill|Walk|Crescent|Place|Gardens|Terrace|Parade|Square|Rise|Green|End|Mews|Court)$/, '') : town),
+    inn: () => `The ${pick(rand, INN_A)} ${pick(rand, INN_B)}`,
+    unique: (draw: () => string) => {
+      // (Drawn again a few times before it gets a number.)
+      let name = draw();
+      for (let k = 0; k < 8 && taken.has(name); k++) name = draw();
+      let out = name;
+      for (let k = 2; taken.has(out); k++) out = `${name} ${k}`;
+      taken.add(out);
+      return out;
+    },
+  };
+}
+
+/** What a card calls civic place `c` in a place of `size` (its own label, else the size's: `Civic.labels`). */
+export function civicLabel(c: Civic, size: TownSize): string {
+  return c.labels?.[size] ?? c.label;
+}
+
+/**
+ * How big area `area` of a town whose main town is `main` is, for its civic places and their names: the main town
+ * (area 0) its own size; a village (any other area) a village, and no bigger than its main town (round a hamlet,
+ * a hamlet). A village is offered a village's civic places (`Civic.least`) and its hall is a village hall.
+ */
+export function areaSize(main: TownSize, area: number): TownSize {
+  return area === 0 ? main : SIZES[Math.min(SIZES.indexOf(main), SIZES.indexOf('village'))];
+}
+
+/**
+ * Whether civic place `c` is for a bigger place than area `area`, of `size` (`Civic.least`, `areaSize`): a village is
+ * given a village's by hand. The main town may be given any (the player's own town: a hamlet may have its school).
+ */
+export function civicTooBig(c: Civic, size: TownSize, area: number): boolean {
+  return area > 0 && SIZES.indexOf(c.least) > SIZES.indexOf(size);
+}
+
+/** Which civic place `place` is (an index into `CIVIC`), or -1: its kind, the careers it was made for first, and its name's look. */
+export function civicOf(place: TownPlace | undefined): number {
+  if (!place) return -1;
+  return CIVIC.findIndex((c) => c.place === place.kind && c.work.every((w, i) => place.work?.[i] === w) && c.known.test(place.name));
+}
+
+/**
+ * The civic places area `area` of `draft` (the main town unless given) does not have yet, a village's of a village's
+ * size (`civicTooBig`: a village has no police station), for step 2's Lot tool to set by hand: each one's index into `CIVIC`, what it is
+ * called on a card (`civicLabel`), and how big its building may be (m along the road, m deep).
+ */
+export function civicChoices(draft: NeighbourhoodDraft, area = 0): { index: number; name: string; w: [number, number]; d: [number, number] }[] {
+  const has = new Set((draft.open?.places ?? []).filter((p) => p.area === area).map(civicOf));
+  const size = areaSize(draftSize(draft), area);
+  return CIVIC.flatMap((c, index) => (has.has(index) || civicTooBig(c, size, area) ? [] : [{ index, name: civicLabel(c, size), w: c.kind.w, d: c.kind.d }]));
+}
+
+/** How big `draft`'s main town is (its place's and options' `civic`). */
+export function draftSize(draft: NeighbourhoodDraft): TownSize {
+  return specOf(placeOf(draft.world?.kind ?? 'country'), draft.world?.options).civic;
 }
 
 export interface BackdropInput {
@@ -548,49 +627,183 @@ export interface BackdropInput {
   rand: Rand;
 }
 
-/** The backdrop and the places of a big world: see the top of this file. */
-export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[]; places: TownPlace[] } {
-  const { content, W, D, roads, areas, slots, rectOf, ground, centres, reserved, greens, water, density, least, civic: size, rand } = input;
-  const index = new RoadIndex(roads);
-  const ways = roads.map((r) => r.kind !== 'trail');
-  // What a building may not stand on (a tile each): what the ground takes (roads, greens, water,
-  // lots and the gaps after them, the parking, the trails, the orchards, the squares), every lot
-  // a metre round, and the land between a lot's front and its road (its driveway crosses it).
-  const blocked = ground.mask();
-  if (reserved) for (let i = 0; i < blocked.length; i++) if (reserved[i]) blocked[i] = 0;
-  const roadTiles = ground.roadTiles();
-  const mark = (r: Rect) => {
-    for (let z = Math.max(0, r.z); z < Math.min(D, r.z + r.d); z++) for (let x = Math.max(0, r.x); x < Math.min(W, r.x + r.w); x++) blocked[z * W + x] = 1;
-  };
-  for (const s of slots) {
-    const r = rectOf(s);
-    mark({ x: r.x - LOT_CLEAR, z: r.z - LOT_CLEAR, w: r.w + 2 * LOT_CLEAR, d: r.d + 2 * LOT_CLEAR });
-    // Out from its front to the road (a wedge on a bend), 14 m at most.
-    const [dx, dz] = [[0, -1], [-1, 0], [0, 1], [1, 0]][s.facing];
-    const along = s.facing % 2 ? r.d : r.w;
-    for (let k = 0; k < along; k++) {
-      let [x, z] = s.facing === 0 ? [r.x + k, r.z - 1] : s.facing === 1 ? [r.x - 1, r.z + k] : s.facing === 2 ? [r.x + k, r.z + r.d] : [r.x + r.w, r.z + k];
-      for (let step = 0; step < 14 && x >= 0 && z >= 0 && x < W && z < D && !roadTiles[z * W + x]; step++, x += dx, z += dz) blocked[z * W + x] = 1;
+/** What a pass over a town laid already is made from (`BackdropPass`): its draft, the house templates its lots are measured by, the content its places' names and careers come from. */
+export interface BackdropDraft {
+  draft: NeighbourhoodDraft;
+  t: Templates;
+  content: Content;
+}
+
+/** A building of a row along a road (`BackdropPass.rowsAlong`): its index, the road, how far along it its middle is and on which side, how far back from the road its back is, its zone. */
+export interface Row {
+  at: number;
+  r: number;
+  s: number;
+  side: 1 | -1;
+  back: number;
+  zone: Zone;
+}
+
+/** The buildings in each 24 m cell (`BackdropPass`'s overlap test). */
+const BUCKET = 24;
+const bucketKey = (cx: number, cz: number) => cx * 4096 + cz;
+
+/**
+ * The backdrop laid in steps (see the top of this file): the civic places (`civic`), rows along
+ * each road (`rowsAlong`), a second row behind them (`secondRow`), the blocks filled in (`infill`),
+ * the centre made the densest (`thin`), the farm buildings (`farms`) and the places' names and
+ * hours (`places`); `result` gives the buildings and the places. `layBackdrop` takes the steps in
+ * that order with one stream, as the generator does.
+ *
+ * Made from a draft (`BackdropDraft`), it builds on a town laid already: what may not be built on
+ * is the town's ground as the edits see it (`edit/ground.ts` `townGround`: its roads, water, lots,
+ * parking, squares and trails) with every lot's margin and the land before it to its road marked,
+ * and every building standing is in the overlap test (a new one may touch it, as the generator's
+ * do). New buildings are added after those
+ * (`rowsAlong`, `secondRow`, `put`, `putCivic`) and named by `placesFor`; the town's own are not
+ * moved. A draft's pass has no centres to lay civic places round or to thin (`civic`, `thin`).
+ */
+export class BackdropPass {
+  private readonly content: Content;
+  private readonly W: number;
+  private readonly D: number;
+  private readonly roads: readonly RoadPlan[];
+  private readonly areas: BackdropInput['areas'];
+  private readonly slots: readonly PlotSlot[];
+  private readonly rectOf: (s: PlotSlot) => Rect;
+  private readonly ground: Ground;
+  private readonly centres: readonly Centre[];
+  /** A draft's centres' outlines (it has no `Centre`s), for which zone a building is in. */
+  private readonly outlines: readonly Pt[][];
+  private readonly greens: readonly Pt[][];
+  private readonly water: Uint8Array;
+  private readonly density: number;
+  private readonly least: number;
+  private readonly size: TownSize;
+  /** How big area `a` is for its places' names (`areaSize` on a draft, the main town's size for the generator). */
+  private readonly sizeOf: (a: number) => TownSize;
+  private readonly index: RoadIndex;
+  /** Which roads are ways (not trails). */
+  private readonly ways: boolean[];
+  /** What a building may not stand on (a tile each). */
+  private readonly blocked: Uint8Array;
+  private readonly built: BackdropBuilding[] = [];
+  private readonly buckets = new Map<number, number[]>();
+  /** Where each building's door is: the middle of its front, on the road's side. */
+  private readonly doors: Pt[] = [];
+  /** The civic places laid, by building. */
+  private readonly civics: { at: number; c: Civic }[] = [];
+  /** The farm buildings' names, by building. */
+  private readonly farmNames: string[] = [];
+  /** The places so far (a draft's, then those named since). */
+  private readonly placeList: TownPlace[] = [];
+
+  constructor(input: BackdropInput | BackdropDraft) {
+    if ('draft' in input) {
+      const { draft, t, content } = input;
+      const open = draft.open;
+      const spec = specOf(placeOf(draft.world?.kind ?? 'country'), draft.world?.options);
+      this.content = content;
+      this.W = draft.width;
+      this.D = draft.depth;
+      this.roads = draft.roads;
+      this.areas = (open?.areas ?? []).map((a, i) => ({
+        name: a.name,
+        rect: { x: a.x, z: a.z, w: a.w, d: a.d },
+        centre: [a.x + a.w / 2, a.z + a.d / 2] as Pt,
+        roads: draft.roads.flatMap((r, k) => (r.area === i && r.kind !== 'trail' ? [k] : [])),
+      }));
+      this.slots = draft.slots;
+      this.rectOf = (s) => plotRect(t, s);
+      // (The ground without the buildings standing: they are in the overlap test, where two may
+      // touch, as a row of shops does; the ground keeps lots a metre off their boxes, which would
+      // keep a new building off its neighbours.)
+      this.ground = townGround(open ? { ...draft, open: { ...open, backdrop: [] } } : draft, t);
+      this.centres = [];
+      this.outlines = (open?.centre ?? []).map((c) => c.poly);
+      // (Only `thin` reads the greens and the water, and a draft's pass has no centres to thin.)
+      this.greens = draft.greens;
+      this.water = new Uint8Array(0);
+      this.density = spec.density;
+      this.least = spec.mainLeast;
+      this.size = spec.civic;
+      // (By hand, a village's civic place is named as a village's: its village hall.)
+      this.sizeOf = (a) => areaSize(spec.civic, a);
+      this.placeList.push(...(open?.places ?? []));
+    } else {
+      this.content = input.content;
+      this.W = input.W;
+      this.D = input.D;
+      this.roads = input.roads;
+      this.areas = input.areas;
+      this.slots = input.slots;
+      this.rectOf = input.rectOf;
+      this.ground = input.ground;
+      this.centres = input.centres;
+      this.outlines = [];
+      this.greens = input.greens;
+      this.water = input.water;
+      this.density = input.density;
+      this.least = input.least;
+      this.size = input.civic;
+      const size = input.civic;
+      this.sizeOf = () => size;
     }
-  }
-  const built: BackdropBuilding[] = [];
-  const buckets = new Map<number, number[]>();
-  const CELL = 24;
-  const key = (cx: number, cz: number) => cx * 4096 + cz;
-  /** Files building `at` under the cells its footprint's box covers. */
-  const bucket = (poly: readonly Pt[], at: number) => {
-    const xs = poly.map((p) => p[0]);
-    const zs = poly.map((p) => p[1]);
-    for (let cz = Math.floor(Math.min(...zs) / CELL); cz <= Math.floor(Math.max(...zs) / CELL); cz++) {
-      for (let cx = Math.floor(Math.min(...xs) / CELL); cx <= Math.floor(Math.max(...xs) / CELL); cx++) {
-        const list = buckets.get(key(cx, cz));
-        if (list) list.push(at);
-        else buckets.set(key(cx, cz), [at]);
+    const { W, D, roads, slots, ground } = this;
+    this.index = new RoadIndex(roads);
+    this.ways = roads.map((r) => r.kind !== 'trail');
+    // What a building may not stand on (a tile each): what the ground takes (roads, greens, water,
+    // lots and the gaps after them, the parking, the trails, the orchards, the squares), every lot
+    // a metre round, and the land between a lot's front and its road (its driveway crosses it).
+    const blocked = (this.blocked = ground.mask());
+    const reserved = 'draft' in input ? undefined : input.reserved;
+    if (reserved) for (let i = 0; i < blocked.length; i++) if (reserved[i]) blocked[i] = 0;
+    const roadTiles = ground.roadTiles();
+    const mark = (r: Rect) => {
+      for (let z = Math.max(0, r.z); z < Math.min(D, r.z + r.d); z++) for (let x = Math.max(0, r.x); x < Math.min(W, r.x + r.w); x++) blocked[z * W + x] = 1;
+    };
+    for (const s of slots) {
+      const r = this.rectOf(s);
+      mark({ x: r.x - LOT_CLEAR, z: r.z - LOT_CLEAR, w: r.w + 2 * LOT_CLEAR, d: r.d + 2 * LOT_CLEAR });
+      // Out from its front to the road (a wedge on a bend), 14 m at most.
+      const [dx, dz] = [[0, -1], [-1, 0], [0, 1], [1, 0]][s.facing];
+      const along = s.facing % 2 ? r.d : r.w;
+      for (let k = 0; k < along; k++) {
+        let [x, z] = s.facing === 0 ? [r.x + k, r.z - 1] : s.facing === 1 ? [r.x - 1, r.z + k] : s.facing === 2 ? [r.x + k, r.z + r.d] : [r.x + r.w, r.z + k];
+        for (let step = 0; step < 14 && x >= 0 && z >= 0 && x < W && z < D && !roadTiles[z * W + x]; step++, x += dx, z += dz) blocked[z * W + x] = 1;
       }
     }
-  };
+    // (A draft's buildings standing: in the overlap test, their doors where their middles are.)
+    if ('draft' in input) {
+      for (const b of input.draft.open?.backdrop ?? []) {
+        const at = this.built.push(b) - 1;
+        this.doors.push(centroidOf(b.poly));
+        this.bucket(b.poly, at);
+      }
+    }
+  }
+
+  /** How many buildings there are so far (a draft's among them). */
+  get count(): number {
+    return this.built.length;
+  }
+
+  /** Files building `at` under the cells its footprint's box covers. */
+  private bucket(poly: readonly Pt[], at: number): void {
+    const xs = poly.map((p) => p[0]);
+    const zs = poly.map((p) => p[1]);
+    for (let cz = Math.floor(Math.min(...zs) / BUCKET); cz <= Math.floor(Math.max(...zs) / BUCKET); cz++) {
+      for (let cx = Math.floor(Math.min(...xs) / BUCKET); cx <= Math.floor(Math.max(...xs) / BUCKET); cx++) {
+        const list = this.buckets.get(bucketKey(cx, cz));
+        if (list) list.push(at);
+        else this.buckets.set(bucketKey(cx, cz), [at]);
+      }
+    }
+  }
+
   /** Whether a footprint may go down (see the top of this file). */
-  const fits = (poly: Pt[]): boolean => {
+  fits(poly: Pt[]): boolean {
+    const { W, D, blocked, index, built } = this;
     const bad = tilesOf(poly, 0, (x, z) => x < EDGE || z < EDGE || x >= W - EDGE || z >= D - EDGE || blocked[z * W + x] === 1);
     if (bad) return false;
     // (Off every road and trail by more than half its width, measured from its middle.)
@@ -604,40 +817,48 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
     }
     const xs = poly.map((p) => p[0]);
     const zs = poly.map((p) => p[1]);
-    for (let cz = Math.floor(Math.min(...zs) / CELL); cz <= Math.floor(Math.max(...zs) / CELL); cz++) {
-      for (let cx = Math.floor(Math.min(...xs) / CELL); cx <= Math.floor(Math.max(...xs) / CELL); cx++) {
+    for (let cz = Math.floor(Math.min(...zs) / BUCKET); cz <= Math.floor(Math.max(...zs) / BUCKET); cz++) {
+      for (let cx = Math.floor(Math.min(...xs) / BUCKET); cx <= Math.floor(Math.max(...xs) / BUCKET); cx++) {
         // (Less than `overlaps`' slack: rounded to the centimetre in the file, it still holds.)
-        for (const j of buckets.get(key(cx, cz)) ?? []) if (overlaps(poly, built[j].poly, 0.02)) return false;
+        for (const j of this.buckets.get(bucketKey(cx, cz)) ?? []) if (overlaps(poly, built[j].poly, 0.02)) return false;
       }
     }
     return true;
-  };
+  }
+
   /** The road (not a trail) nearest a point, within `within` m: as `RoadIndex.nearest`. */
-  const nearestWay = (x: number, z: number, within: number) => {
+  private nearestWay(x: number, z: number, within: number): { road: number; dist: number; s: number; side: 1 | -1 } | null {
     let best: { road: number; dist: number; s: number; side: 1 | -1 } | null = null;
-    for (const [road, hit] of index.around(x, z, within)) {
-      if (!ways[road] || (best && best.dist <= hit.dist)) continue;
+    for (const [road, hit] of this.index.around(x, z, within)) {
+      if (!this.ways[road] || (best && best.dist <= hit.dist)) continue;
       // (+1: the road's left, as `RoadIndex.nearest` says.)
-      const { p } = pointAt(roads[road].points, hit.s);
+      const { p } = pointAt(this.roads[road].points, hit.s);
       const side: 1 | -1 = (x - p[0]) * hit.t[1] - (z - p[1]) * hit.t[0] >= 0 ? 1 : -1;
       best = { road, dist: hit.dist, s: hit.s, side };
     }
     return best;
-  };
-  const areaOf = (p: Pt) => {
+  }
+
+  /** The area a point is in (its box), else the one whose middle is nearest. */
+  private areaOf(p: Pt): number {
+    const { areas } = this;
     const at = areas.findIndex((a) => p[0] >= a.rect.x && p[1] >= a.rect.z && p[0] <= a.rect.x + a.rect.w && p[1] <= a.rect.z + a.rect.d);
     return at >= 0 ? at : areas.reduce((k, a, i) => (dist(a.centre, p) < dist(areas[k].centre, p) ? i : k), 0);
-  };
-  const centreAt = (p: Pt) => centres.some((c) => inside(c.poly, p[0], p[1]));
-  /** Where each building's door is: the middle of its front, on the road's side. */
-  const doors: Pt[] = [];
+  }
+
+  /** Whether a point is in a centre (its outline as it is now: `thin` may narrow it). */
+  private centreAt(p: Pt): boolean {
+    return this.centres.some((c) => inside(c.poly, p[0], p[1])) || this.outlines.some((poly) => inside(poly, p[0], p[1]));
+  }
+
   /**
    * Lays a building of `kind` down, `w` along `t` and `d` back along `n` (away from the road) from
-   * the middle of its front `c`, if it fits: its index, else -1.
+   * the middle of its front `c`, if it fits and faces its road (its roof, storeys and look from
+   * `rand`; a gable end to the road if `endOn`): its index, else -1.
    */
-  const put = (c: Pt, t: Pt, n: Pt, w: number, d: number, kind: Kind, endOn = false): number => {
+  put(c: Pt, t: Pt, n: Pt, w: number, d: number, kind: Kind, rand: Rand, endOn = false): number {
     const poly = rectFrom(c, t, n, w, d);
-    if (!fits(poly) || !facesRoad(poly, roads, index, 0.3)) return -1;
+    if (!this.fits(poly) || !facesRoad(poly, this.roads, this.index, 0.3)) return -1;
     const roof = pick(rand, kind.roofs);
     // (The ridge along the longer side; a church's back from the road.)
     const way = endOn || d > w ? n : t;
@@ -652,110 +873,140 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
       ...(roof === 'gable' || roof === 'mansard' ? { ridge: Math.round(ridge * 1000) / 1000 } : {}),
       use: kind.use,
       look: Math.floor(rand() * 1024),
-      area: areaOf(centroidOf(poly)),
+      area: this.areaOf(centroidOf(poly)),
     };
-    const at = built.push(b) - 1;
-    doors.push(add(c, n, -0.5));
-    bucket(poly, at);
+    const at = this.built.push(b) - 1;
+    this.doors.push(add(c, n, -0.5));
+    this.bucket(poly, at);
     return at;
-  };
+  }
+
+  /**
+   * Civic place `civic` (an index into `CIVIC`) set by hand: its building fronting road `r` at `s`
+   * along it on `side`, set back as the civic places are, as big as `size` (else drawn from its
+   * kind's sizes), laid by `put` and named as a civic place by `placesFor`. Its index, else -1.
+   */
+  putCivic(civic: number, r: number, s: number, side: 1 | -1, rand: Rand, size?: { w: number; d: number }): number {
+    const c = CIVIC[civic];
+    if (!c) return -1;
+    const { c: mid, t, n } = this.frontAt(r, s, side, range(rand, 2.4, 4));
+    const [w, d] = size ? [size.w, size.d] : [range(rand, ...c.kind.w), range(rand, ...c.kind.d)];
+    const at = this.put(mid, t, n, w, d, c.kind, rand, c.endOn);
+    if (at >= 0) this.civics.push({ at, c });
+    return at;
+  }
+
   /** Where a building's front goes from road `r` at `s` on `side`, set back `back` m from its sidewalk's edge: the middle of its front, the way along, the way back from the road. */
-  const frontAt = (r: number, s: number, side: 1 | -1, back: number, ls?: number[]) => {
-    const road = roads[r];
+  private frontAt(r: number, s: number, side: 1 | -1, back: number, ls?: number[]): { c: Pt; t: Pt; n: Pt } {
+    const road = this.roads[r];
     const { p, t } = pointAt(road.points, s, ls);
     const n = leftOf(t).map((v) => v * side) as Pt;
     return { c: add(p, n, road.width / 2 + back), t, n };
-  };
-  const pickKind = (zone: Zone): Kind => {
+  }
+
+  private pickKind(zone: Zone, rand: Rand): Kind {
     const list = KINDS[zone] as readonly (readonly [Kind, number])[];
     let r = rand() * list.reduce((n, [, w]) => n + w, 0);
     for (const [k, w] of list) if ((r -= w) <= 0) return k;
     return list[0][0];
-  };
-  // (Past the sidewalk: off the tiles the road's land takes, a metre and more past its edge.)
-  const setback = (zone: Zone) => (zone === 'centre' ? range(rand, 2.3, 2.8) : zone === 'town' ? range(rand, 2.5, 5) : range(rand, 3, 7));
-
-  // ---- the main towns' civic places, nearest their squares --------------------------------------
-  const civic: { at: number; c: Civic }[] = [];
-  for (const centre of centres) {
-    const a = centre.area;
-    const heart = centre.square ? centroidOf(centre.square) : pointAt(roads[centre.road].points, (centre.s0 + centre.s1) / 2).p;
-    const fronts: { r: number; s: number; side: 1 | -1; far: number }[] = [];
-    for (const r of areas[a].roads) {
-      if (!ways[r] || roads[r].kind === 'country') continue;
-      const ls = lengths(roads[r].points);
-      for (let s = 6; s < ls[ls.length - 1] - 6; s += 3) for (const side of [1, -1] as const) fronts.push({ r, s, side, far: dist(pointAt(roads[r].points, s, ls).p, heart) });
-    }
-    fronts.sort((x, y) => x.far - y.far);
-    for (const c of CIVIC) {
-      if (SIZES.indexOf(c.least) > SIZES.indexOf(size)) continue;
-      for (const f of fronts) {
-        const { c: mid, t, n } = frontAt(f.r, f.s, f.side, range(rand, 2.4, 4));
-        const probe = add(mid, n, 2);
-        if (blocked[Math.floor(probe[1]) * W + Math.floor(probe[0])]) continue;
-        const at = put(mid, t, n, range(rand, ...c.kind.w), range(rand, ...c.kind.d), c.kind, c.endOn);
-        if (at < 0) continue;
-        civic.push({ at, c });
-        break;
-      }
-    }
   }
 
-  // ---- rows along the roads: the centres shoulder to shoulder, the rest with gaps -----------------
-  const rows: { at: number; r: number; s: number; side: 1 | -1; back: number; zone: Zone }[] = [];
-  areas.forEach((area, a) => {
-    for (const r of area.roads) {
-      if (!ways[r]) continue;
-      const road = roads[r];
-      const ls = lengths(road.points);
-      const L = ls[ls.length - 1];
-      for (const side of [1, -1] as const) {
-        let s = 4 + rand() * 4;
-        while (s < L - 4) {
-          const probe = frontAt(r, s, side, 6, ls).c;
-          const zone: Zone = centreAt(probe) ? 'centre' : a === 0 ? 'town' : 'hamlet';
-          // (Now and then a gap: the more the further out.)
-          const skip = zone === 'centre' ? 0.04 : zone === 'town' ? 0.22 * (1.2 - density) : 0.55;
-          if (rand() < skip) {
-            s += range(rand, 6, 16);
-            continue;
-          }
-          const kind = pickKind(zone);
-          let done = false;
-          // (Smaller where it doesn't fit: narrower, and shallower in front of what stands behind.)
-          for (const shrink of [1, 0.75, 0.55]) {
-            const w = Math.max(kind.w[0] * 0.6, range(rand, ...kind.w) * shrink);
-            const d = Math.max(6, range(rand, ...kind.d) * (shrink + 1) / 2);
-            const back = setback(zone);
-            const { c, t, n } = frontAt(r, s + w / 2, side, back, ls);
-            const at = put(c, t, n, w, d, kind);
-            if (at < 0) continue;
-            rows.push({ at, r, s: s + w / 2, side, back: back + d, zone });
-            s += w + (zone === 'centre' ? 0 : zone === 'town' ? range(rand, 1, 4) : range(rand, 4, 12));
-            done = true;
-            break;
-          }
-          if (!done) s += 3;
+  /** (Past the sidewalk: off the tiles the road's land takes, a metre and more past its edge.) */
+  private setback(zone: Zone, rand: Rand): number {
+    return zone === 'centre' ? range(rand, 2.3, 2.8) : zone === 'town' ? range(rand, 2.5, 5) : range(rand, 3, 7);
+  }
+
+  /** The main towns' civic places, of their size, each nearest its square (its high street's middle) where one fits. */
+  civic(rand: Rand): void {
+    const { roads, areas, ways, blocked, W } = this;
+    for (const centre of this.centres) {
+      const a = centre.area;
+      const heart = centre.square ? centroidOf(centre.square) : pointAt(roads[centre.road].points, (centre.s0 + centre.s1) / 2).p;
+      const fronts: { r: number; s: number; side: 1 | -1; far: number }[] = [];
+      for (const r of areas[a].roads) {
+        if (!ways[r] || roads[r].kind === 'country') continue;
+        const ls = lengths(roads[r].points);
+        for (let s = 6; s < ls[ls.length - 1] - 6; s += 3) for (const side of [1, -1] as const) fronts.push({ r, s, side, far: dist(pointAt(roads[r].points, s, ls).p, heart) });
+      }
+      fronts.sort((x, y) => x.far - y.far);
+      for (const c of CIVIC) {
+        if (SIZES.indexOf(c.least) > SIZES.indexOf(this.size)) continue;
+        for (const f of fronts) {
+          const { c: mid, t, n } = this.frontAt(f.r, f.s, f.side, range(rand, 2.4, 4));
+          const probe = add(mid, n, 2);
+          if (blocked[Math.floor(probe[1]) * W + Math.floor(probe[0])]) continue;
+          const at = this.put(mid, t, n, range(rand, ...c.kind.w), range(rand, ...c.kind.d), c.kind, rand, c.endOn);
+          if (at < 0) continue;
+          this.civics.push({ at, c });
+          break;
         }
       }
     }
-  });
-
-  // ---- a second row behind the first (the main towns): yards between, the road nearest still ------
-  for (const row of [...rows]) {
-    if (row.zone === 'hamlet' || rand() > (row.zone === 'centre' ? 0.9 : 0.55 * density + 0.2)) continue;
-    const kind = pickKind(row.zone === 'centre' ? 'centre' : 'town');
-    const w = range(rand, ...kind.w);
-    const d = range(rand, ...kind.d);
-    const { c, t, n } = frontAt(row.r, row.s, row.side, row.back + range(rand, 2, 5));
-    const mid = add(c, n, d / 2);
-    const near = nearestWay(mid[0], mid[1], 80);
-    if (!near || near.road !== row.r) continue;
-    put(c, t, n, w, d, kind);
   }
 
-  // ---- the blocks filled in: on a jittered grid, turned to the road nearest ----------------------
-  const infill = (a: number, chance: number, step: number, within?: Pt[]) => {
+  /**
+   * A row of buildings along road `road` (of area `area`) on each of `sides`: the centre shoulder to
+   * shoulder, the rest with gaps, each of its zone's kinds (`zone`: that zone all along; else the
+   * centre's where it is in one, the main town's in area 0, a hamlet's elsewhere), smaller where it
+   * doesn't fit. The buildings of the row as laid.
+   */
+  rowsAlong(area: number, road: number, sides: readonly (1 | -1)[], rand: Rand, zone?: Zone): Row[] {
+    const { roads, density } = this;
+    const r = road;
+    const ls = lengths(roads[r].points);
+    const L = ls[ls.length - 1];
+    const rows: Row[] = [];
+    for (const side of sides) {
+      let s = 4 + rand() * 4;
+      while (s < L - 4) {
+        const probe = this.frontAt(r, s, side, 6, ls).c;
+        const z: Zone = zone ?? (this.centreAt(probe) ? 'centre' : area === 0 ? 'town' : 'hamlet');
+        // (Now and then a gap: the more the further out.)
+        const skip = z === 'centre' ? 0.04 : z === 'town' ? 0.22 * (1.2 - density) : 0.55;
+        if (rand() < skip) {
+          s += range(rand, 6, 16);
+          continue;
+        }
+        const kind = this.pickKind(z, rand);
+        let done = false;
+        // (Smaller where it doesn't fit: narrower, and shallower in front of what stands behind.)
+        for (const shrink of [1, 0.75, 0.55]) {
+          const w = Math.max(kind.w[0] * 0.6, range(rand, ...kind.w) * shrink);
+          const d = Math.max(6, (range(rand, ...kind.d) * (shrink + 1)) / 2);
+          const back = this.setback(z, rand);
+          const { c, t, n } = this.frontAt(r, s + w / 2, side, back, ls);
+          const at = this.put(c, t, n, w, d, kind, rand);
+          if (at < 0) continue;
+          rows.push({ at, r, s: s + w / 2, side, back: back + d, zone: z });
+          s += w + (z === 'centre' ? 0 : z === 'town' ? range(rand, 1, 4) : range(rand, 4, 12));
+          done = true;
+          break;
+        }
+        if (!done) s += 3;
+      }
+    }
+    return rows;
+  }
+
+  /** A second row behind `rows` (the main towns' only): yards between, the road nearest still, more often the denser the town. */
+  secondRow(rows: readonly Row[], rand: Rand): void {
+    const { density } = this;
+    for (const row of rows) {
+      if (row.zone === 'hamlet' || rand() > (row.zone === 'centre' ? 0.9 : 0.55 * density + 0.2)) continue;
+      const kind = this.pickKind(row.zone === 'centre' ? 'centre' : 'town', rand);
+      const w = range(rand, ...kind.w);
+      const d = range(rand, ...kind.d);
+      const { c, t, n } = this.frontAt(row.r, row.s, row.side, row.back + range(rand, 2, 5));
+      const mid = add(c, n, d / 2);
+      const near = this.nearestWay(mid[0], mid[1], 80);
+      if (!near || near.road !== row.r) continue;
+      this.put(c, t, n, w, d, kind, rand);
+    }
+  }
+
+  /** Area `a`'s blocks filled in (`within`: inside that outline only), on a jittered grid `step` m apart, a building at each point with `chance`, turned to the road nearest. */
+  infillArea(a: number, chance: number, step: number, rand: Rand, within?: Pt[]): void {
+    const { roads, areas, W, D, blocked } = this;
     const xs = within?.map((p) => p[0]);
     const zs = within?.map((p) => p[1]);
     const rect = xs && zs ? { x: Math.min(...xs) + 20, z: Math.min(...zs) + 20, w: Math.max(...xs) - Math.min(...xs) - 40, d: Math.max(...zs) - Math.min(...zs) - 40 } : areas[a].rect;
@@ -766,191 +1017,244 @@ export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[
         if (within && !inside(within, p[0], p[1])) continue;
         if (p[0] < EDGE || p[1] < EDGE || p[0] >= W - EDGE || p[1] >= D - EDGE || blocked[Math.floor(p[1]) * W + Math.floor(p[0])]) continue;
         if (rand() > chance) continue;
-        const near = nearestWay(p[0], p[1], reach + 10);
+        const near = this.nearestWay(p[0], p[1], reach + 10);
         if (!near || near.dist - roads[near.road].width / 2 > reach) continue;
         const { t } = pointAt(roads[near.road].points, near.s);
         const n = leftOf(t).map((v) => v * near.side) as Pt;
-        const zone: Zone = centreAt(p) ? 'centre' : a === 0 ? 'town' : 'hamlet';
-        const kind = pickKind(zone);
+        const zone: Zone = this.centreAt(p) ? 'centre' : a === 0 ? 'town' : 'hamlet';
+        const kind = this.pickKind(zone, rand);
         // (In the centre smaller where it doesn't fit: it is built up close.)
         for (const shrink of zone === 'centre' ? [1, 0.75, 0.55] : [1]) {
           const w = Math.max(kind.w[0] * 0.6, range(rand, ...kind.w) * shrink);
           const d = Math.max(6, (range(rand, ...kind.d) * (shrink + 1)) / 2);
-          if (put(add(p, n, -d / 2), t, n, w, d, kind) >= 0) break;
+          if (this.put(add(p, n, -d / 2), t, n, w, d, kind, rand) >= 0) break;
         }
       }
     }
-  };
-  const countIn = (a: number) => built.filter((b) => b.area === a).length;
-  // (The centres first, closest: the densest.)
-  for (const c of centres) infill(c.area, 1, 6, c.poly);
-  infill(0, 0.3 + 0.45 * density, 12);
-  for (let a = 1; a < areas.length; a++) infill(a, 0.25, 16);
-  // (Short of the least: filled in more closely.)
-  for (let a = 0; a < areas.length; a++) for (let k = 0; k < 3 && countIn(a) < (a === 0 ? least : HAMLET_LEAST); k++) infill(a, 1, 9 - k * 2);
-
-  // ---- the centre the densest: houses and such taken away round it till it is --------------------
-  // (Its square and what the centres' public places leave open count as open land: in a town whose
-  // centre is mostly those, the rest is thinned.)
-  for (const c of centres) {
-    const box = areas[c.area].rect;
-    // (The roads' tiles as the ground has them, a little wider than the check's: `DENSEST` spares it.)
-    const taken = ground.roadTiles().slice();
-    for (const s of slots) {
-      const r = rectOf(s);
-      for (let z = Math.max(0, r.z); z < Math.min(D, r.z + r.d); z++) for (let x = Math.max(0, r.x); x < Math.min(W, r.x + r.w); x++) taken[z * W + x] = 1;
-    }
-    for (const g of greens) fillPoly(g, W, D, (i) => (taken[i] = 1));
-    for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
-    let d = centreDensity(W, D, taken, box, c.poly, built.map((b) => b.poly));
-    // (Not the densest: the outline narrowed to the street, where the land round it is the emptier.)
-    for (const band of BANDS.filter((b) => b < c.band)) {
-      if (d.centre >= d.rest * DENSEST) break;
-      const poly = outline(roads, c, band);
-      if (selfCrossing(poly)) continue;
-      const n = centreDensity(W, D, taken, box, poly, built.map((b) => b.poly));
-      if (n.centre / Math.max(1e-6, n.rest) <= d.centre / Math.max(1e-6, d.rest)) continue;
-      [c.poly, c.band, d] = [poly, band, n];
-    }
-    let rest = d.built[1];
-    // (Those not a place, outside the centre, in its box: the furthest from the centre first.)
-    const mid = centroidOf(c.poly);
-    const spare = built
-      .map((b, i) => ({ i, far: dist(centroidOf(b.poly), mid) }))
-      .filter(({ i }) => d.per[i] > 0 && built[i].area === c.area && !PLACE_KINDS.includes(built[i].use as TownPlace['kind']) && !centreAt(centroidOf(built[i].poly)))
-      .sort((x, y) => y.far - x.far);
-    const drop = new Set<number>();
-    const want = d.centre / DENSEST;
-    for (const { i } of spare) {
-      if (rest / Math.max(1, d.open[1]) < want || built.length - drop.size <= 0 || countIn(c.area) - drop.size <= least) break;
-      drop.add(i);
-      rest -= d.per[i];
-    }
-    if (drop.size) {
-      const keep = built.filter((_, i) => !drop.has(i));
-      const doorsKept = doors.filter((_, i) => !drop.has(i));
-      built.length = 0;
-      built.push(...keep);
-      doors.length = 0;
-      doors.push(...doorsKept);
-      civic.forEach((k) => (k.at -= [...drop].filter((j) => j < k.at).length));
-      // (The buckets anew, by the buildings' new indices.)
-      buckets.clear();
-      built.forEach((b, at) => bucket(b.poly, at));
-    }
   }
 
-  // ---- by every farmstead: a farm building and a barn or two, behind it or beside ------------------
-  const farmNames: string[] = [];
-  const FARM = K('farm', [10, 14], [8, 11], [1, 2], ['gable']);
-  const BARN = K('barn', [12, 18], [9, 12], [2, 2], ['gable']);
-  for (const s of slots) {
-    if (s.lot !== 'farm') continue;
-    const r = rectOf(s);
-    const mid: Pt = [r.x + r.w / 2, r.z + r.d / 2];
-    const front = ([[0, -1], [-1, 0], [0, 1], [1, 0]] as Pt[])[s.facing];
-    const aside: Pt = [-front[1], front[0]];
-    const [depth, width] = s.facing % 2 ? [r.w, r.d] : [r.d, r.w];
-    // (Turned to the road nearest, as every building is.)
-    const near = nearestWay(mid[0], mid[1], 200);
-    const t: Pt = near ? pointAt(roads[near.road].points, near.s).t : aside;
-    const n: Pt = [-t[1], t[0]];
-    const want = between(rand, 2, 3);
-    let made = 0;
-    for (const off of [4, 9, 15]) {
-      for (const [u, v] of [[0, 1], [0.6, 1], [-0.6, 1], [1, 0], [-1, 0], [1, 0.6], [-1, 0.6]] as const) {
-        if (made >= want) break;
-        const kind = made === 0 ? FARM : BARN;
-        const [w, d] = [range(rand, ...kind.w), range(rand, ...kind.d)];
-        // Behind the lot (`v`) or beside it (`u`), `off` m clear of it and its own half again.
-        const c = add(add(mid, front, -v * (depth / 2 + off + 7)), aside, u * (width / 2 + off + 9));
-        const at = put(add(c, n, -d / 2), t, n, w, d, kind);
-        if (at < 0) continue;
-        if (made === 0) farmNames[at] = `${s.name} ${pick(rand, FARM_BUILDINGS)}`;
-        made++;
+  /** How many buildings area `a` has. */
+  private countIn(a: number): number {
+    return this.built.filter((b) => b.area === a).length;
+  }
+
+  /** The blocks filled in: the centres first, closest (the densest); the main town; each hamlet; then more closely where an area is short of its least (`least`, `HAMLET_LEAST`). */
+  infill(rand: Rand): void {
+    const { centres, areas, density, least } = this;
+    for (const c of centres) this.infillArea(c.area, 1, 6, rand, c.poly);
+    this.infillArea(0, 0.3 + 0.45 * density, 12, rand);
+    for (let a = 1; a < areas.length; a++) this.infillArea(a, 0.25, 16, rand);
+    for (let a = 0; a < areas.length; a++) for (let k = 0; k < 3 && this.countIn(a) < (a === 0 ? least : HAMLET_LEAST); k++) this.infillArea(a, 1, 9 - k * 2, rand);
+  }
+
+  /**
+   * Each centre made the densest: its outline narrowed to the street where the land round it is the
+   * emptier, then houses and such taken away round it (the furthest first, never a place, never
+   * below the town's least) till it is. Its square and what the centres' public places leave open
+   * count as open land: in a town whose centre is mostly those, the rest is thinned.
+   */
+  thin(): void {
+    const { built, doors, roads, areas, slots, greens, water, W, D, least } = this;
+    for (const c of this.centres) {
+      const box = areas[c.area].rect;
+      // (The roads' tiles as the ground has them, a little wider than the check's: `DENSEST` spares it.)
+      const taken = this.ground.roadTiles().slice();
+      for (const s of slots) {
+        const r = this.rectOf(s);
+        for (let z = Math.max(0, r.z); z < Math.min(D, r.z + r.d); z++) for (let x = Math.max(0, r.x); x < Math.min(W, r.x + r.w); x++) taken[z * W + x] = 1;
+      }
+      for (const g of greens) fillPoly(g, W, D, (i) => (taken[i] = 1));
+      for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
+      let d = centreDensity(W, D, taken, box, c.poly, built.map((b) => b.poly));
+      // (Not the densest: the outline narrowed to the street, where the land round it is the emptier.)
+      for (const band of BANDS.filter((b) => b < c.band)) {
+        if (d.centre >= d.rest * DENSEST) break;
+        const poly = outline(roads, c, band);
+        if (selfCrossing(poly)) continue;
+        const n = centreDensity(W, D, taken, box, poly, built.map((b) => b.poly));
+        if (n.centre / Math.max(1e-6, n.rest) <= d.centre / Math.max(1e-6, d.rest)) continue;
+        [c.poly, c.band, d] = [poly, band, n];
+      }
+      let rest = d.built[1];
+      // (Those not a place, outside the centre, in its box: the furthest from the centre first.)
+      const mid = centroidOf(c.poly);
+      const spare = built
+        .map((b, i) => ({ i, far: dist(centroidOf(b.poly), mid) }))
+        .filter(({ i }) => d.per[i] > 0 && built[i].area === c.area && !PLACE_KINDS.includes(built[i].use as TownPlace['kind']) && !this.centreAt(centroidOf(built[i].poly)))
+        .sort((x, y) => y.far - x.far);
+      const drop = new Set<number>();
+      const want = d.centre / DENSEST;
+      for (const { i } of spare) {
+        if (rest / Math.max(1, d.open[1]) < want || built.length - drop.size <= 0 || this.countIn(c.area) - drop.size <= least) break;
+        drop.add(i);
+        rest -= d.per[i];
+      }
+      if (drop.size) {
+        const keep = built.filter((_, i) => !drop.has(i));
+        const doorsKept = doors.filter((_, i) => !drop.has(i));
+        built.length = 0;
+        built.push(...keep);
+        doors.length = 0;
+        doors.push(...doorsKept);
+        this.civics.forEach((k) => (k.at -= [...drop].filter((j) => j < k.at).length));
+        // (The buckets anew, by the buildings' new indices.)
+        this.buckets.clear();
+        built.forEach((b, at) => this.bucket(b.poly, at));
       }
     }
   }
 
-  // ---- the places: every public lot, then every backdrop place ------------------------------------
-  const categories = content.careerCategories;
-  const lastNames = content.names.last.length ? content.names.last : ['Smith'];
-  const taken = new Set<string>(slots.map((s) => s.name));
-  const streetNames = (a: number) => areas[a].roads.map((r) => roads[r].name).filter((n): n is string => !!n && !/Trail|Path/.test(n));
-  const namer = (a: number): Namer => {
-    const streets = streetNames(a);
-    const self: Namer = {
-      rand,
-      town: areas[a].name,
-      size,
-      last: () => pick(rand, lastNames),
-      // (A street's own word: "Mill" of "Mill Lane, Ashby".)
-      street: () => (streets.length ? pick(rand, streets).split(',')[0].replace(/ (Street|Road|Lane|Way|Avenue|Row|Close|Drive|Hill|Walk|Crescent|Place|Gardens|Terrace|Parade|Square|Rise|Green|End|Mews|Court)$/, '') : areas[a].name),
-      inn: () => `The ${pick(rand, INN_A)} ${pick(rand, INN_B)}`,
-      unique: (draw: () => string) => {
-        // (Drawn again a few times before it gets a number.)
-        let name = draw();
-        for (let k = 0; k < 8 && taken.has(name); k++) name = draw();
-        let out = name;
-        for (let k = 2; taken.has(out); k++) out = `${name} ${k}`;
-        taken.add(out);
-        return out;
-      },
-    };
-    return self;
-  };
-  const places: TownPlace[] = [];
-  const named = new Set<string>();
-  for (const s of slots) {
-    if (s.kind === 'house') continue;
-    // (A hamlet's grocer or café is called as the main town's is: by its hamlet's name besides.)
-    let name = s.name;
-    if (named.has(name)) name = `${areas[s.area ?? 0].name} ${name.replace(/^The /, '')}`;
-    for (let k = 2; named.has(name); k++) name = `${s.name} ${k}`;
-    named.add(name);
-    taken.add(name);
-    const r = rectOf(s);
-    const kind: TownPlace['kind'] = s.kind === 'outdoor' ? 'outdoor' : s.kind === 'park' ? (s.template === 'market' ? 'shop' : 'park') : s.template === 'cafe' ? 'cafe' : 'shop';
-    // (A shop's tag at its door, on the street; a park's in its middle.)
-    const front = ([[0.5, 0], [0, 0.5], [0.5, 1], [1, 0.5]] as const)[s.facing];
-    const [x, z] = kind === 'park' || kind === 'outdoor' ? [r.x + r.w / 2, r.z + r.d / 2] : [r.x + r.w * front[0], r.z + r.d * front[1]];
-    const work = LOT_WORK[s.template] ?? [];
-    places.push({
-      name,
-      kind,
-      x: r2(x),
-      z: r2(z),
-      plot: s.index,
-      ...(kind === 'park' || kind === 'outdoor' ? {} : { hours: hoursFor(LOT_HOURS, work, categories) }),
-      ...(work.length ? { work } : {}),
-      area: s.area ?? 0,
-    });
-  }
-  const civicAt = new Map(civic.map(({ at, c }) => [at, c]));
-  built.forEach((b, i) => {
-    const kind = b.use as TownPlace['kind'];
-    if (!PLACE_KINDS.includes(kind)) return;
-    const c = civicAt.get(i);
-    const n = namer(b.area);
-    const name = n.unique(() => (c ? c.name(n) : (farmNames[i] ?? placeName(kind, n))));
-    const work = c ? c.work : (KIND_WORK[kind] ?? []);
-    // (Its tag at its door: the middle of its front, on the street side.)
-    b.place = places.length;
-    places.push({ name, kind, x: r2(doors[i][0]), z: r2(doors[i][1]), hours: hoursFor(HOURS[kind as keyof typeof HOURS], work, categories), ...(work.length ? { work: [...work] } : {}), area: b.area });
-  });
-  // Every career a resident may hold works somewhere in each main town: any the civic places left
-  // out (content added since) go to its first office.
-  for (const centre of centres) {
-    const here = places.filter((p) => p.area === centre.area);
-    const office = here.find((p) => p.kind === 'office' && p.plot === undefined);
-    if (!office) continue;
-    for (const c of categories) {
-      if (here.some((p) => p.work?.includes(c.id))) continue;
-      office.work = [...(office.work ?? []), c.id];
-      office.hours = hoursFor(office.hours ?? HOURS.office, [c.id], categories);
+  /** By every farmstead: a farm building and a barn or two, behind it or beside. */
+  farms(rand: Rand): void {
+    const { roads } = this;
+    const FARM = K('farm', [10, 14], [8, 11], [1, 2], ['gable']);
+    const BARN = K('barn', [12, 18], [9, 12], [2, 2], ['gable']);
+    for (const s of this.slots) {
+      if (s.lot !== 'farm') continue;
+      const r = this.rectOf(s);
+      const mid: Pt = [r.x + r.w / 2, r.z + r.d / 2];
+      const front = ([[0, -1], [-1, 0], [0, 1], [1, 0]] as Pt[])[s.facing];
+      const aside: Pt = [-front[1], front[0]];
+      const [depth, width] = s.facing % 2 ? [r.w, r.d] : [r.d, r.w];
+      // (Turned to the road nearest, as every building is.)
+      const near = this.nearestWay(mid[0], mid[1], 200);
+      const t: Pt = near ? pointAt(roads[near.road].points, near.s).t : aside;
+      const n: Pt = [-t[1], t[0]];
+      const want = between(rand, 2, 3);
+      let made = 0;
+      for (const off of [4, 9, 15]) {
+        for (const [u, v] of [[0, 1], [0.6, 1], [-0.6, 1], [1, 0], [-1, 0], [1, 0.6], [-1, 0.6]] as const) {
+          if (made >= want) break;
+          const kind = made === 0 ? FARM : BARN;
+          const [w, d] = [range(rand, ...kind.w), range(rand, ...kind.d)];
+          // Behind the lot (`v`) or beside it (`u`), `off` m clear of it and its own half again.
+          const c = add(add(mid, front, -v * (depth / 2 + off + 7)), aside, u * (width / 2 + off + 9));
+          const at = this.put(add(c, n, -d / 2), t, n, w, d, kind, rand);
+          if (at < 0) continue;
+          if (made === 0) this.farmNames[at] = `${s.name} ${pick(rand, FARM_BUILDINGS)}`;
+          made++;
+        }
+      }
     }
   }
-  return { backdrop: built, places };
+
+  /** The names for places in area `a` (see `namerFor`), none of `taken`. */
+  private namer(a: number, rand: Rand, taken: Set<string>): Namer {
+    const { roads, areas } = this;
+    const lastNames = this.content.names.last.length ? this.content.names.last : ['Smith'];
+    const streets = areas[a].roads.map((r) => roads[r].name).filter((n): n is string => !!n && !/Trail|Path/.test(n));
+    return namerFor(rand, areas[a].name, this.sizeOf(a), lastNames, streets, taken);
+  }
+
+  /** Building `i`'s place, if it is one (a civic place, a farm building, a shop, a café...): named (none of `taken`), its tag at its door, its hours and the careers working there. */
+  private placeOf(i: number, rand: Rand, taken: Set<string>, civicAt: ReadonlyMap<number, Civic>): TownPlace | null {
+    const b = this.built[i];
+    const kind = b.use as TownPlace['kind'];
+    if (!PLACE_KINDS.includes(kind)) return null;
+    const c = civicAt.get(i);
+    const n = this.namer(b.area, rand, taken);
+    const name = n.unique(() => (c ? c.name(n) : (this.farmNames[i] ?? placeName(kind, n))));
+    const work = c ? c.work : (KIND_WORK[kind] ?? []);
+    // (Its tag at its door: the middle of its front, on the street side.)
+    return { name, kind, x: r2(this.doors[i][0]), z: r2(this.doors[i][1]), hours: hoursFor(HOURS[kind as keyof typeof HOURS], work, this.content.careerCategories), ...(work.length ? { work: [...work] } : {}), area: b.area };
+  }
+
+  /** The places: every public lot, then every backdrop place; then every career not working in a main town yet goes to its first office. */
+  places(rand: Rand): void {
+    const { slots, areas, built, placeList: places } = this;
+    const categories = this.content.careerCategories;
+    const taken = new Set<string>(slots.map((s) => s.name));
+    const named = new Set<string>();
+    for (const s of slots) {
+      if (s.kind === 'house') continue;
+      // (A hamlet's grocer or café is called as the main town's is: by its hamlet's name besides.)
+      let name = s.name;
+      if (named.has(name)) name = `${areas[s.area ?? 0].name} ${name.replace(/^The /, '')}`;
+      for (let k = 2; named.has(name); k++) name = `${s.name} ${k}`;
+      named.add(name);
+      taken.add(name);
+      const r = this.rectOf(s);
+      const kind: TownPlace['kind'] = s.kind === 'outdoor' ? 'outdoor' : s.kind === 'park' ? (s.template === 'market' ? 'shop' : 'park') : s.template === 'cafe' ? 'cafe' : 'shop';
+      // (A shop's tag at its door, on the street; a park's in its middle.)
+      const front = ([[0.5, 0], [0, 0.5], [0.5, 1], [1, 0.5]] as const)[s.facing];
+      const [x, z] = kind === 'park' || kind === 'outdoor' ? [r.x + r.w / 2, r.z + r.d / 2] : [r.x + r.w * front[0], r.z + r.d * front[1]];
+      const work = LOT_WORK[s.template] ?? [];
+      places.push({
+        name,
+        kind,
+        x: r2(x),
+        z: r2(z),
+        plot: s.index,
+        ...(kind === 'park' || kind === 'outdoor' ? {} : { hours: hoursFor(LOT_HOURS, work, categories) }),
+        ...(work.length ? { work } : {}),
+        area: s.area ?? 0,
+      });
+    }
+    const civicAt = new Map(this.civics.map(({ at, c }) => [at, c]));
+    built.forEach((b, i) => {
+      const place = this.placeOf(i, rand, taken, civicAt);
+      if (!place) return;
+      b.place = places.length;
+      places.push(place);
+    });
+    // Every career a resident may hold works somewhere in each main town: any the civic places left
+    // out (content added since) go to its first office.
+    for (const centre of this.centres) {
+      const here = places.filter((p) => p.area === centre.area);
+      const office = here.find((p) => p.kind === 'office' && p.plot === undefined);
+      if (!office) continue;
+      for (const c of categories) {
+        if (here.some((p) => p.work?.includes(c.id))) continue;
+        office.work = [...(office.work ?? []), c.id];
+        office.hours = hoursFor(office.hours ?? HOURS.office, [c.id], categories);
+      }
+    }
+  }
+
+  /**
+   * The places among `buildings` (new ones, by index: a draft's own have theirs), named after the
+   * town's other places and its lots (none twice), as `places` names them; each building given its
+   * place's index (after the town's). The new places, in the order of `buildings`.
+   */
+  placesFor(buildings: readonly number[], rand: Rand): TownPlace[] {
+    const taken = new Set<string>([...this.slots.map((s) => s.name), ...this.placeList.map((p) => p.name)]);
+    const civicAt = new Map(this.civics.map(({ at, c }) => [at, c]));
+    const made: TownPlace[] = [];
+    for (const i of buildings) {
+      const b = this.built[i];
+      if (!b || b.place !== undefined) continue;
+      const place = this.placeOf(i, rand, taken, civicAt);
+      if (!place) continue;
+      b.place = this.placeList.length;
+      this.placeList.push(place);
+      made.push(place);
+    }
+    return made;
+  }
+
+  /** The buildings (a draft's first, then the new) and the places. */
+  result(): { backdrop: BackdropBuilding[]; places: TownPlace[] } {
+    return { backdrop: [...this.built], places: [...this.placeList] };
+  }
+}
+
+/** The backdrop and the places of a big world: see the top of this file. */
+export function layBackdrop(input: BackdropInput): { backdrop: BackdropBuilding[]; places: TownPlace[] } {
+  const { rand } = input;
+  const pass = new BackdropPass(input);
+  pass.civic(rand);
+  // Rows along the roads: the centres shoulder to shoulder, the rest with gaps.
+  const rows: Row[] = [];
+  input.areas.forEach((area, a) => {
+    for (const r of area.roads) if (input.roads[r].kind !== 'trail') rows.push(...pass.rowsAlong(a, r, [1, -1], rand));
+  });
+  pass.secondRow(rows, rand);
+  pass.infill(rand);
+  pass.thin();
+  pass.farms(rand);
+  pass.places(rand);
+  const { backdrop, places } = pass.result();
+  return { backdrop, places };
 }
 
 /** A backdrop place's name (not a civic one's). */

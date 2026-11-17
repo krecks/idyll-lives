@@ -1,16 +1,20 @@
 /**
  * A new place's land as a height field whose town follows its slopes (`Land.seeded` `'follow'`):
- * seeded from the generator's own heights (`OpenWorldDraft.heights`), the built land not
- * flattened, then the roads, the lots and the land round them graded into it
- * (`render/shared/builtSurface.ts`), so the land a world stores agrees with its town. Classic
- * worlds and older saves have none (they stay flat); a land a player shaped keeps its heights and
- * is graded again under the town laid on it.
+ * seeded bare, with no town on it, from the generator's own heights (`OpenWorldDraft.heights`:
+ * `seedBare`, step 1); once a town is laid on it, gentle ground eased in under the town
+ * (`gentleUnder`, the built land not flattened), then the roads, the lots and the land round them
+ * graded into it (`render/shared/builtSurface.ts`), so the land a world stores agrees with its
+ * town. Classic worlds and older saves have none (they stay flat); a land a player shaped keeps
+ * its heights and is eased and graded the same way under the town laid on it.
  */
 
 import { DEFAULT_LANDSCAPE, type RoadPlan, type WorldStructure, type WorldZone } from '../core/protocol';
 import { BRIDGE_CLEAR, builtSurfaceOf, CUT_MAX, CUT_MAX_MOUNTAIN_ROAD, GRADE, RETAIN_MAX, surfacePlots, type BuiltSurface, type SurfaceWorld } from '../render/shared/builtSurface';
 import { blankLand, COVER, COVER_CELL, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, type Land } from './land';
-import { APRON, builtOf, Protection } from './landEdit';
+import { APRON, builtOf, landZones, Protection, wetTiles } from './landEdit';
+import { lotKey, removeLots } from './edit/lots';
+import { rle, unrle } from './landMasks';
+import { deckTiles } from './macro';
 import { fbm, ridged, smoothstep } from './noise';
 import type { NeighbourhoodDraft } from './town';
 import { COURT, lengths, nearest, pointAt, RoadIndex, type Pt } from './roads';
@@ -41,19 +45,21 @@ const bedBelow = (e: number) => Math.min(DEPTH_MOST, e * 0.22 + e * e * 0.004);
 export type FollowWorld = Pick<WorldStructure, 'width' | 'depth' | 'plots' | 'meta'> & SurfaceWorld;
 
 /**
- * `draft` with its land (`open.land`) whose town follows its slopes: a place's new world seeded
- * (`seedFollow`) and graded (`gradeLand`); a world laid again on a land the player shaped
- * (`open.land`, seeded `'follow'`) graded again. Anything else (a classic world, a draft from older
- * code, a land drawn flat under its town) as it was. `world`: the draft's preview (`previewWorld`),
- * for its lots, their paths and its roads. `seeded`: given the land before it is graded (a copy).
+ * `draft` with its land (`open.land`) whose town follows its slopes: the land it was laid on
+ * (`open.land`, seeded `'follow'`: step 1's, shaped or not), or else one seeded bare from its
+ * heights (`seedBare`), given gentle ground under its towns (`gentleUnder`) and graded
+ * (`gradeLand`). Anything else (a classic world, a draft from older code, a land drawn flat under
+ * its town) as it was. `world`: the draft's preview (`previewWorld`), for its lots, their paths
+ * and its roads. `seeded`: given the land before it is graded, its gentle ground in it (a copy).
  */
 export function withLand(draft: NeighbourhoodDraft, world: FollowWorld, seeded?: (land: Land) => void): NeighbourhoodDraft {
   const open = draft.open;
   if (!open) return draft;
   let land: Land | null;
   if (open.land) land = open.land.seeded === 'follow' ? { ...open.land, h: open.land.h.slice() } : null;
-  else land = seedFollow(draft, world);
+  else land = open.heights ? seedBare(draft) : null;
   if (!land) return draft;
+  gentleUnder(land, world, draft.slots.map((s) => s.area ?? 0));
   seeded?.({ ...land, h: land.h.slice(), wl: land.wl.slice(), cover: land.cover.slice() });
   gradeLand(land, world);
   return { ...draft, open: { ...open, land } };
@@ -75,12 +81,28 @@ export interface Slopes {
   drift: number;
 }
 
-/** What `measureLand` found over the limits: in words, and which pads (`surfacePlots` indices) and roads break them. */
+/**
+ * How far a road or a pad is over a slope limit (`measureLand`): it climbs too steeply (`climb`), is
+ * cut into the land or stands over it too far (`cut`), or its edge stands too tall over the land
+ * (`edge`) or the pad (`edgePad`) beside it; `by` how much (rise per m, or m) and the limit `most`.
+ */
+export interface Over {
+  what: 'climb' | 'cut' | 'edge' | 'edgePad';
+  by: number;
+  most: number;
+}
+
+/**
+ * What `measureLand` found over the limits: in words, and which pads (`surfacePlots` indices) and
+ * roads break them; and for those over the limits themselves (not only within `margin` of them), how
+ * (`over`: the first limit each breaks, keyed as `pads` and `roads` are).
+ */
 export interface LandMeasure {
   slopes: Slopes;
   problems: string[];
   pads: Set<number>;
   roads: Set<number>;
+  over: { pads: Map<number, Over>; roads: Map<number, Over> };
 }
 
 /**
@@ -101,6 +123,8 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
   const surface = builtSurfaceOf(world, land);
   const roads = world.meta?.roads ?? [];
   const slopes: Slopes = { grade: {}, retain: { land: 0, lot: 0, road: 0 }, cut: { road: 0, lot: 0 }, clear: Infinity, drift: 0 };
+  const over: LandMeasure['over'] = { pads: new Map(), roads: new Map() };
+  const note = (into: Map<number, Over>, n: number, o: Over) => into.has(n) || into.set(n, o);
   const wet = (l: Land, k: number) => l.wl[k] !== NONE && l.wl[k] > l.h[k];
   const [cutMost, edgeMost] = [CUT_MAX - margin, RETAIN_MAX + 0.01 - margin];
   // (Among mountains a country road, a pass, may be cut deeper into the rock.)
@@ -115,6 +139,7 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
     if (kind === 'trail') return;
     if (steepest > GRADE[kind] + 0.01) {
       out.push(`${kind} ${r.name ?? i} climbs ${(steepest * 100).toFixed(1)} % (at most ${GRADE[kind] * 100} %)`);
+      note(over.roads, i, { what: 'climb', by: steepest, most: GRADE[kind] });
       bad.add(i);
     }
     const span = r.bridge && r.bridge[1] > r.bridge[0] ? r.bridge : null;
@@ -131,7 +156,10 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
     }
     slopes.cut.road = Math.max(slopes.cut.road, cut);
     if (cut > roadMost(kind) - margin) {
-      if (cut > roadMost(kind)) out.push(`${kind} ${r.name ?? i} is cut ${cut.toFixed(1)} m into the land or stands over it (at most ${roadMost(kind)})`);
+      if (cut > roadMost(kind)) {
+        out.push(`${kind} ${r.name ?? i} is cut ${cut.toFixed(1)} m into the land or stands over it (at most ${roadMost(kind)})`);
+        note(over.roads, i, { what: 'cut', by: cut, most: roadMost(kind) });
+      }
       bad.add(i);
     }
     if (span) {
@@ -164,7 +192,10 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
     }
     slopes.cut.lot = Math.max(slopes.cut.lot, cut);
     if (cut > cutMost) {
-      if (cut > CUT_MAX) out.push(`lot ${n} (${p.w}×${p.d} m) is cut ${cut.toFixed(1)} m into the land or stands over it (at most ${CUT_MAX})`);
+      if (cut > CUT_MAX) {
+        out.push(`lot ${n} (${p.w}×${p.d} m) is cut ${cut.toFixed(1)} m into the land or stands over it (at most ${CUT_MAX})`);
+        note(over.pads, n, { what: 'cut', by: cut, most: CUT_MAX });
+      }
       pads.add(n);
     }
     const edge = (x: number, z: number) => {
@@ -174,15 +205,23 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
       if (other >= 0) {
         slopes.retain.lot = Math.max(slopes.retain.lot, step);
         if (step > edgeMost) {
-          if (step > RETAIN_MAX + 0.01) out.push(`lot ${n}'s edge stands ${step.toFixed(2)} m over the pad beside it (at most ${RETAIN_MAX})`);
-          // (The backdrop building, else the later lot, gives way.)
-          pads.add(other >= world.plots.length ? other : Math.max(n, other));
+          // (The backdrop building, else the later lot, gives way; but a lot gives way to a building that is a place, a shop or the like.)
+          const place = other >= world.plots.length && world.meta?.backdrop?.[other - world.plots.length]?.place !== undefined;
+          const gives = place ? n : other >= world.plots.length ? other : Math.max(n, other);
+          if (step > RETAIN_MAX + 0.01) {
+            out.push(`lot ${n}'s edge stands ${step.toFixed(2)} m over the pad beside it (at most ${RETAIN_MAX})`);
+            note(over.pads, gives, { what: 'edgePad', by: step, most: RETAIN_MAX });
+          }
+          pads.add(gives);
         }
       } else if (index.onRoad(x, z, LAND_CELL)) slopes.retain.road = Math.max(slopes.retain.road, step);
       else {
         slopes.retain.land = Math.max(slopes.retain.land, step);
         if (step > edgeMost) {
-          if (step > RETAIN_MAX + 0.01) out.push(`lot ${n}'s edge stands ${step.toFixed(2)} m over the land beside it (at most ${RETAIN_MAX})`);
+          if (step > RETAIN_MAX + 0.01) {
+            out.push(`lot ${n}'s edge stands ${step.toFixed(2)} m over the land beside it (at most ${RETAIN_MAX})`);
+            note(over.pads, n, { what: 'edge', by: step, most: RETAIN_MAX });
+          }
           pads.add(n);
         }
       }
@@ -197,7 +236,7 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
     }
   });
   // The land stored against the surface worked out from it, off what is built (unless not asked: the last resort).
-  if (!drift) return { slopes, problems: out, pads, roads: bad };
+  if (!drift) return { slopes, problems: out, pads, roads: bad, over };
   const lot = new Uint8Array(land.h.length);
   for (const p of world.plots) {
     for (let j = Math.ceil(p.z / LAND_CELL); j <= Math.min(land.rows - 1, Math.floor((p.z + p.d) / LAND_CELL)); j++) {
@@ -211,7 +250,7 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
     if (on && roads[on.road].bridge && on.s >= roads[on.road].bridge![0] && on.s <= roads[on.road].bridge![1]) continue;
     slopes.drift = Math.max(slopes.drift, Math.abs((lot[k] || on ? surface.at(x, z) : surface.conformed[k]) - land.h[k] / 100));
   }
-  return { slopes, problems: out, pads, roads: bad };
+  return { slopes, problems: out, pads, roads: bad, over };
 }
 
 /** Pads are filed for `measureLand` by cells this wide (m). */
@@ -227,18 +266,18 @@ const SETTLE_MARGIN = 0.15;
  * `withLand`, and the last resort: a place's world whose built land still breaks a slope limit
  * (`measureLand`, a little within it) gives up what breaks it and is graded again, round after
  * round (`SETTLE_ROUNDS` at most): a lot or a backdrop building cut too deep or whose edge stands
- * too tall (of two pads, the backdrop building, else the later lot) is left out (`diagnostics.dropped`);
+ * too tall (of two pads, the backdrop building, else the later lot; a lot before a building that is a place) is left out (`diagnostics.dropped`);
  * a country road cut too deep (a way out, a loop between places) is left out, and the lots and
- * backdrop buildings on it, where the roads left are still one network with a way out; a dead end reaching past `COURT` m beyond the last road it meets is
+ * backdrop buildings on it (those by it, and those it was the nearest road to), where the roads left are still one network with a way out; a dead end reaching past `COURT` m beyond the last road it meets is
  * cut back to that, and the lots past it left out. What it gave up: `diagnostics.slopes`.
- * `preview`: the world as the menus' preview has it (its lots' paths: `previewWorld`). The draft and
- * that world.
+ * `preview`: the world as the menus' preview has it (its lots' paths: `previewWorld`; asked of the
+ * draft without its land). The draft and that world.
  */
 export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, preview: (draft: NeighbourhoodDraft) => W, seeded?: (land: Land) => void): { draft: NeighbourhoodDraft; world: W } {
   let draft = laid;
   const given = { lots: 0, backdrop: 0, roads: 0, courts: 0, backdropIn: {} as Record<number, number> };
   for (let round = 0; ; round++) {
-    const world = preview(draft);
+    const world = preview(unlanded(draft));
     let first: Land | null = null;
     const graded = withLand(draft, world, (l) => (first = l));
     const land = graded.open?.land;
@@ -254,6 +293,199 @@ export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, prev
     }
     draft = next;
   }
+}
+
+// ---- step 2's settle ---------------------------------------------------------------------------
+
+/** What `settleEdit` gives: see there. */
+export interface EditSettled<W> {
+  draft: NeighbourhoodDraft;
+  world: W;
+  /** The edits refused (`op`: an edit's index in the batch, from 0), each with why: in words, as a clause ("Mill Lane would climb 21 %, …"). */
+  refused: { op: number; why: string }[];
+  /** What in the settled town is over a slope limit (`settleKeys`): the next settle's `before`. */
+  marks: string[];
+  /** The plan settled: its index in the batch's `steps` (the last, unless an edit was refused: then the one that edit was made on). */
+  step: number;
+}
+
+/**
+ * Step 2's settle: the town's plan draft (`plan`: its `open.land` the land as laid, its heights not
+ * yet graded under the town; step 1's, with the town's woods and fields) with its land settled under
+ * it as `settleLand` settles a new town's (gentle ground under the town: `gentleUnder`; the roads and
+ * lots graded in: `gradeLand`), but giving nothing up (decision 11: an edit never makes something
+ * else go). Its cover is opened within 2 m of anything built (as `macro.ts` `settleTown` opens it),
+ * the woods, meadows and fields of its zones made again from that (the water, hills and orchards
+ * kept), and its walkers' water (`open.water`) made again, the plan's (else the land's), with every
+ * bridge's deck dried (`deckTiles` over `RoadPlan.bridge`) as the generator dries them. A plan with
+ * no land of that kind (a classic town) is its own settle. `preview`: the world as the menus'
+ * preview has it (asked of the plan without its land).
+ *
+ * What the batch of edits made over a slope limit (`measureLand`: a road too steep, a road or a lot
+ * cut too deep or standing too high, a lot's edge too tall) is refused. `steps`: the plans the batch
+ * went through, the first the plan last settled, the last `plan` (so its edits are `steps.length - 1`).
+ * `before`: what was over a limit in the last settle (its `marks`); not given, the first step is
+ * settled too to find it (its time again). What is over a limit now and wasn't then is the batch's:
+ * each is laid to the edit that brought it in (a road or a lot that edit added or changed), else to
+ * the edit whose changes are nearest it (removing a lot changes the ground under its neighbours).
+ * Each refused edit is given the reason for the first of its; the plan the first refused edit was
+ * made on is settled instead, and checked again in turn (the edits after it go with it: the plans
+ * build on each other). With no `steps` nothing is refused.
+ */
+export function settleEdit<W extends FollowWorld>(plan: NeighbourhoodDraft, preview: (draft: NeighbourhoodDraft) => W, before?: Iterable<string>, steps?: readonly NeighbourhoodDraft[]): EditSettled<W> {
+  const path = steps && steps.length > 1 ? [...steps.slice(0, -1), plan] : [plan];
+  let at = path.length - 1;
+  let settled = settleOnce(plan, preview);
+  const refused: { op: number; why: string }[] = [];
+  if (at > 0) {
+    let first: Settle<W> | null = null;
+    const had = new Set(before ?? (first = settleOnce(path[0], preview)).over.keys());
+    // (Each step's things by their keys, made once.)
+    const things = path.map(thingsOf);
+    for (;;) {
+      const fresh = [...settled.over].filter(([key]) => !had.has(key));
+      if (!fresh.length || at === 0) break;
+      // (Each edit's reason: the first of what it brought in itself, else the first of what it broke nearby.)
+      const blamed = new Map<number, { why: string; own: boolean }>();
+      for (const [key, o] of fresh) {
+        const { op, own } = blame(key, o.at, things.slice(0, at + 1));
+        if (!blamed.has(op) || (own && !blamed.get(op)!.own)) blamed.set(op, { why: o.why, own });
+      }
+      for (const [op, { why }] of blamed) if (!refused.some((r) => r.op === op)) refused.push({ op, why });
+      at = Math.min(...blamed.keys());
+      settled = at === 0 && first ? first : settleOnce(path[at], preview);
+    }
+    refused.sort((a, b) => a.op - b.op);
+  }
+  return { draft: settled.draft, world: settled.world, refused, marks: [...settled.over.keys()], step: at };
+}
+
+/** One settle of `settleEdit`'s: the plan's draft settled, its preview, and what is over a slope limit in it (by its key: where it is, and why in words). */
+interface Settle<W> {
+  draft: NeighbourhoodDraft;
+  world: W;
+  over: Map<string, { at: Pt[]; why: string }>;
+}
+
+/** `plan` settled as `settleEdit` settles it, giving nothing up: see there. */
+function settleOnce<W extends FollowWorld>(plan: NeighbourhoodDraft, preview: (draft: NeighbourhoodDraft) => W): Settle<W> {
+  const open = plan.open;
+  const laid = open?.land;
+  if (!open || !laid || laid.seeded !== 'follow') return { draft: plan, world: preview(plan), over: new Map() };
+  const world = preview(unlanded(plan));
+  const land: Land = { ...laid, h: laid.h.slice(), wl: laid.wl.slice(), cover: laid.cover.slice() };
+  // The cover open under and by what is built (`macro.ts` `settleTown`), and the zones' woods, meadows and fields from it.
+  const guard = new Protection(land.cols, land.rows, builtOf(world));
+  const cw = coverSpan(land.cols);
+  const c = COVER_CELL / LAND_CELL;
+  for (let r = 0; r < coverSpan(land.rows); r++) for (let q = 0; q < cw; q++) if (guard.dist[Math.min(land.rows - 1, r * c + 1) * land.cols + Math.min(land.cols - 1, q * c + 1)] <= 2) land.cover[r * cw + q] = COVER.open;
+  const cover = landZones(land, { cover: true });
+  const zones = (['water', 'hill', 'fields', 'meadow', 'woods', 'orchard'] as const).flatMap((kind) => (kind === 'fields' || kind === 'meadow' || kind === 'woods' ? cover : open.zones).filter((z) => z.kind === kind));
+  // The walkers' water: the plan's (else the land's), every bridge's deck dry.
+  const [W, D] = [plan.width, plan.depth];
+  const walk = open.water ? unrle(open.water, W * D) : wetTiles(land, W, D);
+  for (const r of plan.roads) if (r.bridge && r.bridge[1] > r.bridge[0]) deckTiles(r, r.bridge, W, D, (tile) => (walk[tile] = 0));
+  // The land eased and graded under the town, and measured (no margin: the limits themselves).
+  gentleUnder(land, world, plan.slots.map((s) => s.area ?? 0));
+  const seeded: Land = { ...land, h: land.h.slice() };
+  gradeLand(land, world);
+  const found = measureLand(world, land, seeded, 0, false);
+  const over = new Map<string, { at: Pt[]; why: string }>();
+  for (const [i, o] of found.over.roads) {
+    const r = plan.roads[i];
+    over.set(roadKey(r), { at: r.points, why: overWords(o, r.name ?? `the ${r.kind ?? 'street'}`, r.kind ?? 'street') });
+  }
+  const plots = world.plots.length;
+  const building = surfacePlots(world);
+  for (const [n, o] of found.over.pads) {
+    const p = building[n];
+    const at: Pt[] = [[p.x, p.z], [p.x + p.w, p.z + p.d]];
+    if (n < plots) over.set(slotKey(plan.slots[n]), { at, why: overWords(o, plan.slots[n].name || 'the lot', 'lot') });
+    else over.set(buildingKey(open.backdrop![n - plots]), { at, why: overWords(o, 'a building there', 'building') });
+  }
+  return { draft: { ...plan, open: { ...open, land, zones, water: rle(walk) } }, world, over };
+}
+
+/** How `o` breaks a slope limit, in words, of `name` (a road of `kind`, a lot or a building). */
+function overWords(o: Over, name: string, kind: string): string {
+  const m = (v: number) => `${v.toFixed(1)} m`;
+  switch (o.what) {
+    case 'climb':
+      return `${name} would climb ${Math.round(o.by * 100)} %, more than a ${kind} may (${Math.round(o.most * 100)} %)`;
+    case 'cut':
+      return `the ground under ${name} would have to be dug out or built up ${m(o.by)} (${m(o.most)} at most)`;
+    case 'edge':
+      return `${name} would stand ${m(o.by)} over the land beside it (${m(o.most)} at most)`;
+    case 'edgePad':
+      return `${name} would stand ${m(o.by)} over the lot beside it (${m(o.most)} at most)`;
+  }
+}
+
+/**
+ * What is over a slope limit is known across edits by keys (`EditSettled.marks`): a road by where it
+ * begins and ends, its points, kind and width (a road renamed is the same road; one drawn on further
+ * another); a lot by where it stands (`lotKey`), the way it faces, its size and its house; a backdrop
+ * building by its footprint. Whatever changes how the land is graded under it changes its key.
+ */
+const tenth = (v: number) => Math.round(v * 10) / 10;
+function roadKey(r: RoadPlan): string {
+  const [a, b] = [r.points[0], r.points[r.points.length - 1]];
+  return `road ${tenth(a[0])},${tenth(a[1])} ${tenth(b[0])},${tenth(b[1])} ${r.points.length} ${r.kind ?? 'street'} ${r.width}`;
+}
+function slotKey(s: NeighbourhoodDraft['slots'][number]): string {
+  return `lot ${lotKey(s)} ${s.facing} ${s.lot ?? ''} ${s.w ?? ''}x${s.d ?? ''} ${s.template}`;
+}
+function buildingKey(b: { poly: readonly Pt[] }): string {
+  return `building ${b.poly.map(([x, z]) => `${tenth(x)},${tenth(z)}`).join(' ')}`;
+}
+
+/** A plan's roads, lots and backdrop buildings by their keys, and where each is (a lot by its corner). */
+function thingsOf(draft: NeighbourhoodDraft): Map<string, readonly Pt[]> {
+  const out = new Map<string, readonly Pt[]>();
+  for (const r of draft.roads) out.set(roadKey(r), r.points);
+  for (const s of draft.slots) out.set(slotKey(s), [[s.x, s.z]]);
+  for (const b of draft.open?.backdrop ?? []) out.set(buildingKey(b), b.poly);
+  return out;
+}
+
+/**
+ * Which edit (its index among `steps.length - 1`) what is over a limit (`key`, at `at`) is laid to:
+ * the last that brought it in (`own`), else the one whose changes (what it added or took away) are
+ * nearest it; the last edit if none changed anything there is.
+ */
+function blame(key: string, at: readonly Pt[], steps: readonly Map<string, readonly Pt[]>[]): { op: number; own: boolean } {
+  const ops = steps.length - 1;
+  for (let i = ops - 1; i >= 0; i--) if (steps[i + 1].has(key) && !steps[i].has(key)) return { op: i, own: true };
+  let [best, far] = [ops - 1, Infinity];
+  for (let i = 0; i < ops; i++) {
+    const [a, b] = [steps[i], steps[i + 1]];
+    for (const [one, other] of [
+      [b, a],
+      [a, b],
+    ]) {
+      for (const [k, pts] of one) {
+        if (other.has(k)) continue;
+        const d = apart(at, pts);
+        if (d <= far) [best, far] = [i, d];
+      }
+    }
+  }
+  return { op: best, own: false };
+}
+
+/** The least distance between two sets of points (m; every 4th of a long one, and its ends). */
+function apart(a: readonly Pt[], b: readonly Pt[]): number {
+  const thin = (p: readonly Pt[]) => (p.length > 16 ? p.filter((_, i) => i % 4 === 0 || i === p.length - 1) : p);
+  let d = Infinity;
+  for (const [x, z] of thin(a)) for (const [u, v] of thin(b)) d = Math.min(d, Math.hypot(x - u, z - v));
+  return d;
+}
+
+/** `draft` without its land (`open.land`): what a settle round previews, its land not wanted there (nor coded into the preview). */
+function unlanded(draft: NeighbourhoodDraft): NeighbourhoodDraft {
+  if (!draft.open?.land) return draft;
+  const { land: _land, ...open } = draft.open;
+  return { ...draft, open };
 }
 
 /** The dead ends (not trails') reaching past `COURT` m beyond the last road they meet: each road, its end, and how far along it the last meeting is. */
@@ -295,6 +527,8 @@ function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasur
   const backdrop = new Set([...found.pads].filter((n) => n >= plots).map((n) => n - plots));
   let roads = draft.roads.map((r) => ({ ...r, points: r.points.slice() }));
   const gone = new Set<number>();
+  /** The dead ends cut back: per road, the stretch of it kept (m along it as it was). */
+  const kept = new Map<number, [number, number]>();
   // Country roads cut too deep (a way out of the world, a loop between places), where the rest is still one network with a way out.
   for (const r of [...found.roads].sort((a, b) => a - b)) {
     if (roads[r].kind !== 'country') continue;
@@ -317,15 +551,28 @@ function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasur
     // (Never one that leaves the roads in two.)
     if (!oneNetwork(trimmed, gone)) continue;
     roads = trimmed;
+    kept.set(c.road, [from, to]);
     given.courts++;
     // (The lots past the new end.)
     entries.forEach((p, n) => {
       if (n < plots && p.entry?.road === c.road && (p.entry.s < from - 0.5 || p.entry.s > to + 0.5)) lots.add(n);
     });
   }
-  // (The lots on a road left out, and the backdrop buildings by it.)
+  // (The lots on a road left out, and the backdrop buildings by it or facing it: no road of their
+  // own left nearer. And the backdrop buildings facing a dead end past where it was cut back to, as
+  // the lots there: the road they faced is gone from by them.)
+  const facedGone = (x: number, z: number) => {
+    let best = { road: -1, dist: Infinity, s: 0 };
+    draft.roads.forEach((r, i) => {
+      const { dist, s } = nearest(r.points, x, z);
+      if (dist < best.dist) best = { road: i, dist, s };
+    });
+    const cut = kept.get(best.road);
+    return gone.has(best.road) || (!!cut && (best.s < cut[0] - 0.5 || best.s > cut[1] + 0.5));
+  };
   entries.forEach((p, n) => {
-    if (n < plots ? p.entry && gone.has(p.entry.road) : [...gone].some((r) => nearest(draft.roads[r].points, p.x + p.w / 2, p.z + p.d / 2).dist < BY_ROAD)) (n < plots ? lots : backdrop).add(n < plots ? n : n - plots);
+    const [x, z] = [p.x + p.w / 2, p.z + p.d / 2];
+    if (n < plots ? p.entry && gone.has(p.entry.road) : (gone.size && [...gone].some((r) => nearest(draft.roads[r].points, x, z).dist < BY_ROAD)) || ((gone.size || kept.size) && facedGone(x, z))) (n < plots ? lots : backdrop).add(n < plots ? n : n - plots);
   });
   if (!gone.size && !lots.size && !backdrop.size && roads.every((r, i) => r === draft.roads[i] || r.points.length === draft.roads[i].points.length)) return null;
   roads = roads.filter((_, i) => !gone.has(i));
@@ -335,32 +582,10 @@ function giveUp(draft: NeighbourhoodDraft, world: FollowWorld, found: LandMeasur
     const area = open.backdrop?.[i]?.area ?? 0;
     given.backdropIn[area] = (given.backdropIn[area] ?? 0) + 1;
   }
-  // The slots left, numbered again; the pads, places and backdrop buildings that name them with them.
-  const kept = draft.slots.filter((s) => !lots.has(s.index));
-  const renumber = new Map(kept.map((s, i) => [s.index, i]));
-  const slots = kept.map((s, i) => ({ ...s, index: i }));
+  // The slots left, numbered again; the pads, places and backdrop buildings that name them with them (`edit/lots.ts`).
   const dropped = [...(draft.diagnostics?.dropped ?? []), ...draft.slots.filter((s) => lots.has(s.index)).map((s) => ({ name: s.name, kind: s.kind, ...(s.lot ? { lot: s.lot } : {}) }))];
-  const pads: Record<number, number> = {};
-  for (const [k, v] of Object.entries(open.pads)) if (renumber.has(Number(k))) pads[renumber.get(Number(k))!] = v;
-  const places = open.places ?? [];
-  const placeGone = new Set<number>();
-  places.forEach((q, i) => {
-    if (q.plot !== undefined && !renumber.has(q.plot)) placeGone.add(i);
-  });
-  (open.backdrop ?? []).forEach((b, i) => {
-    if (backdrop.has(i) && b.place !== undefined) placeGone.add(b.place);
-  });
-  const placeNumber = new Map<number, number>();
-  places.forEach((_, i) => !placeGone.has(i) && placeNumber.set(i, placeNumber.size));
-  const keptPlaces = places.filter((_, i) => !placeGone.has(i)).map((q) => (q.plot === undefined ? q : { ...q, plot: renumber.get(q.plot)! }));
-  const keptBackdrop = (open.backdrop ?? []).filter((_, i) => !backdrop.has(i)).map((b) => (b.place === undefined ? b : { ...b, place: placeNumber.get(b.place)! }));
-  return {
-    ...draft,
-    slots,
-    roads,
-    diagnostics: { ...(draft.diagnostics ?? { dropped: [] }), dropped },
-    open: { ...open, pads, ...(open.places ? { places: keptPlaces } : {}), ...(open.backdrop ? { backdrop: keptBackdrop } : {}) },
-  };
+  const removed = removeLots({ ...draft, roads }, lots, backdrop);
+  return { ...removed, diagnostics: { ...(draft.diagnostics ?? { dropped: [] }), dropped } };
 }
 
 /** Whether the roads but those `without` are one network (as the sim joins them) with a road out of the world on it. */
@@ -388,44 +613,36 @@ export function gradeLand(land: Land, world: SurfaceWorld): BuiltSurface {
 }
 
 /**
- * A place's land before its town is graded into it, from its draft (null: it has no
- * `open.heights`, a classic world or an older draft). Every `LAND_CELL` m:
- * - the generator's heights between its cells' middles, and fading in from what is built (as the
- *   renderer's hills fade in, over the look's `rise`), the finer hills, some roughness, and among
- *   mountains their ridges;
- * - under each town and village, and each lot out on its own, gentler ground (`gentler`);
+ * A place's bare land (step 1), from its draft with no town on it (`macro.ts` `landDraft`: its
+ * `open.heights`, which a classic world has not). Every `LAND_CELL` m:
+ * - the generator's heights between its cells' middles, over the level the town is built at
+ *   (`LandPlan.level`), with the finer hills, some roughness, and among mountains their ridges
+ *   everywhere (`gentleUnder` takes them out again under and round what is built);
  * - its water from the water zones: what reaches the world's edge or is bigger than `POND_MOST`
  *   at the sea's level (`SEA_CM`), each pond at its own, a little below the lowest land round it;
- *   the land beside water no higher than over it by the world's slope, the bed going down from the
- *   shore as the renderer's does, and in a world with water the dry land over the sea's level;
+ *   the land beside water no higher than over it by the world's slope (`shoreClamp`), the bed
+ *   going down from the shore as the renderer's does, and in a world with water the dry land over
+ *   the sea's level;
  * - its cover from the woods, meadow and fields zones.
  */
-export function seedFollow(draft: NeighbourhoodDraft, world: FollowWorld): Land | null {
+export function seedBare(draft: NeighbourhoodDraft): Land {
   const open = draft.open;
   const heights = open?.heights;
-  if (!open || !heights) return null;
+  if (!open || !heights) throw new Error('seedBare: the draft has no heights');
   const land = blankLand(draft.width, draft.depth, 'follow');
   const { cols, rows, h: cm, wl } = land;
   const look = { ...DEFAULT_LANDSCAPE, ...draft.world?.landscape };
   const seed = draft.seed ?? 1;
-  const bank = look.slope ?? 0.5;
-  const dist = new Protection(cols, rows, builtOf(world)).dist;
   const h = new Float32Array(cols * rows);
   for (let j = 0; j < rows; j++) {
     for (let i = 0; i < cols; i++) {
       const [x, z] = [i * LAND_CELL, j * LAND_CELL];
-      const k = j * cols + i;
       const base = between(heights, x, z);
-      const rise = smoothstep(APRON, APRON + look.rise, dist[k]);
-      let detail = 0;
-      if (rise > 0) {
-        detail = (fbm(x * 0.018, z * 0.018, seed) - 0.5) * look.hills + base * 0.3 * (fbm(x * 0.012, z * 0.012, seed + 517, 3) - 0.5);
-        if (look.mountains && base > 15) detail += base * 0.35 * (ridged(x * 0.0075, z * 0.0075, seed + 211) - 0.5) * smoothstep(15, 25, base);
-      }
-      h[k] = base + rise * detail;
+      let detail = (fbm(x * 0.018, z * 0.018, seed) - 0.5) * look.hills + base * 0.3 * (fbm(x * 0.012, z * 0.012, seed + 517, 3) - 0.5);
+      if (look.mountains && base > 15) detail += base * 0.35 * (ridged(x * 0.0075, z * 0.0075, seed + 211) - 0.5) * smoothstep(15, 25, base);
+      h[j * cols + i] = base + detail;
     }
   }
-  gentler(h, cols, rows, dist, world, open.areas, draft.roads, draft.slots.map((s) => s.area ?? 0), look.rise);
 
   // ---- the water ----
   const wet = scan(
@@ -463,18 +680,14 @@ export function seedFollow(draft: NeighbourhoodDraft, world: FollowWorld): Land 
       const level = pond ? Math.round((rim - POND_BELOW) * 100) : SEA_CM;
       for (const k of members) wl[k] = level;
     }
-    // How far each wet sample is from dry land, and the highest the dry land may stand by the water.
+    // How far each wet sample is from dry land: its bed.
     const into = new Float32Array(cols * rows);
-    const top = new Float32Array(cols * rows);
-    for (let k = 0; k < h.length; k++) {
-      into[k] = wet[k] ? Infinity : 0;
-      top[k] = wet[k] ? wl[k] / 100 + SHORE_OVER : Infinity;
-    }
+    for (let k = 0; k < h.length; k++) into[k] = wet[k] ? Infinity : 0;
     chamfer(cols, rows, (k, n, d) => {
       if (into[n] + d < into[k]) into[k] = into[n] + d;
-      if (top[n] + bank * d < top[k]) top[k] = top[n] + bank * d;
     });
-    for (let k = 0; k < h.length; k++) h[k] = wet[k] ? wl[k] / 100 - bedBelow(into[k]) : Math.min(h[k], Math.max(top[k], sea + DRY_OVER));
+    for (let k = 0; k < h.length; k++) if (wet[k]) h[k] = wl[k] / 100 - bedBelow(into[k]);
+    shoreClamp(h, wl, cols, rows, look.slope ?? 0.5);
   }
   for (let k = 0; k < h.length; k++) cm[k] = Math.max(-32767, Math.min(32767, Math.round(h[k] * 100)));
 
@@ -494,6 +707,103 @@ export function seedFollow(draft: NeighbourhoodDraft, world: FollowWorld): Land 
 }
 
 /**
+ * The dry land beside water (`h`, m per sample; `wl` its water levels, cm) brought down to no
+ * higher over the water than the world's slope (`bank`, rise per m) takes it from `SHORE_OVER`
+ * over it at the shore, and in a world with water no lower than `DRY_OVER` over the sea's level.
+ * The water's beds are left as they are.
+ */
+function shoreClamp(h: Float32Array, wl: Int16Array, cols: number, rows: number, bank: number): void {
+  const sea = SEA_CM / 100;
+  const wet = (k: number) => wl[k] !== NONE && wl[k] / 100 > h[k];
+  const top = new Float32Array(cols * rows);
+  let any = false;
+  for (let k = 0; k < h.length; k++) {
+    top[k] = wet(k) ? wl[k] / 100 + SHORE_OVER : Infinity;
+    any ||= wet(k);
+  }
+  if (!any) return;
+  chamfer(cols, rows, (k, n, d) => {
+    if (top[n] + bank * d < top[k]) top[k] = top[n] + bank * d;
+  });
+  for (let k = 0; k < h.length; k++) if (!wet(k)) h[k] = Math.min(Math.max(h[k], sea + DRY_OVER), Math.max(top[k], sea + DRY_OVER));
+}
+
+/** How far the fine hills are smoothed out under and round what is built (`smoothHeights`: samples either way, and how many times). */
+const SMOOTH_REACH = 8;
+const SMOOTH_PASSES = 3;
+
+/**
+ * The land's dry heights (m) with its finer hills smoothed out (three box blurs of
+ * `SMOOTH_REACH` samples either way, over the dry samples alone: a gaussian of about 17 m), its
+ * wider hills and its mountains kept: what the land under and round a town eases to
+ * (`gentleUnder`), and what the generator lays a town by (`macro.ts` `fillFrom`). Wet samples get
+ * the dry land's round them.
+ */
+export function smoothHeights(land: Land): Float32Array {
+  const { cols, rows } = land;
+  const n = cols * rows;
+  const sum = new Float32Array(n);
+  const weight = new Float32Array(n);
+  for (let k = 0; k < n; k++) {
+    if (land.wl[k] !== NONE && land.wl[k] > land.h[k]) continue;
+    sum[k] = land.h[k] / 100;
+    weight[k] = 1;
+  }
+  const line = new Float64Array(Math.max(cols, rows) + 1);
+  // (A box along each row, then each column, the edge's past the edge.)
+  const blur = (a: Float32Array) => {
+    const R = SMOOTH_REACH;
+    const out = new Float32Array(n);
+    for (const [count, length, stride, step] of [
+      [rows, cols, cols, 1],
+      [cols, rows, 1, cols],
+    ] as const) {
+      const src = step === 1 ? a : out.slice();
+      const dst = step === 1 ? out : a;
+      for (let r = 0; r < count; r++) {
+        const at = (i: number) => src[r * stride + Math.min(length - 1, Math.max(0, i)) * step];
+        line[0] = 0;
+        for (let i = 0; i < length + 2 * R; i++) line[i + 1] = line[i] + at(i - R);
+        // (Summed from -R: line[i] holds the samples -R .. i - R - 1.)
+        for (let i = 0; i < length; i++) dst[r * stride + i * step] = (line[i + 2 * R + 1] - line[i]) / (2 * R + 1);
+      }
+    }
+    return a;
+  };
+  for (let p = 0; p < SMOOTH_PASSES; p++) {
+    blur(sum);
+    blur(weight);
+  }
+  const out = new Float32Array(n);
+  for (let k = 0; k < n; k++) out[k] = weight[k] > 1e-6 ? sum[k] / weight[k] : land.h[k] / 100;
+  return out;
+}
+
+/**
+ * Gentler ground under the towns, the villages and the lots out on their own of `world`, fitted
+ * into `land` (its dry heights changed in place; `areaOf`: each plot's area; not given, a plot by a box counts as its area's), as
+ * a place's land yields to its town: within the look's `rise` of anything built its finer hills
+ * fade out (`smoothHeights`), as the renderer's hills fade in from a town's edge; then each area's
+ * box, and each lot out of every box, gets a plane (`gentler`); then the land beside water is
+ * kept to its shore again (`shoreClamp`). What `withLand` does before it grades the town in.
+ */
+export function gentleUnder(land: Land, world: FollowWorld, areaOf: readonly number[] = []): void {
+  const { cols, rows } = land;
+  const look = { ...DEFAULT_LANDSCAPE, ...(world.meta?.world as { landscape?: Partial<typeof DEFAULT_LANDSCAPE> } | undefined)?.landscape };
+  const dist = new Protection(cols, rows, builtOf(world)).dist;
+  const smooth = smoothHeights(land);
+  const h = new Float32Array(cols * rows);
+  const dry = (k: number) => land.wl[k] === NONE || land.wl[k] <= land.h[k];
+  for (let k = 0; k < h.length; k++) {
+    const own = land.h[k] / 100;
+    h[k] = dry(k) ? smooth[k] + smoothstep(APRON, APRON + look.rise, dist[k]) * (own - smooth[k]) : own;
+  }
+  gentler(h, cols, rows, dist, world, world.meta?.areas ?? [], world.meta?.roads ?? [], areaOf, look.rise, dry);
+  shoreClamp(h, land.wl, cols, rows, look.slope ?? 0.5);
+  for (let k = 0; k < h.length; k++) if (dry(k)) land.h[k] = Math.max(-32767, Math.min(32767, Math.round(h[k] * 100)));
+}
+
+/**
  * The land (`h`, m per sample) eased under what is built towards gentle ground: each area's box (a
  * town or a village, with its own streets and lanes where they reach out past it), and each lot or backdrop building out of every box, gets a plane fitted to
  * the land under what is built in it (least squares, tilted no more than `GENTLE_TILT`), the land
@@ -501,9 +811,9 @@ export function seedFollow(draft: NeighbourhoodDraft, world: FollowWorld): Land 
  * `rise`). Where two come near each other, their planes are blended by how near each is (in its
  * own box, almost wholly its own; near a town or a village, its plane before a lone lot's). The hills
  * and mountains rise round the towns, not under them. `dist`: each sample's distance from what is
- * built (`Protection.dist`: 0 on it).
+ * built (`Protection.dist`: 0 on it). The water (`dry` false) is left as it is.
  */
-function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array, world: FollowWorld, areas: readonly { x: number; z: number; w: number; d: number }[], roads: readonly RoadPlan[], areaOf: readonly number[], reach: number): void {
+function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array, world: FollowWorld, areas: readonly { x: number; z: number; w: number; d: number }[], roads: readonly RoadPlan[], areaOf: readonly number[], reach: number, dry: (k: number) => boolean): void {
   const c = LAND_CELL;
   type Box = { x0: number; z0: number; x1: number; z1: number };
   const grow = (box: Box, x0: number, z0: number, x1: number, z1: number) => Object.assign(box, { x0: Math.min(box.x0, x0), z0: Math.min(box.z0, z0), x1: Math.max(box.x1, x1), z1: Math.max(box.z1, z1) });
@@ -516,7 +826,7 @@ function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array
     }
     const near = { ...box };
     world.plots.forEach((p, i) => {
-      if (areaOf[i] === n && p.x < near.x1 + AREA_LOTS && p.x + p.w > near.x0 - AREA_LOTS && p.z < near.z1 + AREA_LOTS && p.z + p.d > near.z0 - AREA_LOTS) grow(box, p.x, p.z, p.x + p.w, p.z + p.d);
+      if ((areaOf[i] ?? n) === n && p.x < near.x1 + AREA_LOTS && p.x + p.w > near.x0 - AREA_LOTS && p.z < near.z1 + AREA_LOTS && p.z + p.d > near.z0 - AREA_LOTS) grow(box, p.x, p.z, p.x + p.w, p.z + p.d);
     });
     return box;
   });
@@ -582,7 +892,7 @@ function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array
       }
     }
   }
-  for (let k = 0; k < h.length; k++) if (weight[k] > 0) h[k] += most[k] * (sum[k] / weight[k] - h[k]);
+  for (let k = 0; k < h.length; k++) if (weight[k] > 0 && dry(k)) h[k] += most[k] * (sum[k] / weight[k] - h[k]);
 }
 
 /** The generator's heights (m) at (`x`, `z`), between its cells' middles (the edge's past the edge). */

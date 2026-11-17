@@ -317,10 +317,14 @@ fn firm_leave(
         return leave_for(&w.sims[i], leave, start);
     }
     // Wherever they've got to since (out in the garden, at a neighbour's), at least as long as
-    // the walk from there looks.
+    // the walk from there looks. Not out by taxi: it brings them home first, by the end of their
+    // stay, and they set off from there. (Timed as a walk out of town from the place it took them
+    // to, hours across a big world, the walk set their stay's end: home 38 minutes after getting
+    // there, Maple Park, country 241141 at seed base 4.)
     let sim = &w.sims[i];
     if let Some(c) = sim.commute
         && !heading_out(sim)
+        && !crate::taxi::out_by_taxi(&w.taxis, sim)
         && let Some(&exit) = w.exits.get(c.exit)
     {
         // At the pace they'd go from there: at home, on the bike their way is timed by
@@ -407,12 +411,35 @@ pub(crate) const LOW_NEED: f32 = 0.15;
 pub const WALK_MARGIN: f32 = 1.05;
 
 /// When someone with work or school starting at `start` leaves (the content's `leave`, unless
-/// they live in an open-world town: then by their walk, `Sim::commute`).
+/// they live in an open-world town: then by their walk, `Sim::commute`). (A worker sets off a
+/// little before that: `early`.)
 pub fn leave_for(sim: &crate::world::Sim, leave: u64, start: u64) -> u64 {
     match sim.commute {
         Some(c) => start.saturating_sub(c.ticks),
         None => leave,
     }
+}
+
+/// The most a worker sets off before their way to work says they must (game minutes). Off (0)
+/// for now: at the full fill the sample worlds' checks did better with everyone off at the last
+/// minute. With 20 minutes, seed bases 1, 3 and 4 failed where they passed without (a taxi
+/// turning round and the car behind it waiting for each other for good at Alder Mill, 84 cars
+/// held up behind them; visits ended within minutes at Stillwater and Stationgate), work taxis
+/// were no more on time, and more cars were held up in view, not fewer.
+const EARLY_MOST: f32 = 0.0;
+
+/// How much earlier than their way needs a household's workers set off for work (ticks, up to
+/// `EARLY_MOST`), by a hash of the household (all in its car go together): the same every day
+/// and after a load, so it is never saved. With every worker off at the last minute, a full
+/// town's commuters met at the ways out in one queue. Only the setting off moves
+/// (`schedule_work`): what's planned round it (getting up and ready, a visit or an outing, a
+/// way home in time) keeps to the leave their way says, and whatever they're at is dropped for
+/// work as ever. (Moved for all of it, every timing done by the leave moved, and a guest was
+/// called home from a visit minutes after getting there: Foundryside, seed base 1.) Not for
+/// school: its day starts for every pupil at once anyway.
+pub(crate) fn early(household: u32) -> u64 {
+    let h = (u64::from(household) + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15) >> 32;
+    h % (ticks(EARLY_MOST) + 1)
 }
 
 /// How long `i`'s way to work takes (`Commute`), worked out when they first need it and when they
@@ -822,7 +849,7 @@ fn schedule_school(w: &mut World, i: usize, day: u32, fresh: Option<u64>) {
     if tick < leave {
         return;
     }
-    if !heading_out(sim) {
+    if !heading_out(sim) && !in_a_car(sim) {
         set_off(sim, content, objects, tick);
     }
 }
@@ -839,7 +866,16 @@ fn schedule_work(w: &mut World, i: usize, day: u32, fresh: Option<u64>) {
     let Some((leave, start, _)) = shift_today(&w.content, job, &sim.skills, tick) else {
         return;
     };
-    let leave = firm_leave(w, i, leave, start, day, fresh);
+    // (A little early, `early`: the walk firmed up as that comes near.)
+    let early = early(sim.household);
+    let leave = firm_leave(
+        w,
+        i,
+        leave.saturating_sub(early),
+        start.saturating_sub(early),
+        day,
+        fresh,
+    );
     let sim = &w.sims[i];
     // By car, when the drive takes it (`cars::lead_ticks`); by the work taxi, in time for it at the
     // kerb (`taxi::leave_at`).
@@ -847,7 +883,7 @@ fn schedule_work(w: &mut World, i: usize, day: u32, fresh: Option<u64>) {
         0 => leave,
         // (By the drive's time, not the walk's: a way out on foot of hours had drivers off in the
         // night.)
-        lead => start.saturating_sub(lead),
+        lead => start.saturating_sub(lead + early),
     };
     let by_taxi = crate::taxi::leave_at(w, i);
     let leave = by_taxi.unwrap_or(leave);
@@ -856,7 +892,7 @@ fn schedule_work(w: &mut World, i: usize, day: u32, fresh: Option<u64>) {
         miss_shift(w, i, day);
         return;
     }
-    if tick < leave || heading_out(sim) {
+    if tick < leave || heading_out(sim) || in_a_car(sim) {
         return;
     }
     if let Some(baby) = stays_home_for(w, i) {
@@ -899,6 +935,19 @@ fn set_off(
 }
 
 /// On their way to work or school (or about to set off).
+/// Whether `sim` is at the wheel of a car on its way, or getting in or out of one: off to work
+/// only once they're out of it (`schedule_work`). Called away mid-drive, a driver on a trip walked
+/// off to work and left the car standing on the road for good with them still its driver
+/// (Mirror Reach, full).
+fn in_a_car(sim: &Sim) -> bool {
+    sim.current.as_ref().is_some_and(|a| {
+        matches!(
+            a.phase,
+            Phase::Driving | Phase::Boarding { .. } | Phase::Alighting { .. }
+        )
+    })
+}
+
 pub(crate) fn heading_out(sim: &Sim) -> bool {
     matches!(
         sim.current.as_ref().map(|a| a.task.kind),
@@ -1994,7 +2043,7 @@ fn give_up_farewell(w: &mut World, i: usize) {
 
 #[cfg(test)]
 mod tests {
-    use super::{doors, knocking};
+    use super::{doors, firm_leave, knocking, refresh_commute};
     use crate::social::EventKind;
     use crate::world::{Activity, Phase, Task, TaskKind};
     use crate::{Command, World, clock, mins, secs};
@@ -2334,5 +2383,39 @@ mod tests {
 
     fn ticks_of(minutes: f32) -> u64 {
         (minutes * crate::TICKS_PER_MINUTE as f32) as u64
+    }
+
+    #[test]
+    fn out_by_taxi_their_way_to_work_is_from_home_not_from_where_it_took_them() {
+        // The worker, out at their neighbour's at the far end of the street from the way out:
+        // there on foot, their way to work is at least the walk from there; brought by taxi, it
+        // brings them home first, and their way is from home. (Timed as a walk across a big world
+        // from the place the taxi took them to, their stay there ended 38 minutes in, Maple Park.)
+        let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+        let i = 0usize;
+        let day = clock::day(w.tick);
+        refresh_commute(&mut w, i, day);
+        let home = w.sims[i].commute.expect("a way to work").ticks;
+        let (leave, start) = (w.tick + mins(600.0), w.tick + mins(660.0));
+        w.sims[i].pos = [35.5, 3.5];
+        w.sims[i].visiting = Some(super::Visit {
+            plot: 1,
+            until: w.tick + mins(120.0),
+            idle: 0,
+            farewell: 0,
+            offer_at: 0,
+            arrived: w.tick,
+            leaving: false,
+            home_by: true,
+        });
+        w.taxis.out_at.push((i as u32, 1));
+        firm_leave(&mut w, i, leave, start, day, None);
+        assert_eq!(w.sims[i].commute.unwrap().ticks, home, "by taxi: from home");
+        w.taxis.out_at.clear();
+        firm_leave(&mut w, i, leave, start, day, None);
+        assert!(
+            w.sims[i].commute.unwrap().ticks > home,
+            "on foot: at least the walk from there"
+        );
     }
 }

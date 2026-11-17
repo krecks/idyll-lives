@@ -67,7 +67,7 @@ import { SunShadows } from './sunShadows';
 import { TemplateCache } from './templateCache';
 import { Thumbnails } from './thumbnail';
 import { benchDiag } from '../../debug/benchFlags';
-import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
+import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 import { fetched } from '../../assets/stream';
 import { both, within } from '../../core/async';
 import { LOOK } from '../look';
@@ -76,12 +76,14 @@ import { GameCameraRig, keepUp } from '../shared/cameraRig';
 import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS, TOWN_FROM, townBlend } from '../shared/lens';
 import { edgeFog, landEdge, menuFog, menuFogFrom, TOWN_RADIUS_LIMITS, townArrival, townFar, townFog, townFogFrom, townNear, townOrbit } from '../shared/townCamera';
 import { townView } from '../shared/townView';
-import { landscapeRing } from '../shared/nature';
+import { landscapeRing, WATER_Y } from '../shared/nature';
 import { setFogFrom } from './shaders/fog';
 import { LT_FIXTURE } from '../../debug/livingTown';
 import { applyLandFixture, LAND_FIXTURE } from '../landFixture';
-import { backdropBuilding, backdropGround, gardenHedges, lotBuilding, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
+import { lotBuilding, MOVER_GROW, TownBuildings, TownMovers, townBackdrop, type Mover, type TownLotHouse } from './townView';
+import { surfaceOf } from '../shared/landSurface';
 import { TownGroundMap } from './groundTiles';
+import { LandHaze } from './landHaze';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
 import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
@@ -135,15 +137,17 @@ import type {
   SeenBird,
   SimStride,
   TownBuildStep,
+  TownGhosts,
   TownShot,
   ViewRect,
   Shading,
   WallMode,
 } from '../types';
-import type { Land, LandRect } from '../../game/land';
+import { LAND_CELL, NONE, type Land, type LandRect } from '../../game/land';
 import { bakeLand, copyLand, fullRect, marchToGround, sameLand } from '../shared/landBake';
 import { OffThreadLand } from '../shared/renderData';
 import { LandCursorDraw } from './landCursor';
+import { TownGhostDraw, type Drape } from './townGhosts';
 import { installLandDebug } from './landDebug';
 import type { Landscape } from './nature';
 
@@ -204,6 +208,8 @@ const BUILD_SLICE_MS = 8;
  * (some 20 ms) after the reveal's frames and the fly-in's last ones.
  */
 const TOWN_RELEASE_MS = 1000;
+/** The day of the week the menus' town is shown on (0 Monday): a working day, its shops and offices open by day. */
+const MENU_WEEKDAY = 2;
 /** The same while the camera roams (a big world, or once it has settled on a lot of its own). */
 const ROAM_SLICE_MS = 4;
 /**
@@ -354,6 +360,28 @@ class PlotFinder {
 class BuildSuperseded extends Error {}
 
 /** The same part of the town in view (the messages make a new rect each time). */
+/** Where step 2's ghosts lie on a landscape (`townGhosts.ts`): its ground, or its water's top where it is wet (a bridge's ghost over a river). */
+function groundOrWater(scape: Landscape): Drape {
+  const field = scape.heightField;
+  return (x, z) => {
+    const h = scape.heightAt(x, z);
+    if (!field) return scape.waterEdge(x, z) > 0 ? Math.max(h, WATER_Y) : h;
+    const [i, j] = [Math.round(x / LAND_CELL), Math.round(z / LAND_CELL)];
+    if (i < 0 || j < 0 || i >= field.cols || j >= field.rows) return h;
+    const k = j * field.cols + i;
+    return field.wl[k] !== NONE && field.wl[k] > field.h[k] ? Math.max(h, field.wl[k] / 100) : h;
+  };
+}
+
+/** A number of each landscape's own, for what is made from it (`LandHaze.set`). */
+const landscapeIds = new WeakMap<object, number>();
+let landscapesSeen = 0;
+function landscapeId(scape: object): number {
+  const id = landscapeIds.get(scape) ?? ++landscapesSeen;
+  landscapeIds.set(scape, id);
+  return id;
+}
+
 function sameView(a: ViewRect | null, b: ViewRect | null): boolean {
   return a === b || (!!a && !!b && a.x === b.x && a.z === b.z && a.w === b.w && a.d === b.d);
 }
@@ -452,6 +480,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * are on (`showLayers`).
    */
   private overview: TownOverview | null = null;
+  /** The haze the menus' land fades into past its edge, from far out (`landHaze.ts`); made with the first town shown. */
+  private landHaze: LandHaze | null = null;
   private townShot: TownShot | null = null;
   private townHighlight: LotHighlight | null = null;
   private townWorld: WorldStructure | null = null;
@@ -1365,10 +1395,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const backdrop = world.meta?.backdrop;
     if (backdrop !== this.townBackdropOf) {
       this.townBackdropOf = backdrop;
-      const list = backdrop ?? [];
-      const driven = (world.meta?.roads ?? []).filter((r) => r.kind !== 'trail');
-      const hedges = gardenHedges(list, list.map((b) => backdropGround(b, driven)), world.plots, driven, ground);
-      this.townBuildings.setBackdrop([...list.map((b, i) => backdropBuilding(b, i, ground, world.meta?.places)), ...hedges]);
+      // (On a land the town follows, each on its pad: `townBackdrop`.)
+      const surface = surfaceOf(world);
+      this.townBuildings.setBackdrop(townBackdrop(world, ground, surface ? (x, z) => surface.at(x, z) : null));
     }
     this.townGround.bake(world, land ?? null);
     this.townLotsBy = { chunks: null, houses: null, up: '' };
@@ -2990,6 +3019,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // given: linear.
     const c = l.clearColor;
     this.app.scene.fog.color.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
+    this.landHaze?.setColour(this.app.scene.fog.color);
     this.camera.camera.clearColor = this.colorTmp.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
     // The look's exposure for the hour and the moonlight grade (`post.ts`: uniforms).
     if (this.post) this.post.exposure = l.exposure * LOOK.exposure;
@@ -3023,7 +3053,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!(await overview.build(world, () => this.pace()))) return;
     if (this.townHighlight) overview.setHighlight(this.townHighlight);
     // Interior lamps of the game's house never reach the overview (nor are they on its layer: this keeps its shaders simple).
-    this.lamps.exclude(overview.meshInstances());
+    perfTime('town: lamps kept out', () => this.lamps.exclude(overview.meshInstances()));
     // (The new street's lamps and windows at the hour shown.)
     if (this.townMode) this.lastLightMinute = -1;
   }
@@ -3038,6 +3068,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const overview = (this.overview ??= new TownOverview(this.app, this.root, this.deps.assets, this.deps.content, this.house));
       const ring = landscapeRing(world);
       Object.assign(this.townReach, { x0: -ring, z0: -ring, x1: world.width + ring, z1: groundDepth(world) + ring });
+      // (The player's pan keeps the camera over the land, the town or none.)
+      this.townRig.setBounds({ x0: 0, z0: 0, x1: world.width, z1: groundDepth(world) });
       if (this.townBuilds++ === 0 && !this.worldBuilding) this.sliceStart = performance.now();
       try {
         // The landscape on the town layer (the game's, when it's the same town). Same seed and size
@@ -3049,16 +3081,23 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
           this.lot.useNature('town', world, (roads, parent) => drawRoads(this.app, roads, parent), onStep),
           this.buildOverview(overview, world).then(() => onStep?.('town')),
         );
-        nature.landscape.refreshLawn(world);
+        perfTime('town: lawn', () => nature.landscape.refreshLawn(world));
         // The camera keeps a clear view over the hills (and out of the mountains).
         this.townRig.ground = (x, z) => nature.landscape.heightAt(x, z);
+        // (The land faded into the haze past its landscape's edge, from far out.)
+        const haze = (this.landHaze ??= new LandHaze(this.app, this.root));
+        haze.set(this.townReach, (x, z) => nature.landscape.heightAt(x, z), townLayer(this.app).id, `${landscapeId(nature.landscape)}|${nature.landscape.landVersion}`);
+        haze.setColour(this.app.scene.fog.color);
       } finally {
         this.townBuilds--;
       }
+      // (Step 2's ghosts over the land as it is built now.)
+      if (ticket === this.townTicket && !this.disposed) this.drawGhosts();
       if (ticket !== this.townTicket || this.disposed || this.townMode) return;
       // Entering from the game (or at start-up): the shot's hour at once.
       this.townMinute = this.townMinuteGoal = this.townShot?.minute ?? minute;
       this.enterTown();
+      this.drawGhosts();
     });
     this.townQueue = run.catch(() => {});
     return run;
@@ -3102,9 +3141,66 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.townMode) this.townRig.pan(dx, dz);
   }
 
+  dragTown(x0: number, y0: number, x1: number, y1: number): void {
+    if (!this.townMode) return;
+    // The land under the pointer follows it; where either point is over the sky or past the land, the level of the
+    // land under the camera's target does instead (a drag that starts on the horizon still pans).
+    const a = this.pickLand(x0, y0);
+    const b = a && this.pickLand(x1, y1);
+    if (a && b) {
+      this.townRig.pan(a.x - b.x, a.z - b.z);
+      return;
+    }
+    const pose = this.townRig.pose;
+    const level = this.townRig.ground?.(pose.tx, pose.tz) ?? 0;
+    const reach = pose.radius * 4;
+    const p = this.rayToLevel(x0, y0, level, reach, this.dragFrom);
+    const q = p && this.rayToLevel(x1, y1, level, reach, this.dragTo);
+    if (p && q) this.townRig.pan(p.x - q.x, p.z - q.z);
+  }
+
+  reframeTown(seconds = 1.2): void {
+    this.townRig.reframe(seconds);
+  }
+
+  private readonly dragFrom = { x: 0, z: 0 };
+  private readonly dragTo = { x: 0, z: 0 };
+
+  /** Where the ray through canvas CSS pixel (`x`, `y`) meets the level `y` m (into `out`), no further than `reach` m along it; null if it rises. */
+  private rayToLevel(x: number, y: number, level: number, reach: number, out: { x: number; z: number }): { x: number; z: number } | null {
+    const { origin, dir } = this.landRay;
+    this.camera.ray(x, y, this.cssSize.width, this.cssSize.height, origin, dir);
+    if (dir.y > -1e-3) return null;
+    const t = Math.min(reach, (level - origin.y) / dir.y);
+    if (t <= 0) return null;
+    out.x = origin.x + dir.x * t;
+    out.z = origin.z + dir.z * t;
+    return out;
+  }
+
   setLotHighlight(highlight: LotHighlight, snap = false): void {
     this.townHighlight = highlight;
     this.overview?.setHighlight(highlight, snap);
+  }
+
+  setTownGhosts(ghosts: TownGhosts | null): void {
+    this.ghosts = ghosts;
+    this.drawGhosts();
+  }
+
+  /** Step 2's edits over the town (`setTownGhosts`), and their drawing (made the first time there are any). */
+  private ghosts: TownGhosts | null = null;
+  private ghostDraw: TownGhostDraw | null = null;
+
+  /** The ghosts drawn again over the land in view (after they changed, or the town under them was built again). */
+  private drawGhosts(): void {
+    const at = this.townMode || !this.lot.landscape ? this.landInView() : null;
+    const ghosts = at ? this.ghosts : null;
+    if (!ghosts && !this.ghostDraw) return;
+    this.ghostDraw ??= new TownGhostDraw(this.app, this.root);
+    const layer = this.lot.townLayer ?? pc.LAYERID_WORLD;
+    this.ghostDraw.set(ghosts, at ? groundOrWater(at.scape) : () => 0, layer, this.townWorld);
+    this.held?.changed();
   }
 
   onTownFrame(fn: (() => void) | null): void {
@@ -3267,6 +3363,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The game comes on screen again (the menus' town is let go a moment later: `releaseTown`). */
   private leaveTown(): void {
     this.townMode = false;
+    this.landHaze?.show(false);
+    // (The game has no ghosts: drawn again over the town when it is shown again.)
+    this.ghostDraw?.set(null, () => 0, 0, null);
     setDatum(this.root, this.lotRoot, this.datum);
     this.lot.datum = this.datum;
     const ticket = this.townTicket;
@@ -3301,6 +3400,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         this.overview?.destroy();
         this.overview = null;
         this.townWorld = null;
+        this.landHaze?.destroy();
+        this.landHaze = null;
         this.townRig.ground = null;
         this.lot.dropNature('town');
       })
@@ -3339,7 +3440,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const secs = Math.min(0.1, dt / 1000);
     this.townRig.setViewport(w, h);
     this.townRig.frame(secs, w / h);
-    // (Its highlights' colours are written in place: the held frame is drawn again, `heldFrames.ts`.)
+    // (Its highlights' colours are written in place: the held frame is drawn again, `heldFrames.ts`. From far out the
+    // lit lots are washed over whole.)
+    this.overview?.setReach(this.townPose.radius);
+    this.landHaze?.show(this.townPose.radius);
     if (this.overview?.frame(secs)) this.held.changed();
     // The light eases between the screens' hours (about two seconds).
     const goal = this.townMinuteGoal;
@@ -3350,6 +3454,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.lastLightMinute !== this.townMinute) {
       this.applyLighting(this.townMinute);
       this.lastLightMinute = this.townMinute;
+      // (The backdrop's windows by the hour: a weekday's, the shops open by day.)
+      this.overview?.setTime(this.townMinute, MENU_WEEKDAY);
       // (The streetlights' and windows' glows too, in their materials.)
       this.held.changed();
     }
@@ -3878,6 +3984,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.handles?.destroy();
     this.hoverTile?.destroy();
     this.landCursor?.destroy();
+    this.ghostDraw?.destroy();
     this.previews?.destroy();
     this.placing?.dispose();
     this.modelRefresh.dispose();
@@ -3905,6 +4012,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.unlistenFiles?.();
     this.unlistenFiles = null;
     this.overview?.destroy();
+    this.landHaze?.destroy();
     this.street?.destroy();
     this.townBuildings?.destroy();
     this.townMovers?.destroy();

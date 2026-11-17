@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import type { SnapshotLayout } from '../src/core/snapshot';
+import { readLayout, type SnapshotLayout } from '../src/core/snapshot';
 import { CARS, carRowAt, carRowIsTaxi, paintTaxi, paintTaxiDoor, TAXI_BODY } from '../src/render/shared/cars';
 import { MAX_CHARACTERS } from '../src/render/shared/characters/rig';
 import { Geo } from '../src/render/shared/geometry';
@@ -57,6 +57,13 @@ describe('car rows', () => {
 
   test('start after as many residents and servers as the renderer has rows for (`MAX_CHARACTERS`)', () => {
     expect(LAYOUT.carBase).toBe(LAYOUT.headerLen + MAX_CHARACTERS * LAYOUT.simStride);
+    expect(LAYOUT.maxSims + LAYOUT.maxStaff).toBe(MAX_CHARACTERS);
+  });
+
+  test('a layout with more residents and servers than the renderer has rows for is refused as the game starts', () => {
+    const text = (maxSims: number) => JSON.stringify({ ...LAYOUT, maxSims });
+    expect(readLayout(text(LAYOUT.maxSims)).maxSims).toBe(LAYOUT.maxSims);
+    expect(() => readLayout(text(LAYOUT.maxSims + 1))).toThrow();
   });
 
   test('start a stride apart from the cars’ base', () => {

@@ -113,8 +113,13 @@ pub(crate) fn plan(w: &mut World) {
         }
     }
     let tick = w.tick;
+    // (Who is at full detail, kept for the tick: those go first when its searches run over
+    // budget, `World::first`.)
+    let mut first = std::mem::take(&mut w.first);
+    first.clear();
     for i in 0..w.sims.len() {
         let full = w.full_detail(i);
+        first.push(full);
         let every = if !full && w.far_away(i) {
             FAR_TICKS
         } else {
@@ -132,6 +137,7 @@ pub(crate) fn plan(w: &mut World) {
             s.owed += 1;
         }
     }
+    w.first = first;
 }
 
 #[cfg(test)]

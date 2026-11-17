@@ -181,10 +181,14 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     // (On a land the town follows, each lot's pad a slab of its own, with its retaining edges: `shared/pads.ts`.)
     const pads = this.surface ? perfTime('nature: pads', () => this.padDraws(app, parent, grounds)) : { slabs: [], edges: [] };
     draws.push(...pads.slabs, ...pads.edges);
+    this.grounds = grounds;
+    this.pads = pads;
     if (this.seaSheet) draws.push((this.sheet = perfTime('nature: water', () => this.water(app, parent))));
     // (A height field's water above the sea's level: its own, tile by tile.)
     if (this.heightField) for (let k = 0; k < this.tiles.length; k++) draws.push(...this.pond(k));
-    if (buildRoads) draws.push(...perfTime('nature: roads', () => buildRoads(this.roads, parent)));
+    this.roadBuilder = buildRoads ?? null;
+    this.roadDraws = buildRoads ? perfTime('nature: roads', () => buildRoads(this.roads, parent)) : [];
+    draws.push(...this.roadDraws);
     for (const e of draws) e.enabled = false;
     this.others = draws;
     this.findSquares();
@@ -210,6 +214,79 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     const colors = new Float32Array((positions.length / 3) * 4);
     await this.shadeTerrain(positions, colors, pace);
     return { positions, colors };
+  }
+
+  /** The terrain's draws (a big world's tiles, else the one), the pads' and the country roads' (and what draws those), as built: what `relay` draws again. */
+  private grounds: pc.Entity[] = [];
+  private pads: { slabs: pc.Entity[]; edges: pc.Entity[] } = { slabs: [], edges: [] };
+  private roadDraws: pc.Entity[] = [];
+  private roadBuilder: RoadBuilder | null = null;
+
+  /** Whether `world` can be taken on in place (`relay`): built, in ground tiles, another town on the same land (`canRelay`). */
+  relayable(world: WorldStructure): boolean {
+    return !!this.host && this.tiles.length > 0 && this.canRelay(world);
+  }
+
+  /**
+   * Takes on another town on the same land in place (`canRelay`; step 2's edits): laid out again (`relayout`), then
+   * the ground tiles where the land as drawn changed shaded again, the pads and the country roads drawn again, the
+   * water as the land now has it and the grass there. Says the box (m) whose woods and flowers are to be grown again
+   * (`regrow`), or null when nothing changed. Between `pace`s; not while `build` runs.
+   */
+  async relay(world: WorldStructure, pace?: () => Promise<void>): Promise<[number, number, number, number] | null> {
+    if (!this.relayable(world)) return null;
+    const host = this.host!;
+    const { app, parent } = host;
+    // (After the town's own planning started: a frame between.)
+    await pace?.();
+    if (!this.host || !this.relayable(world)) return null;
+    const changed = perfTime('nature: relay layout', () => this.relayout(world));
+    this.world = world;
+    await pace?.();
+    if (!this.host) return null;
+    // The pads and the country roads, whole (a few draws; the pads are the lots').
+    const old = [...this.pads.slabs, ...this.pads.edges, ...this.roadDraws];
+    const pads = perfTime('nature: pads', () => this.padDraws(app, parent, this.grounds));
+    this.pads = pads;
+    await pace?.();
+    if (!this.host) {
+      for (const e of [...pads.slabs, ...pads.edges]) e.destroy();
+      return null;
+    }
+    this.roadDraws = this.roadBuilder ? perfTime('nature: roads', () => this.roadBuilder!(this.roads, parent)) : [];
+    const fresh = [...pads.slabs, ...pads.edges, ...this.roadDraws];
+    const gone = new Set(old);
+    this.others = [...this.others.filter((e) => !gone.has(e)), ...fresh];
+    this.drawsChanged(fresh, old);
+    this.grass?.onGround([...this.grounds, ...pads.slabs].map((g) => g.render!.meshInstances[0]));
+    if (!changed) return null;
+    const box = this.landBox(changed.rect, LAND_DONE_PAD);
+    const tiles = this.tilesIn(box);
+    for (const k of tiles) {
+      await pace?.();
+      const t = this.tiles[k];
+      if (!t || !this.host) return null;
+      const positions = this.tileGrid(k);
+      const colors = new Float32Array((positions.length / 3) * 4);
+      const span = perfStart('land: shade tile');
+      await this.shadeTerrain(positions, colors);
+      perfEnd(span);
+      t.kept = bytesOf(colors);
+      this.redrawTile(t, positions, colors);
+    }
+    this.pondsIn(tiles);
+    this.sheetAsNeeded();
+    const grass = this.grass?.grassField;
+    if (grass) {
+      for (let z = box[1]; z < box[3]; z += LAND_GRASS_STRIP) {
+        await pace?.();
+        recolourGrass(grass, this, box[0], z, box[2], Math.min(box[3], z + LAND_GRASS_STRIP));
+      }
+      regroundGrass(grass, this, box[0], box[1], box[2], box[3]);
+      this.grass?.landChanged(true);
+    }
+    const [x0, z0, x1, z1] = changed.box;
+    return [Math.min(box[0], x0), Math.min(box[1], z0), Math.max(box[2], x1), Math.max(box[3], z1)];
   }
 
   /**
@@ -257,6 +334,9 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.woodsSquares = [];
     this.flowerSquares = [];
     for (const e of this.others) e.destroy();
+    this.grounds = [];
+    this.pads = { slabs: [], edges: [] };
+    this.roadDraws = [];
     for (const e of this.ponds.values()) e.destroy();
     this.ponds.clear();
     this.sheet = null;
@@ -358,12 +438,19 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return [k % count, Math.floor(k / count), x0 + (k % count) * TILE, z0 + Math.floor(k / count) * TILE];
   }
 
-  /** Tile `k`'s finest grid (x and z; y to be set), a ring of one past it for the normals: (col, row) from -1 to S + 1, row 0 at its far (max z) edge. */
+  /**
+   * Tile `k`'s finest grid (x and z; y to be set), a ring of one past it for the normals: (col, row) from -1 to S + 1,
+   * row 0 at its far (max z) edge. The last tiles across and down reach past the landscape's square (its side is
+   * seldom a whole number of tiles): their points past it are drawn in to its edge, so the ground stops there. Out
+   * there the rim kept climbing, and the menus' haze, which hangs over the land up to the square's edge, let a strip
+   * of it show above itself along the far sides.
+   */
   private tileGrid(k: number): Float32Array {
-    const { S, c, n } = this.tileFrame();
+    const { S, c, n, x0, z0, size } = this.tileFrame();
     const [, , tx, tz] = this.tileCorner(k);
+    const [x1, z1] = [x0 + size, z0 + size];
     const positions = new Float32Array(n * n * 3);
-    for (let row = -1, v = 0; row <= S + 1; row++) for (let col = -1; col <= S + 1; col++, v++) [positions[v * 3], positions[v * 3 + 2]] = [tx + col * c, tz + (S - row) * c];
+    for (let row = -1, v = 0; row <= S + 1; row++) for (let col = -1; col <= S + 1; col++, v++) [positions[v * 3], positions[v * 3 + 2]] = [Math.min(x1, tx + col * c), Math.min(z1, tz + (S - row) * c)];
     return positions;
   }
 

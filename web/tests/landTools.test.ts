@@ -1,10 +1,11 @@
-// The land palette's brush (`ui/land/landTools.ts`): each group keeps its own size, a river is held to 6–30 m,
+// The land palette's brush (`ui/land/landTools.ts`): each group keeps its own size, a river is held to 4–30 m,
+// the size slider on a log scale (whole metres there and back, "one point" at 4 m and under, the keyboard's steps),
 // the editor's brush is half the size across with the mountains' height; which tools have a strength or a height;
 // the cursor's tone (red where the brush would do nothing); what the cursor tag says a stroke costs (free in
 // Creative, the price, how much short, a refund); and where a stroke stops at the funds.
 // `bun test tests/landTools.test.ts`.
 import { describe, expect, test } from 'bun:test';
-import { brushOf, costLabel, cursorOf, hasHeight, hasStrength, INNER, LAND_GROUPS, sizeOf, SIZES, startBrush, stopsAtFunds, toneOf, toolInfo } from '../src/ui/land/landTools';
+import { brushOf, costLabel, cursorOf, hasHeight, hasStrength, INNER, LAND_GROUPS, POINT, sizeAt, sizeOf, sizeRange, SIZES, sizeText, sliderAt, startBrush, stepSize, stopsAtFunds, toneOf, toolInfo } from '../src/ui/land/landTools';
 import { falloff, TOOL_KIND } from '../src/game/landBrush';
 
 describe('the brush in hand', () => {
@@ -29,10 +30,23 @@ describe('the brush in hand', () => {
     expect(sizeOf(b)).toBe(50);
   });
 
-  test('a river is 6 to 30 m wide whatever the water group says; sizes are held to their range', () => {
+  test('the ranges: shape 1–120, water 2–120, cover 4–120, mountains 60–400, a river 4–30', () => {
+    const range = (t: string) => sizeRange(t as never);
+    expect([range('raise'), range('lake'), range('woods'), range('peak'), range('river')].map(({ min, max }) => ({ min, max }))).toEqual([
+      { min: 1, max: 120 },
+      { min: 2, max: 120 },
+      { min: 4, max: 120 },
+      { min: 60, max: 400 },
+      { min: 4, max: 30 },
+    ]);
+  });
+
+  test('a river is 4 to 30 m wide whatever the water group says; sizes are held to their range', () => {
     const b = startBrush('river');
     expect(sizeOf({ ...b, sizes: { ...b.sizes, water: 120 } })).toBe(30);
-    expect(sizeOf({ ...b, sizes: { ...b.sizes, water: 2 } })).toBe(6);
+    expect(sizeOf({ ...b, sizes: { ...b.sizes, water: 2 } })).toBe(4);
+    expect(sizeOf({ ...b, tool: 'lake', sizes: { ...b.sizes, water: 2 } })).toBe(2);
+    expect(sizeOf({ ...b, tool: 'raise', sizes: { ...b.sizes, shape: 0.2 } })).toBe(1);
     expect(sizeOf({ ...b, tool: 'lake', sizes: { ...b.sizes, water: 120 } })).toBe(120);
     expect(sizeOf({ ...b, tool: 'woods', sizes: { ...b.sizes, cover: 1000 } })).toBe(SIZES.cover.max);
     expect(brushOf({ ...b, strength: 3 }).strength).toBe(1);
@@ -53,6 +67,57 @@ describe('the brush in hand', () => {
     expect(toneOf('dry', false)).toBe('water');
     expect(toneOf('peak', false)).toBe('up');
     expect(toneOf('raise', true)).toBe('bad');
+  });
+});
+
+describe('the size slider', () => {
+  const ranges = [SIZES.shape, SIZES.water, SIZES.cover, SIZES.mountains, sizeRange('river')];
+
+  test('on a log scale: its ends are the range, its middle the geometric middle, and every whole size there and back', () => {
+    for (const range of ranges) {
+      expect(sizeAt(0, range)).toBe(range.min);
+      expect(sizeAt(1, range)).toBe(range.max);
+      expect(sizeAt(0.5, range)).toBe(Math.round(Math.sqrt(range.min * range.max)));
+      for (let size = range.min; size <= range.max; size++) {
+        const t = sliderAt(size, range);
+        expect(t).toBeGreaterThanOrEqual(0);
+        expect(t).toBeLessThanOrEqual(1);
+        expect(sizeAt(t, range)).toBe(size);
+        // (And the slider's own steps, a thousandth, land on it too.)
+        expect(sizeAt(Math.round(t * 1000) / 1000, range)).toBe(size);
+      }
+      // (Slider to size and back moves it no more than a whole metre's share.)
+      for (let t = 0; t <= 1; t += 0.01) expect(Math.abs(sliderAt(sizeAt(t, range), range) - t)).toBeLessThanOrEqual(Math.log((range.min + 0.5) / range.min) / Math.log(range.max / range.min) + 1e-9);
+    }
+    // (Half the shape slider is under 11 m.)
+    expect(sizeAt(0.5, SIZES.shape)).toBe(11);
+  });
+
+  test('the size is written "one point" at 4 m and under, whole metres above', () => {
+    expect(POINT).toBe(4);
+    expect([1, 2, 4].map(sizeText)).toEqual(['one point', 'one point', 'one point']);
+    expect([5, 30, 120].map(sizeText)).toEqual(['5 m', '30 m', '120 m']);
+  });
+
+  test("the keyboard's steps: about a tenth, at least a metre, held to the range", () => {
+    expect(stepSize(1, 1, SIZES.shape)).toBe(2);
+    expect(stepSize(2, -1, SIZES.shape)).toBe(1);
+    expect(stepSize(1, -1, SIZES.shape)).toBe(1);
+    expect(stepSize(50, 1, SIZES.shape)).toBe(55);
+    expect(stepSize(55, -1, SIZES.shape)).toBe(50);
+    expect(stepSize(118, 1, SIZES.shape)).toBe(120);
+    // (From the bottom to the top in a few dozen presses.)
+    let [size, n] = [1, 0];
+    while (size < 120) [size, n] = [stepSize(size, 1, SIZES.shape), n + 1];
+    expect(n).toBeLessThan(60);
+  });
+
+  test("a point brush's cursor sits on the sample it changes, a ring as wide as it; a cover tool's on its cell", () => {
+    expect(cursorOf({ tool: 'raise', radius: 0.5, strength: 1 }, 10.9, 13.2, false)).toEqual({ x: 10, z: 14, radius: 1, inner: 0, tone: 'up' });
+    expect(cursorOf({ tool: 'lake', radius: 1, strength: 1 }, 3.1, 2.9, true)).toEqual({ x: 4, z: 2, radius: 1, inner: 0, tone: 'bad' });
+    expect(cursorOf({ tool: 'woods', radius: 2, strength: 1 }, 7.9, 8.1, false)).toEqual({ x: 6, z: 10, radius: 2, inner: 0, tone: 'cover' });
+    // (Over 4 m: the pointer itself.)
+    expect(cursorOf({ tool: 'raise', radius: 2.5, strength: 1 }, 10.9, 13.2, false).x).toBe(10.9);
   });
 });
 

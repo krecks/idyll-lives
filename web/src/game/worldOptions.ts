@@ -6,10 +6,13 @@
  * `world.ts` so the benchmark's flags can read them without the generator.
  */
 
-import type { TownSize, WorldOptions } from '../core/protocol';
+import type { LandSize, TownSize, WorldOptions } from '../core/protocol';
+
+/** The options step 1 offers as a row of choices (the land's size is not among them: some of its choices may be ruled out, `world.ts` `townFits`). */
+export type ChoiceKey = Exclude<keyof WorldOptions, 'size'>;
 
 /** One option: what step 1 calls it, and its choices in order, each with its label. */
-export interface OptionField<K extends keyof WorldOptions = keyof WorldOptions> {
+export interface OptionField<K extends ChoiceKey = ChoiceKey> {
   key: K;
   label: string;
   choices: readonly { value: WorldOptions[K]; label: string }[];
@@ -58,23 +61,40 @@ export const OPTION_FIELDS: readonly OptionField[] = [
 ];
 
 /**
- * Options from a list such as `town:city,villages:many` (or `town=city`, as the bench tools take
- * them). An entry that names no option or no choice of it is left out, and told to `bad` if given.
+ * The land's size as step 1 offers it, apart from the rows of choices (`world.ts` `LAND_SIZE`: a
+ * town and villages too big for a size rule it out, `townFits`).
+ */
+export const SIZE_FIELD: { key: 'size'; label: string; choices: readonly { value: LandSize; label: string }[] } = {
+  key: 'size',
+  label: 'Size',
+  choices: [
+    { value: 'small', label: 'Small' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'large', label: 'Large' },
+  ],
+};
+
+/** Every option a tool may name, the land's size among them. */
+const NAMED: readonly { key: keyof WorldOptions; choices: readonly { value: string }[] }[] = [...OPTION_FIELDS, SIZE_FIELD];
+
+/**
+ * Options from a list such as `town:city,villages:many,size:large` (or `town=city`, as the bench
+ * tools take them). An entry that names no option or no choice of it is left out, and told to `bad` if given.
  */
 export function parseOptions(text: string | null | undefined, bad?: (entry: string) => void): Partial<WorldOptions> {
   const out: Record<string, string> = {};
   for (const entry of (text ?? '').split(',').map((s) => s.trim()).filter(Boolean)) {
     const [key, value] = entry.split(/[:=]/).map((s) => s.trim());
-    const field = OPTION_FIELDS.find((f) => f.key === key);
+    const field = NAMED.find((f) => f.key === key);
     if (field && field.choices.some((c) => c.value === value)) out[key] = value;
     else bad?.(entry);
   }
   return out as Partial<WorldOptions>;
 }
 
-/** The same options (missing ones only equal missing ones). */
+/** The same options, the land's size among them (missing ones only equal missing ones). */
 export function sameOptions(a: Partial<WorldOptions> | undefined, b: Partial<WorldOptions> | undefined): boolean {
-  return OPTION_FIELDS.every((f) => a?.[f.key] === b?.[f.key]);
+  return NAMED.every((f) => a?.[f.key] === b?.[f.key]);
 }
 
 const TOWN_NAMES: Record<TownSize, string> = { hamlet: 'a hamlet', village: 'a village', town: 'a town', city: 'a city' };

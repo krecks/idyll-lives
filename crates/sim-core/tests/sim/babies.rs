@@ -1165,11 +1165,32 @@ fn a_baby_loaded_from_a_save_lies_back_in_the_crib() {
     }
 }
 
-/// A town as full as it grows (`MAX_SIMS`): partners don't keep trying
-/// for a baby that can't come.
-#[test]
-#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
-fn partners_in_a_full_town_dont_keep_trying_for_a_baby() {
+/// Partners and a home for the elderly holding the rest of `people`, in a town whose file says
+/// the most residents it grows to when `most` is given.
+fn crowded_town(people: usize, most: Option<usize>) -> String {
+    let mut sims = vec![
+        r#"{"name":"Ada","household":0,"x":4.5,"z":8.5,"age":30,"gender":"female"}"#.to_string(),
+        r#"{"name":"Ben","household":0,"x":5.5,"z":8.5,"age":32,"gender":"male"}"#.to_string(),
+    ];
+    sims.extend((2..people).map(|i| {
+        format!(
+            r#"{{"name":"Old {i}","household":1,"x":{}.5,"z":20.5,"age":90}}"#,
+            i % 12
+        )
+    }));
+    let most = most.map_or(String::new(), |n| format!(r#""residentsMost":{n},"#));
+    format!(
+        r#"{{"width":12,"depth":24,{most}
+        "plots":[{{"name":"Home","x":0,"z":0,"w":12,"d":12,"entry":[5.5,11.5]}},{{"name":"Home for the elderly","x":0,"z":12,"w":12,"d":12,"entry":[5.5,23.5]}}],
+        "households":[{{"name":"Moss","plot":0}},{{"name":"Elders","plot":1}}],
+        "objects":[],"sims":[{}],"relationships":[{{"a":0,"b":1,"preset":"partners"}}]}}"#,
+        sims.join(",")
+    )
+}
+
+/// The partners' tries for a baby in `crowded_town(people, most)` over two hours (four times a
+/// try's half hour: room enough to try again and again); `first`: only until the first.
+fn baby_tries(people: usize, most: Option<usize>, first: bool) -> u32 {
     let content = r#"{
         "needs":[{"id":"social","label":"Social","decayPerHour":0.5}],
         "objects":[],
@@ -1181,53 +1202,51 @@ fn partners_in_a_full_town_dont_keep_trying_for_a_baby() {
         "life":{"daysPerYear":2,"stages":[{"id":"baby","label":"Baby","from":0,"baby":true},{"id":"adult","label":"Adult","from":18}],
             "pregnancy":{"chance":1.0,"days":2,"maxAge":50}},
         "bondPresets":{"partners":{"friendship":55,"romance":75,"partners":true}}}"#;
-    let town = |people: usize| {
-        let mut sims = vec![
-            r#"{"name":"Ada","household":0,"x":4.5,"z":8.5,"age":30,"gender":"female"}"#
-                .to_string(),
-            r#"{"name":"Ben","household":0,"x":5.5,"z":8.5,"age":32,"gender":"male"}"#.to_string(),
-        ];
-        sims.extend((2..people).map(|i| {
-            format!(
-                r#"{{"name":"Old {i}","household":1,"x":{}.5,"z":20.5,"age":90}}"#,
-                i % 12
-            )
-        }));
-        format!(
-            r#"{{"width":12,"depth":24,
-            "plots":[{{"name":"Home","x":0,"z":0,"w":12,"d":12,"entry":[5.5,11.5]}},{{"name":"Home for the elderly","x":0,"z":12,"w":12,"d":12,"entry":[5.5,23.5]}}],
-            "households":[{{"name":"Moss","plot":0}},{{"name":"Elders","plot":1}}],
-            "objects":[],"sims":[{}],"relationships":[{{"a":0,"b":1,"preset":"partners"}}]}}"#,
-            sims.join(",")
-        )
-    };
-    // Tries for a baby in a town of `people`, over two hours (four times a try's half hour: room
-    // enough to try again and again); `first`: only until the first.
-    let tries = |people: usize, first: bool| {
-        let mut w = World::from_json(content, &town(people), 1).unwrap();
-        assert_eq!(w.sims.len(), people);
-        let mut tries = 0;
-        let mut was = false;
-        for _ in 0..2 * 60 {
-            minutes(&mut w, 1);
-            let now = matches!(
-                w.sims[0].current().map(|a| a.task.kind),
-                Some(TaskKind::Social { social: 0, .. })
-            );
-            tries += (now && !was) as u32;
-            was = now;
-            if first && tries > 0 {
-                break;
-            }
+    let mut w = World::from_json(content, &crowded_town(people, most), 1).unwrap();
+    assert_eq!(w.sims.len(), people);
+    let mut tries = 0;
+    let mut was = false;
+    for _ in 0..2 * 60 {
+        minutes(&mut w, 1);
+        let now = matches!(
+            w.sims[0].current().map(|a| a.task.kind),
+            Some(TaskKind::Social { social: 0, .. })
+        );
+        tries += (now && !was) as u32;
+        was = now;
+        if first && tries > 0 {
+            break;
         }
-        tries
-    };
-    // (Both towns at once: each is a crowd of 159 or 160 to simulate.)
+    }
+    tries
+}
+
+/// A town as full as it grows (`MAX_SIMS`): partners don't keep trying
+/// for a baby that can't come.
+#[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
+fn partners_in_a_full_town_dont_keep_trying_for_a_baby() {
+    let most = sim_core::world::MAX_SIMS;
+    // (Both towns at once: each is a crowd of the limit, or one fewer, to simulate.)
     let (room, full) = std::thread::scope(|s| {
-        let room = s.spawn(|| tries(sim_core::world::MAX_SIMS - 1, true));
-        let full = s.spawn(|| tries(sim_core::world::MAX_SIMS, false));
+        let room = s.spawn(|| baby_tries(most - 1, None, true));
+        let full = s.spawn(|| baby_tries(most, None, false));
         (room.join().unwrap(), full.join().unwrap())
     });
     assert!(room > 0, "with room in town they do");
     assert_eq!(full, 0, "in a full town they don't");
+}
+
+/// A town its file holds smaller (`residentsMost`) is full at that.
+#[test]
+fn partners_in_a_town_full_by_its_file_dont_try_for_a_baby() {
+    assert!(
+        baby_tries(39, Some(40), true) > 0,
+        "with room in town they do"
+    );
+    assert_eq!(
+        baby_tries(40, Some(40), false),
+        0,
+        "in a full town they don't"
+    );
 }

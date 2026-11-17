@@ -94,9 +94,9 @@ describe('a land the town follows', async () => {
     expect(preview.meta?.land).toBeUndefined();
     const town = populate(content, assets, t, classic);
     expect(JSON.parse(assembleTown(content, t, town, randomHousehold(content, assets, 2), vacantSlots(town)[0].index)).meta.land).toBeUndefined();
-    // A place's draft from before heights.
+    // A place's draft from before heights (and before its land came first: none with it).
     const placed = generateWorld(content, t, 'farm', 7);
-    const { heights: _heights, ...older } = placed.open!;
+    const { heights: _heights, land: _land, plan: _plan, ...older } = placed.open!;
     const old = { ...placed, open: older };
     expect(withLand(old, previewWorld(content, t, old, null))).toBe(old);
   }, 60_000);

@@ -242,6 +242,60 @@ export function backdropBuilding(b: BackdropBuilding, index: number, ground: (x:
   return { roof, cx, cz, ux, uz, w, d, base, top, rise, wall: vary(hex(wallHex), t, s), roofColor: vary(roofColor, s, t, 0.1), floor, style, lit, home: HOMES.has(b.use), ...(hours ? { hours } : {}), seed: hash2(index * 31 + 5, b.storeys), accent: hash2(index * 17 + 3, b.look) };
 }
 
+/**
+ * A number of a backdrop building's own, from its footprint (its colours' and its windows' variation, `backdropBuilding`'s
+ * `index`): the same wherever it is in the list, so a building added or taken away elsewhere leaves the rest as they were.
+ */
+export function footprintSeed(b: { poly: readonly (readonly [number, number])[] }): number {
+  let h = 0x811c9dc5;
+  for (const [x, z] of b.poly) h = Math.imul(Math.imul(h ^ Math.round(x * 100), 16777619) ^ Math.round(z * 100), 16777619);
+  return (h >>> 0) % 1_000_003;
+}
+
+/** What a backdrop building is drawn from, besides the land under it: its key among those drawn last (`townBackdrop`'s `kept`). */
+function drawnKey(b: BackdropBuilding, places: readonly TownPlace[]): string {
+  const hours = b.place === undefined ? undefined : places[b.place]?.hours;
+  return `${b.poly.map(([x, z]) => `${Math.round(x * 100)},${Math.round(z * 100)}`).join(' ')}|${b.storeys}|${b.roof}|${b.ridge ?? '-'}|${b.use}|${b.look}|${hours ? `${hours.open},${hours.close},${hours.days}` : '-'}`;
+}
+
+/** The middle of a footprint (its corners' mean). */
+function middleOf(p: readonly (readonly [number, number])[]): [number, number] {
+  const n = Math.max(1, p.length);
+  return [p.reduce((a, q) => a + q[0], 0) / n, p.reduce((a, q) => a + q[1], 0) / n];
+}
+
+/**
+ * Every backdrop building of `world` as the town view draws it, then its gardens' hedges (`gardenHedges`). On a land the
+ * town follows a building stands on its pad (`floorAt`: the built surface's `at` under its middle, `builtSurface.ts`
+ * lays the backdrop's pads with the lots'), its walls down to the land round it (`ground`); elsewhere on its own `y`
+ * (the flat town's 0). Its variation is its footprint's (`footprintSeed`). `kept`: the buildings drawn last time, by
+ * what each is drawn from and the land under it, taken again where nothing of that changed and left holding this
+ * time's (as the street keeps its chunks by what they draw): a street built up adds its own and leaves the town's be.
+ */
+export function townBackdrop(
+  world: { plots: readonly { x: number; z: number; w: number; d: number }[]; meta?: { backdrop?: BackdropBuilding[]; roads?: RoadPlan[]; places?: TownPlace[] } | null },
+  ground: (x: number, z: number) => number,
+  floorAt: ((x: number, z: number) => number) | null,
+  kept?: Map<string, TownBuilding>,
+): TownBuilding[] {
+  const list = world.meta?.backdrop ?? [];
+  const places = world.meta?.places ?? [];
+  const driven = (world.meta?.roads ?? []).filter((r) => r.kind !== 'trail');
+  const was = kept ? new Map(kept) : null;
+  kept?.clear();
+  const buildings = list.map((b) => {
+    const floor = floorAt ? floorAt(...middleOf(b.poly)) : b.y;
+    let lowest = Infinity;
+    for (const [x, z] of b.poly) lowest = Math.min(lowest, ground(x, z));
+    const key = `${drawnKey(b, places)}|${Math.round(floor * 100)}|${Math.round(lowest * 100)}`;
+    const made = was?.get(key) ?? backdropBuilding(floorAt ? { ...b, y: floor } : b, footprintSeed(b), ground, places);
+    kept?.set(key, made);
+    return made;
+  });
+  const hedges = gardenHedges(list, list.map((b) => backdropGround(b, driven)), world.plots, driven, ground);
+  return [...buildings, ...hedges];
+}
+
 /** The share of a lot's house's windows lit at night while someone is up in it. */
 const LOT_LIT = 0.5;
 
@@ -302,14 +356,31 @@ export interface BackdropGround {
   to: [number, number] | null;
 }
 
+/** Each road's box (x0, z0, x1, z1), made the first time it is asked for: `nearestOnRoads` passes over a road whose box is out of reach. */
+const roadBoxes = new WeakMap<RoadPlan, readonly [number, number, number, number]>();
+function roadBox(r: RoadPlan): readonly [number, number, number, number] {
+  let box = roadBoxes.get(r);
+  if (!box) {
+    let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const [x, z] of r.points) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
+    roadBoxes.set(r, (box = [x0, z0, x1, z1]));
+  }
+  return box;
+}
+
 /** The point of `roads` nearest (x, z), if within `most` m. */
 export function nearestOnRoads(roads: readonly RoadPlan[], x: number, z: number, most: number): [number, number] | null {
   let best = most * most;
   let at: [number, number] | null = null;
   for (const r of roads) {
+    const [x0, z0, x1, z1] = roadBox(r);
+    if (x < x0 - most || x > x1 + most || z < z0 - most || z > z1 + most) continue;
     for (let i = 0; i + 1 < r.points.length; i++) {
       const [ax, az] = r.points[i];
       const [bx, bz] = r.points[i + 1];
+      // (A stretch out of reach either way: passed over.)
+      const reach = Math.sqrt(best);
+      if ((ax < x - reach && bx < x - reach) || (ax > x + reach && bx > x + reach) || (az < z - reach && bz < z - reach) || (az > z + reach && bz > z + reach)) continue;
       const [dx, dz] = [bx - ax, bz - az];
       const l2 = dx * dx + dz * dz;
       const t = l2 > 0 ? Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / l2)) : 0;

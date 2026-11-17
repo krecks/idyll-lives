@@ -159,6 +159,10 @@ pub struct LotFile {
     /// How fast residents age (default: normal).
     #[serde(default)]
     pub lifespan: crate::lifecycle::Lifespan,
+    /// The most residents the town grows to by newcomers and births (optional; absent:
+    /// `world::MAX_SIMS`, and more than it counts as it). Saved with the town.
+    #[serde(default, rename = "residentsMost")]
+    pub residents_most: Option<u32>,
     pub width: u16,
     pub depth: u16,
     /// Storeys the file's houses have (default 1). With more, walls, doors, windows, diagonals and

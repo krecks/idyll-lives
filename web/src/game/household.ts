@@ -248,7 +248,18 @@ const lookGenders = new WeakMap<object, string>();
 export function genderOfLook(appearance: Appearance): string | undefined {
   return lookGenders.get(appearance);
 }
-const uid = () => Math.random().toString(36).slice(2, 10);
+/** A member's id, eight letters and digits drawn from `rand` (a seeded household's ids are the same each time). */
+const uid = (rand: () => number = Math.random) => rand().toString(36).slice(2, 10).padEnd(8, '0');
+
+/** A shuffled copy of `list` (Fisher-Yates), its order drawn from `rand`. */
+function shuffled<T>(list: readonly T[], rand: () => number): T[] {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 function weighted<T>(options: readonly [T, number][], rand: () => number = Math.random): T {
   let roll = rand() * options.reduce((s, [, w]) => s + w, 0);
@@ -259,14 +270,17 @@ function weighted<T>(options: readonly [T, number][], rand: () => number = Math.
 }
 
 /** Attraction for a random Sim: varied, with "the other gender" most common. */
-function randomAttraction(content: Content, gender: string): string[] {
+function randomAttraction(content: Content, gender: string, rand: () => number = Math.random): string[] {
   const ids = content.genders.map((g) => g.id);
   const others = ids.filter((g) => g !== gender);
-  return weighted<string[]>([
-    [others, 70],
-    [ids, 15],
-    [[gender], 15],
-  ]);
+  return weighted<string[]>(
+    [
+      [others, 70],
+      [ids, 15],
+      [[gender], 15],
+    ],
+    rand,
+  );
 }
 
 function randomHair(gender: string, rand: () => number = Math.random): HairStyle {
@@ -301,10 +315,10 @@ function randomHair(gender: string, rand: () => number = Math.random): HairStyle
 }
 
 /** A first name that suits `gender`, avoiding `taken` names while there are others. */
-export function randomFirstName(content: Content, gender: string, taken: readonly string[] = []): string {
+export function randomFirstName(content: Content, gender: string, taken: readonly string[] = [], rand: () => number = Math.random): string {
   const names = content.firstNames(gender);
   const free = names.filter((n) => !taken.includes(n));
-  return pick(free.length ? free : names);
+  return pick(free.length ? free : names, rand);
 }
 
 /**
@@ -376,28 +390,29 @@ export function randomVoice(sim: SimDraft): void {
   delete voice.expressive;
 }
 
-export function randomSim(content: Content, assets: AssetRegistry, taken: readonly string[] = []): SimDraft {
-  const gender = content.genders.length ? pick(content.genders).id : '';
+/** A random resident, every roll from `rand` (the creator's dice by default; a lot's own stream for a neighbour: `people.ts`). */
+export function randomSim(content: Content, assets: AssetRegistry, taken: readonly string[] = [], rand: () => number = Math.random): SimDraft {
+  const gender = content.genders.length ? pick(content.genders, rand).id : '';
   const traits: string[] = [];
-  const target = content.rules.minTraits + Math.floor(Math.random() * (content.rules.maxTraits - content.rules.minTraits + 1));
-  for (const t of [...content.traits].sort(() => Math.random() - 0.5)) {
+  const target = content.rules.minTraits + Math.floor(rand() * (content.rules.maxTraits - content.rules.minTraits + 1));
+  for (const t of shuffled(content.traits, rand)) {
     if (traits.length >= target) break;
     if (!content.traitBlocker(traits, t.id)) traits.push(t.id);
   }
   const perks: string[] = [];
-  for (const p of [...content.perks].sort(() => Math.random() - 0.5)) {
-    if (content.perkCost([...perks, p.id]) <= content.rules.perkPoints && Math.random() < 0.6) perks.push(p.id);
+  for (const p of shuffled(content.perks, rand)) {
+    if (content.perkCost([...perks, p.id]) <= content.rules.perkPoints && rand() < 0.6) perks.push(p.id);
   }
-  const appearance = randomLook(assets, gender);
+  const appearance = randomLook(assets, gender, rand);
   return {
-    uid: uid(),
-    name: randomFirstName(content, gender, taken),
+    uid: uid(rand),
+    name: randomFirstName(content, gender, taken, rand),
     gender,
-    attractedTo: randomAttraction(content, gender),
+    attractedTo: randomAttraction(content, gender, rand),
     appearance,
     traits,
     perks,
-    age: randomAge(content),
+    age: randomAge(content, undefined, rand),
   };
 }
 
@@ -455,11 +470,11 @@ export function lookFromSeed(assets: AssetRegistry, gender: string, seed: number
 }
 
 /** A random age: mostly adults, some young adults, a few elders (or within `stage`). */
-export function randomAge(content: Content, stage?: string): number {
+export function randomAge(content: Content, stage?: string, rand: () => number = Math.random): number {
   const stages = content.adultStages;
-  const id = stage ?? (Math.random() < 0.35 ? stages[0]?.id : Math.random() < 0.8 ? stages[1]?.id : stages[2]?.id) ?? stages[0]?.id;
+  const id = stage ?? (rand() < 0.35 ? stages[0]?.id : rand() < 0.8 ? stages[1]?.id : stages[2]?.id) ?? stages[0]?.id;
   const [lo, hi] = id ? content.stageAges(id) : [25, 50];
-  return lo + Math.floor(Math.random() * (hi - lo + 1));
+  return lo + Math.floor(rand() * (hi - lo + 1));
 }
 
 /** How `randomHousehold` rolls a household: `older`, its first grown-up past the young-adult years (for a dear home). */
@@ -468,46 +483,53 @@ export interface HouseholdRoll {
 }
 
 /**
- * A random household of `size`: often a couple (with a child at home) or two siblings. Most
- * grown-ups have a job (`wealth.ts` `jobFor`: the older, the higher up they may be).
+ * A random household of `size` (one to three if not given): often a couple (with a child at home)
+ * or two siblings. Most grown-ups have a job (`wealth.ts` `jobFor`: the older, the higher up they
+ * may be). Every roll comes from `rand`. The family name is drawn from all of them and, if one of
+ * `avoidNames` has it, moves on to the next free one, so the names other households took change
+ * this one's only when it would have taken one of theirs.
  */
 export function randomHousehold(
   content: Content,
   assets: AssetRegistry,
-  size = 1 + Math.floor(Math.random() * 3),
+  size?: number,
   avoidNames: readonly string[] = [],
   { older = false }: HouseholdRoll = {},
+  rand: () => number = Math.random,
 ): HouseholdDraft {
+  const count = size ?? 1 + Math.floor(rand() * 3);
   const members: SimDraft[] = [];
-  for (let i = 0; i < size; i++) members.push(randomSim(content, assets, members.map((m) => m.name)));
+  for (let i = 0; i < count; i++) members.push(randomSim(content, assets, members.map((m) => m.name), rand));
   const [settled, elder] = content.adultStages.slice(1);
-  if (older && members[0] && settled) members[0].age = randomAge(content, (Math.random() < 0.8 ? settled : (elder ?? settled)).id);
+  if (older && members[0] && settled) members[0].age = randomAge(content, (rand() < 0.8 ? settled : (elder ?? settled)).id, rand);
   const bonds: Bond[] = [];
   // Two adults who are attracted to each other are often a couple.
   const [a, b, c] = members;
   const adult = content.adultStages[0]?.from ?? 18;
   // Children start out of the crib (babies come into a home with a crib).
   const youngest = content.lifeStages.find((s) => !s.baby)?.from ?? adult;
-  const couple = !!a && !!b && a.attractedTo.includes(b.gender) && b.attractedTo.includes(a.gender) && Math.random() < 0.6;
+  const couple = !!a && !!b && a.attractedTo.includes(b.gender) && b.attractedTo.includes(a.gender) && rand() < 0.6;
   if (a && b && couple) {
     bonds.push({ a: a.uid, b: b.uid, preset: 'partners' });
     // Partners are close in age.
-    b.age = Math.max(adult, a.age + Math.floor(Math.random() * 9) - 4);
+    b.age = Math.max(adult, a.age + Math.floor(rand() * 9) - 4);
     // Often with a child at home: little, a teenager, or grown up.
     const parent = Math.min(a.age, b.age);
-    if (c && parent - 20 >= youngest && Math.random() < 0.7) {
-      c.age = Math.max(youngest, parent - 20 - Math.floor(Math.random() * 25));
+    if (c && parent - 20 >= youngest && rand() < 0.7) {
+      c.age = Math.max(youngest, parent - 20 - Math.floor(rand() * 25));
       bonds.push({ a: c.uid, b: a.uid, preset: 'parent' }, { a: c.uid, b: b.uid, preset: 'parent' });
     }
-  } else if (a && b && Math.random() < 0.3) {
+  } else if (a && b && rand() < 0.3) {
     // Or two siblings.
-    b.age = Math.max(adult, a.age + Math.floor(Math.random() * 13) - 6);
+    b.age = Math.max(adult, a.age + Math.floor(rand() * 13) - 6);
     bonds.push({ a: a.uid, b: b.uid, preset: 'siblings' });
   }
   // Most grown-ups work (or have retired from work).
-  for (const m of members) if (content.isAdult(m.age) && Math.random() < 0.75) m.job = jobFor(content, m.age, Math.random);
-  const names = content.names.last.filter((n) => !avoidNames.includes(n));
-  return { name: pick(names.length ? names : content.names.last), members, bonds };
+  for (const m of members) if (content.isAdult(m.age) && rand() < 0.75) m.job = jobFor(content, m.age, rand);
+  const last = content.names.last;
+  let at = Math.floor(rand() * last.length);
+  for (let step = 0; step < last.length && avoidNames.includes(last[at]); step++) at = (at + 1) % last.length;
+  return { name: last[at], members, bonds };
 }
 
 /** Who sleeps where in a household's home (`Residents`): partners share a bed, everyone else has one of their own (babies a crib), a child's for their life stage. */

@@ -426,7 +426,9 @@ fn a_car_waits_for_someone_in_its_way_who_then_steps_aside() {
     w.cars[0].driver = Some(0);
     w.cars[0].aboard = vec![0];
     w.sims[0].away_until = Some(w.tick + 100_000);
-    // ...and Bo stands right in front of it (it faces the street).
+    // ...and Bo stands right in front of it (it faces the street), no shift of his to set off
+    // for in the while (`life::early`: he'd be off a little before it).
+    w.sims[1].job = None;
     w.sims[1].pos = [34.0, 6.5];
     for _ in 0..secs(1.0) {
         w.tick_once();
@@ -1195,5 +1197,123 @@ fn a_car_faces_the_way_it_goes_round_a_corner() {
         worst.to_degrees() < 4.0,
         "its nose {}° off the way it goes",
         worst.to_degrees()
+    );
+}
+
+/// A rider and a car waiting for each other (Otter Weir, seed base 0: a car turning at a junction,
+/// its tail swinging out a tick on, waited for a cyclist beside it by name, `Car::on_foot`; their
+/// way ran through where the car stood, so they waited for it in turn). Stepped out of its way,
+/// the cyclist rode straight back towards it, into the ground it would turn through, and the two
+/// waited for each other for good, 27 residents on their bikes behind them for over two hours.
+/// Someone a car waits for by name doesn't come back into that ground (where it would be a tick
+/// on, `Car::next`), though they may step out of it, or on across it from inside it.
+#[test]
+fn rider_and_car_waiting_on_them_never_come_back_into_its_turn() {
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    let body = Body {
+        ahead: 1.2,
+        behind: 0.6,
+        side: 0.3,
+        yaw: 0.0,
+    };
+    let c = [30.0f32, 6.0];
+    // Turning tight: a tick on turned 1.1 rad further, its tail swinging out.
+    let (now, next) = (-0.4f32, 0.7f32);
+    let car = &mut w.cars[0];
+    car.state = CarState::Leaving;
+    car.shown = Some((c, now, true, 0));
+    car.next = Some((c, next));
+    car.on_foot = vec![1];
+    let (len, wid) = (car.len, car.wid);
+    // Beside its tail as it will be: a metre behind its middle, just out of its ground there.
+    let (h, n) = ([next.sin(), next.cos()], [next.cos(), -next.sin()]);
+    let across = -(wid / 2.0 + 1.2 + 0.1);
+    let at = [c[0] - h[0] + n[0] * across, c[1] - h[1] + n[1] * across];
+    let step = |d: f32| [at[0] + n[0] * d, at[1] + n[1] * d];
+    // (Nowhere near its body as it stands now: a step towards it was taken before.)
+    assert!(!walks_into(c, now, len, wid, 0.0, body, at, step(0.1)));
+    assert_eq!(
+        in_the_way(&w.cars, 1, body, at, step(0.1)),
+        Some(0),
+        "back towards its turn: they wait"
+    );
+    assert_eq!(
+        in_the_way(&w.cars, 1, body, at, step(-0.1)),
+        None,
+        "out of its way: on they go"
+    );
+    // Inside its ground, crossing it: on they go too.
+    let inside = [c[0] - h[0] * 3.0, c[1] - h[1] * 3.0];
+    let across_it = [inside[0] + n[0] * 0.1, inside[1] + n[1] * 0.1];
+    assert_eq!(in_the_way(&w.cars, 1, body, inside, across_it), None);
+    // One it doesn't wait for by name keeps clear as ever (`walks_into`, it and a tick on).
+    w.cars[0].on_foot.clear();
+    assert_eq!(in_the_way(&w.cars, 1, body, at, step(-0.1)), None);
+}
+
+/// A car standing a moment, held up by nobody (its claim just granted, say), goes on: it pulls
+/// over for one coming the other way only as far as it can go on with, as on the move. (A taxi
+/// let through stood at the start of its claim beside one standing the other way, pulled over
+/// as far as it had room where it stood, more than it had on its way a tick on; it had to pull
+/// back in first, couldn't beside that one, and waited for it to pass; that one waited for the
+/// car behind the first, which waited for the first, for good, Clover Acres.)
+#[test]
+fn a_car_held_up_by_nobody_pulls_over_only_as_far_as_it_goes_on_with() {
+    let town = TOWN.replace(
+        r#""cars":[{"plot":0"#,
+        r#""cars":[{"plot":0,"x":30.0,"z":3.0,"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,"body":1,"paint":1},{"plot":0"#,
+    );
+    let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+    // Car 0 east along z = 9.5, its room running out a little ahead; car 1 coming west beside
+    // it, standing, their bodies 0.2 m apart.
+    let lane = |from: f32, to: f32, z: f32, room: &dyn Fn(f32) -> f32| {
+        let mut legs = Legs::default();
+        let n = ((to - from).abs() / 2.0) as i32;
+        for k in 0..=n {
+            let x = from + (to - from).signum() * 2.0 * k as f32;
+            legs.push_lane([x, z], 5.0, room(x), LANE);
+        }
+        let mut r = legs.timed(true, true);
+        r.claim(4.4, 1.8, None);
+        r
+    };
+    let mine = lane(10.0, 50.0, 9.5, &|x| if x < 31.0 { 0.215 } else { 0.0 });
+    let t = mine.points.iter().find(|p| p.0[0] >= 29.0).unwrap().2;
+    let (p, yaw, _) = mine.at(t);
+    let right = shifted([0.0, 0.0], yaw, 1.0);
+    let theirs = lane(50.0, 10.0, 9.5 - right[1] * 2.0, &|_| 0.0);
+    let u = theirs
+        .points
+        .iter()
+        .find(|q| q.0[0] <= p[0] + 1.0)
+        .unwrap()
+        .2;
+    let (q, qyaw, _) = theirs.at(u);
+    for (c, route, at, (pos, facing)) in [(0, mine, t, (p, yaw)), (1, theirs, u, (q, qyaw))] {
+        let car = &mut w.cars[c];
+        car.state = if c == 0 {
+            CarState::Leaving
+        } else {
+            CarState::Arriving
+        };
+        car.route = Some((c == 1, route));
+        car.progress = at;
+        car.shown = Some((pos, facing, true, 0));
+    }
+    let room_on = route_room(&w.cars[0], t + 1.0);
+    assert!(room_on < 0.01 && w.cars[0].route.as_ref().unwrap().1.room_here(t) > 0.2);
+    let others = vehicles(&w.cars, Some(0));
+    pull_over(&mut w, 0, &others, false, None);
+    assert!(
+        w.cars[0].shift <= room_on + 1e-4,
+        "pulled over {:.3} m, with {room_on:.3} m to go on with",
+        w.cars[0].shift
+    );
+    // (Held up by that one, it pulls over for it as far as it has room where it stands.)
+    let others = vehicles(&w.cars, Some(0));
+    pull_over(&mut w, 0, &others, false, Some(car_first(1)));
+    assert!(
+        w.cars[0].shift > 0.0,
+        "held up, it pulls over to let that one by"
     );
 }

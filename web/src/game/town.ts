@@ -9,24 +9,27 @@
  * fields beside it and a farmyard behind. Each plot is laid out with its street at z = 0 and
  * turned onto the town to face its road (`Facing`, `turner`), so every front door faces the road.
  * What kind of world the town is in (`world.ts`) and its seed decide the layout (`generateWorld`);
- * the households come after (`populate`). The result is one town file the simulation loads like any lot.
+ * the households come after (`people.ts` `populate`). The result is one town file the simulation loads like any lot.
  */
 
-import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
 import type { GameKind, LandscapeParams, Lifespan, PorchInfo, TownArea, TownExit, WorldLook, WorldMeta, WorldOptions, WorldSize } from '../core/protocol';
 import { fetchText } from '../content/content';
-import { bedroomsNeeded, householdBonds, householdSpawns, randomHousehold, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
+import { householdBonds, householdSpawns, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { homePrice } from './price';
 import { crownClear, generateHouse, objectInfos, residentsKey, weighted, type GardenSize, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
 import { connect, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Box, type Pt, type RoadPlan } from './roads';
 import { householdFunds, savingsOf } from './wealth';
 import { extend, fill, LEGACY_KINDS, placeOf, specOf, type LotMix, type RoadLayout, type SizeSpec, type WorldStep } from './world';
-import { generateFromSpec, type OpenWorldDraft } from './macro';
+import { generateFromSpec, landDraft, layOn, type OpenWorldDraft } from './macro';
 import { encodeLand, type Land } from './land';
 import { garageAt, garageFor, hash, houseCar, type ParkedCar } from '../render/shared/cars';
 import { placeRides, ridesFor } from './townRides';
 import { fenceRuns, townFences, type TownFence } from './gardenFences';
+import { defaultResidentsMost, neighbourBonds } from './people';
+
+/** The households moved to `people.ts`; still here for those that import them from the town. */
+export { NEIGHBOUR_CAP, populate, rehouse } from './people';
 
 export type Wall = [number, number, number, number];
 export interface Door {
@@ -186,6 +189,8 @@ export interface NeighbourhoodDraft {
   greens: Pt[][];
   /** Neighbour households and the slot each lives in. */
   households: { household: HouseholdDraft; slot: number }[];
+  /** The most residents the town grows to by births and newcomers, as `people.ts` `fillTown` filled it (its town file's `residentsMost`); missing: `defaultResidentsMost`. */
+  residentsMost?: number;
   /**
    * Landscape seed (hills, woods, lawn detail). Kept while the draft is edited, so the 3D preview
    * in the menus and the game itself show the same valley. Missing in drafts from older code.
@@ -220,6 +225,10 @@ export interface WorldInfo {
   landscape: LandscapeParams;
   /** What the player chose besides the place (missing in a classic world and in drafts from older code). */
   options?: WorldOptions;
+  /** The seed its town was laid from, where it is not the land's (`macro.ts` `LayOptions.townSeed`; `WorldLook.townSeed`). */
+  townSeed?: number;
+  /** Its town was laid on a land the player shaped (`WorldLook.shaped`). */
+  shaped?: true;
 }
 
 /** Presentation data the renderer reads back from the world (it survives save/load). */
@@ -285,7 +294,7 @@ export function generatedId(size: LotSize, seed: number, garden?: GardenSize): s
 type Rand = () => number;
 const pick = <T>(list: readonly T[], rand: Rand = Math.random): T => list[Math.floor(rand() * list.length)];
 /** A shuffled copy (Fisher-Yates). */
-function shuffled<T>(list: readonly T[], rand: Rand = Math.random): T[] {
+export function shuffled<T>(list: readonly T[], rand: Rand = Math.random): T[] {
   const out = [...list];
   for (let i = out.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
@@ -608,7 +617,7 @@ export function lotAt(ground: Ground, road: RoadPlan, f: Frontage, w: number, d:
  * A `W` × `D` rectangle (town tiles) facing `facing`'s way, its front edge on the tile line `front`
  * (z when it faces north or south, x when east or west) and its middle at `along` across it.
  */
-function fronting(facing: Facing, front: number, along: number, W: number, D: number): Rect {
+export function fronting(facing: Facing, front: number, along: number, W: number, D: number): Rect {
   const a = Math.round(along - (facing % 2 ? D : W) / 2);
   const at = [{ x: a, z: front }, { x: front, z: a }, { x: a, z: front - D }, { x: front - W, z: a }][facing];
   return { ...at, w: W, d: D };
@@ -629,27 +638,15 @@ export function withLot(town: NeighbourhoodDraft, slot: number, template: string
   return { ...town, slots: town.slots.map((s) => (s.index === slot ? { ...s, template } : s)) };
 }
 
-/**
- * Residents the neighbours number at most (the sim holds 240 Sims in
- * a big world; room left for the player's household and babies).
- */
-export const NEIGHBOUR_CAP = 220;
-
-/**
- * Neighbours a big world starts with when nobody asks for a number (~120
- * residents; the rest of its homes are for sale, and newcomers fill the town from there). Tried at 168
- * in the living-town run and put back: with ~170 from the first morning, a sample world's centre jammed.
- */
-const BIG_START = 118;
-
 /** Time spent generating houses (ms), for the sample tool's budgets: the layout's own time is the rest. */
 export const generateStats = { houseMs: 0 };
 
 /**
  * Lays out a world in place `kind` with `options` (the place's own where not given) from `seed`
  * (the same place, options and seed always give the same world): its roads, lots, houses, public
- * places and farms, its name, tagline and land (`world.ts` `specOf`, `macro.ts` `generateFromSpec`).
- * The roads come first (`WorldSpec.shape`), then the lots along them: the park on the green if
+ * places and farms, its name, tagline and land (`world.ts` `specOf`, `macro.ts` `generateFromSpec`):
+ * as a new game makes it, its land first (`macro.ts` `landDraft`), then its town laid on that from
+ * the same seed (`layOn`). The roads come first (`WorldSpec.shape`), then the lots along them: the park on the green if
  * there is one, the public places round the town's middle, farms out on its edge, the houses from
  * the middle out, each turned to face its road, with a gap or a stretch of meadow between some.
  * Nobody lives there yet (see `populate`). A kind from before places (`LEGACY_KINDS`: a tool's or
@@ -658,9 +655,13 @@ export const generateStats = { houseMs: 0 };
  * `generateFromSpec`'s `shaped`).
  */
 export function generateWorld(content: Content, t: Templates, kind: string, seed = (Math.random() * 2 ** 31) >>> 0, name?: string, step?: (done: WorldStep) => void, options?: Partial<WorldOptions>, land?: Land): NeighbourhoodDraft {
-  const chosen = { ...options };
-  if (Object.hasOwn(LEGACY_KINDS, kind)) chosen.town ??= LEGACY_KINDS[kind].town;
-  return generateFromSpec(content, t, specOf(placeOf(kind), chosen), seed, name, step, land);
+  if (land) {
+    const chosen = { ...options };
+    if (Object.hasOwn(LEGACY_KINDS, kind)) chosen.town ??= LEGACY_KINDS[kind].town;
+    return generateFromSpec(content, t, specOf(placeOf(kind), chosen), seed, name, step, land);
+  }
+  // As a new game makes one: its land (step 1), then its town laid on it (step 2), the town from the land's seed.
+  return layOn(content, t, landDraft(content, t, kind, options, seed), {}, { waterKept: true }, name, step);
 }
 
 /** Courts (lanes left with a dead end) a town keeps at most; a big world's main town, `BIG_COURTS`. */
@@ -881,26 +882,9 @@ export class LotPlacer {
     return [];
   }
 
-  /**
-   * Whether a house on lot `u` at `at` has a driveway whose line meets a road squarely
-   * (`driveMeets`): a car can turn out of it onto the road, not come alongside it (on a bend
-   * the road takes away from the lot's corner, or by a junction). Or no room for one.
-   */
-  private drivesOut(u: Unplaced, at: { x: number; z: number; facing: Facing }): boolean {
-    const { t, roads } = this;
-    const house = u.kind === 'house' ? houseTemplate(t, u.template) : undefined;
-    if (!house) return true;
-    const footprint = (def: string): [number, number] => this.content.object(def)?.footprint ?? [1, 1];
-    const { width, depth } = slotDims(t, u);
-    const sides = driveways(onLot(t, house, u, footprint), width, depth, footprint);
-    const turn = turner(at.x, at.z, width, depth, at.facing);
-    return (
-      !sides.length ||
-      sides.some((r) => {
-        const [a, b] = [turn.point([r.x + r.w / 2, 0]), turn.point([r.x + r.w / 2, -1])];
-        return driveMeets(roads, roadIndex(roads), a, [b[0] - a[0], b[1] - a[1]], DRIVE_REACH)?.square;
-      })
-    );
+  /** Whether a car can turn out of a house on lot `u` at `at` onto the road (`drivesOut`), its things' footprints as the content has them. */
+  drivesOut(u: Unplaced, at: { x: number; z: number; facing: Facing }): boolean {
+    return drivesOut(this.roads, this.t, u, at, (def) => this.content.object(def)?.footprint ?? [1, 1]);
   }
 
   /** House numbers along each road (odd on its left, even on its right), and the roads' names (`names`, by road; those without one are left as they are). */
@@ -913,87 +897,6 @@ export class LotPlacer {
       road.name = name;
     }
   }
-}
-
-/** Tries at a household for a home: one that fits it and can buy it, not too rich for it. */
-const HOUSEHOLD_TRIES = 36;
-/** Savings beyond this many times a home's price make a household too well off for it (taken only when nothing closer turns up). */
-const RICH_FOR = 4;
-
-/**
- * Neighbours for a town: `count` households (default: all but two houses empty), each in a home
- * that has room for it and that it could buy (`wealth.ts` `savingsOf` covers `price.ts`
- * `homePrice`), no more than `MAX_NEIGHBOURS` residents in all. The houses are picked at random
- * and filled dearest first; one no household turns up for stays for sale.
- */
-export function populate(content: Content, assets: AssetRegistry, t: Templates, town: NeighbourhoodDraft, count?: number): NeighbourhoodDraft {
-  // (A big world starts with about 120 residents unless asked for more, up to its cap.)
-  const MAX_NEIGHBOURS = count === undefined ? BIG_START : NEIGHBOUR_CAP;
-  const houses = town.slots.filter((s) => s.kind === 'house');
-  const wanted = Math.max(0, Math.min(count ?? houses.length - 2, houses.length - 1));
-  const price = new Map(houses.map((s) => [s.index, homePrice(content, t, s)]));
-  const dearestFirst = (list: PlotSlot[]) => [...list].sort((a, b) => price.get(b.index)! - price.get(a.index)!);
-  // The houses picked first; the others stand in for any of them nobody could buy. The town's
-  // cheapest home stays for sale (if it can): a starter home within reach of a young household.
-  const cheapest = houses.reduce<PlotSlot | undefined>((a, s) => (!a || price.get(s.index)! < price.get(a.index)! ? s : a), undefined);
-  const order = [...shuffled(houses.filter((s) => s !== cheapest)), ...(cheapest ? [cheapest] : [])];
-  const queue = [...dearestFirst(order.slice(0, wanted)), ...dearestFirst(order.slice(wanted))];
-  const taken = new Set<string>();
-  const households: NeighbourhoodDraft['households'] = [];
-  let residents = 0;
-  for (const slot of queue) {
-    if (households.length >= wanted || residents >= MAX_NEIGHBOURS) break;
-    const bedrooms = houseTemplate(t, slot.template)?.bedrooms ?? 1;
-    const household = householdFor(content, assets, bedrooms, price.get(slot.index)!, MAX_NEIGHBOURS - residents, [...taken]);
-    if (!household) continue;
-    taken.add(household.name);
-    residents += household.members.length;
-    households.push({ household, slot: slot.index });
-  }
-  return { ...town, households };
-}
-
-/**
- * A household for a home with `bedrooms` that costs `price`: it fits (a couple shares a bedroom,
- * two children may, anyone else needs one), has saved enough to buy it, and preferably isn't
- * many times richer than it needs to be. A dear home looks mostly among older households, who
- * have climbed higher and put more by. Null if none turns up.
- */
-function householdFor(
-  content: Content,
-  assets: AssetRegistry,
-  bedrooms: number,
-  price: number,
-  room: number,
-  avoidNames: readonly string[],
-): HouseholdDraft | null {
-  let size = Math.max(1, Math.min(4, bedrooms + Math.floor(Math.random() * 2), room));
-  let best: { household: HouseholdDraft; savings: number } | null = null;
-  // A home dearer than two young grown-ups between jobs could buy goes mostly to an older household.
-  const young = (content.adultStages[0]?.from ?? 18) + 7;
-  const dear = price > savingsOf(content, { members: [{ age: young }, { age: young }] });
-  for (let tries = 0, misfits = 0; tries < HOUSEHOLD_TRIES; tries++) {
-    const household = randomHousehold(content, assets, size, avoidNames, { older: dear ? Math.random() < 0.8 : Math.random() < 0.2 });
-    if (bedroomsNeeded(residentsOf(content, household)) > bedrooms) {
-      if (++misfits % 6 === 0 && size > 1) size--;
-      continue;
-    }
-    const savings = savingsOf(content, household);
-    if (savings < price) continue;
-    if (savings <= Math.max(price, 1) * RICH_FOR) return household;
-    if (!best || savings < best.savings) best = { household, savings };
-  }
-  return best?.household ?? null;
-}
-
-/**
- * Another household for the home on `slot` (one that fits it and can buy it, as `populate` finds
- * them), with a name none of `avoidNames` has; any household of `size` if none turns up.
- */
-export function rehouse(content: Content, assets: AssetRegistry, t: Templates, town: NeighbourhoodDraft, slot: number, size: number, avoidNames: readonly string[]): HouseholdDraft {
-  const s = town.slots[slot];
-  const bedrooms = (s && houseTemplate(t, s.template)?.bedrooms) ?? 1;
-  return (s && householdFor(content, assets, bedrooms, homePrice(content, t, s), NEIGHBOUR_CAP, avoidNames)) ?? randomHousehold(content, assets, size, avoidNames);
 }
 
 /** What a farm's fields grow: two or three of these, a pair of rows each in turn. */
@@ -1088,7 +991,7 @@ function farmstead(content: Content, t: Templates, slot: PlotSlot, rand: Rand): 
 /** Driveways are paths wider than this (garden paths are 1 m); see `driveway`. */
 export const DRIVEWAY_MIN_WIDTH = 1.8;
 /** How far a driveway goes on across the verge to its road at most (m; a garden path's goes 12). */
-const DRIVE_REACH = 30;
+export const DRIVE_REACH = 30;
 
 /** Driveway length past the front wall of the house: room to park a car beside it. */
 const DRIVEWAY_PAST_FRONT = 5.4;
@@ -1513,7 +1416,8 @@ export interface AssembleOptions {
  * neighbours. With `existing`, `player` is the neighbour household already
  * living at `playerSlot`: it stays where it is in the list (with its jobs and history) and only
  * becomes the player's. A new household on an empty lot gets money to build with in Living games.
- * `rand` rolls its dice (who among the neighbours are friends, rivals).
+ * `rand` rolls its dice (who among the neighbours are friends, rivals). The file says the most
+ * residents the town grows to (`residentsMost`): the draft's, else `people.ts` `defaultResidentsMost`.
  */
 export function assembleTown(
   content: Content,
@@ -1563,16 +1467,10 @@ export function assembleTown(
     });
   });
 
-  // Neighbours have history with each other; a newly arrived player household doesn't.
+  // Neighbours have history with each other (`people.ts` `neighbourBonds`); a newly arrived player household doesn't.
   const newcomers = existing ? 0 : player.members.length;
-  for (let a = newcomers; a < sims.length; a++) {
-    for (let b = a + 1; b < sims.length; b++) {
-      if (sims[a].household === sims[b].household) continue;
-      const roll = rand();
-      const preset = roll < 0.03 ? 'rivals' : roll < 0.09 ? 'friends' : roll < 0.3 ? 'acquaintances' : null;
-      if (preset && content.bondPresets.includes(preset)) relationships.push({ a, b, preset });
-    }
-  }
+  const homes = residents.map((r): Pt => [town.slots[r.slot].x, town.slots[r.slot].z]);
+  relationships.push(...neighbourBonds(sims, homes, rand, { from: newcomers, presets: content.bondPresets }));
 
   const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths, facing, seed: town.seed ?? (rand() * 2 ** 31) >>> 0, world: worldLook(town, fields), gardenFences: true };
   const open = openWorldFields(town, drives, cars);
@@ -1599,6 +1497,7 @@ export function assembleTown(
     households,
     sims,
     relationships,
+    residentsMost: town.residentsMost ?? defaultResidentsMost(sims.length),
     exits,
     garages,
     porches,
@@ -1615,7 +1514,28 @@ export function assembleTown(
  * Further from square it comes alongside the road rather than onto it, and its car has no way
  * to turn out onto it.
  */
-const DRIVE_SQUARE = 0.55;
+export const DRIVE_SQUARE = 0.55;
+
+/**
+ * Whether a house on lot `u` at `at` (on `roads`) has a driveway whose line meets a road squarely
+ * (`driveMeets`): a car can turn out of it onto the road, not come alongside it (on a bend the road
+ * takes away from the lot's corner, or by a junction). Or no room for one. `footprint`: how big a
+ * thing on the lot is (its object's, as the content or the templates have it).
+ */
+export function drivesOut(roads: readonly RoadPlan[], t: Templates, u: Unplaced, at: { x: number; z: number; facing: Facing }, footprint: (def: string) => [number, number]): boolean {
+  const house = u.kind === 'house' ? houseTemplate(t, u.template) : undefined;
+  if (!house) return true;
+  const { width, depth } = slotDims(t, u);
+  const sides = driveways(onLot(t, house, u, footprint), width, depth, footprint);
+  const turn = turner(at.x, at.z, width, depth, at.facing);
+  return (
+    !sides.length ||
+    sides.some((r) => {
+      const [a, b] = [turn.point([r.x + r.w / 2, 0]), turn.point([r.x + r.w / 2, -1])];
+      return driveMeets(roads, roadIndex(roads), a, [b[0] - a[0], b[1] - a[1]], DRIVE_REACH)?.square;
+    })
+  );
+}
 
 /** Where a driveway meets its road (`driveMeets`). */
 export interface DriveMeet {
@@ -1633,7 +1553,7 @@ export interface DriveMeet {
  * it squarely there, as the simulation measures it (the way the road's segment runs there:
  * sim-core `Bay::new`). Null: none.
  */
-function driveMeets(list: readonly RoadPlan[], roads: ReturnType<typeof roadIndex>, street: Pt, way: Pt, reach: number): DriveMeet | null {
+export function driveMeets(list: readonly RoadPlan[], roads: ReturnType<typeof roadIndex>, street: Pt, way: Pt, reach: number): DriveMeet | null {
   const at = (k: number): Pt => [street[0] + way[0] * k, street[1] + way[1] * k];
   const widest = Math.max(0, ...list.map((r) => r.width));
   for (let k = 0.5; k <= reach; k += 0.5) {
@@ -1659,7 +1579,7 @@ function driveMeets(list: readonly RoadPlan[], roads: ReturnType<typeof roadInde
 }
 
 /** The way a polyline's segment at arc length `s` runs (a unit direction; as sim-core `Road::tangent`). */
-function segmentWay(pts: readonly Pt[], s: number): Pt {
+export function segmentWay(pts: readonly Pt[], s: number): Pt {
   const ls = lengths(pts);
   let i = 1;
   while (i < pts.length - 1 && ls[i] <= s) i++;
