@@ -30,31 +30,6 @@ const KNOWN: &[(&str, &str, &str)] = &[
         "mean 0.57: shingles, asphalt (mineral granules) or weathered wood, are 0.7 and up",
     ),
     (
-        "metal",
-        "material.floor.carpet",
-        "12 % of texels over 5 % metal (up to 22 %): what lossy storage leaves in the arm map's blue, read as metal where the manifest leaves `metallic` at 1",
-    ),
-    (
-        "metal",
-        "material.furrow",
-        "9 % over 5 % metal (up to 16 %): what lossy storage leaves in the arm map's blue, read as metal where the manifest leaves `metallic` at 1",
-    ),
-    (
-        "metal",
-        "material.ground",
-        "2.5 % over 5 % metal (up to 12 %): what lossy storage leaves in the arm map's blue, read as metal where the manifest leaves `metallic` at 1",
-    ),
-    (
-        "metal",
-        "material.roof",
-        "0.6 % over 5 % metal (up to 14 %): what lossy storage leaves in the arm map's blue, read as metal where the manifest leaves `metallic` at 1",
-    ),
-    (
-        "metal",
-        "material.soil",
-        "9 % over 5 % metal (up to 16 %): what lossy storage leaves in the arm map's blue, read as metal where the manifest leaves `metallic` at 1",
-    ),
-    (
         "normal steep",
         "material.wall.stone",
         "18 % of texels over 45°: the deep joints between thin stones",

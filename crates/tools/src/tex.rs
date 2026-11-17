@@ -451,12 +451,12 @@ pub fn materials() -> J {
                 "#F4F0E8",
                 "wall_plaster",
                 0.5,
-                &[("normalStrength", f(0.7))],
+                &[("normalStrength", f(0.7)), ("metallic", i(0))],
             ),
         ),
         (
             "material.floor",
-            surf("#FFFFFF", "floor_laminate", 0.55, &[]),
+            surf("#FFFFFF", "floor_laminate", 0.55, &[("metallic", i(0))]),
         ),
         (
             "material.ground",
@@ -465,7 +465,11 @@ pub fn materials() -> J {
                     "#FFFFFF",
                     "grass",
                     0.3,
-                    &[("normalStrength", f(0.8)), ("projection", s("xz"))],
+                    &[
+                        ("normalStrength", f(0.8)),
+                        ("projection", s("xz")),
+                        ("metallic", i(0)),
+                    ],
                 ),
                 "sideColor",
                 s("#C9B391"),
@@ -473,11 +477,21 @@ pub fn materials() -> J {
         ),
         (
             "material.road",
-            surf("#FFFFFF", "road_asphalt", 0.2, &[("projection", s("xz"))]),
+            surf(
+                "#FFFFFF",
+                "road_asphalt",
+                0.2,
+                &[("projection", s("xz")), ("metallic", i(0))],
+            ),
         ),
         (
             "material.path",
-            surf("#FFFFFF", "path_hexpaving", 0.7, &[("projection", s("xz"))]),
+            surf(
+                "#FFFFFF",
+                "path_hexpaving",
+                0.7,
+                &[("projection", s("xz")), ("metallic", i(0))],
+            ),
         ),
         // Farm fields (town.ts `farmstead`): tilled earth, the greyscale grain tinted; furrows darker.
         (
@@ -486,7 +500,11 @@ pub fn materials() -> J {
                 "#8A6646",
                 "grass",
                 0.5,
-                &[("projection", s("xz")), ("roughness", i(1))],
+                &[
+                    ("projection", s("xz")),
+                    ("roughness", i(1)),
+                    ("metallic", i(0)),
+                ],
             ),
         ),
         (
@@ -495,7 +513,11 @@ pub fn materials() -> J {
                 "#664A33",
                 "grass",
                 0.5,
-                &[("projection", s("xz")), ("roughness", i(1))],
+                &[
+                    ("projection", s("xz")),
+                    ("roughness", i(1)),
+                    ("metallic", i(0)),
+                ],
             ),
         ),
         (
@@ -640,6 +662,8 @@ pub fn materials() -> J {
     ]);
     // House exterior/interior surfaces. uvScale = 1 / real-world tile size in metres; greyscale detail maps
     // (colour #FFFFFF) are tinted by the game per house/room; roughness multiplies the arm map's roughness.
+    // None of the textured surfaces is metal: `metallic` 0 (it multiplies the arm map's blue, made 0 but
+    // never quite 0 out of lossy storage, where it would read as metal).
     let house = [
         (
             "material.wall.siding",
@@ -647,7 +671,11 @@ pub fn materials() -> J {
                 "#FFFFFF",
                 "siding_wood",
                 0.4,
-                &[("roughness", i(1)), ("normalStrength", i(1))],
+                &[
+                    ("roughness", i(1)),
+                    ("metallic", i(0)),
+                    ("normalStrength", i(1)),
+                ],
             ),
         ),
         (
@@ -656,7 +684,11 @@ pub fn materials() -> J {
                 "#FFFFFF",
                 "brick",
                 1.0,
-                &[("roughness", i(1)), ("normalStrength", i(1))],
+                &[
+                    ("roughness", i(1)),
+                    ("metallic", i(0)),
+                    ("normalStrength", i(1)),
+                ],
             ),
         ),
         (
@@ -665,7 +697,11 @@ pub fn materials() -> J {
                 "#FFFFFF",
                 "roof_shingles",
                 0.667,
-                &[("roughness", i(1)), ("normalStrength", i(1))],
+                &[
+                    ("roughness", i(1)),
+                    ("metallic", i(0)),
+                    ("normalStrength", i(1)),
+                ],
             ),
         ),
         (
@@ -674,7 +710,11 @@ pub fn materials() -> J {
                 "#FFFFFF",
                 "stone_foundation",
                 0.667,
-                &[("roughness", i(1)), ("normalStrength", i(1))],
+                &[
+                    ("roughness", i(1)),
+                    ("metallic", i(0)),
+                    ("normalStrength", i(1)),
+                ],
             ),
         ),
         (
@@ -683,7 +723,11 @@ pub fn materials() -> J {
                 "#FFFFFF",
                 "floor_wood",
                 0.53,
-                &[("roughness", i(1)), ("normalStrength", f(0.8))],
+                &[
+                    ("roughness", i(1)),
+                    ("metallic", i(0)),
+                    ("normalStrength", f(0.8)),
+                ],
             ),
         ),
         (
@@ -692,7 +736,11 @@ pub fn materials() -> J {
                 "#FFFFFF",
                 "floor_tile",
                 0.5,
-                &[("roughness", f(0.7)), ("normalStrength", i(1))],
+                &[
+                    ("roughness", f(0.7)),
+                    ("metallic", i(0)),
+                    ("normalStrength", i(1)),
+                ],
             ),
         ),
         (
@@ -701,7 +749,11 @@ pub fn materials() -> J {
                 "#FFFFFF",
                 "carpet",
                 1.0,
-                &[("roughness", i(1)), ("normalStrength", f(0.8))],
+                &[
+                    ("roughness", i(1)),
+                    ("metallic", i(0)),
+                    ("normalStrength", f(0.8)),
+                ],
             ),
         ),
         (
@@ -710,7 +762,11 @@ pub fn materials() -> J {
                 "#FFFFFF",
                 "wallpaper",
                 0.5,
-                &[("roughness", i(1)), ("normalStrength", f(0.5))],
+                &[
+                    ("roughness", i(1)),
+                    ("metallic", i(0)),
+                    ("normalStrength", f(0.5)),
+                ],
             ),
         ),
         (
@@ -719,7 +775,11 @@ pub fn materials() -> J {
                 "#FFFFFF",
                 "painted_wood",
                 1.0,
-                &[("roughness", i(1)), ("normalStrength", f(0.6))],
+                &[
+                    ("roughness", i(1)),
+                    ("metallic", i(0)),
+                    ("normalStrength", f(0.6)),
+                ],
             ),
         ),
     ];
@@ -734,7 +794,11 @@ pub fn materials() -> J {
                 "#FFFFFF",
                 "grass_lush",
                 0.5,
-                &[("normalStrength", f(0.8)), ("projection", s("xz"))],
+                &[
+                    ("normalStrength", f(0.8)),
+                    ("projection", s("xz")),
+                    ("metallic", i(0)),
+                ],
             ),
             "sideColor",
             s("#C9B391"),
@@ -832,7 +896,7 @@ mod tests {
 
     /// `tests/fixtures/tex/materials.json` is what materials.py wrote (but for the sky's URL, since `cargo envconv`'s `.pcenv`,
     /// and the finishes added since: the trees' leaf cards, leather, the plain ones a thing is made of, velvet,
-    /// lacquer and cloth's sheen).
+    /// lacquer and cloth's sheen; `metallic` 0 on every textured surface).
     #[test]
     fn materials_bytes() {
         assert_eq!(
