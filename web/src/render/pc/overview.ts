@@ -205,7 +205,8 @@ export class TownOverview {
     this.root = new pc.Entity('townOverview');
     parent.addChild(this.root);
     this.templates = new TemplateCache(app);
-    this.street = new Street(app, this.root, assets, house, { layers: this.layers, fenceStyles: content.fenceStyles });
+    // (The backdrop's buildings dressed as the game draws them near: `backdropDress.ts`.)
+    this.street = new Street(app, this.root, assets, house, { layers: this.layers, fenceStyles: content.fenceStyles, backdrop: true });
     this.buildings = new TownBuildings(app, this.root, { layers: this.layers, castShadows: true });
     // Unlit: the output is the vertex colour times the instance colour (`glowByInstance`), added by its alpha.
     const mat = new pc.StandardMaterial();
@@ -266,8 +267,9 @@ export class TownOverview {
     const drawn = backdropKey(world);
     if (key === this.key && drawn === this.backdropKey) return false;
     if (key === this.key) {
-      // Only the backdrop changed (a street built up with the town's buildings alone, or cleared of them): the street,
-      // the ground and the things are as they were, and only the buildings are written again.
+      // Only the backdrop changed (a street built up with the town's buildings alone, or cleared of them): the ground
+      // and the things are as they were; the street plans again only the chunks whose buildings changed.
+      await this.street.build(world, null, pace);
       this.buildings.setBackdrop(this.backdropOf(world));
       this.buildings.show(1);
       this.backdropKey = drawn;
@@ -324,25 +326,40 @@ export class TownOverview {
     return true;
   }
 
-  /** `world`'s backdrop buildings as drawn, on its built surface (`townBackdrop`; those drawn last kept where nothing of them changed). */
+  /**
+   * `world`'s backdrop buildings as boxes, on its built surface (`townBackdrop`; those drawn last kept where nothing of
+   * them changed): those of the chunks the street doesn't draw (it draws every chunk of the menus' town, dressed: none,
+   * unless a building stands in no chunk the street has).
+   */
   private backdropOf(world: WorldStructure): TownBuilding[] {
     const surface = surfaceOf(world);
     const height = surface ? (x: number, z: number) => surface.at(x, z) : () => 0;
     const span = perfStart('town: backdrop');
-    const out = townBackdrop(world, height, surface ? height : null, this.drawnBuildings);
-    perfEnd(span, `${world.meta?.backdrop?.length ?? 0} buildings`);
+    const out = townBackdrop(world, height, surface ? height : null, this.drawnBuildings).filter((b) => b.chunk === undefined || !this.street.chunkDrawn(b.chunk));
+    perfEnd(span, `${world.meta?.backdrop?.length ?? 0} buildings, ${out.length} as boxes`);
     return out;
   }
 
   /** Streetlights, porch lamps and window glass follow the lighting key's lamp level (`glow`: the lamps' colour, linear). */
   setNight(lamps: number, glow: RGB): void {
+    this.lamps = lamps;
     this.street.setNight(lamps, glow);
     this.buildings.setNight(lamps, glow);
   }
+  /** The lamps' level last given (`setNight`): the backdrop's windows go by the hour only while they are on. */
+  private lamps = 0;
 
-  /** The hour shown (`minute` of the day, on `weekday`, 0 Monday): the backdrop's lit windows, a shop's while it is open (`litAt`). */
+  /** The hour shown (`minute` of the day, on `weekday`, 0 Monday): the backdrop's lit windows, a shop's while it is open (`litAt`), near and far alike. */
   setTime(minute: number, weekday: number): void {
+    this.hour = { minute, weekday };
     this.buildings.setTime(minute, weekday);
+    this.street.setTime(minute, weekday, this.lamps > 0);
+  }
+  private hour = { minute: 12 * 60, weekday: 0 };
+
+  /** Each frame: the backdrop's windows the street held back (it draws them again at most once a second) drawn once due; true when they were. */
+  frameLights(): boolean {
+    return this.street.setTime(this.hour.minute, this.hour.weekday, this.lamps > 0);
   }
 
   /** Which lots glow (see `Renderer.setLotHighlight`; `snap`: no easing to it). */
