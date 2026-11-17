@@ -607,7 +607,16 @@ pub fn main(argv: &[String]) -> i32 {
             .into_iter()
             .filter(|k| k.starts_with("model.") || k.starts_with("item.") || k.starts_with("tool."))
             .collect();
-        let report = checkglb::gate(&paths, &keys);
+        // With the Khronos validator over the files it wrote, where it can run (else CI's `models` step finds it).
+        let validated: Vec<(&'static str, checkglb::BatchCheck)> =
+            match checkglb::validate::ready(&checkglb::repo_root()) {
+                Ok(()) => vec![("validator", checkglb::validate::check)],
+                Err(err) => {
+                    println!("The Khronos glTF validator didn't run: {err}");
+                    Vec::new()
+                }
+            };
+        let report = checkglb::gate_with(&paths, &keys, &validated);
         print!("{}", report.text);
         if report.failed > 0 {
             failed.push("check-glb".into());
