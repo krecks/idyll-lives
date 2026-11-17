@@ -2,10 +2,13 @@
 //! it is clad with.
 
 pub mod cards;
+pub mod conifer;
 pub mod leaf;
 pub mod lump;
 mod macros;
 pub mod pots;
+pub mod skeleton;
+pub mod species;
 
 pub use cards::*;
 pub use leaf::*;
