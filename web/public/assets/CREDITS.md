@@ -19,6 +19,13 @@ family scripts under `tools/art/blender/families/` on the `gamekit` toolkit and 
 (glTF, original, CC0). They take their surfaces from the finishes and textures above. No downloaded
 models are used.
 
+The lumps, boulders and bark of those models are pushed about by a smooth noise: Ken Perlin's original gradient
+noise as Blender computes it (`mathutils.noise.noise`). The models' generator in Rust (`crates/artkit`) computes the
+same noise, and takes the noise's two tables (a permutation of 256 and 256 unit gradients,
+`crates/artkit/src/noise_tables.rs`) from Blender as data: Blender Foundation and contributors, GPL-2.0-or-later
+(this project is GPL-3.0-or-later). No Blender code is used, and nothing of it ships: the tables only decide the
+shapes of the models built with them.
+
 The garden decor (`models/garden/`, override pack `packs/gardenDecor/manifest.json`) is built in Blender by
 `tools/art/blender/families/garden_decor.py` on the shared `tools/art/blender/gamekit/` toolkit and exported as `.glb`
 (glTF, original, CC0).

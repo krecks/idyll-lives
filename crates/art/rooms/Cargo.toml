@@ -1,0 +1,13 @@
+[package]
+name = "art-rooms"
+description = "The game's item models, generated: living and dining rooms, offices, bedrooms, decor and lighting. One folder a family."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+artkit = { path = "../../artkit" }

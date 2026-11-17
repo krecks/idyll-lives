@@ -1,0 +1,13 @@
+[package]
+name = "art-outside"
+description = "The game's item models, generated: yards, playgrounds, farms, street furniture, stalls and shops. One folder a family."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+artkit = { path = "../../artkit" }

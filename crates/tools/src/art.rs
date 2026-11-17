@@ -1,4 +1,6 @@
-//! `cargo art`: builds Blender families and checks what they wrote (was tools/art/blender/build.py).
+//! `cargo art` for the families Blender builds (the binary is crates/art, which builds the families ported to
+//! Rust itself and calls this for the rest): builds them and checks what they wrote (was
+//! tools/art/blender/build.py).
 //!
 //!   cargo art kitchen                  build, export and register a family
 //!   cargo art kitchen --only fridge    one model of it (--only a,b: several)
@@ -28,11 +30,16 @@
 //! `--leafcards` renders the one atlas every tree's leaf cards are cut from (the `leafcards` finish), from
 //! leaves the script generates: run it after changing the script; the trees needn't be rebuilt for it.
 
-use crate::checkglb::py::{J, dumps_indent, join, json_str, normpath, relpath};
+use crate::checkglb::py::{dumps_indent, join, json_str, normpath, relpath};
 use crate::checkglb::{self, Paths};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 use std::process::Command;
+
+/// The JSON value a pack and a build's result are held in, and its reader: for the builds done in Rust
+/// (crates/art), which hand `take_build` what Blender's hand it.
+pub use crate::checkglb::json::loads_text as loads;
+pub use crate::checkglb::py::J;
 
 /// Blender: `$BLENDER`, the macOS app, or `blender` on PATH.
 pub fn blender() -> Result<String, String> {

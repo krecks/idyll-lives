@@ -1,0 +1,21 @@
+[package]
+name = "ll-art"
+description = "cargo art: builds the game's item models (the families ported to Rust here, the rest in Blender through ll-tools), writes their packs and runs the gate on them. Never shipped."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "art"
+path = "src/main.rs"
+
+[dependencies]
+artkit = { path = "../artkit" }
+art-nature = { path = "nature" }
+art-outside = { path = "outside" }
+art-packs = { path = "packs" }
+art-rooms = { path = "rooms" }
+art-things = { path = "things" }
+art-wet = { path = "wet" }
+ll-tools = { path = "../tools" }

@@ -1,0 +1,13 @@
+[package]
+name = "art-things"
+description = "The game's item models, generated: hobbies, the children's things, what is held or stands on a table, media, fitness and the birds. One folder a family."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+artkit = { path = "../../artkit" }

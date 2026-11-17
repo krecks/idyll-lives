@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/artkit", "crates/sim-core", "crates/sim-wasm", "crates/sound", "crates/sound-wasm", "crates/tools", "crates/voice", "crates/voice-wasm"]
+members = ["crates/art", "crates/art/nature", "crates/art/outside", "crates/art/packs", "crates/art/rooms", "crates/art/things", "crates/art/wet", "crates/artkit", "crates/sim-core", "crates/sim-wasm", "crates/sound", "crates/sound-wasm", "crates/tools", "crates/voice", "crates/voice-wasm"]
 
 [workspace.package]
 edition = "2024"
@@ -31,3 +31,20 @@ inherits = "release"
 lto = false
 codegen-units = 16
 incremental = true
+# (`cargo art` builds a thread a model and says which one failed: a panic unwinds to it.)
+panic = "unwind"
+
+# The generated models' families (crates/art/*): thousands of lines of calls, changed and built again all day, so
+# lightly optimised; the kernel they call (artkit) keeps the profile's level.
+[profile.tools.package.art-nature]
+opt-level = 1
+[profile.tools.package.art-outside]
+opt-level = 1
+[profile.tools.package.art-packs]
+opt-level = 1
+[profile.tools.package.art-rooms]
+opt-level = 1
+[profile.tools.package.art-things]
+opt-level = 1
+[profile.tools.package.art-wet]
+opt-level = 1

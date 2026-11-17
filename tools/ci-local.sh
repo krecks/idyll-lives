@@ -75,9 +75,9 @@ step() {
     # (The town-building files, `*.slow.test.ts`, only with SLOW_TESTS.)
     # (The tests that make sounds load the sounds' wasm: `bun run sound` builds it.)
     web) (cd web && "${bun_ci[@]}" install --frozen-lockfile && "${bun_ci[@]}" run sound && "${bun_ci[@]}" run test && if [[ -n "${SLOW_TESTS:-}" ]]; then "${bun_ci[@]}" run test:slow; fi) ;;
-    # The character build, the object gate and the content and texture tools, in the build the
-    # aliases above and below run (Cargo.toml's `tools` profile).
-    tools) cargo test -p ll-tools -p sound --profile tools --locked ;;
+    # The character build, the object gate, the models' kernel and runner, and the content and texture
+    # tools, in the build the aliases above and below run (Cargo.toml's `tools` profile).
+    tools) cargo test -p ll-tools -p sound -p artkit -p ll-art --profile tools --locked ;;
     # The PlayCanvas shader chunks' anchors and private names the renderer relies on (tools/render/chunks.json),
     # in the release build the game imports: its package, then the tools' check.
     chunks) (cd web && "${bun_ci[@]}" install --frozen-lockfile) && cargo check-chunks ;;
