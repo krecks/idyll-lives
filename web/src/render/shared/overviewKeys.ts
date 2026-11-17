@@ -36,8 +36,12 @@ export function townKey(world: WorldStructure, roads = roadKey(world)): string {
   ].join('|');
 }
 
-/** What a town's backdrop buildings are drawn from (`townBackdrop`): its buildings, its places' hours, and on a land it follows the surface's roads (as the road mesh is keyed: `roadKey`). */
+/**
+ * What a town's backdrop buildings are drawn from (`townBackdrop`): its buildings, its places' hours, its named places'
+ * lots' looks (drawn closed as backdrop buildings are, `lotLookBuilding`), and on a land it follows the surface's roads
+ * (as the road mesh is keyed: `roadKey`).
+ */
 export function backdropKey(world: WorldStructure): string {
   const surface = surfaceOf(world);
-  return `${hashString(JSON.stringify([world.meta?.backdrop ?? null, (world.meta?.places ?? []).map((p) => p.hours ?? null)]))}|${surface ? surface.roadsSig() : '-'}`;
+  return `${hashString(JSON.stringify([world.meta?.backdrop ?? null, (world.meta?.places ?? []).map((p) => p.hours ?? null), world.meta?.lotLooks ?? null]))}|${surface ? surface.roadsSig() : '-'}`;
 }

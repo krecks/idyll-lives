@@ -14,7 +14,7 @@
  * always gets the same fixture (seeded by `meta.seed`). Debug only: nothing outside `?ltFixture` calls it.
  */
 
-import type { BackdropBuilding, BackdropUse, RoadPlan, TownPlace, WorldMeta, WorldStructure } from '../core/protocol';
+import type { BackdropBuilding, BackdropUse, LotLook, RoadPlan, TownPlace, WorldMeta, WorldStructure } from '../core/protocol';
 import { groundDepth } from '../core/protocol';
 import { mulberry32 } from '../game/noise';
 import { lengths, pointAt } from '../game/roads';
@@ -52,6 +52,48 @@ export function applyLtFixture(world: WorldStructure): boolean {
   meta.centre ??= fx.centre;
   return true;
 }
+
+/**
+ * The named places' lots' looks (`?lotLooks`), until worldgen writes `meta.lotLooks`: every public lot with walls
+ * (a shop, a café, a place's lot) gets a look, the uses in turn (a school, a church, a hall, shops, an office, a
+ * workshop), each with its usual storeys and roof, so the street draws them closed as the backdrop does. A world with
+ * looks of its own is left alone. The same world always gets the same looks (one object, so the street keeps them).
+ */
+export function applyLotLooksFixture(world: WorldStructure): boolean {
+  const meta = world.meta;
+  if (!meta || (meta.lotLooks && !fixtureLooks.has(meta.lotLooks))) return false;
+  const lots = world.plots.flatMap((p, i) => (p.public && p.house ? [i] : []));
+  if (!lots.length) return false;
+  const key = `${meta.seed ?? 0}|${lots.join(',')}`;
+  let looks = madeLooks.get(key);
+  if (!looks) {
+    looks = {};
+    const rand = mulberry32(((meta.seed ?? 1) ^ 0x5a17c0de) >>> 0);
+    lots.forEach((i, k) => {
+      const [use, storeys, roof] = LOOK_TURNS[k % LOOK_TURNS.length];
+      looks![i] = { use, storeys, roof, look: Math.floor(rand() * 1024) };
+    });
+    madeLooks.set(key, looks);
+    fixtureLooks.add(looks);
+  }
+  meta.lotLooks = looks;
+  return true;
+}
+
+/** The fixture's looks in turn: a use, its storeys and its roof. */
+const LOOK_TURNS: readonly [BackdropUse, number, LotLook['roof']][] = [
+  ['school', 2, 'hip'],
+  ['church', 1, 'gable'],
+  ['hall', 2, 'hip'],
+  ['shop', 2, 'gable'],
+  ['cafe', 2, 'mansard'],
+  ['office', 3, 'flat'],
+  ['restaurant', 2, 'gable'],
+  ['workshop', 1, 'gable'],
+];
+/** The fixture's looks made, by world (its seed and its public lots), and the objects themselves (a world's own told apart). */
+const madeLooks = new Map<string, Record<number, LotLook>>();
+const fixtureLooks = new WeakSet<object>();
 
 /** The fixture for `world` (made once per world). */
 export function ltFixture(world: WorldStructure): LtFixture {

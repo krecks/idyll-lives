@@ -6,9 +6,9 @@
  * in, and a building added to a chunk plans only that chunk again.
  */
 import { describe, expect, test } from 'bun:test';
-import type { BackdropBuilding, PlotInfo, RoadPlan, WorldStructure } from '../src/core/protocol';
+import type { BackdropBuilding, LotLook, PlotInfo, RoadPlan, WorldStructure } from '../src/core/protocol';
 import { dressBackdrop, frontSide, PANE_SETS, paneSetLit } from '../src/render/shared/backdropDress';
-import { backdropBuilding } from '../src/render/shared/townBuildings';
+import { backdropBuilding, litAt, lotBuilding, STYLE } from '../src/render/shared/townBuildings';
 import type { Geo } from '../src/render/shared/geometry';
 
 const flat = () => 0;
@@ -187,5 +187,92 @@ describe('the backdrop in the street', async () => {
     street.setWorld(town([...houses, building('shop', 9, 8, 0, 125, 60, 'flat', 2)]));
     const changed = ids.filter((id) => street.chunkKey(id, -1) !== before.get(id));
     expect(changed).toEqual([chunkAt(125, 60)]);
+  });
+});
+
+/** `town` with lot 2 (x 40..60, its house 43..53 × 5..14, its street south of it) a named place's: `look`, its door at x 49..50. */
+function placeTown(look: LotLook | null, storeys = 1): WorldStructure {
+  const world = town([]);
+  const p = world.plots[2];
+  Object.assign(p, { public: true, name: 'School', ...(storeys > 1 ? { storeys } : {}) });
+  world.openings = [{ axis: 'h', x: 49, z: 14, kind: 'door' }] as WorldStructure['openings'];
+  world.meta!.places = [{ name: 'School', kind: 'school', x: 48, z: 14, plot: 2, hours: { open: 480, close: 960, days: 0b11111 }, area: 0 }];
+  if (look) world.meta!.lotLooks = { 2: look };
+  return world;
+}
+
+describe('a named place’s lot closed', async () => {
+  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' }, requestAnimationFrame: () => 0, window: { addEventListener: () => {}, removeEventListener: () => {} } });
+  const { HousePlanner } = await import('../src/render/shared/house');
+  const { TownStreet, lotDresses } = await import('../src/render/shared/street');
+  const { chunkAt } = await import('../src/render/shared/chunks');
+  const options = { has: () => true, entry: () => undefined, lived: true, ground: true, backdrop: true };
+  const school: LotLook = { use: 'school', storeys: 2, roof: 'hip', look: 5 };
+  const id = chunkAt(48, 9.5);
+
+  test('drawn as the backdrop building its look says, on its walls’ box, lit by its place’s hours; open, the game’s own', () => {
+    const street = new TownStreet(new HousePlanner(), placeTown(school), options, 'game');
+    const plan = street.chunk(id, -1);
+    const mine = plan.backdrop.filter((b) => Math.abs(b.t.cx - 48) < 0.01);
+    expect(mine.length).toBe(1);
+    const t = mine[0].t;
+    // Its walls' outer faces (43..53 × 5..14, half a wall out), two storeys, a hip roof along its longer side.
+    expect(t.w).toBeCloseTo(10.14, 2);
+    expect(t.d).toBeCloseTo(9.14, 2);
+    expect(t.cz).toBeCloseTo(9.5, 2);
+    expect(t.top - t.floor).toBeCloseTo(6, 6);
+    expect(t.roof).toBe('hip');
+    expect(t.hours).toEqual({ open: 480, close: 960, days: 0b11111 });
+    expect(plan.silhouettes.parts.some((p) => p.name === 'backdropRender' || p.name === 'silhouetteBrick')).toBe(true);
+    // Its door where the lot's own is (49..50 on its front wall, z 14), facing the street.
+    const trim = plan.silhouettes.parts.find((p) => p.name === 'silhouetteTrim')!.geo;
+    const knobs: [number, number][] = [];
+    for (let i = 0; i < trim.col.length / 4; i++) {
+      const c = trim.col;
+      if (Math.abs(c[i * 4] - KNOB[0]) <= 1 && Math.abs(c[i * 4 + 1] - KNOB[1]) <= 1 && Math.abs(c[i * 4 + 2] - KNOB[2]) <= 1) knobs.push([trim.pos[i * 3], trim.pos[i * 3 + 2]]);
+    }
+    const mid = knobs.filter(([x, z]) => x > 43 && x < 53 && z > 14);
+    expect(mid.length).toBe(16);
+    for (const [x] of mid) expect(Math.abs(x - 49.5)).toBeLessThan(1);
+    // The lot in view: none of it (the game draws its own walls, its real storeys alone).
+    expect(street.chunk(id, 2).backdrop.some((b) => Math.abs(b.t.cx - 48) < 0.01)).toBe(false);
+    // A shop without a look keeps its silhouette.
+    const plain = new TownStreet(new HousePlanner(), placeTown(null), options, 'game');
+    expect(plain.chunk(id, -1).backdrop.length).toBe(0);
+  });
+
+  test('a real upper floor over a lower look: as tall as its own storeys', () => {
+    const street = new TownStreet(new HousePlanner(), placeTown({ ...school, storeys: 1 }, 2), options, 'game');
+    const t = street.chunk(id, -1).backdrop.find((b) => Math.abs(b.t.cx - 48) < 0.01)!.t;
+    expect(t.top - t.floor).toBeCloseTo(6, 6);
+  });
+
+  test('its look changed plans only its chunk again; far off, the box from its look', () => {
+    const street = new TownStreet(new HousePlanner(), placeTown(school), options, 'game');
+    const ids = street.chunkIds();
+    const before = new Map(ids.map((c) => [c, street.chunkKey(c, -1)]));
+    street.setWorld(placeTown({ ...school, roof: 'flat', storeys: 3 }));
+    expect(ids.filter((c) => street.chunkKey(c, -1) !== before.get(c))).toEqual([id]);
+    // Far off: the town view's lot carries its look and hours; the street's far LOD a box as tall as its look.
+    const far = street.townHouses(-1).find((h) => h.plot.id === 2)!;
+    expect(far.dress).toEqual({ look: { ...school, roof: 'flat', storeys: 3 }, hours: { open: 480, close: 960, days: 0b11111 } });
+    const geo = street.farChunk(id, -1)!.geo;
+    let top = -Infinity;
+    for (let i = 0; i < geo.pos.length; i += 3) if (geo.pos[i] > 42.5 && geo.pos[i] < 53.5) top = Math.max(top, geo.pos[i + 1]);
+    expect(top).toBeCloseTo(9 + 0.7, 2);
+    expect(lotDresses(placeTown(null)).size).toBe(0);
+  });
+
+  test('the town view draws it from its look, lit by its hours', () => {
+    const h = { id: 2, chunk: id, box: [42.93, 4.93, 53.07, 14.07] as [number, number, number, number], storeys: 1, wall: '#ffffff', roof: '#000000', shape: 'gable' as const, rise: 2, pad: 0 };
+    const plain = lotBuilding(h, flat);
+    expect(plain.top).toBeCloseTo(3, 6);
+    const t = lotBuilding({ ...h, look: { use: 'church', storeys: 2, roof: 'gable', look: 0 }, hours: { open: 540, close: 1080, days: 127 } }, flat);
+    expect(t.top).toBeCloseTo(6, 6);
+    expect([t.roof, t.style]).toEqual(['gable', STYLE.church[0]]);
+    expect(litAt(t, 600, 0)).toBe(t.lit);
+    expect(litAt(t, 1200, 0)).toBeLessThan(t.lit);
+    // (The church's own stone and slate, as the backdrop's.)
+    expect(t.wall).not.toEqual(plain.wall);
   });
 });
