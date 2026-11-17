@@ -1,7 +1,7 @@
 //! Assembling a model from its parts: joining them into one mesh (or one per moving part), putting a moving
 //! part's origin on its hinge, standing the model on the floor and checking its size.
 
-use crate::math::{Axis, M4, P3, V3, mul_m4_m4m4, mul_m4_v3, radians, v3};
+use crate::math::{Axis, M4, P3, V3, mul_m4_m4m4, radians, v3};
 use crate::mesh::Mesh;
 use crate::scene::{self, Obj, meshes};
 use crate::{perch, uv};
@@ -60,9 +60,7 @@ pub fn join(parts: &[Obj], name: &str, origin: Option<P3>) -> Obj {
             let m = mul_m4_m4m4(&inverse, &other.matrix_world());
             let mut mesh = other.read(|o| o.mesh.clone());
             if !m.is_identity() {
-                for v in &mut mesh.verts {
-                    *v = mul_m4_v3(&m, *v);
-                }
+                mesh.transform(&m);
             }
             first.edit(|o| append(&mut o.mesh, &mesh));
             other.remove();

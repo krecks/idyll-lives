@@ -1,6 +1,7 @@
 //! The kernel the game's item models are generated with.
 #![forbid(unsafe_code)]
 
+pub mod bevel;
 pub mod bvh;
 pub mod family;
 pub mod far;
@@ -18,6 +19,7 @@ mod noise_tables;
 pub mod normals;
 pub mod parts;
 pub mod perch;
+pub mod place;
 pub mod py;
 pub mod rand;
 pub mod scene;

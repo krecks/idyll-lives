@@ -115,10 +115,30 @@ impl Mesh {
         (0..self.faces.len()).map(|f| self.face_normal(f)).collect()
     }
 
-    /// `mesh.transform(matrix)`: every point through it, single precision.
+    /// `mesh.transform(matrix)`: every point through it, single precision; the corners' own normals (a
+    /// bevel's) turn with it.
     pub fn transform(&mut self, m: &M4) {
         for v in &mut self.verts {
             *v = mul_m4_v3(m, *v);
+        }
+        if let Some(normals) = &mut self.normals {
+            let a = m.0;
+            // (a normal goes through the matrix's cofactors: its inverse transposed, but for the length)
+            let cof = |r: usize, c: usize| {
+                let (r1, r2, c1, c2) = ((r + 1) % 3, (r + 2) % 3, (c + 1) % 3, (c + 2) % 3);
+                a[c1][r1] * a[c2][r2] - a[c2][r1] * a[c1][r2]
+            };
+            let k: [[f32; 3]; 3] = std::array::from_fn(|r| std::array::from_fn(|c| cof(r, c)));
+            if k != [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]] {
+                for n in normals {
+                    let turned = V3::new(
+                        k[0][0] * n.x + k[0][1] * n.y + k[0][2] * n.z,
+                        k[1][0] * n.x + k[1][1] * n.y + k[1][2] * n.z,
+                        k[2][0] * n.x + k[2][1] * n.y + k[2][2] * n.z,
+                    );
+                    *n = normalize_v3(turned).0;
+                }
+            }
         }
     }
 

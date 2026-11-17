@@ -310,6 +310,66 @@ impl<A: crate::math::Num, B: crate::math::Num, C: crate::math::Num> From<(A, B, 
 }
 
 options! {
+    /// `swing`'s options.
+    Swing { seconds: f64 = 1.0, axis: crate::math::Axis = crate::math::Axis::Z, ease: Ease = Ease::Smooth, overshoot: f64 = OVERSHOOT }
+}
+
+/// A clip `clip` turning `obj` about its own `axis` (Blender) by `degrees` from rest. A door hinged on its right
+/// edge (seen from the front) opens with a negative angle about Z. `ease`: `Ease::BackOut` swings `overshoot`
+/// past open and settles back, as a door let go does; only where there's room past open (not a lid against a
+/// wall, a bed onto the floor).
+pub fn swing(obj: Obj, clip: &str, degrees: f64, o: Swing) -> Obj {
+    let i = o.axis.index();
+    let r = rest(obj, Path::Rotation, i);
+    let keys = [
+        (1, r),
+        (last_frame(o.seconds), r + crate::math::radians(degrees)),
+    ];
+    key_channel(obj, clip, Path::Rotation, i, &keys, o.ease, o.overshoot)
+}
+
+/// `motion::swing` with its options by name, as the family scripts wrote them: `swing!(obj, clip, degrees, key = value, ...)`.
+#[macro_export]
+macro_rules! swing {
+    ($obj:expr, $clip:expr, $degrees:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::motion::Swing::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::motion::swing($obj, $clip, $crate::forms::num($degrees), o)
+    }};
+}
+
+options! {
+    /// `slide`'s options.
+    Slide { seconds: f64 = 1.0, ease: Ease = Ease::Smooth }
+}
+
+/// A clip `clip` moving `obj` by `offset` (Blender x, y, z, metres) from rest: a drawer pulls out to the front
+/// with a negative y. `ease`: how it eases (`Ease`).
+pub fn slide(obj: Obj, clip: &str, offset: impl Into<crate::math::P3>, o: Slide) -> Obj {
+    let offset = offset.into().array();
+    for (i, &d) in offset.iter().enumerate() {
+        if d != 0.0 {
+            let r = rest(obj, Path::Location, i);
+            let keys = [(1, r), (last_frame(o.seconds), r + d)];
+            key_channel(obj, clip, Path::Location, i, &keys, o.ease, OVERSHOOT);
+        }
+    }
+    obj
+}
+
+/// `motion::slide` with its options by name, as the family scripts wrote them: `slide!(obj, clip, offset, key = value, ...)`.
+#[macro_export]
+macro_rules! slide {
+    ($obj:expr, $clip:expr, $offset:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::motion::Slide::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::motion::slide($obj, $clip, $offset, o)
+    }};
+}
+
+options! {
     /// `squash`'s options.
     Squash { seconds: f64 = 0.6, back: bool = false, split: f64 = 0.5 }
 }

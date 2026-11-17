@@ -1,13 +1,15 @@
 //! Forms: the shapes the primitives can't make, each one mesh part (Blender axes, metres), deterministic, with its
 //! material, as the shapes' builders are. A profile swept along a path (`sweep`: rails, piping, bent tube, a
 //! cabriole leg, a branch), rings lofted into a body (`loft`, `ring`: a bottle, a lamp base, a rounded cabinet),
-//! and what is done to a part after (`jitter`).
+//! an outline with holes extruded into a slab (`extrude`, `rounded_rect`, `smooth_outline`: a shaped apron, a
+//! headboard, a door with a window), and what is done to a part after (`bisect`, `jitter`).
 //!
 //! Smooth forms are shaded smooth with their edges over `angle` degrees kept sharp, so a cap or a square
 //! profile stays crisp without a bevel.
 
+use crate::bevel::{EdgeOrder, bevel_edges};
 use crate::materials::Mat;
-use crate::math::{self, Num, P3, TAU, V3, v3};
+use crate::math::{self, M4, Num, P3, TAU, V3, dot_v3, v3};
 use crate::mesh::{Mesh, UvWay};
 use crate::noise::noise;
 use crate::scene::{self, Obj};
@@ -27,6 +29,83 @@ pub fn circle(r: f64, verts: usize) -> Vec<(f64, f64)> {
             )
         })
         .collect()
+}
+
+/// A w × h rectangle with corners of radius `r` (`corner` segments each), centred, anticlockwise.
+pub fn rounded_rect(w: f64, h: f64, r: f64, corner: usize) -> Vec<(f64, f64)> {
+    let r = r.min(w / 2.0).min(h / 2.0);
+    let mut out = Vec::new();
+    for (cx, cy, a0) in [
+        (w / 2.0 - r, h / 2.0 - r, 0.0),
+        (-w / 2.0 + r, h / 2.0 - r, 90.0),
+        (-w / 2.0 + r, -h / 2.0 + r, 180.0),
+        (w / 2.0 - r, -h / 2.0 + r, 270.0),
+    ] {
+        for i in 0..=corner {
+            let a = math::radians(a0 + 90.0 * i as f64 / corner as f64);
+            out.push((cx + r * math::cos(a), cy + r * math::sin(a)));
+        }
+    }
+    dedupe(&out)
+}
+
+/// Chaikin's corner cutting: each pass replaces every corner by two points a quarter in, rounding it.
+pub fn smooth_outline(points: &[(f64, f64)], passes: usize, closed: bool) -> Vec<(f64, f64)> {
+    let mut pts = points.to_vec();
+    for _ in 0..passes {
+        let mut out = if closed { Vec::new() } else { vec![pts[0]] };
+        let n = pts.len();
+        for i in 0..if closed { n } else { n - 1 } {
+            // (in single precision, as the vectors it was written with)
+            let (a, b) = (pts[i], pts[(i + 1) % n]);
+            let mix = |ka: f32, kb: f32| {
+                (
+                    (a.0 as f32 * ka + b.0 as f32 * kb) as f64,
+                    (a.1 as f32 * ka + b.1 as f32 * kb) as f64,
+                )
+            };
+            out.push(mix(0.75, 0.25));
+            out.push(mix(0.25, 0.75));
+        }
+        if !closed {
+            out.push(pts[n - 1]);
+        }
+        pts = out;
+    }
+    pts
+}
+
+/// Whether 2D point `p` is inside the closed `outline` (even-odd).
+fn inside(p: (f64, f64), outline: &[(f64, f64)]) -> bool {
+    let (x, y) = p;
+    let mut inside = false;
+    for i in 0..outline.len() {
+        let ((x0, y0), (x1, y1)) = (outline[i], outline[(i + 1) % outline.len()]);
+        if (y0 > y) != (y1 > y) && x < x0 + (y - y0) * (x1 - x0) / (y1 - y0) {
+            inside = !inside;
+        }
+    }
+    inside
+}
+
+/// The points without those that repeat the one before (or, the last, the first).
+fn dedupe(pts: &[(f64, f64)]) -> Vec<(f64, f64)> {
+    let eps = 1e-7;
+    // (how far apart as single-precision vectors are)
+    let apart = |a: (f64, f64), b: (f64, f64)| {
+        let (x, y) = (a.0 as f32 - b.0 as f32, a.1 as f32 - b.1 as f32);
+        ((y * y) as f64 + (x * x) as f64).sqrt()
+    };
+    let mut out: Vec<(f64, f64)> = Vec::new();
+    for &p in pts {
+        if out.last().is_none_or(|&last| apart(p, last) > eps) {
+            out.push(p);
+        }
+    }
+    if out.len() > 2 && apart(out[0], out[out.len() - 1]) <= eps {
+        out.pop();
+    }
+    out
 }
 
 // ---- paths --------------------------------------------------------------------------------------------
@@ -308,7 +387,274 @@ pub fn loft(name: impl AsRef<str>, sections: &[Vec<P3>], o: Loft) -> Obj {
     obj.set_location(o.at).set_rotation(o.rot)
 }
 
+// ---- slabs --------------------------------------------------------------------------------------------
+
+/// Where an outline is drawn.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Plane {
+    /// Facing the front: u across, v up, thick front to back (an apron, a headboard, a chair's back).
+    #[default]
+    XZ,
+    /// Lying flat: thick upwards (a shaped top, a tray).
+    XY,
+    /// Facing the side: u back to front, v up (a chair's side, a rocker).
+    YZ,
+}
+
+impl Plane {
+    /// (Blender axis of its u, of its v, of the thickness).
+    fn axes(self) -> (usize, usize, usize) {
+        match self {
+            Plane::XZ => (0, 2, 1),
+            Plane::XY => (0, 1, 2),
+            Plane::YZ => (1, 2, 0),
+        }
+    }
+}
+
+/// The outlines inside a slab's outline that are cut out of it.
+#[derive(Clone, Debug, Default)]
+pub struct Holes(pub Vec<Vec<(f64, f64)>>);
+
+impl crate::Arg<Holes> for Vec<Vec<(f64, f64)>> {
+    fn arg(self) -> Holes {
+        Holes(self)
+    }
+}
+impl crate::Arg<Holes> for &[Vec<(f64, f64)>] {
+    fn arg(self) -> Holes {
+        Holes(self.to_vec())
+    }
+}
+impl<const N: usize> crate::Arg<Holes> for [Vec<(f64, f64)>; N] {
+    fn arg(self) -> Holes {
+        Holes(self.to_vec())
+    }
+}
+
+options! {
+    /// `extrude`'s options.
+    Extrude { at: P3 = P3::ZERO, material: Option<Mat> = None, holes: Holes = Holes(Vec::new()), plane: Plane = Plane::XZ, rot: P3 = P3::ZERO, bevel: f64 = 0.0, bevel_segments: usize = 2, smooth: bool = false, angle: f64 = SHARP }
+}
+
+/// A slab `depth` thick from a closed 2D `outline` [(u, v), ...] and any `holes` (outlines inside it): the
+/// outline's (0, 0) goes on `at`, and the slab is centred on it through its thickness. `plane` is where the
+/// outline is drawn (`Plane`). `bevel` rounds its edges, as the primitives' do.
+///
+/// Its two faces are cut into triangles as Blender cut them (`tri::fill`): a bevel follows the cuts.
+pub fn extrude(name: impl AsRef<str>, outline: &[(f64, f64)], depth: f64, o: Extrude) -> Obj {
+    let name = name.as_ref();
+    let loops: Vec<Vec<(f64, f64)>> = std::iter::once(outline)
+        .chain(o.holes.0.iter().map(Vec::as_slice))
+        .map(dedupe)
+        .collect();
+    let flat: Vec<Vec<[f32; 2]>> = loops
+        .iter()
+        .map(|l| l.iter().map(|p| [p.0 as f32, p.1 as f32]).collect())
+        .collect();
+    let xy: Vec<[f32; 2]> = flat.iter().flatten().copied().collect();
+    let n = xy.len() as u32;
+    // the fill covers the holes too: take out what lies inside one
+    let tris: Vec<[u32; 3]> = crate::tri::fill(&flat)
+        .into_iter()
+        .filter(|t| {
+            let (a, b, c) = (xy[t[0] as usize], xy[t[1] as usize], xy[t[2] as usize]);
+            let third = 1.0_f32 / 3.0;
+            let centre = (
+                ((a[0] + b[0] + c[0]) * third) as f64,
+                ((a[1] + b[1] + c[1]) * third) as f64,
+            );
+            !o.holes.0.iter().any(|h| inside(centre, h))
+        })
+        .collect();
+    // one face at -depth / 2, its copy at +depth / 2, and a wall along every side of the outlines
+    let (iu, iv, iw) = o.plane.axes();
+    let half = -(depth / 2.0) as f32;
+    let (lo, hi) = (0.0_f32 + half, depth as f32 + half);
+    let mut verts = Vec::with_capacity(2 * xy.len());
+    for w in [lo, hi] {
+        for p in &xy {
+            let mut co = [0.0_f32; 3];
+            (co[iu], co[iv], co[iw]) = (p[0], p[1], w);
+            verts.push(V3::new(co[0], co[1], co[2]));
+        }
+    }
+    let mut faces: Vec<Vec<u32>> = tris.iter().map(|t| t.to_vec()).collect();
+    faces.extend(tris.iter().map(|t| vec![t[0] + n, t[1] + n, t[2] + n]));
+    let mut rims = Vec::new();
+    let mut at = 0u32;
+    for l in &loops {
+        let m = l.len() as u32;
+        for i in 0..m {
+            let (a, b) = (at + i, at + (i + 1) % m);
+            faces.push(vec![a, b, b + n, a + n]);
+            rims.push((a, b));
+        }
+        at += m;
+    }
+    // (Blender numbers the outlines' sides first, a face's before its copy's: a rim's bevel starts from them)
+    let order: Vec<(u32, u32)> = rims
+        .iter()
+        .copied()
+        .chain(rims.iter().map(|&(a, b)| (a + n, b + n)))
+        .collect();
+    let mut mesh = Mesh::from_pydata(verts, &faces);
+    mesh.set_material(o.material);
+    mesh.recalc_normals();
+    let obj = scene::add(name, mesh);
+    shade(obj, o.smooth, o.angle);
+    if o.bevel != 0.0 {
+        bevel_edges(
+            obj,
+            o.bevel,
+            o.bevel_segments,
+            30.0,
+            &EdgeOrder::Listed(order),
+        );
+    }
+    obj.set_location(o.at).set_rotation(o.rot)
+}
+
+/// `forms::extrude` with its options by name, as the family scripts wrote them: `extrude!(name, outline, depth, key = value, ...)`.
+#[macro_export]
+macro_rules! extrude {
+    ($name:expr, $outline:expr, $depth:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::forms::Extrude::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::forms::extrude($name, $outline, $depth, o)
+    }};
+}
+
 // ---- after making -------------------------------------------------------------------------------------
+
+/// Cuts `obj` (in place) by the plane through `co` facing `no` (Blender world), dropping what lies in front
+/// of it; `cap` closes the cut with a flat face of its own: half of a lofted disc, a fracture across a stone,
+/// a lump cut off at the ground. For a closed mesh; a point within a tenth of a millimetre of the plane is on it.
+pub fn bisect(obj: Obj, co: impl Into<P3>, no: impl Into<P3>, cap: bool) -> Obj {
+    let world = obj.matrix_world();
+    let back = world.inverted().unwrap_or(M4::IDENTITY);
+    let (co, no): (V3, V3) = (co.into().into(), no.into().into());
+    let no = no.normalized();
+    obj.edit(|part| {
+        let old = &part.mesh;
+        let dist = 0.0001_f32;
+        // which side of the plane each point is on: -1 behind (kept), 0 on it, 1 in front
+        let at: Vec<V3> = old
+            .verts
+            .iter()
+            .map(|&v| if world.is_identity() { v } else { world * v })
+            .collect();
+        let d: Vec<f32> = at.iter().map(|&p| dot_v3(no, p - co)).collect();
+        let side: Vec<i8> = d
+            .iter()
+            .map(|&x| {
+                if x > dist {
+                    1
+                } else if x < -dist {
+                    -1
+                } else {
+                    0
+                }
+            })
+            .collect();
+        let mut new = Mesh {
+            mats: old.mats.clone(),
+            ..Mesh::default()
+        };
+        let mut kept = vec![u32::MAX; old.verts.len()];
+        for (i, &p) in at.iter().enumerate() {
+            if side[i] <= 0 {
+                kept[i] = new.verts.len() as u32;
+                new.verts.push(p);
+            }
+        }
+        // the point where an edge crosses the plane, made once
+        let mut crossings: std::collections::BTreeMap<(u32, u32), u32> =
+            std::collections::BTreeMap::new();
+        let mut cross = |new: &mut Mesh, a: u32, b: u32| -> u32 {
+            let key = crate::mesh::edge(a, b);
+            *crossings.entry(key).or_insert_with(|| {
+                let (da, db) = (d[key.0 as usize].abs(), d[key.1 as usize].abs());
+                let t = da / (da + db);
+                let (p, q) = (at[key.0 as usize], at[key.1 as usize]);
+                let s = 1.0 - t;
+                new.verts.push(V3::new(
+                    s * p.x + t * q.x,
+                    s * p.y + t * q.y,
+                    s * p.z + t * q.z,
+                ));
+                new.verts.len() as u32 - 1
+            })
+        };
+        // each face: its corners behind the plane, with the crossings where it goes through
+        let mut cut_edges: Vec<(u32, u32)> = Vec::new();
+        for f in 0..old.faces.len() {
+            let c = old.corners(f);
+            let n = c.len();
+            let mut out: Vec<u32> = Vec::new();
+            let mut on_plane: Vec<u32> = Vec::new();
+            for i in 0..n {
+                let (a, b) = (c[i], c[(i + 1) % n]);
+                let (sa, sb) = (side[a as usize], side[b as usize]);
+                if sa <= 0 {
+                    out.push(kept[a as usize]);
+                    if sa == 0 {
+                        on_plane.push(kept[a as usize]);
+                    }
+                }
+                if sa * sb < 0 {
+                    let x = cross(&mut new, a, b);
+                    out.push(x);
+                    on_plane.push(x);
+                }
+            }
+            let behind = c.iter().any(|&v| side[v as usize] < 0);
+            if out.len() >= 3 && behind {
+                // the side of it that lies along the plane, as the face runs it
+                for i in 0..out.len() {
+                    let (a, b) = (out[i], out[(i + 1) % out.len()]);
+                    if on_plane.contains(&a) && on_plane.contains(&b) && a != b {
+                        cut_edges.push((a, b));
+                    }
+                }
+                new.push_face(&out, old.faces[f].mat, old.faces[f].smooth);
+            }
+        }
+        if cap {
+            // the cut's edges chained into loops, each run against the faces' way so the cap looks out
+            let mut next: std::collections::BTreeMap<u32, u32> = std::collections::BTreeMap::new();
+            for &(a, b) in &cut_edges {
+                next.insert(b, a);
+            }
+            while let Some((&start, _)) = next.iter().next() {
+                let mut ring = vec![start];
+                let mut v = start;
+                while let Some(w) = next.remove(&v) {
+                    if w == start {
+                        break;
+                    }
+                    ring.push(w);
+                    v = w;
+                }
+                if ring.len() >= 3 {
+                    new.push_face(&ring, 0, false);
+                }
+            }
+        }
+        if !world.is_identity() {
+            new.verts.iter_mut().for_each(|v| *v = back * *v);
+        }
+        new.sharp = old
+            .sharp
+            .iter()
+            .filter(|e| kept[e.0 as usize] != u32::MAX && kept[e.1 as usize] != u32::MAX)
+            .map(|e| crate::mesh::edge(kept[e.0 as usize], kept[e.1 as usize]))
+            .collect();
+        part.mesh = new;
+    });
+    obj
+}
 
 options! {
     /// `jitter`'s options.
