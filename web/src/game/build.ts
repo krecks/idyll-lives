@@ -31,7 +31,7 @@
 
 import type { Content } from '../content/content';
 import type { BackdropUse, RoadPlan, TownArea } from '../core/protocol';
-import { BackdropPass, civicChoices, CIVIC, facesRoad } from './backdrop';
+import { BackdropPass, civicChoices, facesRoad, type Row } from './backdrop';
 import { roadKey } from './edit/buildup';
 import { frontOf, inCentre, townGround } from './edit/ground';
 import { removeLots, renumber, withLotPlace } from './edit/lots';
@@ -39,15 +39,15 @@ import { roadReach, usesOfDraft } from './edit/uses';
 import { encodeLand, heightAt } from './land';
 import { openUnderBuilt, settleLand } from './landFollow';
 import { unrle } from './landMasks';
-import { AREA_APART, cells8, cornersOf, grown, hamletOf, parkingFor, terraceRows, trailTo, type AreaPlan } from './macro';
+import { AREA_APART, BEND, BEND_MOST, cells8, cornersOf, grown, hamletOf, parkingFor, rowHouse, trailTo, type AreaPlan } from './macro';
 import { mulberry32 } from './noise';
-import { BUILD_REACH, fronted, greenSpots, hatched, stretchesOf, type Stretch } from './proposal';
-import { inside, lengths, leftOf, pointAt, RoadIndex, type Pt } from './roads';
-import { boundsOf, frontageOf, generatedHouses, Ground, lotAt, LotPlacer, plotRect, slotDims, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates, type Unplaced } from './town';
+import { fronted, greenSpots, hatched, SPOT_NEAR, stretchesOf, type Stretch } from './proposal';
+import { inside, lengths, leftOf, pointAt, RoadIndex, straightAround, type Pt } from './roads';
+import { boundsOf, frontageOf, generatedHouses, Ground, lotAt, LotPlacer, plotRect, slotDims, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { previewWorld } from './townPreview';
 import type { LaidTown, Proposal } from './townJobs';
 import { layoutHash, unpackUses, USE_CELL, USE_CODE, type UseKind } from './uses';
-import { placeOf, specOf, type WorldSpec } from './world';
+import { placeOf, specOf, type SizeSpec, type WorldSpec } from './world';
 
 type Rand = () => number;
 
@@ -64,19 +64,29 @@ const NEAR_AREA = 30;
 const VILLAGE_CELLS = 100;
 /** A village keeps this many lots at least (`townCheck.ts`); a new one with fewer is folded into the nearest area. */
 const VILLAGE_LOTS = 4;
-/** The share of a terraces-and-flats stretch its terraced rows take (the backdrop's rows the rest). */
-const TERRACE_SHARE = 0.5;
-/** A terraced house's frontage, about (m). */
-const TERRACE_FRONT = 10;
-/** The backdrop's kinds along terraces and flats, and along shops and work. */
-const ROW_KINDS: readonly BackdropUse[] = ['house', 'terrace', 'flats'];
-const SHOP_KINDS: readonly BackdropUse[] = ['shop', 'cafe', 'restaurant', 'office', 'workshop'];
-/** The shop lots an area with shops and none of its own is given one of, and a green stretch's lots, in turn. */
+/** A patch of green the lots leave this big at least (cells) is given an outdoor spot if it has room for one. */
+const SPOT_LEAST = 9;
+/** How far behind the kerb (m) a road's frontage is read for what goes along it. */
+const PROBES = [4, 8, 12] as const;
+/** The backdrop's buildings each use is built with (by use code): homes, terraces and flats, shops and work, (none on a green), public places. */
+const BUILDINGS: readonly (readonly BackdropUse[] | null)[] = [null, ['house'], ['terrace', 'flats'], ['shop', 'cafe', 'restaurant', 'office', 'workshop'], null, ['hall']];
+/** Which use each kind of backdrop building goes on (as `proposal.ts` paints it). */
+const USE_OF: Partial<Record<BackdropUse, UseKind>> = { house: 'homes', terrace: 'rows', flats: 'rows', shop: 'shops', cafe: 'shops', restaurant: 'shops', office: 'shops', workshop: 'shops', hall: 'public', church: 'public', school: 'public' };
+/** The shop lots an area with shops and none of its own is given one of, and a green stretch's lots. */
 const SHOP_LOTS = ['grocer', 'bakery', 'cafe'];
 const GREEN_LOTS = ['park', 'playground'];
-/** A civic place is tried at frontage this far apart along its stretch (m), and at so many places at most. */
-const CIVIC_STEP = 4;
-const CIVIC_TRIES = 200;
+/** Public frontage is read in runs this many metres a step. */
+const RUN_STEP = 2;
+/** A civic place goes on a run of public frontage this much of its kind's narrowest at least; as wide as a run no longer than `CIVIC_SNUG` times its kind's widest (no wider than that widest), else as wide as its kind is. */
+const CIVIC_SHORT = 0.8;
+const CIVIC_SNUG = 1.25;
+/** Of land newly painted terraces and flats, the share terraced lots take (the backdrop's terraces and flats the rest), and a terraced lot's ground, about (m²). */
+const TERRACE_SHARE = 0.5;
+const TERRACE_LOT = 220;
+/** Houses drawn in a row that fit nowhere before an area's houses are done. */
+const HOUSE_MISSES = 8;
+/** The blocks are filled in a building every so far (m) over the land painted for one and not built on. */
+const INFILL_APART = 10;
 
 // ---- streams ----------------------------------------------------------------------------------------
 
@@ -92,7 +102,6 @@ function mix(seed: number, ...words: (string | number)[]): number {
   return h >>> 0;
 }
 
-const range = (rand: Rand, lo: number, hi: number) => lo + (hi - lo) * rand();
 const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const offRect = (r: Rect, [x, z]: Pt) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 const middle = (a: Rect): Pt => [a.x + a.w / 2, a.z + a.d / 2];
@@ -391,6 +400,22 @@ function placePainted(placer: LotPlacer, t: Templates, roads: readonly RoadPlan[
   return n;
 }
 
+/**
+ * A row of terraced houses `units` along the first of `frontage` where the whole row fits as one lot (`lotAt`,
+ * snug) on land painted terraces and flats (`painted`), put down by `LotPlacer.placeRow`; none if it fits nowhere.
+ */
+function rowAlong(placer: LotPlacer, t: Templates, roads: readonly RoadPlan[], units: readonly Unplaced[], frontage: readonly Frontage[], codes: Uint8Array, cols: number, rows: number): PlotSlot[] {
+  const total = units.reduce((n, u) => n + slotDims(t, u).width, 0);
+  const depth = Math.max(...units.map((u) => slotDims(t, u).depth));
+  for (const f of frontage) {
+    const at = lotAt(placer.ground, roads[f.road], f, total, depth, true);
+    if (!at || !painted(codes, rectCells(plotRect(t, { lot: 'terrace', w: total, d: depth, ...at }), cols, rows), 'rows')) continue;
+    const placed = placer.placeRow(units, [f], units[0].area);
+    if (placed.length) return placed;
+  }
+  return [];
+}
+
 /** The smallest home's lot (m along its road, m deep), for `roomAlong`. */
 const SMALLEST: readonly [number, number] = [12, 16];
 
@@ -403,11 +428,75 @@ function roomAlong(placer: LotPlacer, roads: readonly RoadPlan[], frontage: read
   });
 }
 
-/** The outdoor places by the land they want (`PublicTemplate.site`). */
-function outdoorFor(t: Templates, site: 'water' | 'woods' | 'hill' | 'meadow', rand: Rand) {
-  const list = t.parks.filter((p) => p.kind === 'outdoor' && (p.site ?? 'meadow') === site);
-  const all = list.length ? list : t.parks.filter((p) => p.kind === 'outdoor');
-  return all.length ? all[Math.floor(rand() * all.length)] : null;
+/**
+ * Where outdoor place `place` goes on a patch of green (`cells`, of a grid `cols` wide), as `macro.ts` `siteFor`
+ * scores a site: by the water (its back to it), up a hill, in the woods (five of the nine cells round it wooded),
+ * in a meadow; facing the area's middle `home` (its trail comes from there) or away from the water; on land nothing
+ * takes (`ground`), dry, painted green (`SHARE` of `codes`' cells under it), and (`reach`, for a green with no
+ * frontage) no nearer a road than `SPOT_NEAR`. Its rectangle's corner and facing; null if it has no site there.
+ */
+function siteIn(place: PublicTemplate, cells: readonly number[], home: Pt, land: ReturnType<typeof cells8>, water: Uint8Array, ground: Ground, t: Templates, codes: Uint8Array, cols: number, rows: number, W: number, D: number, reach: Float32Array | null): { x: number; z: number; facing: Facing } | null {
+  const frame = place.lot ?? t.plot;
+  const wet = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < D && water[Math.floor(z) * W + Math.floor(x)] === 1;
+  let best: { at: { x: number; z: number; facing: Facing }; score: number } | null = null;
+  for (const k of cells) {
+    const c = cellMid(k, cols);
+    let n: Pt = [c[0] - home[0], c[1] - home[1]];
+    let score = 0;
+    if (place.site === 'water') {
+      let [sx, sz, hits] = [0, 0, 0];
+      for (let a = 0; a < 16; a++) {
+        const [dx, dz] = [Math.cos((a / 16) * Math.PI * 2), Math.sin((a / 16) * Math.PI * 2)];
+        if (wet(c[0] + dx * 16, c[1] + dz * 16)) [sx, sz, hits] = [sx + dx, sz + dz, hits + 1];
+      }
+      if (!hits || hits > 9) continue;
+      n = [sx, sz];
+      score = -hits;
+    } else if (place.site === 'hill') score = -land.at(c[0], c[1]) + land.slope(land.cell(c[0], c[1])) * 60;
+    else if (place.site === 'woods') {
+      let trees = 0;
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) trees += land.woods[land.cell(c[0] + dx * 16, c[1] + dz * 16)];
+      if (trees < 5) continue;
+      score = -trees + land.slope(land.cell(c[0], c[1])) * 60;
+    } else score = land.woods[land.cell(c[0], c[1])] * 4 + land.slope(land.cell(c[0], c[1])) * 60;
+    // (Nearer the patch's own middle the better, a little: a tie goes to the middle.)
+    if (best && score >= best.score) continue;
+    const facing = (Math.abs(n[1]) >= Math.abs(n[0]) ? (n[1] > 0 ? 0 : 2) : n[0] > 0 ? 1 : 3) as Facing;
+    const [w, d] = facing % 2 ? [frame.depth, frame.width] : [frame.width, frame.depth];
+    const r = { x: Math.round(c[0] - w / 2), z: Math.round(c[1] - d / 2), w, d };
+    if (!ground.free({ x: r.x - 3, z: r.z - 3, w: r.w + 6, d: r.d + 6 }, 8)) continue;
+    if (land.wet(c[0], c[1], 0) || [0, 0.5, 1].some((u) => [0, 0.5, 1].some((q) => wet(r.x - 2 + (r.w + 4) * u, r.z - 2 + (r.d + 4) * q)))) continue;
+    const under = rectCells(r, cols, rows);
+    if (!painted(codes, under, 'green') || (reach && under.some((q) => reach[q] <= SPOT_NEAR))) continue;
+    best = { at: { x: r.x, z: r.z, facing }, score };
+  }
+  return best?.at ?? null;
+}
+
+/** The patches of green in `codes` (a grid `cols` × `rows`; cells side by side) but the cells of `taken`, in the grid's order. */
+function greenPatches(codes: Uint8Array, cols: number, rows: number, taken: readonly number[]): number[][] {
+  const seen = new Uint8Array(codes.length);
+  for (const k of taken) seen[k] = 1;
+  const out: number[][] = [];
+  for (let k0 = 0; k0 < codes.length; k0++) {
+    if (seen[k0] || codes[k0] !== USE_CODE.green) continue;
+    const cells: number[] = [];
+    const stack = [k0];
+    seen[k0] = 1;
+    while (stack.length) {
+      const k = stack.pop()!;
+      cells.push(k);
+      const [i, j] = [k % cols, Math.floor(k / cols)];
+      for (const [a, b] of [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]) {
+        const n = b * cols + a;
+        if (a < 0 || b < 0 || a >= cols || b >= rows || seen[n] || codes[n] !== USE_CODE.green) continue;
+        seen[n] = 1;
+        stack.push(n);
+      }
+    }
+    out.push(cells);
+  }
+  return out;
 }
 
 /**
@@ -490,21 +579,152 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   for (const v of made.villages) touched.add(v);
   if (full) areas.forEach((_, a) => touched.add(a));
 
-  // ---- the lots ----
-  // (Each changed area's parking is laid again after: out of the lots' way till then.)
+  // (Each changed area's parking is laid again after: out of the way of what is built till then.)
   draft = { ...draft, open: { ...draft.open!, parking: draft.open!.parking.filter((q) => !touched.has(q.area)) } };
+
+  // ---- where new things go: the land painted a use, and to be built again ----
+  const mask = new Uint8Array(codes.length);
+  for (let k = 0; k < codes.length; k++) if (dirty[k]) mask[k] = codes[k];
+  const codeAt = (x: number, z: number) => {
+    const [ci, cj] = [Math.floor(x / USE_CELL), Math.floor(z / USE_CELL)];
+    return ci >= 0 && cj >= 0 && ci < cols && cj < rows ? mask[cj * cols + ci] : 0;
+  };
+  /** Whether the land `PROBES` behind the kerb at `p` (`n`: away from road `r`) is painted `kind` anywhere. */
+  const behind = (r: number, p: Pt, n: Pt, kind: UseKind) => {
+    const [code, half] = [USE_CODE[kind], roads[r].width / 2];
+    return PROBES.some((b) => codeAt(p[0] + n[0] * (half + b), p[1] + n[1] * (half + b)) === code);
+  };
+  const paintedPoly = (poly: readonly Pt[], kind: UseKind) => painted(mask, polyCells(poly, cols, rows), kind);
+  /** How deep the land painted `kind` reaches back from road `r` at `s` on `side` (m, from 3 m past its edge, where a civic place's front is). */
+  const deepAt = (r: number, s: number, side: 1 | -1, kind: UseKind) => {
+    const { p, t: tt } = pointAt(roads[r].points, s);
+    const n = leftOf(tt).map((v) => v * side);
+    const from = roads[r].width / 2 + 3;
+    let d = 0;
+    while (d < 60 && codeAt(p[0] + n[0] * (from + d + 1), p[1] + n[1] * (from + d + 1)) === USE_CODE[kind]) d++;
+    return d + 1;
+  };
+  const kindsAt = (p: Pt) => BUILDINGS[codeAt(p[0], p[1])] ?? null;
+
+  // ---- the frontage, area by area: each area's roads, and a country road's nearest the area ----
+  // (Each area's nearest its middle first, with a little noise, as `frontageOf` sorts it; only what is painted behind.)
   const spec = specFor(draft);
+  const frontedRoads = roads.flatMap((r, i) => (fronted(r) ? [i] : []));
+  // (No lot by a junction or on a tight bend of the areas' roads; along a country road, where it runs straight, as the generator spills lots out along one.)
+  const offCorners = cornersOf(roads, frontedRoads.filter((r) => roads[r].kind !== 'country'));
+  const lens = new Map(frontedRoads.map((r) => [r, lengths(roads[r].points)]));
+  const corners = (f: Frontage) => (roads[f.road].kind === 'country' ? straightAround(roads[f.road].points, f.s, BEND, BEND_MOST, lens.get(f.road)) : offCorners(f));
+  const byArea: Frontage[][] = areas.map(() => []);
+  for (const f of frontageOf(roads, frontedRoads, [0, 0], () => 0)) {
+    if (PROBES.some((b) => codeAt(f.p[0] + f.n[0] * (roads[f.road].width / 2 + b), f.p[1] + f.n[1] * (roads[f.road].width / 2 + b)))) byArea[roads[f.road].area ?? nearestArea(f.p)].push(f);
+  }
+  // (The roads with land painted along them, either side: the backdrop and the civic places go on a side lots don't, as the generator lays them.)
+  const builtAlong = new Set(frontedRoads.filter((r) => {
+    const road = roads[r];
+    const ls = lengths(road.points);
+    for (let s = 2; s < ls[ls.length - 1]; s += 4) {
+      const { p, t: tt } = pointAt(road.points, s, ls);
+      const n = leftOf(tt);
+      if ([1, -1].some((side) => PROBES.some((b) => codeAt(p[0] + n[0] * side * (road.width / 2 + b), p[1] + n[1] * side * (road.width / 2 + b))))) return true;
+    }
+    return false;
+  }));
+  byArea.forEach((list, a) => {
+    const rand = mulberry32(mix(seed, 'frontage', areas[a].name));
+    const mid = middle(areas[a]);
+    for (const f of list) f.far = dist(f.p, mid) + rand() * 10;
+    list.sort((x, y) => x.far - y.far);
+  });
+  const heartOf = (a: number): Pt => {
+    const c = draft.open!.centre?.find((q) => q.area === a && q.poly.length >= 3);
+    return c ? centroidOf(c.poly) : middle(areas[a]);
+  };
+  const wanted = (a: number) => byArea[a].length > 0 && (full || touched.has(a));
+
+  // ---- the civic places: those each area lacks (`civicChoices`), the most needed first, nearest its heart, where painted public ----
+  // (The public frontage in runs along each road's side, m along it, each with the area it is nearest and what civic places take of it.)
+  const publicRuns: { r: number; side: 1 | -1; s0: number; s1: number; mid: Pt; area: number; taken: [number, number][] }[] = [];
+  for (const r of frontedRoads) {
+    if (!builtAlong.has(r)) continue;
+    const road = roads[r];
+    const ls = lengths(road.points);
+    const L = ls[ls.length - 1];
+    for (const side of [1, -1] as const) {
+      let s0 = -1;
+      const close = (s1: number) => {
+        const mid = pointAt(road.points, (s0 + s1) / 2, ls).p;
+        publicRuns.push({ r, side, s0, s1, mid, area: road.area ?? nearestArea(mid), taken: [] });
+        s0 = -1;
+      };
+      for (let s = RUN_STEP; s <= L - RUN_STEP; s += RUN_STEP) {
+        const { p, t: tt } = pointAt(road.points, s, ls);
+        const on = behind(r, p, leftOf(tt).map((v) => v * side) as Pt, 'public');
+        if (on && s0 < 0) s0 = s - RUN_STEP / 2;
+        else if (!on && s0 >= 0) close(s - RUN_STEP / 2);
+      }
+      if (s0 >= 0) close(L - RUN_STEP / 2);
+    }
+  }
+  /** The civic places area `a` of `from` lacks (`civicChoices`), the most needed first, each on the run of public frontage nearest the area's heart it fits snugly (else any it fits), as wide as the run lets it be. The buildings laid. */
+  const civicIn = (pass: BackdropPass, from: NeighbourhoodDraft, a: number): number[] => {
+    const heart = heartOf(a);
+    const runs = publicRuns.filter((q) => q.area === a).sort((x, y) => dist(x.mid, heart) - dist(y.mid, heart));
+    if (!runs.length) return [];
+    const rand = mulberry32(mix(seed, 'civic', areas[a].name, pass.count));
+    const laid: number[] = [];
+    pass.allow = (poly) => paintedPoly(poly, 'public');
+    for (const c of civicChoices(from, a)) {
+      const [w0, w1] = c.w;
+      let at = -1;
+      for (const run of runs) {
+        const ls = lengths(roads[run.r].points);
+        const near = (s: number) => dist(pointAt(roads[run.r].points, s, ls).p, heart);
+        for (const [u0, u1] of freeOf(run.s0, run.s1, run.taken)) {
+          const len = u1 - u0;
+          if (len < w0 * CIVIC_SHORT) continue;
+          // (As wide as a run that just holds it; else as its kind is, at the run's end nearer the heart, as the generator packs them.)
+          // (Nudged along the run and made shallower and narrower where it doesn't quite fit: against a square, say.)
+          const w = len <= w1 * CIVIC_SNUG ? Math.min(w1, Math.max(w0 * CIVIC_SHORT, len - 1)) : w0 + (w1 - w0) * rand();
+          const dir = near(u0 + w / 2) <= near(u1 - w / 2) ? 1 : -1;
+          let s = 0;
+          for (const [ww, shift] of [[w, 0], [w, 2], [w, 4], [Math.max(w0 * CIVIC_SHORT, w - 2), 1]]) {
+            if (at >= 0 || ww + shift > len) continue;
+            s = dir > 0 ? u0 + shift + ww / 2 : u1 - shift - ww / 2;
+            // (No deeper than the public land is there, as far as its kind allows.)
+            const deep = Math.max(c.d[0] * CIVIC_SHORT, Math.min(c.d[1], deepAt(run.r, s, run.side, 'public')));
+            for (const d of [Math.min(deep, c.d[0] + (c.d[1] - c.d[0]) * rand()), Math.min(deep, c.d[0])]) if (at < 0) at = pass.putCivic(c.index, run.r, s, run.side, rand, { w: ww, d });
+            if (at >= 0) run.taken.push([s - ww / 2 - 1, s + ww / 2 + 1]);
+          }
+          if (at < 0) continue;
+          laid.push(at);
+          break;
+        }
+        if (at >= 0) break;
+      }
+    }
+    pass.allow = undefined;
+    return laid;
+  };
+  {
+    const pass = new BackdropPass({ draft, t, content, squares: 'outline' });
+    const laid = areas.flatMap((_, a) => (wanted(a) ? civicIn(pass, draft, a) : []));
+    if (laid.length) {
+      const places = pass.placesFor(laid, mulberry32(mix(seed, 'civic places')));
+      draft = { ...draft, open: { ...draft.open!, backdrop: pass.result().backdrop, places: [...(draft.open!.places ?? []), ...places] } };
+    }
+  }
+
+  // ---- the lots, area by area as the generator lays them: the public places, the terraces, the houses ----
   const ground = townGround(draft, t);
-  const corners = cornersOf(roads, roads.flatMap((r, i) => (fronted(r) ? [i] : [])));
   const placers: LotPlacer[] = [];
-  const stream = (st: Stretch, ...more: string[]) => mulberry32(mix(seed, roadKey(roads[st.road]), st.kind, st.side, Math.round(st.s0), ...more));
-  const frontageAlong = (st: Stretch & { area: number }, rand: Rand) => frontageOf(roads, [st.road], middle(areas[st.area]), rand).filter((f) => f.side === st.side && f.s >= st.s0 && f.s <= st.s1 && corners(f));
+  const newSlots = () => placers.flatMap((p) => p.slots);
   // A park on each green the roads go round that is painted green, changed and has none, as the generator puts one there.
+  const greenParks = new Set<number>();
   for (const [g, poly] of draft.greens.entries()) {
     const cells = polyCells(poly, cols, rows);
     if (!cells.some((k) => dirty[k]) || !painted(codes, cells, 'green')) continue;
     const box = boundsOf(poly);
-    const taken = [...draft.slots, ...placers.flatMap((p) => p.slots)].some((s) => {
+    const taken = [...draft.slots, ...newSlots()].some((s) => {
       const r = plotRect(t, s);
       return r.x < box.x + box.w && box.x < r.x + r.w && r.z < box.z + box.d && box.z < r.z + r.d;
     });
@@ -514,87 +734,114 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
     const u = publicLot(t, GREEN_LOTS[0], area);
     if (!u) continue;
     const placer = new LotPlacer(content, t, ground, roads, [0, 0], mulberry32(mix(seed, 'green', g)), true);
-    placer.place([u], [], [poly], c, area, true);
+    if (!placer.place([u], [], [poly], c, area, true).length) greenParks.add(area);
     placers.push(placer);
   }
-  // A shop lot for each area with shops and work painted and none of its own.
-  const hasShop = new Set(draft.slots.flatMap((s) => (s.kind === 'shop' ? [s.area ?? 0] : [])));
-  for (const st of stretches) {
-    if (st.kind !== 'shops' || hasShop.has(st.area)) continue;
-    const rand = stream(st, 'shop lot');
-    const u = publicLot(t, SHOP_LOTS[Math.floor(rand() * SHOP_LOTS.length)], st.area);
-    if (!u) continue;
+  // (The cells painted terraces and flats now, to be built, that the proposal had painted otherwise or not at all: by the area each is nearest.)
+  const freshRows = areas.map(() => 0);
+  {
+    const was = base ? unpackUses(usesOfDraft(base.plan)) : null;
+    for (let k = 0; k < mask.length; k++) if (mask[k] === USE_CODE.rows && (!was || was[k] !== USE_CODE.rows)) freshRows[nearestArea(cellMid(k, cols))]++;
+  }
+  for (const [a, fronts] of byArea.entries()) {
+    if (!wanted(a)) continue;
+    const rand = mulberry32(mix(seed, 'lots', areas[a].name));
+    // (No gaps or meadows drawn after the lots: the land painted has them where the town had them.)
     const placer = new LotPlacer(content, t, ground, roads, [0, 0], rand, true);
     placers.push(placer);
-    if (placePainted(placer, t, roads, [u], frontageAlong(st, rand), codes, cols, rows, 'shops')) hasShop.add(st.area);
-  }
-  for (const st of stretches) {
-    if (st.kind === 'shops' || st.kind === 'public') continue;
-    const rand = stream(st);
-    const frontage = frontageAlong(st, rand);
-    if (!frontage.length) continue;
-    const placer = new LotPlacer(content, t, ground, roads, spec.gaps, rand, true);
-    placers.push(placer);
-    if (st.kind === 'homes') {
-      // (No home in a town centre: its frontage is kept for the centre's buildings.)
-      const homes = frontage.filter((f) => !inCentre(draft, [f.p[0] + f.n[0] * 10, f.p[1] + f.n[1] * 10]));
-      // (A home at a time, while there is room for the smallest: a house is drawn only to be put down.)
-      const one = { ...spec.town, lots: 1, places: [0, 0] as [number, number], farms: [0, 0] as [number, number] };
-      for (let k = 0, missed = 0; k < 60 && missed < 4 && roomAlong(placer, roads, homes, codes, cols, rows); k++) {
-        const wanted = wantedLots(content, t, spec, one, rand, { park: false }).map((u) => ({ ...u, area: st.area }));
-        missed = placePainted(placer, t, roads, wanted, homes, codes, cols, rows, 'homes') ? 0 : missed + 1;
-      }
-    } else if (st.kind === 'rows') {
-      const k = Math.max(2, Math.round(((st.s1 - st.s0) * TERRACE_SHARE) / TERRACE_FRONT));
-      const laid = terraceRows(t, placer, [frontage], { terraces: [k, k], rows: spec.rows[1] >= 2 ? spec.rows : [2, 4] }, rand);
-      // (A row only where it is painted terraces and flats, every house of it.)
-      const bad = new Set(laid.filter((row) => row.some((s) => !painted(codes, rectCells(plotRect(t, s), cols, rows), 'rows'))).flat());
-      placer.slots.splice(0, placer.slots.length, ...placer.slots.filter((s) => !bad.has(s)));
-      for (const s of bad) placer.placed.delete(s);
-      for (const s of placer.slots) s.area = st.area;
-    } else if (st.kind === 'green') {
-      for (const id of GREEN_LOTS) {
-        const u = publicLot(t, id, st.area);
-        if (u) placePainted(placer, t, roads, [u], frontage, codes, cols, rows, 'green');
-      }
+    const lots = fronts.filter(corners);
+    const along = (kind: UseKind, list = lots) => list.filter((f) => behind(f.road, f.p, f.n, kind));
+    // The public places the area's lot mix wants (as `wantedLots` draws them for the main town or a village) and it hasn't: a shop on land painted shops, a park on green.
+    const size: SizeSpec = a === 0 ? { ...spec.town, lots: 0, farms: [0, 0] } : { box: spec.hamlet.box, lots: 0, scale: spec.hamlet.scale, places: spec.hamlet.places, farms: [0, 0] };
+    const has = new Set([...draft.slots, ...newSlots()].flatMap((s) => ((s.area ?? 0) === a && s.kind !== 'house' ? [s.template] : [])));
+    if (greenParks.has(a)) has.add(GREEN_LOTS[0]);
+    const [shops, greens] = [along('shops'), along('green')];
+    for (const u of wantedLots(content, t, spec, size, rand, a === 0 ? { park: true } : { park: false, avoid: ['market'] })) {
+      if (u.kind === 'house' || has.has(u.template)) continue;
+      const kind: UseKind = u.kind === 'shop' || u.template === 'market' ? 'shops' : 'green';
+      if (placePainted(placer, t, roads, [{ ...u, area: a }], kind === 'shops' ? shops : greens, mask, cols, rows, kind)) has.add(u.template);
+    }
+    // (Shops painted and no shop lot: one, the area's grocer, baker or café.)
+    if (shops.length && ![...has].some((id) => SHOP_LOTS.includes(id))) {
+      const u = publicLot(t, SHOP_LOTS[Math.floor(rand() * SHOP_LOTS.length)], a);
+      if (u) placePainted(placer, t, roads, [u], shops, mask, cols, rows, 'shops');
+    }
+    // (Each green stretch painted along a road with room for one more: a park or a playground.)
+    for (const st of stretches) {
+      if (st.area !== a || st.kind !== 'green') continue;
+      const u = publicLot(t, GREEN_LOTS[Math.floor(rand() * GREEN_LOTS.length)], a);
+      if (u) placePainted(placer, t, roads, [u], greens.filter((f) => f.road === st.road && f.side === st.side && f.s >= st.s0 && f.s <= st.s1), mask, cols, rows, 'green');
+    }
+    // Terraces: rows of terraced houses along the land painted terraces and flats (off the centre), down to a pair,
+    // as many as the main town's terraces (`WorldSpec.terraces`) less those standing, and of the land newly painted
+    // terraces and flats as much again as half of it holds (the rest the backdrop's terraces and flats).
+    const rowFronts = along('rows', fronts).filter((f) => !inCentre(draft, [f.p[0] + f.n[0] * 10, f.p[1] + f.n[1] * 10]));
+    const rowSpec = { rows: spec.rows[1] >= 2 ? spec.rows : ([2, 4] as [number, number]) };
+    const standing = draft.slots.filter((s) => s.lot === 'terrace' && (s.area ?? 0) === a).length;
+    const drawn = a === 0 ? spec.terraces[0] + Math.floor(rand() * (spec.terraces[1] - spec.terraces[0] + 1)) : 0;
+    let left = Math.max(0, drawn - standing) + Math.round((freshRows[a] * USE_CELL * USE_CELL * TERRACE_SHARE) / TERRACE_LOT);
+    for (let k = 0; k < 400 && left >= 2 && rowFronts.length; k++) {
+      let n = rowSpec.rows[0] + Math.floor(rand() * (rowSpec.rows[1] - rowSpec.rows[0] + 1));
+      n = Math.min(n, left - (left - n === 1 ? 1 : 0));
+      const units = Array.from({ length: Math.max(2, n) }, () => rowHouse(t, rand))
+        .filter((h) => !!h)
+        .map((h): Unplaced => ({ kind: 'house', name: '', lot: 'terrace', area: a, ...h }));
+      if (units.length < 2) break;
+      let placed: PlotSlot[] = [];
+      for (let m = units.length; m >= 2 && !placed.length; m--) placed = rowAlong(placer, t, roads, units.slice(0, m), rowFronts, mask, cols, rows);
+      if (!placed.length) break;
+      left -= placed.length;
+    }
+    // Houses: one of the place's lot mix at a time while one fits, on the land painted homes (none in a town centre: its frontage is the centre's buildings').
+    const homes = along('homes').filter((f) => !inCentre(draft, [f.p[0] + f.n[0] * 10, f.p[1] + f.n[1] * 10]));
+    const one = { ...spec.town, lots: 1, places: [0, 0] as [number, number], farms: [0, 0] as [number, number] };
+    for (let k = 0, missed = 0; k < 600 && missed < HOUSE_MISSES && homes.length; k++) {
+      // (A house is drawn only where there is room for the smallest.)
+      if (missed && !roomAlong(placer, roads, homes, mask, cols, rows)) break;
+      const u = wantedLots(content, t, spec, one, rand, { park: false }).map((w) => ({ ...w, area: a }));
+      missed = placePainted(placer, t, roads, u, homes, mask, cols, rows, 'homes') ? 0 : missed + 1;
     }
   }
-  // Each green with no frontage near a town or village with no outdoor spot on it: an outdoor spot, a trail to it from the area's streets.
+  // Each green with no frontage near a town or village with no outdoor spot on it, then each patch of green the lots
+  // left with none on it: an outdoor spot (of those the place has, the first whose land is there: `siteIn`), a trail to it from the area's streets.
   let land: ReturnType<typeof cells8> | null = null;
   let water: Uint8Array | null = null;
   const trails: RoadPlan[] = [];
   const names = new Set(roads.map((r) => r.name));
   const reach = roadReach(draft);
-  for (const spot of greenSpots(draft)) {
-    const kept = draft.slots.some((s) => s.kind === 'outdoor' && rectCells(plotRect(t, s), cols, rows).some((k) => spot.cells.includes(k)));
+  const outdoor = new Map(t.parks.filter((p) => p.kind === 'outdoor').map((p) => [p.id, p]));
+  const spotIds = [...new Set([...spec.spots, ...outdoor.keys()])].filter((id) => outdoor.has(id));
+  const greenCode = USE_CODE.green;
+  const lotCells = () => [...draft.slots, ...newSlots()].flatMap((s) => rectCells(plotRect(t, s), cols, rows));
+  const patches = [
+    ...greenSpots(draft).map((g) => ({ ...g, far: true })),
+    ...greenPatches(mask, cols, rows, [...lotCells(), ...draft.greens.flatMap((g) => polyCells(g, cols, rows))])
+      .filter((cells) => cells.length >= SPOT_LEAST && cells.some((k) => reach[k] <= SPOT_NEAR))
+      .map((cells) => {
+        const centre = cells.reduce((m, k): Pt => [m[0] + cellMid(k, cols)[0] / cells.length, m[1] + cellMid(k, cols)[1] / cells.length], [0, 0] as Pt);
+        return { cells, centre, area: nearestArea(centre), far: false };
+      }),
+  ];
+  const spotsIn = areas.map(() => 0);
+  for (const spot of patches) {
+    if (!spot.cells.some((k) => mask[k] === greenCode)) continue;
+    const kept = [...draft.slots, ...newSlots()].some((s) => s.kind === 'outdoor' && rectCells(plotRect(t, s), cols, rows).some((k) => spot.cells.includes(k)));
     if (kept) continue;
     const rand = mulberry32(mix(seed, 'spot', Math.round(spot.centre[0]), Math.round(spot.centre[1])));
     water ??= open.water ? unrle(open.water, W * D) : new Uint8Array(W * D);
     land ??= open.land ? cells8(open.land) : null;
     if (!land) break;
-    const wet = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < D && water![Math.floor(z) * W + Math.floor(x)] === 1;
-    const [cx, cz] = spot.centre;
-    const site = [0, 1, 2, 3, 4, 5, 6, 7].some((a) => wet(cx + Math.cos((a * Math.PI) / 4) * 24, cz + Math.sin((a * Math.PI) / 4) * 24)) ? 'water' : land.woods[land.cell(cx, cz)] ? 'woods' : land.at(cx, cz) > land.at(...middle(areas[spot.area])) + 4 ? 'hill' : 'meadow';
-    const place = outdoorFor(t, site, rand);
-    if (!place) break;
-    const frame = place.lot ?? t.plot;
     const home = middle(areas[spot.area]);
-    // (Its cells nearest the green's middle first; facing the area, its trail comes from there.)
-    const tries = [...spot.cells].sort((a, b) => dist(cellMid(a, cols), spot.centre) - dist(cellMid(b, cols), spot.centre));
-    let at: { x: number; z: number; facing: Facing } | null = null;
-    for (const k of tries.slice(0, 40)) {
-      const c = cellMid(k, cols);
-      const v: Pt = [c[0] - home[0], c[1] - home[1]];
-      const facing = (Math.abs(v[1]) >= Math.abs(v[0]) ? (v[1] > 0 ? 0 : 2) : v[0] > 0 ? 1 : 3) as Facing;
-      const [w, d] = facing % 2 ? [frame.depth, frame.width] : [frame.width, frame.depth];
-      const r = { x: Math.round(c[0] - w / 2), z: Math.round(c[1] - d / 2), w, d };
-      if (!ground.free({ x: r.x - 3, z: r.z - 3, w: r.w + 6, d: r.d + 6 }, 8)) continue;
-      if ([0, 0.5, 1].some((u) => [0, 0.5, 1].some((q) => wet(r.x - 2 + (r.w + 4) * u, r.z - 2 + (r.d + 4) * q)))) continue;
-      if (!painted(codes, rectCells(r, cols, rows), 'green') || rectCells(r, cols, rows).some((q) => reach[q] <= BUILD_REACH - 8)) continue;
-      at = { x: r.x, z: r.z, facing };
-      break;
+    const first = spotsIn[spot.area]++;
+    let site: { place: PublicTemplate; at: { x: number; z: number; facing: Facing } } | null = null;
+    for (let k = 0; k < spotIds.length && !site; k++) {
+      const place = outdoor.get(spotIds[(first + k) % spotIds.length])!;
+      const at = siteIn(place, spot.cells, home, land, water, ground, t, mask, cols, rows, W, D, spot.far ? reach : null);
+      if (at) site = { place, at };
     }
-    if (!at) continue;
+    if (!site) continue;
+    const { place, at } = site;
+    const frame = place.lot ?? t.plot;
     const placer = new LotPlacer(content, t, ground, roads, [0, 0], rand, true);
     const area = areas[spot.area];
     const slot = placer.put({ kind: 'outdoor', template: place.id, name: `${area.name} ${place.name}`, lot: 'medium', w: frame.width, d: frame.depth, area: spot.area }, at, null);
@@ -622,55 +869,36 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   draft = { ...draft, roads, slots: [...draft.slots, ...added], open: { ...draft.open!, pads } };
   for (const s of added) if (s.kind !== 'house') draft = withLotPlace(draft, t, content, s.index);
 
-  // ---- the backdrop: rows along terraces and flats, and along shops and work; the civic places ----
-  const pass = new BackdropPass({ draft, t, content });
+  // ---- the backdrop, as the generator lays it: rows along the roads, a row behind, the blocks filled in; each building on land painted its use ----
+  const pass = new BackdropPass({ draft, t, content, squares: 'outline' });
   const from = pass.count;
-  const meant = new Map<number, UseKind>();
-  const since = (n0: number, kind: UseKind) => {
-    for (let i = n0; i < pass.count; i++) meant.set(i, kind);
+  // (Civic places the area's homes now make it big enough for, that it lacked before its lots went down.)
+  for (const [a] of areas.entries()) if (wanted(a)) civicIn(pass, draft, a);
+  pass.allow = (poly, use) => {
+    const kind = USE_OF[use];
+    return !!kind && paintedPoly(poly, kind);
   };
-  for (const st of stretches) {
-    if (st.kind !== 'rows' && st.kind !== 'shops') continue;
-    const n0 = pass.count;
-    const rand = stream(st, 'rows');
-    const rows = pass.rowsAlong(st.area, st.road, [st.side], rand, undefined, { from: st.s0, to: st.s1, kinds: st.kind === 'rows' ? ROW_KINDS : SHOP_KINDS });
-    pass.secondRow(rows, rand);
-    since(n0, st.kind);
+  const laidRows: { rows: Row[]; rand: Rand }[] = [];
+  for (const r of frontedRoads) {
+    if (!builtAlong.has(r)) continue;
+    const road = roads[r];
+    const rand = mulberry32(mix(seed, 'rows', roadKey(road)));
+    const a = road.area ?? nearestArea(pointAt(road.points, lengths(road.points)[road.points.length - 1] / 2).p);
+    laidRows.push({ rows: pass.rowsAlong(a, r, [1, -1], rand, undefined, { kindsAt }), rand });
   }
-  const publicAreas = [...new Set(stretches.filter((st) => st.kind === 'public').map((st) => st.area))];
-  for (const a of publicAreas) {
-    const rand = mulberry32(mix(seed, 'civic', a));
-    const mid = middle(areas[a]);
-    const fronts: { road: number; side: 1 | -1; s: number; far: number }[] = [];
-    for (const st of stretches) {
-      if (st.kind !== 'public' || st.area !== a) continue;
-      const r = roads[st.road];
-      const ls = lengths(r.points);
-      for (let s = st.s0 + 4; s <= st.s1 - 4; s += CIVIC_STEP) fronts.push({ road: st.road, side: st.side, s, far: dist(pointAt(r.points, s, ls).p, mid) });
-    }
-    fronts.sort((x, y) => x.far - y.far);
-    const taken: { road: number; side: number; s0: number; s1: number }[] = [];
-    for (const c of civicChoices(draft, a)) {
-      const kind = CIVIC[c.index].kind;
-      let tries = 0;
-      for (const f of fronts) {
-        if (taken.some((q) => q.road === f.road && q.side === f.side && f.s > q.s0 && f.s < q.s1)) continue;
-        if (++tries > CIVIC_TRIES) break;
-        const [w, d] = [range(rand, ...kind.w), range(rand, ...kind.d)];
-        if (!painted(codes, polyCells(civicBox(roads[f.road], f.s, f.side, w, d), cols, rows), 'public')) continue;
-        const n0 = pass.count;
-        if (pass.putCivic(c.index, f.road, f.s, f.side, rand, { w, d }) < 0) continue;
-        since(n0, 'public');
-        taken.push({ road: f.road, side: f.side, s0: f.s - w / 2 - 2, s1: f.s + w / 2 + 2 });
-        break;
-      }
-    }
-  }
-  const laid = pass.result().backdrop;
-  const keep: number[] = [];
-  for (let i = from; i < laid.length; i++) if (painted(codes, polyCells(laid[i].poly, cols, rows), meant.get(i) ?? 'shops')) keep.push(i);
+  for (const { rows: row, rand } of laidRows) pass.secondRow(row, rand);
+  // The blocks filled in: a building on each patch of land painted for one and not yet built on, every `INFILL_APART` m of it.
+  const spots = infillSpots(mask, cols, rows, [...draft.slots.map((s) => rectCells(plotRect(t, s), cols, rows)), ...pass.result().backdrop.map((b) => polyCells(b.poly, cols, rows))]);
+  const areaAt = (p: Pt) => {
+    const k = areas.findIndex((q) => offRect(q, p) === 0);
+    return k >= 0 ? k : nearestArea(p);
+  };
+  const infillRand = mulberry32(mix(seed, 'infill'));
+  for (const p of spots) pass.infillPoints(areaAt(p), [p], infillRand, kindsAt);
+  pass.allow = undefined;
+  const keep = Array.from({ length: pass.count - from }, (_, k) => from + k);
   const places = pass.placesFor(keep, mulberry32(mix(seed, 'places')));
-  draft = { ...draft, open: { ...draft.open!, backdrop: [...(draft.open!.backdrop ?? []), ...keep.map((i) => laid[i])], places: [...(draft.open!.places ?? []), ...places] } };
+  draft = { ...draft, open: { ...draft.open!, backdrop: pass.result().backdrop, places: [...(draft.open!.places ?? []), ...places] } };
 
   // ---- parking in each area changed; a new village with too few lots goes with the nearest area ----
   draft = foldSmallVillages(parkedAgain(draft, t, touched, seed), made.villages);
@@ -679,17 +907,56 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   return renumber(draft, t, roads.map((_, i) => i));
 }
 
+/**
+ * Where the blocks are filled in: over each patch of `codes` (a grid `cols` × `rows`) painted for a building (homes,
+ * terraces and flats, shops and work, public places; one use, its cells side by side) but the cells of `built` (each a
+ * lot's or a building's), the middles of cells `INFILL_APART` m apart at least, from the patch's middle out. In
+ * the grid's order of the patches.
+ */
+function infillSpots(codes: Uint8Array, cols: number, rows: number, built: readonly (readonly number[])[]): Pt[] {
+  const taken = new Uint8Array(codes.length);
+  for (const cells of built) for (const k of cells) taken[k] = 1;
+  const seen = new Uint8Array(codes.length);
+  const out: Pt[] = [];
+  const apart = INFILL_APART / USE_CELL;
+  for (let k0 = 0; k0 < codes.length; k0++) {
+    const code = codes[k0];
+    if (seen[k0] || taken[k0] || !code || code === USE_CODE.green) continue;
+    const cells: number[] = [];
+    const stack = [k0];
+    seen[k0] = 1;
+    while (stack.length) {
+      const k = stack.pop()!;
+      cells.push(k);
+      const [i, j] = [k % cols, Math.floor(k / cols)];
+      for (const [a, b] of [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]) {
+        const n = b * cols + a;
+        if (a < 0 || b < 0 || a >= cols || b >= rows || seen[n] || taken[n] || codes[n] !== code) continue;
+        seen[n] = 1;
+        stack.push(n);
+      }
+    }
+    const [mi, mj] = [cells.reduce((s, k) => s + (k % cols), 0) / cells.length, cells.reduce((s, k) => s + Math.floor(k / cols), 0) / cells.length];
+    const picked: [number, number][] = [];
+    for (const k of cells.sort((x, y) => Math.hypot((x % cols) - mi, Math.floor(x / cols) - mj) - Math.hypot((y % cols) - mi, Math.floor(y / cols) - mj) || x - y)) {
+      const [i, j] = [k % cols, Math.floor(k / cols)];
+      if (picked.some(([pi, pj]) => Math.hypot(pi - i, pj - j) < apart)) continue;
+      picked.push([i, j]);
+      out.push([(i + 0.5) * USE_CELL, (j + 0.5) * USE_CELL]);
+    }
+  }
+  return out;
+}
+
+/** What of `s0`..`s1` the intervals `taken` leave, in order. */
+function freeOf(s0: number, s1: number, taken: readonly (readonly [number, number])[]): [number, number][] {
+  let free: [number, number][] = [[s0, s1]];
+  for (const [a, b] of taken) free = free.flatMap(([u0, u1]): [number, number][] => (b <= u0 || a >= u1 ? [[u0, u1]] : [...(a > u0 ? [[u0, a] as [number, number]] : []), ...(b < u1 ? [[b, u1] as [number, number]] : [])]));
+  return free;
+}
+
 /** The middle of cell `k` of a grid `cols` wide (m). */
 const cellMid = (k: number, cols: number): Pt => [((k % cols) + 0.5) * USE_CELL, (Math.floor(k / cols) + 0.5) * USE_CELL];
-
-/** A civic building's ground fronting `road` at `s` on `side`, `w` along and `d` deep, set back as `putCivic` sets one (about 3 m past the road's edge). */
-function civicBox(road: RoadPlan, s: number, side: 1 | -1, w: number, d: number): Pt[] {
-  const { p, t } = pointAt(road.points, s);
-  const n = leftOf(t).map((v) => v * side);
-  const back = road.width / 2 + 3;
-  const at = (u: number, v: number): Pt => [p[0] + t[0] * u + n[0] * v, p[1] + t[1] * u + n[1] * v];
-  return [at(-w / 2, back), at(w / 2, back), at(w / 2, back + d), at(-w / 2, back + d)];
-}
 
 /** `draft` with each of `villages` (new areas, by index) that has fewer than `VILLAGE_LOTS` lots folded into the nearest other area (its streets, lots, buildings, places and parking), and gone. */
 function foldSmallVillages(draft: NeighbourhoodDraft, villages: readonly number[]): NeighbourhoodDraft {

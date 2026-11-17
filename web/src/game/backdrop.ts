@@ -660,11 +660,13 @@ export interface BackdropInput {
   rand: Rand;
 }
 
-/** What a pass over a town laid already is made from (`BackdropPass`): its draft, the house templates its lots are measured by, the content its places' names and careers come from. */
+/** What a pass over a town laid already is made from (`BackdropPass`): its draft, the house templates its lots are measured by, the content its places' names and careers come from, and how its squares are kept clear. */
 export interface BackdropDraft {
   draft: NeighbourhoodDraft;
   t: Templates;
   content: Content;
+  /** How a square is kept clear: its box (as the editor's ground has it), or its own outline (`'outline'`, as the generator lays the backdrop round it). */
+  squares?: 'box' | 'outline';
 }
 
 /**
@@ -682,11 +684,16 @@ export interface Row {
   kinds?: readonly BackdropUse[];
 }
 
-/** Where along its road a row goes (m, `from` to `to`; the whole road if not given) and what its buildings may be (`kinds`: any of its zone's if not given). */
+/**
+ * Where along its road a row goes (m, `from` to `to`; the whole road if not given) and what its buildings may be
+ * (`kinds`: any of its zone's if not given; `kindsAt`: those the land a few metres along and 6 m back from the
+ * sidewalk asks for, none there if null, in place of `kinds`, with no gaps but where it asks for none).
+ */
 export interface RowLimits {
   from?: number;
   to?: number;
   kinds?: readonly BackdropUse[];
+  kindsAt?: (p: Pt) => readonly BackdropUse[] | null;
 }
 
 /** The buildings in each 24 m cell (`BackdropPass`'s overlap test). */
@@ -742,6 +749,8 @@ export class BackdropPass {
   private readonly farmNames: string[] = [];
   /** The places so far (a draft's, then those named since). */
   private readonly placeList: TownPlace[] = [];
+  /** What else a building must be to go down (by hand only: Build keeps each to the land painted its use); anything if unset. */
+  allow?: (poly: readonly Pt[], use: BackdropUse) => boolean;
 
   constructor(input: BackdropInput | BackdropDraft) {
     if ('draft' in input) {
@@ -763,7 +772,11 @@ export class BackdropPass {
       // (The ground without the buildings standing: they are in the overlap test, where two may
       // touch, as a row of shops does; the ground keeps lots a metre off their boxes, which would
       // keep a new building off its neighbours.)
-      this.ground = townGround(open ? { ...draft, open: { ...open, backdrop: [] } } : draft, t);
+      this.ground = townGround(open ? { ...draft, open: { ...open, backdrop: [], ...(input.squares === 'outline' ? { squares: [] } : {}) } } : draft, t);
+      // (`squares: 'outline'`: each square's own tiles taken, not its box's, as the generator keeps them.)
+      if (input.squares === 'outline') {
+        for (const sq of open?.squares ?? []) tilesOf(sq, 0, (x, z) => void (inside(sq, x + 0.5, z + 0.5) && this.ground.take({ x, z, w: 1, d: 1 })));
+      }
       this.centres = [];
       this.outlines = (open?.centre ?? []).map((c) => c.poly);
       // (Only `thin` reads the greens and the water, and a draft's pass has no centres to thin.)
@@ -903,7 +916,7 @@ export class BackdropPass {
    */
   put(c: Pt, t: Pt, n: Pt, w: number, d: number, kind: Kind, rand: Rand, endOn = false): number {
     const poly = rectFrom(c, t, n, w, d);
-    if (!this.fits(poly) || !facesRoad(poly, this.roads, this.index, 0.3)) return -1;
+    if ((this.allow && !this.allow(poly, kind.use)) || !this.fits(poly) || !facesRoad(poly, this.roads, this.index, 0.3)) return -1;
     const roof = pick(rand, kind.roofs);
     // (The ridge along the longer side; a church's back from the road.)
     const way = endOn || d > w ? n : t;
@@ -1003,7 +1016,7 @@ export class BackdropPass {
    */
   rowsAlong(area: number, road: number, sides: readonly (1 | -1)[], rand: Rand, zone?: Zone, limits: RowLimits = {}): Row[] {
     const { roads, density } = this;
-    const { from, to, kinds } = limits;
+    const { from, to, kindsAt } = limits;
     const r = road;
     const ls = lengths(roads[r].points);
     const L = ls[ls.length - 1];
@@ -1012,12 +1025,30 @@ export class BackdropPass {
     for (const side of sides) {
       // (From 4 to 8 m along the road; from 0 to 1 m past `from`, if given, to make the most of a short stretch.)
       let s = from === undefined ? 4 + rand() * 4 : Math.max(4, from + rand());
+      // (Where the land asks for kinds: how far on along the road it asks for the same, read every 2 m.)
+      let [runKinds, runEnd]: [readonly BackdropUse[] | null | undefined, number] = [undefined, 0];
       while (s < end) {
         const probe = this.frontAt(r, s, side, 6, ls).c;
+        // (The kinds the land asks for here, if it is asked: on along the road where it asks for none.)
+        let kinds = kindsAt ? kindsAt(this.frontAt(r, Math.min(s + 3, L), side, 6, ls).c) : limits.kinds;
+        if (kinds === null) {
+          s += 2;
+          continue;
+        }
+        if (kindsAt && (kinds !== runKinds || s + 3 >= runEnd)) {
+          let x = s + 3;
+          while (x + 2 <= L && kindsAt(this.frontAt(r, x + 2, side, 6, ls).c) === kinds) x += 2;
+          [runKinds, runEnd] = [kinds, x + 1];
+        }
         const z: Zone = zone ?? (this.centreAt(probe) ? 'centre' : area === 0 ? 'town' : 'hamlet');
-        // (Now and then a gap: the more the further out.)
+        // (Of those, only the kinds that fit what is left of the land asking for them.)
+        if (kindsAt && kinds) {
+          const room = runEnd - s;
+          kinds = KINDS[z].flatMap(([k]) => (kinds!.includes(k.use) && k.w[0] * 0.6 <= room ? [k.use] : []));
+        }
+        // (Now and then a gap: the more the further out. Where the land asks for kinds, its gaps are where it asks for none.)
         const skip = z === 'centre' ? 0.04 : z === 'town' ? 0.22 * (1.2 - density) : 0.55;
-        if (rand() < skip) {
+        if (!kindsAt && rand() < skip) {
           s += range(rand, 6, 16);
           continue;
         }
@@ -1029,7 +1060,7 @@ export class BackdropPass {
         let done = false;
         // (Smaller where it doesn't fit: narrower, and shallower in front of what stands behind.)
         for (const shrink of [1, 0.75, 0.55]) {
-          const w = Math.max(kind.w[0] * 0.6, range(rand, ...kind.w) * shrink);
+          const w = Math.min(Math.max(kind.w[0] * 0.6, range(rand, ...kind.w) * shrink), kindsAt ? runEnd - s : Infinity);
           const d = Math.max(6, (range(rand, ...kind.d) * (shrink + 1)) / 2);
           const back = this.setback(z, rand);
           // (Within the stretch asked for, if one was.)
@@ -1067,31 +1098,54 @@ export class BackdropPass {
 
   /** Area `a`'s blocks filled in (`within`: inside that outline only), on a jittered grid `step` m apart, a building at each point with `chance`, turned to the road nearest. */
   infillArea(a: number, chance: number, step: number, rand: Rand, within?: Pt[]): void {
-    const { roads, areas, W, D, blocked } = this;
+    const { areas } = this;
     const xs = within?.map((p) => p[0]);
     const zs = within?.map((p) => p[1]);
     const rect = xs && zs ? { x: Math.min(...xs) + 20, z: Math.min(...zs) + 20, w: Math.max(...xs) - Math.min(...xs) - 40, d: Math.max(...zs) - Math.min(...zs) - 40 } : areas[a].rect;
-    const reach = INFILL_REACH[a === 0 ? 0 : 1];
     for (let z = rect.z - 20; z < rect.z + rect.d + 20; z += step) {
       for (let x = rect.x - 20; x < rect.x + rect.w + 20; x += step) {
         const p: Pt = [x + range(rand, -step / 3, step / 3), z + range(rand, -step / 3, step / 3)];
         if (within && !inside(within, p[0], p[1])) continue;
-        if (p[0] < EDGE || p[1] < EDGE || p[0] >= W - EDGE || p[1] >= D - EDGE || blocked[Math.floor(p[1]) * W + Math.floor(p[0])]) continue;
-        if (rand() > chance) continue;
-        const near = this.nearestWay(p[0], p[1], reach + 10);
-        if (!near || near.dist - roads[near.road].width / 2 > reach) continue;
-        const { t } = pointAt(roads[near.road].points, near.s);
-        const n = leftOf(t).map((v) => v * near.side) as Pt;
-        const zone: Zone = this.centreAt(p) ? 'centre' : a === 0 ? 'town' : 'hamlet';
-        const kind = this.pickKind(zone, rand);
-        // (In the centre smaller where it doesn't fit: it is built up close.)
-        for (const shrink of zone === 'centre' ? [1, 0.75, 0.55] : [1]) {
-          const w = Math.max(kind.w[0] * 0.6, range(rand, ...kind.w) * shrink);
-          const d = Math.max(6, (range(rand, ...kind.d) * (shrink + 1)) / 2);
-          if (this.put(add(p, n, -d / 2), t, n, w, d, kind, rand) >= 0) break;
-        }
+        this.infillAt(a, p, rand, chance);
       }
     }
+  }
+
+  /**
+   * A building of area `a` at each of `points` (set by hand), turned to the road nearest as the blocks are filled in
+   * (`infillArea`), of the kinds the land there asks for (`kindsAt`: none if null), smaller where it doesn't fit.
+   * The buildings laid, by index.
+   */
+  infillPoints(a: number, points: readonly Pt[], rand: Rand, kindsAt: (p: Pt) => readonly BackdropUse[] | null): number[] {
+    return points.flatMap((p) => {
+      const at = this.infillAt(a, p, rand, 1, kindsAt);
+      return at < 0 ? [] : [at];
+    });
+  }
+
+  /** A building at `p` of area `a` with `chance`, turned to the road nearest within its reach, as `infillArea` lays one (`kindsAt`: see `infillPoints`). Its index, else -1. */
+  private infillAt(a: number, p: Pt, rand: Rand, chance: number, kindsAt?: (p: Pt) => readonly BackdropUse[] | null): number {
+    const { roads, W, D, blocked } = this;
+    const reach = INFILL_REACH[a === 0 ? 0 : 1];
+    if (p[0] < EDGE || p[1] < EDGE || p[0] >= W - EDGE || p[1] >= D - EDGE || blocked[Math.floor(p[1]) * W + Math.floor(p[0])]) return -1;
+    const kinds = kindsAt?.(p);
+    if (kinds === null) return -1;
+    if (rand() > chance) return -1;
+    const near = this.nearestWay(p[0], p[1], reach + 10);
+    if (!near || near.dist - roads[near.road].width / 2 > reach) return -1;
+    const { t } = pointAt(roads[near.road].points, near.s);
+    const n = leftOf(t).map((v) => v * near.side) as Pt;
+    const zone: Zone = this.centreAt(p) ? 'centre' : a === 0 ? 'town' : 'hamlet';
+    const kind = this.pickKind(zone, rand, kinds);
+    if (!kind) return -1;
+    // (In the centre smaller where it doesn't fit: it is built up close; and anywhere the land asks for its kinds.)
+    for (const shrink of zone === 'centre' || kindsAt ? [1, 0.75, 0.55] : [1]) {
+      const w = Math.max(kind.w[0] * 0.6, range(rand, ...kind.w) * shrink);
+      const d = Math.max(6, (range(rand, ...kind.d) * (shrink + 1)) / 2);
+      const at = this.put(add(p, n, -d / 2), t, n, w, d, kind, rand);
+      if (at >= 0) return at;
+    }
+    return -1;
   }
 
   /** How many buildings area `a` has. */

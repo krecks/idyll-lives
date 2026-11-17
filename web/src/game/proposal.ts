@@ -25,8 +25,10 @@ export const FRONT_PROBES = [6, 10, 14, 18] as const;
 export const BUILD_REACH = 36;
 /** A green with no frontage this near an area's box (m) becomes an outdoor spot, a trail to it (`townCheck.ts` wants 150). */
 export const SPOT_REACH = 150;
-/** The least of a green with no frontage that holds an outdoor spot (cells: the smallest spot, 12 × 12 m, and a little round it). */
-const SPOT_CELLS = 12;
+/** A green with no cell this near a road (m) has no frontage (`FRONT_PROBES` and a road's half width): it may be an outdoor spot. */
+export const SPOT_NEAR = 24;
+/** The least of a green with no frontage that holds an outdoor spot (cells: the smallest spot, 12 × 12 m, as `usesOf` paints it). */
+const SPOT_CELLS = 9;
 /** Frontage is read every this many metres along a road. */
 const STEP = 2;
 /** A stretch shorter than this (m) goes with the one before it. */
@@ -330,7 +332,7 @@ function areasOf(draft: NeighbourhoodDraft): Rect[] {
 
 const offRect = (r: Rect, [x, z]: Pt) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 
-/** The greens of `codes` with no frontage (every cell further than `BUILD_REACH` from a road) of `SPOT_CELLS` or more, their middles within `SPOT_REACH` of an area's box. */
+/** The greens of `codes` with no frontage (every cell further than `SPOT_NEAR` from a road) of `SPOT_CELLS` or more, their middles within `SPOT_REACH` of an area's box. */
 function spotsOf(codes: Uint8Array, reach: Float32Array, cols: number, rows: number, areas: readonly Rect[]): GreenSpot[] {
   const green = USE_CODE.green;
   const seen = new Uint8Array(codes.length);
@@ -344,7 +346,7 @@ function spotsOf(codes: Uint8Array, reach: Float32Array, cols: number, rows: num
     while (stack.length) {
       const k = stack.pop()!;
       cells.push(k);
-      if (reach[k] <= BUILD_REACH) near = true;
+      if (reach[k] <= SPOT_NEAR) near = true;
       const [i, j] = [k % cols, Math.floor(k / cols)];
       for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
         const [a, b] = [i + di, j + dj];
