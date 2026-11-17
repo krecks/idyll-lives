@@ -686,10 +686,18 @@ export interface Renderer {
   readonly townShown: boolean;
   /** Overview camera: glides to (or with `cut`, jumps to) a shot. */
   setTownShot(shot: TownShot, cut?: boolean): void;
-  /** Overview camera: user orbit (radians) and zoom factor on top of the shot. */
-  nudgeTown(dAlpha: number, zoom: number): void;
+  /** Overview camera: user orbit (radians), zoom factor and tilt (radians, more is lower; 0.15–1.35 in all) on top of the shot. */
+  nudgeTown(dAlpha: number, zoom: number, dBeta?: number): void;
+  /** Overview camera: the player's zoom by `zoom` towards the land under canvas CSS pixel (`x`, `y`) (it stays under it). */
+  zoomTownAt(x: number, y: number, zoom: number): void;
   /** Overview camera: the player's pan, the target moved (`dx`, `dz`) m over the ground on top of the shot; it stays over the land. */
   panTown(dx: number, dz: number): void;
+  /** Overview camera: the player's pan along the view, `right` m to the picture's right and `forward` m into it. */
+  panTownView(right: number, forward: number): void;
+  /** Overview camera: how near (m from its target) the player's zoom comes in (`OVERVIEW_NEAREST` unless set). */
+  setTownNearest(metres: number): void;
+  /** Overview camera: how far (m) it is from its target now. */
+  readonly townDistance: number;
   /**
    * Overview camera: the player's pan by a drag from canvas CSS pixel (`x0`, `y0`) to (`x1`, `y1`): the land under
    * the pointer follows it (over the sky, the level of the land in view does). Any button, any step, no tool needed.
