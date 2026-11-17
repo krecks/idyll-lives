@@ -54,6 +54,7 @@ export type FollowWorld = Pick<WorldStructure, 'width' | 'depth' | 'plots' | 'me
  * its town) as it was. `world`: the draft's preview (`previewWorld`), for its lots, their paths
  * and its roads. `seeded`: given the land before it is graded, its gentle ground in it (a copy).
  * `ease`: country roads whose land is eased to their own profile besides (`easeAlong`, `settleLand`).
+ * Its areas' planes, fitted afresh, are kept with it (`open.gentle`: step 2's settles ease to them).
  */
 export function withLand(draft: NeighbourhoodDraft, world: FollowWorld, seeded?: (land: Land) => void, ease: readonly RoadPlan[] = []): NeighbourhoodDraft {
   const open = draft.open;
@@ -62,11 +63,11 @@ export function withLand(draft: NeighbourhoodDraft, world: FollowWorld, seeded?:
   if (open.land) land = open.land.seeded === 'follow' ? { ...open.land, h: open.land.h.slice() } : null;
   else land = open.heights ? seedBare(draft) : null;
   if (!land) return draft;
-  gentleUnder(land, world, draft.slots.map((s) => s.area ?? 0));
+  const gentle = gentleUnder(land, world, draft.slots.map((s) => s.area ?? 0));
   if (ease.length) easeAlong(land, ease, { ...DEFAULT_LANDSCAPE, ...world.meta?.world?.landscape }.rise);
   seeded?.({ ...land, h: land.h.slice(), wl: land.wl.slice(), cover: land.cover.slice() });
   gradeLand(land, world);
-  return { ...draft, open: { ...open, land } };
+  return { ...draft, open: { ...open, land, gentle } };
 }
 
 // ---- the limits checked, and the last resort -------------------------------------------------
@@ -279,9 +280,10 @@ const SETTLE_MARGIN = 0.15;
  * that worked in the main town only at places given up works on there (`rehome`: `careers`, the
  * content's career categories; none given, it doesn't).
  * `preview`: the world as the menus' preview has it (its lots' paths: `previewWorld`; asked of the
- * draft without its land). The draft and that world.
+ * draft without its land). The draft, that world, and what in it is still over a slope limit itself
+ * (`marks`, as `settleEdit` keys them: what it couldn't give up).
  */
-export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, preview: (draft: NeighbourhoodDraft) => W, seeded?: (land: Land) => void, careers: readonly CareerCategory[] = []): { draft: NeighbourhoodDraft; world: W } {
+export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, preview: (draft: NeighbourhoodDraft) => W, seeded?: (land: Land) => void, careers: readonly CareerCategory[] = []): { draft: NeighbourhoodDraft; world: W; marks: string[] } {
   let draft = laid;
   const given = { lots: 0, backdrop: 0, roads: 0, courts: 0, backdropIn: {} as Record<number, number> };
   /** The country roads whose land is eased along them (`roadKey`). */
@@ -291,7 +293,7 @@ export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, prev
     let first: Land | null = null;
     const graded = withLand(draft, world, (l) => (first = l), ease.size ? draft.roads.filter((r) => ease.has(roadKey(r))) : []);
     const land = graded.open?.land;
-    if (!land || !first) return { draft: graded, world };
+    if (!land || !first) return { draft: graded, world, marks: [] };
     const courts = longCourts(draft.roads);
     const found = round < SETTLE_ROUNDS ? measureLand(world, land, first, SETTLE_MARGIN, false) : null;
     const next = found ? giveUp(draft, world, found, courts, given, careers, ease) : null;
@@ -299,7 +301,9 @@ export function settleLand<W extends FollowWorld>(laid: NeighbourhoodDraft, prev
       seeded?.(first);
       const total = given.lots + given.backdrop + given.roads + given.courts;
       if (!given.backdrop) delete (given as { backdropIn?: unknown }).backdropIn;
-      return { draft: total ? { ...graded, diagnostics: { ...(graded.diagnostics ?? { dropped: [] }), slopes: given } } : graded, world };
+      // (What is left over a limit itself: step 2's first settle's `before`. The margin changes what is given up, not that.)
+      const marks = [...overOf(draft, world, found ?? measureLand(world, land, first, 0, false)).keys()];
+      return { draft: total ? { ...graded, diagnostics: { ...(graded.diagnostics ?? { dropped: [] }), slopes: given } } : graded, world, marks };
     }
     draft = next;
   }
@@ -395,11 +399,18 @@ function settleOnce<W extends FollowWorld>(plan: NeighbourhoodDraft, preview: (d
   const [W, D] = [plan.width, plan.depth];
   const walk = open.water ? unrle(open.water, W * D) : wetTiles(land, W, D);
   for (const r of plan.roads) if (r.bridge && r.bridge[1] > r.bridge[0]) deckTiles(r, r.bridge, W, D, (tile) => (walk[tile] = 0));
-  // The land eased and graded under the town, and measured (no margin: the limits themselves).
-  gentleUnder(land, world, plan.slots.map((s) => s.area ?? 0));
+  // The land eased and graded under the town, and measured (no margin: the limits themselves). Each
+  // area's plane as the town was laid (`open.gentle`), so an edit changes the land only round itself;
+  // a village put down or moved since gets one fitted afresh.
+  const gentle = gentleUnder(land, world, plan.slots.map((s) => s.area ?? 0), open.gentle);
   const seeded: Land = { ...land, h: land.h.slice() };
   gradeLand(land, world);
-  const found = measureLand(world, land, seeded, 0, false);
+  const over = overOf(plan, world, measureLand(world, land, seeded, 0, false));
+  return { draft: { ...plan, open: { ...open, land, zones, water: rle(walk), gentle } }, world, over };
+}
+
+/** What `found` (measured on `plan`'s preview, `world`) says is over a slope limit itself, by its key (`roadKey`, `slotKey`, `buildingKey`): where it is, and why in words. */
+function overOf(plan: NeighbourhoodDraft, world: FollowWorld, found: LandMeasure): Map<string, { at: Pt[]; why: string }> {
   const over = new Map<string, { at: Pt[]; why: string }>();
   for (const [i, o] of found.over.roads) {
     const r = plan.roads[i];
@@ -411,9 +422,9 @@ function settleOnce<W extends FollowWorld>(plan: NeighbourhoodDraft, preview: (d
     const p = building[n];
     const at: Pt[] = [[p.x, p.z], [p.x + p.w, p.z + p.d]];
     if (n < plots) over.set(slotKey(plan.slots[n]), { at, why: overWords(o, plan.slots[n].name || 'the lot', 'lot') });
-    else over.set(buildingKey(open.backdrop![n - plots]), { at, why: overWords(o, 'a building there', 'building') });
+    else over.set(buildingKey(plan.open!.backdrop![n - plots]), { at, why: overWords(o, 'a building there', 'building') });
   }
-  return { draft: { ...plan, open: { ...open, land, zones, water: rle(walk) } }, world, over };
+  return over;
 }
 
 /** How `o` breaks a slope limit, in words, of `name` (a road of `kind`, a lot or a building). */
@@ -871,8 +882,11 @@ export function smoothHeights(land: Land): Float32Array {
  * fade out (`smoothHeights`), as the renderer's hills fade in from a town's edge; then each area's
  * box, and each lot out of every box, gets a plane (`gentler`); then the land beside water is
  * kept to its shore again (`shoreClamp`). What `withLand` does before it grades the town in.
+ * `kept`: planes fitted before (`open.gentle`), each used as it is for the area whose box it was
+ * fitted to (an area with none, a village put down or moved since, gets one fitted afresh). The
+ * areas' planes used, in their order (a plane per area that has built ground in its box).
  */
-export function gentleUnder(land: Land, world: FollowWorld, areaOf: readonly number[] = []): void {
+export function gentleUnder(land: Land, world: FollowWorld, areaOf: readonly number[] = [], kept: readonly GentlePlane[] = []): GentlePlane[] {
   const { cols, rows } = land;
   const look = { ...DEFAULT_LANDSCAPE, ...(world.meta?.world as { landscape?: Partial<typeof DEFAULT_LANDSCAPE> } | undefined)?.landscape };
   const dist = new Protection(cols, rows, builtOf(world)).dist;
@@ -883,9 +897,27 @@ export function gentleUnder(land: Land, world: FollowWorld, areaOf: readonly num
     const own = land.h[k] / 100;
     h[k] = dry(k) ? smooth[k] + smoothstep(APRON, APRON + look.rise, dist[k]) * (own - smooth[k]) : own;
   }
-  gentler(h, cols, rows, dist, world, world.meta?.areas ?? [], world.meta?.roads ?? [], areaOf, look.rise, dry);
+  const planes = gentler(h, cols, rows, dist, world, world.meta?.areas ?? [], world.meta?.roads ?? [], areaOf, look.rise, dry, kept);
   shoreClamp(h, land.wl, cols, rows, look.slope ?? 0.5);
   for (let k = 0; k < h.length; k++) if (dry(k)) land.h[k] = Math.max(-32767, Math.min(32767, Math.round(h[k] * 100)));
+  return planes;
+}
+
+/**
+ * A town's or a village's gentle ground as `gentleUnder` fitted it: the area's box as the draft has it
+ * (`open.areas`: what it is matched by), the box the plane covers (the area's, grown by its own
+ * streets and the lots by it), and the plane, `a + bx (x - cx) + bz (z - cz)` m. Kept with a laid
+ * town (`open.gentle`; not in its town file nor its code), so step 2's edits ease the land to the
+ * planes it was laid with: a lot removed refits nothing, and the land moves only round it.
+ */
+export interface GentlePlane {
+  area: { x: number; z: number; w: number; d: number };
+  box: { x0: number; z0: number; x1: number; z1: number };
+  a: number;
+  bx: number;
+  bz: number;
+  cx: number;
+  cz: number;
 }
 
 /**
@@ -896,14 +928,18 @@ export function gentleUnder(land: Land, world: FollowWorld, areaOf: readonly num
  * `rise`). Where two come near each other, their planes are blended by how near each is (in its
  * own box, almost wholly its own; near a town or a village, its plane before a lone lot's). The hills
  * and mountains rise round the towns, not under them. `dist`: each sample's distance from what is
- * built (`Protection.dist`: 0 on it). The water (`dry` false) is left as it is.
+ * built (`Protection.dist`: 0 on it). The water (`dry` false) is left as it is. `kept`: an area's
+ * box and plane fitted before, used as they are (`gentleUnder`). The areas' planes used.
  */
-function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array, world: FollowWorld, areas: readonly { x: number; z: number; w: number; d: number }[], roads: readonly RoadPlan[], areaOf: readonly number[], reach: number, dry: (k: number) => boolean): void {
+function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array, world: FollowWorld, areas: readonly { x: number; z: number; w: number; d: number }[], roads: readonly RoadPlan[], areaOf: readonly number[], reach: number, dry: (k: number) => boolean, kept: readonly GentlePlane[]): GentlePlane[] {
   const c = LAND_CELL;
   type Box = { x0: number; z0: number; x1: number; z1: number };
   const grow = (box: Box, x0: number, z0: number, x1: number, z1: number) => Object.assign(box, { x0: Math.min(box.x0, x0), z0: Math.min(box.z0, z0), x1: Math.max(box.x1, x1), z1: Math.max(box.z1, z1) });
+  const keptFor = areas.map((a) => kept.find((g) => g.area.x === a.x && g.area.z === a.z && g.area.w === a.w && g.area.d === a.d));
   // (An area's box, its own streets and lanes, which may reach out past it, and its own lots by them.)
   const boxes: Box[] = areas.map((a, n) => {
+    const known = keptFor[n];
+    if (known) return { ...known.box };
     const box = { x0: a.x, z0: a.z, x1: a.x + a.w, z1: a.z + a.d };
     for (const r of roads) {
       if ((r.area ?? -1) !== n || r.kind === 'country' || r.kind === 'trail') continue;
@@ -928,8 +964,15 @@ function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array
   for (const f of footprints) if (!boxes.some((b) => within(b, (f.x0 + f.x1) / 2, (f.z0 + f.z1) / 2))) alone.push(f);
   // Each one's plane: through the land under what is built in it (in a box: every built sample; a lot alone: its own).
   const planes: { box: Box; a: number; bx: number; bz: number; cx: number; cz: number; town: boolean }[] = [];
+  const used: GentlePlane[] = [];
   for (const [n, box] of [...boxes, ...alone].entries()) {
     const own = n >= boxes.length;
+    const known = own ? undefined : keptFor[n];
+    if (known) {
+      planes.push({ box, a: known.a, bx: known.bx, bz: known.bz, cx: known.cx, cz: known.cz, town: true });
+      used.push(known);
+      continue;
+    }
     const [i0, i1] = [Math.max(0, Math.ceil(box.x0 / c)), Math.min(cols - 1, Math.floor(box.x1 / c))];
     const [j0, j1] = [Math.max(0, Math.ceil(box.z0 / c)), Math.min(rows - 1, Math.floor(box.z1 / c))];
     const pts: [number, number, number][] = [];
@@ -953,6 +996,10 @@ function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array
     if (tilt > GENTLE_TILT) [bx, bz] = [(bx * GENTLE_TILT) / tilt, (bz * GENTLE_TILT) / tilt];
     // (Tilted less, the plane through the land's mean again.)
     planes.push({ box, a: mean, bx, bz, cx, cz, town: !own });
+    if (!own) {
+      const a = areas[n];
+      used.push({ area: { x: a.x, z: a.z, w: a.w, d: a.d }, box: { ...box }, a: mean, bx, bz, cx, cz });
+    }
   }
   // Each sample eased towards the planes near it: the nearest's weight, their heights weighted by each one's.
   const sum = new Float64Array(cols * rows);
@@ -978,6 +1025,7 @@ function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array
     }
   }
   for (let k = 0; k < h.length; k++) if (weight[k] > 0 && dry(k)) h[k] += most[k] * (sum[k] / weight[k] - h[k]);
+  return used;
 }
 
 /** The generator's heights (m) at (`x`, `z`), between its cells' middles (the edge's past the edge). */

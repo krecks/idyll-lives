@@ -68,13 +68,14 @@ export type TownJob =
  * A town laid out: its draft, the menus' preview of it, and the houses made for its lots (by template
  * id). `plan`: a town laid on a land whose town follows its slopes (`town`, `world`): the draft with
  * its land as laid, not yet graded under the town (step 2's edits start from it; settling it again,
- * `edit`, gives `draft`).
+ * `edit`, gives `draft`); `marks`: what in `draft` is over a slope limit (the first `edit`'s `before`).
  */
 export interface LaidTown {
   draft: NeighbourhoodDraft;
   preview: WorldStructure;
   houses: [string, HouseTemplate | undefined][];
   plan?: NeighbourhoodDraft;
+  marks?: string[];
 }
 
 /**
@@ -84,7 +85,7 @@ export interface LaidTown {
  * index in the batch, from 0) with why, as a clause; what in it is over a slope limit (`marks`, the
  * next job's `before`); and what is wrong with it (`townCheck.ts`, `hard` blocks Next), if checked.
  */
-export interface EditedTown extends Omit<LaidTown, 'plan'> {
+export interface EditedTown extends Omit<LaidTown, 'plan' | 'marks'> {
   step: number;
   refused: { op: number; why: string }[];
   marks: string[];
@@ -153,7 +154,7 @@ function laidOut(content: Content, t: Templates, laid: NeighbourhoodDraft, step?
   // (The land as laid: what was given up gone from the town, but its land not graded.)
   const land = laid.open?.land;
   const plan = draft.open && land?.seeded === 'follow' && draft.open.land !== land ? { ...draft, open: { ...draft.open, land } } : undefined;
-  return { draft, preview, houses, ...(plan ? { plan } : {}) };
+  return { draft, preview, houses, ...(plan ? { plan, marks: settled.marks } : {}) };
 }
 
 /** Step 2's edits settled (`EditedTown`): `settleEdit`, the settled land coded into the preview as `laidOut` codes it, the new houses, the checks. */

@@ -24,7 +24,7 @@ import { buildingBox, editGhosts, joinGhosts, lotBox, roadGhost } from './ghosts
 import { find, keyOf, pick, type Picked, type PickWhat } from './pick';
 import type { Issue, TownIssues } from './problems';
 import { EditSession, type SettleTiming } from './session';
-import { settle } from './settle';
+import { settle, type Settled } from './settle';
 import { TOWN_TOOLS, type TownEditor, type TownStageTool, type TownTool } from './tools';
 import { sentence } from './words';
 
@@ -176,13 +176,14 @@ export class TownEditorState implements TownEditor {
         world.draft,
         {
           settle,
-          show: (settled, plan) => this.show(session, settled.draft, settled.preview, plan),
+          show: (settled, plan) => this.show(session, settled, plan),
           changed: () => this.changed(),
           check: (plan, base) => checkTown(this.hooks.content, plan, base),
           report: (why) => toast(sentence(why)),
         },
         world.history,
         world.plan,
+        world.marks,
       ));
     }
     this.changed();
@@ -196,13 +197,15 @@ export class TownEditorState implements TownEditor {
   }
 
   /** The settled town put on screen, and kept as the town the next steps read (`app.world.draft`). */
-  private async show(session: EditSession, draft: NeighbourhoodDraft, preview: Parameters<typeof menuScene.prepare>[1], plan: NeighbourhoodDraft): Promise<void> {
+  private async show(session: EditSession, settled: Settled, plan: NeighbourhoodDraft): Promise<void> {
+    const { draft, preview, marks } = settled;
     menuScene.prepare(draft, preview);
     await menuScene.show(draft, null);
     const w = app.world;
     // (Not if the town was laid again meanwhile: this session's edits are of the one before.)
     if (!w || this.session !== session) return;
-    app.world = { ...w, draft, plan, history: session.history, edited: session.edits > 0 };
+    const { marks: _was, ...rest } = w;
+    app.world = { ...rest, draft, plan, history: session.history, edited: session.edits > 0, ...(marks ? { marks } : {}) };
   }
 
   /** Something changed: the panel told, the ghosts drawn again, `app.world` told of the edits. */

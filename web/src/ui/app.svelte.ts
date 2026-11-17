@@ -38,6 +38,8 @@ export interface LaidTown extends Keyed {
   edited: boolean;
   plan?: NeighbourhoodDraft;
   history?: TownHistory;
+  /** What in `draft` is over a slope limit (the town job's, then each settle's `marks`): step 2's next settle's `before`. */
+  marks?: readonly string[];
 }
 export type Overlay = 'settings' | 'load' | 'credits' | null;
 /** A loading step and the overall progress, 0..1. */

@@ -35,7 +35,7 @@ import { chooseCentre, layBackdrop, reserveCentre } from './backdrop';
 import { random } from './housegen';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, type Land as LandField } from './land';
 import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEdit';
-import { GENTLE_TILT, seedBare, smoothHeights } from './landFollow';
+import { GENTLE_TILT, seedBare, smoothHeights, type GentlePlane } from './landFollow';
 import { chaikin, outlines, rasterize, rle, simplify, simplifyRing, unrle } from './landMasks';
 import { fbm } from './noise';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_TURN, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
@@ -86,6 +86,12 @@ export interface OpenWorldDraft {
   plan?: LandPlan;
   /** Where the main town was laid (the middle of its box, m): the plan's site, or where the player moved it, as the shore and the dry land let it. */
   site?: Pt;
+  /**
+   * The gentle ground the town was laid with, an area's plane each (`landFollow.ts` `GentlePlane`):
+   * step 2's settles ease the land to them again, so an edit moves the land only round itself. Not
+   * in the town file nor the world's code.
+   */
+  gentle?: GentlePlane[];
 }
 
 /**

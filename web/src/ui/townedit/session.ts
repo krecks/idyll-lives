@@ -95,13 +95,15 @@ export class EditSession {
   /**
    * `settled`: the town on screen (as laid, or settled before); `history`: the edits made before (kept
    * while the player goes back and forth through the steps), else none; `from`: the plan `settled`
-   * came from (else `settled` itself). A plan past it is settled after the first pause.
+   * came from (else `settled` itself). A plan past it is settled after the first pause. `marks`: what
+   * in `settled` is over a slope limit (`Settled.marks`), if known: the first settle need not find it.
    */
   constructor(
     settled: NeighbourhoodDraft,
     private readonly hooks: SessionHooks,
     history?: TownHistory,
     from?: NeighbourhoodDraft,
+    marks?: readonly string[],
   ) {
     this.history = history ?? new TownHistory(from ?? settled);
     this.plan = this.history.draft;
@@ -110,6 +112,7 @@ export class EditSession {
     this.timers = hooks.timers ?? realTimers;
     this.now = hooks.now ?? (() => performance.now());
     this.quiet = hooks.quiet ?? QUIET;
+    this.marks = marks;
     this.lastEdit = this.now();
     this.recheck(true);
     if (this.pending) this.schedule();
