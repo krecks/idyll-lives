@@ -3197,10 +3197,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const at = this.townMode || !this.lot.landscape ? this.landInView() : null;
     const ghosts = at ? this.ghosts : null;
     if (!ghosts && !this.ghostDraw) return;
-    this.ghostDraw ??= new TownGhostDraw(this.app, this.root);
+    if (!this.ghostDraw) {
+      this.ghostDraw = new TownGhostDraw(this.app, this.root);
+      this.ghostDraw.setScale(this.townMetresPerPx());
+    }
     const layer = this.lot.townLayer ?? pc.LAYERID_WORLD;
     this.ghostDraw.set(ghosts, at ? groundOrWater(at.scape) : () => 0, layer, this.townWorld);
     this.held?.changed();
+  }
+
+  /** How many m a CSS px is where the overview's camera looks: its distance, lens and the canvas's height. */
+  private townMetresPerPx(): number {
+    return (2 * this.townPose.radius * Math.tan(this.townPose.fov / 2)) / (this.cssSize.height || 1);
   }
 
   onTownFrame(fn: (() => void) | null): void {
@@ -3444,6 +3452,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // lit lots are washed over whole.)
     this.overview?.setReach(this.townPose.radius);
     this.landHaze?.show(this.townPose.radius);
+    // (Step 2's ghosts drawn again when the zoom crosses a step of their least widths on screen.)
+    if (this.ghostDraw?.setScale(this.townMetresPerPx()) && this.ghosts) this.drawGhosts();
     if (this.overview?.frame(secs)) this.held.changed();
     // The light eases between the screens' hours (about two seconds).
     const goal = this.townMinuteGoal;
