@@ -115,7 +115,18 @@ pub fn vertex_normals(mesh: &Mesh) -> Vec<V3> {
 /// A normal a corner, as the file is written with: the mesh's own where it has them (`Mesh::normals`).
 pub fn corner_normals(mesh: &Mesh) -> Vec<V3> {
     if let Some(n) = &mesh.normals {
-        return n.clone();
+        let mut out = n.clone();
+        // what a tool stored for a corner reads in its fan's frame on the mesh as it is now: Blender keeps the
+        // two angles, not the normal, through a join and a move
+        if let Some(stored) = mesh.stored.as_ref().filter(|s| s.len() == out.len()) {
+            let angles: Vec<[i16; 2]> = stored.iter().map(|s| s.unwrap_or([0, 0])).collect();
+            for ((own, read), s) in out.iter_mut().zip(from_stored(mesh, &angles)).zip(stored) {
+                if s.is_some() {
+                    *own = read;
+                }
+            }
+        }
+        return out;
     }
     if mesh.faces.iter().all(|f| f.smooth) && mesh.sharp.is_empty() {
         // smooth all over: one normal a vertex
