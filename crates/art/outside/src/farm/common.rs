@@ -1,13 +1,14 @@
 //! What the farm is built from: the palette, the frame, and the slabs, shells and bars the buildings are made of,
 //! each drawn as an outline on a plane and thickened across it.
 
+use artkit::forms;
 use artkit::materials::Mat;
 use artkit::math::{V3, cosd, sind};
-use artkit::mesh::Mesh;
 use artkit::palette;
-use artkit::place::{Coord, GameFrame};
+use artkit::place::{Coord, GameFrame, N};
 use artkit::py;
-use artkit::scene::{self, Obj};
+use artkit::scene::Obj;
+use artkit::shapes::SHARP;
 
 /// Built in the game's axes (x, height, depth; front +depth).
 pub const F: GameFrame = GameFrame::new(0.0);
@@ -56,55 +57,6 @@ palette! { M:
     coop_dark = ("#3A2A1E", matte),     // the pop hole behind the hatch, the window's wire
 }
 
-/// A float in a part's name, as Python writes it.
-pub fn fr(x: f64) -> String {
-    artkit::json::float_repr(x)
-}
-
-/// A number as the script wrote it, whole or not: `F.at` negates x and depth, and the negation of a whole zero is a
-/// plain zero where a float zero's is a negative one.
-#[derive(Clone, Copy, Debug)]
-pub enum N {
-    I(i32),
-    F(f64),
-}
-
-impl From<f64> for N {
-    fn from(x: f64) -> N {
-        N::F(x)
-    }
-}
-impl From<i32> for N {
-    fn from(i: i32) -> N {
-        N::I(i)
-    }
-}
-
-impl Coord for N {
-    fn f(self) -> f64 {
-        match self {
-            N::I(i) => i as f64,
-            N::F(x) => x,
-        }
-    }
-    fn negated(self) -> f64 {
-        match self {
-            N::I(i) => i.negated(),
-            N::F(x) => -x,
-        }
-    }
-}
-
-impl std::fmt::Display for N {
-    /// As Python's f-string writes it.
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            N::I(i) => write!(f, "{i}"),
-            N::F(x) => write!(f, "{}", fr(*x)),
-        }
-    }
-}
-
 /// A point (u, v) on a plane, each as the script wrote it.
 pub type P2 = (N, N);
 
@@ -132,10 +84,7 @@ pub fn mesh(name: &str, verts: &[(N, N, N)], faces: &[Vec<u32>], material: Mat) 
         .iter()
         .map(|&(x, y, z)| F.at(x, y, z).into())
         .collect();
-    let mut mesh = Mesh::from_pydata(vs, faces);
-    mesh.set_material(Some(material));
-    mesh.recalc_normals();
-    scene::add(name, mesh)
+    forms::object(name, vs, faces, Some(material), false, SHARP, false)
 }
 
 /// A convex outline `pts` on a plane (see `lift`), extruded from `w0` to `w1` across it.
@@ -322,21 +271,6 @@ pub fn frame(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// A whole zero stays a plain zero through `F.at`, a float zero turns negative, and both are named as Python
-    /// writes them.
-    #[test]
-    fn a_number_keeps_the_kind_the_script_wrote() {
-        let whole = F.at(N::I(0), 1.0, N::I(0));
-        let float = F.at(N::F(0.0), 1.0, N::F(0.0));
-        assert!(whole.x.is_sign_positive() && whole.y.is_sign_positive());
-        assert!(float.x.is_sign_negative() && float.y.is_sign_negative());
-        let names: Vec<String> = [N::F(-1.6), N::I(0), N::F(1.6)]
-            .iter()
-            .map(|u| format!("win1{u}"))
-            .collect();
-        assert_eq!(names, ["win1-1.6", "win10", "win11.6"]);
-    }
 
     /// `offset` moves each segment of a polyline `t` to its left, mitred where two meet.
     #[test]

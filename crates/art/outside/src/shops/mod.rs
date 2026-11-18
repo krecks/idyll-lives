@@ -3,13 +3,12 @@
 //!
 //! They stand on town lots, seen from far and by the dozen, so each has a far version (a quarter of the triangles,
 //! E7). The parts are placed in game axes (`GameFrame`), where the game places them: the counter, the case and the
-//! shelves sit back on their 2 x 1 tiles as theirs do (`settle_with` `centre: false` and `centre` on the Model),
+//! shelves sit back on their 2 x 1 tiles as theirs do (`settle!(centre = false)` and `centre` on the Model),
 //! the café chair's seat 2 cm forward. Two clips: the till's cash drawer slides out to the back, to the shopkeeper,
 //! for `treat` (`till`), and the bakery case's back glass door, on the baker's side, slides aside for `pastry`
 //! and `takeCake` (`door`), each as the game's vendor reaches for it.
 
-use artkit::family::{Family, Model};
-use artkit::json::{Json, loads};
+use artkit::family::{Family, Model, motions};
 
 mod bakery;
 mod cafe;
@@ -25,10 +24,6 @@ const DOOR_DELAY: f64 = 1.0; // as the baker reaches in (`sell`: 1.5-2.1 s)
 const DOOR_HOLD: f64 = 1.4; // and shuts again this long after it opened
 
 const FAR: f64 = 0.25; // placed on town lots, seen from afar: a quarter of the triangles (E7)
-
-fn motions(text: &str) -> Json {
-    loads(text).expect("the motions are JSON")
-}
 
 /// The family.
 pub fn family() -> Option<Family> {

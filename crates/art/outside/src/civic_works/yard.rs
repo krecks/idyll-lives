@@ -1,6 +1,6 @@
 //! The builders' yard's timber stack and cement mixer, and the town's flagpole.
 
-use super::common::{Axle, F, own_palette, tyre};
+use super::common::{F, own_palette, tyre};
 use artkit::far::{is_low, low};
 use artkit::math::{Axis, TAU, cos, degrees, pow, radians, sin};
 use artkit::parts::{Settle, join, join_all, new_parts, settle_all, settle_with};
@@ -150,7 +150,7 @@ pub fn timber_stack() -> Vec<Obj> {
             m.rubber,
             None,
             Some(low(24, 10)),
-            Axle::Y,
+            Axis::Y,
         );
     });
     join_all(if is_low() {
@@ -443,7 +443,7 @@ pub fn cement_mixer() -> Vec<Obj> {
                 m.rubber,
                 None,
                 Some(low(20, 10)),
-                Axle::X,
+                Axis::X,
             );
             fcyl!(
                 F,

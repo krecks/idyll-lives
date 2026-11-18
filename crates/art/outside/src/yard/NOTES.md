@@ -9,7 +9,7 @@ The plan names `outdoor.py` as the family; these nine are a family of their own 
 building at once don't all edit one script, palette and pack. Moving them into `outdoor.py` later changes only the
 files' folder (`models/yard/` to `models/outdoor/`): the keys stay `model.<id>`.
 
-Each is built in place where the game places it (`F`, game axes), with `settle_with` with `centre: false` and its
+Each is built in place where the game places it (`F`, game axes), with `settle!(centre = false)` and its
 `Model`'s `centre` where it stands off the footprint's middle. Outdoor things are drawn in the town overview, so
 each has a far version (`far=`): the model's own build at low detail (`far_low`), at rest, all one part, without
 the castle and the washing; the log store's too since 2026-10-22 (it was decimated, `far=0.25`, which
@@ -117,7 +117,7 @@ with the bed ripe: the crop went with the harvest, the bed bare after); the colo
 
 What residents ride to work or school (content `vehicle`; `bicycle` 2 × 1, `bicycleChild` and `eScooter` 1 × 1,
 outdoors). All three original, CC0. Each is built along game x, its **front wheel to +x**, its middle line at depth 0,
-standing upright on the floor (`settle_with` with `centre: false`; the `centre` is the box's middle, a few mm behind the
+standing upright on the floor (`settle!(centre = false)`; the `centre` is the box's middle, a few mm behind the
 footprint's because the back mudguard reaches farther than the front). Plain finishes only, so each is **one draw**.
 
 The two bikes are the bike rack's bike made with other numbers: `Bike` holds a bike's numbers (the rack's are its

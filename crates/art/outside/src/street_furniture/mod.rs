@@ -12,8 +12,7 @@
 //! opens and shuts behind the caller (`door_open`); the town fountain's water runs all the time near the camera
 //! (`water_run`, ambient). The traffic light's lit lens is the renderer's. The rest are still.
 
-use artkit::family::{Family, Model};
-use artkit::json::{Json, loads};
+use artkit::family::{Family, Model, motions};
 
 mod boxes;
 pub(crate) mod common;
@@ -24,10 +23,6 @@ mod seats;
 mod statue;
 
 use common::{FAR, SF, own};
-
-fn motions(text: &str) -> Json {
-    loads(text).expect("the motions are JSON")
-}
 
 /// The family.
 pub fn family() -> Option<Family> {

@@ -1,7 +1,8 @@
 //! Hay: the round bale and the stack of square bales, and their far versions.
 
-use super::common::{F, M, fr};
+use super::common::{F, M};
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
 use artkit::math::{TAU, cos, radians, sin};
 use artkit::parts::{join, join_all, new_parts, settle};
 use artkit::py;
@@ -203,7 +204,7 @@ fn square_bale(name: &str, x: f64, y: f64, detail: bool) {
         );
         for dz in [-0.22, 0.22] {
             cube!(
-                format!("{name}_twine{}", fr(dz)),
+                format!("{name}_twine{}", float_repr(dz)),
                 (0.935, 0.02, 0.455),
                 at = F.at(x, y, dz),
                 material = M.twine
@@ -254,7 +255,7 @@ fn square_bale(name: &str, x: f64, y: f64, detail: bool) {
             .collect();
         fsweep!(
             F,
-            format!("{name}_twine{}", fr(dz)),
+            format!("{name}_twine{}", float_repr(dz)),
             &lp,
             0.008,
             M.twine,

@@ -1,17 +1,22 @@
 //! The raised vegetable bed, the garden shed, the compost bin and the rain barrel.
 
-use super::common::{F, M, N, blob, board, fillet, ground, mesh_of, name, pot, prism, rod, tube};
-use super::play::settle_in_place;
+use super::common::{F, M, blob, board, ground, pot, prism, rod};
 use artkit::far::{is_low, low};
-use artkit::forms::{Scale, rounded_rect};
+use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, PI, TAU, V3, atan2, cos, cosd, degrees, radians, sin, sind};
 use artkit::motion::{Ease, Rock, Squash, Stages, Swing, rock, squash, stages, swing};
+use artkit::parts::numbered;
 use artkit::parts::{hinged, join, join_all, measure, new_parts};
 use artkit::place::Facing;
+use artkit::place::N;
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
-use artkit::{cone, fbox, fcone, fcyl, fextrude, fsphere, fsweep, loft, revolve, ring, torus};
+use artkit::shapes::SHARP;
+use artkit::{
+    cone, fbox, fcone, fcyl, fextrude, fsphere, fsweep, loft, revolve, ring, settle, torus,
+};
 
 // --- the raised vegetable bed (2x1): boards round the soil, lettuces, carrots and tomato plants --------------
 const BED_TOP: f64 = 0.32; // the soil's top
@@ -81,7 +86,7 @@ pub fn raised_bed() -> Vec<Obj> {
             for y in [0.085, 0.255] {
                 fbox!(
                     F,
-                    name("board"),
+                    numbered("board"),
                     1.84,
                     0.162,
                     0.06,
@@ -96,7 +101,7 @@ pub fn raised_bed() -> Vec<Obj> {
             for y in [0.085, 0.255] {
                 fbox!(
                     F,
-                    name("board"),
+                    numbered("board"),
                     0.06,
                     0.162,
                     0.74,
@@ -109,7 +114,7 @@ pub fn raised_bed() -> Vec<Obj> {
             for z in [-0.395, 0.395] {
                 fbox!(
                     F,
-                    name("post"),
+                    numbered("post"),
                     0.09,
                     0.36,
                     0.09,
@@ -121,7 +126,7 @@ pub fn raised_bed() -> Vec<Obj> {
                 if !is_low() {
                     // a pyramid cap on each post
                     cone!(
-                        name("post_cap"),
+                        numbered("post_cap"),
                         0.064,
                         0.0,
                         0.024,
@@ -168,7 +173,7 @@ pub fn raised_bed() -> Vec<Obj> {
         for x in [-0.45, 0.0, 0.45] {
             // the tomatoes' canes
             rod(
-                &name("cane"),
+                &numbered("cane"),
                 (x + 0.14, BED_TOP - 0.02, 0.22),
                 (x + 0.15, BED_TOP + 0.2, 0.22),
                 0.005,
@@ -190,7 +195,7 @@ pub fn raised_bed() -> Vec<Obj> {
             // lettuces, at the back
             let (dx, dz) = jit[i];
             lettuce(
-                &name("lettuce"),
+                &numbered("lettuce"),
                 x + dx,
                 BED_TOP - 0.01,
                 -0.24 + dz,
@@ -205,7 +210,7 @@ pub fn raised_bed() -> Vec<Obj> {
             let (dx, dz) = jit[6 + i];
             for k in 0..low(4, 2) {
                 frond(
-                    &name("frond"),
+                    &numbered("frond"),
                     x + dx,
                     BED_TOP,
                     dz,
@@ -240,7 +245,7 @@ pub fn raised_bed() -> Vec<Obj> {
             let (dx, dz) = jit[6 + i];
             fcone!(
                 F,
-                name("carrot"),
+                numbered("carrot"),
                 0.028,
                 0.02,
                 0.035,
@@ -261,7 +266,7 @@ pub fn raised_bed() -> Vec<Obj> {
                 );
                 fsphere!(
                     F,
-                    name("tomato"),
+                    numbered("tomato"),
                     0.035,
                     p,
                     M.tomato,
@@ -272,7 +277,7 @@ pub fn raised_bed() -> Vec<Obj> {
                 if !is_low() {
                     fcone!(
                         F,
-                        name("calyx"),
+                        numbered("calyx"),
                         0.016,
                         0.004,
                         0.012,
@@ -286,12 +291,12 @@ pub fn raised_bed() -> Vec<Obj> {
     });
     if is_low() {
         // a far version: all one still part, ripe
-        return settle_in_place(&[join_all("raisedBed")]);
+        return settle!(&[join_all("raisedBed")], centre = false);
     }
     let origin = F.at(0, BED_TOP, 0);
     let plants = join(&plants, "plants", Some(origin));
     let crop = join(&crop, "crop", Some(origin));
-    let objs = settle_in_place(&meshes());
+    let objs = settle!(centre = false);
     let height = measure(&[plants]).1[2] - plants.location().z as f64; // the plants' top over the soil
     let sink = (SINK.0 * height, SINK.1 * height, SINK.2 * height);
     stages(
@@ -431,8 +436,7 @@ fn wall_sweep(name: &str, path: [(f64, f64, f64); 2], prof: &[(f64, f64)], o: V3
     }
     faces.push((0..m).rev().collect());
     faces.push((n as u32 * m..(n as u32 + 1) * m).collect());
-    let mats = vec![0; faces.len()];
-    mesh_of(name, vs, &faces, &[M.shed], &mats, false)
+    artkit::forms::object(name, vs, &faces, Some(M.shed), false, SHARP, false)
 }
 
 fn shed_walls() {
@@ -457,7 +461,7 @@ fn shed_walls() {
         for s in [-1.0, 1.0] {
             fbox!(
                 F,
-                name("wall_side"),
+                numbered("wall_side"),
                 t,
                 h,
                 SD - 2.0 * t,
@@ -480,7 +484,7 @@ fn shed_walls() {
         );
         for s in [-1, 1] {
             lap_wall(
-                &name("wall_side"),
+                &numbered("wall_side"),
                 false,
                 zb + t,
                 zf - t,
@@ -553,7 +557,7 @@ fn shed_walls() {
     // the gables
     for (z, z0) in [(FRONT_Z - t, FRONT_Z), (SZ - SD / 2.0, SZ - SD / 2.0 + t)] {
         prism(
-            &name("gable"),
+            &numbered("gable"),
             &[
                 (N::F(-SW / 2.0), EAVE),
                 (N::F(SW / 2.0), EAVE),
@@ -569,7 +573,7 @@ fn shed_walls() {
         for z in [FRONT_Z + 0.012, SZ - SD / 2.0 - 0.012] {
             fbox!(
                 F,
-                name("corner"),
+                numbered("corner"),
                 0.07,
                 h,
                 0.024,
@@ -580,7 +584,7 @@ fn shed_walls() {
             );
             fbox!(
                 F,
-                name("corner_side"),
+                numbered("corner_side"),
                 0.024,
                 h,
                 0.07,
@@ -598,7 +602,7 @@ fn shed_walls() {
     for s in [-1.0, 1.0] {
         fbox!(
             F,
-            name("door_trim"),
+            numbered("door_trim"),
             0.06,
             DOOR_H,
             0.03,
@@ -648,7 +652,7 @@ fn shed_roof() {
         let y = RIDGE - (RIDGE - EAVE) * ((SW / 2.0 + OVER) / 2.0) / (SW / 2.0) + 0.03;
         fbox!(
             F,
-            name("roof"),
+            numbered("roof"),
             run,
             0.04,
             SD + 0.24,
@@ -667,7 +671,7 @@ fn shed_roof() {
                 );
                 fbox!(
                     F,
-                    name("felt_lap"),
+                    numbered("felt_lap"),
                     0.05,
                     0.006,
                     SD + 0.24,
@@ -682,7 +686,7 @@ fn shed_roof() {
             );
             fbox!(
                 F,
-                name("drip"),
+                numbered("drip"),
                 0.03,
                 0.05,
                 SD + 0.24,
@@ -696,7 +700,7 @@ fn shed_roof() {
             // barge boards on the gables' edges
             fbox!(
                 F,
-                name("barge"),
+                numbered("barge"),
                 run - 0.04,
                 0.1,
                 0.025,
@@ -722,7 +726,7 @@ fn shed_roof() {
         for z in [FRONT_Z + 0.115, SZ - SD / 2.0 - 0.115] {
             fbox!(
                 F,
-                name("finial"),
+                numbered("finial"),
                 0.05,
                 0.16,
                 0.035,
@@ -751,7 +755,7 @@ fn shed_inside() {
     for s in [-1.0, 1.0] {
         fbox!(
             F,
-            name("in_side"),
+            numbered("in_side"),
             0.005,
             EAVE - 0.08,
             lz1 - lz0,
@@ -809,7 +813,7 @@ fn shed_inside() {
     }
     for (x, head) in [(0.0, "fork"), (-0.75, "rake")] {
         rod(
-            &name("tool"),
+            &numbered("tool"),
             (x, 0.1, lz0 + 0.3),
             (x + 0.04, 1.25, lz0 + 0.06),
             0.012,
@@ -819,7 +823,7 @@ fn shed_inside() {
         let fork = head == "fork";
         fbox!(
             F,
-            name(head),
+            numbered(head),
             if fork { 0.14 } else { 0.3 },
             if fork { 0.12 } else { 0.03 },
             0.02,
@@ -890,8 +894,8 @@ pub fn shed_small() -> Vec<Obj> {
     } else {
         &[(0.0, 0.0), (0.0, 0.04), (0.055, 0.04), (0.055, 0.0)]
     };
-    crate::playground::common::moulding(
-        &F,
+    kit::moulding!(
+        F,
         "window_frame",
         &[
             (wx + 0.28, wy - 0.23),
@@ -901,9 +905,7 @@ pub fn shed_small() -> Vec<Obj> {
         ],
         profile,
         M.trim,
-        FRONT_Z - 0.002,
-        Facing::Front,
-        artkit::shapes::SHARP,
+        at = FRONT_Z - 0.002
     );
     fbox!(
         F,
@@ -962,7 +964,7 @@ pub fn shed_small() -> Vec<Obj> {
     for s in [-1.0, 1.0] {
         fextrude!(
             F,
-            name("bracket"),
+            numbered("bracket"),
             &[(0.0, 0.0), (0.0, 0.14), (0.15, 0.14), (0.15, 0.12)],
             0.03,
             (wx + s * 0.22, wy - 0.57, FRONT_Z),
@@ -988,7 +990,7 @@ pub fn shed_small() -> Vec<Obj> {
         for k in 0..3 {
             fsphere!(
                 F,
-                name("flower"),
+                numbered("flower"),
                 0.025,
                 (
                     x + (k - 1) as f64 * 0.035,
@@ -1012,7 +1014,7 @@ pub fn shed_small() -> Vec<Obj> {
             let w = (DOOR_W - 0.02) / 5.0;
             fbox!(
                 F,
-                name("door_board"),
+                numbered("door_board"),
                 w - 0.006,
                 DOOR_H - 0.02,
                 0.03,
@@ -1029,7 +1031,7 @@ pub fn shed_small() -> Vec<Obj> {
         for y in [0.3, 1.27] {
             fbox!(
                 F,
-                name("ledge"),
+                numbered("ledge"),
                 DOOR_W - 0.08,
                 0.1,
                 0.02,
@@ -1041,7 +1043,7 @@ pub fn shed_small() -> Vec<Obj> {
             if is_low() {
                 fbox!(
                     F,
-                    name("hinge"),
+                    numbered("hinge"),
                     0.3,
                     0.03,
                     0.008,
@@ -1049,7 +1051,7 @@ pub fn shed_small() -> Vec<Obj> {
                     M.iron
                 );
             } else {
-                t_hinge(&name("hinge"), x0 + 0.02, y, dz + 0.0365, 0.32, M.iron);
+                t_hinge(&numbered("hinge"), x0 + 0.02, y, dz + 0.0365, 0.32, M.iron);
             }
         }
         board(
@@ -1106,13 +1108,13 @@ pub fn shed_small() -> Vec<Obj> {
         }
     });
     if is_low() {
-        return settle_in_place(&[join_all("shedSmall")]);
+        return settle!(&[join_all("shedSmall")], centre = false);
     }
     let door = hinged(
         join(&door, "door", None),
         F.at(DOOR_X - DOOR_W / 2.0, 0.8, FRONT_Z + 0.015),
     );
-    let objs = settle_in_place(&meshes());
+    let objs = settle!(centre = false);
     swing(
         door,
         "door_open",
@@ -1137,7 +1139,7 @@ pub fn compost_bin() -> Vec<Obj> {
         for z in [z0 + 0.03, z1 - 0.03] {
             fbox!(
                 F,
-                name("post"),
+                numbered("post"),
                 0.06,
                 CB_TOP - 0.012,
                 0.06,
@@ -1149,7 +1151,7 @@ pub fn compost_bin() -> Vec<Obj> {
             if !is_low() {
                 // each post's top cut to a shallow point
                 cone!(
-                    name("post_cap"),
+                    numbered("post_cap"),
                     0.042,
                     0.0,
                     0.012,
@@ -1164,7 +1166,7 @@ pub fn compost_bin() -> Vec<Obj> {
     for (k, y) in [0.08, 0.25, 0.42, 0.59].into_iter().enumerate() {
         fbox!(
             F,
-            name("slat_back"),
+            numbered("slat_back"),
             w - 0.04,
             0.12,
             0.025,
@@ -1176,7 +1178,7 @@ pub fn compost_bin() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             fbox!(
                 F,
-                name("slat_side"),
+                numbered("slat_side"),
                 0.025,
                 0.12,
                 d - 0.12,
@@ -1190,7 +1192,7 @@ pub fn compost_bin() -> Vec<Obj> {
             // the front boards: the top one lifted out
             fbox!(
                 F,
-                name("slat_front"),
+                numbered("slat_front"),
                 w - 0.12,
                 0.12,
                 0.025,
@@ -1208,7 +1210,7 @@ pub fn compost_bin() -> Vec<Obj> {
                 for z in [z0 + 0.03, z1 - 0.03] {
                     fcyl!(
                         F,
-                        name("nail"),
+                        numbered("nail"),
                         0.005,
                         0.004,
                         (s * (w / 2.0 + 0.001), y + 0.02, z),
@@ -1224,7 +1226,7 @@ pub fn compost_bin() -> Vec<Obj> {
         // the front boards' guide battens
         fbox!(
             F,
-            name("guide"),
+            numbered("guide"),
             0.03,
             CB_TOP - 0.06,
             0.03,
@@ -1265,7 +1267,7 @@ pub fn compost_bin() -> Vec<Obj> {
         {
             fcone!(
                 F,
-                name("shell"),
+                numbered("shell"),
                 0.025,
                 0.018,
                 0.014,
@@ -1285,7 +1287,7 @@ pub fn compost_bin() -> Vec<Obj> {
             let bw = (d + 0.04) / 4.0;
             fbox!(
                 F,
-                name("lid_board"),
+                numbered("lid_board"),
                 w + 0.04,
                 0.025,
                 bw - 0.008,
@@ -1298,7 +1300,7 @@ pub fn compost_bin() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             fbox!(
                 F,
-                name("batten"),
+                numbered("batten"),
                 0.05,
                 0.03,
                 d - 0.04,
@@ -1327,10 +1329,10 @@ pub fn compost_bin() -> Vec<Obj> {
         );
     });
     if is_low() {
-        return settle_in_place(&[join_all("compostBin")]);
+        return settle!(&[join_all("compostBin")], centre = false);
     }
     let lid = hinged(join(&lid, "lid", None), F.at(0, CB_TOP, z0 - 0.02));
-    let objs = settle_in_place(&meshes());
+    let objs = settle!(centre = false);
     swing(
         lid,
         "lid_open",
@@ -1442,7 +1444,7 @@ pub fn rain_barrel() -> Vec<Obj> {
             let a = 120 * k + 30;
             fbox!(
                 F,
-                name("lid_grip"),
+                numbered("lid_grip"),
                 0.08,
                 0.008,
                 0.012,
@@ -1465,23 +1467,22 @@ pub fn rain_barrel() -> Vec<Obj> {
         rot = (90, 0, 0),
         verts = low(10, 6)
     );
-    tube(
-        &F,
+    kit::tube!(
+        F,
         "tap_spout",
-        &fillet(
+        &kit::fillet!(
             &[
                 (0.0, 0.17, RB_Z + 0.29),
                 (0.0, 0.17, RB_Z + 0.355),
                 (0.0, 0.12, RB_Z + 0.367),
             ],
             0.03,
-            3,
+            3
         ),
         0.016,
         M.brass,
-        Some(low(10, 6)),
-        1,
-        Scale::One(1.0),
+        verts = low(10, 6),
+        round = 1
     );
     fcyl!(
         F,
@@ -1502,5 +1503,5 @@ pub fn rain_barrel() -> Vec<Obj> {
         up = (1, 0, 0),
         scale = [1.0, 1.2]
     );
-    settle_in_place(&[join_all("rainBarrel")])
+    settle!(&[join_all("rainBarrel")], centre = false)
 }

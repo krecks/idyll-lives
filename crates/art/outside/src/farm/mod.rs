@@ -8,8 +8,7 @@
 //! Built in the game's axes (`F`: x, height, depth; front +depth), then stood on the floor and centred on the
 //! footprint (`settle`), the sizes the old parts'.
 
-use artkit::family::{Family, Model};
-use artkit::json::{Json, loads};
+use artkit::family::{Family, Model, motions};
 
 mod barn;
 mod barn_doors;
@@ -25,10 +24,6 @@ use common::M;
 
 /// (width, height, depth): the old parts' bounds, give or take (each model's tolerance)
 const TOLERANCE: f64 = 0.03;
-
-fn motions(text: &str) -> Json {
-    loads(text).expect("the motions are JSON")
-}
 
 /// The family.
 pub fn family() -> Option<Family> {

@@ -1,14 +1,14 @@
 //! The shop counter: 2 x 1, an oak counter with a till, a sweet jar and a magazine rack, sitting back on its tiles
 //! as the game places it; the till's cash drawer slides out to the shopkeeper.
 
-use super::common::{M, jar, settle_back, tilted};
+use super::common::{M, jar, tilted};
 use artkit::forms::rounded_rect;
 use artkit::math::{P3, PI, cos, radians, sin};
 use artkit::motion::{Slide, slide};
 use artkit::parts::{join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, kit_knob, kit_shaker, revolve};
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, kit_knob, kit_shaker, revolve, settle};
 
 const TILL_SECONDS: f64 = 0.8; // the cash drawer pops out this fast
 
@@ -435,7 +435,7 @@ pub fn shop_counter() -> Vec<Obj> {
     });
     let drawer = join(&drawer, "cash_drawer", Some(f.at(tx, top + 0.03, dz)));
 
-    settle_back();
+    settle!(centre = false);
     // (10 cm, to the worktop's back: against a wall at home it stops at the wall's face.)
     slide(
         drawer,

@@ -1,7 +1,8 @@
 //! The ice cream cart: a cream freezer on wheels across its 2 x 1 tiles, a parasol over it; its sliding lid opens as
 //! the seller reaches in.
 
-use super::common::{M, forms_band, fr, settle_in_place, striped, wheel};
+use super::common::{M, forms_band, striped, wheel};
+use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, V3, cos, cosd, radians, sin, sind, v3};
 use artkit::motion::{Slide, slide};
@@ -9,7 +10,8 @@ use artkit::parts::{join, new_parts};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
 use artkit::{
-    fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit_fillet, loft, revolve, soft, sphere, sweep,
+    fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit_fillet, loft, revolve, settle, soft, sphere,
+    sweep,
 };
 
 // --- the ice cream cart: a cream freezer on wheels, a parasol over it ------------------------------------
@@ -133,7 +135,7 @@ pub fn ice_cream_cart() -> Vec<Obj> {
         for y in [0.5, 0.74] {
             soft!(
                 f,
-                format!("band{}", fr(y)),
+                format!("band{}", float_repr(y)),
                 1.312,
                 0.1,
                 0.632,
@@ -186,12 +188,19 @@ pub fn ice_cream_cart() -> Vec<Obj> {
         );
         for x in [-0.62, 0.38] {
             for z in [-0.27, 0.27] {
-                wheel(&f, &format!("wheel{}{}", fr(x), fr(z)), x, z, 0.17, 6);
+                wheel(
+                    &f,
+                    &format!("wheel{}{}", float_repr(x), float_repr(z)),
+                    x,
+                    z,
+                    0.17,
+                    6,
+                );
             }
             for z in [-0.3, 0.3] {
                 fsweep!(
                     f,
-                    format!("axle{}{}", fr(x), fr(z)),
+                    format!("axle{}{}", float_repr(x), float_repr(z)),
                     &[(x, 0.17, 0.0), (x, 0.17, z)],
                     0.012,
                     M.steel,
@@ -225,7 +234,7 @@ pub fn ice_cream_cart() -> Vec<Obj> {
         for z in [-0.22, 0.22] {
             fcyl!(
                 f,
-                format!("bar_mount{}", fr(z)),
+                format!("bar_mount{}", float_repr(z)),
                 0.03,
                 0.02,
                 (0.495, 0.86, z),
@@ -258,7 +267,7 @@ pub fn ice_cream_cart() -> Vec<Obj> {
         for x in [-0.77, 0.47] {
             fbox!(
                 f,
-                format!("deck_end{}", fr(x)),
+                format!("deck_end{}", float_repr(x)),
                 0.06,
                 0.04,
                 0.42,
@@ -271,7 +280,7 @@ pub fn ice_cream_cart() -> Vec<Obj> {
         for z in [-0.115, 0.275] {
             fbox!(
                 f,
-                format!("rail{}", fr(z)),
+                format!("rail{}", float_repr(z)),
                 1.18,
                 0.06,
                 0.03,
@@ -493,7 +502,7 @@ pub fn ice_cream_cart() -> Vec<Obj> {
         );
     });
     let lid = join(&parts, "lid", None);
-    settle_in_place();
+    settle!(centre = false);
     slide(
         lid,
         "lid_open",

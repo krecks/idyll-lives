@@ -2,11 +2,12 @@
 //! e-scooter. No clips: the renderer turns their parts by code, each a top-level node on its pivot: `frame`,
 //! `wheel_front`, `wheel_rear`, `cranks`, `stand`.
 
-use super::common::{F, M, arc_points, bent_bar, board, name, rod};
+use super::common::{F, M, arc_points, bent, board, rod};
 use super::play::{Bike, bike, wheel};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
 use artkit::math::{P3, cosd, pow, sind};
+use artkit::parts::numbered;
 use artkit::parts::{Settle, join, join_all, new_parts, settle_with};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
@@ -423,7 +424,7 @@ fn ebike() -> Bike {
 fn bb_shell(s: &Bike, width: f64) {
     fcyl!(
         F,
-        name("bb_shell"),
+        numbered("bb_shell"),
         0.024 * s.k,
         width,
         (s.bb.0, s.bb.1, s.z),
@@ -437,7 +438,7 @@ fn bb_shell(s: &Bike, width: f64) {
 fn spindle(s: &Bike) {
     fcyl!(
         F,
-        name("spindle"),
+        numbered("spindle"),
         0.009 * s.k,
         2.0 * s.crank_dz,
         (s.bb.0, s.bb.1, s.z),
@@ -550,7 +551,7 @@ fn city_extras(s: &Bike) {
                 .collect();
             fsweep!(
                 F,
-                name("basket_band"),
+                numbered("basket_band"),
                 &band,
                 0.006,
                 M.basket_dark,
@@ -564,7 +565,7 @@ fn city_extras(s: &Bike) {
             let e = 2.0 / 4.0; // the rings' squareness (ring square=4)
             let (u, v) = (pow(c.abs(), e).copysign(c), pow(s_.abs(), e).copysign(s_));
             rod(
-                &name("basket_rib"),
+                &numbered("basket_rib"),
                 (cx + hx * 0.925 * u, cy0 + 0.01, z + hz * 0.925 * v),
                 (cx + hx * 1.003 * u, cy1 - 0.012, z + hz * 1.003 * v),
                 0.0035,
@@ -575,7 +576,7 @@ fn city_extras(s: &Bike) {
     }
     for sg in [-1.0, 1.0] {
         rod(
-            &name("basket_stay"),
+            &numbered("basket_stay"),
             (cx + 0.08, cy0 + 0.005, z + sg * 0.07),
             (s.front, s.r, z + sg * 0.062),
             0.005,
@@ -618,8 +619,8 @@ fn city_extras(s: &Bike) {
     let (ch, x0, x1) = (0.735, -0.3, -0.8);
     for sg in [-1.0, 1.0] {
         let dz = sg * 0.065;
-        bent_bar(
-            &name("carrier_rail"),
+        bent(
+            &numbered("carrier_rail"),
             &[
                 (x0, ch - 0.02, z + dz * 0.5),
                 (x0 - 0.04, ch, z + dz),
@@ -632,7 +633,7 @@ fn city_extras(s: &Bike) {
             3,
         );
         rod(
-            &name("carrier_strut"),
+            &numbered("carrier_strut"),
             (x0, ch - 0.02, z + dz * 0.5),
             (-0.245, 0.585, z + sg * 0.016),
             0.005,
@@ -641,7 +642,7 @@ fn city_extras(s: &Bike) {
         );
         for xa in [x1 + 0.02, -0.64] {
             rod(
-                &name("carrier_stay"),
+                &numbered("carrier_stay"),
                 (xa, ch, z + dz),
                 (s.rear - 0.01, s.r + 0.01, z + sg * 0.046),
                 0.0055,
@@ -652,7 +653,7 @@ fn city_extras(s: &Bike) {
     }
     for xa in [-0.42, -0.56, x1] {
         rod(
-            &name("carrier_bar"),
+            &numbered("carrier_bar"),
             (xa, ch, z - 0.065),
             (xa, ch, z + 0.065),
             0.005,
@@ -702,7 +703,7 @@ fn city_stand(s: &Bike) {
     for sg in [-1.0, 1.0] {
         fsweep!(
             F,
-            name("stand_leg"),
+            numbered("stand_leg"),
             &[
                 (px, py, z + sg * 0.03),
                 (px + 0.02, 0.16, z + sg * 0.1),
@@ -716,7 +717,7 @@ fn city_stand(s: &Bike) {
         );
         fbox!(
             F,
-            name("stand_foot"),
+            numbered("stand_foot"),
             0.055,
             0.016,
             0.04,
@@ -768,7 +769,7 @@ fn kid_extras(s: &Bike) {
         let (gx, gh, gz) = (0.16, 0.66, z + sf * 0.268);
         fcyl!(
             F,
-            name("grip_cap"),
+            numbered("grip_cap"),
             0.019,
             0.012,
             (gx, gh, gz),
@@ -787,7 +788,7 @@ fn kid_extras(s: &Bike) {
             ];
             fsweep!(
                 F,
-                name("streamer"),
+                numbered("streamer"),
                 &pts,
                 0,
                 colours[j as usize],
@@ -807,7 +808,7 @@ fn kid_extras(s: &Bike) {
         let sz = z + sg * 0.175;
         fsweep!(
             F,
-            name("stabiliser"),
+            numbered("stabiliser"),
             &[
                 (s.rear, s.r, z + sg * 0.045),
                 (s.rear - 0.012, 0.12, z + sg * 0.13),
@@ -818,7 +819,7 @@ fn kid_extras(s: &Bike) {
             verts = low(6, 4)
         );
         torus!(
-            name("stabiliser_tyre"),
+            numbered("stabiliser_tyre"),
             sr - 0.014,
             0.014,
             at = F.at(sx, sr, sz),
@@ -829,7 +830,7 @@ fn kid_extras(s: &Bike) {
         );
         fcyl!(
             F,
-            name("stabiliser_hub"),
+            numbered("stabiliser_hub"),
             sr - 0.022,
             0.02,
             (sx, sr, sz),
@@ -839,7 +840,7 @@ fn kid_extras(s: &Bike) {
         );
         fcyl!(
             F,
-            name("stabiliser_axle"),
+            numbered("stabiliser_axle"),
             0.007,
             0.04,
             (sx, sr, sz),
@@ -1244,7 +1245,7 @@ fn sc_axis(h: f64) -> (f64, f64) {
 fn sc_wheel(x: f64, motor: bool) {
     let y = SC_R;
     torus!(
-        name("tyre"),
+        numbered("tyre"),
         SC_R - 0.025,
         0.025,
         at = F.at(x, y, 0),
@@ -1257,7 +1258,7 @@ fn sc_wheel(x: f64, motor: bool) {
     if motor {
         // the motor: a drum as wide as the tyre, a lip either side
         revolve!(
-            name("motor"),
+            numbered("motor"),
             &[
                 (0.0, -0.034),
                 (0.03, -0.034),
@@ -1279,7 +1280,7 @@ fn sc_wheel(x: f64, motor: bool) {
             for s in [-1.0, 1.0] {
                 fcyl!(
                     F,
-                    name("motor_cap"),
+                    numbered("motor_cap"),
                     0.022,
                     0.006,
                     (x, y, s * 0.036),
@@ -1291,7 +1292,7 @@ fn sc_wheel(x: f64, motor: bool) {
         }
     } else {
         revolve!(
-            name("rim"),
+            numbered("rim"),
             &[
                 (rim - 0.012, -0.02),
                 (rim + 0.004, -0.02),
@@ -1305,7 +1306,7 @@ fn sc_wheel(x: f64, motor: bool) {
         );
         fcyl!(
             F,
-            name("hub"),
+            numbered("hub"),
             0.02,
             0.05,
             (x, y, 0),
@@ -1319,7 +1320,7 @@ fn sc_wheel(x: f64, motor: bool) {
                 let m = 0.5 * (0.02 + rim - 0.012);
                 fbox!(
                     F,
-                    name("rim_spoke"),
+                    numbered("rim_spoke"),
                     rim - 0.012 - 0.015,
                     0.012,
                     0.016,
@@ -1331,7 +1332,7 @@ fn sc_wheel(x: f64, motor: bool) {
         }
         fcyl!(
             F,
-            name("brake_disc"),
+            numbered("brake_disc"),
             0.05,
             0.003,
             (x, y, 0.03),
@@ -1342,7 +1343,7 @@ fn sc_wheel(x: f64, motor: bool) {
     }
     fcyl!(
         F,
-        name("axle"),
+        numbered("axle"),
         0.009,
         0.1,
         (x, y, 0),
@@ -1382,7 +1383,7 @@ fn sc_frame() {
         for s in [-1.0, 1.0] {
             fbox!(
                 F,
-                name("deck_trim"),
+                numbered("deck_trim"),
                 l - 0.08,
                 0.008,
                 0.004,
@@ -1394,7 +1395,7 @@ fn sc_frame() {
     // the back fork: a plate either side from the deck's tail to the axle; the fender over the wheel, a light at its end
     for s in [-1.0, 1.0] {
         board(
-            &name("rear_fork"),
+            &numbered("rear_fork"),
             (x0 + 0.03, top - 0.03, s * 0.042),
             (SC_REAR, SC_R, s * 0.042),
             0.04,
@@ -1415,7 +1416,7 @@ fn sc_frame() {
     for (x, (a0, a1)) in [(SC_REAR, (28.0, 152.0)), (SC_FRONT, (45.0, 140.0))] {
         fsweep!(
             F,
-            name("fender"),
+            numbered("fender"),
             &arc_points((x, SC_R, 0.0), SC_R + 0.016, a0, a1, low(10, 4), true),
             0,
             M.scooter,
@@ -1467,7 +1468,7 @@ fn sc_frame() {
     for s in [-1.0, 1.0] {
         fsweep!(
             F,
-            name("fork"),
+            numbered("fork"),
             &[(cx, cy, s * 0.02), (SC_FRONT, SC_R, s * 0.042)],
             0.009,
             M.scooter,
@@ -1544,7 +1545,7 @@ fn sc_frame() {
     for s in [-1.0, 1.0] {
         fsweep!(
             F,
-            name("grip"),
+            numbered("grip"),
             &[(bx, by, s * 0.17), (bx, by, s * 0.29)],
             0.017,
             M.grip_tape,
@@ -1553,7 +1554,7 @@ fn sc_frame() {
         );
         fcyl!(
             F,
-            name("grip_end"),
+            numbered("grip_end"),
             0.018,
             0.008,
             (bx, by, s * 0.294),

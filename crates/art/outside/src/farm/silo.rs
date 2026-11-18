@@ -1,7 +1,8 @@
 //! The grain silo: a galvanised drum on a concrete pad under a red domed cap, its ladder, walkway, door and chute,
 //! and its far version.
 
-use super::common::{F, M, fr};
+use super::common::{F, M};
+use artkit::json::float_repr;
 use artkit::math::{TAU, cos, cosd, degrees, radians, sin, sind};
 use artkit::parts::{join_all, settle};
 use artkit::scene::Obj;
@@ -149,7 +150,7 @@ pub fn silo() -> Vec<Obj> {
     for x in [-0.2, 0.2] {
         kit_tube!(
             F,
-            format!("rail{}", fr(x)),
+            format!("rail{}", float_repr(x)),
             &kit_fillet!(
                 &[
                     (x, 0.3, z),
@@ -166,7 +167,7 @@ pub fn silo() -> Vec<Obj> {
         for y in [1.0, 3.0, 5.0] {
             fbox!(
                 F,
-                format!("stay{}{}", fr(x), fr(y)),
+                format!("stay{}{}", float_repr(x), float_repr(y)),
                 0.03,
                 0.04,
                 0.15,
@@ -177,7 +178,7 @@ pub fn silo() -> Vec<Obj> {
             );
             fcyl!(
                 F,
-                format!("stay_bolt{}{}", fr(x), fr(y)),
+                format!("stay_bolt{}{}", float_repr(x), float_repr(y)),
                 0.018,
                 0.04,
                 (x, y - 0.03, z - 0.14),
@@ -244,7 +245,7 @@ pub fn silo() -> Vec<Obj> {
     for y in [0.42, 1.08] {
         fbox!(
             F,
-            format!("hatch_hinge{}", fr(y)),
+            format!("hatch_hinge{}", float_repr(y)),
             0.03,
             0.05,
             0.14,

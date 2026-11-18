@@ -1,26 +1,23 @@
 //! The vending machines' cabinet, against the back of the tile, with a tray below that a snack or a can drops
 //! into; and the snack machine, its window full of snacks in their spirals.
 
-use super::common::{M, fr, settle_in_place};
+use super::common::M;
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, cos, sin};
 use artkit::motion::{Slide, Swing, slide, swing};
 use artkit::parts::{join, new_parts};
 use artkit::place::GameFrame;
+use artkit::py;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsweep, soft};
+use artkit::{fbox, fcyl, fextrude, fsweep, settle, soft};
 
 pub const FRONT: f64 = 0.29; // the cabinet's front face
 pub const WIN_X: (f64, f64) = (-0.41, 0.16); // the window's sides
 const BAY_X: (f64, f64) = (-0.36, 0.06); // the pick-up tray's opening
 pub const BAY_Y: (f64, f64) = (0.185, 0.34); // its floor and top
 pub const WIN_Y: (f64, f64) = (0.44, 1.72); // the window's bottom and top
-
-/// Python's `sum` of a pair: from a whole zero.
-pub fn sum(p: (f64, f64)) -> f64 {
-    artkit::py::sum([p.0, p.1])
-}
 
 /// The machine's still shell: back block, sides, header with its lit sign, the keypad column, the kick panel round
 /// the tray's opening with its push flap, and the dark lining inside.
@@ -33,7 +30,7 @@ pub fn cabinet(f: &GameFrame, body: Mat) {
         for z in [-0.38, 0.22] {
             fcyl!(
                 f,
-                format!("foot{sx}{}", fr(z)),
+                format!("foot{sx}{}", float_repr(z)),
                 0.022,
                 0.03,
                 (sx as f64 * 0.38, 0.015, z),
@@ -215,11 +212,11 @@ pub fn cabinet(f: &GameFrame, body: Mat) {
     for (x0, x1) in [(WIN_X.0, BAY_X.0), (BAY_X.1, WIN_X.1)] {
         fbox!(
             f,
-            format!("cheek{}", fr(x0)),
+            format!("cheek{}", float_repr(x0)),
             x1 - x0,
             BAY_Y.1 - BAY_Y.0,
             0.26,
-            ((x0 + x1) / 2.0, sum(BAY_Y) / 2.0, 0.16),
+            ((x0 + x1) / 2.0, py::sum([BAY_Y.0, BAY_Y.1]) / 2.0, 0.16),
             body
         );
     }
@@ -245,7 +242,7 @@ pub fn cabinet(f: &GameFrame, body: Mat) {
     for x in [WIN_X.0 + 0.003, WIN_X.1 - 0.003] {
         fbox!(
             f,
-            format!("lining{}", fr(x)),
+            format!("lining{}", float_repr(x)),
             0.006,
             WIN_Y.1 - BAY_Y.0,
             0.25,
@@ -277,7 +274,7 @@ pub fn cabinet(f: &GameFrame, body: Mat) {
         "bezel",
         &rounded_rect(w + 0.03, WIN_Y.1 - WIN_Y.0 + 0.03, 0.02, 2),
         0.012,
-        (cx, sum(WIN_Y) / 2.0, FRONT + 0.002),
+        (cx, py::sum([WIN_Y.0, WIN_Y.1]) / 2.0, FRONT + 0.002),
         body,
         holes = [rounded_rect(w - 0.01, WIN_Y.1 - WIN_Y.0 - 0.01, 0.012, 2)]
     );
@@ -433,7 +430,7 @@ pub fn vending_snack() -> Vec<Obj> {
             WIN_X.1 - WIN_X.0,
             WIN_Y.1 - WIN_Y.0,
             0.01,
-            (cx, sum(WIN_Y) / 2.0, FRONT - 0.015),
+            (cx, py::sum([WIN_Y.0, WIN_Y.1]) / 2.0, FRONT - 0.015),
             M.glass
         );
     });
@@ -442,7 +439,7 @@ pub fn vending_snack() -> Vec<Obj> {
     let (x, y, h, m) = drop.expect("the second shelf's second snack is the one that drops");
     let parts = new_parts(|| bag(&f, "snack", x, y, 0.195, 0.09, h, 0.03, m));
     let snack = join(&parts, "snack", Some(f.at(x, y, 0.195)));
-    settle_in_place();
+    settle!(centre = false);
     let fall = y - (BAY_Y.0 + 0.006 + h / 2.0);
     slide(
         snack,

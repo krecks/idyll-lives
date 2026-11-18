@@ -1,24 +1,16 @@
 //! OU3: the charcoal grill, the gas grill station and the fire pit.
 
-use super::common::{F, M, bent, bottle, jitter, knob, pull, rod, shaker, slab, v};
+use super::common::{F, M, bent, bottle, jitter, rod, slab, v};
+use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, V3, cos, cosd, pow, radians, sin, sind};
 use artkit::motion::{Grow, Swing, grow, swing};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
 use artkit::shapes::SHARP;
-use artkit::{cylinder, fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve};
-
-fn settle_in_place() {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
-}
+use artkit::{cylinder, fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, settle};
 
 /// A convex outline of game (depth, height) points, run across from game x0 to x1: a hood's barrel.
 fn across(name: &str, outline: &[(f64, f64)], x0: f64, x1: f64, material: Mat) -> Obj {
@@ -418,7 +410,7 @@ pub fn grill() -> Vec<Obj> {
         );
     });
     let lid = hinged(join(&parts, "lid", None), F.at(0, KETTLE_RIM, -KETTLE_R));
-    settle_in_place();
+    settle!(centre = false);
     swing(
         lid,
         "lid_open",
@@ -478,15 +470,15 @@ pub fn grill_station() -> Vec<Obj> {
             bevel_segments = 1
         );
         for (k, x) in [-0.3, -0.1, 0.1, 0.3].into_iter().enumerate() {
-            knob(
-                &F,
-                &format!("knob{k}"),
+            kit::knob!(
+                F,
+                format!("knob{k}"),
                 x,
                 0.8,
                 0.154,
                 0.018,
                 M.handle_steel,
-                10,
+                segments = 10
             );
         }
         fcyl!(
@@ -502,36 +494,32 @@ pub fn grill_station() -> Vec<Obj> {
         // two stainless doors, framed, with bar pulls; the hinges' knuckles at their outer edges
         for s in [-1, 1] {
             let sf = s as f64;
-            shaker(
-                &F,
-                &format!("door{s}"),
+            kit::shaker!(
+                F,
+                format!("door{s}"),
                 0.74,
                 0.6,
                 (sf * 0.39, 0.4, 0.147),
                 0.014,
                 M.cart,
-                0.05,
-                None,
-                0.003,
-                false,
+                rail = 0.05,
+                recess = 0.003
             );
-            pull(
-                &F,
-                &format!("door_handle{s}"),
+            kit::pull!(
+                F,
+                format!("door_handle{s}"),
                 sf * 0.39,
                 0.64,
                 0.154,
                 0.44,
                 M.handle_steel,
-                0.008,
-                0.026,
-                false,
-                8,
+                r = 0.008,
+                out = 0.026
             );
             for y in [0.17, 0.63] {
                 fcyl!(
                     F,
-                    format!("knuckle{s}{}", super::common::fr(y)),
+                    format!("knuckle{s}{}", float_repr(y)),
                     0.006,
                     0.05,
                     (sf * 0.765, y, 0.15),
@@ -578,7 +566,7 @@ pub fn grill_station() -> Vec<Obj> {
         }
         for z in [-0.36, 0.08] {
             rod(
-                &format!("grate_frame{}", super::common::fr(z)),
+                &format!("grate_frame{}", float_repr(z)),
                 (-0.42, 0.909, z),
                 (0.42, 0.909, z),
                 0.006,
@@ -686,18 +674,16 @@ pub fn grill_station() -> Vec<Obj> {
             (0, bottom - 0.002, mid),
             M.firebox
         );
-        pull(
-            &F,
+        kit::pull!(
+            F,
             "hood_handle",
-            0.0,
+            0,
             1.0,
             front,
             0.68,
             M.handle_steel,
-            0.012,
-            0.055,
-            false,
-            8,
+            r = 0.012,
+            out = 0.055
         );
         cylinder!(
             "gauge_bezel",
@@ -719,7 +705,7 @@ pub fn grill_station() -> Vec<Obj> {
         );
     });
     let hood = hinged(join(&parts, "hood", None), F.at(0, spring, back));
-    settle_in_place();
+    settle!(centre = false);
     swing(
         hood,
         "hood_up",
@@ -931,7 +917,7 @@ pub fn fire_pit() -> Vec<Obj> {
     // Shrunk to a point at rest, not just flattened: the night glow's copy of the faces, drawn a hair in front,
     // would show a flattened disc through the ash.
     flames.set_scale((0.001, 0.001, 0.001));
-    settle_in_place();
+    settle!(centre = false);
     for axis in [Axis::X, Axis::Y, Axis::Z] {
         grow(flames, "flames", Grow { seconds: 0.8, axis });
     }

@@ -4,7 +4,7 @@
 //! table (`model.parkChessTable`). Notes: NOTES.md.
 //!
 //! Each is built where the game places it (`F`, game axes) and stood on the floor without moving it across
-//! (`settle_with` `centre: false`, `centre` on its `Model`), so the seats stay where the content puts its riders:
+//! (`settle!(centre = false)`, `centre` on its `Model`), so the seats stay where the content puts its riders:
 //! `seat` heights and forward offsets in web/public/content/community.json, slots spread across the width.
 //! Town things, seen from far: every model has a far version.
 //!
@@ -16,8 +16,7 @@
 //!   parkChessTable a white pawn slides one square on (`move`)
 //!
 
-use artkit::family::{Family, Model};
-use artkit::json::{Json, loads};
+use artkit::family::{Family, Model, motions};
 
 pub(crate) mod common;
 mod courts;
@@ -25,10 +24,6 @@ mod frames;
 mod rides;
 
 use common::M;
-
-fn motions(text: &str) -> Json {
-    loads(text).expect("the motions are JSON")
-}
 
 /// The family.
 pub fn family() -> Option<Family> {

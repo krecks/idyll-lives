@@ -2,11 +2,11 @@
 //! of the middle (game x +-1.32), the car along the depth, its nose to the front, its sills 1.27 m up on the arms'
 //! four pads; its wheels lie and lean on the floor round it.
 
-use super::common::{Axle, F, arc, own_palette, tyre};
+use super::common::{F, arc, own_palette, tyre};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
-use artkit::math::{M4, TAU, atan2, cos, degrees, radians, sin};
+use artkit::math::{Axis, M4, TAU, atan2, cos, degrees, radians, sin};
 use artkit::parts::{join, join_all, new_parts, settle_all};
 use artkit::place::Facing;
 use artkit::py;
@@ -444,7 +444,7 @@ pub fn alloy(name: &str, m: &LIFT) -> Obj {
             m.rubber,
             if is_low() { None } else { Some(2) },
             Some(low(32, 12)),
-            Axle::Z,
+            Axis::Z,
         );
         revolve!(
             format!("{name}_rim"),

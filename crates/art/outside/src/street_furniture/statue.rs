@@ -1,11 +1,11 @@
 //! The founder's statue: a bronze woman in a long coat on a granite plinth, pointing.
 
-use super::common::{N, far_keeping_feet, lobed, own};
+use super::common::{far_keeping_feet, lobed, own};
 use artkit::math::P3;
 use artkit::parts::{join_all, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, kit_moulding, loft, revolve, ring};
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, kit_moulding, loft, points, revolve, ring};
 
 pub fn town_statue() -> Vec<Obj> {
     let m = own("townStatue");
@@ -300,12 +300,12 @@ pub fn town_statue() -> Vec<Obj> {
         fsweep!(
             f,
             "arm_right",
-            &[
-                (0.2, y + 1.52, N::I(0)),
-                (0.31, y + 1.57, N::F(0.08)),
-                (0.4, y + 1.62, N::F(0.16)),
-                (0.5, y + 1.71, N::F(0.23)),
-                (0.59, y + 1.79, N::F(0.29))
+            &points![
+                (0.2, y + 1.52, 0),
+                (0.31, y + 1.57, 0.08),
+                (0.4, y + 1.62, 0.16),
+                (0.5, y + 1.71, 0.23),
+                (0.59, y + 1.79, 0.29)
             ],
             0.056,
             bronze,
@@ -334,12 +334,12 @@ pub fn town_statue() -> Vec<Obj> {
         fsweep!(
             f,
             "arm_left",
-            &[
-                (-0.21, y + 1.52, N::I(0)),
-                (-0.25, y + 1.36, N::F(0.02)),
-                (-0.27, y + 1.2, N::F(0.04)),
-                (-0.24, y + 1.16, N::F(0.12)),
-                (-0.21, y + 1.14, N::F(0.18))
+            &points![
+                (-0.21, y + 1.52, 0),
+                (-0.25, y + 1.36, 0.02),
+                (-0.27, y + 1.2, 0.04),
+                (-0.24, y + 1.16, 0.12),
+                (-0.21, y + 1.14, 0.18)
             ],
             0.056,
             bronze,

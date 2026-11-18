@@ -1,13 +1,15 @@
 //! The slide and the climbing frame: a tower to climb, and a way down.
 
-use super::common::{F, M, X, fillet, fr, mesh};
+use super::common::{F, M, X, mesh};
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, V3, cos, cosd, sin, sind};
-use artkit::parts::{Settle, aside, join_all, new_parts, settle_with};
+use artkit::parts::{aside, join_all, new_parts};
 use artkit::place::{Facing, Spot};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, sweep};
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, settle, sweep};
 
 // Game axes: the tower at the back (deck at 1.4 m), the ladder behind it, the chute running down to the front.
 const SLIDE_TOP: (f64, f64) = (1.43, -0.29); // (height, depth) where the chute leaves the deck
@@ -105,7 +107,7 @@ pub fn slide() -> Vec<Obj> {
         for z in [-0.31, -0.69] {
             fcyl!(
                 F,
-                format!("post{}{}", fr(x), fr(z)),
+                format!("post{}{}", float_repr(x), float_repr(z)),
                 0.035,
                 SLIDE_EAVES,
                 (x, SLIDE_EAVES / 2.0, z),
@@ -114,7 +116,7 @@ pub fn slide() -> Vec<Obj> {
             );
             fbox!(
                 F,
-                format!("base_plate{}{}", fr(x), fr(z)),
+                format!("base_plate{}{}", float_repr(x), float_repr(z)),
                 0.12,
                 0.012,
                 0.12,
@@ -125,7 +127,7 @@ pub fn slide() -> Vec<Obj> {
             );
             fsphere!(
                 F,
-                format!("post_cap{}{}", fr(x), fr(z)),
+                format!("post_cap{}{}", float_repr(x), float_repr(z)),
                 0.04,
                 (x, SLIDE_EAVES, z),
                 M.body,
@@ -133,7 +135,7 @@ pub fn slide() -> Vec<Obj> {
                 rings = 5
             );
         }
-        let lp = fillet(
+        let lp = kit::fillet!(
             &[
                 (x, 1.62, -0.5),
                 (x, 1.62, -0.655),
@@ -142,12 +144,11 @@ pub fn slide() -> Vec<Obj> {
                 (x, 1.62, -0.345),
                 (x, 1.62, -0.5),
             ],
-            0.04,
-            3,
+            0.04
         );
         fsweep!(
             F,
-            format!("guard{}", fr(x)),
+            format!("guard{}", float_repr(x)),
             &lp[..lp.len() - 1],
             0.02,
             M.body,
@@ -164,7 +165,7 @@ pub fn slide() -> Vec<Obj> {
             .collect();
         fextrude!(
             F,
-            format!("panel{}", fr(x)),
+            format!("panel{}", float_repr(x)),
             &rounded_rect(0.28, 0.21, 0.03, 2),
             0.014,
             (x, 1.74, -0.5),
@@ -174,7 +175,7 @@ pub fn slide() -> Vec<Obj> {
         );
         fbox!(
             F,
-            format!("beam_side{}", fr(x)),
+            format!("beam_side{}", float_repr(x)),
             0.05,
             0.06,
             0.44,
@@ -187,7 +188,7 @@ pub fn slide() -> Vec<Obj> {
     for z in [-0.31, -0.69] {
         fbox!(
             F,
-            format!("beam{}", fr(z)),
+            format!("beam{}", float_repr(z)),
             0.6,
             0.06,
             0.05,
@@ -254,16 +255,15 @@ pub fn slide() -> Vec<Obj> {
     for x in [-0.25, 0.25] {
         fsweep!(
             F,
-            format!("ladder{}", fr(x)),
-            &fillet(
+            format!("ladder{}", float_repr(x)),
+            &kit::fillet!(
                 &[
                     (x, 0.0, -0.94),
                     (x, 1.42, -0.7),
                     (x, 1.95, -0.69),
                     (x * 1.12, 1.95, -0.69)
                 ],
-                0.06,
-                3
+                0.06
             ),
             0.025,
             M.body,
@@ -271,7 +271,7 @@ pub fn slide() -> Vec<Obj> {
         );
         fcyl!(
             F,
-            format!("ladder_foot{}", fr(x)),
+            format!("ladder_foot{}", float_repr(x)),
             0.026,
             0.012,
             (x, 0.006, -0.938),
@@ -321,7 +321,7 @@ pub fn slide() -> Vec<Obj> {
     for x in [-0.18, 0.18] {
         fsweep!(
             F,
-            format!("leg{}", fr(x)),
+            format!("leg{}", float_repr(x)),
             &[(x, 0.0, 0.84), (x, 0.3, 0.84)],
             0.025,
             M.body,
@@ -329,7 +329,7 @@ pub fn slide() -> Vec<Obj> {
         );
         fbox!(
             F,
-            format!("foot{}", fr(x)),
+            format!("foot{}", float_repr(x)),
             0.09,
             0.012,
             0.09,
@@ -348,13 +348,7 @@ pub fn slide() -> Vec<Obj> {
         verts = 6
     );
     join_all("slide");
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }
 
@@ -384,7 +378,7 @@ pub fn climbing_frame() -> Vec<Obj> {
         for z in [-0.85, 0.85] {
             fbox!(
                 F,
-                format!("post{}{}", fr(x), fr(z)),
+                format!("post{}{}", float_repr(x), float_repr(z)),
                 0.1,
                 2.3,
                 0.1,
@@ -395,7 +389,7 @@ pub fn climbing_frame() -> Vec<Obj> {
             );
             fbox!(
                 F,
-                format!("shoe{}{}", fr(x), fr(z)),
+                format!("shoe{}{}", float_repr(x), float_repr(z)),
                 0.12,
                 0.08,
                 0.12,
@@ -423,7 +417,7 @@ pub fn climbing_frame() -> Vec<Obj> {
     for z in [-0.82, 0.82] {
         fbox!(
             F,
-            format!("joist{}", fr(z)),
+            format!("joist{}", float_repr(z)),
             1.6,
             0.12,
             0.06,
@@ -434,7 +428,7 @@ pub fn climbing_frame() -> Vec<Obj> {
     for x in [-0.85, 0.85] {
         for (z, dz) in [(-0.85, 1.0), (0.85, -1.0)] {
             board(
-                &format!("brace{}{}", fr(x), fr(z)),
+                &format!("brace{}{}", float_repr(x), float_repr(z)),
                 (x, deck - 0.4, z + dz * 0.05),
                 (x, deck - 0.12, z + dz * 0.33),
                 0.07,
@@ -502,7 +496,7 @@ pub fn climbing_frame() -> Vec<Obj> {
     for z in [-0.85, 0.85] {
         fbox!(
             F,
-            format!("beam{}", fr(z)),
+            format!("beam{}", float_repr(z)),
             1.8,
             0.1,
             0.08,
@@ -513,7 +507,7 @@ pub fn climbing_frame() -> Vec<Obj> {
         );
         for s in [-1, 1] {
             board(
-                &format!("rafter{}{s}", fr(z)),
+                &format!("rafter{}{s}", float_repr(z)),
                 (s as f64 * 0.85, 2.3, z),
                 (0, 2.71, z),
                 0.08,
@@ -523,7 +517,7 @@ pub fn climbing_frame() -> Vec<Obj> {
         }
         fextrude!(
             F,
-            format!("gable{}", fr(z)),
+            format!("gable{}", float_repr(z)),
             &[(-0.82, 2.3), (0.82, 2.3), (0.0, 2.68)],
             0.02,
             (0, 0, z - 0.03 * (if z > 0.0 { 1.0 } else { -1.0 })),
@@ -624,7 +618,7 @@ pub fn climbing_frame() -> Vec<Obj> {
     for x in [xs[0], xs[xs.len() - 1]] {
         fcyl!(
             F,
-            format!("peg{}", fr(x)),
+            format!("peg{}", float_repr(x)),
             0.03,
             0.06,
             (x, 0.03, 0.96),
@@ -636,10 +630,9 @@ pub fn climbing_frame() -> Vec<Obj> {
     fsweep!(
         F,
         "pole",
-        &fillet(
+        &kit::fillet!(
             &[(0.55, 0.0, 0.95), (0.55, 2.04, 0.95), (0.55, 2.2, 0.85)],
-            0.06,
-            3
+            0.06
         ),
         0.025,
         M.rail,
@@ -705,12 +698,6 @@ pub fn climbing_frame() -> Vec<Obj> {
         );
     });
     aside(&carried, "flag");
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }

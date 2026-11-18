@@ -1,14 +1,14 @@
 //! The garage's tyre rack and tool chest.
 
-use super::common::{Axle, F, WALL, own_palette, tyre};
+use super::common::{F, WALL, own_palette, tyre};
 use artkit::far::{is_low, low};
 use artkit::forms::Holes;
-use artkit::math::{TAU, atan2, cos, degrees, pow, radians, sin, sqrt};
-use artkit::parts::{Settle, join_all, new_parts, settle_with};
+use artkit::math::{Axis, TAU, atan2, cos, degrees, pow, radians, sin, sqrt};
+use artkit::parts::{join_all, new_parts};
 use artkit::place::Facing;
 use artkit::py;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, kit_tube};
+use artkit::{fbox, fcyl, fextrude, kit_tube, settle};
 
 own_palette! { TYRES:
     body = ("#E07A1F", satin),        // the frames' orange uprights
@@ -142,7 +142,7 @@ pub fn tyre_rack() -> Vec<Obj> {
                     m.rubber,
                     None,
                     Some(low(20, 10)),
-                    Axle::X,
+                    Axis::X,
                 );
                 if !is_low() {
                     // the tread's label, on its crown to the front
@@ -160,13 +160,7 @@ pub fn tyre_rack() -> Vec<Obj> {
         }
     });
     join_all(if is_low() { "tyreRack_far" } else { "tyreRack" });
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }
 
@@ -535,12 +529,6 @@ pub fn tool_chest() -> Vec<Obj> {
     } else {
         "toolChest"
     });
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }

@@ -1,14 +1,17 @@
 //! The litter bin, the post box and the notice board.
 
-use super::common::{fr, own};
+use super::common::own;
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, cos, radians, sin};
 use artkit::motion::{Swing, swing};
-use artkit::parts::{Settle, hinged, join, join_all, new_parts, settle_all, settle_with};
+use artkit::parts::{hinged, join, join_all, new_parts, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcone, fcyl, fextrude, fsphere, fsweep, kit_fillet, loft, revolve, ring};
+use artkit::{
+    fbox, fcone, fcyl, fextrude, fsphere, fsweep, kit_fillet, loft, revolve, ring, settle,
+};
 
 // --- the litter bin: a slatted green bin on a post ----------------------------------------------------------
 /// A ring round a bin of radius `r` at height `y` (Blender): `ribs` slats standing `out` proud, steep-sided, narrow
@@ -72,7 +75,7 @@ pub fn litter_bin() -> Vec<Obj> {
                 .collect();
             fsweep!(
                 f,
-                format!("strap{}", fr(y)),
+                format!("strap{}", float_repr(y)),
                 &pts,
                 0,
                 m.iron,
@@ -80,7 +83,7 @@ pub fn litter_bin() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                format!("lug{}", fr(y)),
+                format!("lug{}", float_repr(y)),
                 0.05,
                 0.04,
                 0.06,
@@ -173,13 +176,7 @@ pub fn litter_bin() -> Vec<Obj> {
         }
     }
     join_all("litterBin");
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }
 
@@ -448,7 +445,7 @@ pub fn notice_board() -> Vec<Obj> {
         for x in [-0.42, 0.42] {
             fbox!(
                 f,
-                format!("post{}", fr(x)),
+                format!("post{}", float_repr(x)),
                 0.08,
                 1.95,
                 0.08,
@@ -458,7 +455,7 @@ pub fn notice_board() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                format!("foot{}", fr(x)),
+                format!("foot{}", float_repr(x)),
                 0.1,
                 0.03,
                 0.1,
@@ -526,7 +523,7 @@ pub fn notice_board() -> Vec<Obj> {
         for x in [-0.5, 0.5] {
             fextrude!(
                 f,
-                format!("barge{}", fr(x)),
+                format!("barge{}", float_repr(x)),
                 &[
                     (-0.1735, -0.075),
                     (0.0, 0.03),
@@ -612,12 +609,6 @@ pub fn notice_board() -> Vec<Obj> {
         }
     }
     join_all("noticeBoard");
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }

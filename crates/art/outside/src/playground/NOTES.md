@@ -7,7 +7,7 @@ hoop (`model.basketballHoop`), the ping-pong table (`model.pingPongTable`) and t
 (`model.parkChessTable`). Built 2026-10-14; they sat in Validate › Playground until checked in play.
 
 Each is built where the game places it (`F`, game axes) and stood on the floor without moving it across
-(`settle_with` with `centre: false`, `centre` on its `Model`), so the seats stay where `community.json` seats the riders. Town
+(`settle!(centre = false)`, `centre` on its `Model`), so the seats stay where `community.json` seats the riders. Town
 things, seen from far: every model has a far version (`far=0.25`; the chess table's by hand, below).
 
 ## The moving ones

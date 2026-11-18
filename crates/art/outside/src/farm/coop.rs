@@ -1,7 +1,8 @@
 //! The chicken coop: a wooden house on braced legs in lap siding under a shingled gable roof, its ramp, windows,
 //! vents, nest box and feeder, and its pop-hole hatch that slides shut at night; and its far version.
 
-use super::common::{F, M, P2, fr, frame, prism, pts, shell, strut};
+use super::common::{F, M, P2, frame, prism, pts, shell, strut};
+use artkit::json::float_repr;
 use artkit::parts::{join, join_all, new_parts, settle, settle_all};
 use artkit::place::Coord;
 use artkit::py;
@@ -58,7 +59,7 @@ fn coop_body(detail: bool) {
         for z in [CB + 0.1, CF - 0.1] {
             fbox!(
                 F,
-                format!("leg{sx}{}", fr(z)),
+                format!("leg{sx}{}", float_repr(z)),
                 0.08,
                 CY0 + 0.02,
                 0.08,
@@ -229,7 +230,7 @@ pub fn coop() -> Vec<Obj> {
             for z in [CB, CF] {
                 fbox!(
                     F,
-                    format!("corner{sx}{}", fr(z)),
+                    format!("corner{sx}{}", float_repr(z)),
                     0.06,
                     CEAVE - CY0,
                     0.06,
@@ -391,7 +392,7 @@ pub fn coop() -> Vec<Obj> {
         );
         for x in [-0.3, 0.3] {
             strut(
-                &format!("nest_hinge{}", fr(x)),
+                &format!("nest_hinge{}", float_repr(x)),
                 (CB - 0.06, 1.155),
                 (CB + 0.02, 1.19),
                 0.008,
@@ -466,7 +467,7 @@ pub fn coop() -> Vec<Obj> {
         for y in [h0 + 0.05, h1 - 0.05] {
             fbox!(
                 F,
-                format!("hatch_rail{}", fr(y)),
+                format!("hatch_rail{}", float_repr(y)),
                 2.0 * hw - 0.04,
                 0.035,
                 0.012,
@@ -512,7 +513,7 @@ pub fn coop_far() -> Vec<Obj> {
         for z in [CB, CF] {
             fbox!(
                 F,
-                format!("corner{sx}{}", fr(z)),
+                format!("corner{sx}{}", float_repr(z)),
                 0.06,
                 CEAVE - CY0,
                 0.06,

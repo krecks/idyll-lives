@@ -1,12 +1,12 @@
 //! The grocery shelves: 2 x 1, a metal gondola of tins, packets and jars, sandwiches at the bottom, sitting back
 //! on its tiles as the game places it.
 
-use super::common::{Along, M, bottle, prism, settle_back};
-use artkit::math::P3;
+use super::common::{M, bottle, prism};
+use artkit::math::{Axis, P3};
 use artkit::parts::{join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude};
+use artkit::{fbox, fcyl, fextrude, settle};
 
 // --- the grocery shelves: 2x1, a metal gondola of tins, packets and jars, sandwiches at the bottom ---
 pub fn grocery_shelf() -> Vec<Obj> {
@@ -143,7 +143,7 @@ pub fn grocery_shelf() -> Vec<Obj> {
                             z - 0.035,
                             z + 0.035,
                             M.bread,
-                            Along::Z,
+                            Axis::Z,
                             0.0,
                         );
                     }
@@ -254,6 +254,6 @@ pub fn grocery_shelf() -> Vec<Obj> {
         }
     });
     join(&still, "shelves", Some(P3::from((0, 0, 0))));
-    settle_back();
+    settle!(centre = false);
     meshes()
 }

@@ -1,11 +1,12 @@
 //! The phone box: a red kiosk, glazed on every side, its door hinged on one side.
 
-use super::common::{N, own};
+use super::common::own;
 use artkit::materials::Mat;
 use artkit::math::{PI, cos, sin};
 use artkit::motion::{Ease, Swing, swing};
 use artkit::parts::{hinged, join, new_parts, settle_all};
-use artkit::place::{Facing, GameFrame};
+use artkit::place::N;
+use artkit::place::{Coord, Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, kit_pull, loft, ring};
 
@@ -188,9 +189,9 @@ pub fn phone_booth() -> Vec<Obj> {
             // a side's (across, height, out) point: on the face at (ox, oz) * FACE
             let at = move |x: N, y: f64, d: N| -> (N, f64, N) {
                 if oz != 0 {
-                    return (x.times(-oz), y, N::F(oz as f64 * (FACE + d_f(d))));
+                    return (x * -oz, y, N::F(oz as f64 * (FACE + d.f())));
                 }
-                (N::F(0.0 + ox as f64 * (FACE + d_f(d))), y, x.times(ox))
+                (N::F(0.0 + ox as f64 * (FACE + d.f())), y, x * ox)
             };
             glazing(&f, &format!("side{k}"), m.glass, red, &at, rot);
             let (kx, _, kz) = at(N::I(0), 0.0, N::I(0));
@@ -375,7 +376,7 @@ pub fn phone_booth() -> Vec<Obj> {
             "door",
             m.glass,
             red,
-            &|x: N, y: f64, d: N| (x, y, N::F(FACE + d_f(d))),
+            &|x: N, y: f64, d: N| (x, y, N::F(FACE + d.f())),
             0.0,
         );
         kit_pull!(
@@ -407,9 +408,4 @@ pub fn phone_booth() -> Vec<Obj> {
         },
     );
     meshes()
-}
-
-fn d_f(d: N) -> f64 {
-    use artkit::place::Coord;
-    d.f()
 }

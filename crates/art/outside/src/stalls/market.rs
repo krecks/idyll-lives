@@ -1,14 +1,15 @@
 //! The market stall: a table of fruit crates under a striped awning on four posts.
 
-use super::common::{M, fr, settle_in_place, valance};
+use super::common::{M, valance};
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::radians;
 use artkit::parts::{join, join_all, new_parts};
 use artkit::place::GameFrame;
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsweep, revolve, sphere};
+use artkit::{fbox, fcyl, fextrude, fsweep, revolve, settle, sphere};
 
 /// An open slatted crate on the table, tilted to the front, heaped with fruit; joined and turned whole.
 fn crate_(f: &GameFrame, name: &str, x: f64, fruit: Mat, rng: &mut Random) -> Obj {
@@ -172,7 +173,7 @@ pub fn market_stall() -> Vec<Obj> {
         for z in [-0.38, 0.38] {
             fbox!(
                 f,
-                format!("shelf_rail{}", fr(z)),
+                format!("shelf_rail{}", float_repr(z)),
                 1.76,
                 0.04,
                 0.04,
@@ -184,7 +185,7 @@ pub fn market_stall() -> Vec<Obj> {
             for (z, h) in [(-0.4, 2.1), (0.4, 1.9)] {
                 fbox!(
                     f,
-                    format!("post{}{}", fr(x), fr(z)),
+                    format!("post{}{}", float_repr(x), float_repr(z)),
                     0.06,
                     h,
                     0.06,
@@ -199,7 +200,7 @@ pub fn market_stall() -> Vec<Obj> {
             for (z, y) in [(0.4, 1.84), (-0.4, 2.04)] {
                 fbox!(
                     f,
-                    format!("brace{}{}", fr(x), fr(z)),
+                    format!("brace{}{}", float_repr(x), float_repr(z)),
                     0.04,
                     0.2,
                     0.04,
@@ -256,7 +257,7 @@ pub fn market_stall() -> Vec<Obj> {
         for dx in [-0.14, 0.14] {
             fsweep!(
                 f,
-                format!("string{}", fr(dx)),
+                format!("string{}", float_repr(dx)),
                 &[(0.5 + dx, 1.84, 0.4), (0.5 + dx * 0.9, 1.72, 0.4)],
                 0.004,
                 M.chalk,
@@ -375,6 +376,6 @@ pub fn market_stall() -> Vec<Obj> {
         }
     });
     join_all("marketStall");
-    settle_in_place();
+    settle!(centre = false);
     meshes()
 }

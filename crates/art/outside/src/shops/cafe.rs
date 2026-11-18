@@ -4,10 +4,10 @@ use super::common::{M, fluted};
 use artkit::far::{is_low, low};
 use artkit::forms::{by, rounded_rect};
 use artkit::math::{P3, PI, TAU, cos, radians, sin};
-use artkit::parts::{Settle, join, new_parts, settle_with};
+use artkit::parts::{join, new_parts};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fcyl, fsweep, kit_scroll, loft, revolve, ring};
+use artkit::{fcyl, fsweep, kit_scroll, loft, revolve, ring, settle};
 
 // Heights the content names (community.json): kept here and checked against it.
 pub const TABLE_TOP: f64 = 0.745; // cafeTable surface.height
@@ -198,13 +198,7 @@ pub fn cafe_table() -> Vec<Obj> {
         }
     });
     join(&still, "table", Some(P3::from((0, 0, 0))));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }
 
@@ -344,12 +338,6 @@ pub fn cafe_chair() -> Vec<Obj> {
         fsweep!(f, "loop", &lp, 0.012, M.bentwood, verts = 6, resolution = 3);
     });
     join(&still, "chair", Some(P3::from((0, 0, 0))));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }

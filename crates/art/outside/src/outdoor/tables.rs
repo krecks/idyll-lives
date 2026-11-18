@@ -1,16 +1,17 @@
 //! OU1's tables and the rest: the round mosaic table, the teak table, the patio chair, the outdoor bar and the
 //! parasol, whose canopy stirs in the wind.
 
-use super::common::{F, M, bent, bottle, cup, finish, fr, rod, side_slab, slab, tapered_leg};
+use super::common::{F, M, bent, bottle, cup, finish, rod, side_slab, slab, tapered_leg};
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, TAU, V3, cos, cosd, pow, sin, sind};
 use artkit::mesh::Mesh;
 use artkit::motion::{Rock, rock};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::scene::{self, Obj, meshes};
 use artkit::{
-    cylinder, fbox, fcyl, fextrude, fsweep, loft, revolve, rod as rod_, soft, sphere, sweep,
+    cylinder, fbox, fcyl, fextrude, fsweep, loft, revolve, rod as rod_, settle, soft, sphere, sweep,
 };
 
 // --- the round patio table: a mosaic top on an iron pedestal ---------------------------------------------------
@@ -223,7 +224,7 @@ pub fn patio_table4() -> Vec<Obj> {
             // the pegs through them
             fcyl!(
                 F,
-                format!("peg{s}{}", fr(z)),
+                format!("peg{s}{}", float_repr(z)),
                 0.007,
                 0.003,
                 (sf * 0.775, y + 0.0005, z),
@@ -386,7 +387,7 @@ pub fn patio_chair() -> Vec<Obj> {
             // glides under the feet
             fcyl!(
                 F,
-                format!("glide{s}{}", fr(z)),
+                format!("glide{s}{}", float_repr(z)),
                 0.0125,
                 0.008,
                 (x, 0.004, z),
@@ -472,7 +473,7 @@ pub fn outdoor_bar() -> Vec<Obj> {
         // the shelves in the back, and their divider
         fbox!(
             F,
-            format!("shelf{}", fr(y)),
+            format!("shelf{}", float_repr(y)),
             1.94,
             0.025,
             0.23,
@@ -590,7 +591,7 @@ pub fn outdoor_bar() -> Vec<Obj> {
     );
     for x in [-0.94, 0.0, 0.94] {
         cylinder!(
-            format!("flange{}", fr(x)),
+            format!("flange{}", float_repr(x)),
             0.035,
             0.008,
             at = F.at(x, 0.2, zf + 0.026),
@@ -832,13 +833,7 @@ pub fn parasol() -> Vec<Obj> {
         );
     });
     let canopy = hinged(join(&top, "canopy", None), F.at(0, 1.3, 0));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     // 3°: at 1.2° the rim moved a pixel or two from the game camera, too little to notice
     rock(
         canopy,

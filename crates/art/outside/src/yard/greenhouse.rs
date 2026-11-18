@@ -1,14 +1,15 @@
 //! The greenhouse (2x3): a white frame on a dwarf wall, glazed; staging and tomatoes inside; its door and its roof
 //! vent open (`door_open`). Built in the script's order, its one long build split where its comments part it.
 
-use super::common::{F, M, N, blob, board, name, pot, prism, rod};
-use super::play::settle_in_place;
+use super::common::{F, M, blob, board, pot, prism, rod};
 use artkit::far::{is_low, low};
 use artkit::math::{Axis, atan2, degrees};
 use artkit::motion::{Ease, Swing, swing};
+use artkit::parts::numbered;
 use artkit::parts::{hinged, join, join_all, new_parts};
+use artkit::place::N;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fsphere, revolve};
+use artkit::{fbox, fsphere, revolve, settle};
 
 const GHW: f64 = 1.8; // width, depth
 const GHD: f64 = 2.8;
@@ -50,7 +51,7 @@ fn wall_and_floor() {
     for s in [-1.0, 1.0] {
         fbox!(
             F,
-            name("wall_side"),
+            numbered("wall_side"),
             t,
             WALL_TOP,
             GHD - 2.0 * t,
@@ -61,7 +62,7 @@ fn wall_and_floor() {
         let w = (GHW - GH_DOOR) / 2.0;
         fbox!(
             F,
-            name("wall_front"),
+            numbered("wall_front"),
             w,
             WALL_TOP,
             t,
@@ -76,7 +77,7 @@ fn wall_and_floor() {
             let y = k as f64 * WALL_TOP / 5.0;
             fbox!(
                 F,
-                name("course"),
+                numbered("course"),
                 GHW + 0.002,
                 0.006,
                 t + 0.002,
@@ -86,7 +87,7 @@ fn wall_and_floor() {
             for s in [-1.0, 1.0] {
                 fbox!(
                     F,
-                    name("course"),
+                    numbered("course"),
                     t + 0.002,
                     0.006,
                     GHD - 2.0 * t,
@@ -96,7 +97,7 @@ fn wall_and_floor() {
                 let w = (GHW - GH_DOOR) / 2.0;
                 fbox!(
                     F,
-                    name("course"),
+                    numbered("course"),
                     w + 0.002,
                     0.006,
                     t + 0.002,
@@ -121,7 +122,7 @@ fn wall_and_floor() {
         for k in 1..6 {
             fbox!(
                 F,
-                name("joint"),
+                numbered("joint"),
                 0.5,
                 0.003,
                 0.008,
@@ -139,7 +140,7 @@ fn frame() {
     for s in [-1.0, 1.0] {
         fbox!(
             F,
-            name("sill"),
+            numbered("sill"),
             0.06,
             0.04,
             GHD,
@@ -148,7 +149,7 @@ fn frame() {
         );
         fbox!(
             F,
-            name("eave"),
+            numbered("eave"),
             0.06,
             0.05,
             GHD,
@@ -168,7 +169,7 @@ fn frame() {
     for z in [-hz + 0.025, hz - 0.025] {
         fbox!(
             F,
-            name("eave_end"),
+            numbered("eave_end"),
             GHW,
             0.04,
             0.05,
@@ -183,7 +184,7 @@ fn frame() {
         for s in [-1.0, 1.0] {
             fbox!(
                 F,
-                name("bar"),
+                numbered("bar"),
                 0.04,
                 GH_EAVE - WALL_TOP,
                 0.04,
@@ -191,7 +192,7 @@ fn frame() {
                 M.gh_frame
             );
             board(
-                &name("rafter"),
+                &numbered("rafter"),
                 (s * 0.03, GH_RIDGE, z),
                 (s * (hx - 0.02), GH_EAVE + 0.01, z),
                 0.04,
@@ -214,7 +215,7 @@ fn frame() {
     for z in [-hz + 0.01, hz - 0.01] {
         // a finial at each end of the ridge
         revolve!(
-            name("finial"),
+            numbered("finial"),
             &[
                 (0.0, 0.0),
                 (0.018, 0.0),
@@ -233,7 +234,7 @@ fn frame() {
                 // a glazing bar across each side's panes
                 fbox!(
                     F,
-                    name("bar_h"),
+                    numbered("bar_h"),
                     0.03,
                     0.025,
                     (GHD - 0.05) / 4.0 - 0.04,
@@ -247,7 +248,7 @@ fn frame() {
         // the back's and the front's glazing bars
         fbox!(
             F,
-            name("bar_back"),
+            numbered("bar_back"),
             0.04,
             GH_EAVE - WALL_TOP,
             0.04,
@@ -258,7 +259,7 @@ fn frame() {
     for s in [-1.0, 1.0] {
         fbox!(
             F,
-            name("door_post"),
+            numbered("door_post"),
             0.05,
             GH_EAVE,
             0.05,
@@ -267,7 +268,7 @@ fn frame() {
         );
         fbox!(
             F,
-            name("sill_front"),
+            numbered("sill_front"),
             (GHW - GH_DOOR) / 2.0,
             0.04,
             0.06,
@@ -288,7 +289,7 @@ fn frame() {
     let (vz0, vz1) = VENT_Z;
     for z in [vz0, vz1] {
         board(
-            &name("vent_rafter"),
+            &numbered("vent_rafter"),
             (-0.03, GH_RIDGE, z),
             (-(hx - 0.02), GH_EAVE + 0.01, z),
             0.03,
@@ -309,7 +310,7 @@ fn glass() {
     for s in [-1.0, 1.0] {
         fbox!(
             F,
-            name("glass_side"),
+            numbered("glass_side"),
             0.01,
             gh,
             GHD - 0.06,
@@ -318,7 +319,7 @@ fn glass() {
         );
         fbox!(
             F,
-            name("glass_front"),
+            numbered("glass_front"),
             (GHW - GH_DOOR) / 2.0 - 0.08,
             gh,
             0.01,
@@ -337,7 +338,7 @@ fn glass() {
     );
     for z in [-hz + 0.025, hz - 0.025] {
         prism(
-            &name("glass_gable"),
+            &numbered("glass_gable"),
             &[
                 (N::F(-hx + 0.03), GH_EAVE + 0.02),
                 (N::F(hx - 0.03), GH_EAVE + 0.02),
@@ -364,7 +365,7 @@ fn glass() {
     for (z0, z1) in [(-hz + 0.02, vz0 - 0.015), (vz1 + 0.015, hz - 0.02)] {
         fbox!(
             F,
-            name("glass_roof_l"),
+            numbered("glass_roof_l"),
             run,
             0.01,
             z1 - z0,
@@ -382,7 +383,7 @@ fn staging() {
         for k in 0..low(5, 2) {
             fbox!(
                 F,
-                name("slat"),
+                numbered("slat"),
                 if !is_low() { 0.09 } else { 0.5 },
                 0.025,
                 1.9,
@@ -402,7 +403,7 @@ fn staging() {
             for e in [-1.0, 1.0] {
                 fbox!(
                     F,
-                    name("leg"),
+                    numbered("leg"),
                     0.04,
                     0.76,
                     0.04,
@@ -430,7 +431,7 @@ fn staging() {
         // tomato plants on canes along the back
         fbox!(
             F,
-            name("grow_bag"),
+            numbered("grow_bag"),
             0.36,
             0.1,
             0.24,
@@ -439,7 +440,7 @@ fn staging() {
             bevel = low(0.03, 0.0)
         );
         rod(
-            &name("cane"),
+            &numbered("cane"),
             (x, 0.1, -1.18),
             (x, 1.55, -1.2),
             0.008,
@@ -461,7 +462,7 @@ fn staging() {
         for j in 0..4 {
             fsphere!(
                 F,
-                name("tomato"),
+                numbered("tomato"),
                 0.032,
                 (
                     x + 0.08 * if j % 2 == 1 { 1.0 } else { -1.0 },
@@ -507,7 +508,7 @@ pub fn greenhouse() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             fbox!(
                 F,
-                name("door_stile"),
+                numbered("door_stile"),
                 0.03,
                 dh,
                 0.02,
@@ -518,7 +519,7 @@ pub fn greenhouse() -> Vec<Obj> {
         for y in [0.045, 0.03 + dh - 0.015, 0.95] {
             fbox!(
                 F,
-                name("door_rail"),
+                numbered("door_rail"),
                 GH_DOOR - 0.07,
                 0.03,
                 0.02,
@@ -552,7 +553,7 @@ pub fn greenhouse() -> Vec<Obj> {
         for z in [vz0 + 0.02, vz1 - 0.02] {
             fbox!(
                 F,
-                name("vent_edge"),
+                numbered("vent_edge"),
                 run - 0.04,
                 0.02,
                 0.025,
@@ -563,14 +564,14 @@ pub fn greenhouse() -> Vec<Obj> {
         }
     });
     if is_low() {
-        return settle_in_place(&[join_all("greenhouse")]);
+        return settle!(&[join_all("greenhouse")], centre = false);
     }
     let door = hinged(
         join(&door, "door", None),
         F.at(-GH_DOOR / 2.0 + 0.02, 1.0, hz - 0.025),
     );
     let vent = hinged(join(&vent, "vent", None), F.at(-0.02, GH_RIDGE + 0.01, 0));
-    let objs = settle_in_place(&meshes());
+    let objs = settle!(centre = false);
     swing(
         door,
         "door_open",

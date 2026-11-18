@@ -14,8 +14,7 @@
 //! Each is built in place where the game placed it (`F`, game axes), so the seat heights (content `seat`)
 //! and the tops things stand on (content `surface`) stay where the game has them.
 
-use artkit::family::{Family, Model};
-use artkit::json::{Json, loads};
+use artkit::family::{Family, Model, motions};
 
 pub(crate) mod common;
 mod fire;
@@ -24,10 +23,6 @@ mod seats;
 mod tables;
 
 use common::M;
-
-fn motions(text: &str) -> Json {
-    loads(text).expect("the motions are JSON")
-}
 
 const SLATS: [(&str, &str); 2] = [("iron", "Frame"), ("park_slats", "Slats")];
 

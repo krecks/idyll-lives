@@ -1,13 +1,13 @@
 //! The drinking fountain and the town fountain: stone, and water that runs.
 
-use super::common::{N, far_keeping_feet, fluted, lobed, own, sweep_tube};
+use super::common::{far_keeping_feet, fluted, lobed, own, sweep_tube};
 use artkit::forms::Scale;
 use artkit::math::{Axis, P3, cosd, sind};
 use artkit::motion::{Grow, Squash, grow, squash};
 use artkit::parts::{hinged, join, new_parts, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcone, fcyl, fsphere, fsweep, kit_fillet, kit_moulding, loft, revolve};
+use artkit::{fbox, fcone, fcyl, fsphere, fsweep, kit_fillet, kit_moulding, loft, points, revolve};
 
 // --- the drinking fountain: a stone pillar and bowl, a chrome bubbler -------------------------------------------
 const TIP: (i32, f64, f64) = (0, 1.075, -0.06); // the bubbler's mouth (game), where the arc of water starts
@@ -141,12 +141,12 @@ pub fn drinking_fountain() -> Vec<Obj> {
         fsweep!(
             f,
             "guard",
-            &[
-                (N::F(-0.03), 1.07, -0.075),
-                (N::F(-0.03), 1.08, -0.045),
-                (N::I(0), 1.088, -0.03),
-                (N::F(0.03), 1.08, -0.045),
-                (N::F(0.03), 1.07, -0.075)
+            &points![
+                (-0.03, 1.07, -0.075),
+                (-0.03, 1.08, -0.045),
+                (0, 1.088, -0.03),
+                (0.03, 1.08, -0.045),
+                (0.03, 1.07, -0.075)
             ],
             0.005,
             m.chrome,

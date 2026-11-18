@@ -4,10 +4,12 @@ use super::common::{fluted, own, square};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
 use artkit::math::{cos, cosd, pow, radians, sin, sind};
-use artkit::parts::{Settle, join_all, settle_all, settle_with};
+use artkit::parts::{join_all, settle_all};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcone, fcyl, fextrude, fsphere, fsweep, kit_scroll, loft, revolve, ring};
+use artkit::{
+    fbox, fcone, fcyl, fextrude, fsphere, fsweep, kit_scroll, loft, revolve, ring, settle,
+};
 
 // --- the street lamp: a cast-iron post with a square lantern ------------------------------------------------
 // (the content's `light.height` is 3.5: the lantern's panes run from 3.46 to 3.88 m)
@@ -420,12 +422,6 @@ pub fn traffic_light() -> Vec<Obj> {
     }
     join_all("trafficLight");
     // (Not centred: its pole's axis stays on the origin, where the snapshot stands it.)
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }

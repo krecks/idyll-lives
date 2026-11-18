@@ -1,7 +1,8 @@
 //! The water trough: an oval galvanised stock tank full of water on two skids, with its float valve, feed pipe and
 //! drain, and its far version.
 
-use super::common::{F, M, fr, stadium_slab, stadium_sweep};
+use super::common::{F, M, stadium_slab, stadium_sweep};
+use artkit::json::float_repr;
 use artkit::parts::{join_all, settle};
 use artkit::scene::Obj;
 use artkit::{cylinder, fbox, fcyl, fsphere, kit_fillet, kit_tube, rod, sphere};
@@ -34,7 +35,7 @@ pub fn trough() -> Vec<Obj> {
             let sf = s as f64;
             fbox!(
                 F,
-                format!("seam{}{s}", fr(x)),
+                format!("seam{}{s}", float_repr(x)),
                 0.03,
                 top - y0 - 0.08,
                 0.008,
@@ -44,7 +45,7 @@ pub fn trough() -> Vec<Obj> {
             for k in 0..5 {
                 fsphere!(
                     F,
-                    format!("rivet{}{s}{k}", fr(x)),
+                    format!("rivet{}{s}{k}", float_repr(x)),
                     0.007,
                     (x, y0 + 0.08 + k as f64 * 0.1, sf * (TR_R + 0.017)),
                     M.steel,
@@ -152,7 +153,7 @@ fn trough_tank(prof: &[(f64, f64)], n: usize) {
     for x in [-0.62, 0.62] {
         fbox!(
             F,
-            format!("skid{}", fr(x)),
+            format!("skid{}", float_repr(x)),
             0.12,
             y0,
             0.66,
