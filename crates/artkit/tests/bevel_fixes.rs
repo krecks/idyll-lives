@@ -377,7 +377,57 @@ fn a_bevels_normals_are_read_on_the_part_where_it_is_joined() {
             "{}",
             report.last().unwrap()
         );
-        assert!(before.0 > 1.0, "{}", report.last().unwrap());
+        // (the frame in two segments isn't clamped: moved, it reads as where it was made)
+        assert!(
+            before.0 > 1.0 || r.name == "slab/frame2",
+            "{}",
+            report.last().unwrap()
+        );
     }
     println!("{}", report.join("\n"));
+}
+
+#[test]
+fn a_slabs_far_face_is_numbered_as_blenders_extrusion_numbers_it() {
+    // Blender's extrusion copies a slab's face triangle by triangle: the copy's points come in the order the
+    // triangles first name them (and its rim's edges in the order they first run them, which decides where a
+    // bevel of two segments or more starts a fan). The slabs of tests/golden/bevel.txt, as the modifier was given
+    // them: every point Blender's, in its order. (The fridge's kick plate, a grille of slots, is filled in another
+    // order than Blender fills it: its triangles are Blender's, their order is not, nor its far points' then.)
+    let mut seen = 0;
+    for r in records("bevel.txt") {
+        if r.kv["kind"] != "extrude"
+            || r.kv["changed"] != "0"
+            || r.name == "kitchen/fridge/kick_plate"
+        {
+            continue;
+        }
+        scene::reset();
+        let loops = r.loops();
+        let slab = extrude(
+            "slab",
+            &loops[0],
+            r.f64("depth"),
+            Extrude {
+                holes: Holes(loops[1..].to_vec()),
+                plane: match r.kv["plane"].as_str() {
+                    "XZ" => Plane::XZ,
+                    "XY" => Plane::XY,
+                    _ => Plane::YZ,
+                },
+                ..Extrude::default()
+            },
+        );
+        let (got, want) = (slab.read(|o| o.mesh.verts.clone()), r.points("bv"));
+        assert_eq!(got.len(), want.len(), "{}", r.name);
+        for (i, (g, w)) in got.iter().zip(&want).enumerate() {
+            assert!(
+                (0..3).all(|k| g[k] == w[k]),
+                "{}: point {i} {g:?}, Blender's {w:?}",
+                r.name
+            );
+        }
+        seen += 1;
+    }
+    assert!(seen >= 8, "{seen} slabs");
 }
