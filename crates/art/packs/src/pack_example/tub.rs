@@ -1,12 +1,12 @@
 //! The whirlpool tub (2x2): an acrylic tub in a slatted cedar surround, two bathers on its bench.
 
-use super::common::{M, moulding};
+use super::common::M;
+use artkit::kit;
 use artkit::math::{P3, cos, radians, sin};
 use artkit::parts::{Settle, join, new_parts, settle_with};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
-use artkit::shapes::SHARP;
 use artkit::{fbox, fcyl, fextrude, fsphere, grow, leaf, loft, revolve, ring, soft, squash};
 
 const RIM: f64 = 0.72; // the rim's top
@@ -141,7 +141,7 @@ fn _cladding(f: &GameFrame) {
             );
         }
     }
-    moulding(
+    kit::moulding!(
         f,
         "foot_rail",
         &[(-0.92, -0.92), (0.92, -0.92), (0.92, 0.92), (-0.92, 0.92)],
@@ -153,9 +153,8 @@ fn _cladding(f: &GameFrame) {
             (0.0, 0.055),
         ],
         M.wood_dark,
-        0.05,
-        false,
-        SHARP,
+        at = 0.05,
+        plane = Facing::Top
     );
     fbox!(f, "plinth", 1.78, 0.05, 1.78, (0, 0.025, 0), M.plinth);
 }

@@ -1,12 +1,12 @@
 //! The chef's stove (2x1): a six-burner range with a double oven, under a chimney hood.
 
-use super::common::{M, WALL, cut_mouth, fillet, moulding, pull, shaker, tube};
+use super::common::{M, WALL, cut_mouth};
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::math::{Axis, P3, TAU, cos, cosd, radians, sin, sind};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
-use artkit::place::GameFrame;
+use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::shapes::SHARP;
 use artkit::{fbox, fcone, fcyl, fextrude, fsweep, grow, loft, revolve, ring, soft, swing, torus};
 
 const HOB: f64 = 0.92; // the hob's top
@@ -60,15 +60,14 @@ fn _burner(f: &GameFrame, name: &str, x: f64, z: f64) {
 fn _grate(f: &GameFrame, name: &str, x: f64) {
     let (y, z0, z1, hw) = (HOB + 0.026, -0.4, 0.13, 0.24);
     let bar = [(0.0, 0.0), (0.016, 0.0), (0.016, 0.016), (0.0, 0.016)]; // (inset, up): a square bar
-    moulding(
+    kit::moulding!(
         f,
         name,
         &[(x - hw, z0), (x + hw, z0), (x + hw, z1), (x - hw, z1)],
         &bar,
         M.grate,
-        y,
-        false,
-        SHARP,
+        at = y,
+        plane = Facing::Top
     );
     let prof = vec![
         (-0.007, -0.008),
@@ -167,7 +166,7 @@ fn _knob(f: &GameFrame, name: &str, x: f64, y: f64) {
 /// An oven door on its bottom hinge at the oven mouth: a steel frame round a black window (the kit's shaker), a
 /// bar pull across its top on two stand-offs (the kit's pull).
 fn _oven_door(f: &GameFrame, name: &str, x: f64, w: f64) {
-    shaker(
+    kit::shaker!(
         f,
         name,
         w,
@@ -175,22 +174,20 @@ fn _oven_door(f: &GameFrame, name: &str, x: f64, w: f64) {
         (x, 0.41, FRONT + 0.0125),
         0.025,
         M.body,
-        0.085,
-        Some(M.window),
-        0.007,
+        rail = 0.085,
+        panel = M.window,
+        recess = 0.007
     );
-    pull(
+    kit::pull!(
         f,
-        &format!("{name}_pull"),
+        format!("{name}_pull"),
         x,
         0.63,
         FRONT + 0.025,
         w - 0.16,
         M.chrome,
-        0.012,
-        0.045,
-        false,
-        8,
+        r = 0.012,
+        out = 0.045
     );
 }
 
@@ -222,23 +219,22 @@ fn _oven(f: &GameFrame, x: f64) {
     }
     for (k, y) in [0.3, 0.46].into_iter().enumerate() {
         // wire racks: a bent rim and rods front to back
-        tube(
+        kit::tube!(
             f,
-            &format!("rack{k}"),
-            &fillet(
+            format!("rack{k}"),
+            &kit::fillet!(
                 &[
                     (x - 0.29, y, back + 0.02),
                     (x - 0.29, y, FRONT - 0.03),
                     (x + 0.29, y, FRONT - 0.03),
                     (x + 0.29, y, back + 0.02),
                 ],
-                0.02,
-                3,
+                0.02
             ),
             0.004,
             M.chrome,
-            Some(4),
-            1,
+            verts = 4,
+            round = 1
         );
         for i in 0..7 {
             let rx = x - 0.24 + i as f64 * 0.08;
@@ -379,23 +375,22 @@ fn _hood(f: &GameFrame) {
 /// copper pan on S-hooks.
 fn _rail(f: &GameFrame) {
     let (z, y) = (WALL + 0.06, 1.36);
-    tube(
+    kit::tube!(
         f,
         "rail",
-        &fillet(
+        &kit::fillet!(
             &[
                 (-0.62, y, WALL + 0.002),
                 (-0.62, y, z),
                 (0.62, y, z),
                 (0.62, y, WALL + 0.002),
             ],
-            0.03,
-            3,
+            0.03
         ),
         0.008,
         M.chrome,
-        Some(8),
-        1,
+        verts = 8,
+        round = 1
     );
     for x in [-0.62, 0.62] {
         fcyl!(
