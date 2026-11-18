@@ -3,7 +3,7 @@
 //! (`model.busStop`), the post box (`model.postBox`), the notice board (`model.noticeBoard`), the phone box
 //! (`model.phoneBooth`), the town fountain (`model.fountainTown`) and the founder's statue (`model.townStatue`); and
 //! the traffic light (`model.trafficLight`), which isn't bought: the renderer stands one at each signal head of the
-//! sim's lit junctions (render/pc/signals.ts). Notes: tools/art/blender/families/street_furniture.md.
+//! sim's lit junctions (render/pc/signals.ts). Notes: NOTES.md.
 //!
 //! Each is built in game axes (`GameFrame`) where the game places it, at the content's heights (the bench's and
 //! the shelter's seats, the fountain's rim, the lamp's light), and each has a far version (a quarter): they stand on
@@ -11,9 +11,6 @@
 //! grows while someone drinks (`water_on`); the post box's flap swings in for a card (`flap`); the phone box's door
 //! opens and shuts behind the caller (`door_open`); the town fountain's water runs all the time near the camera
 //! (`water_run`, ambient). The traffic light's lit lens is the renderer's. The rest are still.
-//!
-//! Being ported: `cargo art street_furniture` builds the family in Blender until
-//! tools/art/blender/families/street_furniture.py goes (`--out` and `--check` build what is here).
 
 use artkit::family::{Family, Model};
 use artkit::json::{Json, loads};
@@ -109,6 +106,7 @@ pub fn family() -> Option<Family> {
              `post` (`flap`), the phone box's door opens for `call` (`door_open`) and the town fountain's water \
              runs near the camera (`water_run`, ambient).",
         )
-        .pack("street_furniture"),
+        .pack("street_furniture")
+        .switched(),
     )
 }
