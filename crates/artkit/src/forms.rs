@@ -530,10 +530,12 @@ pub fn extrude(name: impl AsRef<str>, outline: &[(f64, f64)], depth: f64, o: Ext
 #[macro_export]
 macro_rules! extrude {
     ($name:expr, $outline:expr, $depth:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $outline, $depth);
         #[allow(unused_mut)]
         let mut o = $crate::forms::Extrude::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::forms::extrude($name, $outline, $depth, o)
+        $crate::forms::extrude(args.0, args.1, args.2, o)
     }};
 }
 

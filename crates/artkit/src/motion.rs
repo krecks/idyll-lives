@@ -805,10 +805,12 @@ pub fn swing(obj: Obj, clip: &str, degrees: f64, o: Swing) -> Obj {
 #[macro_export]
 macro_rules! swing {
     ($obj:expr, $clip:expr, $degrees:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($obj, $clip, $degrees);
         #[allow(unused_mut)]
         let mut o = $crate::motion::Swing::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::motion::swing($obj, $clip, $crate::forms::num($degrees), o)
+        $crate::motion::swing(args.0, args.1, $crate::forms::num(args.2), o)
     }};
 }
 
@@ -835,10 +837,12 @@ pub fn slide(obj: Obj, clip: &str, offset: impl Into<crate::math::P3>, o: Slide)
 #[macro_export]
 macro_rules! slide {
     ($obj:expr, $clip:expr, $offset:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($obj, $clip, $offset);
         #[allow(unused_mut)]
         let mut o = $crate::motion::Slide::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::motion::slide($obj, $clip, $offset, o)
+        $crate::motion::slide(args.0, args.1, args.2, o)
     }};
 }
 
@@ -878,10 +882,12 @@ pub fn squash(obj: Obj, clip: &str, scale: impl Into<Factors>, o: Squash) -> Obj
 #[macro_export]
 macro_rules! squash {
     ($obj:expr, $clip:expr, $scale:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($obj, $clip, $scale);
         #[allow(unused_mut)]
         let mut o = $crate::motion::Squash::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::motion::squash($obj, $clip, $scale, o)
+        $crate::motion::squash(args.0, args.1, args.2, o)
     }};
 }
 
@@ -948,10 +954,12 @@ pub fn stages(
 #[macro_export]
 macro_rules! stages {
     ($obj:expr, $clip:expr, picked = $picked:expr, growing = $growing:expr, planted = $planted:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($obj, $clip, $picked, $growing, $planted);
         #[allow(unused_mut)]
         let mut o = $crate::motion::Stages::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::motion::stages($obj, $clip, $picked, $growing, $planted, o)
+        $crate::motion::stages(args.0, args.1, args.2, args.3, args.4, o)
     }};
 }
 
@@ -991,10 +999,12 @@ pub fn grow(obj: Obj, clip: &str, o: Grow) -> Obj {
 #[macro_export]
 macro_rules! grow {
     ($obj:expr, $clip:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($obj, $clip);
         #[allow(unused_mut)]
         let mut o = $crate::motion::Grow::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::motion::grow($obj, $clip, o)
+        $crate::motion::grow(args.0, args.1, o)
     }};
 }
 
@@ -1062,10 +1072,12 @@ pub fn spin(obj: Obj, clip: &str, o: Spin) -> Obj {
 #[macro_export]
 macro_rules! spin {
     ($obj:expr, $clip:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($obj, $clip);
         #[allow(unused_mut)]
         let mut o = $crate::motion::Spin::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::motion::spin($obj, $clip, o)
+        $crate::motion::spin(args.0, args.1, o)
     }};
 }
 
@@ -1122,10 +1134,12 @@ pub fn rock(obj: Obj, clip: &str, degrees: f64, o: Rock) -> Obj {
 #[macro_export]
 macro_rules! rock {
     ($obj:expr, $clip:expr, $degrees:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($obj, $clip, $degrees);
         #[allow(unused_mut)]
         let mut o = $crate::motion::Rock::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::motion::rock($obj, $clip, $crate::forms::num($degrees), o)
+        $crate::motion::rock(args.0, args.1, $crate::forms::num(args.2), o)
     }};
 }
 
@@ -1240,10 +1254,12 @@ pub fn wobble(obj: Obj, clip: &str, degrees: f64, o: Wobble) -> Obj {
 #[macro_export]
 macro_rules! wobble {
     ($obj:expr, $clip:expr, $degrees:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($obj, $clip, $degrees);
         #[allow(unused_mut)]
         let mut o = $crate::motion::Wobble::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::motion::wobble($obj, $clip, $crate::forms::num($degrees), o)
+        $crate::motion::wobble(args.0, args.1, $crate::forms::num(args.2), o)
     }};
 }
 

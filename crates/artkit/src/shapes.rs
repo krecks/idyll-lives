@@ -275,10 +275,12 @@ pub fn torus(name: impl AsRef<str>, major_radius: f64, minor_radius: f64, o: Tor
 #[macro_export]
 macro_rules! torus {
     ($name:expr, $major:expr, $minor:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $major, $minor);
         #[allow(unused_mut)]
         let mut o = $crate::shapes::Torus::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::shapes::torus($name, $major, $minor, o)
+        $crate::shapes::torus(args.0, args.1, args.2, o)
     }};
 }
 

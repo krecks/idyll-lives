@@ -29,10 +29,12 @@ pub fn solidify(obj: Obj, thickness: f64, o: Solidify) -> Obj {
 #[macro_export]
 macro_rules! solidify {
     ($obj:expr, $thickness:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($obj, $thickness);
         #[allow(unused_mut)]
         let mut o = $crate::edit::Solidify::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::edit::solidify($obj, $crate::forms::num($thickness), o)
+        $crate::edit::solidify(args.0, $crate::forms::num(args.1), o)
     }};
 }
 

@@ -426,10 +426,12 @@ macro_rules! settle {
         $crate::parts::settle_with(&$crate::scene::meshes(), how)
     }};
     ($objs:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($objs,);
         #[allow(unused_mut)]
         let mut how = $crate::parts::Settle::default();
         $(how.$k = $v;)*
-        $crate::parts::settle_with($objs, how)
+        $crate::parts::settle_with(args.0, how)
     }};
 }
 

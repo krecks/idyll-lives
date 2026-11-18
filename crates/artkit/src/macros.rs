@@ -6,10 +6,12 @@
 #[macro_export]
 macro_rules! cube {
     ($name:expr, $size:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $size);
         #[allow(unused_mut)]
         let mut o = $crate::shapes::Cube::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::shapes::cube($name, $size, o)
+        $crate::shapes::cube(args.0, args.1, o)
     }};
 }
 
@@ -17,10 +19,12 @@ macro_rules! cube {
 #[macro_export]
 macro_rules! sphere {
     ($name:expr, $radius:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $radius);
         #[allow(unused_mut)]
         let mut o = $crate::shapes::Sphere::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::shapes::sphere($name, $radius, o)
+        $crate::shapes::sphere(args.0, args.1, o)
     }};
 }
 
@@ -28,10 +32,12 @@ macro_rules! sphere {
 #[macro_export]
 macro_rules! cylinder {
     ($name:expr, $radius:expr, $depth:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $radius, $depth);
         #[allow(unused_mut)]
         let mut o = $crate::shapes::Round::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::shapes::cylinder($name, $radius, $depth, o)
+        $crate::shapes::cylinder(args.0, args.1, args.2, o)
     }};
 }
 
@@ -39,10 +45,12 @@ macro_rules! cylinder {
 #[macro_export]
 macro_rules! cone {
     ($name:expr, $r1:expr, $r2:expr, $depth:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $r1, $r2, $depth);
         #[allow(unused_mut)]
         let mut o = $crate::shapes::Round::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::shapes::cone($name, $r1, $r2, $depth, o)
+        $crate::shapes::cone(args.0, args.1, args.2, args.3, o)
     }};
 }
 
@@ -50,10 +58,12 @@ macro_rules! cone {
 #[macro_export]
 macro_rules! rod {
     ($name:expr, $a:expr, $b:expr, $radius:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $a, $b, $radius);
         #[allow(unused_mut)]
         let mut o = $crate::shapes::Rod::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::shapes::rod($name, $a, $b, $radius, o)
+        $crate::shapes::rod(args.0, args.1, args.2, args.3, o)
     }};
 }
 
@@ -61,10 +71,12 @@ macro_rules! rod {
 #[macro_export]
 macro_rules! revolve {
     ($name:expr, $profile:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $profile);
         #[allow(unused_mut)]
         let mut o = $crate::shapes::Revolve::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::shapes::revolve($name, $profile, o)
+        $crate::shapes::revolve(args.0, args.1, o)
     }};
 }
 
@@ -72,10 +84,12 @@ macro_rules! revolve {
 #[macro_export]
 macro_rules! boulder {
     ($name:expr, $radius:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $radius);
         #[allow(unused_mut)]
         let mut o = $crate::shapes::Boulder::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::shapes::boulder($name, $radius, o)
+        $crate::shapes::boulder(args.0, args.1, o)
     }};
 }
 
@@ -83,10 +97,12 @@ macro_rules! boulder {
 #[macro_export]
 macro_rules! sweep {
     ($name:expr, $points:expr, $radius:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $points, $radius);
         #[allow(unused_mut)]
         let mut o = $crate::forms::Sweep::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::forms::sweep($name, $points, $radius, o)
+        $crate::forms::sweep(args.0, args.1, args.2, o)
     }};
 }
 
@@ -94,10 +110,12 @@ macro_rules! sweep {
 #[macro_export]
 macro_rules! ring {
     ($rx:expr, $ry:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($rx, $ry);
         #[allow(unused_mut)]
         let mut o = $crate::forms::Ring::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::forms::ring($rx, $ry, o)
+        $crate::forms::ring(args.0, args.1, o)
     }};
 }
 
@@ -105,10 +123,12 @@ macro_rules! ring {
 #[macro_export]
 macro_rules! loft {
     ($name:expr, $sections:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $sections);
         #[allow(unused_mut)]
         let mut o = $crate::forms::Loft::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::forms::loft($name, $sections, o)
+        $crate::forms::loft(args.0, args.1, o)
     }};
 }
 
@@ -116,10 +136,12 @@ macro_rules! loft {
 #[macro_export]
 macro_rules! jitter {
     ($obj:expr, $amount:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($obj, $amount);
         #[allow(unused_mut)]
         let mut o = $crate::forms::Jitter::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::forms::jitter($obj, $amount, o)
+        $crate::forms::jitter(args.0, args.1, o)
     }};
 }
 
@@ -127,10 +149,12 @@ macro_rules! jitter {
 #[macro_export]
 macro_rules! find {
     ($n:expr, $aims:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($n, $aims);
         #[allow(unused_mut)]
         let mut o = $crate::perch::Find::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::perch::find($n, $aims, o)
+        $crate::perch::find(args.0, args.1, o)
     }};
 }
 
