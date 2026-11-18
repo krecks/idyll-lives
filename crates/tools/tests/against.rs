@@ -134,7 +134,7 @@ fn cupboard() -> Model {
     }
 }
 
-/// The model as a `.glb`: an accessor and a buffer view for each attribute, as Blender's exporter writes one.
+/// The model as a `.glb`: an accessor and a buffer view for each attribute, as an exporter writes one.
 fn glb(model: &Model) -> Vec<u8> {
     use serde_json::{Value, json};
     let mut bin: Vec<u8> = Vec::new();
@@ -343,7 +343,7 @@ fn another_order_of_triangles_vertices_nodes_and_materials_is_the_same() {
     assert!(found.findings.is_empty());
 }
 
-/// Blender's own files: the fridge with the triangles of every primitive in the opposite order, as two exports of
+/// A shipped model's own files: the fridge with the triangles of every primitive in the opposite order, as two exports of
 /// it differ, is the same; with one number of its buffer changed it is not.
 #[test]
 fn a_shipped_model_with_its_triangles_in_another_order_is_the_same() {
@@ -964,13 +964,13 @@ fn a_decimated_far_version_is_held_to_its_own_rule() {
         outcome.text
     );
 
-    let listed = r#"{"model.cupboard far": {"decimated": "decimated by Blender"}}"#;
+    let listed = r#"{"model.cupboard far": {"decimated": "decimated, not repeated"}}"#;
     let outcome = new.against(&old, listed);
     assert!(!outcome.failed(), "{}", outcome.text);
     assert_eq!(row(&outcome, "model.cupboard far").class, Class::Near);
     assert!(
         outcome.text.contains(
-            "accepted: decimated: held to the decimated far versions' rule (decimated by Blender)"
+            "accepted: decimated: held to the decimated far versions' rule (decimated, not repeated)"
         ),
         "{}",
         outcome.text
@@ -1003,7 +1003,7 @@ fn a_decimated_far_version_is_held_to_its_own_rule() {
     // It is a far version's.
     let outcome = new.against(
         &old,
-        r#"{"model.cupboard": {"decimated": "decimated by Blender"}}"#,
+        r#"{"model.cupboard": {"decimated": "decimated, not repeated"}}"#,
     );
     assert!(
         outcome.errors[0].starts_with("model.cupboard: decimated is a far version's"),

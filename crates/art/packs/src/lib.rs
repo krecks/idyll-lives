@@ -1,5 +1,5 @@
-//! The game's item models, generated: trait packs. One folder a family; a family not yet ported has
-//! none to give, and `cargo art` builds it in Blender from tools/art/blender/families/ as before.
+//! The game's item models, generated: trait packs. One folder a family, each
+//! listed in `families()`.
 
 use artkit::family::Family;
 
@@ -20,7 +20,7 @@ pub mod pack_outgoing;
 pub mod pack_romantic;
 pub mod pack_slob;
 
-/// The group's families by their names on the command line (`cargo art <name>`), each once it is ported.
+/// The group's families by their names on the command line (`cargo art <name>`).
 pub fn families() -> Vec<(&'static str, Option<Family>)> {
     vec![
         ("pack_bookworm", pack_bookworm::family()),

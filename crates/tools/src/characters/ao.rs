@@ -2,8 +2,8 @@
 //! sky each vertex does not see, 0 (open) to 1 (enclosed), at rest, from rays over the hemisphere
 //! about its normal against the part itself and what lies round it (the body for a shell, the head
 //! for hair). The shader darkens the colour by it, as the furniture's baked grey does
-//! (tools/art/blender/gamekit/shade.py, which this follows: the same directions, twist, falloff and
-//! rule for buried vertices). Deterministic: fixed directions, no randomness.
+//! (`artkit`'s `shade`, which this follows: the same directions, twist, falloff and rule for buried
+//! vertices). Deterministic: fixed directions, no randomness.
 
 use std::collections::HashMap;
 

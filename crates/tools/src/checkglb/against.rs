@@ -24,8 +24,8 @@
 //! A row that is right as it is takes a line in tools/art/port-accepted.json, `{"<key>": {"<metric>": "<why>"}}`
 //! (a far version's key is `<key> far`, a manifest's its path under the assets), and is then printed as
 //! `accepted`. As with the gate's `accept`, one that names no row, gives no reason or is not needed is an error.
-//! But `decimated`, which says what a far version is (Blender's decimate made it, and makes another on every
-//! run): where the rows fail it, it is held to that rule in their place (`METRICS`); where they pass, it passes.
+//! But `decimated`, which says what a far version is (a decimation made it, which another build need not
+//! repeat): where the rows fail it, it is held to that rule in their place (`METRICS`); where they pass, it passes.
 
 use super::digest;
 use super::glb::{Glb, R, parse_glb};
@@ -167,7 +167,7 @@ pub const METRICS: &[(&str, &str)] = &[
     ("shading", "the baked shading at the nearest points"),
     (
         "decimated",
-        "a far version Blender's decimate made, which not even Blender repeats: where the rows above fail it is \
+        "a far version a decimation made, which another build need not repeat: where the rows above fail it is \
          held to its own rule in their place (the old size within 2 %, its lowest point within 0.5 cm of the \
          model's, at most a tenth more triangles, its surface within 6 cm of the old one's)",
     ),

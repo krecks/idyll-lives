@@ -10,8 +10,8 @@
 //! - shared by exactly two triangles once positions are welded at 0.1 mm (over the whole shape: a part's faces
 //!   may be of two materials), wound the same way round;
 //! - turning 60° or more between their faces, and convex (a corner sticking out, not a crease);
-//! - split in the file at both ends: its two faces' corners there have normals 40° or more apart (gamekit's
-//!   `SHARP`), so a bevel shaded with hardened normals passes by construction, as does a chamfer (45°);
+//! - split in the file at both ends: its two faces' corners there have normals 40° or more apart (artkit's
+//!   `shapes::SHARP`), so a bevel shaded with hardened normals passes by construction, as does a chamfer (45°);
 //! - with both its surfaces 12 mm or more wide across it (a narrower one is a board's edge, too thin to bevel),
 //!   measured over the surface from the edge's middle until the surface ends at another such edge;
 //! - on a piece (what its triangles are joined to) 10 cm or more across.
@@ -47,7 +47,7 @@ use std::hash::{BuildHasherDefault, Hasher};
 const WELD: f64 = 1e-4;
 /// The cosine of the least turn between two faces that makes their edge hard (60°).
 const TURN: f64 = 0.5;
-/// The cosine of the least angle between two corners' normals that splits them (40°, gamekit's `SHARP`).
+/// The cosine of the least angle between two corners' normals that splits them (40°, artkit's `shapes::SHARP`).
 const SPLIT: f64 = 0.766_044_443_118_978;
 /// The cosine of the most two faces turn and are still one flat surface (2°).
 const FLAT: f64 = 0.999_390_827_019_095_8;

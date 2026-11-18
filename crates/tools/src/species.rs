@@ -448,7 +448,7 @@ pub struct Atlas {
 }
 
 impl Atlas {
-    /// Today's atlas (tools/art/blender/families/plants.py `CARD_TILES`, `CORE_TILE`; v turned round as the file
+    /// Today's atlas (artkit's `botany::cards` `CARD_TILES`, `CORE_TILE`; v turned round as the file
     /// has it): three clusters of one generic oval leaf, a quarter each, and the dense tile.
     pub fn today() -> Atlas {
         let tile = |class: &str, u: f64, v: f64| Tile {
