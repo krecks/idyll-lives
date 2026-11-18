@@ -219,10 +219,9 @@ impl Mesh {
                         }
                         *done = true;
                     }
-                    // a third face on the edge: it splits the shading anyway, and isn't marked
-                    Some(_) => {
-                        self.sharp.remove(&e);
-                    }
+                    // a third face on the edge: it splits the shading anyway, and the edge stays as its first
+                    // two faces left it (marked, where they turn more than the angle), as in Blender
+                    Some(_) => {}
                 }
             }
         }
