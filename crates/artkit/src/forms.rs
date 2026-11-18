@@ -549,6 +549,7 @@ pub fn extrude(name: impl AsRef<str>, outline: &[(f64, f64)], depth: f64, o: Ext
             _ => {}
         }
     }
+    scene::update(); // (its normals are set right by operators: Blender works the scene out)
     let obj = scene::add(name, mesh);
     shade(obj, o.smooth, o.angle);
     if o.bevel != 0.0 {
@@ -629,6 +630,7 @@ options! {
 /// every build for a `seed`: bark, a lumpy stone, a hand-made look. `up` scales the vertical part (0: only
 /// sideways).
 pub fn jitter(obj: Obj, amount: f64, o: Jitter) -> Obj {
+    scene::update(); // matrix_world as placed, not as it was before (it is read below)
     let world = obj.world_points();
     obj.edit(|part| {
         for (v, p) in part.mesh.verts.iter_mut().zip(&world) {
@@ -670,6 +672,7 @@ pub fn mirrored(obj: Obj, axis: Axis, name: Option<&str>) -> Obj {
         o.mesh.flip_normals();
         (o.loc, o.rot, o.scale) = (loc, rot, scale);
     });
+    scene::update();
     copy
 }
 
@@ -693,6 +696,7 @@ pub fn object(
         mesh.remove_doubles(1e-6);
     }
     mesh.recalc_normals();
+    scene::update(); // (its normals are set right by operators: Blender works the scene out)
     let obj = scene::add(name, mesh);
     shade(obj, smooth, angle)
 }
