@@ -13,7 +13,7 @@
  * big world takes (its land, its town's layout without generating houses, its land settled under
  * it, and assembling its file: a problem at twice the budget). Problems are listed (and the exit
  * code is 1). Every world is a Big one now (cosy and normal were dropped in 0.8.0).
- * Each world's line counts its terraced houses, backdrop buildings and places.
+ * Each world's line counts its terraced houses, backdrop buildings, named places' lots (`placeLots.ts`) and places.
  *
  * A place's land (`meta.land`, its town graded into it: `landFollow.ts` `withLand`, timed against
  * `LAND_BUDGET`), checked on the surface the renderer works out from the town file
@@ -168,6 +168,8 @@ const SETTLED_AGE = 35;
 /** Grade F, Senior. */
 const SENIOR = 5;
 const forSale: Record<string, number> = {};
+/** The most servers (staffed posts on public lots) in one world, and which. */
+const mostServers: [number, string] = [0, ''];
 /** Worlds, courts in all and the most in one world. */
 const courtsOf: [number, number, number] = [0, 0, 0];
 /** Each world's land: its slopes (`slopeChecks`), how long it took to grade (ms), its size in the file (KB). */
@@ -265,14 +267,19 @@ for (const { kind, seed, options } of runs) {
   const basements = town.slots.filter((s) => s.kind === 'house' && houseTemplate(templates, s.template)?.basement).length;
   const spots = town.slots.filter((s) => s.kind === 'outdoor').length;
   const dropped = world.diagnostics?.dropped.length ?? 0;
+  const placesOut = world.diagnostics?.dropped.filter((d) => d.place).length ?? 0;
+  // (The posts the sim staffs: a staffed thing on a public lot, as sim-core `staff.rs` counts its servers.)
+  const publicPlots = (file.plots as { x: number; z: number; w: number; d: number; public: boolean }[]).filter((p) => p.public);
+  const servers = (file.objects as { def: string; x: number; z: number }[]).filter((o) => content.object(o.def)?.staff && publicPlots.some((p) => o.x >= p.x && o.z >= p.z && o.x < p.x + p.w && o.z < p.z + p.d)).length;
+  if (servers > mostServers[0]) [mostServers[0], mostServers[1]] = [servers, tag];
   const courts = town.roads.filter((r) => r.kind !== 'trail').reduce((n, r) => n + r.ends.filter((e) => e === 'dead').length, 0);
   [courtsOf[0], courtsOf[1], courtsOf[2]] = [courtsOf[0] + 1, courtsOf[1] + courts, Math.max(courtsOf[2], courts)];
   console.log(
     `${tag}: ${town.name} (${town.world?.tagline}) ${town.width}×${town.depth}, ${town.roads.length} road(s) (${courts} courts), ` +
       `${town.open ? `${town.open.areas.length} areas, ${spots} outdoor places, ${((f) => `${(f.built * 100).toFixed(0)}% built and farmed, ${(f.empty * 100).toFixed(0)}% squares empty, `)(fillOf(file, expect.meadow))}` : ''}` +
-      `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''} (${town.slots.filter((s) => s.lot === 'terrace').length} terraced)${dropped ? `, ${dropped} lots left out` : ''}, ${basements} with a basement, ${town.households.length} households, ` +
-      `${town.open?.backdrop ? `${town.open.backdrop.length} backdrop buildings (${town.open.backdrop.filter((b) => b.area === 0).length} in the main town), ${town.open.places?.length ?? 0} places, ` : ''}` +
-      `${file.sims.length} residents, residentsMost ${file.residentsMost}, ${file.relationships.length} relationships, ${file.objects.length} things, ${(text.length / 1e6).toFixed(2)} MB; ` +
+      `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''} (${town.slots.filter((s) => s.lot === 'terrace').length} terraced)${dropped ? `, ${dropped} lots left out${placesOut ? ` (${placesOut} named places')` : ''}` : ''}, ${basements} with a basement, ${town.households.length} households, ` +
+      `${town.open?.backdrop ? `${town.open.backdrop.length} backdrop buildings (${town.open.backdrop.filter((b) => b.area === 0).length} in the main town), ${town.slots.filter((s) => s.dress).length} place lots (${town.slots.filter((s) => s.dress && !s.area).length} in the main town), ${town.open.places?.length ?? 0} places, ` : ''}` +
+      `${servers} servers, ${file.sims.length} residents, residentsMost ${file.residentsMost}, ${file.relationships.length} relationships, ${file.objects.length} things, ${(text.length / 1e6).toFixed(2)} MB; ` +
       `land ${landJob.toFixed(0)} ms, town ${(layout + houses + landMs).toFixed(0)} ms (${layout.toFixed(0)} layout + ${houses.toFixed(0)} houses + ${landMs.toFixed(0)} settled), ${furnished.houses} furnished ahead in ${furnished.ms.toFixed(0)} ms, file ${assemble.toFixed(0)} ms`,
   );
   // What a full town would hold: every home but the few kept for sale (`max(2, 5 %)`, the
@@ -325,6 +332,7 @@ if (landTable.length) {
   console.log(`Slowest land: ${Math.max(...landTable.map((l) => l.ms)).toFixed(0)} ms (budget ${LAND_BUDGET})`);
 }
 const [n, all, most] = courtsOf;
+console.log(`Most servers: ${mostServers[0]} (${mostServers[1]})`);
 console.log(`Courts: ${all} in ${n} worlds (${(all / n).toFixed(1)} a world, ${most} at most)`);
 console.log(`Slowest: land ${slowest[3].toFixed(0)} ms, layout ${slowest[0].toFixed(0)} ms, houses ${slowest[1].toFixed(0)} ms, file ${slowest[2].toFixed(0)} ms`);
 writeFileSync(out, JSON.stringify(worlds));

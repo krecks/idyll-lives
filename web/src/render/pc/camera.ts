@@ -6,6 +6,7 @@
 
 import * as pc from './engine';
 import { toEngine, toGame } from './space';
+import { viewShift } from '../shared/overviewCamera';
 
 export interface Lens {
   /** Vertical field of view (radians), near and far planes (m). */
@@ -23,6 +24,8 @@ export class GameCamera {
   readonly entity: pc.Entity;
   private readonly eye = new pc.Vec3();
   private readonly aim = new pc.Vec3();
+  /** `setPose`'s view offset, worked out in place. */
+  private readonly shift: [number, number, number] = [0, 0, 0];
   private readonly view = new pc.Mat4();
   private readonly viewProj = new pc.Mat4();
   private readonly clip = new pc.Vec4();
@@ -73,19 +76,8 @@ export class GameCamera {
     let ey = ty + radius * cb;
     let ez = tz + radius * sa * sb;
     if (ox !== 0 || oy !== 0) {
-      // The view's right and up in game space (a left-handed look-at, up y).
-      const fx = -ca * sb;
-      const fy = -cb;
-      const fz = -sa * sb;
-      const rl = Math.hypot(fz, fx) || 1;
-      const rx = fz / rl;
-      const rz = -fx / rl;
-      const ux = fy * rz;
-      const uy = fz * rx - fx * rz;
-      const uz = -fy * rx;
-      const dx = -(ox * rx + oy * ux);
-      const dy = -(oy * uy);
-      const dz = -(ox * rz + oy * uz);
+      // Along the view's right and up in game space (`viewShift`).
+      const [dx, dy, dz] = viewShift(alpha, beta, ox, oy, this.shift);
       ex += dx;
       ey += dy;
       ez += dz;

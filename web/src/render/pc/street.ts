@@ -742,10 +742,11 @@ export class Street {
     const town = this.town;
     if (!town) return [];
     // (The land shaped under the town moves its pads: `surfaceMoves`.)
-    const key = `${this.layoutKey}|${this.focus}|${town.surfaceMoves}`;
+    // (A named place's lot as its look has it: `dressKey`.)
+    const key = `${this.layoutKey}|${this.focus}|${town.surfaceMoves}|${town.dressKey}`;
     if (this.townHousesOf?.key !== key) {
       const planner = this.house.planner;
-      const list = town.townHouses(this.focus).map(({ chunk, plot, pad }): TownLotHouse => ({ id: plot.id, chunk, storeys: plot.storeys ?? 1, pad, ...planner.farLook({ x: plot.x, z: plot.z, house: plot.house!, roof: plot.roof, storeys: plot.storeys }) }));
+      const list = town.townHouses(this.focus).map(({ chunk, plot, pad, dress }): TownLotHouse => ({ id: plot.id, chunk, storeys: plot.storeys ?? 1, pad, ...planner.farLook({ x: plot.x, z: plot.z, house: plot.house!, roof: plot.roof, storeys: plot.storeys }), ...(dress ? { look: dress.look, ...(dress.hours ? { hours: dress.hours } : {}) } : {}) }));
       this.townHousesOf = { key, list };
     }
     return this.townHousesOf.list;

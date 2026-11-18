@@ -9,7 +9,7 @@ import type { PlotInfo, RelationshipView, SimView, TownPlace } from '../src/core
 import { dayBar } from '../src/ui/town/dayBar';
 import { layoutTags, tagOrder, type Box, type TagSpot } from '../src/game/tagLayout';
 import { TAG_ORDER } from '../src/ui/town/kinds';
-import { homesForSale, nameLabels, openState, openText, townPlaces } from '../src/ui/town/places';
+import { closedWhy, homesForSale, lotHours, nameLabels, openState, openText, townPlaces } from '../src/ui/town/places';
 import { HAMLET_REACH, homeTag, mostPlaces, mostSales, SALE_MOST, SALE_REACH, nearestFew, placesInView, placeTags, TAG_RANK, tagRank, whereabouts, yourPeople, type TagWorld, type TownTag } from '../src/ui/town/tags';
 import { nextEvents, waitText } from '../src/ui/town/today';
 import { schoolOf, workplaceOf } from '../src/ui/town/workplace';
@@ -233,6 +233,34 @@ describe('places', () => {
     expect(openState(friday, 60, 5).open).toBe(true);
     expect(openState(friday, 60, 6).open).toBe(false);
     expect(openText(openState(undefined, 0, 0), 0, t, days)).toBe('');
+  });
+
+  test("a closed place's Visit why: closed, open, past midnight, other days", () => {
+    const t = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const school = { open: 8 * 60, close: 16 * 60, days: 0b0011111 };
+    expect(closedWhy(school, 7 * 60, 0, t, days)).toBe('Closed · opens 08:00');
+    expect(closedWhy(school, 10 * 60, 0, t, days)).toBeNull();
+    expect(closedWhy(school, 17 * 60, 2, t, days)).toBe('Closed · opens tomorrow 08:00');
+    expect(closedWhy(school, 10 * 60, 5, t, days)).toBe('Closed · opens Mon 08:00');
+    // (Open till 2:00 every day: open after midnight, shut in the morning.)
+    const inn = { open: 12 * 60, close: 2 * 60, days: 0b1111111 };
+    expect(closedWhy(inn, 60, 3, t, days)).toBeNull();
+    expect(closedWhy(inn, 23 * 60, 3, t, days)).toBeNull();
+    expect(closedWhy(inn, 9 * 60, 3, t, days)).toBe('Closed · opens 12:00');
+    expect(closedWhy(undefined, 3 * 60, 0, t, days)).toBeNull();
+  });
+
+  test("a lot's hours: the simulation's, else its place's, else none", () => {
+    const plots = [plot(0, 'A', false), plot(1, 'School', true, { hours: { open: 480, close: 960, days: 31 } }), plot(2, 'Café', true)];
+    const places: TownPlace[] = [
+      { name: 'School', kind: 'school', x: 0, z: 0, area: 0, plot: 1, hours: { open: 0, close: 1, days: 1 } },
+      { name: 'Café', kind: 'cafe', x: 0, z: 0, area: 0, plot: 2, hours: { open: 450, close: 1080, days: 127 } },
+    ];
+    expect(lotHours(1, plots, places)).toEqual({ open: 480, close: 960, days: 31 });
+    expect(lotHours(2, plots, places)).toEqual({ open: 450, close: 1080, days: 127 });
+    expect(lotHours(0, plots, places)).toBeUndefined();
+    expect(lotHours(null, plots, places)).toBeUndefined();
   });
 
   test('homes for sale: lots nobody lives on, priced from land and house', () => {

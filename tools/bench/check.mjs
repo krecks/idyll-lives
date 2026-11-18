@@ -58,6 +58,24 @@
  *             The old single object: --object deskSimple --at 23,14,0 (corner and rot) --use sit
  *               (default 0) --shots 6 --every 500; the camera follows the resident as before.
  *
+ *   places    the named places' lots (`web/src/debug/places.ts`): opens `?state=<state>&debug` paused,
+ *             lists every place with a lot of its own (`__places()`, with the layout each was stamped
+ *             from), and for one place per layout (or the ones named) takes it closed from outside,
+ *             `<layout>-closed-<tag>` (the lot in view, not looked into: drawn as its kind's building),
+ *             looked inside, `<layout>-inside-<tag>` (`__lookInside(name)`, as the card's Look inside),
+ *             and on a lot with a storey above (the hotel, the school, the town hall) upstairs too,
+ *             `<layout>-upstairs-<tag>`; each from the lot's entry side, framed on its walls' box.
+ *             `places-<run>.json` has the list (name, kind, plot, layout, lot, storeys, hours).
+ *               --state visitable (a scene unzipped into debug-states/: `gunzip -c
+ *                 web/public/bench/visitable.json.gz > debug-states/visitable.json`)
+ *               --tag day (each picture's last part; default `night` on a `*-night` state)
+ *               --places "Elmview School,The Elmview Hotel" (by name; layouts more than once) | --all (every
+ *                 place with a lot, the park's and the grocer's too)
+ *               --views closed,inside,upstairs (default) and `far`: looked inside, from the town view
+ *                 (150 m: `<layout>-far-<tag>`, how an opened place reads from far off)  --beta 0.8 (from overhead, inside; closed 0.3 lower and
+ *                 1.6 times as far)  --turn 0.5 (rad
+ *                 round from straight in front)
+ *
  *   sheet     contact sheets for reading an evidence folder (`bench-results/review/<cat>`) at a glance:
  *             per object `sheets/obj-<id>.png`, up to six of its pictures in a grid (gallery, game
  *             camera, in use in play, clip held open, then a close-up, at night, other framings of
@@ -112,7 +130,7 @@ function fail(message) {
   process.exit(1);
 }
 
-if (!['gallery', 'clips', 'play', 'sheet'].includes(what)) fail('say what to check: gallery, clips, play or sheet (options at the top of tools/bench/check.mjs)');
+if (!['gallery', 'clips', 'play', 'places', 'sheet'].includes(what)) fail('say what to check: gallery, clips, play, places or sheet (options at the top of tools/bench/check.mjs)');
 /** Every command but `sheet` opens the game's pages from a server. */
 const served = what !== 'sheet';
 const url = flag('url', null);
@@ -155,7 +173,7 @@ if (served && !url) {
 // linked from outside the server's allowed folders (403), leaves pictures of an empty scene.
 for (const [name, path, needed] of served
   ? [
-      ['wasm', '/src/core/wasm-pkg/sim_wasm_bg.wasm', what === 'play'],
+      ['wasm', '/src/core/wasm-pkg/sim_wasm_bg.wasm', what === 'play' || what === 'places'],
       ['manifest', '/assets/manifest.json', true],
     ]
   : []) {
@@ -1200,6 +1218,100 @@ if (what === 'play') {
     }
   }
   log.timings = timings;
+}
+
+if (what === 'places') {
+  const state = flag('state', 'visitable');
+  const tag = flag('tag', /-night$/.test(state) ? 'night' : 'day');
+  const named = list('places');
+  const views = list('views', 'closed,inside,upstairs');
+  const beta = num('beta', 0.8);
+  const turn = num('turn', 0.5);
+  const page = await newPage();
+  startJob(`open ${state}`);
+  await page.goto(pageUrl('/', { state, debug: '' }), { timeout: 90_000 });
+  await page.waitForFunction(() => typeof window.__places === 'function' && window.__world?.() && window.__sims?.().length > 0, null, { timeout: 120_000, polling: 250 });
+  await page.waitForFunction(() => !window.__check.loading(), null, { timeout: 120_000, polling: 250 });
+  // Paused: the clock (and so the light and who is where) stays the state's.
+  await page.evaluate(() => window.__send({ type: 'setSpeed', speed: 0 }));
+  await settle(page, 2000);
+  const places = await page.evaluate(() => window.__places());
+  log.places = places;
+  if (!places.length) noteError(`no place in ${state} has a lot of its own`);
+  const missing = named.filter((n) => !places.some((p) => p.name === n));
+  if (missing.length) noteError(`no place named ${missing.join(', ')}`);
+  const chosen = named.length ? places.filter((p) => named.includes(p.name)) : has('all') ? places : [...new Map(places.filter((p) => p.template).map((p) => [p.template, p])).values()].sort((a, b) => (a.template ?? a.name).localeCompare(b.template ?? b.name));
+  console.log(`${places.length} places with a lot in ${state}; ${chosen.length} to shoot: ${chosen.map((p) => `${p.template ?? '?'} (${p.name})`).join(', ')}`);
+
+  /** The camera on the lot's walls' box (else the lot), from its entry side `turn` round, as far off as the box needs. */
+  const frame = (p, { storey = 0, low = 0, far = 1 } = {}) =>
+    page.evaluate(
+      ({ plot, storey, beta, turn, far }) => {
+        const l = window.__world().plots[plot];
+        const [x0, z0, x1, z1] = l.house ?? [l.x, l.z, l.x + l.w, l.z + l.d];
+        const [cx, cz] = [(x0 + x1) / 2, (z0 + z1) / 2];
+        const [ex, ez] = l.entry ?? [l.x + l.w / 2, l.z + l.d];
+        const alpha = Math.atan2(ez - cz, ex - cx) + turn;
+        const y = window.__camera().target[1];
+        const radius = Math.max(12, Math.hypot(x1 - x0, z1 - z0) * 1.05 * far);
+        window.__camera({ alpha, beta, radius, target: [cx, y + storey * 3, cz] });
+        return { alpha, beta, radius, target: [cx, y, cz] };
+      },
+      { plot: p.plot, storey, beta: beta - low, turn, far },
+    );
+  const ready = async () => {
+    await settle(page, 1500);
+    await page.evaluate(async () => (await import('/src/assets/stream.ts')).whenStreamSettled()).catch(() => {});
+    await page.waitForFunction(() => !window.__check.loading(), null, { timeout: 60_000, polling: 250 }).catch(() => {});
+    await settle(page, 1000);
+  };
+  for (const p of chosen) {
+    const id = slug(p.template ?? p.name);
+    const extra = { kind: 'place', place: p.name, template: p.template, plot: p.plot, tag };
+    try {
+      if (views.includes('closed')) {
+        startJob(`${id}-closed-${tag}`, extra);
+        await page.evaluate((plot) => {
+          window.__controls.lookInside(null);
+          window.__controls.setStorey(0);
+          window.__showPlot(plot);
+        }, p.plot);
+        await ready();
+        const camera = await frame(p, { low: -0.3, far: 1.6 });
+        await ready();
+        await shot(page, `${id}-closed-${tag}`, { ...extra, view: 'closed', camera });
+      }
+      if (views.includes('inside')) {
+        startJob(`${id}-inside-${tag}`, extra);
+        if ((await page.evaluate((name) => window.__lookInside(name, 0), p.name)) === null) throw new Error(`no lot for ${p.name}`);
+        await ready();
+        const camera = await frame(p);
+        await ready();
+        await shot(page, `${id}-inside-${tag}`, { ...extra, view: 'inside', camera });
+      }
+      if (views.includes('far')) {
+        startJob(`${id}-far-${tag}`, extra);
+        await page.evaluate((name) => window.__lookInside(name, 0), p.name);
+        await ready();
+        await frame(p, { low: -0.1 });
+        const camera = await page.evaluate(() => window.__camera({ radius: 150 }));
+        await ready();
+        await shot(page, `${id}-far-${tag}`, { ...extra, view: 'far', camera });
+      }
+      if (views.includes('upstairs') && p.storeys > 1) {
+        startJob(`${id}-upstairs-${tag}`, extra);
+        await page.evaluate((name) => window.__lookInside(name, 1), p.name);
+        await ready();
+        const camera = await frame(p, { storey: 1 });
+        await ready();
+        await shot(page, `${id}-upstairs-${tag}`, { ...extra, view: 'upstairs', camera });
+        await page.evaluate(() => window.__controls.setStorey(0));
+      }
+    } catch (err) {
+      noteError(`no picture of ${p.name}: ${err.message.split('\n')[0]}`);
+    }
+  }
+  await page.evaluate(() => window.__controls.lookInside(null)).catch(() => {});
 }
 
 if (what === 'sheet') {

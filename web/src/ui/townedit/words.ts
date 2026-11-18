@@ -3,8 +3,13 @@
  * it (the street card lists it first; the Remove tool says it as the pointer goes over a street).
  */
 
+import { CIVIC, civicLabel, draftAreaSize } from '../../game/backdrop';
+import { placeOfTemplate } from '../../game/placeLots';
 import type { Goes } from '../../game/edit/streets';
 import type { NeighbourhoodDraft } from '../../game/town';
+
+/** What a named place's lot of another kind than a civic place is (`backdrop.ts` `ZONE`). */
+const ZONE_KIND: Record<string, string> = { shop: 'Shop', cafe: 'Café', restaurant: 'Restaurant', office: 'Offices', workshop: 'Workshop', farm: 'Farm shop' };
 
 /** A sentence from an edit's reason (they are written as clauses: "it bends tighter than 9 m"). */
 export const sentence = (why: string) => {
@@ -20,8 +25,10 @@ export function listed(items: readonly string[]): string {
   return items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
-/** What a lot is, in a word or two: a home, a farm, a public place's or an outdoor spot's kind. */
-export function lotKind(s: NeighbourhoodDraft['slots'][number]): string {
+/** What a lot is, in a word or two: a home, a farm, a public place's or an outdoor spot's kind, a named place's (a civic place's called as one of its area's size in `draft`: a village's hall its village hall). */
+export function lotKind(s: NeighbourhoodDraft['slots'][number], draft?: NeighbourhoodDraft): string {
+  const what = s.kind === 'shop' ? placeOfTemplate(s.template) : null;
+  if (what) return 'civic' in what ? civicLabel(CIVIC[what.civic], draft ? draftAreaSize(draft, s.area ?? 0) : 'town') : (ZONE_KIND[what.zone] ?? 'Shop');
   if (s.kind === 'house') return s.lot === 'farm' ? 'Farm' : s.lot === 'terrace' ? 'Terraced home' : `${s.lot ? s.lot.charAt(0).toUpperCase() + s.lot.slice(1) : 'A'} home`;
   if (s.kind === 'outdoor') return 'Outdoor spot';
   return s.kind === 'shop' ? 'Shop' : 'Public place';

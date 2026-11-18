@@ -800,10 +800,13 @@ function lotsOnOf(draft: NeighbourhoodDraft, t: Templates, gone: ReadonlySet<num
  * `roads` (each from road `from[i]` of `draft`, -1 a new one) with the country roads left with a dead
  * end where they met what went: taken up where nothing stands on them and no road leads off them,
  * else cut back past their last lot (`cutStub`; `lotsOn`: the lots left on a road of `draft`) and said in the notes. The roads `keep` (of `draft`)
- * are left as they are. A join that meets nothing any more is a dead end (`deadEnds`).
+ * are left as they are. A join that meets nothing any more is a dead end (`deadEnds`). `removing`: one
+ * whose lots would leave it a dead end out in the country past a court's length is taken up with them,
+ * as the roads into the village are (`detach`); `took`: those (by index in `draft`).
  */
-function tidy(draft: NeighbourhoodDraft, roads: RoadPlan[], from: number[], keep: ReadonlySet<number>, carries: ReadonlySet<number>, lotsOn: (road: number) => readonly Rect[], place: string): { roads: RoadPlan[]; from: number[]; notes: string[] } {
+function tidy(draft: NeighbourhoodDraft, roads: RoadPlan[], from: number[], keep: ReadonlySet<number>, carries: ReadonlySet<number>, lotsOn: (road: number) => readonly Rect[], place: string, removing = false): { roads: RoadPlan[]; from: number[]; notes: string[]; took: number[] } {
   const notes: string[] = [];
+  const took: number[] = [];
   const done = new Set<number>();
   for (let round = 0; round < 64; round++) {
     roads = deadEnds(roads, new Set(from.flatMap((o, i) => (keep.has(o) ? [i] : []))));
@@ -822,14 +825,26 @@ function tidy(draft: NeighbourhoodDraft, roads: RoadPlan[], from: number[], keep
         break;
       }
       done.add(old);
-      roads[i] = cutStub(roads, i, end, lotsOn(old));
+      const cut = cutStub(roads, i, end, lotsOn(old));
+      if (removing && !held && courtPast([...roads.slice(0, i), cut, ...roads.slice(i + 1)], i, end) > COURT + 0.5) {
+        took.push(old);
+        taken = i;
+        break;
+      }
+      roads[i] = cut;
       notes.push(`${r.name ?? 'a country road'} is left ending where ${place} was${carries.has(old) ? ': homes stand on it' : ''}`);
     }
     if (taken < 0) break;
     roads = roads.filter((_, i) => i !== taken);
     from = from.filter((_, i) => i !== taken);
   }
-  return { roads, from, notes };
+  return { roads, from, notes, took };
+}
+
+/** How far road `roads[i]`'s dead end `end` reaches past the last road meeting it (m). */
+function courtPast(roads: readonly RoadPlan[], i: number, end: 0 | 1): number {
+  const ls = lengths(roads[i].points);
+  return ls[ls.length - 1] - Math.max(0, ...meetings(roads, i, end));
 }
 
 /**
@@ -1003,10 +1018,6 @@ function removeOnce(draft: NeighbourhoodDraft, t: Templates, area: number): Edit
   const goes = detach(draft, t, parts, true);
   if ('refused' in goes) return goes;
   const lots = new Set([...parts.lots, ...goes.lots]);
-  const kept = removalRefused(draft, lots);
-  if (kept) return { refused: `${kept.replace(/\.$/, '')}: without ${name} it would go` };
-  const homes = draft.slots.filter((s) => s.kind === 'house' && !lots.has(s.index)).length;
-  if (homes < 2) return { refused: `without ${name} the town would have fewer than two homes` };
   // Its roads and those that led only to it, and the roads left ending where it was taken up or cut back.
   const gone = new Set([...parts.roads, ...goes.remove]);
   const left = tidy(
@@ -1017,7 +1028,15 @@ function removeOnce(draft: NeighbourhoodDraft, t: Templates, area: number): Edit
     goes.carries,
     lotsOnOf(draft, t, lots),
     name,
+    true,
   );
+  // (The lots on a country road taken up with its homes go with it.)
+  const spots = entriesOf(draft, t);
+  draft.slots.forEach((s, k) => spots[k] && left.took.includes(spots[k].road) && lots.add(s.index));
+  const kept = removalRefused(draft, lots);
+  if (kept) return { refused: `${kept.replace(/\.$/, '')}: without ${name} it would go` };
+  const homes = draft.slots.filter((s) => s.kind === 'house' && !lots.has(s.index)).length;
+  if (homes < 2) return { refused: `without ${name} the town would have fewer than two homes` };
   for (const i of draft.roads.keys()) if (!left.from.includes(i)) gone.add(i);
   if (!left.roads.some((r) => r.ends.includes('out')) || !reaches(left.roads, left.roads.flatMap((r, i) => (r.area === 0 ? [i] : [])))) return { refused: `without ${name} no road would lead out of the world` };
   // The other areas' streets and lanes it leaves ending where it was, held to a court's length.

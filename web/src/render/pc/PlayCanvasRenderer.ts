@@ -76,18 +76,19 @@ import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
 import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS, TOWN_FROM, townBlend } from '../shared/lens';
-import { edgeFog, landEdge, menuFog, menuFogFrom, TOWN_RADIUS_LIMITS, townArrival, townFar, townFog, townFogFrom, townNear, townOrbit } from '../shared/townCamera';
+import { edgeFog, landEdge, menuFog, menuFogFrom, TOWN_RADIUS_LIMITS, townArrival, townClearance, townFar, townFog, townFogFrom, townNear, townOrbit } from '../shared/townCamera';
 import { townView } from '../shared/townView';
 import { landscapeRing, WATER_Y } from '../shared/nature';
 import { setFogFrom } from './shaders/fog';
-import { LT_FIXTURE } from '../../debug/livingTown';
+import { LOT_LOOKS_FIXTURE, LT_FIXTURE } from '../../debug/livingTown';
 import { applyLandFixture, LAND_FIXTURE } from '../landFixture';
 import { lotBuilding, MOVER_GROW, TownBuildings, TownMovers, townBackdrop, type Mover, type TownLotHouse } from './townView';
 import { STOREY as BACKDROP_STOREY, type TownBuilding } from '../shared/townBuildings';
-import { rayPrism, rectFootprint } from '../shared/buildingPick';
+import { lotWallsHeight, rayPrism, rectFootprint } from '../shared/buildingPick';
 import { surfaceOf } from '../shared/landSurface';
 import { TownGroundMap } from './groundTiles';
 import { LandHaze } from './landHaze';
+import { cutInView } from '../shared/landVeil';
 import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
 import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
@@ -102,7 +103,7 @@ import { OrbitControls } from '../shared/orbit';
 import { Flight, panBounds, Roam, WARM_LOTS, warmLots, type FocusPlot } from '../shared/focus';
 import { CHUNK, chunkCoords, distanceToRect, RectGrid } from '../shared/chunks';
 import { ModelRefresh } from '../shared/modelRefresh';
-import { OverviewCamera } from '../shared/overviewCamera';
+import { OverviewCamera, viewShift } from '../shared/overviewCamera';
 import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
 import { DEFAULT_RESOLUTION, renderScale, watchPixelRatio } from '../shared/resolution';
@@ -504,8 +505,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * are on (`showLayers`).
    */
   private overview: TownOverview | null = null;
-  /** The haze the menus' land fades into past its edge, from far out (`landHaze.ts`); made with the first town shown. */
+  /** The haze the menus' land fades into at its edge, and the curtain closing its cut (`landHaze.ts`); made with the first town shown. */
   private landHaze: LandHaze | null = null;
+  /**
+   * The game's: made the first time its camera is past its landscape (`hazeWorld`), for the landscape and the land as
+   * they were then (`worldHazeFor`, its `landVersion`), and whether it shows now.
+   */
+  private worldHaze: LandHaze | null = null;
+  private worldHazeFor: { scape: Landscape | null; version: number } = { scape: null, version: -1 };
+  private worldHazeShown = false;
   private townShot: TownShot | null = null;
   private townHighlight: LotHighlight | null = null;
   private townWorld: WorldStructure | null = null;
@@ -1269,6 +1277,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   // --- the camera ----------------------------------------------------------------------
 
+  /** The menus' camera's view offset in game space (`viewShift`), worked out in place. */
+  private readonly townShift: [number, number, number] = [0, 0, 0];
+
+  /** The menus' land's height at a point (0 before it has one): for the camera's planes (`applyTownCamera`). */
+  private readonly townHeight = (x: number, z: number): number => this.lot.landscapeOf('town')?.heightAt(x, z) ?? 0;
+
   /** Puts the camera where the game (or the overview) has it this frame. */
   private applyCamera(): void {
     if (this.townMode) {
@@ -1276,15 +1290,19 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // (The menus' town has the full town view's planes, sky and haze at any distance: `applyTownCamera`.)
       const flat = Math.sin(p.beta) * p.radius;
       const [ex, ey, ez] = [p.target.x + Math.cos(p.alpha) * flat, p.target.y + Math.cos(p.beta) * p.radius, p.target.z + Math.sin(p.alpha) * flat];
-      this.applyTownCamera(p.radius, p.alpha, p.beta, ex, ey, ez, true);
-      // (The land's veil moved for the eye: each of its points over the land it is for, as seen from here.)
-      if (this.landHaze?.view(ex, ey, ez)) this.held?.changed();
+      // (Where the camera is drawn from: moved by the view offset, tens of metres from far out. The near plane's
+      // clearance and the land's veil go by it.)
+      const shift = viewShift(p.alpha, p.beta, p.targetScreenOffset.x, p.targetScreenOffset.y, this.townShift);
+      this.applyTownCamera(p.radius, p.alpha, p.beta, ex, ey, ez, true, shift);
+      this.landHaze?.show(p.radius, ex + shift[0], ez + shift[2]);
       this.camera.setPose(p.alpha, p.beta, p.radius, p.target.x, p.target.y, p.target.z, p.targetScreenOffset.x, p.targetScreenOffset.y);
     } else {
       const o = this.orbit;
       // (The eye: target + radius × (cos α sin β, cos β, sin α sin β), game space.)
       const flat = Math.sin(o.beta) * o.radius;
-      this.applyTownCamera(o.radius, o.alpha, o.beta, o.target.x + Math.cos(o.alpha) * flat, o.target.y + Math.cos(o.beta) * o.radius, o.target.z + Math.sin(o.alpha) * flat, false);
+      const [ex, ey, ez] = [o.target.x + Math.cos(o.alpha) * flat, o.target.y + Math.cos(o.beta) * o.radius, o.target.z + Math.sin(o.alpha) * flat];
+      this.applyTownCamera(o.radius, o.alpha, o.beta, ex, ey, ez, false);
+      this.hazeWorld(o.alpha, o.beta, ex, ey, ez);
       this.camera.setPose(o.alpha, o.beta, o.radius, o.target.x, o.target.y, o.target.z);
     }
     this.camera.viewProjectionInto(this.townViewProj);
@@ -1306,13 +1324,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * from the main menu's low shot, and from the new-game screens zoomed out the whole picture was the dome's flat
    * underside, the lots' tags floating on grey.
    */
-  private applyTownCamera(radius: number, alpha: number, beta: number, ex: number, ey: number, ez: number, menus: boolean): void {
+  private applyTownCamera(radius: number, alpha: number, beta: number, ex: number, ey: number, ez: number, menus: boolean, shift?: readonly [number, number, number]): void {
     const blend = menus ? 1 : townBlend(radius);
     const r = menus ? this.townReach : this.worldReach;
     if (blend > 0) {
-      const land = menus ? (this.lot.landscapeOf('town')?.heightAt(ex, ez) ?? 0) : this.groundY(ex, ez);
+      // (The menus' land round the eye too, as far as the near plane reaches, from where the camera is drawn (`shift`):
+      // `townClearance`.)
+      const clearance = menus ? townClearance(ex + (shift?.[0] ?? 0), ey + (shift?.[1] ?? 0), ez + (shift?.[2] ?? 0), radius, this.townHeight) : ey - this.groundY(ex, ez);
       const far = townFar(radius, this.playFar, ex, ey, ez, r.x0, r.z0, r.x1, r.z1, blend);
-      this.camera.setPlanes(townNear(radius, ey - land, blend), far);
+      this.camera.setPlanes(townNear(radius, clearance, blend), far);
       this.lot.skyReach(far, blend);
     } else if (this.townBlendDrawn > 0) {
       this.camera.setPlanes(0, this.playFar);
@@ -1332,6 +1352,33 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     if (Math.abs(fog - this.app.scene.fog.density) > fog * 0.01) this.app.scene.fog.density = fog;
     this.setFogFrom(from);
+  }
+
+  /**
+   * The game's landscape's cut edge closed in the haze's colour and its land faded into the haze at its edge, as the
+   * menus' are (`landHaze.ts` `hold`), while that edge is in the picture (`cutInView`): from the town view far out
+   * over a small land's corner, the eye past the landscape looks back at its cut, the ground tiles' skirts and the sea's
+   * sheet under the hills. With the eye (at `ex`, `ey`, `ez`, looking along `alpha`, `beta`) over the landscape, as it
+   * nearly always is, nothing is worked out, drawn or told.
+   */
+  private hazeWorld(alpha: number, beta: number, ex: number, ey: number, ez: number): void {
+    const r = this.worldReach;
+    const scape = this.lot.landscapeOf('world');
+    if (!scape || (ex >= r.x0 && ex <= r.x1 && ez >= r.z0 && ez <= r.z1)) {
+      if (this.worldHazeShown) this.worldHaze?.hold(0);
+      this.worldHazeShown = false;
+      return;
+    }
+    const haze = (this.worldHaze ??= new LandHaze(this.app, this.root));
+    const made = this.worldHazeFor;
+    if (made.scape !== scape || made.version !== scape.landVersion) {
+      [made.scape, made.version] = [scape, scape.landVersion];
+      haze.set(r, (x, z) => scape.heightAt(x, z), pc.LAYERID_WORLD, `${landscapeId(scape)}|${scape.landVersion}`);
+    }
+    // (The eye in game space: the camera's heights are the engine's, the datum below the land's.)
+    const k = cutInView(r, haze.positions, ex, ey + this.datum, ez, alpha, beta, LENS.fov, this.cssSize.width / Math.max(1, this.cssSize.height));
+    if (k > 0 || this.worldHazeShown) haze.hold(k);
+    this.worldHazeShown = k > 0;
   }
 
   /** Where the haze begins (m from the eye), told to the shaders only when it moved (`shaders/fog.ts`). */
@@ -1794,9 +1841,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (LAND_FIXTURE.size) applyLandFixture(world);
     // (`?ltFixture`: a Big world without a backdrop gets the debug fixture's, until worldgen writes
     // one; its code is a chunk of its own.)
-    if (LT_FIXTURE) {
-      return import('../../debug/ltFixture').then(({ applyLtFixture }) => {
-        applyLtFixture(world);
+    // (`?lotLooks`: the public lots with walls get named places' looks, until worldgen writes them.)
+    if (LT_FIXTURE || LOT_LOOKS_FIXTURE) {
+      return import('../../debug/ltFixture').then(({ applyLtFixture, applyLotLooksFixture }) => {
+        if (LT_FIXTURE) applyLtFixture(world);
+        if (LOT_LOOKS_FIXTURE) applyLotLooksFixture(world);
         return this.placeWorld(world, view);
       });
     }
@@ -3132,7 +3181,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // given: linear.
     const c = l.clearColor;
     this.app.scene.fog.color.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
-    this.landHaze?.setColour(this.app.scene.fog.color);
     this.camera.camera.clearColor = this.colorTmp.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
     // The look's exposure for the hour and the moonlight grade (`post.ts`: uniforms).
     if (this.post) this.post.exposure = l.exposure * LOOK.exposure;
@@ -3182,8 +3230,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const overview = (this.overview ??= new TownOverview(this.app, this.root, this.deps.assets, this.deps.content, this.house));
       const ring = landscapeRing(world);
       Object.assign(this.townReach, { x0: -ring, z0: -ring, x1: world.width + ring, z1: groundDepth(world) + ring });
-      // (The player's pan keeps the camera over the land, the town or none.)
-      this.townRig.setBounds({ x0: 0, z0: 0, x1: world.width, z1: groundDepth(world) });
+      // (The player's pan keeps the camera's target over the land, the town or none, and its eye near it.)
+      this.townRig.setBounds({ x0: 0, z0: 0, x1: world.width, z1: groundDepth(world) }, true);
       if (this.townBuilds++ === 0 && !this.worldBuilding) this.sliceStart = performance.now();
       // (A town on screen already, built again: longer slices, `AGAIN_SLICE_MS`.)
       this.townAgain = this.townMode;
@@ -3201,9 +3249,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         // The camera keeps a clear view over the hills (and out of the mountains).
         this.townRig.ground = (x, z) => nature.landscape.heightAt(x, z);
         // (The land faded into the haze past its landscape's edge, from far out.)
-        const haze = (this.landHaze ??= new LandHaze(this.app, this.root));
-        haze.set(this.townReach, (x, z) => nature.landscape.heightAt(x, z), townLayer(this.app).id, `${landscapeId(nature.landscape)}|${nature.landscape.landVersion}`);
-        haze.setColour(this.app.scene.fog.color);
+        this.landHaze ??= new LandHaze(this.app, this.root);
+        this.hazeLand(nature.landscape);
       } finally {
         this.townBuilds--;
       }
@@ -3421,9 +3468,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return this.landQueue;
   }
 
-  /** The game world's ground map at altitude to be made again (its farmland follows the land's cover: `TownGroundMap`), the next time the town view draws it. */
+  /**
+   * The game world's ground map at altitude to be made again (its farmland follows the land's cover: `TownGroundMap`),
+   * the next time the town view draws it; the menus' land's haze and curtain fitted to the land as it now is.
+   */
   private landMapped(scape: Landscape): void {
     if (scape === this.lot.landscape) this.townGroundStale = true;
+    if (scape === this.lot.landscapeOf('town')) this.hazeLand(scape);
+  }
+
+  /**
+   * The menus' land's haze and the curtain closing its cut edge (`landHaze.ts`) for `scape` as it is now: made again
+   * when its land changed (a stroke that raised the edge, or opened a valley past it, `landVersion`).
+   */
+  private hazeLand(scape: Landscape): void {
+    this.landHaze?.set(this.townReach, (x, z) => scape.heightAt(x, z), townLayer(this.app).id, `${landscapeId(scape)}|${scape.landVersion}`);
   }
   private townGroundStale = false;
 
@@ -3545,6 +3604,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The menus' town comes on screen: the overview's camera from where the game's is (whose pose the orbit keeps), its layer, its light. */
   private enterTown(): void {
     this.townMode = true;
+    // (The game's haze let go: the menus' town has its own.)
+    this.worldHaze?.hold(false);
+    this.worldHazeShown = false;
     this.shaderWatch.phase = 'town';
     this.birdLife.setTown(true);
     this.applyDig(); // (no basement or windowless rooms kept dark in the town.)
@@ -3652,7 +3714,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (Its highlights' colours are written in place: the held frame is drawn again, `heldFrames.ts`. From far out the
     // lit lots are washed over whole.)
     this.overview?.setReach(this.townPose.radius);
-    this.landHaze?.show(this.townPose.radius);
     // (Step 2's ghosts drawn again when the zoom crosses a step of their least widths on screen.)
     if (this.ghostDraw?.setScale(this.townMetresPerPx()) && this.ghosts) this.drawGhosts();
     if (this.useDraw?.setScale(this.townMetresPerPx()) && this.uses) this.drawUses();
@@ -3713,11 +3774,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const view = this.view;
     let best = Infinity;
     let hit: BuildingHit | null = null;
-    for (const p of world.plots) {
+    const looks = world.meta?.lotLooks;
+    for (let i = 0; i < world.plots.length; i++) {
+      const p = world.plots[i];
       if (!p.house || (view && view.x === p.x && view.z === p.z)) continue;
       const [x0, z0, x1, z1] = p.house;
       const g = [this.groundY(x0, z0), this.groundY(x1, z0), this.groundY(x1, z1), this.groundY(x0, z1)];
-      const t = rayPrism(origin, dir, rectFootprint(x0, z0, x1, z1), Math.min(...g) - 0.5, Math.max(...g) + (p.storeys ?? 1) * WALL_HEIGHT + PICK_ROOF);
+      // (A named place's lot as tall as the street draws it closed: its look's storeys, or its own if more, `lotLookBuilding`.)
+      const tall = lotWallsHeight(p.storeys, p.public ? looks?.[i] : undefined, WALL_HEIGHT, BACKDROP_STOREY);
+      const t = rayPrism(origin, dir, rectFootprint(x0, z0, x1, z1), Math.min(...g) - 0.5, Math.max(...g) + tall + PICK_ROOF);
       if (t < best) [best, hit] = [t, { kind: 'lot', plot: p.id }];
     }
     const backdrop = world.meta?.backdrop ?? [];
@@ -4264,6 +4329,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.unlistenFiles = null;
     this.overview?.destroy();
     this.landHaze?.destroy();
+    this.worldHaze?.destroy();
     this.street?.destroy();
     this.townBuildings?.destroy();
     this.backdropBoxes?.destroy();

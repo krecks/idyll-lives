@@ -266,9 +266,11 @@ export function frontSide(t: Pick<TownBuilding, 'cx' | 'cz' | 'ux' | 'uz' | 'w' 
 
 /**
  * Backdrop building `t` (as the town view draws it, `backdropBuilding`; its `use`) dressed, in place. `to`: where its
- * way meets the road (`backdropGround`), the side its door is on.
+ * way meets the road (`backdropGround`), the side its door is on. `door`: a named place's lot closed
+ * (`lotLookBuilding`), where its own front door is (town metres, on that side): the door drawn there, and a church's
+ * tower over it where the door is on an end.
  */
-export function dressBackdrop(t: TownBuilding, use: BackdropUse, to: readonly [number, number] | null): BackdropDress {
+export function dressBackdrop(t: TownBuilding, use: BackdropUse, to: readonly [number, number] | null, door: readonly [number, number] | null = null): BackdropDress {
   const W = t.w / 2;
   const D = t.d / 2;
   const seed = t.seed;
@@ -328,6 +330,9 @@ export function dressBackdrop(t: TownBuilding, use: BackdropUse, to: readonly [n
   // ---- doors: where, then the windows round them ----
   const doors: { s: Side; a: number; wide: number }[] = [];
   const L = d.half(front);
+  // (A lot's own door along the front side, in the building's frame, kept off its corners.)
+  const own = door && ((dx: number, dz: number) => (front < 2 ? dx * t.ux + dz * t.uz : -dx * t.uz + dz * t.ux))(door[0] - t.cx, door[1] - t.cz);
+  const at = (wide: number, fallback: number) => (own === null ? fallback : Math.max(-L + wide / 2 + 0.3, Math.min(L - wide / 2 - 0.3, own)));
   if (use === 'terrace') {
     for (let i = 0; i < homesIn; i++) {
       // (Each home's door at the same end of its frontage, its window beside it; along x on the long sides.)
@@ -335,13 +340,14 @@ export function dressBackdrop(t: TownBuilding, use: BackdropUse, to: readonly [n
       doors.push({ s: front < 2 ? front : 0, a: mid - unit * 0.22, wide: 1 });
     }
   } else if (shop) {
-    doors.push({ s: front, a: (h(seed, 13) - 0.5) * Math.max(0, L - 2.2), wide: 1.1 });
+    doors.push({ s: front, a: at(1.1, (h(seed, 13) - 0.5) * Math.max(0, L - 2.2)), wide: 1.1 });
   } else if (boarded) {
-    doors.push({ s: front, a: (h(seed, 13) - 0.5) * Math.max(0, L - 3), wide: Math.min(3.2, L * 2 - 1.4) });
+    const wide = Math.min(3.2, L * 2 - 1.4);
+    doors.push({ s: front, a: at(wide, (h(seed, 13) - 0.5) * Math.max(0, L - 3)), wide });
   } else {
     const wide = use === 'church' || use === 'school' || use === 'hall' ? 1.7 : use === 'flats' || use === 'office' ? 1.4 : 1;
     const off = home ? (h(seed, 13) - 0.5) * Math.max(0, L * 0.6 - wide) : 0;
-    doors.push({ s: front, a: off, wide });
+    doors.push({ s: front, a: at(wide, off), wide });
   }
   const nearDoor = (s: Side, a: number, k: number, half: number) => k === 0 && doors.some((o) => o.s === s && Math.abs(o.a - a) < o.wide / 2 + half + 0.25);
 
@@ -479,7 +485,7 @@ export function dressBackdrop(t: TownBuilding, use: BackdropUse, to: readonly [n
   // ---- a church's tower and spire at one end ----
   if (use === 'church') {
     const tw = Math.min(2 * D * 0.55, 4.2, 2 * W * 0.4);
-    const x0 = h(seed, 29) < 0.5 ? -W : W - tw;
+    const x0 = door && front === 3 ? -W : door && front === 2 ? W - tw : h(seed, 29) < 0.5 ? -W : W - tw;
     const towerTop = top + t.rise + 3.5;
     d.stone.color(colour).box(x0, floor + PLINTH, -tw / 2, x0 + tw, towerTop, tw / 2, 'ny py');
     d.trim.color(TRIM).box(x0 - 0.06, towerTop - 0.25, -tw / 2 - 0.06, x0 + tw + 0.06, towerTop, tw / 2 + 0.06, 'ny');

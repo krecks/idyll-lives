@@ -30,6 +30,8 @@ import { gpuOnly, meshFrom } from './meshes';
 import { GAME_FRONT_FACE, MaterialLibrary, textureWithFallback } from './materials';
 import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from './models';
 import { codeFor, float, registerShaderFeature, type ShaderFeature } from './shaders/chunks';
+import { setSky } from './shaders/fog';
+import { domeColour, SKY_SEGMENTS, type DomeSky } from '../shared/skyMap';
 import type { AssetRegistry } from '../../assets/registry';
 import type { WorldStructure } from '../../core/protocol';
 import { LookedFrom } from '../shared/chunks';
@@ -38,7 +40,7 @@ import { CountryRoads, ROAD_VERGE } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
 import { GRASS, grassField, gustAt, gustNoise, markGrassPatches, recolourGrass, regroundGrass, type GrassQuality } from '../shared/grass';
 import { OffThreadLand, withTownGrass } from '../shared/renderData';
-import { pondQuads, rectBox } from '../shared/landBake';
+import { pondQuads, rectBox, ROUND_REACH } from '../shared/landBake';
 import { flowingWater, WaterFlowMap } from './water';
 import { padGeometry, padMask, padsOf } from '../shared/pads';
 import { LAND_CELL, type Land, type LandRect } from '../../game/land';
@@ -551,11 +553,16 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return out;
   }
 
-  /** The box (m) round the samples in `rect` the land's drawing leans on, `pad` m out, and on past the world's edge where it reaches it. */
-  landBox(rect: LandRect, pad = 0): [number, number, number, number] {
+  /**
+   * The box (m) round the samples in `rect` the land's drawing leans on, `pad` m out, and on past the world's edge where
+   * it reaches it (and `along` m more each way there: the water past the edge as rounded again once a stroke is done,
+   * `roundedWater`).
+   */
+  landBox(rect: LandRect, pad = 0, along = 0): [number, number, number, number] {
     const field = this.heightField!;
     const box = rectBox(rect, pad);
     const fade = LAND_EDGE_FADE_M + pad;
+    if (rect.i0 <= 0 || rect.j0 <= 0 || rect.i1 >= field.cols || rect.j1 >= field.rows) [box[0], box[1], box[2], box[3]] = [box[0] - along, box[1] - along, box[2] + along, box[3] + along];
     if (rect.i0 <= 0) box[0] = Math.min(box[0], -fade);
     if (rect.j0 <= 0) box[1] = Math.min(box[1], -fade);
     if (rect.i1 >= field.cols) box[2] = Math.max(box[2], Math.max(this.w, field.cols * LAND_CELL) + fade);
@@ -735,8 +742,12 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   async landDone(rect: LandRect, pace?: () => Promise<void>): Promise<[number, number, number, number] | null> {
     if (!this.heightField || !this.host) return null;
     // (On a land its town follows, what the surface solved again moved too.)
+    const exits = this.landExits;
     const changed = this.landChanged(rect);
-    const box = this.landBox(changed, LAND_DONE_PAD);
+    const box = this.landBox(changed, LAND_DONE_PAD, ROUND_REACH);
+    // (A river drawn out to the edge, or away from it: the valley past the edge came, went or moved with it.)
+    const valleys = this.valleysMoved(exits);
+    if (valleys) [box[0], box[1], box[2], box[3]] = [Math.min(box[0], valleys[0]), Math.min(box[1], valleys[1]), Math.max(box[2], valleys[2]), Math.max(box[3], valleys[3])];
     perfTime('land: flow', () => this.flowMap?.changed(changed, true));
     for (const k of this.tilesIn(box)) {
       await pace?.();
@@ -1588,6 +1599,9 @@ function release(built: Instanced, keep?: ReadonlySet<ModelTemplate | undefined>
   if (built.template && !keep?.has(built.template)) disposeTemplate(built.template);
 }
 
+/** The woods' rocks (`LandscapeLayout`'s woods): not plants, but they stand in the veil past the land's edge as the trees do. */
+const ROCK = 'model.rock';
+
 /** One model's plants, as the landscape keeps them. */
 interface Batch {
   /** Its model, and the level drawn (`instanced`'s). */
@@ -1669,8 +1683,12 @@ async function instanced(
   const groups = cell ? groupInstances(matrices, (m) => cell(m[12], m[14])) : new Map<string, number[]>();
   const split = groups.size > 1 ? template.meshes.filter((m) => splitsByGroup(m, matrices.length)) : [];
   const span = perfStart(`nature: instances ${key}`);
+  // (The rocks sink into the land in the haze's veil past its edge as the plants do, `shaders/fog.ts`: their finish is
+  // everyone's, so a copy of it, `MaterialLibrary.veilSinking`.)
+  const sinks = key === ROCK;
   const draw = (m: ModelMesh, indices: readonly number[], name: string): Instances => {
-    const d = new Instances(app.graphicsDevice, parent, m.mesh, m.material, { name, castShadows: false, receiveShadows: true, capacity: indices.length });
+    const material = sinks && m.material instanceof pc.StandardMaterial ? MaterialLibrary.for(app).veilSinking(m.material) : m.material;
+    const d = new Instances(app.graphicsDevice, parent, m.mesh, material, { name, castShadows: false, receiveShadows: true, capacity: indices.length });
     d.setCount(indices.length);
     for (let i = 0; i < indices.length; i++) d.setMatrix(i, matrices[indices[i]]);
     d.update();
@@ -1856,6 +1874,8 @@ export function installNature(app: pc.AppBase): void {
     const kind = WIND_KIND[key];
     if (!kind) return;
     material.setDefine('GAME_WIND', '');
+    // (Sinking into the land in the haze's veil past its edge, `shaders/fog.ts`.)
+    material.setDefine('GAME_VEIL_SINK', '');
     if (key !== 'material.finish.bark') material.setDefine('GAME_WIND_TINT', '');
     // No contact shading among leaves and twigs, and none of them in the depth it is made from (`post.ts`).
     withoutContact(material);
@@ -1922,9 +1942,6 @@ export function windSway(app: pc.AppBase, px: number, pz: number): number {
 
 // ---- Sky ------------------------------------------------------------------------------
 
-/** The dome's sphere: 32 segments (`sphereData`). */
-const SKY_SEGMENTS = 32;
-
 /**
  * Gradient sky dome with a glow around the sun (colours follow the time of day via vertex
  * colours) and a band of drifting clouds (`image.clouds`). Both follow the camera (`follow`), so
@@ -1933,6 +1950,9 @@ const SKY_SEGMENTS = 32;
  * Colours as the look was tuned with: the sky's colour is taken for gamma and linearised before the
  * image processing, so the dome's linear vertex colours are linearised once more here, and the
  * clouds' emissive colour is handed over as an sRGB one (PlayCanvas linearises it).
+ *
+ * Its colour (`shared/skyMap.ts` `domeColour`) is told to the haze too (`shaders/fog.ts` `setSky`): where the land's
+ * veil is whole a thing takes the colour the dome has behind it.
  */
 export class Sky {
   readonly dome: pc.Entity;
@@ -1940,13 +1960,16 @@ export class Sky {
   private readonly mesh: pc.Mesh;
   private readonly dirs: Float32Array;
   private readonly colors: Float32Array;
+  /** What its colour is made of (`domeColour`, game space), and the same with the way to the sun in PlayCanvas's (`setSky`). */
+  private readonly sky: DomeSky = { low: [0, 0, 0], high: [0, 0, 0], sun: [0, 1, 0], glow: [0, 0, 0] };
+  private readonly told: DomeSky = { low: [0, 0, 0], high: [0, 0, 0], sun: [0, 1, 0], glow: [0, 0, 0] };
+  private readonly rgb: [number, number, number] = [0, 0, 0];
   private readonly cloudMaterial: pc.StandardMaterial | null = null;
-  private readonly tmp = { r: 0, g: 0, b: 0 };
-  private readonly glow = { r: 0, g: 0, b: 0 };
+  private readonly device: pc.GraphicsDevice;
   private spin = 0;
 
   constructor(app: pc.AppBase, parent: pc.Entity, private readonly radius: number, cloudsUrl?: string) {
-    const device = app.graphicsDevice;
+    const device = (this.device = app.graphicsDevice);
     const { positions, indices } = sphereData(radius * 2, radius * 2, radius * 2, SKY_SEGMENTS);
     this.dirs = new Float32Array(positions.length);
     for (let i = 0; i < positions.length; i++) this.dirs[i] = positions[i] / radius;
@@ -2050,39 +2073,29 @@ export class Sky {
     this.band.setLocalEulerAngles(0, (this.spin * 180) / Math.PI, 0);
   }
 
-  /** Horizon = fog/clear colour, zenith = deeper sky colour, plus a glow around the sun. */
+  /** Horizon = fog/clear colour, zenith = deeper sky colour, plus a glow around the sun (`domeColour`). */
   update(l: Lighting): void {
-    const sx = -l.sunDirection.x;
-    const sy = -l.sunDirection.y;
-    const sz = -l.sunDirection.z;
     // Strongest at golden hour, faint at noon, a dim halo around the moon at night.
     const strength = Math.min(1, l.sunIntensity / 2.5) * (0.35 + 0.65 * (1 - l.sunUp));
+    const [sky, told, rgb] = [this.sky, this.told, this.rgb];
+    const [z, c] = [l.zenithColor, l.clearColor];
+    [sky.low[0], sky.low[1], sky.low[2]] = [c.r, c.g, c.b];
+    [sky.high[0], sky.high[1], sky.high[2]] = [z.r, z.g, z.b];
+    [sky.sun[0], sky.sun[1], sky.sun[2]] = [-l.sunDirection.x, -l.sunDirection.y, -l.sunDirection.z];
+    [sky.glow[0], sky.glow[1], sky.glow[2]] = [l.sunColor.r * strength, l.sunColor.g * strength, l.sunColor.b * strength];
     const n = this.dirs.length / 3;
-    const tmp = this.tmp;
-    const glow = this.glow;
-    const z = l.zenithColor;
-    const c = l.clearColor;
     for (let i = 0; i < n; i++) {
-      const dx = this.dirs[i * 3];
-      const dy = this.dirs[i * 3 + 1];
-      const dz = this.dirs[i * 3 + 2];
-      const t = smoothstep(0.02, 0.75, dy);
-      tmp.r = c.r + (z.r - c.r) * t;
-      tmp.g = c.g + (z.g - c.g) * t;
-      tmp.b = c.b + (z.b - c.b) * t;
-      const d = Math.max(0, dx * sx + dy * sy + dz * sz);
-      const g = (Math.pow(d, 6) * 0.55 + Math.pow(d, 48) * 0.6) * strength * (dy > -0.05 ? 1 : 0);
-      glow.r = l.sunColor.r * g;
-      glow.g = l.sunColor.g * g;
-      glow.b = l.sunColor.b * g;
       // The linear colour, linearised again (see the class).
-      this.colors[i * 4] = toLinear(toLinear(tmp.r + glow.r));
-      this.colors[i * 4 + 1] = toLinear(toLinear(tmp.g + glow.g));
-      this.colors[i * 4 + 2] = toLinear(toLinear(tmp.b + glow.b));
+      domeColour(sky, this.dirs[i * 3], this.dirs[i * 3 + 1], this.dirs[i * 3 + 2], rgb);
+      this.colors.set(rgb, i * 4);
       this.colors[i * 4 + 3] = 1;
     }
     this.mesh.setColors(this.colors);
     this.mesh.update(pc.PRIMITIVE_TRIANGLES, false);
+    // (To the haze in PlayCanvas's space: the dome's is game space, mirrored in z.)
+    for (let k = 0; k < 3; k++) [told.low[k], told.high[k], told.glow[k]] = [sky.low[k], sky.high[k], sky.glow[k]];
+    [told.sun[0], told.sun[1], told.sun[2]] = [sky.sun[0], sky.sun[1], -sky.sun[2]];
+    setSky(this.device, told);
     const cm = this.cloudMaterial;
     if (cm) {
       // Lit side of the clouds: sky-bright by day, sunset-tinted at golden hour, dim at night.
@@ -2094,6 +2107,7 @@ export class Sky {
   }
 
   destroy(): void {
+    setSky(this.device, null);
     this.dome.destroy();
   }
 }
@@ -2172,7 +2186,7 @@ export class FarCrowns {
     // Gathered by square.
     const cells = new Map<string, { n: number; x: number; y: number; z: number; s: number; x0: number; x1: number; z0: number; z1: number; cone: number; birch: number; fruit: number }>();
     for (const { kind, m } of trees) {
-      if (kind === 'model.rock' || kind.startsWith('model.bush')) continue;
+      if (kind === ROCK || kind.startsWith('model.bush')) continue;
       const [x, y, z] = [m[12], m[13], m[14]];
       const s = Math.hypot(m[0], m[1], m[2]);
       const key = `${Math.floor(x / CROWN_CELL)},${Math.floor(z / CROWN_CELL)}`;
@@ -2230,7 +2244,7 @@ export class FarCrowns {
     if (this.draws) return this.draws;
     const { app, parent } = this;
     const lib = MaterialLibrary.for(app);
-    const material = lib.instanceColored(lib.plainFinish());
+    const material = lib.veilSinking(lib.instanceColored(lib.plainFinish()));
     return (this.draws = [false, true].map((cone) => {
       const mesh = meshFrom(app.graphicsDevice, crownMesh(cone).meshData({ colors: true }))!;
       mesh.incRefCount();

@@ -7,9 +7,9 @@ import { settings } from '../../settings/settings.svelte';
 import { clock, WEEKDAYS } from '../format';
 import { game } from '../state.svelte';
 import { townMap } from '../townMap.svelte';
-import { chosenAnchor, chosenIcon, whoIsIn, type ChosenTown } from './chosen';
+import { chosenAnchor, chosenIcon, placeDetail, whoIsIn, type ChosenTown } from './chosen';
 import { liveTagWorld } from './liveWorld';
-import { openState, openText, townPlaces } from './places';
+import { lotHours, townPlaces } from './places';
 import { yourPeople } from './tags';
 import { townHud } from './townHud.svelte';
 
@@ -21,6 +21,13 @@ class ChosenView {
   readonly icon = $derived(this.chosen ? chosenIcon(this.chosen, this.town) : '');
   readonly anchor = $derived(this.chosen ? chosenAnchor(this.chosen, this.town) : null);
   private readonly world = $derived(this.chosen && (this.chosen.kind === 'place' || this.chosen.kind === 'home') ? liveTagWorld(this.town.places, this.meta) : null);
+  /** The hours the choice keeps: its lot's (`lotHours`), else a backdrop place's own; undefined: always open. */
+  readonly hours = $derived.by(() => {
+    const c = this.chosen;
+    if (!c) return undefined;
+    if (c.plot !== null) return lotHours(c.plot, this.town.plots, this.town.places);
+    return c.kind === 'place' ? this.town.places[c.place]?.hours : undefined;
+  });
   /** Who is inside now; null where nobody is simulated (a backdrop building that is no place) or for a person. */
   readonly inside = $derived.by(() => {
     const w = this.world;
@@ -34,14 +41,14 @@ class ChosenView {
     }
     return whoIsIn(this.chosen, w, yours);
   });
-  /** What it is now: a place open or closed (and till when), who lives in a house; else what the click said. */
+  /** What it is now: a place (a civic one's kind first: "Fire station · open till 17:00") open or closed and till when, who lives in a house; else what the click said. */
   readonly detail = $derived.by(() => {
     const c = this.chosen;
     if (!c) return '';
     if (c.kind === 'place') {
       const p = this.town.places[c.place];
       if (!p) return c.detail;
-      return openText(openState(p.hours, game.minute, game.weekday), game.weekday, (m) => clock(m, settings.clock24h), WEEKDAYS);
+      return placeDetail(p, this.hours, game.minute, game.weekday, (m) => clock(m, settings.clock24h), WEEKDAYS);
     }
     if (c.kind === 'home') {
       const hh = game.households.findIndex((h) => h.plot === c.plot);

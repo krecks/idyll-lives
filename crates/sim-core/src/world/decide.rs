@@ -790,9 +790,32 @@ pub(crate) fn pick_autonomous(
         // and back and an hour there before work or school and before `outingHomeBy`
         // (`outing_fits`).
         let reach = content.autonomy.reach;
+        // The least the way to a place could take, the fastest way they might go (on a bike of
+        // theirs, by car or the taxi, along the straight line: `Travel::eta_at_least`): one past
+        // `visits.outingMinutes` even so is one `outing_fits` would leave out, and its way isn't
+        // looked for.
+        let by_car = goer.drives || ctx.taxis.takes(sim);
+        let pace = walk_per_minute * goer.bike.map_or(1.0, |(speed, _)| speed.max(1.0));
+        let least = |door: [f32; 2]| {
+            let foot = ctx
+                .travel
+                .eta_at_least(pos, door, crate::travel::Mode::Foot, pace);
+            if by_car {
+                let drive =
+                    ctx.travel
+                        .eta_at_least(pos, door, crate::travel::Mode::Car, walk_per_minute);
+                foot.min(drive * crate::travel::DRIVE_MINUTES)
+            } else {
+                foot
+            }
+        };
         for p in ctx.plots.iter().filter(|p| p.public) {
             let door = p.arrival_point();
-            if (door[0] - pos[0]).hypot(door[1] - pos[1]) <= reach {
+            // (Nor one shut now: they don't set off to wait at its door, `start_task`.)
+            if (door[0] - pos[0]).hypot(door[1] - pos[1]) <= reach
+                || least(door) > visits.outing_minutes
+                || !p.open_at(ctx.day, ctx.minute)
+            {
                 continue;
             }
             // By the way they'd go (`leisure_way`).
@@ -824,6 +847,15 @@ pub(crate) fn pick_autonomous(
             );
             if !outing_fits(content, eta, ctx.hour, free) {
                 continue;
+            }
+            // Nor to one shut when they'd get there, or shutting before they could stay
+            // `visits.leastMinutes` (its hours, `Plot::open_for`).
+            if p.hours.is_some() {
+                let at = ctx.tick + crate::mins(eta);
+                let open = p.open_for(crate::clock::day(at), crate::clock::minute_of_day(at));
+                if open < visits.least_minutes {
+                    continue;
+                }
             }
             // The best the place has for each need, as one day out; not with a need that
             // would be low by the time they could leave, that it has nothing for (`lasts`).
@@ -1020,6 +1052,14 @@ pub(crate) fn start_task(
                     || !conditions_met(ctx, sim, o, i)
                     || closed_now(ctx, objects, object, i)
             })
+    {
+        return;
+    }
+    // Nobody sets off for a place shut now (its hours, `Plot::open_at`), asked to or not: one shut
+    // since it was chosen.
+    if let TaskKind::Visit { plot } = task.kind
+        && sim.visiting.is_none_or(|v| v.plot != plot)
+        && !ctx.plots[plot as usize].open_at(ctx.day, ctx.minute)
     {
         return;
     }

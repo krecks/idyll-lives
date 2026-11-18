@@ -56,7 +56,7 @@ import { CUTOUT } from './cutout';
 import { DIAG_VIEW } from './diagView';
 import { gameNormalMap } from './bump';
 import { gameFresnel, gameReflection } from './envBrdf';
-import { gameFog, setFogFrom } from './fog';
+import { gameFog, setFogFrom, setLandVeil, setSky, VEIL_SINK } from './fog';
 import { CONTACT_DIRECT, SOFT_LOOK } from './softLook';
 import { ROOM_LIGHT_CODE, ROOM_LIGHT_ROOMS, ROOM_LIGHTS } from './roomLights';
 import { FINISH_LAYER_ANCHORS, finishLayerReflection, PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
@@ -139,7 +139,7 @@ fn gamePos(p: vec3f) -> vec3f { return vec3f(p.x, p.y, -p.z); }
   },
 };
 
-const features: ShaderFeature[] = [COMMON, VERTEX_TWEAKS, PATTERN, CUTOUT, ROOM_LIGHTS, CUTAWAY, UNDERGROUND, PLAIN_FINISH, SOFT_LOOK, DIAG_VIEW].sort((a, b) => a.priority - b.priority);
+const features: ShaderFeature[] = [COMMON, VERTEX_TWEAKS, PATTERN, CUTOUT, ROOM_LIGHTS, CUTAWAY, UNDERGROUND, PLAIN_FINISH, VEIL_SINK, SOFT_LOOK, DIAG_VIEW].sort((a, b) => a.priority - b.priority);
 
 /**
  * Adds a feature (wind, blankets). Before the first material is made: the chunks
@@ -240,8 +240,11 @@ export function gameChunks(device: pc.GraphicsDevice): Record<Language, Record<s
   let chunks = cache.get(device);
   if (!chunks) {
     cache.set(device, (chunks = { glsl: build(device, 'glsl'), wgsl: build(device, 'wgsl') }));
-    // (The haze from the eye until the renderer says otherwise: the gallery and the previews never do.)
+    // (The haze from the eye, and no land's veil, until the renderer says otherwise: the gallery and the previews never do.)
     setFogFrom(device, 0);
+    setLandVeil(device, 0, 0, 0, 0, 1, 0, 1);
+    // (And a sky for it to read, until a sky's own: `nature.ts` `Sky`.)
+    if (!device.scope.resolve('game_skyLow').value) setSky(device, null);
   }
   return chunks;
 }

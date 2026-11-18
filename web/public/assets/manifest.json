@@ -50,7 +50,9 @@
     "packs/street/manifest.json",
     "packs/held/manifest.json",
     "packs/ground/manifest.json",
-    "packs/birds/manifest.json"
+    "packs/birds/manifest.json",
+    "packs/civic/manifest.json",
+    "packs/civic_works/manifest.json"
   ],
   "entries": {
     "material.wall": {

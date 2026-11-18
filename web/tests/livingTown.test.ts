@@ -2,8 +2,8 @@
 // building fitted to the town view's unit meshes (`render/shared/townBuildings.ts`), their faces facing out, and
 // the debug fixture (`debug/ltFixture.ts`, `?ltFixture`) keeping the contract's rules on a made-up town.
 import { describe, expect, test } from 'bun:test';
-import type { BackdropBuilding, PlotInfo, RoadPlan, WorldStructure } from '../src/core/protocol';
-import { ltFixture } from '../src/debug/ltFixture';
+import type { BackdropBuilding, LotLook, PlotInfo, RoadPlan, WorldStructure } from '../src/core/protocol';
+import { applyLotLooksFixture, ltFixture } from '../src/debug/ltFixture';
 import { BACKDROP_PALETTE, backdropBuilding, backdropGround, gardenHedges, homeLights, litAt, lotBuilding, ROOFS, unitMeshes } from '../src/render/shared/townBuildings';
 
 const flat = () => 0;
@@ -236,5 +236,34 @@ describe('the debug fixture (`?ltFixture`)', () => {
 
   test("a place's building names its place", () => {
     for (const b of fx.backdrop) if (b.place !== undefined) expect(fx.places[b.place].area).toBe(b.area);
+  });
+});
+
+describe('the named places’ lots’ looks fixture (?lotLooks)', () => {
+  const world = (lotLooks?: Record<number, LotLook>) =>
+    ({
+      plots: [
+        { id: 0, public: false, house: [1, 1, 8, 8] },
+        { id: 1, public: true, house: [21, 1, 30, 9] },
+        { id: 2, public: true, house: null },
+        { id: 3, public: true, house: [41, 1, 52, 10] },
+      ] as unknown as PlotInfo[],
+      meta: { seed: 9, ...(lotLooks ? { lotLooks } : {}) },
+    }) as unknown as WorldStructure;
+
+  test('every public lot with walls gets a look, the same object for the same world; a world’s own are left alone', () => {
+    const a = world();
+    expect(applyLotLooksFixture(a)).toBe(true);
+    expect(Object.keys(a.meta!.lotLooks!).map(Number)).toEqual([1, 3]);
+    expect(a.meta!.lotLooks![1].use).toBe('school');
+    const b = world();
+    applyLotLooksFixture(b);
+    expect(b.meta!.lotLooks).toBe(a.meta!.lotLooks);
+    // (Applied again to the world it made: kept.)
+    expect(applyLotLooksFixture(a)).toBe(true);
+    const own = { 3: { use: 'church' as const, storeys: 1, roof: 'gable' as const, look: 2 } };
+    const c = world(own);
+    expect(applyLotLooksFixture(c)).toBe(false);
+    expect(c.meta!.lotLooks).toBe(own);
   });
 });
