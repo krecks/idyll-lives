@@ -20,8 +20,7 @@ pub enum Far {
     Low,
     /// A build of its own.
     Own(Build),
-    /// The model at rest, joined and decimated to this share of its triangles (`far=0.25`). The kernel has no
-    /// decimator yet: a model that asks for one fails to build, and says so.
+    /// The model at rest, joined and decimated to this share of its triangles (`far=0.25`: `far::decimated`).
     Ratio(f64),
 }
 
@@ -292,14 +291,7 @@ pub fn make_far(model: &Model, far_build: Far) -> Result<Vec<Obj>, String> {
     let built = match far_build {
         Far::Low => far::far_of(model.build),
         Far::Own(build) => build(),
-        Far::Ratio(ratio) => {
-            return Err(format!(
-                "{}: its far version is the model decimated to {ratio} of its triangles (far={ratio}), and the \
-                 kernel has no decimator yet (gamekit/far.py `decimated`: Blender's DECIMATE modifier): give it a \
-                 build of its own (`far`, `far_low`) or wait for the decimator",
-                model.id
-            ));
-        }
+        Far::Ratio(ratio) => return make_decimated(model, ratio),
     };
     let objs = if built.is_empty() { meshes() } else { built };
     crate::bevel::apply_all(&objs);
@@ -316,6 +308,57 @@ pub fn make_far(model: &Model, far_build: Far) -> Result<Vec<Obj>, String> {
     scene::log(line);
     stats(&name);
     Ok(objs)
+}
+
+/// The far version of a model that asks for a share of its triangles (`far=0.25`), in the scene: the model built
+/// again, at rest and still, without what is hidden at rest (water grown from nothing), joined into one part named
+/// `<id>_far` and decimated but for its feet and its outermost faces (`far::decimated`).
+fn make_decimated(model: &Model, ratio: f64) -> Result<Vec<Obj>, String> {
+    scene::with(|s| s.centre = model.centre);
+    let built = (model.build)();
+    scene::with(|s| s.centre = [0.0, 0.0]);
+    let objs = if built.is_empty() { meshes() } else { built };
+    let (hidden, shown): (Vec<Obj>, Vec<Obj>) = objs
+        .iter()
+        .partition(|o| o.read(|p| p.scale.array().iter().any(|k| k.abs() < 0.01)));
+    for &o in &hidden {
+        o.remove();
+    }
+    for &o in &shown {
+        // (a part of a hidden one stands by itself, as in Blender once its parent is gone)
+        o.edit(|p| {
+            p.tracks.clear();
+            p.parent = p.parent.filter(|parent| !hidden.contains(parent));
+        });
+    }
+    if shown.is_empty() {
+        return Err(format!(
+            "{}: nothing of it shows at rest to make its far version of",
+            model.id
+        ));
+    }
+    let far = crate::parts::join(
+        &shown,
+        &format!("{}_far", model.id),
+        Some(crate::math::P3::ZERO),
+    );
+    far::decimated(far, ratio, far::FEET, far::EDGE);
+    let name = format!("{}.far", model.id);
+    let tolerance = Tolerance(model.tolerance.0.map(|t| t.max(0.05)));
+    check_size(
+        model.size,
+        tolerance,
+        &[far],
+        &name,
+        model.centre,
+        model.floor,
+    )?;
+    scene::log(format!(
+        "[gamekit] {name}: {} triangles ({:.0}% kept)",
+        far.read(|p| p.mesh.triangles().len()),
+        ratio * 100.0
+    ));
+    Ok(vec![far])
 }
 
 /// The parts shaded and written: the .glb's bytes.
