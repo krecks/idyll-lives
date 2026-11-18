@@ -1,6 +1,6 @@
-# Plants — notes
+# Plants: notes
 
-`plants.py` builds the G1 houseplants into `web/public/assets/models/plants/` and their entries in
+This folder builds the G1 houseplants into `web/public/assets/models/plants/` and their entries in
 `packs/plants/manifest.json`: the potted plant (`model.plant`), the monstera, fiddle-leaf fig, snake plant, cactus
 trio, succulent bowl, fern on a stand, parlour palm, orchid and bonsai (`model.garden.*`). Built 2026-10-14; they
 sat in Validate › Houseplants until checked in play. The G2 flowers followed the same day (below, in Validate ›
@@ -272,3 +272,12 @@ errors, 0 warnings on all 78 files. Seen in the game (gallery WebGPU and WebGL, 
 cargo art plants            # the .glb files, the pack, check-glb
 cargo art plants --preview  # previews/plants/<id>.png, <id>@<clip>.png
 ```
+
+Built here, not in Blender, since 2026-11-18 (`cargo check-glb --against ref/blender`): the 78 files' points
+Blender's (0.000 mm), 56 the same in every bit, the pack the same to the letter but for its comment, every perch
+with it (the recorded bird day passes unchanged). The models are built from artkit's botany (the library half of
+families/plants.py, which stays as the library of the scripts not yet ported). A leaf cut into lobes or leaflets
+has a top and an underside triangle on the same three points wherever a triangle of its outline touches no midrib
+point; Blender's exporter validates a mesh and takes the second of each such pair out, and so does artkit's: those
+leaflets are drawn from one side only, as they were. The rose bush turns the spiral's heading, already degrees,
+into degrees again, as the script did.
