@@ -107,11 +107,12 @@ fn rounded_normal(n: V3) -> [f32; 3] {
     let r = n.array().map(|x| (x * 10000.0).round_ties_even() / 10000.0);
     let len = (r[0] * r[0] + r[1] * r[1] + r[2] * r[2]).sqrt();
     // (no normal at all, which Blender reads at a corner whose fan has no frame, a clamped bevel's: straight up,
-    // as its exporter writes it; a file never carries a normal that isn't a unit vector)
-    let unit = if len == 0.0 {
-        [0.0, 0.0, 1.0]
-    } else {
+    // as its exporter writes it; a file never carries a normal that isn't a unit vector, so one that isn't a
+    // number, or has no length that can be told, is written so too)
+    let unit = if len > 0.0 && len.is_finite() {
         r.map(|x| x / len)
+    } else {
+        [0.0, 0.0, 1.0]
     };
     // (no zero in a file of Blender's is a negative one)
     y_up(V3::new(unit[0], unit[1], unit[2])).map(|x| x + 0.0)
