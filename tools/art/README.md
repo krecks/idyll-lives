@@ -54,7 +54,7 @@ runs it again in `ll-tools`' tests: the tree has 0 errors.
 gate then prints the finding as `accepted: … (<name>: <why>)`. An `accept` that names no strict check, gives no
 reason, or that the model no longer needs is an error, so stale ones don't hide the next finding (a counted
 check's only where it ran). The curtains take
-`footprint`: the rail runs past the window so the open curtains stack beside the glass (`blender/families/decor.md`).
+`footprint`: the rail runs past the window so the open curtains stack beside the glass (`crates/art/rooms/src/decor/NOTES.md`).
 
 **The baseline.** A strict check that came in after the models it finds (`checkglb::COUNTED`) counts its findings
 per model against `gate-baseline.json`, `{"<check>": {"<model key>": <count>}}` (`checkglb/baseline.rs`). A model at

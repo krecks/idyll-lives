@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built decor (tools/art/blender/families/decor.py): wall art and clocks, ornaments, curtains and rugs. Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The clocks' hands tell the game's time (`clock`); the hanging plant sways when watered, the fire burns while a resident warms up by it, and the curtains are drawn at night.",
+  "$comment": "The decor (crates/art/rooms/src/decor, built by cargo art): wall art and clocks, ornaments, curtains and rugs. Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The clocks' hands tell the game's time (`clock`); the hanging plant sways when watered, the fire burns while a resident warms up by it, and the curtains are drawn at night.",
   "version": 1,
   "entries": {
     "model.printFramed": {

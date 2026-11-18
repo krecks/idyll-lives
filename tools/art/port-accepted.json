@@ -2,6 +2,7 @@
   "manifest.json": {"pack": "the base manifest gained the standard's finishes (enamel, ceramic, plastic, rubber, brushed, iron, velvet, lacquer) and the fabric's sheen after the reference was tagged"},
   "model.bakeryCase far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.basketballHoop far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
+  "model.bedQueenUpholstered": {"surface": "the duvet's flat underside (one polygon, hidden in the mattress) is cut into triangles another way than Blender's (19 of its 1,390): its points are Blender's to 0.1 mm, its triangles up to 2.2 mm apart", "shading": "the same underside's other triangles bake other levels at its points (hidden in the mattress)"},
   "model.busStop far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.cafeChair far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.climbingFrame far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
