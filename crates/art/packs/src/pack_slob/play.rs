@@ -4,22 +4,12 @@ use super::common::{_box, _can, _m, _wrapper, M, POP, WALL};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
-use artkit::scene::{Obj, meshes};
+use artkit::scene::Obj;
 use artkit::{
-    fbox, fcyl, fextrude, fsphere, fsweep, jitter, loft, revolve, ring, rock, soft, swing,
+    fbox, fcyl, fextrude, fsphere, fsweep, jitter, loft, revolve, ring, rock, settle, soft, swing,
 };
-
-fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
 
 // --- the spritz & go station (1x1): a narrow shelf unit with a round mirror and an arsenal of sprays ----------
 const SPRAY: (f64, f64, f64) = (0.13, 0.935, -0.28); // the spray bottle's foot (x, height, depth)
@@ -351,7 +341,7 @@ pub fn spritz_station() -> Vec<Obj> {
         );
     });
     let spray = hinged(join(&spray, "spray", None), f.at(sx, sy, sz + 0.035));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(spray, "spritz", 35.0, seconds = 0.4, axis = Axis::X);
     objs
 }
@@ -644,7 +634,7 @@ pub fn arcade_cabinet() -> Vec<Obj> {
         );
     });
     let stick = hinged(join(&stick, "joystick", None), f.at(sx, sy, sz));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     rock!(stick, "joystick", 18.0, seconds = 0.6, axis = Axis::Y);
     objs
 }

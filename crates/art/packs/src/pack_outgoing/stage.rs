@@ -1,14 +1,14 @@
 //! The karaoke stage and the video-call corner.
 
-use super::bar::settle_in_place;
-use super::common::{_speaker, _sq, M, WALL};
+use super::common::{_speaker, M, WALL};
+use artkit::forms::rect;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, cosd, sind};
 use artkit::parts::{hinged, join, new_parts, turn};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fsphere, fsweep, leaf, loft, revolve, slide, soft, swing, torus};
+use artkit::{fbox, fcyl, fsphere, fsweep, leaf, loft, revolve, settle, slide, soft, swing, torus};
 
 // --- the karaoke stage (2x1): a low stage, a lyrics screen, two speakers and two mic stands -----------------
 const MICS: [f64; 2] = [-0.36, 0.36];
@@ -204,7 +204,7 @@ pub fn karaoke_stage() -> Vec<Obj> {
                 ],
                 0.0,
                 M.dark,
-                profile = _sq(0.008, Some(0.025)),
+                profile = rect(0.008, 0.025),
                 up = (0, 1, 0)
             );
         }
@@ -291,7 +291,7 @@ pub fn karaoke_stage() -> Vec<Obj> {
         }
     });
     let mics = hinged(join(&mics, "mics", None), f.at(0, 1.04, MIC_Z));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(mics, "mic_up", (0.0, 0.0, MIC_RISE), seconds = 0.8);
     objs
 }
@@ -661,7 +661,7 @@ pub fn video_call_nook() -> Vec<Obj> {
     });
     let ring = hinged(join(&ring, "ring", None), f.at(x, y, z));
     turn(ring, RING_TILT, Axis::X);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(
         ring,
         "ring_light",

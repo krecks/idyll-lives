@@ -1,25 +1,16 @@
 //! The Cloud Nine power recliner, the sofa-side snack fridge, the living-room workout game and the lava glow lamp.
 
-use super::common::{M, fillet, name, pull, tube};
+use super::common::M;
 use artkit::forms::rounded_rect;
 use artkit::math::{Axis, P3, PI, cos, cosd, radians, sin, sind};
 use artkit::motion::{Ease, Spin, spin};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
-use artkit::scene::{Obj, meshes};
+use artkit::scene::Obj;
 use artkit::{
-    fbox, fcyl, fextrude, fsphere, fsweep, jitter, loft, revolve, ring, slide, soft, swing,
+    fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, loft, revolve, ring, settle, slide, soft,
+    swing,
 };
-
-fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
 
 // --- the Cloud Nine power recliner (1x1): deep seat between rolled arms, the back and footrest power out --------
 const BACK_HINGE: (f64, f64) = (0.42, -0.21); // (height, depth) the back tips about
@@ -84,7 +75,7 @@ pub fn recliner() -> Vec<Obj> {
             .concat();
             fsweep!(
                 f,
-                name("arm"),
+                numbered("arm"),
                 &[(s * 0.37, 0, -0.43), (s * 0.37, 0, 0.27)],
                 0,
                 M.plush,
@@ -93,7 +84,7 @@ pub fn recliner() -> Vec<Obj> {
             );
             fcyl!(
                 f,
-                name("roll_end"),
+                numbered("roll_end"),
                 0.06,
                 0.012,
                 (s * 0.375, 0.56, 0.272),
@@ -103,7 +94,7 @@ pub fn recliner() -> Vec<Obj> {
             );
             fcyl!(
                 f,
-                name("roll_button"),
+                numbered("roll_button"),
                 0.018,
                 0.008,
                 (s * 0.375, 0.56, 0.281),
@@ -157,7 +148,7 @@ pub fn recliner() -> Vec<Obj> {
         );
         // a throw over the left arm: across the roll and hanging down its outside, soft and creased
         let t = 0.012;
-        let pts = fillet(
+        let pts = kit::fillet!(
             &[
                 (-0.29, 0.62, -0.12),
                 (-0.36, 0.665, -0.12),
@@ -165,8 +156,7 @@ pub fn recliner() -> Vec<Obj> {
                 (-0.474, 0.56, -0.12),
                 (-0.474, 0.3, -0.12),
             ],
-            0.04,
-            3,
+            0.04
         );
         let throw = fsweep!(
             f,
@@ -199,7 +189,7 @@ pub fn recliner() -> Vec<Obj> {
         for (y, z, hh) in [(0.55, -0.2, 0.15), (0.71, -0.22, 0.16)] {
             soft!(
                 f,
-                name("back_roll"),
+                numbered("back_roll"),
                 0.5,
                 hh,
                 0.1,
@@ -244,7 +234,7 @@ pub fn recliner() -> Vec<Obj> {
         );
     });
     let foot = hinged(join(&foot, "footrest", None), f.at(0, fy, fz));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(back, "recline", -11.0, seconds = 1.2, axis = Axis::X);
     swing!(foot, "recline", -80.0, seconds = 1.2, axis = Axis::X);
     objs
@@ -272,10 +262,10 @@ fn can(f: &GameFrame, x: f64, y: f64, z: f64, material: artkit::materials::Mat, 
         .iter()
         .map(|&(hh, k)| ring!(r * k, r * k, z = bz + hh, verts = 10, at = (bx, by)))
         .collect();
-    loft!(name("can"), &sections, material = material);
+    loft!(numbered("can"), &sections, material = material);
     fcyl!(
         f,
-        name("can_top"),
+        numbered("can_top"),
         r * 0.8,
         0.002,
         (x, y + h, z),
@@ -305,7 +295,7 @@ pub fn snack_fridge() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             fbox!(
                 f,
-                name("cab_side"),
+                numbered("cab_side"),
                 t,
                 h - 0.03,
                 d - 0.03,
@@ -451,7 +441,7 @@ pub fn snack_fridge() -> Vec<Obj> {
         for fx in [x - w / 2.0 + 0.06, x + w / 2.0 - 0.06] {
             for fz in [z0 + 0.06, z1 - 0.06] {
                 revolve!(
-                    name("foot"),
+                    numbered("foot"),
                     &[
                         (0.0, 0.0),
                         (0.018, 0.0),
@@ -493,7 +483,7 @@ pub fn snack_fridge() -> Vec<Obj> {
         for bx in [-0.12, 0.12] {
             fsphere!(
                 f,
-                name("lid_button"),
+                numbered("lid_button"),
                 0.01,
                 (bx, 0.452, z),
                 M.lid,
@@ -521,7 +511,7 @@ pub fn snack_fridge() -> Vec<Obj> {
             let r = if k % 2 != 0 { 0.05 } else { 0.025 };
             let crisp = fsphere!(
                 f,
-                name("crisp"),
+                numbered("crisp"),
                 0.03,
                 (
                     0.13 + r * cosd(a),
@@ -596,7 +586,7 @@ pub fn snack_fridge() -> Vec<Obj> {
         for k in 0..3 {
             fbox!(
                 f,
-                name("door_item"),
+                numbered("door_item"),
                 0.06,
                 0.012,
                 0.002,
@@ -613,7 +603,7 @@ pub fn snack_fridge() -> Vec<Obj> {
             (0.04, 0.26, z1 + 0.0245),
             M.can_a
         );
-        pull(
+        kit::pull!(
             f,
             "handle",
             x - w / 2.0 + 0.06,
@@ -621,14 +611,13 @@ pub fn snack_fridge() -> Vec<Obj> {
             z1 + 0.018,
             0.16,
             M.chrome,
-            0.007,
-            0.0345,
-            true,
-            8,
+            r = 0.007,
+            out = 0.0345,
+            upright = true
         );
     });
     let door = hinged(join(&door, "door", None), f.at(hx, 0.2, z1 + 0.003));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(
         door,
         "fridge_open",
@@ -646,7 +635,7 @@ pub fn fitness_game() -> Vec<Obj> {
         for y in [0.2, 0.56] {
             fextrude!(
                 f,
-                name("stand_shelf"),
+                numbered("stand_shelf"),
                 &rounded_rect(0.8, 0.3, 0.02, 2),
                 0.04,
                 (0, y, -0.28),
@@ -659,7 +648,7 @@ pub fn fitness_game() -> Vec<Obj> {
         for x in [-0.37, 0.37] {
             fextrude!(
                 f,
-                name("stand_side"),
+                numbered("stand_side"),
                 &rounded_rect(0.28, 0.58, 0.03, 2),
                 0.04,
                 (x, 0.29, -0.28),
@@ -913,7 +902,7 @@ pub fn fitness_game() -> Vec<Obj> {
                 .collect();
             fextrude!(
                 f,
-                name("arrow"),
+                numbered("arrow"),
                 &outline,
                 0.003,
                 (0, 0.0165, 0),
@@ -925,7 +914,7 @@ pub fn fitness_game() -> Vec<Obj> {
         for dz in [-0.33, -0.23] {
             fsweep!(
                 f,
-                name("dumbbell_bar"),
+                numbered("dumbbell_bar"),
                 &[(-0.02, 0.25, dz), (0.16, 0.25, dz)],
                 0.011,
                 M.grip,
@@ -934,7 +923,7 @@ pub fn fitness_game() -> Vec<Obj> {
             for dx in [-0.01, 0.15] {
                 fcyl!(
                     f,
-                    name("dumbbell_end"),
+                    numbered("dumbbell_end"),
                     0.03,
                     0.04,
                     (dx, 0.25, dz),
@@ -966,23 +955,22 @@ pub fn fitness_game() -> Vec<Obj> {
         .map(|&(hh, r)| ring!(r, r, z = bz + hh, verts = 14, at = (bx, by)))
         .collect();
         loft!("kettlebell", &sections, material = M.weight);
-        tube(
+        kit::tube!(
             f,
             "kettle_handle",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (kx - 0.05, 0.11, kz),
                     (kx - 0.055, 0.19, kz),
                     (kx + 0.055, 0.19, kz),
                     (kx + 0.05, 0.11, kz),
                 ],
-                0.035,
-                3,
+                0.035
             ),
             0.012,
             M.weight,
-            Some(8),
-            1,
+            verts = 8,
+            round = 1
         );
     });
     join(&still, "body", Some(P3::ZERO));
@@ -1002,7 +990,7 @@ pub fn fitness_game() -> Vec<Obj> {
         for dx in [-0.14, 0.14] {
             fextrude!(
                 f,
-                name("board_grip"),
+                numbered("board_grip"),
                 &rounded_rect(0.12, 0.16, 0.03, 2),
                 0.004,
                 (dx, 0.1135, 0.2),
@@ -1023,7 +1011,7 @@ pub fn fitness_game() -> Vec<Obj> {
         fbox!(f, "board_mount", 0.08, 0.02, 0.07, (0, 0.082, 0.2), M.grip);
     });
     let board = hinged(join(&board, "board", None), f.at(0, 0.012, 0.2));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(board, "board", 10.0, seconds = 0.8, axis = Axis::Y);
     objs
 }
@@ -1223,7 +1211,7 @@ pub fn lava_lamp() -> Vec<Obj> {
         .into_iter()
         .enumerate()
         {
-            blob(f, &name("blob"), tx + dx, y, tz, r, 2.0 + k as f64, 1.3);
+            blob(f, &numbered("blob"), tx + dx, y, tz, r, 2.0 + k as f64, 1.3);
         }
     });
     let rise = hinged(join(&rise, "blobs", None), f.at(tx, y0, tz));
@@ -1235,7 +1223,7 @@ pub fn lava_lamp() -> Vec<Obj> {
         {
             blob(
                 f,
-                &name("drift"),
+                &numbered("drift"),
                 tx + 0.022 * cosd(a),
                 y,
                 tz + 0.022 * sind(a),
@@ -1246,7 +1234,7 @@ pub fn lava_lamp() -> Vec<Obj> {
         }
     });
     let drift = hinged(join(&drift, "drift", None), f.at(tx, y0, tz));
-    let objs = settle_in_place(); // built in place: the sitter's place is content `places`
+    let objs = settle!(centre = false); // built in place: the sitter's place is content `places`
     slide!(rise, "blobs", (0, 0, 0.14), seconds = 2.5);
     spin(
         drift,

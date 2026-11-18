@@ -1,14 +1,12 @@
-//! What the gloomy pack is built from: its palette, turned and lofted pieces, candles, vases, books and legs, and
-//! the kit's parts it uses.
+//! What the gloomy pack is built from: its palette, candles, vases, books and legs.
 
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
-use artkit::math::{P3, cosd, pow, sind};
-use artkit::place::{GameFrame, Spot};
+use artkit::math::{cosd, pow, sind};
+use artkit::parts::numbered;
+use artkit::place::GameFrame;
 use artkit::rand::Random;
-use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, palette, revolve, ring};
-use std::cell::Cell;
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, kit, palette};
 
 palette! { M:
     walnut = ("#7A5234", wood), // the record cabinet; its main part
@@ -77,69 +75,6 @@ pub const WALL: f64 = -0.43;
 /// In a 2-deep one.
 pub const WALL2: f64 = -0.93;
 
-thread_local! {
-    static N: Cell<u32> = const { Cell::new(0) };
-}
-
-/// `stem` numbered: each part its own name.
-pub fn name(stem: &str) -> String {
-    N.with(|n| {
-        n.set(n.get() + 1);
-        format!("{stem}{}", n.get())
-    })
-}
-
-/// A turned piece standing at game (x, y, z): `profile` [(radius, height up), ...] from its foot, revolved.
-#[allow(clippy::too_many_arguments)]
-pub fn turned(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    z: f64,
-    profile: &[(f64, f64)],
-    material: Mat,
-    segments: usize,
-) -> Obj {
-    revolve!(
-        name,
-        profile,
-        at = f.at(x, y, z),
-        material = material,
-        segments = segments
-    )
-}
-
-/// A body lofted through round rings [(radius, height up), ...] standing at game (x, y, z): a vase, a bottle.
-#[allow(clippy::too_many_arguments)]
-pub fn lathe(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    z: f64,
-    rings: &[(f64, f64)],
-    material: Mat,
-    verts: usize,
-    square: f64,
-) -> Obj {
-    let P3 { x: bx, y: by, .. } = f.at(x, 0, z);
-    let sections: Vec<Vec<P3>> = rings
-        .iter()
-        .map(|&(r, h)| {
-            ring!(
-                r,
-                r,
-                z = y + h,
-                verts = verts,
-                square = square,
-                at = (bx, by)
-            )
-        })
-        .collect();
-    loft!(name, &sections, material = material)
-}
-
 /// A game (x, depth) offset turned `deg` degrees as a part's Blender z turn turns it.
 pub fn turn(dx: f64, dz: f64, deg: f64) -> (f64, f64) {
     let (c, s) = (cosd(deg), sind(deg));
@@ -164,9 +99,9 @@ pub fn candle(
     let mut y = y;
     if holder {
         let rr = r + 0.028;
-        turned(
+        kit::turned!(
             f,
-            &name("candle_dish"),
+            numbered("candle_dish"),
             x,
             y,
             z,
@@ -179,13 +114,13 @@ pub fn candle(
                 (0.0, 0.006),
             ],
             M.brass,
-            12,
+            segments = 12
         );
         y += 0.006;
     }
-    turned(
+    kit::turned!(
         f,
-        &name("candle"),
+        numbered("candle"),
         x,
         y,
         z,
@@ -198,7 +133,7 @@ pub fn candle(
             (0.0, h - 0.009),
         ],
         M.wax,
-        12,
+        segments = 12
     );
     let seed = if seed != 0 {
         seed
@@ -212,7 +147,7 @@ pub fn candle(
         let l = rnd.uniform(0.25, 0.55) * h;
         fsweep!(
             f,
-            name("drip"),
+            numbered("drip"),
             &[
                 (x + (r - 0.004) * c, y + h - 0.003, z + (r - 0.004) * s),
                 (x + (r + 0.001) * c, y + h - 0.008, z + (r + 0.001) * s),
@@ -226,7 +161,7 @@ pub fn candle(
     }
     fsweep!(
         f,
-        name("wick"),
+        numbered("wick"),
         &[
             (x, y + h - 0.009, z),
             (x + 0.001, y + h + 0.002, z),
@@ -239,7 +174,7 @@ pub fn candle(
     if lit {
         fsphere!(
             f,
-            name("candle_flame"),
+            numbered("candle_flame"),
             0.008,
             (x + 0.003, y + h + 0.026, z),
             M.candle_flame,
@@ -253,9 +188,9 @@ pub fn candle(
 
 /// A ceramic vase: a full belly, a narrow neck, a flared lip, hollow at the mouth. Returns its top.
 pub fn vase(f: &GameFrame, x: f64, y: f64, z: f64, s: f64) -> f64 {
-    lathe(
+    kit::lathe!(
         f,
-        &name("vase"),
+        numbered("vase"),
         x,
         y,
         z,
@@ -272,8 +207,7 @@ pub fn vase(f: &GameFrame, x: f64, y: f64, z: f64, s: f64) -> f64 {
             (0.02 * s, 0.17 * s),
         ],
         M.vase,
-        12,
-        2.0,
+        verts = 12
     );
     y + 0.2 * s
 }
@@ -428,183 +362,4 @@ pub fn leg(
             verts = 6
         );
     }
-}
-
-/// The kit's tube (`artkit::kit::tube`), as the script called it.
-pub fn tube<P: Spot>(
-    f: &GameFrame,
-    name: &str,
-    points: &[P],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-) -> Obj {
-    artkit::kit::tube(
-        f,
-        name,
-        points,
-        r,
-        material,
-        artkit::kit::Tube {
-            verts,
-            round,
-            ..artkit::kit::Tube::default()
-        },
-    )
-}
-
-/// The kit's fillet (`artkit::kit::fillet`): the path through `points` with each inner corner rounded.
-pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    artkit::kit::fillet(points, radius, steps)
-}
-
-/// The kit's bar pull (`artkit::kit::pull`), as the script called it.
-#[allow(clippy::too_many_arguments)]
-pub fn pull(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    face: f64,
-    length: f64,
-    material: Mat,
-    r: f64,
-    out: f64,
-    upright: bool,
-    verts: usize,
-) -> Obj {
-    artkit::kit::pull(
-        f,
-        name,
-        x,
-        y,
-        face,
-        length,
-        material,
-        artkit::kit::Pull {
-            r,
-            out,
-            upright,
-            verts,
-        },
-    )
-}
-
-/// The kit's frame-and-panel front (`artkit::kit::shaker`), as the script called it: (frame, panel).
-#[allow(clippy::too_many_arguments)]
-pub fn shaker(
-    f: &GameFrame,
-    name: &str,
-    w: f64,
-    h: f64,
-    at: (f64, f64, f64),
-    t: f64,
-    material: Mat,
-    rail: f64,
-    panel: Option<Mat>,
-    recess: f64,
-    raised: bool,
-) -> (Obj, Obj) {
-    artkit::kit::shaker(
-        f,
-        name,
-        w,
-        h,
-        at,
-        t,
-        material,
-        artkit::kit::Shaker {
-            rail,
-            panel,
-            recess,
-            raised,
-        },
-    )
-}
-
-/// The kit's moulding (`artkit::kit::moulding`), as the script called it: on the front at depth `at`, or on top
-/// at height `at` (`front` false).
-#[allow(clippy::too_many_arguments)]
-pub fn moulding(
-    f: &GameFrame,
-    name: &str,
-    outline: &[(f64, f64)],
-    profile: &[(f64, f64)],
-    material: Mat,
-    at: f64,
-    front: bool,
-    angle: f64,
-) -> Obj {
-    let plane = if front {
-        artkit::place::Facing::Front
-    } else {
-        artkit::place::Facing::Top
-    };
-    artkit::kit::moulding(
-        f,
-        name,
-        outline,
-        profile,
-        material,
-        artkit::kit::Moulding { at, plane, angle },
-    )
-}
-
-/// The kit's cabriole leg (`artkit::kit::cabriole`), as the script called it.
-#[allow(clippy::too_many_arguments)]
-pub fn cabriole(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    z: f64,
-    h: f64,
-    material: Mat,
-    sx: f64,
-    sz: f64,
-    r: f64,
-    verts: usize,
-) -> Obj {
-    artkit::kit::cabriole(
-        f,
-        name,
-        x,
-        z,
-        h,
-        material,
-        sx,
-        sz,
-        artkit::kit::Cabriole { r, verts },
-    )
-}
-
-/// The kit's iron scroll (`artkit::kit::scroll`), as the script called it.
-#[allow(clippy::too_many_arguments)]
-pub fn scroll(
-    f: &GameFrame,
-    name: &str,
-    start: (f64, f64, f64),
-    centre: (f64, f64),
-    material: Mat,
-    turns: f64,
-    end: f64,
-    t: f64,
-    w: f64,
-    steps: usize,
-) -> Obj {
-    artkit::kit::scroll(
-        f,
-        name,
-        start,
-        centre,
-        material,
-        artkit::kit::Scroll {
-            turns,
-            end,
-            t,
-            w,
-            steps,
-            ..artkit::kit::Scroll::default()
-        },
-    )
 }

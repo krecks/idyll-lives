@@ -1,25 +1,15 @@
 //! The home bouldering wall, the interactive spin bike, the rebound trampoline and the streetball hoop.
 
-use super::common::{HOLDS, M, WALL, fillet, lofted, name, paint, tube};
+use super::common::{HOLDS, M, WALL, lofted};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, cos, cosd, radians, sin, sind};
 use artkit::motion::{Rock, Spin, Squash, rock, spin, squash};
-use artkit::parts::{Settle, hinged, join, join_all, new_parts, settle_all, settle_with};
+use artkit::parts::{hinged, join, join_all, new_parts, numbered, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::py::hypot;
-use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, jitter, revolve, soft, torus};
-
-pub fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
+use artkit::scene::Obj;
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, revolve, settle, soft, torus};
 
 // --- the home bouldering wall (2x1): an overhanging panel with holds on an A-frame, a crash mat before it ------
 const LEAN: f64 = 12.0; // the panel's top leans forward by this much (an overhang)
@@ -46,7 +36,7 @@ fn hold(f: &GameFrame, i: i32, x: f64, up: f64, s: f64, material: Mat) {
     ][(i % 4) as usize];
     let h = fsphere!(
         f,
-        name("hold"),
+        numbered("hold"),
         s,
         on_panel(x, up, 0.012),
         material,
@@ -58,7 +48,7 @@ fn hold(f: &GameFrame, i: i32, x: f64, up: f64, s: f64, material: Mat) {
     jitter!(h, s * 0.18, size = s * 1.1, seed = i as f64 * 0.77);
     fcyl!(
         f,
-        name("bolt"),
+        numbered("bolt"),
         0.008,
         0.004,
         on_panel(x, up, 0.012 + s * shape.1),
@@ -87,7 +77,7 @@ pub fn bouldering_wall() -> Vec<Obj> {
     for x in [-0.9, 0.9] {
         fbox!(
             f,
-            name("edge"),
+            numbered("edge"),
             0.06,
             PANEL_H,
             0.08,
@@ -142,7 +132,7 @@ pub fn bouldering_wall() -> Vec<Obj> {
             if x.abs() < 0.84 {
                 fbox!(
                     f,
-                    name("tnut"),
+                    numbered("tnut"),
                     0.012,
                     0.012,
                     0.004,
@@ -157,7 +147,7 @@ pub fn bouldering_wall() -> Vec<Obj> {
     for x in [-0.84, 0.84] {
         fbox!(
             f,
-            name("post"),
+            numbered("post"),
             0.06,
             2.2,
             0.06,
@@ -167,18 +157,18 @@ pub fn bouldering_wall() -> Vec<Obj> {
             bevel_segments = 1
         );
         for (y, up) in [(2.12, 2.18), (1.1, 1.15)] {
-            tube(
+            kit::tube!(
                 f,
-                &name("brace"),
+                numbered("brace"),
                 &[(x, y, WALL + 0.03), on_panel(x, up, -0.05)],
                 0.022,
                 M.climb_frame,
-                Some(8),
-                1,
+                verts = 8,
+                round = 1
             );
             fbox!(
                 f,
-                name("brace_plate"),
+                numbered("brace_plate"),
                 0.08,
                 0.1,
                 0.012,
@@ -189,7 +179,7 @@ pub fn bouldering_wall() -> Vec<Obj> {
         }
         fbox!(
             f,
-            name("post_foot"),
+            numbered("post_foot"),
             0.12,
             0.02,
             0.12,
@@ -248,7 +238,7 @@ pub fn bouldering_wall() -> Vec<Obj> {
             .collect();
         fextrude!(
             f,
-            name("volume"),
+            numbered("volume"),
             &tri,
             0.08,
             on_panel(x, up, 0.06),
@@ -262,7 +252,7 @@ pub fn bouldering_wall() -> Vec<Obj> {
     for s in [-1.0, 1.0] {
         soft!(
             f,
-            name("crash_mat"),
+            numbered("crash_mat"),
             0.935,
             0.22,
             0.811,
@@ -274,23 +264,22 @@ pub fn bouldering_wall() -> Vec<Obj> {
             flat = 1,
             round_segments = 1
         );
-        tube(
+        kit::tube!(
             f,
-            &name("strap"),
-            &fillet(
+            numbered("strap"),
+            &kit::fillet!(
                 &[
                     (s * 0.465 - 0.12, 0.218, 0.36),
                     (s * 0.465 - 0.1, 0.236, 0.36),
                     (s * 0.465 + 0.1, 0.236, 0.36),
                     (s * 0.465 + 0.12, 0.218, 0.36),
                 ],
-                0.02,
-                3,
+                0.02
             ),
             0.008,
             M.mat_band,
-            Some(5),
-            1,
+            verts = 5,
+            round = 1
         );
     }
     lofted(
@@ -340,7 +329,7 @@ pub fn bouldering_wall() -> Vec<Obj> {
         flat = 1
     );
     join_all("boulderingWall");
-    settle_in_place()
+    settle!(centre = false)
 }
 
 // --- the interactive spin bike (1x2): a recumbent trainer, seat at 0.45, cranks in the flywheel's hub --------------
@@ -407,18 +396,17 @@ pub fn spin_bike() -> Vec<Obj> {
             bevel = 0.006,
             bevel_segments = 1
         );
-        tube(
+        kit::tube!(
             f,
             "back_strut",
-            &fillet(
+            &kit::fillet!(
                 &[(0.0, 0.34, -0.14), (0.0, 0.4, -0.3), (0.0, 0.6, -0.36)],
-                0.06,
-                3,
+                0.06
             ),
             0.022,
             M.bike_frame,
-            Some(8),
-            1,
+            verts = 8,
+            round = 1
         );
         // the main beam, curving up from the rear stabiliser to the flywheel's foot
         fsweep!(
@@ -439,7 +427,7 @@ pub fn spin_bike() -> Vec<Obj> {
         for (z, w) in [(-0.66, 0.6), (0.86, 0.56)] {
             fsweep!(
                 f,
-                name("stab"),
+                numbered("stab"),
                 &[(-w / 2.0 + 0.02, 0.03, z), (w / 2.0 - 0.02, 0.03, z)],
                 0,
                 M.bike_grey,
@@ -449,7 +437,7 @@ pub fn spin_bike() -> Vec<Obj> {
             for x in [-w / 2.0 + 0.0065, w / 2.0 - 0.0065] {
                 fcyl!(
                     f,
-                    name("stab_cap"),
+                    numbered("stab_cap"),
                     0.032,
                     0.03,
                     (x, 0.03, z),
@@ -490,7 +478,7 @@ pub fn spin_bike() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             fcyl!(
                 f,
-                name("flywheel"),
+                numbered("flywheel"),
                 0.19,
                 0.006,
                 (s * 0.081, cy, cz),
@@ -502,7 +490,7 @@ pub fn spin_bike() -> Vec<Obj> {
                 let a = (72 * k + 18) as f64;
                 fbox!(
                     f,
-                    name("spoke"),
+                    numbered("spoke"),
                     0.004,
                     0.022,
                     0.15,
@@ -523,27 +511,26 @@ pub fn spin_bike() -> Vec<Obj> {
         );
         for s in [-1.0, 1.0] {
             // the side grips by the seat: bent tube, foam grips
-            tube(
+            kit::tube!(
                 f,
-                &name("grip_post"),
-                &fillet(
+                numbered("grip_post"),
+                &kit::fillet!(
                     &[
                         (s * 0.2, 0.34, 0.1),
                         (s * 0.24, 0.36, 0.12),
                         (s * 0.24, 0.5, 0.12),
                         (s * 0.24, 0.5, -0.12),
                     ],
-                    0.03,
-                    3,
+                    0.03
                 ),
                 0.012,
                 M.steel,
-                Some(8),
-                1,
+                verts = 8,
+                round = 1
             );
             fsweep!(
                 f,
-                name("grip"),
+                numbered("grip"),
                 &[(s * 0.24, 0.5, 0.06), (s * 0.24, 0.5, -0.12)],
                 0.017,
                 M.dark,
@@ -551,14 +538,14 @@ pub fn spin_bike() -> Vec<Obj> {
             );
         }
         // the console on its stalk, its route screen facing the rider, the handlebar and a bottle in its cage
-        tube(
+        kit::tube!(
             f,
             "stalk",
             &[(0.0, 0.5, 0.74), (0.0, 0.75, 0.69), (0.0, 1.0, 0.63)],
             0.025,
             M.bike_frame,
-            Some(10),
-            2,
+            verts = 10,
+            round = 2
         );
         let (cc, a) = ((0, 1.08, 0.6), radians(35.0));
         fextrude!(
@@ -597,23 +584,22 @@ pub fn spin_bike() -> Vec<Obj> {
             M.route_line,
             rot = (35, 0, 0)
         );
-        tube(
+        kit::tube!(
             f,
             "handlebar",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (-0.24, 1.02, 0.5),
                     (-0.22, 0.98, 0.56),
                     (0.22, 0.98, 0.56),
                     (0.24, 1.02, 0.5),
                 ],
-                0.04,
-                3,
+                0.04
             ),
             0.014,
             M.dark,
-            Some(8),
-            1,
+            verts = 8,
+            round = 1
         );
         lofted(
             f,
@@ -641,23 +627,22 @@ pub fn spin_bike() -> Vec<Obj> {
             M.dark,
             verts = 10
         );
-        tube(
+        kit::tube!(
             f,
             "cage",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (0.16, 0.36, 0.8),
                     (0.165, 0.36, 0.84),
                     (0.235, 0.36, 0.84),
                     (0.24, 0.36, 0.8),
                 ],
-                0.02,
-                3,
+                0.02
             ),
             0.004,
             M.steel,
-            Some(4),
-            1,
+            verts = 4,
+            round = 1
         );
     });
     join(&still, "body", Some(P3::ZERO));
@@ -677,7 +662,7 @@ pub fn spin_bike() -> Vec<Obj> {
             let (ey, ez) = (cy + 0.13 * sind(ang), cz + 0.13 * cosd(ang));
             fsweep!(
                 f,
-                name("crank"),
+                numbered("crank"),
                 &[(s * 0.12, cy, cz), (s * 0.122, ey, ez)],
                 0,
                 M.steel,
@@ -687,7 +672,7 @@ pub fn spin_bike() -> Vec<Obj> {
             );
             fcyl!(
                 f,
-                name("spindle"),
+                numbered("spindle"),
                 0.007,
                 0.05,
                 (s * 0.145, ey, ez),
@@ -697,7 +682,7 @@ pub fn spin_bike() -> Vec<Obj> {
             );
             fextrude!(
                 f,
-                name("pedal"),
+                numbered("pedal"),
                 &rounded_rect(0.09, 0.06, 0.012, 2),
                 0.022,
                 (s * 0.2, ey, ez),
@@ -708,7 +693,7 @@ pub fn spin_bike() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                name("strap"),
+                numbered("strap"),
                 0.07,
                 0.022,
                 0.014,
@@ -720,7 +705,7 @@ pub fn spin_bike() -> Vec<Obj> {
         }
     });
     let cranks = hinged(join(&cranks, "cranks", None), f.at(0, cy, cz));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     spin(
         cranks,
         "pedals",
@@ -763,19 +748,19 @@ pub fn trampoline() -> Vec<Obj> {
                     pts.extend([foot, rim]);
                 }
             }
-            tube(
+            kit::tube!(
                 f,
-                &name("leg"),
-                &fillet(&pts, 0.06, 3),
+                numbered("leg"),
+                &kit::fillet!(&pts, 0.06),
                 0.02,
                 M.tramp_frame,
-                Some(8),
-                1,
+                verts = 8,
+                round = 1
             );
             for a in [a0, a0 + 60.0] {
                 fcyl!(
                     f,
-                    name("leg_foot"),
+                    numbered("leg_foot"),
                     0.03,
                     0.012,
                     (0.92 * cosd(a), 0.006, 0.92 * sind(a)),
@@ -788,17 +773,17 @@ pub fn trampoline() -> Vec<Obj> {
             // the springs, under the pad's edge
             let a = (i * 10) as f64;
             let (c, s) = (cosd(a), sind(a));
-            tube(
+            kit::tube!(
                 f,
-                &name("spring"),
+                numbered("spring"),
                 &[
                     (0.8 * c, MAT_RIM - 0.004, 0.8 * s),
                     (0.915 * c, 0.565, 0.915 * s),
                 ],
                 0.007,
                 M.steel,
-                Some(4),
-                1,
+                verts = 4,
+                round = 1
             );
         }
         let prof = [
@@ -822,29 +807,28 @@ pub fn trampoline() -> Vec<Obj> {
         );
         // the ladder at the front: two bent stiles hooked over the frame, two treads
         for x in [-0.13, 0.13] {
-            tube(
+            kit::tube!(
                 f,
-                &name("ladder"),
-                &fillet(
+                numbered("ladder"),
+                &kit::fillet!(
                     &[
                         (x, 0.014, 0.94),
                         (x, 0.5, 0.875),
                         (x, 0.59, 0.895),
                         (x, 0.585, 0.93),
                     ],
-                    0.025,
-                    3,
+                    0.025
                 ),
                 0.014,
                 M.tramp_frame,
-                Some(8),
-                1,
+                verts = 8,
+                round = 1
             );
         }
         for y in [0.18, 0.36] {
             fextrude!(
                 f,
-                name("step"),
+                numbered("step"),
                 &rounded_rect(0.3, 0.07, 0.02, 2),
                 0.025,
                 (0.0, y, 0.94 - y / 0.5 * 0.065),
@@ -865,7 +849,7 @@ pub fn trampoline() -> Vec<Obj> {
         );
         for r in [(90, 0, 30), (0, 90, 30)] {
             torus!(
-                name("ball_seam"),
+                numbered("ball_seam"),
                 0.11,
                 0.003,
                 at = f.at(0.8, 0.11, 0.76),
@@ -901,7 +885,7 @@ pub fn trampoline() -> Vec<Obj> {
             material = M.tramp_mat,
             segments = 40
         );
-        paint(dish, M.dark, |c| {
+        kit::paint(dish, M.dark, |c| {
             let r = hypot(c.x as f64, c.y as f64);
             c.z as f64 > y0 - MAT_SAG - 0.004
                 && ((0.705 < r && r < 0.725) || (0.082 < r && r < 0.098))
@@ -963,7 +947,7 @@ pub fn streetball_hoop() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             fcyl!(
                 f,
-                name("wheel"),
+                numbered("wheel"),
                 0.05,
                 0.04,
                 (s * 0.24, 0.05, WALL + 0.05),
@@ -973,7 +957,7 @@ pub fn streetball_hoop() -> Vec<Obj> {
             );
             fcyl!(
                 f,
-                name("hub"),
+                numbered("hub"),
                 0.022,
                 0.044,
                 (s * 0.24, 0.05, WALL + 0.05),
@@ -983,23 +967,23 @@ pub fn streetball_hoop() -> Vec<Obj> {
             );
         }
         // the pole in two lengths, a collar where they meet, its pad, the arm braces up to the board
-        tube(
+        kit::tube!(
             f,
             "pole",
             &[(0.0, 0.2, -0.28), (0.0, 1.3, -0.215)],
             0.048,
             M.hoop_pole,
-            Some(12),
-            1,
+            verts = 12,
+            round = 1
         );
-        tube(
+        kit::tube!(
             f,
             "pole_upper",
             &[(0.0, 1.26, -0.217), (0.0, 2.32, -0.16)],
             0.04,
             M.hoop_pole,
-            Some(12),
-            1,
+            verts = 12,
+            round = 1
         );
         revolve!(
             "collar",
@@ -1015,14 +999,14 @@ pub fn streetball_hoop() -> Vec<Obj> {
             material = M.dark,
             segments = 12
         );
-        tube(
+        kit::tube!(
             f,
             "collar_knob",
             &[(0.0, 1.3, -0.16), (0.0, 1.3, -0.12)],
             0.012,
             M.dark,
-            Some(6),
-            1,
+            verts = 6,
+            round = 1
         );
         soft!(
             f,
@@ -1037,24 +1021,24 @@ pub fn streetball_hoop() -> Vec<Obj> {
             flat = 1
         );
         for x in [-0.1, 0.1] {
-            tube(
+            kit::tube!(
                 f,
-                &name("arm"),
+                numbered("arm"),
                 &[(0.0, 2.1, -0.18), (x, 2.3, -0.06), (x, 2.42, -0.045)],
                 0.016,
                 M.hoop_pole,
-                Some(8),
-                1,
+                verts = 8,
+                round = 1
             );
         }
-        tube(
+        kit::tube!(
             f,
             "arm_top",
             &[(0.0, 2.25, -0.2), (0.0, 2.42, -0.05)],
             0.028,
             M.hoop_pole,
-            Some(10),
-            1,
+            verts = 10,
+            round = 1
         );
         // the board: white, a red border round it, the target square over the rim
         fextrude!(
@@ -1135,7 +1119,7 @@ pub fn streetball_hoop() -> Vec<Obj> {
         );
         for r in [(90, 0, 0), (0, 90, 0), (0, 0, 0)] {
             torus!(
-                name("ball_seam"),
+                numbered("ball_seam"),
                 0.12,
                 0.003,
                 at = f.at(0.28, 0.12, 0.3),
@@ -1166,12 +1150,12 @@ pub fn streetball_hoop() -> Vec<Obj> {
                         (r * cosd(a), y, rz + r * sind(a))
                     })
                     .collect();
-                fsweep!(f, name("strand"), &pts, 0.0035, M.net, verts = 4);
+                fsweep!(f, numbered("strand"), &pts, 0.0035, M.net, verts = 4);
             }
         }
         for &(y, r) in &levels[1..] {
             torus!(
-                name("net_ring"),
+                numbered("net_ring"),
                 r,
                 0.0035,
                 at = f.at(0, y, rz),
@@ -1182,7 +1166,7 @@ pub fn streetball_hoop() -> Vec<Obj> {
         }
     });
     let net = hinged(join(&net, "net", None), f.at(0, ry, rz));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     rock(
         net,
         "swish",

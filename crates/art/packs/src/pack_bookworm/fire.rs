@@ -1,17 +1,18 @@
 //! The fireside reading lounge and the bedside book stack.
 
-use super::common::{M, WALL, books, cabriole, fillet, lamp, mug, name, pile, shaker, tube};
-use super::rooms::settle_in_place;
+use super::common::{M, WALL, books, lamp, mug, pile};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, cos, cosd, radians, sin, sind};
 use artkit::motion::{Grow, grow};
-use artkit::parts::{hinged, join, new_parts, settle_all};
+use artkit::parts::{hinged, join, new_parts, numbered, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::py::norm;
 use artkit::rand::Random;
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fextrude, fsweep, jitter, loft, revolve, ring, soft, swing, torus};
+use artkit::{
+    fbox, fcyl, fextrude, fsweep, jitter, kit, loft, revolve, ring, settle, soft, swing, torus,
+};
 
 // --- the fireside reading lounge (2x2): two wing chairs before an open fire grate under a hood ----------------
 const STOVE: (f64, f64) = (0.0, 0.62); // the grate's middle (x, depth)
@@ -24,7 +25,7 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
     let z0 = z - d / 2.0;
     soft!(
         f,
-        name("chair_base"),
+        numbered("chair_base"),
         w - 0.08,
         0.2,
         d - 0.06,
@@ -36,7 +37,7 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
     );
     soft!(
         f,
-        name("chair_seat"),
+        numbered("chair_seat"),
         w - 0.24,
         0.088,
         d - 0.2,
@@ -49,7 +50,7 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
     );
     soft!(
         f,
-        name("chair_back"),
+        numbered("chair_back"),
         w - 0.1,
         0.72,
         0.15,
@@ -80,7 +81,7 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
         .concat();
         fsweep!(
             f,
-            name("chair_arm"),
+            numbered("chair_arm"),
             &[(ax, 0.0, z0 + 0.1), (ax, 0.0, z + d / 2.0 - 0.035)],
             0,
             M.velvet,
@@ -89,7 +90,7 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
         );
         fcyl!(
             f,
-            name("chair_scroll"),
+            numbered("chair_scroll"),
             0.06,
             0.02,
             (ax + s * 0.01, 0.565, z + d / 2.0 - 0.03),
@@ -115,7 +116,7 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
         let wing: Vec<(f64, f64)> = wing.iter().map(|&(u, v)| (z + u, v)).collect();
         fextrude!(
             f,
-            name("chair_wing"),
+            numbered("chair_wing"),
             &wing,
             0.075,
             (x + s * (w / 2.0 - 0.065), 0.0, 0.0),
@@ -126,17 +127,16 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
             bevel_segments = 1
         );
         for (lz, dz) in [(z0 + 0.07, -1.0), (z + d / 2.0 - 0.07, 1.0)] {
-            cabriole(
+            kit::cabriole!(
                 f,
-                &name("chair_leg"),
+                numbered("chair_leg"),
                 ax,
                 lz,
                 0.16,
                 M.walnut,
                 s * 0.012,
                 dz * 0.012,
-                0.02,
-                12,
+                r = 0.02
             );
         }
     }
@@ -297,9 +297,9 @@ pub fn fireside_lounge() -> Vec<Obj> {
             // the basket's bars, bowed out
             let a = (30 * k + 15) as f64;
             let (c, s_) = (cosd(a), sind(a));
-            tube(
+            kit::tube!(
                 f,
-                &name("grate_bar"),
+                numbered("grate_bar"),
                 &[
                     (sx + 0.15 * c, 0.13, sz + 0.15 * s_),
                     (sx + 0.2 * c, 0.2, sz + 0.2 * s_),
@@ -307,8 +307,8 @@ pub fn fireside_lounge() -> Vec<Obj> {
                 ],
                 0.006,
                 M.iron,
-                Some(4),
-                2,
+                verts = 4,
+                round = 2
             );
         }
         torus!(
@@ -323,9 +323,9 @@ pub fn fireside_lounge() -> Vec<Obj> {
         for k in 0..3 {
             let a = (120 * k + 30) as f64;
             let (c, s_) = (cosd(a), sind(a));
-            tube(
+            kit::tube!(
                 f,
-                &name("grate_leg"),
+                numbered("grate_leg"),
                 &[
                     (sx + 0.12 * c, 0.13, sz + 0.12 * s_),
                     (sx + 0.16 * c, 0.07, sz + 0.16 * s_),
@@ -333,8 +333,8 @@ pub fn fireside_lounge() -> Vec<Obj> {
                 ],
                 0.012,
                 M.iron,
-                Some(6),
-                2,
+                verts = 6,
+                round = 2
             );
         }
         for (k, (a, dx, dy)) in [(20.0, -0.04, 0.0), (-25.0, 0.05, 0.0), (90.0, 0.0, 0.035)]
@@ -344,7 +344,7 @@ pub fn fireside_lounge() -> Vec<Obj> {
             let (c, s_) = (cosd(a) * 0.14, sind(a) * 0.14);
             log(
                 f,
-                &name("log"),
+                &numbered("log"),
                 (sx + dx - c, 0.17 + dy, sz - s_),
                 (sx + dx + c, 0.17 + dy, sz + s_),
                 0.035,
@@ -388,7 +388,7 @@ pub fn fireside_lounge() -> Vec<Obj> {
         for y in [1.3, 2.05] {
             fcyl!(
                 f,
-                name("flue_band"),
+                numbered("flue_band"),
                 0.066,
                 0.025,
                 (sx, y, sz),
@@ -442,7 +442,7 @@ pub fn fireside_lounge() -> Vec<Obj> {
             let (c, s_) = (cosd(a), sind(a));
             fsweep!(
                 f,
-                name("table_leg"),
+                numbered("table_leg"),
                 &[
                     (0.03 * c, 0.2, -0.16 + 0.03 * s_),
                     (0.1 * c, 0.1, -0.16 + 0.1 * s_),
@@ -535,7 +535,7 @@ pub fn fireside_lounge() -> Vec<Obj> {
         for y in [0.08, 0.16] {
             let r = 0.15 + 0.02 * y / 0.24;
             torus!(
-                name("weave"),
+                numbered("weave"),
                 1.0,
                 0.006,
                 at = f.at(0.68, y, 0.62),
@@ -561,7 +561,7 @@ pub fn fireside_lounge() -> Vec<Obj> {
             let kf = k as f64;
             log(
                 f,
-                &name("spare_log"),
+                &numbered("spare_log"),
                 (0.62 + 0.05 * kf - s_ * 0.3, 0.2 + 0.03 * kf, 0.62 - c),
                 (0.62 + 0.05 * kf + s_ * 0.3, 0.27 + 0.03 * kf, 0.62 + c),
                 0.034,
@@ -581,12 +581,12 @@ pub fn fireside_lounge() -> Vec<Obj> {
             (0.02, 0.05, 0.04, 0.16, M.flame_core, 60.0),
             (-0.02, -0.04, 0.035, 0.18, M.flame_core, 200.0),
         ] {
-            flame(f, &name("flame"), sx + dx, 0.17, sz + dz, r, h, m, t);
+            flame(f, &numbered("flame"), sx + dx, 0.17, sz + dz, r, h, m, t);
         }
     });
     let fire = join(&fire, "flames", Some(f.at(sx, 0.17, sz)));
     fire.edit(|o| o.scale.z = 0.001);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     grow(
         fire,
         "flames",
@@ -642,7 +642,7 @@ pub fn bedside_stack() -> Vec<Obj> {
         for lx in [-0.26, 0.26] {
             for lz in [WALL + 0.04, zf - 0.04] {
                 revolve!(
-                    name("leg"),
+                    numbered("leg"),
                     &[
                         (0.0, 0.0),
                         (0.014, 0.0),
@@ -662,23 +662,20 @@ pub fn bedside_stack() -> Vec<Obj> {
         for i in 0..2 {
             for j in 0..2 {
                 let (cx, cy) = (-0.27 + fw * (i as f64 + 0.5), 0.095 + fh * (j as f64 + 0.5));
-                shaker(
+                kit::shaker!(
                     f,
-                    &name("drawer"),
+                    numbered("drawer"),
                     fw - 0.014,
                     fh - 0.014,
                     (cx, cy, zf - 0.002),
                     0.016,
                     M.panel,
-                    0.03,
-                    None,
-                    0.005,
-                    false,
+                    rail = 0.03
                 );
                 // a brass cup pull and a card frame with its label
                 fsweep!(
                     f,
-                    name("pull"),
+                    numbered("pull"),
                     &[
                         (cx - 0.035, cy - 0.006, zf + 0.006),
                         (cx - 0.03, cy - 0.022, zf + 0.012),
@@ -693,7 +690,7 @@ pub fn bedside_stack() -> Vec<Obj> {
                 );
                 fbox!(
                     f,
-                    name("pull_plate"),
+                    numbered("pull_plate"),
                     0.08,
                     0.012,
                     0.004,
@@ -702,7 +699,7 @@ pub fn bedside_stack() -> Vec<Obj> {
                 );
                 fbox!(
                     f,
-                    name("label_frame"),
+                    numbered("label_frame"),
                     0.054,
                     0.032,
                     0.004,
@@ -711,7 +708,7 @@ pub fn bedside_stack() -> Vec<Obj> {
                 );
                 fbox!(
                     f,
-                    name("label"),
+                    numbered("label"),
                     0.046,
                     0.024,
                     0.002,
@@ -767,7 +764,7 @@ pub fn bedside_stack() -> Vec<Obj> {
         let (gx, gy, gz) = (-0.07, h + 0.004, -0.05);
         for s in [-1.0, 1.0] {
             torus!(
-                name("lens"),
+                numbered("lens"),
                 0.02,
                 0.0028,
                 at = f.at(gx + s * 0.024, gy, gz),
@@ -792,15 +789,14 @@ pub fn bedside_stack() -> Vec<Obj> {
         fsweep!(
             f,
             "glasses_arms",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (gx - 0.044, gy, gz + 0.002),
                     (gx - 0.048, gy + 0.004, gz - 0.016),
                     (gx + 0.04, gy + 0.004, gz - 0.02),
                     (gx + 0.046, gy + 0.008, gz - 0.006)
                 ],
-                0.006,
-                3
+                0.006
             ),
             0.0022,
             M.dark,

@@ -1,13 +1,13 @@
 //! The thunder drum kit (2x1): the drummer on the throne at the middle, the kit before them.
 
-use super::common::{M, fillet, lathe, name, tube, turned};
+use super::common::M;
 use artkit::forms::rounded_rect;
 use artkit::math::{Axis, P3, TAU, cos, cosd, radians, sin, sind, v3};
 use artkit::motion::{Rock, rock};
-use artkit::parts::{join, new_parts, settle_all};
+use artkit::parts::{join, new_parts, numbered, settle_all};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fsphere, fsweep, revolve, torus};
+use artkit::{fbox, fcyl, fsphere, fsweep, kit, revolve, torus};
 
 /// A drum shell with chrome hoops, white heads and lugs: `along_z` false a snare or tom (tilted `tilt` about x),
 /// true the bass drum lying towards the front.
@@ -31,7 +31,7 @@ fn drum(
     };
     fcyl!(
         f,
-        name("shell"),
+        numbered("shell"),
         r,
         depth,
         (x, y, z),
@@ -41,7 +41,7 @@ fn drum(
     );
     fcyl!(
         f,
-        name("head"),
+        numbered("head"),
         r * 0.97,
         depth + 0.006,
         (x, y, z),
@@ -62,7 +62,7 @@ fn drum(
     for e in [-1.0, 1.0] {
         let p = along(e * depth / 2.0, 0.0, 0.0);
         torus!(
-            name("hoop"),
+            numbered("hoop"),
             r + 0.008,
             0.009,
             at = f.at(p.0, p.1, p.2),
@@ -75,41 +75,41 @@ fn drum(
     for k in 0..lugs {
         let a = TAU * (k as f64 + 0.5) / lugs as f64;
         let (u, v) = ((r + 0.008) * cos(a), (r + 0.008) * sin(a));
-        tube(
+        kit::tube!(
             f,
-            &name("lug"),
+            numbered("lug"),
             &[along(-depth * 0.2, u, v), along(depth * 0.2, u, v)],
             0.006,
             M.chrome,
-            Some(4),
-            1,
+            verts = 4,
+            round = 1
         );
     }
 }
 
 /// A chrome tripod stand: three legs braced to a collar, a tube up to height `h` with a clamp halfway.
 fn stand(f: &GameFrame, x: f64, z: f64, h: f64, spread: f64) {
-    tube(
+    kit::tube!(
         f,
-        &name("stand_pole"),
+        numbered("stand_pole"),
         &[(x, 0.1, z), (x, h * 0.55, z)],
         0.011,
         M.chrome,
-        Some(8),
-        1,
+        verts = 8,
+        round = 1
     );
-    tube(
+    kit::tube!(
         f,
-        &name("stand_upper"),
+        numbered("stand_upper"),
         &[(x, h * 0.55, z), (x, h - 0.02, z)],
         0.008,
         M.chrome,
-        Some(8),
-        1,
+        verts = 8,
+        round = 1
     );
     fcyl!(
         f,
-        name("stand_clamp"),
+        numbered("stand_clamp"),
         0.015,
         0.024,
         (x, h * 0.55, z),
@@ -118,7 +118,7 @@ fn stand(f: &GameFrame, x: f64, z: f64, h: f64, spread: f64) {
     );
     fcyl!(
         f,
-        name("stand_hub"),
+        numbered("stand_hub"),
         0.017,
         0.03,
         (x, 0.22, z),
@@ -128,30 +128,30 @@ fn stand(f: &GameFrame, x: f64, z: f64, h: f64, spread: f64) {
     for k in 0..3 {
         let a = (90 + 120 * k) as f64;
         let (c, s) = (cosd(a), sind(a));
-        tube(
+        kit::tube!(
             f,
-            &name("stand_leg"),
+            numbered("stand_leg"),
             &[(x, 0.22, z), (x + spread * c, 0.012, z + spread * s)],
             0.0065,
             M.chrome,
-            Some(6),
-            1,
+            verts = 6,
+            round = 1
         );
-        tube(
+        kit::tube!(
             f,
-            &name("stand_brace"),
+            numbered("stand_brace"),
             &[
                 (x, 0.13, z),
                 (x + spread * 0.5 * c, 0.115, z + spread * 0.5 * s),
             ],
             0.004,
             M.chrome,
-            Some(4),
-            1,
+            verts = 4,
+            round = 1
         );
         fcyl!(
             f,
-            name("stand_foot"),
+            numbered("stand_foot"),
             0.011,
             0.014,
             (x + spread * c, 0.007, z + spread * s),
@@ -184,7 +184,7 @@ fn cymbal(f: &GameFrame, name_: &str, x: f64, y: f64, z: f64, d: f64) {
     );
     fcyl!(
         f,
-        name("felt"),
+        numbered("felt"),
         0.014,
         0.022,
         (x, y + 0.042, z),
@@ -193,7 +193,7 @@ fn cymbal(f: &GameFrame, name_: &str, x: f64, y: f64, z: f64, d: f64) {
     );
     fcyl!(
         f,
-        name("wingnut"),
+        numbered("wingnut"),
         0.006,
         0.014,
         (x, y + 0.058, z),
@@ -202,7 +202,7 @@ fn cymbal(f: &GameFrame, name_: &str, x: f64, y: f64, z: f64, d: f64) {
     );
     fbox!(
         f,
-        name("wing"),
+        numbered("wing"),
         0.03,
         0.01,
         0.003,
@@ -216,7 +216,7 @@ fn pedal(f: &GameFrame, x: f64, z: f64, length: f64) {
     let (z0, z1) = (z - length / 2.0, z + length / 2.0);
     fbox!(
         f,
-        name("pedal_heel"),
+        numbered("pedal_heel"),
         0.075,
         0.012,
         0.06,
@@ -227,7 +227,7 @@ fn pedal(f: &GameFrame, x: f64, z: f64, length: f64) {
     );
     fsweep!(
         f,
-        name("pedal_board"),
+        numbered("pedal_board"),
         &[(x, 0.026, z0 + 0.05), (x, 0.06, z1 - 0.03)],
         0,
         M.dark,
@@ -236,7 +236,7 @@ fn pedal(f: &GameFrame, x: f64, z: f64, length: f64) {
     );
     fbox!(
         f,
-        name("pedal_base"),
+        numbered("pedal_base"),
         0.11,
         0.01,
         0.06,
@@ -246,19 +246,19 @@ fn pedal(f: &GameFrame, x: f64, z: f64, length: f64) {
         bevel_segments = 1
     );
     for s in [-1.0, 1.0] {
-        tube(
+        kit::tube!(
             f,
-            &name("pedal_post"),
+            numbered("pedal_post"),
             &[(x + s * 0.05, 0.02, z1), (x + s * 0.05, 0.13, z1)],
             0.006,
             M.chrome,
-            Some(6),
-            1,
+            verts = 6,
+            round = 1
         );
     }
     fcyl!(
         f,
-        name("pedal_cam"),
+        numbered("pedal_cam"),
         0.02,
         0.1,
         (x, 0.12, z1),
@@ -312,26 +312,25 @@ pub fn thunder_drums() -> Vec<Obj> {
             smooth = false
         );
         for s in [-1.0, 1.0] {
-            tube(
+            kit::tube!(
                 f,
-                &name("spur"),
-                &fillet(
+                numbered("spur"),
+                &kit::fillet!(
                     &[
                         (s * 0.22, 0.16, 0.36),
                         (s * 0.27, 0.1, 0.38),
                         (s * 0.3, 0.012, 0.4),
                     ],
-                    0.03,
-                    3,
+                    0.03
                 ),
                 0.008,
                 M.chrome,
-                Some(6),
-                1,
+                verts = 6,
+                round = 1
             );
             fcyl!(
                 f,
-                name("spur_foot"),
+                numbered("spur_foot"),
                 0.011,
                 0.014,
                 (s * 0.3, 0.007, 0.4),
@@ -340,14 +339,14 @@ pub fn thunder_drums() -> Vec<Obj> {
             );
         }
         pedal(f, 0.0, 0.02, 0.2);
-        tube(
+        kit::tube!(
             f,
             "beater",
             &[(0.0, 0.12, 0.12), (0.0, 0.27, 0.11)],
             0.004,
             M.chrome,
-            Some(5),
-            1,
+            verts = 5,
+            round = 1
         );
         fcyl!(
             f,
@@ -373,56 +372,54 @@ pub fn thunder_drums() -> Vec<Obj> {
             bevel = 0.006,
             bevel_segments = 1
         );
-        tube(
+        kit::tube!(
             f,
             "tom_mount",
             &[(0.0, 0.55, 0.27), (0.0, 0.64, 0.26)],
             0.013,
             M.chrome,
-            Some(8),
-            1,
+            verts = 8,
+            round = 1
         );
         for s in [-1.0, 1.0] {
-            tube(
+            kit::tube!(
                 f,
-                &name("tom_arm"),
-                &fillet(
+                numbered("tom_arm"),
+                &kit::fillet!(
                     &[
                         (0.0, 0.64, 0.26),
                         (s * 0.09, 0.64, 0.26),
                         (s * 0.09, 0.66, 0.255),
                     ],
-                    0.02,
-                    3,
+                    0.02
                 ),
                 0.008,
                 M.chrome,
-                Some(6),
-                1,
+                verts = 6,
+                round = 1
             );
         }
         drum(f, 0.42, 0.43, 0.12, 0.38, 0.34, false, 0.0, 8);
         for a in [30.0, 150.0, 270.0] {
-            tube(
+            kit::tube!(
                 f,
-                &name("tom_leg"),
-                &fillet(
+                numbered("tom_leg"),
+                &kit::fillet!(
                     &[
                         (0.42 + 0.205 * cosd(a), 0.46, 0.12 + 0.205 * sind(a)),
                         (0.42 + 0.23 * cosd(a), 0.4, 0.12 + 0.23 * sind(a)),
                         (0.42 + 0.24 * cosd(a), 0.012, 0.12 + 0.24 * sind(a)),
                     ],
-                    0.02,
-                    3,
+                    0.02
                 ),
                 0.007,
                 M.chrome,
-                Some(6),
-                1,
+                verts = 6,
+                round = 1
             );
             fcyl!(
                 f,
-                name("tom_foot"),
+                numbered("tom_foot"),
                 0.011,
                 0.014,
                 (0.42 + 0.24 * cosd(a), 0.007, 0.12 + 0.24 * sind(a)),
@@ -452,7 +449,7 @@ pub fn thunder_drums() -> Vec<Obj> {
         stand(f, CRASH.0, CRASH.2, CRASH.1, 0.17);
         stand(f, RIDE.0, RIDE.2, RIDE.1, 0.17);
         // the throne, top 0.47: a round padded seat on a tripod; a pair of sticks on it
-        lathe(
+        kit::lathe!(
             f,
             "throne_seat",
             0.0,
@@ -468,8 +465,7 @@ pub fn thunder_drums() -> Vec<Obj> {
                 (0.0, 0.07),
             ],
             M.dark,
-            24,
-            2.0,
+            verts = 24
         );
         fcyl!(
             f,
@@ -486,7 +482,7 @@ pub fn thunder_drums() -> Vec<Obj> {
             let a = radians(r);
             fsweep!(
                 f,
-                name("stick"),
+                numbered("stick"),
                 &[
                     (0.42 - 0.2 * sin(a), 0.611, 0.12 + dz - 0.2 * cos(a)),
                     (0.42 + 0.2 * sin(a), 0.611, 0.12 + dz + 0.2 * cos(a))
@@ -522,7 +518,7 @@ pub fn thunder_drums() -> Vec<Obj> {
             bevel = 0.006,
             bevel_segments = 1
         );
-        turned(
+        kit::turned!(
             f,
             "amp_cone",
             ax,
@@ -536,8 +532,8 @@ pub fn thunder_drums() -> Vec<Obj> {
                 (0.0, 0.02),
             ],
             M.dark,
-            20,
-            (-90.0, 0.0, 0.0),
+            segments = 20,
+            rot = (-90.0, 0.0, 0.0)
         );
         fsphere!(
             f,
@@ -563,7 +559,7 @@ pub fn thunder_drums() -> Vec<Obj> {
         for k in 0..4 {
             fcyl!(
                 f,
-                name("amp_knob"),
+                numbered("amp_knob"),
                 0.011,
                 0.016,
                 (ax - 0.09 + 0.06 * k as f64, 0.53, az + 0.158),
@@ -581,29 +577,28 @@ pub fn thunder_drums() -> Vec<Obj> {
             segments = 6,
             rings = 4
         );
-        tube(
+        kit::tube!(
             f,
             "amp_handle",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (ax - 0.08, 0.6, az),
                     (ax - 0.08, 0.63, az),
                     (ax + 0.08, 0.63, az),
                     (ax + 0.08, 0.6, az),
                 ],
-                0.015,
-                3,
+                0.015
             ),
             0.008,
             M.dark,
-            Some(6),
-            1,
+            verts = 6,
+            round = 1
         );
         for sx in [-1.0, 1.0] {
             for sz in [-1.0, 1.0] {
                 fbox!(
                     f,
-                    name("amp_corner"),
+                    numbered("amp_corner"),
                     0.04,
                     0.04,
                     0.04,

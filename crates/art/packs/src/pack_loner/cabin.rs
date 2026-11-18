@@ -1,15 +1,14 @@
 //! The cedar sauna for one and the no-knock delivery hatch.
 
-use super::common::{_name, _turned, M, WALL, WALL2};
-use super::pod::settle_in_place;
+use super::common::{M, WALL, WALL2};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::math::P3;
 use artkit::motion::Ease;
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
-use artkit::{boulder, fbox, fcyl, fextrude, fsweep, jitter, soft, swing, torus};
+use artkit::{boulder, fbox, fcyl, fextrude, fsweep, jitter, settle, soft, swing, torus};
 
 // --- the cedar sauna for one (1x2): seated in the middle on the bench, a glass door at the front ----------------
 // the door's depth: the seated bather's feet inside it (2026-10-21: 0.42, the shoes at and past the glass: I-packs-17)
@@ -17,7 +16,6 @@ const FRONT: f64 = 0.7;
 
 pub fn solo_sauna() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let none = (0.0, 0.0, 0.0);
     let (zb, zf) = (WALL2, FRONT + 0.01); // the cabin's back and front
     let (zc, d) = ((zb + zf) / 2.0, zf - zb);
     let still = new_parts(|| {
@@ -69,7 +67,7 @@ pub fn solo_sauna() -> Vec<Obj> {
         for s in [-1, 1] {
             fbox!(
                 f,
-                _name("roof_fascia_side"),
+                numbered("roof_fascia_side"),
                 0.02,
                 0.05,
                 d + 0.04,
@@ -86,7 +84,7 @@ pub fn solo_sauna() -> Vec<Obj> {
                 let y = 0.08 + 0.137 * k as f64 + 0.0685;
                 fbox!(
                     f,
-                    _name("board"),
+                    numbered("board"),
                     0.04 + 0.002 * (k % 2) as f64,
                     0.133,
                     d - 0.1,
@@ -98,7 +96,7 @@ pub fn solo_sauna() -> Vec<Obj> {
             }
             fbox!(
                 f,
-                _name("post"),
+                numbered("post"),
                 0.05,
                 1.96,
                 0.06,
@@ -109,7 +107,7 @@ pub fn solo_sauna() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                _name("corner"),
+                numbered("corner"),
                 0.05,
                 1.96,
                 0.05,
@@ -120,7 +118,7 @@ pub fn solo_sauna() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                _name("base_board"),
+                numbered("base_board"),
                 0.05,
                 0.08,
                 d - 0.08,
@@ -156,7 +154,7 @@ pub fn solo_sauna() -> Vec<Obj> {
         for z in [-0.16, -0.06, 0.04, 0.14] {
             fbox!(
                 f,
-                _name("slat"),
+                numbered("slat"),
                 0.78,
                 0.035,
                 0.085,
@@ -169,7 +167,7 @@ pub fn solo_sauna() -> Vec<Obj> {
         for k in 0..6 {
             fbox!(
                 f,
-                _name("skirt_board"),
+                numbered("skirt_board"),
                 0.125,
                 0.38,
                 0.03,
@@ -182,7 +180,7 @@ pub fn solo_sauna() -> Vec<Obj> {
         for z in [-0.54, -0.44, -0.34] {
             fbox!(
                 f,
-                _name("tier_slat"),
+                numbered("tier_slat"),
                 0.78,
                 0.035,
                 0.085,
@@ -195,7 +193,7 @@ pub fn solo_sauna() -> Vec<Obj> {
         for k in 0..6 {
             fbox!(
                 f,
-                _name("tier_board"),
+                numbered("tier_board"),
                 0.125,
                 0.4,
                 0.03,
@@ -208,7 +206,7 @@ pub fn solo_sauna() -> Vec<Obj> {
         for y in [0.98, 1.12] {
             fbox!(
                 f,
-                _name("back_slat"),
+                numbered("back_slat"),
                 0.74,
                 0.06,
                 0.025,
@@ -244,7 +242,7 @@ pub fn solo_sauna() -> Vec<Obj> {
         for k in 0..4 {
             fbox!(
                 f,
-                _name("heater_vent"),
+                numbered("heater_vent"),
                 0.18,
                 0.012,
                 0.004,
@@ -266,7 +264,7 @@ pub fn solo_sauna() -> Vec<Obj> {
         .enumerate()
         {
             boulder!(
-                _name("stone"),
+                numbered("stone"),
                 0.045,
                 at = f.at(0.22 + dx, 1.305, -0.76 + dz),
                 material = M.stones,
@@ -278,7 +276,7 @@ pub fn solo_sauna() -> Vec<Obj> {
         for k in 0..3 {
             fbox!(
                 f,
-                _name("guard"),
+                numbered("guard"),
                 0.025,
                 0.36,
                 0.025,
@@ -288,7 +286,7 @@ pub fn solo_sauna() -> Vec<Obj> {
                 bevel_segments = 1
             );
         }
-        _turned(
+        kit::turned!(
             f,
             "bucket",
             -0.22,
@@ -303,12 +301,11 @@ pub fn solo_sauna() -> Vec<Obj> {
                 (0.0, 0.015),
             ],
             M.cedar_dark,
-            16,
-            none,
+            segments = 16
         );
         for y in [0.87, 0.95] {
             torus!(
-                _name("bucket_band"),
+                numbered("bucket_band"),
                 0.087 + (y - 0.837) * 0.12,
                 0.005,
                 at = f.at(-0.22, y, -0.44),
@@ -330,7 +327,7 @@ pub fn solo_sauna() -> Vec<Obj> {
             verts = 6,
             round = 1
         );
-        _turned(
+        kit::turned!(
             f,
             "ladle_cup",
             -0.225,
@@ -344,8 +341,7 @@ pub fn solo_sauna() -> Vec<Obj> {
                 (0.0, 0.016),
             ],
             M.cedar_dark,
-            12,
-            none,
+            segments = 12
         );
         fbox!(
             f,
@@ -361,7 +357,7 @@ pub fn solo_sauna() -> Vec<Obj> {
         for k in 0..5 {
             fbox!(
                 f,
-                _name("lamp_louvre"),
+                numbered("lamp_louvre"),
                 0.34,
                 0.012,
                 0.02,
@@ -466,7 +462,7 @@ pub fn solo_sauna() -> Vec<Obj> {
         for y in [0.8, 1.3] {
             fcyl!(
                 f,
-                _name("pull_rose"),
+                numbered("pull_rose"),
                 0.02,
                 0.006,
                 (0.3, y, FRONT + 0.011),
@@ -477,7 +473,7 @@ pub fn solo_sauna() -> Vec<Obj> {
         }
     });
     let door = hinged(join(&door, "door", None), f.at(hx, 1.0, FRONT));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(door, "door_open", 60.0, seconds = 0.8, ease = Ease::BackOut);
     objs
 }
@@ -488,7 +484,6 @@ const HATCH: (f64, f64, f64) = (0.52, 0.42, 1.18); // the hatch's width, height 
 
 pub fn delivery_hatch() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let none = (0.0, 0.0, 0.0);
     let (hw, hh, hy) = HATCH;
     let (zc, d) = ((WALL + HZ) / 2.0, HZ - WALL);
     let (lo, hi) = (hy - hh / 2.0, hy + hh / 2.0);
@@ -519,7 +514,7 @@ pub fn delivery_hatch() -> Vec<Obj> {
         for s in [-1, 1] {
             fbox!(
                 f,
-                _name("cabinet_side"),
+                numbered("cabinet_side"),
                 (0.82 - hw) / 2.0,
                 hh + 0.02,
                 d,
@@ -619,7 +614,7 @@ pub fn delivery_hatch() -> Vec<Obj> {
         for x in [-0.28, 0.28] {
             fextrude!(
                 f,
-                _name("bracket"),
+                numbered("bracket"),
                 &smooth_outline(
                     &[
                         (0.0, 0.0),
@@ -675,7 +670,7 @@ pub fn delivery_hatch() -> Vec<Obj> {
             bevel = 0.002,
             bevel_segments = 1
         );
-        _turned(
+        kit::turned!(
             f,
             "cup",
             0.14,
@@ -690,10 +685,9 @@ pub fn delivery_hatch() -> Vec<Obj> {
                 (0.0, 0.16),
             ],
             M.porcelain,
-            16,
-            none,
+            segments = 16
         );
-        _turned(
+        kit::turned!(
             f,
             "cup_lid",
             0.14,
@@ -707,8 +701,7 @@ pub fn delivery_hatch() -> Vec<Obj> {
                 (0.0, 0.016),
             ],
             M.porcelain,
-            16,
-            none,
+            segments = 16
         );
         fbox!(
             f,
@@ -719,7 +712,7 @@ pub fn delivery_hatch() -> Vec<Obj> {
             (0.14, 1.03, -0.04),
             M.porcelain
         );
-        _turned(
+        kit::turned!(
             f,
             "cup_band",
             0.14,
@@ -727,8 +720,7 @@ pub fn delivery_hatch() -> Vec<Obj> {
             -0.04,
             &[(0.039, 0.0), (0.042, 0.0), (0.044, 0.05), (0.041, 0.05)],
             M.kraft,
-            16,
-            none,
+            segments = 16
         );
         kit::tube!(
             f,
@@ -803,7 +795,7 @@ pub fn delivery_hatch() -> Vec<Obj> {
         for x in [-0.29, -0.07] {
             fcyl!(
                 f,
-                _name("plaque_screw"),
+                numbered("plaque_screw"),
                 0.006,
                 0.004,
                 (x, 1.55, HZ + 0.013),
@@ -940,7 +932,7 @@ pub fn delivery_hatch() -> Vec<Obj> {
         );
     });
     let door = hinged(join(&door, "hatch", None), f.at(hw / 2.0, hy, HZ + 0.03));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(door, "hatch", -105.0, seconds = 0.8);
     objs
 }

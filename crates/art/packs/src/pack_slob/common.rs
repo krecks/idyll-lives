@@ -244,7 +244,8 @@ pub fn _wrapper(f: &GameFrame, name: &str, x: f64, z: f64, material: Mat, seed: 
     );
 }
 
-// KIT: joinery.recessed_box (G.cut of a box out of a loft's side)
+// (not `kit::cut!`: the kernel's cut keeps the case's own smooth flags and sharp edges, and 3 % of the case's normals
+// then stand over 15° from Blender's; this one shades the cut case anew, in Blender's order of points and faces)
 /// What the script's boolean (`G.cut`, Blender's exact solver) makes of a lofted case `obj` with a box `cutter` run
 /// into its front (Blender's -y) and not out the back: the box's top and bottom lie within one band of the loft's
 /// upright quads, its sides in the band's front quads. Each quad it crosses loses the mouth (the first and last a

@@ -40,7 +40,8 @@ palette! { M:
 /// The wall's face in a 1-deep footprint, game depth.
 pub const WALL: f64 = -0.43;
 
-// KIT: joinery.recessed_box (G.cut of a box out of a box)
+// (not `kit::cut!`: the kernel's cut numbers the mouth's points, orders its faces and bevels its edges its own way;
+// the same surface and the same row against Blender's build, other bytes; this one keeps Blender's order)
 /// What the script's boolean (`G.cut`, Blender's exact solver) makes of a box `obj` with a box `cutter` run
 /// into it through its front (Blender's -y face) and not out the back or the sides: the front cut round the mouth
 /// (an eight-cornered face and a quad, as Blender splits a face with a hole), the pocket's four walls and back

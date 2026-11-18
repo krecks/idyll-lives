@@ -1,22 +1,13 @@
 //! The candlelit bistro table and the heart-shaped petal tub.
 
-use super::common::{_candle, _flame, _rose, _rose_leaves, _sq, _velvet_chair, _wine_glass, M};
+use super::common::{_candle, _flame, _rose, _rose_leaves, _velvet_chair, _wine_glass, M};
+use artkit::forms::rect;
 use artkit::kit;
 use artkit::math::{Axis, M4, P3, PI, V3, atan2, cos, pow, radians, sin, sqrt};
-use artkit::parts::{Settle, join, new_parts, settle_with};
+use artkit::parts::{join, new_parts};
 use artkit::place::GameFrame;
-use artkit::scene::{Obj, meshes};
-use artkit::{fsphere, fsweep, grow, leaf, loft, revolve, ring, torus};
-
-pub fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
+use artkit::scene::Obj;
+use artkit::{fsphere, fsweep, grow, leaf, loft, revolve, ring, settle, torus};
 
 // --- the candlelit bistro table (2x1): a diner at each end (x = +-0.62, z = 0.1) facing in across the top -------
 const TZ: f64 = 0.1; // the table's and the diners' depth (content `places`)
@@ -89,7 +80,7 @@ pub fn candlelit_table() -> Vec<Obj> {
             ),
             0.0,
             M.runner,
-            profile = _sq(0.003, Some(0.12)),
+            profile = rect(0.003, 0.12),
             up = (0, 0, 1)
         );
         for x in [-0.33, 0.33] {
@@ -180,7 +171,7 @@ pub fn candlelit_table() -> Vec<Obj> {
                     ],
                     0.0,
                     M.gold,
-                    profile = _sq(0.003, Some(if k != 0 { 0.014 } else { 0.018 })),
+                    profile = rect(0.003, if k != 0 { 0.014 } else { 0.018 }),
                     up = (0, 0, 1),
                     scale = if k != 0 { [1.0, 0.7] } else { [1.0, 1.3] }
                 );
@@ -260,7 +251,7 @@ pub fn candlelit_table() -> Vec<Obj> {
     let low = CANDLES.iter().map(|c| c.2).fold(f64::INFINITY, f64::min);
     let flames = join(&flames, "flames", Some(f.at(0, top + 0.05 + low, TZ))); // flattened inside the wax at rest
     flames.set_scale_axis(2, 0.001);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     grow!(flames, "candles", seconds = 0.6);
     objs
 }
@@ -532,7 +523,7 @@ pub fn heart_tub() -> Vec<Obj> {
     });
     let water = join(&water, "water", Some(f.at(0, FLOOR - 0.01, 0))); // hidden in the floor at rest
     water.set_scale_axis(2, 0.001);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     grow!(water, "fill", seconds = 1.2);
     objs
 }

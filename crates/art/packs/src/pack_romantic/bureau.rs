@@ -1,14 +1,13 @@
 //! The love-letter bureau and the rose-arbour swing.
 
-use super::common::{_candle, _rose, _sq, _velvet_chair, M, WALL};
-use super::dining::settle_in_place;
-use artkit::forms::rounded_rect;
+use super::common::{_candle, _rose, _velvet_chair, M, WALL};
+use artkit::forms::{rect, rounded_rect};
 use artkit::kit;
 use artkit::math::{P3, PI, cos, cosd, pow, sin, sind};
 use artkit::parts::{hinged, join, new_parts};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
-use artkit::{fbox, fextrude, fsweep, leaf, revolve, rock, soft, squash, swing};
+use artkit::{fbox, fextrude, fsweep, leaf, revolve, rock, settle, soft, squash, swing};
 
 // --- the love-letter bureau (1x1): its back on the wall, the desk and its pigeonholes there, the writer's chair in front ---
 const DESK_D: f64 = 0.45; // the desk's depth from the wall face
@@ -308,7 +307,7 @@ pub fn letter_bureau() -> Vec<Obj> {
         );
     });
     let flap = hinged(join(&flap, "flap", None), f.at(0, 0.77, hf + 0.009));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(
         flap,
         "fall_front",
@@ -439,7 +438,7 @@ pub fn rose_arbour_swing() -> Vec<Obj> {
                         &[a, b],
                         0.0,
                         M.frame,
-                        profile = _sq(0.01, Some(0.022)),
+                        profile = rect(0.01, 0.022),
                         up = (1, 0, 0)
                     );
                 }
@@ -467,7 +466,7 @@ pub fn rose_arbour_swing() -> Vec<Obj> {
                 &rafter,
                 0.0,
                 M.frame,
-                profile = _sq(0.05, Some(0.06)),
+                profile = rect(0.05, 0.06),
                 up = (0, 0, 1),
                 resolution = 2
             );
@@ -732,7 +731,7 @@ pub fn rose_arbour_swing() -> Vec<Obj> {
         join(&bloom, "bloom", None),
         f.at(BLOOM.0, BLOOM.1 - 0.06, BLOOM.2),
     );
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     rock!(swing, "swing", 7.0, seconds = 2.0);
     squash!(bloom, "cut", 0.001, seconds = 0.6);
     objs

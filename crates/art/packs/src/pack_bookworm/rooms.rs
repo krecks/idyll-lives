@@ -1,26 +1,17 @@
 //! The window-seat reading nook and the rare-books library wall.
 
-use super::common::{M, WALL, books, fillet, knob, moulding, mug, name, shaker, tube};
+use super::common::{M, WALL, books, knob, mug};
 use artkit::forms::rounded_rect;
 use artkit::math::{P3, cos, cosd, pow, radians, sin, sind};
 use artkit::motion::{Squash, squash};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
-use artkit::place::GameFrame;
+use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
-use artkit::scene::{Obj, meshes};
+use artkit::scene::Obj;
 use artkit::{
-    boulder, fbox, fcyl, fextrude, fsphere, fsweep, jitter, loft, revolve, ring, slide, soft, torus,
+    boulder, fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, loft, revolve, ring, settle,
+    slide, soft, torus,
 };
-
-pub fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
 
 // --- the window-seat reading nook (2x1): a cushioned seat between two little bookcases ---------------------
 
@@ -40,7 +31,7 @@ fn case(
     for dx in [-0.195, 0.195] {
         fbox!(
             f,
-            name("side"),
+            numbered("side"),
             0.03,
             top,
             0.4,
@@ -52,7 +43,7 @@ fn case(
     }
     fbox!(
         f,
-        name("back"),
+        numbered("back"),
         0.36,
         top - 0.06,
         0.012,
@@ -62,7 +53,7 @@ fn case(
     for (k, &y) in shelves.iter().enumerate() {
         fbox!(
             f,
-            name("shelf"),
+            numbered("shelf"),
             0.36,
             0.025,
             0.38,
@@ -73,7 +64,7 @@ fn case(
         );
         fbox!(
             f,
-            name("shelf_lip"),
+            numbered("shelf_lip"),
             0.36,
             0.035,
             0.012,
@@ -115,7 +106,7 @@ pub fn reading_nook() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                name("case_kick"),
+                numbered("case_kick"),
                 0.36,
                 0.035,
                 0.012,
@@ -136,7 +127,7 @@ pub fn reading_nook() -> Vec<Obj> {
             bevel = 0.006,
             bevel_segments = 1
         );
-        moulding(
+        kit::moulding!(
             f,
             "cornice",
             &[
@@ -156,9 +147,8 @@ pub fn reading_nook() -> Vec<Obj> {
                 (0.02, 0.09),
             ],
             M.body,
-            1.62,
-            false,
-            artkit::shapes::SHARP,
+            at = 1.62,
+            plane = Facing::Top
         );
         fbox!(
             f,
@@ -213,14 +203,14 @@ pub fn reading_nook() -> Vec<Obj> {
             bevel = 0.003,
             bevel_segments = 1
         );
-        tube(
+        kit::tube!(
             f,
             "pendant_cord",
             &[(0.0, 1.5, -0.12), (0.0, 1.27, -0.12)],
             0.003,
             M.dark,
-            Some(5),
-            1,
+            verts = 5,
+            round = 1
         );
         revolve!(
             "pendant",
@@ -273,7 +263,7 @@ pub fn reading_nook() -> Vec<Obj> {
         for x in [-0.26, 0.26] {
             fbox!(
                 f,
-                name("seat_back_panel"),
+                numbered("seat_back_panel"),
                 0.44,
                 0.5,
                 0.012,
@@ -307,20 +297,17 @@ pub fn reading_nook() -> Vec<Obj> {
             bevel_segments = 1
         );
         for x in [-0.25, 0.25] {
-            shaker(
+            kit::shaker!(
                 f,
-                &name("drawer"),
+                numbered("drawer"),
                 0.46,
                 0.22,
                 (x, 0.2, 0.18),
                 0.02,
                 M.panel,
-                0.045,
-                None,
-                0.005,
-                false,
+                rail = 0.045
             );
-            knob(f, &name("knob"), x, 0.2, 0.19, 0.013, None, 8);
+            knob(f, &numbered("knob"), x, 0.2, 0.19, 0.013, None, 8);
         }
         fbox!(
             f,
@@ -337,7 +324,7 @@ pub fn reading_nook() -> Vec<Obj> {
         for x in [-0.25, 0.25] {
             soft!(
                 f,
-                name("back_cushion"),
+                numbered("back_cushion"),
                 0.48,
                 0.42,
                 0.13,
@@ -421,7 +408,7 @@ pub fn reading_nook() -> Vec<Obj> {
         jitter!(throw, 0.004, size = 0.12, seed = 2.0, up = 0.6);
     });
     let seat = hinged(join(&seat, "seat", None), f.at(0, 0.36, -0.125));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     squash(
         seat,
         "sink_in",
@@ -454,7 +441,7 @@ fn bust(f: &GameFrame, x: f64, y: f64, z: f64, s: f64) {
         z: bz,
     } = f.at(x, y, z);
     revolve!(
-        name("bust_socle"),
+        numbered("bust_socle"),
         &[
             (0.0, 0.0),
             (0.035 * s, 0.0),
@@ -487,7 +474,7 @@ fn bust(f: &GameFrame, x: f64, y: f64, z: f64, s: f64) {
         )
     })
     .collect();
-    loft!(name("bust_chest"), &chest, material = M.bust);
+    loft!(numbered("bust_chest"), &chest, material = M.bust);
     let head: Vec<Vec<P3>> = [
         (0.11, 0.016, 0.017, 0.0),
         (0.13, 0.017, 0.018, -0.002),
@@ -509,9 +496,9 @@ fn bust(f: &GameFrame, x: f64, y: f64, z: f64, s: f64) {
         )
     })
     .collect();
-    loft!(name("bust_head"), &head, material = M.bust);
+    loft!(numbered("bust_head"), &head, material = M.bust);
     let hair = boulder!(
-        name("bust_hair"),
+        numbered("bust_hair"),
         0.034 * s,
         at = (bx, by + 0.006 * s, bz + 0.172 * s),
         material = M.bust,
@@ -549,7 +536,7 @@ fn globe(f: &GameFrame, x: f64, y: f64, z: f64) {
     ] {
         fsphere!(
             f,
-            name("land"),
+            numbered("land"),
             r,
             (
                 c.0 + 0.088 * cosd(a) * cosd(b),
@@ -601,7 +588,7 @@ pub fn library_wall() -> Vec<Obj> {
             bevel = 0.004,
             bevel_segments = 1
         );
-        moulding(
+        kit::moulding!(
             f,
             "cornice",
             &[
@@ -623,9 +610,8 @@ pub fn library_wall() -> Vec<Obj> {
                 (0.03, 0.08),
             ],
             M.body,
-            2.26,
-            false,
-            artkit::shapes::SHARP,
+            at = 2.26,
+            plane = Facing::Top
         );
         fbox!(
             f,
@@ -636,7 +622,7 @@ pub fn library_wall() -> Vec<Obj> {
             (0, 0.05, WALL + 0.185),
             M.body
         );
-        moulding(
+        kit::moulding!(
             f,
             "plinth_mould",
             &[
@@ -654,15 +640,14 @@ pub fn library_wall() -> Vec<Obj> {
                 (0.01, 0.11),
             ],
             M.body,
-            0.0,
-            false,
-            artkit::shapes::SHARP,
+            at = 0.0,
+            plane = Facing::Top
         );
         fbox!(f, "back", 1.8, 2.16, 0.012, (0, 1.18, WALL + 0.006), M.back);
         for x in [-0.91, -0.3, 0.3, 0.91] {
             fbox!(
                 f,
-                name("upright"),
+                numbered("upright"),
                 0.04,
                 2.14,
                 0.38,
@@ -673,7 +658,7 @@ pub fn library_wall() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                name("upright_bead"),
+                numbered("upright_bead"),
                 0.024,
                 2.1,
                 0.008,
@@ -687,7 +672,7 @@ pub fn library_wall() -> Vec<Obj> {
         for y in ys {
             fbox!(
                 f,
-                name("shelf"),
+                numbered("shelf"),
                 1.8,
                 0.03,
                 0.37,
@@ -698,7 +683,7 @@ pub fn library_wall() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                name("shelf_edge"),
+                numbered("shelf_edge"),
                 1.8,
                 0.04,
                 0.012,
@@ -776,7 +761,7 @@ pub fn library_wall() -> Vec<Obj> {
         );
         bust(f, -0.8, 1.01, -0.28, 1.1);
         // the brass rail the ladder hangs on, turned finials at its ends, on brackets from round wall plates
-        tube(
+        kit::tube!(
             f,
             "rail",
             &[
@@ -785,12 +770,12 @@ pub fn library_wall() -> Vec<Obj> {
             ],
             0.0125,
             M.brass,
-            Some(10),
-            1,
+            verts = 10,
+            round = 1
         );
         for s in [-1.0, 1.0] {
             revolve!(
-                name("rail_finial"),
+                numbered("rail_finial"),
                 &[
                     (0.0, 0.0),
                     (0.016, 0.0),
@@ -806,21 +791,21 @@ pub fn library_wall() -> Vec<Obj> {
             );
         }
         for x in [-0.6, 0.0, 0.6] {
-            tube(
+            kit::tube!(
                 f,
-                &name("bracket"),
+                numbered("bracket"),
                 &[
                     (x, LADDER_TOP.0, WALL + 0.38),
                     (x, LADDER_TOP.0, LADDER_TOP.1),
                 ],
                 0.008,
                 M.brass,
-                Some(6),
-                1,
+                verts = 6,
+                round = 1
             );
             fcyl!(
                 f,
-                name("bracket_rose"),
+                numbered("bracket_rose"),
                 0.022,
                 0.01,
                 (x, LADDER_TOP.0, WALL + 0.385),
@@ -841,27 +826,34 @@ pub fn library_wall() -> Vec<Obj> {
             );
             fsweep!(
                 f,
-                name("stile"),
+                numbered("stile"),
                 &[(x, foot.0, foot.1), (x, top.0, top.1)],
                 0,
                 M.honey,
                 profile = rounded_rect(0.05, 0.032, 0.008, 1),
                 up = (1, 0, 0)
             );
-            let hook = fillet(
+            let hook = kit::fillet!(
                 &[
                     (x, 1.93, 0.0),
                     (x, 2.0, -0.002),
                     (x, 2.004, -0.032),
                     (x, 1.975, -0.036),
                 ],
-                0.012,
-                3,
+                0.012
             );
-            tube(f, &name("hook"), &hook, 0.007, M.body, Some(6), 1);
+            kit::tube!(
+                f,
+                numbered("hook"),
+                &hook,
+                0.007,
+                M.body,
+                verts = 6,
+                round = 1
+            );
             fbox!(
                 f,
-                name("fork"),
+                numbered("fork"),
                 0.04,
                 0.05,
                 0.03,
@@ -872,7 +864,7 @@ pub fn library_wall() -> Vec<Obj> {
             );
             fcyl!(
                 f,
-                name("wheel"),
+                numbered("wheel"),
                 0.03,
                 0.02,
                 (x, 0.03, LADDER_FOOT.1),
@@ -887,7 +879,7 @@ pub fn library_wall() -> Vec<Obj> {
             let (y, z) = ladder_at(k as f64 / 8.0);
             fbox!(
                 f,
-                name("tread"),
+                numbered("tread"),
                 0.38,
                 0.025,
                 0.08,
@@ -897,20 +889,20 @@ pub fn library_wall() -> Vec<Obj> {
                 bevel_segments = 1
             );
             if k == 2 || k == 6 {
-                tube(
+                kit::tube!(
                     f,
-                    &name("tie"),
+                    numbered("tie"),
                     &[(0.15, y - 0.03, z + 0.005), (0.55, y - 0.03, z + 0.005)],
                     0.005,
                     M.body,
-                    Some(5),
-                    1,
+                    verts = 5,
+                    round = 1
                 );
             }
         }
     });
     let ladder = join(&ladder, "ladder", None);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(ladder, "ladder", (0.4, 0, 0), seconds = 1.2); // 40 cm along the rail, towards the middle
     objs
 }

@@ -1,15 +1,12 @@
-//! What the couch potato pack is built from: its palette, meshes from points, pleated curtains, speaker drivers,
-//! screens, snacks, and the kit's parts it uses.
+//! What the couch potato pack is built from: its palette, pleated curtains, speaker drivers, screens and snacks.
 
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, V3, atan2, cosd, sind};
-use artkit::mesh::Mesh;
-use artkit::parts::turn;
-use artkit::place::{Facing, GameFrame, Spot};
+use artkit::math::{PI, V3, atan2, cosd, sind};
+use artkit::parts::{numbered, turn};
+use artkit::place::{Facing, GameFrame};
 use artkit::py::fmod;
-use artkit::scene::{self, Obj};
-use artkit::{fbox, fextrude, fsphere, palette, revolve};
-use std::cell::Cell;
+use artkit::scene::Obj;
+use artkit::{fbox, fextrude, fsphere, kit, object_of, palette, revolve};
 
 use artkit::forms::rounded_rect;
 use artkit::math::Axis;
@@ -83,60 +80,7 @@ palette! { M:
     rug = ("#E9B54A", satin),
 }
 
-thread_local! {
-    static N: Cell<u32> = const { Cell::new(0) };
-}
-
-/// `stem` numbered: each part its own name.
-pub fn name(stem: &str) -> String {
-    N.with(|n| {
-        n.set(n.get() + 1);
-        format!("{stem}{}", n.get())
-    })
-}
-
 // --- meshes from points (as pack_cheerful) --------------------------------------------------------------------
-
-/// A mesh object from Blender-space `verts` and `faces`, normals made outward, smooth below `sharp` degrees.
-pub fn obj(name: &str, verts: &[P3], faces: &[Vec<u32>], mats: &[Mat], sharp: f64) -> Obj {
-    let mut mesh = Mesh::from_pydata(verts.iter().map(|&p| V3::from(p)).collect(), faces);
-    for &m in mats {
-        mesh.slot(m);
-    }
-    mesh.recalc_normals();
-    let o = scene::add(name, mesh);
-    o.edit(|p| p.mesh.shade_smooth(sharp));
-    o
-}
-
-/// A polygon's middle, as Blender gives it: the mean of its corners.
-fn centre(mesh: &Mesh, f: usize) -> V3 {
-    let c = mesh.corners(f);
-    let mut s = V3::ZERO;
-    for &v in c {
-        s += mesh.verts[v as usize];
-    }
-    let n = c.len() as f32;
-    V3 {
-        x: s.x / n,
-        y: s.y / n,
-        z: s.z / n,
-    }
-}
-
-/// Gives the faces of `obj` whose middle (its own axes, Blender) passes `test` another material: a band, a stripe,
-/// a surround, with no more triangles.
-pub fn paint(obj: Obj, material: Mat, test: impl Fn(V3) -> bool) -> Obj {
-    obj.edit(|p| {
-        let k = p.mesh.slot(material);
-        for f in 0..p.mesh.faces.len() {
-            if test(centre(&p.mesh, f)) {
-                p.mesh.faces[f].mat = k;
-            }
-        }
-    });
-    obj
-}
 
 /// A pleated curtain across `x0`..`x1` hanging in the plane at depth `z` from its heading at `y1` to its hem at
 /// `y0`: its folds shallow under the heading tape, deepening as it falls; a turned-up hem thickens its foot.
@@ -194,7 +138,7 @@ pub fn pleats(
             (0..n).map(|k| vec![base + k, base + k + 1, base + m - 2 - k, base + m - 1 - k]),
         );
     }
-    obj(name, &verts, &faces, &[mat], 70.0)
+    object_of!(name, &verts, &faces, &[mat], sharp = 70)
 }
 
 /// Turns a model built in place half a turn about the footprint's middle (each part about its own origin,
@@ -253,7 +197,7 @@ pub fn screen(f: &GameFrame, x0: f64, x1: f64, y0: f64, y1: f64, z: f64, stripe:
     let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
     fextrude!(
         f,
-        name("screen_back"),
+        numbered("screen_back"),
         &rounded_rect(w, h, 0.012, 1),
         0.05,
         (cx, cy, z),
@@ -263,7 +207,7 @@ pub fn screen(f: &GameFrame, x0: f64, x1: f64, y0: f64, y1: f64, z: f64, stripe:
     );
     fextrude!(
         f,
-        name("bezel"),
+        numbered("bezel"),
         &rounded_rect(w - 0.03, h - 0.03, 0.01, 1),
         0.008,
         (cx, cy, z - 0.028),
@@ -273,7 +217,7 @@ pub fn screen(f: &GameFrame, x0: f64, x1: f64, y0: f64, y1: f64, z: f64, stripe:
     );
     fbox!(
         f,
-        name("picture"),
+        numbered("picture"),
         w * 0.82,
         h * 0.7,
         0.002,
@@ -282,7 +226,7 @@ pub fn screen(f: &GameFrame, x0: f64, x1: f64, y0: f64, y1: f64, z: f64, stripe:
     );
     fbox!(
         f,
-        name("picture_b"),
+        numbered("picture_b"),
         w * 0.3,
         h * 0.12,
         0.002,
@@ -291,7 +235,7 @@ pub fn screen(f: &GameFrame, x0: f64, x1: f64, y0: f64, y1: f64, z: f64, stripe:
     );
     fbox!(
         f,
-        name("stripe"),
+        numbered("stripe"),
         w * 0.5,
         0.02,
         0.006,
@@ -302,7 +246,7 @@ pub fn screen(f: &GameFrame, x0: f64, x1: f64, y0: f64, y1: f64, z: f64, stripe:
     for i in 1..n {
         fbox!(
             f,
-            name("slat"),
+            numbered("slat"),
             0.016,
             h - 0.05,
             0.006,
@@ -313,7 +257,7 @@ pub fn screen(f: &GameFrame, x0: f64, x1: f64, y0: f64, y1: f64, z: f64, stripe:
     for x in [x0 + 0.02, x1 - 0.02] {
         fbox!(
             f,
-            name("post"),
+            numbered("post"),
             0.04,
             y1 + 0.02,
             0.04,
@@ -324,7 +268,7 @@ pub fn screen(f: &GameFrame, x0: f64, x1: f64, y0: f64, y1: f64, z: f64, stripe:
         );
         fextrude!(
             f,
-            name("post_foot"),
+            numbered("post_foot"),
             &rounded_rect(0.08, 0.12, 0.02, 2),
             0.02,
             (x, 0.01, z - 0.04),
@@ -340,7 +284,7 @@ pub fn screen(f: &GameFrame, x0: f64, x1: f64, y0: f64, y1: f64, z: f64, stripe:
 #[allow(clippy::too_many_arguments)]
 pub fn popcorn(f: &GameFrame, x: f64, y: f64, z: f64, r: f64, h: f64, stripe: Mat, n: i32) {
     let b = revolve!(
-        name("bucket"),
+        numbered("bucket"),
         &[
             (0.0, 0.0),
             (r * 0.75, 0.0),
@@ -353,7 +297,7 @@ pub fn popcorn(f: &GameFrame, x: f64, y: f64, z: f64, r: f64, h: f64, stripe: Ma
         material = M.straw,
         segments = 16
     );
-    paint(b, stripe, |c| {
+    kit::paint(b, stripe, |c| {
         fmod(atan2(c.y as f64, c.x as f64), PI / 4.0) < PI / 8.0
     });
     for k in 0..n {
@@ -361,7 +305,7 @@ pub fn popcorn(f: &GameFrame, x: f64, y: f64, z: f64, r: f64, h: f64, stripe: Ma
         let rr = if k % 2 != 0 { r * 0.55 } else { r * 0.3 };
         fsphere!(
             f,
-            name("popcorn"),
+            numbered("popcorn"),
             r * 0.32,
             (
                 x + rr * cosd(a),
@@ -375,7 +319,7 @@ pub fn popcorn(f: &GameFrame, x: f64, y: f64, z: f64, r: f64, h: f64, stripe: Ma
     }
     fsphere!(
         f,
-        name("popcorn"),
+        numbered("popcorn"),
         r * 0.36,
         (x, y + h + 0.02, z),
         M.popcorn,
@@ -387,14 +331,14 @@ pub fn popcorn(f: &GameFrame, x: f64, y: f64, z: f64, r: f64, h: f64, stripe: Ma
 /// A soda cup standing on `y`: a tapered body, its domed lid and a straw through it.
 pub fn cup(f: &GameFrame, x: f64, y: f64, z: f64, r: f64, h: f64, material: Mat) {
     revolve!(
-        name("soda"),
+        numbered("soda"),
         &[(0.0, 0.0), (r * 0.78, 0.0), (r, h), (0.0, h)],
         at = f.at(x, y, z),
         material = material,
         segments = 12
     );
     revolve!(
-        name("soda_lid"),
+        numbered("soda_lid"),
         &[
             (0.0, 0.0),
             (r * 1.06, 0.0),
@@ -406,76 +350,13 @@ pub fn cup(f: &GameFrame, x: f64, y: f64, z: f64, r: f64, h: f64, material: Mat)
         material = M.straw,
         segments = 12
     );
-    tube(
+    kit::tube!(
         f,
-        &name("straw"),
+        numbered("straw"),
         &[(x + 0.006, y + h, z), (x + 0.012, y + h + 0.1, z - 0.006)],
         0.0045,
         M.straw,
-        Some(6),
-        1,
+        verts = 6,
+        round = 1
     );
-}
-
-// --- the kit's parts ------------------------------------------------------------------------------------------
-
-/// The kit's tube (`artkit::kit::tube`), as the script called it.
-pub fn tube<P: Spot>(
-    f: &GameFrame,
-    name: &str,
-    points: &[P],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-) -> Obj {
-    artkit::kit::tube(
-        f,
-        name,
-        points,
-        r,
-        material,
-        artkit::kit::Tube {
-            verts,
-            round,
-            ..artkit::kit::Tube::default()
-        },
-    )
-}
-
-/// The kit's fillet (`artkit::kit::fillet`): the path through `points` with each inner corner rounded.
-pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    artkit::kit::fillet(points, radius, steps)
-}
-
-/// The kit's bar pull (`artkit::kit::pull`), as the script called it.
-#[allow(clippy::too_many_arguments)]
-pub fn pull(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    face: f64,
-    length: f64,
-    material: Mat,
-    r: f64,
-    out: f64,
-    upright: bool,
-    verts: usize,
-) -> Obj {
-    artkit::kit::pull(
-        f,
-        name,
-        x,
-        y,
-        face,
-        length,
-        material,
-        artkit::kit::Pull {
-            r,
-            out,
-            upright,
-            verts,
-        },
-    )
 }

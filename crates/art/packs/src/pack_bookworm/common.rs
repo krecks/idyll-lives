@@ -1,13 +1,12 @@
-//! What the bookworm pack is built from: its palette, books, china and lamps shared by the six, and the kit's parts
-//! it uses.
+//! What the bookworm pack is built from: its palette, books, china and lamps shared by the six.
 
 use artkit::materials::Mat;
 use artkit::math::{cos, degrees, sin};
-use artkit::place::{GameFrame, Spot};
+use artkit::parts::numbered;
+use artkit::place::GameFrame;
 use artkit::rand::Random;
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fsweep, palette, revolve, torus};
-use std::cell::Cell;
+use artkit::{fbox, fcyl, fsweep, kit, palette, revolve, torus};
 
 palette! { M:
     body = ("#9A6A45", wood), // the library walnut: cases, shelves, the bureau; the main part
@@ -67,18 +66,6 @@ pub const BOOKS: [Mat; 7] = [
 /// The wall's face in a 1-deep footprint, game depth.
 pub const WALL: f64 = -0.43;
 
-thread_local! {
-    static N: Cell<u32> = const { Cell::new(0) };
-}
-
-/// `stem` numbered: each part its own name.
-pub fn name(stem: &str) -> String {
-    N.with(|n| {
-        n.set(n.get() + 1);
-        format!("{stem}{}", n.get())
-    })
-}
-
 // --- books, china and lamps, shared by the six -------------------------------------------------------------------
 
 /// Gives a book's box its page edges in cream on the same mesh (no more triangles): the top of a standing book,
@@ -136,7 +123,7 @@ pub fn books(
         let t = rnd.uniform(0.022, 0.05);
         let h = h_max * rnd.uniform(0.66, 1.0);
         let d = depth * rnd.uniform(0.78, 1.0);
-        let n = name("book");
+        let n = numbered("book");
         let cover = rnd.choice(&BOOKS);
         book(
             f,
@@ -177,7 +164,7 @@ pub fn books(
             px + t / 2.0 * cos(a) - h / 2.0 * sin(a),
             y + t / 2.0 * sin(a) + h / 2.0 * cos(a),
         );
-        let n = name("book");
+        let n = numbered("book");
         let cover = rnd.choice(&BOOKS);
         book(
             f,
@@ -208,7 +195,7 @@ pub fn pile(
     let mut y = y;
     for _ in 0..n {
         let h = rnd.uniform(0.025, 0.045);
-        let nm = name("pile");
+        let nm = numbered("pile");
         let bw = w * rnd.uniform(0.85, 1.05);
         let bd = d * rnd.uniform(0.9, 1.05);
         let bx = x + rnd.uniform(-0.01, 0.01);
@@ -233,7 +220,7 @@ pub fn pile(
 /// A mug standing on `y`: a turned body with its lip and a hollow, tea in it, a handle in one bent piece.
 pub fn mug(f: &GameFrame, x: f64, y: f64, z: f64, material: Mat, fill: Option<Mat>) {
     revolve!(
-        name("mug"),
+        numbered("mug"),
         &[
             (0.0, 0.0),
             (0.036, 0.0),
@@ -250,7 +237,7 @@ pub fn mug(f: &GameFrame, x: f64, y: f64, z: f64, material: Mat, fill: Option<Ma
     );
     fcyl!(
         f,
-        name("mug_tea"),
+        numbered("mug_tea"),
         0.033,
         0.002,
         (x, y + 0.072, z),
@@ -259,16 +246,15 @@ pub fn mug(f: &GameFrame, x: f64, y: f64, z: f64, material: Mat, fill: Option<Ma
     );
     fsweep!(
         f,
-        name("mug_handle"),
-        &fillet(
+        numbered("mug_handle"),
+        &kit::fillet!(
             &[
                 (x + 0.036, y + 0.074, z),
                 (x + 0.066, y + 0.07, z),
                 (x + 0.064, y + 0.028, z),
                 (x + 0.038, y + 0.022, z)
             ],
-            0.012,
-            3
+            0.012
         ),
         0.0065,
         material,
@@ -281,7 +267,7 @@ pub fn mug(f: &GameFrame, x: f64, y: f64, z: f64, material: Mat, fill: Option<Ma
 pub fn lamp(f: &GameFrame, x: f64, y: f64, z: f64, h: f64, shade_: Option<Mat>) {
     let shade_ = shade_.unwrap_or(M.shade);
     revolve!(
-        name("lamp_foot"),
+        numbered("lamp_foot"),
         &[
             (0.0, 0.0),
             (0.07, 0.0),
@@ -297,17 +283,17 @@ pub fn lamp(f: &GameFrame, x: f64, y: f64, z: f64, h: f64, shade_: Option<Mat>) 
         material = M.brass,
         segments = 14
     );
-    tube(
+    kit::tube!(
         f,
-        &name("lamp_stem"),
+        numbered("lamp_stem"),
         &[(x, y + 0.04, z), (x, y + h * 0.62, z)],
         0.008,
         M.brass,
-        Some(8),
-        1,
+        verts = 8,
+        round = 1
     );
     revolve!(
-        name("lamp_collar"),
+        numbered("lamp_collar"),
         &[
             (0.0, 0.0),
             (0.014, 0.0),
@@ -320,7 +306,7 @@ pub fn lamp(f: &GameFrame, x: f64, y: f64, z: f64, h: f64, shade_: Option<Mat>) 
         segments = 10
     );
     revolve!(
-        name("lamp_socket"),
+        numbered("lamp_socket"),
         &[
             (0.0, 0.0),
             (0.018, 0.0),
@@ -334,7 +320,7 @@ pub fn lamp(f: &GameFrame, x: f64, y: f64, z: f64, h: f64, shade_: Option<Mat>) 
     );
     let (rb, rt, sy, sh) = (0.3 * h, 0.2 * h, y + h * 0.56, h * 0.42);
     revolve!(
-        name("lamp_shade"),
+        numbered("lamp_shade"),
         &[
             (rb, 0.0),
             (rt, sh),
@@ -348,7 +334,7 @@ pub fn lamp(f: &GameFrame, x: f64, y: f64, z: f64, h: f64, shade_: Option<Mat>) 
     );
     for (r, yy) in [(rb - 0.002, sy + 0.003), (rt - 0.002, sy + sh - 0.003)] {
         torus!(
-            name("lamp_rim"),
+            numbered("lamp_rim"),
             r,
             0.0035,
             at = f.at(x, yy, z),
@@ -358,7 +344,7 @@ pub fn lamp(f: &GameFrame, x: f64, y: f64, z: f64, h: f64, shade_: Option<Mat>) 
         );
     }
     revolve!(
-        name("lamp_finial"),
+        numbered("lamp_finial"),
         &[
             (0.0, 0.0),
             (0.006, 0.0),
@@ -400,153 +386,5 @@ pub fn knob(
         material = material.unwrap_or(M.brass),
         segments = segments,
         rot = (90, 0, 0)
-    )
-}
-
-/// The kit's tube (`artkit::kit::tube`), as the script called it.
-pub fn tube<P: Spot>(
-    f: &GameFrame,
-    name: &str,
-    points: &[P],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-) -> Obj {
-    artkit::kit::tube(
-        f,
-        name,
-        points,
-        r,
-        material,
-        artkit::kit::Tube {
-            verts,
-            round,
-            ..artkit::kit::Tube::default()
-        },
-    )
-}
-
-/// The kit's fillet (`artkit::kit::fillet`): the path through `points` with each inner corner rounded.
-pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    artkit::kit::fillet(points, radius, steps)
-}
-
-/// The kit's bar pull (`artkit::kit::pull`), as the script called it.
-#[allow(clippy::too_many_arguments)]
-pub fn pull(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    face: f64,
-    length: f64,
-    material: Mat,
-    r: f64,
-    out: f64,
-    upright: bool,
-    verts: usize,
-) -> Obj {
-    artkit::kit::pull(
-        f,
-        name,
-        x,
-        y,
-        face,
-        length,
-        material,
-        artkit::kit::Pull {
-            r,
-            out,
-            upright,
-            verts,
-        },
-    )
-}
-
-/// The kit's frame-and-panel front (`artkit::kit::shaker`), as the script called it: (frame, panel).
-#[allow(clippy::too_many_arguments)]
-pub fn shaker(
-    f: &GameFrame,
-    name: &str,
-    w: f64,
-    h: f64,
-    at: (f64, f64, f64),
-    t: f64,
-    material: Mat,
-    rail: f64,
-    panel: Option<Mat>,
-    recess: f64,
-    raised: bool,
-) -> (Obj, Obj) {
-    artkit::kit::shaker(
-        f,
-        name,
-        w,
-        h,
-        at,
-        t,
-        material,
-        artkit::kit::Shaker {
-            rail,
-            panel,
-            recess,
-            raised,
-        },
-    )
-}
-
-/// The kit's moulding (`artkit::kit::moulding`), as the script called it: on the front at depth `at`, or on top
-/// at height `at` (`front` false).
-#[allow(clippy::too_many_arguments)]
-pub fn moulding(
-    f: &GameFrame,
-    name: &str,
-    outline: &[(f64, f64)],
-    profile: &[(f64, f64)],
-    material: Mat,
-    at: f64,
-    front: bool,
-    angle: f64,
-) -> Obj {
-    let plane = if front {
-        artkit::place::Facing::Front
-    } else {
-        artkit::place::Facing::Top
-    };
-    artkit::kit::moulding(
-        f,
-        name,
-        outline,
-        profile,
-        material,
-        artkit::kit::Moulding { at, plane, angle },
-    )
-}
-
-/// The kit's cabriole leg (`artkit::kit::cabriole`), as the script called it.
-#[allow(clippy::too_many_arguments)]
-pub fn cabriole(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    z: f64,
-    h: f64,
-    material: Mat,
-    sx: f64,
-    sz: f64,
-    r: f64,
-    verts: usize,
-) -> Obj {
-    artkit::kit::cabriole(
-        f,
-        name,
-        x,
-        z,
-        h,
-        material,
-        sx,
-        sz,
-        artkit::kit::Cabriole { r, verts },
     )
 }

@@ -3,11 +3,13 @@
 use super::common::M;
 use artkit::kit;
 use artkit::math::{P3, cos, radians, sin};
-use artkit::parts::{Settle, join, new_parts, settle_with};
+use artkit::parts::{join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
-use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, grow, leaf, loft, revolve, ring, soft, squash};
+use artkit::scene::Obj;
+use artkit::{
+    fbox, fcyl, fextrude, fsphere, grow, leaf, loft, revolve, ring, settle, soft, squash,
+};
 
 const RIM: f64 = 0.72; // the rim's top
 const FLOOR: f64 = 0.2; // the footwell's floor top
@@ -373,13 +375,7 @@ pub fn whirlpool_tub() -> Vec<Obj> {
     });
     let foam = join(&foam, "bubbles", Some(f.at(0, FLOOR - 0.01, 0)));
     foam.set_scale_axis(2, 0.001);
-    let objs = settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    let objs = settle!(centre = false);
     grow!(water, "fill", seconds = 0.8);
     squash!(foam, "bubbles", (1, 1, 1000), seconds = 1.6, back = true);
     objs

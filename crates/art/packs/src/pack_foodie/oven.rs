@@ -1,16 +1,15 @@
 //! The wood-fired pizza oven (2x1): a brick stand and plastered dome, a prep counter at its right.
 
-use super::common::{_basil, _leaf, _lofted, _name, _pot, M, WALL};
-use super::garden::settle_in_place;
+use super::common::{_basil, _leaf, _lofted, _pot, M, WALL};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, cosd, sind, sqrt};
 use artkit::motion::{Path, keys};
-use artkit::parts::{join, new_parts};
+use artkit::parts::{join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, grow, jitter, loft, revolve, ring};
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, grow, jitter, loft, revolve, ring, settle};
 
 const OX: f64 = -0.38; // the oven's middle (game x)
 const HEARTH: f64 = 0.92; // the oven floor and the mouth's sill
@@ -30,7 +29,7 @@ fn _bricks(f: &GameFrame, x0: f64, x1: f64, y0: f64, y1: f64, z: f64, rows: usiz
                 let m = [M.brick, M.brick_light, M.brick][(r + k) % 3];
                 fbox!(
                     f,
-                    _name("brick"),
+                    numbered("brick"),
                     b - a - 0.008,
                     h - 0.01,
                     0.01,
@@ -124,7 +123,7 @@ pub fn pizza_oven() -> Vec<Obj> {
             let x = OX + s as f64 * 0.45;
             fbox!(
                 f,
-                _name("pillar"),
+                numbered("pillar"),
                 0.16,
                 0.7,
                 front - WALL,
@@ -169,7 +168,7 @@ pub fn pizza_oven() -> Vec<Obj> {
                 );
                 _log(
                     f,
-                    &_name("log"),
+                    &numbered("log"),
                     (x, y, -0.26),
                     (x + 0.01 * ((i + j) % 3 - 1) as f64, y, 0.34),
                     0.05,
@@ -244,7 +243,7 @@ pub fn pizza_oven() -> Vec<Obj> {
             let a = 10 + 20 * k as i32;
             fbox!(
                 f,
-                _name("voussoir"),
+                numbered("voussoir"),
                 0.075,
                 0.09,
                 0.012,
@@ -265,7 +264,7 @@ pub fn pizza_oven() -> Vec<Obj> {
         {
             let ember = fsphere!(
                 f,
-                _name("ember"),
+                numbered("ember"),
                 r,
                 (OX + dx, HEARTH + 0.004, MOUTH_Z - 0.01),
                 M.ember,
@@ -434,7 +433,7 @@ pub fn pizza_oven() -> Vec<Obj> {
             let top = HEARTH + 0.01 + sqrt(r * r - dx * dx);
             kit::tube!(
                 f,
-                _name("door_bar"),
+                numbered("door_bar"),
                 &[(OX + dx, HEARTH + 0.012, dz), (OX + dx, top, dz)],
                 0.006,
                 M.iron,
@@ -528,7 +527,7 @@ pub fn pizza_oven() -> Vec<Obj> {
             let (a, d) = ((k * 51) as f64, 0.04 + 0.04 * (k % 2) as f64);
             let mozz = fcyl!(
                 f,
-                _name("mozzarella"),
+                numbered("mozzarella"),
                 0.018,
                 0.006,
                 (px + d * cosd(a), 0.915, pz + d * sind(a)),
@@ -541,7 +540,7 @@ pub fn pizza_oven() -> Vec<Obj> {
             let a = (k * 90 + 30) as f64;
             _leaf(
                 f,
-                &_name("pizza_basil"),
+                &numbered("pizza_basil"),
                 px + 0.05 * cosd(a),
                 0.918,
                 pz + 0.05 * sind(a),
@@ -570,7 +569,7 @@ pub fn pizza_oven() -> Vec<Obj> {
             let z = MOUTH_Z + 0.004 + 0.002 * if k > 3 { 1.0 } else { 0.0 };
             _flame(
                 f,
-                &_name("flame"),
+                &numbered("flame"),
                 OX + dx,
                 HEARTH,
                 z,
@@ -584,7 +583,7 @@ pub fn pizza_oven() -> Vec<Obj> {
     });
     let fire = join(&fire, "flames", Some(f.at(OX, HEARTH, MOUTH_Z)));
     fire.set_scale_axis(2, 0.001);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     // door_off: the door lifts off the mouth and is set down on the ground before the stand's left pillar; the peel
     // follows, round in front of the oven and in through the mouth (Blender axes: x = -game x, y = -game depth, z =
     // height).

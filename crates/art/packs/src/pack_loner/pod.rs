@@ -1,23 +1,13 @@
 //! The hush-shell reading pod and the shortwave radio desk.
 
-use super::common::{_book, _chair, _desk, _lathe, _mug, _name, _turned, M, WALL};
+use super::common::{_book, _chair, _desk, _mug, M, WALL};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, P3, PI, cos, cosd, pow, sin, sind};
-use artkit::parts::{Settle, hinged, join, new_parts, settle, settle_with};
+use artkit::parts::{hinged, join, new_parts, numbered, settle};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, slide, soft, swing, torus};
-
-pub fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, settle, slide, soft, swing, torus};
 
 // --- the hush-shell reading pod (1x1): an upholstered shell chair on a swivel foot, a pram hood over it -------
 const HOOD: (f64, f64) = (1.1, -0.02); // the hood's pivot (height, depth): it turns about a line across the pod's wings
@@ -26,9 +16,8 @@ const HOOD: (f64, f64) = (1.1, -0.02); // the hood's pivot (height, depth): it t
 #[allow(clippy::approx_constant)]
 pub fn quiet_pod() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let none = (0.0, 0.0, 0.0);
     let still = new_parts(|| {
-        _turned(
+        kit::turned!(
             f,
             "foot",
             0,
@@ -43,10 +32,9 @@ pub fn quiet_pod() -> Vec<Obj> {
                 (0.0, 0.04),
             ],
             M.oak,
-            28,
-            none,
+            segments = 28
         );
-        _turned(
+        kit::turned!(
             f,
             "stem",
             0,
@@ -61,8 +49,7 @@ pub fn quiet_pod() -> Vec<Obj> {
                 (0.0, 0.16),
             ],
             M.chrome,
-            18,
-            none,
+            segments = 18
         );
         // the upholstered shell: a bucket under the seat, a tall back up into the hood, wings with rolled front edges,
         // all piped where the panels meet
@@ -93,7 +80,7 @@ pub fn quiet_pod() -> Vec<Obj> {
             let sf = s as f64;
             soft!(
                 f,
-                _name("wing"),
+                numbered("wing"),
                 0.11,
                 0.86,
                 0.6,
@@ -105,7 +92,7 @@ pub fn quiet_pod() -> Vec<Obj> {
             );
             fsweep!(
                 f,
-                _name("wing_edge"),
+                numbered("wing_edge"),
                 &[
                     (sf * 0.355, 0.35, 0.17),
                     (sf * 0.355, 0.78, 0.175),
@@ -118,7 +105,7 @@ pub fn quiet_pod() -> Vec<Obj> {
             );
             fsweep!(
                 f,
-                _name("wing_piping"),
+                numbered("wing_piping"),
                 &[(sf * 0.3, 0.36, 0.17), (sf * 0.3, 1.2, 0.17)],
                 0.008,
                 M.shell,
@@ -126,7 +113,7 @@ pub fn quiet_pod() -> Vec<Obj> {
             );
             soft!(
                 f,
-                _name("wing_lining"),
+                numbered("wing_lining"),
                 0.02,
                 0.6,
                 0.48,
@@ -138,7 +125,7 @@ pub fn quiet_pod() -> Vec<Obj> {
             );
             fcyl!(
                 f,
-                _name("hood_boss"),
+                numbered("hood_boss"),
                 0.05,
                 0.03,
                 (sf * 0.4, HOOD.0, HOOD.1),
@@ -190,7 +177,7 @@ pub fn quiet_pod() -> Vec<Obj> {
                 0.05 + 0.025 * (1.0 - pow(u / 0.29, 2.0)) * (1.0 - pow(v / 0.28, 2.0)) - 0.008;
             fsphere!(
                 f,
-                _name("button"),
+                numbered("button"),
                 0.011,
                 (u, 0.76 + v * cosd(6.0), -0.29 - v * sind(6.0) + out),
                 M.headrest,
@@ -211,7 +198,7 @@ pub fn quiet_pod() -> Vec<Obj> {
         for x in [-0.2, 0.2] {
             fsphere!(
                 f,
-                _name("head_cushion_end"),
+                numbered("head_cushion_end"),
                 0.05,
                 (x, 1.08, -0.31),
                 M.headrest,
@@ -268,7 +255,7 @@ pub fn quiet_pod() -> Vec<Obj> {
             M.chrome,
             verts = 10
         );
-        _turned(
+        kit::turned!(
             f,
             "lamp",
             0.27,
@@ -282,8 +269,7 @@ pub fn quiet_pod() -> Vec<Obj> {
                 (0.0, 0.062),
             ],
             M.lamp,
-            14,
-            none,
+            segments = 14
         );
     });
     join(&still, "body", Some(P3::from((0, 0, 0))));
@@ -297,7 +283,7 @@ pub fn quiet_pod() -> Vec<Obj> {
             let z = HOOD.1 + r * sind(a);
             soft!(
                 f,
-                _name("rib"),
+                numbered("rib"),
                 0.84,
                 0.075,
                 r * 3.1416 / 2.0 / n as f64 + 0.03,
@@ -334,7 +320,6 @@ const ANTENNA: (f64, f64) = (0.2, 0.42); // the telescopic antenna's (x, depth),
 
 pub fn shortwave_radio() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let none = (0.0, 0.0, 0.0);
     let still = new_parts(|| {
         _desk(f, 0.16, 0.45, 0.84, 0.74, M.oak, M.oak, 6);
         _chair(f, -0.02, M.oak, M.seatpad, 6);
@@ -385,7 +370,7 @@ pub fn shortwave_radio() -> Vec<Obj> {
         for k in 0..9 {
             fbox!(
                 f,
-                _name("scale_mark"),
+                numbered("scale_mark"),
                 0.002,
                 if k % 2 != 0 { 0.014 } else { 0.022 },
                 0.002,
@@ -424,9 +409,9 @@ pub fn shortwave_radio() -> Vec<Obj> {
             rot = (0, -25, 0)
         );
         for x in [-0.15, -0.09, -0.03, 0.03] {
-            _turned(
+            kit::turned!(
                 f,
-                &_name("knob"),
+                numbered("knob"),
                 x,
                 0.8,
                 0.243,
@@ -438,8 +423,8 @@ pub fn shortwave_radio() -> Vec<Obj> {
                     (0.0, 0.021),
                 ],
                 M.dark,
-                10,
-                (-90.0, 0.0, 0.0),
+                segments = 10,
+                rot = (-90.0, 0.0, 0.0)
             );
         }
         let holes: Vec<Vec<(f64, f64)>> = (0..3)
@@ -463,7 +448,7 @@ pub fn shortwave_radio() -> Vec<Obj> {
             // vents on its back, which faces the room
             fbox!(
                 f,
-                _name("vent"),
+                numbered("vent"),
                 0.3,
                 0.008,
                 0.004,
@@ -510,7 +495,7 @@ pub fn shortwave_radio() -> Vec<Obj> {
             round = 1
         );
         // the desk microphone, headphones with their cord, the logbook and pencil, a mug
-        _turned(
+        kit::turned!(
             f,
             "mic_base",
             -0.3,
@@ -524,8 +509,7 @@ pub fn shortwave_radio() -> Vec<Obj> {
                 (0.0, 0.02),
             ],
             M.dark,
-            14,
-            none,
+            segments = 14
         );
         kit::tube!(
             f,
@@ -536,7 +520,7 @@ pub fn shortwave_radio() -> Vec<Obj> {
             verts = 6,
             round = 2
         );
-        _lathe(
+        kit::lathe!(
             f,
             "mic_capsule",
             -0.275,
@@ -550,9 +534,7 @@ pub fn shortwave_radio() -> Vec<Obj> {
                 (0.008, 0.095),
             ],
             M.steel,
-            12,
-            2.0,
-            1.0,
+            verts = 12
         );
         torus!(
             "mic_band",
@@ -578,9 +560,9 @@ pub fn shortwave_radio() -> Vec<Obj> {
             resolution = 2
         );
         for zz in [0.17, 0.33] {
-            _turned(
+            kit::turned!(
                 f,
-                &_name("earcup"),
+                numbered("earcup"),
                 0.3,
                 0.765,
                 zz,
@@ -592,8 +574,8 @@ pub fn shortwave_radio() -> Vec<Obj> {
                     (0.0, 0.036),
                 ],
                 M.seatpad,
-                12,
-                (if zz > 0.25 { 90.0 } else { -90.0 }, 0.0, 0.0),
+                segments = 12,
+                rot = (if zz > 0.25 { 90.0 } else { -90.0 }, 0.0, 0.0)
             );
         }
         kit::tube!(
@@ -627,7 +609,7 @@ pub fn shortwave_radio() -> Vec<Obj> {
     join(&still, "body", Some(P3::from((0, 0, 0))));
     // The tuning knob: a big ridged knob with a skirt and a pointer, turned by `dial`.
     let dial = new_parts(|| {
-        _turned(
+        kit::turned!(
             f,
             "dial_knob",
             DIAL.0,
@@ -643,8 +625,8 @@ pub fn shortwave_radio() -> Vec<Obj> {
                 (0.0, 0.03),
             ],
             M.dark,
-            20,
-            (-90.0, 0.0, 0.0),
+            segments = 20,
+            rot = (-90.0, 0.0, 0.0)
         );
         fbox!(
             f,
@@ -679,7 +661,7 @@ pub fn shortwave_radio() -> Vec<Obj> {
         );
     });
     let ant = hinged(join(&ant, "antenna", None), f.at(ANTENNA.0, 1.0, ANTENNA.1));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(dial, "dial", 150.0, seconds = 1.0, axis = Axis::Y);
     slide!(ant, "antenna", (0.0, 0.0, 0.45), seconds = 1.0);
     objs

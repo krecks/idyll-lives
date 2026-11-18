@@ -1,17 +1,16 @@
 //! The jigsaw puzzle table and the bonsai potting bench.
 
-use super::common::{_chair, _desk, _lathe, _m, _mug, _name, _turned, BANDS, M, WALL};
-use super::pod::settle_in_place;
+use super::common::{_chair, _desk, _m, _mug, BANDS, M, WALL};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, acos, cos, cosd, degrees, radians, sin, sind};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
 use artkit::scene::Obj;
 use artkit::{
-    boulder, fbox, fcyl, fextrude, fsphere, fsweep, grow, jitter, rock, soft, squash, torus,
+    boulder, fbox, fcyl, fextrude, fsphere, fsweep, grow, jitter, rock, settle, soft, squash, torus,
 };
 
 // --- the jigsaw puzzle table (1x1): seated in the middle, a puzzle half done on the table before them ---------
@@ -67,7 +66,7 @@ fn _piece(
     let (x, z) = at.unwrap_or((PX0 + i as f64 * PW, PZ0 - j as f64 * PD));
     let o = fextrude!(
         f,
-        _name(name),
+        numbered(name),
         &_jigsaw(size.0, size.1, size.2),
         0.008,
         (x, y + 0.0004 * ((i + j) % 2) as f64, z),
@@ -266,7 +265,7 @@ pub fn puzzle_table() -> Vec<Obj> {
     let x0 = PX0 + 4.0 * PW - PW / 2.0;
     let patch = join(&patch, "pieces", Some(f.at(x0, PY, PZ0 - 2.0 * PD)));
     patch.set_scale_axis(0, 0.001);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     grow!(patch, "pieces", seconds = 0.9, axis = Axis::X);
     objs
 }
@@ -280,7 +279,7 @@ fn _pad(f: &GameFrame, x: f64, y: f64, z: f64, w: f64, d: f64, seed: i32) {
     let mut rnd = Random::new(seed as i128);
     let s = seed as f64;
     let o = boulder!(
-        _name("pad"),
+        numbered("pad"),
         0.5,
         at = f.at(x, y - 0.03, z),
         material = M.leaf,
@@ -294,7 +293,7 @@ fn _pad(f: &GameFrame, x: f64, y: f64, z: f64, w: f64, d: f64, seed: i32) {
         let px = x + rnd.uniform(-w, w) * 0.3;
         let pz = z + rnd.uniform(-d, d) * 0.25;
         let o = boulder!(
-            _name("pad"),
+            numbered("pad"),
             0.5,
             at = f.at(px, y - 0.01, pz),
             material = M.leaf,
@@ -314,7 +313,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
         for k in 0..5 {
             fbox!(
                 f,
-                _name("bench_slat"),
+                numbered("bench_slat"),
                 0.86,
                 0.04,
                 0.082,
@@ -327,7 +326,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
         for k in 0..4 {
             fbox!(
                 f,
-                _name("shelf_slat"),
+                numbered("shelf_slat"),
                 0.8,
                 0.03,
                 0.088,
@@ -361,7 +360,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
             for z in [WALL + 0.025, WALL + 0.415] {
                 fbox!(
                     f,
-                    _name("leg"),
+                    numbered("leg"),
                     0.045,
                     0.78,
                     0.045,
@@ -373,7 +372,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
             }
             fbox!(
                 f,
-                _name("side_rail"),
+                numbered("side_rail"),
                 0.03,
                 0.05,
                 0.36,
@@ -384,7 +383,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                _name("shelf_rail"),
+                numbered("shelf_rail"),
                 0.03,
                 0.04,
                 0.36,
@@ -407,7 +406,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
         );
         // the bonsai: a glazed tray pot on feet, soil and moss, roots gripping it, a twisting tapered trunk with its
         // branches, pads of leaves
-        _lathe(
+        kit::lathe!(
             f,
             "pot",
             0,
@@ -422,15 +421,15 @@ pub fn bonsai_bench() -> Vec<Obj> {
                 (0.175, 0.07),
             ],
             M.glaze,
-            24,
-            7.0,
-            0.68,
+            verts = 24,
+            square = 7.0,
+            sy = 0.68
         );
         for x in [-0.13, 0.13] {
             for z in [-0.25, -0.11] {
                 fbox!(
                     f,
-                    _name("pot_foot"),
+                    numbered("pot_foot"),
                     0.03,
                     0.012,
                     0.03,
@@ -455,7 +454,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
         for (dx, dz) in [(-0.07, 0.02), (0.05, -0.03), (-0.02, -0.05), (0.04, 0.04)] {
             fsweep!(
                 f,
-                _name("root"),
+                numbered("root"),
                 &[
                     (-0.02, 0.93, -0.18),
                     (-0.02 + dx * 0.6, 0.905, -0.18 + dz * 0.6),
@@ -530,7 +529,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
             })
             .collect();
         fsweep!(f, "wire", &coil, 0.004, M.copper, verts = 4);
-        _lathe(
+        kit::lathe!(
             f,
             "mister",
             -0.32,
@@ -546,9 +545,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
                 (0.0, 0.165),
             ],
             M.porcelain,
-            14,
-            2.0,
-            1.0,
+            verts = 14
         );
         fbox!(
             f,
@@ -596,7 +593,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
             ];
             fextrude!(
                 f,
-                _name("shear_blade"),
+                numbered("shear_blade"),
                 &blade,
                 0.004,
                 (0.27 + 0.02 * kf, 0.822 + 0.004 * kf, -0.34),
@@ -605,7 +602,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
                 rot = (0, 0, a)
             );
             torus!(
-                _name("shear_loop"),
+                numbered("shear_loop"),
                 0.016,
                 0.005,
                 at = f.at(0.25 + 0.04 * kf, 0.826, -0.27),
@@ -617,9 +614,9 @@ pub fn bonsai_bench() -> Vec<Obj> {
         // spare terracotta pots on the shelf, a sack of soil on the floor with its top rolled
         for (x, h) in [(-0.25, 0.14), (0.0, 0.12), (0.24, 0.16)] {
             let r = h * 0.55;
-            _turned(
+            kit::turned!(
                 f,
-                &_name("spare_pot"),
+                numbered("spare_pot"),
                 x,
                 0.275,
                 -0.2,
@@ -634,8 +631,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
                     (0.0, 0.012),
                 ],
                 M.terra,
-                16,
-                (0.0, 0.0, 0.0),
+                segments = 16
             );
         }
         soft!(
@@ -689,7 +685,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
             .enumerate()
         {
             let o = boulder!(
-                _name("twig_tuft"),
+                numbered("twig_tuft"),
                 0.5,
                 at = f.at(x, y - s * 0.4, z),
                 material = M.leaf,
@@ -702,7 +698,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
         }
     });
     let twig = hinged(join(&twig, "twig", None), f.at(TWIG.0, TWIG.1, TWIG.2));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     squash!(twig, "trim", 0.001, seconds = 0.7);
     rock!(twig, "mist", 10.0, seconds = 1.2, axis = Axis::Y); // nodding under the mister while it is misted and fed
     objs

@@ -1,7 +1,6 @@
 //! The label-and-sort organizer desk and the tidy entry console.
 
 use super::common::{_flat, _m, M, PASTELS, WALL};
-use super::dock::settle_in_place;
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
@@ -10,7 +9,7 @@ use artkit::parts::{join, new_parts, settle};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
 use artkit::{
-    cupped, fbox, fextrude, fsweep, jitter, leaf, loft, revolve, ring, slide, soft, torus,
+    cupped, fbox, fextrude, fsweep, jitter, leaf, loft, revolve, ring, settle, slide, soft, torus,
 };
 
 // --- the label-and-sort organizer desk (2x1): its back on the wall, the hutch of labelled bins on the desk's back,
@@ -393,7 +392,7 @@ pub fn organizer_desk() -> Vec<Obj> {
         }
     });
     let drawer = join(&drawer, "bin", None);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(drawer, "drawer_open", (0, -0.13, 0), seconds = 0.6);
     objs
 }

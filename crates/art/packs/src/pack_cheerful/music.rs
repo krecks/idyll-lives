@@ -1,25 +1,17 @@
 //! The sunburst jukebox and the spotlight karaoke machine.
 
-use super::common::{M, WALL, aim, around, fillet, moulding, name, obj, paint, slab, tomb, tube};
-use artkit::forms::{Scale, rounded_rect};
+use super::common::{M, WALL, aim, around, slab, tomb};
+use artkit::forms::rounded_rect;
 use artkit::math::{Axis, P3, V3, cos, degrees, radians, sin};
 use artkit::motion::{Spin, attach, spin};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::py::hypot;
-use artkit::scene::{Obj, meshes};
-use artkit::shapes::SHARP;
-use artkit::{cylinder, fbox, fcyl, fextrude, fsphere, fsweep, revolve, slide, swing, torus};
-
-pub fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
+use artkit::scene::Obj;
+use artkit::{
+    cylinder, fbox, fcyl, fextrude, fsphere, fsweep, kit, object_of, revolve, settle, slide, swing,
+    torus,
+};
 
 // --- the sunburst jukebox (1x1): an arch-topped cabinet, a record window, bubble tubes either side -------------
 const ARCH: f64 = 1.08; // the height of the arch's centre
@@ -110,7 +102,7 @@ pub fn jukebox() -> Vec<Obj> {
             let a = radians((10 + 20 * k) as f64);
             fbox!(
                 f,
-                name("ray"),
+                numbered("ray"),
                 0.012,
                 0.2,
                 0.004,
@@ -123,7 +115,7 @@ pub fn jukebox() -> Vec<Obj> {
             // the record stack in the window's foot
             fcyl!(
                 f,
-                name("stack"),
+                numbered("stack"),
                 0.13,
                 0.008,
                 (0.0, 0.906 + 0.009 * k as f64, -0.17),
@@ -174,7 +166,7 @@ pub fn jukebox() -> Vec<Obj> {
             for k in 0..5 {
                 fbox!(
                     f,
-                    name("title"),
+                    numbered("title"),
                     0.06,
                     0.008,
                     0.002,
@@ -192,7 +184,7 @@ pub fn jukebox() -> Vec<Obj> {
             (0.15, M.coral),
         ] {
             revolve!(
-                name("button"),
+                numbered("button"),
                 &[
                     (0.0, 0.0),
                     (0.016, 0.0),
@@ -206,7 +198,7 @@ pub fn jukebox() -> Vec<Obj> {
                 rot = (90, 0, 0)
             );
             torus!(
-                name("button_ring"),
+                numbered("button_ring"),
                 0.018,
                 0.003,
                 at = f.at(x, 0.625, zf + 0.002),
@@ -217,7 +209,7 @@ pub fn jukebox() -> Vec<Obj> {
             );
         }
         // the speaker: cloth in a moulded brass frame, chrome bars bursting out from its foot
-        moulding(
+        kit::moulding!(
             f,
             "grille_frame",
             &[(-0.26, 0.24), (0.26, 0.24), (0.26, 0.56), (-0.26, 0.56)],
@@ -230,9 +222,7 @@ pub fn jukebox() -> Vec<Obj> {
                 (0.026, 0.0),
             ],
             M.brass,
-            zf,
-            true,
-            SHARP,
+            at = zf
         );
         fbox!(
             f,
@@ -250,7 +240,7 @@ pub fn jukebox() -> Vec<Obj> {
             let reach = if 0.29 / s < first { 0.29 / s } else { first };
             fsweep!(
                 f,
-                name("burst"),
+                numbered("burst"),
                 &[
                     (0.03 * c, 0.255 + 0.03 * s, zf + 0.014),
                     (reach * c, 0.255 + reach * s, zf + 0.014)
@@ -275,14 +265,14 @@ pub fn jukebox() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             let (x, z) = (s * 0.33, zf - 0.01);
             revolve!(
-                name("tube"),
+                numbered("tube"),
                 &[(0.0, 0.0), (0.035, 0.0), (0.035, 0.86), (0.0, 0.86)],
                 at = f.at(x, 0.12, z),
                 material = M.amber,
                 segments = 14
             );
             revolve!(
-                name("tube_foot"),
+                numbered("tube_foot"),
                 &[
                     (0.0, 0.0),
                     (0.045, 0.0),
@@ -296,7 +286,7 @@ pub fn jukebox() -> Vec<Obj> {
                 segments = 14
             );
             revolve!(
-                name("tube_cap"),
+                numbered("tube_cap"),
                 &[
                     (0.0, 0.0),
                     (0.042, 0.0),
@@ -313,7 +303,7 @@ pub fn jukebox() -> Vec<Obj> {
             );
             for y in [0.4, 0.68] {
                 torus!(
-                    name("tube_collar"),
+                    numbered("tube_collar"),
                     0.037,
                     0.006,
                     at = f.at(x, y, z),
@@ -326,7 +316,7 @@ pub fn jukebox() -> Vec<Obj> {
                 // bubbles rising in the tubes
                 fsphere!(
                     f,
-                    name("bubble"),
+                    numbered("bubble"),
                     0.012,
                     (x, 0.25 + 0.15 * k as f64 + 0.04 * (k % 2) as f64, z + 0.032),
                     M.sunny,
@@ -351,7 +341,7 @@ pub fn jukebox() -> Vec<Obj> {
         );
         for r in [0.07, 0.1] {
             torus!(
-                name("record_groove"),
+                numbered("record_groove"),
                 r,
                 0.003,
                 at = f.at(0, 0.941, -0.17),
@@ -384,7 +374,7 @@ pub fn jukebox() -> Vec<Obj> {
         );
     });
     let lab = hinged(join(&lab, "record_label", None), f.at(0, 0.937, -0.17));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     attach(lab, rec);
     swing!(rec, "record", 90.0, seconds = 0.8, axis = Axis::X);
     spin(
@@ -438,7 +428,7 @@ fn driver(f: &GameFrame, name: &str, y: f64, z: f64, r: f64, segments: usize) ->
         segments = segments,
         rot = (90, 0, 0)
     );
-    paint(d, M.speaker_trim, |c| {
+    kit::paint(d, M.speaker_trim, |c| {
         hypot(c.x as f64, c.y as f64) > r - 0.024
     })
 }
@@ -475,7 +465,7 @@ pub fn karaoke_machine() -> Vec<Obj> {
         for fx in [-w / 2.0 + 0.06, w / 2.0 - 0.06] {
             for fz in [WALL + 0.06, zf - 0.06] {
                 revolve!(
-                    name("foot"),
+                    numbered("foot"),
                     &[
                         (0.0, 0.0),
                         (0.022, 0.0),
@@ -524,7 +514,7 @@ pub fn karaoke_machine() -> Vec<Obj> {
             // the knobs and the volume ring on the top
             fcyl!(
                 f,
-                name("top_knob"),
+                numbered("top_knob"),
                 0.014,
                 0.014,
                 (-0.15 + 0.05 * k as f64, h + 0.007, WALL + 0.36),
@@ -534,24 +524,22 @@ pub fn karaoke_machine() -> Vec<Obj> {
         }
         for s in [-1.0, 1.0] {
             // a carrying handle in each side
-            tube(
+            kit::tube!(
                 f,
-                &name("handle"),
-                &fillet(
+                numbered("handle"),
+                &kit::fillet!(
                     &[
                         (s * (w / 2.0 - 0.004), h - 0.25, WALL + 0.14),
                         (s * (w / 2.0 + 0.014), h - 0.25, WALL + 0.15),
                         (s * (w / 2.0 + 0.014), h - 0.25, WALL + 0.27),
                         (s * (w / 2.0 - 0.004), h - 0.25, WALL + 0.28),
                     ],
-                    0.01,
-                    3,
+                    0.01
                 ),
                 0.007,
                 M.speaker_trim,
-                Some(6),
-                1,
-                Scale::One(1.0),
+                verts = 6,
+                round = 1
             );
         }
         // the lyrics screen in a rounded case on a hinged neck, leaning back
@@ -604,7 +592,7 @@ pub fn karaoke_machine() -> Vec<Obj> {
         ] {
             fbox!(
                 f,
-                name("lyric"),
+                numbered("lyric"),
                 wl,
                 0.022,
                 0.003,
@@ -666,7 +654,7 @@ pub fn karaoke_machine() -> Vec<Obj> {
         }));
         let mut faces = vec![(0..10).collect::<Vec<u32>>(), (10..20).rev().collect()];
         faces.extend((0..10).map(|i| vec![i, (i + 1) % 10, 10 + (i + 1) % 10, 10 + i]));
-        obj("star", &verts, &faces, &[M.star], None, 35.0, 0.0);
+        object_of!("star", &verts, &faces, &[M.star]);
         let (mx, mz) = MIC;
         revolve!(
             "mic_foot",
@@ -684,15 +672,14 @@ pub fn karaoke_machine() -> Vec<Obj> {
             material = M.stand,
             segments = 20
         );
-        tube(
+        kit::tube!(
             f,
             "mic_tube",
             &[(mx, 0.05, mz), (mx, 1.0, mz)],
             0.013,
             M.chrome,
-            Some(10),
-            1,
-            Scale::One(1.0),
+            verts = 10,
+            round = 1
         );
         revolve!(
             "mic_clutch",
@@ -708,15 +695,14 @@ pub fn karaoke_machine() -> Vec<Obj> {
             material = M.stand,
             segments = 10
         );
-        tube(
+        kit::tube!(
             f,
             "clutch_screw",
             &[(mx, 1.0, mz), (mx + 0.04, 1.0, mz)],
             0.005,
             M.stand,
-            Some(6),
-            1,
-            Scale::One(1.0),
+            verts = 6,
+            round = 1
         );
         // the spotlight on its pole, aimed at the stage: a finned can on a yoke, a lens in its rim
         let (px, pz) = (-0.32, 0.3);
@@ -735,15 +721,14 @@ pub fn karaoke_machine() -> Vec<Obj> {
             material = M.stand,
             segments = 20
         );
-        tube(
+        kit::tube!(
             f,
             "spot_pole",
             &[(px, 0.03, pz), (px, 1.6, pz)],
             0.012,
             M.stand,
-            Some(8),
-            1,
-            Scale::One(1.0),
+            verts = 8,
+            round = 1
         );
         let (head, aim_at) = ((px, 1.66, pz), (0.1, 1.2, 0.9));
         let u = V3::from((aim_at.0 - head.0, aim_at.1 - head.1, aim_at.2 - head.2)).normalized();
@@ -772,7 +757,7 @@ pub fn karaoke_machine() -> Vec<Obj> {
         for k in 0..3 {
             let o = 0.04 - 0.025 * k as f64;
             let fin = torus!(
-                name("spot_fin"),
+                numbered("spot_fin"),
                 0.068,
                 0.004,
                 at = f.at(head.0 - ux * o, head.1 - uy * o, head.2 - uz * o),
@@ -807,10 +792,10 @@ pub fn karaoke_machine() -> Vec<Obj> {
                 )
             })
             .collect();
-        tube(
+        kit::tube!(
             f,
             "spot_yoke",
-            &fillet(
+            &kit::fillet!(
                 &[
                     ends[0],
                     (ends[0].0, 1.6, ends[0].2),
@@ -818,19 +803,17 @@ pub fn karaoke_machine() -> Vec<Obj> {
                     (ends[1].0, 1.6, ends[1].2),
                     ends[1],
                 ],
-                0.02,
-                3,
+                0.02
             ),
             0.008,
             M.stand,
-            Some(6),
-            1,
-            Scale::One(1.0),
+            verts = 6,
+            round = 1
         );
         for &e in &ends {
             fsphere!(
                 f,
-                name("spot_knob"),
+                numbered("spot_knob"),
                 0.014,
                 e,
                 M.stand,
@@ -845,26 +828,24 @@ pub fn karaoke_machine() -> Vec<Obj> {
     let drop = 0.25;
     let mic = new_parts(|| {
         let top = 1.35 - drop;
-        tube(
+        kit::tube!(
             f,
             "mic_upper",
             &[(mx, 0.75 - drop, mz), (mx, top, mz)],
             0.008,
             M.chrome,
-            Some(8),
-            1,
-            Scale::One(1.0),
+            verts = 8,
+            round = 1
         );
         let tip = (mx - 0.05, top + 0.07, mz + 0.08);
-        tube(
+        kit::tube!(
             f,
             "mic_boom",
-            &fillet(&[(mx, top - 0.02, mz), (mx, top + 0.02, mz), tip], 0.02, 3),
+            &kit::fillet!(&[(mx, top - 0.02, mz), (mx, top + 0.02, mz), tip], 0.02),
             0.007,
             M.chrome,
-            Some(6),
-            1,
-            Scale::One(1.0),
+            verts = 6,
+            round = 1
         );
         let end = (tip.0 - 0.015, tip.1 + 0.05, tip.2 + 0.07);
         fsweep!(
@@ -886,7 +867,7 @@ pub fn karaoke_machine() -> Vec<Obj> {
         fsweep!(f, "mic_band", &[end, band], 0.024, M.dark, verts = 10);
     });
     let mic = hinged(join(&mic, "mic", None), f.at(mx, 1.0, mz));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(mic, "mic_up", (0, 0, drop), seconds = 0.8);
     objs
 }

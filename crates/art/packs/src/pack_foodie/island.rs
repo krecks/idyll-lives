@@ -1,14 +1,13 @@
 //! The chef's island (2x1): a marble-topped island, a hob on it, drawers on the cook's side, two stools.
 
-use super::common::{_name, M};
-use super::garden::settle_in_place;
+use super::common::M;
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, P3, cosd, sind};
-use artkit::parts::{join, new_parts};
+use artkit::parts::{join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, grow, revolve, slide, torus};
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, grow, revolve, settle, slide, torus};
 
 const TOP: f64 = 0.9; // the content's top (`surface.height`)
 const RING: f64 = 0.145; // the hob's two rings' x (the left one the cook's)
@@ -21,7 +20,7 @@ fn _stool(f: &GameFrame, x: f64, z: f64) {
     let y = STOOL - 0.045; // the wooden seat's middle
     fcyl!(
         f,
-        _name("stool_seat"),
+        numbered("stool_seat"),
         0.18,
         0.03,
         (x, y, z),
@@ -32,7 +31,7 @@ fn _stool(f: &GameFrame, x: f64, z: f64) {
     );
     fcyl!(
         f,
-        _name("stool_cushion"),
+        numbered("stool_cushion"),
         0.165,
         0.03,
         (x, STOOL - 0.015, z),
@@ -46,7 +45,7 @@ fn _stool(f: &GameFrame, x: f64, z: f64) {
         let (c, s) = (cosd(a), sind(a));
         fsweep!(
             f,
-            _name("stool_leg"),
+            numbered("stool_leg"),
             &[
                 (x + 0.12 * c, y - 0.015, z + 0.12 * s),
                 (x + 0.19 * c, 0.008, z + 0.19 * s)
@@ -58,7 +57,7 @@ fn _stool(f: &GameFrame, x: f64, z: f64) {
         );
     }
     torus!(
-        _name("stool_ring"),
+        numbered("stool_ring"),
         0.165,
         0.009,
         at = f.at(x, 0.3, z),
@@ -69,7 +68,7 @@ fn _stool(f: &GameFrame, x: f64, z: f64) {
     for dx in [-0.12, 0.12] {
         kit::tube!(
             f,
-            _name("stool_back_post"),
+            numbered("stool_back_post"),
             &[
                 (x + dx, STOOL - 0.03, z - 0.13),
                 (x + dx, STOOL + 0.17, z - 0.17)
@@ -82,7 +81,7 @@ fn _stool(f: &GameFrame, x: f64, z: f64) {
     }
     fsweep!(
         f,
-        _name("stool_back"),
+        numbered("stool_back"),
         &[
             (x - 0.16, STOOL + 0.21, z - 0.15),
             (x, STOOL + 0.21, z - 0.183),
@@ -115,7 +114,7 @@ pub fn chefs_island() -> Vec<Obj> {
             let x = s as f64 * 0.8;
             fbox!(
                 f,
-                _name("end"),
+                numbered("end"),
                 0.26,
                 0.78,
                 zf,
@@ -126,7 +125,7 @@ pub fn chefs_island() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                _name("end_plinth"),
+                numbered("end_plinth"),
                 0.24,
                 0.08,
                 zf - 0.03,
@@ -135,7 +134,7 @@ pub fn chefs_island() -> Vec<Obj> {
             );
             kit::shaker!(
                 f,
-                _name("end_drawer"),
+                numbered("end_drawer"),
                 0.22,
                 0.16,
                 (x, 0.75, zf + 0.007),
@@ -145,7 +144,7 @@ pub fn chefs_island() -> Vec<Obj> {
             );
             kit::shaker!(
                 f,
-                _name("end_door"),
+                numbered("end_door"),
                 0.22,
                 0.54,
                 (x, 0.37, zf + 0.007),
@@ -156,7 +155,7 @@ pub fn chefs_island() -> Vec<Obj> {
             for y in [0.79, 0.6] {
                 kit::pull!(
                     f,
-                    _name("end_pull"),
+                    numbered("end_pull"),
                     x,
                     y,
                     zf + 0.014,
@@ -182,7 +181,7 @@ pub fn chefs_island() -> Vec<Obj> {
         for x in [-0.45, 0.45] {
             kit::shaker!(
                 f,
-                _name("side_drawer"),
+                numbered("side_drawer"),
                 0.42,
                 0.13,
                 (x, 0.8, zf + 0.007),
@@ -192,7 +191,7 @@ pub fn chefs_island() -> Vec<Obj> {
             );
             kit::pull!(
                 f,
-                _name("side_pull"),
+                numbered("side_pull"),
                 x,
                 0.8,
                 zf + 0.014,
@@ -239,7 +238,7 @@ pub fn chefs_island() -> Vec<Obj> {
         );
         for dx in [-RING, RING] {
             torus!(
-                _name("hob_ring"),
+                numbered("hob_ring"),
                 0.08,
                 0.003,
                 at = f.at(dx, TOP + 0.009, 0.27),
@@ -249,7 +248,7 @@ pub fn chefs_island() -> Vec<Obj> {
             );
             fcyl!(
                 f,
-                _name("hob_mark"),
+                numbered("hob_mark"),
                 0.05,
                 0.001,
                 (dx, TOP + 0.0085, 0.27),
@@ -303,7 +302,7 @@ pub fn chefs_island() -> Vec<Obj> {
             let sf = s as f64;
             kit::tube!(
                 f,
-                _name("pot_handle"),
+                numbered("pot_handle"),
                 &kit::fillet!(
                     &[
                         (RING + sf * 0.118, TOP + 0.16, 0.25),
@@ -321,7 +320,7 @@ pub fn chefs_island() -> Vec<Obj> {
         }
         for x in [-0.45, 0.45] {
             revolve!(
-                _name("plate"),
+                numbered("plate"),
                 &[
                     (0.0, 0.0),
                     (0.07, 0.0),
@@ -336,7 +335,7 @@ pub fn chefs_island() -> Vec<Obj> {
             );
             fsphere!(
                 f,
-                _name("bite"),
+                numbered("bite"),
                 0.03,
                 (x - 0.02, TOP + 0.02, 0.11),
                 M.salami,
@@ -346,7 +345,7 @@ pub fn chefs_island() -> Vec<Obj> {
             );
             fextrude!(
                 f,
-                _name("bite"),
+                numbered("bite"),
                 &[(0.0, 0.0), (0.05, -0.016), (0.05, 0.016)],
                 0.025,
                 (x + 0.01, TOP + 0.02, 0.1),
@@ -418,7 +417,7 @@ pub fn chefs_island() -> Vec<Obj> {
         for x in [-0.19, 0.19] {
             fbox!(
                 f,
-                _name("drawer_side"),
+                numbered("drawer_side"),
                 0.01,
                 0.08,
                 0.12,
@@ -429,7 +428,7 @@ pub fn chefs_island() -> Vec<Obj> {
         for (k, x) in [-0.12, -0.05, 0.03, 0.1].into_iter().enumerate() {
             fbox!(
                 f,
-                _name("utensil"),
+                numbered("utensil"),
                 0.02,
                 0.008,
                 0.11,
@@ -455,7 +454,7 @@ pub fn chefs_island() -> Vec<Obj> {
     });
     let heat = join(&heat, "hot_ring", Some(f.at(-RING, TOP + 0.0085, 0.27)));
     heat.set_scale((0.001, 0.001, 0.001));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(drawer, "drawer_open", (0, -0.12, 0), seconds = 0.6);
     for axis in [Axis::X, Axis::Y, Axis::Z] {
         grow!(heat, "burner_on", seconds = 0.5, axis = axis);

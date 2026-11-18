@@ -121,8 +121,8 @@ The hammock's pillow is sewn flat and stuffed (`waist`), `resting`. Besides, its
 
 ## The Rust port (2026-11-18)
 
-Ported function for function from the Blender script (`common.rs`: the palette, `_sq`, `_pot`, `_rosette`,
-`_flower`; a file a model, the glasshouse's plants in `ferns.rs`). Against `ref/blender`: 7 near, 0 CHANGED, the pack
+Ported function for function from the Blender script (`common.rs`: the palette, `_pot`, `_rosette`,
+`_flower`; its `_sq` is the kernel's `forms::rect`; a file a model, the glasshouse's plants in `ferns.rs`). Against `ref/blender`: 7 near, 0 CHANGED, the pack
 the same; every part's surface 0.000 mm from Blender's. What is left:
 - clips (veggie bed, hammock, glasshouse): the turns' quaternions differ in their last bits (at most 1.8e-7);
 - the hammock's shading, 0.86 greys of 32 on average (limit 2): vertices where the eye bolts meet the hooks and the

@@ -4,23 +4,13 @@ use super::common::{_bottle, _glass, _m, _stool, BOTTLES, M, WALL};
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
-use artkit::scene::{Obj, meshes};
+use artkit::scene::Obj;
 use artkit::{
-    fbox, fcone, fcyl, fextrude, fsphere, fsweep, leaf, loft, revolve, ring, soft, squash, swing,
-    torus,
+    fbox, fcone, fcyl, fextrude, fsphere, fsweep, leaf, loft, revolve, ring, settle, soft, squash,
+    swing, torus,
 };
-
-pub fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
 
 // --- the home party bar (2x1): a back bar of bottles, the front counter with a beer tap, two stools ---------
 const TAP: (f64, f64, f64) = (0.24, 1.29, 0.04); // the tap lever's pivot (x, height, depth)
@@ -473,7 +463,7 @@ pub fn party_bar() -> Vec<Obj> {
         );
     });
     let lever = hinged(join(&lever, "lever", None), f.at(TAP.0, TAP.1, TAP.2));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(lever, "tap", 40.0, seconds = 0.5, axis = Axis::X);
     objs
 }
@@ -844,7 +834,7 @@ pub fn conversation_sectional() -> Vec<Obj> {
         }
     });
     let seats = hinged(join(&seats, "seats", None), f.at(0, 0.32, 0.06));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     squash!(seats, "sink_in", (1, 1, 0.8), seconds = 0.6);
     objs
 }

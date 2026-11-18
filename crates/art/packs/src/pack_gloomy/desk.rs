@@ -1,16 +1,13 @@
 //! The candlelit writing desk (2x1): the writer's chair in the middle, the desk before them.
 
-use super::common::{
-    M, book, cabriole, candle, lathe, name, open_book, scroll, tube, turned, vase,
-};
-use super::music::settle_in_place;
+use super::common::{M, book, candle, open_book, vase};
 use artkit::forms::rounded_rect;
 use artkit::math::{Axis, P3, PI, cos, cosd, pow, sin, sind, sqrt};
 use artkit::motion::{Grow, grow};
-use artkit::parts::{join, new_parts};
+use artkit::parts::{join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
-use artkit::{fbox, fextrude, fsphere, fsweep, soft, torus};
+use artkit::{fbox, fextrude, fsphere, fsweep, kit, settle, soft, torus};
 
 const WICK: (f64, f64, f64) = (-0.25, 0.75 + 0.14, 0.38); // the lit candle's wick top
 
@@ -51,17 +48,16 @@ pub fn journal_desk() -> Vec<Obj> {
         // top), its lower edge a row of scallops
         for x in [-0.68, 0.68] {
             for z in [0.22, 0.42] {
-                cabriole(
+                kit::cabriole!(
                     f,
-                    &name("leg"),
+                    numbered("leg"),
                     x,
                     z,
                     0.712,
                     M.walnut,
                     0.025_f64.copysign(x),
                     0.014_f64.copysign(z - 0.32),
-                    0.021,
-                    12,
+                    r = 0.021
                 );
             }
         }
@@ -90,7 +86,7 @@ pub fn journal_desk() -> Vec<Obj> {
                 .collect();
             fextrude!(
                 f,
-                name("apron_end"),
+                numbered("apron_end"),
                 &[vec![(0.22, 0.712), (0.4, 0.712)], side].concat(),
                 0.02,
                 (x, 0, 0),
@@ -134,17 +130,17 @@ pub fn journal_desk() -> Vec<Obj> {
             verts = 8
         );
         for x in [-0.66, 0.66] {
-            scroll(
+            kit::scroll!(
                 f,
-                &name("bracket"),
+                numbered("bracket"),
                 (x, 0.888, 0.35),
                 (0.86, 0.38),
                 M.walnut,
-                -0.9,
-                0.3,
-                0.018,
-                0.02,
-                7,
+                turns = -0.9,
+                end = 0.3,
+                t = 0.018,
+                w = 0.02,
+                steps = 7
             );
         }
         // on the desk: the open journal, an inkwell and quill, books, a wilted rose, candles on a dish
@@ -161,7 +157,7 @@ pub fn journal_desk() -> Vec<Obj> {
             Some(M.ink),
             0.0,
         );
-        lathe(
+        kit::lathe!(
             f,
             "inkwell",
             0.3,
@@ -179,8 +175,8 @@ pub fn journal_desk() -> Vec<Obj> {
                 (0.009, 0.052),
             ],
             M.inkwell,
-            16,
-            4.0,
+            verts = 16,
+            square = 4.0
         );
         torus!(
             "inkwell_collar",
@@ -221,7 +217,7 @@ pub fn journal_desk() -> Vec<Obj> {
             (0.2, 0.04, M.sleeve_b, 10.0),
             (0.21, 0.045, M.sleeve_d, -6.0),
         ] {
-            book(f, &name("book"), -0.5, y, 0.36, w, h, 0.15, m, r, None);
+            book(f, &numbered("book"), -0.5, y, 0.36, w, h, 0.15, m, r, None);
             y += h;
         }
         let top = vase(f, 0.6, 0.75, 0.38, 0.7);
@@ -251,7 +247,7 @@ pub fn journal_desk() -> Vec<Obj> {
             let k = k as i32;
             fsphere!(
                 f,
-                name("rose_petal"),
+                numbered("rose_petal"),
                 0.02 * s,
                 (0.672 + dx, top + 0.062 + dy, 0.35 + dz),
                 M.rose,
@@ -275,7 +271,7 @@ pub fn journal_desk() -> Vec<Obj> {
         for (px, pz, a) in [(0.69, 0.3, 20), (0.55, 0.28, -40), (0.71, 0.36, 70)] {
             fsphere!(
                 f,
-                name("fallen_petal"),
+                numbered("fallen_petal"),
                 0.014,
                 (px, 0.752, pz),
                 M.rose,
@@ -285,7 +281,7 @@ pub fn journal_desk() -> Vec<Obj> {
                 rings = 4
             );
         }
-        turned(
+        kit::turned!(
             f,
             "dish",
             -0.215,
@@ -300,7 +296,7 @@ pub fn journal_desk() -> Vec<Obj> {
                 (0.0, 0.008),
             ],
             M.brass,
-            22,
+            segments = 22
         );
         candle(
             f,
@@ -362,7 +358,7 @@ pub fn journal_desk() -> Vec<Obj> {
                     0.025 + 0.016 * (1.0 - pow(u / 0.18, 2.0)) * (1.0 - pow(v / 0.3, 2.0)) - 0.004;
                 fsphere!(
                     f,
-                    name("button"),
+                    numbered("button"),
                     0.008,
                     (
                         u,
@@ -379,7 +375,7 @@ pub fn journal_desk() -> Vec<Obj> {
         for x in [-0.21, 0.21] {
             fsweep!(
                 f,
-                name("back_leg"),
+                numbered("back_leg"),
                 &[(x, 0.0, -0.228), (x, 0.42, -0.27), (x, 1.165, -0.355)],
                 0,
                 M.walnut,
@@ -390,7 +386,7 @@ pub fn journal_desk() -> Vec<Obj> {
             );
             fsphere!(
                 f,
-                name("finial"),
+                numbered("finial"),
                 0.017,
                 (x, 1.18, -0.356),
                 M.walnut,
@@ -399,31 +395,31 @@ pub fn journal_desk() -> Vec<Obj> {
             );
             fsweep!(
                 f,
-                name("front_leg"),
+                numbered("front_leg"),
                 &[(x, 0.39, 0.13), (x, 0.36, 0.13), (x, 0.0, 0.14)],
                 0.02,
                 M.walnut,
                 verts = 10,
                 scale = [1.0, 0.85, 0.62]
             );
-            tube(
+            kit::tube!(
                 f,
-                &name("side_stretcher"),
+                numbered("side_stretcher"),
                 &[(x, 0.13, 0.13), (x, 0.13, -0.246)],
                 0.008,
                 M.walnut,
-                Some(6),
-                1,
+                verts = 6,
+                round = 1
             );
         }
-        tube(
+        kit::tube!(
             f,
             "cross_stretcher",
             &[(-0.21, 0.13, -0.06), (0.21, 0.13, -0.06)],
             0.008,
             M.walnut,
-            Some(6),
-            1,
+            verts = 6,
+            round = 1
         );
         let crest: Vec<(f64, f64, f64)> = [-0.21, -0.14, -0.07, 0.0, 0.07, 0.14, 0.21]
             .iter()
@@ -481,7 +477,7 @@ pub fn journal_desk() -> Vec<Obj> {
     });
     let flame = join(&fl, "flame", Some(f.at(wx, wy, wz)));
     flame.set_scale((0.001, 0.001, 0.001));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     for axis in [Axis::X, Axis::Y, Axis::Z] {
         grow(flame, "candle", Grow { seconds: 0.6, axis });
     }

@@ -1,26 +1,18 @@
 //! The heavy punching bag and the plate-smash bin.
 
 use super::WALL;
-use super::common::{CRATE_MAT, M, chain, fillet, name, tube, turned};
+use super::common::{M, chain};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, cos, cosd, radians, sin, sind};
 use artkit::motion::{Rock, rock};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
-use artkit::scene::{Obj, meshes};
-use artkit::{boulder, fbox, fcyl, fextrude, fsphere, fsweep, jitter, soft, swing, torus};
-
-pub fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
+use artkit::scene::Obj;
+use artkit::{
+    boulder, fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, settle, soft, swing, torus,
+};
 
 // --- the heavy punching bag (1x1): a free-standing frame with a boom, the bag on chains --------------------
 const HOOK: (f64, f64, f64) = (0.0, 1.9, 0.1); // the swivel the bag hangs from (x, height, depth)
@@ -63,7 +55,7 @@ pub fn heavy_bag() -> Vec<Obj> {
         for (x, z) in [(0.0, 0.345), (-0.355, -0.37), (0.355, -0.37)] {
             fbox!(
                 f,
-                name("foot_cap"),
+                numbered("foot_cap"),
                 if x == 0.0 { 0.084 } else { 0.012 },
                 0.064,
                 if x == 0.0 { 0.012 } else { 0.084 },
@@ -77,10 +69,10 @@ pub fn heavy_bag() -> Vec<Obj> {
         fsweep!(
             f,
             "frame",
-            &fillet(
+            &kit::fillet!(
                 &[(0.0, 0.07, -0.37), (0.0, 1.975, -0.37), (0.0, 1.975, 0.13)],
                 0.07,
-                4
+                steps = 4
             ),
             0,
             M.steel,
@@ -90,7 +82,7 @@ pub fn heavy_bag() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             fextrude!(
                 f,
-                name("gusset"),
+                numbered("gusset"),
                 &[(-0.335, 1.94), (-0.2, 1.94), (-0.335, 1.8)],
                 0.006,
                 (s * 0.038, 0, 0),
@@ -99,7 +91,7 @@ pub fn heavy_bag() -> Vec<Obj> {
             );
             fsphere!(
                 f,
-                name("bolt"),
+                numbered("bolt"),
                 0.008,
                 (s * 0.041, 1.9, -0.3),
                 M.chrome,
@@ -130,7 +122,7 @@ pub fn heavy_bag() -> Vec<Obj> {
         for (y, z) in [(0.52, -0.335), (0.075, 0.1)] {
             fbox!(
                 f,
-                name("brace_flange"),
+                numbered("brace_flange"),
                 0.06,
                 if y < 0.1 { 0.012 } else { 0.06 },
                 if y < 0.1 { 0.06 } else { 0.012 },
@@ -151,9 +143,9 @@ pub fn heavy_bag() -> Vec<Obj> {
         );
         // weight plates on pegs at the foot
         for (s, m) in [(-1, M.fire), (1, M.dark)] {
-            tube(
+            kit::tube!(
                 f,
-                &name("peg"),
+                numbered("peg"),
                 &[
                     (0.0, 0.072, -0.29),
                     (0.0, 0.17, -0.29),
@@ -161,8 +153,8 @@ pub fn heavy_bag() -> Vec<Obj> {
                 ],
                 0.015,
                 M.chrome,
-                Some(10),
-                1,
+                verts = 10,
+                round = 1
             );
             let prof = [
                 (0.018, 0.0),
@@ -175,16 +167,16 @@ pub fn heavy_bag() -> Vec<Obj> {
                 (0.018, 0.045),
                 (0.018, 0.0),
             ];
-            turned(
+            kit::turned!(
                 f,
-                &name("plate"),
+                numbered("plate"),
                 s as f64 * 0.177 + (s > 0) as i32 as f64 * 0.045,
                 0.17,
                 -0.29,
                 &prof,
                 m,
-                22,
-                (0.0, 90.0, 0.0),
+                segments = 22,
+                rot = (0.0, 90.0, 0.0)
             );
         }
         // a hook on the upright with a pair of gloves hanging by their laces
@@ -202,7 +194,7 @@ pub fn heavy_bag() -> Vec<Obj> {
         for x in [-0.24, -0.12] {
             fsphere!(
                 f,
-                name("glove"),
+                numbered("glove"),
                 0.07,
                 (x, 1.18, -0.3),
                 M.fire,
@@ -212,7 +204,7 @@ pub fn heavy_bag() -> Vec<Obj> {
             );
             fsweep!(
                 f,
-                name("glove_thumb"),
+                numbered("glove_thumb"),
                 &[
                     (x + 0.04, 1.14, -0.27),
                     (x + 0.062, 1.18, -0.265),
@@ -224,9 +216,9 @@ pub fn heavy_bag() -> Vec<Obj> {
                 resolution = 2,
                 scale = [0.9, 1.0, 0.7]
             );
-            turned(
+            kit::turned!(
                 f,
-                &name("cuff"),
+                numbered("cuff"),
                 x,
                 1.04,
                 -0.3,
@@ -238,21 +230,20 @@ pub fn heavy_bag() -> Vec<Obj> {
                     (0.0, 0.08),
                 ],
                 M.head,
-                12,
-                (0.0, 0.0, 0.0),
+                segments = 12
             );
             fcyl!(
                 f,
-                name("strap"),
+                numbered("strap"),
                 0.052,
                 0.026,
                 (x, 1.075, -0.3),
                 M.dark,
                 verts = 12
             );
-            tube(
+            kit::tube!(
                 f,
-                &name("lace"),
+                numbered("lace"),
                 &[
                     (x, 1.1, -0.29),
                     (x + 0.03, 1.24, -0.31),
@@ -260,8 +251,8 @@ pub fn heavy_bag() -> Vec<Obj> {
                 ],
                 0.004,
                 M.dark,
-                Some(4),
-                2,
+                verts = 4,
+                round = 2
             );
         }
     });
@@ -269,7 +260,7 @@ pub fn heavy_bag() -> Vec<Obj> {
     // The bag, its straps, seams and logo, the chains and swivel: one part hung from the swivel, `swing` rocks it
     // back and forth while it is pounded.
     let bag = new_parts(|| {
-        turned(
+        kit::turned!(
             f,
             "bag",
             hx,
@@ -288,25 +279,23 @@ pub fn heavy_bag() -> Vec<Obj> {
                 (0.0, 1.0),
             ],
             M.bag,
-            28,
-            (0.0, 0.0, 0.0),
+            segments = 28
         );
         for y in [0.86, 1.5] {
-            turned(
+            kit::turned!(
                 f,
-                &name("strap"),
+                numbered("strap"),
                 hx,
                 y - 0.025,
                 hz,
                 &[(0.189, 0.0), (0.195, 0.004), (0.195, 0.046), (0.189, 0.05)],
                 M.dark,
-                28,
-                (0.0, 0.0, 0.0),
+                segments = 28
             );
         }
         for y in [0.72, 1.6] {
             torus!(
-                name("seam"),
+                numbered("seam"),
                 0.186,
                 0.003,
                 at = f.at(hx, y, hz),
@@ -332,7 +321,7 @@ pub fn heavy_bag() -> Vec<Obj> {
             true,
         );
         fextrude!(f, "logo", &flame, 0.008, (hx, 1.18, hz + 0.188), M.flame);
-        turned(
+        kit::turned!(
             f,
             "swivel",
             hx,
@@ -347,14 +336,13 @@ pub fn heavy_bag() -> Vec<Obj> {
                 (0.0, 0.06),
             ],
             M.chrome,
-            10,
-            (0.0, 0.0, 0.0),
+            segments = 10
         );
         for k in 0..4 {
             let a = (45 + 90 * k) as f64;
             let ring = (hx + 0.12 * cosd(a), 1.66, hz + 0.12 * sind(a));
             torus!(
-                name("d_ring"),
+                numbered("d_ring"),
                 0.014,
                 0.003,
                 at = f.at(ring.0, ring.1, ring.2),
@@ -376,7 +364,7 @@ pub fn heavy_bag() -> Vec<Obj> {
         }
     });
     let bag = hinged(join(&bag, "bag", None), f.at(hx, hy, hz));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     rock(
         bag,
         "swing",
@@ -466,7 +454,7 @@ pub fn smash_bin() -> Vec<Obj> {
             for pz in [z0 + 0.03, z1 - 0.03] {
                 fbox!(
                     f,
-                    name("post"),
+                    numbered("post"),
                     0.06,
                     h,
                     0.06,
@@ -485,12 +473,12 @@ pub fn smash_bin() -> Vec<Obj> {
                 let ry = rnd.uniform(-0.8, 0.8);
                 fbox!(
                     f,
-                    name("slat"),
+                    numbered("slat"),
                     w - 0.02,
                     sh - 0.025,
                     0.022,
                     (x, y + dy, zz),
-                    CRATE_MAT,
+                    M.crate_,
                     rot = (0.0, ry, 0.0)
                 );
             }
@@ -499,12 +487,12 @@ pub fn smash_bin() -> Vec<Obj> {
                 let rx = rnd.uniform(-0.8, 0.8);
                 fbox!(
                     f,
-                    name("slat"),
+                    numbered("slat"),
                     0.022,
                     sh - 0.025,
                     d - 0.02,
                     (xx, y + dy, zc),
-                    CRATE_MAT,
+                    M.crate_,
                     rot = (rx, 0.0, 0.0)
                 );
             }
@@ -514,7 +502,7 @@ pub fn smash_bin() -> Vec<Obj> {
             for pz in [z0 + 0.03, z1 - 0.03] {
                 fbox!(
                     f,
-                    name("bracket"),
+                    numbered("bracket"),
                     0.062,
                     0.06,
                     0.06,
@@ -530,7 +518,7 @@ pub fn smash_bin() -> Vec<Obj> {
         for i in 0..5 {
             fbox!(
                 f,
-                name("tape_stripe"),
+                numbered("tape_stripe"),
                 0.06,
                 0.05,
                 0.005,
@@ -567,7 +555,7 @@ pub fn smash_bin() -> Vec<Obj> {
         {
             shard(
                 f,
-                &name("shard"),
+                &numbered("shard"),
                 x + dx,
                 0.19 + 0.01 * k as f64,
                 zc + dz,
@@ -592,7 +580,7 @@ pub fn smash_bin() -> Vec<Obj> {
         {
             shard(
                 f,
-                &name("shard"),
+                &numbered("shard"),
                 sx,
                 0.012,
                 sz,
@@ -604,7 +592,7 @@ pub fn smash_bin() -> Vec<Obj> {
         }
         // the stool and its stack of thrift-store plates
         let (sx, sz) = (0.28, 0.25);
-        turned(
+        kit::turned!(
             f,
             "stool_top",
             sx,
@@ -619,13 +607,12 @@ pub fn smash_bin() -> Vec<Obj> {
                 (0.0, 0.03),
             ],
             M.oak,
-            20,
-            (0.0, 0.0, 0.0),
+            segments = 20
         );
         for a in [90.0, 210.0, 330.0] {
             fsweep!(
                 f,
-                name("stool_leg"),
+                numbered("stool_leg"),
                 &[
                     (sx + 0.08 * cosd(a), 0.43, sz + 0.08 * sind(a)),
                     (sx + 0.13 * cosd(a), 0.0, sz + 0.13 * sind(a))
@@ -654,10 +641,10 @@ pub fn smash_bin() -> Vec<Obj> {
             M.porcelain,
             M.plate_green,
         ] {
-            let n = name("plate");
+            let n = numbered("plate");
             let px = sx + rnd.uniform(-0.008, 0.008);
             let pz = sz + rnd.uniform(-0.008, 0.008);
-            turned(
+            kit::turned!(
                 f,
                 &n,
                 px,
@@ -672,8 +659,7 @@ pub fn smash_bin() -> Vec<Obj> {
                     (0.0, 0.006),
                 ],
                 m,
-                18,
-                (0.0, 0.0, 0.0),
+                segments = 18
             );
             y += 0.02;
         }
@@ -694,7 +680,7 @@ pub fn smash_bin() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             fbox!(
                 f,
-                name("lens"),
+                numbered("lens"),
                 0.055,
                 0.032,
                 0.004,
@@ -704,7 +690,7 @@ pub fn smash_bin() -> Vec<Obj> {
                 bevel_segments = 1
             );
         }
-        tube(
+        kit::tube!(
             f,
             "goggle_strap",
             &[
@@ -715,8 +701,8 @@ pub fn smash_bin() -> Vec<Obj> {
             ],
             0.006,
             M.dark,
-            Some(4),
-            2,
+            verts = 4,
+            round = 2
         );
     });
     join(&still, "body", Some(P3::ZERO));
@@ -727,12 +713,12 @@ pub fn smash_bin() -> Vec<Obj> {
         for k in 0..3 {
             fbox!(
                 f,
-                name("lid_board"),
+                numbered("lid_board"),
                 w + 0.02,
                 0.022,
                 bd - 0.006,
                 (x, h + 0.011, lz0 + bd * (k as f64 + 0.5)),
-                CRATE_MAT,
+                M.crate_,
                 bevel = 0.004,
                 bevel_segments = 1,
                 rot = (0.0, (k - 1) as f64 * 0.6, 0.0)
@@ -741,7 +727,7 @@ pub fn smash_bin() -> Vec<Obj> {
         for xx in [x - w / 2.0 + 0.08, x + w / 2.0 - 0.08] {
             fbox!(
                 f,
-                name("lid_batten"),
+                numbered("lid_batten"),
                 0.05,
                 0.02,
                 z1 - lz0 - 0.04,
@@ -764,7 +750,7 @@ pub fn smash_bin() -> Vec<Obj> {
         );
     });
     let lid = hinged(join(&lid, "lid", None), f.at(x, h, lz0));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(lid, "lid_open", -80.0, seconds = 0.6, axis = Axis::X);
     objs
 }

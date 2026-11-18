@@ -1,5 +1,4 @@
-//! What the nature lover pack is built from: its palette, a square bar's profile, flower pots, leaf rosettes and
-//! flower faces.
+//! What the nature lover pack is built from: its palette, flower pots, leaf rosettes and flower faces.
 
 use artkit::materials::Mat;
 use artkit::place::GameFrame;
@@ -73,16 +72,9 @@ palette! { M:
 
 /// The wall's face in a 1-deep footprint, game depth.
 pub const WALL: f64 = -0.43;
-pub const SQUARE: [(f64, f64); 4] = [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)];
 
 pub fn _m(name: &str) -> Mat {
     M.palette().get(name)
-}
-
-/// A square bar's profile, `w` across (`h` the other way).
-pub fn _sq(w: f64, h: Option<f64>) -> Vec<(f64, f64)> {
-    let h = h.unwrap_or(w);
-    SQUARE.iter().map(|&(u, v)| (u * w, v * h)).collect()
 }
 
 /// A flower pot standing on `y`, `d` across its rim: a tapered wall under a rolled rim, open below the soil (never

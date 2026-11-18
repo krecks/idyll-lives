@@ -1,13 +1,10 @@
-//! What the energetic pack is built from: its palette, meshes from points, lofted bodies, and the kit's parts it
-//! uses.
+//! What the energetic pack is built from: its palette and lofted bodies.
 
 use artkit::materials::Mat;
-use artkit::math::{P3, V3};
-use artkit::mesh::Mesh;
-use artkit::place::{GameFrame, Spot};
-use artkit::scene::{self, Obj};
+use artkit::math::P3;
+use artkit::place::GameFrame;
+use artkit::scene::Obj;
 use artkit::{loft, palette, ring};
-use std::cell::Cell;
 
 palette! { M:
     // the bouldering wall
@@ -101,60 +98,6 @@ pub const HOLDS: [Mat; 7] = [
 /// The wall's face in a 1-deep footprint, game depth.
 pub const WALL: f64 = -0.43;
 
-thread_local! {
-    static N: Cell<u32> = const { Cell::new(0) };
-}
-
-/// `stem` numbered: each part its own name.
-pub fn name(stem: &str) -> String {
-    N.with(|n| {
-        n.set(n.get() + 1);
-        format!("{stem}{}", n.get())
-    })
-}
-
-/// A mesh object from Blender-space `verts` and `faces`, normals made outward, smooth below `sharp` degrees.
-#[allow(dead_code)] // (the script has it too, unused)
-pub fn obj(name: &str, verts: &[P3], faces: &[Vec<u32>], mats: &[Mat], sharp: f64) -> Obj {
-    let mut mesh = Mesh::from_pydata(verts.iter().map(|&p| V3::from(p)).collect(), faces);
-    for &m in mats {
-        mesh.slot(m);
-    }
-    mesh.recalc_normals();
-    let o = scene::add(name, mesh);
-    o.edit(|p| p.mesh.shade_smooth(sharp));
-    o
-}
-
-/// A polygon's middle, as Blender gives it: the mean of its corners.
-fn centre(mesh: &Mesh, f: usize) -> V3 {
-    let c = mesh.corners(f);
-    let mut s = V3::ZERO;
-    for &v in c {
-        s += mesh.verts[v as usize];
-    }
-    let n = c.len() as f32;
-    V3 {
-        x: s.x / n,
-        y: s.y / n,
-        z: s.z / n,
-    }
-}
-
-/// Gives the faces of `obj` whose middle (its own axes, Blender) passes `test` another material: a band, a stripe,
-/// a surround, with no more triangles.
-pub fn paint(obj: Obj, material: Mat, test: impl Fn(V3) -> bool) -> Obj {
-    obj.edit(|p| {
-        let k = p.mesh.slot(material);
-        for f in 0..p.mesh.faces.len() {
-            if test(centre(&p.mesh, f)) {
-                p.mesh.faces[f].mat = k;
-            }
-        }
-    });
-    obj
-}
-
 /// A body standing on `y` at (x, z), lofted through rings (height, half width, half depth) from its foot up.
 #[allow(clippy::too_many_arguments)]
 pub fn lofted(
@@ -187,97 +130,4 @@ pub fn lofted(
         })
         .collect();
     loft!(name, &sections, material = material)
-}
-
-/// The kit's tube (`artkit::kit::tube`), as the script called it.
-pub fn tube<P: Spot>(
-    f: &GameFrame,
-    name: &str,
-    points: &[P],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-) -> Obj {
-    artkit::kit::tube(
-        f,
-        name,
-        points,
-        r,
-        material,
-        artkit::kit::Tube {
-            verts,
-            round,
-            ..artkit::kit::Tube::default()
-        },
-    )
-}
-
-/// The kit's fillet (`artkit::kit::fillet`): the path through `points` with each inner corner rounded.
-pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    artkit::kit::fillet(points, radius, steps)
-}
-
-/// The kit's bar pull (`artkit::kit::pull`), as the script called it.
-#[allow(clippy::too_many_arguments)]
-pub fn pull(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    face: f64,
-    length: f64,
-    material: Mat,
-    r: f64,
-    out: f64,
-    upright: bool,
-    verts: usize,
-) -> Obj {
-    artkit::kit::pull(
-        f,
-        name,
-        x,
-        y,
-        face,
-        length,
-        material,
-        artkit::kit::Pull {
-            r,
-            out,
-            upright,
-            verts,
-        },
-    )
-}
-
-/// The kit's frame-and-panel front (`artkit::kit::shaker`), as the script called it: (frame, panel).
-#[allow(clippy::too_many_arguments)]
-pub fn shaker(
-    f: &GameFrame,
-    name: &str,
-    w: f64,
-    h: f64,
-    at: (f64, f64, f64),
-    t: f64,
-    material: Mat,
-    rail: f64,
-    panel: Option<Mat>,
-    recess: f64,
-    raised: bool,
-) -> (Obj, Obj) {
-    artkit::kit::shaker(
-        f,
-        name,
-        w,
-        h,
-        at,
-        t,
-        material,
-        artkit::kit::Shaker {
-            rail,
-            panel,
-            recess,
-            raised,
-        },
-    )
 }
