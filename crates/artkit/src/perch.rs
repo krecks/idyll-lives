@@ -167,7 +167,7 @@ pub fn find(n: usize, aims: &[Aim], o: Find) {
         }
     };
     scene::log(format!(
-        "[gamekit] perches: {} kept, of {} on the leaves and {} on bare limbs",
+        "[art] perches: {} kept, of {} on the leaves and {} on bare limbs",
         kept.len(),
         leaves.len(),
         open_limbs.len()

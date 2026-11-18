@@ -1205,7 +1205,7 @@ pub fn done(name: &str) -> Vec<Obj> {
     if std::env::var_os("HELD_MEASURE").is_some() {
         let (lo, hi) = measure(&[obj]);
         println!(
-            "[gamekit] {name} built centred on game ({:.4}, {:.4}), size {:.3} x {:.3} x {:.3}, bottom {:.4}",
+            "[art] {name} built centred on game ({:.4}, {:.4}), size {:.3} x {:.3} x {:.3}, bottom {:.4}",
             -(lo[0] + hi[0]) / 2.0,
             -(lo[1] + hi[1]) / 2.0,
             hi[0] - lo[0],

@@ -253,7 +253,7 @@ pub struct Output {
 
 fn stats(name: &str) {
     scene::log(format!(
-        "[gamekit] {name}: {} triangles in {} meshes",
+        "[art] {name}: {} triangles in {} meshes",
         glb::triangles(),
         meshes().len()
     ));
@@ -343,7 +343,7 @@ fn make_decimated(model: &Model, ratio: f64) -> Result<Vec<Obj>, String> {
     // flag on a roof), which is no part of that size, is joined into its far version with the rest.)
     far::decimated(far, ratio, far::FEET, far::EDGE);
     scene::log(format!(
-        "[gamekit] {}.far: {} triangles ({:.0}% kept)",
+        "[art] {}.far: {} triangles ({:.0}% kept)",
         model.id,
         far.read(|p| p.mesh.triangles().len()),
         ratio * 100.0
@@ -421,7 +421,7 @@ pub fn build_model(family: &Family, model: &Model) -> Result<Output, String> {
                     .collect(),
             ),
         );
-        scene::log(format!("[gamekit] {}: {} perches", model.id, perches.len()));
+        scene::log(format!("[art] {}: {} perches", model.id, perches.len()));
     }
     if let Some(habitat) = model.habitat {
         if perches.is_empty() {
@@ -458,12 +458,12 @@ pub fn build_model(family: &Family, model: &Model) -> Result<Output, String> {
         all.extend(glb::materials_used(&far_objs));
         entry.set("materials", family.palette_of(model).finishes(&all)?);
         scene::log(format!(
-            "[gamekit] built its far version -> models/{}/{}.far.glb",
+            "[art] built its far version -> models/{}/{}.far.glb",
             family.name, model.id
         ));
     }
     scene::log(format!(
-        "[gamekit] built {key} -> models/{}/{}.glb",
+        "[art] built {key} -> models/{}/{}.glb",
         family.name, model.id
     ));
     Ok(Output {
