@@ -135,8 +135,8 @@ function handOn(keys: Track, t: number, opts: ArmOptions): Hand | null {
 
 /**
  * A cupboard's door that opens: its hinge and pull (m to the user's right), the pull's height and depth, the
- * hand that opens it. Only the doors the model's `doors_open` or `door_open` swings (kitchen_counters.py,
- * dining.py): both of the wall cabinet's, the glazed one's right door (the user's left), the corner one's single
+ * hand that opens it. Only the doors the model's `doors_open` or `door_open` swings
+ * (crates/art/wet/src/kitchen_counters, dining.py): both of the wall cabinet's, the glazed one's right door (the user's left), the corner one's single
  * door, the china cabinet's left glazed door (the user's right). They open 100 degrees in 0.8 s as the use
  * starts and close after 1.5 s more (the clip's `CUPBOARD_S` round fits it).
  */
@@ -233,7 +233,7 @@ function cupboardPose(fit: CupboardFit): (p: number) => PoseSpec {
 // --- the longcase clock ---------------------------------------------------------------------------
 
 /**
- * The grandfather clock (`decor.py`): the dial 1.77 m up, its face 0.044 m behind the middle; the winding
+ * The grandfather clock (crates/art/rooms/src/decor): the dial 1.77 m up, its face 0.044 m behind the middle; the winding
  * holes either side under its middle (`HOLES`), the hood's left side (`HOOD`, where the other hand steadies
  * it), and the trunk door's window from 0.6 to 1.4 m, 0.08 m behind the middle (a child's hands in at the
  * weights' chains, `CHAINS`).
@@ -306,7 +306,7 @@ function clockPose(fit: ClockFit): (p: number) => PoseSpec {
 // --- the bird feeder ------------------------------------------------------------------------------
 
 /**
- * The songbird feeder (`pack_kind.py`), used from its post (`STEP_IN`'s lane): its house 1.38 to 1.58 m up,
+ * The songbird feeder (`crates/art/packs/src/pack_kind`), used from its post (`STEP_IN`'s lane): its house 1.38 to 1.58 m up,
  * its front 0.13 m behind the middle and its middle 0.22 m, the roof lifted for a refill (`lid_open`); the
  * seed tray round the post at 1.38 m, its front 0.06 m behind the middle.
  */

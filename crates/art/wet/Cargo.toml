@@ -1,0 +1,13 @@
+[package]
+name = "art-wet"
+description = "The game's item models, generated: kitchens, bathrooms and the laundry. One folder a family."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+artkit = { path = "../../artkit" }

@@ -1,0 +1,90 @@
+# Outgoing pack — notes
+
+`crates/art/packs/src/pack_outgoing` builds the six P14 outgoing models into `web/public/assets/models/pack_outgoing/` and their
+entries in `packs/pack_outgoing/manifest.json`, an override pack listed in the base manifest. Built
+2026-10-14; they sat in Validate › Outgoing until checked in play.
+
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`),
+backs on the wall's face (depth −0.43; the old parts' backs were 2 cm into the wall).
+
+| Model | Moving part and clip | Played by |
+|---|---|---|
+| `partyBar` | the beer tap's lever, hinged on the faucet: `tap` pulls it 40° towards the front (0.5 s), `hold` 2 s. "Back bar" (`wood`) colours the back cabinet, its top and the bottle shelves together (2026-10-21: the shelves were `oak`, the counter top's: M-packs-03) | `mixDrinks`, `soda` |
+| `conversationSectional` | the three seat cushions (tops at 0.45), origin on their underside: `sink_in` presses them 20 % (0.6 s) | `hangOut` |
+| `karaokeStage` | both mic stands' upper tubes, booms and mics, lowered at rest: `mic_up` raises them 20 cm (0.8 s). The screen and its lyrics glow while it is sung on (`screen`, `lyric`, `lyric_hi` `screen` glows: M-packs-07) | `practise`, `perform` |
+| `videoCallNook` | the ring light and its phone clip, pivoting in the yoke: tipped back 60° at rest (face to the ceiling), `ring_light` swings it up to face the caller (0.7 s). The ring light and the laptop's screen glow while the call lasts (`ring`, `screen`: M-packs-07) | `call` |
+| `danceFloor` | the sixteen tiles in two checkerboard parts: `tiles` (a loop, 1.2 s) lifts one set 2.5 cm and back, then the other. The tiles light up in their colours while it is danced on (`tile_*` `screen` glows: M-packs-07) | `dance` (`loops`) |
+| `photoWall` | a new snapshot in the board's bottom row, built full size and shrunk to nothing: `photo` grows it onto the board (0.8 s). The string of bulbs glows at night (`bulb`) | `reminisce` |
+
+The dance floor's table entry asks for the loop itself (`tiles`, E1), built as two parts on one clip with
+`motion::turns` (the two sets take turns lifting), and it starts and ends at rest.
+
+**Draw calls: 3 each.** The still body takes its plain finishes and at most one textured finish, the moving parts
+the rest. So that it stays at 3:
+- the bar: the counter is coral satin, its top, shelves and back cabinet `wood`; the stool tops are plain satin;
+- the sectional: frame, back and arms `fabric` on the still body (with the back cushions and the pouf), the seat
+  cushions `fabric` on their moving part; the console, the plant and the throw pillows are plain;
+- the karaoke stage: the deck is `wood`, the speakers plain satin (no speaker cloth draw);
+- the video-call corner: the desk top and the chair's shell and legs are `wood`, the chair's cushions plain satin;
+- the dance floor: no textured finish; the two tile sets are the two moving parts (gloss);
+- the photo wall: the frame and legs are `wood`, the cork plain matte.
+
+No glass anywhere: the bar's glasses and bottles are plain gloss. The bar's flutes are on the `body` material, so
+colouring the body colours the whole front (the tap's handle too). Nothing glows at night (the table asks for no
+night clip; the dance floor's tiles and the photo wall's string lights could take a `glow` later, one more draw
+each at night).
+
+| Model | Size (w × h × d) | Triangles | Draws | Colour parts |
+|---|---|---|---|---|
+| `model.outgoing.partyBar` | 1.84 × 2.00 × 0.88 m | 7,828 (was 7,872) | 7,828 | Body, Upholstery, Back bar |
+| `model.outgoing.conversationSectional` | 1.90 × 1.42 × 1.86 m | 7,940 (was 4,612) | 9,072 | Body, Upholstery |
+| `model.outgoing.karaokeStage` | 1.90 × 1.63 × 0.88 m | 3,668 (was 2,532) | 3,668 | Body, Speakers |
+| `model.outgoing.videoCallNook` | 0.84 × 1.28 × 0.78 m | 3,508 (was 3,132) | 3,508 | Body, Upholstery, Wood |
+| `model.outgoing.danceFloor` | 1.94 × 2.33 × 1.88 m | 4,112 (was 3,632) | 4,112 | Body, Speakers |
+| `model.outgoing.photoWall` | 0.90 × 2.14 × 0.49 m | 3,410 (was 3,634) | 3,410 | Body, Board |
+
+"Upholstery" (the plan's second colour part) fits the bar's stool tops, the sectional's cushions and the desk
+chair; the stage and the dance floor take their speakers instead, the photo wall its cork board.
+
+`check-glb`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Clips bench: every
+clip at rest and open on WebGPU and WebGL (the dance floor mid-loop, each tile set up in turn); the bar coloured
+there. In play (`wants-asking`, WebGPU, in the yard): the sectional (hangOut, seated), the dance floor (dance,
+the loop going), the bar (mixDrinks) and the video-call corner (call, seated facing the desk, the ring up) used by
+a resident; the video-call corner at all four facings, the stage and photo wall turned; the bar and sectional
+bought coloured; the same at night (`office-night`, WebGL).
+
+## Detail pass (2026-10-22)
+
+Same keys, sizes, parts, clips, paint and draws.
+- **Party bar:** the fluted coral front one slab extruded from a scalloped outline, a cap and plinth, an oak top with a
+  rounded nose, the foot rail bent back into the counter; the back bar's doors raised-panel `kit::shaker!`s with
+  `kit::knob!`s, a gallery rail on each shelf, round brass uprights; bottles lofted (round and square) with labels,
+  wine with foil; the tap tower bent in one piece on a flange, a turned lever; a pint with its head, a turned shaker;
+  stools lofted, with foot-ring struts and domed bases.
+- **Sectional:** every panel and cushion `soft_box!`: welted arms, piped back and seat cushions, plump pillows; tapered
+  brass feet; the console's legs tapered with stretchers, a turned lamp, a plant of heart leaves, a buttoned pouf with a
+  welt and a lipped tray.
+- **Karaoke stage:** a plank deck, turned speaker cones (surround, cone, dust cap), floor spots in yokes, tripod mic
+  stands of bent legs, the mics turned. Its screen's foot stood 1 cm into the wall (as the old one): moved, the `centre`
+  is (0, 0.012) now (it was 0.007).
+- **Video-call corner:** hairpin legs, a ring-light stand with a weighted foot and the yoke bent in one piece, a phone
+  with its screen, a laptop with keys and pad, a mug with a handle, a notebook and pen, a chair on a shell with tapered
+  legs.
+- **Dance floor:** the posts and beam are triangular box trusses (three chords, zigzag lacing), a moulded edge round
+  the base, moving-head spots, the mirror ball on a motor; tiles bevelled.
+- **Photo wall:** the board's frame a moulding, prints with round-headed pins, one sagging wire with sockets and bulbs,
+  lofted balloons on curling strings, a gift with a bow of two loops and tails.
+
+The bar keeps the gate's warning "seat 0.74 m (content `seat`): no model under it (x -0.50, depth 0.50)": the stools
+stand at depth 0.28 as before (the same warning on the file before this pass).
+
+## Rebuild
+
+```
+cargo art pack_outgoing            # the six .glb, the pack, check-glb
+cargo art pack_outgoing --preview  # previews/pack_outgoing/<id>.png, <id>@<clip>.png
+```
+
+## The soft forms pass (2026-11-13)
+
+The conversation sectional's three pillows are sewn flat and stuffed (`waist`), its seat and back cushions `resting`. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 2 models changed shape: `conversationSectional`, `videoCallNook`; 11,448 to 12,580 triangles.

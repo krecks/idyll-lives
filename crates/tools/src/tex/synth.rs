@@ -22,12 +22,17 @@
 mod organic;
 
 use super::grey_detail;
+use super::jpeg::{self, Chroma};
 use super::pil::{Filter, Img};
 use crate::content;
 use std::f64::consts::FRAC_1_SQRT_2;
 use std::path::Path;
 
 mod built;
+#[cfg(test)]
+mod standard;
+
+pub use built::features;
 
 // --- periodic noise -------------------------------------------------------------------------------
 
@@ -409,6 +414,24 @@ pub struct Set {
     pub ao_base: f64,
 }
 
+impl Set {
+    /// Its maps' directory under `web/public/assets/`, as the manifest names them: `textures/<set>`, the
+    /// sidewalk's `street/sidewalk`.
+    pub fn dir(&self) -> String {
+        if self.name == "sidewalk" {
+            "street/sidewalk".into()
+        } else {
+            format!("textures/{}", self.name)
+        }
+    }
+}
+
+/// The set a manifest material's `texture` (`textures/brick/albedo.jpg`) is the albedo of.
+pub fn set_of_texture(texture: &str) -> Option<&'static Set> {
+    let dir = texture.strip_suffix("/albedo.jpg")?;
+    SETS.iter().find(|s| s.dir() == dir)
+}
+
 const fn set(
     name: &'static str,
     albedo: usize,
@@ -594,12 +617,12 @@ pub fn run(only: &[&str]) -> Result<(), String> {
             return Err(format!("unknown texture set: {name}"));
         }
     }
-    let root = content::root().join("web/public/assets/textures");
+    let assets = content::root().join("web/public/assets");
     for set in SETS {
         if !only.is_empty() && !only.contains(&set.name) {
             continue;
         }
-        write_set(&root, &set)?;
+        write_set(&assets, &set)?;
     }
     if only.contains(&"sky") {
         println!("sky: textures/sky/clouds.png is `cargo tex clouds`, unchanged");
@@ -607,7 +630,8 @@ pub fn run(only: &[&str]) -> Result<(), String> {
     Ok(())
 }
 
-fn write_set(root: &Path, set: &Set) -> Result<(), String> {
+/// A set's maps at their sizes: (albedo, normal, arm).
+pub fn maps(set: &Set) -> (Img, Img, Img) {
     // The organic sets (`organic`) make their own albedo tone, AO and roughness.
     let (albedo, normal, arm) = match organic::generate(set.name, set.albedo) {
         Some(o) => o.maps(set),
@@ -635,25 +659,70 @@ fn write_set(root: &Path, set: &Set) -> Result<(), String> {
             (albedo, normal, arm)
         }
     };
-    let dir = if set.name == "sidewalk" {
-        root.join("../street/sidewalk")
-    } else {
-        root.join(set.name)
-    };
-    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    albedo.save_jpeg(&dir.join("albedo.jpg"), 85, true)?;
     let normal = if set.normal == set.albedo {
         normal
     } else {
         normal.resize(set.normal, set.normal, Filter::Lanczos)
     };
-    normal.save_jpeg(&dir.join("normal.jpg"), 88, true)?;
     let arm = if set.arm == set.albedo {
         arm
     } else {
         arm.resize(set.arm, set.arm, Filter::Lanczos)
     };
-    arm.save_jpeg(&dir.join("arm.jpg"), 85, true)?;
+    (albedo, normal, arm)
+}
+
+/// The qualities a normal map is stored at, the lowest that keeps it ([`normal_jpeg`]) taken.
+const NORMAL_QUALITY: [u8; 8] = [88, 90, 92, 94, 95, 96, 97, 98];
+
+/// A normal map as a JPEG: 4:4:4 (its channels are a direction's components, each a quantity of its own,
+/// which 4:2:0 would average two of, bending every normal), at the lowest of [`NORMAL_QUALITY`] whose decoded
+/// map keeps what `standard.rs` holds a stored normal map to: 95 % of texels within 10 % of unit length, the
+/// mean slope within 0.02 on both axes. (The highest when none does: the standard's test then says which.)
+fn normal_jpeg(normal: &Img) -> (Vec<u8>, u8) {
+    let keeps = |px: &[u8]| {
+        let (mut unit, mut n) = (0usize, 0usize);
+        let (mut sx, mut sy) = (0f64, 0f64);
+        for t in px.as_chunks::<3>().0 {
+            let [x, y, z] = t.map(|c| c as f64 / 255.0 * 2.0 - 1.0);
+            if ((x * x + y * y + z * z).sqrt() - 1.0).abs() <= 0.10 {
+                unit += 1;
+            }
+            if z > 0.05 {
+                sx += x / z;
+                sy += y / z;
+                n += 1;
+            }
+        }
+        let n = n.max(1) as f64;
+        unit as f64 >= 0.95 * (px.len() / 3) as f64
+            && (sx / n).abs() <= 0.02
+            && (sy / n).abs() <= 0.02
+    };
+    let mut stored = (Vec::new(), 0);
+    for q in NORMAL_QUALITY {
+        let bytes = jpeg::encode(&normal.px, normal.w, normal.h, 3, q, true, Chroma::Full);
+        let kept = jpeg::decode(&bytes).is_some_and(|(.., px)| keeps(&px));
+        stored = (bytes, q);
+        if kept {
+            break;
+        }
+    }
+    stored
+}
+
+fn write_set(assets: &Path, set: &Set) -> Result<(), String> {
+    let (albedo, normal, arm) = maps(set);
+    let dir = assets.join(set.dir());
+    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    // The albedo is for the eye (4:2:0, as any photograph); the normal and arm maps are data, each channel
+    // its own quantity: 4:4:4 (the arm map's ambient occlusion and roughness come back within half the
+    // error, and its blue, metalness, stays nearer 0).
+    albedo.save_jpeg(&dir.join("albedo.jpg"), 85, true, Chroma::Half)?;
+    let (normal_bytes, quality) = normal_jpeg(&normal);
+    let path = dir.join("normal.jpg");
+    std::fs::write(&path, normal_bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+    arm.save_jpeg(&dir.join("arm.jpg"), 85, true, Chroma::Full)?;
     let mut bytes = 0;
     for f in ["albedo.jpg", "normal.jpg", "arm.jpg"] {
         bytes += std::fs::metadata(dir.join(f))
@@ -661,7 +730,7 @@ fn write_set(root: &Path, set: &Set) -> Result<(), String> {
             .len();
     }
     println!(
-        "{:<18} {}x{}  {} KB",
+        "{:<18} {}x{}  {} KB  (normal q{quality})",
         set.name,
         set.albedo,
         set.normal,

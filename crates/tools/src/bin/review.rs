@@ -1,6 +1,7 @@
 //! `cargo review`: the authenticity review's checks (`ll_tools::review`).
 //!
-//!     cargo review sizes [--md <dir>]   sizes and functional heights against docs/review/reference.json
+//!     cargo review sizes [--md <dir>]   sizes and functional heights against docs/review/reference.json,
+//!         [--check]                     plants against their species; `--check` gates it by the baseline
 //!     cargo review uses [--md <dir>]    uses, motions and sounds per object, and what looks wrong
 
 fn main() {

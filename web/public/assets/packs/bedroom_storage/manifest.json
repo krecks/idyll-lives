@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built bedroom storage (tools/art/blender/families/bedroom_storage.py): the nightstands, the blanket chest, the laundry hamper and the bed-end bench (BR2), and the dressers, chests and wardrobes (BR3). Listed in the base manifest's packs. A dresser or chest slides its middle drawer out 30 cm (`drawer_open`), a wardrobe swings its doors open (`doors_open`, `door_open`) while a resident picks an outfit.",
+  "$comment": "The bedroom storage (crates/art/rooms/src/bedroom_storage, built by cargo art): the nightstands, the blanket chest, the laundry hamper and the bed-end bench (BR2), and the dressers, chests and wardrobes (BR3). Listed in the base manifest's packs. A dresser or chest slides its middle drawer out 30 cm (`drawer_open`), a wardrobe swings its doors open (`doors_open`, `door_open`) while a resident picks an outfit.",
   "version": 1,
   "entries": {
     "model.nightstand": {

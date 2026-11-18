@@ -871,6 +871,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
     this.lib = MaterialLibrary.for(this.app).setAssets(this.deps.assets);
     this.lib.anisotropy = this.quality.anisotropy;
+    this.lib.finishLayers = this.quality.finishLayers && !this.diag.has('nolayers');
     this.lib.setShading(this.shading);
 
     const scene = this.app.scene;

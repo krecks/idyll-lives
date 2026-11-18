@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built hot-headed pack models (tools/art/blender/families/pack_hotHeaded.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each has its moving part: the bag swings while pounded, the crate's lid flips up, the cymbals rock while the kit is played, the zafu sinks, the desk drawer slides out and the plunge tub's slatted cover rolls back.",
+  "$comment": "Hot-headed pack models (crates/art/packs/src/pack_hot_headed, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each has its moving part: the bag swings while pounded, the crate's lid flips up, the cymbals rock while the kit is played, the zafu sinks, the desk drawer slides out and the plunge tub's slatted cover rolls back.",
   "version": 1,
   "entries": {
     "model.hotHeaded.heavyBag": {

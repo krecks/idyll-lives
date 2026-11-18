@@ -1,5 +1,5 @@
 {
-  "$comment": "Catalogue 2: Music, games and crafts. Separate pieces only. Models: assets/manifest.json and the packs it lists (tools/art/blender/families/).",
+  "$comment": "Catalogue 2: Music, games and crafts. Separate pieces only. Models: assets/manifest.json and the packs it lists (crates/art).",
   "objects": [
     {
       "id": "drumKit",

@@ -1,5 +1,5 @@
-//! `cargo check-glb [keys…] [--keys] [--preview]`: the gate for the game's glTF models
-//! (docs/design/objects.md, "Validation"), was tools/art/blender/check_glb.py, and prints what it printed.
+//! `cargo check-glb [keys…] [--keys] [--preview] [--against <rev|dir>] [--built <dir>]`: the gate for the game's
+//! glTF models (docs/design/objects.md, "Validation").
 //!
 //! It reads every `.glb` a model entry of the manifests uses (the base manifest and its packs, later ones
 //! overriding) with that entry, checks what the game needs of it, and that every model the content draws
@@ -8,20 +8,35 @@
 //!   cargo check-glb                        every .glb the manifests use
 //!   cargo check-glb model.garden.gnome …   only these keys (model., item., tool.)
 //!   cargo check-glb --keys                 the keys a build may write (`known_keys`)
-//!   cargo check-glb --preview              also re-imports each file in Blender and renders it to
-//!                                          tools/art/blender/previews/<family>/rt_<name>.png (gamekit/review.py)
+//!   cargo check-glb --preview [--sheet]    also draws each file as read (`preview`) to
+//!                                          tools/art/previews/<family>/rt_<name>.png, its clips, perches and far
+//!                                          version beside it (and its sheet)
+//!   cargo check-glb --validate             also runs the Khronos glTF validator over each file and its far
+//!                                          version (`validate`: Bun and web/'s `gltf-validator`)
+//!   cargo check-glb --update-baseline      first lowers tools/art/gate-baseline.json to what the counted checks
+//!                                          find (`COUNTED`; it only lowers counts and takes keys out)
+//!   cargo check-glb --against <rev|dir>    not the gate: whether this build of the models is that one (`against`)
+//!   cargo check-glb --built <dir>          the same rules over what the game builds as it runs, dumped there by
+//!                                          tools/built/dump.ts (`built`)
 //!
-//! Run the Khronos glTF validator too (the standard says how); this checks the game's own rules.
-//!
-//! What it prints is check_glb.py's to the byte: JSON objects are read in file order, numbers as Python
+//! What it prints keeps one form: JSON objects are read in file order, numbers as Python
 //! has them (an int stays an int), and formatted, `repr`'d and `math.hypot`'d as Python does (`py`); and
 //! since, the functional heights' warnings (`heights`: seats, tops, mattresses and lamps against the model).
 //! `measures` gives `cargo review` the same numbers.
 
-mod glb;
+pub mod against;
+pub mod baseline;
+pub mod built;
+mod digest;
+pub(crate) mod glb;
 pub(crate) mod json;
+pub mod meshes;
+mod near;
+pub mod preview;
 pub(crate) mod py;
+pub mod validate;
 
+use baseline::{Baseline, Counts, Found, Verdict};
 use glb::{Glb, R, accessor, first_value, image_size, index, item, key, parse_glb, values};
 use py::{
     J, Num, dirname, dist, fixed, hypot, join, normpath, percent, relpath, repr, repr_str, signed,
@@ -53,8 +68,8 @@ const EXTENSIONS: [&str; 7] = [
     "KHR_materials_ior",
     "KHR_materials_specular",
 ];
-/// Largest texture side (px).
-const TEXTURE_MAX: u32 = 1024;
+/// Largest side (px) of a texture of a model's own by the model's largest side (m): (up to, most).
+const TEXTURE_MAX: [(f64, u32); 2] = [(2.5, 512), (f64::INFINITY, 1024)];
 /// The wall's face lies this far into a footprint's back tile (m): a wall-standing thing's back is there.
 const WALL: f64 = 0.07;
 /// A house's floor is drawn 1 cm up: a flat part on the floor must reach this high (m) to show over it.
@@ -110,7 +125,30 @@ pub const STRICT: &[(&str, &str)] = &[
         "materials unmapped, double-sided, see-through (BLEND), glowing by day or with unused UVs",
     ),
     ("far", "its far version isn't the full model's size"),
+    (
+        "validator",
+        "the Khronos glTF validator reports an error or a warning",
+    ),
+    (
+        "reference",
+        "it is outside its kind's range in docs/review/reference.json",
+    ),
+    ("edges", "hard edges show unbevelled at the play camera"),
+    (
+        "texels",
+        "a textured finish's texels are too sparse, too dense or stretched",
+    ),
+    (
+        "pbr",
+        "a finish's PBR values are outside their plausible ranges",
+    ),
 ];
+
+/// The strict checks counted per model against the baseline (`baseline`): each came into the gate after the models
+/// it finds, so a model's findings up to its count in tools/art/gate-baseline.json are warnings, and more, or any
+/// in a model the file doesn't have, fail. Some run only when asked (`--validate`) or outside the gate (`cargo
+/// review sizes`), so an `accept` of one is unused only where it ran.
+pub const COUNTED: [&str; 5] = ["validator", "reference", "edges", "texels", "pbr"];
 
 /// Marks a finding of the strict check `kind` (`STRICT`), carried among the warnings until `strictly` sorts it.
 const TAG: char = '\u{1f}';
@@ -127,12 +165,13 @@ fn untag(s: &str) -> Option<(&str, &str)> {
 
 /// The findings of one model with its strict ones sorted out (`STRICT`): an error each, or, where its entry's
 /// `accept` names the check, an accepted note with the reason. An `accept` that names no strict check, gives no
-/// reason, or that the model no longer needs is an error: a stale one would hide the next.
-/// Returns (errors, warnings, accepted).
+/// reason, or that the model no longer needs is an error: a stale one would hide the next (a counted check's
+/// only where it ran, `ran`). Returns (errors, warnings, accepted).
 fn strictly(
     entry: &J,
     errors: Vec<String>,
     warnings: Vec<String>,
+    ran: &[&str],
 ) -> (Vec<String>, Vec<String>, Vec<String>) {
     let none = J::Obj(Vec::new());
     let accept = entry.get("accept").unwrap_or(&none);
@@ -188,7 +227,11 @@ fn strictly(
     }
     out.0.extend(problems);
     for (k, reason) in &reasons {
-        if reason.is_some() && STRICT.iter().any(|(s, _)| s == k) && !used.contains(k) {
+        if reason.is_some()
+            && STRICT.iter().any(|(s, _)| s == k)
+            && (!COUNTED.contains(&k.as_str()) || ran.contains(&k.as_str()))
+            && !used.contains(k)
+        {
             out.0.push(format!("`accept.{k}` is unused: the model passes that check (take it out of its Model or entry)"));
         }
     }
@@ -197,7 +240,7 @@ fn strictly(
 const SWEEP: f64 = 0.01;
 /// How far (m) a model's middle at rest may be off its `centre` (centres.json).
 const OFF_CENTRE: f64 = 0.02;
-/// A bird's `bird` (tools/art/blender/families/birds.py; the renderer flies it by code): its length bill to tail
+/// A bird's `bird` (crates/art/things/src/birds; the renderer flies it by code): its length bill to tail
 /// tip and wingspan (m, both needed), its body's middle over its feet (`perchHeight`, m) and how far its perched
 /// torso is raised from level (`pitch`, degrees).
 const BIRD_KEYS: [&str; 4] = ["length", "wingspan", "perchHeight", "pitch"];
@@ -207,14 +250,14 @@ const BIRD_PARTS: [&str; 5] = ["body", "head", "tail", "wing.L", "wing.R"];
 const BIRD_FIT: f64 = 0.05;
 /// How far (m) a perch (`perches`: where the game's birds sit on a tree or a hedge) may be outside the model's box.
 const PERCH_OUT: f64 = 0.01;
-/// What a model with `perches` is, its entry's `habitat` (families/trees.py, plants.py): a broadleaved or fruit tree,
+/// What a model with `perches` is, its entry's `habitat` (crates/art/nature/src/trees and plants): a broadleaved or fruit tree,
 /// a conifer, a bush or shrub, or a hedge.
 const HABITATS: [&str; 4] = ["tree", "conifer", "bush", "hedge"];
 
-/// Where the gate reads: the repo's assets, content and tools/art/blender/centres.json.
+/// Where the gate reads: the repo's assets, content and tools/art/centres.json.
 pub struct Paths {
-    /// tools/art/blender
-    pub here: String,
+    /// tools/art: the models' tools (centres.json, the gate's baseline, previews/)
+    pub art: String,
     /// web/public/assets
     pub assets: String,
     /// web/public/content
@@ -222,11 +265,13 @@ pub struct Paths {
     /// web/src/render/shared/characters/furniture.json: where residents sit and lie on each object (`SEATS`,
     /// `BEDS`, `BUNKS` in characters.ts), for the height checks.
     pub furniture: String,
-    /// tools/art/blender/centres.json: where each Blender-built model is centred at rest (its Model's
-    /// `centre`, (0, 0) for most): {key: [x, depth]}, for this gate only (the game doesn't read it). A build
-    /// writes its models' (gamekit/family.py), `cargo art --centres` every family's. A key that isn't in it
-    /// isn't built here (a third-party file): its centre isn't checked.
+    /// tools/art/centres.json: where each model `cargo art` builds is centred at rest (its Model's `centre`,
+    /// (0, 0) for most): {key: [x, depth]}, for this gate only (the game doesn't read it). A build writes its
+    /// models', `cargo art --centres` every family's. A key that isn't in it isn't built here (a third-party
+    /// file): its centre isn't checked.
     pub centres: String,
+    /// tools/art/gate-baseline.json: the counted checks' findings each model may keep (`baseline`).
+    pub baseline: String,
 }
 
 impl Paths {
@@ -234,14 +279,15 @@ impl Paths {
     pub fn at(root: &str) -> Paths {
         let root = normpath(root);
         Paths {
-            here: normpath(&join(&root, "tools/art/blender")),
+            art: normpath(&join(&root, "tools/art")),
             assets: normpath(&join(&root, "web/public/assets")),
             content: normpath(&join(&root, "web/public/content")),
             furniture: normpath(&join(
                 &root,
                 "web/src/render/shared/characters/furniture.json",
             )),
-            centres: normpath(&join(&root, "tools/art/blender/centres.json")),
+            centres: normpath(&join(&root, "tools/art/centres.json")),
+            baseline: normpath(&join(&root, baseline::FILE)),
         }
     }
 
@@ -508,6 +554,8 @@ fn content_objects(defs: &Content) -> R<HashMap<String, Vec<Facts>>> {
 struct Finishes {
     plain: HashMap<String, bool>,
     see_through: HashSet<String>,
+    /// The textured ones: {key: (its `uvScale`, its texture's file)}.
+    textures: HashMap<String, (f64, String)>,
 }
 
 impl Finishes {
@@ -540,7 +588,7 @@ fn apply(m: &Matrix, v: &[Num]) -> [Num; 3] {
     ]
 }
 
-fn applied(m: &Matrix, v: &[Num]) -> [f64; 3] {
+pub(crate) fn applied(m: &Matrix, v: &[Num]) -> [f64; 3] {
     apply(m, v).map(Num::f)
 }
 
@@ -590,9 +638,9 @@ fn node_name(nodes: &J, i: usize) -> String {
 
 /// A mesh node of the default scene: its mesh, its world matrix, its moving part (the nearest node above
 /// it, or itself, that an animation moves; None: the still body) and the node.
-struct Placed {
-    mesh: J,
-    m: Matrix,
+pub(crate) struct Placed {
+    pub(crate) mesh: J,
+    pub(crate) m: Matrix,
     part: Option<usize>,
     node: usize,
 }
@@ -603,7 +651,7 @@ type Pose = HashMap<(usize, &'static str), Vec<Num>>;
 
 /// The mesh nodes of the default scene (`Placed`), their parts where `pose` puts them; `worlds`, if given,
 /// gets every node's world matrix.
-fn node_matrices(
+pub(crate) fn node_matrices(
     gltf: &J,
     pose: Option<&Pose>,
     worlds: Option<&mut HashMap<usize, Matrix>>,
@@ -1028,7 +1076,7 @@ fn habitat_errors(entry: &J) -> Vec<String> {
 }
 
 /// The primitives of a mesh (`gltf['meshes'][i]['primitives']`).
-fn primitives<'a>(gltf: &'a J, mesh: &J) -> R<&'a [J]> {
+pub(crate) fn primitives<'a>(gltf: &'a J, mesh: &J) -> R<&'a [J]> {
     Ok(key(item(gltf, "meshes", mesh)?, "primitives")?
         .list()
         .unwrap_or(&[]))
@@ -1053,7 +1101,7 @@ fn positions(g: &Glb, prim: &J) -> R<Vec<Vec<Num>>> {
 }
 
 /// Whether a primitive's vertex colour (COLOR_0) is anything but grey. The game reads it as the shading baked into
-/// the model's creases (gamekit/shade.py) and multiplies it into the part's colour, so a colour in it would tint
+/// the model's creases (artkit's shade.rs) and multiplies it into the part's colour, so a colour in it would tint
 /// the part. One it can't read here (compressed) passes.
 fn coloured(g: &Glb, prim: &J) -> R<bool> {
     let Some(index) = key(prim, "attributes")?.get("COLOR_0") else {
@@ -1068,7 +1116,7 @@ fn coloured(g: &Glb, prim: &J) -> R<bool> {
 }
 
 /// Whether an accessor's values are all the same (or can't be read here: compressed): a plain part's UVs, zero
-/// in Blender, (0, 1) once the exporter has turned v round.
+/// as built, (0, 1) once the writer has turned v round.
 fn constant(g: &Glb, index: &J) -> R<bool> {
     Ok(accessor(g, index)?.is_none_or(|rows| {
         rows.first().is_none_or(|first| {
@@ -1525,13 +1573,13 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
         }
         if late > CLIP_START {
             errors.push(format!(
-                "clip {name} starts {} s in: the game holds it at rest until then, a pause each round of a loop (its first key at 0 s: gamekit/export.py)",
+                "clip {name} starts {} s in: the game holds it at rest until then, a pause each round of a loop (its first key at 0 s, as artkit writes a clip)",
                 fixed(late, 3)
             ));
         }
         if cubic {
             warnings.push(strict("cubic", format!(
-                "clip {name} has cubic-spline keys: the game plays them as straight lines between the keys (export it sampled, as gamekit does)"
+                "clip {name} has cubic-spline keys: the game plays them as straight lines between the keys (export it sampled, as artkit does)"
             )));
         }
         for c in key(a, "channels")?.list().unwrap_or(&[]) {
@@ -1850,7 +1898,7 @@ type Bounds = ([Num; 3], [Num; 3]);
 /// Each moving part's bounds (None: the still body), in the order they're met.
 type PartBounds = Vec<(Option<usize>, Bounds)>;
 
-/// A model's nodes drawn but not part of its own size (`gamekit.parts.ASIDE`): a desk's chair, a chest of
+/// A model's nodes drawn but not part of its own size (`artkit::parts::aside`): a desk's chair, a chest of
 /// drawers' picture, the blocks left out in front of a toy box, the flag on a climbing frame, the block and
 /// bottle beside a rolled mat. The game draws them; `model()` leaves them out of the size it measures.
 pub const ASIDE: &str = "_aside";
@@ -3143,6 +3191,8 @@ struct Info {
     lo: [Num; 3],
     clips: usize,
     moving: usize,
+    /// What each counted check run on the file (`FileCheck`) found.
+    counted: Vec<(&'static str, Found)>,
 }
 
 fn dims_text(dims: &[Num; 3]) -> String {
@@ -3158,9 +3208,79 @@ fn in_hand(key: &str) -> bool {
     key.starts_with("tool.")
 }
 
+/// A model file as a counted check gets it: the model's key and entry, the file, the manifests' finishes, and
+/// whether it is the model's far version.
+struct ModelFile<'a> {
+    key: &'a str,
+    entry: &'a J,
+    glb: &'a Glb,
+    fin: &'a Finishes,
+    far: bool,
+}
+
+/// A counted check (`COUNTED`) run on each model file as the gate reads it, the full model's and its far
+/// version's (whose findings are the model's): what it finds in the file.
+type FileCheck = fn(&ModelFile) -> R<Found>;
+
+/// The counted checks run on each model file, by name.
+const FILE_CHECKS: &[(&str, FileCheck)] =
+    &[("edges", meshes::hard_edges), ("texels", meshes::texels)];
+
+/// A counted check (`COUNTED`) run over every model file at once (an outside program, `--validate`) before the
+/// models are judged: given each model's key, its file and its far version's, what it found in each model it read.
+pub type BatchCheck =
+    fn(&[(String, String, Option<String>)]) -> Result<BTreeMap<String, Found>, String>;
+
+/// The counted checks of a gate run and the baseline they are judged by.
+struct Counting<'a> {
+    baseline: &'a Baseline,
+    file: &'a [(&'static str, FileCheck)],
+    /// What the batch checks (`BatchCheck`) found: {check: {key: …}}.
+    batch: BTreeMap<&'static str, BTreeMap<String, Found>>,
+}
+
+/// One model's findings of a counted check by the baseline (`baseline::sort`), as (errors, warnings) for
+/// `strictly`, and the count the baseline may keep. Over it or new, the findings are strict: errors unless the
+/// model's entry `accept`s the check. An entry that accepts it takes its findings whatever the baseline holds
+/// (it may keep none), so a count the baseline still has for the model is stale.
+fn ratchet(
+    baseline: &Baseline,
+    entry: &J,
+    key: &str,
+    check: &'static str,
+    found: Found,
+) -> (Vec<String>, Vec<String>, u64) {
+    let accepted = entry
+        .get("accept")
+        .and_then(|a| a.get(check))
+        .and_then(J::str)
+        .is_some_and(|r| !r.trim().is_empty());
+    let count = found.count;
+    let verdict = match (accepted, count) {
+        (false, _) => baseline.judge(check, key, count),
+        (true, 0) => Verdict::Clean,
+        (true, _) => Verdict::New(count),
+    };
+    let sorted = baseline::sort(check, verdict, found);
+    let mut errors = sorted.errors;
+    let base = baseline.get(check, key);
+    if accepted && base > 0 {
+        errors.push(format!(
+            "{check}: its entry accepts it, and the baseline still has {base}: take it out (`cargo check-glb --update-baseline`)"
+        ));
+    }
+    let mut warnings: Vec<String> = sorted
+        .strict
+        .into_iter()
+        .map(|t| strict(check, t))
+        .collect();
+    warnings.extend(sorted.warnings);
+    (errors, warnings, if accepted { 0 } else { count })
+}
+
 /// (errors, warnings, summary) for one model entry and its file (and its far version's, at `far`);
 /// `facts`: those of each content object that draws it (`content_objects`); `centre`: where it's built
-/// centred (centres.json; None: not built here, not checked).
+/// centred (centres.json; None: not built here, not checked); `counting`: the counted checks.
 #[allow(clippy::too_many_arguments)]
 fn check(
     entry_key: &str,
@@ -3171,9 +3291,19 @@ fn check(
     facts: Option<&Vec<Facts>>,
     centre: Option<&J>,
     furniture: Option<&Furniture>,
+    counting: &Counting,
 ) -> R<Checked> {
-    let (mut errors, mut warnings, info) =
-        check_file(entry_key, fin, entry, path, facts, centre, furniture)?;
+    let (mut errors, mut warnings, info) = check_file(
+        entry_key,
+        fin,
+        entry,
+        path,
+        false,
+        facts,
+        centre,
+        furniture,
+        counting.file,
+    )?;
     let mut summary = format!(
         "{:>6} KB {:>6} tris {} draws {:>2} materials  {} m",
         fixed(info.size as f64 / 1024.0, 1),
@@ -3185,6 +3315,7 @@ fn check(
     if info.clips > 0 {
         summary += &format!("  {} moving parts, {} clips", info.moving, info.clips);
     }
+    let mut far_counted = Vec::new();
     if let Some(far) = far {
         // Its far version (`far`): the same model, still, with far fewer triangles.
         // (Without what the full model is checked for: its clips, colours and centre, a bird's parts and the perches.)
@@ -3199,11 +3330,20 @@ fn check(
                 .cloned()
                 .collect(),
         );
-        let (mut far_errors, mut far_warnings, far_info) =
-            match check_file(entry_key, fin, &far_entry, far, None, None, None) {
-                Ok((e, w, i)) => (e, w, Some(i)),
-                Err(err) => (vec![format!("cannot read {far}: {err}")], Vec::new(), None),
-            };
+        let (mut far_errors, mut far_warnings, far_info) = match check_file(
+            entry_key,
+            fin,
+            &far_entry,
+            far,
+            true,
+            None,
+            None,
+            None,
+            counting.file,
+        ) {
+            Ok((e, w, i)) => (e, w, Some(i)),
+            Err(err) => (vec![format!("cannot read {far}: {err}")], Vec::new(), None),
+        };
         if let Some(fi) = far_info {
             if fi.clips > 0 {
                 far_errors.push("has clips: a far version stands still".into());
@@ -3238,6 +3378,7 @@ fn check(
                 ));
             }
             summary += &format!("  (far: {} tris)", fi.tris);
+            far_counted = fi.counted;
         }
         // (A strict finding of the far version stays one: `strict`'s mark comes first.)
         let far = |w: String| match untag(&w) {
@@ -3248,12 +3389,42 @@ fn check(
         // (What it says of the far version, it says of the full model too.)
         warnings.extend(far_warnings.into_iter().map(far));
     }
-    let (errors, warnings, accepted) = strictly(entry, errors, warnings);
+    // The counted checks: what they found in the file and its far version's (`far: …`), and the batch checks'.
+    let mut found: BTreeMap<&'static str, Found> = BTreeMap::new();
+    let far_found = far_counted.into_iter().map(|(c, f)| {
+        let text = f.text.into_iter().map(|t| format!("far: {t}")).collect();
+        (
+            c,
+            Found {
+                count: f.count,
+                text,
+            },
+        )
+    });
+    let batch = counting
+        .batch
+        .iter()
+        .filter_map(|(c, by_key)| Some((*c, by_key.get(entry_key)?.clone())));
+    for (c, f) in info.counted.into_iter().chain(far_found).chain(batch) {
+        let all = found.entry(c).or_default();
+        all.count += f.count;
+        all.text.extend(f.text);
+    }
+    let mut counts = Vec::new();
+    for (c, f) in found {
+        let (e, w, n) = ratchet(counting.baseline, entry, entry_key, c, f);
+        errors.extend(e);
+        warnings.extend(w);
+        counts.push((c, n));
+    }
+    let ran: Vec<&str> = counts.iter().map(|(c, _)| *c).collect();
+    let (errors, warnings, accepted) = strictly(entry, errors, warnings, &ran);
     Ok(Checked {
         errors,
         warnings,
         accepted,
         summary,
+        counts,
     })
 }
 
@@ -3264,18 +3435,24 @@ struct Checked {
     warnings: Vec<String>,
     accepted: Vec<String>,
     summary: String,
+    /// What the counted checks that ran counted, as the baseline may keep it (`ratchet`).
+    counts: Vec<(&'static str, u64)>,
 }
 
-/// (errors, warnings, numbers) for one model entry and a file of it; `facts`: those of each content object
-/// that draws it (`content_objects`), each checked; `centre`: where it's built centred (centres.json), or None.
+/// (errors, warnings, numbers) for one model entry and a file of it (`far`: its far version); `facts`: those of
+/// each content object that draws it (`content_objects`), each checked; `centre`: where it's built centred
+/// (centres.json), or None; `counted`: the counted checks to run on it.
+#[allow(clippy::too_many_arguments)]
 fn check_file(
     entry_key: &str,
     fin: &Finishes,
     entry: &J,
     path: &str,
+    far: bool,
     facts: Option<&Vec<Facts>>,
     centre: Option<&J>,
     furniture: Option<&Furniture>,
+    counted: &[(&'static str, FileCheck)],
 ) -> R<(Vec<String>, Vec<String>, Info)> {
     let (mut errors, mut warnings) = (Vec::new(), Vec::new());
     let data = std::fs::read(path).map_err(|e| py::os_error(&e, path))?;
@@ -3496,7 +3673,7 @@ fn check_file(
             } else {
                 None
             };
-            // UVs a textured finish draws with (gamekit/uv.py) or the file's own textures read; a plain part joined
+            // UVs a textured finish draws with (artkit's uv.rs) or the file's own textures read; a plain part joined
             // with textured ones carries one UV throughout, which costs next to nothing compressed.
             if let Some(uvs) = key(prim, "attributes")?.get("TEXCOORD_0") {
                 let used = finish.map_or(textured, |f| fin.textured(f));
@@ -3590,7 +3767,7 @@ fn check_file(
     }
     if let Some(names) = flags.get("coloured").filter(|n| !n.is_empty()) {
         let names = names.iter().cloned().collect::<Vec<_>>().join(", ");
-        errors.push(format!("materials with a coloured COLOR_0: {names} (the game multiplies it in as baked shading, grey: gamekit/shade.py)"));
+        errors.push(format!("materials with a coloured COLOR_0: {names} (the game multiplies it in as baked shading, grey: artkit's shade.rs)"));
     }
 
     // Units and origin: on the floor, centred on the footprint (models.ts lines files up by neither).
@@ -3768,6 +3945,7 @@ fn check_file(
         .find(|(up, _, _)| side.f() <= *up)
         .map(|(_, t, m)| (*t, *m))
         .ok_or("StopIteration")?;
+    let texture_most = texture_most(side.f());
     if tris > most {
         errors.push(format!(
             "{tris} triangles, at most {most} for a model {} m across (aim for {target})",
@@ -3819,10 +3997,11 @@ fn check_file(
             None => None,
         };
         if let Some((w, h)) = wh
-            && w.max(h) > TEXTURE_MAX
+            && w.max(h) > texture_most
         {
             errors.push(format!(
-                "texture {i} is {w}x{h}, at most {TEXTURE_MAX} px a side"
+                "texture {i} is {w}x{h}, at most {texture_most} px a side for a model {} m across",
+                fixed(side.f(), 2)
             ));
         }
         let label = img
@@ -3847,27 +4026,64 @@ fn check_file(
             .and_then(J::list)
             .map_or(0, |a| a.len()),
         moving: moved_nodes(gltf)?.len(),
+        counted: counted
+            .iter()
+            .map(|(c, run)| {
+                let file = ModelFile {
+                    key: entry_key,
+                    entry,
+                    glb: &g,
+                    fin,
+                    far,
+                };
+                Ok((*c, run(&file)?))
+            })
+            .collect::<R<_>>()?,
     };
     Ok((errors, warnings, info))
 }
 
-/// What the gate found: its text, the keys it checked (in order), the model file of each, and whether
-/// anything failed.
+/// The largest side (px) of a texture of its own for a model `side` m across (`TEXTURE_MAX`).
+fn texture_most(side: f64) -> u32 {
+    TEXTURE_MAX
+        .iter()
+        .find(|(up, _)| side <= *up)
+        .map_or(TEXTURE_MAX[1].1, |(_, most)| *most)
+}
+
+/// What the gate found: its text, the keys it checked (in order), the model file of each, whether anything
+/// failed, and what the counted checks that ran counted (`Baseline::lowered`).
 pub struct Report {
     pub text: String,
     pub checked: Vec<String>,
     pub files: Vec<String>,
     pub failed: usize,
+    pub counts: Counts,
 }
 
-/// Runs the gate over `keys` (every model if none), as check_glb.py's `main` did, into a report.
+/// Runs the gate over `keys` (every model if none) into a report.
 pub fn gate(paths: &Paths, keys: &[String]) -> Report {
+    gate_with(paths, keys, &[])
+}
+
+/// The gate with counted checks run over every file at once (`BatchCheck`), each by its name in `COUNTED`.
+pub fn gate_with(paths: &Paths, keys: &[String], batch: &[(&'static str, BatchCheck)]) -> Report {
+    run_gate(paths, keys, FILE_CHECKS, batch)
+}
+
+fn run_gate(
+    paths: &Paths,
+    keys: &[String],
+    file: &[(&'static str, FileCheck)],
+    batch: &[(&'static str, BatchCheck)],
+) -> Report {
     let mut text = String::new();
     let fail = |text: String| Report {
         text,
         checked: Vec::new(),
         files: Vec::new(),
         failed: 1,
+        counts: Counts::new(),
     };
     let read = || -> Result<_, String> {
         let stack = asset_manifests(paths)?;
@@ -3893,6 +4109,14 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
         Err(err) => {
             return fail(format!(
                 "FAIL centres.json\n       error: cannot read it: {err}\n"
+            ));
+        }
+    };
+    let baseline = match Baseline::read(&paths.baseline) {
+        Ok(b) => b,
+        Err(err) => {
+            return fail(format!(
+                "FAIL gate-baseline.json\n       error: cannot read it: {err}\n"
             ));
         }
     };
@@ -3947,6 +4171,8 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
             if k.is_empty() { "(empty model)" } else { k }
         );
     }
+    // Each model to check with its file and its far version's.
+    let mut todo = Vec::new();
     for (k, (entry, manifest)) in &entries {
         let url = entry
             .get("url")
@@ -3961,11 +4187,36 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
             .get("far")
             .filter(|f| f.truthy())
             .map(|f| normpath(&join(&dirname(manifest), &f.key())));
+        todo.push((k, entry, path, far));
+    }
+    let mut counting = Counting {
+        baseline: &baseline,
+        file,
+        batch: BTreeMap::new(),
+    };
+    let model_files: Vec<(String, String, Option<String>)> = todo
+        .iter()
+        .map(|(k, _, path, far)| ((*k).clone(), path.clone(), far.clone()))
+        .collect();
+    for (name, run) in batch {
+        match run(&model_files) {
+            Ok(found) => {
+                counting.batch.insert(name, found);
+            }
+            Err(err) => {
+                failed += 1;
+                text += &format!("FAIL {name}\n       error: {err}\n");
+            }
+        }
+    }
+    let mut counts = Counts::new();
+    for (k, entry, path, far) in todo {
         let Checked {
             errors,
             warnings,
             accepted,
             summary,
+            counts: counted,
         } = check(
             k,
             &fin,
@@ -3975,13 +4226,18 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
             facts.get(k),
             centres.get(k),
             Some(&furniture),
+            &counting,
         )
         .unwrap_or_else(|err| Checked {
             errors: vec![format!("cannot read {path}: {err}")],
             warnings: Vec::new(),
             accepted: Vec::new(),
             summary: String::new(),
+            counts: Vec::new(),
         });
+        for (c, n) in counted {
+            counts.entry(c.into()).or_default().insert(k.clone(), n);
+        }
         failed += !errors.is_empty() as usize;
         checked.push(k.clone());
         files.push(path.clone());
@@ -3999,6 +4255,38 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
             text += &format!("       accepted: {a}\n");
         }
     }
+    // The baseline itself: a section for no counted check, and, over every model, a key of a check that ran that is
+    // no model the gate checked (counted as none found, so `--update-baseline` takes it out).
+    let mut stale = Vec::new();
+    let seen: HashSet<&str> = checked.iter().map(String::as_str).collect();
+    for check in baseline.checks() {
+        // (The built world's sections are its own gate's: `built`.)
+        if built::CHECKS.contains(&check) {
+            continue;
+        }
+        if !COUNTED.contains(&check) {
+            stale.push(format!(
+                "{} is no counted check (one of {}): take it out",
+                repr_str(check),
+                COUNTED.join(", ")
+            ));
+            continue;
+        }
+        let Some(ran) = counts.get_mut(check).filter(|_| keys.is_empty()) else {
+            continue;
+        };
+        for key in baseline.keys(check).filter(|k| !seen.contains(k)) {
+            stale.push(format!("{check}: {key} is no model the gate checked: take it out (`cargo check-glb --update-baseline`)"));
+            ran.insert(key.into(), 0);
+        }
+    }
+    if !stale.is_empty() {
+        failed += 1;
+        text += "FAIL gate-baseline.json\n";
+        for e in stale {
+            text += &format!("       error: {e}\n");
+        }
+    }
     text += &format!("{} models, {failed} failed", checked.len());
     if !problems.is_empty() {
         text += &format!(" ({} without a file it can read)", problems.len());
@@ -4009,7 +4297,32 @@ pub fn gate(paths: &Paths, keys: &[String]) -> Report {
         checked,
         files,
         failed,
+        counts,
     }
+}
+
+/// Lowers the baseline to what the gate counts over `keys` (every model if none; `Baseline::lowered`) and writes
+/// it if that changes it: a line for each change.
+pub fn update_baseline(
+    paths: &Paths,
+    keys: &[String],
+    batch: &[(&'static str, BatchCheck)],
+) -> Result<Vec<String>, String> {
+    update_with(paths, keys, FILE_CHECKS, batch)
+}
+
+fn update_with(
+    paths: &Paths,
+    keys: &[String],
+    file: &[(&'static str, FileCheck)],
+    batch: &[(&'static str, BatchCheck)],
+) -> Result<Vec<String>, String> {
+    let report = run_gate(paths, keys, file, batch);
+    let (lowered, changes) = Baseline::read(&paths.baseline)?.lowered(&report.counts);
+    if !changes.is_empty() {
+        lowered.write(&paths.baseline)?;
+    }
+    Ok(changes)
 }
 
 /// The model entries of the manifests once stacked ({key: (entry, the manifest it's in)}), and their finishes.
@@ -4018,6 +4331,7 @@ fn model_entries(stack: &[(String, J)]) -> (BTreeMap<String, (J, String)>, Finis
     let mut fin = Finishes {
         plain: HashMap::new(),
         see_through: HashSet::new(),
+        textures: HashMap::new(),
     };
     for (path, m) in stack {
         for (k, entry) in m
@@ -4052,6 +4366,20 @@ fn model_entries(stack: &[(String, J)]) -> (BTreeMap<String, (J, String)>, Finis
                 );
                 if alpha < 1.0 {
                     fin.see_through.insert(k.clone());
+                }
+                match entry
+                    .get("texture")
+                    .and_then(J::str)
+                    .filter(|t| !t.is_empty())
+                {
+                    Some(texture) => {
+                        let scale = entry.get("uvScale").and_then(J::num).map_or(1.0, |s| s.f());
+                        let file = normpath(&join(&dirname(path), texture));
+                        fin.textures.insert(k.clone(), (scale, file));
+                    }
+                    None => {
+                        fin.textures.remove(k);
+                    }
                 }
             }
         }
@@ -4260,8 +4588,15 @@ pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Meas
     Ok(Measures { models, objects })
 }
 
-/// `cargo check-glb [keys…] [--keys] [--preview]`: the exit code.
+/// `cargo check-glb [keys…] [--keys] [--preview [--sheet]] [--validate] [--update-baseline]`, or
+/// `--against` (`against::main`), or `--built` (`built::main`): the exit code.
 pub fn main(args: &[String]) -> i32 {
+    if args.iter().any(|a| a == "--against") {
+        return against::main(args);
+    }
+    if args.iter().any(|a| a == "--built") {
+        return built::main(args);
+    }
     let paths = Paths::repo();
     if args.iter().any(|a| a == "--keys") {
         return match known_keys(&paths) {
@@ -4285,29 +4620,33 @@ pub fn main(args: &[String]) -> i32 {
         .filter(|a| a.starts_with("model.") || a.starts_with("item.") || a.starts_with("tool."))
         .cloned()
         .collect();
-    let report = gate(&paths, &keys);
+    // The counted checks run over every file at once (`BatchCheck`), by name.
+    let mut batch: Vec<(&'static str, BatchCheck)> = Vec::new();
+    if args.iter().any(|a| a == "--validate") {
+        batch.push(("validator", validate::check));
+    }
+    if args.iter().any(|a| a == "--update-baseline") {
+        match update_baseline(&paths, &keys, &batch) {
+            Ok(changes) if changes.is_empty() => println!("{}: nothing to lower", baseline::FILE),
+            Ok(changes) => {
+                for c in changes {
+                    println!("{}: {c}", baseline::FILE);
+                }
+            }
+            Err(err) => {
+                eprintln!("cannot update {}: {err}", baseline::FILE);
+                return 1;
+            }
+        }
+    }
+    let report = gate_with(&paths, &keys, &batch);
     print!("{}", report.text);
     let mut code = if report.failed > 0 { 1 } else { 0 };
-    if args.iter().any(|a| a == "--preview") && !report.checked.is_empty() {
-        // Re-imports each file in Blender and renders it to previews/<family>/rt_<name>.png, so export problems show:
-        // review.py takes `key=file` for each checked model whose file is there.
-        let review = join(&paths.here, "gamekit/review.py");
-        let pairs: Vec<String> = report
-            .checked
-            .iter()
-            .zip(&report.files)
-            .filter(|(_, f)| std::path::Path::new(f).exists())
-            .map(|(k, f)| format!("{k}={f}"))
-            .collect();
-        let ok = crate::art::blender()
-            .map(|exe| crate::art::echo(&crate::art::run(&exe, &review, &pairs, &[])));
-        match ok {
-            Ok(true) => {}
-            Ok(false) => code = 1,
-            Err(err) => {
-                eprintln!("{err}");
-                code = 1;
-            }
+    let has = |flag: &str| args.iter().any(|a| a == flag);
+    if has("--preview") && !report.checked.is_empty() {
+        // Draws each file as read to previews/<family>/rt_<name>.png, so export problems show.
+        if preview::review(&paths, &report.checked, &report.files, has("--sheet")) != 0 {
+            code = 1;
         }
     }
     code
@@ -4502,7 +4841,7 @@ mod tests {
         assert_eq!(finish("stone"), None);
     }
 
-    /// One triangle whose vertex colour is `colour` at each corner (normalised u16 RGBA, as Blender writes it).
+    /// One triangle whose vertex colour is `colour` at each corner (normalised u16 RGBA, as the models' writer writes it).
     fn shaded(colour: [u16; 4]) -> Glb {
         let mut bin: Vec<u8> = [[0f32, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
             .iter()
@@ -4926,7 +5265,7 @@ mod tests {
         );
     }
 
-    /// The blue tit as built (families/birds.py) against its `bird`, and against wrong ones.
+    /// The blue tit as built (crates/art/things/src/birds) against its `bird`, and against wrong ones.
     #[test]
     fn a_bird_is_checked_against_its_file() {
         let path = join(&repo_root(), "web/public/assets/models/birds/blueTit.glb");
@@ -5006,6 +5345,7 @@ mod tests {
                 &j(&format!(r#"{{"url": "x.glb"{accept}}}"#)),
                 vec!["a hard error".into()],
                 warnings,
+                &[],
             )
         };
         // Not accepted: an error, the aim a warning.
@@ -5063,11 +5403,23 @@ mod tests {
         let fin = Finishes {
             plain: HashMap::new(),
             see_through: HashSet::new(),
+            textures: HashMap::new(),
         };
         let path = join(&repo_root(), "web/public/assets/models/held/coin.glb");
         let entry = j(r#"{"type": "model", "url": "coin.glb"}"#);
         let thin = |key: &str| {
-            let c = check(key, &fin, &entry, &path, None, None, None, None).unwrap();
+            let c = check(
+                key,
+                &fin,
+                &entry,
+                &path,
+                None,
+                None,
+                None,
+                None,
+                &no_counting(),
+            )
+            .unwrap();
             c.errors
                 .iter()
                 .chain(&c.warnings)
@@ -5147,5 +5499,264 @@ mod tests {
                 "`habitat` without `perches`: it says what the perches are on",
             ]
         );
+    }
+
+    /// No counted checks, an empty baseline.
+    fn no_counting() -> Counting<'static> {
+        Counting {
+            baseline: Box::leak(Box::default()),
+            file: &[],
+            batch: BTreeMap::new(),
+        }
+    }
+
+    /// An example counted check, no rule of the gate's: a finding for each mesh of the file.
+    fn meshes(file: &ModelFile) -> R<Found> {
+        let n = file
+            .glb
+            .gltf
+            .get("meshes")
+            .and_then(J::list)
+            .map_or(0, |m| m.len());
+        Ok(Found {
+            count: n as u64,
+            text: (0..n).map(|i| format!("mesh {i}")).collect(),
+        })
+    }
+
+    /// An example counted check that finds nothing.
+    fn nothing(_: &ModelFile) -> R<Found> {
+        Ok(Found::default())
+    }
+
+    #[test]
+    fn a_texture_of_its_own_is_512_px_or_1024_over_2_5_m() {
+        assert_eq!(
+            [0.3, 2.5, 2.51, 10.0].map(texture_most),
+            [512, 512, 1024, 1024]
+        );
+    }
+
+    /// A counted check's findings by the baseline: new or over, strict; at it, warnings; under it, stale; an entry
+    /// that accepts the check takes them whatever the baseline holds.
+    #[test]
+    fn a_counted_check_is_judged_by_the_baseline() {
+        let fin = Finishes {
+            plain: HashMap::new(),
+            see_through: HashSet::new(),
+            textures: HashMap::new(),
+        };
+        let path = join(&repo_root(), "web/public/assets/models/held/coin.glb");
+        let run = |base: &str,
+                   accept: &str,
+                   file: &[(&'static str, FileCheck)],
+                   batch: u64,
+                   far: Option<&str>| {
+            let baseline = Baseline::parse(base).unwrap();
+            let mut counting = Counting {
+                baseline: &baseline,
+                file,
+                batch: BTreeMap::new(),
+            };
+            if batch > 0 {
+                let found = Found {
+                    count: batch,
+                    text: vec!["from the batch".into()],
+                };
+                counting
+                    .batch
+                    .insert("edges", BTreeMap::from([("tool.coin".to_string(), found)]));
+            }
+            let entry = j(&format!(
+                r#"{{"type": "model", "url": "coin.glb"{accept}}}"#
+            ));
+            check(
+                "tool.coin",
+                &fin,
+                &entry,
+                &path,
+                far,
+                None,
+                None,
+                None,
+                &counting,
+            )
+            .unwrap()
+        };
+        let mine = |lines: &[String]| -> Vec<String> {
+            lines
+                .iter()
+                .filter(|l| l.contains("mesh ") || l.contains("edges") || l.contains("batch"))
+                .cloned()
+                .collect()
+        };
+        let edges: &[(&'static str, FileCheck)] = &[("edges", meshes)];
+        let c = run("{}", "", edges, 0, None);
+        let n = c.counts[0].1;
+        assert_eq!(c.counts, [("edges", n)]);
+        assert!(n >= 1);
+        let each: Vec<String> = (0..n).map(|i| format!("mesh {i}")).collect();
+        // New: an error each.
+        assert_eq!(mine(&c.errors), each);
+        assert!(mine(&c.warnings).is_empty());
+        // Held: warnings, led by the count.
+        let held = format!(r#"{{"edges": {{"tool.coin": {n}}}}}"#);
+        let c = run(&held, "", edges, 0, None);
+        assert!(mine(&c.errors).is_empty(), "{:?}", c.errors);
+        assert_eq!(
+            mine(&c.warnings)[0],
+            format!("edges: {n} found, as the baseline has (tools/art/gate-baseline.json)")
+        );
+        assert_eq!(mine(&c.warnings)[1..], each);
+        // Over: one more from a batch check, all strict.
+        let c = run(&held, "", edges, 1, None);
+        assert_eq!(
+            mine(&c.errors)[0],
+            format!(
+                "edges: {} found, {n} in the baseline (tools/art/gate-baseline.json): fix the new ones",
+                n + 1
+            )
+        );
+        assert_eq!(mine(&c.errors).last().unwrap(), "from the batch");
+        assert_eq!(c.counts, [("edges", n + 1)]);
+        // Stale: warnings and an error to lower it.
+        let c = run(
+            &format!(r#"{{"edges": {{"tool.coin": {}}}}}"#, n + 2),
+            "",
+            edges,
+            0,
+            None,
+        );
+        assert_eq!(
+            mine(&c.errors),
+            [format!(
+                "edges: {n} found, {} in the baseline: lower it (`cargo check-glb --update-baseline`)",
+                n + 2
+            )]
+        );
+        assert_eq!(mine(&c.warnings), each);
+        // The far version's findings are the model's.
+        let c = run("{}", "", edges, 0, Some(&path));
+        assert_eq!(c.counts, [("edges", 2 * n)]);
+        assert!(mine(&c.errors).contains(&"far: mesh 0".to_string()));
+        // Accepted: whatever the baseline holds, and it may keep none.
+        let why = r#", "accept": {"edges": "an example"}"#;
+        let c = run("{}", why, edges, 0, None);
+        assert!(mine(&c.errors).is_empty(), "{:?}", c.errors);
+        assert_eq!(c.accepted[0], "mesh 0 (edges: an example)");
+        assert_eq!(c.counts, [("edges", 0)]);
+        let c = run(&held, why, edges, 0, None);
+        assert_eq!(
+            mine(&c.errors),
+            [format!(
+                "edges: its entry accepts it, and the baseline still has {n}: take it out (`cargo check-glb --update-baseline`)"
+            )]
+        );
+        // An accept of a counted check is unused where it ran and found nothing, not where it didn't run.
+        let c = run("{}", why, &[("edges", nothing)], 0, None);
+        assert!(
+            c.errors
+                .iter()
+                .any(|e| e.starts_with("`accept.edges` is unused")),
+            "{:?}",
+            c.errors
+        );
+        let c = run("{}", why, &[], 0, None);
+        assert!(mine(&c.errors).is_empty(), "{:?}", c.errors);
+        assert!(c.counts.is_empty());
+    }
+
+    /// The gate over a model with the example check: the baseline's verdicts in its report, and `--update-baseline`
+    /// lowering and taking out but never raising or adding.
+    #[test]
+    fn the_gate_judges_by_the_baseline_and_update_only_lowers() {
+        let dir = std::env::temp_dir().join(format!("ll-gate-baseline-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut paths = Paths::repo();
+        paths.baseline = dir
+            .join("gate-baseline.json")
+            .to_string_lossy()
+            .into_owned();
+        let set = |text: &str| std::fs::write(&paths.baseline, text).unwrap();
+        let read = || std::fs::read_to_string(&paths.baseline).unwrap();
+        let keys = vec!["model.fridge".to_string()];
+        let edges: &[(&'static str, FileCheck)] = &[("edges", meshes)];
+        let run = || run_gate(&paths, &keys, edges, &[]);
+        // No file: strict, and nothing to add.
+        let r = run();
+        assert_eq!(r.failed, 1, "{}", r.text);
+        assert!(r.text.starts_with("FAIL model.fridge "), "{}", r.text);
+        assert!(r.text.contains("\n       error: mesh 0\n"), "{}", r.text);
+        let n = r.counts["edges"]["model.fridge"];
+        assert_eq!(
+            update_with(&paths, &keys, edges, &[]).unwrap(),
+            Vec::<String>::new()
+        );
+        assert!(!std::path::Path::new(&paths.baseline).exists());
+        // At its count: it passes, its findings warnings.
+        set(&format!("{{\"edges\": {{\"model.fridge\": {n}}}}}\n"));
+        let r = run();
+        assert_eq!(r.failed, 0, "{}", r.text);
+        assert!(r.text.contains(&format!(
+            "       warning: edges: {n} found, as the baseline has"
+        )));
+        // Higher: stale until lowered; lowered once, then as it was.
+        set(&format!("{{\"edges\": {{\"model.fridge\": {}}}}}\n", n + 3));
+        assert_eq!(run().failed, 1);
+        assert_eq!(
+            update_with(&paths, &keys, edges, &[]).unwrap(),
+            [format!("edges: model.fridge {} -> {n}", n + 3)]
+        );
+        assert_eq!(
+            read(),
+            format!("{{\n  \"edges\": {{\n    \"model.fridge\": {n}\n  }}\n}}\n")
+        );
+        assert_eq!(run().failed, 0);
+        // Lower: over; never raised.
+        set(&format!(
+            "{{\"edges\": {{\"model.fridge\": {}}}}}\n",
+            n.max(2) - 1
+        ));
+        if n >= 2 {
+            assert_eq!(run().failed, 1);
+            assert!(update_with(&paths, &keys, edges, &[]).unwrap().is_empty());
+        }
+        // A section for no counted check.
+        set("{\"looks\": {\"model.fridge\": 1}}\n");
+        let r = run();
+        assert!(
+            r.text
+                .contains("FAIL gate-baseline.json\n       error: 'looks' is no counted check"),
+            "{}",
+            r.text
+        );
+        // Over every model, a key that is no model is stale, and taken out.
+        set("{\"edges\": {\"model.gone\": 2}}\n");
+        let none: &[(&'static str, FileCheck)] = &[("edges", nothing)];
+        let r = run_gate(&paths, &[], none, &[]);
+        assert_eq!(r.failed, 1, "{}", r.text);
+        assert!(r.text.contains("FAIL gate-baseline.json\n       error: edges: model.gone is no model the gate checked"), "{}", r.text);
+        assert_eq!(
+            update_with(&paths, &[], none, &[]).unwrap(),
+            [
+                "edges: model.gone out (was 2)",
+                "edges: none left, strict for every model"
+            ]
+        );
+        assert_eq!(read(), "{}\n");
+        // The built world's sections are its own gate's to judge (`built::CHECKS`): left as they are.
+        set("{\"built.edges\": {\"house.cottage\": 3}}\n");
+        let r = run_gate(&paths, &[], none, &[]);
+        assert_eq!(r.failed, 0, "{}", r.text);
+        assert!(update_with(&paths, &[], none, &[]).unwrap().is_empty());
+        assert_eq!(read(), "{\"built.edges\": {\"house.cottage\": 3}}\n");
+        // A baseline that can't be read fails the gate.
+        set("{\"edges\": {\"model.fridge\": 0}}");
+        assert!(
+            run()
+                .text
+                .starts_with("FAIL gate-baseline.json\n       error: cannot read it: ")
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

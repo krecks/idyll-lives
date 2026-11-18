@@ -413,7 +413,7 @@ export interface ActionAnim {
 }
 /**
  * A prop in the hand (G-70), drawn by `residents.ts` `writeHand` while the use goes on: a `tool.*` model
- * (tools/art/blender/families/held.py), held by its `grip`:
+ * (crates/art/things/src/held), held by its `grip`:
  * - `level`: upright, turned the way they face, `at` m from the palm along their right, up and ahead (given for the right
  *   hand, the left mirrored); `sip`: tipped to the lips as the hand comes up to the mouth (a cup);
  * - `hand`: in the hand's own frame (at rest, hanging at the side: +x the resident's right, +y up the arm, +z ahead),

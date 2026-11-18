@@ -1,0 +1,13 @@
+[package]
+name = "art-nature"
+description = "The game's item models, generated: trees, plants, the garden, the ground and the street. One folder a family."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+artkit = { path = "../../artkit" }

@@ -1,6 +1,6 @@
 /**
  * The neighbourhood around the viewed lot, as a lived-in street: the neighbour houses
- * (`HouseBuilder.silhouettes`, with porches, chimneys and garages), sidewalks with kerbs turning
+ * (`HouseBuilder.silhouettes`, with porches and garages), sidewalks with kerbs turning
  * the junctions' corners, the junctions' stop lines and crosswalks (`roads.ts`), streetlights that light up at night (with pools of light on the
  * ground), mailboxes, hydrants and bins along the kerb, cars parked on neighbours' driveways,
  * the fences and hedges round gardens and fields, and flower beds along their house
@@ -21,7 +21,7 @@
  *   (`lawnMask`). The menus' town (`pc/overview.ts`) draws every lot's things itself.
  * - Nothing on the viewed lot: the player builds there (the mailbox stands on the sidewalk). In
  *   the menus' town the player's lot (`WorldMeta.home`) gets its house as a shell dressed as the
- *   game draws it (its porch, no chimney or garden dressing), and nothing else. Its garage, if the
+ *   game draws it (its porch, no garden dressing), and nothing else. Its garage, if the
  *   town gave it one (`WorldStructure.garages`), its house's porches (the simulation's,
  *   `WorldStructure.porches`, as on every silhouette: `porchDoors`) and its porch pieces stand on it
  *   in the game too, drawn apart (`StreetPlan.lot`): they go with the lot's ground while its
@@ -39,7 +39,7 @@
  *   lot (build-mode edits don't rebuild it), merged into a handful of meshes (one per material)
  *   plus thin-instanced foliage and props (manifest models: `model.street.*` and the town's
  *   things, see `assets/packs/street/manifest.json`), a few dozen draw calls for the whole street.
- * - Models built in Blender (`.glb` files, downloaded like the rest), plus a CC0 concrete texture for the sidewalks.
+ * - Generated models (`.glb` files, downloaded like the rest), plus a CC0 concrete texture for the sidewalks.
  *
  * Engine-neutral: `planStreet` lays the street out and writes its geometry and its models'
  * instances (`StreetPlan`); the renderer's `Street` (`pc/street.ts`) draws it.
@@ -1371,6 +1371,7 @@ export class TownStreet {
     if (L.info.house) {
       const [x0, z0, x1, z1] = L.info.house;
       for (const { o } of this.openingGrid.near({ x: x0, z: z0, w: x1 - x0, d: z1 - z0 }, 1)) h = mix(mix(mix(h, o.x), o.z * 7 + (o.axis === 'h' ? 1 : 2)), o.kind.length);
+      h = mix(h, this.coverOf(L));
     }
     // Its porches and porch pieces.
     for (const p of this.world.porches ?? []) if (p.plot === L.info.id) h = mix(mix(mix(h, p.x), p.z * 7 + (p.axis === 'h' ? 1 : 2)), p.out + 3);
@@ -1427,7 +1428,7 @@ export class TownStreet {
       const g = kind === 'shop' ? null : world.garages ? (this.garages.get(L.info.id) ?? null) : home ? null : this.legacyGarage(L, focus);
       const [x0, z0, x1, z1] = L.info.house ?? [lone!.x0, lone!.z0, lone!.x1, lone!.z1];
       const front: [number, number] = L.turned ? [-L.front, 0] : [0, L.front];
-      spec = { x0, z0, x1, z1, lot: L.info, home, dressingOnly: home && game, front, door: L.door, garage: g, porches, pieces, roof: L.plot.roof, storeys: L.plot.storeys, lived: kind === 'house' && this.options.lived };
+      spec = { x0, z0, x1, z1, lot: L.info, home, dressingOnly: home && game, front, door: L.door, garage: g, porches, pieces, roof: L.plot.roof, cover: this.coverOf(L), storeys: L.plot.storeys, lived: kind === 'house' && this.options.lived };
       // (A canopy against the viewed house's wall goes with it in the cutaway.)
       if (spec.dressingOnly && pieces?.some((p) => p.kind === 'canopy')) spec.walled = this.walled;
       if (dress) return { parts: this.outdoors(L, parts), silhouettes, spec, lot, dressed: this.lotDressed(L, dress) };
@@ -2067,7 +2068,7 @@ export class TownStreet {
   farChunk(id: number, focus: number): { key: string; geo: Geo } | null {
     const houses = (this.plotsByChunk().get(id) ?? []).filter((L) => L.info.house && L.info.id !== focus && (L.base === 'house' || L.base === 'shop'));
     if (!houses.length) return null;
-    const key = `${id}|${houses.map((L) => `${L.info.id}:${L.info.house!.join(',')}:${L.info.roof?.join(',') ?? ''}:${L.info.storeys ?? 1}${this.dresses.has(L.info.id) ? `:${hashString(JSON.stringify(this.dresses.get(L.info.id)))}` : ''}`).join(';')}${this.levels ? `|v${this.levels.surface.version(id)}` : ''}`;
+    const key = `${id}|${houses.map((L) => `${L.info.id}:${L.info.house!.join(',')}:${L.info.roof?.join(',') ?? ''}:${L.info.storeys ?? 1}:${this.coverOf(L)}${this.dresses.has(L.info.id) ? `:${hashString(JSON.stringify(this.dresses.get(L.info.id)))}` : ''}`).join(';')}${this.levels ? `|v${this.levels.surface.version(id)}` : ''}`;
     const cached = this.far.get(id);
     if (cached?.key === key) return cached;
     const geo = new Geo();
@@ -2081,7 +2082,7 @@ export class TownStreet {
       // (On a land the town follows, each on its pad.)
       const dy = this.padOf(L);
       const into = dy ? new Geo() : geo;
-      this.planner.farHouse(into, { x: L.info.x, z: L.info.z, house: L.info.house!, roof: L.info.roof, storeys: L.info.storeys });
+      this.planner.farHouse(into, { x: L.info.x, z: L.info.z, house: L.info.house!, roof: L.info.roof, storeys: L.info.storeys, cover: this.coverOf(L) });
       if (dy) geo.merge(into, dy);
     }
     const out = { key, geo };
@@ -2094,16 +2095,21 @@ export class TownStreet {
    * Every lot's house the far LOD draws (`farChunk`'s, the focus lot's left out), with the chunk it is planned in and
    * its pad: the town view draws them all at once (`pc/townView.ts`), those of the chunks not streamed in.
    */
-  townHouses(focus: number): { chunk: number; plot: PlotInfo; pad: number; dress?: LotDress }[] {
-    const out: { chunk: number; plot: PlotInfo; pad: number; dress?: LotDress }[] = [];
+  townHouses(focus: number): { chunk: number; plot: PlotInfo; pad: number; cover: number; dress?: LotDress }[] {
+    const out: { chunk: number; plot: PlotInfo; pad: number; cover: number; dress?: LotDress }[] = [];
     for (const [chunk, list] of this.plotsByChunk()) {
       for (const L of list) {
         if (!L.info.house || L.info.id === focus || (L.base !== 'house' && L.base !== 'shop')) continue;
         const dress = this.dresses.get(L.info.id);
-        out.push({ chunk, plot: L.info, pad: this.padOf(L), ...(dress ? { dress } : {}) });
+        out.push({ chunk, plot: L.info, pad: this.padOf(L), cover: this.coverOf(L), ...(dress ? { dress } : {}) });
       }
     }
     return out;
+  }
+
+  /** The wall covering most of a lot's house's outside wears (`HousePlanner.exteriorCover`: 0, its own look), for its far versions. */
+  private coverOf(L: PlotLayout): number {
+    return L.info.house ? this.planner.exteriorCover(this.world, L.info.house, L.info.storeys ?? 1) : 0;
   }
 
   /** The named places' lots' looks as a key (`townHouses` made again when it changes). */

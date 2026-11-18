@@ -150,7 +150,7 @@ fn nearest(p: V3, a: V3, b: V3, c: V3) -> Nearest {
 }
 
 /// The barycentric weights of the point of triangle abc nearest p.
-fn nearest_weights(p: V3, a: V3, b: V3, c: V3) -> [f64; 3] {
+pub fn nearest_weights(p: V3, a: V3, b: V3, c: V3) -> [f64; 3] {
     let mut w = [0.0; 3];
     match nearest(p, a, b, c) {
         Nearest::Corner(i) => w[i] = 1.0,

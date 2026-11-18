@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built fittings for the town's named places (tools/art/blender/families/civic.py; content/civic.json): front desks and counters, the church's pews, lectern and altar, the pub's bar, school desks, the waiting room's bench, the couch, shop rails and the rest. Listed in the base manifest's packs. Nothing moves.",
+  "$comment": "The fittings for the town's named places (crates/art/outside/src/civic, built by cargo art; content/civic.json): front desks and counters, the church's pews, lectern and altar, the pub's bar, school desks, the waiting room's bench, the couch, shop rails and the rest. Listed in the base manifest's packs. Nothing moves.",
   "version": 1,
   "entries": {
     "model.receptionDesk": {

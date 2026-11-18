@@ -78,7 +78,7 @@ pub struct Glb {
     pub size: usize,
 }
 
-/// Reads the chunks of a `.glb` (check_glb.py `read_glb`).
+/// Reads the chunks of a `.glb`.
 pub fn parse_glb(data: &[u8]) -> R<Glb> {
     let word = |off: usize| -> R<u32> {
         data.get(off..off + 4).map(|b| u32::from_le_bytes(b.try_into().unwrap())).ok_or_else(|| {

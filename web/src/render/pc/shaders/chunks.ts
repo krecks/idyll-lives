@@ -30,7 +30,8 @@
  * - `end`: replaces `endPS` (the colour, fog, tone mapping and gamma) where its defines say so.
  * - `fogPS`: the game's haze in its materials (`fog.ts`); `reflectionEnvPS`, `reflectionEnvHQPS`:
  *   the sky's reflection rising at a slant, and `fresnelSchlickPS`: the full Schlick term for the
- *   lights' highlights (`envBrdf.ts`); `normalMapPS`: normal maps at the game's strength (`bump.ts`).
+ *   lights' highlights (`envBrdf.ts`); `normalMapPS`: normal maps at the game's strength (`bump.ts`);
+ *   `reflectionSheenPS`, `reflectionCCPS`: a finish's layers reflecting the room (`surface.ts`).
  *
  * Features run in the order of their priority, lowest first. Engine-wide patches
  * (`patchEngineChunks`, once per device) put the game's light where no per-material chunk reaches:
@@ -58,7 +59,7 @@ import { gameFresnel, gameReflection } from './envBrdf';
 import { gameFog, setFogFrom, setLandVeil, setSky, VEIL_SINK } from './fog';
 import { CONTACT_DIRECT, SOFT_LOOK } from './softLook';
 import { ROOM_LIGHT_CODE, ROOM_LIGHT_ROOMS, ROOM_LIGHTS } from './roomLights';
-import { PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
+import { FINISH_LAYER_ANCHORS, finishLayerReflection, PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
 import { UNDERGROUND } from './underground';
 
 export type Language = 'glsl' | 'wgsl';
@@ -290,6 +291,8 @@ function build(device: pc.GraphicsDevice, lang: Language): Record<string, string
   out.fresnelSchlickPS = gameFresnel(engineChunk(device, lang, 'fresnelSchlickPS'), lang, replaceOnce);
   // Normal maps at the game's strength (`bump.ts`).
   out.normalMapPS = gameNormalMap(engineChunk(device, lang, 'normalMapPS'), lang, replaceOnce);
+  // A finish's sheen and clear coat reflecting the room, in a room (`surface.ts`).
+  for (const chunk of Object.keys(FINISH_LAYER_ANCHORS[lang]) as (keyof (typeof FINISH_LAYER_ANCHORS)['glsl'])[]) out[chunk] = finishLayerReflection(engineChunk(device, lang, chunk), chunk, lang, replaceOnce);
 
   // The lamps' falloff, the game's own (`roomLights.ts`): the engine's functions renamed, ours in their place.
   for (const chunk of ['falloffInvSquaredPS', 'spotPS'] as const) {

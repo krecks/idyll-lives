@@ -13,7 +13,7 @@ node_modules
 /dev-logs
 /web/.assets
 __pycache__
-/tools/art/blender/previews
+/tools/art/previews
 /web/.vite-cache
 # The town view's scenes (tools/bench/scene.mjs makes them: half a megabyte each, and they age with the save format)
 /web/public/bench/town-*.json.gz

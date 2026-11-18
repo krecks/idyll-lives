@@ -770,6 +770,77 @@
       ]
     },
     {
+      "for": "render/pc/shaders/surface.ts, softLook.ts, materials.ts: the finishes' layers (cloth's sheen, a lacquer's clear coat) on PlayCanvas's own lobes, reflecting the room in a room.",
+      "anchors": [
+        {
+          "chunk": "lit/frag/reflectionSheen.js",
+          "glsl": "sReflection += calcReflection(worldNormal, 0.0) * saturate(DG);",
+          "wgsl": "sReflection = sReflection + (calcReflection(worldNormal, 0.0) * saturate(dg));",
+          "who": "shaders/surface.ts: the sheen's reflection of the sky, the room's in a room on a finish with layers"
+        },
+        {
+          "chunk": "lit/frag/reflectionCC.js",
+          "glsl": "ccReflection += calcReflection(reflDir, gloss);",
+          "wgsl": "ccReflection = ccReflection + calcReflection(reflDir, gloss);",
+          "who": "shaders/surface.ts: the clear coat's reflection of the sky, the room's in a room on a finish with layers"
+        },
+        {
+          "chunk": "lit/frag/lightSheen.js",
+          "glsl": "float D = sheenD(worldNormal, h, sheenGloss);",
+          "wgsl": "let D: f32 = sheenD(worldNormal, h, sheenGloss);",
+          "who": "materials.ts layer: the sheen term takes `sheenGloss` as its roughness (a finish's `sheenRoughness` as it is, not inverted)"
+        },
+        {
+          "chunk": "lit/frag/reflectionSheen.js",
+          "glsl": "void addReflectionSheen(vec3 worldNormal, vec3 viewDir, float gloss) {",
+          "wgsl": "fn addReflectionSheen(worldNormal: vec3f, viewDir: vec3f, gloss: f32) {",
+          "who": "shaders/surface.ts: the sheen's reflection in litArgs_worldNormal's room (its normal is that one)"
+        },
+        {
+          "chunk": "standard/frag/clearCoatGloss.js",
+          "glsl": "#ifdef STD_CLEARCOATGLOSS_INVERT\n\tccGlossiness = 1.0 - ccGlossiness;",
+          "wgsl": "#ifdef STD_CLEARCOATGLOSS_INVERT\n\tccGlossiness = 1.0 - ccGlossiness;",
+          "who": "materials.ts layer: a finish's `clearcoatRoughness` given as the coat's gloss, inverted (`clearCoatGlossInvert`)"
+        },
+        {
+          "chunk": "lit/frag/lighting/lightFunctionLight.js",
+          "glsl": "sSpecularLight += getLightSpecularSheen(",
+          "wgsl": "sSpecularLight = sSpecularLight + (getLightSpecularSheen(",
+          "who": "shaders/softLook.ts: the sun's highlight in the sheen in sSpecularLight, scaled in the combine (SPECULAR_UNITS)"
+        },
+        {
+          "chunk": "lit/frag/lighting/lightFunctionLight.js",
+          "glsl": "ccSpecularLight += lightspecularCC;",
+          "wgsl": "ccSpecularLight = ccSpecularLight + lightspecularCC;",
+          "who": "shaders/softLook.ts: the sun's highlight in the clear coat in ccSpecularLight, scaled in the combine"
+        },
+        {
+          "chunk": "lit/frag/clusteredLight.js",
+          "glsl": "sSpecularLight += getLightSpecularSheen(",
+          "wgsl": "sSpecularLight = sSpecularLight + getLightSpecularSheen(",
+          "who": "shaders/softLook.ts: the lamps' highlights in the sheen in sSpecularLight too"
+        },
+        {
+          "chunk": "lit/frag/clusteredLight.js",
+          "glsl": "ccSpecularLight += getLightSpecular(",
+          "wgsl": "ccSpecularLight = ccSpecularLight + getLightSpecular(",
+          "who": "shaders/softLook.ts: the lamps' highlights in the clear coat in ccSpecularLight too"
+        },
+        {
+          "chunk": "lit/frag/combine.js",
+          "glsl": "ret = ret * sheenScaling + (sSpecularLight + sReflection.rgb) * sheenSpecularity;",
+          "wgsl": "ret = ret * sheenScaling + (sSpecularLight + sReflection.rgb) * sheenSpecularity;",
+          "who": "shaders/softLook.ts: the sheen combined from sSpecularLight and sReflection (what the combine scales before the engine adds them)"
+        },
+        {
+          "chunk": "lit/frag/combine.js",
+          "glsl": "ret = ret * clearCoatScaling + (ccSpecularLight + ccReflection) * clearcoatSpecularity;",
+          "wgsl": "ret = ret * clearCoatScaling + (ccSpecularLight + ccReflection) * clearcoatSpecularity;",
+          "who": "shaders/softLook.ts: the clear coat combined from ccSpecularLight and ccReflection"
+        }
+      ]
+    },
+    {
       "for": "render/pc/shaders/bump.ts: normal maps at the game's strength.",
       "anchors": [
         {

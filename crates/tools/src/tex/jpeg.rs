@@ -1,7 +1,8 @@
 //! Baseline JPEG the way Pillow does it with libjpeg-turbo.
 //!
-//! The encoder makes what `save(path, 'JPEG', quality=q[, optimize=True])` makes: YCbCr from libjpeg's
-//! fixed-point tables, 4:2:0 chroma (2x2 means with its alternating bias), its edge padding and dummy blocks, the
+//! The encoder makes what `save(path, 'JPEG', quality=q[, optimize=True][, subsampling=0])` makes: YCbCr from
+//! libjpeg's fixed-point tables, 4:2:0 chroma (2x2 means with its alternating bias), its edge padding and dummy
+//! blocks, or 4:4:4 (`Chroma::Full`), the
 //! islow DCT, the quality-scaled Annex K tables and reciprocal quantisation, and Huffman tables optimised per image
 //! (`optimize`) or the standard ones.
 //!
@@ -387,16 +388,36 @@ pub fn rgb_to_ycc(r: u8, g: u8, b: u8) -> (u8, u8, u8) {
     (y as u8, cb as u8, cr as u8)
 }
 
-/// Encodes 8-bit greyscale (`ch` 1) or RGB (`ch` 3) pixels.
-pub fn encode(px: &[u8], w: usize, h: usize, ch: usize, quality: u8, optimize: bool) -> Vec<u8> {
+/// How much of the colour a JPEG keeps.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Chroma {
+    /// 4:2:0, Pillow's default (`subsampling=2`): a chroma sample for each 2x2 pixels. Enough for the eye,
+    /// which sees colour coarser than brightness.
+    Half,
+    /// 4:4:4 (`subsampling=0`): every component at full size. For data (a normal map's directions, a packed
+    /// map's channels), where each channel is a quantity of its own and averaging them bends it.
+    Full,
+}
+
+/// Encodes 8-bit greyscale (`ch` 1) or RGB (`ch` 3) pixels (`chroma` only matters for RGB).
+pub fn encode(
+    px: &[u8],
+    w: usize,
+    h: usize,
+    ch: usize,
+    quality: u8,
+    optimize: bool,
+    chroma: Chroma,
+) -> Vec<u8> {
     assert!(ch == 1 || ch == 3, "jpeg: 1 or 3 channels");
     assert!(w > 0 && h > 0 && w <= 65535 && h <= 65535, "jpeg: bad size");
     let colour = ch == 3;
+    let half = colour && chroma == Chroma::Half;
     // Each component is padded by repeating its last column and row out to whole blocks (chroma: the full-size
     // plane to an even height and to twice its block width before the 2x2 means, then its last row); blocks past
     // a component's last whole block column or row in an MCU are libjpeg's dummies: no AC, the DC before them.
     let (wib, hib) = (w.div_ceil(8), h.div_ceil(8));
-    let planes: Vec<Plane> = if colour {
+    let ycc = |px: &[u8]| {
         let mut ycc = [vec![0u8; w * h], vec![0u8; w * h], vec![0u8; w * h]];
         for i in 0..w * h {
             let (y, cb, cr) = rgb_to_ycc(px[3 * i], px[3 * i + 1], px[3 * i + 2]);
@@ -404,6 +425,10 @@ pub fn encode(px: &[u8], w: usize, h: usize, ch: usize, quality: u8, optimize: b
             ycc[1][i] = cb;
             ycc[2][i] = cr;
         }
+        ycc
+    };
+    let planes: Vec<Plane> = if half {
+        let ycc = ycc(px);
         let (cw, chh) = (w.div_ceil(2), h.div_ceil(2));
         let sub = |p: &[u8]| {
             let ds = Plane::padded(p, w, h, cw.div_ceil(8) * 16, chh * 2).h2v2();
@@ -414,6 +439,11 @@ pub fn encode(px: &[u8], w: usize, h: usize, ch: usize, quality: u8, optimize: b
             sub(&ycc[1]),
             sub(&ycc[2]),
         ]
+    } else if colour {
+        ycc(px)
+            .iter()
+            .map(|p| Plane::padded(p, w, h, wib * 8, hib * 8))
+            .collect()
     } else {
         vec![Plane::padded(px, w, h, wib * 8, hib * 8)]
     };
@@ -426,9 +456,10 @@ pub fn encode(px: &[u8], w: usize, h: usize, ch: usize, quality: u8, optimize: b
         .iter()
         .map(|t| t.map(|q| reciprocal(q as u32 * 8)))
         .collect();
+    let table_of = |comp: usize| usize::from(comp > 0);
     // The blocks in scan order, each with its component.
-    let mut blocks: Vec<(usize, [i32; 64])> = Vec::with_capacity(wib * hib * 3 / 2);
-    if colour {
+    let mut blocks: Vec<(usize, [i32; 64])> = Vec::with_capacity(wib * hib * planes.len());
+    if half {
         for my in 0..h.div_ceil(16) {
             for mx in 0..w.div_ceil(16) {
                 let mut last_dc = 0;
@@ -449,13 +480,15 @@ pub fn encode(px: &[u8], w: usize, h: usize, ch: usize, quality: u8, optimize: b
             }
         }
     } else {
+        // One block of each component per MCU.
         for by in 0..hib {
             for bx in 0..wib {
-                blocks.push((0, planes[0].block(bx, by, &divisors[0])));
+                for (comp, plane) in planes.iter().enumerate() {
+                    blocks.push((comp, plane.block(bx, by, &divisors[table_of(comp)])));
+                }
             }
         }
     }
-    let table_of = |comp: usize| usize::from(comp > 0);
     let ntab = if colour { 2 } else { 1 };
     let huffs: Vec<[Huff; 2]> = if optimize {
         let mut freq = vec![[[0u64; 257]; 2]; ntab];
@@ -511,7 +544,7 @@ pub fn encode(px: &[u8], w: usize, h: usize, ch: usize, quality: u8, optimize: b
     sof.extend_from_slice(&(w as u16).to_be_bytes());
     sof.push(ncomp as u8);
     for c in 0..ncomp {
-        let samp = if colour && c == 0 { 0x22 } else { 0x11 };
+        let samp = if half && c == 0 { 0x22 } else { 0x11 };
         sof.extend_from_slice(&[c as u8 + 1, samp, table_of(c) as u8]);
     }
     seg(&mut out, 0xC0, &sof);
@@ -1100,7 +1133,7 @@ mod tests {
         let px: Vec<u8> = (0..w * h * 3)
             .map(|i| ((i / 3 % w) * 2 + (i / 3 / w) * 2 + (i % 3) * 30) as u8)
             .collect();
-        let (dw, dh, ch, out) = decode(&encode(&px, w, h, 3, 95, true)).unwrap();
+        let (dw, dh, ch, out) = decode(&encode(&px, w, h, 3, 95, true, Chroma::Half)).unwrap();
         assert_eq!((dw, dh, ch), (w, h, 3));
         let err: f64 = px
             .iter()
@@ -1110,9 +1143,33 @@ mod tests {
             / px.len() as f64;
         assert!(err < 10.0, "{err}");
         let grey: Vec<u8> = (0..w * h).map(|i| (i % 256) as u8).collect();
-        let (_, _, ch, out) = decode(&encode(&grey, w, h, 1, 90, false)).unwrap();
+        let (_, _, ch, out) = decode(&encode(&grey, w, h, 1, 90, false, Chroma::Half)).unwrap();
         assert_eq!(ch, 1);
         assert!(grey.iter().zip(&out).all(|(&a, &b)| a.abs_diff(b) < 40));
+    }
+
+    #[test]
+    fn full_chroma_keeps_colour_detail() {
+        // Blue alternating each pixel under a flat red and green: 4:2:0 averages it away, 4:4:4 keeps it
+        // (and both come back as whole pictures, the odd size padded).
+        let (w, h) = (35, 19);
+        let px: Vec<u8> = (0..w * h)
+            .flat_map(|i| [128, 128, if (i % w + i / w) % 2 == 0 { 96 } else { 160 }])
+            .collect();
+        let error = |chroma| {
+            let (dw, dh, ch, out) = decode(&encode(&px, w, h, 3, 90, true, chroma)).unwrap();
+            assert_eq!((dw, dh, ch), (w, h, 3));
+            px.iter()
+                .zip(&out)
+                .skip(2)
+                .step_by(3)
+                .map(|(&a, &b)| a.abs_diff(b) as f64)
+                .sum::<f64>()
+                / (w * h) as f64
+        };
+        let (half, full) = (error(Chroma::Half), error(Chroma::Full));
+        assert!(half > 20.0, "{half}");
+        assert!(full < 8.0, "{full}");
     }
 
     #[test]

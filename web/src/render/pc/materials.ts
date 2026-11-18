@@ -27,6 +27,7 @@
  * something of its own changes.
  */
 
+import { benchDiag } from '../../debug/benchFlags';
 import * as pc from './engine';
 import { skyLighting, type SkyLighting } from './env';
 import { INSTANCE_COLOR_SEMANTIC, installGameChunks, patchEngineChunks, WALL_CUT_SEMANTIC } from './shaders/chunks';
@@ -36,6 +37,8 @@ import { softLookWanted } from './shaders/softLook';
 import { withBuild } from '../../assets/build';
 import { materialTextures, optimizedUrl, type AssetRegistry } from '../../assets/registry';
 import type { MaterialEntry } from '../../assets/types';
+import { settings } from '../../settings/settings.svelte';
+import { isGraphicsPreset, QUALITY } from '../quality';
 import type { RGB } from '../shared/environment';
 import { WALL_HEIGHT } from '../shared/walls';
 import type { Shading } from '../types';
@@ -377,6 +380,12 @@ export class MaterialLibrary {
   private readonly device: pc.GraphicsDevice;
   /** Anisotropic filtering of the surfaces' textures (the graphics preset's `anisotropy`; set before the first surface). */
   anisotropy = 8;
+  /**
+   * Whether the finishes' layers are drawn (cloth's sheen, a lacquer's clear coat: `layer`). The graphics
+   * preset's `finishLayers`: the player's (or `?quality=`'s) for the previews' and the dev pages'
+   * libraries, the renderer's own for the game's; set before the first finish.
+   */
+  finishLayers = finishLayersWanted();
   /** Wall cutaway state read by every `cutaway` material. */
   readonly wallCut = new WallCutState();
   /** The cut-out finishes made so far (and their copies), each with its entry's `cutout` (`setCutoutCoverage`). */
@@ -847,6 +856,7 @@ export class MaterialLibrary {
     mat.glossInvert = true;
     mat.gloss = entry.roughness ?? (entry.arm ? 1 : 0.8);
     mat.metalness = entry.metallic ?? (entry.arm ? 1 : 0);
+    const layered = this.finishLayers && layer(mat, entry);
     if (entry.alpha !== undefined && entry.alpha < 1) {
       mat.opacity = entry.alpha;
       mat.blendType = pc.BLEND_NORMAL;
@@ -865,6 +875,7 @@ export class MaterialLibrary {
     if (options.vertexColors) mat.setDefine('GAME_SRGB_COLORS', '');
     if (options.planarUV) mat.setDefine('GAME_PLANAR_UV', '');
     if (this.cutouts.has(mat)) mat.setDefine('GAME_CUTOUT', '');
+    if (layered) mat.setDefine('GAME_FINISH_LAYERS', '');
     if (options.cutaway) this.cutaway(mat);
     if (options.pattern === 'stripes') mat.setDefine('GAME_PATTERN_STRIPES', '');
     if (options.pattern === 'whitewash') mat.setDefine('GAME_PATTERN_WHITEWASH', '');
@@ -925,6 +936,38 @@ export class MaterialLibrary {
     void job.finally(() => this.pending.delete(job));
     return made;
   }
+}
+
+/**
+ * The graphics preset's `finishLayers`: `?quality=`'s on the page, else the player's preset's (Medium's
+ * where there is none); `?diag=nolayers` leaves them out, to measure them.
+ */
+function finishLayersWanted(): boolean {
+  const asked = new URLSearchParams(globalThis.location?.search ?? '').get('quality');
+  const preset = isGraphicsPreset(asked) ? asked : settings.graphics;
+  return QUALITY[isGraphicsPreset(preset) ? preset : 'medium'].finishLayers && !benchDiag().has('nolayers');
+}
+
+/**
+ * A finish's layers on `mat`, PlayCanvas's own lobes (`shaders/surface.ts`, `GAME_FINISH_LAYERS`): cloth's
+ * sheen (`sheenColor`, `sheenRoughness`) and a clear coat (`clearcoat`, `clearcoatRoughness`). Whether it
+ * has one.
+ */
+function layer(mat: pc.StandardMaterial, entry: MaterialEntry): boolean {
+  const sheen = entry.sheenColor !== undefined && entry.sheenRoughness !== undefined;
+  const coat = (entry.clearcoat ?? 0) > 0;
+  if (sheen) {
+    mat.useSheen = true;
+    mat.sheen.fromString(entry.sheenColor!);
+    // PlayCanvas's sheen term takes `sheenGloss` as its roughness (`lightSheenPS` `sheenD`, `reflectionSheenPS`): as it is, not inverted.
+    mat.sheenGloss = entry.sheenRoughness!;
+  }
+  if (coat) {
+    mat.clearCoat = entry.clearcoat!;
+    mat.clearCoatGlossInvert = true;
+    mat.clearCoatGloss = entry.clearcoatRoughness ?? 0;
+  }
+  return sheen || coat;
 }
 
 /**
