@@ -186,12 +186,48 @@ impl Mesh {
     }
 
     /// `mesh.shade_smooth()` then `mesh.set_sharp_from_angle(angle)`: smooth, but for the edges between two faces
-    /// that turn more than `degrees` as the mesh is now (a half turn or more: none).
+    /// that turn more than `degrees` as the mesh is now (a half turn or more: none). On a mesh with normals of its
+    /// own the turn is told by them (`own_face_normals`), as they read once its sharp edges are gone.
     pub fn shade_smooth(&mut self, degrees: f64) {
+        self.smooth_by_angle(degrees, false);
+    }
+
+    /// `bpy.ops.object.shade_smooth_by_angle(angle)`: as `shade_smooth`, but the edges that are sharp stay sharp,
+    /// and a mesh with normals of its own tells the turn by them as they read with those edges.
+    pub fn shade_smooth_by_angle(&mut self, degrees: f64) {
+        self.smooth_by_angle(degrees, true);
+    }
+
+    /// The faces' normals as a mesh with normals of its own gives them (Blender's `mesh.polygon_normals`, and what
+    /// its smooth by angle reads): each face's corners' normals as they read now, summed and made a unit vector,
+    /// which is not where the face looks once a cut or a clamped bevel has left its corners' normals elsewhere.
+    /// None on a mesh without.
+    pub fn own_face_normals(&self) -> Option<Vec<V3>> {
+        self.normals.as_ref()?;
+        let corners = crate::normals::corner_normals(self);
+        let unit = |f: &Face| {
+            let mut sum = V3::ZERO;
+            for &n in &corners[f.start as usize..(f.start + f.len) as usize] {
+                sum += n;
+            }
+            let d = dot_v3(sum, sum);
+            if d > 1.0e-35 {
+                let length = d.sqrt();
+                V3::new(sum.x / length, sum.y / length, sum.z / length)
+            } else {
+                V3::ZERO
+            }
+        };
+        Some(self.faces.iter().map(unit).collect())
+    }
+
+    fn smooth_by_angle(&mut self, degrees: f64, keep: bool) {
         for f in &mut self.faces {
             f.smooth = true;
         }
-        self.sharp.clear();
+        if !keep {
+            self.sharp.clear();
+        }
         let angle = crate::math::radians(degrees) as f32;
         if angle as f64 >= crate::math::PI {
             return;
@@ -200,6 +236,8 @@ impl Mesh {
         let normals = self.face_normals();
         // each edge's first face, then whether a second or third came
         let mut first: BTreeMap<(u32, u32), (usize, u32, bool)> = BTreeMap::new();
+        // (a mesh with normals of its own tells the turn by them, not by where its faces' points are)
+        let normals = self.own_face_normals().unwrap_or(normals);
         for f in 0..self.faces.len() {
             let c = self.corners(f).to_vec();
             for (i, &v) in c.iter().enumerate() {
@@ -214,10 +252,8 @@ impl Mesh {
                         }
                         *done = true;
                     }
-                    // a third face on the edge: it splits the shading anyway, and isn't marked
-                    Some(_) => {
-                        self.sharp.remove(&e);
-                    }
+                    // (a third face on the edge takes no mark off it)
+                    Some(_) => {}
                 }
             }
         }
