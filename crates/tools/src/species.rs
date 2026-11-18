@@ -188,7 +188,8 @@ impl Species {
 /// What a part of the plant is, by its finish and name.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Role {
-    /// Leaves drawn as lumps or blades (`foliage`).
+    /// Leaves drawn as lumps or blades (`foliage`), or plain and named for a leaf or a stem (a houseplant's glossy
+    /// blades).
     Leaves,
     /// Leaf cards (`leafcards`).
     Cards,
@@ -209,6 +210,8 @@ impl Role {
             "foliage" => Role::Leaves,
             "bark" => Role::Bark,
             _ if named(&["bloom", "blossom", "flower", "petal", "fruit", "centre"]) => Role::Bloom,
+            // (Leaves and stalks drawn plain, a houseplant's glossy blades: by their names, as on foliage.)
+            _ if named(&["leaf", "stem"]) => Role::Leaves,
             _ => Role::Other,
         }
     }
@@ -736,6 +739,14 @@ pub fn model_files(paths: &checkglb::Paths) -> Result<BTreeMap<String, (String, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn plain_leaves_are_leaves_by_name() {
+        assert_eq!(Role::of("leaf_dark", "satin"), Role::Leaves);
+        assert_eq!(Role::of("stem", "satin"), Role::Leaves);
+        assert_eq!(Role::of("body", "ceramic"), Role::Other);
+        assert_eq!(Role::of("pot", "foliage"), Role::Leaves);
+    }
 
     fn part(name: &str, finish: &str, colour: [f64; 3], luminance: f64) -> Part {
         Part {

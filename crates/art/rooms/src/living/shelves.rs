@@ -4,12 +4,16 @@
 //! is a part of its own that tips out 25° from its shelf while a resident reads, studies or does homework there
 //! (`book_out`), and back at the end.
 
-use super::common::{book, disc, knob, mesh, prism_faces};
+use super::common::{
+    BOARD, PAGES_IN, SPINE, SPINE_STEPS, book, bulge, disc, hardback, hardback_end, knob, mesh,
+    prism_faces,
+};
 use super::{F, M};
 use artkit::forms::{Holes, rounded_rect};
 use artkit::materials::Mat;
-use artkit::math::{Axis, PI, TAU, cos, sin};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::math::{Axis, PI, TAU, cos, radians, sin, tan};
+use artkit::parts::{hinged, join, new_parts, turn};
+use artkit::place::Facing;
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fextrude, fsphere, fsweep, jitter, settle, swing};
@@ -43,9 +47,62 @@ pub(super) fn book_row(
     stack: bool,
     out: Option<usize>,
 ) -> Option<Out> {
+    shelf_row(x0, x1, y, front, depth, hmax, seed, fill, stack, out, None)
+}
+
+/// `book_row` of hardbacks (`hardback`: rounded spines, the page block set in), the same books for the same `seed`,
+/// some pushed further back than others; where a row ends short of its shelf, `room` (no stack), one more leans on
+/// the last.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn hardback_row(
+    x0: f64,
+    x1: f64,
+    y: f64,
+    front: f64,
+    depth: f64,
+    hmax: f64,
+    seed: i128,
+    fill: f64,
+    stack: bool,
+    out: Option<usize>,
+    room: f64,
+) -> Option<Out> {
+    shelf_row(
+        x0,
+        x1,
+        y,
+        front,
+        depth,
+        hmax,
+        seed,
+        fill,
+        stack,
+        out,
+        Some(room),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn shelf_row(
+    x0: f64,
+    x1: f64,
+    y: f64,
+    front: f64,
+    depth: f64,
+    hmax: f64,
+    seed: i128,
+    fill: f64,
+    stack: bool,
+    out: Option<usize>,
+    room: Option<f64>,
+) -> Option<Out> {
+    let fine = room.is_some();
+    let one = if fine { hardback } else { book };
     let mut rnd = Random::new(seed);
+    // (the hardbacks' own variation draws from a generator of its own, so the books are the plain row's)
+    let mut more = Random::new(seed * 7 + 3);
     let end = x0 + (x1 - x0) * fill - if stack { 0.24 } else { 0.0 };
-    let (mut x, mut k, mut got) = (x0, 0, None);
+    let (mut x, mut k, mut got, mut last) = (x0, 0, None, 0.0);
     loop {
         let (t, h, d) = (
             rnd.uniform(0.022, 0.044),
@@ -64,17 +121,62 @@ pub(super) fn book_row(
             x += rnd.uniform(0.03, 0.06);
             continue;
         }
+        let front = if fine && Some(k) != out {
+            front - more.uniform(0.0, 0.012)
+        } else {
+            front
+        };
         if Some(k) == out {
             cover = M.book_a; // a red one, to be seen
-            let parts = new_parts(|| book(x + t / 2.0, y, front, t, h, d, cover, band));
+            let parts = new_parts(|| one(x + t / 2.0, y, front, t, h, d, cover, band));
             got = Some((parts, (x + t / 2.0, y, front)));
         } else {
-            book(x + t / 2.0, y, front, t, h, d, cover, band);
+            one(x + t / 2.0, y, front, t, h, d, cover, band);
         }
+        last = h;
         x += t + 0.0015;
         k += 1;
     }
-    if stack {
+    if fine && !stack && k > 0 {
+        // one leaning on the last, resting on its foot's inner corner, if it fits on the shelf
+        let (t, h, d) = (
+            rnd.uniform(0.024, 0.04),
+            hmax * rnd.uniform(0.8, 0.95),
+            depth * rnd.uniform(0.86, 1.0),
+        );
+        let (cover, lean) = (rnd.choice(&books()), rnd.uniform(14.0, 22.0));
+        let front = front - more.uniform(0.0, 0.01);
+        let a = radians(lean);
+        let px = x + last.min(h * cos(a)) * tan(a);
+        if px + t * cos(a) < room.unwrap_or(x1) - 0.01 {
+            let parts = new_parts(|| hardback(px + t / 2.0, y, front, t, h, d, cover, false));
+            turn(
+                join(&parts, "leaning", Some(F.at(px, y, front))),
+                lean,
+                Axis::Y,
+            );
+        }
+    }
+    if stack && fine {
+        let (mut top, cx) = (y, if x0 > x { x0 } else { x } + 0.13);
+        for _ in 0..rnd.randint(2, 3) {
+            let (w, t, d) = (
+                rnd.uniform(0.16, 0.21),
+                rnd.uniform(0.024, 0.04),
+                depth * rnd.uniform(0.8, 0.95),
+            );
+            let at = (cx + rnd.uniform(-0.01, 0.01), top + t / 2.0, front);
+            let cover = rnd.choice(&books());
+            let turned = rnd.uniform(-5.0, 5.0);
+            let parts = new_parts(|| lying(at, w, t, d, cover));
+            turn(
+                join(&parts, "lying", Some(F.at(at.0, at.1, front - d / 2.0))),
+                turned,
+                Axis::Z,
+            );
+            top += t;
+        }
+    } else if stack {
         let (mut top, cx) = (y, if x0 > x { x0 } else { x } + 0.13);
         for _ in 0..rnd.randint(2, 3) {
             let (w, t, d) = (
@@ -102,6 +204,39 @@ pub(super) fn book_row(
         }
     }
     got
+}
+
+/// A hardback lying on its side, `w` long, `t` thick and `d` deep, its middle at (x, y) and its spine's crown at
+/// depth `z`, facing the front.
+fn lying(at: (f64, f64, f64), w: f64, t: f64, d: f64, cover: Mat) {
+    let (x, y, z) = at;
+    let bu = bulge(t);
+    // (the end's (across, out) as the side's (depth, height), turned back to counter-clockwise)
+    let mut end: Vec<(f64, f64)> = hardback_end(t, d, bu, BOARD, SPINE, SPINE_STEPS)
+        .into_iter()
+        .map(|(a, o)| (o, a))
+        .collect();
+    end.reverse();
+    fextrude!(
+        F,
+        "book",
+        &end,
+        w,
+        (x, y, z),
+        cover,
+        plane = Facing::Side,
+        smooth = true
+    );
+    let pd = d - bu - SPINE - PAGES_IN;
+    fbox!(
+        F,
+        "pages",
+        w - 2.0 * PAGES_IN,
+        t - 2.0 * BOARD - 0.0006,
+        pd,
+        (x, y, z - bu - SPINE - pd / 2.0),
+        M.pages
+    );
 }
 
 /// A vase standing on `y`: a foot, a belly, a neck flaring to a lip, open at the mouth.
@@ -420,7 +555,9 @@ pub fn bookshelf() -> Vec<Obj> {
         1.8,
         0.012,
         (0, 0.98, WALL + 0.006),
-        M.shelf_back
+        M.shelf_back,
+        bevel = 0.004,
+        bevel_segments = 1
     );
     fbox!(
         F,
@@ -476,9 +613,13 @@ pub fn bookshelf() -> Vec<Obj> {
         );
     }
     let front = zf - 0.03;
-    book_row(-0.405, 0.405, 0.1, front, 0.22, 0.32, 1, 1.0, false, None);
-    book_row(-0.405, 0.405, 0.52, front, 0.22, 0.3, 2, 0.95, true, None);
-    let out = book_row(
+    hardback_row(
+        -0.405, 0.405, 0.1, front, 0.22, 0.32, 1, 0.8, false, None, 0.405,
+    );
+    hardback_row(
+        -0.405, 0.405, 0.52, front, 0.22, 0.3, 2, 0.95, true, None, 0.405,
+    );
+    let out = hardback_row(
         -0.405,
         0.405,
         0.94,
@@ -489,9 +630,14 @@ pub fn bookshelf() -> Vec<Obj> {
         1.0,
         false,
         Some(9),
+        0.405,
     );
-    book_row(-0.405, 0.2, 1.36, front, 0.22, 0.3, 4, 1.0, false, None);
-    book_row(-0.405, -0.1, 1.76, front, 0.2, 0.1, 5, 0.9, true, None);
+    hardback_row(
+        -0.405, 0.2, 1.36, front, 0.22, 0.3, 4, 1.0, false, None, 0.405,
+    );
+    hardback_row(
+        -0.405, -0.1, 1.76, front, 0.2, 0.1, 5, 0.9, true, None, 0.405,
+    );
     plant(0.24, 1.76, zm, 0.045, 0.06, M.clay, 0.05);
     tips_out("bookshelf", out)
 }

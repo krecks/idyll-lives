@@ -23,6 +23,25 @@ mod shrubs;
 /// beyond).
 const TOLERANCE: f64 = 0.03;
 
+/// `p` with the potted plant's finishes: its leaves and stalks plain `satin` (crisp folded blades, not the foliage
+/// texture's dapple; still, as the cacti are), its pot glazed (`ceramic`).
+pub fn plain_leaves(p: artkit::materials::Palette) -> artkit::materials::Palette {
+    let changed: Vec<artkit::materials::Mat> = [
+        ("leaf", "satin"),
+        ("leaf_dark", "satin"),
+        ("leaf_light", "satin"),
+        ("stem", "satin"),
+        ("body", "ceramic"),
+    ]
+    .iter()
+    .map(|&(name, finish)| artkit::materials::Mat {
+        finish,
+        ..p.get(name)
+    })
+    .collect();
+    p.with(&changed)
+}
+
 /// The family.
 pub fn family() -> Option<Family> {
     let pot = |model: Model| model.tolerance(TOLERANCE).paint(&[("body", "Pot")]);
@@ -35,14 +54,28 @@ pub fn family() -> Option<Family> {
         "plants",
         BASE.palette(),
         vec![
-            pot(Model::new("plant", houseplants::plant, (0.772, 0.825, 0.791)).key("model.plant")),
+            pot(
+                Model::new("plant", houseplants::plant, (0.772, 0.825, 0.791))
+                    .key("model.plant")
+                    .palette(plain_leaves(BASE.palette()))
+                    .accept(
+                        "edges",
+                        "the rims of its leaf blades, drawn plain (satin): the gate leaves a leaf's rim unjudged on foliage",
+                    ),
+            ),
             pot(
                 Model::new("monstera", houseplants::monstera, (0.784, 0.911, 0.791))
-                    .key("model.garden.monstera"),
+                    .key("model.garden.monstera")
+                    .palette(plain_leaves(BASE.palette())),
             ),
             pot(
                 Model::new("fiddleFig", houseplants::fiddle_fig, (0.528, 1.626, 0.527))
-                    .key("model.garden.fiddleFig"),
+                    .key("model.garden.fiddleFig")
+                    .palette(plain_leaves(BASE.palette()))
+                    .accept(
+                        "edges",
+                        "the rims of its leaf blades, drawn plain (satin): the gate leaves a leaf's rim unjudged on foliage",
+                    ),
             ),
             pot(
                 Model::new("snakePlant", houseplants::snake_plant, (0.341, 0.905, 0.32))
@@ -66,7 +99,8 @@ pub fn family() -> Option<Family> {
                 .key("model.garden.palm")),
             pot(
                 Model::new("orchid", houseplants::orchid, (0.431, 1.198, 0.381))
-                    .key("model.garden.orchid"),
+                    .key("model.garden.orchid")
+                    .palette(plain_leaves(BASE.palette())),
             ),
             pot(
                 Model::new("bonsai", houseplants::bonsai, (0.62, 1.354, 0.407))

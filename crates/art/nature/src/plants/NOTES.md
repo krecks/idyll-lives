@@ -33,15 +33,15 @@ whole prune (the game brings it back after). It is the model's fourth draw call 
 
 | Model | Size (w × h × d) | Triangles | Draws |
 |---|---|---|---|
-| `model.plant` | 0.77 × 0.83 × 0.79 m | 1,884 | 2 |
-| `model.garden.monstera` | 0.78 × 0.91 × 0.79 m | 1,576 | 2 |
-| `model.garden.fiddleFig` | 0.53 × 1.63 × 0.53 m | 2,080 | 3 |
+| `model.plant` | 0.77 × 0.83 × 0.79 m | 1,884 | 1 |
+| `model.garden.monstera` | 0.78 × 0.91 × 0.79 m | 1,576 | 1 |
+| `model.garden.fiddleFig` | 0.53 × 1.63 × 0.53 m | 2,080 | 2 |
 | `model.garden.snakePlant` | 0.34 × 0.91 × 0.32 m | 1,452 | 2 |
 | `model.garden.cacti` | 0.57 × 0.52 × 0.47 m | 1,940 | 1 |
 | `model.garden.succulents` | 0.62 × 0.17 × 0.62 m | 1,980 | 1 |
 | `model.garden.bostonFern` | 0.73 × 0.98 × 0.79 m | 1,968 | 3 |
 | `model.garden.palm` | 0.77 × 0.89 × 0.69 m | 1,926 | 2 |
-| `model.garden.orchid` | 0.43 × 1.20 × 0.38 m | 1,554 | 3 |
+| `model.garden.orchid` | 0.43 × 1.20 × 0.38 m | 1,554 | 2 |
 | `model.garden.bonsai` | 0.62 × 1.35 × 0.41 m | 3,144 | 4 |
 
 `check-glb`: 10 models, 0 failed; warnings: the bonsai's four draw calls. Khronos validator: 0 errors, 0 warnings
@@ -279,3 +279,19 @@ has a top and an underside triangle on the same three points wherever a triangle
 point; artkit's writer takes the second of each such pair out (as Blender's exporter did): those
 leaflets are drawn from one side only, as they were. The rose bush turns the spiral's heading, already degrees,
 into degrees again, as the Blender script did.
+
+## The potted plant's plain leaves (2026-11-18)
+
+From a showcase living room judged at the play camera: the potted plant's leaves and stalks are plain `satin` in
+darker greens (`plain_leaves`). The foliage texture drew them as a dark-and-light dapple at the play camera; now they
+read as folded glossy blades. They no longer sway (the nature shader moves only foliage and bark), as the cacti
+don't. Its pot is glazed (`ceramic`). One draw call (was two). The gate judges a plain leaf's rims as edges, so the
+entry accepts `edges` (the leaves' rims, 36, and the pot's rim and saucer, the 2 it had). `cargo review sizes` finds
+a plant's leaves by their finish, or, drawn plain, by their names (`leaf`, `stem`: crates/tools/src/species.rs).
+
+The monstera, the fiddle-leaf fig and the orchid took the same (2026-11-18): their big leaves read as speckle at the
+play camera too, and as leaves plain. Colours as they were (already dark); one draw call fewer each; the fig accepts
+`edges` as the potted plant does. Tried and left on foliage: the snake plant (each blade's pale edge is a wider leaf
+behind it, which plain shows from behind as a whole pale blade), the parlour palm and the fern on its stand (fine
+fronds: plain, they came out paler and faceted, not clearer), and the lumpy crowns (the hanging plant, the bonsai, the
+plant table's pots: plain, a lump reads as a green balloon; the dapple is what makes it leaves).
