@@ -55,7 +55,9 @@ to read first.
 5. **Wire it in** when the object is new (below), and run `cargo test -p sim-core --test sim shipped_content::`
    (`cargo test -p sim-core` if you touched the sim).
 6. **Look in the game.** The inspector and the gallery, then your own dev server driven headless (below): WebGPU and
-   `&renderer=webgl`, at rest and with each clip playing, by day and at night.
+   `&renderer=webgl`, at rest and with each clip playing, by day and at night. Judge it at the play camera
+   (`check.mjs gallery --camera game`), where a player sees it; objects.md, "What reads at the play camera", says
+   what shows there and what does not.
 7. **Finish up.** `cargo art <family> --check` (the same bytes again), `cargo review sizes --check` and
    `cargo review uses --check`; the model's line in `NOTES.md` and in `web/public/assets/CREDITS.md`. A build gives
    the same bytes every time, so `git status` shows only what you changed; never commit `tools/art/previews/`.
@@ -454,5 +456,7 @@ Playwright headless with full Chrome for Testing, at 1 % volume (`page.addInitSc
   sign, and the file keeps it too. Write whole numbers whole (`(0, 0.735, 0)`).
 - **Turned by a quaternion.** A `rod!` is, and so is what is joined onto one: an Euler turn does nothing to it until
   its mode is set. `swing!`, `spin!`, `rock!`, `wobble!` and `path` set it themselves.
+- **Plain leaves.** A plant's leaves on a plain finish (`plain_leaves`) no longer sway, count as edges in the
+  gate, and are found by `cargo review sizes` by their names (`leaf`, `stem`), not their finish: name them so.
 - **Doubled faces go when written.** The writer drops a face on the corners of an earlier one, after the shading:
   the file can have fewer triangles than the build's line says.

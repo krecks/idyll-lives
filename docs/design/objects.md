@@ -135,6 +135,21 @@ instances, so these costs are per kind of object in view, plus the triangles of 
   that meets a crease an edge band, or its corners darken it all over.
 - **Judge it lit:** `cargo art <family> --preview` draws the shapes and the baked shading; the game is the lit
   view (the inspector, `check.mjs gallery`, WebGPU and `--renderer webgl`) and the last word.
+- **What reads at the play camera** (6 to 9.5 m indoors, `check.mjs gallery --camera game`), measured on a
+  showcase living room (2026-11-18): what changes the whole object reads; what changes its surface does not.
+  - Reads: the silhouette, the colour and how light or dark it is against its neighbours, and big clear shapes in
+    place of busy texture. Four houseplants with big leaves (potted plant, monstera, fiddle-leaf fig, orchid) read
+    as speckle on `foliage` and as leaves on plain `satin` (`plain_leaves` in crates/art/nature/src/plants).
+    A row of books reads better uneven: some pushed back, one leaning where the row ends short (`hardback`,
+    `hardback_row` in crates/art/rooms/src/living).
+  - Does not read: the finish swaps (velvet, lacquer, enamel, brushed: a softer sheen, seen close up only),
+    bevels of 3 to 8 mm, rounded spines, a mug's foot ring (a mug is about 15 px there).
+  - Plain leaves stop the wind's flutter (only `foliage` and `bark` sway) and count as edges in the gate
+    (`.accept("edges", ..)`). They fail where the texture is what makes the leaves: fine fronds (palm, fern),
+    a blade drawn as a pale leaf behind a dark one (snake plant), lumpy crowns (hanging plant, bonsai, topiary:
+    plain, a lump reads as a green balloon).
+  - Detail that does not read still costs download: weigh triangles and bytes against what the play camera shows,
+    and show a before and after from the play camera before spending them across many models.
 
 ## Materials, finishes, tints, styles and quality
 
