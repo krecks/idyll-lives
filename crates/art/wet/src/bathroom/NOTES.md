@@ -17,11 +17,11 @@ only manifest that defines these keys.
   keys it from there to scale 1. `motions` plays `water_on` for the `wash` animation tag, with no `hold`,
   so the water runs for the whole use and retracts afterwards (the `wash` tag covers both the `wash` and
   `washUp` interactions).
-- **Against the wall.** The sinks stand with their backs on the wall face (game depth -0.43): `centre=` on each
+- **Against the wall.** The sinks stand with their backs on the wall face (game depth -0.43): `.centre(..)` on each
   `Model`, where settling centres it (they stood centred on the tile, 15–22 cm off the wall, until
   2026-10-14). Their old parts (the base sink and the rest) reached 1–4 cm into
   the wall and were moved forward onto it.
-- **Basins.** Each basin is one shell lofted through rings (`_lathe`, `_bowl_shell`): up the outside, over a
+- **Basins.** Each basin is one shell lofted through rings (`_lathe`, `bowl_shell`): up the outside, over a
   rounded rim and down the inside to its floor, so the inside faces up into the bowl. The base sink's is an
   undermount steel basin under a worktop slab cut with a rounded opening. Its cabinet's hidden top stays 3 cm under
   the basin's floor, with painted "shoulders" round the basin up to the worktop: a face within 1 cm of the basin's
@@ -29,12 +29,12 @@ only manifest that defines these keys.
 - **The detail pass (2026-10-22).** Every model was rebuilt with the forms (sweeps, lofts, extrusions,
   soft boxes, the kit's tube): same keys, sizes, centres, heights, parts, pivots, clips, `motions`, paint and draws.
   The family's helpers: `_lathe` (a loft through game rings: squareness, an egg's narrowing, a deeper back, a ring
-  moved forward), `_gooseneck` (a tap in one sweep: riser, half-circle arc, aerator, domed rose, side lever),
-  `_pull` (a one-piece bar pull), `_shaker` + `_panel` (a frame with a hole round a panel set 6 mm back; the
+  moved forward), `gooseneck` (a tap in one sweep: riser, half-circle arc, aerator, domed rose, side lever),
+  `_pull` (a one-piece bar pull), `shaker` + `_panel` (a frame with a hole round a panel set 6 mm back; the
   panel is a band and its middle, so the shading baked per vertex darkens only the band in the crease, not the
-  whole face), `_bends` (a path's corners turned in round bends as points, swept as they are: Catmull-Rom through
-  long runs beside short corner spans overshot by 12 cm), `_frame`, `_tray`, `_grate`, `_head`, `_hand_shower`,
-  `_bar_mixer`, `_caddy`, `_curtain` (one wavy sheet), `_bottle`, `_cup`, `_drain`, `_rose`/`_wall_rose`.
+  whole face), `bends` (a path's corners turned in round bends as points, swept as they are: Catmull-Rom through
+  long runs beside short corner spans overshot by 12 cm), `_frame`, `_tray`, `_grate`, `_head`, `hand_shower`,
+  `bar_mixer`, `caddy`, `_curtain` (one wavy sheet), `_bottle`, `_cup`, `drain`, `_rose`/`wall_rose`.
 
 ## The models
 
@@ -77,10 +77,10 @@ old part (`catalog.double_vanity`) has none either.
 - **Shapes.** Egg-shaped from above (`EGG`, narrower to the front), as an elongated bowl is. The bowl is one
   shell (`_bowl`): up the outside to a rounded rim and down the inside to a water disc. A waisted foot rising into
   the bowl's underside (`_foot`) with a bolt cap each side, or a wall-hung bowl on a rounded porcelain block
-  (`_column`) into the panel. The seat is a rounded section swept round the egg (`_seat`) on two buffers, the lid
-  a domed loft, the hinges a knuckle on a post each. The cisterns are rounded lofts (`_cistern`) under a soft lid a
-  little proud of them (`_cistern_lid`; the classic's stepped, with a band round it), the flush levers a boss and
-  a swept arm (`_lever`). The roll (`_roll`) hangs on a one-piece holder with its loose end down the front.
+  (`column`) into the panel. The seat is a rounded section swept round the egg (`_seat`) on two buffers, the lid
+  a domed loft, the hinges a knuckle on a post each. The cisterns are rounded lofts (`cistern`) under a soft lid a
+  little proud of them (`cistern_lid`; the classic's stepped, with a band round it), the flush levers a boss and
+  a swept arm (`_lever`). The roll (`roll`) hangs on a one-piece holder with its loose end down the front.
 - **The lid** is the one moving part (`lid`), hinged across its back edge, on its underside; `lid_up`
   swings it 100° about X in 0.6 s, to lean on the cistern (the hinge is 8.6–9.5 cm in front of it so the
   lid just meets it). The smart toilet's lid is level with its seat housing (the bidet unit) and hinged on
@@ -110,11 +110,11 @@ errors, 0 warnings each.
 `model.shower`, `model.showerStall`, `model.showerWalkIn` and `model.showerRain`, built 2026-10-14. They sat in
 Validate › Showers until checked in play.
 
-- **They fill their tile**, their backs on the wall's face (game depth -0.43; `centre=` 2–3.5 cm forward of
+- **They fill their tile**, their backs on the wall's face (game depth -0.43; `.centre(..)` 2–3.5 cm forward of
   the middle, as the old parts), so they reached 2–4 cm into the wall until 2026-10-15. The rain shower is
   0.93 m deep (its tray and back wall 1 cm shallower), so its front is on the tile's edge. The resident steps in
   onto the middle (`inside`). Walls at the back and on the left (game -x), the open sides glass or a curtain.
-- **The rain** is the one moving part (`water`): thin streams (`_rain`: a disc of rings, or a grid under the
+- **The rain** is the one moving part (`water`): thin streams (`rain`: a disc of rings, or a grid under the
   square head) built full length from the head's underside to the tray, joined with the origin on the head
   and scaled to 0.001 along their length, so they're hidden in the head at rest. `water_on` grows them down
   in 0.5 s and `motions` holds it for the whole use (the `shower` tag). The stall's head is on the wall, so
@@ -134,7 +134,7 @@ Validate › Showers until checked in play.
   gathered into that corner at rest
   (scaled to 0.32 along the rail about its origin there); `curtain_draw` grows it across in 0.9 s, 1 s into the
   use, held till the use ends (A-bathroom-02). The water comes on at 1.8 s.
-- **Tiles** (`_tiled_walls`) are thin satin squares a little proud of a grout backing: the base shower 30 cm,
+- **Tiles** (`tiled_walls`) are thin satin squares a little proud of a grout backing: the base shower 30 cm,
   the stall 25 cm. The walk-in shower's stone wall has grooved joints; the rain shower's walls are plain stone.
   The rain shower's front glass covers only the left half: the right half is the way in.
 - **Details (2026-10-22).** Trays are one loft with a raised lip round a floor falling to the drain (`_tray`), the
@@ -163,7 +163,7 @@ Validate › Baths until checked in play.
 - **2 × 1 tiles, centred.** The resident sits along the tub, back at the end without the taps and legs out
   towards them (`SEATS` `along`, `legsOut`: 0.25, 0.28 and 0.27 m high, the hips 0.38–0.42 m from the middle);
   the tub floors are 0.15–0.17 m, so they sit in the water.
-- **The tub** is one closed shell (`_loft`): superellipse rings up the outside, over the rim and down the inside
+- **The tub** is one closed shell (`loft`): superellipse rings up the outside, over the rim and down the inside
   to the floor, so the inside faces up into the tub; flat-shaded above 40°. The built-in bath is squarer
   (higher exponent) behind a gloss front and end panels over a dark plinth set back under them.
 - **Two moving parts.** The tap's stream (`stream`, the sinks' `_water` way) grows in 0.4 s (`tap_on`, held
@@ -175,7 +175,7 @@ Validate › Baths until checked in play.
 - **Sizes against the old parts.** The freestanding bath's filler stands beyond the tub's end (1.89 m
   wide, the old part's tub 1.80 m); the clawfoot's rolled rim makes it 0.83 m deep (0.78 m). Both fit
   their 2 × 1 tiles.
-- **Details (2026-10-22).** Each has a plug and an overflow plate (`_waste`). The built-in bath's front panel
+- **Details (2026-10-22).** Each has a plug and an overflow plate (`waste`). The built-in bath's front panel
   carries a moulded frame; its deck mixer a pillar with a collar, a spout bent down over the water and two lever
   handles on roses; a towel folded in two layers and a duck with a tail. The clawfoot tub has a rolled bead swept
   round its rim, ball-and-claw feet (a curved leg, a ball, three swept claws), a filler bent in one tube with

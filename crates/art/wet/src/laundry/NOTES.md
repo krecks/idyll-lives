@@ -25,10 +25,10 @@ round the porthole. Two moving parts:
 - **The drum's face** (`drum`): a dark disc with three paddles and the washing, just behind the window, its
   origin on the axis. `drum_spin` turns it once in 1.2 s (`spin`); on the washer only.
 
-`motions` (2026-10-21, review A-bathroom-03): the washer `{'uses': {'laundry': ['door_open', {'clip': 'drum_spin',
-'delay': 3.5, 'every': 1.1}]}, 'hold': 2.5}`: the drum turns once the door has shut (3.5 s in), round after round
+`motions` (2026-10-21, review A-bathroom-03): the washer `{"uses": {"laundry": ["door_open", {"clip": "drum_spin",
+"delay": 3.5, "every": 1.1}]}, "hold": 2.5}`: the drum turns once the door has shut (3.5 s in), round after round
 (`every` a hair under the turn, so there's no pause) till the wash ends; it turned behind the open door before. The
-dryer `{'uses': {'laundry': 'door_open'}, 'hold': 2.5}`: "Fold the laundry" opens it to take the washing out, and
+dryer `{"uses": {"laundry": "door_open"}, "hold": 2.5}`: "Fold the laundry" opens it to take the washing out, and
 the drum stays still (it tumbled the whole fold). By the interaction id, as the `clean` tag is shared with other
 chores. The washing on the top (folded towels, the
 dryer's basket of dry washing) is plain satin, so it costs no draw call.
@@ -39,8 +39,8 @@ turning.
 
 ## Running on their own (0.5.0, I-bathroom-07)
 
-The machines run on their own once loaded (content `runs`). Their motions now: `{'uses': {'laundry': 'door_open',
-'unload': 'door_open'}, 'hold': 2.5, 'running': 'drum_spin'}`: loading and taking the washing out open the door,
+The machines run on their own once loaded (content `runs`). Their motions now: `{"uses": {"laundry": "door_open",
+"unload": "door_open"}, "hold": 2.5, "running": "drum_spin"}`: loading and taking the washing out open the door,
 which shuts again after 2.5 s, and the drum goes round while the machine runs with nobody there, from rest to rest
 (`running`), a turn each 1.2 s on the washer (unchanged) and each 1.8 s on the dryer (new: its drum didn't turn
 before). The washer's file is as it was.

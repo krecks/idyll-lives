@@ -59,7 +59,7 @@ minutes, comfort; not autonomous). It costs the chest a third draw call.
 
 The three-drawer nightstand's top drawer (`drawer`, origin on the carcass face, box behind it; a biscuit tin, two
 chocolate bars and a paperback in it) slides out 30 cm (`drawer_open`, as the dressers') for the content's "Grab a
-snack from the drawer" (`snack`, `SNACK_DRAWER`), held 2.5 s: a second draw call. It was keyed to "Pick an outfit"
+snack from the drawer" (`snack`, `snack_drawer`), held 2.5 s: a second draw call. It was keyed to "Pick an outfit"
 with clothes in it until 2026-10-21, when the content gave the drawer the snack (I-bedroom-05). The hamper's lid
 (`lid`, hinged at its back; the basket is hollow with washing in it) lifts 70° (`lid_open`, 0.7 s; any further and
 it goes into the wall the hamper stands at) for the whole of the content's "Sort the washing" (`sortWashing`,
@@ -97,7 +97,7 @@ the side: it came up through the carcass's top (and the single one's side).
 ### Detail (2026-10-22)
 
 Rebuilt with the forms and the kit (`kit::pull`, `knob`, `shaker`, `fillet`), same sizes, centres, tops, parts, clips
-and draws. Fronts are `_front` ('plain': rounded; 'shaker': a frame round a recessed panel), hardware is turned or
+and draws. Fronts are `common::front` (plain: rounded; shaker: a frame round a recessed panel), hardware is turned or
 swept in one piece, tops rounded (`_top`), clothes on wire hangers with sloping shoulders (`_hanger`). A panel set in a
 frame stops a hair inside the opening, and no bead or cove wraps a carcass's edge: a vertex buried in another part
 bakes black (`artkit::shade`) and a face with only corner vertices goes dark all over (the shaker panels and the dresser's
@@ -120,7 +120,6 @@ No change to the build: its soft boxes take the shared form's new shape (the sof
 
 ## Ported to Rust (2026-11-18)
 
-Built by `cargo art bedroom_storage` from this module (its Python script's numbers and order, one function each;
-the pulls, knobs, frame-and-panel fronts and bent paths are artkit's kit). Against the last Blender build
-(`ref/blender`): 1 same, 13 near, every surface to 0.000 mm. The palette's `box` is `M.box_` in the code (`box` is
+Built in Rust since 2026-11-18 (`cargo art bedroom_storage`), proved against the last Blender build (`ref/blender`). The pulls, knobs, frame-and-panel
+fronts and bent paths are artkit's kit. The palette's `box` is `M.box_` in the code (`box` is
 Rust's word), named `box` in the file and the pack.

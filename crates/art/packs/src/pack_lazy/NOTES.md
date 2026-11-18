@@ -4,7 +4,7 @@
 `packs/pack_lazy/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Lazy until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`).
 What the renderer fixes is kept: the bed's mattress top at 0.49 (`BEDS` default 0.5; it is in `BLANKET_BEDS`, so no
 duvet is modelled, only a throw folded at the foot), the pod's and the poufs' seats at 0.45, the vibration plate's
 deck at 0.125 (content `stand.height` 0.12, where the resident stands).
@@ -78,7 +78,7 @@ plate 1,452 → 2,862, hub 2,236 → 2,282; draws unchanged).
   number plate; a keypad of keys, a camera, a logo; a taped parcel with its label, a soft takeout bag with its top
   folded and handles.
 - `vibePlate`: a soft base with a lime band swept round it and feet; an oval column curving up to the console, the
-  handlebar bent from one tube (`kit.fillet`) with rounded grips; the console with a screen and buttons; a lofted
+  handlebar bent from one tube (`kit::fillet!`) with rounded grips; the console with a screen and buttons; a lofted
   bottle. The deck: a ribbed pad with two footprints (outlines).
 - `smartHub`: splayed tapered legs, a lofted speaker with buttons by its ring, a dock with its slot, books with
   pages, a turned robot vacuum with a bumper band, turret, wheels and side brush. The tablet: an app grid, a dock bar

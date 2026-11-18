@@ -4,10 +4,10 @@
 `packs/pack_neat/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Neat until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`),
 keeping its footprint, its wall side (backs on the wall face at depth −0.43; the old parts' were at −0.455) and
 the desk chair's seat at 0.45 m. The entry console and the rain shower tower stood 2 cm into the wall; they are
-centred on their `Model` `centre` now (`G.settle()`), backs on the face, as the wall-standing ones' old parts
+centred on their `Model` `centre` now (`settle_all()`), backs on the face, as the wall-standing ones' old parts
 stood, so the model and the wall agree within a centimetre.
 
 | Model | Moving part and clip | Played by |
@@ -16,7 +16,7 @@ stood, so the model and the wall agree within a centimetre.
 | `laundryCenter` | the washer's porthole door, hinged on its left: `door_open` swings it 100° (0.8 s), `hold` 2.5 s: open for the washing to go in or come out, shut while the machine runs alone (2026-10-21; since 2026-10-26 the load and the unload play it, not the folding) | `laundry`, `unload` |
 | `rainShowerTower` | streaks of rain from the square head, built full length, origin at the head: `water_on` grows them down (0.6 s); the glass door across the middle of the front, hinged on its right: `door_open` swings it 95° out (0.8 s), `hold` 1.5 s and `out` 1.5 s: it lets the bather in, shuts behind them and opens again to let them out (2026-10-21: it was part of the still body, walked through) | `steamShower` |
 | `organizerDesk` | the middle bin of the hutch's lower row, with cards in it: `drawer_open` slides it 13 cm out towards the sitter (0.6 s). Since 2026-10-21 the desk stands with its back on the wall, the hutch on the desk's back open to the sitter and the room, the chair in front (seat 0.45 at depth 0.25, the hips at 0.21: `furniture.json` `back`): it stood the other way round, the hutch's back and the modesty panel to the room (M-packs-05) | `sort`, `ledger` |
-| `robotVacuumDock` | the robot, origin at its middle: `vacuum_round` (a loop, `G.path`, 5 s a round at 0.25 m/s) drives it 18 cm out of the dock, once round a 14 cm circle in front of it (to the left, clear of the plant), facing the way it goes, and back in, round after round while it is programmed (2026-10-21: it peeked 60 cm out and back) | `program` (loop) |
+| `robotVacuumDock` | the robot, origin at its middle: `vacuum_round` (a loop, `motion::path`, 5 s a round at 0.25 m/s) drives it 18 cm out of the dock, once round a 14 cm circle in front of it (to the left, clear of the plant), facing the way it goes, and back in, round after round while it is programmed (2026-10-21: it peeked 60 cm out and back) | `program` (loop) |
 | `entryConsole` | the key tray drawer under the top (front, knob, tray, keys): `tray` slides it 20 cm out (0.6 s). The mirror and the hook board hang on a birch back panel rising from the top (posts and a cap), so they stand on something free of a wall too (2026-10-21, M-packs-01; Q-06) | `tidy` |
 
 The mop is not hidden while in use: the `clean` animation holds no prop, so it stays out of its dock, leaning, and
@@ -70,8 +70,8 @@ stuffed, poles, rails and hooks swept in one piece. Same keys, sizes, parts, cli
   keys, a ledger with a ribbon, a turned pen cup; the chair padded on splayed tapered legs.
 - **Robot vacuum:** a turned rug with a border, the dock lofted with a bin behind its window and a ramp; the robot turned
   with its lid's seam, a bumper, the lidar turret and a six-bristle side brush; a snake plant of upright twisted leaves.
-- **Entry console:** tapered legs, a slatted shoe shelf with lofted shoes, a moulded mirror frame (`G.kit.moulding`), J
-  hooks, a stuffed tote with handles and a draped scarf, tulips (`plants.cupped`) with strap leaves, a `G.kit.knob`.
+- **Entry console:** tapered legs, a slatted shoe shelf with lofted shoes, a moulded mirror frame (`kit::moulding!`), J
+  hooks, a stuffed tote with handles and a draped scarf, tulips (`cupped!`) with strap leaves, a `kit::knob!`.
 
 ## Rebuild
 

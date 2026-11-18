@@ -6,7 +6,7 @@ Ceiling Lights, Wall Lights, Floor Lamps and Table Lamps until signed off.
 
 - **LT1, ceiling:** `ceilingPendant`, `ceilingLight`, `chandelier`, `pendantIndustrial`, `ceilingFan`,
   `trackLights`, `paperLantern`. They hang from 2.8 m at their real height (settled with `floor = false`,
-  `floor=False` on the `Model`), centred. The pendant lamp and the paper lantern, which residents walk under, hang
+  `.on_wall()` on the `Model`), centred. The pendant lamp and the paper lantern, which residents walk under, hang
   clear of heads: their lowest point 2.11 and 2.12 m up (a 0.69 m drop; 2026-10-21, review M-lighting-05 and Q-12,
   was 1.85 and 1.80); the chandelier and the industrial pendant hang lower, over furniture only (content
   `headHeight`).
@@ -65,23 +65,23 @@ Not on Low (E2); at rest they look as the old part.
 ## Shapes
 
 - `lathe` turns an old part's `lathe` (profile in fractions of its size) into a `revolve`, closing the
-  profile and optionally adding the liner. `top=True` puts the origin at the top, to tilt the swing-arm
+  profile and optionally adding the liner. `top: true` puts the origin at the top, to tilt the swing-arm
   shade about where it hangs.
 - `_drum` is an open drum or cone shade with a wall thickness (4 segments turned 45° for the square ones).
-- `_trough` is the banker's half-round shade, open below, coming 20° past the axis so the tube bulb hides.
+- `trough` is the banker's half-round shade, open below, coming 20° past the axis so the tube bulb hides.
 
 ## Detail pass (2026-10-22)
 
 Rebuilt with the forms and the kit: same keys, sizes (within 2 %), centres (the fan's re-measured), bulb heights,
 paint and draws; every lamp under its size class's target. Shared turned parts: `_turned` (a profile from a foot),
-`_canopy` (a ceiling cup with a cord grip), `_socket` (ribbed), `_pear` (a pear bulb), `_ring` (rolled rims, wires),
+`_canopy` (a ceiling cup with a cord grip), `_socket` (ribbed), `pear` (a pear bulb), `_ring` (rolled rims, wires),
 `loft_at` (rounded-square bodies, `loft`/`ring`); `drum` takes `rims` (rolled bindings in the shade's own fabric)
 and `spider` (the wire fitter seen from above); cords, stems, arms and harps are `kit::tube` sweeps. Shades keep
 their materials and glows.
 - **Ceiling**: the pendant's and the industrial dome's rolled lips, collars and fitters, pear bulbs; the lantern's
   glazing bars, head rails and hipped lid; the chandelier's turned column, S-scrolled arms and curved spokes (one
   sweep each, no rod-and-sphere chains), bobeches and a finial; the fan's banded motor, ball cover and coupler,
-  extruded blades with rounded tips on curved irons (axis still on the tile's middle, `settle(centre=False)`); the
+  extruded blades with rounded tips on curved irons (axis still on the tile's middle, `settle!(centre = false)`); the
   track's slotted channel, live end and finned spot cans aimed as before; the paper lantern's skin pinched in at each
   rib, open top and bottom on wire rims, a lining and bulb seen through them.
 - **Wall**: turned back plates, the sconce's gooseneck arm and candle cup, the swing arm's bent arms, thumb screw and
@@ -136,7 +136,6 @@ shade, and the tiles it reaches over count as its own. Khronos validator: 0 erro
 
 ## Ported to Rust (2026-11-18)
 
-Built by `cargo art lighting` from this module (its Python script's numbers and order, one function each). The
-content's lights the bulbs are checked against are read from web/public/content (base.json, furniture.json,
-catalog2/lighting.json), built into the crate. Against the last Blender build (`ref/blender`): 7 same, 14 near,
-every surface within 0.2 mm (the square table lamp's shade), most to 0.000 mm.
+Built in Rust since 2026-11-18 (`cargo art lighting`), proved against the last Blender build (`ref/blender`). The content's
+lights the bulbs are checked against are read from web/public/content (base.json, furniture.json,
+catalog2/lighting.json), built into the crate.

@@ -2,7 +2,7 @@
 
 The garden decor of `garden.json`: the gnome, the bird bath, the two-tier fountain, the stone lantern, the
 wheelbarrow planter and the boulders. Family `garden`: the models go to `web/public/assets/models/garden/`, the
-entries to `packs/gardenDecor/manifest.json` (`cargo art garden_decor`). Built in Blender axes at the old parts' sizes (within
+entries to `packs/gardenDecor/manifest.json` (`cargo art garden_decor`). Built in the model's build axes (z up) at the old parts' sizes (within
 10 %), each stood on the floor and centred by `settle`. The fountain's water moves all the time near the camera (`flow`, ambient);
 the rest are still.
 
@@ -44,8 +44,6 @@ the wheelbarrow come down by half while showing more.
 `check-glb`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings on each file. In the game
 (2026-10-22, headless, WebGPU and WebGL2): the gallery and the fountain's `flow` on the clips bench, no errors.
 
-Built here, not in Blender, since 2026-11-18 (`cargo check-glb --against ref/blender`): the bird bath and the
-fountain the same in every bit, the gnome, the lantern and the wheelbarrow the same points and triangles (the baked
-shading within 0.05 of a grey level), the boulders within 0.001 mm with the same triangles a material. The boulders'
+Built in Rust since 2026-11-18, proved against the last Blender build (`cargo check-glb --against ref/blender`). The boulders'
 cuts are the ground's (`ground::rock::_cut`, on artkit's `edit::bisect_plane`, `holes_fill` and `triangulate`): a
 stone's fractures are cut where it was made, at the origin.

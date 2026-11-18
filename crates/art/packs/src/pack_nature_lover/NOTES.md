@@ -5,7 +5,7 @@ and their entries in `packs/pack_natureLover/manifest.json`, a pack listed in th
 (the trait's only model manifest). Built 2026-10-14; they sat in Validate › Nature Lover until checked in
 play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`),
 keeping its footprint, its wall side (the potting bench and the shower against the wall face at depth −0.43), the
 hammock's sling low point at 0.5 m (no `BEDS` entry: the default mattress height) and the glasshouse bench's seats
 at 0.45 m.
@@ -23,7 +23,7 @@ at 0.45 m.
 `tieBouquet` grows a tied bouquet (three stems, three flower heads and a twine wrap, plain) on the potting bench's
 worktop front (`bouquet`, 0.8 s), held while it is tied and gone when it ends, as the kids' painting. Its origin is
 inside the worktop, so it flattens out of sight at rest. It is a part of its own: the bench takes 4 draws (7,704
-triangles: its pots leave out their undersides and, under the soil, their insides, `_pot(trim=True)`).
+triangles: its pots leave out their undersides and, under the soil, their insides: `common::_pot`).
 
 `tendVeggies` rustles the bed (`rustle`, 0.6 s in and every 2.4 s while tended): the plants and the fruit sway
 3° back and forth about their shared origin on the soil line through the bed's middle. A use clip on a growing
@@ -43,7 +43,7 @@ seedlings sway by their own height and keep their size. No new part: still 4 dra
   and the spreader bars' wood. The old grass tuft is left out.
 - The shower's potted plant, the feeder's tube (plain gloss, no glass) and the bench's seedling are plain.
 
-**Found in the game:** a part in a textured finish (`foliage`) that is grown from nothing (`G.grow` from 0.001) never
+**Found in the game:** a part in a textured finish (`foliage`) that is grown from nothing (`grow!` from 0.001) never
 showed on the clips bench, WebGPU or WebGL; the same part in plain satin did, so the seedling is plain satin. Fixed
 in the renderer since: such a part takes its normals and UVs from its grown shape (`models.ts`), and the foliage
 flutter is in world metres however far a part is scaled (`nature.ts`). A grown part doesn't flutter (it stays flat and
@@ -80,11 +80,11 @@ lying direction is the engine's, not the model's.
 
 ## Detail pass (2026-10-22)
 
-Every plant is now leaves (`plants.leaf`: closed, bent blades, `notch` cutting fern fronds, tomato and carrot leaves
-into leaflets) and flower faces (`plants.star`) on swept stems, in place of lumpy balls and rods; pots are turned with a
+Every plant is now leaves (`leaf!`: closed, bent blades, `notch` cutting fern fronds, tomato and carrot leaves
+into leaflets) and flower faces (`star!`) on swept stems, in place of lumpy balls and rods; pots are turned with a
 rolled rim and a soil mound, open below the soil (never seen). Same keys, sizes, parts, clips, paint and draws.
 - **Veggie bed:** chamfered boards between posts with pyramid caps, a moulded cap rail mitred round the top
-  (`G.kit.moulding`), the soil puffed and uneven; lettuces as cupped rosettes round a heart, feathery carrot tops,
+  (`kit::moulding!`), the soil puffed and uneven; lettuces as cupped rosettes round a heart, feathery carrot tops,
   tomato plants winding up tapered stakes with toothed leaves and trusses of tomatoes under their calyces, a courgette's
   big heart-shaped leaves on stalks with two swept courgettes and their flowers; a seed packet on its stick.
 - **Potting bench:** planked worktop and slatted shelf, a tongue-and-groove back board (one slab extruded from a grooved
@@ -92,8 +92,8 @@ rolled rim and a soil mound, open below the soil (never seen). Same keys, sizes,
   a flowering pot with starred flowers on stems, seedling trays of sprouts, a lofted watering can with its rose and bent
   handle, stuffed sacks with rolled tops, stacked pots; the seedling and bouquet built of leaves and flower faces.
 - **Bird feeder:** a post in a steel socket, the tray with a mitred lip on braces, the house's gable walls cut with a
-  round entry (`G.extrude` with a hole) under a two-board roof and a ridge cap, a perch dowel; the seed tube with a domed
-  lid, a dish with ports and a perch; a goldfinch and the landing bluebird are `G.kit.songbird`s; a stone-edged round bed
+  round entry (`extrude!` with a hole) under a two-board roof and a ridge cap, a perch dowel; the seed tube with a domed
+  lid, a dish with ports and a perch; a goldfinch and the landing bluebird are `kit::songbird!`s; a stone-edged round bed
   of flowering clumps at the foot.
 - **Hammock:** a laminated arm swept in one piece each side (no rods and spheres), the beam and feet rounded; the sling
   a sweep per stripe with hemmed edges, round spreader bars, seven cords to a rope ring each end and a rope to the hook;
@@ -103,7 +103,7 @@ rolled rim and a soil mound, open below the soil (never seen). Same keys, sizes,
   with a soft soap; a potted plant of strap leaves.
 - **Moss terrarium:** a turned pedestal with collars, a lipped plate, a mossy mound (jittered), two tiered firs, a fern,
   two toadstools; a lofted mister with a trigger; a braided round rug; the cloche turned with a rim and a knob.
-- **Glasshouse:** gutters along the eaves, triangular gable glass (`G.extrude`), stepping stones in the gravel; a bench of
+- **Glasshouse:** gutters along the eaves, triangular gable glass (`extrude!`), stepping stones in the gravel; a bench of
   slats on shaped ends with stuffed cushions (thinner: the gate's seat check found the first 2.7 cm high); orchids with
   leaves and arching spikes of blooms, ferns cut into leaflets, potted palms, hanging baskets on three chains with
   trailing stems.
@@ -119,16 +119,7 @@ cargo art pack_natureLover --preview  # previews/pack_natureLover/<id>.png, <id>
 
 The hammock's pillow is sewn flat and stuffed (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 5 models changed shape: `birdFeeder`, `gardenHammock`, `glasshouse`, `pottingBench`, `veggieBed`; 29,410 to 29,584 triangles.
 
-## The Rust port (2026-11-18)
+## Built in Rust (2026-11-18)
 
-Ported function for function from the Blender script (`common.rs`: the palette, `_pot`, `_rosette`,
-`_flower`; its `_sq` is the kernel's `forms::rect`; a file a model, the glasshouse's plants in `ferns.rs`). Against `ref/blender`: 7 near, 0 CHANGED, the pack
-the same; every part's surface 0.000 mm from Blender's. What is left:
-- clips (veggie bed, hammock, glasshouse): the turns' quaternions differ in their last bits (at most 1.8e-7);
-- the hammock's shading, 0.86 greys of 32 on average (limit 2): vertices where the eye bolts meet the hooks and the
-  ropes and cords meet the rope rings, rays tied on the tori;
-- the glasshouse's body stands 3.7 nm (2^-28 m) higher: its posts' feet lie one single-precision step under the floor
-  in both files; the kernel's `settle` lifts it by that step, Blender's did not.
-
-Found in the script, left as it was: `TOPY` (the terrarium's soil top) is set and never read (not ported); the
-potting bench's line above names a `_pot(trim=True)` the script does not have.
+In Rust since 2026-11-18 (`common.rs`: the palette, `_pot`, `_rosette`, `_flower`; a file a model, the glasshouse's
+plants in `ferns.rs`), proved against the last Blender build (`ref/blender`). Left as the Blender script had it: `TOPY` (the terrarium's soil top) was set and never read (not ported).

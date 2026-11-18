@@ -5,25 +5,25 @@ below). One pack, `packs/yard/manifest.json`,
 models in `models/yard/`. Built 2026-10-16; they sat in Validate › Yard until signed off (the sandpit and the bike
 rack back to Outdoor › Play, the rest to Outdoor › Yard).
 
-The plan names `outdoor.py` as the family; these nine are a family of their own so that three tasks (OU3, OU4, OU5)
-building at once don't all edit one script, palette and pack. Moving them into `outdoor.py` later changes only the
+The plan named the outdoor family; these nine are a family of their own so that three tasks (OU3, OU4, OU5)
+building at once didn't all edit one module, palette and pack. Moving them into `outside/src/outdoor` later changes only the
 files' folder (`models/yard/` to `models/outdoor/`): the keys stay `model.<id>`.
 
 Each is built in place where the game places it (`F`, game axes), with `settle!(centre = false)` and its
 `Model`'s `centre` where it stands off the footprint's middle. Outdoor things are drawn in the town overview, so
-each has a far version (`far=`): the model's own build at low detail (`far_low`), at rest, all one part, without
-the castle and the washing; the log store's too since 2026-10-22 (it was decimated, `far=0.25`, which
+each has a far version: the model's own build at low detail (`.far_low()`), at rest, all one part, without
+the castle and the washing; the log store's too since 2026-10-22 (it was decimated, `.far_ratio(0.25)`, which
 turned its logs to spikes).
 
-What each has since the detail pass (2026-10-22, with gamekit's forms and kit; the same sizes, heights, parts, clips,
+What each has since the detail pass (2026-10-22, with the kit and the forms, now artkit's; the same sizes, heights, parts, clips,
 draws, paint and far versions, each far version at most half its model):
 
 | Model | Now |
 |---|---|
-| sandbox | two boards high a side, a mitred capping frame (`kit.moulding`), triangular corner seats, lumpy sand (`_ground`), a lofted bucket with its sand and wire handle, a spade laid in one line (blade, shaft, T grip), star moulds; the castle with the bucket's ridges and a door |
+| sandbox | two boards high a side, a mitred capping frame (`kit::moulding!`), triangular corner seats, lumpy sand (`ground`), a lofted bucket with its sand and wire handle, a spade laid in one line (blade, shaft, T grip), star moulds; the castle with the bucket's ridges and a door |
 | bikeRack | hoops each one bent tube on feet; the bike's tapered tubes, head tube, raked curved fork, curved seat stays, laced spokes from flanged hubs, C-section mudguards, a lofted saddle, swept-back bars, a cog; the stand's feet |
 | raisedBed | lettuces lofted (ruffled outer leaves round a cupped heart), carrot fronds (leaflets, tilted), tomato bushes up canes (the canes in the still part), calyxes on the tomatoes, lumpy soil, post caps |
-| shedSmall | weatherboards: each wall swept from a lapped saw-tooth section (`_lap_wall`), cut every 0.3 m so its shading isn't only its buried ends'; a moulded window frame, a sill, a lofted window box on brackets, corner boards, a drip cap, felt laps and drip edges, finials; T-hinges with bolts, a ring latch |
+| shedSmall | weatherboards: each wall swept from a lapped saw-tooth section (`lap_wall`), cut every 0.3 m so its shading isn't only its buried ends'; a moulded window frame, a sill, a lofted window box on brackets, corner boards, a drip cap, felt laps and drip edges, finials; T-hinges with bolts, a ring latch |
 | greenhouse | mortar courses on the dwarf wall (`mortar`), the path's joints, ridge finials, a glazing bar across each side bay, a kick panel on the door |
 | compostBin | post caps, galvanised nails, more on the heap (eggshells, `shell`), a shaped grip |
 | rainBarrel | one loft: a foot ring, two hoop bands, sixteen ribs between them, a rolled top; a domed lid with grips and a mesh inlet; a flanged tap with a bent spout and a lever |
@@ -40,13 +40,13 @@ Yard keeps the kit's jitter out; its noise is `noise()` only.
 | `shedSmall` | the ledged and braced door with black T-hinges and a latch, hinged on the left: `door_open` swings it 100° out (1 s) for the whole of pottering | `potter` |
 | `greenhouse` | the glass door, hinged on its left post, and the roof vent on the left slope, hinged at the ridge: `door_open` swings the door 70° out and lifts the vent 25° (0.9 s), one clip on both | `tend`, `harvest` |
 | `compostBin` | the slatted lid, hinged along the back: `lid_open` lifts it 75° (0.8 s), back down after `hold` 2 s | `compost` |
-| `clothesline` | the washing (towels, a sheet, shirts, jeans, socks, pegs), a part a line (`washing_a` front, `washing_b`, `washing_c` back), each with its origin on its line: `washing` lets them down one after another (1.5 s, half a second each, `G.grow_in_turn`), so played along with the hang-out they come a line at a time. It is the `open` clip too: hanging the washing out leaves the line open (content `leaves`), so the washing stays out until it is taken in | `washing`; `open` |
+| `clothesline` | the washing (towels, a sheet, shirts, jeans, socks, pegs), a part a line (`washing_a` front, `washing_b`, `washing_c` back), each with its origin on its line: `washing` lets them down one after another (1.5 s, half a second each, `motion::grow_in_turn`), so played along with the hang-out they come a line at a time. It is the `open` clip too: hanging the washing out leaves the line open (content `leaves`), so the washing stays out until it is taken in | `washing`; `open` |
 
 The rain barrel and the log store are still. The rides have no clips: the renderer turns their parts by code (below).
 
 - **The sandpit**: boards with capping rails all round, two corner seats at the back, sand with two heaps, a red
   bucket full of sand, a blue spade, a star mould turned out and its mould.
-- **The bike rack**: four galvanised hoops on a rail (each one bent tube, `_bent`, so no seams show where rods met),
+- **The bike rack**: four galvanised hoops on a rail (each one bent tube, `bent`, so no seams show where rods met),
   a blue bike in front of them (frame, mudguards, spoked wheels, chain ring, cranks, chain, saddle, bars and bell),
   and a repair stand either side of the back wheel. The bars are 0.44 m wide and the bike stands on the tile's
   middle line, so the model keeps within 10 % of the old part's depth.
@@ -121,10 +121,10 @@ standing upright on the floor (`settle!(centre = false)`; the `centre` is the bo
 footprint's because the back mudguard reaches farther than the front). Plain finishes only, so each is **one draw**.
 
 The two bikes are the bike rack's bike made with other numbers: `Bike` holds a bike's numbers (the rack's are its
-defaults, `RACK_BIKE`, so the rack is built as before: 5248 triangles, far 1784), `_wheel` and `_bike` build from it
+defaults, `Bike::default()`, so the rack is built as before: 5248 triangles, far 1784), `wheel` and `bike` build from it
 (tapered tubes, a raked curved fork, laced spokes from flanged hubs, C-section mudguards, a lofted saddle, bars bent
 in one piece, the chain ring, cranks, pedals and chain). The rack's chain is on +z, to the front; the rides' is on the
-**rider's right, game −z** (`drive=-1`: facing +x, +z is the rider's left).
+**rider's right, game −z** (`drive: -1.0`: facing +x, +z is the rider's left).
 
 No clips: the renderer moves their parts by code (as the birds', `birds.md`). The parts are the scene's top-level
 nodes, unrotated, at scale 1, each with its origin on its pivot:
@@ -184,4 +184,4 @@ cargo art yard --preview  # previews/yard/sandbox.png, sandbox@castle.png, …
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `eScooter`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `eScooter`; the same triangles.

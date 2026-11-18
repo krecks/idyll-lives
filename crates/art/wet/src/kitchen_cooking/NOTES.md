@@ -104,14 +104,14 @@ Validate › Appliances until checked in play.
 ## The detail pass (2026-10-22)
 
 Same sizes (within 2 %), centres, parts, pivots, clips, `motions`, paint and draw calls; more of what a real one has.
-Shared parts: `_knob` (a turned skirt, grip and dished cap with a pointer line), `_burner` (a spreader, a cap and a
-cast-iron pan support: a square of bar with four fingers), `_flame` (a ring with twelve blue tongues), `_hob_ring` (a
-printed double ring), `oven` (the cavity cut out of the carcass (`hollow`: the front split round the opening and five walls, as Blender's boolean cut them), its walls dark enamel, a wire
-rack on runners and a lamp: an open door shows an oven, not a dark face), `_oven_door`/`_oven_face` (a dark frame
-round a black window, an inner pane, a round bar handle on stand-offs in one piece), `_strip` (a rounded fascia with a
+Shared parts: `knob` (a turned skirt, grip and dished cap with a pointer line), `burner` (a spreader, a cap and a
+cast-iron pan support: a square of bar with four fingers), `flame` (a ring with twelve blue tongues), `hob_ring` (a
+printed double ring), `oven` (the cavity cut out of the carcass (`hollow`: the front split round the opening and five walls), its walls dark enamel, a wire
+rack on runners and a lamp: an open door shows an oven, not a dark face), `oven_door`/`oven_face` (a dark frame
+round a black window, an inner pane, a round bar handle on stand-offs in one piece), `strip` (a rounded fascia with a
 clock display), `shaker` and `pull` (shaker fronts and one-piece bar pulls on every cabinet), `stock_pot`,
-`_frying_pan`, `_tray`, `_cup`, `_canister`, `_basket` (a dishwasher's wire basket), `_fillet` (round a bent tube's
-corners without the Catmull-Rom overshoot `kit.tube` makes between a long span and a short one).
+the frying pan, `tray`, `cup`, `canister`, `basket` (a dishwasher's wire basket), `fillet` (round a bent tube's
+corners without the Catmull-Rom overshoot `kit::tube!` makes between a long span and a short one).
 
 - **stoveElectric**: printed zones, a rounded splash guard with a vent, a fascia with a clock, a real oven, a drawer
   with a bar pull.
@@ -185,7 +185,7 @@ the old 0.79-deep numbers and are drawn through `COUNTER66` (`GameFrame::with_de
 the old `shallow`). Islands stand free, centred.
 
 Also from the review: the hob clip (`burner_on`) lasts the whole use, and only `oven_open`
-shuts after `HOLD` (a `{clip, hold}`); each oven has a dark `oven_cavity` face just inside its closed door,
+shuts after `HOLD` (a `{clip, hold}`); each oven has a dark `<name>_cavity` face just inside its closed door,
 and each dishwasher's dark tub face sits just inside its door, so a dropped door shows an oven or a tub
 and the tray and rack slide out of it; the microwave is hollow (floor, top, back, side and the control
 column), so its turntable shows through the window and the open door.

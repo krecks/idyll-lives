@@ -4,8 +4,8 @@
 entries in `packs/pack_energetic/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sat in Validate › Energetic until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
-The contrast shower stood 2 cm into the wall; it is centred on its `Model` `centre` now (`G.settle()`), its back on
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`).
+The contrast shower stood 2 cm into the wall; it is centred on its `Model` `centre` now (`settle_all()`), its back on
 the wall face at −0.43 and its front 3 cm short of the tile's, as the wall-standing ones' old parts stood, so the
 model and the wall agree within a centimetre.
 The contrast shower fills its tile with its own tiled walls, as the bathroom family's showers do.
@@ -15,14 +15,14 @@ The contrast shower fills its tile with its own tiled walls, as the bathroom fam
 | `boulderingWall` | none: still, as the plan says (the holds are the shape) | — |
 | `spinBike` | the cranks, pedals and axle in the flywheel's hub: `pedals` turns them once a second, a loop; `ride: pedals` is not set (the rider sits on the still seat) | `ride` (loop) |
 | `trampoline` | the mat, a shallow dish from the springs in with its origin at its rim: `bounce` deepens the dip five times (the middle from 0.58 to 0.50 m, where the bouncing feet land, content `stand.height`) and back, 0.625 s, a loop at the residents' 1.6 bounces a second | `bounce` (loop) |
-| `streetballHoop` | the net (crossing cords and two rings), pivoting on the rim: `swish` sways it 9° either way and home (`G.rock`, 1 s), after each shot: 1.4 s into the use, then every 3.2 s (`delay`, `every`) | `shoot` |
+| `streetballHoop` | the net (crossing cords and two rings), pivoting on the rim: `swish` sways it 9° either way and home (`rock!`, 1 s), after each shot: 1.4 s into the use, then every 3.2 s (`delay`, `every`) | `shoot` |
 | `powerBlender` | the jug's lid: `lid` lifts it 9 cm (0.5 s), `hold` 1 s, then it settles back; the smoothie: `blades` swirls it once a second from the lid back on, `every` 0.9 s | `blend` |
 | `contrastShower` | the rain: a 5 × 5 grid of streams under the square head, scaled to nothing: `water_on` grows them down (0.5 s); the glass door across the middle of the front, hinged on its right: `door_open` swings it 95° out (0.8 s), `hold` 1.5 s and `out` 1.5 s, letting the bather in and out (2026-10-21: the door was in the still body; a fourth draw, Q-05; no handle, to keep the door one draw) | `rinse` |
 | `recoveryPod` | the tinted canopy and its rim, hinged at the head end, standing open 40° at rest: `canopy` lowers it over the resident (1.2 s) and lifts it after | `recover` |
 
 **Detail pass (2026-10-22).** Rebuilt with the forms and the kit (README "The toolkit"); keys, sizes, centres,
 parts, clips, motions, paint and draws as before. Triangles in the table below (was: before the pass).
-- `boulderingWall`: a grid of T-nut holes over the panel, a seam across it; twenty holds, lumpy (`G.jitter`) in
+- `boulderingWall`: a grid of T-nut holes over the panel, a seam across it; twenty holds, lumpy (`jitter!`) in
   four shapes and turned; the volumes extruded wedges; brace plates; the crash mat in two piped halves with carry
   loops; a lofted chalk bag with a rim and brush; a folded towel.
 - `spinBike`: a piped seat, a puffed backrest on a shell; the beam swept in a curve, stabilisers with caps, the
@@ -37,7 +37,7 @@ parts, clips, motions, paint and draws as before. Triangles in the table below (
   a tapered rim bracket and plate; the net's strands spiralling down both ways from the rim into diamonds; three
   seams on the ball.
 - `powerBlender`: the worktop's front rolled (postformed, one sweep); frame-and-panel doors and drawer
-  (`kit.shaker`) with bar pulls; a lofted motor with turned dials; a squared, lofted jug with a spout and handle;
+  (`kit::shaker!`) with bar pulls; a lofted motor with turned dials; a squared, lofted jug with a spout and handle;
   a lofted fruit bowl, fruit with stalks, two curved bananas; a board with a hanging hole, lemon halves and a
   knife; straws in the glasses; the lid turned with its cap.
 - `contrastShower`: a rounded tray with a turned drain and slots; tiles with softened edges; swept posts and one
@@ -59,7 +59,7 @@ parts, clips, motions, paint and draws as before. Triangles in the table below (
 
 The blender's blades loop (2026-10-21, review A-packs-02): the blades would turn inside the smoothie, which hides
 them, so the smoothie itself swirls: it is a part of its own (with streaks of orange, apple and lime down its side
-and bits at its top, so the turn shows through the glass jug), turned once a second (`blades`, `G.spin`) from the lid
+and bits at its top, so the turn shows through the glass jug), turned once a second (`blades`, `spin!`) from the lid
 back on (`delay` 1.5 s) till the blend ends (`every` 0.9 s, a hair under its round). It is the fourth draw.
 
 Not done, as the plan allows:
@@ -102,4 +102,4 @@ cargo art pack_energetic --preview  # previews/pack_energetic/<id>.png, <id>@<cl
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 4 models changed shape: `boulderingWall`, `recoveryPod`, `spinBike`, `streetballHoop`; 16,636 to 16,732 triangles.
+No change to the build: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 4 models changed shape: `boulderingWall`, `recoveryPod`, `spinBike`, `streetballHoop`; 16,636 to 16,732 triangles.

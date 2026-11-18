@@ -4,7 +4,7 @@
 entries in `packs/pack_outgoing/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sat in Validate › Outgoing until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`),
 backs on the wall's face (depth −0.43; the old parts' backs were 2 cm into the wall).
 
 | Model | Moving part and clip | Played by |
@@ -17,7 +17,7 @@ backs on the wall's face (depth −0.43; the old parts' backs were 2 cm into the
 | `photoWall` | a new snapshot in the board's bottom row, built full size and shrunk to nothing: `photo` grows it onto the board (0.8 s). The string of bulbs glows at night (`bulb`) | `reminisce` |
 
 The dance floor's table entry asks for the loop itself (`tiles`, E1), built as two parts on one clip with
-`G.turns` (the two sets take turns lifting), and it starts and ends at rest.
+`motion::turns` (the two sets take turns lifting), and it starts and ends at rest.
 
 **Draw calls: 3 each.** The still body takes its plain finishes and at most one textured finish, the moving parts
 the rest. So that it stays at 3:
@@ -57,11 +57,11 @@ bought coloured; the same at night (`office-night`, WebGL).
 
 Same keys, sizes, parts, clips, paint and draws.
 - **Party bar:** the fluted coral front one slab extruded from a scalloped outline, a cap and plinth, an oak top with a
-  rounded nose, the foot rail bent back into the counter; the back bar's doors raised-panel `G.kit.shaker`s with
-  `G.kit.knob`s, a gallery rail on each shelf, round brass uprights; bottles lofted (round and square) with labels,
+  rounded nose, the foot rail bent back into the counter; the back bar's doors raised-panel `kit::shaker!`s with
+  `kit::knob!`s, a gallery rail on each shelf, round brass uprights; bottles lofted (round and square) with labels,
   wine with foil; the tap tower bent in one piece on a flange, a turned lever; a pint with its head, a turned shaker;
   stools lofted, with foot-ring struts and domed bases.
-- **Sectional:** every panel and cushion `G.soft_box`: welted arms, piped back and seat cushions, plump pillows; tapered
+- **Sectional:** every panel and cushion `soft_box!`: welted arms, piped back and seat cushions, plump pillows; tapered
   brass feet; the console's legs tapered with stretchers, a turned lamp, a plant of heart leaves, a buttoned pouf with a
   welt and a lipped tray.
 - **Karaoke stage:** a plank deck, turned speaker cones (surround, cone, dust cap), floor spots in yokes, tripod mic

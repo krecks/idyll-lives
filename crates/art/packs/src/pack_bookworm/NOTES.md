@@ -4,10 +4,10 @@
 entries in `packs/pack_bookworm/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sat in Validate › Bookworm until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`),
 with one moving part. Pack families write to a pack of their own (`pack_<trait>`), keyed `model.<trait>.<id>`, so
 the trait's pack keeps the old parts. The bedside stack stood 3 cm into the wall; it is centred on its `Model`
-`centre` now (`G.settle()`), its back on the wall face at −0.43, as the wall-standing ones' old parts stood, so
+`centre` now (`settle_all()`), its back on the wall face at −0.43, as the wall-standing ones' old parts stood, so
 the model and the wall agree within a centimetre.
 
 The writer's bureau stands with its back on the wall's face and its chair in front; the writer faces the bureau
@@ -42,13 +42,13 @@ ones), so they show cream with no more triangles; china takes its glazed bands t
 Rebuilt with the forms and the kit (README "The toolkit"); keys, sizes, centres, parts, clips, motions and paint as
 before. Triangles in the table below (was: before the pass).
 - `readingNook`: the cases' shelves with a lipped front edge and a kick; books with page edges, some leaning; a
-  cornice moulding (`kit.moulding`) round the header, an arched, beaded valance; a pendant on its cord with a
-  rolled rim and bulb; frame-and-panel drawers (`kit.shaker`) with turned knobs; stuffed, piped back cushions and
-  pillows (`F.soft`); the seat cushion piped, the throw a swept, wobbled cloth folded over its front.
+  cornice moulding (`kit::moulding!`) round the header, an arched, beaded valance; a pendant on its cord with a
+  rolled rim and bulb; frame-and-panel drawers (`kit::shaker!`) with turned knobs; stuffed, piped back cushions and
+  pillows (`soft!`); the seat cushion piped, the throw a swept, wobbled cloth folded over its front.
 - `libraryWall`: a crown moulding and a moulded plinth run round the case, beads on the uprights and shelf
   edges; a desk globe with land and a brass meridian; a lofted marble bust with hair; the rail on wall roses with
   turned finials; the ladder's stiles swept, wooden hooks bent over the rail, wheels in forks, two tie rods.
-- `writingBureau`: now built facing the front as it stands (no `_turn_round`; the flap's clip unchanged); shaker
+- `writingBureau`: now built facing the front as it stands (no `turn_round`; the flap's clip unchanged); shaker
   drawers with knobs, a rounded desk top and hutch top, an arched crest; letters with envelopes in the
   pigeonholes; an inkwell and quill; the chair with raked swept back legs, turned front legs, stretchers, a bowed
   crest rail, a vase splat and a piped pad; the flap a raised panel with its lining, a bar pull and a key.

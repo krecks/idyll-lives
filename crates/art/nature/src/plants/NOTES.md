@@ -100,7 +100,7 @@ same build function run with `LOW` set (`far_of`, now artkit's `far::far_of`), s
 rows, three-sided stems open at their ends, lumps and cups with fewer segments, smaller stars) and its moving part
 joined in, still; boxes lose their bevels, sprigs keep one leaf, flower faces three petals and no middle, cups
 three sides, mounds twelve. Where it leaves things out it still draws every random number the full build draws, so
-what's left stands where it did. It keeps the model's size (within 5 %); a decimated copy (`far=0.25`) dipped below
+what's left stands where it did. It keeps the model's size (within 5 %); a decimated copy (`.far_ratio(0.25)`) dipped below
 the floor and lost thin parts. Every far version comes to 30–49 % of its model's triangles.
 
 ## The shrubs (G3)
@@ -111,7 +111,7 @@ bush stands in the woods (`nature.ts` `natureDecor`, thin instances), so they co
 The lot dressing's other two old parts, `model.bush.small` (also in the woods) and `model.bush.flowering`, and
 the streets' and hedged lots' `model.hedge` are built here too (`bushSmall`, `bushFlowering`, `streetHedge`: the
 shrub, the shrub with pink blossom, the garden hedge's block without its sprigs), each one draw call on `foliage`.
-The hedge's block (`hedge_block`) is in soft mounds since 2026-11-12 (a second, wider `G.jitter`, 7.5 cm over half a
+The hedge's block (`hedge_block`) is in soft mounds since 2026-11-12 (a second, wider `jitter!`, 7.5 cm over half a
 metre): from the play camera, above, its top was a ruled strip; the triangles, the size and the draw are the same.
 
 - **Shrubs** (`shrub`): a dark core lump and clumps round it, lighter on top; flowers (`dots`) spread over the upper
@@ -124,12 +124,12 @@ metre): from the play camera, above, its top was a ruled strip; the triangles, t
   roses their roses; the rest none. Each one's flower heads are all one material, the colour part, so "Flowers"
   colours every head (they cycled three or four shades of one hue until 2026-10-17, and the colour reached only the
   first; the geraniums' clusters too).
-- **Perches** (2026-10-22): where the game's birds sit (`birds.py`), the entry's `perches` in the model's game axes
+- **Perches** (2026-10-22): where the game's birds sit (`things/src/birds`), the entry's `perches` in the model's game axes
   (`perches`, artkit's `perch`, as the trees' in trees.md). Lines come in from round and above towards the shrub's
   middle, or along a hedge's top (`hedge_top`), and meet its leaves. The perch is 2 cm in from there, on leaves that
   face up a little at least, with nothing over it within 15 cm, spread at least 20 cm apart. Found before the trimmed
   sprigs and the cut rose are built. The rose bush's canes are offered too, half way up their arch, but none stands
-  in the open (`G.perch.bare`), so its five are on its leafy base.
+  in the open (`perch::bare`), so its five are on its leafy base.
   The bush has 6, `model.bush.small` 4, `model.bush.flowering` 6, `model.hedge` 6, the boxwood 4, the topiary 4
   (on its cone), the garden hedge 6, the hydrangea 5, the rose bush 5 and the azalea 5. Lavender, ferns, grass and
   hostas have none. Perches only add data: the meshes are unchanged (same triangles as the table), and so are the
@@ -158,7 +158,7 @@ Khronos validator: 0 errors, 0 warnings on every new file.
 
 `model.garden.vegPatch`, `tomatoes`, `strawberries`, `herbs`, `pumpkins`. The four crops (content `grows`) are three
 parts each: the still bed, the leaves (`plants`) and the crop (`crop`), in one growth clip, `grow`
-(`motions.growth`, `G.stages`): ripe at rest; picked, the crop gone; growing, the leaves 0.8 high and sunk a tenth
+(`motions.growth`, `stages!`): ripe at rest; picked, the crop gone; growing, the leaves 0.8 high and sunk a tenth
 of their height into the soil; planted, half high and sunk a third (`SINK`), so what shows is each plant's top, small,
 where the plant stands (scaled about the bed's middle, as first built, the seedlings drew together there). The
 vegetable patch's plants are its crop: picked, they are under the soil and the bed is bare (`harvested`); its
@@ -187,12 +187,12 @@ play from a state with all four crops at each (picked, planted, growing, ripe).
   still reads its 1.35 m against `houseplantSmall`: the tree on the stand, as before.
 - **Rose bush** (M-garden-06): open, upright canes from a low leafy base, leaf clusters along them and a cupped rose
   (`ROSE`, a revolved cup curled in over its middle) on each; the one at the front is the cut one.
-- **Azalea** (M-garden-06): 36 small, flat trusses all over it, down its sides (`dots` `far_every=2`: a far version
+- **Azalea** (M-garden-06): 36 small, flat trusses all over it, down its sides (`dots` `far_every = 2`: a far version
   builds every other one, drawing every random number), not the 20 big rose-like heads.
 - **Meadow** (M-garden-06): long grass, 64 thin blades up to 0.5 m leaning every way and stalks gone to seed, over
   low tussocks (a far version: every third blade).
 - **Strawberries** (M-garden-07): each plant a rosette of five spreading leaves, two upright in the middle and a dark
-  heart; `_crop(..., sink=(0, 0.04, 0.12))`, so a seedling sits flat on the straw rather than sunk into it.
+  heart; `_crop!(.., sink = (0.0, 0.04, 0.12))`, so a seedling sits flat on the straw rather than sunk into it.
 
 ## The detail pass (2026-10-22)
 
@@ -202,7 +202,7 @@ Same keys, sizes (each fitted to its old size, `fit_to`, since a plant grown fro
 once built), parts, clips, `motions`, `paint` materials and draw calls; perches as many (the small bush 5, was 4). The
 tables above carry the new triangles.
 
-New helpers (trees.py, street.py and garden_things.py import the old ones, unchanged):
+New helpers (now in `artkit::botany`, which the trees, the street and the garden things share):
 
 - **`cut_leaf`**: a leaf cut from its outline (`outline`: a profile with a wavy or toothed edge; `pinnate`: leaflets
   along a midrib, swept forward and standing apart; `slits`: a monstera's splits; `lobed`: a palmate leaf), a closed
@@ -210,7 +210,7 @@ New helpers (trees.py, street.py and garden_things.py import the old ones, uncha
   `leaf`. Triangulated by ear clipping: `BEAUTY` filled the notches between leaflets.
 - **`rays`**: a flower's face of separate rounded petals (6 triangles a petal), cupped or curling back, with a raised
   middle: daisies, poppies (4 broad), lilies (curled back, round a throat), azaleas, pansies, a rose (two layers).
-- **`leafy_shrub`**: as `trees.py` `oak`: woody stems (`twig` colour, on `foliage`, so still one draw) rising and
+- **`leafy_shrub`**: as the trees' oak (`nature/src/trees/oak.rs`): woody stems (`twig` colour, on `foliage`, so still one draw) rising and
   forking into broken masses of clumps round a dark heart, sprays of leaves breaking the outline, flowers added on
   the masses (`on_masses`); **`florets`**: a bumpy ball of florets (mopheads, pompoms, trusses, plumes, spikes).
 - **`vessel`** (a pot with a rolled lip, a foot, a saucer) and **`soil_top`** (an uneven soil mound in it); **`twig`**,
@@ -273,10 +273,9 @@ cargo art plants            # the .glb files, the pack, check-glb
 cargo art plants --preview  # previews/plants/<id>.png, <id>@<clip>.png
 ```
 
-Built here, not in Blender, since 2026-11-18 (`cargo check-glb --against ref/blender`): the 78 files' points
-Blender's (0.000 mm), 56 the same in every bit, the pack the same to the letter but for its comment, every perch
-with it (the recorded bird day passes unchanged). The models are built from artkit's botany. A leaf cut into lobes or leaflets
+Built in Rust from artkit's botany since 2026-11-18, proved against the last Blender build (`cargo check-glb --against
+ref/blender`). A leaf cut into lobes or leaflets
 has a top and an underside triangle on the same three points wherever a triangle of its outline touches no midrib
-point; Blender's exporter validates a mesh and takes the second of each such pair out, and so does artkit's: those
+point; artkit's writer takes the second of each such pair out (as Blender's exporter did): those
 leaflets are drawn from one side only, as they were. The rose bush turns the spiral's heading, already degrees,
-into degrees again, as the script did.
+into degrees again, as the Blender script did.

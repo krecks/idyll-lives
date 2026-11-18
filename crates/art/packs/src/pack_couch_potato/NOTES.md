@@ -4,15 +4,15 @@
 their entries in `packs/pack_couchPotato/manifest.json`, a pack listed in the base manifest's `packs` (the
 trait's only model manifest). Built 2026-10-14; they sat in Validate › Couch Potato until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`).
 The cinema wall and the game console stood 2–3 cm into the wall; they are centred on their `Model` `centre` now
-(`G.settle()`), their backs on the wall face at −0.43, as the wall-standing ones' old parts stood, so the model
+(`settle_all()`), their backs on the wall face at −0.43, as the wall-standing ones' old parts stood, so the model
 and the wall agree within a centimetre.
 The screens the residents watch (the cinema's, the console's) stand on the wall at the back of the footprint, the
 seats in front of them, the sitters facing the object's back (content `"seat": {"height": 0.45, "forward": 0.05,
 "facing": "back"}` for the cinema, `"forward": 0.12` for the console, as the piano and the writer's bureau). Each is
 built as the old part first stood (the seats at the back, the screen at the front edge facing them, its oak back to
-the room) and turned round (`_turn_round`), so its oak back is on the wall and the console's tray slides out the other
+the room) and turned round (`turn_round`), so its oak back is on the wall and the console's tray slides out the other
 way (+Z game, towards the players); the old parts were turned the same way. The cinema's hips stay where they were on its seats (0.05 is the old 0 turned round);
 the console's sit 8 cm further back than before, against the loveseat's back, so the knees stay under the shelf.
 
@@ -40,13 +40,13 @@ parts, clips, motions, paint and draws as before. Triangles in the table below (
   wobbled cloth over the arm.
 - `snackFridge`: lofted cans necked at the top and foot; a liner floor and a shelf lip; the pizza box's lid line;
   turned feet; a piped lid with two buttons; jittered crisps; the door rounded, a seal loop and liner inside, a
-  takeout menu with items on its screen, an upright bar pull (`kit.pull`).
+  takeout menu with items on its screen, an upright bar pull (`kit::pull!`).
 - `fitnessGame`: rounded shelves and sides, a back panel; a rounded TV, foot, swept neck and sensor bar with its
   glass; the coach drawn with arms up; a folded towel; a lofted bottle with a sports cap; a soft mat with step
   arrows; a pair of dumbbells; a lofted kettlebell with a bent handle; the balance board's deck, grips and mount
   rounded.
 - `lavaLamp`: a puffed pouf with a piped top and button; a turned table stem; a tapered lamp foot and cap; the wax
-  blobs and pool wobbled (`G.jitter`).
+  blobs and pool wobbled (`jitter!`).
 
 **Draw calls: 3 each, the lava lamp 4.**
 - The cinema has two moving parts (the curtains, `fabric`), so its still body is all plain: the recliners are satin

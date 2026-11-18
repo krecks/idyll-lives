@@ -15,8 +15,8 @@ are `slab`s: an outline on a face's frame (`plane`, `board`), a few millimetres 
 
 **Detail pass (2026-10-22)**, with the forms and the kit, every model's size, centre, parts, clips, draws and heights
 kept: mattresses, pillows, duvets and cushions are soft boxes (piped, puffed, the covers rumpled), frames and rails
-swept in one piece (`kit.fillet` for bent tube), shaped boards extruded with their cut-outs, turned parts revolved,
-round bodies lofted. Small soft boxes take `round_segments=1` (a default one is about 300 triangles). The bean bag's
+swept in one piece (`kit::fillet!` for bent tube), shaped boards extruded with their cut-outs, turned parts revolved,
+round bodies lofted. Small soft boxes take `round_segments = 1` (a default one is about 300 triangles). The bean bag's
 creases move its vertices up and down only (`rumple`): `jitter` sideways moved its bounds by 3 mm between a
 `--only` build and a family build, and the centre check allows 2 mm.
 
@@ -31,7 +31,7 @@ creases move its vertices up and down only (`rumple`): `jitter` sideways moved i
   baby, not turning all night; the crib's uses can't tell a sleeping baby from an awake one, and playing is the
   one that means awake). The mobile hangs at the back,
   clear of the arms of a grown-up lifting the baby out over the front rail.
-- **Kids' bed** and **race car bed** (1 × 2): as bedroom.py's beds, the duvet's top third (`duvet_flap`) folds back
+- **Kids' bed** and **race car bed** (1 × 2): as the bedroom's beds (`rooms/src/bedroom`), the duvet's top third (`duvet_flap`) folds back
   toward the foot while a resident sleeps or naps (`turn_down`), gathered to a fifth of its length half way over so
   it rolls as cloth (2026-10-21). Both are in `BLANKET_BEDS`, so the game lays its
   quilt over the sleeper. The car's body, wheels and spoiler are

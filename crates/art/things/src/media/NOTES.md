@@ -8,7 +8,7 @@ in Validate › Media until checked in play.
 
 Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `centre` on its `Model`), its
 back on the wall face (-0.43). The old parts of the portable TV, the bench, the home cinema, the stereo and the
-fireplace reached 1.5–6 cm into the wall; they are moved forward onto its face (`shift(…, dz=…)`). Residents watch standing on the tile in front (the `watch` pose), so every screen faces the front (+Z), as
+fireplace reached 1.5–6 cm into the wall; these are built forward, their backs on its face. Residents watch standing on the tile in front (the `watch` pose), so every screen faces the front (+Z), as
 the old parts did and as housegen expects (`"opposite": "sofa"`).
 
 | Model | Moving parts and clip | Played by |
@@ -18,7 +18,7 @@ the old parts did and as housegen expects (`"opposite": "sofa"`).
 | `tvRetro` | the telescopic aerial, origin at its foot on the case's top right: `antenna` lifts it 35° (0.9 s) | `watch` (until it ends) |
 | `tvStandLow` | the TV with the lift's lid on its top edge, down in the bench at rest: `tv_up` lifts it 60 cm (1.6 s) | `watch` (sinks back at the end) |
 | `homeCinema` | the projector screen, its origin in the case on the wall, flattened into it at rest: `screen_down` unrolls it (1.4 s) | `watch`, `film` |
-| `stereo` | the record on the turntable (platter, vinyl, label with a stripe): `record` turns it once in 1.8 s, 33 rpm (a loop; 2026-10-21, for the CD tray, which no longer moves); the two woofer cones: `pulse` swells them forward and back (0.5 s, `squash(back=True)`, `every` 0.45 s) | `listen`, `dance` |
+| `stereo` | the record on the turntable (platter, vinyl, label with a stripe): `record` turns it once in 1.8 s, 33 rpm (a loop; 2026-10-21, for the CD tray, which no longer moves); the two woofer cones: `pulse` swells them forward and back (0.5 s, `squash!(.., back = true)`, `every` 0.45 s) | `listen`, `dance` |
 | `boombox` | the cassette door, hinged at its foot: `cassette` tips it 32° open (0.5 s), `hold` 1.2 s | `listen` |
 | `fireplaceElectric` | the flames (five tongues and their cores), origin inside the log bed, flattened into it at rest: `flames` grows them (0.8 s) | `relax` |
 
@@ -107,6 +107,4 @@ No change to the models' code: their soft boxes take the shared form's new shape
 
 ## Built in Rust (2026-11-18)
 
-Ported line for line from the Blender script (`crates/art/things/src/media`): against the last Blender build
-(`ref/blender`) all eight are near (every point Blender's, 0.000 mm; baked shading within 1.1 of 32 greys), the pack
-the same. The palette's `crate` is the field `M.crate_`, named `crate` (`named("crate")`): Rust keeps the word.
+Built in Rust since 2026-11-18 (`cargo art media`), proved against the last Blender build (`ref/blender`). The palette's `crate` is the field `M.crate_`, named `crate` (`named("crate")`): Rust keeps the word.

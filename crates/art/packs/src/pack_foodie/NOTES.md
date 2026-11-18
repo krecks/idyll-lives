@@ -25,11 +25,11 @@ dome or the door).
 
 **Detail pass (2026-10-22).** Rebuilt with the forms and the kit (README "The toolkit"); keys, sizes, centres,
 parts, clips, motions, paint and draws as before. Triangles in the table below (was: before the pass).
-- `herbGarden`: legs with rounded edges; a moulded rim round the trough (`kit.moulding`, `plane='top'`); bumpy
+- `herbGarden`: legs with rounded edges; a moulded rim round the trough (`kit::moulding!`, `plane = Facing::Top`); bumpy
   soil; basil of extruded leaves in tiers up a stem, rosemary of tapering stems, thyme as lumpy mounds; a saucer
   under the sprig's pot, rolled pot rims; a shaped trowel; a woven basket with an arched handle; the sprig's leaves
   extruded.
-- `deliPantry`: raised-panel doors (`kit.shaker`) with hinges and upright bar pulls; a crown moulding; shelf lips;
+- `deliPantry`: raised-panel doors (`kit::shaker!`) with hinges and upright bar pulls; a crown moulding; shelf lips;
   a rounded marble ledge; lofted jars with label bands and turned lids, a crock, oil and wine bottles; cheese
   wheels with their rind painted, one cut; loaves wobbled with three slashes; lofted salami tied on strings; a
   board with a hanging hole and a wedge of cheese; tomatoes with their calyx.
@@ -41,7 +41,7 @@ parts, clips, motions, paint and draws as before. Triangles in the table below (
   and bracket; the page blocks swept from a curved section, rising from the spine; a curled turning page; a
   ribbon hanging over the edge; brass page clips; cookbooks with page edges (`_pages`); a turned stool; a
   recipe-card box with its lid propped open.
-- `pizzaOven`: logs crooked (`G.jitter`) with pale cut ends; a rounded hearth; the dome turned and wobbled; the
+- `pizzaOven`: logs crooked (`jitter!`) with pale cut ends; a rounded hearth; the dome turned and wobbled; the
   arch one extruded ring; bevelled voussoirs; a lofted flue on a collar and a turned cap; a shaker door with an
   iron bar pull on the counter; a lumpy dough ball, a turned sauce bowl, a lofted oil bottle; the door's rim one
   bent bar, a rail and an oak bar pull; the peel's blade a shaped outline, a tapered handle; the pizza with a
@@ -103,4 +103,4 @@ The game draws the cook's board, bowl or pan and what they carried in on the sta
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `espressoBar`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `espressoBar`; the same triangles.

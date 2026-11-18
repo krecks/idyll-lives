@@ -6,13 +6,13 @@ they sat in Validate › Music, Games and Crafts until checked in play.
 
 Each is built where the game places it (`F`, game axes; `settle` without centring, and `centre` on its
 `Model`), so seats and stools stay where the game seats residents. The dartboard hangs at its real height
-(`floor=False`).
+(`.on_wall()`).
 
 ## Music (H1)
 
 - **Piano**: an upright with its back on the wall's face and its bench in front; the pianist faces the case
   (content `"seat": {"height": 0.47, "forward": 0.227, "facing": "back"}`). It is built as the old part
-  stood (keys to the back) and turned round (`_turn_round`), so its clips open the other way; the old part
+  stood (keys to the back) and turned round (`turn_round`), so its clips open the other way; the old part
   was turned the same. Two
   parts share one clip, `fallboard`, played by `play` until the use ends: the fallboard lifts 90° off the keys
   to stand against the case, and the music desk, hinged at its top, swings its foot out 18° so the sheet leans
@@ -30,7 +30,7 @@ Each is built where the game places it (`F`, game axes; `settle` without centrin
   so both are held as guitars.
 - **Digital piano** (2 × 1): still. A console of 88 full-size keys (52 white at 2.35 cm, A0 at the player's left, game -x as built),
   their tops at 0.745 m as the upright's, on two side panels with a pedal board, a control strip and a music rest, an
-  X-legged bench at 0.48 m; built facing the front and turned round (`_turn_round`) to stand with its back on the
+  X-legged bench at 0.48 m; built facing the front and turned round (`turn_round`) to stand with its back on the
   wall like the upright, the player facing it (content `seat` 0.48 m, `forward` 0.18, `facing: back`). 2026-10-21,
   review M-hobbies-04: a three-octave keyboard on an X-stand on one tile, the keys at 0.845 m.
 - **Drum kit** (2 × 2): a real five-piece spread out (2026-10-21, review M-hobbies-05: packed onto one tile): a 22"
@@ -56,7 +56,7 @@ Each is built where the game places it (`F`, game axes; `settle` without centrin
   `STROKE`), the racked balls go (`racked_off`, a part squashed away to the rack's middle in 0.15 s) and the fifteen
   come up spread over the cloth as the break leaves them (`spread`, a part grown up out of the slate in 0.3 s, flat
   inside it at rest); both play back when the game ends (2026-10-26, review I-hobbies-05: the balls stayed racked).
-  The cue is in the players' hands, one each (held.py `tool.cue`), not on the cloth (it lay there while they mimed
+  The cue is in the players' hands, one each (`things/src/held`'s `tool.cue`), not on the cloth (it lay there while they mimed
   it). The cloth is `matte`, not `fabric`: the two parts of balls take the textured finish's draw call (four at most).
 - **Foosball**: the eight rods of a real table, 15 cm apart, from the left goal blue's goalie and defence, red's attack,
   the two teams' five midfielders, blue's attack, red's defence and goalie; blue's handles to the front, where the
@@ -64,7 +64,7 @@ Each is built where the game places it (`F`, game axes; `settle` without centrin
   clip for each, `foosClip`; squared to the table at their lane, `characters.ts` `STEP_IN` `square`), red's short at the back so the table stands against a wall (2026-10-21, review
   M-hobbies-07: four rods, every handle on the front). Blue's defence and attack rods kick ±55° in a loop, `rods`.
   Four turning rods would be six draw calls.
-- **Dartboard**: twenty segments and the rings are one flat mesh (`_dart_face`). Three darts, one part, grow
+- **Dartboard**: twenty segments and the rings are one flat mesh (`dart_face`). Three darts, one part, grow
   out of the board (`darts`). Hidden at rest, they leave the model 7 cm deep and centred on the board, where
   the old part (darts in) was 19 cm.
   Their origin is 2 cm inside the board, so at rest they flatten out of sight (on the face, the flights showed
@@ -134,12 +134,12 @@ Every model rebuilt with the forms and the kit (sweeps, lofts, extrusions, soft 
 sizes, centres, parts, pivots, clips, motions, paint and draws; the held instruments keep their origin (the foot) and
 axes. What each now has:
 
-- **Piano**: raised panels (`kit.shaker`) on the upper front and the kneeboard, a moulded lid nosing, scroll key
+- **Piano**: raised panels (`kit::shaker!`) on the upper front and the kneeboard, a moulded lid nosing, scroll key
   cheeks, turned legs on scrolled toes, brass candlesticks, swept pedals on a lyre; a piped bench cushion on turned
   legs. The fallboard has a lip, a nameplate and hinges; the music desk an arched top pierced with fretwork.
-- **Guitar stands** (`_guitar_stand`): a tube post with a height collar, legs bent back in one piece, a cradle bent in
+- **Guitar stands** (`guitar_stand`): a tube post with a height collar, legs bent back in one piece, a cradle bent in
   one piece with rubber sleeves, a rubber-lined yoke.
-- **Ukulele, guitars**: bodies are extruded outlines (`_figure8` bouts; the electric's double cutaway) with rounded
+- **Ukulele, guitars**: bodies are extruded outlines (`figure8` bouts; the electric's double cutaway) with rounded
   edges and inset tops, D-section swept necks, shaped heads, fret dots; the electric's saddles, tremolo arm, turned
   knobs, switch and jack; the acoustic's binding, rosette rings, pickguard and pinned bridge. The amp's grille is
   piped, its handle a strap.
@@ -150,8 +150,8 @@ axes. What each now has:
   snare's strainer, basket and sticks, a lofted throne.
 - **Chess table**: a turned pedestal on three swept feet, a rounded top; knights carved in profile; the chair
   (`_chair`, shared with the sewing table) has back posts in one piece from the floor, tapered legs, curved rails.
-- **Pool table**: mitred rails rounded over (`kit.moulding`), cushion noses between the pockets, leather pocket
-  mouths, diamond sights, turned legs, serpentine skirts, a rack with rounded corners (the cue is held.py's).
+- **Pool table**: mitred rails rounded over (`kit::moulding!`), cushion noses between the pockets, leather pocket
+  mouths, diamond sights, turned legs, serpentine skirts, a rack with rounded corners (the cue is a held thing's, `things/src/held`).
 - **Foosball**: men cut in profile (head, body, legs, feet), turned handles, framed side panels, rod bearings,
   tapered legs on levelling feet, ball-return slots.
 - **Dartboard**: a mitred cabinet moulding, the board's rounded edge (1 mm behind the printed face: level with it, it
@@ -177,7 +177,7 @@ axes. What each now has:
   craft knife, rolls of tape, glue.
 
 Flat details (key gaps, pegboard holes, the board's squares, glue lines) are one mesh of flat quads each
-(`_flat_quads`), not boxes: 56 key gaps went from 672 triangles to 112.
+(`flat_quads`), not boxes: 56 key gaps went from 672 triangles to 112.
 
 ## Rebuild
 
