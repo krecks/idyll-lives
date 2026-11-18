@@ -64,19 +64,17 @@ pub fn join(parts: &[Obj], name: &str, origin: Option<P3>) -> Obj {
 /// order given, and leave the scene. `first` keeps its place, turn and scale.
 pub(crate) fn join_into(first: Obj, others: &[Obj]) {
     if !others.is_empty() {
+        // every part's points go from its own frame to the world and back into the first's, the first's own
+        // too: through Blender's inverse of the first's matrix (Eigen's) times the part's matrix, and not at all
+        // where that product is the identity within a millionth (`Mesh::transform`)
         let world = first.matrix_world();
-        let (loc, plain) = first.read(|o| (o.loc, o.unturned() && o.parent.is_none()));
-        let inverse = if plain {
-            M4::translation(-loc)
-        } else {
-            world.inverted().unwrap_or(M4::IDENTITY)
-        };
+        let inverse = crate::math::invert_m4(&world).unwrap_or(M4::IDENTITY);
+        let own = mul_m4_m4m4(&inverse, &world);
+        first.edit(|o| o.mesh.transform(&own));
         for &other in others {
             let m = mul_m4_m4m4(&inverse, &other.matrix_world());
             let mut mesh = other.read(|o| o.mesh.clone());
-            if !m.is_identity() {
-                mesh.transform(&m);
-            }
+            mesh.transform(&m);
             first.edit(|o| append(&mut o.mesh, &mesh));
             other.remove();
         }
