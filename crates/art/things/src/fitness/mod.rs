@@ -77,5 +77,5 @@ pub fn family() -> Option<Family> {
          materials map onto the game's finishes so a model costs one draw call per finish group. The treadmill runs \
          its belt (`belt_run`) and the bike turns its pedals (`pedals_turn`) while used; the yoga mat unrolls \
          (`unroll`) for yoga.",
-    ))
+    ).switched())
 }

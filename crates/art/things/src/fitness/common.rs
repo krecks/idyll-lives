@@ -1,12 +1,10 @@
-//! What the home gym is built from: the helpers fitness.py shared between its models, and the kit's parts it used
-//! (marked `KIT:` until the kernel has them).
+//! What the home gym is built from: the helpers fitness.py shared between its models.
 
 use super::M;
-use artkit::forms::{Scale, Sweep, rounded_rect};
+use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
-use artkit::math::{Axis, M4, P3, V3, cos, pow, radians, sin, tan};
-use artkit::place::{Coord, GameFrame, Spot};
-use artkit::scene::Obj;
+use artkit::math::{Axis, M4, P3, cos, radians, sin};
+use artkit::place::{Coord, GameFrame};
 use artkit::{fcyl, revolve};
 
 /// A game point (x, height, depth).
@@ -212,88 +210,4 @@ pub fn dumbbell(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, w: f64, along
             verts = 8
         );
     }
-}
-
-/// `tube`'s options.
-pub struct Tube {
-    pub verts: Option<usize>,
-    pub round: usize,
-    pub scale: Scale,
-}
-
-impl Default for Tube {
-    fn default() -> Tube {
-        Tube {
-            verts: None,
-            round: 3,
-            scale: Scale::One(1.0),
-        }
-    }
-}
-
-// KIT: kit.tube
-/// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of points;
-/// 1 keeps them sharp), its ends capped: a towel rail, a bent-tube frame, a tap's riser, a hose. `verts` round: by
-/// default 8, and more for one over 13 mm in radius, as many as keep its outline within a millimetre of the circle.
-pub fn tube<S: Spot>(
-    frame: &GameFrame,
-    name: impl AsRef<str>,
-    points: &[S],
-    r: f64,
-    material: Mat,
-    o: Tube,
-) -> Obj {
-    let s = Sweep {
-        verts: o.verts,
-        resolution: o.round,
-        scale: o.scale,
-        least: 8,
-        ..Sweep::default()
-    };
-    frame.sweep(name, points, r, material, s)
-}
-
-/// The kit's parts called as the script called them, their options by name.
-pub mod call {
-    /// `tube` with its options by name: `tube!(F, name, points, r, material, verts = 8, round = 1)`.
-    macro_rules! tube {
-        ($frame:expr, $name:expr, $points:expr, $r:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-            #[allow(unused_mut)]
-            let mut o = $crate::fitness::common::Tube::default();
-            $(o.$k = artkit::Arg::arg($v);)*
-            $crate::fitness::common::tube(&$frame, $name, $points, $r, $material, o)
-        }};
-    }
-    pub(crate) use tube;
-}
-
-// KIT: kit.fillet
-/// The path through `points` (any axes) with each inner corner rounded to about `radius` (`steps` points round it, on
-/// a curve that never overshoots, however uneven the spacing). For handles, bent rails and draped cloth swept with
-/// `resolution` 1.
-// (3.1415 is the kit's own limit for a straight corner, not pi.)
-#[allow(clippy::approx_constant)]
-pub fn fillet(points: &[P], radius: f64, steps: usize) -> Vec<P> {
-    let pts: Vec<V3> = points.iter().map(|&p| V3::from(p)).collect();
-    let mut out = vec![pts[0]];
-    for w in pts.windows(3) {
-        let (a, p, c) = (w[0], w[1], w[2]);
-        let (d1, d2) = (a - p, c - p);
-        if d1.length() < 1e-9 || d2.length() < 1e-9 || d1.angle(d2) > 3.1415 {
-            out.push(p);
-            continue;
-        }
-        let t = (radius / 1e-6_f64.max(tan(d1.angle(d2) / 2.0)))
-            .min(d1.length() * 0.5)
-            .min(d2.length() * 0.5);
-        let (p1, p2) = (p + d1.normalized() * t, p + d2.normalized() * t);
-        for i in 0..=steps {
-            let k = i as f64 / steps as f64;
-            out.push(p1 * pow(1.0 - k, 2.0) + p * 2 * k * (1.0 - k) + p2 * k * k);
-        }
-    }
-    out.push(pts[pts.len() - 1]);
-    out.iter()
-        .map(|p| (p.x as f64, p.y as f64, p.z as f64))
-        .collect()
 }

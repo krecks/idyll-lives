@@ -2,8 +2,8 @@
 //! (content `held`), so the bench's bar (`bar_off`) and a pair of the rack's dumbbells (`pair_off`) leave them.
 
 use super::M;
-use super::common::call::tube;
-use super::common::{Along, dumbbell, fillet, plate, py, rr};
+use super::common::{Along, dumbbell, plate, py, rr};
+use artkit::kit;
 use artkit::math::{P3, cos, radians, sin};
 use artkit::parts::{hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
@@ -157,7 +157,7 @@ pub fn weight_bench() -> Vec<Obj> {
                     round_segments = 1
                 );
             }
-            tube!(
+            kit::tube!(
                 f,
                 format!("brace{s}"),
                 &[(sf * 0.36, 0.05, -0.58), (sf * 0.36, 0.45, -0.77)],
@@ -245,7 +245,7 @@ pub fn weight_bench() -> Vec<Obj> {
     // The bar on the J-hooks, its origin at its middle: hidden while lifted (`bar_off`), the game drawing it
     // in the lifter's hands (content `held`) once they lie down (`BAR_DELAY`).
     let parts = new_parts(|| {
-        tube!(
+        kit::tube!(
             f,
             "bar",
             &[(-0.3, BAR.1, BAR.2), (0.3, BAR.1, BAR.2)],
@@ -307,7 +307,7 @@ pub fn weight_bench() -> Vec<Obj> {
                 major_segments = 12,
                 minor_segments = 4
             );
-            tube!(
+            kit::tube!(
                 f,
                 format!("collar_arm{s}"),
                 &[
@@ -358,7 +358,7 @@ pub fn dumbbells() -> Vec<Obj> {
         // the A-frames: each one square tube bent over the top, on a foot rail with rubber caps, a cap on the apex
         for s in [-1, 1] {
             let x = s as f64 * 0.36;
-            let frame = fillet(
+            let frame = kit::fillet(
                 &[(x, 0.012, 0.08), (x, 0.7, -0.21), (x, 0.012, -0.3)],
                 0.05,
                 3,

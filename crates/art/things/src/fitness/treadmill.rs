@@ -1,8 +1,8 @@
 //! The treadmill: belt along the depth, the console at the back; the runner faces the back.
 
 use super::M;
-use super::common::call::tube;
-use super::common::{Num, fillet, on, py, rr};
+use super::common::{Num, on, py, rr};
+use artkit::kit;
 use artkit::math::P3;
 use artkit::motion::scroll;
 use artkit::parts::{join, new_parts};
@@ -201,7 +201,7 @@ pub fn treadmill() -> Vec<Obj> {
                 profile = rr(0.07, 0.045, 0.02, 2),
                 up = (0, 1, 0)
             );
-            let bar = fillet(
+            let bar = kit::fillet(
                 &[
                     (sf * 0.3, 1.18, -0.63),
                     (sf * 0.33, 1.16, -0.6),
@@ -211,7 +211,7 @@ pub fn treadmill() -> Vec<Obj> {
                 0.04,
                 3,
             );
-            tube!(
+            kit::tube!(
                 f,
                 format!("handlebar{s}"),
                 &bar,
@@ -220,7 +220,7 @@ pub fn treadmill() -> Vec<Obj> {
                 verts = 10,
                 round = 1
             );
-            tube!(
+            kit::tube!(
                 f,
                 format!("grip{s}"),
                 &[(sf * 0.33, 1.083, -0.39), (sf * 0.33, 1.062, -0.29)],
@@ -338,7 +338,7 @@ pub fn treadmill() -> Vec<Obj> {
             rot = (90 + TILT, 0, 0),
             verts = 10
         );
-        tube!(
+        kit::tube!(
             f,
             "lanyard",
             &[

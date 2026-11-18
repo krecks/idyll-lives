@@ -1,8 +1,8 @@
 //! The exercise bike: an upright bike, the flywheel at the front, the cranks under the saddle.
 
 use super::M;
-use super::common::call::tube;
-use super::common::{Num, fillet, on, py, rr};
+use super::common::{Num, on, py, rr};
+use artkit::kit;
 use artkit::math::{Axis, P3, TAU, cos, cosd, pow, sin, sind};
 use artkit::parts::{hinged, join, new_parts};
 use artkit::place::GameFrame;
@@ -57,7 +57,7 @@ pub fn exercise_bike() -> Vec<Obj> {
         }
         // the frame: one swept piece from the beam up through the bottom bracket to the seat post, the handlebar
         // post curving up from the front, the flywheel's shroud between
-        tube!(
+        kit::tube!(
             f,
             "down_tube",
             &[(0, 0.62, -0.11), CRANK],
@@ -75,7 +75,7 @@ pub fn exercise_bike() -> Vec<Obj> {
             profile = &frame,
             up = (1, 0, 0)
         );
-        tube!(
+        kit::tube!(
             f,
             "seat_post",
             &[(0, 0.58, -0.106), (0, 0.7, -0.1)],
@@ -96,7 +96,7 @@ pub fn exercise_bike() -> Vec<Obj> {
             bevel = 0.004,
             bevel_segments = 1
         );
-        tube!(
+        kit::tube!(
             f,
             "seat_knob_stem",
             &[(0, 0.585, -0.08), (0, 0.585, -0.04)],
@@ -174,7 +174,7 @@ pub fn exercise_bike() -> Vec<Obj> {
                 verts = 10
             );
         }
-        tube!(
+        kit::tube!(
             f,
             "resistance_cable",
             &[
@@ -204,7 +204,7 @@ pub fn exercise_bike() -> Vec<Obj> {
         })
         .collect();
         loft!("saddle", &sections, material = M.pads);
-        tube!(
+        kit::tube!(
             f,
             "saddle_rail",
             &[(0, 0.705, -0.2), (0, 0.705, -0.04)],
@@ -220,10 +220,10 @@ pub fn exercise_bike() -> Vec<Obj> {
             (0.22, 0.98, 0.3),
             (0.22, 1.0, 0.16),
         ];
-        tube!(
+        kit::tube!(
             f,
             "bar",
-            &fillet(&bar, 0.05, 3),
+            &kit::fillet(&bar, 0.05, 3),
             0.017,
             M.steel,
             verts = 10,
@@ -231,7 +231,7 @@ pub fn exercise_bike() -> Vec<Obj> {
         );
         for s in [-1, 1] {
             let sf = s as f64;
-            tube!(
+            kit::tube!(
                 f,
                 format!("grip{s}"),
                 &[(sf * 0.22, 0.992, 0.24), (sf * 0.22, 1.0, 0.15)],
