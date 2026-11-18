@@ -119,7 +119,15 @@ pub struct Bevelled {
     pub segments: usize,
     /// The offset the edges were cut back by: the width, or less where the mesh has no room for it.
     pub offset: f32,
+    /// For each point of the new mesh, the old vertex whose corner it was made at (`u32::MAX`: a point kept).
+    pub made_at: Vec<u32>,
+    /// For each old vertex with a corner: its bevelled edges in Blender's order of the vertex's edges (each one's
+    /// other end and the faces before and after it), and the corner's new points (`Charts::centre` reads them).
+    pub centres: BTreeMap<u32, Centre>,
 }
+
+/// A corner's bevelled edges, each as (other end, face before, face after), and its new points' numbers.
+pub type Centre = (Vec<(u32, u32, u32)>, Vec<u32>);
 
 /// The faces' normals as the mesh the bevel works on keeps them (Blender's BMesh): a triangle or a quad of no
 /// area has none, where a mesh's own is straight up.
@@ -242,6 +250,8 @@ struct Corner {
     v: u32,
     edges: Vec<Half>,
     bounds: Vec<Bound>,
+    /// Which of `edges` Blender's own list of them starts at.
+    listed_from: usize,
 }
 
 /// A face a corner makes: its corners, each one's source face, its material, for the corner's polygon the vertex,
@@ -881,6 +891,8 @@ pub fn bevelled(
             picks: Vec::new(),
             segments,
             offset: 0.0,
+            made_at: vec![u32::MAX; mesh.verts.len()],
+            centres: BTreeMap::new(),
         });
     }
     // each bevelled vertex's edges, anticlockwise from the first bevelled one the mesh numbers
@@ -930,10 +942,15 @@ pub fn bevelled(
         // points start from the list's last edge if it is bevelled, from its first if not. So they start from
         // that edge where the list was turned over, and from the edge before it, if bevelled, where it was not
         let n = edges.len();
+        let mut listed_from = 0;
         if n > 2 {
             let number = |h: &Half| rank[&edge(v, h.to)];
-            if number(&edges[1]) < number(&edges[n - 1]) && edges[n - 1].bev {
+            if number(&edges[1]) > number(&edges[n - 1]) {
+                // (turned over, its list starts at the edge after this one)
+                listed_from = 1;
+            } else if edges[n - 1].bev {
                 edges.rotate_right(1);
+                listed_from = 1;
             }
         }
         work.corners.insert(
@@ -941,6 +958,7 @@ pub fn bevelled(
             Corner {
                 v,
                 edges,
+                listed_from,
                 ..Corner::default()
             },
         );
@@ -997,6 +1015,8 @@ pub fn bevelled(
     let mut corner_faces: Vec<CornerFace> = Vec::new();
     let mut picks = Vec::new();
     let mut grids: BTreeMap<u32, Numbers> = BTreeMap::new();
+    let mut made_at = vec![u32::MAX; out.verts.len()];
+    let mut centres: BTreeMap<u32, Centre> = BTreeMap::new();
     for &v in &keys {
         let corner = &work.corners[&v];
         let mut grid = Numbers::new();
@@ -1084,6 +1104,19 @@ pub fn bevelled(
             let from: Vec<u32> = (0..n).map(|i| corner.bounds[i].face).collect();
             corner_faces.push((ring, from, mat, Some(v), None));
         }
+        made_at.resize(out.verts.len(), v);
+        let (halves, m) = (&corner.edges, corner.edges.len());
+        centres.insert(
+            v,
+            (
+                (0..m)
+                    .map(|k| (corner.listed_from + k) % m)
+                    .filter(|&i| halves[i].bev)
+                    .map(|i| (halves[i].to, halves[(i + m - 1) % m].fnext, halves[i].fnext))
+                    .collect(),
+                (0..n).map(|i| grid[&(i, 0, 0)]).collect(),
+            ),
+        );
         grids.insert(v, grid);
     }
     // the faces left as they were
@@ -1214,6 +1247,8 @@ pub fn bevelled(
         picks,
         segments: ns,
         offset: each,
+        made_at,
+        centres,
     })
 }
 
@@ -2002,9 +2037,12 @@ impl Space {
             });
             sum / counted.len() as f32
         };
-        let (vec_ref, _) = normalize_v3(vec_ref - mul_v3_fl(lnor, dtp_ref));
-        let (vec_ortho, _) = normalize_v3(lnor.cross(vec_ref));
-        let (other, _) = normalize_v3(vec_other - mul_v3_fl(lnor, dtp_other));
+        // (unit vectors by division here, as the frame's own code makes them; the fan's sides and normal, which
+        // Blender's bevel hands it, are made by the reciprocal)
+        let unit = crate::normals::unit;
+        let vec_ref = unit(vec_ref - mul_v3_fl(lnor, dtp_ref));
+        let vec_ortho = unit(lnor.cross(vec_ref));
+        let other = unit(vec_other - mul_v3_fl(lnor, dtp_other));
         let dtp = dot_v3(vec_ref, other);
         let ref_beta = if dtp < Space::TRIGO {
             let beta = crate::normals::acos_approx(dtp);
@@ -2048,7 +2086,7 @@ impl Space {
         } else {
             Space::short(alpha / self.ref_alpha)
         };
-        let (vec, _) = normalize_v3(mul_v3_fl(self.lnor, -cos_alpha) + custom);
+        let vec = crate::normals::unit(mul_v3_fl(self.lnor, -cos_alpha) + custom);
         let cos_beta = dot_v3(self.vec_ref, vec);
         let b = if cos_beta < Space::TRIGO {
             let mut beta = crate::normals::acos_approx(cos_beta);
@@ -2370,6 +2408,86 @@ impl<'a> Charts<'a> {
     }
 }
 
+impl Charts<'_> {
+    /// The old face a corner's polygon takes its texture from (Blender's `frep_for_center_poly`): of the faces
+    /// picked either side of each bevelled edge, in Blender's order of the vertex's edges, the pick of those the
+    /// corner's new points, laid onto the face, keep an area on; the first of them all where none does (a corner
+    /// cut back by under 14 mm at right angles has too little on any).
+    fn centre(&self, new: &Mesh, vert: u32, centre: &Centre) -> u32 {
+        let (edges, ring) = centre;
+        let points: Vec<V3> = ring.iter().map(|&v| new.verts[v as usize]).collect();
+        let (mut choices, mut any): (Vec<u32>, Option<u32>) = (Vec::new(), None);
+        for &(_, before, after) in edges {
+            let f = self.pick(&[before, after]);
+            any.get_or_insert(f);
+            if !choices.contains(&f) && !self.bad_poly(vert, f, &points) {
+                choices.push(f);
+            }
+        }
+        if choices.is_empty() {
+            any.unwrap_or(0)
+        } else {
+            self.pick(&choices)
+        }
+    }
+
+    /// Whether a corner's new points `points`, each inside the old face `f` as it is and the others on the
+    /// nearer of the face's two sides at the vertex, span next to no area (Blender's `is_bad_uv_poly`): a
+    /// texture read from that face would have none on the corner's polygon.
+    fn bad_poly(&self, vert: u32, f: u32, points: &[V3]) -> bool {
+        let c = self.old.corners(f as usize);
+        let Some(at) = c.iter().position(|&v| v == vert) else {
+            return false;
+        };
+        let n = c.len();
+        let co = |v: u32| self.old.verts[v as usize];
+        let corners: Vec<V3> = c.iter().map(|&v| co(v)).collect();
+        let normal = normal_newell(&corners);
+        // two axes across the face
+        let (x, _) = normalize_v3(co(c[(at + 1) % n]) - co(vert));
+        let y = normal.cross(x);
+        let flat = |p: V3| [dot_v3(p, x) as f64, dot_v3(p, y) as f64];
+        let outline: Vec<[f64; 2]> = corners.iter().map(|&p| flat(p)).collect();
+        // (inside: the outline turns all the way round the point; a point on its edge is not)
+        let inside = |p: [f64; 2]| {
+            let mut turned = 0.0_f64;
+            for i in 0..outline.len() {
+                let (a, b) = (outline[i], outline[(i + 1) % outline.len()]);
+                let (a, b) = ([a[0] - p[0], a[1] - p[1]], [b[0] - p[0], b[1] - p[1]]);
+                turned += (a[0] * b[1] - a[1] * b[0]).atan2(a[0] * b[0] + a[1] * b[1]);
+            }
+            turned.abs() > 4.0
+        };
+        let sides = [
+            (co(vert), co(c[(at + 1) % n])),
+            (co(c[(at + n - 1) % n]), co(vert)),
+        ];
+        let laid: Vec<[f64; 2]> = points
+            .iter()
+            .map(|&p| {
+                if inside(flat(p)) {
+                    return flat(p);
+                }
+                let (a, b) = (
+                    on_segment(p, sides[0].0, sides[0].1),
+                    on_segment(p, sides[1].0, sides[1].1),
+                );
+                flat(if dot_v3(a - p, a - p) <= dot_v3(b - p, b - p) {
+                    a
+                } else {
+                    b
+                })
+            })
+            .collect();
+        let mut area = 0.0_f64;
+        for i in 0..laid.len() {
+            let (a, b) = (laid[i], laid[(i + 1) % laid.len()]);
+            area += a[0] * b[1] - a[1] * b[0];
+        }
+        (area.abs() * 0.5) < EPSILON_BIG as f64
+    }
+}
+
 /// A corner's patch of an odd number of segments, for its texture (Blender's bevel_build_rings): which old face
 /// each corner of its quads reads, and the old edge a corner on the patch's middle lines is read on.
 struct Patch<'a> {
@@ -2384,7 +2502,7 @@ struct Patch<'a> {
 }
 
 impl<'a> Patch<'a> {
-    fn new(charts: &Charts, vert: u32, across: &'a [(u32, u32, u32)]) -> Patch<'a> {
+    fn new(charts: &Charts, vert: u32, across: &'a [(u32, u32, u32)], centre: u32) -> Patch<'a> {
         let n = across.len();
         let beats = (0..n)
             .map(|i| charts.pick(&[across[i].1, across[(i + 1) % n].1]) == across[i].1)
@@ -2393,19 +2511,12 @@ impl<'a> Patch<'a> {
             .iter()
             .map(|&(to, before, after)| !charts.runs_on((vert, to), before, after))
             .collect();
-        let mut choices: Vec<u32> = Vec::new();
-        for &(_, before, after) in across {
-            let f = charts.pick(&[before, after]);
-            if !choices.contains(&f) {
-                choices.push(f);
-            }
-        }
         Patch {
             vert,
             across,
             beats,
             seam,
-            centre: charts.pick(&choices),
+            centre,
         }
     }
 
@@ -2530,6 +2641,7 @@ pub fn carried(
     let charts = Charts::new(old, uvs, odd, sides_from);
     let mut source = made.source.clone();
     let mut read_at: Vec<Option<(u32, u32)>> = vec![None; source.len()];
+    let centre_of = |vert: u32| charts.centre(new, vert, &made.centres[&vert]);
     for pick in &made.picks {
         match pick {
             Pick::Strip { at, edge, faces, k } => {
@@ -2574,7 +2686,7 @@ pub fn carried(
                 place,
                 across,
             } => {
-                let patch = Patch::new(&charts, *vert, across);
+                let patch = Patch::new(&charts, *vert, across, centre_of(*vert));
                 let (i, j, k) = *place;
                 if !odd {
                     // an even number: the quads that touch the patch's middle lines read their points there on
@@ -2604,7 +2716,7 @@ pub fn carried(
             } => {
                 if !across.is_empty() && odd {
                     // the polygon in the middle of a patch: its corners as the quads round it have them
-                    let patch = Patch::new(&charts, *vert, across);
+                    let patch = Patch::new(&charts, *vert, across, centre_of(*vert));
                     for i in 0..on.len() {
                         source[*at + i] = if patch.any_seam() {
                             patch.centre
@@ -2621,14 +2733,7 @@ pub fn carried(
                 {
                     continue;
                 }
-                let mut choices: Vec<u32> = Vec::new();
-                for &(_, before, after) in edges {
-                    let f = charts.pick(&[before, after]);
-                    if !choices.contains(&f) {
-                        choices.push(f);
-                    }
-                }
-                let from = charts.pick(&choices);
+                let from = centre_of(*vert);
                 // the face's two sides at the vertex, in the face's order of them
                 let c = old.corners(from as usize);
                 let Some(p) = c.iter().position(|&v| v == *vert) else {
@@ -2676,5 +2781,75 @@ pub fn carried(
             ];
         }
     }
+    merge_uvs(old, uvs, new, made, &source, &mut out);
     out
+}
+
+/// Two UVs Blender takes for one: within a ten-thousandth each way.
+fn uv_joined(a: [f32; 2], b: [f32; 2]) -> bool {
+    (a[0] - b[0]).abs() <= 0.0001 && (a[1] - b[1]).abs() <= 0.0001
+}
+
+/// Blender's last pass over a bevel's UVs (`bevel_merge_uvs`): at each new point, the corners of the new faces
+/// whose textures come from one old face, or from old faces whose UVs were joined at the old vertex the point
+/// was made at, are given the mean of their UVs. Where every face has a chart of its own nothing is joined and
+/// nothing moves; where two faces share their UVs along an edge (a box of square section under the box
+/// projection), the corner polygon's corner, read on that edge, is averaged in with the two beside it, which
+/// pulls a strip that would have no area in the texture a little off its line.
+/// `source`: the old face each new corner's UV was read from.
+fn merge_uvs(
+    old: &Mesh,
+    uvs: &[[f32; 2]],
+    new: &Mesh,
+    made: &Bevelled,
+    source: &[u32],
+    out: &mut [[f32; 2]],
+) {
+    // each old corner's group among the corners of its vertex whose UVs are joined (the first it joins)
+    let mut at_vertex: BTreeMap<u32, Vec<usize>> = BTreeMap::new();
+    for (l, &v) in old.loops.iter().enumerate() {
+        at_vertex.entry(v).or_default().push(l);
+    }
+    let mut group = vec![0_usize; old.loops.len()];
+    for corners in at_vertex.values() {
+        let mut groups: Vec<Vec<usize>> = Vec::new();
+        for &l in corners {
+            let joins = groups
+                .iter()
+                .position(|g| g.iter().any(|&m| uv_joined(uvs[l], uvs[m])));
+            let g = joins.unwrap_or_else(|| {
+                groups.push(Vec::new());
+                groups.len() - 1
+            });
+            groups[g].push(l);
+            group[l] = g;
+        }
+    }
+    // the new corners at each new point, by the group of the face they stand for (its first corner's source)
+    let mut buckets: BTreeMap<(u32, usize), Vec<usize>> = BTreeMap::new();
+    for face in &new.faces {
+        let (start, end) = (face.start as usize, (face.start + face.len) as usize);
+        let from = source[start] as usize;
+        for (l, &v) in new.loops.iter().enumerate().take(end).skip(start) {
+            let old_vertex = made.made_at[v as usize];
+            if old_vertex == u32::MAX {
+                continue;
+            }
+            let c = old.corners(from);
+            if let Some(i) = c.iter().position(|&w| w == old_vertex) {
+                let g = group[old.faces[from].start as usize + i];
+                buckets.entry((v, g)).or_default().push(l);
+            }
+        }
+    }
+    for corners in buckets.values().filter(|c| c.len() > 1) {
+        let mut sum = [0.0_f32; 2];
+        for &l in corners {
+            sum = [sum[0] + out[l][0], sum[1] + out[l][1]];
+        }
+        let k = 1.0 / corners.len() as f32;
+        for &l in corners {
+            out[l] = [sum[0] * k, sum[1] * k];
+        }
+    }
 }
