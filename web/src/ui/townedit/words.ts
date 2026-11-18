@@ -5,6 +5,7 @@
 
 import { CIVIC, civicLabel, draftAreaSize } from '../../game/backdrop';
 import { placeOfTemplate } from '../../game/placeLots';
+import type { Goes } from '../../game/edit/streets';
 import type { NeighbourhoodDraft } from '../../game/town';
 
 /** What a named place's lot of another kind than a civic place is (`backdrop.ts` `ZONE`). */
@@ -33,16 +34,27 @@ export function lotKind(s: NeighbourhoodDraft['slots'][number], draft?: Neighbou
   return s.kind === 'shop' ? 'Shop' : 'Public place';
 }
 
-/** What a removal takes besides the thing itself: other roads, homes, other lots, buildings, parking (`streets.ts` `whatGoes`). */
-export function whatGoesLine(draft: NeighbourhoodDraft, goes: { roads: number[]; lots: number[]; backdrop: number[]; parking: number[] }, road: number): string[] {
-  const roads = goes.roads.filter((r) => r !== road).map((r) => draft.roads[r]?.name ?? 'a road');
+/** What a removal takes besides the thing itself: other roads, bridges left leading nowhere, homes, other lots, buildings, parking (`streets.ts` `whatGoes`). */
+export function whatGoesLine(draft: NeighbourhoodDraft, goes: Pick<Goes, 'roads' | 'lots' | 'backdrop' | 'parking'> & Partial<Pick<Goes, 'bridges'>>, road: number): string[] {
+  const bridged = new Set(goes.bridges ?? []);
+  const name = (r: number) => draft.roads[r]?.name ?? 'a road';
+  const roads = goes.roads.filter((r) => r !== road && !bridged.has(r)).map(name);
+  const bridges = [...bridged].filter((r) => r !== road).map(name);
   const homes = goes.lots.filter((i) => draft.slots[i]?.kind === 'house').length;
   const others = goes.lots.length - homes;
   return [
     ...(roads.length ? [`${count(roads.length, 'road')} left joined to nothing (${listed(roads)})`] : []),
+    ...(bridges.length ? [`${count(bridges.length, 'bridge')} left leading nowhere (${listed(bridges)})`] : []),
     ...(homes ? [count(homes, 'home')] : []),
     ...(others ? [count(others, 'other lot')] : []),
     ...(goes.backdrop.length ? [count(goes.backdrop.length, 'building')] : []),
     ...(goes.parking.length ? [count(goes.parking.length, 'parking space')] : []),
   ];
+}
+
+/** What a removal makes of the country roads it leaves a long dead end (`Goes.streets`), as a sentence; null: none. */
+export function madeStreetsLine(draft: NeighbourhoodDraft, goes: Pick<Goes, 'streets'>): string | null {
+  const names = goes.streets.map((r) => draft.roads[r]?.name ?? 'a country road');
+  if (!names.length) return null;
+  return `${listed(names)}, left ending past a court, ${names.length === 1 ? 'becomes a street' : 'become streets'} (no taxi turns round in a country road).`;
 }

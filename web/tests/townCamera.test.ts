@@ -8,7 +8,7 @@ import { describe, expect, test } from 'bun:test';
 import { Flight, panBounds, Roam, SETTLE_MS, type FocusPlot } from '../src/render/shared/focus';
 import { BETA_LIMITS, LENS, RADIUS_LIMITS, TOWN_FROM, TOWN_FULL, TOWN_MAX, townBlend } from '../src/render/shared/lens';
 import { OrbitControls } from '../src/render/shared/orbit';
-import { edgeFog, FOG_EDGE, FOG_FROM, landEdge, menuFog, menuFogFrom, TOWN_BETA, TOWN_FOG, TOWN_NEAR_SHARE, TOWN_RADIUS_LIMITS, townArrival, townBeta, townFar, townFog, townFogFrom, townInset, townKeyZoom, townNear, townOrbit, townWheel } from '../src/render/shared/townCamera';
+import { edgeFog, FOG_EDGE, FOG_FROM, landEdge, menuFog, menuFogFrom, TOWN_BETA, TOWN_FOG, TOWN_NEAR_SHARE, TOWN_RADIUS_LIMITS, townArrival, townBeta, townClearance, townFar, townFog, townFogFrom, townInset, townKeyZoom, townNear, townOrbit, townWheel } from '../src/render/shared/townCamera';
 
 const WORLD = { width: 1024, depth: 1024, meta: { world: { size: 'big' } } };
 const RING = 260;
@@ -552,5 +552,19 @@ describe('the town view: the roaming focus', () => {
     low.update(cam(512, 180), 0, at, () => true);
     high.update(cam(512, TOWN_MAX), 0, at, () => true);
     expect(high.chunks.size).toBe(low.chunks.size);
+  });
+});
+
+describe('the near plane by a gorge', () => {
+  test("the land beside the eye counts, as far as the near plane reaches: a gorge's sides aren't cut through", () => {
+    // A slot 18 m wide and 104 m deep along x; the eye 65 m up in it, 300 m out.
+    const gorge = (_x: number, z: number) => (Math.abs(z - 480) < 9 ? -4 : 100);
+    const radius = 300;
+    expect(townClearance(1100, 65, 480, radius, gorge)).toBeCloseTo(-35, 6);
+    // (Under it alone it was 69 m: a near plane of 34.5 m, through the sides 9 m off.)
+    expect(townNear(radius, 65 - gorge(1100, 480), 1)).toBeCloseTo(34.5, 6);
+    expect(townNear(radius, townClearance(1100, 65, 480, radius, gorge), 1)).toBe(Math.max(LENS.near, radius * LENS.nearShare));
+    // Over open land, as before.
+    expect(townClearance(1100, 165, 300, radius, gorge)).toBeCloseTo(65, 6);
   });
 });

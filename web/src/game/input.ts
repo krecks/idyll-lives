@@ -183,3 +183,13 @@ export function routeKey(e: KeyPress, c: KeyContext): 'escape' | 'undo' | 'redo'
   if (e.key === 'Tab' && !c.onScene) return 'none';
   return 'game';
 }
+
+/**
+ * F8 off the game (the main menu, New game's steps; `App.svelte`): `report` saves a debug report,
+ * `held` is a held key's repeat (taken from the browser, no second report), `none` isn't ours. In the
+ * game the session's own keys (`routeKey`) have F8, so it is never handled twice.
+ */
+export function menuKey(e: Pick<KeyPress, 'key'> & { repeat: boolean }, screen: string): 'report' | 'held' | 'none' {
+  if (e.key !== 'F8' || screen === 'game') return 'none';
+  return e.repeat ? 'held' : 'report';
+}

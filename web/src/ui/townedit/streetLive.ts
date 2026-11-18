@@ -10,8 +10,8 @@
  * - a bend tighter than 9 m, where it bends;
  * - a junction within 14 m of another, by that junction;
  * - running into or alongside another road, or across a green, where it does;
- * - a crossing of the water: a bridge stretch, or red where it is too wide, bends, or a road or a
- *   lot is on it, as `bridgeable` says;
+ * - a crossing of the water: a bridge stretch, or red where it may not be bridged, as `bridges.ts`
+ *   `crossWater` says (`drawStreet` lays its bridges with it too);
  * - a stretch that climbs more steeply than its kind may, or that the land would need more than
  *   `CUT_MAX` m of cut or fill under (`profileOf`, on the plan's land as the settle measures against
  *   it: the land as laid with its finer hills smoothed out, as `gentleUnder` smooths them under
@@ -24,20 +24,20 @@
  *   are not judged.
  *
  * What it leaves to `drawStreet` itself, run when the pointer rests and when the street is ended
- * (`verdictOf`): what is in the way, how far a dead end reaches past the roads it carries on, the
- * roads it is split into at its bridges and whether the network stays one. Two of its refusals are
- * of a street not finished yet rather than of one that may not be (`unfinished`): a dead end
- * longer than a court, and a street joining no road yet. While drawing they are said, not drawn red.
+ * (`verdictOf`): what is in the way, the roads it is split into at its bridges, the footpaths it
+ * cuts and whether the network stays one. Two of its refusals are of a street not finished yet
+ * rather than of one that may not be (`unfinished`): a bridge with no road on beyond it, and a
+ * street joining no road yet. While drawing they are said, not drawn red.
  */
 
 import type { RoadKind, RoadPlan } from '../../core/protocol';
-import { bridgeable, bridgeStretch, wetSpans } from '../../game/bridges';
+import { bridgeStretch, crossWater, DRAWN_SPAN, wetSpans } from '../../game/bridges';
 import type { Edited } from '../../game/edit/edited';
-import { drawStreet, madeKind, Meeting, ONE_CROSSING, ROOM, streetCourse, streetLine, streetWidth, TRAIL_APART, type End, type StreetLine } from '../../game/edit/streets';
+import { crossingsOf, drawStreet, madeKind, Meeting, ROOM, streetCourse, streetLine, streetWidth, TRAIL_APART, type End, type StreetLine } from '../../game/edit/streets';
 import { heightAt, NONE, type Land } from '../../game/land';
 import { overWords, smoothHeights } from '../../game/landFollow';
 import { unrle } from '../../game/landMasks';
-import { bends, clearOf, COURT, inside, lengths, pointAt, roomAt, tangent, type Fit, type Pt } from '../../game/roads';
+import { bends, clearOf, inside, lengths, nearest, pointAt, roomAt, tangent, type Fit, type Pt } from '../../game/roads';
 import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '../../game/town';
 import { CUT_MAX, CUT_MAX_MOUNTAIN_ROAD, GRADE, profileOf } from '../../render/shared/builtSurface';
 
@@ -159,7 +159,7 @@ function meetingOf(c: Context, trail: boolean): Meeting {
 }
 
 /** A `drawStreet` refusal of a street that is not finished rather than one that may not be: it reaches no road yet, or its dead end is longer than a court. */
-export const unfinished = (why: string) => /^it joins none of the roads$|past the last road it meets/.test(why);
+export const unfinished = (why: string) => /^it joins none of the roads$|past the last road it meets|^a bridge needs a road on at each end/.test(why);
 
 /** Stretches merged where they meet or overlap (of one tone), and clamped to `[0, L]`. */
 function merged(list: readonly Stretch[], L: number): Stretch[] {
@@ -205,6 +205,7 @@ function unclearAt(pts: readonly Pt[], width: number, roads: readonly RoadPlan[]
     const t = tangent(pts, i);
     for (const [r, near] of m.index.around(x, z, widest / 2 + apart)) {
       if (bad) break;
+      if (m.skip(r)) continue;
       const clear = roads[r].width / 2 + width / 2 + 1;
       const free = clear * 1.8 + 1;
       if (near.dist < clear && !((r === from && s < free) || (r === to && u < free))) bad = true;
@@ -279,7 +280,7 @@ export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: read
   }
   const joins: LiveStreet['joins'] = [];
   for (const j of junctions) {
-    const ok = roomAt(meet.index, j.at, [j.road]);
+    const ok = roomAt(meet.index, j.at, [j.road], meet.skip);
     joins.push({ at: j.at, ok });
     if (!ok) refuse(`it meets ${named(j.road)} within ${ROOM} m of another junction`, by(j.at, ROOM));
   }
@@ -290,11 +291,11 @@ export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: read
   const toRoad = end.kind === 'join' || end.kind === 'extend' ? end.road : -1;
   const fit: Fit = { box: { w: W, d: D }, margin: -0.5, greens: draft.greens };
   const apart = trail ? TRAIL_APART : 18;
-  if (!clearOf(part, width, roads, meet.index, fit, fromRoad, toRoad, trail ? TRAIL_APART : undefined)) {
+  if (!clearOf(part, width, roads, meet.index, fit, fromRoad, toRoad, trail ? TRAIL_APART : undefined, meet.skip)) {
     const at = unclearAt(part, width, roads, meet, fit, fromRoad, toRoad, apart);
     const where = at.length ? at : [{ from: 0, to: L, tone: 'bad' as const }];
     if (part.some(([x, z], i) => ls[i] > 4 && L - ls[i] > 4 && draft.greens.some((g) => inside(g, x, z)))) refuse('it runs across a green', ...where);
-    else if (!clearOf(part, width, roads, meet.index, fit, fromRoad, toRoad, 0)) refuse('it runs into another road', ...where);
+    else if (!clearOf(part, width, roads, meet.index, fit, fromRoad, toRoad, 0, meet.skip)) refuse('it runs into another road', ...where);
     else refuse(`it runs closer than ${apart} m alongside another road`, ...where);
   }
 
@@ -303,34 +304,43 @@ export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: read
   const made: RoadKind = it.kind ?? 'street';
   const area = it.area ?? -1;
 
-  // ---- the water: a bridge over each crossing (the last first, as drawStreet bridges them) ----
+  // ---- the water: a bridge over each crossing (the last first, as drawStreet bridges them: `bridges.ts` `crossWater`) ----
   const bridges: number[] = [];
   const decks: Stretch[] = [];
+  let bridgeOpen: string | null = null;
   if (c.wet) {
     const spans = wetSpans(part, c.wet, W, D);
     if (spans.length && trail) refuse('a footpath does not cross the water', ...spans.map(([a, b]) => ({ from: a, to: b, tone: 'bad' as const })));
     else if (spans.length) {
-      const crossings: [number, number][] = [];
-      for (const s of spans) {
-        const last = crossings[crossings.length - 1];
-        if (last && s[0] - last[1] < ONE_CROSSING) last[1] = s[1];
-        else crossings.push([s[0], s[1]]);
-      }
       // (Not the dead ends it carries on: they are of the road it makes.)
       const base = start.kind === 'extend' ? start.road : -1;
       const merging = start.kind === 'extend' && end.kind === 'extend' ? end.road : -1;
-      const others = roads.filter((_, i) => i !== base && i !== merging);
+      const others = roads.filter((_, i) => i !== base && i !== merging && !meet.crossable(i));
       // (What the street clears is out of the bridge's way; what it doesn't, stays.)
       const gone = clear ? underLine(c.plots, part, width / 2 + 1.5) : new Set<number>();
       const plots = gone.size ? c.plots.filter((_, i) => !gone.has(i)) : c.plots;
-      for (const span of [...crossings].reverse()) {
+      const ends: RoadPlan['ends'] = [start.kind === 'join' || start.kind === 'extend' ? 'join' : 'dead', end.kind === 'join' || end.kind === 'extend' ? 'join' : 'dead'];
+      // (Each crossing laid on the line as drawn up to it, as drawStreet lays it on the road before the bridges after it.)
+      let line: Pt[] = part;
+      for (const span of crossingsOf(spans).reverse()) {
         const [a, b] = bridgeStretch(L, span);
-        let no = bridgeable(part, span, others, plots);
-        if (!no && ((a === 0 && start.kind !== 'join' && start.kind !== 'extend') || (b === L && end.kind !== 'join' && end.kind !== 'extend'))) no = 'a bridge needs a road on at each end: carry it on past the water';
-        decks.push({ from: a, to: b, tone: 'bad' });
-        if (no) refuse(no, { from: a, to: b, tone: 'bad' });
-        else list.push({ from: a, to: b, tone: 'bridge' });
-        if (!no) bridges.unshift(Math.round(span[1] - span[0]));
+        const crossed = crossWater(line, line === part ? ends : [ends[0], 'join'], span, { wet: c.wet, W, D, roads: others, plots, land: draft.open?.land, most: DRAWN_SPAN });
+        if (typeof crossed === 'string') {
+          // (One wanting a road on beyond it is a street not finished yet: said, not drawn red.)
+          if (/^a bridge needs a road on at each end/.test(crossed)) bridgeOpen ??= crossed;
+          else refuse(crossed, { from: a, to: b, tone: 'bad' });
+          continue;
+        }
+        const { fit } = crossed;
+        list.push({ from: fit.a, to: fit.b, tone: 'bridge' });
+        // (Its deck, where the land under it is not judged: along the line as drawn, where the deck's ends are nearest.)
+        const bl = lengths(crossed.bridge);
+        const [d0, d1] = [pointAt(crossed.bridge, fit.deck![0], bl).p, pointAt(crossed.bridge, fit.deck![1], bl).p];
+        const [s0, s1] = [nearest(part, d0[0], d0[1], ls).s, nearest(part, d1[0], d1[1], ls).s];
+        decks.push({ from: Math.min(s0, s1), to: Math.max(s0, s1), tone: 'bridge' });
+        const water = wetSpans(crossed.bridge, c.wet, W, D);
+        bridges.unshift(Math.round(water.length ? water[water.length - 1][1] - water[0][0] : 0));
+        if (crossed.before) line = crossed.before;
       }
     }
   }
@@ -364,7 +374,7 @@ export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: read
   const onRoad = (e: End) => e.kind !== 'free';
   let open: string | null = null;
   if (!onRoad(start) && !onRoad(end)) open = 'it joins no road yet: start or end it on one';
-  else if (!trail && (!onRoad(start) || !onRoad(end)) && start.kind !== 'extend' && L > COURT + 0.5) open = `a dead end reaches ${COURT} m at most: carry it on to a road`;
+  else if (bridgeOpen) open = bridgeOpen;
   // (Its far end is the one nearest the last point drawn: a dead end it carries on is its start, whichever end the player drew it from.)
   const last = points[points.length - 1];
   const far = near(last) === 0 ? start : end;
@@ -397,10 +407,11 @@ export function verdictOf(draft: NeighbourhoodDraft, t: Templates, content: Para
   return drawStreet(draft, t, content, { points, kind, clear, fill: false, seed, asked });
 }
 
-/** The roads of `after` that `before` hasn't (by the road itself: the edits keep the roads they leave as they were). */
-export function newRoads(before: NeighbourhoodDraft, after: NeighbourhoodDraft): number[] {
+/** The roads a street drawn on `before` made (`after.made`: its own pieces, not the footpaths it cut), else those `after.draft` has that `before` hasn't (by the road itself: the edits keep the roads they leave as they were). */
+export function newRoads(before: NeighbourhoodDraft, after: { draft: NeighbourhoodDraft; made?: readonly number[] }): number[] {
+  if (after.made) return [...after.made];
   const had = new Set(before.roads);
-  return after.roads.flatMap((r, i) => (had.has(r) ? [] : [i]));
+  return after.draft.roads.flatMap((r, i) => (had.has(r) ? [] : [i]));
 }
 
 /**

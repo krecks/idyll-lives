@@ -201,7 +201,7 @@
       keys: [
         [['Space'], 'Pause / resume'],
         [['1', '–', '3'], 'Game speed'],
-        [['4'], 'Super speed (quiet hours)'],
+        [['4'], 'Super speed (30×; 60× in quiet hours)'],
         [['0'], 'Pause'],
       ],
     },

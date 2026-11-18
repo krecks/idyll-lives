@@ -16,7 +16,7 @@ pub enum Command {
         speed: u8,
     },
     /// Super speed by itself: the game goes to super speed as the player's household falls
-    /// quiet (all asleep or out, `World::calm`).
+    /// quiet (all asleep or out, `World::calm`), and back to the speed before it as that ends.
     SetAutoFast {
         enabled: bool,
     },

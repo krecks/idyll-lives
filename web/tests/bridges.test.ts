@@ -89,6 +89,40 @@ describe("a bridge's stone", async () => {
     expect([...new Set(tips.map((p) => `${p[0]}:${p[2]}`))].sort()).toEqual(['105.5', '94.5'].flatMap((x) => [192.5, 185, 177.5].map((z) => `${Number(x) + (x === '105.5' ? 0.9 : -0.9)}:${z}`)).sort());
   });
 
+  test("on a land the town follows, the deck is cut where the road takes its heights: its top follows the road's, never over it", () => {
+    // 30 m north to south, the road coming down 3 m off the bank over its first 6 m and on level (a kink at 6 m): a
+    // piece from pier to pier (7.5 m) straight would stand 0.6 m over the road at the kink.
+    const road = (u: number) => Math.max(0, 3 - 0.5 * u);
+    const draw = (stops?: number[]) => {
+      const geo = new Geo();
+      bridge(
+        [
+          [100, 200],
+          [100, 170],
+        ],
+        7,
+        () => new Painter(geo),
+        { deck: road, bed: () => -3, ...(stops ? { stops } : {}) },
+      );
+      // (The deck's top, straight from corner to corner of each piece: how far over the road's own surface, at its
+      // most, every 25 cm along.)
+      const half = 3.5 + BRIDGE.apron;
+      const top = bounds(geo.pos)
+        .at.filter(([x, y, z]) => Math.abs(x - 100) < half + 0.01 && Math.abs(y - BRIDGE.top - road(200 - z)) < 1e-6)
+        .map(([, y, z]): [number, number] => [200 - z, y - BRIDGE.top])
+        .sort((a, b) => a[0] - b[0]);
+      let most = -Infinity;
+      for (let u = 0; u <= 30; u += 0.25) {
+        const k = Math.max(0, top.findIndex(([v]) => v >= u) - 1);
+        const [[u0, y0], [u1, y1]] = [top[k], top[Math.min(top.length - 1, k + 1)]];
+        most = Math.max(most, (u1 > u0 ? y0 + ((y1 - y0) * (u - u0)) / (u1 - u0) : y0) - road(u));
+      }
+      return most;
+    };
+    expect(draw()).toBeGreaterThan(0.5);
+    expect(draw(Array.from({ length: 29 }, (_, k) => k + 1))).toBeLessThan(1e-5);
+  });
+
   test("a generated road's deck (points a metre apart) is drawn as its straight runs; round a bend, no more piers", () => {
     const draw = (deck: [number, number][]) => {
       const geo = new Geo();

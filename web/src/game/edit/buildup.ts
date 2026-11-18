@@ -373,7 +373,8 @@ export function civicOffered(draft: NeighbourhoodDraft, area: number): { civic: 
 export function builtAlong(before: NeighbourhoodDraft, drawn: Edited, t: Templates, content: Content, mode: BuildMode, seed: number): Edited & { leftOut?: number } {
   if ('refused' in drawn) return drawn;
   const had = new Set(before.roads);
-  const fresh = drawn.draft.roads.flatMap((r, i) => (had.has(r) ? [] : [i]));
+  // (Its own pieces, not the footpaths it cut: `Edited.made`.)
+  const fresh = drawn.made ?? drawn.draft.roads.flatMap((r, i) => (had.has(r) ? [] : [i]));
   let draft = drawn.draft;
   let leftOut = 0;
   for (const [k, road] of fresh.entries()) {
@@ -382,5 +383,5 @@ export function builtAlong(before: NeighbourhoodDraft, drawn: Edited, t: Templat
     draft = e.draft;
     leftOut += e.leftOut ?? 0;
   }
-  return { draft, cleared: drawn.cleared, ...(leftOut ? { leftOut } : {}) };
+  return { draft, cleared: drawn.cleared, made: fresh, ...(leftOut ? { leftOut } : {}) };
 }

@@ -74,6 +74,8 @@ const offRect = (r: Rect, x: number, z: number) => Math.hypot(Math.max(r.x - x, 
 const HOLDS = 200;
 /** The longest deck a bridge has over the water, a causeway (a road out of the world) (m). */
 const SPAN = 45;
+/** A deck the player drew (a town checked as edited, not generated: `townProblems`' `generated`) may be this long (m: `bridges.ts` `DRAWN_SPAN`). */
+const DRAWN_SPAN = 70;
 const CAUSEWAY = 140;
 /** A bridge's deck runs straight: it turns no further than this (radians) end to end. */
 const DECK_TURN = 0.05;
@@ -147,8 +149,12 @@ function measureFill(town: CheckedTown, meadow: boolean): { built: number; empty
   return { built: filled / Math.max(1, land), empty: empty / squares };
 }
 
-/** What's wrong with how a town's roads join up, its areas, water, bridges, trails and names (the open-world checks), and how filled it is (`expect`, if given). */
-function openProblems(town: CheckedTown, expect: Expected | undefined, river: boolean, index: RoadIndex): string[] {
+/**
+ * What's wrong with how a town's roads join up, its areas, water, bridges, trails and names (the open-world checks), and
+ * how filled it is (`expect`, if given). Not `generated` (a town edited by hand): a street's or a lane's dead end may
+ * reach past a court (the sim turns round in any of theirs), and a deck may be `DRAWN_SPAN` m long.
+ */
+function openProblems(town: CheckedTown, expect: Expected | undefined, river: boolean, index: RoadIndex, generated = true): string[] {
   const out: string[] = [];
   const roads = index.roads;
   // Joined as the sim joins them (travel.rs `Graph::build`): an end within half the wider road's width and a metre of the other's middle.
@@ -185,6 +191,8 @@ function openProblems(town: CheckedTown, expect: Expected | undefined, river: bo
   const courts = areas.map(() => 0);
   roads.forEach((r, i) => {
     if (r.kind === 'trail') return;
+    // (A street or a lane drawn by hand may end where it likes, as many as the player likes.)
+    if (!generated && r.kind !== 'country') return;
     const L = lengths(r.points).at(-1)!;
     for (const e of [0, 1] as const) {
       if (r.ends[e] !== 'dead') continue;
@@ -220,7 +228,7 @@ function openProblems(town: CheckedTown, expect: Expected | undefined, river: bo
       if (r.points.some(([x, z]) => wet(x, z))) out.push(`road ${r.name ?? i} runs over water`);
     });
   }
-  out.push(...bridgeProblems(town, roads, river));
+  out.push(...bridgeProblems(town, roads, river, generated ? SPAN : DRAWN_SPAN));
   // Trails: each outdoor place at the end of one, near its area; no trail through a lot.
   const ends = roads.flatMap((r) => [r.points[0], r.points[r.points.length - 1]]);
   town.plots.forEach((p, i) => {
@@ -284,10 +292,10 @@ function openProblems(town: CheckedTown, expect: Expected | undefined, river: bo
 
 /**
  * What's wrong with a world's bridges and causeways: a road over the water (a water zone) but on
- * its deck (`bridge`, its arc lengths); a deck longer than `SPAN` (a causeway's, a road out of the
+ * its deck (`bridge`, its arc lengths); a deck longer than `span` (`SPAN`; a causeway's, a road out of the
  * world, `CAUSEWAY`) or not straight; a deck over no water; a river (`river`) with no bridge.
  */
-function bridgeProblems(town: CheckedTown, roads: readonly RoadPlan[], river: boolean): string[] {
+function bridgeProblems(town: CheckedTown, roads: readonly RoadPlan[], river: boolean, span = SPAN): string[] {
   const out: string[] = [];
   const water = (town.meta.zones ?? []).filter((z) => z.kind === 'water').map((z) => z.poly);
   // (At the 1 m tile's middle, as the water's tiles are made from the zones: `macro.ts` `rasterize`.)
@@ -308,7 +316,7 @@ function bridgeProblems(town: CheckedTown, roads: readonly RoadPlan[], river: bo
     const off = r.points.findIndex(([x, z], k) => wet(x, z) && (ls[k] < s0 || ls[k] > s1));
     if (off >= 0) out.push(`${name} runs over the water off its deck at ${r.points[off][0].toFixed(0)}, ${r.points[off][1].toFixed(0)}`);
     if (!r.points.some(([x, z], k) => ls[k] >= s0 && ls[k] <= s1 && (wet(x, z) || !!town.landWet?.(x, z)))) out.push(`${name}'s deck is over no water`);
-    const most = r.ends.includes('out') ? CAUSEWAY : SPAN;
+    const most = r.ends.includes('out') ? CAUSEWAY : span;
     if (s1 - s0 > most) out.push(`${name}'s deck is ${(s1 - s0).toFixed(0)} m long (${most} m at most)`);
     const turn = Math.abs(headingAt(r.points, s1, ls) - headingAt(r.points, s0, ls));
     if (Math.min(turn, 2 * Math.PI - turn) > DECK_TURN) out.push(`${name}'s deck turns ${((turn * 180) / Math.PI).toFixed(0)}°`);
@@ -482,8 +490,8 @@ function livingProblems(town: CheckedTown, careers: readonly string[], expect: E
  * same way for longer share it.
  */
 const SIDE_BY_SIDE = 60;
-function layoutProblems(town: CheckedTown, expect: Expected | undefined, river: boolean, index: RoadIndex): string[] {
-  const out: string[] = openProblems(town, expect, river, index);
+function layoutProblems(town: CheckedTown, expect: Expected | undefined, river: boolean, index: RoadIndex, generated = true): string[] {
+  const out: string[] = openProblems(town, expect, river, index, generated);
   // (Trails are on foot, between the lots: `openProblems` checks they keep off them.)
   const roads = (town.meta.roads ?? []).filter((r) => r.kind !== 'trail');
   const mask = roadMask(roads, town.width, town.depth, 0);
@@ -529,6 +537,6 @@ export function townProblems(town: CheckedTown, expect?: Expected, { river = fal
   const soft: string[] = [];
   // (One index of the roads for every check that asks which are near a point.)
   const index = new RoadIndex(town.roads ?? town.meta.roads ?? []);
-  const hard = [...layoutProblems(town, expect, river, index), ...livingProblems(town, careers, expect, given, soft, index, generated)];
+  const hard = [...layoutProblems(town, expect, river, index, generated), ...livingProblems(town, careers, expect, given, soft, index, generated)];
   return { hard, soft };
 }

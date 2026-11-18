@@ -59,7 +59,7 @@ import { wallCorners, writeFences } from './fences';
 import { shownFences } from './shownFences';
 import { centroid, lengths, pointAt } from '../../game/roads';
 import { pavedRects } from './paving';
-import { bridgeSpans, Kerb, KERB, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, stretchOf, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
+import { bridgeSpans, Kerb, KERB, levelStops, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, stretchOf, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
 import { JunctionCuts, junctionsOf, type JunctionPlan } from './junctions';
 import { Levels, levelsOf } from './landSurface';
 import type { BuiltSurface } from './builtSurface';
@@ -1915,7 +1915,8 @@ export class TownStreet {
     for (const road of [...this.roads, ...this.ways.country]) {
       for (const [s0, s1] of bridgeSpans(road)) {
         // (On a land the town follows, its deck as the road climbs over it, its piers down to the bed.)
-        const heights = levels ? { deck: (u: number) => levels.road(road, s0 + u), bed: (x: number, z: number) => levels.surface.landAt(x, z) } : undefined;
+        const stops = levels ? levelStops(road).flatMap((s) => (s > s0 && s < s1 ? [s - s0] : [])) : [];
+        const heights = levels ? { deck: (u: number) => levels.road(road, s0 + u), bed: (x: number, z: number) => levels.surface.landAt(x, z), stops } : undefined;
         bridge(stretchOf(road, s0, s1), road.width, (x, z) => at(x, z).parts.props, heights);
       }
     }
@@ -2321,8 +2322,15 @@ export function bridge(
   deck: readonly (readonly [number, number])[],
   width: number,
   into: (x: number, z: number) => Painter,
-  /** On a land the town follows: the road's height `u` m along the deck from its start, and the land's (the water's bed) at a point; the deck climbs with the road, the piers' noses reach down to the bed. None: at 0. */
-  heights?: { deck: (u: number) => number; bed: (x: number, z: number) => number },
+  /**
+   * On a land the town follows: the road's height `u` m along the deck from its start, and the land's (the water's
+   * bed) at a point; the deck climbs with the road, the piers' noses reach down to the bed. `stops`: where along the
+   * deck (m from its start) the road's surface takes its heights, running straight between them (`levelStops`): the
+   * deck is cut there too, so its top follows the road's and never stands over it where the road bends up or down
+   * (a piece from pier to pier, straight, stood over the asphalt where the road came down off a high bank onto it).
+   * None: at 0.
+   */
+  heights?: { deck: (u: number) => number; bed: (x: number, z: number) => number; stops?: readonly number[] },
 ): void {
   const B = BRIDGE;
   const half = width / 2 + B.apron;
@@ -2354,37 +2362,41 @@ export function bridge(
     for (let k = Math.floor(ls[i] / P + 1e-6) + 1; k * P < ls[i + 1] - 1e-6; k++) cuts.push(k * P - ls[i]);
     cuts.push(len);
     for (let c = 0; c + 1 < cuts.length; c++) {
-      const u0 = cuts[c] - (c === 0 ? past(i) : 0);
-      const u1 = cuts[c + 1] + (c + 2 === cuts.length ? past(i + 1) : 0);
-      const L = u1 - u0;
-      const [mx, mz] = [runs[i][0] + dx * (u0 + L / 2), runs[i][1] + dz * (u0 + L / 2)];
-      // (Climbing with the road: at its height at the piece's middle, sheared to its heights at its ends.)
-      const [ya, yb] = heights ? [heights.deck(ls[i] + u0), heights.deck(ls[i] + u1)] : [0, 0];
-      const p = into(mx, mz).at(mx, mz, yaw, (ya + yb) / 2, L > 0 ? (yb - ya) / L : 0);
-      const [first, last] = [i === 0 && c === 0, i + 2 === runs.length && c + 2 === cuts.length];
-      // The deck (no underside: it is under the water), closed at the bridge's two ends.
-      const ends = `${first ? '' : 'nz'}${last ? '' : 'pz'}`;
-      p.paint(BRIDGE_STONE, 0.9).box(-half, B.under, -L / 2, half, B.top, L / 2, `ny${ends}`);
-      for (const side of [-1, 1]) {
-        const [o0, o1] = side < 0 ? [-half, -half + B.wall] : [half - B.wall, half];
-        p.paint(BRIDGE_STONE, 0.9).box(o0, B.top, -L / 2, o1, B.top + B.parapet - B.coping, L / 2, `ny${ends}`);
-        p.paint(BRIDGE_COPING, 0.8).box(o0 - 0.05, B.top + B.parapet - B.coping, -L / 2, o1 + 0.05, B.top + B.parapet, L / 2, ends);
-        // A post at each end of the parapet.
-        for (const [end, at] of [[first, -L / 2], [last, L / 2]] as const) {
-          if (!end) continue;
-          const x = side * (half - B.post / 2);
-          p.paint(BRIDGE_COPING, 0.85).box(x - B.post / 2, B.top, at - B.post / 2, x + B.post / 2, B.top + B.postUp, at + B.post / 2, 'ny');
-        }
-        // A pier's nose where the piece begins (not at the bridge's start: its abutment is on the bank), down to the
-        // bed under it on a land the town follows.
-        if (cuts[c] > 1e-6) {
-          const at = cuts[c] - u0 - L / 2;
-          let down: number = BRIDGE.under;
-          if (heights) {
-            const [nx, nz] = [mx + dx * at + dz * side * (half + BRIDGE.nose / 2), mz + dz * at - dx * side * (half + BRIDGE.nose / 2)];
-            down = Math.min(BRIDGE.under, heights.bed(nx, nz) - PIER_SINK - ((ya + yb) / 2 + (at * (yb - ya)) / (L || 1)));
+      const [from, to] = [cuts[c] - (c === 0 ? past(i) : 0), cuts[c + 1] + (c + 2 === cuts.length ? past(i + 1) : 0)];
+      // (Cut again where the road's surface takes its heights, on a land the town follows.)
+      const bounds = [from, ...(heights?.stops ?? []).map((u) => u - ls[i]).filter((u) => u > from + 0.05 && u < to - 0.05), to];
+      for (let k = 0; k + 1 < bounds.length; k++) {
+        const [u0, u1] = [bounds[k], bounds[k + 1]];
+        const L = u1 - u0;
+        const [mx, mz] = [runs[i][0] + dx * (u0 + L / 2), runs[i][1] + dz * (u0 + L / 2)];
+        // (Climbing with the road: at its height at the piece's middle, sheared to its heights at its ends.)
+        const [ya, yb] = heights ? [heights.deck(ls[i] + u0), heights.deck(ls[i] + u1)] : [0, 0];
+        const p = into(mx, mz).at(mx, mz, yaw, (ya + yb) / 2, L > 0 ? (yb - ya) / L : 0);
+        const [first, last] = [i === 0 && c === 0 && k === 0, i + 2 === runs.length && c + 2 === cuts.length && k + 2 === bounds.length];
+        // The deck (no underside: it is under the water), closed at the bridge's two ends.
+        const ends = `${first ? '' : 'nz'}${last ? '' : 'pz'}`;
+        p.paint(BRIDGE_STONE, 0.9).box(-half, B.under, -L / 2, half, B.top, L / 2, `ny${ends}`);
+        for (const side of [-1, 1]) {
+          const [o0, o1] = side < 0 ? [-half, -half + B.wall] : [half - B.wall, half];
+          p.paint(BRIDGE_STONE, 0.9).box(o0, B.top, -L / 2, o1, B.top + B.parapet - B.coping, L / 2, `ny${ends}`);
+          p.paint(BRIDGE_COPING, 0.8).box(o0 - 0.05, B.top + B.parapet - B.coping, -L / 2, o1 + 0.05, B.top + B.parapet, L / 2, ends);
+          // A post at each end of the parapet.
+          for (const [end, at] of [[first, -L / 2], [last, L / 2]] as const) {
+            if (!end) continue;
+            const x = side * (half - B.post / 2);
+            p.paint(BRIDGE_COPING, 0.85).box(x - B.post / 2, B.top, at - B.post / 2, x + B.post / 2, B.top + B.postUp, at + B.post / 2, 'ny');
           }
-          nose(p, side, half, at, down);
+          // A pier's nose where the piece between two piers begins (not at the bridge's start: its abutment is on the
+          // bank), down to the bed under it on a land the town follows.
+          if (k === 0 && cuts[c] > 1e-6) {
+            const at = cuts[c] - u0 - L / 2;
+            let down: number = BRIDGE.under;
+            if (heights) {
+              const [nx, nz] = [mx + dx * at + dz * side * (half + BRIDGE.nose / 2), mz + dz * at - dx * side * (half + BRIDGE.nose / 2)];
+              down = Math.min(BRIDGE.under, heights.bed(nx, nz) - PIER_SINK - ((ya + yb) / 2 + (at * (yb - ya)) / (L || 1)));
+            }
+            nose(p, side, half, at, down);
+          }
         }
       }
     }

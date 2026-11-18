@@ -142,11 +142,172 @@ export function chamfer(mask: Uint8Array, gw: number, gd: number, value: 0 | 1):
   return dist;
 }
 
+/** `edgeWater`'s kinds: no water near, the sea's (at `SEA_CM`), water above the sea's level (a pond, a river). */
+export const EDGE_DRY = 0;
+export const EDGE_SEA = 1;
+export const EDGE_POND = 2;
+
+/**
+ * Where water reaches the land's edge in a run no longer than `most` m along it (a river's or a stream's way out, not
+ * a sea's coast): the side it leaves by (0: z = 0, 1: x = max, 2: z = max, 3: x = 0), the middle of the run along that
+ * side and half its width (m, from the run's samples), whether it is the sea's (`SEA_CM`) or water above it, and its
+ * highest level (m). Runs over a corner count on each side. The landscape past the edge opens into a valley there
+ * (`LandscapeLayout.valley`).
+ */
+export interface LandExit {
+  side: 0 | 1 | 2 | 3;
+  at: number;
+  half: number;
+  sea: boolean;
+  level: number;
+}
+
+export function landExits(land: Land, most: number): LandExit[] {
+  const { cols, rows, h, wl } = land;
+  const out: LandExit[] = [];
+  if (cols < 2 || rows < 2) return out;
+  const sides: [0 | 1 | 2 | 3, number, (q: number) => number][] = [
+    [0, cols, (q) => q],
+    [1, rows, (q) => q * cols + cols - 1],
+    [2, cols, (q) => (rows - 1) * cols + q],
+    [3, rows, (q) => q * cols],
+  ];
+  for (const [side, n, index] of sides) {
+    let start = -1;
+    for (let q = 0; q <= n; q++) {
+      const k = q < n ? index(q) : -1;
+      const wet = k >= 0 && wl[k] !== NONE && wl[k] > h[k];
+      if (wet && start < 0) start = q;
+      if (wet || start < 0) continue;
+      // (The run from `start` to `q - 1`: its width reaches half a sample past each end, where the shore lies between.)
+      const width = (q - start) * LAND_CELL;
+      if (width <= most) {
+        let [sea, level] = [false, -Infinity];
+        for (let r = start; r < q; r++) {
+          const v = wl[index(r)];
+          sea ||= v === SEA_CM;
+          level = Math.max(level, v / 100);
+        }
+        out.push({ side, at: ((start + q - 1) / 2) * LAND_CELL, half: width / 2, sea, level });
+      }
+      start = -1;
+    }
+  }
+  return out;
+}
+
+/** Water reaching the edge in a run longer than this (m) is a coast: the land past it is left as it is. */
+export const EXIT_MOST = 160;
+/** Past the edge the valley's ground comes down to it over this far (m): at the edge the land past it is the field's. */
+export const VALLEY_IN = 60;
+/** Beside a sea river's channel the valley's bank holds wholly from the edge on, easing to `VALLEY_IN`'s over this far (m). */
+export const VALLEY_BANK = 14;
+/** How fast (m a metre out) the valley's floor and the river's channel widen, either way. */
+const VALLEY_WIDEN = 0.5;
+const CHANNEL_WIDEN = 0.12;
+/** The valley's floor rises this much a metre out, and stands this far over the sea's level by a sea river's banks. */
+const VALLEY_RISE = 0.01;
+const FLOOR_OVER = 0.6;
+/** A sea river's banks rise this much a metre from its water up to the floor. */
+const BANK_GRADE = 0.12;
+/** The valley's sides rise at most this much a metre across (tan: 26.6° at the edge) easing to this (12.4°) by `VALLEY_OUT` m out. */
+export const VALLEY_STEEP = 0.5;
+const VALLEY_GENTLE = 0.22;
+const VALLEY_OUT = 260;
+
+/**
+ * The highest the land past the edge may stand `d` m out from it and `a` m across from the middle of `exit`, and how
+ * far (m) it is inside the exit's water there (< 0 outside; a river above the sea's level ends at the edge: its width
+ * carried on, dry): a river's way out opens into a valley, its floor and the channel of a sea river (the sea's level
+ * `sea`, m) widening with the distance, its sides rising at no more than `VALLEY_STEEP` (gentler further out), so the
+ * hills past the edge stand back from it. `out` takes both (no allocation).
+ */
+export function valleyCap(exit: LandExit, d: number, a: number, sea: number, out: { cap: number; wet: number }): { cap: number; wet: number } {
+  const s = smoothstep01(d / VALLEY_IN);
+  const grade = VALLEY_STEEP + (VALLEY_GENTLE - VALLEY_STEEP) * smoothstep01(d / VALLEY_OUT);
+  if (exit.sea) {
+    const floor = sea + FLOOR_OVER + d * VALLEY_RISE;
+    const channel = exit.half + d * CHANNEL_WIDEN * s;
+    const floorHalf = channel + (floor - sea) / BANK_GRADE + d * VALLEY_WIDEN;
+    out.wet = channel - a;
+    if (a < channel) out.cap = sea - Math.min(4, (channel - a) * 0.22 + (channel - a) ** 2 * 0.004);
+    else if (a < floorHalf) out.cap = Math.min(floor, sea + (a - channel) * BANK_GRADE);
+    else out.cap = floor + (a - floorHalf) * grade;
+  } else {
+    const floor = Math.max(exit.level, sea) + END_BANK_OVER + d * VALLEY_RISE;
+    const floorHalf = exit.half + d * VALLEY_WIDEN;
+    // (Its own width "wet": what the river ended behind goes on as the valley's floor.)
+    out.wet = exit.half - a;
+    out.cap = a < floorHalf ? floor : floor + (a - floorHalf) * grade;
+  }
+  return out;
+}
+
+/** How far over its water a river above the sea's level ends at the edge (m, as `LandscapeLayout`'s `END_BANK`). */
+const END_BANK_OVER = 0.25;
+
+/** Smoothstep of `t` clamped to 0..1. */
+function smoothstep01(t: number): number {
+  const u = Math.min(1, Math.max(0, t));
+  return u * u * (3 - 2 * u);
+}
+
+/** The place round the land's edge of boundary sample (`i`, `j`): from the corner (0, 0) along z = 0, then up x = max, back along z = max, down x = 0. */
+function ringAt(cols: number, rows: number, i: number, j: number): number {
+  if (j === 0) return i;
+  if (i === cols - 1) return cols - 1 + j;
+  if (j === rows - 1) return cols - 1 + rows - 1 + (cols - 1 - i);
+  return 2 * (cols - 1) + rows - 1 + (rows - 1 - j);
+}
+
+/**
+ * The water round the land's edge, for the land past it (`LandscapeLayout.ground`): for each edge sample, in order
+ * round the edge (`ringAt`), the kind of the nearest water on the edge within `reach` m of it along the edge (round
+ * the corners too): `EDGE_SEA`, `EDGE_POND` or `EDGE_DRY`. Past the edge only the sea runs on; a pond or a river ends
+ * there. Null on a land too small to have a ring.
+ */
+export function edgeWater(land: Land, reach: number): Uint8Array | null {
+  const { cols, rows, h, wl } = land;
+  if (cols < 2 || rows < 2) return null;
+  const n = 2 * (cols - 1) + 2 * (rows - 1);
+  const kind = new Uint8Array(n);
+  const mark = (i: number, j: number) => {
+    const k = j * cols + i;
+    if (wl[k] !== NONE && wl[k] > h[k]) kind[ringAt(cols, rows, i, j)] = wl[k] === SEA_CM ? EDGE_SEA : EDGE_POND;
+  };
+  for (let i = 0; i < cols; i++) [mark(i, 0), mark(i, rows - 1)];
+  for (let j = 1; j < rows - 1; j++) [mark(0, j), mark(cols - 1, j)];
+  const out = new Uint8Array(n);
+  const r = Math.min(Math.floor(n / 2), Math.ceil(reach / LAND_CELL));
+  for (let p = 0; p < n; p++) {
+    for (let d = 0; d <= r; d++) {
+      const v = kind[(p + d) % n] || kind[(p - d + n) % n];
+      if (v) {
+        out[p] = v;
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/** `edgeWater`'s kind at the edge sample nearest (x, z), a point past the land's edge; `EDGE_DRY` inside it. */
+export function edgeWaterAt(land: Land, edge: Uint8Array | null, x: number, z: number): number {
+  if (!edge) return EDGE_DRY;
+  const { cols, rows } = land;
+  const [fx, fz] = [x / LAND_CELL, z / LAND_CELL];
+  if (fx >= 0 && fz >= 0 && fx <= cols - 1 && fz <= rows - 1) return EDGE_DRY;
+  // (The sample the point is past, on the edge: in a corner's square, the corner.)
+  return edge[ringAt(cols, rows, Math.min(cols - 1, Math.max(0, Math.round(fx))), Math.min(rows - 1, Math.max(0, Math.round(fz))))];
+}
+
 /**
  * `wetDistance`'s field at (x, z): read between the samples, and past the land's edge the edge's carried on out
- * (deeper in water that reaches it, further from water that doesn't). -Infinity without water.
+ * (deeper in water that reaches it, further from water that doesn't). -Infinity without water. With `edge`
+ * (`edgeWater`), only the sea runs on past it: other water reaching the edge ends there, the land past it as far from
+ * the water as it is from the edge.
  */
-export function wetEdgeAt(land: Land, sd: Float32Array | null, x: number, z: number): number {
+export function wetEdgeAt(land: Land, sd: Float32Array | null, x: number, z: number, edge: Uint8Array | null = null): number {
   if (!sd) return -Infinity;
   const { cols, rows } = land;
   const fx = x / LAND_CELL;
@@ -159,6 +320,7 @@ export function wetEdgeAt(land: Land, sd: Float32Array | null, x: number, z: num
   const [u, v] = [cx - i, cz - j];
   const [i1, j1] = [Math.min(i + 1, cols - 1), Math.min(j + 1, rows - 1)];
   const e = (sd[j * cols + i] * (1 - u) + sd[j * cols + i1] * u) * (1 - v) + (sd[j1 * cols + i] * (1 - u) + sd[j1 * cols + i1] * u) * v;
+  if (e > 0 && out > 0 && edgeWaterAt(land, edge, x, z) === EDGE_POND) return -out;
   return e > 0 ? e + out : e - out;
 }
 

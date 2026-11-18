@@ -180,6 +180,9 @@ pub struct SaveFile {
     /// or 60×).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resume_speed: Option<u8>,
+    /// The game went to super speed by itself (absent: the player picked the speed).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub auto_super: bool,
     pub autonomy: bool,
     /// How fast residents age (absent before v13: off).
     #[serde(default)]
@@ -1017,6 +1020,7 @@ impl World {
             tick: self.tick,
             speed: self.speed,
             resume_speed: Some(self.resume_speed),
+            auto_super: self.auto_super && self.speed == SUPER_SPEED,
             autonomy: self.autonomy,
             lifespan: Some(self.lifespan),
             storeys: Some(self.storeys),
@@ -1225,13 +1229,14 @@ impl World {
         // timed in real seconds.)
         let ticks = Rescale::of(save.version);
         world.tick = ticks.tick(save.tick);
-        // (Before v40, 4 and 5 were 30× and 60×: super speed now, dropping back to 10×.)
+        // (Before v40, 4 and 5 were 30× and 60×: super speed now, 10× under it.)
         let (speed, resume) = if save.version < 40 && save.speed > 3 {
             (SUPER_SPEED, Some(3))
         } else {
             (save.speed.min(MAX_SPEED), save.resume_speed)
         };
         world.speed = speed;
+        world.auto_super = save.auto_super && speed == SUPER_SPEED;
         world.resume_speed = resume
             .unwrap_or(if (1..SUPER_SPEED).contains(&speed) {
                 speed
@@ -2993,8 +2998,8 @@ mod tests {
 
     #[test]
     fn the_speeds_of_older_saves() {
-        // Before v40, 4 and 5 were 30× and 60×: super speed now, dropping back to 10× (at once,
-        // with Old awake), and the speed super speed drops back to is saved.
+        // Before v40, 4 and 5 were 30× and 60×: super speed now (30× with Old awake), 10× under it;
+        // the speed under super speed is saved.
         for (version, speed, now, back) in
             [(39, 5, 4, 3), (39, 4, 4, 3), (39, 2, 2, 2), (40, 4, 4, 1)]
         {
@@ -3013,7 +3018,7 @@ mod tests {
             let again = World::from_save_json(CONTENT, &w.save_json()).unwrap();
             assert_eq!((again.speed, again.resume_speed), (now, back));
             w.advance();
-            assert_eq!(w.speed, back, "Old is up: back to {back}");
+            assert_eq!(w.speed, now, "Old is up: the speed stays");
         }
     }
 

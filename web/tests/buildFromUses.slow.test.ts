@@ -5,7 +5,7 @@
 // twice and no hard problem its layout hadn't, the rest of the town standing as it was; an untouched layout built
 // again from another seed is about as dense as the generator's town, kind by kind (a table printed); a cluster
 // painted far from every town along a street of its own is a village; the brush never paints water or a road; and
-// step 2's summary is within a quarter of what Build makes (exactly it for an untouched layout). `SLOW_TESTS=1 bun test tests/buildFromUses.slow.test.ts`.
+// step 2's summary is within a quarter of what Build makes (exactly it for an untouched layout; an edit that leaves the zones be moves it by what it changes). `SLOW_TESTS=1 bun test tests/buildFromUses.slow.test.ts`.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -241,12 +241,56 @@ describe('build from uses', async () => {
     ];
     // (Untouched, given its proposal: what Build gives it, the proposal's town, exactly.)
     expect(usesSummary(proposal.plan, proposal)).toEqual(townSummary(build(proposal, proposal.plan, PROPOSAL_SEED).draft));
-    expect(usesSummary(small, proposal)).toEqual(usesSummary(small));
+    // (Its zones cleared, given its proposal: the estimate as it is, nothing of the proposal's town kept.)
+    const bare: NeighbourhoodDraft = { ...proposal.plan, open: { ...proposal.plan.open!, uses: usesEmpty(proposal.plan.open!.uses!.cols, proposal.plan.open!.uses!.rows) } };
+    expect(usesSummary(bare, proposal)).toEqual(usesSummary(bare));
     for (const p of plans) {
       // (Everything zoned built again: another seed.)
       const got = counts(layOutUses(p.proposal, p.plan, t, content, 9));
       const est = usesSummary(p.plan);
       for (const k of ['homes', 'shops', 'parks', 'public'] as const) close(`${p.what} ${k}`, est[k], got[k]);
+    }
+  }, 120_000);
+
+  test("a street drawn out of the town into the open, the zones left be: step 2's summary moves by what it changes, about what Build then makes", () => {
+    const { layout } = caseOf(cases[0]);
+    const { proposal } = layout;
+    const plan = proposal.plan;
+    const exact = townSummary(proposal.built);
+    const [W, D] = [plan.width, plan.depth];
+    // A dead end 120 m long off a street of the town, square to it, into land no road is within 60 m of.
+    const index = new RoadIndex(plan.roads);
+    let edited: NeighbourhoodDraft | null = null;
+    const why = new Map<string, number>();
+    for (const { r, i } of streetsOf(plan)) {
+      const ls = lengths(r.points);
+      for (let s = 20; s < ls[ls.length - 1] - 20 && !edited; s += 10) {
+        const { p, t: tt } = pointAt(r.points, s, ls);
+        for (const side of [1, -1] as const) {
+          const n = leftOf(tt).map((v) => v * side) as Pt;
+          const end: Pt = [p[0] + n[0] * 126, p[1] + n[1] * 126];
+          if (end[0] < 20 || end[1] < 20 || end[0] > W - 20 || end[1] > D - 20) continue;
+          if ([40, 80, 120].some((d) => index.nearest(p[0] + n[0] * d, p[1] + n[1] * d, 30))) continue;
+          const e = drawStreet(plan, t, content, { points: [[p[0] + n[0] * 6, p[1] + n[1] * 6], end], kind: 'street', clear: true, fill: false, seed: 3 });
+          const k = 'refused' in e ? e.refused : `${e.draft.roads.length - plan.roads.length} roads`;
+          why.set(k, (why.get(k) ?? 0) + 1);
+          if ('draft' in e && e.draft.roads.length === plan.roads.length + 1 && e.draft.roads[i] === plan.roads[i]) {
+            edited = e.draft;
+            break;
+          }
+        }
+      }
+      if (edited) break;
+    }
+    if (!edited) throw new Error(`no dead end could be drawn out of the town: ${JSON.stringify([...why])}`);
+    const raw = usesSummary(edited);
+    const est = usesSummary(edited, proposal);
+    const got = counts(build(proposal, edited, PROPOSAL_SEED).draft);
+    console.log(`untouched ${JSON.stringify(exact)}; a dead end drawn: estimated ${JSON.stringify(raw)} on its own, ${JSON.stringify(est)} kept to the proposal's town; built ${JSON.stringify(got)}`);
+    for (const k of ['homes', 'shops', 'parks', 'public'] as const) {
+      // (Its zones as they were: the proposal's town but for what the street adds, and what Build makes of it.)
+      expect({ k, est: est[k], ok: Math.abs(est[k] - exact[k]) <= Math.max(2, 0.05 * exact[k]) }).toEqual({ k, est: est[k], ok: true });
+      expect({ k, est: est[k], got: got[k], ok: Math.abs(est[k] - got[k]) <= Math.max(3, 0.1 * got[k]) }).toEqual({ k, est: est[k], got: got[k], ok: true });
     }
   }, 120_000);
 

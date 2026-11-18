@@ -176,24 +176,33 @@ fn speed_controls_tick_rate() {
     assert_eq!(w.tick, TICKS_PER_STEP[3] as u64);
     assert_eq!(w.step_rate(), TICKS_PER_STEP[3]);
     assert!(w.apply(Command::SetSpeed { speed: 5 }).is_err());
-    // Ada is up: super speed isn't to be had, and the game stays at the speed chosen before it.
+    // Ada is up: super speed is still to be had, at 30× (`SUPER_BUSY`) a step at most.
     w.apply(Command::SetSpeed { speed: 2 }).unwrap();
     w.apply(Command::SetSpeed { speed: SUPER_SPEED }).unwrap();
-    assert_eq!(w.speed, 2);
+    assert_eq!(w.speed, SUPER_SPEED);
+    let before = w.tick;
+    w.advance();
+    assert_eq!(w.tick, before + SUPER_BUSY as u64, "awake: 30×");
+    assert_eq!(w.step_rate(), SUPER_BUSY);
+    assert_eq!(w.speed, SUPER_SPEED, "the player's pick stays");
     w.apply(Command::SetSpeed { speed: 0 }).unwrap();
     w.apply(Command::SetSpeed { speed: SUPER_SPEED }).unwrap();
-    assert_eq!(w.speed, 2, "from a pause: the speed chosen before");
+    assert_eq!(w.speed, SUPER_SPEED, "from a pause too");
 }
 
-/// A world whose bed is for sleeping, with Ada asleep in it (at `speed`, `auto` super speed).
-fn asleep_world(speed: u8, auto: bool) -> World {
-    let content = CONTENT
+/// The test content with its bed for sleeping.
+fn asleep_content() -> String {
+    CONTENT
         .replace(r#""pose":"lie","#, r#""pose":"lie","tags":["sleep"],"#)
         .replace(
             r#""needs":["#,
             r#""dayRhythm":{"sleepTags":["sleep"]},"needs":["#,
-        );
-    let mut w = World::from_json(&content, LOT, 7).unwrap();
+        )
+}
+
+/// A world whose bed is for sleeping, with Ada asleep in it (at `speed`, `auto` super speed).
+fn asleep_world(speed: u8, auto: bool) -> World {
+    let mut w = World::from_json(&asleep_content(), LOT, 7).unwrap();
     w.apply(Command::SetSpeed { speed }).unwrap();
     w.apply(Command::SetAutoFast { enabled: auto }).unwrap();
     w.advance();
@@ -247,7 +256,7 @@ fn super_speed_by_itself_while_the_household_sleeps() {
 }
 
 #[test]
-fn super_speed_drops_back_as_someone_wakes() {
+fn super_speed_the_player_picked_stays_at_30x_as_someone_wakes() {
     let mut w = asleep_world(3, false);
     let before = w.tick;
     w.advance();
@@ -258,12 +267,34 @@ fn super_speed_drops_back_as_someone_wakes() {
     );
     w.apply(Command::SetSpeed { speed: SUPER_SPEED }).unwrap();
     assert_eq!(w.speed, SUPER_SPEED);
+    let before = w.tick;
     w.advance();
+    assert_eq!(w.tick, before + 60, "asleep: 60×");
+    // She wakes: super speed stays, at 30×.
+    w.sims[0].current = None;
+    let before = w.tick;
+    w.advance();
+    assert_eq!((w.speed, w.tick), (SUPER_SPEED, before + SUPER_BUSY as u64));
+}
+
+#[test]
+fn super_speed_gone_to_by_itself_drops_back_as_someone_wakes() {
+    let mut w = asleep_world(3, true);
+    w.advance();
+    assert_eq!(w.speed, SUPER_SPEED, "asleep: super speed by itself");
     // She wakes: no more super-speed ticks, and the next step is at 10× again.
     w.sims[0].current = None;
     w.start_step();
     assert!(!w.advance_more());
     assert_eq!(w.speed, 3);
+    // Saved while it ran by itself, it still drops back once loaded.
+    let mut w = asleep_world(3, true);
+    w.advance();
+    let mut again = World::from_save_json(&asleep_content(), &w.save_json()).unwrap();
+    assert_eq!(again.speed, SUPER_SPEED);
+    again.sims[0].current = None;
+    again.advance();
+    assert_eq!(again.speed, 3);
 }
 
 #[test]

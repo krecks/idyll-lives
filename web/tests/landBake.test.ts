@@ -8,8 +8,9 @@ import { describe, expect, test } from 'bun:test';
 import type { WorldStructure } from '../src/core/protocol';
 import { COVER, coverSpan, encodeLand, LAND_CELL, NONE, SEA_CM, type Land } from '../src/game/land';
 import { CountryRoads } from '../src/render/shared/countryRoads';
-import { bakeLand, copyLand, marchToGround, pondQuads, wetDistance, wetEdgeAt } from '../src/render/shared/landBake';
-import { LAND_BLOCK, LandscapeLayout, type Woods } from '../src/render/shared/nature';
+import { landZones } from '../src/game/landEdit';
+import { bakeLand, copyLand, EDGE_DRY, EDGE_POND, EDGE_SEA, edgeWater, edgeWaterAt, EXIT_MOST, landExits, marchToGround, pondQuads, wetDistance, wetEdgeAt } from '../src/render/shared/landBake';
+import { LAND_BLOCK, LandscapeLayout, WATER_Y, type Woods } from '../src/render/shared/nature';
 import { islandWorld, plainWorld, SIDE } from './support/landFixtures';
 
 type Grown = {
@@ -223,6 +224,154 @@ describe("the field's water", () => {
     // (Its sea's edge where the field's water ends.)
     expect(drawn.waterEdge(0, 0)).toBeGreaterThan(0);
     expect(drawn.waterEdge(256, 256)).toBeLessThan(0);
+  });
+});
+
+describe('past the edge only the sea runs on', () => {
+  /** A flat, dry land `n` samples a side, 2 m up. */
+  const flat = (n = 64): Land => ({ cols: n, rows: n, h: new Int16Array(n * n).fill(200), wl: new Int16Array(n * n).fill(NONE), cover: new Uint8Array(coverSpan(n) ** 2), seeded: 'drawn', edited: false });
+
+  test('each edge sample knows the nearest water along the edge, round the corners', () => {
+    const land = flat();
+    const wet = (i: number, j: number, level: number) => ([land.h[j * 64 + i], land.wl[j * 64 + i]] = [-200, level]);
+    // A river 5 samples wide out through the east side (x = 63), rows 20..24; the sea along the south (z = 0) from x 0 to 9.
+    for (let j = 20; j <= 24; j++) for (let i = 40; i < 64; i++) wet(i, j, 100);
+    for (let i = 0; i < 10; i++) wet(i, 0, SEA_CM);
+    const edge = edgeWater(land, 8);
+    // (Past the east side by its rows; 8 m along it is 4 samples.)
+    const east = (j: number) => edgeWaterAt(land, edge, 63 * LAND_CELL + 5, j * LAND_CELL);
+    expect([east(22), east(20), east(16), east(15), east(28), east(29)]).toEqual([EDGE_POND, EDGE_POND, EDGE_POND, EDGE_DRY, EDGE_POND, EDGE_DRY]);
+    // The sea, south of the land, and round its corner up the west side.
+    expect(edgeWaterAt(land, edge, 8, -30)).toBe(EDGE_SEA);
+    expect(edgeWaterAt(land, edge, -10, 6)).toBe(EDGE_SEA);
+    expect(edgeWaterAt(land, edge, -10, 20)).toBe(EDGE_DRY);
+    // Inside the land's samples: none.
+    expect(edgeWaterAt(land, edge, 60, 44)).toBe(EDGE_DRY);
+    // Past the river's end the land is dry, its sand round the end only; past the sea, the sea.
+    const sd = wetDistance(land);
+    expect(wetEdgeAt(land, sd, 63 * LAND_CELL + 4, 44, edge)).toBeCloseTo(-4, 6);
+    expect(wetEdgeAt(land, sd, 63 * LAND_CELL + 4, 44)).toBeGreaterThan(0);
+    expect(wetEdgeAt(land, sd, 8, -30, edge)).toBeGreaterThan(30);
+  });
+
+  /** The plain world's land surveyed, with a river 20 m wide carved from x 300 east out through its edge, its level `level` cm. */
+  const carved = (level = 50) => {
+    const field = bakeLand(layout(plainWorld()), SIDE, SIDE);
+    for (let j = 55; j <= 64; j++) {
+      for (let i = 150; i < field.cols; i++) {
+        const k = j * field.cols + i;
+        [field.h[k], field.wl[k]] = [Math.min(field.h[k], level - 200), level];
+      }
+    }
+    return field;
+  };
+
+  test('a river through the edge ends there, behind a bank: no sand, no bed, no water past it, step 1 or 2', () => {
+    const field = carved();
+    const world = plainWorld();
+    // Step 1: the world's own zones; step 2: the land's water among them (as the town laid on it has them).
+    const laid = { ...world, meta: { ...world.meta!, zones: [...world.meta!.zones!.filter((z) => z.kind !== 'water'), ...landZones(field, { water: true })] } } as WorldStructure;
+    for (const w of [world, laid]) {
+      const drawn = layout(w);
+      drawn.setLand(copyLand(field));
+      const z = 119;
+      // (In the land: the river.)
+      expect(drawn.waterEdge(SIDE - 6, z)).toBeGreaterThan(0);
+      // Past the edge: its end's bank, then the land's own, never under the sea's level; its sand only at the end.
+      expect(drawn.ground(SIDE - 1, z)).toBeGreaterThanOrEqual(0.75 - 1e-6);
+      expect(drawn.ground(SIDE + 1, z)).toBeGreaterThan(0.5);
+      for (let x = SIDE + 1; x < SIDE + 400; x += 7) {
+        expect(drawn.ground(x, z)).toBeGreaterThan(WATER_Y + 0.2);
+        expect(drawn.waterEdge(x, z)).toBeLessThan(0);
+        if (x > SIDE + 12) expect(drawn.waterEdge(x, z)).toBeLessThan(-8);
+      }
+      // (Beside it as before: the field's edge followed out.)
+      expect(Math.abs(drawn.ground(SIDE + 1, 300) - drawn.ground(SIDE - 1, 300))).toBeLessThan(0.5);
+    }
+    // A river run down under the sea's level ends behind a bank over the sea's sheet.
+    const low = layout(world);
+    low.setLand(carved(-60));
+    for (let x = SIDE - 1; x < SIDE + 80; x += 3) expect(low.ground(x, 119)).toBeGreaterThan(WATER_Y);
+  });
+
+  test('a generated land reaches the edge only with the sea: drawn past it as before', () => {
+    for (const world of [plainWorld(), islandWorld()]) {
+      const baked = bakeLand(layout(world), SIDE, SIDE);
+      const edge = edgeWater(baked, 20)!;
+      expect(edge.includes(EDGE_POND)).toBe(false);
+      const drawn = layout(world);
+      drawn.setLand(baked);
+      const sd = wetDistance(baked);
+      for (let a = 0; a < 360; a += 5) {
+        const [x, z] = [SIDE / 2 + Math.cos((a * Math.PI) / 180) * 400, SIDE / 2 + Math.sin((a * Math.PI) / 180) * 400];
+        expect(drawn.waterEdge(x, z)).toBe(wetEdgeAt(baked, sd, x, z));
+      }
+    }
+    // The island's sea runs on past it all round.
+    const island = layout(islandWorld());
+    island.setLand(bakeLand(layout(islandWorld()), SIDE, SIDE));
+    for (const [x, z] of [[-30, 256], [SIDE + 30, 100], [256, -60], [256, SIDE + 60]]) expect(island.waterEdge(x, z)).toBeGreaterThan(0);
+  });
+});
+
+describe("a river's way out opens into a valley past the edge", () => {
+  /**
+   * The plain world's land surveyed, with a river 20 m wide (rows 55..64) carved east out through its edge, at `level`
+   * cm, its banks graded at 30 % up to the land (as a generated river's are; the land past the edge follows its own).
+   */
+  const carved = (level: number) => {
+    const field = bakeLand(layout(plainWorld()), SIDE, SIDE);
+    for (let j = 45; j <= 74; j++) {
+      for (let i = 150; i < field.cols; i++) {
+        const k = j * field.cols + i;
+        const off = Math.max(0, Math.abs(j - 59.5) - 5) * LAND_CELL;
+        if (off === 0) [field.h[k], field.wl[k]] = [Math.min(field.h[k], level - 200), level];
+        else field.h[k] = Math.min(field.h[k], level - 200 + off * 30);
+      }
+    }
+    return field;
+  };
+  /** The steepest the ground rises (rise over run, either way) round (x, z), over 1 m. */
+  const steepness = (l: LandscapeLayout, x: number, z: number) => Math.hypot(l.ground(x + 0.5, z) - l.ground(x - 0.5, z), l.ground(x, z + 0.5) - l.ground(x, z - 0.5));
+  /** tan 35°: the steepest a valley's side may be. */
+  const LIMIT = Math.tan((35 * Math.PI) / 180);
+
+  test('a river at the sea\'s level: the channel widens out, the land beside it slopes back no steeper than 35°', () => {
+    const field = carved(SEA_CM);
+    const exits = landExits(field, EXIT_MOST);
+    expect(exits).toEqual([{ side: 1, at: 119, half: 10, sea: true, level: SEA_CM / 100 }]);
+    const drawn = layout(plainWorld());
+    drawn.setLand(field);
+    let steepest = 0;
+    for (let d = 4; d <= 300; d += 4) {
+      // (Across the river's way out and well beyond the valley's floor, either side.)
+      for (let a = -140 - d * 0.5; a <= 140 + d * 0.5; a += 3) steepest = Math.max(steepest, steepness(drawn, SIDE + d, 119 + a));
+      // Its water goes on, wider further out, under the sea's sheet.
+      expect(drawn.ground(SIDE + d, 119)).toBeLessThan(WATER_Y);
+      expect(drawn.waterEdge(SIDE + d, 119)).toBeGreaterThan(0);
+    }
+    expect(steepest).toBeLessThan(LIMIT);
+    const wet = (d: number) => [...Array(200).keys()].filter((k) => drawn.waterEdge(SIDE + d, 19 + k) > 0).length;
+    expect(wet(200)).toBeGreaterThan(wet(20) + 30);
+    // Beside the water a floor over the sea's level, not flooded; the hills come back further off.
+    expect(drawn.ground(SIDE + 150, 119 + 40)).toBeGreaterThan(WATER_Y + 0.3);
+    expect(drawn.ground(SIDE + 150, 119 + 40)).toBeLessThan(5);
+  });
+
+  test('a river above it (one drawn to the edge) ends behind its bank, the valley dry past it', () => {
+    const drawn = layout(plainWorld());
+    drawn.setLand(carved(50));
+    let steepest = 0;
+    for (let d = 4; d <= 300; d += 4) {
+      for (let a = -140 - d * 0.5; a <= 140 + d * 0.5; a += 3) steepest = Math.max(steepest, steepness(drawn, SIDE + d, 119 + a));
+      expect(drawn.ground(SIDE + d, 119)).toBeGreaterThanOrEqual(0.75 - 1e-6);
+      expect(drawn.waterEdge(SIDE + d, 119)).toBeLessThan(0);
+    }
+    expect(steepest).toBeLessThan(LIMIT);
+  });
+
+  test('a coast is no way out: the sea all round an island is left as it was', () => {
+    expect(landExits(bakeLand(layout(islandWorld()), SIDE, SIDE), EXIT_MOST)).toEqual([]);
   });
 });
 

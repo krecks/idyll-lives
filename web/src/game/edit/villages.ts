@@ -37,9 +37,13 @@
 
 import type { Content } from '../../content/content';
 import type { RoadPlan, TownArea } from '../../core/protocol';
+import { crossWater, DRAWN_SPAN, wetSpans, withoutDeck } from '../bridges';
 import { along, clearOfBoxes, CountryRouter, TRIES, type Cells, type Onward, type Port, type Way } from '../countryRouter';
 import { heightAt, type Land } from '../land';
-import { AREA_APART, cells8, cornersOf, hamletFits, hamletLots, hamletOf, parkingFor, putHamlet, type AreaPlan } from '../macro';
+import { wetTiles } from '../landEdit';
+import { rle, unrle } from '../landMasks';
+import { bridgeSites, dryPieces } from '../landPieces';
+import { AREA_APART, BRIDGE_IN, cells8, cornersOf, DECK_PAST, deckTiles, hamletFits, hamletLots, hamletOf, parkingFor, putHamlet, ROAD_WIDTH, type AreaPlan } from '../macro';
 import { mulberry32 } from '../noise';
 import { COURT, endDir, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, roadIndex, tangent, type Pt } from '../roads';
 import { boundsOf, frontageOf, LotPlacer, plotRect, type Facing, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';
@@ -78,6 +82,10 @@ const STEEP_FAULT = 1000;
 const STUB_PAST = 10;
 /** The fewest lots a hamlet has (`townCheck.ts`: a hamlet of fewer is a fault). */
 const FEWEST_LOTS = 4;
+/** A bridge to a village the water cuts off is the first that serves of so many crossings, the nearest first (`bridgeOver`). */
+const BRIDGE_TRIES = 12;
+/** A crossing's line is carried on this far (m) past its ends, onto the dry land `bridgeSites` finds there, so its deck may reach on over a dip (`bridgeOver`). */
+const BRIDGE_REACH = 12;
 
 const NOTHING: { lots: number[]; backdrop: number[] } = { lots: [], backdrop: [] };
 const r2 = (v: number) => Math.round(v * 100) / 100;
@@ -347,11 +355,12 @@ export function canMoveVillage(draft: NeighbourhoodDraft, t: Templates, area: nu
 
 /**
  * The country road on from port `q` to the network: as `CountryRouter.onward` lays one, but only to
- * a country road already laid out in the country (not a bridge), never to the world's edge (a road
- * out of the world from a village alone would be a network of its own). Null if there is none, or
- * every way is too steep.
+ * a country road already laid out in the country (not a bridge), or into one of `others` (a
+ * village's ports, head on: into its box only by them), never to the world's edge (a road out of
+ * the world from a village alone would be a network of its own). Null if there is none, or every
+ * way is too steep.
  */
-function toNetwork(router: CountryRouter, q: Port, blocked: Uint8Array): Onward | null {
+function toNetwork(router: CountryRouter, q: Port, blocked: Uint8Array, others: readonly Port[] = []): Onward | null {
   const { cells: land, roads } = router;
   const { gw, gd } = land;
   const plain = (p: Pt) => clearOfBoxes(router.areas, p, 30);
@@ -359,36 +368,49 @@ function toNetwork(router: CountryRouter, q: Port, blocked: Uint8Array): Onward 
   roads.forEach((r, i) => {
     if (r.kind === 'country' && !r.bridge && i !== q.road) r.points.forEach((p, j) => plain(p) && country.set(land.cell(p[0], p[1]), { road: i, t: tangent(r.points, j) }));
   });
-  if (!country.size) return null;
+  const portAt = new Map(others.map((x) => [land.cell(x.p[0] + x.dir[0] * 8, x.p[1] + x.dir[1] * 8), x]));
+  if (!country.size && !portAt.size) return null;
   const from: Way = { p: q.p, dir: q.dir, port: q };
   const inFront = (p: Pt) => q.dir[0] * (p[0] - q.p[0]) + q.dir[1] * (p[1] - q.p[1]) >= dist(p, q.p) * Math.cos(AHEAD);
   const banned = new Set<number>();
-  // A country road met square to it (give or take an eighth of a turn); what lies off to the side or behind the port costs more.
+  // A country road met square to it (give or take an eighth of a turn), a port head on; what lies off to the side or behind the port costs more.
   const goal = (i: number, h?: number) => {
+    if (banned.has(i)) return -1;
+    const port = portAt.get(i);
+    if (port) return router.into(port)(h) ? (inFront(land.centre(i)) ? 0 : ASIDE) : -1;
     const on = country.get(i);
-    if (banned.has(i) || !on || (h !== undefined && Math.abs(along(h, on.t)) >= 0.75)) return -1;
+    if (!on || (h !== undefined && Math.abs(along(h, on.t)) >= 0.75)) return -1;
     return inFront(land.centre(i)) ? 0 : ASIDE;
   };
-  // (Not over a lot, a building or a parking space: the generator lays its roads before them; by the port, as it may.)
-  const free = (cost: (i: number) => number) => (i: number) => (blocked[i] && dist(land.centre(i), q.p) > 12 ? Infinity : cost(i));
+  // (Not over a lot, a building or a parking space: the generator lays its roads before them; by the port, as it may. Into a village by its ports.)
+  const free = (cost: (i: number) => number) => (i: number) => (blocked[i] && dist(land.centre(i), q.p) > 12 ? Infinity : router.areaBlock[i] && others.some((x) => dist(land.centre(i), x.p) < 26) ? 1 : cost(i));
   const costs = [free(router.cost([q.p])), free(router.relaxed([q.p]))] as const;
   let made: Onward['made'] | null = null;
   for (let tries = 0; tries < TRIES && (!made || made.bad > 0); tries++) {
     const cells = router.route([from], goal, () => 0, undefined, costs)?.cells;
     const end = cells?.[cells.length - 1];
     if (!cells || end === undefined) break;
-    // Into the other road square to it, ending on its middle (met from the side the way comes from).
-    const other = country.get(end)!.road;
-    const c = cells.length >= 3 ? land.centre(cells[cells.length - 3]) : q.p;
-    const pts = roads[other].points;
-    const at = nearest(pts, c[0], c[1]);
-    const { p: T, t: tq } = pointAt(pts, at.s);
-    const n = leftOf(tq);
-    const b: Way = { p: T, dir: [n[0] * at.side, n[1] * at.side] };
-    const course = cells.slice(0, -1);
-    const road = router.road(from, course, b, ['join', 'join'], '');
+    const to = portAt.get(end);
+    let course = cells;
+    let b: Way;
+    let road: RoadPlan;
+    if (to) {
+      b = { p: to.p, dir: to.dir, port: to };
+      road = router.road(from, cells, b, ['join', 'join'], '');
+    } else {
+      // Into the other road square to it, ending on its middle (met from the side the way comes from).
+      const other = country.get(end)!.road;
+      const c = cells.length >= 3 ? land.centre(cells[cells.length - 3]) : q.p;
+      const pts = roads[other].points;
+      const at = nearest(pts, c[0], c[1]);
+      const { p: T, t: tq } = pointAt(pts, at.s);
+      const n = leftOf(tq);
+      b = { p: T, dir: [n[0] * at.side, n[1] * at.side] };
+      course = cells.slice(0, -1);
+      road = router.road(from, course, b, ['join', 'join'], '');
+    }
     const bad = router.fault(road) + (router.tooSteep(road.points) ? STEEP_FAULT : 0);
-    if (!made || bad < made.bad) made = { road, bad, cells: course, b, side: -1 };
+    if (!made || bad < made.bad) made = { road, ...(to ? { to } : {}), bad, cells: course, b, side: -1 };
     // (Not there again.)
     const [ex, ez] = [end % gw, Math.floor(end / gw)];
     for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) if (ex + dx >= 0 && ez + dz >= 0 && ex + dx < gw && ez + dz < gd) banned.add((ez + dz) * gw + ex + dx);
@@ -503,11 +525,13 @@ function capCourts(draft: NeighbourhoodDraft, roads: readonly RoadPlan[], from: 
 
 /**
  * A road laid from one of a village's ports (`ports`, in box `rect`, the village named `place`) to
- * the network (`toNetwork`), the port nearest a country road first, its pieces named; every port
- * then settled (`settlePort`). The router keeps out of `areas`' boxes (the village's among them).
- * Changes `roads` (added to; the ports' roads replaced). Whether a road was laid.
+ * the network (`toNetwork`), the port nearest a country road first, its pieces named; where none can
+ * be (the village on a piece of dry land the water cuts off), a bridge to it (`bridgeOver`); every
+ * port then settled (`settlePort`). The router keeps out of `areas`' boxes (the village's among
+ * them). Changes `roads` (added to; the ports' roads replaced). Whether a road was laid, and with a
+ * bridge, the walkers' water (`walk`, as it was before) with its deck dry.
  */
-function linkUp(draft: NeighbourhoodDraft, roads: RoadPlan[], areas: readonly Rect[], ports: readonly Port[], rect: Rect, place: string, taken: Set<string>, things: readonly Rect[]): boolean {
+function linkUp(draft: NeighbourhoodDraft, roads: RoadPlan[], areas: readonly Rect[], ports: readonly Port[], rect: Rect, place: string, taken: Set<string>, things: readonly Rect[], walk: () => Uint8Array): { laid: boolean; walk?: Uint8Array } {
   const cells = cellsFor(draft.open!.land!);
   const router = new CountryRouter(cells, areas.map((r) => ({ rect: r })), roads, specFor(draft));
   // The 8 m cells the lots, buildings and parking stand on, which a road keeps off.
@@ -532,8 +556,85 @@ function linkUp(draft: NeighbourhoodDraft, roads: RoadPlan[], areas: readonly Re
     laid = true;
     break;
   }
+  const bridged = laid ? null : bridgeOver(draft, roads, router, blocked, clashes, ports, rect, place, taken, things, walk);
   for (const q of ports) settlePort(roads, q, rect);
-  return laid;
+  return { laid: laid || !!bridged, ...(bridged ? { walk: bridged } : {}) };
+}
+
+/**
+ * Where no road can be routed from a village to the network, its piece of dry land cut off by the
+ * water (`landPieces.ts` `dryPieces`, over the router's cells): a bridge over the water to a piece a
+ * country road is on. Placed by hand, it is laid as a street drawn over the water is (`bridges.ts`
+ * `crossWater`: its deck `DRAWN_SPAN` m at most, not the generator's `BRIDGE_SPAN`, and reaching on
+ * over the dip a river lies in). Of the crossings (`bridgeSites`, square to both banks, their ends
+ * `BRIDGE_IN` m past the banks) from the village's piece to such a piece, the nearest the village
+ * and that piece's country roads first, `BRIDGE_TRIES` of them: the first that crosses one stretch
+ * of water (`wetSpans`) and may be bridged there (`crossWater`, on its line carried `BRIDGE_REACH` m
+ * on past either end: no road nor lot on it), with a country road from its far end to the network
+ * and from its near end into one of the village's `ports` (`toNetwork`), neither over one of
+ * `things` (`clashes`). Changes `roads` (the bridge and its roads added, named for `place`); the
+ * walkers' water (`walk`, as it was) with its deck dry (`deckTiles`), or null if no bridge was laid.
+ */
+function bridgeOver(draft: NeighbourhoodDraft, roads: RoadPlan[], router: CountryRouter, blocked: Uint8Array, clashes: (r: RoadPlan) => boolean, ports: readonly Port[], rect: Rect, place: string, taken: Set<string>, things: readonly Rect[], walk: () => Uint8Array): Uint8Array | null {
+  const land = draft.open?.land;
+  if (!land || !ports.length) return null;
+  const { width: W, depth: D } = draft;
+  const pieces = dryPieces(router.cells);
+  const own = pieces.of(middleOf(rect));
+  const country = roads.filter((r) => r.kind === 'country' && !r.bridge);
+  const reached = new Set(country.flatMap((r) => r.points.map((p) => pieces.of(p))));
+  if (own < 0 || !reached.size) return null;
+  const water = wetTiles(land, W, D);
+  const index = new RoadIndex(country);
+  const toRoad = (p: Pt) => index.nearest(p[0], p[1], 4000)?.dist ?? 4000;
+  const sites = bridgeSites(water, W, D, DRAWN_SPAN - 2 * DECK_PAST - 1)
+    .flatMap((s) => {
+      const a: Pt = [r2(s.a[0] - s.u[0] * BRIDGE_IN), r2(s.a[1] - s.u[1] * BRIDGE_IN)];
+      const b: Pt = [r2(s.b[0] + s.u[0] * BRIDGE_IN), r2(s.b[1] + s.u[1] * BRIDGE_IN)];
+      const [pa, pb] = [pieces.of(a), pieces.of(b)];
+      if (pa === own && pb !== own && reached.has(pb)) return [{ near: a, far: b }];
+      if (pb === own && pa !== own && reached.has(pa)) return [{ near: b, far: a }];
+      return [];
+    })
+    .map((s) => ({ ...s, score: offRect(rect, s.near) + toRoad(s.far) }))
+    .sort((x, y) => x.score - y.score);
+  for (const site of sites.slice(0, BRIDGE_TRIES)) {
+    const along: Pt = [(site.far[0] - site.near[0]) / dist(site.near, site.far), (site.far[1] - site.near[1]) / dist(site.near, site.far)];
+    const ends: [Pt, Pt] = [
+      [site.near[0] - along[0] * BRIDGE_REACH, site.near[1] - along[1] * BRIDGE_REACH],
+      [site.far[0] + along[0] * BRIDGE_REACH, site.far[1] + along[1] * BRIDGE_REACH],
+    ];
+    const line = evenly(ends, 1).map(([x, z]): Pt => [r2(x), r2(z)]);
+    const spans = wetSpans(line, water, W, D);
+    if (spans.length !== 1) continue;
+    const crossed = crossWater(line, ['join', 'join'], spans[0], { wet: water, W, D, roads, plots: things, land });
+    if (typeof crossed === 'string') continue;
+    const points = crossed.bridge;
+    const [near, far] = [points[0], points[points.length - 1]];
+    const at = roads.length;
+    const u: Pt = [(far[0] - near[0]) / dist(near, far), (far[1] - near[1]) / dist(near, far)];
+    const town = toNetwork(router, { road: at, end: 1, area: -1, p: far, dir: u, used: false }, blocked);
+    const home = town && toNetwork(router, { road: at, end: 0, area: -1, p: near, dir: [-u[0], -u[1]], used: false }, blocked, ports);
+    if (!town || !home) continue;
+    const ways = [router.layOnward(home).laid, router.layOnward(town).laid];
+    if (ways.some((laid) => laid.some(clashes))) continue;
+    const deck = crossed.fit.deck!;
+    const bridge: RoadPlan = { points, width: ROAD_WIDTH, ends: ['join', 'join'], kind: 'country', name: bridgeName(place, taken), bridge: [deck[0], deck[1]] };
+    const out = walk().slice();
+    deckTiles(bridge, deck, W, D, (tile) => (out[tile] = 0));
+    roads.push(bridge);
+    for (const laid of ways) for (const r of laid) roads.push({ ...r, name: roadName(place, taken) });
+    return out;
+  }
+  return null;
+}
+
+/** A name for a bridge to `place` nobody in town has ("Ashby Bridge", else "Ashby Old Bridge"), taken. */
+function bridgeName(place: string, taken: Set<string>): string {
+  let name = [`${place} Bridge`, `${place} Old Bridge`].find((n) => !taken.has(n));
+  for (let k = 2; !name; k++) if (!taken.has(`${place} Bridge ${k}`)) name = `${place} Bridge ${k}`;
+  taken.add(name);
+  return name;
 }
 
 // ---- placing ------------------------------------------------------------------------------------------
@@ -566,7 +667,7 @@ export function placeVillage(draft: NeighbourhoodDraft, t: Templates, content: C
     taken.add(streets[k]);
   });
   // Its road to the network, and its ways out nobody took ended inside its box.
-  const linked = linkUp(draft, roads, [...open.areas.map(rectOf), plan.rect], plan.ports, plan.rect, plan.name, taken, thingsOf(draft, t));
+  const linked = linkUp(draft, roads, [...open.areas.map(rectOf), plan.rect], plan.ports, plan.rect, plan.name, taken, thingsOf(draft, t), () => unrle(open.water, W * D));
   // Its lots, as the generator puts a hamlet's: along its own streets, off the corners, nearest its middle first.
   const greens = [...draft.greens, ...plan.greens.map((g) => g.map(([x, z]): Pt => [r2(x), r2(z)]))];
   const laid: NeighbourhoodDraft = { ...draft, roads, greens };
@@ -589,10 +690,10 @@ export function placeVillage(draft: NeighbourhoodDraft, t: Templates, content: C
     parking.push({ x: r.x + r.w / 2, z: r.z + r.d / 2, rot: facing, area: a });
   }
   const area: TownArea = { name: plan.name, kind: 'hamlet', x: plan.rect.x, z: plan.rect.z, w: plan.rect.w, d: plan.rect.d };
-  let next: NeighbourhoodDraft = { ...laid, slots: [...draft.slots, ...slots], open: { ...open, areas: [...open.areas, area], parking: [...open.parking, ...parking] } };
+  let next: NeighbourhoodDraft = { ...laid, slots: [...draft.slots, ...slots], open: { ...open, areas: [...open.areas, area], parking: [...open.parking, ...parking], ...(linked.walk ? { water: rle(linked.walk) } : {}) } };
   for (const s of slots) if (s.kind !== 'house') next = withLotPlace(next, t, content, s.index);
   next = renumber(next, t, plan.roads);
-  const notes = linked && reaches(next.roads, plan.roads) ? [] : [`no road could be found to ${plan.name}: draw one to it`];
+  const notes = linked.laid && reaches(next.roads, plan.roads) ? [] : [`no road could be found to ${plan.name}: draw one to it`];
   return { draft: next, cleared: NOTHING, ...(notes.length ? { notes } : {}) };
 }
 
@@ -746,6 +847,23 @@ function courtPast(roads: readonly RoadPlan[], i: number, end: 0 | 1): number {
   return ls[ls.length - 1] - Math.max(0, ...meetings(roads, i, end));
 }
 
+/**
+ * The walkers' water (`open.water`) with the tiles under the decks of `draft`'s roads `gone` (those
+ * that are bridges) wet again where the land's water is (`bridges.ts` `withoutDeck`); null if none
+ * of them is a bridge.
+ */
+function withoutDecks(draft: NeighbourhoodDraft, gone: readonly number[]): Uint8Array | null {
+  const open = draft.open;
+  const bridges = gone.filter((i) => draft.roads[i].bridge);
+  if (!open?.land || !bridges.length) return null;
+  const { width: W, depth: D } = draft;
+  const water = wetTiles(open.land, W, D);
+  const wetAt = (x: number, z: number) => water[Math.floor(z) * W + Math.floor(x)] === 1;
+  let walk = unrle(open.water, W * D);
+  for (const i of bridges) walk = withoutDeck(draft.roads[i], walk, wetAt, W, D);
+  return walk;
+}
+
 // ---- moving -------------------------------------------------------------------------------------------
 
 /**
@@ -841,10 +959,14 @@ export function moveVillage(draft: NeighbourhoodDraft, t: Templates, area: numbe
   const roads = left.roads;
   const notes = left.notes;
   const ownAt = own.map((i) => left.from.indexOf(i));
+  // (The water under a bridge taken up is water again.)
+  let walk = withoutDecks(draft, draft.roads.flatMap((_, i) => (left.from.includes(i) ? [] : [i])));
   // Its road to the network, from where its streets were met.
   const ports = portsOf(roads, ownAt, own.map((i) => draft.roads[i]), rect, area);
   const areas = open.areas.map((a, k) => (k === area ? rect : rectOf(a)));
-  const linked = ports.length > 0 && linkUp(draft, roads, areas, ports, rect, name, namesIn({ ...draft, roads }), thingsOf(draft, t, parts));
+  const link = ports.length > 0 ? linkUp(draft, roads, areas, ports, rect, name, namesIn({ ...draft, roads }), thingsOf(draft, t, parts), () => walk ?? unrle(open.water, draft.width * draft.depth)) : { laid: false };
+  const linked = link.laid;
+  if (link.walk) walk = link.walk;
   // The other areas' streets and lanes it leaves ending where it was, held to a court's length (once
   // its new road is down: that may meet one again); the buildings and parking by a stretch cut off go.
   const capped = capCourts(draft, roads, left.from, lotsOnOf(draft, t, parts.lots), name, area, `with ${name} moved`);
@@ -862,7 +984,7 @@ export function moveVillage(draft: NeighbourhoodDraft, t: Templates, area: numbe
     roads: deadEnds(capped.roads),
     slots,
     greens,
-    open: { ...open, areas: open.areas.map((a, k) => (k === area ? { ...a, x: rect.x, z: rect.z } : a)), zones, pads, parking: parking.filter((p) => !byCut(p.x, p.z, 10)), ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...gentleWithout(open, open.areas[area]) },
+    open: { ...open, areas: open.areas.map((a, k) => (k === area ? { ...a, x: rect.x, z: rect.z } : a)), zones, pads, parking: parking.filter((p) => !byCut(p.x, p.z, 10)), ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...gentleWithout(open, open.areas[area]), ...(walk ? { water: rle(walk) } : {}) },
   };
   if (cut.size) next = removeLots(next, new Set(), cut);
   if (!linked || !reaches(next.roads, ownAt)) notes.push(`no road could be found to ${name}: draw one to it`);
@@ -936,11 +1058,13 @@ function removeOnce(draft: NeighbourhoodDraft, t: Templates, area: number): Edit
   const backdrop = new Set(parts.backdrop);
   (open.backdrop ?? []).forEach((b, i) => (b.area === area || byGone(...middleOfPoly(b.poly), 40) || byCut(...middleOfPoly(b.poly), 40)) && backdrop.add(i));
   const parking = new Set(open.parking.flatMap((p, i) => (parts.parking.has(i) || byGone(p.x, p.z, 10) || byCut(p.x, p.z, 10) ? [i] : [])));
+  // (The water under a bridge that goes is water again.)
+  const walk = withoutDecks(draft, [...gone]);
   let next: NeighbourhoodDraft = {
     ...draft,
     roads: capped.roads,
     greens: draft.greens.filter((_, i) => !parts.greens.has(i)),
-    open: { ...open, parking: open.parking.filter((_, i) => !parking.has(i)), zones: open.zones.filter((_, i) => !parts.orchards.has(i)) },
+    open: { ...open, parking: open.parking.filter((_, i) => !parking.has(i)), zones: open.zones.filter((_, i) => !parts.orchards.has(i)), ...(walk ? { water: rle(walk) } : {}) },
   };
   next = removeArea(removeLots(next, lots, backdrop), area);
   const cleared = { lots: [...lots].sort((a, b) => a - b), backdrop: [...backdrop].sort((a, b) => a - b) };

@@ -1,7 +1,8 @@
 // The land first, then the town on it (the `land` and `town` jobs, `townJobs.ts`; `macro.ts` `landDraft`, `layOn`):
 // a town laid on every place's bare land, one road network with no lot in the water, the land's plan and name
 // carried; a new world (`generateWorld`) is that land and that town; a river kept as planned bridged, one
-// painted over not; the land as step 1 left it, and its level, kept away from the town (no jump in height
+// painted over bridged to the villages across it, a river cross a village on every quarter (none with no villages),
+// a city too big for any quarter told so; the land as step 1 left it, and its level, kept away from the town (no jump in height
 // between the steps); and a land the player shaped still taking a town, its town file carrying that land. `SLOW_TESTS=1 bun test tests/landFirst.slow.test.ts`.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
@@ -47,6 +48,7 @@ describe('the land first, then the town', async () => {
   const { unrle } = await import('../src/game/landMasks');
   const { decodeLand, LAND_CELL, landHash } = await import('../src/game/land');
   const { WORLD_KINDS } = await import('../src/game/world');
+  const { editedProblems } = await import('../src/game/edit/checked');
   type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
   type TownResult = import('../src/game/townJobs').TownResult;
@@ -115,7 +117,7 @@ describe('the land first, then the town', async () => {
     expect(JSON.stringify(other.slots)).not.toBe(JSON.stringify(laid.draft.slots));
   }, 300_000);
 
-  test('a river kept as planned is bridged; one painted over is not', () => {
+  test('a river kept as planned is bridged; one painted over is bridged to the villages across it', () => {
     const land = landOf('river', 7, { town: 'village', villages: 'few' });
     const kept = townOn(land).draft;
     const decks = (d: NeighbourhoodDraft) => d.roads.filter((r) => r.bridge && r.bridge[1] > r.bridge[0]);
@@ -124,10 +126,61 @@ describe('the land first, then the town', async () => {
     expect(kept.diagnostics?.roads ?? []).toEqual([]);
     // (The town's own bridge, from its waterfront street.)
     expect(decks(kept).some((r) => r.name === `${kept.name} Bridge`)).toBe(true);
-    // Its water changed (not as planned): no bridge, the town on the largest piece of dry land.
+    // Its water changed (not as planned): the town on a piece of dry land, a village on the other
+    // bank, and a bridge of the generator's length at most to it.
     const changed = townOn(land, { waterKept: false }).draft;
-    expect(decks(changed)).toEqual([]);
+    expect(decks(changed).length).toBeGreaterThan(0);
+    for (const r of decks(changed)) expect(r.bridge![1] - r.bridge![0], r.name).toBeLessThanOrEqual(45);
     expect(faults(changed)).toEqual([]);
+    expect(changed.diagnostics?.roads ?? []).toEqual([]);
+  }, 300_000);
+
+  /** `land` with a river cross carved into it: two rivers 30 m across through its middle, their banks wavering a few metres as a painted one's do. */
+  const crossed = (land: NeighbourhoodDraft): NeighbourhoodDraft => {
+    const was = land.open!.land!;
+    const shaped = { ...was, h: was.h.slice(), wl: was.wl.slice(), cover: was.cover.slice(), edited: true };
+    const W = land.width;
+    for (let j = 0; j < shaped.rows; j++) {
+      for (let i = 0; i < shaped.cols; i++) {
+        const [x, z] = [i * LAND_CELL, j * LAND_CELL];
+        if (Math.abs(x - W / 2 + 3 * Math.sin(z / 8)) >= 15 && Math.abs(z - W / 2 + 3 * Math.sin(x / 8)) >= 15) continue;
+        const k = j * shaped.cols + i;
+        shaped.h[k] = Math.min(shaped.h[k], -150);
+        shaped.wl[k] = -40;
+      }
+    }
+    return { ...land, open: { ...land.open!, land: shaped } };
+  };
+  const quarterOf = (draft: NeighbourhoodDraft, a: { x: number; z: number; w: number; d: number }) => (a.x + a.w / 2 < draft.width / 2 ? 0 : 1) + (a.z + a.d / 2 < draft.depth / 2 ? 0 : 2);
+
+  test('a river cross painted on a large land: a village on every quarter, bridged to the town', () => {
+    const land = crossed(landOf('heath', 5, { size: 'large', town: 'village', villages: 'few' }));
+    const { draft } = townOn(land, { waterKept: false });
+    const areas = draft.open!.areas;
+    expect(new Set(areas.map((a) => quarterOf(draft, a))).size).toBe(4);
+    expect(draft.diagnostics?.pieces).toBeUndefined();
+    const decks = draft.roads.filter((r) => r.bridge && r.bridge[1] > r.bridge[0]);
+    expect(decks.length).toBeGreaterThanOrEqual(3);
+    for (const r of decks) expect(r.bridge![1] - r.bridge![0], r.name).toBeLessThanOrEqual(45);
+    expect(faults(draft)).toEqual([]);
+    expect(draft.diagnostics?.roads ?? []).toEqual([]);
+    expect(editedProblems(draft, t, content).hard.filter((line) => /bridge|deck|network/.test(line))).toEqual([]);
+    // The same land and seed, the same town.
+    expect(JSON.stringify(townOn(land, { waterKept: false }).draft)).toBe(JSON.stringify(draft));
+    // A site asked for on another quarter: the town goes there.
+    const W = draft.width;
+    const moved = townOn(land, { waterKept: false, site: [W * 0.25, W * 0.25] }).draft;
+    expect(quarterOf(moved, moved.open!.areas[0])).toBe(0);
+    expect(faults(moved)).toEqual([]);
+  }, 300_000);
+
+  test('a river cross with no villages: the town alone, no bridge; a city too big for any quarter is told so', () => {
+    const alone = townOn(crossed(landOf('heath', 5, { size: 'large', town: 'village', villages: 'none' })), { waterKept: false }).draft;
+    expect(alone.open!.areas.length).toBe(1);
+    expect(alone.roads.some((r) => r.bridge && r.bridge[1] > r.bridge[0])).toBe(false);
+    expect(faults(alone)).toEqual([]);
+    const city = crossed(landOf('heath', 5, { size: 'medium', town: 'city', villages: 'few' }));
+    expect(() => townOn(city, { waterKept: false })).toThrow(/^There is no dry land big enough for the town: it needs \d+ × \d+ m in one piece\.$/);
   }, 300_000);
 
   test('the land kept as step 1 left it, and its level: no jump in height between the steps', () => {

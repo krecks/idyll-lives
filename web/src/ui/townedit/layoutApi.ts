@@ -30,6 +30,35 @@ function setUses(draft: NeighbourhoodDraft, layer: UseLayer): NeighbourhoodDraft
   return { ...draft, open: { ...draft.open, uses: layer } };
 }
 
+/** Each plan's zones as drawn (`shownUses`), kept per uses layer and roads. */
+const shown = new WeakMap<UseLayer, WeakMap<readonly object[], UseLayer>>();
+
+/**
+ * `draft`'s zones as the overlay draws them: none on a road (nor on the water, `noUseCells`), as Build puts nothing
+ * there. A street drawn across zones leaves the cells under it painted (taken off it, it gives them back), and they
+ * were drawn over its asphalt, a homes zone's orange tinting it brown. Null: no zones.
+ */
+export function shownUses(draft: NeighbourhoodDraft): UseLayer | null {
+  const layer = draft.open?.uses;
+  if (!layer) return null;
+  let byRoads = shown.get(layer);
+  if (!byRoads) shown.set(layer, (byRoads = new WeakMap()));
+  let out = byRoads.get(draft.roads);
+  if (!out) {
+    const codes = unpackUses(layer);
+    const none = noUseCells(draft);
+    let off = false;
+    for (let k = 0; k < codes.length; k++) if (codes[k] && none[k]) off = true;
+    if (off) {
+      const kept = codes.slice();
+      for (let k = 0; k < kept.length; k++) if (none[k]) kept[k] = 0;
+      out = packUses(kept, layer.cols, layer.rows);
+    } else out = layer;
+    byRoads.set(draft.roads, out);
+  }
+  return out;
+}
+
 /** The summary in a line: "Homes ≈ 84 · Shops ≈ 12 · Parks 3 · Public 5". */
 export function summaryLine(s: UsesSummary): string {
   return `Homes ≈ ${s.homes} · Shops ≈ ${s.shops} · Parks ${s.parks} · Public ${s.public}`;

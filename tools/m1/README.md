@@ -1,9 +1,9 @@
 # The M1 estimate
 
 The game's floor is an 8 GB Apple M1 (2020). This estimates how fast the simulation runs on one,
-from a faster Mac (an M3 Pro), and whether it keeps up with 10×, the fastest speed the player
-picks at any hour: 10 ticks a step, 60 steps a second, so 600 ticks a second. (Super speed, in
-quiet hours only, runs as fast as the machine can.)
+from a faster Mac (an M3 Pro), and whether it keeps up with 10×, the fastest fixed speed: 10
+ticks a step, 60 steps a second, so 600 ticks a second. (Super speed has no rate to keep up with:
+it runs as fast as the machine can, up to 30×, and up to 60× in quiet hours.)
 
     tools/m1/run.sh
 

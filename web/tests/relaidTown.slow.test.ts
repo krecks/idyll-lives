@@ -1,6 +1,6 @@
 // "Lay the town again" (`macro.ts` `generateFromSpec`'s `shaped`, step 1): a lake painted over a world's main
 // town, the town laid again on that land, gives one road network as the sim joins its roads, no lot or road
-// in the water, no bridge over a river that is no longer the place's, the areas on the one piece of dry land,
+// in the water, a bridge no longer than the generator's over a river that is now the land's to the villages across it,
 // and the world keeps its name and its main town's shape; the draft carries the land (graded flat under the
 // town) and its water and zones come from it. Unshaped worlds are as they were (the classic and world-option
 // goldens). `SLOW_TESTS=1 bun test tests/relaidTown.slow.test.ts`.
@@ -44,6 +44,7 @@ describe('the town laid again on a shaped land', async () => {
   const { LandEditor, surveyDraft, wetTile } = await import('../src/game/landEdit');
   const { unrle } = await import('../src/game/landMasks');
   const { LAND_CELL } = await import('../src/game/land');
+  const { deckTiles } = await import('../src/game/macro');
   type Templates = import('../src/game/town').Templates;
   type WorldOptions = import('../src/game/world').WorldOptions;
   const content = await Content.load('http://localhost/content/base.json');
@@ -82,8 +83,10 @@ describe('the town laid again on a shaped land', async () => {
         expect(homes(relaid)).toBeGreaterThan(homes(draft) * 0.6);
         // One road network.
         expect(networks(relaid.roads), `${tag}: networks`).toBe(1);
-        // No bridge (the river is the land's now, and no bridge is laid over it).
-        expect(relaid.roads.some((r) => r.bridge && r.bridge[1] > r.bridge[0]), `${tag}: bridges`).toBe(false);
+        // The river is the land's now: a bridge over it to the villages across it, no longer than the generator's.
+        const decks = relaid.roads.filter((r) => r.bridge && r.bridge[1] > r.bridge[0]);
+        if (kind === 'river') expect(decks.length, `${tag}: bridges`).toBeGreaterThan(0);
+        for (const r of decks) expect(r.bridge![1] - r.bridge![0], `${tag}: ${r.name}`).toBeLessThanOrEqual(45);
         // No lot, and no road, in the water; the sim's water is the land's.
         const shaped = relaid.open!.land!;
         expect(shaped.edited).toBe(true);
@@ -94,8 +97,11 @@ describe('the town laid again on a shaped land', async () => {
           for (let z = r.z; z < r.z + r.d; z++) for (let x = r.x; x < r.x + r.w; x++) expect(water[z * W + x], `${tag}: ${s.name} in the water`).toBe(0);
         }
         for (const r of relaid.roads) for (const [x, z] of r.points) if (x >= 0 && z >= 0 && x < W && z < relaid.depth) expect(water[Math.floor(z) * W + Math.floor(x)], `${tag}: ${r.name} in the water`).toBe(0);
+        // (But under the decks, walked dry.)
+        const deck = new Set<number>();
+        for (const r of decks) deckTiles(r, r.bridge!, W, relaid.depth, (tile) => deck.add(tile));
         let wet = 0;
-        for (let z = 0; z < relaid.depth; z += 4) for (let x = 0; x < W; x += 4) if (wetTile(shaped, x, z) !== !!water[z * W + x]) wet++;
+        for (let z = 0; z < relaid.depth; z += 4) for (let x = 0; x < W; x += 4) if (!deck.has(z * W + x) && wetTile(shaped, x, z) !== !!water[z * W + x]) wet++;
         expect(wet).toBe(0);
         // The lake is a water zone; the land is flat under the lots.
         expect(relaid.open!.zones.some((z) => z.kind === 'water')).toBe(true);
