@@ -1,15 +1,46 @@
 //! The kids' things. Notes: tools/art/blender/families/kids.md.
 //!
-//! Being ported: the kids' chair is built here; the family's other models are still
-//! tools/art/blender/families/kids.py's (`cargo art kids` builds them all in Blender until that script goes;
-//! `--out` and `--check` build what is here).
+//! KD1 baby and kids' beds: the crib with its changing table (`model.crib`), the kids' bed (`model.kidsBed`), the race
+//!   car bed (`model.kidsBedCar`) and the high chair (`model.highChair`).
+//! KD2 toys: the toy box and toy chest, the doll house, the rocking horse, the play tent, the ball pit, the train
+//!   table, the play mat, the giant teddy bear and the kids' bean bag.
+//! KD3 kids' study and art: the kids' desk, table and chair, the picture-book shelf, the chalkboard easel and the
+//!   kids' easel.
+//!
+//! Each is built where the game places it (`F`, game axes: x, height, depth; front +depth), then stood on the floor
+//! (`common::place`, `centre` on its `Model`), so seats, mattresses and wall backs stay where the game puts
+//! residents. Seat and mattress heights are the renderer's (characters.ts `SEATS`, `BEDS`; the content's `surface`
+//! and `seat`).
+//!
+//! Built with the forms: mattresses, pillows, duvets and cushions are soft boxes, frames and rails one swept piece,
+//! shaped boards (the car's sides, arched headboards and ends, the doll house's windows, the toy box's lid) extruded
+//! outlines with their cut-outs, turned parts revolved, round bodies (the horse, the teddy, the bean bag, the tent's
+//! canvas) lofted.
+//!
+//! Being ported: `--out` and `--check` build what is here; `cargo art kids` builds the family in Blender until
+//! tools/art/blender/families/kids.py goes.
 
 use artkit::family::{Family, Model};
+use artkit::json;
 use artkit::palette;
 use artkit::place::GameFrame;
 
+mod beds;
+mod boxes;
+mod chair;
 mod common;
-mod study;
+mod crib;
+mod desk;
+mod doll;
+mod easels;
+mod horse;
+mod kit;
+mod mat;
+mod pit;
+mod plush;
+mod shelf;
+mod tent;
+mod train;
 
 palette! { M:
     // toys' colours, shared
@@ -147,15 +178,117 @@ const F: GameFrame = GameFrame::new(0.0);
 
 /// The family, as far as it is built here.
 pub fn family() -> Option<Family> {
+    let turn_down = || json!({"uses": {"sleep": "turn_down", "nap": "turn_down"}});
+    // open while the child plays (the toys are out), shut when they're done
+    let lid = || json!({"uses": {"play": "lid_open"}});
     Some(Family::new(
         "kids",
         M.palette(),
         vec![
+            // KD1
+            Model::new("crib", crib::crib, (1.935, 1.008, 0.69))
+                .key("model.crib")
+                .centre(-0.0125, -0.095)
+                // the mobile turns for an awake baby, while someone plays with them; not all night
+                .motions(json!({"uses": {"feed": "side_down", "change": "side_down", "cuddle": "side_down"},
+                                "loops": {"play": "mobile"}}))
+                .paint(&[("crib", "Frame"), ("crib_bedding", "Bedding"), ("mobile", "Mobile")]),
+            Model::new("kidsBed", beds::kids_bed, (0.97, 0.764, 1.88))
+                .key("model.kidsBed")
+                .centre(0.005, 0.01)
+                .motions(turn_down())
+                .paint(&[("kids_frame", "Frame"), ("kids_bedding", "Bedding")]),
+            Model::new("kidsBedCar", beds::kids_bed_car, (0.985, 0.775, 1.916))
+                .key("model.kidsBedCar")
+                .centre(0.0, 0.028)
+                .motions(turn_down())
+                .paint(&[("car", "Car body"), ("car_bedding", "Bedding")]),
+            Model::new("highChair", chair::high_chair, (0.533, 0.945, 0.554))
+                .key("model.highChair")
+                .centre(0.0, 0.06)
+                .motions(json!({"uses": {"sit": {"clip": "tray_out", "hold": 1.0, "out": 1.2}}}))
+                .paint(&[("chair_white", "Frame"), ("chair_cushion", "Bedding")]),
+            // KD2
+            // its own size: the blocks left out in front of it are drawn with it, not measured (the box is 0.5 m deep)
+            Model::new("toyBox", boxes::toy_box, (0.82, 0.51, 0.518))
+                .key("model.toyBox")
+                .centre(0.0, -0.0389)
+                .motions(lid())
+                .paint(&[("toybox", "Body"), ("toybox_lid", "Lid")]),
+            Model::new("toyChest", boxes::toy_chest, (0.846, 0.534, 0.513))
+                .key("model.toyChest")
+                .centre(0.0, -0.1735)
+                .motions(lid())
+                .paint(&[("chest", "Body"), ("chest_trim", "Trim")]),
+            Model::new("dollHouse", doll::doll_house, (0.84, 0.908, 0.456))
+                .key("model.dollHouse")
+                .centre(0.0, -0.202)
+                .motions(json!({"uses": {"dolls": "front_open"}}))
+                .paint(&[("house", "Walls"), ("roof", "Roof")]),
+            Model::new("rockingHorse", horse::rocking_horse, (0.289, 0.825, 0.877))
+                .key("model.rockingHorse")
+                .centre(0.0, 0.0426)
+                .motions(json!({"loops": {"ride": "rock"}, "ride": "rock"}))
+                .paint(&[("horse", "Body"), ("saddle", "Trim")]),
+            Model::new("playTent", tent::play_tent, (0.952, 1.574, 0.827))
+                .key("model.playTent")
+                .centre(0.0, 0.0)
+                .motions(json!({"uses": {"play": "flap_open"}}))
+                .paint(&[("canvas", "Canvas"), ("poles", "Poles")]),
+            Model::new("ballPit", pit::ball_pit, (0.93, 0.47, 0.93))
+                .key("model.ballPit")
+                .centre(0.0, 0.035)
+                .motions(json!({"loops": {"jump": "bounce"}}))
+                .paint(&[("pit", "Pit"), ("pit_rim", "Rim")]),
+            Model::new("trainTable", train::train_table, (1.24, 0.68, 0.84))
+                .key("model.trainTable")
+                .centre(0.0, 0.0)
+                .motions(json!({"loops": {"trains": "train"}}))
+                .paint(&[("train_table", "Table"), ("train", "Train")]),
+            Model::new("playMat", mat::play_mat, (0.92, 0.204, 0.92))
+                .key("model.playMat")
+                .centre(0.0, 0.03)
+                .motions(json!({"uses": {"blocks": "blocks"}}))
+                .paint(&[("mat", "Mat")]),
+            Model::new("teddyBear", plush::teddy_bear, (0.635, 0.912, 0.575))
+                .key("model.teddyBear")
+                .centre(0.0, 0.0575)
+                .motions(json!({"uses": {"hug": "squish"}}))
+                .paint(&[("fur", "Fur"), ("bow", "Bow")]),
+            Model::new("beanBagKids", plush::bean_bag_kids, (0.62, 0.528, 0.645))
+                .key("model.beanBagKids")
+                .centre(0.0, 0.0187)
+                .motions(json!({"uses": {"flop": "squash"}}))
+                .paint(&[("bag", "Bag")]),
             // KD3
-            Model::new("kidsChair", study::kids_chair, (0.32, 0.57, 0.323))
+            Model::new("kidsDesk", desk::kids_desk, (0.76, 0.691, 0.82))
+                .key("model.kidsDesk")
+                .centre(0.0, 0.01)
+                .motions(json!({"uses": {"homework": "drawer_open", "drawing": "drawer_open"}, "hold": 2}))
+                .paint(&[("kdesk", "Frame"), ("kdesk_top", "Top"), ("kdesk_chair", "Chair")]),
+            Model::new("kidsTable", desk::kids_table, (0.64, 0.5, 0.64))
+                .key("model.kidsTable")
+                .centre(0.0, 0.0)
+                .paint(&[("ktable", "Frame"), ("ktable_top", "Top")]),
+            Model::new("kidsChair", desk::kids_chair, (0.32, 0.57, 0.323))
                 .key("model.kidsChair")
                 .centre(0.0, 0.0386)
                 .paint(&[("kchair", "Frame"), ("kchair_seat", "Seat")]),
+            Model::new("kidsBookshelf", shelf::kids_bookshelf, (0.77, 0.925, 0.4))
+                .key("model.kidsBookshelf")
+                .centre(0.0, -0.23)
+                .motions(json!({"uses": {"read": "book_out"}}))
+                .paint(&[("kshelf", "Frame"), ("kshelf_top", "Top")]),
+            Model::new("kidsChalkboard", easels::kids_chalkboard, (0.66, 0.956, 0.528))
+                .key("model.kidsChalkboard")
+                .centre(0.0, 0.0259)
+                .motions(json!({"uses": {"draw": "drawing"}}))
+                .paint(&[("chalk_frame", "Frame"), ("slate", "Board")]),
+            Model::new("kidsEasel", easels::kids_easel, (0.66, 1.208, 0.634))
+                .key("model.kidsEasel")
+                .centre(0.0, 0.0)
+                .motions(json!({"uses": {"paint": "painting"}}))
+                .paint(&[("easel", "Easel")]),
         ],
         "Blender-built kids' things (tools/art/blender/families/kids.py): the crib, the beds and the \
          high chair, the toys, and the kids' study and art things. Listed in the base manifest's \
