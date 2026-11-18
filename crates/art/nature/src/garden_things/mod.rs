@@ -2,7 +2,7 @@
 //! planter box (`model.planterBox`), the birdhouse (`model.birdhouse`), the bird feeders
 //! (`model.birdFeederPole`), the dog house (`model.dogHouse`), the sundial (`model.sundial`), the stepping stones
 //! (`model.steppingStones`), the garden lamp post (`model.lampPost`) and the string lights
-//! (`model.stringLights`). Notes: tools/art/blender/families/garden_things.md.
+//! (`model.stringLights`). Notes: NOTES.md.
 //!
 //! Each is built in game axes (`F`) where the game places it. The pond's water is opaque `gloss`, as the
 //! fountains'; its ripples spread all the time near the camera (`ripple`, ambient) and a koi comes up out of it to
@@ -10,10 +10,6 @@
 //! planter box's leaves are on `foliage`, which the nature shader sways and tints. The lamp post's panes and the
 //! string lights' bulbs glow at night (E8), each bulb near its content `light.height`; the string sways (`sway`,
 //! ambient). The planter box and the lamp post have far versions (the town overview). The rest are still.
-//!
-//! Being ported: every model is built here, but the family is still tools/art/blender/families/garden_things.py's
-//! (`cargo art garden_things` builds it in Blender until that script goes; `--out` and `--check` build what is
-//! here): the lamp post's far version is Blender's decimation of it, which the kernel can't make yet.
 //!
 //! Run:  cargo art garden_things [--only sundial] [--preview]
 
@@ -110,6 +106,7 @@ pub fn family() -> Option<Family> {
              and the string sways near the camera (`sway`, ambient). The planter box and the lamp post \
              have far versions.",
         )
-        .pack("garden_things"),
+        .pack("garden_things")
+        .switched(),
     )
 }
