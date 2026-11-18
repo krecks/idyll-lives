@@ -27,7 +27,7 @@
  */
 
 import type * as pc from '../engine';
-import type { Language } from './chunks';
+import type { Language, ShaderFeature } from './chunks';
 
 /** The lines of `fogPS` replaced: the fragment's distance, and the exponential-squared factor. */
 export const FOG_ANCHORS = {
@@ -136,3 +136,35 @@ const veilTold = new WeakMap<pc.GraphicsDevice, { cx: number; cz: number; hx: nu
 /** The arrays the veil's uniforms are set from, a pair a device (`setLandVeil`). */
 const veilRects = new WeakMap<pc.GraphicsDevice, Float32Array>();
 const veilFades = new WeakMap<pc.GraphicsDevice, Float32Array>();
+
+/**
+ * What stands in the veil sinks into the land as it fades (`GAME_VEIL_SINK`, instanced draws: the woods' trees and
+ * bushes, the far crowns): each copy scaled down about its foot by the veil where it stands (`setLandVeil`: its x and
+ * z, and how far it is from the eye, as `fogPS` has it), gone where the veil is whole. The haze takes a thing and the
+ * ground under it alike, so a dark crown on a pale field kept its share of their difference whatever the haze:
+ * halfway into the veil the woods stood as dark domes on a ground gone to haze. Not in the shadow pass (the sun's map
+ * is drawn again only when something in it changes).
+ */
+function veilSinkCode(lang: Language): ShaderFeature['glsl'] {
+  const glsl = lang === 'glsl';
+  const u = (n: string) => (glsl ? n : `uniform.${n}`);
+  const [v2, v4, decl] = glsl ? ['vec2', 'vec4', 'float'] : ['vec2f', 'vec4f', 'let'];
+  return {
+    vsDecl: glsl
+      ? '\n#ifdef GAME_VEIL_SINK\n\tuniform vec4 game_landVeil;\n\tuniform vec4 game_veilFade;\n\tuniform vec3 view_position;\n#endif\n'
+      : '\n#ifdef GAME_VEIL_SINK\n\tuniform game_landVeil: vec4f;\n\tuniform game_veilFade: vec4f;\n\tuniform view_position: vec3f;\n#endif\n',
+    vsLocal: `
+#if defined(GAME_VEIL_SINK) && defined(INSTANCING) && !defined(SHADOW_PASS)
+	// (Nothing to work out without a veil, as the game nearly always is.)
+	if (${u('game_veilFade')}.y > 0.0) {
+		${glsl ? 'vec3' : 'let'} sinkAt = (${u('matrix_model')} * ${v4}(instance_line4.xyz, 1.0)).xyz;
+		${decl} sinkOut = length(max(abs(sinkAt.xz - ${u('game_landVeil')}.xy) - ${u('game_landVeil')}.zw, ${v2}(0.0)));
+		${decl} sinkLeft = 1.0 - ${u('game_veilFade')}.y * smoothstep(0.0, ${u('game_veilFade')}.x, sinkOut) * smoothstep(0.0, ${u('game_veilFade')}.z, distance(sinkAt, ${u('view_position')}));
+		localPos = localPos * (sinkLeft * sinkLeft);
+	}
+#endif`,
+  };
+}
+
+/** The veil's sinking (`veilSinkCode`), after the plants' wind (`nature.ts`, 230). */
+export const VEIL_SINK: ShaderFeature = { name: 'veilSink', priority: 239, glsl: veilSinkCode('glsl'), wgsl: veilSinkCode('wgsl') };

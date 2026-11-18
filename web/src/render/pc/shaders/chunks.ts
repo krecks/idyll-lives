@@ -55,7 +55,7 @@ import { CUTOUT } from './cutout';
 import { DIAG_VIEW } from './diagView';
 import { gameNormalMap } from './bump';
 import { gameFresnel, gameReflection } from './envBrdf';
-import { gameFog, setFogFrom, setLandVeil } from './fog';
+import { gameFog, setFogFrom, setLandVeil, VEIL_SINK } from './fog';
 import { CONTACT_DIRECT, SOFT_LOOK } from './softLook';
 import { ROOM_LIGHT_CODE, ROOM_LIGHT_ROOMS, ROOM_LIGHTS } from './roomLights';
 import { PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
@@ -138,7 +138,7 @@ fn gamePos(p: vec3f) -> vec3f { return vec3f(p.x, p.y, -p.z); }
   },
 };
 
-const features: ShaderFeature[] = [COMMON, VERTEX_TWEAKS, PATTERN, CUTOUT, ROOM_LIGHTS, CUTAWAY, UNDERGROUND, PLAIN_FINISH, SOFT_LOOK, DIAG_VIEW].sort((a, b) => a.priority - b.priority);
+const features: ShaderFeature[] = [COMMON, VERTEX_TWEAKS, PATTERN, CUTOUT, ROOM_LIGHTS, CUTAWAY, UNDERGROUND, PLAIN_FINISH, VEIL_SINK, SOFT_LOOK, DIAG_VIEW].sort((a, b) => a.priority - b.priority);
 
 /**
  * Adds a feature (wind, blankets). Before the first material is made: the chunks
