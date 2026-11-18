@@ -1,14 +1,14 @@
-# Bedroom storage — notes
+# Bedroom storage (`crates/art/rooms/src/bedroom_storage`)
 
-`bedroom_storage.py` builds the bedroom's nightstands and small storage (BR2) and its wardrobes and drawers (BR3)
+The module builds the bedroom's nightstands and small storage (BR2) and its wardrobes and drawers (BR3)
 into `web/public/assets/models/bedroom_storage/` and their entries in `packs/bedroom_storage/manifest.json`, keyed
 by the existing `model.<id>` keys. Built
 2026-10-14. They sat in Validate › Nightstands and Validate › Wardrobes until checked in play.
 
 ## Shared
 
-- **Built in place.** The parts are placed in game axes with no shift (`F = G.GameFrame()`), where the game places it,
-  and settled with `G.settle(centre=False)` and `centre=` on each `Model`. Most stand at the
+- **Built in place.** The parts are placed in game axes with no shift (`F = GameFrame::new(0.0)`), where the game places it,
+  and settled with `centre = false` and a `centre` on each `Model`. Most stand at the
   back of their tile: their backs are on the wall face (game depth -0.43, `WALL`). Several old parts reached
   3.5–7 cm into the wall (the nightstand and lamp nightstand to -0.465, the tall chest and low dresser to -0.48,
   the armoire to -0.50); they stand on the wall face now too (2026-10-14; the armoire's and the chests' a little
@@ -96,11 +96,11 @@ the side: it came up through the carcass's top (and the single one's side).
 
 ### Detail (2026-10-22)
 
-Rebuilt with the forms and the kit (`G.kit.pull`, `knob`, `shaker`, `fillet`), same sizes, centres, tops, parts, clips
+Rebuilt with the forms and the kit (`kit::pull`, `knob`, `shaker`, `fillet`), same sizes, centres, tops, parts, clips
 and draws. Fronts are `_front` ('plain': rounded; 'shaker': a frame round a recessed panel), hardware is turned or
 swept in one piece, tops rounded (`_top`), clothes on wire hangers with sloping shoulders (`_hanger`). A panel set in a
 frame stops a hair inside the opening, and no bead or cove wraps a carcass's edge: a vertex buried in another part
-bakes black (`shade.py`) and a face with only corner vertices goes dark all over (the shaker panels and the dresser's
+bakes black (`artkit::shade`) and a face with only corner vertices goes dark all over (the shaker panels and the dresser's
 side did, in the lit preview).
 
 `check-glb`: 0 failed; warnings: 4 draw calls on the dresser and the low dresser (their drawers carry metal pulls,
@@ -111,8 +111,16 @@ as before). Khronos validator: 0 errors, 0 warnings each.
 ```
 cargo art bedroom_storage            # every .glb, the pack, check-glb
 cargo art bedroom_storage --preview  # previews/bedroom_storage/dresser.png, dresser@drawer_open.png, …
+cargo art bedroom_storage --check    # rebuilt and held to the committed files, byte for byte
 ```
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 9 models changed shape: `benchBedEnd`, `cedarChest`, `chestOfDrawers`, `dresser`, `dresserLow`, `nightstand`, `nightstandDrawers`, `nightstandLamp`, `nightstandModern`; 25,580 to 25,660 triangles.
+No change to the build: its soft boxes take the shared form's new shape (the soft form: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 9 models changed shape: `benchBedEnd`, `cedarChest`, `chestOfDrawers`, `dresser`, `dresserLow`, `nightstand`, `nightstandDrawers`, `nightstandLamp`, `nightstandModern`; 25,580 to 25,660 triangles.
+
+## Ported to Rust (2026-11-18)
+
+Built by `cargo art bedroom_storage` from this module (its Python script's numbers and order, one function each;
+the pulls, knobs, frame-and-panel fronts and bent paths are artkit's kit). Against the last Blender build
+(`ref/blender`): 1 same, 13 near, every surface to 0.000 mm. The palette's `box` is `BOX` in the code (`box` is
+Rust's word).
