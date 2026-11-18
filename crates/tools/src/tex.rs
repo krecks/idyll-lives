@@ -10,6 +10,7 @@
 //! encoder), so the outputs are the scripts' to the byte; see `pil` and `jpeg`.
 
 pub(crate) mod jpeg;
+pub mod leafcards;
 pub mod pil;
 pub mod synth;
 
@@ -21,12 +22,15 @@ use std::path::Path;
 pub const USAGE: &str = "usage: cargo tex <command> ...
   clouds <out.png>                          the sky's tileable cloud layer
   synth [set...]                            procedural albedo/normal/arm maps (no downloads)
-  materials                                 writes materials.json (PBR material + environment entries)";
+  materials                                 writes materials.json (PBR material + environment entries)
+  leafcards [out.png]                       the trees' leaf-card atlas";
 pub fn main_with(args: &[String]) -> i32 {
     let a: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
     let res = match a.as_slice() {
         ["clouds", out] => clouds(Path::new(out)),
         ["synth", only @ ..] => synth::run(only),
+        ["leafcards"] => leafcards::run(None),
+        ["leafcards", out] => leafcards::run(Some(out)),
         ["materials"] => {
             finish_faults(&crate::content::root().join("web/public/assets")).and_then(|faults| {
                 if faults.is_empty() {
