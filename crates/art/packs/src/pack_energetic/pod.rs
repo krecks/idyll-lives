@@ -3,13 +3,11 @@
 use super::common::{M, lofted, name};
 use super::play::settle_in_place;
 use artkit::forms::rounded_rect;
-use artkit::math::{Axis, P3, TAU, V3, cos, sin};
-use artkit::mesh::Mesh;
+use artkit::math::{Axis, P3, TAU, cos, sin};
 use artkit::parts::{hinged, join, new_parts, turn};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, soft, swing, torus};
-use std::collections::BTreeMap;
 
 const CANOPY: (f64, f64, f64, f64, f64) = (0.42, -0.35, 0.4, 0.4, 0.5); // the canopy's rim height, middle depth, half-width, height, half-length
 const CANOPY_UP: f64 = 40.0; // how far it stands open at rest (degrees)
@@ -55,85 +53,6 @@ fn boot(f: &GameFrame, x: f64, y: f64, z: f64) {
             minor_segments = 3
         )
         .set_scale((0.112, 0.062, 1.0));
-    }
-}
-
-// KIT: bmesh.ops.delete(context='VERTS')
-/// The mesh without its points below `z` (its own axes) and the faces on them.
-fn delete_below(mesh: &mut Mesh, z: f32) {
-    let keep: Vec<bool> = mesh.verts.iter().map(|v| v.z >= z).collect();
-    let mut at = vec![u32::MAX; mesh.verts.len()];
-    let mut out = Mesh {
-        mats: mesh.mats.clone(),
-        ..Mesh::default()
-    };
-    for (i, v) in mesh.verts.iter().enumerate() {
-        if keep[i] {
-            at[i] = out.verts.len() as u32;
-            out.verts.push(*v);
-        }
-    }
-    for f in 0..mesh.faces.len() {
-        let c = mesh.corners(f);
-        if c.iter().all(|&v| keep[v as usize]) {
-            let c: Vec<u32> = c.iter().map(|&v| at[v as usize]).collect();
-            out.push_face(&c, mesh.faces[f].mat, mesh.faces[f].smooth);
-        }
-    }
-    out.sharp = mesh
-        .sharp
-        .iter()
-        .filter(|e| keep[e.0 as usize] && keep[e.1 as usize])
-        .map(|e| artkit::mesh::edge(at[e.0 as usize], at[e.1 as usize]))
-        .collect();
-    *mesh = out;
-}
-
-/// A face's run along an edge: from, to, the face.
-type Run = (u32, u32, usize);
-
-// KIT: the Solidify modifier (simple, its offset -1, rim filled)
-/// The surface thickened `t` inwards along its points' normals: the inner surface faces in, a rim closes its open
-/// edges.
-fn solidify(mesh: &mut Mesh, t: f32) {
-    let n = mesh.verts.len() as u32;
-    let normals = artkit::normals::vertex_normals(mesh);
-    let inner: Vec<V3> = mesh
-        .verts
-        .iter()
-        .zip(&normals)
-        .map(|(v, k)| V3 {
-            x: v.x - k.x * t,
-            y: v.y - k.y * t,
-            z: v.z - k.z * t,
-        })
-        .collect();
-    let faces = mesh.faces.len();
-    // each edge's faces' runs along it, for the open edges (one face) the rim closes
-    let mut runs: BTreeMap<(u32, u32), Vec<Run>> = BTreeMap::new();
-    for f in 0..faces {
-        let c = mesh.corners(f).to_vec();
-        for i in 0..c.len() {
-            let (a, b) = (c[i], c[(i + 1) % c.len()]);
-            runs.entry(artkit::mesh::edge(a, b))
-                .or_default()
-                .push((a, b, f));
-        }
-    }
-    mesh.verts.extend(inner);
-    for f in 0..faces {
-        let mut c: Vec<u32> = mesh.corners(f).iter().map(|&v| v + n).collect();
-        c.reverse();
-        let (mat, smooth) = (mesh.faces[f].mat, mesh.faces[f].smooth);
-        mesh.push_face(&c, mat, smooth);
-    }
-    let sharp: Vec<(u32, u32)> = mesh.sharp.iter().map(|&(a, b)| (a + n, b + n)).collect();
-    mesh.sharp.extend(sharp);
-    for run in runs.values() {
-        if let [(a, b, f)] = run[..] {
-            let (mat, smooth) = (mesh.faces[f].mat, mesh.faces[f].smooth);
-            mesh.push_face(&[b, a, a + n, b + n], mat, smooth);
-        }
     }
 }
 
@@ -269,10 +188,8 @@ pub fn recovery_pod() -> Vec<Obj> {
             segments = 28,
             rings = 14
         );
-        shell.edit(|o| {
-            delete_below(&mut o.mesh, -1e-4);
-            solidify(&mut o.mesh, 0.008);
-        });
+        artkit::edit::delete_verts(shell, |co| co.z < -1e-4);
+        artkit::solidify!(shell, 0.008);
         let rim = torus!(
             "canopy_rim",
             1.0,
