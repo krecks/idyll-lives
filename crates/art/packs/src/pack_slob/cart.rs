@@ -1,7 +1,8 @@
 //! The late-night microwave cart (1x1): a rolling cart, a microwave on top, frozen dinners below.
 
-use super::common::{_box, _can, _m, _wrapper, M, POP, cut_pocket, fillet, shaker, tube};
+use super::common::{_box, _can, _m, _wrapper, M, POP, cut_pocket};
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::math::P3;
 use artkit::motion::Ease;
 use artkit::parts::{hinged, join, new_parts, settle};
@@ -112,23 +113,22 @@ pub fn microwave_cart() -> Vec<Obj> {
                 _castor(f, &format!("castor{cx}{cz}"), cx, cz);
             }
         }
-        tube(
+        kit::tube!(
             f,
             "handle",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (0.33, 0.84, -0.4),
                     (0.37, 0.95, -0.4),
                     (0.37, 0.95, -0.04),
                     (0.33, 0.84, -0.04),
                 ],
-                0.03,
-                3,
+                0.03
             ),
             0.012,
             M.chrome,
-            Some(8),
-            1,
+            verts = 8,
+            round = 1
         );
         fsweep!(
             f,
@@ -403,7 +403,7 @@ pub fn microwave_cart() -> Vec<Obj> {
     let dw = w - pw - 0.02;
     let dx0 = x - w / 2.0 + 0.005;
     let door = new_parts(|| {
-        shaker(
+        kit::shaker!(
             f,
             "mw_door",
             dw,
@@ -411,9 +411,9 @@ pub fn microwave_cart() -> Vec<Obj> {
             (dx0 + dw / 2.0, y + h / 2.0, zf + 0.006),
             0.016,
             M.gloss_white,
-            0.04,
-            Some(M.window),
-            0.004,
+            rail = 0.04,
+            panel = M.window,
+            recess = 0.004
         );
         fsweep!(
             f,

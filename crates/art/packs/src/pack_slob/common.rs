@@ -1,14 +1,13 @@
 //! What the slob pack is built from: its palette, rounded boxes, the cans, chip bags and wrappers strewn about,
-//! the kit's parts it uses, and the microwave's cavity.
+//! and the microwave's cavity.
 
-use artkit::forms::{Sweep, rounded_rect};
 use artkit::materials::Mat;
-use artkit::math::{Axis, M4, P3, V3, pow, radians, tan};
+use artkit::math::{Axis, M4, P3, V3, radians};
 use artkit::mesh::Mesh;
-use artkit::place::{Coord, GameFrame, Spot};
+use artkit::place::{Coord, GameFrame};
 use artkit::scene::Obj;
 use artkit::shapes::{SHARP, shade};
-use artkit::{boulder, fbox, fextrude, loft, palette, revolve, ring, soft};
+use artkit::{boulder, fbox, loft, palette, revolve, ring, soft};
 
 palette! { M:
     body = ("#D9533F", metal),       // the microwave cart's frame; see the per-model notes for each body
@@ -243,109 +242,6 @@ pub fn _wrapper(f: &GameFrame, name: &str, x: f64, z: f64, material: Mat, seed: 
         noise = 0.4,
         subdivisions = 1
     );
-}
-
-// KIT: kit.tube
-/// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of
-/// points; 1 keeps them sharp), its ends capped. `verts` round: by default 8, and more for one over 13 mm in
-/// radius, as many as keep its outline within a millimetre of the circle (`forms::sweep`).
-pub fn tube<P: Spot>(
-    f: &GameFrame,
-    name: &str,
-    points: &[P],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-) -> Obj {
-    f.sweep(
-        name,
-        points,
-        r,
-        material,
-        Sweep {
-            verts,
-            resolution: round,
-            least: 8,
-            ..Sweep::default()
-        },
-    )
-}
-
-// KIT: kit.fillet
-/// The path through `points` (any axes) with each inner corner rounded to about `radius` (`steps` points round
-/// it, on a curve that never overshoots, however uneven the spacing: Catmull-Rom loops on a short leg beside a long
-/// one). For handles, bent rails and draped cloth swept with `resolution` 1.
-// (3.1415 is the script's own limit for a straight corner, not pi.)
-#[allow(clippy::approx_constant)]
-pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    let pts: Vec<V3> = points.iter().map(|&p| V3::from(p)).collect();
-    let mut out = vec![pts[0]];
-    for w in pts.windows(3) {
-        let (a, p, c) = (w[0], w[1], w[2]);
-        let (d1, d2) = (a - p, c - p);
-        if d1.length() < 1e-9 || d2.length() < 1e-9 || d1.angle(d2) > 3.1415 {
-            out.push(p);
-            continue;
-        }
-        let t = (radius / 1e-6_f64.max(tan(d1.angle(d2) / 2.0)))
-            .min(d1.length() * 0.5)
-            .min(d2.length() * 0.5);
-        let (p1, p2) = (p + d1.normalized() * t, p + d2.normalized() * t);
-        for i in 0..=steps {
-            let k = i as f64 / steps as f64;
-            out.push(p1 * pow(1.0 - k, 2.0) + p * 2 * k * (1.0 - k) + p2 * k * k);
-        }
-    }
-    out.push(pts[pts.len() - 1]);
-    out.iter()
-        .map(|p| (p.x as f64, p.y as f64, p.z as f64))
-        .collect()
-}
-
-// KIT: kit.shaker
-/// A frame-and-panel front `w` x `h`, `t` thick, centred at game `at`, facing the front (a cabinet's door, a
-/// drawer's front): a frame `rail` wide round a panel set back `recess`, flat; `panel`: the panel's own
-/// material. Returns (frame, panel). (The kit's raised panel isn't used here.)
-#[allow(clippy::too_many_arguments)]
-pub fn shaker<X: Coord, Y: Coord, Z: Coord>(
-    f: &GameFrame,
-    name: &str,
-    w: f64,
-    h: f64,
-    at: (X, Y, Z),
-    t: f64,
-    material: Mat,
-    rail: f64,
-    panel: Option<Mat>,
-    recess: f64,
-) -> (Obj, Obj) {
-    let hole = rounded_rect(w - 2.0 * rail, h - 2.0 * rail, 0.003, 1);
-    let fr = fextrude!(
-        f,
-        name,
-        &rounded_rect(w, h, 0.003, 1),
-        t,
-        at,
-        material,
-        holes = vec![hole],
-        bevel = 0.004_f64.min(t * 0.2),
-        bevel_segments = 1
-    );
-    // (a hair inside the opening, not into the frame: a vertex buried in it would bake black)
-    let (pw, ph) = (w - 2.0 * rail - 0.002, h - 2.0 * rail - 0.002);
-    let pn = fbox!(
-        f,
-        format!("{name}_panel"),
-        pw,
-        ph,
-        t - 2.0 * recess,
-        at,
-        panel.unwrap_or(material),
-        bevel = 0.002,
-        bevel_segments = 1
-    );
-    (fr, pn)
 }
 
 // KIT: joinery.recessed_box (G.cut of a box out of a loft's side)

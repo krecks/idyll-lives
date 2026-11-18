@@ -1,8 +1,9 @@
 //! The crumb-proof beanbag, the snack-stash nightstand and the command-couch gaming recliner, and the controller
 //! lying by two of them.
 
-use super::common::{_bake, _box, _can, _chip_bag, _m, _place, _wrapper, M, shaker};
+use super::common::{_bake, _box, _can, _chip_bag, _m, _place, _wrapper, M};
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, PI, TAU, V3, cos, pow, radians, sin};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
@@ -269,7 +270,7 @@ pub fn snack_nightstand() -> Vec<Obj> {
             (0.279, 0.27, -0.02),
             M.dark
         );
-        shaker(
+        kit::shaker!(
             f,
             "front_panel",
             0.48,
@@ -277,9 +278,8 @@ pub fn snack_nightstand() -> Vec<Obj> {
             (0, 0.2, 0.212),
             0.012,
             M.stand_front,
-            0.05,
-            Some(M.stand),
-            0.005,
+            rail = 0.05,
+            panel = M.stand
         );
         fbox!(
             f,

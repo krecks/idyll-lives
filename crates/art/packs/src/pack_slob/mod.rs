@@ -64,5 +64,5 @@ pub fn family() -> Option<Family> {
          The materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while \
          it is used: the microwave's door opens, the beanbag squashes, the snack drawer slides out, the spray tips, the \
          joystick waggles, and the recliner reclines and swings its cup holder out.",
-    ))
+    ).switched())
 }

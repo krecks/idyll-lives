@@ -156,8 +156,7 @@ onto the turning record, the bureau's flap drops and the arbour swing sways whil
 was rebuilt with a chair at each end, its two diners facing each other (2026-10-21).
 
 The slob pack models (`models/pack_slob/microwaveCart.glb`, `beanbag.glb`, `snackNightstand.glb`, `spritzStation.glb`,
-`arcadeCabinet.glb`, `gamingRecliner.glb`, override pack `packs/pack_slob/manifest.json`) are built in Blender by
-`tools/art/blender/families/pack_slob.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while
+`arcadeCabinet.glb`, `gamingRecliner.glb`, override pack `packs/pack_slob/manifest.json`) are built by `crates/art/packs/src/pack_slob` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves while
 it is used: the microwave's door opens, the beanbag squashes, the snack drawer slides out, the spray tips, the joystick
 waggles, and the recliner reclines and swings its cup holder out.
 
