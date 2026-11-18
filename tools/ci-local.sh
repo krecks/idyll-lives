@@ -19,13 +19,13 @@
 #                                A pull request's CI leaves them out; a tag's and a run by hand
 #                                have them, as does this script run with no step.
 #
-# Steps: pins fmt clippy sim generated clips web tools chunks sizes uses models built, and types (the web's types
+# Steps: pins fmt clippy sim generated clips web tools chunks sizes uses models built art, and types (the web's types
 # and lint over fresh wasm builds of the sim, the sounds and the voice: not in CI's job, which builds no wasm, so run
 # only here).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-all=(pins fmt clippy sim generated clips web tools chunks sizes uses models built types)
+all=(pins fmt clippy sim generated clips web tools chunks sizes uses models built art types)
 quick=(pins fmt clippy sim clips web chunks types)
 
 pinned=$(sed -nE 's/^ *bun-version: *([0-9.]+).*/\1/p' .github/workflows/ci.yml | head -1)
@@ -75,9 +75,9 @@ step() {
     # (The town-building files, `*.slow.test.ts`, only with SLOW_TESTS.)
     # (The tests that make sounds load the sounds' wasm: `bun run sound` builds it.)
     web) (cd web && "${bun_ci[@]}" install --frozen-lockfile && "${bun_ci[@]}" run sound && "${bun_ci[@]}" run test && if [[ -n "${SLOW_TESTS:-}" ]]; then "${bun_ci[@]}" run test:slow; fi) ;;
-    # The character build, the object gate, the models' kernel and runner, and the content and texture
-    # tools, in the build the aliases above and below run (Cargo.toml's `tools` profile).
-    tools) cargo test -p ll-tools -p sound -p artkit -p ll-art --profile tools --locked ;;
+    # The character build, the object gate, the models' kernel, runner and families, and the content and
+    # texture tools, in the build the aliases above and below run (Cargo.toml's `tools` profile).
+    tools) cargo test -p ll-tools -p sound -p artkit -p ll-art -p art-nature -p art-wet -p art-rooms -p art-packs -p art-outside -p art-things --profile tools --locked ;;
     # The PlayCanvas shader chunks' anchors and private names the renderer relies on (tools/render/chunks.json),
     # in the release build the game imports: its package, then the tools' check.
     chunks) (cd web && "${bun_ci[@]}" install --frozen-lockfile) && cargo check-chunks ;;
@@ -91,6 +91,10 @@ step() {
     # gate: a fixed set of samples dumped by the game's own generators (about 2 s; no browser, no wasm, no
     # packages), then held to the same rules, what they find today by tools/art/gate-baseline.json (about 12 s).
     built) "${bun_ci[@]}" tools/built/dump.ts target/built && cargo check-glb --built target/built ;;
+    # Every family of item models built again in memory and held to the committed files, packs and centres, byte
+    # for byte (crates/art; about 40 s on top of the tools' build): a model changed in code and not rebuilt, or a
+    # build that gives other bytes on another machine, fails here.
+    art) cargo art --all --check ;;
     types) (cd web && bun run wasm && bun run sound && bun run voice:wasm && "${bun_ci[@]}" run check && "${bun_ci[@]}" run lint) ;;
     *)
       echo "unknown step: $1 (steps: ${all[*]})" >&2

@@ -257,9 +257,9 @@ jobs:
           path: .ci-passed
           key: ci-passed-web-${{ needs.changes.outputs.web-key }}
 
-  # ll-tools' and the sounds' tests, pins, chunks, sizes, uses, models, the built world: crates/, Cargo.*, .cargo/,
-  # the toolchain, web/ but its tests, tools/pins, tools/render, tools/art/blender/centres.json,
-  # tools/art/gate-baseline.json, tools/art/validate.ts, docs/review/reference.json, tools/built.
+  # ll-tools', the models' and the sounds' tests, pins, chunks, sizes, uses, models, the built world, the models
+  # rebuilt: crates/, Cargo.*, .cargo/, the toolchain, web/ but its tests, tools/pins, tools/render, tools/art (but
+  # its README), docs/review/reference.json, tools/built.
   tools:
     name: Tools, object sizes, uses and models
     needs: changes
@@ -292,9 +292,10 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # The repo's tools (crates/tools): a fresh character build against the committed set and its
-      # checks, the object gate over every shipped model (no Blender), and the content and texture
-      # tools; and the sounds (crates/sound), each made and held to what it should be. Release without
-      # fat LTO, built once for these and the three checks after.
+      # checks, the object gate over every shipped model, the models' kernel, runner and families
+      # (crates/artkit, crates/art), and the content and texture tools; and the sounds (crates/sound),
+      # each made and held to what it should be. Release without fat LTO, built once for these and
+      # the checks after.
       - name: Tool tests
         if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh tools
@@ -331,7 +332,7 @@ jobs:
         if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh uses
 
-      # Every shipped model at the gate (no Blender): a clip that does not run rest to rest, a part that
+      # Every shipped model at the gate: a clip that does not run rest to rest, a part that
       # moves without one, a budget over, a functional height (seat, top, mattress, lamp) the mesh and the
       # content disagree on. A measure out of range is the review's to weigh; a broken model fails here.
       - name: Models
@@ -344,6 +345,12 @@ jobs:
       - name: Built world
         if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh built
+
+      # Every family of item models built again in memory (crates/art) and held to the committed files, packs
+      # and centres byte for byte: a model changed in code and not rebuilt fails here (about 40 s).
+      - name: Models rebuilt
+        if: steps.passed.outputs.cache-hit != 'true'
+        run: tools/ci-local.sh art
 
       - name: Remember the pass
         if: steps.passed.outputs.cache-hit != 'true' && needs.changes.outputs.tools-key != ''
