@@ -194,6 +194,11 @@ export const WATER_Y = -0.35;
  * the edge to wholly rounded this far (m) past it.
  */
 const ROUND_IN = 8;
+/**
+ * Inside the world's edge, within this far (m) of it, a height field's shore is drawn into the water rounded past the
+ * edge where that is wetter (`shoreIn`): from wholly at the edge to not at all this far in.
+ */
+const BLEND_IN = 8;
 /** Past the world's edge, behind the sandy bank of a height field's water the land rises no steeper than this (19°). */
 const SHORE_RISE = 0.35;
 /** Past the world's edge a height field's edge's stand off the landscape is carried out over this (m), not its banks and beds. */
@@ -973,13 +978,62 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     // (A height field's: the edge of its water.)
     if (!this.field) return this.drawnWaterEdge(x, z);
     let e = wetEdgeAt(this.field, this.wetSd, x, z, this.edgeWet);
-    if (x >= 0 && z >= 0 && x <= this.w && z <= this.d) return e;
-    // Past the edge, rounded (`pastWater`): eased in from the edge's own, carried straight out, over `ROUND_IN` m. Not by
-    // a pond's or a river's end: it ends at the edge.
-    const k = smoothstep(0, ROUND_IN, Math.hypot(x - Math.min(this.w, Math.max(0, x)), z - Math.min(this.d, Math.max(0, z))));
+    if (x >= 0 && z >= 0 && x <= this.w && z <= this.d) return this.shoreIn(x, z, e);
+    // Past the edge, rounded (`pastWater`): eased in from the edge's own, carried straight out (drawn into the rounded
+    // water where that is wetter as the edge inside it is: `shoreIn`), over `ROUND_IN` m. Not by a pond's or a river's
+    // end: it ends at the edge.
+    const [cx, cz] = [Math.min(this.w, Math.max(0, x)), Math.min(this.d, Math.max(0, z))];
+    const out = Math.hypot(x - cx, z - cz);
+    const k = smoothstep(0, ROUND_IN, out);
     const grid = k > 0 && edgeWaterAt(this.field, this.edgeWet, x, z) !== EDGE_POND ? this.pastWater() : null;
-    if (grid) e += (waterGridAt(grid, x, z) - e) * k;
+    if (grid) {
+      const g = waterGridAt(grid, x, z);
+      const own = g > e ? e + (g - e) * this.seaPast(grid, cx + ((x - cx) / out) * ROUND_IN, cz + ((z - cz) / out) * ROUND_IN) : e;
+      e = own + (g - own) * k;
+    }
     return this.downValleys(x, z, e);
+  }
+
+  /**
+   * The field's water's edge `e` (`wetEdgeAt`) at (x, z) inside the world, within `BLEND_IN` m of its edge drawn into
+   * the water rounded past it (`pastWater`) where that is wetter: wholly at the edge, not at all `BLEND_IN` m in. A
+   * coast that met the edge at a slant left a dry rim between them, the edge's outermost points dry beside the sea for
+   * tens of metres, a few metres wide; the rounded water past it, which carried its dry edge straight out, ended it
+   * there as a spit of sand standing out into the sea. Now the rim goes under the sea where it is that thin with the sea
+   * past the edge too, and the shore comes round to the edge as the rounded one does. Never drier (a river's channel to
+   * the edge is the field's), and not by a pond's or a river's end above the sea (it ends at the edge behind its bank).
+   */
+  private shoreIn(x: number, z: number, e: number): number {
+    // (m in from the edge, and the edge's nearest point as far past it as the water there is wholly rounded.)
+    const [dx0, dz0, dx1, dz1] = [x, z, this.w - x, this.d - z];
+    const d = Math.min(dx0, dz0, dx1, dz1);
+    if (d >= BLEND_IN || !this.wetSd) return e;
+    const [px, pz] = d === dx0 ? [-ROUND_IN, z] : d === dz0 ? [x, -ROUND_IN] : d === dx1 ? [this.w + ROUND_IN, z] : [x, this.d + ROUND_IN];
+    if (edgeWaterAt(this.field!, this.edgeWet, px, pz) === EDGE_POND) return e;
+    const grid = this.pastWater();
+    const g = grid ? waterGridAt(grid, x, z) : e;
+    if (g <= e) return e;
+    return e + (g - e) * (1 - smoothstep(0, BLEND_IN, d)) * this.seaPast(grid!, px, pz);
+  }
+
+  /**
+   * How much a shore by the edge is drawn into the rounded water past it (`shoreIn`) for the rounded water at (`px`,
+   * `pz`), `ROUND_IN` m past the edge: wholly with the sea there, not at all with land (a strip of land with land past
+   * it is the land's).
+   */
+  private seaPast(grid: WaterGrid, px: number, pz: number): number {
+    return smoothstep(-1, 3, waterGridAt(grid, px, pz));
+  }
+
+  /**
+   * The land `h` at (x, z) inside the world as drawn by its shore (`shoreIn`): where that moved into the land, brought
+   * down as the land past the edge is by its water (`bank`), wholly once it moved a metre.
+   */
+  private landIn(x: number, z: number, h: number): number {
+    if (!this.wetSd || Math.min(x, z, this.w - x, this.d - z) >= BLEND_IN) return h;
+    const e = wetEdgeAt(this.field!, this.wetSd, x, z, this.edgeWet);
+    const moved = this.shoreIn(x, z, e) - e;
+    return moved > 0 ? h + (this.bank(h, e + moved) - h) * smoothstep(0, 1, moved) : h;
   }
 
   /**
@@ -990,7 +1044,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     if (this.roundGrid !== undefined) return this.roundGrid;
     const pad = Math.ceil((this.ring + 16) / ROUND_CELL) * ROUND_CELL;
     const [w, d] = [this.w, this.d];
-    this.roundGrid = this.wetSd ? roundedWater(-pad, -pad, w + pad, d + pad, (x, z) => wetEdgeAt(this.field!, this.wetSd, x, z, this.edgeWet), (x, z) => x >= 0 && z >= 0 && x <= w && z <= d) : null;
+    // (The land's own cells held but by its edge, whose shore is drawn into this water: `shoreIn`.)
+    const [x0, z0, x1, z1] = [BLEND_IN, BLEND_IN, w - BLEND_IN, d - BLEND_IN];
+    this.roundGrid = this.wetSd ? roundedWater(-pad, -pad, w + pad, d + pad, (x, z) => wetEdgeAt(this.field!, this.wetSd, x, z, this.edgeWet), (x, z) => x >= x0 && z >= z0 && x <= x1 && z <= z1) : null;
     return this.roundGrid;
   }
   /** `pastWater`'s grid (undefined: to be made). */
@@ -1201,10 +1257,10 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   /**
    * The terrain's height (m) at a point of its grid: `heightAt`, but on a land its town follows the graded land
    * inside the world (`fieldAt`: under a road `ROAD_SINK` below it, so it never shows through; the lots' pads are
-   * slabs of their own, `pc/nature.ts`).
+   * slabs of their own, `pc/nature.ts`; by the edge as its shore is drawn, `landIn`).
    */
   terrainAt(x: number, z: number): number {
-    if (this.surface && x >= 0 && z >= 0 && x <= this.w && z <= this.d) return this.fieldAt(x, z);
+    if (this.surface && x >= 0 && z >= 0 && x <= this.w && z <= this.d) return this.landIn(x, z, this.fieldAt(x, z));
     return this.heightAt(x, z);
   }
 
@@ -1243,8 +1299,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const field = this.field;
     if (!field) return this.drawnGround(x, z);
     if (x >= 0 && z >= 0 && x <= this.w && z <= this.d) {
-      // (Its last 2 m, past its last samples, hold their heights: a pond's end bank there already.)
-      const h = this.fieldAt(x, z);
+      // (Its last 2 m, past its last samples, hold their heights: a pond's end bank there already. By the edge, as its
+      // shore is drawn: `landIn`.)
+      const h = this.landIn(x, z, this.fieldAt(x, z));
       return (x > (field.cols - 1) * LAND_CELL || z > (field.rows - 1) * LAND_CELL) && edgeWaterAt(field, this.edgeWet, x, z) === EDGE_POND ? this.endBank(field, x, z, h) : h;
     }
     const cx = Math.min(this.w, Math.max(0, x));
@@ -1254,7 +1311,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const today = this.pastGround(x, z, e);
     const fade = 1 - smoothstep(0, LAND_EDGE_FADE, Math.hypot(x - cx, z - cz));
     if (fade <= 0) return this.valley(x, z, today);
-    const edge = pond ? this.endBank(field, cx, cz, this.fieldAt(cx, cz)) : this.fieldAt(cx, cz);
+    const edge = pond ? this.endBank(field, cx, cz, this.fieldAt(cx, cz)) : this.landIn(cx, cz, this.fieldAt(cx, cz));
     // (Its stand off the landscape there carried out as land only, over `BANK_TOP`, and not into the water past the
     // edge, rounded: its banks and its beds, and its land by them, carried straight out squared the water's corners.)
     const base = this.pastGround(cx, cz, pond ? null : this.waterEdge(cx, cz));
@@ -1379,7 +1436,11 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   private pastGround(x: number, z: number, e: number | null): number {
     const h = this.drawnGround(x, z, false);
-    if (e === null) return h;
+    return e === null ? h : this.bank(h, e);
+  }
+
+  /** The land `h` brought down by water whose edge is `e` m off (`waterEdge`'s): under it its bed, by it a sandy bank, behind that rising no steeper than `SHORE_RISE`. */
+  private bank(h: number, e: number): number {
     const beach = this.beach * 1.5;
     if (e > 0) return Math.min(h, WATER_Y - Math.min(4, e * 0.22 + e * e * 0.004));
     return Math.min(h, WATER_Y + Math.min(-e, beach) * 0.09 + Math.max(0, -e - beach) * SHORE_RISE);
