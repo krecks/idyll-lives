@@ -687,3 +687,62 @@ fn a_bevels_corners_take_their_texture_from_the_face_blender_takes_it_from() {
     }
     println!("{}", report.join("\n"));
 }
+
+#[test]
+fn a_bevelled_plain_part_joined_first_leaves_the_others_their_texture() {
+    use artkit::materials::{Finish, Finishes, Mat};
+    // a plain, bevelled part first, a wooden one beside it: the wood's UVs are its own, in its own frame, whether
+    // or not the first part has a bevel (they were made again over the whole joined mesh)
+    let wood_uvs = |bevel: f64| -> Vec<[u32; 2]> {
+        scene::reset();
+        let f = |roughness, textured| Finish {
+            roughness,
+            metallic: 0.0,
+            textured,
+        };
+        let finishes: Finishes = [("matte", f(0.75, false)), ("wood", f(0.8, true))]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect();
+        scene::set_finishes(finishes);
+        let frame = artkit::place::GameFrame::new(0.0);
+        let a = artkit::fbox!(
+            frame,
+            "a",
+            0.2,
+            0.2,
+            0.2,
+            (0, 0.1, 0),
+            Mat::new("plinth", "#8C867E", "matte"),
+            bevel = bevel,
+            bevel_segments = 1
+        );
+        let b = artkit::fbox!(
+            frame,
+            "b",
+            0.2,
+            0.6,
+            0.3,
+            (1, 0.3, 0),
+            Mat::new("body", "#B88A5A", "wood")
+        );
+        let joined = artkit::parts::join(&[a, b], "j", None);
+        joined.read(|o| {
+            assert!(o.mesh.uv_metres, "bevel {bevel}: the joined UVs are final");
+            let uvs = o.mesh.uvs.as_ref().expect("a textured model has UVs");
+            let mut out: Vec<[u32; 2]> = o
+                .mesh
+                .faces
+                .iter()
+                .filter(|face| face.mat == 1)
+                .flat_map(|face| &uvs[face.start as usize..(face.start + face.len) as usize])
+                .map(|uv| [uv[0].to_bits(), uv[1].to_bits()])
+                .collect();
+            out.sort();
+            out
+        })
+    };
+    let (plain, bevelled) = (wood_uvs(0.0), wood_uvs(0.01));
+    assert!(plain.iter().any(|uv| *uv != [0, 0]), "the wood has UVs");
+    assert_eq!(plain, bevelled);
+}
