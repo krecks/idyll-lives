@@ -149,8 +149,8 @@ Each moves while it is used: the bar's tap lever pulls, the sectional's cushions
 swings up, the dance floor's tiles pulse and a new photo grows.
 
 The romantic pack models (`models/pack_romantic/candlelitTable.glb`, `heartTub.glb`, `vanity.glb`, `gramophone.glb`,
-`letterBureau.glb`, `roseArbourSwing.glb`, override pack `packs/pack_romantic/manifest.json`) are built in Blender by
-`tools/art/blender/families/pack_romantic.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves
+`letterBureau.glb`, `roseArbourSwing.glb`, override pack `packs/pack_romantic/manifest.json`) are built by
+`crates/art/packs/src/pack_romantic` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves
 while it is used: the candles light, the tub fills with petals, the vanity's drawer opens, the gramophone's arm drops
 onto the turning record, the bureau's flap drops and the arbour swing sways while a bloom is cut. The candlelit table
 was rebuilt with a chair at each end, its two diners facing each other (2026-10-21).

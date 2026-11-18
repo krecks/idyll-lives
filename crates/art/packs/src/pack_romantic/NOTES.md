@@ -1,6 +1,6 @@
 # Romantic pack — notes
 
-`pack_romantic.py` builds the six P15 romantic models into `web/public/assets/models/pack_romantic/` and their
+`crates/art/packs/src/pack_romantic` builds the six P15 romantic models into `web/public/assets/models/pack_romantic/` and their
 entries in `packs/pack_romantic/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sat in Validate › Romantic until checked in play.
 
