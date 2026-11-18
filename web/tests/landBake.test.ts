@@ -9,7 +9,7 @@ import type { WorldStructure } from '../src/core/protocol';
 import { COVER, coverSpan, encodeLand, LAND_CELL, NONE, SEA_CM, type Land } from '../src/game/land';
 import { CountryRoads } from '../src/render/shared/countryRoads';
 import { landZones } from '../src/game/landEdit';
-import { bakeLand, carriedWetEdgeAt, copyLand, EDGE_DRY, EDGE_POND, EDGE_SEA, edgeWater, edgeWaterAt, EXIT_MOST, landExits, marchToGround, pondQuads, ROUND_REACH, roundedWater, seaRims, waterGridAt, wetDistance, wetEdgeAt } from '../src/render/shared/landBake';
+import { bakeLand, carriedWetEdgeAt, copyLand, EDGE_DRY, EDGE_POND, EDGE_SEA, edgeWater, edgeWaterAt, EXIT_MOST, landExits, marchToGround, pondQuads, ROUND_REACH, roundedWater, seaRims, seaWays, waterGridAt, waterMetres, wetDistance, wetEdgeAt } from '../src/render/shared/landBake';
 import { LAND_BLOCK, LandscapeLayout, WATER_Y, type Woods } from '../src/render/shared/nature';
 import { islandWorld, plainWorld, SIDE } from './support/landFixtures';
 
@@ -474,6 +474,65 @@ describe("the sea's far shore meeting the edge behind a rim of land", () => {
       const drawn = layout(plainWorld());
       drawn.setLand(land);
       expect(drawn.waterEdge(-30, 130)).toBeLessThan(0);
+    }
+  });
+});
+
+describe("the shore past the edge in metres, and the sea's wide ways out", () => {
+  test('metres from the rounded shore, whatever its values rose by across it', () => {
+    // A grid of `edge` over a 400 m square round (0, 0), 4 m cells, as `roundedWater` lays one out.
+    const grid = (edge: (x: number, z: number) => number) => {
+      const [cols, rows] = [101, 101];
+      const e = new Float32Array(cols * rows);
+      for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) e[j * cols + i] = edge(-200 + i * 4, -200 + j * 4);
+      return { x0: -200, z0: -200, cell: 4, cols, rows, e };
+    };
+    // A shore along x = 10 whose values rise 14 a metre across it (as the rounded water's did far past the edge).
+    const m = waterMetres(grid((x) => (x - 10) * 14));
+    for (const z of [-80, 0, 60]) for (const x of [-60, -12, 0, 9, 11, 30, 90]) expect(Math.abs(waterGridAt(m, x, z) - (x - 10))).toBeLessThan(0.6);
+    // A round pond 60 m across (its values 5 a metre): metres from its shore, within the chamfer's 8 %.
+    const pond = waterMetres(grid((x, z) => (30 - Math.hypot(x, z)) * 5));
+    for (const [x, z] of [[0, 0], [20, 0], [0, -45], [60, 60], [-100, 20]]) {
+      const want = 30 - Math.hypot(x, z);
+      expect(Math.abs(waterGridAt(pond, x, z) - want)).toBeLessThan(1 + Math.abs(want) * 0.08);
+    }
+  });
+
+  /** The plain world's land surveyed, the sea over its south side up to 120 m in, out through its south edge between x `from` and `to` (m). */
+  const way = (from: number, to: number) => {
+    const land = bakeLand(layout(plainWorld()), SIDE, SIDE);
+    for (let j = 0; j <= 60; j++) {
+      for (let i = 0; i < land.cols; i++) {
+        if (j < 6 && (i * LAND_CELL < from || i * LAND_CELL > to)) continue;
+        const k = j * land.cols + i;
+        [land.h[k], land.wl[k]] = [Math.min(land.h[k], SEA_CM - 200), SEA_CM];
+      }
+    }
+    return land;
+  };
+
+  test("a sea's way out wider than a river's, land either side of it, widens past the edge, the land beside it sloping down to it", () => {
+    const land = way(150, 360);
+    const ways = seaWays(land);
+    expect(ways.length).toBe(1);
+    expect(ways[0]).toMatchObject({ side: 0, sea: true, wide: true });
+    expect(ways[0].half * 2).toBeGreaterThan(200);
+    // (A river's width is a valley's, and a coast round a corner is neither.)
+    expect(seaWays(way(150, 250))).toEqual([]);
+    expect(seaWays(way(-10, 360))).toEqual([]);
+    const drawn = layout(plainWorld());
+    drawn.setLand(land);
+    // By the edge its banks where the field has them (rounded); 200 m out, over 10 m further out either side.
+    expect(drawn.waterEdge(120, -4)).toBeLessThan(0);
+    expect(drawn.waterEdge(390, -4)).toBeLessThan(0);
+    for (const x of [140, 370]) expect(drawn.waterEdge(x, -200)).toBeGreaterThan(0);
+    for (const x of [100, 420]) expect(drawn.waterEdge(x, -200)).toBeLessThan(0);
+    // Its bank: metres from the water, the land behind it rising no steeper than 19° (a wall before).
+    for (const z of [-80, -200]) {
+      let x = 300;
+      while (drawn.waterEdge(x, z) > 0) x += 1;
+      for (let a = x + 2; a < x + 60; a += 4) expect(Math.abs(drawn.waterEdge(a, z) + (a - x))).toBeLessThan(4);
+      for (let a = x; a < x + 120; a += 4) expect(drawn.ground(a + 4, z) - drawn.ground(a, z)).toBeLessThan(4 * 0.36);
     }
   });
 });

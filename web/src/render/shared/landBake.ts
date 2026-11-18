@@ -160,6 +160,8 @@ export interface LandExit {
   half: number;
   sea: boolean;
   level: number;
+  /** A sea's way out wider than a river's (`seaWays`): past the edge its channel widens as a sea river's does, but no valley opens round it. */
+  wide?: boolean;
 }
 
 export function landExits(land: Land, most: number): LandExit[] {
@@ -198,6 +200,20 @@ export function landExits(land: Land, most: number): LandExit[] {
 
 /** Water reaching the edge in a run longer than this (m) is a coast: the land past it is left as it is. */
 export const EXIT_MOST = 160;
+
+/**
+ * The sea's ways out wider than a river's (`EXIT_MOST`) with land either side of them on the edge (a sea's channel
+ * out through one side, not its coast round a corner): past the edge its channel widens as a sea river's does
+ * (`valleyCap`'s wet), so its banks splay out into the haze rather than run on straight as the edge cut them; the land
+ * beside it is the landscape's own (no valley), brought down to the water as the shore past the edge has it.
+ */
+export function seaWays(land: Land): LandExit[] {
+  const { cols, rows } = land;
+  return landExits(land, Infinity).filter((e) => {
+    const length = ((e.side === 0 || e.side === 2 ? cols : rows) - 1) * LAND_CELL;
+    return e.sea && 2 * e.half > EXIT_MOST && e.at - e.half > LAND_CELL && e.at + e.half < length - LAND_CELL;
+  }).map((e) => ({ ...e, wide: true }));
+}
 /** Past the edge the valley's ground comes down to it over this far (m): at the edge the land past it is the field's. */
 export const VALLEY_IN = 60;
 /** Beside a sea river's channel the valley's bank holds wholly from the edge on, easing to `VALLEY_IN`'s over this far (m). */
@@ -461,6 +477,57 @@ function boxBlur(v: Float32Array, at: number, step: number, n: number, line: Flo
     v[at + k * step] = sum / (2 * r + 1);
     sum += get(k + r + 1) - get(k - r);
   }
+}
+
+/**
+ * `grid` (`roundedWater`'s) as metres from its shore (above 0 in the water): the same shore (where it crosses 0), each
+ * cell as far from it as it is, measured on the grid (from the cells by the shore, where it crosses between two of them,
+ * on out by two chamfer passes). The rounded water past the land's edge is carried out from the edge deeper and
+ * further from the water as it goes out (`wetEdgeAt`), so rounded its values rose across its shore up to 14 m a metre
+ * there, and what was laid by them as metres from it (a sandy bank, the land behind it rising no steeper than 19°,
+ * `LandscapeLayout.bank`) stood as a wall; this is what such things are measured by.
+ */
+export function waterMetres(grid: WaterGrid): WaterGrid {
+  const { cols, rows, cell, e } = grid;
+  const far = (cols + rows) * cell;
+  const d = new Float32Array(cols * rows).fill(far);
+  // (By the shore: where it crosses between a cell and the next, as far from it as it crosses.)
+  for (let j = 0; j < rows; j++) {
+    for (let i = 0; i < cols; i++) {
+      const k = j * cols + i;
+      const v = e[k];
+      if (v === 0) {
+        d[k] = 0;
+        continue;
+      }
+      for (const [a, b] of [[i - 1, j], [i + 1, j], [i, j - 1], [i, j + 1]]) {
+        if (a < 0 || b < 0 || a >= cols || b >= rows) continue;
+        const w = e[b * cols + a];
+        if (v > 0 !== w > 0) d[k] = Math.min(d[k], (v / (v - w)) * cell);
+      }
+    }
+  }
+  const diag = cell * Math.SQRT2;
+  const pass = (j0: number, j1: number, dj: number, i0: number, i1: number, di: number) => {
+    for (let j = j0; j !== j1; j += dj) {
+      for (let i = i0; i !== i1; i += di) {
+        const k = j * cols + i;
+        let v = d[k];
+        if (i - di >= 0 && i - di < cols) v = Math.min(v, d[k - di] + cell);
+        if (j - dj >= 0 && j - dj < rows) {
+          const up = k - dj * cols;
+          v = Math.min(v, d[up] + cell);
+          if (i - di >= 0 && i - di < cols) v = Math.min(v, d[up - di] + diag);
+          if (i + di >= 0 && i + di < cols) v = Math.min(v, d[up + di] + diag);
+        }
+        d[k] = v;
+      }
+    }
+  };
+  pass(0, rows, 1, 0, cols, 1);
+  pass(rows - 1, -1, -1, cols - 1, -1, -1);
+  for (let k = 0; k < d.length; k++) if (e[k] < 0) d[k] = -d[k];
+  return { ...grid, e: d };
 }
 
 /** `grid`'s value at (x, z), read between its cells (its edge's past them). */
