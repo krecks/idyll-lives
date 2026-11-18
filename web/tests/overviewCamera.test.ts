@@ -5,7 +5,7 @@
  * framed again when asked.
  */
 import { describe, expect, test } from 'bun:test';
-import { areaFocus, OVERVIEW_CLOSE, OVERVIEW_FARTHEST, OVERVIEW_NEAREST, OverviewCamera, TILT_MAX, TILT_MIN, viewShift, type AreaWorld } from '../src/render/shared/overviewCamera';
+import { areaFocus, EYE_OUT, OVERVIEW_CLOSE, OVERVIEW_FARTHEST, OVERVIEW_NEAREST, OverviewCamera, TILT_MAX, TILT_MIN, viewShift, type AreaWorld } from '../src/render/shared/overviewCamera';
 import { LENS } from '../src/render/shared/lens';
 import type { TownShot } from '../src/render/types';
 
@@ -238,6 +238,49 @@ describe("the player's free camera", () => {
       [0, -12],
     ])
       expect(eye[1] + sy).toBeGreaterThanOrEqual(gorge(eye[0] + sx + ax, eye[2] + sz + az));
+  });
+
+  test('from far out, tilted low, it keeps within reach of a land with a landscape round it; nearer it tilts as it will', () => {
+    const size = 832;
+    /** How far (m) the camera as drawn stands off the land. */
+    const off = (pose: ReturnType<typeof camera>['pose']) => {
+      const [sx, , sz] = viewShift(pose.alpha, pose.beta, pose.targetScreenOffset.x, pose.targetScreenOffset.y, [0, 0, 0]);
+      const flat = Math.sin(pose.beta) * pose.radius;
+      const [x, z] = [pose.target.x + Math.cos(pose.alpha) * flat + sx, pose.target.z + Math.sin(pose.alpha) * flat + sz];
+      return Math.hypot(Math.max(-x, 0, x - size), Math.max(-z, 0, z - size));
+    };
+    for (const alpha of [-Math.PI / 2, 0, 0.8]) {
+      const { rig, pose } = camera();
+      rig.setBounds({ x0: 0, z0: 0, x1: size, z1: size }, true);
+      rig.setShot({ ...whole(size), alpha }, true);
+      settle(rig);
+      // (The whole land's shot as framed: as it was.)
+      expect(pose.beta).toBeCloseTo(0.62, 6);
+      // Tilted as low as it goes, 1,300 m out: no lower than keeps it within reach (well past the landscape, before:
+      // 600 m and more off the land, 290 m up).
+      rig.nudge(0, pose.radius / 1300, TILT_MAX);
+      settle(rig);
+      expect(pose.radius).toBeCloseTo(1300, 3);
+      expect(pose.beta).toBeLessThan(1.1);
+      expect(pose.beta).toBeGreaterThan(0.8);
+      expect(off(pose)).toBeLessThanOrEqual(EYE_OUT + 0.5);
+      expect(off(pose)).toBeGreaterThan(EYE_OUT - 1);
+      // Further out, higher still; nearer, as low as it goes.
+      rig.nudge(0, pose.radius / 2100);
+      settle(rig);
+      expect(pose.beta).toBeLessThan(0.6);
+      expect(off(pose)).toBeLessThanOrEqual(EYE_OUT + 0.5);
+      rig.nudge(0, pose.radius / 300);
+      settle(rig);
+      expect(pose.beta).toBeCloseTo(TILT_MAX, 6);
+    }
+    // Without a landscape round the land (none given), as low as it goes from anywhere.
+    const { rig, pose } = camera();
+    rig.setBounds({ x0: 0, z0: 0, x1: size, z1: size });
+    rig.setShot(whole(size), true);
+    rig.nudge(0, pose.radius / 1300, TILT_MAX);
+    settle(rig);
+    expect(pose.beta).toBeCloseTo(TILT_MAX, 6);
   });
 
   test("pans along the view: right is the picture's right, forward is into it", () => {

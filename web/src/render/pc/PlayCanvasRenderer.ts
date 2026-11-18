@@ -3191,8 +3191,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const overview = (this.overview ??= new TownOverview(this.app, this.root, this.deps.assets, this.deps.content, this.house));
       const ring = landscapeRing(world);
       Object.assign(this.townReach, { x0: -ring, z0: -ring, x1: world.width + ring, z1: groundDepth(world) + ring });
-      // (The player's pan keeps the camera over the land, the town or none.)
-      this.townRig.setBounds({ x0: 0, z0: 0, x1: world.width, z1: groundDepth(world) });
+      // (The player's pan keeps the camera's target over the land, the town or none, and its eye near it.)
+      this.townRig.setBounds({ x0: 0, z0: 0, x1: world.width, z1: groundDepth(world) }, true);
       if (this.townBuilds++ === 0 && !this.worldBuilding) this.sliceStart = performance.now();
       // (A town on screen already, built again: longer slices, `AGAIN_SLICE_MS`.)
       this.townAgain = this.townMode;
