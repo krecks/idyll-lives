@@ -7,7 +7,7 @@ use artkit::materials::Mat;
 use artkit::math::{M4, V3, v3};
 use artkit::noise::noise;
 use artkit::parts::{join_all, measure};
-use artkit::scene::Obj;
+use artkit::scene::{self, Obj};
 use artkit::{bisect_plane, boulder};
 
 /// Game (x, depth): the old part's middle.
@@ -17,11 +17,12 @@ pub const GROUND: f64 = -0.115;
 
 /// Cuts `obj` (in place) by the plane through `co` facing `no`, dropping what lies in front of it and closing
 /// the cut with a face of its own: a fracture, or the ground. The cut face is drawn flat. What is left is all
-/// triangles. `world`: the part's matrix as Blender had it when it was cut (a part made and placed since Blender
-/// last looked at the scene was still where it was made, at the origin, unturned).
-pub fn _cut(obj: Obj, world: &M4, co: impl Into<V3>, no: impl Into<V3>) -> Obj {
+/// triangles. The plane is the world's, by the part's matrix as Blender has it when it is cut (a part made and
+/// placed since the scene was last worked out is still where it was made, at the origin, unturned).
+pub fn _cut(obj: Obj, co: impl Into<V3>, no: impl Into<V3>) -> Obj {
     let (co, no): (V3, V3) = (co.into(), no.into());
-    obj.edit(|o| o.mesh.transform(world));
+    let world = obj.matrix_world_seen();
+    obj.edit(|o| o.mesh.transform(&world));
     let edges = bisect_plane!(obj, co, no, clear_outer = true);
     if !edges.is_empty() {
         let made = holes_fill(obj, &edges);
@@ -86,7 +87,7 @@ fn _stone(
                 .fold(f64::NEG_INFINITY, f64::max)
         });
         // (the stone's matrix is still the one it was made with, at the origin, while these are cut)
-        _cut(o, &M4::IDENTITY, n * (reach - depth), n);
+        _cut(o, o.matrix_world_seen() * (n * (reach - depth)), n);
     }
     o.edit(|p| {
         let highest = p
@@ -97,7 +98,8 @@ fn _stone(
             .fold(f32::NEG_INFINITY, f32::max);
         p.loc.z = (top - highest as f64) as f32;
     });
-    _cut(o, &o.matrix_world(), (0, 0, GROUND), (0, 0, -1))
+    scene::update();
+    _cut(o, (0, 0, GROUND), (0, 0, -1))
 }
 
 /// Colours a stone's weathered faces (its rounded ones, not the fresh flat breaks): lichen in patches on what
@@ -110,22 +112,7 @@ fn _weather(obj: Obj, seed: f64, lichen: Mat, soil: Mat, cover: f64) {
             if !o.mesh.faces[f].smooth {
                 continue;
             }
-            let corners = o.mesh.corners(f);
-            let middle = if let [a, b, c] = *corners {
-                let (a, b, c) = (
-                    o.mesh.verts[a as usize],
-                    o.mesh.verts[b as usize],
-                    o.mesh.verts[c as usize],
-                );
-                V3::new(
-                    (a.x + b.x + c.x) / 3.0,
-                    (a.y + b.y + c.y) / 3.0,
-                    (a.z + b.z + c.z) / 3.0,
-                )
-            } else {
-                panic!("a cut stone is all triangles");
-            };
-            let c = world * middle;
+            let c = world * o.mesh.face_centre(f);
             if (c.z as f64) < 0.004 {
                 o.mesh.faces[f].mat = soil;
             } else if o.mesh.face_normal(f).z as f64 > 0.45
@@ -227,7 +214,6 @@ pub fn rock() -> Vec<Obj> {
 mod tests {
     use super::*;
     use artkit::mesh::{Mesh, edge};
-    use artkit::scene;
     use std::collections::BTreeMap;
 
     /// How many faces run each side, by its two points.
@@ -248,8 +234,8 @@ mod tests {
         let stone = boulder!("stone", 0.3, seed = 1.5, subdivisions = 2);
         _lump(stone, 0.08, 4.0, 1.5);
         let no = v3(0.3, -0.2, 1).normalized();
-        _cut(stone, &M4::IDENTITY, no * 0.4, no);
-        _cut(stone, &M4::IDENTITY, (0, 0, 0.1), (0, 0, -1));
+        _cut(stone, no * 0.4, no);
+        _cut(stone, (0, 0, 0.1), (0, 0, -1));
         stone.read(|o| {
             assert!(o.mesh.faces.iter().all(|f| f.len == 3));
             assert!(

@@ -397,8 +397,7 @@ fn a_thin_panel_goes_flat_and_keeps_its_outline() {
     // a board 2 cm thick: its two sides close up (thinner than the reach), its outline stays
     let panel = slab([1.0, 0.02, 0.6]);
     let done = decimate::collapse(&panel, 0.0, &free(&panel));
-    assert!(done.faces.len() < 12, "{}", done.faces.len());
-    assert!(closed(&done));
+    assert_eq!(done.faces.len(), 4);
     assert_no_slivers(&done, "the panel");
     for v in &done.verts {
         assert!(
@@ -406,13 +405,116 @@ fn a_thin_panel_goes_flat_and_keeps_its_outline() {
             "{v:?}"
         );
     }
-    // seen from the front it is as large as it was
-    let front: f64 = (0..done.faces.len())
-        .map(|f| normal(&done, f)[1])
-        .filter(|&n| n < 0.0)
-        .map(|n| -n / 2.0)
-        .sum();
-    assert!((front - 0.6).abs() < 1e-6, "{front}");
+    // seen from the front it is as large as it was, and from the back
+    for side in [-1.0, 1.0] {
+        let seen: f64 = (0..done.faces.len())
+            .map(|f| normal(&done, f)[1] * side)
+            .filter(|&n| n > 0.0)
+            .map(|n| n / 2.0)
+            .sum();
+        assert!((seen - 0.6).abs() < 1e-6, "{seen}");
+    }
+    // its two sides lie on one another: each has its own four vertices and its own normal at them, so neither is
+    // shaded as the other; no edge is sharp
+    assert_eq!(done.verts.len(), 8);
+    assert!(done.sharp.is_empty());
+    let normals = artkit::normals::corner_normals(&done);
+    for f in 0..done.faces.len() {
+        let own = normal(&done, f)[1].signum();
+        for l in done.faces[f].start..done.faces[f].start + 3 {
+            // (to within the board's thickness over its length: its corners closed up where they cost least)
+            assert!(
+                normals[l as usize].y * own as f32 > 0.999,
+                "{:?}",
+                normals[l as usize]
+            );
+        }
+    }
+    for (e, on) in faces_on_edges(&done) {
+        assert_eq!(
+            on.len(),
+            if on.iter().any(|&f| on.iter().any(|&g| g != f)) {
+                2
+            } else {
+                1
+            },
+            "{e:?}"
+        );
+    }
+    assert_eq!(written(&done), 8);
+}
+
+/// The faces on each of a mesh's edges.
+fn faces_on_edges(mesh: &Mesh) -> BTreeMap<(u32, u32), Vec<usize>> {
+    let mut on: BTreeMap<(u32, u32), Vec<usize>> = BTreeMap::new();
+    for f in 0..mesh.faces.len() {
+        let c = mesh.corners(f);
+        for i in 0..c.len() {
+            on.entry(edge(c[i], c[(i + 1) % c.len()]))
+                .or_default()
+                .push(f);
+        }
+    }
+    on
+}
+
+/// How many vertices a file of `mesh` has: one for each normal and UV a vertex has at its corners.
+fn written(mesh: &Mesh) -> usize {
+    let normals = artkit::normals::corner_normals(mesh);
+    let mut corners = BTreeSet::new();
+    for (l, &v) in mesh.loops.iter().enumerate() {
+        let n = normals[l].array().map(|x| (x * 1e4).round() as i64);
+        let uv = mesh.uvs.as_ref().map(|uv| uv[l].map(f32::to_bits));
+        corners.insert((v, n, uv));
+    }
+    corners.len()
+}
+
+#[test]
+fn a_vertex_is_written_once_where_the_models_was() {
+    // a smooth ball: no edge of it is sharp, before or after, and each vertex has one normal
+    let mut smooth = ball(16, 32, 0.5);
+    smooth.shade_smooth(180.0);
+    let done = decimate::collapse(&smooth, 0.25, &free(&smooth));
+    assert!(done.sharp.is_empty());
+    assert_eq!(written(&done), done.verts.len());
+    // the same ball shaded flat: every edge of it is sharp once its faces have turned from one another
+    let flat = ball(16, 32, 0.5);
+    let done = decimate::collapse(&flat, 0.25, &free(&flat));
+    assert!(done.sharp.len() > done.faces.len());
+    assert!(written(&done) > 2 * done.verts.len());
+    // a ball smooth but for its equator, with a texture laid on it from above that runs on over all of it: a
+    // vertex of the equator is written twice (a normal each side), every other once, and the texture is not torn
+    let (rings, segments) = (16, 32);
+    let mut halves = ball(rings, segments, 0.5);
+    halves.shade_smooth(180.0);
+    let at = |j: u32| 1 + (rings / 2 - 1) * segments + j % segments;
+    for j in 0..segments {
+        halves.sharp.insert(edge(at(j), at(j + 1)));
+    }
+    halves.uvs = Some(
+        halves
+            .loops
+            .iter()
+            .map(|&v| [halves.verts[v as usize].x, halves.verts[v as usize].y])
+            .collect(),
+    );
+    halves.uv_metres = true;
+    let done = decimate::collapse(&halves, 0.25, &free(&halves));
+    let mut on_the_line: BTreeSet<u32> = BTreeSet::new();
+    for &(a, b) in &done.sharp {
+        on_the_line.extend([a, b]);
+    }
+    assert!(!on_the_line.is_empty() && on_the_line.len() < done.verts.len() / 4);
+    assert_eq!(written(&done), done.verts.len() + on_the_line.len());
+    let mut uv_at: BTreeMap<u32, BTreeSet<[u32; 2]>> = BTreeMap::new();
+    for (l, &v) in done.loops.iter().enumerate() {
+        uv_at
+            .entry(v)
+            .or_default()
+            .insert(done.uvs.as_ref().unwrap()[l].map(f32::to_bits));
+    }
+    assert!(uv_at.values().all(|uvs| uvs.len() == 1));
 }
 
 #[test]
@@ -452,6 +554,11 @@ fn a_material_keeps_its_ground_and_a_sheet_its_outline() {
         "{ground:?}"
     );
     assert_eq!(done.mats.len(), 2);
+    // the sheet is flat and its texture runs on over it: a vertex is written once a material
+    assert!(done.sharp.is_empty());
+    let on_the_line = done.verts.iter().filter(|v| v.x.abs() < 1e-6).count();
+    assert_eq!(written(&done), done.verts.len());
+    assert!(on_the_line >= 2);
 }
 
 #[test]
@@ -459,12 +566,14 @@ fn a_sharp_edge_left_stays_sharp() {
     // a ball with its equator sharp: decimated, the edges left along the equator are sharp and no other is
     let (rings, segments) = (16, 32);
     let mut mesh = ball(rings, segments, 0.5);
+    mesh.shade_smooth(180.0);
     let at = |j: u32| 1 + (rings / 2 - 1) * segments + j % segments;
     for j in 0..segments {
         mesh.sharp.insert(edge(at(j), at(j + 1)));
     }
     let done = decimate::collapse(&mesh, 0.25, &free(&mesh));
     assert!(!done.sharp.is_empty());
+    assert!(done.faces.iter().all(|f| f.smooth));
     for &(a, b) in &done.sharp {
         for v in [a, b] {
             // (within a ring of it: nothing holds a collapse's point to a line the ball has no crease along)

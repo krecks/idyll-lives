@@ -1,11 +1,11 @@
 //! The dog house, the sundial and the stepping stones.
 
-use super::common::{_name, _own, _prism, F, M};
+use super::common::{_own, _prism, F, M};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{TAU, V3, atan2, cos, cosd, degrees, pow, sin, sind, v3};
 use artkit::noise::noise;
-use artkit::parts::{Settle, join_all, settle_all, settle_with};
+use artkit::parts::{Settle, join_all, numbered, settle_all, settle_with};
 use artkit::place::Facing;
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
@@ -40,7 +40,7 @@ fn _letter(ch: char, x: f64, y: f64, z: f64, size: f64, material: Mat) {
         let a: V3 = F.at(x - ax * s * 0.8, y + ay * s, z).into();
         let b: V3 = F.at(x - bx * s * 0.8, y + by * s, z).into();
         rod!(
-            _name("stroke"),
+            numbered("stroke"),
             a,
             b,
             t / 2.0,

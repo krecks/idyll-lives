@@ -8,6 +8,13 @@ use crate::parts::{Tolerance, check_size};
 use crate::scene::{self, Obj, meshes};
 use crate::{far, glb, motion, perch, shade, uv};
 
+/// A model's motions from the JSON a script's dict is, where it is put together as text (a part of it shared by
+/// several models, a number written into it): `.motions(motions(r#"{"night": "close"}"#))`. `json!` writes one in
+/// place.
+pub fn motions(text: &str) -> Json {
+    crate::json::loads(text).expect("the motions are JSON")
+}
+
 /// Builds a model in the empty scene (Blender axes, metres), standing on the floor and centred on its footprint;
 /// it returns its parts (none: every mesh in the scene).
 pub type Build = fn() -> Vec<Obj>;

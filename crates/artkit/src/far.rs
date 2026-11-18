@@ -60,6 +60,10 @@ pub fn decimated(obj: Obj, ratio: f64, feet: f64, edge: f64) -> Obj {
 
 /// `decimated` on a mesh; how many faces were turned back.
 pub fn decimate(mesh: &mut Mesh, ratio: f64, feet: f64, edge: f64) -> usize {
+    // the normals it is shaded with, as they are read on the mesh as it is (a bevel's are kept as angles in its
+    // corners' frames): what the collapses keep smooth and what they keep apart
+    mesh.normals = Some(crate::normals::corner_normals(mesh));
+    mesh.stored = None;
     merge_doubles(mesh, 1e-5);
     let reference = Surface::new(
         mesh.triangle_verts()
@@ -70,6 +74,11 @@ pub fn decimate(mesh: &mut Mesh, ratio: f64, feet: f64, edge: f64) -> usize {
     let locked = locks(mesh, feet, edge);
     let (mut done, was) = decimate::collapse_traced(mesh, ratio, &locked);
     let turned = turn_back(&mut done, &was, &reference);
+    if turned > 0 {
+        // (the normals the collapses left were its faces' as they lay: the mesh's smooth faces and sharp edges
+        // give them again)
+        done.normals = None;
+    }
     *mesh = done;
     turned
 }

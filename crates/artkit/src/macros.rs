@@ -158,6 +158,19 @@ macro_rules! find {
     }};
 }
 
+/// `forms::object_of` with its options by name, as the packs' scripts called their `_obj`: `object_of!(name, verts, faces, mats, face_mats = .., sharp = 50, bevel = 0.004)`.
+#[macro_export]
+macro_rules! object_of {
+    ($name:expr, $verts:expr, $faces:expr, $mats:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $verts, $faces, $mats);
+        #[allow(unused_mut)]
+        let mut o = $crate::forms::ObjectOf::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::forms::object_of(args.0, args.1, args.2, args.3, o)
+    }};
+}
+
 /// A value given for an option: itself, or what a script would have written for it (a whole number for a count
 /// or a length, a tuple for a point, a bare value where there may be none).
 pub trait Arg<T> {
@@ -264,5 +277,15 @@ impl<T: Clone> Arg<Vec<T>> for &[T] {
 impl<T: Clone> Arg<Vec<T>> for &Vec<T> {
     fn arg(self) -> Vec<T> {
         self.clone()
+    }
+}
+impl<T: Clone> Arg<Option<Vec<T>>> for &[T] {
+    fn arg(self) -> Option<Vec<T>> {
+        Some(self.to_vec())
+    }
+}
+impl<T: Clone> Arg<Option<Vec<T>>> for &Vec<T> {
+    fn arg(self) -> Option<Vec<T>> {
+        Some(self.clone())
     }
 }

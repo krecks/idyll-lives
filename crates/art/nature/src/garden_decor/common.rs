@@ -5,7 +5,7 @@ use artkit::boulder;
 use artkit::bvh::Rays;
 use artkit::materials::Mat;
 use artkit::math::{M4, P3, PI, TAU, V3, cos, p3, radians, sin, v3};
-use artkit::scene::Obj;
+use artkit::scene::{self, Obj};
 
 /// Loft rings for a turned body whose rim is scalloped: `rows` (radius, height), each ring's radius waving by
 /// `depth` (a fraction) round `lobes` lobes, fading in from rows at or above `scallop_from` height.
@@ -116,7 +116,7 @@ pub fn _stone(
                 .fold(f64::NEG_INFINITY, f64::max)
         });
         // (the stone's matrix is still the one it was made with, at the origin, while these are cut)
-        _cut(o, &M4::IDENTITY, n * (reach - depth), n);
+        _cut(o, o.matrix_world_seen() * (n * (reach - depth)), n);
     }
     o.edit(|p| {
         let highest = p
@@ -127,7 +127,8 @@ pub fn _stone(
             .fold(f32::NEG_INFINITY, f32::max);
         p.loc.z = (top - highest as f64) as f32;
     });
-    _cut(o, &o.matrix_world(), (0, 0, 0), (0, 0, -1))
+    scene::update();
+    _cut(o, (0, 0, 0), (0, 0, -1))
 }
 
 /// Where lines straight down through `points` (x, y) first meet what is built so far, `sink` below it.

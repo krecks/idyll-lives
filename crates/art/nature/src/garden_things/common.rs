@@ -5,8 +5,8 @@ use artkit::materials::Mat;
 use artkit::math::{V3, cosd, sind};
 use artkit::mesh::Mesh;
 use artkit::palette;
+use artkit::parts::numbered;
 use artkit::place::GameFrame;
-use artkit::rand::Random;
 use artkit::scene::{self, Obj};
 use artkit::{fsphere, rod};
 use std::cell::Cell;
@@ -94,7 +94,6 @@ pub const BODIES: [(&str, &str, &str); 9] = [
 thread_local! {
     /// The palette of the model being built on this thread.
     static CURRENT: Cell<SPEC> = const { Cell::new(SPEC) };
-    static COUNT: Cell<u32> = const { Cell::new(0) };
 }
 
 /// The palette for model `id`: the family's colours and its own `body`.
@@ -123,62 +122,6 @@ pub fn M() -> SPEC {
 
 pub const F: GameFrame = GameFrame::new(0.0);
 
-pub fn _name(stem: &str) -> String {
-    let n = COUNT.with(|c| {
-        c.set(c.get() + 1);
-        c.get()
-    });
-    format!("{stem}{n}")
-}
-
-// KIT: random.Random(<float>)
-/// `random.Random(seed)` for a seed that is not a whole number's: CPython seeds from the float's hash, as an
-/// unsigned number.
-pub fn random_of(seed: f64) -> Random {
-    Random::new(float_hash(seed) as u64 as i128)
-}
-
-/// CPython's `hash()` of a finite float: the number modulo 2^61 - 1, a whole number's its own.
-fn float_hash(v: f64) -> i64 {
-    const BITS: u32 = 61;
-    const MODULUS: u64 = (1 << BITS) - 1;
-    assert!(v.is_finite(), "a seed is a finite number");
-    // the fraction in 0.5..1 and its power of two
-    let (mut m, mut e) = if v == 0.0 {
-        (0.0, 0)
-    } else {
-        let bits = v.to_bits();
-        let exp = ((bits >> 52) & 0x7ff) as i32;
-        assert!(exp != 0, "a seed is not that small");
-        (
-            f64::from_bits((bits & !(0x7ff << 52)) | (1022 << 52)),
-            exp - 1022,
-        )
-    };
-    let negative = m < 0.0;
-    m = m.abs();
-    let mut x: u64 = 0;
-    while m != 0.0 {
-        x = ((x << 28) & MODULUS) | (x >> (BITS - 28));
-        m *= 268435456.0; // 2**28
-        e -= 28;
-        let y = m as u64;
-        m -= y as f64;
-        x += y;
-        if x >= MODULUS {
-            x -= MODULUS;
-        }
-    }
-    let e = if e >= 0 {
-        e as u32 % BITS
-    } else {
-        BITS - 1 - ((-1 - e) as u32 % BITS)
-    };
-    x = ((x << e) & MODULUS) | (x >> (BITS - e));
-    let hash = if negative { -(x as i64) } else { x as i64 };
-    if hash == -1 { -2 } else { hash }
-}
-
 /// {object id: light.height} from the content: the bulbs are placed against it.
 fn _content_lights() -> Vec<(String, f64)> {
     let mut out: Vec<(String, f64)> = Vec::new();
@@ -197,10 +140,12 @@ fn _content_lights() -> Vec<(String, f64)> {
             continue;
         };
         for o in objects {
-            let height = match o.get("light").and_then(|l| l.get("height")) {
-                Some(Json::Num(h)) => *h,
-                Some(Json::Int(h)) => *h as f64,
-                _ => continue,
+            let Some(height) = o
+                .get("light")
+                .and_then(|l| l.get("height"))
+                .and_then(Json::num)
+            else {
+                continue;
             };
             let Some(id) = o.get("id").and_then(Json::str) else {
                 continue;
@@ -264,7 +209,7 @@ pub fn _bird(x: f64, y: f64, z: f64, body: Mat, breast: Mat, turn: f64) {
     let (c, s) = (cosd(turn), sind(turn));
     fsphere!(
         F,
-        _name("bird_body"),
+        numbered("bird_body"),
         0.5,
         (x, y + 0.03, z),
         body,
@@ -275,7 +220,7 @@ pub fn _bird(x: f64, y: f64, z: f64, body: Mat, breast: Mat, turn: f64) {
     );
     fsphere!(
         F,
-        _name("bird_head"),
+        numbered("bird_head"),
         0.023,
         (x + 0.034 * s, y + 0.072, z + 0.034 * c),
         body,
@@ -284,7 +229,7 @@ pub fn _bird(x: f64, y: f64, z: f64, body: Mat, breast: Mat, turn: f64) {
     );
     fsphere!(
         F,
-        _name("bird_breast"),
+        numbered("bird_breast"),
         0.5,
         (x + 0.013 * s, y + 0.026, z + 0.016 * c),
         breast,
@@ -293,7 +238,7 @@ pub fn _bird(x: f64, y: f64, z: f64, body: Mat, breast: Mat, turn: f64) {
         rings = 6
     );
     rod!(
-        _name("beak"),
+        numbered("beak"),
         F.at(x + 0.05 * s, y + 0.074, z + 0.05 * c),
         F.at(x + 0.068 * s, y + 0.071, z + 0.068 * c),
         0.006,
@@ -301,7 +246,7 @@ pub fn _bird(x: f64, y: f64, z: f64, body: Mat, breast: Mat, turn: f64) {
         verts = 5
     );
     rod!(
-        _name("tail"),
+        numbered("tail"),
         F.at(x - 0.035 * s, y + 0.035, z - 0.035 * c),
         F.at(x - 0.078 * s, y + 0.052, z - 0.078 * c),
         0.012,
@@ -313,23 +258,6 @@ pub fn _bird(x: f64, y: f64, z: f64, body: Mat, breast: Mat, turn: f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_float_seeds_as_cpython_seeds_from_it() {
-        // hash(seed) and random.Random(seed).random() from CPython 3.13
-        for (seed, hash, first) in [
-            (1.37, 853161913409067009, 0.33933552464541206),
-            (4.37, 853161913409067012, 0.4879741318539018),
-            (42.11, 253642731013505066, 0.9462209642398599),
-            (-2.5, -1152921504606846978, 0.4779490710306722),
-            (0.1, 230584300921369408, 0.8062579873336703),
-            (3.0, 3, 0.23796462709189137),
-            (5.11, 253642731013507077, 0.970877619772797),
-        ] {
-            assert_eq!(float_hash(seed), hash, "hash({seed})");
-            assert_eq!(random_of(seed).random(), first, "Random({seed})");
-        }
-    }
 
     #[test]
     fn each_model_has_its_own_body_and_the_lamps_their_lights() {

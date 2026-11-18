@@ -2,7 +2,7 @@
 //! kit's parts it uses.
 
 use artkit::materials::Mat;
-use artkit::math::{P3, Quat, TAU, V3, cos, sin};
+use artkit::math::{Axis, P3, Quat, TAU, V3, cos, sin};
 use artkit::place::{GameFrame, Spot};
 use artkit::scene::Obj;
 use artkit::{loft, palette, revolve, ring, torus};
@@ -174,7 +174,7 @@ pub fn chain(
     let (a, b) = (V3::from(f.at(a.0, a.1, a.2)), V3::from(f.at(b.0, b.1, b.2)));
     let d = b - a;
     let n = 2.max(artkit::py::round(d.length() / pitch));
-    let q0 = to_track_quat_xz(d);
+    let q0 = d.to_track_quat(Axis::X, Axis::Z);
     let mut made = Vec::new();
     for k in 0..n {
         let c = a + d * ((k as f64 + 0.5) / n as f64);
@@ -187,10 +187,8 @@ pub fn chain(
             major_segments = 8,
             minor_segments = 3
         );
-        let q = mul_qt_qtqt(
-            q0,
-            quaternion((1.0, 0.0, 0.0), std::f64::consts::PI / 2.0 * (k % 2) as f64),
-        );
+        let q = q0
+            * Quat::from_axis_angle((1.0, 0.0, 0.0), std::f64::consts::PI / 2.0 * (k % 2) as f64);
         link.edit(|o| o.quat = Some(q));
         link.set_scale((d.length() / n as f64 / (2.0 * r) * 1.25, 0.75, 1.0));
         made.push(link);
@@ -227,94 +225,4 @@ pub fn tube<P: Spot>(
 /// The kit's fillet (`artkit::kit::fillet`): the path through `points` with each inner corner rounded.
 pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
     artkit::kit::fillet(points, radius, steps)
-}
-
-// KIT: mathutils Vector.to_track_quat('X', 'Z')
-/// The turn that points +X along `vec`, +Z kept up (Blender's `vec_to_quat`).
-fn to_track_quat_xz(vec: V3) -> Quat {
-    let len = dot(vec, vec).sqrt();
-    if len == 0.0 {
-        return Quat::IDENTITY;
-    }
-    let t = V3 {
-        x: -vec.x,
-        y: -vec.y,
-        z: -vec.z,
-    };
-    let mut nor = V3 {
-        x: 0.0,
-        y: -t.z,
-        z: t.y,
-    };
-    if t.y.abs() + t.z.abs() < 1e-4 {
-        nor.y = 1.0;
-    }
-    let co = t.x / len;
-    let nor = normalized(nor);
-    let q = axis_angle_normalized_to_quat(nor, saacos(co));
-    let m = q.to_matrix();
-    let fp = m.0[2];
-    let angle = -0.5 * (libm::atan2(fp[1] as f64, fp[2] as f64) as f32);
-    let co = libm::cos(angle as f64) as f32;
-    let si = libm::sin(angle as f64) as f32 / len;
-    let q2 = Quat {
-        w: co,
-        x: t.x * si,
-        y: t.y * si,
-        z: t.z * si,
-    };
-    mul_qt_qtqt(q2, q)
-}
-
-// KIT: mathutils Quaternion(axis, angle)
-/// The turn by `angle` (radians) about `axis`.
-fn quaternion(axis: (f64, f64, f64), angle: f64) -> Quat {
-    axis_angle_normalized_to_quat(normalized(V3::from(axis)), angle as f32)
-}
-
-fn dot(a: V3, b: V3) -> f32 {
-    a.x * b.x + a.y * b.y + a.z * b.z
-}
-
-fn normalized(v: V3) -> V3 {
-    let d = dot(v, v);
-    if d > 1.0e-35 {
-        let k = 1.0 / d.sqrt();
-        V3 {
-            x: v.x * k,
-            y: v.y * k,
-            z: v.z * k,
-        }
-    } else {
-        V3::ZERO
-    }
-}
-
-fn saacos(f: f32) -> f32 {
-    libm::acos(f.clamp(-1.0, 1.0) as f64) as f32
-}
-
-fn axis_angle_normalized_to_quat(axis: V3, angle: f32) -> Quat {
-    let phi = 0.5 * angle;
-    let (si, co) = (libm::sin(phi as f64) as f32, libm::cos(phi as f64) as f32);
-    Quat {
-        w: co,
-        x: axis.x * si,
-        y: axis.y * si,
-        z: axis.z * si,
-    }
-}
-
-// KIT: mathutils Quaternion @ Quaternion
-fn mul_qt_qtqt(a: Quat, b: Quat) -> Quat {
-    let t0 = a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z;
-    let t1 = a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y;
-    let t2 = a.w * b.y + a.y * b.w + a.z * b.x - a.x * b.z;
-    let z = a.z * b.w + a.w * b.z + a.x * b.y - a.y * b.x;
-    Quat {
-        w: t0,
-        x: t1,
-        y: t2,
-        z,
-    }
 }

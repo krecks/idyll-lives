@@ -701,6 +701,46 @@ pub fn object(
     shade(obj, smooth, angle)
 }
 
+options! {
+    /// `object_of`'s options.
+    ObjectOf { face_mats: Option<Vec<u16>> = None, sharp: f64 = 35.0, bevel: f64 = 0.0 }
+}
+
+/// The packs' `_obj`: a part of the Blender points `verts` and `faces` with the materials `mats` in its slots
+/// (every face on the first, or face i on `face_mats[i]`), its faces turned to look outwards, smooth with its edges
+/// over `sharp` degrees kept sharp, and its edges over 40 degrees rounded in two segments where a `bevel` is
+/// given. Not `object`: no operator makes it, so the scene is not worked out, and it takes several materials.
+pub fn object_of(name: &str, verts: &[P3], faces: &[Vec<u32>], mats: &[Mat], o: ObjectOf) -> Obj {
+    let mut mesh = Mesh::from_pydata(verts.iter().map(|&p| V3::from(p)).collect(), faces);
+    for &m in mats {
+        mesh.slot(m);
+    }
+    if let Some(face_mats) = &o.face_mats {
+        for (face, &i) in mesh.faces.iter_mut().zip(face_mats) {
+            face.mat = i;
+        }
+    }
+    mesh.recalc_normals();
+    let obj = scene::add(name, mesh);
+    obj.edit(|p| p.mesh.shade_smooth(o.sharp));
+    if o.bevel != 0.0 {
+        // (a mesh made of points and faces)
+        bevel_edges(obj, o.bevel, 2, 40.0, &EdgeOrder::Corners);
+    }
+    obj
+}
+
+/// A bar's square profile, `w` across and `h` the other way, about its middle, from its low left corner round
+/// (the packs' `_sq`): what a sweep takes for its `profile`.
+pub fn rect(w: f64, h: f64) -> Vec<(f64, f64)> {
+    vec![
+        (-w / 2.0, -h / 2.0),
+        (w / 2.0, -h / 2.0),
+        (w / 2.0, h / 2.0),
+        (-w / 2.0, h / 2.0),
+    ]
+}
+
 /// A number or a point given where either will do.
 pub fn num(x: impl Num) -> f64 {
     x.f()

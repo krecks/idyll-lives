@@ -1,11 +1,11 @@
 //! The garden lamp post and the string lights.
 
-use super::common::{_name, _near_light, _own, F};
+use super::common::{_near_light, _own, F};
 use artkit::far::low;
 use artkit::kit::fillet;
 use artkit::math::{P3, PI, TAU, cos, cosd, p3, pow, sin, sind};
 use artkit::motion::{Rock, rock};
-use artkit::parts::{Settle, hinged, join, join_all, new_parts, settle_all, settle_with};
+use artkit::parts::{Settle, hinged, join, join_all, new_parts, numbered, settle_all, settle_with};
 use artkit::py;
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
@@ -402,7 +402,7 @@ pub fn stringLights() -> Vec<Obj> {
             .iter()
             .map(|&(dy, r)| ring!(r, r, z = y + dy, verts = 6, at = (b.x, b.y)))
             .collect();
-            loft!(_name("socket"), &socket, material = m.socket);
+            loft!(numbered("socket"), &socket, material = m.socket);
             let bulb: Vec<Vec<P3>> = [
                 (-0.05, 0.009),
                 (-0.058, 0.012),
@@ -416,7 +416,7 @@ pub fn stringLights() -> Vec<Obj> {
             .iter()
             .map(|&(dy, r)| ring!(r, r, z = y + dy, verts = 8, at = (b.x, b.y)))
             .collect();
-            loft!(_name("bulb"), &bulb, material = m.bulb);
+            loft!(numbered("bulb"), &bulb, material = m.bulb);
             heights.push(y - 0.09);
         }
         let n = heights.len() as f64;

@@ -1,12 +1,27 @@
-//! Signs: the taxi's livery on the taxi rank's signs (its word and its chequers), and raised block letters.
+//! Signs: the taxi's livery on the taxi rank's signs (its word and its chequers), raised block letters, and a band or
+//! a label painted onto a part's own faces.
 
 use crate::forms::{self, Extrude, Holes, Plane};
 use crate::materials::Mat;
-use crate::math::{Num, atan2, degrees};
+use crate::math::{Num, V3, atan2, degrees};
 use crate::place::{Coord, GameFrame};
 use crate::py;
 use crate::scene::Obj;
 use crate::shapes::{Cube, options};
+
+/// Gives the faces of `obj` whose middle (its own axes, Blender's; `Mesh::face_centre`) passes `test` another
+/// material: a band, a surround, a label, a rind, with no more triangles (the packs' `_paint`).
+pub fn paint(obj: Obj, material: Mat, test: impl Fn(V3) -> bool) -> Obj {
+    obj.edit(|p| {
+        let k = p.mesh.slot(material);
+        for f in 0..p.mesh.faces.len() {
+            if test(p.mesh.face_centre(f)) {
+                p.mesh.faces[f].mat = k;
+            }
+        }
+    });
+    obj
+}
 
 options! {
     /// `taxi_word`'s options.

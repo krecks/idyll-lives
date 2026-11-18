@@ -92,4 +92,4 @@ Blender's (0.000 mm), two the same in every bit, the pack the same but for its c
 materials in a palette of its own (the family's colours and its own `body`: `common::palette_of`); the lamp post's
 far version is artkit's decimation of it (`far_ratio`), held to the decimated far versions' rule. The bulbs are held
 to the content's `light.height` as the build runs (`_near_light`, the content read when the tool is compiled). The
-stones' own random numbers are seeded from a float as CPython seeds from one (`random_of`).
+stones' own random numbers are seeded from a float as CPython seeds from one (`Random::from_float`).
