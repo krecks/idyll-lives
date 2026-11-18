@@ -135,8 +135,8 @@ function handOn(keys: Track, t: number, opts: ArmOptions): Hand | null {
 
 /**
  * A cupboard's door that opens: its hinge and pull (m to the user's right), the pull's height and depth, the
- * hand that opens it. Only the doors the model's `doors_open` or `door_open` swings (kitchen_counters.py,
- * dining.py): both of the wall cabinet's, the glazed one's right door (the user's left), the corner one's single
+ * hand that opens it. Only the doors the model's `doors_open` or `door_open` swings
+ * (crates/art/wet/src/kitchen_counters, dining.py): both of the wall cabinet's, the glazed one's right door (the user's left), the corner one's single
  * door, the china cabinet's left glazed door (the user's right). They open 100 degrees in 0.8 s as the use
  * starts and close after 1.5 s more (the clip's `CUPBOARD_S` round fits it).
  */

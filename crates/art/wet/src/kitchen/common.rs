@@ -356,6 +356,8 @@ pub fn soft(obj: Obj) -> Obj {
         o.mesh.shade_smooth_by_angle(40.0);
         let normals = weighted_normals(&o.mesh);
         o.mesh.normals = Some(normals);
+        // (what the bevel stored is replaced: the weighted normals are the ones Blender keeps)
+        o.mesh.stored = None;
     });
     obj
 }

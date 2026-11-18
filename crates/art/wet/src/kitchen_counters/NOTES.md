@@ -1,6 +1,6 @@
 # Kitchen counters — notes
 
-`kitchen_counters.py` builds the kitchen's **K4 base counters**, **K5 tall and wall storage** and **K6 islands and bars** into
+the family builds the kitchen's **K4 base counters**, **K5 tall and wall storage** and **K6 islands and bars** into
 `web/public/assets/models/kitchen_counters/` and their entries in `packs/kitchen_counters/manifest.json`.
 
 K4 (2026-10-14): the plain counter (`model.counter`), the corner counter (`model.counterCorner`), the
@@ -59,12 +59,12 @@ groups; the still bodies of the textured things (oak shelves, a basket) are kept
 Every moving part is its own object with its origin on the hinge (or the front face for a slide); each
 clip is one NLA track named for the pack's `motions`. Frame 1 is the rest pose. A door that a resident
 opens swings out 100° (`DOOR_SECONDS` 1.6 s, `DOOR_HOLD` 2.5 s); a drawer slides out 25 cm
-(`SECONDS` 1.4 s, `HOLD` 1.5 s). `G.settle()` runs before `G.swing()`/`G.slide()`, since a clip keys the
+(`SECONDS` 1.4 s, `HOLD` 1.5 s). Settling runs before `swing`/`slide`, since a clip keys the
 rest pose where it is.
 
 ## Detail pass (2026-10-22)
 
-Rebuilt with the forms and the kit (`G.sweep`, `G.loft`/`G.ring`, `F.extrude` with holes, `F.soft`, `G.kit.tube`),
+Rebuilt with the forms and the kit (sweeps, lofts of rings, extrusions with holes, soft boxes, the kit's tube),
 keeping every key, size, centre, footprint, worktop height, node, hinge, clip, `motions`, `paint` and draw count. The
 shared parts, in the script:
 
@@ -195,12 +195,12 @@ checked in play.
 
 ## Where it stands (review, 2026-10-14)
 
-Each floor model is centred where the game places it (its `Model`'s `centre`, which `G.settle()` uses),
+Each floor model is centred where the game places it (its `Model`'s `centre`, which settling uses),
 not on its tile: its back is on the wall face (-0.43), as the old part's, a run of counters and
 appliances lines up, and its top is under its content `surface`. Since the
 2026-10-14 fix-ups the old parts no longer reach into the wall: both moved forward onto the face.
 There is one counter depth, the catalogue's 0.66 m (worktop -0.43..0.23): the catalog2 counters keep
-the old 0.79-deep numbers and are drawn through `COUNTER66` (gamekit `GameFrame(depths=)`,
+the old 0.79-deep numbers and are drawn through `COUNTER66` (`GameFrame::with_depths`,
 the old `shallow`). Islands stand free, centred.
 
 ## Rebuild
@@ -212,4 +212,4 @@ cargo art kitchen_counters --preview  # previews/kitchen_counters/<id>.png, <id>
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `recyclingBins`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (the kit's soft forms: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `recyclingBins`; the same triangles.

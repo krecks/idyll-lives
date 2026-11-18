@@ -289,7 +289,7 @@ room has.
 ## Moving parts
 
 A door, a lid or a drawer that moves while residents use the object: one node per moving part in
-the file, moved by a clip of its own. The fridge's doors (`families/kitchen.py`), the wall bed that folds
+the file, moved by a clip of its own. The fridge's doors (`crates/art/wet/src/kitchen`), the wall bed that folds
 down for a whole sleep (`families/living.py`) and the template's lid and drawer (`families/_template.py`)
 are the examples; `G.hinged`, `G.turn`, `G.swing` and `G.slide` do the work.
 

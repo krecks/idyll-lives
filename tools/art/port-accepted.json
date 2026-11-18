@@ -9,6 +9,7 @@
   "model.farm.scarecrow far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.foodie.pizzaOven": {"shading": "Blender's UV sphere has its faces in another order on every run: three of its own builds differ by 2.76 to 3.15 greys on the dough ball; the kernel's is within that"},
   "model.fountainTown far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
+  "model.fridgeMiniRetro": {"normals": "the name plate's letters: Blender's text has the walls of the holes in its A and R facing into the metal; the kernel's look outwards"},
   "model.groceryShelf far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.hotDogStand far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.iceCreamCart far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},

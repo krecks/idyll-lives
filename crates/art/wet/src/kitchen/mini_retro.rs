@@ -1,11 +1,11 @@
-//! The pastel-pink retro mini fridge, as in the reference photo. Not in the family yet: its raised gold letters are
-//! made by Blender's text tool, and the kernel's block letters have not landed (`letters`).
+//! The pastel-pink retro mini fridge, as in the reference photo.
 
 use super::M;
 use super::common::{apple, carton, gasket, jar, soft, tube};
 use super::cut::cut_cabinet;
 use super::fridge::{bottle, door_bin};
 use super::sticker::unicorn;
+use artkit::kit::Letters;
 use artkit::materials::Mat;
 use artkit::motion::Ease;
 use artkit::parts::{hinged, join, new_parts, settle_all};
@@ -13,17 +13,24 @@ use artkit::place::GameFrame;
 use artkit::scene::Obj;
 use artkit::{fbox, fcone, fcyl, swing};
 
-/// Raised metal letters on a face at game depth `at[2]`, centred on (x, height), facing the front: Blender's text
-/// (`size` high, 1.5 mm deep, letters spaced 1.25, three steps a curve) made a mesh, its faces turned outward.
-/// It waits for the kernel's block letters.
-fn letters(_f: &GameFrame, text: &str, _at: (f64, f64, f64), _size: f64, _material: Mat) -> Obj {
-    unimplemented!("raised letters ({text:?}) wait for the kernel's block letters")
+/// Raised metal letters on a face at game depth `at[2]`, centred on (x, height), facing the front: block letters
+/// of a text `size` high, 3 mm proud, spaced as Blender's text with a character spacing of 1.25 (the kit's).
+fn letters(f: &GameFrame, text: &str, at: (f64, f64, f64), size: f64, material: Mat) -> Obj {
+    artkit::kit::letters(
+        f,
+        "letters",
+        text,
+        size,
+        0.003,
+        at,
+        material,
+        Letters { space: 1.25 },
+    )
 }
 
 /// A pastel-pink retro mini fridge, as in the reference photo: a soft rounded cabinet on tapered brass
 /// feet, vents at the back of its sides, and one door over the whole front with a brass D handle, raised
 /// gold letters ("MARIE") and a die-cut unicorn sticker.
-#[allow(dead_code)] // (out of the family until `letters` can be made)
 pub fn fridge_mini_retro() -> Vec<Obj> {
     let fp = GameFrame::new(0.0);
     let front = 0.115; // the door's face; the handle reaches the old part's front (0.15)

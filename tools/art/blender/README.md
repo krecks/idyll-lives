@@ -187,7 +187,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
    A count the family gives is kept as it is: `cargo review facets` lists what shows its flat sides (over 1.5 mm).
 
    Spend the triangles where they show (silhouettes, edges, what a hand touches) and keep hidden parts plain
-   (`families/living.py` armchair and sofa, `kitchen.py` fridge). End with:
+   (`families/living.py` armchair and sofa, the kitchen's fridge, now `crates/art/wet/src/kitchen`). End with:
    - `G.join_all('<id>')` for a model with no moving parts;
    - one `G.join` per part for a model with moving parts (below);
    - then `G.settle()`, which stands it on the floor, centred, by moving it, never scaling.
@@ -369,7 +369,7 @@ How the parts work:
 - **In the game's renderer.** The clips bench, `/clips.html?keys=model.<id>` (below), plays every clip
   of the model as the game does.
 - **Examples.**
-  - `families/kitchen.py`: two doors, played by uses.
+  - `crates/art/wet/src/kitchen` (the fridge): two doors, played by uses.
   - `families/living.py`: a bed built open, folded to rest, and held down while open.
   - `families/_template.py`: a lid and a drawer.
 

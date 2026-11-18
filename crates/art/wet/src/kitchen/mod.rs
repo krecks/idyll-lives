@@ -1,5 +1,5 @@
 //! The kitchen: the top-freezer fridge (`model.fridge`), five more fridges, the wine fridge and two sinks.
-//! Notes: tools/art/blender/families/kitchen.md.
+//! Notes: NOTES.md.
 //!
 //! A cabinet and two doors, each door its own node turning on its hinge, with a clip per door: the game
 //! opens the fridge door while a resident takes food or a drink out (`motions`). At rest both are closed.
@@ -131,8 +131,7 @@ fn uses(pairs: &[(&str, &str)]) -> Json {
     )
 }
 
-/// The family. The retro mini fridge (`fridgeMiniRetro`) is not in it yet: its raised letters wait for the
-/// kernel's block letters (`mini_retro::letters`), so `cargo art` builds it in Blender until they land.
+/// The family.
 pub fn family() -> Option<Family> {
     let s = Json::from;
     // A floor thing against a wall is centred where the game places it (`centre`): its back on the wall,
@@ -217,6 +216,28 @@ pub fn family() -> Option<Family> {
                     ("hold", Json::Num(HOLD)),
                 ]))
                 .paint(&[("mint", "Body"), ("chrome", "Handle"), ("mint2", "Trim")]),
+            Model::new(
+                "fridgeMiniRetro",
+                mini_retro::fridge_mini_retro,
+                (0.58, 0.86, 0.58),
+            )
+            .key("model.fridgeMiniRetro")
+            .centre(0.0, -0.14)
+            .motions(obj(vec![
+                (
+                    "uses",
+                    obj(["fetch", "cook", "drink"]
+                        .into_iter()
+                        .map(|u| (u, s("fridge_open")))
+                        .collect()),
+                ),
+                ("hold", Json::Num(3.0)),
+            ]))
+            .paint(&[
+                ("pink", "Body"),
+                ("gold", "Handle & feet"),
+                ("pink2", "Trim"),
+            ]),
             Model::new("wineFridge", wine::wine_fridge, (1.00, 0.95, 0.66))
                 .key("model.wineFridge")
                 .centre(0.0, -0.10)
@@ -289,5 +310,5 @@ pub fn family() -> Option<Family> {
          a resident takes food or a drink (`motions`); the French-door freezer slides and the wine \
          fridge's top shelf of bottles slides out once its glass door is open; every freezer door and \
          the French freezer drawer open for 'Get some ice cream'.",
-    ))
+    ).switched())
 }

@@ -463,7 +463,7 @@ pub fn farmhouse_sink() -> Vec<Obj> {
 
 /// Two steel bowls set into a stone worktop over a two-metre run of four shaker doors, a gooseneck tap with a
 /// lever behind each bowl, a soap dish and a potted herb between them. Built in the counters' drawn 0.66 m depth
-/// (kitchen_counters.py COUNTER66's drawn numbers: the worktop -0.43..0.23).
+/// (the counters' COUNTER66 drawn numbers, crates/art/wet/src/kitchen_counters: the worktop -0.43..0.23).
 pub fn counter_sink_double() -> Vec<Obj> {
     let fk = GameFrame::new(0.085);
     let still = new_parts(|| {
