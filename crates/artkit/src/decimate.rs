@@ -37,11 +37,12 @@ const TURN: f64 = 0.2;
 const AREA: f64 = 1e-12;
 /// How far (m) a collapse may take a vertex from the planes it is held to (its faces' as they were at first,
 /// those across its open edges and lines between materials, and those of every vertex merged into it): a part
-/// thicker than this is not squashed, a sheet's corner not cut off, a rod not shortened. The first is tried; if
-/// the count cannot be met within it, the second, which is what the comparison lets two far versions differ by
-/// (`cargo check-glb --against`, 60 mm); and if not within that either, the mesh is left as the first leaves
-/// it: more would spoil its posts and panels for a few triangles.
-pub const REACH: [f64; 2] = [0.03, 0.06];
+/// thicker than this is not squashed, a sheet's corner not cut off, a rod not shortened. The first is tried: a
+/// post, a rail or a table's leg, 5 cm and more across, keeps its shape. If the count cannot be met within it,
+/// the second, which is what the comparison lets two far versions differ by (`cargo check-glb --against`,
+/// 60 mm); and if not within that either, the mesh is left as the first leaves it: more would spoil its posts
+/// and panels for a few triangles.
+pub const REACH: [f64; 2] = [0.045, 0.06];
 const FLAT: f64 = 1e-5;
 
 fn sub(a: P, b: P) -> P {
@@ -597,8 +598,8 @@ fn cut(p: &[V3]) -> Vec<[u32; 3]> {
     }
 }
 
-/// `mesh` cut into triangles and brought down to `ratio` of them (rounded down), or as near it as the module's
-/// rules allow. `locked`: for each vertex, whether it must stay as it is. The vertices and triangles left keep
+/// `mesh` cut into triangles and brought down to `ratio` of them (rounded down, as Blender's modifier counts
+/// what it is to leave: it stops at that or a triangle under), or as near it as the module's rules allow. `locked`: for each vertex, whether it must stay as it is. The vertices and triangles left keep
 /// their order, each triangle its face's material and shading; an edge is sharp where it was, and where two
 /// smooth faces meet that were not shaded as one surface; the UVs follow their corners; the corners' own normals
 /// and the baked shading are not kept (they were the old surface's).

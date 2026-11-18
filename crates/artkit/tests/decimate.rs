@@ -6,7 +6,9 @@
 //!
 //!   cargo test -p artkit --profile tools --test decimate -- --ignored --nocapture
 //!
-//! prints that for all 28 of them, and writes each new far version to $DECIMATE_OUT/<family>/<id>.far.glb if set.
+//! prints that for all 28 of them, each decimated from Blender's model and held against Blender's far version
+//! (git's ref/blender, whatever the working tree has by now), and writes each new far version to
+//! $DECIMATE_OUT/<family>/<id>.far.glb if set.
 
 use artkit::family::{Family, Model, build_model};
 use artkit::far::{self, Surface};
@@ -917,12 +919,29 @@ fn read(name: &str, far: bool) -> glb::Model {
     glb::read(&data).unwrap_or_else(|e| panic!("{path}: {e}"))
 }
 
-/// The committed model `name` (`<family>/<id>`) decimated as its far version is, and that measured against its
-/// committed far version.
-fn decimated(name: &str, ratio: f64) -> (Mesh, Measured) {
-    let (model, old) = (read(name, false), triangles(&read(name, true)));
-    let whole = triangles(&model);
-    let mut mesh = joined(&model);
+/// A model's file (`<family>/<id>`) or its far version's as Blender built it: the reference the port is held
+/// against (the revision ref/blender), whatever the working tree has by now.
+fn blenders(name: &str, far: bool) -> glb::Model {
+    let path = format!(
+        "ref/blender:web/public/assets/models/{name}{}.glb",
+        if far { ".far" } else { "" }
+    );
+    let out = std::process::Command::new("git")
+        .args(["-C", env!("CARGO_MANIFEST_DIR"), "show", &path])
+        .output()
+        .unwrap_or_else(|e| panic!("git show {path}: {e}"));
+    assert!(
+        out.status.success(),
+        "git show {path}: no such file or revision"
+    );
+    glb::read(&out.stdout).unwrap_or_else(|e| panic!("{path}: {e}"))
+}
+
+/// A model's file decimated as its far version is, and that measured against `old`, a far version of it.
+fn decimated(model: &glb::Model, old: &glb::Model, ratio: f64) -> (Mesh, Measured) {
+    let old = triangles(old);
+    let whole = triangles(model);
+    let mut mesh = joined(model);
     let turned = far::decimate(&mut mesh, ratio, far::FEET, far::EDGE);
     let new: Vec<[V3; 3]> = (0..mesh.faces.len())
         .map(|f| {
@@ -966,7 +985,7 @@ fn committed_models_decimated_pass_the_comparisons_rule() {
         "stalls/iceCreamCart",
         "street_furniture/phoneBooth",
     ] {
-        let (mesh, measured) = decimated(name, 0.25);
+        let (mesh, measured) = decimated(&read(name, false), &read(name, true), 0.25);
         println!("{}", measured.row(name));
         assert!(measured.passes(), "{name}: {}", measured.row(name));
         // a quarter of the model's triangles, or as near as its feet and its box allow
@@ -1018,8 +1037,8 @@ const DECIMATED: [&str; 28] = [
 const UNLIKE_BLENDERS: [(&str, &str); 6] = [
     (
         "playground/pingPongTable",
-        "Blender's is 29 mm taller than its model and up to 191 mm off it; the kernel's has the model's box and \
-         is 30 mm off it at most, with 296 triangles to Blender's 267 (its legs and net are not squashed)",
+        "Blender's is 29 mm taller than its model and up to 191 mm off it (its top is gone but for the lines); \
+         the kernel's has the model's box, is 36 mm off it at most and has 284 triangles to Blender's 267",
     ),
     (
         "shops/groceryShelf",
@@ -1040,13 +1059,13 @@ const UNLIKE_BLENDERS: [(&str, &str); 6] = [
     ),
     (
         "street_furniture/noticeBoard",
-        "its posts, frame and notes cannot be had in a quarter of their triangles without being squashed: 28.3 % \
+        "its posts, frame and notes cannot be had in a quarter of their triangles without being squashed: 27.4 % \
          of the model's to Blender's 22.2 %, whose cork board is gone",
     ),
 ];
 
 #[test]
-#[ignore = "all 28 decimated far versions against the committed ones: a table to read, and files to look at"]
+#[ignore = "all 28 decimated far versions against Blender's (git's ref/blender): a table to read, and files to look at"]
 fn every_decimated_far_version() {
     let out = std::env::var("DECIMATE_OUT").ok();
     let finishes = plain();
@@ -1055,7 +1074,7 @@ fn every_decimated_far_version() {
     let mut unlike = Vec::new();
     for name in DECIMATED {
         let started = std::time::Instant::now();
-        let (mesh, measured) = decimated(name, 0.25);
+        let (mesh, measured) = decimated(&blenders(name, false), &blenders(name, true), 0.25);
         println!(
             "{}  ({:.2} s)",
             measured.row(name),
