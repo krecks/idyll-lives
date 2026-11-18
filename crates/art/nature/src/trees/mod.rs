@@ -45,7 +45,7 @@ const TOLERANCE: f64 = 0.1;
 pub fn family() -> Option<Family> {
     let tree = |model: Model| model.tolerance(TOLERANCE).far_low().habitat("tree");
     let conifer = |model: Model| model.tolerance(TOLERANCE).far_low().habitat("conifer");
-    Some(Family::new(
+    let trees = Family::new(
         "trees",
         base(),
         vec![
@@ -101,5 +101,6 @@ pub fn family() -> Option<Family> {
          which the far woods and the town overview draw. Clips: an apple shrinks away while it is picked, the fruit \
          follows the tree's ripeness (picked bare, the lemons all go), the Japanese maple's stray sprigs while it is \
          shaped.",
-    ))
+    );
+    Some(trees.switched())
 }
