@@ -100,4 +100,4 @@ cargo art pack_cheerful --preview  # previews/pack_cheerful/<id>.png, <id>@<clip
 
 ## The soft forms pass (2026-11-13)
 
-The hammock's pillow is sewn flat and stuffed (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 2 models changed shape: `partyBooth`, `rainbowHammock`; 12,188 to 12,442 triangles.
+The hammock's pillow is sewn flat and stuffed (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 2 models changed shape: `partyBooth`, `rainbowHammock`; 12,188 to 12,442 triangles.

@@ -1,5 +1,5 @@
 {
-  "$comment": "Big working things for the town's named places (the fire station's engines, the garage's lift, the newspaper's press, the builders' yard), in the `community` buy category. Their models are built in tools/art/blender/families/civic_works.py (pack assets/packs/civic_works). Footprints stay within 6 × 6 tiles (sim-core `world::MAX_SIZE`).",
+  "$comment": "Big working things for the town's named places (the fire station's engines, the garage's lift, the newspaper's press, the builders' yard), in the `community` buy category. Their models are built by crates/art/outside/src/civic_works (pack assets/packs/civic_works). Footprints stay within 6 × 6 tiles (sim-core `world::MAX_SIZE`).",
   "objects": [
     {
       "id": "fireEngine",

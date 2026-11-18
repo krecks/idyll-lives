@@ -63,7 +63,7 @@ parts, clips, paint and draws):
 
 ```
 cargo art pack_example            # the two .glb, the pack, check-glb
-cargo art pack_example --preview  # tools/art/blender/previews/pack_example/<id>.png, <id>@<clip>.png
+cargo art pack_example --preview  # tools/art/previews/pack_example/<id>.png, <id>@<clip>.png
 ```
 
 ## Cooking at it (2026-11-03)
@@ -76,4 +76,4 @@ content `surface`: a stove's hob isn't a top things are put on, as the other coo
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 2 models changed shape: `chefStove`, `whirlpoolTub`; the same triangles.
+No change to the script: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 2 models changed shape: `chefStove`, `whirlpoolTub`; the same triangles.

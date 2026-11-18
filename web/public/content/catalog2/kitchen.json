@@ -1,5 +1,5 @@
 {
-  "$comment": "Catalogue 2: Counters (tops at 0.95 m, prep stations), islands and bars, cooking appliances and kitchen storage. Separate pieces only. Models: assets/manifest.json and the packs it lists (tools/art/blender/families/).",
+  "$comment": "Catalogue 2: Counters (tops at 0.95 m, prep stations), islands and bars, cooking appliances and kitchen storage. Separate pieces only. Models: assets/manifest.json and the packs it lists (crates/art).",
   "objects": [
     {
       "id": "counterEnd",

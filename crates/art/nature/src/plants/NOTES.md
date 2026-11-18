@@ -96,7 +96,7 @@ the old part's pot narrowed to the model's 40 cm on 2026-10-15).
 ## Far versions
 
 Every outdoor model (G2, G3) has a far version, `<id>.far.glb`, drawn in the town overview and the far woods: the
-same build function run with `LOW` set (`far_of`, now gamekit's `G.far_of`, `gamekit/far.py`), so every shape is the same but coarser (leaves with half the
+same build function run with `LOW` set (`far_of`, now artkit's `far::far_of`), so every shape is the same but coarser (leaves with half the
 rows, three-sided stems open at their ends, lumps and cups with fewer segments, smaller stars) and its moving part
 joined in, still; boxes lose their bevels, sprigs keep one leaf, flower faces three petals and no middle, cups
 three sides, mounds twelve. Where it leaves things out it still draws every random number the full build draws, so
@@ -125,7 +125,7 @@ metre): from the play camera, above, its top was a ruled strip; the triangles, t
   colours every head (they cycled three or four shades of one hue until 2026-10-17, and the colour reached only the
   first; the geraniums' clusters too).
 - **Perches** (2026-10-22): where the game's birds sit (`birds.py`), the entry's `perches` in the model's game axes
-  (`perches`, `gamekit/perch.py`, as the trees' in trees.md). Lines come in from round and above towards the shrub's
+  (`perches`, artkit's `perch`, as the trees' in trees.md). Lines come in from round and above towards the shrub's
   middle, or along a hedge's top (`hedge_top`), and meet its leaves. The perch is 2 cm in from there, on leaves that
   face up a little at least, with nothing over it within 15 cm, spread at least 20 cm apart. Found before the trimmed
   sprigs and the cut rose are built. The rose bush's canes are offered too, half way up their arch, but none stands
@@ -275,8 +275,7 @@ cargo art plants --preview  # previews/plants/<id>.png, <id>@<clip>.png
 
 Built here, not in Blender, since 2026-11-18 (`cargo check-glb --against ref/blender`): the 78 files' points
 Blender's (0.000 mm), 56 the same in every bit, the pack the same to the letter but for its comment, every perch
-with it (the recorded bird day passes unchanged). The models are built from artkit's botany (the library half of
-families/plants.py, which stays as the library of the scripts not yet ported). A leaf cut into lobes or leaflets
+with it (the recorded bird day passes unchanged). The models are built from artkit's botany. A leaf cut into lobes or leaflets
 has a top and an underside triangle on the same three points wherever a triangle of its outline touches no midrib
 point; Blender's exporter validates a mesh and takes the second of each such pair out, and so does artkit's: those
 leaflets are drawn from one side only, as they were. The rose bush turns the spiral's heading, already degrees,

@@ -179,7 +179,7 @@ colour studio.
 ## The detail pass (2026-10-22)
 
 Every model but the two worked examples (`model.armchair`, `model.sofa`, rebuilt the day before) rebuilt with the
-forms (gamekit/forms.py), same keys, sizes, centres, nodes, clips, motions, paint and draws; the triangles in the
+forms (artkit's `forms`), same keys, sizes, centres, nodes, clips, motions, paint and draws; the triangles in the
 tables above. The helpers (common.rs):
 
 - **`cushion`** is a `F.soft` box: rounded, puffed on its two largest faces, its corners pinched in (the shared
