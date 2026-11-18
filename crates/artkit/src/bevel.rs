@@ -2094,11 +2094,6 @@ pub fn apply(obj: Obj) -> Obj {
             });
             // the mesh is still the one whose UVs were made: joined first, it says so for the whole
             made.mesh.uv_metres = o.mesh.uv_metres;
-        } else if o.mesh.uvs.is_some() {
-            // (a part on plain finishes keeps its zeros and that they are final: joined first, its mesh is the
-            // joined one, and the others' UVs are not to be made again over the whole of it)
-            made.mesh.uvs = Some(vec![[0.0, 0.0]; made.mesh.loops.len()]);
-            made.mesh.uv_metres = o.mesh.uv_metres;
         }
         o.mesh = made.mesh;
         o.bevel = None;
