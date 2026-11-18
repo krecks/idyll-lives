@@ -1,10 +1,10 @@
 # Foodie pack — notes
 
-`pack_foodie.py` builds the six P6 foodie models into `web/public/assets/models/pack_foodie/` and their entries in
+`crates/art/packs/src/pack_foodie` builds the six P6 foodie models into `web/public/assets/models/pack_foodie/` and their entries in
 `packs/pack_foodie/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Foodie until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`GameFrame`, game axes; settled on the floor where it was built, and `centre` on its `Model`),
 backs on the wall's face (depth −0.43). The island's top is at 0.9, the content's `surface.height` (the
 old part's was 0.83), so what is put on it sits on it; its two counter stools' seats are at 0.65, 25 cm under the top (`furniture.json`
 `foodie.chefsIsland` 0.65, the hips at depth −0.235, the sitters at x ±0.5 facing the top, the knees under its back overhang; foot rings at 0.3; 2026-10-21: they were 0.45, chair height, the top at the chest: M-packs-04).

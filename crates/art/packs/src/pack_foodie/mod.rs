@@ -69,5 +69,5 @@ pub fn family() -> Option<Family> {
          packs. The materials map onto the game's finishes so a model costs one draw call per finish group. A sprig \
          grows, the pantry doors swing, the coffee runs, a page turns, the oven door lifts aside for the peel as the \
          fire grows, and the island's drawer pulls out.",
-    ))
+    ).switched())
 }
