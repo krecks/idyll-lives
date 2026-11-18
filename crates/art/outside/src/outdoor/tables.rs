@@ -1,9 +1,7 @@
 //! OU1's tables and the rest: the round mosaic table, the teak table, the patio chair, the outdoor bar and the
 //! parasol, whose canopy stirs in the wind.
 
-use super::common::{
-    F, M, bent, bottle, cup, finish, fr, inset_individual, rod, side_slab, slab, tapered_leg,
-};
+use super::common::{F, M, bent, bottle, cup, finish, fr, rod, side_slab, slab, tapered_leg};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, TAU, V3, cos, cosd, pow, sin, sind};
@@ -66,8 +64,16 @@ fn mosaic(
             mesh.loops[face.start as usize + 1..(face.start + face.len) as usize].reverse();
         }
     }
-    inset_individual(&mut mesh, grout as f32, raised as f32);
-    scene::add(name, mesh)
+    let obj = scene::add(name, mesh);
+    artkit::edit::inset_individual(
+        obj,
+        artkit::edit::InsetIndividual {
+            thickness: grout,
+            depth: raised,
+            use_even_offset: true,
+            ..Default::default()
+        },
+    )
 }
 
 pub fn patio_table_round() -> Vec<Obj> {
