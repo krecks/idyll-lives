@@ -89,7 +89,7 @@ feeder 5,004 → 6,724, settee 3,188 → 7,360; draws unchanged).
   its perch; the kit's songbirds (`kit::songbird!`: a robin at the door, a tit on the tray, a finch and a sparrow in the
   bath); a bath with a rolled rim; jittered flowering shrubs; a soft seed sack with its top rolled, a tin of seed and
   a scoop. The roof: shingle rows and a ridge.
-- `hearthSettee`: a piped soft base and back, puffed back cushions, rolled arms with welts (the living room's, `rooms/src/living`), turned
+- `hearthSettee`: a piped soft base and back, puffed back cushions, rolled arms with welts (the living room's, `crates/art/rooms/src/living`), turned
   legs, buttoned pillows, a lantern with bands, a cap and a ring. The seats: piped cushions with their tops at 0.45, a
   strip quilt of five fabrics draped over the right cushion and down its front, stitched across.
 

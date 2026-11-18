@@ -54,7 +54,7 @@ rider's rocks on the saddle, the merry-go-round's goes round sitting on the plat
   net up the front and a fireman's pole beside it (the content's description).
 - **Ping-pong table** (3 × 2): a green top at the ITTF's 2.74 × 1.525 m, 0.76 m up, with white lines, on two concrete
   legs, a steel net 15.25 cm high reaching 15.25 cm past each side, and a ball; the players stand at its
-  ends (`places` ±1.8 m; it was 1.9 × 0.94 m on 2 × 1, its top 0.78). The bats are in the players' hands (`things/src/held`'s
+  ends (`places` ±1.8 m; it was 1.9 × 0.94 m on 2 × 1, its top 0.78). The bats are in the players' hands (`crates/art/things/src/held`'s
   `tool.bat`; 2026-10-26, review I-community-06: two lay on the top while it was played).
   All plain finishes: one draw call.
 
@@ -103,7 +103,7 @@ the saddle, handles and pegs of the spring rider, the merry-go-round's rail curv
   collar, bent arms with a strut, the board in a moulded steel frame with a pad along its foot, the shooter's square
   one outline, a flanged rim bracket and spring housing, net hooks; the net's strands each one cord (`swish` as before).
 - **Ping-pong table**: a steel band round the top's edge and an apron under it, tapered concrete piers with an arch
-  through them and steel caps, the net as a plate with slots, a band, posts and clamps (the bats are the held things', `things/src/held`).
+  through them and steel caps, the net as a plate with slots, a band, posts and clamps (the bats are the held things', `crates/art/things/src/held`).
 - **Park chess table**: a moulded pedestal, a top with a chamfered edge and a band under it, the board in a border,
   turned stools; knights and bishops join the game (a knight's head swept), a cross-barred king, a taken pawn beside
   the board. The far version builds from the same pedestal, top and stools at 12 sides.

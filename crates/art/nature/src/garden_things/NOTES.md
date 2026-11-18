@@ -4,7 +4,7 @@ Outdoor (OU5): the pond, the small garden things and the garden lights. One pack
 `packs/garden_things/manifest.json`. Built 2026-10-16; they sat in Validate › Garden Things until signed off (back to Outdoor ›
 Decor, the two lights to Outdoor › Lights).
 
-A family of its own rather than more of the outdoor family (`outside/src/outdoor`): OU3 and OU4 went there at the same
+A family of its own rather than more of the outdoor family (`crates/art/outside/src/outdoor`): OU3 and OU4 went there at the same
 time, and this kept the three apart. Each model has its own `body` colour and finish (stones, a wooden box, a cream birdhouse, a
 red kennel, iron), so each build makes its own palette (`common::_own`), as the street furniture's do.
 

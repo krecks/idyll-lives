@@ -124,7 +124,7 @@ metre): from the play camera, above, its top was a ruled strip; the triangles, t
   roses their roses; the rest none. Each one's flower heads are all one material, the colour part, so "Flowers"
   colours every head (they cycled three or four shades of one hue until 2026-10-17, and the colour reached only the
   first; the geraniums' clusters too).
-- **Perches** (2026-10-22): where the game's birds sit (`things/src/birds`), the entry's `perches` in the model's game axes
+- **Perches** (2026-10-22): where the game's birds sit (`crates/art/things/src/birds`), the entry's `perches` in the model's game axes
   (`perches`, artkit's `perch`, as the trees' in trees.md). Lines come in from round and above towards the shrub's
   middle, or along a hedge's top (`hedge_top`), and meet its leaves. The perch is 2 cm in from there, on leaves that
   face up a little at least, with nothing over it within 15 cm, spread at least 20 cm apart. Found before the trimmed
@@ -210,7 +210,7 @@ New helpers (now in `artkit::botany`, which the trees, the street and the garden
   `leaf`. Triangulated by ear clipping: `BEAUTY` filled the notches between leaflets.
 - **`rays`**: a flower's face of separate rounded petals (6 triangles a petal), cupped or curling back, with a raised
   middle: daisies, poppies (4 broad), lilies (curled back, round a throat), azaleas, pansies, a rose (two layers).
-- **`leafy_shrub`**: as the trees' oak (`nature/src/trees/oak.rs`): woody stems (`twig` colour, on `foliage`, so still one draw) rising and
+- **`leafy_shrub`**: as the trees' oak (`crates/art/nature/src/trees/oak.rs`): woody stems (`twig` colour, on `foliage`, so still one draw) rising and
   forking into broken masses of clumps round a dark heart, sprays of leaves breaking the outline, flowers added on
   the masses (`on_masses`); **`florets`**: a bumpy ball of florets (mopheads, pompoms, trusses, plumes, spikes).
 - **`vessel`** (a pot with a rolled lip, a foot, a saucer) and **`soil_top`** (an uneven soil mound in it); **`twig`**,

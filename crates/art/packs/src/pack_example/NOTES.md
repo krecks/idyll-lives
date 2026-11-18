@@ -25,7 +25,7 @@ origin, so on the first round they ride up on the rising water instead of floati
 
 **Draw calls: 4 each** (`check-glb` warns "aim for 3"), on purpose:
 - the stove: its body (all plain finishes) plus the door, the knob and the flame, the plan's "knob and flame ring" —
-  as the gas range and the range cooker (`wet/src/kitchen_cooking`) do;
+  as the gas range and the range cooker (`crates/art/wet/src/kitchen_cooking`) do;
 - the tub: its body (plain, plus the surround's `wood`) plus the water and the bubbles — the plan's extra loop (E1).
   Making the cedar surround plain satin would bring it to 3.
 

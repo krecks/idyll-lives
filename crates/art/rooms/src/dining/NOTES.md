@@ -52,7 +52,7 @@ it costs no draw call. The bar cart's trays, bottles and wine glasses are `glass
   stool draws in 3 groups (base wood; seat wood and fabric).
 - **Bar cart**: the cocktail shaker is a part of its own, its origin at its foot, in the middle of the top tray's
   front edge, before the resident who mixes from the front tile. `shake` squashes it away in 0.2 s for `mix`, for as
-  long as the drink is mixed, while the resident shakes the same shaker in both hands (`things/src/held`'s `tool.shaker`,
+  long as the drink is mixed, while the resident shakes the same shaker in both hands (`crates/art/things/src/held`'s `tool.shaker`,
   `clips/props.ts` `shake`; 2026-10-26, review I-kitchen-13: it lifted 10 cm and tipped 30° on its own).
 - **Storage doors:** the sideboard's four fluted doors, the buffet's five panelled doors and the china cabinet's two
   glazed doors are parts of their own, hinged on their outer edges. All three are `cupboard` stations (content

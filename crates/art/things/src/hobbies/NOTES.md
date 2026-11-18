@@ -56,7 +56,7 @@ Each is built where the game places it (`F`, game axes; `settle` without centrin
   `STROKE`), the racked balls go (`racked_off`, a part squashed away to the rack's middle in 0.15 s) and the fifteen
   come up spread over the cloth as the break leaves them (`spread`, a part grown up out of the slate in 0.3 s, flat
   inside it at rest); both play back when the game ends (2026-10-26, review I-hobbies-05: the balls stayed racked).
-  The cue is in the players' hands, one each (`things/src/held`'s `tool.cue`), not on the cloth (it lay there while they mimed
+  The cue is in the players' hands, one each (`crates/art/things/src/held`'s `tool.cue`), not on the cloth (it lay there while they mimed
   it). The cloth is `matte`, not `fabric`: the two parts of balls take the textured finish's draw call (four at most).
 - **Foosball**: the eight rods of a real table, 15 cm apart, from the left goal blue's goalie and defence, red's attack,
   the two teams' five midfielders, blue's attack, red's defence and goalie; blue's handles to the front, where the
@@ -151,7 +151,7 @@ axes. What each now has:
 - **Chess table**: a turned pedestal on three swept feet, a rounded top; knights carved in profile; the chair
   (`_chair`, shared with the sewing table) has back posts in one piece from the floor, tapered legs, curved rails.
 - **Pool table**: mitred rails rounded over (`kit::moulding!`), cushion noses between the pockets, leather pocket
-  mouths, diamond sights, turned legs, serpentine skirts, a rack with rounded corners (the cue is a held thing's, `things/src/held`).
+  mouths, diamond sights, turned legs, serpentine skirts, a rack with rounded corners (the cue is a held thing's, `crates/art/things/src/held`).
 - **Foosball**: men cut in profile (head, body, legs, feet), turned handles, framed side panels, rod bearings,
   tapered legs on levelling feet, ball-return slots.
 - **Dartboard**: a mitred cabinet moulding, the board's rounded edge (1 mm behind the printed face: level with it, it

@@ -6,7 +6,7 @@ models in `models/yard/`. Built 2026-10-16; they sat in Validate › Yard until 
 rack back to Outdoor › Play, the rest to Outdoor › Yard).
 
 The plan named the outdoor family; these nine are a family of their own so that three tasks (OU3, OU4, OU5)
-building at once didn't all edit one module, palette and pack. Moving them into `outside/src/outdoor` later changes only the
+building at once didn't all edit one module, palette and pack. Moving them into `crates/art/outside/src/outdoor` later changes only the
 files' folder (`models/yard/` to `models/outdoor/`): the keys stay `model.<id>`.
 
 Each is built in place where the game places it (`F`, game axes), with `settle!(centre = false)` and its
