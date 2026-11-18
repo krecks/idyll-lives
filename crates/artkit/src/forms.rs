@@ -651,7 +651,8 @@ pub fn jitter(obj: Obj, amount: f64, o: Jitter) -> Obj {
 pub fn mirrored(obj: Obj, axis: Axis, name: Option<&str>) -> Obj {
     let (mesh, way, bevel) = obj.read(|o| (o.mesh.clone(), o.uv, o.bevel.clone()));
     let name = name.map_or_else(|| format!("{}_mirror", obj.name()), str::to_string);
-    let copy = scene::add(&name, mesh);
+    // (a copy of the part with a copy of its mesh: each under the next free name after its own)
+    let copy = scene::add_as(&name, &obj.data_name(), mesh);
     let mut k = [1.0_f32; 3];
     k[axis.index()] = -1.0;
     let flip = M4::diagonal(V3::new(k[0], k[1], k[2]));

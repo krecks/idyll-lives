@@ -52,8 +52,10 @@ pub fn join(parts: &[Obj], name: &str, origin: Option<P3>) -> Obj {
         // (it keeps its mode, as in Blender: a part joined onto a rod is still turned by a quaternion, by none)
         (o.rot, o.scale) = (V3::ZERO, v3(1, 1, 1));
         o.quat = o.quat.map(|_| Quat::IDENTITY);
-        o.name = name.to_string();
     });
+    // (the part and its mesh take the name; one already in use, by a part or by the mesh of a part that is
+    // gone, gets Blender's number after it)
+    first.set_name(name).set_data_name(name);
     if let Some(origin) = origin {
         set_origin(first, origin);
     }

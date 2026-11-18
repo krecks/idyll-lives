@@ -21,6 +21,9 @@ pub struct Obj(pub(crate) u32);
 #[derive(Clone, Debug)]
 pub struct Object {
     pub name: String,
+    /// Its mesh's own name, which the file's mesh carries: the part's name where its mesh was made under it, a
+    /// primitive's kind (`Cube`, `Cylinder.003`) otherwise, until a join names it.
+    pub data_name: String,
     pub mesh: Mesh,
     pub loc: V3,
     /// Its Euler angles in `order`, radians (not read while it is turned by a quaternion).
@@ -46,9 +49,10 @@ impl Object {
         self.alive && !self.tracks.is_empty()
     }
 
-    pub(crate) fn new(name: &str, mesh: Mesh) -> Object {
+    pub(crate) fn new(name: String, data_name: String, mesh: Mesh) -> Object {
         Object {
-            name: name.to_string(),
+            name,
+            data_name,
             mesh,
             loc: V3::ZERO,
             rot: V3::ZERO,
@@ -119,6 +123,29 @@ pub struct Scene {
     pub finishes: Finishes,
     /// What the build said, a line each, for the runner to print.
     pub log: Vec<String>,
+    /// Every mesh name in use: the parts', and those of parts that are gone (joined into another), whose meshes
+    /// Blender keeps until the scene is emptied.
+    pub(crate) mesh_names: std::collections::BTreeSet<String>,
+}
+
+/// `name`, or the name Blender gives where `taken` says it is in use: its stem (`name` without a `.123` at its
+/// end) with the lowest number free, three digits at least: `water.001`.
+pub(crate) fn unique_name(name: &str, taken: impl Fn(&str) -> bool) -> String {
+    if !taken(name) {
+        return name.to_string();
+    }
+    let stem = match name.rsplit_once('.') {
+        Some((stem, digits))
+            if !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) =>
+        {
+            stem
+        }
+        _ => name,
+    };
+    (1..)
+        .map(|n| format!("{stem}.{n:03}"))
+        .find(|candidate| !taken(candidate))
+        .unwrap()
 }
 
 thread_local! {
@@ -139,6 +166,7 @@ pub fn set_finishes(finishes: Finishes) {
 pub fn reset() {
     with(|s| {
         s.objects.clear();
+        s.mesh_names.clear();
         s.perches.clear();
         s.low = false;
         s.centre = [0.0, 0.0];
@@ -165,10 +193,25 @@ pub fn take_log() -> Vec<String> {
     with(|s| std::mem::take(&mut s.log))
 }
 
-/// A new part of `mesh` in the scene.
+/// A new part of `mesh` in the scene, the mesh made under the part's name (`bpy.data.meshes.new(name)`, then
+/// `bpy.data.objects.new(name, mesh)`). A name in use gets Blender's number: a second part `leg` is `leg.001`.
 pub fn add(name: &str, mesh: Mesh) -> Obj {
+    add_as(name, name, mesh)
+}
+
+/// A new part of `mesh` made by one of Blender's primitive operators: its mesh is named for the primitive's
+/// `kind` (`Cube`, `Sphere`, `Cylinder`, `Cone`, `Torus`, `Icosphere`), the part as the script names it after.
+pub fn add_primitive(kind: &str, name: &str, mesh: Mesh) -> Obj {
+    add_as(name, kind, mesh)
+}
+
+/// A new part named `name` with its mesh named `data_name`, each made one of a kind as Blender does.
+pub(crate) fn add_as(name: &str, data_name: &str, mesh: Mesh) -> Obj {
     with(|s| {
-        s.objects.push(Object::new(name, mesh));
+        let name = unique_name(name, |n| s.objects.iter().any(|o| o.alive && o.name == n));
+        let data_name = unique_name(data_name, |n| s.mesh_names.contains(n));
+        s.mesh_names.insert(data_name.clone());
+        s.objects.push(Object::new(name, data_name, mesh));
         Obj(s.objects.len() as u32 - 1)
     })
 }
@@ -258,9 +301,37 @@ impl Obj {
         self.read(|o| o.scale)
     }
 
-    /// `obj.name = name`.
+    /// `obj.name = name`: under a name another part has, Blender's number after it (`water.001`).
     pub fn set_name(self, name: &str) -> Obj {
-        self.edit(|o| o.name = name.to_string());
+        with(|s| {
+            let taken = |n: &str| {
+                s.objects
+                    .iter()
+                    .enumerate()
+                    .any(|(i, o)| o.alive && i as u32 != self.0 && o.name == n)
+            };
+            let name = unique_name(name, taken);
+            s.get_mut(self).name = name;
+        });
+        self
+    }
+
+    /// `obj.data.name`: the name the file's mesh carries.
+    pub fn data_name(self) -> String {
+        self.read(|o| o.data_name.clone())
+    }
+
+    /// `obj.data.name = name`: one of a kind among the meshes, those of parts joined away too.
+    pub fn set_data_name(self, name: &str) -> Obj {
+        with(|s| {
+            let own = s.get(self).data_name.clone();
+            if own != name {
+                s.mesh_names.remove(&own);
+                let name = unique_name(name, |n| s.mesh_names.contains(n));
+                s.mesh_names.insert(name.clone());
+                s.get_mut(self).data_name = name;
+            }
+        });
         self
     }
 

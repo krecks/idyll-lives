@@ -139,14 +139,15 @@ options! {
 
 /// A box of `size` (x, y, z) or one number for all three.
 pub fn cube(name: impl AsRef<str>, size: impl Into<Size>, o: Cube) -> Obj {
-    let obj = scene::add(name.as_ref(), cube_mesh());
+    let obj = scene::add_primitive("Cube", name.as_ref(), cube_mesh());
     scale_mesh(obj, size.into().0);
     let bevel = (o.bevel, o.bevel_segments, EdgeOrder::Faces);
     finish(obj, o.at, o.rot, o.material, o.smooth, bevel, SHARP)
 }
 
 pub fn sphere(name: impl AsRef<str>, radius: f64, o: Sphere) -> Obj {
-    let obj = scene::add(
+    let obj = scene::add_primitive(
+        "Sphere",
         name.as_ref(),
         uv_sphere_mesh(o.segments, o.rings, radius as f32),
     );
@@ -157,13 +158,19 @@ pub fn sphere(name: impl AsRef<str>, radius: f64, o: Sphere) -> Obj {
 
 /// A cylinder along z, `depth` long.
 pub fn cylinder(name: impl AsRef<str>, radius: f64, depth: f64, o: Round) -> Obj {
-    cone(name, radius, radius, depth, o)
+    round("Cylinder", name.as_ref(), radius, radius, depth, o)
 }
 
 /// A cone or frustum along z, radius `r1` at the bottom and `r2` at the top.
 pub fn cone(name: impl AsRef<str>, r1: f64, r2: f64, depth: f64, o: Round) -> Obj {
-    let obj = scene::add(
-        name.as_ref(),
+    round("Cone", name.as_ref(), r1, r2, depth, o)
+}
+
+/// A cylinder or a cone: the one mesh, named for the operator that made it.
+fn round(kind: &str, name: &str, r1: f64, r2: f64, depth: f64, o: Round) -> Obj {
+    let obj = scene::add_primitive(
+        kind,
+        name,
         cone_mesh(o.verts, r1 as f32, r2 as f32, depth as f32),
     );
     scale_mesh(obj, o.scale);
@@ -258,7 +265,8 @@ pub fn revolve(name: impl AsRef<str>, profile: &[(f64, f64)], o: Revolve) -> Obj
 
 /// A ring lying in the xy plane.
 pub fn torus(name: impl AsRef<str>, major_radius: f64, minor_radius: f64, o: Torus) -> Obj {
-    let obj = scene::add(
+    let obj = scene::add_primitive(
+        "Torus",
         name.as_ref(),
         torus_mesh(
             major_radius as f32,
@@ -286,7 +294,8 @@ macro_rules! torus {
 
 /// A lumpy, deterministic boulder: an icosphere displaced by noise, bottom on z = 0.
 pub fn boulder(name: impl AsRef<str>, radius: f64, o: Boulder) -> Obj {
-    let obj = scene::add(
+    let obj = scene::add_primitive(
+        "Icosphere",
         name.as_ref(),
         ico_sphere_mesh(o.subdivisions, radius as f32),
     );
