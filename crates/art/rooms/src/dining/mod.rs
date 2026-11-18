@@ -1,13 +1,10 @@
-//! The kitchen's dining things. Notes: tools/art/blender/families/dining.md.
+//! The kitchen's dining things. Notes: NOTES.md.
 //!
 //! Each is built in place where the game places it (`F`, game axes): table tops at the content's `surface`
 //! heights (`TT` 0.75), seats where the game seats residents.
 //!
 //! The detail is built from the forms: tops and seat boards lofted with a moulded edge (`slab`), turned legs
 //! (`turned`), arched aprons extruded (`apron`).
-//!
-//! Being ported: every model is built here, but tools/art/blender/families/dining.py still builds the family
-//! (`cargo art dining` runs it in Blender until that script goes; `--out` and `--check` build what is here).
 
 use artkit::family::{Family, Model};
 use artkit::json;
