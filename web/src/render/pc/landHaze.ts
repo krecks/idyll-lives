@@ -23,7 +23,7 @@
  */
 
 import * as pc from './engine';
-import { curtain, VEIL_NEAR, veilAt, veilRect, type VeilRect } from '../shared/landVeil';
+import { curtain, VEIL_EDGE, VEIL_NEAR, veilAt, veilRect, type VeilRect } from '../shared/landVeil';
 import { WATER_Y } from '../shared/nature';
 import { landVeilTold, setLandVeil, skyFog } from './shaders/fog';
 
@@ -117,8 +117,10 @@ export class LandHaze {
     const told = landVeilTold(this.app.graphicsDevice);
     // (As the shaders keep them, in single precision; its ends exactly: clear is none, whole is whole.)
     const k32 = Math.fround(strength);
-    if (told && Math.fround(p.x) === told.cx && Math.fround(p.z) === told.cz && Math.fround(r?.hx ?? 0) === told.hx && Math.fround(r?.hz ?? 0) === told.hz && (k32 === told.strength || (Math.abs(strength - told.strength) < 0.002 && strength > 0 && strength < 1))) return;
-    setLandVeil(this.app.graphicsDevice, p.x, p.z, r?.hx ?? 0, r?.hz ?? 0, r?.fade ?? 1, strength, VEIL_NEAR);
+    // (While the curtain is drawn, the land's last metres before it whole in the veil at any strength: `VEIL_EDGE`.)
+    const edge = this.entity.enabled ? Math.min(VEIL_EDGE, r?.fade ?? 0) : 0;
+    if (told && Math.fround(p.x) === told.cx && Math.fround(p.z) === told.cz && Math.fround(r?.hx ?? 0) === told.hx && Math.fround(r?.hz ?? 0) === told.hz && edge === told.edge && (k32 === told.strength || (Math.abs(strength - told.strength) < 0.002 && strength > 0 && strength < 1))) return;
+    setLandVeil(this.app.graphicsDevice, p.x, p.z, r?.hx ?? 0, r?.hz ?? 0, r?.fade ?? 1, strength, VEIL_NEAR, edge);
   }
 
   destroy(): void {

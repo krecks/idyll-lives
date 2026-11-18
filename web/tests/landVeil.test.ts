@@ -161,7 +161,9 @@ describe("the haze's shaders", () => {
     expect(glsl).toContain('uniform vec4 game_landVeil;');
     expect(glsl).toContain('uniform vec4 game_veilFade;');
     expect(glsl).toContain('smoothstep(0.0, game_veilFade.z, distance(vPositionW, view_position))');
-    expect(glsl).toMatch(/#ifndef VERTEXSHADER\s+gameVeil = game_veilFade\.y \* smoothstep\(0\.0, game_veilFade\.x/);
+    expect(glsl).toMatch(/#ifndef VERTEXSHADER\s+float veilOut = length\(max\(abs\(vPositionW\.xz - game_landVeil\.xy\)/);
+    // (Its strength, but whole over the landscape's last `game_veilFade.w` m while the curtain is drawn; 0 in the game.)
+    expect(glsl).toContain('gameVeil = max(game_veilFade.y, step(1e-6, game_veilFade.w) * smoothstep(game_veilFade.x - max(game_veilFade.w, 1e-3), game_veilFade.x, veilOut)) * smoothstep(0.0, game_veilFade.x, veilOut)');
     // (Without a veil the haze's colour as ever, nothing of the sky read; with it, the sky's dome behind.)
     expect(glsl).toContain('if (gameVeil > 0.0) gameHazed = mix(gameHazed, gameSkyAt(normalize(vPositionW - view_position)) * dBlendModeFogFactor, gameVeil);');
     expect(glsl).toMatch(/#ifndef VERTEXSHADER\s+float gameVeil = 0\.0;\s+uniform vec3 game_skyLow;/);
@@ -175,5 +177,6 @@ describe("the haze's shaders", () => {
     expect(wgsl).toContain('if (gameVeil > 0.0) { gameHazed = mix(gameHazed, gameSkyAt(normalize(vPositionW - uniform.view_position)) * dBlendModeFogFactor, gameVeil); }');
     expect(wgsl).toContain('uniform game_skySun: vec3f;');
     expect(wgsl).not.toContain('texture');
+    expect(wgsl).toContain('gameVeil = max(uniform.game_veilFade.y, step(1e-6, uniform.game_veilFade.w) * smoothstep(uniform.game_veilFade.x - max(uniform.game_veilFade.w, 1e-3), uniform.game_veilFade.x, veilOut))');
   });
 });

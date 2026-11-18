@@ -19,6 +19,14 @@ export const VEIL_FADE = 240;
  */
 export const VEIL_NEAR = 200;
 
+/**
+ * While the curtain closing the landscape's cut edge is drawn (`curtain`), the veil is whole over the landscape's last
+ * this many metres whatever its strength (m; `shaders/fog.ts`): from a camera out over the band at its edge, the veil
+ * at a quarter of its strength there, the curtain stood as a straight wall of the sky's colour across land and water
+ * barely hazed.
+ */
+export const VEIL_EDGE = 60;
+
 /** A box of the world (m). */
 export interface VeilBox {
   x0: number;

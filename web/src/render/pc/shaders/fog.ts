@@ -122,6 +122,16 @@ const FOG_FROM_DECL: Record<Language, string> = {
   wgsl: `#ifdef GAME_LOOK\n\tuniform game_fogFrom: f32;\n\tuniform game_landVeil: vec4f;\n\tuniform game_veilFade: vec4f;\n\t#ifndef VERTEXSHADER\n\tvar<private> gameVeil: f32 = 0.0;${skyCode('wgsl')}\t#endif\n#endif\n`,
 };
 
+/**
+ * The veil's strength at a point `out` m past its clear rectangle (`setLandVeil`): its strength (`game_veilFade.y`), but
+ * whole over the landscape's last `game_veilFade.w` m (`VEIL_EDGE`, 0: not) while the curtain closing its cut edge is
+ * drawn (`landHaze.ts`), so the land meets that curtain in the sky's colour at any strength.
+ */
+function veilStrength(lang: Language, out: string): string {
+  const v = lang === 'glsl' ? 'game_veilFade' : 'uniform.game_veilFade';
+  return `max(${v}.y, step(1e-6, ${v}.w) * smoothstep(${v}.x - max(${v}.w, 1e-3), ${v}.x, ${out}))`;
+}
+
 const FOG_CODE: Record<Language, { depth: string; exp2: string; mix: string }> = {
   glsl: {
     depth: `
@@ -135,7 +145,8 @@ const FOG_CODE: Record<Language, { depth: string; exp2: string; mix: string }> =
 		#ifdef GAME_LOOK
 			fogFactor = pow(fogFactor, 2.2);
 			#ifndef VERTEXSHADER
-				gameVeil = game_veilFade.y * smoothstep(0.0, game_veilFade.x, length(max(abs(vPositionW.xz - game_landVeil.xy) - game_landVeil.zw, vec2(0.0)))) * smoothstep(0.0, game_veilFade.z, distance(vPositionW, view_position));
+				float veilOut = length(max(abs(vPositionW.xz - game_landVeil.xy) - game_landVeil.zw, vec2(0.0)));
+				gameVeil = ${veilStrength('glsl', 'veilOut')} * smoothstep(0.0, game_veilFade.x, veilOut) * smoothstep(0.0, game_veilFade.z, distance(vPositionW, view_position));
 			#endif
 		#endif`,
     mix: `
@@ -159,7 +170,7 @@ const FOG_CODE: Record<Language, { depth: string; exp2: string; mix: string }> =
 			#ifndef VERTEXSHADER
 				let veilOut = length(max(abs(vPositionW.xz - uniform.game_landVeil.xy) - uniform.game_landVeil.zw, vec2f(0.0)));
 				let veilNear = smoothstep(0.0, uniform.game_veilFade.z, distance(vPositionW, uniform.view_position));
-				gameVeil = uniform.game_veilFade.y * smoothstep(0.0, uniform.game_veilFade.x, veilOut) * veilNear;
+				gameVeil = ${veilStrength('wgsl', 'veilOut')} * smoothstep(0.0, uniform.game_veilFade.x, veilOut) * veilNear;
 			#endif
 			return pow(evaluateFogFactorExp2(depth, uniform.fog_density), 2.2);
 		#else
@@ -240,9 +251,11 @@ export function fogFrom(device: pc.GraphicsDevice): number {
 /**
  * The menus' land's veil for `device`'s game materials (`shared/landVeil.ts`): clear within `hx` × `hz` m either side
  * of (`cx`, `cz`) (engine space: x and z as the shaders' world positions have them), whole `fade` m past that, at
- * `strength` (0: none, the game's), and whole from `near` m from the eye. Allocation-free after a device's first.
+ * `strength` (0: none, the game's), and whole from `near` m from the eye; whole whatever its strength over the last
+ * `edge` m before it is whole (0: not; the curtain closing the landscape's cut edge drawn, `landHaze.ts`).
+ * Allocation-free after a device's first.
  */
-export function setLandVeil(device: pc.GraphicsDevice, cx: number, cz: number, hx: number, hz: number, fade: number, strength: number, near: number): void {
+export function setLandVeil(device: pc.GraphicsDevice, cx: number, cz: number, hx: number, hz: number, fade: number, strength: number, near: number, edge = 0): void {
   const rect = veilRects.get(device) ?? new Float32Array(4);
   const at = veilFades.get(device) ?? new Float32Array(4);
   veilRects.set(device, rect);
@@ -254,6 +267,7 @@ export function setLandVeil(device: pc.GraphicsDevice, cx: number, cz: number, h
   at[0] = Math.max(1, fade);
   at[1] = Math.min(1, Math.max(0, strength));
   at[2] = Math.max(1, near);
+  at[3] = Math.max(0, edge);
   device.scope.resolve('game_landVeil').setValue(rect);
   device.scope.resolve('game_veilFade').setValue(at);
 }
@@ -262,16 +276,16 @@ export function setLandVeil(device: pc.GraphicsDevice, cx: number, cz: number, h
  * Where the land's veil stands as last told to `device` (`setLandVeil`, engine space: its middle and half its clear
  * rectangle's sides) and how strong it is; null before it was. Allocation-free.
  */
-export function landVeilTold(device: pc.GraphicsDevice): { cx: number; cz: number; hx: number; hz: number; strength: number } | null {
+export function landVeilTold(device: pc.GraphicsDevice): { cx: number; cz: number; hx: number; hz: number; strength: number; edge: number } | null {
   const rect = veilRects.get(device);
   const at = veilFades.get(device);
   if (!rect || !at) return null;
-  const told = veilTold.get(device) ?? { cx: 0, cz: 0, hx: 0, hz: 0, strength: 0 };
+  const told = veilTold.get(device) ?? { cx: 0, cz: 0, hx: 0, hz: 0, strength: 0, edge: 0 };
   veilTold.set(device, told);
-  [told.cx, told.cz, told.hx, told.hz, told.strength] = [rect[0], rect[1], rect[2], rect[3], at[1]];
+  [told.cx, told.cz, told.hx, told.hz, told.strength, told.edge] = [rect[0], rect[1], rect[2], rect[3], at[1], at[3]];
   return told;
 }
-const veilTold = new WeakMap<pc.GraphicsDevice, { cx: number; cz: number; hx: number; hz: number; strength: number }>();
+const veilTold = new WeakMap<pc.GraphicsDevice, { cx: number; cz: number; hx: number; hz: number; strength: number; edge: number }>();
 
 /** The arrays the veil's uniforms are set from, a pair a device (`setLandVeil`). */
 const veilRects = new WeakMap<pc.GraphicsDevice, Float32Array>();
@@ -296,10 +310,10 @@ function veilSinkCode(lang: Language): ShaderFeature['glsl'] {
     vsLocal: `
 #if defined(GAME_VEIL_SINK) && defined(INSTANCING) && !defined(SHADOW_PASS)
 	// (Nothing to work out without a veil, as the game nearly always is.)
-	if (${u('game_veilFade')}.y > 0.0) {
+	if (${u('game_veilFade')}.y > 0.0 || ${u('game_veilFade')}.w > 0.0) {
 		${glsl ? 'vec3' : 'let'} sinkAt = (${u('matrix_model')} * ${v4}(instance_line4.xyz, 1.0)).xyz;
 		${decl} sinkOut = length(max(abs(sinkAt.xz - ${u('game_landVeil')}.xy) - ${u('game_landVeil')}.zw, ${v2}(0.0)));
-		${decl} sinkLeft = 1.0 - ${u('game_veilFade')}.y * smoothstep(0.0, ${u('game_veilFade')}.x, sinkOut) * smoothstep(0.0, ${u('game_veilFade')}.z, distance(sinkAt, ${u('view_position')}));
+		${decl} sinkLeft = 1.0 - ${veilStrength(lang, 'sinkOut')} * smoothstep(0.0, ${u('game_veilFade')}.x, sinkOut) * smoothstep(0.0, ${u('game_veilFade')}.z, distance(sinkAt, ${u('view_position')}));
 		localPos = localPos * (sinkLeft * sinkLeft);
 	}
 #endif`,
