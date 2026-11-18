@@ -550,3 +550,35 @@ fn a_bevel_of_a_width_below_zero_is_none() {
         );
     }
 }
+
+#[test]
+fn a_bevelled_boxs_faces_come_in_blenders_order() {
+    // Blender makes a corner's faces vertex by vertex, then a strip an edge, then the box's own faces again in the
+    // order its vertices first come to them, each vertex's faces as its edges are numbered. The baked shading's
+    // rays meet the faces in this order, so it is Blender's: every face of the boxes of tests/golden/bevel.txt,
+    // corner for corner.
+    let mut seen = 0;
+    for r in records("bevel.txt") {
+        if r.kv["kind"] != "cube" || r.kv["changed"] != "0" {
+            continue;
+        }
+        scene::reset();
+        let s: Vec<f64> = r.kv["size"].split(',').map(f64w).collect();
+        let part = cube(
+            "box",
+            (s[0], s[1], s[2]),
+            Cube {
+                bevel: r.f64("width"),
+                bevel_segments: r.kv["seg"].parse().unwrap(),
+                ..Cube::default()
+            },
+        );
+        let mesh = artkit::bevel::apply(part).read(|o| o.mesh.clone());
+        let got: Vec<Vec<u32>> = (0..mesh.faces.len())
+            .map(|f| mesh.corners(f).to_vec())
+            .collect();
+        assert_eq!(got, r.faces("of"), "{}", r.name);
+        seen += 1;
+    }
+    assert!(seen >= 5, "{seen} boxes");
+}
