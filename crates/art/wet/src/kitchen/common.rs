@@ -21,7 +21,6 @@ pub fn py_max(a: f64, b: f64) -> f64 {
     if b > a { b } else { a }
 }
 
-// KIT: kit.tube
 #[allow(clippy::too_many_arguments)] // (as the kit has it)
 /// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of points; 1
 /// keeps them sharp), its ends capped. `verts` round: by default 8, and more for one over 13 mm in radius, as many
@@ -36,14 +35,19 @@ pub fn tube<P: artkit::place::Spot>(
     round: usize,
     scale: f64,
 ) -> Obj {
-    let o = artkit::forms::Sweep {
-        verts,
-        resolution: round,
-        scale: artkit::forms::Scale::One(scale),
-        least: 8,
-        ..artkit::forms::Sweep::default()
-    };
-    frame.sweep(name, points, r, material, o)
+    // (the kit's tube, called as the script called it)
+    artkit::kit::tube(
+        frame,
+        name,
+        points,
+        r,
+        material,
+        artkit::kit::Tube {
+            verts,
+            round,
+            scale: artkit::forms::Scale::One(scale),
+        },
+    )
 }
 
 // --- parts the K1 fridges and the sinks share (each in the model's own GameFrame) ---------------------------
@@ -349,9 +353,7 @@ pub fn jar(
 pub fn soft(obj: Obj) -> Obj {
     artkit::bevel::apply(obj);
     obj.edit(|o| {
-        let kept = o.mesh.sharp.clone();
-        o.mesh.shade_smooth(40.0);
-        o.mesh.sharp.extend(kept);
+        o.mesh.shade_smooth_by_angle(40.0);
         let normals = weighted_normals(&o.mesh);
         o.mesh.normals = Some(normals);
     });

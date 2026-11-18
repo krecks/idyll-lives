@@ -233,7 +233,7 @@ function cupboardPose(fit: CupboardFit): (p: number) => PoseSpec {
 // --- the longcase clock ---------------------------------------------------------------------------
 
 /**
- * The grandfather clock (`decor.py`): the dial 1.77 m up, its face 0.044 m behind the middle; the winding
+ * The grandfather clock (crates/art/rooms/src/decor): the dial 1.77 m up, its face 0.044 m behind the middle; the winding
  * holes either side under its middle (`HOLES`), the hood's left side (`HOOD`, where the other hand steadies
  * it), and the trunk door's window from 0.6 to 1.4 m, 0.08 m behind the middle (a child's hands in at the
  * weights' chains, `CHAINS`).

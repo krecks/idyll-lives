@@ -1,0 +1,81 @@
+# Slob pack — notes
+
+`crates/art/packs/src/pack_slob` builds the six P16 slob models into `web/public/assets/models/pack_slob/` and their entries in
+`packs/pack_slob/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
+Validate › Slob until checked in play.
+
+Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+backs on the wall's face where they stand against one. Seats keep the old part's: the beanbag's dimple and the
+nightstand's padded top at about 0.45, the recliner's seat top at 0.45 in the middle.
+
+| Model | Moving part and clip | Played by |
+|---|---|---|
+| `microwaveCart` | the microwave's door, window and handle, hinged on its outer edge: `door_open` swings it 100° open (0.6 s), `hold` 1.5 s (open and shut) | `nuke`, `invent` |
+| `beanbag` | the whole bag (body, back, dimple, seam), origin on the floor: `squash` settles it to 86 % high, 4 % wider (0.5 s) | `flop`, `snooze` |
+| `snackNightstand` | the top side drawer full of chip bags and a cookie: `drawer_open` slides it 16 cm out to the right (0.6 s) | `midnightSnack` |
+| `spritzStation` | the trigger spray bottle, hinged on its foot: `spritz` tips it 35° to the front (0.4 s). The round mirror hangs on a purple back board rising from the top and the green towel on a chrome bar under the top's front, so neither hangs on the air free of a wall (2026-10-21, M-packs-02; Q-06). | `spritz` |
+| `arcadeCabinet` | the joystick, its origin in the deck: `joystick` waggles it 18° each way, side to side, in 0.6 s (a loop). The marquee glows at night (`glow`) and the screen while it is played (`screen`; 2026-10-21, M-packs-07). | `chaseHighScore`, `quickRound` (`loops`) |
+| `gamingRecliner` | the tall back with its stripe and headrest, hinged at the seat's back: `recline` lays it back 20° (1 s); the cup holder with a soda on the right armrest: `cup_out` swings it 110° out (0.6 s) | `marathon`; `armrestSoda` |
+
+The arcade's joystick is the loop the table asks for (E1). The recliner's back reclines and the sitter rides
+it (`ride: recline`), tipping back with it.
+
+**Draw calls: 2–3 each.** Nothing here needs more:
+- the cart, the beanbag and the arcade cabinet are all plain (2: the body and the moving part); the beanbag's
+  vinyl is satin ("wipe-clean");
+- the nightstand's padded top and the spritz station's towels and laundry are `fabric` (3);
+- the recliner is leatherette satin, its two moving parts the 2nd and 3rd draw; the mini-fridge's door is plain
+  gloss, no glass;
+- the spritz station's round mirror is chrome, as the old part's (no mirror glass: it is not the point here).
+
+| Model | Size (w × h × d) | Triangles | Draws | Colour parts |
+|---|---|---|---|---|
+| `model.slob.microwaveCart` | 0.74 × 1.10 × 0.78 m | 5,136 (was 2,944) | 5,136 | Body |
+| `model.slob.beanbag` | 0.88 × 0.66 × 0.87 m | 1,478 (was 2,116) | 1,478 | Body |
+| `model.slob.snackNightstand` | 0.89 × 0.45 × 0.73 m | 3,672 (was 1,652) | 3,672 | Body, Top |
+| `model.slob.spritzStation` | 0.68 × 1.62 × 0.80 m | 3,988 (was 2,000) | 3,988 | Body |
+| `model.slob.arcadeCabinet` | 0.77 × 1.88 × 0.78 m | 2,636 (was 1,676) | 2,636 | Body, Sides |
+| `model.slob.gamingRecliner` | 1.77 × 1.10 × 0.87 m | 6,844 (was 2,764) | 6,748 | Body, Stripes |
+
+Body is the cart's red frame, the bag, the nightstand, the spritz station's purple shelves, the arcade cabinet and
+the recliner's leatherette. The nightstand's top, the cabinet's side panels and the recliner's stripes are extra
+colour parts where they fit.
+
+`check-glb`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Clips bench: every
+clip at rest and open on WebGPU and WebGL (the joystick mid-waggle). In play (`wants-asking`, WebGPU, in the yard):
+the beanbag (flop, seated), the recliner (marathon, seated), the nightstand (midnightSnack, seated on it, the
+drawer out), the cart (nuke) and the arcade (chaseHighScore) used by a resident; the arcade cabinet at all four
+facings, the cart, nightstand and spritz station turned; the recliner, beanbag, cart and nightstand bought
+coloured; the same at night (`office-night`, WebGL).
+
+## Detail pass (2026-10-22)
+
+Same keys, sizes, parts, clips and paint; draws the same or fewer.
+- **Microwave cart:** lofted trays with a raised lip, round posts on castors (plate, fork, tyred wheel), the handle bent
+  in one piece with a grip; the microwave's cavity cut into its case (`G.cut`) with a turntable and a bowl of noodles, its
+  door a `G.kit.shaker` round the window with a swept handle, soft keys, a turned dial; stuffed dinners and pizza box, a
+  cool box with a handle; cans turned with ring pulls.
+- **Beanbag:** one lofted, wrinkled body (`G.jitter`) rising into a back, with a hollow where the sitter sinks: the
+  content's seat is 0.30 m, 5 cm forward, and the old bag was 0.41 there (the gate warned 11 cm); 0.31 now. The dimple's
+  own part (`bag_light`) is gone: 2 draws (3 before), fewer triangles. Piped seam and a carry loop; a lofted controller,
+  a puffed chip bag.
+- **Snack nightstand:** a rounded cabinet, the pad piped and buttoned, a `G.kit.shaker` front panel, swept pulls, feet;
+  chip bags puffed and crimped in the drawer, a cookie, a candy bar; a turned alarm clock with its bells lying over, a
+  sock, a magazine.
+- **Spritz station:** rounded shelves, the mirror's frame turned, spray cans necked with caps, lofted bottles, the hung
+  towel draped over its bar, soft heaps of laundry with a sleeve trailing; the trigger bottle lofted with a swept trigger.
+- **Arcade cabinet:** the sides extruded from the classic profile (kick, jutting deck, sloping screen, marquee hood), the
+  side art following it, the screen puffed under its bezel, turned buttons, coin slots, a turned boot under the stick.
+- **Gaming recliner:** base, arms and back stuffed and piped, the seat stitched in channels, a lofted mini fridge with a
+  handle, a console with vents, a headset on a swept band with turned ear cups, a lofted controller.
+
+## Rebuild
+
+```
+cargo art pack_slob            # the six .glb, the pack, check-glb
+cargo art pack_slob --preview  # previews/pack_slob/<id>.png, <id>@<clip>.png
+```
+
+## The soft forms pass (2026-11-13)
+
+The spritz station's laundry heaps are left unpinched (heaps, not cushions). Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 5 models changed shape: `arcadeCabinet`, `beanbag`, `gamingRecliner`, `snackNightstand`, `spritzStation`; 18,618 to 18,522 triangles.

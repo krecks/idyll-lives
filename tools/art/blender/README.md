@@ -178,7 +178,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      has no cord. A third fewer triangles: give it to every cushion, mattress and cover that lies on something.
    Its steps (`flat`, `round_segments`) are chosen to keep its rounded edges within 1.5 mm of their curve and its
    crowned faces within 2 mm; give them only to save triangles on something small. A seat cushion a clip sinks (`G.squash`) is its own part, as before
-   (`families/living.py` `_cushion`, `_seat`; `bedroom.py` `_pillow`, `_duvet`).
+   (`families/living.py` `_cushion`, `_seat`; crates/art/rooms/src/bedroom `pillow`, `duvet`).
 
    Round things take as many sides as keep their outline within a millimetre of the circle when the family gives
    no count (`G.sides(radius)`: a polygon's sides stand `r × (1 − cos(π / n))` in): a lathe (`G.revolve`) 24 up to
@@ -339,7 +339,7 @@ How the parts work:
   - `{'night': 'close'}`: a clip held open from dusk to dawn (curtains drawn).
   - `{'clock': {'hour': 'hour_hand', 'minute': 'minute_hand', 'at': 610}}`: a clock's hands, each a
     whole turn (`G.spin`), held where the game's time has them, on every preset; `at` is what they show
-    at rest, in minutes past twelve (`families/decor.py` `_clock_hands`).
+    at rest, in minutes past twelve (crates/art/rooms/src/decor `clock_hands`).
   - `{'growth': 'grow'}`: a crop's clip, held where its growth stage is (content `grows`). Make it with
     `G.stages(part, 'grow', picked=…, growing=…, planted=…)`, a scale per stage (ripe is the rest
     pose): the fruit `0.001, 0.001, 0.001`, the plants `1, 0.6, 0.25`. Plants spread over a bed in one
@@ -455,7 +455,7 @@ never one that's already running) and drive Playwright headless with full Chrome
 - **Lopsided turning parts.** `G.settle()` centres the model's box, which moves a part that goes round
   off the middle when it reaches farther one way (five fan blades: 3.3 cm), and it then sweeps past its
   tile. Build it with its axis on the middle, `G.settle(centre=False)`, and give the `Model` the box's
-  middle as its `centre` (`families/lighting.py` `ceilingFan`). The gate fails a part a loop or ambient
+  middle as its `centre` (crates/art/rooms/src/lighting `ceiling_fan`). The gate fails a part a loop or ambient
   clip spins (G.spin) whose circle reaches over 1 cm past the footprint, indoors.
 - **Clicking.** An object is clicked by its drawn outline at rest, never past its tiles. An object held open
   is clicked by its whole tiles. The contact shadow is the model's own shape at rest, seen from above: darkest

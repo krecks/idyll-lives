@@ -421,7 +421,9 @@ fn box_cut(mesh: &mut Mesh, inner: &Mesh, pts: &[V3]) {
         ((bl, tl), [side(true, true), side(true, false)]),
         ((tr, br), [side(false, false), side(false, true)]),
     ];
-    let split = |c: &[u32]| -> Option<Vec<u32>> {
+    // a face split by an edge's two crossings: its corners, and for each the old corner it carries what is stored
+    // at from (a crossing takes the stored angles of the end of the edge it lies next to)
+    let split = |c: &[u32]| -> Option<(Vec<u32>, Vec<usize>)> {
         for &((p, q), on) in &edges {
             for (i, &v) in c.iter().enumerate() {
                 let w = c[(i + 1) % c.len()];
@@ -432,11 +434,15 @@ fn box_cut(mesh: &mut Mesh, inner: &Mesh, pts: &[V3]) {
                 } else {
                     continue;
                 };
+                let n = c.len();
                 // (the face starts at the second of the two)
                 let mut out = vec![second, w];
-                out.extend((2..c.len()).map(|k| c[(i + k) % c.len()]));
+                let mut from = vec![(i + 1) % n, (i + 1) % n];
+                out.extend((2..n).map(|k| c[(i + k) % n]));
+                from.extend((2..n).map(|k| (i + k) % n));
                 out.extend([v, first]);
-                return Some(out);
+                from.extend([i, i]);
+                return Some((out, from));
             }
         }
         None
@@ -468,13 +474,38 @@ fn box_cut(mesh: &mut Mesh, inner: &Mesh, pts: &[V3]) {
         mats: old.mats.clone(),
         ..Mesh::default()
     };
+    // Blender's boolean carries each kept corner's stored normal over as it was, corner for corner; the front's
+    // two pieces store none of their own (zeros: the shading's own normal)
+    let carried = old.normals.is_some() || old.stored.is_some();
+    let mut normals: Vec<V3> = Vec::new();
+    let mut stored: Vec<Option<[i16; 2]>> = Vec::new();
+    let carry = |normals: &mut Vec<V3>,
+                 stored: &mut Vec<Option<[i16; 2]>>,
+                 m: &Mesh,
+                 f: usize,
+                 from: &[usize]| {
+        let start = m.faces[f].start as usize;
+        for &k in from {
+            normals.push(m.normals.as_ref().map_or(V3::ZERO, |n| n[start + k]));
+            stored.push(m.stored.as_ref().and_then(|s| s[start + k]));
+        }
+    };
     for (f, face) in old.faces.iter().enumerate() {
         let c: Vec<u32> = old.corners(f).iter().map(|&v| remap[v as usize]).collect();
         if f == front {
-            new.push_face(&top, face.mat, face.smooth);
-            new.push_face(&bottom, face.mat, face.smooth);
+            let n = old.face_normal(f);
+            for piece in [&top, &bottom] {
+                new.push_face(piece, face.mat, face.smooth);
+                normals.extend(std::iter::repeat_n(n, piece.len()));
+                stored.extend(std::iter::repeat_n(Some([0, 0]), piece.len()));
+            }
         } else {
-            new.push_face(&split(&c).unwrap_or(c), face.mat, face.smooth);
+            let (c, from) = split(&c).unwrap_or_else(|| {
+                let n = c.len();
+                (c, (0..n).collect())
+            });
+            carry(&mut normals, &mut stored, &old, f, &from);
+            new.push_face(&c, face.mat, face.smooth);
         }
     }
     // the cutter's faces behind the front, turned inward, in its order and its material
@@ -499,7 +530,13 @@ fn box_cut(mesh: &mut Mesh, inner: &Mesh, pts: &[V3]) {
                 v
             })
             .collect();
+        let from: Vec<usize> = (0..n).map(|k| (start + n - k) % n).collect();
+        carry(&mut normals, &mut stored, inner, f, &from);
         new.push_face(&turned, slot, face.smooth);
+    }
+    if carried {
+        new.normals = Some(normals);
+        new.stored = Some(stored);
     }
     *mesh = new;
 }
