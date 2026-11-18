@@ -1,13 +1,13 @@
-# Tabletop — notes
+# Tabletop: notes
 
-`tabletop.py` builds the 39 tabletop things into `web/public/assets/models/tabletop/`
+`crates/art/things/src/tabletop` (`cargo art tabletop`) builds the 40 tabletop things into `web/public/assets/models/tabletop/`
 and their entries in `packs/tabletop/manifest.json`. Built 2026-10-14; they sat in Validate (Kitchenware, Tableware, Books And Pots, Small Ornaments, Desk And
 Bath Bits) until checked in play, then went back to `tabletop` and their old group (`kitchenware`, `tableware`, `books`,
 `plants`, `ornaments`, `bath`, `desk`, `toys`).
 
 ## What they keep
 
-- **Origin at the base, centred** (the `surface` layer: the renderer lifts them to their host's top). `G.settle` puts
+- **Origin at the base, centred** (the `surface` layer: the renderer lifts them to their host's top). `settle` puts
   them there.
 - **Size** no wider than the content's `radius` (the disc a thing takes on a top; the gate warns of one reaching
   over 10 % past it). The four widest (`plateSet`, `teapotSet`, `espressoMachineSmall`, `monitor`, radius 0.23–0.3 m) don't fit
@@ -27,7 +27,7 @@ Bath Bits) until checked in play, then went back to `tabletop` and their old gro
 Rebuilt with the forms and the kit (README "The toolkit"): turned things are lofted rings (`turned`: a profile of
 (r, z) rows, few sides, rims kept sharp and few-sided bodies shaded round), handles, spouts and stems swept
 (`G.kit.fillet` round their bends), slabs extruded with their holes (`slab`), flat faces a single polygon (`disc`: a
-drink's surface), the plants' leaves and flowers plants.py's. Sixteen were over half the target before (up to
+drink's surface), the plants' leaves and flowers the botany's. Sixteen were over half the target before (up to
 1,496); every one is under it now, with more on it. Sizes, centres, parts, clips and draws as before.
 
 | Model | Size (w × h × d) | Triangles (before) | Draws | What it has |
@@ -136,4 +136,4 @@ nothing while the kettle's lid flipped up. Each now has one moving part (two dra
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `monitor`; the same triangles.
+No change to the models' code: their soft boxes take the shared form's new shape (rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `monitor`; the same triangles.
