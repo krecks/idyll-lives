@@ -507,6 +507,20 @@ pub fn extrude(name: impl AsRef<str>, outline: &[(f64, f64)], depth: f64, o: Ext
     let mut mesh = Mesh::from_pydata(verts, &faces);
     mesh.set_material(o.material);
     mesh.recalc_normals();
+    // (Blender's extrusion makes each wall from the end of its side where the face's triangle along it starts,
+    // looking inwards as the outline was drawn; drawn facing the front, it looks out as it is and stays, and
+    // lying flat or facing the side it is turned round. So of the walls made here from the outline's own
+    // direction, one that looks out facing the front starts a corner on, and one turned round lying flat or
+    // facing the side a corner back; the others start where Blender's do)
+    for (f, made) in faces.iter().enumerate().skip(sides_from) {
+        let face = mesh.faces[f];
+        let corners = &mut mesh.loops[face.start as usize..(face.start + face.len) as usize];
+        match (o.plane == Plane::XZ, corners == made.as_slice()) {
+            (true, true) => corners.rotate_left(1),
+            (false, false) => corners.rotate_right(1),
+            _ => {}
+        }
+    }
     let obj = scene::add(name, mesh);
     shade(obj, o.smooth, o.angle);
     if o.bevel != 0.0 {

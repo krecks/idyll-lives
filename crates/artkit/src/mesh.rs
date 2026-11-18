@@ -197,7 +197,11 @@ impl Mesh {
             return;
         }
         let cos = libm::cos(angle as f64) as f32;
-        let normals = self.face_normals();
+        // (the faces' normals as Blender's mesh keeps them: Newell's sum for every face, a triangle's and a
+        // quad's too, which a twisted quad's diagonals don't give)
+        let normals: Vec<V3> = (0..self.faces.len())
+            .map(|f| normal_newell(&self.points(f)))
+            .collect();
         // each edge's first face, then whether a second or third came
         let mut first: BTreeMap<(u32, u32), (usize, u32, bool)> = BTreeMap::new();
         for f in 0..self.faces.len() {
@@ -484,17 +488,14 @@ impl Mesh {
     }
 }
 
-/// A polygon's normal as Blender works it out.
+/// A polygon's normal as Blender works it out (straight up for one of no area, a triangle or a quad too).
 pub fn normal_of(p: &[V3]) -> V3 {
-    match p.len() {
+    let n = match p.len() {
         3 => normal_tri(p[0], p[1], p[2]),
         4 => normalize_v3((p[0] - p[2]).cross(p[1] - p[3])).0,
-        _ => {
-            let n = newell(p);
-            let (unit, len) = normalize_v3(n);
-            if len == 0.0 { V3::Z } else { unit }
-        }
-    }
+        _ => normalize_v3(newell(p)).0,
+    };
+    if n == V3::ZERO { V3::Z } else { n }
 }
 
 /// A triangle's normal.
