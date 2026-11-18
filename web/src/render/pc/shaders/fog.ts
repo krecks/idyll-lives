@@ -118,6 +118,21 @@ export function setLandVeil(device: pc.GraphicsDevice, cx: number, cz: number, h
   device.scope.resolve('game_veilFade').setValue(at);
 }
 
+/**
+ * Where the land's veil stands as last told to `device` (`setLandVeil`, engine space: its middle and half its clear
+ * rectangle's sides) and how strong it is; null before it was. Allocation-free.
+ */
+export function landVeilTold(device: pc.GraphicsDevice): { cx: number; cz: number; hx: number; hz: number; strength: number } | null {
+  const rect = veilRects.get(device);
+  const at = veilFades.get(device);
+  if (!rect || !at) return null;
+  const told = veilTold.get(device) ?? { cx: 0, cz: 0, hx: 0, hz: 0, strength: 0 };
+  veilTold.set(device, told);
+  [told.cx, told.cz, told.hx, told.hz, told.strength] = [rect[0], rect[1], rect[2], rect[3], at[1]];
+  return told;
+}
+const veilTold = new WeakMap<pc.GraphicsDevice, { cx: number; cz: number; hx: number; hz: number; strength: number }>();
+
 /** The arrays the veil's uniforms are set from, a pair a device (`setLandVeil`). */
 const veilRects = new WeakMap<pc.GraphicsDevice, Float32Array>();
 const veilFades = new WeakMap<pc.GraphicsDevice, Float32Array>();
