@@ -212,7 +212,7 @@ sways with its sleeper, the sun rises and the booth's curtain is drawn.
 
 The couch potato pack models (`models/pack_couchPotato/cinemaWall.glb`, `gameConsole.glb`, `recliner.glb`,
 `snackFridge.glb`, `fitnessGame.glb`, `lavaLamp.glb`, override pack `packs/pack_couchPotato/manifest.json`) are built
-in Blender by `tools/art/blender/families/pack_couchPotato.py` on `gamekit` and exported as `.glb` (glTF, original,
+by `crates/art/packs/src/pack_couch_potato` on `artkit` and exported as `.glb` (glTF, original,
 CC0). The cinema's curtains are drawn apart, the console's disc tray slides out, the recliner reclines, the fridge
 door swings, the balance board tilts and the lava lamp's wax rises while it is used, and drifts round all the time.
 
