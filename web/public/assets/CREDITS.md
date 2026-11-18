@@ -199,7 +199,7 @@ nightstand-sized bedside stack; the lava lamp turned to its watcher; and glowing
 
 The neat pack models (`models/pack_neat/steamMopDock.glb`, `laundryCenter.glb`, `rainShowerTower.glb`,
 `organizerDesk.glb`, `robotVacuumDock.glb`, `entryConsole.glb`, override pack `packs/pack_neat/manifest.json`) are
-built in Blender by `tools/art/blender/families/pack_neat.py` on `gamekit` and exported as `.glb` (glTF, original,
+built by `crates/art/packs/src/pack_neat` on `artkit` and exported as `.glb` (glTF, original,
 CC0). Each moves one part while it is used: the mop leaves its dock, the washer's door opens, the rain falls, a bin
 slides out of the desk's hutch, the robot rolls out and back, and the key tray drawer opens.
 
